@@ -6,11 +6,7 @@ import type { SessionUser } from "@/types/auth";
 const COOKIE_NAME = "carom_session";
 
 function getSessionSecret(): string {
-  const secret = process.env.SESSION_SECRET;
-  if (process.env.NODE_ENV === "production" && !secret) {
-    throw new Error("SESSION_SECRET is required in production. Set it in your environment.");
-  }
-  return secret || "default-secret-change-in-production";
+  return process.env.SESSION_SECRET || (process.env.NODE_ENV === "production" ? "" : "default-secret-change-in-production");
 }
 
 const SECRET = new TextEncoder().encode(getSessionSecret());
@@ -31,6 +27,9 @@ export async function createSession(
   user: SessionUser,
   expiresInDays: number = 7
 ): Promise<string> {
+  if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+    throw new Error("SESSION_SECRET is required in production. Set it in your environment.");
+  }
   return new SignJWT({ ...user })
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime(`${expiresInDays}d`)
