@@ -6,7 +6,6 @@ import CardBox from "@/components/admin/_components/CardBox";
 import Button from "@/components/admin/_components/Button";
 import FormField from "@/components/admin/_components/FormField";
 import NotificationBar from "@/components/admin/_components/NotificationBar";
-import { AdminPageActions } from "@/components/admin/AdminPageActions";
 
 export default function AdminLoginPage() {
   const [error, setError] = useState("");
@@ -37,9 +36,6 @@ export default function AdminLoginPage() {
 
   return (
     <main className="relative z-10 flex min-h-screen flex-col bg-gray-50 p-4 dark:bg-slate-800">
-      <div className="px-2 pt-4">
-        <AdminPageActions />
-      </div>
       <div className="flex flex-1 items-center justify-center">
       <div className="w-full max-w-sm">
         <CardBox className="relative z-10">

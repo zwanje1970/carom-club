@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { createSession, verifyPassword } from "@/lib/auth";
 
-const DB_ERROR_CODES = ["P1001", "P1002", "P1017", "P1033"]; // 연결 불가/끊김 등
+const DB_ERROR_CODES = ["P1001", "P1002", "P1017", "P1033", "P2024"]; // 연결 불가/끊김/풀 타임아웃
 
 function isDbConnectionError(e: unknown): boolean {
   const err = e as { code?: string; message?: string };
@@ -13,6 +13,23 @@ function isDbConnectionError(e: unknown): boolean {
 }
 
 const DB_UNAVAILABLE_MSG = "데이터베이스가 연결되지 않았습니다. .env에 DATABASE_URL을 설정해 주세요.";
+
+/** 연결 오류 시 재시도 (Neon 콜드스타트 등). 최대 3회, 간격 500ms → 1s */
+async function withDbRetry<T>(fn: () => Promise<T>): Promise<T> {
+  const delays = [0, 500, 1000];
+  let lastError: unknown;
+  for (let i = 0; i < delays.length; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, delays[i]));
+    try {
+      return await fn();
+    } catch (e) {
+      lastError = e;
+      if (!isDbConnectionError(e) || i === delays.length - 1) throw e;
+      console.warn("[login] DB connection retry", i + 1, "/", delays.length);
+    }
+  }
+  throw lastError;
+}
 
 export async function POST(request: Request) {
   if (!isDatabaseConfigured()) {
@@ -39,9 +56,11 @@ export async function POST(request: Request) {
 
     let user;
     try {
-      user = await prisma.user.findUnique({
-        where: { username: username.trim() },
-      });
+      user = await withDbRetry(() =>
+        prisma.user.findUnique({
+          where: { username: username.trim() },
+        })
+      );
     } catch (dbError) {
       console.error("[login] DB error:", dbError);
       if (isDbConnectionError(dbError)) {
