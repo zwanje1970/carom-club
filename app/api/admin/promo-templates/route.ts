@@ -114,7 +114,7 @@ export async function POST(request: Request) {
           : "CUSTOM",
         contentHtml: contentHtml || "<p></p>",
         isDefault: false,
-        createdById: session.userId,
+        createdById: session.id,
       },
     });
     return NextResponse.json({

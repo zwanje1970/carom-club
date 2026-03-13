@@ -11,9 +11,7 @@ import CardBox from "@/components/admin/_components/CardBox";
 import Button from "@/components/admin/_components/Button";
 
 export default async function AdminTournamentsNewPage() {
-  let organizations: Awaited<
-    ReturnType<typeof prisma.organization.findMany<{ orderBy: { name: "asc" } }>>
-  > = [];
+  let organizations: { id: string; name: string; slug: string; type: string; address: string | null }[] = [];
   try {
     organizations = await prisma.organization.findMany({
       orderBy: { name: "asc" },
@@ -24,9 +22,9 @@ export default async function AdminTournamentsNewPage() {
       id: o.id,
       name: o.name,
       slug: o.slug,
-      type: "CLUB" as const,
+      type: "CLUB",
       address: null,
-    })) as typeof organizations;
+    }));
   }
 
   let isVenueClient = false;

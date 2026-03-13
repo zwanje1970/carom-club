@@ -268,9 +268,9 @@ export async function updateFooterSettings(
       const [row] = await prisma.$queryRaw<SiteSettingRow[]>`
         SELECT * FROM "SiteSetting" WHERE "id" = ${createdRow!.id}
       `;
-      return dbRowToFooterSettings(row ?? createdRow);
+      return dbRowToFooterSettings((row ?? createdRow) as Parameters<typeof dbRowToFooterSettings>[0]);
     }
-    return dbRowToFooterSettings(createdRow);
+    return dbRowToFooterSettings(createdRow as Parameters<typeof dbRowToFooterSettings>[0]);
   }
 
   const footerUpdatePayload = {
@@ -311,5 +311,5 @@ export async function updateFooterSettings(
   const [row] = await prisma.$queryRaw<SiteSettingRow[]>`
     SELECT * FROM "SiteSetting" WHERE "id" = ${existing.id}
   `;
-  return dbRowToFooterSettings(row!);
+  return dbRowToFooterSettings(row! as Parameters<typeof dbRowToFooterSettings>[0]);
 }

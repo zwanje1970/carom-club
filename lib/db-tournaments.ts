@@ -6,6 +6,16 @@
 
 import { prisma } from "@/lib/db";
 
+/** 대회 수정 페이지용 findUnique include 타입 (.tsx에서 제네릭 파싱 이슈 회피) */
+export type TournamentForEdit = Awaited<
+  ReturnType<
+    typeof prisma.tournament.findUnique<{
+      where: { id: string };
+      include: { organization: true; rule: true; _count: { select: { entries: true } }; tournamentVenues: { include: { organization: { select: { id: true; name: true } } } } };
+    }>
+  >
+>;
+
 export type TournamentListRow = {
   id: string;
   name: string;

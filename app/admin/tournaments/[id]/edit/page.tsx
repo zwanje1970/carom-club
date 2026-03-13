@@ -1,5 +1,6 @@
 import { mdiTrophy } from "@mdi/js";
 import { prisma } from "@/lib/db";
+import type { TournamentForEdit } from "@/lib/db-tournaments";
 import { TournamentEditForm } from "@/components/admin/tournament/TournamentEditForm";
 import SectionMain from "@/components/admin/_components/Section/Main";
 import SectionTitleLineWithButton from "@/components/admin/_components/Section/TitleLineWithButton";
@@ -12,14 +13,7 @@ export default async function AdminTournamentEditPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  let tournament: Awaited<
-    ReturnType<
-      typeof prisma.tournament.findUnique<{
-        where: { id: string };
-        include: { organization: true; rule: true; _count: { select: { entries: true } }; tournamentVenues: { include: { organization: { select: { id: true, name: true } } } };
-      }>
-    >
-  > = null;
+  let tournament: TournamentForEdit | null = null;
   try {
     tournament = await prisma.tournament.findUnique({
       where: { id },

@@ -138,7 +138,10 @@ export function RichEditor({
       Image.extend({
         addAttributes() {
           const parent = this.parent?.();
-          const parentAttrs = typeof parent?.addAttributes === "function" ? parent.addAttributes() : {};
+          const parentAttrs =
+            parent && typeof (parent as { addAttributes?: () => Record<string, unknown> }).addAttributes === "function"
+              ? (parent as { addAttributes: () => Record<string, unknown> }).addAttributes()
+              : {};
           return {
             ...parentAttrs,
             align: {
@@ -149,6 +152,7 @@ export function RichEditor({
           };
         },
         addNodeView() {
+          // eslint-disable-next-line @typescript-eslint/no-this-alias -- extension instance needed in closure
           const ext = this;
           const resizeOpts = ext.options?.resize;
           if (!resizeOpts || !resizeOpts.enabled || typeof document === "undefined") return null;

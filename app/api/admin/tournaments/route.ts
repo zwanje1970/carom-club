@@ -217,7 +217,7 @@ export async function POST(request: Request) {
         promoContent: promoContent != null ? (promoContent as string).trim() || null : null,
         outlineDraft: outlineDraft != null ? (outlineDraft as string).trim() || null : null,
         outlinePublished: outlinePublished != null ? (outlinePublished as string).trim() || null : null,
-        approvalType: approvalType != null ? (approvalType as string).trim() || null : null,
+        approvalType: approvalType != null ? (approvalType as string).trim() || undefined : undefined,
       },
     });
     if (rule && typeof rule === "object") {

@@ -60,8 +60,8 @@ export default function FeeLedgerPageClient({ initialData }: Props) {
   const sorted = useMemo(() => {
     const arr = [...filtered];
     arr.sort((a, b) => {
-      let va: string | number | null = (a as Record<string, unknown>)[sortKey] as string | number | null;
-      let vb: string | number | null = (b as Record<string, unknown>)[sortKey] as string | number | null;
+      const va: string | number | null = (a as Record<string, unknown>)[sortKey] as string | number | null;
+      const vb: string | number | null = (b as Record<string, unknown>)[sortKey] as string | number | null;
       if (va == null && vb == null) return 0;
       if (va == null) return sortDir === "asc" ? 1 : -1;
       if (vb == null) return sortDir === "asc" ? -1 : 1;
