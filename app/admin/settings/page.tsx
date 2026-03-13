@@ -53,7 +53,7 @@ export default function AdminSettingsPage() {
             <li key={item.href}>
               <Link
                 href={item.href}
-                className="flex items-center justify-between gap-4 px-0 py-4 text-left transition first:pt-0 last:pb-0 hover:opacity-80"
+                className="flex items-center justify-between gap-4 px-0 py-8 text-left transition first:pt-0 last:pb-0 hover:opacity-80"
               >
                 <div>
                   <span className="font-medium text-gray-900 dark:text-slate-100">{item.label}</span>
