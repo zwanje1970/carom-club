@@ -90,9 +90,9 @@ export async function POST(request: Request) {
       role: string;
       status?: string | null;
       withdrawnAt?: Date | null;
-    } | null;
+    };
 
-    let user: LoginUser;
+    let user: LoginUser | null;
     try {
       user = await withDbRetry(() =>
         prisma.user.findUnique({
@@ -113,12 +113,14 @@ export async function POST(request: Request) {
         // P2022 시 최소 필드만으로 재시도 (status/withdrawnAt 없을 때)
         console.warn("[login] P2022: 최소 필드(id,name,username,email,password,role)로 재시도");
         try {
-          user = await prisma.user.findUnique({
+          const fallbackUser = await prisma.user.findUnique({
             where: { username: username.trim() },
             select: minimalSelect,
           });
-          if (user) (user as LoginUser).status = null;
-          if (user) (user as LoginUser).withdrawnAt = null;
+          user =
+            fallbackUser != null
+              ? { ...fallbackUser, status: null, withdrawnAt: null }
+              : null;
         } catch (fallbackError) {
           const fe = fallbackError as { code?: string; meta?: unknown };
           console.error("[login] fallback also failed:", fallbackError);

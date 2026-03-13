@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import type { HeroContent as HeroContentType } from "@/lib/content/hero-from-section";
 import type { HeroSettings } from "@/lib/hero-settings";
@@ -127,12 +128,16 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
     <section className="relative overflow-hidden border-b border-site-border bg-gradient-to-b from-site-card to-[var(--site-bg)] flex-shrink-0 w-full">
       {hasBanner ? (
         <div className="relative min-h-[280px] sm:min-h-[320px] md:min-h-[380px] flex flex-col items-center justify-center py-10 sm:py-12 w-full">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={bannerSrc}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover pointer-events-none"
-          />
+          <div className="absolute inset-0">
+            <Image
+              src={bannerSrc}
+              alt="히어로 배너"
+              fill
+              className="object-cover pointer-events-none"
+              sizes="100vw"
+              unoptimized={bannerSrc.startsWith("data:")}
+            />
+          </div>
           <div className="absolute inset-0 bg-black/40 pointer-events-none" />
           <div className="relative z-10 w-full flex flex-col items-center justify-center px-4 text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.8)] py-6">
             {content}
@@ -221,14 +226,19 @@ function HomeHeroFromSettings({ settings }: { settings: HeroSettings }) {
         }}
       />
       <div className="hero-block-new flex flex-col items-center py-10 sm:py-12 md:py-12 w-full">
-        <img
-          src={bgSrc}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover pointer-events-none"
-          style={{
-            filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined,
-          }}
-        />
+        <div className="absolute inset-0">
+          <Image
+            src={bgSrc}
+            alt="히어로 배경"
+            fill
+            className="object-cover pointer-events-none"
+            sizes="100vw"
+            unoptimized={bgSrc.startsWith("data:")}
+            style={{
+              filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined,
+            }}
+          />
+        </div>
         <div
           className="absolute inset-0 pointer-events-none"
           style={{ backgroundColor: `rgba(0,0,0,${s.heroOverlayOpacity})` }}

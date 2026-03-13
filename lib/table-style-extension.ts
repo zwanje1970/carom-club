@@ -28,6 +28,7 @@ export class TableViewWithAlign extends BaseTableView implements NodeView {
   constructor(
     node: PMNode,
     cellMinWidth: number,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- BaseTableView signature
     _view?: import("@tiptap/pm/view").EditorView
   ) {
     super(node, cellMinWidth);
