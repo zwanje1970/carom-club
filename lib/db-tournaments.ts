@@ -62,7 +62,7 @@ export async function getTournamentsListRaw(options?: {
        LEFT JOIN "Organization" o ON o.id = t."organizationId"
        WHERE t.status NOT IN ('DRAFT', 'HIDDEN')
        ORDER BY t."startAt" ${order === "DESC" ? "DESC" : "ASC"}
-       LIMIT ?`,
+       LIMIT $1`,
       limit
     );
     return rows.map((r) => ({
@@ -112,7 +112,7 @@ export async function getTournamentsListAdminRaw(): Promise<TournamentListRow[]>
        FROM "Tournament" t
        LEFT JOIN "Organization" o ON o.id = t."organizationId"
        ORDER BY t."startAt" DESC
-       LIMIT ?`,
+       LIMIT $1`,
       500
     );
     return rows.map((r) => ({
