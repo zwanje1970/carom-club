@@ -12,7 +12,6 @@ type Props = {
 };
 
 export default function FeeLedgerModal({ organizationId, organizationName, onClose }: Props) {
-  const [feeSetting, setFeeSetting] = useState<FeeSetting>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -27,9 +26,12 @@ export default function FeeLedgerModal({ organizationId, organizationName, onClo
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/organizations/${organizationId}/fee`, { credentials: "include" });
-      const data = await res.json();
+      const data = (await res.json()) as {
+        feeSetting?: FeeSetting;
+        payments?: Payment[];
+        error?: string;
+      };
       if (!res.ok) throw new Error(data.error || "조회 실패");
-      setFeeSetting(data.feeSetting ?? null);
       setPayments(data.payments ?? []);
       const d = new Date();
       const y = d.getFullYear();

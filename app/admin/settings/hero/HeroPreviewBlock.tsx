@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import type { HeroSettings } from "@/lib/hero-settings";
 
 const HERO_PLACEHOLDER =
@@ -61,14 +62,19 @@ export default function HeroPreviewBlock({ settings }: Props) {
       }}
     >
       {/* background */}
-      <img
-        src={bgSrc}
-        alt=""
-        className="absolute inset-0 h-full w-full object-cover"
-        style={{
-          filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined,
-        }}
-      />
+      <div className="absolute inset-0">
+        <Image
+          src={bgSrc}
+          alt="히어로 배경 미리보기"
+          fill
+          className="object-cover"
+          sizes="800px"
+          style={{
+            filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined,
+          }}
+          unoptimized={bgSrc.startsWith("data:")}
+        />
+      </div>
       <div
         className="absolute inset-0"
         style={{ backgroundColor: `rgba(0,0,0,${s.heroOverlayOpacity})` }}
