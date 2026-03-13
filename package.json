@@ -20,6 +20,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@floating-ui/dom": "^1.7.6",
     "@mdi/js": "^7.4.47",
     "@mdi/react": "^1.6.1",
     "@neondatabase/serverless": "^1.0.0",
