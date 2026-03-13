@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  테마 메인 색상 (primary/secondary)
+  - 정의: :root 의 --site-primary, --site-secondary (아래)
+  - Tailwind: theme.colors.site.primary / site.secondary → var(--site-primary) (tailwind.config.ts)
+  - 기본값: lib/site-settings.ts 의 DEFAULT_PRIMARY_COLOR, DEFAULT_SECONDARY_COLOR 와 동일하게 유지
+  - 런타임: app/layout → SiteThemeStyles 가 getSiteSettings() 값으로 :root 덮어씀 → 전체 UI에 반영
+  - 사용: bg-site-primary, text-site-primary, border-site-primary, focus:ring-site-primary 등
+*/
+:root {
+  --site-bg: #F6F8FB;
+  --site-card: #FFFFFF;
+  --site-text: #111827;
+  --site-border: #E5E7EB;
+  --site-primary: #991b1b;
+  --site-secondary: #78350f;
+}
+
+/* 버튼: primary(빨강), secondary(노랑) */
+.btn-primary {
+  background-color: var(--site-primary);
+  color: #fff;
+}
+.btn-primary:hover {
+  filter: brightness(1.08);
+}
+.btn-secondary {
+  background-color: var(--site-secondary);
+  color: #111827;
+}
+.btn-secondary:hover {
+  filter: brightness(0.97);
+}
+
+/* 카드 공통: 밝은 배경 + 테두리 + 그림자 */
+.card-site {
+  background-color: var(--site-card);
+  border: 1px solid var(--site-border);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+}
+
+/* 사이트 기본 글꼴: Pretendard (모바일/PC 공통) */
+@layer base {
+  body {
+    @apply antialiased;
+    background-color: var(--site-bg);
+    color: var(--site-text);
+    font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", sans-serif;
+  }
+  /* 편집기/콘텐츠에서 선택 가능한 웹폰트가 정상 적용되도록 font-family 사용 시 fallback */
+  [style*="font-family"] {
+    font-feature-settings: normal;
+  }
+  img,
+  video {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+  /* 폼 입력 전각 문자 방지: 반각으로 표시·입력 (회원가입/로그인/신청 폼 등) */
+  .font-input-halfwidth,
+  input.font-input-halfwidth,
+  textarea.font-input-halfwidth {
+    font-variant-east-asian: normal;
+  }
+}

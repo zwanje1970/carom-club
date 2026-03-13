@@ -1,0 +1,9 @@
+{
+  "name": "CAROM.CLUB",
+  "short_name": "Carom Club",
+  "description": "당구 대회와 커뮤니티",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#f59e0b"
+}

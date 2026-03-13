@@ -1,0 +1,2 @@
+-- User: 탈퇴 상태 (DELETED)
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "status" TEXT;

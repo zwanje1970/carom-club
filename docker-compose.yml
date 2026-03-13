@@ -1,0 +1,18 @@
+# 로컬 전체 기능 테스트용 PostgreSQL (클라이언트 신청·마이페이지 등 DB 저장)
+# 사용: docker compose up -d → npm run db:push → npm run db:seed → npm run dev
+# (Docker 미설치 시 .env 에 Neon 등 클라우드 DATABASE_URL 설정 후 db:push 만 실행)
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: carom
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

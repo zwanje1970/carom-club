@@ -1,0 +1,49 @@
+"use client";
+
+import { createContext, useContext, useMemo } from "react";
+import type { FooterSettings } from "@/lib/footer-settings";
+
+export type SiteSettings = {
+  siteName: string;
+  siteDescription: string | null;
+  logoUrl: string | null;
+  primaryColor: string;
+  secondaryColor: string;
+  headerBgColor: string | null;
+  headerTextColor: string | null;
+  headerActiveColor: string | null;
+  footer?: FooterSettings;
+};
+
+const SiteSettingsContext = createContext<SiteSettings | null>(null);
+
+export function SiteSettingsProvider({
+  initial,
+  children,
+}: {
+  initial: SiteSettings;
+  children: React.ReactNode;
+}) {
+  const value = useMemo(() => initial, [initial]);
+  return (
+    <SiteSettingsContext.Provider value={value}>
+      {children}
+    </SiteSettingsContext.Provider>
+  );
+}
+
+export function useSiteSettings(): SiteSettings {
+  const ctx = useContext(SiteSettingsContext);
+  return (
+    ctx ?? {
+      siteName: "CAROM.CLUB",
+      siteDescription: null,
+      logoUrl: null,
+      primaryColor: "#d97706",
+      secondaryColor: "#b91c1c",
+      headerBgColor: null,
+      headerTextColor: null,
+      headerActiveColor: null,
+    }
+  );
+}
