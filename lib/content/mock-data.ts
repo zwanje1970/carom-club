@@ -1,0 +1,110 @@
+/**
+ * CMS mock 데이터
+ * Neon DB 연결 시 service에서 이 파일 대신 DB 조회로 교체
+ */
+
+import type { PageSection } from "@/types/page-section";
+import type { Popup } from "@/types/popup";
+import type { NoticeBar } from "@/types/notice-bar";
+
+const now = new Date().toISOString();
+const past = new Date(Date.now() - 86400000).toISOString();
+const future = new Date(Date.now() + 86400000 * 30).toISOString();
+
+export const mockPageSections: PageSection[] = [
+  {
+    id: "ps-1",
+    type: "text",
+    title: "환영 문구",
+    subtitle: "당구와 함께하는 시간",
+    description: "캐롬클럽에서 다양한 대회와 모임에 참여해 보세요.",
+    textAlign: "center",
+    page: "home",
+    placement: "below_main_copy",
+    imageUrl: null,
+    imageUrlMobile: null,
+    imageHeightPc: null,
+    imageHeightMobile: null,
+    linkType: "none",
+    internalPage: null,
+    internalPath: null,
+    externalUrl: null,
+    openInNewTab: false,
+    buttons: [
+      { id: "b1", name: "대회 참가 신청", linkType: "internal", href: "/tournaments", openInNewTab: false, isPrimary: true },
+    ],
+    isVisible: true,
+    sortOrder: 10,
+    startAt: past,
+    endAt: future,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: "ps-2",
+    type: "image",
+    title: "메인 비주얼",
+    subtitle: null,
+    description: null,
+    textAlign: "center",
+    page: "home",
+    placement: "main_visual_bg",
+    imageUrl: "/uploads/placeholder-banner.jpg",
+    imageUrlMobile: null,
+    imageHeightPc: 400,
+    imageHeightMobile: 280,
+    linkType: "internal",
+    internalPage: "tournaments",
+    internalPath: null,
+    externalUrl: null,
+    openInNewTab: false,
+    buttons: [],
+    isVisible: true,
+    sortOrder: 5,
+    startAt: null,
+    endAt: null,
+    createdAt: now,
+    updatedAt: now,
+  },
+];
+
+export const mockPopups: Popup[] = [
+  {
+    id: "pop-1",
+    title: "신규 대회 안내",
+    description: "이번 달 대회가 오픈되었습니다.",
+    imageUrl: null,
+    buttonName: "자세히 보기",
+    buttonLink: "/tournaments",
+    page: "home",
+    startAt: past,
+    endAt: future,
+    hideForTodayEnabled: true,
+    showCloseButton: true,
+    isVisible: true,
+    sortOrder: 0,
+    createdAt: now,
+    updatedAt: now,
+  },
+];
+
+export const mockNoticeBars: NoticeBar[] = [
+  {
+    id: "nb-1",
+    message: "시스템 점검 안내: 3월 15일 02:00~04:00 (KST)",
+    linkType: "none",
+    internalPath: null,
+    externalUrl: null,
+    openInNewTab: false,
+    backgroundColor: "#1e3a5f",
+    textColor: "#ffffff",
+    page: "all",
+    position: "below_header",
+    startAt: past,
+    endAt: future,
+    isVisible: false, // 해제됨
+    sortOrder: 0,
+    createdAt: now,
+    updatedAt: now,
+  },
+];

@@ -1,0 +1,242 @@
+"use client";
+
+import Link from "next/link";
+import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import type { HeroContent as HeroContentType } from "@/lib/content/hero-from-section";
+import type { HeroSettings } from "@/lib/hero-settings";
+
+const HERO_PLACEHOLDER_SVG =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='400' viewBox='0 0 1200 400'%3E%3Crect fill='%23f3f4f6' width='1200' height='400'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-family='sans-serif' font-size='18'%3EHero 배너 이미지%3C/text%3E%3C/svg%3E";
+
+function getHeroTitleStyle(copy: Record<string, string>): { style: React.CSSProperties; alignClass: string } {
+  const style: React.CSSProperties = {};
+  const font = (copy["site.hero.titleFont"] ?? "").trim();
+  const size = (copy["site.hero.titleSize"] ?? "").trim();
+  const color = (copy["site.hero.titleColor"] ?? "").trim();
+  const lineHeight = (copy["site.hero.titleLineHeight"] ?? "").trim();
+  const align = (copy["site.hero.titleAlign"] ?? "").trim();
+  if (font && font !== "sans" && font !== "serif") style.fontFamily = font;
+  if (color) style.color = color;
+  if (lineHeight) style.lineHeight = lineHeight;
+  if (size && /^\d+px$/i.test(size)) style.fontSize = size;
+  const alignClass = align === "left" ? "text-left" : align === "right" ? "text-right" : "text-center";
+  return { style, alignClass };
+}
+
+function buttonSizeClassLegacy(size: "sm" | "md" | "lg" | undefined): string {
+  const base = "inline-flex items-center justify-center rounded-xl font-medium transition focus:outline-none focus:ring-2 focus:ring-site-primary focus:ring-offset-2";
+  switch (size) {
+    case "sm":
+      return `${base} min-h-[36px] px-4 py-2 text-xs`;
+    case "lg":
+      return `${base} min-h-[52px] px-8 py-4 text-base`;
+    default:
+      return `${base} min-h-[44px] px-6 py-3 text-sm`;
+  }
+}
+
+function buttonSizeClassNew(size: "small" | "medium" | "large"): string {
+  const base = "inline-flex items-center justify-center rounded-xl font-medium transition focus:outline-none focus:ring-2 focus:ring-site-primary focus:ring-offset-2";
+  switch (size) {
+    case "small":
+      return `${base} min-h-[32px] px-4 py-2 text-xs`;
+    case "large":
+      return `${base} min-h-[52px] px-8 py-4 text-base`;
+    default:
+      return `${base} min-h-[44px] px-6 py-3 text-sm`;
+  }
+}
+
+function buttonVariantClassNew(variant: "primary" | "secondary" | "outline"): string {
+  switch (variant) {
+    case "primary":
+      return "bg-site-primary text-white shadow-sm hover:opacity-90";
+    case "outline":
+      return "border-2 border-white/90 bg-transparent text-white hover:bg-white/10";
+    default:
+      return "bg-white/20 text-white hover:bg-white/30";
+  }
+}
+
+type HomeHeroProps = {
+  copy: Record<string, string>;
+  hero?: HeroContentType | null;
+  heroSettings?: HeroSettings | null;
+};
+
+export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
+  const useNewHero = heroSettings?.heroEnabled && heroSettings !== null;
+
+  if (useNewHero) {
+    return <HomeHeroFromSettings settings={heroSettings!} />;
+  }
+
+  const hasBanner = hero?.heroImageUrl?.trim();
+  const bannerSrc = hasBanner ? hero!.heroImageUrl! : HERO_PLACEHOLDER_SVG;
+  const titleHtml = (copy["site.hero.titleHtml"] ?? "").trim();
+  const { style: titleStyle, alignClass: titleAlignClass } = getHeroTitleStyle(copy);
+  const isOverlay = !!hasBanner;
+  const buttonsAbove = hero?.heroBtnPosition === "above";
+  const heroButtons =
+    hero?.heroButtons?.length
+      ? hero.heroButtons
+      : [
+          { label: getCopyValue(copy as Record<AdminCopyKey, string>, "site.hero.btnTournaments"), href: "/tournaments", size: "md" as const },
+          { label: getCopyValue(copy as Record<AdminCopyKey, string>, "site.hero.btnApply"), href: "/tournaments", size: "md" as const },
+        ];
+
+  const titleBlock = (
+    <div
+      className={`hero-html prose prose-p:my-0.5 max-w-none ${titleAlignClass} ${isOverlay ? "text-white [&_*]:text-inherit" : "text-site-text"}`}
+      style={Object.keys(titleStyle).length ? titleStyle : undefined}
+      dangerouslySetInnerHTML={{ __html: titleHtml || "<p>CAROM.CLUB</p>" }}
+    />
+  );
+
+  const buttonsBlock = heroButtons.length > 0 ? (
+    <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+      {heroButtons.map((btn, i) => (
+        <Link
+          key={i}
+          href={btn.href}
+          className={
+            i === 0
+              ? `bg-site-primary text-white shadow-sm hover:opacity-90 ${buttonSizeClassLegacy(btn.size)}`
+              : `border-2 border-site-primary bg-site-card text-site-primary hover:bg-site-primary/5 ${buttonSizeClassLegacy(btn.size)}`
+          }
+        >
+          {btn.label}
+        </Link>
+      ))}
+    </div>
+  ) : null;
+
+  const content = (
+    <div
+      className={`relative z-10 w-full flex flex-col justify-center px-4 leading-tight ${
+        isOverlay ? "text-white [&_.hero-html]:text-inherit" : ""
+      }`}
+    >
+      {buttonsAbove && buttonsBlock}
+      <div className={buttonsAbove ? "mt-4" : ""}>{titleBlock}</div>
+      {!buttonsAbove && <div className="mt-8">{buttonsBlock}</div>}
+    </div>
+  );
+
+  return (
+    <section className="relative overflow-visible border-b border-site-border bg-gradient-to-b from-site-card to-[var(--site-bg)]">
+      {hasBanner ? (
+        <div className="relative min-h-[280px] sm:min-h-[320px] md:min-h-[380px] flex flex-col items-center justify-center py-10 sm:py-12">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={bannerSrc}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover pointer-events-none"
+          />
+          <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+          <div className="relative z-10 w-full flex flex-col items-center justify-center px-4 text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.8)] py-6">
+            {content}
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(214,40,40,0.08),transparent)] pointer-events-none" />
+          <div className="relative z-10 min-h-[280px] sm:min-h-[320px] md:min-h-[380px] w-full flex flex-col items-center justify-center py-10 sm:py-12">
+            {content}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+function HomeHeroFromSettings({ settings }: { settings: HeroSettings }) {
+  const s = settings;
+  const bgSrc = s.heroBackgroundImageUrl?.trim() || HERO_PLACEHOLDER_SVG;
+  const textAlignClass =
+    s.heroTextAlign === "left" ? "text-left" : s.heroTextAlign === "right" ? "text-right" : "text-center";
+  const justifyClass =
+    s.heroContentVerticalAlign === "top"
+      ? "justify-start"
+      : s.heroContentVerticalAlign === "bottom"
+        ? "justify-end"
+        : "justify-center";
+  const buttonsAlignClass =
+    s.heroButtonsAlign === "left" ? "justify-start" : s.heroButtonsAlign === "right" ? "justify-end" : "justify-center";
+  const enabledButtons = s.heroButtons.filter((b) => b.enabled && b.label.trim());
+
+  const buttonsBlock = enabledButtons.length > 0 ? (
+    <div className={`flex w-full flex-wrap gap-3 sm:gap-4 ${buttonsAlignClass}`}>
+      {enabledButtons.map((btn, i) => (
+        <Link
+          key={i}
+          href={btn.href || "#"}
+          target={btn.openInNewTab ? "_blank" : undefined}
+          rel={btn.openInNewTab ? "noopener noreferrer" : undefined}
+          className={`${buttonSizeClassNew(btn.size)} ${buttonVariantClassNew(btn.variant)}`}
+        >
+          {btn.label}
+        </Link>
+      ))}
+    </div>
+  ) : null;
+
+  const textBlock = (
+    <div className={`w-full ${textAlignClass}`} style={{ maxWidth: s.heroTextMaxWidth }}>
+      {s.heroEyebrowText && (
+        <p className="mb-1 text-white/90" style={{ fontSize: s.heroSubtitleSize }}>
+          {s.heroEyebrowText}
+        </p>
+      )}
+      <h1 className="font-bold leading-tight text-white" style={{ fontSize: s.heroTitleSize }}>
+        {s.heroTitle || "CAROM.CLUB"}
+      </h1>
+      {s.heroSubtitle && (
+        <p className="mt-1 text-white/95" style={{ fontSize: s.heroSubtitleSize }}>
+          {s.heroSubtitle}
+        </p>
+      )}
+      {s.heroButtonsPosition === "belowTitle" && <div className="mt-6">{buttonsBlock}</div>}
+      {s.heroButtonsPosition === "belowSubtitle" && <div className="mt-6">{buttonsBlock}</div>}
+    </div>
+  );
+
+  const itemsClass =
+    s.heroTextAlign === "left" ? "items-start" : s.heroTextAlign === "right" ? "items-end" : "items-center";
+  const content = (
+    <div className={`relative z-10 flex w-full flex-1 flex-col px-4 py-6 ${justifyClass} ${itemsClass}`}>
+      {textBlock}
+      {s.heroButtonsPosition === "bottom" && <div className="mt-auto pt-6">{buttonsBlock}</div>}
+    </div>
+  );
+
+  const mobileHeight = s.heroHeightMobile || "280px";
+  const desktopHeight = s.heroHeightDesktop || "380px";
+
+  return (
+    <section className="relative overflow-hidden border-b border-site-border">
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `.hero-block-new{min-height:${mobileHeight}}@media(min-width:768px){.hero-block-new{min-height:${desktopHeight}}}`,
+        }}
+      />
+      <div className="hero-block-new relative flex flex-col items-center py-10 sm:py-12 md:py-12 w-full">
+        <img
+          src={bgSrc}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover pointer-events-none"
+          style={{
+            filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined,
+          }}
+        />
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ backgroundColor: `rgba(0,0,0,${s.heroOverlayOpacity})` }}
+        />
+        <div className="relative z-10 w-full flex flex-col flex-1 text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]">
+          {content}
+        </div>
+      </div>
+    </section>
+  );
+}

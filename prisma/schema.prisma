@@ -1,0 +1,545 @@
+// CAROM.CLUB Platform - Neon PostgreSQL
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+// ============== DB와 일치: User.role 은 PostgreSQL UserRole enum ==============
+enum UserRole {
+  USER
+  CLIENT_ADMIN
+  PLATFORM_ADMIN
+}
+
+// ============== User & MemberProfile ==============
+// 회원탈퇴는 soft delete만 사용 (status=DELETED, withdrawnAt 설정). User 행을 DELETE 하지 않음.
+// 게시글/문의/신청/참가 등 작성 데이터는 유지하고, 화면에서 작성자만 "탈퇴회원"으로 표시.
+
+model User {
+  id          String    @id @default(cuid())
+  name        String
+  username    String    @unique
+  password    String
+  email       String
+  phone       String?
+  role        UserRole  @default(USER)
+  status      String?   // ACTIVE(일반) | DELETED(탈퇴)
+  withdrawnAt DateTime? // 탈퇴 시각 (설정 시 로그인 불가, 재가입 제한 기간 적용)
+  latitude    Float?    // 회원 주소 좌표 (거리 정렬 폴백용)
+  longitude   Float?
+  address     String?   // 기본주소 (주소검색)
+  addressDetail String?  // 상세주소
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  memberProfile    MemberProfile?
+  orgMemberships   OrganizationMember[]
+  tournamentEntries     TournamentEntry[]
+  tournamentAttendances TournamentAttendance[]
+  inquiries        Inquiry[]
+  notifications    Notification[]
+  clientApplications ClientApplication[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+model MemberProfile {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  handicap          String?   // 핸디
+  avg               String?   // AVG
+  avgProofUrl       String?   // AVG 증빙 URL (Vercel Blob 등)
+  avgProofExpiresAt DateTime? // 증빙 만료일
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============== Client Application (클라이언트 신청) ==============
+
+model ClientApplication {
+  id                String   @id @default(cuid())
+  type              String   // VENUE | CLUB | FEDERATION | HOST | INSTRUCTOR
+  status            String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  applicantUserId   String?
+  organizationName  String
+  applicantName    String
+  phone            String
+  email            String
+  region           String?
+  shortDescription String?
+  referenceLink    String?
+  rejectedReason   String?
+  reviewedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  applicant User? @relation(fields: [applicantUserId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([applicantUserId])
+}
+
+// ============== Organization (당구장/동호회/연맹/주최자/강사) ==============
+
+model Organization {
+  id               String   @id @default(cuid())
+  ownerUserId      String?  // 1계정 1업체 시 대표 관리자
+  slug             String   @unique
+  name             String
+  type             String   @default("CLUB") // VENUE | CLUB | FEDERATION | HOST | INSTRUCTOR | OTHER
+  shortDescription String?
+  description      String?
+  fullDescription  String?
+  logoImageUrl     String?
+  coverImageUrl    String?
+  phone            String?
+  email            String?
+  website          String?
+  address          String?
+  addressDetail    String?   // 상세주소
+  addressNaverMapEnabled Boolean? @default(false) // 지번 주소 네이버 지도 연동 여부
+  region           String?
+  latitude         Float?
+  longitude        Float?
+  isPublished      Boolean  @default(false)
+  setupCompleted   Boolean  @default(false)
+  promoDraft       String?
+  promoPublished   String?
+  promoPublishedAt DateTime?
+  typeSpecificJson String? // 업체 종류별 JSON: 당구장/동호회/연맹/레슨
+  // 플랫폼 관리: 권한 정지/제명, 비고
+  status       String  @default("ACTIVE") // ACTIVE | SUSPENDED | EXPELLED
+  adminRemarks String? // 비고 (사유 등)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  members           OrganizationMember[]
+  tournaments       Tournament[]
+  tournamentVenues  TournamentVenue[]  // 이 당구장이 개최지로 지정된 대회들
+  feeSetting       OrganizationFeeSetting?
+  feePayments      OrganizationFeePayment[]
+}
+
+// 클라이언트 회비 설정: 월회비/연회비 택일
+model OrganizationFeeSetting {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  feeType        String   // MONTHLY | ANNUAL
+  amountInWon    Int?     // 권장 금액 (원)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// 클라이언트 회비 입금 장부
+model OrganizationFeePayment {
+  id             String   @id @default(cuid())
+  organizationId String
+  amountInWon    Int      // 입금액 (원)
+  paidAt         DateTime // 입금일
+  period         String   // 월회비: "2025-01", 연회비: "2025"
+  memo           String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([organizationId, period])
+}
+
+model OrganizationMember {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  role           String   @default("MEMBER") // OWNER | ADMIN | MEMBER | GUEST
+  status         String   @default("ACTIVE")  // ACTIVE | PENDING | SUSPENDED | LEFT
+  joinedAt       DateTime               @default(now())
+  leftAt         DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+// 홍보 페이지 템플릿 (편집기에서 불러오기/저장)
+model PromoPageTemplate {
+  id            String   @id @default(cuid())
+  name          String   // 템플릿명
+  description   String?  // 용도 설명
+  category      String   // VENUE_INTRO | TOURNAMENT | LESSON | EVENT | CUSTOM
+  thumbnailUrl  String?  // 썸네일 (선택)
+  contentHtml   String   @db.Text // 편집기 HTML 내용 (복사본으로 불러옴)
+  isDefault     Boolean  @default(false) // 기본 제공 템플릿
+  createdById   String?  // 관리자가 저장한 경우
+  createdAt     DateTime @default(now())
+
+  @@index([isDefault])
+  @@index([category])
+}
+
+model Tournament {
+  id               String    @id @default(cuid())
+  organizationId   String
+  name             String
+  title            String?   // 표제 (name 대신 사용 가능)
+  slug             String?
+  summary          String?
+  description      String?
+  posterImageUrl   String?
+  imageUrl         String?  // 레거시
+  venue            String?
+  venueName        String?
+  region           String?
+  startAt          DateTime
+  endAt            DateTime?
+  entryFee         Int?
+  prizeInfo        String?
+  gameFormat       String?
+  qualification    String?
+  entryCondition   String?   // 참가 조건 (예: 평균 0.5 미만)
+  maxParticipants  Int?
+  status           String    @default("OPEN")   // DRAFT | OPEN | CLOSED | FINISHED | HIDDEN
+  approvalType     String    @default("HOST_APPROVAL") // HOST_APPROVAL | AUTO_APPROVAL | OCR_APPROVAL
+  rules            String?   // 경기 요강 (긴 텍스트)
+  promoContent     String?   // 대회 홍보 HTML (당구장 홍보와 동일 에디터)
+  outlineDraft     String?
+  outlinePublished String?
+  outlinePublishedAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  rule         TournamentRule?
+  entries      TournamentEntry[]
+  rounds       TournamentRound[]
+  tournamentVenues TournamentVenue[]  // 연맹/동호회 대회 시 개최 당구장 목록
+}
+
+model TournamentVenue {
+  id             String   @id @default(cuid())
+  tournamentId   String
+  organizationId String   // 당구장(Organization type=VENUE) id
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  tournament   Tournament   @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, organizationId])
+  @@index([tournamentId])
+  @@index([organizationId])
+}
+
+model TournamentRule {
+  id            String   @id @default(cuid())
+  tournamentId  String   @unique
+  // 참가
+  entryFee      Int?
+  operatingFee  Int?
+  maxEntries    Int?
+  useWaiting      Boolean  @default(false)
+  entryConditions String?
+  // 대진표/진행 (SQLite: Json 미지원 → String 저장)
+  bracketType   String?  // 죽방(jukbang), 서바이벌(survival), 토너먼트(tournament)
+  bracketConfig String?  // JSON string: tableCount, maxPerGroup, finalistCount, noRematch, detailFormat
+  // 상금
+  prizeType     String?  // fixed, ratio, score_proportional
+  prizeInfo     String?  // JSON string: fixed ranks, ratio %, score config
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+}
+
+// ============== Tournament Entry (참가 신청) ==============
+
+model TournamentEntry {
+  id               String   @id @default(cuid())
+  tournamentId     String
+  userId           String
+  status           String   @default("APPLIED") // APPLIED | CONFIRMED | REJECTED | CANCELED
+  depositorName    String?
+  paidAt           DateTime?
+  round            String?
+  prize            Int?
+  waitingListOrder Int?   // 웨이팅 순번
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attendances TournamentAttendance[]
+
+  @@unique([tournamentId, userId])
+  @@index([tournamentId])
+  @@index([userId])
+}
+
+model TournamentAttendance {
+  id        String   @id @default(cuid())
+  entryId   String
+  userId    String
+  attended  Boolean  @default(true) // 출석 여부
+  createdAt DateTime @default(now())
+
+  entry TournamentEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([entryId, userId])
+  @@index([entryId])
+  @@index([userId])
+}
+
+// ============== Tournament Round / Group / Result ==============
+
+model TournamentRound {
+  id            String   @id @default(cuid())
+  tournamentId  String
+  name          String   // 예: "예선", "본선 1라운드"
+  sortOrder     Int      @default(0)
+  bracketData   String?  // JSON string: 대진표 데이터 (SQLite Json 미지원)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tournament Tournament         @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  groups      TournamentGroup[]
+}
+
+model TournamentGroup {
+  id        String   @id @default(cuid())
+  roundId   String
+  name      String?  // 조 이름 (A조, B조 등)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  round   TournamentRound        @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  members TournamentGroupMember[]
+  results TournamentResult[]
+}
+
+model TournamentGroupMember {
+  id       String   @id @default(cuid())
+  groupId  String
+  entryId  String   // TournamentEntry 참조 목적 (실제 FK는 없을 수 있음 - 엔트리와 매핑)
+  sortOrder Int     @default(0)
+  createdAt DateTime @default(now())
+
+  group TournamentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+}
+
+model TournamentResult {
+  id        String   @id @default(cuid())
+  groupId   String
+  entryId   String?  // 우승/준우승 등 매핑
+  rank      Int?
+  score     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  group TournamentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+}
+
+// ============== Notification ==============
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  message   String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ============== Site settings (singleton) ==============
+
+model SiteSetting {
+  id              String   @id @default(cuid())
+  siteName        String   @default("CAROM.CLUB")
+  siteDescription String?
+  logoUrl         String?
+  primaryColor    String   @default("#d97706")  // amber-600
+  secondaryColor  String   @default("#b91c1c")  // red-700
+  // 헤더·메뉴 색상 (관리자 > 사이트 설정)
+  headerBgColor     String?
+  headerTextColor   String?
+  headerActiveColor String?
+  // 홈페이지 Hero 배너 (관리자 > 홈페이지 관리)
+  heroImageUrl    String?
+  heroTitle       String?
+  heroDescription String?
+  heroLinkUrl     String?
+  // 메인 히어로 전용 설정 (JSON)
+  heroSettingsJson String?
+  // 플랫폼 소개 이미지
+  introImageUrl   String?
+  // 추천 대회 배너
+  featuredBannerImageUrl String?
+  featuredBannerLinkUrl  String?
+  withdrawRejoinDays    Int      @default(0) // 탈퇴 후 재가입 가능 일수 (0=즉시 가능)
+  // 푸터 설정 (관리자 설정)
+  footerEnabled       Boolean  @default(false)
+  footerBgColor       String?
+  footerTextColor     String?
+  footerTitle         String?
+  footerCompanyName   String?
+  footerBusinessNumber String?
+  footerCeoName       String?
+  footerAddress       String?
+  footerPhone         String?
+  footerEmail         String?
+  footerCopyright     String?
+  footerFontSize      String?  // 푸터 전체 기본 글꼴 크기: xs | sm | base | lg
+  footerFontSizesJson    String?  // JSON: 주관사 정보 항목별 글자크기 { title?, companyName?, ... }
+  footerFontFamiliesJson String?  // JSON: 주관사 정보 항목별 글꼴 { title?, companyName?, ... }
+  footerPartnersJson     String?   // JSON: FooterPartner[] (id, name, category, logoUrl, websiteUrl, sortOrder, enabled)
+  updatedAt           DateTime @updatedAt
+}
+
+// 관리자 메뉴명·문구 커스텀 (플랫폼 관리자 > 설정 > 메뉴/문구)
+model AdminCopy {
+  id    String @id @default(cuid())
+  key   String @unique // 예: menu.dashboard, nav.logout
+  value String
+}
+
+// ============== Integration settings (singleton, API 키 등) ==============
+
+model IntegrationSetting {
+  id                 String   @id @default(cuid())
+  naverMapClientId   String?  // 네이버 지도 JavaScript API 클라이언트 ID (관리자 입력 또는 env)
+  updatedAt          DateTime @updatedAt
+}
+
+// ============== Notification settings (singleton) ==============
+
+model NotificationSetting {
+  id                      String   @id @default(cuid())
+  adminEmail              String?  // 관리자 알림 수신 이메일
+  notifyNewRegistration   Boolean  @default(true)   // 참가 신청 접수 시 관리자 알림
+  notifyRegistrationConfirmed Boolean @default(true) // 참가자 신청 완료 이메일 발송
+  notifyPaymentConfirmed  Boolean  @default(true)   // 입금 확인 알림
+  notifyAnnouncement      Boolean  @default(true)   // 공지사항 알림
+  updatedAt               DateTime @updatedAt
+}
+
+// ============== CMS: Page Sections, Popups, Notice Bars ==============
+
+model PageSection {
+  id                String   @id @default(cuid())
+  type              String   // image | text | cta
+  title             String
+  subtitle          String?
+  description       String?
+  textAlign         String   @default("center") // left | center | right
+  page              String   // home | venues | tournaments | community | mypage
+  placement         String   // below_header | main_visual_bg | ...
+  imageUrl          String?
+  imageUrlMobile    String?
+  imageHeightPc     Int?
+  imageHeightMobile Int?
+  linkType          String   @default("none") // none | internal | external
+  internalPage      String?
+  internalPath      String?
+  externalUrl       String?
+  openInNewTab      Boolean  @default(false)
+  buttons           String?  // JSON string: SectionButton[] (SQLite Json 미지원)
+  isVisible         Boolean  @default(true)
+  sortOrder         Int      @default(0)
+  startAt           DateTime?
+  endAt             DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([page, placement])
+  @@index([page])
+}
+
+model Popup {
+  id                 String   @id @default(cuid())
+  title              String
+  description        String?
+  imageUrl           String?
+  buttonName         String?
+  buttonLink         String?
+  page               String    // all | home | venues | tournaments | community
+  startAt            DateTime?
+  endAt              DateTime?
+  hideForTodayEnabled Boolean  @default(true)
+  showCloseButton    Boolean   @default(true)
+  isVisible         Boolean   @default(true)
+  sortOrder         Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([page])
+}
+
+model NoticeBar {
+  id             String   @id @default(cuid())
+  message        String
+  linkType       String   @default("none") // none | internal | external
+  internalPath   String?
+  externalUrl    String?
+  openInNewTab   Boolean   @default(false)
+  backgroundColor String  @default("#1e3a5f")
+  textColor      String    @default("#ffffff")
+  page           String    // all | home | venues | tournaments
+  position       String    @default("below_header") // below_header | fixed_top
+  startAt        DateTime?
+  endAt          DateTime?
+  isVisible     Boolean   @default(true)
+  sortOrder     Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([page])
+}
+
+// ============== Inquiry ==============
+
+model Inquiry {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  content   String
+  reply     String?
+  replyAt   DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
