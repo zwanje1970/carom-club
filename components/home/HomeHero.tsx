@@ -124,9 +124,9 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
   );
 
   return (
-    <section className="relative overflow-visible border-b border-site-border bg-gradient-to-b from-site-card to-[var(--site-bg)]">
+    <section className="relative overflow-hidden border-b border-site-border bg-gradient-to-b from-site-card to-[var(--site-bg)] flex-shrink-0 w-full">
       {hasBanner ? (
-        <div className="relative min-h-[280px] sm:min-h-[320px] md:min-h-[380px] flex flex-col items-center justify-center py-10 sm:py-12">
+        <div className="relative min-h-[280px] sm:min-h-[320px] md:min-h-[380px] flex flex-col items-center justify-center py-10 sm:py-12 w-full">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={bannerSrc}
@@ -141,7 +141,7 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
       ) : (
         <>
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(214,40,40,0.08),transparent)] pointer-events-none" />
-          <div className="relative z-10 min-h-[280px] sm:min-h-[320px] md:min-h-[380px] w-full flex flex-col items-center justify-center py-10 sm:py-12">
+          <div className="relative z-10 min-h-[280px] sm:min-h-[320px] md:min-h-[380px] w-full flex flex-col items-center justify-center py-10 sm:py-12 flex-shrink-0">
             {content}
           </div>
         </>
@@ -214,13 +214,13 @@ function HomeHeroFromSettings({ settings }: { settings: HeroSettings }) {
   const desktopHeight = s.heroHeightDesktop || "380px";
 
   return (
-    <section className="relative overflow-hidden border-b border-site-border">
+    <section className="hero-section-new relative overflow-hidden border-b border-site-border flex-shrink-0 w-full">
       <style
         dangerouslySetInnerHTML={{
-          __html: `.hero-block-new{min-height:${mobileHeight}}@media(min-width:768px){.hero-block-new{min-height:${desktopHeight}}}`,
+          __html: `.hero-section-new{min-height:${mobileHeight}}@media(min-width:768px){.hero-section-new{min-height:${desktopHeight}}}.hero-block-new{position:absolute;inset:0;min-height:${mobileHeight}}@media(min-width:768px){.hero-block-new{min-height:${desktopHeight}}}`,
         }}
       />
-      <div className="hero-block-new relative flex flex-col items-center py-10 sm:py-12 md:py-12 w-full">
+      <div className="hero-block-new flex flex-col items-center py-10 sm:py-12 md:py-12 w-full">
         <img
           src={bgSrc}
           alt=""
