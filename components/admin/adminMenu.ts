@@ -104,12 +104,7 @@ export function getMenuAside(copy?: Record<string, string>): MenuAsideItem[] {
 /** @deprecated getMenuAside(copy) 사용 권장 */
 export const menuAside = getMenuAside();
 
-export function buildMenuNavBar(userName: string, _copy?: Record<string, string>): MenuNavBarItem[] {
-  return [
-    {
-      isCurrentUser: true,
-      label: userName,
-      href: "/admin/me",
-    },
-  ];
+/** 상단 오른쪽 네비게이션 메뉴. 관리자 정보 아이콘 제거됨(관리자 정보 수정은 설정 메뉴에서) */
+export function buildMenuNavBar(_userName?: string, _copy?: Record<string, string>): MenuNavBarItem[] {
+  return [];
 }

@@ -6,6 +6,11 @@ import CardBox from "@/components/admin/_components/CardBox";
 
 const SETTINGS_MENU = [
   {
+    href: "/admin/me",
+    label: "관리자 정보 수정",
+    description: "로그인한 관리자 이름·비밀번호 변경",
+  },
+  {
     href: "/admin/settings/site",
     label: "사이트 설정",
     description: "사이트 이름, 로고, 기본 정보",
