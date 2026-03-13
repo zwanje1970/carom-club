@@ -24,19 +24,24 @@ export function MainSiteHeader() {
   const { restartIntro } = useIntroController();
   const settings = useSiteSettings();
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined);
+  const [mounted, setMounted] = useState(false);
 
   const headerBg = settings.headerBgColor ?? DEFAULT_HEADER_BG;
   const headerText = settings.headerTextColor ?? DEFAULT_HEADER_TEXT;
   const headerActive = settings.headerActiveColor ?? DEFAULT_HEADER_ACTIVE;
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+  useEffect(() => {
+    if (!mounted) return;
     fetch("/api/auth/session")
       .then((res) => res.json())
       .then((data) => setUser(data.user ?? null))
       .catch(() => setUser(null));
-  }, []);
+  }, [mounted]);
 
-  const isLoggedIn = !!user;
+  const isLoggedIn = mounted && !!user;
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });

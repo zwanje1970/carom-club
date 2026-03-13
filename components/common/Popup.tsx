@@ -50,10 +50,15 @@ export function Popup({ popup, onClose }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
         className="absolute inset-0 bg-black/50"
-        aria-hidden
+        aria-hidden="true"
         onClick={handleClose}
       />
-      <div className="relative z-10 w-full max-w-md rounded-lg bg-white shadow-xl dark:bg-slate-800">
+      <div
+        className="relative z-10 w-full max-w-md rounded-lg bg-white shadow-xl dark:bg-slate-800"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="popup-title"
+      >
         {popup.showCloseButton && (
           <button
             type="button"
@@ -65,7 +70,7 @@ export function Popup({ popup, onClose }: Props) {
           </button>
         )}
         <div className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">
+          <h3 id="popup-title" className="text-lg font-semibold text-gray-900 dark:text-slate-100">
             {popup.title}
           </h3>
           {popup.description && (

@@ -4,6 +4,7 @@ import { isDatabaseConfigured } from "@/lib/db-mode";
 import { createSession, verifyPassword } from "@/lib/auth";
 
 const DB_ERROR_CODES = ["P1001", "P1002", "P1017", "P1033", "P2024"]; // 연결 불가/끊김/풀 타임아웃
+const DB_SCHEMA_MISMATCH_CODE = "P2022"; // 컬럼 없음 (schema와 DB 불일치)
 
 function isDbConnectionError(e: unknown): boolean {
   const err = e as { code?: string; message?: string };
@@ -12,11 +13,16 @@ function isDbConnectionError(e: unknown): boolean {
   ) || (typeof err?.message === "string" && /connect|ECONNREFUSED|timeout|database/i.test(err.message));
 }
 
+function isDbSchemaMismatchError(e: unknown): boolean {
+  const err = e as { code?: string };
+  return err?.code === DB_SCHEMA_MISMATCH_CODE;
+}
+
 const DB_UNAVAILABLE_MSG = "데이터베이스가 연결되지 않았습니다. .env에 DATABASE_URL을 설정해 주세요.";
 
-/** 연결 오류 시 재시도 (Neon 콜드스타트 등). 최대 3회, 간격 500ms → 1s */
+/** 연결 오류 시 재시도 (Neon 콜드스타트 등). 최대 5회, 간격 0/0.8/2/3/4초 */
 async function withDbRetry<T>(fn: () => Promise<T>): Promise<T> {
-  const delays = [0, 500, 1000];
+  const delays = [0, 800, 2000, 3000, 4000];
   let lastError: unknown;
   for (let i = 0; i < delays.length; i++) {
     if (i > 0) await new Promise((r) => setTimeout(r, delays[i]));
@@ -24,8 +30,9 @@ async function withDbRetry<T>(fn: () => Promise<T>): Promise<T> {
       return await fn();
     } catch (e) {
       lastError = e;
+      const err = e as { code?: string };
       if (!isDbConnectionError(e) || i === delays.length - 1) throw e;
-      console.warn("[login] DB connection retry", i + 1, "/", delays.length);
+      console.warn("[login] DB connection retry", i + 1, "/", delays.length, err?.code ?? "");
     }
   }
   throw lastError;
@@ -54,22 +61,84 @@ export async function POST(request: Request) {
       );
     }
 
-    let user;
+    // 로그인에서 실제 사용 필드만 select (P2022 방지: DB에 없는 컬럼 미요청)
+    const loginSelect = {
+      id: true,
+      name: true,
+      username: true,
+      email: true,
+      password: true,
+      role: true,
+      status: true,
+      withdrawnAt: true,
+    } as const;
+    const minimalSelect = {
+      id: true,
+      name: true,
+      username: true,
+      email: true,
+      password: true,
+      role: true,
+    } as const;
+
+    type LoginUser = {
+      id: string;
+      name: string;
+      username: string;
+      email: string;
+      password: string;
+      role: string;
+      status?: string | null;
+      withdrawnAt?: Date | null;
+    } | null;
+
+    let user: LoginUser;
     try {
       user = await withDbRetry(() =>
         prisma.user.findUnique({
           where: { username: username.trim() },
+          select: loginSelect,
         })
       );
     } catch (dbError) {
+      const err = dbError as { code?: string; message?: string; meta?: unknown };
       console.error("[login] DB error:", dbError);
-      if (isDbConnectionError(dbError)) {
+      console.error("[login] DB error.code:", err?.code);
+      console.error("[login] DB error.message:", err?.message);
+      console.error("[login] DB error.meta (전체):", JSON.stringify(err?.meta ?? null, null, 2));
+      if (typeof err?.meta === "object" && err.meta !== null && "column" in err.meta) {
+        console.error("[login] DB error.meta.column (없는 컬럼):", (err.meta as { column?: unknown }).column);
+      }
+      if (isDbSchemaMismatchError(dbError)) {
+        // P2022 시 최소 필드만으로 재시도 (status/withdrawnAt 없을 때)
+        console.warn("[login] P2022: 최소 필드(id,name,username,email,password,role)로 재시도");
+        try {
+          user = await prisma.user.findUnique({
+            where: { username: username.trim() },
+            select: minimalSelect,
+          });
+          if (user) (user as LoginUser).status = null;
+          if (user) (user as LoginUser).withdrawnAt = null;
+        } catch (fallbackError) {
+          const fe = fallbackError as { code?: string; meta?: unknown };
+          console.error("[login] fallback also failed:", fallbackError);
+          console.error("[login] fallback error.meta:", JSON.stringify(fe?.meta ?? null, null, 2));
+          return NextResponse.json(
+            {
+              error:
+                "데이터베이스 스키마가 일치하지 않습니다. 터미널에서 npx prisma generate 후 npx prisma db push 또는 npx prisma migrate deploy 를 실행해 주세요.",
+            },
+            { status: 503 }
+          );
+        }
+      } else if (isDbConnectionError(dbError)) {
         return NextResponse.json(
           { error: "데이터베이스에 일시적으로 연결할 수 없습니다. 잠시 후 다시 시도해 주세요." },
           { status: 503 }
         );
+      } else {
+        throw dbError;
       }
-      throw dbError;
     }
 
     if (!user) {
@@ -79,8 +148,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const withdrawnAt = (user as { withdrawnAt?: Date | null }).withdrawnAt;
-    const status = (user as { status?: string | null }).status;
+    const withdrawnAt = user.withdrawnAt ?? null;
+    const status = user.status ?? null;
     if (withdrawnAt || status === "DELETED") {
       return NextResponse.json(
         { error: "탈퇴한 계정입니다. 재가입 문의는 관리자에게 연락해 주세요." },

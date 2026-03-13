@@ -69,7 +69,7 @@ export const DEFAULT_HERO_SETTINGS: HeroSettings = {
   heroButtonsAlign: "center",
   heroButtons: [
     { ...DEFAULT_BUTTON, enabled: true, label: "진행중 대회 보기", href: "/tournaments", variant: "primary" },
-    { ...DEFAULT_BUTTON, enabled: true, label: "대회 참가 신청", href: "/apply", variant: "outline" },
+    { ...DEFAULT_BUTTON, enabled: true, label: "대회 참가 신청", href: "/apply/client", variant: "outline" },
     { ...DEFAULT_BUTTON },
   ],
 };

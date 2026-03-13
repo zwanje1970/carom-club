@@ -116,13 +116,14 @@ export function HomeTournamentCards({
                   className="group flex flex-col overflow-hidden rounded-2xl border border-site-border bg-site-card shadow-sm transition hover:border-site-primary/30 hover:shadow-md h-full"
                 >
                   <div className="relative aspect-[16/10] w-full bg-gray-100">
-                    {t.imageUrl ? (
+                    {t.imageUrl?.trim() ? (
                       <Image
-                        src={t.imageUrl}
+                        src={t.imageUrl.trim()}
                         alt=""
                         fill
                         className="object-cover"
                         sizes="(max-width: 640px) 85vw, (max-width: 1024px) 48vw, 320px"
+                        unoptimized={!t.imageUrl.trim().startsWith("/") && !t.imageUrl.includes("vercel-storage")}
                       />
                     ) : (
                       <div

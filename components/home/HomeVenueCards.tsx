@@ -77,13 +77,14 @@ export function HomeVenueCards({
                 </div>
                 {/* 우측 절반: 이미지 (클라이언트 등록 cover, 정비율 object-cover로 크기 최적화) */}
                 <div className="relative w-1/2 shrink-0 aspect-square bg-gray-200 dark:bg-slate-700">
-                  {v.coverImageUrl ? (
+                  {v.coverImageUrl?.trim() ? (
                     <Image
-                      src={v.coverImageUrl}
+                      src={v.coverImageUrl.trim()}
                       alt=""
                       fill
                       sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                       className="object-cover"
+                      unoptimized={!v.coverImageUrl.trim().startsWith("/") && !v.coverImageUrl.includes("vercel-storage")}
                     />
                   ) : (
                     <span className="absolute inset-0 flex items-center justify-center text-3xl text-site-secondary/50" aria-hidden>
