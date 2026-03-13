@@ -33,7 +33,7 @@ export default function LayoutAuthenticated({ children }: Props) {
       <div
         className={`${layoutAsidePadding} ${
           isAsideMobileExpanded ? "ml-60 lg:ml-0" : ""
-        } min-h-screen w-screen bg-gray-50 pt-14 transition-(--transition-position) lg:w-auto dark:bg-slate-800 dark:text-slate-100`}
+        } min-h-screen w-screen bg-gray-50 pt-12 transition-(--transition-position) lg:w-auto dark:bg-slate-800 dark:text-slate-100`}
       >
         <NavBar
           menu={menuNavBar}

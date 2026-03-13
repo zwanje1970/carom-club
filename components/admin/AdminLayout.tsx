@@ -36,22 +36,29 @@ export function AdminLayout({ children, userName, copy, footer }: Props) {
   };
 
   const menuNavBar = buildMenuNavBar(userName, copy);
+  const hasNavBar = menuNavBar.length > 0;
+  const headerHeight = hasNavBar ? 128 : 64; // 메인 헤더 64px, NavBar 있으면 +64px
   const footerText = copy?.["footer.copyright"] ?? "CAROM.CLUB 관리자";
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-800 dark:text-slate-100">
-      <NavBar
-        menu={menuNavBar}
-        className=""
-        userName={userName}
-        onLogout={handleLogout}
-      />
+      {hasNavBar && (
+        <NavBar
+          menu={menuNavBar}
+          className=""
+          userName={userName}
+          onLogout={handleLogout}
+        />
+      )}
       <div
-        className="relative z-0 min-h-screen w-full pt-[128px]"
-        style={{ paddingTop: "128px" }}
+        className="relative z-0 min-h-screen w-full"
+        style={{ paddingTop: `${headerHeight}px` }}
       >
-        <AdminPageActions />
-        <main className={`min-h-[calc(100vh-128px)] ${ADMIN_ACTION_BAR_PT_CLASS} p-4 sm:p-6 overflow-x-hidden`}>
+        <AdminPageActions topOffset={headerHeight} />
+        <main
+          className={`${ADMIN_ACTION_BAR_PT_CLASS} p-4 sm:p-6 overflow-x-hidden`}
+          style={{ minHeight: `calc(100vh - ${headerHeight}px)` }}
+        >
           {children}
         </main>
         {footer?.footerEnabled ? (

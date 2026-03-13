@@ -48,12 +48,12 @@ export default function AdminSettingsPage() {
       <SectionTitleLineWithButton icon={mdiCog} title="설정" />
       <p className="mb-6 text-sm text-gray-600 dark:text-slate-400">설정 항목을 선택하세요.</p>
       <CardBox>
-        <ul className="divide-y divide-gray-200 dark:divide-slate-700">
+        <ul className="space-y-4">
           {SETTINGS_MENU.map((item) => (
-            <li key={item.href}>
+            <li key={item.href} className="border-b border-gray-200 last:border-b-0 dark:border-slate-700">
               <Link
                 href={item.href}
-                className="flex items-center justify-between gap-4 px-0 py-8 text-left transition first:pt-0 last:pb-0 hover:opacity-80"
+                className="flex items-center justify-between gap-4 px-4 py-5 text-left transition hover:bg-gray-50 hover:opacity-90 dark:hover:bg-slate-700/50"
               >
                 <div>
                   <span className="font-medium text-gray-900 dark:text-slate-100">{item.label}</span>
