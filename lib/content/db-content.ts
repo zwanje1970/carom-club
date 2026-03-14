@@ -38,6 +38,11 @@ function rowToPageSection(r: {
   sortOrder: number;
   startAt: Date | null;
   endAt: Date | null;
+  backgroundColor?: string | null;
+  titleIconType?: string | null;
+  titleIconName?: string | null;
+  titleIconImageUrl?: string | null;
+  titleIconSize?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }): PageSection {
@@ -69,6 +74,11 @@ function rowToPageSection(r: {
     sortOrder: r.sortOrder,
     startAt: toISO(r.startAt),
     endAt: toISO(r.endAt),
+    backgroundColor: r.backgroundColor ?? null,
+    titleIconType: (r.titleIconType as PageSection["titleIconType"]) ?? null,
+    titleIconName: r.titleIconName ?? null,
+    titleIconImageUrl: r.titleIconImageUrl ?? null,
+    titleIconSize: (r.titleIconSize as PageSection["titleIconSize"]) ?? null,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   };
@@ -242,6 +252,11 @@ export async function upsertPageSectionInDb(data: PageSectionInput): Promise<Pag
     sortOrder: data.sortOrder,
     startAt: data.startAt ? new Date(data.startAt) : null,
     endAt: data.endAt ? new Date(data.endAt) : null,
+    backgroundColor: data.backgroundColor ?? null,
+    titleIconType: data.titleIconType ?? null,
+    titleIconName: data.titleIconName ?? null,
+    titleIconImageUrl: data.titleIconImageUrl ?? null,
+    titleIconSize: data.titleIconSize ?? null,
   };
   const r = await prisma.pageSection.upsert({
     where: { id: data.id },

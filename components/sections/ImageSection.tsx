@@ -44,8 +44,12 @@ export function ImageSection({ section }: Props) {
     </>
   );
 
+  const bg = section.backgroundColor?.trim();
   const wrapper = (
-    <div className="relative w-full overflow-hidden bg-gray-100">
+    <div
+      className={`relative w-full overflow-hidden ${!bg ? "bg-gray-100" : ""}`}
+      style={bg ? { backgroundColor: bg } : undefined}
+    >
       {image}
     </div>
   );

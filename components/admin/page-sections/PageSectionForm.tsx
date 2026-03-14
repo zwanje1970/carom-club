@@ -46,6 +46,11 @@ const emptySection = (): Omit<PageSection, "createdAt" | "updatedAt"> => ({
   sortOrder: 0,
   startAt: null,
   endAt: null,
+  backgroundColor: null,
+  titleIconType: "none",
+  titleIconName: null,
+  titleIconImageUrl: null,
+  titleIconSize: null,
 });
 
 type Props = {
@@ -608,6 +613,72 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
       <section>
         <h3 className="mb-4 text-lg font-semibold">기본 정보</h3>
         <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">섹션 배경색</label>
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="text"
+                value={form.backgroundColor ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, backgroundColor: e.target.value || null }))}
+                className="w-28 rounded border border-site-border bg-white px-2 py-1.5 text-sm dark:bg-slate-700"
+                placeholder="#ffffff"
+              />
+              <ColorPalette64
+                applyMode="background"
+                selectedHex={form.backgroundColor ?? undefined}
+                onSelect={(hex) => setForm((f) => ({ ...f, backgroundColor: hex }))}
+                cellSize={20}
+              />
+            </div>
+            <p className="mt-1 text-xs text-gray-500">비우면 기존 스타일 유지</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">제목 아이콘 유형</label>
+            <select
+              value={form.titleIconType ?? "none"}
+              onChange={(e) => setForm((f) => ({ ...f, titleIconType: e.target.value as "none" | "icon" | "image" }))}
+              className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-700"
+            >
+              <option value="none">없음</option>
+              <option value="icon">아이콘(문자/이모지)</option>
+              <option value="image">이미지</option>
+            </select>
+          </div>
+          {(form.titleIconType === "icon" || form.titleIconType === "image") && (
+            <>
+              {form.titleIconType === "icon" && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">아이콘 문자/이모지</label>
+                  <input
+                    type="text"
+                    value={form.titleIconName ?? ""}
+                    onChange={(e) => setForm((f) => ({ ...f, titleIconName: e.target.value || null }))}
+                    className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-700"
+                    placeholder="예: 🏆 또는 ●"
+                  />
+                </div>
+              )}
+              {form.titleIconType === "image" && (
+                <AdminImageField
+                  label="제목 아이콘 이미지 URL"
+                  value={form.titleIconImageUrl}
+                  onChange={(url) => setForm((f) => ({ ...f, titleIconImageUrl: url }))}
+                  policy="section"
+                />
+              )}
+              <div>
+                <label className="block text-sm font-medium mb-1">아이콘 크기</label>
+                <select
+                  value={form.titleIconSize ?? "small"}
+                  onChange={(e) => setForm((f) => ({ ...f, titleIconSize: e.target.value as "small" | "medium" }))}
+                  className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-700"
+                >
+                  <option value="small">작게 (16~18px)</option>
+                  <option value="medium">보통 (20~24px)</option>
+                </select>
+              </div>
+            </>
+          )}
           <div>
             <label className="block text-sm font-medium mb-1">섹션 유형 (필수)</label>
             <select

@@ -88,22 +88,22 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
 
   const titleBlock = (
     <div
-      className={`hero-html prose prose-p:my-0.5 max-w-none ${titleAlignClass} ${isOverlay ? "text-white [&_*]:text-inherit" : "text-site-text"}`}
+      className={`hero-html prose prose-p:my-0.5 max-w-none text-3xl md:text-6xl ${titleAlignClass} ${isOverlay ? "text-white [&_*]:text-inherit" : "text-site-text"}`}
       style={Object.keys(titleStyle).length ? titleStyle : undefined}
       dangerouslySetInnerHTML={{ __html: titleHtml || "<p>CAROM.CLUB</p>" }}
     />
   );
 
   const buttonsBlock = heroButtons.length > 0 ? (
-    <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+    <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4">
       {heroButtons.map((btn, i) => (
         <Link
           key={i}
           href={btn.href}
           className={
             i === 0
-              ? `bg-site-primary text-white shadow-sm hover:opacity-90 ${buttonSizeClassLegacy(btn.size)}`
-              : `border-2 border-site-primary bg-site-card text-site-primary hover:bg-site-primary/5 ${buttonSizeClassLegacy(btn.size)}`
+              ? `bg-site-primary text-white shadow-sm hover:opacity-90 px-4 py-2 text-sm md:px-8 md:py-4 md:text-lg inline-flex items-center justify-center rounded-xl font-medium min-h-[36px] md:min-h-[52px]`
+              : `border-2 border-site-primary bg-site-card text-site-primary hover:bg-site-primary/5 px-4 py-2 text-sm md:px-8 md:py-4 md:text-lg inline-flex items-center justify-center rounded-xl font-medium min-h-[36px] md:min-h-[52px]`
           }
         >
           {btn.label}
@@ -114,20 +114,20 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
 
   const content = (
     <div
-      className={`relative z-10 w-full flex flex-col justify-center px-4 leading-tight ${
+      className={`relative z-10 w-full flex flex-col justify-center px-4 leading-tight py-4 md:py-6 ${
         isOverlay ? "text-white [&_.hero-html]:text-inherit" : ""
       }`}
     >
       {buttonsAbove && buttonsBlock}
-      <div className={buttonsAbove ? "mt-4" : ""}>{titleBlock}</div>
-      {!buttonsAbove && <div className="mt-8">{buttonsBlock}</div>}
+      <div className={buttonsAbove ? "mt-2 md:mt-4" : ""}>{titleBlock}</div>
+      {!buttonsAbove && <div className="mt-4 md:mt-8">{buttonsBlock}</div>}
     </div>
   );
 
   return (
     <section className="relative overflow-hidden border-b border-site-border bg-gradient-to-b from-site-card to-[var(--site-bg)] flex-shrink-0 w-full">
       {hasBanner ? (
-        <div className="relative min-h-[280px] sm:min-h-[320px] md:min-h-[380px] flex flex-col items-center justify-center py-10 sm:py-12 w-full">
+        <div className="relative min-h-[240px] md:min-h-[420px] flex flex-col items-center justify-center py-6 md:py-12 w-full">
           <div className="absolute inset-0">
             <Image
               src={bannerSrc}
@@ -139,14 +139,14 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
             />
           </div>
           <div className="absolute inset-0 bg-black/40 pointer-events-none" />
-          <div className="relative z-10 w-full flex flex-col items-center justify-center px-4 text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.8)] py-6">
+          <div className="relative z-10 w-full flex flex-col items-center justify-center px-4 text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]">
             {content}
           </div>
         </div>
       ) : (
         <>
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(214,40,40,0.08),transparent)] pointer-events-none" />
-          <div className="relative z-10 min-h-[280px] sm:min-h-[320px] md:min-h-[380px] w-full flex flex-col items-center justify-center py-10 sm:py-12 flex-shrink-0">
+          <div className="relative z-10 min-h-[240px] md:min-h-[420px] w-full flex flex-col items-center justify-center py-6 md:py-12 flex-shrink-0">
             {content}
           </div>
         </>

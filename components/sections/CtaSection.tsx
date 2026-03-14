@@ -2,6 +2,7 @@
 
 import { SmartLink } from "@/components/common/SmartLink";
 import type { PageSection } from "@/types/page-section";
+import { SectionTitleWithIcon } from "@/components/content/SectionTitleWithIcon";
 
 type Props = { section: PageSection };
 
@@ -15,14 +16,16 @@ export function CtaSection({ section }: Props) {
   const align = alignClass[section.textAlign] ?? "text-center justify-center";
   const buttons = Array.isArray(section?.buttons) ? section.buttons : [];
   const hasButtons = buttons.length > 0;
+  const bg = section.backgroundColor?.trim();
 
   return (
-    <section className="border-b border-site-border bg-site-card py-8 sm:py-12">
+    <section
+      className={`border-b border-site-border py-8 sm:py-12 ${!bg ? "bg-site-card" : ""}`}
+      style={bg ? { backgroundColor: bg } : undefined}
+    >
       <div className={`mx-auto max-w-3xl px-4 flex flex-col items-center ${align}`}>
         {section.title && (
-          <h2 className="text-2xl font-bold text-site-text sm:text-3xl">
-            {section.title}
-          </h2>
+          <SectionTitleWithIcon section={section} title={section.title} />
         )}
         {section.subtitle && (
           <p className="mt-2 text-lg text-gray-600">{section.subtitle}</p>

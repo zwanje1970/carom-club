@@ -34,8 +34,13 @@ export async function GET(request: Request) {
   const list = await getTournamentsListWithOrgCoords(take * 3);
   const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
 
+  /** 접수중(OPEN) 대회를 상단에 노출: 1순위 OPEN, 2순위 나머지 */
+  const openFirst = <T extends { status: string }>(arr: T[]): T[] =>
+    [...arr].sort((a, b) => (a.status === "OPEN" ? (b.status === "OPEN" ? 0 : -1) : b.status === "OPEN" ? 1 : 0));
+
   if (!hasCoords) {
-    const out: HomeTournamentItem[] = list.slice(0, take).map((t) => ({
+    const sorted = openFirst(list).slice(0, take);
+    const out: HomeTournamentItem[] = sorted.map((t) => ({
       id: t.id,
       name: t.name,
       startAt: t.startAt,
@@ -57,6 +62,9 @@ export async function GET(request: Request) {
     return { ...rest, distanceKm: km };
   });
   withDistance.sort((a, b) => {
+    const openA = a.status === "OPEN" ? 0 : 1;
+    const openB = b.status === "OPEN" ? 0 : 1;
+    if (openA !== openB) return openA - openB;
     const ka = a.distanceKm;
     const kb = b.distanceKm;
     if (ka == null && kb == null) return 0;

@@ -19,7 +19,9 @@ const NAV = [
   { href: "/community", label: "커뮤니티" },
 ] as const;
 
-export function MainSiteHeader() {
+type MainSiteHeaderProps = { hideOnMobile?: boolean };
+
+export function MainSiteHeader({ hideOnMobile = false }: MainSiteHeaderProps) {
   const pathname = usePathname() ?? "";
   const { restartIntro } = useIntroController();
   const settings = useSiteSettings();
@@ -55,7 +57,7 @@ export function MainSiteHeader() {
 
   return (
     <header
-      className="sticky top-0 z-20 h-16 min-h-[64px] border-b relative flex items-center transition-colors"
+      className={`sticky top-0 z-20 h-16 min-h-[64px] border-b relative flex items-center transition-colors ${hideOnMobile ? "hidden md:flex" : ""}`}
       style={{
         height: "64px",
         backgroundColor: headerBg,

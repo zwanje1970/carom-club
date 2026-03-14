@@ -6,7 +6,7 @@ import { BottomNav } from "./BottomNav";
 type Props = { children: React.ReactNode };
 
 /**
- * 모바일에서 BottomNav 표시 + 본문 하단 여백(pb-20).
+ * 모바일에서 BottomNav 표시 + 본문 하단 여백(pb-24).
  * /admin/* 에서는 BottomNav 미표시, 여백 없음.
  */
 export function MobileBottomNavWrapper({ children }: Props) {
@@ -15,7 +15,7 @@ export function MobileBottomNavWrapper({ children }: Props) {
 
   return (
     <>
-      <div className={isAdmin ? "" : "pb-20 md:pb-0"}>{children}</div>
+      <div className={isAdmin ? "" : "pb-24 md:pb-0"}>{children}</div>
       {!isAdmin && <BottomNav />}
     </>
   );

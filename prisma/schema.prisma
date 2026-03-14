@@ -479,6 +479,11 @@ model PageSection {
   sortOrder         Int      @default(0)
   startAt           DateTime?
   endAt             DateTime?
+  backgroundColor   String?
+  titleIconType     String?  // none | icon | image
+  titleIconName     String?
+  titleIconImageUrl String?
+  titleIconSize     String?  // small | medium
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

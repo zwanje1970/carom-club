@@ -102,27 +102,27 @@ export function HomeTournamentCards({
           </div>
         </div>
         <div
-          className="mt-6 -mx-4 sm:-mx-6 overflow-x-auto overflow-y-hidden"
+          className="mt-6 -mx-4 sm:-mx-6 flex gap-4 overflow-x-auto overflow-y-hidden snap-x snap-mandatory touch-pan-x pb-4 md:overflow-visible md:flex-wrap md:pb-0"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
-          <ul className="flex gap-4 px-4 pb-2 sm:px-6">
+          <ul className="flex gap-4 px-4 sm:px-6 min-w-0 md:flex-wrap md:w-full">
             {tournaments.map((t) => (
               <li
                 key={t.id}
-                className="flex-shrink-0 w-[85%] min-w-[260px] sm:w-[48%] sm:min-w-[280px] lg:w-[calc((100%-2rem)/3.2)] lg:max-w-[320px]"
+                className="flex-shrink-0 w-[280px] min-w-[280px] snap-start md:w-[48%] md:min-w-[280px] lg:w-[calc((100%-2rem)/3.2)] lg:max-w-[320px]"
               >
                 <Link
                   href={`/tournaments/${t.id}`}
                   className="group flex flex-col overflow-hidden rounded-2xl border border-site-border bg-site-card shadow-sm transition hover:border-site-primary/30 hover:shadow-md h-full"
                 >
-                  <div className="relative aspect-[16/10] w-full bg-gray-100">
+                  <div className="relative w-full h-32 md:h-40 bg-gray-100 shrink-0">
                     {t.imageUrl?.trim() ? (
                       <Image
                         src={t.imageUrl.trim()}
                         alt=""
                         fill
                         className="object-cover"
-                        sizes="(max-width: 640px) 85vw, (max-width: 1024px) 48vw, 320px"
+                        sizes="(max-width: 768px) 280px, (max-width: 1024px) 48vw, 320px"
                         unoptimized={!t.imageUrl.trim().startsWith("/") && !t.imageUrl.includes("vercel-storage")}
                       />
                     ) : (
@@ -139,21 +139,21 @@ export function HomeTournamentCards({
                       {statusLabel(t.status)}
                     </span>
                   </div>
-                  <div className="flex flex-1 flex-col p-4">
-                    <h3 className="font-semibold text-site-text group-hover:text-site-primary">
+                  <div className="flex flex-1 flex-col p-3 gap-2">
+                    <h3 className="font-semibold text-site-text group-hover:text-site-primary text-sm md:text-base">
                       {t.name}
                     </h3>
                     {t.organization && (
-                      <p className="mt-0.5 text-sm text-gray-500">{t.organization.name}</p>
+                      <p className="mt-0.5 text-xs text-gray-500 md:text-sm">{t.organization.name}</p>
                     )}
                     {t.distanceKm != null && (
-                      <p className="mt-0.5 text-sm text-gray-500">{formatDistanceKm(t.distanceKm)}</p>
+                      <p className="mt-0.5 text-xs text-gray-500 md:text-sm">{formatDistanceKm(t.distanceKm)}</p>
                     )}
-                    <p className="mt-1 text-sm text-gray-600">
+                    <p className="mt-1 text-xs text-gray-600 md:text-sm">
                       {formatDate(t.startAt)}
                       {t.venue && ` · ${t.venue}`}
                     </p>
-                    <span className="mt-3 inline-flex min-h-[40px] w-full items-center justify-center rounded-xl bg-site-primary text-sm font-medium text-white transition group-hover:opacity-90">
+                    <span className="mt-2 inline-flex min-h-[36px] md:min-h-[40px] w-full items-center justify-center rounded-xl bg-site-primary py-2 text-sm font-medium text-white transition group-hover:opacity-90">
                       {getCopyValue(c, "site.home.tournaments.btnJoin")}
                     </span>
                   </div>
@@ -162,10 +162,10 @@ export function HomeTournamentCards({
             ))}
           </ul>
         </div>
-        <div className="mt-6 text-center">
+        <div className="mt-4 md:mt-6 text-center">
           <Link
             href="/tournaments"
-            className="inline-flex items-center justify-center rounded-xl border-2 border-site-primary bg-site-primary px-6 py-2.5 text-sm font-medium text-white hover:opacity-90 transition"
+            className="inline-flex items-center justify-center rounded-xl border-2 border-site-primary bg-site-primary px-5 py-2 text-sm font-medium text-white hover:opacity-90 transition"
           >
             전체 대회 보기
           </Link>
