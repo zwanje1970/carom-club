@@ -5,6 +5,8 @@ import { HomeTournamentCards } from "./HomeTournamentCards";
 import { HomeVenueCards } from "./HomeVenueCards";
 import type { TournamentListRow } from "@/lib/db-tournaments";
 
+/** 정렬 우선순위: 1) GPS → /api/home/venues·tournaments?lat=&lng= (Haversine), 2) API 내부에서 회원 주소 좌표 사용, 3) 기존 정렬 */
+
 type VenueItem = {
   id: string;
   name: string;

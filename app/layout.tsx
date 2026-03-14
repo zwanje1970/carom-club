@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { IntroRoot } from "@/components/intro/IntroRoot";
 import { MainSiteHeaderWrapper } from "@/components/layout/MainSiteHeaderWrapper";
+import { MobileBottomNavWrapper } from "@/components/layout/MobileBottomNavWrapper";
 import { AdminFloatButton } from "@/components/AdminFloatButton";
 import NotificationBanner from "@/components/NotificationBanner";
 import { getSiteSettings, DEFAULT_PRIMARY_COLOR, DEFAULT_SECONDARY_COLOR } from "@/lib/site-settings";
@@ -105,7 +106,7 @@ export default async function RootLayout({
           <NotificationBanner />
           <IntroRoot>
             <MainSiteHeaderWrapper />
-            {children}
+            <MobileBottomNavWrapper>{children}</MobileBottomNavWrapper>
           </IntroRoot>
           <AdminFloatButton />
         </SiteSettingsProvider>
