@@ -6,19 +6,19 @@ import CardBox from "@/components/admin/_components/CardBox";
 
 const SETTINGS_MENU = [
   {
+    href: "/admin/site",
+    label: "사이트 관리 (메인페이지·히어로·푸터 등)",
+    description: "메인페이지 구성, 히어로·헤더·푸터·컴포넌트·공통 디자인",
+  },
+  {
     href: "/admin/me",
     label: "관리자 정보 수정",
     description: "로그인한 관리자 이름·비밀번호 변경",
   },
   {
     href: "/admin/settings/site",
-    label: "사이트 설정",
-    description: "사이트 이름, 로고, 기본 정보",
-  },
-  {
-    href: "/admin/settings/hero",
-    label: "메인 히어로 설정",
-    description: "메인페이지 상단 히어로 배경·텍스트·버튼",
+    label: "사이트 기본 정보",
+    description: "사이트 이름, 로고, 테마 색상",
   },
   {
     href: "/admin/settings/notifications",
@@ -31,14 +31,14 @@ const SETTINGS_MENU = [
     description: "API·외부 서비스 연동",
   },
   {
+    href: "/admin/settings/platform-billing",
+    label: "요금 정책",
+    description: "요금 정책 활성화, 대회 이용권·연회원 가격",
+  },
+  {
     href: "/admin/settings/labels",
     label: "메뉴/문구",
     description: "관리자 메뉴명·버튼 문구 수정",
-  },
-  {
-    href: "/admin/settings/footer",
-    label: "푸터(하단바) 설정",
-    description: "하단바 배경/글자색, 주관사 정보, 협력업체",
   },
 ] as const;
 

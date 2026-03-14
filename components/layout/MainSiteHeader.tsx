@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoLink } from "@/components/intro/LogoLink";
-import { useIntroController } from "@/components/intro/useIntroController";
 import { useSiteSettings } from "@/components/SiteSettingsProvider";
 import type { SessionUser } from "@/types/auth";
 
@@ -23,7 +22,6 @@ type MainSiteHeaderProps = { hideOnMobile?: boolean };
 
 export function MainSiteHeader({ hideOnMobile = false }: MainSiteHeaderProps) {
   const pathname = usePathname() ?? "";
-  const { restartIntro } = useIntroController();
   const settings = useSiteSettings();
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined);
   const [mounted, setMounted] = useState(false);
@@ -64,17 +62,7 @@ export function MainSiteHeader({ hideOnMobile = false }: MainSiteHeaderProps) {
         borderColor: headerBg,
       }}
     >
-      <button
-        type="button"
-        onClick={restartIntro}
-        className="absolute left-0 top-0 bottom-0 flex items-center pl-3 sm:pl-4 text-xs transition focus:outline-none focus:underline z-10 opacity-80 hover:opacity-100"
-        style={{ color: headerText }}
-        title="인트로 다시 보기"
-        aria-label="인트로 다시 보기"
-      >
-        ⓘ
-      </button>
-      <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 pl-8 sm:pl-10 pr-4 py-3 sm:px-6 sm:gap-4">
+      <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:gap-4">
         <div className="flex items-center gap-2 min-w-0">
           <LogoLink variant="white" data-main-logo />
         </div>

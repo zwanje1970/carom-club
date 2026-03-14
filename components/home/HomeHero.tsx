@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import { useIntroController } from "@/components/intro/useIntroController";
 import type { HeroContent as HeroContentType } from "@/lib/content/hero-from-section";
 import type { HeroSettings } from "@/lib/hero-settings";
 
@@ -66,6 +67,7 @@ type HomeHeroProps = {
 };
 
 export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
+  const { restartIntro } = useIntroController();
   const useNewHero = heroSettings?.heroEnabled && heroSettings !== null;
 
   if (useNewHero) {
@@ -126,6 +128,15 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
 
   return (
     <section className="relative overflow-hidden border-b border-site-border bg-gradient-to-b from-site-card to-[var(--site-bg)] flex-shrink-0 w-full">
+      <button
+        type="button"
+        onClick={restartIntro}
+        className="absolute left-0 top-0 z-20 flex items-center p-3 sm:p-4 text-xs rounded-br-md bg-black/30 text-white/95 hover:text-white hover:bg-black/40 transition focus:outline-none focus:underline"
+        title="인트로 다시 보기"
+        aria-label="인트로 다시 보기"
+      >
+        ⓘ
+      </button>
       {hasBanner ? (
         <div className="relative min-h-[240px] md:min-h-[420px] flex flex-col items-center justify-center py-6 md:py-12 w-full">
           <div className="absolute inset-0">
@@ -156,6 +167,7 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
 }
 
 function HomeHeroFromSettings({ settings }: { settings: HeroSettings }) {
+  const { restartIntro } = useIntroController();
   const s = settings;
   const bgSrc = s.heroBackgroundImageUrl?.trim() || HERO_PLACEHOLDER_SVG;
   const textAlignClass =
@@ -220,6 +232,15 @@ function HomeHeroFromSettings({ settings }: { settings: HeroSettings }) {
 
   return (
     <section className="hero-section-new relative overflow-hidden border-b border-site-border flex-shrink-0 w-full">
+      <button
+        type="button"
+        onClick={restartIntro}
+        className="absolute left-0 top-0 z-20 flex items-center p-3 sm:p-4 text-xs rounded-br-md bg-black/30 text-white/95 hover:text-white hover:bg-black/40 transition focus:outline-none focus:underline"
+        title="인트로 다시 보기"
+        aria-label="인트로 다시 보기"
+      >
+        ⓘ
+      </button>
       <style
         dangerouslySetInnerHTML={{
           __html: `.hero-section-new{min-height:${mobileHeight}}@media(min-width:768px){.hero-section-new{min-height:${desktopHeight}}}.hero-block-new{position:absolute;inset:0;min-height:${mobileHeight}}@media(min-width:768px){.hero-block-new{min-height:${desktopHeight}}}`,

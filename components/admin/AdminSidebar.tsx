@@ -10,6 +10,7 @@ const menu = [
   { href: "/admin/venues", label: "클라이언트 목록" },
   { href: "/admin/fee-ledger", label: "회비 장부" },
   { href: "/admin/client-applications", label: "클라이언트 신청" },
+  { href: "/admin/site", label: "사이트 관리" },
   { href: "/admin/settings", label: "설정" },
 ];
 

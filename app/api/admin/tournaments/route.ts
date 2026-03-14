@@ -4,6 +4,7 @@ import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { isPlatformAdmin } from "@/types/auth";
+import { getPlatformSettings, hasActiveClientMembership } from "@/lib/platform-settings";
 
 /** 최근 대회 목록 (이전 대회 불러오기 모달용). ?organizationId= 시 해당 업체만. */
 export async function GET(request: Request) {
@@ -184,6 +185,23 @@ export async function POST(request: Request) {
       { error: "레슨 클라이언트는 대회 등록이 불가합니다." },
       { status: 403 }
     );
+  }
+
+  const platform = await getPlatformSettings();
+  if (platform.billingEnabled) {
+    const hasMembership = await hasActiveClientMembership(organizationId);
+    if (!hasMembership) {
+      return NextResponse.json(
+        {
+          error: "대회 1회 이용권 결제가 필요합니다.",
+          requiredPayment: {
+            type: "tournament_fee",
+            amount: platform.tournamentFee,
+          },
+        },
+        { status: 402 }
+      );
+    }
   }
 
   const validStatus =

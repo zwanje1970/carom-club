@@ -257,7 +257,13 @@ export function TournamentNewForm({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "저장에 실패했습니다.");
+        const msg = data.error || "저장에 실패했습니다.";
+        const amount = data.requiredPayment?.amount;
+        setError(
+          amount != null
+            ? `${msg} (${Number(amount).toLocaleString()}원)`
+            : msg
+        );
         return;
       }
       const newId = data.id as string | undefined;

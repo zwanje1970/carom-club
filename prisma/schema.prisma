@@ -138,6 +138,7 @@ model Organization {
   tournamentVenues  TournamentVenue[]  // 이 당구장이 개최지로 지정된 대회들
   feeSetting       OrganizationFeeSetting?
   feePayments      OrganizationFeePayment[]
+  clientMemberships ClientMembership[]  // 연회원: 유효 시 대회 무제한 생성
 }
 
 // 클라이언트 회비 설정: 월회비/연회비 택일
@@ -452,6 +453,31 @@ model NotificationSetting {
   notifyPaymentConfirmed  Boolean  @default(true)   // 입금 확인 알림
   notifyAnnouncement      Boolean  @default(true)   // 공지사항 알림
   updatedAt               DateTime @updatedAt
+}
+
+// ============== Platform billing (요금 정책) ==============
+// 단일 행. billing_enabled=false 이면 2026년처럼 모든 기능 무료.
+
+model PlatformSettings {
+  id                    String   @id @default(cuid())
+  billingEnabled        Boolean  @default(false)  // true 시 결제 시스템 적용 (2027년~)
+  tournamentFee         Int      @default(30000)   // 대회 1회 이용권 (원)
+  clientMembershipFee   Int      @default(180000)  // 클라이언트 당구장 연회원 (원)
+  updatedAt             DateTime @updatedAt
+}
+
+// 클라이언트 당구장 연회원: 유효 기간 내면 대회 무제한 생성 가능.
+model ClientMembership {
+  id             String   @id @default(cuid())
+  organizationId String
+  validFrom      DateTime @default(now())
+  validUntil     DateTime // 이 날짜까지(포함) 연회원 유효
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([validUntil])
 }
 
 // ============== CMS: Page Sections, Popups, Notice Bars ==============

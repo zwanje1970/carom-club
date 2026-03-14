@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { containerMaxW } from "./_lib/config";
 
 /** 액션바 높이·본문 상단 여백 (한 곳에서 관리) */
@@ -12,11 +13,36 @@ type AdminPageActionsProps = {
   topOffset?: number;
 };
 
+/** 이전 페이지가 /admin 내부일 때만 history.back(), 아니면 대시보드(/admin)로 이동 (메인으로 나가지 않음) */
+function handleAdminBack(router: ReturnType<typeof useRouter>) {
+  try {
+    const ref = document.referrer;
+    if (!ref) {
+      router.push("/admin");
+      return;
+    }
+    const refUrl = new URL(ref);
+    if (
+      refUrl.origin === window.location.origin &&
+      refUrl.pathname.startsWith("/admin") &&
+      refUrl.pathname !== window.location.pathname
+    ) {
+      window.history.back();
+    } else {
+      router.push("/admin");
+    }
+  } catch {
+    router.push("/admin");
+  }
+}
+
 /**
  * 관리자 본문 상단 공통 액션: 뒤로 가기, 대시보드로 가기
- * 헤더 바로 아래 고정(fixed). NavBar 없을 때 구간 없이 붙음.
+ * 뒤로 가기는 대시보드(/admin) 안에서만 동작, 메인으로는 나가지 않음.
  */
 export function AdminPageActions({ topOffset = 64 }: AdminPageActionsProps) {
+  const router = useRouter();
+
   return (
     <div
       className={`fixed left-0 right-0 z-40 ${ACTION_BAR_HEIGHT} flex items-center border-b border-gray-200 bg-gray-50 shadow-sm dark:border-slate-600 dark:bg-slate-800`}
@@ -25,7 +51,7 @@ export function AdminPageActions({ topOffset = 64 }: AdminPageActionsProps) {
       <div className={`flex w-full flex-wrap items-center gap-2 px-4 py-1.5 sm:gap-3 sm:px-6 ${containerMaxW} mx-auto`}>
         <button
           type="button"
-          onClick={() => window.history.back()}
+          onClick={() => handleAdminBack(router)}
           className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
         >
           뒤로 가기

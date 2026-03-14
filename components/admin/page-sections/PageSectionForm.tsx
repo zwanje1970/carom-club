@@ -23,7 +23,25 @@ import { HeroBlockEditor } from "@/components/admin/hero/HeroBlockEditor";
 import { HeroPreview } from "@/components/admin/hero/HeroPreview";
 import { FONT_FAMILIES, FONT_SIZES_PX } from "@/lib/editor-fonts";
 
-const emptySection = (): Omit<PageSection, "createdAt" | "updatedAt"> => ({
+type PageSectionFormState = Omit<PageSection, "createdAt" | "updatedAt"> & {
+  title: string;
+  subtitle: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  imageUrlMobile: string | null;
+  internalPage: PageSection["internalPage"];
+  internalPath: string | null;
+  externalUrl: string | null;
+  backgroundColor: string | null;
+  titleIconType: "none" | "icon" | "image";
+  titleIconName: string | null;
+  titleIconImageUrl: string | null;
+  titleIconSize: "small" | "medium" | null;
+  startAt: string | null;
+  endAt: string | null;
+};
+
+const emptySection = (): PageSectionFormState => ({
   id: "",
   type: "text",
   title: "",
@@ -52,6 +70,28 @@ const emptySection = (): Omit<PageSection, "createdAt" | "updatedAt"> => ({
   titleIconImageUrl: null,
   titleIconSize: null,
 });
+
+/** 서버/initial 데이터를 폼 상태로 정규화. undefined 제거 → 문자열 '', nullable은 null */
+function normalizeSectionForForm(s: PageSection): PageSectionFormState {
+  return {
+    ...s,
+    title: s.title ?? "",
+    subtitle: s.subtitle ?? null,
+    description: s.description ?? null,
+    imageUrl: s.imageUrl ?? null,
+    imageUrlMobile: s.imageUrlMobile ?? null,
+    internalPage: s.internalPage ?? null,
+    internalPath: s.internalPath ?? null,
+    externalUrl: s.externalUrl ?? null,
+    backgroundColor: s.backgroundColor ?? null,
+    titleIconType: (s.titleIconType === "icon" || s.titleIconType === "image" ? s.titleIconType : "none") as PageSectionFormState["titleIconType"],
+    titleIconName: s.titleIconName ?? null,
+    titleIconImageUrl: s.titleIconImageUrl ?? null,
+    titleIconSize: s.titleIconSize === "medium" ? "medium" : s.titleIconSize === "small" ? "small" : null,
+    startAt: s.startAt ? s.startAt.slice(0, 16) : null,
+    endAt: s.endAt ? s.endAt.slice(0, 16) : null,
+  };
+}
 
 type Props = {
   initial?: PageSection | null;
@@ -133,21 +173,11 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
   const [heroSpecialCharsOpen, setHeroSpecialCharsOpen] = useState(false);
   const heroEditorRef = useRef<Editor | null>(null);
   const heroSpecialCharsRef = useRef<HTMLDivElement>(null);
-  const [form, setForm] = useState(() => {
+  const [form, setForm] = useState<PageSectionFormState>(() => {
     if (initial) {
-      return {
-        ...initial,
-        startAt: initial.startAt ? initial.startAt.slice(0, 16) : null,
-        endAt: initial.endAt ? initial.endAt.slice(0, 16) : null,
-      };
+      return { ...normalizeSectionForForm(initial), id: initial.id };
     }
-    const e = emptySection();
-    return {
-      ...e,
-      id: `ps-${Date.now()}`,
-      startAt: null as string | null,
-      endAt: null as string | null,
-    };
+    return { ...emptySection(), id: `ps-${Date.now()}` };
   });
 
   const isHeroSection = form.placement === "main_visual_bg" && form.type === "image";
@@ -619,13 +649,13 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
               <input
                 type="text"
                 value={form.backgroundColor ?? ""}
-                onChange={(e) => setForm((f) => ({ ...f, backgroundColor: e.target.value || null }))}
+                onChange={(e) => setForm((f) => ({ ...f, backgroundColor: e.target.value.trim() || null }))}
                 className="w-28 rounded border border-site-border bg-white px-2 py-1.5 text-sm dark:bg-slate-700"
                 placeholder="#ffffff"
               />
               <ColorPalette64
                 applyMode="background"
-                selectedHex={form.backgroundColor ?? undefined}
+                selectedHex={form.backgroundColor || undefined}
                 onSelect={(hex) => setForm((f) => ({ ...f, backgroundColor: hex }))}
                 cellSize={20}
               />
@@ -635,7 +665,7 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
           <div>
             <label className="block text-sm font-medium mb-1">제목 아이콘 유형</label>
             <select
-              value={form.titleIconType ?? "none"}
+              value={form.titleIconType}
               onChange={(e) => setForm((f) => ({ ...f, titleIconType: e.target.value as "none" | "icon" | "image" }))}
               className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-700"
             >
@@ -652,7 +682,7 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
                   <input
                     type="text"
                     value={form.titleIconName ?? ""}
-                    onChange={(e) => setForm((f) => ({ ...f, titleIconName: e.target.value || null }))}
+                    onChange={(e) => setForm((f) => ({ ...f, titleIconName: e.target.value.trim() || null }))}
                     className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-700"
                     placeholder="예: 🏆 또는 ●"
                   />
@@ -661,7 +691,7 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
               {form.titleIconType === "image" && (
                 <AdminImageField
                   label="제목 아이콘 이미지 URL"
-                  value={form.titleIconImageUrl}
+                  value={form.titleIconImageUrl ?? null}
                   onChange={(url) => setForm((f) => ({ ...f, titleIconImageUrl: url }))}
                   policy="section"
                 />
@@ -697,7 +727,7 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
             </label>
             <input
               type="text"
-              value={form.title}
+              value={form.title ?? ""}
               onChange={(e) => !isHeroSection && setForm((f) => ({ ...f, title: e.target.value }))}
               readOnly={isHeroSection}
               className={`w-full rounded border border-site-border px-3 py-2 dark:bg-slate-700 ${isHeroSection ? "bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400" : "bg-white"}`}
@@ -778,7 +808,7 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
           <div className="space-y-4">
             <AdminImageField
               label={isHeroSection ? "배경 이미지 (업로드 또는 URL, 필수)" : "대표 이미지 (업로드 또는 URL 중 하나 필수)"}
-              value={form.imageUrl}
+              value={form.imageUrl ?? null}
               onChange={(url) => setForm((f) => ({ ...f, imageUrl: url }))}
               policy="section"
               recommendedSize={
@@ -790,7 +820,7 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
             />
             <AdminImageField
               label="모바일 이미지 (선택)"
-              value={form.imageUrlMobile}
+              value={form.imageUrlMobile ?? null}
               onChange={(url) => setForm((f) => ({ ...f, imageUrlMobile: url }))}
               policy="section"
               recommendedSize={RECOMMENDED_IMAGE_SIZES[form.placement]?.mobile}
@@ -869,8 +899,8 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
                 <label className="block text-sm font-medium mb-1">또는 직접 경로 입력</label>
                 <input
                   type="text"
-                  value={internalPathFromPage}
-                  onChange={(e) => setForm((f) => ({ ...f, internalPath: e.target.value || null, internalPage: null }))}
+                  value={internalPathFromPage ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, internalPath: e.target.value.trim() || null, internalPage: null }))}
                   className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-700"
                   placeholder="/ 또는 /tournaments"
                 />
@@ -884,7 +914,7 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
                 <input
                   type="url"
                   value={form.externalUrl ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, externalUrl: e.target.value || null }))}
+                  onChange={(e) => setForm((f) => ({ ...f, externalUrl: e.target.value.trim() || null }))}
                   className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-700"
                   placeholder="https://example.com"
                 />
