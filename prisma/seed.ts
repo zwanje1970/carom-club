@@ -85,6 +85,66 @@ async function main() {
   } catch (e) {
     console.warn("기본 당구장 생성은 건너뜁니다 (DB 스키마 불일치 시):", (e as Error).message);
   }
+
+  // 10단계: 기본 기능·요금제·등록상품 시드
+  try {
+    const features = [
+      { code: "TOURNAMENT_PROMO_PAGE", name: "대회 홍보 페이지", description: "대회 홍보 페이지 노출/편집" },
+      { code: "PARTICIPANT_MANAGEMENT", name: "참가자 관리", description: "참가 신청·확정·출석 관리" },
+      { code: "BRACKET_SYSTEM", name: "대진표 시스템", description: "대진표 생성·관리" },
+      { code: "SETTLEMENT_SYSTEM", name: "정산 시스템", description: "경기 결과·정산" },
+      { code: "MULTI_ZONE_OPERATION", name: "다권역 운영", description: "부/권역 설정·공동관리자 배정" },
+    ];
+    for (const f of features) {
+      await prisma.feature.upsert({
+        where: { code: f.code },
+        create: { ...f, isActive: true },
+        update: { name: f.name, description: f.description ?? null },
+      });
+    }
+    console.log("기본 기능 5종이 생성/업데이트되었습니다.");
+
+    const annualPlan = await prisma.pricingPlan.upsert({
+      where: { code: "annual_membership" },
+      create: {
+        code: "annual_membership",
+        name: "연회원",
+        planType: "ANNUAL",
+        billingType: "YEARLY",
+        price: 0,
+        currency: "KRW",
+        isActive: true,
+        validDays: 365,
+      },
+      update: { isActive: true },
+    });
+    const featureIds = await prisma.feature.findMany({ where: { code: { in: features.map((x) => x.code) } }, select: { id: true, code: true } });
+    for (const feat of featureIds) {
+      await prisma.planFeature.upsert({
+        where: { planId_featureId: { planId: annualPlan.id, featureId: feat.id } },
+        create: { planId: annualPlan.id, featureId: feat.id },
+        update: {},
+      });
+    }
+    console.log("연회원 요금제 및 포함 기능이 연결되었습니다.");
+
+    const listingProducts = [
+      { code: "VENUE_PROMOTION", name: "당구장 홍보 등록", postingMonths: 1, price: 0 },
+      { code: "TOURNAMENT_POSTING", name: "대회 등록", postingMonths: 1, price: 0 },
+      { code: "LESSON_POSTING", name: "레슨 등록", postingMonths: 1, price: 0 },
+      { code: "CLUB_POSTING", name: "동호회 등록", postingMonths: 1, price: 0 },
+    ];
+    for (const p of listingProducts) {
+      await prisma.listingProduct.upsert({
+        where: { code: p.code },
+        create: { ...p, currency: "KRW", isActive: true, appliesToGeneralOnly: true },
+        update: { name: p.name, postingMonths: p.postingMonths, price: p.price },
+      });
+    }
+    console.log("등록상품 4종이 생성/업데이트되었습니다.");
+  } catch (e) {
+    console.warn("10단계 시드(기능/요금제/등록상품) 건너뜁니다:", (e as Error).message);
+  }
 }
 
 main()

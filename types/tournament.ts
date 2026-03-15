@@ -2,7 +2,8 @@
 export const TOURNAMENT_STATUSES = [
   { value: "DRAFT", label: "초안" },
   { value: "OPEN", label: "모집중" },
-  { value: "CLOSED", label: "마감" },
+  { value: "CLOSED", label: "참가 마감" },
+  { value: "BRACKET_GENERATED", label: "대진 생성됨" },
   { value: "FINISHED", label: "종료" },
   { value: "HIDDEN", label: "숨김" },
 ] as const;

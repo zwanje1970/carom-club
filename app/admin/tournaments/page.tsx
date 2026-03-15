@@ -64,10 +64,11 @@ export default async function AdminTournamentsPage() {
     });
   }
 
-  let canCreateTournament = true;
-  try {
-    const session = await getSession();
-    if (session && !isPlatformAdmin(session)) {
+  const session = await getSession();
+  const isPlatform = session ? isPlatformAdmin(session) : false;
+  let canCreateTournament = !isPlatform;
+  if (!isPlatform && session) {
+    try {
       const orgId = await getClientAdminOrganizationId(session);
       if (orgId) {
         const org = await prisma.organization.findUnique({
@@ -76,14 +77,14 @@ export default async function AdminTournamentsPage() {
         });
         if (org?.type === "INSTRUCTOR") canCreateTournament = false;
       }
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
   }
 
   return (
     <SectionMain>
-      <SectionTitleLineWithButton icon={mdiTrophy} title="대회 목록">
+      <SectionTitleLineWithButton icon={mdiTrophy} title={isPlatform ? "대회 현황" : "대회 목록"}>
         {canCreateTournament && (
           <div className="flex flex-wrap items-center gap-2">
             <Button href="/admin/tournaments/new" label="이전 대회 불러오기" color="contrast" outline />

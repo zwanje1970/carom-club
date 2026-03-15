@@ -16,6 +16,7 @@ function isDbConnectionError(e: unknown): boolean {
 }
 
 const VALID_TYPES = ["VENUE", "CLUB", "FEDERATION", "HOST", "INSTRUCTOR"] as const;
+const VALID_CLIENT_TYPES = ["GENERAL", "REGISTERED"] as const;
 
 /** POST: 클라이언트 신청 생성 (로그인 시 applicantUserId 저장). 저장은 raw SQL 우선으로 스키마 오류 회피 */
 export async function POST(request: Request) {
@@ -29,6 +30,10 @@ export async function POST(request: Request) {
   }
 
   const type = typeof body?.type === "string" ? body.type : "";
+  const requestedClientType =
+    typeof body?.requestedClientType === "string" && VALID_CLIENT_TYPES.includes(body.requestedClientType as (typeof VALID_CLIENT_TYPES)[number])
+      ? (body.requestedClientType as (typeof VALID_CLIENT_TYPES)[number])
+      : "GENERAL";
   const organizationName = typeof body?.organizationName === "string" ? body.organizationName : "";
   const applicantName = typeof body?.applicantName === "string" ? body.applicantName : "";
   const phone = typeof body?.phone === "string" ? body.phone : "";
@@ -69,6 +74,7 @@ export async function POST(request: Request) {
     const app = await prisma.clientApplication.create({
       data: {
         type: type as (typeof VALID_TYPES)[number],
+        requestedClientType,
         organizationName: organizationName.trim(),
         applicantName: applicantName.trim(),
         phone: phone.trim(),

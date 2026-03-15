@@ -24,6 +24,7 @@ export type ExistingApplication = {
   id: string;
   type: string;
   status: string;
+  requestedClientType?: string;
   organizationName: string;
   applicantName: string;
   phone: string;
@@ -32,6 +33,11 @@ export type ExistingApplication = {
   shortDescription: string | null;
   referenceLink: string | null;
 };
+
+const REQUESTED_CLIENT_TYPES = [
+  { value: "GENERAL", label: "일반업체" },
+  { value: "REGISTERED", label: "등록업체 (승인 시 연회원 처리)" },
+] as const;
 
 type Props = {
   successRedirect: string;
@@ -53,6 +59,7 @@ export function ClientApplyForm({ successRedirect, successLinkLabel = "확인", 
 
   const [form, setForm] = useState({
     type: (existingApplication?.type ?? "VENUE") as (typeof CLIENT_TYPES)[number]["value"],
+    requestedClientType: (existingApplication?.requestedClientType ?? "GENERAL") as (typeof REQUESTED_CLIENT_TYPES)[number]["value"],
     organizationName: existingApplication?.organizationName ?? "",
     applicantName: existingApplication?.applicantName ?? initialData?.applicantName ?? "",
     phone: existingApplication?.phone ?? initialData?.phone ?? "",
@@ -67,6 +74,7 @@ export function ClientApplyForm({ successRedirect, successLinkLabel = "확인", 
       const n = (s: string | null | undefined) => toHalfwidth(String(s ?? "").trim());
       const snapshot = {
         type: n(existingApplication.type ?? "VENUE"),
+        requestedClientType: n(existingApplication.requestedClientType ?? "GENERAL"),
         organizationName: n(existingApplication.organizationName ?? ""),
         applicantName: n(existingApplication.applicantName ?? ""),
         phone: n(existingApplication.phone ?? ""),
@@ -78,6 +86,7 @@ export function ClientApplyForm({ successRedirect, successLinkLabel = "확인", 
       initialEditSnapshot.current = snapshot;
       setForm({
         type: (existingApplication.type ?? "VENUE") as (typeof CLIENT_TYPES)[number]["value"],
+        requestedClientType: (existingApplication.requestedClientType ?? "GENERAL") as (typeof REQUESTED_CLIENT_TYPES)[number]["value"],
         organizationName: existingApplication.organizationName ?? "",
         applicantName: existingApplication.applicantName ?? "",
         phone: existingApplication.phone ?? "",
@@ -113,6 +122,7 @@ export function ClientApplyForm({ successRedirect, successLinkLabel = "확인", 
       const n = (s: string | null | undefined) => toHalfwidth(String(s ?? "").trim());
       const cur = {
         type: n(form.type),
+        requestedClientType: n(form.requestedClientType),
         organizationName: n(form.organizationName),
         applicantName: n(form.applicantName),
         phone: n(form.phone),
@@ -124,6 +134,7 @@ export function ClientApplyForm({ successRedirect, successLinkLabel = "확인", 
       const init = initialEditSnapshot.current;
       if (
         cur.type === init.type &&
+        cur.requestedClientType === init.requestedClientType &&
         cur.organizationName === init.organizationName &&
         cur.applicantName === init.applicantName &&
         cur.phone === init.phone &&
@@ -215,6 +226,24 @@ export function ClientApplyForm({ successRedirect, successLinkLabel = "확인", 
             </option>
           ))}
         </select>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">등록 구분 *</label>
+        <select
+          required
+          className="w-full border border-gray-300 rounded px-3 py-2"
+          value={form.requestedClientType}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, requestedClientType: e.target.value as typeof form.requestedClientType }))
+          }
+        >
+          {REQUESTED_CLIENT_TYPES.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-gray-500">일반업체와 등록업체를 구분합니다. 등록업체 승인 시 연회원으로 처리됩니다.</p>
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">업체/단체명 *</label>

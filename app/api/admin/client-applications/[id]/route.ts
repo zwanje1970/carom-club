@@ -39,6 +39,7 @@ export async function PATCH(
       status?: "PENDING" | "APPROVED" | "REJECTED";
       rejectedReason?: string;
     };
+    const reviewedByUserId = session.id;
 
     if (status !== "PENDING" && status !== "APPROVED" && status !== "REJECTED") {
       return NextResponse.json(
@@ -66,6 +67,7 @@ export async function PATCH(
           status: "PENDING",
           rejectedReason: null,
           reviewedAt: null,
+          reviewedByUserId: null,
         },
       });
       return NextResponse.json({ ok: true, status: "PENDING" });
@@ -80,6 +82,7 @@ export async function PATCH(
           status: "REJECTED",
           rejectedReason: reason,
           reviewedAt: now,
+          reviewedByUserId,
         },
       });
       if (applicantId) {
@@ -105,11 +108,23 @@ export async function PATCH(
       where: { ownerUserId: applicantId },
     });
 
+    const requestedType = (app as { requestedClientType?: string | null }).requestedClientType ?? "GENERAL";
+    const orgClientType = requestedType === "REGISTERED" ? "REGISTERED" : "GENERAL";
+    const orgMembershipType = requestedType === "REGISTERED" ? "ANNUAL" : "NONE";
+
     if (existingOrg) {
-      // 이미 업체가 있음(이전에 승인 후 보류로 되돌린 경우 등): 신청만 APPROVED로 갱신
+      // 이미 업체가 있음: 신청만 APPROVED로 갱신하고 organization 등급 반영
       await prisma.clientApplication.update({
         where: { id },
-        data: { status: "APPROVED", rejectedReason: null, reviewedAt: now },
+        data: { status: "APPROVED", rejectedReason: null, reviewedAt: now, reviewedByUserId },
+      });
+      await prisma.organization.update({
+        where: { id: existingOrg.id },
+        data: {
+          clientType: orgClientType,
+          approvalStatus: "APPROVED",
+          membershipType: orgMembershipType,
+        },
       });
       return NextResponse.json({ ok: true, status: "APPROVED" });
     }
@@ -134,6 +149,9 @@ export async function PATCH(
           addressDetail: applicant?.addressDetail?.trim() || null,
           isPublished: false,
           setupCompleted: false,
+          clientType: orgClientType,
+          approvalStatus: "APPROVED",
+          membershipType: orgMembershipType,
         },
       });
 
@@ -157,7 +175,7 @@ export async function PATCH(
 
       await tx.clientApplication.update({
         where: { id },
-        data: { status: "APPROVED", rejectedReason: null, reviewedAt: now },
+        data: { status: "APPROVED", rejectedReason: null, reviewedAt: now, reviewedByUserId },
       });
 
       await tx.notification.create({

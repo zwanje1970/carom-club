@@ -73,7 +73,15 @@
     `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`  
   - 나온 값을 그대로 복사해 Value에 붙여넣기.
 
-#### ③ BLOB_READ_WRITE_TOKEN (선택, AVG 증빙 업로드용)
+#### ③ Web Push (선택, 대회 알림 푸시용)
+- **Key:** `VAPID_PRIVATE_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (또는 `VAPID_PUBLIC_KEY`)
+- **Value:** `npx web-push generate-vapid-keys` 로 생성한 키 쌍. 푸시 미사용 시 생략 가능.
+
+#### ④ 경기장 안내 Cron (선택)
+- **Key:** `CRON_SECRET`
+- **Value:** `/api/cron/venue-reminder` 호출 시 `Authorization: Bearer <값>` 또는 `X-Cron-Secret: <값>` 으로 전달할 비밀값.
+
+#### ⑤ BLOB_READ_WRITE_TOKEN (선택, AVG 증빙 업로드용)
 - **Key:** `BLOB_READ_WRITE_TOKEN`
 - **Value:** Vercel 대시보드 → **Storage** → **Blob** 생성 후, 해당 스토어의 **`.env.local`** 또는 Storage 설정에 나오는 `BLOB_READ_WRITE_TOKEN` 값을 복사해 넣기.
 

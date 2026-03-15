@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { ClientSidebar } from "@/components/client/ClientSidebar";
 
 export default async function ClientLayout({
   children,
@@ -25,6 +27,11 @@ export default async function ClientLayout({
     );
   }
 
+  // 권역 관리자는 전용 콘솔로 리다이렉트 (전체 대회 운영 메뉴 접근 불가)
+  if (session.role === "ZONE_MANAGER") {
+    redirect("/zone");
+  }
+
   if (session.role !== "CLIENT_ADMIN") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-site-bg p-4">
@@ -43,32 +50,9 @@ export default async function ClientLayout({
   }
 
   return (
-    <div className="min-h-screen bg-site-bg">
-      <header className="border-b border-site-border bg-site-card px-4 py-3">
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <Link href="/client/dashboard" className="font-semibold text-site-text">
-            클라이언트 대시보드
-          </Link>
-          <nav className="flex items-center gap-4 text-sm">
-            <Link href="/client/dashboard" className="text-gray-600 hover:text-site-primary">
-              대시보드
-            </Link>
-            <Link href="/client/tournaments" className="text-gray-600 hover:text-site-primary">
-              대회 관리
-            </Link>
-            <Link href="/client/setup" className="text-gray-600 hover:text-site-primary">
-              업체 설정
-            </Link>
-            <Link href="/client/promo" className="text-gray-600 hover:text-site-primary">
-              홍보 페이지 편집
-            </Link>
-            <Link href="/" className="text-gray-600 hover:text-site-primary">
-              메인으로
-            </Link>
-          </nav>
-        </div>
-      </header>
-      <main className="mx-auto max-w-6xl p-4">{children}</main>
+    <div className="flex min-h-screen bg-site-bg">
+      <ClientSidebar />
+      <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
     </div>
   );
 }

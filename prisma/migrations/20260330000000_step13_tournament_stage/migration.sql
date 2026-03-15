@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Tournament" ADD COLUMN IF NOT EXISTS "tournamentStage" TEXT NOT NULL DEFAULT 'SETUP';

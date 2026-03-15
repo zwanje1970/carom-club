@@ -33,10 +33,10 @@ export default function PageSectionsLayout({
           PC 또는 태블릿 가로 모드에서 접속해 주세요.
         </p>
         <Link
-          href="/admin"
+          href="/admin/settings"
           className="mt-6 rounded-lg bg-site-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90"
         >
-          관리자 대시보드로
+          설정으로
         </Link>
       </div>
     );

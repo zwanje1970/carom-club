@@ -1,17 +1,30 @@
 import { notFound } from "next/navigation";
 import { mdiTrophy } from "@mdi/js";
+import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { isPlatformAdmin } from "@/lib/permissions";
 import { OutlineEditor } from "@/components/admin/OutlineEditor";
 import SectionMain from "@/components/admin/_components/Section/Main";
 import SectionTitleLineWithButton from "@/components/admin/_components/Section/TitleLineWithButton";
 import CardBox from "@/components/admin/_components/CardBox";
 import Button from "@/components/admin/_components/Button";
+import { ClientOnlyBlock } from "@/components/admin/ClientOnlyBlock";
 
 export default async function AdminTournamentOutlinePage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await getSession();
+  if (session && isPlatformAdmin(session)) {
+    return (
+      <SectionMain>
+        <SectionTitleLineWithButton icon={mdiTrophy} title="대회요강 편집" />
+        <ClientOnlyBlock title="대회요강 편집은 클라이언트 관리자 전용입니다" backHref="/admin/tournaments" backLabel="대회 현황" />
+      </SectionMain>
+    );
+  }
+
   const { id } = await params;
   let tournament: Awaited<
     ReturnType<

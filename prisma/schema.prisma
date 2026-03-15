@@ -15,6 +15,7 @@ enum UserRole {
   USER
   CLIENT_ADMIN
   PLATFORM_ADMIN
+  ZONE_MANAGER
 }
 
 // ============== User & MemberProfile ==============
@@ -46,6 +47,10 @@ model User {
   notifications    Notification[]
   clientApplications ClientApplication[]
   passwordResetTokens PasswordResetToken[]
+  tournamentsCreated   Tournament[]           // 대회 생성자 (감사용)
+  zoneManagerAssignments ZoneManagerAssignment[]
+  entryZoneAssignmentsGranted TournamentEntryZoneAssignment[]  // 권역 배정 수행자
+  pushSubscriptions PushSubscription[]
 }
 
 model PasswordResetToken {
@@ -77,21 +82,23 @@ model MemberProfile {
 // ============== Client Application (클라이언트 신청) ==============
 
 model ClientApplication {
-  id                String   @id @default(cuid())
-  type              String   // VENUE | CLUB | FEDERATION | HOST | INSTRUCTOR
-  status            String   @default("PENDING") // PENDING | APPROVED | REJECTED
-  applicantUserId   String?
-  organizationName  String
-  applicantName    String
-  phone            String
-  email            String
-  region           String?
-  shortDescription String?
-  referenceLink    String?
-  rejectedReason   String?
-  reviewedAt       DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id                   String    @id @default(cuid())
+  type                 String    // VENUE | CLUB | FEDERATION | HOST | INSTRUCTOR
+  status               String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  requestedClientType  String?    @default("GENERAL") // GENERAL | REGISTERED (일반업체 vs 등록업체)
+  applicantUserId     String?
+  organizationName    String
+  applicantName       String
+  phone               String
+  email               String
+  region              String?
+  shortDescription    String?
+  referenceLink       String?
+  rejectedReason      String?
+  reviewedAt          DateTime?
+  reviewedByUserId    String?    // 승인/반려 처리한 플랫폼 관리자
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 
   applicant User? @relation(fields: [applicantUserId], references: [id], onDelete: SetNull)
 
@@ -130,6 +137,11 @@ model Organization {
   // 플랫폼 관리: 권한 정지/제명, 비고
   status       String  @default("ACTIVE") // ACTIVE | SUSPENDED | EXPELLED
   adminRemarks String? // 비고 (사유 등)
+  // 클라이언트 구분 (2단계 정책): 일반업체/등록업체, 승인 상태, 연회원 여부
+  clientType           String?   @default("GENERAL")  // GENERAL | REGISTERED
+  approvalStatus       String?   // PENDING | APPROVED | REJECTED (승인된 클라이언트만 운영)
+  membershipType       String?   // NONE | ANNUAL (연회원 적용 시 ANNUAL). 현재 무료 운영 중심, 확장용.
+  membershipExpireDate DateTime? // 연회원 만료일. membershipType=ANNUAL일 때 사용. 없으면 무제한 또는 별도 구독으로 판단.
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
@@ -139,6 +151,11 @@ model Organization {
   feeSetting       OrganizationFeeSetting?
   feePayments      OrganizationFeePayment[]
   clientMemberships ClientMembership[]  // 연회원: 유효 시 대회 무제한 생성
+  // 10단계: 요금/기능/등록상품
+  planSubscriptions OrganizationPlanSubscription[]
+  featureAccesses   OrganizationFeatureAccess[]
+  paymentRecords    PaymentRecord[]
+  listingPurchases  ListingPurchaseRecord[]
 }
 
 // 클라이언트 회비 설정: 월회비/연회비 택일
@@ -205,6 +222,7 @@ model PromoPageTemplate {
 model Tournament {
   id               String    @id @default(cuid())
   organizationId   String
+  createdByUserId  String?   // 대회 생성자 (감사/권한 보조용, 소유권은 organizationId 기준)
   name             String
   title            String?   // 표제 (name 대신 사용 가능)
   slug             String?
@@ -223,21 +241,52 @@ model Tournament {
   qualification    String?
   entryCondition   String?   // 참가 조건 (예: 평균 0.5 미만)
   maxParticipants  Int?
-  status           String    @default("OPEN")   // DRAFT | OPEN | CLOSED | FINISHED | HIDDEN
+  status           String    @default("OPEN")   // DRAFT | OPEN | CLOSED | BRACKET_GENERATED | FINISHED | HIDDEN
+  tournamentStage  String    @default("SETUP")  // SETUP | QUALIFIER_RUNNING | QUALIFIER_COMPLETED | FINAL_READY | FINAL_RUNNING | COMPLETED (권역 예선→본선 진행)
   approvalType     String    @default("HOST_APPROVAL") // HOST_APPROVAL | AUTO_APPROVAL | OCR_APPROVAL
   rules            String?   // 경기 요강 (긴 텍스트)
   promoContent     String?   // 대회 홍보 HTML (당구장 홍보와 동일 에디터)
   outlineDraft     String?
   outlinePublished String?
   outlinePublishedAt DateTime?
+  // 유료화 확장용: 대회 홍보 상품. 현재 무료 운영, 구조만 확보.
+  isPromoted       Boolean   @default(false)  // 홍보 상품 적용 여부
+  promotionLevel   Int?      // 1=기본, 2=프리미엄 등. 상품별 레벨
+  promotionEndDate DateTime? // 홍보 노출 종료일
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?            @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
   rule         TournamentRule?
   entries      TournamentEntry[]
   rounds       TournamentRound[]
-  tournamentVenues TournamentVenue[]  // 연맹/동호회 대회 시 개최 당구장 목록
+  tournamentVenues     TournamentVenue[]       // 연맹/동호회 대회 시 개최 당구장 목록 (Organization 참조)
+  matchVenues         TournamentMatchVenue[]   // 당구장 대회 MVP: 1경기장, 2경기장… (표시/정보용)
+  tournamentZones     TournamentZone[]         // 대회별 권역 연결 (예선 권역 등, 연맹대회용)
+  finalQualifiers     TournamentFinalQualifier[]
+  finalMatches        TournamentFinalMatch[]
+
+  @@index([status, startAt])
+}
+
+// 당구장 대회 MVP: 대회별 경기장 슬롯 (1경기장, 2경기장 …). 표시/정보용, 대진 분산은 추후.
+model TournamentMatchVenue {
+  id           String   @id @default(cuid())
+  tournamentId String
+  venueNumber  Int      // 1, 2, 3 …
+  displayLabel String  // "1경기장"
+  venueName    String?  // 경기장명
+  address      String?
+  phone        String?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, venueNumber])
+  @@index([tournamentId])
 }
 
 model TournamentVenue {
@@ -282,20 +331,27 @@ model TournamentEntry {
   id               String   @id @default(cuid())
   tournamentId     String
   userId           String
-  status           String   @default("APPLIED") // APPLIED | CONFIRMED | REJECTED | CANCELED
-  depositorName    String?
-  paidAt           DateTime?
+  slotNumber       Int      @default(1)  // 중복 참가 시 1, 2, 3... (같은 user가 여러 슬롯 보유 가능)
+  status           String   @default("APPLIED") // APPLIED(신청대기) | CONFIRMED(참가확정) | REJECTED | CANCELED
+  depositorName    String?  // 입금자명 등 (참가비 연동 시 사용)
+  clubOrAffiliation String? // 소속/클럽 (신청 시 선택 입력, 확장용)
+  entryFeeAmount   Int?    // 이 슬롯의 참가비 (1슬롯=1배, 2슬롯부터=2배 적용 시 저장)
+  paymentMarkedByApplicantAt DateTime? // 신청자 입금완료 체크 시각, 관리자 입금확인 가능 조건
+  paidAt           DateTime?  // 관리자 입금확인 시각 (중복 확인 방지)
+  rejectionReason String?  // 반려 시 사유 (CLIENT_ADMIN 입력)
+  reviewedAt       DateTime? // 승인/반려 처리 시각
   round            String?
   prize            Int?
-  waitingListOrder Int?   // 웨이팅 순번
+  waitingListOrder Int?   // 웨이팅 순번 (입금확인 시 정원 초과면 자동 부여, 확정 취소 시 자동 갱신)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
   tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   attendances TournamentAttendance[]
+  zoneAssignment TournamentEntryZoneAssignment?  // 대회별 권역 배정 (1:1)
 
-  @@unique([tournamentId, userId])
+  @@unique([tournamentId, userId, slotNumber])
   @@index([tournamentId])
   @@index([userId])
 }
@@ -369,6 +425,144 @@ model TournamentResult {
   @@index([groupId])
 }
 
+// ============== Zone (권역) & 대회-권역 연결 & 권역 관리자 배정 ==============
+// ZONE_MANAGER 역할 사용자는 배정된 권역만 결과 입력·진출 확정 가능.
+// TournamentZone: 어떤 zone이 어떤 tournament에 연결되어 있는지 (권역별 예선·본선 연결용).
+
+model Zone {
+  id        String   @id @default(cuid())
+  name      String   // 권역명 (예: 서울권, 부산권)
+  code      String?  // 짧은 코드 (예: SEOUL, BUSAN)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  managerAssignments ZoneManagerAssignment[]
+  tournamentZones    TournamentZone[]
+}
+
+model TournamentZone {
+  id               String   @id @default(cuid())
+  tournamentId     String
+  zoneId           String
+  name             String?  // 대회 안에서의 표시명 (없으면 Zone.name 사용)
+  code             String?  // 대회 안에서의 코드
+  sortOrder        Int      @default(0)
+  status           String?  // ACTIVE | DRAFT | CLOSED 등 (선택)
+  advanceCount     Int      @default(1)   // 본선 진출 인원 수 (TOP_N 시)
+  advanceRuleType  String   @default("WINNER_ONLY")  // WINNER_ONLY | TOP_N
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  zone       Zone       @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  zoneAssignments TournamentEntryZoneAssignment[]
+  zoneMatches     TournamentZoneMatch[]
+  finalQualifiers TournamentFinalQualifier[]
+
+  @@unique([tournamentId, zoneId])
+  @@index([tournamentId])
+  @@index([zoneId])
+}
+
+// 권역별 대진표 경기 1건. TournamentZone 단위로 생성·관리.
+model TournamentZoneMatch {
+  id               String   @id @default(cuid())
+  tournamentId     String
+  tournamentZoneId String
+  roundIndex       Int      // 0 = 1라운드
+  matchIndex       Int      // 라운드 내 순번
+  entryIdA         String?  // TournamentEntry id, BYE 시 null
+  entryIdB         String?
+  scoreA           Int?     // 점수(선택)
+  scoreB           Int?
+  winnerEntryId    String?  // 확정 시
+  status           String   @default("PENDING")  // PENDING | BYE | IN_PROGRESS | COMPLETED
+  nextMatchId      String?  // 승자 진출 경기 id
+  nextSlot         String?  // A | B (다음 경기 슬롯)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tournamentZone TournamentZone @relation(fields: [tournamentZoneId], references: [id], onDelete: Cascade)
+
+  @@index([tournamentZoneId])
+  @@index([tournamentId])
+}
+
+// 본선 진출자 1명. 권역 결과에서 추출 후 취합.
+model TournamentFinalQualifier {
+  id                String   @id @default(cuid())
+  tournamentId      String
+  tournamentZoneId  String
+  entryId           String   // TournamentEntry id
+  qualifiedRank     Int      // 1=우승, 2=준우승, 3=3위, ...
+  sourceMatchId     String?  // 출처 경기 (TournamentZoneMatch id)
+  seedOrder         Int      @default(0)  // 본선 시드/배정 순서
+  createdAt         DateTime @default(now())
+
+  tournament     Tournament    @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  tournamentZone TournamentZone @relation(fields: [tournamentZoneId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, tournamentZoneId, qualifiedRank])
+  @@index([tournamentId])
+  @@index([tournamentZoneId])
+}
+
+// 본선 대진 경기 1건. 대회 단위.
+model TournamentFinalMatch {
+  id               String   @id @default(cuid())
+  tournamentId     String
+  roundIndex       Int      // 0 = 1라운드 (32강/64강 등)
+  matchIndex       Int
+  entryIdA         String?
+  entryIdB         String?
+  scoreA           Int?
+  scoreB           Int?
+  winnerEntryId    String?
+  status           String   @default("PENDING")
+  nextMatchId      String?
+  nextSlot         String?  // A | B
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@index([tournamentId])
+}
+
+// 참가자 → 대회별 권역(TournamentZone) 배정. 한 참가자는 같은 대회에서 하나의 권역에만 배정.
+model TournamentEntryZoneAssignment {
+  id                String    @id @default(cuid())
+  tournamentEntryId String    @unique  // 1:1
+  tournamentZoneId  String
+  assignmentType    String    // AUTO | MANUAL
+  assignedAt        DateTime  @default(now())
+  assignedByUserId  String?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  entry    TournamentEntry @relation(fields: [tournamentEntryId], references: [id], onDelete: Cascade)
+  tournamentZone TournamentZone @relation(fields: [tournamentZoneId], references: [id], onDelete: Cascade)
+  assignedBy User? @relation(fields: [assignedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tournamentZoneId])
+}
+
+model ZoneManagerAssignment {
+  id        String   @id @default(cuid())
+  userId    String
+  zoneId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  zone Zone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, zoneId])
+  @@index([userId])
+  @@index([zoneId])
+}
+
 // ============== Notification ==============
 
 model Notification {
@@ -381,6 +575,44 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// ============== Web Push ==============
+// 사용자별 브라우저 구독. 한 사용자가 여러 기기에서 구독 가능.
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   // 브라우저 push subscription endpoint
+  p256dh    String   // 클라이언트 public key
+  auth      String   // auth secret
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, endpoint])
+  @@index([userId])
+}
+
+// Web Push 발송 기록
+model NotificationLog {
+  id            String    @id @default(cuid())
+  userId        String
+  tournamentId  String?
+  type          String    // ENTRY_APPROVED | BRACKET_GENERATED | VENUE_REMINDER | PRIZE
+  title         String
+  body          String?
+  url           String?
+  status        String    @default("PENDING") // PENDING | SENT | FAILED
+  errorMessage  String?
+  createdAt     DateTime  @default(now())
+  sentAt        DateTime?
+
+  @@index([userId])
+  @@index([tournamentId])
+  @@index([type, createdAt])
 }
 
 // ============== Site settings (singleton) ==============
@@ -478,6 +710,158 @@ model ClientMembership {
 
   @@index([organizationId])
   @@index([validUntil])
+}
+
+// ============== 10단계: 요금제/기능/등록상품 ==============
+
+model Feature {
+  id          String   @id @default(cuid())
+  code        String   @unique // TOURNAMENT_PROMO_PAGE, PARTICIPANT_MANAGEMENT 등
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  planFeatures        PlanFeature[]
+  organizationAccess  OrganizationFeatureAccess[]
+}
+
+model PricingPlan {
+  id          String   @id @default(cuid())
+  code        String   @unique // annual_membership, tournament_all_in_one_package 등
+  name        String
+  description String?
+  planType    String   // ANNUAL | PACKAGE | FEATURE
+  billingType String   // ONE_TIME | YEARLY
+  price       Int      @default(0)  // 원 단위, DB 저장
+  currency    String   @default("KRW")
+  isActive    Boolean  @default(true)
+  validDays   Int?     // 유효 일수 (연회원 365 등)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  planFeatures    PlanFeature[]
+  subscriptions   OrganizationPlanSubscription[]
+  paymentRecords  PaymentRecord[]
+}
+
+model PlanFeature {
+  id        String   @id @default(cuid())
+  planId    String
+  featureId String
+  createdAt DateTime @default(now())
+
+  plan   PricingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  feature Feature    @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, featureId])
+  @@index([planId])
+  @@index([featureId])
+}
+
+model OrganizationPlanSubscription {
+  id              String    @id @default(cuid())
+  organizationId  String
+  planId          String
+  status          String    // ACTIVE | EXPIRED | CANCELLED
+  startedAt       DateTime  @default(now())
+  expiresAt       DateTime?
+  grantedByUserId String?
+  sourceType      String    // MANUAL | PURCHASE | APPROVAL
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         PricingPlan  @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([planId])
+  @@index([status, expiresAt])
+}
+
+model OrganizationFeatureAccess {
+  id           String    @id @default(cuid())
+  organizationId String
+  featureId    String
+  status       String    // ACTIVE | EXPIRED | REVOKED
+  startedAt    DateTime  @default(now())
+  expiresAt    DateTime?
+  sourceType   String    // PLAN | PURCHASE | MANUAL | MEMBERSHIP
+  sourceRefId  String?   // 구독/결제 id 등
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  feature      Feature      @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([featureId])
+  @@index([status, expiresAt])
+}
+
+// 결제 기록. 연회원/대회홍보/기능상품 등 통합. 현재는 수동·테스트 위주, PG 연동 시 확장.
+model PaymentRecord {
+  id                 String    @id @default(cuid())
+  organizationId     String
+  planId             String?
+  paymentType        String?   // MEMBERSHIP | TOURNAMENT_PROMO | FEATURE | PLAN | 기타. 확장 시 결제 유형 구분
+  amount             Int       @default(0)  // 원
+  currency           String    @default("KRW")
+  status             String    // PENDING | PAID | FAILED | CANCELLED | MANUAL_GRANTED
+  paidAt             DateTime?
+  sourceType         String    // MANUAL | MOCK | PG_FUTURE
+  externalPaymentId  String?
+  createdByUserId    String?
+  memo               String?
+  createdAt          DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         PricingPlan?  @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([planId])
+  @@index([status])
+}
+
+model ListingProduct {
+  id                  String   @id @default(cuid())
+  code                String   @unique // VENUE_PROMOTION, TOURNAMENT_POSTING, LESSON_POSTING, CLUB_POSTING
+  name                String
+  description         String?
+  postingMonths       Int      @default(1)  // 게시기간(개월)
+  price               Int      @default(0)  // 원, 0이면 무료
+  currency            String   @default("KRW")
+  isActive            Boolean  @default(true)
+  appliesToGeneralOnly Boolean @default(true)  // true = 일반업체만 적용, 등록업체 제외
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  purchases ListingPurchaseRecord[]
+}
+
+model ListingPurchaseRecord {
+  id                String    @id @default(cuid())
+  organizationId    String
+  listingProductId  String
+  targetType        String    // VENUE_PROMO | TOURNAMENT | LESSON | CLUB
+  targetId          String?   // 대상 레코드 id (선택)
+  postingMonths     Int       @default(1)
+  amount            Int       @default(0)
+  status            String    @default("ACTIVE")  // ACTIVE | EXPIRED | CANCELLED
+  startedAt         DateTime  @default(now())
+  expiresAt         DateTime?
+  createdAt         DateTime  @default(now())
+
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  listingProduct ListingProduct @relation(fields: [listingProductId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([listingProductId])
+  @@index([status, expiresAt])
 }
 
 // ============== CMS: Page Sections, Popups, Notice Bars ==============

@@ -62,7 +62,14 @@ export default function LoginPage() {
         // ignore
       }
       const role = data.role as string | undefined;
-      const next = role === "PLATFORM_ADMIN" ? "/admin" : "/";
+      const next =
+        role === "PLATFORM_ADMIN"
+          ? "/admin"
+          : role === "CLIENT_ADMIN"
+            ? "/client"
+            : role === "ZONE_MANAGER"
+              ? "/zone"
+              : "/";
       window.location.href = next;
     } finally {
       setLoading(false);

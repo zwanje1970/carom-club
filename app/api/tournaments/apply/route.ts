@@ -2,6 +2,19 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
+import { getPublicTournamentOrNull } from "@/lib/public-tournament";
+
+function parseAllowMultipleSlots(rule: { bracketConfig?: string | object | null } | null): boolean {
+  if (!rule?.bracketConfig) return false;
+  try {
+    const raw =
+      typeof rule.bracketConfig === "string" ? JSON.parse(rule.bracketConfig) : rule.bracketConfig;
+    const c = raw as Record<string, unknown>;
+    return c.allowMultipleSlots === true;
+  } catch {
+    return false;
+  }
+}
 
 export async function POST(request: Request) {
   if (!isDatabaseConfigured()) {
@@ -15,16 +28,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  let body: { tournamentId?: string; depositorName?: string };
+  let body: { tournamentId?: string; depositorName?: string; clubOrAffiliation?: string; additionalSlot?: boolean };
   try {
-    body = (await request.json()) as { tournamentId?: string; depositorName?: string };
+    body = (await request.json()) as typeof body;
   } catch {
     return NextResponse.json(
       { error: "잘못된 요청 본문입니다." },
       { status: 400 }
     );
   }
-  const { tournamentId, depositorName } = body;
+  const { tournamentId, depositorName, clubOrAffiliation, additionalSlot } = body;
+  const club = typeof clubOrAffiliation === "string" ? clubOrAffiliation.trim() || null : null;
 
   if (!tournamentId || !depositorName?.trim()) {
     return NextResponse.json(
@@ -33,36 +47,67 @@ export async function POST(request: Request) {
     );
   }
 
-  const tournament = await prisma.tournament.findUnique({
+  const tournament = await getPublicTournamentOrNull(tournamentId);
+  if (!tournament) {
+    return NextResponse.json({ error: "대회를 찾을 수 없거나 비공개 대회입니다." }, { status: 404 });
+  }
+  if (tournament.status === "FINISHED") {
+    return NextResponse.json({ error: "종료된 대회에는 참가 신청할 수 없습니다." }, { status: 400 });
+  }
+  if (tournament.status === "CLOSED") {
+    return NextResponse.json({ error: "참가 신청이 마감되었습니다." }, { status: 400 });
+  }
+  if (tournament.status === "DRAFT") {
+    return NextResponse.json({ error: "아직 참가 신청을 받지 않습니다. 운영자 안내를 기다려 주세요." }, { status: 400 });
+  }
+  if (tournament.status !== "OPEN") {
+    return NextResponse.json({ error: "현재 모집 중이 아닙니다. 참가 신청을 받지 않습니다." }, { status: 400 });
+  }
+
+  const tournamentWithRule = await prisma.tournament.findUnique({
     where: { id: tournamentId },
     include: { rule: true },
   });
-  if (!tournament) {
-    return NextResponse.json({ error: "대회를 찾을 수 없습니다." }, { status: 404 });
-  }
-  if (tournament.status !== "OPEN") {
-    return NextResponse.json({ error: "현재 모집 중인 대회가 아닙니다." }, { status: 400 });
-  }
+  if (!tournamentWithRule) return NextResponse.json({ error: "대회를 찾을 수 없습니다." }, { status: 404 });
 
-  const existing = await prisma.tournamentEntry.findUnique({
-    where: {
-      tournamentId_userId: { tournamentId, userId: session.id },
-    },
+  const allowMultipleSlots = parseAllowMultipleSlots(tournamentWithRule.rule);
+  const baseEntryFee = tournamentWithRule.rule?.entryFee ?? tournamentWithRule.entryFee ?? 0;
+
+  const existingEntries = await prisma.tournamentEntry.findMany({
+    where: { tournamentId, userId: session.id },
+    select: { id: true, status: true, slotNumber: true },
+    orderBy: { slotNumber: "asc" },
   });
-  if (existing) {
-    if (existing.status === "CANCELED") {
-      // 재신청 가능하도록 기존 취소 건은 업데이트할 수 있음 (또는 새로 생성 정책에 따라)
-    } else {
-      return NextResponse.json({ error: "이미 참가 신청하셨습니다." }, { status: 400 });
+
+  const nonCanceled = existingEntries.filter((e) => e.status !== "CANCELED");
+  const maxSlot = existingEntries.length > 0 ? Math.max(...existingEntries.map((e) => e.slotNumber)) : 0;
+  const nextSlotNumber = maxSlot + 1;
+
+  if (!allowMultipleSlots) {
+    if (nonCanceled.length > 0) {
+      return NextResponse.json({ error: "이미 참가 신청하셨습니다. 이 대회는 중복 참가를 허용하지 않습니다." }, { status: 400 });
+    }
+    const canceled = existingEntries.find((e) => e.status === "CANCELED");
+    if (canceled) {
+      await prisma.tournamentEntry.delete({ where: { id: canceled.id } });
+    }
+  } else {
+    if (additionalSlot && nonCanceled.length === 0) {
+      return NextResponse.json({ error: "먼저 1슬롯 참가 신청을 완료한 후 추가 슬롯을 신청할 수 있습니다." }, { status: 400 });
+    }
+    if (!additionalSlot && nonCanceled.length > 0) {
+      return NextResponse.json(
+        { error: "이미 참가 신청하셨습니다. 추가 슬롯을 원하시면 '추가 슬롯 신청 (참가비 2배)'을 이용해 주세요." },
+        { status: 400 }
+      );
     }
   }
 
-  const maxEntries = tournament.rule?.maxEntries ?? 0;
+  const maxEntries = tournamentWithRule.rule?.maxEntries ?? tournamentWithRule.maxParticipants ?? 0;
   const confirmedCount = await prisma.tournamentEntry.count({
     where: { tournamentId, status: "CONFIRMED" },
   });
-  const useWaiting = tournament.rule?.useWaiting ?? false;
-
+  const useWaiting = tournamentWithRule.rule?.useWaiting ?? false;
   const isFull = maxEntries > 0 && confirmedCount >= maxEntries;
 
   try {
@@ -73,39 +118,37 @@ export async function POST(request: Request) {
       );
     }
 
-    if (existing?.status === "CANCELED") {
-      await prisma.tournamentEntry.delete({
-        where: { id: existing.id },
-      });
-    }
-
-    let waitingListOrder: number | null = null;
-
-    if (isFull && useWaiting) {
-      const lastWaiting = await prisma.tournamentEntry.findFirst({
-        where: { tournamentId, status: "APPLIED" },
-        orderBy: { waitingListOrder: "desc" },
-      });
-      waitingListOrder = (lastWaiting?.waitingListOrder ?? 0) + 1;
-    }
+    const isAdditionalSlot = allowMultipleSlots && nextSlotNumber >= 2;
+    const entryFeeAmount = isAdditionalSlot ? baseEntryFee * 2 : baseEntryFee;
 
     await prisma.tournamentEntry.create({
       data: {
         tournamentId,
         userId: session.id,
+        slotNumber: nextSlotNumber,
         status: "APPLIED",
         depositorName: depositorName.trim(),
-        waitingListOrder,
+        clubOrAffiliation: club,
+        entryFeeAmount: baseEntryFee > 0 ? entryFeeAmount : null,
       },
     });
+
+    const feeMessage =
+      nextSlotNumber === 1
+        ? baseEntryFee > 0
+          ? `참가비 ${baseEntryFee.toLocaleString()}원`
+          : ""
+        : baseEntryFee > 0
+          ? `추가 슬롯 참가비 ${(baseEntryFee * 2).toLocaleString()}원 (2배)`
+          : "";
 
     return NextResponse.json({
       ok: true,
       status: "APPLIED",
-      message:
-        waitingListOrder != null
-          ? `대기 목록 ${waitingListOrder}번으로 등록되었습니다.`
-          : "참가 신청이 접수되었습니다. 참가비 입금 후 확정됩니다.",
+      slotNumber: nextSlotNumber,
+      message: nextSlotNumber >= 2
+        ? `추가 슬롯(슬롯${nextSlotNumber}) 신청이 접수되었습니다. ${feeMessage} 입금 후 '입금 완료'를 체크해 주세요.`
+        : "참가 신청이 접수되었습니다. 입금 후 아래에서 '입금 완료'를 체크해 주세요. 관리자 입금확인 순으로 참가가 확정됩니다.",
     });
   } catch (e) {
     console.error("apply error", e);

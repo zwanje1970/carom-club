@@ -27,10 +27,17 @@ export type TournamentListRow = {
   venueName: string | null;
   gameFormat: string | null;
   imageUrl: string | null;
+  posterImageUrl: string | null;
+  summary: string | null;
+  maxParticipants: number | null;
+  confirmedCount: number;
   organization: { id: string; name: string; slug: string } | null;
 };
 
-/** 공개 토너먼트 목록 (DRAFT/HIDDEN 제외). 실패 시 빈 배열 반환. */
+/**
+ * 공개 토너먼트 목록 (DRAFT/HIDDEN 제외). 실패 시 빈 배열 반환.
+ * [확장] 유료화 시: Tournament.isPromoted, promotionLevel, promotionEndDate 로 홍보 상품 노출·정렬 추가 가능. 현재는 미사용.
+ */
 export async function getTournamentsListRaw(options?: {
   orderBy?: "asc" | "desc";
   take?: number;
@@ -50,13 +57,19 @@ export async function getTournamentsListRaw(options?: {
         venueName: string | null;
         gameFormat: string | null;
         imageUrl: string | null;
+        posterImageUrl: string | null;
+        summary: string | null;
+        maxParticipants: number | null;
+        confirmedCount: bigint;
         orgId: string | null;
         orgName: string | null;
         orgSlug: string | null;
       }[]
     >(
       `SELECT t.id, t.name, t."startAt", t."endAt", t.status, t."organizationId",
-              t.venue, t."venueName", t."gameFormat", t."imageUrl",
+              t.venue, t."venueName", t."gameFormat", t."imageUrl", t."posterImageUrl", t.summary,
+              t."maxParticipants",
+              (SELECT COUNT(*) FROM "TournamentEntry" e WHERE e."tournamentId" = t.id AND e.status = 'CONFIRMED')::int AS "confirmedCount",
               o.id AS "orgId", o.name AS "orgName", o.slug AS "orgSlug"
        FROM "Tournament" t
        LEFT JOIN "Organization" o ON o.id = t."organizationId"
@@ -76,6 +89,10 @@ export async function getTournamentsListRaw(options?: {
       venueName: r.venueName,
       gameFormat: r.gameFormat,
       imageUrl: r.imageUrl,
+      posterImageUrl: r.posterImageUrl,
+      summary: r.summary,
+      maxParticipants: r.maxParticipants,
+      confirmedCount: Number(r.confirmedCount ?? 0),
       organization:
         r.orgId && r.orgName
           ? { id: r.orgId, name: r.orgName, slug: r.orgSlug ?? "" }
@@ -205,6 +222,10 @@ export async function getTournamentsListWithOrgCoords(
         venueName: string | null;
         gameFormat: string | null;
         imageUrl: string | null;
+        posterImageUrl: string | null;
+        summary: string | null;
+        maxParticipants: number | null;
+        confirmedCount: bigint;
         orgId: string | null;
         orgName: string | null;
         orgSlug: string | null;
@@ -213,7 +234,9 @@ export async function getTournamentsListWithOrgCoords(
       }[]
     >(
       `SELECT t.id, t.name, t."startAt", t."endAt", t.status, t."organizationId",
-              t.venue, t."venueName", t."gameFormat", t."imageUrl",
+              t.venue, t."venueName", t."gameFormat", t."imageUrl", t."posterImageUrl", t.summary,
+              t."maxParticipants",
+              (SELECT COUNT(*) FROM "TournamentEntry" e WHERE e."tournamentId" = t.id AND e.status = 'CONFIRMED')::bigint AS "confirmedCount",
               o.id AS "orgId", o.name AS "orgName", o.slug AS "orgSlug",
               o.latitude AS "orgLatitude", o.longitude AS "orgLongitude"
        FROM "Tournament" t
@@ -234,6 +257,10 @@ export async function getTournamentsListWithOrgCoords(
       venueName: r.venueName,
       gameFormat: r.gameFormat,
       imageUrl: r.imageUrl,
+      posterImageUrl: r.posterImageUrl ?? null,
+      summary: r.summary ?? null,
+      maxParticipants: r.maxParticipants ?? null,
+      confirmedCount: Number(r.confirmedCount ?? 0),
       organization:
         r.orgId && r.orgName
           ? { id: r.orgId, name: r.orgName, slug: r.orgSlug ?? "" }

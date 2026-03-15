@@ -27,6 +27,7 @@ export async function GET() {
         id: string;
         type: string;
         status: string;
+        requestedClientType: string | null;
         organizationName: string;
         applicantName: string;
         phone: string;
@@ -39,7 +40,7 @@ export async function GET() {
         rejectedReason: string | null;
       }[]
     >(
-      `SELECT id, type, status, "organizationName", "applicantName", phone, email, region, "shortDescription", "referenceLink", "createdAt", "reviewedAt", "rejectedReason"
+      `SELECT id, type, status, "requestedClientType", "organizationName", "applicantName", phone, email, region, "shortDescription", "referenceLink", "createdAt", "reviewedAt", "rejectedReason"
        FROM "ClientApplication"
        WHERE "applicantUserId" = $1 OR email = $2
        ORDER BY "createdAt" DESC
@@ -52,6 +53,7 @@ export async function GET() {
           id: rows[0].id,
           type: rows[0].type,
           status: rows[0].status,
+          requestedClientType: rows[0].requestedClientType ?? "GENERAL",
           organizationName: rows[0].organizationName,
           applicantName: rows[0].applicantName,
           phone: rows[0].phone,
@@ -100,6 +102,10 @@ export async function PATCH(request: Request) {
   }
 
   const type = typeof body?.type === "string" ? body.type : "";
+  const requestedClientType =
+    typeof body?.requestedClientType === "string"
+      ? (body.requestedClientType === "REGISTERED" ? "REGISTERED" : "GENERAL")
+      : undefined;
   const organizationName = typeof body?.organizationName === "string" ? body.organizationName : "";
   const applicantName = typeof body?.applicantName === "string" ? body.applicantName : "";
   const phone = typeof body?.phone === "string" ? body.phone : "";
@@ -134,6 +140,7 @@ export async function PATCH(request: Request) {
       where: { id: existing.id },
       data: {
         type: type as (typeof VALID_TYPES)[number],
+        ...(requestedClientType !== undefined ? { requestedClientType } : {}),
         organizationName: organizationName.trim(),
         applicantName: applicantName.trim(),
         phone: phone.trim(),

@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { mdiTrophy } from "@mdi/js";
+import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { canManageTournament } from "@/lib/permissions";
 import { getMockTournamentById } from "@/lib/mock-data";
 import { BracketGenerateButton } from "@/components/admin/BracketGenerateButton";
 import SectionMain from "@/components/admin/_components/Section/Main";
@@ -70,6 +72,9 @@ export default async function AdminTournamentDetailPage({
   }
   if (!tournament) notFound();
 
+  const session = await getSession();
+  const canManage = session ? canManageTournament(session, tournament, tournament.organization) : false;
+
   const gameType =
     (tournament.rule?.bracketConfig as { gameFormatMain?: string } | null)?.gameFormatMain ??
     tournament.rule?.bracketType ??
@@ -80,9 +85,15 @@ export default async function AdminTournamentDetailPage({
       <SectionTitleLineWithButton icon={mdiTrophy} title={tournament.name}>
         <Buttons>
           <Button href="/admin/tournaments" label="← 목록" color="contrast" small />
-          <Button href={`/admin/tournaments/${id}/edit`} label="설정 수정" color="info" small />
-          <Button href={`/admin/tournaments/${id}/outline`} label="대회요강 편집" color="contrast" outline small />
-          <Button href={`/admin/tournaments/${id}/participants`} label="참가자 관리" color="contrast" outline small />
+          {canManage && (
+            <>
+              <Button href={`/admin/tournaments/${id}/edit`} label="설정 수정" color="info" small />
+              <Button href={`/admin/tournaments/${id}/outline`} label="대회요강 편집" color="contrast" outline small />
+              <Button href={`/admin/tournaments/${id}/participants`} label="참가자 관리" color="contrast" outline small />
+              <Button href={`/admin/tournaments/${id}/bracket`} label="대진표" color="contrast" outline small />
+              <Button href={`/admin/tournaments/${id}/maintenance`} label="유지보수" color="warning" outline small />
+            </>
+          )}
         </Buttons>
       </SectionTitleLineWithButton>
 
@@ -103,11 +114,14 @@ export default async function AdminTournamentDetailPage({
         </dl>
       </CardBox>
 
-      <BracketGenerateButton
-        tournamentId={id}
-        gameType={gameType}
-        existingRoundsCount={tournament._count.rounds}
-      />
+      {canManage && (
+        <BracketGenerateButton
+          tournamentId={id}
+          gameType={gameType}
+          existingRoundsCount={tournament._count.rounds}
+          tournamentStatus={tournament.status}
+        />
+      )}
     </SectionMain>
   );
 }

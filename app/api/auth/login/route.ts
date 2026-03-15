@@ -175,7 +175,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const role = String(user.role) as "USER" | "CLIENT_ADMIN" | "PLATFORM_ADMIN";
+    const role = String(user.role) as "USER" | "CLIENT_ADMIN" | "PLATFORM_ADMIN" | "ZONE_MANAGER";
     if (platformAdminOnly && role !== "PLATFORM_ADMIN") {
       return NextResponse.json(
         { error: "플랫폼 관리자 전용 로그인입니다. 이 계정으로는 접근할 수 없습니다." },

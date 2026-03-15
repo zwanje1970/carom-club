@@ -1,16 +1,14 @@
 import Link from "next/link";
 
+/** 플랫폼관리자 전용 메뉴. 대회 실무(대회관리/참가자/대진표)는 제거, 대회 현황(모니터링)만 유지 */
 const menu = [
   { href: "/admin", label: "대시보드" },
-  { href: "/admin/tournaments", label: "대회관리" },
-  { href: "/admin/participants", label: "참가자관리" },
-  { href: "/admin/brackets", label: "대진표관리" },
+  { href: "/admin/tournaments", label: "대회 현황" },
   { href: "/admin/members", label: "회원관리" },
   { href: "/admin/inquiries", label: "문의관리" },
   { href: "/admin/venues", label: "클라이언트 목록" },
   { href: "/admin/fee-ledger", label: "회비 장부" },
   { href: "/admin/client-applications", label: "클라이언트 신청" },
-  { href: "/admin/site", label: "사이트 관리" },
   { href: "/admin/settings", label: "설정" },
 ];
 

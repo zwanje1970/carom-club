@@ -2,10 +2,9 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
-import { isPlatformAdmin } from "@/types/auth";
-import { getClientAdminOrganizationId } from "@/lib/auth-org";
+import { canViewTournament, canManageTournament } from "@/lib/permissions";
 
-/** 대회에 연결된 당구장(대회 당구장) 목록 */
+/** 대회에 연결된 당구장(대회 당구장) 목록. GET → canViewTournament */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -17,9 +16,6 @@ export async function GET(
   if (!session) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
-  if (session.role !== "PLATFORM_ADMIN" && session.role !== "CLIENT_ADMIN") {
-    return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
-  }
 
   const { id: tournamentId } = await params;
   const tournament = await prisma.tournament.findUnique({
@@ -29,7 +25,7 @@ export async function GET(
   if (!tournament) {
     return NextResponse.json({ error: "대회를 찾을 수 없습니다." }, { status: 404 });
   }
-  if (!isPlatformAdmin(session) && tournament.organization.ownerUserId !== session.id) {
+  if (!canViewTournament(session, tournament, tournament.organization)) {
     return NextResponse.json({ error: "해당 대회를 볼 권한이 없습니다." }, { status: 403 });
   }
 
@@ -50,7 +46,7 @@ export async function GET(
   );
 }
 
-/** 대회 당구장 추가 */
+/** 대회 당구장 추가. POST → canManageTournament */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -62,9 +58,6 @@ export async function POST(
   if (!session) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
-  if (session.role !== "PLATFORM_ADMIN" && session.role !== "CLIENT_ADMIN") {
-    return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
-  }
 
   const { id: tournamentId } = await params;
   const tournament = await prisma.tournament.findUnique({
@@ -74,7 +67,7 @@ export async function POST(
   if (!tournament) {
     return NextResponse.json({ error: "대회를 찾을 수 없습니다." }, { status: 404 });
   }
-  if (!isPlatformAdmin(session) && tournament.organization.ownerUserId !== session.id) {
+  if (!canManageTournament(session, tournament, tournament.organization)) {
     return NextResponse.json({ error: "해당 대회를 수정할 권한이 없습니다." }, { status: 403 });
   }
 
@@ -113,7 +106,7 @@ export async function POST(
   }
 }
 
-/** 대회 당구장 제거. ?organizationId=xxx */
+/** 대회 당구장 제거. ?organizationId=xxx. DELETE → canManageTournament */
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -125,9 +118,6 @@ export async function DELETE(
   if (!session) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
-  if (session.role !== "PLATFORM_ADMIN" && session.role !== "CLIENT_ADMIN") {
-    return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
-  }
 
   const { id: tournamentId } = await params;
   const tournament = await prisma.tournament.findUnique({
@@ -137,7 +127,7 @@ export async function DELETE(
   if (!tournament) {
     return NextResponse.json({ error: "대회를 찾을 수 없습니다." }, { status: 404 });
   }
-  if (!isPlatformAdmin(session) && tournament.organization.ownerUserId !== session.id) {
+  if (!canManageTournament(session, tournament, tournament.organization)) {
     return NextResponse.json({ error: "해당 대회를 수정할 권한이 없습니다." }, { status: 403 });
   }
 

@@ -3,10 +3,11 @@ import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
-import { isPlatformAdmin } from "@/types/auth";
+import { createListingPurchaseRecord } from "@/lib/listing-registration";
+import { isPlatformAdmin, isClientAdmin, canManageOrganization } from "@/lib/permissions";
 import { getPlatformSettings, hasActiveClientMembership } from "@/lib/platform-settings";
 
-/** 최근 대회 목록 (이전 대회 불러오기 모달용). ?organizationId= 시 해당 업체만. */
+/** 최근 대회 목록 (이전 대회 불러오기 모달용). ?organizationId= 시 해당 업체만. GET → 조회 권한만. */
 export async function GET(request: Request) {
   if (!isDatabaseConfigured()) {
     return NextResponse.json(
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
   if (!session) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
-  if (session.role !== "PLATFORM_ADMIN" && session.role !== "CLIENT_ADMIN") {
+  if (!isPlatformAdmin(session) && !isClientAdmin(session)) {
     return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
   }
 
@@ -62,6 +63,7 @@ export async function GET(request: Request) {
   }
 }
 
+/** 대회 생성. POST → 실무 권한(canManageOrganization). PLATFORM_ADMIN은 대회 생성 불가. */
 export async function POST(request: Request) {
   if (!isDatabaseConfigured()) {
     return NextResponse.json(
@@ -72,9 +74,6 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
-  }
-  if (session.role !== "PLATFORM_ADMIN" && session.role !== "CLIENT_ADMIN") {
-    return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
   }
 
   const body = await request.json();
@@ -146,38 +145,40 @@ export async function POST(request: Request) {
 
   let organizationId: string;
   if (isPlatformAdmin(session)) {
-    if (!bodyOrgId || !name?.trim() || !startAt) {
-      return NextResponse.json(
-        { error: "업체, 대회명, 일시를 입력해주세요." },
-        { status: 400 }
-      );
-    }
-    organizationId = bodyOrgId;
-  } else {
-    const myOrgId = await getClientAdminOrganizationId(session);
-    if (!myOrgId) {
-      return NextResponse.json(
-        { error: "소속된 업체가 없습니다. 먼저 업체 설정을 완료해 주세요." },
-        { status: 403 }
-      );
-    }
-    organizationId = myOrgId;
-    if (!name?.trim() || !startAt) {
-      return NextResponse.json(
-        { error: "대회명, 일시를 입력해주세요." },
-        { status: 400 }
-      );
-    }
+    return NextResponse.json(
+      { error: "대회 생성은 클라이언트 관리자만 가능합니다. 플랫폼 관리자는 대회 실무 권한이 없습니다." },
+      { status: 403 }
+    );
+  }
+  const myOrgId = await getClientAdminOrganizationId(session);
+  if (!myOrgId) {
+    return NextResponse.json(
+      { error: "소속된 업체가 없습니다. 먼저 업체 설정을 완료해 주세요." },
+      { status: 403 }
+    );
+  }
+  organizationId = myOrgId;
+  if (!name?.trim() || !startAt) {
+    return NextResponse.json(
+      { error: "대회명, 일시를 입력해주세요." },
+      { status: 400 }
+    );
   }
 
   const org = await prisma.organization.findUnique({
     where: { id: organizationId },
-    select: { id: true, type: true },
+    select: { id: true, type: true, ownerUserId: true },
   });
   if (!org) {
     return NextResponse.json(
       { error: "업체를 찾을 수 없습니다." },
-      { status: 400 }
+      { status: 404 }
+    );
+  }
+  if (!canManageOrganization(session, org)) {
+    return NextResponse.json(
+      { error: "해당 업체의 대회를 생성할 권한이 없습니다." },
+      { status: 403 }
     );
   }
   if (org.type === "INSTRUCTOR") {
@@ -212,6 +213,7 @@ export async function POST(request: Request) {
     const tournament = await prisma.tournament.create({
       data: {
         organizationId,
+        createdByUserId: session.id,
         name: name.trim(),
         startAt: new Date(startAt),
         ...(endAt != null && endAt !== "" && { endAt: new Date(endAt) }),
@@ -272,6 +274,13 @@ export async function POST(request: Request) {
         },
       });
     }
+    await createListingPurchaseRecord({
+      organizationId: tournament.organizationId,
+      listingCode: "TOURNAMENT_POSTING",
+      targetType: "TOURNAMENT",
+      targetId: tournament.id,
+    }).catch((err) => console.warn("listing purchase record create (tournament) skipped:", err));
+
     return NextResponse.json({ ok: true, id: tournament.id });
   } catch (e) {
     console.error("tournament create error", e);

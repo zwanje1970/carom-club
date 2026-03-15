@@ -5,6 +5,7 @@ import { MainSiteHeaderWrapper } from "@/components/layout/MainSiteHeaderWrapper
 import { MobileBottomNavWrapper } from "@/components/layout/MobileBottomNavWrapper";
 import { AdminFloatButton } from "@/components/AdminFloatButton";
 import NotificationBanner from "@/components/NotificationBanner";
+import { RegisterServiceWorker } from "@/components/push/RegisterServiceWorker";
 import { getSiteSettings, DEFAULT_PRIMARY_COLOR, DEFAULT_SECONDARY_COLOR } from "@/lib/site-settings";
 import { SiteSettingsProvider } from "@/components/SiteSettingsProvider";
 import { SiteThemeStyles } from "@/components/SiteThemeStyles";
@@ -103,6 +104,7 @@ export default async function RootLayout({
           secondaryColor={settings.secondaryColor ?? DEFAULT_SECONDARY_COLOR}
         />
         <SiteSettingsProvider initial={settings}>
+          <RegisterServiceWorker />
           <NotificationBanner />
           <IntroRoot>
             <MainSiteHeaderWrapper />

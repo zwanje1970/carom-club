@@ -8,6 +8,7 @@ import SectionMain from "@/components/admin/_components/Section/Main";
 import SectionTitleLineWithButton from "@/components/admin/_components/Section/TitleLineWithButton";
 import CardBox from "@/components/admin/_components/CardBox";
 import Button from "@/components/admin/_components/Button";
+import { AdminOrganizationGrants } from "@/components/admin/AdminOrganizationGrants";
 
 const CLIENT_TYPES = ["VENUE", "CLUB", "FEDERATION", "INSTRUCTOR"] as const;
 const TYPE_LABELS: Record<string, string> = {
@@ -325,6 +326,9 @@ export default async function AdminVenueDetailPage({
             )}
           </CardBox>
         )}
+
+        {/* 구독/기능 부여 (플랫폼 관리자) */}
+        <AdminOrganizationGrants organizationId={org.id} />
 
         {/* 관리자 정보 */}
         <CardBox>

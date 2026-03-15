@@ -18,10 +18,13 @@ import {
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { getTournamentsListRaw, getVenuesListRaw, type TournamentListRow } from "@/lib/db-tournaments";
 import { MOCK_TOURNAMENTS_LIST, MOCK_VENUES_LIST } from "@/lib/mock-data";
+import { getServerTiming, logServerTiming } from "@/lib/perf";
 
-export const dynamic = "force-dynamic";
+/** 메인·대회·당구장 목록은 60초 캐시. 체감 속도 개선용 */
+export const revalidate = 60;
 
 export default async function HomePage() {
+  getServerTiming();
   const [copy, noticeBars, popups, pageSections, heroSettings, siteSettings] = await Promise.all([
     getAdminCopy(),
     getNoticeBarsForPage("home"),
@@ -30,6 +33,7 @@ export default async function HomePage() {
     getHeroSettings(),
     getSiteSettings(),
   ]);
+  logServerTiming("fetch_sections");
   const heroSection = pageSections.find(
     (s) => s.placement === "main_visual_bg" && s.type === "image"
   );
@@ -41,16 +45,19 @@ export default async function HomePage() {
   let venues: { id: string; name: string; slug: string }[] = [];
 
   if (isDatabaseConfigured()) {
+    const dbStart = Date.now();
     const [tList, vList] = await Promise.all([
       getTournamentsListRaw({ orderBy: "asc", take: 6 }),
       getVenuesListRaw(6),
     ]);
+    logServerTiming("db", dbStart);
     tournaments = tList.length > 0 ? tList : (MOCK_TOURNAMENTS_LIST as unknown as TournamentListRow[]);
     venues = vList.length > 0 ? vList : MOCK_VENUES_LIST.map((v) => ({ id: v.id, name: v.name, slug: v.slug }));
   } else {
     tournaments = MOCK_TOURNAMENTS_LIST as unknown as TournamentListRow[];
     venues = MOCK_VENUES_LIST.map((v) => ({ id: v.id, name: v.name, slug: v.slug }));
   }
+  logServerTiming("page");
 
   return (
     <main className="min-h-screen bg-[var(--site-bg)] text-site-text">

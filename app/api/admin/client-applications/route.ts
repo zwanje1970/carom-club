@@ -44,7 +44,12 @@ export async function GET() {
         },
       },
     });
-    return NextResponse.json(list);
+    return NextResponse.json(
+      list.map((a) => ({
+        ...a,
+        requestedClientType: (a as { requestedClientType?: string | null }).requestedClientType ?? "GENERAL",
+      }))
+    );
   } catch (e) {
     console.error("[admin/client-applications] GET error:", e);
     if (process.env.NODE_ENV === "development" && isDbConnectionError(e)) {
@@ -56,6 +61,7 @@ export async function GET() {
           id: string;
           type: string;
           status: string;
+          requestedClientType: string | null;
           organizationName: string;
           applicantName: string;
           phone: string;
@@ -75,7 +81,7 @@ export async function GET() {
           uWithdrawnAt: Date | null;
         }[]
       >(
-        `SELECT a.id, a.type, a.status, a."organizationName", a."applicantName", a.phone, a.email,
+        `SELECT a.id, a.type, a.status, a."requestedClientType", a."organizationName", a."applicantName", a.phone, a.email,
                 a.region, a."shortDescription", a."referenceLink", a."rejectedReason", a."reviewedAt",
                 a."createdAt", a."applicantUserId",
                 u.id AS "uId", u.name AS "uName", u.username AS "uUsername", u.email AS "uEmail",
@@ -88,6 +94,7 @@ export async function GET() {
         id: r.id,
         type: r.type,
         status: r.status,
+        requestedClientType: r.requestedClientType ?? "GENERAL",
         organizationName: r.organizationName,
         applicantName: r.applicantName,
         phone: r.phone,

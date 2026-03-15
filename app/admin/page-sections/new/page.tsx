@@ -38,7 +38,10 @@ export default function NewPageSectionPage() {
   return (
     <SectionMain>
       <SectionTitleLineWithButton icon={mdiFormatListBulleted} title="페이지 섹션 추가">
-        <Button href="/admin/page-sections" label="← 목록" color="contrast" small />
+        <div className="flex items-center gap-2">
+          <Button href="/admin/site" label="사이트 관리" color="contrast" small />
+          <Button href="/admin/page-sections" label="← 목록" color="contrast" small />
+        </div>
       </SectionTitleLineWithButton>
       <CardBox className="max-w-4xl">
         <PageSectionForm

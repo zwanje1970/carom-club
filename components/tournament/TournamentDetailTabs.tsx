@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { TournamentApplyForm } from "./TournamentApplyForm";
@@ -24,6 +25,8 @@ type TournamentDetailTabsProps = {
   tournamentId: string;
   /** 대회 안내 탭에서 내용 없을 때 표시 문구 */
   infoEmptyText?: string;
+  /** 참가자 명단 공개 여부(관리자 옵션). false면 인원 수만 표시 */
+  participantsListPublic?: boolean;
   tournament: {
     name: string;
     description: string | null;
@@ -32,6 +35,7 @@ type TournamentDetailTabsProps = {
     startAt: string;
     gameFormat: string | null;
     status: string;
+    maxParticipants?: number | null;
     rule: {
       entryFee: number | null;
       operatingFee: number | null;
@@ -41,7 +45,17 @@ type TournamentDetailTabsProps = {
     } | null;
   };
   isLoggedIn: boolean;
-  myEntry: { id: string; status: string; waitingListOrder: number | null } | null;
+  myEntries: Array<{
+    id: string;
+    status: string;
+    waitingListOrder: number | null;
+    paymentMarkedByApplicantAt: string | null;
+    slotNumber: number;
+  }>;
+  allowMultipleSlots: boolean;
+  entryFee: number | null;
+  canApplyFirstSlot: boolean;
+  canApplyAdditionalSlot: boolean;
   entries: Array<{
     id: string;
     userId: string;
@@ -51,6 +65,7 @@ type TournamentDetailTabsProps = {
     depositorName: string | null;
     status: string;
     waitingListOrder: number | null;
+    slotNumber: number;
   }>;
 };
 
@@ -59,13 +74,19 @@ export function TournamentDetailTabs({
   currentTab,
   tournamentId,
   infoEmptyText = "안내 내용이 없습니다.",
+  participantsListPublic = true,
   tournament,
   isLoggedIn,
-  myEntry,
+  myEntries,
+  allowMultipleSlots,
+  entryFee,
+  canApplyFirstSlot,
+  canApplyAdditionalSlot,
   entries,
 }: TournamentDetailTabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [markingPaid, setMarkingPaid] = useState<string | null>(null);
 
   function setTab(tabId: string) {
     const next = new URLSearchParams(searchParams.toString());
@@ -74,14 +95,21 @@ export function TournamentDetailTabs({
   }
 
   const confirmedCount = entries.filter((e) => e.status === "CONFIRMED").length;
-  const maxEntries = tournament.rule?.maxEntries ?? 0;
-  const isFull = maxEntries > 0 && confirmedCount >= maxEntries;
+  const maxCap = tournament.maxParticipants ?? tournament.rule?.maxEntries ?? 0;
+  const isFull = maxCap > 0 && confirmedCount >= maxCap;
   const useWaiting = tournament.rule?.useWaiting ?? false;
-  const canApply =
-    tournament.status === "OPEN" &&
-    (useWaiting || !isFull) &&
-    !myEntry;
-  const alreadyApplied = !!myEntry && myEntry.status !== "CANCELED";
+  const canApply = canApplyFirstSlot || canApplyAdditionalSlot;
+  const alreadyApplied = myEntries.some((e) => e.status !== "CANCELED");
+  const applyClosedReason =
+    tournament.status === "DRAFT"
+      ? "아직 참가 신청을 받지 않습니다."
+      : tournament.status === "CLOSED"
+        ? "참가 신청이 마감되었습니다."
+        : tournament.status === "FINISHED"
+          ? "종료된 대회입니다."
+          : isFull && !useWaiting
+            ? "정원이 마감되었습니다."
+            : null;
 
   return (
     <div>
@@ -102,36 +130,6 @@ export function TournamentDetailTabs({
         ))}
       </nav>
 
-      {currentTab === "info" && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-3">{tabs.find((t) => t.id === "info")?.label ?? "대회 안내"}</h2>
-          {tournament.description ? (
-            <div
-              className="prose prose-sm max-w-none break-words overflow-hidden"
-              dangerouslySetInnerHTML={{ __html: tournament.description }}
-            />
-          ) : (
-            <p className="text-gray-500">{infoEmptyText}</p>
-          )}
-          <dl className="mt-4 text-sm space-y-1">
-            <dt className="text-gray-500">일시</dt>
-            <dd>{formatStartAt(tournament.startAt)}</dd>
-            {tournament.venue && (
-              <>
-                <dt className="text-gray-500">장소</dt>
-                <dd>{tournament.venue}</dd>
-              </>
-            )}
-            {tournament.gameFormat && (
-              <>
-                <dt className="text-gray-500">경기방식</dt>
-                <dd>{tournament.gameFormat}</dd>
-              </>
-            )}
-          </dl>
-        </div>
-      )}
-
       {currentTab === "outline" && (
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold mb-3">대회요강</h2>
@@ -149,34 +147,67 @@ export function TournamentDetailTabs({
       {currentTab === "apply" && (
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold mb-3">참가신청</h2>
-          {alreadyApplied && (
-            <div className="text-blue-700 bg-blue-50 p-4 rounded mb-4 flex flex-wrap items-center justify-between gap-2">
-              <span>
-                내 신청 상태:{" "}
-                {myEntry!.status === "CONFIRMED"
-                  ? "참가 확정 (취소 불가)"
-                  : myEntry!.status === "APPLIED"
-                    ? myEntry!.waitingListOrder != null
-                      ? `대기 ${myEntry!.waitingListOrder}번`
-                      : "신청됨 (입금 후 확정)"
-                    : myEntry!.status === "REJECTED"
-                      ? "거절"
-                      : myEntry!.status === "CANCELED"
-                        ? "취소"
-                        : myEntry!.status}
-              </span>
-              {myEntry!.status === "APPLIED" && (
-                <CancelEntryButton entryId={myEntry!.id} onCancel={() => router.refresh()} />
-              )}
+          {myEntries.length > 0 && (
+            <div className="space-y-3 mb-4">
+              <h3 className="text-sm font-semibold text-site-text">내 참가 슬롯</h3>
+              {myEntries
+                .filter((e) => e.status !== "CANCELED")
+                .map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="text-blue-700 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-200 p-4 rounded-lg flex flex-wrap items-center justify-between gap-2"
+                  >
+                    <span>
+                      <strong>슬롯{entry.slotNumber}</strong>
+                      {" · "}
+                      {entry.status === "CONFIRMED"
+                        ? "참가 확정"
+                        : entry.status === "APPLIED"
+                          ? entry.waitingListOrder != null
+                            ? `대기 ${entry.waitingListOrder}번`
+                            : entry.paymentMarkedByApplicantAt != null
+                              ? "입금확인 대기 중"
+                              : "신청됨 (입금 후 입금 완료 체크)"
+                          : entry.status === "REJECTED"
+                            ? "거절"
+                            : entry.status}
+                    </span>
+                    <span className="flex flex-wrap items-center gap-2">
+                      {entry.status === "APPLIED" && !entry.paymentMarkedByApplicantAt && (
+                        <button
+                          type="button"
+                          disabled={markingPaid !== null}
+                          onClick={async () => {
+                            setMarkingPaid(entry.id);
+                            try {
+                              const res = await fetch(`/api/tournaments/entry/${entry.id}/mark-paid`, { method: "PATCH" });
+                              if (!res.ok) {
+                                const d = await res.json().catch(() => ({}));
+                                alert(d.error || "처리 실패");
+                                return;
+                              }
+                              router.refresh();
+                            } finally {
+                              setMarkingPaid(null);
+                            }
+                          }}
+                          className="rounded-lg bg-site-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                        >
+                          {markingPaid === entry.id ? "처리 중..." : "입금 완료했습니다"}
+                        </button>
+                      )}
+                      {(entry.status === "APPLIED" || entry.status === "CONFIRMED") && (
+                        <CancelEntryButton entryId={entry.id} onCancel={() => router.refresh()} />
+                      )}
+                    </span>
+                  </div>
+                ))}
             </div>
           )}
-          {!canApply && tournament.status === "OPEN" && isFull && !useWaiting && (
-            <p className="text-site-text bg-site-secondary/20 border border-site-secondary/40 p-4 rounded">
-              정원이 마감되었습니다. 참가 신청을 받지 않습니다.
+          {!canApply && !alreadyApplied && applyClosedReason && (
+            <p className="text-gray-700 dark:text-slate-300 bg-gray-100 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 p-4 rounded-lg">
+              {applyClosedReason}
             </p>
-          )}
-          {tournament.status !== "OPEN" && !alreadyApplied && (
-            <p className="text-gray-500">현재 모집 중이 아닙니다.</p>
           )}
           {canApply && !isLoggedIn && (
             <p className="text-gray-500">
@@ -186,45 +217,61 @@ export function TournamentDetailTabs({
               후 참가 신청할 수 있습니다.
             </p>
           )}
-          {canApply && isLoggedIn && (
+          {canApplyFirstSlot && isLoggedIn && (
             <TournamentApplyForm
               tournamentId={tournamentId}
               entryFee={tournament.rule?.entryFee ?? null}
               entryConditionsHtml={tournament.rule?.entryConditions ?? null}
             />
           )}
+          {canApplyAdditionalSlot && isLoggedIn && (
+            <TournamentApplyForm
+              tournamentId={tournamentId}
+              entryFee={entryFee != null ? entryFee * 2 : null}
+              entryConditionsHtml={tournament.rule?.entryConditions ?? null}
+              additionalSlot
+            />
+          )}
         </div>
       )}
 
       {currentTab === "participants" && (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <h2 className="text-lg font-semibold p-4 border-b">참가자 명단</h2>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">이름</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">핸디</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">AVG</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">상태</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {entries.filter((e) => e.status === "CONFIRMED" || (e.status === "APPLIED" && e.waitingListOrder != null)).map((e) => (
-                <tr key={e.id}>
-                  <td className="px-4 py-2 text-sm">{e.userName}</td>
-                  <td className="px-4 py-2 text-sm text-gray-600">{e.handicap ?? "-"}</td>
-                  <td className="px-4 py-2 text-sm text-gray-600">{e.avg ?? "-"}</td>
-                  <td className="px-4 py-2 text-sm">
-                    {e.status === "CONFIRMED" ? "참가확정" : `대기 ${e.waitingListOrder ?? "-"}번`}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-          {entries.filter((e) => e.status === "CONFIRMED" || (e.status === "APPLIED" && e.waitingListOrder != null)).length === 0 && (
-            <p className="p-4 text-gray-500 text-center">참가자 명단이 없습니다.</p>
+        <div className="bg-white dark:bg-site-card rounded-lg shadow overflow-hidden border border-site-border">
+          <h2 className="text-lg font-semibold p-4 border-b border-site-border">참가자 명단</h2>
+          {!participantsListPublic ? (
+            <p className="p-4 text-site-text-muted text-sm">참가자 명단은 비공개입니다. 참가 인원 수는 상단 참가자 현황에서 확인할 수 있습니다.</p>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-site-border">
+                  <thead className="bg-site-bg/50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-site-text-muted">이름</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-site-text-muted">핸디</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-site-text-muted">AVG</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-site-text-muted">상태</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-site-border">
+                    {entries.filter((e) => e.status === "CONFIRMED" || (e.status === "APPLIED" && e.waitingListOrder != null)).map((e) => (
+                      <tr key={e.id}>
+                        <td className="px-4 py-2 text-sm text-site-text">
+                          {e.slotNumber > 1 ? `${e.userName} (슬롯${e.slotNumber})` : e.userName}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-site-text-muted">{e.handicap ?? "-"}</td>
+                        <td className="px-4 py-2 text-sm text-site-text-muted">{e.avg ?? "-"}</td>
+                        <td className="px-4 py-2 text-sm">
+                          {e.status === "CONFIRMED" ? "참가확정" : `대기 ${e.waitingListOrder ?? "-"}번`}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {entries.filter((e) => e.status === "CONFIRMED" || (e.status === "APPLIED" && e.waitingListOrder != null)).length === 0 && (
+                <p className="p-4 text-site-text-muted text-center text-sm">참가자 명단이 없습니다.</p>
+              )}
+            </>
           )}
         </div>
       )}

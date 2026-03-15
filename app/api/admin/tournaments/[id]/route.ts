@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
-import { isPlatformAdmin } from "@/types/auth";
+import { canViewTournament, canManageTournament } from "@/lib/permissions";
+import { sendPrizeNotifications } from "@/lib/push/prizeNotifications";
 
-/** 이전 대회 복사용: 대회 + 규칙 전체 반환 (원본과 연결 없음). */
+/** 이전 대회 복사용: 대회 + 규칙 전체 반환 (원본과 연결 없음). GET → canViewTournament */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -19,9 +20,6 @@ export async function GET(
   if (!session) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
-  if (session.role !== "PLATFORM_ADMIN" && session.role !== "CLIENT_ADMIN") {
-    return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
-  }
 
   const { id } = await params;
   const tournament = await prisma.tournament.findUnique({
@@ -34,7 +32,7 @@ export async function GET(
   if (!tournament) {
     return NextResponse.json({ error: "대회를 찾을 수 없습니다." }, { status: 404 });
   }
-  if (!isPlatformAdmin(session) && tournament.organization.ownerUserId !== session.id) {
+  if (!canViewTournament(session, tournament, tournament.organization)) {
     return NextResponse.json({ error: "해당 대회를 볼 권한이 없습니다." }, { status: 403 });
   }
 
@@ -84,6 +82,7 @@ export async function GET(
   });
 }
 
+/** 대회 수정. PATCH → canManageTournament (클라이언트: 자기 대회, 플랫폼: 전체) */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -98,9 +97,6 @@ export async function PATCH(
   if (!session) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
-  if (session.role !== "PLATFORM_ADMIN" && session.role !== "CLIENT_ADMIN") {
-    return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
-  }
 
   const { id } = await params;
   const tournament = await prisma.tournament.findUnique({
@@ -110,7 +106,7 @@ export async function PATCH(
   if (!tournament) {
     return NextResponse.json({ error: "대회를 찾을 수 없습니다." }, { status: 404 });
   }
-  if (!isPlatformAdmin(session) && tournament.organization.ownerUserId !== session.id) {
+  if (!canManageTournament(session, tournament, tournament.organization)) {
     return NextResponse.json({ error: "해당 대회를 수정할 권한이 없습니다." }, { status: 403 });
   }
 
@@ -118,10 +114,14 @@ export async function PATCH(
   const {
     name,
     startAt,
+    endAt,
     venue,
     venueName,
     status,
     gameFormat,
+    summary,
+    description,
+    posterImageUrl,
     entryFee,
     maxParticipants,
     entryCondition,
@@ -131,10 +131,14 @@ export async function PATCH(
   } = body as {
     name?: string;
     startAt?: string;
+    endAt?: string | null;
     venue?: string;
     venueName?: string;
     status?: string;
     gameFormat?: string;
+    summary?: string | null;
+    description?: string | null;
+    posterImageUrl?: string | null;
     entryFee?: number | null;
     maxParticipants?: number | null;
     entryCondition?: string | null;
@@ -143,11 +147,13 @@ export async function PATCH(
     promoContent?: string | null;
   };
 
-  const validStatuses = ["DRAFT", "OPEN", "CLOSED", "FINISHED", "HIDDEN"] as const;
+  const validStatuses = ["DRAFT", "OPEN", "CLOSED", "BRACKET_GENERATED", "FINISHED", "HIDDEN"] as const;
   const statusValue =
     status !== undefined && validStatuses.includes(status as (typeof validStatuses)[number])
       ? (status as (typeof validStatuses)[number])
       : undefined;
+  const wasFinished = tournament.status === "FINISHED";
+  const becomingFinished = statusValue === "FINISHED" && !wasFinished;
 
   try {
     await prisma.tournament.update({
@@ -155,10 +161,14 @@ export async function PATCH(
       data: {
         ...(name !== undefined && { name }),
         ...(startAt !== undefined && { startAt: new Date(startAt) }),
+        ...(endAt !== undefined && { endAt: endAt != null && endAt !== "" ? new Date(endAt) : null }),
         ...(venue !== undefined && { venue: venue || null }),
         ...(venueName !== undefined && { venueName: venueName || null }),
         ...(statusValue !== undefined && { status: statusValue }),
         ...(gameFormat !== undefined && { gameFormat: gameFormat || null }),
+        ...(summary !== undefined && { summary: summary?.trim() || null }),
+        ...(description !== undefined && { description: description?.trim() || null }),
+        ...(posterImageUrl !== undefined && { posterImageUrl: posterImageUrl?.trim() || null }),
         ...(entryFee !== undefined && { entryFee: entryFee != null && Number.isFinite(Number(entryFee)) ? Number(entryFee) : null }),
         ...(maxParticipants !== undefined && { maxParticipants: maxParticipants != null && Number.isFinite(Number(maxParticipants)) ? Number(maxParticipants) : null }),
         ...(entryCondition !== undefined && { entryCondition: entryCondition?.trim() || null }),
@@ -167,6 +177,14 @@ export async function PATCH(
         ...(promoContent !== undefined && { promoContent: promoContent?.trim() || null }),
       },
     });
+    if (becomingFinished) {
+      try {
+        const t = await prisma.tournament.findUnique({ where: { id }, select: { name: true } });
+        if (t) await sendPrizeNotifications(id, t.name);
+      } catch (pushErr) {
+        console.error("prize push error", pushErr);
+      }
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("tournament update error", e);

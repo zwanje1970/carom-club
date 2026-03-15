@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
 import { PromoEditor } from "@/components/admin/PromoEditor";
+import { ListingProductBanner } from "@/components/client/ListingProductBanner";
 
 export default async function ClientPromoPage() {
   const session = await getSession();
@@ -26,6 +27,8 @@ export default async function ClientPromoPage() {
     select: {
       id: true,
       name: true,
+      clientType: true,
+      membershipType: true,
       promoDraft: true,
       promoPublished: true,
       promoPublishedAt: true,
@@ -47,6 +50,11 @@ export default async function ClientPromoPage() {
         </Link>
       </div>
       <p className="text-sm text-gray-600">{org.name} · 공개 홍보 페이지에 노출되는 내용을 편집합니다.</p>
+      <ListingProductBanner
+        listingCode="VENUE_PROMOTION"
+        organizationClientType={org.clientType}
+        organizationMembershipType={org.membershipType}
+      />
       <div className="rounded-lg border border-site-border bg-site-card p-6">
         <PromoEditor
           organizationId={org.id}

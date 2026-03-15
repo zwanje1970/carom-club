@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
+import { canManageTournament } from "@/lib/permissions";
 
+/** 대회 개요 저장/발행. PATCH → canManageTournament */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -19,6 +21,17 @@ export async function PATCH(
   }
 
   const { id } = await params;
+  const tournament = await prisma.tournament.findUnique({
+    where: { id },
+    include: { organization: { select: { ownerUserId: true } } },
+  });
+  if (!tournament) {
+    return NextResponse.json({ error: "대회를 찾을 수 없습니다." }, { status: 404 });
+  }
+  if (!canManageTournament(session, tournament, tournament.organization)) {
+    return NextResponse.json({ error: "해당 대회를 수정할 권한이 없습니다." }, { status: 403 });
+  }
+
   const body = await request.json();
   const { draft, publish } = body as { draft?: string; publish?: string };
 

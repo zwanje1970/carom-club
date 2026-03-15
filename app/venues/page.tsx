@@ -1,24 +1,29 @@
 import Link from "next/link";
 import { ContentLayer } from "@/components/content/ContentLayer";
 import { PageSectionsRenderer } from "@/components/content/PageSectionsRenderer";
+import { VenuesListWithLocation } from "@/components/venues/VenuesListWithLocation";
 import { getAdminCopy, getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { getNoticeBarsForPage, getPopupsForPage, getPageSectionsForPage } from "@/lib/content/service";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { MOCK_VENUES_LIST } from "@/lib/mock-data";
+import { getServerTiming, logServerTiming } from "@/lib/perf";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function VenuesPage() {
+  getServerTiming();
   const [copy, noticeBars, popups, pageSections] = await Promise.all([
     getAdminCopy(),
     getNoticeBarsForPage("venues"),
     getPopupsForPage("venues"),
     getPageSectionsForPage("venues"),
   ]);
+  logServerTiming("fetch_copy");
   const c = copy as Record<AdminCopyKey, string>;
   let venues: { id: string; name: string; slug: string }[] = [];
 
+  const dbStart = Date.now();
   if (isDatabaseConfigured()) {
     try {
       const approvedApplicantIds = await prisma.clientApplication
@@ -42,6 +47,8 @@ export default async function VenuesPage() {
   } else {
     venues = MOCK_VENUES_LIST.map((v) => ({ id: v.id, name: v.name, slug: v.slug }));
   }
+  logServerTiming("db", dbStart);
+  logServerTiming("page");
 
   return (
     <main className="min-h-screen bg-[var(--site-bg)] text-site-text">
@@ -53,28 +60,14 @@ export default async function VenuesPage() {
         </Link>
         <h1 className="mt-4 text-2xl font-bold text-site-text">{getCopyValue(c, "site.venues.title")}</h1>
         <p className="mt-2 text-gray-600">{getCopyValue(c, "site.venues.subtitle")}</p>
+        <p className="mt-1 text-sm text-gray-500">위치를 허용하면 가까운 당구장부터 볼 수 있습니다.</p>
 
         {venues.length === 0 ? (
           <div className="mt-8 rounded-2xl border border-site-border bg-site-card p-10 text-center">
             <p className="text-gray-500">{getCopyValue(c, "site.venues.empty")}</p>
           </div>
         ) : (
-          <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {venues.map((v) => (
-              <li key={v.id}>
-                <Link
-                  href={`/v/${v.slug}`}
-                  className="flex overflow-hidden rounded-2xl border border-site-border bg-site-card p-5 shadow-sm transition hover:border-site-secondary/50 hover:shadow-md"
-                >
-                  <span className="text-2xl text-site-secondary/80">●</span>
-                  <div className="ml-3 flex-1 min-w-0">
-                    <h2 className="font-semibold text-site-text">{v.name}</h2>
-                    <p className="mt-0.5 text-sm text-gray-500">자세히 보기 →</p>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <VenuesListWithLocation initialVenues={venues} copy={copy} />
         )}
       </div>
     </main>

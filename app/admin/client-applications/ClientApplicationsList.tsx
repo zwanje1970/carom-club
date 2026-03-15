@@ -14,13 +14,19 @@ const TYPE_LABELS: Record<string, string> = {
 const STATUS_LABELS: Record<string, string> = {
   PENDING: "대기",
   APPROVED: "승인",
-  REJECTED: "거절",
+  REJECTED: "반려",
+};
+
+const CLIENT_TYPE_LABELS: Record<string, string> = {
+  GENERAL: "일반업체",
+  REGISTERED: "등록업체",
 };
 
 type Row = {
   id: string;
   type: string;
   status: string;
+  requestedClientType?: string;
   organizationName: string;
   applicantName: string;
   phone: string;
@@ -118,6 +124,7 @@ export function ClientApplicationsList() {
         <thead>
           <tr className="border-b border-site-border bg-gray-50 dark:bg-slate-800/50">
             <th className="p-3 text-left font-medium">유형</th>
+            <th className="p-3 text-left font-medium">신청 유형</th>
             <th className="p-3 text-left font-medium">업체명</th>
             <th className="p-3 text-left font-medium">신청자</th>
             <th className="p-3 text-left font-medium">연락처</th>
@@ -131,6 +138,7 @@ export function ClientApplicationsList() {
           {list.map((row) => (
             <tr key={row.id} className="border-b border-site-border last:border-0">
               <td className="p-3">{TYPE_LABELS[row.type] ?? row.type}</td>
+              <td className="p-3">{CLIENT_TYPE_LABELS[row.requestedClientType ?? "GENERAL"] ?? row.requestedClientType}</td>
               <td className="p-3">{row.organizationName}</td>
               <td className="p-3">
                 {getDisplayName(row.applicant) || row.applicantName}
@@ -158,8 +166,11 @@ export function ClientApplicationsList() {
                         type="button"
                         disabled={!!actioning}
                         onClick={() =>
-                          withConfirm("이 신청을 승인하시겠습니까? 업체가 생성되고 신청자가 클라이언트 관리자로 변경됩니다.", () =>
-                            handleAction(row.id, "APPROVED")
+                          withConfirm(
+                            row.requestedClientType === "REGISTERED"
+                              ? "등록업체로 승인하시겠습니까? 업체가 생성되고 연회원(ANNUAL)으로 설정됩니다."
+                              : "이 신청을 승인하시겠습니까? 업체가 생성되고 신청자가 클라이언트 관리자로 변경됩니다.",
+                            () => handleAction(row.id, "APPROVED")
                           )
                         }
                         className="rounded bg-green-600 px-2 py-1 text-white text-xs hover:bg-green-700 disabled:opacity-50"
@@ -230,8 +241,11 @@ export function ClientApplicationsList() {
                         type="button"
                         disabled={!!actioning}
                         onClick={() =>
-                          withConfirm("이 신청을 승인하시겠습니까? 업체가 생성되고 신청자가 클라이언트 관리자로 변경됩니다.", () =>
-                            handleAction(row.id, "APPROVED")
+                          withConfirm(
+                            row.requestedClientType === "REGISTERED"
+                              ? "등록업체로 승인하시겠습니까? 업체가 생성되고 연회원(ANNUAL)으로 설정됩니다."
+                              : "이 신청을 승인하시겠습니까? 업체가 생성되고 신청자가 클라이언트 관리자로 변경됩니다.",
+                            () => handleAction(row.id, "APPROVED")
                           )
                         }
                         className="rounded bg-green-600 px-2 py-1 text-white text-xs hover:bg-green-700 disabled:opacity-50"

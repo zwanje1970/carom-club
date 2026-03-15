@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
+import { createListingPurchaseRecord } from "@/lib/listing-registration";
 
 export async function GET() {
   const session = await getSession();
@@ -56,6 +57,12 @@ export async function PATCH(request: Request) {
           promoPublishedAt: new Date(),
           promoDraft: publish,
         },
+      });
+      await createListingPurchaseRecord({
+        organizationId: orgId,
+        listingCode: "VENUE_PROMOTION",
+        targetType: "VENUE_PROMO",
+        targetId: orgId,
       });
       return NextResponse.json({ ok: true, published: true });
     }

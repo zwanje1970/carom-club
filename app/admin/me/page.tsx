@@ -55,7 +55,7 @@ export default async function AdminMePage() {
             <dt className="text-gray-500 dark:text-slate-400">닉네임</dt>
             <dd>{user.username}</dd>
             <dt className="text-gray-500 dark:text-slate-400">권한</dt>
-            <dd>{user.role === "PLATFORM_ADMIN" ? "플랫폼 관리자" : user.role === "CLIENT_ADMIN" ? "클라이언트 관리자" : "일반회원"}</dd>
+            <dd>{user.role === "PLATFORM_ADMIN" ? "플랫폼 관리자" : user.role === "CLIENT_ADMIN" ? "클라이언트 관리자" : user.role === "ZONE_MANAGER" ? "권역 관리자" : "일반회원"}</dd>
             <dt className="text-gray-500 dark:text-slate-400">계정 생성일</dt>
             <dd>{user.createdAt.toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" })}</dd>
           </dl>

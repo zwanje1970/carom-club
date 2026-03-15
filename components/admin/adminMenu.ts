@@ -5,8 +5,6 @@
 import {
   mdiViewDashboard,
   mdiTrophy,
-  mdiAccountGroup,
-  mdiTable,
   mdiAccountMultiple,
   mdiMessageQuestion,
   mdiOfficeBuilding,
@@ -17,7 +15,6 @@ import {
   mdiFormatSection,
   mdiWindowRestore,
   mdiViewCarousel,
-  mdiPlus,
   mdiFormatListBulleted,
   mdiAccountCog,
   mdiCashMultiple,
@@ -44,6 +41,10 @@ const defaultCopy: Record<string, string> = {
   "menu.venueList": "클라이언트 목록",
   "menu.feeLedger": "회비 장부",
   "menu.clientApplications": "클라이언트 신규신청",
+  "menu.billing": "요금 정책",
+  "menu.features": "기능 목록",
+  "menu.pricingPlans": "요금제/상품",
+  "menu.listingProducts": "등록상품 정책",
   "menu.settings": "설정",
   "nav.myInfo": "내 정보",
   "nav.settings": "설정",
@@ -69,15 +70,7 @@ export function getMenuAside(copy?: Record<string, string>): MenuAsideItem[] {
         { href: "/admin/notice-bars", label: L(copy, "menu.noticeBars"), icon: mdiViewCarousel },
       ],
     },
-    {
-      label: L(copy, "menu.tournaments"),
-      icon: mdiTrophy,
-      menu: [
-        { href: "/admin/tournaments", label: L(copy, "menu.tournamentList"), icon: mdiFormatListBulleted },
-        { href: "/admin/tournaments/new", label: L(copy, "menu.tournamentNew"), icon: mdiPlus },
-        { href: "/admin/participants", label: L(copy, "menu.participants"), icon: mdiAccountGroup },
-      ],
-    },
+    { href: "/admin/tournaments", label: "대회 현황", icon: mdiTrophy },
     {
       label: L(copy, "menu.venues"),
       icon: mdiOfficeBuilding,
@@ -87,7 +80,6 @@ export function getMenuAside(copy?: Record<string, string>): MenuAsideItem[] {
         { href: "/admin/client-applications", label: L(copy, "menu.clientApplications"), icon: mdiClipboardCheck },
       ],
     },
-    { href: "/admin/brackets", label: L(copy, "menu.brackets"), icon: mdiTable },
     {
       label: L(copy, "menu.members"),
       icon: mdiAccountMultiple,
@@ -97,6 +89,15 @@ export function getMenuAside(copy?: Record<string, string>): MenuAsideItem[] {
       ],
     },
     { href: "/admin/inquiries", label: L(copy, "menu.inquiries"), icon: mdiMessageQuestion },
+    {
+      label: L(copy, "menu.billing"),
+      icon: mdiCashMultiple,
+      menu: [
+        { href: "/admin/features", label: L(copy, "menu.features"), icon: mdiFormatListBulleted },
+        { href: "/admin/pricing-plans", label: L(copy, "menu.pricingPlans"), icon: mdiFormatListBulleted },
+        { href: "/admin/listing-products", label: L(copy, "menu.listingProducts"), icon: mdiFormatListBulleted },
+      ],
+    },
     { href: "/admin/settings", label: L(copy, "menu.settings"), icon: mdiCog },
   ];
 }

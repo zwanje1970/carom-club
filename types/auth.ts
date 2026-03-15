@@ -1,5 +1,5 @@
-/** 플랫폼 역할: USER(일반), CLIENT_ADMIN(클라이언트 관리자), PLATFORM_ADMIN(플랫폼 관리자) */
-export type UserRole = "USER" | "CLIENT_ADMIN" | "PLATFORM_ADMIN";
+/** 사용자 역할: USER(일반), CLIENT_ADMIN(클라이언트 관리자), PLATFORM_ADMIN(플랫폼 관리자), ZONE_MANAGER(권역 관리자) */
+export type UserRole = "USER" | "CLIENT_ADMIN" | "PLATFORM_ADMIN" | "ZONE_MANAGER";
 
 export interface SessionUser {
   id: string;

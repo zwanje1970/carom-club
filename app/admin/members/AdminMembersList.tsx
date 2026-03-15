@@ -7,6 +7,7 @@ const ROLE_LABELS: Record<string, string> = {
   USER: "일반회원",
   CLIENT_ADMIN: "클라이언트 관리자",
   PLATFORM_ADMIN: "플랫폼 관리자",
+  ZONE_MANAGER: "권역 관리자",
 };
 
 const STATUS_LABELS: Record<string, string> = {

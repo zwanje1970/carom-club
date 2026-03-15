@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { SmartLink } from "@/components/common/SmartLink";
 import { INTERNAL_PAGE_PATHS } from "@/lib/content/constants";
 import type { PageSection } from "@/types/page-section";
@@ -11,6 +12,7 @@ type Props = { section: PageSection };
 
 export function ImageSection({ section }: Props) {
   const imgUrl = section.imageUrl?.trim() || PLACEHOLDER;
+  const imgUrlMobile = section.imageUrlMobile?.trim() || imgUrl;
   const heightPc = section.imageHeightPc ?? 320;
   const heightMobile = section.imageHeightMobile ?? 240;
   const hasLink =
@@ -24,23 +26,32 @@ export function ImageSection({ section }: Props) {
         ? section.externalUrl ?? "#"
         : "#";
   const internal = section.linkType === "internal";
+  const isDataUrl = (url: string) => url.startsWith("data:");
 
   const image = (
     <>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={imgUrl}
-        alt={section.title || ""}
-        className="hidden h-full w-full object-cover sm:block"
-        style={{ height: heightPc }}
-      />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={section.imageUrlMobile?.trim() || imgUrl}
-        alt={section.title || ""}
-        className="h-full w-full object-cover sm:hidden"
-        style={{ height: heightMobile }}
-      />
+      <div className="relative hidden w-full overflow-hidden sm:block" style={{ height: heightPc }}>
+        <Image
+          src={imgUrl}
+          alt={section.title || ""}
+          fill
+          className="object-cover"
+          sizes="100vw"
+          loading="lazy"
+          unoptimized={isDataUrl(imgUrl)}
+        />
+      </div>
+      <div className="relative block w-full overflow-hidden sm:hidden" style={{ height: heightMobile }}>
+        <Image
+          src={imgUrlMobile}
+          alt={section.title || ""}
+          fill
+          className="object-cover"
+          sizes="100vw"
+          loading="lazy"
+          unoptimized={isDataUrl(imgUrlMobile)}
+        />
+      </div>
     </>
   );
 

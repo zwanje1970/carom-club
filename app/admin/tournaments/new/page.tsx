@@ -11,6 +11,25 @@ import CardBox from "@/components/admin/_components/CardBox";
 import Button from "@/components/admin/_components/Button";
 
 export default async function AdminTournamentsNewPage() {
+  const session = await getSession();
+  if (session && isPlatformAdmin(session)) {
+    return (
+      <SectionMain>
+        <SectionTitleLineWithButton icon={mdiTrophy} title="대회 생성" />
+        <CardBox>
+          <p className="font-medium text-gray-900 dark:text-slate-100">대회 생성은 클라이언트 관리자 전용 기능입니다.</p>
+          <p className="mt-2 text-sm text-gray-600 dark:text-slate-400">
+            플랫폼 관리자는 대회를 생성·수정할 수 없습니다. 대회 운영은 클라이언트 관리자(/client) 콘솔에서 진행해 주세요.
+          </p>
+          <p className="mt-4">
+            <Button href="/admin" label="대시보드로" color="contrast" outline small />
+            <Button href="/admin/tournaments" label="대회 현황" color="info" small className="ml-2" />
+          </p>
+        </CardBox>
+      </SectionMain>
+    );
+  }
+
   let organizations: { id: string; name: string; slug: string; type: string; address: string | null }[] = [];
   try {
     organizations = await prisma.organization.findMany({
@@ -31,7 +50,6 @@ export default async function AdminTournamentsNewPage() {
   let readOnlyVenueInfo: { name: string; address: string } | null = null;
   let isLessonClient = false;
   try {
-    const session = await getSession();
     if (session && !isPlatformAdmin(session)) {
       const orgId = await getClientAdminOrganizationId(session);
       if (orgId) {

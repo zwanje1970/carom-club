@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
+import { canManageTournament } from "@/lib/permissions";
 
+/** 출석 체크. POST → canManageTournament */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string; entryId: string }> }
@@ -18,7 +20,19 @@ export async function POST(
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  const { entryId } = await params;
+  const { id: tournamentId, entryId } = await params;
+
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    include: { organization: { select: { ownerUserId: true } } },
+  });
+  if (!tournament) {
+    return NextResponse.json({ error: "대회를 찾을 수 없습니다." }, { status: 404 });
+  }
+  if (!canManageTournament(session, tournament, tournament.organization)) {
+    return NextResponse.json({ error: "해당 대회를 수정할 권한이 없습니다." }, { status: 403 });
+  }
+
   const body = await request.json();
   const { attended } = body as { attended: boolean };
 
@@ -27,6 +41,9 @@ export async function POST(
     include: { attendances: true },
   });
   if (!entry) {
+    return NextResponse.json({ error: "참가 신청을 찾을 수 없습니다." }, { status: 404 });
+  }
+  if (entry.tournamentId !== tournamentId) {
     return NextResponse.json({ error: "참가 신청을 찾을 수 없습니다." }, { status: 404 });
   }
   if (entry.status !== "CONFIRMED") {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import type { Popup as PopupType } from "@/types/popup";
 
 const STORAGE_PREFIX = "carom_popup_hide_";
@@ -79,12 +80,15 @@ export function Popup({ popup, onClose }: Props) {
             </p>
           )}
           {popup.imageUrl && (
-            <div className="mt-4 overflow-hidden rounded">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+            <div className="relative mt-4 aspect-video w-full overflow-hidden rounded">
+              <Image
                 src={popup.imageUrl}
                 alt=""
-                className="h-auto w-full object-cover"
+                fill
+                className="object-cover"
+                sizes="(max-width: 480px) 100vw, 480px"
+                loading="lazy"
+                unoptimized={!popup.imageUrl.trim().startsWith("/")}
               />
             </div>
           )}

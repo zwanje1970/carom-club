@@ -51,6 +51,10 @@ export async function GET(request: Request) {
       venueName: t.venueName,
       gameFormat: t.gameFormat,
       imageUrl: t.imageUrl,
+      posterImageUrl: t.posterImageUrl ?? null,
+      summary: t.summary ?? null,
+      maxParticipants: t.maxParticipants ?? null,
+      confirmedCount: t.confirmedCount ?? 0,
       organization: t.organization,
     }));
     return NextResponse.json(out);
@@ -84,6 +88,10 @@ export async function GET(request: Request) {
     venueName: t.venueName,
     gameFormat: t.gameFormat,
     imageUrl: t.imageUrl,
+    posterImageUrl: t.posterImageUrl ?? null,
+    summary: t.summary ?? null,
+    maxParticipants: t.maxParticipants ?? null,
+    confirmedCount: t.confirmedCount ?? 0,
     organization: t.organization,
     distanceKm: t.distanceKm ?? undefined,
   }));

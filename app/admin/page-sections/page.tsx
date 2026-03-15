@@ -47,10 +47,13 @@ export default function AdminPageSectionsPage() {
   return (
     <SectionMain>
       <SectionTitleLineWithButton icon={mdiFormatListBulleted} title="페이지 섹션 관리">
-        <Button href="/admin/page-sections/new" icon={mdiPlus} label="섹션 추가" color="info" small />
+        <div className="flex items-center gap-2">
+          <Button href="/admin/site" label="설정 · 사이트 관리" color="contrast" small />
+          <Button href="/admin/page-sections/new" icon={mdiPlus} label="섹션 추가" color="info" small />
+        </div>
       </SectionTitleLineWithButton>
       <p className="mb-2 text-sm text-gray-500 dark:text-slate-400">
-        사이트 페이지에 이미지·텍스트·버튼 섹션을 배치할 수 있습니다.
+        사이트 페이지에 이미지·텍스트·버튼 섹션을 배치할 수 있습니다. (설정 → 사이트 관리 → 컴포넌트 관리)
       </p>
       <p className="mb-6 text-sm text-amber-700 dark:text-amber-400">
         <strong>메인 상단 히어로(배경 이미지·제목·부제목)</strong>를 바꾸려면 [노출 페이지: 메인페이지] → [노출 위치: 메인 비주얼 배경]으로 필터한 뒤 해당 섹션을 수정하거나, 없으면 [섹션 추가]로 유형 &quot;이미지&quot;, 위치 &quot;메인 비주얼 배경&quot;으로 새로 만드세요.

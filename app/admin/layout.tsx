@@ -31,6 +31,11 @@ export default async function AdminLayoutRoot({
     redirect("/admin/login");
   }
 
+  // 권역 관리자는 전용 콘솔로 리다이렉트
+  if (session.role === "ZONE_MANAGER") {
+    redirect("/zone");
+  }
+
   // 로그인됐지만 플랫폼 관리자 아님 → 접근 차단 (403 UI + 메인 이동 링크)
   if (session.role !== "PLATFORM_ADMIN") {
     return (

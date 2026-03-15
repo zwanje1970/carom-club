@@ -19,6 +19,10 @@ export async function GET(
   const { id } = await params;
   const tournament = await prisma.tournament.findFirst({
     where: { id, organizationId: orgId },
+    include: {
+      matchVenues: { orderBy: { sortOrder: "asc" } },
+      rule: true,
+    },
   });
   if (!tournament) {
     return NextResponse.json({ error: "대회를 찾을 수 없습니다." }, { status: 404 });

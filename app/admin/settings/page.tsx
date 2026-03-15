@@ -7,8 +7,8 @@ import CardBox from "@/components/admin/_components/CardBox";
 const SETTINGS_MENU = [
   {
     href: "/admin/site",
-    label: "사이트 관리 (메인페이지·히어로·푸터 등)",
-    description: "메인페이지 구성, 히어로·헤더·푸터·컴포넌트·공통 디자인",
+    label: "사이트 관리",
+    description: "메인페이지 구성, 히어로·헤더·푸터·페이지 섹션(컴포넌트)·공통 디자인 — 단일 진입",
   },
   {
     href: "/admin/me",
