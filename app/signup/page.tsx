@@ -17,8 +17,6 @@ export default function SignupPage() {
     username: "",
     phone: "",
     password: "",
-    handicap: "",
-    avg: "",
     address: "",
     addressDetail: "",
   });
@@ -36,8 +34,6 @@ export default function SignupPage() {
           username: form.username,
           phone: form.phone,
           password: form.password,
-          handicap: form.handicap || undefined,
-          avg: form.avg || undefined,
           address: form.address?.trim() || undefined,
           addressDetail: form.addressDetail?.trim() || undefined,
         }),
@@ -154,31 +150,6 @@ export default function SignupPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              핸디 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              className="w-full border border-gray-300 rounded px-3 py-2 font-input-halfwidth"
-              value={form.handicap}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, handicap: toHalfwidth(e.target.value) }))
-              }
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              AVG <span className="text-gray-400">(선택)</span>
-            </label>
-            <input
-              type="text"
-              className="w-full border border-gray-300 rounded px-3 py-2 font-input-halfwidth"
-              value={form.avg}
-              onChange={(e) => setForm((f) => ({ ...f, avg: toHalfwidth(e.target.value) }))}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
               주소 <span className="text-gray-400">(선택)</span>
             </label>
             <div className="flex gap-2">
@@ -202,9 +173,6 @@ export default function SignupPage() {
               onChange={(e) => setForm((f) => ({ ...f, addressDetail: e.target.value }))}
             />
           </div>
-          <p className="text-xs text-gray-500">
-            AVG 증빙 이미지는 가입 후 마이페이지에서 등록할 수 있습니다.
-          </p>
           <button
             type="submit"
             disabled={loading}

@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ensureDatabaseUrlForDevelopment } from "@/lib/db-mode";
+import { nameToSlug } from "@/lib/slug";
 
 const CLIENT_ORG_TYPES = ["VENUE", "CLUB", "FEDERATION", "INSTRUCTOR"] as const;
 
-/** PATCH: 플랫폼 관리자 — 클라이언트 권한 정지/복원/제명, 비고 저장 */
+/** PATCH: 플랫폼 관리자 — 클라이언트 권한 정지/복원/제명, 비고, slug 수정 */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -17,9 +18,10 @@ export async function PATCH(
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
-    const { status, adminRemarks } = body as {
+    const { status, adminRemarks, slug: slugInput } = body as {
       status?: "ACTIVE" | "SUSPENDED" | "EXPELLED";
       adminRemarks?: string | null;
+      slug?: string | null;
     };
     const org = await prisma.organization.findFirst({
       where: { id, type: { in: [...CLIENT_ORG_TYPES] } },
@@ -27,9 +29,22 @@ export async function PATCH(
     if (!org) {
       return NextResponse.json({ error: "클라이언트를 찾을 수 없습니다." }, { status: 404 });
     }
-    const data: { status?: string; adminRemarks?: string | null } = {};
+    const data: { status?: string; adminRemarks?: string | null; slug?: string | null } = {};
     if (status === "ACTIVE" || status === "SUSPENDED" || status === "EXPELLED") data.status = status;
     if (adminRemarks !== undefined) data.adminRemarks = adminRemarks === "" ? null : adminRemarks;
+    if (slugInput !== undefined) {
+      const slugValue = slugInput === null || slugInput === "" ? null : nameToSlug(slugInput);
+      if (slugValue === "org") {
+        return NextResponse.json({ error: "slug는 영문 소문자, 숫자, 하이픈만 사용 가능합니다." }, { status: 400 });
+      }
+      if (slugValue) {
+        const existing = await prisma.organization.findUnique({ where: { slug: slugValue } });
+        if (existing && existing.id !== id) {
+          return NextResponse.json({ error: "이미 사용 중인 slug입니다." }, { status: 400 });
+        }
+      }
+      data.slug = slugValue;
+    }
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ ok: true });
     }

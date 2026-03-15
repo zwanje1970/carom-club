@@ -7,9 +7,6 @@ import { useIntroController } from "@/components/intro/useIntroController";
 import type { HeroContent as HeroContentType } from "@/lib/content/hero-from-section";
 import type { HeroSettings } from "@/lib/hero-settings";
 
-const HERO_PLACEHOLDER_SVG =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='400' viewBox='0 0 1200 400'%3E%3Crect fill='%23f3f4f6' width='1200' height='400'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-family='sans-serif' font-size='18'%3EHero 배너 이미지%3C/text%3E%3C/svg%3E";
-
 function getHeroTitleStyle(copy: Record<string, string>): { style: React.CSSProperties; alignClass: string } {
   const style: React.CSSProperties = {};
   const font = (copy["site.hero.titleFont"] ?? "").trim();
@@ -75,7 +72,7 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
   }
 
   const hasBanner = hero?.heroImageUrl?.trim();
-  const bannerSrc = hasBanner ? hero!.heroImageUrl! : HERO_PLACEHOLDER_SVG;
+  const bannerSrc = hasBanner ? hero!.heroImageUrl! : "";
   const titleHtml = (copy["site.hero.titleHtml"] ?? "").trim();
   const { style: titleStyle, alignClass: titleAlignClass } = getHeroTitleStyle(copy);
   const isOverlay = !!hasBanner;
@@ -137,7 +134,7 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
       >
         ⓘ
       </button>
-      {hasBanner ? (
+      {hasBanner && bannerSrc ? (
         <div className="relative min-h-[240px] md:min-h-[420px] flex flex-col items-center justify-center py-6 md:py-12 w-full">
           <div className="absolute inset-0">
             <Image
@@ -169,7 +166,8 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
 function HomeHeroFromSettings({ settings }: { settings: HeroSettings }) {
   const { restartIntro } = useIntroController();
   const s = settings;
-  const bgSrc = s.heroBackgroundImageUrl?.trim() || HERO_PLACEHOLDER_SVG;
+  const hasBgImage = !!s.heroBackgroundImageUrl?.trim();
+  const bgSrc = hasBgImage ? (s.heroBackgroundImageUrl?.trim() ?? "") : "";
   const textAlignClass =
     s.heroTextAlign === "left" ? "text-left" : s.heroTextAlign === "right" ? "text-right" : "text-center";
   const justifyClass =
@@ -247,19 +245,21 @@ function HomeHeroFromSettings({ settings }: { settings: HeroSettings }) {
         }}
       />
       <div className="hero-block-new flex flex-col items-center py-10 sm:py-12 md:py-12 w-full">
-        <div className="absolute inset-0">
-          <Image
-            src={bgSrc}
-            alt="히어로 배경"
-            fill
-            className="object-cover pointer-events-none"
-            sizes="100vw"
-            unoptimized={bgSrc.startsWith("data:")}
-            style={{
-              filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined,
-            }}
-          />
-        </div>
+        {hasBgImage && bgSrc ? (
+          <div className="absolute inset-0">
+            <Image
+              src={bgSrc}
+              alt="히어로 배경"
+              fill
+              className="object-cover pointer-events-none"
+              sizes="100vw"
+              unoptimized={bgSrc.startsWith("data:")}
+              style={{
+                filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined,
+              }}
+            />
+          </div>
+        ) : null}
         <div
           className="absolute inset-0 pointer-events-none"
           style={{ backgroundColor: `rgba(0,0,0,${s.heroOverlayOpacity})` }}

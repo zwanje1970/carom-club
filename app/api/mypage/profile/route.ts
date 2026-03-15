@@ -19,8 +19,6 @@ export async function PATCH(request: Request) {
     name?: string;
     email?: string;
     phone?: string;
-    handicap?: string;
-    avg?: string;
     address?: string;
     addressDetail?: string;
   };
@@ -30,7 +28,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const { name, email, phone, handicap, avg, address, addressDetail } = body;
+  const { name, email, phone, address, addressDetail } = body;
   const updates: {
     name?: string;
     email?: string;
@@ -64,19 +62,6 @@ export async function PATCH(request: Request) {
         await tx.user.update({
           where: { id: session.id },
           data: updates,
-        });
-      }
-      const profileUpdates: { handicap?: string | null; avg?: string | null } = {};
-      if (handicap !== undefined) profileUpdates.handicap = handicap?.trim() || null;
-      if (avg !== undefined) profileUpdates.avg = avg?.trim() || null;
-      if (Object.keys(profileUpdates).length > 0) {
-        await tx.memberProfile.upsert({
-          where: { userId: session.id },
-          create: {
-            userId: session.id,
-            ...profileUpdates,
-          },
-          update: profileUpdates,
         });
       }
     });

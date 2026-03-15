@@ -23,24 +23,11 @@ export async function POST(request: Request) {
   }
   try {
     const body = await request.json();
-    const {
-      name,
-      username,
-      phone,
-      password,
-      handicap,
-      avg,
-      avgProofUrl,
-      address,
-      addressDetail,
-    } = body as {
+    const { name, username, phone, password, address, addressDetail } = body as {
       name?: string;
       username?: string;
       phone?: string;
       password?: string;
-      handicap?: string;
-      avg?: string;
-      avgProofUrl?: string;
       address?: string;
       addressDetail?: string;
     };
@@ -53,9 +40,6 @@ export async function POST(request: Request) {
     }
 
     const hashed = await hashPassword(password);
-    const expiresAt = avgProofUrl
-      ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
-      : null;
 
     try {
       const existing = await prisma.user.findUnique({
@@ -103,22 +87,11 @@ export async function POST(request: Request) {
         if (profile) {
           await prisma.memberProfile.update({
             where: { id: profile.id },
-            data: {
-              handicap: handicap?.trim() || null,
-              avg: avg?.trim() || null,
-              avgProofUrl: avgProofUrl || null,
-              avgProofExpiresAt: expiresAt,
-            },
+            data: {},
           });
         } else {
           await prisma.memberProfile.create({
-            data: {
-              userId: existing.id,
-              handicap: handicap?.trim() || null,
-              avg: avg?.trim() || null,
-              avgProofUrl: avgProofUrl || null,
-              avgProofExpiresAt: expiresAt,
-            },
+            data: { userId: existing.id },
           });
         }
         return NextResponse.json({ ok: true, userId: existing.id });
@@ -138,13 +111,7 @@ export async function POST(request: Request) {
       });
 
       await prisma.memberProfile.create({
-        data: {
-          userId: user.id,
-          handicap: handicap?.trim() || null,
-          avg: avg?.trim() || null,
-          avgProofUrl: avgProofUrl || null,
-          avgProofExpiresAt: expiresAt,
-        },
+        data: { userId: user.id },
       });
 
       return NextResponse.json({ ok: true, userId: user.id });

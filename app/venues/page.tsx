@@ -29,14 +29,16 @@ export default async function VenuesPage() {
           distinct: ["applicantUserId"],
         })
         .then((rows) => rows.map((r) => r.applicantUserId).filter((id): id is string => id != null));
-      venues = await prisma.organization.findMany({
+      const rows = await prisma.organization.findMany({
         where: {
           type: "VENUE",
+          slug: { not: null },
           ownerUserId: { in: approvedApplicantIds },
         },
         select: { id: true, name: true, slug: true },
         orderBy: { name: "asc" },
       });
+      venues = rows.map((r) => ({ id: r.id, name: r.name, slug: r.slug! }));
     } catch {
       venues = MOCK_VENUES_LIST.map((v) => ({ id: v.id, name: v.name, slug: v.slug }));
     }

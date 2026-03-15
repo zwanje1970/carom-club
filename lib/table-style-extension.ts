@@ -21,9 +21,16 @@ function applyTableAlign(dom: HTMLElement, align: string | null) {
   }
 }
 
-/** 표 정렬(wrapper) + style(테이블 요소) 적용 TableView */
+declare global {
+  interface Window {
+    __richEditorTableResize?: import("@tiptap/pm/view").EditorView | null;
+  }
+}
+
+/** 표 정렬(wrapper) + style(테이블 요소) 적용 + 드래그로 전체 너비 조절 TableView */
 export class TableViewWithAlign extends BaseTableView implements NodeView {
   declare table: HTMLTableElement;
+  private resizeHandle: HTMLDivElement | null = null;
 
   constructor(
     node: PMNode,
@@ -32,10 +39,58 @@ export class TableViewWithAlign extends BaseTableView implements NodeView {
     _view?: import("@tiptap/pm/view").EditorView
   ) {
     super(node, cellMinWidth);
+    if (this.dom && typeof this.dom.classList?.add === "function") {
+      this.dom.classList.add("tableWrapper");
+    }
     applyTableAlign(this.dom, node.attrs.align);
     if (node.attrs.style && typeof node.attrs.style === "string") {
       this.table.style.cssText = node.attrs.style;
+      const widthMatch = node.attrs.style.match(/\bwidth\s*:\s*([^;]+)/i);
+      if (widthMatch) {
+        const w = widthMatch[1].trim();
+        (this.dom as HTMLElement).style.width = w;
+        (this.dom as HTMLElement).style.minWidth = w;
+      }
     }
+    this.addResizeHandle();
+  }
+
+  private addResizeHandle() {
+    if (typeof document === "undefined" || !this.dom) return;
+    const handle = document.createElement("div");
+    handle.className = "table-resize-handle";
+    handle.setAttribute("data-table-resize", "1");
+    handle.title = "드래그하여 표 너비 조절";
+    this.dom.appendChild(handle);
+    this.resizeHandle = handle;
+
+    let startX = 0;
+    let startWidth = 0;
+
+    handle.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      startX = e.clientX;
+      startWidth = (this.dom as HTMLElement).offsetWidth;
+      const onMove = (e2: MouseEvent) => {
+        const dx = e2.clientX - startX;
+        const next = Math.max(100, startWidth + dx);
+        (this.dom as HTMLElement).style.width = `${next}px`;
+        (this.dom as HTMLElement).style.minWidth = `${next}px`;
+      };
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        const view = typeof window !== "undefined" ? window.__richEditorTableResize : null;
+        if (view) {
+          const w = (this.dom as HTMLElement).offsetWidth;
+          (this.dom as HTMLElement).dispatchEvent(
+            new CustomEvent("table-resize-commit", { bubbles: true, detail: { wrapper: this.dom, width: w } })
+          );
+        }
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    });
   }
 
   update(node: PMNode): boolean {
@@ -44,6 +99,12 @@ export class TableViewWithAlign extends BaseTableView implements NodeView {
       applyTableAlign(this.dom, node.attrs.align);
       if (node.attrs.style && typeof node.attrs.style === "string") {
         this.table.style.cssText = node.attrs.style;
+        const widthMatch = node.attrs.style.match(/\bwidth\s*:\s*([^;]+)/i);
+        if (widthMatch) {
+          const w = widthMatch[1].trim();
+          (this.dom as HTMLElement).style.width = w;
+          (this.dom as HTMLElement).style.minWidth = w;
+        }
       }
     }
     return ok;
@@ -107,6 +168,23 @@ export function getWidthFromTableStyle(style: string | null | undefined): string
   if (widthMatch) parts.push(widthMatch[0].trim());
   if (minWidthMatch) parts.push(minWidthMatch[0].trim());
   return parts.join("; ");
+}
+
+/**
+ * style 문자열에서 width/min-width를 제거한 뒤 새 width만 넣어 반환.
+ */
+export function setWidthInTableStyle(
+  style: string | null | undefined,
+  widthPx: number
+): string {
+  if (!style || typeof style !== "string") return `width: ${widthPx}px`;
+  const withoutWidth = style
+    .replace(/\bwidth\s*:\s*[^;]+;?/gi, "")
+    .replace(/\bmin-width\s*:\s*[^;]+;?/gi, "")
+    .replace(/;\s*;/, ";")
+    .trim();
+  const sep = withoutWidth ? "; " : "";
+  return `${withoutWidth}${sep}width: ${widthPx}px`;
 }
 
 export type TableStyleParts = {

@@ -1,10 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { TournamentApplyForm } from "./TournamentApplyForm";
-import { CancelEntryButton } from "./CancelEntryButton";
 
 type Tab = { id: string; label: string };
 
@@ -18,6 +15,9 @@ type TournamentDetailTabsProps = {
     name: string;
     description: string | null;
     outlinePublished: string | null;
+    outlinePdfUrl?: string | null;
+    posterImageUrl?: string | null;
+    promoContent?: string | null;
     venue: string | null;
     startAt: string;
     gameFormat: string | null;
@@ -29,6 +29,7 @@ type TournamentDetailTabsProps = {
       maxEntries: number | null;
       useWaiting: boolean;
       entryConditions: string | null;
+      accountNumber?: string | null;
     } | null;
   };
   isLoggedIn: boolean;
@@ -70,7 +71,6 @@ export function TournamentDetailTabs({
 }: TournamentDetailTabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [markingPaid, setMarkingPaid] = useState<string | null>(null);
 
   function setTab(tabId: string) {
     const next = new URLSearchParams(searchParams.toString());
@@ -78,35 +78,18 @@ export function TournamentDetailTabs({
     router.push(`/tournaments/${tournamentId}?${next.toString()}`);
   }
 
-  const confirmedCount = entries.filter((e) => e.status === "CONFIRMED").length;
-  const maxCap = tournament.maxParticipants ?? tournament.rule?.maxEntries ?? 0;
-  const isFull = maxCap > 0 && confirmedCount >= maxCap;
-  const useWaiting = tournament.rule?.useWaiting ?? false;
-  const canApply = canApplyFirstSlot || canApplyAdditionalSlot;
-  const alreadyApplied = myEntries.some((e) => e.status !== "CANCELED");
-  const applyClosedReason =
-    tournament.status === "DRAFT"
-      ? "아직 참가 신청을 받지 않습니다."
-      : tournament.status === "CLOSED"
-        ? "참가 신청이 마감되었습니다."
-        : tournament.status === "FINISHED"
-          ? "종료된 대회입니다."
-          : isFull && !useWaiting
-            ? "정원이 마감되었습니다."
-            : null;
-
   return (
     <div>
-      <nav className="flex border-b border-gray-200 gap-1 mb-6">
+      <nav className="grid grid-cols-3 sm:flex flex-wrap border-b border-gray-200 gap-1 mb-6">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setTab(tab.id)}
-            className={`px-4 py-2 text-sm font-medium rounded-t border-b-2 -mb-px ${
+            className={`px-2 py-2.5 sm:px-4 text-sm font-medium rounded-t border-b-2 -mb-px text-center whitespace-normal leading-tight sm:whitespace-nowrap sm:text-left min-h-[2.75rem] sm:min-h-0 ${
               currentTab === tab.id
-                ? "border-site-primary text-site-primary bg-white"
-                : "border-transparent text-gray-500 hover:text-gray-700"
+                ? "border-site-primary text-site-primary bg-white dark:bg-site-card"
+                : "border-transparent text-gray-500 hover:text-gray-700 dark:text-site-text-muted dark:hover:text-site-text"
             }`}
           >
             {tab.label}
@@ -115,106 +98,42 @@ export function TournamentDetailTabs({
       </nav>
 
       {currentTab === "outline" && (
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white dark:bg-site-card rounded-lg shadow p-6 space-y-6">
           <h2 className="text-lg font-semibold mb-3">대회요강</h2>
-          {tournament.outlinePublished ? (
-            <div
-              className="prose prose-sm max-w-none break-words overflow-hidden"
-              dangerouslySetInnerHTML={{ __html: tournament.outlinePublished }}
-            />
-          ) : (
-            <p className="text-gray-500">등록된 요강이 없습니다.</p>
-          )}
-        </div>
-      )}
-
-      {currentTab === "apply" && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-3">참가신청</h2>
-          {myEntries.length > 0 && (
-            <div className="space-y-3 mb-4">
-              <h3 className="text-sm font-semibold text-site-text">내 참가 슬롯</h3>
-              {myEntries
-                .filter((e) => e.status !== "CANCELED")
-                .map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="text-blue-700 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-200 p-4 rounded-lg flex flex-wrap items-center justify-between gap-2"
-                  >
-                    <span>
-                      <strong>슬롯{entry.slotNumber}</strong>
-                      {" · "}
-                      {entry.status === "CONFIRMED"
-                        ? "참가 확정"
-                        : entry.status === "APPLIED"
-                          ? entry.waitingListOrder != null
-                            ? `대기 ${entry.waitingListOrder}번`
-                            : entry.paymentMarkedByApplicantAt != null
-                              ? "입금확인 대기 중"
-                              : "신청됨 (입금 후 입금 완료 체크)"
-                          : entry.status === "REJECTED"
-                            ? "거절"
-                            : entry.status}
-                    </span>
-                    <span className="flex flex-wrap items-center gap-2">
-                      {entry.status === "APPLIED" && !entry.paymentMarkedByApplicantAt && (
-                        <button
-                          type="button"
-                          disabled={markingPaid !== null}
-                          onClick={async () => {
-                            setMarkingPaid(entry.id);
-                            try {
-                              const res = await fetch(`/api/tournaments/entry/${entry.id}/mark-paid`, { method: "PATCH" });
-                              if (!res.ok) {
-                                const d = await res.json().catch(() => ({}));
-                                alert(d.error || "처리 실패");
-                                return;
-                              }
-                              router.refresh();
-                            } finally {
-                              setMarkingPaid(null);
-                            }
-                          }}
-                          className="rounded-lg bg-site-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-                        >
-                          {markingPaid === entry.id ? "처리 중..." : "입금 완료했습니다"}
-                        </button>
-                      )}
-                      {(entry.status === "APPLIED" || entry.status === "CONFIRMED") && (
-                        <CancelEntryButton entryId={entry.id} onCancel={() => router.refresh()} />
-                      )}
-                    </span>
-                  </div>
-                ))}
+          {/* 1. 이미지(포스터) */}
+          {(tournament.posterImageUrl ?? "").trim() && (
+            <div className="relative w-full aspect-[2/1] max-h-80 rounded-lg overflow-hidden bg-site-bg">
+              <img
+                src={(tournament.posterImageUrl ?? "").trim()}
+                alt="대회 포스터"
+                className="w-full h-full object-contain"
+              />
             </div>
           )}
-          {!canApply && !alreadyApplied && applyClosedReason && (
-            <p className="text-gray-700 dark:text-slate-300 bg-gray-100 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 p-4 rounded-lg">
-              {applyClosedReason}
-            </p>
-          )}
-          {canApply && !isLoggedIn && (
-            <p className="text-gray-500">
-              <Link href={`/login?next=/tournaments/${tournamentId}?tab=apply`} className="text-blue-600 hover:underline">
-                로그인
-              </Link>
-              후 참가 신청할 수 있습니다.
-            </p>
-          )}
-          {canApplyFirstSlot && isLoggedIn && (
-            <TournamentApplyForm
-              tournamentId={tournamentId}
-              entryFee={tournament.rule?.entryFee ?? null}
-              entryConditionsHtml={tournament.rule?.entryConditions ?? null}
+          {/* 2. 에디터 내용 */}
+          {(tournament.outlinePublished || tournament.promoContent) && (tournament.outlinePublished || tournament.promoContent || "").trim() && (
+            <div
+              className="prose prose-sm max-w-none break-words overflow-hidden dark:prose-invert"
+              dangerouslySetInnerHTML={{
+                __html: (tournament.outlinePublished || tournament.promoContent || "").trim(),
+              }}
             />
           )}
-          {canApplyAdditionalSlot && isLoggedIn && (
-            <TournamentApplyForm
-              tournamentId={tournamentId}
-              entryFee={entryFee != null ? entryFee * 2 : null}
-              entryConditionsHtml={tournament.rule?.entryConditions ?? null}
-              additionalSlot
-            />
+          {/* 3. PDF 다운로드/미리보기 */}
+          {(tournament.outlinePdfUrl ?? "").trim() && (
+            <div>
+              <a
+                href={(tournament.outlinePdfUrl ?? "").trim()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center rounded-lg bg-site-primary/10 px-4 py-2 text-sm font-medium text-site-primary hover:bg-site-primary/20"
+              >
+                PDF 다운로드 / 미리보기
+              </a>
+            </div>
+          )}
+          {!(tournament.posterImageUrl ?? "").trim() && !(tournament.outlinePublished || tournament.promoContent || "").trim() && !(tournament.outlinePdfUrl ?? "").trim() && (
+            <p className="text-gray-500 dark:text-site-text-muted">등록된 요강이 없습니다.</p>
           )}
         </div>
       )}

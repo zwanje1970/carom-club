@@ -1,27 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-
-function slugFromName(name: string): string {
-  return name
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9가-힣-]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "") || "org";
-}
-
-async function ensureUniqueSlug(base: string): Promise<string> {
-  let slug = base;
-  let n = 0;
-  while (true) {
-    const exists = await prisma.organization.findUnique({ where: { slug } });
-    if (!exists) return slug;
-    n += 1;
-    slug = `${base}-${n}`;
-  }
-}
+import { nameToSlug, ensureUniqueSlug } from "@/lib/slug";
 
 /** PATCH: 상태 변경 (PENDING | APPROVED | REJECTED). 승인/거절 후 되돌리기 및 재변경 가능 */
 export async function PATCH(
@@ -129,8 +109,10 @@ export async function PATCH(
       return NextResponse.json({ ok: true, status: "APPROVED" });
     }
 
-    const baseSlug = slugFromName(app.organizationName);
-    const slug = await ensureUniqueSlug(baseSlug);
+    const baseSlug = nameToSlug(app.organizationName);
+    const slug = await ensureUniqueSlug(baseSlug, (s) =>
+      prisma.organization.findUnique({ where: { slug: s } }).then(Boolean)
+    );
 
     await prisma.$transaction(async (tx) => {
       const applicant = app.applicant as { address?: string | null; addressDetail?: string | null } | null;

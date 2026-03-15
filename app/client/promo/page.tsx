@@ -32,6 +32,8 @@ export default async function ClientPromoPage() {
       promoDraft: true,
       promoPublished: true,
       promoPublishedAt: true,
+      promoPdfUrl: true,
+      promoImageUrl: true,
     },
   });
   if (!org) {
@@ -61,6 +63,8 @@ export default async function ClientPromoPage() {
           initialDraft={org.promoDraft ?? ""}
           initialPublished={org.promoPublished ?? ""}
           publishedAt={org.promoPublishedAt?.toISOString() ?? null}
+          initialPromoPdfUrl={org.promoPdfUrl ?? null}
+          initialPromoImageUrl={org.promoImageUrl ?? null}
           apiPath="/api/client/organization/promo"
         />
       </div>

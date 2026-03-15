@@ -9,8 +9,6 @@ export type EditProfileInitial = {
   name: string;
   email: string;
   phone: string;
-  handicap: string;
-  avg: string;
   address: string;
   addressDetail: string;
 };
@@ -39,8 +37,6 @@ export function EditProfileForm({
           name: form.name.trim(),
           email: form.email.trim(),
           phone: form.phone.trim() || null,
-          handicap: form.handicap.trim() || null,
-          avg: form.avg.trim() || null,
           address: form.address.trim() || null,
           addressDetail: form.addressDetail.trim() || null,
         }),
@@ -100,30 +96,6 @@ export function EditProfileForm({
           className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-site-primary focus:border-site-primary"
           value={form.phone}
           onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          핸디
-        </label>
-        <input
-          type="text"
-          className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-site-primary focus:border-site-primary"
-          value={form.handicap}
-          onChange={(e) =>
-            setForm((f) => ({ ...f, handicap: e.target.value }))
-          }
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          AVG
-        </label>
-        <input
-          type="text"
-          className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-site-primary focus:border-site-primary"
-          value={form.avg}
-          onChange={(e) => setForm((f) => ({ ...f, avg: e.target.value }))}
         />
       </div>
       <div>

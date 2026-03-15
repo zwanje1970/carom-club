@@ -20,6 +20,7 @@ import {
   buildTableStyle,
   buildCellStyle,
   parseTableStyle,
+  setWidthInTableStyle,
 } from "@/lib/table-style-extension";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { ColorPalette64, type ColorApplyMode } from "@/components/editor/ColorPalette64";
@@ -98,7 +99,7 @@ function useImageUpload() {
   return useCallback(async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append("file", file);
-    const res = await fetch("/api/admin/upload-image", { method: "POST", body: formData });
+    const res = await fetch("/api/admin/upload-image", { method: "POST", body: formData, credentials: "include" });
     const text = await res.text();
     let errorMessage = "업로드 실패";
     try {
@@ -163,7 +164,12 @@ export function RichEditor({
               if (value != null && key !== "width" && key !== "height") el.setAttribute(key, value as string);
             });
             if (node.attrs.align) el.setAttribute("data-align", node.attrs.align);
-            el.src = HTMLAttributes.src as string;
+            const src = (HTMLAttributes.src ?? node.attrs?.src) ?? "";
+            el.src = src;
+            const w = node.attrs?.width;
+            const h = node.attrs?.height;
+            if (w != null) el.style.width = typeof w === "number" ? `${w}px` : String(w);
+            if (h != null) el.style.height = typeof h === "number" ? `${h}px` : String(h);
             const nodeView = new ResizableNodeView({
               element: el,
               editor,
@@ -181,6 +187,13 @@ export function RichEditor({
                 if (updatedNode.type !== node.type) return false;
                 if (updatedNode.attrs.align) el.setAttribute("data-align", updatedNode.attrs.align);
                 else el.removeAttribute("data-align");
+                if (updatedNode.attrs.src !== undefined) el.src = updatedNode.attrs.src ?? "";
+                const nw = updatedNode.attrs.width;
+                const nh = updatedNode.attrs.height;
+                if (nw != null) el.style.width = typeof nw === "number" ? `${nw}px` : String(nw);
+                else el.style.width = "";
+                if (nh != null) el.style.height = typeof nh === "number" ? `${nh}px` : String(nh);
+                else el.style.height = "";
                 return true;
               },
               options: {
@@ -192,10 +205,13 @@ export function RichEditor({
             const dom = nodeView.dom as HTMLElement;
             dom.style.visibility = "hidden";
             dom.style.pointerEvents = "none";
-            el.onload = () => {
+            const show = () => {
               dom.style.visibility = "";
               dom.style.pointerEvents = "";
             };
+            el.onload = show;
+            el.onerror = show;
+            if (typeof window !== "undefined") window.setTimeout(show, 2000);
             return nodeView;
           };
         },
@@ -333,6 +349,33 @@ export function RichEditor({
     input.click();
   }, [editor, uploadImage]);
 
+  useEffect(() => {
+    if (!editor?.view) return;
+    const v = editor.view;
+    window.__richEditorTableResize = v;
+    const onCommit = (e: Event) => {
+      const ev = e as CustomEvent<{ wrapper: HTMLElement; width: number }>;
+      const { wrapper, width } = ev.detail ?? {};
+      if (!wrapper || width == null) return;
+      try {
+        const pos = v.posAtDOM(wrapper, 0);
+        const node = v.state.doc.nodeAt(pos);
+        if (node && node.type.name === "table") {
+          const newStyle = setWidthInTableStyle(node.attrs.style, width);
+          const tr = v.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, style: newStyle });
+          v.dispatch(tr);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    document.addEventListener("table-resize-commit", onCommit);
+    return () => {
+      window.__richEditorTableResize = null;
+      document.removeEventListener("table-resize-commit", onCommit);
+    };
+  }, [editor]);
+
   if (!editor) {
     return (
       <div className={`min-h-[200px] border border-site-border rounded-lg bg-gray-50 flex items-center justify-center text-gray-500 ${className}`}>
@@ -388,8 +431,11 @@ export function RichEditor({
         .rich-editor-tiptap [data-resize-handle]:hover { background: rgba(217, 119, 6, 0.25); }
         .rich-editor-tiptap [data-resize-container].ProseMirror-selectednode { outline: none; }
         .rich-editor-tiptap [data-resize-container].ProseMirror-selectednode img { box-shadow: 0 0 0 2px var(--site-primary); }
-        .rich-editor-tiptap .tableWrapper { display: block; overflow: auto; resize: horizontal; min-width: 200px; max-width: 100%; cursor: default; }
+        .rich-editor-tiptap .tableWrapper { display: block; overflow: visible; min-width: 200px; max-width: 100%; cursor: default; position: relative; }
         .rich-editor-tiptap .tableWrapper table { width: 100% !important; box-sizing: border-box; }
+        .rich-editor-tiptap .table-resize-handle { position: absolute; right: 0; top: 0; bottom: 0; width: 10px; cursor: col-resize; z-index: 5; }
+        .rich-editor-tiptap .table-resize-handle:hover { background: rgba(217, 119, 6, 0.15); }
+        .rich-editor-tiptap .table-resize-handle::after { content: ''; position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 2px; height: 24px; border-radius: 1px; background: var(--site-primary, #d97706); opacity: 0.6; }
         /* 표 안 셀 지정(선택) 시 시각적 표시 */
         .rich-editor-tiptap .ProseMirror .selectedCell:after {
           z-index: 2;
@@ -510,12 +556,15 @@ export function RichEditor({
           </ToolbarButton>
         </div>
         <span className="text-gray-400 select-none"> | </span>
-        {/* 정렬: 문단 / 표 / 그림 */}
+        {/* 정렬: 문단 / 표(전체) / 표 셀 안 문단 / 그림 */}
         <div className="flex items-center gap-0.5">
-          {editor.isActive("table") ? (() => {
+          {(() => {
             const sel = editor.state.selection;
-            const tableAlign = sel instanceof NodeSelection && sel.node?.type?.name === "table" ? sel.node.attrs.align : editor.getAttributes("table").align;
-            return (
+            const isTableNodeSelected = sel instanceof NodeSelection && sel.node?.type?.name === "table";
+            const isInTableCell = editor.isActive("tableCell") || editor.isActive("tableHeader");
+            if (isTableNodeSelected) {
+              const tableAlign = sel.node.attrs.align;
+              return (
             <>
               <ToolbarButton
                 onClick={() => {
@@ -617,35 +666,57 @@ export function RichEditor({
               </ToolbarButton>
             </>
             );
-          })() : editor.isActive("image") ? (
-            <>
-              <ToolbarButton onClick={() => editor.chain().focus().updateAttributes("image", { align: "left" }).run()} active={editor.getAttributes("image").align === "left"} title="그림 왼쪽 정렬">
-                <svg width="20" height="14" viewBox="0 0 20 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden><path d="M2 3h16M2 6h10M2 9h14M2 12h8" /></svg>
-              </ToolbarButton>
-              <span className="text-gray-400 select-none">|</span>
-              <ToolbarButton onClick={() => editor.chain().focus().updateAttributes("image", { align: "center" }).run()} active={editor.getAttributes("image").align === "center"} title="그림 가운데 정렬">
-                <svg width="20" height="14" viewBox="0 0 20 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden><path d="M5 3h10M3 6h14M4 9h12M6 12h8" /></svg>
-              </ToolbarButton>
-              <span className="text-gray-400 select-none">|</span>
-              <ToolbarButton onClick={() => editor.chain().focus().updateAttributes("image", { align: "right" }).run()} active={editor.getAttributes("image").align === "right"} title="그림 오른쪽 정렬">
-                <svg width="20" height="14" viewBox="0 0 20 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden><path d="M2 3h16M8 6h10M4 9h14M10 12h8" /></svg>
-              </ToolbarButton>
-            </>
-          ) : (
-            <>
-              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="왼쪽 정렬">
-                <svg width="20" height="14" viewBox="0 0 20 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden><path d="M2 3h16M2 6h10M2 9h14M2 12h8" /></svg>
-              </ToolbarButton>
-              <span className="text-gray-400 select-none">|</span>
-              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="가운데">
-                <svg width="20" height="14" viewBox="0 0 20 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden><path d="M5 3h10M3 6h14M4 9h12M6 12h8" /></svg>
-              </ToolbarButton>
-              <span className="text-gray-400 select-none">|</span>
-              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("right").run()} active={editor.isActive({ textAlign: "right" })} title="오른쪽">
-                <svg width="20" height="14" viewBox="0 0 20 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden><path d="M2 3h16M8 6h10M4 9h14M10 12h8" /></svg>
-              </ToolbarButton>
-            </>
-          )}
+            }
+            if (isInTableCell) {
+              return (
+                <>
+                  <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="셀 내용 왼쪽 정렬">
+                    <svg width="20" height="14" viewBox="0 0 20 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden><path d="M2 3h16M2 6h10M2 9h14M2 12h8" /></svg>
+                  </ToolbarButton>
+                  <span className="text-gray-400 select-none">|</span>
+                  <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="셀 내용 가운데">
+                    <svg width="20" height="14" viewBox="0 0 20 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden><path d="M5 3h10M3 6h14M4 9h12M6 12h8" /></svg>
+                  </ToolbarButton>
+                  <span className="text-gray-400 select-none">|</span>
+                  <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("right").run()} active={editor.isActive({ textAlign: "right" })} title="셀 내용 오른쪽">
+                    <svg width="20" height="14" viewBox="0 0 20 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden><path d="M2 3h16M8 6h10M4 9h14M10 12h8" /></svg>
+                  </ToolbarButton>
+                </>
+              );
+            }
+            if (editor.isActive("image")) {
+              return (
+                <>
+                  <ToolbarButton onClick={() => editor.chain().focus().updateAttributes("image", { align: "left" }).run()} active={editor.getAttributes("image").align === "left"} title="그림 왼쪽 정렬">
+                    <svg width="20" height="14" viewBox="0 0 20 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden><path d="M2 3h16M2 6h10M2 9h14M2 12h8" /></svg>
+                  </ToolbarButton>
+                  <span className="text-gray-400 select-none">|</span>
+                  <ToolbarButton onClick={() => editor.chain().focus().updateAttributes("image", { align: "center" }).run()} active={editor.getAttributes("image").align === "center"} title="그림 가운데 정렬">
+                    <svg width="20" height="14" viewBox="0 0 20 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden><path d="M5 3h10M3 6h14M4 9h12M6 12h8" /></svg>
+                  </ToolbarButton>
+                  <span className="text-gray-400 select-none">|</span>
+                  <ToolbarButton onClick={() => editor.chain().focus().updateAttributes("image", { align: "right" }).run()} active={editor.getAttributes("image").align === "right"} title="그림 오른쪽 정렬">
+                    <svg width="20" height="14" viewBox="0 0 20 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden><path d="M2 3h16M8 6h10M4 9h14M10 12h8" /></svg>
+                  </ToolbarButton>
+                </>
+              );
+            }
+            return (
+              <>
+                <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="왼쪽 정렬">
+                  <svg width="20" height="14" viewBox="0 0 20 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden><path d="M2 3h16M2 6h10M2 9h14M2 12h8" /></svg>
+                </ToolbarButton>
+                <span className="text-gray-400 select-none">|</span>
+                <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="가운데">
+                  <svg width="20" height="14" viewBox="0 0 20 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden><path d="M5 3h10M3 6h14M4 9h12M6 12h8" /></svg>
+                </ToolbarButton>
+                <span className="text-gray-400 select-none">|</span>
+                <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("right").run()} active={editor.isActive({ textAlign: "right" })} title="오른쪽">
+                  <svg width="20" height="14" viewBox="0 0 20 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden><path d="M2 3h16M8 6h10M4 9h14M10 12h8" /></svg>
+                </ToolbarButton>
+              </>
+            );
+          })()}
         </div>
         <span className="text-gray-400 select-none"> | </span>
         {/* 목록/링크 */}

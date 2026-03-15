@@ -33,6 +33,7 @@ export type TournamentPromoBlockProps = {
   endAt: Date | string | null;
   venue: string | null;
   matchVenues?: Array<{ displayLabel: string; venueName?: string | null; address?: string | null; phone?: string | null }>;
+  tournamentVenues?: Array<{ id: string; name: string; slug: string }>;
   maxParticipants: number | null;
   confirmedCount: number;
   useWaiting: boolean;
@@ -57,6 +58,7 @@ export function TournamentPromoBlock({
   endAt,
   venue,
   matchVenues,
+  tournamentVenues,
   maxParticipants,
   confirmedCount,
   useWaiting,
@@ -86,12 +88,12 @@ export function TournamentPromoBlock({
       {/* Hero: 대표 이미지 + 제목 */}
       <div className="rounded-xl overflow-hidden bg-site-card border border-site-border">
         {posterImageUrl ? (
-          <div className="relative w-full aspect-[2/1]">
+          <div className="relative w-full aspect-[2/1] bg-site-bg flex items-center justify-center">
             <Image
               src={posterImageUrl}
               alt=""
               fill
-              className="object-cover"
+              className="object-contain"
               sizes="(max-width: 768px) 100vw, 800px"
               unoptimized={!posterImageUrl.startsWith("/")}
             />
@@ -202,16 +204,30 @@ export function TournamentPromoBlock({
             </>
           )}
         </dl>
-        {matchVenues && matchVenues.length > 0 && (
+        {((tournamentVenues && tournamentVenues.length > 0) || (matchVenues && matchVenues.length > 0)) && (
           <div className="mt-4 pt-4 border-t border-site-border">
             <h3 className="text-xs font-semibold text-site-text-muted mb-2">경기장</h3>
             <div className="grid gap-2 sm:grid-cols-2">
-              {matchVenues.map((v, i) => (
-                <div key={i} className="rounded-lg border border-site-border bg-site-bg/50 p-3 text-sm">
+              {tournamentVenues?.map((tv) => (
+                <div key={tv.id} className="rounded-lg border border-site-border bg-site-bg/50 p-3 text-sm">
+                  <div className="font-medium text-site-text">{tv.name}</div>
+                  <Link
+                    href={`/v/${tv.slug}`}
+                    className="mt-2 inline-flex items-center rounded-md bg-site-primary/10 px-2.5 py-1 text-xs font-medium text-site-primary hover:bg-site-primary/20"
+                  >
+                    당구장 홍보 바로가기 →
+                  </Link>
+                </div>
+              ))}
+              {matchVenues?.map((v, i) => (
+                <div key={`match-${i}`} className="rounded-lg border border-site-border bg-site-bg/50 p-3 text-sm">
                   <div className="font-medium text-site-text">[{v.displayLabel}]</div>
                   {v.venueName && <div>{v.venueName}</div>}
                   {v.address && <div className="text-site-text-muted">{v.address}</div>}
                   {v.phone && <div className="text-site-text-muted">{v.phone}</div>}
+                  <p className="mt-2 text-xs text-site-text-muted">
+                    캐롬클럽 사이트에 등록되지 않은 당구장(경기장)입니다.
+                  </p>
                 </div>
               ))}
             </div>

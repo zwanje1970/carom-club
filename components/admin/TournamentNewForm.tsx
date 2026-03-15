@@ -13,6 +13,7 @@ import {
   LoadPreviousTournamentModal,
   type TournamentCopySource,
 } from "./tournament/LoadPreviousTournamentModal";
+import { RichEditorLazy } from "@/components/RichEditorLazy";
 
 type Org = { id: string; name: string; slug: string; type?: string; address?: string | null };
 
@@ -575,33 +576,33 @@ export function TournamentNewForm({
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">
                   경기 요강
                 </label>
-                <textarea
+                <RichEditorLazy
                   value={rules}
-                  onChange={(e) => setRules(e.target.value)}
-                  rows={4}
-                  className="w-full rounded border border-gray-300 px-3 py-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  onChange={setRules}
+                  placeholder="경기 요강을 입력하세요"
+                  minHeight="160px"
                 />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">
-                  홍보 페이지 내용 (HTML)
+                  홍보 페이지 내용
                 </label>
-                <textarea
+                <RichEditorLazy
                   value={promoContent}
-                  onChange={(e) => setPromoContent(e.target.value)}
-                  rows={4}
-                  className="w-full rounded border border-gray-300 px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  onChange={setPromoContent}
+                  placeholder="홍보 페이지 내용을 입력하세요 (그림·표 등 삽입 가능)"
+                  minHeight="200px"
                 />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">
                   공개용 요강 (outline)
                 </label>
-                <textarea
+                <RichEditorLazy
                   value={outlinePublished}
-                  onChange={(e) => setOutlinePublished(e.target.value)}
-                  rows={3}
-                  className="w-full rounded border border-gray-300 px-3 py-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  onChange={setOutlinePublished}
+                  placeholder="대회 요강을 입력하세요 (그림·표 등 삽입 가능)"
+                  minHeight="200px"
                 />
               </div>
               <div>

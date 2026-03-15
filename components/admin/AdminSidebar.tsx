@@ -4,7 +4,7 @@ import Link from "next/link";
 const menu = [
   { href: "/admin", label: "대시보드" },
   { href: "/admin/tournaments", label: "대회 현황" },
-  { href: "/admin/members", label: "회원관리" },
+  { href: "/admin/members", label: "권한관리" },
   { href: "/admin/inquiries", label: "문의관리" },
   { href: "/admin/venues", label: "클라이언트 목록" },
   { href: "/admin/fee-ledger", label: "회비 장부" },

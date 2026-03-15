@@ -13,8 +13,8 @@ const DEFAULT_HEADER_ACTIVE = "#fbbf24";
 
 const NAV = [
   { href: "/", label: "HOME" },
-  { href: "/venues", label: "당구장" },
   { href: "/tournaments", label: "대회" },
+  { href: "/venues", label: "당구장" },
   { href: "/community", label: "커뮤니티" },
 ] as const;
 
@@ -92,7 +92,7 @@ export function MainSiteHeader({ hideOnMobile = false }: MainSiteHeaderProps) {
               >
                 마이페이지
               </Link>
-              {user?.role === "CLIENT_ADMIN" && (
+              {user?.loginMode === "client" && (
                 <Link
                   href="/client/dashboard"
                   className="text-sm font-medium transition hover:opacity-90"

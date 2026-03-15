@@ -9,6 +9,7 @@ import SectionTitleLineWithButton from "@/components/admin/_components/Section/T
 import CardBox from "@/components/admin/_components/CardBox";
 import Button from "@/components/admin/_components/Button";
 import { AdminOrganizationGrants } from "@/components/admin/AdminOrganizationGrants";
+import { VenueSlugEdit } from "@/components/admin/VenueSlugEdit";
 
 const CLIENT_TYPES = ["VENUE", "CLUB", "FEDERATION", "INSTRUCTOR"] as const;
 const TYPE_LABELS: Record<string, string> = {
@@ -61,7 +62,7 @@ export default async function AdminVenueDetailPage({
   let org: {
     id: string;
     name: string;
-    slug: string;
+    slug: string | null;
     type: string;
     status: string;
     adminRemarks: string | null;
@@ -169,7 +170,11 @@ export default async function AdminVenueDetailPage({
             )}
             <div className="min-w-0 flex-1 space-y-1">
               <p><span className="text-gray-500 dark:text-slate-400">상호</span> {org.name}</p>
-              <p><span className="text-gray-500 dark:text-slate-400">SLUG</span> <code className="rounded bg-gray-100 px-1 dark:bg-slate-700">{org.slug}</code></p>
+              <p>
+                <span className="text-gray-500 dark:text-slate-400">SLUG</span>{" "}
+                <code className="rounded bg-gray-100 px-1 dark:bg-slate-700">{org.slug ?? "—"}</code>
+              </p>
+              <VenueSlugEdit organizationId={org.id} initialSlug={org.slug} />
               {org.shortDescription && (
                 <p><span className="text-gray-500 dark:text-slate-400">한줄 소개</span> {org.shortDescription}</p>
               )}
@@ -383,14 +388,18 @@ export default async function AdminVenueDetailPage({
               />
             </Link>
           )}
-          <a
-            href={`/v/${org.slug}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
-          >
-            공개 페이지 보기
-          </a>
+          {org.slug ? (
+            <a
+              href={`/v/${org.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+            >
+              공개 페이지 보기
+            </a>
+          ) : (
+            <span className="text-sm text-gray-500 dark:text-slate-400">slug를 설정하면 공개 페이지 링크가 활성화됩니다.</span>
+          )}
         </div>
       </div>
     </SectionMain>

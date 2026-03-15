@@ -78,11 +78,14 @@ export default function ClientTournamentEditPage() {
     const res = await fetch(`/api/admin/tournaments/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+        body: JSON.stringify({
         name: values.name.trim(),
         startAt: new Date(values.startAt).toISOString(),
         endAt: values.endAt ? new Date(values.endAt).toISOString() : null,
-        venue: values.venue.trim() || undefined,
+        venue:
+          venues.length > 0
+            ? [venues[0].venueName, venues[0].address].filter(Boolean).join(" ").trim() || undefined
+            : values.venue.trim() || undefined,
         status: values.status,
         gameFormat: values.gameFormat,
         summary: values.summary.trim() || null,
@@ -158,11 +161,10 @@ export default function ClientTournamentEditPage() {
         submitLabel="저장"
       >
         <div>
-          <label className="block text-sm font-medium text-site-text mb-1">대회 홍보 내용 (선택)</label>
           <RichEditorLazy
             value={promoContent}
             onChange={setPromoContent}
-            placeholder="상세 홍보 문구를 입력하세요"
+            placeholder="경기 요강을 입력하세요"
             minHeight="200px"
           />
         </div>

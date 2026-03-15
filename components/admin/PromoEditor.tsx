@@ -10,15 +10,18 @@ import { PROMO_TEMPLATE_CATEGORIES } from "@/lib/promo-templates";
 export function PromoEditor({
   organizationId,
   initialDraft,
-  initialPublished, // reserved for future published preview
+  initialPublished,
   publishedAt,
-  /** When set, PATCH requests use this path instead of /api/admin/venues/[id]/promo (e.g. client dashboard). */
+  initialPromoPdfUrl = null,
+  initialPromoImageUrl = null,
   apiPath,
 }: {
   organizationId: string;
   initialDraft: string;
   initialPublished: string;
   publishedAt: string | null;
+  initialPromoPdfUrl?: string | null;
+  initialPromoImageUrl?: string | null;
   apiPath?: string;
 }) {
   void initialPublished;
@@ -32,6 +35,13 @@ export function PromoEditor({
     },
     [draftKey]
   );
+  const [useEditor, setUseEditor] = useState(true);
+  const [usePdf, setUsePdf] = useState(() => !!initialPromoPdfUrl);
+  const [useImage, setUseImage] = useState(() => !!initialPromoImageUrl);
+  const [promoPdfUrl, setPromoPdfUrl] = useState<string | null>(initialPromoPdfUrl ?? null);
+  const [promoImageUrl, setPromoImageUrl] = useState<string | null>(initialPromoImageUrl ?? null);
+  const [pdfUploading, setPdfUploading] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
@@ -107,7 +117,11 @@ export function PromoEditor({
       const res = await fetch(patchUrl, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ draft }),
+        body: JSON.stringify({
+          draft: useEditor ? draft : "",
+          promoPdfUrl: usePdf ? promoPdfUrl : null,
+          promoImageUrl: useImage ? promoImageUrl : null,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -126,10 +140,13 @@ export function PromoEditor({
     setMessage(null);
     setLoading(true);
     try {
+      const payload: Record<string, unknown> = { publish: useEditor ? draft : "" };
+      if (usePdf) payload.promoPdfUrl = promoPdfUrl;
+      if (useImage) payload.promoImageUrl = promoImageUrl;
       const res = await fetch(patchUrl, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publish: draft }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -144,6 +161,49 @@ export function PromoEditor({
     }
   }
 
+  async function onPdfChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPdfUploading(true);
+    setMessage(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/admin/upload-pdf", { method: "POST", body: formData, credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "업로드 실패");
+      setPromoPdfUrl(data.url);
+      setMessage({ type: "ok", text: "PDF가 업로드되었습니다." });
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "PDF 업로드 실패" });
+    } finally {
+      setPdfUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  async function onImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageUploading(true);
+    setMessage(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("policy", "venue");
+      const res = await fetch("/api/admin/upload-image", { method: "POST", body: formData, credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "업로드 실패");
+      setPromoImageUrl(data.url);
+      setMessage({ type: "ok", text: "이미지가 업로드되었습니다." });
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "이미지 업로드 실패" });
+    } finally {
+      setImageUploading(false);
+      e.target.value = "";
+    }
+  }
+
   return (
     <div className="space-y-4">
       {message && (
@@ -151,12 +211,55 @@ export function PromoEditor({
           {message.text}
         </p>
       )}
-      <RichEditorLazy
-        value={draft}
-        onChange={setDraft}
-        placeholder="홍보 내용을 작성하세요"
-        minHeight="320px"
-      />
+      <div className="flex flex-wrap gap-4 border-b border-gray-200 pb-4">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={useEditor} onChange={(e) => setUseEditor(e.target.checked)} className="rounded border-gray-300" />
+          <span className="text-sm font-medium">에디터 내용</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={usePdf} onChange={(e) => setUsePdf(e.target.checked)} className="rounded border-gray-300" />
+          <span className="text-sm font-medium">PDF 파일</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={useImage} onChange={(e) => setUseImage(e.target.checked)} className="rounded border-gray-300" />
+          <span className="text-sm font-medium">이미지 파일</span>
+        </label>
+      </div>
+      {useEditor && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-gray-700">에디터 내용</p>
+          <RichEditorLazy
+            value={draft}
+            onChange={setDraft}
+            placeholder="홍보 내용을 작성하세요"
+            minHeight="320px"
+          />
+        </div>
+      )}
+      {usePdf && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-gray-700">PDF 파일</p>
+          <input type="file" accept="application/pdf" onChange={onPdfChange} disabled={pdfUploading} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-site-primary/10 file:text-site-primary hover:file:bg-site-primary/20" />
+          {promoPdfUrl && (
+            <p className="text-sm text-gray-600">
+              등록됨: <a href={promoPdfUrl} target="_blank" rel="noopener noreferrer" className="text-site-primary underline">{promoPdfUrl.slice(0, 60)}…</a>
+              <button type="button" onClick={() => setPromoPdfUrl(null)} className="ml-2 text-red-600 text-xs">삭제</button>
+            </p>
+          )}
+        </div>
+      )}
+      {useImage && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-gray-700">대표 이미지</p>
+          <input type="file" accept="image/*" onChange={onImageChange} disabled={imageUploading} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-site-primary/10 file:text-site-primary hover:file:bg-site-primary/20" />
+          {promoImageUrl && (
+            <div className="flex items-center gap-3">
+              <img src={promoImageUrl} alt="대표" className="h-24 w-auto object-contain rounded border border-gray-200" />
+              <button type="button" onClick={() => setPromoImageUrl(null)} className="text-red-600 text-sm">삭제</button>
+            </div>
+          )}
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         <button
           type="button"

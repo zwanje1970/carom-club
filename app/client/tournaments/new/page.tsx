@@ -16,6 +16,10 @@ export default function ClientTournamentsNewPage() {
   ) {
     const startAt = new Date(values.startAt);
     const endAt = values.endAt ? new Date(values.endAt) : null;
+    const venueSummary =
+      venues.length > 0
+        ? [venues[0].venueName, venues[0].address].filter(Boolean).join(" ").trim() || null
+        : null;
     const res = await fetch("/api/admin/tournaments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -23,7 +27,7 @@ export default function ClientTournamentsNewPage() {
         name: values.name.trim(),
         startAt: startAt.toISOString(),
         endAt: endAt ? endAt.toISOString() : null,
-        venue: values.venue.trim() || null,
+        venue: venueSummary,
         status: values.status,
         gameFormat: values.gameFormat,
         summary: values.summary.trim() || null,
@@ -43,8 +47,23 @@ export default function ClientTournamentsNewPage() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "저장에 실패했습니다.");
+    const tournamentId = data.id;
+    if (tournamentId && venues.length > 0) {
+      const venuePayload = venues.map((v) => ({
+        venueNumber: v.venueNumber,
+        displayLabel: v.displayLabel || `${v.venueNumber}경기장`,
+        venueName: v.venueName.trim() || undefined,
+        address: v.address.trim() || undefined,
+        phone: v.phone.trim() || undefined,
+      }));
+      await fetch(`/api/admin/tournaments/${tournamentId}/match-venues`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ venues: venuePayload }),
+      });
+    }
     setTimeout(() => {
-      router.push(data.id ? `/client/tournaments/${data.id}` : "/client/tournaments");
+      router.push(tournamentId ? `/client/tournaments/${tournamentId}` : "/client/tournaments");
       router.refresh();
     }, 800);
   }
@@ -62,11 +81,10 @@ export default function ClientTournamentsNewPage() {
         submitLabel="등록"
       >
         <div>
-          <label className="block text-sm font-medium text-site-text mb-1">대회 홍보 내용 (선택)</label>
           <RichEditorLazy
             value={promoContent}
             onChange={setPromoContent}
-            placeholder="상세 홍보 문구를 입력하세요"
+            placeholder="경기 요강을 입력하세요"
             minHeight="200px"
           />
         </div>

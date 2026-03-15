@@ -23,6 +23,8 @@ export default async function AdminVenuePromoPage({
           promoDraft: true;
           promoPublished: true;
           promoPublishedAt: true;
+          promoPdfUrl: true;
+          promoImageUrl: true;
         };
       }>
     >
@@ -36,6 +38,8 @@ export default async function AdminVenuePromoPage({
         promoDraft: true,
         promoPublished: true,
         promoPublishedAt: true,
+        promoPdfUrl: true,
+        promoImageUrl: true,
       },
     });
   } catch {
@@ -48,6 +52,8 @@ export default async function AdminVenuePromoPage({
           promoDraft: null,
           promoPublished: null,
           promoPublishedAt: null,
+          promoPdfUrl: null,
+          promoImageUrl: null,
         }
       : null;
   }
@@ -66,6 +72,8 @@ export default async function AdminVenuePromoPage({
           initialDraft={org.promoDraft ?? ""}
           initialPublished={org.promoPublished ?? ""}
           publishedAt={org.promoPublishedAt?.toISOString() ?? null}
+          initialPromoPdfUrl={org.promoPdfUrl ?? null}
+          initialPromoImageUrl={org.promoImageUrl ?? null}
         />
       </CardBox>
     </SectionMain>

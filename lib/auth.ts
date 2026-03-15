@@ -43,7 +43,19 @@ export async function getSession(): Promise<SessionUser | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, SECRET);
-    return payload as unknown as SessionUser;
+    const raw = payload as unknown as Record<string, unknown>;
+    const role = raw.role as SessionUser["role"];
+    const loginMode = (raw.loginMode as SessionUser["loginMode"]) ?? "user";
+    const isClientAccount = typeof raw.isClientAccount === "boolean" ? raw.isClientAccount : role === "CLIENT_ADMIN";
+    return {
+      id: String(raw.id),
+      name: String(raw.name),
+      username: String(raw.username),
+      email: String(raw.email),
+      role,
+      loginMode,
+      isClientAccount,
+    } as SessionUser;
   } catch {
     return null;
   }

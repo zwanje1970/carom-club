@@ -3,13 +3,14 @@ import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
 import { isAnnualMembershipActive } from "@/lib/feature-access";
+import { canAccessClientDashboard } from "@/types/auth";
 
 const now = new Date();
 
-/** GET: 자기 조직이 사용 가능한 기능 목록. CLIENT_ADMIN */
+/** GET: 클라이언트 로그인 모드일 때만 자기 조직이 사용 가능한 기능 목록 */
 export async function GET() {
   const session = await getSession();
-  if (!session || session.role !== "CLIENT_ADMIN") {
+  if (!session || !canAccessClientDashboard(session)) {
     return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
   }
   const orgId = await getClientAdminOrganizationId(session);

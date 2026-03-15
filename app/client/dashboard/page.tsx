@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
+import { ClientLoginWelcomeBanner } from "@/components/client/ClientLoginWelcomeBanner";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "초안",
@@ -12,9 +13,16 @@ const STATUS_LABEL: Record<string, string> = {
   HIDDEN: "숨김",
 };
 
-export default async function ClientDashboardPage() {
+export default async function ClientDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ welcome?: string }>;
+}) {
   const session = await getSession();
   if (!session || session.role !== "CLIENT_ADMIN") return null;
+
+  const params = await searchParams;
+  const welcome = params.welcome;
 
   const orgId = await getClientAdminOrganizationId(session);
   let org: {
@@ -62,6 +70,7 @@ export default async function ClientDashboardPage() {
 
   return (
     <div className="space-y-8">
+      <ClientLoginWelcomeBanner show={welcome === "1"} />
       <div>
         <h1 className="text-2xl font-bold text-site-text">대회 운영 대시보드</h1>
         <p className="mt-1 text-sm text-gray-600">

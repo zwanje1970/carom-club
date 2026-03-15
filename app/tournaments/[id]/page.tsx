@@ -26,9 +26,8 @@ function parseParticipantsListPublic(rule: { bracketConfig?: string | object | n
 function buildTabs() {
   return [
     { id: "outline", label: "대회요강" },
-    { id: "apply", label: "참가신청" },
     { id: "participants", label: "참가자 명단" },
-    { id: "results", label: "결과" },
+    { id: "results", label: "대회결과" },
     { id: "inquiry", label: "시합문의" },
   ] as const;
 }
@@ -74,6 +73,7 @@ export default async function TournamentDetailPage({
         organization: mock.organization,
         rule: mock.rule,
         matchVenues: [],
+        tournamentVenues: [],
         _count: { tournamentZones: 0, finalMatches: 0 },
       } as unknown as Awaited<ReturnType<typeof getTournamentBasic>>;
       useMock = true;
@@ -97,6 +97,7 @@ export default async function TournamentDetailPage({
       organization: mock.organization,
       rule: mock.rule,
       matchVenues: [],
+      tournamentVenues: [],
       _count: { tournamentZones: 0, finalMatches: 0 },
     } as unknown as Awaited<ReturnType<typeof getTournamentBasic>>;
     useMock = true;
@@ -111,10 +112,22 @@ export default async function TournamentDetailPage({
 
   const tabs = buildTabs();
   const currentTab = (() => {
-    const t = tabs.find((tab) => tab.id === (tabParam ?? "outline"));
-    return t ? t.id : "outline";
+    const defaultTab = tabs[0]?.id ?? "outline";
+    const t = tabs.find((tab) => tab.id === (tabParam ?? defaultTab));
+    return t ? t.id : defaultTab;
   })();
+  const initialShowApply = tabParam === "apply";
   const participantsListPublic = parseParticipantsListPublic(tournament.rule);
+  const accountNumber = (() => {
+    try {
+      const bc = tournament.rule?.bracketConfig;
+      const raw = bc == null ? null : typeof bc === "string" ? JSON.parse(bc) : bc;
+      const v = (raw as Record<string, unknown>)?.accountNumber;
+      return typeof v === "string" && v.trim() ? v.trim() : null;
+    } catch {
+      return null;
+    }
+  })();
   const allowMultipleSlots = (() => {
     try {
       const bc = tournament.rule?.bracketConfig;
@@ -132,11 +145,20 @@ export default async function TournamentDetailPage({
         phone: v.phone,
       }))
     : [];
+  const tournamentVenues = Array.isArray(tournament.tournamentVenues)
+    ? tournament.tournamentVenues.map((tv) => ({
+        id: tv.organization.id,
+        name: tv.organization.name,
+        slug: tv.organization.slug,
+      }))
+    : [];
   const tournamentPayload = {
     name: tournament.name,
     summary: tournament.summary ?? null,
     description: tournament.description ?? null,
     outlinePublished: tournament.outlinePublished ?? null,
+    outlinePdfUrl: tournament.outlinePdfUrl ?? null,
+    promoContent: tournament.promoContent ?? null,
     posterImageUrl: tournament.posterImageUrl ?? null,
     venue: tournament.venue ?? null,
     startAt: tournament.startAt,
@@ -154,6 +176,7 @@ export default async function TournamentDetailPage({
           maxEntries: tournament.rule.maxEntries,
           useWaiting: tournament.rule.useWaiting,
           entryConditions: tournament.rule.entryConditions,
+          accountNumber,
         }
       : null,
   };
@@ -161,10 +184,12 @@ export default async function TournamentDetailPage({
     tournamentId: id,
     tournament: { ...tournamentPayload, id: tournament.id },
     matchVenues,
+    tournamentVenues,
     tabs,
     currentTab,
     participantsListPublic,
     allowMultipleSlots,
+    initialShowApply,
   };
   logServerTiming("page");
 
@@ -178,12 +203,14 @@ export default async function TournamentDetailPage({
             tabs={tabs}
             currentTab={currentTab}
             participantsListPublic={participantsListPublic}
+            initialShowApply={initialShowApply}
             tournament={{
               ...tournamentPayload,
               startAt: tournament.startAt instanceof Date ? tournament.startAt.toISOString() : String(tournament.startAt),
               endAt: tournament.endAt != null ? (tournament.endAt instanceof Date ? tournament.endAt.toISOString() : String(tournament.endAt)) : null,
             }}
             matchVenues={matchVenues}
+            tournamentVenues={[]}
             confirmedCount={0}
             isLoggedIn={false}
             myEntries={[]}

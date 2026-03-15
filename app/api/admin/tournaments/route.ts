@@ -204,36 +204,41 @@ export async function POST(request: Request) {
     typeof status === "string" && ["DRAFT", "OPEN", "CLOSED", "FINISHED", "HIDDEN"].includes(status)
       ? status
       : "OPEN";
+
+  const createData = {
+    organizationId,
+    createdByUserId: session.id,
+    name: name.trim(),
+    startAt: new Date(startAt),
+    ...(endAt != null && endAt !== "" && { endAt: new Date(endAt) }),
+    venue: venue != null ? (venue as string).trim() || null : null,
+    venueName: venueName != null ? (venueName as string).trim() || null : null,
+    region: region != null ? (region as string).trim() || null : null,
+    status: validStatus as "DRAFT" | "OPEN" | "CLOSED" | "FINISHED" | "HIDDEN",
+    gameFormat: gameFormat != null ? (gameFormat as string).trim() || null : null,
+    title: title != null ? (title as string).trim() || null : null,
+    slug: slug != null ? (slug as string).trim() || null : null,
+    summary: summary != null ? (summary as string).trim() || null : null,
+    description: description != null ? (description as string).trim() || null : null,
+    posterImageUrl: posterImageUrl != null ? (posterImageUrl as string).trim() || null : null,
+    imageUrl: imageUrl != null ? (imageUrl as string).trim() || null : null,
+    entryFee: entryFee != null && Number.isFinite(Number(entryFee)) ? Number(entryFee) : null,
+    maxParticipants: maxParticipants != null && Number.isFinite(Number(maxParticipants)) ? Number(maxParticipants) : null,
+    entryCondition: entryCondition != null ? (entryCondition as string).trim() || null : null,
+    qualification: qualification != null ? (qualification as string).trim() || null : null,
+    prizeInfo: prizeInfo != null ? (prizeInfo as string).trim() || null : null,
+    rules: rules != null ? (rules as string).trim() || null : null,
+    promoContent: promoContent != null ? (promoContent as string).trim() || null : null,
+    outlineDraft: outlineDraft != null ? (outlineDraft as string).trim() || null : null,
+    outlinePublished: outlinePublished != null ? (outlinePublished as string).trim() || null : null,
+    approvalType: approvalType != null ? (approvalType as string).trim() || undefined : undefined,
+  };
+  console.log("[POST /api/admin/tournaments] create data payload (fields being sent):", JSON.stringify(Object.keys(createData), null, 2));
+  console.log("[POST /api/admin/tournaments] create data payload (values):", JSON.stringify(createData, null, 2));
+
   try {
     const tournament = await prisma.tournament.create({
-      data: {
-        organizationId,
-        createdByUserId: session.id,
-        name: name.trim(),
-        startAt: new Date(startAt),
-        ...(endAt != null && endAt !== "" && { endAt: new Date(endAt) }),
-        venue: venue != null ? (venue as string).trim() || null : null,
-        venueName: venueName != null ? (venueName as string).trim() || null : null,
-        region: region != null ? (region as string).trim() || null : null,
-        status: validStatus as "DRAFT" | "OPEN" | "CLOSED" | "FINISHED" | "HIDDEN",
-        gameFormat: gameFormat != null ? (gameFormat as string).trim() || null : null,
-        title: title != null ? (title as string).trim() || null : null,
-        slug: slug != null ? (slug as string).trim() || null : null,
-        summary: summary != null ? (summary as string).trim() || null : null,
-        description: description != null ? (description as string).trim() || null : null,
-        posterImageUrl: posterImageUrl != null ? (posterImageUrl as string).trim() || null : null,
-        imageUrl: imageUrl != null ? (imageUrl as string).trim() || null : null,
-        entryFee: entryFee != null && Number.isFinite(Number(entryFee)) ? Number(entryFee) : null,
-        maxParticipants: maxParticipants != null && Number.isFinite(Number(maxParticipants)) ? Number(maxParticipants) : null,
-        entryCondition: entryCondition != null ? (entryCondition as string).trim() || null : null,
-        qualification: qualification != null ? (qualification as string).trim() || null : null,
-        prizeInfo: prizeInfo != null ? (prizeInfo as string).trim() || null : null,
-        rules: rules != null ? (rules as string).trim() || null : null,
-        promoContent: promoContent != null ? (promoContent as string).trim() || null : null,
-        outlineDraft: outlineDraft != null ? (outlineDraft as string).trim() || null : null,
-        outlinePublished: outlinePublished != null ? (outlinePublished as string).trim() || null : null,
-        approvalType: approvalType != null ? (approvalType as string).trim() || undefined : undefined,
-      },
+      data: createData,
     });
     if (rule && typeof rule === "object") {
       const bracketConfigStr =
@@ -278,9 +283,28 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, id: tournament.id });
   } catch (e) {
-    console.error("tournament create error", e);
+    const err = e as { code?: string; meta?: Record<string, unknown>; message?: string };
+    console.error("tournament create error (raw):", e);
+    console.error("tournament create error (JSON):", JSON.stringify(e, null, 2));
+    if (err?.code) console.error("Prisma error code:", err.code);
+    if (err?.meta) {
+      console.error("Prisma error meta (전체):", JSON.stringify(err.meta, null, 2));
+      const meta = err.meta as Record<string, unknown>;
+      if (meta?.column_name != null) console.error("에러 로그에 없는 컬럼명(DB에 없음):", meta.column_name);
+      if (meta?.column != null) console.error("에러 로그에 없는 컬럼명(DB에 없음):", meta.column);
+      if (Array.isArray(meta?.target) && meta.target.length) console.error("에러 target(없는 컬럼 가능성):", meta.target);
+    }
+    const missingColumn =
+      (err?.meta as { column_name?: string })?.column_name ??
+      (err?.meta as { column?: string })?.column ??
+      (Array.isArray((err?.meta as { target?: string[] })?.target) ? (err?.meta as { target: string[] }).target[0] : undefined);
+    if (missingColumn) console.error("에러에 포함된 컬럼명(없는 컬럼 가능성):", missingColumn);
     return NextResponse.json(
-      { error: "대회 생성 중 오류가 발생했습니다." },
+      {
+        error: "대회 생성 중 오류가 발생했습니다.",
+        ...(process.env.NODE_ENV === "development" && err?.message && { detail: err.message }),
+        ...(missingColumn && { missingColumn: String(missingColumn) }),
+      },
       { status: 500 }
     );
   }

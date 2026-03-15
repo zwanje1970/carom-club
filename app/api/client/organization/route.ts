@@ -3,8 +3,10 @@ import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
+import { nameToSlug } from "@/lib/slug";
+import { canAccessClientDashboard } from "@/types/auth";
 
-/** GET: CLIENT_ADMIN 본인 소유 업체 1개 반환 */
+/** GET: 클라이언트 로그인 모드일 때만 본인 소유 업체 1개 반환 */
 export async function GET() {
   if (!isDatabaseConfigured()) {
     return NextResponse.json(
@@ -13,7 +15,7 @@ export async function GET() {
     );
   }
   const session = await getSession();
-  if (!session || session.role !== "CLIENT_ADMIN") {
+  if (!session || !canAccessClientDashboard(session)) {
     return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
   }
   const orgId = await getClientAdminOrganizationId(session);
@@ -38,7 +40,7 @@ export async function PATCH(request: Request) {
     );
   }
   const session = await getSession();
-  if (!session || session.role !== "CLIENT_ADMIN") {
+  if (!session || !canAccessClientDashboard(session)) {
     return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
   }
   const orgId = await getClientAdminOrganizationId(session);
@@ -91,9 +93,9 @@ export async function PATCH(request: Request) {
 
   let slugValue: string | undefined;
   if (slug !== undefined) {
-    slugValue = slug.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9가-힣-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "") || undefined;
-    if (!slugValue) {
-      return NextResponse.json({ error: "slug를 입력해 주세요." }, { status: 400 });
+    slugValue = nameToSlug(slug);
+    if (!slugValue || slugValue === "org") {
+      return NextResponse.json({ error: "slug를 입력해 주세요. (영문 소문자, 숫자, 하이픈만 가능)" }, { status: 400 });
     }
     const existing = await prisma.organization.findUnique({
       where: { slug: slugValue },

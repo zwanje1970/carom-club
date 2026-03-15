@@ -8,11 +8,14 @@ import { PushSubscribeButton } from "@/components/push/PushSubscribeButton";
 export function TournamentApplyForm({
   tournamentId,
   entryFee,
+  accountNumber,
   entryConditionsHtml,
   additionalSlot = false,
 }: {
   tournamentId: string;
   entryFee: number | null;
+  /** 계좌번호(은행명, 예금주) — 참가신청 시 입금용으로 복사 버튼과 함께 표시 */
+  accountNumber: string | null;
   entryConditionsHtml: string | null;
   additionalSlot?: boolean;
 }) {
@@ -89,6 +92,25 @@ export function TournamentApplyForm({
         {additionalSlot ? "추가 슬롯 참가비 (2배): " : "참가비: "}
         {entryFee != null ? `${Number(entryFee).toLocaleString()}원` : "문의"}
       </p>
+      {accountNumber && accountNumber.trim() && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">계좌번호(은행명, 예금주)</label>
+          <div className="flex gap-2">
+            <span className="flex-1 border border-gray-300 dark:border-slate-600 rounded px-3 py-2 bg-gray-50 dark:bg-slate-800 text-gray-800 dark:text-slate-200 text-sm break-all">
+              {accountNumber.trim()}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                if (navigator.clipboard) navigator.clipboard.writeText(accountNumber.trim());
+              }}
+              className="rounded-lg border border-gray-300 dark:border-slate-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 whitespace-nowrap"
+            >
+              복사
+            </button>
+          </div>
+        </div>
+      )}
       {entryConditionsHtml && (
         <div className="border rounded p-3 bg-gray-50 max-h-40 overflow-auto">
           <div

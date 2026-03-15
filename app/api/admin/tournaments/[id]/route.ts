@@ -187,9 +187,19 @@ export async function PATCH(
     }
     return NextResponse.json({ ok: true });
   } catch (e) {
-    console.error("tournament update error", e);
+    const err = e as { code?: string; meta?: { target?: string[]; column_name?: string }; message?: string };
+    console.error("tournament update error (raw):", e);
+    console.error("tournament update error (JSON):", JSON.stringify(e, null, 2));
+    if (err?.code) console.error("Prisma error code:", err.code);
+    if (err?.meta) console.error("Prisma error meta:", JSON.stringify(err.meta, null, 2));
+    const missingColumn = err?.meta?.column_name ?? (err?.meta as { column?: string })?.column ?? (err?.meta as { target?: string[] })?.target?.[0];
+    if (missingColumn) console.error("에러에 포함된 컬럼명(없는 컬럼 가능성):", missingColumn);
     return NextResponse.json(
-      { error: "대회 수정 중 오류가 발생했습니다." },
+      {
+        error: "대회 수정 중 오류가 발생했습니다.",
+        ...(process.env.NODE_ENV === "development" && err?.message && { detail: err.message }),
+        ...(missingColumn && { missingColumn: String(missingColumn) }),
+      },
       { status: 500 }
     );
   }

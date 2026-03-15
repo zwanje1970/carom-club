@@ -1,12 +1,8 @@
 import { redirect } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
-import { getAvgProofStatus } from "@/lib/avg-proof";
-import { AvgProofStatusBadge } from "@/components/AvgProofStatus";
-import { AvgProofUpload } from "@/components/AvgProofUpload";
 import { ClientApplyBottomCta } from "@/components/mypage/ClientApplyBottomCta";
 import { WithdrawAccountButton } from "@/components/mypage/WithdrawAccountButton";
 
@@ -72,12 +68,6 @@ export default async function MypagePage() {
     redirect("/login");
   }
 
-  const profile = user.memberProfile;
-  const proofStatus = getAvgProofStatus(
-    profile?.avgProofUrl,
-    profile?.avgProofExpiresAt
-  );
-
   return (
     <main className="min-h-screen bg-site-bg p-4 md:p-8">
       <div className="mx-auto w-full max-w-2xl">
@@ -130,42 +120,7 @@ export default async function MypagePage() {
                   return [u.address.trim(), u.addressDetail?.trim()].filter(Boolean).join(" ");
                 })()}
               </dd>
-              <dt className="text-gray-500">핸디</dt>
-              <dd>{profile?.handicap ?? "-"}</dd>
-              <dt className="text-gray-500">AVG</dt>
-              <dd>{profile?.avg ?? "-"}</dd>
-              <dt className="text-gray-500">AVG 증빙 상태</dt>
-              <dd>
-                <AvgProofStatusBadge status={proofStatus} />
-                {profile?.avgProofExpiresAt && (
-                  <span className="ml-2 text-gray-500">
-                    (만료일:{" "}
-                    {new Date(profile.avgProofExpiresAt).toLocaleDateString(
-                      "ko-KR"
-                    )}
-                    )
-                  </span>
-                )}
-              </dd>
             </dl>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold text-gray-800 mb-3">
-              AVG 증빙 이미지
-            </h2>
-            {profile?.avgProofUrl && (
-              <div className="mb-3 relative w-full max-w-xs aspect-[4/3] border rounded overflow-hidden bg-gray-100">
-                <Image
-                  src={profile.avgProofUrl}
-                  alt="AVG 증빙"
-                  fill
-                  className="object-contain"
-                  sizes="(max-width: 384px) 100vw, 384px"
-                />
-              </div>
-            )}
-            <AvgProofUpload />
           </section>
 
           {session.role === "USER" && (

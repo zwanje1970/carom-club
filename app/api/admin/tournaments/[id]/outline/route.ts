@@ -33,29 +33,41 @@ export async function PATCH(
   }
 
   const body = await request.json();
-  const { draft, publish } = body as { draft?: string; publish?: string };
+  const { draft, publish, outlinePdfUrl, posterImageUrl } = body as {
+    draft?: string;
+    publish?: string;
+    outlinePdfUrl?: string | null;
+    posterImageUrl?: string | null;
+  };
 
   try {
     if (publish !== undefined) {
+      const updateData: Record<string, unknown> = {
+        outlinePublished: publish,
+        outlinePublishedAt: new Date(),
+        outlineDraft: publish,
+      };
+      if (outlinePdfUrl !== undefined) updateData.outlinePdfUrl = outlinePdfUrl;
+      if (posterImageUrl !== undefined) updateData.posterImageUrl = posterImageUrl;
       await prisma.tournament.update({
         where: { id },
-        data: {
-          outlinePublished: publish,
-          outlinePublishedAt: new Date(),
-          outlineDraft: publish,
-        },
+        data: updateData as Parameters<typeof prisma.tournament.update>[0]["data"],
       });
       return NextResponse.json({ ok: true, published: true });
     }
-    if (draft !== undefined) {
+    if (draft !== undefined || outlinePdfUrl !== undefined || posterImageUrl !== undefined) {
+      const updateData: Record<string, unknown> = {};
+      if (draft !== undefined) updateData.outlineDraft = draft;
+      if (outlinePdfUrl !== undefined) updateData.outlinePdfUrl = outlinePdfUrl;
+      if (posterImageUrl !== undefined) updateData.posterImageUrl = posterImageUrl;
       await prisma.tournament.update({
         where: { id },
-        data: { outlineDraft: draft },
+        data: updateData as Parameters<typeof prisma.tournament.update>[0]["data"],
       });
       return NextResponse.json({ ok: true });
     }
     return NextResponse.json(
-      { error: "draft 또는 publish 값을 보내주세요." },
+      { error: "draft, publish, outlinePdfUrl, posterImageUrl 중 하나 이상을 보내주세요." },
       { status: 400 }
     );
   } catch (e) {

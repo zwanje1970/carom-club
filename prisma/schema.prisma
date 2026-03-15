@@ -111,7 +111,7 @@ model ClientApplication {
 model Organization {
   id               String   @id @default(cuid())
   ownerUserId      String?  // 1계정 1업체 시 대표 관리자
-  slug             String   @unique
+  slug             String?  @unique // URL용 (carom.club/hmc). nullable: 기존 데이터 호환
   name             String
   type             String   @default("CLUB") // VENUE | CLUB | FEDERATION | HOST | INSTRUCTOR | OTHER
   shortDescription String?
@@ -133,6 +133,8 @@ model Organization {
   promoDraft       String?
   promoPublished   String?
   promoPublishedAt DateTime?
+  promoPdfUrl      String?   // 홍보용 PDF
+  promoImageUrl    String?   // 홍보용 대표 이미지
   typeSpecificJson String? // 업체 종류별 JSON: 당구장/동호회/연맹/레슨
   // 플랫폼 관리: 권한 정지/제명, 비고
   status       String  @default("ACTIVE") // ACTIVE | SUSPENDED | EXPELLED
@@ -249,6 +251,7 @@ model Tournament {
   outlineDraft     String?
   outlinePublished String?
   outlinePublishedAt DateTime?
+  outlinePdfUrl    String?   // 요강용 PDF
   // 유료화 확장용: 대회 홍보 상품. 현재 무료 운영, 구조만 확보.
   isPromoted       Boolean   @default(false)  // 홍보 상품 적용 여부
   promotionLevel   Int?      // 1=기본, 2=프리미엄 등. 상품별 레벨

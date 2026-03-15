@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
+import { nameToSlug, ensureUniqueSlug } from "@/lib/slug";
 
 export async function POST(request: Request) {
   if (!isDatabaseConfigured()) {
@@ -26,24 +27,32 @@ export async function POST(request: Request) {
   }
 
   const name = body.name?.trim();
-  const slug = body.slug?.trim()?.toLowerCase().replace(/\s+/g, "-");
-  if (!name || !slug) {
+  if (!name) {
     return NextResponse.json(
-      { error: "당구장명과 slug를 입력해주세요." },
+      { error: "당구장명을 입력해주세요." },
       { status: 400 }
     );
   }
 
-  // slug 중복 확인 (raw 쿼리)
-  const existingRows = await prisma.$queryRawUnsafe<{ id: string }[]>(
-    `SELECT id FROM "Organization" WHERE slug = $1`,
-    slug
-  );
-  if (existingRows.length > 0) {
+  const slug = body.slug?.trim()
+    ? nameToSlug(body.slug)
+    : await ensureUniqueSlug(nameToSlug(name), (s) =>
+        prisma.organization.findUnique({ where: { slug: s } }).then(Boolean)
+      );
+  if (!slug || (body.slug?.trim() && slug === "org")) {
     return NextResponse.json(
-      { error: "이미 사용 중인 slug입니다. 다른 값을 사용해주세요." },
+      { error: "slug를 입력해주세요. (영문 소문자, 숫자, 하이픈만 가능)" },
       { status: 400 }
     );
+  }
+  if (body.slug?.trim()) {
+    const exists = await prisma.organization.findUnique({ where: { slug } });
+    if (exists) {
+      return NextResponse.json(
+        { error: "이미 사용 중인 slug입니다. 다른 값을 사용해주세요." },
+        { status: 400 }
+      );
+    }
   }
 
   const description = body.description?.trim() || null;

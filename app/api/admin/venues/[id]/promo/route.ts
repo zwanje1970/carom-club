@@ -20,7 +20,17 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await request.json();
-  const { draft, publish } = body as { draft?: string; publish?: string };
+  const {
+    draft,
+    publish,
+    promoPdfUrl,
+    promoImageUrl,
+  } = body as {
+    draft?: string;
+    publish?: string;
+    promoPdfUrl?: string | null;
+    promoImageUrl?: string | null;
+  };
 
   const org = await prisma.organization.findFirst({
     where: { id, type: "VENUE" },
@@ -31,25 +41,32 @@ export async function PATCH(
 
   try {
     if (publish !== undefined) {
+      const updateData: Record<string, unknown> = {
+        promoPublished: publish,
+        promoPublishedAt: new Date(),
+        promoDraft: publish,
+      };
+      if (promoPdfUrl !== undefined) updateData.promoPdfUrl = promoPdfUrl;
+      if (promoImageUrl !== undefined) updateData.promoImageUrl = promoImageUrl;
       await prisma.organization.update({
         where: { id },
-        data: {
-          promoPublished: publish,
-          promoPublishedAt: new Date(),
-          promoDraft: publish,
-        },
+        data: updateData as Parameters<typeof prisma.organization.update>[0]["data"],
       });
       return NextResponse.json({ ok: true, published: true });
     }
-    if (draft !== undefined) {
+    if (draft !== undefined || promoPdfUrl !== undefined || promoImageUrl !== undefined) {
+      const updateData: Record<string, unknown> = {};
+      if (draft !== undefined) updateData.promoDraft = draft;
+      if (promoPdfUrl !== undefined) updateData.promoPdfUrl = promoPdfUrl;
+      if (promoImageUrl !== undefined) updateData.promoImageUrl = promoImageUrl;
       await prisma.organization.update({
         where: { id },
-        data: { promoDraft: draft },
+        data: updateData as Parameters<typeof prisma.organization.update>[0]["data"],
       });
       return NextResponse.json({ ok: true });
     }
     return NextResponse.json(
-      { error: "draft 또는 publish 값을 보내주세요." },
+      { error: "draft, publish, promoPdfUrl, promoImageUrl 중 하나 이상을 보내주세요." },
       { status: 400 }
     );
   } catch (e) {

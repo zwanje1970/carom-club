@@ -42,7 +42,7 @@ export default function LoginPage() {
           username,
           password,
           rememberMe,
-          clientLogin: clientMode,
+          isClientLogin: clientMode,
         }),
       });
       const data = await res.json();
@@ -62,11 +62,12 @@ export default function LoginPage() {
         // ignore
       }
       const role = data.role as string | undefined;
+      const loginMode = data.loginMode as string | undefined;
       const next =
         role === "PLATFORM_ADMIN"
           ? "/admin"
-          : role === "CLIENT_ADMIN"
-            ? "/client"
+          : loginMode === "client"
+            ? "/client?welcome=1"
             : role === "ZONE_MANAGER"
               ? "/zone"
               : "/";

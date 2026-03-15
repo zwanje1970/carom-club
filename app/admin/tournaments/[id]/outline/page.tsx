@@ -36,6 +36,8 @@ export default async function AdminTournamentOutlinePage({
           outlineDraft: true;
           outlinePublished: true;
           outlinePublishedAt: true;
+          outlinePdfUrl: true;
+          posterImageUrl: true;
         };
       }>
     >
@@ -49,6 +51,8 @@ export default async function AdminTournamentOutlinePage({
         outlineDraft: true,
         outlinePublished: true,
         outlinePublishedAt: true,
+        outlinePdfUrl: true,
+        posterImageUrl: true,
       },
     });
   } catch {
@@ -58,6 +62,8 @@ export default async function AdminTournamentOutlinePage({
       outlineDraft: "",
       outlinePublished: "",
       outlinePublishedAt: null,
+      outlinePdfUrl: null,
+      posterImageUrl: null,
     };
   }
   if (!tournament) notFound();
@@ -74,6 +80,8 @@ export default async function AdminTournamentOutlinePage({
           initialDraft={tournament.outlineDraft ?? ""}
           initialPublished={tournament.outlinePublished ?? ""}
           publishedAt={tournament.outlinePublishedAt?.toISOString() ?? null}
+          initialOutlinePdfUrl={tournament.outlinePdfUrl ?? null}
+          initialPosterImageUrl={tournament.posterImageUrl ?? null}
         />
       </CardBox>
     </SectionMain>

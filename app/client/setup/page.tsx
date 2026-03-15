@@ -15,7 +15,9 @@ const ORG_TYPES = [
 type OrgType = (typeof ORG_TYPES)[number]["value"];
 
 type VenueTableInfo = { kind?: string; count?: string; fee?: string };
+export type VenueCategoryOption = "daedae_only" | "mixed";
 type VenueSpecific = {
+  venueCategory?: VenueCategoryOption;
   daedae?: VenueTableInfo;
   jungdae?: VenueTableInfo;
   pocket?: VenueTableInfo;
@@ -528,6 +530,34 @@ export default function ClientSetupPage() {
         {form.type === "VENUE" && (
           <div className="space-y-4 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
             <h3 className="text-sm font-semibold text-gray-800">당구장 정보</h3>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">구장 구분</label>
+              <div className="flex flex-wrap gap-4">
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="venueCategory"
+                    value="daedae_only"
+                    checked={(venue.venueCategory ?? "daedae_only") === "daedae_only"}
+                    onChange={() => setTypeSpecific({ venueCategory: "daedae_only" })}
+                    className="text-site-primary"
+                  />
+                  <span className="text-sm text-gray-700">대대전용</span>
+                </label>
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="venueCategory"
+                    value="mixed"
+                    checked={venue.venueCategory === "mixed"}
+                    onChange={() => setTypeSpecific({ venueCategory: "mixed" })}
+                    className="text-site-primary"
+                  />
+                  <span className="text-sm text-gray-700">복합구장</span>
+                </label>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">대대만 있으면 대대전용, 중대·포켓이 있으면 복합구장으로 선택하세요.</p>
+            </div>
             {/* 대대 */}
             <div className="rounded border border-gray-200 bg-white p-3">
               <h4 className="text-sm font-medium text-gray-700 mb-2">대대</h4>

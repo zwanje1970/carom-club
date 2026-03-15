@@ -13,6 +13,8 @@ type VenueRow = {
   shortDescription: string | null;
   description: string | null;
   promoPublished: string | null;
+  promoPdfUrl: string | null;
+  promoImageUrl: string | null;
   logoImageUrl: string | null;
   coverImageUrl: string | null;
   phone: string | null;
@@ -73,6 +75,8 @@ export default async function VenueDetailPage({
           shortDescription: true,
           description: true,
           promoPublished: true,
+          promoPdfUrl: true,
+          promoImageUrl: true,
           logoImageUrl: true,
           coverImageUrl: true,
           phone: true,
@@ -96,6 +100,8 @@ export default async function VenueDetailPage({
             shortDescription: null,
             description: null,
             promoPublished: null,
+            promoPdfUrl: null,
+            promoImageUrl: null,
             logoImageUrl: null,
             coverImageUrl: null,
             phone: null,
@@ -119,6 +125,8 @@ export default async function VenueDetailPage({
           shortDescription: null,
           description: null,
           promoPublished: null,
+          promoPdfUrl: null,
+          promoImageUrl: null,
           logoImageUrl: null,
           coverImageUrl: null,
           phone: null,
@@ -142,6 +150,8 @@ export default async function VenueDetailPage({
         shortDescription: null,
         description: null,
         promoPublished: null,
+        promoPdfUrl: null,
+        promoImageUrl: null,
         logoImageUrl: null,
         coverImageUrl: null,
         phone: null,
@@ -345,11 +355,37 @@ export default async function VenueDetailPage({
           </div>
         )}
 
-        {venue.promoPublished ? (
-          <div
-            className="prose prose-sm mt-6 max-w-none rounded-2xl border border-site-border bg-site-card p-6 shadow-sm prose-p:text-gray-600"
-            dangerouslySetInnerHTML={{ __html: venue.promoPublished }}
-          />
+        {/* 홍보: 1. 대표 이미지 2. 에디터 내용 3. PDF */}
+        {(venue.promoImageUrl ?? venue.promoPublished ?? venue.promoPdfUrl) ? (
+          <div className="mt-6 space-y-6">
+            {venue.promoImageUrl?.trim() && (
+              <div className="relative w-full aspect-[2/1] max-h-80 rounded-2xl border border-site-border bg-site-card overflow-hidden">
+                <Image
+                  src={venue.promoImageUrl.trim()}
+                  alt="대표 이미지"
+                  fill
+                  className="object-contain"
+                  sizes="(max-width: 768px) 100vw, 800px"
+                />
+              </div>
+            )}
+            {venue.promoPublished?.trim() && (
+              <div
+                className="prose prose-sm max-w-none rounded-2xl border border-site-border bg-site-card p-6 shadow-sm prose-p:text-gray-600"
+                dangerouslySetInnerHTML={{ __html: venue.promoPublished }}
+              />
+            )}
+            {venue.promoPdfUrl?.trim() && (
+              <a
+                href={venue.promoPdfUrl.trim()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center rounded-lg bg-site-primary/10 px-4 py-2 text-sm font-medium text-site-primary hover:bg-site-primary/20"
+              >
+                PDF 다운로드 / 미리보기
+              </a>
+            )}
+          </div>
         ) : (
           !venue.description && (
             <div className="mt-6 rounded-2xl border border-site-border bg-site-card p-8 text-center">

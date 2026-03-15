@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { processUploadedImage, uploadToBlob } from "@/lib/image-upload";
 import { IMAGE_POLICIES, type ImageKind } from "@/lib/image-policies";
 
-const ALLOWED_POLICIES: ImageKind[] = ["content", "section", "banner", "logo", "thumbnail"];
+const ALLOWED_POLICIES: ImageKind[] = ["content", "section", "banner", "logo", "thumbnail", "venue", "tournament"];
 
 export async function POST(request: Request) {
   const session = await getSession();

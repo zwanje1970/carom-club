@@ -44,15 +44,15 @@ export async function POST(request: Request) {
   }
   try {
     const body = await request.json();
-    const { username, password, platformAdminOnly, rememberMe, clientLogin, clientMode } = body as {
+    const { username, password, platformAdminOnly, rememberMe, isClientLogin } = body as {
       username?: string;
       password?: string;
       platformAdminOnly?: boolean;
       rememberMe?: boolean;
-      clientLogin?: boolean;
-      clientMode?: boolean;
+      /** 클라이언트로 로그인 체크 시 true. 이 값으로만 client 모드 허용 */
+      isClientLogin?: boolean;
     };
-    const isClientLoginRequest = clientLogin === true || clientMode === true;
+    const isClientLoginRequest = isClientLogin === true;
 
     if (!username?.trim() || !password) {
       return NextResponse.json(
@@ -191,6 +191,9 @@ export async function POST(request: Request) {
         { status: 403 }
       );
     }
+    const isClientAccount = role === "CLIENT_ADMIN";
+    const loginMode = isClientAccount && isClientLoginRequest ? "client" : "user";
+
     const token = await createSession(
       {
         id: user.id,
@@ -198,13 +201,15 @@ export async function POST(request: Request) {
         username: user.username,
         email: user.email,
         role,
+        loginMode,
+        isClientAccount,
       },
       rememberMe ? 30 : 7
     );
     const maxAge = rememberMe
       ? 60 * 60 * 24 * 30 // 30일
       : 60 * 60 * 24 * 7; // 7일
-    const res = NextResponse.json({ ok: true, role });
+    const res = NextResponse.json({ ok: true, role, loginMode });
     res.cookies.set("carom_session", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

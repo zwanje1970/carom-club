@@ -78,8 +78,6 @@ export default async function MypageEditPage() {
     name: user.name,
     email: user.email ?? "",
     phone: user.phone ?? "",
-    handicap: profile?.handicap ?? "",
-    avg: profile?.avg ?? "",
     address: userWithAddress?.address ?? "",
     addressDetail: userWithAddress?.addressDetail ?? "",
   };
