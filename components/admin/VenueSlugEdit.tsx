@@ -47,9 +47,7 @@ export function VenueSlugEdit({
         className="rounded border border-gray-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
         aria-label="URL slug"
       />
-      <Button type="submit" color="info" small disabled={saving}>
-        {saving ? "저장 중…" : "저장"}
-      </Button>
+      <Button type="submit" color="info" small disabled={saving} label={saving ? "저장 중…" : "저장"} />
       {error && <span className="text-sm text-red-600 dark:text-red-400">{error}</span>}
     </form>
   );

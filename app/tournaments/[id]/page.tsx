@@ -5,6 +5,7 @@ import { getCommonPageData } from "@/lib/common-page-data";
 import { getTournamentBasic } from "@/lib/db-tournaments";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { getMockTournamentById } from "@/lib/mock-data";
+import { normalizeSlugs } from "@/lib/normalize-slug";
 import { TournamentDetailView } from "@/components/tournament/TournamentDetailView";
 import { TournamentDetailWithEntries } from "@/components/tournament/TournamentDetailWithEntries";
 import { STAGE_LABELS } from "@/lib/tournament-stage";
@@ -146,11 +147,13 @@ export default async function TournamentDetailPage({
       }))
     : [];
   const tournamentVenues = Array.isArray(tournament.tournamentVenues)
-    ? tournament.tournamentVenues.map((tv) => ({
-        id: tv.organization.id,
-        name: tv.organization.name,
-        slug: tv.organization.slug,
-      }))
+    ? normalizeSlugs(
+        tournament.tournamentVenues.map((tv) => ({
+          id: tv.organization.id,
+          name: tv.organization.name,
+          slug: tv.organization.slug,
+        }))
+      )
     : [];
   const tournamentPayload = {
     name: tournament.name,

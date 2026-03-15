@@ -19,6 +19,7 @@ export type TournamentDetailViewProps = {
     summary: string | null;
     description: string | null;
     outlinePublished: string | null;
+    outlinePdfUrl?: string | null;
     promoContent?: string | null;
     posterImageUrl: string | null;
     venue: string | null;

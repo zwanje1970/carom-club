@@ -6,6 +6,7 @@
 
 import { prisma } from "@/lib/db";
 import { haversineKm } from "@/lib/distance";
+import { normalizeSlug } from "@/lib/normalize-slug";
 
 /** 대회 수정 페이지용 findUnique include 타입 (.tsx에서 제네릭 파싱 이슈 회피) */
 export type TournamentForEdit = Awaited<
@@ -122,7 +123,7 @@ export async function getTournamentsListForPublicPage(options: {
       confirmedCount: Number(r.confirmedCount ?? 0),
       organization:
         r.orgId && r.orgName
-          ? { id: r.orgId, name: r.orgName, slug: r.orgSlug ?? "" }
+          ? normalizeSlug({ id: r.orgId, name: r.orgName, slug: r.orgSlug })
           : null,
       distanceKm: null as number | null,
     }));
@@ -213,7 +214,7 @@ export async function getTournamentsListRaw(options?: {
       confirmedCount: Number(r.confirmedCount ?? 0),
       organization:
         r.orgId && r.orgName
-          ? { id: r.orgId, name: r.orgName, slug: r.orgSlug ?? "" }
+          ? normalizeSlug({ id: r.orgId, name: r.orgName, slug: r.orgSlug })
           : null,
     }));
   } catch {
@@ -274,7 +275,7 @@ export async function getTournamentsListAdminRaw(): Promise<TournamentListRow[]>
       confirmedCount: Number(r.confirmedCount) ?? 0,
       organization:
         r.orgId && r.orgName
-          ? { id: r.orgId, name: r.orgName, slug: r.orgSlug ?? "" }
+          ? normalizeSlug({ id: r.orgId, name: r.orgName, slug: r.orgSlug })
           : null,
     }));
   } catch {
@@ -447,6 +448,7 @@ export async function getTournamentsListWithOrgCoords(
         venue: string | null;
         venueName: string | null;
         gameFormat: string | null;
+        prizeInfo: string | null;
         imageUrl: string | null;
         posterImageUrl: string | null;
         summary: string | null;
@@ -460,7 +462,7 @@ export async function getTournamentsListWithOrgCoords(
       }[]
     >(
       `SELECT t.id, t.name, t."startAt", t."endAt", t.status, t."organizationId",
-              t.venue, t."venueName", t."gameFormat", t."imageUrl", t."posterImageUrl", t.summary,
+              t.venue, t."venueName", t."gameFormat", t."prizeInfo", t."imageUrl", t."posterImageUrl", t.summary,
               t."maxParticipants",
               (SELECT COUNT(*) FROM "TournamentEntry" e WHERE e."tournamentId" = t.id AND e.status = 'CONFIRMED')::bigint AS "confirmedCount",
               o.id AS "orgId", o.name AS "orgName", o.slug AS "orgSlug",
@@ -482,6 +484,7 @@ export async function getTournamentsListWithOrgCoords(
       venue: r.venue,
       venueName: r.venueName,
       gameFormat: r.gameFormat,
+      prizeInfo: r.prizeInfo ?? null,
       imageUrl: r.imageUrl,
       posterImageUrl: r.posterImageUrl ?? null,
       summary: r.summary ?? null,
@@ -489,7 +492,7 @@ export async function getTournamentsListWithOrgCoords(
       confirmedCount: Number(r.confirmedCount ?? 0),
       organization:
         r.orgId && r.orgName
-          ? { id: r.orgId, name: r.orgName, slug: r.orgSlug ?? "" }
+          ? normalizeSlug({ id: r.orgId, name: r.orgName, slug: r.orgSlug })
           : null,
       orgLatitude: r.orgLatitude,
       orgLongitude: r.orgLongitude,

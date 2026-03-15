@@ -19,7 +19,6 @@ const VENUE_CATEGORY_OPTIONS: { value: "all" | "daedae_only" | "mixed"; label: s
   { value: "mixed", label: "복합구장" },
 ];
 
-const IMAGE_SIZE = 96;
 const GAP = 16;
 
 /** 모바일 4, 태블릿 5, PC 6~8 */

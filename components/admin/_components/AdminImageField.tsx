@@ -7,7 +7,7 @@ const ALLOWED_EXT = "jpg, jpeg, png, webp";
 
 type Props = {
   label: string;
-  value: string | null;
+  value: string | null | undefined;
   onChange: (url: string | null) => void;
   /** 업로드 시 사용할 정책 (section → 최적화 적용) */
   policy?: "content" | "section";

@@ -4,6 +4,7 @@ import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { createListingPurchaseRecord } from "@/lib/listing-registration";
+import { normalizeSlug } from "@/lib/normalize-slug";
 import { isPlatformAdmin, isClientAdmin, canManageOrganization } from "@/lib/permissions";
 import { getPlatformSettings, hasActiveClientMembership } from "@/lib/platform-settings";
 
@@ -52,7 +53,7 @@ export async function GET(request: Request) {
         organizationId: t.organizationId,
         venue: t.venue,
         status: t.status,
-        organization: t.organization,
+        organization: t.organization ? normalizeSlug(t.organization) : null,
       }))
     );
   } catch (e) {

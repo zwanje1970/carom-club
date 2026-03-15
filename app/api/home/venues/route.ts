@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getVenuesListWithCoords } from "@/lib/db-tournaments";
 import { haversineKm } from "@/lib/distance";
 import { isDatabaseConfigured } from "@/lib/db-mode";
+import { normalizeSlugs } from "@/lib/normalize-slug";
 
 export type HomeVenueItem = {
   id: string;
@@ -38,10 +39,11 @@ export async function GET(request: Request) {
   }
 
   const list = await getVenuesListWithCoords(take * 3);
+  const listNorm = normalizeSlugs(list);
   const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
 
   if (!hasCoords) {
-    const out: HomeVenueItem[] = list.slice(0, take).map((v) => ({
+    const out: HomeVenueItem[] = listNorm.slice(0, take).map((v) => ({
       id: v.id,
       name: v.name,
       slug: v.slug,
@@ -50,7 +52,7 @@ export async function GET(request: Request) {
     return NextResponse.json(out);
   }
 
-  const withDistance = list.map((v) => {
+  const withDistance = listNorm.map((v) => {
     const km = haversineKm(lat, lng, v.latitude, v.longitude);
     return { ...v, distanceKm: km };
   });

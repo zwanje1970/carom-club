@@ -1,5 +1,6 @@
 import { mdiOfficeBuilding } from "@mdi/js";
 import { prisma } from "@/lib/db";
+import { normalizeSlugs } from "@/lib/normalize-slug";
 import { MOCK_VENUES_LIST } from "@/lib/mock-data";
 import SectionMain from "@/components/admin/_components/Section/Main";
 import SectionTitleLineWithButton from "@/components/admin/_components/Section/TitleLineWithButton";
@@ -51,49 +52,55 @@ export default async function AdminVenuesPage() {
       if (!appMap.has(key)) appMap.set(key, app.createdAt);
     }
 
-    rows = orgs.map((org) => {
-      const key = org.ownerUserId
-        ? `${org.ownerUserId}:${org.name.trim().toLowerCase()}`
-        : "";
-      return {
-        id: org.id,
-        name: org.name,
-        slug: org.slug,
-        type: org.type,
-        status: (org as { status?: string }).status ?? "ACTIVE",
-        adminRemarks: (org as { adminRemarks?: string | null }).adminRemarks ?? null,
-        createdAt: org.createdAt,
-        applicationCreatedAt: key ? appMap.get(key) ?? null : null,
-      };
-    });
+    rows = normalizeSlugs(
+      orgs.map((org) => {
+        const key = org.ownerUserId
+          ? `${org.ownerUserId}:${org.name.trim().toLowerCase()}`
+          : "";
+        return {
+          id: org.id,
+          name: org.name,
+          slug: org.slug,
+          type: org.type,
+          status: (org as { status?: string }).status ?? "ACTIVE",
+          adminRemarks: (org as { adminRemarks?: string | null }).adminRemarks ?? null,
+          createdAt: org.createdAt,
+          applicationCreatedAt: key ? appMap.get(key) ?? null : null,
+        };
+      })
+    );
   } catch {
     try {
       const orgRows = await prisma.$queryRawUnsafe<
-        { id: string; name: string; slug: string; type: string; ownerUserId: string | null; createdAt: Date }[]
+        { id: string; name: string; slug: string | null; type: string; ownerUserId: string | null; createdAt: Date }[]
       >(
         `SELECT id, name, slug, type, "ownerUserId", "createdAt" FROM "Organization" WHERE type IN ('VENUE','CLUB','FEDERATION','INSTRUCTOR') ORDER BY "createdAt" DESC`
       );
-      rows = orgRows.map((o) => ({
-        id: o.id,
-        name: o.name,
-        slug: o.slug,
-        type: o.type,
-        status: "ACTIVE",
-        adminRemarks: null as string | null,
-        createdAt: o.createdAt,
-        applicationCreatedAt: null,
-      }));
+      rows = normalizeSlugs(
+        orgRows.map((o) => ({
+          id: o.id,
+          name: o.name,
+          slug: o.slug,
+          type: o.type,
+          status: "ACTIVE",
+          adminRemarks: null as string | null,
+          createdAt: o.createdAt,
+          applicationCreatedAt: null,
+        }))
+      );
     } catch {
-      rows = (MOCK_VENUES_LIST as { id: string; name: string; slug: string }[]).map((v) => ({
-        id: v.id,
-        name: v.name,
-        slug: v.slug,
-        type: "VENUE",
-        status: "ACTIVE",
-        adminRemarks: null,
-        createdAt: new Date(),
-        applicationCreatedAt: null,
-      }));
+      rows = normalizeSlugs(
+        (MOCK_VENUES_LIST as { id: string; name: string; slug: string }[]).map((v) => ({
+          id: v.id,
+          name: v.name,
+          slug: v.slug,
+          type: "VENUE",
+          status: "ACTIVE",
+          adminRemarks: null,
+          createdAt: new Date(),
+          applicationCreatedAt: null,
+        }))
+      );
     }
   }
 

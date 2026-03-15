@@ -1,4 +1,4 @@
-/** 한 행: 업체별 회비 장부 요약 */
+/** 한 행: 업체별 회비 장부 요약. slug는 DB nullable이지만 UI 전달 시 normalize로 string. */
 export type FeeLedgerRow = {
   id: string;
   name: string;

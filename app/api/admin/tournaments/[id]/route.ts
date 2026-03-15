@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
+import { normalizeSlug } from "@/lib/normalize-slug";
 import { canViewTournament, canManageTournament } from "@/lib/permissions";
 import { sendPrizeNotifications } from "@/lib/push/prizeNotifications";
 
@@ -78,7 +79,7 @@ export async function GET(
           prizeInfo: tournament.rule.prizeInfo,
         }
       : null,
-    organization: tournament.organization,
+    organization: tournament.organization ? normalizeSlug(tournament.organization) : null,
   });
 }
 

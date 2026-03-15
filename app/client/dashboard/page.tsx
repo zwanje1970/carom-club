@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
+import { normalizeSlug } from "@/lib/normalize-slug";
 import { ClientLoginWelcomeBanner } from "@/components/client/ClientLoginWelcomeBanner";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -40,7 +41,7 @@ export default async function ClientDashboardPage({
       select: { name: true, slug: true, setupCompleted: true, approvalStatus: true, clientType: true, membershipType: true },
     });
     if (row) {
-      org = row;
+      org = normalizeSlug(row);
       if (!row.setupCompleted) {
         redirect("/client/setup");
       }

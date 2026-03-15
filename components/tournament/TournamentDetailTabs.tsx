@@ -62,11 +62,11 @@ export function TournamentDetailTabs({
   tournamentId,
   participantsListPublic = true,
   tournament,
-  isLoggedIn,
-  myEntries,
-  entryFee,
-  canApplyFirstSlot,
-  canApplyAdditionalSlot,
+  isLoggedIn: _isLoggedIn,
+  myEntries: _myEntries,
+  entryFee: _entryFee,
+  canApplyFirstSlot: _canApplyFirstSlot,
+  canApplyAdditionalSlot: _canApplyAdditionalSlot,
   entries,
 }: TournamentDetailTabsProps) {
   const router = useRouter();
@@ -183,9 +183,9 @@ export function TournamentDetailTabs({
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold mb-3">시합문의</h2>
           <p className="text-gray-500">대회 관련 문의는 로그인 후 문의하기를 이용해 주세요.</p>
-          <a href="/admin/inquiries" className="text-site-primary hover:underline text-sm mt-2 inline-block">
+          <Link href="/admin/inquiries" className="text-site-primary hover:underline text-sm mt-2 inline-block">
             문의 관리 (관리자)
-          </a>
+          </Link>
         </div>
       )}
 

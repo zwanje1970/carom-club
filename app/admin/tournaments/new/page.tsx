@@ -2,6 +2,7 @@ import { mdiTrophy } from "@mdi/js";
 import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
+import { normalizeSlugs } from "@/lib/normalize-slug";
 import { isPlatformAdmin } from "@/types/auth";
 import { MOCK_ORGANIZATIONS_LIST } from "@/lib/mock-data";
 import { TournamentNewForm } from "@/components/admin/TournamentNewForm";
@@ -32,18 +33,21 @@ export default async function AdminTournamentsNewPage() {
 
   let organizations: { id: string; name: string; slug: string; type: string; address: string | null }[] = [];
   try {
-    organizations = await prisma.organization.findMany({
+    const orgs = await prisma.organization.findMany({
       orderBy: { name: "asc" },
       select: { id: true, name: true, slug: true, type: true, address: true },
     });
+    organizations = normalizeSlugs(orgs);
   } catch {
-    organizations = MOCK_ORGANIZATIONS_LIST.map((o) => ({
-      id: o.id,
-      name: o.name,
-      slug: o.slug,
-      type: "CLUB",
-      address: null,
-    }));
+    organizations = normalizeSlugs(
+      MOCK_ORGANIZATIONS_LIST.map((o) => ({
+        id: o.id,
+        name: o.name,
+        slug: o.slug,
+        type: "CLUB",
+        address: null,
+      }))
+    );
   }
 
   let isVenueClient = false;

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { normalizeSlugs } from "@/lib/normalize-slug";
 import type { FeeLedgerRow, PaymentRecord, FeeLedgerData } from "./types";
 
 const CLIENT_TYPES = ["VENUE", "CLUB", "FEDERATION", "INSTRUCTOR"] as const;
@@ -31,7 +32,7 @@ export async function getFeeLedgerData(): Promise<FeeLedgerData> {
   const currentM = now.getMonth() + 1;
   const currentPeriod = `${currentY}-${String(currentM).padStart(2, "0")}`;
 
-  const rows: FeeLedgerRow[] = [];
+  const rows: (Omit<FeeLedgerRow, "slug"> & { slug: string | null })[] = [];
   const payments: PaymentRecord[] = [];
   let paidThisMonth = 0;
   let arrearsCount = 0;
@@ -114,7 +115,7 @@ export async function getFeeLedgerData(): Promise<FeeLedgerData> {
   payments.sort((a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime());
 
   return {
-    rows,
+    rows: normalizeSlugs(rows),
     payments,
     summary: {
       totalOrgs: rows.length,

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
+import { normalizeSlug } from "@/lib/normalize-slug";
 import { canViewTournament, canManageTournament } from "@/lib/permissions";
 
 /** 대회에 연결된 당구장(대회 당구장) 목록. GET → canViewTournament */
@@ -41,7 +42,7 @@ export async function GET(
       id: v.id,
       organizationId: v.organizationId,
       sortOrder: v.sortOrder,
-      organization: v.organization,
+      organization: v.organization ? normalizeSlug(v.organization) : null,
     }))
   );
 }

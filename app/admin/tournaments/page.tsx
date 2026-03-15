@@ -3,6 +3,7 @@ import { mdiTrophy } from "@mdi/js";
 import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
+import { normalizeSlug } from "@/lib/normalize-slug";
 import { isPlatformAdmin } from "@/types/auth";
 import { getTournamentsListAdminRaw, type TournamentListRow } from "@/lib/db-tournaments";
 import { MOCK_TOURNAMENTS_LIST } from "@/lib/mock-data";
@@ -58,12 +59,13 @@ export default async function AdminTournamentsPage() {
         venue: t.venue ?? null,
         venueName: ext.venueName ?? null,
         gameFormat: t.gameFormat ?? null,
+        prizeInfo: null,
         imageUrl: ext.imageUrl ?? null,
         posterImageUrl: null,
         summary: null,
         maxParticipants: null,
         confirmedCount: 0,
-        organization: org ? { id: org.id, name: org.name, slug: org.slug ?? "" } : null,
+        organization: org ? normalizeSlug(org) : null,
       };
     });
   }

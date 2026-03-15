@@ -1,6 +1,5 @@
 import { HomeSectionsWithLocation } from "@/components/home/HomeSectionsWithLocation";
 import { HomeNoticeCommunity } from "@/components/home/HomeNoticeCommunity";
-import { VenueCarousel } from "@/components/home/VenueCarousel";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import Link from "next/link";
 import { isDatabaseConfigured } from "@/lib/db-mode";

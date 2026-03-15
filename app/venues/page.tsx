@@ -6,6 +6,7 @@ import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { getCommonPageData } from "@/lib/common-page-data";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
+import { normalizeSlugs } from "@/lib/normalize-slug";
 import { MOCK_VENUES_LIST } from "@/lib/mock-data";
 import { getServerTiming, logServerTiming } from "@/lib/perf";
 
@@ -38,12 +39,12 @@ export default async function VenuesPage() {
         select: { id: true, name: true, slug: true },
         orderBy: { name: "asc" },
       });
-      venues = rows.map((r) => ({ id: r.id, name: r.name, slug: r.slug! }));
+      venues = normalizeSlugs(rows.map((r) => ({ id: r.id, name: r.name, slug: r.slug })));
     } catch {
-      venues = MOCK_VENUES_LIST.map((v) => ({ id: v.id, name: v.name, slug: v.slug }));
+      venues = normalizeSlugs(MOCK_VENUES_LIST.map((v) => ({ id: v.id, name: v.name, slug: v.slug })));
     }
   } else {
-    venues = MOCK_VENUES_LIST.map((v) => ({ id: v.id, name: v.name, slug: v.slug }));
+    venues = normalizeSlugs(MOCK_VENUES_LIST.map((v) => ({ id: v.id, name: v.name, slug: v.slug })));
   }
   logServerTiming("db", dbStart);
   logServerTiming("page");
