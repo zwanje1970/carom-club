@@ -3,7 +3,7 @@
  * Neon DB 연결 시 테이블 구조 설계에 사용
  */
 
-export type NoticeBarPageSlug = "all" | "home" | "venues" | "tournaments";
+export type NoticeBarPageSlug = "all" | "home" | "venues" | "tournaments" | "community";
 
 export interface NoticeBar {
   id: string;

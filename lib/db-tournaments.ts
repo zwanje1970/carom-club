@@ -212,6 +212,30 @@ export async function getVenuesListWithCoords(
   }
 }
 
+/** 대회 상세 첫 화면용: organization, rule, matchVenues, _count만. entries 제외로 첫 응답 경량화. */
+export async function getTournamentBasic(id: string) {
+  return prisma.tournament.findUnique({
+    where: { id },
+    include: {
+      organization: true,
+      rule: true,
+      _count: { select: { tournamentZones: true, finalMatches: true } },
+      matchVenues: { orderBy: { sortOrder: "asc" } },
+    },
+  });
+}
+
+/** 대회 상세 후속 로딩용: 엔트리 목록만 (참가자 명단/참가신청 탭). */
+export async function getTournamentEntries(id: string) {
+  return prisma.tournamentEntry.findMany({
+    where: { tournamentId: id },
+    include: {
+      user: { include: { memberProfile: true } },
+    },
+    orderBy: [{ status: "asc" }, { createdAt: "asc" }],
+  });
+}
+
 /** 공개 토너먼트 목록 + 주최 조직 위도/경도 (거리 정렬용). take 상한 50. */
 export async function getTournamentsListWithOrgCoords(
   take = 50

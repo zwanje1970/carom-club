@@ -47,3 +47,28 @@ export async function measureAsync<T>(
     logServerTiming(label, start);
   }
 }
+
+// --- 클라이언트 전용 (브라우저에서만 동작) ---
+const CLIENT_ENABLED = typeof window !== "undefined" && process.env.NEXT_PUBLIC_PERF_LOG !== "0";
+
+/** 클라이언트: 페이지 진입 후 첫 렌더/ hydration 구간 측정용. mount 시점에 호출 */
+export function logClientTiming(label: string, startMs: number): number {
+  const end = typeof performance !== "undefined" ? performance.now() : Date.now() - startMs;
+  const duration = Math.round(end - startMs);
+  if (CLIENT_ENABLED && typeof console !== "undefined" && console.info) {
+    console.info(`[perf:client] ${label}: ${duration}ms`);
+  }
+  return duration;
+}
+
+/** 클라이언트: Navigation Timing 기반 TTFB / DCL / LCP 후보 로그 (mount 시 한 번 호출 권장) */
+export function logNavigationTiming(): void {
+  if (!CLIENT_ENABLED || typeof window === "undefined" || !window.performance?.getEntriesByType) return;
+  const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+  if (!nav) return;
+  const ttfb = nav.responseStart - nav.requestStart;
+  const dcl = nav.domContentLoadedEventEnd - nav.startTime;
+  if (typeof console !== "undefined" && console.info) {
+    console.info(`[perf:client] ttfb: ${Math.round(ttfb)}ms, dcl: ${Math.round(dcl)}ms`);
+  }
+}

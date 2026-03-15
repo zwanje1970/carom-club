@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { TournamentFormSimple } from "@/components/client/TournamentFormSimple";
-import { RichEditor } from "@/components/RichEditor";
+import { RichEditorLazy } from "@/components/RichEditorLazy";
 
 function parseBracketConfig(config: unknown): Record<string, unknown> | null {
   if (config == null) return null;
@@ -159,7 +159,7 @@ export default function ClientTournamentEditPage() {
       >
         <div>
           <label className="block text-sm font-medium text-site-text mb-1">대회 홍보 내용 (선택)</label>
-          <RichEditor
+          <RichEditorLazy
             value={promoContent}
             onChange={setPromoContent}
             placeholder="상세 홍보 문구를 입력하세요"

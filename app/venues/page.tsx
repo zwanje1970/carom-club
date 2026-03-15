@@ -2,8 +2,8 @@ import Link from "next/link";
 import { ContentLayer } from "@/components/content/ContentLayer";
 import { PageSectionsRenderer } from "@/components/content/PageSectionsRenderer";
 import { VenuesListWithLocation } from "@/components/venues/VenuesListWithLocation";
-import { getAdminCopy, getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
-import { getNoticeBarsForPage, getPopupsForPage, getPageSectionsForPage } from "@/lib/content/service";
+import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import { getCommonPageData } from "@/lib/common-page-data";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { MOCK_VENUES_LIST } from "@/lib/mock-data";
@@ -13,12 +13,8 @@ export const revalidate = 60;
 
 export default async function VenuesPage() {
   getServerTiming();
-  const [copy, noticeBars, popups, pageSections] = await Promise.all([
-    getAdminCopy(),
-    getNoticeBarsForPage("venues"),
-    getPopupsForPage("venues"),
-    getPageSectionsForPage("venues"),
-  ]);
+  const common = await getCommonPageData("venues");
+  const { copy, noticeBars, popups, pageSections } = common;
   logServerTiming("fetch_copy");
   const c = copy as Record<AdminCopyKey, string>;
   let venues: { id: string; name: string; slug: string }[] = [];

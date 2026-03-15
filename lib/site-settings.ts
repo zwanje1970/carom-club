@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import {
@@ -62,7 +63,7 @@ const DEFAULTS: SiteSettings = {
   },
 };
 
-export async function getSiteSettings(): Promise<SiteSettings> {
+async function getSiteSettingsUncached(): Promise<SiteSettings> {
   if (!isDatabaseConfigured()) {
     return DEFAULTS;
   }
@@ -87,6 +88,14 @@ export async function getSiteSettings(): Promise<SiteSettings> {
   } catch {
     return DEFAULTS;
   }
+}
+
+/** 60초 캐시. 레이아웃·공통 데이터와 함께 반복 요청 시 캐시에서 반환. */
+export async function getSiteSettings(): Promise<SiteSettings> {
+  return unstable_cache(getSiteSettingsUncached, ["site-settings"], {
+    revalidate: 60,
+    tags: ["site-settings", "common-page-data"],
+  })();
 }
 
 type SiteSettingRow = {

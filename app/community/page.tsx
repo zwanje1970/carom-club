@@ -1,8 +1,9 @@
-import { getAdminCopy, getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import { getCommonPageData } from "@/lib/common-page-data";
 
 export default async function CommunityPage() {
-  const copy = await getAdminCopy();
-  const c = copy as Record<AdminCopyKey, string>;
+  const common = await getCommonPageData("community");
+  const c = common.copy as Record<AdminCopyKey, string>;
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
       <div className="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6">

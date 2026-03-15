@@ -19,19 +19,20 @@ type Props = {
   copy: Record<string, string>;
 };
 
-/** 당구장 목록: 위치 허용 시 가까운 순 노출, 거리 표시. */
+/** 당구장 목록: 기본 목록 즉시 표시, 위치 허용 시 가까운 순으로 후처리. */
 export function VenuesListWithLocation({ initialVenues, copy }: Props) {
   const [venues, setVenues] = useState<VenueItem[]>(
     initialVenues.map((v) => ({ ...v, coverImageUrl: null }))
   );
   const [sortByDistance, setSortByDistance] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [locationRefining, setLocationRefining] = useState(false);
   const [locationError, setLocationError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     function fetchWithCoords(lat: number, lng: number) {
+      setLocationRefining(true);
       const params = new URLSearchParams({ lat: String(lat), lng: String(lng), take: "100" });
       fetch(`/api/home/venues?${params}`)
         .then((r) => r.json())
@@ -41,18 +42,11 @@ export function VenuesListWithLocation({ initialVenues, copy }: Props) {
           setSortByDistance(list.some((v) => v.distanceKm != null));
         })
         .finally(() => {
-          if (!cancelled) setLoading(false);
+          if (!cancelled) setLocationRefining(false);
         });
     }
 
-    function doneWithoutCoords() {
-      if (cancelled) return;
-      setSortByDistance(false);
-      setLoading(false);
-    }
-
     if (!navigator.geolocation) {
-      doneWithoutCoords();
       return;
     }
 
@@ -64,9 +58,8 @@ export function VenuesListWithLocation({ initialVenues, copy }: Props) {
       () => {
         if (cancelled) return;
         setLocationError(true);
-        doneWithoutCoords();
       },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 }
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
     );
 
     return () => {
@@ -86,13 +79,13 @@ export function VenuesListWithLocation({ initialVenues, copy }: Props) {
 
   return (
     <div className="mt-8 space-y-4">
-      {loading && (
-        <p className="text-sm text-gray-500">위치 기준으로 가까운 당구장을 불러오는 중…</p>
+      {locationRefining && (
+        <p className="text-sm text-gray-500">가까운 순으로 정렬 중…</p>
       )}
-      {!loading && sortByDistance && (
+      {!locationRefining && sortByDistance && (
         <p className="text-sm font-medium text-site-primary">가까운 순으로 보여드립니다.</p>
       )}
-      {!loading && !sortByDistance && locationError && (
+      {!locationRefining && !sortByDistance && locationError && (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
           위치를 허용하면 가까운 당구장부터 볼 수 있습니다. 이름 순으로 표시 중입니다.
         </p>

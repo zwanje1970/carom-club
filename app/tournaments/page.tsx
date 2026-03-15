@@ -2,8 +2,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { ContentLayer } from "@/components/content/ContentLayer";
 import { PageSectionsRenderer } from "@/components/content/PageSectionsRenderer";
-import { getAdminCopy, getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
-import { getNoticeBarsForPage, getPopupsForPage, getPageSectionsForPage } from "@/lib/content/service";
+import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import { getCommonPageData } from "@/lib/common-page-data";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { getTournamentsListRaw, type TournamentListRow } from "@/lib/db-tournaments";
 import { MOCK_TOURNAMENTS_LIST } from "@/lib/mock-data";
@@ -22,12 +22,8 @@ function formatDate(d: Date) {
 
 export default async function TournamentsPage() {
   getServerTiming();
-  const [copy, noticeBars, popups, pageSections] = await Promise.all([
-    getAdminCopy(),
-    getNoticeBarsForPage("tournaments"),
-    getPopupsForPage("tournaments"),
-    getPageSectionsForPage("tournaments"),
-  ]);
+  const common = await getCommonPageData("tournaments");
+  const { copy, noticeBars, popups, pageSections } = common;
   logServerTiming("fetch_copy");
   const c = copy as Record<AdminCopyKey, string>;
   let tournaments: TournamentListRow[] = [];

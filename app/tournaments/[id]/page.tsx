@@ -1,14 +1,14 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getSession } from "@/lib/auth";
-import { getAdminCopy, getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
-import { prisma } from "@/lib/db";
+import { getCommonPageData } from "@/lib/common-page-data";
+import { getTournamentBasic } from "@/lib/db-tournaments";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { getMockTournamentById } from "@/lib/mock-data";
-import { getDisplayName } from "@/lib/display-name";
 import { TournamentDetailView } from "@/components/tournament/TournamentDetailView";
+import { TournamentDetailWithEntries } from "@/components/tournament/TournamentDetailWithEntries";
 import { STAGE_LABELS } from "@/lib/tournament-stage";
-import { getServerTiming, logServerTiming } from "@/lib/perf";
+import { logServerTiming } from "@/lib/perf";
 
 function parseParticipantsListPublic(rule: { bracketConfig?: string | object | null } | null): boolean {
   if (!rule?.bracketConfig) return true;
@@ -23,7 +23,7 @@ function parseParticipantsListPublic(rule: { bracketConfig?: string | object | n
   return true;
 }
 
-function buildTabs(copy: Record<AdminCopyKey, string>) {
+function buildTabs() {
   return [
     { id: "outline", label: "대회요강" },
     { id: "apply", label: "참가신청" },
@@ -31,6 +31,17 @@ function buildTabs(copy: Record<AdminCopyKey, string>) {
     { id: "results", label: "결과" },
     { id: "inquiry", label: "시합문의" },
   ] as const;
+}
+
+/** 엔트리/세션 로딩 중 표시 */
+function TournamentDetailSkeleton() {
+  return (
+    <div className="animate-pulse space-y-4 rounded-xl border border-site-border bg-site-card p-6">
+      <div className="h-6 w-1/3 rounded bg-site-border" />
+      <div className="h-4 w-full rounded bg-site-border" />
+      <div className="h-4 w-2/3 rounded bg-site-border" />
+    </div>
+  );
 }
 
 export default async function TournamentDetailPage({
@@ -43,41 +54,11 @@ export default async function TournamentDetailPage({
   const { id } = await params;
   const { tab: tabParam } = await searchParams;
 
-  type TournamentDetail = Awaited<
-    ReturnType<
-      typeof prisma.tournament.findUnique<{
-        where: { id: string };
-        include: {
-          organization: true;
-          rule: true;
-          entries: {
-            include: { user: { include: { memberProfile: true } } };
-            orderBy: [{ status: "asc" }, { createdAt: "asc" }];
-          };
-        };
-      }>
-    >
-  >;
-  let tournament: (TournamentDetail & { matchVenues?: Array<{ displayLabel: string; venueName?: string | null; address?: string | null; phone?: string | null }>; _count?: { tournamentZones: number; finalMatches: number } }) | null = null;
-  let useMock = false;
-
   const dbStart = Date.now();
-  if (isDatabaseConfigured()) {
+  let tournament = isDatabaseConfigured() ? await getTournamentBasic(id) : null;
+  let useMock = false;
+  if (!tournament && isDatabaseConfigured()) {
     try {
-      tournament = await prisma.tournament.findUnique({
-        where: { id },
-        include: {
-          organization: true,
-          rule: true,
-          _count: { select: { tournamentZones: true, finalMatches: true } },
-          matchVenues: { orderBy: { sortOrder: "asc" } },
-          entries: {
-            include: { user: { include: { memberProfile: true } } },
-            orderBy: [{ status: "asc" }, { createdAt: "asc" }],
-          },
-        },
-      });
-    } catch {
       const mock = getMockTournamentById(id);
       tournament = {
         id: mock.id,
@@ -92,11 +73,15 @@ export default async function TournamentDetailPage({
         organizationId: mock.organization.id,
         organization: mock.organization,
         rule: mock.rule,
-        entries: [],
-      } as unknown as TournamentDetail & { matchVenues: [] };
+        matchVenues: [],
+        _count: { tournamentZones: 0, finalMatches: 0 },
+      } as unknown as Awaited<ReturnType<typeof getTournamentBasic>>;
       useMock = true;
+    } catch {
+      tournament = null;
     }
-  } else {
+  }
+  if (!tournament && !isDatabaseConfigured()) {
     const mock = getMockTournamentById(id);
     tournament = {
       id: mock.id,
@@ -111,8 +96,9 @@ export default async function TournamentDetailPage({
       organizationId: mock.organization.id,
       organization: mock.organization,
       rule: mock.rule,
-      entries: [],
-    } as unknown as TournamentDetail & { matchVenues: [] };
+      matchVenues: [],
+      _count: { tournamentZones: 0, finalMatches: 0 },
+    } as unknown as Awaited<ReturnType<typeof getTournamentBasic>>;
     useMock = true;
   }
   logServerTiming("db", dbStart);
@@ -120,19 +106,15 @@ export default async function TournamentDetailPage({
   if (!tournament) notFound();
 
   const copyStart = Date.now();
-  const [copy, session] = await Promise.all([getAdminCopy(), getSession()]);
+  await getCommonPageData("tournaments");
   logServerTiming("fetch_copy", copyStart);
-  const c = copy as Record<AdminCopyKey, string>;
-  const tabs = buildTabs(c);
-  const myEntries = session
-    ? tournament.entries.filter((e) => e.userId === session.id).map((e) => ({
-        id: e.id,
-        status: e.status,
-        waitingListOrder: e.waitingListOrder,
-        paymentMarkedByApplicantAt: e.paymentMarkedByApplicantAt?.toISOString() ?? null,
-        slotNumber: e.slotNumber ?? 1,
-      }))
-    : [];
+
+  const tabs = buildTabs();
+  const currentTab = (() => {
+    const t = tabs.find((tab) => tab.id === (tabParam ?? "outline"));
+    return t ? t.id : "outline";
+  })();
+  const participantsListPublic = parseParticipantsListPublic(tournament.rule);
   const allowMultipleSlots = (() => {
     try {
       const bc = tournament.rule?.bracketConfig;
@@ -142,14 +124,6 @@ export default async function TournamentDetailPage({
       return false;
     }
   })();
-
-  const currentTab = (() => {
-    const t = tabs.find((tab) => tab.id === (tabParam ?? "outline"));
-    return t ? t.id : "outline";
-  })();
-
-  const participantsListPublic = parseParticipantsListPublic(tournament.rule);
-  const confirmedCount = tournament.entries.filter((e) => e.status === "CONFIRMED").length;
   const matchVenues = Array.isArray(tournament.matchVenues)
     ? tournament.matchVenues.map((v) => ({
         displayLabel: v.displayLabel,
@@ -158,63 +132,76 @@ export default async function TournamentDetailPage({
         phone: v.phone,
       }))
     : [];
+  const tournamentPayload = {
+    name: tournament.name,
+    summary: tournament.summary ?? null,
+    description: tournament.description ?? null,
+    outlinePublished: tournament.outlinePublished ?? null,
+    posterImageUrl: tournament.posterImageUrl ?? null,
+    venue: tournament.venue ?? null,
+    startAt: tournament.startAt,
+    endAt: tournament.endAt,
+    gameFormat: tournament.gameFormat ?? null,
+    status: tournament.status,
+    entryFee: tournament.entryFee ?? tournament.rule?.entryFee ?? null,
+    prizeInfo: tournament.prizeInfo ?? null,
+    entryCondition: tournament.entryCondition ?? null,
+    maxParticipants: tournament.maxParticipants ?? null,
+    rule: tournament.rule
+      ? {
+          entryFee: tournament.rule.entryFee,
+          operatingFee: tournament.rule.operatingFee,
+          maxEntries: tournament.rule.maxEntries,
+          useWaiting: tournament.rule.useWaiting,
+          entryConditions: tournament.rule.entryConditions,
+        }
+      : null,
+  };
+  const baseProps = {
+    tournamentId: id,
+    tournament: { ...tournamentPayload, id: tournament.id },
+    matchVenues,
+    tabs,
+    currentTab,
+    participantsListPublic,
+    allowMultipleSlots,
+  };
   logServerTiming("page");
+
+  if (useMock) {
+    return (
+      <main className="min-h-screen overflow-x-hidden bg-site-bg">
+        <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
+          <p className="mb-4 text-center text-sm text-site-primary">DB 없이 미리보기 데이터로 표시 중입니다.</p>
+          <TournamentDetailView
+            tournamentId={id}
+            tabs={tabs}
+            currentTab={currentTab}
+            participantsListPublic={participantsListPublic}
+            tournament={{
+              ...tournamentPayload,
+              startAt: tournament.startAt instanceof Date ? tournament.startAt.toISOString() : String(tournament.startAt),
+              endAt: tournament.endAt != null ? (tournament.endAt instanceof Date ? tournament.endAt.toISOString() : String(tournament.endAt)) : null,
+            }}
+            matchVenues={matchVenues}
+            confirmedCount={0}
+            isLoggedIn={false}
+            myEntries={[]}
+            allowMultipleSlots={allowMultipleSlots}
+            entryFee={tournament.entryFee ?? tournament.rule?.entryFee ?? null}
+            entries={[]}
+          />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-site-bg">
       <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
-        {useMock && (
-          <p className="mb-4 text-center text-sm text-site-primary">DB 없이 미리보기 데이터로 표시 중입니다.</p>
-        )}
-
-        <TournamentDetailView
-          tournamentId={id}
-          tabs={tabs}
-          currentTab={currentTab}
-          participantsListPublic={participantsListPublic}
-          tournament={{
-            name: tournament.name,
-            summary: tournament.summary ?? null,
-            description: tournament.description ?? null,
-            outlinePublished: tournament.outlinePublished ?? null,
-            posterImageUrl: tournament.posterImageUrl ?? null,
-            venue: tournament.venue ?? null,
-            startAt: tournament.startAt instanceof Date ? tournament.startAt.toISOString() : String(tournament.startAt),
-            endAt: tournament.endAt != null ? (tournament.endAt instanceof Date ? tournament.endAt.toISOString() : String(tournament.endAt)) : null,
-            gameFormat: tournament.gameFormat ?? null,
-            status: tournament.status,
-            entryFee: tournament.entryFee ?? tournament.rule?.entryFee ?? null,
-            prizeInfo: tournament.prizeInfo ?? null,
-            entryCondition: tournament.entryCondition ?? null,
-            maxParticipants: tournament.maxParticipants ?? null,
-            rule: tournament.rule
-              ? {
-                  entryFee: tournament.rule.entryFee,
-                  operatingFee: tournament.rule.operatingFee,
-                  maxEntries: tournament.rule.maxEntries,
-                  useWaiting: tournament.rule.useWaiting,
-                  entryConditions: tournament.rule.entryConditions,
-                }
-              : null,
-          }}
-          matchVenues={matchVenues}
-          confirmedCount={confirmedCount}
-          isLoggedIn={!!session}
-          myEntries={myEntries}
-          allowMultipleSlots={allowMultipleSlots}
-          entryFee={tournament.entryFee ?? tournament.rule?.entryFee ?? null}
-          entries={tournament.entries.map((e) => ({
-            id: e.id,
-            userId: e.userId,
-            userName: getDisplayName(e.user),
-            handicap: e.user.memberProfile?.handicap ?? null,
-            avg: e.user.memberProfile?.avg ?? null,
-            depositorName: e.depositorName,
-            status: e.status,
-            waitingListOrder: e.waitingListOrder,
-            slotNumber: e.slotNumber ?? 1,
-          }))}
-        />
+        <Suspense fallback={<TournamentDetailSkeleton />}>
+          <TournamentDetailWithEntries {...baseProps} />
+        </Suspense>
 
         {"tournamentStage" in tournament && tournament._count && (
           <section className="mt-8 rounded-xl border border-site-border bg-site-card p-4">

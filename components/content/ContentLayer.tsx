@@ -1,10 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { NoticeBar } from "@/components/common/NoticeBar";
-import { Popup } from "@/components/common/Popup";
 import type { NoticeBar as NoticeBarType } from "@/types/notice-bar";
 import type { Popup as PopupType } from "@/types/popup";
+
+const Popup = dynamic(
+  () => import("@/components/common/Popup").then((m) => ({ default: m.Popup })),
+  { ssr: false }
+);
 
 type Props = {
   noticeBars?: NoticeBarType[] | null;

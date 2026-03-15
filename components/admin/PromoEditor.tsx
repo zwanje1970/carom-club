@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { RichEditor } from "@/components/RichEditor";
+import { RichEditorLazy } from "@/components/RichEditorLazy";
 import { getDraftKey, getDraft, setDraft as saveDraftToStorage, clearDraft } from "@/lib/admin-drafts";
 import type { PromoPageTemplateRow } from "@/lib/promo-templates";
 import { PROMO_TEMPLATE_CATEGORIES } from "@/lib/promo-templates";
@@ -151,7 +151,7 @@ export function PromoEditor({
           {message.text}
         </p>
       )}
-      <RichEditor
+      <RichEditorLazy
         value={draft}
         onChange={setDraft}
         placeholder="홍보 내용을 작성하세요"

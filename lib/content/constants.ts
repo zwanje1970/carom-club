@@ -92,6 +92,7 @@ export const NOTICE_BAR_PAGE_LABELS: Record<NoticeBarPageSlug, string> = {
   home: "메인페이지",
   venues: "당구장 페이지",
   tournaments: "대회 페이지",
+  community: "커뮤니티",
 };
 
 export const SECTION_TYPE_LABELS = {

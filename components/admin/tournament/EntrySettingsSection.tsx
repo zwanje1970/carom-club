@@ -1,6 +1,6 @@
 "use client";
 
-import { RichEditor } from "@/components/RichEditor";
+import { RichEditorLazy } from "@/components/RichEditorLazy";
 
 export type EntrySettings = {
   entryFee: number | "";
@@ -104,7 +104,7 @@ export function EntrySettingsSection({
         <label className="block text-sm font-medium text-gray-700 mb-1">
           참가 조건
         </label>
-        <RichEditor
+        <RichEditorLazy
           value={v.entryConditions}
           onChange={(entryConditions) => update({ entryConditions })}
           placeholder="참가 조건을 입력하세요 (예: AVG 제출 필수, 핸디 제한 등)"

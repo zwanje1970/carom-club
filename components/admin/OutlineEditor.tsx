@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { RichEditor } from "@/components/RichEditor";
+import { RichEditorLazy } from "@/components/RichEditorLazy";
 import { getDraftKey, getDraft, setDraft as saveDraftToStorage, clearDraft } from "@/lib/admin-drafts";
 
 export function OutlineEditor({
@@ -82,7 +82,7 @@ export function OutlineEditor({
           {message.text}
         </p>
       )}
-      <RichEditor
+      <RichEditorLazy
         value={draft}
         onChange={setDraft}
         placeholder="대회요강을 작성하세요"

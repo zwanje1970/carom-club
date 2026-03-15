@@ -9,6 +9,7 @@ import { RegisterServiceWorker } from "@/components/push/RegisterServiceWorker";
 import { getSiteSettings, DEFAULT_PRIMARY_COLOR, DEFAULT_SECONDARY_COLOR } from "@/lib/site-settings";
 import { SiteSettingsProvider } from "@/components/SiteSettingsProvider";
 import { SiteThemeStyles } from "@/components/SiteThemeStyles";
+import { ClientPerfLogger } from "@/components/ClientPerfLogger";
 import { SITE_NAME, DEFAULT_SITE_URL } from "@/lib/site-settings";
 
 export const viewport: Viewport = {
@@ -83,7 +84,7 @@ export default async function RootLayout({
   return (
     <html lang="ko" className="scroll-smooth">
       <head>
-        {/* 웹폰트: Pretendard, Spoqa Han Sans Neo (CDN) */}
+        {/* 웹폰트: Google Fonts는 display=swap 적용. CDN 폰트는 초기 렌더 후 로드 권장. */}
         <link
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css"
           rel="stylesheet"
@@ -92,7 +93,6 @@ export default async function RootLayout({
           href="https://spoqa.github.io/spoqa-han-sans/css/SpoqaHanSansNeo.css"
           rel="stylesheet"
         />
-        {/* Google Fonts: Noto Sans KR, Nanum Gothic, Nanum Myeongjo, Black Han Sans, Do Hyeon, Gothic A1, IBM Plex Sans KR */}
         <link
           href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Nanum+Gothic&family=Nanum+Myeongjo&family=Black+Han+Sans&family=Do+Hyeon&family=Gothic+A1:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap"
           rel="stylesheet"
@@ -104,6 +104,7 @@ export default async function RootLayout({
           secondaryColor={settings.secondaryColor ?? DEFAULT_SECONDARY_COLOR}
         />
         <SiteSettingsProvider initial={settings}>
+          <ClientPerfLogger />
           <RegisterServiceWorker />
           <NotificationBanner />
           <IntroRoot>
