@@ -81,7 +81,7 @@ export function PublicFinalBracket({
   }, [data, search]);
 
   if (loading) return <p className="text-sm text-gray-500 py-4">불러오는 중…</p>;
-  if (!data) return <p className="text-sm text-gray-500 py-4">대진표를 불러올 수 없습니다.</p>();
+  if (!data) return <p className="text-sm text-gray-500 py-4">대진표를 불러올 수 없습니다.</p>;
 
   const roundOrder = Object.keys(filteredByRound)
     .map(Number)
