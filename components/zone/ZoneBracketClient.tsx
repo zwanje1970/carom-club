@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Match = {
@@ -29,16 +29,16 @@ export function ZoneBracketClient({ tzId, allowEdit }: { tzId: string; allowEdit
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
 
-  function load() {
+  const load = useCallback(() => {
     fetch(`/api/zone/tournament-zones/${tzId}/bracket`)
       .then((r) => r.ok ? r.json() : null)
       .then(setData)
       .finally(() => setLoading(false));
-  }
+  }, [tzId]);
 
   useEffect(() => {
     load();
-  }, [tzId]);
+  }, [load]);
 
   async function setResult(matchId: string, winnerEntryId: string | null, scoreA?: number, scoreB?: number) {
     setUpdating(matchId);

@@ -171,7 +171,6 @@ export default async function TournamentDetailPage({
           tournamentId={id}
           tabs={tabs}
           currentTab={currentTab}
-          infoEmptyText={getCopyValue(c, "site.tournamentDetail.infoEmpty")}
           participantsListPublic={participantsListPublic}
           tournament={{
             name: tournament.name,

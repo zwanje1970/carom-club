@@ -24,11 +24,9 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  let organizationId: string | undefined = searchParams.get("organizationId") ?? undefined;
-  if (!isPlatformAdmin(session)) {
-    const myOrgId = await getClientAdminOrganizationId(session);
-    if (myOrgId) organizationId = myOrgId;
-  }
+  const organizationId: string | undefined = !isPlatformAdmin(session)
+    ? (await getClientAdminOrganizationId(session)) ?? searchParams.get("organizationId") ?? undefined
+    : searchParams.get("organizationId") ?? undefined;
   const take = Math.min(Number(searchParams.get("take")) || 20, 50);
 
   try {
@@ -78,7 +76,6 @@ export async function POST(request: Request) {
 
   const body = await request.json();
   const {
-    organizationId: bodyOrgId,
     name,
     startAt,
     endAt,
@@ -105,7 +102,6 @@ export async function POST(request: Request) {
     approvalType,
     rule,
   } = body as {
-    organizationId?: string;
     name?: string;
     startAt?: string;
     endAt?: string | null;
@@ -143,7 +139,6 @@ export async function POST(request: Request) {
     };
   };
 
-  let organizationId: string;
   if (isPlatformAdmin(session)) {
     return NextResponse.json(
       { error: "대회 생성은 클라이언트 관리자만 가능합니다. 플랫폼 관리자는 대회 실무 권한이 없습니다." },
@@ -157,7 +152,7 @@ export async function POST(request: Request) {
       { status: 403 }
     );
   }
-  organizationId = myOrgId;
+  const organizationId = myOrgId;
   if (!name?.trim() || !startAt) {
     return NextResponse.json(
       { error: "대회명, 일시를 입력해주세요." },

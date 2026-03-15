@@ -6,25 +6,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { TournamentApplyForm } from "./TournamentApplyForm";
 import { CancelEntryButton } from "./CancelEntryButton";
 
-/** 서버/클라이언트 동일 출력으로 하이드레이션 오류 방지 */
-function formatStartAt(isoString: string): string {
-  const d = new Date(isoString);
-  const y = d.getFullYear();
-  const m = d.getMonth() + 1;
-  const day = d.getDate();
-  const h = d.getHours();
-  const min = d.getMinutes();
-  return `${y}. ${m}. ${day}. ${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
-}
-
 type Tab = { id: string; label: string };
 
 type TournamentDetailTabsProps = {
   tabs: readonly Tab[];
   currentTab: string;
   tournamentId: string;
-  /** 대회 안내 탭에서 내용 없을 때 표시 문구 */
-  infoEmptyText?: string;
   /** 참가자 명단 공개 여부(관리자 옵션). false면 인원 수만 표시 */
   participantsListPublic?: boolean;
   tournament: {
@@ -52,7 +39,6 @@ type TournamentDetailTabsProps = {
     paymentMarkedByApplicantAt: string | null;
     slotNumber: number;
   }>;
-  allowMultipleSlots: boolean;
   entryFee: number | null;
   canApplyFirstSlot: boolean;
   canApplyAdditionalSlot: boolean;
@@ -73,12 +59,10 @@ export function TournamentDetailTabs({
   tabs,
   currentTab,
   tournamentId,
-  infoEmptyText = "안내 내용이 없습니다.",
   participantsListPublic = true,
   tournament,
   isLoggedIn,
   myEntries,
-  allowMultipleSlots,
   entryFee,
   canApplyFirstSlot,
   canApplyAdditionalSlot,

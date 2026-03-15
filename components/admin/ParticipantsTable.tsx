@@ -497,7 +497,7 @@ function EntryActions({
   loadingId: string | null;
   onConfirmPayment: (id: string) => void;
   onCancel: (id: string) => void;
-  onReject: (id: string) => void;
+  onReject: (id: string, reason: string | null) => void | Promise<void>;
   onAbsent: (id: string) => void;
   onAttendance: (id: string, attended: boolean) => void;
   onForceStatusOpen: () => void;

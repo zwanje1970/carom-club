@@ -32,7 +32,7 @@ export function PushSubscribeButton({
         setMessage("알림이 차단되어 있습니다. 브라우저 설정에서 허용해 주세요.");
         return;
       }
-      let permission = Notification.permission;
+      let permission: NotificationPermission = Notification.permission;
       if (permission !== "granted") {
         permission = await Notification.requestPermission();
       }
@@ -51,7 +51,7 @@ export function PushSubscribeButton({
       const { publicKey } = await keyRes.json();
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
+        applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
       });
       const j = sub.toJSON();
       const p256dh = j.keys?.p256dh ?? (sub.getKey("p256dh") ? arrayBufferToBase64(sub.getKey("p256dh")!) : "");

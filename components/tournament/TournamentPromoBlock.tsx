@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 
 function formatSchedule(startAt: string | Date, endAt?: string | Date | null): string {
@@ -85,11 +86,16 @@ export function TournamentPromoBlock({
       {/* Hero: 대표 이미지 + 제목 */}
       <div className="rounded-xl overflow-hidden bg-site-card border border-site-border">
         {posterImageUrl ? (
-          <img
-            src={posterImageUrl}
-            alt=""
-            className="w-full aspect-[2/1] object-cover"
-          />
+          <div className="relative w-full aspect-[2/1]">
+            <Image
+              src={posterImageUrl}
+              alt=""
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 800px"
+              unoptimized={!posterImageUrl.startsWith("/")}
+            />
+          </div>
         ) : (
           <div className="w-full aspect-[2/1] bg-site-bg flex items-center justify-center text-site-text-muted text-sm">
             대표 이미지 없음

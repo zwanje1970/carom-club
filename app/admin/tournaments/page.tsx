@@ -59,6 +59,10 @@ export default async function AdminTournamentsPage() {
         venueName: ext.venueName ?? null,
         gameFormat: t.gameFormat ?? null,
         imageUrl: ext.imageUrl ?? null,
+        posterImageUrl: null,
+        summary: null,
+        maxParticipants: null,
+        confirmedCount: 0,
         organization: org ? { id: org.id, name: org.name, slug: org.slug ?? "" } : null,
       };
     });

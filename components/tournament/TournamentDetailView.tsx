@@ -9,7 +9,6 @@ export type TournamentDetailViewProps = {
   tournamentId: string;
   tabs: readonly { id: string; label: string }[];
   currentTab: string;
-  infoEmptyText: string;
   participantsListPublic: boolean;
   tournament: {
     name: string;
@@ -63,7 +62,6 @@ export function TournamentDetailView({
   tournamentId,
   tabs,
   currentTab,
-  infoEmptyText,
   participantsListPublic,
   tournament,
   matchVenues,
@@ -131,7 +129,6 @@ export function TournamentDetailView({
         tabs={tabs}
         currentTab={currentTab}
         tournamentId={tournamentId}
-        infoEmptyText={infoEmptyText}
         participantsListPublic={participantsListPublic}
         tournament={{
           name: tournament.name,
@@ -146,7 +143,6 @@ export function TournamentDetailView({
         }}
         isLoggedIn={isLoggedIn}
         myEntries={myEntries}
-        allowMultipleSlots={allowMultipleSlots}
         entryFee={entryFee}
         canApplyFirstSlot={canApplyFirstSlot}
         canApplyAdditionalSlot={canApplyAdditionalSlot}

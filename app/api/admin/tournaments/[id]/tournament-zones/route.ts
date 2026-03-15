@@ -55,7 +55,7 @@ export async function POST(
     return NextResponse.json({ error: "해당 대회를 수정할 권한이 없습니다." }, { status: 403 });
   }
 
-  let body: { zoneId?: string; name?: string; code?: string; sortOrder?: number };
+  let body: { zoneId?: string; name?: string; code?: string; sortOrder?: number; status?: string };
   try {
     body = await request.json();
   } catch {

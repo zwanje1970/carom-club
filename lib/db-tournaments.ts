@@ -118,13 +118,18 @@ export async function getTournamentsListAdminRaw(): Promise<TournamentListRow[]>
         venueName: string | null;
         gameFormat: string | null;
         imageUrl: string | null;
+        posterImageUrl: string | null;
+        summary: string | null;
+        maxParticipants: number | null;
+        confirmedCount: bigint;
         orgId: string | null;
         orgName: string | null;
         orgSlug: string | null;
       }[]
     >(
       `SELECT t.id, t.name, t."startAt", t."endAt", t.status, t."organizationId",
-              t.venue, t."venueName", t."gameFormat", t."imageUrl",
+              t.venue, t."venueName", t."gameFormat", t."imageUrl", t."posterImageUrl", t.summary, t."maxParticipants",
+              (SELECT COUNT(*)::int FROM "TournamentEntry" e WHERE e."tournamentId" = t.id AND e.status = 'CONFIRMED') AS "confirmedCount",
               o.id AS "orgId", o.name AS "orgName", o.slug AS "orgSlug"
        FROM "Tournament" t
        LEFT JOIN "Organization" o ON o.id = t."organizationId"
@@ -143,6 +148,10 @@ export async function getTournamentsListAdminRaw(): Promise<TournamentListRow[]>
       venueName: r.venueName,
       gameFormat: r.gameFormat,
       imageUrl: r.imageUrl,
+      posterImageUrl: r.posterImageUrl ?? null,
+      summary: r.summary ?? null,
+      maxParticipants: r.maxParticipants ?? null,
+      confirmedCount: Number(r.confirmedCount) ?? 0,
       organization:
         r.orgId && r.orgName
           ? { id: r.orgId, name: r.orgName, slug: r.orgSlug ?? "" }

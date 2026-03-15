@@ -76,9 +76,15 @@ export default async function AdminTournamentParticipantsPage({
             handicap: e.user.memberProfile?.handicap ?? null,
             avg: e.user.memberProfile?.avg ?? null,
             depositorName: e.depositorName,
+            clubOrAffiliation: e.clubOrAffiliation ?? null,
             status: e.status,
             waitingListOrder: e.waitingListOrder,
+            slotNumber: e.slotNumber ?? 1,
+            paymentMarkedByApplicantAt: e.paymentMarkedByApplicantAt?.toISOString() ?? null,
             paidAt: e.paidAt?.toISOString() ?? null,
+            reviewedAt: e.reviewedAt?.toISOString() ?? null,
+            rejectionReason: e.rejectionReason ?? null,
+            createdAt: e.createdAt.toISOString(),
             attended: e.attendances[0]?.attended ?? null,
           }))}
         />
