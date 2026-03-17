@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { EditProfileForm } from "@/components/mypage/EditProfileForm";
+import { WithdrawAccountButton } from "@/components/mypage/WithdrawAccountButton";
 
 export default async function MypageEditPage() {
   const session = await getSession();
@@ -101,6 +102,12 @@ export default async function MypageEditPage() {
           </p>
           <EditProfileForm initial={initial} />
         </div>
+
+        {session.role === "USER" && (
+          <div className="mt-6 rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-800">
+            <WithdrawAccountButton />
+          </div>
+        )}
       </div>
     </main>
   );

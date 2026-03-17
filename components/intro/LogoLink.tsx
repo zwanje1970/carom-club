@@ -11,11 +11,14 @@ const ballBase = "h-3.5 w-3.5 rounded-full sm:h-4 sm:w-4";
 type LogoLinkProps = {
   variant?: "default" | "dark" | "white" | "footer";
   "data-main-logo"?: boolean;
+  /** true이면 클릭 시 인트로 재생 후 메인으로 (모바일 헤더 로고용) */
+  runIntroOnClick?: boolean;
 };
 
 export function LogoLink({
   variant = "default",
   "data-main-logo": dataMainLogo,
+  runIntroOnClick = false,
   ...linkRest
 }: LogoLinkProps) {
   const pathname = usePathname();
@@ -24,6 +27,12 @@ export function LogoLink({
   const { siteName, logoUrl } = useSiteSettings();
 
   const handleClick = (e: React.MouseEvent) => {
+    if (dataMainLogo && runIntroOnClick) {
+      e.preventDefault();
+      restartIntro();
+      if (pathname !== "/") router.push("/");
+      return;
+    }
     if (dataMainLogo) return;
     e.preventDefault();
     restartIntro();

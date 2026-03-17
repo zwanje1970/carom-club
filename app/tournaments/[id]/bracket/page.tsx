@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import { getCommonPageData } from "@/lib/common-page-data";
 import { getPublicTournamentOrNull } from "@/lib/public-tournament";
 import { PublicFinalBracket } from "@/components/public/PublicFinalBracket";
 
@@ -10,8 +12,12 @@ export default async function PublicFinalBracketPage({
   params: Promise<{ id: string }>;
 }) {
   const { id: tournamentId } = await params;
-  const tournament = await getPublicTournamentOrNull(tournamentId);
+  const [tournament, common] = await Promise.all([
+    getPublicTournamentOrNull(tournamentId),
+    getCommonPageData("tournaments"),
+  ]);
   if (!tournament) notFound();
+  const c = common.copy as Record<AdminCopyKey, string>;
 
   const finalMatchCount = await prisma.tournamentFinalMatch.count({ where: { tournamentId } });
   if (finalMatchCount === 0) {
@@ -23,7 +29,7 @@ export default async function PublicFinalBracketPage({
           </Link>
           <h1 className="text-xl font-bold text-site-text mb-2">{tournament.name}</h1>
           <p className="rounded-xl border border-site-border bg-site-card p-8 text-center text-gray-500">
-            본선 대진이 아직 생성되지 않았습니다.
+            {getCopyValue(c, "site.tournament.finalBracketNotCreatedYet")}
           </p>
         </div>
       </main>
@@ -37,7 +43,7 @@ export default async function PublicFinalBracketPage({
           ← 대회 상세
         </Link>
         <h1 className="text-xl font-bold text-site-text mb-1">{tournament.name}</h1>
-        <p className="text-sm text-gray-600 mb-6">본선 대진표</p>
+        <p className="text-sm text-gray-600 mb-6">{getCopyValue(c, "site.tournament.finalBracketLabel")}</p>
         <PublicFinalBracket tournamentId={tournamentId} tournamentName={tournament.name} />
       </div>
     </main>

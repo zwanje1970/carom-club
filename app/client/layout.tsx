@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { getAdminCopy, getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { canAccessClientDashboard } from "@/types/auth";
 import { ClientSidebar } from "@/components/client/ClientSidebar";
 
@@ -11,12 +12,15 @@ export default async function ClientLayout({
 }) {
   const session = await getSession();
 
+  const copy = await getAdminCopy();
+  const c = copy as Record<AdminCopyKey, string>;
+
   if (!session) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-site-bg p-4">
         <div className="max-w-sm text-center">
           <h1 className="text-xl font-bold text-site-text">로그인이 필요합니다</h1>
-          <p className="mt-2 text-gray-600">클라이언트 대시보드는 로그인 후 이용할 수 있습니다.</p>
+          <p className="mt-2 text-gray-600">{getCopyValue(c, "client.dashboard.loginPrompt")}</p>
           <Link
             href="/login"
             className="mt-6 inline-block rounded-lg bg-site-primary px-5 py-2.5 font-medium text-white hover:opacity-90"
@@ -54,7 +58,7 @@ export default async function ClientLayout({
 
   return (
     <div className="flex min-h-screen bg-site-bg">
-      <ClientSidebar />
+      <ClientSidebar copy={copy} />
       <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
     </div>
   );

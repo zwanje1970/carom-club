@@ -97,12 +97,6 @@ export default function AdminSettingsIntegrationPage() {
             </div>
 
             <form onSubmit={handleSaveNaverMap} className="space-y-3">
-              {error && (
-                <NotificationBar color="danger">{error}</NotificationBar>
-              )}
-              {success && (
-                <NotificationBar color="success">저장되었습니다.</NotificationBar>
-              )}
               <div>
                 <label className="block text-sm font-medium text-site-text mb-1">
                   네이버 지도 클라이언트 ID (NAVER_MAP_CLIENT_ID)
@@ -120,13 +114,17 @@ export default function AdminSettingsIntegrationPage() {
                   NAVER_MAP_CLIENT_ID가 있으면 DB에 없을 때 그 값을 사용합니다.
                 </p>
               </div>
-              <Button
-                type="submit"
-                label={saving ? "저장중" : "저장"}
-                color="info"
-                small
-                disabled={saving}
-              />
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  type="submit"
+                  label={saving ? "저장중" : "저장"}
+                  color="info"
+                  small
+                  disabled={saving}
+                />
+                {error && <NotificationBar color="danger">{error}</NotificationBar>}
+                {success && <NotificationBar color="success">저장되었습니다.</NotificationBar>}
+              </div>
             </form>
           </section>
         </CardBox>

@@ -54,7 +54,7 @@ export function AdminLayout({ children, userName, copy, footer }: Props) {
         className="relative z-0 min-h-screen w-full"
         style={{ paddingTop: `${headerHeight}px` }}
       >
-        <AdminPageActions topOffset={headerHeight} />
+        <AdminPageActions topOffset={headerHeight} copy={copy} />
         <main
           className={`${ADMIN_ACTION_BAR_PT_CLASS} p-4 sm:p-6 overflow-x-hidden`}
           style={{ minHeight: `calc(100vh - ${headerHeight}px)` }}

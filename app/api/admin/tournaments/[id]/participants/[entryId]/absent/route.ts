@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { ORGANIZATION_SELECT_OWNER } from "@/lib/db-selects";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { canManageTournament } from "@/lib/permissions";
 
@@ -24,7 +25,7 @@ export async function POST(
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
-    include: { organization: { select: { ownerUserId: true } } },
+    include: { organization: { select: ORGANIZATION_SELECT_OWNER } },
   });
   if (!tournament) {
     return NextResponse.json({ error: "대회를 찾을 수 없습니다." }, { status: 404 });

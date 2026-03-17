@@ -91,13 +91,6 @@ export default function AdminSettingsPlatformBillingPage() {
       </p>
       <CardBox className="max-w-xl">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-            <NotificationBar color="danger">{error}</NotificationBar>
-          )}
-          {success && (
-            <NotificationBar color="success">저장되었습니다.</NotificationBar>
-          )}
-
           <div className="rounded-lg border border-site-border bg-site-card p-4 space-y-3">
             <h2 className="text-sm font-semibold text-site-text">요금 정책 활성화</h2>
             <label className="flex items-center justify-between gap-4 cursor-pointer">
@@ -162,7 +155,7 @@ export default function AdminSettingsPlatformBillingPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Button
               type="submit"
               label={saving ? "저장 중…" : "저장"}
@@ -170,6 +163,8 @@ export default function AdminSettingsPlatformBillingPage() {
               disabled={saving}
             />
             <Button href="/admin/settings" label="취소" color="contrast" outline />
+            {error && <NotificationBar color="danger">{error}</NotificationBar>}
+            {success && <NotificationBar color="success">저장되었습니다.</NotificationBar>}
           </div>
         </form>
       </CardBox>

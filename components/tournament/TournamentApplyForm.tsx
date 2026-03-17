@@ -25,6 +25,10 @@ export function TournamentApplyForm({
   const [successMessage, setSuccessMessage] = useState("");
   const [depositorName, setDepositorName] = useState("");
   const [clubOrAffiliation, setClubOrAffiliation] = useState("");
+  const [handicap, setHandicap] = useState("");
+  const [avg, setAvg] = useState("");
+  const [avgProofUrl, setAvgProofUrl] = useState("");
+  const [avgProofUploading, setAvgProofUploading] = useState(false);
   const [agreed, setAgreed] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -48,6 +52,9 @@ export function TournamentApplyForm({
           tournamentId,
           depositorName: depositorName.trim(),
           clubOrAffiliation: clubOrAffiliation.trim() || undefined,
+          handicap: handicap.trim() || undefined,
+          avg: avg.trim() || undefined,
+          avgProofUrl: avgProofUrl.trim() || undefined,
           ...(additionalSlot && { additionalSlot: true }),
         }),
       });
@@ -65,6 +72,9 @@ export function TournamentApplyForm({
       setSuccessMessage(data.message || "참가 신청이 접수되었습니다. 운영자 승인 후 참가가 확정됩니다.");
       setDepositorName("");
       setClubOrAffiliation("");
+      setHandicap("");
+      setAvg("");
+      setAvgProofUrl("");
       setAgreed(false);
       router.refresh();
     } finally {
@@ -119,28 +129,101 @@ export function TournamentApplyForm({
           />
         </div>
       )}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          입금자명 <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          required
-          value={depositorName}
-          onChange={(e) => setDepositorName(e.target.value)}
-          className="w-full border border-gray-300 rounded px-3 py-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-          placeholder="입금 시 사용할 이름"
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+            입금자명 <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            required
+            value={depositorName}
+            onChange={(e) => setDepositorName(e.target.value)}
+            className="w-full border border-gray-300 rounded px-3 py-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            placeholder="입금 시 사용할 이름"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">소속/클럽 (선택)</label>
+          <input
+            type="text"
+            value={clubOrAffiliation}
+            onChange={(e) => setClubOrAffiliation(e.target.value)}
+            className="w-full border border-gray-300 rounded px-3 py-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            placeholder="소속 동호회·클럽명"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">핸디 (선택)</label>
+          <input
+            type="text"
+            value={handicap}
+            onChange={(e) => setHandicap(e.target.value)}
+            className="w-full border border-gray-300 rounded px-3 py-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            placeholder="예: 10"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">AVG (선택)</label>
+          <input
+            type="text"
+            value={avg}
+            onChange={(e) => setAvg(e.target.value)}
+            className="w-full border border-gray-300 rounded px-3 py-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            placeholder="예: 0.523"
+          />
+        </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">소속/클럽 (선택)</label>
-        <input
-          type="text"
-          value={clubOrAffiliation}
-          onChange={(e) => setClubOrAffiliation(e.target.value)}
-          className="w-full border border-gray-300 rounded px-3 py-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-          placeholder="소속 동호회·클럽명"
-        />
+        <label className="block text-sm font-medium text-gray-700 mb-1">AVG 인증서 첨부 (선택)</label>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="text-sm text-gray-600 file:mr-2 file:rounded file:border-0 file:bg-site-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-white file:hover:opacity-90"
+            disabled={avgProofUploading}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              setAvgProofUploading(true);
+              setError("");
+              try {
+                const formData = new FormData();
+                formData.set("file", file);
+                const res = await fetch("/api/tournaments/apply/upload-avg-proof", {
+                  method: "POST",
+                  credentials: "include",
+                  body: formData,
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                  setError(data.error ?? "인증서 업로드에 실패했습니다.");
+                  return;
+                }
+                setAvgProofUrl(data.url ?? "");
+              } catch {
+                setError("인증서 업로드에 실패했습니다.");
+              } finally {
+                setAvgProofUploading(false);
+                e.target.value = "";
+              }
+            }}
+          />
+          {avgProofUploading && <span className="text-sm text-gray-500">업로드 중…</span>}
+          {avgProofUrl && (
+            <span className="text-sm text-green-600 dark:text-green-400">
+              첨부됨
+              <button
+                type="button"
+                onClick={() => setAvgProofUrl("")}
+                className="ml-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                제거
+              </button>
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-xs text-gray-500">JPG, PNG, WebP (최대 8MB)</p>
       </div>
       <div className="flex items-start gap-2">
         <input
@@ -155,7 +238,7 @@ export function TournamentApplyForm({
         </label>
       </div>
       <p className="text-xs text-gray-500">
-        로그인한 회원 정보(이름, 연락처, 핸디 등)가 자동으로 반영됩니다. 로그인이 필요합니다.
+        로그인한 회원 정보(이름, 연락처)가 반영됩니다. 핸디·AVG·인증서는 위에서 입력·첨부해 주세요.
       </p>
       <button
         type="submit"

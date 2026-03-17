@@ -1,0 +1,139 @@
+"use client";
+
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { useState, useRef } from "react";
+
+export default function CommunityBoardWritePage() {
+  const params = useParams();
+  const router = useRouter();
+  const slug = params.slug as string;
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [isPinned, setIsPinned] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError("");
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch("/api/community/upload-image", { method: "POST", body: formData, credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "업로드 실패");
+      setImageUrls((prev) => [...prev, data.url]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "업로드 실패");
+    }
+    e.target.value = "";
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) { setError("제목을 입력하세요."); return; }
+    setError("");
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/community/boards/${slug}/posts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ title: title.trim(), content: content.trim(), imageUrls, isPinned }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "저장 실패");
+      router.push(`/community/posts/${data.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "저장 실패");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <main className="min-h-screen bg-site-bg text-site-text">
+      <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">
+        <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4" aria-label="breadcrumb">
+          <Link href="/community" className="hover:text-site-primary">커뮤니티</Link>
+          <span aria-hidden>/</span>
+          <Link href={`/community/boards/${slug}`} className="hover:text-site-primary">{slug}</Link>
+          <span aria-hidden>/</span>
+          <span className="text-site-text font-medium">글쓰기</span>
+        </nav>
+        <h1 className="text-xl font-bold mb-6">글쓰기</h1>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="post-title" className="block text-sm font-medium mb-1">제목</label>
+            <input
+              id="post-title"
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              maxLength={200}
+              className="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2"
+              placeholder="제목"
+            />
+          </div>
+          {slug === "notice" && (
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={isPinned} onChange={(e) => setIsPinned(e.target.checked)} />
+              <span className="text-sm">상단 고정</span>
+            </label>
+          )}
+          <div>
+            <label className="block text-sm font-medium mb-1">본문</label>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              rows={12}
+              className="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2"
+              placeholder="내용"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">이미지</label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleUpload}
+              className="hidden"
+            />
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="py-2 px-4 rounded-lg border border-gray-300 dark:border-slate-600 text-sm font-medium">
+              이미지 추가
+            </button>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {imageUrls.map((url) => (
+                <div key={url} className="relative">
+                  <img src={url} alt="" className="w-24 h-24 object-cover rounded-lg" />
+                  <button
+                    type="button"
+                    onClick={() => setImageUrls((prev) => prev.filter((u) => u !== url))}
+                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+          {error && <p className="text-red-600 text-sm">{error}</p>}
+          <div className="flex gap-3">
+            <button type="submit" disabled={submitting} className="py-2 px-4 rounded-lg bg-site-primary text-white font-medium disabled:opacity-50">
+              {submitting ? "등록 중…" : "등록"}
+            </button>
+            <Link href={`/community/boards/${slug}`} className="py-2 px-4 rounded-lg border border-gray-300 dark:border-slate-600 font-medium">
+              취소
+            </Link>
+          </div>
+        </form>
+      </div>
+    </main>
+  );
+}

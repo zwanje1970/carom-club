@@ -3,21 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+/** 모바일 하단 네비: 당구대회, 당구장홍보, 마이페이지, 커뮤니티. 당구노트는 마이페이지 퀵메뉴에서 이동. */
 const ITEMS = [
-  { href: "/", label: "홈", icon: HomeIcon },
-  { href: "/tournaments", label: "대회", icon: TrophyIcon },
-  { href: "/venues", label: "당구장", icon: VenueIcon },
-  { href: "/community", label: "커뮤니티", icon: CommunityIcon },
+  { href: "/tournaments", label: "당구대회", icon: TrophyIcon },
+  { href: "/venues", label: "당구장홍보", icon: VenueIcon },
   { href: "/mypage", label: "마이페이지", icon: MypageIcon },
+  { href: "/community", label: "커뮤니티", icon: CommunityIcon },
 ] as const;
 
-function HomeIcon({ active }: { active: boolean }) {
-  return (
-    <svg className="w-7 h-7 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-    </svg>
-  );
-}
 function TrophyIcon({ active }: { active: boolean }) {
   return (
     <svg className="w-7 h-7 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
@@ -57,19 +50,20 @@ export function BottomNav() {
       aria-label="하단 메뉴"
     >
       {ITEMS.map(({ href, label, icon: Icon }) => {
-        const isHome = href === "/";
-        const isActive = isHome ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
+        const isActive =
+          pathname === href ||
+          (href !== "/community" && pathname.startsWith(href + "/"));
         return (
           <Link
             key={href}
             href={href}
-            className={`flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs transition min-h-[72px] ${
+            className={`flex flex-1 flex-col items-center justify-center gap-1 py-3 text-xs transition min-h-[72px] min-w-[44px] border-t-2 ${
               isActive
-                ? "text-site-primary font-medium"
-                : "text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200"
+                ? "text-site-primary font-medium border-site-primary bg-site-primary/5"
+                : "border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200"
             }`}
           >
-            <span className="inline-flex items-center justify-center">
+            <span className="inline-flex items-center justify-center min-h-[28px] min-w-[28px]">
               <Icon active={isActive} />
             </span>
             <span>{label}</span>

@@ -42,7 +42,6 @@ export type TournamentPromoBlockProps = {
   canApply: boolean;
   alreadyApplied: boolean;
   applyClosedReason: string | null;
-  onGoToApply: () => void;
 };
 
 export function TournamentPromoBlock({
@@ -67,7 +66,6 @@ export function TournamentPromoBlock({
   canApply,
   alreadyApplied,
   applyClosedReason,
-  onGoToApply,
 }: TournamentPromoBlockProps) {
   const max = maxParticipants ?? 0;
   const remaining = max > 0 ? Math.max(0, max - confirmedCount) : null;
@@ -146,20 +144,19 @@ export function TournamentPromoBlock({
           )}
           {canApply && !alreadyApplied && !isLoggedIn && (
             <p className="text-sm text-site-text-muted">
-              <Link href={`/login?next=/tournaments/${tournamentId}?tab=apply`} className="text-site-primary hover:underline font-medium">
+              <Link href={`/login?next=/tournaments/${tournamentId}/apply`} className="text-site-primary hover:underline font-medium">
                 로그인
               </Link>
               후 참가 신청할 수 있습니다.
             </p>
           )}
           {canApply && !alreadyApplied && isLoggedIn && (
-            <button
-              type="button"
-              onClick={onGoToApply}
+            <Link
+              href={`/tournaments/${tournamentId}/apply`}
               className="w-full sm:w-auto inline-flex justify-center items-center rounded-xl bg-site-primary px-6 py-3.5 text-base font-medium text-white hover:opacity-90 transition-opacity"
             >
               참가 신청하기
-            </button>
+            </Link>
           )}
           {!canApply && !alreadyApplied && applyClosedReason && (
             <p className="text-sm text-site-text-muted bg-site-bg/50 rounded-lg px-4 py-3">{applyClosedReason}</p>

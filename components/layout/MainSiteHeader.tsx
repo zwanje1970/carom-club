@@ -25,6 +25,7 @@ export function MainSiteHeader({ hideOnMobile = false }: MainSiteHeaderProps) {
   const settings = useSiteSettings();
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined);
   const [mounted, setMounted] = useState(false);
+  const [notificationUnread, setNotificationUnread] = useState(0);
 
   const headerBg = settings.headerBgColor ?? DEFAULT_HEADER_BG;
   const headerText = settings.headerTextColor ?? DEFAULT_HEADER_TEXT;
@@ -40,6 +41,14 @@ export function MainSiteHeader({ hideOnMobile = false }: MainSiteHeaderProps) {
       .then((data) => setUser(data.user ?? null))
       .catch(() => setUser(null));
   }, [mounted]);
+
+  useEffect(() => {
+    if (!mounted || !user) return;
+    fetch("/api/community/notifications", { credentials: "include" })
+      .then((res) => res.ok ? res.json() : { unreadCount: 0 })
+      .then((data) => setNotificationUnread(data.unreadCount ?? 0))
+      .catch(() => setNotificationUnread(0));
+  }, [mounted, user]);
 
   const isLoggedIn = mounted && !!user;
 
@@ -85,6 +94,21 @@ export function MainSiteHeader({ hideOnMobile = false }: MainSiteHeaderProps) {
           })}
           {isLoggedIn ? (
             <>
+              <Link
+                href="/community/notifications"
+                className="relative inline-flex items-center justify-center w-9 h-9 rounded-full hover:opacity-90"
+                style={{ color: headerText }}
+                aria-label={notificationUnread > 0 ? `알림 ${notificationUnread}건` : "알림"}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                {notificationUnread > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-xs font-medium bg-red-500 text-white px-1">
+                    {notificationUnread > 99 ? "99+" : notificationUnread}
+                  </span>
+                )}
+              </Link>
               <Link
                 href="/mypage"
                 className="text-sm font-medium transition hover:opacity-90"

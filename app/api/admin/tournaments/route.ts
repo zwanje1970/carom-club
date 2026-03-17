@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
+import { ORGANIZATION_SELECT_PUBLIC, TOURNAMENT_SELECT_LIST } from "@/lib/db-selects";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { createListingPurchaseRecord } from "@/lib/listing-registration";
 import { normalizeSlug } from "@/lib/normalize-slug";
@@ -36,13 +37,8 @@ export async function GET(request: Request) {
       orderBy: { startAt: "desc" },
       take,
       select: {
-        id: true,
-        name: true,
-        startAt: true,
-        organizationId: true,
-        venue: true,
-        status: true,
-        organization: { select: { id: true, name: true, slug: true } },
+        ...TOURNAMENT_SELECT_LIST,
+        organization: { select: ORGANIZATION_SELECT_PUBLIC },
       },
     });
     return NextResponse.json(

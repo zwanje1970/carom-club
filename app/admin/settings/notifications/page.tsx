@@ -99,13 +99,6 @@ export default function AdminSettingsNotificationsPage() {
       </p>
       <CardBox className="max-w-xl">
       <form onSubmit={handleSubmit} className="space-y-6">
-        {error && (
-          <NotificationBar color="danger">{error}</NotificationBar>
-        )}
-        {success && (
-          <NotificationBar color="success">저장되었습니다.</NotificationBar>
-        )}
-
         <div>
           <label className="block text-sm font-medium text-site-text mb-1">
             관리자 알림 이메일 주소
@@ -198,7 +191,7 @@ export default function AdminSettingsNotificationsPage() {
           </label>
         </div>
 
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Button
             type="submit"
             label={saving ? "저장중" : "저장"}
@@ -206,6 +199,8 @@ export default function AdminSettingsNotificationsPage() {
             disabled={saving}
           />
           <Button href="/admin/settings" label="취소" color="contrast" outline />
+          {error && <NotificationBar color="danger">{error}</NotificationBar>}
+          {success && <NotificationBar color="success">저장되었습니다.</NotificationBar>}
         </div>
       </form>
       </CardBox>

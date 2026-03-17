@@ -308,10 +308,6 @@ export function TournamentNewForm({
       />
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {error && (
-          <NotificationBar color="danger">{error}</NotificationBar>
-        )}
-
         <section className="rounded-lg border border-gray-200 p-6 dark:border-slate-700">
           <h2 className="mb-4 border-b pb-2 text-lg font-semibold text-gray-800 dark:text-slate-100">
             기본 정보
@@ -621,7 +617,7 @@ export function TournamentNewForm({
           )}
         </section>
 
-        <Buttons>
+        <Buttons className="gap-3 flex-wrap">
           <Button
             type="submit"
             label={loading ? "저장 중…" : "새 대회 저장"}
@@ -629,6 +625,7 @@ export function TournamentNewForm({
             disabled={loading}
           />
           <Button href="/admin/tournaments" label="취소" color="contrast" outline />
+          {error && <NotificationBar color="danger">{error}</NotificationBar>}
         </Buttons>
       </form>
     </div>

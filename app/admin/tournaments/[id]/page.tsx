@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { mdiTrophy } from "@mdi/js";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { ORGANIZATION_SELECT_ADMIN_BASIC } from "@/lib/db-selects";
 import { canManageTournament } from "@/lib/permissions";
 import { getMockTournamentById } from "@/lib/mock-data";
 import { BracketGenerateButton } from "@/components/admin/BracketGenerateButton";
@@ -48,7 +49,7 @@ export default async function AdminTournamentDetailPage({
     ReturnType<
       typeof prisma.tournament.findUnique<{
         where: { id: string };
-        include: { organization: true; rule: true; _count: { select: { rounds: true } } };
+        include: { organization: { select: typeof ORGANIZATION_SELECT_ADMIN_BASIC }; rule: true; _count: { select: { rounds: true } } };
       }>
     >
   > = null;
@@ -56,7 +57,7 @@ export default async function AdminTournamentDetailPage({
     tournament = await prisma.tournament.findUnique({
       where: { id },
       include: {
-        organization: true,
+        organization: { select: ORGANIZATION_SELECT_ADMIN_BASIC },
         rule: true,
         _count: { select: { rounds: true } },
       },

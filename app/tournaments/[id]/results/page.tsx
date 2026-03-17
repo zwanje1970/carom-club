@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import { getCommonPageData } from "@/lib/common-page-data";
 import { getPublicTournamentOrNull } from "@/lib/public-tournament";
-import { STAGE_LABELS } from "@/lib/tournament-stage";
+import { STAGE_LABELS, TOURNAMENT_STAGES } from "@/lib/tournament-stage";
 
 export default async function PublicTournamentResultsPage({
   params,
@@ -10,8 +12,12 @@ export default async function PublicTournamentResultsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id: tournamentId } = await params;
-  const tournament = await getPublicTournamentOrNull(tournamentId);
+  const [tournament, common] = await Promise.all([
+    getPublicTournamentOrNull(tournamentId),
+    getCommonPageData("tournaments"),
+  ]);
   if (!tournament) notFound();
+  const c = common.copy as Record<AdminCopyKey, string>;
 
   const zones = await prisma.tournamentZone.findMany({
     where: { tournamentId },
@@ -27,8 +33,10 @@ export default async function PublicTournamentResultsPage({
     prisma.tournamentFinalMatch.count({ where: { tournamentId, status: "COMPLETED" } }),
   ]);
 
-  const stage = tournament.tournamentStage ?? "SETUP";
-  const stageLabel = STAGE_LABELS[stage as keyof typeof STAGE_LABELS] ?? stage;
+  const stage = (tournament.tournamentStage ?? "SETUP") as keyof typeof STAGE_LABELS;
+  const stageLabel = TOURNAMENT_STAGES.includes(stage as (typeof TOURNAMENT_STAGES)[number])
+    ? getCopyValue(c, `site.tournament.stage.${stage}` as AdminCopyKey)
+    : (STAGE_LABELS[stage] ?? stage);
 
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
@@ -37,7 +45,7 @@ export default async function PublicTournamentResultsPage({
           ← 대회 상세
         </Link>
         <h1 className="text-xl font-bold text-site-text mb-1">{tournament.name}</h1>
-        <p className="text-sm text-gray-600 mb-6">경기 결과</p>
+        <p className="text-sm text-gray-600 mb-6">{getCopyValue(c, "site.tournament.resultsLabel")}</p>
 
         <div className="mb-6 rounded-xl border border-site-border bg-site-card p-4">
           <p className="text-sm text-gray-600">
@@ -46,7 +54,7 @@ export default async function PublicTournamentResultsPage({
         </div>
 
         <section className="mb-8">
-          <h2 className="text-lg font-semibold text-site-text mb-3">권역 예선</h2>
+          <h2 className="text-lg font-semibold text-site-text mb-3">{getCopyValue(c, "site.tournament.qualifierLabel")}</h2>
           <div className="rounded-xl border border-site-border bg-site-card p-4 mb-4">
             <p className="text-sm text-gray-600">
               완료 <span className="font-semibold text-site-text">{zoneCompleted}</span> / 전체{" "}
@@ -73,11 +81,11 @@ export default async function PublicTournamentResultsPage({
               </li>
             ))}
           </ul>
-          {zones.length === 0 && <p className="text-sm text-gray-500">권역이 없습니다.</p>}
+          {zones.length === 0 && <p className="text-sm text-gray-500">{getCopyValue(c, "site.tournament.zonesEmpty")}</p>}
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-site-text mb-3">본선</h2>
+          <h2 className="text-lg font-semibold text-site-text mb-3">{getCopyValue(c, "site.tournament.finalLabel")}</h2>
           {finalTotal > 0 ? (
             <>
               <div className="rounded-xl border border-site-border bg-site-card p-4 mb-4">
@@ -96,11 +104,11 @@ export default async function PublicTournamentResultsPage({
                 href={`/tournaments/${tournamentId}/bracket`}
                 className="inline-flex items-center rounded-lg bg-violet-100 px-4 py-2 text-sm font-medium text-violet-800 hover:bg-violet-200 dark:bg-violet-900/40 dark:text-violet-200"
               >
-                본선 대진표 보기
+                {getCopyValue(c, "site.tournament.finalBracketView")}
               </Link>
             </>
           ) : (
-            <p className="text-sm text-gray-500">본선 대진이 생성되지 않았습니다.</p>
+            <p className="text-sm text-gray-500">{getCopyValue(c, "site.tournament.finalBracketNotCreated")}</p>
           )}
         </section>
       </div>

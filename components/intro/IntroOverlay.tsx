@@ -20,7 +20,15 @@ type LogoMetrics = {
 };
 
 function measureLogo(): LogoMetrics | null {
-  const mainLogo = document.querySelector("[data-main-logo]");
+  const candidates = document.querySelectorAll("[data-main-logo]");
+  let mainLogo: Element | null = null;
+  for (const el of candidates) {
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      mainLogo = el;
+      break;
+    }
+  }
   const ballsContainer = mainLogo?.querySelector("[data-logo-balls]");
   const textEl = mainLogo?.querySelector("[data-logo-text]") as HTMLElement | null;
   if (!ballsContainer || !textEl) return null;

@@ -145,6 +145,28 @@ async function main() {
   } catch (e) {
     console.warn("10단계 시드(기능/요금제/등록상품) 건너뜁니다:", (e as Error).message);
   }
+
+  // 커뮤니티 게시판: notice, free, qna, tips, reviews, trouble (난구해결사)
+  try {
+    const boards = [
+      { slug: "notice", name: "공지사항", description: "관리자 공지", type: "notice", sortOrder: 0 },
+      { slug: "free", name: "자유게시판", description: "일반 커뮤니티", type: "free", sortOrder: 1 },
+      { slug: "qna", name: "질문/Q&A", description: "당구 기술·장비·룰 질문", type: "qna", sortOrder: 2 },
+      { slug: "tips", name: "공략/팁", description: "당구 공략과 팁", type: "tips", sortOrder: 3 },
+      { slug: "reviews", name: "후기", description: "장비·당구장·대회 후기", type: "reviews", sortOrder: 4 },
+      { slug: "trouble", name: "난구해결사", description: "문제구 질문 및 해법 토론", type: "trouble", sortOrder: 5 },
+    ];
+    for (const b of boards) {
+      await prisma.communityBoard.upsert({
+        where: { slug: b.slug },
+        create: { ...b, isActive: true },
+        update: { name: b.name, description: b.description ?? null, type: b.type, sortOrder: b.sortOrder },
+      });
+    }
+    console.log("커뮤니티 게시판이 생성/업데이트되었습니다.");
+  } catch (e) {
+    console.warn("커뮤니티 게시판 시드 건너뜁니다:", (e as Error).message);
+  }
 }
 
 main()

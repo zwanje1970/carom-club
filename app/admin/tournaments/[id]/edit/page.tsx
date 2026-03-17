@@ -1,6 +1,7 @@
 import { mdiTrophy } from "@mdi/js";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { ORGANIZATION_SELECT_ADMIN_EDIT, ORGANIZATION_SELECT_PUBLIC } from "@/lib/db-selects";
 import { isPlatformAdmin } from "@/lib/permissions";
 import type { TournamentForEdit } from "@/lib/db-tournaments";
 import { TournamentEditForm } from "@/components/admin/tournament/TournamentEditForm";
@@ -31,12 +32,12 @@ export default async function AdminTournamentEditPage({
     tournament = await prisma.tournament.findUnique({
       where: { id },
       include: {
-        organization: true,
+        organization: { select: ORGANIZATION_SELECT_ADMIN_EDIT },
         rule: true,
         _count: { select: { entries: true } },
         tournamentVenues: {
           orderBy: { sortOrder: "asc" },
-          include: { organization: { select: { id: true, name: true } } },
+          include: { organization: { select: ORGANIZATION_SELECT_PUBLIC } },
         },
       },
     });
@@ -104,7 +105,10 @@ export default async function AdminTournamentEditPage({
   const initialTournamentVenues = tournament.tournamentVenues.map((tv) => ({
     id: tv.id,
     organizationId: tv.organizationId,
-    organization: tv.organization,
+    organization: {
+      id: tv.organization.id,
+      name: tv.organization.name,
+    },
   }));
 
   return (

@@ -68,7 +68,7 @@ export default async function ClientTournamentDetailPage({
   const tournament = await prisma.tournament.findFirst({
     where: { id, organizationId: orgId },
     include: {
-      organization: { select: { name: true } },
+      organization: { select: { name: true } }, // 클라이언트 상세 헤더: 이름만
       matchVenues: { orderBy: { sortOrder: "asc" } },
     },
   });

@@ -371,8 +371,6 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
-      {error && <NotificationBar color="danger">{error}</NotificationBar>}
-
       {isHeroSection && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
           <p className="font-medium">메인 페이지 상단 히어로 영역</p>
@@ -1033,9 +1031,10 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
         </div>
       </section>
 
-      <div className="flex gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" label={saving ? "저장 중…" : "저장"} color="info" disabled={saving} />
         <Button type="button" label="취소" color="contrast" outline onClick={onCancel} />
+        {error && <NotificationBar color="danger">{error}</NotificationBar>}
       </div>
         </div>
 

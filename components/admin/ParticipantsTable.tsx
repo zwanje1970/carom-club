@@ -77,6 +77,7 @@ type Entry = {
   userPhone: string | null;
   handicap: string | null;
   avg: string | null;
+  avgProofUrl: string | null;
   depositorName: string | null;
   clubOrAffiliation: string | null;
   status: string;
@@ -354,6 +355,9 @@ export function ParticipantsTable({
               <th className="px-3 py-2.5 text-left text-xs font-medium text-site-text-muted">이름</th>
               <th className="px-3 py-2.5 text-left text-xs font-medium text-site-text-muted">연락처</th>
               <th className="px-3 py-2.5 text-left text-xs font-medium text-site-text-muted">소속</th>
+              <th className="px-3 py-2.5 text-left text-xs font-medium text-site-text-muted">핸디</th>
+              <th className="px-3 py-2.5 text-left text-xs font-medium text-site-text-muted">AVG</th>
+              <th className="px-3 py-2.5 text-left text-xs font-medium text-site-text-muted">인증서</th>
               <th className="px-3 py-2.5 text-left text-xs font-medium text-site-text-muted">신청일</th>
               <th className="px-3 py-2.5 text-left text-xs font-medium text-site-text-muted">입금표시</th>
               <th className="px-3 py-2.5 text-left text-xs font-medium text-site-text-muted">상태</th>
@@ -371,6 +375,15 @@ export function ParticipantsTable({
                   <td className="px-3 py-2.5 text-sm text-site-text">{entryDisplayName(e)}</td>
                   <td className="px-3 py-2.5 text-sm text-site-text-muted">{e.userPhone ?? "-"}</td>
                   <td className="px-3 py-2.5 text-sm text-site-text-muted">{e.clubOrAffiliation ?? "-"}</td>
+                  <td className="px-3 py-2.5 text-sm text-site-text-muted">{e.handicap ?? "-"}</td>
+                  <td className="px-3 py-2.5 text-sm text-site-text-muted">{e.avg ?? "-"}</td>
+                  <td className="px-3 py-2.5 text-sm">
+                    {e.avgProofUrl ? (
+                      <a href={e.avgProofUrl} target="_blank" rel="noopener noreferrer" className="text-site-primary hover:underline">보기</a>
+                    ) : (
+                      <span className="text-site-text-muted">-</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2.5 text-sm text-site-text-muted">
                     {e.createdAt ? new Date(e.createdAt).toLocaleDateString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"}
                   </td>
@@ -429,7 +442,13 @@ export function ParticipantsTable({
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="font-medium text-site-text">{e.depositorName ?? "-"} <span className="text-site-text-muted text-sm">({entryDisplayName(e)})</span></p>
-                  <p className="text-sm text-site-text-muted">{e.userPhone ?? "-"} · {e.clubOrAffiliation ?? "-"}</p>
+                  <p className="text-sm text-site-text-muted">
+                    {e.userPhone ?? "-"} · {e.clubOrAffiliation ?? "-"}
+                    {(e.handicap || e.avg) && <> · 핸디 {e.handicap ?? "-"} / AVG {e.avg ?? "-"}</>}
+                    {e.avgProofUrl && (
+                      <> · <a href={e.avgProofUrl} target="_blank" rel="noopener noreferrer" className="text-site-primary hover:underline">인증서 보기</a></>
+                    )}
+                  </p>
                 </div>
                 <PillTag color={displayStateColor(state)} label={entryStatusLabel(e)} small />
               </div>

@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { ORGANIZATION_SELECT_OWNER } from "@/lib/db-selects";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { canManageTournament } from "@/lib/permissions";
+import { awardTournamentAttend } from "@/lib/community-score-service";
 
 /** 출석 체크. POST → canManageTournament */
 export async function POST(
@@ -24,7 +26,7 @@ export async function POST(
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
-    include: { organization: { select: { ownerUserId: true } } },
+    include: { organization: { select: ORGANIZATION_SELECT_OWNER } },
   });
   if (!tournament) {
     return NextResponse.json({ error: "대회를 찾을 수 없습니다." }, { status: 404 });
@@ -58,13 +60,18 @@ export async function POST(
         data: { attended },
       });
     } else {
-      await prisma.tournamentAttendance.create({
+      const attendance = await prisma.tournamentAttendance.create({
         data: {
           entryId: entry.id,
           userId: entry.userId,
           attended,
         },
       });
+      if (attended) {
+        try {
+          await awardTournamentAttend(entry.userId, attendance.id);
+        } catch (_) {}
+      }
     }
     return NextResponse.json({ ok: true });
   } catch (e) {

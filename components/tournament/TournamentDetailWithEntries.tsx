@@ -40,7 +40,6 @@ export type TournamentDetailWithEntriesProps = {
   currentTab: string;
   participantsListPublic: boolean;
   allowMultipleSlots: boolean;
-  initialShowApply?: boolean;
 };
 
 /** Suspense 내부: 엔트리 + 세션 후속 로딩 후 상세 뷰 렌더. 공개 페이지 첫 응답에서 session/entries 제외. */
@@ -53,7 +52,6 @@ export async function TournamentDetailWithEntries({
   currentTab,
   participantsListPublic,
   allowMultipleSlots,
-  initialShowApply = false,
 }: TournamentDetailWithEntriesProps) {
   const [entries, session] = await Promise.all([
     getTournamentEntries(tournamentId),
@@ -87,7 +85,6 @@ export async function TournamentDetailWithEntries({
       tabs={tabs}
       currentTab={currentTab}
       participantsListPublic={participantsListPublic}
-      initialShowApply={initialShowApply}
       tournament={{
         name: tournament.name,
         summary: tournament.summary ?? null,

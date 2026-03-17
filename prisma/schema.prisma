@@ -13,8 +13,9 @@ generator client {
 // ============== DB와 일치: User.role 은 PostgreSQL UserRole enum ==============
 enum UserRole {
   USER
+  MODERATOR   // 커뮤니티: 신고 관리, 숨김 처리
   CLIENT_ADMIN
-  PLATFORM_ADMIN
+  PLATFORM_ADMIN  // 커뮤니티 ADMIN: 공지 작성, 게시판/글 삭제, 권한 변경
   ZONE_MANAGER
 }
 
@@ -51,6 +52,22 @@ model User {
   zoneManagerAssignments ZoneManagerAssignment[]
   entryZoneAssignmentsGranted TournamentEntryZoneAssignment[]  // 권역 배정 수행자
   pushSubscriptions PushSubscription[]
+  billiardNotes     BilliardNote[]
+  nanguPosts        NanguPost[]
+  nanguSolutions    NanguSolution[]
+  communityPosts    CommunityPost[]
+  communityComments CommunityComment[]
+  communityPostLikes    CommunityPostLike[]
+  communityCommentLikes CommunityCommentLike[]
+  communityBookmarks    CommunityBookmark[]
+  communityNotifications         CommunityNotification[]
+  communityNotificationsAsRelated CommunityNotification[] @relation("NotificationActor")
+  communityReports       CommunityReport[]
+  troubleShotSolutions   TroubleShotSolution[]
+  communityScoreLogs     CommunityScoreLog[]
+  nanguSolutionVotes    NanguSolutionVote[]
+
+  communityScore        Int      @default(0)  // 커뮤니티 신뢰도 누적 점수 (레벨 계산용)
 }
 
 model PasswordResetToken {
@@ -338,6 +355,9 @@ model TournamentEntry {
   status           String   @default("APPLIED") // APPLIED(신청대기) | CONFIRMED(참가확정) | REJECTED | CANCELED
   depositorName    String?  // 입금자명 등 (참가비 연동 시 사용)
   clubOrAffiliation String? // 소속/클럽 (신청 시 선택 입력, 확장용)
+  handicap         String?  // 핸디 (참가 신청 시 입력)
+  avg              String?  // AVG (참가 신청 시 입력)
+  avgProofUrl      String?  // AVG 인증서 이미지 URL (참가 신청 시 첨부)
   entryFeeAmount   Int?    // 이 슬롯의 참가비 (1슬롯=1배, 2슬롯부터=2배 적용 시 저장)
   paymentMarkedByApplicantAt DateTime? // 신청자 입금완료 체크 시각, 관리자 입금확인 가능 조건
   paidAt           DateTime?  // 관리자 입금확인 시각 (중복 확인 방지)
@@ -670,6 +690,22 @@ model AdminCopy {
   value String
 }
 
+// 관리자 활동 로그
+model AdminLog {
+  id          String   @id @default(cuid())
+  adminId     String
+  actionType  String   // create | update | delete | toggle
+  targetType  String   // notice | system_text | user_role | tournament | site_feature | etc
+  targetId    String?
+  beforeValue String?  @db.Text // JSON or summary
+  afterValue  String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  @@index([adminId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
+
 // ============== Integration settings (singleton, API 키 등) ==============
 
 model IntegrationSetting {
@@ -943,6 +979,329 @@ model NoticeBar {
   updatedAt     DateTime  @updatedAt
 
   @@index([page])
+}
+
+// ============== Community: 당구노트 (개인 기록, 공개 게시판 아님) ==============
+// 회원 본인만 관리. 난구해결로 보내기 시 게시판 글에 전달용.
+
+model BilliardNote {
+  id          String    @id @default(cuid())
+  authorId    String
+  title       String?   // 제목
+  noteDate    DateTime? // 기록 날짜 (표시용)
+  redBallX    Float     // 0..1 playfield normalized
+  redBallY    Float
+  yellowBallX Float
+  yellowBallY Float
+  whiteBallX  Float
+  whiteBallY  Float
+  cueBall     String    // "white" | "yellow"
+  memo        String?   @db.Text // 내용
+  imageUrl    String?
+  visibility  String    @default("private") // "private" | "community" (레거시)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  troubleShotsFromNote TroubleShotPost[]
+
+  @@index([authorId])
+  @@index([visibility, createdAt])
+}
+
+// ============== Community: 난구해결사 (문제 + 해법 레이어) ==============
+// 원본 공배치는 글쓰기 단계에서만 생성·저장되며, 게시 후에는 모두 보기 전용.
+// 해법은 별도 레이어(좌표 기반)로 저장.
+
+model NanguPost {
+  id                 String   @id @default(cuid())
+  authorId           String
+  title              String
+  content            String   @db.Text  // 문제 설명
+  ballPlacementJson  String   @db.Text  // JSON: { redBall, yellowBall, whiteBall, cueBall } 정규화 0..1, 수정 불가
+  adoptedSolutionId  String?  @unique // 채택된 해법 id (채택 시 질문자 +2, 해법 작성자 +6)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  author            User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  solutions         NanguSolution[]
+  adoptedSolution   NanguSolution?  @relation("AdoptedSolution", fields: [adoptedSolutionId], references: [id], onDelete: SetNull)
+
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+model NanguSolution {
+  id        String   @id @default(cuid())
+  postId    String
+  authorId  String
+  title     String?  // 해법 제목 (선택)
+  comment   String?  @db.Text
+  dataJson  String   @db.Text  // 좌표 기반: paths, thicknessOffsetX, tipX, tipY, speed, depth, isBankShot 등
+  voteCount Int     @default(0)  // goodCount - badCount (정렬용 캐시)
+  goodCount Int     @default(0)
+  badCount  Int     @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  post          NanguPost    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author        User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  votes         NanguSolutionVote[]
+  adoptedByPost NanguPost?   @relation("AdoptedSolution")
+
+  @@index([postId])
+  @@index([authorId])
+}
+
+enum NanguSolutionVoteType {
+  GOOD
+  BAD
+}
+
+model NanguSolutionVote {
+  id         String              @id @default(cuid())
+  solutionId String
+  userId     String
+  vote       NanguSolutionVoteType
+  createdAt  DateTime            @default(now())
+
+  solution NanguSolution @relation(fields: [solutionId], references: [id], onDelete: Cascade)
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([solutionId, userId])
+  @@index([solutionId])
+  @@index([userId])
+}
+
+// ============== Community (게시판/게시글/댓글/추천/북마크) ==============
+// type: notice | free | qna | tips | reviews | trouble (난구해결사)
+// UI: notice/free=list, qna=list+해결표시, tips/reviews=card, trouble=특수 Q&A
+
+model CommunityBoard {
+  id          String   @id @default(cuid())
+  slug        String   @unique  // notice, free, qna, tips, reviews, trouble
+  name        String
+  description String?  @db.Text
+  type        String   @default("free")  // notice | free | qna | tips | reviews | trouble
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  posts CommunityPost[]
+
+  @@index([sortOrder])
+  @@index([type, isActive])
+}
+
+model CommunityPost {
+  id           String   @id @default(cuid())
+  boardId      String
+  authorId     String
+  title        String
+  content      String   @db.Text
+  thumbnailUrl String?  // 대표 이미지 (카드형 게시판용)
+  imageUrls    String?  // JSON array of URLs
+  isPinned     Boolean  @default(false)
+  isHidden     Boolean  @default(false)
+  viewCount    Int      @default(0)
+  likeCount    Int      @default(0)   // 캐시, CommunityPostLike 기준 갱신
+  commentCount Int      @default(0)   // 캐시, CommunityComment 기준 갱신
+  isSolved     Boolean  @default(false)  // qna 게시판: 채택 완료 여부
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  board   CommunityBoard   @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  author  User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comments    CommunityComment[]
+  likes       CommunityPostLike[]
+  bookmarks   CommunityBookmark[]
+  postViews   CommunityPostView[]
+  reports     CommunityReport[]
+  troubleShot TroubleShotPost?
+
+  @@index([boardId])
+  @@index([authorId])
+  @@index([boardId, isPinned, createdAt])
+  @@index([createdAt])
+  @@index([isHidden])
+}
+
+model CommunityPostView {
+  id        String   @id @default(cuid())
+  postId    String
+  viewerKey String   // 로그인: 세션 기반 키, 비로그인: localStorage/cookie UUID (중복 조회 방지)
+  userId    String?  // 로그인 시
+  viewedAt  DateTime @default(now())
+
+  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, viewerKey])
+  @@index([postId])
+  @@index([viewedAt])
+}
+
+model CommunityComment {
+  id        String   @id @default(cuid())
+  postId    String
+  parentId  String?  // 대댓글
+  authorId  String
+  content   String   @db.Text
+  isHidden  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  post     CommunityPost  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parent   CommunityComment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  children CommunityComment[] @relation("CommentReplies")
+  author   User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes    CommunityCommentLike[]
+  reports  CommunityReport[]
+
+  @@index([postId])
+  @@index([parentId])
+  @@index([authorId])
+}
+
+model CommunityPostLike {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([postId])
+  @@index([userId])
+}
+
+model CommunityCommentLike {
+  id        String   @id @default(cuid())
+  commentId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  comment CommunityComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@index([commentId])
+  @@index([userId])
+}
+
+model CommunityBookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([userId])
+  @@index([postId])
+}
+
+// 댓글/답글 알림: 내 글에 댓글, 내 댓글에 답글
+model CommunityNotification {
+  id            String    @id @default(cuid())
+  userId        String
+  type          String    // comment_on_post | reply_to_comment
+  postId        String
+  commentId     String?   // 이동 대상 댓글
+  relatedUserId String
+  readAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  relatedUser User @relation("NotificationActor", fields: [relatedUserId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, readAt])
+  @@map("community_notifications")
+}
+
+// 신고: 게시글/댓글, 사유 선택, 동일 사용자 중복 신고 불가
+model CommunityReport {
+  id          String   @id @default(cuid())
+  reporterId  String
+  targetType  String   // post | comment
+  targetId    String   // postId or commentId (중복 체크용)
+  postId      String?
+  commentId   String?
+  reason      String   // PROFANITY | AD_SPAM | INAPPROPRIATE | MISINFO | CONFLICT | OTHER
+  status      String   @default("PENDING") // PENDING | REVIEWED | RESOLVED | DISMISSED
+  adminMemo   String?  @db.Text
+  processedAt DateTime?
+  processedBy String?
+  createdAt   DateTime @default(now())
+
+  post    CommunityPost?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment CommunityComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  reporter User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([reporterId, targetType, targetId])
+  @@index([targetType, targetId])
+  @@index([status])
+}
+
+// ============== 커뮤니티 신뢰도 점수 (레벨/등급) ==============
+model CommunityScoreLog {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // post_created | comment_like_received | solution_created | solution_good | solution_bad | solution_adopted | adopter_bonus | tournament_apply | tournament_cancel | tournament_attend
+  amount    Int      // +2, +1, +4, +6, -10, +10 등
+  refType   String?  // post | comment | solution | entry | attendance
+  refId     String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ============== 난구해결사 (CommunityPost 기반 확장) ==============
+// trouble 게시판 글 1개 = CommunityPost 1개 + TroubleShotPost 1개 (공배치·난이도·채택해법)
+
+model TroubleShotPost {
+  id                 String   @id @default(cuid())
+  postId             String   @unique  // CommunityPost (board=trouble)
+  sourceNoteId       String?  // 당구노트에서 보낸 경우
+  layoutImageUrl     String?  // 공배치 이미지
+  difficulty         String?  // 난이도 표시
+  isSolved           Boolean  @default(false)
+  acceptedSolutionId String?  // 채택된 TroubleShotSolution id
+
+  post     CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  sourceNote BilliardNote? @relation(fields: [sourceNoteId], references: [id], onDelete: SetNull)
+  solutions TroubleShotSolution[]
+
+  @@index([postId])
+  @@index([sourceNoteId])
+  @@index([isSolved])
+}
+
+model TroubleShotSolution {
+  id              String   @id @default(cuid())
+  troubleShotPostId String
+  authorId        String
+  title           String?
+  content         String   @db.Text
+  solutionImageUrl String?
+  voteCount       Int      @default(0)
+  isAccepted      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  troubleShotPost TroubleShotPost @relation(fields: [troubleShotPostId], references: [id], onDelete: Cascade)
+  author         User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([troubleShotPostId])
+  @@index([authorId])
 }
 
 // ============== Inquiry ==============

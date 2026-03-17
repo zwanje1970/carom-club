@@ -119,9 +119,6 @@ export default function HeroSettingsForm() {
 
   return (
     <form onSubmit={handleSave} className="space-y-8">
-      {error && <NotificationBar color="danger">{error}</NotificationBar>}
-      {success && <NotificationBar color="success">저장되었습니다. 메인페이지에서 확인하세요.</NotificationBar>}
-
       {/* 미리보기 */}
       <section>
         <h3 className="mb-3 text-base font-semibold text-gray-900 dark:text-slate-100">미리보기</h3>
@@ -392,7 +389,7 @@ export default function HeroSettingsForm() {
         </div>
       </section>
 
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <button
           type="submit"
           disabled={saving}
@@ -400,6 +397,8 @@ export default function HeroSettingsForm() {
         >
           {saving ? "저장 중..." : "저장"}
         </button>
+        {error && <NotificationBar color="danger">{error}</NotificationBar>}
+        {success && <NotificationBar color="success">저장되었습니다. 메인페이지에서 확인하세요.</NotificationBar>}
       </div>
     </form>
   );

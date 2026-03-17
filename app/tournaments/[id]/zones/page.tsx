@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import { getCommonPageData } from "@/lib/common-page-data";
 import { getPublicTournamentOrNull } from "@/lib/public-tournament";
 
 export default async function PublicTournamentZonesPage({
@@ -9,8 +11,12 @@ export default async function PublicTournamentZonesPage({
   params: Promise<{ id: string }>;
 }) {
   const { id: tournamentId } = await params;
-  const tournament = await getPublicTournamentOrNull(tournamentId);
+  const [tournament, common] = await Promise.all([
+    getPublicTournamentOrNull(tournamentId),
+    getCommonPageData("tournaments"),
+  ]);
   if (!tournament) notFound();
+  const c = common.copy as Record<AdminCopyKey, string>;
 
   const zones = await prisma.tournamentZone.findMany({
     where: { tournamentId },
@@ -47,7 +53,7 @@ export default async function PublicTournamentZonesPage({
           ← 대회 상세
         </Link>
         <h1 className="text-xl font-bold text-site-text mb-1">{tournament.name}</h1>
-        <p className="text-sm text-gray-600 mb-6">권역 예선</p>
+        <p className="text-sm text-gray-600 mb-6">{getCopyValue(c, "site.tournament.qualifierLabel")}</p>
 
         <ul className="space-y-4">
           {zones.map((z) => {
@@ -95,7 +101,7 @@ export default async function PublicTournamentZonesPage({
         </ul>
         {zones.length === 0 && (
           <p className="rounded-xl border border-site-border bg-site-card p-8 text-center text-gray-500">
-            권역이 없습니다.
+            {getCopyValue(c, "site.tournament.zonesEmpty")}
           </p>
         )}
       </div>

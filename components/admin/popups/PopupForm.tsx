@@ -63,7 +63,6 @@ export function PopupForm({ initial, onSubmit, onCancel }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {error && <NotificationBar color="danger">{error}</NotificationBar>}
       <div>
         <label className="block text-sm font-medium mb-1">팝업 제목 (필수)</label>
         <input
@@ -163,9 +162,10 @@ export function PopupForm({ initial, onSubmit, onCancel }: Props) {
           <span className="text-sm">닫기 버튼 표시</span>
         </label>
       </div>
-      <div className="flex gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" label={saving ? "저장 중…" : "저장"} color="info" disabled={saving} />
         <Button type="button" label="취소" color="contrast" outline onClick={onCancel} />
+        {error && <NotificationBar color="danger">{error}</NotificationBar>}
       </div>
     </form>
   );

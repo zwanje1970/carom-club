@@ -5,15 +5,28 @@
  */
 
 import { prisma } from "@/lib/db";
+import {
+  ORGANIZATION_SELECT_PUBLIC,
+  ORGANIZATION_SELECT_ADMIN_EDIT,
+  TOURNAMENT_SELECT_BASIC,
+} from "@/lib/db-selects";
 import { haversineKm } from "@/lib/distance";
 import { normalizeSlug } from "@/lib/normalize-slug";
 
-/** 대회 수정 페이지용 findUnique include 타입 (.tsx에서 제네릭 파싱 이슈 회피) */
+/** 대회 수정 페이지용: organization은 select만 사용 (promo/venue 등 불필요 컬럼 미조회) */
 export type TournamentForEdit = Awaited<
   ReturnType<
     typeof prisma.tournament.findUnique<{
       where: { id: string };
-      include: { organization: true; rule: true; _count: { select: { entries: true } }; tournamentVenues: { include: { organization: { select: { id: true; name: true } } } } };
+      include: {
+        organization: { select: typeof ORGANIZATION_SELECT_ADMIN_EDIT };
+        rule: true;
+        _count: { select: { entries: true } };
+        tournamentVenues: {
+          orderBy: { sortOrder: "asc" };
+          include: { organization: { select: typeof ORGANIZATION_SELECT_PUBLIC } };
+        };
+      };
     }>
   >
 >;
@@ -402,24 +415,70 @@ export async function getVenuesListWithCoords(
   }
 }
 
-/** 대회 상세 첫 화면용: organization, rule, matchVenues, tournamentVenues, _count만. entries 제외로 첫 응답 경량화. */
-export async function getTournamentBasic(id: string) {
-  return prisma.tournament.findUnique({
-    where: { id },
-    include: {
-      organization: true,
-      rule: true,
-      _count: { select: { tournamentZones: true, finalMatches: true } },
-      matchVenues: { orderBy: { sortOrder: "asc" } },
-      tournamentVenues: {
-        orderBy: { sortOrder: "asc" },
-        include: { organization: { select: { id: true, name: true, slug: true } } },
-      },
+/** 공개 상세용 경량 relation select (무거운 entries/rounds/brackets 제외) */
+const TOURNAMENT_BASIC_RELATIONS = {
+  organization: { select: ORGANIZATION_SELECT_PUBLIC },
+  rule: true,
+  _count: { select: { tournamentZones: true, finalMatches: true } },
+  matchVenues: {
+    orderBy: { sortOrder: "asc" as const },
+    select: {
+      id: true,
+      tournamentId: true,
+      venueNumber: true,
+      displayLabel: true,
+      venueName: true,
+      address: true,
+      phone: true,
+      sortOrder: true,
+      createdAt: true,
+      updatedAt: true,
     },
-  });
+  },
+  tournamentVenues: {
+    orderBy: { sortOrder: "asc" as const },
+    select: {
+      id: true,
+      tournamentId: true,
+      organizationId: true,
+      sortOrder: true,
+      createdAt: true,
+      organization: { select: ORGANIZATION_SELECT_PUBLIC },
+    },
+  },
+} as const;
+
+/** 대회 상세 첫 화면: TOURNAMENT_SELECT_BASIC + organization, rule, matchVenues, tournamentVenues, _count만. entries/rounds/brackets 별도 조회. */
+/** outlinePdfUrl·promoPdfUrl 미존재 DB 호환: 실패 시 해당 컬럼 제외 select로 재시도 후 null 보정. */
+export async function getTournamentBasic(id: string) {
+  try {
+    return await prisma.tournament.findUnique({
+      where: { id },
+      select: {
+        ...TOURNAMENT_SELECT_BASIC,
+        ...TOURNAMENT_BASIC_RELATIONS,
+      },
+    });
+  } catch (e) {
+    const err = e as { message?: string; code?: string };
+    const isMissingColumn =
+      err?.message?.includes("outlinePdfUrl") || err?.message?.includes("promoPdfUrl") || err?.code === "P2010";
+    if (!isMissingColumn) throw e;
+
+    const { outlinePdfUrl: _omit, ...basicWithoutPdf } = TOURNAMENT_SELECT_BASIC;
+    const row = await prisma.tournament.findUnique({
+      where: { id },
+      select: {
+        ...basicWithoutPdf,
+        ...TOURNAMENT_BASIC_RELATIONS,
+      },
+    });
+    if (!row) return null;
+    return { ...row, outlinePdfUrl: null as string | null };
+  }
 }
 
-/** 대회 상세 후속 로딩용: 엔트리 목록만 (참가자 명단/참가신청 탭). */
+/** 대회 상세 후속 로딩용: 엔트리 목록만 (참가자 명단/참가신청 탭). 무거운 relation이므로 첫 렌더에서 호출 금지. */
 export async function getTournamentEntries(id: string) {
   return prisma.tournamentEntry.findMany({
     where: { tournamentId: id },

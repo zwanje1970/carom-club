@@ -13,7 +13,9 @@ export type ImageKind =
   | "section"
   | "proof"
   | "thumbnail"
-  | "footerPartner";
+  | "footerPartner"
+  | "billiard"
+  | "community";
 
 export interface ImagePolicy {
   /** 최대 폭 (px). 초과 시 비율 유지 리사이즈 */
@@ -118,6 +120,24 @@ export const IMAGE_POLICIES: Record<ImageKind, ImagePolicy> = {
     allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/svg+xml"],
     blobPathPrefix: "footer-partner",
     allowSvg: true,
+  },
+  billiard: {
+    maxWidth: 1200,
+    maxHeight: 600,
+    format: "webp",
+    quality: 82,
+    maxFileSize: 2 * 1024 * 1024,
+    allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
+    blobPathPrefix: "billiard",
+  },
+  community: {
+    maxWidth: 1200,
+    maxHeight: 0,
+    format: "webp",
+    quality: 75,
+    maxFileSize: 5 * 1024 * 1024,
+    allowedMimeTypes: ["image/jpeg", "image/png", "image/gif", "image/webp"],
+    blobPathPrefix: "community",
   },
 };
 

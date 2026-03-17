@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { containerMaxW } from "./_lib/config";
+import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 
 /** 액션바 높이·본문 상단 여백 (한 곳에서 관리) */
 const ACTION_BAR_HEIGHT = "h-12";
@@ -11,6 +12,8 @@ export const ADMIN_ACTION_BAR_PT_CLASS = "pt-12";
 type AdminPageActionsProps = {
   /** 헤더 영역 높이(px). NavBar 없으면 64, 있으면 128 */
   topOffset?: number;
+  /** 메뉴/문구 (뒤로 가기, 대시보드로 가기 등) */
+  copy?: Record<string, string>;
 };
 
 /** 이전 페이지가 /admin 내부일 때만 history.back(), 아니면 대시보드(/admin)로 이동 (메인으로 나가지 않음) */
@@ -40,8 +43,11 @@ function handleAdminBack(router: ReturnType<typeof useRouter>) {
  * 관리자 본문 상단 공통 액션: 뒤로 가기, 대시보드로 가기
  * 뒤로 가기는 대시보드(/admin) 안에서만 동작, 메인으로는 나가지 않음.
  */
-export function AdminPageActions({ topOffset = 64 }: AdminPageActionsProps) {
+export function AdminPageActions({ topOffset = 64, copy }: AdminPageActionsProps) {
   const router = useRouter();
+  const c = (copy ?? {}) as Record<AdminCopyKey, string>;
+  const backLabel = getCopyValue(c, "admin.common.back");
+  const dashboardLabel = getCopyValue(c, "admin.common.goToDashboard");
 
   return (
     <div
@@ -54,13 +60,13 @@ export function AdminPageActions({ topOffset = 64 }: AdminPageActionsProps) {
           onClick={() => handleAdminBack(router)}
           className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
         >
-          뒤로 가기
+          {backLabel}
         </button>
         <Link
           href="/admin"
           className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
         >
-          대시보드로 가기
+          {dashboardLabel}
         </Link>
       </div>
     </div>

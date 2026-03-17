@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { hashPassword } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/site-settings";
+import { isFeatureEnabled } from "@/lib/site-feature-flags";
 
 const DB_ERROR_CODES = ["P1001", "P1002", "P1017", "P1033"];
 
@@ -20,6 +21,10 @@ const DB_UNAVAILABLE_MSG = "데이터베이스가 연결되지 않았습니다. 
 export async function POST(request: Request) {
   if (!isDatabaseConfigured()) {
     return NextResponse.json({ error: DB_UNAVAILABLE_MSG }, { status: 503 });
+  }
+  const signupEnabled = await isFeatureEnabled("signup_enabled");
+  if (!signupEnabled) {
+    return NextResponse.json({ error: "현재 회원가입이 중단되었습니다." }, { status: 503 });
   }
   try {
     const body = await request.json();

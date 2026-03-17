@@ -64,7 +64,6 @@ export function NoticeBarForm({ initial, onSubmit, onCancel }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {error && <NotificationBar color="danger">{error}</NotificationBar>}
       <div>
         <label className="block text-sm font-medium mb-1">공지 문구 (필수)</label>
         <input
@@ -201,9 +200,10 @@ export function NoticeBarForm({ initial, onSubmit, onCancel }: Props) {
           />
         </div>
       </div>
-      <div className="flex gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" label={saving ? "저장 중…" : "저장"} color="info" disabled={saving} />
         <Button type="button" label="취소" color="contrast" outline onClick={onCancel} />
+        {error && <NotificationBar color="danger">{error}</NotificationBar>}
       </div>
     </form>
   );

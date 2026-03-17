@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { sendPushToUser } from "@/lib/push/sendPush";
+import { revokeTournamentCancel } from "@/lib/community-score-service";
 
 /** 참가 신청 취소. 확정 참가 취소 시 대기 1순위 자동 승격 및 대기순번 갱신 */
 export async function POST(request: Request) {
@@ -128,6 +129,10 @@ export async function POST(request: Request) {
         }
       }
     }
+
+    try {
+      await revokeTournamentCancel(entry.userId, entryId);
+    } catch (_) {}
 
     return NextResponse.json({ ok: true });
   } catch (e) {

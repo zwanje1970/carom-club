@@ -142,13 +142,6 @@ export default function AdminSettingsSitePage() {
       </p>
       <CardBox className="max-w-xl">
       <form onSubmit={handleSubmit} className="space-y-6">
-        {error && (
-          <NotificationBar color="danger">{error}</NotificationBar>
-        )}
-        {success && (
-          <NotificationBar color="success">저장되었습니다.</NotificationBar>
-        )}
-
         <div>
           <label className="block text-sm font-medium text-site-text mb-1">사이트 로고</label>
           <p className="text-xs text-gray-500 mb-2">새 이미지를 선택하면 기존 로고를 대체합니다. JPEG, PNG, WebP, SVG 지원. 로고는 선명도 우선으로 자동 최적화됩니다. (최대 2MB)</p>
@@ -296,7 +289,7 @@ export default function AdminSettingsSitePage() {
         </div>
         <p className="text-xs text-gray-500 dark:text-slate-400 -mt-2">헤더(상단바)·메뉴 색상을 비우면 기본값(검정 배경, 회색·앰버 메뉴)이 적용됩니다.</p>
 
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Button
             type="submit"
             label={saving ? "저장중" : "저장"}
@@ -304,6 +297,8 @@ export default function AdminSettingsSitePage() {
             disabled={saving}
           />
           <Button href="/admin/settings" label="취소" color="contrast" outline />
+          {error && <NotificationBar color="danger">{error}</NotificationBar>}
+          {success && <NotificationBar color="success">저장되었습니다.</NotificationBar>}
         </div>
       </form>
       </CardBox>

@@ -25,7 +25,7 @@ export default async function ClientTournamentsPage() {
     where: { organizationId: orgId },
     orderBy: { startAt: "desc" },
     include: {
-      organization: { select: { name: true } },
+      organization: { select: { name: true } }, // 클라이언트 카드: 이름만
       _count: { select: { entries: true } },
     },
   });

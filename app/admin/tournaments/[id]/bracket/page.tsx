@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { ORGANIZATION_SELECT_ADMIN_BASIC } from "@/lib/db-selects";
 import { canManageTournament } from "@/lib/permissions";
 import { BracketGenerateButton } from "@/components/admin/BracketGenerateButton";
 import { BracketManualEdit } from "@/components/client/BracketManualEdit";
@@ -19,7 +20,7 @@ export default async function AdminTournamentBracketPage({
   const tournament = await prisma.tournament.findUnique({
     where: { id },
     include: {
-      organization: { select: { id: true, name: true, ownerUserId: true } },
+      organization: { select: ORGANIZATION_SELECT_ADMIN_BASIC },
       rule: true,
       _count: { select: { rounds: true, finalMatches: true } },
     },

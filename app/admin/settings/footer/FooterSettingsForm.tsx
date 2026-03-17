@@ -169,13 +169,6 @@ export default function FooterSettingsForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
-      {error && (
-        <NotificationBar color="danger">{error}</NotificationBar>
-      )}
-      {success && (
-        <NotificationBar color="success">저장되었습니다.</NotificationBar>
-      )}
-
       <CardBox>
         <h3 className="text-lg font-semibold text-site-text mb-4">푸터 사용</h3>
         <label className="flex items-center gap-2 cursor-pointer">
@@ -430,7 +423,7 @@ export default function FooterSettingsForm() {
         )}
       </CardBox>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button
           type="submit"
           label={saving ? "저장 중..." : "저장"}
@@ -438,6 +431,8 @@ export default function FooterSettingsForm() {
           disabled={saving}
         />
         <Button href="/admin/settings" label="취소" color="contrast" outline />
+        {error && <NotificationBar color="danger">{error}</NotificationBar>}
+        {success && <NotificationBar color="success">저장되었습니다.</NotificationBar>}
       </div>
     </form>
   );

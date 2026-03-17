@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { getPublicTournamentOrNull } from "@/lib/public-tournament";
+import { awardTournamentApply } from "@/lib/community-score-service";
 
 function parseAllowMultipleSlots(rule: { bracketConfig?: string | object | null } | null): boolean {
   if (!rule?.bracketConfig) return false;
@@ -28,7 +29,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  let body: { tournamentId?: string; depositorName?: string; clubOrAffiliation?: string; additionalSlot?: boolean };
+  let body: {
+    tournamentId?: string;
+    depositorName?: string;
+    clubOrAffiliation?: string;
+    additionalSlot?: boolean;
+    handicap?: string;
+    avg?: string;
+    avgProofUrl?: string;
+  };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -37,8 +46,11 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-  const { tournamentId, depositorName, clubOrAffiliation, additionalSlot } = body;
+  const { tournamentId, depositorName, clubOrAffiliation, additionalSlot, handicap, avg, avgProofUrl } = body;
   const club = typeof clubOrAffiliation === "string" ? clubOrAffiliation.trim() || null : null;
+  const handicapVal = typeof handicap === "string" ? handicap.trim() || null : null;
+  const avgVal = typeof avg === "string" ? avg.trim() || null : null;
+  const avgProofVal = typeof avgProofUrl === "string" ? avgProofUrl.trim() || null : null;
 
   if (!tournamentId || !depositorName?.trim()) {
     return NextResponse.json(
@@ -121,7 +133,7 @@ export async function POST(request: Request) {
     const isAdditionalSlot = allowMultipleSlots && nextSlotNumber >= 2;
     const entryFeeAmount = isAdditionalSlot ? baseEntryFee * 2 : baseEntryFee;
 
-    await prisma.tournamentEntry.create({
+    const entry = await prisma.tournamentEntry.create({
       data: {
         tournamentId,
         userId: session.id,
@@ -129,9 +141,15 @@ export async function POST(request: Request) {
         status: "APPLIED",
         depositorName: depositorName.trim(),
         clubOrAffiliation: club,
+        handicap: handicapVal,
+        avg: avgVal,
+        avgProofUrl: avgProofVal,
         entryFeeAmount: baseEntryFee > 0 ? entryFeeAmount : null,
       },
     });
+    try {
+      await awardTournamentApply(session.id, entry.id);
+    } catch (_) {}
 
     const feeMessage =
       nextSlotNumber === 1

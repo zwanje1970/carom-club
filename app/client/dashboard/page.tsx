@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
+import { getAdminCopy, getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { prisma } from "@/lib/db";
 import { normalizeSlug } from "@/lib/normalize-slug";
 import { ClientLoginWelcomeBanner } from "@/components/client/ClientLoginWelcomeBanner";
@@ -22,6 +23,8 @@ export default async function ClientDashboardPage({
   const session = await getSession();
   if (!session || session.role !== "CLIENT_ADMIN") return null;
 
+  const copy = await getAdminCopy();
+  const c = copy as Record<AdminCopyKey, string>;
   const params = await searchParams;
   const welcome = params.welcome;
 
@@ -73,7 +76,7 @@ export default async function ClientDashboardPage({
     <div className="space-y-8">
       <ClientLoginWelcomeBanner show={welcome === "1"} />
       <div>
-        <h1 className="text-2xl font-bold text-site-text">대회 운영 대시보드</h1>
+        <h1 className="text-2xl font-bold text-site-text">{getCopyValue(c, "client.dashboard.title")}</h1>
         <p className="mt-1 text-sm text-gray-600">
           {org ? `${org.name} 대회 운영 현황입니다.` : "내 조직 대회 운영 현황"}
         </p>

@@ -1,0 +1,16 @@
+---
+description: Prisma 조회 시 공용 select 상수 사용 및 Organization/Tournament 조회 규칙
+globs: lib/db*.ts,**/api/**/route.ts,app/**/page.tsx,app/**/edit/page.tsx
+alwaysApply: false
+---
+
+# Prisma 조회 작성 규칙
+
+- **공용 상수 우선**: Organization/Tournament 조회는 `lib/db-selects.ts` 상수 사용. ad-hoc select 전에 기존 상수로 해결 가능한지 확인.
+- **Organization**: 공개 → `ORGANIZATION_SELECT_PUBLIC`. 관리자 목록/상세/권한 → `ORGANIZATION_SELECT_ADMIN_BASIC`. 관리자 수정 폼 → `ORGANIZATION_SELECT_ADMIN_EDIT`. `ORGANIZATION_SELECT_ADMIN`은 deprecated, 새 코드에서 사용 금지.
+- **Tournament**: 목록/카드 → `TOURNAMENT_SELECT_LIST`. 공개 상세 → `TOURNAMENT_SELECT_BASIC`(alias `TOURNAMENT_SELECT_DETAIL_PUBLIC`). 관리자 상세 → `TOURNAMENT_SELECT_ADMIN_BASIC`. 관리자 수정 → `TOURNAMENT_SELECT_ADMIN_EDIT`. `TOURNAMENT_SELECT_CARD`는 deprecated.
+- **금지**: `organization: true`, `include: true` 남용, 무거운 relation(entries, brackets, payments, rounds)을 공용 select에 포함.
+- **relation**: 필요한 필드만 명시적 select. 무거운 relation은 별도 함수(`getTournamentEntries()` 등)로 분리.
+- **getTournamentBasic**: `TOURNAMENT_SELECT_BASIC` 기반 스칼라 + ORGANIZATION_SELECT_PUBLIC, rule, _count, matchVenues, tournamentVenues만. entries/rounds/brackets 미포함. outlinePdfUrl 등 컬럼 불일치 시 fallback 유지.
+
+자세한 내용: `docs/PRISMA_QUERY_RULES.md`

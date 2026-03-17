@@ -8,7 +8,8 @@ import { getMockTournamentById } from "@/lib/mock-data";
 import { normalizeSlugs } from "@/lib/normalize-slug";
 import { TournamentDetailView } from "@/components/tournament/TournamentDetailView";
 import { TournamentDetailWithEntries } from "@/components/tournament/TournamentDetailWithEntries";
-import { STAGE_LABELS } from "@/lib/tournament-stage";
+import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import { STAGE_LABELS, TOURNAMENT_STAGES } from "@/lib/tournament-stage";
 import { logServerTiming } from "@/lib/perf";
 
 function parseParticipantsListPublic(rule: { bracketConfig?: string | object | null } | null): boolean {
@@ -108,8 +109,9 @@ export default async function TournamentDetailPage({
   if (!tournament) notFound();
 
   const copyStart = Date.now();
-  await getCommonPageData("tournaments");
+  const common = await getCommonPageData("tournaments");
   logServerTiming("fetch_copy", copyStart);
+  const c = common.copy as Record<AdminCopyKey, string>;
 
   const tabs = buildTabs();
   const currentTab = (() => {
@@ -117,7 +119,6 @@ export default async function TournamentDetailPage({
     const t = tabs.find((tab) => tab.id === (tabParam ?? defaultTab));
     return t ? t.id : defaultTab;
   })();
-  const initialShowApply = tabParam === "apply";
   const participantsListPublic = parseParticipantsListPublic(tournament.rule);
   const accountNumber = (() => {
     try {
@@ -192,7 +193,6 @@ export default async function TournamentDetailPage({
     currentTab,
     participantsListPublic,
     allowMultipleSlots,
-    initialShowApply,
   };
   logServerTiming("page");
 
@@ -206,7 +206,6 @@ export default async function TournamentDetailPage({
             tabs={tabs}
             currentTab={currentTab}
             participantsListPublic={participantsListPublic}
-            initialShowApply={initialShowApply}
             tournament={{
               ...tournamentPayload,
               startAt: tournament.startAt instanceof Date ? tournament.startAt.toISOString() : String(tournament.startAt),
@@ -235,30 +234,33 @@ export default async function TournamentDetailPage({
 
         {"tournamentStage" in tournament && tournament._count && (
           <section className="mt-8 rounded-xl border border-site-border bg-site-card p-4">
-            <h2 className="text-sm font-semibold text-site-text mb-2">대진 · 결과</h2>
+            <h2 className="text-sm font-semibold text-site-text mb-2">{getCopyValue(c, "site.tournament.bracketSectionTitle")}</h2>
             <p className="text-xs text-site-text-muted mb-3">
-              진행 상태: {STAGE_LABELS[(tournament.tournamentStage as keyof typeof STAGE_LABELS) ?? "SETUP"] ?? tournament.tournamentStage ?? "설정"}
+              진행 상태:{" "}
+              {TOURNAMENT_STAGES.includes((tournament.tournamentStage ?? "SETUP") as (typeof TOURNAMENT_STAGES)[number])
+                ? getCopyValue(c, `site.tournament.stage.${(tournament.tournamentStage as string) ?? "SETUP"}` as AdminCopyKey)
+                : (STAGE_LABELS[(tournament.tournamentStage as keyof typeof STAGE_LABELS) ?? "SETUP"] ?? tournament.tournamentStage ?? "설정")}
             </p>
             <div className="flex flex-wrap gap-2">
               <Link
                 href={`/tournaments/${id}/zones`}
                 className="inline-flex items-center rounded-lg bg-blue-100 px-3 py-1.5 text-sm font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
               >
-                권역 예선
+                {getCopyValue(c, "site.tournament.qualifierLabel")}
               </Link>
               {(tournament._count?.finalMatches ?? 0) > 0 && (
                 <Link
                   href={`/tournaments/${id}/bracket`}
                   className="inline-flex items-center rounded-lg bg-violet-100 px-3 py-1.5 text-sm font-medium text-violet-800 dark:bg-violet-900/40 dark:text-violet-200"
                 >
-                  본선 대진표
+                  {getCopyValue(c, "site.tournament.finalBracketLabel")}
                 </Link>
               )}
               <Link
                 href={`/tournaments/${id}/results`}
                 className="inline-flex items-center rounded-lg bg-emerald-100 px-3 py-1.5 text-sm font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
               >
-                경기 결과
+                {getCopyValue(c, "site.tournament.resultsLabel")}
               </Link>
             </div>
           </section>

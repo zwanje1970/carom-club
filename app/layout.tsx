@@ -3,6 +3,7 @@ import "./globals.css";
 import { IntroRoot } from "@/components/intro/IntroRoot";
 import { MainSiteHeaderWrapper } from "@/components/layout/MainSiteHeaderWrapper";
 import { MobileBottomNavWrapper } from "@/components/layout/MobileBottomNavWrapper";
+import { BallPlacementFullscreenProvider } from "@/components/community/BallPlacementFullscreenContext";
 import { AdminFloatButton } from "@/components/AdminFloatButton";
 import NotificationBanner from "@/components/NotificationBanner";
 import { RegisterServiceWorker } from "@/components/push/RegisterServiceWorker";
@@ -107,10 +108,12 @@ export default async function RootLayout({
           <ClientPerfLogger />
           <RegisterServiceWorker />
           <NotificationBanner />
+          <BallPlacementFullscreenProvider>
           <IntroRoot>
             <MainSiteHeaderWrapper />
             <MobileBottomNavWrapper>{children}</MobileBottomNavWrapper>
           </IntroRoot>
+        </BallPlacementFullscreenProvider>
           <AdminFloatButton />
         </SiteSettingsProvider>
       </body>

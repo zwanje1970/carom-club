@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { ORGANIZATION_SELECT_OWNER } from "@/lib/db-selects";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { canManageTournament } from "@/lib/permissions";
 import {
@@ -50,7 +51,7 @@ export async function POST(
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
     include: {
-      organization: { select: { ownerUserId: true } },
+      organization: { select: ORGANIZATION_SELECT_OWNER },
       rule: true,
       entries: {
         where: { status: "CONFIRMED" },

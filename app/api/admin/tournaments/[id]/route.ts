@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { ORGANIZATION_SELECT_ADMIN_BASIC, ORGANIZATION_SELECT_OWNER } from "@/lib/db-selects";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { normalizeSlug } from "@/lib/normalize-slug";
 import { canViewTournament, canManageTournament } from "@/lib/permissions";
@@ -26,7 +27,7 @@ export async function GET(
   const tournament = await prisma.tournament.findUnique({
     where: { id },
     include: {
-      organization: { select: { id: true, name: true, slug: true, ownerUserId: true } },
+      organization: { select: ORGANIZATION_SELECT_ADMIN_BASIC },
       rule: true,
     },
   });
@@ -102,7 +103,7 @@ export async function PATCH(
   const { id } = await params;
   const tournament = await prisma.tournament.findUnique({
     where: { id },
-    include: { organization: { select: { ownerUserId: true } } },
+    include: { organization: { select: ORGANIZATION_SELECT_OWNER } },
   });
   if (!tournament) {
     return NextResponse.json({ error: "대회를 찾을 수 없습니다." }, { status: 404 });

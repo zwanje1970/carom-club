@@ -145,9 +145,6 @@ export function TournamentEditForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {error && <NotificationBar color="danger">{error}</NotificationBar>}
-      {success && <NotificationBar color="success">저장되었습니다.</NotificationBar>}
-
       <section className="rounded-lg border border-gray-200 p-6 dark:border-slate-700">
         <h2 className="text-lg font-semibold text-gray-800 border-b pb-2 mb-4">
           기본 정보
@@ -335,7 +332,7 @@ export function TournamentEditForm({
       />
       <FinanceSummaryBox data={financeSummary} />
 
-      <Buttons>
+      <Buttons className="gap-3 flex-wrap">
         <Button
           type="submit"
           label={loading ? "저장중" : "저장"}
@@ -343,6 +340,8 @@ export function TournamentEditForm({
           disabled={loading}
         />
         <Button href={`/admin/tournaments/${tournamentId}`} label="취소" color="contrast" outline />
+        {error && <NotificationBar color="danger">{error}</NotificationBar>}
+        {success && <NotificationBar color="success">저장되었습니다.</NotificationBar>}
       </Buttons>
     </form>
   );
