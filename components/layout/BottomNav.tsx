@@ -12,18 +12,20 @@ type BottomNavItem = {
 
 /** 모바일 하단 네비: 1줄 5개 메뉴 */
 const ITEMS: BottomNavItem[] = [
-  { href: "/tournaments", label: "대회 찾기", icon: MedalIcon },
+  { href: "/tournaments", label: "대회 찾기", icon: TrophyIcon },
   { href: "/mypage/notes", label: "당구노트", icon: NoteIcon, emphasize: true },
   { href: "/venues", label: "당구장 찾기", icon: VenueIcon },
   { href: "/community", label: "커뮤니티", icon: CommunityIcon },
   { href: "/mypage", label: "마이 페이지", icon: MypageIcon },
 ];
 
-function MedalIcon({ active }: { active: boolean }) {
+function TrophyIcon({ active }: { active: boolean }) {
   return (
     <svg className="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-      <circle cx="12" cy="9" r="4" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 21h8M12 13v6M10 19l2-2 2 2" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1v6zm0 0H4.5a1 1 0 0 1 0-5H6zm13.5 0H18a1 1 0 0 0 0-5h-1.5" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 22h16" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14.66v1.626a2 2 0 0 1-.976 1.696A5 5 0 0 0 7 21.978" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 14.66v1.626a2 2 0 0 0 .976 1.696A5 5 0 0 1 17 21.978" />
     </svg>
   );
 }

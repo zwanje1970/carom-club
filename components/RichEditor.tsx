@@ -95,24 +95,41 @@ export type RichEditorProps = {
 
 import { FONT_FAMILIES, FONT_SIZES_PX } from "@/lib/editor-fonts";
 
-function useImageUpload() {
-  return useCallback(async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("/api/admin/upload-image", { method: "POST", body: formData, credentials: "include" });
-    const text = await res.text();
-    let errorMessage = "업로드 실패";
-    try {
-      const d = text ? JSON.parse(text) : {};
-      errorMessage = d.error || errorMessage;
-    } catch {
-      if (!res.ok && text) errorMessage = text.slice(0, 100);
-    }
-    if (!res.ok) throw new Error(errorMessage);
-    const d = JSON.parse(text) as { url?: string };
-    if (!d?.url) throw new Error("업로드 결과가 올바르지 않습니다.");
-    return d.url;
-  }, []);
+const UPLOAD_ERROR_TOAST_MESSAGE =
+  "이미지 업로드에 실패했습니다. 잠시 후 다시 시도하거나 관리자에게 문의해 주세요.";
+
+function useImageUpload(onUploadError?: (message: string) => void) {
+  return useCallback(
+    async (file: File): Promise<string> => {
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/admin/upload-image", { method: "POST", body: formData, credentials: "include" });
+        const text = await res.text();
+        let errorMessage = "업로드 실패";
+        try {
+          const d = text ? JSON.parse(text) : {};
+          errorMessage = d.error || errorMessage;
+        } catch {
+          if (!res.ok && text) errorMessage = text.slice(0, 100);
+        }
+        if (!res.ok) {
+          onUploadError?.(UPLOAD_ERROR_TOAST_MESSAGE);
+          throw new Error(errorMessage);
+        }
+        const d = JSON.parse(text) as { url?: string };
+        if (!d?.url) {
+          onUploadError?.(UPLOAD_ERROR_TOAST_MESSAGE);
+          throw new Error("업로드 결과가 올바르지 않습니다.");
+        }
+        return d.url;
+      } catch (e) {
+        onUploadError?.(UPLOAD_ERROR_TOAST_MESSAGE);
+        throw e;
+      }
+    },
+    [onUploadError]
+  );
 }
 
 export function RichEditor({
@@ -122,7 +139,12 @@ export function RichEditor({
   className = "",
   minHeight = "200px",
 }: RichEditorProps) {
-  const uploadImage = useImageUpload();
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const onUploadError = useCallback((message: string) => {
+    setUploadError(message);
+    setTimeout(() => setUploadError(null), 6000);
+  }, []);
+  const uploadImage = useImageUpload(onUploadError);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
@@ -344,7 +366,11 @@ export function RichEditor({
     input.accept = "image/*";
     input.onchange = () => {
       const file = input.files?.[0];
-      if (file) uploadImage(file).then((url) => editor?.commands.setImage({ src: url }));
+      if (file) {
+        uploadImage(file)
+          .then((url) => editor?.commands.setImage({ src: url }))
+          .catch(() => {});
+      }
     };
     input.click();
   }, [editor, uploadImage]);
@@ -407,6 +433,14 @@ export function RichEditor({
 
   return (
     <div className={`rich-editor-tiptap ${className}`}>
+      {uploadError && (
+        <div
+          role="alert"
+          className="fixed bottom-4 left-1/2 z-[100] max-w-[90vw] -translate-x-1/2 rounded-lg border border-red-200 bg-red-600 px-4 py-3 text-center text-sm text-white shadow-lg"
+        >
+          {uploadError}
+        </div>
+      )}
       <style dangerouslySetInnerHTML={{ __html: `
         .rich-editor-tiptap .ProseMirror { min-height: ${minHeight}; padding: 12px; outline: none; font-family: inherit; }
         .rich-editor-tiptap .ProseMirror p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: #9ca3af; float: left; }
