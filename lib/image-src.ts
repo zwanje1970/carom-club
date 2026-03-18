@@ -14,10 +14,14 @@ export function isOptimizableImageSrc(src: string | null | undefined): boolean {
   return false;
 }
 
-/** img/Image에 넣어도 되는 유효한 src 문자열 반환 (무효면 빈 문자열) */
-export function sanitizeImageSrc(src: string | null | undefined): string {
-  if (src == null || typeof src !== "string") return "";
+/** img/Image에 넣어도 되는 유효한 src. 무효 시 null (undefined, null, "", javascript: 제거, trim) */
+export function sanitizeImageSrc(src: string | null | undefined): string | null {
+  if (src == null || typeof src !== "string") return null;
   const s = src.trim();
-  if (s === "" || s.startsWith("javascript:")) return "";
+  if (s === "" || s.startsWith("javascript:")) return null;
   return s;
 }
+
+/** 이미지 src 무효 시 사용할 placeholder (data URL, 파일 불필요) */
+export const IMAGE_PLACEHOLDER_SRC =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect fill='%23f3f4f6' width='100' height='100'/%3E%3Ctext x='50' y='55' text-anchor='middle' fill='%239ca3af' font-size='12'%3E?%3C/text%3E%3C/svg%3E";

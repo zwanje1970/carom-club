@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { TournamentListRow } from "@/lib/db-tournaments";
+import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
 import { formatDistanceKm } from "@/lib/distance";
 
 type TabId = "upcoming" | "closed" | "finished";
@@ -182,19 +183,27 @@ export function TournamentsListWithFilters({
                   <div
                     className={`relative ${hasImage ? "aspect-[2/1] bg-site-bg" : "min-h-[80px] bg-site-primary/10"} flex flex-col justify-end p-3`}
                   >
-                    {hasImage ? (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <Image
-                          src={hasImage}
-                          alt=""
-                          fill
-                          className="object-contain"
-                          sizes="(max-width: 768px) 100vw, 400px"
-                          loading="lazy"
-                          unoptimized={!hasImage.startsWith("/")}
-                        />
-                      </div>
-                    ) : null}
+                    {(() => {
+                      const src = sanitizeImageSrc(hasImage);
+                      if (!src) return null;
+                      return (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          {!isOptimizableImageSrc(src) ? (
+                            <img src={src} alt="" className="absolute inset-0 w-full h-full object-contain" />
+                          ) : (
+                            <Image
+                              src={src}
+                              alt=""
+                              fill
+                              className="object-contain"
+                              sizes="(max-width: 768px) 100vw, 400px"
+                              loading="lazy"
+                              unoptimized
+                            />
+                          )}
+                        </div>
+                      );
+                    })()}
                     <div className="relative z-10">
                       <h2 className="font-semibold text-site-text line-clamp-2 text-sm sm:text-base">{t.name}</h2>
                       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-site-text-muted">

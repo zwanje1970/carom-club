@@ -3,13 +3,34 @@
 import Image from "next/image";
 import { SmartLink } from "@/components/common/SmartLink";
 import { INTERNAL_PAGE_PATHS } from "@/lib/content/constants";
-import { isOptimizableImageSrc } from "@/lib/image-src";
+import { IMAGE_PLACEHOLDER_SRC, isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
 import type { PageSection } from "@/types/page-section";
 
 const PLACEHOLDER =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='400' viewBox='0 0 800 400'%3E%3Crect fill='%23e5e7eb' width='800' height='400'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='14'%3E이미지%3C/text%3E%3C/svg%3E";
 
 type Props = { section: PageSection };
+
+function SectionImageCell({ src, alt }: { src: string; alt: string }) {
+  const safeSrc = sanitizeImageSrc(src);
+  if (!safeSrc) {
+    return <img src={IMAGE_PLACEHOLDER_SRC} alt={alt} className="absolute inset-0 w-full h-full object-cover" />;
+  }
+  if (!isOptimizableImageSrc(safeSrc)) {
+    return <img src={safeSrc} alt={alt} className="absolute inset-0 w-full h-full object-cover" />;
+  }
+  return (
+    <Image
+      src={safeSrc}
+      alt={alt}
+      fill
+      className="object-cover"
+      sizes="100vw"
+      loading="lazy"
+      unoptimized
+    />
+  );
+}
 
 export function ImageSection({ section }: Props) {
   const imgUrl = section.imageUrl?.trim() || PLACEHOLDER;
@@ -31,32 +52,10 @@ export function ImageSection({ section }: Props) {
   const image = (
     <>
       <div className="relative hidden w-full overflow-hidden sm:block" style={{ height: heightPc }}>
-        {isOptimizableImageSrc(imgUrl) ? (
-          <Image
-            src={imgUrl}
-            alt={section.title || ""}
-            fill
-            className="object-cover"
-            sizes="100vw"
-            loading="lazy"
-          />
-        ) : (
-          <img src={imgUrl} alt={section.title || ""} className="absolute inset-0 w-full h-full object-cover" />
-        )}
+        <SectionImageCell src={imgUrl} alt={section.title || ""} />
       </div>
       <div className="relative block w-full overflow-hidden sm:hidden" style={{ height: heightMobile }}>
-        {isOptimizableImageSrc(imgUrlMobile) ? (
-          <Image
-            src={imgUrlMobile}
-            alt={section.title || ""}
-            fill
-            className="object-cover"
-            sizes="100vw"
-            loading="lazy"
-          />
-        ) : (
-          <img src={imgUrlMobile} alt={section.title || ""} className="absolute inset-0 w-full h-full object-cover" />
-        )}
+        <SectionImageCell src={imgUrlMobile} alt={section.title || ""} />
       </div>
     </>
   );

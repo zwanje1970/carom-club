@@ -251,16 +251,20 @@ export function clampBallToPlayfieldAndNoOverlap(
   return clampBallToPlayfield(px, py, rect);
 }
 
-/** 클릭 지점(픽셀)에서 맞은 공 반환. 없으면 null */
+/**
+ * 클릭/터치 지점(픽셀)에서 맞은 공 반환. 없으면 null.
+ * @param hitRadiusScale 공 반지름의 배수 (기본 1). 난구 공배치 모드에서는 1.5 권장.
+ */
 export function hitTestBall(
   px: number,
   py: number,
   redBall: { x: number; y: number },
   yellowBall: { x: number; y: number },
   whiteBall: { x: number; y: number },
-  rect: PlayfieldRect
+  rect: PlayfieldRect,
+  hitRadiusScale: number = 1
 ): BallColor | null {
-  const r = getBallRadius(getPlayfieldLongSide(rect));
+  const r = getBallRadius(getPlayfieldLongSide(rect)) * hitRadiusScale;
   const balls: { id: BallColor; x: number; y: number }[] = [
     { id: "red", ...redBall },
     { id: "yellow", ...yellowBall },

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
+import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
 import { useIntroController } from "./useIntroController";
 import { useSiteSettings } from "@/components/SiteSettingsProvider";
 
@@ -52,7 +53,6 @@ export function LogoLink({
 
   if (logoUrl) {
     const imgClass = isFooter ? "h-6 w-auto sm:h-7" : "h-8 w-auto sm:h-9";
-    const isSvg = logoUrl.includes(".svg") || logoUrl.toLowerCase().includes("svg");
     return (
       <Link
         href="/"
@@ -63,20 +63,24 @@ export function LogoLink({
         aria-label={dataMainLogo ? `${siteName} 홈` : `${siteName} 홈 (인트로 다시 보기)`}
       >
         <span className={`relative flex shrink-0 ${imgClass}`} data-logo-balls>
-          {isSvg ? (
-            /* eslint-disable-next-line @next/next/no-img-element -- SVG from Blob, next/image does not optimize SVG */
-            <img src={logoUrl} alt="" className="h-full w-auto object-contain" />
-          ) : (
-            <Image
-              src={logoUrl}
-              alt=""
-              width={160}
-              height={48}
-              className="h-full w-auto object-contain"
-              sizes="(max-width: 640px) 120px, 160px"
-              unoptimized={false}
-            />
-          )}
+          {(() => {
+            const safeLogo = sanitizeImageSrc(logoUrl);
+            if (!safeLogo) return <span className="h-8 w-20 bg-gray-200 dark:bg-slate-600 rounded shrink-0" aria-hidden />;
+            if (!isOptimizableImageSrc(safeLogo)) {
+              return <img src={safeLogo} alt="" className="h-full w-auto object-contain" />;
+            }
+            return (
+              <Image
+                src={safeLogo}
+                alt=""
+                width={160}
+                height={48}
+                className="h-full w-auto object-contain"
+                sizes="(max-width: 640px) 120px, 160px"
+                unoptimized
+              />
+            );
+          })()}
         </span>
         <span data-logo-text>{siteName}</span>
       </Link>

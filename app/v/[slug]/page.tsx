@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { isOptimizableImageSrc } from "@/lib/image-src";
+import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { MOCK_VENUES_LIST } from "@/lib/mock-data";
@@ -181,17 +181,19 @@ export default async function VenueDetailPage({
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-10">
         <header className="mt-4">
           <div className="flex flex-wrap items-start gap-4">
-            {venue.logoImageUrl && (
-              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-site-border bg-site-card">
-                <Image
-                  src={venue.logoImageUrl}
-                  alt=""
-                  fill
-                  className="object-contain"
-                  unoptimized
-                />
-              </div>
-            )}
+            {(() => {
+              const safeLogo = sanitizeImageSrc(venue.logoImageUrl);
+              if (!safeLogo) return null;
+              return (
+                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-site-border bg-site-card">
+                  {!isOptimizableImageSrc(safeLogo) ? (
+                    <img src={safeLogo} alt="" className="absolute inset-0 w-full h-full object-contain" />
+                  ) : (
+                    <Image src={safeLogo} alt="" fill className="object-contain" unoptimized />
+                  )}
+                </div>
+              );
+            })()}
             <div className="min-w-0 flex-1">
               <h1 className="text-2xl font-bold text-site-text">{venue.name}</h1>
               {venue.shortDescription && (
@@ -201,18 +203,19 @@ export default async function VenueDetailPage({
           </div>
         </header>
 
-        {venue.coverImageUrl && (
-          <div className="relative mt-6 aspect-[21/9] w-full overflow-hidden rounded-2xl border border-site-border bg-site-card">
-            <Image
-              src={venue.coverImageUrl}
-              alt=""
-              fill
-              className="object-cover"
-              unoptimized
-              priority
-            />
-          </div>
-        )}
+        {(() => {
+          const safeCover = sanitizeImageSrc(venue.coverImageUrl);
+          if (!safeCover) return null;
+          return (
+            <div className="relative mt-6 aspect-[21/9] w-full overflow-hidden rounded-2xl border border-site-border bg-site-card">
+              {!isOptimizableImageSrc(safeCover) ? (
+                <img src={safeCover} alt="" className="absolute inset-0 w-full h-full object-cover" />
+              ) : (
+                <Image src={safeCover} alt="" fill className="object-cover" unoptimized priority />
+              )}
+            </div>
+          );
+        })()}
 
         {(venue.address || venue.phone || venue.email || venue.website) && (
           <section className="mt-6 rounded-2xl border border-site-border bg-site-card p-6">
@@ -359,21 +362,26 @@ export default async function VenueDetailPage({
         {/* 홍보: 1. 대표 이미지 2. 에디터 내용 3. PDF */}
         {(venue.promoImageUrl ?? venue.promoPublished ?? venue.promoPdfUrl) ? (
           <div className="mt-6 space-y-6">
-            {venue.promoImageUrl?.trim() && (
-              <div className="relative w-full aspect-[2/1] max-h-80 rounded-2xl border border-site-border bg-site-card overflow-hidden">
-                {isOptimizableImageSrc(venue.promoImageUrl) ? (
-                  <Image
-                    src={venue.promoImageUrl.trim()}
-                    alt="대표 이미지"
-                    fill
-                    className="object-contain"
-                    sizes="(max-width: 768px) 100vw, 800px"
-                  />
-                ) : (
-                  <img src={venue.promoImageUrl.trim()} alt="대표 이미지" className="absolute inset-0 w-full h-full object-contain" />
-                )}
-              </div>
-            )}
+            {(() => {
+              const safePromo = sanitizeImageSrc(venue.promoImageUrl);
+              if (!safePromo) return null;
+              return (
+                <div className="relative w-full aspect-[2/1] max-h-80 rounded-2xl border border-site-border bg-site-card overflow-hidden">
+                  {!isOptimizableImageSrc(safePromo) ? (
+                    <img src={safePromo} alt="대표 이미지" className="absolute inset-0 w-full h-full object-contain" />
+                  ) : (
+                    <Image
+                      src={safePromo}
+                      alt="대표 이미지"
+                      fill
+                      className="object-contain"
+                      sizes="(max-width: 768px) 100vw, 800px"
+                      unoptimized
+                    />
+                  )}
+                </div>
+              );
+            })()}
             {venue.promoPublished?.trim() && (
               <div
                 className="prose prose-sm max-w-none rounded-2xl border border-site-border bg-site-card p-6 shadow-sm prose-p:text-gray-600"

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import type { HeroSettings } from "@/lib/hero-settings";
+import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
 
 const HERO_PLACEHOLDER =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='300'%3E%3Crect fill='%23e5e7eb' width='800' height='300'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='14'%3E배경 이미지%3C/text%3E%3C/svg%3E";
@@ -63,17 +64,33 @@ export default function HeroPreviewBlock({ settings }: Props) {
     >
       {/* background */}
       <div className="absolute inset-0">
-        <Image
-          src={bgSrc}
-          alt="히어로 배경 미리보기"
-          fill
-          className="object-cover"
-          sizes="800px"
-          style={{
-            filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined,
-          }}
-          unoptimized={bgSrc.startsWith("data:")}
-        />
+        {(() => {
+          const safeSrc = sanitizeImageSrc(bgSrc);
+          if (!safeSrc) return null;
+          if (!isOptimizableImageSrc(safeSrc)) {
+            return (
+              <img
+                src={safeSrc}
+                alt="히어로 배경 미리보기"
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined }}
+              />
+            );
+          }
+          return (
+            <Image
+              src={safeSrc}
+              alt="히어로 배경 미리보기"
+              fill
+              className="object-cover"
+              sizes="800px"
+              unoptimized
+              style={{
+                filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined,
+              }}
+            />
+          );
+        })()}
       </div>
       <div
         className="absolute inset-0"

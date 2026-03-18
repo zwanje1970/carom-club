@@ -136,6 +136,8 @@ export interface BilliardTableCanvasProps {
   drawStyle?: TableDrawStyle;
   /** true면 수구를 둘러싼 회색 원을 깜빡이게 표시 (난구 해법 출발선 스팟). 저장 이미지에는 미포함. */
   showCueBallSpot?: boolean;
+  /** 난구 공배치 모드: 선택 시 1.5~2배 반투명 원, 크로스헤어 미표시 */
+  placementMode?: boolean;
 }
 
 export interface BilliardTableCanvasHandle {
@@ -364,6 +366,9 @@ function drawTable(
   }
 }
 
+const PLACEMENT_SELECTION_RING_SCALE = 1.75;
+const PLACEMENT_SELECTION_RING_OPACITY = 0.28;
+
 function drawBall(
   ctx: CanvasRenderingContext2D,
   rect: PlayfieldRect,
@@ -372,7 +377,8 @@ function drawBall(
   color: "red" | "yellow" | "white",
   isCue: boolean,
   isSelected: boolean,
-  wireframe: boolean = false
+  wireframe: boolean = false,
+  placementMode: boolean = false
 ) {
   const { px, py } = normalizedToPixel(x, y, rect);
   const r = getBallRadius(getPlayfieldLongSide(rect));
@@ -472,14 +478,27 @@ function drawBall(
   ctx.arc(px, py, r, 0, Math.PI * 2);
   ctx.fill();
 
-  // 5. 선택된 공: 이중 테두리
+  // 5. 선택된 공: 공배치 모드면 1.5~2배 반투명 원(공 색상), 아니면 이중 테두리
   if (isSelected) {
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    ctx.strokeStyle = "rgba(0,0,0,0.5)";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    if (placementMode) {
+      const ringR = r * PLACEMENT_SELECTION_RING_SCALE;
+      const hex = colors[color];
+      const rgb = hex.startsWith("#") ? hex.slice(1) : hex;
+      const rv = parseInt(rgb.slice(0, 2), 16);
+      const gv = parseInt(rgb.slice(2, 4), 16);
+      const bv = parseInt(rgb.slice(4, 6), 16);
+      ctx.fillStyle = `rgba(${rv},${gv},${bv},${PLACEMENT_SELECTION_RING_OPACITY})`;
+      ctx.beginPath();
+      ctx.arc(px, py, ringR, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(0,0,0,0.5)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
   }
 }
 
@@ -548,6 +567,7 @@ const BilliardTableCanvas = forwardRef<
     orientation = "landscape",
     drawStyle = "realistic",
     showCueBallSpot = false,
+    placementMode = false,
   },
   ref
 ) {
@@ -562,9 +582,12 @@ const BilliardTableCanvas = forwardRef<
       withGrid: boolean,
       withCrosshair: boolean = true,
       style: TableDrawStyle = drawStyle,
-      cueBallSpotOpacity?: number
+      cueBallSpotOpacity?: number,
+      /** true면 저장/내보내기용 — 선택 링·크로스헤어 미표시 */
+      noSelectionForExport?: boolean
     ) => {
       const isWireframe = style === "wireframe";
+      const sel = noSelectionForExport ? null : selectedBall;
       drawTable(ctx, width, height, withGrid, orientation, style);
       const rect = getPlayfieldRect(width, height);
       const toView = (lx: number, ly: number) =>
@@ -572,12 +595,12 @@ const BilliardTableCanvas = forwardRef<
       const rView = toView(redBall.x, redBall.y);
       const yView = toView(yellowBall.x, yellowBall.y);
       const wView = toView(whiteBall.x, whiteBall.y);
-      drawBall(ctx, rect, rView.x, rView.y, "red", false, selectedBall === "red", isWireframe);
-      drawBall(ctx, rect, yView.x, yView.y, "yellow", cueBall === "yellow", selectedBall === "yellow", isWireframe);
-      drawBall(ctx, rect, wView.x, wView.y, "white", cueBall === "white", selectedBall === "white", isWireframe);
-      if (withCrosshair && selectedBall) {
+      drawBall(ctx, rect, rView.x, rView.y, "red", false, sel === "red", isWireframe, placementMode);
+      drawBall(ctx, rect, yView.x, yView.y, "yellow", cueBall === "yellow", sel === "yellow", isWireframe, placementMode);
+      drawBall(ctx, rect, wView.x, wView.y, "white", cueBall === "white", sel === "white", isWireframe, placementMode);
+      if (withCrosshair && !placementMode && sel) {
         const pos =
-          selectedBall === "red" ? redBall : selectedBall === "yellow" ? yellowBall : whiteBall;
+          sel === "red" ? redBall : sel === "yellow" ? yellowBall : whiteBall;
         const v = toView(pos.x, pos.y);
         drawCrosshair(ctx, rect, v.x, v.y);
       }
@@ -590,7 +613,7 @@ const BilliardTableCanvas = forwardRef<
         drawCueBallSpot(ctx, rect, cueView.x, cueView.y, cueBallSpotOpacity);
       }
     },
-    [width, height, isPortrait, redBall, yellowBall, whiteBall, cueBall, selectedBall, paths, drawStyle]
+    [width, height, isPortrait, redBall, yellowBall, whiteBall, cueBall, selectedBall, paths, drawStyle, placementMode]
   );
 
   useEffect(() => {
@@ -600,7 +623,7 @@ const BilliardTableCanvas = forwardRef<
     if (!ctx) return;
     canvas.width = width;
     canvas.height = height;
-    draw(ctx, showGrid, true, drawStyle);
+      draw(ctx, showGrid, true, drawStyle, undefined, false);
   }, [draw, showGrid, drawStyle]);
 
   // 수구 스팟 깜빡임: showCueBallSpot 시에만 rAF로 주기적 그리기 (저장 이미지에는 미포함)
@@ -614,13 +637,13 @@ const BilliardTableCanvas = forwardRef<
     const tick = () => {
       const t = Date.now() / 180;
       const opacity = Math.sin(t) >= 0 ? 1 : 0;
-      draw(ctx, showGrid, true, drawStyle, opacity);
+      draw(ctx, showGrid, true, drawStyle, opacity, false);
       frameId = requestAnimationFrame(tick);
     };
     frameId = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(frameId);
-      draw(ctx, showGrid, true, drawStyle);
+      draw(ctx, showGrid, true, drawStyle, undefined, false);
     };
   }, [showCueBallSpot, draw, showGrid, drawStyle]);
 
@@ -643,16 +666,16 @@ const BilliardTableCanvas = forwardRef<
         drawTable(offCtx, w, h, includeGrid, "landscape", styleToUse);
         const rect = getPlayfieldRect(w, h);
         const wf = styleToUse === "wireframe";
-        drawBall(offCtx, rect, redBall.x, redBall.y, "red", false, false, wf);
-        drawBall(offCtx, rect, yellowBall.x, yellowBall.y, "yellow", cueBall === "yellow", false, wf);
-        drawBall(offCtx, rect, whiteBall.x, whiteBall.y, "white", cueBall === "white", false, wf);
+        drawBall(offCtx, rect, redBall.x, redBall.y, "red", false, false, wf, false);
+        drawBall(offCtx, rect, yellowBall.x, yellowBall.y, "yellow", cueBall === "yellow", false, wf, false);
+        drawBall(offCtx, rect, whiteBall.x, whiteBall.y, "white", cueBall === "white", false, wf, false);
         if (paths?.length) {
           drawPaths(offCtx, rect, paths, cueBall, whiteBall, yellowBall, undefined);
         }
         return off.toDataURL("image/png");
       }
 
-      draw(ctx, includeGrid, false, styleToUse);
+      draw(ctx, includeGrid, false, styleToUse, undefined, true);
       return canvas.toDataURL("image/png");
     },
   }));

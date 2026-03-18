@@ -73,6 +73,8 @@ export interface BilliardTableEditorProps {
   /** 실사보기/단순보기 (제어 모드) */
   drawStyle?: "realistic" | "wireframe";
   onDrawStyleChange?: (value: "realistic" | "wireframe") => void;
+  /** 난구 공배치 전용: 위치만, 터치 1.5배, 선택 반투명 링, 상단 안내, 경로 모드 비노출 */
+  placementMode?: boolean;
 }
 
 const BilliardTableEditor = forwardRef<
@@ -96,6 +98,7 @@ const BilliardTableEditor = forwardRef<
     onGridChange,
     drawStyle: drawStyleProp,
     onDrawStyleChange,
+    placementMode = false,
   },
   ref
 ) {
@@ -140,7 +143,7 @@ const BilliardTableEditor = forwardRef<
 
   const handlePointerDownBall = (normalized: { x: number; y: number }) => {
     const { px, py } = normalizedToPixel(normalized.x, normalized.y, rect);
-    const hit = hitTestBall(px, py, redBall, yellowBall, whiteBall, rect);
+    const hit = hitTestBall(px, py, redBall, yellowBall, whiteBall, rect, placementMode ? 1.5 : 1);
     if (hit) {
       setSelectedBall(hit);
       setIsDragging(true);
@@ -274,8 +277,26 @@ const BilliardTableEditor = forwardRef<
     },
   }));
 
+  const placementHintLabel =
+    placementMode && isDragging && selectedBall
+      ? selectedBall === "red"
+        ? "🔴공 이동"
+        : selectedBall === "yellow"
+          ? "🟡공 이동"
+          : "⚪공 이동"
+      : null;
+
   const canvasBlock = (
     <div className="flex justify-center items-center rounded-lg p-2 overflow-x-auto flex-1 min-h-0">
+      {placementHintLabel && (
+        <div
+          className="fixed left-1/2 top-6 z-50 -translate-x-1/2 text-[15px] font-bold text-site-text"
+          style={{ pointerEvents: "none" }}
+          aria-live="polite"
+        >
+          {placementHintLabel}
+        </div>
+      )}
       <div className="relative w-full h-full max-h-full flex items-center justify-center min-w-0">
         <BilliardTableCanvas
           ref={tableRef}
@@ -295,6 +316,7 @@ const BilliardTableEditor = forwardRef<
           orientation={effectiveOrientation}
           drawStyle={tableDrawStyle}
           showCueBallSpot={isBallMode ? !isDragging : true}
+          placementMode={placementMode}
         />
         {mode === "path" && (
           <BilliardPathLayer
@@ -325,7 +347,8 @@ const BilliardTableEditor = forwardRef<
 
   return (
     <div className="space-y-4">
-      {/* 모드 전환 + 경로 툴바 */}
+      {/* 모드 전환 + 경로 툴바 (placementMode면 공배치만, 경로 비노출) */}
+      {!placementMode && (
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-gray-600 dark:text-gray-400 mr-1">모드:</span>
         <button
@@ -376,10 +399,13 @@ const BilliardTableEditor = forwardRef<
           </>
         )}
       </div>
+      )}
 
       {mode === "ball" && (
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          테이블 위 공을 클릭해 선택한 뒤 드래그로 이동합니다. 공은 서로 겹치지 않으며 플레이필드 안에서만 움직입니다.
+          {placementMode
+            ? "공을 드래그해 위치를 설정하세요."
+            : "테이블 위 공을 클릭해 선택한 뒤 드래그로 이동합니다. 공은 서로 겹치지 않으며 플레이필드 안에서만 움직입니다."}
         </p>
       )}
 

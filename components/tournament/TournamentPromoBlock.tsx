@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
 
 function formatSchedule(startAt: string | Date, endAt?: string | Date | null): string {
   const s = new Date(startAt);
@@ -85,25 +86,32 @@ export function TournamentPromoBlock({
     <article className="space-y-6">
       {/* Hero: 대표 이미지 + 제목 */}
       <div className="rounded-xl overflow-hidden bg-site-card border border-site-border">
-        {posterImageUrl?.trim() ? (
-          <div className="relative w-full aspect-[2/1] bg-site-bg flex items-center justify-center">
-            {posterImageUrl.startsWith("data:") || posterImageUrl.startsWith("blob:") ? (
-              <img src={posterImageUrl} alt="" className="absolute inset-0 w-full h-full object-contain" />
-            ) : (
-              <Image
-                src={posterImageUrl}
-                alt=""
-                fill
-                className="object-contain"
-                sizes="(max-width: 768px) 100vw, 800px"
-              />
-            )}
-          </div>
-        ) : (
-          <div className="w-full aspect-[2/1] bg-site-bg flex items-center justify-center text-site-text-muted text-sm">
-            대표 이미지 없음
-          </div>
-        )}
+        {(() => {
+          const safeSrc = sanitizeImageSrc(posterImageUrl ?? "");
+          if (!safeSrc) {
+            return (
+              <div className="w-full aspect-[2/1] bg-site-bg flex items-center justify-center text-site-text-muted text-sm">
+                대표 이미지 없음
+              </div>
+            );
+          }
+          return (
+            <div className="relative w-full aspect-[2/1] bg-site-bg flex items-center justify-center">
+              {!isOptimizableImageSrc(safeSrc) ? (
+                <img src={safeSrc} alt="" className="absolute inset-0 w-full h-full object-contain" />
+              ) : (
+                <Image
+                  src={safeSrc}
+                  alt=""
+                  fill
+                  className="object-contain"
+                  sizes="(max-width: 768px) 100vw, 800px"
+                  unoptimized
+                />
+              )}
+            </div>
+          );
+        })()}
         <div className="p-4 sm:p-5">
           <h1 className="text-xl sm:text-2xl font-bold text-site-text">{name}</h1>
           {summary && <p className="mt-2 text-site-text-muted text-sm sm:text-base leading-relaxed">{summary}</p>}

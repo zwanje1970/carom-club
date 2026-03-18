@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
 import type { Popup as PopupType } from "@/types/popup";
 
 const STORAGE_PREFIX = "carom_popup_hide_";
@@ -79,22 +80,27 @@ export function Popup({ popup, onClose }: Props) {
               {popup.description}
             </p>
           )}
-          {popup.imageUrl?.trim() && (
-            <div className="relative mt-4 aspect-video w-full overflow-hidden rounded">
-              {popup.imageUrl.startsWith("data:") || popup.imageUrl.startsWith("blob:") ? (
-                <img src={popup.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-              ) : (
-                <Image
-                  src={popup.imageUrl}
-                  alt=""
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 480px) 100vw, 480px"
-                  loading="lazy"
-                />
-              )}
-            </div>
-          )}
+          {(() => {
+            const safeSrc = sanitizeImageSrc(popup.imageUrl);
+            if (!safeSrc) return null;
+            return (
+              <div className="relative mt-4 aspect-video w-full overflow-hidden rounded">
+                {!isOptimizableImageSrc(safeSrc) ? (
+                  <img src={safeSrc} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                ) : (
+                  <Image
+                    src={safeSrc}
+                    alt=""
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 480px) 100vw, 480px"
+                    loading="lazy"
+                    unoptimized
+                  />
+                )}
+              </div>
+            );
+          })()}
           <div className="mt-4 flex flex-wrap gap-2">
             {popup.buttonName && popup.buttonLink && (
               <Link

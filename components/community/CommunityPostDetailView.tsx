@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
+import { IMAGE_PLACEHOLDER_SRC, isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
 
 const VIEWER_KEY_STORAGE = "community_viewer_key";
 
@@ -378,18 +378,26 @@ export function CommunityPostDetailView({
             </div>
             {post.imageUrls?.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-2">
-                {post.imageUrls
-                  .map((url) => sanitizeImageSrc(url))
-                  .filter(Boolean)
-                  .map((url) => (
-                    <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block">
-                      {isOptimizableImageSrc(url) ? (
-                        <Image src={url} alt="" width={240} height={160} className="rounded-lg object-cover" unoptimized />
-                      ) : (
-                        <img src={url} alt="" width={240} height={160} className="rounded-lg object-cover w-[240px] h-[160px]" />
-                      )}
+                {post.imageUrls.map((url, i) => {
+                  const safeSrc = sanitizeImageSrc(url);
+                  if (!safeSrc) {
+                    return (
+                      <img key={`ph-${i}`} src={IMAGE_PLACEHOLDER_SRC} alt="" width={240} height={160} className="rounded-lg object-cover w-[240px] h-[160px]" />
+                    );
+                  }
+                  if (!isOptimizableImageSrc(safeSrc)) {
+                    return (
+                      <a key={safeSrc} href={safeSrc} target="_blank" rel="noopener noreferrer" className="block">
+                        <img src={safeSrc} alt="" width={240} height={160} className="rounded-lg object-cover w-[240px] h-[160px]" />
+                      </a>
+                    );
+                  }
+                  return (
+                    <a key={safeSrc} href={safeSrc} target="_blank" rel="noopener noreferrer" className="block">
+                      <Image src={safeSrc} alt="" width={240} height={160} className="rounded-lg object-cover" unoptimized />
                     </a>
-                  ))}
+                  );
+                })}
               </div>
             )}
             <div className="mt-6 flex flex-wrap gap-2">

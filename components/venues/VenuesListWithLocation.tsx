@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { formatDistanceKm } from "@/lib/distance";
 
@@ -105,18 +106,19 @@ export function VenuesListWithLocation({ initialVenues, copy }: Props) {
                 )}
                 <p className="mt-0.5 text-sm text-gray-500">자세히 보기 →</p>
               </div>
-              {v.coverImageUrl?.trim() ? (
-                <div className="relative ml-3 h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-gray-100">
-                  <Image
-                    src={v.coverImageUrl.trim()}
-                    alt=""
-                    fill
-                    className="object-cover"
-                    sizes="56px"
-                    unoptimized={!v.coverImageUrl.trim().startsWith("/") && !v.coverImageUrl.includes("vercel-storage")}
-                  />
-                </div>
-              ) : null}
+              {(() => {
+                const src = sanitizeImageSrc(v.coverImageUrl);
+                if (!src) return null;
+                return (
+                  <div className="relative ml-3 h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                    {!isOptimizableImageSrc(src) ? (
+                      <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                    ) : (
+                      <Image src={src} alt="" fill className="object-cover" sizes="56px" unoptimized />
+                    )}
+                  </div>
+                );
+              })()}
             </Link>
           </li>
         ))}

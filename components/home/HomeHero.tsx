@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
 import type { HeroContent as HeroContentType } from "@/lib/content/hero-from-section";
 import type { HeroSettings } from "@/lib/hero-settings";
 
@@ -121,20 +122,23 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
     </div>
   );
 
+  const safeBannerSrc = hasBanner ? sanitizeImageSrc(bannerSrc) : null;
+
   return (
     <section className="relative overflow-hidden border-b border-site-border bg-gradient-to-b from-site-card to-[var(--site-bg)] flex-shrink-0 w-full">
-      {hasBanner && bannerSrc ? (
+      {safeBannerSrc ? (
         <div className="relative min-h-[240px] md:min-h-[420px] flex flex-col items-center justify-center py-6 md:py-12 w-full">
           <div className="absolute inset-0">
-            {bannerSrc.startsWith("data:") || bannerSrc.startsWith("blob:") ? (
-              <img src={bannerSrc} alt="히어로 배너" className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
+            {!isOptimizableImageSrc(safeBannerSrc) ? (
+              <img src={safeBannerSrc} alt="히어로 배너" className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
             ) : (
               <Image
-                src={bannerSrc}
+                src={safeBannerSrc}
                 alt="히어로 배너"
                 fill
                 className="object-cover pointer-events-none"
                 sizes="100vw"
+                unoptimized
               />
             )}
           </div>
@@ -227,29 +231,34 @@ function HomeHeroFromSettings({ settings }: { settings: HeroSettings }) {
         }}
       />
       <div className="hero-block-new flex flex-col items-center py-10 sm:py-12 md:py-12 w-full">
-        {hasBgImage && bgSrc ? (
-          <div className="absolute inset-0">
-            {bgSrc.startsWith("data:") || bgSrc.startsWith("blob:") ? (
-              <img
-                src={bgSrc}
-                alt="히어로 배경"
-                className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                style={{ filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined }}
-              />
-            ) : (
-              <Image
-                src={bgSrc}
-                alt="히어로 배경"
-                fill
-                className="object-cover pointer-events-none"
-                sizes="100vw"
-                style={{
-                  filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined,
-                }}
-              />
-            )}
-          </div>
-        ) : null}
+        {(() => {
+          const safeBg = sanitizeImageSrc(bgSrc);
+          if (!safeBg) return null;
+          return (
+            <div className="absolute inset-0">
+              {!isOptimizableImageSrc(safeBg) ? (
+                <img
+                  src={safeBg}
+                  alt="히어로 배경"
+                  className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                  style={{ filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined }}
+                />
+              ) : (
+                <Image
+                  src={safeBg}
+                  alt="히어로 배경"
+                  fill
+                  className="object-cover pointer-events-none"
+                  sizes="100vw"
+                  unoptimized
+                  style={{
+                    filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined,
+                  }}
+                />
+              )}
+            </div>
+          );
+        })()}
         <div
           className="absolute inset-0 pointer-events-none"
           style={{ backgroundColor: `rgba(0,0,0,${s.heroOverlayOpacity})` }}

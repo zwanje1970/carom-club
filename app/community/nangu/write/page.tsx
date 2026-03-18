@@ -160,7 +160,7 @@ export default function NanguWritePage() {
             )}
             {source?.type === "direct" && (
               <div className="mb-6">
-                <NanguBallPlacementEditor ref={editorRef} onNext={handleDirectNext} />
+                <NanguBallPlacementEditor ref={editorRef} onNext={handleDirectNext} placementMode />
               </div>
             )}
           </>
@@ -218,8 +218,8 @@ export default function NanguWritePage() {
 
 const NanguBallPlacementEditor = React.forwardRef<
   BilliardTableEditorHandle,
-  { onNext: () => void }
->(function NanguBallPlacementEditor({ onNext }, ref) {
+  { onNext: () => void; placementMode?: boolean }
+>(function NanguBallPlacementEditor({ onNext, placementMode = true }, ref) {
   const innerRef = React.useRef<BilliardTableEditorHandle>(null);
   React.useImperativeHandle(ref, () => innerRef.current!);
   return (
@@ -230,6 +230,7 @@ const NanguBallPlacementEditor = React.forwardRef<
           defaultMode="ball"
           interactive={true}
           showGrid={true}
+          placementMode={placementMode}
         />
       </div>
       <p className="mt-2 text-xs text-gray-500">공을 드래그해 배치한 뒤 아래 버튼을 누르세요.</p>
@@ -238,7 +239,7 @@ const NanguBallPlacementEditor = React.forwardRef<
         onClick={onNext}
         className="mt-4 w-full py-3 rounded-lg bg-site-primary text-white font-medium"
       >
-        다음: 제목·설명 입력
+        공배치 완료
       </button>
     </div>
   );
