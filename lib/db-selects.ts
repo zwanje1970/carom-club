@@ -6,7 +6,7 @@
  * - entries, brackets, payments 등 무거운 relation은 공용 select에 넣지 않고 별도 조회.
  */
 
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "@/generated/prisma";
 
 // ---------------------------------------------------------------------------
 // Organization

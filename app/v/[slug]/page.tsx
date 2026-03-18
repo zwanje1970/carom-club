@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { notFound } from "next/navigation";
+import { isOptimizableImageSrc } from "@/lib/image-src";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { MOCK_VENUES_LIST } from "@/lib/mock-data";
@@ -360,13 +361,17 @@ export default async function VenueDetailPage({
           <div className="mt-6 space-y-6">
             {venue.promoImageUrl?.trim() && (
               <div className="relative w-full aspect-[2/1] max-h-80 rounded-2xl border border-site-border bg-site-card overflow-hidden">
-                <Image
-                  src={venue.promoImageUrl.trim()}
-                  alt="대표 이미지"
-                  fill
-                  className="object-contain"
-                  sizes="(max-width: 768px) 100vw, 800px"
-                />
+                {isOptimizableImageSrc(venue.promoImageUrl) ? (
+                  <Image
+                    src={venue.promoImageUrl.trim()}
+                    alt="대표 이미지"
+                    fill
+                    className="object-contain"
+                    sizes="(max-width: 768px) 100vw, 800px"
+                  />
+                ) : (
+                  <img src={venue.promoImageUrl.trim()} alt="대표 이미지" className="absolute inset-0 w-full h-full object-contain" />
+                )}
               </div>
             )}
             {venue.promoPublished?.trim() && (

@@ -31,14 +31,28 @@ export default async function TournamentApplyPage({
     : [];
 
   const confirmedCount = entries.filter((e) => e.status === "CONFIRMED").length;
-  const maxCap = tournament.maxParticipants ?? tournament.rule?.maxEntries ?? 0;
+  type TournamentBasic = {
+    name: string;
+    status: string;
+    entryFee?: number | null;
+    maxParticipants?: number | null;
+    rule?: {
+      maxEntries?: number | null;
+      useWaiting?: boolean;
+      bracketConfig?: string | null;
+      entryConditions?: string | null;
+      entryFee?: number | null;
+    };
+  };
+  const t = tournament as unknown as TournamentBasic;
+  const maxCap = t.maxParticipants ?? t.rule?.maxEntries ?? 0;
   const isFull = maxCap > 0 && confirmedCount >= maxCap;
-  const useWaiting = tournament.rule?.useWaiting ?? false;
+  const useWaiting = t.rule?.useWaiting ?? false;
   const activeEntries = myEntries.filter((e) => e.status !== "CANCELED");
 
   const accountNumber = (() => {
     try {
-      const bc = tournament.rule?.bracketConfig;
+      const bc = t.rule?.bracketConfig;
       const raw = bc == null ? null : typeof bc === "string" ? JSON.parse(bc) : bc;
       const v = (raw as Record<string, unknown>)?.accountNumber;
       return typeof v === "string" && v.trim() ? v.trim() : null;
@@ -49,7 +63,7 @@ export default async function TournamentApplyPage({
 
   const allowMultipleSlots = (() => {
     try {
-      const bc = tournament.rule?.bracketConfig;
+      const bc = t.rule?.bracketConfig;
       const raw = bc == null ? null : typeof bc === "string" ? JSON.parse(bc) : bc;
       return (raw as Record<string, unknown>)?.allowMultipleSlots === true;
     } catch {
@@ -58,22 +72,22 @@ export default async function TournamentApplyPage({
   })();
 
   const canApplyFirstSlot =
-    tournament.status === "OPEN" && (useWaiting || !isFull) && activeEntries.length === 0;
+    t.status === "OPEN" && (useWaiting || !isFull) && activeEntries.length === 0;
   const canApplyAdditionalSlot =
-    tournament.status === "OPEN" && (useWaiting || !isFull) && allowMultipleSlots && activeEntries.length >= 1;
+    t.status === "OPEN" && (useWaiting || !isFull) && allowMultipleSlots && activeEntries.length >= 1;
 
   const applyClosedReason =
-    tournament.status === "DRAFT"
+    t.status === "DRAFT"
       ? "아직 참가 신청을 받지 않습니다."
-      : tournament.status === "CLOSED"
+      : t.status === "CLOSED"
         ? "참가 신청이 마감되었습니다."
-        : tournament.status === "FINISHED"
+        : t.status === "FINISHED"
           ? "종료된 대회입니다."
           : isFull && !useWaiting
             ? "정원이 마감되었습니다."
             : null;
 
-  const entryFee = tournament.entryFee ?? tournament.rule?.entryFee ?? null;
+  const entryFee = t.entryFee ?? t.rule?.entryFee ?? null;
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-site-bg">
@@ -85,13 +99,13 @@ export default async function TournamentApplyPage({
           ← 대회 안내
         </Link>
 
-        <h1 className="text-xl sm:text-2xl font-bold text-site-text mb-6">{tournament.name}</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-site-text mb-6">{t.name}</h1>
 
         <TournamentApplySection
           tournamentId={id}
           entryFee={entryFee}
           accountNumber={accountNumber}
-          entryConditionsHtml={tournament.rule?.entryConditions ?? null}
+          entryConditionsHtml={t.rule?.entryConditions ?? null}
           isLoggedIn={!!session}
           myEntries={myEntries}
           canApplyFirstSlot={canApplyFirstSlot}

@@ -85,16 +85,19 @@ export function TournamentPromoBlock({
     <article className="space-y-6">
       {/* Hero: 대표 이미지 + 제목 */}
       <div className="rounded-xl overflow-hidden bg-site-card border border-site-border">
-        {posterImageUrl ? (
+        {posterImageUrl?.trim() ? (
           <div className="relative w-full aspect-[2/1] bg-site-bg flex items-center justify-center">
-            <Image
-              src={posterImageUrl}
-              alt=""
-              fill
-              className="object-contain"
-              sizes="(max-width: 768px) 100vw, 800px"
-              unoptimized={!posterImageUrl.startsWith("/")}
-            />
+            {posterImageUrl.startsWith("data:") || posterImageUrl.startsWith("blob:") ? (
+              <img src={posterImageUrl} alt="" className="absolute inset-0 w-full h-full object-contain" />
+            ) : (
+              <Image
+                src={posterImageUrl}
+                alt=""
+                fill
+                className="object-contain"
+                sizes="(max-width: 768px) 100vw, 800px"
+              />
+            )}
           </div>
         ) : (
           <div className="w-full aspect-[2/1] bg-site-bg flex items-center justify-center text-site-text-muted text-sm">

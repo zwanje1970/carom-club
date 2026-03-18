@@ -140,9 +140,9 @@ export function AdminMembersList() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
-        const data = await res.json().catch(() => ({}));
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
         if (!res.ok) {
-          alert(data.error ?? "저장에 실패했습니다.");
+          alert(data?.error ?? "저장에 실패했습니다.");
           return;
         }
         setManageRow(null);
@@ -152,7 +152,7 @@ export function AdminMembersList() {
         setSaving(false);
       }
     },
-    [router, setParams]
+    [router]
   );
 
   return (

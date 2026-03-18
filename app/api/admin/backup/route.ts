@@ -16,7 +16,7 @@ export async function GET() {
   try {
     const items = await listBackupRecords(50);
     return NextResponse.json({
-      items: items.map((r) => ({
+      items: items.map((r: { id: string; filename: string; sizeBytes: number; createdAt: Date }) => ({
         id: r.id,
         filename: r.filename,
         sizeBytes: r.sizeBytes,

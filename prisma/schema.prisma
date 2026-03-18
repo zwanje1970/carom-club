@@ -690,6 +690,44 @@ model AdminCopy {
   value String
 }
 
+// 사이트 기능 플래그 (회원가입/대회생성/참가신청/커뮤니티 등 ON·OFF)
+model SiteFeatureFlag {
+  id      String  @id @default(cuid())
+  key     String  @unique // signup_enabled, tournament_create_enabled, ...
+  enabled Boolean @default(true)
+}
+
+// 고정 문구 (플랫폼 관리자 > 설정 > 고정 문구)
+model SystemText {
+  id           String   @id @default(cuid())
+  key          String   @unique
+  group        String
+  label        String
+  description  String?
+  value        String?
+  defaultValue String?
+  isEnabled    Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([group])
+  @@index([key])
+}
+
+// 고정 문구 변경 이력
+model SystemTextHistory {
+  id        String   @id @default(cuid())
+  textId    String
+  key       String
+  value     String?
+  action    String   // update | clear | reset_default | restore
+  adminId   String
+  createdAt DateTime @default(now())
+
+  @@index([textId])
+  @@index([createdAt])
+}
+
 // 관리자 활동 로그
 model AdminLog {
   id          String   @id @default(cuid())
@@ -703,6 +741,29 @@ model AdminLog {
 
   @@index([adminId])
   @@index([targetType, targetId])
+  @@index([createdAt])
+}
+
+// 추천 콘텐츠 (홈/관리자: 대회·장소·게시글 추천)
+model FeaturedContent {
+  id        String   @id @default(cuid())
+  type      String   // tournament | venue | post
+  targetId  String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@unique([type, targetId])
+  @@index([type, sortOrder])
+}
+
+// 관리자 DB 백업 기록
+model BackupRecord {
+  id        String   @id @default(cuid())
+  filename  String
+  filePath  String
+  sizeBytes Int
+  createdAt DateTime @default(now())
+
   @@index([createdAt])
 }
 
@@ -979,6 +1040,27 @@ model NoticeBar {
   updatedAt     DateTime  @updatedAt
 
   @@index([page])
+}
+
+// 플랫폼 공지 (관리자: bar | popup | emergency)
+model Notice {
+  id          String    @id @default(cuid())
+  type        String    // bar | popup | emergency
+  title       String
+  content     String    @default("")
+  linkUrl     String?
+  startAt     DateTime?
+  endAt       DateTime?
+  isActive    Boolean   @default(true)
+  showOnce    Boolean   @default(false)
+  showMobile  Boolean   @default(true)
+  showDesktop Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([type])
+  @@index([isActive, type])
 }
 
 // ============== Community: 당구노트 (개인 기록, 공개 게시판 아님) ==============

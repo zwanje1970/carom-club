@@ -42,6 +42,7 @@ export default async function MypagePage() {
         addressDetail: null,
         createdAt: new Date(),
         updatedAt: new Date(),
+        communityScore: 0,
         memberProfile: null,
       };
       useMock = true;
@@ -63,6 +64,7 @@ export default async function MypagePage() {
       addressDetail: null,
       createdAt: new Date(),
       updatedAt: new Date(),
+      communityScore: 0,
       memberProfile: null,
     };
     useMock = true;

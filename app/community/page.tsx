@@ -10,6 +10,25 @@ import { isDatabaseConfigured } from "@/lib/db-mode";
 const TAKE = 10;
 const LATEST_TAKE = 20;
 
+type PostItem = {
+  id: string;
+  title: string;
+  authorName: string;
+  likeCount: number;
+  commentCount: number;
+  viewCount: number;
+  createdAt: string;
+  boardSlug: string;
+  boardName: string;
+};
+
+type Popular = {
+  today: PostItem[];
+  weekly: PostItem[];
+  mostLiked: PostItem[];
+  mostComments: PostItem[];
+};
+
 export default async function CommunityPage() {
   const [common, session] = await Promise.all([getCommonPageData("community"), getSession()]);
   const c = common.copy as Record<AdminCopyKey, string>;
@@ -17,14 +36,14 @@ export default async function CommunityPage() {
   const canManageReports_ = canManageReports(session);
 
   let boards: { id: string; slug: string; name: string; type: string }[] = [];
-  let popular: { today: unknown[]; weekly: unknown[]; mostLiked: unknown[]; mostComments: unknown[] } = {
+  let popular: Popular = {
     today: [],
     weekly: [],
     mostLiked: [],
     mostComments: [],
   };
-  let latest: unknown[] = [];
-  let latestByBoard: Record<string, { id: string; title: string; authorName: string; likeCount: number; commentCount: number; createdAt: string }[]> = {
+  let latest: PostItem[] = [];
+  const latestByBoard: Record<string, { id: string; title: string; authorName: string; likeCount: number; commentCount: number; createdAt: string }[]> = {
     free: [],
     qna: [],
     tips: [],

@@ -61,6 +61,7 @@ export default async function ClientTournamentParticipantsPage({
     userPhone: e.user.phone ?? null,
     handicap: e.user.memberProfile?.handicap ?? null,
     avg: e.user.memberProfile?.avg ?? null,
+    avgProofUrl: e.user.memberProfile?.avgProofUrl ?? null,
     depositorName: e.depositorName,
     clubOrAffiliation: e.clubOrAffiliation ?? null,
     status: e.status,

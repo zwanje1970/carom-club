@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { formatDistanceKm } from "@/lib/distance";
+import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
 
 type Tournament = {
   id: string;
@@ -131,23 +132,30 @@ export function HomeTournamentCards({
                   className="group flex flex-col overflow-hidden rounded-2xl border border-site-border bg-site-card shadow-sm transition hover:border-site-primary/30 hover:shadow-md h-full min-h-[200px] md:min-h-0"
                 >
                   <div className="relative w-full h-28 md:h-40 bg-gray-100 shrink-0">
-                    {(t.posterImageUrl || t.imageUrl)?.trim() ? (
-                      <Image
-                        src={(t.posterImageUrl || t.imageUrl)!.trim()}
-                        alt=""
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 768px) 280px, (max-width: 1024px) 48vw, 320px"
-                        unoptimized={!(t.posterImageUrl || t.imageUrl)!.trim().startsWith("/") && !(t.posterImageUrl || t.imageUrl)!.includes("vercel-storage")}
-                      />
-                    ) : (
-                      <div
-                        className="absolute inset-0 flex items-center justify-center text-4xl text-gray-300"
-                        aria-hidden
-                      >
-                        ●
-                      </div>
-                    )}
+                    {(() => {
+                      const src = sanitizeImageSrc((t.posterImageUrl || t.imageUrl) ?? "");
+                      if (!src) {
+                        return (
+                          <div
+                            className="absolute inset-0 flex items-center justify-center text-4xl text-gray-300"
+                            aria-hidden
+                          >
+                            ●
+                          </div>
+                        );
+                      }
+                      return isOptimizableImageSrc(src) ? (
+                        <Image
+                          src={src}
+                          alt=""
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 280px, (max-width: 1024px) 48vw, 320px"
+                        />
+                      ) : (
+                        <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                      );
+                    })()}
                     <span
                       className={`absolute right-2 top-2 rounded-full px-2.5 py-1 text-xs font-semibold shadow-sm ${statusColor(t.status)}`}
                     >

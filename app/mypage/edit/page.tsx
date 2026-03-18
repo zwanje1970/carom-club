@@ -45,6 +45,7 @@ export default async function MypageEditPage() {
         addressDetail: null,
         createdAt: new Date(),
         updatedAt: new Date(),
+        communityScore: 0,
         memberProfile: null,
       };
     }
@@ -65,6 +66,7 @@ export default async function MypageEditPage() {
       addressDetail: null,
       createdAt: new Date(),
       updatedAt: new Date(),
+      communityScore: 0,
       memberProfile: null,
     };
   }

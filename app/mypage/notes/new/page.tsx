@@ -136,7 +136,7 @@ export default function MypageNewNotePage() {
     ) {
       throw new Error("공 배치 정보가 올바르지 않습니다. 당구공 배치를 다시 해 주세요.");
     }
-    let dataURL = placementPayload.getImageDataURL?.();
+    let dataURL: string | null | undefined = placementPayload.getImageDataURL?.();
     if (!dataURL && typeof window !== "undefined") {
       dataURL = sessionStorage.getItem(BALL_LAYOUT_IMAGE_KEY);
     }

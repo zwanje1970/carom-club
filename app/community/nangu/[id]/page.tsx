@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { getLevelFromScore, getTierName, getTierColor } from "@/lib/community-level";
+import type { NanguBallPlacement } from "@/lib/nangu-types";
 import { NanguPostDetailClient } from "./NanguPostDetailClient";
 
 export default async function NanguPostDetailPage({
@@ -55,12 +56,7 @@ export default async function NanguPostDetailPage({
     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
 
-  const ballPlacement = JSON.parse(post.ballPlacementJson) as {
-    redBall: { x: number; y: number };
-    yellowBall: { x: number; y: number };
-    whiteBall: { x: number; y: number };
-    cueBall: string;
-  };
+  const ballPlacement = JSON.parse(post.ballPlacementJson) as NanguBallPlacement;
   const isAuthor = session?.id === post.authorId;
   const postAuthorLevel = post.author ? getLevelFromScore(post.author.communityScore ?? 0) : 1;
 

@@ -46,7 +46,7 @@ export default function NanguWritePage() {
         setSource({ type: "fromNote", placement });
         setPlacement(placement);
       })
-      .catch(() => setSource({ type: "fromNote", placement: null }))
+      .catch(() => setSource({ type: "direct", placement: null }))
       .finally(() => setLoading(false));
   }, [fromNoteId]);
 

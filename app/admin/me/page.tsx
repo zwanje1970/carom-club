@@ -34,6 +34,7 @@ export default async function AdminMePage() {
       addressDetail: null,
       createdAt: new Date(),
       updatedAt: new Date(),
+      communityScore: 0,
     };
   }
   if (!user) redirect("/login");

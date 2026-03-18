@@ -1,5 +1,5 @@
 /** 사용자 역할: USER(일반), CLIENT_ADMIN(클라이언트 관리자), PLATFORM_ADMIN(플랫폼 관리자), ZONE_MANAGER(권역 관리자) */
-export type UserRole = "USER" | "CLIENT_ADMIN" | "PLATFORM_ADMIN" | "ZONE_MANAGER";
+export type UserRole = "USER" | "MODERATOR" | "CLIENT_ADMIN" | "PLATFORM_ADMIN" | "ZONE_MANAGER";
 
 /** 로그인 모드: 체크박스 기준. user=일반회원, client=클라이언트 대시보드 */
 export type LoginMode = "user" | "client";

@@ -49,7 +49,10 @@ export async function GET(request: Request) {
         organizationId: t.organizationId,
         venue: t.venue,
         status: t.status,
-        organization: t.organization ? normalizeSlug(t.organization) : null,
+        organization:
+          t.organization != null
+            ? normalizeSlug(t.organization as unknown as { id: string; name: string; slug: string | null })
+            : null,
       }))
     );
   } catch (e) {

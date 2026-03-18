@@ -54,7 +54,14 @@ export default function CommunityNotificationsPage() {
           <span aria-hidden>/</span>
           <span className="text-site-text font-medium">알림</span>
         </nav>
-        <h1 className="text-xl font-bold mb-4">알림</h1>
+        <h1 className="text-xl font-bold mb-4">
+          알림
+          {unreadCount > 0 && (
+            <span className="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-medium rounded-full bg-site-primary text-white">
+              {unreadCount}
+            </span>
+          )}
+        </h1>
         {loading ? (
           <p className="text-gray-500">불러오는 중…</p>
         ) : list.length === 0 ? (

@@ -6,7 +6,7 @@ import { getTournamentBasic } from "@/lib/db-tournaments";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { getMockTournamentById } from "@/lib/mock-data";
 import { normalizeSlugs } from "@/lib/normalize-slug";
-import { TournamentDetailView } from "@/components/tournament/TournamentDetailView";
+import { TournamentDetailView, type TournamentDetailViewProps } from "@/components/tournament/TournamentDetailView";
 import { TournamentDetailWithEntries } from "@/components/tournament/TournamentDetailWithEntries";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { STAGE_LABELS, TOURNAMENT_STAGES } from "@/lib/tournament-stage";
@@ -108,6 +108,39 @@ export default async function TournamentDetailPage({
 
   if (!tournament) notFound();
 
+  type TournamentShape = {
+    id: string;
+    name: string;
+    summary: string | null;
+    description: string | null;
+    outlinePublished: boolean | null;
+    outlinePdfUrl: string | null;
+    promoContent: string | null;
+    posterImageUrl: string | null;
+    venue: string | null;
+    startAt: Date;
+    endAt: Date | null;
+    gameFormat: string | null;
+    status: string;
+    entryFee: number | null;
+    prizeInfo: string | null;
+    entryCondition: string | null;
+    maxParticipants: number | null;
+    tournamentStage?: string | null;
+    rule?: {
+      bracketConfig?: string | object | null;
+      entryFee?: number | null;
+      operatingFee?: number | null;
+      maxEntries?: number | null;
+      useWaiting?: boolean;
+      entryConditions?: string | null;
+    } | null;
+    matchVenues?: { displayLabel: string; venueName: string; address: string | null; phone: string | null }[];
+    tournamentVenues?: { organization: { id: string; name: string; slug: string | null } }[];
+    _count?: { finalMatches?: number };
+  };
+  const t = tournament as unknown as TournamentShape;
+
   const copyStart = Date.now();
   const common = await getCommonPageData("tournaments");
   logServerTiming("fetch_copy", copyStart);
@@ -116,13 +149,13 @@ export default async function TournamentDetailPage({
   const tabs = buildTabs();
   const currentTab = (() => {
     const defaultTab = tabs[0]?.id ?? "outline";
-    const t = tabs.find((tab) => tab.id === (tabParam ?? defaultTab));
-    return t ? t.id : defaultTab;
+    const tab = tabs.find((tb) => tb.id === (tabParam ?? defaultTab));
+    return tab ? tab.id : defaultTab;
   })();
-  const participantsListPublic = parseParticipantsListPublic(tournament.rule);
+  const participantsListPublic = parseParticipantsListPublic(t.rule ?? null);
   const accountNumber = (() => {
     try {
-      const bc = tournament.rule?.bracketConfig;
+      const bc = t.rule?.bracketConfig;
       const raw = bc == null ? null : typeof bc === "string" ? JSON.parse(bc) : bc;
       const v = (raw as Record<string, unknown>)?.accountNumber;
       return typeof v === "string" && v.trim() ? v.trim() : null;
@@ -132,24 +165,24 @@ export default async function TournamentDetailPage({
   })();
   const allowMultipleSlots = (() => {
     try {
-      const bc = tournament.rule?.bracketConfig;
+      const bc = t.rule?.bracketConfig;
       const raw = bc == null ? null : typeof bc === "string" ? JSON.parse(bc) : bc;
       return (raw as Record<string, unknown>)?.allowMultipleSlots === true;
     } catch {
       return false;
     }
   })();
-  const matchVenues = Array.isArray(tournament.matchVenues)
-    ? tournament.matchVenues.map((v) => ({
+  const matchVenues = Array.isArray(t.matchVenues)
+    ? t.matchVenues.map((v) => ({
         displayLabel: v.displayLabel,
         venueName: v.venueName,
         address: v.address,
         phone: v.phone,
       }))
     : [];
-  const tournamentVenues = Array.isArray(tournament.tournamentVenues)
+  const tournamentVenues = Array.isArray(t.tournamentVenues)
     ? normalizeSlugs(
-        tournament.tournamentVenues.map((tv) => ({
+        t.tournamentVenues.map((tv) => ({
           id: tv.organization.id,
           name: tv.organization.name,
           slug: tv.organization.slug,
@@ -157,36 +190,51 @@ export default async function TournamentDetailPage({
       )
     : [];
   const tournamentPayload = {
-    name: tournament.name,
-    summary: tournament.summary ?? null,
-    description: tournament.description ?? null,
-    outlinePublished: tournament.outlinePublished ?? null,
-    outlinePdfUrl: tournament.outlinePdfUrl ?? null,
-    promoContent: tournament.promoContent ?? null,
-    posterImageUrl: tournament.posterImageUrl ?? null,
-    venue: tournament.venue ?? null,
-    startAt: tournament.startAt,
-    endAt: tournament.endAt,
-    gameFormat: tournament.gameFormat ?? null,
-    status: tournament.status,
-    entryFee: tournament.entryFee ?? tournament.rule?.entryFee ?? null,
-    prizeInfo: tournament.prizeInfo ?? null,
-    entryCondition: tournament.entryCondition ?? null,
-    maxParticipants: tournament.maxParticipants ?? null,
-    rule: tournament.rule
+    name: t.name,
+    summary: t.summary ?? null,
+    description: t.description ?? null,
+    outlinePublished: t.outlinePublished ?? null,
+    outlinePdfUrl: t.outlinePdfUrl ?? null,
+    promoContent: t.promoContent ?? null,
+    posterImageUrl: t.posterImageUrl ?? null,
+    venue: t.venue ?? null,
+    startAt: t.startAt,
+    endAt: t.endAt,
+    gameFormat: t.gameFormat ?? null,
+    status: t.status,
+    entryFee: t.entryFee ?? t.rule?.entryFee ?? null,
+    prizeInfo: t.prizeInfo ?? null,
+    entryCondition: t.entryCondition ?? null,
+    maxParticipants: t.maxParticipants ?? null,
+    rule: t.rule
       ? {
-          entryFee: tournament.rule.entryFee,
-          operatingFee: tournament.rule.operatingFee,
-          maxEntries: tournament.rule.maxEntries,
-          useWaiting: tournament.rule.useWaiting,
-          entryConditions: tournament.rule.entryConditions,
+          entryFee: t.rule.entryFee,
+          operatingFee: t.rule.operatingFee,
+          maxEntries: t.rule.maxEntries,
+          useWaiting: t.rule.useWaiting,
+          entryConditions: t.rule.entryConditions,
           accountNumber,
+        }
+      : null,
+  };
+  const baseTournament = {
+    ...tournamentPayload,
+    id: t.id,
+    outlinePublished: tournamentPayload.outlinePublished != null ? String(tournamentPayload.outlinePublished) : null,
+    rule: tournamentPayload.rule
+      ? {
+          entryFee: tournamentPayload.rule.entryFee ?? null,
+          operatingFee: tournamentPayload.rule.operatingFee ?? null,
+          maxEntries: tournamentPayload.rule.maxEntries ?? null,
+          useWaiting: tournamentPayload.rule.useWaiting ?? false,
+          entryConditions: tournamentPayload.rule.entryConditions ?? null,
+          accountNumber: accountNumber ?? null,
         }
       : null,
   };
   const baseProps = {
     tournamentId: id,
-    tournament: { ...tournamentPayload, id: tournament.id },
+    tournament: baseTournament,
     matchVenues,
     tournamentVenues,
     tabs,
@@ -208,16 +256,27 @@ export default async function TournamentDetailPage({
             participantsListPublic={participantsListPublic}
             tournament={{
               ...tournamentPayload,
-              startAt: tournament.startAt instanceof Date ? tournament.startAt.toISOString() : String(tournament.startAt),
-              endAt: tournament.endAt != null ? (tournament.endAt instanceof Date ? tournament.endAt.toISOString() : String(tournament.endAt)) : null,
-            }}
+              outlinePublished: tournamentPayload.outlinePublished != null ? String(tournamentPayload.outlinePublished) : null,
+              startAt: t.startAt instanceof Date ? t.startAt.toISOString() : String(t.startAt),
+              endAt: t.endAt != null ? (t.endAt instanceof Date ? t.endAt.toISOString() : String(t.endAt)) : null,
+              rule: tournamentPayload.rule
+                ? {
+                    entryFee: tournamentPayload.rule.entryFee ?? null,
+                    operatingFee: tournamentPayload.rule.operatingFee ?? null,
+                    maxEntries: tournamentPayload.rule.maxEntries ?? null,
+                    useWaiting: tournamentPayload.rule.useWaiting ?? false,
+                    entryConditions: tournamentPayload.rule.entryConditions ?? null,
+                    accountNumber: accountNumber ?? null,
+                  }
+                : null,
+            } as TournamentDetailViewProps["tournament"]}
             matchVenues={matchVenues}
             tournamentVenues={[]}
             confirmedCount={0}
             isLoggedIn={false}
             myEntries={[]}
             allowMultipleSlots={allowMultipleSlots}
-            entryFee={tournament.entryFee ?? tournament.rule?.entryFee ?? null}
+            entryFee={t.entryFee ?? t.rule?.entryFee ?? null}
             entries={[]}
           />
         </div>
@@ -232,14 +291,14 @@ export default async function TournamentDetailPage({
           <TournamentDetailWithEntries {...baseProps} />
         </Suspense>
 
-        {"tournamentStage" in tournament && tournament._count && (
+        {"tournamentStage" in t && t._count && (
           <section className="mt-8 rounded-xl border border-site-border bg-site-card p-4">
             <h2 className="text-sm font-semibold text-site-text mb-2">{getCopyValue(c, "site.tournament.bracketSectionTitle")}</h2>
             <p className="text-xs text-site-text-muted mb-3">
               진행 상태:{" "}
-              {TOURNAMENT_STAGES.includes((tournament.tournamentStage ?? "SETUP") as (typeof TOURNAMENT_STAGES)[number])
-                ? getCopyValue(c, `site.tournament.stage.${(tournament.tournamentStage as string) ?? "SETUP"}` as AdminCopyKey)
-                : (STAGE_LABELS[(tournament.tournamentStage as keyof typeof STAGE_LABELS) ?? "SETUP"] ?? tournament.tournamentStage ?? "설정")}
+              {TOURNAMENT_STAGES.includes((t.tournamentStage ?? "SETUP") as (typeof TOURNAMENT_STAGES)[number])
+                ? getCopyValue(c, `site.tournament.stage.${(t.tournamentStage as string) ?? "SETUP"}` as AdminCopyKey)
+                : (STAGE_LABELS[(t.tournamentStage as keyof typeof STAGE_LABELS) ?? "SETUP"] ?? t.tournamentStage ?? "설정")}
             </p>
             <div className="flex flex-wrap gap-2">
               <Link
@@ -248,7 +307,7 @@ export default async function TournamentDetailPage({
               >
                 {getCopyValue(c, "site.tournament.qualifierLabel")}
               </Link>
-              {(tournament._count?.finalMatches ?? 0) > 0 && (
+              {(t._count?.finalMatches ?? 0) > 0 && (
                 <Link
                   href={`/tournaments/${id}/bracket`}
                   className="inline-flex items-center rounded-lg bg-violet-100 px-3 py-1.5 text-sm font-medium text-violet-800 dark:bg-violet-900/40 dark:text-violet-200"

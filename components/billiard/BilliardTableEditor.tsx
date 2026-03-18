@@ -417,7 +417,7 @@ const BilliardTableEditor = forwardRef<
           <span className="ml-2 border-l border-gray-300 dark:border-slate-600 pl-2">그리드:</span>
           <button
             type="button"
-            onClick={() => setGridOn((prev) => !prev)}
+            onClick={() => setGridOn(!gridOn)}
             className={`px-2 py-1 rounded border ${
               gridOn
                 ? "bg-site-primary text-white border-site-primary"

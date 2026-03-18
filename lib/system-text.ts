@@ -3,6 +3,7 @@
  * 우선순위: 관리자 설정값(value) → defaultValue → 빈 문자열.
  * isEnabled=false면 빈 문자열 반환(숨김).
  */
+import type { Prisma } from "@/generated/prisma";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 
@@ -62,7 +63,7 @@ export async function listSystemTexts(options?: {
 }): Promise<SystemTextRow[]> {
   if (!isDatabaseConfigured()) return [];
   try {
-    const where: { group?: string; OR?: { key: { contains: string; mode: "insensitive" }; label: { contains: string; mode: "insensitive" }; value: { contains: string; mode: "insensitive" } }[] } = {};
+    const where: Prisma.SystemTextWhereInput = {};
     if (options?.group) where.group = options.group;
     if (options?.search?.trim()) {
       const q = options.search.trim();

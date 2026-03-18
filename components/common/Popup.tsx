@@ -79,17 +79,20 @@ export function Popup({ popup, onClose }: Props) {
               {popup.description}
             </p>
           )}
-          {popup.imageUrl && (
+          {popup.imageUrl?.trim() && (
             <div className="relative mt-4 aspect-video w-full overflow-hidden rounded">
-              <Image
-                src={popup.imageUrl}
-                alt=""
-                fill
-                className="object-cover"
-                sizes="(max-width: 480px) 100vw, 480px"
-                loading="lazy"
-                unoptimized={!popup.imageUrl.trim().startsWith("/")}
-              />
+              {popup.imageUrl.startsWith("data:") || popup.imageUrl.startsWith("blob:") ? (
+                <img src={popup.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+              ) : (
+                <Image
+                  src={popup.imageUrl}
+                  alt=""
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 480px) 100vw, 480px"
+                  loading="lazy"
+                />
+              )}
             </div>
           )}
           <div className="mt-4 flex flex-wrap gap-2">

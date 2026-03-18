@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { isOptimizableImageSrc } from "@/lib/image-src";
 
 export type VenueCarouselItem = {
   id: string;
@@ -181,16 +182,19 @@ export function VenueCarousel({ venues }: { venues: VenueCarouselItem[] }) {
                 className="flex flex-col items-center shrink-0 snap-start w-[calc((100%-3*1rem)/4)] min-w-[calc((100%-3*1rem)/4)] sm:w-[calc((100%-4*1rem)/5)] sm:min-w-[calc((100%-4*1rem)/5)] md:w-[calc((100%-5*1rem)/6)] md:min-w-[calc((100%-5*1rem)/6)] lg:w-[calc((100%-7*1rem)/8)] lg:min-w-[calc((100%-7*1rem)/8)] max-w-[140px] group py-3 px-2 rounded-xl min-h-[120px] active:bg-gray-100/50 dark:active:bg-slate-800/50"
               >
                 <div className="relative w-[88px] h-[88px] sm:w-[96px] sm:h-[96px] rounded-full overflow-hidden bg-site-bg border border-site-border flex-shrink-0 transition-transform duration-200 group-hover:scale-105">
-                  {imageUrl(v) ? (
-                    <Image
-                      src={imageUrl(v)!}
-                      alt=""
-                      fill
-                      sizes="96px"
-                      className="object-cover"
-                      loading="lazy"
-                      unoptimized={!imageUrl(v)!.startsWith("/") && !imageUrl(v)!.includes("vercel-storage")}
-                    />
+                  {imageUrl(v)?.trim() ? (
+                    isOptimizableImageSrc(imageUrl(v)) ? (
+                      <Image
+                        src={imageUrl(v)!.trim()}
+                        alt=""
+                        fill
+                        sizes="96px"
+                        className="object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <img src={imageUrl(v)!.trim()} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                    )
                   ) : (
                     <span className="absolute inset-0 flex items-center justify-center text-2xl text-site-text-muted" aria-hidden>
                       ●

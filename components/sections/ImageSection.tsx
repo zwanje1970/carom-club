@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { SmartLink } from "@/components/common/SmartLink";
 import { INTERNAL_PAGE_PATHS } from "@/lib/content/constants";
+import { isOptimizableImageSrc } from "@/lib/image-src";
 import type { PageSection } from "@/types/page-section";
 
 const PLACEHOLDER =
@@ -26,31 +27,36 @@ export function ImageSection({ section }: Props) {
         ? section.externalUrl ?? "#"
         : "#";
   const internal = section.linkType === "internal";
-  const isDataUrl = (url: string) => url.startsWith("data:");
 
   const image = (
     <>
       <div className="relative hidden w-full overflow-hidden sm:block" style={{ height: heightPc }}>
-        <Image
-          src={imgUrl}
-          alt={section.title || ""}
-          fill
-          className="object-cover"
-          sizes="100vw"
-          loading="lazy"
-          unoptimized={isDataUrl(imgUrl)}
-        />
+        {isOptimizableImageSrc(imgUrl) ? (
+          <Image
+            src={imgUrl}
+            alt={section.title || ""}
+            fill
+            className="object-cover"
+            sizes="100vw"
+            loading="lazy"
+          />
+        ) : (
+          <img src={imgUrl} alt={section.title || ""} className="absolute inset-0 w-full h-full object-cover" />
+        )}
       </div>
       <div className="relative block w-full overflow-hidden sm:hidden" style={{ height: heightMobile }}>
-        <Image
-          src={imgUrlMobile}
-          alt={section.title || ""}
-          fill
-          className="object-cover"
-          sizes="100vw"
-          loading="lazy"
-          unoptimized={isDataUrl(imgUrlMobile)}
-        />
+        {isOptimizableImageSrc(imgUrlMobile) ? (
+          <Image
+            src={imgUrlMobile}
+            alt={section.title || ""}
+            fill
+            className="object-cover"
+            sizes="100vw"
+            loading="lazy"
+          />
+        ) : (
+          <img src={imgUrlMobile} alt={section.title || ""} className="absolute inset-0 w-full h-full object-cover" />
+        )}
       </div>
     </>
   );

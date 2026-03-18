@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { formatDistanceKm } from "@/lib/distance";
+import { isOptimizableImageSrc } from "@/lib/image-src";
 
 type Venue = {
   id: string;
@@ -81,14 +82,21 @@ export function HomeVenueCards({
                   </div>
                   <div className="relative w-1/2 shrink-0 aspect-square bg-gray-200 dark:bg-slate-700 md:aspect-square">
                     {v.coverImageUrl?.trim() ? (
-                      <Image
-                        src={v.coverImageUrl.trim()}
-                        alt=""
-                        fill
-                        sizes="(max-width: 768px) 45vw, (max-width: 1024px) 33vw, 25vw"
-                        className="object-cover"
-                        unoptimized={!v.coverImageUrl.trim().startsWith("/") && !v.coverImageUrl.includes("vercel-storage")}
-                      />
+                      (() => {
+                        const src = v.coverImageUrl!.trim();
+                        if (!src) return null;
+                        return isOptimizableImageSrc(src) ? (
+                          <Image
+                            src={src}
+                            alt=""
+                            fill
+                            sizes="(max-width: 768px) 45vw, (max-width: 1024px) 33vw, 25vw"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                        );
+                      })()
                     ) : (
                       <span className="absolute inset-0 flex items-center justify-center text-2xl text-site-secondary/50 md:text-3xl" aria-hidden>
                         ●

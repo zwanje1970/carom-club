@@ -126,14 +126,17 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
       {hasBanner && bannerSrc ? (
         <div className="relative min-h-[240px] md:min-h-[420px] flex flex-col items-center justify-center py-6 md:py-12 w-full">
           <div className="absolute inset-0">
-            <Image
-              src={bannerSrc}
-              alt="히어로 배너"
-              fill
-              className="object-cover pointer-events-none"
-              sizes="100vw"
-              unoptimized={bannerSrc.startsWith("data:")}
-            />
+            {bannerSrc.startsWith("data:") || bannerSrc.startsWith("blob:") ? (
+              <img src={bannerSrc} alt="히어로 배너" className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
+            ) : (
+              <Image
+                src={bannerSrc}
+                alt="히어로 배너"
+                fill
+                className="object-cover pointer-events-none"
+                sizes="100vw"
+              />
+            )}
           </div>
           <div className="absolute inset-0 bg-black/40 pointer-events-none" />
           <div className="relative z-10 w-full flex flex-col items-center justify-center px-4 text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]">
@@ -226,17 +229,25 @@ function HomeHeroFromSettings({ settings }: { settings: HeroSettings }) {
       <div className="hero-block-new flex flex-col items-center py-10 sm:py-12 md:py-12 w-full">
         {hasBgImage && bgSrc ? (
           <div className="absolute inset-0">
-            <Image
-              src={bgSrc}
-              alt="히어로 배경"
-              fill
-              className="object-cover pointer-events-none"
-              sizes="100vw"
-              unoptimized={bgSrc.startsWith("data:")}
-              style={{
-                filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined,
-              }}
-            />
+            {bgSrc.startsWith("data:") || bgSrc.startsWith("blob:") ? (
+              <img
+                src={bgSrc}
+                alt="히어로 배경"
+                className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                style={{ filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined }}
+              />
+            ) : (
+              <Image
+                src={bgSrc}
+                alt="히어로 배경"
+                fill
+                className="object-cover pointer-events-none"
+                sizes="100vw"
+                style={{
+                  filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined,
+                }}
+              />
+            )}
           </div>
         ) : null}
         <div
