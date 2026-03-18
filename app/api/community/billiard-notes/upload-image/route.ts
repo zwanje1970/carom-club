@@ -3,6 +3,8 @@ import { getSession } from "@/lib/auth";
 import { processUploadedImage, uploadToBlob, isBlobConfigError, BLOB_SERVICE_UNAVAILABLE_MESSAGE } from "@/lib/image-upload";
 import { IMAGE_POLICIES } from "@/lib/image-policies";
 
+export const runtime = "nodejs";
+
 /** 당구노트 테이블 이미지 업로드. 로그인한 사용자만. */
 export async function POST(request: Request) {
   const session = await getSession();

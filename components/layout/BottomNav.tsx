@@ -12,17 +12,18 @@ type BottomNavItem = {
 
 /** 모바일 하단 네비: 1줄 5개 메뉴 */
 const ITEMS: BottomNavItem[] = [
-  { href: "/tournaments", label: "대회 찾기", icon: TrophyIcon },
+  { href: "/tournaments", label: "대회 찾기", icon: MedalIcon },
   { href: "/mypage/notes", label: "당구노트", icon: NoteIcon, emphasize: true },
   { href: "/venues", label: "당구장 찾기", icon: VenueIcon },
   { href: "/community", label: "커뮤니티", icon: CommunityIcon },
   { href: "/mypage", label: "마이 페이지", icon: MypageIcon },
 ];
 
-function TrophyIcon({ active }: { active: boolean }) {
+function MedalIcon({ active }: { active: boolean }) {
   return (
     <svg className="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 3v2m0 4v8m4-16v2m0 4v8M6 21h12a2 2 0 002-2v-4H4v4a2 2 0 002 2zm4-12h4" />
+      <circle cx="12" cy="9" r="4" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 21h8M12 13v6M10 19l2-2 2 2" />
     </svg>
   );
 }

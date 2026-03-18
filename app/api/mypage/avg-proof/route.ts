@@ -5,6 +5,8 @@ import { isDatabaseConfigured } from "@/lib/db-mode";
 import { processUploadedImage, uploadToBlob, isBlobConfigError, BLOB_SERVICE_UNAVAILABLE_MESSAGE } from "@/lib/image-upload";
 import { IMAGE_POLICIES } from "@/lib/image-policies";
 
+export const runtime = "nodejs";
+
 const BLOB_ERROR_MESSAGE =
   "이미지 저장 설정이 되어 있지 않아 업로드할 수 없습니다. 관리자에게 문의해 주세요.";
 

@@ -3,6 +3,8 @@ import { getSession } from "@/lib/auth";
 import { processUploadedImage, uploadToBlob, isBlobConfigError, BLOB_SERVICE_UNAVAILABLE_MESSAGE } from "@/lib/image-upload";
 import { IMAGE_POLICIES, type ImageKind } from "@/lib/image-policies";
 
+export const runtime = "nodejs";
+
 const ALLOWED_POLICIES: ImageKind[] = ["content", "section", "banner", "logo", "thumbnail", "venue", "tournament"];
 
 export async function POST(request: Request) {

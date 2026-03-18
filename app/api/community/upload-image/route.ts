@@ -3,6 +3,8 @@ import { getSession } from "@/lib/auth";
 import { processUploadedImage, uploadToBlob, isBlobConfigError, BLOB_SERVICE_UNAVAILABLE_MESSAGE } from "@/lib/image-upload";
 import { IMAGE_POLICIES } from "@/lib/image-policies";
 
+export const runtime = "nodejs";
+
 /** 커뮤니티 게시글 첨부 이미지 업로드. 로그인 필수 */
 export async function POST(request: Request) {
   const session = await getSession();

@@ -3,6 +3,8 @@ import { getSession } from "@/lib/auth";
 import { processUploadedImage, uploadToBlob, isBlobConfigError, BLOB_SERVICE_UNAVAILABLE_MESSAGE } from "@/lib/image-upload";
 import { IMAGE_POLICIES } from "@/lib/image-policies";
 
+export const runtime = "nodejs";
+
 /** 협력업체 로고 업로드. 반환: { url } */
 export async function POST(request: Request) {
   const session = await getSession();

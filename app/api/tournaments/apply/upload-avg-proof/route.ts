@@ -4,6 +4,8 @@ import { isDatabaseConfigured } from "@/lib/db-mode";
 import { processUploadedImage, uploadToBlob, isBlobConfigError, BLOB_SERVICE_UNAVAILABLE_MESSAGE } from "@/lib/image-upload";
 import { IMAGE_POLICIES } from "@/lib/image-policies";
 
+export const runtime = "nodejs";
+
 /** 대회 참가 신청 시 AVG 인증서 이미지 업로드. URL만 반환하며 DB에는 저장하지 않음. 신청 폼에서 avgProofUrl로 전달 */
 export async function POST(request: Request) {
   if (!isDatabaseConfigured()) {

@@ -4,6 +4,8 @@ import { put } from "@vercel/blob";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 
+export const runtime = "nodejs";
+
 const MAX_PDF_SIZE = 20 * 1024 * 1024; // 20MB
 const ALLOWED_TYPES = ["application/pdf"];
 
