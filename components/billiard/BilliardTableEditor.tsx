@@ -147,7 +147,7 @@ const BilliardTableEditor = forwardRef<
 
   const handlePointerDownBall = (normalized: { x: number; y: number }) => {
     const { px, py } = normalizedToPixel(normalized.x, normalized.y, rect);
-    const hit = hitTestBall(px, py, redBall, yellowBall, whiteBall, rect, placementMode ? 1.5 : 1);
+    const hit = hitTestBall(px, py, redBall, yellowBall, whiteBall, rect, placementMode ? 2 : 1);
     if (hit) {
       if (hit !== selectedBall) setLastDragEndTime(null);
       setSelectedBall(hit);
@@ -364,7 +364,7 @@ const BilliardTableEditor = forwardRef<
     placementMode && selectedBall && selectedPos
       ? `X:${selectedPos.x.toFixed(3)} Y:${selectedPos.y.toFixed(3)}`
       : null;
-  const showCoordBar = placementMode && (isDragging || isFineTuning) && coordText;
+  const showCoordBar = placementMode && selectedBall && coordText;
 
   const canvasBlock = (
     <div className="flex justify-center items-center rounded-lg p-2 overflow-x-auto flex-1 min-h-0">

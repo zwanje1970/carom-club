@@ -17,6 +17,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
+  themeColor: "#000000",
 };
 
 function getSiteUrl(): string {
@@ -35,7 +36,8 @@ export async function generateMetadata(): Promise<Metadata> {
       description,
       metadataBase: new URL(baseUrl),
       icons: {
-        icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%231a1a2e' width='32' height='32' rx='6'/%3E%3Ctext x='16' y='22' text-anchor='middle' fill='%23fff' font-size='18' font-weight='bold' font-family='system-ui'%3EC%3C/text%3E%3C/svg%3E",
+        icon: "/icons/app-icon.png",
+        apple: "/icons/app-icon.png",
       },
       openGraph: {
         title,
@@ -49,7 +51,8 @@ export async function generateMetadata(): Promise<Metadata> {
       description: "당구 대회, 모임, 레슨을 한 곳에서.",
       metadataBase: new URL(baseUrl),
       icons: {
-        icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%231a1a2e' width='32' height='32' rx='6'/%3E%3Ctext x='16' y='22' text-anchor='middle' fill='%23fff' font-size='18' font-weight='bold' font-family='system-ui'%3EC%3C/text%3E%3C/svg%3E",
+        icon: "/icons/app-icon.png",
+        apple: "/icons/app-icon.png",
       },
       openGraph: {
         title: SITE_NAME,
@@ -85,6 +88,11 @@ export default async function RootLayout({
   return (
     <html lang="ko" className="scroll-smooth">
       <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#000000" />
+        <link rel="apple-touch-icon" href="/icons/app-icon.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black" />
         {/* 웹폰트: Google Fonts는 display=swap 적용. CDN 폰트는 초기 렌더 후 로드 권장. */}
         <link
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css"

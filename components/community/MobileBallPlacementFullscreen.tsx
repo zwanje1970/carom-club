@@ -124,76 +124,78 @@ export function MobileBallPlacementFullscreen({
       className="fixed inset-0 z-[9999] flex flex-col bg-site-bg"
       style={{ padding: "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)" }}
     >
-      {/* 오른쪽 상단: 점3개 메뉴 + 완료 버튼 */}
-      <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
-        <div className="relative" ref={menuRef}>
+      {/* 상단: 점3개 메뉴(왼쪽) + 완료 버튼 — 프레임 필드 너비(max-w-2xl) 안에만 배치 */}
+      <div className="w-full flex justify-center px-2 pt-2 z-10 shrink-0">
+        <div className="w-full max-w-2xl flex items-center justify-between gap-2">
+          <div className="relative" ref={menuRef}>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/20 dark:bg-white/20 text-site-text backdrop-blur-sm hover:bg-black/30 dark:hover:bg-white/30"
+              aria-label="메뉴"
+              aria-expanded={menuOpen}
+            >
+              <KebabIcon className="h-4 w-4" />
+            </button>
+            {menuOpen && (
+              <div
+                className="absolute left-0 top-full mt-1 min-w-[140px] rounded-lg border border-gray-200 dark:border-slate-600 bg-white/95 dark:bg-slate-800/95 shadow-lg py-1 z-20 backdrop-blur-sm"
+                role="menu"
+              >
+                <div className="px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-slate-400 border-b border-gray-100 dark:border-slate-700">
+                  보기
+                </div>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setDrawStyle("realistic"); setMenuOpen(false); }}
+                  className={`w-full px-3 py-2 text-left text-sm ${drawStyle === "realistic" ? "bg-site-primary/10 text-site-primary font-medium" : "text-site-text"}`}
+                >
+                  실사보기
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setDrawStyle("wireframe"); setMenuOpen(false); }}
+                  className={`w-full px-3 py-2 text-left text-sm ${drawStyle === "wireframe" ? "bg-site-primary/10 text-site-primary font-medium" : "text-site-text"}`}
+                >
+                  단순보기
+                </button>
+                <div className="px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-slate-400 border-b border-gray-100 dark:border-slate-700 mt-1">
+                  그리드
+                </div>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setGridOn(true); setMenuOpen(false); }}
+                  className={`w-full px-3 py-2 text-left text-sm ${gridOn ? "bg-site-primary/10 text-site-primary font-medium" : "text-site-text"}`}
+                >
+                  그리드 ON
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setGridOn(false); setMenuOpen(false); }}
+                  className={`w-full px-3 py-2 text-left text-sm ${!gridOn ? "bg-site-primary/10 text-site-primary font-medium" : "text-site-text"}`}
+                >
+                  그리드 OFF
+                </button>
+              </div>
+            )}
+          </div>
           <button
             type="button"
-            onClick={() => setMenuOpen((v) => !v)}
-            className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/90 dark:bg-slate-800/90 text-site-text shadow hover:bg-white dark:hover:bg-slate-700"
-            aria-label="메뉴"
-            aria-expanded={menuOpen}
+            onClick={handleComplete}
+            disabled={saving || !cueBall}
+            className="flex items-center gap-1 rounded-lg bg-site-primary px-2.5 py-1.5 text-xs font-medium text-white shadow disabled:opacity-50"
+            aria-label="저장 후 완료"
           >
-            <KebabIcon className="h-5 w-5" />
+            <span>{saving ? "저장 중…" : "완료"}</span>
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
           </button>
-          {menuOpen && (
-            <div
-              className="absolute right-0 top-full mt-1 min-w-[160px] rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-lg py-1 z-20"
-              role="menu"
-            >
-              <div className="px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-slate-400 border-b border-gray-100 dark:border-slate-700">
-                보기
-              </div>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => { setDrawStyle("realistic"); setMenuOpen(false); }}
-                className={`w-full px-3 py-2 text-left text-sm ${drawStyle === "realistic" ? "bg-site-primary/10 text-site-primary font-medium" : "text-site-text"}`}
-              >
-                실사보기
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => { setDrawStyle("wireframe"); setMenuOpen(false); }}
-                className={`w-full px-3 py-2 text-left text-sm ${drawStyle === "wireframe" ? "bg-site-primary/10 text-site-primary font-medium" : "text-site-text"}`}
-              >
-                단순보기
-              </button>
-              <div className="px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-slate-400 border-b border-gray-100 dark:border-slate-700 mt-1">
-                그리드
-              </div>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => { setGridOn(true); setMenuOpen(false); }}
-                className={`w-full px-3 py-2 text-left text-sm ${gridOn ? "bg-site-primary/10 text-site-primary font-medium" : "text-site-text"}`}
-              >
-                그리드 ON
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => { setGridOn(false); setMenuOpen(false); }}
-                className={`w-full px-3 py-2 text-left text-sm ${!gridOn ? "bg-site-primary/10 text-site-primary font-medium" : "text-site-text"}`}
-              >
-                그리드 OFF
-              </button>
-            </div>
-          )}
         </div>
-        <button
-          type="button"
-          onClick={handleComplete}
-          disabled={saving || !cueBall}
-          className="flex items-center gap-1.5 rounded-lg bg-site-primary px-3 py-2 text-sm font-medium text-white shadow disabled:opacity-50"
-          aria-label="저장 후 완료"
-        >
-          <span>{saving ? "저장 중…" : "완료"}</span>
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-        </button>
       </div>
 
       {/* 당구대 전체 영역 (세로 가득) */}
@@ -214,6 +216,7 @@ export function MobileBallPlacementFullscreen({
             canvasOnly={true}
             orientation={orientation}
             cueBall={cueBall ?? undefined}
+            placementMode={true}
           />
 
           {/* 수구 미선택 시 중앙 반투명 오버레이 */}
