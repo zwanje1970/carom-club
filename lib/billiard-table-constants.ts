@@ -253,7 +253,7 @@ export function clampBallToPlayfieldAndNoOverlap(
 
 /**
  * 클릭/터치 지점(픽셀)에서 맞은 공 반환. 없으면 null.
- * @param hitRadiusScale 공 반지름의 배수 (기본 1). 난구 공배치 모드에서는 2 권장(지름 4배 터치 영역).
+ * @param hitRadiusScale 공 반지름의 배수 (기본 1). 난구 공배치 모드에서는 4 권장(지름 8배 터치 영역).
  */
 export function hitTestBall(
   px: number,

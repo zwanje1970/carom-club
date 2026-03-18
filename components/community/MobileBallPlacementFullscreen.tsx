@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   BilliardTableEditor,
   type BilliardTableEditorHandle,
 } from "@/components/billiard";
-import type { CueBallType } from "@/lib/billiard-table-constants";
+import type { BallColor, CueBallType } from "@/lib/billiard-table-constants";
 import type { TableOrientation } from "@/lib/billiard-table-constants";
 import { useBallPlacementFullscreen } from "./BallPlacementFullscreenContext";
 
@@ -71,6 +71,23 @@ export function MobileBallPlacementFullscreen({
   const [drawStyle, setDrawStyle] = useState<"realistic" | "wireframe">("realistic");
   const orientation = useTableOrientation();
   const menuRef = useRef<HTMLDivElement>(null);
+  const [placementBar, setPlacementBar] = useState<{
+    selectedBall: BallColor | null;
+    x: number;
+    y: number;
+    showCrosshair: boolean;
+  } | null>(null);
+  const onPlacementBarInfo = useCallback(
+    (info: {
+      selectedBall: BallColor | null;
+      x: number;
+      y: number;
+      showCrosshair: boolean;
+    }) => {
+      setPlacementBar(info);
+    },
+    []
+  );
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -124,9 +141,33 @@ export function MobileBallPlacementFullscreen({
       className="fixed inset-0 z-[9999] flex flex-col bg-site-bg"
       style={{ padding: "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)" }}
     >
-      {/* 상단: 점3개 메뉴(왼쪽) + 완료 버튼 — 프레임 필드 너비(max-w-2xl) 안에만 배치 */}
+      {/* 상단: 좌표·공선택 | 점3개·완료 — 한 줄·max-w-2xl */}
       <div className="w-full flex justify-center px-2 pt-2 z-10 shrink-0">
-        <div className="w-full max-w-2xl flex items-center justify-between gap-2">
+        <div className="w-full max-w-2xl flex items-center gap-2 min-h-9">
+          <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-2 gap-y-0.5 pr-1">
+            {placementBar?.selectedBall ? (
+              <>
+                <span
+                  className="text-[11px] sm:text-xs font-mono tabular-nums text-site-text font-medium"
+                  aria-live="polite"
+                >
+                  X:{placementBar.x.toFixed(3)} Y:{placementBar.y.toFixed(3)}
+                </span>
+                <span className="text-[11px] sm:text-xs font-medium text-site-text shrink-0">
+                  ●
+                  {placementBar.selectedBall === "red"
+                    ? "빨간"
+                    : placementBar.selectedBall === "yellow"
+                      ? "노란"
+                      : "흰"}
+                  공
+                </span>
+              </>
+            ) : (
+              <span className="text-[11px] text-site-text/50">공을 탭해 선택</span>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
           <div className="relative" ref={menuRef}>
             <button
               type="button"
@@ -195,6 +236,7 @@ export function MobileBallPlacementFullscreen({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </button>
+          </div>
         </div>
       </div>
 
@@ -217,6 +259,7 @@ export function MobileBallPlacementFullscreen({
             orientation={orientation}
             cueBall={cueBall ?? undefined}
             placementMode={true}
+            onPlacementBarInfo={onPlacementBarInfo}
           />
 
           {/* 수구 미선택 시 중앙 반투명 오버레이 */}

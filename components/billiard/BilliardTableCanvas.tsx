@@ -138,7 +138,7 @@ export interface BilliardTableCanvasProps {
   showCueBallSpot?: boolean;
   /** 난구 공배치 모드: 선택 시 지름 4배 검정 반투명 원, 크로스헤어 미표시 */
   placementMode?: boolean;
-  /** 공배치 시 선택된 공 중심에 빨간 + 표시 (드래그/미세조정 중 또는 종료 후 3초) */
+  /** 공배치 시 선택된 공 기준 플레이필드 전체 십자선(+) 표시 */
   showCrosshairAtSelected?: boolean;
 }
 
@@ -543,28 +543,6 @@ function drawCrosshair(
   ctx.restore();
 }
 
-/** 공배치: 선택된 공 중심 빨간 + 표시 (드래그 종료 후 3초 또는 미세조정 중 유지) */
-function drawPlacementPlus(
-  ctx: CanvasRenderingContext2D,
-  rect: PlayfieldRect,
-  centerX: number,
-  centerY: number
-) {
-  const { px, py } = normalizedToPixel(centerX, centerY, rect);
-  const len = 10;
-  ctx.save();
-  ctx.strokeStyle = "#c41e3a";
-  ctx.lineWidth = 2;
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.moveTo(px - len, py);
-  ctx.lineTo(px + len, py);
-  ctx.moveTo(px, py - len);
-  ctx.lineTo(px, py + len);
-  ctx.stroke();
-  ctx.restore();
-}
-
 const BilliardTableCanvas = forwardRef<
   BilliardTableCanvasHandle,
   BilliardTableCanvasProps
@@ -629,7 +607,7 @@ const BilliardTableCanvas = forwardRef<
         const pos =
           sel === "red" ? redBall : sel === "yellow" ? yellowBall : whiteBall;
         const v = toView(pos.x, pos.y);
-        drawPlacementPlus(ctx, rect, v.x, v.y);
+        drawCrosshair(ctx, rect, v.x, v.y);
       }
       if (paths?.length) {
         drawPaths(ctx, rect, paths, cueBall, whiteBall, yellowBall, isPortrait ? landscapeToPortraitNorm : undefined);

@@ -75,6 +75,13 @@ export interface BilliardTableEditorProps {
   onDrawStyleChange?: (value: "realistic" | "wireframe") => void;
   /** 난구 공배치 전용: 위치만, 터치 1.5배, 선택 반투명 링, 상단 안내, 경로 모드 비노출 */
   placementMode?: boolean;
+  /** canvasOnly+placement: 상단 바(좌표·공 선택)에 넘길 상태 — 있으면 고정 좌표 오버레이 숨김 */
+  onPlacementBarInfo?: (info: {
+    selectedBall: BallColor | null;
+    x: number;
+    y: number;
+    showCrosshair: boolean;
+  }) => void;
 }
 
 const BilliardTableEditor = forwardRef<
@@ -99,6 +106,7 @@ const BilliardTableEditor = forwardRef<
     drawStyle: drawStyleProp,
     onDrawStyleChange,
     placementMode = false,
+    onPlacementBarInfo,
   },
   ref
 ) {
@@ -147,7 +155,7 @@ const BilliardTableEditor = forwardRef<
 
   const handlePointerDownBall = (normalized: { x: number; y: number }) => {
     const { px, py } = normalizedToPixel(normalized.x, normalized.y, rect);
-    const hit = hitTestBall(px, py, redBall, yellowBall, whiteBall, rect, placementMode ? 2 : 1);
+    const hit = hitTestBall(px, py, redBall, yellowBall, whiteBall, rect, placementMode ? 4 : 1);
     if (hit) {
       if (hit !== selectedBall) setLastDragEndTime(null);
       setSelectedBall(hit);
@@ -231,6 +239,40 @@ const BilliardTableEditor = forwardRef<
       isFineTuning ||
       (lastDragEndTime !== null && Date.now() - lastDragEndTime < 3000))
   );
+
+  useEffect(() => {
+    if (!placementMode || !canvasOnly || !onPlacementBarInfo) return;
+    if (!selectedBall) {
+      onPlacementBarInfo({
+        selectedBall: null,
+        x: 0,
+        y: 0,
+        showCrosshair: showPlus,
+      });
+      return;
+    }
+    const pos =
+      selectedBall === "red"
+        ? redBall
+        : selectedBall === "yellow"
+          ? yellowBall
+          : whiteBall;
+    onPlacementBarInfo({
+      selectedBall,
+      x: pos.x,
+      y: pos.y,
+      showCrosshair: showPlus,
+    });
+  }, [
+    placementMode,
+    canvasOnly,
+    onPlacementBarInfo,
+    selectedBall,
+    redBall,
+    yellowBall,
+    whiteBall,
+    showPlus,
+  ]);
 
   useEffect(() => {
     if (!placementMode || !selectedBall || isFineTuning) return;
@@ -364,7 +406,8 @@ const BilliardTableEditor = forwardRef<
     placementMode && selectedBall && selectedPos
       ? `X:${selectedPos.x.toFixed(3)} Y:${selectedPos.y.toFixed(3)}`
       : null;
-  const showCoordBar = placementMode && selectedBall && coordText;
+  const showCoordBar =
+    placementMode && selectedBall && coordText && !onPlacementBarInfo;
 
   const canvasBlock = (
     <div className="flex justify-center items-center rounded-lg p-2 overflow-x-auto flex-1 min-h-0">
@@ -415,60 +458,79 @@ const BilliardTableEditor = forwardRef<
         />
         {placementMode && showPlus && (
           <div
-            className="absolute bottom-4 left-1/2 -translate-x-1/2"
-            style={{ pointerEvents: "auto" }}
+            className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none"
             aria-label="미세조정 (4방향)"
           >
-            <div className="grid grid-cols-3 gap-4 items-center justify-center w-max">
-              <span className="w-14 h-14" aria-hidden />
+            <div className="grid grid-cols-3 gap-3 items-center justify-center w-max pointer-events-auto">
+              <span className="w-12 h-12" aria-hidden />
               <button
                 type="button"
                 aria-label="위로 미세 이동"
-                className="w-14 h-14 min-w-[56px] min-h-[56px] flex items-center justify-center rounded-full font-bold text-white bg-black/25 active:bg-black/45 transition-colors"
-                onPointerDown={() => startFineTune(0, -FINE_STEP)}
+                className="w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-full text-lg font-bold text-white bg-black/35 active:bg-black/55 transition-colors"
+                onPointerDown={() =>
+                  startFineTune(
+                    effectiveOrientation === "landscape" ? 0 : -FINE_STEP,
+                    effectiveOrientation === "landscape" ? -FINE_STEP : 0
+                  )
+                }
                 onPointerUp={handleFineTuneEnd}
                 onPointerLeave={handleFineTuneEnd}
                 onPointerCancel={handleFineTuneEnd}
               >
                 ▲
               </button>
-              <span className="w-14 h-14" aria-hidden />
+              <span className="w-12 h-12" aria-hidden />
               <button
                 type="button"
                 aria-label="왼쪽으로 미세 이동"
-                className="w-14 h-14 min-w-[56px] min-h-[56px] flex items-center justify-center rounded-full font-bold text-white bg-black/25 active:bg-black/45 transition-colors"
-                onPointerDown={() => startFineTune(-FINE_STEP, 0)}
+                className="w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-full text-lg font-bold text-white bg-black/35 active:bg-black/55 transition-colors"
+                onPointerDown={() =>
+                  startFineTune(
+                    effectiveOrientation === "landscape" ? -FINE_STEP : 0,
+                    effectiveOrientation === "landscape" ? 0 : FINE_STEP
+                  )
+                }
                 onPointerUp={handleFineTuneEnd}
                 onPointerLeave={handleFineTuneEnd}
                 onPointerCancel={handleFineTuneEnd}
               >
                 ◀
               </button>
-              <span className="w-14 h-14" aria-hidden />
+              <span className="w-12 h-12" aria-hidden />
               <button
                 type="button"
                 aria-label="오른쪽으로 미세 이동"
-                className="w-14 h-14 min-w-[56px] min-h-[56px] flex items-center justify-center rounded-full font-bold text-white bg-black/25 active:bg-black/45 transition-colors"
-                onPointerDown={() => startFineTune(FINE_STEP, 0)}
+                className="w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-full text-lg font-bold text-white bg-black/35 active:bg-black/55 transition-colors"
+                onPointerDown={() =>
+                  startFineTune(
+                    effectiveOrientation === "landscape" ? FINE_STEP : 0,
+                    effectiveOrientation === "landscape" ? 0 : -FINE_STEP
+                  )
+                }
                 onPointerUp={handleFineTuneEnd}
                 onPointerLeave={handleFineTuneEnd}
                 onPointerCancel={handleFineTuneEnd}
               >
                 ▶
               </button>
-              <span className="w-14 h-14" aria-hidden />
+              <span className="w-12 h-12" aria-hidden />
               <button
                 type="button"
                 aria-label="아래로 미세 이동"
-                className="w-14 h-14 min-w-[56px] min-h-[56px] flex items-center justify-center rounded-full font-bold text-white bg-black/25 active:bg-black/45 transition-colors"
-                onPointerDown={() => startFineTune(0, FINE_STEP)}
+                className="w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-full text-lg font-bold text-white bg-black/35 active:bg-black/55 transition-colors"
+                onPointerDown={() =>
+                  startFineTune(
+                    effectiveOrientation === "landscape" ? 0 : FINE_STEP,
+                    effectiveOrientation === "landscape" ? FINE_STEP : 0
+                  )
+                }
                 onPointerUp={handleFineTuneEnd}
                 onPointerLeave={handleFineTuneEnd}
                 onPointerCancel={handleFineTuneEnd}
               >
                 ▼
               </button>
-              <span className="w-14 h-14" aria-hidden />
+              <span className="w-12 h-12" aria-hidden />
             </div>
           </div>
         )}
