@@ -224,12 +224,13 @@ const BilliardTableEditor = forwardRef<
     if (selectedBall) setLastDragEndTime(Date.now());
   }, [clearFineTuneInterval, selectedBall]);
 
-  const showPlus =
+  const showPlus = Boolean(
     placementMode &&
     selectedBall &&
     (isDragging ||
       isFineTuning ||
-      (lastDragEndTime !== null && Date.now() - lastDragEndTime < 3000));
+      (lastDragEndTime !== null && Date.now() - lastDragEndTime < 3000))
+  );
 
   useEffect(() => {
     if (!placementMode || !selectedBall || isFineTuning) return;
