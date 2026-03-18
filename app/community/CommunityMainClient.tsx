@@ -25,7 +25,7 @@ type Popular = {
 type LatestByBoard = Record<string, { id: string; title: string; authorName: string; likeCount: number; commentCount: number; createdAt: string }[]>;
 
 const BOARD_SLUGS = ["free", "qna", "tips", "reviews", "trouble"] as const;
-const BOARD_LABELS: Record<string, string> = { free: "자유", qna: "질문답변", tips: "공략/팁", reviews: "후기", trouble: "난구해결사" };
+const BOARD_LABELS: Record<string, string> = { free: "자유", qna: "질문답변", tips: "공략/팁", reviews: "대회후기", trouble: "난구해결사" };
 
 export function CommunityMainClient({
   boards,
@@ -62,6 +62,7 @@ export function CommunityMainClient({
 
   return (
     <div className="mt-6 space-y-8">
+      {/* 상단: 글쓰기 버튼 + 게시판 탭 */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         {canManageReports && (
           <Link href="/community/admin/reports" className="text-sm text-site-primary hover:underline">
@@ -74,7 +75,6 @@ export function CommunityMainClient({
           </Link>
         </div>
       </div>
-      {/* 게시판 탭: PC 가로 탭, 모바일 드롭다운/스크롤 */}
       <section aria-label="게시판 선택">
         <div className="hidden sm:block border-b border-gray-200 dark:border-slate-600">
           <div className="flex gap-1 overflow-x-auto">
@@ -132,6 +132,36 @@ export function CommunityMainClient({
         </div>
       </section>
 
+      {/* 난구해결사 강조 카드 (상단 배치) */}
+      <section aria-labelledby="trouble-heading" className="rounded-2xl border-2 border-site-primary/30 bg-gradient-to-br from-site-primary/5 to-transparent dark:from-site-primary/10 p-6">
+        <h2 id="trouble-heading" className="text-xl font-bold text-site-text mb-2">난구해결사</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          당구 문제를 올리고 해법을 나누는 공간입니다. 노트에서 난구해결로 보내면 함께 풀 수 있습니다.
+        </p>
+        <div className="flex flex-wrap gap-4 mb-4">
+          <span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 px-3 py-1 text-sm font-medium">
+            진행중 {troubleStats.open}건
+          </span>
+          <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200 px-3 py-1 text-sm font-medium">
+            해결 {troubleStats.solved}건
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/community/trouble"
+            className="inline-flex items-center justify-center rounded-lg bg-site-primary text-white px-5 py-2.5 text-sm font-medium hover:opacity-90"
+          >
+            문제풀기
+          </Link>
+          <Link
+            href="/community/trouble/write"
+            className="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-site-text px-5 py-2.5 text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-700"
+          >
+            등록
+          </Link>
+        </div>
+      </section>
+
       {/* 인기글 */}
       <section aria-labelledby="popular-heading">
         <h2 id="popular-heading" className="text-lg font-semibold mb-3">인기글</h2>
@@ -182,7 +212,7 @@ export function CommunityMainClient({
         </ul>
       </section>
 
-      {/* 게시판 카드: 자유/질문/팁/후기, 카드당 최신 3개 */}
+      {/* 일반 게시판 카드: 자유, 질문답변, 공략/팁, 대회후기 */}
       <section aria-labelledby="board-cards-heading">
         <h2 id="board-cards-heading" className="text-lg font-semibold mb-4">게시판</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -213,36 +243,6 @@ export function CommunityMainClient({
               </div>
             );
           })}
-        </div>
-      </section>
-
-      {/* 난구해결사 강조 카드 */}
-      <section aria-labelledby="trouble-heading" className="rounded-2xl border-2 border-site-primary/30 bg-gradient-to-br from-site-primary/5 to-transparent dark:from-site-primary/10 p-6">
-        <h2 id="trouble-heading" className="text-xl font-bold text-site-text mb-2">난구해결사</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          당구 문제를 올리고 해법을 나누는 공간입니다. 문제풀기와 등록을 통해 함께 풀어보세요.
-        </p>
-        <div className="flex flex-wrap gap-4 mb-4">
-          <span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 px-3 py-1 text-sm font-medium">
-            진행중 {troubleStats.open}건
-          </span>
-          <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200 px-3 py-1 text-sm font-medium">
-            해결 {troubleStats.solved}건
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Link
-            href="/community/trouble"
-            className="inline-flex items-center justify-center rounded-lg bg-site-primary text-white px-5 py-2.5 text-sm font-medium hover:opacity-90"
-          >
-            문제풀기
-          </Link>
-          <Link
-            href="/community/trouble/write"
-            className="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-site-text px-5 py-2.5 text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-700"
-          >
-            등록
-          </Link>
         </div>
       </section>
     </div>

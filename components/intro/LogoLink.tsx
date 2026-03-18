@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
+import { sanitizeImageSrc } from "@/lib/image-src";
 import { useIntroController } from "./useIntroController";
 import { useSiteSettings } from "@/components/SiteSettingsProvider";
 
@@ -66,18 +65,12 @@ export function LogoLink({
           {(() => {
             const safeLogo = sanitizeImageSrc(logoUrl);
             if (!safeLogo) return <span className="h-8 w-20 bg-gray-200 dark:bg-slate-600 rounded shrink-0" aria-hidden />;
-            if (!isOptimizableImageSrc(safeLogo)) {
-              return <img src={safeLogo} alt="" className="h-full w-auto object-contain" />;
-            }
             return (
-              <Image
+              <img
                 src={safeLogo}
                 alt=""
-                width={160}
-                height={48}
-                className="h-full w-auto object-contain"
-                sizes="(max-width: 640px) 120px, 160px"
-                unoptimized
+                className="h-full w-auto object-contain max-h-12"
+                data-debug-src={safeLogo}
               />
             );
           })()}

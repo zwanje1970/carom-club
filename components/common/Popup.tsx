@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
-import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
+import { sanitizeImageSrc } from "@/lib/image-src";
 import type { Popup as PopupType } from "@/types/popup";
 
 const STORAGE_PREFIX = "carom_popup_hide_";
@@ -85,19 +84,12 @@ export function Popup({ popup, onClose }: Props) {
             if (!safeSrc) return null;
             return (
               <div className="relative mt-4 aspect-video w-full overflow-hidden rounded">
-                {!isOptimizableImageSrc(safeSrc) ? (
-                  <img src={safeSrc} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                ) : (
-                  <Image
-                    src={safeSrc}
-                    alt=""
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 480px) 100vw, 480px"
-                    loading="lazy"
-                    unoptimized
-                  />
-                )}
+                <img
+                  src={safeSrc}
+                  alt=""
+                  className="absolute inset-0 w-full h-full object-cover min-h-[80px]"
+                  data-debug-src={safeSrc}
+                />
               </div>
             );
           })()}

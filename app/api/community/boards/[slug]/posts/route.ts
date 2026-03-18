@@ -18,6 +18,7 @@ export async function GET(
   const { slug } = await params;
   const { searchParams } = new URL(request.url);
   const sort = searchParams.get("sort") === "likes" ? "likes" : "latest";
+  const statusFilter = searchParams.get("status") as string | null; // trouble 전용: all | open | solved
   const q = searchParams.get("q")?.trim() || "";
   const page = Math.max(0, Number(searchParams.get("page")) || 0);
   const take = Math.min(Number(searchParams.get("take")) || 20, 50);
@@ -36,6 +37,8 @@ export async function GET(
     boardId: board.id,
     ...(showHidden ? {} : { isHidden: false }),
     ...(q ? { OR: [{ title: { contains: q, mode: "insensitive" as const } }, { content: { contains: q, mode: "insensitive" as const } }] } : {}),
+    ...(slug === "trouble" && statusFilter === "open" ? { isSolved: false } : {}),
+    ...(slug === "trouble" && statusFilter === "solved" ? { isSolved: true } : {}),
   };
 
   const listSelect = {

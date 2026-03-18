@@ -136,8 +136,10 @@ export interface BilliardTableCanvasProps {
   drawStyle?: TableDrawStyle;
   /** true면 수구를 둘러싼 회색 원을 깜빡이게 표시 (난구 해법 출발선 스팟). 저장 이미지에는 미포함. */
   showCueBallSpot?: boolean;
-  /** 난구 공배치 모드: 선택 시 1.5~2배 반투명 원, 크로스헤어 미표시 */
+  /** 난구 공배치 모드: 선택 시 지름 4배 검정 반투명 원, 크로스헤어 미표시 */
   placementMode?: boolean;
+  /** 공배치 시 선택된 공 중심에 빨간 + 표시 (드래그/미세조정 중 또는 종료 후 3초) */
+  showCrosshairAtSelected?: boolean;
 }
 
 export interface BilliardTableCanvasHandle {
@@ -366,9 +368,9 @@ function drawTable(
   }
 }
 
-/** 공배치 선택 표시: 공 중심 기준 지름 5배 반투명 원 (공 위 레이어) */
-const PLACEMENT_SELECTION_RING_SCALE = 5;
-const PLACEMENT_SELECTION_RING_OPACITY = 0.25;
+/** 공배치 선택 표시: 공 중심 기준 지름 4배, 검정, opacity 0.3 (공 위 레이어) */
+const PLACEMENT_SELECTION_RING_SCALE = 2;
+const PLACEMENT_SELECTION_RING_OPACITY = 0.3;
 
 function drawBall(
   ctx: CanvasRenderingContext2D,
@@ -479,16 +481,11 @@ function drawBall(
   ctx.arc(px, py, r, 0, Math.PI * 2);
   ctx.fill();
 
-  // 5. 선택된 공: 공배치 모드면 1.5~2배 반투명 원(공 색상), 아니면 이중 테두리
+  // 5. 선택된 공: 공배치 모드면 지름 4배 검정 반투명 원(0.3), 아니면 이중 테두리
   if (isSelected) {
     if (placementMode) {
       const ringR = r * PLACEMENT_SELECTION_RING_SCALE;
-      const hex = colors[color];
-      const rgb = hex.startsWith("#") ? hex.slice(1) : hex;
-      const rv = parseInt(rgb.slice(0, 2), 16);
-      const gv = parseInt(rgb.slice(2, 4), 16);
-      const bv = parseInt(rgb.slice(4, 6), 16);
-      ctx.fillStyle = `rgba(${rv},${gv},${bv},${PLACEMENT_SELECTION_RING_OPACITY})`;
+      ctx.fillStyle = `rgba(0,0,0,${PLACEMENT_SELECTION_RING_OPACITY})`;
       ctx.beginPath();
       ctx.arc(px, py, ringR, 0, Math.PI * 2);
       ctx.fill();
@@ -546,6 +543,28 @@ function drawCrosshair(
   ctx.restore();
 }
 
+/** 공배치: 선택된 공 중심 빨간 + 표시 (드래그 종료 후 3초 또는 미세조정 중 유지) */
+function drawPlacementPlus(
+  ctx: CanvasRenderingContext2D,
+  rect: PlayfieldRect,
+  centerX: number,
+  centerY: number
+) {
+  const { px, py } = normalizedToPixel(centerX, centerY, rect);
+  const len = 10;
+  ctx.save();
+  ctx.strokeStyle = "#c41e3a";
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(px - len, py);
+  ctx.lineTo(px + len, py);
+  ctx.moveTo(px, py - len);
+  ctx.lineTo(px, py + len);
+  ctx.stroke();
+  ctx.restore();
+}
+
 const BilliardTableCanvas = forwardRef<
   BilliardTableCanvasHandle,
   BilliardTableCanvasProps
@@ -569,6 +588,7 @@ const BilliardTableCanvas = forwardRef<
     drawStyle = "realistic",
     showCueBallSpot = false,
     placementMode = false,
+    showCrosshairAtSelected = false,
   },
   ref
 ) {
@@ -605,6 +625,12 @@ const BilliardTableCanvas = forwardRef<
         const v = toView(pos.x, pos.y);
         drawCrosshair(ctx, rect, v.x, v.y);
       }
+      if (placementMode && sel && showCrosshairAtSelected) {
+        const pos =
+          sel === "red" ? redBall : sel === "yellow" ? yellowBall : whiteBall;
+        const v = toView(pos.x, pos.y);
+        drawPlacementPlus(ctx, rect, v.x, v.y);
+      }
       if (paths?.length) {
         drawPaths(ctx, rect, paths, cueBall, whiteBall, yellowBall, isPortrait ? landscapeToPortraitNorm : undefined);
       }
@@ -614,7 +640,7 @@ const BilliardTableCanvas = forwardRef<
         drawCueBallSpot(ctx, rect, cueView.x, cueView.y, cueBallSpotOpacity);
       }
     },
-    [width, height, isPortrait, redBall, yellowBall, whiteBall, cueBall, selectedBall, paths, drawStyle, placementMode]
+    [width, height, isPortrait, redBall, yellowBall, whiteBall, cueBall, selectedBall, paths, drawStyle, placementMode, showCrosshairAtSelected]
   );
 
   useEffect(() => {

@@ -1,7 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
+import { sanitizeImageSrc } from "@/lib/image-src";
 import { mdiOfficeBuilding, mdiPencil, mdiCashMultiple } from "@mdi/js";
 import { prisma } from "@/lib/db";
 import { MOCK_VENUES_LIST } from "@/lib/mock-data";
@@ -163,11 +162,12 @@ export default async function AdminVenueDetailPage({
               if (!safeLogo) return null;
               return (
                 <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-gray-200 dark:border-slate-600">
-                  {!isOptimizableImageSrc(safeLogo) ? (
-                    <img src={safeLogo} alt="" className="absolute inset-0 w-full h-full object-contain" />
-                  ) : (
-                    <Image src={safeLogo} alt="" fill className="object-contain" unoptimized />
-                  )}
+                  <img
+                    src={safeLogo}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-contain"
+                    data-debug-src={safeLogo}
+                  />
                 </div>
               );
             })()}
@@ -187,12 +187,13 @@ export default async function AdminVenueDetailPage({
             const safeCover = sanitizeImageSrc(org.coverImageUrl);
             if (!safeCover) return null;
             return (
-              <div className="relative mt-4 aspect-[21/9] w-full max-w-2xl overflow-hidden rounded-lg border border-gray-200 dark:border-slate-600">
-                {!isOptimizableImageSrc(safeCover) ? (
-                  <img src={safeCover} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                ) : (
-                  <Image src={safeCover} alt="" fill className="object-cover" unoptimized />
-                )}
+              <div className="relative mt-4 aspect-[21/9] w-full max-w-2xl overflow-hidden rounded-lg border border-gray-200 dark:border-slate-600 min-h-[100px]">
+                <img
+                  src={safeCover}
+                  alt=""
+                  className="absolute inset-0 w-full h-full object-cover"
+                  data-debug-src={safeCover}
+                />
               </div>
             );
           })()}

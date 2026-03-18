@@ -3,23 +3,34 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+export type NoteFilter = "all" | "public" | "private" | "sent";
+
 interface NoteItem {
   id: string;
+  title: string | null;
   memo: string | null;
   imageUrl: string | null;
   visibility: string;
   createdAt: string;
+  sentToTroubleCount?: number;
 }
 
 export interface BilliardNotesListClientProps {
-  /** 노트 목록/상세 링크 기준 경로. 예: /mypage/notes */
   basePath?: string;
 }
+
+const FILTERS: { value: NoteFilter; label: string }[] = [
+  { value: "all", label: "전체" },
+  { value: "public", label: "공개" },
+  { value: "private", label: "비공개" },
+  { value: "sent", label: "난구해결 전송" },
+];
 
 export function BilliardNotesListClient({ basePath = "/mypage/notes" }: BilliardNotesListClientProps) {
   const [list, setList] = useState<NoteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [filter, setFilter] = useState<NoteFilter>("all");
 
   useEffect(() => {
     fetch("/api/community/billiard-notes?mine=1", { credentials: "include" })
@@ -32,17 +43,24 @@ export function BilliardNotesListClient({ basePath = "/mypage/notes" }: Billiard
       .finally(() => setLoading(false));
   }, []);
 
+  const filtered =
+    filter === "all"
+      ? list
+      : filter === "public"
+        ? list.filter((n) => n.visibility === "community")
+        : filter === "private"
+          ? list.filter((n) => n.visibility !== "community")
+          : list.filter((n) => (n.sentToTroubleCount ?? 0) > 0);
+
   if (loading) {
-    return <p className="text-gray-500">불러오는 중…</p>;
+    return <p className="text-gray-500 py-6">불러오는 중…</p>;
   }
   if (error) {
     return (
-      <p className="text-red-600">
+      <p className="text-red-600 py-4">
         {error}
         {error.includes("로그인") && (
-          <Link href="/login" className="ml-2 underline">
-            로그인
-          </Link>
+          <Link href="/login" className="ml-2 underline">로그인</Link>
         )}
       </p>
     );
@@ -50,40 +68,54 @@ export function BilliardNotesListClient({ basePath = "/mypage/notes" }: Billiard
 
   return (
     <div className="space-y-4">
-      {list.length === 0 ? (
+      <div className="flex flex-wrap gap-2">
+        {FILTERS.map((f) => (
+          <button
+            key={f.value}
+            type="button"
+            onClick={() => setFilter(f.value)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+              filter === f.value
+                ? "bg-site-primary text-white"
+                : "bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+      {filtered.length === 0 ? (
         <p className="text-gray-500 py-8 text-center">
-          저장한 노트가 없습니다.{" "}
-          <Link href={`${basePath}/new`} className="text-site-primary hover:underline">작성</Link>해 보세요.
+          {filter === "all" ? "저장한 노트가 없습니다. " : "해당하는 노트가 없습니다. "}
+          {filter === "all" && (
+            <Link href={`${basePath}/new`} className="text-site-primary hover:underline">새 노트 작성</Link>
+          )}
         </p>
       ) : (
         <ul className="space-y-3">
-          {list.map((n) => (
+          {filtered.map((n) => (
             <li key={n.id}>
               <Link
                 href={`${basePath}/${n.id}`}
-                className="flex gap-3 p-3 rounded-lg border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-800/50"
+                className="flex gap-3 p-3 rounded-xl border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition"
               >
-                <div className="w-24 h-24 shrink-0 rounded overflow-hidden bg-gray-100 dark:bg-slate-700">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-lg overflow-hidden bg-gray-100 dark:bg-slate-700">
                   {n.imageUrl ? (
-                    <img
-                      src={n.imageUrl}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={n.imageUrl} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                      이미지 없음
-                    </div>
+                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">이미지 없음</div>
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                    {n.memo || "(메모 없음)"}
+                  <p className="font-medium text-site-text line-clamp-1">
+                    {n.title?.trim() || n.memo?.trim() || "(제목 없음)"}
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {new Date(n.createdAt).toLocaleDateString("ko-KR")}
-                    {" · "}
-                    {n.visibility === "community" ? "커뮤니티 게시" : "비공개"}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    {n.visibility === "community" ? "공개" : "비공개"}
+                    {(n.sentToTroubleCount ?? 0) > 0 && ` · 난구해결 전송 ${n.sentToTroubleCount}회`}
                   </p>
                 </div>
               </Link>

@@ -3,8 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
-import { IMAGE_PLACEHOLDER_SRC, isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
+import { IMAGE_PLACEHOLDER_SRC, sanitizeImageSrc } from "@/lib/image-src";
 
 const VIEWER_KEY_STORAGE = "community_viewer_key";
 
@@ -124,6 +123,13 @@ export function CommunityPostDetailView({
     liked: boolean;
     bookmarked: boolean;
     isHidden?: boolean;
+    isSolved?: boolean;
+    troubleShot?: {
+      layoutImageUrl: string | null;
+      difficulty: string | null;
+      sourceNoteId: string | null;
+      acceptedSolutionId: string | null;
+    };
   } | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentText, setCommentText] = useState("");
@@ -367,6 +373,29 @@ export function CommunityPostDetailView({
           <span className="text-site-text font-medium line-clamp-1">{post.title}</span>
         </nav>
 
+        {/* 난구해결사: 문제 공배치 상단 고정 영역 */}
+        {post.boardSlug === "trouble" && post.troubleShot?.layoutImageUrl && (
+          <section className="rounded-xl overflow-hidden bg-gray-900 mb-6 flex justify-center" aria-label="문제 공배치">
+            <img
+              src={post.troubleShot.layoutImageUrl}
+              alt="문제 공배치"
+              className="max-w-full h-auto w-full"
+            />
+          </section>
+        )}
+        {post.boardSlug === "trouble" && post.troubleShot?.sourceNoteId && (
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            원본 노트:{" "}
+            {post.isAuthor ? (
+              <Link href={`/mypage/notes/${post.troubleShot.sourceNoteId}`} className="text-site-primary hover:underline">
+                노트에서 보냄
+              </Link>
+            ) : (
+              <span>노트에서 보냄</span>
+            )}
+          </p>
+        )}
+
         <article className="rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 overflow-hidden">
           <div className="p-4 sm:p-6">
             <h1 className="text-xl font-bold text-site-text">{post.title}</h1>
@@ -385,16 +414,16 @@ export function CommunityPostDetailView({
                       <img key={`ph-${i}`} src={IMAGE_PLACEHOLDER_SRC} alt="" width={240} height={160} className="rounded-lg object-cover w-[240px] h-[160px]" />
                     );
                   }
-                  if (!isOptimizableImageSrc(safeSrc)) {
-                    return (
-                      <a key={safeSrc} href={safeSrc} target="_blank" rel="noopener noreferrer" className="block">
-                        <img src={safeSrc} alt="" width={240} height={160} className="rounded-lg object-cover w-[240px] h-[160px]" />
-                      </a>
-                    );
-                  }
                   return (
                     <a key={safeSrc} href={safeSrc} target="_blank" rel="noopener noreferrer" className="block">
-                      <Image src={safeSrc} alt="" width={240} height={160} className="rounded-lg object-cover" unoptimized />
+                      <img
+                        src={safeSrc}
+                        alt=""
+                        width={240}
+                        height={160}
+                        className="rounded-lg object-cover w-[240px] h-[160px]"
+                        data-debug-src={safeSrc}
+                      />
                     </a>
                   );
                 })}

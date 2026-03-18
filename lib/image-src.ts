@@ -14,11 +14,24 @@ export function isOptimizableImageSrc(src: string | null | undefined): boolean {
   return false;
 }
 
-/** img/Image에 넣어도 되는 유효한 src. 무효 시 null (undefined, null, "", javascript: 제거, trim) */
+/**
+ * img/Image에 넣어도 되는 유효한 src.
+ * - undefined, null, "", javascript: → null
+ * - 상대 경로(예: uploads/foo.jpg) → 앞에 / 붙여 절대 경로로 (배포 시 같은 오리진 기준)
+ */
 export function sanitizeImageSrc(src: string | null | undefined): string | null {
   if (src == null || typeof src !== "string") return null;
   const s = src.trim();
   if (s === "" || s.startsWith("javascript:")) return null;
+  if (
+    !s.startsWith("http://") &&
+    !s.startsWith("https://") &&
+    !s.startsWith("/") &&
+    !s.startsWith("data:") &&
+    !s.startsWith("blob:")
+  ) {
+    return `/${s}`;
+  }
   return s;
 }
 

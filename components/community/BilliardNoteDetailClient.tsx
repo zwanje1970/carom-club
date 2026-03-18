@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { SendToTroubleSheet } from "./SendToTroubleSheet";
 
 interface NoteData {
   id: string;
@@ -22,7 +23,6 @@ interface NoteData {
 
 export interface BilliardNoteDetailClientProps {
   note: NoteData;
-  /** 노트 목록/수정 링크 기준 경로. 예: /mypage/notes */
   basePath?: string;
 }
 
@@ -31,6 +31,7 @@ export function BilliardNoteDetailClient({ note, basePath = "/mypage/notes" }: B
   const [visibility, setVisibility] = useState(note.visibility);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
+  const [sendSheetOpen, setSendSheetOpen] = useState(false);
 
   const toggleCommunity = async () => {
     if (!note.isAuthor) return;
@@ -84,8 +85,44 @@ export function BilliardNoteDetailClient({ note, basePath = "/mypage/notes" }: B
     </div>
   );
 
+  const defaultTitle = note.title?.trim() || note.memo?.trim() || "";
+  const defaultContent = note.memo?.trim() || "";
+
+  const actionBar = note.isAuthor && (
+    <>
+      <button
+        type="button"
+        onClick={() => setSendSheetOpen(true)}
+        className="flex-1 min-w-0 py-2.5 rounded-lg bg-site-primary text-white font-medium text-sm hover:opacity-90"
+      >
+        난구해결로 보내기
+      </button>
+      <Link
+        href={`${basePath}/${note.id}/edit`}
+        className="flex-1 min-w-0 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 font-medium text-sm text-center hover:bg-gray-50 dark:hover:bg-slate-800"
+      >
+        수정
+      </Link>
+      <button
+        type="button"
+        onClick={toggleCommunity}
+        disabled={updating}
+        className="flex-1 min-w-0 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 font-medium text-sm disabled:opacity-50"
+      >
+        {visibility === "community" ? "게시 취소" : "공개전환"}
+      </button>
+      <button
+        type="button"
+        onClick={handleDelete}
+        className="flex-1 min-w-0 py-2.5 rounded-lg border border-red-300 text-red-600 font-medium text-sm hover:bg-red-50 dark:hover:bg-red-900/20"
+      >
+        삭제
+      </button>
+    </>
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24 md:pb-0">
       <div className="rounded-lg overflow-hidden bg-gray-900 flex justify-center">
         {note.isAuthor ? (
           <Link
@@ -107,9 +144,7 @@ export function BilliardNoteDetailClient({ note, basePath = "/mypage/notes" }: B
       )}
       {note.memo && (
         <div>
-          <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
-            내용
-          </h2>
+          <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">내용</h2>
           <p className="text-site-text whitespace-pre-wrap">{note.memo}</p>
         </div>
       )}
@@ -122,14 +157,16 @@ export function BilliardNoteDetailClient({ note, basePath = "/mypage/notes" }: B
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
+      {/* 데스크톱: 인라인 버튼 */}
       {note.isAuthor && (
-        <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-200 dark:border-slate-600">
-          <Link
-            href={`/community/nangu/write?fromNote=${note.id}`}
-            className="px-4 py-2 rounded-lg bg-site-primary text-white font-medium text-sm"
+        <div className="hidden md:flex flex-wrap gap-2 pt-4 border-t border-gray-200 dark:border-slate-600">
+          <button
+            type="button"
+            onClick={() => setSendSheetOpen(true)}
+            className="px-4 py-2 rounded-lg bg-site-primary text-white font-medium text-sm hover:opacity-90"
           >
             난구해결로 보내기
-          </Link>
+          </button>
           <Link
             href={`${basePath}/${note.id}/edit`}
             className="px-4 py-2 rounded-lg border border-gray-300 dark:border-slate-600 font-medium text-sm"
@@ -152,6 +189,23 @@ export function BilliardNoteDetailClient({ note, basePath = "/mypage/notes" }: B
             삭제
           </button>
         </div>
+      )}
+
+      {/* 모바일: 하단 고정 액션바 (하단 네비 위에 배치) */}
+      {note.isAuthor && (
+        <div className="fixed bottom-20 left-0 right-0 z-30 p-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-t border-gray-200 dark:border-slate-700 md:hidden">
+          <div className="flex gap-2 max-w-2xl mx-auto">{actionBar}</div>
+        </div>
+      )}
+
+      {sendSheetOpen && (
+        <SendToTroubleSheet
+          noteId={note.id}
+          defaultTitle={defaultTitle}
+          defaultContent={defaultContent}
+          defaultImageUrl={note.imageUrl}
+          onClose={() => setSendSheetOpen(false)}
+        />
       )}
     </div>
   );

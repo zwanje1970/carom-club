@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useEffect, useState } from "react";
-import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
+import { sanitizeImageSrc } from "@/lib/image-src";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { formatDistanceKm } from "@/lib/distance";
 
@@ -111,11 +110,12 @@ export function VenuesListWithLocation({ initialVenues, copy }: Props) {
                 if (!src) return null;
                 return (
                   <div className="relative ml-3 h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-gray-100">
-                    {!isOptimizableImageSrc(src) ? (
-                      <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                    ) : (
-                      <Image src={src} alt="" fill className="object-cover" sizes="56px" unoptimized />
-                    )}
+                    <img
+                      src={src}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover"
+                      data-debug-src={src}
+                    />
                   </div>
                 );
               })()}

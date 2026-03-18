@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-/** 모바일 하단 네비: 당구대회, 당구장홍보, 마이페이지, 커뮤니티. 당구노트는 마이페이지 퀵메뉴에서 이동. */
-const ITEMS = [
-  { href: "/tournaments", label: "당구대회", icon: TrophyIcon },
-  { href: "/venues", label: "당구장홍보", icon: VenueIcon },
-  { href: "/mypage", label: "마이페이지", icon: MypageIcon },
+/** 모바일 하단 네비: 대회, 노트(중앙 강조), 당구장, 커뮤니티, 마이. 노트 = /mypage/notes */
+const ITEMS_LEFT = [
+  { href: "/tournaments", label: "대회", icon: TrophyIcon },
+] as const;
+const ITEMS_CENTER = { href: "/mypage/notes", label: "노트", icon: NoteIcon, emphasize: true } as const;
+const ITEMS_RIGHT = [
+  { href: "/venues", label: "당구장", icon: VenueIcon },
   { href: "/community", label: "커뮤니티", icon: CommunityIcon },
+  { href: "/mypage", label: "마이", icon: MypageIcon },
 ] as const;
 
 function TrophyIcon({ active }: { active: boolean }) {
@@ -39,37 +42,65 @@ function MypageIcon({ active }: { active: boolean }) {
     </svg>
   );
 }
+function NoteIcon({ active }: { active: boolean }) {
+  return (
+    <svg className="w-8 h-8 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+    </svg>
+  );
+}
 
-/** 모바일(768px 이하) 전용 하단 고정 네비게이션. /admin에서는 사용하지 않음. */
+function NavLink({
+  href,
+  label,
+  icon: Icon,
+  pathname,
+  emphasize,
+}: {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ active: boolean }>;
+  pathname: string;
+  emphasize?: boolean;
+}) {
+  const isActive =
+    pathname === href ||
+    (href === "/mypage/notes" && pathname.startsWith("/mypage/notes")) ||
+    (href !== "/community" && href !== "/mypage" && pathname.startsWith(href + "/")) ||
+    (href === "/mypage" && (pathname === "/mypage" || (pathname.startsWith("/mypage/") && !pathname.startsWith("/mypage/notes"))));
+  const base = "flex flex-1 flex-col items-center justify-center gap-0.5 py-3 text-xs transition min-h-[72px] min-w-[44px] border-t-2 ";
+  const activeClass = "text-site-primary font-medium border-site-primary bg-site-primary/5";
+  const inactiveClass = "border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200";
+  const emphasisClass = emphasize ? "bg-site-primary/10 dark:bg-site-primary/20" : "";
+  return (
+    <Link
+      href={href}
+      className={`${base} ${isActive ? activeClass : inactiveClass} ${isActive && emphasize ? emphasisClass : ""}`}
+    >
+      <span className={`inline-flex items-center justify-center ${emphasize ? "min-h-[32px] min-w-[32px]" : "min-h-[28px] min-w-[28px]"}`}>
+        <Icon active={isActive} />
+      </span>
+      <span>{label}</span>
+    </Link>
+  );
+}
+
+/** 모바일(768px 이하) 전용 하단 고정 네비게이션. 대회 | 노트(중앙 강조) | 당구장 | 커뮤니티 | 마이 */
 export function BottomNav() {
   const pathname = usePathname() ?? "";
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 h-20 bg-white border-t border-gray-200 flex justify-around items-center md:hidden dark:bg-slate-900 dark:border-slate-700"
+      className="fixed bottom-0 left-0 right-0 z-50 h-20 bg-white border-t border-gray-200 flex justify-around items-stretch md:hidden dark:bg-slate-900 dark:border-slate-700"
       aria-label="하단 메뉴"
     >
-      {ITEMS.map(({ href, label, icon: Icon }) => {
-        const isActive =
-          pathname === href ||
-          (href !== "/community" && pathname.startsWith(href + "/"));
-        return (
-          <Link
-            key={href}
-            href={href}
-            className={`flex flex-1 flex-col items-center justify-center gap-1 py-3 text-xs transition min-h-[72px] min-w-[44px] border-t-2 ${
-              isActive
-                ? "text-site-primary font-medium border-site-primary bg-site-primary/5"
-                : "border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200"
-            }`}
-          >
-            <span className="inline-flex items-center justify-center min-h-[28px] min-w-[28px]">
-              <Icon active={isActive} />
-            </span>
-            <span>{label}</span>
-          </Link>
-        );
-      })}
+      {ITEMS_LEFT.map((item) => (
+        <NavLink key={item.href} href={item.href} label={item.label} icon={item.icon} pathname={pathname} />
+      ))}
+      <NavLink href={ITEMS_CENTER.href} label={ITEMS_CENTER.label} icon={ITEMS_CENTER.icon} pathname={pathname} emphasize />
+      {ITEMS_RIGHT.map((item) => (
+        <NavLink key={item.href} href={item.href} label={item.label} icon={item.icon} pathname={pathname} />
+      ))}
     </nav>
   );
 }

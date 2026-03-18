@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
-import { IMAGE_PLACEHOLDER_SRC, isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
+import { IMAGE_PLACEHOLDER_SRC, sanitizeImageSrc } from "@/lib/image-src";
 
 export type VenueCarouselItem = {
   id: string;
@@ -187,10 +186,14 @@ export function VenueCarousel({ venues }: { venues: VenueCarouselItem[] }) {
                     if (!src) {
                       return <img src={IMAGE_PLACEHOLDER_SRC} alt="" className="absolute inset-0 w-full h-full object-cover" />;
                     }
-                    return isOptimizableImageSrc(src) ? (
-                      <Image src={src} alt="" fill sizes="96px" className="object-cover" loading="lazy" unoptimized />
-                    ) : (
-                      <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                    return (
+                      <img
+                        src={src}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-cover"
+                        loading="lazy"
+                        data-debug-src={src}
+                      />
                     );
                   })()}
                 </div>

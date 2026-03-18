@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { TournamentListRow } from "@/lib/db-tournaments";
-import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
+import { sanitizeImageSrc } from "@/lib/image-src";
 import { formatDistanceKm } from "@/lib/distance";
 
 type TabId = "upcoming" | "closed" | "finished";
@@ -187,20 +186,13 @@ export function TournamentsListWithFilters({
                       const src = sanitizeImageSrc(hasImage);
                       if (!src) return null;
                       return (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          {!isOptimizableImageSrc(src) ? (
-                            <img src={src} alt="" className="absolute inset-0 w-full h-full object-contain" />
-                          ) : (
-                            <Image
-                              src={src}
-                              alt=""
-                              fill
-                              className="object-contain"
-                              sizes="(max-width: 768px) 100vw, 400px"
-                              loading="lazy"
-                              unoptimized
-                            />
-                          )}
+                        <div className="absolute inset-0 flex items-center justify-center min-h-[80px]">
+                          <img
+                            src={src}
+                            alt=""
+                            className="absolute inset-0 w-full h-full object-contain"
+                            data-debug-src={src}
+                          />
                         </div>
                       );
                     })()}

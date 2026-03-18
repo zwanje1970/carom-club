@@ -1,14 +1,15 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { buildMenuNavBar } from "./adminMenu";
-import NavBar from "./dashboard/_components/NavBar";
 import FooterBar from "./dashboard/_components/FooterBar";
 import { AdminPageActions, ADMIN_ACTION_BAR_PT_CLASS } from "./AdminPageActions";
+import { AdminLayoutSidebar, AdminMobileMenuButton, ADMIN_SIDEBAR_WIDTH } from "./AdminLayoutSidebar";
 import { hasAnyDrafts, clearAllDrafts } from "@/lib/admin-drafts";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import type { FooterSettings } from "@/lib/footer-settings";
+
+const ACTION_BAR_HEIGHT = 48;
 
 type Props = {
   children: React.ReactNode;
@@ -19,8 +20,9 @@ type Props = {
   footer?: FooterSettings;
 };
 
-export function AdminLayout({ children, userName, copy, footer }: Props) {
+export function AdminLayout({ children, copy, footer }: Props) {
   const router = useRouter();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     if (hasAnyDrafts()) {
@@ -35,29 +37,30 @@ export function AdminLayout({ children, userName, copy, footer }: Props) {
     router.refresh();
   };
 
-  const menuNavBar = buildMenuNavBar(userName, copy);
-  const hasNavBar = menuNavBar.length > 0;
-  const headerHeight = hasNavBar ? 128 : 64; // 메인 헤더 64px, NavBar 있으면 +64px
   const footerText = copy?.["footer.copyright"] ?? "CAROM.CLUB 관리자";
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-800 dark:text-slate-100">
-      {hasNavBar && (
-        <NavBar
-          menu={menuNavBar}
-          className=""
-          userName={userName}
-          onLogout={handleLogout}
-        />
-      )}
+      <AdminLayoutSidebar
+        copy={copy}
+        onLogout={handleLogout}
+        mobileOpen={mobileMenuOpen}
+        onMobileClose={() => setMobileMenuOpen(false)}
+      />
       <div
-        className="relative z-0 min-h-screen w-full"
-        style={{ paddingTop: `${headerHeight}px` }}
+        className="relative z-0 min-h-screen min-w-0 lg:pl-[280px]"
+        style={{ paddingTop: `${ACTION_BAR_HEIGHT}px` }}
       >
-        <AdminPageActions topOffset={headerHeight} copy={copy} />
+        <AdminPageActions
+          topOffset={0}
+          copy={copy}
+          leftSlot={
+            <AdminMobileMenuButton onClick={() => setMobileMenuOpen(true)} />
+          }
+        />
         <main
           className={`${ADMIN_ACTION_BAR_PT_CLASS} p-4 sm:p-6 overflow-x-hidden`}
-          style={{ minHeight: `calc(100vh - ${headerHeight}px)` }}
+          style={{ minHeight: `calc(100vh - ${ACTION_BAR_HEIGHT}px)` }}
         >
           {children}
         </main>

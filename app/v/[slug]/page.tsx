@@ -1,6 +1,5 @@
-import Image from "next/image";
 import { notFound } from "next/navigation";
-import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
+import { sanitizeImageSrc } from "@/lib/image-src";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { MOCK_VENUES_LIST } from "@/lib/mock-data";
@@ -186,11 +185,12 @@ export default async function VenueDetailPage({
               if (!safeLogo) return null;
               return (
                 <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-site-border bg-site-card">
-                  {!isOptimizableImageSrc(safeLogo) ? (
-                    <img src={safeLogo} alt="" className="absolute inset-0 w-full h-full object-contain" />
-                  ) : (
-                    <Image src={safeLogo} alt="" fill className="object-contain" unoptimized />
-                  )}
+                  <img
+                    src={safeLogo}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-contain"
+                    data-debug-src={safeLogo}
+                  />
                 </div>
               );
             })()}
@@ -207,12 +207,13 @@ export default async function VenueDetailPage({
           const safeCover = sanitizeImageSrc(venue.coverImageUrl);
           if (!safeCover) return null;
           return (
-            <div className="relative mt-6 aspect-[21/9] w-full overflow-hidden rounded-2xl border border-site-border bg-site-card">
-              {!isOptimizableImageSrc(safeCover) ? (
-                <img src={safeCover} alt="" className="absolute inset-0 w-full h-full object-cover" />
-              ) : (
-                <Image src={safeCover} alt="" fill className="object-cover" unoptimized priority />
-              )}
+            <div className="relative mt-6 aspect-[21/9] w-full overflow-hidden rounded-2xl border border-site-border bg-site-card min-h-[120px]">
+              <img
+                src={safeCover}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover"
+                data-debug-src={safeCover}
+              />
             </div>
           );
         })()}
@@ -366,19 +367,13 @@ export default async function VenueDetailPage({
               const safePromo = sanitizeImageSrc(venue.promoImageUrl);
               if (!safePromo) return null;
               return (
-                <div className="relative w-full aspect-[2/1] max-h-80 rounded-2xl border border-site-border bg-site-card overflow-hidden">
-                  {!isOptimizableImageSrc(safePromo) ? (
-                    <img src={safePromo} alt="대표 이미지" className="absolute inset-0 w-full h-full object-contain" />
-                  ) : (
-                    <Image
-                      src={safePromo}
-                      alt="대표 이미지"
-                      fill
-                      className="object-contain"
-                      sizes="(max-width: 768px) 100vw, 800px"
-                      unoptimized
-                    />
-                  )}
+                <div className="relative w-full aspect-[2/1] max-h-80 rounded-2xl border border-site-border bg-site-card overflow-hidden min-h-[120px]">
+                  <img
+                    src={safePromo}
+                    alt="대표 이미지"
+                    className="absolute inset-0 w-full h-full object-contain"
+                    data-debug-src={safePromo}
+                  />
                 </div>
               );
             })()}

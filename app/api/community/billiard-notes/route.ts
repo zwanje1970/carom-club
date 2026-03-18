@@ -52,13 +52,25 @@ export async function GET(request: Request) {
     take: 100,
     select: {
       id: true,
+      title: true,
       memo: true,
       imageUrl: true,
       visibility: true,
       createdAt: true,
+      _count: { select: { troubleShotsFromNote: true } },
     },
   });
-  return NextResponse.json(list);
+  return NextResponse.json(
+    list.map((n) => ({
+      id: n.id,
+      title: n.title,
+      memo: n.memo,
+      imageUrl: n.imageUrl,
+      visibility: n.visibility,
+      createdAt: n.createdAt,
+      sentToTroubleCount: n._count.troubleShotsFromNote,
+    }))
+  );
 }
 
 /** 노트 생성. 이미지 URL은 먼저 upload-image로 업로드 후 전달. */

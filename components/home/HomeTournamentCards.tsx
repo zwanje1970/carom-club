@@ -1,8 +1,7 @@
 import Link from "next/link";
-import Image from "next/image";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { formatDistanceKm } from "@/lib/distance";
-import { IMAGE_PLACEHOLDER_SRC, isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
+import { IMAGE_PLACEHOLDER_SRC, sanitizeImageSrc } from "@/lib/image-src";
 
 type Tournament = {
   id: string;
@@ -139,17 +138,13 @@ export function HomeTournamentCards({
                           <img src={IMAGE_PLACEHOLDER_SRC} alt="" className="absolute inset-0 w-full h-full object-cover" />
                         );
                       }
-                      return isOptimizableImageSrc(src) ? (
-                        <Image
+                      return (
+                        <img
                           src={src}
                           alt=""
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 768px) 280px, (max-width: 1024px) 48vw, 320px"
-                          unoptimized
+                          className="absolute inset-0 w-full h-full object-cover"
+                          data-debug-src={src}
                         />
-                      ) : (
-                        <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" />
                       );
                     })()}
                     <span

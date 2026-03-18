@@ -1,9 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { SmartLink } from "@/components/common/SmartLink";
 import { INTERNAL_PAGE_PATHS } from "@/lib/content/constants";
-import { IMAGE_PLACEHOLDER_SRC, isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
+import { IMAGE_PLACEHOLDER_SRC, sanitizeImageSrc } from "@/lib/image-src";
 import type { PageSection } from "@/types/page-section";
 
 const PLACEHOLDER =
@@ -16,18 +15,12 @@ function SectionImageCell({ src, alt }: { src: string; alt: string }) {
   if (!safeSrc) {
     return <img src={IMAGE_PLACEHOLDER_SRC} alt={alt} className="absolute inset-0 w-full h-full object-cover" />;
   }
-  if (!isOptimizableImageSrc(safeSrc)) {
-    return <img src={safeSrc} alt={alt} className="absolute inset-0 w-full h-full object-cover" />;
-  }
   return (
-    <Image
+    <img
       src={safeSrc}
       alt={alt}
-      fill
-      className="object-cover"
-      sizes="100vw"
-      loading="lazy"
-      unoptimized
+      className="absolute inset-0 w-full h-full object-cover min-h-[80px]"
+      data-debug-src={safeSrc}
     />
   );
 }

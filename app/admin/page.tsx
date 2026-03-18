@@ -2,16 +2,13 @@ import Link from "next/link";
 import { mdiViewDashboard } from "@mdi/js";
 import SectionMain from "@/components/admin/_components/Section/Main";
 import SectionTitleLineWithButton from "@/components/admin/_components/Section/TitleLineWithButton";
-import { DashboardMenuBox } from "@/components/admin/DashboardMenuBox";
 import CardBox from "@/components/admin/_components/CardBox";
 import { getAdminCopy, getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
-import { getMenuAside } from "@/components/admin/adminMenu";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 
 export default async function AdminPage() {
   const copy = await getAdminCopy();
-  const menuAside = getMenuAside(copy).filter((item) => item.href !== "/admin");
 
   let stats: {
     organizationCount: number;
@@ -67,9 +64,6 @@ export default async function AdminPage() {
           </Link>
         </CardBox>
       </div>
-
-      <h2 className="mb-3 text-sm font-semibold text-gray-700 dark:text-slate-300">{getCopyValue(c, "admin.dashboard.quickLinks")}</h2>
-      <DashboardMenuBox menu={menuAside} />
     </SectionMain>
   );
 }

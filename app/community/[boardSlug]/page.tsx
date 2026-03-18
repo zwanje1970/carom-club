@@ -25,6 +25,7 @@ export default function CommunityBoardSlugPage() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<"latest" | "likes">("latest");
+  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "solved">("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
 
@@ -33,6 +34,7 @@ export default function CommunityBoardSlugPage() {
     setPinned([]);
     setPosts([]);
     setPage(0);
+    setStatusFilter("all");
   }, [boardSlug]);
 
   useEffect(() => {
@@ -40,6 +42,7 @@ export default function CommunityBoardSlugPage() {
     setLoading(true);
     const q = new URLSearchParams({ sort, page: String(page), take: "20" });
     if (search.trim()) q.set("q", search.trim());
+    if (boardSlug === "trouble" && statusFilter !== "all") q.set("status", statusFilter);
     fetch(`/api/community/boards/${boardSlug}/posts?${q}`, { credentials: "include" })
       .then((res) => {
         if (!res.ok) throw new Error("목록을 불러올 수 없습니다.");
@@ -53,7 +56,7 @@ export default function CommunityBoardSlugPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [boardSlug, sort, search, page]);
+  }, [boardSlug, sort, statusFilter, search, page]);
 
   const runSearch = () => setPage(0);
 
@@ -91,21 +94,16 @@ export default function CommunityBoardSlugPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 mb-4">
+          {boardSlug === "trouble" && (
+            <div className="flex rounded-lg border border-gray-300 dark:border-slate-600 overflow-hidden">
+              <button type="button" onClick={() => { setStatusFilter("all"); setPage(0); }} className={`px-3 py-2 text-sm font-medium ${statusFilter === "all" ? "bg-site-primary text-white" : "bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300"}`}>전체</button>
+              <button type="button" onClick={() => { setStatusFilter("open"); setPage(0); }} className={`px-3 py-2 text-sm font-medium ${statusFilter === "open" ? "bg-site-primary text-white" : "bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300"}`}>해결중</button>
+              <button type="button" onClick={() => { setStatusFilter("solved"); setPage(0); }} className={`px-3 py-2 text-sm font-medium ${statusFilter === "solved" ? "bg-site-primary text-white" : "bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300"}`}>해결완료</button>
+            </div>
+          )}
           <div className="flex rounded-lg border border-gray-300 dark:border-slate-600 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => { setSort("latest"); setPage(0); }}
-              className={`px-3 py-2 text-sm font-medium ${sort === "latest" ? "bg-site-primary text-white" : "bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300"}`}
-            >
-              최신순
-            </button>
-            <button
-              type="button"
-              onClick={() => { setSort("likes"); setPage(0); }}
-              className={`px-3 py-2 text-sm font-medium ${sort === "likes" ? "bg-site-primary text-white" : "bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300"}`}
-            >
-              추천순
-            </button>
+            <button type="button" onClick={() => { setSort("latest"); setPage(0); }} className={`px-3 py-2 text-sm font-medium ${sort === "latest" ? "bg-site-primary text-white" : "bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300"}`}>최신순</button>
+            <button type="button" onClick={() => { setSort("likes"); setPage(0); }} className={`px-3 py-2 text-sm font-medium ${sort === "likes" ? "bg-site-primary text-white" : "bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300"}`}>추천순</button>
           </div>
           <div className="flex-1 min-w-[180px] flex gap-2">
             <input

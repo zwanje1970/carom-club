@@ -1,8 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
+import { sanitizeImageSrc } from "@/lib/image-src";
 
 function formatSchedule(startAt: string | Date, endAt?: string | Date | null): string {
   const s = new Date(startAt);
@@ -97,18 +96,12 @@ export function TournamentPromoBlock({
           }
           return (
             <div className="relative w-full aspect-[2/1] bg-site-bg flex items-center justify-center">
-              {!isOptimizableImageSrc(safeSrc) ? (
-                <img src={safeSrc} alt="" className="absolute inset-0 w-full h-full object-contain" />
-              ) : (
-                <Image
-                  src={safeSrc}
-                  alt=""
-                  fill
-                  className="object-contain"
-                  sizes="(max-width: 768px) 100vw, 800px"
-                  unoptimized
-                />
-              )}
+              <img
+                src={safeSrc}
+                alt=""
+                className="absolute inset-0 w-full h-full object-contain min-h-[80px]"
+                data-debug-src={safeSrc}
+              />
             </div>
           );
         })()}

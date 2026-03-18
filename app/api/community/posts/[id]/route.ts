@@ -27,12 +27,21 @@ export async function GET(
       imageUrls: true,
       isPinned: true,
       isHidden: true,
+      isSolved: true,
       viewCount: true,
       createdAt: true,
       updatedAt: true,
       board: { select: { slug: true, name: true } },
       author: { select: { id: true, name: true } },
       _count: { select: { likes: true, comments: true } },
+      troubleShot: {
+        select: {
+          layoutImageUrl: true,
+          difficulty: true,
+          sourceNoteId: true,
+          acceptedSolutionId: true,
+        },
+      },
     },
   });
   if (!post) {
@@ -64,7 +73,7 @@ export async function GET(
   }
 
   const imageUrls = post.imageUrls ? (JSON.parse(post.imageUrls) as string[]) : [];
-  return NextResponse.json({
+  const payload: Record<string, unknown> = {
     id: post.id,
     boardId: post.boardId,
     boardSlug: post.board.slug,
@@ -76,6 +85,7 @@ export async function GET(
     imageUrls,
     isPinned: post.isPinned,
     isHidden: post.isHidden,
+    isSolved: post.isSolved ?? false,
     viewCount: post.viewCount,
     likeCount: post._count.likes,
     commentCount: post._count.comments,
@@ -86,7 +96,16 @@ export async function GET(
     canDelete: session?.id === post.authorId || isCommunityAdmin(session),
     liked,
     bookmarked,
-  });
+  };
+  if (post.board.slug === "trouble" && post.troubleShot) {
+    payload.troubleShot = {
+      layoutImageUrl: post.troubleShot.layoutImageUrl,
+      difficulty: post.troubleShot.difficulty,
+      sourceNoteId: post.troubleShot.sourceNoteId,
+      acceptedSolutionId: post.troubleShot.acceptedSolutionId,
+    };
+  }
+  return NextResponse.json(payload);
 }
 
 /** 게시글 수정. 작성자 또는 관리자 */

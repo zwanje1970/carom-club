@@ -94,9 +94,10 @@ export async function uploadToLocal(processed: ProcessedImage): Promise<{ url: s
 }
 
 /**
- * 처리된 이미지를 저장. DATABASE_URL/배포 환경 기준:
- * - BLOB_READ_WRITE_TOKEN 있음 → Vercel Blob
- * - 없음 → public/uploads (로컬에서만 쓰기 가능)
+ * 처리된 이미지를 저장.
+ * - BLOB_READ_WRITE_TOKEN 있음 → Vercel Blob (배포 권장)
+ * - Vercel 배포인데 토큰 없음 → 에러 (서버리스에서는 public/uploads 쓰기 유지 안 됨 → 404)
+ * - 로컬에서 토큰 없음 → public/uploads
  */
 export async function uploadToBlob(
   processed: ProcessedImage,
@@ -108,6 +109,11 @@ export async function uploadToBlob(
       contentType: processed.contentType,
     });
     return { url: blob.url };
+  }
+  if (process.env.VERCEL === "1") {
+    throw new Error(
+      "배포 환경에서는 이미지가 저장되지 않습니다. Vercel Blob을 사용하려면 BLOB_READ_WRITE_TOKEN을 설정하세요. (현재 /uploads 경로는 서버리스에서 유지되지 않아 404가 납니다.)"
+    );
   }
   return uploadToLocal(processed);
 }
