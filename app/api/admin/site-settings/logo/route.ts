@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { processUploadedImage, uploadToBlob } from "@/lib/image-upload";
+import { processUploadedImage, uploadToBlob, isBlobConfigError, BLOB_SERVICE_UNAVAILABLE_MESSAGE } from "@/lib/image-upload";
 import { IMAGE_POLICIES } from "@/lib/image-policies";
 
 export async function POST(request: Request) {
@@ -29,6 +29,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
     console.error("[site-settings logo] upload error:", e);
+    if (isBlobConfigError(message)) {
+      return NextResponse.json(
+        { error: BLOB_SERVICE_UNAVAILABLE_MESSAGE },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: "업로드 중 오류가 발생했습니다." },
       { status: 500 }

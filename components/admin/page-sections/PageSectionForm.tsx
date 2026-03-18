@@ -258,7 +258,7 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
     if (form.type === "image") {
       const hasImage = !!(form.imageUrl?.trim());
       if (!hasImage) {
-        setError("이미지를 업로드하거나 URL을 입력해 주세요.");
+        setError("이미지 첨부파일을 업로드해 주세요.");
         return;
       }
     }
@@ -688,7 +688,7 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
               )}
               {form.titleIconType === "image" && (
                 <AdminImageField
-                  label="제목 아이콘 이미지 URL"
+                  label="제목 아이콘 이미지 (첨부파일)"
                   value={form.titleIconImageUrl ?? null}
                   onChange={(url) => setForm((f) => ({ ...f, titleIconImageUrl: url }))}
                   policy="section"
@@ -805,7 +805,7 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
           </h3>
           <div className="space-y-4">
             <AdminImageField
-              label={isHeroSection ? "배경 이미지 (업로드 또는 URL, 필수)" : "대표 이미지 (업로드 또는 URL 중 하나 필수)"}
+              label={isHeroSection ? "배경 이미지 (첨부파일, 필수)" : "대표 이미지 (첨부파일, 필수)"}
               value={form.imageUrl ?? null}
               onChange={(url) => setForm((f) => ({ ...f, imageUrl: url }))}
               policy="section"

@@ -15,6 +15,19 @@ import { optimizeImage, isAllowedMime } from "./image-optimizer";
 export const BLOB_TOKEN_MISSING_MESSAGE =
   "이미지 저장 설정이 되어 있지 않습니다. BLOB_READ_WRITE_TOKEN을 설정해 주세요.";
 
+/** 클라이언트에 반환할 503 메시지 (Blob 미설정 또는 Blob API 오류) */
+export const BLOB_SERVICE_UNAVAILABLE_MESSAGE =
+  "이미지 저장 설정이 되어 있지 않아 업로드할 수 없습니다. 관리자에게 문의해 주세요.";
+
+/** Blob 설정/토큰/API 오류로 인한 실패인지 판별 (503 반환용) */
+export function isBlobConfigError(message: string): boolean {
+  return (
+    message.includes("BLOB_READ_WRITE_TOKEN") ||
+    message.includes("배포 환경에서는 이미지가 저장되지 않습니다") ||
+    /blob|token|BLOB_READ_WRITE|unauthorized|403/i.test(message)
+  );
+}
+
 /** Blob에 저장할 경로 생성: {prefix}/YYYYMMDD-{random}.{ext} */
 export function buildBlobPath(
   prefix: string,
@@ -93,11 +106,15 @@ export async function uploadToLocal(processed: ProcessedImage): Promise<{ url: s
   return { url };
 }
 
+/** 배포 환경에서 토큰 없을 때 에러 메시지 (이미지는 Blob에만 저장, /uploads 미지원) */
+export const UPLOAD_DEPLOY_REQUIRES_BLOB_MESSAGE =
+  "배포 환경에서는 이미지가 저장되지 않습니다. Vercel Blob을 사용하려면 BLOB_READ_WRITE_TOKEN을 설정하세요. (현재 /uploads 경로는 서버리스에서 유지되지 않아 404가 납니다.)";
+
 /**
  * 처리된 이미지를 저장.
- * - BLOB_READ_WRITE_TOKEN 있음 → Vercel Blob (배포 권장)
- * - Vercel 배포인데 토큰 없음 → 에러 (서버리스에서는 public/uploads 쓰기 유지 안 됨 → 404)
- * - 로컬에서 토큰 없음 → public/uploads
+ * - BLOB_READ_WRITE_TOKEN 있음 → Vercel Blob (공개 URL 반환, DB에는 이 URL 저장)
+ * - Vercel 또는 NODE_ENV=production 이고 토큰 없음 → 에러 (로컬 /uploads 미지원)
+ * - 로컬 개발에서만 토큰 없음 → public/uploads (DB에는 /uploads/... 저장, 배포 시 404 주의)
  */
 export async function uploadToBlob(
   processed: ProcessedImage,
@@ -110,10 +127,9 @@ export async function uploadToBlob(
     });
     return { url: blob.url };
   }
-  if (process.env.VERCEL === "1") {
-    throw new Error(
-      "배포 환경에서는 이미지가 저장되지 않습니다. Vercel Blob을 사용하려면 BLOB_READ_WRITE_TOKEN을 설정하세요. (현재 /uploads 경로는 서버리스에서 유지되지 않아 404가 납니다.)"
-    );
+  const isDeploy = process.env.VERCEL === "1" || process.env.NODE_ENV === "production";
+  if (isDeploy) {
+    throw new Error(UPLOAD_DEPLOY_REQUIRES_BLOB_MESSAGE);
   }
   return uploadToLocal(processed);
 }

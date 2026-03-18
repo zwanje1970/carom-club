@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { processUploadedImage, uploadToBlob } from "@/lib/image-upload";
+import { processUploadedImage, uploadToBlob, isBlobConfigError, BLOB_SERVICE_UNAVAILABLE_MESSAGE } from "@/lib/image-upload";
 import { IMAGE_POLICIES } from "@/lib/image-policies";
 
 /** 커뮤니티 게시글 첨부 이미지 업로드. 로그인 필수 */
@@ -27,6 +27,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
     console.error("[community/upload-image] error:", e);
+    if (isBlobConfigError(message)) {
+      return NextResponse.json(
+        { error: BLOB_SERVICE_UNAVAILABLE_MESSAGE },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

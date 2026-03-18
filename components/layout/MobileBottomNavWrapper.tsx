@@ -8,7 +8,7 @@ import { useBallPlacementFullscreen } from "@/components/community/BallPlacement
 type Props = { children: React.ReactNode };
 
 /**
- * 모바일에서 BottomNav 표시 + 본문 하단 여백(pb-24).
+ * 모바일에서 BottomNav 표시 + 본문 하단 여백(pb-28, 2줄 네비 높이).
  * 메인 4페이지(대회/당구장/커뮤니티/마이페이지) 스와이프 영역 적용.
  * /admin/* 에서는 BottomNav 미표시, 여백 없음.
  * 당구노트 공 배치 전체화면 시 BottomNav 숨김, 여백 제거.
@@ -21,7 +21,7 @@ export function MobileBottomNavWrapper({ children }: Props) {
 
   return (
     <>
-      <div className={hideNav ? "" : "pb-24 md:pb-0"}>
+      <div className={hideNav ? "" : "pb-28 md:pb-0"}>
         <MainPageSwipeArea>{children}</MainPageSwipeArea>
       </div>
       {!hideNav && <BottomNav />}

@@ -390,29 +390,60 @@ export async function getVenuesListRaw(
   }
 }
 
-/** 당구장 목록 + 위도/경도 (거리 정렬용). take 상한 50. */
+/** 당구장 목록 + 위도/경도 + 대대전용/복합구장 구분. take 상한 150. */
+export type VenueListRow = {
+  id: string;
+  name: string;
+  slug: string;
+  coverImageUrl: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  venueCategory: "daedae_only" | "mixed" | null;
+};
+
 export async function getVenuesListWithCoords(
   take = 50
-): Promise<{ id: string; name: string; slug: string; coverImageUrl: string | null; latitude: number | null; longitude: number | null }[]> {
+): Promise<VenueListRow[]> {
   try {
-    const rows = await prisma.$queryRawUnsafe<
-      { id: string; name: string; slug: string; coverImageUrl: string | null; latitude: number | null; longitude: number | null }[]
-    >(
-      `SELECT t.id, t.name, t.slug, t."coverImageUrl", t.latitude, t.longitude FROM (
-         SELECT DISTINCT ON (o.id) o.id, o.name, o.slug, o."coverImageUrl", o.latitude, o.longitude
-         FROM "Organization" o
-         INNER JOIN "ClientApplication" a ON a."applicantUserId" = o."ownerUserId" AND a.status = 'APPROVED'
-         WHERE o.type = 'VENUE' AND o.slug IS NOT NULL
-         ORDER BY o.id
-       ) t
-       ORDER BY t.name ASC
-       LIMIT $1`,
-      take
-    );
-    return rows;
+    const rows = await prisma.organization.findMany({
+      where: {
+        type: "VENUE",
+        slug: { not: null },
+        ownerUserId: { in: await getApprovedApplicantUserIds() },
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        coverImageUrl: true,
+        latitude: true,
+        longitude: true,
+        typeSpecificJson: true,
+      },
+      orderBy: { name: "asc" },
+      take: Math.min(take, 150),
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      slug: r.slug!,
+      coverImageUrl: r.coverImageUrl ?? null,
+      latitude: r.latitude ?? null,
+      longitude: r.longitude ?? null,
+      venueCategory: venueCategoryFromTypeSpecific(r.typeSpecificJson),
+    }));
   } catch {
     return [];
   }
+}
+
+async function getApprovedApplicantUserIds(): Promise<string[]> {
+  const rows = await prisma.clientApplication.findMany({
+    where: { status: "APPROVED" },
+    select: { applicantUserId: true },
+    distinct: ["applicantUserId"],
+  });
+  return rows.map((r) => r.applicantUserId).filter((id): id is string => id != null);
 }
 
 /** 공개 상세용 경량 relation select (무거운 entries/rounds/brackets 제외) */

@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { isDatabaseConfigured } from "@/lib/db-mode";
-import { processUploadedImage, uploadToBlob } from "@/lib/image-upload";
+import { processUploadedImage, uploadToBlob, isBlobConfigError, BLOB_SERVICE_UNAVAILABLE_MESSAGE } from "@/lib/image-upload";
 import { IMAGE_POLICIES } from "@/lib/image-policies";
-
-const BLOB_ERROR_MESSAGE =
-  "이미지 저장 설정이 되어 있지 않습니다. 관리자에게 문의해 주세요.";
 
 /** 대회 참가 신청 시 AVG 인증서 이미지 업로드. URL만 반환하며 DB에는 저장하지 않음. 신청 폼에서 avgProofUrl로 전달 */
 export async function POST(request: Request) {
@@ -41,18 +38,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
     console.error("[apply/upload-avg-proof] error:", e);
-    const err = e as { message?: string };
-    const isBlobError =
-      typeof err?.message === "string" &&
-      (/blob|token|BLOB_READ_WRITE|unauthorized|403/i.test(err.message) ||
-        err.message.includes("token"));
+    if (isBlobConfigError(message)) {
+      return NextResponse.json(
+        { error: BLOB_SERVICE_UNAVAILABLE_MESSAGE },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       {
-        error: isBlobError
-          ? BLOB_ERROR_MESSAGE
-          : "이미지 업로드 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+        error: "이미지 업로드 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
       },
-      { status: isBlobError ? 503 : 500 }
+      { status: 500 }
     );
   }
 }

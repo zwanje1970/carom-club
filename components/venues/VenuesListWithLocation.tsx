@@ -6,27 +6,40 @@ import { sanitizeImageSrc } from "@/lib/image-src";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { formatDistanceKm } from "@/lib/distance";
 
+const VENUE_CATEGORY_OPTIONS: { value: "all" | "daedae_only" | "mixed"; label: string }[] = [
+  { value: "all", label: "전체" },
+  { value: "daedae_only", label: "대대전용구장" },
+  { value: "mixed", label: "복합구장" },
+];
+
 type VenueItem = {
   id: string;
   name: string;
   slug: string;
   coverImageUrl?: string | null;
   distanceKm?: number | null;
+  venueCategory?: "daedae_only" | "mixed" | null;
 };
 
 type Props = {
-  initialVenues: { id: string; name: string; slug: string }[];
+  initialVenues: { id: string; name: string; slug: string; venueCategory?: "daedae_only" | "mixed" | null }[];
   copy: Record<string, string>;
 };
 
-/** 당구장 목록: 기본 목록 즉시 표시, 위치 허용 시 가까운 순으로 후처리. */
+/** 당구장 목록: 기본 목록 즉시 표시, 위치 허용 시 가까운 순으로 후처리, 대대전용/복합구장 필터. */
 export function VenuesListWithLocation({ initialVenues, copy }: Props) {
   const [venues, setVenues] = useState<VenueItem[]>(
     initialVenues.map((v) => ({ ...v, coverImageUrl: null }))
   );
+  const [venueFilter, setVenueFilter] = useState<"all" | "daedae_only" | "mixed">("all");
   const [sortByDistance, setSortByDistance] = useState(false);
   const [locationRefining, setLocationRefining] = useState(false);
   const [locationError, setLocationError] = useState(false);
+
+  const filteredVenues =
+    venueFilter === "all"
+      ? venues
+      : venues.filter((v) => v.venueCategory === venueFilter);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +92,26 @@ export function VenuesListWithLocation({ initialVenues, copy }: Props) {
 
   return (
     <div className="mt-8 space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium text-site-text">찾기:</span>
+        {VENUE_CATEGORY_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => setVenueFilter(opt.value)}
+            className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+              venueFilter === opt.value
+                ? "border-site-primary bg-site-primary/15 text-site-primary"
+                : "border-site-border bg-site-card text-site-text hover:border-site-secondary/50"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+      {venueFilter !== "all" && filteredVenues.length === 0 && (
+        <p className="text-sm text-gray-500">해당 조건의 당구장이 없습니다.</p>
+      )}
       {locationRefining && (
         <p className="text-sm text-gray-500">가까운 순으로 정렬 중…</p>
       )}
@@ -91,7 +124,7 @@ export function VenuesListWithLocation({ initialVenues, copy }: Props) {
         </p>
       )}
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {venues.map((v) => (
+        {filteredVenues.map((v) => (
           <li key={v.id}>
             <Link
               href={`/v/${v.slug}`}

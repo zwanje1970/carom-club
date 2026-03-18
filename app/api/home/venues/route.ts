@@ -12,6 +12,7 @@ export type HomeVenueItem = {
   slug: string;
   coverImageUrl: string | null;
   distanceKm?: number | null;
+  venueCategory?: "daedae_only" | "mixed" | null;
 };
 
 /** 메인 당구장 목록. ?lat=&lng= 있으면 가까운 순, 없으면 로그인 시 회원 좌표 사용, 없으면 기존 정렬. */
@@ -71,6 +72,7 @@ export async function GET(request: Request) {
     slug: v.slug,
     coverImageUrl: v.coverImageUrl,
     distanceKm: v.distanceKm ?? undefined,
+    venueCategory: v.venueCategory ?? undefined,
   }));
   return NextResponse.json(out);
 }

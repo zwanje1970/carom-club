@@ -88,7 +88,7 @@ export function AdminImageField({
                   disabled={uploading}
                   className="rounded border border-site-border bg-white px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50"
                 >
-                  {uploading ? "업로드 중…" : "이미지 교체"}
+                  {uploading ? "업로드 중…" : "첨부파일 교체"}
                 </button>
                 <button
                   type="button"
@@ -119,7 +119,7 @@ export function AdminImageField({
           `}
         >
           <p className="text-gray-600 dark:text-slate-400">
-            드래그 앤 드롭 또는 파일 선택 (허용: {ALLOWED_EXT})
+            드래그 앤 드롭 또는 첨부파일 선택 (허용: {ALLOWED_EXT})
           </p>
           <input
             ref={inputRef}
@@ -134,21 +134,10 @@ export function AdminImageField({
             disabled={uploading}
             className="mt-2 rounded border border-site-border bg-white px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
           >
-            {uploading ? "업로드 중…" : "파일 선택"}
+            {uploading ? "업로드 중…" : "첨부파일 선택"}
           </button>
         </div>
       )}
-
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-gray-500">또는 URL 입력 (선택):</span>
-        <input
-          type="text"
-          value={value ?? ""}
-          onChange={(e) => onChange(e.target.value.trim() || null)}
-          className="flex-1 min-w-0 rounded border border-site-border bg-white px-2 py-1.5 text-sm dark:bg-slate-700"
-          placeholder="https:// 또는 /uploads/..."
-        />
-      </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>

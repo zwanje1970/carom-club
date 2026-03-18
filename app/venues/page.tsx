@@ -4,7 +4,7 @@ import { PageSectionsRenderer } from "@/components/content/PageSectionsRenderer"
 import { VenuesListWithLocation } from "@/components/venues/VenuesListWithLocation";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { getCommonPageData } from "@/lib/common-page-data";
-import { prisma } from "@/lib/db";
+import { getVenuesListWithCoords } from "@/lib/db-tournaments";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { normalizeSlugs } from "@/lib/normalize-slug";
 import { MOCK_VENUES_LIST } from "@/lib/mock-data";
@@ -18,33 +18,24 @@ export default async function VenuesPage() {
   const { copy, noticeBars, popups, pageSections } = common;
   logServerTiming("fetch_copy");
   const c = copy as Record<AdminCopyKey, string>;
-  let venues: { id: string; name: string; slug: string }[] = [];
+  let venues: { id: string; name: string; slug: string; venueCategory?: "daedae_only" | "mixed" | null }[] = [];
 
   const dbStart = Date.now();
   if (isDatabaseConfigured()) {
     try {
-      const approvedApplicantIds = await prisma.clientApplication
-        .findMany({
-          where: { status: "APPROVED" },
-          select: { applicantUserId: true },
-          distinct: ["applicantUserId"],
-        })
-        .then((rows) => rows.map((r) => r.applicantUserId).filter((id): id is string => id != null));
-      const rows = await prisma.organization.findMany({
-        where: {
-          type: "VENUE",
-          slug: { not: null },
-          ownerUserId: { in: approvedApplicantIds },
-        },
-        select: { id: true, name: true, slug: true },
-        orderBy: { name: "asc" },
-      });
-      venues = normalizeSlugs(rows.map((r) => ({ id: r.id, name: r.name, slug: r.slug })));
+      const rows = await getVenuesListWithCoords(150);
+      venues = normalizeSlugs(
+        rows.map((r) => ({ id: r.id, name: r.name, slug: r.slug, venueCategory: r.venueCategory }))
+      );
     } catch {
-      venues = normalizeSlugs(MOCK_VENUES_LIST.map((v) => ({ id: v.id, name: v.name, slug: v.slug })));
+      venues = normalizeSlugs(
+        MOCK_VENUES_LIST.map((v) => ({ id: v.id, name: v.name, slug: v.slug }))
+      );
     }
   } else {
-    venues = normalizeSlugs(MOCK_VENUES_LIST.map((v) => ({ id: v.id, name: v.name, slug: v.slug })));
+    venues = normalizeSlugs(
+      MOCK_VENUES_LIST.map((v) => ({ id: v.id, name: v.name, slug: v.slug }))
+    );
   }
   logServerTiming("db", dbStart);
   logServerTiming("page");

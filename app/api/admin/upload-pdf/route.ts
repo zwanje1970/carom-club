@@ -40,14 +40,26 @@ export async function POST(request: Request) {
   const safeName = (file.name || "file").replace(/[^a-zA-Z0-9.-]/g, "_").slice(0, 50);
   const blobPath = `promo-pdf/${date}-${session.id.slice(0, 8)}-${random}-${safeName}`;
 
+  const isDeploy = process.env.VERCEL === "1" || process.env.NODE_ENV === "production";
+  const hasBlobToken = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
+    if (hasBlobToken) {
       const blob = await put(blobPath, buffer, {
         access: "public",
         contentType: "application/pdf",
       });
       return NextResponse.json({ url: blob.url });
+    }
+    if (isDeploy) {
+      return NextResponse.json(
+        {
+          error:
+            "배포 환경에서는 PDF 저장이 되지 않습니다. Vercel Blob을 사용하려면 BLOB_READ_WRITE_TOKEN을 설정하세요.",
+        },
+        { status: 503 }
+      );
     }
     const cwd = process.cwd();
     const dir = path.join(cwd, "public", "uploads", path.dirname(blobPath));

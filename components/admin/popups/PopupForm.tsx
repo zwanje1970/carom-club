@@ -5,6 +5,7 @@ import type { Popup } from "@/types/popup";
 import { POPUP_PAGE_LABELS } from "@/lib/content/constants";
 import Button from "@/components/admin/_components/Button";
 import NotificationBar from "@/components/admin/_components/NotificationBar";
+import { AdminImageField } from "@/components/admin/_components/AdminImageField";
 
 type Props = {
   initial?: Popup | null;
@@ -83,12 +84,11 @@ export function PopupForm({ initial, onSubmit, onCancel }: Props) {
         />
       </div>
       <div>
-        <label className="block text-sm font-medium mb-1">팝업 이미지 URL</label>
-        <input
-          type="url"
-          value={form.imageUrl ?? ""}
-          onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value || null }))}
-          className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-700"
+        <AdminImageField
+          label="팝업 이미지 (첨부파일)"
+          value={form.imageUrl ?? null}
+          onChange={(url) => setForm((f) => ({ ...f, imageUrl: url }))}
+          policy="content"
         />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
-import { processUploadedImage, uploadToBlob } from "@/lib/image-upload";
+import { processUploadedImage, uploadToBlob, isBlobConfigError, BLOB_SERVICE_UNAVAILABLE_MESSAGE } from "@/lib/image-upload";
 import { IMAGE_POLICIES } from "@/lib/image-policies";
 
 const BLOB_ERROR_MESSAGE =
@@ -60,18 +60,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
     console.error("[avg-proof] upload error:", e);
-    const err = e as { message?: string };
-    const isBlobError =
-      typeof err?.message === "string" &&
-      (/blob|token|BLOB_READ_WRITE|unauthorized|403/i.test(err.message) ||
-        err.message.includes("token"));
+    if (isBlobConfigError(message)) {
+      return NextResponse.json(
+        { error: BLOB_SERVICE_UNAVAILABLE_MESSAGE },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       {
-        error: isBlobError
-          ? BLOB_ERROR_MESSAGE
-          : "이미지 업로드 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+        error: "이미지 업로드 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
       },
-      { status: isBlobError ? 503 : 500 }
+      { status: 500 }
     );
   }
 }
