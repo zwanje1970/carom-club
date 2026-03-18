@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** 공통 디자인 설정: 사이트 설정(테마·기본 색상)으로 이동 */
-export default function AdminSiteDesignPage() {
-  redirect("/admin/settings/site");
+/** 사이트·디자인 설정: 메인페이지 관리에서만 편집 */
+export default function AdminSiteDesignRedirectPage() {
+  redirect("/admin/site/settings");
 }

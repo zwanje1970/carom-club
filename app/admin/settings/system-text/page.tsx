@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** 고정 문구 관리 → 메뉴·문구 통합 페이지로 리다이렉트 */
-export default function AdminSettingsSystemTextPage() {
-  redirect("/admin/settings/labels");
+/** 문구 통합: 메인페이지 관리에서만 편집 */
+export default function AdminSettingsSystemTextRedirectPage() {
+  redirect("/admin/site/copy");
 }

@@ -5,12 +5,8 @@ import type { CueBallType } from "@/lib/billiard-table-constants";
 
 const DRAFT_STORAGE_KEY = "billiardNoteDraft";
 
-/** 배치 전 표시용 기본 당구대 이미지 (SVG data URL). 프로그램 렌더링 축소 방식 사용 안 함. */
-const DEFAULT_TABLE_IMAGE =
-  "data:image/svg+xml," +
-  encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 220" width="400" height="220"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#5c3d2a"/><stop offset="100%" stop-color="#2e1c12"/></linearGradient></defs><rect width="400" height="220" rx="12" fill="url(#g)"/><rect x="40" y="40" width="320" height="140" rx="6" fill="#2d5a27"/></svg>'
-  );
+/** 배치 전 표시용 기본 당구대 이미지. 배치 화면과 동일한 테이블(공 없음)을 줄인 SVG. */
+const DEFAULT_TABLE_IMAGE = "/images/billiard-table-preview.svg";
 
 export interface PlacementPayload {
   redBall: { x: number; y: number };

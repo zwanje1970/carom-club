@@ -24,13 +24,30 @@ export default function DatePicker({
   placeholder,
 }: PropsType) {
   useEffect(() => {
+    const currentMode = mode || "single";
     const flatPickr = flatpickr(`#${id}`, {
-      mode: mode || "single",
+      mode: currentMode,
       static: true,
       monthSelectorType: "static",
       dateFormat: "Y-m-d",
       defaultDate,
-      onChange,
+      onChange(selectedDates, dateStr, instance) {
+        if (onChange) {
+          if (Array.isArray(onChange)) {
+            onChange.forEach((fn) => fn(selectedDates, dateStr, instance));
+          } else {
+            (onChange as Hook)(selectedDates, dateStr, instance);
+          }
+        }
+        // 날짜 선택 시 달력 닫기: single은 즉시, range는 두 날짜 모두 선택 후
+        const shouldClose =
+          currentMode === "single" ||
+          (currentMode === "range" && selectedDates.length >= 2) ||
+          (currentMode === "multiple" && selectedDates.length > 0);
+        if (shouldClose && instance?.close) {
+          instance.close();
+        }
+      },
     });
 
     return () => {

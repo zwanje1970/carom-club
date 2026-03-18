@@ -60,20 +60,23 @@
 | /admin/fee-ledger | 회비 장부 |
 | /admin/client-applications | 클라이언트 신청 (PLATFORM_ADMIN만, 페이지에서 체크) |
 | /admin/settings | 설정 목록 |
-| /admin/settings/site | 사이트 기본 정보 |
-| /admin/settings/hero | 히어로 설정 |
-| /admin/settings/footer | 푸터 설정 |
+| /admin/settings/site | → `/admin/site/settings` 리다이렉트 |
+| /admin/settings/hero | → `/admin/site/hero` 리다이렉트 |
+| /admin/settings/footer | → `/admin/site/footer` 리다이렉트 |
 | /admin/settings/notifications | 알림 설정 |
 | /admin/settings/integration | 연동 설정 |
 | /admin/settings/platform-billing | 요금 정책 |
-| /admin/settings/labels | 메뉴/문구 |
+| /admin/settings/labels | → `/admin/site/copy` 리다이렉트 |
+| /admin/settings/system-text | → `/admin/site/copy` 리다이렉트 |
 | /admin/site | 사이트 관리 랜딩 |
 | /admin/site/main | 메인페이지 구성 |
-| /admin/site/hero | → /admin/settings/hero |
+| /admin/site/hero | 메인 히어로 설정 + 구 CMS 메인 비주얼 링크 |
 | /admin/site/components | → /admin/page-sections |
 | /admin/site/header | 헤더 설정 |
-| /admin/site/footer | → /admin/settings/footer |
-| /admin/site/design | → /admin/settings/site |
+| /admin/site/footer | 푸터 설정 + 문구 페이지 링크 |
+| /admin/site/copy | 고정문구 · 페이지별 문구(통합) |
+| /admin/site/design | → `/admin/site/settings` 리다이렉트 |
+| /admin/site/settings | 사이트 설정 · 디자인/색상 (로고·테마·헤더 색상 등) |
 | /admin/page-sections | 페이지 섹션(컴포넌트) 목록 |
 | /admin/page-sections/new | 섹션 추가 |
 | /admin/page-sections/[id]/edit | 섹션 수정 |

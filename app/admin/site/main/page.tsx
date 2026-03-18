@@ -14,7 +14,7 @@ type MainSectionItem = {
   id: string;
   key: string;
   label: string;
-  type: "hero" | "cms" | "fixed";
+  type: "hero" | "cms" | "fixed" | "copy" | "settings";
   isVisible: boolean;
   editHref: string;
   section?: PageSection;
@@ -42,6 +42,22 @@ export default function AdminSiteMainPage() {
     { id: "notice_community", key: "notice_community", label: "공지 / 커뮤니티", type: "fixed", isVisible: true, editHref: "/admin/site/components" },
     { id: "location", key: "location", label: "위치 안내", type: "fixed", isVisible: true, editHref: "/admin/site/components" },
     { id: "footer", key: "footer", label: "푸터", type: "fixed", isVisible: true, editHref: "/admin/site/footer" },
+    {
+      id: "copy",
+      key: "copy",
+      label: "고정문구 · 페이지별 문구",
+      type: "copy",
+      isVisible: true,
+      editHref: "/admin/site/copy",
+    },
+    {
+      id: "settings",
+      key: "settings",
+      label: "사이트 설정 · 디자인/색상",
+      type: "settings",
+      isVisible: true,
+      editHref: "/admin/site/settings",
+    },
   ];
 
   const list: MainSectionItem[] = [];
@@ -93,7 +109,19 @@ export default function AdminSiteMainPage() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <span className="font-medium text-gray-900 dark:text-slate-100">{item.label}</span>
-                  <span className="ml-2 text-xs text-gray-500">({item.type === "hero" ? "히어로" : item.type === "cms" ? "CMS 섹션" : "고정 블록"})</span>
+                  <span className="ml-2 text-xs text-gray-500">
+                    (
+                    {item.type === "hero"
+                      ? "히어로"
+                      : item.type === "cms"
+                        ? "CMS 섹션"
+                        : item.type === "copy"
+                          ? "문구"
+                          : item.type === "settings"
+                            ? "설정"
+                            : "고정 블록"}
+                    )
+                  </span>
                 </div>
                 <Link
                   href={item.editHref}

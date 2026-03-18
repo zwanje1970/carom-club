@@ -11,15 +11,10 @@ import {
   mdiClipboardList,
   mdiFormatSection,
   mdiPageLayoutBody,
-  mdiImageText,
   mdiViewModule,
   mdiViewCarousel,
   mdiWindowRestore,
   mdiFormatListBulleted,
-  mdiText,
-  mdiPalette,
-  mdiPageLayoutFooter,
-  mdiFormatListBulletedType,
   mdiAccountCog,
   mdiShieldAlert,
   mdiMessageQuestion,
@@ -41,9 +36,7 @@ import type { MenuAsideItem } from "./_interfaces";
 
 /** 사이트관리 하위 */
 const SITE_ITEMS: MenuAsideItem[] = [
-  { href: "/admin/settings/site", label: "사이트 설정", icon: mdiCog },
   { href: "/admin/site/main", label: "메인페이지 관리", icon: mdiPageLayoutBody },
-  { href: "/admin/settings/hero", label: "히어로 관리", icon: mdiImageText },
   {
     label: "섹션/컴포넌트 관리",
     icon: mdiFormatSection,
@@ -61,10 +54,6 @@ const SITE_ITEMS: MenuAsideItem[] = [
       { href: "/admin/notice-bars", label: "공지바", icon: mdiViewCarousel },
     ],
   },
-  { href: "/admin/settings/system-text", label: "고정문구 관리", icon: mdiText },
-  { href: "/admin/settings/labels", label: "페이지별 문구 수정", icon: mdiFormatListBulletedType },
-  { href: "/admin/site/design", label: "디자인/색상 설정", icon: mdiPalette },
-  { href: "/admin/settings/footer", label: "푸터 관리", icon: mdiPageLayoutFooter },
 ];
 
 /** 회원관리 하위 (신고는 운영관리에서만) */

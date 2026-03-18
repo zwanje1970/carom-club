@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 778 422" width="778" height="422" aria-hidden="true">
+  <defs>
+    <!-- Frame gradient (matches BilliardTableCanvas realistic) -->
+    <linearGradient id="frameGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3a3836"/>
+      <stop offset="35%" stop-color="#2c2b2a"/>
+      <stop offset="50%" stop-color="#252423"/>
+      <stop offset="65%" stop-color="#2a2928"/>
+      <stop offset="100%" stop-color="#363432"/>
+    </linearGradient>
+    <!-- Playfield shadow (top) -->
+    <linearGradient id="shadowTop" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="rgba(0,0,0,0.28)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </linearGradient>
+    <linearGradient id="shadowBottom" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="rgba(0,0,0,0)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0.28)"/>
+    </linearGradient>
+    <linearGradient id="shadowLeft" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="rgba(0,0,0,0.28)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </linearGradient>
+    <linearGradient id="shadowRight" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="rgba(0,0,0,0)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0.28)"/>
+    </linearGradient>
+  </defs>
+  <!-- 1. Frame (outer rounded, then inner rect = frame band) -->
+  <rect x="0" y="0" width="778" height="422" rx="9" ry="9" fill="url(#frameGrad)"/>
+  <rect x="23" y="23" width="732" height="376" fill="#2a88ab"/>
+  <rect x="0" y="0" width="778" height="422" rx="9" ry="9" fill="none" stroke="rgba(0,0,0,0.45)" stroke-width="1.5"/>
+  <rect x="1" y="1" width="776" height="420" rx="8" ry="8" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <rect x="23" y="23" width="732" height="376" fill="none" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>
+  <!-- 2. Cushion + playfield (same #2a88ab), playfield strokes -->
+  <rect x="33" y="33" width="712" height="356" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
+  <rect x="33" y="33" width="712" height="356" fill="none" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>
+  <!-- 3. Playfield shadow -->
+  <rect x="33" y="33" width="712" height="356" fill="#2a88ab"/>
+  <rect x="33" y="33" width="712" height="14" fill="url(#shadowTop)"/>
+  <rect x="33" y="375" width="712" height="14" fill="url(#shadowBottom)"/>
+  <rect x="33" y="33" width="14" height="356" fill="url(#shadowLeft)"/>
+  <rect x="731" y="33" width="14" height="356" fill="url(#shadowRight)"/>
+  <rect x="34" y="34" width="710" height="354" fill="none" stroke="rgba(0,0,0,0.22)" stroke-width="1"/>
+  <!-- 4. Points (white dots, same positions as canvas) -->
+  <g fill="#ffffff">
+    <circle cx="33" cy="13.8" r="2.25"/><circle cx="122" cy="13.8" r="2.25"/><circle cx="211" cy="13.8" r="2.25"/><circle cx="300" cy="13.8" r="2.25"/><circle cx="389" cy="13.8" r="2.25"/><circle cx="478" cy="13.8" r="2.25"/><circle cx="567" cy="13.8" r="2.25"/><circle cx="656" cy="13.8" r="2.25"/><circle cx="745" cy="13.8" r="2.25"/>
+    <circle cx="33" cy="408.2" r="2.25"/><circle cx="122" cy="408.2" r="2.25"/><circle cx="211" cy="408.2" r="2.25"/><circle cx="300" cy="408.2" r="2.25"/><circle cx="389" cy="408.2" r="2.25"/><circle cx="478" cy="408.2" r="2.25"/><circle cx="567" cy="408.2" r="2.25"/><circle cx="656" cy="408.2" r="2.25"/><circle cx="745" cy="408.2" r="2.25"/>
+    <circle cx="13.8" cy="33" r="2.25"/><circle cx="13.8" cy="122" r="2.25"/><circle cx="13.8" cy="211" r="2.25"/><circle cx="13.8" cy="300" r="2.25"/><circle cx="13.8" cy="389" r="2.25"/>
+    <circle cx="764.2" cy="33" r="2.25"/><circle cx="764.2" cy="122" r="2.25"/><circle cx="764.2" cy="211" r="2.25"/><circle cx="764.2" cy="300" r="2.25"/><circle cx="764.2" cy="389" r="2.25"/>
+  </g>
+</svg>

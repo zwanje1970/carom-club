@@ -11,27 +11,28 @@
 | 메뉴 | 경로 | 설명 |
 |------|------|------|
 | 메인페이지 구성 | `/admin/site/main` | 섹션 표시/숨김, 순서, 각 섹션 편집 이동 |
-| 히어로 설정 | `/admin/site/hero` → `/admin/settings/hero` | 표시 여부, 높이, 배경, 제목, 버튼 |
+| 히어로 설정 | `/admin/site/hero` (메인페이지 관리 → 히어로 편집) | 표시 여부, 높이, 배경, 제목, 버튼 + 구 CMS 메인 비주얼 링크 |
 | 컴포넌트 관리 | `/admin/site/components` → `/admin/page-sections` | 카드·배너·텍스트·이미지형 섹션 |
 | 헤더 설정 | `/admin/site/header` | 배경색, 글자색, 활성 메뉴 강조색 (전용 화면) |
-| 푸터 설정 | `/admin/site/footer` → `/admin/settings/footer` | 높이, 배경색, 문구, 링크, 고객센터/SNS |
-| 공통 디자인 설정 | `/admin/site/design` → `/admin/settings/site` | 기본 색상·테마 (섹션 공통 기본값) |
+| 푸터 설정 | `/admin/site/footer` (메인페이지 구성 → 푸터) | 배경/글자색, 주관사, 협력업체 등 |
+| 고정문구·페이지별 문구 | `/admin/site/copy` | 메뉴·문구 + 고정문구 한 화면 |
+| 사이트 설정 · 디자인/색상 | `/admin/site/settings` (메인페이지 구성 → 편집) | 로고, Primary/Secondary 색상, 헤더·메뉴 색상, 재가입 기간 |
 
 ### 설정 (`/admin/settings`)
 사이트 관리와 분리된 전역 설정.
 
-- 사이트 기본 정보 (이름, 로고, 테마)
+- (사이트 기본·로고·테마는 `/admin/site/settings`, 구 `/admin/settings/site`·`/admin/site/design` 리다이렉트)
 - 관리자 정보 수정
 - 알림 설정
 - 연동 설정
 - 요금 정책
-- 메뉴/문구
+- (메뉴·문구는 `/admin/site/copy`, 구 `/admin/settings/labels` 리다이렉트)
 
 ---
 
 ## 2. 메인페이지 구성 페이지 (`/admin/site/main`)
 
-- **표시 순서**: 히어로 → CMS 섹션(홈) → 고정 블록(대회·당구장, 빠른 참가, 공지/커뮤니티, 위치 안내, 푸터)
+- **표시 순서**: 히어로 → CMS 섹션(홈) → 고정 블록(대회·당구장, 빠른 참가, 공지/커뮤니티, 위치 안내, 푸터) → 고정문구·페이지별 문구
 - **표시 여부**: CMS 섹션은 DB `isVisible` 반영, 고정 블록은 현재 항상 표시 (추후 설정 확장 가능)
 - **편집 이동**: 각 행의 "편집"으로 해당 전용 화면 또는 페이지 섹션 수정으로 이동
 - **순서 변경**: CMS 섹션만 컴포넌트 관리(페이지 섹션)에서 placement별 드래그 정렬 지원
@@ -40,8 +41,10 @@
 
 ## 3. 히어로 / 푸터 / 헤더
 
-- **히어로**: 기존 `/admin/settings/hero` 유지. 사이트 관리에서는 `/admin/site/hero`로 리다이렉트.
-- **푸터**: 기존 `/admin/settings/footer` 유지. `/admin/site/footer`로 리다이렉트.
+- **히어로**: 편집은 `/admin/site/hero`만 사용. `/admin/settings/hero`는 `/admin/site/hero`로 리다이렉트(북마크 호환).
+- **푸터**: 편집은 `/admin/site/footer`만 사용. `/admin/settings/footer`는 리다이렉트.
+- **문구**: 편집은 `/admin/site/copy`만 사용. `/admin/settings/labels`, `/admin/settings/system-text`는 리다이렉트.
+- **사이트·디자인**: 편집은 `/admin/site/settings`만 사용. `/admin/settings/site`, `/admin/site/design`은 리다이렉트.
 - **헤더**: 전용 화면 신규 추가 (`/admin/site/header`). 배경색·글자색·활성색만 노출, 저장 시 `PUT /api/site-settings`에 해당 필드만 전달. 미리보기 영역 포함.
 
 ---

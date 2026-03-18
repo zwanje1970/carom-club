@@ -100,10 +100,12 @@ export function AdminLayoutSidebar({ copy, onLogout, mobileOpen, onMobileClose }
                     className={`overflow-hidden pl-4 ${isOpen ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"}`}
                     style={{ transition: "max-height 0.2s ease-out, opacity 0.15s" }}
                   >
-                    {item.menu.map((sub, subIdx) => {
-                      if (!sub.href) return null;
-                      const subActive = isActive(sub.href);
-                      return (
+                    {(() => {
+                      const firstActiveSubIdx = item.menu.findIndex((m) => m.href && isActive(m.href));
+                      return item.menu.map((sub, subIdx) => {
+                        if (!sub.href) return null;
+                        const subActive = isActive(sub.href) && firstActiveSubIdx === subIdx;
+                        return (
                         <li key={subIdx} className="py-0.5">
                           <Link
                             href={sub.href}
@@ -119,7 +121,8 @@ export function AdminLayoutSidebar({ copy, onLogout, mobileOpen, onMobileClose }
                           </Link>
                         </li>
                       );
-                    })}
+                      });
+                    })()}
                   </ul>
                 </li>
               );
