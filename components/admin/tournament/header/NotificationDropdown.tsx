@@ -92,6 +92,7 @@ export default function NotificationDropdown() {
                   src="/images/user/user-02.jpg"
                   alt="User"
                   className="w-full overflow-hidden rounded-full"
+                  unoptimized
                 />
                 <span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
               </span>
@@ -128,6 +129,7 @@ export default function NotificationDropdown() {
                   src="/images/user/user-03.jpg"
                   alt="User"
                   className="w-full overflow-hidden rounded-full"
+                  unoptimized
                 />
                 <span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
               </span>
@@ -165,6 +167,7 @@ export default function NotificationDropdown() {
                   src="/images/user/user-04.jpg"
                   alt="User"
                   className="w-full overflow-hidden rounded-full"
+                  unoptimized
                 />
                 <span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
               </span>
@@ -202,6 +205,7 @@ export default function NotificationDropdown() {
                   src="/images/user/user-05.jpg"
                   alt="User"
                   className="w-full overflow-hidden rounded-full"
+                  unoptimized
                 />
                 <span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-error-500 dark:border-gray-900"></span>
               </span>
@@ -238,6 +242,7 @@ export default function NotificationDropdown() {
                   src="/images/user/user-02.jpg"
                   alt="User"
                   className="w-full overflow-hidden rounded-full"
+                  unoptimized
                 />
                 <span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
               </span>
@@ -274,6 +279,7 @@ export default function NotificationDropdown() {
                   src="/images/user/user-03.jpg"
                   alt="User"
                   className="w-full overflow-hidden rounded-full"
+                  unoptimized
                 />
                 <span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
               </span>
@@ -310,6 +316,7 @@ export default function NotificationDropdown() {
                   src="/images/user/user-04.jpg"
                   alt="User"
                   className="w-full overflow-hidden rounded-full"
+                  unoptimized
                 />
                 <span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
               </span>
@@ -347,6 +354,7 @@ export default function NotificationDropdown() {
                   src="/images/user/user-05.jpg"
                   alt="User"
                   className="overflow-hidden rounded-full"
+                  unoptimized
                 />
                 <span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-error-500 dark:border-gray-900"></span>
               </span>

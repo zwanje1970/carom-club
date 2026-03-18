@@ -28,6 +28,7 @@ function toggleDropdown(e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
             height={44}
             src="/images/user/owner.jpg"
             alt="User"
+            unoptimized
           />
         </span>
 

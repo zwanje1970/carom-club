@@ -366,8 +366,9 @@ function drawTable(
   }
 }
 
-const PLACEMENT_SELECTION_RING_SCALE = 1.75;
-const PLACEMENT_SELECTION_RING_OPACITY = 0.28;
+/** 공배치 선택 표시: 공 중심 기준 지름 5배 반투명 원 (공 위 레이어) */
+const PLACEMENT_SELECTION_RING_SCALE = 5;
+const PLACEMENT_SELECTION_RING_OPACITY = 0.25;
 
 function drawBall(
   ctx: CanvasRenderingContext2D,

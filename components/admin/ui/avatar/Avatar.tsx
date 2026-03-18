@@ -48,6 +48,7 @@ const Avatar: React.FC<AvatarProps> = ({
         src={src}
         alt={alt}
         className="object-cover w-full rounded-full"
+        unoptimized
       />
 
       {/* Status Indicator */}
