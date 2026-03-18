@@ -109,6 +109,7 @@ const BilliardTableEditor = forwardRef<
     onDrawStyleChange,
     placementMode = false,
     onPlacementBarInfo,
+    cueBallSpotEnabled = true,
   },
   ref
 ) {
@@ -462,7 +463,7 @@ const BilliardTableEditor = forwardRef<
                 : true
           }
           placementMode={placementMode}
-          showCrosshairAtSelected={showPlus}
+          showCrosshairAtSelected={showPlus ?? false}
         />
         {placementMode && showPlus && (
           <div
