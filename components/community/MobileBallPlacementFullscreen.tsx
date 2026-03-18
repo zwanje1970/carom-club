@@ -69,6 +69,8 @@ export function MobileBallPlacementFullscreen({
   const [menuOpen, setMenuOpen] = useState(false);
   const [gridOn, setGridOn] = useState(true);
   const [drawStyle, setDrawStyle] = useState<"realistic" | "wireframe">("realistic");
+  /** 수구 깜빡임(스팟) 표시 — 수구확인 버튼으로 ON/OFF */
+  const [cueSpotOn, setCueSpotOn] = useState(true);
   const orientation = useTableOrientation();
   const menuRef = useRef<HTMLDivElement>(null);
   const [placementBar, setPlacementBar] = useState<{
@@ -167,7 +169,7 @@ export function MobileBallPlacementFullscreen({
               <span className="text-[11px] text-site-text/50">공을 탭해 선택</span>
             )}
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <div className="relative" ref={menuRef}>
             <button
               type="button"
@@ -226,6 +228,21 @@ export function MobileBallPlacementFullscreen({
           </div>
           <button
             type="button"
+            onClick={() => setCueSpotOn((v) => !v)}
+            className={`shrink-0 rounded-lg px-2 py-1.5 text-[10px] sm:text-xs font-semibold leading-tight border transition-colors ${
+              cueSpotOn
+                ? "border-site-primary/60 bg-site-primary/15 text-site-primary"
+                : "border-gray-300 dark:border-slate-600 bg-black/10 dark:bg-white/10 text-site-text"
+            }`}
+            aria-pressed={cueSpotOn}
+            aria-label={cueSpotOn ? "수구 확인 표시 끄기" : "수구 확인 표시 켜기"}
+          >
+            수구확인
+            <br />
+            <span className="tabular-nums">{cueSpotOn ? "ON" : "OFF"}</span>
+          </button>
+          <button
+            type="button"
             onClick={handleComplete}
             disabled={saving || !cueBall}
             className="flex items-center gap-1 rounded-lg bg-site-primary px-2.5 py-1.5 text-xs font-medium text-white shadow disabled:opacity-50"
@@ -260,6 +277,7 @@ export function MobileBallPlacementFullscreen({
             cueBall={cueBall ?? undefined}
             placementMode={true}
             onPlacementBarInfo={onPlacementBarInfo}
+            cueBallSpotEnabled={cueSpotOn}
           />
 
           {/* 수구 미선택 시 중앙 반투명 오버레이 */}

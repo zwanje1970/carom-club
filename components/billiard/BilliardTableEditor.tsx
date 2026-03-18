@@ -82,6 +82,8 @@ export interface BilliardTableEditorProps {
     y: number;
     showCrosshair: boolean;
   }) => void;
+  /** 공배치: 수구 깜빡임(스팟) 표시 여부. 기본 true */
+  cueBallSpotEnabled?: boolean;
 }
 
 const BilliardTableEditor = forwardRef<
@@ -452,7 +454,13 @@ const BilliardTableEditor = forwardRef<
           paths={paths}
           orientation={effectiveOrientation}
           drawStyle={tableDrawStyle}
-          showCueBallSpot={placementMode ? false : isBallMode ? !isDragging : true}
+          showCueBallSpot={
+            placementMode
+              ? cueBallSpotEnabled && !isDragging
+              : isBallMode
+                ? !isDragging
+                : true
+          }
           placementMode={placementMode}
           showCrosshairAtSelected={showPlus}
         />
