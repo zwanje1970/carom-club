@@ -3,16 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-/** 모바일 하단 네비: 2줄 — 1줄: 대회 찾기, 당구노트, 당구장 찾기 / 2줄: 커뮤니티, 마이 페이지 */
-const ROW1 = [
+type BottomNavItem = {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ active: boolean }>;
+  emphasize?: boolean;
+};
+
+/** 모바일 하단 네비: 1줄 5개 메뉴 */
+const ITEMS: BottomNavItem[] = [
   { href: "/tournaments", label: "대회 찾기", icon: TrophyIcon },
   { href: "/mypage/notes", label: "당구노트", icon: NoteIcon, emphasize: true },
   { href: "/venues", label: "당구장 찾기", icon: VenueIcon },
-] as const;
-const ROW2 = [
   { href: "/community", label: "커뮤니티", icon: CommunityIcon },
   { href: "/mypage", label: "마이 페이지", icon: MypageIcon },
-] as const;
+];
 
 function TrophyIcon({ active }: { active: boolean }) {
   return (
@@ -81,22 +86,22 @@ function NavLink({
       <span className={`inline-flex items-center justify-center ${emph ? "min-h-[28px] min-w-[28px]" : "min-h-[24px] min-w-[24px]"}`}>
         <Icon active={isActive} />
       </span>
-      <span>{label}</span>
+      <span className="block text-center">{label}</span>
     </Link>
   );
 }
 
-/** 모바일(768px 이하) 전용 하단 고정 네비게이션. 2줄: 대회 찾기·당구노트·당구장 찾기 / 커뮤니티·마이 페이지 */
+/** 모바일(768px 이하) 전용 하단 고정 네비게이션. 1줄 5개 메뉴 */
 export function BottomNav() {
   const pathname = usePathname() ?? "";
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 flex flex-col md:hidden dark:bg-slate-900 dark:border-slate-700"
+      className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 md:hidden dark:bg-slate-900 dark:border-slate-700"
       aria-label="하단 메뉴"
     >
-      <div className="flex justify-around items-stretch flex-1 min-h-[52px]">
-        {ROW1.map((item) => (
+      <div className="flex justify-around items-stretch min-h-[52px]">
+        {ITEMS.map((item) => (
           <NavLink
             key={item.href}
             href={item.href}
@@ -105,11 +110,6 @@ export function BottomNav() {
             pathname={pathname}
             emphasize={item.emphasize}
           />
-        ))}
-      </div>
-      <div className="flex justify-around items-stretch flex-1 min-h-[52px] border-t border-gray-100 dark:border-slate-700/80">
-        {ROW2.map((item) => (
-          <NavLink key={item.href} href={item.href} label={item.label} icon={item.icon} pathname={pathname} />
         ))}
       </div>
     </nav>
