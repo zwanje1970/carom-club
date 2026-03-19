@@ -1,8 +1,9 @@
 /**
- * 이미지 업로드 공통: 검증 + 최적화 + Blob 또는 로컬 저장
+ * 이미지 업로드 공통: 검증 + 최적화 + 환경별 저장
  *
- * - BLOB_READ_WRITE_TOKEN 있음 → Vercel Blob 사용 (배포/Neon 연동 시)
- * - 없음 → public/uploads 에 로컬 저장 (로컬 개발/테스트용). 완성 후 토큰만 설정하면 Blob으로 전환됨.
+ * - NODE_ENV === "development" → public/uploads/{prefix}/ 에 저장, 반환 /uploads/{prefix}/파일명.webp
+ * - NODE_ENV === "production" → Vercel Blob 사용 (BLOB_READ_WRITE_TOKEN 필요), 반환 blob.url
+ * - 배포 환경에서는 fs 사용 금지. 파일명은 항상 서버에서 생성.
  */
 
 import { put } from "@vercel/blob";
@@ -93,7 +94,8 @@ export async function processUploadedImage(
 
 /**
  * 처리된 이미지를 로컬 public/uploads 에 저장.
- * 로컬 개발/테스트용. BLOB_READ_WRITE_TOKEN 없을 때 사용.
+ * 로컬 개발/테스트용. 파일명은 buildBlobPath에서 자동 생성 (예: billiard/YYYYMMDD-xxxx.webp).
+ * 반환: /uploads/{blobPath} 형태 상대경로 (예: /uploads/billiard/20250319-abc123.webp).
  */
 export async function uploadToLocal(processed: ProcessedImage): Promise<{ url: string }> {
   const cwd = process.cwd();
@@ -111,25 +113,23 @@ export const UPLOAD_DEPLOY_REQUIRES_BLOB_MESSAGE =
   "배포 환경에서는 이미지가 저장되지 않습니다. Vercel Blob을 사용하려면 BLOB_READ_WRITE_TOKEN을 설정하세요. (현재 /uploads 경로는 서버리스에서 유지되지 않아 404가 납니다.)";
 
 /**
- * 처리된 이미지를 저장.
- * - BLOB_READ_WRITE_TOKEN 있음 → Vercel Blob (공개 URL 반환, DB에는 이 URL 저장)
- * - Vercel 또는 NODE_ENV=production 이고 토큰 없음 → 에러 (로컬 /uploads 미지원)
- * - 로컬 개발에서만 토큰 없음 → public/uploads (DB에는 /uploads/... 저장, 배포 시 404 주의)
+ * 처리된 이미지를 저장. 환경 분기:
+ * - development → public/uploads/{blobPath} (예: public/uploads/billiard/YYYYMMDD-xxx.webp), 반환 /uploads/billiard/xxx.webp
+ * - production → Vercel Blob (BLOB_READ_WRITE_TOKEN 필수), 반환 blob.url. 배포에서는 fs 사용 금지.
  */
 export async function uploadToBlob(
   processed: ProcessedImage,
   options?: { access?: "public" }
 ): Promise<{ url: string }> {
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    const blob = await put(processed.blobPath, processed.buffer, {
-      access: options?.access ?? "public",
-      contentType: processed.contentType,
-    });
-    return { url: blob.url };
+  if (process.env.NODE_ENV === "development") {
+    return uploadToLocal(processed);
   }
-  const isDeploy = process.env.VERCEL === "1" || process.env.NODE_ENV === "production";
-  if (isDeploy) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
     throw new Error(UPLOAD_DEPLOY_REQUIRES_BLOB_MESSAGE);
   }
-  return uploadToLocal(processed);
+  const blob = await put(processed.blobPath, processed.buffer, {
+    access: options?.access ?? "public",
+    contentType: processed.contentType,
+  });
+  return { url: blob.url };
 }

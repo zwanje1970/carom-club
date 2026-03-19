@@ -56,7 +56,11 @@ export default async function TournamentDetailPage({
   const { tab: tabParam } = await searchParams;
 
   const dbStart = Date.now();
-  let tournament = isDatabaseConfigured() ? await getTournamentBasic(id) : null;
+  const [tournamentFromDb, common] = await Promise.all([
+    isDatabaseConfigured() ? getTournamentBasic(id) : Promise.resolve(null),
+    getCommonPageData("tournaments"),
+  ]);
+  let tournament = tournamentFromDb;
   let useMock = false;
   if (!tournament && isDatabaseConfigured()) {
     try {
@@ -141,9 +145,7 @@ export default async function TournamentDetailPage({
   };
   const t = tournament as unknown as TournamentShape;
 
-  const copyStart = Date.now();
-  const common = await getCommonPageData("tournaments");
-  logServerTiming("fetch_copy", copyStart);
+  logServerTiming("fetch_copy", dbStart);
   const c = common.copy as Record<AdminCopyKey, string>;
 
   const tabs = buildTabs();

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { formatKoreanDate } from "@/lib/format-date";
 
 export type NoteFilter = "all" | "public" | "private" | "sent";
 
@@ -111,7 +112,7 @@ export function BilliardNotesListClient({ basePath = "/mypage/notes" }: Billiard
                     {n.title?.trim() || n.memo?.trim() || "(제목 없음)"}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {new Date(n.createdAt).toLocaleDateString("ko-KR")}
+                    {formatKoreanDate(n.createdAt)}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                     {n.visibility === "community" ? "공개" : "비공개"}

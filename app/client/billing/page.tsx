@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { getMyBillingData } from "@/lib/billing-client";
 import { formatPrice, formatPostingMonths } from "@/lib/feature-access";
+import { formatKoreanDate, formatKoreanDateTime } from "@/lib/format-date";
 
 const CLIENT_TYPE_LABEL: Record<string, string> = {
   GENERAL: "일반업체",
@@ -115,7 +116,7 @@ export default async function ClientBillingPage() {
                         {f.status === "ACTIVE" ? "사용 중" : "만료"}
                       </span>
                     </td>
-                    <td className="py-2 text-gray-500">{f.expiresAt ? new Date(f.expiresAt).toLocaleDateString("ko-KR") : "—"}</td>
+                    <td className="py-2 text-gray-500">{f.expiresAt ? formatKoreanDate(f.expiresAt) : "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -149,8 +150,8 @@ export default async function ClientBillingPage() {
                     <td className="py-2">
                       <span className={s.status === "ACTIVE" ? "text-green-600" : "text-gray-500"}>{s.status === "ACTIVE" ? "활성" : s.status}</span>
                     </td>
-                    <td className="py-2 text-gray-600">{new Date(s.startedAt).toLocaleDateString("ko-KR")}</td>
-                    <td className="py-2 text-gray-600">{s.expiresAt ? new Date(s.expiresAt).toLocaleDateString("ko-KR") : "—"}</td>
+                    <td className="py-2 text-gray-600">{formatKoreanDate(s.startedAt)}</td>
+                    <td className="py-2 text-gray-600">{s.expiresAt ? formatKoreanDate(s.expiresAt) : "—"}</td>
                     <td className="py-2 text-gray-500">{s.sourceType === "MANUAL" ? "수동 부여" : s.sourceType}</td>
                   </tr>
                 ))}
@@ -190,7 +191,7 @@ export default async function ClientBillingPage() {
           <ul className="mt-3 space-y-2 text-sm">
             {history.map((h) => (
               <li key={`${h.type}-${h.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-site-border/50 pb-2 last:border-0">
-                <span className="text-gray-500">{new Date(h.at).toLocaleString("ko-KR")}</span>
+                <span className="text-gray-500">{formatKoreanDateTime(h.at)}</span>
                 {h.type === "PAYMENT" && (
                   <>
                     <span className="font-medium">{h.label}</span>
@@ -210,7 +211,7 @@ export default async function ClientBillingPage() {
                     <span className="font-medium">등록: {h.productName}</span>
                     <span className="text-gray-500">{h.targetType}</span>
                     <span className={h.status === "ACTIVE" ? "text-green-600" : "text-gray-500"}>{h.status}</span>
-                    {h.expiresAt && <span className="text-gray-500">~{new Date(h.expiresAt).toLocaleDateString("ko-KR")}</span>}
+                    {h.expiresAt && <span className="text-gray-500">~{formatKoreanDate(h.expiresAt)}</span>}
                   </>
                 )}
               </li>

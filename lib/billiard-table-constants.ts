@@ -52,7 +52,52 @@ export function getBallRadius(playFieldLongSide: number): number {
 }
 
 export type BallColor = "red" | "yellow" | "white";
+/** 수구: 흰공 또는 노란공만 허용. red는 수구가 될 수 없음. */
 export type CueBallType = "white" | "yellow";
+/** 목적구 색 (현재 1개만 사용). 수구와 역할 분리. */
+export type ObjectBallType = "red";
+/** 공의 역할: 수구 vs 목적구 */
+export type BallRole = "cue" | "object";
+
+/** 수구 색상 → 렌더용 hex (white → 흰공, yellow → 노란공) */
+export function getCueBallColor(cueBallType: CueBallType): string {
+  return cueBallType === "yellow" ? "#f5d033" : "#f8f8f8";
+}
+
+/** 목적구 색상 → 렌더용 hex. red 고정. */
+export function getObjectBallColor(_objectBallType?: ObjectBallType): string {
+  return "#c41e3a";
+}
+
+/** 목적구(노란공) when cue is white — 렌더용 hex */
+export function getObjectBallYellowColor(): string {
+  return "#f5d033";
+}
+
+/** ballColor가 현재 수구(cueBallType)이면 true. red는 항상 false. */
+export function isCueBall(ballColor: BallColor, cueBallType: CueBallType): boolean {
+  return ballColor === cueBallType;
+}
+
+/** ballColor가 목적구이면 true (수구가 아닌 공). red는 항상 목적구. */
+export function isObjectBall(ballColor: BallColor, cueBallType: CueBallType): boolean {
+  return ballColor !== cueBallType;
+}
+
+/**
+ * 외부 입력(API/폼)을 CueBallType으로 정규화.
+ * white | yellow만 허용. red 등 잘못된 값은 white로 fallback하고 로그.
+ */
+export function normalizeCueBallType(v: unknown): CueBallType {
+  if (v === "yellow") return "yellow";
+  if (v === "white") return "white";
+  if (v === "red" || (typeof v === "string" && v.trim().toLowerCase() === "red")) {
+    if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test") {
+      console.warn("[normalizeCueBallType] invalid cueBall value 'red' received; using 'white'. red is object-only.");
+    }
+  }
+  return "white";
+}
 
 /** 가로형 = 캔버스 가로가 길고, 세로형 = 캔버스 세로가 긺. 좌표는 항상 landscape 기준 0..1 저장 */
 export type TableOrientation = "landscape" | "portrait";
@@ -253,7 +298,7 @@ export function clampBallToPlayfieldAndNoOverlap(
 
 /**
  * 클릭/터치 지점(픽셀)에서 맞은 공 반환. 없으면 null.
- * @param hitRadiusScale 공 반지름의 배수 (기본 1). 난구 공배치 모드에서는 4 권장(지름 8배 터치 영역).
+ * @param hitRadiusScale 공 반지름의 배수 (기본 1). 난구 공배치 모드에서는 6 사용(공선택 터치셀 50% 확대).
  */
 export function hitTestBall(
   px: number,

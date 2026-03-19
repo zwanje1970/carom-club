@@ -7,7 +7,8 @@ import { BallPlacementFullscreenProvider } from "@/components/community/BallPlac
 import { AdminFloatButton } from "@/components/AdminFloatButton";
 import NotificationBanner from "@/components/NotificationBanner";
 import { RegisterServiceWorker } from "@/components/push/RegisterServiceWorker";
-import { getSiteSettings, DEFAULT_PRIMARY_COLOR, DEFAULT_SECONDARY_COLOR } from "@/lib/site-settings";
+import { getCommonGlobalData } from "@/lib/common-page-data";
+import { DEFAULT_PRIMARY_COLOR, DEFAULT_SECONDARY_COLOR } from "@/lib/site-settings";
 import { SiteSettingsProvider } from "@/components/SiteSettingsProvider";
 import { SiteThemeStyles } from "@/components/SiteThemeStyles";
 import { ClientPerfLogger } from "@/components/ClientPerfLogger";
@@ -27,10 +28,10 @@ function getSiteUrl(): string {
 export async function generateMetadata(): Promise<Metadata> {
   const baseUrl = getSiteUrl();
   try {
-    const settings = await getSiteSettings();
-    const title = settings.siteName || SITE_NAME;
+    const { siteSettings } = await getCommonGlobalData();
+    const title = siteSettings.siteName || SITE_NAME;
     const description =
-      settings.siteDescription || "당구 대회, 모임, 레슨을 한 곳에서.";
+      siteSettings.siteDescription || "당구 대회, 모임, 레슨을 한 곳에서.";
     return {
       title,
       description,
@@ -80,7 +81,8 @@ export default async function RootLayout({
     headerActiveColor: null as string | null,
   };
   try {
-    settings = await getSiteSettings();
+    const globalData = await getCommonGlobalData();
+    settings = globalData.siteSettings;
   } catch {
     // use defaults
   }

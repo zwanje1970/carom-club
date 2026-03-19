@@ -6,6 +6,7 @@
  * 기존 당구노트 저장 구조는 변경하지 않고, 확장 포인트만 준비.
  */
 import React, { useState } from "react";
+import { getObjectBallColor, getObjectBallYellowColor } from "@/lib/billiard-table-constants";
 import type { BilliardShotPanelData } from "@/lib/billiard-path-types";
 
 export interface BilliardShotPanelProps {
@@ -48,7 +49,7 @@ export function BilliardShotPanel({
           <div
             className="absolute w-10 h-10 rounded-full border-2 border-gray-400"
             style={{
-              backgroundColor: targetBallColor === "red" ? "#c41e3a" : "#f5d033",
+              backgroundColor: targetBallColor === "red" ? getObjectBallColor() : getObjectBallYellowColor(),
               left: "20%",
               top: "50%",
               transform: "translate(-50%, -50%)",

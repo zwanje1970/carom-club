@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { formatKoreanDate } from "@/lib/format-date";
 
 interface FeedItem {
   id: string;
@@ -65,7 +66,7 @@ export function CommunityBilliardNotesSection() {
                     {n.memo || "(메모 없음)"}
                   </p>
                   <p className="text-xs text-gray-400">
-                    {n.authorName} · {new Date(n.createdAt).toLocaleDateString("ko-KR")}
+                    {n.authorName} · {formatKoreanDate(n.createdAt)}
                   </p>
                 </div>
               </Link>

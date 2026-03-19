@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { RichEditorLazy } from "@/components/RichEditorLazy";
+import { formatKoreanDateTime } from "@/lib/format-date";
 import { getDraftKey, getDraft, setDraft as saveDraftToStorage, clearDraft } from "@/lib/admin-drafts";
 
 export function OutlineEditor({
@@ -220,7 +221,7 @@ export function OutlineEditor({
       </div>
       {publishedAt && (
         <p className="text-sm text-gray-500">
-          마지막 게시: {new Date(publishedAt).toLocaleString("ko-KR")}
+          마지막 게시: {formatKoreanDateTime(publishedAt)}
         </p>
       )}
 

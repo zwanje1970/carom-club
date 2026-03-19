@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { IMAGE_PLACEHOLDER_SRC, sanitizeImageSrc } from "@/lib/image-src";
+import { formatKoreanDateTime } from "@/lib/format-date";
 
 const VIEWER_KEY_STORAGE = "community_viewer_key";
 
@@ -32,7 +33,7 @@ function CommentItem({
           <p className="mt-1 text-site-text whitespace-pre-wrap">{comment.content}</p>
         )}
         <div className="mt-2 flex items-center gap-3 text-xs text-gray-500 flex-wrap">
-          <span>{new Date(comment.createdAt).toLocaleString("ko-KR")}</span>
+          <span>{formatKoreanDateTime(comment.createdAt)}</span>
           {!comment.isHidden && (
             <>
               <button type="button" onClick={() => onLike(comment.id)} className={comment.liked ? "text-site-primary font-medium" : ""}>
@@ -124,6 +125,7 @@ export function CommunityPostDetailView({
     bookmarked: boolean;
     isHidden?: boolean;
     isSolved?: boolean;
+    isLoggedIn?: boolean;
     troubleShot?: {
       layoutImageUrl: string | null;
       difficulty: string | null;
@@ -141,6 +143,22 @@ export function CommunityPostDetailView({
   const [reportTarget, setReportTarget] = useState<{ type: "post" | "comment"; id: string } | null>(null);
   const [reportReason, setReportReason] = useState<string>("OTHER");
   const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [troubleSolutions, setTroubleSolutions] = useState<
+    {
+      id: string;
+      title: string | null;
+      content: string;
+      solutionImageUrl: string | null;
+      goodCount: number;
+      badCount: number;
+      isAccepted: boolean;
+      createdAt: string;
+      authorName: string;
+      myVote: string | null;
+    }[]
+  >([]);
+  const [troubleSolutionsLoading, setTroubleSolutionsLoading] = useState(false);
+  const [troubleSolutionBusyId, setTroubleSolutionBusyId] = useState<string | null>(null);
 
   const listHref = linkOverrides?.listHref ?? (post ? `/community/boards/${post.boardSlug}` : "/community");
   const editHref = linkOverrides?.editHref ?? `/community/posts/${postId}/edit`;
@@ -187,10 +205,26 @@ export function CommunityPostDetailView({
       .catch(() => setComments([]));
   }, [postId]);
 
+  const loadTroubleSolutions = useCallback(() => {
+    setTroubleSolutionsLoading(true);
+    fetch(`/api/community/trouble/${postId}/solutions`, { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) throw new Error("해법 목록을 불러올 수 없습니다.");
+        return res.json();
+      })
+      .then(setTroubleSolutions)
+      .catch(() => setTroubleSolutions([]))
+      .finally(() => setTroubleSolutionsLoading(false));
+  }, [postId]);
+
   useEffect(() => {
     loadPost();
     loadComments();
   }, [loadPost, loadComments]);
+
+  useEffect(() => {
+    if (post?.boardSlug === "trouble") loadTroubleSolutions();
+  }, [post?.boardSlug, loadTroubleSolutions]);
 
   const handleLike = async () => {
     if (likeLoading || !post) return;
@@ -400,7 +434,7 @@ export function CommunityPostDetailView({
           <div className="p-4 sm:p-6">
             <h1 className="text-xl font-bold text-site-text">{post.title}</h1>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              {post.authorName} · {new Date(post.createdAt).toLocaleString("ko-KR")} · 추천 {post.likeCount} · 조회 {post.viewCount}
+              {post.authorName} · {formatKoreanDateTime(post.createdAt)} · 추천 {post.likeCount} · 조회 {post.viewCount}
             </p>
             <div className="mt-4 prose prose-sm dark:prose-invert max-w-none text-site-text whitespace-pre-wrap">
               {post.content}
@@ -467,9 +501,191 @@ export function CommunityPostDetailView({
               <button type="button" onClick={() => handleReport("post", postId)} className="py-2 px-4 rounded-lg border border-gray-300 dark:border-slate-600 text-sm text-gray-600 dark:text-gray-400">
                 신고
               </button>
+              {post.boardSlug === "trouble" && (
+                post.isLoggedIn ? (
+                  <Link
+                    href={`/community/trouble/${postId}/solution/new`}
+                    className="py-2 px-4 rounded-lg text-sm font-medium bg-site-primary text-white hover:opacity-90"
+                  >
+                    난구해법 제시
+                  </Link>
+                ) : (
+                  <Link
+                    href={`/login?redirect=${encodeURIComponent(`/community/trouble/${postId}`)}`}
+                    className="py-2 px-4 rounded-lg text-sm font-medium border border-site-primary text-site-primary hover:bg-site-primary/10"
+                  >
+                    로그인하면 난구해법 제시 가능
+                  </Link>
+                )
+              )}
             </div>
           </div>
         </article>
+
+        {/* 난구해법: 본문 아래, 댓글 위 */}
+        {post.boardSlug === "trouble" && (
+          <section className="mt-8" aria-labelledby="trouble-solutions-heading">
+            <h2 id="trouble-solutions-heading" className="text-lg font-semibold mb-4">
+              난구해법
+            </h2>
+            {troubleSolutionsLoading ? (
+              <p className="text-gray-500 dark:text-gray-400 text-sm">불러오는 중…</p>
+            ) : troubleSolutions.length === 0 ? (
+              <div className="rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 p-6 text-center">
+                <p className="text-gray-500 dark:text-gray-400">아직 등록된 난구해법이 없습니다.</p>
+                {post.isLoggedIn && (
+                  <Link
+                    href={`/community/trouble/${postId}/solution/new`}
+                    className="mt-3 inline-block py-2 px-4 rounded-lg text-sm font-medium bg-site-primary text-white hover:opacity-90"
+                  >
+                    난구해법 제시
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <ul className="space-y-6">
+                {troubleSolutions.map((sol) => {
+                  const busy = troubleSolutionBusyId === sol.id;
+                  const canAdopt = post.isAuthor && !sol.isAccepted;
+                  const acceptedId = post.troubleShot?.acceptedSolutionId;
+                  const isAccepted = acceptedId === sol.id;
+                  return (
+                    <li
+                      key={sol.id}
+                      className="rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 overflow-hidden"
+                    >
+                      <div className="p-4 sm:p-6">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {isAccepted && (
+                            <span className="inline-flex items-center rounded-full bg-site-primary/20 text-site-primary px-2.5 py-0.5 text-xs font-medium">
+                              채택됨
+                            </span>
+                          )}
+                          <h3 className="text-base font-semibold text-site-text">
+                            {sol.title || "해법"}
+                          </h3>
+                        </div>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                          {sol.authorName} · {formatKoreanDateTime(sol.createdAt)}
+                        </p>
+                        {sol.solutionImageUrl && (
+                          <div className="mt-3">
+                            <img
+                              src={sanitizeImageSrc(sol.solutionImageUrl) ?? undefined}
+                              alt="해법"
+                              className="max-w-full h-auto rounded-lg object-contain max-h-64"
+                            />
+                          </div>
+                        )}
+                        <p className="mt-3 text-site-text whitespace-pre-wrap text-sm">
+                          {sol.content}
+                        </p>
+                        <div className="mt-4 flex flex-wrap items-center gap-2">
+                          {canAdopt && (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={async () => {
+                                setTroubleSolutionBusyId(sol.id);
+                                try {
+                                  const res = await fetch(
+                                    `/api/community/trouble/${postId}/solutions/${sol.id}/adopt`,
+                                    { method: "POST", credentials: "include" }
+                                  );
+                                  const data = await res.json();
+                                  if (res.ok) loadTroubleSolutions();
+                                  else alert(data.error ?? "채택 처리에 실패했습니다.");
+                                } finally {
+                                  setTroubleSolutionBusyId(null);
+                                }
+                              }}
+                              className="py-2 px-4 rounded-lg text-sm font-medium border border-site-primary text-site-primary hover:bg-site-primary/10 disabled:opacity-50"
+                            >
+                              채택
+                            </button>
+                          )}
+                          {post.isLoggedIn && (
+                            <>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={async () => {
+                                  setTroubleSolutionBusyId(sol.id);
+                                  try {
+                                    const res = await fetch(
+                                      `/api/community/trouble/${postId}/solutions/${sol.id}/vote`,
+                                      {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        credentials: "include",
+                                        body: JSON.stringify({
+                                          vote: sol.myVote === "GOOD" ? "good" : "good",
+                                        }),
+                                      }
+                                    );
+                                    const data = await res.json();
+                                    if (res.ok) loadTroubleSolutions();
+                                    else alert(data.error ?? "투표에 실패했습니다.");
+                                  } finally {
+                                    setTroubleSolutionBusyId(null);
+                                  }
+                                }}
+                                className={`py-2 px-3 rounded-lg text-sm font-medium ${
+                                  sol.myVote === "GOOD"
+                                    ? "bg-site-primary text-white"
+                                    : "border border-gray-300 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700"
+                                } disabled:opacity-50`}
+                              >
+                                GOOD {sol.goodCount}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={async () => {
+                                  setTroubleSolutionBusyId(sol.id);
+                                  try {
+                                    const res = await fetch(
+                                      `/api/community/trouble/${postId}/solutions/${sol.id}/vote`,
+                                      {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        credentials: "include",
+                                        body: JSON.stringify({
+                                          vote: sol.myVote === "BAD" ? "bad" : "bad",
+                                        }),
+                                      }
+                                    );
+                                    const data = await res.json();
+                                    if (res.ok) loadTroubleSolutions();
+                                    else alert(data.error ?? "투표에 실패했습니다.");
+                                  } finally {
+                                    setTroubleSolutionBusyId(null);
+                                  }
+                                }}
+                                className={`py-2 px-3 rounded-lg text-sm font-medium ${
+                                  sol.myVote === "BAD"
+                                    ? "bg-red-600 text-white"
+                                    : "border border-gray-300 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700"
+                                } disabled:opacity-50`}
+                              >
+                                BAD {sol.badCount}
+                              </button>
+                            </>
+                          )}
+                          {!post.isLoggedIn && (
+                            <span className="text-sm text-gray-500 dark:text-gray-400">
+                              GOOD {sol.goodCount} · BAD {sol.badCount}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        )}
 
         <section className="mt-8" aria-labelledby="comments-heading">
           <h2 id="comments-heading" className="text-lg font-semibold mb-4">댓글 ({post.commentCount})</h2>

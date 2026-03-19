@@ -6,6 +6,7 @@
  * 두께(수구 위치)와 당점(수구 위 빨간 점)을 동시에 조정.
  */
 import React, { useRef, useEffect, useCallback, useState } from "react";
+import { getCueBallColor, getObjectBallColor, getObjectBallYellowColor } from "@/lib/billiard-table-constants";
 import type { BilliardContactPanelData } from "@/lib/billiard-path-types";
 
 const STAGE_SIZE = 260;
@@ -105,8 +106,8 @@ export function BilliardContactPanel({
 
     ctx.clearRect(0, 0, STAGE_SIZE, STAGE_SIZE);
 
-    const objColor = objectBallColor === "red" ? "#c41e3a" : "#f5d033";
-    const cueColor = cueBallColor === "white" ? "#f8f8f8" : "#f5d033";
+    const objColor = objectBallColor === "red" ? getObjectBallColor() : getObjectBallYellowColor();
+    const cueColor = getCueBallColor(cueBallColor);
 
     // 보조선 (중심 기준선)
     ctx.strokeStyle = "rgba(255,255,255,0.15)";

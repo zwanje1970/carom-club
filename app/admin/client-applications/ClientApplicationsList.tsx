@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getDisplayName } from "@/lib/display-name";
+import { formatKoreanDate } from "@/lib/format-date";
 
 const TYPE_LABELS: Record<string, string> = {
   VENUE: "당구장",
@@ -150,7 +151,7 @@ export function ClientApplicationsList() {
               <td className="p-3">
                 <span className="font-medium">{STATUS_LABELS[row.status] ?? row.status}</span>
               </td>
-              <td className="p-3">{new Date(row.createdAt).toLocaleDateString("ko-KR")}</td>
+              <td className="p-3">{formatKoreanDate(row.createdAt)}</td>
               <td className="p-3 max-w-[200px]">
                 {row.status === "REJECTED" && (
                   <span className="text-gray-600 dark:text-slate-400">

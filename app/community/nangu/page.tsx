@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { formatKoreanDate } from "@/lib/format-date";
 
 type NanguPostListItem = {
   id: string;
@@ -64,7 +65,7 @@ export default function NanguBoardPage() {
                 >
                   <h2 className="font-semibold text-site-text">{p.title}</h2>
                   <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {p.authorName} · {new Date(p.createdAt).toLocaleDateString("ko-KR")} · 해법 {p.solutionCount}개
+                    {p.authorName} · {formatKoreanDate(p.createdAt)} · 해법 {p.solutionCount}개
                   </p>
                 </Link>
               </li>

@@ -5,6 +5,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { FeeLedgerData, FeeLedgerRow, PaymentRecord } from "./types";
 import FeeLedgerModal from "../venues/FeeLedgerModal";
+import { formatKoreanDate } from "@/lib/format-date";
 
 const STATUS_LABELS: Record<string, string> = {
   ACTIVE: "정상",
@@ -75,14 +76,7 @@ export default function FeeLedgerPageClient({ initialData }: Props) {
     return arr;
   }, [filtered, sortKey, sortDir]);
 
-  function formatDate(iso: string | null): string {
-    if (!iso) return "-";
-    return new Date(iso).toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  }
+  const formatDate = (iso: string | null): string => (iso ? formatKoreanDate(iso) : "-");
 
   function downloadExcel() {
     const headers = [
@@ -103,7 +97,7 @@ export default function FeeLedgerPageClient({ initialData }: Props) {
       r.feeType ? FEE_TYPE_LABELS[r.feeType] ?? r.feeType : "-",
       r.amountInWon != null ? String(r.amountInWon) : "-",
       r.latestPeriod ?? "-",
-      formatDate(r.latestPaidAt),
+      r.latestPaidAt ? formatKoreanDate(r.latestPaidAt) : "-",
       r.thisMonthStatus,
       r.monthsArrears != null ? String(r.monthsArrears) : "-",
       String(r.totalPaid),

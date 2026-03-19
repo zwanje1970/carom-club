@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { formatKoreanDateWithWeekday } from "@/lib/format-date";
 
 /** id 문자열을 0~1 사이 값으로 해시 */
 function hashToFloat(id: string): number {
@@ -18,15 +19,6 @@ function pastelBg(id: string): string {
   const s = 45 + hashToFloat(id + "s") * 25;
   const l = 82 + hashToFloat(id + "l") * 12;
   return `hsl(${h}, ${s}%, ${l}%)`;
-}
-
-function formatDate(d: Date): string {
-  return new Intl.DateTimeFormat("ko-KR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    weekday: "short",
-  }).format(d);
 }
 
 type TournamentRow = {
@@ -57,7 +49,7 @@ export function ClientTournamentCards({ tournaments }: { tournaments: Tournament
               style={{ backgroundColor: pastelBg(t.id) }}
             >
               <h2 className="font-semibold line-clamp-2 text-base">{t.name}</h2>
-              <p className="mt-1.5 text-sm opacity-90">{formatDate(new Date(t.startAt))}</p>
+              <p className="mt-1.5 text-sm opacity-90">{formatKoreanDateWithWeekday(t.startAt)}</p>
             </div>
             {/* 하단: 흰 배경, 좌 당구장명 / 우 신청현황 */}
             <div className="flex items-center justify-between gap-3 p-3 bg-white border-t border-site-border">

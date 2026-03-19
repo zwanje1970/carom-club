@@ -3,14 +3,18 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { NanguSolutionForm } from "@/components/nangu/NanguSolutionForm";
-import type { NanguBallPlacement } from "@/lib/nangu-types";
+import { NanguSolutionEditor } from "@/components/nangu/NanguSolutionEditor";
+import type { NanguBallPlacement, NanguSolutionData } from "@/lib/nangu-types";
 
 export default function NanguSolutionNewPage() {
   const params = useParams();
   const router = useRouter();
   const postId = params.id as string;
-  const [post, setPost] = useState<{ ballPlacement: NanguBallPlacement } | null>(null);
+  const [post, setPost] = useState<{
+    ballPlacement: NanguBallPlacement;
+    title: string;
+    content: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -20,7 +24,13 @@ export default function NanguSolutionNewPage() {
         if (!res.ok) throw new Error("게시글을 불러올 수 없습니다.");
         return res.json();
       })
-      .then((data) => setPost({ ballPlacement: data.ballPlacement }))
+      .then((data) =>
+        setPost({
+          ballPlacement: data.ballPlacement,
+          title: data.title ?? "",
+          content: data.content ?? "",
+        })
+      )
       .catch((e) => setError(e instanceof Error ? e.message : "오류"))
       .finally(() => setLoading(false));
   }, [postId]);
@@ -28,16 +38,7 @@ export default function NanguSolutionNewPage() {
   const handleSubmit = async (payload: {
     title?: string | null;
     comment?: string | null;
-    data: {
-      isBankShot: boolean;
-      thicknessOffsetX?: number;
-      tipX?: number;
-      tipY?: number;
-      paths: { points: { x: number; y: number }[] }[];
-      reflectionPath?: { points: { x: number; y: number }[] };
-      speed?: number;
-      depth?: number;
-    };
+    data: NanguSolutionData;
   }) => {
     const res = await fetch(`/api/community/nangu/${postId}/solutions`, {
       method: "POST",
@@ -87,7 +88,12 @@ export default function NanguSolutionNewPage() {
           <span className="text-site-text font-medium">해법 제시</span>
         </nav>
         <h1 className="text-xl font-bold mb-6">해법 제시</h1>
-        <NanguSolutionForm ballPlacement={post.ballPlacement} onSubmit={handleSubmit} />
+        <NanguSolutionEditor
+          ballPlacement={post.ballPlacement}
+          postTitle={post.title}
+          postContent={post.content}
+          onSubmit={handleSubmit}
+        />
       </div>
     </main>
   );

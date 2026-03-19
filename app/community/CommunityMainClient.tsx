@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
+import { formatKoreanDate, formatKoreanDateTime } from "@/lib/format-date";
 
 type PostItem = {
   id: string;
@@ -204,7 +205,7 @@ export function CommunityMainClient({
               <Link href={postLink(p)} className="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-800/50">
                 <span className="font-medium text-site-text line-clamp-1">{p.title}</span>
                 <span className="text-xs text-gray-500 mt-0.5 block">
-                  [{p.boardName}] {p.authorName} · {new Date(p.createdAt).toLocaleString("ko-KR")} · 추천 {p.likeCount} · 댓글 {p.commentCount}
+                  [{p.boardName}] {p.authorName} · {formatKoreanDateTime(p.createdAt)} · 추천 {p.likeCount} · 댓글 {p.commentCount}
                 </span>
               </Link>
             </li>
@@ -232,7 +233,7 @@ export function CommunityMainClient({
                         {item.title}
                       </Link>
                       <span className="text-xs text-gray-500">
-                        {item.authorName} · {new Date(item.createdAt).toLocaleDateString("ko-KR")} · 추천 {item.likeCount}
+                        {item.authorName} · {formatKoreanDate(item.createdAt)} · 추천 {item.likeCount}
                       </span>
                     </li>
                   ))}

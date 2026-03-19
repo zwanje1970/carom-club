@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { normalizeCueBallType } from "@/lib/billiard-table-constants";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 
@@ -79,7 +80,7 @@ export async function POST(request: Request) {
   let body: {
     title: string;
     content: string;
-    ballPlacement: { redBall: { x: number; y: number }; yellowBall: { x: number; y: number }; whiteBall: { x: number; y: number }; cueBall: string };
+    ballPlacement: { redBall: { x: number; y: number }; yellowBall: { x: number; y: number }; whiteBall: { x: number; y: number }; cueBall?: unknown };
   };
   try {
     body = await request.json();
@@ -92,7 +93,7 @@ export async function POST(request: Request) {
   if (!title) return NextResponse.json({ error: "제목을 입력하세요." }, { status: 400 });
   if (!body.ballPlacement) return NextResponse.json({ error: "공 배치가 필요합니다." }, { status: 400 });
 
-  const cueBall = body.ballPlacement.cueBall === "yellow" ? "yellow" : "white";
+  const cueBall = normalizeCueBallType(body.ballPlacement.cueBall);
   const ballPlacementJson = JSON.stringify({
     redBall: body.ballPlacement.redBall,
     yellowBall: body.ballPlacement.yellowBall,

@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { BilliardTableCanvas } from "@/components/billiard";
 import { BilliardTableEditor, type BilliardTableEditorHandle } from "@/components/billiard";
+import { normalizeCueBallType } from "@/lib/billiard-table-constants";
 import type { NanguBallPlacement } from "@/lib/nangu-types";
 
 type PlacementSource = 
@@ -41,7 +42,7 @@ export default function NanguWritePage() {
           redBall: data.redBall,
           yellowBall: data.yellowBall,
           whiteBall: data.whiteBall,
-          cueBall: data.cueBall === "yellow" ? "yellow" : "white",
+          cueBall: normalizeCueBallType(data.cueBall),
         };
         setSource({ type: "fromNote", placement });
         setPlacement(placement);

@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import PillTag from "./_components/PillTag";
 import Button from "./_components/Button";
+import { formatKoreanDateShort, formatKoreanDateTime } from "@/lib/format-date";
 
 export type DisplayState =
   | "PAYMENT_PENDING"   // 입금대기
@@ -385,11 +386,11 @@ export function ParticipantsTable({
                     )}
                   </td>
                   <td className="px-3 py-2.5 text-sm text-site-text-muted">
-                    {e.createdAt ? new Date(e.createdAt).toLocaleDateString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"}
+                    {e.createdAt ? formatKoreanDateShort(e.createdAt) : "-"}
                   </td>
                   <td className="px-3 py-2.5 text-sm text-site-text-muted">
                     {e.paymentMarkedByApplicantAt
-                      ? new Date(e.paymentMarkedByApplicantAt).toLocaleDateString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+                      ? formatKoreanDateShort(e.paymentMarkedByApplicantAt)
                       : "-"}
                   </td>
                   <td className="px-3 py-2.5 text-sm">
@@ -453,9 +454,9 @@ export function ParticipantsTable({
                 <PillTag color={displayStateColor(state)} label={entryStatusLabel(e)} small />
               </div>
               <p className="text-xs text-site-text-muted">
-                신청 {e.createdAt ? new Date(e.createdAt).toLocaleString("ko-KR") : "-"}
+                신청 {e.createdAt ? formatKoreanDateTime(e.createdAt) : "-"}
                 {e.paymentMarkedByApplicantAt && (
-                  <> · 입금표시 {new Date(e.paymentMarkedByApplicantAt).toLocaleString("ko-KR")}</>
+                  <> · 입금표시 {formatKoreanDateTime(e.paymentMarkedByApplicantAt)}</>
                 )}
               </p>
               <div className="flex flex-wrap gap-2 pt-1">

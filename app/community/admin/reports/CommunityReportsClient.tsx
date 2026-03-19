@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { formatKoreanDateTime } from "@/lib/format-date";
 
 type ReportItem = {
   id: string;
@@ -152,7 +153,7 @@ export default function CommunityReportsClient() {
                   <td className="p-3">{r.reasonLabel}</td>
                   <td className="p-3">{STATUS_OPTIONS.find((s) => s.value === r.status)?.label ?? r.status}</td>
                   <td className="p-3">{r.reporter?.name ?? r.reporter?.username ?? "-"}</td>
-                  <td className="p-3">{new Date(r.createdAt).toLocaleString("ko-KR")}</td>
+                  <td className="p-3">{formatKoreanDateTime(r.createdAt)}</td>
                   <td className="p-3">
                     <button type="button" onClick={() => setSelectedId(r.id)} className="text-site-primary hover:underline">
                       상세

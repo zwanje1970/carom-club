@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { formatKoreanDate } from "@/lib/format-date";
 
 type PostRow = {
   id: string;
@@ -83,7 +84,7 @@ export default function MypageCommunityPage() {
                 <Link href={`/community/posts/${p.id}`} className="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-800/50">
                   <span className="font-medium text-site-text line-clamp-1">{p.title}</span>
                   <span className="text-xs text-gray-500 mt-0.5 block">
-                    [{p.boardName}] 추천 {p.likeCount} · 댓글 {p.commentCount} · 조회 {p.viewCount} · {new Date(p.createdAt).toLocaleDateString("ko-KR")}
+                    [{p.boardName}] 추천 {p.likeCount} · 댓글 {p.commentCount} · 조회 {p.viewCount} · {formatKoreanDate(p.createdAt)}
                   </span>
                 </Link>
               </li>
@@ -98,7 +99,7 @@ export default function MypageCommunityPage() {
                 <Link href={`/community/posts/${c.postId}#comment-${c.id}`} className="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-800/50">
                   <span className="text-site-text line-clamp-2">{c.content}</span>
                   <span className="text-xs text-gray-500 mt-0.5 block">
-                    [{c.boardName}] {c.postTitle} · 추천 {c.likeCount} · {new Date(c.createdAt).toLocaleDateString("ko-KR")}
+                    [{c.boardName}] {c.postTitle} · 추천 {c.likeCount} · {formatKoreanDate(c.createdAt)}
                   </span>
                 </Link>
               </li>
@@ -113,7 +114,7 @@ export default function MypageCommunityPage() {
                 <Link href={`/community/posts/${p.id}`} className="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-800/50">
                   <span className="font-medium text-site-text line-clamp-1">{p.title}</span>
                   <span className="text-xs text-gray-500 mt-0.5 block">
-                    [{p.boardName}] 추천 {p.likeCount} · 댓글 {p.commentCount} · 조회 {p.viewCount} · {new Date(p.createdAt).toLocaleDateString("ko-KR")}
+                    [{p.boardName}] 추천 {p.likeCount} · 댓글 {p.commentCount} · 조회 {p.viewCount} · {formatKoreanDate(p.createdAt)}
                   </span>
                 </Link>
               </li>

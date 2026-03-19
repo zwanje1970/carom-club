@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { mdiClose } from "@mdi/js";
+import { formatKoreanDate } from "@/lib/format-date";
 import Button from "../_components/Button";
 import CardBox from "../_components/CardBox";
 import CardBoxComponentTitle from "../_components/CardBox/Component/Title";
@@ -172,7 +173,7 @@ export function LoadPreviousTournamentModal({
                       <span className="text-sm text-gray-500 dark:text-slate-400">
                         {loadingOne === t.id
                           ? "불러오는 중…"
-                          : new Date(t.startAt).toLocaleDateString("ko-KR")}
+                          : formatKoreanDate(t.startAt)}
                       </span>
                     </button>
                   </li>

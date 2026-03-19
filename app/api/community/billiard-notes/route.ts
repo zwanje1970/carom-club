@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { normalizeCueBallType } from "@/lib/billiard-table-constants";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 
@@ -118,7 +119,7 @@ export async function POST(request: Request) {
   }
 
   const visibility = body.visibility === "community" ? "community" : "private";
-  const cueBall = body.cueBall === "yellow" ? "yellow" : "white";
+  const cueBall = normalizeCueBallType(body.cueBall);
   const noteDate = body.noteDate ? new Date(body.noteDate) : null;
 
   try {

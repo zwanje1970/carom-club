@@ -8,16 +8,6 @@ export const runtime = "nodejs";
 const ALLOWED_POLICIES: ImageKind[] = ["content", "section", "banner", "logo", "thumbnail", "venue", "tournament"];
 
 export async function POST(request: Request) {
-  // [DEBUG] 배포 503 원인 추적용 임시 로그 (확인 후 제거)
-  const debugEnv = {
-    runtime: "nodejs (export const runtime)",
-    NODE_ENV: process.env.NODE_ENV,
-    VERCEL: process.env.VERCEL,
-    hasBlobToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
-    blobTokenLength: process.env.BLOB_READ_WRITE_TOKEN?.length ?? 0,
-  };
-  console.error("[admin/upload-image] DEBUG env:", JSON.stringify(debugEnv));
-
   const session = await getSession();
   const allowed = session?.role === "PLATFORM_ADMIN" || session?.role === "CLIENT_ADMIN";
   if (!session || !allowed) {
@@ -33,8 +23,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (process.env.VERCEL === "1" && !process.env.BLOB_READ_WRITE_TOKEN) {
-    console.error("[admin/upload-image] 503 조건 충족: VERCEL=1 이고 BLOB_READ_WRITE_TOKEN 없음. 반환 직전.");
+  if (process.env.NODE_ENV === "production" && !process.env.BLOB_READ_WRITE_TOKEN) {
     return NextResponse.json(
       { error: BLOB_SERVICE_UNAVAILABLE_MESSAGE },
       { status: 503 }
@@ -57,7 +46,6 @@ export async function POST(request: Request) {
     }
     console.error("[admin/upload-image] error:", e);
     if (isBlobConfigError(message)) {
-      console.error("[admin/upload-image] 503 조건: catch 블록 내 isBlobConfigError. message:", message);
       return NextResponse.json(
         { error: BLOB_SERVICE_UNAVAILABLE_MESSAGE },
         { status: 503 }

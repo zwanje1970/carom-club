@@ -365,12 +365,46 @@ function drawTable(
       ctx.stroke();
     }
     ctx.setLineDash([]);
+
+    // 5-2. 단순보기: 쿠션필드 그리드 — 플레이필드 긴쪽 80등분, 짧은쪽 40등분, 파란 실선 (그리드와 함께 표시)
+    if (isWireframe) {
+      const longDivs = 80;
+      const shortDivs = 40;
+      const nVert = isLandscape ? longDivs + 1 : shortDivs + 1;
+      const nHorz = isLandscape ? shortDivs + 1 : longDivs + 1;
+      const stepVert = isLandscape ? pw / longDivs : pw / shortDivs;
+      const stepHorz = isLandscape ? ph / shortDivs : ph / longDivs;
+      ctx.strokeStyle = "#2563eb";
+      ctx.lineWidth = 0.5;
+      for (let i = 0; i <= nVert - 1; i++) {
+        const x = left + i * stepVert;
+        ctx.beginPath();
+        ctx.moveTo(x, FRAME_INSET);
+        ctx.lineTo(x, top);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, top + ph);
+        ctx.lineTo(x, height - FRAME_INSET);
+        ctx.stroke();
+      }
+      for (let j = 0; j <= nHorz - 1; j++) {
+        const y = top + j * stepHorz;
+        ctx.beginPath();
+        ctx.moveTo(FRAME_INSET, y);
+        ctx.lineTo(left, y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(left + pw, y);
+        ctx.lineTo(width - FRAME_INSET, y);
+        ctx.stroke();
+      }
+    }
   }
 }
 
-/** 공배치 선택 표시: 공 중심 기준 지름 4배, 검정, opacity 0.3 (공 위 레이어) */
+/** 공배치 선택 표시: 공 중심 기준 지름 4배, 검정, opacity 20% (공 위 레이어) */
 const PLACEMENT_SELECTION_RING_SCALE = 2;
-const PLACEMENT_SELECTION_RING_OPACITY = 0.3;
+const PLACEMENT_SELECTION_RING_OPACITY = 0.2;
 
 function drawBall(
   ctx: CanvasRenderingContext2D,
@@ -481,7 +515,7 @@ function drawBall(
   ctx.arc(px, py, r, 0, Math.PI * 2);
   ctx.fill();
 
-  // 5. 선택된 공: 공배치 모드면 지름 4배 검정 반투명 원(0.3), 아니면 이중 테두리
+  // 5. 선택된 공: 공배치 모드면 지름 4배 검정 반투명 원(20%), 아니면 이중 테두리
   if (isSelected) {
     if (placementMode) {
       const ringR = r * PLACEMENT_SELECTION_RING_SCALE;

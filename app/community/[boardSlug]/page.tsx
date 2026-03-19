@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { formatKoreanDate } from "@/lib/format-date";
 
 type PostItem = {
   id: string;
@@ -129,7 +130,7 @@ export default function CommunityBoardSlugPage() {
                   <span className="inline-block mr-2 text-xs text-amber-700 dark:text-amber-400 font-medium">[공지]</span>
                   <span className="font-medium text-site-text">{p.title}</span>
                   <span className="text-xs text-gray-500 mt-0.5 block">
-                    {p.authorName} · 추천 {p.likeCount} · 댓글 {p.commentCount} · 조회 {p.viewCount} · {new Date(p.createdAt).toLocaleDateString("ko-KR")}
+                    {p.authorName} · 추천 {p.likeCount} · 댓글 {p.commentCount} · 조회 {p.viewCount} · {formatKoreanDate(p.createdAt)}
                   </span>
                 </Link>
               </li>
@@ -142,7 +143,7 @@ export default function CommunityBoardSlugPage() {
                     {p.title}
                   </span>
                   <span className="text-xs text-gray-500 mt-0.5 block">
-                    {p.authorName} · 추천 {p.likeCount} · 댓글 {p.commentCount} · 조회 {p.viewCount} · {new Date(p.createdAt).toLocaleDateString("ko-KR")}
+                    {p.authorName} · 추천 {p.likeCount} · 댓글 {p.commentCount} · 조회 {p.viewCount} · {formatKoreanDate(p.createdAt)}
                   </span>
                 </Link>
               </li>

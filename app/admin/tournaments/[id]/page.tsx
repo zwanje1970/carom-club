@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { mdiTrophy } from "@mdi/js";
 import { getSession } from "@/lib/auth";
+import { formatKoreanDateTime } from "@/lib/format-date";
 import { prisma } from "@/lib/db";
 import { ORGANIZATION_SELECT_ADMIN_BASIC } from "@/lib/db-selects";
 import { canManageTournament } from "@/lib/permissions";
@@ -103,7 +104,7 @@ export default async function AdminTournamentDetailPage({
           <dt className="text-gray-500 dark:text-slate-400">업체</dt>
           <dd className="text-gray-900 dark:text-slate-100">{tournament.organization.name}</dd>
           <dt className="text-gray-500 dark:text-slate-400">일시</dt>
-          <dd>{new Date(tournament.startAt).toLocaleString("ko-KR")}</dd>
+          <dd>{formatKoreanDateTime(tournament.startAt)}</dd>
           <dt className="text-gray-500 dark:text-slate-400">장소</dt>
           <dd>{tournament.venue ?? "-"}</dd>
           <dt className="text-gray-500 dark:text-slate-400">상태</dt>

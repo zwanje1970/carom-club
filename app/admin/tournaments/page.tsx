@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { mdiTrophy } from "@mdi/js";
 import { getSession } from "@/lib/auth";
+import { formatKoreanDateTime } from "@/lib/format-date";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
 import { normalizeSlug } from "@/lib/normalize-slug";
@@ -146,7 +147,7 @@ export default async function AdminTournamentsPage() {
                       {t.organization?.name ?? "-"}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600 dark:text-slate-400">
-                      {new Date(t.startAt).toLocaleString("ko-KR")}
+                      {formatKoreanDateTime(t.startAt)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600 dark:text-slate-400">
                       {t.venue ?? "-"}

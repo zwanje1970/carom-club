@@ -6,6 +6,7 @@ import { canWriteNotice, isCommunityModerator } from "@/lib/community-roles";
 import { isFeatureEnabled } from "@/lib/site-feature-flags";
 import { awardPostCreated } from "@/lib/community-score-service";
 import { getLevelFromScore } from "@/lib/community-level";
+import { ensureDefaultCommunityBoards } from "@/lib/community-ensure-boards";
 
 /** 게시판별 글 목록. 텍스트 중심. 숨김 글은 관리자만 노출 */
 export async function GET(
@@ -25,10 +26,17 @@ export async function GET(
   const session = await getSession();
   const showHidden = isCommunityModerator(session);
 
-  const board = await prisma.communityBoard.findUnique({
+  let board = await prisma.communityBoard.findUnique({
     where: { slug },
     select: { id: true, slug: true, name: true },
   });
+  if (!board) {
+    await ensureDefaultCommunityBoards();
+    board = await prisma.communityBoard.findUnique({
+      where: { slug },
+      select: { id: true, slug: true, name: true },
+    });
+  }
   if (!board) {
     return NextResponse.json({ error: "게시판을 찾을 수 없습니다." }, { status: 404 });
   }
@@ -103,10 +111,17 @@ export async function POST(
   }
   const { slug } = await params;
 
-  const board = await prisma.communityBoard.findUnique({
+  let board = await prisma.communityBoard.findUnique({
     where: { slug },
     select: { id: true, slug: true },
   });
+  if (!board) {
+    await ensureDefaultCommunityBoards();
+    board = await prisma.communityBoard.findUnique({
+      where: { slug },
+      select: { id: true, slug: true },
+    });
+  }
   if (!board) {
     return NextResponse.json({ error: "게시판을 찾을 수 없습니다." }, { status: 404 });
   }

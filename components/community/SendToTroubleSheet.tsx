@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { isAllowedImageUrl } from "@/lib/image-src";
 
 const DIFFICULTIES = [
   { value: "", label: "선택 안 함" },
@@ -40,6 +41,11 @@ export function SendToTroubleSheet({
       setError("제목을 입력하세요.");
       return;
     }
+    const urlTrim = imageUrl.trim();
+    if (urlTrim && !isAllowedImageUrl(urlTrim)) {
+      setError("이미지 URL은 /uploads/... 상대경로 또는 http(s) 주소만 입력할 수 있습니다.");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch("/api/community/trouble/from-note", {
@@ -50,15 +56,18 @@ export function SendToTroubleSheet({
           noteId,
           title: title.trim(),
           content: content.trim(),
-          imageUrl: imageUrl.trim() || null,
+          imageUrl: urlTrim || null,
           difficulty: difficulty || null,
         }),
       });
+      const j = await res.json().catch(() => ({}));
+      console.log("[난구해결 등록] 응답 status:", res.status, "body:", { message: j.message, error: j.error, id: j.id });
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j.error ?? "등록에 실패했습니다.");
+        const serverMessage = j.error ?? j.message ?? "등록에 실패했습니다.";
+        console.error("[난구해결 등록] 실패:", res.status, serverMessage);
+        throw new Error(serverMessage);
       }
-      const { id } = await res.json();
+      const { id } = j;
       onClose();
       router.push(`/community/trouble/${id}`);
     } catch (e) {
@@ -122,10 +131,11 @@ export function SendToTroubleSheet({
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">공배치 이미지 URL</label>
             <input
-              type="url"
+              type="text"
+              inputMode="url"
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="선택 (노트 이미지 사용 시 비워두기)"
+              placeholder="선택 (노트 이미지 사용 시 비워두기, /uploads/... 또는 http(s) URL)"
               className="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-site-text"
             />
             {defaultImageUrl && (

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { formatKoreanDateTime } from "@/lib/format-date";
 
 type NotificationItem = {
   id: string;
@@ -82,7 +83,7 @@ export default function CommunityNotificationsPage() {
                       <><strong>{n.relatedUserName ?? "알 수 없음"}</strong>님이 내 글에 댓글을 남겼습니다.</>
                     )}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">{new Date(n.createdAt).toLocaleString("ko-KR")}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{formatKoreanDateTime(n.createdAt)}</p>
                 </button>
               </li>
             ))}

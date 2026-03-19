@@ -40,12 +40,14 @@ export function BilliardNoteFormScreen({
   redirectBasePath = "/mypage/notes",
 }: BilliardNoteFormScreenProps) {
   const [title, setTitle] = useState("");
-  const [noteDate, setNoteDate] = useState(() =>
-    new Date().toISOString().slice(0, 10)
-  );
+  const [noteDate, setNoteDate] = useState("");
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    setNoteDate((prev) => (prev ? prev : new Date().toISOString().slice(0, 10)));
+  }, []);
 
   useEffect(() => {
     try {

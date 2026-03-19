@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { formatKoreanDateTime } from "@/lib/format-date";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
 import { STAGE_LABELS } from "@/lib/tournament-stage";
@@ -119,7 +120,7 @@ export default async function ClientTournamentDetailPage({
         <dt className="text-gray-500">상태</dt>
         <dd>{STATUS_LABEL[tournament.status] ?? tournament.status}</dd>
         <dt className="text-gray-500">일시</dt>
-        <dd>{new Date(tournament.startAt).toLocaleString("ko-KR")}</dd>
+        <dd>{formatKoreanDateTime(tournament.startAt)}</dd>
         {tournament.venue && (
           <>
             <dt className="text-gray-500">장소</dt>

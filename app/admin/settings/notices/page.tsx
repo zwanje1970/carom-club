@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { mdiBullhorn } from "@mdi/js";
+import { formatKoreanDateTime } from "@/lib/format-date";
 import SectionMain from "@/components/admin/_components/Section/Main";
 import SectionTitleLineWithButton from "@/components/admin/_components/Section/TitleLineWithButton";
 import CardBox from "@/components/admin/_components/CardBox";
@@ -196,7 +197,7 @@ export default function AdminSettingsNoticesPage() {
                     <td className="p-2">{TYPE_LABELS[n.type] ?? n.type}</td>
                     <td className="p-2">{n.title}</td>
                     <td className="p-2">
-                      {n.startAt ? new Date(n.startAt).toLocaleString("ko-KR") : "-"} ~ {n.endAt ? new Date(n.endAt).toLocaleString("ko-KR") : "-"}
+                      {n.startAt ? formatKoreanDateTime(n.startAt) : "-"} ~ {n.endAt ? formatKoreanDateTime(n.endAt) : "-"}
                     </td>
                     <td className="p-2">{n.isActive ? "ON" : "OFF"}</td>
                     <td className="p-2">

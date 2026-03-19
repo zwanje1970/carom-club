@@ -73,7 +73,7 @@ export interface BilliardTableEditorProps {
   /** 실사보기/단순보기 (제어 모드) */
   drawStyle?: "realistic" | "wireframe";
   onDrawStyleChange?: (value: "realistic" | "wireframe") => void;
-  /** 난구 공배치 전용: 위치만, 터치 1.5배, 선택 반투명 링, 상단 안내, 경로 모드 비노출 */
+  /** 난구 공배치 전용: 위치만, 터치셀 50% 확대(반지름 6배), 선택 반투명 링, 상단 안내, 경로 모드 비노출 */
   placementMode?: boolean;
   /** canvasOnly+placement: 상단 바(좌표·공 선택)에 넘길 상태 — 있으면 고정 좌표 오버레이 숨김 */
   onPlacementBarInfo?: (info: {
@@ -137,10 +137,18 @@ const BilliardTableEditor = forwardRef<
   const [gridOnInternal, setGridOnInternal] = useState(showGrid);
   const [tableDrawStyleInternal, setTableDrawStyleInternal] = useState<"realistic" | "wireframe">("realistic");
   const tableRef = useRef<BilliardTableCanvasHandle>(null);
+  const fineTuneDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fineTuneIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const FINE_STEP = 0.002; // 1회 클릭/연속 이동 시 normalized 이동량 (약 1~2px 수준)
+  const fineTunePressStartRef = useRef<number>(0);
+  const fineTuneLastMoveRef = useRef<number>(0);
+  const fineTuneDirectionRef = useRef<{ dx: number; dy: number } | null>(null);
+  const moveSelectedBallRef = useRef<(dx: number, dy: number) => void>(() => {});
   const [lastDragEndTime, setLastDragEndTime] = useState<number | null>(null);
   const [isFineTuning, setIsFineTuning] = useState(false);
+
+  /** 그리드 1칸 = 정규화 좌표 (플레이필드 80x40 그리드 기준) */
+  const GRID_STEP_LONG = 1 / 80;
+  const GRID_STEP_SHORT = 1 / 40;
 
   const gridOn = gridOnProp ?? gridOnInternal;
   const setGridOn = (v: boolean) => {
@@ -158,7 +166,7 @@ const BilliardTableEditor = forwardRef<
 
   const handlePointerDownBall = (normalized: { x: number; y: number }) => {
     const { px, py } = normalizedToPixel(normalized.x, normalized.y, rect);
-    const hit = hitTestBall(px, py, redBall, yellowBall, whiteBall, rect, placementMode ? 4 : 1);
+    const hit = hitTestBall(px, py, redBall, yellowBall, whiteBall, rect, placementMode ? 6 : 1);
     if (hit) {
       if (hit !== selectedBall) setLastDragEndTime(null);
       setSelectedBall(hit);
@@ -210,30 +218,58 @@ const BilliardTableEditor = forwardRef<
     [selectedBall, redBall, yellowBall, whiteBall, rect]
   );
 
-  const clearFineTuneInterval = useCallback(() => {
+  const clearFineTuneTimers = useCallback(() => {
+    if (fineTuneDelayRef.current) {
+      clearTimeout(fineTuneDelayRef.current);
+      fineTuneDelayRef.current = null;
+    }
     if (fineTuneIntervalRef.current) {
       clearInterval(fineTuneIntervalRef.current);
       fineTuneIntervalRef.current = null;
     }
+    fineTuneDirectionRef.current = null;
   }, []);
 
-  useEffect(() => () => clearFineTuneInterval(), [clearFineTuneInterval]);
+  useEffect(() => {
+    moveSelectedBallRef.current = moveSelectedBall;
+  }, [moveSelectedBall]);
+
+  useEffect(() => () => clearFineTuneTimers(), [clearFineTuneTimers]);
 
   const startFineTune = useCallback(
     (dx: number, dy: number) => {
+      if (!selectedBall) return;
       setLastDragEndTime(null);
       setIsFineTuning(true);
-      moveSelectedBall(dx, dy); // 1회 클릭 시 즉시 1스텝 이동
-      fineTuneIntervalRef.current = setInterval(() => moveSelectedBall(dx, dy), 120); // 길게 누름: 연속 이동
+      moveSelectedBall(dx, dy);
+      fineTunePressStartRef.current = Date.now();
+      fineTuneLastMoveRef.current = fineTunePressStartRef.current;
+      fineTuneDirectionRef.current = { dx, dy };
+      clearFineTuneTimers();
+      fineTuneDelayRef.current = setTimeout(() => {
+        fineTuneDelayRef.current = null;
+        const move = () => {
+          const dir = fineTuneDirectionRef.current;
+          if (!dir) return;
+          const elapsed = Date.now() - fineTunePressStartRef.current;
+          if (elapsed < 250) return;
+          const intervalMs = elapsed < 500 ? 80 : elapsed < 1500 ? 40 : 20;
+          if (Date.now() - fineTuneLastMoveRef.current >= intervalMs) {
+            fineTuneLastMoveRef.current = Date.now();
+            moveSelectedBallRef.current(dir.dx, dir.dy);
+          }
+        };
+        fineTuneIntervalRef.current = setInterval(move, 20);
+      }, 250);
     },
-    [moveSelectedBall]
+    [moveSelectedBall, selectedBall, clearFineTuneTimers]
   );
 
   const handleFineTuneEnd = useCallback(() => {
-    clearFineTuneInterval();
+    clearFineTuneTimers();
     setIsFineTuning(false);
     if (selectedBall) setLastDragEndTime(Date.now());
-  }, [clearFineTuneInterval, selectedBall]);
+  }, [clearFineTuneTimers, selectedBall]);
 
   const showPlus = Boolean(
     placementMode &&
@@ -474,68 +510,76 @@ const BilliardTableEditor = forwardRef<
               <span className="w-12 h-12" aria-hidden />
               <button
                 type="button"
-                aria-label="위로 미세 이동"
-                className="w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-full text-lg font-bold text-white bg-black/35 active:bg-black/55 transition-colors"
-                onPointerDown={() =>
+                aria-label="위로 1칸 이동"
+                className="w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-full text-lg font-bold text-white bg-black/35 active:bg-black/55 active:scale-95 transition-[background-color,transform] touch-none select-none"
+                onPointerDown={(e) => {
+                  e.preventDefault();
                   startFineTune(
-                    effectiveOrientation === "landscape" ? 0 : -FINE_STEP,
-                    effectiveOrientation === "landscape" ? -FINE_STEP : 0
-                  )
-                }
+                    effectiveOrientation === "landscape" ? 0 : -GRID_STEP_SHORT,
+                    effectiveOrientation === "landscape" ? -GRID_STEP_SHORT : 0
+                  );
+                }}
                 onPointerUp={handleFineTuneEnd}
                 onPointerLeave={handleFineTuneEnd}
                 onPointerCancel={handleFineTuneEnd}
+                onContextMenu={(e) => e.preventDefault()}
               >
                 ▲
               </button>
               <span className="w-12 h-12" aria-hidden />
               <button
                 type="button"
-                aria-label="왼쪽으로 미세 이동"
-                className="w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-full text-lg font-bold text-white bg-black/35 active:bg-black/55 transition-colors"
-                onPointerDown={() =>
+                aria-label="왼쪽으로 1칸 이동"
+                className="w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-full text-lg font-bold text-white bg-black/35 active:bg-black/55 active:scale-95 transition-[background-color,transform] touch-none select-none"
+                onPointerDown={(e) => {
+                  e.preventDefault();
                   startFineTune(
-                    effectiveOrientation === "landscape" ? -FINE_STEP : 0,
-                    effectiveOrientation === "landscape" ? 0 : FINE_STEP
-                  )
-                }
+                    effectiveOrientation === "landscape" ? -GRID_STEP_LONG : 0,
+                    effectiveOrientation === "landscape" ? 0 : GRID_STEP_LONG
+                  );
+                }}
                 onPointerUp={handleFineTuneEnd}
                 onPointerLeave={handleFineTuneEnd}
                 onPointerCancel={handleFineTuneEnd}
+                onContextMenu={(e) => e.preventDefault()}
               >
                 ◀
               </button>
               <span className="w-12 h-12" aria-hidden />
               <button
                 type="button"
-                aria-label="오른쪽으로 미세 이동"
-                className="w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-full text-lg font-bold text-white bg-black/35 active:bg-black/55 transition-colors"
-                onPointerDown={() =>
+                aria-label="오른쪽으로 1칸 이동"
+                className="w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-full text-lg font-bold text-white bg-black/35 active:bg-black/55 active:scale-95 transition-[background-color,transform] touch-none select-none"
+                onPointerDown={(e) => {
+                  e.preventDefault();
                   startFineTune(
-                    effectiveOrientation === "landscape" ? FINE_STEP : 0,
-                    effectiveOrientation === "landscape" ? 0 : -FINE_STEP
-                  )
-                }
+                    effectiveOrientation === "landscape" ? GRID_STEP_LONG : 0,
+                    effectiveOrientation === "landscape" ? 0 : -GRID_STEP_LONG
+                  );
+                }}
                 onPointerUp={handleFineTuneEnd}
                 onPointerLeave={handleFineTuneEnd}
                 onPointerCancel={handleFineTuneEnd}
+                onContextMenu={(e) => e.preventDefault()}
               >
                 ▶
               </button>
               <span className="w-12 h-12" aria-hidden />
               <button
                 type="button"
-                aria-label="아래로 미세 이동"
-                className="w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-full text-lg font-bold text-white bg-black/35 active:bg-black/55 transition-colors"
-                onPointerDown={() =>
+                aria-label="아래로 1칸 이동"
+                className="w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-full text-lg font-bold text-white bg-black/35 active:bg-black/55 active:scale-95 transition-[background-color,transform] touch-none select-none"
+                onPointerDown={(e) => {
+                  e.preventDefault();
                   startFineTune(
-                    effectiveOrientation === "landscape" ? 0 : FINE_STEP,
-                    effectiveOrientation === "landscape" ? FINE_STEP : 0
-                  )
-                }
+                    effectiveOrientation === "landscape" ? 0 : GRID_STEP_SHORT,
+                    effectiveOrientation === "landscape" ? GRID_STEP_SHORT : 0
+                  );
+                }}
                 onPointerUp={handleFineTuneEnd}
                 onPointerLeave={handleFineTuneEnd}
                 onPointerCancel={handleFineTuneEnd}
+                onContextMenu={(e) => e.preventDefault()}
               >
                 ▼
               </button>

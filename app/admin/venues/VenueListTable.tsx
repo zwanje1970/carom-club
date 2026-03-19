@@ -5,6 +5,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { ClientListRow } from "./page";
 import FeeLedgerModal from "./FeeLedgerModal";
+import { formatKoreanDate } from "@/lib/format-date";
 
 const TYPE_OPTIONS = [
   { value: "", label: "전체" },
@@ -27,14 +28,9 @@ const STATUS_LABELS: Record<string, string> = {
   EXPELLED: "제명",
 };
 
-function formatDate(d: Date | null): string {
-  if (!d) return "-";
-  const date = typeof d === "string" ? new Date(d) : d;
-  return date.toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
+function formatDate(d: Date | string | null): string {
+  if (d == null) return "-";
+  return formatKoreanDate(d);
 }
 
 type Props = { rows: ClientListRow[] };

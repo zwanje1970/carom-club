@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { mdiDatabaseExport } from "@mdi/js";
+import { formatKoreanDateTime } from "@/lib/format-date";
 import SectionMain from "@/components/admin/_components/Section/Main";
 import SectionTitleLineWithButton from "@/components/admin/_components/Section/TitleLineWithButton";
 import CardBox from "@/components/admin/_components/CardBox";
@@ -98,7 +99,7 @@ export default function AdminSettingsBackupPage() {
                   <tr key={r.id} className="border-b border-site-border/50">
                     <td className="p-2 font-mono text-xs">{r.filename}</td>
                     <td className="p-2">{formatBytes(r.sizeBytes)}</td>
-                    <td className="p-2">{new Date(r.createdAt).toLocaleString("ko-KR")}</td>
+                    <td className="p-2">{formatKoreanDateTime(r.createdAt)}</td>
                     <td className="p-2">
                       <a
                         href={`/api/admin/backup/${r.id}/download`}

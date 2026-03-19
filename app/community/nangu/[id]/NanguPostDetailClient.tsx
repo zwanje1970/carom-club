@@ -2,7 +2,9 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { BilliardTableCanvas } from "@/components/billiard";
+import { formatKoreanDate } from "@/lib/format-date";
 import { NanguSolutionLayerCanvas } from "@/components/nangu/NanguSolutionLayerCanvas";
 import { CommunityLevelBadge } from "@/components/community/CommunityLevelBadge";
 import { DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT } from "@/lib/billiard-table-constants";
@@ -43,7 +45,38 @@ export function NanguPostDetailClient({
   };
   solutions: SolutionItem[];
 }) {
+  const router = useRouter();
   const [expandedSolutionId, setExpandedSolutionId] = useState<string | null>(null);
+  const [voteLoading, setVoteLoading] = useState<string | null>(null);
+  const [adoptLoading, setAdoptLoading] = useState<string | null>(null);
+
+  const handleVote = async (solutionId: string, vote: "good" | "bad") => {
+    setVoteLoading(solutionId);
+    try {
+      const res = await fetch(`/api/community/nangu/solutions/${solutionId}/vote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ vote }),
+      });
+      if (res.ok) router.refresh();
+    } finally {
+      setVoteLoading(null);
+    }
+  };
+
+  const handleAdopt = async (solutionId: string) => {
+    setAdoptLoading(solutionId);
+    try {
+      const res = await fetch(`/api/community/nangu/${post.id}/solutions/${solutionId}/adopt`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.ok) router.refresh();
+    } finally {
+      setAdoptLoading(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -57,7 +90,7 @@ export function NanguPostDetailClient({
             size="sm"
           />
         )}
-        <span>· {new Date(post.createdAt).toLocaleDateString("ko-KR")}</span>
+        <span>· {formatKoreanDate(post.createdAt)}</span>
       </p>
       <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{post.content}</p>
 
@@ -151,6 +184,34 @@ export function NanguPostDetailClient({
                       data={s.data}
                       className="pointer-events-none absolute inset-0"
                     />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 mt-4">
+                    {post.isAuthor && !s.isAdopted && (
+                      <button
+                        type="button"
+                        onClick={() => handleAdopt(s.id)}
+                        disabled={!!adoptLoading}
+                        className="px-3 py-1.5 rounded-lg border border-site-primary text-site-primary text-sm font-medium disabled:opacity-50"
+                      >
+                        {adoptLoading === s.id ? "처리 중…" : "질문자 채택"}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleVote(s.id, "good")}
+                      disabled={!!voteLoading}
+                      className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-slate-600 text-site-text text-sm disabled:opacity-50"
+                    >
+                      {voteLoading === s.id ? "…" : "GOOD"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleVote(s.id, "bad")}
+                      disabled={!!voteLoading}
+                      className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-slate-600 text-site-text text-sm disabled:opacity-50"
+                    >
+                      {voteLoading === s.id ? "…" : "BAD"}
+                    </button>
                   </div>
                 </div>
               )}

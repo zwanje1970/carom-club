@@ -94,6 +94,7 @@ export async function GET(
     isAuthor: session?.id === post.authorId,
     canEdit: session?.id === post.authorId || isCommunityAdmin(session),
     canDelete: session?.id === post.authorId || isCommunityAdmin(session),
+    isLoggedIn: !!session,
     liked,
     bookmarked,
   };

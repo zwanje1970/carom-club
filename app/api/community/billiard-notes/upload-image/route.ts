@@ -5,7 +5,11 @@ import { IMAGE_POLICIES } from "@/lib/image-policies";
 
 export const runtime = "nodejs";
 
-/** 당구노트 테이블 이미지 업로드. 로그인한 사용자만. */
+/**
+ * 당구노트 테이블 이미지 업로드. 로그인한 사용자만.
+ * 로컬 테스트: 파일명 자동 생성 후 public/uploads/billiard/ 에 저장, 반환값은 /uploads/billiard/파일명.webp 상대경로.
+ * (FORCE_LOCAL_IMAGE_UPLOAD=1 이거나 BLOB_READ_WRITE_TOKEN 없을 때)
+ */
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) {

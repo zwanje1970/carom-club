@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import CardBox from "@/components/admin/_components/CardBox";
+import { formatKoreanDate } from "@/lib/format-date";
 
 type Plan = { id: string; code: string; name: string };
 type Feature = { id: string; code: string; name: string };
@@ -144,7 +145,7 @@ export function AdminOrganizationGrants({ organizationId }: { organizationId: st
               {subscriptions.map((s) => (
                 <li key={s.id}>
                   {s.plan.name} ({s.plan.code}) · {s.status} · 출처: {s.sourceType}
-                  {s.expiresAt && ` · 만료: ${new Date(s.expiresAt).toLocaleDateString("ko-KR")}`}
+                  {s.expiresAt && ` · 만료: ${formatKoreanDate(s.expiresAt)}`}
                   {s.notes && ` · 메모: ${s.notes}`}
                 </li>
               ))}
@@ -204,7 +205,7 @@ export function AdminOrganizationGrants({ organizationId }: { organizationId: st
               {featureAccess.map((a) => (
                 <li key={a.id}>
                   {a.feature.name} ({a.feature.code}) · {a.status} · 출처: {a.sourceType}
-                  {a.expiresAt && ` · 만료: ${new Date(a.expiresAt).toLocaleDateString("ko-KR")}`}
+                  {a.expiresAt && ` · 만료: ${formatKoreanDate(a.expiresAt)}`}
                   {a.notes && ` · 메모: ${a.notes}`}
                 </li>
               ))}

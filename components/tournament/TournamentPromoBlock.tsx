@@ -2,16 +2,7 @@
 
 import Link from "next/link";
 import { sanitizeImageSrc } from "@/lib/image-src";
-
-function formatSchedule(startAt: string | Date, endAt?: string | Date | null): string {
-  const s = new Date(startAt);
-  const e = endAt ? new Date(endAt) : null;
-  const fmt = (d: Date) =>
-    d.toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" }) +
-    " " +
-    d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
-  return e ? `${fmt(s)} ~ ${fmt(e)}` : fmt(s);
-}
+import { formatKoreanSchedule } from "@/lib/format-date";
 
 const GAME_FORMAT_LABEL: Record<string, string> = {
   TOURNAMENT: "토너먼트",
@@ -197,7 +188,7 @@ export function TournamentPromoBlock({
             </>
           )}
           <dt className="text-site-text-muted text-sm">경기 일정</dt>
-          <dd className="text-site-text">{formatSchedule(startAt, endAt)}</dd>
+          <dd className="text-site-text">{formatKoreanSchedule(startAt, endAt)}</dd>
           {venue && (
             <>
               <dt className="text-site-text-muted text-sm">대회 장소</dt>

@@ -64,6 +64,7 @@ model User {
   communityNotificationsAsRelated CommunityNotification[] @relation("NotificationActor")
   communityReports       CommunityReport[]
   troubleShotSolutions   TroubleShotSolution[]
+  troubleShotSolutionVotes TroubleShotSolutionVote[]
   communityScoreLogs     CommunityScoreLog[]
   nanguSolutionVotes    NanguSolutionVote[]
 
@@ -1374,16 +1375,40 @@ model TroubleShotSolution {
   title           String?
   content         String   @db.Text
   solutionImageUrl String?
+  solutionDataJson String?  @db.Text  // NanguSolutionData 호환 JSON (두께/당점/경로 등)
   voteCount       Int      @default(0)
+  goodCount       Int      @default(0)
+  badCount        Int      @default(0)
   isAccepted      Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   troubleShotPost TroubleShotPost @relation(fields: [troubleShotPostId], references: [id], onDelete: Cascade)
   author         User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  votes          TroubleShotSolutionVote[]
 
   @@index([troubleShotPostId])
   @@index([authorId])
+}
+
+enum TroubleShotSolutionVoteType {
+  GOOD
+  BAD
+}
+
+model TroubleShotSolutionVote {
+  id         String                     @id @default(cuid())
+  solutionId String
+  userId     String
+  vote       TroubleShotSolutionVoteType
+  createdAt  DateTime                   @default(now())
+
+  solution TroubleShotSolution @relation(fields: [solutionId], references: [id], onDelete: Cascade)
+  user     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([solutionId, userId])
+  @@index([solutionId])
+  @@index([userId])
 }
 
 // ============== Inquiry ==============

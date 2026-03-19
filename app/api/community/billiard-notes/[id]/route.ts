@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { normalizeCueBallType } from "@/lib/billiard-table-constants";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 
@@ -125,7 +126,7 @@ export async function PATCH(
     data.whiteBallY = body.whiteBall.y;
   }
   if (body.cueBall != null) {
-    data.cueBall = body.cueBall === "yellow" ? "yellow" : "white";
+    data.cueBall = normalizeCueBallType(body.cueBall);
   }
   if (body.memo !== undefined) data.memo = body.memo?.trim() || null;
   if (body.imageUrl !== undefined) data.imageUrl = body.imageUrl?.trim() || null;

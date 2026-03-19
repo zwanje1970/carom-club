@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BilliardNoteFormScreen } from "@/components/community/BilliardNoteFormScreen";
 import { MobileBallPlacementFullscreen } from "@/components/community/MobileBallPlacementFullscreen";
 import type { PlacementPayload } from "@/components/community/BilliardNoteFormScreen";
+import { normalizeCueBallType } from "@/lib/billiard-table-constants";
 
 function dataURLToBlob(dataURL: string): Blob {
   const arr = dataURL.split(",");
@@ -173,7 +174,7 @@ export default function MypageNewNotePage() {
         redBall: { x: redBall.x, y: redBall.y },
         yellowBall: { x: yellowBall.x, y: yellowBall.y },
         whiteBall: { x: whiteBall.x, y: whiteBall.y },
-        cueBall: cueBall === "yellow" ? "yellow" : "white",
+        cueBall: normalizeCueBallType(cueBall),
         memo: data.content || null,
         imageUrl: url,
         visibility: "private",

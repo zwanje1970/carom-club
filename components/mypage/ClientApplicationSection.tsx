@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { formatKoreanDate } from "@/lib/format-date";
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "신청중",
@@ -89,7 +90,7 @@ export function ClientApplicationSection() {
                 <dd>{application.organizationName}</dd>
                 <dt className="text-gray-500">신청일</dt>
                 <dd>
-                  {new Date(application.createdAt).toLocaleDateString("ko-KR")}
+                  {formatKoreanDate(application.createdAt)}
                 </dd>
               </>
             )}

@@ -4,6 +4,22 @@
  * - 유효한 https 또는 / 로 시작하는 URL만 next/image로 처리
  */
 
+/**
+ * 이미지 URL로 허용할 값인지 검사. 폼/API 검증용.
+ * - 빈 문자열 → 허용 (미입력)
+ * - / 로 시작 (상대경로, 예: /uploads/billiard/xxx.webp) → 허용
+ * - http://, https:// → 허용
+ * - 그 외 → false
+ */
+export function isAllowedImageUrl(url: string | null | undefined): boolean {
+  if (url == null || typeof url !== "string") return true;
+  const s = url.trim();
+  if (s === "") return true;
+  if (s.startsWith("/")) return true;
+  if (s.startsWith("http://") || s.startsWith("https://")) return true;
+  return false;
+}
+
 /** next/image 최적화를 사용해도 되는 src인지 (false면 일반 <img> 사용 권장) */
 export function isOptimizableImageSrc(src: string | null | undefined): boolean {
   if (src == null || typeof src !== "string") return false;

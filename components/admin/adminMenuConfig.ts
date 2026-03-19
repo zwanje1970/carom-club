@@ -9,9 +9,8 @@ import {
   mdiAccountMultiple,
   mdiOfficeBuilding,
   mdiClipboardList,
-  mdiFormatSection,
+  mdiPalette,
   mdiPageLayoutBody,
-  mdiViewModule,
   mdiViewCarousel,
   mdiWindowRestore,
   mdiFormatListBulleted,
@@ -21,7 +20,6 @@ import {
   mdiForum,
   mdiHistory,
   mdiClipboardCheck,
-  mdiFormatListGroup,
   mdiStarCircle,
   mdiCalendarCheck,
   mdiSchool,
@@ -31,29 +29,20 @@ import {
   mdiAlertCircle,
   mdiNotebookEdit,
   mdiBell,
+  mdiTable,
 } from "@mdi/js";
 import type { MenuAsideItem } from "./_interfaces";
 
-/** 사이트관리 하위 */
+/** 사이트관리 하위 (운영자 기준: 무엇을 바꾸는지 직관적) */
 const SITE_ITEMS: MenuAsideItem[] = [
-  { href: "/admin/site/main", label: "메인페이지 관리", icon: mdiPageLayoutBody },
-  {
-    label: "섹션/컴포넌트 관리",
-    icon: mdiFormatSection,
-    menu: [
-      { href: "/admin/page-sections", label: "페이지 섹션", icon: mdiFormatListBulleted },
-      { href: "/admin/site/components", label: "컴포넌트", icon: mdiViewModule },
-    ],
-  },
-  { href: "/admin/settings/featured-content", label: "배너/노출 관리", icon: mdiViewCarousel },
-  {
-    label: "팝업/공지바 관리",
-    icon: mdiWindowRestore,
-    menu: [
-      { href: "/admin/popups", label: "팝업", icon: mdiWindowRestore },
-      { href: "/admin/notice-bars", label: "공지바", icon: mdiViewCarousel },
-    ],
-  },
+  { href: "/admin/site", label: "대시보드", icon: mdiViewDashboard },
+  { href: "/admin/site/design", label: "스타일 설정", icon: mdiPalette },
+  { href: "/admin/site/main", label: "메인페이지 구성", icon: mdiPageLayoutBody },
+  { href: "/admin/site/hero", label: "히어로 설정", icon: mdiViewCarousel },
+  { href: "/admin/notice-bars", label: "공지바 관리", icon: mdiBullhorn },
+  { href: "/admin/popups", label: "팝업 관리", icon: mdiWindowRestore },
+  { href: "/admin/site/copy", label: "문구 관리", icon: mdiFormatListBulleted },
+  { href: "/admin/site/footer", label: "푸터 관리", icon: mdiTable },
 ];
 
 /** 회원관리 하위 (신고는 운영관리에서만) */

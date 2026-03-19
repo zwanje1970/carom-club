@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { mdiChartBox } from "@mdi/js";
+import { formatKoreanDateTime } from "@/lib/format-date";
 import SectionMain from "@/components/admin/_components/Section/Main";
 import SectionTitleLineWithButton from "@/components/admin/_components/Section/TitleLineWithButton";
 import CardBox from "@/components/admin/_components/CardBox";
@@ -103,7 +104,7 @@ export default function AdminSettingsSystemStatusPage() {
                 <Link href={`/admin/tournaments/${t.id}`} className="text-site-primary hover:underline line-clamp-1">
                   {t.name}
                 </Link>
-                <span className="text-gray-500 text-xs ml-1">{new Date(t.createdAt).toLocaleString("ko-KR")}</span>
+                <span className="text-gray-500 text-xs ml-1">{formatKoreanDateTime(t.createdAt)}</span>
               </li>
             ))}
           </ul>

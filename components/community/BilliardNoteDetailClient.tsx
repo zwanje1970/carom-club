@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SendToTroubleSheet } from "./SendToTroubleSheet";
+import { formatKoreanDate, formatKoreanDateTime } from "@/lib/format-date";
 
 interface NoteData {
   id: string;
@@ -139,7 +140,7 @@ export function BilliardNoteDetailClient({ note, basePath = "/mypage/notes" }: B
 
       {note.noteDate && (
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          기록 날짜: {new Date(note.noteDate).toLocaleDateString("ko-KR")}
+          기록 날짜: {formatKoreanDate(note.noteDate)}
         </p>
       )}
       {note.memo && (
@@ -150,7 +151,7 @@ export function BilliardNoteDetailClient({ note, basePath = "/mypage/notes" }: B
       )}
 
       <p className="text-sm text-gray-500">
-        {note.authorName} · {new Date(note.createdAt).toLocaleString("ko-KR")}
+        {note.authorName} · {formatKoreanDateTime(note.createdAt)}
         {" · "}
         {visibility === "community" ? "커뮤니티 게시" : "비공개"}
       </p>

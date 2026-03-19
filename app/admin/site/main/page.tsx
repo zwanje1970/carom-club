@@ -133,11 +133,12 @@ export default function AdminSiteMainPage() {
             ))}
           </ul>
         )}
-        <div className="mt-6 pt-4 border-t border-gray-200 dark:border-slate-700">
-          <p className="text-sm text-gray-500 dark:text-slate-400 mb-2">
-            CMS 섹션의 순서 변경·추가·삭제는 컴포넌트 관리에서 할 수 있습니다.
+        <div className="mt-6 pt-4 border-t border-gray-200 dark:border-slate-700 flex flex-wrap items-center gap-2">
+          <p className="text-sm text-gray-500 dark:text-slate-400 w-full mb-1">
+            메인 관련 구조는 여기서 끝나게 정리합니다. 섹션 추가·순서 변경은 아래에서 할 수 있습니다.
           </p>
-          <Button href="/admin/site/components" label="컴포넌트 관리로 이동" color="info" small />
+          <Button href="/admin/page-sections" label="페이지 섹션" color="info" small />
+          <Button href="/admin/site/components" label="컴포넌트" color="info" small />
         </div>
       </CardBox>
     </SectionMain>

@@ -146,7 +146,8 @@ async function main() {
     console.warn("10단계 시드(기능/요금제/등록상품) 건너뜁니다:", (e as Error).message);
   }
 
-  // 커뮤니티 게시판: notice, free, qna, tips, reviews, trouble (난구해결사)
+  // 커뮤니티 게시판. slug는 API/라우트와 정확히 일치해야 함 (lib/community-ensure-boards.ts와 동일 목록)
+  // trouble = 난구해결사 (노트에서 "난구해결로 보내기" 시 사용)
   try {
     const boards = [
       { slug: "notice", name: "공지사항", description: "관리자 공지", type: "notice", sortOrder: 0 },

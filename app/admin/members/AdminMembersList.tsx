@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { MemberRow } from "@/app/api/admin/members/route";
+import { formatKoreanDate } from "@/lib/format-date";
 
 const ROLE_TYPE_OPTIONS = [
   { value: "all", label: "전체" },
@@ -289,10 +290,10 @@ export function AdminMembersList() {
                       <td className="p-3 text-site-text">{getRoleDisplayLabel(row)}</td>
                       <td className="p-3 text-site-text">{getStatusDisplayLabel(row)}</td>
                       <td className="p-3 text-site-text-muted">
-                        {row.createdAt ? new Date(row.createdAt).toLocaleDateString("ko-KR") : "-"}
+                        {row.createdAt ? formatKoreanDate(row.createdAt) : "-"}
                       </td>
                       <td className="p-3 text-site-text-muted">
-                        {row.updatedAt ? new Date(row.updatedAt).toLocaleDateString("ko-KR") : "-"}
+                        {row.updatedAt ? formatKoreanDate(row.updatedAt) : "-"}
                       </td>
                       <td className="p-3">
                         <button
