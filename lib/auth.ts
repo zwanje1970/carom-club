@@ -44,9 +44,18 @@ export async function getSession(): Promise<SessionUser | null> {
   try {
     const { payload } = await jwtVerify(token, SECRET);
     const raw = payload as unknown as Record<string, unknown>;
-    const role = raw.role as SessionUser["role"];
     const loginMode = (raw.loginMode as SessionUser["loginMode"]) ?? "user";
-    const isClientAccount = typeof raw.isClientAccount === "boolean" ? raw.isClientAccount : role === "CLIENT_ADMIN";
+    const authChannelRaw = raw.authChannel;
+    const authChannel: SessionUser["authChannel"] =
+      authChannelRaw === "admin" || authChannelRaw === "client" || authChannelRaw === "user"
+        ? authChannelRaw
+        : "user";
+    let role = raw.role as SessionUser["role"];
+    if (role === "PLATFORM_ADMIN" && authChannel !== "admin") {
+      role = "USER";
+    }
+    const isClientAccount =
+      typeof raw.isClientAccount === "boolean" ? raw.isClientAccount : role === "CLIENT_ADMIN";
     return {
       id: String(raw.id),
       name: String(raw.name),
@@ -55,6 +64,7 @@ export async function getSession(): Promise<SessionUser | null> {
       role,
       loginMode,
       isClientAccount,
+      authChannel,
     } as SessionUser;
   } catch {
     return null;

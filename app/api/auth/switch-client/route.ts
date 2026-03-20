@@ -22,6 +22,7 @@ export async function POST() {
     {
       ...session,
       loginMode: "client",
+      authChannel: "client",
       isClientAccount: true,
     },
     7

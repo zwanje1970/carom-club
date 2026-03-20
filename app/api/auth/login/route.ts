@@ -175,14 +175,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const role = String(user.role) as "USER" | "CLIENT_ADMIN" | "PLATFORM_ADMIN" | "ZONE_MANAGER";
-    if (platformAdminOnly && role !== "PLATFORM_ADMIN") {
+    const dbRole = String(user.role) as "USER" | "CLIENT_ADMIN" | "PLATFORM_ADMIN" | "ZONE_MANAGER";
+    if (platformAdminOnly && dbRole !== "PLATFORM_ADMIN") {
       return NextResponse.json(
         { error: "플랫폼 관리자 전용 로그인입니다. 이 계정으로는 접근할 수 없습니다." },
         { status: 403 }
       );
     }
-    if (isClientLoginRequest && role === "USER") {
+    if (isClientLoginRequest && dbRole === "USER") {
       return NextResponse.json(
         {
           error:
@@ -191,7 +191,14 @@ export async function POST(request: Request) {
         { status: 403 }
       );
     }
-    const isClientAccount = role === "CLIENT_ADMIN";
+    const isClientAccount = dbRole === "CLIENT_ADMIN";
+    const authChannel = platformAdminOnly
+      ? "admin"
+      : isClientAccount && isClientLoginRequest
+        ? "client"
+        : "user";
+    const effectiveRole =
+      !platformAdminOnly && dbRole === "PLATFORM_ADMIN" ? "USER" : dbRole;
     const loginMode = isClientAccount && isClientLoginRequest ? "client" : "user";
 
     const token = await createSession(
@@ -200,8 +207,9 @@ export async function POST(request: Request) {
         name: user.name,
         username: user.username,
         email: user.email,
-        role,
+        role: effectiveRole,
         loginMode,
+        authChannel,
         isClientAccount,
       },
       rememberMe ? 30 : 7
@@ -209,7 +217,7 @@ export async function POST(request: Request) {
     const maxAge = rememberMe
       ? 60 * 60 * 24 * 30 // 30일
       : 60 * 60 * 24 * 7; // 7일
-    const res = NextResponse.json({ ok: true, role, loginMode });
+    const res = NextResponse.json({ ok: true, role: effectiveRole, loginMode, authChannel });
     res.cookies.set("carom_session", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

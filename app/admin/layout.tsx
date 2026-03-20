@@ -36,8 +36,8 @@ export default async function AdminLayoutRoot({
     redirect("/zone");
   }
 
-  // 로그인됐지만 플랫폼 관리자 아님 → 접근 차단 (403 UI + 메인 이동 링크)
-  if (session.role !== "PLATFORM_ADMIN") {
+  // 로그인됐지만 관리자 전용 로그인(authChannel admin)으로 들어온 플랫폼 관리자만 허용
+  if (session.role !== "PLATFORM_ADMIN" || session.authChannel !== "admin") {
     return (
       <div className="min-h-screen flex flex-col bg-site-bg p-4">
         <div className="px-2 pt-4">
