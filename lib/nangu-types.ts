@@ -52,12 +52,12 @@ export function ballPlacementToSourceLayout(
   return { title, description, balls };
 }
 
-/** 진행선 스팟 1개 (정규화 0..1, 타입: 공/쿠션/자유) */
+/** 진행선 스팟 1개 (정규화 0..1). end = 3쿠션 이후 마지막 자유 스팟(화살표) */
 export interface NanguPathPoint {
   id: string;
   x: number;
   y: number;
-  type: "ball" | "cushion" | "free";
+  type: "ball" | "cushion" | "free" | "end";
 }
 
 /** 해법 경로 1개: 스팟을 순서대로 연결. 마지막 선에는 화살표 표시 */
@@ -87,7 +87,9 @@ export interface NanguSolutionData {
   backstrokeLevel?: number;
   /** 팔로우스트로크 0~10 (왼쪽=짧음, 오른쪽=김) */
   followStrokeLevel?: number;
-  /** 볼스피드 1~10 (레일 1~5 참고) */
+  /** 볼 스피드 1.0~5.0 (0.5 단계). 있으면 거리·시간 계산에 우선 */
+  ballSpeed?: number;
+  /** 볼스피드 1~10 (레일 1~5 참고, 레거시·동기화용) */
   speedLevel?: number;
   /** 속도 1~5 (레거시) */
   speed?: number;

@@ -13,6 +13,9 @@ export function NanguReadOnlyLayout({
   showGrid = true,
   className,
   fillContainer = false,
+  hideObjectBall = false,
+  ballNormOverrides,
+  showCueBallSpot = true,
 }: {
   ballPlacement: NanguBallPlacement;
   width?: number;
@@ -21,6 +24,12 @@ export function NanguReadOnlyLayout({
   className?: string;
   /** true면 부모 폭/높이를 채움 (배치도 확대용) */
   fillContainer?: boolean;
+  /** 1목적구(red) 숨김 — 1목 경로 미입력 시 애니메이션 시연 등 */
+  hideObjectBall?: boolean;
+  /** 경로 재생 시 공 위치 덮어쓰기 */
+  ballNormOverrides?: Partial<Record<"red" | "yellow" | "white", { x: number; y: number }>>;
+  /** 재생 중 rAF 충돌 방지용으로 끄기 */
+  showCueBallSpot?: boolean;
 }) {
   return (
     <div
@@ -36,7 +45,9 @@ export function NanguReadOnlyLayout({
         cueBall={ballPlacement.cueBall}
         interactive={false}
         showGrid={showGrid}
-        showCueBallSpot={true}
+        showCueBallSpot={showCueBallSpot}
+        hideRedBall={hideObjectBall}
+        ballNormOverrides={ballNormOverrides}
       />
     </div>
   );

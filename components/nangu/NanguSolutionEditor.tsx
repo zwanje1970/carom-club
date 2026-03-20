@@ -16,11 +16,26 @@ import {
 import type { NanguBallPlacement } from "@/lib/nangu-types";
 import type { NanguSolutionData } from "@/lib/nangu-types";
 import type { NanguPathPoint } from "@/lib/nangu-types";
+import type { CushionSnapFn } from "@/lib/cue-path-cushion-rules";
+import {
+  appendCuePathSpot,
+  insertCuePathSpot,
+  moveCuePathSpotById,
+  stripInvalidEndSpots,
+} from "@/lib/cue-path-cushion-rules";
 import { NanguReadOnlyLayout } from "./NanguReadOnlyLayout";
 import { NanguSolutionPathOverlay } from "./NanguSolutionPathOverlay";
 import { NanguThicknessEditor, getThicknessOverlap } from "./NanguThicknessEditor";
 import { NanguSpinEditor } from "./NanguSpinEditor";
 import { NanguFocusZoomOverlay, type NanguFocusZoomTarget } from "./NanguFocusZoomOverlay";
+import {
+  BALL_SPEED_OPTIONS,
+  ballSpeedToLegacySpeed,
+  ballSpeedToLegacySpeedLevel,
+  ballSpeedToRailCount,
+  getRailDisplayPowerForBallSpeed,
+  type BallSpeed,
+} from "@/lib/ball-speed-constants";
 
 export type NanguActivePanel =
   | "thickness"
@@ -41,8 +56,6 @@ export interface NanguSolutionEditorProps {
   }) => Promise<void>;
 }
 
-const SPEED_RAIL_LABELS = [null, null, "1레일", null, "2레일", null, "3레일", null, "4레일", null, "5레일"] as (string | null)[];
-
 export function NanguSolutionEditor({
   ballPlacement,
   postTitle,
@@ -56,9 +69,10 @@ export function NanguSolutionEditor({
   const [spinY, setSpinY] = useState(0);
   const [backstrokeLevel, setBackstrokeLevel] = useState(5);
   const [followStrokeLevel, setFollowStrokeLevel] = useState(5);
-  const [speedLevel, setSpeedLevel] = useState(5);
+  const [ballSpeed, setBallSpeed] = useState<BallSpeed>(3.0);
   const [pathMode, setPathMode] = useState(false);
   const [pathPoints, setPathPoints] = useState<NanguPathPoint[]>([]);
+  const [pathRuleHint, setPathRuleHint] = useState("");
   const [explanationText, setExplanationText] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -118,52 +132,61 @@ export function NanguSolutionEditor({
     return { x: nx, y: ny, type: onEdge ? "cushion" : "free" };
   }, []);
 
-  const addPathPoint = useCallback(
-    (norm: { x: number; y: number }, type?: "ball" | "cushion" | "free") => {
-      const snapped =
-        type != null
-          ? { x: norm.x, y: norm.y, type }
-          : snapToCushionIfNear(norm.x, norm.y);
-      setPathPoints((prev) => [
-        ...prev,
-        {
-          id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          x: snapped.x,
-          y: snapped.y,
-          type: snapped.type,
-        },
-      ]);
+  const cushionSnapFn: CushionSnapFn = useCallback(
+    (x: number, y: number) => {
+      const r = snapToCushionIfNear(x, y);
+      return { x: r.x, y: r.y, type: r.type === "cushion" ? "cushion" : "free" };
     },
     [snapToCushionIfNear]
   );
 
+  const newCueSpotId = useCallback(
+    () => `p-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    []
+  );
+
+  const runCueAppend = useCallback(
+    (norm: { x: number; y: number }) => {
+      setPathPoints((prev) => {
+        const r = appendCuePathSpot(prev, norm, cushionSnapFn, newCueSpotId);
+        if (!r.ok) {
+          queueMicrotask(() => setPathRuleHint(r.message));
+          return prev;
+        }
+        queueMicrotask(() => setPathRuleHint(""));
+        return r.points;
+      });
+    },
+    [cushionSnapFn, newCueSpotId]
+  );
+
   const clearPathPoints = useCallback(() => setPathPoints([]), []);
 
-  const movePathPoint = useCallback((id: string, norm: { x: number; y: number }) => {
-    const snapped = snapToCushionIfNear(norm.x, norm.y);
-    setPathPoints((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, x: snapped.x, y: snapped.y, type: snapped.type } : p))
-    );
-  }, [snapToCushionIfNear]);
+  const movePathPoint = useCallback(
+    (id: string, norm: { x: number; y: number }) => {
+      setPathPoints((prev) => moveCuePathSpotById(prev, id, norm, cushionSnapFn));
+    },
+    [cushionSnapFn]
+  );
 
   const removePathPoint = useCallback((id: string) => {
-    setPathPoints((prev) => prev.filter((p) => p.id !== id));
+    setPathPoints((prev) => stripInvalidEndSpots(prev.filter((p) => p.id !== id)));
   }, []);
 
-  const insertPathPointBetween = useCallback((segmentIndex: number, norm: { x: number; y: number }) => {
-    const snapped = snapToCushionIfNear(norm.x, norm.y);
-    const newPoint: NanguPathPoint = {
-      id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      x: snapped.x,
-      y: snapped.y,
-      type: snapped.type,
-    };
-    setPathPoints((prev) => {
-      const next = [...prev];
-      next.splice(segmentIndex, 0, newPoint);
-      return next;
-    });
-  }, [snapToCushionIfNear]);
+  const insertPathPointBetween = useCallback(
+    (segmentIndex: number, norm: { x: number; y: number }) => {
+      setPathPoints((prev) => {
+        const r = insertCuePathSpot(prev, segmentIndex, norm, cushionSnapFn, newCueSpotId);
+        if (!r.ok) {
+          queueMicrotask(() => setPathRuleHint(r.message));
+          return prev;
+        }
+        queueMicrotask(() => setPathRuleHint(""));
+        return r.points;
+      });
+    },
+    [cushionSnapFn, newCueSpotId]
+  );
 
   const handleTableClick = useCallback(
     (e: React.MouseEvent) => {
@@ -177,9 +200,9 @@ export function NanguSolutionEditor({
           (p) => Math.hypot(p.x - norm.x, p.y - norm.y) < dupThreshold
         );
       if (isDup) return;
-      addPathPoint(norm);
+      runCueAppend(norm);
     },
-    [pathMode, getNormalizedFromEvent, addPathPoint, pathPoints.length]
+    [pathMode, getNormalizedFromEvent, runCueAppend, pathPoints]
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -203,8 +226,9 @@ export function NanguSolutionEditor({
           paths: pointsForPath.length >= 2 ? [{ points: pointsForPath, pointsWithType: pathPoints }] : [],
           backstrokeLevel,
           followStrokeLevel,
-          speedLevel,
-          speed: Math.ceil(speedLevel / 2),
+          ballSpeed,
+          speedLevel: ballSpeedToLegacySpeedLevel(ballSpeed),
+          speed: ballSpeedToLegacySpeed(ballSpeed),
           explanationText: explanationText.trim() || undefined,
         },
       });
@@ -239,16 +263,19 @@ export function NanguSolutionEditor({
           <NanguSolutionPathOverlay
             pathPoints={pathPoints}
             cuePos={cuePos}
+            objectBallNorm={ballPlacement.redBall}
+            objectPathPoints={[]}
             width={DEFAULT_TABLE_WIDTH}
             height={DEFAULT_TABLE_HEIGHT}
             pathMode={pathMode}
+            objectPathMode={false}
             getNormalizedFromEvent={getNormalizedFromEvent}
             onAddPoint={(norm) => {
               const dupThreshold = 0.03;
-              const isDup =
-                pathPoints.length > 0 &&
-                pathPoints.some((p) => Math.hypot(p.x - norm.x, p.y - norm.y) < dupThreshold);
-              if (!isDup) addPathPoint(norm);
+              const isDup = pathPoints.some(
+                (p) => Math.hypot(p.x - norm.x, p.y - norm.y) < dupThreshold
+              );
+              if (!isDup) runCueAppend(norm);
             }}
             onRemovePoint={removePathPoint}
             onMovePoint={movePathPoint}
@@ -256,15 +283,29 @@ export function NanguSolutionEditor({
           />
         </div>
         {pathMode && (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="text-sm text-site-primary font-medium">진행경로 모드</span>
-            <button
-              type="button"
-              onClick={clearPathPoints}
-              className="text-sm text-red-600 dark:text-red-400 hover:underline"
-            >
-              전체선 삭제
-            </button>
+          <div className="mt-2 flex flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-site-primary font-medium">진행경로 모드</span>
+              <button
+                type="button"
+                onClick={() => {
+                  clearPathPoints();
+                  setPathRuleHint("");
+                }}
+                className="text-sm text-red-600 dark:text-red-400 hover:underline"
+              >
+                전체선 삭제
+              </button>
+            </div>
+            {pathRuleHint ? (
+              <p className="text-xs text-amber-700 dark:text-amber-300" role="status">
+                {pathRuleHint}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500 dark:text-slate-400">
+                쿠션 3회 전: 레일 위만. 이후 탭: 마지막 자유 스팟(화살표). 쿠션·끝 스팟은 드래그로 조정.
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -421,30 +462,30 @@ export function NanguSolutionEditor({
               setFocusZoom({ active: true, target: "speed", originX: e.clientX, originY: e.clientY })
             }
           >
-            <p className="text-xs text-gray-500 mb-2">볼스피드: 1~10 (레일 참고)</p>
-            <div className="flex items-end gap-0.5">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
-                <div key={i} className="flex flex-col items-center">
+            <p className="text-xs text-gray-500 mb-2">볼 스피드: 1.0 ~ 5.0 (0.5 단계)</p>
+            <div className="flex flex-wrap items-end gap-1">
+              {BALL_SPEED_OPTIONS.map((v) => (
+                <div key={v} className="flex flex-col items-center">
                   <button
                     type="button"
-                    onClick={() => setSpeedLevel(i)}
-                    className={`w-7 h-8 flex items-center justify-center text-lg font-bold rounded transition ${
-                      speedLevel === i
+                    onClick={() => setBallSpeed(v)}
+                    className={`min-w-[2.25rem] h-8 px-1 flex items-center justify-center text-sm font-bold rounded transition ${
+                      ballSpeed === v
                         ? "bg-site-primary text-white"
                         : "bg-gray-200 dark:bg-slate-600 text-site-text hover:bg-gray-300 dark:hover:bg-slate-500"
                     }`}
                   >
-                    &gt;
+                    {v}
                   </button>
-                  {SPEED_RAIL_LABELS[i] && (
-                    <span className="text-[10px] text-gray-500 dark:text-slate-400 mt-0.5">
-                      {SPEED_RAIL_LABELS[i]}
-                    </span>
-                  )}
+                  <span className="text-[10px] text-gray-500 dark:text-slate-400 mt-0.5 whitespace-nowrap">
+                    {ballSpeedToRailCount(v)}레일
+                  </span>
                 </div>
               ))}
             </div>
-            <p className="text-xs text-site-text mt-1">{speedLevel} / 10</p>
+            <p className="text-xs text-site-text mt-1">
+              {ballSpeed} · {ballSpeedToRailCount(ballSpeed)}레일 · 표시 {getRailDisplayPowerForBallSpeed(ballSpeed)}
+            </p>
           </div>
         )}
 
@@ -452,11 +493,17 @@ export function NanguSolutionEditor({
           <div>
             <p className="text-sm text-site-primary font-medium">진행경로 제시</p>
             <p className="text-xs text-gray-500 mt-1">
-              위 배치도를 클릭해 스팟을 순서대로 찍으세요. 수구에서 시작해 목적구·쿠션을 거쳐 경로를 만듭니다.
+              쿠션 3회 전에는 레일 위만. 이후 한 번 더 탭하면 마지막 자유 스팟(화살표). 쿠션·끝 스팟은 드래그로 조정합니다.
             </p>
             <button
               type="button"
-              onClick={() => setPathMode(!pathMode)}
+              onClick={() =>
+                setPathMode((v) => {
+                  const next = !v;
+                  if (!next) setPathRuleHint("");
+                  return next;
+                })
+              }
               className={`mt-2 px-3 py-1.5 rounded-lg text-sm ${pathMode ? "bg-site-primary text-white" : "border border-gray-300 dark:border-slate-600"}`}
             >
               {pathMode ? "경로 입력 중" : "경로 입력 시작"}
@@ -552,26 +599,26 @@ export function NanguSolutionEditor({
           )}
           {focusZoom.target === "speed" && (
             <div className="p-4">
-              <p className="text-sm font-medium text-site-text mb-2">볼스피드 (확대)</p>
-              <div className="flex items-end gap-1">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
-                  <div key={i} className="flex flex-col items-center">
+              <p className="text-sm font-medium text-site-text mb-2">볼 스피드 (확대)</p>
+              <div className="flex flex-wrap items-end gap-1 max-w-[320px]">
+                {BALL_SPEED_OPTIONS.map((v) => (
+                  <div key={v} className="flex flex-col items-center">
                     <button
                       type="button"
-                      onClick={() => setSpeedLevel(i)}
-                      className={`w-10 h-12 flex items-center justify-center text-xl font-bold rounded transition ${
-                        speedLevel === i ? "bg-site-primary text-white" : "bg-gray-200 dark:bg-slate-600 text-site-text"
+                      onClick={() => setBallSpeed(v)}
+                      className={`min-w-[2.75rem] h-12 px-1 flex items-center justify-center text-lg font-bold rounded transition ${
+                        ballSpeed === v ? "bg-site-primary text-white" : "bg-gray-200 dark:bg-slate-600 text-site-text"
                       }`}
                     >
-                      &gt;
+                      {v}
                     </button>
-                    {SPEED_RAIL_LABELS[i] && (
-                      <span className="text-xs text-gray-500 mt-0.5">{SPEED_RAIL_LABELS[i]}</span>
-                    )}
+                    <span className="text-[10px] text-gray-500 mt-0.5">{ballSpeedToRailCount(v)}레일</span>
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-site-text mt-1">{speedLevel} / 10</p>
+              <p className="text-xs text-site-text mt-2">
+                {ballSpeed} · {ballSpeedToRailCount(ballSpeed)}레일 · 표시 {getRailDisplayPowerForBallSpeed(ballSpeed)}
+              </p>
             </div>
           )}
         </NanguFocusZoomOverlay>

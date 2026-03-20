@@ -140,6 +140,10 @@ export interface BilliardTableCanvasProps {
   placementMode?: boolean;
   /** 공배치 시 선택된 공 기준 플레이필드 전체 십자선(+) 표시 */
   showCrosshairAtSelected?: boolean;
+  /** true면 1목적구(red) 미표시 — 애니메이션 시연 등 */
+  hideRedBall?: boolean;
+  /** 경로 재생 등: landscape 정규화 좌표로 공 위치 덮어쓰기 (미지정 색은 placement 유지) */
+  ballNormOverrides?: Partial<Record<"red" | "yellow" | "white", { x: number; y: number }>>;
 }
 
 export interface BilliardTableCanvasHandle {
@@ -601,6 +605,8 @@ const BilliardTableCanvas = forwardRef<
     showCueBallSpot = false,
     placementMode = false,
     showCrosshairAtSelected = false,
+    hideRedBall = false,
+    ballNormOverrides,
   },
   ref
 ) {
@@ -625,21 +631,26 @@ const BilliardTableCanvas = forwardRef<
       const rect = getPlayfieldRect(width, height);
       const toView = (lx: number, ly: number) =>
         isPortrait ? landscapeToPortraitNorm(lx, ly) : { x: lx, y: ly };
-      const rView = toView(redBall.x, redBall.y);
-      const yView = toView(yellowBall.x, yellowBall.y);
-      const wView = toView(whiteBall.x, whiteBall.y);
-      drawBall(ctx, rect, rView.x, rView.y, "red", false, sel === "red", isWireframe, placementMode);
+      const redDraw = ballNormOverrides?.red ?? redBall;
+      const yellowDraw = ballNormOverrides?.yellow ?? yellowBall;
+      const whiteDraw = ballNormOverrides?.white ?? whiteBall;
+      const rView = toView(redDraw.x, redDraw.y);
+      const yView = toView(yellowDraw.x, yellowDraw.y);
+      const wView = toView(whiteDraw.x, whiteDraw.y);
+      if (!hideRedBall) {
+        drawBall(ctx, rect, rView.x, rView.y, "red", false, sel === "red", isWireframe, placementMode);
+      }
       drawBall(ctx, rect, yView.x, yView.y, "yellow", cueBall === "yellow", sel === "yellow", isWireframe, placementMode);
       drawBall(ctx, rect, wView.x, wView.y, "white", cueBall === "white", sel === "white", isWireframe, placementMode);
       if (withCrosshair && !placementMode && sel) {
         const pos =
-          sel === "red" ? redBall : sel === "yellow" ? yellowBall : whiteBall;
+          sel === "red" ? redDraw : sel === "yellow" ? yellowDraw : whiteDraw;
         const v = toView(pos.x, pos.y);
         drawCrosshair(ctx, rect, v.x, v.y);
       }
       if (placementMode && sel && showCrosshairAtSelected) {
         const pos =
-          sel === "red" ? redBall : sel === "yellow" ? yellowBall : whiteBall;
+          sel === "red" ? redDraw : sel === "yellow" ? yellowDraw : whiteDraw;
         const v = toView(pos.x, pos.y);
         drawCrosshair(ctx, rect, v.x, v.y);
       }
@@ -647,12 +658,27 @@ const BilliardTableCanvas = forwardRef<
         drawPaths(ctx, rect, paths, cueBall, whiteBall, yellowBall, isPortrait ? landscapeToPortraitNorm : undefined);
       }
       if (cueBallSpotOpacity != null && cueBallSpotOpacity > 0) {
-        const cuePos = cueBall === "white" ? whiteBall : yellowBall;
+        const cuePos = cueBall === "white" ? whiteDraw : yellowDraw;
         const cueView = toView(cuePos.x, cuePos.y);
         drawCueBallSpot(ctx, rect, cueView.x, cueView.y, cueBallSpotOpacity);
       }
     },
-    [width, height, isPortrait, redBall, yellowBall, whiteBall, cueBall, selectedBall, paths, drawStyle, placementMode, showCrosshairAtSelected]
+    [
+      width,
+      height,
+      isPortrait,
+      redBall,
+      yellowBall,
+      whiteBall,
+      cueBall,
+      selectedBall,
+      paths,
+      drawStyle,
+      placementMode,
+      showCrosshairAtSelected,
+      hideRedBall,
+      ballNormOverrides,
+    ]
   );
 
   useEffect(() => {

@@ -24,7 +24,11 @@ export async function middleware(request: NextRequest) {
   requestHeaders.set("x-pathname", pathname);
 
   const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
-  const isAdminLogin = pathname === "/admin/login" || pathname.startsWith("/admin/login/");
+  const isAdminLogin =
+    pathname === "/admin/login" ||
+    pathname.startsWith("/admin/login/") ||
+    pathname === "/admin/api/auth/login" ||
+    pathname.startsWith("/admin/api/auth/login");
   if (isAdminRoute && !isAdminLogin) {
     const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
     if (!token) {

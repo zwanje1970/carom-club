@@ -35,8 +35,9 @@ export function NanguSolutionLayerCanvas({
     ctx.clearRect(0, 0, width, height);
     const rect = getPlayfieldRect(width, height);
 
-    const pathColor = "rgb(57,255,20)"; // 형광연두색 (난구해결사 공진행선)
-    const drawPath = (points: { x: number; y: number }[]) => {
+    const cuePathColor = "rgb(239, 68, 68)";
+    const objectPathColor = "rgb(125, 211, 252)";
+    const drawPath = (points: { x: number; y: number }[], pathColor: string) => {
       if (points.length < 2) return;
       for (let i = 0; i < points.length - 1; i++) {
         const a = normalizedToPixel(points[i].x, points[i].y, rect);
@@ -71,8 +72,8 @@ export function NanguSolutionLayerCanvas({
       }
     };
 
-    data.paths?.forEach((path) => drawPath(path.points));
-    if (data.reflectionPath?.points?.length) drawPath(data.reflectionPath.points);
+    data.paths?.forEach((path) => drawPath(path.points, cuePathColor));
+    if (data.reflectionPath?.points?.length) drawPath(data.reflectionPath.points, objectPathColor);
   }, [width, height, data]);
 
   return (

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
-import { createSession, verifyPassword } from "@/lib/auth";
+import { clearSessionCookie, createSession, verifyPassword } from "@/lib/auth";
 
 const DB_ERROR_CODES = ["P1001", "P1002", "P1017", "P1033", "P2024"]; // 연결 불가/끊김/풀 타임아웃
 const DB_SCHEMA_MISMATCH_CODE = "P2022"; // 컬럼 없음 (schema와 DB 불일치)
@@ -43,8 +43,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: DB_UNAVAILABLE_MSG }, { status: 503 });
   }
   try {
+    // 기존 세션 제거 (이전 관리자/다른 계정 쿠키가 새 로그인에 섞이지 않도록)
+    await clearSessionCookie();
+
     const body = await request.json();
-    const { username, password, platformAdminOnly, rememberMe, isClientLogin } = body as {
+    const { username, password, rememberMe, isClientLogin } = body as {
       username?: string;
       password?: string;
       platformAdminOnly?: boolean;
@@ -53,6 +56,11 @@ export async function POST(request: Request) {
       isClientLogin?: boolean;
     };
     const isClientLoginRequest = isClientLogin === true;
+
+    const { pathname } = new URL(request.url);
+    // authChannel은 이 요청의 URL 경로만 사용 (platformAdminOnly 등 body 값으로 결정하지 않음).
+    // 관리자 로그인은 /admin/... API로 POST 해야 pathname이 /admin 으로 시작함 (예: /admin/api/auth/login).
+    const isAdminLogin = pathname.startsWith("/admin");
 
     if (!username?.trim() || !password) {
       return NextResponse.json(
@@ -176,9 +184,19 @@ export async function POST(request: Request) {
     }
 
     const dbRole = String(user.role) as "USER" | "CLIENT_ADMIN" | "PLATFORM_ADMIN" | "ZONE_MANAGER";
-    if (platformAdminOnly && dbRole !== "PLATFORM_ADMIN") {
+    if (isAdminLogin && dbRole !== "PLATFORM_ADMIN") {
       return NextResponse.json(
         { error: "플랫폼 관리자 전용 로그인입니다. 이 계정으로는 접근할 수 없습니다." },
+        { status: 403 }
+      );
+    }
+    // 일반 로그인에서는 플랫폼 관리자 계정 사용 불가 (관리자 전용 URL에서만 로그인)
+    if (!isAdminLogin && dbRole === "PLATFORM_ADMIN") {
+      return NextResponse.json(
+        {
+          error:
+            "플랫폼 관리자 계정은 일반 로그인을 사용할 수 없습니다. 관리자 로그인(/admin/login)에서 로그인해 주세요.",
+        },
         { status: 403 }
       );
     }
@@ -192,13 +210,13 @@ export async function POST(request: Request) {
       );
     }
     const isClientAccount = dbRole === "CLIENT_ADMIN";
-    const authChannel = platformAdminOnly
+    const authChannel = isAdminLogin
       ? "admin"
       : isClientAccount && isClientLoginRequest
         ? "client"
         : "user";
     const effectiveRole =
-      !platformAdminOnly && dbRole === "PLATFORM_ADMIN" ? "USER" : dbRole;
+      !isAdminLogin && dbRole === "PLATFORM_ADMIN" ? "USER" : dbRole;
     const loginMode = isClientAccount && isClientLoginRequest ? "client" : "user";
 
     const token = await createSession(

@@ -6,7 +6,7 @@
  * - 해법: 두께·당점·백스트로크·팔로우·볼스피드·진행경로·해설
  * - 저장: content(해설) + solutionData(JSON)
  */
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import {
   getPlayfieldRect,
   pixelToNormalized,
@@ -22,6 +22,25 @@ import { NanguThicknessEditor, getThicknessOverlap } from "@/components/nangu/Na
 import { NanguSpinEditor } from "@/components/nangu/NanguSpinEditor";
 import { NanguFocusZoomOverlay, type NanguFocusZoomTarget } from "@/components/nangu/NanguFocusZoomOverlay";
 import { sanitizeImageSrc } from "@/lib/image-src";
+import { TROUBLE_SOLUTION_CONSOLE } from "@/components/trouble/trouble-console-contract";
+import { cueObjectCollisionNormalized } from "@/lib/solution-path-geometry";
+import type { CushionSnapFn } from "@/lib/cue-path-cushion-rules";
+import {
+  appendCuePathSpot,
+  insertCuePathSpot,
+  moveCuePathSpotById,
+  stripInvalidEndSpots,
+} from "@/lib/cue-path-cushion-rules";
+import {
+  BALL_SPEED_OPTIONS,
+  ballSpeedToLegacySpeed,
+  ballSpeedToLegacySpeedLevel,
+  ballSpeedToRailCount,
+  getRailDisplayPowerForBallSpeed,
+  type BallSpeed,
+} from "@/lib/ball-speed-constants";
+import { useTroublePathPlayback } from "@/hooks/useTroublePathPlayback";
+import { CollisionWarningToast } from "@/components/trouble/CollisionWarningToast";
 
 export type TroubleActivePanel =
   | "thickness"
@@ -41,7 +60,6 @@ export interface TroubleSolutionEditorProps {
   onSubmit: (payload: { content: string; solutionData: NanguSolutionData }) => Promise<void>;
 }
 
-const SPEED_RAIL_LABELS = [null, null, "1레일", null, "2레일", null, "3레일", null, "4레일", null, "5레일"] as (string | null)[];
 /** PC에서 배치도 폭 확대 (중심 콘텐츠) */
 const LAYOUT_PLACEMENT_MAX_WIDTH = 960;
 
@@ -59,9 +77,13 @@ export function TroubleSolutionEditor({
   const [spinY, setSpinY] = useState(0);
   const [backstrokeLevel, setBackstrokeLevel] = useState(5);
   const [followStrokeLevel, setFollowStrokeLevel] = useState(5);
-  const [speedLevel, setSpeedLevel] = useState(5);
+  const [ballSpeed, setBallSpeed] = useState<BallSpeed>(3.0);
   const [pathMode, setPathMode] = useState(false);
+  const [objectPathMode, setObjectPathMode] = useState(false);
   const [pathPoints, setPathPoints] = useState<NanguPathPoint[]>([]);
+  const [objectPathPoints, setObjectPathPoints] = useState<NanguPathPoint[]>([]);
+  /** 1목 경로 미입력 상태에서 시연 시 red 공 숨김 */
+  const [pathRuleHint, setPathRuleHint] = useState("");
   const [explanationText, setExplanationText] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -79,6 +101,13 @@ export function TroubleSolutionEditor({
       ? ballPlacement.yellowBall
       : ballPlacement.whiteBall
     : { x: 0.5, y: 0.5 };
+
+  const objectBallNorm = ballPlacement?.redBall ?? null;
+
+  const collisionNorm = useMemo(() => {
+    if (!objectBallNorm || pathPoints.length < 1) return null;
+    return cueObjectCollisionNormalized(cuePos, pathPoints[0], objectBallNorm, rect);
+  }, [objectBallNorm, pathPoints, cuePos, rect]);
 
   const getNormalizedFromEvent = useCallback(
     (clientX: number, clientY: number): { x: number; y: number } | null => {
@@ -111,45 +140,126 @@ export function TroubleSolutionEditor({
     return { x: nx, y: ny, type: onEdge ? "cushion" : "free" };
   }, []);
 
-  const addPathPoint = useCallback(
+  const cushionSnapFn: CushionSnapFn = useCallback(
+    (x: number, y: number) => {
+      const r = snapToCushionIfNear(x, y);
+      return { x: r.x, y: r.y, type: r.type === "cushion" ? "cushion" : "free" };
+    },
+    [snapToCushionIfNear]
+  );
+
+  const newCueSpotId = useCallback(
+    () => `p-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    []
+  );
+
+  const runCueAppend = useCallback(
+    (norm: { x: number; y: number }) => {
+      setPathPoints((prev) => {
+        const r = appendCuePathSpot(prev, norm, cushionSnapFn, newCueSpotId);
+        if (!r.ok) {
+          queueMicrotask(() => setPathRuleHint(r.message));
+          return prev;
+        }
+        queueMicrotask(() => setPathRuleHint(""));
+        return r.points;
+      });
+    },
+    [cushionSnapFn, newCueSpotId]
+  );
+
+  const clearPathPoints = useCallback(() => {
+    setPathPoints([]);
+    setObjectPathPoints([]);
+  }, []);
+
+  const addObjectPathPoint = useCallback(
     (norm: { x: number; y: number }, type?: "ball" | "cushion" | "free") => {
       const snapped =
         type != null ? { x: norm.x, y: norm.y, type } : snapToCushionIfNear(norm.x, norm.y);
-      setPathPoints((prev) => [
+      setObjectPathPoints((prev) => [
         ...prev,
-        { id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, x: snapped.x, y: snapped.y, type: snapped.type },
+        { id: `o-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, x: snapped.x, y: snapped.y, type: snapped.type },
       ]);
     },
     [snapToCushionIfNear]
   );
 
-  const clearPathPoints = useCallback(() => setPathPoints([]), []);
+  const clearObjectPathPoints = useCallback(() => setObjectPathPoints([]), []);
 
-  const movePathPoint = useCallback((id: string, norm: { x: number; y: number }) => {
-    const snapped = snapToCushionIfNear(norm.x, norm.y);
-    setPathPoints((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, x: snapped.x, y: snapped.y, type: snapped.type } : p))
-    );
-  }, [snapToCushionIfNear]);
+  const moveObjectPathPoint = useCallback(
+    (id: string, norm: { x: number; y: number }) => {
+      const snapped = snapToCushionIfNear(norm.x, norm.y);
+      setObjectPathPoints((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, x: snapped.x, y: snapped.y, type: snapped.type } : p))
+      );
+    },
+    [snapToCushionIfNear]
+  );
 
-  const removePathPoint = useCallback((id: string) => {
-    setPathPoints((prev) => prev.filter((p) => p.id !== id));
+  const removeObjectPathPoint = useCallback((id: string) => {
+    setObjectPathPoints((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
-  const insertPathPointBetween = useCallback((segmentIndex: number, norm: { x: number; y: number }) => {
-    const snapped = snapToCushionIfNear(norm.x, norm.y);
-    const newPoint: NanguPathPoint = {
-      id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      x: snapped.x,
-      y: snapped.y,
-      type: snapped.type,
-    };
-    setPathPoints((prev) => {
-      const next = [...prev];
-      next.splice(segmentIndex, 0, newPoint);
-      return next;
-    });
-  }, [snapToCushionIfNear]);
+  const insertObjectPathPointBetween = useCallback(
+    (segmentIndex: number, norm: { x: number; y: number }) => {
+      const snapped = snapToCushionIfNear(norm.x, norm.y);
+      const newPoint: NanguPathPoint = {
+        id: `o-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        x: snapped.x,
+        y: snapped.y,
+        type: snapped.type,
+      };
+      setObjectPathPoints((prev) => {
+        const next = [...prev];
+        next.splice(segmentIndex, 0, newPoint);
+        return next;
+      });
+    },
+    [snapToCushionIfNear]
+  );
+
+  const pathPlayback = useTroublePathPlayback({
+    ballPlacement,
+    pathPoints,
+    objectPathPoints,
+    ballSpeed,
+    isBankShot,
+    thicknessOffsetX,
+  });
+
+  useEffect(() => {
+    if (pathPoints.length === 0) {
+      setObjectPathPoints([]);
+      setObjectPathMode(false);
+    }
+  }, [pathPoints.length]);
+
+  const movePathPoint = useCallback(
+    (id: string, norm: { x: number; y: number }) => {
+      setPathPoints((prev) => moveCuePathSpotById(prev, id, norm, cushionSnapFn));
+    },
+    [cushionSnapFn]
+  );
+
+  const removePathPoint = useCallback((id: string) => {
+    setPathPoints((prev) => stripInvalidEndSpots(prev.filter((p) => p.id !== id)));
+  }, []);
+
+  const insertPathPointBetween = useCallback(
+    (segmentIndex: number, norm: { x: number; y: number }) => {
+      setPathPoints((prev) => {
+        const r = insertCuePathSpot(prev, segmentIndex, norm, cushionSnapFn, newCueSpotId);
+        if (!r.ok) {
+          queueMicrotask(() => setPathRuleHint(r.message));
+          return prev;
+        }
+        queueMicrotask(() => setPathRuleHint(""));
+        return r.points;
+      });
+    },
+    [cushionSnapFn, newCueSpotId]
+  );
 
   const handleTableClick = useCallback(
     (e: React.MouseEvent) => {
@@ -159,9 +269,9 @@ export function TroubleSolutionEditor({
       const dupThreshold = 0.03;
       const isDup = pathPoints.length > 0 && pathPoints.some((p) => Math.hypot(p.x - norm.x, p.y - norm.y) < dupThreshold);
       if (isDup) return;
-      addPathPoint(norm);
+      runCueAppend(norm);
     },
-    [pathMode, getNormalizedFromEvent, addPathPoint, pathPoints.length]
+    [pathMode, getNormalizedFromEvent, runCueAppend, pathPoints]
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -170,6 +280,15 @@ export function TroubleSolutionEditor({
     setSaving(true);
     try {
       const pointsForPath = pathPoints.length >= 1 ? pathPoints.map((p) => ({ x: p.x, y: p.y })) : [];
+      let reflectionPath: NanguSolutionData["reflectionPath"];
+      if (collisionNorm && objectPathPoints.length >= 1) {
+        const objPts = objectPathPoints.map((p) => ({ x: p.x, y: p.y }));
+        reflectionPath = {
+          points: [{ x: collisionNorm.x, y: collisionNorm.y }, ...objPts],
+          pointsWithType: objectPathPoints,
+        };
+      }
+
       const solutionData: NanguSolutionData = {
         isBankShot,
         thicknessOffsetX: isBankShot ? undefined : thicknessOffsetX,
@@ -178,10 +297,12 @@ export function TroubleSolutionEditor({
         spinX,
         spinY,
         paths: pointsForPath.length >= 2 ? [{ points: pointsForPath, pointsWithType: pathPoints }] : [],
+        reflectionPath,
         backstrokeLevel,
         followStrokeLevel,
-        speedLevel,
-        speed: Math.ceil(speedLevel / 2),
+        ballSpeed,
+        speedLevel: ballSpeedToLegacySpeedLevel(ballSpeed),
+        speed: ballSpeedToLegacySpeed(ballSpeed),
         explanationText: explanationText.trim() || undefined,
       };
       await onSubmit({
@@ -198,8 +319,14 @@ export function TroubleSolutionEditor({
   const showImageOnly = !ballPlacement && layoutImageUrl;
   const layoutSrc = layoutImageUrl ? sanitizeImageSrc(layoutImageUrl) : null;
 
+  const C = TROUBLE_SOLUTION_CONSOLE;
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 flex flex-col">
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-6 flex flex-col"
+      data-trouble-console={C.root}
+    >
       {/* 1) 제목/설명 */}
       <div>
         <h2 className="text-lg font-semibold text-site-text">{postTitle}</h2>
@@ -211,6 +338,7 @@ export function TroubleSolutionEditor({
         <p className="text-xs text-gray-500 dark:text-slate-400 mb-2 self-start">원본 공배치 (읽기 전용)</p>
         <div
           ref={containerRef}
+          data-trouble-region={C.region.readonlyLayout}
           className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600 w-full max-w-full cursor-crosshair"
           style={{
             maxWidth: LAYOUT_PLACEMENT_MAX_WIDTH,
@@ -220,7 +348,14 @@ export function TroubleSolutionEditor({
         >
           {ballPlacement ? (
             <div className="absolute inset-0 w-full h-full">
-              <NanguReadOnlyLayout ballPlacement={ballPlacement} showGrid fillContainer />
+              <NanguReadOnlyLayout
+                ballPlacement={ballPlacement}
+                showGrid
+                fillContainer
+                hideObjectBall={false}
+                ballNormOverrides={pathPlayback.ballNormOverrides ?? undefined}
+                showCueBallSpot={!pathPlayback.isPlaybackActive}
+              />
             </div>
           ) : showImageOnly && layoutSrc ? (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-slate-800">
@@ -238,64 +373,148 @@ export function TroubleSolutionEditor({
           <NanguSolutionPathOverlay
             pathPoints={pathPoints}
             cuePos={cuePos}
+            objectBallNorm={objectBallNorm}
+            objectPathPoints={objectPathPoints}
             width={DEFAULT_TABLE_WIDTH}
             height={DEFAULT_TABLE_HEIGHT}
             pathMode={pathMode}
+            objectPathMode={objectPathMode}
             getNormalizedFromEvent={getNormalizedFromEvent}
             onAddPoint={(norm) => {
               const dupThreshold = 0.03;
-              const isDup = pathPoints.length > 0 && pathPoints.some((p) => Math.hypot(p.x - norm.x, p.y - norm.y) < dupThreshold);
-              if (!isDup) addPathPoint(norm);
+              const isDup = pathPoints.some((p) => Math.hypot(p.x - norm.x, p.y - norm.y) < dupThreshold);
+              if (!isDup) runCueAppend(norm);
             }}
             onRemovePoint={removePathPoint}
             onMovePoint={movePathPoint}
             onInsertBetween={insertPathPointBetween}
+            onAddObjectPoint={(norm) => {
+              if (!collisionNorm) return;
+              const dupThreshold = 0.03;
+              const isDup =
+                objectPathPoints.length > 0 &&
+                objectPathPoints.some((p) => Math.hypot(p.x - norm.x, p.y - norm.y) < dupThreshold);
+              if (!isDup) addObjectPathPoint(norm);
+            }}
+            onRemoveObjectPoint={removeObjectPathPoint}
+            onMoveObjectPoint={moveObjectPathPoint}
+            onInsertObjectBetween={insertObjectPathPointBetween}
           />
         </div>
       </div>
 
       {/* 3) 진행경로 관련 버튼 (세로형: 배치도 바로 아래) */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2" data-trouble-region={C.region.pathToolbar}>
         <span className="text-sm font-medium text-site-text">진행경로</span>
         <button
           type="button"
-          onClick={() => setPathMode(!pathMode)}
+          data-trouble-action={C.action.togglePathMode}
+          onClick={() => {
+            setPathMode((v) => {
+              const next = !v;
+              if (next) setObjectPathMode(false);
+              else setPathRuleHint("");
+              return next;
+            });
+          }}
           className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${
             pathMode ? "bg-site-primary text-white border-site-primary" : "border-gray-300 dark:border-slate-600 text-site-text"
           }`}
         >
-          {pathMode ? "경로 입력 중" : "경로 입력 시작"}
+          {pathMode ? "수구 경로 입력 중" : "수구 경로 입력"}
         </button>
         {pathMode && (
-          <button type="button" onClick={clearPathPoints} className="text-sm text-red-600 dark:text-red-400 hover:underline">
-            전체선 삭제
+          <button
+            type="button"
+            data-trouble-action={C.action.clearPath}
+            onClick={clearPathPoints}
+            className="text-sm text-red-600 dark:text-red-400 hover:underline"
+          >
+            수구 경로 전체 삭제
           </button>
         )}
+        {objectBallNorm && pathPoints.length >= 1 && collisionNorm && (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setObjectPathMode((v) => {
+                  const next = !v;
+                  if (next) {
+                    setPathMode(false);
+                    setActivePanel("path");
+                  }
+                  return next;
+                });
+              }}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${
+                objectPathMode
+                  ? "bg-sky-600 text-white border-sky-600"
+                  : "border-gray-300 dark:border-slate-600 text-site-text"
+              }`}
+            >
+              {objectPathMode ? "1목 경로 입력 중" : "1목 경로 입력"}
+            </button>
+            {objectPathMode && (
+              <button
+                type="button"
+                onClick={clearObjectPathPoints}
+                className="text-sm text-red-600 dark:text-red-400 hover:underline"
+              >
+                1목 경로 삭제
+              </button>
+            )}
+          </>
+        )}
+        {ballPlacement && pathPoints.length >= 1 && (
+          <button
+            type="button"
+            data-trouble-action={C.action.playPath}
+            disabled={!pathPlayback.canPlayback || pathPlayback.isPlaybackActive}
+            onClick={() => pathPlayback.startPlayback()}
+            className="px-3 py-1.5 rounded-lg text-sm border border-amber-400 text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {pathPlayback.isPlaybackActive ? "재생 중…" : "경로 재생"}
+          </button>
+        )}
+        {pathRuleHint ? (
+          <p className="text-xs text-amber-700 dark:text-amber-300 w-full" role="status">
+            {pathRuleHint}
+          </p>
+        ) : null}
         <p className="text-xs text-gray-500 dark:text-slate-400 w-full mt-0.5">
-          진행선은 수구에서 시작합니다. 위 배치도에서 스팟을 순서대로 찍으세요.
+          수구 경로(빨강): 쿠션에 세 번 닿기 전에는 레일 위에만 스팟을 찍을 수 있습니다. 세 번 이후 한 번 더 탭하면 마지막 자유 스팟(end,
+          화살표)이 생깁니다. 쿠션·마지막 스팟은 드래그로 조정할 수 있습니다. 1목 경로(하늘)는 별도 규칙입니다.
         </p>
       </div>
 
       {/* 4) 해법 설정 패널 */}
-      <div className="rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 p-4">
+      <div
+        className="rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 p-4"
+        data-trouble-region={C.region.settings}
+      >
         <p className="text-sm font-medium text-site-text mb-3">해법 설정</p>
         <div className="flex flex-wrap gap-2 mb-4">
           {(
             [
-              ["thickness", "두께"],
-              ["spin", "당점"],
-              ["backstroke", "백스트로크"],
-              ["followstroke", "팔로우"],
-              ["speed", "볼스피드"],
-              ["path", "진행경로"],
+              ["thickness", "두께", C.action.panelThickness],
+              ["spin", "당점", C.action.panelSpin],
+              ["backstroke", "백스트로크", C.action.panelBackstroke],
+              ["followstroke", "팔로우", C.action.panelFollowstroke],
+              ["speed", "볼스피드", C.action.panelSpeed],
+              ["path", "진행경로", C.action.panelPath],
             ] as const
-          ).map(([key, label]) => (
+          ).map(([key, label, actionAttr]) => (
             <button
               key={key}
               type="button"
+              data-trouble-action={actionAttr}
               onClick={() => {
                 setActivePanel(key);
-                if (key === "path") setPathMode(true);
+                if (key === "path") {
+                  setPathMode(true);
+                  setObjectPathMode(false);
+                }
               }}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
                 activePanel === key || (key === "path" && pathMode)
@@ -390,26 +609,28 @@ export function TroubleSolutionEditor({
 
         {activePanel === "speed" && (
           <div className="py-2 -mx-2 px-2 rounded-lg touch-manipulation">
-            <p className="text-xs text-gray-500 mb-2">볼스피드: 1~10 (레일 참고)</p>
-            <div className="flex items-end gap-0.5">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
-                <div key={i} className="flex flex-col items-center">
+            <p className="text-xs text-gray-500 mb-2">볼 스피드: 1.0 ~ 5.0 (0.5 단계)</p>
+            <div className="flex flex-wrap items-end gap-1">
+              {BALL_SPEED_OPTIONS.map((v) => (
+                <div key={v} className="flex flex-col items-center">
                   <button
                     type="button"
-                    onClick={() => setSpeedLevel(i)}
-                    className={`w-7 h-8 flex items-center justify-center text-lg font-bold rounded transition ${
-                      speedLevel === i ? "bg-site-primary text-white" : "bg-gray-200 dark:bg-slate-600 text-site-text hover:bg-gray-300 dark:hover:bg-slate-500"
+                    onClick={() => setBallSpeed(v)}
+                    className={`min-w-[2.25rem] h-8 px-1 flex items-center justify-center text-sm font-bold rounded transition ${
+                      ballSpeed === v ? "bg-site-primary text-white" : "bg-gray-200 dark:bg-slate-600 text-site-text hover:bg-gray-300 dark:hover:bg-slate-500"
                     }`}
                   >
-                    &gt;
+                    {v}
                   </button>
-                  {SPEED_RAIL_LABELS[i] && (
-                    <span className="text-[10px] text-gray-500 dark:text-slate-400 mt-0.5">{SPEED_RAIL_LABELS[i]}</span>
-                  )}
+                  <span className="text-[10px] text-gray-500 dark:text-slate-400 mt-0.5 whitespace-nowrap">
+                    {ballSpeedToRailCount(v)}레일
+                  </span>
                 </div>
               ))}
             </div>
-            <p className="text-xs text-site-text mt-1">{speedLevel} / 10</p>
+            <p className="text-xs text-site-text mt-1">
+              {ballSpeed} · {ballSpeedToRailCount(ballSpeed)}레일 · 표시 {getRailDisplayPowerForBallSpeed(ballSpeed)}
+            </p>
           </div>
         )}
 
@@ -424,7 +645,7 @@ export function TroubleSolutionEditor({
       </div>
 
       {/* 5) 해설 입력 */}
-      <div>
+      <div data-trouble-region={C.region.explanation}>
         <label className="block text-sm font-medium text-site-text mb-1">해설</label>
         <textarea
           value={explanationText}
@@ -439,6 +660,7 @@ export function TroubleSolutionEditor({
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <button
         type="submit"
+        data-trouble-action={C.action.submitSolution}
         disabled={saving}
         className="w-full py-3 rounded-lg bg-site-primary text-white font-medium disabled:opacity-50"
       >
@@ -487,22 +709,35 @@ export function TroubleSolutionEditor({
           )}
           {focusZoom.target === "speed" && (
             <div className="p-4">
-              <p className="text-sm font-medium text-site-text mb-2">볼스피드 (확대)</p>
-              <div className="flex items-end gap-1">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
-                  <div key={i} className="flex flex-col items-center">
-                    <button type="button" onClick={() => setSpeedLevel(i)} className={`w-10 h-12 flex items-center justify-center text-xl font-bold rounded transition ${speedLevel === i ? "bg-site-primary text-white" : "bg-gray-200 dark:bg-slate-600 text-site-text"}`}>
-                      &gt;
+              <p className="text-sm font-medium text-site-text mb-2">볼 스피드 (확대)</p>
+              <div className="flex flex-wrap items-end gap-1 max-w-[320px]">
+                {BALL_SPEED_OPTIONS.map((v) => (
+                  <div key={v} className="flex flex-col items-center">
+                    <button
+                      type="button"
+                      onClick={() => setBallSpeed(v)}
+                      className={`min-w-[2.75rem] h-12 px-1 flex items-center justify-center text-lg font-bold rounded transition ${
+                        ballSpeed === v ? "bg-site-primary text-white" : "bg-gray-200 dark:bg-slate-600 text-site-text"
+                      }`}
+                    >
+                      {v}
                     </button>
-                    {SPEED_RAIL_LABELS[i] && <span className="text-xs text-gray-500 mt-0.5">{SPEED_RAIL_LABELS[i]}</span>}
+                    <span className="text-[10px] text-gray-500 mt-0.5">{ballSpeedToRailCount(v)}레일</span>
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-site-text mt-1">{speedLevel} / 10</p>
+              <p className="text-xs text-site-text mt-2">
+                {ballSpeed} · {ballSpeedToRailCount(ballSpeed)}레일 · 표시 {getRailDisplayPowerForBallSpeed(ballSpeed)}
+              </p>
             </div>
           )}
         </NanguFocusZoomOverlay>
       )}
+
+      <CollisionWarningToast
+        message={pathPlayback.collisionMessage}
+        onDismiss={pathPlayback.dismissCollisionMessage}
+      />
     </form>
   );
 }
