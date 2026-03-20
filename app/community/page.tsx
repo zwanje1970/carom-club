@@ -8,8 +8,6 @@ import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 
 const TAKE = 10;
-const LATEST_TAKE = 20;
-
 type PostItem = {
   id: string;
   title: string;
@@ -42,15 +40,6 @@ export default async function CommunityPage() {
     mostLiked: [],
     mostComments: [],
   };
-  let latest: PostItem[] = [];
-  const latestByBoard: Record<string, { id: string; title: string; authorName: string; likeCount: number; commentCount: number; createdAt: string }[]> = {
-    free: [],
-    qna: [],
-    tips: [],
-    reviews: [],
-  };
-  let troubleStats = { open: 0, solved: 0 };
-
   if (isDatabaseConfigured()) {
     try {
       const now = new Date();
@@ -64,50 +53,7 @@ export default async function CommunityPage() {
         select: { id: true, slug: true, name: true, type: true },
       });
 
-      // 게시판별 최신 3개 (최소 필드만)
-      const boardSlugs = ["free", "qna", "tips", "reviews"] as const;
       const hiddenFilter = { isHidden: false };
-      const minimalPostSelect = {
-        id: true,
-        title: true,
-        createdAt: true,
-        likeCount: true,
-        commentCount: true,
-        author: { select: { name: true } },
-      } as const;
-      const latestFetches = boardSlugs.map((slug) =>
-        prisma.communityPost.findMany({
-          where: { ...hiddenFilter, board: { slug } },
-          orderBy: { createdAt: "desc" },
-          take: 3,
-          select: minimalPostSelect,
-        })
-      );
-      const latestResults = await Promise.all(latestFetches);
-      boardSlugs.forEach((slug, i) => {
-        latestByBoard[slug] = latestResults[i].map((p) => ({
-          id: p.id,
-          title: p.title,
-          authorName: p.author.name,
-          likeCount: p.likeCount ?? 0,
-          commentCount: p.commentCount ?? 0,
-          createdAt: p.createdAt.toISOString(),
-        }));
-      });
-
-      // 난구해결사 진행중/해결 수 (TroubleShotPost)
-      try {
-        const troubleBoard = await prisma.communityBoard.findFirst({ where: { slug: "trouble" }, select: { id: true } });
-        if (troubleBoard) {
-          const [openCount, solvedCount] = await Promise.all([
-            prisma.troubleShotPost.count({ where: { post: { boardId: troubleBoard.id }, isSolved: false } }),
-            prisma.troubleShotPost.count({ where: { post: { boardId: troubleBoard.id }, isSolved: true } }),
-          ]);
-          troubleStats = { open: openCount, solved: solvedCount };
-        }
-      } catch {
-        troubleStats = { open: 0, solved: 0 };
-      }
 
       const format = (p: { id: string; title: string; viewCount: number; createdAt: Date; board: { slug: string; name: string }; author: { name: string }; _count: { likes: number; comments: number } }) => ({
         id: p.id,
@@ -121,7 +67,7 @@ export default async function CommunityPage() {
         boardName: p.board.name,
       });
 
-      const [todayPosts, weekPosts, mostLikedPosts, mostCommentPosts, latestPosts] = await Promise.all([
+      const [todayPosts, weekPosts, mostLikedPosts, mostCommentPosts] = await Promise.all([
         prisma.communityPost.findMany({
           where: { ...hiddenFilter, createdAt: { gte: todayStart } },
           orderBy: { viewCount: "desc" },
@@ -146,12 +92,6 @@ export default async function CommunityPage() {
           take: TAKE,
           select: { id: true, title: true, viewCount: true, createdAt: true, board: { select: { slug: true, name: true } }, author: { select: { name: true } }, _count: { select: { likes: true, comments: true } } },
         }),
-        prisma.communityPost.findMany({
-          where: hiddenFilter,
-          orderBy: { createdAt: "desc" },
-          take: LATEST_TAKE,
-          select: { id: true, title: true, viewCount: true, createdAt: true, board: { select: { slug: true, name: true } }, author: { select: { name: true } }, _count: { select: { likes: true, comments: true } } },
-        }),
       ]);
 
       popular = {
@@ -160,7 +100,6 @@ export default async function CommunityPage() {
         mostLiked: mostLikedPosts.map(format),
         mostComments: mostCommentPosts.map(format),
       };
-      latest = latestPosts.map(format);
     } catch {
       // Prisma client 미재생성(communityBoard 없음) 또는 DB 오류 시 빈 목록 유지
     }
@@ -175,14 +114,7 @@ export default async function CommunityPage() {
         <h1 className="text-2xl font-bold text-site-text">{communityTitle}</h1>
         <p className="mt-1 text-gray-600 dark:text-gray-400">{getCopyValue(c, "site.community.subtitle")}</p>
 
-        <CommunityMainClient
-          boards={boards}
-          popular={popular}
-          latest={latest}
-          latestByBoard={latestByBoard}
-          troubleStats={troubleStats}
-          canManageReports={canManageReports_}
-        />
+        <CommunityMainClient boards={boards} popular={popular} canManageReports={canManageReports_} />
       </div>
     </main>
   );

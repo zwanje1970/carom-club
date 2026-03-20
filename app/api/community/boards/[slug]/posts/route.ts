@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
@@ -18,6 +19,11 @@ export async function GET(
   }
   const { slug } = await params;
   const { searchParams } = new URL(request.url);
+  const popularRaw = searchParams.get("popular");
+  const popular =
+    popularRaw === "today" || popularRaw === "weekly" || popularRaw === "liked" || popularRaw === "comments"
+      ? popularRaw
+      : null;
   const sort = searchParams.get("sort") === "likes" ? "likes" : "latest";
   const statusFilter = searchParams.get("status") as string | null; // trouble 전용: all | open | solved
   const q = searchParams.get("q")?.trim() || "";
@@ -41,17 +47,31 @@ export async function GET(
     return NextResponse.json({ error: "게시판을 찾을 수 없습니다." }, { status: 404 });
   }
 
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekStart = new Date(todayStart);
+  weekStart.setDate(weekStart.getDate() - 7);
+
+  const popularDateWhere =
+    popular === "today"
+      ? { createdAt: { gte: todayStart } }
+      : popular === "weekly"
+        ? { createdAt: { gte: weekStart } }
+        : {};
+
   const where = {
     boardId: board.id,
     ...(showHidden ? {} : { isHidden: false }),
     ...(q ? { OR: [{ title: { contains: q, mode: "insensitive" as const } }, { content: { contains: q, mode: "insensitive" as const } }] } : {}),
     ...(slug === "trouble" && statusFilter === "open" ? { isSolved: false } : {}),
     ...(slug === "trouble" && statusFilter === "solved" ? { isSolved: true } : {}),
+    ...popularDateWhere,
   };
 
   const listSelect = {
     id: true,
     title: true,
+    thumbnailUrl: true,
     viewCount: true,
     isPinned: true,
     isSolved: true,
@@ -59,6 +79,17 @@ export async function GET(
     author: { select: { name: true } },
     _count: { select: { likes: true, comments: true } },
   } as const;
+
+  const listOrderBy: Prisma.CommunityPostOrderByWithRelationInput | Prisma.CommunityPostOrderByWithRelationInput[] =
+    popular === "liked"
+      ? [{ likes: { _count: "desc" } }, { createdAt: "desc" }]
+      : popular === "comments"
+        ? [{ comments: { _count: "desc" } }, { createdAt: "desc" }]
+        : popular === "today" || popular === "weekly"
+          ? [{ viewCount: "desc" }, { createdAt: "desc" }]
+          : sort === "likes"
+            ? [{ likes: { _count: "desc" } }, { createdAt: "desc" }]
+            : { createdAt: "desc" };
 
   const [pinned, list] = await Promise.all([
     slug === "notice"
@@ -70,16 +101,27 @@ export async function GET(
       : [],
     prisma.communityPost.findMany({
       where: slug === "notice" ? { ...where, isPinned: false } : where,
-      orderBy: sort === "likes" ? [{ likes: { _count: "desc" } }, { createdAt: "desc" }] : { createdAt: "desc" },
+      orderBy: listOrderBy,
       skip: page * take,
       take,
       select: listSelect,
     }),
   ]);
 
-  const format = (p: { id: string; title: string; viewCount: number; isPinned: boolean; isSolved: boolean | null; createdAt: Date; author: { name: string }; _count: { likes: number; comments: number } }) => ({
+  const format = (p: {
+    id: string;
+    title: string;
+    thumbnailUrl: string | null;
+    viewCount: number;
+    isPinned: boolean;
+    isSolved: boolean | null;
+    createdAt: Date;
+    author: { name: string };
+    _count: { likes: number; comments: number };
+  }) => ({
     id: p.id,
     title: p.title,
+    thumbnailUrl: p.thumbnailUrl ?? null,
     authorName: p.author.name,
     likeCount: p._count.likes,
     commentCount: p._count.comments,

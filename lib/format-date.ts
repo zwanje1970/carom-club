@@ -72,3 +72,16 @@ export function formatKoreanDateWithWeekday(v: string | number | Date): string {
     timeZone: "Asia/Seoul",
   }).format(new Date(v));
 }
+
+/** 게시판 리스트용 짧은 날짜 (예: 03.19) — timeZone 고정 */
+export function formatCommunityListDate(v: string | number | Date): string {
+  const d = new Date(v);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Seoul",
+  }).formatToParts(d);
+  const m = parts.find((p) => p.type === "month")?.value ?? "";
+  const day = parts.find((p) => p.type === "day")?.value ?? "";
+  return `${m}.${day}`;
+}
