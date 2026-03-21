@@ -36,37 +36,49 @@ export async function POST(
   const since = new Date();
   since.setHours(since.getHours() - VIEW_DEDUP_HOURS);
 
-  const existing = await prisma.communityPostView.findUnique({
-    where: { postId_viewerKey: { postId, viewerKey: key } },
-    select: { viewedAt: true },
-  });
+  try {
+    const existing = await prisma.communityPostView.findUnique({
+      where: { postId_viewerKey: { postId, viewerKey: key } },
+      select: { viewedAt: true },
+    });
 
-  if (existing && existing.viewedAt >= since) {
-    return NextResponse.json({ counted: false, viewCount: undefined });
-  }
+    if (existing && existing.viewedAt >= since) {
+      return NextResponse.json({ counted: false, viewCount: undefined });
+    }
 
-  await prisma.$transaction([
-    existing
-      ? prisma.communityPostView.update({
-          where: { postId_viewerKey: { postId, viewerKey: key } },
-          data: { viewedAt: new Date(), userId: session?.id ?? null },
-        })
-      : prisma.communityPostView.create({
-          data: {
-            postId,
-            viewerKey: key,
-            userId: session?.id ?? null,
-          },
-        }),
-    prisma.communityPost.update({
+    await prisma.$transaction([
+      existing
+        ? prisma.communityPostView.update({
+            where: { postId_viewerKey: { postId, viewerKey: key } },
+            data: { viewedAt: new Date(), userId: session?.id ?? null },
+          })
+        : prisma.communityPostView.create({
+            data: {
+              postId,
+              viewerKey: key,
+              userId: session?.id ?? null,
+            },
+          }),
+      prisma.communityPost.update({
+        where: { id: postId },
+        data: { viewCount: { increment: 1 } },
+      }),
+    ]);
+
+    const updated = await prisma.communityPost.findUnique({
       where: { id: postId },
-      data: { viewCount: { increment: 1 } },
-    }),
-  ]);
-
-  const updated = await prisma.communityPost.findUnique({
-    where: { id: postId },
-    select: { viewCount: true },
-  });
-  return NextResponse.json({ counted: true, viewCount: updated?.viewCount ?? 0 });
+      select: { viewCount: true },
+    });
+    return NextResponse.json({ counted: true, viewCount: updated?.viewCount ?? 0 });
+  } catch (e) {
+    const err = e as Error & { code?: string };
+    console.error("[posts/view] 조회수 반영 실패:", err.message, err.code);
+    return NextResponse.json(
+      {
+        error: "조회수를 반영할 수 없습니다. DB 마이그레이션을 확인하세요.",
+        details: process.env.NODE_ENV === "development" ? err.message : undefined,
+      },
+      { status: 500 }
+    );
+  }
 }

@@ -1,13 +1,26 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { toHalfwidth } from "@/lib/input-normalize";
+import { safeInternalNextPath } from "@/lib/safe-internal-path";
 
 const REMEMBER_ID_KEY = "carom_remember_username";
 const REMEMBER_ID_CHECKED_KEY = "carom_remember_username_checked";
 
-export default function LoginPage() {
+const NOTES_NEXT_PREFIX = "/mypage/notes";
+
+function readNextFromBrowser(): string | null {
+  if (typeof window === "undefined") return null;
+  return safeInternalNextPath(new URLSearchParams(window.location.search).get("next"));
+}
+
+function LoginForm() {
+  const searchParams = useSearchParams();
+  const rawNext = searchParams.get("next");
+  const requestedNext = safeInternalNextPath(rawNext);
+
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState("");
@@ -29,6 +42,11 @@ export default function LoginPage() {
       // ignore
     }
   }, []);
+
+  const signupHref =
+    requestedNext != null
+      ? `/signup?next=${encodeURIComponent(requestedNext)}`
+      : "/signup";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -63,15 +81,32 @@ export default function LoginPage() {
       }
       const role = data.role as string | undefined;
       const loginMode = data.loginMode as string | undefined;
-      const next =
-        role === "PLATFORM_ADMIN"
-          ? "/admin"
-          : loginMode === "client"
-            ? "/client?welcome=1"
-            : role === "ZONE_MANAGER"
-              ? "/zone"
-              : "/";
-      window.location.href = next;
+      /** 제출 시점 URL 기준(클라이언트 네비게이션·쿼리 유실 방지) */
+      const nextDest = readNextFromBrowser() ?? requestedNext;
+      const returnToNotes = nextDest != null && nextDest.startsWith(NOTES_NEXT_PREFIX);
+
+      if (role === "PLATFORM_ADMIN") {
+        window.location.href = "/admin";
+        return;
+      }
+      // 당구노트 등에서 온 경우: 클라이언트/권역 기본 이동보다 next(노트 경로) 우선
+      if (returnToNotes && nextDest) {
+        window.location.href = nextDest;
+        return;
+      }
+      if (loginMode === "client") {
+        window.location.href = "/client?welcome=1";
+        return;
+      }
+      if (role === "ZONE_MANAGER") {
+        window.location.href = "/zone";
+        return;
+      }
+      if (nextDest) {
+        window.location.href = nextDest;
+        return;
+      }
+      window.location.href = "/";
     } finally {
       setLoading(false);
     }
@@ -151,7 +186,7 @@ export default function LoginPage() {
           </div>
         </form>
         <p className="mt-4 text-center text-sm text-gray-600">
-          <Link href="/signup" className="text-site-primary hover:underline">
+          <Link href={signupHref} className="text-site-primary hover:underline">
             회원가입
           </Link>
           {" · "}
@@ -165,5 +200,21 @@ export default function LoginPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen flex items-center justify-center p-4 bg-site-bg">
+          <div className="w-full max-w-md bg-site-card rounded-lg shadow border border-site-border p-8 text-center text-sm text-gray-600">
+            불러오는 중…
+          </div>
+        </main>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

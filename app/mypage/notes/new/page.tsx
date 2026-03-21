@@ -1,11 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
 import Link from "next/link";
 import { BilliardNoteFormScreen } from "@/components/community/BilliardNoteFormScreen";
 import { MobileBallPlacementFullscreen } from "@/components/community/MobileBallPlacementFullscreen";
 import type { PlacementPayload } from "@/components/community/BilliardNoteFormScreen";
 import { normalizeCueBallType } from "@/lib/billiard-table-constants";
+import {
+  BALL_LAYOUT_IMAGE_KEY,
+  BALL_LAYOUT_PLACEMENT_KEY,
+  BILLIARD_NOTE_DRAFT_KEY,
+  BILLIARD_NOTE_NEW_PAGE_GUARD,
+  clearBilliardNoteNewPageGuardOnly,
+} from "@/lib/billiard-note-composer-session";
 
 function dataURLToBlob(dataURL: string): Blob {
   const arr = dataURL.split(",");
@@ -15,21 +22,6 @@ function dataURLToBlob(dataURL: string): Blob {
   const u8 = new Uint8Array(n);
   while (n--) u8[n] = bstr.charCodeAt(n);
   return new Blob([u8], { type: mime });
-}
-
-const MOBILE_MAX_WIDTH = 768;
-
-const BALL_LAYOUT_IMAGE_KEY = "ballLayoutImage";
-const BALL_LAYOUT_PLACEMENT_KEY = "billiardNotePlacement";
-const DRAFT_STORAGE_KEY = "billiardNoteDraft";
-
-function getInitialPreviewFromStorage(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return sessionStorage.getItem(BALL_LAYOUT_IMAGE_KEY);
-  } catch {
-    return null;
-  }
 }
 
 function buildPlacementPayloadFromStorage(): PlacementPayload | null {
@@ -52,11 +44,15 @@ function buildPlacementPayloadFromStorage(): PlacementPayload | null {
     ) {
       return null;
     }
+    const cueOk =
+      placement.cueBall === "white" || placement.cueBall === "yellow"
+        ? placement.cueBall
+        : undefined;
     return {
       redBall: placement.redBall,
       yellowBall: placement.yellowBall,
       whiteBall: placement.whiteBall,
-      cueBall: placement.cueBall ?? "white",
+      ...(cueOk != null ? { cueBall: cueOk } : {}),
       getImageDataURL: () => imageData,
     };
   } catch {
@@ -65,36 +61,39 @@ function buildPlacementPayloadFromStorage(): PlacementPayload | null {
 }
 
 export default function MypageNewNotePage() {
-  const [isMobile, setIsMobile] = useState(false);
   const [showPlacement, setShowPlacement] = useState(false);
   const [placementPayload, setPlacementPayload] = useState<PlacementPayload | null>(null);
   const [previewDataURL, setPreviewDataURL] = useState<string | null>(null);
-  const [imageError, setImageError] = useState<string | null>(null);
-  const [previewHydrated, setPreviewHydrated] = useState(false);
-  const [layoutInvalid, setLayoutInvalid] = useState(false);
-  const [ballLayoutError, setBallLayoutError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth <= MOBILE_MAX_WIDTH);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
+  /**
+   * 목록 등에서 들어온 "새 작성"만 초기화. 가드로 Strict Mode 재마운트 시 이중 삭제 방지.
+   * 가드는 노트 목록(/mypage/notes)에서 해제됨.
+   */
+  useLayoutEffect(() => {
+    try {
+      if (sessionStorage.getItem(BILLIARD_NOTE_NEW_PAGE_GUARD) === "1") {
+        return;
+      }
+      sessionStorage.removeItem(BALL_LAYOUT_IMAGE_KEY);
+      sessionStorage.removeItem(BALL_LAYOUT_PLACEMENT_KEY);
+      sessionStorage.removeItem(BILLIARD_NOTE_DRAFT_KEY);
+      sessionStorage.setItem(BILLIARD_NOTE_NEW_PAGE_GUARD, "1");
+    } catch {
+      // ignore
+    }
+    setPreviewDataURL(null);
+    setPlacementPayload(null);
   }, []);
 
   useEffect(() => {
-    if (previewHydrated) return;
-    const saved = getInitialPreviewFromStorage();
-    if (saved) setPreviewDataURL(saved);
-    const restored = buildPlacementPayloadFromStorage();
-    if (restored) setPlacementPayload((prev) => prev ?? restored);
-    setPreviewHydrated(true);
-  }, [previewHydrated]);
+    return () => {
+      clearBilliardNoteNewPageGuardOnly();
+    };
+  }, []);
 
+  /** 공배치 전체화면을 닫은 뒤, 방금 저장된 세션과 상태 동기화 */
   useEffect(() => {
     if (!showPlacement) {
-      setImageError(null);
-      setLayoutInvalid(false);
-      setBallLayoutError(null);
       const saved = typeof window !== "undefined" ? sessionStorage.getItem(BALL_LAYOUT_IMAGE_KEY) : null;
       if (saved) setPreviewDataURL((prev) => prev || saved);
       const restored = buildPlacementPayloadFromStorage();
@@ -129,6 +128,9 @@ export default function MypageNewNotePage() {
   }): Promise<string | null> => {
     if (!placementPayload) return null;
     const { redBall, yellowBall, whiteBall, cueBall } = placementPayload;
+    if (cueBall !== "white" && cueBall !== "yellow") {
+      throw new Error("수구(흰공/노란공)를 선택한 뒤 당구공 배치를 완료해 주세요.");
+    }
     if (
       !redBall || !yellowBall || !whiteBall ||
       typeof redBall.x !== "number" || typeof redBall.y !== "number" ||
@@ -187,9 +189,10 @@ export default function MypageNewNotePage() {
     const id = resJson.id;
     if (!id) throw new Error("저장 응답이 올바르지 않습니다.");
     try {
-      sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+      sessionStorage.removeItem(BILLIARD_NOTE_DRAFT_KEY);
       sessionStorage.removeItem(BALL_LAYOUT_IMAGE_KEY);
       sessionStorage.removeItem(BALL_LAYOUT_PLACEMENT_KEY);
+      sessionStorage.removeItem(BILLIARD_NOTE_NEW_PAGE_GUARD);
     } catch {
       // ignore
     }
@@ -231,7 +234,10 @@ export default function MypageNewNotePage() {
           onSubmit={handleSubmit}
           onOpenPlacement={() => setShowPlacement(true)}
           showPlacement={showPlacement}
-          hasPlacement={!!placementPayload}
+          hasPlacement={
+            !!placementPayload &&
+            (placementPayload.cueBall === "white" || placementPayload.cueBall === "yellow")
+          }
           redirectBasePath="/mypage/notes"
         />
       </div>

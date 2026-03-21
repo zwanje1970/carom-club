@@ -68,13 +68,13 @@ export default function CommunityNotificationsPage() {
         ) : list.length === 0 ? (
           <p className="text-gray-500">알림이 없습니다.</p>
         ) : (
-          <ul className="divide-y divide-gray-200 dark:divide-slate-600 rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 overflow-hidden">
+          <ul className="divide-y divide-gray-200 dark:divide-slate-700" aria-label="알림 목록">
             {list.map((n) => (
               <li key={n.id}>
                 <button
                   type="button"
                   onClick={() => markReadAndGo(n)}
-                  className={`w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-800 transition ${!n.readAt ? "bg-site-primary/5 dark:bg-site-primary/10" : ""}`}
+                  className={`w-full text-left px-1 py-3.5 hover:bg-gray-50/80 dark:hover:bg-slate-800/40 transition ${!n.readAt ? "bg-site-primary/5 dark:bg-site-primary/10" : ""}`}
                 >
                   <p className="text-sm">
                     {n.type === "reply_to_comment" ? (

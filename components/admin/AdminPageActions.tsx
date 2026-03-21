@@ -53,11 +53,11 @@ export function AdminPageActions({ topOffset = 64, copy, leftSlot }: AdminPageAc
 
   return (
     <div
-      className={`fixed left-0 right-0 z-40 ${ACTION_BAR_HEIGHT} flex items-center border-b border-gray-200 bg-gray-50 shadow-sm dark:border-slate-600 dark:bg-slate-800 lg:left-[280px]`}
+      className={`fixed left-0 right-0 z-[60] ${ACTION_BAR_HEIGHT} flex items-center border-b border-gray-200 bg-gray-50 shadow-sm dark:border-slate-600 dark:bg-slate-800 lg:left-[280px]`}
       style={{ top: `${topOffset}px` }}
     >
-      <div className={`flex w-full flex-wrap items-center gap-2 px-4 py-1.5 sm:gap-3 sm:px-6 ${containerMaxW} mx-auto`}>
-        {leftSlot}
+      <div className={`flex w-full min-w-0 flex-wrap items-center gap-2 px-4 py-1.5 sm:gap-3 sm:px-6 ${containerMaxW} mx-auto`}>
+        {leftSlot != null ? <div className="flex shrink-0 items-center">{leftSlot}</div> : null}
         <button
           type="button"
           onClick={() => handleAdminBack(router)}

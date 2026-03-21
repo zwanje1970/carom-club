@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
+import { parseTroubleBallPlacementJson } from "@/lib/trouble-ball-placement";
 
 /**
  * 난구해결(trouble) 게시글 조회 - 해법 작성 페이지용.
@@ -27,6 +28,7 @@ export async function GET(
         select: {
           id: true,
           layoutImageUrl: true,
+          ballPlacementJson: true,
           difficulty: true,
         },
       },
@@ -37,11 +39,14 @@ export async function GET(
     return NextResponse.json({ error: "해당 난구해결 글을 찾을 수 없습니다." }, { status: 404 });
   }
 
+  const ballPlacement = parseTroubleBallPlacementJson(post.troubleShot.ballPlacementJson);
+
   return NextResponse.json({
     id: post.id,
     title: post.title,
     content: post.content ?? "",
     layoutImageUrl: post.troubleShot.layoutImageUrl ?? null,
+    ballPlacement,
     difficulty: post.troubleShot.difficulty ?? null,
   });
 }

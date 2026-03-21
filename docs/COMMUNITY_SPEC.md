@@ -25,6 +25,9 @@
 | `/mypage/notes` | 당구노트 목록 (마이페이지) |
 | `/mypage/notes/new` | 노트 작성 |
 | `/mypage/notes/[id]` | 노트 상세/수정 |
+| `/mypage/notes/[id]/edit` | 노트 편집 |
+
+**당구노트 인증**: `/mypage/notes` 하위는 **로그인 필수**. 비회원은 서버 레이아웃에서 본문을 렌더하지 않고 로그인 유도 모달만 표시. `/api/community/billiard-notes`·`/[id]`는 비로그인 시 조회/생성/수정(및 커뮤니티 피드 목록) **401**.
 
 ---
 

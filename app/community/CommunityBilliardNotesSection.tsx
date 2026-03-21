@@ -16,10 +16,18 @@ interface FeedItem {
 export function CommunityBilliardNotesSection() {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [needLogin, setNeedLogin] = useState(false);
 
   useEffect(() => {
-    fetch("/api/community/billiard-notes?visibility=community")
-      .then((res) => (res.ok ? res.json() : []))
+    fetch("/api/community/billiard-notes?visibility=community", { credentials: "include" })
+      .then((res) => {
+        if (res.status === 401) {
+          setNeedLogin(true);
+          return [];
+        }
+        setNeedLogin(false);
+        return res.ok ? res.json() : [];
+      })
       .then(setItems)
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
@@ -38,34 +46,36 @@ export function CommunityBilliardNotesSection() {
       </div>
       {loading ? (
         <p className="text-gray-500 text-sm">불러오는 중…</p>
+      ) : needLogin ? (
+        <p className="text-gray-600 dark:text-slate-400 text-sm">
+          커뮤니티에 게시된 노트는{" "}
+          <Link href="/login?next=%2Fcommunity" className="text-site-primary font-medium hover:underline">
+            로그인
+          </Link>
+          후 볼 수 있습니다.
+        </p>
       ) : items.length === 0 ? (
         <p className="text-gray-500 text-sm">커뮤니티에 게시된 노트가 없습니다.</p>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="divide-y divide-gray-200 dark:divide-slate-700" aria-label="노트 목록">
           {items.slice(0, 6).map((n) => (
             <li key={n.id}>
               <Link
                 href={`/community/notes/${n.id}`}
-                className="block rounded-lg border border-gray-200 dark:border-slate-600 overflow-hidden hover:bg-gray-50 dark:hover:bg-slate-800/50"
+                className="flex items-start gap-3 py-3.5 px-1 hover:bg-gray-50/80 dark:hover:bg-slate-800/40"
               >
-                <div className="aspect-[2/1] bg-gray-100 dark:bg-slate-700">
+                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-gray-100 dark:bg-slate-700">
                   {n.imageUrl ? (
-                    <img
-                      src={n.imageUrl}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={n.imageUrl} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                      이미지 없음
-                    </div>
+                    <div className="flex h-full w-full items-center justify-center text-[10px] text-gray-400">이미지 없음</div>
                   )}
                 </div>
-                <div className="p-2">
-                  <p className="text-xs text-gray-500 line-clamp-1">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-site-text line-clamp-2 leading-snug">
                     {n.memo || "(메모 없음)"}
                   </p>
-                  <p className="text-xs text-gray-400">
+                  <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
                     {n.authorName} · {formatKoreanDate(n.createdAt)}
                   </p>
                 </div>

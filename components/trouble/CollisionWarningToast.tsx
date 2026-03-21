@@ -6,24 +6,37 @@ export function CollisionWarningToast({
   message,
   onDismiss,
   regionAttr,
+  variant = "trouble",
 }: {
   message: string | null;
   onDismiss: () => void;
   /** data-trouble-region (기본: 콘솔 계약) */
   regionAttr?: string;
+  /** trouble: data-trouble-* / plain: 충돌 안내만 */
+  variant?: "trouble" | "plain";
 }) {
   if (!message) return null;
   const region = regionAttr ?? TROUBLE_SOLUTION_CONSOLE.region.collisionWarning;
+  const troubleProps =
+    variant === "trouble"
+      ? {
+          "data-trouble-region": region,
+        }
+      : {
+          "data-nangu-region": "nangu-collision-warning",
+        };
   return (
     <div
       role="alert"
-      data-trouble-region={region}
+      {...troubleProps}
       className="fixed bottom-6 left-1/2 z-[120] -translate-x-1/2 px-4 py-3 rounded-lg shadow-lg bg-amber-900 text-amber-50 border border-amber-700 max-w-[min(90vw,420px)] text-center text-sm font-medium flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-center dark:bg-amber-950 dark:text-amber-100"
     >
       <span>{message}</span>
       <button
         type="button"
-        data-trouble-action={TROUBLE_SOLUTION_CONSOLE.action.dismissCollision}
+        {...(variant === "trouble"
+          ? { "data-trouble-action": TROUBLE_SOLUTION_CONSOLE.action.dismissCollision }
+          : { "data-nangu-action": "nangu-dismiss-collision" })}
         onClick={onDismiss}
         className="text-xs underline opacity-90 hover:opacity-100"
       >

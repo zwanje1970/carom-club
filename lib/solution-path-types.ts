@@ -26,7 +26,7 @@ export interface SolutionPath {
   segments: SolutionPathSegment[];
 }
 
-/** 수구 → 사용자 스팟들을 순서대로 연결한 선분 (수구는 points에 포함하지 않음) */
+/** 수구 → 사용자 스팟들을 순서대로 연결한 선분 (항상 수구에서 시작, 수구는 points에 포함하지 않음) */
 export function buildCuePathSegments(
   cue: { x: number; y: number },
   spots: Pick<SolutionPathPoint, "x" | "y">[]

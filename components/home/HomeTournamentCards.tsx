@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { formatDistanceKm } from "@/lib/distance";
+import { formatKoreanMonthDayWeekday } from "@/lib/format-date";
 import { IMAGE_PLACEHOLDER_SRC, sanitizeImageSrc } from "@/lib/image-src";
 
 type Tournament = {
@@ -19,14 +20,6 @@ type Tournament = {
   organization: { name: string } | null;
   distanceKm?: number | null;
 };
-
-function formatDate(d: Date) {
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "long",
-    day: "numeric",
-    weekday: "short",
-  }).format(d);
-}
 
 function statusLabel(status: string) {
   switch (status) {
@@ -188,7 +181,7 @@ export function HomeTournamentCards({
                       </p>
                     )}
                     <p className="mt-1 text-xs text-gray-600 md:text-sm">
-                      {formatDate(t.startAt)}
+                      {formatKoreanMonthDayWeekday(t.startAt)}
                       {t.venue && ` · ${t.venue}`}
                     </p>
                   </div>

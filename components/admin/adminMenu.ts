@@ -65,7 +65,7 @@ export function getMenuAside(copy?: Record<string, string>): MenuAsideItem[] {
       label: L(copy, "menu.content"),
       icon: mdiFormatSection,
       menu: [
-        { href: "/admin/page-sections", label: L(copy, "menu.pageSections"), icon: mdiFormatListBulleted, hideOnMobile: true },
+        { href: "/admin/page-sections", label: L(copy, "menu.pageSections"), icon: mdiFormatListBulleted },
         { href: "/admin/popups", label: L(copy, "menu.popups"), icon: mdiWindowRestore },
         { href: "/admin/notice-bars", label: L(copy, "menu.noticeBars"), icon: mdiViewCarousel },
       ],

@@ -6,23 +6,11 @@
  * - 해법: 두께·당점·백스트로크·팔로우·볼스피드·진행경로·해설 별도 state
  * - 자동 물리 계산 없음, 사용자 수동 조작만
  */
-import React, { useState, useCallback, useRef } from "react";
-import {
-  getPlayfieldRect,
-  pixelToNormalized,
-  DEFAULT_TABLE_WIDTH,
-  DEFAULT_TABLE_HEIGHT,
-} from "@/lib/billiard-table-constants";
+import React, { useState, useCallback } from "react";
+import { DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT } from "@/lib/billiard-table-constants";
 import type { NanguBallPlacement } from "@/lib/nangu-types";
 import type { NanguSolutionData } from "@/lib/nangu-types";
 import type { NanguPathPoint } from "@/lib/nangu-types";
-import type { CushionSnapFn } from "@/lib/cue-path-cushion-rules";
-import {
-  appendCuePathSpot,
-  insertCuePathSpot,
-  moveCuePathSpotById,
-  stripInvalidEndSpots,
-} from "@/lib/cue-path-cushion-rules";
 import { NanguReadOnlyLayout } from "./NanguReadOnlyLayout";
 import { NanguSolutionPathOverlay } from "./NanguSolutionPathOverlay";
 import { NanguThicknessEditor, getThicknessOverlap } from "./NanguThicknessEditor";
@@ -36,6 +24,9 @@ import {
   getRailDisplayPowerForBallSpeed,
   type BallSpeed,
 } from "@/lib/ball-speed-constants";
+import { SolutionPathEditorFullscreen } from "./SolutionPathEditorFullscreen";
+import { NanguTablePreviewHitLayer } from "./NanguTablePreviewHitLayer";
+import { useTableOrientation } from "@/hooks/useTableOrientation";
 
 export type NanguActivePanel =
   | "thickness"
@@ -70,9 +61,10 @@ export function NanguSolutionEditor({
   const [backstrokeLevel, setBackstrokeLevel] = useState(5);
   const [followStrokeLevel, setFollowStrokeLevel] = useState(5);
   const [ballSpeed, setBallSpeed] = useState<BallSpeed>(3.0);
-  const [pathMode, setPathMode] = useState(false);
   const [pathPoints, setPathPoints] = useState<NanguPathPoint[]>([]);
-  const [pathRuleHint, setPathRuleHint] = useState("");
+  /** 당구노트형 전체화면(오버레이) + 경로 편집 UI (스팟·줌·재생은 이 상태에서만) */
+  const [fullScreenEditMode, setFullScreenEditMode] = useState(false);
+  const [pathFsKey, setPathFsKey] = useState(0);
   const [explanationText, setExplanationText] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -82,128 +74,25 @@ export function NanguSolutionEditor({
     originX: number;
     originY: number;
   }>({ active: false, target: null, originX: 0, originY: 0 });
-  const containerRef = useRef<HTMLDivElement>(null);
-  const rect = getPlayfieldRect(DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT);
+
+  const previewOrientation = useTableOrientation();
 
   const cueBall = ballPlacement.cueBall;
   const cuePos = cueBall === "yellow" ? ballPlacement.yellowBall : ballPlacement.whiteBall;
 
-  const getNormalizedFromEvent = useCallback(
-    (clientX: number, clientY: number): { x: number; y: number } | null => {
-      const el = containerRef.current;
-      if (!el) return null;
-      const r = el.getBoundingClientRect();
-      const scaleX = DEFAULT_TABLE_WIDTH / r.width;
-      const scaleY = DEFAULT_TABLE_HEIGHT / r.height;
-      const px = (clientX - r.left) * scaleX;
-      const py = (clientY - r.top) * scaleY;
-      if (
-        px >= rect.left &&
-        px <= rect.left + rect.width &&
-        py >= rect.top &&
-        py <= rect.top + rect.height
-      ) {
-        return pixelToNormalized(px, py, rect);
-      }
-      return null;
-    },
-    [rect.left, rect.top, rect.width, rect.height]
-  );
-
-  const snapToCushionIfNear = useCallback((x: number, y: number): { x: number; y: number; type: "ball" | "cushion" | "free" } => {
-    const margin = 0.04;
-    let nx = x,
-      ny = y;
-    let onEdge = false;
-    if (x <= margin) {
-      nx = 0;
-      onEdge = true;
-    } else if (x >= 1 - margin) {
-      nx = 1;
-      onEdge = true;
-    }
-    if (y <= margin) {
-      ny = 0;
-      onEdge = true;
-    } else if (y >= 1 - margin) {
-      ny = 1;
-      onEdge = true;
-    }
-    return { x: nx, y: ny, type: onEdge ? "cushion" : "free" };
+  const closeFullScreenEdit = useCallback(() => {
+    setFullScreenEditMode(false);
   }, []);
 
-  const cushionSnapFn: CushionSnapFn = useCallback(
-    (x: number, y: number) => {
-      const r = snapToCushionIfNear(x, y);
-      return { x: r.x, y: r.y, type: r.type === "cushion" ? "cushion" : "free" };
-    },
-    [snapToCushionIfNear]
-  );
-
-  const newCueSpotId = useCallback(
-    () => `p-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    []
-  );
-
-  const runCueAppend = useCallback(
-    (norm: { x: number; y: number }) => {
-      setPathPoints((prev) => {
-        const r = appendCuePathSpot(prev, norm, cushionSnapFn, newCueSpotId);
-        if (!r.ok) {
-          queueMicrotask(() => setPathRuleHint(r.message));
-          return prev;
-        }
-        queueMicrotask(() => setPathRuleHint(""));
-        return r.points;
-      });
-    },
-    [cushionSnapFn, newCueSpotId]
-  );
-
-  const clearPathPoints = useCallback(() => setPathPoints([]), []);
-
-  const movePathPoint = useCallback(
-    (id: string, norm: { x: number; y: number }) => {
-      setPathPoints((prev) => moveCuePathSpotById(prev, id, norm, cushionSnapFn));
-    },
-    [cushionSnapFn]
-  );
-
-  const removePathPoint = useCallback((id: string) => {
-    setPathPoints((prev) => stripInvalidEndSpots(prev.filter((p) => p.id !== id)));
+  /** 미리보기 탭/버튼: 당구노트 공배치와 동일한 전체화면 셸로 경로 편집 */
+  const enterFullScreenEdit = useCallback(() => {
+    setPathFsKey((k) => k + 1);
+    setFullScreenEditMode(true);
   }, []);
 
-  const insertPathPointBetween = useCallback(
-    (segmentIndex: number, norm: { x: number; y: number }) => {
-      setPathPoints((prev) => {
-        const r = insertCuePathSpot(prev, segmentIndex, norm, cushionSnapFn, newCueSpotId);
-        if (!r.ok) {
-          queueMicrotask(() => setPathRuleHint(r.message));
-          return prev;
-        }
-        queueMicrotask(() => setPathRuleHint(""));
-        return r.points;
-      });
-    },
-    [cushionSnapFn, newCueSpotId]
-  );
-
-  const handleTableClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (!pathMode) return;
-      const norm = getNormalizedFromEvent(e.clientX, e.clientY);
-      if (!norm) return;
-      const dupThreshold = 0.03;
-      const isDup =
-        pathPoints.length > 0 &&
-        pathPoints.some(
-          (p) => Math.hypot(p.x - norm.x, p.y - norm.y) < dupThreshold
-        );
-      if (isDup) return;
-      runCueAppend(norm);
-    },
-    [pathMode, getNormalizedFromEvent, runCueAppend, pathPoints]
-  );
+  const clearCommittedPath = useCallback(() => {
+    setPathPoints([]);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -223,7 +112,7 @@ export function NanguSolutionEditor({
           tipY: spinY,
           spinX,
           spinY,
-          paths: pointsForPath.length >= 2 ? [{ points: pointsForPath, pointsWithType: pathPoints }] : [],
+          paths: pointsForPath.length >= 1 ? [{ points: pointsForPath, pointsWithType: pathPoints }] : [],
           backstrokeLevel,
           followStrokeLevel,
           ballSpeed,
@@ -247,68 +136,102 @@ export function NanguSolutionEditor({
         <p className="text-sm text-gray-600 dark:text-slate-400 mt-1 whitespace-pre-wrap">{postContent}</p>
       </div>
 
-      {/* 2. 중앙 배치도 + 진행선 오버레이 */}
+      {/* 2. 당구노트 공배치와 동일 좌표 미리보기 — 탭/버튼으로 전체화면 경로 편집 */}
       <div>
-        <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">원본 공배치 (읽기 전용)</p>
+        <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">
+          공 배치 미리보기 (당구노트 저장 좌표 · 수구 깜빡임 표시) — 그림을 탭하면 전체화면에서 경로선을 그립니다
+        </p>
         <div
-          ref={containerRef}
-          className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600 w-full max-w-full cursor-crosshair"
+          className="relative w-full max-w-full rounded-lg border border-gray-200 dark:border-slate-600 overflow-hidden"
           style={{
             maxWidth: DEFAULT_TABLE_WIDTH,
-            aspectRatio: `${DEFAULT_TABLE_WIDTH} / ${DEFAULT_TABLE_HEIGHT}`,
+            aspectRatio:
+              previewOrientation === "portrait"
+                ? `${DEFAULT_TABLE_HEIGHT} / ${DEFAULT_TABLE_WIDTH}`
+                : `${DEFAULT_TABLE_WIDTH} / ${DEFAULT_TABLE_HEIGHT}`,
           }}
-          onClick={handleTableClick}
         >
-          <NanguReadOnlyLayout ballPlacement={ballPlacement} showGrid />
-          <NanguSolutionPathOverlay
-            pathPoints={pathPoints}
-            cuePos={cuePos}
-            objectBallNorm={ballPlacement.redBall}
-            objectPathPoints={[]}
-            width={DEFAULT_TABLE_WIDTH}
-            height={DEFAULT_TABLE_HEIGHT}
-            pathMode={pathMode}
-            objectPathMode={false}
-            getNormalizedFromEvent={getNormalizedFromEvent}
-            onAddPoint={(norm) => {
-              const dupThreshold = 0.03;
-              const isDup = pathPoints.some(
-                (p) => Math.hypot(p.x - norm.x, p.y - norm.y) < dupThreshold
-              );
-              if (!isDup) runCueAppend(norm);
-            }}
-            onRemovePoint={removePathPoint}
-            onMovePoint={movePathPoint}
-            onInsertBetween={insertPathPointBetween}
+          {/* 캔버스·SVG는 포인터 통과 → 히트 레이어만 탭 수신 */}
+          <div className="absolute inset-0 z-0 pointer-events-none">
+            <div className="absolute inset-0">
+              <NanguReadOnlyLayout
+                ballPlacement={ballPlacement}
+                fillContainer
+                embedFill
+                className="absolute inset-0 w-full h-full rounded-none border-0 overflow-hidden"
+                showGrid
+                drawStyle="realistic"
+                showCueBallSpot
+                orientation={previewOrientation}
+                betweenTableAndBallsLayer={
+                  <NanguSolutionPathOverlay
+                    pathPoints={pathPoints}
+                    cuePos={cuePos}
+                    tableBallPlacement={ballPlacement}
+                    objectPathPoints={[]}
+                    orientation={previewOrientation}
+                    pathMode={false}
+                    objectPathMode={false}
+                    pathLinesVisible={true}
+                    ballPickLayout={ballPlacement}
+                  />
+                }
+              />
+            </div>
+            <div
+              className="absolute bottom-1.5 right-1.5 z-[2] rounded-md bg-black/60 text-white text-[10px] sm:text-xs font-medium px-2 py-1 shadow-sm max-w-[min(100%-0.75rem,14rem)] leading-snug text-right"
+              aria-hidden
+            >
+              미리보기 · 탭 시 전체화면
+            </div>
+          </div>
+          <NanguTablePreviewHitLayer
+            className="absolute inset-0 z-[3] cursor-pointer touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-site-primary rounded-lg"
+            onOpen={enterFullScreenEdit}
+            ariaLabel="전체화면에서 경로 편집 열기"
           />
         </div>
-        {pathMode && (
-          <div className="mt-2 flex flex-col gap-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-site-primary font-medium">진행경로 모드</span>
-              <button
-                type="button"
-                onClick={() => {
-                  clearPathPoints();
-                  setPathRuleHint("");
-                }}
-                className="text-sm text-red-600 dark:text-red-400 hover:underline"
-              >
-                전체선 삭제
-              </button>
-            </div>
-            {pathRuleHint ? (
-              <p className="text-xs text-amber-700 dark:text-amber-300" role="status">
-                {pathRuleHint}
-              </p>
-            ) : (
-              <p className="text-xs text-gray-500 dark:text-slate-400">
-                쿠션 3회 전: 레일 위만. 이후 탭: 마지막 자유 스팟(화살표). 쿠션·끝 스팟은 드래그로 조정.
-              </p>
-            )}
-          </div>
-        )}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => enterFullScreenEdit()}
+            className="px-3 py-2 rounded-lg text-sm font-medium bg-site-primary text-white hover:opacity-90 touch-manipulation"
+          >
+            전체화면 · 경로선 편집
+          </button>
+          <button
+            type="button"
+            disabled={pathPoints.length === 0}
+            onClick={clearCommittedPath}
+            className="px-3 py-2 rounded-lg text-sm font-medium border border-red-300 text-red-700 dark:text-red-300 disabled:opacity-50 touch-manipulation"
+          >
+            저장된 경로 지우기
+          </button>
+          <span className="text-xs text-gray-500 dark:text-slate-400">
+            수구 경로 스팟 {pathPoints.length}개
+            {pathPoints.length >= 1 ? " · 수구 경로 있음" : ""}
+          </span>
+        </div>
       </div>
+
+      {fullScreenEditMode && (
+        <SolutionPathEditorFullscreen
+          key={pathFsKey}
+          variant="nangu"
+          presentation="noteBallPlacementFullscreen"
+          ballPlacement={ballPlacement}
+          initialPathPoints={pathPoints}
+          initialObjectPathPoints={[]}
+          thicknessOffsetX={thicknessOffsetX}
+          isBankShot={isBankShot}
+          ballSpeed={ballSpeed}
+          onCancel={closeFullScreenEdit}
+          onConfirm={({ pathPoints: next }) => {
+            setPathPoints(next);
+            closeFullScreenEdit();
+          }}
+        />
+      )}
 
       {/* 3. 설정패널 영역 */}
       <div className="rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 p-4">
@@ -327,12 +250,9 @@ export function NanguSolutionEditor({
             <button
               key={key}
               type="button"
-              onClick={() => {
-                setActivePanel(key);
-                if (key === "path") setPathMode(true);
-              }}
+              onClick={() => setActivePanel(key)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
-                activePanel === key || (key === "path" && pathMode)
+                activePanel === key
                   ? "bg-site-primary text-white border-site-primary"
                   : "bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-site-text"
               }`}
@@ -490,23 +410,22 @@ export function NanguSolutionEditor({
         )}
 
         {activePanel === "path" && (
-          <div>
+          <div className="space-y-2">
             <p className="text-sm text-site-primary font-medium">진행경로 제시</p>
-            <p className="text-xs text-gray-500 mt-1">
-              쿠션 3회 전에는 레일 위만. 이후 한 번 더 탭하면 마지막 자유 스팟(화살표). 쿠션·끝 스팟은 드래그로 조정합니다.
+            <p className="text-xs text-gray-500 dark:text-slate-400">
+              위 <strong>미리보기 그림</strong>을 탭하거나 아래 버튼으로 당구노트와 같은 방식의 <strong>전체화면</strong>에 들어가 경로선을 그립니다. 공은
+              읽기 전용(당구노트 저장 좌표), 미리보기에서는 경로만 표시됩니다. 수구 경로 첫 스팟은 <strong>1목적구</strong> 또는{" "}
+              <strong>쿠션 테두리</strong>에 연결할 수 있습니다.
+            </p>
+            <p className="text-xs text-gray-500 dark:text-slate-400">
+              전체화면 메뉴: 확대/축소, 실사·단순 보기, 그리드, 이전경로선삭제, 전체경로선삭제, 애니메이션 구현 등. 완료 시 반영, 취소 시 변경 없음.
             </p>
             <button
               type="button"
-              onClick={() =>
-                setPathMode((v) => {
-                  const next = !v;
-                  if (!next) setPathRuleHint("");
-                  return next;
-                })
-              }
-              className={`mt-2 px-3 py-1.5 rounded-lg text-sm ${pathMode ? "bg-site-primary text-white" : "border border-gray-300 dark:border-slate-600"}`}
+              onClick={() => enterFullScreenEdit()}
+              className="mt-1 px-3 py-2 rounded-lg text-sm font-medium bg-site-primary text-white hover:opacity-90 touch-manipulation"
             >
-              {pathMode ? "경로 입력 중" : "경로 입력 시작"}
+              전체화면 · 경로선 편집
             </button>
           </div>
         )}

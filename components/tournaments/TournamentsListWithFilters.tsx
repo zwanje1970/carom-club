@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { TournamentListRow } from "@/lib/db-tournaments";
+import { formatKoreanDateWithWeekday } from "@/lib/format-date";
 import { sanitizeImageSrc } from "@/lib/image-src";
 import { formatDistanceKm } from "@/lib/distance";
 
@@ -33,15 +34,6 @@ const SORT_OPTIONS: Record<TabId, { id: SortId; label: string }[]> = {
     { id: "date", label: "날짜순" },
   ],
 };
-
-function formatDate(d: Date | string) {
-  return new Intl.DateTimeFormat("ko-KR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    weekday: "short",
-  }).format(typeof d === "string" ? new Date(d) : d);
-}
 
 export function TournamentsListWithFilters({
   copy,
@@ -206,7 +198,7 @@ export function TournamentsListWithFilters({
                   </div>
                   <div className="p-3 border-t border-site-border">
                     <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-site-text-muted">
-                      <span>{formatDate(t.startAt)}</span>
+                      <span>{formatKoreanDateWithWeekday(t.startAt)}</span>
                       {statusBadge && (
                         <span
                           className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${

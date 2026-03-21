@@ -1,15 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toHalfwidth } from "@/lib/input-normalize";
 import { AddressSearchButton } from "@/components/AddressSearchButton";
+import { safeInternalNextPath } from "@/lib/safe-internal-path";
 
 export default function SignupPage() {
   const router = useRouter();
+  const [afterLoginNext, setAfterLoginNext] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const n = new URLSearchParams(window.location.search).get("next");
+    setAfterLoginNext(safeInternalNextPath(n));
+  }, []);
   const [checkLoading, setCheckLoading] = useState(false);
   const [usernameCheck, setUsernameCheck] = useState<"idle" | "available" | "taken">("idle");
   const [form, setForm] = useState({
@@ -183,7 +191,14 @@ export default function SignupPage() {
         </form>
         <p className="mt-4 text-center text-sm text-gray-600">
           이미 계정이 있으신가요?{" "}
-          <Link href="/login" className="text-site-primary hover:underline">
+          <Link
+            href={
+              afterLoginNext != null
+                ? `/login?next=${encodeURIComponent(afterLoginNext)}`
+                : "/login"
+            }
+            className="text-site-primary hover:underline"
+          >
             로그인
           </Link>
         </p>

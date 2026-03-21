@@ -77,14 +77,24 @@ export default function MypageCommunityPage() {
 
         {loading && <p className="text-gray-500 py-4">불러오는 중…</p>}
         {!loading && tab === "posts" && (
-          <ul className="rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 divide-y divide-gray-200 dark:divide-slate-600">
-            {(items as PostRow[]).length === 0 && <li className="px-4 py-8 text-center text-gray-500 text-sm">글이 없습니다.</li>}
+          <ul className="divide-y divide-gray-200 dark:divide-slate-700" aria-label="내가 쓴 글">
+            {(items as PostRow[]).length === 0 && (
+              <li className="py-10 text-center text-sm text-gray-500">글이 없습니다.</li>
+            )}
             {(items as PostRow[]).map((p) => (
               <li key={p.id}>
-                <Link href={`/community/posts/${p.id}`} className="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-800/50">
-                  <span className="font-medium text-site-text line-clamp-1">{p.title}</span>
-                  <span className="text-xs text-gray-500 mt-0.5 block">
-                    [{p.boardName}] 추천 {p.likeCount} · 댓글 {p.commentCount} · 조회 {p.viewCount} · {formatKoreanDate(p.createdAt)}
+                <Link
+                  href={`/community/posts/${p.id}`}
+                  className="flex items-start gap-3 py-3.5 px-1 hover:bg-gray-50/80 dark:hover:bg-slate-800/40"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-site-text line-clamp-2 leading-snug">{p.title}</p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
+                      [{p.boardName}] 추천 {p.likeCount} · 댓글 {p.commentCount} · 조회 {p.viewCount} · {formatKoreanDate(p.createdAt)}
+                    </p>
+                  </div>
+                  <span className="shrink-0 self-start rounded-md border border-gray-200 dark:border-slate-600 px-2 py-0.5 text-xs text-gray-500 dark:text-slate-400 tabular-nums">
+                    {p.commentCount}
                   </span>
                 </Link>
               </li>
@@ -92,29 +102,46 @@ export default function MypageCommunityPage() {
           </ul>
         )}
         {!loading && tab === "comments" && (
-          <ul className="rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 divide-y divide-gray-200 dark:divide-slate-600">
-            {(items as CommentRow[]).length === 0 && <li className="px-4 py-8 text-center text-gray-500 text-sm">댓글이 없습니다.</li>}
+          <ul className="divide-y divide-gray-200 dark:divide-slate-700" aria-label="내가 쓴 댓글">
+            {(items as CommentRow[]).length === 0 && (
+              <li className="py-10 text-center text-sm text-gray-500">댓글이 없습니다.</li>
+            )}
             {(items as CommentRow[]).map((c) => (
               <li key={c.id}>
-                <Link href={`/community/posts/${c.postId}#comment-${c.id}`} className="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-800/50">
-                  <span className="text-site-text line-clamp-2">{c.content}</span>
-                  <span className="text-xs text-gray-500 mt-0.5 block">
-                    [{c.boardName}] {c.postTitle} · 추천 {c.likeCount} · {formatKoreanDate(c.createdAt)}
-                  </span>
+                <Link
+                  href={`/community/posts/${c.postId}#comment-${c.id}`}
+                  className="flex items-start gap-3 py-3.5 px-1 hover:bg-gray-50/80 dark:hover:bg-slate-800/40"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-site-text line-clamp-2 leading-snug">{c.content}</p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
+                      [{c.boardName}] {c.postTitle} · 추천 {c.likeCount} · {formatKoreanDate(c.createdAt)}
+                    </p>
+                  </div>
                 </Link>
               </li>
             ))}
           </ul>
         )}
         {!loading && (tab === "received-likes" || tab === "bookmarks") && (
-          <ul className="rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 divide-y divide-gray-200 dark:divide-slate-600">
-            {(items as PostRow[]).length === 0 && <li className="px-4 py-8 text-center text-gray-500 text-sm">글이 없습니다.</li>}
+          <ul className="divide-y divide-gray-200 dark:divide-slate-700" aria-label="글 목록">
+            {(items as PostRow[]).length === 0 && (
+              <li className="py-10 text-center text-sm text-gray-500">글이 없습니다.</li>
+            )}
             {(items as PostRow[]).map((p) => (
               <li key={p.id}>
-                <Link href={`/community/posts/${p.id}`} className="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-800/50">
-                  <span className="font-medium text-site-text line-clamp-1">{p.title}</span>
-                  <span className="text-xs text-gray-500 mt-0.5 block">
-                    [{p.boardName}] 추천 {p.likeCount} · 댓글 {p.commentCount} · 조회 {p.viewCount} · {formatKoreanDate(p.createdAt)}
+                <Link
+                  href={`/community/posts/${p.id}`}
+                  className="flex items-start gap-3 py-3.5 px-1 hover:bg-gray-50/80 dark:hover:bg-slate-800/40"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-site-text line-clamp-2 leading-snug">{p.title}</p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
+                      [{p.boardName}] 추천 {p.likeCount} · 댓글 {p.commentCount} · 조회 {p.viewCount} · {formatKoreanDate(p.createdAt)}
+                    </p>
+                  </div>
+                  <span className="shrink-0 self-start rounded-md border border-gray-200 dark:border-slate-600 px-2 py-0.5 text-xs text-gray-500 dark:text-slate-400 tabular-nums">
+                    {p.commentCount}
                   </span>
                 </Link>
               </li>

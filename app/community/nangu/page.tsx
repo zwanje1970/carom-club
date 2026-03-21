@@ -56,17 +56,22 @@ export default function NanguBoardPage() {
           <p className="text-gray-500">아직 글이 없습니다.</p>
         )}
         {!loading && !error && posts.length > 0 && (
-          <ul className="space-y-4">
+          <ul className="divide-y divide-gray-200 dark:divide-slate-700" aria-label="게시글 목록">
             {posts.map((p) => (
               <li key={p.id}>
                 <Link
                   href={`/community/nangu/${p.id}`}
-                  className="block rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 p-4 hover:border-site-primary/50"
+                  className="flex items-start gap-3 py-3.5 px-1 hover:bg-gray-50/80 dark:hover:bg-slate-800/40"
                 >
-                  <h2 className="font-semibold text-site-text">{p.title}</h2>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {p.authorName} · {formatKoreanDate(p.createdAt)} · 해법 {p.solutionCount}개
-                  </p>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-site-text line-clamp-2 leading-snug">{p.title}</p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {p.authorName} · {formatKoreanDate(p.createdAt)} · 해법 {p.solutionCount}개
+                    </p>
+                  </div>
+                  <span className="shrink-0 self-start rounded-md border border-gray-200 dark:border-slate-600 px-2 py-0.5 text-xs text-gray-500 dark:text-slate-400 tabular-nums">
+                    {p.solutionCount}
+                  </span>
                 </Link>
               </li>
             ))}

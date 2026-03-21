@@ -1355,6 +1355,7 @@ model TroubleShotPost {
   postId             String   @unique  // CommunityPost (board=trouble)
   sourceNoteId       String?  // 당구노트에서 보낸 경우
   layoutImageUrl     String?  // 공배치 이미지
+  ballPlacementJson  String?  @db.Text // NanguBallPlacement JSON (from-note 시 노트 컬럼에서 조합)
   difficulty         String?  // 난이도 표시
   isSolved           Boolean  @default(false)
   acceptedSolutionId String?  // 채택된 TroubleShotSolution id

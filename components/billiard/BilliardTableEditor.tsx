@@ -6,6 +6,7 @@
  * - mode: ball(공 배치) / path(경로 편집). 두 모드가 섞이지 않음.
  */
 import React, { useState, useRef, forwardRef, useImperativeHandle, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import BilliardTableCanvas, {
   type BallPositions,
   type BilliardTableCanvasHandle,
@@ -25,6 +26,7 @@ import {
   type TableOrientation,
 } from "@/lib/billiard-table-constants";
 import type { BilliardPath } from "@/lib/billiard-path-types";
+import { useSolutionTableZoomContext } from "@/components/nangu/solution-table-zoom-context";
 
 const defaultPositions: BallPositions = {
   red: { x: 0.25, y: 0.5 },
@@ -84,6 +86,12 @@ export interface BilliardTableEditorProps {
   }) => void;
   /** 공배치: 수구 깜빡임(스팟) 표시 여부. 기본 true */
   cueBallSpotEnabled?: boolean;
+  /** canvasOnly: 부모 고정 크기(W×H)에 캔버스 100% 채움(줌 셀 등). 패딩 생략 */
+  tableEmbedFill?: boolean;
+  /**
+   * 미세조정(▲◀▶▼)을 이 DOM 노드로 포털 — 줌·테이블 스케일과 무관하게 뷰포트 중앙·고정 크기
+   */
+  fineTuneOverlayRoot?: HTMLElement | null;
 }
 
 const BilliardTableEditor = forwardRef<
@@ -110,10 +118,26 @@ const BilliardTableEditor = forwardRef<
     placementMode = false,
     onPlacementBarInfo,
     cueBallSpotEnabled = true,
+    tableEmbedFill = false,
+    fineTuneOverlayRoot = null,
   },
   ref
 ) {
   const rect = getPlayfieldRect(DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT);
+
+  const zoomShellCtx = useSolutionTableZoomContext();
+  const fineTuneInverseScale =
+    !fineTuneOverlayRoot &&
+    tableEmbedFill &&
+    zoomShellCtx &&
+    zoomShellCtx.contentVisualScale > 0
+      ? 1 / zoomShellCtx.contentVisualScale
+      : 1;
+
+  /** 포털 미세조정: 화면·줌과 무관한 고정 px 크기 */
+  const ftBtnClass =
+    "box-border flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-full border-0 text-[20px] font-bold leading-none text-white bg-black/40 shadow-md active:bg-black/55 active:scale-[0.97] touch-manipulation select-none";
+  const ftSpacerClass = "h-[48px] w-[48px] shrink-0";
 
   const [mode, setMode] = useState<BilliardEditorMode>(defaultMode);
   const [redBall, setRedBall] = useState(() => {
@@ -424,55 +448,14 @@ const BilliardTableEditor = forwardRef<
     },
   }));
 
-  const placementHintLabel =
-    placementMode && isDragging && selectedBall
-      ? selectedBall === "red"
-        ? "🔴공 이동"
-        : selectedBall === "yellow"
-          ? "🟡공 이동"
-          : "⚪공 이동"
-      : null;
-
-  const selectedPos =
-    placementMode && selectedBall
-      ? selectedBall === "red"
-        ? redBall
-        : selectedBall === "yellow"
-          ? yellowBall
-          : whiteBall
-      : null;
-  const coordText =
-    placementMode && selectedBall && selectedPos
-      ? `X:${selectedPos.x.toFixed(3)} Y:${selectedPos.y.toFixed(3)}`
-      : null;
-  const showCoordBar =
-    placementMode && selectedBall && coordText && !onPlacementBarInfo;
-
   const canvasBlock = (
-    <div className="flex justify-center items-center rounded-lg p-2 overflow-x-auto flex-1 min-h-0">
-      {placementHintLabel && (
-        <div
-          className="fixed left-1/2 top-6 z-50 -translate-x-1/2 text-[15px] font-bold text-site-text bg-transparent"
-          style={{ pointerEvents: "none" }}
-          aria-live="polite"
-        >
-          {placementHintLabel}
-        </div>
-      )}
-      {showCoordBar && (
-        <div
-          className="fixed left-0 right-0 top-0 z-50 flex items-center justify-center bg-black py-2 text-[13px] font-bold tabular-nums"
-          style={{
-            pointerEvents: "none",
-            color: "#00ff41",
-            fontFamily: "ui-monospace, monospace",
-            textShadow: "0 0 4px #00ff41",
-          }}
-          aria-live="polite"
-        >
-          {coordText}
-        </div>
-      )}
+    <div
+      className={
+        tableEmbedFill
+          ? "flex flex-1 min-h-0 min-w-0 w-full h-full items-center justify-center overflow-hidden"
+          : "flex justify-center items-center rounded-lg p-2 overflow-x-auto flex-1 min-h-0"
+      }
+    >
       <div className="relative w-full h-full max-h-full flex items-center justify-center min-w-0">
         <BilliardTableCanvas
           ref={tableRef}
@@ -491,6 +474,8 @@ const BilliardTableEditor = forwardRef<
           paths={paths}
           orientation={effectiveOrientation}
           drawStyle={tableDrawStyle}
+          /** 줌 셀(W×H) 좌표와 히트검사 일치 — 미전달 시 dvh 기준 크기로 가운데 정렬되어 isEmptyForPan과 어긋남 */
+          embedFill={tableEmbedFill}
           showCueBallSpot={
             placementMode
               ? cueBallSpotEnabled && !isDragging
@@ -501,17 +486,29 @@ const BilliardTableEditor = forwardRef<
           placementMode={placementMode}
           showCrosshairAtSelected={showPlus ?? false}
         />
-        {placementMode && showPlus && (
+        {placementMode && showPlus && !fineTuneOverlayRoot && (
           <div
             className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none"
             aria-label="미세조정 (4방향)"
           >
-            <div className="grid grid-cols-3 gap-3 items-center justify-center w-max pointer-events-auto">
-              <span className="w-12 h-12" aria-hidden />
+            <div
+              className="pointer-events-auto"
+              data-ball-placement-overlay-ui=""
+              style={
+                fineTuneInverseScale !== 1
+                  ? {
+                      transform: `scale(${fineTuneInverseScale})`,
+                      transformOrigin: "center center",
+                    }
+                  : undefined
+              }
+            >
+            <div className="grid grid-cols-3 gap-3 items-center justify-center w-max">
+              <span className={ftSpacerClass} aria-hidden />
               <button
                 type="button"
                 aria-label="위로 1칸 이동"
-                className="w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-full text-lg font-bold text-white bg-black/35 active:bg-black/55 active:scale-95 transition-[background-color,transform] touch-none select-none"
+                className={ftBtnClass}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   startFineTune(
@@ -526,11 +523,11 @@ const BilliardTableEditor = forwardRef<
               >
                 ▲
               </button>
-              <span className="w-12 h-12" aria-hidden />
+              <span className={ftSpacerClass} aria-hidden />
               <button
                 type="button"
                 aria-label="왼쪽으로 1칸 이동"
-                className="w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-full text-lg font-bold text-white bg-black/35 active:bg-black/55 active:scale-95 transition-[background-color,transform] touch-none select-none"
+                className={ftBtnClass}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   startFineTune(
@@ -545,11 +542,11 @@ const BilliardTableEditor = forwardRef<
               >
                 ◀
               </button>
-              <span className="w-12 h-12" aria-hidden />
+              <span className={ftSpacerClass} aria-hidden />
               <button
                 type="button"
                 aria-label="오른쪽으로 1칸 이동"
-                className="w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-full text-lg font-bold text-white bg-black/35 active:bg-black/55 active:scale-95 transition-[background-color,transform] touch-none select-none"
+                className={ftBtnClass}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   startFineTune(
@@ -564,11 +561,11 @@ const BilliardTableEditor = forwardRef<
               >
                 ▶
               </button>
-              <span className="w-12 h-12" aria-hidden />
+              <span className={ftSpacerClass} aria-hidden />
               <button
                 type="button"
                 aria-label="아래로 1칸 이동"
-                className="w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-full text-lg font-bold text-white bg-black/35 active:bg-black/55 active:scale-95 transition-[background-color,transform] touch-none select-none"
+                className={ftBtnClass}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   startFineTune(
@@ -583,7 +580,8 @@ const BilliardTableEditor = forwardRef<
               >
                 ▼
               </button>
-              <span className="w-12 h-12" aria-hidden />
+              <span className={ftSpacerClass} aria-hidden />
+            </div>
             </div>
           </div>
         )}
@@ -605,16 +603,112 @@ const BilliardTableEditor = forwardRef<
     </div>
   );
 
+  const placementFineTunePortal =
+    fineTuneOverlayRoot && placementMode && showPlus
+      ? createPortal(
+          <div
+            className="pointer-events-auto"
+            data-ball-placement-overlay-ui=""
+            aria-label="미세조정 (4방향)"
+          >
+            <div className="grid grid-cols-3 gap-3 items-center justify-center w-max">
+              <span className={ftSpacerClass} aria-hidden />
+              <button
+                type="button"
+                aria-label="위로 1칸 이동"
+                className={ftBtnClass}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  startFineTune(
+                    effectiveOrientation === "landscape" ? 0 : -GRID_STEP_SHORT,
+                    effectiveOrientation === "landscape" ? -GRID_STEP_SHORT : 0
+                  );
+                }}
+                onPointerUp={handleFineTuneEnd}
+                onPointerLeave={handleFineTuneEnd}
+                onPointerCancel={handleFineTuneEnd}
+                onContextMenu={(e) => e.preventDefault()}
+              >
+                ▲
+              </button>
+              <span className={ftSpacerClass} aria-hidden />
+              <button
+                type="button"
+                aria-label="왼쪽으로 1칸 이동"
+                className={ftBtnClass}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  startFineTune(
+                    effectiveOrientation === "landscape" ? -GRID_STEP_LONG : 0,
+                    effectiveOrientation === "landscape" ? 0 : GRID_STEP_LONG
+                  );
+                }}
+                onPointerUp={handleFineTuneEnd}
+                onPointerLeave={handleFineTuneEnd}
+                onPointerCancel={handleFineTuneEnd}
+                onContextMenu={(e) => e.preventDefault()}
+              >
+                ◀
+              </button>
+              <span className={ftSpacerClass} aria-hidden />
+              <button
+                type="button"
+                aria-label="오른쪽으로 1칸 이동"
+                className={ftBtnClass}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  startFineTune(
+                    effectiveOrientation === "landscape" ? GRID_STEP_LONG : 0,
+                    effectiveOrientation === "landscape" ? 0 : -GRID_STEP_LONG
+                  );
+                }}
+                onPointerUp={handleFineTuneEnd}
+                onPointerLeave={handleFineTuneEnd}
+                onPointerCancel={handleFineTuneEnd}
+                onContextMenu={(e) => e.preventDefault()}
+              >
+                ▶
+              </button>
+              <span className={ftSpacerClass} aria-hidden />
+              <button
+                type="button"
+                aria-label="아래로 1칸 이동"
+                className={ftBtnClass}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  startFineTune(
+                    effectiveOrientation === "landscape" ? 0 : GRID_STEP_SHORT,
+                    effectiveOrientation === "landscape" ? GRID_STEP_SHORT : 0
+                  );
+                }}
+                onPointerUp={handleFineTuneEnd}
+                onPointerLeave={handleFineTuneEnd}
+                onPointerCancel={handleFineTuneEnd}
+                onContextMenu={(e) => e.preventDefault()}
+              >
+                ▼
+              </button>
+              <span className={ftSpacerClass} aria-hidden />
+            </div>
+          </div>,
+          fineTuneOverlayRoot
+        )
+      : null;
+
   if (canvasOnly) {
     return (
-      <div className="relative w-full h-full flex flex-col items-center justify-center min-h-0">
-        {canvasBlock}
-        {children}
-      </div>
+      <>
+        <div className="relative w-full h-full flex flex-col items-center justify-center min-h-0">
+          {canvasBlock}
+          {children}
+        </div>
+        {placementFineTunePortal}
+      </>
     );
   }
 
   return (
+    <>
     <div className="space-y-4">
       {/* 모드 전환 + 경로 툴바 (placementMode면 공배치만, 경로 비노출) */}
       {!placementMode && (
@@ -780,6 +874,8 @@ const BilliardTableEditor = forwardRef<
 
       {children}
     </div>
+    {placementFineTunePortal}
+    </>
   );
 });
 

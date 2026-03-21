@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import type { CueBallType } from "@/lib/billiard-table-constants";
-
-const DRAFT_STORAGE_KEY = "billiardNoteDraft";
+import { BILLIARD_NOTE_DRAFT_KEY } from "@/lib/billiard-note-composer-session";
 
 /** 배치 전 표시용 기본 당구대 이미지. 배치 화면과 동일한 테이블(공 없음)을 줄인 SVG. */
 const DEFAULT_TABLE_IMAGE = "/images/billiard-table-preview.svg";
@@ -12,7 +11,8 @@ export interface PlacementPayload {
   redBall: { x: number; y: number };
   yellowBall: { x: number; y: number };
   whiteBall: { x: number; y: number };
-  cueBall: CueBallType;
+  /** 미선택 시 공배치 전체화면에서 흰공/노란공 수구 선택 UI 표시 */
+  cueBall?: CueBallType;
   getImageDataURL: () => string;
 }
 
@@ -51,7 +51,7 @@ export function BilliardNoteFormScreen({
 
   useEffect(() => {
     try {
-      const raw = typeof window !== "undefined" ? sessionStorage.getItem(DRAFT_STORAGE_KEY) : null;
+      const raw = typeof window !== "undefined" ? sessionStorage.getItem(BILLIARD_NOTE_DRAFT_KEY) : null;
       if (raw) {
         const d = JSON.parse(raw) as { title?: string; content?: string };
         if (d.title != null) setTitle(String(d.title));
@@ -131,7 +131,7 @@ export function BilliardNoteFormScreen({
           onClick={() => {
             try {
               sessionStorage.setItem(
-                DRAFT_STORAGE_KEY,
+                BILLIARD_NOTE_DRAFT_KEY,
                 JSON.stringify({ title, content })
               );
             } catch {

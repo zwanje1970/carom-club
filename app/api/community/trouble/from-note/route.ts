@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "현재 커뮤니티 글쓰기가 중단되었습니다." }, { status: 503 });
   }
 
-  let body: { noteId: string; title: string; content: string; imageUrl?: string | null; difficulty?: string | null };
+  let body: { noteId: string; title: string; content: string; imageUrl?: string | null };
   try {
     body = await request.json();
   } catch (e) {
@@ -39,7 +39,18 @@ export async function POST(request: Request) {
   try {
     const note = await prisma.billiardNote.findUnique({
       where: { id: noteId },
-      select: { id: true, authorId: true, imageUrl: true },
+      select: {
+        id: true,
+        authorId: true,
+        imageUrl: true,
+        redBallX: true,
+        redBallY: true,
+        yellowBallX: true,
+        yellowBallY: true,
+        whiteBallX: true,
+        whiteBallY: true,
+        cueBall: true,
+      },
     });
     if (!note || note.authorId !== session.id) {
       console.log(LOG_PREFIX, "노트 조회 실패 또는 권한 없음:", { noteId, note: note ?? null, sessionId: session.id });
@@ -64,7 +75,14 @@ export async function POST(request: Request) {
     }
 
     const layoutImageUrl = (body.imageUrl ?? note.imageUrl)?.trim() || null;
-    const difficulty = (body.difficulty ?? "")?.trim() || null;
+
+    /** BilliardNote는 컬럼 저장 — TroubleShotPost·난구와 동일 NanguBallPlacement JSON */
+    const ballPlacementJson = JSON.stringify({
+      redBall: { x: note.redBallX, y: note.redBallY },
+      yellowBall: { x: note.yellowBallX, y: note.yellowBallY },
+      whiteBall: { x: note.whiteBallX, y: note.whiteBallY },
+      cueBall: note.cueBall === "yellow" ? "yellow" : "white",
+    });
 
     const postPayload = {
       boardId: board.id,
@@ -76,7 +94,7 @@ export async function POST(request: Request) {
       postId: "(create 직후 채움)" as unknown as string,
       sourceNoteId: note.id,
       layoutImageUrl,
-      difficulty,
+      difficulty: null,
     };
     console.log(LOG_PREFIX, "CommunityPost create 직전 payload:", JSON.stringify(postPayload, null, 2));
     console.log(LOG_PREFIX, "TroubleShotPost 예정 payload:", JSON.stringify({ ...troublePayload, postId: "(post.id)" }, null, 2));
@@ -104,7 +122,8 @@ export async function POST(request: Request) {
           postId: post.id,
           sourceNoteId: note.id,
           layoutImageUrl,
-          difficulty,
+          ballPlacementJson,
+          difficulty: null,
         },
       });
     } catch (createErr) {
@@ -114,7 +133,13 @@ export async function POST(request: Request) {
         stack: err.stack,
         code: err.code,
         meta: err.meta,
-        payload: { postId: post.id, sourceNoteId: note.id, layoutImageUrl, difficulty },
+        payload: {
+          postId: post.id,
+          sourceNoteId: note.id,
+          layoutImageUrl,
+          ballPlacementJson: "(from note)",
+          difficulty: null,
+        },
       });
       throw createErr;
     }
@@ -127,7 +152,7 @@ export async function POST(request: Request) {
       stack: err.stack,
       code: err.code,
       meta: err.meta,
-      requestBody: { noteId: body?.noteId, title: body?.title?.slice(0, 50), contentLength: body?.content?.length, imageUrl: body?.imageUrl ? "(있음)" : null, difficulty: body?.difficulty },
+      requestBody: { noteId: body?.noteId, title: body?.title?.slice(0, 50), contentLength: body?.content?.length, imageUrl: body?.imageUrl ? "(있음)" : null },
     });
     const msg = err.message || "등록에 실패했습니다.";
     return NextResponse.json({ error: msg }, { status: 500 });

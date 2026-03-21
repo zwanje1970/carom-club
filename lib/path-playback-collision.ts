@@ -24,44 +24,62 @@ export function touchDiameterThresholdPx(rect: PlayfieldRect): number {
   return 2 * getBallRadius(longSide) - TOUCH_EPS_PX;
 }
 
-/** 수구 이동 중: 적색 1목 + (수구가 아닌) 다른 수구색 공과 접촉 */
+export type CuePhaseCollisionOptions = {
+  /**
+   * 시각화 재생: 수구→첫 스팟 광선상 **의도된 1목**과 맞닿는 순간은 경로 끝으로 정상 — 충돌 팝업 제외
+   */
+  ignoreTouchingBallKeys?: readonly ("red" | "yellow" | "white")[];
+};
+
+/** 수구 이동 중: 수구가 아닌 두 목적 후보 공 + (고정된) 다른 수구색 공과 접촉 */
 export function cuePhaseCollisionWithOthers(
   cueNorm: NormPoint,
   placement: NanguBallPlacement,
-  rect: PlayfieldRect
+  rect: PlayfieldRect,
+  options?: CuePhaseCollisionOptions
 ): boolean {
   const d = touchDiameterThresholdPx(rect);
-  if (normDistancePx(cueNorm, placement.redBall, rect) < d) return true;
+  const skip = new Set(options?.ignoreTouchingBallKeys ?? []);
+  if (!skip.has("red") && normDistancePx(cueNorm, placement.redBall, rect) < d) return true;
   if (placement.cueBall === "white") {
-    if (normDistancePx(cueNorm, placement.yellowBall, rect) < d) return true;
+    if (!skip.has("yellow") && normDistancePx(cueNorm, placement.yellowBall, rect) < d) return true;
   } else {
-    if (normDistancePx(cueNorm, placement.whiteBall, rect) < d) return true;
+    if (!skip.has("white") && normDistancePx(cueNorm, placement.whiteBall, rect) < d) return true;
   }
   return false;
 }
 
 /**
- * 1목(적색) 이동 중: 양 수구색과 접촉.
- * `skipMovingCueVsRed`: 충돌 직후 구간에서 적색이 아직 수구 맞춤 지점 근처일 때 오탐 방지
+ * 1목(수구 제외 2구 중 실제 맞은 공) 이동 중: 나머지 두 공(수구 끝 위치 + 제3구)과 접촉.
+ * `skipEarlyVsCue`: 충돌 직후 구간에서 맞은 공이 수구 맞춤 지점 근처일 때 오탐 방지
  */
 export function objectPhaseCollisionWithOthers(
-  redNorm: NormPoint,
+  movingObjectNorm: NormPoint,
+  movingBallKey: "red" | "yellow" | "white",
   placement: NanguBallPlacement,
   cueEndNorm: NormPoint,
   rect: PlayfieldRect,
-  skipMovingCueVsRed: boolean
+  skipEarlyVsCue: boolean,
+  progress01: number
 ): boolean {
   const d = touchDiameterThresholdPx(rect);
-  const whitePos: NormPoint = placement.cueBall === "white" ? cueEndNorm : placement.whiteBall;
-  const yellowPos: NormPoint = placement.cueBall === "yellow" ? cueEndNorm : placement.yellowBall;
+  const OBJECT_PHASE_SKIP_UNTIL_T = 0.12;
 
-  if (normDistancePx(redNorm, whitePos, rect) < d) {
-    const movingCueIsWhite = placement.cueBall === "white";
-    if (!(skipMovingCueVsRed && movingCueIsWhite)) return true;
-  }
-  if (normDistancePx(redNorm, yellowPos, rect) < d) {
-    const movingCueIsYellow = placement.cueBall === "yellow";
-    if (!(skipMovingCueVsRed && movingCueIsYellow)) return true;
+  for (const key of ["red", "yellow", "white"] as const) {
+    if (key === movingBallKey) continue;
+    const other: NormPoint =
+      key === placement.cueBall
+        ? cueEndNorm
+        : key === "red"
+          ? placement.redBall
+          : key === "yellow"
+            ? placement.yellowBall
+            : placement.whiteBall;
+    if (normDistancePx(movingObjectNorm, other, rect) < d) {
+      const otherIsCue = key === placement.cueBall;
+      if (otherIsCue && skipEarlyVsCue && progress01 < OBJECT_PHASE_SKIP_UNTIL_T) continue;
+      return true;
+    }
   }
   return false;
 }

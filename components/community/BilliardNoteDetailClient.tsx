@@ -29,34 +29,8 @@ export interface BilliardNoteDetailClientProps {
 
 export function BilliardNoteDetailClient({ note, basePath = "/mypage/notes" }: BilliardNoteDetailClientProps) {
   const router = useRouter();
-  const [visibility, setVisibility] = useState(note.visibility);
-  const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
   const [sendSheetOpen, setSendSheetOpen] = useState(false);
-
-  const toggleCommunity = async () => {
-    if (!note.isAuthor) return;
-    setError("");
-    setUpdating(true);
-    const next = visibility === "community" ? "private" : "community";
-    try {
-      const res = await fetch(`/api/community/billiard-notes/${note.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ visibility: next }),
-      });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j.error ?? "변경에 실패했습니다.");
-      }
-      setVisibility(next);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "오류");
-    } finally {
-      setUpdating(false);
-    }
-  };
 
   const handleDelete = async () => {
     if (!note.isAuthor) return;
@@ -106,14 +80,6 @@ export function BilliardNoteDetailClient({ note, basePath = "/mypage/notes" }: B
       </Link>
       <button
         type="button"
-        onClick={toggleCommunity}
-        disabled={updating}
-        className="flex-1 min-w-0 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 font-medium text-sm disabled:opacity-50"
-      >
-        {visibility === "community" ? "게시 취소" : "공개전환"}
-      </button>
-      <button
-        type="button"
         onClick={handleDelete}
         className="flex-1 min-w-0 py-2.5 rounded-lg border border-red-300 text-red-600 font-medium text-sm hover:bg-red-50 dark:hover:bg-red-900/20"
       >
@@ -153,7 +119,7 @@ export function BilliardNoteDetailClient({ note, basePath = "/mypage/notes" }: B
       <p className="text-sm text-gray-500">
         {note.authorName} · {formatKoreanDateTime(note.createdAt)}
         {" · "}
-        {visibility === "community" ? "커뮤니티 게시" : "비공개"}
+        {note.visibility === "community" ? "커뮤니티 게시" : "비공개"}
       </p>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -174,14 +140,6 @@ export function BilliardNoteDetailClient({ note, basePath = "/mypage/notes" }: B
           >
             수정
           </Link>
-          <button
-            type="button"
-            onClick={toggleCommunity}
-            disabled={updating}
-            className="px-4 py-2 rounded-lg border border-gray-300 dark:border-slate-600 font-medium text-sm disabled:opacity-50"
-          >
-            {visibility === "community" ? "게시 취소" : "커뮤니티에 게시"}
-          </button>
           <button
             type="button"
             onClick={handleDelete}

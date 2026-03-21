@@ -39,13 +39,16 @@
 | `trouble-settings` | 해법 설정 탭·패널 |
 | `trouble-explanation` | 해설 입력 |
 | `trouble-collision-warning` | 경로 재생 중 충돌 경고 토스트 |
+| `trouble-playback-view-controls` | 재생 중 경로선/그리드/실사 토글 오버레이 |
 
 ## 액션 식별자 (`data-trouble-action`)
 
 | action 값 | 동작 |
 |-----------|------|
 | `trouble-toggle-path-mode` | 경로 입력 모드 on/off |
-| `trouble-clear-path` | 경로 점 전체 삭제 |
+| `trouble-clear-path` | (레거시 식별자) — UI는 `trouble-clear-all-paths` 사용 |
+| `trouble-undo-last-path-spot` | 마지막 추가 스팟·선 Undo |
+| `trouble-clear-all-paths` | 수구·1목 경로·스팟·화살표 전체 삭제 (공 배치 유지) |
 | `trouble-panel-thickness` | 두께 패널 활성화 |
 | `trouble-panel-spin` | 당점 패널 |
 | `trouble-panel-backstroke` | 백스트로크 |
@@ -53,8 +56,11 @@
 | `trouble-panel-speed` | 볼스피드 |
 | `trouble-panel-path` | 진행경로 안내 패널 |
 | `trouble-submit-solution` | 해법 등록 제출 |
-| `trouble-play-path` | 경로 재생 (수구→1목) |
+| `trouble-play-path` | 애니메이션 시연 (수구→1목, 충돌 시 정지) |
 | `trouble-dismiss-collision` | 충돌 메시지 닫기 |
+| `trouble-playback-toggle-pathlines` | 재생 중 경로선 표시 토글 |
+| `trouble-playback-toggle-grid` | 재생 중 그리드 표시 토글 |
+| `trouble-playback-toggle-drawstyle` | 재생 중 실사/단순보기 토글 |
 
 ## 관련 파일
 

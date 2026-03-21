@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { IMAGE_PLACEHOLDER_SRC, sanitizeImageSrc } from "@/lib/image-src";
 import { formatKoreanDateTime } from "@/lib/format-date";
+import { DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT } from "@/lib/billiard-table-constants";
+import type { NanguBallPlacement } from "@/lib/nangu-types";
+import { NanguReadOnlyLayout } from "@/components/nangu/NanguReadOnlyLayout";
 
 const VIEWER_KEY_STORAGE = "community_viewer_key";
 
@@ -407,16 +410,41 @@ export function CommunityPostDetailView({
           <span className="text-site-text font-medium line-clamp-1">{post.title}</span>
         </nav>
 
-        {/* 난구해결사: 문제 공배치 상단 고정 영역 */}
-        {post.boardSlug === "trouble" && post.troubleShot?.layoutImageUrl && (
-          <section className="rounded-xl overflow-hidden bg-gray-900 mb-6 flex justify-center" aria-label="문제 공배치">
-            <img
-              src={post.troubleShot.layoutImageUrl}
-              alt="문제 공배치"
-              className="max-w-full h-auto w-full"
-            />
+        {/* 난구해결사: 문제 공배치 — 당구노트 좌표가 있으면 테이블 UI, 없으면 이미지 */}
+        {post.boardSlug === "trouble" && post.troubleShot?.ballPlacement && (
+          <section className="mb-6" aria-label="문제 공배치">
+            <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">공 배치 (당구노트와 동일 좌표)</p>
+            <div
+              className="relative w-full max-w-full mx-auto rounded-xl overflow-hidden border border-gray-200 dark:border-slate-600"
+              style={{
+                maxWidth: DEFAULT_TABLE_WIDTH,
+                aspectRatio: `${DEFAULT_TABLE_WIDTH} / ${DEFAULT_TABLE_HEIGHT}`,
+              }}
+            >
+              <NanguReadOnlyLayout
+                ballPlacement={post.troubleShot.ballPlacement}
+                fillContainer
+                embedFill
+                className="absolute inset-0 w-full h-full rounded-none border-0 overflow-hidden"
+                showGrid
+                drawStyle="realistic"
+                showCueBallSpot
+                hideObjectBall={false}
+              />
+            </div>
           </section>
         )}
+        {post.boardSlug === "trouble" &&
+          !post.troubleShot?.ballPlacement &&
+          post.troubleShot?.layoutImageUrl && (
+            <section className="rounded-xl overflow-hidden bg-gray-900 mb-6 flex justify-center" aria-label="문제 공배치">
+              <img
+                src={post.troubleShot.layoutImageUrl}
+                alt="문제 공배치"
+                className="max-w-full h-auto w-full"
+              />
+            </section>
+          )}
         {post.boardSlug === "trouble" && post.troubleShot?.sourceNoteId && (
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             원본 노트:{" "}

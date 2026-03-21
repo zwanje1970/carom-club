@@ -159,6 +159,25 @@ export function normalizedToPixel(
 }
 
 /**
+ * 플레이필드 정규화 좌표(0..1) 두 점 사이 유클리드 거리(px).
+ * 2:1 필드에서는 norm 공간의 hypot(dx,dy)가 실제 거리와 달라 공 탭·1목 스냅이 빗나가므로 픽셀 거리 사용.
+ */
+export function distanceNormPointsInPlayfieldPx(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  rect: PlayfieldRect
+): number {
+  const pa = normalizedToPixel(a.x, a.y, rect);
+  const pb = normalizedToPixel(b.x, b.y, rect);
+  return Math.hypot(pa.px - pb.px, pa.py - pb.py);
+}
+
+/** 경로 편집: 공 탭 인식 반경(px) — 터치 여유 + 공 지름 기준 */
+export function getSolutionPathBallTapRadiusPx(rect: PlayfieldRect): number {
+  return Math.max(getBallRadius(getPlayfieldLongSide(rect)) * 3.2, 24);
+}
+
+/**
  * 공 외곽 원 전체가 플레이필드 안에 있도록 공 중심 좌표를 보정.
  * 공 중심은 플레이필드 경계에서 ballRadius 만큼 안쪽에 있어야 하며,
  * ballRadius는 플레이필드 긴 변 기준 getBallRadius(longSide) 사용.

@@ -1,21 +1,34 @@
 "use client";
 
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   BilliardTableEditor,
   type BilliardTableEditorHandle,
 } from "@/components/billiard";
-import type { BallColor, CueBallType } from "@/lib/billiard-table-constants";
-import type { TableOrientation } from "@/lib/billiard-table-constants";
+import {
+  DEFAULT_TABLE_WIDTH,
+  DEFAULT_TABLE_HEIGHT,
+  getPlayfieldRect,
+  hitTestBall,
+  isInsidePlayfield,
+  landscapeToPortraitNorm,
+  normalizedToPixel,
+  pixelToNormalized,
+  portraitToLandscapeNorm,
+  type BallColor,
+  type CueBallType,
+  type TableOrientation,
+} from "@/lib/billiard-table-constants";
+import { SolutionTableZoomShell } from "@/components/nangu/SolutionTableZoomShell";
+import type { SolutionTablePanPointerPolicy } from "@/components/nangu/SolutionTableZoomShell";
+import type { SolutionTableZoomContextValue } from "@/components/nangu/solution-table-zoom-context";
 import { useBallPlacementFullscreen } from "./BallPlacementFullscreenContext";
 
-function KebabIcon({ className }: { className?: string }) {
+function CloseXIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} fill="currentColor" viewBox="0 0 24 24" aria-hidden>
-      <circle cx="12" cy="5" r="1.5" />
-      <circle cx="12" cy="12" r="1.5" />
-      <circle cx="12" cy="19" r="1.5" />
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden>
+      <path d="M18 6L6 18M6 6l12 12" />
     </svg>
   );
 }
@@ -62,17 +75,18 @@ export function MobileBallPlacementFullscreen({
   const router = useRouter();
   const editorRef = useRef<BilliardTableEditorHandle>(null);
   const fullscreen = useBallPlacementFullscreen();
-  const [cueBall, setCueBall] = useState<CueBallType | null>(
-    initialCueBall ?? null
-  );
+  /** 공배치 시작 시 수구 선택 UI 없음 — 기본 흰공(또는 initial). 변경은 상단「수구」 */
+  const [cueBall, setCueBall] = useState<CueBallType>(initialCueBall ?? "white");
+  const [cuePickerOpen, setCuePickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [toolsDrawerOpen, setToolsDrawerOpen] = useState(false);
   const [gridOn, setGridOn] = useState(true);
   const [drawStyle, setDrawStyle] = useState<"realistic" | "wireframe">("realistic");
   /** 수구 깜빡임(스팟) 표시 — 수구확인 버튼으로 ON/OFF */
   const [cueSpotOn, setCueSpotOn] = useState(true);
+  /** 미세조정 UI 포털 타깃 — 뷰포트 중앙·고정 크기 */
+  const [fineTuneOverlayRoot, setFineTuneOverlayRoot] = useState<HTMLDivElement | null>(null);
   const orientation = useTableOrientation();
-  const menuRef = useRef<HTMLDivElement>(null);
   const [placementBar, setPlacementBar] = useState<{
     selectedBall: BallColor | null;
     x: number;
@@ -91,14 +105,77 @@ export function MobileBallPlacementFullscreen({
     []
   );
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const close = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+  const zoomCtxRef = useRef<SolutionTableZoomContextValue | null>(null);
+  const cw = orientation === "portrait" ? DEFAULT_TABLE_HEIGHT : DEFAULT_TABLE_WIDTH;
+  const ch = orientation === "portrait" ? DEFAULT_TABLE_WIDTH : DEFAULT_TABLE_HEIGHT;
+  const playfieldRect = useMemo(() => getPlayfieldRect(cw, ch), [cw, ch]);
+  /** 공 스냅샷·히트는 항상 landscape 정규화 기준 (BilliardTableEditor / 캔버스와 동일) */
+  const landscapePlayfieldRect = useMemo(
+    () => getPlayfieldRect(DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT),
+    []
+  );
+  /**
+   * 줌 초점: 항상 플레이필드 중심만 사용.
+   * 선택 공 좌표를 초점으로 두면 드래그할 때마다 focusCanvas가 바뀌어
+   * 뷰가 공을 화면 중앙에 붙잡고 테이블만 밀리는 것처럼 보임.
+   */
+  const zoomFocus = useMemo(() => {
+    const centerVn =
+      orientation === "portrait"
+        ? landscapeToPortraitNorm(0.5, 0.5)
+        : { x: 0.5, y: 0.5 };
+    const center = normalizedToPixel(centerVn.x, centerVn.y, playfieldRect);
+    return { x: center.px, y: center.py };
+  }, [orientation, playfieldRect]);
+
+  const panPointerPolicy = useMemo((): SolutionTablePanPointerPolicy => {
+    return {
+      isEmptyForPan(clientX, clientY, target) {
+        if (target instanceof Element) {
+          if (target.closest("[data-solution-table-zoom-controls]")) return false;
+          if (target.closest("[data-ball-placement-overlay-ui]")) return false;
+          if (target.closest("[data-ball-placement-chrome]")) return false;
+        }
+        const z = zoomCtxRef.current;
+        if (!z) return false;
+        const cp = z.viewportClientToCanvasPx(clientX, clientY);
+        if (!cp || !isInsidePlayfield(cp.x, cp.y, playfieldRect)) return false;
+        const snap = editorRef.current?.getSnapshot();
+        // ref 미부착 시 "빈 곳"으로 보지 않음 — 그렇지 않으면 줌>1에서 뷰 팬이 먼저 잡혀 공이 안 움직임
+        if (!snap) return false;
+        const vn = pixelToNormalized(cp.x, cp.y, playfieldRect);
+        const vnLand =
+          orientation === "portrait"
+            ? portraitToLandscapeNorm(vn.x, vn.y)
+            : { x: vn.x, y: vn.y };
+        const { px: hitPx, py: hitPy } = normalizedToPixel(
+          vnLand.x,
+          vnLand.y,
+          landscapePlayfieldRect
+        );
+        return (
+          hitTestBall(
+            hitPx,
+            hitPy,
+            snap.redBall,
+            snap.yellowBall,
+            snap.whiteBall,
+            landscapePlayfieldRect,
+            6
+          ) == null
+        );
+      },
     };
-    document.addEventListener("click", close);
-    return () => document.removeEventListener("click", close);
-  }, [menuOpen]);
+  }, [playfieldRect, landscapePlayfieldRect, orientation]);
+
+  useEffect(() => {
+    if (!toolsDrawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setToolsDrawerOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toolsDrawerOpen]);
 
   useEffect(() => {
     fullscreen?.setFullscreen(true);
@@ -138,184 +215,277 @@ export function MobileBallPlacementFullscreen({
     }
   };
 
+  const handleCancel = () => {
+    fullscreen?.setFullscreen(false);
+    onExitFullscreen?.();
+    if (!returnOnly) router.back();
+  };
+
+  const pickCue = (next: CueBallType) => {
+    setCueBall(next);
+    setCuePickerOpen(false);
+  };
+
   return (
     <div
       className="fixed inset-0 z-[9999] flex flex-col bg-site-bg"
       style={{ padding: "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)" }}
     >
-      {/* 상단: 좌표·공선택 | 점3개·완료 — 한 줄·max-w-2xl */}
-      <div className="w-full flex justify-center px-2 pt-2 z-10 shrink-0">
-        <div className="w-full max-w-2xl flex items-center gap-2 min-h-9">
-          <div className="flex-1 min-w-0 pr-1">
-            <div
-              className={`inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md px-2 py-1.5 ${
-                placementBar?.selectedBall ? "bg-black" : "bg-black/60"
-              }`}
-              aria-live="polite"
-            >
-              {placementBar?.selectedBall ? (
-                <>
-                  <span
-                    className="text-[11px] sm:text-xs font-mono tabular-nums font-medium text-[#00ff88]"
-                    style={{ textShadow: "0 0 6px #00ff88" }}
-                  >
-                    X:{placementBar.x.toFixed(3)} Y:{placementBar.y.toFixed(3)}
-                  </span>
-                  <span className="text-[11px] sm:text-xs font-medium text-white shrink-0 inline-flex items-center gap-1">
-                    <span
-                      className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
-                      style={{
-                        backgroundColor:
-                          placementBar.selectedBall === "red"
-                            ? "#c41e3a"
-                            : placementBar.selectedBall === "yellow"
-                              ? "#f5d033"
-                              : "#f8f8f8",
-                      }}
-                      aria-hidden
-                    />
-                    {placementBar.selectedBall === "red"
-                      ? "빨간"
-                      : placementBar.selectedBall === "yellow"
-                        ? "노란"
-                        : "흰"}
-                    공
-                  </span>
-                </>
-              ) : (
-                <span className="text-[11px] text-white/70">공을 탭해 선택</span>
-              )}
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-          <div className="relative" ref={menuRef}>
-            <button
-              type="button"
-              onClick={() => setMenuOpen((v) => !v)}
-              className="flex h-8 min-w-[2rem] items-center justify-center gap-1 rounded-lg bg-black/20 dark:bg-white/20 text-site-text backdrop-blur-sm hover:bg-black/30 dark:hover:bg-white/30 px-2"
-              aria-label="보기"
-              aria-expanded={menuOpen}
-            >
-              <KebabIcon className="h-4 w-4 shrink-0" />
-              <span className="text-xs font-medium">보기</span>
-            </button>
-            {menuOpen && (
-              <div
-                className="absolute left-0 top-full mt-1 min-w-[160px] rounded-lg border border-gray-200 dark:border-slate-600 bg-white/95 dark:bg-slate-800/95 shadow-lg py-1.5 z-20 backdrop-blur-sm"
-                role="menu"
-              >
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setDrawStyle(drawStyle === "realistic" ? "wireframe" : "realistic");
-                    setMenuOpen(false);
-                  }}
-                  className="w-full px-4 py-3 min-h-[44px] text-left text-sm font-medium text-site-text hover:bg-gray-100 dark:hover:bg-slate-700 active:bg-gray-200 dark:active:bg-slate-600"
-                >
-                  {drawStyle === "realistic" ? "단순보기" : "실사보기"}
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setGridOn(!gridOn);
-                    setMenuOpen(false);
-                  }}
-                  className="w-full px-4 py-3 min-h-[44px] text-left text-sm font-medium text-site-text hover:bg-gray-100 dark:hover:bg-slate-700 active:bg-gray-200 dark:active:bg-slate-600"
-                >
-                  {gridOn ? "그리드 숨기기" : "그리드 보이기"}
-                </button>
-              </div>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => setCueSpotOn((v) => !v)}
-            className={`shrink-0 rounded-lg px-2 py-1.5 text-[10px] sm:text-xs font-semibold leading-tight border transition-colors ${
-              cueSpotOn
-                ? "border-site-primary/60 bg-site-primary/15 text-site-primary"
-                : "border-gray-300 dark:border-slate-600 bg-black/10 dark:bg-white/10 text-site-text"
+      {/* 당구대 전체 영역 (세로 가득) + 줌/팬 — 프레임 위 플로팅 X·저장·슬라이드 메뉴 */}
+      <div className="flex flex-1 min-h-0 w-full items-stretch justify-center p-2">
+        <div className="relative flex h-full min-h-0 w-full max-w-2xl flex-col">
+          {/* 반투명 배경 + 우측 슬라이딩 패널 */}
+          <div
+            data-ball-placement-chrome=""
+            aria-hidden={!toolsDrawerOpen}
+            className={`fixed inset-0 z-[195] bg-black/30 transition-opacity duration-300 ease-out ${
+              toolsDrawerOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
             }`}
-            aria-pressed={cueSpotOn}
-            aria-label={cueSpotOn ? "수구 확인 표시 끄기" : "수구 확인 표시 켜기"}
+            onClick={() => setToolsDrawerOpen(false)}
+          />
+          <aside
+            data-ball-placement-chrome=""
+            id="ball-placement-tools-drawer"
+            aria-hidden={!toolsDrawerOpen}
+            className={`fixed top-0 right-0 z-[200] flex h-full w-[min(88vw,300px)] flex-col border-l border-white/20 bg-black/30 text-white shadow-[-6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md transition-transform duration-300 ease-out ${
+              toolsDrawerOpen ? "translate-x-0" : "pointer-events-none translate-x-full"
+            }`}
           >
-            수구확인
-            <br />
-            <span className="tabular-nums">{cueSpotOn ? "ON" : "OFF"}</span>
-          </button>
+            <div className="border-b border-white/15 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+              <h2 className="text-sm font-semibold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">보기 · 설정</h2>
+            </div>
+            <div className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <button
+                type="button"
+                className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-medium bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                onClick={() => {
+                  setToolsDrawerOpen(false);
+                  setCuePickerOpen(true);
+                }}
+              >
+                수구 변경
+                <span className="mt-0.5 block text-xs font-normal text-white/55">
+                  현재: {cueBall === "yellow" ? "노란공" : "흰공"}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-medium bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                onClick={() => {
+                  setDrawStyle(drawStyle === "realistic" ? "wireframe" : "realistic");
+                  setToolsDrawerOpen(false);
+                }}
+              >
+                {drawStyle === "realistic" ? "단순보기로 전환" : "실사보기로 전환"}
+              </button>
+              <button
+                type="button"
+                className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-medium bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                onClick={() => {
+                  setGridOn(!gridOn);
+                  setToolsDrawerOpen(false);
+                }}
+              >
+                {gridOn ? "그리드 숨기기" : "그리드 보이기"}
+              </button>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={cueSpotOn}
+                className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-medium bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                onClick={() => {
+                  setCueSpotOn((v) => !v);
+                  setToolsDrawerOpen(false);
+                }}
+              >
+                수구 확인 표시
+                <span className="mt-0.5 block text-xs font-normal text-white/55">
+                  {cueSpotOn ? "켜짐 (ON)" : "꺼짐 (OFF)"}
+                </span>
+              </button>
+            </div>
+          </aside>
+
+          {/* 우측 가장자리 살짝 노출 탭 — 슬라이드 메뉴 열기 */}
           <button
             type="button"
-            onClick={handleComplete}
-            disabled={saving || !cueBall}
-            className="flex items-center gap-1 rounded-lg bg-site-primary px-2.5 py-1.5 text-xs font-medium text-white shadow disabled:opacity-50"
-            aria-label="저장 후 완료"
+            data-ball-placement-chrome=""
+            aria-label="보기 및 설정 메뉴 열기"
+            aria-expanded={toolsDrawerOpen}
+            aria-controls="ball-placement-tools-drawer"
+            onClick={() => setToolsDrawerOpen(true)}
+            className="absolute right-0 top-1/2 z-[125] flex h-11 w-[1.35rem] -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-white/20 bg-black/30 text-white shadow-md backdrop-blur-sm touch-manipulation hover:bg-black/40 active:bg-black/45"
           >
-            <span>{saving ? "저장 중…" : "완료"}</span>
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            <svg className="h-3.5 w-3.5 shrink-0 opacity-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" />
             </svg>
           </button>
-          </div>
-        </div>
-      </div>
 
-      {/* 당구대 전체 영역 (세로 가득) */}
-      <div className="flex flex-1 min-h-0 w-full items-center justify-center p-2">
-        <div className="relative h-full w-full max-w-2xl flex items-center justify-center">
-          <BilliardTableEditor
-            ref={editorRef}
-            initialRed={initialRed}
-            initialYellow={initialYellow}
-            initialWhite={initialWhite}
-            initialCueBall={cueBall ?? undefined}
-            showGrid={gridOn}
-            gridOn={gridOn}
-            onGridChange={setGridOn}
-            drawStyle={drawStyle}
-            onDrawStyleChange={setDrawStyle}
-            interactive={cueBall !== null}
-            canvasOnly={true}
-            orientation={orientation}
-            cueBall={cueBall ?? undefined}
-            placementMode={true}
-            onPlacementBarInfo={onPlacementBarInfo}
-            cueBallSpotEnabled={cueSpotOn}
-          />
+          {/* 프레임 왼쪽 상단: 닫기 (원형 X) */}
+          <button
+            type="button"
+            data-ball-placement-chrome=""
+            onClick={handleCancel}
+            className="absolute z-[125] flex h-11 w-11 items-center justify-center rounded-full border border-white/35 bg-black/50 text-white shadow-lg backdrop-blur-md touch-manipulation hover:bg-black/60 active:scale-95"
+            style={{ top: "max(0.5rem, env(safe-area-inset-top, 0px))", left: "max(0.5rem, env(safe-area-inset-left, 0px))" }}
+            aria-label="닫기"
+          >
+            <CloseXIcon className="h-5 w-5" />
+          </button>
 
-          {/* 수구 미선택 시 중앙 반투명 오버레이 — 투명도 20%, 원형셀 50% 확대 */}
-          {cueBall === null && (
+          {/* 프레임 오른쪽 상단: 저장 */}
+          <button
+            type="button"
+            data-ball-placement-chrome=""
+            onClick={handleComplete}
+            disabled={saving}
+            className="absolute z-[125] rounded-full bg-site-primary px-4 py-2.5 text-xs font-semibold text-white shadow-lg backdrop-blur-sm touch-manipulation disabled:opacity-50 hover:brightness-110 active:scale-[0.98]"
+            style={{ top: "max(0.5rem, env(safe-area-inset-top, 0px))", right: "max(0.5rem, env(safe-area-inset-right, 0px))" }}
+            aria-label={saving ? "저장 중" : "저장"}
+          >
+            {saving ? "저장 중…" : "저장"}
+          </button>
+
+          {/* 선택된 공 표시 (중앙 상단) */}
+          {placementBar?.selectedBall ? (
             <div
-              className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/20"
+              className="pointer-events-none absolute left-1/2 top-2 z-[124] -translate-x-1/2"
+              style={{ top: "max(0.5rem, env(safe-area-inset-top, 0px))" }}
+              aria-live="polite"
+            >
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/55 px-3 py-1.5 text-[11px] font-medium text-white shadow-md backdrop-blur-sm sm:text-xs">
+                <span
+                  className="inline-block h-2 w-2 shrink-0 rounded-full"
+                  style={{
+                    backgroundColor:
+                      placementBar.selectedBall === "red"
+                        ? "#c41e3a"
+                        : placementBar.selectedBall === "yellow"
+                          ? "#f5d033"
+                          : "#f8f8f8",
+                  }}
+                  aria-hidden
+                />
+                {placementBar.selectedBall === "red"
+                  ? "빨간 공"
+                  : placementBar.selectedBall === "yellow"
+                    ? "노란 공"
+                    : "흰 공"}
+              </div>
+            </div>
+          ) : null}
+
+          <SolutionTableZoomShell
+            className="relative min-h-0 flex-1 w-full overflow-hidden rounded-lg border border-gray-200 dark:border-slate-600"
+            contentWidth={cw}
+            contentHeight={ch}
+            focusCanvasX={zoomFocus.x}
+            focusCanvasY={zoomFocus.y}
+            fitMode="contain"
+            panResetKey={placementBar?.selectedBall ?? "none"}
+            panPointerPolicy={panPointerPolicy}
+            forceShowZoomControls
+          >
+            {(zoom) => {
+              zoomCtxRef.current = zoom;
+              return (
+                <div className="relative" style={{ width: cw, height: ch }}>
+                  <BilliardTableEditor
+                    ref={editorRef}
+                    initialRed={initialRed}
+                    initialYellow={initialYellow}
+                    initialWhite={initialWhite}
+                    initialCueBall={cueBall}
+                    showGrid={gridOn}
+                    gridOn={gridOn}
+                    onGridChange={setGridOn}
+                    drawStyle={drawStyle}
+                    onDrawStyleChange={setDrawStyle}
+                    interactive={true}
+                    canvasOnly={true}
+                    orientation={orientation}
+                    cueBall={cueBall}
+                    placementMode={true}
+                    onPlacementBarInfo={onPlacementBarInfo}
+                    cueBallSpotEnabled={cueSpotOn}
+                    tableEmbedFill
+                    fineTuneOverlayRoot={fineTuneOverlayRoot}
+                  />
+                </div>
+              );
+            }}
+          </SolutionTableZoomShell>
+
+          {/* 상단「수구」로만 열림 — 공배치 시작 시에는 표시하지 않음 */}
+          {cuePickerOpen && (
+            <div
+              className="absolute inset-0 z-[220] flex items-center justify-center rounded-lg bg-transparent"
               aria-modal="true"
               role="dialog"
               aria-label="수구 선택"
             >
-              <div className="mx-4 rounded-xl bg-transparent px-6 py-5">
-                <p className="text-center text-base font-medium text-white mb-4">
-                  수구선택 후 공을 배치하세요
+              <button
+                type="button"
+                className="absolute inset-0 cursor-default bg-transparent"
+                aria-label="닫기"
+                onClick={() => setCuePickerOpen(false)}
+              />
+              <div className="relative z-[1] mx-4 flex flex-col items-center rounded-xl bg-transparent px-6 py-5">
+                <p
+                  className="text-center text-base font-medium text-white mb-6"
+                  style={{
+                    textShadow:
+                      "0 1px 3px rgba(0,0,0,0.95), 0 0 10px rgba(0,0,0,0.6)",
+                  }}
+                >
+                  수구를 선택하세요
                 </p>
                 <div className="flex gap-8 justify-center">
                   <button
                     type="button"
-                    onClick={() => setCueBall("white")}
-                    className="flex h-[84px] w-[84px] items-center justify-center rounded-full border-2 border-white/20 shadow-md hover:scale-110 hover:border-white/30 transition-transform"
-                    aria-label="흰공"
+                    onClick={() => pickCue("white")}
+                    className={`flex h-[84px] w-[84px] items-center justify-center rounded-full border-2 shadow-md transition-transform hover:scale-110 hover:border-white/40 ${
+                      cueBall === "white"
+                        ? "border-site-primary ring-2 ring-site-primary/50"
+                        : "border-white/20"
+                    }`}
+                    aria-label="흰공을 수구로"
                   >
-                    <span className="h-[60px] w-[60px] rounded-full bg-[#f8f8f8] shadow-inner block" style={{ boxShadow: "inset 0 2px 4px rgba(255,255,255,0.8), inset 0 -2px 4px rgba(0,0,0,0.15)" }} />
+                    <span
+                      className="h-[60px] w-[60px] rounded-full bg-[#f8f8f8] shadow-inner block"
+                      style={{
+                        boxShadow:
+                          "inset 0 2px 4px rgba(255,255,255,0.8), inset 0 -2px 4px rgba(0,0,0,0.15)",
+                      }}
+                    />
                   </button>
                   <button
                     type="button"
-                    onClick={() => setCueBall("yellow")}
-                    className="flex h-[84px] w-[84px] items-center justify-center rounded-full border-2 border-white/20 shadow-md hover:scale-110 hover:border-white/30 transition-transform"
-                    aria-label="노란공"
+                    onClick={() => pickCue("yellow")}
+                    className={`flex h-[84px] w-[84px] items-center justify-center rounded-full border-2 shadow-md transition-transform hover:scale-110 hover:border-white/40 ${
+                      cueBall === "yellow"
+                        ? "border-site-primary ring-2 ring-site-primary/50"
+                        : "border-white/20"
+                    }`}
+                    aria-label="노란공을 수구로"
                   >
-                    <span className="h-[60px] w-[60px] rounded-full bg-[#f5d033] block" style={{ boxShadow: "inset 0 2px 4px rgba(255,255,255,0.5), inset 0 -2px 4px rgba(0,0,0,0.25)" }} />
+                    <span
+                      className="h-[60px] w-[60px] rounded-full bg-[#f5d033] block"
+                      style={{
+                        boxShadow: "inset 0 2px 4px rgba(255,255,255,0.5), inset 0 -2px 4px rgba(0,0,0,0.25)",
+                      }}
+                    />
                   </button>
                 </div>
               </div>
             </div>
           )}
+
+          {/* 미세조정(▲◀▶▼): 뷰포트 정중앙·48px 고정 — 수구 모달(z-200) 아래 두지 않도록 같은 컬럼 안에서 쌓기 */}
+          <div
+            ref={setFineTuneOverlayRoot}
+            className="pointer-events-none fixed inset-0 z-[130] flex items-center justify-center"
+          />
         </div>
       </div>
     </div>

@@ -2,17 +2,17 @@
 
 /**
  * 난구해결(trouble) 전용 해법 편집기.
- * - 원본: layoutImageUrl(이미지) 또는 ballPlacement(좌표) 읽기 전용
- * - 해법: 두께·당점·백스트로크·팔로우·볼스피드·진행경로·해설
+ * - 원본: layoutImageUrl(이미지) 또는 ballPlacement(좌표) 읽기 전용 미리보기
+ * - 경로 편집: 전체화면만 (스팟·줌·애니메이션)
  * - 저장: content(해설) + solutionData(JSON)
  */
-import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   getPlayfieldRect,
-  pixelToNormalized,
   DEFAULT_TABLE_WIDTH,
   DEFAULT_TABLE_HEIGHT,
 } from "@/lib/billiard-table-constants";
+import { useTableOrientation } from "@/hooks/useTableOrientation";
 import type { NanguBallPlacement } from "@/lib/nangu-types";
 import type { NanguSolutionData } from "@/lib/nangu-types";
 import type { NanguPathPoint } from "@/lib/nangu-types";
@@ -23,14 +23,7 @@ import { NanguSpinEditor } from "@/components/nangu/NanguSpinEditor";
 import { NanguFocusZoomOverlay, type NanguFocusZoomTarget } from "@/components/nangu/NanguFocusZoomOverlay";
 import { sanitizeImageSrc } from "@/lib/image-src";
 import { TROUBLE_SOLUTION_CONSOLE } from "@/components/trouble/trouble-console-contract";
-import { cueObjectCollisionNormalized } from "@/lib/solution-path-geometry";
-import type { CushionSnapFn } from "@/lib/cue-path-cushion-rules";
-import {
-  appendCuePathSpot,
-  insertCuePathSpot,
-  moveCuePathSpotById,
-  stripInvalidEndSpots,
-} from "@/lib/cue-path-cushion-rules";
+import { cueFirstObjectHitFromBallPlacement } from "@/lib/solution-path-geometry";
 import {
   BALL_SPEED_OPTIONS,
   ballSpeedToLegacySpeed,
@@ -39,8 +32,8 @@ import {
   getRailDisplayPowerForBallSpeed,
   type BallSpeed,
 } from "@/lib/ball-speed-constants";
-import { useTroublePathPlayback } from "@/hooks/useTroublePathPlayback";
-import { CollisionWarningToast } from "@/components/trouble/CollisionWarningToast";
+import { SolutionPathEditorFullscreen } from "@/components/nangu/SolutionPathEditorFullscreen";
+import { NanguTablePreviewHitLayer } from "@/components/nangu/NanguTablePreviewHitLayer";
 
 export type TroubleActivePanel =
   | "thickness"
@@ -60,9 +53,6 @@ export interface TroubleSolutionEditorProps {
   onSubmit: (payload: { content: string; solutionData: NanguSolutionData }) => Promise<void>;
 }
 
-/** PC에서 배치도 폭 확대 (중심 콘텐츠) */
-const LAYOUT_PLACEMENT_MAX_WIDTH = 960;
-
 export function TroubleSolutionEditor({
   layoutImageUrl,
   ballPlacement,
@@ -78,12 +68,10 @@ export function TroubleSolutionEditor({
   const [backstrokeLevel, setBackstrokeLevel] = useState(5);
   const [followStrokeLevel, setFollowStrokeLevel] = useState(5);
   const [ballSpeed, setBallSpeed] = useState<BallSpeed>(3.0);
-  const [pathMode, setPathMode] = useState(false);
-  const [objectPathMode, setObjectPathMode] = useState(false);
   const [pathPoints, setPathPoints] = useState<NanguPathPoint[]>([]);
   const [objectPathPoints, setObjectPathPoints] = useState<NanguPathPoint[]>([]);
-  /** 1목 경로 미입력 상태에서 시연 시 red 공 숨김 */
-  const [pathRuleHint, setPathRuleHint] = useState("");
+  const [pathFsOpen, setPathFsOpen] = useState(false);
+  const [pathFsKey, setPathFsKey] = useState(0);
   const [explanationText, setExplanationText] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -93,7 +81,9 @@ export function TroubleSolutionEditor({
     originX: number;
     originY: number;
   }>({ active: false, target: null, originX: 0, originY: 0 });
-  const containerRef = useRef<HTMLDivElement>(null);
+
+  const previewOrientation = useTableOrientation();
+
   const rect = getPlayfieldRect(DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT);
 
   const cuePos = ballPlacement
@@ -102,177 +92,22 @@ export function TroubleSolutionEditor({
       : ballPlacement.whiteBall
     : { x: 0.5, y: 0.5 };
 
-  const objectBallNorm = ballPlacement?.redBall ?? null;
+  const firstObjectHit = useMemo(() => {
+    if (!ballPlacement || pathPoints.length < 1) return null;
+    return cueFirstObjectHitFromBallPlacement(cuePos, pathPoints[0], ballPlacement, rect);
+  }, [ballPlacement, pathPoints, cuePos, rect]);
 
-  const collisionNorm = useMemo(() => {
-    if (!objectBallNorm || pathPoints.length < 1) return null;
-    return cueObjectCollisionNormalized(cuePos, pathPoints[0], objectBallNorm, rect);
-  }, [objectBallNorm, pathPoints, cuePos, rect]);
+  const collisionNorm = firstObjectHit?.collision ?? null;
 
-  const getNormalizedFromEvent = useCallback(
-    (clientX: number, clientY: number): { x: number; y: number } | null => {
-      const el = containerRef.current;
-      if (!el) return null;
-      const r = el.getBoundingClientRect();
-      const scaleX = DEFAULT_TABLE_WIDTH / r.width;
-      const scaleY = DEFAULT_TABLE_HEIGHT / r.height;
-      const px = (clientX - r.left) * scaleX;
-      const py = (clientY - r.top) * scaleY;
-      if (
-        px >= rect.left &&
-        px <= rect.left + rect.width &&
-        py >= rect.top &&
-        py <= rect.top + rect.height
-      ) {
-        return pixelToNormalized(px, py, rect);
-      }
-      return null;
-    },
-    [rect.left, rect.top, rect.width, rect.height]
-  );
-
-  const snapToCushionIfNear = useCallback((x: number, y: number): { x: number; y: number; type: "ball" | "cushion" | "free" } => {
-    const margin = 0.04;
-    let nx = x, ny = y;
-    let onEdge = false;
-    if (x <= margin) { nx = 0; onEdge = true; } else if (x >= 1 - margin) { nx = 1; onEdge = true; }
-    if (y <= margin) { ny = 0; onEdge = true; } else if (y >= 1 - margin) { ny = 1; onEdge = true; }
-    return { x: nx, y: ny, type: onEdge ? "cushion" : "free" };
+  const openPathFullscreen = useCallback(() => {
+    setPathFsKey((k) => k + 1);
+    setPathFsOpen(true);
   }, []);
 
-  const cushionSnapFn: CushionSnapFn = useCallback(
-    (x: number, y: number) => {
-      const r = snapToCushionIfNear(x, y);
-      return { x: r.x, y: r.y, type: r.type === "cushion" ? "cushion" : "free" };
-    },
-    [snapToCushionIfNear]
-  );
-
-  const newCueSpotId = useCallback(
-    () => `p-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    []
-  );
-
-  const runCueAppend = useCallback(
-    (norm: { x: number; y: number }) => {
-      setPathPoints((prev) => {
-        const r = appendCuePathSpot(prev, norm, cushionSnapFn, newCueSpotId);
-        if (!r.ok) {
-          queueMicrotask(() => setPathRuleHint(r.message));
-          return prev;
-        }
-        queueMicrotask(() => setPathRuleHint(""));
-        return r.points;
-      });
-    },
-    [cushionSnapFn, newCueSpotId]
-  );
-
-  const clearPathPoints = useCallback(() => {
+  const clearCommittedPath = useCallback(() => {
     setPathPoints([]);
     setObjectPathPoints([]);
   }, []);
-
-  const addObjectPathPoint = useCallback(
-    (norm: { x: number; y: number }, type?: "ball" | "cushion" | "free") => {
-      const snapped =
-        type != null ? { x: norm.x, y: norm.y, type } : snapToCushionIfNear(norm.x, norm.y);
-      setObjectPathPoints((prev) => [
-        ...prev,
-        { id: `o-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, x: snapped.x, y: snapped.y, type: snapped.type },
-      ]);
-    },
-    [snapToCushionIfNear]
-  );
-
-  const clearObjectPathPoints = useCallback(() => setObjectPathPoints([]), []);
-
-  const moveObjectPathPoint = useCallback(
-    (id: string, norm: { x: number; y: number }) => {
-      const snapped = snapToCushionIfNear(norm.x, norm.y);
-      setObjectPathPoints((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, x: snapped.x, y: snapped.y, type: snapped.type } : p))
-      );
-    },
-    [snapToCushionIfNear]
-  );
-
-  const removeObjectPathPoint = useCallback((id: string) => {
-    setObjectPathPoints((prev) => prev.filter((p) => p.id !== id));
-  }, []);
-
-  const insertObjectPathPointBetween = useCallback(
-    (segmentIndex: number, norm: { x: number; y: number }) => {
-      const snapped = snapToCushionIfNear(norm.x, norm.y);
-      const newPoint: NanguPathPoint = {
-        id: `o-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        x: snapped.x,
-        y: snapped.y,
-        type: snapped.type,
-      };
-      setObjectPathPoints((prev) => {
-        const next = [...prev];
-        next.splice(segmentIndex, 0, newPoint);
-        return next;
-      });
-    },
-    [snapToCushionIfNear]
-  );
-
-  const pathPlayback = useTroublePathPlayback({
-    ballPlacement,
-    pathPoints,
-    objectPathPoints,
-    ballSpeed,
-    isBankShot,
-    thicknessOffsetX,
-  });
-
-  useEffect(() => {
-    if (pathPoints.length === 0) {
-      setObjectPathPoints([]);
-      setObjectPathMode(false);
-    }
-  }, [pathPoints.length]);
-
-  const movePathPoint = useCallback(
-    (id: string, norm: { x: number; y: number }) => {
-      setPathPoints((prev) => moveCuePathSpotById(prev, id, norm, cushionSnapFn));
-    },
-    [cushionSnapFn]
-  );
-
-  const removePathPoint = useCallback((id: string) => {
-    setPathPoints((prev) => stripInvalidEndSpots(prev.filter((p) => p.id !== id)));
-  }, []);
-
-  const insertPathPointBetween = useCallback(
-    (segmentIndex: number, norm: { x: number; y: number }) => {
-      setPathPoints((prev) => {
-        const r = insertCuePathSpot(prev, segmentIndex, norm, cushionSnapFn, newCueSpotId);
-        if (!r.ok) {
-          queueMicrotask(() => setPathRuleHint(r.message));
-          return prev;
-        }
-        queueMicrotask(() => setPathRuleHint(""));
-        return r.points;
-      });
-    },
-    [cushionSnapFn, newCueSpotId]
-  );
-
-  const handleTableClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (!pathMode) return;
-      const norm = getNormalizedFromEvent(e.clientX, e.clientY);
-      if (!norm) return;
-      const dupThreshold = 0.03;
-      const isDup = pathPoints.length > 0 && pathPoints.some((p) => Math.hypot(p.x - norm.x, p.y - norm.y) < dupThreshold);
-      if (isDup) return;
-      runCueAppend(norm);
-    },
-    [pathMode, getNormalizedFromEvent, runCueAppend, pathPoints]
-  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -281,12 +116,15 @@ export function TroubleSolutionEditor({
     try {
       const pointsForPath = pathPoints.length >= 1 ? pathPoints.map((p) => ({ x: p.x, y: p.y })) : [];
       let reflectionPath: NanguSolutionData["reflectionPath"];
-      if (collisionNorm && objectPathPoints.length >= 1) {
+      let reflectionObjectBall: NanguSolutionData["reflectionObjectBall"];
+      if (collisionNorm && objectPathPoints.length >= 1 && ballPlacement && pathPoints.length >= 1) {
+        const hit = cueFirstObjectHitFromBallPlacement(cuePos, pathPoints[0], ballPlacement, rect);
         const objPts = objectPathPoints.map((p) => ({ x: p.x, y: p.y }));
         reflectionPath = {
           points: [{ x: collisionNorm.x, y: collisionNorm.y }, ...objPts],
           pointsWithType: objectPathPoints,
         };
+        reflectionObjectBall = hit?.objectKey;
       }
 
       const solutionData: NanguSolutionData = {
@@ -296,8 +134,9 @@ export function TroubleSolutionEditor({
         tipY: spinY,
         spinX,
         spinY,
-        paths: pointsForPath.length >= 2 ? [{ points: pointsForPath, pointsWithType: pathPoints }] : [],
+        paths: pointsForPath.length >= 1 ? [{ points: pointsForPath, pointsWithType: pathPoints }] : [],
         reflectionPath,
+        reflectionObjectBall,
         backstrokeLevel,
         followStrokeLevel,
         ballSpeed,
@@ -321,6 +160,8 @@ export function TroubleSolutionEditor({
 
   const C = TROUBLE_SOLUTION_CONSOLE;
 
+  const previewDisabled = !ballPlacement && !showImageOnly;
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -330,163 +171,153 @@ export function TroubleSolutionEditor({
       {/* 1) 제목/설명 */}
       <div>
         <h2 className="text-lg font-semibold text-site-text">{postTitle}</h2>
-        <p className="text-sm text-gray-600 dark:text-slate-400 mt-1 whitespace-pre-wrap line-clamp-4">{postContent}</p>
+        <p className="text-sm text-gray-600 dark:text-slate-400 mt-1 whitespace-pre-wrap line-clamp-4">
+          {postContent}
+        </p>
       </div>
 
-      {/* 2) 공배치도 (확대: PC에서 중심 콘텐츠) */}
+      {/* 2) 공배치 미리보기 — 당구노트 해법과 동일: 기기 방향 반영, 탭 시 당구노트형 전체화면 */}
       <div className="w-full flex flex-col items-center">
-        <p className="text-xs text-gray-500 dark:text-slate-400 mb-2 self-start">원본 공배치 (읽기 전용)</p>
+        <p className="text-xs text-gray-500 dark:text-slate-400 mb-2 self-start">
+          {ballPlacement
+            ? "공 배치 미리보기 (문제에 저장된 좌표 · 수구 표시) — 그림을 탭하면 전체화면에서 경로선을 그립니다"
+            : "원본 공배치 (미리보기 · 탭하면 전체화면 경로 편집)"}
+        </p>
         <div
-          ref={containerRef}
-          data-trouble-region={C.region.readonlyLayout}
-          className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600 w-full max-w-full cursor-crosshair"
+          className={`relative rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600 w-full max-w-full ${
+            previewDisabled ? "opacity-50" : ""
+          }`}
           style={{
-            maxWidth: LAYOUT_PLACEMENT_MAX_WIDTH,
-            aspectRatio: `${DEFAULT_TABLE_WIDTH} / ${DEFAULT_TABLE_HEIGHT}`,
+            maxWidth: DEFAULT_TABLE_WIDTH,
+            aspectRatio:
+              previewOrientation === "portrait"
+                ? `${DEFAULT_TABLE_HEIGHT} / ${DEFAULT_TABLE_WIDTH}`
+                : `${DEFAULT_TABLE_WIDTH} / ${DEFAULT_TABLE_HEIGHT}`,
           }}
-          onClick={handleTableClick}
         >
-          {ballPlacement ? (
-            <div className="absolute inset-0 w-full h-full">
-              <NanguReadOnlyLayout
-                ballPlacement={ballPlacement}
-                showGrid
-                fillContainer
-                hideObjectBall={false}
-                ballNormOverrides={pathPlayback.ballNormOverrides ?? undefined}
-                showCueBallSpot={!pathPlayback.isPlaybackActive}
-              />
-            </div>
-          ) : showImageOnly && layoutSrc ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-slate-800">
-              <img
-                src={layoutSrc}
-                alt="원본 공배치"
-                className="w-full h-full object-contain"
-              />
-            </div>
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-slate-800 text-gray-500 text-sm">
-              배치 이미지 없음
-            </div>
-          )}
-          <NanguSolutionPathOverlay
-            pathPoints={pathPoints}
-            cuePos={cuePos}
-            objectBallNorm={objectBallNorm}
-            objectPathPoints={objectPathPoints}
-            width={DEFAULT_TABLE_WIDTH}
-            height={DEFAULT_TABLE_HEIGHT}
-            pathMode={pathMode}
-            objectPathMode={objectPathMode}
-            getNormalizedFromEvent={getNormalizedFromEvent}
-            onAddPoint={(norm) => {
-              const dupThreshold = 0.03;
-              const isDup = pathPoints.some((p) => Math.hypot(p.x - norm.x, p.y - norm.y) < dupThreshold);
-              if (!isDup) runCueAppend(norm);
-            }}
-            onRemovePoint={removePathPoint}
-            onMovePoint={movePathPoint}
-            onInsertBetween={insertPathPointBetween}
-            onAddObjectPoint={(norm) => {
-              if (!collisionNorm) return;
-              const dupThreshold = 0.03;
-              const isDup =
-                objectPathPoints.length > 0 &&
-                objectPathPoints.some((p) => Math.hypot(p.x - norm.x, p.y - norm.y) < dupThreshold);
-              if (!isDup) addObjectPathPoint(norm);
-            }}
-            onRemoveObjectPoint={removeObjectPathPoint}
-            onMoveObjectPoint={moveObjectPathPoint}
-            onInsertObjectBetween={insertObjectPathPointBetween}
+          <div className="absolute inset-0 z-0 pointer-events-none">
+            {ballPlacement ? (
+              <>
+                <div className="absolute inset-0 w-full h-full">
+                  <NanguReadOnlyLayout
+                    ballPlacement={ballPlacement}
+                    showGrid
+                    drawStyle="realistic"
+                    fillContainer
+                    embedFill
+                    className="absolute inset-0 w-full h-full rounded-none border-0 overflow-hidden"
+                    hideObjectBall={false}
+                    showCueBallSpot
+                    orientation={previewOrientation}
+                    betweenTableAndBallsLayer={
+                      <NanguSolutionPathOverlay
+                        pathPoints={pathPoints}
+                        cuePos={cuePos}
+                        tableBallPlacement={ballPlacement}
+                        objectPathPoints={objectPathPoints}
+                        orientation={previewOrientation}
+                        pathMode={false}
+                        objectPathMode={false}
+                        pathLinesVisible={true}
+                        ballPickLayout={ballPlacement}
+                      />
+                    }
+                  />
+                </div>
+                <div
+                  className="absolute bottom-1.5 right-1.5 z-[2] rounded-md bg-black/60 text-white text-[10px] sm:text-xs font-medium px-2 py-1 shadow-sm max-w-[min(100%-0.75rem,14rem)] leading-snug text-right"
+                  aria-hidden
+                >
+                  미리보기 · 탭 시 전체화면
+                </div>
+              </>
+            ) : showImageOnly && layoutSrc ? (
+              <>
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-slate-800">
+                  <img src={layoutSrc} alt="원본 공배치" className="w-full h-full object-contain" />
+                </div>
+                <NanguSolutionPathOverlay
+                  pathPoints={pathPoints}
+                  cuePos={cuePos}
+                  objectPathPoints={objectPathPoints}
+                  orientation={previewOrientation}
+                  pathMode={false}
+                  objectPathMode={false}
+                  pathLinesVisible={true}
+                />
+                <div
+                  className="absolute bottom-1.5 right-1.5 z-[2] rounded-md bg-black/60 text-white text-[10px] sm:text-xs font-medium px-2 py-1 shadow-sm max-w-[min(100%-0.75rem,14rem)] leading-snug text-right"
+                  aria-hidden
+                >
+                  미리보기 · 탭 시 전체화면
+                </div>
+              </>
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-slate-800 text-gray-500 text-sm">
+                배치 이미지 없음
+              </div>
+            )}
+          </div>
+          <NanguTablePreviewHitLayer
+            dataTroubleRegion={C.region.readonlyLayout}
+            disabled={previewDisabled}
+            className="absolute inset-0 z-[3] cursor-pointer touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-site-primary rounded-lg"
+            onOpen={openPathFullscreen}
+            ariaLabel="전체화면에서 경로 편집 열기"
           />
+        </div>
+
+        <div
+          className="mt-2 flex flex-wrap items-center gap-2 self-stretch"
+          data-trouble-region={C.region.pathToolbar}
+        >
+          <button
+            type="button"
+            data-trouble-action={C.action.togglePathMode}
+            disabled={previewDisabled}
+            onClick={openPathFullscreen}
+            className="px-3 py-2 rounded-lg text-sm font-medium bg-site-primary text-white hover:opacity-90 touch-manipulation disabled:opacity-50"
+          >
+            전체화면 · 경로선 편집
+          </button>
+          <button
+            type="button"
+            data-trouble-action={C.action.clearAllPaths}
+            disabled={pathPoints.length === 0 && objectPathPoints.length === 0}
+            onClick={clearCommittedPath}
+            className="px-3 py-2 rounded-lg text-sm font-medium border border-red-300 text-red-700 dark:text-red-300 disabled:opacity-50 touch-manipulation"
+          >
+            저장된 경로 지우기
+          </button>
+          <span className="text-xs text-gray-500 dark:text-slate-400">
+            수구 경로 스팟 {pathPoints.length}개
+            {objectPathPoints.length > 0 ? ` · 1목 스팟 ${objectPathPoints.length}개` : ""}
+            {pathPoints.length >= 1 ? " · 수구 경로 있음" : ""}
+          </span>
         </div>
       </div>
 
-      {/* 3) 진행경로 관련 버튼 (세로형: 배치도 바로 아래) */}
-      <div className="flex flex-wrap items-center gap-2" data-trouble-region={C.region.pathToolbar}>
-        <span className="text-sm font-medium text-site-text">진행경로</span>
-        <button
-          type="button"
-          data-trouble-action={C.action.togglePathMode}
-          onClick={() => {
-            setPathMode((v) => {
-              const next = !v;
-              if (next) setObjectPathMode(false);
-              else setPathRuleHint("");
-              return next;
-            });
+      {pathFsOpen && (
+        <SolutionPathEditorFullscreen
+          key={pathFsKey}
+          variant="trouble"
+          presentation="noteBallPlacementFullscreen"
+          readOnlyCueAndBalls={!!ballPlacement}
+          ballPlacement={ballPlacement}
+          layoutImageUrl={ballPlacement ? null : layoutImageUrl}
+          initialPathPoints={pathPoints}
+          initialObjectPathPoints={objectPathPoints}
+          thicknessOffsetX={thicknessOffsetX}
+          isBankShot={isBankShot}
+          ballSpeed={ballSpeed}
+          onCancel={() => setPathFsOpen(false)}
+          onConfirm={({ pathPoints: nextCue, objectPathPoints: nextObj }) => {
+            setPathPoints(nextCue);
+            setObjectPathPoints(nextObj);
+            setPathFsOpen(false);
           }}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${
-            pathMode ? "bg-site-primary text-white border-site-primary" : "border-gray-300 dark:border-slate-600 text-site-text"
-          }`}
-        >
-          {pathMode ? "수구 경로 입력 중" : "수구 경로 입력"}
-        </button>
-        {pathMode && (
-          <button
-            type="button"
-            data-trouble-action={C.action.clearPath}
-            onClick={clearPathPoints}
-            className="text-sm text-red-600 dark:text-red-400 hover:underline"
-          >
-            수구 경로 전체 삭제
-          </button>
-        )}
-        {objectBallNorm && pathPoints.length >= 1 && collisionNorm && (
-          <>
-            <button
-              type="button"
-              onClick={() => {
-                setObjectPathMode((v) => {
-                  const next = !v;
-                  if (next) {
-                    setPathMode(false);
-                    setActivePanel("path");
-                  }
-                  return next;
-                });
-              }}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${
-                objectPathMode
-                  ? "bg-sky-600 text-white border-sky-600"
-                  : "border-gray-300 dark:border-slate-600 text-site-text"
-              }`}
-            >
-              {objectPathMode ? "1목 경로 입력 중" : "1목 경로 입력"}
-            </button>
-            {objectPathMode && (
-              <button
-                type="button"
-                onClick={clearObjectPathPoints}
-                className="text-sm text-red-600 dark:text-red-400 hover:underline"
-              >
-                1목 경로 삭제
-              </button>
-            )}
-          </>
-        )}
-        {ballPlacement && pathPoints.length >= 1 && (
-          <button
-            type="button"
-            data-trouble-action={C.action.playPath}
-            disabled={!pathPlayback.canPlayback || pathPlayback.isPlaybackActive}
-            onClick={() => pathPlayback.startPlayback()}
-            className="px-3 py-1.5 rounded-lg text-sm border border-amber-400 text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {pathPlayback.isPlaybackActive ? "재생 중…" : "경로 재생"}
-          </button>
-        )}
-        {pathRuleHint ? (
-          <p className="text-xs text-amber-700 dark:text-amber-300 w-full" role="status">
-            {pathRuleHint}
-          </p>
-        ) : null}
-        <p className="text-xs text-gray-500 dark:text-slate-400 w-full mt-0.5">
-          수구 경로(빨강): 쿠션에 세 번 닿기 전에는 레일 위에만 스팟을 찍을 수 있습니다. 세 번 이후 한 번 더 탭하면 마지막 자유 스팟(end,
-          화살표)이 생깁니다. 쿠션·마지막 스팟은 드래그로 조정할 수 있습니다. 1목 경로(하늘)는 별도 규칙입니다.
-        </p>
-      </div>
+        />
+      )}
 
       {/* 4) 해법 설정 패널 */}
       <div
@@ -509,15 +340,9 @@ export function TroubleSolutionEditor({
               key={key}
               type="button"
               data-trouble-action={actionAttr}
-              onClick={() => {
-                setActivePanel(key);
-                if (key === "path") {
-                  setPathMode(true);
-                  setObjectPathMode(false);
-                }
-              }}
+              onClick={() => setActivePanel(key)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
-                activePanel === key || (key === "path" && pathMode)
+                activePanel === key
                   ? "bg-site-primary text-white border-site-primary"
                   : "bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-site-text"
               }`}
@@ -534,7 +359,9 @@ export function TroubleSolutionEditor({
               isBankShot={isBankShot}
               onChange={setThicknessOffsetX}
               onBankShotChange={setIsBankShot}
-              onFocusZoomRequest={(cx, cy) => setFocusZoom({ active: true, target: "thickness", originX: cx, originY: cy })}
+              onFocusZoomRequest={(cx, cy) =>
+                setFocusZoom({ active: true, target: "thickness", originX: cx, originY: cy })
+              }
               onFocusZoomEnd={() => setFocusZoom((z) => ({ ...z, active: false }))}
             />
             <p className="text-xs text-gray-500 mt-1">보조: 두께 수치</p>
@@ -559,19 +386,40 @@ export function TroubleSolutionEditor({
             <NanguSpinEditor
               spinX={spinX}
               spinY={spinY}
-              onChange={({ spinX: x, spinY: y }) => { setSpinX(x); setSpinY(y); }}
-              onFocusZoomRequest={(cx, cy) => setFocusZoom({ active: true, target: "spin", originX: cx, originY: cy })}
+              onChange={({ spinX: x, spinY: y }) => {
+                setSpinX(x);
+                setSpinY(y);
+              }}
+              onFocusZoomRequest={(cx, cy) =>
+                setFocusZoom({ active: true, target: "spin", originX: cx, originY: cy })
+              }
               onFocusZoomEnd={() => setFocusZoom((z) => ({ ...z, active: false }))}
             />
             <p className="text-xs text-gray-500 mt-1">보조: X/Y 슬라이더</p>
             <div className="flex flex-wrap gap-4">
               <label className="flex items-center gap-2">
                 <span className="text-sm w-16">X</span>
-                <input type="range" min={-1} max={1} step={0.1} value={spinX} onChange={(e) => setSpinX(e.target.valueAsNumber)} className="w-32" />
+                <input
+                  type="range"
+                  min={-1}
+                  max={1}
+                  step={0.1}
+                  value={spinX}
+                  onChange={(e) => setSpinX(e.target.valueAsNumber)}
+                  className="w-32"
+                />
               </label>
               <label className="flex items-center gap-2">
                 <span className="text-sm w-16">Y</span>
-                <input type="range" min={-1} max={1} step={0.1} value={spinY} onChange={(e) => setSpinY(e.target.valueAsNumber)} className="w-32" />
+                <input
+                  type="range"
+                  min={-1}
+                  max={1}
+                  step={0.1}
+                  value={spinY}
+                  onChange={(e) => setSpinY(e.target.valueAsNumber)}
+                  className="w-32"
+                />
               </label>
             </div>
           </div>
@@ -617,7 +465,9 @@ export function TroubleSolutionEditor({
                     type="button"
                     onClick={() => setBallSpeed(v)}
                     className={`min-w-[2.25rem] h-8 px-1 flex items-center justify-center text-sm font-bold rounded transition ${
-                      ballSpeed === v ? "bg-site-primary text-white" : "bg-gray-200 dark:bg-slate-600 text-site-text hover:bg-gray-300 dark:hover:bg-slate-500"
+                      ballSpeed === v
+                        ? "bg-site-primary text-white"
+                        : "bg-gray-200 dark:bg-slate-600 text-site-text hover:bg-gray-300 dark:hover:bg-slate-500"
                     }`}
                   >
                     {v}
@@ -629,17 +479,28 @@ export function TroubleSolutionEditor({
               ))}
             </div>
             <p className="text-xs text-site-text mt-1">
-              {ballSpeed} · {ballSpeedToRailCount(ballSpeed)}레일 · 표시 {getRailDisplayPowerForBallSpeed(ballSpeed)}
+              {ballSpeed} · {ballSpeedToRailCount(ballSpeed)}레일 · 표시{" "}
+              {getRailDisplayPowerForBallSpeed(ballSpeed)}
             </p>
           </div>
         )}
 
         {activePanel === "path" && (
-          <div>
+          <div className="space-y-2">
             <p className="text-sm text-site-primary font-medium">진행경로 제시</p>
-            <p className="text-xs text-gray-500 mt-1">
-              위에서 &quot;경로 입력 시작&quot;을 누른 뒤 배치도를 클릭해 스팟을 순서대로 찍으세요. 수구에서 시작해 목적구·쿠션을 거쳐 경로를 만듭니다.
+            <p className="text-xs text-gray-500 dark:text-slate-400">
+              위 미리보기를 탭하거나 버튼으로 <strong>당구노트 공배치와 같은 전체화면</strong>에 들어가 스팟·경로·1목·줌·애니메이션을 사용합니다.
+              수구 경로 첫 스팟은 <strong>1목적구</strong> 또는 <strong>쿠션 테두리</strong>에 연결할 수 있습니다. 완료 시 반영, 취소 시 이전 상태로
+              돌아갑니다.
             </p>
+            <button
+              type="button"
+              onClick={openPathFullscreen}
+              disabled={previewDisabled}
+              className="px-3 py-2 rounded-lg text-sm font-medium bg-site-primary text-white hover:opacity-90 touch-manipulation disabled:opacity-50"
+            >
+              전체화면 · 경로선 편집
+            </button>
           </div>
         )}
       </div>
@@ -690,20 +551,41 @@ export function TroubleSolutionEditor({
           {focusZoom.target === "spin" && (
             <div className="p-4">
               <p className="text-sm font-medium text-site-text mb-2">당점 (확대)</p>
-              <NanguSpinEditor spinX={spinX} spinY={spinY} onChange={({ spinX: x, spinY: y }) => { setSpinX(x); setSpinY(y); }} />
+              <NanguSpinEditor
+                spinX={spinX}
+                spinY={spinY}
+                onChange={({ spinX: x, spinY: y }) => {
+                  setSpinX(x);
+                  setSpinY(y);
+                }}
+              />
             </div>
           )}
           {focusZoom.target === "backstroke" && (
             <div className="p-4 min-w-[200px]">
               <p className="text-sm font-medium text-site-text mb-2">백스트로크 (확대)</p>
-              <input type="range" min={0} max={10} value={backstrokeLevel} onChange={(e) => setBackstrokeLevel(e.target.valueAsNumber)} className="w-full h-10" />
+              <input
+                type="range"
+                min={0}
+                max={10}
+                value={backstrokeLevel}
+                onChange={(e) => setBackstrokeLevel(e.target.valueAsNumber)}
+                className="w-full h-10"
+              />
               <p className="text-xs text-site-text mt-1">{backstrokeLevel} / 10</p>
             </div>
           )}
           {focusZoom.target === "followstroke" && (
             <div className="p-4 min-w-[200px]">
               <p className="text-sm font-medium text-site-text mb-2">팔로우스트로크 (확대)</p>
-              <input type="range" min={0} max={10} value={followStrokeLevel} onChange={(e) => setFollowStrokeLevel(e.target.valueAsNumber)} className="w-full h-10" />
+              <input
+                type="range"
+                min={0}
+                max={10}
+                value={followStrokeLevel}
+                onChange={(e) => setFollowStrokeLevel(e.target.valueAsNumber)}
+                className="w-full h-10"
+              />
               <p className="text-xs text-site-text mt-1">{followStrokeLevel} / 10</p>
             </div>
           )}
@@ -727,17 +609,13 @@ export function TroubleSolutionEditor({
                 ))}
               </div>
               <p className="text-xs text-site-text mt-2">
-                {ballSpeed} · {ballSpeedToRailCount(ballSpeed)}레일 · 표시 {getRailDisplayPowerForBallSpeed(ballSpeed)}
+                {ballSpeed} · {ballSpeedToRailCount(ballSpeed)}레일 · 표시{" "}
+                {getRailDisplayPowerForBallSpeed(ballSpeed)}
               </p>
             </div>
           )}
         </NanguFocusZoomOverlay>
       )}
-
-      <CollisionWarningToast
-        message={pathPlayback.collisionMessage}
-        onDismiss={pathPlayback.dismissCollisionMessage}
-      />
     </form>
   );
 }

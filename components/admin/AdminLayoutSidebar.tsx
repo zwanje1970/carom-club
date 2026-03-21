@@ -147,9 +147,13 @@ export function AdminLayoutSidebar({ copy, onLogout, mobileOpen, onMobileClose }
     </>
   );
 
-  const asideClass =
-    "fixed left-0 top-0 z-40 flex h-full w-[280px] flex-col bg-white shadow-lg dark:bg-slate-900 dark:shadow-none";
-  const overlayClass = "fixed inset-0 z-30 bg-black/50";
+  /** 데스크톱: 전체 높이. 모바일: 상단 액션바(h-12) 아래부터만 펼쳐져 햄버거·뒤로가기와 겹치지 않음 */
+  const asideClassDesktop =
+    "fixed left-0 top-0 z-20 flex h-full w-[280px] flex-col bg-white shadow-lg dark:bg-slate-900 dark:shadow-none";
+  const asideClassMobile =
+    "fixed left-0 top-12 z-50 flex h-[calc(100dvh-3rem)] max-h-[calc(100dvh-3rem)] w-[280px] flex-col bg-white shadow-lg dark:bg-slate-900 dark:shadow-none";
+  /** 액션바(z-60) 아래 영역만 딤 — 메뉴(z-50)는 그 위 */
+  const overlayClass = "fixed inset-x-0 bottom-0 top-12 z-40 bg-black/50";
 
   if (isMobile) {
     return (
@@ -158,10 +162,11 @@ export function AdminLayoutSidebar({ copy, onLogout, mobileOpen, onMobileClose }
           <div className={overlayClass} aria-hidden onClick={onMobileClose} />
         )}
         <aside
-          className={`${asideClass} transition-transform duration-200 ${
+          className={`${asideClassMobile} transition-transform duration-200 ease-out ${
             mobileOpen ? "translate-x-0" : "-translate-x-full"
           }`}
           aria-label="관리자 메뉴"
+          aria-hidden={!mobileOpen}
         >
           {sidebarContent}
         </aside>
@@ -170,7 +175,7 @@ export function AdminLayoutSidebar({ copy, onLogout, mobileOpen, onMobileClose }
   }
 
   return (
-    <aside className={`${asideClass} z-20`} aria-label="관리자 메뉴">
+    <aside className={asideClassDesktop} aria-label="관리자 메뉴">
       {sidebarContent}
     </aside>
   );

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatKoreanDate } from "@/lib/format-date";
+import { clearBilliardNoteNewPageGuardOnly } from "@/lib/billiard-note-composer-session";
 
 export type NoteFilter = "all" | "public" | "private" | "sent";
 
@@ -32,6 +33,10 @@ export function BilliardNotesListClient({ basePath = "/mypage/notes" }: Billiard
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<NoteFilter>("all");
+
+  useEffect(() => {
+    clearBilliardNoteNewPageGuardOnly();
+  }, []);
 
   useEffect(() => {
     fetch("/api/community/billiard-notes?mine=1", { credentials: "include" })
@@ -93,30 +98,27 @@ export function BilliardNotesListClient({ basePath = "/mypage/notes" }: Billiard
           )}
         </p>
       ) : (
-        <ul className="space-y-3">
+        <ul className="divide-y divide-gray-200 dark:divide-slate-700" aria-label="노트 목록">
           {filtered.map((n) => (
             <li key={n.id}>
               <Link
                 href={`${basePath}/${n.id}`}
-                className="flex gap-3 p-3 rounded-xl border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition"
+                className="flex items-start gap-3 py-3.5 px-1 hover:bg-gray-50/80 dark:hover:bg-slate-800/40"
               >
-                <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-lg overflow-hidden bg-gray-100 dark:bg-slate-700">
+                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-gray-100 dark:bg-slate-700">
                   {n.imageUrl ? (
-                    <img src={n.imageUrl} alt="" className="w-full h-full object-cover" />
+                    <img src={n.imageUrl} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">이미지 없음</div>
+                    <div className="flex h-full w-full items-center justify-center text-[10px] text-gray-400">없음</div>
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-site-text line-clamp-1">
+                  <p className="font-medium text-site-text line-clamp-2 leading-snug">
                     {n.title?.trim() || n.memo?.trim() || "(제목 없음)"}
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {formatKoreanDate(n.createdAt)}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    {n.visibility === "community" ? "공개" : "비공개"}
-                    {(n.sentToTroubleCount ?? 0) > 0 && ` · 난구해결 전송 ${n.sentToTroubleCount}회`}
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {formatKoreanDate(n.createdAt)} · {n.visibility === "community" ? "공개" : "비공개"}
+                    {(n.sentToTroubleCount ?? 0) > 0 && ` · 난구 ${n.sentToTroubleCount}회`}
                   </p>
                 </div>
               </Link>

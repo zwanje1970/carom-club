@@ -1,6 +1,13 @@
 "use client";
 
-import React, { useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from "react";
+import React, {
+  useRef,
+  useEffect,
+  useImperativeHandle,
+  forwardRef,
+  useCallback,
+  type ReactNode,
+} from "react";
 import {
   DEFAULT_TABLE_WIDTH,
   DEFAULT_TABLE_HEIGHT,
@@ -144,6 +151,15 @@ export interface BilliardTableCanvasProps {
   hideRedBall?: boolean;
   /** 경로 재생 등: landscape 정규화 좌표로 공 위치 덮어쓰기 (미지정 색은 placement 유지) */
   ballNormOverrides?: Partial<Record<"red" | "yellow" | "white", { x: number; y: number }>>;
+  /** 고정 부모(W×H) 안에 100% 채움 (줌 쉘 등). false면 기존 min(100%,dvh) 맞춤 */
+  embedFill?: boolean;
+  /**
+   * true면 테이블(쿠션·필드)과 공을 분리: 아래 캔버스=테이블만, `children`=중간(SVG 경로 등), 위 캔버스=공만.
+   * 경로선이 공 아래로 가게 할 때 사용. 위 공 캔버스는 pointer-events: none.
+   */
+  splitBallLayer?: boolean;
+  /** `splitBallLayer`일 때 테이블과 공 사이에 렌더 (경로 오버레이 등) */
+  children?: ReactNode;
 }
 
 export interface BilliardTableCanvasHandle {
@@ -607,27 +623,31 @@ const BilliardTableCanvas = forwardRef<
     showCrosshairAtSelected = false,
     hideRedBall = false,
     ballNormOverrides,
+    embedFill = false,
+    splitBallLayer = false,
+    children,
   },
   ref
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const tableLayerRef = useRef<HTMLCanvasElement>(null);
+  const ballLayerRef = useRef<HTMLCanvasElement>(null);
   const isPortrait = orientation === "portrait";
   const width = isPortrait ? heightProp : widthProp;
   const height = isPortrait ? widthProp : heightProp;
 
-  const draw = useCallback(
+  const hitCanvasRef = splitBallLayer ? tableLayerRef : canvasRef;
+
+  const drawBallsAndDecorations = useCallback(
     (
       ctx: CanvasRenderingContext2D,
-      withGrid: boolean,
       withCrosshair: boolean = true,
       style: TableDrawStyle = drawStyle,
       cueBallSpotOpacity?: number,
-      /** true면 저장/내보내기용 — 선택 링·크로스헤어 미표시 */
       noSelectionForExport?: boolean
     ) => {
       const isWireframe = style === "wireframe";
       const sel = noSelectionForExport ? null : selectedBall;
-      drawTable(ctx, width, height, withGrid, orientation, style);
       const rect = getPlayfieldRect(width, height);
       const toView = (lx: number, ly: number) =>
         isPortrait ? landscapeToPortraitNorm(lx, ly) : { x: lx, y: ly };
@@ -681,43 +701,92 @@ const BilliardTableCanvas = forwardRef<
     ]
   );
 
+  const draw = useCallback(
+    (
+      ctx: CanvasRenderingContext2D,
+      withGrid: boolean,
+      withCrosshair: boolean = true,
+      style: TableDrawStyle = drawStyle,
+      cueBallSpotOpacity?: number,
+      /** true면 저장/보내기용 — 선택 링·크로스헤어 미표시 */
+      noSelectionForExport?: boolean
+    ) => {
+      drawTable(ctx, width, height, withGrid, orientation, style);
+      drawBallsAndDecorations(ctx, withCrosshair, style, cueBallSpotOpacity, noSelectionForExport);
+    },
+    [width, height, orientation, drawBallsAndDecorations]
+  );
+
   useEffect(() => {
+    if (splitBallLayer) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     canvas.width = width;
     canvas.height = height;
-      draw(ctx, showGrid, true, drawStyle, undefined, false);
-  }, [draw, showGrid, drawStyle]);
+    draw(ctx, showGrid, true, drawStyle, undefined, false);
+  }, [splitBallLayer, draw, showGrid, drawStyle, width, height]);
+
+  useEffect(() => {
+    if (!splitBallLayer) return;
+    const tCan = tableLayerRef.current;
+    const bCan = ballLayerRef.current;
+    if (!tCan || !bCan) return;
+    const tCtx = tCan.getContext("2d");
+    const bCtx = bCan.getContext("2d");
+    if (!tCtx || !bCtx) return;
+    tCan.width = width;
+    tCan.height = height;
+    bCan.width = width;
+    bCan.height = height;
+    drawTable(tCtx, width, height, showGrid, orientation, drawStyle);
+    bCtx.clearRect(0, 0, width, height);
+    drawBallsAndDecorations(bCtx, true, drawStyle, undefined, false);
+  }, [splitBallLayer, width, height, showGrid, orientation, drawStyle, drawBallsAndDecorations]);
 
   // 수구 스팟 깜빡임: showCueBallSpot 시에만 rAF로 주기적 그리기 (저장 이미지에는 미포함)
   useEffect(() => {
     if (!showCueBallSpot) return;
+    let frameId: number;
+    if (splitBallLayer) {
+      const bCan = ballLayerRef.current;
+      if (!bCan) return;
+      const bCtx = bCan.getContext("2d");
+      if (!bCtx) return;
+      const tick = () => {
+        const t = Date.now() / 180;
+        const opacity = Math.sin(t) >= 0 ? 1 : 0;
+        bCtx.clearRect(0, 0, width, height);
+        drawBallsAndDecorations(bCtx, true, drawStyle, opacity, false);
+        frameId = requestAnimationFrame(tick);
+      };
+      frameId = requestAnimationFrame(tick);
+      return () => {
+        cancelAnimationFrame(frameId);
+        bCtx.clearRect(0, 0, width, height);
+        drawBallsAndDecorations(bCtx, true, drawStyle, undefined, false);
+      };
+    }
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    let frameId: number;
-    const tick = () => {
+    const tickSingle = () => {
       const t = Date.now() / 180;
       const opacity = Math.sin(t) >= 0 ? 1 : 0;
       draw(ctx, showGrid, true, drawStyle, opacity, false);
-      frameId = requestAnimationFrame(tick);
+      frameId = requestAnimationFrame(tickSingle);
     };
-    frameId = requestAnimationFrame(tick);
+    frameId = requestAnimationFrame(tickSingle);
     return () => {
       cancelAnimationFrame(frameId);
       draw(ctx, showGrid, true, drawStyle, undefined, false);
     };
-  }, [showCueBallSpot, draw, showGrid, drawStyle]);
+  }, [showCueBallSpot, splitBallLayer, draw, drawBallsAndDecorations, showGrid, drawStyle, width, height])
 
   useImperativeHandle(ref, () => ({
     getDataURL(includeGrid: boolean, forceLandscape?: boolean, forceStyle?: TableDrawStyle) {
-      const canvas = canvasRef.current;
-      if (!canvas) return "";
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return "";
       const styleToUse = forceStyle ?? drawStyle;
 
       if (forceLandscape && isPortrait) {
@@ -727,7 +796,7 @@ const BilliardTableCanvas = forwardRef<
         off.width = w;
         off.height = h;
         const offCtx = off.getContext("2d");
-        if (!offCtx) return canvas.toDataURL("image/png");
+        if (!offCtx) return "";
         drawTable(offCtx, w, h, includeGrid, "landscape", styleToUse);
         const rect = getPlayfieldRect(w, h);
         const wf = styleToUse === "wireframe";
@@ -740,15 +809,20 @@ const BilliardTableCanvas = forwardRef<
         return off.toDataURL("image/png");
       }
 
+      const exportCanvas = document.createElement("canvas");
+      exportCanvas.width = width;
+      exportCanvas.height = height;
+      const ctx = exportCanvas.getContext("2d");
+      if (!ctx) return "";
       draw(ctx, includeGrid, false, styleToUse, undefined, true);
-      return canvas.toDataURL("image/png");
+      return exportCanvas.toDataURL("image/png");
     },
   }));
 
   const playfield = getPlayfieldRect(width, height);
 
   function getNormalizedFromEvent(clientX: number, clientY: number): { x: number; y: number } | null {
-    const canvas = canvasRef.current;
+    const canvas = hitCanvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
@@ -774,7 +848,7 @@ const BilliardTableCanvas = forwardRef<
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!interactive) return;
-    const canvas = canvasRef.current;
+    const canvas = hitCanvasRef.current;
     if (!canvas) return;
     const norm = getNormalizedFromEvent(e.clientX, e.clientY);
     if (norm) {
@@ -790,7 +864,7 @@ const BilliardTableCanvas = forwardRef<
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
+    const canvas = hitCanvasRef.current;
     if (canvas) canvas.releasePointerCapture(e.pointerId);
     onPointerUp?.();
   };
@@ -813,11 +887,48 @@ const BilliardTableCanvas = forwardRef<
   const usePointerDrag = Boolean(onPointerDown ?? onPointerMove ?? onPointerUp);
 
   // 테이블 긴쪽 기준으로 화면에 전부 나오게: 너비·높이 모두 컨테이너 및 뷰포트 안에 맞춤
-  const fitStyle: React.CSSProperties = {
-    width: `min(100%, 100dvh * ${width}/${height})`,
-    height: `min(100%, 100vw * ${height}/${width})`,
-    aspectRatio: `${width} / ${height}`,
+  const fitStyle: React.CSSProperties = embedFill
+    ? { width: "100%", height: "100%", display: "block" as const }
+    : {
+        width: `min(100%, 100dvh * ${width}/${height})`,
+        height: `min(100%, 100vw * ${height}/${width})`,
+        aspectRatio: `${width} / ${height}`,
+      };
+
+  const canvasCommonStyle: React.CSSProperties = {
+    cursor: interactive ? "crosshair" : "default",
+    objectFit: embedFill ? "fill" : "contain",
   };
+
+  if (splitBallLayer) {
+    return (
+      <div className="relative max-w-full max-h-full" style={fitStyle}>
+        <canvas
+          ref={tableLayerRef}
+          width={width}
+          height={height}
+          className="absolute inset-0 z-0 h-full w-full touch-none block"
+          style={canvasCommonStyle}
+          onClick={!usePointerDrag ? handleClick : undefined}
+          onTouchEnd={!usePointerDrag ? handleTouchEnd : undefined}
+          onPointerDown={usePointerDrag ? handlePointerDown : undefined}
+          onPointerMove={usePointerDrag ? handlePointerMove : undefined}
+          onPointerUp={usePointerDrag ? handlePointerUp : undefined}
+          onPointerCancel={usePointerDrag ? handlePointerUp : undefined}
+          aria-label="당구대"
+        />
+        <div className="pointer-events-none absolute inset-0 z-[5] min-h-0 min-w-0">{children}</div>
+        <canvas
+          ref={ballLayerRef}
+          width={width}
+          height={height}
+          className="pointer-events-none absolute inset-0 z-10 h-full w-full touch-none block"
+          style={{ objectFit: embedFill ? "fill" : "contain" }}
+          aria-hidden
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-full max-h-full" style={fitStyle}>
@@ -828,7 +939,8 @@ const BilliardTableCanvas = forwardRef<
         className="w-full h-full touch-none block"
         style={{
           cursor: interactive ? "crosshair" : "default",
-          objectFit: "contain",
+          /** embedFill: 부모가 캔버스 비율과 동일 — 꽉 채워 object-fit 여백 없이 히트 좌표와 줌 셀 일치 */
+          objectFit: embedFill ? "fill" : "contain",
         }}
         onClick={!usePointerDrag ? handleClick : undefined}
         onTouchEnd={!usePointerDrag ? handleTouchEnd : undefined}

@@ -2,14 +2,39 @@
  * 난구해결사 데이터 타입
  * - 원본 공배치: 게시 후 수정 불가, 보기 전용
  * - 해법: 별도 레이어, 좌표 기반 저장 (자동 물리 계산 없음, 사용자 수동 조작)
- * - 수구(cueBall): white | yellow만. red는 목적구로만 사용.
+ * - 수구(cueBall): white | yellow만.
+ * - **1목적구**: 수구를 제외한 나머지 두 공 중 하나(빨강·노랑 또는 빨강·흰, 수구에 따라 다름).
  */
 
 import type { CueBallType } from "./billiard-table-constants";
 
 export type { ObjectBallType } from "./billiard-table-constants";
 
-/** 원본 공배치 (문제). 저장 후 변경 불가. cueBall은 수구(white|yellow), red는 목적구. */
+/** 3구 색(수구·1목 판별에 사용) */
+export type ObjectBallColorKey = "red" | "yellow" | "white";
+
+export interface LabeledBallNorm {
+  key: ObjectBallColorKey;
+  x: number;
+  y: number;
+}
+
+/** 수구가 아닌 두 공(1목 후보) — 경로 스냅·충돌 광선의 먼저 맞는 공 판별에 사용 */
+export function getNonCueBallNorms(placement: NanguBallPlacement): LabeledBallNorm[] {
+  const { redBall, yellowBall, whiteBall, cueBall } = placement;
+  if (cueBall === "white") {
+    return [
+      { key: "red", x: redBall.x, y: redBall.y },
+      { key: "yellow", x: yellowBall.x, y: yellowBall.y },
+    ];
+  }
+  return [
+    { key: "red", x: redBall.x, y: redBall.y },
+    { key: "white", x: whiteBall.x, y: whiteBall.y },
+  ];
+}
+
+/** 원본 공배치 (문제). 저장 후 변경 불가. cueBall은 수구(white|yellow). */
 export interface NanguBallPlacement {
   redBall: { x: number; y: number };
   yellowBall: { x: number; y: number };
@@ -17,7 +42,7 @@ export interface NanguBallPlacement {
   cueBall: CueBallType;
 }
 
-/** 해법 계산/입력 시 수구·목적구 분리. cueBallType에 red 불가. */
+/** 해법 계산/입력 시 수구·1목 분리. 1목은 수구 제외 두 공 중 하나의 위치. */
 export interface NanguSolutionInput {
   cueBallType: CueBallType;
   cueBallPosition: { x: number; y: number };
@@ -52,7 +77,7 @@ export function ballPlacementToSourceLayout(
   return { title, description, balls };
 }
 
-/** 진행선 스팟 1개 (정규화 0..1). end = 3쿠션 이후 마지막 자유 스팟(화살표) */
+/** 진행선 스팟 1개 (정규화 0..1). end = 레일이 아닌 위치에 둔 끝 스팟(화살표로 경로 종료) */
 export interface NanguPathPoint {
   id: string;
   x: number;
@@ -83,6 +108,8 @@ export interface NanguSolutionData {
   paths: NanguSolutionPath[];
   /** 1목적구 반사각 경로 (선택) */
   reflectionPath?: NanguSolutionPath;
+  /** 1목 경로 재생 시 이동하는 공(수구 제외 2개 중 실제 맞은 쪽). 없으면 red로 간주(구버전) */
+  reflectionObjectBall?: ObjectBallColorKey;
   /** 백스트로크 0~10 (오른쪽=짧음, 왼쪽=김) */
   backstrokeLevel?: number;
   /** 팔로우스트로크 0~10 (왼쪽=짧음, 오른쪽=김) */

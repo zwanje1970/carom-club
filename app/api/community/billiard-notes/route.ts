@@ -18,6 +18,9 @@ export async function GET(request: Request) {
   const visibility = searchParams.get("visibility");
 
   if (visibility === "community") {
+    if (!session) {
+      return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+    }
     const list = await prisma.billiardNote.findMany({
       where: { visibility: "community" },
       orderBy: { createdAt: "desc" },

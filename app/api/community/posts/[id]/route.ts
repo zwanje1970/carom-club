@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { isCommunityAdmin, isCommunityModerator } from "@/lib/community-roles";
+import { parseTroubleBallPlacementJson } from "@/lib/trouble-ball-placement";
 
 /** 게시글 상세 조회. 조회수는 POST /view 에서만 증가 */
 export async function GET(
@@ -37,6 +38,7 @@ export async function GET(
       troubleShot: {
         select: {
           layoutImageUrl: true,
+          ballPlacementJson: true,
           difficulty: true,
           sourceNoteId: true,
           acceptedSolutionId: true,
@@ -101,6 +103,7 @@ export async function GET(
   if (post.board.slug === "trouble" && post.troubleShot) {
     payload.troubleShot = {
       layoutImageUrl: post.troubleShot.layoutImageUrl,
+      ballPlacement: parseTroubleBallPlacementJson(post.troubleShot.ballPlacementJson),
       difficulty: post.troubleShot.difficulty,
       sourceNoteId: post.troubleShot.sourceNoteId,
       acceptedSolutionId: post.troubleShot.acceptedSolutionId,

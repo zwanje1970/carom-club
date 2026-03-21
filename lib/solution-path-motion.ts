@@ -5,6 +5,7 @@
 import type { PlayfieldRect } from "@/lib/billiard-table-constants";
 import type { NanguBallPlacement, NanguPathPoint, NanguSolutionData, NanguSolutionPath } from "@/lib/nangu-types";
 import {
+  computePolylinePlaybackDurationMs,
   computeStrokeAnimationDurationMs,
   computeStrokeAnimationDurationSec,
 } from "@/lib/path-animation-timing";
@@ -25,6 +26,11 @@ import type { RailCount } from "@/lib/rail-power-constants";
 import { computeThicknessCollisionSplitFromSolution } from "@/lib/thickness-power-split";
 
 export type { NormPoint, PositionAlongPathResult };
+
+/** `visualizationPlayback`: 경로 시연 — 마지막 스팟까지 전 구간 이동 + 플레이필드 긴 변 왕복 기준 재생 시간 */
+export type BuildPathMotionPlanOptions = {
+  visualizationPlayback?: boolean;
+};
 
 export interface PathMotionPlan {
   /** 정규화 꼭짓점 (이동 허용 경로) */
@@ -85,24 +91,31 @@ function buildMoveParamsFromSolution(
 export function buildCuePathMotionPlan(
   placement: NanguBallPlacement,
   data: NanguSolutionData,
-  rect: PlayfieldRect
+  rect: PlayfieldRect,
+  options?: BuildPathMotionPlanOptions
 ): PathMotionPlan | null {
   const path = data.paths?.[0];
   const spots = path?.points;
   if (!spots?.length) return null;
 
   const cue = cuePositionFromPlacement(placement);
+  /** 수구 꼭짓점 포함 — 감속·시연 시간은 스팟 간만이 아니라 수구→첫 스팟→…→마지막 스팟 총거리 */
   const poly = verticesFromCueAndSpots(cue, spots);
   const pathLengthPx = polylineTotalLengthPx(poly, rect);
   const cushionCount = countCushionsInPath(path);
   const moveParams = buildMoveParamsFromSolution(data, cushionCount);
   const split = computeThicknessCollisionSplitFromSolution(data.isBankShot ?? false, data.thicknessOffsetX);
   const strokeTotalPowerReferencePx = computeStrokeTotalPowerReferencePx(rect, moveParams);
-  const moveDistancePx = computeCueMoveDistancePx(rect, moveParams);
+  const physicsMoveDistancePx = computeCueMoveDistancePx(rect, moveParams);
+  const moveDistancePx = options?.visualizationPlayback ? pathLengthPx : physicsMoveDistancePx;
   const effectiveTravelPx = Math.min(moveDistancePx, pathLengthPx);
   const powerRailCount = resolveMoveDistanceRailCount(moveParams);
-  const animationDurationSec = computeStrokeAnimationDurationSec(powerRailCount);
-  const animationDurationMs = computeStrokeAnimationDurationMs(powerRailCount);
+  const animationDurationSec = options?.visualizationPlayback
+    ? computePolylinePlaybackDurationMs(pathLengthPx, rect) / 1000
+    : computeStrokeAnimationDurationSec(powerRailCount);
+  const animationDurationMs = options?.visualizationPlayback
+    ? computePolylinePlaybackDurationMs(pathLengthPx, rect)
+    : computeStrokeAnimationDurationMs(powerRailCount);
 
   return {
     polylineNormalized: poly,
@@ -122,7 +135,11 @@ export function buildCuePathMotionPlan(
 /**
  * 1목적구 경로 (reflectionPath.points[0]=충돌점 …)
  */
-export function buildObjectPathMotionPlan(data: NanguSolutionData, rect: PlayfieldRect): PathMotionPlan | null {
+export function buildObjectPathMotionPlan(
+  data: NanguSolutionData,
+  rect: PlayfieldRect,
+  options?: BuildPathMotionPlanOptions
+): PathMotionPlan | null {
   const rp = data.reflectionPath;
   const pts = rp?.points;
   if (!pts || pts.length < 2) return null;
@@ -134,11 +151,16 @@ export function buildObjectPathMotionPlan(data: NanguSolutionData, rect: Playfie
   const moveParams = buildMoveParamsFromSolution(data, cushionCount);
   const split = computeThicknessCollisionSplitFromSolution(data.isBankShot ?? false, data.thicknessOffsetX);
   const strokeTotalPowerReferencePx = computeStrokeTotalPowerReferencePx(rect, moveParams);
-  const moveDistancePx = computeObjectMoveDistancePx(rect, moveParams);
+  const physicsMoveDistancePx = computeObjectMoveDistancePx(rect, moveParams);
+  const moveDistancePx = options?.visualizationPlayback ? pathLengthPx : physicsMoveDistancePx;
   const effectiveTravelPx = Math.min(moveDistancePx, pathLengthPx);
   const powerRailCount = resolveMoveDistanceRailCount(moveParams);
-  const animationDurationSec = computeStrokeAnimationDurationSec(powerRailCount);
-  const animationDurationMs = computeStrokeAnimationDurationMs(powerRailCount);
+  const animationDurationSec = options?.visualizationPlayback
+    ? computePolylinePlaybackDurationMs(pathLengthPx, rect) / 1000
+    : computeStrokeAnimationDurationSec(powerRailCount);
+  const animationDurationMs = options?.visualizationPlayback
+    ? computePolylinePlaybackDurationMs(pathLengthPx, rect)
+    : computeStrokeAnimationDurationMs(powerRailCount);
 
   return {
     polylineNormalized: poly,

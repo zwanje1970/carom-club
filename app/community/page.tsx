@@ -107,7 +107,7 @@ export default async function CommunityPage() {
 
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
-      <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
+      <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
         <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4" aria-label="breadcrumb">
           <Link href="/community" className="hover:text-site-primary">{communityTitle}</Link>
         </nav>
