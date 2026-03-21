@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
@@ -80,16 +79,17 @@ export async function GET(
     _count: { select: { likes: true, comments: true } },
   } as const;
 
-  const listOrderBy: Prisma.CommunityPostOrderByWithRelationInput | Prisma.CommunityPostOrderByWithRelationInput[] =
+  /** Prisma findMany orderBy — `@prisma/client`의 Prisma 네임스페이스와 커스텀 generate 경로 불일치 시 CI 타입 오류 방지 */
+  const listOrderBy =
     popular === "liked"
-      ? [{ likes: { _count: "desc" } }, { createdAt: "desc" }]
+      ? [{ likes: { _count: "desc" as const } }, { createdAt: "desc" as const }]
       : popular === "comments"
-        ? [{ comments: { _count: "desc" } }, { createdAt: "desc" }]
+        ? [{ comments: { _count: "desc" as const } }, { createdAt: "desc" as const }]
         : popular === "today" || popular === "weekly"
-          ? [{ viewCount: "desc" }, { createdAt: "desc" }]
+          ? [{ viewCount: "desc" as const }, { createdAt: "desc" as const }]
           : sort === "likes"
-            ? [{ likes: { _count: "desc" } }, { createdAt: "desc" }]
-            : { createdAt: "desc" };
+            ? [{ likes: { _count: "desc" as const } }, { createdAt: "desc" as const }]
+            : { createdAt: "desc" as const };
 
   const [pinned, list] = await Promise.all([
     slug === "notice"
