@@ -29,6 +29,9 @@ export async function GET(
   const page = Math.max(0, Number(searchParams.get("page")) || 0);
   const take = Math.min(Number(searchParams.get("take")) || 20, 50);
   const session = await getSession();
+  if (slug === "trouble" && !session) {
+    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
   const showHidden = isCommunityModerator(session);
 
   let board = await prisma.communityBoard.findUnique({

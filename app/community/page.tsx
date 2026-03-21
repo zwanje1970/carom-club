@@ -53,7 +53,11 @@ export default async function CommunityPage() {
         select: { id: true, slug: true, name: true, type: true },
       });
 
-      const hiddenFilter = { isHidden: false };
+      /** 비로그인 시 커뮤니티 홈 인기글에서 난구해결(trouble) 노출 제외 */
+      const hiddenFilter = {
+        isHidden: false,
+        ...(session ? {} : { board: { slug: { not: "trouble" as const } } }),
+      };
 
       const format = (p: { id: string; title: string; viewCount: number; createdAt: Date; board: { slug: string; name: string }; author: { name: string }; _count: { likes: number; comments: number } }) => ({
         id: p.id,

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { BilliardNoteDetailClient } from "@/components/community/BilliardNoteDetailClient";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 export default async function MypageNoteDetailPage({
   params,
@@ -11,6 +11,9 @@ export default async function MypageNoteDetailPage({
 }) {
   const { id } = await params;
   const session = await getSession();
+  if (!session) {
+    redirect(`/login?next=${encodeURIComponent(`/mypage/notes/${id}`)}`);
+  }
   const note = await prisma.billiardNote.findUnique({
     where: { id },
     select: {

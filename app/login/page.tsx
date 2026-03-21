@@ -10,6 +10,8 @@ const REMEMBER_ID_KEY = "carom_remember_username";
 const REMEMBER_ID_CHECKED_KEY = "carom_remember_username_checked";
 
 const NOTES_NEXT_PREFIX = "/mypage/notes";
+/** 난구해결사·난구해결 게시판 — 로그인 후 원래 페이지로 (클라이언트 기본 이동보다 우선) */
+const TROUBLE_NANGU_NEXT_PREFIXES = ["/community/nangu", "/community/trouble"] as const;
 
 function readNextFromBrowser(): string | null {
   if (typeof window === "undefined") return null;
@@ -84,13 +86,18 @@ function LoginForm() {
       /** 제출 시점 URL 기준(클라이언트 네비게이션·쿼리 유실 방지) */
       const nextDest = readNextFromBrowser() ?? requestedNext;
       const returnToNotes = nextDest != null && nextDest.startsWith(NOTES_NEXT_PREFIX);
+      const returnToTroubleNangu =
+        nextDest != null &&
+        TROUBLE_NANGU_NEXT_PREFIXES.some(
+          (p) => nextDest === p || nextDest.startsWith(`${p}/`)
+        );
 
       if (role === "PLATFORM_ADMIN") {
         window.location.href = "/admin";
         return;
       }
-      // 당구노트 등에서 온 경우: 클라이언트/권역 기본 이동보다 next(노트 경로) 우선
-      if (returnToNotes && nextDest) {
+      // 당구노트·난구해결사 등에서 온 경우: 클라이언트/권역 기본 이동보다 next 우선
+      if ((returnToNotes || returnToTroubleNangu) && nextDest) {
         window.location.href = nextDest;
         return;
       }

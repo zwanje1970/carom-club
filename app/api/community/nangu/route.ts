@@ -12,6 +12,10 @@ export async function GET() {
       { status: 503 }
     );
   }
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
 
   const list = await prisma.nanguPost.findMany({
     orderBy: { createdAt: "desc" },

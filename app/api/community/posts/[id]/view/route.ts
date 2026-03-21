@@ -17,13 +17,16 @@ export async function POST(
 
   const post = await prisma.communityPost.findUnique({
     where: { id: postId },
-    select: { id: true },
+    select: { id: true, board: { select: { slug: true } } },
   });
   if (!post) {
     return NextResponse.json({ error: "글을 찾을 수 없습니다." }, { status: 404 });
   }
 
   const session = await getSession();
+  if (post.board.slug === "trouble" && !session) {
+    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
   const body = await request.json().catch(() => ({}));
   const viewerKey = (body.viewerKey as string)?.trim() || (request.headers.get("x-viewer-key") ?? "").trim();
 

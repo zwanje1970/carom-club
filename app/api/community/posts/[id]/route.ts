@@ -49,6 +49,9 @@ export async function GET(
   if (!post) {
     return NextResponse.json({ error: "글을 찾을 수 없습니다." }, { status: 404 });
   }
+  if (post.board.slug === "trouble" && !session) {
+    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
   if (post.isHidden && !canSeeHidden) {
     return NextResponse.json({
       id: post.id,

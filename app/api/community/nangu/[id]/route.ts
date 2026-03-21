@@ -14,6 +14,10 @@ export async function GET(
       { status: 503 }
     );
   }
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
   const { id } = await params;
 
   const post = await prisma.nanguPost.findUnique({
@@ -46,8 +50,7 @@ export async function GET(
     },
   });
 
-  const session = await getSession();
-  const isAuthor = session?.id === post.authorId;
+  const isAuthor = session.id === post.authorId;
 
   return NextResponse.json({
     id: post.id,

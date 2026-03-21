@@ -1,7 +1,13 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { BilliardNotesListClient } from "@/components/community/BilliardNotesListClient";
+import { getSession } from "@/lib/auth";
 
-export default function MypageNotesPage() {
+export default async function MypageNotesPage() {
+  const session = await getSession();
+  if (!session) {
+    redirect(`/login?next=${encodeURIComponent("/mypage/notes")}`);
+  }
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
       <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">
