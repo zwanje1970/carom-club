@@ -3,9 +3,8 @@ import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import {
   clearSessionCookie,
-  COOKIE_NAME,
   createSession,
-  getSessionCookieOptions,
+  setSessionCookieOnResponse,
   verifyPassword,
 } from "@/lib/auth";
 
@@ -242,7 +241,7 @@ export async function POST(request: Request) {
       ? 60 * 60 * 24 * 30 // 30일
       : 60 * 60 * 24 * 7; // 7일
     const res = NextResponse.json({ ok: true, role: effectiveRole, loginMode, authChannel });
-    res.cookies.set(COOKIE_NAME, token, getSessionCookieOptions(maxAge));
+    setSessionCookieOnResponse(res, token, maxAge);
     return res;
   } catch (e) {
     const err = e as Error;

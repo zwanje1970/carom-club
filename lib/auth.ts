@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import type { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import type { SessionUser } from "@/types/auth";
 
@@ -107,6 +108,15 @@ export async function getSession(): Promise<SessionUser | null> {
 export async function setSessionCookie(token: string): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, token, getSessionCookieOptions(60 * 60 * 24 * 7));
+}
+
+/** Route Handler 응답에 세션 쿠키 부착 — 옵션은 getSessionCookieOptions 단일 경로 */
+export function setSessionCookieOnResponse(
+  res: NextResponse,
+  token: string,
+  maxAgeSeconds: number
+): void {
+  res.cookies.set(COOKIE_NAME, token, getSessionCookieOptions(maxAgeSeconds));
 }
 
 export async function clearSessionCookie(): Promise<void> {

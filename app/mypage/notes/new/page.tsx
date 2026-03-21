@@ -199,6 +199,7 @@ export default function MypageNewNotePage() {
     return id;
   };
 
+  /** 공 배치 풀스크린: 항상 `MobileBallPlacementFullscreen` (경로/해법 편집은 `SolutionPathEditorFullscreen` — 이 페이지에서는 미사용). */
   if (showPlacement) {
     return (
       <main className="min-h-screen bg-site-bg text-site-text">

@@ -147,6 +147,15 @@ export function SolutionPathEditorFullscreen({
     if (ballPlacement?.cueBall) setCueBallChoice(ballPlacement.cueBall);
   }, [ballPlacement?.cueBall]);
 
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    console.debug("[SolutionPathEditorFullscreen] mounted", {
+      variant,
+      presentation,
+      readOnlyCueAndBalls,
+    });
+  }, [variant, presentation, readOnlyCueAndBalls]);
+
   /** 좌표 배치가 있을 때 수구 표시 — readOnly면 게시물/문제의 cueBall 고정 */
   const layoutForCue = useMemo((): NanguBallPlacement | null => {
     if (!ballPlacement) return null;

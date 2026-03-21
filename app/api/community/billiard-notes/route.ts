@@ -3,6 +3,33 @@ import { getSession } from "@/lib/auth";
 import { normalizeCueBallType } from "@/lib/billiard-table-constants";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
+import type { SessionUser } from "@/types/auth";
+
+function logBilliardNotesAuthDebug(request: Request, session: SessionUser | null) {
+  if (process.env.AUTH_DEBUG_COOKIE !== "1") return;
+  const host = request.headers.get("host") ?? "";
+  const proto = request.headers.get("x-forwarded-proto") ?? "";
+  const ck = request.headers.get("cookie") ?? "";
+  let mineParam: string | null = null;
+  let visibilityParam: string | null = null;
+  try {
+    const u = new URL(request.url);
+    mineParam = u.searchParams.get("mine");
+    visibilityParam = u.searchParams.get("visibility");
+  } catch {
+    // ignore
+  }
+  console.warn("[billiard-notes] AUTH_DEBUG_COOKIE", {
+    host,
+    xForwardedProto: proto,
+    cookieHeaderPresent: ck.length > 0,
+    cookieLength: ck.length,
+    hasCaromSessionName: ck.includes("carom_session"),
+    getSessionOk: session != null,
+    mineParam,
+    visibilityParam,
+  });
+}
 
 /** 내 노트 목록: GET ?mine=1 (기본). 커뮤니티 피드: GET ?visibility=community */
 export async function GET(request: Request) {
@@ -13,6 +40,7 @@ export async function GET(request: Request) {
     );
   }
   const session = await getSession();
+  logBilliardNotesAuthDebug(request, session);
   const { searchParams } = new URL(request.url);
   const mine = searchParams.get("mine") !== "0";
   const visibility = searchParams.get("visibility");
@@ -47,16 +75,6 @@ export async function GET(request: Request) {
   }
 
   if (!session) {
-    if (process.env.AUTH_DEBUG_COOKIE === "1") {
-      const cookieHeader = request.headers.get("cookie") ?? "";
-      console.warn(
-        "[billiard-notes] GET mine: no session",
-        "cookieLength=",
-        cookieHeader.length,
-        "hasName=",
-        cookieHeader.includes("carom_session")
-      );
-    }
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 

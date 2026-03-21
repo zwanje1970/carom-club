@@ -111,10 +111,17 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         has: [
-          {
-            type: "host",
-            value: "www.carom.club",
-          },
+          { type: "host", value: "www.carom.club" },
+        ],
+        destination: "https://carom.club/:path*",
+        permanent: true,
+      },
+      /** apex에서 HTTP로 들어온 요청 → HTTPS (Vercel 앞단에서 막히는 경우도 있으나, Next에서 한 번 더 정규화) */
+      {
+        source: "/:path*",
+        has: [
+          { type: "host", value: "carom.club" },
+          { type: "header", key: "x-forwarded-proto", value: "http" },
         ],
         destination: "https://carom.club/:path*",
         permanent: true,

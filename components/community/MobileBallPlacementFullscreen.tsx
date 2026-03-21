@@ -87,6 +87,13 @@ export function MobileBallPlacementFullscreen({
   useEffect(() => {
     setNoteMemo(initialMemo);
   }, [initialMemo]);
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    console.debug("[MobileBallPlacementFullscreen] mounted", {
+      returnOnly,
+      includeMemoField,
+    });
+  }, [returnOnly, includeMemoField]);
   /** 공배치 시작 시 수구 선택 UI 없음 — 기본 흰공(또는 initial). 변경은 상단「수구」 */
   const [cueBall, setCueBall] = useState<CueBallType>(initialCueBall ?? "white");
   const [cuePickerOpen, setCuePickerOpen] = useState(false);

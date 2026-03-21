@@ -33,7 +33,10 @@ export function BilliardNotesListClient({ basePath = "/mypage/notes" }: Billiard
   const pathname = usePathname() ?? basePath;
   const [list, setList] = useState<NoteItem[]>([]);
   const [loading, setLoading] = useState(true);
+  /** 서버/앱 오류 메시지(401 제외) */
   const [error, setError] = useState("");
+  /** 네트워크 단절·fetch 실패 등(401과 구분) */
+  const [networkError, setNetworkError] = useState(false);
   const [needLogin, setNeedLogin] = useState(false);
   const [filter, setFilter] = useState<NoteFilter>("all");
 
@@ -45,6 +48,7 @@ export function BilliardNotesListClient({ basePath = "/mypage/notes" }: Billiard
     let cancelled = false;
     setLoading(true);
     setError("");
+    setNetworkError(false);
     setNeedLogin(false);
     fetch("/api/community/billiard-notes?mine=1", {
       credentials: "include",
@@ -68,7 +72,16 @@ export function BilliardNotesListClient({ basePath = "/mypage/notes" }: Billiard
         if (!cancelled && data) setList(data);
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "오류");
+        if (cancelled) return;
+        const isLikelyNetwork =
+          e instanceof TypeError ||
+          (e instanceof Error && (e.name === "AbortError" || /network|fetch|load failed/i.test(e.message)));
+        if (isLikelyNetwork) {
+          setNetworkError(true);
+          setError("");
+          return;
+        }
+        setError(e instanceof Error ? e.message : "오류");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -104,6 +117,16 @@ export function BilliardNotesListClient({ basePath = "/mypage/notes" }: Billiard
         >
           로그인하기
         </Link>
+      </div>
+    );
+  }
+  if (networkError) {
+    return (
+      <div className="rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50/80 dark:bg-red-950/20 p-4 text-sm text-site-text">
+        <p className="font-medium text-red-800 dark:text-red-200">네트워크 오류</p>
+        <p className="mt-1 text-gray-600 dark:text-slate-400">
+          연결을 확인한 뒤 다시 시도해 주세요. (인증 문제가 아닐 수 있습니다)
+        </p>
       </div>
     );
   }
