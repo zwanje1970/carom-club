@@ -20,6 +20,21 @@ type JwtPayload = {
   authChannel?: string;
 };
 
+/** Vercel Edge / 로컬 공통 — Production 배포 여부 확인용 (검색: `[CAROM][MW][NOTES]`) */
+function logNotesMwDiagnostic(
+  request: NextRequest,
+  pathname: string,
+  result: "pass" | "no_cookie" | "jwt_invalid"
+) {
+  const host =
+    request.headers.get("x-forwarded-host") ??
+    request.headers.get("host") ??
+    "";
+  console.warn(
+    `[CAROM][MW][NOTES] ${JSON.stringify({ host, pathname, result })}`
+  );
+}
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const requestHeaders = new Headers(request.headers);
@@ -68,25 +83,31 @@ export async function middleware(request: NextRequest) {
   if (isMypageNotesRoute) {
     const token = request.cookies.get(SESSION_COOKIE)?.value;
     if (!token) {
+      logNotesMwDiagnostic(request, pathname, "no_cookie");
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("next", pathname);
       const res = NextResponse.redirect(loginUrl);
       res.headers.set("Cache-Control", "private, no-store, max-age=0, must-revalidate");
+      res.headers.set("x-carom-notes-mw", "no-cookie");
       return res;
     }
     try {
       await jwtVerify(token, SECRET);
     } catch {
+      logNotesMwDiagnostic(request, pathname, "jwt_invalid");
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("next", pathname);
       const res = NextResponse.redirect(loginUrl);
       res.headers.set("Cache-Control", "private, no-store, max-age=0, must-revalidate");
+      res.headers.set("x-carom-notes-mw", "jwt-invalid");
       return res;
     }
+    logNotesMwDiagnostic(request, pathname, "pass");
     const res = NextResponse.next({
       request: { headers: requestHeaders },
     });
     res.headers.set("Cache-Control", "private, no-store, max-age=0, must-revalidate");
+    res.headers.set("x-carom-notes-mw", "pass");
     return res;
   }
 
@@ -94,3 +115,16 @@ export async function middleware(request: NextRequest) {
     request: { headers: requestHeaders },
   });
 }
+
+/**
+ * 당구노트·관리자 경로만 Edge 미들웨어 실행 (정적 자산은 기본 제외).
+ * `/mypage/notes`, `/mypage/notes/new`, `/mypage/notes/foo` 모두 `/mypage/notes` 또는 `/mypage/notes/:path*` 로 매칭.
+ */
+export const config = {
+  matcher: [
+    "/admin",
+    "/admin/:path*",
+    "/mypage/notes",
+    "/mypage/notes/:path*",
+  ],
+};

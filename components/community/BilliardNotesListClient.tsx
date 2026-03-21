@@ -22,6 +22,12 @@ export interface BilliardNotesListClientProps {
   basePath?: string;
 }
 
+/** Vercel 빌드 시 `next.config` env로 주입(로컬은 `local`). 배포 확인 후 제거 가능 */
+const CAROM_NOTES_LIST_DIAG =
+  typeof process.env.NEXT_PUBLIC_CAROM_NOTES_DIAG === "string"
+    ? process.env.NEXT_PUBLIC_CAROM_NOTES_DIAG
+    : "local";
+
 const FILTERS: { value: NoteFilter; label: string }[] = [
   { value: "all", label: "전체" },
   { value: "public", label: "공개" },
@@ -101,12 +107,22 @@ export function BilliardNotesListClient({ basePath = "/mypage/notes" }: Billiard
           : list.filter((n) => (n.sentToTroubleCount ?? 0) > 0);
 
   if (loading) {
-    return <p className="text-gray-500 py-6">불러오는 중…</p>;
+    return (
+      <div className="space-y-2">
+        <p className="text-[10px] font-mono text-gray-400/80" data-carom-diag="notes-list-loading">
+          {`carom:notes-list:${CAROM_NOTES_LIST_DIAG}`}
+        </p>
+        <p className="text-gray-500 py-6">불러오는 중…</p>
+      </div>
+    );
   }
   if (needLogin) {
     const next = `/login?next=${encodeURIComponent(pathname)}`;
     return (
       <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 p-4 text-sm text-site-text">
+        <p className="text-[10px] font-mono text-gray-500 mb-2" data-carom-diag="notes-list-needlogin">
+          {`carom:notes-list:${CAROM_NOTES_LIST_DIAG}`}
+        </p>
         <p className="font-medium">로그인이 필요합니다.</p>
         <p className="mt-1 text-gray-600 dark:text-slate-400">
           세션이 없거나 만료되었습니다. 다시 로그인하면 노트 목록을 불러올 수 있습니다.
@@ -123,6 +139,9 @@ export function BilliardNotesListClient({ basePath = "/mypage/notes" }: Billiard
   if (networkError) {
     return (
       <div className="rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50/80 dark:bg-red-950/20 p-4 text-sm text-site-text">
+        <p className="text-[10px] font-mono text-gray-500 mb-2" data-carom-diag="notes-list-net">
+          {`carom:notes-list:${CAROM_NOTES_LIST_DIAG}`}
+        </p>
         <p className="font-medium text-red-800 dark:text-red-200">네트워크 오류</p>
         <p className="mt-1 text-gray-600 dark:text-slate-400">
           연결을 확인한 뒤 다시 시도해 주세요. (인증 문제가 아닐 수 있습니다)
@@ -133,6 +152,9 @@ export function BilliardNotesListClient({ basePath = "/mypage/notes" }: Billiard
   if (error) {
     return (
       <p className="text-red-600 py-4">
+        <span className="block text-[10px] font-mono text-gray-500 mb-1" data-carom-diag="notes-list-err">
+          {`carom:notes-list:${CAROM_NOTES_LIST_DIAG}`}
+        </span>
         {error}
         {(error.includes("로그인") || error.includes("401")) && (
           <Link href={`/login?next=${encodeURIComponent(pathname)}`} className="ml-2 underline">
@@ -197,6 +219,13 @@ export function BilliardNotesListClient({ basePath = "/mypage/notes" }: Billiard
           ))}
         </ul>
       )}
+      <p
+        className="pt-3 text-[10px] font-mono text-gray-400/80 dark:text-slate-500 border-t border-gray-200/70 dark:border-slate-700/70"
+        data-carom-diag="notes-list"
+        title="배포·빌드 확인용 (확인 후 제거 가능)"
+      >
+        {`carom:notes-list:${CAROM_NOTES_LIST_DIAG}`}
+      </p>
     </div>
   );
 }

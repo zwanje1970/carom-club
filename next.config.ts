@@ -105,6 +105,11 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   outputFileTracingRoot: path.join(__dirname),
+  /** 클라이언트 번들에 커밋 앞 7자 주입 — Production HTML의 carom:notes-list 와 동일 값 기대 */
+  env: {
+    NEXT_PUBLIC_CAROM_NOTES_DIAG:
+      process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local",
+  },
 
   async redirects() {
     return [
