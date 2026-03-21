@@ -84,6 +84,7 @@ function NavLink({
   return (
     <Link
       href={href}
+      prefetch={href === "/mypage/notes" ? false : undefined}
       className={`${base} ${isActive ? activeClass : inactiveClass} ${isActive && emph ? emphasisClass : ""}`}
     >
       <span className={`inline-flex items-center justify-center ${emph ? "min-h-[28px] min-w-[28px]" : "min-h-[24px] min-w-[24px]"}`}>

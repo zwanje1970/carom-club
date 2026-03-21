@@ -69,15 +69,24 @@ export async function middleware(request: NextRequest) {
     if (!token) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("next", pathname);
-      return NextResponse.redirect(loginUrl);
+      const res = NextResponse.redirect(loginUrl);
+      res.headers.set("Cache-Control", "private, no-store, max-age=0, must-revalidate");
+      return res;
     }
     try {
       await jwtVerify(token, SECRET);
     } catch {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("next", pathname);
-      return NextResponse.redirect(loginUrl);
+      const res = NextResponse.redirect(loginUrl);
+      res.headers.set("Cache-Control", "private, no-store, max-age=0, must-revalidate");
+      return res;
     }
+    const res = NextResponse.next({
+      request: { headers: requestHeaders },
+    });
+    res.headers.set("Cache-Control", "private, no-store, max-age=0, must-revalidate");
+    return res;
   }
 
   return NextResponse.next({

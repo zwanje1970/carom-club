@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
-import { clearSessionCookie, createSession, verifyPassword } from "@/lib/auth";
+import {
+  clearSessionCookie,
+  COOKIE_NAME,
+  createSession,
+  getSessionCookieOptions,
+  verifyPassword,
+} from "@/lib/auth";
 
 const DB_ERROR_CODES = ["P1001", "P1002", "P1017", "P1033", "P2024"]; // 연결 불가/끊김/풀 타임아웃
 const DB_SCHEMA_MISMATCH_CODE = "P2022"; // 컬럼 없음 (schema와 DB 불일치)
@@ -236,13 +242,7 @@ export async function POST(request: Request) {
       ? 60 * 60 * 24 * 30 // 30일
       : 60 * 60 * 24 * 7; // 7일
     const res = NextResponse.json({ ok: true, role: effectiveRole, loginMode, authChannel });
-    res.cookies.set("carom_session", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge,
-      path: "/",
-    });
+    res.cookies.set(COOKIE_NAME, token, getSessionCookieOptions(maxAge));
     return res;
   } catch (e) {
     const err = e as Error;

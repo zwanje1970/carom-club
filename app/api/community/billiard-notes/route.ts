@@ -47,6 +47,16 @@ export async function GET(request: Request) {
   }
 
   if (!session) {
+    if (process.env.AUTH_DEBUG_COOKIE === "1") {
+      const cookieHeader = request.headers.get("cookie") ?? "";
+      console.warn(
+        "[billiard-notes] GET mine: no session",
+        "cookieLength=",
+        cookieHeader.length,
+        "hasName=",
+        cookieHeader.includes("carom_session")
+      );
+    }
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 

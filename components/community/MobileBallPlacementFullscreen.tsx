@@ -49,6 +49,12 @@ export interface MobileBallPlacementFullscreenProps {
   onExitFullscreen?: () => void;
   /** true면 완료 시 router.back() 호출 안 함 (작성 화면 복귀용) */
   returnOnly?: boolean;
+  /**
+   * 노트 수정 등: 슬라이드 메뉴에 메모 입력 — 저장 시 payload.memo에 포함.
+   * 미사용 시(작성 단계 공배치) memo는 빈 문자열로 전달.
+   */
+  includeMemoField?: boolean;
+  initialMemo?: string;
 }
 
 function useTableOrientation() {
@@ -71,10 +77,16 @@ export function MobileBallPlacementFullscreen({
   onSave,
   onExitFullscreen,
   returnOnly = false,
+  includeMemoField = false,
+  initialMemo = "",
 }: MobileBallPlacementFullscreenProps) {
   const router = useRouter();
   const editorRef = useRef<BilliardTableEditorHandle>(null);
   const fullscreen = useBallPlacementFullscreen();
+  const [noteMemo, setNoteMemo] = useState(initialMemo);
+  useEffect(() => {
+    setNoteMemo(initialMemo);
+  }, [initialMemo]);
   /** 공배치 시작 시 수구 선택 UI 없음 — 기본 흰공(또는 initial). 변경은 상단「수구」 */
   const [cueBall, setCueBall] = useState<CueBallType>(initialCueBall ?? "white");
   const [cuePickerOpen, setCuePickerOpen] = useState(false);
@@ -202,7 +214,7 @@ export function MobileBallPlacementFullscreen({
       const getImageDataURL = () => imageData;
       await onSave({
         ...snapshot,
-        memo: "",
+        memo: includeMemoField ? noteMemo.trim() : "",
         getImageDataURL,
       });
       fullscreen?.setFullscreen(false);
@@ -303,6 +315,20 @@ export function MobileBallPlacementFullscreen({
                   {cueSpotOn ? "켜짐 (ON)" : "꺼짐 (OFF)"}
                 </span>
               </button>
+              {includeMemoField ? (
+                <div className="mt-2 border-t border-white/10 pt-3">
+                  <label className="block text-xs font-medium text-white/80 mb-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">
+                    메모
+                  </label>
+                  <textarea
+                    value={noteMemo}
+                    onChange={(e) => setNoteMemo(e.target.value)}
+                    placeholder="상황, 느낀 점 등"
+                    rows={4}
+                    className="w-full rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-site-primary focus:outline-none focus:ring-1 focus:ring-site-primary"
+                  />
+                </div>
+              ) : null}
             </div>
           </aside>
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { formatKoreanDate } from "@/lib/format-date";
 import { clearBilliardNoteNewPageGuardOnly } from "@/lib/billiard-note-composer-session";
 
@@ -29,9 +30,11 @@ const FILTERS: { value: NoteFilter; label: string }[] = [
 ];
 
 export function BilliardNotesListClient({ basePath = "/mypage/notes" }: BilliardNotesListClientProps) {
+  const pathname = usePathname() ?? basePath;
   const [list, setList] = useState<NoteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [needLogin, setNeedLogin] = useState(false);
   const [filter, setFilter] = useState<NoteFilter>("all");
 
   useEffect(() => {
@@ -39,14 +42,40 @@ export function BilliardNotesListClient({ basePath = "/mypage/notes" }: Billiard
   }, []);
 
   useEffect(() => {
-    fetch("/api/community/billiard-notes?mine=1", { credentials: "include" })
-      .then((res) => {
-        if (!res.ok) throw new Error("목록을 불러올 수 없습니다.");
-        return res.json();
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    setNeedLogin(false);
+    fetch("/api/community/billiard-notes?mine=1", {
+      credentials: "include",
+      mode: "same-origin",
+      cache: "no-store",
+    })
+      .then(async (res) => {
+        if (cancelled) return;
+        if (res.status === 401) {
+          setNeedLogin(true);
+          setList([]);
+          return;
+        }
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error((j as { error?: string }).error ?? "목록을 불러올 수 없습니다.");
+        }
+        return res.json() as Promise<NoteItem[]>;
       })
-      .then(setList)
-      .catch((e) => setError(e instanceof Error ? e.message : "오류"))
-      .finally(() => setLoading(false));
+      .then((data) => {
+        if (!cancelled && data) setList(data);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "오류");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filtered =
@@ -61,12 +90,31 @@ export function BilliardNotesListClient({ basePath = "/mypage/notes" }: Billiard
   if (loading) {
     return <p className="text-gray-500 py-6">불러오는 중…</p>;
   }
+  if (needLogin) {
+    const next = `/login?next=${encodeURIComponent(pathname)}`;
+    return (
+      <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 p-4 text-sm text-site-text">
+        <p className="font-medium">로그인이 필요합니다.</p>
+        <p className="mt-1 text-gray-600 dark:text-slate-400">
+          세션이 없거나 만료되었습니다. 다시 로그인하면 노트 목록을 불러올 수 있습니다.
+        </p>
+        <Link
+          href={next}
+          className="mt-3 inline-block rounded-lg bg-site-primary px-4 py-2 text-white font-medium hover:opacity-90"
+        >
+          로그인하기
+        </Link>
+      </div>
+    );
+  }
   if (error) {
     return (
       <p className="text-red-600 py-4">
         {error}
-        {error.includes("로그인") && (
-          <Link href="/login" className="ml-2 underline">로그인</Link>
+        {(error.includes("로그인") || error.includes("401")) && (
+          <Link href={`/login?next=${encodeURIComponent(pathname)}`} className="ml-2 underline">
+            로그인
+          </Link>
         )}
       </p>
     );

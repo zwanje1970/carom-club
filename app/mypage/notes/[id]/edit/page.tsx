@@ -3,8 +3,17 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { BilliardNoteEditor } from "@/components/community/BilliardNoteEditor";
 import { MobileBallPlacementFullscreen } from "@/components/community/MobileBallPlacementFullscreen";
+import type { CueBallType } from "@/lib/billiard-table-constants";
+
+type NoteSavePayload = {
+  redBall: { x: number; y: number };
+  yellowBall: { x: number; y: number };
+  whiteBall: { x: number; y: number };
+  cueBall: CueBallType;
+  memo: string;
+  getImageDataURL: () => string;
+};
 
 function dataURLToBlob(dataURL: string): Blob {
   const arr = dataURL.split(",");
@@ -20,7 +29,6 @@ export default function MypageEditNotePage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  const [isMobile, setIsMobile] = useState(false);
   const [note, setNote] = useState<{
     redBall: { x: number; y: number };
     yellowBall: { x: number; y: number };
@@ -31,13 +39,6 @@ export default function MypageEditNotePage() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth <= 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
 
   useEffect(() => {
     fetch(`/api/community/billiard-notes/${id}`, { credentials: "include" })
@@ -60,7 +61,7 @@ export default function MypageEditNotePage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const handleSaveCore = async (payload: Parameters<Parameters<typeof BilliardNoteEditor>[0]["onSave"]>[0]) => {
+  const handleSaveCore = async (payload: NoteSavePayload) => {
     setError("");
     const dataURL = payload.getImageDataURL();
     if (!dataURL) throw new Error("이미지를 생성할 수 없습니다.");
@@ -98,11 +99,6 @@ export default function MypageEditNotePage() {
     }
   };
 
-  const handleSave = async (payload: Parameters<Parameters<typeof BilliardNoteEditor>[0]["onSave"]>[0]) => {
-    await handleSaveCore(payload);
-    router.push(`/mypage/notes/${id}`);
-  };
-
   if (loading) {
     return (
       <main className="min-h-screen bg-site-bg text-site-text">
@@ -125,46 +121,20 @@ export default function MypageEditNotePage() {
     );
   }
 
-  if (isMobile && note) {
-    return (
-      <main className="min-h-screen bg-site-bg text-site-text">
-        <MobileBallPlacementFullscreen
-          initialRed={note.redBall}
-          initialYellow={note.yellowBall}
-          initialWhite={note.whiteBall}
-          initialCueBall={note.cueBall}
-          onSave={handleSaveCore}
-        />
-      </main>
-    );
-  }
-
+  /** 신규 작성과 동일한 풀스크린 공배치 UI(줌·도구 서랍). 데스크톱·모바일 공통. */
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
-      <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">
-        <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4" aria-label="breadcrumb">
-          <Link href="/mypage" className="hover:text-site-primary">마이페이지</Link>
-          <span aria-hidden>/</span>
-          <Link href="/mypage/notes" className="hover:text-site-primary">당구노트</Link>
-          <span aria-hidden>/</span>
-          <span className="text-site-text font-medium">수정</span>
-        </nav>
-        <div className="flex items-center gap-4 mb-6">
-          <Link href={`/mypage/notes/${id}`} className="text-site-primary hover:underline">
-            ← 취소
-          </Link>
-          <h1 className="text-xl font-bold">노트 수정</h1>
-        </div>
-        <BilliardNoteEditor
-          initialRed={note.redBall}
-          initialYellow={note.yellowBall}
-          initialWhite={note.whiteBall}
-          initialCueBall={note.cueBall}
-          initialMemo={note.memo ?? ""}
-          onSave={handleSave}
-          saveLabel="저장"
-        />
-      </div>
+      <MobileBallPlacementFullscreen
+        initialRed={note.redBall}
+        initialYellow={note.yellowBall}
+        initialWhite={note.whiteBall}
+        initialCueBall={note.cueBall}
+        includeMemoField
+        initialMemo={note.memo ?? ""}
+        onSave={handleSaveCore}
+        returnOnly
+        onExitFullscreen={() => router.push(`/mypage/notes/${id}`)}
+      />
     </main>
   );
 }

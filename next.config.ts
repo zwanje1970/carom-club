@@ -26,7 +26,6 @@ function buildRemotePatterns(): RemotePattern[] {
       hostname: "**.public.blob.vercel-storage.com",
       port: "",
       pathname: "/**",
-      // search 미지정: Blob 서명 URL 등 ?token= 쿼리 허용 (search: "" 는 쿼리 없는 URL만 매칭 → 400 유발)
     },
     {
       protocol: "https",
@@ -46,8 +45,14 @@ function buildRemotePatterns(): RemotePattern[] {
     });
     if (siteHost.startsWith("www.")) {
       const apex = siteHost.slice(4);
-      if (apex)
-        patterns.push({ protocol: "https", hostname: apex, port: "", pathname: "/**" });
+      if (apex) {
+        patterns.push({
+          protocol: "https",
+          hostname: apex,
+          port: "",
+          pathname: "/**",
+        });
+      }
     } else {
       patterns.push({
         protocol: "https",
@@ -81,8 +86,14 @@ function buildRemotePatterns(): RemotePattern[] {
   if (extra?.trim()) {
     for (const part of extra.split(",").map((s) => s.trim()).filter(Boolean)) {
       const h = hostnameFromEnvUrl(part.includes("://") ? part : `https://${part}`);
-      if (h)
-        patterns.push({ protocol: "https", hostname: h, port: "", pathname: "/**" });
+      if (h) {
+        patterns.push({
+          protocol: "https",
+          hostname: h,
+          port: "",
+          pathname: "/**",
+        });
+      }
     }
   }
 
@@ -94,13 +105,26 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   outputFileTracingRoot: path.join(__dirname),
+
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [
+          {
+            type: "host",
+            value: "www.carom.club",
+          },
+        ],
+        destination: "https://carom.club/:path*",
+        permanent: true,
+      },
+    ];
+  },
+
   images: {
     remotePatterns: buildRemotePatterns(),
     localPatterns: [{ pathname: "/uploads/**" }],
-    /**
-     * Vercel 배포: Image Optimization 이 Blob·쿼리·호스트 불일치로 400 나는 경우가 많아 비활성화.
-     * 자체 호스팅 등에서는 미설정 시 최적화 유지. 필요 시 NEXT_IMAGE_UNOPTIMIZED=1
-     */
     unoptimized:
       process.env.VERCEL === "1" || process.env.NEXT_IMAGE_UNOPTIMIZED === "1",
   },
