@@ -1,13 +1,8 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { BilliardNotesListClient } from "@/components/community/BilliardNotesListClient";
-import { getSession } from "@/lib/auth";
 
+/** 비로그인 차단: `middleware.ts` + `layout.tsx`(redirect). 여기서는 목록만 렌더 */
 export default async function MypageNotesPage() {
-  const session = await getSession();
-  if (!session) {
-    redirect(`/login?next=${encodeURIComponent("/mypage/notes")}`);
-  }
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
       <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">

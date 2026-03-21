@@ -23,6 +23,7 @@ type JwtPayload = {
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const requestHeaders = new Headers(request.headers);
+  /** `app/mypage/notes/layout.tsx` 등에서 `login?next=` 복귀 경로용 */
   requestHeaders.set("x-pathname", pathname);
 
   const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");

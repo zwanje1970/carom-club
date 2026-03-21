@@ -1,5 +1,6 @@
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { NotesLoginGate } from "@/components/mypage/NotesLoginGate";
 import { MypageNotesSessionGuard } from "@/components/mypage/MypageNotesSessionGuard";
 
 /** 쿠키 기반 세션과 맞춰 HTML/RSC가 공용 캐시되지 않도록 */
@@ -13,7 +14,9 @@ export default async function MypageNotesLayout({
 }) {
   const session = await getSession();
   if (!session) {
-    return <NotesLoginGate />;
+    const h = await headers();
+    const path = h.get("x-pathname") ?? "/mypage/notes";
+    redirect(`/login?next=${encodeURIComponent(path)}`);
   }
   return (
     <MypageNotesSessionGuard initialShow>
