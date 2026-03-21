@@ -20,7 +20,7 @@
 - 코드에 `https://www.carom.club/...` 로 API를 직접 부르는 패턴은 없음 — 상대경로 `/api/...` 사용.
 - 메타/OG 기본값은 `lib/site-settings.ts`의 `DEFAULT_SITE_URL` 등 — API와 무관.
 - **문제 패턴**: `www`에서 로그인해 쿠키가 `www` 전용으로만 붙고, `apex`에서 `/api` 호출 시 쿠키 미전달.
-- **코드 측 정규화**: `next.config.ts`의 `redirects` — `www.carom.club` → `https://carom.club/:path*` (308), `carom.club` + `x-forwarded-proto: http` → `https://carom.club/:path*` (영구).
+- **정규화(www·HTTPS)**: `next.config.ts`에는 host 기반 redirects 없음 — **Vercel Domains**에서만 설정(Next redirects와 중복 시 무한 리다이렉트 방지).
 - **대응**: Vercel Domains에서 apex/`www` 정리 + `SESSION_COOKIE_DOMAIN=carom.club`(코드가 `.carom.club`로 발급).
 
 ## 4. 세션 쿠키 (수정 후)
