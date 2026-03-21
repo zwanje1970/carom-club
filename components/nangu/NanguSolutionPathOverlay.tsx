@@ -150,10 +150,8 @@ export function NanguSolutionPathOverlay({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [draggingObjectId, setDraggingObjectId] = useState<string | null>(null);
   const lastClickRef = useRef<{ id: string; t: number; kind: "cue" | "obj" } | null>(null);
-  const cueBallGestureRef = useRef<{
-    t: number;
-    timer: ReturnType<typeof setTimeout>;
-  } | null>(null);
+  /** 브라우저 setTimeout 핸들 (number). Node `Timeout`과 병합 타입 충돌 방지 */
+  const cueBallGestureRef = useRef<{ t: number; timer: number } | null>(null);
 
   useEffect(() => {
     return () => {

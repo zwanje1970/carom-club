@@ -134,6 +134,8 @@ export function CommunityPostDetailView({
       difficulty: string | null;
       sourceNoteId: string | null;
       acceptedSolutionId: string | null;
+      /** 당구노트 연동 시 API가 내려주는 정규화 공배치 */
+      ballPlacement?: NanguBallPlacement | null;
     };
   } | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
