@@ -115,6 +115,11 @@ export function SolutionPathEditorFullscreen({
   const [objectPathPoints, setObjectPathPoints] = useState<NanguPathPoint[]>(initialObjectPathPoints);
   const [pathMode, setPathMode] = useState(true);
   const [objectPathMode, setObjectPathMode] = useState(false);
+  /**
+   * 난구(trouble): 수구경로 / 1적구경로 — 동시 활성 불가, 동시 비활성 가능(이때 경로선 추가 불가).
+   * nangu는 기존 pathMode·objectPathMode만 사용.
+   */
+  const [troublePathEditLayer, setTroublePathEditLayer] = useState<"cue" | "object" | null>("cue");
   const [pathAddStack, setPathAddStack] = useState<Array<"cue" | "object">>([]);
   /** overlay 모드만 공 탭 시 줌 초점 이동. note 셸은 당구노트 공배치와 같이 플레이필드 중심 고정(테이블이 공을 쫓아 움직이지 않음) */
   const [zoomFocusOverlay, setZoomFocusOverlay] = useState({
@@ -655,6 +660,11 @@ export function SolutionPathEditorFullscreen({
     ]
   );
 
+  const cuePathEditing =
+    variant === "trouble" ? troublePathEditLayer === "cue" : pathMode;
+  const objectPathEditing =
+    variant === "trouble" ? troublePathEditLayer === "object" : false;
+
   const pathPlayback = useSolutionPathPlayback({
     ballPlacement: layoutForCue,
     pathPoints,
@@ -664,7 +674,7 @@ export function SolutionPathEditorFullscreen({
     thicknessOffsetX,
     /** 1목 경로 그리기 모드 + 스팟 1개 이상일 때만 재생 충돌 팝업 */
     collisionWarningsEnabled:
-      variant === "trouble" && objectPathMode && objectPathPoints.length >= 1,
+      variant === "trouble" && objectPathEditing && objectPathPoints.length >= 1,
   });
 
   const allowCuePlaybackGestures =
@@ -676,10 +686,11 @@ export function SolutionPathEditorFullscreen({
     if (now && !wasPlaybackActiveRef.current) {
       setPlaybackPathLinesVisible(true);
       setPlaybackGridVisible(true);
-      setPlaybackDrawStyle("realistic");
+      /** 단순보기에서도 재생 시 동일 스타일 유지 */
+      setPlaybackDrawStyle(tableDrawStyle);
     }
     wasPlaybackActiveRef.current = now;
-  }, [pathPlayback.isPlaybackActive]);
+  }, [pathPlayback.isPlaybackActive, tableDrawStyle]);
 
   useEffect(() => {
     if (!isNoteShell) return;
@@ -691,9 +702,13 @@ export function SolutionPathEditorFullscreen({
 
   useEffect(() => {
     if (!isNoteShell) return;
-    setPathMode(true);
-    setObjectPathMode(false);
-  }, [isNoteShell]);
+    if (variant === "trouble") {
+      setTroublePathEditLayer("cue");
+    } else {
+      setPathMode(true);
+      setObjectPathMode(false);
+    }
+  }, [isNoteShell, variant]);
 
   const { resetPlayback: resetPathPlayback } = pathPlayback;
 
@@ -702,9 +717,13 @@ export function SolutionPathEditorFullscreen({
     setPathAddStack([]);
     setPathPoints([]);
     setObjectPathPoints([]);
-    setObjectPathMode(false);
-    setPathMode(true);
-  }, [resetPathPlayback]);
+    if (variant === "trouble") {
+      setTroublePathEditLayer("cue");
+    } else {
+      setObjectPathMode(false);
+      setPathMode(true);
+    }
+  }, [resetPathPlayback, variant]);
 
   const undoLastPathSpot = useCallback(() => {
     setPathAddStack((stack) => {
@@ -725,11 +744,15 @@ export function SolutionPathEditorFullscreen({
   useEffect(() => {
     if (pathPoints.length === 0) {
       setObjectPathPoints([]);
-      setObjectPathMode(false);
       setPathAddStack([]);
-      setPathMode(true);
+      if (variant === "trouble") {
+        setTroublePathEditLayer("cue");
+      } else {
+        setObjectPathMode(false);
+        setPathMode(true);
+      }
     }
-  }, [pathPoints.length]);
+  }, [pathPoints.length, variant]);
 
   const movePathPoint = useCallback(
     (id: string, norm: { x: number; y: number }) => {
@@ -835,17 +858,17 @@ export function SolutionPathEditorFullscreen({
 
   const panPointerPolicy = useMemo((): SolutionTablePanPointerPolicy => {
     const ballPickLayout =
-      layoutForCue && (pathMode || (showObjectPath && objectPathMode)) ? layoutForCue : undefined;
+      layoutForCue && (cuePathEditing || objectPathEditing) ? layoutForCue : undefined;
     const ballNormOverrides = pathPlayback.ballNormOverrides ?? undefined;
     const objectPts = showObjectPath ? objectPathPoints : [];
-    const objMode = showObjectPath && objectPathMode;
+    const objMode = objectPathEditing;
 
     const classifyAt = (clientX: number, clientY: number) => {
       const norm = getNormalizedFromEvent(clientX, clientY);
       if (!norm) return null;
       return classifySolutionPathPointerHit({
         norm,
-        pathMode,
+        pathMode: cuePathEditing,
         objectPathMode: objMode,
         cuePos,
         pathPoints,
@@ -872,7 +895,7 @@ export function SolutionPathEditorFullscreen({
       onEmptyTap: (clientX, clientY) => {
         const aimMargin = getPointerAimFromEvent(clientX, clientY);
         if (aimMargin?.kind === "tableCanvas") {
-          if (pathMode) runCueAppendAim(aimMargin);
+          if (cuePathEditing) runCueAppendAim(aimMargin);
           else if (objMode && collisionNorm) addObjectPathAim(aimMargin);
           return;
         }
@@ -903,9 +926,9 @@ export function SolutionPathEditorFullscreen({
     };
   }, [
     layoutForCue,
-    pathMode,
+    cuePathEditing,
+    objectPathEditing,
     showObjectPath,
-    objectPathMode,
     pathPlayback.ballNormOverrides,
     getNormalizedFromEvent,
     getPointerAimFromEvent,
@@ -1046,35 +1069,45 @@ export function SolutionPathEditorFullscreen({
                 <span className="tabular-nums">{cueSpotOn ? "ON" : "OFF"}</span>
               </button>
             )}
-            {showObjectPath && layoutForCue && (
-              <button
-                type="button"
-                {...(variant === "trouble" ? { "data-trouble-action": C.action.toggleObjectPathMode } : {})}
-                onClick={() => {
-                  setObjectPathMode((v) => {
-                    const next = !v;
-                    if (next) setPathMode(false);
-                    /** 1목 끄면 수구 경로만 수정 가능하도록 수구 입력 다시 켬 */
-                    else setPathMode(true);
-                    return next;
-                  });
-                }}
-                className={`shrink-0 rounded-lg px-2 py-1.5 text-[10px] sm:text-xs font-semibold leading-tight border transition-colors touch-manipulation max-w-[9.5rem] sm:max-w-none ${
-                  objectPathMode
-                    ? "border-sky-700 bg-sky-600/20 text-sky-900 dark:text-sky-100"
-                    : "border-gray-300 dark:border-slate-600 bg-black/10 dark:bg-white/10 text-site-text"
-                }`}
-                aria-pressed={objectPathMode}
-                aria-label={
-                  objectPathMode
-                    ? "1목적구 경로선 그리기 끄기"
-                    : "1목적구 경로선 그리기 켜기"
-                }
-              >
-                1목적구 경로선
-                <br />
-                <span className="tabular-nums">{objectPathMode ? "그리는 중" : "그리기"}</span>
-              </button>
+            {showObjectPath && layoutForCue && variant === "trouble" && (
+              <>
+                <button
+                  type="button"
+                  {...{ "data-trouble-action": C.action.togglePathMode }}
+                  onClick={() =>
+                    setTroublePathEditLayer((cur) => (cur === "cue" ? null : "cue"))
+                  }
+                  className={`shrink-0 rounded-lg px-2 py-1.5 text-[10px] sm:text-xs font-semibold leading-tight border transition-colors touch-manipulation ${
+                    cuePathEditing
+                      ? "border-site-primary/70 bg-site-primary/15 text-site-primary"
+                      : "border-gray-300 dark:border-slate-600 bg-black/10 dark:bg-white/10 text-site-text"
+                  }`}
+                  aria-pressed={cuePathEditing}
+                  aria-label={cuePathEditing ? "수구경로 그리기 끄기" : "수구경로 그리기 켜기"}
+                >
+                  수구경로
+                  <br />
+                  <span className="tabular-nums">{cuePathEditing ? "ON" : "OFF"}</span>
+                </button>
+                <button
+                  type="button"
+                  {...{ "data-trouble-action": C.action.toggleObjectPathMode }}
+                  onClick={() =>
+                    setTroublePathEditLayer((cur) => (cur === "object" ? null : "object"))
+                  }
+                  className={`shrink-0 rounded-lg px-2 py-1.5 text-[10px] sm:text-xs font-semibold leading-tight border transition-colors touch-manipulation ${
+                    objectPathEditing
+                      ? "border-sky-700 bg-sky-600/20 text-sky-900 dark:text-sky-100"
+                      : "border-gray-300 dark:border-slate-600 bg-black/10 dark:bg-white/10 text-site-text"
+                  }`}
+                  aria-pressed={objectPathEditing}
+                  aria-label={objectPathEditing ? "1적구경로 그리기 끄기" : "1적구경로 그리기 켜기"}
+                >
+                  1적구경로
+                  <br />
+                  <span className="tabular-nums">{objectPathEditing ? "ON" : "OFF"}</span>
+                </button>
+              </>
             )}
             <button
               type="button"
@@ -1338,15 +1371,15 @@ export function SolutionPathEditorFullscreen({
                               tableBallPlacement={layoutForCue}
                               objectPathPoints={showObjectPath ? objectPathPoints : []}
                               orientation={isNoteShell ? noteShellTableOrientation : "landscape"}
-                              pathMode={pathMode}
-                              objectPathMode={showObjectPath && objectPathMode}
+                              pathMode={cuePathEditing}
+                              objectPathMode={objectPathEditing}
                               getNormalizedFromEvent={getNormalizedFromEvent}
                               getPointerAimFromEvent={getPointerAimFromEvent}
                               onZoomSetFocusCanvasPx={
                                 isNoteShell ? undefined : (cx, cy) => setZoomFocusOverlay({ x: cx, y: cy })
                               }
                               ballPickLayout={
-                                layoutForCue && (pathMode || (showObjectPath && objectPathMode))
+                                layoutForCue && (cuePathEditing || objectPathEditing)
                                   ? layoutForCue
                                   : undefined
                               }
@@ -1423,8 +1456,8 @@ export function SolutionPathEditorFullscreen({
                         cuePos={cuePos}
                         objectPathPoints={showObjectPath ? objectPathPoints : []}
                         orientation={isNoteShell ? noteShellTableOrientation : "landscape"}
-                        pathMode={pathMode}
-                        objectPathMode={showObjectPath && objectPathMode}
+                        pathMode={cuePathEditing}
+                        objectPathMode={objectPathEditing}
                         getNormalizedFromEvent={getNormalizedFromEvent}
                         getPointerAimFromEvent={getPointerAimFromEvent}
                         onZoomSetFocusCanvasPx={
@@ -1484,7 +1517,7 @@ export function SolutionPathEditorFullscreen({
                     )}
                     <PathPlaybackViewOverlay
                       variant={variant === "trouble" ? "trouble" : "nangu"}
-                      active={pathPlayback.isPlaybackActive && !isNoteShell}
+                      active={pathPlayback.isPlaybackActive}
                       pathLinesVisible={playbackPathLinesVisible}
                       onPathLinesVisibleChange={setPlaybackPathLinesVisible}
                       gridVisible={playbackGridVisible}
@@ -1509,50 +1542,87 @@ export function SolutionPathEditorFullscreen({
           <>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium">진행경로</span>
-            <button
-              type="button"
-              {...(variant === "trouble" ? { "data-trouble-action": C.action.togglePathMode } : {})}
-              onClick={() => {
-                setPathMode((v) => {
-                  const next = !v;
-                  if (next) setObjectPathMode(false);
-                  return next;
-                });
-              }}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border touch-manipulation ${
-                pathMode
-                  ? "bg-site-primary text-white border-site-primary"
-                  : "border-gray-300 dark:border-slate-600 text-site-text"
-              }`}
-            >
-              {pathMode ? "수구 경로 입력 중" : "수구 경로 입력"}
-            </button>
-            {showObjectPath && layoutForCue && (
-              <button
-                type="button"
-                {...(variant === "trouble" ? { "data-trouble-action": C.action.toggleObjectPathMode } : {})}
-                onClick={() => {
-                  setObjectPathMode((v) => {
-                    const next = !v;
-                    if (next) setPathMode(false);
-                    else setPathMode(true);
-                    return next;
-                  });
-                }}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium border touch-manipulation ${
-                  objectPathMode
-                    ? "bg-sky-700 text-white border-sky-700"
-                    : "border-gray-300 dark:border-slate-600 text-site-text"
-                }`}
-                aria-pressed={objectPathMode}
-                aria-label={
-                  objectPathMode
-                    ? "1목적구 경로선 그리기 끄기"
-                    : "1목적구 경로선 그리기 켜기"
-                }
-              >
-                {objectPathMode ? "1목적구 경로선 그리는 중" : "1목적구 경로선 그리기"}
-              </button>
+            {variant === "trouble" && showObjectPath && layoutForCue ? (
+              <>
+                <button
+                  type="button"
+                  {...{ "data-trouble-action": C.action.togglePathMode }}
+                  onClick={() =>
+                    setTroublePathEditLayer((cur) => (cur === "cue" ? null : "cue"))
+                  }
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border touch-manipulation ${
+                    cuePathEditing
+                      ? "bg-site-primary text-white border-site-primary"
+                      : "border-gray-300 dark:border-slate-600 text-site-text"
+                  }`}
+                  aria-pressed={cuePathEditing}
+                  aria-label={cuePathEditing ? "수구경로 그리기 끄기" : "수구경로 그리기 켜기"}
+                >
+                  {cuePathEditing ? "수구경로 ON" : "수구경로 OFF"}
+                </button>
+                <button
+                  type="button"
+                  {...{ "data-trouble-action": C.action.toggleObjectPathMode }}
+                  onClick={() =>
+                    setTroublePathEditLayer((cur) => (cur === "object" ? null : "object"))
+                  }
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border touch-manipulation ${
+                    objectPathEditing
+                      ? "bg-sky-700 text-white border-sky-700"
+                      : "border-gray-300 dark:border-slate-600 text-site-text"
+                  }`}
+                  aria-pressed={objectPathEditing}
+                  aria-label={objectPathEditing ? "1적구경로 그리기 끄기" : "1적구경로 그리기 켜기"}
+                >
+                  {objectPathEditing ? "1적구경로 ON" : "1적구경로 OFF"}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPathMode((v) => {
+                      const next = !v;
+                      if (next) setObjectPathMode(false);
+                      return next;
+                    });
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border touch-manipulation ${
+                    pathMode
+                      ? "bg-site-primary text-white border-site-primary"
+                      : "border-gray-300 dark:border-slate-600 text-site-text"
+                  }`}
+                >
+                  {pathMode ? "수구 경로 입력 중" : "수구 경로 입력"}
+                </button>
+                {showObjectPath && layoutForCue && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setObjectPathMode((v) => {
+                        const next = !v;
+                        if (next) setPathMode(false);
+                        else setPathMode(true);
+                        return next;
+                      });
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border touch-manipulation ${
+                      objectPathMode
+                        ? "bg-sky-700 text-white border-sky-700"
+                        : "border-gray-300 dark:border-slate-600 text-site-text"
+                    }`}
+                    aria-pressed={objectPathMode}
+                    aria-label={
+                      objectPathMode
+                        ? "1목적구 경로선 그리기 끄기"
+                        : "1목적구 경로선 그리기 켜기"
+                    }
+                  >
+                    {objectPathMode ? "1목적구 경로선 그리는 중" : "1목적구 경로선 그리기"}
+                  </button>
+                )}
+              </>
             )}
             <button
               type="button"
@@ -1586,8 +1656,11 @@ export function SolutionPathEditorFullscreen({
             </button>
           </div>
             <p className="text-xs text-gray-500 dark:text-slate-400">
-              스팟·드래그·줌은 이 화면에서만 사용합니다. 1목 경로는 수구보다 먼저 그려도 됩니다(스위치·애니메이션
-              시연은 수구 경로와 맞물릴 때만). 완료 시 저장되고, 취소 시 들어오기 전 상태로 돌아갑니다.
+              스팟·드래그·줌은 이 화면에서만 사용합니다.
+              {variant === "trouble"
+                ? " 난구: 「수구경로」「1적구경로」는 동시에 켤 수 없으며, 둘 다 끄면 경로선을 추가할 수 없습니다."
+                : " 1목 경로는 수구보다 먼저 그려도 됩니다(스위치·애니메이션 시연은 수구 경로와 맞물릴 때만)."}
+              완료 시 저장되고, 취소 시 들어오기 전 상태로 돌아갑니다.
             </p>
           </>
         </div>

@@ -994,7 +994,6 @@ const BilliardTableCanvas = forwardRef<
           onPointerCancel={usePointerDrag ? handlePointerUp : undefined}
           aria-label="당구대"
         />
-        <div className="pointer-events-none absolute inset-0 z-[5] min-h-0 min-w-0">{children}</div>
         <canvas
           ref={ballLayerRef}
           width={width}
@@ -1003,6 +1002,11 @@ const BilliardTableCanvas = forwardRef<
           style={{ objectFit: embedFill ? "fill" : "contain" }}
           aria-hidden
         />
+        {/*
+          경로 SVG는 공 레이어 위(z-20). 모바일 WebKit 등에서 캔버스 아래에 두면 합성·투명도 이슈로 파란 선이 안 보이는 경우가 있어
+          테이블 → 공 → 경로 순으로 쌓음(자식 오버레이에서 pointer-events 제어).
+        */}
+        <div className="absolute inset-0 z-[20] min-h-0 min-w-0">{children}</div>
       </div>
     );
   }

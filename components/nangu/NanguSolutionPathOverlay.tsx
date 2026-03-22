@@ -8,11 +8,15 @@ import {
   getPlayfieldLongSide,
   distanceNormPointsInPlayfieldPx,
   getSolutionPathBallTapRadiusPx,
+  isInsidePlayfield,
+  pixelToNormalized,
   DEFAULT_TABLE_WIDTH,
   DEFAULT_TABLE_HEIGHT,
   landscapeToPortraitNorm,
+  portraitToLandscapeNorm,
   type TableOrientation,
 } from "@/lib/billiard-table-constants";
+import { useSolutionTableZoomContext } from "@/components/nangu/solution-table-zoom-context";
 import { spotCenterNormForDraw } from "@/lib/path-spot-display";
 import {
   getNonCueBallNorms,
@@ -143,6 +147,56 @@ export function NanguSolutionPathOverlay({
       return { px, py };
     },
     [orientation, drawRect]
+  );
+
+  /** SolutionTableZoomShell 안에서 줌 컨텍스트 사용 — 부모 ref 미동기화·프로덕션 타이밍 이슈로 좌표가 null 되는 경우 방지 */
+  const zoomFromShell = useSolutionTableZoomContext();
+  const playfieldRectForPointer = useMemo(
+    () =>
+      orientation === "portrait"
+        ? getPlayfieldRect(DEFAULT_TABLE_HEIGHT, DEFAULT_TABLE_WIDTH)
+        : getPlayfieldRect(DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT),
+    [orientation]
+  );
+
+  const resolvePointerAimFromClient = useCallback(
+    (clientX: number, clientY: number): PathPointerAim | null => {
+      if (zoomFromShell?.viewportClientToCanvasPx) {
+        const cp = zoomFromShell.viewportClientToCanvasPx(clientX, clientY);
+        if (!cp) return null;
+        if (cp.x < -2 || cp.y < -2 || cp.x > canvasW + 2 || cp.y > canvasH + 2) return null;
+        if (isInsidePlayfield(cp.x, cp.y, playfieldRectForPointer)) {
+          const vn = pixelToNormalized(cp.x, cp.y, playfieldRectForPointer);
+          const land = orientation === "portrait" ? portraitToLandscapeNorm(vn.x, vn.y) : vn;
+          return { kind: "playfield", norm: land };
+        }
+        return { kind: "tableCanvas", cx: cp.x, cy: cp.y };
+      }
+      if (getPointerAimFromEvent) return getPointerAimFromEvent(clientX, clientY);
+      if (getNormalizedFromEvent) {
+        const n = getNormalizedFromEvent(clientX, clientY);
+        return n ? { kind: "playfield", norm: n } : null;
+      }
+      return null;
+    },
+    [
+      zoomFromShell,
+      canvasW,
+      canvasH,
+      playfieldRectForPointer,
+      orientation,
+      getPointerAimFromEvent,
+      getNormalizedFromEvent,
+    ]
+  );
+
+  const resolveLandscapeNormFromClient = useCallback(
+    (clientX: number, clientY: number): { x: number; y: number } | null => {
+      const aim = resolvePointerAimFromClient(clientX, clientY);
+      if (aim?.kind === "playfield") return aim.norm;
+      return null;
+    },
+    [resolvePointerAimFromClient]
   );
 
   const firstObjectBallsForCollision = useMemo(() => {
@@ -284,14 +338,7 @@ export function NanguSolutionPathOverlay({
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
-      if (!getNormalizedFromEvent && !getPointerAimFromEvent) return;
-      let aim: PathPointerAim | null = null;
-      if (getPointerAimFromEvent) {
-        aim = getPointerAimFromEvent(e.clientX, e.clientY);
-      } else {
-        const n = getNormalizedFromEvent?.(e.clientX, e.clientY);
-        aim = n ? { kind: "playfield", norm: n } : null;
-      }
+      const aim = resolvePointerAimFromClient(e.clientX, e.clientY);
       if (!aim) return;
       const now = Date.now();
 
@@ -509,8 +556,8 @@ export function NanguSolutionPathOverlay({
       if (c.kind === "emptyCue" || c.kind === "pathObjectBallTap") {
         /** 마지막이 쿠션(스팟점)이면 플레이필드 어디를 탭해도 스냅 기준으로 다음 스팟 연결 — 반직선 실패 없이 */
         const lastCue = pathPoints[pathPoints.length - 1];
-        if (lastCue?.type === "cushion" && getNormalizedFromEvent) {
-          const n = getNormalizedFromEvent(e.clientX, e.clientY);
+        if (lastCue?.type === "cushion") {
+          const n = resolveLandscapeNormFromClient(e.clientX, e.clientY);
           if (n) {
             onAddPoint?.(n);
             e.stopPropagation();
@@ -527,8 +574,8 @@ export function NanguSolutionPathOverlay({
     [
       pathMode,
       objectPathMode,
-      getNormalizedFromEvent,
-      getPointerAimFromEvent,
+      resolvePointerAimFromClient,
+      resolveLandscapeNormFromClient,
       pathPoints,
       objectPathPoints,
       cuePos,
@@ -558,8 +605,7 @@ export function NanguSolutionPathOverlay({
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
-      if (!getNormalizedFromEvent) return;
-      const norm = getNormalizedFromEvent(e.clientX, e.clientY);
+      const norm = resolveLandscapeNormFromClient(e.clientX, e.clientY);
       if (!norm) return;
       if (draggingObjectId && onMoveObjectPoint) {
         onMoveObjectPoint(draggingObjectId, norm);
@@ -571,7 +617,7 @@ export function NanguSolutionPathOverlay({
         e.preventDefault();
       }
     },
-    [draggingId, draggingObjectId, getNormalizedFromEvent, onMovePoint, onMoveObjectPoint]
+    [draggingId, draggingObjectId, resolveLandscapeNormFromClient, onMovePoint, onMoveObjectPoint]
   );
 
   const handlePointerUp = useCallback(() => {
