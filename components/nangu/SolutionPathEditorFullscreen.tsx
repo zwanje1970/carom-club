@@ -22,7 +22,7 @@ import {
   isInsidePlayfield,
   portraitToLandscapeNorm,
   distanceNormPointsInPlayfieldPx,
-  playfieldGridOneCellEdgePx,
+  pathAutoChainNearCushionMaxDistancePx,
   DEFAULT_TABLE_WIDTH,
   DEFAULT_TABLE_HEIGHT,
   type TableOrientation,
@@ -64,10 +64,35 @@ import {
 } from "@/lib/solution-path-pointer-classify";
 import { resolveTroubleFirstObjectBallKey } from "@/lib/trouble-first-object-ball";
 import { isPathTooCloseToNonCueBalls } from "@/lib/solution-path-ball-clearance";
+import {
+  type PathSegmentCurveControl,
+  clonePathCurveControls,
+  pruneCuePathCurveControls,
+  pruneObjectPathCurveControls,
+} from "@/lib/path-curve-display";
 import { cx } from "@/components/client/console/ui/cx";
 
 /** nangu는 1목 경로 없음. 매 렌더 `[]`를 넘기면 재생 훅의 의존성이 바뀌어 매번 reset되어 애니메이션이 동작하지 않음 */
 const EMPTY_NANGU_OBJECT_PATH_POINTS: NanguPathPoint[] = [];
+
+const MAX_PATH_EDITOR_UNDO = 6;
+
+const UNDO_LIMIT_TOAST_MS = 500;
+
+type PathEditorPairSnapshot = {
+  cue: NanguPathPoint[];
+  obj: NanguPathPoint[];
+  cueCurves?: PathSegmentCurveControl[];
+  objCurves?: PathSegmentCurveControl[];
+};
+
+function clonePathPointsForUndo(pts: NanguPathPoint[]): NanguPathPoint[] {
+  return pts.map((p) => ({ ...p }));
+}
+
+function clampCurveControlNorm(n: { x: number; y: number }): { x: number; y: number } {
+  return { x: Math.min(1, Math.max(0, n.x)), y: Math.min(1, Math.max(0, n.y)) };
+}
 
 /** 난구(trouble)·nangu 공통 — 경로 모드 토글 동일 크기, 활성 컬러 / 비활성 흑백 */
 function pathLayerToggleClass(active: boolean, layer: "cue" | "object") {
@@ -112,10 +137,18 @@ export type SolutionPathEditorFullscreenProps = {
   /** 열릴 때 스냅샷 (부모 key로 리마운트 시 초기화) */
   initialPathPoints: NanguPathPoint[];
   initialObjectPathPoints: NanguPathPoint[];
+  /** 난구 표시 전용 곡선(저장·미리보기 복원) */
+  initialCuePathDisplayCurves?: PathSegmentCurveControl[];
+  initialObjectPathDisplayCurves?: PathSegmentCurveControl[];
   thicknessOffsetX: number;
   isBankShot: boolean;
   ballSpeed: BallSpeed;
-  onConfirm: (payload: { pathPoints: NanguPathPoint[]; objectPathPoints: NanguPathPoint[] }) => void;
+  onConfirm: (payload: {
+    pathPoints: NanguPathPoint[];
+    objectPathPoints: NanguPathPoint[];
+    cuePathDisplayCurves?: PathSegmentCurveControl[];
+    objectPathDisplayCurves?: PathSegmentCurveControl[];
+  }) => void;
   onCancel: () => void;
   /**
    * overlay: z-[200] 일반 모달.
@@ -123,7 +156,7 @@ export type SolutionPathEditorFullscreenProps = {
    */
   presentation?: SolutionPathEditorPresentation;
   /**
-   * true: 공 좌표·수구는 데이터 그대로(캔버스는 이미 읽기 전용). 상단「수구」변경만 비활성.
+   * true: 공 좌표·수구는 데이터 그대로(캔버스는 이미 읽기 전용). 난구 해법제시에는「수구」버튼 자체를 숨김.
    * 난구해법 등 문제에 고정된 배치를 쓸 때.
    */
   readOnlyCueAndBalls?: boolean;
@@ -135,6 +168,8 @@ export function SolutionPathEditorFullscreen({
   layoutImageUrl = null,
   initialPathPoints,
   initialObjectPathPoints,
+  initialCuePathDisplayCurves = [],
+  initialObjectPathDisplayCurves = [],
   thicknessOffsetX,
   isBankShot,
   ballSpeed,
@@ -155,7 +190,138 @@ export function SolutionPathEditorFullscreen({
    * nangu는 기존 pathMode·objectPathMode만 사용.
    */
   const [troublePathEditLayer, setTroublePathEditLayer] = useState<"cue" | "object" | null>("cue");
-  const [pathAddStack, setPathAddStack] = useState<Array<"cue" | "object">>([]);
+  /** 스팟 추가·삽입·삭제·드래그 이동·전체 삭제 직전 스냅샷 — 되돌리기 1회 = 직전 동작 취소 */
+  const [pathUndoStack, setPathUndoStack] = useState<PathEditorPairSnapshot[]>([]);
+  const pathPointsRef = useRef(pathPoints);
+  const objectPathPointsRef = useRef(objectPathPoints);
+  useEffect(() => {
+    pathPointsRef.current = pathPoints;
+  }, [pathPoints]);
+  useEffect(() => {
+    objectPathPointsRef.current = objectPathPoints;
+  }, [objectPathPoints]);
+
+  const [cuePathCurveControls, setCuePathCurveControls] = useState<PathSegmentCurveControl[]>(() =>
+    clonePathCurveControls(initialCuePathDisplayCurves)
+  );
+  const [objectPathCurveControls, setObjectPathCurveControls] = useState<PathSegmentCurveControl[]>(
+    () => clonePathCurveControls(initialObjectPathDisplayCurves)
+  );
+  /** 난구: 선분 더블탭을 스팟 삽입 대신 곡선 노드로 */
+  const [troubleCurveEditMode, setTroubleCurveEditMode] = useState(false);
+  const cueCurveControlsRef = useRef(cuePathCurveControls);
+  const objectCurveControlsRef = useRef(objectPathCurveControls);
+  useEffect(() => {
+    cueCurveControlsRef.current = cuePathCurveControls;
+  }, [cuePathCurveControls]);
+  useEffect(() => {
+    objectCurveControlsRef.current = objectPathCurveControls;
+  }, [objectPathCurveControls]);
+
+  useEffect(() => {
+    setCuePathCurveControls((prev) => pruneCuePathCurveControls(prev, pathPoints));
+    setObjectPathCurveControls((prev) => pruneObjectPathCurveControls(prev, objectPathPoints));
+  }, [pathPoints, objectPathPoints]);
+
+  const pushPathUndoSnapshot = useCallback((cueSnap: NanguPathPoint[], objSnap: NanguPathPoint[]) => {
+    setPathUndoStack((s) => [
+      ...s.slice(-(MAX_PATH_EDITOR_UNDO - 1)),
+      {
+        cue: clonePathPointsForUndo(cueSnap),
+        obj: clonePathPointsForUndo(objSnap),
+        cueCurves: clonePathCurveControls(cueCurveControlsRef.current),
+        objCurves: clonePathCurveControls(objectCurveControlsRef.current),
+      },
+    ]);
+  }, []);
+
+  const onPathSpotDragStart = useCallback(
+    (_kind: "cue" | "object", _spotId: string) => {
+      pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
+    },
+    [pushPathUndoSnapshot]
+  );
+
+  const onPathSpotDragEnd = useCallback(() => {}, []);
+
+  const onCurveHandleDragBegin = useCallback(() => {
+    pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
+  }, [pushPathUndoSnapshot]);
+
+  const upsertCueDisplayCurve = useCallback(
+    (key: string, norm: { x: number; y: number }) => {
+      pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
+      const c = clampCurveControlNorm(norm);
+      setCuePathCurveControls((prev) => [...prev.filter((x) => x.key !== key), { key, x: c.x, y: c.y }]);
+    },
+    [pushPathUndoSnapshot]
+  );
+
+  const upsertObjectDisplayCurve = useCallback(
+    (key: string, norm: { x: number; y: number }) => {
+      pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
+      const c = clampCurveControlNorm(norm);
+      setObjectPathCurveControls((prev) => [...prev.filter((x) => x.key !== key), { key, x: c.x, y: c.y }]);
+    },
+    [pushPathUndoSnapshot]
+  );
+
+  const moveCueDisplayCurve = useCallback((key: string, norm: { x: number; y: number }) => {
+    const c = clampCurveControlNorm(norm);
+    setCuePathCurveControls((prev) => prev.map((x) => (x.key === key ? { ...x, ...c } : x)));
+  }, []);
+
+  const moveObjectDisplayCurve = useCallback((key: string, norm: { x: number; y: number }) => {
+    const c = clampCurveControlNorm(norm);
+    setObjectPathCurveControls((prev) => prev.map((x) => (x.key === key ? { ...x, ...c } : x)));
+  }, []);
+
+  const removeCueDisplayCurve = useCallback(
+    (key: string) => {
+      pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
+      setCuePathCurveControls((prev) => prev.filter((x) => x.key !== key));
+    },
+    [pushPathUndoSnapshot]
+  );
+
+  const removeObjectDisplayCurve = useCallback(
+    (key: string) => {
+      pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
+      setObjectPathCurveControls((prev) => prev.filter((x) => x.key !== key));
+    },
+    [pushPathUndoSnapshot]
+  );
+
+  const straightenAllDisplayCurves = useCallback(() => {
+    if (cuePathCurveControls.length === 0 && objectPathCurveControls.length === 0) return;
+    pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
+    setCuePathCurveControls([]);
+    setObjectPathCurveControls([]);
+  }, [pushPathUndoSnapshot, cuePathCurveControls.length, objectPathCurveControls.length]);
+
+  const [undoLimitToastVisible, setUndoLimitToastVisible] = useState(false);
+  const undoLimitToastTimerRef = useRef<number | null>(null);
+
+  const showUndoLimitToast = useCallback(() => {
+    setUndoLimitToastVisible(true);
+    if (undoLimitToastTimerRef.current != null) {
+      window.clearTimeout(undoLimitToastTimerRef.current);
+    }
+    undoLimitToastTimerRef.current = window.setTimeout(() => {
+      setUndoLimitToastVisible(false);
+      undoLimitToastTimerRef.current = null;
+    }, UNDO_LIMIT_TOAST_MS);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (undoLimitToastTimerRef.current != null) {
+        window.clearTimeout(undoLimitToastTimerRef.current);
+      }
+    },
+    []
+  );
+
   /** overlay 모드만 공 탭 시 줌 초점 이동. note 셸은 당구노트 공배치와 같이 플레이필드 중심 고정(테이블이 공을 쫓아 움직이지 않음) */
   const [zoomFocusOverlay, setZoomFocusOverlay] = useState({
     x: DEFAULT_TABLE_WIDTH / 2,
@@ -356,14 +522,13 @@ export function SolutionPathEditorFullscreen({
         if (!r.ok) {
           return prev;
         }
-        const nAdded = r.points.length - prev.length;
-        queueMicrotask(() =>
-          setPathAddStack((s) => [...s, ...Array.from({ length: nAdded }, () => "cue" as const)])
-        );
+        queueMicrotask(() => {
+          pushPathUndoSnapshot(prev, objectPathPointsRef.current);
+        });
         return r.points;
       });
     },
-    [cuePathSnapFn, newCueSpotId, rayAppendCtx]
+    [cuePathSnapFn, newCueSpotId, rayAppendCtx, pushPathUndoSnapshot]
   );
 
   const runCueAppendAim = useCallback(
@@ -383,14 +548,13 @@ export function SolutionPathEditorFullscreen({
           )
         );
         if (isDup) return prev;
-        const nAdded = newSlice.length;
-        queueMicrotask(() =>
-          setPathAddStack((s) => [...s, ...Array.from({ length: nAdded }, () => "cue" as const)])
-        );
+        queueMicrotask(() => {
+          pushPathUndoSnapshot(prev, objectPathPointsRef.current);
+        });
         return r.points;
       });
     },
-    [cuePathSnapFn, newCueSpotId, rayAppendCtx, rect]
+    [cuePathSnapFn, newCueSpotId, rayAppendCtx, rect, pushPathUndoSnapshot]
   );
 
   const addObjectPathPoint = useCallback(
@@ -398,12 +562,12 @@ export function SolutionPathEditorFullscreen({
       const newId = () => `o-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       setObjectPathPoints((prev) => {
         if (type != null) {
-          queueMicrotask(() => setPathAddStack((s) => [...s, "object"]));
+          queueMicrotask(() => pushPathUndoSnapshot(pathPointsRef.current, prev));
           return [...prev, { id: newId(), x: norm.x, y: norm.y, type }];
         }
         if (!layoutForCue || !collisionNorm) {
           const snapped = snapToPlayfieldCushionJunction(norm.x, norm.y);
-          queueMicrotask(() => setPathAddStack((s) => [...s, "object"]));
+          queueMicrotask(() => pushPathUndoSnapshot(pathPointsRef.current, prev));
           return [...prev, { id: newId(), x: snapped.x, y: snapped.y, type: snapped.type }];
         }
         const last = prev.length > 0 ? prev[prev.length - 1]! : null;
@@ -427,7 +591,7 @@ export function SolutionPathEditorFullscreen({
             allowNonCueBallCircle: false,
           });
           if (cushionHit && cushionHit.type === "cushion") {
-            const maxAutoPx = playfieldGridOneCellEdgePx(rect, effectivePortrait);
+            const maxAutoPx = pathAutoChainNearCushionMaxDistancePx(rect, effectivePortrait);
             const distToCushion = distanceNormPointsInPlayfieldPx(
               { x: last.x, y: last.y },
               { x: cushionHit.x, y: cushionHit.y },
@@ -443,7 +607,7 @@ export function SolutionPathEditorFullscreen({
               );
               const id1 = newId();
               const id2 = newId();
-              queueMicrotask(() => setPathAddStack((s) => [...s, "object", "object"]));
+              queueMicrotask(() => pushPathUndoSnapshot(pathPointsRef.current, prev));
               return [
                 ...prev,
                 { id: id1, x: cushionHit.x, y: cushionHit.y, type: "cushion" },
@@ -459,11 +623,11 @@ export function SolutionPathEditorFullscreen({
           getNonCueBallNorms(layoutForCue).map(({ x, y }) => ({ x, y })),
           rect
         );
-        queueMicrotask(() => setPathAddStack((s) => [...s, "object"]));
+        queueMicrotask(() => pushPathUndoSnapshot(pathPointsRef.current, prev));
         return [...prev, { id: newId(), x: snapped.x, y: snapped.y, type: snapped.type }];
       });
     },
-    [layoutForCue, collisionNorm, rect, tableCanvasW, tableCanvasH, effectivePortrait]
+    [layoutForCue, collisionNorm, rect, tableCanvasW, tableCanvasH, effectivePortrait, pushPathUndoSnapshot]
   );
 
   const moveObjectPathPoint = useCallback(
@@ -488,15 +652,18 @@ export function SolutionPathEditorFullscreen({
     [layoutForCue, collisionNorm, rect, objectPathActiveSpotId]
   );
 
-  const removeObjectPathPoint = useCallback((id: string) => {
-    setObjectPathPoints((prev) => {
-      const idx = prev.findIndex((p) => p.id === id);
-      if (idx < 0) return prev;
-      if (!isLastSegmentEndpointSpotIndex(prev, idx)) return prev;
-      queueMicrotask(() => setPathAddStack([]));
-      return prev.filter((p) => p.id !== id);
-    });
-  }, []);
+  const removeObjectPathPoint = useCallback(
+    (id: string) => {
+      setObjectPathPoints((prev) => {
+        const idx = prev.findIndex((p) => p.id === id);
+        if (idx < 0) return prev;
+        if (!isLastSegmentEndpointSpotIndex(prev, idx)) return prev;
+        queueMicrotask(() => pushPathUndoSnapshot(pathPointsRef.current, prev));
+        return prev.filter((p) => p.id !== id);
+      });
+    },
+    [pushPathUndoSnapshot]
+  );
 
   const insertObjectPathPointBetween = useCallback(
     (segmentIndex: number, norm: { x: number; y: number }) => {
@@ -523,11 +690,11 @@ export function SolutionPathEditorFullscreen({
       setObjectPathPoints((prev) => {
         const next = [...prev];
         next.splice(segmentIndex, 0, newPoint);
-        queueMicrotask(() => setPathAddStack((s) => [...s, "object"]));
+        queueMicrotask(() => pushPathUndoSnapshot(pathPointsRef.current, prev));
         return next;
       });
     },
-    [collisionNorm, layoutForCue, objectPathPoints, rect]
+    [collisionNorm, layoutForCue, objectPathPoints, rect, pushPathUndoSnapshot]
   );
 
   const addObjectPathAim = useCallback(
@@ -562,7 +729,7 @@ export function SolutionPathEditorFullscreen({
             allowNonCueBallCircle: false,
           });
           if (cushionOnly && cushionOnly.type === "cushion") {
-            const maxAutoPx = playfieldGridOneCellEdgePx(rect, effectivePortrait);
+            const maxAutoPx = pathAutoChainNearCushionMaxDistancePx(rect, effectivePortrait);
             const distToCushion = distanceNormPointsInPlayfieldPx(
               from,
               { x: cushionOnly.x, y: cushionOnly.y },
@@ -595,9 +762,7 @@ export function SolutionPathEditorFullscreen({
                 )
               );
               if (isDup) return prev;
-              queueMicrotask(() =>
-                setPathAddStack((s) => [...s, "object" as const, "object" as const])
-              );
+              queueMicrotask(() => pushPathUndoSnapshot(pathPointsRef.current, prev));
               return [...prev, ...newPoints];
             }
           }
@@ -627,7 +792,7 @@ export function SolutionPathEditorFullscreen({
               dupThresholdPx
           );
         if (isDup) return prev;
-        queueMicrotask(() => setPathAddStack((s) => [...s, "object"]));
+        queueMicrotask(() => pushPathUndoSnapshot(pathPointsRef.current, prev));
         return [
           ...prev,
           {
@@ -648,6 +813,7 @@ export function SolutionPathEditorFullscreen({
       effectivePortrait,
       rect,
       addObjectPathPoint,
+      pushPathUndoSnapshot,
     ]
   );
 
@@ -689,7 +855,7 @@ export function SolutionPathEditorFullscreen({
       setObjectPathPoints((prev) => {
         const next = [...prev];
         next.splice(segmentIndex, 0, newPoint);
-        queueMicrotask(() => setPathAddStack((s) => [...s, "object"]));
+        queueMicrotask(() => pushPathUndoSnapshot(pathPointsRef.current, prev));
         return next;
       });
     },
@@ -703,6 +869,7 @@ export function SolutionPathEditorFullscreen({
       effectivePortrait,
       rect,
       insertObjectPathPointBetween,
+      pushPathUndoSnapshot,
     ]
   );
 
@@ -759,38 +926,42 @@ export function SolutionPathEditorFullscreen({
   const { resetPlayback: resetPathPlayback } = pathPlayback;
 
   const clearAllPaths = useCallback(() => {
+    pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
     resetPathPlayback();
-    setPathAddStack([]);
     setPathPoints([]);
     setObjectPathPoints([]);
+    setCuePathCurveControls([]);
+    setObjectPathCurveControls([]);
     if (variant === "trouble") {
       setTroublePathEditLayer("cue");
     } else {
       setObjectPathMode(false);
       setPathMode(true);
     }
-  }, [resetPathPlayback, variant]);
+  }, [resetPathPlayback, variant, pushPathUndoSnapshot]);
 
-  const undoLastPathSpot = useCallback(() => {
-    setPathAddStack((stack) => {
-      if (stack.length === 0) return stack;
-      const kind = stack[stack.length - 1];
+  const onUndoPathClick = useCallback(() => {
+    if (pathPlayback.isPlaybackActive) return;
+    setPathUndoStack((stack) => {
+      if (stack.length === 0) {
+        queueMicrotask(() => showUndoLimitToast());
+        return stack;
+      }
+      const snap = stack[stack.length - 1]!;
       const next = stack.slice(0, -1);
       queueMicrotask(() => {
-        if (kind === "cue") {
-          setPathPoints((prev) => stripInvalidEndSpots(prev.slice(0, -1)));
-        } else {
-          setObjectPathPoints((prev) => prev.slice(0, -1));
-        }
+        setPathPoints(clonePathPointsForUndo(snap.cue));
+        setObjectPathPoints(clonePathPointsForUndo(snap.obj));
+        setCuePathCurveControls(clonePathCurveControls(snap.cueCurves ?? []));
+        setObjectPathCurveControls(clonePathCurveControls(snap.objCurves ?? []));
       });
       return next;
     });
-  }, []);
+  }, [pathPlayback.isPlaybackActive, showUndoLimitToast]);
 
   useEffect(() => {
     if (pathPoints.length === 0) {
       setObjectPathPoints([]);
-      setPathAddStack([]);
       if (variant === "trouble") {
         setTroublePathEditLayer("cue");
       } else {
@@ -811,10 +982,16 @@ export function SolutionPathEditorFullscreen({
     [cuePathSnapFn, cuePathActiveSpotId]
   );
 
-  const removePathPoint = useCallback((id: string) => {
-    setPathAddStack([]);
-    setPathPoints((prev) => stripInvalidEndSpots(prev.filter((p) => p.id !== id)));
-  }, []);
+  const removePathPoint = useCallback(
+    (id: string) => {
+      setPathPoints((prev) => {
+        if (!prev.some((p) => p.id === id)) return prev;
+        queueMicrotask(() => pushPathUndoSnapshot(prev, objectPathPointsRef.current));
+        return stripInvalidEndSpots(prev.filter((p) => p.id !== id));
+      });
+    },
+    [pushPathUndoSnapshot]
+  );
 
   const insertPathPointBetween = useCallback(
     (segmentIndex: number, norm: { x: number; y: number }) => {
@@ -823,11 +1000,13 @@ export function SolutionPathEditorFullscreen({
         if (!r.ok) {
           return prev;
         }
-        queueMicrotask(() => setPathAddStack((s) => [...s, "cue"]));
+        queueMicrotask(() => {
+          pushPathUndoSnapshot(prev, objectPathPointsRef.current);
+        });
         return r.points;
       });
     },
-    [cuePathSnapFn, newCueSpotId]
+    [cuePathSnapFn, newCueSpotId, pushPathUndoSnapshot]
   );
 
   const insertPathPointBetweenAim = useCallback(
@@ -837,11 +1016,13 @@ export function SolutionPathEditorFullscreen({
         if (!r.ok) {
           return prev;
         }
-        queueMicrotask(() => setPathAddStack((s) => [...s, "cue"]));
+        queueMicrotask(() => {
+          pushPathUndoSnapshot(prev, objectPathPointsRef.current);
+        });
         return r.points;
       });
     },
-    [cuePathSnapFn, newCueSpotId, rayAppendCtx]
+    [cuePathSnapFn, newCueSpotId, rayAppendCtx, pushPathUndoSnapshot]
   );
 
   useEffect(() => {
@@ -1037,6 +1218,7 @@ export function SolutionPathEditorFullscreen({
       pathPoints,
       objectPathPoints,
       collisionNorm,
+      collisionStruckBallKey: cueToFirstObjectHit?.objectKey ?? null,
       checkCuePath: cuePathEditing && pathPoints.length >= 1,
       checkObjectPath: objectPathEditing && Boolean(collisionNorm) && objectPathPoints.length >= 1,
     });
@@ -1047,6 +1229,7 @@ export function SolutionPathEditorFullscreen({
     pathPoints,
     objectPathPoints,
     collisionNorm,
+    cueToFirstObjectHit?.objectKey,
     cuePathEditing,
     objectPathEditing,
   ]);
@@ -1063,6 +1246,28 @@ export function SolutionPathEditorFullscreen({
       setTableDrawStyle((d) => (d === "realistic" ? "wireframe" : "realistic"));
     }
   }, [pathPlayback.isPlaybackActive]);
+
+  const objectPathLinesRequestedVisible =
+    showObjectPath &&
+    objectPathPoints.length > 0 &&
+    (!pathPlayback.isPlaybackActive || playbackPathLinesVisible);
+
+  const curveLineVisible =
+    !pathPlayback.isPlaybackActive || playbackPathLinesVisible;
+
+  const allowCurveHandleInteraction =
+    variant === "trouble" &&
+    troubleCurveEditMode &&
+    (cuePathEditing || objectPathEditing) &&
+    !pathPlayback.isPlaybackActive &&
+    curveLineVisible;
+
+  const curveHandlesShowSubtle =
+    variant === "trouble" &&
+    (cuePathCurveControls.length > 0 || objectPathCurveControls.length > 0) &&
+    curveLineVisible &&
+    !allowCurveHandleInteraction &&
+    !pathPlayback.isPlaybackActive;
 
   return (
     <div
@@ -1088,6 +1293,65 @@ export function SolutionPathEditorFullscreen({
             data-cue-spot-blink={showCueSpot ? "on" : "off"}
             data-object-spot-blink={showObjectBallSpot ? "on" : "off"}
           />
+          <span
+            className="sr-only"
+            aria-hidden
+            data-testid="trouble-e2e-playback-debug"
+            data-playback-active={pathPlayback.isPlaybackActive ? "1" : "0"}
+            data-playback-phase={pathPlayback.playbackPhase}
+            data-reflection-path-ready={pathPlayback.playbackReflectionMeta.reflectionPathReady ? "1" : "0"}
+            data-reflection-object-ball={pathPlayback.playbackReflectionMeta.reflectionObjectBall ?? "none"}
+            data-struck-key-source={pathPlayback.playbackReflectionMeta.struckKeySource}
+            data-object-path-points-len={String(pathPlayback.playbackReflectionMeta.objectPathPointsLen)}
+            data-moving-ball-key={pathPlayback.playbackReflectionMeta.movingBallKeyResolved ?? "none"}
+            data-timing-p-hit-first01={
+              pathPlayback.playbackTimingDebug != null
+                ? String(pathPlayback.playbackTimingDebug.pHitFirst01)
+                : ""
+            }
+            data-timing-p-warn-recontact-after01={
+              pathPlayback.playbackTimingDebug != null
+                ? String(pathPlayback.playbackTimingDebug.pWarnRecontactAfter01)
+                : ""
+            }
+            data-timing-hit-progress-source={
+              pathPlayback.playbackTimingDebug?.hitProgressSource ?? ""
+            }
+            data-timing-cue-wall-ms={
+              pathPlayback.playbackTimingDebug != null
+                ? String(pathPlayback.playbackTimingDebug.cueWallDurationMs)
+                : ""
+            }
+            data-timing-cue-hit-rel-ms={
+              pathPlayback.playbackTimingDebug?.cueHitRelMs != null
+                ? String(pathPlayback.playbackTimingDebug.cueHitRelMs)
+                : ""
+            }
+            data-timing-object-start-rel-ms={
+              pathPlayback.playbackTimingDebug?.objectStartRelMs != null
+                ? String(pathPlayback.playbackTimingDebug.objectStartRelMs)
+                : ""
+            }
+            data-timing-cue-complete-rel-ms={
+              pathPlayback.playbackTimingDebug?.cueCompleteRelMs != null
+                ? String(pathPlayback.playbackTimingDebug.cueCompleteRelMs)
+                : ""
+            }
+            data-timing-warning-rel-ms={
+              pathPlayback.playbackTimingDebug?.warningTriggeredRelMs != null
+                ? String(pathPlayback.playbackTimingDebug.warningTriggeredRelMs)
+                : ""
+            }
+            data-timing-phase-at-end={pathPlayback.playbackTimingDebug?.playbackPhaseAtEnd ?? ""}
+            data-timing-moving-key={pathPlayback.playbackTimingDebug?.movingKey ?? ""}
+            data-playback-path-lines-toggle={playbackPathLinesVisible ? "1" : "0"}
+            data-path-overlay-above-balls="0"
+            data-object-line-visible={
+              objectPathLinesRequestedVisible
+                ? "1"
+                : "0"
+            }
+          />
         </>
       )}
       {isNoteShell ? (
@@ -1109,7 +1373,7 @@ export function SolutionPathEditorFullscreen({
               </button>
             </div>
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            {layoutForCue && (
+            {layoutForCue && variant !== "trouble" && (
               <button
                 type="button"
                 disabled={readOnlyCueAndBalls}
@@ -1178,6 +1442,22 @@ export function SolutionPathEditorFullscreen({
             )}
             <button
               type="button"
+              data-testid="trouble-e2e-undo-last-spot-toolbar"
+              data-undo-count={String(pathUndoStack.length)}
+              {...(variant === "trouble" ? { "data-trouble-action": C.action.undoLastPathSpot } : {})}
+              disabled={pathPlayback.isPlaybackActive}
+              title={`직전 편집(추가·이동·삭제·전체삭제 직전) 1회 취소 · 남은 ${pathUndoStack.length}회 (최대 ${MAX_PATH_EDITOR_UNDO}회까지 기록)`}
+              onClick={() => onUndoPathClick()}
+              className={cx(
+                toolbarBtn,
+                toolbarGhost,
+                "shrink-0 px-2.5 py-2 text-xs max-[380px]:px-2"
+              )}
+            >
+              되돌리기·{pathUndoStack.length}
+            </button>
+            <button
+              type="button"
               className={cx(
                 toolbarBtn,
                 toolbarPrimary,
@@ -1187,6 +1467,10 @@ export function SolutionPathEditorFullscreen({
                 onConfirm({
                   pathPoints,
                   objectPathPoints: variant === "trouble" ? objectPathPoints : [],
+                  cuePathDisplayCurves:
+                    variant === "trouble" ? cuePathCurveControls : undefined,
+                  objectPathDisplayCurves:
+                    variant === "trouble" ? objectPathCurveControls : undefined,
                 })
               }
             >
@@ -1220,6 +1504,10 @@ export function SolutionPathEditorFullscreen({
               onConfirm({
                 pathPoints,
                 objectPathPoints: variant === "trouble" ? objectPathPoints : [],
+                cuePathDisplayCurves:
+                  variant === "trouble" ? cuePathCurveControls : undefined,
+                objectPathDisplayCurves:
+                  variant === "trouble" ? objectPathCurveControls : undefined,
               })
             }
           >
@@ -1281,15 +1569,17 @@ export function SolutionPathEditorFullscreen({
                 <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-white/50">경로</p>
                 <button
                   type="button"
+                  data-undo-count={String(pathUndoStack.length)}
                   {...(variant === "trouble" ? { "data-trouble-action": C.action.undoLastPathSpot } : {})}
                   className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-medium bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-45"
-                  disabled={pathAddStack.length === 0 || pathPlayback.isPlaybackActive}
+                  disabled={pathPlayback.isPlaybackActive}
+                  title={`남은 되돌리기 ${pathUndoStack.length}회`}
                   onClick={() => {
-                    undoLastPathSpot();
+                    onUndoPathClick();
                     setLeftPathDrawerOpen(false);
                   }}
                 >
-                  마지막 경로선 삭제
+                  되돌리기 ({pathUndoStack.length}회)
                 </button>
                 <button
                   type="button"
@@ -1307,6 +1597,41 @@ export function SolutionPathEditorFullscreen({
                 >
                   전체 경로선 삭제
                 </button>
+                {variant === "trouble" && (
+                  <>
+                    <p className="mt-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-white/50">
+                      설명용 곡선
+                    </p>
+                    <button
+                      type="button"
+                      data-state={troubleCurveEditMode ? "on" : "off"}
+                      className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-medium bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-45"
+                      disabled={pathPlayback.isPlaybackActive}
+                      onClick={() => setTroubleCurveEditMode((v) => !v)}
+                    >
+                      {troubleCurveEditMode
+                        ? "곡선 편집 끄기 (선분 더블탭 → 스팟 삽입)"
+                        : "곡선 편집 켜기 (선분 더블탭 → 곡선 노드)"}
+                      <span className="mt-0.5 block text-xs font-normal text-white/55">
+                        판정·재생은 직선 데이터만 사용합니다
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-medium bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-45"
+                      disabled={
+                        pathPlayback.isPlaybackActive ||
+                        (cuePathCurveControls.length === 0 && objectPathCurveControls.length === 0)
+                      }
+                      onClick={() => {
+                        straightenAllDisplayCurves();
+                        setLeftPathDrawerOpen(false);
+                      }}
+                    >
+                      곡선 전부 직선으로
+                    </button>
+                  </>
+                )}
                 <button
                   type="button"
                   {...(variant === "trouble" ? { "data-trouble-action": C.action.playPath } : {})}
@@ -1363,13 +1688,14 @@ export function SolutionPathEditorFullscreen({
         )}
         <div
           className={`flex min-h-0 w-full flex-1 flex-col ${
-            isNoteShell ? "items-stretch justify-center p-2" : ""
+            /* 가로는 테이블 폭(max-w-2xl)만 쓰고 뷰포트 중앙 정렬 (stretch+w-full 조합은 항상 좌측 정렬됨) */
+            isNoteShell ? "items-center justify-center p-2" : ""
           }`}
         >
         <div
           className={
             isNoteShell
-              ? "relative flex h-full min-h-0 w-full max-w-2xl min-w-0 flex-1 flex-col pt-2"
+              ? "relative flex h-full min-h-0 w-[min(100%,42rem)] max-w-2xl min-w-0 flex-1 flex-col pt-2"
               : "relative mx-auto flex w-full max-w-4xl min-h-0 min-w-0 flex-1 flex-col px-2 pt-2"
           }
         >
@@ -1447,6 +1773,7 @@ export function SolutionPathEditorFullscreen({
                           showObjectBallSpot={showObjectBallSpot}
                           objectBallSpotKey={objectPathHighlightBallKey}
                           orientation={isNoteShell ? noteShellTableOrientation : "landscape"}
+                          pathOverlayAboveBalls={false}
                           betweenTableAndBallsLayer={
                             <NanguSolutionPathOverlay
                               pathPoints={pathPoints}
@@ -1488,6 +1815,8 @@ export function SolutionPathEditorFullscreen({
                               onInsertCuePathAim={insertPathPointBetweenAim}
                               onRemovePoint={removePathPoint}
                               onMovePoint={movePathPoint}
+                              onPathSpotDragStart={onPathSpotDragStart}
+                              onPathSpotDragEnd={onPathSpotDragEnd}
                               onInsertBetween={insertPathPointBetween}
                               onAddObjectPoint={(norm) => {
                                 if (!collisionNorm) return;
@@ -1519,6 +1848,36 @@ export function SolutionPathEditorFullscreen({
                                       pathPlayback.startPlayback();
                                     }
                                   : undefined
+                              }
+                              cueDisplayCurveControls={
+                                variant === "trouble" ? cuePathCurveControls : []
+                              }
+                              objectDisplayCurveControls={
+                                variant === "trouble" ? objectPathCurveControls : []
+                              }
+                              troubleCurveEditMode={variant === "trouble" && troubleCurveEditMode}
+                              curveHandleInteraction={allowCurveHandleInteraction}
+                              curveHandlesShowSubtle={curveHandlesShowSubtle}
+                              onUpsertCueDisplayCurve={
+                                variant === "trouble" ? upsertCueDisplayCurve : undefined
+                              }
+                              onUpsertObjectDisplayCurve={
+                                variant === "trouble" ? upsertObjectDisplayCurve : undefined
+                              }
+                              onMoveCueDisplayCurve={
+                                variant === "trouble" ? moveCueDisplayCurve : undefined
+                              }
+                              onMoveObjectDisplayCurve={
+                                variant === "trouble" ? moveObjectDisplayCurve : undefined
+                              }
+                              onRemoveCueDisplayCurve={
+                                variant === "trouble" ? removeCueDisplayCurve : undefined
+                              }
+                              onRemoveObjectDisplayCurve={
+                                variant === "trouble" ? removeObjectDisplayCurve : undefined
+                              }
+                              onCurveHandleDragBegin={
+                                variant === "trouble" ? onCurveHandleDragBegin : undefined
                               }
                             />
                           }
@@ -1572,6 +1931,8 @@ export function SolutionPathEditorFullscreen({
                         onInsertCuePathAim={insertPathPointBetweenAim}
                         onRemovePoint={removePathPoint}
                         onMovePoint={movePathPoint}
+                        onPathSpotDragStart={onPathSpotDragStart}
+                        onPathSpotDragEnd={onPathSpotDragEnd}
                         onInsertBetween={insertPathPointBetween}
                         onAddObjectPoint={(norm) => {
                           if (!collisionNorm) return;
@@ -1603,6 +1964,36 @@ export function SolutionPathEditorFullscreen({
                                 pathPlayback.startPlayback();
                               }
                             : undefined
+                        }
+                        cueDisplayCurveControls={
+                          variant === "trouble" ? cuePathCurveControls : []
+                        }
+                        objectDisplayCurveControls={
+                          variant === "trouble" ? objectPathCurveControls : []
+                        }
+                        troubleCurveEditMode={variant === "trouble" && troubleCurveEditMode}
+                        curveHandleInteraction={allowCurveHandleInteraction}
+                        curveHandlesShowSubtle={curveHandlesShowSubtle}
+                        onUpsertCueDisplayCurve={
+                          variant === "trouble" ? upsertCueDisplayCurve : undefined
+                        }
+                        onUpsertObjectDisplayCurve={
+                          variant === "trouble" ? upsertObjectDisplayCurve : undefined
+                        }
+                        onMoveCueDisplayCurve={
+                          variant === "trouble" ? moveCueDisplayCurve : undefined
+                        }
+                        onMoveObjectDisplayCurve={
+                          variant === "trouble" ? moveObjectDisplayCurve : undefined
+                        }
+                        onRemoveCueDisplayCurve={
+                          variant === "trouble" ? removeCueDisplayCurve : undefined
+                        }
+                        onRemoveObjectDisplayCurve={
+                          variant === "trouble" ? removeObjectDisplayCurve : undefined
+                        }
+                        onCurveHandleDragBegin={
+                          variant === "trouble" ? onCurveHandleDragBegin : undefined
                         }
                       />
                     )}
@@ -1707,12 +2098,14 @@ export function SolutionPathEditorFullscreen({
             )}
             <button
               type="button"
+              data-undo-count={String(pathUndoStack.length)}
               {...(variant === "trouble" ? { "data-trouble-action": C.action.undoLastPathSpot } : {})}
-              disabled={pathAddStack.length === 0 || pathPlayback.isPlaybackActive}
-              onClick={() => undoLastPathSpot()}
+              disabled={pathPlayback.isPlaybackActive}
+              title={`직전 편집 1회 취소 · 남은 ${pathUndoStack.length}회`}
+              onClick={() => onUndoPathClick()}
               className={cx(toolbarBtn, toolbarGhost)}
             >
-              이전 스팟
+              되돌리기·{pathUndoStack.length}
             </button>
             <button
               type="button"
@@ -1807,6 +2200,18 @@ export function SolutionPathEditorFullscreen({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {undoLimitToastVisible && (
+        <div
+          className="pointer-events-none fixed inset-0 z-[10060] flex items-center justify-center"
+          role="status"
+          aria-live="polite"
+        >
+          <p className="rounded-xl bg-black/80 px-5 py-3 text-center text-sm font-semibold text-white shadow-lg ring-1 ring-white/10">
+            더 이상 되돌릴 수 없습니다
+          </p>
         </div>
       )}
 

@@ -10,7 +10,7 @@ type Props = {
 };
 
 /**
- * 가로 목록을 연속 흐름(무한 루프)으로 스크롤 — PC·모바일 공통.
+ * 가로 목록을 연속 흐름(무한 루프)으로 자동 스크롤 — 모바일·데스크톱 공통.
  * 자식에 동일 카드가 두 번 나열되어 있어야 하며, scrollWidth의 절반에서 루프 리셋.
  */
 export function HomeTournamentListAutoScroll({ flowSpeed, children }: Props) {
@@ -19,6 +19,17 @@ export function HomeTournamentListAutoScroll({ flowSpeed, children }: Props) {
   const inAutoFlowRef = useRef(false);
   const userPauseUntilRef = useRef(0);
   const lastTsRef = useRef<number | null>(null);
+  const reducedMotionRef = useRef(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    reducedMotionRef.current = mq.matches;
+    const onChange = () => {
+      reducedMotionRef.current = mq.matches;
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     const el = ref.current;
@@ -43,7 +54,7 @@ export function HomeTournamentListAutoScroll({ flowSpeed, children }: Props) {
         return;
       }
 
-      if (window.matchMedia("(min-width: 768px)").matches) {
+      if (reducedMotionRef.current) {
         lastTsRef.current = null;
         rafId = requestAnimationFrame(tick);
         return;

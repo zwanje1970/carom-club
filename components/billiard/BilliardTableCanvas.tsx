@@ -20,6 +20,7 @@ import {
   FRAME_INSET,
   PLAYFIELD_INSET,
   PATH_SPOT_RADIUS_PX,
+  distanceNormPointsInPlayfieldPx,
   type PlayfieldRect,
   type BallColor,
   type CueBallType,
@@ -162,6 +163,11 @@ export interface BilliardTableCanvasProps {
    * 경로선이 공 아래로 가게 할 때 사용. 위 공 캔버스는 pointer-events: none.
    */
   splitBallLayer?: boolean;
+  /**
+   * splitBallLayer일 때 기본: children z-10, 공 z-20 → 1목적구 경로(1적구 중심 출발)가 공 스프라이트에 가려짐.
+   * true면 children을 z-30으로 올려 경로·스팟이 공 위에 보이게 함. 재생 중 공이 선 위에 보여야 할 때는 false 유지.
+   */
+  pathOverlayAboveBalls?: boolean;
   /** `splitBallLayer`일 때 테이블과 공 사이에 렌더 (경로 오버레이 등) */
   children?: ReactNode;
 }
@@ -558,48 +564,104 @@ function drawBall(
   }
 }
 
-/** 수구를 둘러싼 회색 점선 원 (난구 해법 출발선 스팟용). 수구보다 크게, opacity로 깜빡임. */
+const LAYOUT_REST_MOVE_EPS_PX = 1.2;
+
+/** `ballNormOverrides`로 이동한 공의 배치 원점 — 실제 공과 동일 스프라이트, 고정·반투명 (수구/1적구 식별 링과 무관) */
+const ORIGIN_GHOST_BALL_OPACITY = 0.2;
+
+function drawOriginGhostBall(
+  ctx: CanvasRenderingContext2D,
+  rect: PlayfieldRect,
+  normX: number,
+  normY: number,
+  ballKey: BallColor,
+  isCue: boolean,
+  wireframe: boolean
+) {
+  ctx.save();
+  ctx.globalAlpha = ORIGIN_GHOST_BALL_OPACITY;
+  drawBall(ctx, rect, normX, normY, ballKey, isCue, false, wireframe, false);
+  ctx.restore();
+}
+
+/** 수구·1목 식별 링: 보이는 최외곽 반지름 = 공 반지름 × 이 값 (지름 기준 약 2배) */
+const SPOT_RING_OUTER_RADIUS_FACTOR = 2;
+
+/** 수구 식별 링 — 형광 빨강 */
+const CUE_SPOT_RING_RGB = { r: 255, g: 0, b: 90 } as const;
+/** 1목 식별 링 — 형광 파랑 */
+const OBJECT_SPOT_RING_RGB = { r: 0, g: 200, b: 255 } as const;
+
+/**
+ * 난구 해법: 수구·1목 **식별용 스팟 깜빡임** 전용 점선 링 — 공 지름의 `SPOT_RING_OUTER_RADIUS_FACTOR`배, `showCueBallSpot` / `showObjectBallSpot` 전용.
+ * Canvas stroke는 경로 기준으로 바깥으로 S/2 확장되므로, **보이는 최외곽 반지름 = SPOT_RING_OUTER_RADIUS_FACTOR × R**이 되려면
+ * `pathRadius = SPOT_RING_OUTER_RADIUS_FACTOR * R - S_outer/2` (S_outer = 바깥으로 정의되는 가장 두꺼운 stroke).
+ */
+function drawColoredBallSpotRing(
+  ctx: CanvasRenderingContext2D,
+  rect: PlayfieldRect,
+  normX: number,
+  normY: number,
+  ballKey: BallColor,
+  opacity: number,
+  variant: "cueSpot" | "objectSpot"
+) {
+  const { px, py } = normalizedToPixel(normX, normY, rect);
+  const longSide = getPlayfieldLongSide(rect);
+  /** `drawBall`과 동일 — 실제 공 렌더 반지름(px) */
+  const R = getBallRadius(longSide);
+  /** 수구·1목 동일: 두께·점선 패턴만 통일, 색만 variant로 구분 */
+  const lineW = Math.max(2, R * 0.2);
+  const dash: [number, number] = [6, 5];
+  /** 흰공: 바깥 테두리 stroke가 최외곽을 결정 */
+  const whiteOutlineExtraPx = 1.8;
+  const S_outer =
+    ballKey === "white" ? lineW + whiteOutlineExtraPx : lineW;
+  const outerR = R * SPOT_RING_OUTER_RADIUS_FACTOR;
+  const pathRadius = Math.max(R * 0.12, outerR - S_outer / 2);
+
+  const mainRgb = variant === "cueSpot" ? CUE_SPOT_RING_RGB : OBJECT_SPOT_RING_RGB;
+  const mainStroke = `rgba(${mainRgb.r},${mainRgb.g},${mainRgb.b},${opacity})`;
+
+  ctx.save();
+  ctx.setLineDash(dash);
+  if (ballKey === "white") {
+    ctx.strokeStyle = `rgba(0,0,0,${opacity * 0.5})`;
+    ctx.lineWidth = lineW + whiteOutlineExtraPx;
+    ctx.beginPath();
+    ctx.arc(px, py, pathRadius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = mainStroke;
+  ctx.lineWidth = lineW;
+  ctx.beginPath();
+  ctx.arc(px, py, pathRadius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** 수구 스팟 — 수구가 흰/노란에 맞는 색 */
 function drawCueBallSpot(
   ctx: CanvasRenderingContext2D,
   rect: PlayfieldRect,
   cueNormX: number,
   cueNormY: number,
-  opacity: number
+  opacity: number,
+  cueBallColor: BallColor
 ) {
-  const { px, py } = normalizedToPixel(cueNormX, cueNormY, rect);
-  const longSide = getPlayfieldLongSide(rect);
-  const ballR = getBallRadius(longSide);
-  const spotR = ballR * 1.815; // 수구보다 약 10% 더 큰 원 (1.65 * 1.1)
-  ctx.save();
-  ctx.strokeStyle = `rgba(57,255,20,${opacity})`;
-  ctx.lineWidth = Math.max(2, ballR * 0.2);
-  ctx.setLineDash([6, 5]);
-  ctx.beginPath();
-  ctx.arc(px, py, spotR, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
+  drawColoredBallSpotRing(ctx, rect, cueNormX, cueNormY, cueBallColor, opacity, "cueSpot");
 }
 
-/** 1목적구 해법 출발 — 수구 스팟보다 얇은 점선·진한 파랑(경로선과 통일) */
+/** 1목 스팟 — 형광 파랑, 수구 링과 동일 크기·선 스타일 */
 function drawObjectBallSpot(
   ctx: CanvasRenderingContext2D,
   rect: PlayfieldRect,
   normX: number,
   normY: number,
-  opacity: number
+  opacity: number,
+  objectBallKey: BallColor
 ) {
-  const { px, py } = normalizedToPixel(normX, normY, rect);
-  const longSide = getPlayfieldLongSide(rect);
-  const ballR = getBallRadius(longSide);
-  const spotR = ballR * 1.815;
-  ctx.save();
-  ctx.strokeStyle = `rgba(29,78,216,${opacity})`;
-  ctx.lineWidth = Math.max(1, ballR * 0.12);
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  ctx.arc(px, py, spotR, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
+  drawColoredBallSpotRing(ctx, rect, normX, normY, objectBallKey, opacity, "objectSpot");
 }
 
 /** 선택된 공 중심 + 좌표선 (배치 시에만, 저장 이미지 제외). 실선·붉은색·가늘게. */
@@ -653,6 +715,7 @@ const BilliardTableCanvas = forwardRef<
     ballNormOverrides,
     embedFill = false,
     splitBallLayer = false,
+    pathOverlayAboveBalls = false,
     children,
   },
   ref
@@ -680,6 +743,20 @@ const BilliardTableCanvas = forwardRef<
       const rect = getPlayfieldRect(width, height);
       const toView = (lx: number, ly: number) =>
         isPortrait ? landscapeToPortraitNorm(lx, ly) : { x: lx, y: ly };
+
+      /** 재생 시 이동한 공의 배치 원점 — 반투명 고정 공 (cueOrigin / firstObject 등 각 색별로 별도, 식별 링 미사용) */
+      if (ballNormOverrides) {
+        for (const key of ["red", "yellow", "white"] as const) {
+          const ovr = ballNormOverrides[key];
+          if (!ovr) continue;
+          const orig = key === "red" ? redBall : key === "yellow" ? yellowBall : whiteBall;
+          if (distanceNormPointsInPlayfieldPx(orig, ovr, rect) <= LAYOUT_REST_MOVE_EPS_PX) continue;
+          const v = toView(orig.x, orig.y);
+          const isCue = (key === "yellow" && cueBall === "yellow") || (key === "white" && cueBall === "white");
+          drawOriginGhostBall(ctx, rect, v.x, v.y, key, isCue, isWireframe);
+        }
+      }
+
       const redDraw = ballNormOverrides?.red ?? redBall;
       const yellowDraw = ballNormOverrides?.yellow ?? yellowBall;
       const whiteDraw = ballNormOverrides?.white ?? whiteBall;
@@ -709,7 +786,8 @@ const BilliardTableCanvas = forwardRef<
       if (cueBallSpotOpacity != null && cueBallSpotOpacity > 0) {
         const cuePos = cueBall === "white" ? whiteDraw : yellowDraw;
         const cueView = toView(cuePos.x, cuePos.y);
-        drawCueBallSpot(ctx, rect, cueView.x, cueView.y, cueBallSpotOpacity);
+        const cueColor: BallColor = cueBall === "white" ? "white" : "yellow";
+        drawCueBallSpot(ctx, rect, cueView.x, cueView.y, cueBallSpotOpacity, cueColor);
       }
       if (
         objectBallSpotOpacity != null &&
@@ -723,7 +801,14 @@ const BilliardTableCanvas = forwardRef<
               ? yellowDraw
               : whiteDraw;
         const objView = toView(objDraw.x, objDraw.y);
-        drawObjectBallSpot(ctx, rect, objView.x, objView.y, objectBallSpotOpacity);
+        drawObjectBallSpot(
+          ctx,
+          rect,
+          objView.x,
+          objView.y,
+          objectBallSpotOpacity,
+          objectBallSpotKey
+        );
       }
     },
     [
@@ -742,6 +827,7 @@ const BilliardTableCanvas = forwardRef<
       hideRedBall,
       ballNormOverrides,
       objectBallSpotKey,
+      cueBall,
     ]
   );
 
@@ -994,11 +1080,16 @@ const BilliardTableCanvas = forwardRef<
           onPointerCancel={usePointerDrag ? handlePointerUp : undefined}
           aria-label="당구대"
         />
-        <div className="absolute inset-0 z-10 min-h-0 min-w-0">{children}</div>
+        <div
+          className={`absolute inset-0 min-h-0 min-w-0 ${pathOverlayAboveBalls ? "z-[30]" : "z-10"}`}
+        >
+          {children}
+        </div>
         {/*
-          테이블(z-0) → 경로 SVG(z-10) → 공(z-20).
-          난구 해법 재생 시 공이 경로선 위에 보이도록 공 캔버스를 최상단에 둠. 공 캔버스는 pointer-events-none이라
-          경로 편집/탭은 아래 오버레이로 전달됨.
+          테이블(z-0) → 경로 SVG(기본 z-10, pathOverlayAboveBalls 시에만 z-30) → 공(z-20).
+          난구 해법은 공을 항상 선 위에 두는 것이 원칙 — 1목 경로 가시성은 NanguSolutionPathOverlay에서
+          첫 선분 시작점을 공 외곽으로 보정(outwardOffsetFromBallCenterTowardPointNorm)해 해결.
+          공 캔버스는 pointer-events-none이라 경로 오버레이로 포인터가 전달됨.
         */}
         <canvas
           ref={ballLayerRef}

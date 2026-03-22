@@ -12,6 +12,7 @@
  */
 
 import type { CueBallType } from "./billiard-table-constants";
+import type { PathSegmentCurveControl } from "./path-curve-display";
 
 export type { ObjectBallType } from "./billiard-table-constants";
 
@@ -129,4 +130,10 @@ export interface NanguSolutionData {
   depth?: number;
   /** 해설 텍스트 */
   explanationText?: string;
+  /**
+   * 표시 전용 곡선(선분당 2차 베지어 제어점). 직선 paths/reflectionPath와 별개.
+   * 판정·재생·충돌에는 사용하지 않음.
+   */
+  cuePathDisplayCurves?: PathSegmentCurveControl[];
+  objectPathDisplayCurves?: PathSegmentCurveControl[];
 }

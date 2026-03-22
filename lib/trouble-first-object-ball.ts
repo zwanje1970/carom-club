@@ -30,7 +30,7 @@ import {
 } from "@/lib/nangu-types";
 
 /** `type === "ball"` 스팟이 어느 비수구 공에 붙었는지 — 탭 반경 이내만 유효 */
-function objectBallKeyForBallSpot(
+export function objectBallKeyForBallSpot(
   p: NanguPathPoint,
   placement: NanguBallPlacement,
   rect: PlayfieldRect

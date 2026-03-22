@@ -16,6 +16,7 @@ import {
   computeStrokeAnimationDurationSec,
 } from "@/lib/path-animation-timing";
 import {
+  polylineSegmentLengthsPx,
   polylineTotalLengthPx,
   sampleMotionAlongPath,
   type NormPoint,
@@ -32,12 +33,18 @@ import type { RailCount } from "@/lib/rail-power-constants";
 import { spotCenterNormForDraw } from "@/lib/path-spot-display";
 import { cueFirstObjectHitFromBallPlacement } from "@/lib/solution-path-geometry";
 import { computeThicknessCollisionSplitFromSolution } from "@/lib/thickness-power-split";
+import { objectBallKeyForBallSpot } from "@/lib/trouble-first-object-ball";
 
 export type { NormPoint, PositionAlongPathResult };
 
 /** `visualizationPlayback`: 경로 시연 — 마지막 스팟까지 전 구간 이동 + 플레이필드 긴 변 왕복 기준 재생 시간 */
 export type BuildPathMotionPlanOptions = {
   visualizationPlayback?: boolean;
+  /**
+   * 시연 시 1목 경로 꼭짓점(첫 점 제외)을 오버레이와 동일하게 `spotCenterNormForDraw`로 맞춤.
+   * 보통 `getNonCueBallNorms(placement)`의 `{x,y}` 배열.
+   */
+  objectBallNormsForSpotDraw?: readonly { x: number; y: number }[];
 };
 
 export interface PathMotionPlan {
@@ -77,6 +84,30 @@ function countCushionsInPath(path: NanguSolutionPath | undefined): number {
 function verticesFromCueAndSpots(cue: NormPoint, spotCoords: { x: number; y: number }[]): NormPoint[] {
   if (spotCoords.length === 0) return [cue];
   return [cue, ...spotCoords.map((p) => ({ x: p.x, y: p.y }))];
+}
+
+/** reflectionPath: pts[0]=시작, pts[1..]↔typed[0..] — 시연 시 스팟 표시 중심과 재생 폴리라인 일치 */
+function objectReflectionPolylineNormalized(
+  firstVertex: NormPoint,
+  pts: readonly { x: number; y: number }[],
+  typed: NanguPathPoint[] | undefined,
+  rect: PlayfieldRect,
+  options?: BuildPathMotionPlanOptions
+): NormPoint[] {
+  const rawTail = pts.slice(1).map((p) => ({ x: p.x, y: p.y }));
+  const canUseSpotDraw =
+    Boolean(options?.visualizationPlayback) &&
+    (options?.objectBallNormsForSpotDraw?.length ?? 0) > 0 &&
+    Boolean(typed) &&
+    typed!.length === pts.length - 1;
+
+  if (!canUseSpotDraw) {
+    return [{ x: firstVertex.x, y: firstVertex.y }, ...rawTail];
+  }
+
+  const spotOpts = { objectBallNorms: options!.objectBallNormsForSpotDraw! };
+  const tail = typed!.map((p) => spotCenterNormForDraw(p, rect, spotOpts));
+  return [{ x: firstVertex.x, y: firstVertex.y }, ...tail];
 }
 
 function buildMoveParamsFromSolution(
@@ -169,6 +200,87 @@ export function buildCuePathMotionPlan(
  * 1목 반사 경로 시연이 있을 때: 수구는 **마지막 `ball` 스팟(스위치)** 까지만 이동한다.
  * 그 뒤에 쿠션·end 스팟이 더 있어도 시연용 수구 폴리라인은 여기서 자른다.
  */
+export type CueFirstObjectHitProgressSource =
+  | "struck-first-ball"
+  | "first-any-ball"
+  | "last-ball"
+  | "end";
+
+/**
+ * Trouble 시연: **전체** 빨간 수구 폴리라인에서 1목과의 **첫** 의도 충돌 지점까지의 거리 비율(0..1).
+ * - `reflectionObjectBall`과 일치하는 **첫** `ball` 스팟 우선
+ * - 없으면 첫 유효 공 스팟 → 마지막 공 스팟(레거시) → 1
+ *
+ * `pathProgress`(감속 τ 기준 경로 진행률)가 이 값에 도달하면 1목 object 페이즈를 시작해도 됨.
+ * (과거: 마지막 ball 스팟 비율을 쓰면 1목이 수구 시연 끝까지 밀림.)
+ */
+export function computeCueProgress01ForFirstObjectHitAlongFullPath(
+  plan: PathMotionPlan,
+  pathPoints: readonly NanguPathPoint[],
+  placement: NanguBallPlacement,
+  rect: PlayfieldRect,
+  struckKey: "red" | "yellow" | "white" | null | undefined
+): {
+  pHit01: number;
+  hitPathPointIndex: number | null;
+  source: CueFirstObjectHitProgressSource;
+} {
+  const dTotal = plan.pathLengthPx;
+  const lens = polylineSegmentLengthsPx(plan.polylineNormalized, rect);
+  const cumToSpotIndex = (pathPointIndex: number): number => {
+    let cum = 0;
+    const lastSeg = Math.min(pathPointIndex, lens.length - 1);
+    for (let s = 0; s <= lastSeg && s < lens.length; s++) cum += lens[s] ?? 0;
+    return cum;
+  };
+  const toP = (cum: number) => (dTotal > 0 ? Math.min(1, cum / dTotal) : 1);
+
+  if (struckKey) {
+    for (let i = 0; i < pathPoints.length; i++) {
+      const p = pathPoints[i]!;
+      if (p.type !== "ball") continue;
+      const k = objectBallKeyForBallSpot(p, placement, rect);
+      if (k === struckKey) {
+        return {
+          pHit01: toP(cumToSpotIndex(i)),
+          hitPathPointIndex: i,
+          source: "struck-first-ball",
+        };
+      }
+    }
+  }
+
+  for (let i = 0; i < pathPoints.length; i++) {
+    const p = pathPoints[i]!;
+    if (p.type !== "ball") continue;
+    const k = objectBallKeyForBallSpot(p, placement, rect);
+    if (k != null) {
+      return {
+        pHit01: toP(cumToSpotIndex(i)),
+        hitPathPointIndex: i,
+        source: "first-any-ball",
+      };
+    }
+  }
+
+  let lastBallIdx = -1;
+  for (let i = pathPoints.length - 1; i >= 0; i--) {
+    if (pathPoints[i]?.type === "ball") {
+      lastBallIdx = i;
+      break;
+    }
+  }
+  if (lastBallIdx >= 0) {
+    return {
+      pHit01: toP(cumToSpotIndex(lastBallIdx)),
+      hitPathPointIndex: lastBallIdx,
+      source: "last-ball",
+    };
+  }
+
+  return { pHit01: 1, hitPathPointIndex: null, source: "end" };
+}
+
 export function truncateCuePathPlanAtLastBallSpotForPlayback(
   plan: PathMotionPlan,
   pathPoints: NanguPathPoint[],
@@ -215,9 +327,15 @@ export function buildObjectPathMotionPlan(
   const pts = rp?.points;
   if (!pts || pts.length < 2) return null;
 
-  const poly = pts.map((p) => ({ x: p.x, y: p.y }));
-  const pathLengthPx = polylineTotalLengthPx(poly, rect);
   const typed: NanguPathPoint[] | undefined = rp.pointsWithType;
+  const poly = objectReflectionPolylineNormalized(
+    { x: pts[0].x, y: pts[0].y },
+    pts,
+    typed,
+    rect,
+    options
+  );
+  const pathLengthPx = polylineTotalLengthPx(poly, rect);
   const cushionCount = typed?.filter((p) => p.type === "cushion").length ?? 0;
   const moveParams = buildMoveParamsFromSolution(data, cushionCount);
   const split = computeThicknessCollisionSplitFromSolution(data.isBankShot ?? false, data.thicknessOffsetX);
@@ -260,12 +378,10 @@ export function buildObjectPathMotionPlanWithStartVertex(
 ): PathMotionPlan | null {
   const base = buildObjectPathMotionPlan(data, rect, options);
   const pts = data.reflectionPath?.points;
+  const typed = data.reflectionPath?.pointsWithType;
   if (!base || !pts || pts.length < 2) return null;
 
-  const poly = [
-    { x: objectStartNorm.x, y: objectStartNorm.y },
-    ...pts.slice(1).map((p) => ({ x: p.x, y: p.y })),
-  ];
+  const poly = objectReflectionPolylineNormalized(objectStartNorm, pts, typed, rect, options);
   const pathLengthPx = polylineTotalLengthPx(poly, rect);
   const moveDistancePx = options?.visualizationPlayback ? pathLengthPx : base.moveDistancePx;
   const effectiveTravelPx = Math.min(moveDistancePx, pathLengthPx);

@@ -1282,6 +1282,15 @@ model CommunityPost {
   @@index([boardId])
   @@index([authorId])
   @@index([boardId, isPinned, createdAt])
+  /// 목록: board + 숨김 제외 + 최신순
+  @@index([boardId, isHidden, createdAt])
+  /// 인기(조회/추천/댓글) — 목록 where에 맞춤
+  @@index([boardId, isHidden, viewCount])
+  @@index([boardId, isHidden, likeCount])
+  @@index([boardId, isHidden, commentCount])
+  @@index([boardId, isHidden, isSolved, createdAt])
+  /// 제목 검색·정렬 보조 (board + 숨김 + title)
+  @@index([boardId, isHidden, title])
   @@index([createdAt])
   @@index([isHidden])
 }

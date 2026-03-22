@@ -15,12 +15,13 @@ const TROUBLE_NANGU_NEXT_PREFIXES = ["/community/nangu", "/community/trouble"] a
 
 function readNextFromBrowser(): string | null {
   if (typeof window === "undefined") return null;
-  return safeInternalNextPath(new URLSearchParams(window.location.search).get("next"));
+  const sp = new URLSearchParams(window.location.search);
+  return safeInternalNextPath(sp.get("next") ?? sp.get("returnUrl"));
 }
 
 function LoginForm() {
   const searchParams = useSearchParams();
-  const rawNext = searchParams.get("next");
+  const rawNext = searchParams.get("next") ?? searchParams.get("returnUrl");
   const requestedNext = safeInternalNextPath(rawNext);
 
   const [error, setError] = useState("");
@@ -98,6 +99,11 @@ function LoginForm() {
       }
       // 당구노트·난구해결사 등에서 온 경우: 클라이언트/권역 기본 이동보다 next 우선
       if ((returnToNotes || returnToTroubleNangu) && nextDest) {
+        window.location.href = nextDest;
+        return;
+      }
+      /** 커뮤니티 게시판 등에서 `next=/community/...` 로 온 경우, 클라이언트 로그인이어도 원래 목록으로 복귀 */
+      if (loginMode === "client" && nextDest?.startsWith("/community/")) {
         window.location.href = nextDest;
         return;
       }

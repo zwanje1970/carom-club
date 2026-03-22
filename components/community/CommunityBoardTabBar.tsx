@@ -1,7 +1,4 @@
-"use client";
-
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { orderedHubBoards, tabLabelForSlug } from "./communityBoardConstants";
 import { NanguSolverIcon } from "./NanguSolverIcon";
 
@@ -9,13 +6,14 @@ type Board = { id: string; slug: string; name: string };
 
 type Props = {
   boards: Board[];
+  /** 현재 게시판 slug (커뮤니티 홈이면 `""`) */
+  activeSlug: string;
 };
 
 /**
- * 상단 게시판 탭: 배경 없음, 선택 시 하단 border 강조만
+ * 상단 게시판 탭 — 서버 렌더, `activeSlug`로 활성 표시
  */
-export function CommunityBoardTabBar({ boards }: Props) {
-  const pathname = usePathname() ?? "";
+export function CommunityBoardTabBar({ boards, activeSlug }: Props) {
   const ordered = orderedHubBoards(boards);
 
   return (
@@ -27,14 +25,16 @@ export function CommunityBoardTabBar({ boards }: Props) {
         {ordered.map((b) => {
           const href = b.slug === "trouble" ? "/community/trouble" : `/community/${b.slug}`;
           const active =
-            b.slug === "trouble"
-              ? pathname === "/community/trouble" || pathname.startsWith("/community/trouble/")
-              : pathname === `/community/${b.slug}` || pathname.startsWith(`/community/${b.slug}/`);
+            activeSlug !== "" &&
+            (b.slug === "trouble"
+              ? activeSlug === "trouble"
+              : activeSlug === b.slug);
           const label = tabLabelForSlug(b.slug, b.name);
           return (
             <Link
               key={b.id}
               href={href}
+              scroll={false}
               className={`shrink-0 inline-flex items-center gap-0 px-3 sm:px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 active
                   ? "border-site-primary text-site-text"

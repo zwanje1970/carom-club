@@ -26,9 +26,20 @@ import {
 } from "@/lib/nangu-types";
 import { isLastSegmentEndpointSpotIndex, type PathPointerAim } from "@/lib/cue-path-cushion-rules";
 import { classifySolutionPathPointerHit } from "@/lib/solution-path-pointer-classify";
-import { cueFirstObjectHitAmongNormalized } from "@/lib/solution-path-geometry";
+import {
+  ballCircumferenceNormFacingApproach,
+  cueFirstObjectHitAmongNormalized,
+} from "@/lib/solution-path-geometry";
+import { outwardOffsetFromBallCenterTowardPointNorm } from "@/lib/path-motion-geometry";
 import { buildCuePathSegments, buildObjectPathSegments } from "@/lib/solution-path-types";
 import { resolveTroubleFirstObjectBallKey } from "@/lib/trouble-first-object-ball";
+import {
+  type PathSegmentCurveControl,
+  cueSegmentCurveKey,
+  objectSegmentCurveKey,
+  isValidCueCurveKey,
+  isValidObjectCurveKey,
+} from "@/lib/path-curve-display";
 
 /** 수구 진행 경로 */
 const CUE_PATH_STROKE = "rgb(239, 68, 68)";
@@ -41,6 +52,10 @@ const SPOT_FILL_OPACITY = 0.7;
 /** 1목 경로 스팟: 경로선과 동일 진한 파랑·60% 불투명 */
 const OBJECT_SPOT_FILL = OBJECT_PATH_STROKE;
 const OBJECT_SPOT_FILL_OPACITY = 0.6;
+
+const CURVE_HANDLE_HIT_PX = 26;
+const CURVE_LONG_PRESS_MS = 480;
+const CURVE_HANDLE_MOVE_CANCEL_PX = 10;
 
 /**
  * 수구 경로(빨강) + 1목적구 경로(진한 파랑).
@@ -70,6 +85,8 @@ export function NanguSolutionPathOverlay({
   onAddObjectPathAim,
   onRemoveObjectPoint,
   onMoveObjectPoint,
+  onPathSpotDragStart,
+  onPathSpotDragEnd,
   onInsertObjectBetween,
   onInsertObjectPathAim,
   pathLinesVisible = true,
@@ -91,6 +108,18 @@ export function NanguSolutionPathOverlay({
   objectActiveSpotOverrideId = null,
   onCueActiveSpotChange,
   onObjectActiveSpotChange,
+  cueDisplayCurveControls = [],
+  objectDisplayCurveControls = [],
+  troubleCurveEditMode = false,
+  curveHandleInteraction = false,
+  curveHandlesShowSubtle = false,
+  onUpsertCueDisplayCurve,
+  onUpsertObjectDisplayCurve,
+  onMoveCueDisplayCurve,
+  onMoveObjectDisplayCurve,
+  onRemoveCueDisplayCurve,
+  onRemoveObjectDisplayCurve,
+  onCurveHandleDragBegin,
 }: {
   pathPoints: NanguPathPoint[];
   cuePos: { x: number; y: number };
@@ -113,6 +142,9 @@ export function NanguSolutionPathOverlay({
   onAddObjectPathAim?: (aim: PathPointerAim) => void;
   onRemoveObjectPoint?: (id: string) => void;
   onMoveObjectPoint?: (id: string, norm: { x: number; y: number }) => void;
+  /** 활성 스팟 드래그 시작 직전 — 되돌리기용 스냅샷 1회 */
+  onPathSpotDragStart?: (kind: "cue" | "object", spotId: string) => void;
+  onPathSpotDragEnd?: () => void;
   onInsertObjectBetween?: (segmentIndex: number, norm: { x: number; y: number }) => void;
   onInsertObjectPathAim?: (segmentIndex: number, aim: PathPointerAim) => void;
   /** false면 경로선·스팟·수구 보조 링 숨김 (재생 중 토글) */
@@ -128,6 +160,26 @@ export function NanguSolutionPathOverlay({
   objectActiveSpotOverrideId?: string | null;
   onCueActiveSpotChange?: (id: string | null) => void;
   onObjectActiveSpotChange?: (id: string | null) => void;
+  /** 표시 전용 곡선 제어점(직선 pathPoints와 분리) */
+  cueDisplayCurveControls?: PathSegmentCurveControl[];
+  objectDisplayCurveControls?: PathSegmentCurveControl[];
+  /**
+   * true: 난구 곡선 편집 모드 — 선분 더블탭 시 스팟 삽입 대신 곡선 노드 생성/이동.
+   * false: 기존처럼 선분 더블탭 = 스팟 삽입.
+   */
+  troubleCurveEditMode?: boolean;
+  /** 곡선 노드 드래그·삭제·선분 더블탭(곡선 모드) */
+  curveHandleInteraction?: boolean;
+  /** 편집 모드가 아닐 때 약한 노드 표시(미리보기 등) */
+  curveHandlesShowSubtle?: boolean;
+  onUpsertCueDisplayCurve?: (key: string, norm: { x: number; y: number }) => void;
+  onUpsertObjectDisplayCurve?: (key: string, norm: { x: number; y: number }) => void;
+  onMoveCueDisplayCurve?: (key: string, norm: { x: number; y: number }) => void;
+  onMoveObjectDisplayCurve?: (key: string, norm: { x: number; y: number }) => void;
+  onRemoveCueDisplayCurve?: (key: string) => void;
+  onRemoveObjectDisplayCurve?: (key: string) => void;
+  /** 곡선 노드 드래그 시작 시(되돌리기 스냅샷용) */
+  onCurveHandleDragBegin?: () => void;
 }) {
   /** 저장/충돌 계산은 항상 landscape 플레이필드 기준 */
   const collisionRect = useMemo(
@@ -142,13 +194,30 @@ export function NanguSolutionPathOverlay({
   const [draggingObjectId, setDraggingObjectId] = useState<string | null>(null);
   const lastClickRef = useRef<{ id: string; t: number; kind: "cue" | "obj" } | null>(null);
   const segmentDblRef = useRef<{ key: string; t: number } | null>(null);
+  /** 곡선 편집 모드 전용 — `segmentDblRef`와 분리(직선 삽입과 동시 타이밍 충돌 방지) */
+  const curveSegmentDblRef = useRef<{ key: string; t: number } | null>(null);
   /** 브라우저 setTimeout 핸들 (number). Node `Timeout`과 병합 타입 충돌 방지 */
   const cueBallGestureRef = useRef<{ t: number; timer: number } | null>(null);
+  const [draggingCurve, setDraggingCurve] = useState<null | { kind: "cue" | "object"; key: string }>(
+    null
+  );
+  const curveHandleLastTapRef = useRef<{ kind: "cue" | "object"; key: string; t: number } | null>(
+    null
+  );
+  const curveLongPressRef = useRef<{
+    kind: "cue" | "object";
+    key: string;
+    timer: number;
+    startClientX: number;
+    startClientY: number;
+  } | null>(null);
 
   useEffect(() => {
     return () => {
       const p = cueBallGestureRef.current;
       if (p?.timer) clearTimeout(p.timer);
+      const lp = curveLongPressRef.current;
+      if (lp?.timer) window.clearTimeout(lp.timer);
     };
   }, []);
 
@@ -240,6 +309,28 @@ export function NanguSolutionPathOverlay({
 
   const collisionNorm = cueFirstHit?.collision ?? null;
 
+  /**
+   * 수구 경로 스팟이 없을 때 — `SolutionPathEditorFullscreen.cueToFirstObjectHit`와 동일한 가상 접점.
+   * (스팟만 object 경로에 있을 때 파란 선이 `collisionNorm` 없이 비지 않게)
+   */
+  const cuePathEmptyVirtualHitNorm = useMemo(() => {
+    if (pathPoints.length >= 1) return null;
+    const placement = tableBallPlacement ?? ballPickLayout ?? null;
+    if (!placement) return null;
+    const nonCue = getNonCueBallNorms(placement);
+    if (nonCue.length === 0) return null;
+    let nearest = nonCue[0]!;
+    let bestD = Infinity;
+    for (const b of nonCue) {
+      const d = distanceNormPointsInPlayfieldPx(cuePos, { x: b.x, y: b.y }, collisionRect);
+      if (d < bestD) {
+        bestD = d;
+        nearest = b;
+      }
+    }
+    return ballCircumferenceNormFacingApproach({ x: nearest.x, y: nearest.y }, cuePos, collisionRect);
+  }, [pathPoints.length, tableBallPlacement, ballPickLayout, cuePos, collisionRect]);
+
   /** 1목 경로 시작 구슬: 스팟으로 확정된 1목만 — 광선·거리 폴백 없음 (`lib/trouble-first-object-ball`) */
   const placementForFirstObject = tableBallPlacement ?? ballPickLayout ?? null;
   const resolvedFirstObjectBallKey = useMemo((): ObjectBallColorKey | null => {
@@ -288,50 +379,121 @@ export function NanguSolutionPathOverlay({
     [objectPathPoints, collisionRect, spotDrawOpts]
   );
 
+  /** 표시 전용 시작점 — 재생·경고와 무관 (`objectPathPoints` 있으면 선을 그릴 수 있게 분기) */
+  const objectPathRenderStartNorm =
+    objectPathLineStartNorm ?? collisionNorm ?? cuePathEmptyVirtualHitNorm;
+
   const objectSegmentsNorm = useMemo(() => {
     if (objectSpotDisplayNorms.length < 1) return [];
-    if (objectPathMode && objectPathLineStartNorm) {
-      return buildObjectPathSegments(objectPathLineStartNorm, objectSpotDisplayNorms);
-    }
-    /** 1목 중심에서 파란 경로 시작 — 충돌점(수구 접촉 시 수구 중심 근처)이 아님 */
-    if (objectPathLineStartNorm) {
-      return buildObjectPathSegments(objectPathLineStartNorm, objectSpotDisplayNorms);
-    }
-    if (!collisionNorm) return [];
-    return buildObjectPathSegments(collisionNorm, objectSpotDisplayNorms);
-  }, [objectPathMode, objectPathLineStartNorm, collisionNorm, objectSpotDisplayNorms]);
+    if (!objectPathRenderStartNorm) return [];
+    return buildObjectPathSegments(objectPathRenderStartNorm, objectSpotDisplayNorms);
+  }, [objectPathRenderStartNorm, objectSpotDisplayNorms]);
+
+  /**
+   * 공 캔버스가 경로(z-10)보다 위(z-20)일 때, 중심→첫점 선분이 공 아래에 가려지지 않도록
+   * 첫 선분 시작만 공 외곽으로 보정 (레이어 뒤집기 없음).
+   */
+  const cueSegmentsNormForDraw = useMemo(() => {
+    if (cueSegmentsNorm.length < 1) return cueSegmentsNorm;
+    const first = { ...cueSegmentsNorm[0]! };
+    first.start = outwardOffsetFromBallCenterTowardPointNorm(
+      first.start,
+      first.end,
+      collisionRect
+    );
+    return [first, ...cueSegmentsNorm.slice(1)];
+  }, [cueSegmentsNorm, collisionRect]);
+
+  const objectSegmentsNormForDraw = useMemo(() => {
+    if (objectSegmentsNorm.length < 1) return objectSegmentsNorm;
+    const first = { ...objectSegmentsNorm[0]! };
+    first.start = outwardOffsetFromBallCenterTowardPointNorm(
+      first.start,
+      first.end,
+      collisionRect
+    );
+    return [first, ...objectSegmentsNorm.slice(1)];
+  }, [objectSegmentsNorm, collisionRect]);
 
   const cuePxSegs = useMemo(
     () =>
-      cueSegmentsNorm.map((s) => ({
+      cueSegmentsNormForDraw.map((s) => ({
         x1: toPx(s.start.x, s.start.y).px,
         y1: toPx(s.start.x, s.start.y).py,
         x2: toPx(s.end.x, s.end.y).px,
         y2: toPx(s.end.x, s.end.y).py,
       })),
-    [cueSegmentsNorm, toPx]
+    [cueSegmentsNormForDraw, toPx]
   );
 
   const objectPxSegs = useMemo(
     () =>
-      objectSegmentsNorm.map((s) => ({
+      objectSegmentsNormForDraw.map((s) => ({
         x1: toPx(s.start.x, s.start.y).px,
         y1: toPx(s.start.x, s.start.y).py,
         x2: toPx(s.end.x, s.end.y).px,
         y2: toPx(s.end.x, s.end.y).py,
       })),
-    [objectSegmentsNorm, toPx]
+    [objectSegmentsNormForDraw, toPx]
   );
 
-  const cuePx = toPx(cuePos.x, cuePos.y);
+  const cueCurveByKey = useMemo(() => {
+    const m = new Map<string, { x: number; y: number }>();
+    for (const c of cueDisplayCurveControls) {
+      if (isValidCueCurveKey(c.key, pathPoints)) m.set(c.key, { x: c.x, y: c.y });
+    }
+    return m;
+  }, [cueDisplayCurveControls, pathPoints]);
 
-  const objectPathHighlightPx = useMemo(
-    () =>
-      objectPathLineStartNorm
-        ? toPx(objectPathLineStartNorm.x, objectPathLineStartNorm.y)
-        : null,
-    [objectPathLineStartNorm, toPx]
-  );
+  const objectCurveByKey = useMemo(() => {
+    const m = new Map<string, { x: number; y: number }>();
+    for (const c of objectDisplayCurveControls) {
+      if (isValidObjectCurveKey(c.key, objectPathPoints)) m.set(c.key, { x: c.x, y: c.y });
+    }
+    return m;
+  }, [objectDisplayCurveControls, objectPathPoints]);
+
+  const cueSegmentRender = useMemo(() => {
+    return cuePxSegs.map((seg, i) => {
+      const sk = cueSegmentCurveKey(pathPoints, i);
+      const ctrl = sk ? cueCurveByKey.get(sk) : undefined;
+      if (!ctrl) {
+        return { mode: "line" as const, i, x1: seg.x1, y1: seg.y1, x2: seg.x2, y2: seg.y2 };
+      }
+      const cp = toPx(ctrl.x, ctrl.y);
+      return {
+        mode: "quad" as const,
+        i,
+        x1: seg.x1,
+        y1: seg.y1,
+        cx: cp.px,
+        cy: cp.py,
+        x2: seg.x2,
+        y2: seg.y2,
+      };
+    });
+  }, [cuePxSegs, pathPoints, cueCurveByKey, toPx]);
+
+  const objectSegmentRender = useMemo(() => {
+    return objectPxSegs.map((seg, i) => {
+      const sk = objectSegmentCurveKey(objectPathPoints, i);
+      const ctrl = sk ? objectCurveByKey.get(sk) : undefined;
+      if (!ctrl) {
+        return { mode: "line" as const, i, x1: seg.x1, y1: seg.y1, x2: seg.x2, y2: seg.y2 };
+      }
+      const cp = toPx(ctrl.x, ctrl.y);
+      return {
+        mode: "quad" as const,
+        i,
+        x1: seg.x1,
+        y1: seg.y1,
+        cx: cp.px,
+        cy: cp.py,
+        x2: seg.x2,
+        y2: seg.y2,
+      };
+    });
+  }, [objectPxSegs, objectPathPoints, objectCurveByKey, toPx]);
 
   /** 항상 활성 스팟은 1개 — 기본은 각 경로의 마지막 끝 스팟 */
   const effectiveCueActiveId = useMemo(() => {
@@ -404,6 +566,86 @@ export function NanguSolutionPathOverlay({
       }
 
       const norm = aim.norm;
+
+      /** 곡선 노드(드래그·더블탭 삭제·길게 눌러 삭제) — 활성 경로 레이어만 */
+      if (curveHandleInteraction && pathLinesVisible && aim.kind === "playfield") {
+        const tryHit = (
+          kind: "cue" | "object",
+          list: PathSegmentCurveControl[],
+          valid: (key: string) => boolean,
+          onRemove?: (key: string) => void
+        ): boolean => {
+          for (const ctl of list) {
+            if (!valid(ctl.key)) continue;
+            if (
+              distanceNormPointsInPlayfieldPx(norm, { x: ctl.x, y: ctl.y }, collisionRect) >
+              CURVE_HANDLE_HIT_PX
+            ) {
+              continue;
+            }
+            const prev = curveHandleLastTapRef.current;
+            if (prev && prev.kind === kind && prev.key === ctl.key && now - prev.t < 420) {
+              curveHandleLastTapRef.current = null;
+              if (curveLongPressRef.current?.timer) window.clearTimeout(curveLongPressRef.current.timer);
+              curveLongPressRef.current = null;
+              setDraggingCurve(null);
+              onRemove?.(ctl.key);
+              e.preventDefault();
+              e.stopPropagation();
+              return true;
+            }
+            curveHandleLastTapRef.current = { kind, key: ctl.key, t: now };
+            if (curveLongPressRef.current?.timer) window.clearTimeout(curveLongPressRef.current.timer);
+            onCurveHandleDragBegin?.();
+            const k = ctl.key;
+            const tRef = curveLongPressRef;
+            const timer = window.setTimeout(() => {
+              if (tRef.current?.key === k) {
+                onRemove?.(k);
+                setDraggingCurve(null);
+                tRef.current = null;
+              }
+            }, CURVE_LONG_PRESS_MS);
+            curveLongPressRef.current = {
+              kind,
+              key: k,
+              timer,
+              startClientX: e.clientX,
+              startClientY: e.clientY,
+            };
+            setDraggingCurve({ kind, key: k });
+            try {
+              (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+            } catch {
+              /* ignore */
+            }
+            e.preventDefault();
+            e.stopPropagation();
+            return true;
+          }
+          return false;
+        };
+
+        if (pathMode && !objectPathMode) {
+          const stopped = tryHit(
+            "cue",
+            cueDisplayCurveControls,
+            (key) => isValidCueCurveKey(key, pathPoints),
+            onRemoveCueDisplayCurve
+          );
+          if (stopped) return;
+        }
+        if (objectPathMode && !pathMode) {
+          const stopped = tryHit(
+            "object",
+            objectDisplayCurveControls,
+            (key) => isValidObjectCurveKey(key, objectPathPoints),
+            onRemoveObjectDisplayCurve
+          );
+          if (stopped) return;
+        }
+      }
+
       const c = classifySolutionPathPointerHit({
         norm,
         pathMode,
@@ -511,6 +753,25 @@ export function NanguSolutionPathOverlay({
       }
 
       if (c.kind === "objectSegment") {
+        if (
+          troubleCurveEditMode &&
+          curveHandleInteraction &&
+          objectPathMode &&
+          !pathMode
+        ) {
+          const tkey = `curve-obj-${c.segmentIndex}`;
+          const lastC = curveSegmentDblRef.current;
+          if (lastC?.key === tkey && now - lastC.t < 420) {
+            curveSegmentDblRef.current = null;
+            const sk = objectSegmentCurveKey(objectPathPoints, c.segmentIndex);
+            if (sk) onUpsertObjectDisplayCurve?.(sk, norm);
+          } else {
+            curveSegmentDblRef.current = { key: tkey, t: now };
+          }
+          e.stopPropagation();
+          e.preventDefault();
+          return;
+        }
         const key = `obj-${c.segmentIndex}`;
         const lastS = segmentDblRef.current;
         if (lastS?.key === key && now - lastS.t < 400) {
@@ -553,13 +814,30 @@ export function NanguSolutionPathOverlay({
           const { px, py } = toPx(p.x, p.y);
           onZoomSetFocusCanvasPx?.(px, py);
         }
-        if (p.id === effectiveCueActiveId) setDraggingId(p.id);
+        if (p.id === effectiveCueActiveId) {
+          onPathSpotDragStart?.("cue", p.id);
+          setDraggingId(p.id);
+        }
         e.stopPropagation();
         e.preventDefault();
         return;
       }
 
       if (c.kind === "cueSegment") {
+        if (troubleCurveEditMode && curveHandleInteraction && pathMode && !objectPathMode) {
+          const tkey = `curve-cue-${c.segmentIndex}`;
+          const lastC = curveSegmentDblRef.current;
+          if (lastC?.key === tkey && now - lastC.t < 420) {
+            curveSegmentDblRef.current = null;
+            const sk = cueSegmentCurveKey(pathPoints, c.segmentIndex);
+            if (sk) onUpsertCueDisplayCurve?.(sk, norm);
+          } else {
+            curveSegmentDblRef.current = { key: tkey, t: now };
+          }
+          e.stopPropagation();
+          e.preventDefault();
+          return;
+        }
         const key = `cue-${c.segmentIndex}`;
         const lastS = segmentDblRef.current;
         if (lastS?.key === key && now - lastS.t < 400) {
@@ -610,6 +888,7 @@ export function NanguSolutionPathOverlay({
       onAddObjectPoint,
       onAddObjectPathAim,
       onRemoveObjectPoint,
+      onPathSpotDragStart,
       onInsertObjectBetween,
       onInsertObjectPathAim,
       ballPickLayout,
@@ -625,11 +904,39 @@ export function NanguSolutionPathOverlay({
       effectiveObjectActiveId,
       onCueActiveSpotChange,
       onObjectActiveSpotChange,
+      curveHandleInteraction,
+      pathLinesVisible,
+      cueDisplayCurveControls,
+      objectDisplayCurveControls,
+      troubleCurveEditMode,
+      onRemoveCueDisplayCurve,
+      onRemoveObjectDisplayCurve,
+      onUpsertCueDisplayCurve,
+      onUpsertObjectDisplayCurve,
+      onCurveHandleDragBegin,
     ]
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
+      if (draggingCurve) {
+        const norm = resolveLandscapeNormFromClient(e.clientX, e.clientY);
+        if (norm) {
+          if (draggingCurve.kind === "cue") onMoveCueDisplayCurve?.(draggingCurve.key, norm);
+          else onMoveObjectDisplayCurve?.(draggingCurve.key, norm);
+        }
+        const lp = curveLongPressRef.current;
+        if (
+          lp &&
+          (Math.abs(e.clientX - lp.startClientX) > CURVE_HANDLE_MOVE_CANCEL_PX ||
+            Math.abs(e.clientY - lp.startClientY) > CURVE_HANDLE_MOVE_CANCEL_PX)
+        ) {
+          window.clearTimeout(lp.timer);
+          curveLongPressRef.current = null;
+        }
+        e.preventDefault();
+        return;
+      }
       const norm = resolveLandscapeNormFromClient(e.clientX, e.clientY);
       if (!norm) return;
       if (draggingObjectId && onMoveObjectPoint) {
@@ -642,13 +949,28 @@ export function NanguSolutionPathOverlay({
         e.preventDefault();
       }
     },
-    [draggingId, draggingObjectId, resolveLandscapeNormFromClient, onMovePoint, onMoveObjectPoint]
+    [
+      draggingCurve,
+      draggingId,
+      draggingObjectId,
+      resolveLandscapeNormFromClient,
+      onMovePoint,
+      onMoveObjectPoint,
+      onMoveCueDisplayCurve,
+      onMoveObjectDisplayCurve,
+    ]
   );
 
   const handlePointerUp = useCallback(() => {
+    const lp = curveLongPressRef.current;
+    if (lp?.timer) window.clearTimeout(lp.timer);
+    curveLongPressRef.current = null;
+    setDraggingCurve(null);
+    const wasDragging = draggingId != null || draggingObjectId != null;
     setDraggingId(null);
     setDraggingObjectId(null);
-  }, []);
+    if (wasDragging) onPathSpotDragEnd?.();
+  }, [draggingId, draggingObjectId, onPathSpotDragEnd]);
 
   const interactive = pathMode || objectPathMode || Boolean(allowCuePlaybackGestures);
 
@@ -670,6 +992,12 @@ export function NanguSolutionPathOverlay({
       data-testid="nangu-solution-path-overlay"
       data-cue-path-segment-count={cuePxSegs.length}
       data-object-path-segment-count={objectPxSegs.length}
+      data-object-path-points-len={objectPathPoints.length}
+      data-first-object-ball-key={resolvedFirstObjectBallKey ?? "none"}
+      data-object-path-start-ready={objectPathRenderStartNorm ? "1" : "0"}
+      data-object-line-visible={
+        pathLinesVisible && objectPxSegs.length > 0 ? "1" : "0"
+      }
       className="absolute inset-0 w-full h-full"
       style={{ pointerEvents: interactive ? "auto" : "none" }}
       onPointerDown={handlePointerDown}
@@ -683,58 +1011,99 @@ export function NanguSolutionPathOverlay({
         height={canvasH}
         viewBox={`0 0 ${canvasW} ${canvasH}`}
       >
-        {/* 수구 경로 */}
+        {/* 수구 경로 — 제어점 있으면 2차 베지어(표시 전용) */}
         {pathLinesVisible &&
-          cuePxSegs.map((seg, i) => (
-            <line
-              key={`cue-seg-${i}`}
-              x1={seg.x1}
-              y1={seg.y1}
-              x2={seg.x2}
-              y2={seg.y2}
-              stroke={CUE_PATH_STROKE}
-              strokeWidth={LINE_WIDTH}
-              strokeLinecap="round"
-            />
-          ))}
+          cueSegmentRender.map((seg) =>
+            seg.mode === "line" ? (
+              <line
+                key={`cue-seg-${seg.i}`}
+                x1={seg.x1}
+                y1={seg.y1}
+                x2={seg.x2}
+                y2={seg.y2}
+                stroke={CUE_PATH_STROKE}
+                strokeWidth={LINE_WIDTH}
+                strokeLinecap="round"
+              />
+            ) : (
+              <path
+                key={`cue-seg-${seg.i}`}
+                d={`M ${seg.x1} ${seg.y1} Q ${seg.cx} ${seg.cy} ${seg.x2} ${seg.y2}`}
+                fill="none"
+                stroke={CUE_PATH_STROKE}
+                strokeWidth={LINE_WIDTH}
+                strokeLinecap="round"
+              />
+            )
+          )}
         {/* 1목적구 경로 */}
         {pathLinesVisible &&
-          objectPxSegs.map((seg, i) => (
-          <line
-            key={`obj-seg-${i}`}
-            x1={seg.x1}
-            y1={seg.y1}
-            x2={seg.x2}
-            y2={seg.y2}
-            stroke={OBJECT_PATH_STROKE}
-            strokeWidth={LINE_WIDTH}
-            strokeLinecap="round"
-          />
-        ))}
-        {pathLinesVisible && (
-          <g>
-            <circle
-              cx={cuePx.px}
-              cy={cuePx.py}
-              r={ballR}
-              fill="none"
-              stroke="rgba(30, 64, 175, 0.85)"
-              strokeWidth={2.5}
-            />
-          </g>
-        )}
-        {pathLinesVisible && objectPathMode && objectPathHighlightPx && (
-          <g opacity={0.4 + 0.6 * spotBlink01}>
-            <circle
-              cx={objectPathHighlightPx.px}
-              cy={objectPathHighlightPx.py}
-              r={ballR}
-              fill="none"
-              stroke="rgb(29, 78, 216)"
-              strokeWidth={2.5}
-            />
-          </g>
-        )}
+          objectSegmentRender.map((seg) =>
+            seg.mode === "line" ? (
+              <line
+                key={`obj-seg-${seg.i}`}
+                x1={seg.x1}
+                y1={seg.y1}
+                x2={seg.x2}
+                y2={seg.y2}
+                stroke={OBJECT_PATH_STROKE}
+                strokeWidth={LINE_WIDTH}
+                strokeLinecap="round"
+              />
+            ) : (
+              <path
+                key={`obj-seg-${seg.i}`}
+                d={`M ${seg.x1} ${seg.y1} Q ${seg.cx} ${seg.cy} ${seg.x2} ${seg.y2}`}
+                fill="none"
+                stroke={OBJECT_PATH_STROKE}
+                strokeWidth={LINE_WIDTH}
+                strokeLinecap="round"
+              />
+            )
+          )}
+        {(curveHandleInteraction || curveHandlesShowSubtle) &&
+          pathLinesVisible &&
+          cueDisplayCurveControls.map((ctl) => {
+            if (!isValidCueCurveKey(ctl.key, pathPoints)) return null;
+            const { px, py } = toPx(ctl.x, ctl.y);
+            const subtle = !curveHandleInteraction || !pathMode || objectPathMode;
+            return (
+              <circle
+                key={`cue-curve-ctl-${ctl.key}`}
+                cx={px}
+                cy={py}
+                r={subtle ? 3.5 : 6}
+                fill={subtle ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.92)"}
+                stroke={CUE_PATH_STROKE}
+                strokeWidth={subtle ? 1 : 1.5}
+                opacity={subtle ? 0.55 : 1}
+              />
+            );
+          })}
+        {(curveHandleInteraction || curveHandlesShowSubtle) &&
+          pathLinesVisible &&
+          objectDisplayCurveControls.map((ctl) => {
+            if (!isValidObjectCurveKey(ctl.key, objectPathPoints)) return null;
+            const { px, py } = toPx(ctl.x, ctl.y);
+            const subtle = !curveHandleInteraction || !objectPathMode || pathMode;
+            return (
+              <circle
+                key={`obj-curve-ctl-${ctl.key}`}
+                cx={px}
+                cy={py}
+                r={subtle ? 3.5 : 6}
+                fill={subtle ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.92)"}
+                stroke={OBJECT_PATH_STROKE}
+                strokeWidth={subtle ? 1 : 1.5}
+                opacity={subtle ? 0.55 : 1}
+              />
+            );
+          })}
+        {/*
+          수구/1목 “깜빡이는 점선”은 BilliardTableCanvas(showCueBallSpot·showObjectBallSpot) 전용.
+          원래 위치는 재생 시 ballNormOverrides + BilliardTableCanvas 반투명 고정 공(ghost)만 사용.
+          SVG에 공 중심 실선 링을 두면 현재 공과 겹쳐 고정 테두리처럼 보이므로 여기서는 그리지 않음.
+        */}
 
         {/* 수구 경로 스팟 */}
         {pathLinesVisible &&

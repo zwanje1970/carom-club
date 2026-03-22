@@ -33,7 +33,7 @@
 - **애니메이션 시간**: `PathMotionPlan.animationDurationSec` / `animationDurationMs` — 기본은 세기 **레일 번호(1~5)** 기준.  
   기본은 레일 1에서 약 1초, 레일이 올라갈수록 증가. 값은 **`PATH_ANIMATION_TIMING`** 객체에서 조정 (시연 후 튜닝).  
   Trouble「경로 시연」숨김 시간은 `computePathPreviewDemoHoldMs` (스트로크 ms + `pathPreviewDemoPaddingMs`).
-- **경로 시연 재생** (`useTroublePathPlayback`): 수구는 **전체** 빨간 `cuePlan` 폴리라인 끝까지 진행(1목 스팟에서 끊지 않음). 이후 수구는 빨간 끝점에 고정되고 1목만 파란 폴리라인(`runObjectPhase`, `sampleObjectMotion` τ=0 동기 반영 후 rAF). `cueDurationMs`·감속·τ는 빨간 길이만, `objectDurationMs`는 파란 길이만. 튜닝: `PATH_ANIMATION_TIMING.playbackLongEdgeOneWayMs`, `cuePlaybackSpotPauseMs` 등.
+- **경로 시연 재생** (`useTroublePathPlayback`): 수구는 **전체** 빨간 `cuePlan` 폴리라인 끝까지 진행(1목 스팟에서 끊지 않음). **1목 object 페이즈**는 `computeCueProgress01ForFirstObjectHitAlongFullPath`로 구한 **첫 1목 공 스팟**까지의 거리 비율(`pHitFirst01`)에 도달한 시점부터 시작한다(마지막 ball 스팟 비율과 혼동하면 1목이 수구 시연 끝까지 밀림). 수구↔1목 **재충돌** 팝업만 `pWarnRecontactAfter01`(첫 충돌 직후 소구간 bump) 이후로 분리. 이후 수구는 빨간 끝점에 고정되고 1목만 파란 폴리라인(`sampleObjectMotion` 등). `cueDurationMs`·감속·τ는 빨간 길이만, `objectDurationMs`는 파란 길이만. 튜닝: `PATH_ANIMATION_TIMING.playbackLongEdgeOneWayMs`, `cuePlaybackSpotPauseMs` 등. E2E 디버그: `data-testid="trouble-e2e-playback-debug"`의 `data-timing-*` 속성(히트·완료·경고 시각 등).
 
 상수는 `rail-power-constants.ts`, `ball-speed-constants.ts`, `path-motion-distance.ts`, `path-animation-timing.ts`, `thickness-power-split.ts`에서 조정.
 
@@ -42,6 +42,7 @@
 - 애니메이션 **재생 중**에만 우측 상단 오버레이: 경로선 숨김/보이기, 그리드 숨김/보이기, 실사↔단순 보기 — **항상 현재 상태의 반대 라벨 1개**만 표시.
 - 클릭 시 즉시 반영, **재생(rAF)은 중단하지 않음**. 재생 시작 시 옵션은 기본(경로·그리드 표시, 실사)으로 리셋.
 - Trouble: `data-trouble-region="trouble-playback-view-controls"`, 액션 `trouble-playback-toggle-pathlines` 등 (`trouble-console-contract.ts`).
+- **레이어**: `BilliardTableCanvas`에서 테이블 `z-0` → 경로 SVG `z-10` → 공 `z-20`(기본). 공은 항상 경로선 위. 1목 파란 선이 공 원 안에서 가려지지 않게 하려면 레이어를 올리지 않고 `NanguSolutionPathOverlay`에서 첫 선분 시작을 `outwardOffsetFromBallCenterTowardPointNorm`으로 공 외곽(반지름+margin px)만큼 밀어 그림(`lib/path-motion-geometry.ts`). `pathOverlayAboveBalls`는 예외용으로만 유지(난구 해법 기본은 `false`).
 
 ## 기본 경로 버튼 (8단계)
 

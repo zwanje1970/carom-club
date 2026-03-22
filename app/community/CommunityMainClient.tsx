@@ -63,7 +63,7 @@ export function CommunityMainClient({
         </div>
       )}
 
-      <CommunityBoardTabBar boards={hubBoards} />
+      <CommunityBoardTabBar boards={hubBoards} activeSlug="" />
 
       <CommunityPopularPills value={popularTab} onChange={setPopularTab} className="mt-2" />
 

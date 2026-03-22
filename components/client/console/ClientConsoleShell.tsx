@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import type { ClientOrganization } from "@/types/client-organization";
 import { ClientOrganizationSelect } from "@/components/client/console/ClientOrganizationSelect";
+import { MobileLandscapeLockButton } from "@/components/MobileLandscapeLockButton";
 
 /** 1차: 업무 콘솔 메뉴 (요구사항 6항) */
 const PRIMARY_NAV: { href: string; label: string }[] = [
@@ -162,6 +163,7 @@ export function ClientConsoleShell({
               {title}
             </h1>
           </div>
+          <MobileLandscapeLockButton />
           <ClientOrganizationSelect
             organizations={organizations}
             activeOrganizationId={activeOrganizationId}

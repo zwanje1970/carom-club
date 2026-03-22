@@ -22,7 +22,8 @@ export type TroublePathFixtureName =
   | "firstYellow"
   | "cushionsThenRed"
   | "objectPathOneSegment"
-  | "cueAndObjectPaths";
+  | "cueAndObjectPaths"
+  | "objectPathBallOnly";
 
 export function getTroublePathFixture(name: string | null): {
   pathPoints: NanguPathPoint[];
@@ -77,6 +78,15 @@ export function getTroublePathFixture(name: string | null): {
         ],
         objectPathPoints: [
           spot("o1", 0.48, 0.52, "cushion"),
+          spot("o2", 0.55, 0.48, "cushion"),
+        ],
+      };
+    /** 수구 경로에 공 스팟 없음 — 1목은 1목 경로의 ball 스팟만으로 확정(재생 reflection도 동일 기준) */
+    case "objectPathBallOnly":
+      return {
+        pathPoints: [spot("c1", 0.22, 0.36, "cushion")],
+        objectPathPoints: [
+          spot("onRed", E2E_TROUBLE_BALL_PLACEMENT.redBall.x, E2E_TROUBLE_BALL_PLACEMENT.redBall.y, "ball"),
           spot("o2", 0.55, 0.48, "cushion"),
         ],
       };

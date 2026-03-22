@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { isCommunityAdmin, isCommunityModerator } from "@/lib/community-roles";
 import { parseTroubleBallPlacementJson } from "@/lib/trouble-ball-placement";
+import { revalidateCommunityNoticePinned } from "@/lib/community-notice-pinned-revalidate";
 
 /** 게시글 상세 조회. 조회수는 POST /view 에서만 증가 */
 export async function GET(
@@ -131,7 +132,7 @@ export async function PATCH(
 
   const existing = await prisma.communityPost.findUnique({
     where: { id },
-    select: { authorId: true, board: { select: { slug: true } } },
+    select: { authorId: true, boardId: true, board: { select: { slug: true } } },
   });
   if (!existing) {
     return NextResponse.json({ error: "글을 찾을 수 없습니다." }, { status: 404 });
@@ -157,6 +158,9 @@ export async function PATCH(
     where: { id },
     data,
   });
+  if (existing.board.slug === "notice") {
+    revalidateCommunityNoticePinned(existing.boardId);
+  }
   return NextResponse.json({ id: updated.id, updatedAt: updated.updatedAt.toISOString() });
 }
 
@@ -176,7 +180,7 @@ export async function DELETE(
 
   const existing = await prisma.communityPost.findUnique({
     where: { id },
-    select: { authorId: true },
+    select: { authorId: true, boardId: true, board: { select: { slug: true } } },
   });
   if (!existing) {
     return NextResponse.json({ error: "글을 찾을 수 없습니다." }, { status: 404 });
@@ -187,5 +191,8 @@ export async function DELETE(
   }
 
   await prisma.communityPost.delete({ where: { id } });
+  if (existing.board.slug === "notice") {
+    revalidateCommunityNoticePinned(existing.boardId);
+  }
   return NextResponse.json({ ok: true });
 }

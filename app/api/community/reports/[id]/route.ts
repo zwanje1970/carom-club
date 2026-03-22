@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { canManageReports } from "@/lib/community-roles";
+import { revalidateCommunityNoticePinned } from "@/lib/community-notice-pinned-revalidate";
 
 /** 신고 상세 (GET) 및 처리 (PATCH): 상태 변경, 관리자 메모, 게시글/댓글 숨김 */
 export async function GET(
@@ -168,6 +169,16 @@ export async function PATCH(
       });
     }
   });
+
+  if ((body.hidePost === true || body.unhidePost === true) && report.postId) {
+    const post = await prisma.communityPost.findUnique({
+      where: { id: report.postId },
+      select: { boardId: true, board: { select: { slug: true } } },
+    });
+    if (post?.board.slug === "notice") {
+      revalidateCommunityNoticePinned(post.boardId);
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }

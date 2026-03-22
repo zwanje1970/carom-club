@@ -126,6 +126,10 @@ export async function POST(
   const comment = await prisma.communityComment.create({
     data: { postId, authorId: session.id, content, parentId },
   });
+  await prisma.communityPost.update({
+    where: { id: postId },
+    data: { commentCount: { increment: 1 } },
+  });
 
   const notifyUserId = parentId ? parentAuthorId : post.authorId;
   if (notifyUserId && notifyUserId !== session.id) {

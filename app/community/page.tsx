@@ -55,42 +55,62 @@ export default async function CommunityPage() {
         ...(session ? {} : { board: { slug: { not: "trouble" as const } } }),
       };
 
-      const format = (p: { id: string; title: string; viewCount: number; createdAt: Date; board: { slug: string; name: string }; author: { name: string }; _count: { likes: number; comments: number } }) => ({
+      const format = (p: {
+        id: string;
+        title: string;
+        viewCount: number;
+        createdAt: Date;
+        likeCount: number;
+        commentCount: number;
+        board: { slug: string; name: string };
+        author: { name: string };
+      }) => ({
         id: p.id,
         title: p.title,
         authorName: p.author.name,
-        likeCount: p._count.likes,
-        commentCount: p._count.comments,
+        likeCount: p.likeCount,
+        commentCount: p.commentCount,
         viewCount: p.viewCount,
         createdAt: p.createdAt.toISOString(),
         boardSlug: p.board.slug,
         boardName: p.board.name,
       });
 
+      const listSelect = {
+        id: true,
+        title: true,
+        viewCount: true,
+        createdAt: true,
+        likeCount: true,
+        commentCount: true,
+        board: { select: { slug: true, name: true } },
+        author: { select: { name: true } },
+      } as const;
+
       const [todayPosts, weekPosts, mostLikedPosts, mostCommentPosts] = await Promise.all([
         prisma.communityPost.findMany({
           where: { ...hiddenFilter, createdAt: { gte: todayStart } },
-          orderBy: { viewCount: "desc" },
+          orderBy: [{ viewCount: "desc" }, { createdAt: "desc" }],
           take: TAKE,
-          select: { id: true, title: true, viewCount: true, createdAt: true, board: { select: { slug: true, name: true } }, author: { select: { name: true } }, _count: { select: { likes: true, comments: true } } },
+          select: listSelect,
         }),
         prisma.communityPost.findMany({
           where: { ...hiddenFilter, createdAt: { gte: weekStart } },
-          orderBy: { viewCount: "desc" },
+          orderBy: [{ viewCount: "desc" }, { createdAt: "desc" }],
           take: TAKE,
-          select: { id: true, title: true, viewCount: true, createdAt: true, board: { select: { slug: true, name: true } }, author: { select: { name: true } }, _count: { select: { likes: true, comments: true } } },
+          select: listSelect,
         }),
         prisma.communityPost.findMany({
           where: hiddenFilter,
-          orderBy: { likes: { _count: "desc" } },
+          orderBy: [{ likeCount: "desc" }, { createdAt: "desc" }],
           take: TAKE,
-          select: { id: true, title: true, viewCount: true, createdAt: true, board: { select: { slug: true, name: true } }, author: { select: { name: true } }, _count: { select: { likes: true, comments: true } } },
+          select: listSelect,
         }),
         prisma.communityPost.findMany({
           where: hiddenFilter,
-          orderBy: { comments: { _count: "desc" } },
+          orderBy: [{ commentCount: "desc" }, { createdAt: "desc" }],
           take: TAKE,
-          select: { id: true, title: true, viewCount: true, createdAt: true, board: { select: { slug: true, name: true } }, author: { select: { name: true } }, _count: { select: { likes: true, comments: true } } },
+          select: listSelect,
         }),
       ]);
 

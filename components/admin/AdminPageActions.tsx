@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { containerMaxW } from "./_lib/config";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import { MobileLandscapeLockButton } from "@/components/MobileLandscapeLockButton";
 
 /** 액션바 높이·본문 상단 여백 (한 곳에서 관리) */
 const ACTION_BAR_HEIGHT = "h-12";
@@ -71,6 +72,9 @@ export function AdminPageActions({ topOffset = 64, copy, leftSlot }: AdminPageAc
         >
           {dashboardLabel}
         </Link>
+        <div className="ml-auto shrink-0" aria-label="모바일 화면 방향">
+          <MobileLandscapeLockButton appearance="admin" />
+        </div>
       </div>
     </div>
   );

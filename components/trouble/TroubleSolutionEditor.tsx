@@ -16,6 +16,7 @@ import { useTableOrientation } from "@/hooks/useTableOrientation";
 import type { NanguBallPlacement } from "@/lib/nangu-types";
 import type { NanguSolutionData } from "@/lib/nangu-types";
 import type { NanguPathPoint } from "@/lib/nangu-types";
+import type { PathSegmentCurveControl } from "@/lib/path-curve-display";
 import { NanguReadOnlyLayout } from "@/components/nangu/NanguReadOnlyLayout";
 import { NanguSolutionPathOverlay } from "@/components/nangu/NanguSolutionPathOverlay";
 import { NanguThicknessEditor, getThicknessOverlap } from "@/components/nangu/NanguThicknessEditor";
@@ -66,6 +67,10 @@ export function TroubleSolutionEditor({
   const [ballSpeed, setBallSpeed] = useState<BallSpeed>(3.0);
   const [pathPoints, setPathPoints] = useState<NanguPathPoint[]>([]);
   const [objectPathPoints, setObjectPathPoints] = useState<NanguPathPoint[]>([]);
+  const [cuePathDisplayCurves, setCuePathDisplayCurves] = useState<PathSegmentCurveControl[]>([]);
+  const [objectPathDisplayCurves, setObjectPathDisplayCurves] = useState<PathSegmentCurveControl[]>(
+    []
+  );
   const [pathFsOpen, setPathFsOpen] = useState(false);
   const [pathFsKey, setPathFsKey] = useState(0);
   const [explanationText, setExplanationText] = useState("");
@@ -110,6 +115,8 @@ export function TroubleSolutionEditor({
   const clearCommittedPath = useCallback(() => {
     setPathPoints([]);
     setObjectPathPoints([]);
+    setCuePathDisplayCurves([]);
+    setObjectPathDisplayCurves([]);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -157,6 +164,10 @@ export function TroubleSolutionEditor({
         speedLevel: ballSpeedToLegacySpeedLevel(ballSpeed),
         speed: ballSpeedToLegacySpeed(ballSpeed),
         explanationText: explanationText.trim() || undefined,
+        cuePathDisplayCurves:
+          cuePathDisplayCurves.length > 0 ? cuePathDisplayCurves : undefined,
+        objectPathDisplayCurves:
+          objectPathDisplayCurves.length > 0 ? objectPathDisplayCurves : undefined,
       };
       await onSubmit({
         content: explanationText.trim(),
@@ -212,6 +223,7 @@ export function TroubleSolutionEditor({
                     showObjectBallSpot={showObjectBallSpotPulse}
                     objectBallSpotKey={firstObjectBallKey}
                     orientation={previewOrientation}
+                    pathOverlayAboveBalls={false}
                     betweenTableAndBallsLayer={
                       <NanguSolutionPathOverlay
                         pathPoints={pathPoints}
@@ -223,6 +235,12 @@ export function TroubleSolutionEditor({
                         objectPathMode={false}
                         pathLinesVisible={true}
                         ballPickLayout={ballPlacement}
+                        cueDisplayCurveControls={cuePathDisplayCurves}
+                        objectDisplayCurveControls={objectPathDisplayCurves}
+                        curveHandleInteraction={false}
+                        curveHandlesShowSubtle={
+                          cuePathDisplayCurves.length > 0 || objectPathDisplayCurves.length > 0
+                        }
                       />
                     }
                   />
@@ -295,13 +313,22 @@ export function TroubleSolutionEditor({
           layoutImageUrl={ballPlacement ? null : layoutImageUrl}
           initialPathPoints={pathPoints}
           initialObjectPathPoints={objectPathPoints}
+          initialCuePathDisplayCurves={cuePathDisplayCurves}
+          initialObjectPathDisplayCurves={objectPathDisplayCurves}
           thicknessOffsetX={thicknessOffsetX}
           isBankShot={isBankShot}
           ballSpeed={ballSpeed}
           onCancel={() => setPathFsOpen(false)}
-          onConfirm={({ pathPoints: nextCue, objectPathPoints: nextObj }) => {
+          onConfirm={({
+            pathPoints: nextCue,
+            objectPathPoints: nextObj,
+            cuePathDisplayCurves: nextCueCurves,
+            objectPathDisplayCurves: nextObjCurves,
+          }) => {
             setPathPoints(nextCue);
             setObjectPathPoints(nextObj);
+            setCuePathDisplayCurves(nextCueCurves ?? []);
+            setObjectPathDisplayCurves(nextObjCurves ?? []);
             setPathFsOpen(false);
           }}
         />

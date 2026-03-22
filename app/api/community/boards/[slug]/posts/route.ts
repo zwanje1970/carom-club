@@ -7,13 +7,24 @@ import { isFeatureEnabled } from "@/lib/site-feature-flags";
 import { awardPostCreated } from "@/lib/community-score-service";
 import { getLevelFromScore } from "@/lib/community-level";
 import { ensureDefaultCommunityBoards } from "@/lib/community-ensure-boards";
+import {
+  BOARD_LIST_TAKE_DEFAULT,
+  BOARD_LIST_TAKE_MAX,
+  formatBoardListRow,
+  queryBoardPostLists,
+  type BoardListQueryParams,
+} from "@/lib/community-board-list-query";
+import { communityListPerfStart } from "@/lib/community-list-perf";
+import { revalidateCommunityNoticePinned } from "@/lib/community-notice-pinned-revalidate";
 
-/** 게시판별 글 목록. 텍스트 중심. 숨김 글은 관리자만 노출 */
+/** 게시판별 글 목록. 본문·imageUrls·에디터 JSON 미포함. 검색은 제목만(본문 LIKE 제거로 부하 감소). */
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ slug: string }> }
 ) {
+  const endPerf = communityListPerfStart(`GET boards/[slug]/posts`);
   if (!isDatabaseConfigured()) {
+    endPerf();
     return NextResponse.json({ error: "DB 연결되지 않음" }, { status: 503 });
   }
   const { slug } = await params;
@@ -24,12 +35,16 @@ export async function GET(
       ? popularRaw
       : null;
   const sort = searchParams.get("sort") === "likes" ? "likes" : "latest";
-  const statusFilter = searchParams.get("status") as string | null; // trouble 전용: all | open | solved
-  const q = searchParams.get("q")?.trim() || "";
+  const statusRaw = searchParams.get("status");
+  const statusFilter: BoardListQueryParams["statusFilter"] =
+    slug === "trouble" && (statusRaw === "open" || statusRaw === "solved") ? statusRaw : "all";
+  const qRaw = searchParams.get("q")?.trim() || "";
   const page = Math.max(0, Number(searchParams.get("page")) || 0);
-  const take = Math.min(Number(searchParams.get("take")) || 20, 50);
+  const take = Math.min(Number(searchParams.get("take")) || BOARD_LIST_TAKE_DEFAULT, BOARD_LIST_TAKE_MAX);
+  const cursorRaw = searchParams.get("cursor")?.trim() || null;
   const session = await getSession();
   if (slug === "trouble" && !session) {
+    endPerf();
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
   const showHidden = isCommunityModerator(session);
@@ -46,100 +61,44 @@ export async function GET(
     });
   }
   if (!board) {
+    endPerf();
     return NextResponse.json({ error: "게시판을 찾을 수 없습니다." }, { status: 404 });
   }
 
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const weekStart = new Date(todayStart);
-  weekStart.setDate(weekStart.getDate() - 7);
-
-  const popularDateWhere =
-    popular === "today"
-      ? { createdAt: { gte: todayStart } }
-      : popular === "weekly"
-        ? { createdAt: { gte: weekStart } }
-        : {};
-
-  const where = {
+  const listParams: BoardListQueryParams = {
     boardId: board.id,
-    ...(showHidden ? {} : { isHidden: false }),
-    ...(q ? { OR: [{ title: { contains: q, mode: "insensitive" as const } }, { content: { contains: q, mode: "insensitive" as const } }] } : {}),
-    ...(slug === "trouble" && statusFilter === "open" ? { isSolved: false } : {}),
-    ...(slug === "trouble" && statusFilter === "solved" ? { isSolved: true } : {}),
-    ...popularDateWhere,
+    slug,
+    showHidden,
+    qTitle: qRaw || undefined,
+    statusFilter,
+    popular,
+    sort,
+    page,
+    take,
   };
 
-  const listSelect = {
-    id: true,
-    title: true,
-    thumbnailUrl: true,
-    viewCount: true,
-    isPinned: true,
-    isSolved: true,
-    createdAt: true,
-    author: { select: { name: true } },
-    _count: { select: { likes: true, comments: true } },
-  } as const;
+  try {
+    const { pinned, list, nextCursor } = await queryBoardPostLists(listParams, {
+      cursor: cursorRaw,
+    });
+    endPerf();
 
-  /** Prisma findMany orderBy — `@prisma/client`의 Prisma 네임스페이스와 커스텀 generate 경로 불일치 시 CI 타입 오류 방지 */
-  const listOrderBy =
-    popular === "liked"
-      ? [{ likes: { _count: "desc" as const } }, { createdAt: "desc" as const }]
-      : popular === "comments"
-        ? [{ comments: { _count: "desc" as const } }, { createdAt: "desc" as const }]
-        : popular === "today" || popular === "weekly"
-          ? [{ viewCount: "desc" as const }, { createdAt: "desc" as const }]
-          : sort === "likes"
-            ? [{ likes: { _count: "desc" as const } }, { createdAt: "desc" as const }]
-            : { createdAt: "desc" as const };
-
-  const [pinned, list] = await Promise.all([
-    slug === "notice"
-      ? prisma.communityPost.findMany({
-          where: { ...where, isPinned: true },
-          orderBy: { createdAt: "desc" },
-          select: listSelect,
-        })
-      : [],
-    prisma.communityPost.findMany({
-      where: slug === "notice" ? { ...where, isPinned: false } : where,
-      orderBy: listOrderBy,
-      skip: page * take,
-      take,
-      select: listSelect,
-    }),
-  ]);
-
-  const format = (p: {
-    id: string;
-    title: string;
-    thumbnailUrl: string | null;
-    viewCount: number;
-    isPinned: boolean;
-    isSolved: boolean | null;
-    createdAt: Date;
-    author: { name: string };
-    _count: { likes: number; comments: number };
-  }) => ({
-    id: p.id,
-    title: p.title,
-    thumbnailUrl: p.thumbnailUrl ?? null,
-    authorName: p.author.name,
-    likeCount: p._count.likes,
-    commentCount: p._count.comments,
-    viewCount: p.viewCount,
-    isPinned: p.isPinned,
-    isSolved: p.isSolved ?? false,
-    createdAt: p.createdAt.toISOString(),
-  });
-
-  return NextResponse.json({
-    board: { id: board.id, slug: board.slug, name: board.name },
-    pinned: pinned.map(format),
-    posts: list.map(format),
-    hasMore: list.length === take,
-  });
+    const res = NextResponse.json({
+      board: { id: board.id, slug: board.slug, name: board.name },
+      pinned: pinned.map(formatBoardListRow),
+      posts: list.map(formatBoardListRow),
+      hasMore: list.length === take,
+      nextCursor,
+    });
+    /** 익명 목록은 짧게 캐시 (세션은 trouble 등에서만 변동) */
+    if (slug !== "trouble" && !showHidden) {
+      res.headers.set("Cache-Control", "public, s-maxage=15, stale-while-revalidate=60");
+    }
+    return res;
+  } catch (e) {
+    endPerf();
+    return NextResponse.json({ error: "목록을 불러오지 못했습니다." }, { status: 500 });
+  }
 }
 
 /** 게시글 작성. 공지사항(slug=notice)은 관리자만 */
@@ -209,6 +168,9 @@ export async function POST(
       isPinned,
     },
   });
+  if (board.slug === "notice") {
+    revalidateCommunityNoticePinned(board.id);
+  }
   if (board.slug !== "notice") {
     try {
       await awardPostCreated(session.id, post.id);

@@ -5,6 +5,7 @@ import { MainSiteHeaderWrapper } from "@/components/layout/MainSiteHeaderWrapper
 import { MobileBottomNavWrapper } from "@/components/layout/MobileBottomNavWrapper";
 import { BallPlacementFullscreenProvider } from "@/components/community/BallPlacementFullscreenContext";
 import { AdminFloatButton } from "@/components/AdminFloatButton";
+import { ClientFloatButton } from "@/components/ClientFloatButton";
 import NotificationBanner from "@/components/NotificationBanner";
 import { RegisterServiceWorker } from "@/components/push/RegisterServiceWorker";
 import { getCommonGlobalData } from "@/lib/common-page-data";
@@ -125,6 +126,7 @@ export default async function RootLayout({
           </IntroRoot>
         </BallPlacementFullscreenProvider>
           <AdminFloatButton />
+          <ClientFloatButton />
         </SiteSettingsProvider>
       </body>
     </html>

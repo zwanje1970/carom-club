@@ -27,6 +27,7 @@ export function NanguReadOnlyLayout({
   drawStyle = "realistic",
   orientation = "landscape",
   betweenTableAndBallsLayer,
+  pathOverlayAboveBalls = false,
 }: {
   ballPlacement: NanguBallPlacement;
   width?: number;
@@ -52,6 +53,8 @@ export function NanguReadOnlyLayout({
   orientation?: TableOrientation;
   /** 테이블·공 사이 레이어(경로 SVG) — 지정 시 공이 경로선 위에 그려짐 */
   betweenTableAndBallsLayer?: ReactNode;
+  /** 기본 false. true면 경로 SVG를 공 위(z-30)로 — 난구 해법은 공 최상위 유지를 위해 보통 사용 안 함 */
+  pathOverlayAboveBalls?: boolean;
 }) {
   return (
     <div
@@ -76,6 +79,7 @@ export function NanguReadOnlyLayout({
         embedFill={embedFill}
         orientation={orientation}
         splitBallLayer={Boolean(betweenTableAndBallsLayer)}
+        pathOverlayAboveBalls={pathOverlayAboveBalls}
       >
         {betweenTableAndBallsLayer}
       </BilliardTableCanvas>

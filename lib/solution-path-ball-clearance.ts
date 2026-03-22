@@ -1,14 +1,27 @@
 /**
  * 경로 선분과 비수구 공(수구 제외) 사이 이격이 스팟(공 반지름)보다 작은지 검사.
  * 진행로가 공에 너무 붙었을 때 안내 오버레이용.
+ *
+ * 규칙:
+ * - 스팟이 해당 목적구에 붙은 경우(`type==="ball"` + 탭 반경 내): 그 선분은 해당 공에 대해 검사하지 않음.
+ * - 1목 경로 첫 선분은 충돌점에서 출발 → 충돌 난 공(`collisionStruckBallKey`)에 대해 첫 선분은 검사 제외.
+ * - 위에 해당하지 않는 선분만, 공 중심 ↔ 선분 최단거리(px)가 스팟 반지름(=공 반지름) 미만이면 true.
  */
 import {
   normalizedToPixel,
   getBallRadius,
   getPlayfieldLongSide,
+  distanceNormPointsInPlayfieldPx,
+  getSolutionPathBallTapRadiusPx,
   type PlayfieldRect,
 } from "@/lib/billiard-table-constants";
-import { getNonCueBallNorms, type NanguBallPlacement, type NanguPathPoint } from "@/lib/nangu-types";
+import {
+  getNonCueBallNorms,
+  type NanguBallPlacement,
+  type NanguPathPoint,
+  type ObjectBallColorKey,
+  type LabeledBallNorm,
+} from "@/lib/nangu-types";
 
 function distPointToSegmentPx(
   px: number,
@@ -43,6 +56,28 @@ function distNormSegmentToBallCenterPx(
   return distPointToSegmentPx(P.px, P.py, A.px, A.py, B.px, B.py);
 }
 
+/** 스팟이 이 비수구 공에 탭으로 붙은 것으로 볼 수 있는지 */
+function pathPointAttachedToBall(p: NanguPathPoint, ball: LabeledBallNorm, rect: PlayfieldRect): boolean {
+  if (p.type !== "ball") return false;
+  const tapR = getSolutionPathBallTapRadiusPx(rect);
+  return distanceNormPointsInPlayfieldPx({ x: p.x, y: p.y }, { x: ball.x, y: ball.y }, rect) <= tapR;
+}
+
+/** 해당 공에 대해 이 선분은 의도적 접촉/출발이라 간격 검사 생략 */
+function segmentExemptForBall(
+  ball: LabeledBallNorm,
+  endPoint: NanguPathPoint,
+  startPoint: NanguPathPoint | null,
+  startIsCollisionPoint: boolean,
+  collisionStruckBallKey: ObjectBallColorKey | null,
+  rect: PlayfieldRect
+): boolean {
+  if (pathPointAttachedToBall(endPoint, ball, rect)) return true;
+  if (startPoint && pathPointAttachedToBall(startPoint, ball, rect)) return true;
+  if (startIsCollisionPoint && collisionStruckBallKey === ball.key) return true;
+  return false;
+}
+
 export function isPathTooCloseToNonCueBalls(params: {
   rect: PlayfieldRect;
   placement: NanguBallPlacement;
@@ -50,6 +85,8 @@ export function isPathTooCloseToNonCueBalls(params: {
   pathPoints: NanguPathPoint[];
   objectPathPoints: NanguPathPoint[];
   collisionNorm: { x: number; y: number } | null;
+  /** 수구→첫 스팟 광선이 맞은 비수구 공 — 1목 경로 첫 선분은 이 공 표면에서 출발 */
+  collisionStruckBallKey?: ObjectBallColorKey | null;
   checkCuePath: boolean;
   checkObjectPath: boolean;
 }): boolean {
@@ -60,6 +97,7 @@ export function isPathTooCloseToNonCueBalls(params: {
     pathPoints,
     objectPathPoints,
     collisionNorm,
+    collisionStruckBallKey = null,
     checkCuePath,
     checkObjectPath,
   } = params;
@@ -67,27 +105,43 @@ export function isPathTooCloseToNonCueBalls(params: {
   const balls = getNonCueBallNorms(placement);
   if (balls.length === 0) return false;
 
-  const segmentHitsBall = (ax: number, ay: number, bx: number, by: number) => {
-    for (const b of balls) {
-      const d = distNormSegmentToBallCenterPx(ax, ay, bx, by, b.x, b.y, rect);
-      if (d < spotR) return true;
-    }
-    return false;
+  const segmentTooClose = (
+    ax: number,
+    ay: number,
+    bx: number,
+    by: number,
+    ball: LabeledBallNorm
+  ) => {
+    const d = distNormSegmentToBallCenterPx(ax, ay, bx, by, ball.x, ball.y, rect);
+    return d < spotR;
   };
 
   if (checkCuePath && pathPoints.length >= 1) {
     let prev = cuePos;
-    for (const p of pathPoints) {
-      if (segmentHitsBall(prev.x, prev.y, p.x, p.y)) return true;
+    let prevPoint: NanguPathPoint | null = null;
+    for (let i = 0; i < pathPoints.length; i++) {
+      const p = pathPoints[i]!;
+      for (const b of balls) {
+        if (segmentExemptForBall(b, p, prevPoint, false, null, rect)) continue;
+        if (segmentTooClose(prev.x, prev.y, p.x, p.y, b)) return true;
+      }
       prev = { x: p.x, y: p.y };
+      prevPoint = p;
     }
   }
 
   if (checkObjectPath && collisionNorm && objectPathPoints.length >= 1) {
     let prev = collisionNorm;
-    for (const p of objectPathPoints) {
-      if (segmentHitsBall(prev.x, prev.y, p.x, p.y)) return true;
+    let prevPoint: NanguPathPoint | null = null;
+    for (let i = 0; i < objectPathPoints.length; i++) {
+      const p = objectPathPoints[i]!;
+      const startIsCollision = i === 0;
+      for (const b of balls) {
+        if (segmentExemptForBall(b, p, prevPoint, startIsCollision, collisionStruckBallKey, rect)) continue;
+        if (segmentTooClose(prev.x, prev.y, p.x, p.y, b)) return true;
+      }
       prev = { x: p.x, y: p.y };
+      prevPoint = p;
     }
   }
 

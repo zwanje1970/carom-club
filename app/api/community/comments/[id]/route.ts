@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
+import { syncCommunityPostCommentCount } from "@/lib/community-post-counts";
 
 /** 댓글 삭제. 작성자만 */
 export async function DELETE(
@@ -19,7 +20,7 @@ export async function DELETE(
 
   const comment = await prisma.communityComment.findUnique({
     where: { id },
-    select: { authorId: true },
+    select: { authorId: true, postId: true },
   });
   if (!comment) {
     return NextResponse.json({ error: "댓글을 찾을 수 없습니다." }, { status: 404 });
@@ -28,6 +29,8 @@ export async function DELETE(
     return NextResponse.json({ error: "삭제 권한이 없습니다." }, { status: 403 });
   }
 
+  const postId = comment.postId;
   await prisma.communityComment.delete({ where: { id } });
+  await syncCommunityPostCommentCount(postId);
   return NextResponse.json({ ok: true });
 }

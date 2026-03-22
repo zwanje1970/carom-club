@@ -81,4 +81,20 @@ test.describe("난구 경로 / 1목 E2E", () => {
       "0"
     );
   });
+
+  test("10) 1목 경로 있을 때 재생용 reflection 데이터 생성(reflection-path-ready)", async ({ page }) => {
+    await page.goto(fixtureUrl("cueAndObjectPaths"));
+    const dbg = page.getByTestId("trouble-e2e-playback-debug");
+    await expect(dbg).toHaveAttribute("data-reflection-path-ready", "1");
+    await expect(dbg).toHaveAttribute("data-reflection-object-ball", "red");
+    await expect(dbg).toHaveAttribute("data-moving-ball-key", "red");
+  });
+
+  test("11) 수구 경로에 공 스팟 없어도 1목 경로 ball 스팟이면 reflection 준비", async ({ page }) => {
+    await page.goto(fixtureUrl("objectPathBallOnly"));
+    const dbg = page.getByTestId("trouble-e2e-playback-debug");
+    await expect(dbg).toHaveAttribute("data-reflection-path-ready", "1");
+    await expect(dbg).toHaveAttribute("data-struck-key-source", "resolve");
+    await expect(dbg).toHaveAttribute("data-reflection-object-ball", "red");
+  });
 });

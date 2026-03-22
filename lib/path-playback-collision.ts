@@ -71,42 +71,71 @@ export function collectInitialTouchingBallPairs(
 
 export type CuePhaseCollisionOptions = {
   /**
-   * 시각화 재생: 수구 광선상 먼저 맞는 **1목 후보** — 수구 구간에서 해당 공과의 맞닿음은 스위치(의도된 첫 접촉)로 충돌 팝업 제외
+   * @deprecated {@link neverWarnWhenTouchingBallKeys} + {@link firstObjectBallKey}/{@link warnReContactAfterProgress} 권장
    */
   ignoreTouchingBallKeys?: readonly ("red" | "yellow" | "white")[];
+  /**
+   * 수구 재생 중 이 공(들)과 맞닿아도 충돌 팝업 없음 — **2목**(1목이 아닌 비수구) 등
+   */
+  neverWarnWhenTouchingBallKeys?: readonly ("red" | "yellow" | "white")[];
+  /**
+   * 1목: `cuePathProgress01 < warnReContactAfterProgress` 구간의 맞닿음은 의도적 첫 접촉으로 무시,
+   * 그 이후 맞닿음만 **수구↔1목 재충돌**로 팝업
+   */
+  firstObjectBallKey?: "red" | "yellow" | "white" | null;
+  cuePathProgress01?: number;
+  warnReContactAfterProgress?: number;
   /** 재생 시작 시 이미 맞닿아 있던 쌍 — 수구·목적구 포함, 맞닿음 유지 시 충돌 아님 */
   initialTouchingPairs?: ReadonlySet<string>;
 };
 
-/** 수구 이동 중: 수구가 아닌 두 목적 후보 공 + (고정된) 다른 수구색 공과 원둘레 접촉 이상 */
+/** 수구 이동 중: 비수구·다른 수구색과의 맞닿음 — 2목은 무시, 1목은 첫 접촉(progress 임계 전)만 무시 후 재접촉 시 충돌 */
 export function cuePhaseCollisionWithOthers(
   cueNorm: NormPoint,
   placement: NanguBallPlacement,
   rect: PlayfieldRect,
   options?: CuePhaseCollisionOptions
 ): boolean {
-  const skip = new Set(options?.ignoreTouchingBallKeys ?? []);
+  const legacySkip = new Set(options?.ignoreTouchingBallKeys ?? []);
   const initialPairs = options?.initialTouchingPairs;
   const cueKey = placement.cueBall === "yellow" ? "yellow" : "white";
   const skipInitialWithCue = (otherKey: "red" | "yellow" | "white") =>
     initialPairs?.has(ballPairKey(cueKey, otherKey)) ?? false;
 
+  const ignoreTouchForCollision = (key: "red" | "yellow" | "white"): boolean => {
+    if (key === cueKey) return true;
+    if (options?.neverWarnWhenTouchingBallKeys?.includes(key)) return true;
+    const prog = options?.cuePathProgress01;
+    const th = options?.warnReContactAfterProgress;
+    const firstK = options?.firstObjectBallKey;
+    if (
+      firstK === key &&
+      prog !== undefined &&
+      th !== undefined &&
+      prog < th - 1e-6
+    ) {
+      return true;
+    }
+    if (legacySkip.has(key)) return true;
+    return false;
+  };
+
   if (
-    !skip.has("red") &&
+    !ignoreTouchForCollision("red") &&
     !skipInitialWithCue("red") &&
     areBallCentersTouchingOrCloser(cueNorm, placement.redBall, rect)
   )
     return true;
   if (placement.cueBall === "white") {
     if (
-      !skip.has("yellow") &&
+      !ignoreTouchForCollision("yellow") &&
       !skipInitialWithCue("yellow") &&
       areBallCentersTouchingOrCloser(cueNorm, placement.yellowBall, rect)
     )
       return true;
   } else {
     if (
-      !skip.has("white") &&
+      !ignoreTouchForCollision("white") &&
       !skipInitialWithCue("white") &&
       areBallCentersTouchingOrCloser(cueNorm, placement.whiteBall, rect)
     )

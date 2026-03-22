@@ -5,7 +5,10 @@
  */
 import {
   clampBallToPlayfield,
+  getBallRadius,
+  getPlayfieldLongSide,
   normalizedToPixel,
+  pixelToNormalized,
   type PlayfieldRect,
 } from "@/lib/billiard-table-constants";
 
@@ -48,6 +51,41 @@ export interface PositionAlongPathResult {
   distanceAlongPathPx: number;
   /** 경로 전체 길이에 도달했는지 (이동한 거리 ≥ 유효 이동거리이고 경로 끝) */
   atPolylineEnd: boolean;
+}
+
+/**
+ * 경로 SVG가 공 캔버스 **아래**(z-10)일 때, 공 중심에서 출발하는 첫 선분이 공 원 안에 가려지지 않도록
+ * 시작점을 공 외곽(반지름 + margin)만큼 `towardNorm` 방향으로 밀어 norm 좌표로 반환.
+ * (레이어를 공 위로 올리지 않고 가시성만 확보할 때 사용)
+ */
+export function outwardOffsetFromBallCenterTowardPointNorm(
+  ballCenterNorm: NormPoint,
+  towardNorm: NormPoint,
+  rect: PlayfieldRect,
+  options?: { marginPx?: number }
+): NormPoint {
+  const marginPx = options?.marginPx ?? 1;
+  const pa = normalizedToPixel(ballCenterNorm.x, ballCenterNorm.y, rect);
+  const pb = normalizedToPixel(towardNorm.x, towardNorm.y, rect);
+  const dx = pb.px - pa.px;
+  const dy = pb.py - pa.py;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-4) return { ...ballCenterNorm };
+
+  const R = getBallRadius(getPlayfieldLongSide(rect)) + marginPx;
+  const step = Math.min(R, len - 1);
+  if (step <= 0) {
+    const frac = Math.min(0.42, (0.85 * len) / Math.max(R, 1e-6));
+    const qx = pa.px + (dx / len) * frac * len;
+    const qy = pa.py + (dy / len) * frac * len;
+    const n = pixelToNormalized(qx, qy, rect);
+    return clampBallToPlayfield(n.x, n.y, rect);
+  }
+
+  const qx = pa.px + (dx / len) * step;
+  const qy = pa.py + (dy / len) * step;
+  const n = pixelToNormalized(qx, qy, rect);
+  return clampBallToPlayfield(n.x, n.y, rect);
 }
 
 /**

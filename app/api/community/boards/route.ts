@@ -8,8 +8,12 @@ export async function GET() {
     return NextResponse.json({ error: "DB 연결되지 않음" }, { status: 503 });
   }
   const boards = await prisma.communityBoard.findMany({
+    where: { isActive: true },
     orderBy: { sortOrder: "asc" },
-    select: { id: true, slug: true, name: true, description: true, sortOrder: true },
+    /** 목록 탭용 — description 등 큰 필드 제외 */
+    select: { id: true, slug: true, name: true, sortOrder: true },
   });
-  return NextResponse.json(boards);
+  const res = NextResponse.json(boards);
+  res.headers.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
+  return res;
 }

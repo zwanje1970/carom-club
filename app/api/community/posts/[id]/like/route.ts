@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
+import { syncCommunityPostLikeCount } from "@/lib/community-post-counts";
 
 /** 게시글 추천(좋아요) 토글 */
 export async function POST(
@@ -32,10 +33,12 @@ export async function POST(
     await prisma.communityPostLike.delete({
       where: { postId_userId: { postId, userId: session.id } },
     });
+    await syncCommunityPostLikeCount(postId);
     return NextResponse.json({ liked: false });
   }
   await prisma.communityPostLike.create({
     data: { postId, userId: session.id },
   });
+  await syncCommunityPostLikeCount(postId);
   return NextResponse.json({ liked: true });
 }

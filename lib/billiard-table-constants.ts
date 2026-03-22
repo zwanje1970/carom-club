@@ -158,6 +158,23 @@ export function playfieldGridOneCellEdgePx(rect: PlayfieldRect, portrait: boolea
   return Math.min(stepX, stepY);
 }
 
+/**
+ * 직전 스팟→쿠션-only 교차점까지 거리가 이 한도 이하일 때만,
+ * 쿠션/프레임 쪽 탭 시 쿠션 스팟+다음 스팟을 자동 연속 배치(경로 편집 공통).
+ * 한도 = 그리드 1칸 × 배율 (기존 100%에서 축소 — 가까울 때만 자동).
+ */
+export const PATH_AUTO_CHAIN_NEAR_CUSHION_MAX_DISTANCE_GRID_FRACTION = 0.1;
+
+export function pathAutoChainNearCushionMaxDistancePx(
+  rect: PlayfieldRect,
+  portrait: boolean
+): number {
+  return (
+    playfieldGridOneCellEdgePx(rect, portrait) *
+    PATH_AUTO_CHAIN_NEAR_CUSHION_MAX_DISTANCE_GRID_FRACTION
+  );
+}
+
 /** 픽셀 좌표 → 정규화 0..1 (플레이필드 내) */
 export function pixelToNormalized(
   px: number,

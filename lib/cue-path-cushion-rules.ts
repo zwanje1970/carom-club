@@ -15,7 +15,7 @@ import {
   distanceNormPointsInPlayfieldPx,
   getPlayfieldRect,
   getSolutionPathBallTapRadiusPx,
-  playfieldGridOneCellEdgePx,
+  pathAutoChainNearCushionMaxDistancePx,
   type PlayfieldRect,
 } from "@/lib/billiard-table-constants";
 import {
@@ -366,7 +366,10 @@ export function appendCuePathSpotWithAim(
       allowNonCueBallCircle: false,
     });
     if (cushionOnly && cushionOnly.type === "cushion") {
-      const maxAutoPx = playfieldGridOneCellEdgePx(rayCtx.collisionRectLandscape, rayCtx.portrait);
+      const maxAutoPx = pathAutoChainNearCushionMaxDistancePx(
+        rayCtx.collisionRectLandscape,
+        rayCtx.portrait
+      );
       const distToCushion = distanceNormPointsInPlayfieldPx(
         fromLandscape,
         { x: cushionOnly.x, y: cushionOnly.y },
