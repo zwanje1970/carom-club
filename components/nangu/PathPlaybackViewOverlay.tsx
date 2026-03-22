@@ -51,7 +51,7 @@ export function PathPlaybackViewOverlay({
       <button
         type="button"
         {...{ [p]: variant === "trouble" ? C.playbackTogglePathlines : "nangu-playback-toggle-pathlines" }}
-        className="px-2.5 py-1.5 rounded-md text-xs font-medium shadow-md border bg-white/95 dark:bg-slate-900/95 border-gray-200 dark:border-slate-600 text-site-text hover:bg-gray-50 dark:hover:bg-slate-800"
+        className="w-full rounded-xl border border-zinc-200/90 bg-white/95 px-3 py-2 text-left text-xs font-semibold text-zinc-800 shadow-md backdrop-blur-sm transition hover:bg-zinc-50 dark:border-slate-600 dark:bg-slate-900/95 dark:text-zinc-100 dark:hover:bg-slate-800"
         onClick={(e) => {
           stop(e);
           onPathLinesVisibleChange(!pathLinesVisible);
@@ -73,7 +73,7 @@ export function PathPlaybackViewOverlay({
       <button
         type="button"
         {...{ [p]: variant === "trouble" ? C.playbackToggleDrawstyle : "nangu-playback-toggle-drawstyle" }}
-        className="px-2.5 py-1.5 rounded-md text-xs font-medium shadow-md border bg-white/95 dark:bg-slate-900/95 border-gray-200 dark:border-slate-600 text-site-text hover:bg-gray-50 dark:hover:bg-slate-800"
+        className="w-full rounded-xl border border-zinc-200/90 bg-white/95 px-3 py-2 text-left text-xs font-semibold text-zinc-800 shadow-md backdrop-blur-sm transition hover:bg-zinc-50 dark:border-slate-600 dark:bg-slate-900/95 dark:text-zinc-100 dark:hover:bg-slate-800"
         onClick={(e) => {
           stop(e);
           onDrawStyleChange(drawStyle === "realistic" ? "wireframe" : "realistic");

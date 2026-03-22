@@ -4,6 +4,13 @@ import { prisma } from "@/lib/db";
 import { ORGANIZATION_SELECT_OWNER } from "@/lib/db-selects";
 import { canManageTournament } from "@/lib/permissions";
 import { buildFinalBracketPlan, orderQualifiersForAutoAssign } from "@/lib/final-bracket";
+import {
+  createBracketMatchesFromPlan,
+  fetchMatchVenueIdsOrdered,
+  getOrCreateTournamentRoundByName,
+  sortFinalBracketPlan,
+} from "@/lib/tournament-bracket-matches";
+import { syncBracketMatchProgressStates } from "@/lib/tournament-match-progress";
 
 /** 본선 대진표 생성. POST → canManageTournament. body: size (32|64), assignMode (auto|manual), forceRegenerate? (PLATFORM_ADMIN만) */
 export async function POST(
@@ -37,9 +44,6 @@ export async function POST(
   if (existing && !forceRegenerate) {
     return NextResponse.json({ error: "이미 본선 대진이 생성되어 있습니다." }, { status: 400 });
   }
-  if (existing && forceRegenerate) {
-    await prisma.tournamentFinalMatch.deleteMany({ where: { tournamentId } });
-  }
 
   const size = (body?.size === 64 ? 64 : 32) as 32 | 64;
   const assignMode = body?.assignMode === "manual" ? "manual" : "auto";
@@ -67,42 +71,26 @@ export async function POST(
   }
 
   const plan = buildFinalBracketPlan(slotEntries, size);
-  const sorted = [...plan].sort((a, b) => a.roundIndex - b.roundIndex || a.matchIndex - b.matchIndex);
-  const createdIds: string[] = [];
+  const sorted = sortFinalBracketPlan(plan);
 
-  for (const p of sorted) {
-    const created = await prisma.tournamentFinalMatch.create({
-      data: {
-        tournamentId,
-        roundIndex: p.roundIndex,
-        matchIndex: p.matchIndex,
-        entryIdA: p.entryIdA,
-        entryIdB: p.entryIdB,
-        status: p.status,
-        nextMatchId: null,
-        nextSlot: null,
-      },
+  await prisma.$transaction(async (tx) => {
+    await tx.tournamentFinalMatch.deleteMany({ where: { tournamentId } });
+    const round = await getOrCreateTournamentRoundByName(tx, tournamentId, "본선 브래킷");
+    const venueIds = await fetchMatchVenueIdsOrdered(tx, tournamentId);
+    await createBracketMatchesFromPlan(tx, {
+      tournamentId,
+      tournamentRoundId: round.id,
+      sortedPlan: sorted,
+      bracketPhase: "MAIN",
+      matchVenueIdsInOrder: venueIds.length ? venueIds : undefined,
     });
-    createdIds.push(created.id);
-  }
-
-  for (let i = 0; i < sorted.length; i++) {
-    const p = sorted[i];
-    const nextRound = p.roundIndex + 1;
-    const nextMatchIndex = Math.floor(p.matchIndex / 2);
-    const nextSlot = (p.matchIndex % 2 === 0 ? "A" : "B") as "A" | "B";
-    const j = sorted.findIndex((q) => q.roundIndex === nextRound && q.matchIndex === nextMatchIndex);
-    if (j >= 0 && createdIds[j]) {
-      await prisma.tournamentFinalMatch.update({
-        where: { id: createdIds[i] },
-        data: { nextMatchId: createdIds[j], nextSlot },
-      });
-    }
-  }
-
-  await prisma.tournament.update({
-    where: { id: tournamentId },
-    data: { tournamentStage: "FINAL_RUNNING" },
+    await tx.tournament.update({
+      where: { id: tournamentId },
+      data: { tournamentStage: "FINAL_RUNNING" },
+    });
   });
+
+  await syncBracketMatchProgressStates(prisma, tournamentId);
+
   return NextResponse.json({ ok: true, matchCount: plan.length, size });
 }

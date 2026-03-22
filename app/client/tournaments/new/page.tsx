@@ -20,7 +20,7 @@ export default function ClientTournamentsNewPage() {
       venues.length > 0
         ? [venues[0].venueName, venues[0].address].filter(Boolean).join(" ").trim() || null
         : null;
-    const res = await fetch("/api/admin/tournaments", {
+    const res = await fetch("/api/client/tournaments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -56,7 +56,7 @@ export default function ClientTournamentsNewPage() {
         address: v.address.trim() || undefined,
         phone: v.phone.trim() || undefined,
       }));
-      await fetch(`/api/admin/tournaments/${tournamentId}/match-venues`, {
+      await fetch(`/api/client/tournaments/${tournamentId}/match-venues`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ venues: venuePayload }),

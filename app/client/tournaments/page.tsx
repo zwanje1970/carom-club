@@ -50,7 +50,7 @@ export default async function ClientTournamentsPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-site-text">내 대회</h1>
         <Link
-          href="/client/tournaments/new"
+          href="/client/operations/tournaments/new"
           className="rounded-lg bg-site-primary px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
         >
           새 대회 만들기

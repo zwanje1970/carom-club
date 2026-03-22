@@ -22,11 +22,13 @@ import {
   getNonCueBallNorms,
   type NanguBallPlacement,
   type NanguPathPoint,
+  type ObjectBallColorKey,
 } from "@/lib/nangu-types";
 import { isLastSegmentEndpointSpotIndex, type PathPointerAim } from "@/lib/cue-path-cushion-rules";
 import { classifySolutionPathPointerHit } from "@/lib/solution-path-pointer-classify";
 import { cueFirstObjectHitAmongNormalized } from "@/lib/solution-path-geometry";
 import { buildCuePathSegments, buildObjectPathSegments } from "@/lib/solution-path-types";
+import { resolveTroubleFirstObjectBallKey } from "@/lib/trouble-first-object-ball";
 
 /** 수구 진행 경로 */
 const CUE_PATH_STROKE = "rgb(239, 68, 68)";
@@ -84,6 +86,11 @@ export function NanguSolutionPathOverlay({
   onCueBallSingleTap,
   /** 수구 더블 탭(예: 재생 후 재시작) */
   onCueBallDoubleTap,
+  /** null이면 마지막 끝 스팟만 활성 — 다른 스팟 더블클릭 시 전환 */
+  cueActiveSpotOverrideId = null,
+  objectActiveSpotOverrideId = null,
+  onCueActiveSpotChange,
+  onObjectActiveSpotChange,
 }: {
   pathPoints: NanguPathPoint[];
   cuePos: { x: number; y: number };
@@ -117,6 +124,10 @@ export function NanguSolutionPathOverlay({
   allowCuePlaybackGestures?: boolean;
   onCueBallSingleTap?: () => void;
   onCueBallDoubleTap?: () => void;
+  cueActiveSpotOverrideId?: string | null;
+  objectActiveSpotOverrideId?: string | null;
+  onCueActiveSpotChange?: (id: string | null) => void;
+  onObjectActiveSpotChange?: (id: string | null) => void;
 }) {
   /** 저장/충돌 계산은 항상 landscape 플레이필드 기준 */
   const collisionRect = useMemo(
@@ -130,6 +141,7 @@ export function NanguSolutionPathOverlay({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [draggingObjectId, setDraggingObjectId] = useState<string | null>(null);
   const lastClickRef = useRef<{ id: string; t: number; kind: "cue" | "obj" } | null>(null);
+  const segmentDblRef = useRef<{ key: string; t: number } | null>(null);
   /** 브라우저 setTimeout 핸들 (number). Node `Timeout`과 병합 타입 충돌 방지 */
   const cueBallGestureRef = useRef<{ t: number; timer: number } | null>(null);
 
@@ -228,39 +240,24 @@ export function NanguSolutionPathOverlay({
 
   const collisionNorm = cueFirstHit?.collision ?? null;
 
-  /**
-   * 1목 경로 그리기 모드: 수구→첫 스팟 광선으로 먼저 맞는 목적구(또는 수구 경로 없을 때 가장 가까운 목적구) 중심에서 선 시작.
-   * 비활성 시에는 기존처럼 충돌점(원주)에서 시작.
-   */
-  const objectPathTargetBallKey = useMemo(() => {
-    if (!firstObjectBallsForCollision?.length) return null;
-    if (pathPoints.length >= 1) {
-      const hit = cueFirstObjectHitAmongNormalized(
-        cuePos,
-        pathPoints[0],
-        firstObjectBallsForCollision,
-        collisionRect
-      );
-      /** 첫 스팟 방향으로 맞는 1목이 없어도(광선 미스) 파란 경로는 그릴 수 있어야 함 → 가장 가까운 목적구로 폴백 */
-      if (hit?.objectKey) return hit.objectKey;
-    }
-    let nearest = firstObjectBallsForCollision[0]!;
-    let bestD = Infinity;
-    for (const b of firstObjectBallsForCollision) {
-      const d = distanceNormPointsInPlayfieldPx(cuePos, { x: b.x, y: b.y }, collisionRect);
-      if (d < bestD) {
-        bestD = d;
-        nearest = b;
-      }
-    }
-    return nearest.key;
-  }, [firstObjectBallsForCollision, pathPoints, cuePos, collisionRect]);
+  /** 1목 경로 시작 구슬: 스팟으로 확정된 1목만 — 광선·거리 폴백 없음 (`lib/trouble-first-object-ball`) */
+  const placementForFirstObject = tableBallPlacement ?? ballPickLayout ?? null;
+  const resolvedFirstObjectBallKey = useMemo((): ObjectBallColorKey | null => {
+    if (!placementForFirstObject) return null;
+    return resolveTroubleFirstObjectBallKey({
+      placement: placementForFirstObject,
+      cuePos,
+      pathPoints,
+      objectPathPoints,
+      rect: collisionRect,
+    });
+  }, [placementForFirstObject, cuePos, pathPoints, objectPathPoints, collisionRect]);
 
   const objectPathLineStartNorm = useMemo(() => {
-    if (!objectPathTargetBallKey || !firstObjectBallsForCollision) return null;
-    const b = firstObjectBallsForCollision.find((x) => x.key === objectPathTargetBallKey);
+    if (!resolvedFirstObjectBallKey || !firstObjectBallsForCollision) return null;
+    const b = firstObjectBallsForCollision.find((x) => x.key === resolvedFirstObjectBallKey);
     return b ? { x: b.x, y: b.y } : null;
-  }, [objectPathTargetBallKey, firstObjectBallsForCollision]);
+  }, [resolvedFirstObjectBallKey, firstObjectBallsForCollision]);
 
   /** 경로선은 스팟 원 중심(쿠션 clamp + 목적구 원 비침범 보정)까지만 이어짐 — 저장 좌표와 다를 수 있음 */
   const cueSpotDisplayNorms = useMemo(
@@ -335,6 +332,17 @@ export function NanguSolutionPathOverlay({
         : null,
     [objectPathLineStartNorm, toPx]
   );
+
+  /** 항상 활성 스팟은 1개 — 기본은 각 경로의 마지막 끝 스팟 */
+  const effectiveCueActiveId = useMemo(() => {
+    if (pathPoints.length === 0) return null;
+    return cueActiveSpotOverrideId ?? pathPoints[pathPoints.length - 1]!.id;
+  }, [pathPoints, cueActiveSpotOverrideId]);
+
+  const effectiveObjectActiveId = useMemo(() => {
+    if (objectPathPoints.length === 0) return null;
+    return objectActiveSpotOverrideId ?? objectPathPoints[objectPathPoints.length - 1]!.id;
+  }, [objectPathPoints, objectActiveSpotOverrideId]);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -479,12 +487,14 @@ export function NanguSolutionPathOverlay({
         const p = objectPathPoints.find((x) => x.id === c.id);
         if (!p) return;
         const objIdx = objectPathPoints.findIndex((x) => x.id === c.id);
-        const movableObj =
-          objIdx >= 0 && isLastSegmentEndpointSpotIndex(objectPathPoints, objIdx);
         const last = lastClickRef.current;
         if (last?.kind === "obj" && last?.id === p.id && now - last.t < 400) {
           lastClickRef.current = null;
-          if (movableObj) onRemoveObjectPoint?.(p.id);
+          if (p.id !== effectiveObjectActiveId) {
+            onObjectActiveSpotChange?.(p.id);
+          } else if (objIdx >= 0 && isLastSegmentEndpointSpotIndex(objectPathPoints, objIdx)) {
+            onRemoveObjectPoint?.(p.id);
+          }
           e.stopPropagation();
           e.preventDefault();
           return;
@@ -494,16 +504,22 @@ export function NanguSolutionPathOverlay({
           const { px, py } = toPx(p.x, p.y);
           onZoomSetFocusCanvasPx?.(px, py);
         }
-        /** 마지막 세그먼트 양끝 스팟만 드래그 — 수구 경로와 동일 */
-        if (movableObj) setDraggingObjectId(p.id);
+        if (p.id === effectiveObjectActiveId) setDraggingObjectId(p.id);
         e.stopPropagation();
         e.preventDefault();
         return;
       }
 
       if (c.kind === "objectSegment") {
-        if (onInsertObjectPathAim) onInsertObjectPathAim(c.segmentIndex, aim);
-        else onInsertObjectBetween?.(c.segmentIndex, norm);
+        const key = `obj-${c.segmentIndex}`;
+        const lastS = segmentDblRef.current;
+        if (lastS?.key === key && now - lastS.t < 400) {
+          segmentDblRef.current = null;
+          if (onInsertObjectPathAim) onInsertObjectPathAim(c.segmentIndex, aim);
+          else onInsertObjectBetween?.(c.segmentIndex, norm);
+        } else {
+          segmentDblRef.current = { key, t: now };
+        }
         e.stopPropagation();
         e.preventDefault();
         return;
@@ -523,7 +539,11 @@ export function NanguSolutionPathOverlay({
         const last = lastClickRef.current;
         if (last?.kind === "cue" && last?.id === p.id && now - last.t < 400) {
           lastClickRef.current = null;
-          onRemovePoint?.(p.id);
+          if (p.id !== effectiveCueActiveId) {
+            onCueActiveSpotChange?.(p.id);
+          } else {
+            onRemovePoint?.(p.id);
+          }
           e.stopPropagation();
           e.preventDefault();
           return;
@@ -533,21 +553,22 @@ export function NanguSolutionPathOverlay({
           const { px, py } = toPx(p.x, p.y);
           onZoomSetFocusCanvasPx?.(px, py);
         }
-        /** 마지막 세그먼트에 속하지 않은(더 앞선) 스팟은 이동 불가 — 더블탭 삭제만 허용. 마지막 세그 양끝(끝·끝에서 두 번째)은 드래그 가능 */
-        const nCue = pathPoints.length;
-        const lastCueId = nCue > 0 ? pathPoints[nCue - 1]!.id : null;
-        const penultimateCueId = nCue >= 2 ? pathPoints[nCue - 2]!.id : null;
-        if (p.id === lastCueId || (penultimateCueId != null && p.id === penultimateCueId)) {
-          setDraggingId(p.id);
-        }
+        if (p.id === effectiveCueActiveId) setDraggingId(p.id);
         e.stopPropagation();
         e.preventDefault();
         return;
       }
 
       if (c.kind === "cueSegment") {
-        if (onInsertCuePathAim) onInsertCuePathAim(c.segmentIndex, aim);
-        else onInsertBetween?.(c.segmentIndex, norm);
+        const key = `cue-${c.segmentIndex}`;
+        const lastS = segmentDblRef.current;
+        if (lastS?.key === key && now - lastS.t < 400) {
+          segmentDblRef.current = null;
+          if (onInsertCuePathAim) onInsertCuePathAim(c.segmentIndex, aim);
+          else onInsertBetween?.(c.segmentIndex, norm);
+        } else {
+          segmentDblRef.current = { key, t: now };
+        }
         e.stopPropagation();
         e.preventDefault();
         return;
@@ -600,6 +621,10 @@ export function NanguSolutionPathOverlay({
       allowCuePlaybackGestures,
       onCueBallSingleTap,
       onCueBallDoubleTap,
+      effectiveCueActiveId,
+      effectiveObjectActiveId,
+      onCueActiveSpotChange,
+      onObjectActiveSpotChange,
     ]
   );
 
@@ -642,6 +667,9 @@ export function NanguSolutionPathOverlay({
 
   return (
     <div
+      data-testid="nangu-solution-path-overlay"
+      data-cue-path-segment-count={cuePxSegs.length}
+      data-object-path-segment-count={objectPxSegs.length}
       className="absolute inset-0 w-full h-full"
       style={{ pointerEvents: interactive ? "auto" : "none" }}
       onPointerDown={handlePointerDown}
@@ -693,21 +721,10 @@ export function NanguSolutionPathOverlay({
               stroke="rgba(30, 64, 175, 0.85)"
               strokeWidth={2.5}
             />
-            <text
-              x={cuePx.px}
-              y={cuePx.py}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fill="rgb(30, 64, 175)"
-              fontSize={Math.max(10, ballR * 0.5)}
-              fontWeight="600"
-            >
-              수구
-            </text>
           </g>
         )}
         {pathLinesVisible && objectPathMode && objectPathHighlightPx && (
-          <g>
+          <g opacity={0.4 + 0.6 * spotBlink01}>
             <circle
               cx={objectPathHighlightPx.px}
               cy={objectPathHighlightPx.py}
@@ -716,17 +733,6 @@ export function NanguSolutionPathOverlay({
               stroke="rgb(29, 78, 216)"
               strokeWidth={2.5}
             />
-            <text
-              x={objectPathHighlightPx.px}
-              y={objectPathHighlightPx.py}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fill="rgb(29, 78, 216)"
-              fontSize={Math.max(10, ballR * 0.5)}
-              fontWeight="600"
-            >
-              1목
-            </text>
           </g>
         )}
 
@@ -735,8 +741,7 @@ export function NanguSolutionPathOverlay({
           pathPoints.map((p, i) => {
           const n = cueSpotDisplayNorms[i]!;
           const { px, py } = toPx(n.x, n.y);
-          const movableCue = isLastSegmentEndpointSpotIndex(pathPoints, i);
-          const blinkFactor = movableCue ? spotBlink01 : 1;
+          const blinkFactor = p.id === effectiveCueActiveId ? spotBlink01 : 1;
           return (
             <circle
               key={p.id}
@@ -754,8 +759,7 @@ export function NanguSolutionPathOverlay({
           objectPathPoints.map((p, i) => {
           const n = objectSpotDisplayNorms[i]!;
           const { px, py } = toPx(n.x, n.y);
-          const movableObj = isLastSegmentEndpointSpotIndex(objectPathPoints, i);
-          const blinkFactor = movableObj ? spotBlink01 : 1;
+          const blinkFactor = p.id === effectiveObjectActiveId ? spotBlink01 : 1;
           return (
             <circle
               key={p.id}

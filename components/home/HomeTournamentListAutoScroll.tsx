@@ -10,7 +10,7 @@ type Props = {
 };
 
 /**
- * 모바일(~md 미만)에서 가로 목록을 연속 흐름으로 스크롤(무한 루프).
+ * 가로 목록을 연속 흐름(무한 루프)으로 스크롤 — PC·모바일 공통.
  * 자식에 동일 카드가 두 번 나열되어 있어야 하며, scrollWidth의 절반에서 루프 리셋.
  */
 export function HomeTournamentListAutoScroll({ flowSpeed, children }: Props) {
@@ -99,7 +99,7 @@ export function HomeTournamentListAutoScroll({ flowSpeed, children }: Props) {
           pausedRef.current = false;
         }, 2200);
       }}
-      className="mt-6 -mx-4 sm:-mx-6 flex gap-4 overflow-x-auto overflow-y-hidden touch-pan-x pb-4 md:overflow-visible md:flex-wrap md:pb-0"
+      className="mt-6 -mx-4 sm:-mx-6 flex flex-nowrap gap-4 overflow-x-auto overflow-y-hidden touch-pan-x pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       style={{ WebkitOverflowScrolling: "touch" }}
     >
       {children}

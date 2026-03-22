@@ -63,13 +63,13 @@ function TournamentCardItem({ t, duplicate }: { t: Tournament; duplicate?: boole
   return (
     <li
       aria-hidden={duplicate}
-      className={`flex-shrink-0 w-[260px] min-w-[260px] md:w-[48%] md:min-w-[280px] lg:w-[calc((100%-2rem)/3.2)] lg:max-w-[320px] ${duplicate ? "md:hidden" : ""}`}
+      className="flex h-full min-h-[200px] w-[260px] min-w-[260px] shrink-0 sm:min-h-0 sm:w-[280px] sm:min-w-[280px]"
     >
       <Link
         href={`/tournaments/${t.id}`}
         tabIndex={duplicate ? -1 : undefined}
         aria-hidden={duplicate}
-        className="group flex flex-col overflow-hidden rounded-2xl border border-site-border bg-site-card shadow-sm transition hover:border-site-primary/30 hover:shadow-md h-full min-h-[200px] md:min-h-0"
+        className="group flex h-full min-h-[200px] flex-col overflow-hidden rounded-2xl border border-site-border bg-site-card shadow-sm transition hover:border-site-primary/30 hover:shadow-md sm:min-h-0"
       >
         <div className="relative w-full h-28 md:h-40 bg-gray-100 shrink-0">
           {(() => {
@@ -195,7 +195,7 @@ export function HomeTournamentCards({
           </Link>
         </div>
         <HomeTournamentListAutoScroll flowSpeed={homeCarouselFlowSpeed}>
-          <ul className="flex gap-4 px-4 sm:px-6 min-w-0 md:flex-wrap md:w-full">
+          <ul className="flex w-max min-w-0 flex-nowrap gap-4 px-4 sm:px-6">
             {tournaments.map((t) => (
               <TournamentCardItem key={t.id} t={t} />
             ))}

@@ -1,0 +1,3 @@
+ALTER TABLE "TournamentFinalMatch" ADD COLUMN IF NOT EXISTS "scheduledStartAt" TIMESTAMP(3);
+ALTER TABLE "TournamentFinalMatch" ADD COLUMN IF NOT EXISTS "hasIssue" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "TournamentFinalMatch" ADD COLUMN IF NOT EXISTS "issueNote" TEXT;

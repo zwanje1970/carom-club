@@ -84,6 +84,8 @@ export const DEFAULT_ADMIN_COPY: Record<string, string> = {
   "site.home.venues.subtitleWithList": "대표 구장을 만나보세요.",
   "site.home.venues.empty": "등록된 당구장이 없습니다.",
   "site.home.venues.btnViewAll": "전체 보기 →",
+  "site.home.community.notes.title": "당구노트",
+  "site.home.community.notes.desc": "연습·경기 기록을 남기고 언제든 복기해 보세요.",
   "site.home.community.nangu.title": "난구해결사",
   "site.home.community.nangu.desc": "문제구 질문 및 해법 토론 게시판입니다.",
   "site.home.quickApply.title": "빠른 참가 신청",
@@ -254,6 +256,8 @@ export const DEFAULT_ADMIN_COPY: Record<string, string> = {
   "client.dashboard.goTo": "대시보드로",
   "client.dashboard.loginPrompt": "클라이언트 대시보드는 로그인 후 이용할 수 있습니다.",
   "client.dashboard.consoleTitle": "대회 운영 콘솔",
+  /** 콘솔 상단 헤더 — 사이트 메인(/) 이동 */
+  "client.console.homeButton": "홈",
   "client.zones.title": "부/권역 설정",
   "client.zones.description": "대회별 권역 연결은 각 대회 상세 → 부/권역 탭에서 설정할 수 있습니다. 권역별 예선·본선 운영 시 사용합니다.",
   "client.sidebar.dashboard": "대시보드",
@@ -341,6 +345,7 @@ export const ADMIN_COPY_GROUPS: { group: string; keys: (keyof typeof DEFAULT_ADM
       "site.home.tournaments.empty", "site.home.tournaments.btnList", "site.home.tournaments.btnViewAll", "site.home.tournaments.btnJoin",
       "site.home.venues.title", "site.home.venues.subtitle", "site.home.venues.subtitleWithList",
       "site.home.venues.empty", "site.home.venues.btnViewAll",
+      "site.home.community.notes.title", "site.home.community.notes.desc",
       "site.home.community.nangu.title", "site.home.community.nangu.desc",
       "site.home.quickApply.title", "site.home.quickApply.desc", "site.home.quickApply.btnApply", "site.home.quickApply.btnLogin",
       "site.home.location.title", "site.home.location.subtitle", "site.home.location.body", "site.home.location.hint",
@@ -408,7 +413,7 @@ export const ADMIN_COPY_GROUPS: { group: string; keys: (keyof typeof DEFAULT_ADM
   {
     group: "클라이언트 대시보드",
     keys: [
-      "client.dashboard.title", "client.dashboard.label", "client.dashboard.goTo", "client.dashboard.loginPrompt", "client.dashboard.consoleTitle",
+      "client.dashboard.title", "client.dashboard.label", "client.dashboard.goTo", "client.dashboard.loginPrompt", "client.dashboard.consoleTitle", "client.console.homeButton",
       "client.zones.title", "client.zones.description",
       "client.sidebar.dashboard", "client.sidebar.myTournaments", "client.sidebar.participants", "client.sidebar.zones", "client.sidebar.brackets", "client.sidebar.results", "client.sidebar.coAdmins", "client.sidebar.promo", "client.sidebar.setup", "client.sidebar.billing", "client.sidebar.myZones", "client.sidebar.zoneOps",
     ],

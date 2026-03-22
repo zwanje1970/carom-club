@@ -86,8 +86,8 @@
 
 ## 7. 변경/추가 파일 요약
 
-- **components/client/ClientSidebar.tsx** — 신규. 대회 운영 콘솔 메뉴.
-- **app/client/layout.tsx** — ClientSidebar 사용, 상단 인라인 네비 제거.
+- **components/client/console/ClientConsoleShell.tsx** — 사업자용 업무 콘솔 골격(좌측 사이드바·상단 헤더·메인).
+- **app/client/layout.tsx** — ClientConsoleShell 사용, 메인 사이트 헤더/하단 네비와 분리(`/client`는 루트 래퍼에서 제외).
 - **app/client/dashboard/page.tsx** — 내 조직 대회 현황(접수중/마감/종료/승인대기), 빠른 작업, 최근 대회.
 - **app/client/tournaments/page.tsx** — 제목 "내 대회", 참가자 수·수정일·바로가기(상세/수정/참가자/대진표/결과).
 - **app/client/tournaments/[id]/page.tsx** — 탭 네비(기본정보/대회요강/참가자/부권역/대진표/결과/공동관리자/홍보).

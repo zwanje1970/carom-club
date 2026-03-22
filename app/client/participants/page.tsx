@@ -38,7 +38,11 @@ export default async function ClientParticipantsPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-site-text">참가자 관리</h1>
       <p className="text-sm text-gray-600">
-        대회별 참가자 목록·확정·출석은 각 대회의 참가자 탭에서 관리할 수 있습니다.
+        대회 운영 콘솔에서 필터·정렬·일괄 입금확인·대기 승격까지 처리하려면{" "}
+        <Link href="/client/operations" className="text-site-primary underline">
+          운영 관리 → 대회 → 참가자
+        </Link>
+        를 이용하세요. 아래는 대회별 빠른 링크입니다.
       </p>
       {tournaments.length === 0 ? (
         <p className="text-gray-500">등록된 대회가 없습니다.</p>
@@ -52,7 +56,7 @@ export default async function ClientParticipantsPage() {
               <span className="font-medium text-site-text">{t.name}</span>
               <span className="text-sm text-gray-500">{STATUS_LABEL[t.status] ?? t.status} · 참가 {t._count.entries}명</span>
               <Link
-                href={`/client/tournaments/${t.id}/participants`}
+                href={`/client/operations/tournaments/${t.id}/participants`}
                 className="rounded-lg bg-site-primary px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
               >
                 참가자 관리

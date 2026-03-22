@@ -115,6 +115,16 @@ export default async function ClientTournamentParticipantsPage({
 
       <p className="text-sm text-site-text-muted">{tournament.name}</p>
 
+      <div className="rounded-lg border border-site-border bg-site-bg/50 px-4 py-3 text-sm text-site-text">
+        <strong>대회 운영 콘솔</strong>에서 필터·정렬·일괄 입금확인·대기 승격:{" "}
+        <Link
+          href={`/client/operations/tournaments/${id}/participants`}
+          className="font-medium text-site-primary underline"
+        >
+          참가자 관리 (콘솔)
+        </Link>
+      </div>
+
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <span className="text-sm text-site-text-muted">참가자 강제 추가는 추후 제공 예정입니다.</span>
       </div>

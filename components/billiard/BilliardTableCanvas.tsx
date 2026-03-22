@@ -994,19 +994,20 @@ const BilliardTableCanvas = forwardRef<
           onPointerCancel={usePointerDrag ? handlePointerUp : undefined}
           aria-label="당구대"
         />
+        <div className="absolute inset-0 z-10 min-h-0 min-w-0">{children}</div>
+        {/*
+          테이블(z-0) → 경로 SVG(z-10) → 공(z-20).
+          난구 해법 재생 시 공이 경로선 위에 보이도록 공 캔버스를 최상단에 둠. 공 캔버스는 pointer-events-none이라
+          경로 편집/탭은 아래 오버레이로 전달됨.
+        */}
         <canvas
           ref={ballLayerRef}
           width={width}
           height={height}
-          className="pointer-events-none absolute inset-0 z-10 h-full w-full touch-none block"
+          className="pointer-events-none absolute inset-0 z-20 h-full w-full touch-none block"
           style={{ objectFit: embedFill ? "fill" : "contain" }}
           aria-hidden
         />
-        {/*
-          경로 SVG는 공 레이어 위(z-20). 모바일 WebKit 등에서 캔버스 아래에 두면 합성·투명도 이슈로 파란 선이 안 보이는 경우가 있어
-          테이블 → 공 → 경로 순으로 쌓음(자식 오버레이에서 pointer-events 제어).
-        */}
-        <div className="absolute inset-0 z-[20] min-h-0 min-w-0">{children}</div>
       </div>
     );
   }

@@ -270,6 +270,10 @@ model Tournament {
   outlinePublished String?
   outlinePublishedAt DateTime?
   outlinePdfUrl    String?   // 요강용 PDF
+  /// 대진표 생성 전 참가 명단 확정 시각. 설정 후 확정자 목록 스냅샷과 함께 고정되며, 신청/입금확인/취소 등 변경이 제한됨.
+  participantRosterLockedAt DateTime?
+  /// 확정 시점 CONFIRMED entry id 목록 등 JSON (lib/tournament-participant-roster.ts 스키마)
+  participantRosterSnapshot   String?
   // 유료화 확장용: 대회 홍보 상품. 현재 무료 운영, 구조만 확보.
   isPromoted       Boolean   @default(false)  // 홍보 상품 적용 여부
   promotionLevel   Int?      // 1=기본, 2=프리미엄 등. 상품별 레벨
@@ -287,8 +291,42 @@ model Tournament {
   tournamentZones     TournamentZone[]         // 대회별 권역 연결 (예선 권역 등, 연맹대회용)
   finalQualifiers     TournamentFinalQualifier[]
   finalMatches        TournamentFinalMatch[]
+  finalMatchAuditLogs TournamentFinalMatchAuditLog[]
+  settlement          TournamentSettlement?
 
   @@index([status, startAt])
+}
+
+/// 대회 종료 후 참가비·환불·상금·비용 등을 기록 (대회별 1건 + 라인 아이템)
+model TournamentSettlement {
+  id             String    @id @default(cuid())
+  tournamentId   String    @unique
+  status         String    @default("DRAFT") // DRAFT | LOCKED
+  memo           String?
+  lockedAt       DateTime?
+  lockedByUserId String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tournament Tournament               @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  lines      TournamentSettlementLine[]
+}
+
+model TournamentSettlementLine {
+  id           String   @id @default(cuid())
+  settlementId String
+  category     String // ENTRY_FEE | REFUND | PRIZE | OPERATING | VENUE_RENT | LABOR | OTHER
+  label        String?
+  flow         String // INCOME | EXPENSE
+  amountKrw    Int
+  note         String?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  settlement TournamentSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+
+  @@index([settlementId])
 }
 
 // 당구장 대회 MVP: 대회별 경기장 슬롯 (1경기장, 2경기장 …). 표시/정보용, 대진 분산은 추후.
@@ -304,7 +342,8 @@ model TournamentMatchVenue {
   createdAt    DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  tournament      Tournament             @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  bracketMatches  TournamentFinalMatch[]
 
   @@unique([tournamentId, venueNumber])
   @@index([tournamentId])
@@ -402,12 +441,13 @@ model TournamentRound {
   tournamentId  String
   name          String   // 예: "예선", "본선 1라운드"
   sortOrder     Int      @default(0)
-  bracketData   String?  // JSON string: 대진표 데이터 (SQLite Json 미지원)
+  bracketData   String?  // 레거시/조편성용 JSON. 단판 토너먼트 본선은 TournamentFinalMatch가 정본.
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  tournament Tournament         @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  groups      TournamentGroup[]
+  tournament   Tournament            @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  groups       TournamentGroup[]
+  finalMatches TournamentFinalMatch[]
 }
 
 model TournamentGroup {
@@ -532,26 +572,60 @@ model TournamentFinalQualifier {
   @@index([tournamentZoneId])
 }
 
-// 본선 대진 경기 1건. 대회 단위.
+// 대회 단위 단판/본선 브래킷 경기 1건 (운영 정본). entryIdA/B = 선수 슬롯 1·2, winnerEntryId = 승자.
+// 예선(TournamentZoneMatch)·본선을 bracketPhase로 구분해 동일 패턴으로 확장 가능.
 model TournamentFinalMatch {
   id               String   @id @default(cuid())
   tournamentId     String
+  /// 라운드 묶음(예: 단판 본체 / 본선 브래킷). 없으면 null — 레거시·권역 본선 전용 생성분.
+  tournamentRoundId String?
+  /// 당구장 대회 MVP 경기장 슬롯(1경기장, 2경기장…). 미배정 시 null.
+  matchVenueId     String?
+  /// MAIN=일반 본선/단판, QUALIFIER=예선권역과 구분 시, PLAY_IN 등
+  bracketPhase     String   @default("MAIN")
+
   roundIndex       Int      // 0 = 1라운드 (32강/64강 등)
-  matchIndex       Int
-  entryIdA         String?
-  entryIdB         String?
+  matchIndex       Int      // 라운드 내 경기 번호(0부터). 화면 표시용은 +1 가능.
+  entryIdA         String?  // player1 슬롯 (TournamentEntry id)
+  entryIdB         String?  // player2 슬롯
   scoreA           Int?
   scoreB           Int?
   winnerEntryId    String?
-  status           String   @default("PENDING")
-  nextMatchId      String?
-  nextSlot         String?  // A | B
+  status           String   @default("PENDING") // PENDING | READY | BYE | IN_PROGRESS | COMPLETED
+  nextMatchId      String?  // 승자 진출 경기 id (TournamentFinalMatch.id)
+  nextSlot         String?  // A | B — 다음 경기의 어느 슬롯으로 승자가 들어가는지
+  /// 운영 콘솔 예정 시작 시각 (로컬 표시는 클라이언트에서 변환)
+  scheduledStartAt DateTime?
+  /// 문제 경기 플래그 (현장 이슈·재배정 필요 등)
+  hasIssue         Boolean  @default(false)
+  issueNote        String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  tournament       Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  tournamentRound  TournamentRound? @relation(fields: [tournamentRoundId], references: [id], onDelete: SetNull)
+  matchVenue       TournamentMatchVenue? @relation(fields: [matchVenueId], references: [id], onDelete: SetNull)
 
   @@index([tournamentId])
+  @@index([tournamentRoundId])
+  @@index([matchVenueId])
+  @@index([tournamentId, bracketPhase, roundIndex, matchIndex])
+}
+
+/// 본선/단판 Match 수정 감사(결과·상태 변경 추적). bracketConfig 정책과 별도로 이력 적재.
+model TournamentFinalMatchAuditLog {
+  id           String   @id @default(cuid())
+  tournamentId String
+  matchId      String
+  actorUserId  String
+  action       String   // PATCH | START | RESULT
+  summaryJson  String   @db.Text
+  createdAt    DateTime @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@index([tournamentId, matchId])
+  @@index([createdAt])
 }
 
 // 참가자 → 대회별 권역(TournamentZone) 배정. 한 참가자는 같은 대회에서 하나의 권역에만 배정.

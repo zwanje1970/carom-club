@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { ORGANIZATION_SELECT_ADMIN_BASIC, ORGANIZATION_SELECT_OWNER } from "@/lib/db-selects";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { normalizeSlug } from "@/lib/normalize-slug";
-import { canViewTournament, canManageTournament } from "@/lib/permissions";
+import { canViewTournament, canManageTournament, isPlatformAdmin } from "@/lib/permissions";
 import { sendPrizeNotifications } from "@/lib/push/prizeNotifications";
 
 /** 이전 대회 복사용: 대회 + 규칙 전체 반환 (원본과 연결 없음). GET → canViewTournament */
@@ -61,6 +61,7 @@ export async function GET(
       entryCondition: tournament.entryCondition,
       maxParticipants: tournament.maxParticipants,
       status: tournament.status,
+      participantRosterLockedAt: tournament.participantRosterLockedAt?.toISOString() ?? null,
       approvalType: tournament.approvalType,
       rules: tournament.rules,
       promoContent: tournament.promoContent,
@@ -156,6 +157,22 @@ export async function PATCH(
       : undefined;
   const wasFinished = tournament.status === "FINISHED";
   const becomingFinished = statusValue === "FINISHED" && !wasFinished;
+
+  const rosterLocked = tournament.participantRosterLockedAt != null;
+  if (rosterLocked && !isPlatformAdmin(session)) {
+    if (maxParticipants !== undefined || entryFee !== undefined) {
+      return NextResponse.json(
+        { error: "참가 명단이 확정된 대회는 정원·참가비를 수정할 수 없습니다." },
+        { status: 409 }
+      );
+    }
+    if (statusValue !== undefined && (statusValue === "OPEN" || statusValue === "DRAFT")) {
+      return NextResponse.json(
+        { error: "참가 명단 확정 후 모집 중·초안 상태로 되돌릴 수 없습니다." },
+        { status: 409 }
+      );
+    }
+  }
 
   try {
     await prisma.tournament.update({

@@ -5,12 +5,12 @@
  * - 원본 공배치: 읽기 전용
  * - 해법: 두께·당점·백스트로크·팔로우·볼스피드·진행경로·해설 별도 state
  * - 자동 물리 계산 없음, 사용자 수동 조작만
+ * - 되돌리기: 직전 편집 스냅샷으로 복원 (최대 NANGU_SOLUTION_EDITOR_MAX_UNDO 단계)
  */
 import React, { useState, useCallback } from "react";
 import { DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT } from "@/lib/billiard-table-constants";
 import type { NanguBallPlacement } from "@/lib/nangu-types";
 import type { NanguSolutionData } from "@/lib/nangu-types";
-import type { NanguPathPoint } from "@/lib/nangu-types";
 import { NanguReadOnlyLayout } from "./NanguReadOnlyLayout";
 import { NanguSolutionPathOverlay } from "./NanguSolutionPathOverlay";
 import { NanguThicknessEditor, getThicknessOverlap } from "./NanguThicknessEditor";
@@ -22,19 +22,19 @@ import {
   ballSpeedToLegacySpeedLevel,
   ballSpeedToRailCount,
   getRailDisplayPowerForBallSpeed,
-  type BallSpeed,
 } from "@/lib/ball-speed-constants";
 import { SolutionPathEditorFullscreen } from "./SolutionPathEditorFullscreen";
 import { NanguTablePreviewHitLayer } from "./NanguTablePreviewHitLayer";
 import { useTableOrientation } from "@/hooks/useTableOrientation";
+import {
+  type NanguSolutionEditorUndoSnapshot,
+  cloneNanguSolutionEditorSnapshot,
+  createInitialNanguSolutionEditorSnapshot,
+  NANGU_SOLUTION_EDITOR_MAX_UNDO,
+  type NanguActivePanel,
+} from "@/lib/nangu-solution-editor-undo";
 
-export type NanguActivePanel =
-  | "thickness"
-  | "spin"
-  | "backstroke"
-  | "followstroke"
-  | "speed"
-  | "path";
+export type { NanguActivePanel };
 
 export interface NanguSolutionEditorProps {
   ballPlacement: NanguBallPlacement;
@@ -53,19 +53,51 @@ export function NanguSolutionEditor({
   postContent,
   onSubmit,
 }: NanguSolutionEditorProps) {
-  const [activePanel, setActivePanel] = useState<NanguActivePanel>("thickness");
-  const [isBankShot, setIsBankShot] = useState(false);
-  const [thicknessOffsetX, setThicknessOffsetX] = useState(0.5);
-  const [spinX, setSpinX] = useState(0);
-  const [spinY, setSpinY] = useState(0);
-  const [backstrokeLevel, setBackstrokeLevel] = useState(5);
-  const [followStrokeLevel, setFollowStrokeLevel] = useState(5);
-  const [ballSpeed, setBallSpeed] = useState<BallSpeed>(3.0);
-  const [pathPoints, setPathPoints] = useState<NanguPathPoint[]>([]);
+  const [editor, setEditor] = useState<NanguSolutionEditorUndoSnapshot>(() =>
+    createInitialNanguSolutionEditorSnapshot()
+  );
+  const [undoStack, setUndoStack] = useState<NanguSolutionEditorUndoSnapshot[]>([]);
+
+  const commit = useCallback(
+    (updater: (prev: NanguSolutionEditorUndoSnapshot) => NanguSolutionEditorUndoSnapshot) => {
+      setEditor((prev) => {
+        setUndoStack((stack) => [
+          ...stack.slice(-(NANGU_SOLUTION_EDITOR_MAX_UNDO - 1)),
+          cloneNanguSolutionEditorSnapshot(prev),
+        ]);
+        return updater(prev);
+      });
+    },
+    []
+  );
+
+  const handleUndo = useCallback(() => {
+    setUndoStack((stack) => {
+      if (stack.length === 0) return stack;
+      const top = stack[stack.length - 1]!;
+      setEditor(cloneNanguSolutionEditorSnapshot(top));
+      return stack.slice(0, -1);
+    });
+  }, []);
+
+  const canUndo = undoStack.length > 0;
+
+  const {
+    activePanel,
+    isBankShot,
+    thicknessOffsetX,
+    spinX,
+    spinY,
+    backstrokeLevel,
+    followStrokeLevel,
+    ballSpeed,
+    pathPoints,
+    explanationText,
+  } = editor;
+
   /** 당구노트형 전체화면(오버레이) + 경로 편집 UI (스팟·줌·재생은 이 상태에서만) */
   const [fullScreenEditMode, setFullScreenEditMode] = useState(false);
   const [pathFsKey, setPathFsKey] = useState(0);
-  const [explanationText, setExplanationText] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [focusZoom, setFocusZoom] = useState<{
@@ -91,17 +123,16 @@ export function NanguSolutionEditor({
   }, []);
 
   const clearCommittedPath = useCallback(() => {
-    setPathPoints([]);
-  }, []);
+    commit((prev) => ({ ...prev, pathPoints: [] }));
+  }, [commit]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSaving(true);
     try {
-      const pointsForPath = pathPoints.length >= 1
-        ? pathPoints.map((p) => ({ x: p.x, y: p.y }))
-        : [];
+      const pointsForPath =
+        pathPoints.length >= 1 ? pathPoints.map((p) => ({ x: p.x, y: p.y })) : [];
       await onSubmit({
         title: null,
         comment: explanationText.trim() || null,
@@ -136,10 +167,10 @@ export function NanguSolutionEditor({
         <p className="text-sm text-gray-600 dark:text-slate-400 mt-1 whitespace-pre-wrap">{postContent}</p>
       </div>
 
-      {/* 2. 당구노트 공배치와 동일 좌표 미리보기 — 탭/버튼으로 전체화면 경로 편집 */}
-      <div>
+      {/* 2. 당구노트 공배치와 동일 좌표 미리보기 — 탭/버튼으로 전체화면 경로 편집 (테이블 가운데 정렬) */}
+      <div className="flex w-full flex-col items-center">
         <div
-          className="relative w-full max-w-full rounded-lg border border-gray-200 dark:border-slate-600 overflow-hidden"
+          className="relative mx-auto w-full max-w-full overflow-hidden rounded-lg border border-gray-200 dark:border-slate-600"
           style={{
             maxWidth: DEFAULT_TABLE_WIDTH,
             aspectRatio:
@@ -182,7 +213,10 @@ export function NanguSolutionEditor({
             ariaLabel="전체화면에서 경로 편집 열기"
           />
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div
+          className="mx-auto mt-2 flex w-full max-w-full flex-wrap items-center justify-center gap-2"
+          style={{ maxWidth: DEFAULT_TABLE_WIDTH }}
+        >
           <button
             type="button"
             onClick={() => enterFullScreenEdit()}
@@ -218,7 +252,7 @@ export function NanguSolutionEditor({
           ballSpeed={ballSpeed}
           onCancel={closeFullScreenEdit}
           onConfirm={({ pathPoints: next }) => {
-            setPathPoints(next);
+            commit((prev) => ({ ...prev, pathPoints: next }));
             closeFullScreenEdit();
           }}
         />
@@ -241,7 +275,7 @@ export function NanguSolutionEditor({
             <button
               key={key}
               type="button"
-              onClick={() => setActivePanel(key)}
+              onClick={() => commit((prev) => ({ ...prev, activePanel: key }))}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
                 activePanel === key
                   ? "bg-site-primary text-white border-site-primary"
@@ -258,8 +292,8 @@ export function NanguSolutionEditor({
             <NanguThicknessEditor
               value={thicknessOffsetX}
               isBankShot={isBankShot}
-              onChange={setThicknessOffsetX}
-              onBankShotChange={setIsBankShot}
+              onChange={(v) => commit((prev) => ({ ...prev, thicknessOffsetX: v }))}
+              onBankShotChange={(v) => commit((prev) => ({ ...prev, isBankShot: v }))}
               onFocusZoomRequest={(clientX, clientY) =>
                 setFocusZoom({ active: true, target: "thickness", originX: clientX, originY: clientY })
               }
@@ -274,8 +308,11 @@ export function NanguSolutionEditor({
               value={thicknessOffsetX}
               onChange={(e) => {
                 const v = e.target.valueAsNumber;
-                setThicknessOffsetX(v);
-                if (getThicknessOverlap(v)) setIsBankShot(false);
+                commit((prev) => {
+                  let nextBank = prev.isBankShot;
+                  if (getThicknessOverlap(v)) nextBank = false;
+                  return { ...prev, thicknessOffsetX: v, isBankShot: nextBank };
+                });
               }}
               className="w-full max-w-xs"
             />
@@ -288,8 +325,7 @@ export function NanguSolutionEditor({
               spinX={spinX}
               spinY={spinY}
               onChange={({ spinX: x, spinY: y }) => {
-                setSpinX(x);
-                setSpinY(y);
+                commit((prev) => ({ ...prev, spinX: x, spinY: y }));
               }}
               onFocusZoomRequest={(clientX, clientY) =>
                 setFocusZoom({ active: true, target: "spin", originX: clientX, originY: clientY })
@@ -306,7 +342,9 @@ export function NanguSolutionEditor({
                   max={1}
                   step={0.1}
                   value={spinX}
-                  onChange={(e) => setSpinX(e.target.valueAsNumber)}
+                  onChange={(e) =>
+                    commit((prev) => ({ ...prev, spinX: e.target.valueAsNumber }))
+                  }
                   className="w-32"
                 />
               </label>
@@ -318,7 +356,9 @@ export function NanguSolutionEditor({
                   max={1}
                   step={0.1}
                   value={spinY}
-                  onChange={(e) => setSpinY(e.target.valueAsNumber)}
+                  onChange={(e) =>
+                    commit((prev) => ({ ...prev, spinY: e.target.valueAsNumber }))
+                  }
                   className="w-32"
                 />
               </label>
@@ -339,7 +379,9 @@ export function NanguSolutionEditor({
               min={0}
               max={10}
               value={backstrokeLevel}
-              onChange={(e) => setBackstrokeLevel(e.target.valueAsNumber)}
+              onChange={(e) =>
+                commit((prev) => ({ ...prev, backstrokeLevel: e.target.valueAsNumber }))
+              }
               className="w-full max-w-xs"
             />
             <p className="text-xs text-site-text mt-1">{backstrokeLevel} / 10</p>
@@ -359,7 +401,9 @@ export function NanguSolutionEditor({
               min={0}
               max={10}
               value={followStrokeLevel}
-              onChange={(e) => setFollowStrokeLevel(e.target.valueAsNumber)}
+              onChange={(e) =>
+                commit((prev) => ({ ...prev, followStrokeLevel: e.target.valueAsNumber }))
+              }
               className="w-full max-w-xs"
             />
             <p className="text-xs text-site-text mt-1">{followStrokeLevel} / 10</p>
@@ -379,7 +423,7 @@ export function NanguSolutionEditor({
                 <div key={v} className="flex flex-col items-center">
                   <button
                     type="button"
-                    onClick={() => setBallSpeed(v)}
+                    onClick={() => commit((prev) => ({ ...prev, ballSpeed: v }))}
                     className={`min-w-[2.25rem] h-8 px-1 flex items-center justify-center text-sm font-bold rounded transition ${
                       ballSpeed === v
                         ? "bg-site-primary text-white"
@@ -419,7 +463,7 @@ export function NanguSolutionEditor({
         <label className="block text-sm font-medium text-site-text mb-1">해설</label>
         <textarea
           value={explanationText}
-          onChange={(e) => setExplanationText(e.target.value)}
+          onChange={(e) => commit((prev) => ({ ...prev, explanationText: e.target.value }))}
           rows={4}
           className="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-site-text"
           placeholder="해법 설명을 입력하세요 (두께·당점·경로 의도, 주의점 등)"
@@ -428,13 +472,24 @@ export function NanguSolutionEditor({
 
       {/* 5. 제출 */}
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-      <button
-        type="submit"
-        disabled={saving}
-        className="w-full py-3 rounded-lg bg-site-primary text-white font-medium disabled:opacity-50"
-      >
-        {saving ? "저장 중…" : "해법 등록"}
-      </button>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-stretch">
+        <button
+          type="button"
+          disabled={!canUndo || saving}
+          onClick={handleUndo}
+          title={`직전 편집 상태로 되돌립니다 (최대 ${NANGU_SOLUTION_EDITOR_MAX_UNDO}단계)`}
+          className="sm:w-40 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-site-text font-medium disabled:opacity-45 disabled:pointer-events-none hover:bg-gray-50 dark:hover:bg-slate-700 touch-manipulation"
+        >
+          되돌리기
+        </button>
+        <button
+          type="submit"
+          disabled={saving}
+          className="flex-1 min-h-[3rem] py-3 rounded-lg bg-site-primary text-white font-medium disabled:opacity-50 touch-manipulation"
+        >
+          {saving ? "저장 중…" : "해법 등록"}
+        </button>
+      </div>
 
       {/* 포커스 확대 오버레이 */}
       {focusZoom.active && focusZoom.target && (
@@ -451,8 +506,8 @@ export function NanguSolutionEditor({
               <NanguThicknessEditor
                 value={thicknessOffsetX}
                 isBankShot={isBankShot}
-                onChange={setThicknessOffsetX}
-                onBankShotChange={setIsBankShot}
+                onChange={(v) => commit((prev) => ({ ...prev, thicknessOffsetX: v }))}
+                onBankShotChange={(v) => commit((prev) => ({ ...prev, isBankShot: v }))}
               />
             </div>
           )}
@@ -463,8 +518,7 @@ export function NanguSolutionEditor({
                 spinX={spinX}
                 spinY={spinY}
                 onChange={({ spinX: x, spinY: y }) => {
-                  setSpinX(x);
-                  setSpinY(y);
+                  commit((prev) => ({ ...prev, spinX: x, spinY: y }));
                 }}
               />
             </div>
@@ -478,7 +532,9 @@ export function NanguSolutionEditor({
                 min={0}
                 max={10}
                 value={backstrokeLevel}
-                onChange={(e) => setBackstrokeLevel(e.target.valueAsNumber)}
+                onChange={(e) =>
+                  commit((prev) => ({ ...prev, backstrokeLevel: e.target.valueAsNumber }))
+                }
                 className="w-full h-10"
               />
               <p className="text-xs text-site-text mt-1">{backstrokeLevel} / 10</p>
@@ -493,7 +549,9 @@ export function NanguSolutionEditor({
                 min={0}
                 max={10}
                 value={followStrokeLevel}
-                onChange={(e) => setFollowStrokeLevel(e.target.valueAsNumber)}
+                onChange={(e) =>
+                  commit((prev) => ({ ...prev, followStrokeLevel: e.target.valueAsNumber }))
+                }
                 className="w-full h-10"
               />
               <p className="text-xs text-site-text mt-1">{followStrokeLevel} / 10</p>
@@ -507,7 +565,7 @@ export function NanguSolutionEditor({
                   <div key={v} className="flex flex-col items-center">
                     <button
                       type="button"
-                      onClick={() => setBallSpeed(v)}
+                      onClick={() => commit((prev) => ({ ...prev, ballSpeed: v }))}
                       className={`min-w-[2.75rem] h-12 px-1 flex items-center justify-center text-lg font-bold rounded transition ${
                         ballSpeed === v ? "bg-site-primary text-white" : "bg-gray-200 dark:bg-slate-600 text-site-text"
                       }`}

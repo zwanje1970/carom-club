@@ -63,7 +63,10 @@ export default async function ClientTournamentPromoPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-site-text">홍보페이지</h1>
-        <Link href={`${base}/edit`} className="rounded-lg bg-site-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90">
+        <Link
+          href={`/client/operations/tournaments/${id}/edit`}
+          className="rounded-lg bg-site-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+        >
           기본 정보·홍보 수정
         </Link>
       </div>

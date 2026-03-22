@@ -4,15 +4,17 @@ import { prisma } from "@/lib/db";
 import { ORGANIZATION_SELECT_OWNER } from "@/lib/db-selects";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { canManageTournament } from "@/lib/permissions";
-import {
-  generateRounds,
-  randomGrouping,
-  fixedGrouping,
-  buildBracket,
-} from "@/modules/bracket-engine";
-import type { BracketFormat } from "@/modules/bracket-engine/tournament-bracket";
+import { generateRounds, randomGrouping, fixedGrouping } from "@/modules/bracket-engine";
 import { buildFinalBracketPlan, type BracketSize } from "@/lib/final-bracket";
+import {
+  createBracketMatchesFromPlan,
+  fetchMatchVenueIdsOrdered,
+  getOrCreateTournamentRoundByName,
+  sortFinalBracketPlan,
+} from "@/lib/tournament-bracket-matches";
+import { syncBracketMatchProgressStates } from "@/lib/tournament-match-progress";
 import { sendPushToUsers } from "@/lib/push/sendPush";
+import { validateConfirmedEntriesMatchRosterSnapshot } from "@/lib/tournament-participant-roster";
 
 /** 참가 인원 기준 다음 브래킷 크기 (2의 거듭제곱, 최대 64) */
 function nextBracketSize(count: number): BracketSize {
@@ -93,7 +95,6 @@ export async function POST(
       );
     }
   }
-  const detailFormat = (config.detailFormat as string) ?? "1v1_masters";
   const tableCount = (config.tableCount as number) ?? 6;
   const maxPerGroup = (config.maxPerGroup as number) ?? 6;
   const finalistCount = (config.finalistCount as number) ?? 3;
@@ -104,66 +105,40 @@ export async function POST(
   if (type === "tournament" || gameType === "tournament") {
     // 참가확정자(CONFIRMED)만 사용. 대기자(APPLIED)는 포함되지 않음.
     const entryIds = tournament.entries.map((e) => e.id);
+    const snapCheck = await validateConfirmedEntriesMatchRosterSnapshot(tournamentId, entryIds);
+    if (!snapCheck.ok) {
+      return NextResponse.json({ error: snapCheck.error }, { status: 400 });
+    }
     if (entryIds.length < 2) {
       return NextResponse.json(
         { error: "토너먼트 생성에는 최소 2명 이상의 참가 확정자가 필요합니다." },
         { status: 400 }
       );
     }
-    const format = detailFormat as BracketFormat;
-    const matches = buildBracket(format, entryIds);
-    const bracketData = { type: "tournament", format: detailFormat, matches };
-
-    // 본선 매치 테이블용: 2의 거듭제곱 크기, 무작위 배치 후 BYE 패딩
+    // 본선 매치 테이블(TournamentFinalMatch): 2의 거듭제곱 크기, 무작위 배치 후 BYE 패딩 — JSON blob 없이 관계형만 저장
     const size = nextBracketSize(entryIds.length);
     const slotEntries: (string | null)[] = [...shuffle(entryIds)];
     while (slotEntries.length < size) slotEntries.push(null);
     const plan = buildFinalBracketPlan(slotEntries, size);
-    const sorted = [...plan].sort((a, b) => a.roundIndex - b.roundIndex || a.matchIndex - b.matchIndex);
+    const sorted = sortFinalBracketPlan(plan);
 
-    const createdIds: string[] = [];
     await prisma.$transaction(async (tx) => {
-      await tx.tournamentRound.create({
-        data: {
-          tournamentId,
-          name: "토너먼트",
-          sortOrder: 0,
-          bracketData: JSON.stringify(bracketData),
-        },
+      const round = await getOrCreateTournamentRoundByName(tx, tournamentId, "단판 토너먼트");
+      const venueIds = await fetchMatchVenueIdsOrdered(tx, tournamentId);
+      await createBracketMatchesFromPlan(tx, {
+        tournamentId,
+        tournamentRoundId: round.id,
+        sortedPlan: sorted,
+        bracketPhase: "MAIN",
+        matchVenueIdsInOrder: venueIds.length ? venueIds : undefined,
       });
-      for (const p of sorted) {
-        const created = await tx.tournamentFinalMatch.create({
-          data: {
-            tournamentId,
-            roundIndex: p.roundIndex,
-            matchIndex: p.matchIndex,
-            entryIdA: p.entryIdA,
-            entryIdB: p.entryIdB,
-            status: p.status,
-            nextMatchId: null,
-            nextSlot: null,
-          },
-        });
-        createdIds.push(created.id);
-      }
-      for (let i = 0; i < sorted.length; i++) {
-        const p = sorted[i];
-        const nextRound = p.roundIndex + 1;
-        const nextMatchIndex = Math.floor(p.matchIndex / 2);
-        const nextSlot = (p.matchIndex % 2 === 0 ? "A" : "B") as "A" | "B";
-        const j = sorted.findIndex((q) => q.roundIndex === nextRound && q.matchIndex === nextMatchIndex);
-        if (j >= 0 && createdIds[j]) {
-          await tx.tournamentFinalMatch.update({
-            where: { id: createdIds[i] },
-            data: { nextMatchId: createdIds[j], nextSlot },
-          });
-        }
-      }
       await tx.tournament.update({
         where: { id: tournamentId },
         data: { status: "BRACKET_GENERATED" },
       });
     });
+
+    await syncBracketMatchProgressStates(prisma, tournamentId);
 
     const userIds = tournament.entries.map((e) => e.userId);
     try {

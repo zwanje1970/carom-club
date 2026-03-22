@@ -46,8 +46,12 @@ export async function GET(
     tournamentName: tournament.name,
     matches: matches.map((m) => ({
       id: m.id,
+      tournamentRoundId: m.tournamentRoundId,
+      matchVenueId: m.matchVenueId,
+      bracketPhase: m.bracketPhase,
       roundIndex: m.roundIndex,
       matchIndex: m.matchIndex,
+      /** 선수 슬롯 1·2 (TournamentEntry id) */
       entryIdA: m.entryIdA,
       entryIdB: m.entryIdB,
       entryAName: entryDisplayName(m.entryIdA),
@@ -56,6 +60,8 @@ export async function GET(
       scoreB: m.scoreB,
       winnerEntryId: m.winnerEntryId,
       status: m.status,
+      nextMatchId: m.nextMatchId,
+      nextSlot: m.nextSlot,
     })),
     stats,
   });

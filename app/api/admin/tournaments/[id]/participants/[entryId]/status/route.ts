@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { ORGANIZATION_SELECT_OWNER } from "@/lib/db-selects";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { canManageTournament } from "@/lib/permissions";
+import { ROSTER_LOCKED_ENTRY_ERROR } from "@/lib/tournament-roster-lock";
 
 const ALLOWED_STATUSES = ["APPLIED", "CONFIRMED", "CANCELED", "REJECTED"] as const;
 
@@ -41,6 +42,9 @@ export async function PATCH(
       { error: "대진표 생성 후에는 상태를 임의로 변경할 수 없습니다." },
       { status: 400 }
     );
+  }
+  if (tournament.participantRosterLockedAt != null) {
+    return NextResponse.json({ error: ROSTER_LOCKED_ENTRY_ERROR }, { status: 409 });
   }
 
   let body: { status?: string };

@@ -115,6 +115,10 @@ type VenueSlot = {
 type TournamentFormSimpleProps = {
   mode: "create" | "edit";
   tournamentId?: string;
+  /** site: 기존 마이페이지 톤 · console: /client 운영 콘솔(좁은 radius·zinc) */
+  appearance?: "site" | "console";
+  /** true: 취소 옆에 임시저장(DRAFT 상태로 제출) */
+  showDraftSaveButton?: boolean;
   initialData?: Partial<TournamentFormValues> & {
     matchVenues?: { venueNumber: number; displayLabel?: string; venueName?: string; address?: string; phone?: string }[];
     rule?: { bracketConfig?: unknown };
@@ -128,12 +132,76 @@ type TournamentFormSimpleProps = {
 export function TournamentFormSimple({
   mode,
   tournamentId,
+  appearance = "site",
+  showDraftSaveButton = false,
   initialData,
   onSubmit,
   onCancelHref,
   submitLabel,
   children,
 }: TournamentFormSimpleProps) {
+  const isConsole = appearance === "console";
+  const chrome = isConsole
+    ? {
+        form: "space-y-4",
+        section:
+          "rounded-sm border border-zinc-300 bg-white p-3 sm:p-4 space-y-3 dark:border-zinc-700 dark:bg-zinc-900",
+        sectionTitle:
+          "text-sm font-semibold text-zinc-900 dark:text-zinc-100 border-b border-zinc-300 pb-2 dark:border-zinc-600",
+        input:
+          "w-full border border-zinc-300 bg-white px-2 py-2 text-xs text-zinc-900 rounded-sm focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-zinc-500",
+        inputNum:
+          "w-full border border-zinc-300 bg-white px-2 py-2 text-xs text-zinc-900 rounded-sm focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+        select:
+          "w-full border border-zinc-300 bg-white px-2 py-2 text-xs text-zinc-900 rounded-sm dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100",
+        dropzone:
+          "border border-dashed border-zinc-400 rounded-sm p-5 text-center cursor-pointer text-xs text-zinc-600 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800/50 focus:outline-none focus:ring-1 focus:ring-zinc-400",
+        venueCard: "rounded-sm border border-zinc-300 p-3 space-y-2 bg-zinc-50/50 dark:border-zinc-600 dark:bg-zinc-800/30",
+        venueInput: "w-full border border-zinc-300 rounded-sm px-2 py-1.5 text-xs dark:border-zinc-600 dark:bg-zinc-950",
+        pillOff:
+          "bg-zinc-100 text-zinc-800 border border-zinc-300 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-600",
+        pillOn: "bg-zinc-800 text-white border border-zinc-800 dark:bg-zinc-200 dark:text-zinc-900 dark:border-zinc-200",
+        linkBtn:
+          "rounded-sm border border-zinc-300 px-4 py-2 text-xs font-medium text-zinc-800 hover:bg-zinc-50 text-center dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800",
+        submitBtn:
+          "rounded-sm border border-zinc-800 bg-zinc-800 px-4 py-2 text-xs font-medium text-white hover:bg-zinc-900 disabled:opacity-50 dark:border-zinc-200 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white",
+        addVenueBtn:
+          "rounded-sm border border-zinc-300 px-2 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800",
+        label: "block text-xs font-medium text-zinc-700 mb-1 dark:text-zinc-300",
+        pillPrimary: "bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900",
+        muted: "text-xs text-zinc-500 dark:text-zinc-500",
+        venueTitle: "font-medium text-zinc-900 text-xs dark:text-zinc-100",
+        checkbox: "rounded border-zinc-400 text-zinc-800 focus:ring-zinc-400 dark:border-zinc-600",
+        inlineLabel: "text-xs text-zinc-800 dark:text-zinc-200",
+      }
+    : {
+        form: "space-y-6 max-w-xl mx-auto",
+        section: "rounded-xl border border-site-border bg-site-card p-4 sm:p-5 space-y-4",
+        sectionTitle: "text-base font-semibold text-site-text border-b border-site-border pb-2",
+        input:
+          "w-full border border-site-border rounded-lg px-3 py-2.5 text-site-text bg-site-card focus:ring-2 focus:ring-site-primary focus:border-transparent",
+        inputNum:
+          "w-full border border-site-border rounded-lg px-3 py-2.5 text-site-text bg-site-card [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+        select: "w-full border border-site-border rounded-lg px-3 py-2.5 text-site-text bg-site-card",
+        dropzone:
+          "border-2 border-dashed border-site-border rounded-lg p-6 text-center cursor-pointer hover:bg-site-bg/50 focus:outline-none focus:ring-2 focus:ring-site-primary",
+        venueCard: "rounded-lg border border-site-border p-3 space-y-2 bg-site-bg/30",
+        venueInput: "w-full border border-site-border rounded px-3 py-2 text-sm",
+        pillOff: "bg-site-bg text-site-text border border-site-border hover:bg-site-border/30",
+        pillOn: "bg-site-bg text-site-text border border-site-border",
+        linkBtn:
+          "rounded-lg border border-site-border px-5 py-2.5 font-medium text-site-text hover:bg-site-bg text-center",
+        submitBtn:
+          "rounded-lg bg-site-primary px-5 py-2.5 font-medium text-white hover:opacity-90 disabled:opacity-50",
+        addVenueBtn:
+          "rounded-lg border border-site-border px-3 py-1.5 text-sm font-medium text-site-text hover:bg-site-bg",
+        label: "block text-sm font-medium text-site-text mb-1",
+        pillPrimary: "bg-site-primary text-white",
+        muted: "text-xs text-site-text-muted",
+        venueTitle: "font-medium text-site-text text-sm",
+        checkbox: "rounded border-site-border text-site-primary focus:ring-site-primary",
+        inlineLabel: "text-sm text-site-text",
+      };
   const [form, setForm] = useState<TournamentFormValues>(() => {
     const base = { ...defaultFormValues };
     if (initialData) {
@@ -191,6 +259,7 @@ export function TournamentFormSimple({
   const [success, setSuccess] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const submitAsDraftRef = useRef(false);
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -241,6 +310,8 @@ export function TournamentFormSimple({
     e.preventDefault();
     setError("");
     setSuccess(false);
+    const asDraft = submitAsDraftRef.current;
+    submitAsDraftRef.current = false;
     if (!form.name.trim()) {
       setError("대회명을 입력해 주세요.");
       return;
@@ -250,7 +321,7 @@ export function TournamentFormSimple({
       return;
     }
     const hasVenue = venues.some((v) => (v.venueName || v.address || "").trim());
-    if (!hasVenue) {
+    if (!asDraft && !hasVenue) {
       setError("대회장소를 1곳 이상 입력해 주세요.");
       return;
     }
@@ -263,6 +334,7 @@ export function TournamentFormSimple({
       const endAtIso = end.toISOString().slice(0, 16);
       const payload = {
         ...form,
+        status: asDraft ? "DRAFT" : form.status,
         endAt: form.endAt || endAtIso,
         prizeInfo: buildPrizeInfo() || form.prizeInfo,
       };
@@ -275,8 +347,10 @@ export function TournamentFormSimple({
     }
   }
 
+  const formDomId = tournamentId ? `tournament-form-${tournamentId}` : "tournament-form-new";
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-xl mx-auto">
+    <form id={formDomId} onSubmit={handleSubmit} className={chrome.form}>
       {success && (
         <p className="text-sm text-green-700 bg-green-50 dark:bg-green-900/20 p-3 rounded-lg" role="status">
           저장되었습니다.
@@ -284,21 +358,21 @@ export function TournamentFormSimple({
       )}
 
       {/* 1. 기본 정보 */}
-      <section className="rounded-xl border border-site-border bg-site-card p-4 sm:p-5 space-y-4">
-        <h2 className="text-base font-semibold text-site-text border-b border-site-border pb-2">기본 정보</h2>
+      <section className={chrome.section}>
+        <h2 className={chrome.sectionTitle}>기본 정보</h2>
         <div>
-          <label className="block text-sm font-medium text-site-text mb-1">대회명 *</label>
+          <label className={chrome.label}>대회명 *</label>
           <input
             type="text"
             required
-            className="w-full border border-site-border rounded-lg px-3 py-2.5 text-site-text bg-site-card focus:ring-2 focus:ring-site-primary focus:border-transparent"
+            className={chrome.input}
             placeholder="예: 2025 봄맞이 3구 대회"
             value={form.name}
             onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-site-text mb-1">대표 이미지 (선택)</label>
+          <label className={chrome.label}>대표 이미지 (선택)</label>
           <input
             ref={fileInputRef}
             type="file"
@@ -311,31 +385,31 @@ export function TournamentFormSimple({
             tabIndex={0}
             onClick={() => fileInputRef.current?.click()}
             onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
-            className="border-2 border-dashed border-site-border rounded-lg p-6 text-center cursor-pointer hover:bg-site-bg/50 focus:outline-none focus:ring-2 focus:ring-site-primary"
+            className={chrome.dropzone}
           >
             {form.posterImageUrl ? (
               <img src={form.posterImageUrl} alt="대표 이미지" className="max-h-40 mx-auto rounded object-contain" />
             ) : (
-              <span className="text-site-text-muted text-sm">
+              <span className={chrome.muted}>
                 {uploading ? "업로드 중..." : "클릭해서 이미지 선택"}
               </span>
             )}
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-site-text mb-1">대회소개 (선택)</label>
+          <label className={chrome.label}>대회소개 (선택)</label>
           <textarea
             rows={3}
-            className="w-full border border-site-border rounded-lg px-3 py-2.5 text-site-text bg-site-card focus:ring-2 focus:ring-site-primary focus:border-transparent"
+            className={chrome.input}
             placeholder="대회를 한 줄로 소개해 주세요."
             value={form.summary}
             onChange={(e) => setForm((f) => ({ ...f, summary: e.target.value }))}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-site-text mb-1">상태</label>
+          <label className={chrome.label}>상태</label>
           <select
-            className="w-full border border-site-border rounded-lg px-3 py-2.5 text-site-text bg-site-card"
+            className={chrome.select}
             value={form.status}
             onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
           >
@@ -349,16 +423,16 @@ export function TournamentFormSimple({
       </section>
 
       {/* 2. 모집인원 · 참가비 · 계좌번호 */}
-      <section className="rounded-xl border border-site-border bg-site-card p-4 sm:p-5 space-y-4">
-        <h2 className="text-base font-semibold text-site-text border-b border-site-border pb-2">모집인원 · 참가비 · 계좌번호</h2>
+      <section className={chrome.section}>
+        <h2 className={chrome.sectionTitle}>모집인원 · 참가비 · 계좌번호</h2>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-site-text mb-1">모집 인원 *</label>
+            <label className={chrome.label}>모집 인원 *</label>
             <input
               type="number"
               min={1}
               required
-              className="w-full border border-site-border rounded-lg px-3 py-2.5 text-site-text bg-site-card [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              className={chrome.inputNum}
               placeholder="32"
               value={form.maxParticipants === "" ? "" : form.maxParticipants}
               onChange={(e) =>
@@ -367,12 +441,12 @@ export function TournamentFormSimple({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-site-text mb-1">참가비 (원) *</label>
+            <label className={chrome.label}>참가비 (원) *</label>
             <input
               type="number"
               min={0}
               required
-              className="w-full border border-site-border rounded-lg px-3 py-2.5 text-site-text bg-site-card [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              className={chrome.inputNum}
               placeholder="0"
               value={form.entryFee === "" ? "" : form.entryFee}
               onChange={(e) =>
@@ -382,10 +456,10 @@ export function TournamentFormSimple({
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-site-text mb-1">계좌번호(은행명, 예금주)</label>
+          <label className={chrome.label}>계좌번호(은행명, 예금주)</label>
           <input
             type="text"
-            className="w-full border border-site-border rounded-lg px-3 py-2.5 text-site-text bg-site-card"
+            className={chrome.select}
             placeholder="예: 국민은행 123-456-789 예금주명"
             value={form.accountNumber}
             onChange={(e) => setForm((f) => ({ ...f, accountNumber: e.target.value }))}
@@ -394,44 +468,44 @@ export function TournamentFormSimple({
       </section>
 
       {/* 3. 상금 */}
-      <section className="rounded-xl border border-site-border bg-site-card p-4 sm:p-5 space-y-4">
-        <h2 className="text-base font-semibold text-site-text border-b border-site-border pb-2">상금</h2>
+      <section className={chrome.section}>
+        <h2 className={chrome.sectionTitle}>상금</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
-            <label className="block text-sm font-medium text-site-text mb-1">우승</label>
+            <label className={chrome.label}>우승</label>
             <input
               type="text"
-              className="w-full border border-site-border rounded-lg px-3 py-2.5 text-site-text bg-site-card"
+              className={chrome.select}
               placeholder="예: 50만원"
               value={form.prizeFirst}
               onChange={(e) => setForm((f) => ({ ...f, prizeFirst: e.target.value }))}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-site-text mb-1">준우승</label>
+            <label className={chrome.label}>준우승</label>
             <input
               type="text"
-              className="w-full border border-site-border rounded-lg px-3 py-2.5 text-site-text bg-site-card"
+              className={chrome.select}
               placeholder="예: 30만원"
               value={form.prizeSecond}
               onChange={(e) => setForm((f) => ({ ...f, prizeSecond: e.target.value }))}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-site-text mb-1">3위</label>
+            <label className={chrome.label}>3위</label>
             <input
               type="text"
-              className="w-full border border-site-border rounded-lg px-3 py-2.5 text-site-text bg-site-card"
+              className={chrome.select}
               placeholder="예: 10만원"
               value={form.prizeThird}
               onChange={(e) => setForm((f) => ({ ...f, prizeThird: e.target.value }))}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-site-text mb-1">3위</label>
+            <label className={chrome.label}>3위</label>
             <input
               type="text"
-              className="w-full border border-site-border rounded-lg px-3 py-2.5 text-site-text bg-site-card"
+              className={chrome.select}
               placeholder="예: 10만원"
               value={form.prizeThird2}
               onChange={(e) => setForm((f) => ({ ...f, prizeThird2: e.target.value }))}
@@ -439,17 +513,17 @@ export function TournamentFormSimple({
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-site-text mb-1">추가 (자유 입력)</label>
+          <label className={chrome.label}>추가 (자유 입력)</label>
           <textarea
             rows={2}
-            className="w-full border border-site-border rounded-lg px-3 py-2.5 text-site-text bg-site-card"
+            className={chrome.select}
             placeholder="4위 이하, 특별상 등"
             value={form.prizeExtra}
             onChange={(e) => setForm((f) => ({ ...f, prizeExtra: e.target.value }))}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-site-text mb-1">경기 방식 *</label>
+          <label className={chrome.label}>경기 방식 *</label>
           <div className="flex flex-wrap gap-2">
             {GAME_FORMAT_OPTIONS.map((opt) => (
               <button
@@ -457,8 +531,8 @@ export function TournamentFormSimple({
                 type="button"
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                   form.gameFormat === opt.value
-                    ? "bg-site-primary text-white"
-                    : "bg-site-bg text-site-text border border-site-border hover:bg-site-border/30"
+                    ? chrome.pillPrimary
+                    : chrome.pillOff
                 }`}
                 onClick={() => setForm((f) => ({ ...f, gameFormat: opt.value }))}
               >
@@ -468,7 +542,7 @@ export function TournamentFormSimple({
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-site-text mb-1">참가 조건 *</label>
+          <label className={chrome.label}>참가 조건 *</label>
           <div className="flex flex-wrap gap-2 mb-2">
             {ENTRY_QUALIFICATION_OPTIONS.map((opt) => (
               <button
@@ -476,8 +550,8 @@ export function TournamentFormSimple({
                 type="button"
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
                   form.entryQualificationType === opt.value
-                    ? "bg-site-primary text-white"
-                    : "bg-site-bg text-site-text border border-site-border"
+                    ? chrome.pillPrimary
+                    : chrome.pillOff
                 }`}
                 onClick={() => setForm((f) => ({ ...f, entryQualificationType: opt.value }))}
               >
@@ -488,14 +562,14 @@ export function TournamentFormSimple({
           <input
             type="text"
             required
-            className="w-full border border-site-border rounded-lg px-3 py-2.5 text-site-text bg-site-card"
+            className={chrome.select}
             placeholder="예: 에버 0.5 미만 / 점수 10점 이상"
             value={form.entryCondition}
             onChange={(e) => setForm((f) => ({ ...f, entryCondition: e.target.value }))}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-site-text mb-1">지역 / 전국 *</label>
+          <label className={chrome.label}>지역 / 전국 *</label>
           <div className="flex gap-2">
             {SCOPE_OPTIONS.map((opt) => (
               <button
@@ -503,8 +577,8 @@ export function TournamentFormSimple({
                 type="button"
                 className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium ${
                   form.scope === opt.value
-                    ? "bg-site-primary text-white"
-                    : "bg-site-bg text-site-text border border-site-border"
+                    ? chrome.pillPrimary
+                    : chrome.pillOff
                 }`}
                 onClick={() => setForm((f) => ({ ...f, scope: opt.value }))}
               >
@@ -514,17 +588,17 @@ export function TournamentFormSimple({
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-site-text mb-1">대회 기간 (일) *</label>
+          <label className={chrome.label}>대회 기간 (일) *</label>
           <input
             type="number"
             min={1}
-            className="w-full max-w-24 border border-site-border rounded-lg px-3 py-2.5 text-site-text bg-site-card"
+            className={`w-full max-w-24 ${chrome.inputNum}`}
             value={form.durationDays}
             onChange={(e) =>
               setForm((f) => ({ ...f, durationDays: Math.max(1, parseInt(e.target.value, 10) || 1) }))
             }
           />
-          <p className="mt-1 text-xs text-site-text-muted">시작일로부터 며칠 동안인지 입력 (기본값 1)</p>
+          <p className={`mt-1 ${chrome.muted}`}>시작일로부터 며칠 동안인지 입력 (기본값 1)</p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
@@ -535,7 +609,7 @@ export function TournamentFormSimple({
               checked={form.allowMultipleSlots}
               onChange={(e) => setForm((f) => ({ ...f, allowMultipleSlots: e.target.checked }))}
             />
-            <label htmlFor="allowMultiple" className="text-sm text-site-text">
+            <label htmlFor="allowMultiple" className={chrome.inlineLabel}>
               중복 참가 허용
             </label>
           </div>
@@ -543,11 +617,11 @@ export function TournamentFormSimple({
             <input
               type="checkbox"
               id="participantsListPublic"
-              className="rounded border-site-border text-site-primary focus:ring-site-primary"
+              className={chrome.checkbox}
               checked={form.participantsListPublic}
               onChange={(e) => setForm((f) => ({ ...f, participantsListPublic: e.target.checked }))}
             />
-            <label htmlFor="participantsListPublic" className="text-sm text-site-text">
+            <label htmlFor="participantsListPublic" className={chrome.inlineLabel}>
               참가자 명단 공개
             </label>
           </div>
@@ -555,24 +629,24 @@ export function TournamentFormSimple({
       </section>
 
       {/* 3. 일정 · 장소 */}
-      <section className="rounded-xl border border-site-border bg-site-card p-4 sm:p-5 space-y-4">
-        <h2 className="text-base font-semibold text-site-text border-b border-site-border pb-2">일정 · 장소</h2>
+      <section className={chrome.section}>
+        <h2 className={chrome.sectionTitle}>일정 · 장소</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-site-text mb-1">시작 일시 *</label>
+            <label className={chrome.label}>시작 일시 *</label>
             <input
               type="datetime-local"
               required
-              className="w-full border border-site-border rounded-lg px-3 py-2.5 text-site-text bg-site-card"
+              className={chrome.select}
               value={form.startAt}
               onChange={(e) => setForm((f) => ({ ...f, startAt: e.target.value }))}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-site-text mb-1">종료 일시</label>
+            <label className={chrome.label}>종료 일시</label>
             <input
               type="datetime-local"
-              className="w-full border border-site-border rounded-lg px-3 py-2.5 text-site-text bg-site-card"
+              className={chrome.select}
               value={form.endAt}
               onChange={(e) => setForm((f) => ({ ...f, endAt: e.target.value }))}
             />
@@ -580,7 +654,7 @@ export function TournamentFormSimple({
         </div>
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="block text-sm font-medium text-site-text">대회 장소 * (1곳 이상)</label>
+            <label className={chrome.label}>대회 장소 * (1곳 이상)</label>
             <button
               type="button"
               onClick={() => {
@@ -590,18 +664,18 @@ export function TournamentFormSimple({
                   { venueNumber: nextNum, displayLabel: `${nextNum}경기장`, venueName: "", address: "", phone: "" },
                 ]);
               }}
-              className="rounded-lg border border-site-border px-3 py-1.5 text-sm font-medium text-site-text hover:bg-site-bg"
+              className={chrome.addVenueBtn}
             >
               대회장소 추가
             </button>
           </div>
           <div className="space-y-3">
             {venues.map((v, idx) => (
-              <div key={v.venueNumber} className="rounded-lg border border-site-border p-3 space-y-2 bg-site-bg/30">
-                <div className="font-medium text-site-text text-sm">{v.displayLabel}</div>
+              <div key={v.venueNumber} className={chrome.venueCard}>
+                <div className={chrome.venueTitle}>{v.displayLabel}</div>
                 <input
                   type="text"
-                  className="w-full border border-site-border rounded px-3 py-2 text-sm"
+                  className={chrome.venueInput}
                   placeholder="경기장명"
                   value={v.venueName}
                   onChange={(e) =>
@@ -614,7 +688,7 @@ export function TournamentFormSimple({
                 />
                 <input
                   type="text"
-                  className="w-full border border-site-border rounded px-3 py-2 text-sm"
+                  className={chrome.venueInput}
                   placeholder="주소"
                   value={v.address}
                   onChange={(e) =>
@@ -627,7 +701,7 @@ export function TournamentFormSimple({
                 />
                 <input
                   type="text"
-                  className="w-full border border-site-border rounded px-3 py-2 text-sm"
+                  className={chrome.venueInput}
                   placeholder="전화"
                   value={v.phone}
                   onChange={(e) =>
@@ -654,22 +728,38 @@ export function TournamentFormSimple({
       </section>
 
       {/* 경기요강 (선택) */}
-      <section className="rounded-xl border border-site-border bg-site-card p-4 sm:p-5 space-y-4">
-        <h2 className="text-base font-semibold text-site-text border-b border-site-border pb-2">경기요강 (선택)</h2>
+      <section className={chrome.section}>
+        <h2 className={chrome.sectionTitle}>경기요강 (선택)</h2>
         {children}
       </section>
 
-      <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2 sm:items-center">
+      <div className="flex flex-col-reverse sm:flex-row flex-wrap gap-3 pt-2 sm:items-center">
         <Link
           href={onCancelHref}
-          className="rounded-lg border border-site-border px-5 py-2.5 font-medium text-site-text hover:bg-site-bg text-center"
+          className={chrome.linkBtn}
         >
           취소
         </Link>
+        {showDraftSaveButton ? (
+          <button
+            type="button"
+            disabled={saving}
+            className={chrome.linkBtn}
+            onClick={() => {
+              submitAsDraftRef.current = true;
+              const formEl = document.getElementById(
+                tournamentId ? `tournament-form-${tournamentId}` : "tournament-form-new"
+              ) as HTMLFormElement | null;
+              formEl?.requestSubmit();
+            }}
+          >
+            {saving ? "처리 중..." : "임시저장"}
+          </button>
+        ) : null}
         <button
           type="submit"
           disabled={saving}
-          className="rounded-lg bg-site-primary px-5 py-2.5 font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className={chrome.submitBtn}
         >
           {saving ? "저장 중..." : submitLabel ?? (mode === "create" ? "등록" : "저장")}
         </button>

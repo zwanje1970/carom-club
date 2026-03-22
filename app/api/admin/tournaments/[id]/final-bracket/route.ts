@@ -56,6 +56,9 @@ export async function GET(
     tournamentId,
     matches: matches.map((m) => ({
       id: m.id,
+      tournamentRoundId: m.tournamentRoundId,
+      matchVenueId: m.matchVenueId,
+      bracketPhase: m.bracketPhase,
       roundIndex: m.roundIndex,
       matchIndex: m.matchIndex,
       entryIdA: m.entryIdA,

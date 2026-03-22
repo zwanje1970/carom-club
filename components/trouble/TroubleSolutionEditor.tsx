@@ -23,7 +23,7 @@ import { NanguSpinEditor } from "@/components/nangu/NanguSpinEditor";
 import { NanguFocusZoomOverlay, type NanguFocusZoomTarget } from "@/components/nangu/NanguFocusZoomOverlay";
 import { sanitizeImageSrc } from "@/lib/image-src";
 import { TROUBLE_SOLUTION_CONSOLE } from "@/components/trouble/trouble-console-contract";
-import { cueFirstObjectHitFromBallPlacement } from "@/lib/solution-path-geometry";
+import { resolveTroubleFirstObjectBallKey } from "@/lib/trouble-first-object-ball";
 import {
   BALL_SPEED_OPTIONS,
   ballSpeedToLegacySpeed,
@@ -88,12 +88,19 @@ export function TroubleSolutionEditor({
       : ballPlacement.whiteBall
     : { x: 0.5, y: 0.5 };
 
-  const firstObjectHit = useMemo(() => {
-    if (!ballPlacement || pathPoints.length < 1) return null;
-    return cueFirstObjectHitFromBallPlacement(cuePos, pathPoints[0], ballPlacement, rect);
-  }, [ballPlacement, pathPoints, cuePos, rect]);
+  /** 미리보기 1목 링·저장 — `lib/trouble-first-object-ball.ts`와 동일(스팟 없으면 null) */
+  const firstObjectBallKey = useMemo(() => {
+    if (!ballPlacement) return null;
+    return resolveTroubleFirstObjectBallKey({
+      placement: ballPlacement,
+      cuePos,
+      pathPoints,
+      objectPathPoints,
+      rect,
+    });
+  }, [ballPlacement, cuePos, pathPoints, objectPathPoints, rect]);
 
-  const collisionNorm = firstObjectHit?.collision ?? null;
+  const showObjectBallSpotPulse = firstObjectBallKey != null;
 
   const openPathFullscreen = useCallback(() => {
     setPathFsKey((k) => k + 1);
@@ -113,23 +120,25 @@ export function TroubleSolutionEditor({
       const pointsForPath = pathPoints.length >= 1 ? pathPoints.map((p) => ({ x: p.x, y: p.y })) : [];
       let reflectionPath: NanguSolutionData["reflectionPath"];
       let reflectionObjectBall: NanguSolutionData["reflectionObjectBall"];
-      if (collisionNorm && objectPathPoints.length >= 1 && ballPlacement && pathPoints.length >= 1) {
-        const hit = cueFirstObjectHitFromBallPlacement(cuePos, pathPoints[0], ballPlacement, rect);
-        const key = hit?.objectKey;
-        if (key) {
-          const objPts = objectPathPoints.map((p) => ({ x: p.x, y: p.y }));
-          const startNorm =
-            key === "red"
-              ? ballPlacement.redBall
-              : key === "yellow"
-                ? ballPlacement.yellowBall
-                : ballPlacement.whiteBall;
-          reflectionPath = {
-            points: [{ x: startNorm.x, y: startNorm.y }, ...objPts],
-            pointsWithType: objectPathPoints,
-          };
-          reflectionObjectBall = key;
-        }
+      if (
+        firstObjectBallKey &&
+        objectPathPoints.length >= 1 &&
+        ballPlacement &&
+        pathPoints.length >= 1
+      ) {
+        const key = firstObjectBallKey;
+        const objPts = objectPathPoints.map((p) => ({ x: p.x, y: p.y }));
+        const startNorm =
+          key === "red"
+            ? ballPlacement.redBall
+            : key === "yellow"
+              ? ballPlacement.yellowBall
+              : ballPlacement.whiteBall;
+        reflectionPath = {
+          points: [{ x: startNorm.x, y: startNorm.y }, ...objPts],
+          pointsWithType: objectPathPoints,
+        };
+        reflectionObjectBall = key;
       }
 
       const solutionData: NanguSolutionData = {
@@ -173,10 +182,10 @@ export function TroubleSolutionEditor({
       className="space-y-6 flex flex-col"
       data-trouble-console={C.root}
     >
-      {/* 공배치 미리보기 — 기기 방향 반영, 탭 시 전체화면 */}
-      <div className="w-full flex flex-col items-center">
+      {/* 공배치 미리보기 — 기기 방향 반영, 탭 시 전체화면 (PC에서 테이블 폭만큼 가운데 — 당구노트 공배치와 동일) */}
+      <div className="flex w-full flex-col items-center">
         <div
-          className={`relative rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600 w-full max-w-full ${
+          className={`relative mx-auto w-full max-w-full overflow-hidden rounded-lg border border-gray-200 dark:border-slate-600 ${
             previewDisabled ? "opacity-50" : ""
           }`}
           style={{
@@ -200,12 +209,8 @@ export function TroubleSolutionEditor({
                     className="absolute inset-0 w-full h-full rounded-none border-0 overflow-hidden"
                     hideObjectBall={false}
                     showCueBallSpot
-                    showObjectBallSpot={
-                      pathPoints.length >= 1 &&
-                      objectPathPoints.length >= 1 &&
-                      Boolean(firstObjectHit?.objectKey)
-                    }
-                    objectBallSpotKey={firstObjectHit?.objectKey ?? null}
+                    showObjectBallSpot={showObjectBallSpotPulse}
+                    objectBallSpotKey={firstObjectBallKey}
                     orientation={previewOrientation}
                     betweenTableAndBallsLayer={
                       <NanguSolutionPathOverlay
@@ -254,11 +259,13 @@ export function TroubleSolutionEditor({
         </div>
 
         <div
-          className="mt-2 flex flex-wrap items-center gap-2 self-stretch"
+          className="mx-auto mt-2 flex w-full max-w-full flex-wrap items-center justify-center gap-2"
+          style={{ maxWidth: DEFAULT_TABLE_WIDTH }}
           data-trouble-region={C.region.pathToolbar}
         >
           <button
             type="button"
+            data-testid="trouble-e2e-open-path-fullscreen"
             data-trouble-action={C.action.togglePathMode}
             disabled={previewDisabled}
             onClick={openPathFullscreen}

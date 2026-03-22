@@ -1,6 +1,7 @@
 /**
  * 수구→첫 스팟 직선과 1목적구(원)의 접촉 시점 — 중심거리 = 2R 인 첫 교점
  * 1목은 수구를 제외한 두 공 중, 광선상 가장 먼저 맞는 공.
+ * (난구 전체 규칙·쿠션 경로 등은 `lib/nangu-types.ts`, `lib/trouble-first-object-ball.ts` 참고)
  */
 import type { PlayfieldRect } from "@/lib/billiard-table-constants";
 import {

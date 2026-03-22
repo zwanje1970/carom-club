@@ -1,0 +1,84 @@
+import { NextResponse } from "next/server";
+import { getSession } from "@/lib/auth";
+import { assertClientCanMutateTournamentById } from "@/lib/client-tournament-access";
+import { prisma } from "@/lib/db";
+import { isDatabaseConfigured } from "@/lib/db-mode";
+import { getDisplayName } from "@/lib/display-name";
+
+/** 클라 콘솔: 조직 소속 대회 참가자 목록 (JSON) */
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  if (!isDatabaseConfigured()) {
+    return NextResponse.json({ error: "데이터베이스가 연결되지 않았습니다." }, { status: 503 });
+  }
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
+  const { id: tournamentId } = await params;
+  const gate = await assertClientCanMutateTournamentById(session, tournamentId);
+  if (!gate.ok) {
+    return NextResponse.json({ error: gate.error }, { status: gate.status });
+  }
+
+  const tournament = await prisma.tournament.findFirst({
+    where: { id: tournamentId, organizationId: gate.organizationId },
+    select: {
+      id: true,
+      name: true,
+      maxParticipants: true,
+      status: true,
+      participantRosterLockedAt: true,
+      rule: { select: { maxEntries: true, useWaiting: true } },
+    },
+  });
+  if (!tournament) {
+    return NextResponse.json({ error: "대회를 찾을 수 없습니다." }, { status: 404 });
+  }
+
+  const entries = await prisma.tournamentEntry.findMany({
+    where: { tournamentId },
+    include: {
+      user: { include: { memberProfile: true } },
+      attendances: true,
+    },
+    orderBy: [{ status: "asc" }, { waitingListOrder: "asc" }, { createdAt: "asc" }],
+  });
+
+  const rows = entries.map((e) => ({
+    id: e.id,
+    userId: e.userId,
+    userName: getDisplayName(e.user),
+    userPhone: e.user.phone ?? null,
+    userEmail: e.user.email ?? null,
+    handicap: e.handicap ?? e.user.memberProfile?.handicap ?? null,
+    avg: e.avg ?? e.user.memberProfile?.avg ?? null,
+    avgProofUrl: e.avgProofUrl ?? e.user.memberProfile?.avgProofUrl ?? null,
+    depositorName: e.depositorName,
+    clubOrAffiliation: e.clubOrAffiliation ?? null,
+    round: e.round ?? null,
+    status: e.status,
+    waitingListOrder: e.waitingListOrder,
+    slotNumber: e.slotNumber ?? 1,
+    paymentMarkedByApplicantAt: e.paymentMarkedByApplicantAt?.toISOString() ?? null,
+    paidAt: e.paidAt?.toISOString() ?? null,
+    reviewedAt: e.reviewedAt?.toISOString() ?? null,
+    rejectionReason: e.rejectionReason ?? null,
+    createdAt: e.createdAt.toISOString(),
+    attended: e.attendances[0]?.attended ?? null,
+  }));
+
+  return NextResponse.json({
+    tournament: {
+      id: tournament.id,
+      name: tournament.name,
+      maxParticipants: tournament.maxParticipants ?? tournament.rule?.maxEntries ?? null,
+      useWaiting: tournament.rule?.useWaiting ?? false,
+      tournamentStatus: tournament.status,
+      participantRosterLockedAt: tournament.participantRosterLockedAt?.toISOString() ?? null,
+    },
+    entries: rows,
+  });
+}

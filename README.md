@@ -55,3 +55,16 @@ npm run dev
 
 - `npm run build` — Prisma generate + Next 빌드
 - `npm run lint` — ESLint
+
+## 난구 경로 / 1목 E2E · QA
+
+Playwright로 **경로선·1목** UI를 검증합니다.
+
+```bash
+npx playwright install chromium   # 최초 1회
+npm run dev                       # 터미널 1
+# 터미널 2 (PowerShell): $env:PLAYWRIGHT_SKIP_WEBSERVER='1'; npm run test:e2e
+```
+
+- **실행 방법·배포 환경변수·수동 체크리스트·장애 시 확인 순서:** [`docs/QA-TROUBLE-PATH.md`](docs/QA-TROUBLE-PATH.md)
+- **fixture·PLAYWRIGHT_BASE_URL:** [`e2e/README.md`](e2e/README.md)

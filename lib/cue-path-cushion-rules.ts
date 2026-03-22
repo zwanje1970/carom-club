@@ -590,12 +590,16 @@ export function moveCuePathSpotById(
   prev: NanguPathPoint[],
   id: string,
   norm: { x: number; y: number },
-  snap: CuePathSnapFn
+  snap: CuePathSnapFn,
+  opts?: { forceMovableSpotId?: string | null }
 ): NanguPathPoint[] {
   const idx = prev.findIndex((q) => q.id === id);
   if (idx < 0) return prev;
-  /** 마지막 세그먼트 양끝 스팟만 이동 — 그 안의 그 외(더 앞선) 스팟은 고정 */
-  if (!isLastSegmentEndpointSpotIndex(prev, idx)) {
+  const n = prev.length;
+  const forceId = opts?.forceMovableSpotId ?? null;
+  /** 기본: 마지막 스팟만 이동. 사용자가 다른 스팟을 활성화하면 해당 id만 추가 이동 허용 */
+  const canMove = idx === n - 1 || (forceId != null && prev[idx]!.id === forceId);
+  if (!canMove) {
     return prev;
   }
   const snapCtx = (): CuePathSnapContext => ({

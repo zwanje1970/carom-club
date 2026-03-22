@@ -87,7 +87,7 @@ export default async function ClientTournamentDetailPage({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-site-text">{tournament.name}</h1>
         <Link
-          href={`/client/tournaments/${id}/edit`}
+          href={`/client/operations/tournaments/${id}/edit`}
           className="rounded-lg border border-site-border px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-800"
         >
           기본 정보 수정

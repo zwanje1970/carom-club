@@ -4,10 +4,14 @@ import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
 import { ORGANIZATION_SELECT_PUBLIC, TOURNAMENT_SELECT_LIST } from "@/lib/db-selects";
 import { isDatabaseConfigured } from "@/lib/db-mode";
-import { createListingPurchaseRecord } from "@/lib/listing-registration";
 import { normalizeSlug } from "@/lib/normalize-slug";
 import { isPlatformAdmin, isClientAdmin, canManageOrganization } from "@/lib/permissions";
 import { getPlatformSettings, hasActiveClientMembership } from "@/lib/platform-settings";
+import {
+  buildTournamentCreateData,
+  insertTournamentWithRuleAndListing,
+  type TournamentCreateFields,
+} from "@/lib/tournament-create-shared";
 
 /** 최근 대회 목록 (이전 대회 불러오기 모달용). ?organizationId= 시 해당 업체만. GET → 조회 권한만. */
 export async function GET(request: Request) {
@@ -200,88 +204,38 @@ export async function POST(request: Request) {
     }
   }
 
-  const validStatus =
-    typeof status === "string" && ["DRAFT", "OPEN", "CLOSED", "FINISHED", "HIDDEN"].includes(status)
-      ? status
-      : "OPEN";
-
-  const createData = {
-    organizationId,
-    createdByUserId: session.id,
-    name: name.trim(),
-    startAt: new Date(startAt),
-    ...(endAt != null && endAt !== "" && { endAt: new Date(endAt) }),
-    venue: venue != null ? (venue as string).trim() || null : null,
-    venueName: venueName != null ? (venueName as string).trim() || null : null,
-    region: region != null ? (region as string).trim() || null : null,
-    status: validStatus as "DRAFT" | "OPEN" | "CLOSED" | "FINISHED" | "HIDDEN",
-    gameFormat: gameFormat != null ? (gameFormat as string).trim() || null : null,
-    title: title != null ? (title as string).trim() || null : null,
-    slug: slug != null ? (slug as string).trim() || null : null,
-    summary: summary != null ? (summary as string).trim() || null : null,
-    description: description != null ? (description as string).trim() || null : null,
-    posterImageUrl: posterImageUrl != null ? (posterImageUrl as string).trim() || null : null,
-    imageUrl: imageUrl != null ? (imageUrl as string).trim() || null : null,
-    entryFee: entryFee != null && Number.isFinite(Number(entryFee)) ? Number(entryFee) : null,
-    maxParticipants: maxParticipants != null && Number.isFinite(Number(maxParticipants)) ? Number(maxParticipants) : null,
-    entryCondition: entryCondition != null ? (entryCondition as string).trim() || null : null,
-    qualification: qualification != null ? (qualification as string).trim() || null : null,
-    prizeInfo: prizeInfo != null ? (prizeInfo as string).trim() || null : null,
-    rules: rules != null ? (rules as string).trim() || null : null,
-    promoContent: promoContent != null ? (promoContent as string).trim() || null : null,
-    outlineDraft: outlineDraft != null ? (outlineDraft as string).trim() || null : null,
-    outlinePublished: outlinePublished != null ? (outlinePublished as string).trim() || null : null,
-    approvalType: approvalType != null ? (approvalType as string).trim() || undefined : undefined,
+  const fields: TournamentCreateFields = {
+    name: name!.trim(),
+    startAt: startAt as string,
+    endAt,
+    venue,
+    venueName,
+    region,
+    status,
+    gameFormat,
+    title,
+    slug,
+    summary,
+    description,
+    posterImageUrl,
+    imageUrl,
+    entryFee,
+    maxParticipants,
+    entryCondition,
+    qualification,
+    prizeInfo,
+    rules,
+    promoContent,
+    outlineDraft,
+    outlinePublished,
+    approvalType,
+    rule: rule && typeof rule === "object" ? rule : null,
   };
-  console.log("[POST /api/admin/tournaments] create data payload (fields being sent):", JSON.stringify(Object.keys(createData), null, 2));
-  console.log("[POST /api/admin/tournaments] create data payload (values):", JSON.stringify(createData, null, 2));
+  const createData = buildTournamentCreateData(organizationId, session.id, fields);
 
   try {
-    const tournament = await prisma.tournament.create({
-      data: createData,
-    });
-    if (rule && typeof rule === "object") {
-      const bracketConfigStr =
-        rule.bracketConfig !== undefined && rule.bracketConfig !== null
-          ? typeof rule.bracketConfig === "string"
-            ? rule.bracketConfig
-            : JSON.stringify(rule.bracketConfig)
-          : undefined;
-      await prisma.tournamentRule.upsert({
-        where: { tournamentId: tournament.id },
-        create: {
-          tournamentId: tournament.id,
-          entryFee: rule.entryFee ?? undefined,
-          operatingFee: rule.operatingFee ?? undefined,
-          maxEntries: rule.maxEntries ?? undefined,
-          useWaiting: rule.useWaiting ?? false,
-          entryConditions: rule.entryConditions ?? undefined,
-          bracketType: rule.bracketType ?? undefined,
-          bracketConfig: bracketConfigStr ?? undefined,
-          prizeType: rule.prizeType ?? undefined,
-          prizeInfo: rule.prizeInfo ?? undefined,
-        },
-        update: {
-          entryFee: rule.entryFee ?? undefined,
-          operatingFee: rule.operatingFee ?? undefined,
-          maxEntries: rule.maxEntries ?? undefined,
-          useWaiting: rule.useWaiting ?? false,
-          entryConditions: rule.entryConditions ?? undefined,
-          bracketType: rule.bracketType ?? undefined,
-          bracketConfig: bracketConfigStr ?? undefined,
-          prizeType: rule.prizeType ?? undefined,
-          prizeInfo: rule.prizeInfo ?? undefined,
-        },
-      });
-    }
-    await createListingPurchaseRecord({
-      organizationId: tournament.organizationId,
-      listingCode: "TOURNAMENT_POSTING",
-      targetType: "TOURNAMENT",
-      targetId: tournament.id,
-    }).catch((err) => console.warn("listing purchase record create (tournament) skipped:", err));
-
-    return NextResponse.json({ ok: true, id: tournament.id });
+    const { id } = await insertTournamentWithRuleAndListing(createData, fields.rule);
+    return NextResponse.json({ ok: true, id });
   } catch (e) {
     const err = e as { code?: string; meta?: Record<string, unknown>; message?: string };
     console.error("tournament create error (raw):", e);

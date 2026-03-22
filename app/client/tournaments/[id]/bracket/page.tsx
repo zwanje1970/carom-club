@@ -75,9 +75,17 @@ export default async function ClientTournamentBracketPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-site-text">대진표 관리</h1>
-        <Link href={base} className="rounded-lg border border-site-border px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-slate-800">
-          ← 대회 상세
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/client/operations/tournaments/${id}/bracket-build`}
+            className="rounded-lg border border-site-border bg-site-bg px-3 py-2 text-sm font-medium hover:bg-site-border/20"
+          >
+            대회 운영 콘솔 · 대진 생성
+          </Link>
+          <Link href={base} className="rounded-lg border border-site-border px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-slate-800">
+            ← 대회 상세
+          </Link>
+        </div>
       </div>
 
       <nav className="flex flex-wrap gap-1 border-b border-site-border pb-2">

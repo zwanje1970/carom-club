@@ -93,18 +93,32 @@ export async function PATCH(
     const orgMembershipType = requestedType === "REGISTERED" ? "ANNUAL" : "NONE";
 
     if (existingOrg) {
-      // 이미 업체가 있음: 신청만 APPROVED로 갱신하고 organization 등급 반영
-      await prisma.clientApplication.update({
-        where: { id },
-        data: { status: "APPROVED", rejectedReason: null, reviewedAt: now, reviewedByUserId },
-      });
-      await prisma.organization.update({
-        where: { id: existingOrg.id },
-        data: {
-          clientType: orgClientType,
-          approvalStatus: "APPROVED",
-          membershipType: orgMembershipType,
-        },
+      // 이미 업체가 있음: 신청만 APPROVED로 갱신하고 organization 등급 반영 + 소유자 멤버 행 보장
+      await prisma.$transaction(async (tx) => {
+        await tx.clientApplication.update({
+          where: { id },
+          data: { status: "APPROVED", rejectedReason: null, reviewedAt: now, reviewedByUserId },
+        });
+        await tx.organization.update({
+          where: { id: existingOrg.id },
+          data: {
+            clientType: orgClientType,
+            approvalStatus: "APPROVED",
+            membershipType: orgMembershipType,
+          },
+        });
+        await tx.organizationMember.upsert({
+          where: {
+            organizationId_userId: { organizationId: existingOrg.id, userId: applicantId },
+          },
+          create: {
+            organizationId: existingOrg.id,
+            userId: applicantId,
+            role: "OWNER",
+            status: "ACTIVE",
+          },
+          update: { status: "ACTIVE", role: "OWNER" },
+        });
       });
       return NextResponse.json({ ok: true, status: "APPROVED" });
     }

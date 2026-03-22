@@ -1,9 +1,22 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getAdminCopy, getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import {
+  CLIENT_CONSOLE_ORG_COOKIE,
+  getAccessibleClientOrganizationsCached,
+  pickActiveOrganizationId,
+} from "@/lib/client-console-org";
 import { canAccessClientDashboard } from "@/types/auth";
-import { ClientSidebar } from "@/components/client/ClientSidebar";
+import { ClientConsoleShell } from "@/components/client/console/ClientConsoleShell";
+
+export const metadata = {
+  title: { template: "%s | 대회 운영 콘솔", default: "캐롬클럽 대회 운영 콘솔" },
+};
+
+/** 서버 세션·권한 — 캐시와 맞지 않음 */
+export const dynamic = "force-dynamic";
 
 export default async function ClientLayout({
   children,
@@ -56,10 +69,18 @@ export default async function ClientLayout({
     redirect("/");
   }
 
+  const organizations = await getAccessibleClientOrganizationsCached(session.id);
+  const cookieStore = await cookies();
+  const preferredOrgId = cookieStore.get(CLIENT_CONSOLE_ORG_COOKIE)?.value ?? null;
+  const activeOrganizationId = pickActiveOrganizationId(organizations, preferredOrgId);
+
   return (
-    <div className="flex min-h-screen bg-site-bg">
-      <ClientSidebar copy={copy} />
-      <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
-    </div>
+    <ClientConsoleShell
+      copy={copy}
+      organizations={organizations}
+      activeOrganizationId={activeOrganizationId}
+    >
+      {children}
+    </ClientConsoleShell>
   );
 }

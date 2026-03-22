@@ -119,7 +119,7 @@
 
 ### 4.2 라이브러리
 
-- `lib/auth-org.ts`: `getClientAdminOrganizationId(session)`, `getAllowedOrganizationIds(session)` — CLIENT_ADMIN은 Organization.ownerUserId === session.id 인 1개.
+- `lib/auth-org.ts`: `getClientAdminOrganizationId(session)`, `getAllowedOrganizationIds(session)` — CLIENT_ADMIN은 `Organization.ownerUserId` 또는 `OrganizationMember(ACTIVE)`로 연결된 조직들; 활성 조직은 쿠키 `client_console_org_id` + `lib/client-console-org.ts`의 `pickActiveOrganizationId`.
 
 ### 4.3 레이아웃/페이지
 
