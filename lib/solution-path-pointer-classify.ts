@@ -12,7 +12,10 @@ import {
   type PlayfieldRect,
 } from "@/lib/billiard-table-constants";
 import { getNonCueBallNorms, type NanguBallPlacement, type NanguPathPoint } from "@/lib/nangu-types";
-import { cueFirstObjectHitAmongNormalized } from "@/lib/solution-path-geometry";
+import {
+  ballCircumferenceNormFacingApproach,
+  cueFirstObjectHitAmongNormalized,
+} from "@/lib/solution-path-geometry";
 
 /** 스팟/세그먼트 히트 — 플레이필드 px 기준 (2:1에서 norm hypot 왜곡 방지) */
 const SPOT_HIT_PX = 30;
@@ -66,6 +69,8 @@ export type PathPointerClassification =
   | { kind: "cueSegment"; segmentIndex: number }
   | { kind: "objectSegment"; segmentIndex: number }
   | { kind: "emptyCue" }
+  /** pathMode에서 목적구(비수구) 넓은 터치 반경 — `emptyCue`와 동일 처리, 패닝용 빈 영역으로 보지 않음 */
+  | { kind: "pathObjectBallTap" }
   | { kind: "emptyObject" };
 
 export function isClassificationEmptyForPan(c: PathPointerClassification): boolean {
@@ -116,26 +121,62 @@ export function classifySolutionPathPointerHit(params: {
     pathPoints.length >= 1
   ) {
     const cueKey = layoutForCollision.cueBall === "yellow" ? "yellow" : "white";
-    const cueNorm =
-      ballNormOverrides?.[cueKey] ??
-      (cueKey === "yellow" ? layoutForCollision.yellowBall : layoutForCollision.whiteBall);
-    if (distanceNormPointsInPlayfieldPx(norm, cueNorm, rect) <= ballTapPx) {
+    const layoutCueNorm =
+      cueKey === "yellow" ? layoutForCollision.yellowBall : layoutForCollision.whiteBall;
+    const currentCueNorm = ballNormOverrides?.[cueKey] ?? layoutCueNorm;
+    const hitCurrent = distanceNormPointsInPlayfieldPx(norm, currentCueNorm, rect) <= ballTapPx;
+    const hitOriginal = distanceNormPointsInPlayfieldPx(norm, layoutCueNorm, rect) <= ballTapPx;
+    /** 재생 후 수구가 원래 자리에서 떠 있을 때만 — 원래 자리 탭으로도 복귀 허용 */
+    const cueVisuallyMoved =
+      distanceNormPointsInPlayfieldPx(currentCueNorm, layoutCueNorm, rect) > 4;
+    if (hitCurrent || (cueVisuallyMoved && hitOriginal)) {
       return { kind: "cueBallPlayback" };
     }
   }
 
   if (!pathMode && !objectPathMode) return { kind: "inactive" };
-  const firstForCollision =
-    layoutForCollision && pathPoints.length >= 1
-      ? getNonCueBallNorms(layoutForCollision)
-      : objectBallNorm && pathPoints.length >= 1
-        ? [{ key: "red" as const, x: objectBallNorm.x, y: objectBallNorm.y }]
-        : null;
 
-  const collisionNorm =
-    firstForCollision && firstForCollision.length > 0
-      ? cueFirstObjectHitAmongNormalized(cuePos, pathPoints[0], firstForCollision, rect)?.collision ?? null
-      : null;
+  /**
+   * 1목 경로 시작점(충돌점) — `SolutionPathEditorFullscreen`의 cueToFirstObjectHit와 동일.
+   * 수구 경로 첫 스팟이 없으면: 수구에 가장 가까운 목적구 원주(수구 방향) — 분류에서도 collisionNorm 필요.
+   */
+  let collisionNorm: { x: number; y: number } | null = null;
+  if (pathPoints.length >= 1) {
+    const firstForCollision =
+      layoutForCollision
+        ? getNonCueBallNorms(layoutForCollision)
+        : objectBallNorm
+          ? [{ key: "red" as const, x: objectBallNorm.x, y: objectBallNorm.y }]
+          : null;
+    if (firstForCollision && firstForCollision.length > 0) {
+      collisionNorm =
+        cueFirstObjectHitAmongNormalized(cuePos, pathPoints[0], firstForCollision, rect)?.collision ?? null;
+    }
+  } else if (layoutForCollision) {
+    const nonCue = getNonCueBallNorms(layoutForCollision);
+    if (nonCue.length > 0) {
+      let nearest = nonCue[0]!;
+      let bestD = Infinity;
+      for (const b of nonCue) {
+        const d = distanceNormPointsInPlayfieldPx(cuePos, { x: b.x, y: b.y }, rect);
+        if (d < bestD) {
+          bestD = d;
+          nearest = b;
+        }
+      }
+      collisionNorm = ballCircumferenceNormFacingApproach(
+        { x: nearest.x, y: nearest.y },
+        cuePos,
+        rect
+      );
+    }
+  } else if (objectBallNorm) {
+    collisionNorm = ballCircumferenceNormFacingApproach(
+      { x: objectBallNorm.x, y: objectBallNorm.y },
+      cuePos,
+      rect
+    );
+  }
 
   /**
    * 1목·수구 스팟/세그먼트가 공(줌)보다 먼저 — 공 표면에 찍힌 스팟도 드래그·삭제·세그먼트 삽입 가능.
@@ -200,8 +241,25 @@ export function classifySolutionPathPointerHit(params: {
     const rb = ballNormOverrides?.red ?? ballPickLayout.redBall;
     const yb = ballNormOverrides?.yellow ?? ballPickLayout.yellowBall;
     const wb = ballNormOverrides?.white ?? ballPickLayout.whiteBall;
-    for (const b of [rb, yb, wb]) {
+    const cueBall = ballPickLayout.cueBall === "yellow" ? "yellow" : "white";
+    /** 노란/흰 중 수구만 true — 빨강은 항상 목적구 후보 */
+    const isCueBallKey = (key: "red" | "yellow" | "white") =>
+      key !== "red" && key === cueBall;
+
+    for (const { key, b } of [
+      { key: "red" as const, b: rb },
+      { key: "yellow" as const, b: yb },
+      { key: "white" as const, b: wb },
+    ]) {
       if (distanceNormPointsInPlayfieldPx(norm, b, rect) <= ballTapPx) {
+        /** 1목 경로 모드: 목적구(비수구) 탭은 스팟 추가 — 수구 탭만 줌용 `ball` */
+        if (objectPathMode && !isCueBallKey(key)) {
+          return { kind: "emptyObject" };
+        }
+        /** 수구 경로: 목적구 터치 반경이면 끝점이 공에 안 닿아도 목적구에 스팟 스냅 */
+        if (pathMode && !isCueBallKey(key)) {
+          return { kind: "pathObjectBallTap" };
+        }
         return { kind: "ball" };
       }
     }

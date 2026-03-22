@@ -15,12 +15,15 @@ type Props = {
   copy: Record<string, string>;
   /** 당구장 소개 캐러셀용 (진행중 대회 다음에 표시) */
   carouselVenues?: VenueCarouselItem[];
+  /** 메인 대회·당구장 가로 흐름 속도(1~100) */
+  homeCarouselFlowSpeed?: number;
 };
 
 export function HomeSectionsWithLocation({
   initialTournaments,
   copy,
   carouselVenues = [],
+  homeCarouselFlowSpeed = 50,
 }: Props) {
   const [tournaments, setTournaments] = useState<TournamentItem[]>(
     initialTournaments.map((t) => ({
@@ -98,8 +101,14 @@ export function HomeSectionsWithLocation({
 
   return (
     <>
-      <HomeTournamentCards tournaments={tournaments} copy={copy} />
-      {carouselVenues.length > 0 && <VenueCarousel venues={carouselVenues} />}
+      <HomeTournamentCards
+        tournaments={tournaments}
+        copy={copy}
+        homeCarouselFlowSpeed={homeCarouselFlowSpeed}
+      />
+      {carouselVenues.length > 0 && (
+        <VenueCarousel venues={carouselVenues} homeCarouselFlowSpeed={homeCarouselFlowSpeed} />
+      )}
     </>
   );
 }

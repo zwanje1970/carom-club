@@ -665,6 +665,8 @@ model SiteSetting {
   featuredBannerImageUrl String?
   featuredBannerLinkUrl  String?
   withdrawRejoinDays    Int      @default(0) // 탈퇴 후 재가입 가능 일수 (0=즉시 가능)
+  // 메인 대회·당구장 가로 흐름 속도(1=느림 ~ 100=빠름), 관리자 사이트 설정
+  homeCarouselFlowSpeed Int @default(50)
   // 푸터 설정 (관리자 설정)
   footerEnabled       Boolean  @default(false)
   footerBgColor       String?

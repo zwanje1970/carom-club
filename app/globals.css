@@ -68,3 +68,45 @@
     font-variant-east-asian: normal;
   }
 }
+
+/* 경로 재생 충돌 안내: 다섯 번 깜빡인 뒤 사라짐 */
+@keyframes collision-warning-blink {
+  0% {
+    opacity: 1;
+  }
+  5% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  19% {
+    opacity: 0;
+  }
+  26% {
+    opacity: 1;
+  }
+  33% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  47% {
+    opacity: 0;
+  }
+  54% {
+    opacity: 1;
+  }
+  61% {
+    opacity: 0;
+  }
+  68%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-collision-warning-blink {
+  animation: collision-warning-blink 4s ease-in-out forwards;
+}

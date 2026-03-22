@@ -22,26 +22,37 @@ import {
   isInsidePlayfield,
   portraitToLandscapeNorm,
   distanceNormPointsInPlayfieldPx,
+  playfieldGridOneCellEdgePx,
   DEFAULT_TABLE_WIDTH,
   DEFAULT_TABLE_HEIGHT,
+  type TableOrientation,
 } from "@/lib/billiard-table-constants";
 import { getNonCueBallNorms, type NanguBallPlacement, type NanguPathPoint } from "@/lib/nangu-types";
-import { cueFirstObjectHitFromBallPlacement } from "@/lib/solution-path-geometry";
 import {
-  appendCuePathSpot,
+  ballCircumferenceNormFacingApproach,
+  cueFirstObjectHitFromBallPlacement,
+} from "@/lib/solution-path-geometry";
+import {
+  appendCuePathPlayfieldWithAutoCushion,
   appendCuePathSpotWithAim,
   insertCuePathSpot,
   insertCuePathSpotWithAim,
   moveCuePathSpotById,
+  cuePathAppendWouldDuplicateExistingSpot,
   snapCuePathTap,
   snapObjectPathPlayfieldTap,
   snapToPlayfieldCushionJunction,
   stripInvalidEndSpots,
+  isLastSegmentEndpointSpotIndex,
   type CuePathRayAppendContext,
   type CuePathSnapFn,
   type PathPointerAim,
 } from "@/lib/cue-path-cushion-rules";
-import { resolveObjectPathRayHitLandscape } from "@/lib/cue-path-ray-resolve";
+import {
+  resolveObjectPathRayHitLandscape,
+  landscapeNormToPlayfieldCanvasPx,
+  tableCanvasClampedToPlayfieldLandscapeNorm,
+} from "@/lib/cue-path-ray-resolve";
 import type { BallSpeed } from "@/lib/ball-speed-constants";
 import { useSolutionPathPlayback } from "@/hooks/useSolutionPathPlayback";
 import { TROUBLE_SOLUTION_CONSOLE } from "@/components/trouble/trouble-console-contract";
@@ -52,8 +63,8 @@ import {
   isClassificationEmptyForPan,
 } from "@/lib/solution-path-pointer-classify";
 
-/** 마지막 세그먼트 화살표: 스팟 추가·이동 후 이 시간 동안 다음 스팟이 없으면 표시 */
-const PATH_LAST_ARROW_IDLE_MS = 3000;
+/** nangu는 1목 경로 없음. 매 렌더 `[]`를 넘기면 재생 훅의 의존성이 바뀌어 매번 reset되어 애니메이션이 동작하지 않음 */
+const EMPTY_NANGU_OBJECT_PATH_POINTS: NanguPathPoint[] = [];
 
 export type SolutionPathEditorPresentation = "overlay" | "noteBallPlacementFullscreen";
 
@@ -102,25 +113,9 @@ export function SolutionPathEditorFullscreen({
   }
   const [pathPoints, setPathPoints] = useState<NanguPathPoint[]>(initialPathPoints);
   const [objectPathPoints, setObjectPathPoints] = useState<NanguPathPoint[]>(initialObjectPathPoints);
-  /** 3초 유휴 후에만 마지막 세그먼트 끝 화살표(그 전엔 마지막 스팟도 점만) */
-  const [showCuePathLastArrowAfterIdle, setShowCuePathLastArrowAfterIdle] = useState(false);
-  const [showObjectPathLastArrowAfterIdle, setShowObjectPathLastArrowAfterIdle] = useState(false);
-  useEffect(() => {
-    setShowCuePathLastArrowAfterIdle(false);
-    if (pathPoints.length === 0) return;
-    const id = window.setTimeout(() => setShowCuePathLastArrowAfterIdle(true), PATH_LAST_ARROW_IDLE_MS);
-    return () => clearTimeout(id);
-  }, [pathPoints]);
-  useEffect(() => {
-    setShowObjectPathLastArrowAfterIdle(false);
-    if (objectPathPoints.length === 0) return;
-    const id = window.setTimeout(() => setShowObjectPathLastArrowAfterIdle(true), PATH_LAST_ARROW_IDLE_MS);
-    return () => clearTimeout(id);
-  }, [objectPathPoints]);
   const [pathMode, setPathMode] = useState(true);
   const [objectPathMode, setObjectPathMode] = useState(false);
   const [pathAddStack, setPathAddStack] = useState<Array<"cue" | "object">>([]);
-  const [pathRuleHint, setPathRuleHint] = useState("");
   /** overlay 모드만 공 탭 시 줌 초점 이동. note 셸은 당구노트 공배치와 같이 플레이필드 중심 고정(테이블이 공을 쫓아 움직이지 않음) */
   const [zoomFocusOverlay, setZoomFocusOverlay] = useState({
     x: DEFAULT_TABLE_WIDTH / 2,
@@ -133,8 +128,31 @@ export function SolutionPathEditorFullscreen({
   const isNoteShell = presentation === "noteBallPlacementFullscreen";
   const ballPlacementFullscreen = useBallPlacementFullscreen();
   const deviceOrientation = useTableOrientation();
-  /** 노트 셸: 좌측 슬라이드 — 경로 삭제·애니메이션·보기 설정 (테이블 높이 고정용으로 상·하단 메뉴 대체) */
+  /** PC·태블릿(넓은 뷰포트): 모바일 가로만 제외하고 긴 변 세로 테이블과 동일하게 맞춤 */
+  const [viewportMdUp, setViewportMdUp] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const update = () => setViewportMdUp(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  /** 노트 셸: 우측 슬라이드(당구노트 공배치와 동일 위치) — 경로 삭제·애니메이션·보기 설정 */
   const [leftPathDrawerOpen, setLeftPathDrawerOpen] = useState(false);
+  /** 난구(trouble): 우측 패널을 드래그로 닫기 — 열림 기준 오른쪽으로 밀린 px(0=완전히 열림) */
+  const [troubleDrawerDragPx, setTroubleDrawerDragPx] = useState(0);
+  const [troubleDrawerDragging, setTroubleDrawerDragging] = useState(false);
+  const troubleDrawerAsideRef = useRef<HTMLElement | null>(null);
+  const troubleDrawerDragRef = useRef<{ startX: number; basePx: number } | null>(null);
+  const troubleDrawerDragPxRef = useRef(0);
+
+  useEffect(() => {
+    troubleDrawerDragPxRef.current = troubleDrawerDragPx;
+  }, [troubleDrawerDragPx]);
+
+  useEffect(() => {
+    setTroubleDrawerDragPx(0);
+  }, [leftPathDrawerOpen]);
   const [tableGridOn, setTableGridOn] = useState(true);
   const [tableDrawStyle, setTableDrawStyle] = useState<TableDrawStyle>("realistic");
   const [cueSpotOn, setCueSpotOn] = useState(true);
@@ -147,15 +165,6 @@ export function SolutionPathEditorFullscreen({
     if (ballPlacement?.cueBall) setCueBallChoice(ballPlacement.cueBall);
   }, [ballPlacement?.cueBall]);
 
-  useEffect(() => {
-    if (process.env.NODE_ENV !== "development") return;
-    console.debug("[SolutionPathEditorFullscreen] mounted", {
-      variant,
-      presentation,
-      readOnlyCueAndBalls,
-    });
-  }, [variant, presentation, readOnlyCueAndBalls]);
-
   /** 좌표 배치가 있을 때 수구 표시 — readOnly면 게시물/문제의 cueBall 고정 */
   const layoutForCue = useMemo((): NanguBallPlacement | null => {
     if (!ballPlacement) return null;
@@ -163,8 +172,13 @@ export function SolutionPathEditorFullscreen({
     return { ...ballPlacement, cueBall: cueBallChoice };
   }, [ballPlacement, cueBallChoice, readOnlyCueAndBalls]);
 
-  /** 당구노트 공배치 전체화면과 같이 세로 보기: 기기 portrait 시 테이블 긴 변이 세로 */
-  const effectivePortrait = isNoteShell && deviceOrientation === "portrait";
+  /**
+   * 노트 셸: 테이블 긴 변 세로 — 기기 세로 모드이거나 PC/태블릿(768px 이상)일 때.
+   * 좁은 화면에서만 가로(landscape) 뷰포트면 긴 변 가로 유지.
+   */
+  const effectivePortrait =
+    isNoteShell && (deviceOrientation === "portrait" || viewportMdUp);
+  const noteShellTableOrientation: TableOrientation = effectivePortrait ? "portrait" : "landscape";
   const tableCanvasW = effectivePortrait ? DEFAULT_TABLE_HEIGHT : DEFAULT_TABLE_WIDTH;
   const tableCanvasH = effectivePortrait ? DEFAULT_TABLE_WIDTH : DEFAULT_TABLE_HEIGHT;
   const pointerRect = useMemo(
@@ -193,9 +207,31 @@ export function SolutionPathEditorFullscreen({
     return getNonCueBallNorms(layoutForCue).map(({ x, y }) => ({ x, y }));
   }, [layoutForCue]);
 
+  /**
+   * 수구 경로 첫 스팟이 있으면 광선 충돌점. 없으면 수구에 가장 가까운 1목 후보 공의 원주(수구 방향) — 1목 경로만 먼저 그릴 때 사용.
+   */
   const cueToFirstObjectHit = useMemo(() => {
-    if (!layoutForCue || pathPoints.length < 1) return null;
-    return cueFirstObjectHitFromBallPlacement(cuePos, pathPoints[0], layoutForCue, rect);
+    if (!layoutForCue) return null;
+    if (pathPoints.length >= 1) {
+      return cueFirstObjectHitFromBallPlacement(cuePos, pathPoints[0], layoutForCue, rect);
+    }
+    const nonCue = getNonCueBallNorms(layoutForCue);
+    if (nonCue.length === 0) return null;
+    let nearest = nonCue[0]!;
+    let bestD = Infinity;
+    for (const b of nonCue) {
+      const d = distanceNormPointsInPlayfieldPx(cuePos, { x: b.x, y: b.y }, rect);
+      if (d < bestD) {
+        bestD = d;
+        nearest = b;
+      }
+    }
+    const collision = ballCircumferenceNormFacingApproach(
+      { x: nearest.x, y: nearest.y },
+      cuePos,
+      rect
+    );
+    return { collision, objectKey: nearest.key };
   }, [layoutForCue, pathPoints, cuePos, rect]);
   const collisionNorm = cueToFirstObjectHit?.collision ?? null;
 
@@ -265,17 +301,18 @@ export function SolutionPathEditorFullscreen({
   const runCueAppend = useCallback(
     (norm: { x: number; y: number }) => {
       setPathPoints((prev) => {
-        const r = appendCuePathSpot(prev, norm, cuePathSnapFn, newCueSpotId);
+        const r = appendCuePathPlayfieldWithAutoCushion(prev, norm, cuePathSnapFn, newCueSpotId, rayAppendCtx);
         if (!r.ok) {
-          queueMicrotask(() => setPathRuleHint(r.message));
           return prev;
         }
-        queueMicrotask(() => setPathRuleHint(""));
-        queueMicrotask(() => setPathAddStack((s) => [...s, "cue"]));
+        const nAdded = r.points.length - prev.length;
+        queueMicrotask(() =>
+          setPathAddStack((s) => [...s, ...Array.from({ length: nAdded }, () => "cue" as const)])
+        );
         return r.points;
       });
     },
-    [cuePathSnapFn, newCueSpotId]
+    [cuePathSnapFn, newCueSpotId, rayAppendCtx]
   );
 
   const runCueAppendAim = useCallback(
@@ -284,18 +321,21 @@ export function SolutionPathEditorFullscreen({
       setPathPoints((prev) => {
         const r = appendCuePathSpotWithAim(prev, aim, cuePathSnapFn, newCueSpotId, rayAppendCtx);
         if (!r.ok) {
-          queueMicrotask(() => setPathRuleHint(r.message));
           return prev;
         }
-        const added = r.points[r.points.length - 1];
-        const isDup = prev.some(
-          (p) =>
-            distanceNormPointsInPlayfieldPx({ x: added.x, y: added.y }, { x: p.x, y: p.y }, rect) <
-            dupThresholdPx
+        const newSlice = r.points.slice(prev.length);
+        const isDup = newSlice.some((added) =>
+          prev.some(
+            (p) =>
+              distanceNormPointsInPlayfieldPx({ x: added.x, y: added.y }, { x: p.x, y: p.y }, rect) <
+              dupThresholdPx
+          )
         );
         if (isDup) return prev;
-        queueMicrotask(() => setPathRuleHint(""));
-        queueMicrotask(() => setPathAddStack((s) => [...s, "cue"]));
+        const nAdded = newSlice.length;
+        queueMicrotask(() =>
+          setPathAddStack((s) => [...s, ...Array.from({ length: nAdded }, () => "cue" as const)])
+        );
         return r.points;
       });
     },
@@ -304,34 +344,75 @@ export function SolutionPathEditorFullscreen({
 
   const addObjectPathPoint = useCallback(
     (norm: { x: number; y: number }, type?: "ball" | "cushion" | "free") => {
-      const snapped =
-        type != null
-          ? { x: norm.x, y: norm.y, type }
-          : !layoutForCue || !collisionNorm
-            ? snapToPlayfieldCushionJunction(norm.x, norm.y)
-            : snapObjectPathPlayfieldTap(
+      const newId = () => `o-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      setObjectPathPoints((prev) => {
+        if (type != null) {
+          queueMicrotask(() => setPathAddStack((s) => [...s, "object"]));
+          return [...prev, { id: newId(), x: norm.x, y: norm.y, type }];
+        }
+        if (!layoutForCue || !collisionNorm) {
+          const snapped = snapToPlayfieldCushionJunction(norm.x, norm.y);
+          queueMicrotask(() => setPathAddStack((s) => [...s, "object"]));
+          return [...prev, { id: newId(), x: snapped.x, y: snapped.y, type: snapped.type }];
+        }
+        const last = prev.length > 0 ? prev[prev.length - 1]! : null;
+        const fromForSnap = last ?? collisionNorm;
+        /** 직전 스팟이 쿠션이 아니면: 연장선의 쿠션 교차 → 탭 스냅 스팟 */
+        if (last && last.type !== "cushion") {
+          const aimCanvasPx = landscapeNormToPlayfieldCanvasPx(
+            norm,
+            tableCanvasW,
+            tableCanvasH,
+            effectivePortrait
+          );
+          const cushionHit = resolveObjectPathRayHitLandscape({
+            fromLandscape: { x: last.x, y: last.y },
+            aimCanvasPx,
+            canvasW: tableCanvasW,
+            canvasH: tableCanvasH,
+            portrait: effectivePortrait,
+            collisionRectLandscape: rect,
+            ballPlacement: layoutForCue,
+            allowNonCueBallCircle: false,
+          });
+          if (cushionHit && cushionHit.type === "cushion") {
+            const maxAutoPx = playfieldGridOneCellEdgePx(rect, effectivePortrait);
+            const distToCushion = distanceNormPointsInPlayfieldPx(
+              { x: last.x, y: last.y },
+              { x: cushionHit.x, y: cushionHit.y },
+              rect
+            );
+            if (distToCushion <= maxAutoPx) {
+              const snapped = snapObjectPathPlayfieldTap(
                 norm.x,
                 norm.y,
-                objectPathPoints.length > 0
-                  ? objectPathPoints[objectPathPoints.length - 1]!
-                  : collisionNorm,
+                { x: cushionHit.x, y: cushionHit.y },
                 getNonCueBallNorms(layoutForCue).map(({ x, y }) => ({ x, y })),
                 rect
               );
-      setObjectPathPoints((prev) => {
+              const id1 = newId();
+              const id2 = newId();
+              queueMicrotask(() => setPathAddStack((s) => [...s, "object", "object"]));
+              return [
+                ...prev,
+                { id: id1, x: cushionHit.x, y: cushionHit.y, type: "cushion" },
+                { id: id2, x: snapped.x, y: snapped.y, type: snapped.type },
+              ];
+            }
+          }
+        }
+        const snapped = snapObjectPathPlayfieldTap(
+          norm.x,
+          norm.y,
+          fromForSnap,
+          getNonCueBallNorms(layoutForCue).map(({ x, y }) => ({ x, y })),
+          rect
+        );
         queueMicrotask(() => setPathAddStack((s) => [...s, "object"]));
-        return [
-          ...prev,
-          {
-            id: `o-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            x: snapped.x,
-            y: snapped.y,
-            type: snapped.type,
-          },
-        ];
+        return [...prev, { id: newId(), x: snapped.x, y: snapped.y, type: snapped.type }];
       });
     },
-    [layoutForCue, collisionNorm, objectPathPoints, rect]
+    [layoutForCue, collisionNorm, rect, tableCanvasW, tableCanvasH, effectivePortrait]
   );
 
   const moveObjectPathPoint = useCallback(
@@ -339,6 +420,7 @@ export function SolutionPathEditorFullscreen({
       setObjectPathPoints((prev) => {
         const idx = prev.findIndex((p) => p.id === id);
         if (idx < 0) return prev;
+        if (!isLastSegmentEndpointSpotIndex(prev, idx)) return prev;
         const snapped =
           !layoutForCue || !collisionNorm
             ? snapToPlayfieldCushionJunction(norm.x, norm.y)
@@ -356,13 +438,18 @@ export function SolutionPathEditorFullscreen({
   );
 
   const removeObjectPathPoint = useCallback((id: string) => {
-    setPathAddStack([]);
-    setObjectPathPoints((prev) => prev.filter((p) => p.id !== id));
+    setObjectPathPoints((prev) => {
+      const idx = prev.findIndex((p) => p.id === id);
+      if (idx < 0) return prev;
+      if (!isLastSegmentEndpointSpotIndex(prev, idx)) return prev;
+      queueMicrotask(() => setPathAddStack([]));
+      return prev.filter((p) => p.id !== id);
+    });
   }, []);
 
   const insertObjectPathPointBetween = useCallback(
     (segmentIndex: number, norm: { x: number; y: number }) => {
-      if (!collisionNorm || !layoutForCue) return;
+      if (!layoutForCue || !collisionNorm) return;
       const chain: { x: number; y: number }[] = [
         collisionNorm,
         ...objectPathPoints.map((p) => ({ x: p.x, y: p.y })),
@@ -394,41 +481,93 @@ export function SolutionPathEditorFullscreen({
 
   const addObjectPathAim = useCallback(
     (aim: PathPointerAim) => {
-      if (!collisionNorm || !layoutForCue) return;
+      if (!layoutForCue || !collisionNorm) return;
       const dupThresholdPx = 14;
+      const newId = () => `o-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       if (aim.kind === "playfield") {
         addObjectPathPoint(aim.norm);
         return;
       }
-      const from =
-        objectPathPoints.length > 0
-          ? {
-              x: objectPathPoints[objectPathPoints.length - 1]!.x,
-              y: objectPathPoints[objectPathPoints.length - 1]!.y,
-            }
-          : collisionNorm;
-      const hit = resolveObjectPathRayHitLandscape({
-        fromLandscape: from,
-        aimCanvasPx: { x: aim.cx, y: aim.cy },
-        canvasW: tableCanvasW,
-        canvasH: tableCanvasH,
-        portrait: effectivePortrait,
-        collisionRectLandscape: rect,
-        ballPlacement: layoutForCue,
-        /** 충돌점 또는 직전 스팟이 쿠션일 때만 목적구 원 허용(공에서 출발 시 중간 구간은 쿠션 라인만, 수구 경로와 동일한 느낌) */
-        allowNonCueBallCircle:
-          objectPathPoints.length === 0 ||
-          objectPathPoints[objectPathPoints.length - 1]?.type === "cushion",
-        excludeBallKeys:
-          cueToFirstObjectHit && objectPathPoints.length === 0
-            ? [cueToFirstObjectHit.objectKey]
-            : undefined,
-      });
-      if (!hit) {
-        queueMicrotask(() => setPathRuleHint("1목 경로: 쿠션·프레임 방향으로 교차점을 찾지 못했습니다."));
-        return;
-      }
       setObjectPathPoints((prev) => {
+        const from =
+          prev.length > 0
+            ? {
+                x: prev[prev.length - 1]!.x,
+                y: prev[prev.length - 1]!.y,
+              }
+            : collisionNorm;
+        const last = prev.length > 0 ? prev[prev.length - 1]! : null;
+
+        /** 직전이 쿠션이 아닐 때: 쿠션-only 교차 → 클램프 탭 스냅 (수구 경로와 동일) */
+        if (last && last.type !== "cushion") {
+          const cushionOnly = resolveObjectPathRayHitLandscape({
+            fromLandscape: from,
+            aimCanvasPx: { x: aim.cx, y: aim.cy },
+            canvasW: tableCanvasW,
+            canvasH: tableCanvasH,
+            portrait: effectivePortrait,
+            collisionRectLandscape: rect,
+            ballPlacement: layoutForCue,
+            allowNonCueBallCircle: false,
+          });
+          if (cushionOnly && cushionOnly.type === "cushion") {
+            const maxAutoPx = playfieldGridOneCellEdgePx(rect, effectivePortrait);
+            const distToCushion = distanceNormPointsInPlayfieldPx(
+              from,
+              { x: cushionOnly.x, y: cushionOnly.y },
+              rect
+            );
+            if (distToCushion <= maxAutoPx) {
+              const tapNorm = tableCanvasClampedToPlayfieldLandscapeNorm(
+                aim.cx,
+                aim.cy,
+                tableCanvasW,
+                tableCanvasH,
+                effectivePortrait
+              );
+              const snapped = snapObjectPathPlayfieldTap(
+                tapNorm.x,
+                tapNorm.y,
+                { x: cushionOnly.x, y: cushionOnly.y },
+                getNonCueBallNorms(layoutForCue).map(({ x, y }) => ({ x, y })),
+                rect
+              );
+              const newPoints: NanguPathPoint[] = [
+                { id: newId(), x: cushionOnly.x, y: cushionOnly.y, type: "cushion" },
+                { id: newId(), x: snapped.x, y: snapped.y, type: snapped.type },
+              ];
+              const isDup = newPoints.some((added) =>
+                prev.some(
+                  (p) =>
+                    distanceNormPointsInPlayfieldPx({ x: added.x, y: added.y }, { x: p.x, y: p.y }, rect) <
+                    dupThresholdPx
+                )
+              );
+              if (isDup) return prev;
+              queueMicrotask(() =>
+                setPathAddStack((s) => [...s, "object" as const, "object" as const])
+              );
+              return [...prev, ...newPoints];
+            }
+          }
+        }
+
+        const hit = resolveObjectPathRayHitLandscape({
+          fromLandscape: from,
+          aimCanvasPx: { x: aim.cx, y: aim.cy },
+          canvasW: tableCanvasW,
+          canvasH: tableCanvasH,
+          portrait: effectivePortrait,
+          collisionRectLandscape: rect,
+          ballPlacement: layoutForCue,
+          allowNonCueBallCircle:
+            prev.length === 0 || prev[prev.length - 1]?.type === "cushion",
+          excludeBallKeys:
+            cueToFirstObjectHit && prev.length === 0 ? [cueToFirstObjectHit.objectKey] : undefined,
+        });
+        if (!hit) {
+          return prev;
+        }
         const isDup =
           prev.length > 0 &&
           prev.some(
@@ -437,12 +576,11 @@ export function SolutionPathEditorFullscreen({
               dupThresholdPx
           );
         if (isDup) return prev;
-        queueMicrotask(() => setPathRuleHint(""));
         queueMicrotask(() => setPathAddStack((s) => [...s, "object"]));
         return [
           ...prev,
           {
-            id: `o-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            id: newId(),
             x: hit.x,
             y: hit.y,
             type: hit.type,
@@ -454,7 +592,6 @@ export function SolutionPathEditorFullscreen({
       collisionNorm,
       cueToFirstObjectHit,
       layoutForCue,
-      objectPathPoints,
       tableCanvasW,
       tableCanvasH,
       effectivePortrait,
@@ -465,7 +602,7 @@ export function SolutionPathEditorFullscreen({
 
   const insertObjectPathPointBetweenAim = useCallback(
     (segmentIndex: number, aim: PathPointerAim) => {
-      if (!collisionNorm || !layoutForCue) return;
+      if (!layoutForCue || !collisionNorm) return;
       if (aim.kind === "playfield") {
         insertObjectPathPointBetween(segmentIndex, aim.norm);
         return;
@@ -490,7 +627,6 @@ export function SolutionPathEditorFullscreen({
           cueToFirstObjectHit && segmentIndex === 0 ? [cueToFirstObjectHit.objectKey] : undefined,
       });
       if (!hit) {
-        queueMicrotask(() => setPathRuleHint("삽입 위치를 찾지 못했습니다."));
         return;
       }
       const newPoint: NanguPathPoint = {
@@ -502,7 +638,6 @@ export function SolutionPathEditorFullscreen({
       setObjectPathPoints((prev) => {
         const next = [...prev];
         next.splice(segmentIndex, 0, newPoint);
-        queueMicrotask(() => setPathRuleHint(""));
         queueMicrotask(() => setPathAddStack((s) => [...s, "object"]));
         return next;
       });
@@ -523,17 +658,14 @@ export function SolutionPathEditorFullscreen({
   const pathPlayback = useSolutionPathPlayback({
     ballPlacement: layoutForCue,
     pathPoints,
-    objectPathPoints: variant === "trouble" ? objectPathPoints : [],
+    objectPathPoints: variant === "trouble" ? objectPathPoints : EMPTY_NANGU_OBJECT_PATH_POINTS,
     ballSpeed,
     isBankShot,
     thicknessOffsetX,
+    /** 1목 경로 그리기 모드 + 스팟 1개 이상일 때만 재생 충돌 팝업 */
+    collisionWarningsEnabled:
+      variant === "trouble" && objectPathMode && objectPathPoints.length >= 1,
   });
-
-  /** 재생 중에는 항상 마지막 화살표(편집 중에는 3초 유휴 후에만) */
-  const pathOverlayShowCueLastArrow =
-    pathPlayback.isPlaybackActive || showCuePathLastArrowAfterIdle;
-  const pathOverlayShowObjectLastArrow =
-    pathPlayback.isPlaybackActive || showObjectPathLastArrowAfterIdle;
 
   const allowCuePlaybackGestures =
     isNoteShell && Boolean(layoutForCue && pathPoints.length >= 1 && !pathPlayback.isPlaybackActive);
@@ -570,8 +702,8 @@ export function SolutionPathEditorFullscreen({
     setPathAddStack([]);
     setPathPoints([]);
     setObjectPathPoints([]);
-    setPathRuleHint("");
     setObjectPathMode(false);
+    setPathMode(true);
   }, [resetPathPlayback]);
 
   const undoLastPathSpot = useCallback(() => {
@@ -595,6 +727,7 @@ export function SolutionPathEditorFullscreen({
       setObjectPathPoints([]);
       setObjectPathMode(false);
       setPathAddStack([]);
+      setPathMode(true);
     }
   }, [pathPoints.length]);
 
@@ -615,10 +748,8 @@ export function SolutionPathEditorFullscreen({
       setPathPoints((prev) => {
         const r = insertCuePathSpot(prev, segmentIndex, norm, cuePathSnapFn, newCueSpotId);
         if (!r.ok) {
-          queueMicrotask(() => setPathRuleHint(r.message));
           return prev;
         }
-        queueMicrotask(() => setPathRuleHint(""));
         queueMicrotask(() => setPathAddStack((s) => [...s, "cue"]));
         return r.points;
       });
@@ -631,10 +762,8 @@ export function SolutionPathEditorFullscreen({
       setPathPoints((prev) => {
         const r = insertCuePathSpotWithAim(prev, segmentIndex, aim, cuePathSnapFn, newCueSpotId, rayAppendCtx);
         if (!r.ok) {
-          queueMicrotask(() => setPathRuleHint(r.message));
           return prev;
         }
-        queueMicrotask(() => setPathRuleHint(""));
         queueMicrotask(() => setPathAddStack((s) => [...s, "cue"]));
         return r.points;
       });
@@ -655,6 +784,51 @@ export function SolutionPathEditorFullscreen({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onCancel, isNoteShell, leftPathDrawerOpen]);
+
+  const endTroubleDrawerDrag = useCallback((e: React.PointerEvent) => {
+    if (!isNoteShell) return;
+    troubleDrawerDragRef.current = null;
+    setTroubleDrawerDragging(false);
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    const w = troubleDrawerAsideRef.current?.offsetWidth ?? 180;
+    const threshold = Math.min(72, w * 0.25);
+    setTroubleDrawerDragPx((px) => {
+      if (px >= threshold) {
+        queueMicrotask(() => setLeftPathDrawerOpen(false));
+      }
+      return 0;
+    });
+  }, [isNoteShell]);
+
+  const onTroubleDrawerHandlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (!isNoteShell) return;
+      e.preventDefault();
+      troubleDrawerDragRef.current = {
+        startX: e.clientX,
+        basePx: troubleDrawerDragPxRef.current,
+      };
+      setTroubleDrawerDragging(true);
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [isNoteShell]
+  );
+
+  const onTroubleDrawerHandlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!isNoteShell || !troubleDrawerDragRef.current) return;
+      const w = troubleDrawerAsideRef.current?.offsetWidth ?? 180;
+      const { startX, basePx } = troubleDrawerDragRef.current;
+      const dx = e.clientX - startX;
+      const next = Math.max(0, Math.min(basePx + dx, w));
+      setTroubleDrawerDragPx(next);
+    },
+    [variant]
+  );
 
   const C = TROUBLE_SOLUTION_CONSOLE;
   const showObjectPath = variant === "trouble";
@@ -689,6 +863,7 @@ export function SolutionPathEditorFullscreen({
       isEmptyForPan: (clientX, clientY, target) => {
         if (target instanceof Element) {
           if (target.closest("[data-solution-table-zoom-controls]")) return false;
+          if (target.closest("[data-path-fs-drawer-drag]")) return false;
           if (isNoteShell && target.closest("[data-path-editor-fs-chrome]")) return false;
         }
         const c = classifyAt(clientX, clientY);
@@ -703,15 +878,15 @@ export function SolutionPathEditorFullscreen({
         }
         const c = classifyAt(clientX, clientY);
         if (!c) return;
-        if (c.kind === "emptyCue") {
+        if (c.kind === "emptyCue" || c.kind === "pathObjectBallTap") {
           const norm = getNormalizedFromEvent(clientX, clientY);
           if (!norm) return;
           const dupThresholdPx = 14;
-          const isDup = pathPoints.some(
-            (p) =>
-              distanceNormPointsInPlayfieldPx(norm, { x: p.x, y: p.y }, rect) < dupThresholdPx
-          );
-          if (!isDup) runCueAppend(norm);
+          if (
+            !cuePathAppendWouldDuplicateExistingSpot(pathPoints, norm, rect, dupThresholdPx)
+          ) {
+            runCueAppend(norm);
+          }
         } else if (c.kind === "emptyObject") {
           const norm = getNormalizedFromEvent(clientX, clientY);
           if (!norm || !collisionNorm) return;
@@ -762,6 +937,33 @@ export function SolutionPathEditorFullscreen({
   const drawStyleForTable = pathPlayback.isPlaybackActive ? playbackDrawStyle : tableDrawStyle;
   const showCueSpot =
     (isNoteShell ? cueSpotOn : true) && !pathPlayback.isPlaybackActive;
+
+  /** 수구 광선으로 먼저 맞는 목적구(또는 첫 스팟 없을 때 가장 가까운 목적구) — 1목 출발 점선 링 */
+  const objectPathHighlightBallKey = useMemo((): "red" | "yellow" | "white" | null => {
+    if (!layoutForCue || !showObjectPath) return null;
+    const nonCue = getNonCueBallNorms(layoutForCue);
+    if (nonCue.length === 0) return null;
+    if (pathPoints.length >= 1) {
+      const hit = cueFirstObjectHitFromBallPlacement(cuePos, pathPoints[0], layoutForCue, rect);
+      return hit?.objectKey ?? null;
+    }
+    let nearest = nonCue[0]!;
+    let bestD = Infinity;
+    for (const b of nonCue) {
+      const d = distanceNormPointsInPlayfieldPx(cuePos, { x: b.x, y: b.y }, rect);
+      if (d < bestD) {
+        bestD = d;
+        nearest = b;
+      }
+    }
+    return nearest.key;
+  }, [layoutForCue, showObjectPath, pathPoints, cuePos, rect]);
+
+  const showObjectBallSpot =
+    showCueSpot &&
+    showObjectPath &&
+    objectPathHighlightBallKey != null &&
+    objectPathPoints.length >= 1;
 
   const toggleGrid = useCallback(() => {
     if (pathPlayback.isPlaybackActive) setPlaybackGridVisible((v) => !v);
@@ -844,6 +1046,36 @@ export function SolutionPathEditorFullscreen({
                 <span className="tabular-nums">{cueSpotOn ? "ON" : "OFF"}</span>
               </button>
             )}
+            {showObjectPath && layoutForCue && (
+              <button
+                type="button"
+                {...(variant === "trouble" ? { "data-trouble-action": C.action.toggleObjectPathMode } : {})}
+                onClick={() => {
+                  setObjectPathMode((v) => {
+                    const next = !v;
+                    if (next) setPathMode(false);
+                    /** 1목 끄면 수구 경로만 수정 가능하도록 수구 입력 다시 켬 */
+                    else setPathMode(true);
+                    return next;
+                  });
+                }}
+                className={`shrink-0 rounded-lg px-2 py-1.5 text-[10px] sm:text-xs font-semibold leading-tight border transition-colors touch-manipulation max-w-[9.5rem] sm:max-w-none ${
+                  objectPathMode
+                    ? "border-sky-700 bg-sky-600/20 text-sky-900 dark:text-sky-100"
+                    : "border-gray-300 dark:border-slate-600 bg-black/10 dark:bg-white/10 text-site-text"
+                }`}
+                aria-pressed={objectPathMode}
+                aria-label={
+                  objectPathMode
+                    ? "1목적구 경로선 그리기 끄기"
+                    : "1목적구 경로선 그리기 켜기"
+                }
+              >
+                1목적구 경로선
+                <br />
+                <span className="tabular-nums">{objectPathMode ? "그리는 중" : "그리기"}</span>
+              </button>
+            )}
             <button
               type="button"
               className="shrink-0 flex items-center gap-1 rounded-lg bg-site-primary px-2.5 py-1.5 text-xs font-medium text-white shadow touch-manipulation"
@@ -904,19 +1136,44 @@ export function SolutionPathEditorFullscreen({
               onClick={() => setLeftPathDrawerOpen(false)}
             />
             <aside
+              ref={troubleDrawerAsideRef}
               data-path-editor-fs-chrome=""
-              id="path-fs-left-drawer"
+              id="path-fs-right-drawer"
               aria-hidden={!leftPathDrawerOpen}
-              className={`fixed left-0 top-0 z-[205] flex h-full w-[min(88vw,300px)] flex-col border-r border-white/20 bg-black/30 text-white shadow-[6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md transition-transform duration-300 ease-out ${
-                leftPathDrawerOpen ? "translate-x-0" : "pointer-events-none -translate-x-full"
-              }`}
+              className={`fixed right-0 top-0 z-[205] flex h-full w-[min(52.8vw,180px)] flex-col border-l border-white/20 bg-black/30 text-white shadow-[-6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md ${
+                leftPathDrawerOpen ? "pointer-events-auto" : "pointer-events-none translate-x-full"
+              } ${troubleDrawerDragging ? "!duration-0" : "transition-transform duration-300 ease-out"}`}
+              style={
+                leftPathDrawerOpen
+                  ? {
+                      transform: `translateX(${troubleDrawerDragPx}px)`,
+                      transition: troubleDrawerDragging ? "none" : undefined,
+                    }
+                  : undefined
+              }
             >
+              {leftPathDrawerOpen && (
+                <div
+                  data-path-fs-drawer-drag=""
+                  aria-hidden
+                  className="absolute left-0 top-0 z-10 h-full w-4 cursor-grab touch-none active:cursor-grabbing"
+                  style={{ touchAction: "none" }}
+                  onPointerDown={onTroubleDrawerHandlePointerDown}
+                  onPointerMove={onTroubleDrawerHandlePointerMove}
+                  onPointerUp={endTroubleDrawerDrag}
+                  onPointerCancel={endTroubleDrawerDrag}
+                />
+              )}
               <div className="border-b border-white/15 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
                 <h2 className="text-sm font-semibold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                   경로 · 보기
                 </h2>
               </div>
-              <div className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <div
+                className={`flex flex-1 flex-col gap-1 overflow-y-auto px-3 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] min-h-0 ${
+                  variant === "trouble" ? "justify-center" : ""
+                }`}
+              >
                 <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-white/50">경로</p>
                 <button
                   type="button"
@@ -979,26 +1236,6 @@ export function SolutionPathEditorFullscreen({
                   type="button"
                   className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-medium bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
                   onClick={() => {
-                    zoomShellApiRef.current?.zoomIn();
-                    setLeftPathDrawerOpen(false);
-                  }}
-                >
-                  확대 (+)
-                </button>
-                <button
-                  type="button"
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-medium bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
-                  onClick={() => {
-                    zoomShellApiRef.current?.zoomOut();
-                      setLeftPathDrawerOpen(false);
-                  }}
-                >
-                  축소 (−)
-                </button>
-                <button
-                  type="button"
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-medium bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
-                  onClick={() => {
                     toggleDrawStyle();
                     setLeftPathDrawerOpen(false);
                   }}
@@ -1019,19 +1256,37 @@ export function SolutionPathEditorFullscreen({
             </aside>
           </>
         )}
-        <div className="relative mx-auto flex w-full max-w-4xl min-h-0 min-w-0 flex-1 flex-col px-2 pt-2">
+        <div
+          className={`flex min-h-0 w-full flex-1 flex-col ${
+            isNoteShell ? "items-stretch justify-center p-2" : ""
+          }`}
+        >
+        <div
+          className={
+            isNoteShell
+              ? "relative flex h-full min-h-0 w-full max-w-2xl min-w-0 flex-1 flex-col pt-2"
+              : "relative mx-auto flex w-full max-w-4xl min-h-0 min-w-0 flex-1 flex-col px-2 pt-2"
+          }
+        >
           {isNoteShell && (
             <button
               type="button"
               data-path-editor-fs-chrome=""
               aria-label="경로 및 보기 메뉴 열기"
               aria-expanded={leftPathDrawerOpen}
-              aria-controls="path-fs-left-drawer"
+              aria-controls="path-fs-right-drawer"
               onClick={() => setLeftPathDrawerOpen(true)}
-              className="absolute left-0 top-1/2 z-[125] flex h-11 w-[1.35rem] -translate-y-1/2 items-center justify-center rounded-r-lg border border-l-0 border-white/20 bg-black/30 text-white shadow-md backdrop-blur-sm touch-manipulation hover:bg-black/40 active:bg-black/45"
+              className="absolute right-0 top-[45.5%] z-[125] flex h-11 w-[1.215rem] -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-gray-300/60 bg-white/20 text-gray-800 shadow-md backdrop-blur-sm touch-manipulation hover:bg-white/30 active:bg-white/25 dark:border-slate-500/60 dark:bg-white/20 dark:text-gray-900"
             >
-              <svg className="h-3.5 w-3.5 shrink-0 opacity-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} aria-hidden>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              <svg
+                className="h-3.5 w-3.5 shrink-0 opacity-90"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.2}
+                aria-hidden
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" />
               </svg>
             </button>
           )}
@@ -1054,7 +1309,7 @@ export function SolutionPathEditorFullscreen({
               zoomApiRef={zoomShellApiRef}
               forceShowZoomControls={!isNoteShell}
               fitMode="contain"
-              panResetKey={isNoteShell ? deviceOrientation : undefined}
+              panResetKey={isNoteShell ? noteShellTableOrientation : undefined}
               className="relative h-full w-full min-h-0 overflow-hidden rounded-lg border border-gray-200 dark:border-slate-600"
             >
               {(zoom) => {
@@ -1073,14 +1328,16 @@ export function SolutionPathEditorFullscreen({
                           hideObjectBall={false}
                           ballNormOverrides={pathPlayback.ballNormOverrides ?? undefined}
                           showCueBallSpot={showCueSpot}
-                          orientation={isNoteShell ? deviceOrientation : "landscape"}
+                          showObjectBallSpot={showObjectBallSpot}
+                          objectBallSpotKey={objectPathHighlightBallKey}
+                          orientation={isNoteShell ? noteShellTableOrientation : "landscape"}
                           betweenTableAndBallsLayer={
                             <NanguSolutionPathOverlay
                               pathPoints={pathPoints}
                               cuePos={cuePos}
                               tableBallPlacement={layoutForCue}
                               objectPathPoints={showObjectPath ? objectPathPoints : []}
-                              orientation={isNoteShell ? deviceOrientation : "landscape"}
+                              orientation={isNoteShell ? noteShellTableOrientation : "landscape"}
                               pathMode={pathMode}
                               objectPathMode={showObjectPath && objectPathMode}
                               getNormalizedFromEvent={getNormalizedFromEvent}
@@ -1096,12 +1353,16 @@ export function SolutionPathEditorFullscreen({
                               ballNormOverrides={pathPlayback.ballNormOverrides ?? undefined}
                               onAddPoint={(norm) => {
                                 const dupThresholdPx = 14;
-                                const isDup = pathPoints.some(
-                                  (p) =>
-                                    distanceNormPointsInPlayfieldPx(norm, { x: p.x, y: p.y }, rect) <
+                                if (
+                                  !cuePathAppendWouldDuplicateExistingSpot(
+                                    pathPoints,
+                                    norm,
+                                    rect,
                                     dupThresholdPx
-                                );
-                                if (!isDup) runCueAppend(norm);
+                                  )
+                                ) {
+                                  runCueAppend(norm);
+                                }
                               }}
                               onAddCuePathAim={runCueAppendAim}
                               onInsertCuePathAim={insertPathPointBetweenAim}
@@ -1126,8 +1387,6 @@ export function SolutionPathEditorFullscreen({
                               onInsertObjectBetween={insertObjectPathPointBetween}
                               onInsertObjectPathAim={insertObjectPathPointBetweenAim}
                               pathLinesVisible={!pathPlayback.isPlaybackActive || playbackPathLinesVisible}
-                              showCuePathLastArrow={pathOverlayShowCueLastArrow}
-                              showObjectPathLastArrow={pathOverlayShowObjectLastArrow}
                               allowCuePlaybackGestures={allowCuePlaybackGestures}
                               onCueBallSingleTap={
                                 allowCuePlaybackGestures ? () => resetPathPlayback() : undefined
@@ -1163,7 +1422,7 @@ export function SolutionPathEditorFullscreen({
                         pathPoints={pathPoints}
                         cuePos={cuePos}
                         objectPathPoints={showObjectPath ? objectPathPoints : []}
-                        orientation={isNoteShell ? deviceOrientation : "landscape"}
+                        orientation={isNoteShell ? noteShellTableOrientation : "landscape"}
                         pathMode={pathMode}
                         objectPathMode={showObjectPath && objectPathMode}
                         getNormalizedFromEvent={getNormalizedFromEvent}
@@ -1174,12 +1433,16 @@ export function SolutionPathEditorFullscreen({
                         ballNormOverrides={pathPlayback.ballNormOverrides ?? undefined}
                         onAddPoint={(norm) => {
                           const dupThresholdPx = 14;
-                          const isDup = pathPoints.some(
-                            (p) =>
-                              distanceNormPointsInPlayfieldPx(norm, { x: p.x, y: p.y }, rect) <
+                          if (
+                            !cuePathAppendWouldDuplicateExistingSpot(
+                              pathPoints,
+                              norm,
+                              rect,
                               dupThresholdPx
-                          );
-                          if (!isDup) runCueAppend(norm);
+                            )
+                          ) {
+                            runCueAppend(norm);
+                          }
                         }}
                         onAddCuePathAim={runCueAppendAim}
                         onInsertCuePathAim={insertPathPointBetweenAim}
@@ -1204,8 +1467,6 @@ export function SolutionPathEditorFullscreen({
                         onInsertObjectBetween={insertObjectPathPointBetween}
                         onInsertObjectPathAim={insertObjectPathPointBetweenAim}
                         pathLinesVisible={!pathPlayback.isPlaybackActive || playbackPathLinesVisible}
-                        showCuePathLastArrow={pathOverlayShowCueLastArrow}
-                        showObjectPathLastArrow={pathOverlayShowObjectLastArrow}
                         allowCuePlaybackGestures={allowCuePlaybackGestures}
                         onCueBallSingleTap={
                           allowCuePlaybackGestures ? () => resetPathPlayback() : undefined
@@ -1237,16 +1498,17 @@ export function SolutionPathEditorFullscreen({
             </SolutionTableZoomShell>
           </div>
         </div>
+        </div>
 
+        {!isNoteShell && (
         <div
           className="shrink-0 border-t border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 space-y-2 overflow-y-auto max-h-[min(28vh,320px)] sm:max-h-[38vh]"
           style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
           {...(variant === "trouble" ? { "data-trouble-region": C.region.pathToolbar } : {})}
-          {...(isNoteShell ? { "data-path-editor-fs-chrome": "" } : {})}
         >
+          <>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium">{isNoteShell ? "경로" : "진행경로"}</span>
-            {!isNoteShell && (
+            <span className="text-sm font-medium">진행경로</span>
             <button
               type="button"
               {...(variant === "trouble" ? { "data-trouble-action": C.action.togglePathMode } : {})}
@@ -1254,7 +1516,6 @@ export function SolutionPathEditorFullscreen({
                 setPathMode((v) => {
                   const next = !v;
                   if (next) setObjectPathMode(false);
-                  else setPathRuleHint("");
                   return next;
                 });
               }}
@@ -1266,94 +1527,71 @@ export function SolutionPathEditorFullscreen({
             >
               {pathMode ? "수구 경로 입력 중" : "수구 경로 입력"}
             </button>
-            )}
-            {showObjectPath && layoutForCue && pathPoints.length >= 1 && collisionNorm && (
+            {showObjectPath && layoutForCue && (
               <button
                 type="button"
+                {...(variant === "trouble" ? { "data-trouble-action": C.action.toggleObjectPathMode } : {})}
                 onClick={() => {
                   setObjectPathMode((v) => {
                     const next = !v;
                     if (next) setPathMode(false);
+                    else setPathMode(true);
                     return next;
                   });
                 }}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium border touch-manipulation ${
                   objectPathMode
-                    ? "bg-sky-600 text-white border-sky-600"
+                    ? "bg-sky-700 text-white border-sky-700"
                     : "border-gray-300 dark:border-slate-600 text-site-text"
                 }`}
+                aria-pressed={objectPathMode}
+                aria-label={
+                  objectPathMode
+                    ? "1목적구 경로선 그리기 끄기"
+                    : "1목적구 경로선 그리기 켜기"
+                }
               >
-                {objectPathMode ? "1목 경로 입력 중" : "1목 경로 입력"}
+                {objectPathMode ? "1목적구 경로선 그리는 중" : "1목적구 경로선 그리기"}
               </button>
             )}
-            {!isNoteShell && (
-              <>
-                <button
-                  type="button"
-                  {...(variant === "trouble" ? { "data-trouble-action": C.action.undoLastPathSpot } : {})}
-                  disabled={pathAddStack.length === 0 || pathPlayback.isPlaybackActive}
-                  onClick={() => undoLastPathSpot()}
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-300 dark:border-slate-600 disabled:opacity-50 touch-manipulation"
-                >
-                  이전 스팟
-                </button>
-                <button
-                  type="button"
-                  {...(variant === "trouble" ? { "data-trouble-action": C.action.clearAllPaths } : {})}
-                  disabled={
-                    (pathPoints.length === 0 && objectPathPoints.length === 0) ||
-                    pathPlayback.isPlaybackActive
-                  }
-                  onClick={() => clearAllPaths()}
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium border border-red-300 text-red-600 disabled:opacity-50 touch-manipulation"
-                >
-                  전체 삭제
-                </button>
-                <button
-                  type="button"
-                  {...(variant === "trouble" ? { "data-trouble-action": C.action.playPath } : {})}
-                  disabled={!pathPlayback.canPlayback || pathPlayback.isPlaybackActive}
-                  onClick={() => pathPlayback.startPlayback()}
-                  className="px-3 py-1.5 rounded-lg text-sm border border-amber-400 text-amber-800 bg-amber-50 dark:bg-amber-950/40 disabled:opacity-50 touch-manipulation"
-                >
-                  {pathPlayback.isPlaybackActive ? "재생 중…" : "애니메이션 시연"}
-                </button>
-              </>
-            )}
+            <button
+              type="button"
+              {...(variant === "trouble" ? { "data-trouble-action": C.action.undoLastPathSpot } : {})}
+              disabled={pathAddStack.length === 0 || pathPlayback.isPlaybackActive}
+              onClick={() => undoLastPathSpot()}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-300 dark:border-slate-600 disabled:opacity-50 touch-manipulation"
+            >
+              이전 스팟
+            </button>
+            <button
+              type="button"
+              {...(variant === "trouble" ? { "data-trouble-action": C.action.clearAllPaths } : {})}
+              disabled={
+                (pathPoints.length === 0 && objectPathPoints.length === 0) ||
+                pathPlayback.isPlaybackActive
+              }
+              onClick={() => clearAllPaths()}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium border border-red-300 text-red-600 disabled:opacity-50 touch-manipulation"
+            >
+              전체 삭제
+            </button>
+            <button
+              type="button"
+              {...(variant === "trouble" ? { "data-trouble-action": C.action.playPath } : {})}
+              disabled={!pathPlayback.canPlayback || pathPlayback.isPlaybackActive}
+              onClick={() => pathPlayback.startPlayback()}
+              className="px-3 py-1.5 rounded-lg text-sm border border-amber-400 text-amber-800 bg-amber-50 dark:bg-amber-950/40 disabled:opacity-50 touch-manipulation"
+            >
+              {pathPlayback.isPlaybackActive ? "재생 중…" : "애니메이션 시연"}
+            </button>
           </div>
-          {pathRuleHint ? (
-            <p className="text-xs text-amber-700 dark:text-amber-300" role="status">
-              {pathRuleHint}
-            </p>
-          ) : (
             <p className="text-xs text-gray-500 dark:text-slate-400">
-              {isNoteShell ? (
-                variant === "nangu" ? (
-                  <>
-                    당구노트에 저장된 공 좌표가 그대로 표시됩니다. 공은 읽기 전용이며, 수구 위치에서 경로선만 그립니다. 좌측 가장자리 탭에서
-                    경로 삭제·애니메이션·확대·표시(그리드·실사)를 설정할 수 있습니다. 스팟·드래그·빈 곳 드래그(팬)은 이 화면에서만 가능합니다.
-                    완료 시 반영, 취소 시 이전 상태로 돌아갑니다.
-                  </>
-                ) : readOnlyCueAndBalls ? (
-                  <>
-                    난구 문제에 지정된 공·수구는 고정입니다. 경로선만 편집합니다. 좌측 가장자리 탭에서 경로 삭제·애니메이션·확대·표시(그리드·실사)를
-                    설정할 수 있습니다. 스팟·드래그·빈 곳 드래그(팬)은 이 화면에서만 가능합니다. 완료 시 반영, 취소 시 이전 상태로 돌아갑니다.
-                  </>
-                ) : (
-                  <>
-                    난구해결 문제의 공 좌표가 그대로 표시됩니다. 공은 읽기 전용이며, 수구 위치에서 경로선만 그립니다. 좌측 가장자리 탭에서 경로
-                    삭제·애니메이션·확대·표시(그리드·실사)를 설정할 수 있습니다. 스팟·드래그·빈 곳 드래그(팬)은 이 화면에서만 가능합니다. 완료 시
-                    반영, 취소 시 이전 상태로 돌아갑니다.
-                  </>
-                )
-              ) : (
-                <>
-                  스팟·드래그·줌(좌측)은 이 화면에서만 사용합니다. 완료 시 저장되고, 취소 시 들어오기 전 상태로 돌아갑니다.
-                </>
-              )}
+              스팟·드래그·줌은 이 화면에서만 사용합니다. 1목 경로는 수구보다 먼저 그려도 됩니다(스위치·애니메이션
+              시연은 수구 경로와 맞물릴 때만). 완료 시 저장되고, 취소 시 들어오기 전 상태로 돌아갑니다.
             </p>
-          )}
+          </>
         </div>
+        )}
       </div>
 
       {cuePickerOpen && layoutForCue && !readOnlyCueAndBalls && (

@@ -25,10 +25,6 @@ export default async function TournamentsPage() {
         <h1 className="text-2xl font-bold text-site-text">{getCopyValue(c, "site.tournaments.title")}</h1>
         <p className="mt-2 text-gray-600">{getCopyValue(c, "site.tournaments.subtitle")}</p>
 
-        {useMock && (
-          <p className="mt-4 text-center text-sm text-site-primary">DB 없이 미리보기 데이터로 표시 중입니다.</p>
-        )}
-
         <TournamentsListWithFilters copy={c} useMock={useMock} />
       </div>
     </main>

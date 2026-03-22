@@ -29,6 +29,12 @@ export const DEFAULT_TABLE_WIDTH = PLAYFIELD_WIDTH + INSET_TOTAL * 2;
 export const DEFAULT_TABLE_HEIGHT = PLAYFIELD_HEIGHT + INSET_TOTAL * 2;
 
 /**
+ * 경로 스팟 원 반지름(px, 캔버스 좌표) — `BilliardTableCanvas` 경로 점 표시와 동일.
+ * 슬라이드 탭 포인트 등 UI에서 시각 일치용.
+ */
+export const PATH_SPOT_RADIUS_PX = 10;
+
+/**
  * 공 지름은 플레이필드 긴 변(longSide) 기준 약 2.16%.
  * 화면/orientation 기준 아님. 테이블 회전 시에도 공 크기 동일 유지.
  * longSide = max(playFieldWidth, playFieldHeight)
@@ -136,6 +142,22 @@ export function getPlayfieldRect(
   };
 }
 
+/** 플레이필드 표시 그리드 — `BilliardTableCanvas`와 동일: 긴 변 8칸·짧은 변 4칸 */
+export const PLAYFIELD_GRID_LONG_DIVS = 8;
+export const PLAYFIELD_GRID_SHORT_DIVS = 4;
+
+/**
+ * 그리드 한 칸의 한 변 길이(px). portrait 시 가로/세로 분할 수가 바뀜.
+ * 직전 스팟→자동 쿠션 교차까지 허용 거리 상한 등에 사용.
+ */
+export function playfieldGridOneCellEdgePx(rect: PlayfieldRect, portrait: boolean): number {
+  const nDivX = portrait ? PLAYFIELD_GRID_SHORT_DIVS : PLAYFIELD_GRID_LONG_DIVS;
+  const nDivY = portrait ? PLAYFIELD_GRID_LONG_DIVS : PLAYFIELD_GRID_SHORT_DIVS;
+  const stepX = rect.width / nDivX;
+  const stepY = rect.height / nDivY;
+  return Math.min(stepX, stepY);
+}
+
 /** 픽셀 좌표 → 정규화 0..1 (플레이필드 내) */
 export function pixelToNormalized(
   px: number,
@@ -172,9 +194,20 @@ export function distanceNormPointsInPlayfieldPx(
   return Math.hypot(pa.px - pb.px, pa.py - pb.py);
 }
 
-/** 경로 편집: 공 탭 인식 반경(px) — 터치 여유 + 공 지름 기준 */
+/**
+ * 당구노트 공 배치(`BilliardTableEditor` placementMode)와 동일 — `hitTestBall` 의 반지름 배수.
+ * 난구해법·경로 편집의 공/수구 탭도 이 값과 맞춤.
+ */
+export const BALL_PLACEMENT_TOUCH_RADIUS_SCALE = 6;
+
+/** 당구노트 공 배치 터치 반경(px) — 공 반지름 × {@link BALL_PLACEMENT_TOUCH_RADIUS_SCALE} */
+export function getBallPlacementTouchRadiusPx(rect: PlayfieldRect): number {
+  return getBallRadius(getPlayfieldLongSide(rect)) * BALL_PLACEMENT_TOUCH_RADIUS_SCALE;
+}
+
+/** 경로 편집·난구 수구/공 탭 — {@link getBallPlacementTouchRadiusPx} 와 동일 */
 export function getSolutionPathBallTapRadiusPx(rect: PlayfieldRect): number {
-  return Math.max(getBallRadius(getPlayfieldLongSide(rect)) * 3.2, 24);
+  return getBallPlacementTouchRadiusPx(rect);
 }
 
 /**
@@ -317,7 +350,7 @@ export function clampBallToPlayfieldAndNoOverlap(
 
 /**
  * 클릭/터치 지점(픽셀)에서 맞은 공 반환. 없으면 null.
- * @param hitRadiusScale 공 반지름의 배수 (기본 1). 난구 공배치 모드에서는 6 사용(공선택 터치셀 50% 확대).
+ * @param hitRadiusScale 공 반지름의 배수 (기본 1). 당구노트 공 배치는 {@link BALL_PLACEMENT_TOUCH_RADIUS_SCALE}.
  */
 export function hitTestBall(
   px: number,

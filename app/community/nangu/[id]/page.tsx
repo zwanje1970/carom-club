@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NanguSolverIcon } from "@/components/community/NanguSolverIcon";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
@@ -70,7 +71,10 @@ export default async function NanguPostDetailPage({
           <span aria-hidden>/</span>
           <span className="text-site-text font-medium">상세</span>
         </nav>
-        <h1 className="text-xl font-bold mb-6">{post.title}</h1>
+        <div className="flex items-start gap-0 mb-6">
+          <NanguSolverIcon size={48} className="mt-0.5 shrink-0" />
+          <h1 className="text-xl font-bold flex-1 min-w-0 break-words">{post.title}</h1>
+        </div>
         <NanguPostDetailClient
           post={{
             id: post.id,

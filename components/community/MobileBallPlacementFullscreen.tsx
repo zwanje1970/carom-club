@@ -7,6 +7,7 @@ import {
   type BilliardTableEditorHandle,
 } from "@/components/billiard";
 import {
+  BALL_PLACEMENT_TOUCH_RADIUS_SCALE,
   DEFAULT_TABLE_WIDTH,
   DEFAULT_TABLE_HEIGHT,
   getPlayfieldRect,
@@ -23,6 +24,7 @@ import {
 import { SolutionTableZoomShell } from "@/components/nangu/SolutionTableZoomShell";
 import type { SolutionTablePanPointerPolicy } from "@/components/nangu/SolutionTableZoomShell";
 import type { SolutionTableZoomContextValue } from "@/components/nangu/solution-table-zoom-context";
+import { useTableOrientation } from "@/hooks/useTableOrientation";
 import { useBallPlacementFullscreen } from "./BallPlacementFullscreenContext";
 
 function CloseXIcon({ className }: { className?: string }) {
@@ -57,18 +59,6 @@ export interface MobileBallPlacementFullscreenProps {
   initialMemo?: string;
 }
 
-function useTableOrientation() {
-  const [orientation, setOrientation] = useState<TableOrientation>("landscape");
-  useEffect(() => {
-    const mq = window.matchMedia("(orientation: portrait)");
-    const update = () => setOrientation(mq.matches ? "portrait" : "landscape");
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
-  return orientation;
-}
-
 export function MobileBallPlacementFullscreen({
   initialRed,
   initialYellow,
@@ -87,25 +77,35 @@ export function MobileBallPlacementFullscreen({
   useEffect(() => {
     setNoteMemo(initialMemo);
   }, [initialMemo]);
-  useEffect(() => {
-    if (process.env.NODE_ENV !== "development") return;
-    console.debug("[MobileBallPlacementFullscreen] mounted", {
-      returnOnly,
-      includeMemoField,
-    });
-  }, [returnOnly, includeMemoField]);
   /** 공배치 시작 시 수구 선택 UI 없음 — 기본 흰공(또는 initial). 변경은 상단「수구」 */
   const [cueBall, setCueBall] = useState<CueBallType>(initialCueBall ?? "white");
   const [cuePickerOpen, setCuePickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toolsDrawerOpen, setToolsDrawerOpen] = useState(false);
+  /** 우측 패널 드래그로 닫기 — 열린 상태 기준 오른쪽으로 밀린 px (0 = 완전히 열림) */
+  const [toolsDrawerDragPx, setToolsDrawerDragPx] = useState(0);
+  const [toolsDrawerDragging, setToolsDrawerDragging] = useState(false);
+  const toolsDrawerAsideRef = useRef<HTMLElement | null>(null);
+  const toolsDrawerDragRef = useRef<{ startX: number; basePx: number } | null>(null);
+  const toolsDrawerDragPxRef = useRef(0);
   const [gridOn, setGridOn] = useState(true);
   const [drawStyle, setDrawStyle] = useState<"realistic" | "wireframe">("realistic");
   /** 수구 깜빡임(스팟) 표시 — 수구확인 버튼으로 ON/OFF */
   const [cueSpotOn, setCueSpotOn] = useState(true);
   /** 미세조정 UI 포털 타깃 — 뷰포트 중앙·고정 크기 */
   const [fineTuneOverlayRoot, setFineTuneOverlayRoot] = useState<HTMLDivElement | null>(null);
-  const orientation = useTableOrientation();
+  const deviceOrientation = useTableOrientation();
+  /** PC·태블릿(768px+): 경로 전체화면과 같이 긴 변 세로. 좁은 가로만 가로 테이블 유지 */
+  const [viewportMdUp, setViewportMdUp] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const update = () => setViewportMdUp(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  const tableOrientation: TableOrientation =
+    deviceOrientation === "portrait" || viewportMdUp ? "portrait" : "landscape";
   const [placementBar, setPlacementBar] = useState<{
     selectedBall: BallColor | null;
     x: number;
@@ -125,8 +125,8 @@ export function MobileBallPlacementFullscreen({
   );
 
   const zoomCtxRef = useRef<SolutionTableZoomContextValue | null>(null);
-  const cw = orientation === "portrait" ? DEFAULT_TABLE_HEIGHT : DEFAULT_TABLE_WIDTH;
-  const ch = orientation === "portrait" ? DEFAULT_TABLE_WIDTH : DEFAULT_TABLE_HEIGHT;
+  const cw = tableOrientation === "portrait" ? DEFAULT_TABLE_HEIGHT : DEFAULT_TABLE_WIDTH;
+  const ch = tableOrientation === "portrait" ? DEFAULT_TABLE_WIDTH : DEFAULT_TABLE_HEIGHT;
   const playfieldRect = useMemo(() => getPlayfieldRect(cw, ch), [cw, ch]);
   /** 공 스냅샷·히트는 항상 landscape 정규화 기준 (BilliardTableEditor / 캔버스와 동일) */
   const landscapePlayfieldRect = useMemo(
@@ -140,12 +140,12 @@ export function MobileBallPlacementFullscreen({
    */
   const zoomFocus = useMemo(() => {
     const centerVn =
-      orientation === "portrait"
+      tableOrientation === "portrait"
         ? landscapeToPortraitNorm(0.5, 0.5)
         : { x: 0.5, y: 0.5 };
     const center = normalizedToPixel(centerVn.x, centerVn.y, playfieldRect);
     return { x: center.px, y: center.py };
-  }, [orientation, playfieldRect]);
+  }, [tableOrientation, playfieldRect]);
 
   const panPointerPolicy = useMemo((): SolutionTablePanPointerPolicy => {
     return {
@@ -164,7 +164,7 @@ export function MobileBallPlacementFullscreen({
         if (!snap) return false;
         const vn = pixelToNormalized(cp.x, cp.y, playfieldRect);
         const vnLand =
-          orientation === "portrait"
+          tableOrientation === "portrait"
             ? portraitToLandscapeNorm(vn.x, vn.y)
             : { x: vn.x, y: vn.y };
         const { px: hitPx, py: hitPy } = normalizedToPixel(
@@ -180,12 +180,20 @@ export function MobileBallPlacementFullscreen({
             snap.yellowBall,
             snap.whiteBall,
             landscapePlayfieldRect,
-            6
+            BALL_PLACEMENT_TOUCH_RADIUS_SCALE
           ) == null
         );
       },
     };
-  }, [playfieldRect, landscapePlayfieldRect, orientation]);
+  }, [playfieldRect, landscapePlayfieldRect, tableOrientation]);
+
+  useEffect(() => {
+    toolsDrawerDragPxRef.current = toolsDrawerDragPx;
+  }, [toolsDrawerDragPx]);
+
+  useEffect(() => {
+    setToolsDrawerDragPx(0);
+  }, [toolsDrawerOpen]);
 
   useEffect(() => {
     if (!toolsDrawerOpen) return;
@@ -195,6 +203,43 @@ export function MobileBallPlacementFullscreen({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [toolsDrawerOpen]);
+
+  const endToolsDrawerDrag = useCallback((e: React.PointerEvent) => {
+    toolsDrawerDragRef.current = null;
+    setToolsDrawerDragging(false);
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    const w = toolsDrawerAsideRef.current?.offsetWidth ?? 180;
+    const threshold = Math.min(72, w * 0.25);
+    setToolsDrawerDragPx((px) => {
+      if (px >= threshold) {
+        queueMicrotask(() => setToolsDrawerOpen(false));
+      }
+      return 0;
+    });
+  }, []);
+
+  const onToolsDrawerHandlePointerDown = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    toolsDrawerDragRef.current = {
+      startX: e.clientX,
+      basePx: toolsDrawerDragPxRef.current,
+    };
+    setToolsDrawerDragging(true);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }, []);
+
+  const onToolsDrawerHandlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!toolsDrawerDragRef.current) return;
+    const w = toolsDrawerAsideRef.current?.offsetWidth ?? 180;
+    const { startX, basePx } = toolsDrawerDragRef.current;
+    const dx = e.clientX - startX;
+    const next = Math.max(0, Math.min(basePx + dx, w));
+    setToolsDrawerDragPx(next);
+  }, []);
 
   useEffect(() => {
     fullscreen?.setFullscreen(true);
@@ -263,17 +308,37 @@ export function MobileBallPlacementFullscreen({
             onClick={() => setToolsDrawerOpen(false)}
           />
           <aside
+            ref={toolsDrawerAsideRef}
             data-ball-placement-chrome=""
             id="ball-placement-tools-drawer"
             aria-hidden={!toolsDrawerOpen}
-            className={`fixed top-0 right-0 z-[200] flex h-full w-[min(88vw,300px)] flex-col border-l border-white/20 bg-black/30 text-white shadow-[-6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md transition-transform duration-300 ease-out ${
-              toolsDrawerOpen ? "translate-x-0" : "pointer-events-none translate-x-full"
-            }`}
+            className={`fixed top-0 right-0 z-[200] flex h-full w-[min(52.8vw,180px)] flex-col border-l border-white/20 bg-black/30 text-white shadow-[-6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md ${
+              toolsDrawerOpen ? "pointer-events-auto" : "pointer-events-none translate-x-full"
+            } ${toolsDrawerDragging ? "!duration-0" : "transition-transform duration-300 ease-out"}`}
+            style={
+              toolsDrawerOpen
+                ? {
+                    transform: `translateX(${toolsDrawerDragPx}px)`,
+                    transition: toolsDrawerDragging ? "none" : undefined,
+                  }
+                : undefined
+            }
           >
+            {toolsDrawerOpen && (
+              <div
+                aria-hidden
+                className="absolute left-0 top-0 z-10 h-full w-4 cursor-grab touch-none active:cursor-grabbing"
+                style={{ touchAction: "none" }}
+                onPointerDown={onToolsDrawerHandlePointerDown}
+                onPointerMove={onToolsDrawerHandlePointerMove}
+                onPointerUp={endToolsDrawerDrag}
+                onPointerCancel={endToolsDrawerDrag}
+              />
+            )}
             <div className="border-b border-white/15 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
               <h2 className="text-sm font-semibold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">보기 · 설정</h2>
             </div>
-            <div className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <button
                 type="button"
                 className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-medium bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
@@ -347,9 +412,16 @@ export function MobileBallPlacementFullscreen({
             aria-expanded={toolsDrawerOpen}
             aria-controls="ball-placement-tools-drawer"
             onClick={() => setToolsDrawerOpen(true)}
-            className="absolute right-0 top-1/2 z-[125] flex h-11 w-[1.35rem] -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-white/20 bg-black/30 text-white shadow-md backdrop-blur-sm touch-manipulation hover:bg-black/40 active:bg-black/45"
+            className="absolute right-0 top-[45.5%] z-[125] flex h-11 w-[1.215rem] -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-gray-300/60 bg-white/20 text-gray-800 shadow-md backdrop-blur-sm touch-manipulation hover:bg-white/30 active:bg-white/25 dark:border-slate-500/60 dark:bg-white/20 dark:text-gray-900"
           >
-            <svg className="h-3.5 w-3.5 shrink-0 opacity-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} aria-hidden>
+            <svg
+              className="h-3.5 w-3.5 shrink-0 opacity-90"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.2}
+              aria-hidden
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" />
             </svg>
           </button>
@@ -415,7 +487,7 @@ export function MobileBallPlacementFullscreen({
             focusCanvasX={zoomFocus.x}
             focusCanvasY={zoomFocus.y}
             fitMode="contain"
-            panResetKey={placementBar?.selectedBall ?? "none"}
+            panResetKey={`${tableOrientation}-${placementBar?.selectedBall ?? "none"}`}
             panPointerPolicy={panPointerPolicy}
             forceShowZoomControls
           >
@@ -436,7 +508,7 @@ export function MobileBallPlacementFullscreen({
                     onDrawStyleChange={setDrawStyle}
                     interactive={true}
                     canvasOnly={true}
-                    orientation={orientation}
+                    orientation={tableOrientation}
                     cueBall={cueBall}
                     placementMode={true}
                     onPlacementBarInfo={onPlacementBarInfo}

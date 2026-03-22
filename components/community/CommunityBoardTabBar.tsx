@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { orderedHubBoards, tabLabelForSlug } from "./communityBoardConstants";
+import { NanguSolverIcon } from "./NanguSolverIcon";
 
 type Board = { id: string; slug: string; name: string };
 
@@ -34,12 +35,13 @@ export function CommunityBoardTabBar({ boards }: Props) {
             <Link
               key={b.id}
               href={href}
-              className={`shrink-0 px-3 sm:px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              className={`shrink-0 inline-flex items-center gap-0 px-3 sm:px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 active
                   ? "border-site-primary text-site-text"
                   : "border-transparent text-gray-500 dark:text-slate-400 hover:text-site-text"
               }`}
             >
+              {b.slug === "trouble" && <NanguSolverIcon size={32} />}
               {label}
             </Link>
           );

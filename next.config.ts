@@ -105,17 +105,12 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   outputFileTracingRoot: path.join(__dirname),
-  /** 클라이언트 번들에 커밋 앞 7자 주입 — Production HTML의 carom:notes-list 와 동일 값 기대 */
-  env: {
-    NEXT_PUBLIC_CAROM_NOTES_DIAG:
-      process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local",
-  },
 
   /** www/apex·HTTP 정규화 redirects 는 사용하지 않음 — Vercel Domains(리다이렉트·HTTPS)와 중복 시 ERR_TOO_MANY_REDIRECTS 발생 가능 */
 
   images: {
     remotePatterns: buildRemotePatterns(),
-    localPatterns: [{ pathname: "/uploads/**" }],
+    localPatterns: [{ pathname: "/uploads/**" }, { pathname: "/images/**" }],
     unoptimized:
       process.env.VERCEL === "1" || process.env.NEXT_IMAGE_UNOPTIMIZED === "1",
   },

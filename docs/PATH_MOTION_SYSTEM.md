@@ -33,7 +33,7 @@
 - **애니메이션 시간**: `PathMotionPlan.animationDurationSec` / `animationDurationMs` — 기본은 세기 **레일 번호(1~5)** 기준.  
   기본은 레일 1에서 약 1초, 레일이 올라갈수록 증가. 값은 **`PATH_ANIMATION_TIMING`** 객체에서 조정 (시연 후 튜닝).  
   Trouble「경로 시연」숨김 시간은 `computePathPreviewDemoHoldMs` (스트로크 ms + `pathPreviewDemoPaddingMs`).
-- **경로 시연 재생** (`useTroublePathPlayback` / `buildCuePathMotionPlan(..., { visualizationPlayback: true })`): 수구 폴리라인은 **수구→첫 스팟→…→마지막 스팟(화살표)** 총거리(`verticesFromCueAndSpots` + `polylineTotalLengthPx`)로만 계산(스팟 간 구간만 합산하지 않음). 1목이 있으면 **감속 기준 총거리** = 그 수구 폴리라인 길이 + **충돌점→1목 마지막 스팟** 폴리라인 길이로 `computePolylinePlaybackDurationMs`를 **한 번** 적용한 뒤, 수구/1목 **구간별 재생 ms**는 길이 비율로 나눔. 수구 구간: 총 이동 시간 T에 **전역 감속** `cuePathDecelerationProgress(τ/T)`(τ=이동 전용 경과 ms, 스팟 멈춤은 벽시계만 추가). 꼭짓점 τ는 누적 거리 비율의 역감속으로 맞춤. 1목 구간도 `cuePathDecelerationProgress`. 튜닝: `PATH_ANIMATION_TIMING.playbackLongEdgeOneWayMs`(기본 편도 L=3초, 왕복 2L=6초), `cuePlaybackSpotPauseMs`(스팟 멈춤) 등. 재생 종료 후 공 위치는 유지되며, 수구 단일 탭으로 `resetPlayback` 시 원 배치로 복귀.
+- **경로 시연 재생** (`useTroublePathPlayback`): 수구는 **전체** 빨간 `cuePlan` 폴리라인 끝까지 진행(1목 스팟에서 끊지 않음). 이후 수구는 빨간 끝점에 고정되고 1목만 파란 폴리라인(`runObjectPhase`, `sampleObjectMotion` τ=0 동기 반영 후 rAF). `cueDurationMs`·감속·τ는 빨간 길이만, `objectDurationMs`는 파란 길이만. 튜닝: `PATH_ANIMATION_TIMING.playbackLongEdgeOneWayMs`, `cuePlaybackSpotPauseMs` 등.
 
 상수는 `rail-power-constants.ts`, `ball-speed-constants.ts`, `path-motion-distance.ts`, `path-animation-timing.ts`, `thickness-power-split.ts`에서 조정.
 
@@ -52,7 +52,7 @@
 ## 경로 재생 중 충돌 (7단계)
 
 - Trouble 해법 편집기 `경로 재생`: 수구 경로 → (1목 경로가 있으면) 적색 경로 순서로 `PathMotionPlan` 기준 시간에 맞춰 이동.
-- 이동 중 **다른 공과 중심거리 &lt; 2R − ε** 이면 즉시 정지, 경로선(오버레이)은 그대로 유지, 문구 **「충돌이 발생하였습니다.」** 표시 (`CollisionWarningToast`). 재계산·새 경로 생성 없음.
+- 이동 중 **다른 공과 중심거리 &lt; 2R − ε** 이면 즉시 정지, 경로선(오버레이)은 그대로 유지, 화면 중앙에 흰색 큰 글자로 **「충돌이」/「발생하였습니다.」** 두 줄, 다섯 번 깜빡인 뒤 사라지게 표시 (`CollisionWarningToast`). 재계산·새 경로 생성 없음.
 - 판정·문구: `lib/path-playback-collision.ts`, `hooks/useTroublePathPlayback.ts`.
 
 ## 테이블 확대·패닝 (10단계)

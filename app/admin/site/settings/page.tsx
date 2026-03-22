@@ -18,6 +18,8 @@ type SiteSettings = {
   primaryColor: string;
   secondaryColor: string;
   withdrawRejoinDays: number;
+  /** 메인 진행중 대회·당구장 가로 흐름 속도(1~100) */
+  homeCarouselFlowSpeed: number;
   headerBgColor: string | null;
   headerTextColor: string | null;
   headerActiveColor: string | null;
@@ -30,6 +32,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   primaryColor: "#d97706",
   secondaryColor: "#b91c1c",
   withdrawRejoinDays: 0,
+  homeCarouselFlowSpeed: 50,
   headerBgColor: null,
   headerTextColor: null,
   headerActiveColor: null,
@@ -56,6 +59,10 @@ export default function AdminSiteSettingsPage() {
           primaryColor: data.primaryColor ?? DEFAULT_SETTINGS.primaryColor,
           secondaryColor: data.secondaryColor ?? DEFAULT_SETTINGS.secondaryColor,
           withdrawRejoinDays: typeof data.withdrawRejoinDays === "number" ? data.withdrawRejoinDays : DEFAULT_SETTINGS.withdrawRejoinDays,
+          homeCarouselFlowSpeed:
+            typeof data.homeCarouselFlowSpeed === "number"
+              ? data.homeCarouselFlowSpeed
+              : DEFAULT_SETTINGS.homeCarouselFlowSpeed,
           headerBgColor: data.headerBgColor ?? null,
           headerTextColor: data.headerTextColor ?? null,
           headerActiveColor: data.headerActiveColor ?? null,
@@ -105,6 +112,7 @@ export default function AdminSiteSettingsPage() {
           primaryColor: form.primaryColor,
           secondaryColor: form.secondaryColor,
           withdrawRejoinDays: Math.max(0, Math.floor(Number(form.withdrawRejoinDays)) || 0),
+          homeCarouselFlowSpeed: Math.max(1, Math.min(100, Math.floor(Number(form.homeCarouselFlowSpeed)) || 50)),
           headerBgColor: form.headerBgColor?.trim() || null,
           headerTextColor: form.headerTextColor?.trim() || null,
           headerActiveColor: form.headerActiveColor?.trim() || null,
@@ -185,6 +193,28 @@ export default function AdminSiteSettingsPage() {
               </button>
             )}
           </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-site-text mb-1">
+            메인 대회·당구장 목록 흐름 속도 (1~100)
+          </label>
+          <input
+            type="number"
+            min={1}
+            max={100}
+            value={form.homeCarouselFlowSpeed}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                homeCarouselFlowSpeed: Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 50)),
+              }))
+            }
+            className="w-24 rounded-lg border border-site-border bg-white px-3 py-2 text-site-text focus:border-site-primary focus:outline-none focus:ring-1 focus:ring-site-primary"
+          />
+          <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
+            숫자가 클수록 빠르게 흐릅니다. 「진행중 대회」와 「당구장 소개」 가로 목록이 연속으로 무한 스크롤됩니다.
+          </p>
         </div>
 
         <div>

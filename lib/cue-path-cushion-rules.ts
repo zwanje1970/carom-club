@@ -2,10 +2,11 @@
  * 수구 진행 경로 규칙
  * - 경로 **선분**은 항상 수구 위치에서 첫 스팟으로 시작(렌더: `buildCuePathSegments`).
  * - **수구에서 이어지는 첫 스팟**은 **1목 후보 공 중심**(수구 제외 2구 중 탭에 가까운 쪽) 또는 **플레이필드·쿠션(레일) 안쪽 테두리**에만 연결.
+ * - **쿠션 스팟 직후**에 이어지는 스팟도 **1목 후보 공 둘레** 또는 **다음 쿠션**·**end** 가능(수구 직후와 동일하게 목적구 스냅).
  * - **쿠션필드·프레임** 탭: 직전 점→탭 방향 반직선이 먼저 만나는 **쿠션 라인(플레이필드 경계)** 또는 **수구가 아닌 공의 원 둘레**에 스팟(`appendCuePathSpotWithAim` / `lib/cue-path-ray-resolve`).
- * - 그 다음부터: 쿠션 체인은 테두리끼리만 이어짐. 테두리가 아니면 **end**(화살표, 다음 스팟 없음).
- * - 선분 삽입: 첫 구간(수구~첫 스팟 사이)에 넣을 때만 1목/테두리 허용, 그 외는 테두리만.
- * - cushion / ball / end 스팟은 드래그로 이동 (마지막 쿠션 → 안쪽 end, end → 테두리 쿠션 스냅 시 cushion)
+ * - 직전이 **공(ball)** 인 구간: 다음은 쿠션 또는 end(기존).
+ * - 선분 삽입: 수구~첫 스팟 구간, 또는 **직전 스팟이 쿠션인 구간**에만 1목 둘레 삽입 허용, 그 외 중간은 테두리만.
+ * - **마지막 경로선(세그먼트)의 양끝 스팟만** 드래그로 이동(끝에서 두 번째·마지막). 직전이 공·쿠션이면 기존 스팟과 같은 위치에 다시 찍기 허용.
  */
 import type { NanguBallPlacement, NanguPathPoint } from "@/lib/nangu-types";
 import {
@@ -14,10 +15,15 @@ import {
   distanceNormPointsInPlayfieldPx,
   getPlayfieldRect,
   getSolutionPathBallTapRadiusPx,
+  playfieldGridOneCellEdgePx,
   type PlayfieldRect,
 } from "@/lib/billiard-table-constants";
-import { resolveCuePathRayHitLandscape } from "@/lib/cue-path-ray-resolve";
-import { ballCircumferenceNormFacingApproach } from "@/lib/solution-path-geometry";
+import {
+  resolveCuePathRayHitLandscape,
+  landscapeNormToPlayfieldCanvasPx,
+  tableCanvasClampedToPlayfieldLandscapeNorm,
+} from "@/lib/cue-path-ray-resolve";
+import { spotCenterOnObjectBallExternalTangencyFromTap } from "@/lib/solution-path-geometry";
 
 export function countCushionSpots(points: NanguPathPoint[]): number {
   return points.filter((p) => p.type === "cushion").length;
@@ -46,8 +52,17 @@ export type CuePathSnapResult = { x: number; y: number; type: "cushion" | "free"
 /** @deprecated CuePathSnapResult 사용 */
 export type CushionSnapResult = CuePathSnapResult;
 
-/** `cueNorm`이 있으면 ball 스냅을 공 **원주**(수구 방향)에 둠 */
-export type CuePathSnapContext = { firstFromCue: boolean; cueNorm?: { x: number; y: number } };
+/**
+ * - `firstFromCue`: 삽입 세그먼트가 수구~첫 스팟일 때 true(기존).
+ * - `allowObjectBallSnap`: 명시 시 1목 후보 스냅 허용 여부(미입력이면 `firstFromCue`와 동일).
+ * - `approachNorm` / `cueNorm`: 공 원주 스냅 시 진입 방향 기준(수구 또는 **직전 스팟**). `approachNorm` 우선.
+ */
+export type CuePathSnapContext = {
+  firstFromCue: boolean;
+  allowObjectBallSnap?: boolean;
+  approachNorm?: { x: number; y: number };
+  cueNorm?: { x: number; y: number };
+};
 
 /** 수구→첫 스팟 배치 시에만 1목적구 스냅 허용 */
 export type CuePathSnapFn = (x: number, y: number, ctx: CuePathSnapContext) => CuePathSnapResult;
@@ -84,7 +99,7 @@ export const FIRST_OBJECT_BALL_SNAP_NORM = 0.045;
 
 /**
  * 수구 경로 탭/드래그 스냅.
- * - `firstFromCue`: 수구에서 바로 이어지는 스팟(첫 점 또는 그 앞에 삽입)일 때만 **1목 후보 공**(수구 제외 2개) 스냅.
+ * - 1목 후보 스냅: 수구→첫 스팟, 또는 **쿠션 직후** 스팟(`allowObjectBallSnap`).
  */
 export function snapCuePathTap(
   x: number,
@@ -92,7 +107,8 @@ export function snapCuePathTap(
   firstObjectCandidates: { x: number; y: number }[] | null,
   ctx: CuePathSnapContext
 ): CuePathSnapResult {
-  if (ctx.firstFromCue && firstObjectCandidates && firstObjectCandidates.length > 0) {
+  const allowBall = ctx.allowObjectBallSnap ?? ctx.firstFromCue;
+  if (allowBall && firstObjectCandidates && firstObjectCandidates.length > 0) {
     const rect = getPlayfieldRect(DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT);
     const snapPx = getSolutionPathBallTapRadiusPx(rect);
     let best: { x: number; y: number } | null = null;
@@ -105,9 +121,21 @@ export function snapCuePathTap(
       }
     }
     if (best != null && bestD <= snapPx) {
-      if (ctx.cueNorm) {
-        const surf = ballCircumferenceNormFacingApproach(best, ctx.cueNorm, rect);
-        return { type: "ball", x: surf.x, y: surf.y };
+      const approach = ctx.approachNorm ?? ctx.cueNorm;
+      if (approach) {
+        const segmentFrom = ctx.firstFromCue
+          ? ctx.cueNorm ?? approach
+          : ctx.approachNorm ?? ctx.cueNorm ?? approach;
+        if (segmentFrom) {
+          const surf = spotCenterOnObjectBallExternalTangencyFromTap(
+            segmentFrom,
+            { x, y },
+            best,
+            rect,
+            firstObjectCandidates
+          );
+          return { type: "ball", x: surf.x, y: surf.y };
+        }
       }
       return { type: "ball", x: best.x, y: best.y };
     }
@@ -136,7 +164,13 @@ export function snapObjectPathPlayfieldTap(
     }
   }
   if (best != null && bestD <= snapPx) {
-    const surf = ballCircumferenceNormFacingApproach(best, fromNorm, rect);
+    const surf = spotCenterOnObjectBallExternalTangencyFromTap(
+      fromNorm,
+      { x, y },
+      best,
+      rect,
+      objectCandidates
+    );
     return { type: "ball", x: surf.x, y: surf.y };
   }
   return snapToPlayfieldCushionJunction(x, y);
@@ -164,6 +198,40 @@ function lastPathSpot(prev: NanguPathPoint[]): NanguPathPoint | undefined {
   return prev.length ? prev[prev.length - 1] : undefined;
 }
 
+/**
+ * 직전 스팟이 목적구(ball) 또는 쿠션이면, 새 스팟을 기존 스팟과 동일(근접) 위치에 다시 찍을 수 있다.
+ */
+export function cuePathAppendAllowsDuplicateCoincident(prev: NanguPathPoint[]): boolean {
+  const last = lastPathSpot(prev);
+  return last != null && (last.type === "ball" || last.type === "cushion");
+}
+
+/** 추가될 좌표가 이미 있는 스팟과 겹치면 true — 위 규칙으로 허용되면 false */
+export function cuePathAppendWouldDuplicateExistingSpot(
+  prev: NanguPathPoint[],
+  added: { x: number; y: number },
+  rect: PlayfieldRect,
+  dupThresholdPx: number
+): boolean {
+  if (cuePathAppendAllowsDuplicateCoincident(prev)) return false;
+  return prev.some(
+    (p) =>
+      distanceNormPointsInPlayfieldPx({ x: added.x, y: added.y }, { x: p.x, y: p.y }, rect) <
+      dupThresholdPx
+  );
+}
+
+/** 수구→첫 스팟 또는 직전이 쿠션일 때 1목 후보 스냅 허용 */
+function allowObjectBallSnapAtPathIndex(prev: NanguPathPoint[], idx: number): boolean {
+  return idx === 0 || prev[idx - 1]?.type === "cushion";
+}
+
+function approachNormForPathIndex(prev: NanguPathPoint[], idx: number): { x: number; y: number } | undefined {
+  if (idx === 0) return undefined;
+  const q = prev[idx - 1];
+  return q ? { x: q.x, y: q.y } : undefined;
+}
+
 /** 반직선으로 구한 쿠션/공 둘레 점을 기존 규칙에 맞게 추가 */
 function appendResolvedCueSpot(
   prev: NanguPathPoint[],
@@ -171,7 +239,7 @@ function appendResolvedCueSpot(
   newId: () => string
 ): CuePathMutationResult {
   if (hasEndSpot(prev)) {
-    return { ok: false, message: "마지막 스팟이 이미 있습니다. 드래그로 위치를 조정하세요." };
+    return { ok: false, message: "" };
   }
   const last = lastPathSpot(prev);
   if (!last) {
@@ -196,6 +264,12 @@ function appendResolvedCueSpot(
         points: [...prev, { id: newId(), x: resolved.x, y: resolved.y, type: "cushion" }],
       };
     }
+    if (resolved.type === "ball") {
+      return {
+        ok: true,
+        points: [...prev, { id: newId(), x: resolved.x, y: resolved.y, type: "ball" }],
+      };
+    }
     const c = clampEndSpotPosition(resolved.x, resolved.y);
     return {
       ok: true,
@@ -215,15 +289,56 @@ function appendResolvedCueSpot(
       points: [...prev, { id: newId(), x: c.x, y: c.y, type: "end" }],
     };
   }
-  return { ok: false, message: "마지막 스팟이 이미 있습니다." };
+  return { ok: false, message: "" };
 }
 
 function allowNonCueBallCircleForCueAppend(prev: NanguPathPoint[]): boolean {
-  return prev.length === 0;
+  if (prev.length === 0) return true;
+  return lastPathSpot(prev)?.type === "cushion";
+}
+
+/**
+ * 직전 스팟이 쿠션이 아닐 때(공·free 등): 직전→탭 방향으로 먼저 쿠션 교차점을 넣은 뒤, 탭 위치를 스냅한 스팟을 이어 붙임.
+ * (쿠션 밖 탭은 클램프된 플레이필드 좌표로 스냅)
+ */
+export function appendCuePathPlayfieldWithAutoCushion(
+  prev: NanguPathPoint[],
+  tapNorm: { x: number; y: number },
+  snap: CuePathSnapFn,
+  newId: () => string,
+  rayCtx: CuePathRayAppendContext
+): CuePathMutationResult {
+  const last = lastPathSpot(prev);
+  if (hasEndSpot(prev)) {
+    return { ok: false, message: "" };
+  }
+  if (!last || last.type === "cushion") {
+    return appendCuePathSpot(prev, tapNorm, snap, newId);
+  }
+  const aimCanvasPx = landscapeNormToPlayfieldCanvasPx(tapNorm, rayCtx.canvasW, rayCtx.canvasH, rayCtx.portrait);
+  const cushionHit = resolveCuePathRayHitLandscape({
+    fromLandscape: { x: last.x, y: last.y },
+    aimCanvasPx,
+    canvasW: rayCtx.canvasW,
+    canvasH: rayCtx.canvasH,
+    portrait: rayCtx.portrait,
+    collisionRectLandscape: rayCtx.collisionRectLandscape,
+    ballPlacement: rayCtx.ballPlacement,
+    allowNonCueBallCircle: false,
+  });
+  if (!cushionHit || cushionHit.type !== "cushion") {
+    return appendCuePathSpot(prev, tapNorm, snap, newId);
+  }
+  const prevWithCushion: NanguPathPoint[] = [
+    ...prev,
+    { id: newId(), x: cushionHit.x, y: cushionHit.y, type: "cushion" },
+  ];
+  return appendCuePathSpot(prevWithCushion, tapNorm, snap, newId);
 }
 
 function allowNonCueBallCircleForCueInsert(prev: NanguPathPoint[], segmentIndex: number): boolean {
-  return segmentIndex === 0;
+  if (segmentIndex === 0) return true;
+  return prev[segmentIndex - 1]?.type === "cushion";
 }
 
 export function appendCuePathSpotWithAim(
@@ -234,10 +349,45 @@ export function appendCuePathSpotWithAim(
   rayCtx: CuePathRayAppendContext
 ): CuePathMutationResult {
   if (aim.kind === "playfield") {
-    return appendCuePathSpot(prev, aim.norm, snap, newId);
+    return appendCuePathPlayfieldWithAutoCushion(prev, aim.norm, snap, newId, rayCtx);
   }
   const last = lastPathSpot(prev);
   const fromLandscape = last ? { x: last.x, y: last.y } : rayCtx.cueLandscape;
+  /** 직전이 쿠션이 아니면: 먼저 쿠션-only로 교차점 → 탭을 클램프·스냅한 스팟 연결 */
+  if (last && last.type !== "cushion" && !hasEndSpot(prev)) {
+    const cushionOnly = resolveCuePathRayHitLandscape({
+      fromLandscape,
+      aimCanvasPx: { x: aim.cx, y: aim.cy },
+      canvasW: rayCtx.canvasW,
+      canvasH: rayCtx.canvasH,
+      portrait: rayCtx.portrait,
+      collisionRectLandscape: rayCtx.collisionRectLandscape,
+      ballPlacement: rayCtx.ballPlacement,
+      allowNonCueBallCircle: false,
+    });
+    if (cushionOnly && cushionOnly.type === "cushion") {
+      const maxAutoPx = playfieldGridOneCellEdgePx(rayCtx.collisionRectLandscape, rayCtx.portrait);
+      const distToCushion = distanceNormPointsInPlayfieldPx(
+        fromLandscape,
+        { x: cushionOnly.x, y: cushionOnly.y },
+        rayCtx.collisionRectLandscape
+      );
+      if (distToCushion <= maxAutoPx) {
+        const tapNorm = tableCanvasClampedToPlayfieldLandscapeNorm(
+          aim.cx,
+          aim.cy,
+          rayCtx.canvasW,
+          rayCtx.canvasH,
+          rayCtx.portrait
+        );
+        const prevWithCushion: NanguPathPoint[] = [
+          ...prev,
+          { id: newId(), x: cushionOnly.x, y: cushionOnly.y, type: "cushion" },
+        ];
+        return appendCuePathSpot(prevWithCushion, tapNorm, snap, newId);
+      }
+    }
+  }
   const hit = resolveCuePathRayHitLandscape({
     fromLandscape,
     aimCanvasPx: { x: aim.cx, y: aim.cy },
@@ -272,7 +422,7 @@ export function insertCuePathSpotWithAim(
   if (hasEndSpot(prev)) {
     return { ok: false, message: "마지막 스팟이 있으면 선분 삽입을 할 수 없습니다." };
   }
-  const firstFromCue = segmentIndex === 0;
+  const allowBallFromPrev = allowNonCueBallCircleForCueInsert(prev, segmentIndex);
   const chain: { x: number; y: number }[] = [rayCtx.cueLandscape, ...prev.map((p) => ({ x: p.x, y: p.y }))];
   const fromLandscape = chain[segmentIndex]!;
   const hit = resolveCuePathRayHitLandscape({
@@ -283,7 +433,7 @@ export function insertCuePathSpotWithAim(
     portrait: rayCtx.portrait,
     collisionRectLandscape: rayCtx.collisionRectLandscape,
     ballPlacement: rayCtx.ballPlacement,
-    allowNonCueBallCircle: allowNonCueBallCircleForCueInsert(prev, segmentIndex),
+    allowNonCueBallCircle: allowBallFromPrev,
   });
   if (!hit) {
     return {
@@ -291,12 +441,12 @@ export function insertCuePathSpotWithAim(
       message: "쿠션·프레임 방향으로 삽입할 위치를 찾지 못했습니다.",
     };
   }
-  const okSpot = hit.type === "cushion" || (firstFromCue && hit.type === "ball");
+  const okSpot = hit.type === "cushion" || (allowBallFromPrev && hit.type === "ball");
   if (!okSpot) {
     return {
       ok: false,
-      message: firstFromCue
-        ? "수구 직후 구간만 목적구 둘레에 스팟을 넣을 수 있습니다. 그 외 중간 구간은 쿠션 라인만 가능합니다."
+      message: allowBallFromPrev
+        ? "수구 직후·쿠션 직후 구간만 목적구 둘레에 스팟을 넣을 수 있습니다. 그 외 중간 구간은 쿠션 라인만 가능합니다."
         : "중간에 넣는 스팟은 쿠션 라인 위만 가능합니다.",
     };
   }
@@ -313,10 +463,14 @@ export function appendCuePathSpot(
   newId: () => string
 ): CuePathMutationResult {
   if (hasEndSpot(prev)) {
-    return { ok: false, message: "마지막 스팟이 이미 있습니다. 드래그로 위치를 조정하세요." };
+    return { ok: false, message: "" };
   }
   const last = lastPathSpot(prev);
-  const snapped = snap(norm.x, norm.y, { firstFromCue: !last });
+  const snapped = snap(norm.x, norm.y, {
+    firstFromCue: !last,
+    allowObjectBallSnap: !last || last.type === "cushion",
+    approachNorm: last ? { x: last.x, y: last.y } : undefined,
+  });
 
   /** 첫 스팟: 수구에서 출발 — 1목 / 테두리(쿠션) / 그 외 end */
   if (!last) {
@@ -339,15 +493,23 @@ export function appendCuePathSpot(
     };
   }
 
-  /** 쿠션 체인 이후: 테두리만 다음 쿠션 (1목 스냅 비활성) */
-  const chainSnap = snap(norm.x, norm.y, { firstFromCue: false });
-
-  /** 이어 붙이기: 직전이 쿠션일 때만 체인 — 레일이면 다음 쿠션, 아니면 end */
+  /** 직전이 쿠션: 다음 쿠션 · 1목 둘레 · end */
   if (last.type === "cushion") {
+    const chainSnap = snap(norm.x, norm.y, {
+      firstFromCue: false,
+      allowObjectBallSnap: true,
+      approachNorm: { x: last.x, y: last.y },
+    });
     if (chainSnap.type === "cushion") {
       return {
         ok: true,
         points: [...prev, { id: newId(), x: chainSnap.x, y: chainSnap.y, type: "cushion" }],
+      };
+    }
+    if (chainSnap.type === "ball") {
+      return {
+        ok: true,
+        points: [...prev, { id: newId(), x: chainSnap.x, y: chainSnap.y, type: "ball" }],
       };
     }
     const c = clampEndSpotPosition(norm.x, norm.y);
@@ -357,7 +519,8 @@ export function appendCuePathSpot(
     };
   }
 
-  /** ball 등 첫 스팟이 쿠션이 아닐 때: 쿠션만 이어 붙임, 아니면 끝 */
+  /** 직전이 공(ball) 등: 쿠션만 이어 붙임, 아니면 끝 */
+  const chainSnap = snap(norm.x, norm.y, { firstFromCue: false, allowObjectBallSnap: false });
   if (chainSnap.type === "cushion") {
     return {
       ok: true,
@@ -381,15 +544,18 @@ export function insertCuePathSpot(
   if (hasEndSpot(prev)) {
     return { ok: false, message: "마지막 스팟이 있으면 선분 삽입을 할 수 없습니다." };
   }
-  const firstFromCue = segmentIndex === 0;
-  const snapped = snap(norm.x, norm.y, { firstFromCue });
-  const okSpot =
-    snapped.type === "cushion" || (firstFromCue && snapped.type === "ball");
+  const allowObjectBallSnap = allowNonCueBallCircleForCueInsert(prev, segmentIndex);
+  const snapped = snap(norm.x, norm.y, {
+    firstFromCue: segmentIndex === 0,
+    allowObjectBallSnap,
+    approachNorm: approachNormForPathIndex(prev, segmentIndex),
+  });
+  const okSpot = snapped.type === "cushion" || (allowObjectBallSnap && snapped.type === "ball");
   if (!okSpot) {
     return {
       ok: false,
-      message: firstFromCue
-        ? "수구 직후 스팟은 1목 후보 공(수구 제외 2구) 또는 플레이필드·쿠션이 만나는 테두리 위에만 넣을 수 있습니다. 중간 구간은 테두리 위만 가능합니다."
+      message: allowObjectBallSnap
+        ? "수구 직후·쿠션 직후 스팟은 1목 후보 공 또는 플레이필드·쿠션 테두리 위에만 넣을 수 있습니다. 그 외 중간 구간은 테두리 위만 가능합니다."
         : "중간에 넣는 스팟은 플레이필드와 쿠션이 만나는 테두리 위에만 둘 수 있습니다.",
     };
   }
@@ -412,6 +578,14 @@ function projectToNearestRail(x: number, y: number): { x: number; y: number } {
   return { x, y: 1 };
 }
 
+/** 마지막 세그먼트의 두 끝에 해당하는 스팟 인덱스(수구↔첫 스팟 구간이면 첫 스팟만) — 드래그·깜빡임 UI와 공유 */
+export function isLastSegmentEndpointSpotIndex(prev: NanguPathPoint[], idx: number): boolean {
+  const n = prev.length;
+  if (n < 1) return false;
+  if (idx === n - 1) return true;
+  return n >= 2 && idx === n - 2;
+}
+
 export function moveCuePathSpotById(
   prev: NanguPathPoint[],
   id: string,
@@ -419,22 +593,31 @@ export function moveCuePathSpotById(
   snap: CuePathSnapFn
 ): NanguPathPoint[] {
   const idx = prev.findIndex((q) => q.id === id);
-  const firstFromCue = idx === 0;
+  if (idx < 0) return prev;
+  /** 마지막 세그먼트 양끝 스팟만 이동 — 그 안의 그 외(더 앞선) 스팟은 고정 */
+  if (!isLastSegmentEndpointSpotIndex(prev, idx)) {
+    return prev;
+  }
+  const snapCtx = (): CuePathSnapContext => ({
+    firstFromCue: idx === 0,
+    allowObjectBallSnap: allowObjectBallSnapAtPathIndex(prev, idx),
+    approachNorm: approachNormForPathIndex(prev, idx),
+  });
   return prev.map((p) => {
     if (p.id !== id) return p;
     if (p.type === "end") {
-      const s = snap(norm.x, norm.y, { firstFromCue: idx === 0 });
+      const s = snap(norm.x, norm.y, snapCtx());
       if (s.type === "cushion") {
         return { ...p, x: s.x, y: s.y, type: "cushion" };
       }
-      if (s.type === "ball" && idx === 0) {
+      if (s.type === "ball" && allowObjectBallSnapAtPathIndex(prev, idx)) {
         return { ...p, x: s.x, y: s.y, type: "ball" };
       }
       const c = clampEndSpotPosition(norm.x, norm.y);
       return { ...p, x: c.x, y: c.y };
     }
     if (p.type === "ball") {
-      const s = snap(norm.x, norm.y, { firstFromCue: true });
+      const s = snap(norm.x, norm.y, snapCtx());
       if (s.type === "ball") {
         return { ...p, x: s.x, y: s.y, type: "ball" };
       }
@@ -446,11 +629,11 @@ export function moveCuePathSpotById(
     }
     if (p.type === "cushion") {
       const isLastSpot = idx === prev.length - 1;
-      const s = snap(norm.x, norm.y, { firstFromCue });
+      const s = snap(norm.x, norm.y, snapCtx());
       if (s.type === "cushion") {
         return { ...p, x: s.x, y: s.y, type: "cushion" };
       }
-      if (s.type === "ball" && firstFromCue) {
+      if (s.type === "ball" && allowObjectBallSnapAtPathIndex(prev, idx)) {
         return { ...p, x: s.x, y: s.y, type: "ball" };
       }
       /** 마지막 스팟만: 쿠션 → 플레이필드 안쪽(스냅 free)은 end로 — 그 외에는 기존처럼 가장 가까운 레일로만 이동 */
@@ -459,20 +642,20 @@ export function moveCuePathSpotById(
         return { ...p, x: c.x, y: c.y, type: "end" };
       }
       const rail = projectToNearestRail(norm.x, norm.y);
-      const s2 = snap(rail.x, rail.y, { firstFromCue });
+      const s2 = snap(rail.x, rail.y, snapCtx());
       if (s2.type === "cushion") {
         return { ...p, x: s2.x, y: s2.y, type: "cushion" };
       }
-      if (s2.type === "ball" && firstFromCue) {
+      if (s2.type === "ball" && allowObjectBallSnapAtPathIndex(prev, idx)) {
         return { ...p, x: s2.x, y: s2.y, type: "ball" };
       }
       return { ...p, x: s2.x, y: s2.y, type: "cushion" };
     }
-    const s = snap(norm.x, norm.y, { firstFromCue });
+    const s = snap(norm.x, norm.y, snapCtx());
     if (s.type === "cushion") {
       return { ...p, x: s.x, y: s.y, type: "cushion" };
     }
-    if (s.type === "ball" && firstFromCue) {
+    if (s.type === "ball" && allowObjectBallSnapAtPathIndex(prev, idx)) {
       return { ...p, x: s.x, y: s.y, type: "ball" };
     }
     return { ...p, x: norm.x, y: norm.y };

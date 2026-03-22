@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatKoreanDate } from "@/lib/format-date";
+import { NanguSolverIcon } from "@/components/community/NanguSolverIcon";
 
 type NanguPostListItem = {
   id: string;
@@ -39,7 +40,10 @@ export default function NanguBoardPage() {
           <span className="text-site-text font-medium">난구해결사</span>
         </nav>
         <div className="flex items-center justify-between gap-4 mb-6">
-          <h1 className="text-xl font-bold">난구해결사</h1>
+          <div className="flex items-center gap-0 min-w-0">
+            <NanguSolverIcon size={56} />
+            <h1 className="text-xl font-bold truncate">난구해결사</h1>
+          </div>
           <Link
             href="/community/nangu/write"
             className="shrink-0 py-2 px-4 rounded-lg bg-site-primary text-white text-sm font-medium"

@@ -48,16 +48,12 @@ export interface TroubleSolutionEditorProps {
   layoutImageUrl: string | null;
   /** 좌표 기반 배치 (있으면 읽기 전용 테이블 렌더, 없으면 이미지 표시) */
   ballPlacement: NanguBallPlacement | null;
-  postTitle: string;
-  postContent: string;
   onSubmit: (payload: { content: string; solutionData: NanguSolutionData }) => Promise<void>;
 }
 
 export function TroubleSolutionEditor({
   layoutImageUrl,
   ballPlacement,
-  postTitle,
-  postContent,
   onSubmit,
 }: TroubleSolutionEditorProps) {
   const [activePanel, setActivePanel] = useState<TroubleActivePanel>("thickness");
@@ -119,12 +115,21 @@ export function TroubleSolutionEditor({
       let reflectionObjectBall: NanguSolutionData["reflectionObjectBall"];
       if (collisionNorm && objectPathPoints.length >= 1 && ballPlacement && pathPoints.length >= 1) {
         const hit = cueFirstObjectHitFromBallPlacement(cuePos, pathPoints[0], ballPlacement, rect);
-        const objPts = objectPathPoints.map((p) => ({ x: p.x, y: p.y }));
-        reflectionPath = {
-          points: [{ x: collisionNorm.x, y: collisionNorm.y }, ...objPts],
-          pointsWithType: objectPathPoints,
-        };
-        reflectionObjectBall = hit?.objectKey;
+        const key = hit?.objectKey;
+        if (key) {
+          const objPts = objectPathPoints.map((p) => ({ x: p.x, y: p.y }));
+          const startNorm =
+            key === "red"
+              ? ballPlacement.redBall
+              : key === "yellow"
+                ? ballPlacement.yellowBall
+                : ballPlacement.whiteBall;
+          reflectionPath = {
+            points: [{ x: startNorm.x, y: startNorm.y }, ...objPts],
+            pointsWithType: objectPathPoints,
+          };
+          reflectionObjectBall = key;
+        }
       }
 
       const solutionData: NanguSolutionData = {
@@ -168,21 +173,8 @@ export function TroubleSolutionEditor({
       className="space-y-6 flex flex-col"
       data-trouble-console={C.root}
     >
-      {/* 1) 제목/설명 */}
-      <div>
-        <h2 className="text-lg font-semibold text-site-text">{postTitle}</h2>
-        <p className="text-sm text-gray-600 dark:text-slate-400 mt-1 whitespace-pre-wrap line-clamp-4">
-          {postContent}
-        </p>
-      </div>
-
-      {/* 2) 공배치 미리보기 — 당구노트 해법과 동일: 기기 방향 반영, 탭 시 당구노트형 전체화면 */}
+      {/* 공배치 미리보기 — 기기 방향 반영, 탭 시 전체화면 */}
       <div className="w-full flex flex-col items-center">
-        <p className="text-xs text-gray-500 dark:text-slate-400 mb-2 self-start">
-          {ballPlacement
-            ? "공 배치 미리보기 (문제에 저장된 좌표 · 수구 표시) — 그림을 탭하면 전체화면에서 경로선을 그립니다"
-            : "원본 공배치 (미리보기 · 탭하면 전체화면 경로 편집)"}
-        </p>
         <div
           className={`relative rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600 w-full max-w-full ${
             previewDisabled ? "opacity-50" : ""
@@ -208,6 +200,12 @@ export function TroubleSolutionEditor({
                     className="absolute inset-0 w-full h-full rounded-none border-0 overflow-hidden"
                     hideObjectBall={false}
                     showCueBallSpot
+                    showObjectBallSpot={
+                      pathPoints.length >= 1 &&
+                      objectPathPoints.length >= 1 &&
+                      Boolean(firstObjectHit?.objectKey)
+                    }
+                    objectBallSpotKey={firstObjectHit?.objectKey ?? null}
                     orientation={previewOrientation}
                     betweenTableAndBallsLayer={
                       <NanguSolutionPathOverlay
@@ -224,12 +222,6 @@ export function TroubleSolutionEditor({
                     }
                   />
                 </div>
-                <div
-                  className="absolute bottom-1.5 right-1.5 z-[2] rounded-md bg-black/60 text-white text-[10px] sm:text-xs font-medium px-2 py-1 shadow-sm max-w-[min(100%-0.75rem,14rem)] leading-snug text-right"
-                  aria-hidden
-                >
-                  미리보기 · 탭 시 전체화면
-                </div>
               </>
             ) : showImageOnly && layoutSrc ? (
               <>
@@ -245,12 +237,6 @@ export function TroubleSolutionEditor({
                   objectPathMode={false}
                   pathLinesVisible={true}
                 />
-                <div
-                  className="absolute bottom-1.5 right-1.5 z-[2] rounded-md bg-black/60 text-white text-[10px] sm:text-xs font-medium px-2 py-1 shadow-sm max-w-[min(100%-0.75rem,14rem)] leading-snug text-right"
-                  aria-hidden
-                >
-                  미리보기 · 탭 시 전체화면
-                </div>
               </>
             ) : (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-slate-800 text-gray-500 text-sm">
@@ -289,11 +275,6 @@ export function TroubleSolutionEditor({
           >
             저장된 경로 지우기
           </button>
-          <span className="text-xs text-gray-500 dark:text-slate-400">
-            수구 경로 스팟 {pathPoints.length}개
-            {objectPathPoints.length > 0 ? ` · 1목 스팟 ${objectPathPoints.length}개` : ""}
-            {pathPoints.length >= 1 ? " · 수구 경로 있음" : ""}
-          </span>
         </div>
       </div>
 
@@ -487,12 +468,6 @@ export function TroubleSolutionEditor({
 
         {activePanel === "path" && (
           <div className="space-y-2">
-            <p className="text-sm text-site-primary font-medium">진행경로 제시</p>
-            <p className="text-xs text-gray-500 dark:text-slate-400">
-              위 미리보기를 탭하거나 버튼으로 <strong>당구노트 공배치와 같은 전체화면</strong>에 들어가 스팟·경로·1목·줌·애니메이션을 사용합니다.
-              수구 경로 첫 스팟은 <strong>1목적구</strong> 또는 <strong>쿠션 테두리</strong>에 연결할 수 있습니다. 완료 시 반영, 취소 시 이전 상태로
-              돌아갑니다.
-            </p>
             <button
               type="button"
               onClick={openPathFullscreen}

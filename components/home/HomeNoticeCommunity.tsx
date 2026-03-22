@@ -1,47 +1,26 @@
 import Link from "next/link";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import { NanguSolverIcon } from "@/components/community/NanguSolverIcon";
 
 export function HomeNoticeCommunity({ copy }: { copy: Record<string, string> }) {
   const c = copy as Record<AdminCopyKey, string>;
   return (
     <section className="px-4 py-10 sm:px-6 sm:py-12">
       <div className="mx-auto max-w-5xl">
-        <h2 className="text-xl font-bold text-site-text sm:text-2xl">
-          {getCopyValue(c, "site.home.community.title")}
-        </h2>
-        <p className="mt-1 text-sm text-gray-600">
-          {getCopyValue(c, "site.home.community.subtitle")}
-        </p>
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <div className="max-w-xl">
           <Link
-            href="/community"
-            className="flex items-center gap-4 rounded-2xl border border-site-border bg-site-card p-5 shadow-sm transition hover:border-site-primary/30 hover:shadow-md"
+            href="/community/nangu"
+            className="flex items-center gap-4 rounded-2xl border border-sky-300 bg-gradient-to-br from-sky-100 to-sky-50 p-5 shadow-sm transition hover:border-sky-400 hover:from-sky-200 hover:to-sky-100 hover:shadow-md dark:border-sky-600 dark:bg-gradient-to-br dark:from-sky-950 dark:to-sky-900/90 dark:hover:border-sky-500 dark:hover:from-sky-900 dark:hover:to-sky-950"
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-site-primary/10 text-site-primary">
-              📢
+            <span className="flex shrink-0 items-center justify-center overflow-visible">
+              <NanguSolverIcon size={104} priority />
             </span>
             <div className="min-w-0">
               <h3 className="font-semibold text-site-text">
-                {getCopyValue(c, "site.home.community.notice.title")}
+                {getCopyValue(c, "site.home.community.nangu.title")}
               </h3>
-              <p className="mt-0.5 text-sm text-gray-500">
-                {getCopyValue(c, "site.home.community.notice.desc")}
-              </p>
-            </div>
-          </Link>
-          <Link
-            href="/community"
-            className="flex items-center gap-4 rounded-2xl border border-site-border bg-site-card p-5 shadow-sm transition hover:border-site-primary/30 hover:shadow-md"
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-site-secondary/20 text-site-text">
-              💬
-            </span>
-            <div className="min-w-0">
-              <h3 className="font-semibold text-site-text">
-                {getCopyValue(c, "site.home.community.community.title")}
-              </h3>
-              <p className="mt-0.5 text-sm text-gray-500">
-                {getCopyValue(c, "site.home.community.community.desc")}
+              <p className="mt-0.5 text-sm text-sky-900/70 dark:text-sky-200/75">
+                {getCopyValue(c, "site.home.community.nangu.desc")}
               </p>
             </div>
           </Link>

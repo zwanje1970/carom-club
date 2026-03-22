@@ -18,6 +18,7 @@ import {
   getDragPositionIfValid,
   hitTestBall,
   getPlayfieldRect,
+  BALL_PLACEMENT_TOUCH_RADIUS_SCALE,
   normalizedToPixel,
   DEFAULT_TABLE_WIDTH,
   DEFAULT_TABLE_HEIGHT,
@@ -190,7 +191,15 @@ const BilliardTableEditor = forwardRef<
 
   const handlePointerDownBall = (normalized: { x: number; y: number }) => {
     const { px, py } = normalizedToPixel(normalized.x, normalized.y, rect);
-    const hit = hitTestBall(px, py, redBall, yellowBall, whiteBall, rect, placementMode ? 6 : 1);
+    const hit = hitTestBall(
+      px,
+      py,
+      redBall,
+      yellowBall,
+      whiteBall,
+      rect,
+      placementMode ? BALL_PLACEMENT_TOUCH_RADIUS_SCALE : 1
+    );
     if (hit) {
       if (hit !== selectedBall) setLastDragEndTime(null);
       setSelectedBall(hit);

@@ -3,7 +3,12 @@
  * 1목은 수구를 제외한 두 공 중, 광선상 가장 먼저 맞는 공.
  */
 import type { PlayfieldRect } from "@/lib/billiard-table-constants";
-import { getBallRadius, getPlayfieldLongSide, normalizedToPixel } from "@/lib/billiard-table-constants";
+import {
+  getBallRadius,
+  getPlayfieldLongSide,
+  normalizedToPixel,
+  pixelToNormalized,
+} from "@/lib/billiard-table-constants";
 import { getNonCueBallNorms, type LabeledBallNorm, type NanguBallPlacement } from "@/lib/nangu-types";
 
 function normToPx(x: number, y: number, rect: PlayfieldRect) {
@@ -121,6 +126,134 @@ export function ballCircumferenceNormFacingApproach(
     x: (px - rect.left) / rect.width,
     y: (py - rect.top) / rect.height,
   };
+}
+
+/**
+ * 선분 AB가 원 O(r)의 **열린** 원판(거리 < r)과 만나는지 — 경로가 목적구를 관통하는지 판별.
+ */
+function segmentIntersectsOpenDiskPx(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  ox: number,
+  oy: number,
+  r: number
+): boolean {
+  const abx = bx - ax;
+  const aby = by - ay;
+  const ab2 = abx * abx + aby * aby;
+  if (ab2 < 1e-14) {
+    return Math.hypot(ax - ox, ay - oy) < r - 1e-3;
+  }
+  let t = ((ox - ax) * abx + (oy - ay) * aby) / ab2;
+  t = Math.max(0, Math.min(1, t));
+  const px = ax + t * abx;
+  const py = ay + t * aby;
+  const d = Math.hypot(px - ox, py - oy);
+  return d < r - 0.35;
+}
+
+/** 선분이 수구가 아닌 **어느** 목적구 원(반지름 R)의 열린 원판이라도 관통하는지 */
+function segmentPenetratesAnyObjectBallPx(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  allCentersNorm: readonly { x: number; y: number }[],
+  r: number,
+  rect: PlayfieldRect
+): boolean {
+  if (allCentersNorm.length === 0) return false;
+  for (const cn of allCentersNorm) {
+    const { px: ox, py: oy } = normalizedToPixel(cn.x, cn.y, rect);
+    if (segmentIntersectsOpenDiskPx(ax, ay, bx, by, ox, oy, r)) return true;
+  }
+  return false;
+}
+
+/**
+ * 스팟 원·목적구 원이 같은 반지름 R일 때 외접(중심거리 2R).
+ * 탭 방향(목적구 중심→탭)으로 스팟 중심을 두되, 출발점→스팟 선분이 **모든** 목적구(비수구) 원 내부를 관통하지 않게 각도 보정.
+ * @param segmentFromNorm 선분 시작(수구 또는 직전 스팟)
+ * @param allObjectBallCentersNorm 수구 제외한 모든 목적구 중심 — 1목·2목 구분 없이 관통 검사
+ */
+export function spotCenterOnObjectBallExternalTangencyFromTap(
+  segmentFromNorm: { x: number; y: number },
+  tapNorm: { x: number; y: number },
+  ballCenterNorm: { x: number; y: number },
+  rect: PlayfieldRect,
+  allObjectBallCentersNorm: readonly { x: number; y: number }[]
+): { x: number; y: number } {
+  const longSide = getPlayfieldLongSide(rect);
+  const R = getBallRadius(longSide);
+  const distPx = 2 * R;
+
+  const penetrationTargets =
+    allObjectBallCentersNorm.length > 0 ? allObjectBallCentersNorm : [ballCenterNorm];
+
+  const O = normalizedToPixel(ballCenterNorm.x, ballCenterNorm.y, rect);
+  const Tap = normalizedToPixel(tapNorm.x, tapNorm.y, rect);
+  const C = normalizedToPixel(segmentFromNorm.x, segmentFromNorm.y, rect);
+
+  let dx = Tap.px - O.px;
+  let dy = Tap.py - O.py;
+  let len = Math.hypot(dx, dy);
+  if (len < 1e-6) {
+    dx = 1;
+    dy = 0;
+    len = 1;
+  }
+  const baseAng = Math.atan2(dy, dx);
+
+  const tryAngle = (ang: number) => {
+    const ux = Math.cos(ang);
+    const uy = Math.sin(ang);
+    const sx = O.px + ux * distPx;
+    const sy = O.py + uy * distPx;
+    return { sx, sy };
+  };
+
+  const step = (2 * Math.PI) / 360;
+  const deltas: number[] = [0];
+  for (let j = 1; j <= 180; j++) {
+    deltas.push(j * step);
+    deltas.push(-j * step);
+  }
+
+  for (const d of deltas) {
+    const { sx, sy } = tryAngle(baseAng + d);
+    if (!segmentPenetratesAnyObjectBallPx(C.px, C.py, sx, sy, penetrationTargets, R, rect)) {
+      return pixelToNormalized(sx, sy, rect);
+    }
+  }
+
+  /** 탭 방향으로 유효한 각도가 없을 때: 접근 방향 원주점 쪽으로 2R 외접 중심 */
+  const surf = ballCircumferenceNormFacingApproach(ballCenterNorm, segmentFromNorm, rect);
+  const surfPx = normalizedToPixel(surf.x, surf.y, rect);
+  let sdx = surfPx.px - O.px;
+  let sdy = surfPx.py - O.py;
+  let slen = Math.hypot(sdx, sdy);
+  if (slen < 1e-6) {
+    sdx = 1;
+    sdy = 0;
+    slen = 1;
+  }
+  const fx = O.px + (sdx / slen) * distPx;
+  const fy = O.py + (sdy / slen) * distPx;
+  if (!segmentPenetratesAnyObjectBallPx(C.px, C.py, fx, fy, penetrationTargets, R, rect)) {
+    return pixelToNormalized(fx, fy, rect);
+  }
+
+  for (let i = 0; i < 360; i++) {
+    const ang = (i * 2 * Math.PI) / 360;
+    const { sx, sy } = tryAngle(ang);
+    if (!segmentPenetratesAnyObjectBallPx(C.px, C.py, sx, sy, penetrationTargets, R, rect)) {
+      return pixelToNormalized(sx, sy, rect);
+    }
+  }
+
+  return pixelToNormalized(fx, fy, rect);
 }
 
 /**

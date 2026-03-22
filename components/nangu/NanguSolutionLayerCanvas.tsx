@@ -36,7 +36,7 @@ export function NanguSolutionLayerCanvas({
     const rect = getPlayfieldRect(width, height);
 
     const cuePathColor = "rgb(239, 68, 68)";
-    const objectPathColor = "rgb(125, 211, 252)";
+    const objectPathColor = "rgb(29, 78, 216)";
     const drawPath = (points: { x: number; y: number }[], pathColor: string) => {
       if (points.length < 2) return;
       for (let i = 0; i < points.length - 1; i++) {

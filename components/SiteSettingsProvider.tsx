@@ -9,6 +9,8 @@ export type SiteSettings = {
   logoUrl: string | null;
   primaryColor: string;
   secondaryColor: string;
+  /** 메인 대회·당구장 목록 자동 슬라이드(초) — 레이아웃에서 선택적 */
+  homeCarouselFlowSpeed?: number;
   headerBgColor: string | null;
   headerTextColor: string | null;
   headerActiveColor: string | null;

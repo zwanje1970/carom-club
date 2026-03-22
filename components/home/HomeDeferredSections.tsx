@@ -46,6 +46,7 @@ export async function HomeDeferredSections({
         initialTournaments={tournaments}
         copy={copy}
         carouselVenues={carouselVenues}
+        homeCarouselFlowSpeed={siteSettings.homeCarouselFlowSpeed}
       />
       <div className="mx-auto max-w-5xl px-4 sm:px-6 flex flex-wrap gap-4 justify-center text-sm">
         <Link href="/venues" className="text-site-primary hover:underline font-medium">
@@ -53,10 +54,13 @@ export async function HomeDeferredSections({
         </Link>
       </div>
       <HomeNoticeCommunity copy={copy} />
-      <SiteFooter
-        footer={siteSettings.footer}
-        defaultTagline={copy["site.footer.tagline"] ?? undefined}
-      />
+      {/* 모바일 메인: 하단 푸터 생략(하단 탭 네비와 겹침·화면 단순화) */}
+      <div className="hidden md:block">
+        <SiteFooter
+          footer={siteSettings.footer}
+          defaultTagline={copy["site.footer.tagline"] ?? undefined}
+        />
+      </div>
     </>
   );
 }

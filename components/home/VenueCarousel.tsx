@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { IMAGE_PLACEHOLDER_SRC, sanitizeImageSrc } from "@/lib/image-src";
+import { flowSpeedToPxPerSec } from "@/lib/home-carousel-flow";
 
 export type VenueCarouselItem = {
   id: string;
@@ -31,7 +32,14 @@ function getVisibleCount(): number {
   return 8;
 }
 
-export function VenueCarousel({ venues }: { venues: VenueCarouselItem[] }) {
+export function VenueCarousel({
+  venues,
+  homeCarouselFlowSpeed = 50,
+}: {
+  venues: VenueCarouselItem[];
+  /** 메인 가로 흐름 속도(1~100) */
+  homeCarouselFlowSpeed?: number;
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [venueFilter, setVenueFilter] = useState<"all" | "daedae_only" | "mixed">("all");
   const [visibleCount, setVisibleCount] = useState(6);
@@ -39,6 +47,11 @@ export function VenueCarousel({ venues }: { venues: VenueCarouselItem[] }) {
   const [totalPages, setTotalPages] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, scrollLeft: 0 });
+  const isDraggingRef = useRef(false);
+  const userScrollPauseUntilRef = useRef(0);
+  const programmaticScrollRef = useRef(false);
+  const inAutoFlowRef = useRef(false);
+  const lastTsRef = useRef<number | null>(null);
 
   const filteredVenues = (() => {
     let list = venues;
@@ -69,10 +82,16 @@ export function VenueCarousel({ venues }: { venues: VenueCarouselItem[] }) {
       const el = scrollRef.current;
       if (!el || filteredVenues.length === 0) return;
       const pageIndex = Math.max(0, Math.min(page, totalPages - 1));
-      const cardWidth = (el.scrollWidth - GAP * (visibleCount - 1)) / visibleCount;
+      const half = el.scrollWidth / 2;
+      const n = filteredVenues.length;
+      const cardWidth = (half - GAP * (n - 1)) / n;
       const targetScroll = pageIndex * visibleCount * (cardWidth + GAP);
+      programmaticScrollRef.current = true;
       el.scrollTo({ left: targetScroll, behavior: "smooth" });
       setCurrentPage(pageIndex);
+      window.setTimeout(() => {
+        programmaticScrollRef.current = false;
+      }, 700);
     },
     [visibleCount, totalPages, filteredVenues.length]
   );
@@ -80,8 +99,14 @@ export function VenueCarousel({ venues }: { venues: VenueCarouselItem[] }) {
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el || filteredVenues.length === 0) return;
-    const cardWidth = (el.scrollWidth - GAP * (visibleCount - 1)) / visibleCount;
-    const page = Math.round(el.scrollLeft / (cardWidth + GAP));
+    if (!programmaticScrollRef.current && !inAutoFlowRef.current) {
+      userScrollPauseUntilRef.current = Date.now() + 4500;
+    }
+    const half = el.scrollWidth / 2;
+    const x = el.scrollLeft % half;
+    const n = filteredVenues.length;
+    const cardWidth = (half - GAP * (n - 1)) / n;
+    const page = Math.round(x / (visibleCount * (cardWidth + GAP)));
     setCurrentPage(Math.max(0, Math.min(page, totalPages - 1)));
   }, [visibleCount, totalPages, filteredVenues.length]);
 
@@ -91,6 +116,71 @@ export function VenueCarousel({ venues }: { venues: VenueCarouselItem[] }) {
     el.addEventListener("scroll", handleScroll, { passive: true });
     return () => el.removeEventListener("scroll", handleScroll);
   }, [handleScroll]);
+
+  useEffect(() => {
+    isDraggingRef.current = isDragging;
+  }, [isDragging]);
+
+  /** 연속 흐름: 목록을 두 번 이어 붙여 무한 스크롤 */
+  useEffect(() => {
+    if (filteredVenues.length === 0) return;
+    let cancelled = false;
+    let rafId = 0;
+    const speedPx = flowSpeedToPxPerSec(homeCarouselFlowSpeed);
+
+    const tick = (now: number) => {
+      if (cancelled) return;
+      const scrollEl = scrollRef.current;
+      if (!scrollEl) {
+        rafId = requestAnimationFrame(tick);
+        return;
+      }
+
+      if (isDraggingRef.current || Date.now() < userScrollPauseUntilRef.current) {
+        lastTsRef.current = null;
+        rafId = requestAnimationFrame(tick);
+        return;
+      }
+
+      const half = scrollEl.scrollWidth / 2;
+      if (half < 8 || scrollEl.scrollWidth <= scrollEl.clientWidth + 2) {
+        lastTsRef.current = null;
+        rafId = requestAnimationFrame(tick);
+        return;
+      }
+
+      const last = lastTsRef.current ?? now;
+      const dt = Math.min(0.064, (now - last) / 1000);
+      lastTsRef.current = now;
+
+      inAutoFlowRef.current = true;
+      scrollEl.scrollLeft += speedPx * dt;
+      if (scrollEl.scrollLeft >= half - 0.5) {
+        scrollEl.scrollLeft -= half;
+      }
+      queueMicrotask(() => {
+        inAutoFlowRef.current = false;
+      });
+
+      rafId = requestAnimationFrame(tick);
+    };
+
+    const waitForRef = () => {
+      if (cancelled) return;
+      if (!scrollRef.current) {
+        rafId = requestAnimationFrame(waitForRef);
+        return;
+      }
+      lastTsRef.current = null;
+      rafId = requestAnimationFrame(tick);
+    };
+    waitForRef();
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(rafId);
+    };
+  }, [homeCarouselFlowSpeed, filteredVenues.length]);
 
   const onDragStart = (e: React.MouseEvent) => {
     if (!scrollRef.current) return;
@@ -162,7 +252,7 @@ export function VenueCarousel({ venues }: { venues: VenueCarouselItem[] }) {
 
           <div
             ref={scrollRef}
-            className="flex gap-4 overflow-x-auto overflow-y-hidden pb-2 snap-x snap-mandatory scroll-smooth [&::-webkit-scrollbar]:hidden"
+            className="flex gap-4 overflow-x-auto overflow-y-hidden pb-2 [&::-webkit-scrollbar]:hidden"
             style={{
               scrollbarWidth: "none",
               msOverflowStyle: "none",
@@ -178,7 +268,38 @@ export function VenueCarousel({ venues }: { venues: VenueCarouselItem[] }) {
                 key={v.id}
                 href={`/v/${v.slug}`}
                 onClick={(e) => isDragging && e.preventDefault()}
-                className="flex flex-col items-center shrink-0 snap-start w-[calc((100%-3*1rem)/4)] min-w-[calc((100%-3*1rem)/4)] sm:w-[calc((100%-4*1rem)/5)] sm:min-w-[calc((100%-4*1rem)/5)] md:w-[calc((100%-5*1rem)/6)] md:min-w-[calc((100%-5*1rem)/6)] lg:w-[calc((100%-7*1rem)/8)] lg:min-w-[calc((100%-7*1rem)/8)] max-w-[140px] group py-3 px-2 rounded-xl min-h-[120px] active:bg-gray-100/50 dark:active:bg-slate-800/50"
+                className="flex flex-col items-center shrink-0 w-[calc((100%-3*1rem)/4)] min-w-[calc((100%-3*1rem)/4)] sm:w-[calc((100%-4*1rem)/5)] sm:min-w-[calc((100%-4*1rem)/5)] md:w-[calc((100%-5*1rem)/6)] md:min-w-[calc((100%-5*1rem)/6)] lg:w-[calc((100%-7*1rem)/8)] lg:min-w-[calc((100%-7*1rem)/8)] max-w-[140px] group py-3 px-2 rounded-xl min-h-[120px] active:bg-gray-100/50 dark:active:bg-slate-800/50"
+              >
+                <div className="relative w-[88px] h-[88px] sm:w-[96px] sm:h-[96px] rounded-full overflow-hidden bg-site-bg border border-site-border flex-shrink-0 transition-transform duration-200 group-hover:scale-105">
+                  {(() => {
+                    const src = sanitizeImageSrc(imageUrl(v) ?? "");
+                    if (!src) {
+                      return <img src={IMAGE_PLACEHOLDER_SRC} alt="" className="absolute inset-0 w-full h-full object-cover" />;
+                    }
+                    return (
+                      <img
+                        src={src}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-cover"
+                        loading="lazy"
+                        data-debug-src={src}
+                      />
+                    );
+                  })()}
+                </div>
+                <p className="mt-2 text-center text-sm font-medium text-site-text line-clamp-2 break-words w-full px-0.5">
+                  {v.name}
+                </p>
+              </Link>
+            ))}
+            {filteredVenues.map((v) => (
+              <Link
+                key={`marq-${v.id}`}
+                href={`/v/${v.slug}`}
+                aria-hidden
+                tabIndex={-1}
+                onClick={(e) => isDragging && e.preventDefault()}
+                className="flex flex-col items-center shrink-0 w-[calc((100%-3*1rem)/4)] min-w-[calc((100%-3*1rem)/4)] sm:w-[calc((100%-4*1rem)/5)] sm:min-w-[calc((100%-4*1rem)/5)] md:w-[calc((100%-5*1rem)/6)] md:min-w-[calc((100%-5*1rem)/6)] lg:w-[calc((100%-7*1rem)/8)] lg:min-w-[calc((100%-7*1rem)/8)] max-w-[140px] group py-3 px-2 rounded-xl min-h-[120px] active:bg-gray-100/50 dark:active:bg-slate-800/50"
               >
                 <div className="relative w-[88px] h-[88px] sm:w-[96px] sm:h-[96px] rounded-full overflow-hidden bg-site-bg border border-site-border flex-shrink-0 transition-transform duration-200 group-hover:scale-105">
                   {(() => {

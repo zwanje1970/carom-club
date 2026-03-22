@@ -1,9 +1,13 @@
 /**
  * 경로 기반 이동 — 기하만 담당 (길이·거리만큼 보간).
  * 물리 엔진 없음. 픽셀 거리는 플레이필드 직교 좌표 기준.
+ * 샘플된 정규화 좌표는 {@link clampBallToPlayfield}로 보정해 쿠션(0/1) 근처에서도 공 원이 레일 밖으로 나가지 않게 함.
  */
-import type { PlayfieldRect } from "@/lib/billiard-table-constants";
-import { normalizedToPixel } from "@/lib/billiard-table-constants";
+import {
+  clampBallToPlayfield,
+  normalizedToPixel,
+  type PlayfieldRect,
+} from "@/lib/billiard-table-constants";
 
 export interface NormPoint {
   x: number;
@@ -24,6 +28,15 @@ export function polylineSegmentLengthsPx(vertices: NormPoint[], rect: PlayfieldR
 
 export function polylineTotalLengthPx(vertices: NormPoint[], rect: PlayfieldRect): number {
   return polylineSegmentLengthsPx(vertices, rect).reduce((s, l) => s + l, 0);
+}
+
+function withBallCenterClampedToPlayfield(
+  norm: NormPoint,
+  rect: PlayfieldRect
+): { x: number; y: number; normalized: NormPoint } {
+  const n = clampBallToPlayfield(norm.x, norm.y, rect);
+  const { px, py } = normalizedToPixel(n.x, n.y, rect);
+  return { x: px, y: py, normalized: n };
 }
 
 export interface PositionAlongPathResult {
@@ -47,14 +60,15 @@ export function positionOnPolylineAtDistancePx(
   rect: PlayfieldRect
 ): PositionAlongPathResult {
   if (vertices.length === 0) {
-    return { x: 0, y: 0, normalized: { x: 0, y: 0 }, distanceAlongPathPx: 0, atPolylineEnd: true };
+    const c = withBallCenterClampedToPlayfield({ x: 0, y: 0 }, rect);
+    return { ...c, distanceAlongPathPx: 0, atPolylineEnd: true };
   }
   if (vertices.length === 1) {
-    const p = normalizedToPixel(vertices[0].x, vertices[0].y, rect);
+    const c = withBallCenterClampedToPlayfield(vertices[0], rect);
     return {
-      x: p.px,
-      y: p.py,
-      normalized: { ...vertices[0] },
+      x: c.x,
+      y: c.y,
+      normalized: c.normalized,
       distanceAlongPathPx: 0,
       atPolylineEnd: true,
     };
@@ -81,12 +95,12 @@ export function positionOnPolylineAtDistancePx(
     }
     remaining -= len;
   }
-  const last = vertices[vertices.length - 1];
-  const p = normalizedToPixel(last.x, last.y, rect);
+  const last = vertices[vertices.length - 1]!;
+  const c = withBallCenterClampedToPlayfield(last, rect);
   return {
-    x: p.px,
-    y: p.py,
-    normalized: { ...last },
+    x: c.x,
+    y: c.y,
+    normalized: c.normalized,
     distanceAlongPathPx: total,
     atPolylineEnd: true,
   };

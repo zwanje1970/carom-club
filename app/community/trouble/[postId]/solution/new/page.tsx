@@ -73,44 +73,12 @@ export default function TroubleSolutionNewPage() {
 
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
-      <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6">
-        <nav
-          className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4"
-          aria-label="breadcrumb"
-        >
-          <Link href="/community" className="hover:text-site-primary">
-            커뮤니티
-          </Link>
-          <span aria-hidden>/</span>
-          <Link href="/community/boards/trouble" className="hover:text-site-primary">
-            난구해결
-          </Link>
-          <span aria-hidden>/</span>
-          <Link href={`/community/trouble/${postId}`} className="hover:text-site-primary">
-            상세
-          </Link>
-          <span aria-hidden>/</span>
-          <span className="text-site-text font-medium">해법 제시</span>
-        </nav>
-
-        <h1 className="text-xl font-bold mb-6">난구해법 제시</h1>
-
+      <div className="mx-auto w-full max-w-4xl px-4 py-4 sm:px-6 sm:py-5">
         <TroubleSolutionEditor
           layoutImageUrl={post.layoutImageUrl ?? null}
           ballPlacement={post.ballPlacement ?? null}
-          postTitle={post.title}
-          postContent={post.content ?? ""}
           onSubmit={handleSubmit}
         />
-
-        <div className="mt-4">
-          <Link
-            href={`/community/trouble/${postId}`}
-            className="text-sm text-gray-500 dark:text-gray-400 hover:text-site-primary"
-          >
-            ← 상세로 돌아가기
-          </Link>
-        </div>
       </div>
     </main>
   );

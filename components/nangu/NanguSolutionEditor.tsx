@@ -138,9 +138,6 @@ export function NanguSolutionEditor({
 
       {/* 2. 당구노트 공배치와 동일 좌표 미리보기 — 탭/버튼으로 전체화면 경로 편집 */}
       <div>
-        <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">
-          공 배치 미리보기 (당구노트 저장 좌표 · 수구 깜빡임 표시) — 그림을 탭하면 전체화면에서 경로선을 그립니다
-        </p>
         <div
           className="relative w-full max-w-full rounded-lg border border-gray-200 dark:border-slate-600 overflow-hidden"
           style={{
@@ -177,12 +174,6 @@ export function NanguSolutionEditor({
                   />
                 }
               />
-            </div>
-            <div
-              className="absolute bottom-1.5 right-1.5 z-[2] rounded-md bg-black/60 text-white text-[10px] sm:text-xs font-medium px-2 py-1 shadow-sm max-w-[min(100%-0.75rem,14rem)] leading-snug text-right"
-              aria-hidden
-            >
-              미리보기 · 탭 시 전체화면
             </div>
           </div>
           <NanguTablePreviewHitLayer
@@ -412,14 +403,6 @@ export function NanguSolutionEditor({
         {activePanel === "path" && (
           <div className="space-y-2">
             <p className="text-sm text-site-primary font-medium">진행경로 제시</p>
-            <p className="text-xs text-gray-500 dark:text-slate-400">
-              위 <strong>미리보기 그림</strong>을 탭하거나 아래 버튼으로 당구노트와 같은 방식의 <strong>전체화면</strong>에 들어가 경로선을 그립니다. 공은
-              읽기 전용(당구노트 저장 좌표), 미리보기에서는 경로만 표시됩니다. 수구 경로 첫 스팟은 <strong>1목적구</strong> 또는{" "}
-              <strong>쿠션 테두리</strong>에 연결할 수 있습니다.
-            </p>
-            <p className="text-xs text-gray-500 dark:text-slate-400">
-              전체화면 메뉴: 확대/축소, 실사·단순 보기, 그리드, 이전경로선삭제, 전체경로선삭제, 애니메이션 구현 등. 완료 시 반영, 취소 시 변경 없음.
-            </p>
             <button
               type="button"
               onClick={() => enterFullScreenEdit()}

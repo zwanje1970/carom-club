@@ -3,7 +3,13 @@
  * - 경로 계산과 이동 거리 계산은 하위 모듈에 위임
  */
 import type { PlayfieldRect } from "@/lib/billiard-table-constants";
-import type { NanguBallPlacement, NanguPathPoint, NanguSolutionData, NanguSolutionPath } from "@/lib/nangu-types";
+import {
+  getNonCueBallNorms,
+  type NanguBallPlacement,
+  type NanguPathPoint,
+  type NanguSolutionData,
+  type NanguSolutionPath,
+} from "@/lib/nangu-types";
 import {
   computePolylinePlaybackDurationMs,
   computeStrokeAnimationDurationMs,
@@ -23,6 +29,8 @@ import {
   type MoveDistanceParams,
 } from "@/lib/path-motion-distance";
 import type { RailCount } from "@/lib/rail-power-constants";
+import { spotCenterNormForDraw } from "@/lib/path-spot-display";
+import { cueFirstObjectHitFromBallPlacement } from "@/lib/solution-path-geometry";
 import { computeThicknessCollisionSplitFromSolution } from "@/lib/thickness-power-split";
 
 export type { NormPoint, PositionAlongPathResult };
@@ -99,8 +107,33 @@ export function buildCuePathMotionPlan(
   if (!spots?.length) return null;
 
   const cue = cuePositionFromPlacement(placement);
-  /** 수구 꼭짓점 포함 — 감속·시연 시간은 스팟 간만이 아니라 수구→첫 스팟→…→마지막 스팟 총거리 */
-  const poly = verticesFromCueAndSpots(cue, spots);
+  /** 시연: 오버레이 스팟과 동일한 중심(쿠션 등 clamp)으로 꼭짓점을 맞춰 수구가 스팟과 정확히 겹치며 이동 */
+  const typed = path.pointsWithType;
+  const objectNorms = getNonCueBallNorms(placement);
+  const spotOpts = { objectBallNorms: objectNorms.map((b) => ({ x: b.x, y: b.y })) };
+  const firstHitForViz =
+    options?.visualizationPlayback &&
+    typed &&
+    typed.length === spots.length &&
+    typed[0]?.type === "ball"
+      ? cueFirstObjectHitFromBallPlacement(cue, typed[0], placement, rect)
+      : null;
+  const struckForFirst =
+    firstHitForViz && objectNorms.find((b) => b.key === firstHitForViz.objectKey);
+  const poly =
+    options?.visualizationPlayback && typed && typed.length === spots.length
+      ? [
+          cue,
+          ...typed.map((p, i) =>
+            spotCenterNormForDraw(p, rect, {
+              ...spotOpts,
+              ...(i === 0 && struckForFirst
+                ? { cueFirstSpotStruckBallNorm: { x: struckForFirst.x, y: struckForFirst.y } }
+                : {}),
+            })
+          ),
+        ]
+      : verticesFromCueAndSpots(cue, spots);
   const pathLengthPx = polylineTotalLengthPx(poly, rect);
   const cushionCount = countCushionsInPath(path);
   const moveParams = buildMoveParamsFromSolution(data, cushionCount);
@@ -129,6 +162,44 @@ export function buildCuePathMotionPlan(
     powerRailCount,
     animationDurationSec,
     animationDurationMs,
+  };
+}
+
+/**
+ * 1목 반사 경로 시연이 있을 때: 수구는 **마지막 `ball` 스팟(스위치)** 까지만 이동한다.
+ * 그 뒤에 쿠션·end 스팟이 더 있어도 시연용 수구 폴리라인은 여기서 자른다.
+ */
+export function truncateCuePathPlanAtLastBallSpotForPlayback(
+  plan: PathMotionPlan,
+  pathPoints: NanguPathPoint[],
+  rect: PlayfieldRect,
+  hasReflectionPath: boolean
+): PathMotionPlan {
+  if (!hasReflectionPath || pathPoints.length === 0) return plan;
+  let lastBallIdx = -1;
+  for (let i = pathPoints.length - 1; i >= 0; i--) {
+    if (pathPoints[i]!.type === "ball") {
+      lastBallIdx = i;
+      break;
+    }
+  }
+  if (lastBallIdx < 0) return plan;
+  const poly = plan.polylineNormalized;
+  const endExclusive = lastBallIdx + 2;
+  if (endExclusive < 2 || endExclusive > poly.length) return plan;
+  const truncated = poly.slice(0, endExclusive);
+  const pathLengthPx = polylineTotalLengthPx(truncated, rect);
+  const moveDistancePx = pathLengthPx;
+  const effectiveTravelPx = Math.min(moveDistancePx, pathLengthPx);
+  const animationDurationMs = computePolylinePlaybackDurationMs(pathLengthPx, rect);
+  return {
+    ...plan,
+    polylineNormalized: truncated,
+    pathLengthPx,
+    moveDistancePx,
+    effectiveTravelPx,
+    animationDurationMs,
+    animationDurationSec: animationDurationMs / 1000,
   };
 }
 
@@ -174,6 +245,44 @@ export function buildObjectPathMotionPlan(
     powerRailCount,
     animationDurationSec,
     animationDurationMs,
+  };
+}
+
+/**
+ * 수구 푸시 구간 끝에서의 1목 실제 위치로 `reflectionPath` 첫 꼭짓점을 맞춤.
+ * (저장된 충돌점과 수 mm 단위 차이가 나도 시연 연속성 유지)
+ */
+export function buildObjectPathMotionPlanWithStartVertex(
+  data: NanguSolutionData,
+  objectStartNorm: NormPoint,
+  rect: PlayfieldRect,
+  options?: BuildPathMotionPlanOptions
+): PathMotionPlan | null {
+  const base = buildObjectPathMotionPlan(data, rect, options);
+  const pts = data.reflectionPath?.points;
+  if (!base || !pts || pts.length < 2) return null;
+
+  const poly = [
+    { x: objectStartNorm.x, y: objectStartNorm.y },
+    ...pts.slice(1).map((p) => ({ x: p.x, y: p.y })),
+  ];
+  const pathLengthPx = polylineTotalLengthPx(poly, rect);
+  const moveDistancePx = options?.visualizationPlayback ? pathLengthPx : base.moveDistancePx;
+  const effectiveTravelPx = Math.min(moveDistancePx, pathLengthPx);
+  const animationDurationMs =
+    options?.visualizationPlayback === true
+      ? computePolylinePlaybackDurationMs(pathLengthPx, rect)
+      : (base.animationDurationMs ?? computePolylinePlaybackDurationMs(pathLengthPx, rect));
+  const animationDurationSec = animationDurationMs / 1000;
+
+  return {
+    ...base,
+    polylineNormalized: poly,
+    pathLengthPx,
+    moveDistancePx,
+    effectiveTravelPx,
+    animationDurationMs,
+    animationDurationSec,
   };
 }
 

@@ -1,6 +1,4 @@
-import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { getCommonPageData } from "@/lib/common-page-data";
-import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { canManageReports } from "@/lib/community-roles";
 import { CommunityMainClient } from "./CommunityMainClient";
@@ -28,9 +26,7 @@ type Popular = {
 };
 
 export default async function CommunityPage() {
-  const [common, session] = await Promise.all([getCommonPageData("community"), getSession()]);
-  const c = common.copy as Record<AdminCopyKey, string>;
-  const communityTitle = getCopyValue(c, "site.community.title");
+  const [, session] = await Promise.all([getCommonPageData("community"), getSession()]);
   const canManageReports_ = canManageReports(session);
 
   let boards: { id: string; slug: string; name: string; type: string }[] = [];
@@ -112,12 +108,6 @@ export default async function CommunityPage() {
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
       <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
-        <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4" aria-label="breadcrumb">
-          <Link href="/community" className="hover:text-site-primary">{communityTitle}</Link>
-        </nav>
-        <h1 className="text-2xl font-bold text-site-text">{communityTitle}</h1>
-        <p className="mt-1 text-gray-600 dark:text-gray-400">{getCopyValue(c, "site.community.subtitle")}</p>
-
         <CommunityMainClient boards={boards} popular={popular} canManageReports={canManageReports_} />
       </div>
     </main>

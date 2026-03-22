@@ -46,4 +46,4 @@
 1. Production에서 **한 호스트**만 사용하는지 확인 (또는 `SESSION_COOKIE_DOMAIN` 설정).
 2. 로그인 후 DevTools → Application → Cookies에서 `carom_session`의 **Domain** 확인.
 3. `/mypage/notes`에서 목록이 뜨는지, 401 시 안내 카드가 뜨는지 확인.
-4. **로컬 개발**에서 `/mypage/notes/new` → 공 배치 풀스크린 시 콘솔에 `[MobileBallPlacementFullscreen] mounted`만 보이는지(경로 편집 화면은 `[SolutionPathEditorFullscreen] mounted` — 다른 플로우).
+4. `/mypage/notes/new`에서 공 배치는 `MobileBallPlacementFullscreen`, 노트/난구 등 **경로 편집**은 `SolutionPathEditorFullscreen` — 서로 다른 플로우.

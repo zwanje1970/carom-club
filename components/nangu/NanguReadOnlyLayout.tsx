@@ -8,6 +8,7 @@ import {
   type TableOrientation,
 } from "@/lib/billiard-table-constants";
 import type { NanguBallPlacement } from "@/lib/nangu-types";
+import type { BallColor } from "@/lib/billiard-table-constants";
 
 /** 원본 공배치 읽기 전용 표시. 드래그/클릭 불가, 수구 구분 표시 */
 export function NanguReadOnlyLayout({
@@ -21,6 +22,8 @@ export function NanguReadOnlyLayout({
   hideObjectBall = false,
   ballNormOverrides,
   showCueBallSpot = true,
+  showObjectBallSpot = false,
+  objectBallSpotKey = null,
   drawStyle = "realistic",
   orientation = "landscape",
   betweenTableAndBallsLayer,
@@ -40,6 +43,9 @@ export function NanguReadOnlyLayout({
   ballNormOverrides?: Partial<Record<"red" | "yellow" | "white", { x: number; y: number }>>;
   /** 재생 중 rAF 충돌 방지용으로 끄기 */
   showCueBallSpot?: boolean;
+  /** 1목 경로 그리기 모드: 목적구 점선 스팟 깜빡임 */
+  showObjectBallSpot?: boolean;
+  objectBallSpotKey?: BallColor | null;
   /** 실사 | 단순보기(와이어프레임) */
   drawStyle?: TableDrawStyle;
   /** 당구노트 전체화면과 동일하게 기기 방향 반영 */
@@ -62,6 +68,8 @@ export function NanguReadOnlyLayout({
         interactive={false}
         showGrid={showGrid}
         showCueBallSpot={showCueBallSpot}
+        showObjectBallSpot={showObjectBallSpot}
+        objectBallSpotKey={objectBallSpotKey}
         hideRedBall={hideObjectBall}
         ballNormOverrides={ballNormOverrides}
         drawStyle={drawStyle}

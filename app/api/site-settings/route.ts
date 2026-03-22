@@ -16,6 +16,7 @@ export async function GET() {
         logoUrl: null,
         primaryColor: "#d97706",
         secondaryColor: "#b91c1c",
+        homeCarouselFlowSpeed: 50,
       },
       { status: 200 }
     );
@@ -38,6 +39,7 @@ export async function PUT(request: Request) {
     headerBgColor?: string | null;
     headerTextColor?: string | null;
     headerActiveColor?: string | null;
+    homeCarouselFlowSpeed?: number;
   };
   try {
     body = await request.json();
@@ -59,6 +61,7 @@ export async function PUT(request: Request) {
       headerBgColor: body.headerBgColor,
       headerTextColor: body.headerTextColor,
       headerActiveColor: body.headerActiveColor,
+      homeCarouselFlowSpeed: body.homeCarouselFlowSpeed,
     });
     revalidatePath("/", "layout");
     return NextResponse.json(settings);

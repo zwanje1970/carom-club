@@ -250,7 +250,6 @@ export default async function TournamentDetailPage({
     return (
       <main className="min-h-screen overflow-x-hidden bg-site-bg">
         <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
-          <p className="mb-4 text-center text-sm text-site-primary">DB 없이 미리보기 데이터로 표시 중입니다.</p>
           <TournamentDetailView
             tournamentId={id}
             tabs={tabs}

@@ -20,13 +20,6 @@ export default async function MypageNotesLayout({
   }
   return (
     <MypageNotesSessionGuard initialShow>
-      {/* 배포 확인: DOM/스크린리더 — DevTools Elements에서 data-carom-notes-layout 검색 */}
-      <span
-        data-carom-notes-layout="1"
-        data-carom-diag="notes-rsc-layout"
-        className="sr-only"
-        aria-hidden
-      />
       {children}
     </MypageNotesSessionGuard>
   );

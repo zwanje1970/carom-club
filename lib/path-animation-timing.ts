@@ -141,11 +141,13 @@ export function cuePlaybackMovementElapsedMs(
  * 스팟(꼭짓점)마다 `pauseMs` 동안 `τ`만 멈춤(벽시계는 더 감).
  * `tauAtVertices`[k] = 수구→k번째 스팟까지의 **경로 거리 비율**에 대응하는 감속 시계상 이동 경과 ms.
  * `tauAtVertices.length === numSpots + 1`, `tauAtVertices[0]=0`, `tauAtVertices[numSpots]=T`.
+ * @param skipPauseAfterLastSegment true면 **마지막 꼭짓점(1목 접촉 직후)** 에서의 스팟 멈춤을 생략 — 수구→1목 구간이 끊기지 않게 함.
  */
 export function cuePlaybackMovementTauMsFromWallMs(
   wallMs: number,
   tauAtVertices: readonly number[],
-  pauseMs: number
+  pauseMs: number,
+  skipPauseAfterLastSegment?: boolean
 ): number {
   const n = tauAtVertices.length - 1;
   if (n <= 0) return 0;
@@ -160,6 +162,9 @@ export function cuePlaybackMovementTauMsFromWallMs(
       return tauStart + Math.max(0, wallMs - w);
     }
     w += md;
+    if (skipPauseAfterLastSegment && i === n - 1) {
+      continue;
+    }
     if (wallMs <= w + pauseMs) {
       return tauEnd;
     }
@@ -172,7 +177,9 @@ export function cuePlaybackMovementTauMsFromWallMs(
 export function cuePlaybackWallDurationWithSpotPausesMs(
   moveDurationMs: number,
   numSpots: number,
-  pauseMs: number
+  pauseMs: number,
+  skipPauseAfterLastSpot?: boolean
 ): number {
-  return moveDurationMs + pauseMs * Math.max(0, numSpots);
+  const pauseCount = Math.max(0, numSpots - (skipPauseAfterLastSpot ? 1 : 0));
+  return moveDurationMs + pauseMs * pauseCount;
 }

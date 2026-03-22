@@ -25,6 +25,8 @@ export const TROUBLE_SOLUTION_CONSOLE = {
   /** 클릭·포커스 타겟용 (E2E·SVG 래퍼·에이전트가 이 이름으로 찾음) */
   action: {
     togglePathMode: "trouble-toggle-path-mode",
+    /** 1목적구 경로선 그리기 모드 토글 (탭하지 않으면 1목 경로 편집 비활성) */
+    toggleObjectPathMode: "trouble-toggle-object-path-mode",
     clearPath: "trouble-clear-path",
     panelThickness: "trouble-panel-thickness",
     panelSpin: "trouble-panel-spin",

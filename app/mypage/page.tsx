@@ -17,7 +17,6 @@ export default async function MypagePage() {
 
   type UserWithProfile = Awaited<ReturnType<typeof prisma.user.findUnique<{ where: { id: string }; include: { memberProfile: true } }>>>;
   let user: UserWithProfile = null;
-  let useMock = false;
 
   if (isDatabaseConfigured()) {
     try {
@@ -45,7 +44,6 @@ export default async function MypagePage() {
         communityScore: 0,
         memberProfile: null,
       };
-      useMock = true;
     }
   } else {
     user = {
@@ -67,7 +65,6 @@ export default async function MypagePage() {
       communityScore: 0,
       memberProfile: null,
     };
-    useMock = true;
   }
   if (!user) {
     redirect("/login");
@@ -83,10 +80,6 @@ export default async function MypagePage() {
   return (
     <main className="min-h-screen bg-site-bg p-4 md:p-8">
       <div className="mx-auto w-full max-w-2xl">
-        {useMock && (
-          <p className="mb-4 text-center text-sm text-site-primary">DB 없이 세션 정보만 표시 중입니다.</p>
-        )}
-
         <h1 className="mb-4 text-xl font-bold md:text-2xl">마이페이지</h1>
 
         {/* 프로필 카드: 이름, 로그인 상태, 계정 유형 */}

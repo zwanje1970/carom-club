@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { NanguSolverIcon } from "@/components/community/NanguSolverIcon";
 import { BilliardTableCanvas } from "@/components/billiard";
 import { BilliardTableEditor, type BilliardTableEditorHandle } from "@/components/billiard";
 import { normalizeCueBallType } from "@/lib/billiard-table-constants";
@@ -129,7 +130,10 @@ export default function NanguWritePage() {
           <span aria-hidden>/</span>
           <span className="text-site-text font-medium">글쓰기</span>
         </nav>
-        <h1 className="text-xl font-bold mb-6">난구해결사 글쓰기</h1>
+        <div className="flex items-center gap-0 mb-6">
+          <NanguSolverIcon size={56} />
+          <h1 className="text-xl font-bold">난구해결사 글쓰기</h1>
+        </div>
 
         {step === 1 && (
           <>

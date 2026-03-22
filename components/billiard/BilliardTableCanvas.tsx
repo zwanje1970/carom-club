@@ -19,6 +19,7 @@ import {
   getBallRadius,
   FRAME_INSET,
   PLAYFIELD_INSET,
+  PATH_SPOT_RADIUS_PX,
   type PlayfieldRect,
   type BallColor,
   type CueBallType,
@@ -34,7 +35,6 @@ export interface BallPositions {
 
 const PATH_LINE_WIDTH = 2.5;
 const PATH_LINE_CAP = "round" as CanvasLineCap;
-const SPOT_RADIUS_PX = 10;
 const ARROW_LENGTH = 12;
 const ARROW_ANGLE_DEG = 30;
 
@@ -112,7 +112,7 @@ function drawPaths(
       ctx.strokeStyle = "rgba(255,255,255,0.8)";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.arc(px, py, SPOT_RADIUS_PX, 0, Math.PI * 2);
+      ctx.arc(px, py, PATH_SPOT_RADIUS_PX, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     });
@@ -143,6 +143,10 @@ export interface BilliardTableCanvasProps {
   drawStyle?: TableDrawStyle;
   /** true면 수구를 둘러싼 회색 원을 깜빡이게 표시 (난구 해법 출발선 스팟). 저장 이미지에는 미포함. */
   showCueBallSpot?: boolean;
+  /** 1목 경로 그리기 모드: 해당 공에 진한 파랑 점선 스팟 깜빡임 (저장 이미지 미포함) */
+  showObjectBallSpot?: boolean;
+  /** `showObjectBallSpot`일 때 점선을 그릴 공 (수구 제외 목적구) */
+  objectBallSpotKey?: BallColor | null;
   /** 난구 공배치 모드: 선택 시 지름 4배 검정 반투명 원, 크로스헤어 미표시 */
   placementMode?: boolean;
   /** 공배치 시 선택된 공 기준 플레이필드 전체 십자선(+) 표시 */
@@ -576,6 +580,28 @@ function drawCueBallSpot(
   ctx.restore();
 }
 
+/** 1목적구 해법 출발 — 수구 스팟보다 얇은 점선·진한 파랑(경로선과 통일) */
+function drawObjectBallSpot(
+  ctx: CanvasRenderingContext2D,
+  rect: PlayfieldRect,
+  normX: number,
+  normY: number,
+  opacity: number
+) {
+  const { px, py } = normalizedToPixel(normX, normY, rect);
+  const longSide = getPlayfieldLongSide(rect);
+  const ballR = getBallRadius(longSide);
+  const spotR = ballR * 1.815;
+  ctx.save();
+  ctx.strokeStyle = `rgba(29,78,216,${opacity})`;
+  ctx.lineWidth = Math.max(1, ballR * 0.12);
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.arc(px, py, spotR, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
 /** 선택된 공 중심 + 좌표선 (배치 시에만, 저장 이미지 제외). 실선·붉은색·가늘게. */
 function drawCrosshair(
   ctx: CanvasRenderingContext2D,
@@ -619,6 +645,8 @@ const BilliardTableCanvas = forwardRef<
     orientation = "landscape",
     drawStyle = "realistic",
     showCueBallSpot = false,
+    showObjectBallSpot = false,
+    objectBallSpotKey = null,
     placementMode = false,
     showCrosshairAtSelected = false,
     hideRedBall = false,
@@ -644,6 +672,7 @@ const BilliardTableCanvas = forwardRef<
       withCrosshair: boolean = true,
       style: TableDrawStyle = drawStyle,
       cueBallSpotOpacity?: number,
+      objectBallSpotOpacity?: number,
       noSelectionForExport?: boolean
     ) => {
       const isWireframe = style === "wireframe";
@@ -682,6 +711,20 @@ const BilliardTableCanvas = forwardRef<
         const cueView = toView(cuePos.x, cuePos.y);
         drawCueBallSpot(ctx, rect, cueView.x, cueView.y, cueBallSpotOpacity);
       }
+      if (
+        objectBallSpotOpacity != null &&
+        objectBallSpotOpacity > 0 &&
+        objectBallSpotKey
+      ) {
+        const objDraw =
+          objectBallSpotKey === "red"
+            ? redDraw
+            : objectBallSpotKey === "yellow"
+              ? yellowDraw
+              : whiteDraw;
+        const objView = toView(objDraw.x, objDraw.y);
+        drawObjectBallSpot(ctx, rect, objView.x, objView.y, objectBallSpotOpacity);
+      }
     },
     [
       width,
@@ -698,6 +741,7 @@ const BilliardTableCanvas = forwardRef<
       showCrosshairAtSelected,
       hideRedBall,
       ballNormOverrides,
+      objectBallSpotKey,
     ]
   );
 
@@ -708,11 +752,19 @@ const BilliardTableCanvas = forwardRef<
       withCrosshair: boolean = true,
       style: TableDrawStyle = drawStyle,
       cueBallSpotOpacity?: number,
+      objectBallSpotOpacity?: number,
       /** true면 저장/보내기용 — 선택 링·크로스헤어 미표시 */
       noSelectionForExport?: boolean
     ) => {
       drawTable(ctx, width, height, withGrid, orientation, style);
-      drawBallsAndDecorations(ctx, withCrosshair, style, cueBallSpotOpacity, noSelectionForExport);
+      drawBallsAndDecorations(
+        ctx,
+        withCrosshair,
+        style,
+        cueBallSpotOpacity,
+        objectBallSpotOpacity,
+        noSelectionForExport
+      );
     },
     [width, height, orientation, drawBallsAndDecorations]
   );
@@ -725,7 +777,7 @@ const BilliardTableCanvas = forwardRef<
     if (!ctx) return;
     canvas.width = width;
     canvas.height = height;
-    draw(ctx, showGrid, true, drawStyle, undefined, false);
+    draw(ctx, showGrid, true, drawStyle, undefined, undefined, false);
   }, [splitBallLayer, draw, showGrid, drawStyle, width, height]);
 
   useEffect(() => {
@@ -742,12 +794,12 @@ const BilliardTableCanvas = forwardRef<
     bCan.height = height;
     drawTable(tCtx, width, height, showGrid, orientation, drawStyle);
     bCtx.clearRect(0, 0, width, height);
-    drawBallsAndDecorations(bCtx, true, drawStyle, undefined, false);
+    drawBallsAndDecorations(bCtx, true, drawStyle, undefined, undefined, false);
   }, [splitBallLayer, width, height, showGrid, orientation, drawStyle, drawBallsAndDecorations]);
 
-  // 수구 스팟 깜빡임: showCueBallSpot 시에만 rAF로 주기적 그리기 (저장 이미지에는 미포함)
+  // 수구·1목 스팟 깜빡임: showCueBallSpot / showObjectBallSpot 시에만 rAF (저장 이미지 미포함)
   useEffect(() => {
-    if (!showCueBallSpot) return;
+    if (!showCueBallSpot && !showObjectBallSpot) return;
     let frameId: number;
     if (splitBallLayer) {
       const bCan = ballLayerRef.current;
@@ -758,14 +810,21 @@ const BilliardTableCanvas = forwardRef<
         const t = Date.now() / 180;
         const opacity = Math.sin(t) >= 0 ? 1 : 0;
         bCtx.clearRect(0, 0, width, height);
-        drawBallsAndDecorations(bCtx, true, drawStyle, opacity, false);
+        drawBallsAndDecorations(
+          bCtx,
+          true,
+          drawStyle,
+          showCueBallSpot ? opacity : undefined,
+          showObjectBallSpot ? opacity : undefined,
+          false
+        );
         frameId = requestAnimationFrame(tick);
       };
       frameId = requestAnimationFrame(tick);
       return () => {
         cancelAnimationFrame(frameId);
         bCtx.clearRect(0, 0, width, height);
-        drawBallsAndDecorations(bCtx, true, drawStyle, undefined, false);
+        drawBallsAndDecorations(bCtx, true, drawStyle, undefined, undefined, false);
       };
     }
     const canvas = canvasRef.current;
@@ -775,15 +834,33 @@ const BilliardTableCanvas = forwardRef<
     const tickSingle = () => {
       const t = Date.now() / 180;
       const opacity = Math.sin(t) >= 0 ? 1 : 0;
-      draw(ctx, showGrid, true, drawStyle, opacity, false);
+      draw(
+        ctx,
+        showGrid,
+        true,
+        drawStyle,
+        showCueBallSpot ? opacity : undefined,
+        showObjectBallSpot ? opacity : undefined,
+        false
+      );
       frameId = requestAnimationFrame(tickSingle);
     };
     frameId = requestAnimationFrame(tickSingle);
     return () => {
       cancelAnimationFrame(frameId);
-      draw(ctx, showGrid, true, drawStyle, undefined, false);
+      draw(ctx, showGrid, true, drawStyle, undefined, undefined, false);
     };
-  }, [showCueBallSpot, splitBallLayer, draw, drawBallsAndDecorations, showGrid, drawStyle, width, height])
+  }, [
+    showCueBallSpot,
+    showObjectBallSpot,
+    splitBallLayer,
+    draw,
+    drawBallsAndDecorations,
+    showGrid,
+    drawStyle,
+    width,
+    height,
+  ]);
 
   useImperativeHandle(ref, () => ({
     getDataURL(includeGrid: boolean, forceLandscape?: boolean, forceStyle?: TableDrawStyle) {
@@ -814,7 +891,7 @@ const BilliardTableCanvas = forwardRef<
       exportCanvas.height = height;
       const ctx = exportCanvas.getContext("2d");
       if (!ctx) return "";
-      draw(ctx, includeGrid, false, styleToUse, undefined, true);
+      draw(ctx, includeGrid, false, styleToUse, undefined, undefined, true);
       return exportCanvas.toDataURL("image/png");
     },
   }));

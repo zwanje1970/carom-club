@@ -13,6 +13,34 @@ import {
   pixelToNormalized,
   portraitToLandscapeNorm,
 } from "@/lib/billiard-table-constants";
+
+/** landscape 저장 좌표 → 플레이필드 캔버스 픽셀 (반직선 aimCanvasPx용) */
+export function landscapeNormToPlayfieldCanvasPx(
+  normLandscape: { x: number; y: number },
+  canvasW: number,
+  canvasH: number,
+  portrait: boolean
+): { x: number; y: number } {
+  const pfCanvas = getPlayfieldRect(canvasW, canvasH);
+  const view = portrait ? landscapeToPortraitNorm(normLandscape.x, normLandscape.y) : normLandscape;
+  const { px, py } = normalizedToPixel(view.x, view.y, pfCanvas);
+  return { x: px, y: py };
+}
+
+/** 테이블 캔버스 탭을 플레이필드 안으로 클램프한 뒤 landscape 정규화 좌표 */
+export function tableCanvasClampedToPlayfieldLandscapeNorm(
+  cx: number,
+  cy: number,
+  canvasW: number,
+  canvasH: number,
+  portrait: boolean
+): { x: number; y: number } {
+  const pfCanvas = getPlayfieldRect(canvasW, canvasH);
+  const px = Math.min(Math.max(cx, pfCanvas.left), pfCanvas.left + pfCanvas.width);
+  const py = Math.min(Math.max(cy, pfCanvas.top), pfCanvas.top + pfCanvas.height);
+  const vn = pixelToNormalized(px, py, pfCanvas);
+  return portrait ? portraitToLandscapeNorm(vn.x, vn.y) : vn;
+}
 import type { NanguBallPlacement, ObjectBallColorKey } from "@/lib/nangu-types";
 import { getNonCueBallNorms } from "@/lib/nangu-types";
 

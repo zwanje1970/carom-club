@@ -8,6 +8,7 @@ import {
   footerFontSizesToJson,
   footerFontFamiliesToJson,
 } from "@/lib/footer-settings";
+import { clampFlowSpeed } from "@/lib/home-carousel-flow";
 
 /** 사이트 영문 브랜드명 */
 export const SITE_NAME = "CAROM.CLUB";
@@ -28,6 +29,8 @@ export type SiteSettings = {
   primaryColor: string;
   secondaryColor: string;
   withdrawRejoinDays: number;
+  /** 메인 진행중 대회·당구장 가로 흐름 속도(1~100) */
+  homeCarouselFlowSpeed: number;
   headerBgColor: string | null;
   headerTextColor: string | null;
   headerActiveColor: string | null;
@@ -41,6 +44,7 @@ const DEFAULTS: SiteSettings = {
   primaryColor: DEFAULT_PRIMARY_COLOR,
   secondaryColor: DEFAULT_SECONDARY_COLOR,
   withdrawRejoinDays: 0,
+  homeCarouselFlowSpeed: 50,
   headerBgColor: null,
   headerTextColor: null,
   headerActiveColor: null,
@@ -105,6 +109,7 @@ type SiteSettingRow = {
   primaryColor: string;
   secondaryColor: string;
   withdrawRejoinDays?: number;
+  homeCarouselFlowSpeed?: number;
   headerBgColor?: string | null;
   headerTextColor?: string | null;
   headerActiveColor?: string | null;
@@ -134,6 +139,7 @@ function dbRowToSettings(row: SiteSettingRow): SiteSettings {
     primaryColor: row.primaryColor,
     secondaryColor: row.secondaryColor,
     withdrawRejoinDays: row.withdrawRejoinDays ?? 0,
+    homeCarouselFlowSpeed: clampFlowSpeed(row.homeCarouselFlowSpeed),
     headerBgColor: row.headerBgColor ?? null,
     headerTextColor: row.headerTextColor ?? null,
     headerActiveColor: row.headerActiveColor ?? null,
@@ -204,6 +210,9 @@ export async function updateSiteSettings(
     }),
     ...(data.withdrawRejoinDays !== undefined && {
       withdrawRejoinDays: Math.max(0, Math.floor(Number(data.withdrawRejoinDays)) || 0),
+    }),
+    ...(data.homeCarouselFlowSpeed !== undefined && {
+      homeCarouselFlowSpeed: clampFlowSpeed(data.homeCarouselFlowSpeed),
     }),
   };
   await prisma.siteSetting.update({

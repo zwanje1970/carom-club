@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
 type BottomNavItem = {
@@ -99,13 +98,6 @@ function NavLink({
 /** 모바일(768px 이하) 전용 하단 고정 네비게이션. 1줄 5개 메뉴 */
 export function BottomNav() {
   const pathname = usePathname() ?? "";
-
-  useEffect(() => {
-    if (process.env.NODE_ENV !== "development") return;
-    console.debug(
-      "[BottomNav] components/layout/BottomNav.tsx — 당구노트 탭 href=/mypage/notes (prefetch 비활성)"
-    );
-  }, []);
 
   return (
     <nav
