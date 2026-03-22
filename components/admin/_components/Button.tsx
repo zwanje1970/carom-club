@@ -21,6 +21,8 @@ type Props = {
   roundedFull?: boolean;
   isGrouped?: boolean;
   onClick?: (e: React.MouseEvent) => void;
+  "aria-label"?: string;
+  title?: string;
 };
 
 export default function Button({
@@ -39,6 +41,8 @@ export default function Button({
   disabled = false,
   roundedFull = false,
   onClick,
+  "aria-label": ariaLabel,
+  title,
   ...props
 }: Props) {
   const componentClass = [
@@ -84,7 +88,13 @@ export default function Button({
 
   if (href && !disabled) {
     return (
-      <Link href={href} target={target} className={componentClassString}>
+      <Link
+        href={href}
+        target={target}
+        className={componentClassString}
+        aria-label={ariaLabel}
+        title={title}
+      >
         {componentChildren}
       </Link>
     );
@@ -98,6 +108,8 @@ export default function Button({
       target,
       disabled,
       onClick,
+      "aria-label": ariaLabel,
+      title,
     },
     componentChildren,
   );

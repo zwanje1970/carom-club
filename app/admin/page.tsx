@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { mdiViewDashboard } from "@mdi/js";
+import { mdiHome, mdiViewDashboard } from "@mdi/js";
 import SectionMain from "@/components/admin/_components/Section/Main";
 import SectionTitleLineWithButton from "@/components/admin/_components/Section/TitleLineWithButton";
 import CardBox from "@/components/admin/_components/CardBox";
+import Button from "@/components/admin/_components/Button";
 import { getAdminCopy, getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
@@ -33,7 +34,15 @@ export default async function AdminPage() {
   const c = copy as Record<AdminCopyKey, string>;
   return (
     <SectionMain>
-      <SectionTitleLineWithButton icon={mdiViewDashboard} title={getCopyValue(c, "admin.dashboard.title")} main />
+      <SectionTitleLineWithButton icon={mdiViewDashboard} title={getCopyValue(c, "admin.dashboard.title")} main>
+        <Button
+          icon={mdiHome}
+          href="/"
+          color="whiteDark"
+          className="touch-manipulation"
+          aria-label="사이트 홈으로 이동"
+        />
+      </SectionTitleLineWithButton>
       <p className="mb-6 text-sm text-gray-600 dark:text-slate-400">
         {getCopyValue(c, "admin.dashboard.subtitle")}
       </p>

@@ -40,7 +40,8 @@ export function AdminLayout({ children, copy, footer }: Props) {
   const footerText = copy?.["footer.copyright"] ?? "CAROM.CLUB 관리자";
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-800 dark:text-slate-100">
+    /* z-30: 메인 레이아웃 MainSiteHeader(z-20) 위에 그려져 모바일에서 햄버거·액션바가 가려지지 않음 */
+    <div className="relative z-30 min-h-screen bg-gray-50 dark:bg-slate-800 dark:text-slate-100">
       <AdminLayoutSidebar
         copy={copy}
         onLogout={handleLogout}
@@ -48,7 +49,7 @@ export function AdminLayout({ children, copy, footer }: Props) {
         onMobileClose={() => setMobileMenuOpen(false)}
       />
       <div
-        className="relative z-0 min-h-screen min-w-0 lg:pl-[280px]"
+        className="relative min-h-screen min-w-0 lg:pl-[280px]"
         style={{ paddingTop: `${ACTION_BAR_HEIGHT}px` }}
       >
         <AdminPageActions
