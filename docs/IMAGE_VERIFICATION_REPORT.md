@@ -16,7 +16,7 @@
 | **당구장** | `/v/[slug]` | logoImageUrl, coverImageUrl | app/v/[slug]/page.tsx |
 | **당구장 목록** | (홈 내 섹션 등) | coverImageUrl | VenuesListWithLocation |
 | **커뮤니티** | `/community`, 게시글 상세 | imageUrls, 섹션 이미지 | CommunityPostDetailView, ImageSection |
-| **당구노트** | `/community/notes`, `/mypage/notes` | imageUrl | BilliardNotesListClient, BilliardNoteDetailClient (둘 다 `<img>` 사용) |
+| **난구노트** | `/community/notes`, `/mypage/notes` | imageUrl | BilliardNotesListClient, BilliardNoteDetailClient (둘 다 `<img>` 사용) |
 | **관리자** | `/admin/venues/[id]` | logoImageUrl, coverImageUrl | app/admin/venues/[id]/page.tsx |
 | **관리자** | `/admin/settings/hero` 미리보기 | heroBackgroundImageUrl, 배너 | HeroPreviewBlock |
 | **공통** | 전역 | 팝업 이미지, 푸터 파트너 로고, 헤더 로고 | Popup, SiteFooter, LogoLink |

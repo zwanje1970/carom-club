@@ -46,7 +46,7 @@ export async function GET(
       dataJson: true,
       voteCount: true,
       createdAt: true,
-      author: { select: { name: true } },
+      author: { select: { id: true, name: true } },
     },
   });
 
@@ -68,6 +68,7 @@ export async function GET(
       data: JSON.parse(s.dataJson),
       voteCount: s.voteCount,
       createdAt: s.createdAt,
+      authorId: s.author.id,
       authorName: s.author.name,
     })),
   });

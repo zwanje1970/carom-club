@@ -60,7 +60,7 @@ export async function middleware(request: NextRequest) {
   }
 
   /**
-   * 당구노트: 레이아웃만으로는 배포/캐시·RSC 조합에서 비회원 노출 이슈가 있을 수 있어
+   * 난구노트: 레이아웃만으로는 배포/캐시·RSC 조합에서 비회원 노출 이슈가 있을 수 있어
    * Edge에서 세션 쿠키 + JWT 검증으로 선차단 (관리자와 동일 비밀키).
    */
   const isMypageNotesRoute =
@@ -94,3 +94,11 @@ export async function middleware(request: NextRequest) {
     request: { headers: requestHeaders },
   });
 }
+
+/**
+ * `_next/static`·`_next/image`·파비콘 등 정적 자산은 미들웨어를 건너뜀.
+ * (전 경로 실행 시 RSC 청크 JS 요청이 불필요하게 Edge를 거치며 지연·타임아웃이 날 수 있음)
+ */
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+};

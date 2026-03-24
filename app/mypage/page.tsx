@@ -92,7 +92,7 @@ export default async function MypagePage() {
           <MypageActionButtons session={sessionInfo} />
         </div>
 
-        {/* 퀵메뉴 2x2: 당구노트, 내 정보 수정 포함. 클라이언트는 클라이언트 회원이 일반회원으로 로그인했을 때만 표시 */}
+        {/* 퀵메뉴 2x2: 난구노트, 내 정보 수정 포함. 클라이언트는 클라이언트 회원이 일반회원으로 로그인했을 때만 표시 */}
         <div className="mb-6">
           <h2 className="mb-3 text-sm font-semibold text-gray-600 dark:text-gray-400">퀵메뉴</h2>
           <MypageQuickMenu

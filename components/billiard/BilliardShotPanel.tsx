@@ -3,7 +3,7 @@
 /**
  * 해법 패널: 당구대 옆 세로 패널.
  * 난구풀이/해법 작성에서 두께·당점·속도·큐깊이 입력용.
- * 기존 당구노트 저장 구조는 변경하지 않고, 확장 포인트만 준비.
+ * 기존 난구노트 저장 구조는 변경하지 않고, 확장 포인트만 준비.
  */
 import React, { useState } from "react";
 import { getObjectBallColor, getObjectBallYellowColor } from "@/lib/billiard-table-constants";

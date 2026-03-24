@@ -1,91 +1,25 @@
 /**
- * 관리자 메뉴 구조 (고정)
- * - 상위 5개: 대시보드, 사이트관리, 회원관리, 클라이언트관리, 운영관리
- * - 관리 대상 기준 분류, 동일 기능 중복 없음
+ * 관리자 사이드바 메뉴 (업무 흐름 기준, 단일 진입점)
+ * - copy: 플랫폼 설정의 메뉴/문구 키로 덮어쓰기 가능
  */
 import {
   mdiViewDashboard,
-  mdiCog,
-  mdiAccountMultiple,
+  mdiTrophy,
   mdiOfficeBuilding,
-  mdiClipboardList,
-  mdiPalette,
-  mdiPageLayoutBody,
-  mdiViewCarousel,
-  mdiWindowRestore,
-  mdiFormatListBulleted,
-  mdiAccountCog,
-  mdiShieldAlert,
-  mdiMessageQuestion,
-  mdiForum,
-  mdiHistory,
   mdiClipboardCheck,
-  mdiStarCircle,
-  mdiCalendarCheck,
-  mdiSchool,
-  mdiBullhorn,
-  mdiBug,
-  mdiLightbulb,
-  mdiAlertCircle,
-  mdiNotebookEdit,
-  mdiBell,
-  mdiTable,
+  mdiCashMultiple,
+  mdiAccountMultiple,
+  mdiFormatSection,
+  mdiFormatListBulleted,
+  mdiWindowRestore,
+  mdiViewCarousel,
+  mdiMessageQuestion,
+  mdiCog,
 } from "@mdi/js";
 import type { MenuAsideItem } from "./_interfaces";
 
-/** 사이트관리 하위 (운영자 기준: 무엇을 바꾸는지 직관적) */
-const SITE_ITEMS: MenuAsideItem[] = [
-  { href: "/admin/site", label: "대시보드", icon: mdiViewDashboard },
-  { href: "/admin/site/design", label: "스타일 설정", icon: mdiPalette },
-  { href: "/admin/site/main", label: "메인페이지 구성", icon: mdiPageLayoutBody },
-  { href: "/admin/site/hero", label: "히어로 설정", icon: mdiViewCarousel },
-  { href: "/admin/notice-bars", label: "공지바 관리", icon: mdiBullhorn },
-  { href: "/admin/popups", label: "팝업 관리", icon: mdiWindowRestore },
-  { href: "/admin/site/copy", label: "문구 관리", icon: mdiFormatListBulleted },
-  { href: "/admin/site/footer", label: "푸터 관리", icon: mdiTable },
-];
-
-/** 회원관리 하위 (신고는 운영관리에서만) */
-const MEMBER_ITEMS: MenuAsideItem[] = [
-  { href: "/admin/members", label: "회원 목록", icon: mdiFormatListBulleted },
-  { href: "/admin/members", label: "회원 상세", icon: mdiAccountMultiple },
-  { href: "/admin/members", label: "회원 권한/상태 관리", icon: mdiAccountCog },
-  { href: "/admin/members", label: "회원 제재 관리", icon: mdiShieldAlert },
-  { href: "/admin/inquiries", label: "문의/건의사항", icon: mdiMessageQuestion },
-  { href: "/admin/community/posts", label: "커뮤니티 글 관리", icon: mdiForum },
-  { href: "/admin/members/activity", label: "활동 로그", icon: mdiHistory },
-];
-
-/** 클라이언트관리 하위 */
-const CLIENT_ITEMS: MenuAsideItem[] = [
-  { href: "/admin/client-applications", label: "클라이언트 신청 관리", icon: mdiClipboardCheck },
-  { href: "/admin/venues", label: "클라이언트 목록", icon: mdiFormatListBulleted },
-  { href: "/admin/venues", label: "클라이언트 상세", icon: mdiOfficeBuilding },
-  { href: "/admin/pricing-plans", label: "등급/연회원 관리", icon: mdiStarCircle },
-  { href: "/admin/venues", label: "노출/기간 관리", icon: mdiViewCarousel },
-  { href: "/admin/settings/featured-content", label: "메인 노출 ON/OFF", icon: mdiStarCircle },
-  { href: "/admin/tournaments", label: "대회 운영 현황", icon: mdiCalendarCheck },
-  { href: "/admin/venues", label: "레슨 운영 현황", icon: mdiSchool },
-];
-
-/** 운영관리 하위 (신고 처리 = 여기만) */
-const OPERATION_ITEMS: MenuAsideItem[] = [
-  { href: "/admin/settings/notices", label: "공지사항 관리", icon: mdiBullhorn },
-  { href: "/admin/inquiries", label: "오류제보 관리", icon: mdiBug },
-  { href: "/admin/inquiries", label: "기능개선 요청", icon: mdiLightbulb },
-  { href: "/community/admin/reports", label: "신고 처리", icon: mdiAlertCircle },
-  { href: "/admin/settings/admin-logs", label: "운영 로그", icon: mdiNotebookEdit },
-  { href: "/admin/settings/notifications", label: "알림 관리", icon: mdiBell },
-];
-
-function flattenHrefs(items: MenuAsideItem[]): string[] {
-  const out: string[] = [];
-  for (const it of items) {
-    if (it.href) out.push(it.href);
-    if (it.menu) out.push(...flattenHrefs(it.menu));
-  }
-  return out;
-}
+const CLIENT_CHILD_HREFS = ["/admin/venues", "/admin/client-applications", "/admin/fee-ledger"] as const;
+const CONTENT_CHILD_HREFS = ["/admin/page-sections", "/admin/popups", "/admin/notice-bars"] as const;
 
 /** 현재 pathname이 해당 그룹에 속하는지 */
 export function isGroupActive(pathname: string, hrefs: string[]): boolean {
@@ -93,43 +27,54 @@ export function isGroupActive(pathname: string, hrefs: string[]): boolean {
   return hrefs.some((h) => pathname === h || (h !== "/admin" && pathname.startsWith(h + "/")));
 }
 
-/** 상위 5개 + 하위 메뉴 (고정) */
-export function getAdminMenuAside(copy?: Record<string, string>): MenuAsideItem[] {
+/**
+ * 사이드바 메뉴 구조
+ * 순서: 대시보드 → 대회관리 → 클라이언트 관리 → 회원·권한 → 콘텐츠 → 문의 → 설정(/admin/site)
+ */
+export function getAdminMenuAside(copy?: Record<string, string> | undefined): MenuAsideItem[] {
   const L = (key: string, fallback: string) =>
     (copy?.[key] && String(copy[key]).trim()) || fallback;
 
   return [
     { href: "/admin", label: L("menu.dashboard", "대시보드"), icon: mdiViewDashboard },
+    { href: "/admin/tournaments", label: L("menu.tournaments", "대회관리"), icon: mdiTrophy },
     {
-      label: L("menu.site", "사이트관리"),
-      icon: mdiCog,
-      menu: SITE_ITEMS,
-    },
-    {
-      label: L("menu.members", "회원관리"),
-      icon: mdiAccountMultiple,
-      menu: MEMBER_ITEMS,
-    },
-    {
-      label: L("menu.venues", "클라이언트관리"),
+      label: L("menu.clientSection", "클라이언트 관리"),
       icon: mdiOfficeBuilding,
-      menu: CLIENT_ITEMS,
+      menu: [
+        { href: "/admin/venues", label: L("menu.venueList", "클라이언트 목록"), icon: mdiFormatListBulleted },
+        { href: "/admin/client-applications", label: L("menu.clientApplications", "신청 관리"), icon: mdiClipboardCheck },
+        { href: "/admin/fee-ledger", label: L("menu.feeLedger", "정산"), icon: mdiCashMultiple },
+      ],
     },
+    { href: "/admin/members", label: L("menu.membersUnified", "회원·권한 관리"), icon: mdiAccountMultiple },
     {
-      label: L("menu.operation", "운영관리"),
-      icon: mdiClipboardList,
-      menu: OPERATION_ITEMS,
+      label: L("menu.content", "콘텐츠 관리"),
+      icon: mdiFormatSection,
+      menu: [
+        { href: "/admin/page-sections", label: L("menu.pageSections", "페이지 섹션 관리"), icon: mdiFormatListBulleted },
+        { href: "/admin/popups", label: L("menu.popups", "팝업 관리"), icon: mdiWindowRestore },
+        { href: "/admin/notice-bars", label: L("menu.noticeBars", "공지 배너 관리"), icon: mdiViewCarousel },
+      ],
     },
+    { href: "/admin/inquiries", label: L("menu.inquiries", "문의관리"), icon: mdiMessageQuestion },
+    { href: "/admin/site", label: L("menu.settings", "설정"), icon: mdiCog },
   ];
 }
 
-/** pathname 기준으로 펼칠 상위 메뉴 인덱스 (0=대시보드, 1=사이트, 2=회원, 3=클라이언트, 4=운영) */
+/**
+ * pathname 기준으로 펼칠 그룹 인덱스 (getAdminMenuAside 반환 배열의 인덱스)
+ * 0=대시보드, 1=대회관리, 2=클라이언트 관리, 3=회원·권한, 4=콘텐츠, 5=문의, 6=설정
+ * -1: 펼침 없음(대시보드·대회관리 등 단일 링크이거나 해당 없음)
+ */
 export function getExpandedGroupIndex(pathname: string): number {
   if (!pathname || pathname === "/admin") return -1;
-  const groups = [["/admin"], flattenHrefs(SITE_ITEMS), flattenHrefs(MEMBER_ITEMS), flattenHrefs(CLIENT_ITEMS), flattenHrefs(OPERATION_ITEMS)];
-  for (let i = 1; i < groups.length; i++) {
-    if (groups[i].some((h) => pathname === h || (h !== "/admin" && pathname.startsWith(h + "/"))))
-      return i;
-  }
+
+  if (CLIENT_CHILD_HREFS.some((h) => pathname === h || pathname.startsWith(`${h}/`))) return 2;
+  if (pathname === "/admin/members" || pathname.startsWith("/admin/members/")) return 3;
+  if (CONTENT_CHILD_HREFS.some((h) => pathname === h || pathname.startsWith(`${h}/`))) return 4;
+  if (pathname === "/admin/inquiries" || pathname.startsWith("/admin/inquiries/")) return 5;
+  if (pathname === "/admin/site" || pathname.startsWith("/admin/site/")) return 6;
+
   return -1;
 }

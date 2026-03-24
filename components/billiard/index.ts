@@ -1,6 +1,6 @@
 /**
  * 공통 당구대 모듈
- * - 당구노트, 난구풀이, 해법 작성에서 동일한 캔버스/편집기를 재사용합니다.
+ * - 난구노트, 난구풀이, 해법 작성에서 동일한 캔버스/편집기를 재사용합니다.
  * - 좌표·공 규격은 lib/billiard-table-constants.ts 참고.
  */
 export { default as BilliardTableCanvas } from "./BilliardTableCanvas";

@@ -36,7 +36,7 @@ export function CommunityBilliardNotesSection() {
   return (
     <section className="mt-10" aria-labelledby="community-feed-heading">
       <div className="flex items-center justify-between mb-4">
-        <h2 id="community-feed-heading" className="text-lg font-semibold">커뮤니티에 게시된 노트</h2>
+        <h2 id="community-feed-heading" className="text-lg font-semibold">커뮤니티에 게시된 난구노트</h2>
         <Link
           href="/community/notes"
           className="text-site-primary hover:underline text-sm"
@@ -48,16 +48,16 @@ export function CommunityBilliardNotesSection() {
         <p className="text-gray-500 text-sm">불러오는 중…</p>
       ) : needLogin ? (
         <p className="text-gray-600 dark:text-slate-400 text-sm">
-          커뮤니티에 게시된 노트는{" "}
+          커뮤니티에 게시된 난구노트는{" "}
           <Link href="/login?next=%2Fcommunity" className="text-site-primary font-medium hover:underline">
             로그인
           </Link>
           후 볼 수 있습니다.
         </p>
       ) : items.length === 0 ? (
-        <p className="text-gray-500 text-sm">커뮤니티에 게시된 노트가 없습니다.</p>
+        <p className="text-gray-500 text-sm">커뮤니티에 게시된 난구노트가 없습니다.</p>
       ) : (
-        <ul className="divide-y divide-gray-200 dark:divide-slate-700" aria-label="노트 목록">
+        <ul className="divide-y divide-gray-200 dark:divide-slate-700" aria-label="난구노트 목록">
           {items.slice(0, 6).map((n) => (
             <li key={n.id}>
               <Link

@@ -27,7 +27,7 @@ export interface BilliardNoteFormScreenProps {
   showPlacement: boolean;
   /** 배치 데이터 있음 여부 (저장 버튼 활성화 등) */
   hasPlacement: boolean;
-  /** 저장 후 이동할 노트 상세 경로 기준. 예: /mypage/notes */
+  /** 저장 후 이동할 난구노트 상세 경로 기준. 예: /mypage/notes */
   redirectBasePath?: string;
 }
 

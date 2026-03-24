@@ -1,4 +1,4 @@
-# 당구노트 접근 정책·경로·배포 점검
+# 난구노트 접근 정책·경로·배포 점검
 
 ## 1. 비회원이 URL로 들어왔을 때 예전에 안 막혀 보일 수 있었던 이유
 
@@ -44,7 +44,7 @@
 
 | 역할 | 파일 |
 |------|------|
-| 모바일 하단 네비 “당구노트” | `components/layout/BottomNav.tsx` → `href="/mypage/notes"` |
+| 모바일 하단 네비 “난구노트” | `components/layout/BottomNav.tsx` → `href="/mypage/notes"` |
 | 노트 목록 UI | `components/community/BilliardNotesListClient.tsx` (`app/mypage/notes/page.tsx`) |
 | 새 글 폼·공 배치 진입 | `app/mypage/notes/new/page.tsx` → `BilliardNoteFormScreen` + `MobileBallPlacementFullscreen` |
 | 공 배치 풀스크린 | `components/community/MobileBallPlacementFullscreen.tsx` |
@@ -64,4 +64,4 @@
 ## 7. 홈 `revalidate = 60` 과 회원 UI
 
 - 홈 **서버 HTML**은 최대 60초 단위로 재검증 가능.
-- **로그인 여부에 따라 달라지는 버튼**이 전부 서버에서만 결정되면 캐시에 섞일 수 있음. 현재 하단 네비는 **클라이언트**이며, 당구노트는 **서버 middleware/layout**으로 보호.
+- **로그인 여부에 따라 달라지는 버튼**이 전부 서버에서만 결정되면 캐시에 섞일 수 있음. 현재 하단 네비는 **클라이언트**이며, 난구노트는 **서버 middleware/layout**으로 보호.

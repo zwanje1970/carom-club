@@ -40,23 +40,29 @@ export default async function MypageNoteDetailPage({
   const isAuthor = session?.id === note.authorId;
   if (!isAuthor) notFound();
 
+  const linkedTrouble = await prisma.troubleShotPost.findFirst({
+    where: { sourceNoteId: id },
+    orderBy: { post: { createdAt: "desc" } },
+    select: { postId: true },
+  });
+
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
       <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">
         <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4" aria-label="breadcrumb">
           <Link href="/mypage" className="hover:text-site-primary">마이페이지</Link>
           <span aria-hidden>/</span>
-          <Link href="/mypage/notes" className="hover:text-site-primary">당구노트</Link>
+          <Link href="/mypage/notes" className="hover:text-site-primary">난구노트</Link>
           <span aria-hidden>/</span>
           <span className="text-site-text font-medium">상세</span>
         </nav>
-        <h1 className="text-xl font-bold mb-6">{note.title || "당구노트"}</h1>
+        <h1 className="text-xl font-bold mb-6">{note.title || "난구노트"}</h1>
         <BilliardNoteDetailClient
           note={{
             id: note.id,
             authorName: note.author.name,
             title: note.title,
-            noteDate: note.noteDate?.toISOString() ?? null,
+            noteDate: note.noteDate ?? null,
             redBall: { x: note.redBallX, y: note.redBallY },
             yellowBall: { x: note.yellowBallX, y: note.yellowBallY },
             whiteBall: { x: note.whiteBallX, y: note.whiteBallY },
@@ -64,9 +70,10 @@ export default async function MypageNoteDetailPage({
             memo: note.memo,
             imageUrl: note.imageUrl,
             visibility: note.visibility,
-            createdAt: note.createdAt.toISOString(),
+            createdAt: note.createdAt,
             isAuthor,
           }}
+          linkedTroublePostId={linkedTrouble?.postId ?? null}
           basePath="/mypage/notes"
         />
       </div>

@@ -1,35 +1,49 @@
 "use client";
 
 /**
- * 난구해결사 해법 편집기 (명세 기반)
- * - 원본 공배치: 읽기 전용
- * - 해법: 두께·당점·백스트로크·팔로우·볼스피드·진행경로·해설 별도 state
- * - 자동 물리 계산 없음, 사용자 수동 조작만
- * - 되돌리기: 직전 편집 스냅샷으로 복원 (최대 NANGU_SOLUTION_EDITOR_MAX_UNDO 단계)
+ * 而ㅻ??덊떚 ?뚮궃援с?寃뚯떆???대쾿 ?몄쭛湲?(`/community/nangu/.../solution/new`).
+ * ?쒓뎄?닿껐??trouble)??`TroubleSolutionEditor` ??濡ㅼ븘???쒖꽌쨌?댁떇 ?먯튃: docs/NANGU_SOLUTION_ROLLOUT.md
+ * - ?먮낯 怨듬같移? ?쎄린 ?꾩슜
+ * - ?대쾿: ?먭퍡쨌?뱀젏쨌諛깆뒪?몃줈??룻뙏濡쒖슦쨌蹂쇱뒪?쇰뱶쨌吏꾪뻾寃쎈줈쨌?댁꽕 蹂꾨룄 state
+ * - ?먮룞 臾쇰━ 怨꾩궛 ?놁쓬, ?ъ슜???섎룞 議곗옉留? * - ?섎룎由ш린: 吏곸쟾 ?몄쭛 ?ㅻ깄?룹쑝濡?蹂듭썝 (理쒕? NANGU_SOLUTION_EDITOR_MAX_UNDO ?④퀎)
  */
-import React, { useState, useCallback } from "react";
-import { DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT } from "@/lib/billiard-table-constants";
+import React, { useState, useCallback, useMemo } from "react";
+import {
+  DEFAULT_SOLUTION_SETTINGS,
+  clampSolutionSettings,
+  mergeSolutionSettings,
+  type SolutionSettingsValue,
+} from "@/lib/solution-settings-panel-value";
+import {
+  DEFAULT_TABLE_WIDTH,
+  DEFAULT_TABLE_HEIGHT,
+  getPlayfieldRect,
+} from "@/lib/billiard-table-constants";
+import {
+  computeCueBallNormFromPanelSettings,
+  panelThicknessFromMainThicknessOffset,
+  thicknessOffsetXFromThicknessStep,
+} from "@/lib/solution-panel-ball-layout";
 import type { NanguBallPlacement } from "@/lib/nangu-types";
 import type { NanguSolutionData } from "@/lib/nangu-types";
 import { NanguReadOnlyLayout } from "./NanguReadOnlyLayout";
 import { NanguSolutionPathOverlay } from "./NanguSolutionPathOverlay";
-import { NanguThicknessEditor, getThicknessOverlap } from "./NanguThicknessEditor";
-import { NanguSpinEditor } from "./NanguSpinEditor";
-import { NanguFocusZoomOverlay, type NanguFocusZoomTarget } from "./NanguFocusZoomOverlay";
 import {
-  BALL_SPEED_OPTIONS,
   ballSpeedToLegacySpeed,
   ballSpeedToLegacySpeedLevel,
   ballSpeedToRailCount,
-  getRailDisplayPowerForBallSpeed,
+  normalizeBallSpeed,
 } from "@/lib/ball-speed-constants";
 import { SolutionPathEditorFullscreen } from "./SolutionPathEditorFullscreen";
 import { NanguTablePreviewHitLayer } from "./NanguTablePreviewHitLayer";
 import { useTableOrientation } from "@/hooks/useTableOrientation";
 import {
+  createInitialNanguSnapshotFromEditorProps,
+  resolvePanelSettingsAndAuthority,
+} from "@/lib/solution-editor-hydrate";
+import {
   type NanguSolutionEditorUndoSnapshot,
   cloneNanguSolutionEditorSnapshot,
-  createInitialNanguSolutionEditorSnapshot,
   NANGU_SOLUTION_EDITOR_MAX_UNDO,
   type NanguActivePanel,
 } from "@/lib/nangu-solution-editor-undo";
@@ -40,6 +54,10 @@ export interface NanguSolutionEditorProps {
   ballPlacement: NanguBallPlacement;
   postTitle: string;
   postContent: string;
+  /** ??λ맂 ?대쾿 JSON ??硫붿씤쨌?⑤꼸쨌寃쎈줈쨌?댁꽕 ?쇨큵 蹂듭썝 */
+  initialSolutionData?: Partial<NanguSolutionData> | null;
+  /** `initialSolutionData.settings`留??곕줈 ?섍만 ???덇굅?? */
+  initialPersistedSettings?: SolutionSettingsValue | null;
   onSubmit: (payload: {
     title?: string | null;
     comment?: string | null;
@@ -51,10 +69,12 @@ export function NanguSolutionEditor({
   ballPlacement,
   postTitle,
   postContent,
+  initialSolutionData = null,
+  initialPersistedSettings = null,
   onSubmit,
 }: NanguSolutionEditorProps) {
   const [editor, setEditor] = useState<NanguSolutionEditorUndoSnapshot>(() =>
-    createInitialNanguSolutionEditorSnapshot()
+    createInitialNanguSnapshotFromEditorProps(initialSolutionData, initialPersistedSettings)
   );
   const [undoStack, setUndoStack] = useState<NanguSolutionEditorUndoSnapshot[]>([]);
 
@@ -92,38 +112,130 @@ export function NanguSolutionEditor({
     followStrokeLevel,
     ballSpeed,
     pathPoints,
+    cuePathCurveNodes,
+    objectPathCurveNodes,
     explanationText,
   } = editor;
 
-  /** 당구노트형 전체화면(오버레이) + 경로 편집 UI (스팟·줌·재생은 이 상태에서만) */
-  const [fullScreenEditMode, setFullScreenEditMode] = useState(false);
+  /** 吏꾩엯 ??怨㏓컮濡?寃쎈줈???꾩껜?붾㈃(?쒓뎄?대쾿 ?쒖떆 1???숈꽑). ?ㅽ뙚쨌以뙿룹옱?앹? ??紐⑤뱶?먯꽌留?*/
+  const [fullScreenEditMode, setFullScreenEditMode] = useState(true);
   const [pathFsKey, setPathFsKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [focusZoom, setFocusZoom] = useState<{
-    active: boolean;
-    target: NanguFocusZoomTarget;
-    originX: number;
-    originY: number;
-  }>({ active: false, target: null, originX: 0, originY: 0 });
+  const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  const [settingsFocusSection, setSettingsFocusSection] = useState<
+    null | "thickness" | "tip" | "rail"
+  >(null);
+  /**
+   * true硫?誘몃땲 ?⑤꼸??蹂쇱뒪?쇰뱶쨌?먭퍡(physics)쨌?섍뎄 諛곗튂 ?ㅻ쾭?쇱씠?쑣톞ipNorm ?쒖떆瑜?二쇰룄.
+   * 誘몄궗????硫붿씤 ?щ씪?대뜑/諛곗튂留??ъ슜.
+   */
+  const [settingsPanelBallSpeedAuthoritative, setSettingsPanelBallSpeedAuthoritative] = useState(
+    () => resolvePanelSettingsAndAuthority(initialSolutionData, initialPersistedSettings).authoritative
+  );
+  const [panelSettings, setPanelSettings] = useState<SolutionSettingsValue>(() =>
+    resolvePanelSettingsAndAuthority(initialSolutionData, initialPersistedSettings).settings
+  );
+
+  const openSettingsPanel = useCallback(
+    (section?: "thickness" | "tip" | "rail") => {
+      setSettingsFocusSection(section ?? null);
+      setPanelSettings((prev) => {
+        const base = {
+          ballSpeed: editor.ballSpeed,
+          backstroke: editor.backstrokeLevel,
+          followStroke: editor.followStrokeLevel,
+        };
+        if (!settingsPanelBallSpeedAuthoritative) {
+          return clampSolutionSettings(
+            mergeSolutionSettings(
+              {
+                ...base,
+                railCount: ballSpeedToRailCount(editor.ballSpeed),
+                ...panelThicknessFromMainThicknessOffset(editor.thicknessOffsetX),
+              },
+              prev
+            )
+          );
+        }
+        return clampSolutionSettings(mergeSolutionSettings(base, prev));
+      });
+      setSettingsPanelBallSpeedAuthoritative(true);
+      setSettingsPanelOpen(true);
+    },
+    [
+      settingsPanelBallSpeedAuthoritative,
+      editor.ballSpeed,
+      editor.backstrokeLevel,
+      editor.followStrokeLevel,
+      editor.thicknessOffsetX,
+    ]
+  );
 
   const previewOrientation = useTableOrientation();
 
-  const cueBall = ballPlacement.cueBall;
-  const cuePos = cueBall === "yellow" ? ballPlacement.yellowBall : ballPlacement.whiteBall;
+  const rectLandscape = useMemo(
+    () => getPlayfieldRect(DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT),
+    []
+  );
+
+  const cueBallNormFromPanel = useMemo(
+    () => computeCueBallNormFromPanelSettings(ballPlacement.redBall, panelSettings, rectLandscape),
+    [ballPlacement.redBall, panelSettings, rectLandscape]
+  );
+
+  const cueBallNormForDisplay = useMemo(() => {
+    if (!settingsPanelBallSpeedAuthoritative) {
+      return ballPlacement.cueBall === "yellow" ? ballPlacement.yellowBall : ballPlacement.whiteBall;
+    }
+    return cueBallNormFromPanel;
+  }, [settingsPanelBallSpeedAuthoritative, ballPlacement, cueBallNormFromPanel]);
+
+  const ballNormOverridesForPanel = useMemo(() => {
+    /** ?쒖떆???섍뎄 ?ㅻ쾭?쇱씠?쒕뒗 ?ㅼ젙李쎌씠 ?대┛ ?숈븞?먮쭔 ?곸슜 (?좊땲硫붿씠??醫뚰몴 濡쒖쭅怨?遺꾨━) */
+    if (!settingsPanelBallSpeedAuthoritative || !settingsPanelOpen) return undefined;
+    const k = ballPlacement.cueBall === "yellow" ? "yellow" : "white";
+    return { [k]: cueBallNormFromPanel } as Partial<
+      Record<"red" | "yellow" | "white", { x: number; y: number }>
+    >;
+  }, [settingsPanelBallSpeedAuthoritative, settingsPanelOpen, ballPlacement.cueBall, cueBallNormFromPanel]);
+
+  const effectiveThicknessOffsetX = useMemo(() => {
+    if (!settingsPanelBallSpeedAuthoritative) return thicknessOffsetX;
+    const step = panelSettings?.thicknessStep;
+    if (step == null || Number.isNaN(step)) return thicknessOffsetX;
+    return thicknessOffsetXFromThicknessStep(step, panelSettings.cueSide);
+  }, [
+    settingsPanelBallSpeedAuthoritative,
+    panelSettings?.thicknessStep,
+    panelSettings.cueSide,
+    thicknessOffsetX,
+  ]);
+
+  const effectiveBallSpeed = useMemo(() => {
+    if (!settingsPanelBallSpeedAuthoritative) return ballSpeed;
+    const v = panelSettings?.railCount;
+    if (v == null || Number.isNaN(Number(v))) return ballSpeed;
+    return normalizeBallSpeed(v);
+  }, [settingsPanelBallSpeedAuthoritative, panelSettings?.railCount, ballSpeed]);
 
   const closeFullScreenEdit = useCallback(() => {
     setFullScreenEditMode(false);
   }, []);
 
-  /** 미리보기 탭/버튼: 당구노트 공배치와 동일한 전체화면 셸로 경로 편집 */
+  /** 誘몃━蹂닿린 ??踰꾪듉: ?쒓뎄?명듃 怨듬같移섏? ?숈씪???꾩껜?붾㈃ ?몃줈 寃쎈줈 ?몄쭛 */
   const enterFullScreenEdit = useCallback(() => {
     setPathFsKey((k) => k + 1);
     setFullScreenEditMode(true);
   }, []);
 
   const clearCommittedPath = useCallback(() => {
-    commit((prev) => ({ ...prev, pathPoints: [] }));
+    commit((prev) => ({
+      ...prev,
+      pathPoints: [],
+      cuePathCurveNodes: [],
+      objectPathCurveNodes: [],
+    }));
   }, [commit]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -138,7 +250,7 @@ export function NanguSolutionEditor({
         comment: explanationText.trim() || null,
         data: {
           isBankShot,
-          thicknessOffsetX: isBankShot ? undefined : thicknessOffsetX,
+          thicknessOffsetX: isBankShot ? undefined : effectiveThicknessOffsetX,
           tipX: spinX,
           tipY: spinY,
           spinX,
@@ -146,10 +258,16 @@ export function NanguSolutionEditor({
           paths: pointsForPath.length >= 1 ? [{ points: pointsForPath, pointsWithType: pathPoints }] : [],
           backstrokeLevel,
           followStrokeLevel,
-          ballSpeed,
-          speedLevel: ballSpeedToLegacySpeedLevel(ballSpeed),
-          speed: ballSpeedToLegacySpeed(ballSpeed),
+          ballSpeed: effectiveBallSpeed,
+          speedLevel: ballSpeedToLegacySpeedLevel(effectiveBallSpeed),
+          speed: ballSpeedToLegacySpeed(effectiveBallSpeed),
           explanationText: explanationText.trim() || undefined,
+          cuePathCurveNodes: cuePathCurveNodes.length > 0 ? cuePathCurveNodes : undefined,
+          objectPathCurveNodes:
+            objectPathCurveNodes.length > 0 ? objectPathCurveNodes : undefined,
+          settings: settingsPanelBallSpeedAuthoritative
+            ? clampSolutionSettings(panelSettings)
+            : undefined,
         },
       });
     } catch (err) {
@@ -161,13 +279,66 @@ export function NanguSolutionEditor({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* 1. 상단 정보 영역 */}
+      {/* 1. ?곷떒 ?뺣낫 ?곸뿭 */}
       <div>
         <h2 className="text-lg font-semibold text-site-text">{postTitle}</h2>
         <p className="text-sm text-gray-600 dark:text-slate-400 mt-1 whitespace-pre-wrap">{postContent}</p>
       </div>
 
-      {/* 2. 당구노트 공배치와 동일 좌표 미리보기 — 탭/버튼으로 전체화면 경로 편집 (테이블 가운데 정렬) */}
+      {fullScreenEditMode && (
+        <SolutionPathEditorFullscreen
+          key={pathFsKey}
+          variant="nangu"
+          presentation="noteBallPlacementFullscreen"
+          ballPlacement={ballPlacement}
+          panelBallNormOverrides={ballNormOverridesForPanel}
+          panelCueTipNorm={
+            settingsPanelBallSpeedAuthoritative ? panelSettings.tipNorm : null
+          }
+          initialPathPoints={pathPoints}
+          initialObjectPathPoints={[]}
+          initialCuePathCurveNodes={cuePathCurveNodes}
+          initialObjectPathCurveNodes={objectPathCurveNodes}
+          thicknessOffsetX={effectiveThicknessOffsetX}
+          isBankShot={isBankShot}
+          ballSpeed={effectiveBallSpeed}
+          settingsValue={panelSettings}
+          onSettingsChange={(next) => {
+            setSettingsPanelBallSpeedAuthoritative(true);
+            setPanelSettings(next);
+            if (next.railCount != null && !Number.isNaN(Number(next.railCount))) {
+              commit((prev) => ({ ...prev, ballSpeed: normalizeBallSpeed(next.railCount) }));
+            }
+          }}
+          settingsOpen={settingsPanelOpen}
+          onSettingsOpen={openSettingsPanel}
+          onSettingsClose={() => {
+            setSettingsPanelOpen(false);
+            setSettingsFocusSection(null);
+          }}
+          settingsFocusSection={settingsFocusSection}
+          onCancel={closeFullScreenEdit}
+          onConfirm={({
+            pathPoints: next,
+            cuePathCurveNodes: nextCueCurveNodes,
+            objectPathCurveNodes: nextObjCurveNodes,
+          }) => {
+            commit((prev) => ({
+              ...prev,
+              pathPoints: next,
+              cuePathCurveNodes: nextCueCurveNodes ?? [],
+              objectPathCurveNodes: nextObjCurveNodes ?? [],
+            }));
+            closeFullScreenEdit();
+          }}
+        />
+      )}
+
+      <div
+        className={fullScreenEditMode ? "hidden" : undefined}
+        aria-hidden={fullScreenEditMode}
+      >
+      {/* 2. ?쒓뎄?명듃 怨듬같移섏? ?숈씪 醫뚰몴 誘몃━蹂닿린 ???꾩껜?붾㈃ 醫낅즺 ?꾩뿉留??쒖떆(??쑝濡??ㅼ떆 ?닿린 媛?? */}
       <div className="flex w-full flex-col items-center">
         <div
           className="relative mx-auto w-full max-w-full overflow-hidden rounded-lg border border-gray-200 dark:border-slate-600"
@@ -179,11 +350,15 @@ export function NanguSolutionEditor({
                 : `${DEFAULT_TABLE_WIDTH} / ${DEFAULT_TABLE_HEIGHT}`,
           }}
         >
-          {/* 캔버스·SVG는 포인터 통과 → 히트 레이어만 탭 수신 */}
+          {/* 罹붾쾭?ㅒ톁VG???ъ씤???듦낵 ???덊듃 ?덉씠?대쭔 ???섏떊 */}
           <div className="absolute inset-0 z-0 pointer-events-none">
             <div className="absolute inset-0">
               <NanguReadOnlyLayout
                 ballPlacement={ballPlacement}
+                ballNormOverrides={ballNormOverridesForPanel}
+                cueTipNorm={
+                  settingsPanelBallSpeedAuthoritative ? panelSettings.tipNorm : null
+                }
                 fillContainer
                 embedFill
                 className="absolute inset-0 w-full h-full rounded-none border-0 overflow-hidden"
@@ -194,14 +369,16 @@ export function NanguSolutionEditor({
                 betweenTableAndBallsLayer={
                   <NanguSolutionPathOverlay
                     pathPoints={pathPoints}
-                    cuePos={cuePos}
+                    cuePos={cueBallNormForDisplay}
                     tableBallPlacement={ballPlacement}
                     objectPathPoints={[]}
+                    cuePathCurveNodes={cuePathCurveNodes}
                     orientation={previewOrientation}
                     pathMode={false}
                     objectPathMode={false}
                     pathLinesVisible={true}
                     ballPickLayout={ballPlacement}
+                    ballNormOverrides={ballNormOverridesForPanel}
                   />
                 }
               />
@@ -239,245 +416,40 @@ export function NanguSolutionEditor({
         </div>
       </div>
 
-      {fullScreenEditMode && (
-        <SolutionPathEditorFullscreen
-          key={pathFsKey}
-          variant="nangu"
-          presentation="noteBallPlacementFullscreen"
-          ballPlacement={ballPlacement}
-          initialPathPoints={pathPoints}
-          initialObjectPathPoints={[]}
-          thicknessOffsetX={thicknessOffsetX}
-          isBankShot={isBankShot}
-          ballSpeed={ballSpeed}
-          onCancel={closeFullScreenEdit}
-          onConfirm={({ pathPoints: next }) => {
-            commit((prev) => ({ ...prev, pathPoints: next }));
-            closeFullScreenEdit();
-          }}
-        />
-      )}
-
-      {/* 3. 설정패널 영역 */}
-      <div className="rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 p-4">
-        <p className="text-sm font-medium text-site-text mb-3">해법 설정</p>
-        <div className="flex flex-wrap gap-2 mb-4">
-          {(
-            [
-              ["thickness", "두께"],
-              ["spin", "당점"],
-              ["backstroke", "백스트로크"],
-              ["followstroke", "팔로우"],
-              ["speed", "볼스피드"],
-              ["path", "진행경로"],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => commit((prev) => ({ ...prev, activePanel: key }))}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
-                activePanel === key
-                  ? "bg-site-primary text-white border-site-primary"
-                  : "bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-site-text"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {activePanel === "thickness" && (
-          <div className="space-y-2">
-            <NanguThicknessEditor
-              value={thicknessOffsetX}
-              isBankShot={isBankShot}
-              onChange={(v) => commit((prev) => ({ ...prev, thicknessOffsetX: v }))}
-              onBankShotChange={(v) => commit((prev) => ({ ...prev, isBankShot: v }))}
-              onFocusZoomRequest={(clientX, clientY) =>
-                setFocusZoom({ active: true, target: "thickness", originX: clientX, originY: clientY })
-              }
-              onFocusZoomEnd={() => setFocusZoom((z) => ({ ...z, active: false }))}
-            />
-            <p className="text-xs text-gray-500 mt-1">보조: 두께 수치</p>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={1 / 16}
-              value={thicknessOffsetX}
-              onChange={(e) => {
-                const v = e.target.valueAsNumber;
-                commit((prev) => {
-                  let nextBank = prev.isBankShot;
-                  if (getThicknessOverlap(v)) nextBank = false;
-                  return { ...prev, thicknessOffsetX: v, isBankShot: nextBank };
-                });
-              }}
-              className="w-full max-w-xs"
-            />
-          </div>
-        )}
-
-        {activePanel === "spin" && (
-          <div className="space-y-2">
-            <NanguSpinEditor
-              spinX={spinX}
-              spinY={spinY}
-              onChange={({ spinX: x, spinY: y }) => {
-                commit((prev) => ({ ...prev, spinX: x, spinY: y }));
-              }}
-              onFocusZoomRequest={(clientX, clientY) =>
-                setFocusZoom({ active: true, target: "spin", originX: clientX, originY: clientY })
-              }
-              onFocusZoomEnd={() => setFocusZoom((z) => ({ ...z, active: false }))}
-            />
-            <p className="text-xs text-gray-500 mt-1">보조: X/Y 슬라이더</p>
-            <div className="flex flex-wrap gap-4">
-              <label className="flex items-center gap-2">
-                <span className="text-sm w-16">X</span>
-                <input
-                  type="range"
-                  min={-1}
-                  max={1}
-                  step={0.1}
-                  value={spinX}
-                  onChange={(e) =>
-                    commit((prev) => ({ ...prev, spinX: e.target.valueAsNumber }))
-                  }
-                  className="w-32"
-                />
-              </label>
-              <label className="flex items-center gap-2">
-                <span className="text-sm w-16">Y</span>
-                <input
-                  type="range"
-                  min={-1}
-                  max={1}
-                  step={0.1}
-                  value={spinY}
-                  onChange={(e) =>
-                    commit((prev) => ({ ...prev, spinY: e.target.valueAsNumber }))
-                  }
-                  className="w-32"
-                />
-              </label>
-            </div>
-          </div>
-        )}
-
-        {activePanel === "backstroke" && (
-          <div
-            className="py-2 -mx-2 px-2 rounded-lg touch-manipulation"
-            onPointerDown={(e) =>
-              setFocusZoom({ active: true, target: "backstroke", originX: e.clientX, originY: e.clientY })
-            }
-          >
-            <p className="text-xs text-gray-500 mb-1">백스트로크: 오른쪽=짧음, 왼쪽=김</p>
-            <input
-              type="range"
-              min={0}
-              max={10}
-              value={backstrokeLevel}
-              onChange={(e) =>
-                commit((prev) => ({ ...prev, backstrokeLevel: e.target.valueAsNumber }))
-              }
-              className="w-full max-w-xs"
-            />
-            <p className="text-xs text-site-text mt-1">{backstrokeLevel} / 10</p>
-          </div>
-        )}
-
-        {activePanel === "followstroke" && (
-          <div
-            className="py-2 -mx-2 px-2 rounded-lg touch-manipulation"
-            onPointerDown={(e) =>
-              setFocusZoom({ active: true, target: "followstroke", originX: e.clientX, originY: e.clientY })
-            }
-          >
-            <p className="text-xs text-gray-500 mb-1">팔로우스트로크: 왼쪽=짧음, 오른쪽=김</p>
-            <input
-              type="range"
-              min={0}
-              max={10}
-              value={followStrokeLevel}
-              onChange={(e) =>
-                commit((prev) => ({ ...prev, followStrokeLevel: e.target.valueAsNumber }))
-              }
-              className="w-full max-w-xs"
-            />
-            <p className="text-xs text-site-text mt-1">{followStrokeLevel} / 10</p>
-          </div>
-        )}
-
-        {activePanel === "speed" && (
-          <div
-            className="py-2 -mx-2 px-2 rounded-lg touch-manipulation"
-            onPointerDown={(e) =>
-              setFocusZoom({ active: true, target: "speed", originX: e.clientX, originY: e.clientY })
-            }
-          >
-            <p className="text-xs text-gray-500 mb-2">볼 스피드: 1.0 ~ 5.0 (0.5 단계)</p>
-            <div className="flex flex-wrap items-end gap-1">
-              {BALL_SPEED_OPTIONS.map((v) => (
-                <div key={v} className="flex flex-col items-center">
-                  <button
-                    type="button"
-                    onClick={() => commit((prev) => ({ ...prev, ballSpeed: v }))}
-                    className={`min-w-[2.25rem] h-8 px-1 flex items-center justify-center text-sm font-bold rounded transition ${
-                      ballSpeed === v
-                        ? "bg-site-primary text-white"
-                        : "bg-gray-200 dark:bg-slate-600 text-site-text hover:bg-gray-300 dark:hover:bg-slate-500"
-                    }`}
-                  >
-                    {v}
-                  </button>
-                  <span className="text-[10px] text-gray-500 dark:text-slate-400 mt-0.5 whitespace-nowrap">
-                    {ballSpeedToRailCount(v)}레일
-                  </span>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-site-text mt-1">
-              {ballSpeed} · {ballSpeedToRailCount(ballSpeed)}레일 · 표시 {getRailDisplayPowerForBallSpeed(ballSpeed)}
-            </p>
-          </div>
-        )}
-
-        {activePanel === "path" && (
-          <div className="space-y-2">
-            <p className="text-sm text-site-primary font-medium">진행경로 제시</p>
-            <button
-              type="button"
-              onClick={() => enterFullScreenEdit()}
-              className="mt-1 px-3 py-2 rounded-lg text-sm font-medium bg-site-primary text-white hover:opacity-90 touch-manipulation"
-            >
-              전체화면 · 경로선 편집
-            </button>
-          </div>
-        )}
+      {/* 3. ?ㅼ젙: SettingsPanel(紐⑤컮???몃꽕???쒗듃, PC 紐⑤떖)留??ъ슜 ??援ы삎 ??룹뒳?쇱씠??UI ?쒓굅 */}
+      <div
+        className="rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 p-4"
+        data-solution-settings={JSON.stringify(panelSettings)}
+      >
+        <p className="text-sm font-medium text-site-text mb-2">해법 설정</p>
+        <p className="text-xs text-gray-500 dark:text-slate-400 mb-3">
+          두께·당점·백/팔로우·레일거리는 설정 패널에서 조절합니다. 경로는 전체화면 하단 설정 버튼에서 수정하세요.
+        </p>
+        <p className="mt-3 text-[11px] text-gray-500 dark:text-slate-500">
+          설정과 전체화면 경로 편집 패널은 하단에서 열 수 있습니다.
+        </p>
       </div>
 
-      {/* 4. 해설 입력 */}
+      {/* 4. ?댁꽕 ?낅젰 */}
       <div>
-        <label className="block text-sm font-medium text-site-text mb-1">해설</label>
+        <label className="block text-sm font-medium text-site-text mb-1">설명</label>
         <textarea
           value={explanationText}
           onChange={(e) => commit((prev) => ({ ...prev, explanationText: e.target.value }))}
           rows={4}
           className="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-site-text"
-          placeholder="해법 설명을 입력하세요 (두께·당점·경로 의도, 주의점 등)"
+          placeholder="해법 설명을 입력하세요. (두께·당점·경로 의도, 주의점 등)"
         />
       </div>
 
-      {/* 5. 제출 */}
+      {/* 5. ?쒖텧 */}
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-stretch">
         <button
           type="button"
           disabled={!canUndo || saving}
           onClick={handleUndo}
-          title={`직전 편집 상태로 되돌립니다 (최대 ${NANGU_SOLUTION_EDITOR_MAX_UNDO}단계)`}
+          title={`직전 편집 상태로 되돌립니다. (최대 ${NANGU_SOLUTION_EDITOR_MAX_UNDO}단계)`}
           className="sm:w-40 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-site-text font-medium disabled:opacity-45 disabled:pointer-events-none hover:bg-gray-50 dark:hover:bg-slate-700 touch-manipulation"
         >
           되돌리기
@@ -487,102 +459,11 @@ export function NanguSolutionEditor({
           disabled={saving}
           className="flex-1 min-h-[3rem] py-3 rounded-lg bg-site-primary text-white font-medium disabled:opacity-50 touch-manipulation"
         >
-          {saving ? "저장 중…" : "해법 등록"}
+          {saving ? "저장 중..." : "해법 등록"}
         </button>
       </div>
-
-      {/* 포커스 확대 오버레이 */}
-      {focusZoom.active && focusZoom.target && (
-        <NanguFocusZoomOverlay
-          active={focusZoom.active}
-          target={focusZoom.target}
-          originX={focusZoom.originX}
-          originY={focusZoom.originY}
-          onClose={() => setFocusZoom((z) => ({ ...z, active: false }))}
-        >
-          {focusZoom.target === "thickness" && (
-            <div className="p-4">
-              <p className="text-sm font-medium text-site-text mb-2">두께 (확대)</p>
-              <NanguThicknessEditor
-                value={thicknessOffsetX}
-                isBankShot={isBankShot}
-                onChange={(v) => commit((prev) => ({ ...prev, thicknessOffsetX: v }))}
-                onBankShotChange={(v) => commit((prev) => ({ ...prev, isBankShot: v }))}
-              />
-            </div>
-          )}
-          {focusZoom.target === "spin" && (
-            <div className="p-4">
-              <p className="text-sm font-medium text-site-text mb-2">당점 (확대)</p>
-              <NanguSpinEditor
-                spinX={spinX}
-                spinY={spinY}
-                onChange={({ spinX: x, spinY: y }) => {
-                  commit((prev) => ({ ...prev, spinX: x, spinY: y }));
-                }}
-              />
-            </div>
-          )}
-          {focusZoom.target === "backstroke" && (
-            <div className="p-4 min-w-[200px]">
-              <p className="text-sm font-medium text-site-text mb-2">백스트로크 (확대)</p>
-              <p className="text-xs text-gray-500 mb-1">오른쪽=짧음, 왼쪽=김</p>
-              <input
-                type="range"
-                min={0}
-                max={10}
-                value={backstrokeLevel}
-                onChange={(e) =>
-                  commit((prev) => ({ ...prev, backstrokeLevel: e.target.valueAsNumber }))
-                }
-                className="w-full h-10"
-              />
-              <p className="text-xs text-site-text mt-1">{backstrokeLevel} / 10</p>
-            </div>
-          )}
-          {focusZoom.target === "followstroke" && (
-            <div className="p-4 min-w-[200px]">
-              <p className="text-sm font-medium text-site-text mb-2">팔로우스트로크 (확대)</p>
-              <p className="text-xs text-gray-500 mb-1">왼쪽=짧음, 오른쪽=김</p>
-              <input
-                type="range"
-                min={0}
-                max={10}
-                value={followStrokeLevel}
-                onChange={(e) =>
-                  commit((prev) => ({ ...prev, followStrokeLevel: e.target.valueAsNumber }))
-                }
-                className="w-full h-10"
-              />
-              <p className="text-xs text-site-text mt-1">{followStrokeLevel} / 10</p>
-            </div>
-          )}
-          {focusZoom.target === "speed" && (
-            <div className="p-4">
-              <p className="text-sm font-medium text-site-text mb-2">볼 스피드 (확대)</p>
-              <div className="flex flex-wrap items-end gap-1 max-w-[320px]">
-                {BALL_SPEED_OPTIONS.map((v) => (
-                  <div key={v} className="flex flex-col items-center">
-                    <button
-                      type="button"
-                      onClick={() => commit((prev) => ({ ...prev, ballSpeed: v }))}
-                      className={`min-w-[2.75rem] h-12 px-1 flex items-center justify-center text-lg font-bold rounded transition ${
-                        ballSpeed === v ? "bg-site-primary text-white" : "bg-gray-200 dark:bg-slate-600 text-site-text"
-                      }`}
-                    >
-                      {v}
-                    </button>
-                    <span className="text-[10px] text-gray-500 mt-0.5">{ballSpeedToRailCount(v)}레일</span>
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-site-text mt-2">
-                {ballSpeed} · {ballSpeedToRailCount(ballSpeed)}레일 · 표시 {getRailDisplayPowerForBallSpeed(ballSpeed)}
-              </p>
-            </div>
-          )}
-        </NanguFocusZoomOverlay>
-      )}
+      </div>
     </form>
   );
 }
+

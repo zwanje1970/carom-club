@@ -11,7 +11,7 @@
 1. **Neon 콘솔** → 해당 프로젝트 DB 선택 → **SQL Editor** 열기.
 2. 아래 파일 내용을 복사해 붙여넣고 **Run** 실행.
    - 파일: `prisma/migrations/20260404000000_add_billiard_notes/CREATE_BilliardNote_standalone.sql`
-3. 실행 후 `/mypage/notes/new`에서 당구노트 저장이 동작하는지 확인.
+3. 실행 후 `/mypage/notes/new`에서 난구노트 저장이 동작하는지 확인.
 
 ## 마이그레이션 기록 정리(선택)
 

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * 경로(수구·1목) 편집 전용 전체화면 — 스팟/줌/재생은 여기서만 (미리보기는 보기 전용).
+ * 寃쎈줈(?섍뎄쨌1紐? ?몄쭛 ?꾩슜 ?꾩껜?붾㈃ ???ㅽ뙚/以??ъ깮? ?ш린?쒕쭔 (誘몃━蹂닿린??蹂닿린 ?꾩슜).
  */
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type { TableDrawStyle } from "@/components/billiard";
@@ -27,7 +27,17 @@ import {
   DEFAULT_TABLE_HEIGHT,
   type TableOrientation,
 } from "@/lib/billiard-table-constants";
-import { getNonCueBallNorms, type NanguBallPlacement, type NanguPathPoint } from "@/lib/nangu-types";
+import {
+  getNonCueBallNorms,
+  type NanguBallPlacement,
+  type NanguCurveNode,
+  type NanguPathPoint,
+} from "@/lib/nangu-types";
+import {
+  cloneNanguCurveNodes,
+  pruneCuePathCurveNodes,
+  pruneObjectPathCurveNodes,
+} from "@/lib/nangu-curve-nodes";
 import {
   ballCircumferenceNormFacingApproach,
   cueFirstObjectHitFromBallPlacement,
@@ -53,7 +63,7 @@ import {
   landscapeNormToPlayfieldCanvasPx,
   tableCanvasClampedToPlayfieldLandscapeNorm,
 } from "@/lib/cue-path-ray-resolve";
-import type { BallSpeed } from "@/lib/ball-speed-constants";
+import { normalizeBallSpeed, type BallSpeed } from "@/lib/ball-speed-constants";
 import { useSolutionPathPlayback } from "@/hooks/useSolutionPathPlayback";
 import { TROUBLE_SOLUTION_CONSOLE } from "@/components/trouble/trouble-console-contract";
 import { CollisionWarningToast } from "@/components/trouble/CollisionWarningToast";
@@ -71,19 +81,84 @@ import {
   pruneObjectPathCurveControls,
 } from "@/lib/path-curve-display";
 import { cx } from "@/components/client/console/ui/cx";
+import { SettingsPanel, type SolutionSettingsValue } from "@/components/ui/SettingsPanel";
+import { SolutionSettingsSummaryBar } from "@/components/ui/SolutionSettingsSummaryBar";
 
-/** nangu는 1목 경로 없음. 매 렌더 `[]`를 넘기면 재생 훅의 의존성이 바뀌어 매번 reset되어 애니메이션이 동작하지 않음 */
+/** nangu??1紐?寃쎈줈 ?놁쓬. 留??뚮뜑 `[]`瑜??섍린硫??ъ깮 ?낆쓽 ?섏〈?깆씠 諛붾뚯뼱 留ㅻ쾲 reset?섏뼱 ?좊땲硫붿씠?섏씠 ?숈옉?섏? ?딆쓬 */
 const EMPTY_NANGU_OBJECT_PATH_POINTS: NanguPathPoint[] = [];
 
-const MAX_PATH_EDITOR_UNDO = 6;
+const MAX_PATH_EDITOR_UNDO = 10;
+/** ?몄젒 吏??異붽? ?덉슜: ?꾩쟾 以묐났 ??嫄곗쓽 媛숈? ??留?李⑤떒 */
+const SPOT_APPEND_DUP_THRESHOLD_PX = 3;
+
+function arePathPointsEqual(a: NanguPathPoint[], b: NanguPathPoint[]) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    const x = a[i]!;
+    const y = b[i]!;
+    if (x.id !== y.id || x.x !== y.x || x.y !== y.y || x.type !== y.type) return false;
+  }
+  return true;
+}
+
+function areCurveControlsEqual(a: PathSegmentCurveControl[], b: PathSegmentCurveControl[]) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    const x = a[i]!;
+    const y = b[i]!;
+    if (x.key !== y.key || x.x !== y.x || x.y !== y.y) return false;
+  }
+  return true;
+}
+
+function areNanguCurveNodesEqual(a: NanguCurveNode[], b: NanguCurveNode[]) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    const x = a[i]!;
+    const y = b[i]!;
+    if (x.segmentKey !== y.segmentKey || x.x !== y.x || x.y !== y.y) return false;
+  }
+  return true;
+}
 
 const UNDO_LIMIT_TOAST_MS = 500;
+
+function CloseXIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      aria-hidden
+    >
+      <path d="M18 6L6 18M6 6l12 12" />
+    </svg>
+  );
+}
+
+function UndoStrokeIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+      <path
+        strokeWidth={2.2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 010 11H11"
+      />
+    </svg>
+  );
+}
 
 type PathEditorPairSnapshot = {
   cue: NanguPathPoint[];
   obj: NanguPathPoint[];
   cueCurves?: PathSegmentCurveControl[];
   objCurves?: PathSegmentCurveControl[];
+  cueCurveNodes?: NanguCurveNode[];
+  objCurveNodes?: NanguCurveNode[];
 };
 
 function clonePathPointsForUndo(pts: NanguPathPoint[]): NanguPathPoint[] {
@@ -94,7 +169,7 @@ function clampCurveControlNorm(n: { x: number; y: number }): { x: number; y: num
   return { x: Math.min(1, Math.max(0, n.x)), y: Math.min(1, Math.max(0, n.y)) };
 }
 
-/** 난구(trouble)·nangu 공통 — 경로 모드 토글 동일 크기, 활성 컬러 / 비활성 흑백 */
+/** ?쒓뎄(trouble)쨌nangu 怨듯넻 ??寃쎈줈 紐⑤뱶 ?좉? ?숈씪 ?ш린, ?쒖꽦 而щ윭 / 鍮꾪솢???묐갚 */
 function pathLayerToggleClass(active: boolean, layer: "cue" | "object") {
   return cx(
     "inline-flex h-10 w-[9rem] flex-shrink-0 items-center justify-center rounded-xl border-2 px-2 text-center text-[11px] font-semibold leading-snug transition-all duration-200 touch-manipulation shadow-sm sm:text-xs",
@@ -130,16 +205,18 @@ export type SolutionPathEditorPresentation = "overlay" | "noteBallPlacementFulls
 
 export type SolutionPathEditorFullscreenProps = {
   variant: "nangu" | "trouble";
-  /** trouble: 이미지 배치만 있을 때 null + layoutImageUrl */
+  /** trouble: ?대?吏 諛곗튂留??덉쓣 ??null + layoutImageUrl */
   ballPlacement: NanguBallPlacement | null;
-  /** ballPlacement 가 null 일 때(난구 이미지 원본) */
+  /** ballPlacement 媛 null ?????쒓뎄 ?대?吏 ?먮낯) */
   layoutImageUrl?: string | null;
-  /** 열릴 때 스냅샷 (부모 key로 리마운트 시 초기화) */
+  /** ?대┫ ???ㅻ깄??(遺紐?key濡?由щ쭏?댄듃 ??珥덇린?? */
   initialPathPoints: NanguPathPoint[];
   initialObjectPathPoints: NanguPathPoint[];
-  /** 난구 표시 전용 곡선(저장·미리보기 복원) */
+  /** ?쒓뎄 ?쒖떆 ?꾩슜 怨≪꽑(??Β룸?由щ낫湲?蹂듭썝) */
   initialCuePathDisplayCurves?: PathSegmentCurveControl[];
   initialObjectPathDisplayCurves?: PathSegmentCurveControl[];
+  initialCuePathCurveNodes?: NanguCurveNode[];
+  initialObjectPathCurveNodes?: NanguCurveNode[];
   thicknessOffsetX: number;
   isBankShot: boolean;
   ballSpeed: BallSpeed;
@@ -148,18 +225,31 @@ export type SolutionPathEditorFullscreenProps = {
     objectPathPoints: NanguPathPoint[];
     cuePathDisplayCurves?: PathSegmentCurveControl[];
     objectPathDisplayCurves?: PathSegmentCurveControl[];
+    cuePathCurveNodes?: NanguCurveNode[];
+    objectPathCurveNodes?: NanguCurveNode[];
   }) => void;
   onCancel: () => void;
   /**
-   * overlay: z-[200] 일반 모달.
-   * noteBallPlacementFullscreen: 당구노트 공배치 전체화면과 동일 셸(z-[9999]·safe-area·하단 네비 숨김).
+   * overlay: z-[200] ?쇰컲 紐⑤떖.
+   * noteBallPlacementFullscreen: ?쒓뎄?명듃 怨듬같移??꾩껜?붾㈃怨??숈씪 ??z-[9999]쨌safe-area쨌?섎떒 ?ㅻ퉬 ?④?).
    */
   presentation?: SolutionPathEditorPresentation;
   /**
-   * true: 공 좌표·수구는 데이터 그대로(캔버스는 이미 읽기 전용). 난구 해법제시에는「수구」버튼 자체를 숨김.
-   * 난구해법 등 문제에 고정된 배치를 쓸 때.
+   * true: 怨?醫뚰몴쨌?섍뎄???곗씠??洹몃?濡?罹붾쾭?ㅻ뒗 ?대? ?쎄린 ?꾩슜). ?쒓뎄 ?대쾿?쒖떆?먮뒗?뚯닔援с띾쾭???먯껜瑜??④?.
+   * ?쒓뎄?대쾿 ??臾몄젣??怨좎젙??諛곗튂瑜?????
    */
   readOnlyCueAndBalls?: boolean;
+  /** ?대쾿 誘몃땲?⑤꼸 ?섍뎄 諛곗튂 ???ъ깮 以??ㅻ쾭?덉씠? 蹂묓빀(?ъ깮 ?곗꽑) */
+  panelBallNormOverrides?: Partial<Record<"red" | "yellow" | "white", { x: number; y: number }>>;
+  panelCueTipNorm?: { x: number; y: number } | null;
+  settingsValue?: SolutionSettingsValue;
+  onSettingsChange?: (next: SolutionSettingsValue) => void;
+  settingsOpen?: boolean;
+  /** ??ぉ蹂?吏꾩엯 ??援ш컙 ?꾨떖 ???섎떒 ?붿빟怨??숈씪 `panelSettings`??遺紐⑤쭔 蹂닿? */
+  onSettingsOpen?: (section?: "thickness" | "tip" | "rail") => void;
+  onSettingsClose?: () => void;
+  /** `SettingsPanel` 珥덇린 ?ъ빱????遺紐?`panelSettings`? ?⑥씪 ?뚯뒪 */
+  settingsFocusSection?: null | "thickness" | "tip" | "rail";
 };
 
 export function SolutionPathEditorFullscreen({
@@ -170,6 +260,8 @@ export function SolutionPathEditorFullscreen({
   initialObjectPathPoints,
   initialCuePathDisplayCurves = [],
   initialObjectPathDisplayCurves = [],
+  initialCuePathCurveNodes = [],
+  initialObjectPathCurveNodes = [],
   thicknessOffsetX,
   isBankShot,
   ballSpeed,
@@ -177,6 +269,14 @@ export function SolutionPathEditorFullscreen({
   onCancel,
   presentation = "overlay",
   readOnlyCueAndBalls = false,
+  panelBallNormOverrides,
+  panelCueTipNorm = null,
+  settingsValue,
+  onSettingsChange,
+  settingsOpen = false,
+  onSettingsOpen,
+  onSettingsClose,
+  settingsFocusSection = null,
 }: SolutionPathEditorFullscreenProps) {
   if (variant === "nangu" && !ballPlacement) {
     throw new Error("SolutionPathEditorFullscreen: nangu variant requires ballPlacement");
@@ -186,11 +286,11 @@ export function SolutionPathEditorFullscreen({
   const [pathMode, setPathMode] = useState(true);
   const [objectPathMode, setObjectPathMode] = useState(false);
   /**
-   * 난구(trouble): 수구경로 / 1적구경로 — 동시 활성 불가, 동시 비활성 가능(이때 경로선 추가 불가).
-   * nangu는 기존 pathMode·objectPathMode만 사용.
+   * ?쒓뎄(trouble): ?섍뎄寃쎈줈 / 1?곴뎄寃쎈줈 ???숈떆 ?쒖꽦 遺덇?, ?숈떆 鍮꾪솢??媛???대븣 寃쎈줈??異붽? 遺덇?).
+   * nangu??湲곗〈 pathMode쨌objectPathMode留??ъ슜.
    */
   const [troublePathEditLayer, setTroublePathEditLayer] = useState<"cue" | "object" | null>("cue");
-  /** 스팟 추가·삽입·삭제·드래그 이동·전체 삭제 직전 스냅샷 — 되돌리기 1회 = 직전 동작 취소 */
+  /** ?ㅽ뙚 異붽?쨌?쎌엯쨌??젣쨌?쒕옒洹??대룞쨌?꾩껜 ??젣 吏곸쟾 ?ㅻ깄?????섎룎由ш린 1??= 吏곸쟾 ?숈옉 痍⑥냼 */
   const [pathUndoStack, setPathUndoStack] = useState<PathEditorPairSnapshot[]>([]);
   const pathPointsRef = useRef(pathPoints);
   const objectPathPointsRef = useRef(objectPathPoints);
@@ -207,34 +307,65 @@ export function SolutionPathEditorFullscreen({
   const [objectPathCurveControls, setObjectPathCurveControls] = useState<PathSegmentCurveControl[]>(
     () => clonePathCurveControls(initialObjectPathDisplayCurves)
   );
-  /** 난구: 선분 더블탭을 스팟 삽입 대신 곡선 노드로 */
+  const [cuePathCurveNodes, setCuePathCurveNodes] = useState<NanguCurveNode[]>(() =>
+    cloneNanguCurveNodes(initialCuePathCurveNodes)
+  );
+  const [objectPathCurveNodes, setObjectPathCurveNodes] = useState<NanguCurveNode[]>(() =>
+    cloneNanguCurveNodes(initialObjectPathCurveNodes)
+  );
+  /** ?쒓뎄: ?좊텇 ?붾툝??쓣 ?ㅽ뙚 ?쎌엯 ???怨≪꽑 ?몃뱶濡?*/
   const [troubleCurveEditMode, setTroubleCurveEditMode] = useState(false);
   const cueCurveControlsRef = useRef(cuePathCurveControls);
   const objectCurveControlsRef = useRef(objectPathCurveControls);
+  const cueCurveNodesRef = useRef(cuePathCurveNodes);
+  const objectCurveNodesRef = useRef(objectPathCurveNodes);
   useEffect(() => {
     cueCurveControlsRef.current = cuePathCurveControls;
   }, [cuePathCurveControls]);
   useEffect(() => {
     objectCurveControlsRef.current = objectPathCurveControls;
   }, [objectPathCurveControls]);
+  useEffect(() => {
+    cueCurveNodesRef.current = cuePathCurveNodes;
+  }, [cuePathCurveNodes]);
+  useEffect(() => {
+    objectCurveNodesRef.current = objectPathCurveNodes;
+  }, [objectPathCurveNodes]);
 
   useEffect(() => {
     setCuePathCurveControls((prev) => pruneCuePathCurveControls(prev, pathPoints));
     setObjectPathCurveControls((prev) => pruneObjectPathCurveControls(prev, objectPathPoints));
+    setCuePathCurveNodes((prev) => pruneCuePathCurveNodes(prev, pathPoints));
+    setObjectPathCurveNodes((prev) => pruneObjectPathCurveNodes(prev, objectPathPoints));
   }, [pathPoints, objectPathPoints]);
 
   const pushPathUndoSnapshot = useCallback((cueSnap: NanguPathPoint[], objSnap: NanguPathPoint[]) => {
-    setPathUndoStack((s) => [
-      ...s.slice(-(MAX_PATH_EDITOR_UNDO - 1)),
-      {
+    setPathUndoStack((s) => {
+      const nextSnap: PathEditorPairSnapshot = {
         cue: clonePathPointsForUndo(cueSnap),
         obj: clonePathPointsForUndo(objSnap),
         cueCurves: clonePathCurveControls(cueCurveControlsRef.current),
         objCurves: clonePathCurveControls(objectCurveControlsRef.current),
-      },
-    ]);
+        cueCurveNodes: cloneNanguCurveNodes(cueCurveNodesRef.current),
+        objCurveNodes: cloneNanguCurveNodes(objectCurveNodesRef.current),
+      };
+      const last = s[s.length - 1];
+      if (
+        last &&
+        arePathPointsEqual(last.cue, nextSnap.cue) &&
+        arePathPointsEqual(last.obj, nextSnap.obj) &&
+        areCurveControlsEqual(last.cueCurves ?? [], nextSnap.cueCurves ?? []) &&
+        areCurveControlsEqual(last.objCurves ?? [], nextSnap.objCurves ?? []) &&
+        areNanguCurveNodesEqual(last.cueCurveNodes ?? [], nextSnap.cueCurveNodes ?? []) &&
+        areNanguCurveNodesEqual(last.objCurveNodes ?? [], nextSnap.objCurveNodes ?? [])
+      ) {
+        return s;
+      }
+      return [...s.slice(-(MAX_PATH_EDITOR_UNDO - 1)), nextSnap];
+    });
   }, []);
 
+  /** ?ㅽ뙚 ?쒕옒洹?1??= ?섎룎由ш린 1???쒕옒洹??쒖옉 吏곸쟾 ?곹깭瑜??ㅽ깮?????. noop ?대룞???ы븿. */
   const onPathSpotDragStart = useCallback(
     (_kind: "cue" | "object", _spotId: string) => {
       pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
@@ -252,7 +383,12 @@ export function SolutionPathEditorFullscreen({
     (key: string, norm: { x: number; y: number }) => {
       pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
       const c = clampCurveControlNorm(norm);
-      setCuePathCurveControls((prev) => [...prev.filter((x) => x.key !== key), { key, x: c.x, y: c.y }]);
+      /** ?ъ깮? path-bezier媛 display ?쒖뼱?먯쓣 ?곕?濡? ??怨≪꽑? ?몃뱶留?梨꾩썙 吏곸꽑 ?ъ깮 ?좎? */
+      setCuePathCurveControls((prev) => prev.filter((x) => x.key !== key));
+      setCuePathCurveNodes((prev) => [
+        ...prev.filter((n) => n.segmentKey !== key),
+        { segmentKey: key, x: c.x, y: c.y },
+      ]);
     },
     [pushPathUndoSnapshot]
   );
@@ -261,25 +397,44 @@ export function SolutionPathEditorFullscreen({
     (key: string, norm: { x: number; y: number }) => {
       pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
       const c = clampCurveControlNorm(norm);
-      setObjectPathCurveControls((prev) => [...prev.filter((x) => x.key !== key), { key, x: c.x, y: c.y }]);
+      setObjectPathCurveControls((prev) => prev.filter((x) => x.key !== key));
+      setObjectPathCurveNodes((prev) => [
+        ...prev.filter((n) => n.segmentKey !== key),
+        { segmentKey: key, x: c.x, y: c.y },
+      ]);
     },
     [pushPathUndoSnapshot]
   );
 
   const moveCueDisplayCurve = useCallback((key: string, norm: { x: number; y: number }) => {
     const c = clampCurveControlNorm(norm);
-    setCuePathCurveControls((prev) => prev.map((x) => (x.key === key ? { ...x, ...c } : x)));
+    setCuePathCurveNodes((prev) => {
+      if (!prev.some((n) => n.segmentKey === key)) return prev;
+      return prev.map((n) => (n.segmentKey === key ? { ...n, ...c } : n));
+    });
+    setCuePathCurveControls((prev) => {
+      if (!prev.some((x) => x.key === key)) return prev;
+      return prev.map((x) => (x.key === key ? { ...x, ...c } : x));
+    });
   }, []);
 
   const moveObjectDisplayCurve = useCallback((key: string, norm: { x: number; y: number }) => {
     const c = clampCurveControlNorm(norm);
-    setObjectPathCurveControls((prev) => prev.map((x) => (x.key === key ? { ...x, ...c } : x)));
+    setObjectPathCurveNodes((prev) => {
+      if (!prev.some((n) => n.segmentKey === key)) return prev;
+      return prev.map((n) => (n.segmentKey === key ? { ...n, ...c } : n));
+    });
+    setObjectPathCurveControls((prev) => {
+      if (!prev.some((x) => x.key === key)) return prev;
+      return prev.map((x) => (x.key === key ? { ...x, ...c } : x));
+    });
   }, []);
 
   const removeCueDisplayCurve = useCallback(
     (key: string) => {
       pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
       setCuePathCurveControls((prev) => prev.filter((x) => x.key !== key));
+      setCuePathCurveNodes((prev) => prev.filter((n) => n.segmentKey !== key));
     },
     [pushPathUndoSnapshot]
   );
@@ -288,16 +443,32 @@ export function SolutionPathEditorFullscreen({
     (key: string) => {
       pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
       setObjectPathCurveControls((prev) => prev.filter((x) => x.key !== key));
+      setObjectPathCurveNodes((prev) => prev.filter((n) => n.segmentKey !== key));
     },
     [pushPathUndoSnapshot]
   );
 
   const straightenAllDisplayCurves = useCallback(() => {
-    if (cuePathCurveControls.length === 0 && objectPathCurveControls.length === 0) return;
+    if (
+      cuePathCurveControls.length === 0 &&
+      objectPathCurveControls.length === 0 &&
+      cuePathCurveNodes.length === 0 &&
+      objectPathCurveNodes.length === 0
+    ) {
+      return;
+    }
     pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
     setCuePathCurveControls([]);
     setObjectPathCurveControls([]);
-  }, [pushPathUndoSnapshot, cuePathCurveControls.length, objectPathCurveControls.length]);
+    setCuePathCurveNodes([]);
+    setObjectPathCurveNodes([]);
+  }, [
+    pushPathUndoSnapshot,
+    cuePathCurveControls.length,
+    objectPathCurveControls.length,
+    cuePathCurveNodes.length,
+    objectPathCurveNodes.length,
+  ]);
 
   const [undoLimitToastVisible, setUndoLimitToastVisible] = useState(false);
   const undoLimitToastTimerRef = useRef<number | null>(null);
@@ -322,7 +493,7 @@ export function SolutionPathEditorFullscreen({
     []
   );
 
-  /** overlay 모드만 공 탭 시 줌 초점 이동. note 셸은 당구노트 공배치와 같이 플레이필드 중심 고정(테이블이 공을 쫓아 움직이지 않음) */
+  /** overlay 紐⑤뱶留?怨?????以?珥덉젏 ?대룞. note ?몄? ?쒓뎄?명듃 怨듬같移섏? 媛숈씠 ?뚮젅?댄븘??以묒떖 怨좎젙(?뚯씠釉붿씠 怨듭쓣 已볦븘 ?吏곸씠吏 ?딆쓬) */
   const [zoomFocusOverlay, setZoomFocusOverlay] = useState({
     x: DEFAULT_TABLE_WIDTH / 2,
     y: DEFAULT_TABLE_HEIGHT / 2,
@@ -334,7 +505,7 @@ export function SolutionPathEditorFullscreen({
   const isNoteShell = presentation === "noteBallPlacementFullscreen";
   const ballPlacementFullscreen = useBallPlacementFullscreen();
   const deviceOrientation = useTableOrientation();
-  /** PC·태블릿(넓은 뷰포트): 모바일 가로만 제외하고 긴 변 세로 테이블과 동일하게 맞춤 */
+  /** PC쨌?쒕툝由??볦? 酉고룷??: 紐⑤컮??媛濡쒕쭔 ?쒖쇅?섍퀬 湲?蹂 ?몃줈 ?뚯씠釉붽낵 ?숈씪?섍쾶 留욎땄 */
   const [viewportMdUp, setViewportMdUp] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)");
@@ -343,9 +514,11 @@ export function SolutionPathEditorFullscreen({
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
   }, []);
-  /** 노트 셸: 우측 슬라이드(당구노트 공배치와 동일 위치) — 경로 삭제·애니메이션·보기 설정 */
+  /** ?명듃 ?? ?곗륫 ?щ씪?대뱶(?쒓뎄?명듃 怨듬같移섏? ?숈씪 ?꾩튂) ??寃쎈줈 ??젣쨌?좊땲硫붿씠?샕룸낫湲??ㅼ젙 */
   const [leftPathDrawerOpen, setLeftPathDrawerOpen] = useState(false);
-  /** 난구(trouble): 우측 패널을 드래그로 닫기 — 열림 기준 오른쪽으로 밀린 px(0=완전히 열림) */
+  /** ?명듃 ?? ?곗륫 ?щ씪?대뱶 ??醫뚯륫怨??낅┰ 硫붾돱 ?곸뿭) */
+  const [rightPathDrawerOpen, setRightPathDrawerOpen] = useState(false);
+  /** ?쒓뎄(trouble): ?곗륫 ?⑤꼸???쒕옒洹몃줈 ?リ린 ???대┝ 湲곗? ?ㅻⅨ履쎌쑝濡?諛由?px(0=?꾩쟾???대┝) */
   const [troubleDrawerDragPx, setTroubleDrawerDragPx] = useState(0);
   const [troubleDrawerDragging, setTroubleDrawerDragging] = useState(false);
   const troubleDrawerAsideRef = useRef<HTMLElement | null>(null);
@@ -358,7 +531,27 @@ export function SolutionPathEditorFullscreen({
 
   useEffect(() => {
     setTroubleDrawerDragPx(0);
-  }, [leftPathDrawerOpen]);
+  }, [rightPathDrawerOpen]);
+
+  /** ?쒓뎄(trouble): 醫뚯륫 ?щ씪?대뱶 ?⑤꼸 ???곗륫 ?⑤꼸怨??移?*/
+  const [troubleLeftDrawerOpen, setTroubleLeftDrawerOpen] = useState(false);
+  const [troubleLeftDrawerDragPx, setTroubleLeftDrawerDragPx] = useState(0);
+  const [troubleLeftDrawerDragging, setTroubleLeftDrawerDragging] = useState(false);
+  const troubleLeftDrawerAsideRef = useRef<HTMLElement | null>(null);
+  const troubleLeftDrawerDragRef = useRef<{ startX: number; basePx: number } | null>(null);
+  const troubleLeftDrawerDragPxRef = useRef(0);
+  const [pathSaveFeedback, setPathSaveFeedback] = useState<"idle" | "saving" | "ok" | "err">("idle");
+  const [menuInfoFeedback, setMenuInfoFeedback] = useState<string | null>(null);
+  const [spotMagnifierEnabled, setSpotMagnifierEnabled] = useState(false);
+
+  useEffect(() => {
+    troubleLeftDrawerDragPxRef.current = troubleLeftDrawerDragPx;
+  }, [troubleLeftDrawerDragPx]);
+
+  useEffect(() => {
+    setTroubleLeftDrawerDragPx(0);
+  }, [troubleLeftDrawerOpen]);
+
   const [tableGridOn, setTableGridOn] = useState(true);
   const [tableDrawStyle, setTableDrawStyle] = useState<TableDrawStyle>("realistic");
   const [cueSpotOn, setCueSpotOn] = useState(true);
@@ -366,7 +559,7 @@ export function SolutionPathEditorFullscreen({
     ballPlacement?.cueBall ?? "white"
   );
   const [cuePickerOpen, setCuePickerOpen] = useState(false);
-  /** 경로 스팟: 기본 마지막 끝 스팟만 활성 — 다른 스팟 더블클릭 시 전환(항상 1개) */
+  /** 寃쎈줈 ?ㅽ뙚: 湲곕낯 留덉?留????ㅽ뙚留??쒖꽦 ???ㅻⅨ ?ㅽ뙚 ?붾툝?대┃ ???꾪솚(??긽 1媛? */
   const [cuePathActiveSpotId, setCuePathActiveSpotId] = useState<string | null>(null);
   const [objectPathActiveSpotId, setObjectPathActiveSpotId] = useState<string | null>(null);
 
@@ -374,7 +567,7 @@ export function SolutionPathEditorFullscreen({
     if (ballPlacement?.cueBall) setCueBallChoice(ballPlacement.cueBall);
   }, [ballPlacement?.cueBall]);
 
-  /** 좌표 배치가 있을 때 수구 표시 — readOnly면 게시물/문제의 cueBall 고정 */
+  /** 醫뚰몴 諛곗튂媛 ?덉쓣 ???섍뎄 ?쒖떆 ??readOnly硫?寃뚯떆臾?臾몄젣??cueBall 怨좎젙 */
   const layoutForCue = useMemo((): NanguBallPlacement | null => {
     if (!ballPlacement) return null;
     if (readOnlyCueAndBalls) return ballPlacement;
@@ -382,8 +575,8 @@ export function SolutionPathEditorFullscreen({
   }, [ballPlacement, cueBallChoice, readOnlyCueAndBalls]);
 
   /**
-   * 노트 셸: 테이블 긴 변 세로 — 기기 세로 모드이거나 PC/태블릿(768px 이상)일 때.
-   * 좁은 화면에서만 가로(landscape) 뷰포트면 긴 변 가로 유지.
+   * ?명듃 ?? ?뚯씠釉?湲?蹂 ?몃줈 ??湲곌린 ?몃줈 紐⑤뱶?닿굅??PC/?쒕툝由?768px ?댁긽)????
+   * 醫곸? ?붾㈃?먯꽌留?媛濡?landscape) 酉고룷?몃㈃ 湲?蹂 媛濡??좎?.
    */
   const effectivePortrait =
     isNoteShell && (deviceOrientation === "portrait" || viewportMdUp);
@@ -406,18 +599,24 @@ export function SolutionPathEditorFullscreen({
   const layoutSrc =
     !ballPlacement && layoutImageUrl ? sanitizeImageSrc(layoutImageUrl) : null;
   const cuePos = layoutForCue
-    ? layoutForCue.cueBall === "yellow"
-      ? layoutForCue.yellowBall
-      : layoutForCue.whiteBall
+    ? (() => {
+        const base =
+          layoutForCue.cueBall === "yellow"
+            ? layoutForCue.yellowBall
+            : layoutForCue.whiteBall;
+        if (!panelBallNormOverrides) return base;
+        const k = layoutForCue.cueBall === "yellow" ? "yellow" : "white";
+        return panelBallNormOverrides[k] ?? base;
+      })()
     : { x: 0.5, y: 0.5 };
-  /** 수구 제외 1목 후보 2구 — 첫 스팟 스냅용 좌표 */
+  /** ?섍뎄 ?쒖쇅 1紐??꾨낫 2援???泥??ㅽ뙚 ?ㅻ깄??醫뚰몴 */
   const firstObjectSnapCandidates = useMemo((): { x: number; y: number }[] | null => {
     if (!layoutForCue) return null;
     return getNonCueBallNorms(layoutForCue).map(({ x, y }) => ({ x, y }));
   }, [layoutForCue]);
 
   /**
-   * 수구 경로 첫 스팟이 있으면 광선 충돌점. 없으면 수구에 가장 가까운 1목 후보 공의 원주(수구 방향) — 1목 경로만 먼저 그릴 때 사용.
+   * ?섍뎄 寃쎈줈 泥??ㅽ뙚???덉쑝硫?愿묒꽑 異⑸룎?? ?놁쑝硫??섍뎄??媛??媛源뚯슫 1紐??꾨낫 怨듭쓽 ?먯＜(?섍뎄 諛⑺뼢) ??1紐?寃쎈줈留?癒쇱? 洹몃┫ ???ъ슜.
    */
   const cueToFirstObjectHit = useMemo(() => {
     if (!layoutForCue) return null;
@@ -464,7 +663,7 @@ export function SolutionPathEditorFullscreen({
     [pointerRect, effectivePortrait]
   );
 
-  /** 플레이필드 안 = norm · 쿠션/프레임 = 캔버스 px (반직선으로 쿠션선·목적구 둘레 스팟) */
+  /** ?뚮젅?댄븘????= norm 쨌 荑좎뀡/?꾨젅??= 罹붾쾭??px (諛섏쭅?좎쑝濡?荑좎뀡?졖룸ぉ?곴뎄 ?섎젅 ?ㅽ뙚) */
   const getPointerAimFromEvent = useCallback(
     (clientX: number, clientY: number): PathPointerAim | null => {
       const z = zoomCtxRef.current;
@@ -522,9 +721,7 @@ export function SolutionPathEditorFullscreen({
         if (!r.ok) {
           return prev;
         }
-        queueMicrotask(() => {
-          pushPathUndoSnapshot(prev, objectPathPointsRef.current);
-        });
+        pushPathUndoSnapshot(prev, objectPathPointsRef.current);
         return r.points;
       });
     },
@@ -533,7 +730,7 @@ export function SolutionPathEditorFullscreen({
 
   const runCueAppendAim = useCallback(
     (aim: PathPointerAim) => {
-      const dupThresholdPx = 14;
+      const dupThresholdPx = SPOT_APPEND_DUP_THRESHOLD_PX;
       setPathPoints((prev) => {
         const r = appendCuePathSpotWithAim(prev, aim, cuePathSnapFn, newCueSpotId, rayAppendCtx);
         if (!r.ok) {
@@ -548,9 +745,7 @@ export function SolutionPathEditorFullscreen({
           )
         );
         if (isDup) return prev;
-        queueMicrotask(() => {
-          pushPathUndoSnapshot(prev, objectPathPointsRef.current);
-        });
+        pushPathUndoSnapshot(prev, objectPathPointsRef.current);
         return r.points;
       });
     },
@@ -562,17 +757,17 @@ export function SolutionPathEditorFullscreen({
       const newId = () => `o-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       setObjectPathPoints((prev) => {
         if (type != null) {
-          queueMicrotask(() => pushPathUndoSnapshot(pathPointsRef.current, prev));
+          pushPathUndoSnapshot(pathPointsRef.current, prev);
           return [...prev, { id: newId(), x: norm.x, y: norm.y, type }];
         }
         if (!layoutForCue || !collisionNorm) {
           const snapped = snapToPlayfieldCushionJunction(norm.x, norm.y);
-          queueMicrotask(() => pushPathUndoSnapshot(pathPointsRef.current, prev));
+          pushPathUndoSnapshot(pathPointsRef.current, prev);
           return [...prev, { id: newId(), x: snapped.x, y: snapped.y, type: snapped.type }];
         }
         const last = prev.length > 0 ? prev[prev.length - 1]! : null;
         const fromForSnap = last ?? collisionNorm;
-        /** 직전 스팟이 쿠션이 아니면: 연장선의 쿠션 교차 → 탭 스냅 스팟 */
+        /** 吏곸쟾 ?ㅽ뙚??荑좎뀡???꾨땲硫? ?곗옣?좎쓽 荑좎뀡 援먯감 ?????ㅻ깄 ?ㅽ뙚 */
         if (last && last.type !== "cushion") {
           const aimCanvasPx = landscapeNormToPlayfieldCanvasPx(
             norm,
@@ -607,7 +802,7 @@ export function SolutionPathEditorFullscreen({
               );
               const id1 = newId();
               const id2 = newId();
-              queueMicrotask(() => pushPathUndoSnapshot(pathPointsRef.current, prev));
+              pushPathUndoSnapshot(pathPointsRef.current, prev);
               return [
                 ...prev,
                 { id: id1, x: cushionHit.x, y: cushionHit.y, type: "cushion" },
@@ -623,7 +818,7 @@ export function SolutionPathEditorFullscreen({
           getNonCueBallNorms(layoutForCue).map(({ x, y }) => ({ x, y })),
           rect
         );
-        queueMicrotask(() => pushPathUndoSnapshot(pathPointsRef.current, prev));
+        pushPathUndoSnapshot(pathPointsRef.current, prev);
         return [...prev, { id: newId(), x: snapped.x, y: snapped.y, type: snapped.type }];
       });
     },
@@ -646,7 +841,9 @@ export function SolutionPathEditorFullscreen({
                 getNonCueBallNorms(layoutForCue).map(({ x, y }) => ({ x, y })),
                 rect
               );
-        return prev.map((p) => (p.id === id ? { ...p, x: snapped.x, y: snapped.y, type: snapped.type } : p));
+        return prev.map((p) =>
+          p.id === id ? { ...p, x: snapped.x, y: snapped.y, type: snapped.type } : p
+        );
       });
     },
     [layoutForCue, collisionNorm, rect, objectPathActiveSpotId]
@@ -658,7 +855,7 @@ export function SolutionPathEditorFullscreen({
         const idx = prev.findIndex((p) => p.id === id);
         if (idx < 0) return prev;
         if (!isLastSegmentEndpointSpotIndex(prev, idx)) return prev;
-        queueMicrotask(() => pushPathUndoSnapshot(pathPointsRef.current, prev));
+        pushPathUndoSnapshot(pathPointsRef.current, prev);
         return prev.filter((p) => p.id !== id);
       });
     },
@@ -690,7 +887,7 @@ export function SolutionPathEditorFullscreen({
       setObjectPathPoints((prev) => {
         const next = [...prev];
         next.splice(segmentIndex, 0, newPoint);
-        queueMicrotask(() => pushPathUndoSnapshot(pathPointsRef.current, prev));
+        pushPathUndoSnapshot(pathPointsRef.current, prev);
         return next;
       });
     },
@@ -700,7 +897,7 @@ export function SolutionPathEditorFullscreen({
   const addObjectPathAim = useCallback(
     (aim: PathPointerAim) => {
       if (!layoutForCue || !collisionNorm) return;
-      const dupThresholdPx = 14;
+      const dupThresholdPx = SPOT_APPEND_DUP_THRESHOLD_PX;
       const newId = () => `o-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       if (aim.kind === "playfield") {
         addObjectPathPoint(aim.norm);
@@ -716,7 +913,7 @@ export function SolutionPathEditorFullscreen({
             : collisionNorm;
         const last = prev.length > 0 ? prev[prev.length - 1]! : null;
 
-        /** 직전이 쿠션이 아닐 때: 쿠션-only 교차 → 클램프 탭 스냅 (수구 경로와 동일) */
+        /** 吏곸쟾??荑좎뀡???꾨땺 ?? 荑좎뀡-only 援먯감 ???대옩?????ㅻ깄 (?섍뎄 寃쎈줈? ?숈씪) */
         if (last && last.type !== "cushion") {
           const cushionOnly = resolveObjectPathRayHitLandscape({
             fromLandscape: from,
@@ -762,7 +959,7 @@ export function SolutionPathEditorFullscreen({
                 )
               );
               if (isDup) return prev;
-              queueMicrotask(() => pushPathUndoSnapshot(pathPointsRef.current, prev));
+              pushPathUndoSnapshot(pathPointsRef.current, prev);
               return [...prev, ...newPoints];
             }
           }
@@ -792,7 +989,7 @@ export function SolutionPathEditorFullscreen({
               dupThresholdPx
           );
         if (isDup) return prev;
-        queueMicrotask(() => pushPathUndoSnapshot(pathPointsRef.current, prev));
+        pushPathUndoSnapshot(pathPointsRef.current, prev);
         return [
           ...prev,
           {
@@ -855,7 +1052,7 @@ export function SolutionPathEditorFullscreen({
       setObjectPathPoints((prev) => {
         const next = [...prev];
         next.splice(segmentIndex, 0, newPoint);
-        queueMicrotask(() => pushPathUndoSnapshot(pathPointsRef.current, prev));
+        pushPathUndoSnapshot(pathPointsRef.current, prev);
         return next;
       });
     },
@@ -878,17 +1075,54 @@ export function SolutionPathEditorFullscreen({
   const objectPathEditing =
     variant === "trouble" ? troublePathEditLayer === "object" : false;
 
+  const playbackBallSpeed = normalizeBallSpeed(
+    settingsValue?.railCount != null ? Number(settingsValue.railCount) : Number(ballSpeed)
+  );
+
   const pathPlayback = useSolutionPathPlayback({
     ballPlacement: layoutForCue,
     pathPoints,
     objectPathPoints: variant === "trouble" ? objectPathPoints : EMPTY_NANGU_OBJECT_PATH_POINTS,
-    ballSpeed,
+    ballSpeed: playbackBallSpeed,
     isBankShot,
     thicknessOffsetX,
-    /** 1목 경로 그리기 모드 + 스팟 1개 이상일 때만 재생 충돌 팝업 */
+    ignorePhysics: Boolean(settingsValue?.ignorePhysics),
+    cuePathCurveControls: variant === "trouble" ? cuePathCurveControls : undefined,
+    cuePathCurveNodes: variant === "trouble" ? cuePathCurveNodes : undefined,
+    objectPathCurveControls: variant === "trouble" ? objectPathCurveControls : undefined,
+    objectPathCurveNodes: variant === "trouble" ? objectPathCurveNodes : undefined,
+    /** 1紐?寃쎈줈 洹몃━湲?紐⑤뱶 + ?ㅽ뙚 1媛??댁긽???뚮쭔 ?ъ깮 異⑸룎 ?앹뾽 */
     collisionWarningsEnabled:
       variant === "trouble" && objectPathEditing && objectPathPoints.length >= 1,
   });
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    if (variant !== "trouble" || !settingsValue) return;
+    console.debug("[trouble-playback:settings-source]", {
+      ballSpeedRaw: playbackBallSpeed,
+      thicknessStepRaw: settingsValue.thicknessStep,
+      railCountRaw: settingsValue.railCount,
+      playbackBallSpeedInput: playbackBallSpeed,
+      playbackThicknessOffsetInput: thicknessOffsetX,
+      settingsPanelOpen: settingsOpen,
+    });
+  }, [variant, settingsValue, playbackBallSpeed, thicknessOffsetX, settingsOpen]);
+
+  const mergedBallNormOverridesForCanvas = useMemo(() => {
+    const a = panelBallNormOverrides;
+    const b = pathPlayback.ballNormOverrides;
+    if (!a && !b) return undefined;
+    return { ...(a ?? {}), ...(b ?? {}) };
+  }, [panelBallNormOverrides, pathPlayback.ballNormOverrides]);
+
+  const cuePosWithPlayback = useMemo(() => {
+    if (!layoutForCue) return cuePos;
+    const pb = pathPlayback.ballNormOverrides;
+    if (!pb) return cuePos;
+    const k = layoutForCue.cueBall === "yellow" ? "yellow" : "white";
+    return pb[k] ?? cuePos;
+  }, [cuePos, layoutForCue, pathPlayback.ballNormOverrides]);
 
   const allowCuePlaybackGestures =
     isNoteShell && Boolean(layoutForCue && pathPoints.length >= 1 && !pathPlayback.isPlaybackActive);
@@ -897,9 +1131,7 @@ export function SolutionPathEditorFullscreen({
   useEffect(() => {
     const now = pathPlayback.isPlaybackActive;
     if (now && !wasPlaybackActiveRef.current) {
-      setPlaybackPathLinesVisible(true);
-      setPlaybackGridVisible(true);
-      /** 단순보기에서도 재생 시 동일 스타일 유지 */
+      /** ?⑥닚蹂닿린?먯꽌???ъ깮 ???숈씪 ?ㅽ????좎? */
       setPlaybackDrawStyle(tableDrawStyle);
     }
     wasPlaybackActiveRef.current = now;
@@ -932,6 +1164,8 @@ export function SolutionPathEditorFullscreen({
     setObjectPathPoints([]);
     setCuePathCurveControls([]);
     setObjectPathCurveControls([]);
+    setCuePathCurveNodes([]);
+    setObjectPathCurveNodes([]);
     if (variant === "trouble") {
       setTroublePathEditLayer("cue");
     } else {
@@ -954,6 +1188,11 @@ export function SolutionPathEditorFullscreen({
         setObjectPathPoints(clonePathPointsForUndo(snap.obj));
         setCuePathCurveControls(clonePathCurveControls(snap.cueCurves ?? []));
         setObjectPathCurveControls(clonePathCurveControls(snap.objCurves ?? []));
+        setCuePathCurveNodes(cloneNanguCurveNodes(snap.cueCurveNodes ?? []));
+        setObjectPathCurveNodes(cloneNanguCurveNodes(snap.objCurveNodes ?? []));
+        if (stack.length >= MAX_PATH_EDITOR_UNDO && next.length === 0) {
+          showUndoLimitToast();
+        }
       });
       return next;
     });
@@ -973,11 +1212,11 @@ export function SolutionPathEditorFullscreen({
 
   const movePathPoint = useCallback(
     (id: string, norm: { x: number; y: number }) => {
-      setPathPoints((prev) =>
-        moveCuePathSpotById(prev, id, norm, cuePathSnapFn, {
+      setPathPoints((prev) => {
+        return moveCuePathSpotById(prev, id, norm, cuePathSnapFn, {
           forceMovableSpotId: cuePathActiveSpotId === id ? id : null,
-        })
-      );
+        });
+      });
     },
     [cuePathSnapFn, cuePathActiveSpotId]
   );
@@ -986,7 +1225,7 @@ export function SolutionPathEditorFullscreen({
     (id: string) => {
       setPathPoints((prev) => {
         if (!prev.some((p) => p.id === id)) return prev;
-        queueMicrotask(() => pushPathUndoSnapshot(prev, objectPathPointsRef.current));
+        pushPathUndoSnapshot(prev, objectPathPointsRef.current);
         return stripInvalidEndSpots(prev.filter((p) => p.id !== id));
       });
     },
@@ -1000,9 +1239,7 @@ export function SolutionPathEditorFullscreen({
         if (!r.ok) {
           return prev;
         }
-        queueMicrotask(() => {
-          pushPathUndoSnapshot(prev, objectPathPointsRef.current);
-        });
+        pushPathUndoSnapshot(prev, objectPathPointsRef.current);
         return r.points;
       });
     },
@@ -1016,9 +1253,7 @@ export function SolutionPathEditorFullscreen({
         if (!r.ok) {
           return prev;
         }
-        queueMicrotask(() => {
-          pushPathUndoSnapshot(prev, objectPathPointsRef.current);
-        });
+        pushPathUndoSnapshot(prev, objectPathPointsRef.current);
         return r.points;
       });
     },
@@ -1028,6 +1263,16 @@ export function SolutionPathEditorFullscreen({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      if (isNoteShell && variant === "trouble" && troubleLeftDrawerOpen) {
+        e.preventDefault();
+        setTroubleLeftDrawerOpen(false);
+        return;
+      }
+      if (isNoteShell && rightPathDrawerOpen) {
+        e.preventDefault();
+        setRightPathDrawerOpen(false);
+        return;
+      }
       if (isNoteShell && leftPathDrawerOpen) {
         e.preventDefault();
         setLeftPathDrawerOpen(false);
@@ -1037,7 +1282,7 @@ export function SolutionPathEditorFullscreen({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onCancel, isNoteShell, leftPathDrawerOpen]);
+  }, [onCancel, isNoteShell, leftPathDrawerOpen, rightPathDrawerOpen, variant, troubleLeftDrawerOpen]);
 
   const endTroubleDrawerDrag = useCallback((e: React.PointerEvent) => {
     if (!isNoteShell) return;
@@ -1052,7 +1297,7 @@ export function SolutionPathEditorFullscreen({
     const threshold = Math.min(72, w * 0.25);
     setTroubleDrawerDragPx((px) => {
       if (px >= threshold) {
-        queueMicrotask(() => setLeftPathDrawerOpen(false));
+        queueMicrotask(() => setRightPathDrawerOpen(false));
       }
       return 0;
     });
@@ -1081,7 +1326,55 @@ export function SolutionPathEditorFullscreen({
       const next = Math.max(0, Math.min(basePx + dx, w));
       setTroubleDrawerDragPx(next);
     },
-    [variant]
+    [isNoteShell]
+  );
+
+  const endTroubleLeftDrawerDrag = useCallback(
+    (e: React.PointerEvent) => {
+      if (!isNoteShell) return;
+      troubleLeftDrawerDragRef.current = null;
+      setTroubleLeftDrawerDragging(false);
+      try {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+      const w = troubleLeftDrawerAsideRef.current?.offsetWidth ?? 180;
+      const threshold = Math.min(72, w * 0.25);
+      setTroubleLeftDrawerDragPx((px) => {
+        if (px >= threshold) {
+          queueMicrotask(() => setTroubleLeftDrawerOpen(false));
+        }
+        return 0;
+      });
+    },
+    [isNoteShell]
+  );
+
+  const onTroubleLeftDrawerHandlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (!isNoteShell) return;
+      e.preventDefault();
+      troubleLeftDrawerDragRef.current = {
+        startX: e.clientX,
+        basePx: troubleLeftDrawerDragPxRef.current,
+      };
+      setTroubleLeftDrawerDragging(true);
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [isNoteShell]
+  );
+
+  const onTroubleLeftDrawerHandlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!isNoteShell || !troubleLeftDrawerDragRef.current) return;
+      const w = troubleLeftDrawerAsideRef.current?.offsetWidth ?? 180;
+      const { startX, basePx } = troubleLeftDrawerDragRef.current;
+      const dx = e.clientX - startX;
+      const next = Math.max(0, Math.min(basePx - dx, w));
+      setTroubleLeftDrawerDragPx(next);
+    },
+    [isNoteShell]
   );
 
   const C = TROUBLE_SOLUTION_CONSOLE;
@@ -1090,7 +1383,7 @@ export function SolutionPathEditorFullscreen({
   const panPointerPolicy = useMemo((): SolutionTablePanPointerPolicy => {
     const ballPickLayout =
       layoutForCue && (cuePathEditing || objectPathEditing) ? layoutForCue : undefined;
-    const ballNormOverrides = pathPlayback.ballNormOverrides ?? undefined;
+    const ballNormOverrides = mergedBallNormOverridesForCanvas ?? undefined;
     const objectPts = showObjectPath ? objectPathPoints : [];
     const objMode = objectPathEditing;
 
@@ -1101,7 +1394,7 @@ export function SolutionPathEditorFullscreen({
         norm,
         pathMode: cuePathEditing,
         objectPathMode: objMode,
-        cuePos,
+        cuePos: cuePosWithPlayback,
         pathPoints,
         objectPathPoints: objectPts,
         ballPickLayout,
@@ -1135,7 +1428,7 @@ export function SolutionPathEditorFullscreen({
         if (c.kind === "emptyCue" || c.kind === "pathObjectBallTap") {
           const norm = getNormalizedFromEvent(clientX, clientY);
           if (!norm) return;
-          const dupThresholdPx = 14;
+          const dupThresholdPx = SPOT_APPEND_DUP_THRESHOLD_PX;
           if (
             !cuePathAppendWouldDuplicateExistingSpot(pathPoints, norm, rect, dupThresholdPx)
           ) {
@@ -1144,7 +1437,7 @@ export function SolutionPathEditorFullscreen({
         } else if (c.kind === "emptyObject") {
           const norm = getNormalizedFromEvent(clientX, clientY);
           if (!norm || !collisionNorm) return;
-          const dupThresholdPx = 14;
+          const dupThresholdPx = SPOT_APPEND_DUP_THRESHOLD_PX;
           const isDup =
             objectPathPoints.length > 0 &&
             objectPathPoints.some(
@@ -1160,10 +1453,10 @@ export function SolutionPathEditorFullscreen({
     cuePathEditing,
     objectPathEditing,
     showObjectPath,
-    pathPlayback.ballNormOverrides,
+    mergedBallNormOverridesForCanvas,
     getNormalizedFromEvent,
     getPointerAimFromEvent,
-    cuePos,
+    cuePosWithPlayback,
     pathPoints,
     objectPathPoints,
     runCueAppend,
@@ -1177,7 +1470,7 @@ export function SolutionPathEditorFullscreen({
   ]);
 
   const rootClass = isNoteShell
-    ? "fixed inset-0 z-[9999] flex flex-col bg-site-bg text-site-text"
+    ? "fixed inset-0 z-[10050] flex h-[100dvh] min-h-[100dvh] w-screen flex-col overflow-hidden overscroll-none bg-site-bg text-site-text"
     : "fixed inset-0 z-[200] flex flex-col bg-site-bg text-site-text";
 
   const rootStyle: React.CSSProperties | undefined = isNoteShell
@@ -1192,7 +1485,7 @@ export function SolutionPathEditorFullscreen({
   const showCueSpot =
     (isNoteShell ? cueSpotOn : true) && !pathPlayback.isPlaybackActive;
 
-  /** 1목적구 — 현재 활성 경로의 `type==="ball"` 스팟 순서만으로 파생 (`resolveTroubleFirstObjectBallKey`) */
+  /** 1紐⑹쟻援????꾩옱 ?쒖꽦 寃쎈줈??`type==="ball"` ?ㅽ뙚 ?쒖꽌留뚯쑝濡??뚯깮 (`resolveTroubleFirstObjectBallKey`) */
   const objectPathHighlightBallKey = useMemo((): "red" | "yellow" | "white" | null => {
     if (!layoutForCue || !showObjectPath) return null;
     return resolveTroubleFirstObjectBallKey({
@@ -1204,11 +1497,11 @@ export function SolutionPathEditorFullscreen({
     });
   }, [layoutForCue, showObjectPath, pathPoints, objectPathPoints, cuePos, rect]);
 
-  /** 수구 스팟과 동일: 1목이 유효할 때 레이어와 무관하게 공 캔버스에 깜빡임 (편집 레이어만 켤 때로 제한하지 않음) */
+  /** ?섍뎄 ?ㅽ뙚怨??숈씪: 1紐⑹씠 ?좏슚?????덉씠?댁? 臾닿??섍쾶 怨?罹붾쾭?ㅼ뿉 源쒕묀??(?몄쭛 ?덉씠?대쭔 耳??뚮줈 ?쒗븳?섏? ?딆쓬) */
   const showObjectBallSpot =
     showCueSpot && showObjectPath && objectPathHighlightBallKey != null;
 
-  /** 수구 제외 공에 경로선이 스팟 반지름보다 가깝게 붙은 경우 — 테이블 중앙 안내 */
+  /** ?섍뎄 ?쒖쇅 怨듭뿉 寃쎈줈?좎씠 ?ㅽ뙚 諛섏?由꾨낫??媛源앷쾶 遺숈? 寃쎌슦 ???뚯씠釉?以묒븰 ?덈궡 */
   const pathClearanceWarning = useMemo(() => {
     if (!layoutForCue) return false;
     return isPathTooCloseToNonCueBalls({
@@ -1247,6 +1540,11 @@ export function SolutionPathEditorFullscreen({
     }
   }, [pathPlayback.isPlaybackActive]);
 
+  const showMenuInfo = useCallback((message: string) => {
+    setMenuInfoFeedback(message);
+    window.setTimeout(() => setMenuInfoFeedback(null), 1400);
+  }, []);
+
   const objectPathLinesRequestedVisible =
     showObjectPath &&
     objectPathPoints.length > 0 &&
@@ -1264,10 +1562,18 @@ export function SolutionPathEditorFullscreen({
 
   const curveHandlesShowSubtle =
     variant === "trouble" &&
-    (cuePathCurveControls.length > 0 || objectPathCurveControls.length > 0) &&
+    (cuePathCurveControls.length > 0 ||
+      objectPathCurveControls.length > 0 ||
+      cuePathCurveNodes.length > 0 ||
+      objectPathCurveNodes.length > 0) &&
     curveLineVisible &&
     !allowCurveHandleInteraction &&
     !pathPlayback.isPlaybackActive;
+
+  const cuePbDbg = pathPlayback.cuePlaybackPathDebug;
+  const objPbDbg = pathPlayback.objectPlaybackPathDebug;
+  const cueDistDbg = pathPlayback.cuePlaybackDistanceDebug;
+  const objDistDbg = pathPlayback.objectPlaybackDistanceDebug;
 
   return (
     <div
@@ -1277,6 +1583,75 @@ export function SolutionPathEditorFullscreen({
       role="dialog"
       aria-modal="true"
       aria-labelledby="path-fs-title"
+      {...(variant === "trouble"
+        ? {
+            ...(cuePbDbg
+              ? {
+                  "data-cue-playback-polyline-points": cuePbDbg.polylineVertexCount,
+                  "data-cue-playback-curve-node-count": cuePbDbg.cueCurveNodeCount,
+                  "data-cue-playback-curve-control-count": cuePbDbg.cueCurveControlCount,
+                  "data-cue-playback-has-curve": cuePbDbg.hasCueCurvePlayback ? "1" : "0",
+                }
+              : {}),
+            ...(cueDistDbg
+              ? {
+                  "data-cue-playable-distance": String(cueDistDbg.playableDistancePx),
+                  "data-cue-polyline-length": String(cueDistDbg.polylineLengthPx),
+                  "data-cue-effective-travel-length": String(cueDistDbg.effectiveTravelLengthPx),
+                  "data-cue-stops-early": cueDistDbg.stopsEarly ? "1" : "0",
+                  "data-thickness-loss-ratio":
+                    cueDistDbg.thicknessLossRatio != null ? String(cueDistDbg.thicknessLossRatio) : "",
+                  "data-cue-playable-distance-before-hit":
+                    cueDistDbg.cueDistanceBeforeHitPx != null
+                      ? String(cueDistDbg.cueDistanceBeforeHitPx)
+                      : "",
+                  "data-cue-playable-distance-after-hit":
+                    cueDistDbg.cueDistanceAfterHitCapPx != null
+                      ? String(cueDistDbg.cueDistanceAfterHitCapPx)
+                      : "",
+                  "data-thickness-split-applied": cueDistDbg.thicknessSplitApplied ? "1" : "0",
+                  "data-curve-coefficient":
+                    cueDistDbg.curveDampingMeanCoefficient != null
+                      ? String(cueDistDbg.curveDampingMeanCoefficient)
+                      : "",
+                  "data-curve-segment-count":
+                    cueDistDbg.curveSegmentCount != null ? String(cueDistDbg.curveSegmentCount) : "",
+                  "data-effective-polyline-length":
+                    cueDistDbg.effectivePolylineLengthPx != null
+                      ? String(cueDistDbg.effectivePolylineLengthPx)
+                      : "",
+                  "data-curve-damping-applied": cueDistDbg.curveDampingApplied ? "1" : "0",
+                }
+              : {}),
+            ...(objPbDbg
+              ? {
+                  "data-object-playback-polyline-points": objPbDbg.polylineVertexCount,
+                  "data-object-playback-curve-node-count": objPbDbg.objectCurveNodeCount,
+                  "data-object-playback-has-curve": objPbDbg.hasObjectCurvePlayback ? "1" : "0",
+                }
+              : {}),
+            ...(objDistDbg
+              ? {
+                  "data-object-playable-distance": String(objDistDbg.playableDistancePx),
+                  "data-object-polyline-length": String(objDistDbg.polylineLengthPx),
+                  "data-object-effective-travel-length": String(objDistDbg.effectiveTravelLengthPx),
+                  "data-object-stops-early": objDistDbg.stopsEarly ? "1" : "0",
+                  "data-object-playable-distance-from-hit": String(objDistDbg.objectDistanceFromHitPx),
+                  "data-object-curve-coefficient":
+                    objDistDbg.curveDampingMeanCoefficient != null
+                      ? String(objDistDbg.curveDampingMeanCoefficient)
+                      : "",
+                  "data-object-curve-segment-count":
+                    objDistDbg.curveSegmentCount != null ? String(objDistDbg.curveSegmentCount) : "",
+                  "data-object-effective-polyline-length":
+                    objDistDbg.effectivePolylineLengthPx != null
+                      ? String(objDistDbg.effectivePolylineLengthPx)
+                      : "",
+                  "data-object-curve-damping-applied": objDistDbg.curveDampingApplied ? "1" : "0",
+                }
+              : {}),
+          }
+        : {})}
     >
       {variant === "trouble" && (
         <>
@@ -1354,73 +1729,72 @@ export function SolutionPathEditorFullscreen({
           />
         </>
       )}
-      {isNoteShell ? (
-        <div
-          data-path-editor-fs-chrome=""
-          className="w-full flex justify-center px-2 pt-2 z-[210] shrink-0 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900"
-        >
-          <div className="w-full max-w-2xl flex items-center gap-1.5 sm:gap-2 min-h-9 pb-2">
-            <h1 id="path-fs-title" className="sr-only">
-              {variant === "nangu" ? "해법 경로 편집 전체화면" : "난구해법 경로 편집 전체화면"}
-            </h1>
-            <div className="flex-1 min-w-0 flex items-center gap-2">
-              <button
-                type="button"
-                className={cx(toolbarBtn, toolbarGhost, "shrink-0 px-3 py-2 text-xs")}
-                onClick={onCancel}
-              >
-                취소
-              </button>
-            </div>
-            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            {layoutForCue && variant !== "trouble" && (
-              <button
-                type="button"
-                disabled={readOnlyCueAndBalls}
-                onClick={() => {
-                  if (!readOnlyCueAndBalls) setCuePickerOpen(true);
-                }}
-                title={
-                  readOnlyCueAndBalls
-                    ? "이 문제에 지정된 수구만 사용합니다 (변경 불가)"
-                    : undefined
-                }
-                className={`shrink-0 rounded-lg px-2 py-1.5 text-xs font-semibold border touch-manipulation ${
-                  layoutForCue.cueBall === "yellow"
-                    ? "border-amber-400/70 bg-amber-500/15 text-amber-900 dark:text-amber-200"
-                    : "border-gray-300 dark:border-slate-600 bg-black/10 dark:bg-white/10 text-site-text"
-                } ${readOnlyCueAndBalls ? "cursor-not-allowed opacity-60" : ""}`}
-                aria-label={
-                  readOnlyCueAndBalls ? "수구 (문제 지정, 변경 불가)" : "수구 변경"
-                }
-              >
-                수구
-              </button>
-            )}
-            {layoutForCue && (
-              <button
-                type="button"
-                onClick={() => setCueSpotOn((v) => !v)}
-                className={cueSpotToggleClass(cueSpotOn)}
-                aria-pressed={cueSpotOn}
-                aria-label={cueSpotOn ? "수구 확인 표시 끄기" : "수구 확인 표시 켜기"}
-              >
-                수구확인
-              </button>
-            )}
-            {showObjectPath && layoutForCue && variant === "trouble" && (
-              <>
+      <h1 id="path-fs-title" className="sr-only">
+        {variant === "trouble" ? "난구해결 경로 편집 전체화면" : "해법 경로 편집 전체화면"}
+      </h1>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {isNoteShell && variant === "trouble" && (
+          <>
+            <div
+              data-path-editor-fs-chrome=""
+              aria-hidden={!troubleLeftDrawerOpen}
+              className={`fixed inset-0 z-[200] bg-black/30 transition-opacity duration-300 ease-out ${
+                troubleLeftDrawerOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+              }`}
+              onClick={() => setTroubleLeftDrawerOpen(false)}
+            />
+            <aside
+              ref={troubleLeftDrawerAsideRef}
+              data-path-editor-fs-chrome=""
+              id="path-fs-left-drawer"
+              aria-hidden={!troubleLeftDrawerOpen}
+              className={`fixed left-0 top-0 z-[205] flex h-full w-[min(52.8vw,180px)] flex-col border-r border-white/20 bg-black/30 text-white shadow-[6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md ${
+                troubleLeftDrawerOpen ? "pointer-events-auto" : "pointer-events-none -translate-x-full"
+              } ${troubleLeftDrawerDragging ? "!duration-0" : "transition-transform duration-300 ease-out"}`}
+              style={
+                troubleLeftDrawerOpen
+                  ? {
+                      transform: `translateX(${-troubleLeftDrawerDragPx}px)`,
+                      transition: troubleLeftDrawerDragging ? "none" : undefined,
+                    }
+                  : undefined
+              }
+            >
+              {troubleLeftDrawerOpen && (
+                <div
+                  data-path-fs-drawer-drag=""
+                  aria-hidden
+                  className="absolute right-0 top-0 z-10 h-full w-4 cursor-grab touch-none active:cursor-grabbing"
+                  style={{ touchAction: "none" }}
+                  onPointerDown={onTroubleLeftDrawerHandlePointerDown}
+                  onPointerMove={onTroubleLeftDrawerHandlePointerMove}
+                  onPointerUp={endTroubleLeftDrawerDrag}
+                  onPointerCancel={endTroubleLeftDrawerDrag}
+                />
+              )}
+              <div className="border-b border-white/15 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+                <h2 className="text-sm font-semibold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                  해법 편집
+                </h2>
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <button
                   type="button"
                   data-testid="trouble-e2e-cue-path-toggle"
                   data-state={cuePathEditing ? "on" : "off"}
                   {...{ "data-trouble-action": C.action.togglePathMode }}
-                  onClick={() =>
-                    setTroublePathEditLayer((cur) => (cur === "cue" ? null : "cue"))
-                  }
-                  className={pathLayerToggleClass(cuePathEditing, "cue")}
+                  onClick={() => {
+                    setTroublePathEditLayer((cur) => (cur === "cue" ? null : "cue"));
+                    setTroubleLeftDrawerOpen(false);
+                  }}
+                  className={cx(
+                    "w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors",
+                    cuePathEditing
+                      ? "bg-site-primary/35 ring-2 ring-site-primary/80"
+                      : "bg-black/25 hover:bg-black/35 active:bg-black/40"
+                  )}
                   aria-pressed={cuePathEditing}
-                  aria-label={cuePathEditing ? "수구경로 그리기 끄기" : "수구경로 그리기 켜기"}
                 >
                   수구경로
                 </button>
@@ -1429,95 +1803,116 @@ export function SolutionPathEditorFullscreen({
                   data-testid="trouble-e2e-object-path-toggle"
                   data-state={objectPathEditing ? "on" : "off"}
                   {...{ "data-trouble-action": C.action.toggleObjectPathMode }}
-                  onClick={() =>
-                    setTroublePathEditLayer((cur) => (cur === "object" ? null : "object"))
-                  }
-                  className={pathLayerToggleClass(objectPathEditing, "object")}
+                  onClick={() => {
+                    setTroublePathEditLayer((cur) => (cur === "object" ? null : "object"));
+                    setTroubleLeftDrawerOpen(false);
+                  }}
+                  className={cx(
+                    "w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors",
+                    objectPathEditing
+                      ? "bg-site-primary/35 ring-2 ring-site-primary/80"
+                      : "bg-black/25 hover:bg-black/35 active:bg-black/40"
+                  )}
                   aria-pressed={objectPathEditing}
-                  aria-label={objectPathEditing ? "1적구경로 그리기 끄기" : "1적구경로 그리기 켜기"}
                 >
                   1적구경로
                 </button>
-              </>
-            )}
-            <button
-              type="button"
-              data-testid="trouble-e2e-undo-last-spot-toolbar"
-              data-undo-count={String(pathUndoStack.length)}
-              {...(variant === "trouble" ? { "data-trouble-action": C.action.undoLastPathSpot } : {})}
-              disabled={pathPlayback.isPlaybackActive}
-              title={`직전 편집(추가·이동·삭제·전체삭제 직전) 1회 취소 · 남은 ${pathUndoStack.length}회 (최대 ${MAX_PATH_EDITOR_UNDO}회까지 기록)`}
-              onClick={() => onUndoPathClick()}
-              className={cx(
-                toolbarBtn,
-                toolbarGhost,
-                "shrink-0 px-2.5 py-2 text-xs max-[380px]:px-2"
-              )}
-            >
-              되돌리기·{pathUndoStack.length}
-            </button>
-            <button
-              type="button"
-              className={cx(
-                toolbarBtn,
-                toolbarPrimary,
-                "shrink-0 gap-1.5 px-3.5 py-2 text-xs font-semibold shadow-md"
-              )}
-              onClick={() =>
-                onConfirm({
-                  pathPoints,
-                  objectPathPoints: variant === "trouble" ? objectPathPoints : [],
-                  cuePathDisplayCurves:
-                    variant === "trouble" ? cuePathCurveControls : undefined,
-                  objectPathDisplayCurves:
-                    variant === "trouble" ? objectPathCurveControls : undefined,
-                })
-              }
-            >
-              <span>완료</span>
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <header
-          className="flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2"
-          style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top, 0px))" }}
-        >
-          <button
-            type="button"
-            className={cx(toolbarBtn, toolbarGhost, "px-4 py-2.5")}
-            onClick={onCancel}
-          >
-            취소
-          </button>
-          <h1 id="path-fs-title" className="text-base font-semibold truncate text-center flex-1 px-2">
-            경로 편집
-          </h1>
-          <button
-            type="button"
-            className={cx(toolbarBtn, toolbarPrimary, "px-4 py-2.5 font-semibold shadow-md")}
-            onClick={() =>
-              onConfirm({
-                pathPoints,
-                objectPathPoints: variant === "trouble" ? objectPathPoints : [],
-                cuePathDisplayCurves:
-                  variant === "trouble" ? cuePathCurveControls : undefined,
-                objectPathDisplayCurves:
-                  variant === "trouble" ? objectPathCurveControls : undefined,
-              })
-            }
-          >
-            완료
-          </button>
-        </header>
-      )}
-
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        {isNoteShell && (
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={troubleCurveEditMode}
+                  data-state={troubleCurveEditMode ? "on" : "off"}
+                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-45"
+                  disabled={pathPlayback.isPlaybackActive}
+                  onClick={() => {
+                    setTroubleCurveEditMode((v) => !v);
+                    setTroubleLeftDrawerOpen(false);
+                  }}
+                >
+                  {troubleCurveEditMode ? "곡선을 직선으로 변경" : "곡선 켜기(구간더블탭)"}
+                </button>
+                <button
+                  type="button"
+                  disabled={!pathPlayback.canPlayback || pathPlayback.isPlaybackActive}
+                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-45"
+                  onClick={() => {
+                    pathPlayback.startPlayback();
+                    setTroubleLeftDrawerOpen(false);
+                  }}
+                >
+                  {pathPlayback.isPlaybackActive ? "애니메이션 재생 중" : "애니메이션 재생"}
+                </button>
+                <div className="ml-2 flex flex-col gap-2 border-l border-white/20 pl-2">
+                  <button
+                    type="button"
+                    className="w-full rounded-xl px-4 py-3 text-left text-sm font-semibold bg-black/20 hover:bg-black/30 active:bg-black/35 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                    onClick={() => setPlaybackPathLinesVisible((v) => !v)}
+                  >
+                    {playbackPathLinesVisible ? "경로선 숨기기" : "경로선 보이기"}
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full rounded-xl px-4 py-3 text-left text-sm font-semibold bg-black/20 hover:bg-black/30 active:bg-black/35 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                    onClick={() => setPlaybackGridVisible((v) => !v)}
+                  >
+                    {playbackGridVisible ? "그리드 숨기기" : "그리드 보이기"}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  data-testid="trouble-e2e-path-save-confirm"
+                  disabled={pathSaveFeedback === "saving" || pathPlayback.isPlaybackActive}
+                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-site-primary/90 text-white hover:bg-site-primary touch-manipulation shadow-md disabled:opacity-50"
+                  onClick={() => {
+                    setPathSaveFeedback("saving");
+                    try {
+                      onConfirm({
+                        pathPoints,
+                        objectPathPoints,
+                        cuePathDisplayCurves: cuePathCurveControls,
+                        objectPathDisplayCurves: objectPathCurveControls,
+                        cuePathCurveNodes,
+                        objectPathCurveNodes,
+                      });
+                      setPathSaveFeedback("ok");
+                      window.setTimeout(() => setPathSaveFeedback("idle"), 1400);
+                      setTroubleLeftDrawerOpen(false);
+                    } catch {
+                      setPathSaveFeedback("err");
+                      window.setTimeout(() => setPathSaveFeedback("idle"), 2000);
+                    }
+                  }}
+                >
+                  저장
+                </button>
+                <button
+                  type="button"
+                  data-testid="trouble-e2e-clear-all-paths"
+                  {...{ "data-trouble-action": C.action.clearAllPaths }}
+                  className="mt-1 w-full rounded-lg px-2 py-2 text-center text-[11px] font-medium text-red-200/95 underline-offset-2 hover:underline touch-manipulation disabled:opacity-40"
+                  disabled={
+                    (pathPoints.length === 0 && objectPathPoints.length === 0) ||
+                    pathPlayback.isPlaybackActive
+                  }
+                  onClick={() => {
+                    clearAllPaths();
+                    setTroubleLeftDrawerOpen(false);
+                  }}
+                >
+                  전체 경로 삭제
+                </button>
+                {pathSaveFeedback !== "idle" && (
+                  <p className="px-1 text-[11px] font-medium text-white/85">
+                    {pathSaveFeedback === "saving" && "저장중..."}
+                    {pathSaveFeedback === "ok" && "저장 완료"}
+                    {pathSaveFeedback === "err" && "저장 실패"}
+                  </p>
+                )}
+              </div>
+            </aside>
+          </>
+        )}
+        {isNoteShell && variant !== "trouble" && (
           <>
             <div
               data-path-editor-fs-chrome=""
@@ -1528,15 +1923,160 @@ export function SolutionPathEditorFullscreen({
               onClick={() => setLeftPathDrawerOpen(false)}
             />
             <aside
+              data-path-editor-fs-chrome=""
+              id="path-fs-left-drawer-nangu"
+              aria-hidden={!leftPathDrawerOpen}
+              className={`fixed left-0 top-0 z-[205] flex h-full w-[min(52.8vw,180px)] flex-col border-r border-white/20 bg-black/30 text-white shadow-[6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md transition-transform duration-300 ease-out ${
+                leftPathDrawerOpen ? "pointer-events-auto" : "pointer-events-none -translate-x-full"
+              }`}
+            >
+              <div className="border-b border-white/15 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+                <h2 className="text-sm font-semibold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                  해법 편집
+                </h2>
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                <button
+                  type="button"
+                  data-state={pathMode ? "on" : "off"}
+                  onClick={() => {
+                    setPathMode((v) => {
+                      const next = !v;
+                      if (next) setObjectPathMode(false);
+                      return next;
+                    });
+                    setLeftPathDrawerOpen(false);
+                  }}
+                  className={cx(
+                    "w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors",
+                    pathMode ? "bg-site-primary/35 ring-2 ring-site-primary/80" : "bg-black/25 hover:bg-black/35 active:bg-black/40"
+                  )}
+                  aria-pressed={pathMode}
+                >
+                  수구경로
+                </button>
+                <button
+                  type="button"
+                  data-state={objectPathMode ? "on" : "off"}
+                  disabled
+                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 text-white/70 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-55"
+                  aria-pressed={false}
+                >
+                  1적구경로
+                </button>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={false}
+                  disabled
+                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 text-white/70 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-55"
+                >
+                  곡선 켜기(구간더블탭)
+                </button>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={false}
+                  disabled
+                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 text-white/70 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-55"
+                >
+                  곡선을 직선으로 변경
+                </button>
+                <button
+                  type="button"
+                  className="mt-1 w-full rounded-lg px-2 py-2 text-center text-[11px] font-medium text-red-200/95 underline-offset-2 hover:underline touch-manipulation disabled:opacity-40"
+                  disabled={pathPoints.length === 0 || pathPlayback.isPlaybackActive}
+                  onClick={() => {
+                    clearAllPaths();
+                    setLeftPathDrawerOpen(false);
+                  }}
+                >
+                  전체 경로 삭제
+                </button>
+                <button
+                  type="button"
+                  disabled={!pathPlayback.canPlayback || pathPlayback.isPlaybackActive}
+                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-45"
+                  onClick={() => {
+                    pathPlayback.startPlayback();
+                    setLeftPathDrawerOpen(false);
+                  }}
+                >
+                  {pathPlayback.isPlaybackActive ? "애니메이션 재생 중" : "애니메이션 재생"}
+                </button>
+                <div className="ml-2 flex flex-col gap-2 border-l border-white/20 pl-2">
+                  <button
+                    type="button"
+                    className="w-full rounded-xl px-4 py-3 text-left text-sm font-semibold bg-black/20 hover:bg-black/30 active:bg-black/35 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                    onClick={() => setPlaybackPathLinesVisible((v) => !v)}
+                  >
+                    {playbackPathLinesVisible ? "경로선 숨기기" : "경로선 보이기"}
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full rounded-xl px-4 py-3 text-left text-sm font-semibold bg-black/20 hover:bg-black/30 active:bg-black/35 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                    onClick={() => setPlaybackGridVisible((v) => !v)}
+                  >
+                    {playbackGridVisible ? "그리드 숨기기" : "그리드 보이기"}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  disabled={pathSaveFeedback === "saving" || pathPlayback.isPlaybackActive}
+                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-site-primary/90 text-white hover:bg-site-primary touch-manipulation shadow-md disabled:opacity-50"
+                  onClick={() => {
+                    setPathSaveFeedback("saving");
+                    try {
+                      onConfirm({
+                        pathPoints,
+                        objectPathPoints: [],
+                        cuePathDisplayCurves: cuePathCurveControls,
+                        objectPathDisplayCurves: objectPathCurveControls,
+                        cuePathCurveNodes,
+                        objectPathCurveNodes,
+                      });
+                      setPathSaveFeedback("ok");
+                      window.setTimeout(() => setPathSaveFeedback("idle"), 1400);
+                    } catch {
+                      setPathSaveFeedback("err");
+                      window.setTimeout(() => setPathSaveFeedback("idle"), 2000);
+                    }
+                    setLeftPathDrawerOpen(false);
+                  }}
+                >
+                  저장
+                </button>
+                {pathSaveFeedback !== "idle" && (
+                  <p className="px-1 text-[11px] font-medium text-white/85">
+                    {pathSaveFeedback === "saving" && "저장중..."}
+                    {pathSaveFeedback === "ok" && "저장 완료"}
+                    {pathSaveFeedback === "err" && "저장 실패"}
+                  </p>
+                )}
+              </div>
+            </aside>
+          </>
+        )}
+        {isNoteShell && (
+          <>
+            <div
+              data-path-editor-fs-chrome=""
+              aria-hidden={!rightPathDrawerOpen}
+              className={`fixed inset-0 z-[200] bg-black/30 transition-opacity duration-300 ease-out ${
+                rightPathDrawerOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+              }`}
+              onClick={() => setRightPathDrawerOpen(false)}
+            />
+            <aside
               ref={troubleDrawerAsideRef}
               data-path-editor-fs-chrome=""
-              id="path-fs-right-drawer"
-              aria-hidden={!leftPathDrawerOpen}
+              id="path-fs-right-drawer-common"
+              aria-hidden={!rightPathDrawerOpen}
               className={`fixed right-0 top-0 z-[205] flex h-full w-[min(52.8vw,180px)] flex-col border-l border-white/20 bg-black/30 text-white shadow-[-6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md ${
-                leftPathDrawerOpen ? "pointer-events-auto" : "pointer-events-none translate-x-full"
+                rightPathDrawerOpen ? "pointer-events-auto" : "pointer-events-none translate-x-full"
               } ${troubleDrawerDragging ? "!duration-0" : "transition-transform duration-300 ease-out"}`}
               style={
-                leftPathDrawerOpen
+                rightPathDrawerOpen
                   ? {
                       transform: `translateX(${troubleDrawerDragPx}px)`,
                       transition: troubleDrawerDragging ? "none" : undefined,
@@ -1544,7 +2084,7 @@ export function SolutionPathEditorFullscreen({
                   : undefined
               }
             >
-              {leftPathDrawerOpen && (
+              {rightPathDrawerOpen && (
                 <div
                   data-path-fs-drawer-drag=""
                   aria-hidden
@@ -1558,169 +2098,165 @@ export function SolutionPathEditorFullscreen({
               )}
               <div className="border-b border-white/15 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
                 <h2 className="text-sm font-semibold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                  경로 · 보기
+                  설정
                 </h2>
               </div>
-              <div
-                className={`flex flex-1 flex-col gap-1 overflow-y-auto px-3 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] min-h-0 ${
-                  variant === "trouble" ? "justify-center" : ""
-                }`}
-              >
-                <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-white/50">경로</p>
+              <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-white/60">보기</p>
                 <button
                   type="button"
-                  data-undo-count={String(pathUndoStack.length)}
-                  {...(variant === "trouble" ? { "data-trouble-action": C.action.undoLastPathSpot } : {})}
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-medium bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-45"
-                  disabled={pathPlayback.isPlaybackActive}
-                  title={`남은 되돌리기 ${pathUndoStack.length}회`}
-                  onClick={() => {
-                    onUndoPathClick();
-                    setLeftPathDrawerOpen(false);
-                  }}
+                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                  onClick={() => toggleDrawStyle()}
                 >
-                  되돌리기 ({pathUndoStack.length}회)
+                  {drawStyleForTable === "realistic" ? "실사보기 → 단순보기" : "단순보기 → 실사보기"}
                 </button>
                 <button
                   type="button"
-                  data-testid="trouble-e2e-clear-all-paths"
-                  {...(variant === "trouble" ? { "data-trouble-action": C.action.clearAllPaths } : {})}
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-medium bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-45"
-                  disabled={
-                    (pathPoints.length === 0 && objectPathPoints.length === 0) ||
-                    pathPlayback.isPlaybackActive
-                  }
-                  onClick={() => {
-                    clearAllPaths();
-                    setLeftPathDrawerOpen(false);
-                  }}
-                >
-                  전체 경로선 삭제
-                </button>
-                {variant === "trouble" && (
-                  <>
-                    <p className="mt-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-white/50">
-                      설명용 곡선
-                    </p>
-                    <button
-                      type="button"
-                      data-state={troubleCurveEditMode ? "on" : "off"}
-                      className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-medium bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-45"
-                      disabled={pathPlayback.isPlaybackActive}
-                      onClick={() => setTroubleCurveEditMode((v) => !v)}
-                    >
-                      {troubleCurveEditMode
-                        ? "곡선 편집 끄기 (선분 더블탭 → 스팟 삽입)"
-                        : "곡선 편집 켜기 (선분 더블탭 → 곡선 노드)"}
-                      <span className="mt-0.5 block text-xs font-normal text-white/55">
-                        판정·재생은 직선 데이터만 사용합니다
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-medium bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-45"
-                      disabled={
-                        pathPlayback.isPlaybackActive ||
-                        (cuePathCurveControls.length === 0 && objectPathCurveControls.length === 0)
-                      }
-                      onClick={() => {
-                        straightenAllDisplayCurves();
-                        setLeftPathDrawerOpen(false);
-                      }}
-                    >
-                      곡선 전부 직선으로
-                    </button>
-                  </>
-                )}
-                <button
-                  type="button"
-                  {...(variant === "trouble" ? { "data-trouble-action": C.action.playPath } : {})}
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-medium bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-45"
-                  disabled={!pathPlayback.canPlayback || pathPlayback.isPlaybackActive}
-                  onClick={() => {
-                    pathPlayback.startPlayback();
-                    setLeftPathDrawerOpen(false);
-                  }}
-                >
-                  애니메이션 보기
-                  <span className="mt-0.5 block text-xs font-normal text-white/55">
-                    재생 중에는 경로 편집이 잠깁니다
-                  </span>
-                </button>
-                {pathPlayback.isPlaybackActive && (
-                  <>
-                    <p className="mt-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-white/50">
-                      재생 중
-                    </p>
-                    <button
-                      type="button"
-                      className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-medium bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
-                      onClick={() => setPlaybackPathLinesVisible(!playbackPathLinesVisible)}
-                    >
-                      {playbackPathLinesVisible ? "경로선 숨기기" : "경로선 보이기"}
-                    </button>
-                  </>
-                )}
-                <p className="mt-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-white/50">보기</p>
-                <button
-                  type="button"
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-medium bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
-                  onClick={() => {
-                    toggleDrawStyle();
-                    setLeftPathDrawerOpen(false);
-                  }}
-                >
-                  {drawStyleForTable === "realistic" ? "단순보기로 전환" : "실사보기로 전환"}
-                </button>
-                <button
-                  type="button"
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-medium bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
-                  onClick={() => {
-                    toggleGrid();
-                    setLeftPathDrawerOpen(false);
-                  }}
+                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                  onClick={() => toggleGrid()}
                 >
                   {gridVisibleForTable ? "그리드 숨기기" : "그리드 보이기"}
                 </button>
+                <button
+                  type="button"
+                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                  onClick={() => setCueSpotOn((v) => !v)}
+                >
+                  {cueSpotOn ? "수구 숨기기" : "수구 보이기"}
+                </button>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={spotMagnifierEnabled}
+                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                  onClick={() => setSpotMagnifierEnabled((v) => !v)}
+                >
+                  {spotMagnifierEnabled ? "스팟 확대 ON" : "스팟 확대 OFF"}
+                </button>
+                <p className="mt-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-white/60">지원</p>
+                <button
+                  type="button"
+                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                  onClick={() => showMenuInfo("사용법 메뉴는 준비 중입니다.")}
+                >
+                  사용법 메뉴
+                </button>
+                <button
+                  type="button"
+                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                  onClick={() => showMenuInfo("기능개선 건의 접수 기능은 준비 중입니다.")}
+                >
+                  기능개선 건의
+                </button>
+                <button
+                  type="button"
+                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                  onClick={() => showMenuInfo("오류신고 접수 기능은 준비 중입니다.")}
+                >
+                  오류신고
+                </button>
+                {menuInfoFeedback && (
+                  <p className="px-1 text-[11px] font-medium text-white/85">{menuInfoFeedback}</p>
+                )}
               </div>
             </aside>
           </>
         )}
         <div
           className={`flex min-h-0 w-full flex-1 flex-col ${
-            /* 가로는 테이블 폭(max-w-2xl)만 쓰고 뷰포트 중앙 정렬 (stretch+w-full 조합은 항상 좌측 정렬됨) */
+            /* 媛濡쒕뒗 ?뚯씠釉???max-w-2xl)留??곌퀬 酉고룷??以묒븰 ?뺣젹 (stretch+w-full 議고빀? ??긽 醫뚯륫 ?뺣젹?? */
             isNoteShell ? "items-center justify-center p-2" : ""
           }`}
         >
         <div
           className={
             isNoteShell
-              ? "relative flex h-full min-h-0 w-[min(100%,42rem)] max-w-2xl min-w-0 flex-1 flex-col pt-2"
+              ? `relative flex h-full min-h-0 w-[min(100%,42rem)] max-w-2xl min-w-0 flex-1 flex-col pt-2${
+                  onSettingsChange
+                    ? " pb-[max(5.75rem,env(safe-area-inset-bottom,0px))]"
+                    : ""
+                }`
               : "relative mx-auto flex w-full max-w-4xl min-h-0 min-w-0 flex-1 flex-col px-2 pt-2"
           }
         >
           {isNoteShell && (
-            <button
-              type="button"
-              data-testid="trouble-e2e-path-drawer-open"
-              data-path-editor-fs-chrome=""
-              aria-label="경로 및 보기 메뉴 열기"
-              aria-expanded={leftPathDrawerOpen}
-              aria-controls="path-fs-right-drawer"
-              onClick={() => setLeftPathDrawerOpen(true)}
-              className="absolute right-0 top-[45.5%] z-[125] flex h-11 w-[1.215rem] -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-gray-300/60 bg-white/20 text-gray-800 shadow-md backdrop-blur-sm touch-manipulation hover:bg-white/30 active:bg-white/25 dark:border-slate-500/60 dark:bg-white/20 dark:text-gray-900"
-            >
-              <svg
-                className="h-3.5 w-3.5 shrink-0 opacity-90"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2.2}
-                aria-hidden
+            <>
+              <button
+                type="button"
+                data-path-editor-fs-chrome=""
+                data-testid="trouble-e2e-path-close"
+                onClick={onCancel}
+                className="absolute z-[125] flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full border border-white/35 bg-black/50 text-white shadow-lg backdrop-blur-md touch-manipulation hover:bg-black/60 active:scale-95"
+                style={{
+                  top: "max(0.5rem, env(safe-area-inset-top, 0px))",
+                  left: "max(0.5rem, env(safe-area-inset-left, 0px))",
+                }}
+                aria-label="닫기"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" />
-              </svg>
-            </button>
+                <CloseXIcon className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                data-path-editor-fs-chrome=""
+                data-testid="trouble-e2e-undo-last-spot-toolbar"
+                data-undo-count={String(pathUndoStack.length)}
+                {...(variant === "trouble" ? { "data-trouble-action": C.action.undoLastPathSpot } : {})}
+                disabled={pathPlayback.isPlaybackActive || pathUndoStack.length === 0}
+                title={`직전 편집 1회 취소 · 남은 ${pathUndoStack.length}회`}
+                onClick={() => onUndoPathClick()}
+                className="absolute z-[125] flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full border border-white/35 bg-black/50 text-white shadow-lg backdrop-blur-md touch-manipulation hover:bg-black/60 active:scale-95 disabled:pointer-events-none disabled:opacity-40"
+                style={{
+                  top: "max(0.5rem, env(safe-area-inset-top, 0px))",
+                  right: "max(0.5rem, env(safe-area-inset-right, 0px))",
+                }}
+                aria-label="되돌리기"
+              >
+                <UndoStrokeIcon className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                data-testid="trouble-e2e-path-drawer-open"
+                data-path-editor-fs-chrome=""
+                aria-label="해법 편집 메뉴 열기"
+                aria-expanded={variant === "trouble" ? troubleLeftDrawerOpen : leftPathDrawerOpen}
+                aria-controls={variant === "trouble" ? "path-fs-left-drawer" : "path-fs-left-drawer-nangu"}
+                onClick={() =>
+                  variant === "trouble" ? setTroubleLeftDrawerOpen(true) : setLeftPathDrawerOpen(true)
+                }
+                className="absolute left-0 top-[45.5%] z-[125] flex h-11 w-[1.215rem] -translate-y-1/2 items-center justify-center rounded-r-lg border border-l-0 border-gray-300/60 bg-white/20 text-gray-800 shadow-md backdrop-blur-sm touch-manipulation hover:bg-white/30 active:bg-white/25 dark:border-slate-500/60 dark:bg-white/20 dark:text-gray-900"
+              >
+                <svg
+                  className="h-3.5 w-3.5 shrink-0 opacity-90"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.2}
+                  aria-hidden
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                data-path-editor-fs-chrome=""
+                aria-label="우측 메뉴 열기"
+                aria-expanded={rightPathDrawerOpen}
+                aria-controls="path-fs-right-drawer-common"
+                onClick={() => setRightPathDrawerOpen(true)}
+                className="absolute right-0 top-[45.5%] z-[125] flex h-11 w-[1.215rem] -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-gray-300/60 bg-white/20 text-gray-800 shadow-md backdrop-blur-sm touch-manipulation hover:bg-white/30 active:bg-white/25 dark:border-slate-500/60 dark:bg-white/20 dark:text-gray-900"
+              >
+                <svg
+                  className="h-3.5 w-3.5 shrink-0 opacity-90"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.2}
+                  aria-hidden
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" />
+                </svg>
+              </button>
+            </>
           )}
           <div
             className={
@@ -1752,9 +2288,9 @@ export function SolutionPathEditorFullscreen({
                       {pathClearanceWarning && layoutForCue && (cuePathEditing || objectPathEditing) && (
                         <div className="pointer-events-none absolute inset-0 z-[130] flex items-center justify-center px-3">
                           <div className="max-w-[min(92%,20rem)] rounded-lg bg-black/60 px-3 py-2.5 text-center text-[11px] font-semibold leading-snug text-white shadow-lg sm:text-xs">
-                            진행로에 공이 있습니다.
+                            吏꾪뻾濡쒖뿉 怨듭씠 ?덉뒿?덈떎.
                             <span className="mt-1 block font-normal opacity-95">
-                              공이 맞게 하려면 공에 스팟을 찍으세요.
+                              怨듭씠 留욊쾶 ?섎젮硫?怨듭뿉 ?ㅽ뙚??李띿쑝?몄슂.
                             </span>
                           </div>
                         </div>
@@ -1768,7 +2304,8 @@ export function SolutionPathEditorFullscreen({
                           embedFill
                           className="absolute inset-0 w-full h-full rounded-none border-0 overflow-hidden"
                           hideObjectBall={false}
-                          ballNormOverrides={pathPlayback.ballNormOverrides ?? undefined}
+                          ballNormOverrides={mergedBallNormOverridesForCanvas}
+                          cueTipNorm={panelCueTipNorm}
                           showCueBallSpot={showCueSpot}
                           showObjectBallSpot={showObjectBallSpot}
                           objectBallSpotKey={objectPathHighlightBallKey}
@@ -1797,9 +2334,9 @@ export function SolutionPathEditorFullscreen({
                                   ? layoutForCue
                                   : undefined
                               }
-                              ballNormOverrides={pathPlayback.ballNormOverrides ?? undefined}
+                              ballNormOverrides={mergedBallNormOverridesForCanvas}
                               onAddPoint={(norm) => {
-                                const dupThresholdPx = 14;
+                                const dupThresholdPx = SPOT_APPEND_DUP_THRESHOLD_PX;
                                 if (
                                   !cuePathAppendWouldDuplicateExistingSpot(
                                     pathPoints,
@@ -1820,7 +2357,7 @@ export function SolutionPathEditorFullscreen({
                               onInsertBetween={insertPathPointBetween}
                               onAddObjectPoint={(norm) => {
                                 if (!collisionNorm) return;
-                                const dupThresholdPx = 14;
+                                const dupThresholdPx = SPOT_APPEND_DUP_THRESHOLD_PX;
                                 const isDup =
                                   objectPathPoints.length > 0 &&
                                   objectPathPoints.some(
@@ -1855,6 +2392,8 @@ export function SolutionPathEditorFullscreen({
                               objectDisplayCurveControls={
                                 variant === "trouble" ? objectPathCurveControls : []
                               }
+                              cuePathCurveNodes={variant === "trouble" ? cuePathCurveNodes : []}
+                              objectPathCurveNodes={variant === "trouble" ? objectPathCurveNodes : []}
                               troubleCurveEditMode={variant === "trouble" && troubleCurveEditMode}
                               curveHandleInteraction={allowCurveHandleInteraction}
                               curveHandlesShowSubtle={curveHandlesShowSubtle}
@@ -1879,6 +2418,8 @@ export function SolutionPathEditorFullscreen({
                               onCurveHandleDragBegin={
                                 variant === "trouble" ? onCurveHandleDragBegin : undefined
                               }
+                              magnifierDrawStyle={drawStyleForTable}
+                              magnifierEnabled={spotMagnifierEnabled}
                             />
                           }
                         />
@@ -1892,7 +2433,7 @@ export function SolutionPathEditorFullscreen({
                         </div>
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center bg-gray-100 text-sm text-gray-500 dark:bg-slate-800 dark:text-slate-400">
-                          배치 없음
+                          諛곗튂 ?놁쓬
                         </div>
                       )}
                     </div>
@@ -1913,9 +2454,9 @@ export function SolutionPathEditorFullscreen({
                         onZoomSetFocusCanvasPx={
                           isNoteShell ? undefined : (cx, cy) => setZoomFocusOverlay({ x: cx, y: cy })
                         }
-                        ballNormOverrides={pathPlayback.ballNormOverrides ?? undefined}
+                        ballNormOverrides={mergedBallNormOverridesForCanvas}
                         onAddPoint={(norm) => {
-                          const dupThresholdPx = 14;
+                          const dupThresholdPx = SPOT_APPEND_DUP_THRESHOLD_PX;
                           if (
                             !cuePathAppendWouldDuplicateExistingSpot(
                               pathPoints,
@@ -1936,7 +2477,7 @@ export function SolutionPathEditorFullscreen({
                         onInsertBetween={insertPathPointBetween}
                         onAddObjectPoint={(norm) => {
                           if (!collisionNorm) return;
-                          const dupThresholdPx = 14;
+                          const dupThresholdPx = SPOT_APPEND_DUP_THRESHOLD_PX;
                           const isDup =
                             objectPathPoints.length > 0 &&
                             objectPathPoints.some(
@@ -1971,6 +2512,8 @@ export function SolutionPathEditorFullscreen({
                         objectDisplayCurveControls={
                           variant === "trouble" ? objectPathCurveControls : []
                         }
+                        cuePathCurveNodes={variant === "trouble" ? cuePathCurveNodes : []}
+                        objectPathCurveNodes={variant === "trouble" ? objectPathCurveNodes : []}
                         troubleCurveEditMode={variant === "trouble" && troubleCurveEditMode}
                         curveHandleInteraction={allowCurveHandleInteraction}
                         curveHandlesShowSubtle={curveHandlesShowSubtle}
@@ -1995,18 +2538,22 @@ export function SolutionPathEditorFullscreen({
                         onCurveHandleDragBegin={
                           variant === "trouble" ? onCurveHandleDragBegin : undefined
                         }
+                        magnifierDrawStyle={drawStyleForTable}
+                        magnifierEnabled={spotMagnifierEnabled}
                       />
                     )}
-                    <PathPlaybackViewOverlay
-                      variant={variant === "trouble" ? "trouble" : "nangu"}
-                      active={pathPlayback.isPlaybackActive}
-                      pathLinesVisible={playbackPathLinesVisible}
-                      onPathLinesVisibleChange={setPlaybackPathLinesVisible}
-                      gridVisible={playbackGridVisible}
-                      onGridVisibleChange={setPlaybackGridVisible}
-                      drawStyle={playbackDrawStyle}
-                      onDrawStyleChange={setPlaybackDrawStyle}
-                    />
+                    {!isNoteShell && (
+                      <PathPlaybackViewOverlay
+                        variant={variant === "trouble" ? "trouble" : "nangu"}
+                        active={pathPlayback.isPlaybackActive}
+                        pathLinesVisible={playbackPathLinesVisible}
+                        onPathLinesVisibleChange={setPlaybackPathLinesVisible}
+                        gridVisible={playbackGridVisible}
+                        onGridVisibleChange={setPlaybackGridVisible}
+                        drawStyle={playbackDrawStyle}
+                        onDrawStyleChange={setPlaybackDrawStyle}
+                      />
+                    )}
                   </>
                 );
               }}
@@ -2087,8 +2634,8 @@ export function SolutionPathEditorFullscreen({
                     aria-pressed={objectPathMode}
                     aria-label={
                       objectPathMode
-                        ? "1목적구 경로선 그리기 끄기"
-                        : "1목적구 경로선 그리기 켜기"
+                        ? "1목적구 경로 그리기 끄기"
+                        : "1목적구 경로 그리기 켜기"
                     }
                   >
                     1적구경로
@@ -2098,6 +2645,13 @@ export function SolutionPathEditorFullscreen({
             )}
             <button
               type="button"
+              onClick={() => onSettingsOpen?.()}
+              className={cx(toolbarBtn, toolbarGhost)}
+            >
+              설정
+            </button>
+            <button
+              type="button"
               data-undo-count={String(pathUndoStack.length)}
               {...(variant === "trouble" ? { "data-trouble-action": C.action.undoLastPathSpot } : {})}
               disabled={pathPlayback.isPlaybackActive}
@@ -2105,7 +2659,7 @@ export function SolutionPathEditorFullscreen({
               onClick={() => onUndoPathClick()}
               className={cx(toolbarBtn, toolbarGhost)}
             >
-              되돌리기·{pathUndoStack.length}
+              ?섎룎由ш린쨌{pathUndoStack.length}
             </button>
             <button
               type="button"
@@ -2117,7 +2671,7 @@ export function SolutionPathEditorFullscreen({
               onClick={() => clearAllPaths()}
               className={cx(toolbarBtn, toolbarDanger)}
             >
-              전체 삭제
+              ?꾩껜 ??젣
             </button>
             <button
               type="button"
@@ -2126,13 +2680,33 @@ export function SolutionPathEditorFullscreen({
               onClick={() => pathPlayback.startPlayback()}
               className={cx(toolbarBtn, toolbarAccent, "font-semibold")}
             >
-              {pathPlayback.isPlaybackActive ? "재생 중…" : "애니메이션 시연"}
+              {pathPlayback.isPlaybackActive ? "재생 중..." : "애니메이션 시연"}
             </button>
           </div>
           </>
         </div>
         )}
+        {isNoteShell && onSettingsChange && (
+          <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-[220] flex justify-center px-0 pb-[env(safe-area-inset-bottom,0px)]">
+            <SolutionSettingsSummaryBar
+              value={settingsValue}
+              onThicknessClick={() => onSettingsOpen?.("thickness")}
+              onTipClick={() => onSettingsOpen?.("tip")}
+              onRailClick={() => onSettingsOpen?.("rail")}
+              className="w-full max-w-[min(100%,42rem)] rounded-none border-x-0 border-b-0"
+            />
+          </div>
+        )}
       </div>
+
+      <SettingsPanel
+        open={settingsOpen}
+        onClose={() => onSettingsClose?.()}
+        value={settingsValue}
+        onChange={onSettingsChange}
+        showMobileThumbnail={false}
+        focusSectionOnOpen={settingsFocusSection}
+      />
 
       {cuePickerOpen && layoutForCue && !readOnlyCueAndBalls && (
         <div
@@ -2154,8 +2728,7 @@ export function SolutionPathEditorFullscreen({
                 textShadow: "0 1px 3px rgba(0,0,0,0.95), 0 0 10px rgba(0,0,0,0.6)",
               }}
             >
-              수구를 선택하세요
-            </p>
+              ?섍뎄瑜??좏깮?섏꽭??            </p>
             <div className="flex gap-8 justify-center">
               <button
                 type="button"
@@ -2210,7 +2783,7 @@ export function SolutionPathEditorFullscreen({
           aria-live="polite"
         >
           <p className="rounded-xl bg-black/80 px-5 py-3 text-center text-sm font-semibold text-white shadow-lg ring-1 ring-white/10">
-            더 이상 되돌릴 수 없습니다
+            ???댁긽 ?섎룎由????놁뒿?덈떎
           </p>
         </div>
       )}
@@ -2223,3 +2796,4 @@ export function SolutionPathEditorFullscreen({
     </div>
   );
 }
+

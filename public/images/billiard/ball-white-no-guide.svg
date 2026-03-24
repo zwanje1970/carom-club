@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="21.3624mm" height="21.3624mm" version="1.1"
+  style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd"
+  viewBox="0 0 340.1 340.1">
+  <defs>
+    <style type="text/css">
+      <![CDATA[
+    .str0 {stroke:#EEEBD1;stroke-width:2.81;stroke-miterlimit:22.9256}
+    .fil0 {fill:none}
+   ]]>
+    </style>
+    <radialGradient id="whiteBallFillNoGuide" cx="36%" cy="32%" r="68%" fx="32%" fy="28%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="50%" stop-color="#F7F5EF" />
+      <stop offset="100%" stop-color="#DDD8CC" />
+    </radialGradient>
+  </defs>
+  <g id="ball-white">
+    <circle cx="170.05" cy="170.05" r="168.64" fill="url(#whiteBallFillNoGuide)" />
+    <circle id="ball-base" class="fil0 str0" cx="170.05" cy="170.05" r="168.64" />
+  </g>
+</svg>

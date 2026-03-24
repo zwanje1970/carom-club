@@ -22,7 +22,7 @@ export interface BilliardMarker {
   type: BilliardMarkerType;
 }
 
-/** 해법 패널 확장 데이터 (저장 구조 준비, 당구노트 스키마는 미수정) */
+/** 해법 패널 확장 데이터 (저장 구조 준비, 난구노트 스키마는 미수정) */
 export interface BilliardShotPanelData {
   /** 두께: 수구-목적구 겹침 정도 등 */
   thickness?: number;

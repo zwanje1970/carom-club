@@ -8,6 +8,7 @@ import { formatKoreanDateTime } from "@/lib/format-date";
 import { DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT } from "@/lib/billiard-table-constants";
 import type { NanguBallPlacement } from "@/lib/nangu-types";
 import { NanguReadOnlyLayout } from "@/components/nangu/NanguReadOnlyLayout";
+import type { CommunityPostDetailJson, TroubleSolutionListItem } from "@/lib/community-post-detail-server";
 
 const VIEWER_KEY_STORAGE = "community_viewer_key";
 
@@ -102,45 +103,88 @@ export type CommunityPostDetailViewLinkOverrides = {
   deleteRedirect: string;
 };
 
+type CommunityPostDetailPostState = {
+  id: string;
+  boardSlug: string;
+  boardName: string;
+  hiddenMessage?: string;
+  authorName: string;
+  title: string;
+  content: string;
+  imageUrls: string[];
+  viewCount: number;
+  likeCount: number;
+  commentCount: number;
+  createdAt: string;
+  isAuthor: boolean;
+  canEdit: boolean;
+  liked: boolean;
+  bookmarked: boolean;
+  isHidden?: boolean;
+  isSolved?: boolean;
+  isLoggedIn?: boolean;
+  troubleShot?: {
+    layoutImageUrl: string | null;
+    difficulty: string | null;
+    sourceNoteId: string | null;
+    acceptedSolutionId: string | null;
+    /** 난구노트 연동 시 API가 내려주는 정규화 공배치 */
+    ballPlacement?: NanguBallPlacement | null;
+  };
+};
+
+function detailJsonToPostState(j: CommunityPostDetailJson): CommunityPostDetailPostState {
+  const imageUrls = Array.isArray(j.imageUrls) ? (j.imageUrls as string[]) : [];
+  const base: CommunityPostDetailPostState = {
+    id: String(j.id),
+    boardSlug: String(j.boardSlug),
+    boardName: String(j.boardName),
+    authorName: String(j.authorName ?? ""),
+    title: String(j.title ?? ""),
+    content: String(j.content ?? ""),
+    imageUrls,
+    viewCount: typeof j.viewCount === "number" ? j.viewCount : Number(j.viewCount ?? 0),
+    likeCount: typeof j.likeCount === "number" ? j.likeCount : Number(j.likeCount ?? 0),
+    commentCount: typeof j.commentCount === "number" ? j.commentCount : Number(j.commentCount ?? 0),
+    createdAt: String(j.createdAt ?? ""),
+    isAuthor: Boolean(j.isAuthor),
+    canEdit: Boolean(j.canEdit),
+    liked: Boolean(j.liked),
+    bookmarked: Boolean(j.bookmarked),
+    isHidden: j.isHidden as boolean | undefined,
+    isSolved: j.isSolved as boolean | undefined,
+    isLoggedIn: j.isLoggedIn as boolean | undefined,
+    troubleShot: j.troubleShot as CommunityPostDetailPostState["troubleShot"],
+  };
+  if (j.isHidden && typeof j.hiddenMessage === "string") {
+    return { ...base, isHidden: true, hiddenMessage: j.hiddenMessage };
+  }
+  return base;
+}
+
 export function CommunityPostDetailView({
   postId,
   linkOverrides,
+  serverHydrated = false,
+  initialPostJson,
+  initialComments,
+  initialTroubleSolutions,
 }: {
   postId: string;
   linkOverrides?: CommunityPostDetailViewLinkOverrides;
+  /** 서버에서 post·댓글·해법을 내려준 경우 — 초기 fetch 생략 */
+  serverHydrated?: boolean;
+  initialPostJson?: CommunityPostDetailJson;
+  initialComments?: Comment[];
+  initialTroubleSolutions?: TroubleSolutionListItem[];
 }) {
   const router = useRouter();
-  const [post, setPost] = useState<{
-    id: string;
-    boardSlug: string;
-    boardName: string;
-    authorName: string;
-    title: string;
-    content: string;
-    imageUrls: string[];
-    viewCount: number;
-    likeCount: number;
-    commentCount: number;
-    createdAt: string;
-    isAuthor: boolean;
-    canEdit: boolean;
-    liked: boolean;
-    bookmarked: boolean;
-    isHidden?: boolean;
-    isSolved?: boolean;
-    isLoggedIn?: boolean;
-    troubleShot?: {
-      layoutImageUrl: string | null;
-      difficulty: string | null;
-      sourceNoteId: string | null;
-      acceptedSolutionId: string | null;
-      /** 당구노트 연동 시 API가 내려주는 정규화 공배치 */
-      ballPlacement?: NanguBallPlacement | null;
-    };
-  } | null>(null);
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [post, setPost] = useState<CommunityPostDetailPostState | null>(() =>
+    serverHydrated && initialPostJson ? detailJsonToPostState(initialPostJson) : null
+  );
+  const [comments, setComments] = useState<Comment[]>(() => initialComments ?? []);
   const [commentText, setCommentText] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!serverHydrated);
   const [submittingComment, setSubmittingComment] = useState(false);
   const [likeLoading, setLikeLoading] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
@@ -148,20 +192,9 @@ export function CommunityPostDetailView({
   const [reportTarget, setReportTarget] = useState<{ type: "post" | "comment"; id: string } | null>(null);
   const [reportReason, setReportReason] = useState<string>("OTHER");
   const [reportSubmitting, setReportSubmitting] = useState(false);
-  const [troubleSolutions, setTroubleSolutions] = useState<
-    {
-      id: string;
-      title: string | null;
-      content: string;
-      solutionImageUrl: string | null;
-      goodCount: number;
-      badCount: number;
-      isAccepted: boolean;
-      createdAt: string;
-      authorName: string;
-      myVote: string | null;
-    }[]
-  >([]);
+  const [troubleSolutions, setTroubleSolutions] = useState<TroubleSolutionListItem[]>(() =>
+    serverHydrated ? initialTroubleSolutions ?? [] : []
+  );
   const [troubleSolutionsLoading, setTroubleSolutionsLoading] = useState(false);
   const [troubleSolutionBusyId, setTroubleSolutionBusyId] = useState<string | null>(null);
 
@@ -223,13 +256,32 @@ export function CommunityPostDetailView({
   }, [postId]);
 
   useEffect(() => {
+    if (serverHydrated) return;
     loadPost();
     loadComments();
-  }, [loadPost, loadComments]);
+  }, [serverHydrated, loadPost, loadComments]);
 
   useEffect(() => {
+    if (serverHydrated) return;
     if (post?.boardSlug === "trouble") loadTroubleSolutions();
-  }, [post?.boardSlug, loadTroubleSolutions]);
+  }, [serverHydrated, post?.boardSlug, loadTroubleSolutions]);
+
+  /** 서버에서 이미 본문을 내려준 경우에도 조회수 증가(익명 viewerKey) */
+  useEffect(() => {
+    if (!serverHydrated || !post || post.isHidden) return;
+    const viewerKey = getOrCreateViewerKey();
+    fetch(`/api/community/posts/${postId}/view`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ viewerKey }),
+    })
+      .then((r) => r.json())
+      .then((v) => {
+        if (v.counted && v.viewCount != null) setPost((p) => (p ? { ...p, viewCount: v.viewCount } : null));
+      })
+      .catch(() => {});
+  }, [serverHydrated, postId, post?.isHidden]);
 
   const handleLike = async () => {
     if (likeLoading || !post) return;
@@ -393,7 +445,7 @@ export function CommunityPostDetailView({
             <Link href={listHref} className="hover:text-site-primary">{post.boardName}</Link>
           </nav>
           <p className="rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 p-6 text-gray-600 dark:text-gray-400">
-            {(post as { hiddenMessage?: string }).hiddenMessage ?? "관리자에 의해 숨김 처리된 내용입니다."}
+            {post.hiddenMessage ?? "관리자에 의해 숨김 처리된 내용입니다."}
           </p>
           <Link href={listHref} className="mt-4 inline-block text-site-primary underline">목록으로</Link>
         </div>
@@ -412,10 +464,10 @@ export function CommunityPostDetailView({
           <span className="text-site-text font-medium line-clamp-1">{post.title}</span>
         </nav>
 
-        {/* 난구해결사: 문제 공배치 — 당구노트 좌표가 있으면 테이블 UI, 없으면 이미지 */}
+        {/* 난구해결사: 문제 공배치 — 난구노트 좌표가 있으면 테이블 UI, 없으면 이미지 */}
         {post.boardSlug === "trouble" && post.troubleShot?.ballPlacement && (
           <section className="mb-6" aria-label="문제 공배치">
-            <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">공 배치 (당구노트와 동일 좌표)</p>
+            <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">공 배치 (난구노트와 동일 좌표)</p>
             <div
               className="relative w-full max-w-full mx-auto rounded-xl overflow-hidden border border-gray-200 dark:border-slate-600"
               style={{
@@ -449,13 +501,13 @@ export function CommunityPostDetailView({
           )}
         {post.boardSlug === "trouble" && post.troubleShot?.sourceNoteId && (
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            원본 노트:{" "}
+            원본 난구노트:{" "}
             {post.isAuthor ? (
               <Link href={`/mypage/notes/${post.troubleShot.sourceNoteId}`} className="text-site-primary hover:underline">
-                노트에서 보냄
+                난구노트에서 보냄
               </Link>
             ) : (
-              <span>노트에서 보냄</span>
+              <span>난구노트에서 보냄</span>
             )}
           </p>
         )}

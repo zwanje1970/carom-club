@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ClientBillingSettlementConsole } from "@/components/client/console/ClientBillingSettlementConsole";
 
 export const metadata = {
-  title: "대회 정산",
+  title: "정산",
 };
 
 export default async function ClientBillingPage({

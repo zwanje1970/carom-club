@@ -18,10 +18,49 @@ import {
 } from "@/lib/solution-path-geometry";
 
 /** 스팟/세그먼트 히트 — 플레이필드 px 기준 (2:1에서 norm hypot 왜곡 방지) */
-const SPOT_HIT_PX = 30;
+const SPOT_HIT_PX = 18;
 /** 마지막 스팟(화살표 끝·쿠션 닿음)은 세그먼트 선에 가려져 드래그가 안 되는 경우가 있어 넓게 */
-const SPOT_HIT_LAST_PX = 48;
+const SPOT_HIT_LAST_PX = 26;
 const SEGMENT_HIT_PX = 22;
+
+/** 터치가 여러 스팟 반경에 겹칠 때 — 거리(px)가 가장 가까운 스팟 id (없으면 null) */
+function pickNearestCueSpotId(
+  norm: { x: number; y: number },
+  pathPoints: NanguPathPoint[],
+  rect: PlayfieldRect
+): string | null {
+  let bestId: string | null = null;
+  let bestD = Infinity;
+  for (let pi = 0; pi < pathPoints.length; pi++) {
+    const p = pathPoints[pi]!;
+    const maxHitPx = pi === pathPoints.length - 1 ? SPOT_HIT_LAST_PX : SPOT_HIT_PX;
+    const d = distanceNormPointsInPlayfieldPx(norm, { x: p.x, y: p.y }, rect);
+    if (d <= maxHitPx && d < bestD) {
+      bestD = d;
+      bestId = p.id;
+    }
+  }
+  return bestId;
+}
+
+function pickNearestObjectSpotId(
+  norm: { x: number; y: number },
+  objectPathPoints: NanguPathPoint[],
+  rect: PlayfieldRect
+): string | null {
+  let bestId: string | null = null;
+  let bestD = Infinity;
+  for (let pi = 0; pi < objectPathPoints.length; pi++) {
+    const p = objectPathPoints[pi]!;
+    const maxHitPx = pi === objectPathPoints.length - 1 ? SPOT_HIT_LAST_PX : SPOT_HIT_PX;
+    const d = distanceNormPointsInPlayfieldPx(norm, { x: p.x, y: p.y }, rect);
+    if (d <= maxHitPx && d < bestD) {
+      bestD = d;
+      bestId = p.id;
+    }
+  }
+  return bestId;
+}
 
 /** @deprecated zoom 포커스용; 공 탭은 getSolutionPathBallTapRadiusPx(rect) 사용 */
 export const SOLUTION_PATH_BALL_PICK_ZOOM_NORM = 0.055;
@@ -183,12 +222,9 @@ export function classifySolutionPathPointerHit(params: {
    * 그 다음 공 탭(줌), 마지막에 빈 영역(emptyCue / emptyObject).
    */
   if (objectPathMode && collisionNorm) {
-    for (let pi = 0; pi < objectPathPoints.length; pi++) {
-      const p = objectPathPoints[pi]!;
-      const hitPx = pi === objectPathPoints.length - 1 ? SPOT_HIT_LAST_PX : SPOT_HIT_PX;
-      if (distanceNormPointsInPlayfieldPx(norm, { x: p.x, y: p.y }, rect) < hitPx) {
-        return { kind: "objectSpot", id: p.id };
-      }
+    const nearestObj = pickNearestObjectSpotId(norm, objectPathPoints, rect);
+    if (nearestObj) {
+      return { kind: "objectSpot", id: nearestObj };
     }
     const objChain = [collisionNorm, ...objectPathPoints.map((p) => ({ x: p.x, y: p.y }))];
     for (let i = 0; i < objChain.length - 1; i++) {
@@ -210,12 +246,9 @@ export function classifySolutionPathPointerHit(params: {
   }
 
   if (pathMode) {
-    for (let pi = 0; pi < pathPoints.length; pi++) {
-      const p = pathPoints[pi]!;
-      const hitPx = pi === pathPoints.length - 1 ? SPOT_HIT_LAST_PX : SPOT_HIT_PX;
-      if (distanceNormPointsInPlayfieldPx(norm, { x: p.x, y: p.y }, rect) < hitPx) {
-        return { kind: "cueSpot", id: p.id };
-      }
+    const nearestCue = pickNearestCueSpotId(norm, pathPoints, rect);
+    if (nearestCue) {
+      return { kind: "cueSpot", id: nearestCue };
     }
     const allPts = [cuePos, ...pathPoints];
     for (let i = 0; i < allPts.length - 1; i++) {

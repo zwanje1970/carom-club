@@ -109,7 +109,7 @@ export function BilliardNotesListClient({ basePath = "/mypage/notes" }: Billiard
       <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 p-4 text-sm text-site-text">
         <p className="font-medium">로그인이 필요합니다.</p>
         <p className="mt-1 text-gray-600 dark:text-slate-400">
-          세션이 없거나 만료되었습니다. 다시 로그인하면 노트 목록을 불러올 수 있습니다.
+          세션이 없거나 만료되었습니다. 다시 로그인하면 난구노트 목록을 불러올 수 있습니다.
         </p>
         <Link
           href={next}
@@ -163,13 +163,13 @@ export function BilliardNotesListClient({ basePath = "/mypage/notes" }: Billiard
       </div>
       {filtered.length === 0 ? (
         <p className="text-gray-500 py-8 text-center">
-          {filter === "all" ? "저장한 노트가 없습니다. " : "해당하는 노트가 없습니다. "}
+          {filter === "all" ? "저장한 난구노트가 없습니다. " : "해당하는 난구노트가 없습니다. "}
           {filter === "all" && (
-            <Link href={`${basePath}/new`} className="text-site-primary hover:underline">새 노트 작성</Link>
+            <Link href={`${basePath}/new`} className="text-site-primary hover:underline">새 난구노트 작성</Link>
           )}
         </p>
       ) : (
-        <ul className="divide-y divide-gray-200 dark:divide-slate-700" aria-label="노트 목록">
+        <ul className="divide-y divide-gray-200 dark:divide-slate-700" aria-label="난구노트 목록">
           {filtered.map((n) => (
             <li key={n.id}>
               <Link

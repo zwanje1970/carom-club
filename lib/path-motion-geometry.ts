@@ -159,3 +159,56 @@ export function sampleMotionAlongPath(
   const distanceAlong = Math.max(0, Math.min(1, progress01)) * effectiveCap;
   return positionOnPolylineAtDistancePx(vertices, distanceAlong, rect);
 }
+
+/**
+ * 논리 세그먼트별 유효 거리 소모(L/coeff)를 따라 물리 거리 s를 구한다.
+ */
+export function mapEffectiveCostToPhysicalDistance(
+  targetEffective: number,
+  segmentPhysicalLengths: number[],
+  segmentCoefficients: number[]
+): number {
+  let effAcc = 0;
+  let s = 0;
+  const n = Math.min(segmentPhysicalLengths.length, segmentCoefficients.length);
+  for (let i = 0; i < n; i++) {
+    const L = segmentPhysicalLengths[i]!;
+    const c = Math.max(1e-9, segmentCoefficients[i]!);
+    const effSeg = L / c;
+    if (targetEffective >= effAcc + effSeg - 1e-9) {
+      effAcc += effSeg;
+      s += L;
+      continue;
+    }
+    const rem = Math.max(0, targetEffective - effAcc);
+    s += rem * c;
+    break;
+  }
+  return s;
+}
+
+/**
+ * 곡선 감속: 동일 moveDistancePx 예산으로 유효 경로 비용(W) 기준 진행 → 물리 거리로 변환.
+ * coeff=1 전 구간이면 W=pathLengthPx로 기존 sampleMotionAlongPath와 동일.
+ */
+export function sampleMotionAlongPathWithEffectiveCost(
+  vertices: NormPoint[],
+  pathLengthPx: number,
+  moveDistancePx: number,
+  progress01: number,
+  rect: PlayfieldRect,
+  effectivePathCostPx: number,
+  logicalSegmentPhysicalLengthsPx: number[],
+  logicalSegmentCurveCoefficients: number[]
+): PositionAlongPathResult {
+  const W = Math.max(0, effectivePathCostPx);
+  const effectiveCap = Math.min(Math.max(0, moveDistancePx), W);
+  const targetEffective = Math.max(0, Math.min(1, progress01)) * effectiveCap;
+  const physicalDistance = mapEffectiveCostToPhysicalDistance(
+    targetEffective,
+    logicalSegmentPhysicalLengthsPx,
+    logicalSegmentCurveCoefficients
+  );
+  const clampedPhysical = Math.min(physicalDistance, Math.max(0, pathLengthPx));
+  return positionOnPolylineAtDistancePx(vertices, clampedPhysical, rect);
+}

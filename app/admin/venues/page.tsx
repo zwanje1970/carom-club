@@ -107,6 +107,9 @@ export default async function AdminVenuesPage() {
   return (
     <SectionMain>
       <SectionTitleLineWithButton icon={mdiOfficeBuilding} title="클라이언트 목록" />
+      <p className="mb-4 text-sm text-gray-600 dark:text-slate-400">
+        승인된 클라이언트 목록입니다. 신규 등록은「신청 관리」에서 승인 처리하세요.
+      </p>
 
       <CardBox hasTable>
         <VenueListTable rows={rows} />

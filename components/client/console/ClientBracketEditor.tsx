@@ -8,6 +8,12 @@ import {
   ConsolePageHeader,
   ConsoleSection,
 } from "@/components/client/console/ui";
+import { OperationsTournamentPhaseStepper } from "@/components/client/console/OperationsTournamentPhaseStepper";
+import {
+  buildOperationPhaseSteps,
+  type OperationsPhaseView,
+  type TournamentOperationPhaseSnapshot,
+} from "@/lib/client-tournament-operation-phase";
 import { cx } from "@/components/client/console/ui/cx";
 import { consoleTextMuted } from "@/components/client/console/ui/tokens";
 
@@ -140,10 +146,15 @@ export function ClientBracketEditor({
   tournamentId,
   tournamentName,
   listHref,
+  operationPhase,
 }: {
   tournamentId: string;
   tournamentName: string;
   listHref: string;
+  operationPhase?: {
+    snapshot: TournamentOperationPhaseSnapshot;
+    currentView: OperationsPhaseView;
+  };
 }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -438,15 +449,26 @@ export function ClientBracketEditor({
     }
   }, [tournamentId, load]);
 
+  const phaseBlock =
+    operationPhase && (
+      <OperationsTournamentPhaseStepper
+        steps={buildOperationPhaseSteps(tournamentId, operationPhase.snapshot, operationPhase.currentView)}
+      />
+    );
+
   if (loading && matches.length === 0) {
     return (
-      <div className="p-4 text-sm text-zinc-600 dark:text-zinc-400">대진 데이터를 불러오는 중…</div>
+      <div className="space-y-3 p-4">
+        {phaseBlock}
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">대진 데이터를 불러오는 중…</p>
+      </div>
     );
   }
 
   if (!loading && matches.length === 0) {
     return (
       <div className="space-y-3 p-4">
+        {phaseBlock}
         <p className="text-sm text-zinc-700 dark:text-zinc-300">
           아직 생성된 본선/단판 Match가 없습니다. 먼저 대진 생성을 진행하세요.
         </p>
@@ -462,9 +484,10 @@ export function ClientBracketEditor({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
+      {phaseBlock}
       <ConsolePageHeader
         eyebrow="운영 관리 · 대진"
-        title="브래킷 보기·수정"
+        title="대진표 보기·수정"
         description={`「${tournamentName}」 — Match 데이터 직결. 카드 선택 후 우측에서 수정·저장합니다.`}
         actions={
           <div className="flex flex-wrap gap-2">

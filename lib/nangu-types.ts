@@ -12,6 +12,7 @@
  */
 
 import type { CueBallType } from "./billiard-table-constants";
+import type { SolutionSettingsValue } from "./solution-settings-panel-value";
 import type { PathSegmentCurveControl } from "./path-curve-display";
 
 export type { ObjectBallType } from "./billiard-table-constants";
@@ -91,6 +92,16 @@ export interface NanguPathPoint {
   type: "ball" | "cushion" | "free" | "end";
 }
 
+/**
+ * 곡선 경로 노드(후속 단계 렌더·재생용). 직선 스팟 배열과 별도 저장.
+ * `segmentKey`는 `lib/path-curve-display`의 cue/object 세그먼트 키 규약과 동일.
+ */
+export interface NanguCurveNode {
+  segmentKey: string;
+  x: number;
+  y: number;
+}
+
 /** 해법 경로 1개: 스팟을 순서대로 연결. 마지막 선에는 화살표 표시 */
 export interface NanguSolutionPath {
   points: { x: number; y: number }[]; // 정규화 0..1 (레거시 호환)
@@ -136,4 +147,9 @@ export interface NanguSolutionData {
    */
   cuePathDisplayCurves?: PathSegmentCurveControl[];
   objectPathDisplayCurves?: PathSegmentCurveControl[];
+  /** 표시용 베지어와 별개 — 곡선 노드(후속 단계). 직선 paths/reflectionPath와 별개 */
+  cuePathCurveNodes?: NanguCurveNode[];
+  objectPathCurveNodes?: NanguCurveNode[];
+  /** 미니 설정 패널 값(배치·당점·스트로크 표시용) — 물리·재생과 별도 */
+  settings?: SolutionSettingsValue;
 }

@@ -14,6 +14,7 @@ import {
   getPlayfieldRect,
   getPlayfieldLongSide,
   normalizedToPixel,
+  pixelToNormalized,
   landscapeToPortraitNorm,
   portraitToLandscapeNorm,
   getBallRadius,
@@ -26,6 +27,10 @@ import {
   type CueBallType,
   type TableOrientation,
 } from "@/lib/billiard-table-constants";
+import {
+  CUE_TIP_MARK_RADIUS_FRAC,
+  CUE_TIP_NORM_DISPLAY_FRAC,
+} from "@/lib/solution-panel-ball-layout";
 import type { BilliardPath } from "@/lib/billiard-path-types";
 
 export interface BallPositions {
@@ -156,8 +161,15 @@ export interface BilliardTableCanvasProps {
   hideRedBall?: boolean;
   /** 경로 재생 등: landscape 정규화 좌표로 공 위치 덮어쓰기 (미지정 색은 placement 유지) */
   ballNormOverrides?: Partial<Record<"red" | "yellow" | "white", { x: number; y: number }>>;
+  /** 해법 패널 당점(unit disk) — 수구 위 시각 표시만, 물리·재생 미사용 */
+  cueTipNorm?: { x: number; y: number } | null;
   /** 고정 부모(W×H) 안에 100% 채움 (줌 쉘 등). false면 기존 min(100%,dvh) 맞춤 */
   embedFill?: boolean;
+  /**
+   * 줌 셀: 브라우저 client → 테이블 캔버스 비트맵 픽셀(내재 width×height).
+   * 지정 시 포인터→정규화에 getBoundingClientRect 대신 사용 — scale/pan과 동일 역변환으로 공 좌표가 줌과 분리됨.
+   */
+  clientToTablePx?: (clientX: number, clientY: number) => { x: number; y: number } | null;
   /**
    * true면 테이블(쿠션·필드)과 공을 분리: 아래 캔버스=테이블만, `children`=중간(SVG 경로 등), 위 캔버스=공만.
    * 경로선이 공 아래로 가게 할 때 사용. 위 공 캔버스는 pointer-events: none.
@@ -685,6 +697,35 @@ function drawCrosshair(
   ctx.restore();
 }
 
+/** 패널 tipNorm — landscape 플레이필드 기준 오프셋 후 view(세로회전) 반영 */
+function drawCueTipIndicator(
+  ctx: CanvasRenderingContext2D,
+  rect: PlayfieldRect,
+  cueLandscape: { x: number; y: number },
+  tipNorm: { x: number; y: number },
+  toView: (lx: number, ly: number) => { x: number; y: number }
+) {
+  const rectL = getPlayfieldRect(DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT);
+  const longSide = getPlayfieldLongSide(rectL);
+  const r = getBallRadius(longSide);
+  const cL = normalizedToPixel(cueLandscape.x, cueLandscape.y, rectL);
+  const tipPxL = cL.px + tipNorm.x * r * CUE_TIP_NORM_DISPLAY_FRAC;
+  const tipPyL = cL.py + tipNorm.y * r * CUE_TIP_NORM_DISPLAY_FRAC;
+  const tipNormL = pixelToNormalized(tipPxL, tipPyL, rectL);
+  const tipView = toView(tipNormL.x, tipNormL.y);
+  const { px, py } = normalizedToPixel(tipView.x, tipView.y, rect);
+  ctx.save();
+  ctx.fillStyle = "#38bdf8";
+  ctx.strokeStyle = "rgba(255,255,255,0.85)";
+  ctx.lineWidth = Math.max(1, r * 0.07);
+  const dotR = Math.max(2, r * CUE_TIP_MARK_RADIUS_FRAC);
+  ctx.beginPath();
+  ctx.arc(px, py, dotR, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
 const BilliardTableCanvas = forwardRef<
   BilliardTableCanvasHandle,
   BilliardTableCanvasProps
@@ -713,7 +754,9 @@ const BilliardTableCanvas = forwardRef<
     showCrosshairAtSelected = false,
     hideRedBall = false,
     ballNormOverrides,
+    cueTipNorm = null,
     embedFill = false,
+    clientToTablePx,
     splitBallLayer = false,
     pathOverlayAboveBalls = false,
     children,
@@ -810,6 +853,10 @@ const BilliardTableCanvas = forwardRef<
           objectBallSpotKey
         );
       }
+      if (cueTipNorm) {
+        const cueDrawForTip = cueBall === "white" ? whiteDraw : yellowDraw;
+        drawCueTipIndicator(ctx, rect, cueDrawForTip, cueTipNorm, toView);
+      }
     },
     [
       width,
@@ -827,7 +874,7 @@ const BilliardTableCanvas = forwardRef<
       hideRedBall,
       ballNormOverrides,
       objectBallSpotKey,
-      cueBall,
+      cueTipNorm,
     ]
   );
 
@@ -985,13 +1032,22 @@ const BilliardTableCanvas = forwardRef<
   const playfield = getPlayfieldRect(width, height);
 
   function getNormalizedFromEvent(clientX: number, clientY: number): { x: number; y: number } | null {
-    const canvas = hitCanvasRef.current;
-    if (!canvas) return null;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const px = (clientX - rect.left) * scaleX;
-    const py = (clientY - rect.top) * scaleY;
+    let px: number;
+    let py: number;
+    if (embedFill && clientToTablePx) {
+      const p = clientToTablePx(clientX, clientY);
+      if (!p) return null;
+      px = p.x;
+      py = p.y;
+    } else {
+      const canvas = hitCanvasRef.current;
+      if (!canvas) return null;
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      px = (clientX - rect.left) * scaleX;
+      py = (clientY - rect.top) * scaleY;
+    }
     if (
       px >= playfield.left &&
       px <= playfield.left + playfield.width &&

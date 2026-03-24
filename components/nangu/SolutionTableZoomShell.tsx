@@ -68,7 +68,7 @@ export interface SolutionTableZoomShellProps {
   panPointerPolicy?: SolutionTablePanPointerPolicy;
   /** 외부(예: 상단 케밥)에서 +/− 줌과 동기화 */
   zoomApiRef?: React.MutableRefObject<SolutionTableZoomShellApi | null>;
-  /** true면 재생 잠금 중에도 좌측 줌 컨트롤 표시 (난구 당구노트형 전체화면) */
+  /** true면 재생 잠금 중에도 좌측 줌 컨트롤 표시 (난구 난구노트형 전체화면) */
   forceShowZoomControls?: boolean;
   /**
    * cover: 뷰포트를 콘텐츠가 항상 덮음(최소 줌도 꽉 찬 화면, 테이블 주변 여백 없음). 패닝은 잘리지 않는 범위로만 허용.
@@ -222,12 +222,16 @@ export const SolutionTableZoomShell = forwardRef<HTMLDivElement, SolutionTableZo
         if (!coverPanBounds || vw <= 0 || vh <= 0) return;
         if (shouldResetPan) {
           const c = clampPanToCoverBounds(0, 0, coverPanBounds);
+          panXRef.current = c.panX;
+          panYRef.current = c.panY;
           setPanX(c.panX);
           setPanY(c.panY);
           return;
         }
         const c = clampPanToCoverBounds(panXRef.current, panYRef.current, coverPanBounds);
         if (c.panX !== panXRef.current || c.panY !== panYRef.current) {
+          panXRef.current = c.panX;
+          panYRef.current = c.panY;
           setPanX(c.panX);
           setPanY(c.panY);
         }
@@ -237,12 +241,16 @@ export const SolutionTableZoomShell = forwardRef<HTMLDivElement, SolutionTableZo
       if (fitMode === "contain" && containPanBounds) {
         if (shouldResetPan) {
           const c = clampPanToCoverBounds(0, 0, containPanBounds);
+          panXRef.current = c.panX;
+          panYRef.current = c.panY;
           setPanX(c.panX);
           setPanY(c.panY);
           return;
         }
         const c = clampPanToCoverBounds(panXRef.current, panYRef.current, containPanBounds);
         if (c.panX !== panXRef.current || c.panY !== panYRef.current) {
+          panXRef.current = c.panX;
+          panYRef.current = c.panY;
           setPanX(c.panX);
           setPanY(c.panY);
         }
@@ -250,6 +258,8 @@ export const SolutionTableZoomShell = forwardRef<HTMLDivElement, SolutionTableZo
       }
 
       if (shouldResetPan) {
+        panXRef.current = 0;
+        panYRef.current = 0;
         setPanX(0);
         setPanY(0);
       }
@@ -558,6 +568,8 @@ export const SolutionTableZoomShell = forwardRef<HTMLDivElement, SolutionTableZo
                 }
 
                 zoomLevelRef.current = newZoom;
+                panXRef.current = npx;
+                panYRef.current = npy;
                 setZoomLevel(newZoom);
                 setPanX(npx);
                 setPanY(npy);
@@ -587,11 +599,17 @@ export const SolutionTableZoomShell = forwardRef<HTMLDivElement, SolutionTableZo
             const nx = panXRef.current + dx;
             const ny = panYRef.current + dy;
             const c = clampPanToCoverBounds(nx, ny, panBounds);
+            panXRef.current = c.panX;
+            panYRef.current = c.panY;
             setPanX(c.panX);
             setPanY(c.panY);
           } else {
-            setPanX((p) => p + dx);
-            setPanY((p) => p + dy);
+            const nx = panXRef.current + dx;
+            const ny = panYRef.current + dy;
+            panXRef.current = nx;
+            panYRef.current = ny;
+            setPanX(nx);
+            setPanY(ny);
           }
           return;
         }
@@ -606,11 +624,17 @@ export const SolutionTableZoomShell = forwardRef<HTMLDivElement, SolutionTableZo
           const nx = panXRef.current + dx;
           const ny = panYRef.current + dy;
           const c = clampPanToCoverBounds(nx, ny, panBounds);
+          panXRef.current = c.panX;
+          panYRef.current = c.panY;
           setPanX(c.panX);
           setPanY(c.panY);
         } else {
-          setPanX((p) => p + dx);
-          setPanY((p) => p + dy);
+          const nx = panXRef.current + dx;
+          const ny = panYRef.current + dy;
+          panXRef.current = nx;
+          panYRef.current = ny;
+          setPanX(nx);
+          setPanY(ny);
         }
       },
       [fitMode, coverPanBounds, containPanBounds, isCoarsePointer, W, H, focusCanvasX, focusCanvasY]

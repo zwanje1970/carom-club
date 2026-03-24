@@ -31,8 +31,9 @@ export function clampZoomLevel(z: number): number {
 }
 
 /**
- * transform-origin 0,0 기준:
- * 화면(뷰포트) 좌표 vx,vy → 콘텐츠(캔버스) 픽셀
+ * transform-origin **0 0** + `transform: translate(tx,ty) scale(s)` (CSS 적용 순서와 동일) 기준 역변환.
+ * 핀치 중심 보정(SolutionTableZoomShell)도 동일 전제를 쓰므로, 포인터 매핑·줌 보정·렌더링이 한 좌표계를 공유한다.
+ * 공(월드) 좌표는 이 역변환으로만 얻고, 저장 값은 항상 플레이필드 정규화/픽셀(테이블 내재 좌표)만 사용한다.
  */
 export function viewportPxToCanvasPx(
   vx: number,

@@ -5,7 +5,7 @@ import Link from "next/link";
 const BASE_ITEMS = [
   { href: "/mypage?tab=entries", label: "참가 대회" },
   { href: "/mypage?tab=applications", label: "신청 내역" },
-  { href: "/mypage/notes", label: "당구노트" },
+  { href: "/mypage/notes", label: "난구노트" },
   { href: "/mypage/edit", label: "내 정보 수정" },
   { href: "/notifications-popup", label: "알림" },
 ] as const;

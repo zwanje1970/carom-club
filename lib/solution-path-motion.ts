@@ -6,6 +6,7 @@ import type { PlayfieldRect } from "@/lib/billiard-table-constants";
 import {
   getNonCueBallNorms,
   type NanguBallPlacement,
+  type NanguCurveNode,
   type NanguPathPoint,
   type NanguSolutionData,
   type NanguSolutionPath,
@@ -19,9 +20,14 @@ import {
   polylineSegmentLengthsPx,
   polylineTotalLengthPx,
   sampleMotionAlongPath,
+  sampleMotionAlongPathWithEffectiveCost,
   type NormPoint,
   type PositionAlongPathResult,
 } from "@/lib/path-motion-geometry";
+import {
+  computeCuePlaybackSegmentDampingPlan,
+  computeObjectPlaybackSegmentDampingPlan,
+} from "@/lib/path-curve-damping";
 import {
   computeCueMoveDistancePx,
   computeObjectMoveDistancePx,
@@ -30,9 +36,17 @@ import {
   type MoveDistanceParams,
 } from "@/lib/path-motion-distance";
 import type { RailCount } from "@/lib/rail-power-constants";
+import type { PathSegmentCurveControl } from "@/lib/path-curve-display";
+import { buildCueCurvedPlaybackPolyline, buildObjectCurvedPlaybackPolyline } from "@/lib/path-bezier-playback";
 import { spotCenterNormForDraw } from "@/lib/path-spot-display";
 import { cueFirstObjectHitFromBallPlacement } from "@/lib/solution-path-geometry";
 import { computeThicknessCollisionSplitFromSolution } from "@/lib/thickness-power-split";
+import {
+  getCuePlayableDistanceFromBallSpeed,
+  troubleTotalMovableDistancePx,
+} from "@/lib/trouble-playback-distance";
+import { computeTroubleThicknessSplit } from "@/lib/trouble-thickness-split";
+import { troubleHitStepFromThicknessOffsetX } from "@/lib/trouble-thickness-split";
 import { objectBallKeyForBallSpot } from "@/lib/trouble-first-object-ball";
 
 export type { NormPoint, PositionAlongPathResult };
@@ -45,6 +59,21 @@ export type BuildPathMotionPlanOptions = {
    * 보통 `getNonCueBallNorms(placement)`의 `{x,y}` 배열.
    */
   objectBallNormsForSpotDraw?: readonly { x: number; y: number }[];
+  /**
+   * 난구: 재생만 곡선 — `pathPoints`와 별도의 표시용 베지어 제어점(판정·경고는 직선 유지)
+   */
+  cuePathCurveControls?: PathSegmentCurveControl[];
+  /** 수구 재생 — `cuePathCurveControls`보다 우선(저장 구조·렌더와 동일) */
+  cuePathCurveNodes?: NanguCurveNode[];
+  objectPathCurveControls?: PathSegmentCurveControl[];
+  /** 1목 재생 — `objectPathCurveControls`보다 우선 */
+  objectPathCurveNodes?: NanguCurveNode[];
+  /**
+   * 난구 재생: 볼스피드 n레일 거리 모델 + 두께 표(L=step/20) 적용 (직선 판정 엔진과 분리)
+   */
+  troublePlaybackModel?: boolean;
+  /** true면 물리 계산(ballSpeed/thickness/damping)을 무시하고 경로 길이 100% 재생 */
+  ignorePhysics?: boolean;
 };
 
 export interface PathMotionPlan {
@@ -69,6 +98,30 @@ export interface PathMotionPlan {
   /** 스트로크 재생 시간(초), `PATH_ANIMATION_TIMING` 기준 */
   animationDurationSec?: number;
   animationDurationMs?: number;
+  /**
+   * 곡선 재생 시 스팟 i 끝에 해당하는 폴리라인 꼭짓점 인덱스(잘라내기·1목 진입 비율용)
+   * 직선만일 때는 [1,2,…,pathPoints.length]
+   */
+  spotEndVertexIndices?: number[];
+  /** trouble 시연: UI 볼스피드 기준 수구 이동 가능 거리(px), `min` 적용 전 */
+  playbackCuePlayableDistancePx?: number;
+  /** trouble 시연: UI 볼스피드 기준 1목 이동 가능 거리(px), 두께 분배 없이 `totalMovable`과 동일 스케일 */
+  playbackObjectPlayableDistancePx?: number;
+  /** trouble 시연: 두께 기반 1목 전달 비율 L */
+  playbackThicknessLossRatioL?: number;
+  /** trouble 시연: 충돌 직전 기준 이동 가능 거리 V(px) — 볼스피드 모델 */
+  playbackCueDistanceBeforeHitPx?: number;
+  /** trouble 시연: 충돌 후 수구 경로에 허용되는 거리 상한 V×(1−L)(px) */
+  playbackCueDistanceAfterHitCapPx?: number;
+  /** trouble 시연: 1목 반사 경로가 있을 때 두께 분배를 수구 pre/post·1목에 적용했는지 */
+  playbackThicknessSplitApplied?: boolean;
+  /** 시연: 곡선 세그먼트 유효 거리 소모 합 Σ(L/coeff) */
+  playbackEffectivePathCostPx?: number;
+  playbackLogicalSegmentPhysicalLengthsPx?: number[];
+  playbackLogicalSegmentCurveCoefficients?: number[];
+  playbackCurveDampingApplied?: boolean;
+  playbackCurveDampingMeanCoefficient?: number;
+  playbackCurveDampingCurveSegmentCount?: number;
 }
 
 function cuePositionFromPlacement(placement: NanguBallPlacement): NormPoint {
@@ -151,7 +204,7 @@ export function buildCuePathMotionPlan(
       : null;
   const struckForFirst =
     firstHitForViz && objectNorms.find((b) => b.key === firstHitForViz.objectKey);
-  const poly =
+  const polyStraight =
     options?.visualizationPlayback && typed && typed.length === spots.length
       ? [
           cue,
@@ -165,14 +218,145 @@ export function buildCuePathMotionPlan(
           ),
         ]
       : verticesFromCueAndSpots(cue, spots);
+
+  let poly = polyStraight;
+  let spotEndVertexIndices: number[] | undefined;
+  const hasCueCurveForPlayback =
+    (options?.cuePathCurveControls?.length ?? 0) > 0 || (options?.cuePathCurveNodes?.length ?? 0) > 0;
+  if (
+    options?.visualizationPlayback &&
+    typed &&
+    typed.length === spots.length &&
+    hasCueCurveForPlayback
+  ) {
+    const curved = buildCueCurvedPlaybackPolyline(
+      polyStraight,
+      typed,
+      options.cuePathCurveControls,
+      options.cuePathCurveNodes
+    );
+    poly = curved.vertices;
+    spotEndVertexIndices = curved.spotEndVertexIndices;
+  } else if (options?.visualizationPlayback && typed && typed.length === spots.length) {
+    spotEndVertexIndices = typed.map((_, i) => i + 1);
+  }
+
   const pathLengthPx = polylineTotalLengthPx(poly, rect);
   const cushionCount = countCushionsInPath(path);
   const moveParams = buildMoveParamsFromSolution(data, cushionCount);
-  const split = computeThicknessCollisionSplitFromSolution(data.isBankShot ?? false, data.thicknessOffsetX);
-  const strokeTotalPowerReferencePx = computeStrokeTotalPowerReferencePx(rect, moveParams);
+  const troubleModel = Boolean(options?.troublePlaybackModel);
+  const ignorePhysics = Boolean(options?.visualizationPlayback && troubleModel && options?.ignorePhysics);
+  const split = ignorePhysics
+    ? { thickness01: 0.5, cueRetain: 1, objectTransfer: 0 }
+    : troubleModel
+      ? computeTroubleThicknessSplit(data.isBankShot ?? false, data.thicknessOffsetX)
+      : computeThicknessCollisionSplitFromSolution(data.isBankShot ?? false, data.thicknessOffsetX);
+  const ballSpeedVal = data.ballSpeed ?? 3;
+  const totalMovablePx =
+    !ignorePhysics && troubleModel ? troubleTotalMovableDistancePx(rect, ballSpeedVal) : undefined;
+  const cuePlayablePx =
+    !ignorePhysics && troubleModel && options?.visualizationPlayback
+      ? getCuePlayableDistanceFromBallSpeed(rect, ballSpeedVal)
+      : undefined;
+  const strokeTotalPowerReferencePx =
+    ignorePhysics
+      ? undefined
+      : troubleModel
+        ? cuePlayablePx ?? totalMovablePx
+        : computeStrokeTotalPowerReferencePx(rect, moveParams);
   const physicsMoveDistancePx = computeCueMoveDistancePx(rect, moveParams);
-  const moveDistancePx = options?.visualizationPlayback ? pathLengthPx : physicsMoveDistancePx;
+  const L = split.objectTransfer;
+  const hasReflectionForThicknessSplit =
+    Boolean(data.reflectionPath?.points && data.reflectionPath.points.length >= 2) &&
+    data.reflectionObjectBall != null &&
+    typed &&
+    typed.length === spots.length;
+
+  let moveDistancePx: number = pathLengthPx;
+  let playbackThicknessSplitApplied = false;
+  let playbackCueDistanceAfterHitCapPx: number | undefined;
+  let playbackCueDistanceBeforeHitPx: number | undefined;
+  let playbackThicknessLossRatioL: number | undefined;
+  let playbackCueDistanceBeforeHitAppliedPx: number | undefined;
+  let playbackCueDistanceAfterHitAppliedPx: number | undefined;
+  let playbackObjectDistanceAfterHitAppliedPx: number | undefined;
+
+  if (ignorePhysics) {
+    moveDistancePx = pathLengthPx;
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[trouble-playback:path-only]", {
+        ignorePhysics: true,
+        appliedPx: pathLengthPx,
+        pathLength: pathLengthPx,
+      });
+    }
+  } else if (options?.visualizationPlayback && troubleModel && cuePlayablePx != null) {
+    const V = cuePlayablePx;
+    playbackCueDistanceBeforeHitPx = V;
+    playbackThicknessLossRatioL = L;
+
+    if (hasReflectionForThicknessSplit) {
+      const tempPlan: PathMotionPlan = {
+        polylineNormalized: poly,
+        pathLengthPx,
+        moveDistancePx: pathLengthPx,
+        effectiveTravelPx: pathLengthPx,
+        spotEndVertexIndices,
+      };
+      const hitAlong = computeCueProgress01ForFirstObjectHitAlongFullPath(
+        tempPlan,
+        typed,
+        placement,
+        rect,
+        data.reflectionObjectBall ?? null
+      );
+      const dHit = hitAlong.pHit01 * pathLengthPx;
+      const dPost = Math.max(0, pathLengthPx - dHit);
+      const cuePreLimit = Math.min(dHit, V);
+      const cuePostLimit = Math.min(dPost, V * (1 - L));
+      moveDistancePx = cuePreLimit + cuePostLimit;
+      playbackCueDistanceBeforeHitAppliedPx = cuePreLimit;
+      playbackCueDistanceAfterHitAppliedPx = cuePostLimit;
+      playbackObjectDistanceAfterHitAppliedPx = V * L;
+      playbackThicknessSplitApplied = true;
+      playbackCueDistanceAfterHitCapPx = V * (1 - L);
+    } else {
+      moveDistancePx = Math.min(pathLengthPx, V);
+      playbackCueDistanceBeforeHitAppliedPx = moveDistancePx;
+      playbackCueDistanceAfterHitAppliedPx = 0;
+      playbackObjectDistanceAfterHitAppliedPx = V * L;
+    }
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[trouble-playback:cue-plan]", {
+        V,
+        L,
+        cuePreAppliedPx: playbackCueDistanceBeforeHitAppliedPx,
+        cuePostAppliedPx: playbackCueDistanceAfterHitAppliedPx,
+      });
+    }
+  } else if (options?.visualizationPlayback) {
+    moveDistancePx = pathLengthPx;
+  } else {
+    moveDistancePx = physicsMoveDistancePx;
+  }
   const effectiveTravelPx = Math.min(moveDistancePx, pathLengthPx);
+  const curveDampingPlan =
+    options?.visualizationPlayback &&
+    !troubleModel &&
+    typed &&
+    typed.length === spots.length &&
+    spotEndVertexIndices &&
+    spotEndVertexIndices.length === typed.length
+      ? computeCuePlaybackSegmentDampingPlan(
+          poly,
+          polyStraight,
+          typed,
+          spotEndVertexIndices,
+          rect,
+          options.cuePathCurveControls,
+          options.cuePathCurveNodes
+        )
+      : null;
   const powerRailCount = resolveMoveDistanceRailCount(moveParams);
   const animationDurationSec = options?.visualizationPlayback
     ? computePolylinePlaybackDurationMs(pathLengthPx, rect) / 1000
@@ -193,11 +377,23 @@ export function buildCuePathMotionPlan(
     powerRailCount,
     animationDurationSec,
     animationDurationMs,
+    spotEndVertexIndices,
+    playbackCuePlayableDistancePx: cuePlayablePx,
+    playbackThicknessLossRatioL,
+    playbackCueDistanceBeforeHitPx,
+    playbackCueDistanceAfterHitCapPx,
+    playbackThicknessSplitApplied,
+    playbackEffectivePathCostPx: curveDampingPlan?.effectivePathCostPx,
+    playbackLogicalSegmentPhysicalLengthsPx: curveDampingPlan?.logicalSegmentPhysicalLengthsPx,
+    playbackLogicalSegmentCurveCoefficients: curveDampingPlan?.logicalSegmentCurveCoefficients,
+    playbackCurveDampingApplied: Boolean(curveDampingPlan && curveDampingPlan.curveSegmentCount > 0),
+    playbackCurveDampingMeanCoefficient: curveDampingPlan?.meanCurveCoefficient,
+    playbackCurveDampingCurveSegmentCount: curveDampingPlan?.curveSegmentCount,
   };
 }
 
 /**
- * 1목 반사 경로 시연이 있을 때: 수구는 **마지막 `ball` 스팟(스위치)** 까지만 이동한다.
+ * 1목 반사 경로 시엘이 있을 때: 수구는 **마지막 `ball` 스팟(스위치)** 까지만 이동한다.
  * 그 뒤에 쿠션·end 스팟이 더 있어도 시연용 수구 폴리라인은 여기서 자른다.
  */
 export type CueFirstObjectHitProgressSource =
@@ -228,6 +424,11 @@ export function computeCueProgress01ForFirstObjectHitAlongFullPath(
   const dTotal = plan.pathLengthPx;
   const lens = polylineSegmentLengthsPx(plan.polylineNormalized, rect);
   const cumToSpotIndex = (pathPointIndex: number): number => {
+    const idx = plan.spotEndVertexIndices?.[pathPointIndex];
+    if (idx != null && idx >= 0 && idx < plan.polylineNormalized.length) {
+      const sub = plan.polylineNormalized.slice(0, idx + 1);
+      return polylineTotalLengthPx(sub, rect);
+    }
     let cum = 0;
     const lastSeg = Math.min(pathPointIndex, lens.length - 1);
     for (let s = 0; s <= lastSeg && s < lens.length; s++) cum += lens[s] ?? 0;
@@ -297,13 +498,24 @@ export function truncateCuePathPlanAtLastBallSpotForPlayback(
   }
   if (lastBallIdx < 0) return plan;
   const poly = plan.polylineNormalized;
-  const endExclusive = lastBallIdx + 2;
-  if (endExclusive < 2 || endExclusive > poly.length) return plan;
-  const truncated = poly.slice(0, endExclusive);
+  let truncated: NormPoint[];
+  const endBySpot = plan.spotEndVertexIndices?.[lastBallIdx];
+  if (endBySpot != null && endBySpot + 1 <= poly.length) {
+    truncated = poly.slice(0, endBySpot + 1);
+  } else {
+    const endExclusive = lastBallIdx + 2;
+    if (endExclusive < 2 || endExclusive > poly.length) return plan;
+    truncated = poly.slice(0, endExclusive);
+  }
   const pathLengthPx = polylineTotalLengthPx(truncated, rect);
-  const moveDistancePx = pathLengthPx;
+  const moveDistancePx = Math.min(pathLengthPx, plan.moveDistancePx);
   const effectiveTravelPx = Math.min(moveDistancePx, pathLengthPx);
   const animationDurationMs = computePolylinePlaybackDurationMs(pathLengthPx, rect);
+  const spotEnd =
+    plan.spotEndVertexIndices && lastBallIdx >= 0
+      ? plan.spotEndVertexIndices.slice(0, lastBallIdx + 1)
+      : plan.spotEndVertexIndices;
+
   return {
     ...plan,
     polylineNormalized: truncated,
@@ -312,6 +524,7 @@ export function truncateCuePathPlanAtLastBallSpotForPlayback(
     effectiveTravelPx,
     animationDurationMs,
     animationDurationSec: animationDurationMs / 1000,
+    spotEndVertexIndices: spotEnd,
   };
 }
 
@@ -328,21 +541,97 @@ export function buildObjectPathMotionPlan(
   if (!pts || pts.length < 2) return null;
 
   const typed: NanguPathPoint[] | undefined = rp.pointsWithType;
-  const poly = objectReflectionPolylineNormalized(
+  const polyStraight = objectReflectionPolylineNormalized(
     { x: pts[0].x, y: pts[0].y },
     pts,
     typed,
     rect,
     options
   );
+
+  let poly = polyStraight;
+  let spotEndVertexIndices: number[] | undefined;
+  const hasObjectCurveForPlayback =
+    (options?.objectPathCurveControls?.length ?? 0) > 0 || (options?.objectPathCurveNodes?.length ?? 0) > 0;
+  if (
+    options?.visualizationPlayback &&
+    typed &&
+    typed.length === pts.length - 1 &&
+    hasObjectCurveForPlayback
+  ) {
+    const curved = buildObjectCurvedPlaybackPolyline(
+      polyStraight,
+      typed,
+      options.objectPathCurveControls,
+      options.objectPathCurveNodes
+    );
+    poly = curved.vertices;
+    spotEndVertexIndices = curved.spotEndVertexIndices;
+  } else if (options?.visualizationPlayback && typed && typed.length === pts.length - 1) {
+    spotEndVertexIndices = typed.map((_, i) => i + 1);
+  }
+
   const pathLengthPx = polylineTotalLengthPx(poly, rect);
   const cushionCount = typed?.filter((p) => p.type === "cushion").length ?? 0;
   const moveParams = buildMoveParamsFromSolution(data, cushionCount);
-  const split = computeThicknessCollisionSplitFromSolution(data.isBankShot ?? false, data.thicknessOffsetX);
-  const strokeTotalPowerReferencePx = computeStrokeTotalPowerReferencePx(rect, moveParams);
+  const troubleModel = Boolean(options?.troublePlaybackModel);
+  const ignorePhysics = Boolean(options?.visualizationPlayback && troubleModel && options?.ignorePhysics);
+  const split = ignorePhysics
+    ? { thickness01: 0.5, cueRetain: 1, objectTransfer: 0 }
+    : troubleModel
+      ? computeTroubleThicknessSplit(data.isBankShot ?? false, data.thicknessOffsetX)
+      : computeThicknessCollisionSplitFromSolution(data.isBankShot ?? false, data.thicknessOffsetX);
+  const ballSpeedVal = data.ballSpeed ?? 3;
+  const totalMovablePx = troubleModel ? troubleTotalMovableDistancePx(rect, ballSpeedVal) : undefined;
+  const V0 = !ignorePhysics ? getCuePlayableDistanceFromBallSpeed(rect, ballSpeedVal) : 0;
+  const L = split.objectTransfer;
+  const objectPlayablePx =
+    !ignorePhysics && troubleModel && options?.visualizationPlayback
+      ? V0 * L
+      : undefined;
+  const strokeTotalPowerReferencePx =
+    ignorePhysics
+      ? undefined
+      : troubleModel
+        ? totalMovablePx
+        : computeStrokeTotalPowerReferencePx(rect, moveParams);
   const physicsMoveDistancePx = computeObjectMoveDistancePx(rect, moveParams);
-  const moveDistancePx = options?.visualizationPlayback ? pathLengthPx : physicsMoveDistancePx;
+  const moveDistancePx = ignorePhysics
+    ? pathLengthPx
+    : options?.visualizationPlayback
+    ? troubleModel
+      ? Math.min(pathLengthPx, objectPlayablePx ?? 0)
+      : pathLengthPx
+    : physicsMoveDistancePx;
+  if (!ignorePhysics && options?.visualizationPlayback && troubleModel && process.env.NODE_ENV !== "production") {
+    console.debug("[trouble-playback:object-plan]", {
+      objectPostAppliedPx: moveDistancePx,
+    });
+  } else if (ignorePhysics && process.env.NODE_ENV !== "production") {
+    console.debug("[trouble-playback:path-only]", {
+      ignorePhysics: true,
+      appliedPx: pathLengthPx,
+      pathLength: pathLengthPx,
+    });
+  }
   const effectiveTravelPx = Math.min(moveDistancePx, pathLengthPx);
+  const objectCurveDampingPlan =
+    options?.visualizationPlayback &&
+    !troubleModel &&
+    typed &&
+    typed.length === pts.length - 1 &&
+    spotEndVertexIndices &&
+    spotEndVertexIndices.length === typed.length
+      ? computeObjectPlaybackSegmentDampingPlan(
+          poly,
+          polyStraight,
+          typed,
+          spotEndVertexIndices,
+          rect,
+          options.objectPathCurveControls,
+          options.objectPathCurveNodes
+        )
+      : null;
   const powerRailCount = resolveMoveDistanceRailCount(moveParams);
   const animationDurationSec = options?.visualizationPlayback
     ? computePolylinePlaybackDurationMs(pathLengthPx, rect) / 1000
@@ -363,6 +652,14 @@ export function buildObjectPathMotionPlan(
     powerRailCount,
     animationDurationSec,
     animationDurationMs,
+    spotEndVertexIndices,
+    playbackObjectPlayableDistancePx: objectPlayablePx,
+    playbackEffectivePathCostPx: objectCurveDampingPlan?.effectivePathCostPx,
+    playbackLogicalSegmentPhysicalLengthsPx: objectCurveDampingPlan?.logicalSegmentPhysicalLengthsPx,
+    playbackLogicalSegmentCurveCoefficients: objectCurveDampingPlan?.logicalSegmentCurveCoefficients,
+    playbackCurveDampingApplied: Boolean(objectCurveDampingPlan && objectCurveDampingPlan.curveSegmentCount > 0),
+    playbackCurveDampingMeanCoefficient: objectCurveDampingPlan?.meanCurveCoefficient,
+    playbackCurveDampingCurveSegmentCount: objectCurveDampingPlan?.curveSegmentCount,
   };
 }
 
@@ -381,10 +678,69 @@ export function buildObjectPathMotionPlanWithStartVertex(
   const typed = data.reflectionPath?.pointsWithType;
   if (!base || !pts || pts.length < 2) return null;
 
-  const poly = objectReflectionPolylineNormalized(objectStartNorm, pts, typed, rect, options);
+  const polyStraight = objectReflectionPolylineNormalized(objectStartNorm, pts, typed, rect, options);
+  let poly = polyStraight;
+  let spotEndVertexIndices: number[] | undefined = base.spotEndVertexIndices;
+  const hasObjectCurveForPlayback =
+    (options?.objectPathCurveControls?.length ?? 0) > 0 || (options?.objectPathCurveNodes?.length ?? 0) > 0;
+  if (
+    options?.visualizationPlayback &&
+    typed &&
+    typed.length === pts.length - 1 &&
+    hasObjectCurveForPlayback
+  ) {
+    const curved = buildObjectCurvedPlaybackPolyline(
+      polyStraight,
+      typed,
+      options.objectPathCurveControls,
+      options.objectPathCurveNodes
+    );
+    poly = curved.vertices;
+    spotEndVertexIndices = curved.spotEndVertexIndices;
+  } else if (options?.visualizationPlayback && typed && typed.length === pts.length - 1) {
+    spotEndVertexIndices = typed.map((_, i) => i + 1);
+  }
+
   const pathLengthPx = polylineTotalLengthPx(poly, rect);
-  const moveDistancePx = options?.visualizationPlayback ? pathLengthPx : base.moveDistancePx;
+  const troubleModel = Boolean(options?.troublePlaybackModel);
+  const ignorePhysics = Boolean(options?.visualizationPlayback && troubleModel && options?.ignorePhysics);
+  const split = ignorePhysics
+    ? { thickness01: 0.5, cueRetain: 1, objectTransfer: 0 }
+    : troubleModel
+      ? computeTroubleThicknessSplit(data.isBankShot ?? false, data.thicknessOffsetX)
+      : computeThicknessCollisionSplitFromSolution(data.isBankShot ?? false, data.thicknessOffsetX);
+  const ballSpeedVal = data.ballSpeed ?? 3;
+  const V0 = !ignorePhysics ? getCuePlayableDistanceFromBallSpeed(rect, ballSpeedVal) : 0;
+  const L = split.objectTransfer;
+  const objectPlayablePx =
+    !ignorePhysics && troubleModel && options?.visualizationPlayback
+      ? V0 * L
+      : undefined;
+  const moveDistancePx = ignorePhysics
+    ? pathLengthPx
+    : options?.visualizationPlayback
+    ? troubleModel
+      ? Math.min(pathLengthPx, objectPlayablePx ?? 0)
+      : pathLengthPx
+    : base.moveDistancePx;
   const effectiveTravelPx = Math.min(moveDistancePx, pathLengthPx);
+  const objectCurveDampingPlanWithStart =
+    options?.visualizationPlayback &&
+    !troubleModel &&
+    typed &&
+    typed.length === pts.length - 1 &&
+    spotEndVertexIndices &&
+    spotEndVertexIndices.length === typed.length
+      ? computeObjectPlaybackSegmentDampingPlan(
+          poly,
+          polyStraight,
+          typed,
+          spotEndVertexIndices,
+          rect,
+          options.objectPathCurveControls,
+          options.objectPathCurveNodes
+        )
+      : null;
   const animationDurationMs =
     options?.visualizationPlayback === true
       ? computePolylinePlaybackDurationMs(pathLengthPx, rect)
@@ -399,6 +755,14 @@ export function buildObjectPathMotionPlanWithStartVertex(
     effectiveTravelPx,
     animationDurationMs,
     animationDurationSec,
+    spotEndVertexIndices,
+    playbackObjectPlayableDistancePx: objectPlayablePx,
+    playbackEffectivePathCostPx: objectCurveDampingPlanWithStart?.effectivePathCostPx,
+    playbackLogicalSegmentPhysicalLengthsPx: objectCurveDampingPlanWithStart?.logicalSegmentPhysicalLengthsPx,
+    playbackLogicalSegmentCurveCoefficients: objectCurveDampingPlanWithStart?.logicalSegmentCurveCoefficients,
+    playbackCurveDampingApplied: Boolean(objectCurveDampingPlanWithStart && objectCurveDampingPlanWithStart.curveSegmentCount > 0),
+    playbackCurveDampingMeanCoefficient: objectCurveDampingPlanWithStart?.meanCurveCoefficient,
+    playbackCurveDampingCurveSegmentCount: objectCurveDampingPlanWithStart?.curveSegmentCount,
   };
 }
 
@@ -410,6 +774,27 @@ export function sampleCueMotion(
   progress01: number,
   rect: PlayfieldRect
 ): PositionAlongPathResult {
+  const W = plan.playbackEffectivePathCostPx;
+  const lens = plan.playbackLogicalSegmentPhysicalLengthsPx;
+  const coeffs = plan.playbackLogicalSegmentCurveCoefficients;
+  if (
+    W != null &&
+    lens != null &&
+    coeffs != null &&
+    lens.length > 0 &&
+    lens.length === coeffs.length
+  ) {
+    return sampleMotionAlongPathWithEffectiveCost(
+      plan.polylineNormalized,
+      plan.pathLengthPx,
+      plan.moveDistancePx,
+      progress01,
+      rect,
+      W,
+      lens,
+      coeffs
+    );
+  }
   return sampleMotionAlongPath(
     plan.polylineNormalized,
     plan.pathLengthPx,
@@ -424,6 +809,27 @@ export function sampleObjectMotion(
   progress01: number,
   rect: PlayfieldRect
 ): PositionAlongPathResult {
+  const W = plan.playbackEffectivePathCostPx;
+  const lens = plan.playbackLogicalSegmentPhysicalLengthsPx;
+  const coeffs = plan.playbackLogicalSegmentCurveCoefficients;
+  if (
+    W != null &&
+    lens != null &&
+    coeffs != null &&
+    lens.length > 0 &&
+    lens.length === coeffs.length
+  ) {
+    return sampleMotionAlongPathWithEffectiveCost(
+      plan.polylineNormalized,
+      plan.pathLengthPx,
+      plan.moveDistancePx,
+      progress01,
+      rect,
+      W,
+      lens,
+      coeffs
+    );
+  }
   return sampleMotionAlongPath(
     plan.polylineNormalized,
     plan.pathLengthPx,

@@ -97,7 +97,7 @@ function LoginForm() {
         window.location.href = "/admin";
         return;
       }
-      // 당구노트·난구해결사 등에서 온 경우: 클라이언트/권역 기본 이동보다 next 우선
+      // 난구노트·난구해결사 등에서 온 경우: 클라이언트/권역 기본 이동보다 next 우선
       if ((returnToNotes || returnToTroubleNangu) && nextDest) {
         window.location.href = nextDest;
         return;

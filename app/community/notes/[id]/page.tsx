@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-/** 당구노트 상세는 마이페이지로 이동. 기존 URL 호환용 리다이렉트 */
+/** 난구노트 상세는 마이페이지로 이동. 기존 URL 호환용 리다이렉트 */
 export default async function CommunityNoteDetailRedirect({
   params,
 }: {

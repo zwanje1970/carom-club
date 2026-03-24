@@ -9,6 +9,16 @@ import {
   ConsolePageHeader,
   ConsoleSection,
 } from "@/components/client/console/ui";
+import {
+  OperationsStepFlowBar,
+  OperationsTournamentFlowNav,
+} from "@/components/client/console/OperationsTournamentFlowNav";
+import { OperationsTournamentPhaseStepper } from "@/components/client/console/OperationsTournamentPhaseStepper";
+import {
+  buildOperationPhaseSteps,
+  type OperationsPhaseView,
+  type TournamentOperationPhaseSnapshot,
+} from "@/lib/client-tournament-operation-phase";
 import { cx } from "@/components/client/console/ui/cx";
 import { consoleTextBody, consoleTextMuted } from "@/components/client/console/ui/tokens";
 import type { ParticipantRosterSummary } from "@/lib/tournament-participant-roster";
@@ -16,9 +26,14 @@ import type { ParticipantRosterSummary } from "@/lib/tournament-participant-rost
 export function ClientOperationsParticipantRosterPanel({
   tournamentId,
   listHref,
+  operationPhase,
 }: {
   tournamentId: string;
   listHref: string;
+  operationPhase?: {
+    snapshot: TournamentOperationPhaseSnapshot;
+    currentView: OperationsPhaseView;
+  };
 }) {
   const [data, setData] = useState<ParticipantRosterSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -98,13 +113,26 @@ export function ClientOperationsParticipantRosterPanel({
     }
   }
 
+  const phaseBlock =
+    operationPhase && (
+      <OperationsTournamentPhaseStepper
+        steps={buildOperationPhaseSteps(tournamentId, operationPhase.snapshot, operationPhase.currentView)}
+      />
+    );
+
   if (loading) {
-    return <p className={cx(consoleTextMuted, "py-12 text-center text-sm")}>불러오는 중…</p>;
+    return (
+      <div className="space-y-4">
+        {phaseBlock}
+        <p className={cx(consoleTextMuted, "py-8 text-center text-sm")}>불러오는 중…</p>
+      </div>
+    );
   }
 
   if (!data) {
     return (
-      <div className="space-y-2">
+      <div className="space-y-4">
+        {phaseBlock}
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <Link href={listHref} className="text-sm text-zinc-700 underline dark:text-zinc-300">
           목록으로
@@ -119,26 +147,15 @@ export function ClientOperationsParticipantRosterPanel({
   return (
     <div className="space-y-4">
       <ConsolePageHeader
-        eyebrow="운영 관리 · 대회"
+        eyebrow="대회 운영"
         title="참가 명단 확정"
-        description={`「${data.tournamentName}」 — 대진표 생성 전 최종 확정자 집합을 고정합니다.`}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={listHref}
-              className="rounded-sm border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
-            >
-              운영 · 대회 목록
-            </Link>
-            <Link
-              href={`/client/operations/tournaments/${tournamentId}/participants`}
-              className="rounded-sm border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              참가자 표
-            </Link>
-          </div>
-        }
+        description={`「${data.tournamentName}」 — 대진 생성 전 최종 확정자 집합을 고정합니다.`}
       />
+
+      {phaseBlock}
+
+      <OperationsTournamentFlowNav tournamentId={tournamentId} listHref={listHref} active="roster" />
+      <OperationsStepFlowBar tournamentId={tournamentId} listHref={listHref} activeStep="roster" />
 
       {error && (
         <p className="rounded-sm border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-100">

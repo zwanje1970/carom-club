@@ -1,28 +1,17 @@
 "use client";
 
 /**
- * 난구해결(trouble) 전용 해법 편집기.
- * - 원본: layoutImageUrl(이미지) 또는 ballPlacement(좌표) 읽기 전용 미리보기
- * - 경로 편집: 전체화면만 (스팟·줌·애니메이션)
- * - 저장: content(해설) + solutionData(JSON)
+ * ?쒓뎄?닿껐??trouble) ?꾩슜 ?대쾿 ?몄쭛湲????곗꽑 ?덉젙?????(docs/NANGU_SOLUTION_ROLLOUT.md).
+ * - ?먮낯: layoutImageUrl(?대?吏) ?먮뒗 ballPlacement(醫뚰몴) ?쎄린 ?꾩슜 誘몃━蹂닿린
+ * - 寃쎈줈 ?몄쭛: ?꾩껜?붾㈃留?(?ㅽ뙚쨌以뙿룹븷?덈찓?댁뀡)
+ * - ??? content(?댁꽕) + solutionData(JSON)
  */
-import React, { useState, useCallback, useMemo } from "react";
-import {
-  getPlayfieldRect,
-  DEFAULT_TABLE_WIDTH,
-  DEFAULT_TABLE_HEIGHT,
-} from "@/lib/billiard-table-constants";
-import { useTableOrientation } from "@/hooks/useTableOrientation";
+import React, { useState, useCallback, useMemo, useEffect, useLayoutEffect } from "react";
+import { getPlayfieldRect, DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT } from "@/lib/billiard-table-constants";
 import type { NanguBallPlacement } from "@/lib/nangu-types";
-import type { NanguSolutionData } from "@/lib/nangu-types";
+import type { NanguCurveNode, NanguSolutionData } from "@/lib/nangu-types";
 import type { NanguPathPoint } from "@/lib/nangu-types";
 import type { PathSegmentCurveControl } from "@/lib/path-curve-display";
-import { NanguReadOnlyLayout } from "@/components/nangu/NanguReadOnlyLayout";
-import { NanguSolutionPathOverlay } from "@/components/nangu/NanguSolutionPathOverlay";
-import { NanguThicknessEditor, getThicknessOverlap } from "@/components/nangu/NanguThicknessEditor";
-import { NanguSpinEditor } from "@/components/nangu/NanguSpinEditor";
-import { NanguFocusZoomOverlay, type NanguFocusZoomTarget } from "@/components/nangu/NanguFocusZoomOverlay";
-import { sanitizeImageSrc } from "@/lib/image-src";
 import { TROUBLE_SOLUTION_CONSOLE } from "@/components/trouble/trouble-console-contract";
 import { resolveTroubleFirstObjectBallKey } from "@/lib/trouble-first-object-ball";
 import {
@@ -31,69 +20,178 @@ import {
   ballSpeedToLegacySpeedLevel,
   ballSpeedToRailCount,
   getRailDisplayPowerForBallSpeed,
+  normalizeBallSpeed,
   type BallSpeed,
 } from "@/lib/ball-speed-constants";
 import { SolutionPathEditorFullscreen } from "@/components/nangu/SolutionPathEditorFullscreen";
-import { NanguTablePreviewHitLayer } from "@/components/nangu/NanguTablePreviewHitLayer";
-
-export type TroubleActivePanel =
-  | "thickness"
-  | "spin"
-  | "backstroke"
-  | "followstroke"
-  | "speed"
-  | "path";
+import {
+  DEFAULT_SOLUTION_SETTINGS,
+  clampSolutionSettings,
+  mergeSolutionSettings,
+  type SolutionSettingsValue,
+} from "@/lib/solution-settings-panel-value";
+import {
+  computeCueBallNormFromPanelSettings,
+  panelThicknessFromMainThicknessOffset,
+  thicknessOffsetXFromThicknessStep,
+} from "@/lib/solution-panel-ball-layout";
+import {
+  createTroubleSolutionEditorInitialState,
+  resolvePanelSettingsAndAuthority,
+} from "@/lib/solution-editor-hydrate";
 
 export interface TroubleSolutionEditorProps {
-  /** 이미지만 있을 때 사용. ballPlacement 있으면 무시 가능 */
+  /** ?대?吏留??덉쓣 ???ъ슜. ballPlacement ?덉쑝硫?臾댁떆 媛??*/
   layoutImageUrl: string | null;
-  /** 좌표 기반 배치 (있으면 읽기 전용 테이블 렌더, 없으면 이미지 표시) */
+  /** 醫뚰몴 湲곕컲 諛곗튂 (?덉쑝硫??쎄린 ?꾩슜 ?뚯씠釉??뚮뜑, ?놁쑝硫??대?吏 ?쒖떆) */
   ballPlacement: NanguBallPlacement | null;
+  /** ??λ맂 ?대쾿 JSON ??硫붿씤쨌?⑤꼸쨌寃쎈줈쨌蹂몃Ц 蹂듭썝 */
+  initialSolutionData?: Partial<NanguSolutionData> | null;
+  /** `initialSolutionData.settings`留??곕줈 ?섍만 ??*/
+  initialPersistedSettings?: SolutionSettingsValue | null;
+  /** trouble ?대쾿 蹂몃Ц(?댁꽕 ?띿뒪?? */
+  initialContent?: string | null;
   onSubmit: (payload: { content: string; solutionData: NanguSolutionData }) => Promise<void>;
 }
 
 export function TroubleSolutionEditor({
   layoutImageUrl,
   ballPlacement,
+  initialSolutionData = null,
+  initialPersistedSettings = null,
+  initialContent = null,
   onSubmit,
 }: TroubleSolutionEditorProps) {
-  const [activePanel, setActivePanel] = useState<TroubleActivePanel>("thickness");
-  const [isBankShot, setIsBankShot] = useState(false);
-  const [thicknessOffsetX, setThicknessOffsetX] = useState(0.5);
-  const [spinX, setSpinX] = useState(0);
-  const [spinY, setSpinY] = useState(0);
-  const [backstrokeLevel, setBackstrokeLevel] = useState(5);
-  const [followStrokeLevel, setFollowStrokeLevel] = useState(5);
-  const [ballSpeed, setBallSpeed] = useState<BallSpeed>(3.0);
-  const [pathPoints, setPathPoints] = useState<NanguPathPoint[]>([]);
-  const [objectPathPoints, setObjectPathPoints] = useState<NanguPathPoint[]>([]);
-  const [cuePathDisplayCurves, setCuePathDisplayCurves] = useState<PathSegmentCurveControl[]>([]);
-  const [objectPathDisplayCurves, setObjectPathDisplayCurves] = useState<PathSegmentCurveControl[]>(
-    []
+  const ih = useMemo(
+    () => createTroubleSolutionEditorInitialState(initialSolutionData, initialPersistedSettings, initialContent),
+    [initialSolutionData, initialPersistedSettings, initialContent]
   );
-  const [pathFsOpen, setPathFsOpen] = useState(false);
+
+  const [isBankShot, setIsBankShot] = useState(ih.isBankShot);
+  const [thicknessOffsetX, setThicknessOffsetX] = useState(ih.thicknessOffsetX);
+  const [spinX, setSpinX] = useState(ih.spinX);
+  const [spinY, setSpinY] = useState(ih.spinY);
+  const [backstrokeLevel, setBackstrokeLevel] = useState(ih.backstrokeLevel);
+  const [followStrokeLevel, setFollowStrokeLevel] = useState(ih.followStrokeLevel);
+  const [ballSpeed, setBallSpeed] = useState<BallSpeed>(ih.ballSpeed);
+  const [pathPoints, setPathPoints] = useState<NanguPathPoint[]>(ih.pathPoints);
+  const [objectPathPoints, setObjectPathPoints] = useState<NanguPathPoint[]>(ih.objectPathPoints);
+  const [cuePathDisplayCurves, setCuePathDisplayCurves] = useState<PathSegmentCurveControl[]>(ih.cuePathDisplayCurves);
+  const [objectPathDisplayCurves, setObjectPathDisplayCurves] = useState<PathSegmentCurveControl[]>(
+    ih.objectPathDisplayCurves
+  );
+  const [cuePathCurveNodes, setCuePathCurveNodes] = useState<NanguCurveNode[]>(ih.cuePathCurveNodes);
+  const [objectPathCurveNodes, setObjectPathCurveNodes] = useState<NanguCurveNode[]>(ih.objectPathCurveNodes);
+  const [pathFsOpen, setPathFsOpen] = useState(() => !!(ballPlacement || layoutImageUrl));
   const [pathFsKey, setPathFsKey] = useState(0);
-  const [explanationText, setExplanationText] = useState("");
+
+  /** 諛곗튂/?대?吏媛 ?덉쑝硫??섏씤???꾩뿉 ?꾩껜?붾㈃ 寃쎈줈 ?몄쭛??耳?以묎컙(?ㅼ젙 ?? 源쒕묀?꾩쓣 以꾩엫 */
+  useLayoutEffect(() => {
+    if (ballPlacement || layoutImageUrl) {
+      setPathFsOpen(true);
+    } else {
+      setPathFsOpen(false);
+    }
+  }, [ballPlacement, layoutImageUrl]);
+  const [explanationText, setExplanationText] = useState(ih.explanationText);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [focusZoom, setFocusZoom] = useState<{
-    active: boolean;
-    target: NanguFocusZoomTarget;
-    originX: number;
-    originY: number;
-  }>({ active: false, target: null, originX: 0, originY: 0 });
+  const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  const [settingsFocusSection, setSettingsFocusSection] = useState<
+    null | "thickness" | "tip" | "rail"
+  >(null);
+  /**
+   * true硫?誘몃땲 ?⑤꼸??蹂쇱뒪?쇰뱶쨌?먭퍡(physics)쨌?섍뎄 諛곗튂 ?ㅻ쾭?쇱씠?쑣톞ipNorm ?쒖떆瑜?二쇰룄.
+   * 誘몄궗????硫붿씤 ?щ씪?대뜑/諛곗튂留??ъ슜.
+   */
+  const [settingsPanelBallSpeedAuthoritative, setSettingsPanelBallSpeedAuthoritative] = useState(
+    () => resolvePanelSettingsAndAuthority(initialSolutionData, initialPersistedSettings).authoritative
+  );
+  const [panelSettings, setPanelSettings] = useState<SolutionSettingsValue>(() =>
+    resolvePanelSettingsAndAuthority(initialSolutionData, initialPersistedSettings).settings
+  );
 
-  const previewOrientation = useTableOrientation();
+  const openSettingsPanel = useCallback(
+    (section?: "thickness" | "tip" | "rail") => {
+      setSettingsFocusSection(section ?? null);
+      setPanelSettings((prev) => {
+        const base = {
+          ballSpeed,
+          backstroke: backstrokeLevel,
+          followStroke: followStrokeLevel,
+        };
+        if (!settingsPanelBallSpeedAuthoritative) {
+          return clampSolutionSettings(
+            mergeSolutionSettings(
+              {
+                ...base,
+                railCount: ballSpeedToRailCount(ballSpeed),
+                ...panelThicknessFromMainThicknessOffset(thicknessOffsetX),
+              },
+              prev
+            )
+          );
+        }
+        return clampSolutionSettings(mergeSolutionSettings(base, prev));
+      });
+      setSettingsPanelBallSpeedAuthoritative(true);
+      setSettingsPanelOpen(true);
+    },
+    [
+      settingsPanelBallSpeedAuthoritative,
+      ballSpeed,
+      backstrokeLevel,
+      followStrokeLevel,
+      thicknessOffsetX,
+    ]
+  );
 
   const rect = getPlayfieldRect(DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT);
 
+  const cueBallNormFromPanel = useMemo(() => {
+    if (!ballPlacement) return null;
+    return computeCueBallNormFromPanelSettings(ballPlacement.redBall, panelSettings, rect);
+  }, [ballPlacement, panelSettings, rect]);
+
+  const ballNormOverridesForPanel = useMemo(() => {
+    /** ?쒖떆???섍뎄 ?ㅻ쾭?쇱씠?쒕뒗 ?ㅼ젙李쎌씠 ?대┛ ?숈븞?먮쭔 ?곸슜 (?좊땲硫붿씠??醫뚰몴 濡쒖쭅怨?遺꾨━) */
+    if (!settingsPanelBallSpeedAuthoritative || !settingsPanelOpen || !ballPlacement || !cueBallNormFromPanel) {
+      return undefined;
+    }
+    const k = ballPlacement.cueBall === "yellow" ? "yellow" : "white";
+    return { [k]: cueBallNormFromPanel } as Partial<
+      Record<"red" | "yellow" | "white", { x: number; y: number }>
+    >;
+  }, [settingsPanelBallSpeedAuthoritative, settingsPanelOpen, ballPlacement, cueBallNormFromPanel]);
+
   const cuePos = ballPlacement
-    ? ballPlacement.cueBall === "yellow"
-      ? ballPlacement.yellowBall
-      : ballPlacement.whiteBall
+    ? settingsPanelBallSpeedAuthoritative && cueBallNormFromPanel
+      ? cueBallNormFromPanel
+      : ballPlacement.cueBall === "yellow"
+        ? ballPlacement.yellowBall
+        : ballPlacement.whiteBall
     : { x: 0.5, y: 0.5 };
 
-  /** 미리보기 1목 링·저장 — `lib/trouble-first-object-ball.ts`와 동일(스팟 없으면 null) */
+  const effectiveThicknessOffsetX = useMemo(() => {
+    if (!settingsPanelBallSpeedAuthoritative) return thicknessOffsetX;
+    const step = panelSettings?.thicknessStep;
+    if (step == null || Number.isNaN(step)) return thicknessOffsetX;
+    return thicknessOffsetXFromThicknessStep(step, panelSettings.cueSide);
+  }, [
+    settingsPanelBallSpeedAuthoritative,
+    panelSettings?.thicknessStep,
+    panelSettings.cueSide,
+    thicknessOffsetX,
+  ]);
+
+  const effectiveBallSpeed = useMemo(() => {
+    if (!settingsPanelBallSpeedAuthoritative) return ballSpeed;
+    const v = panelSettings?.railCount;
+    if (v == null || Number.isNaN(Number(v))) return ballSpeed;
+    return normalizeBallSpeed(v);
+  }, [settingsPanelBallSpeedAuthoritative, panelSettings?.railCount, ballSpeed]);
+
+  /** 誘몃━蹂닿린 1紐?留겶룹?????`lib/trouble-first-object-ball.ts`? ?숈씪(?ㅽ뙚 ?놁쑝硫?null) */
   const firstObjectBallKey = useMemo(() => {
     if (!ballPlacement) return null;
     return resolveTroubleFirstObjectBallKey({
@@ -105,8 +203,6 @@ export function TroubleSolutionEditor({
     });
   }, [ballPlacement, cuePos, pathPoints, objectPathPoints, rect]);
 
-  const showObjectBallSpotPulse = firstObjectBallKey != null;
-
   const openPathFullscreen = useCallback(() => {
     setPathFsKey((k) => k + 1);
     setPathFsOpen(true);
@@ -117,6 +213,8 @@ export function TroubleSolutionEditor({
     setObjectPathPoints([]);
     setCuePathDisplayCurves([]);
     setObjectPathDisplayCurves([]);
+    setCuePathCurveNodes([]);
+    setObjectPathCurveNodes([]);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -150,7 +248,7 @@ export function TroubleSolutionEditor({
 
       const solutionData: NanguSolutionData = {
         isBankShot,
-        thicknessOffsetX: isBankShot ? undefined : thicknessOffsetX,
+        thicknessOffsetX: isBankShot ? undefined : effectiveThicknessOffsetX,
         tipX: spinX,
         tipY: spinY,
         spinX,
@@ -160,14 +258,20 @@ export function TroubleSolutionEditor({
         reflectionObjectBall,
         backstrokeLevel,
         followStrokeLevel,
-        ballSpeed,
-        speedLevel: ballSpeedToLegacySpeedLevel(ballSpeed),
-        speed: ballSpeedToLegacySpeed(ballSpeed),
+        ballSpeed: effectiveBallSpeed,
+        speedLevel: ballSpeedToLegacySpeedLevel(effectiveBallSpeed),
+        speed: ballSpeedToLegacySpeed(effectiveBallSpeed),
         explanationText: explanationText.trim() || undefined,
         cuePathDisplayCurves:
           cuePathDisplayCurves.length > 0 ? cuePathDisplayCurves : undefined,
         objectPathDisplayCurves:
           objectPathDisplayCurves.length > 0 ? objectPathDisplayCurves : undefined,
+        cuePathCurveNodes: cuePathCurveNodes.length > 0 ? cuePathCurveNodes : undefined,
+        objectPathCurveNodes:
+          objectPathCurveNodes.length > 0 ? objectPathCurveNodes : undefined,
+        settings: settingsPanelBallSpeedAuthoritative
+          ? clampSolutionSettings(panelSettings)
+          : undefined,
       };
       await onSubmit({
         content: explanationText.trim(),
@@ -181,7 +285,6 @@ export function TroubleSolutionEditor({
   };
 
   const showImageOnly = !ballPlacement && layoutImageUrl;
-  const layoutSrc = layoutImageUrl ? sanitizeImageSrc(layoutImageUrl) : null;
 
   const C = TROUBLE_SOLUTION_CONSOLE;
 
@@ -193,330 +296,132 @@ export function TroubleSolutionEditor({
       className="space-y-6 flex flex-col"
       data-trouble-console={C.root}
     >
-      {/* 공배치 미리보기 — 기기 방향 반영, 탭 시 전체화면 (PC에서 테이블 폭만큼 가운데 — 당구노트 공배치와 동일) */}
-      <div className="flex w-full flex-col items-center">
+      {previewDisabled && (
         <div
-          className={`relative mx-auto w-full max-w-full overflow-hidden rounded-lg border border-gray-200 dark:border-slate-600 ${
-            previewDisabled ? "opacity-50" : ""
-          }`}
-          style={{
-            maxWidth: DEFAULT_TABLE_WIDTH,
-            aspectRatio:
-              previewOrientation === "portrait"
-                ? `${DEFAULT_TABLE_HEIGHT} / ${DEFAULT_TABLE_WIDTH}`
-                : `${DEFAULT_TABLE_WIDTH} / ${DEFAULT_TABLE_HEIGHT}`,
-          }}
+          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-100"
+          data-trouble-region={C.region.readonlyLayout}
         >
-          <div className="absolute inset-0 z-0 pointer-events-none">
-            {ballPlacement ? (
-              <>
-                <div className="absolute inset-0 w-full h-full">
-                  <NanguReadOnlyLayout
-                    ballPlacement={ballPlacement}
-                    showGrid
-                    drawStyle="realistic"
-                    fillContainer
-                    embedFill
-                    className="absolute inset-0 w-full h-full rounded-none border-0 overflow-hidden"
-                    hideObjectBall={false}
-                    showCueBallSpot
-                    showObjectBallSpot={showObjectBallSpotPulse}
-                    objectBallSpotKey={firstObjectBallKey}
-                    orientation={previewOrientation}
-                    pathOverlayAboveBalls={false}
-                    betweenTableAndBallsLayer={
-                      <NanguSolutionPathOverlay
-                        pathPoints={pathPoints}
-                        cuePos={cuePos}
-                        tableBallPlacement={ballPlacement}
-                        objectPathPoints={objectPathPoints}
-                        orientation={previewOrientation}
-                        pathMode={false}
-                        objectPathMode={false}
-                        pathLinesVisible={true}
-                        ballPickLayout={ballPlacement}
-                        cueDisplayCurveControls={cuePathDisplayCurves}
-                        objectDisplayCurveControls={objectPathDisplayCurves}
-                        curveHandleInteraction={false}
-                        curveHandlesShowSubtle={
-                          cuePathDisplayCurves.length > 0 || objectPathDisplayCurves.length > 0
-                        }
-                      />
-                    }
-                  />
-                </div>
-              </>
-            ) : showImageOnly && layoutSrc ? (
-              <>
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-slate-800">
-                  <img src={layoutSrc} alt="원본 공배치" className="w-full h-full object-contain" />
-                </div>
-                <NanguSolutionPathOverlay
-                  pathPoints={pathPoints}
-                  cuePos={cuePos}
-                  objectPathPoints={objectPathPoints}
-                  orientation={previewOrientation}
-                  pathMode={false}
-                  objectPathMode={false}
-                  pathLinesVisible={true}
-                />
-              </>
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-slate-800 text-gray-500 text-sm">
-                배치 이미지 없음
-              </div>
-            )}
-          </div>
-          <NanguTablePreviewHitLayer
-            dataTroubleRegion={C.region.readonlyLayout}
-            disabled={previewDisabled}
-            className="absolute inset-0 z-[3] cursor-pointer touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-site-primary rounded-lg"
-            onOpen={openPathFullscreen}
-            ariaLabel="전체화면에서 경로 편집 열기"
-          />
+          怨듬같移??뺣낫媛 ?놁뼱 寃쎈줈 ?대쾿???묒꽦?????놁뒿?덈떎. ??寃뚯떆臾쇱뿉 諛곗튂??醫뚰몴 ?먮뒗 ?대?吏)媛 ?덉뼱???⑸땲??
         </div>
+      )}
 
-        <div
-          className="mx-auto mt-2 flex w-full max-w-full flex-wrap items-center justify-center gap-2"
-          style={{ maxWidth: DEFAULT_TABLE_WIDTH }}
-          data-trouble-region={C.region.pathToolbar}
-        >
-          <button
-            type="button"
-            data-testid="trouble-e2e-open-path-fullscreen"
-            data-trouble-action={C.action.togglePathMode}
-            disabled={previewDisabled}
-            onClick={openPathFullscreen}
-            className="px-3 py-2 rounded-lg text-sm font-medium bg-site-primary text-white hover:opacity-90 touch-manipulation disabled:opacity-50"
-          >
-            전체화면 · 경로선 편집
-          </button>
-          <button
-            type="button"
-            data-trouble-action={C.action.clearAllPaths}
-            disabled={pathPoints.length === 0 && objectPathPoints.length === 0}
-            onClick={clearCommittedPath}
-            className="px-3 py-2 rounded-lg text-sm font-medium border border-red-300 text-red-700 dark:text-red-300 disabled:opacity-50 touch-manipulation"
-          >
-            저장된 경로 지우기
-          </button>
-        </div>
-      </div>
-
-      {pathFsOpen && (
+      {/* ?쒓뎄?대쾿 ?쒖떆: 以묎컙 諛곗튂???ㅼ젙 ???놁씠 怨㏓컮濡?寃쎈줈???꾩껜?붾㈃ ??DOM ?쒖꽌??癒쇱? 留덉슫??*/}
+      {!previewDisabled && pathFsOpen && (
         <SolutionPathEditorFullscreen
           key={pathFsKey}
           variant="trouble"
           presentation="noteBallPlacementFullscreen"
           readOnlyCueAndBalls={!!ballPlacement}
           ballPlacement={ballPlacement}
+          panelBallNormOverrides={ballNormOverridesForPanel}
+          panelCueTipNorm={
+            settingsPanelBallSpeedAuthoritative ? panelSettings.tipNorm : null
+          }
           layoutImageUrl={ballPlacement ? null : layoutImageUrl}
           initialPathPoints={pathPoints}
           initialObjectPathPoints={objectPathPoints}
           initialCuePathDisplayCurves={cuePathDisplayCurves}
           initialObjectPathDisplayCurves={objectPathDisplayCurves}
-          thicknessOffsetX={thicknessOffsetX}
+          initialCuePathCurveNodes={cuePathCurveNodes}
+          initialObjectPathCurveNodes={objectPathCurveNodes}
+          thicknessOffsetX={effectiveThicknessOffsetX}
           isBankShot={isBankShot}
-          ballSpeed={ballSpeed}
-          onCancel={() => setPathFsOpen(false)}
+          ballSpeed={effectiveBallSpeed}
+          settingsValue={panelSettings}
+          onSettingsChange={(next) => {
+            setSettingsPanelBallSpeedAuthoritative(true);
+            setPanelSettings(next);
+            if (next.railCount != null && !Number.isNaN(Number(next.railCount))) {
+              setBallSpeed(normalizeBallSpeed(next.railCount));
+            }
+          }}
+          settingsOpen={settingsPanelOpen}
+          onSettingsOpen={openSettingsPanel}
+          onSettingsClose={() => {
+            setSettingsPanelOpen(false);
+            setSettingsFocusSection(null);
+          }}
+          settingsFocusSection={settingsFocusSection}
+          onCancel={() => {
+            if (typeof window !== "undefined" && !window.confirm("경로 편집을 종료할까요?")) {
+              return;
+            }
+            setPathFsOpen(false);
+          }}
           onConfirm={({
             pathPoints: nextCue,
             objectPathPoints: nextObj,
             cuePathDisplayCurves: nextCueCurves,
             objectPathDisplayCurves: nextObjCurves,
+            cuePathCurveNodes: nextCueCurveNodes,
+            objectPathCurveNodes: nextObjCurveNodes,
           }) => {
             setPathPoints(nextCue);
             setObjectPathPoints(nextObj);
             setCuePathDisplayCurves(nextCueCurves ?? []);
             setObjectPathDisplayCurves(nextObjCurves ?? []);
+            setCuePathCurveNodes(nextCueCurveNodes ?? []);
+            setObjectPathCurveNodes(nextObjCurveNodes ?? []);
             setPathFsOpen(false);
           }}
         />
       )}
 
-      {/* 4) 해법 설정 패널 */}
+      <div
+        className={
+          pathFsOpen && !previewDisabled ? "hidden" : undefined
+        }
+        aria-hidden={pathFsOpen && !previewDisabled}
+      >
+        {!previewDisabled && !pathFsOpen && (
+          <div
+            className="flex flex-col items-stretch gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-slate-600 dark:bg-slate-800/50 mb-6"
+            data-trouble-region={C.region.pathToolbar}
+          >
+            <p className="text-sm text-site-text">
+              경로 편집 화면으로 이동합니다. 두께와 당점 값을 먼저 설정한 뒤 경로를 이어서 편집할 수 있습니다.
+            </p>
+            <button
+              type="button"
+              data-testid="trouble-e2e-open-path-fullscreen"
+              data-trouble-action={C.action.togglePathMode}
+              onClick={openPathFullscreen}
+              className="w-full rounded-lg px-3 py-2.5 text-sm font-medium bg-site-primary text-white hover:opacity-90 touch-manipulation"
+            >
+              경로선 편집 다시 열기
+            </button>
+            <button
+              type="button"
+              data-trouble-action={C.action.clearAllPaths}
+              disabled={pathPoints.length === 0 && objectPathPoints.length === 0}
+              onClick={clearCommittedPath}
+              className="rounded-lg px-3 py-2 text-sm font-medium border border-red-300 text-red-700 dark:text-red-300 disabled:opacity-50 touch-manipulation"
+            >
+              저장된 경로 지우기
+            </button>
+          </div>
+        )}
+
+      {/* 4) ?대쾿 ?ㅼ젙: SettingsPanel(紐⑤컮???몃꽕???쒗듃, PC 紐⑤떖)留???援ы삎 ??룹뒳?쇱씠??UI ?쒓굅 */}
       <div
         className="rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 p-4"
         data-trouble-region={C.region.settings}
+        data-solution-settings={JSON.stringify(panelSettings)}
       >
-        <p className="text-sm font-medium text-site-text mb-3">해법 설정</p>
-        <div className="flex flex-wrap gap-2 mb-4">
-          {(
-            [
-              ["thickness", "두께", C.action.panelThickness],
-              ["spin", "당점", C.action.panelSpin],
-              ["backstroke", "백스트로크", C.action.panelBackstroke],
-              ["followstroke", "팔로우", C.action.panelFollowstroke],
-              ["speed", "볼스피드", C.action.panelSpeed],
-              ["path", "진행경로", C.action.panelPath],
-            ] as const
-          ).map(([key, label, actionAttr]) => (
-            <button
-              key={key}
-              type="button"
-              data-trouble-action={actionAttr}
-              onClick={() => setActivePanel(key)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
-                activePanel === key
-                  ? "bg-site-primary text-white border-site-primary"
-                  : "bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-site-text"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {activePanel === "thickness" && (
-          <div className="space-y-2">
-            <NanguThicknessEditor
-              value={thicknessOffsetX}
-              isBankShot={isBankShot}
-              onChange={setThicknessOffsetX}
-              onBankShotChange={setIsBankShot}
-              onFocusZoomRequest={(cx, cy) =>
-                setFocusZoom({ active: true, target: "thickness", originX: cx, originY: cy })
-              }
-              onFocusZoomEnd={() => setFocusZoom((z) => ({ ...z, active: false }))}
-            />
-            <p className="text-xs text-gray-500 mt-1">보조: 두께 수치</p>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={1 / 16}
-              value={thicknessOffsetX}
-              onChange={(e) => {
-                const v = e.target.valueAsNumber;
-                setThicknessOffsetX(v);
-                if (getThicknessOverlap(v)) setIsBankShot(false);
-              }}
-              className="w-full max-w-xs"
-            />
-          </div>
-        )}
-
-        {activePanel === "spin" && (
-          <div className="space-y-2">
-            <NanguSpinEditor
-              spinX={spinX}
-              spinY={spinY}
-              onChange={({ spinX: x, spinY: y }) => {
-                setSpinX(x);
-                setSpinY(y);
-              }}
-              onFocusZoomRequest={(cx, cy) =>
-                setFocusZoom({ active: true, target: "spin", originX: cx, originY: cy })
-              }
-              onFocusZoomEnd={() => setFocusZoom((z) => ({ ...z, active: false }))}
-            />
-            <p className="text-xs text-gray-500 mt-1">보조: X/Y 슬라이더</p>
-            <div className="flex flex-wrap gap-4">
-              <label className="flex items-center gap-2">
-                <span className="text-sm w-16">X</span>
-                <input
-                  type="range"
-                  min={-1}
-                  max={1}
-                  step={0.1}
-                  value={spinX}
-                  onChange={(e) => setSpinX(e.target.valueAsNumber)}
-                  className="w-32"
-                />
-              </label>
-              <label className="flex items-center gap-2">
-                <span className="text-sm w-16">Y</span>
-                <input
-                  type="range"
-                  min={-1}
-                  max={1}
-                  step={0.1}
-                  value={spinY}
-                  onChange={(e) => setSpinY(e.target.valueAsNumber)}
-                  className="w-32"
-                />
-              </label>
-            </div>
-          </div>
-        )}
-
-        {activePanel === "backstroke" && (
-          <div className="py-2 -mx-2 px-2 rounded-lg touch-manipulation">
-            <p className="text-xs text-gray-500 mb-1">백스트로크: 오른쪽=짧음, 왼쪽=김</p>
-            <input
-              type="range"
-              min={0}
-              max={10}
-              value={backstrokeLevel}
-              onChange={(e) => setBackstrokeLevel(e.target.valueAsNumber)}
-              className="w-full max-w-xs"
-            />
-            <p className="text-xs text-site-text mt-1">{backstrokeLevel} / 10</p>
-          </div>
-        )}
-
-        {activePanel === "followstroke" && (
-          <div className="py-2 -mx-2 px-2 rounded-lg touch-manipulation">
-            <p className="text-xs text-gray-500 mb-1">팔로우스트로크: 왼쪽=짧음, 오른쪽=김</p>
-            <input
-              type="range"
-              min={0}
-              max={10}
-              value={followStrokeLevel}
-              onChange={(e) => setFollowStrokeLevel(e.target.valueAsNumber)}
-              className="w-full max-w-xs"
-            />
-            <p className="text-xs text-site-text mt-1">{followStrokeLevel} / 10</p>
-          </div>
-        )}
-
-        {activePanel === "speed" && (
-          <div className="py-2 -mx-2 px-2 rounded-lg touch-manipulation">
-            <p className="text-xs text-gray-500 mb-2">볼 스피드: 1.0 ~ 5.0 (0.5 단계)</p>
-            <div className="flex flex-wrap items-end gap-1">
-              {BALL_SPEED_OPTIONS.map((v) => (
-                <div key={v} className="flex flex-col items-center">
-                  <button
-                    type="button"
-                    onClick={() => setBallSpeed(v)}
-                    className={`min-w-[2.25rem] h-8 px-1 flex items-center justify-center text-sm font-bold rounded transition ${
-                      ballSpeed === v
-                        ? "bg-site-primary text-white"
-                        : "bg-gray-200 dark:bg-slate-600 text-site-text hover:bg-gray-300 dark:hover:bg-slate-500"
-                    }`}
-                  >
-                    {v}
-                  </button>
-                  <span className="text-[10px] text-gray-500 dark:text-slate-400 mt-0.5 whitespace-nowrap">
-                    {ballSpeedToRailCount(v)}레일
-                  </span>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-site-text mt-1">
-              {ballSpeed} · {ballSpeedToRailCount(ballSpeed)}레일 · 표시{" "}
-              {getRailDisplayPowerForBallSpeed(ballSpeed)}
-            </p>
-          </div>
-        )}
-
-        {activePanel === "path" && (
-          <div className="space-y-2">
-            <button
-              type="button"
-              onClick={openPathFullscreen}
-              disabled={previewDisabled}
-              className="px-3 py-2 rounded-lg text-sm font-medium bg-site-primary text-white hover:opacity-90 touch-manipulation disabled:opacity-50"
-            >
-              전체화면 · 경로선 편집
-            </button>
-          </div>
+        <p className="text-sm font-medium text-site-text mb-2">해법 설정</p>
+        <p className="text-xs text-gray-500 dark:text-slate-400 mb-3">
+          두께·당점·백/팔로우·레일거리는 설정 패널에서 조절합니다. 경로는 전체화면 하단 설정 버튼에서 수정하세요.
+        </p>
+        {!previewDisabled && (
+          <p className="mt-3 text-[11px] text-gray-500 dark:text-slate-500">
+            설정과 경로의 전체화면 편집 패널은 하단에서 열 수 있습니다.
+          </p>
         )}
       </div>
 
-      {/* 5) 해설 입력 */}
+      {/* 5) ?댁꽕 ?낅젰 */}
       <div data-trouble-region={C.region.explanation}>
-        <label className="block text-sm font-medium text-site-text mb-1">해설</label>
+        <label className="block text-sm font-medium text-site-text mb-1">설명</label>
         <textarea
           value={explanationText}
           onChange={(e) => setExplanationText(e.target.value)}
@@ -534,97 +439,10 @@ export function TroubleSolutionEditor({
         disabled={saving}
         className="w-full py-3 rounded-lg bg-site-primary text-white font-medium disabled:opacity-50"
       >
-        {saving ? "등록 중…" : "해법 등록"}
+        {saving ? "등록 중..." : "해법 등록"}
       </button>
-
-      {/* 포커스 확대 */}
-      {focusZoom.active && focusZoom.target && (
-        <NanguFocusZoomOverlay
-          active={focusZoom.active}
-          target={focusZoom.target}
-          originX={focusZoom.originX}
-          originY={focusZoom.originY}
-          onClose={() => setFocusZoom((z) => ({ ...z, active: false }))}
-        >
-          {focusZoom.target === "thickness" && (
-            <div className="p-4">
-              <p className="text-sm font-medium text-site-text mb-2">두께 (확대)</p>
-              <NanguThicknessEditor
-                value={thicknessOffsetX}
-                isBankShot={isBankShot}
-                onChange={setThicknessOffsetX}
-                onBankShotChange={setIsBankShot}
-              />
-            </div>
-          )}
-          {focusZoom.target === "spin" && (
-            <div className="p-4">
-              <p className="text-sm font-medium text-site-text mb-2">당점 (확대)</p>
-              <NanguSpinEditor
-                spinX={spinX}
-                spinY={spinY}
-                onChange={({ spinX: x, spinY: y }) => {
-                  setSpinX(x);
-                  setSpinY(y);
-                }}
-              />
-            </div>
-          )}
-          {focusZoom.target === "backstroke" && (
-            <div className="p-4 min-w-[200px]">
-              <p className="text-sm font-medium text-site-text mb-2">백스트로크 (확대)</p>
-              <input
-                type="range"
-                min={0}
-                max={10}
-                value={backstrokeLevel}
-                onChange={(e) => setBackstrokeLevel(e.target.valueAsNumber)}
-                className="w-full h-10"
-              />
-              <p className="text-xs text-site-text mt-1">{backstrokeLevel} / 10</p>
-            </div>
-          )}
-          {focusZoom.target === "followstroke" && (
-            <div className="p-4 min-w-[200px]">
-              <p className="text-sm font-medium text-site-text mb-2">팔로우스트로크 (확대)</p>
-              <input
-                type="range"
-                min={0}
-                max={10}
-                value={followStrokeLevel}
-                onChange={(e) => setFollowStrokeLevel(e.target.valueAsNumber)}
-                className="w-full h-10"
-              />
-              <p className="text-xs text-site-text mt-1">{followStrokeLevel} / 10</p>
-            </div>
-          )}
-          {focusZoom.target === "speed" && (
-            <div className="p-4">
-              <p className="text-sm font-medium text-site-text mb-2">볼 스피드 (확대)</p>
-              <div className="flex flex-wrap items-end gap-1 max-w-[320px]">
-                {BALL_SPEED_OPTIONS.map((v) => (
-                  <div key={v} className="flex flex-col items-center">
-                    <button
-                      type="button"
-                      onClick={() => setBallSpeed(v)}
-                      className={`min-w-[2.75rem] h-12 px-1 flex items-center justify-center text-lg font-bold rounded transition ${
-                        ballSpeed === v ? "bg-site-primary text-white" : "bg-gray-200 dark:bg-slate-600 text-site-text"
-                      }`}
-                    >
-                      {v}
-                    </button>
-                    <span className="text-[10px] text-gray-500 mt-0.5">{ballSpeedToRailCount(v)}레일</span>
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-site-text mt-2">
-                {ballSpeed} · {ballSpeedToRailCount(ballSpeed)}레일 · 표시{" "}
-                {getRailDisplayPowerForBallSpeed(ballSpeed)}
-              </p>
-            </div>
-          )}
-        </NanguFocusZoomOverlay>
-      )}
+      </div>
     </form>
   );
 }
+

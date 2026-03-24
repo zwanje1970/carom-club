@@ -1,41 +1,41 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
+import { isDatabaseConfigured } from "@/lib/db-mode";
+import { getCachedNanguBoardList } from "@/lib/community-nangu-list-server";
 import { formatKoreanDate } from "@/lib/format-date";
 import { NanguSolverIcon } from "@/components/community/NanguSolverIcon";
 
-type NanguPostListItem = {
-  id: string;
-  title: string;
-  content: string;
-  createdAt: string;
-  authorName: string;
-  solutionCount: number;
-  solutions: { id: string; title: string | null; authorName: string; voteCount: number; createdAt: string }[];
-};
+export const revalidate = 60;
 
-export default function NanguBoardPage() {
-  const [posts, setPosts] = useState<NanguPostListItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+export default async function NanguBoardPage() {
+  if (!isDatabaseConfigured()) {
+    return (
+      <main className="min-h-screen bg-site-bg text-site-text">
+        <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">
+          <p className="text-gray-600 dark:text-slate-400">데이터베이스에 연결할 수 없습니다.</p>
+          <Link href="/community" className="mt-2 inline-block text-site-primary underline">
+            커뮤니티로
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
-  useEffect(() => {
-    fetch("/api/community/nangu", { credentials: "include" })
-      .then((res) => {
-        if (!res.ok) throw new Error("목록을 불러올 수 없습니다.");
-        return res.json();
-      })
-      .then(setPosts)
-      .catch((e) => setError(e instanceof Error ? e.message : "오류"))
-      .finally(() => setLoading(false));
-  }, []);
+  const session = await getSession();
+  if (!session) {
+    redirect(`/login?next=${encodeURIComponent("/community/nangu")}`);
+  }
+
+  const posts = await getCachedNanguBoardList();
 
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
       <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">
         <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4" aria-label="breadcrumb">
-          <Link href="/community" className="hover:text-site-primary">커뮤니티</Link>
+          <Link href="/community" className="hover:text-site-primary">
+            커뮤니티
+          </Link>
           <span aria-hidden>/</span>
           <span className="text-site-text font-medium">난구해결사</span>
         </nav>
@@ -51,15 +51,10 @@ export default function NanguBoardPage() {
             글쓰기
           </Link>
         </div>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
-          문제구 질문 및 해법 토론용 게시판입니다.
-        </p>
-        {loading && <p className="text-gray-500">목록 불러오는 중…</p>}
-        {error && <p className="text-red-600">{error}</p>}
-        {!loading && !error && posts.length === 0 && (
+        <p className="text-gray-600 dark:text-gray-400 mb-6">문제구 질문 및 해법 토론용 게시판입니다.</p>
+        {posts.length === 0 ? (
           <p className="text-gray-500">아직 글이 없습니다.</p>
-        )}
-        {!loading && !error && posts.length > 0 && (
+        ) : (
           <ul className="divide-y divide-gray-200 dark:divide-slate-700" aria-label="게시글 목록">
             {posts.map((p) => (
               <li key={p.id}>

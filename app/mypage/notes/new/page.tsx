@@ -222,11 +222,11 @@ export default function MypageNewNotePage() {
         <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4" aria-label="breadcrumb">
           <Link href="/mypage" className="hover:text-site-primary">마이페이지</Link>
           <span aria-hidden>/</span>
-          <Link href="/mypage/notes" className="hover:text-site-primary">당구노트</Link>
+          <Link href="/mypage/notes" className="hover:text-site-primary">난구노트</Link>
           <span aria-hidden>/</span>
           <span className="text-site-text font-medium">작성</span>
         </nav>
-        <h1 className="text-xl font-bold mb-6">당구노트 작성</h1>
+        <h1 className="text-xl font-bold mb-6">난구노트 작성</h1>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
           제목·날짜·내용을 입력하고, 당구공배치를 클릭해 공을 배치한 뒤 저장하세요.
         </p>

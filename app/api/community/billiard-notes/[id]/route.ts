@@ -43,7 +43,7 @@ export async function GET(
     },
   });
   if (!note) {
-    return NextResponse.json({ error: "노트를 찾을 수 없습니다." }, { status: 404 });
+    return NextResponse.json({ error: "난구노트를 찾을 수 없습니다." }, { status: 404 });
   }
   const isAuthor = session?.id === note.authorId;
   if (note.visibility !== "community" && !isAuthor) {
@@ -63,8 +63,8 @@ export async function GET(
     memo: note.memo,
     imageUrl: note.imageUrl,
     visibility: note.visibility,
-    createdAt: note.createdAt,
-    updatedAt: note.updatedAt,
+    createdAt: note.createdAt.toISOString(),
+    updatedAt: note.updatedAt.toISOString(),
     isAuthor,
   });
 }
@@ -90,7 +90,7 @@ export async function PATCH(
     select: { authorId: true },
   });
   if (!existing) {
-    return NextResponse.json({ error: "노트를 찾을 수 없습니다." }, { status: 404 });
+    return NextResponse.json({ error: "난구노트를 찾을 수 없습니다." }, { status: 404 });
   }
   if (existing.authorId !== session.id) {
     return NextResponse.json({ error: "수정 권한이 없습니다." }, { status: 403 });
@@ -144,7 +144,7 @@ export async function PATCH(
   return NextResponse.json({
     id: updated.id,
     visibility: updated.visibility,
-    updatedAt: updated.updatedAt,
+    updatedAt: updated.updatedAt.toISOString(),
   });
 }
 
@@ -169,7 +169,7 @@ export async function DELETE(
     select: { authorId: true },
   });
   if (!existing) {
-    return NextResponse.json({ error: "노트를 찾을 수 없습니다." }, { status: 404 });
+    return NextResponse.json({ error: "난구노트를 찾을 수 없습니다." }, { status: 404 });
   }
   if (existing.authorId !== session.id) {
     return NextResponse.json({ error: "삭제 권한이 없습니다." }, { status: 403 });

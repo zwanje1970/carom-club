@@ -20,7 +20,10 @@ export default async function AdminFeeLedgerPage() {
 
   return (
     <SectionMain>
-      <SectionTitleLineWithButton icon={mdiCashMultiple} title="전체 회비 장부" />
+      <SectionTitleLineWithButton icon={mdiCashMultiple} title="정산" />
+      <p className="mb-4 text-sm text-gray-600 dark:text-slate-400">
+        클라이언트 정산 관리 — 회비·납부 현황을 조회합니다.
+      </p>
 
       <CardBox>
         <FeeLedgerPageClient initialData={data} />

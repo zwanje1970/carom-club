@@ -68,7 +68,7 @@ export async function GET(request: Request) {
         memo: n.memo,
         imageUrl: n.imageUrl,
         visibility: n.visibility,
-        createdAt: n.createdAt,
+        createdAt: n.createdAt.toISOString(),
         authorName: n.author.name,
       }))
     );
@@ -99,7 +99,7 @@ export async function GET(request: Request) {
       memo: n.memo,
       imageUrl: n.imageUrl,
       visibility: n.visibility,
-      createdAt: n.createdAt,
+      createdAt: n.createdAt.toISOString(),
       sentToTroubleCount: n._count.troubleShotsFromNote,
     }))
   );
@@ -174,7 +174,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
     id: note.id,
     visibility: note.visibility,
-    createdAt: note.createdAt,
+    createdAt: note.createdAt.toISOString(),
   });
   } catch (e) {
     console.error("[billiard-notes] POST create error:", e);

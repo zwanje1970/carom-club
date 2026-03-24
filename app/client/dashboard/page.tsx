@@ -135,7 +135,7 @@ export default async function ClientDashboardPage({
                       href="/client/operations"
                       className="text-[11px] font-medium text-indigo-800 underline dark:text-indigo-300"
                     >
-                      운영 관리
+                      대회 운영
                     </Link>
                   </ConsoleTableTd>
                 </ConsoleTableRow>
@@ -146,10 +146,10 @@ export default async function ClientDashboardPage({
                   </ConsoleTableTd>
                   <ConsoleTableTd className="text-right">
                     <Link
-                      href="/client/participants"
+                      href="/client/operations"
                       className="text-[11px] font-medium text-indigo-800 underline dark:text-indigo-300"
                     >
-                      참가자
+                      대회 운영
                     </Link>
                   </ConsoleTableTd>
                 </ConsoleTableRow>
@@ -177,7 +177,7 @@ export default async function ClientDashboardPage({
                       href="/client/billing"
                       className="text-[11px] font-medium text-indigo-800 underline dark:text-indigo-300"
                     >
-                      대회 정산
+                      정산
                     </Link>
                   </ConsoleTableTd>
                 </ConsoleTableRow>
@@ -265,7 +265,7 @@ export default async function ClientDashboardPage({
                 새 대회
               </Link>
               <Link
-                href="/client/participants"
+                href="/client/operations"
                 className="rounded-sm border border-zinc-400 px-2.5 py-1.5 font-medium hover:bg-zinc-200/60 dark:border-zinc-600 dark:hover:bg-zinc-800"
               >
                 참가 승인
@@ -274,25 +274,25 @@ export default async function ClientDashboardPage({
                 href="/client/operations"
                 className="rounded-sm border border-zinc-400 px-2.5 py-1.5 font-medium hover:bg-zinc-200/60 dark:border-zinc-600 dark:hover:bg-zinc-800"
               >
-                운영 관리
+                대회 운영
               </Link>
               <Link
-                href="/client/brackets"
+                href="/client/operations"
                 className="rounded-sm border border-zinc-400 px-2.5 py-1.5 font-medium hover:bg-zinc-200/60 dark:border-zinc-600 dark:hover:bg-zinc-800"
               >
-                대진표
+                대진·브래킷
               </Link>
               <Link
                 href="/client/billing"
                 className="rounded-sm border border-zinc-400 px-2.5 py-1.5 font-medium hover:bg-zinc-200/60 dark:border-zinc-600 dark:hover:bg-zinc-800"
               >
-                대회 정산
+                정산
               </Link>
               <Link
-                href="/client/schedule"
+                href="/client/promo"
                 className="rounded-sm border border-zinc-400 px-2.5 py-1.5 font-medium hover:bg-zinc-200/60 dark:border-zinc-600 dark:hover:bg-zinc-800"
               >
-                일정
+                홍보
               </Link>
             </div>
           </ConsoleSection>
@@ -392,8 +392,8 @@ export default async function ClientDashboardPage({
 
           <p className={cx("text-[10px]", consoleTextMuted)}>
             {getCopyValue(c, "client.dashboard.consoleTitle")} — 도움말은{" "}
-            <Link href="/client/content" className="underline">
-              콘텐츠 관리
+            <Link href="/client/promo" className="underline">
+              콘텐츠/홍보
             </Link>
             ·{" "}
             <Link href="/client/settings" className="underline">

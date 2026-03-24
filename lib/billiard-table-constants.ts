@@ -212,12 +212,12 @@ export function distanceNormPointsInPlayfieldPx(
 }
 
 /**
- * 당구노트 공 배치(`BilliardTableEditor` placementMode)와 동일 — `hitTestBall` 의 반지름 배수.
+ * 난구노트 공 배치(`BilliardTableEditor` placementMode)와 동일 — `hitTestBall` 의 반지름 배수.
  * 난구해법·경로 편집의 공/수구 탭도 이 값과 맞춤.
  */
 export const BALL_PLACEMENT_TOUCH_RADIUS_SCALE = 6;
 
-/** 당구노트 공 배치 터치 반경(px) — 공 반지름 × {@link BALL_PLACEMENT_TOUCH_RADIUS_SCALE} */
+/** 난구노트 공 배치 터치 반경(px) — 공 반지름 × {@link BALL_PLACEMENT_TOUCH_RADIUS_SCALE} */
 export function getBallPlacementTouchRadiusPx(rect: PlayfieldRect): number {
   return getBallRadius(getPlayfieldLongSide(rect)) * BALL_PLACEMENT_TOUCH_RADIUS_SCALE;
 }
@@ -367,7 +367,7 @@ export function clampBallToPlayfieldAndNoOverlap(
 
 /**
  * 클릭/터치 지점(픽셀)에서 맞은 공 반환. 없으면 null.
- * @param hitRadiusScale 공 반지름의 배수 (기본 1). 당구노트 공 배치는 {@link BALL_PLACEMENT_TOUCH_RADIUS_SCALE}.
+ * @param hitRadiusScale 공 반지름의 배수 (기본 1). 난구노트 공 배치는 {@link BALL_PLACEMENT_TOUCH_RADIUS_SCALE}.
  */
 export function hitTestBall(
   px: number,

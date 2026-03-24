@@ -1,6 +1,6 @@
 /**
- * 관리자 사이드/상단 메뉴 (기존 app/admin 라우트 기준)
- * copy: 플랫폼 관리자 > 설정 > 메뉴/문구에서 수정한 값 (없으면 기본값 사용)
+ * 관리자 사이드/상단 메뉴 (레거시·문구 기본값)
+ * 사이드바 실제 구조는 adminMenuConfig.ts 의 getAdminMenuAside 를 사용합니다.
  */
 import {
   mdiViewDashboard,
@@ -16,7 +16,6 @@ import {
   mdiWindowRestore,
   mdiViewCarousel,
   mdiFormatListBulleted,
-  mdiAccountCog,
   mdiCashMultiple,
 } from "@mdi/js";
 import type { MenuAsideItem, MenuNavBarItem } from "./_interfaces";
@@ -29,22 +28,13 @@ const defaultCopy: Record<string, string> = {
   "menu.popups": "팝업 관리",
   "menu.noticeBars": "공지 배너 관리",
   "menu.tournaments": "대회관리",
-  "menu.tournamentList": "대회 목록",
-  "menu.tournamentNew": "대회 생성",
-  "menu.participants": "참가 신청 관리",
-  "menu.brackets": "대진표관리",
-  "menu.members": "회원관리",
-  "menu.memberList": "회원 목록",
-  "menu.memberRoles": "권한 관리",
+  "menu.members": "회원·권한 관리",
+  "menu.membersUnified": "회원·권한 관리",
   "menu.inquiries": "문의관리",
-  "menu.venues": "클라이언트 관리",
+  "menu.clientSection": "클라이언트 관리",
   "menu.venueList": "클라이언트 목록",
-  "menu.feeLedger": "회비 장부",
-  "menu.clientApplications": "클라이언트 신규신청",
-  "menu.billing": "요금 정책",
-  "menu.features": "기능 목록",
-  "menu.pricingPlans": "요금제/상품",
-  "menu.listingProducts": "등록상품 정책",
+  "menu.feeLedger": "정산",
+  "menu.clientApplications": "신청 관리",
   "menu.settings": "설정",
   "nav.myInfo": "내 정보",
   "nav.settings": "설정",
@@ -55,12 +45,24 @@ const defaultCopy: Record<string, string> = {
 
 function L(copy: Record<string, string> | undefined, key: string): string {
   const v = copy?.[key];
-  return (typeof v === "string" && v.trim() !== "") ? v.trim() : (defaultCopy[key] ?? key);
+  return typeof v === "string" && v.trim() !== "" ? v.trim() : (defaultCopy[key] ?? key);
 }
 
+/** @deprecated getAdminMenuAside(adminMenuConfig) 사용 권장 — 동일 업무 흐름 구조로 정렬됨 */
 export function getMenuAside(copy?: Record<string, string>): MenuAsideItem[] {
   return [
     { href: "/admin", label: L(copy, "menu.dashboard"), icon: mdiViewDashboard },
+    { href: "/admin/tournaments", label: L(copy, "menu.tournaments"), icon: mdiTrophy },
+    {
+      label: L(copy, "menu.clientSection"),
+      icon: mdiOfficeBuilding,
+      menu: [
+        { href: "/admin/venues", label: L(copy, "menu.venueList"), icon: mdiFormatListBulleted },
+        { href: "/admin/client-applications", label: L(copy, "menu.clientApplications"), icon: mdiClipboardCheck },
+        { href: "/admin/fee-ledger", label: L(copy, "menu.feeLedger"), icon: mdiCashMultiple },
+      ],
+    },
+    { href: "/admin/members", label: L(copy, "menu.membersUnified"), icon: mdiAccountMultiple },
     {
       label: L(copy, "menu.content"),
       icon: mdiFormatSection,
@@ -70,42 +72,13 @@ export function getMenuAside(copy?: Record<string, string>): MenuAsideItem[] {
         { href: "/admin/notice-bars", label: L(copy, "menu.noticeBars"), icon: mdiViewCarousel },
       ],
     },
-    { href: "/admin/tournaments", label: "대회 현황", icon: mdiTrophy },
-    {
-      label: L(copy, "menu.venues"),
-      icon: mdiOfficeBuilding,
-      menu: [
-        { href: "/admin/venues", label: L(copy, "menu.venueList"), icon: mdiFormatListBulleted },
-        { href: "/admin/fee-ledger", label: L(copy, "menu.feeLedger"), icon: mdiCashMultiple },
-        { href: "/admin/client-applications", label: L(copy, "menu.clientApplications"), icon: mdiClipboardCheck },
-      ],
-    },
-    {
-      label: L(copy, "menu.members"),
-      icon: mdiAccountMultiple,
-      menu: [
-        { href: "/admin/members", label: L(copy, "menu.memberList"), icon: mdiFormatListBulleted },
-        { href: "/admin/members", label: L(copy, "menu.memberRoles"), icon: mdiAccountCog },
-      ],
-    },
     { href: "/admin/inquiries", label: L(copy, "menu.inquiries"), icon: mdiMessageQuestion },
-    {
-      label: L(copy, "menu.billing"),
-      icon: mdiCashMultiple,
-      menu: [
-        { href: "/admin/features", label: L(copy, "menu.features"), icon: mdiFormatListBulleted },
-        { href: "/admin/pricing-plans", label: L(copy, "menu.pricingPlans"), icon: mdiFormatListBulleted },
-        { href: "/admin/listing-products", label: L(copy, "menu.listingProducts"), icon: mdiFormatListBulleted },
-      ],
-    },
-    { href: "/admin/settings", label: L(copy, "menu.settings"), icon: mdiCog },
+    { href: "/admin/site", label: L(copy, "menu.settings"), icon: mdiCog },
   ];
 }
 
-/** @deprecated getMenuAside(copy) 사용 권장 */
 export const menuAside = getMenuAside();
 
-/** 상단 오른쪽 네비게이션 메뉴. 관리자 정보 아이콘 제거됨(관리자 정보 수정은 설정 메뉴에서) */
 export function buildMenuNavBar(_userName?: string, _copy?: Record<string, string>): MenuNavBarItem[] {
   return [];
 }

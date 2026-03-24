@@ -16,9 +16,12 @@ import {
 } from "@/components/client/console/ui/ConsoleTable";
 import { ConsoleSection } from "@/components/client/console/ui/ConsoleSection";
 import { ConsoleBadge } from "@/components/client/console/ui/ConsoleBadge";
+import { OperationsQuickActions } from "@/components/client/console/OperationsQuickActions";
+import { OperationsTournamentMobileCard } from "@/components/client/console/OperationsTournamentMobileCard";
+import { OperationsTournamentListRowActions } from "@/components/client/console/OperationsTournamentListRowActions";
 
 export const metadata = {
-  title: "운영 관리",
+  title: "대회 운영",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -38,10 +41,10 @@ export default async function ClientOperationsPage() {
   if (!orgId) {
     return (
       <div className="space-y-4">
-        <ConsolePageHeader title="운영 관리" description="먼저 업체를 선택·설정해 주세요." />
+        <ConsolePageHeader title="대회 운영" description="먼저 업체를 선택·설정해 주세요." />
         <Link
           href="/client/setup"
-          className="inline-block rounded-sm border border-zinc-300 px-3 py-2 text-xs font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          className="inline-flex min-h-[44px] items-center rounded-md border border-zinc-300 px-4 text-xs font-medium dark:border-zinc-600"
         >
           업체 설정
         </Link>
@@ -81,110 +84,102 @@ export default async function ClientOperationsPage() {
       : [];
   const countMap = Object.fromEntries(confirmedByTournament.map((r) => [r.tournamentId, r._count.id]));
 
+  const firstId = tournaments[0]?.id ?? null;
+
   return (
     <div className="space-y-4">
       <ConsolePageHeader
-        eyebrow="운영 관리"
-        title="대회"
+        eyebrow="대회 운영"
+        title="대회 운영"
         description={`조직 「${org?.name ?? "—"}」 소속 대회만 표시됩니다.`}
         actions={
           <Link
             href="/client/operations/tournaments/new"
-            className="rounded-sm border border-zinc-800 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-900 dark:border-zinc-200 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+            className="hidden min-h-[44px] items-center rounded-md border border-zinc-800 bg-zinc-800 px-3 text-xs font-medium text-white hover:bg-zinc-900 dark:border-zinc-200 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white lg:inline-flex"
           >
             새 대회
           </Link>
         }
       />
 
-      <ConsoleSection title="대회 목록" flush>
+      <OperationsQuickActions firstTournamentId={firstId} />
+
+      <ConsoleSection title="등록된 대회" flush>
         {tournaments.length === 0 ? (
           <p className="text-xs text-zinc-500 dark:text-zinc-400">등록된 대회가 없습니다.</p>
         ) : (
-          <ConsoleTable>
-            <ConsoleTableHead>
-              <ConsoleTableRow>
-                <ConsoleTableTh>대회명</ConsoleTableTh>
-                <ConsoleTableTh>일정</ConsoleTableTh>
-                <ConsoleTableTh>장소</ConsoleTableTh>
-                <ConsoleTableTh>참가비</ConsoleTableTh>
-                <ConsoleTableTh>신청</ConsoleTableTh>
-                <ConsoleTableTh>상태</ConsoleTableTh>
-                <ConsoleTableTh className="text-right">작업</ConsoleTableTh>
-              </ConsoleTableRow>
-            </ConsoleTableHead>
-            <ConsoleTableBody>
+          <>
+            <div className="hidden lg:block">
+              <ConsoleTable>
+                <ConsoleTableHead>
+                  <ConsoleTableRow>
+                    <ConsoleTableTh>대회명</ConsoleTableTh>
+                    <ConsoleTableTh>일정</ConsoleTableTh>
+                    <ConsoleTableTh>장소</ConsoleTableTh>
+                    <ConsoleTableTh>참가비</ConsoleTableTh>
+                    <ConsoleTableTh>신청</ConsoleTableTh>
+                    <ConsoleTableTh>상태</ConsoleTableTh>
+                    <ConsoleTableTh className="text-right">작업</ConsoleTableTh>
+                  </ConsoleTableRow>
+                </ConsoleTableHead>
+                <ConsoleTableBody>
+                  {tournaments.map((t) => {
+                    const confirmed = countMap[t.id] ?? 0;
+                    const max = t.maxParticipants;
+                    return (
+                      <ConsoleTableRow key={t.id}>
+                        <ConsoleTableTd className="max-w-[12rem] font-medium">
+                          <span className="line-clamp-2">{t.name}</span>
+                        </ConsoleTableTd>
+                        <ConsoleTableTd className="whitespace-nowrap">
+                          {formatKoreanDateWithWeekday(t.startAt)}
+                        </ConsoleTableTd>
+                        <ConsoleTableTd className="max-w-[10rem]">
+                          <span className="line-clamp-2 text-zinc-600 dark:text-zinc-400">
+                            {t.venue?.trim() || "—"}
+                          </span>
+                        </ConsoleTableTd>
+                        <ConsoleTableTd>
+                          {t.entryFee != null ? `${Number(t.entryFee).toLocaleString()}원` : "—"}
+                        </ConsoleTableTd>
+                        <ConsoleTableTd>
+                          {confirmed}
+                          {max != null && max > 0 ? ` / ${max}` : ""}
+                        </ConsoleTableTd>
+                        <ConsoleTableTd>
+                          <ConsoleBadge tone="neutral">{STATUS_LABEL[t.status] ?? t.status}</ConsoleBadge>
+                        </ConsoleTableTd>
+                        <ConsoleTableTd className="text-right">
+                          <OperationsTournamentListRowActions tournamentId={t.id} />
+                        </ConsoleTableTd>
+                      </ConsoleTableRow>
+                    );
+                  })}
+                </ConsoleTableBody>
+              </ConsoleTable>
+            </div>
+
+            <div className="flex flex-col gap-3 lg:hidden">
               {tournaments.map((t) => {
                 const confirmed = countMap[t.id] ?? 0;
                 const max = t.maxParticipants;
                 return (
-                  <ConsoleTableRow key={t.id}>
-                    <ConsoleTableTd className="max-w-[12rem] font-medium">
-                      <span className="line-clamp-2">{t.name}</span>
-                    </ConsoleTableTd>
-                    <ConsoleTableTd className="whitespace-nowrap">
-                      {formatKoreanDateWithWeekday(t.startAt)}
-                    </ConsoleTableTd>
-                    <ConsoleTableTd className="max-w-[10rem]">
-                      <span className="line-clamp-2 text-zinc-600 dark:text-zinc-400">
-                        {t.venue?.trim() || "—"}
-                      </span>
-                    </ConsoleTableTd>
-                    <ConsoleTableTd>
-                      {t.entryFee != null ? `${Number(t.entryFee).toLocaleString()}원` : "—"}
-                    </ConsoleTableTd>
-                    <ConsoleTableTd>
-                      {confirmed}
-                      {max != null && max > 0 ? ` / ${max}` : ""}
-                    </ConsoleTableTd>
-                    <ConsoleTableTd>
-                      <ConsoleBadge tone="neutral">{STATUS_LABEL[t.status] ?? t.status}</ConsoleBadge>
-                    </ConsoleTableTd>
-                    <ConsoleTableTd className="text-right">
-                      <div className="flex flex-wrap justify-end gap-1.5">
-                        <Link
-                          href={`/client/operations/tournaments/${t.id}/edit`}
-                          className="rounded-sm border border-zinc-300 px-2 py-1 text-[11px] font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                        >
-                          수정
-                        </Link>
-                        <Link
-                          href={`/client/operations/tournaments/${t.id}/participant-roster`}
-                          className="rounded-sm border border-zinc-600 px-2 py-1 text-[11px] font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-500 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                        >
-                          명단 확정
-                        </Link>
-                        <Link
-                          href={`/client/operations/tournaments/${t.id}/bracket-build`}
-                          className="rounded-sm border border-zinc-400 px-2 py-1 text-[11px] font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-500 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                        >
-                          대진 콘솔
-                        </Link>
-                        <Link
-                          href={`/client/operations/tournaments/${t.id}/bracket`}
-                          className="rounded-sm border border-indigo-600 px-2 py-1 text-[11px] font-medium text-indigo-800 hover:bg-indigo-50 dark:border-indigo-500 dark:text-indigo-200 dark:hover:bg-indigo-950/50"
-                        >
-                          브래킷 편집
-                        </Link>
-                        <Link
-                          href={`/client/operations/tournaments/${t.id}/participants`}
-                          className="rounded-sm border border-zinc-800 bg-zinc-800 px-2 py-1 text-[11px] font-medium text-white hover:bg-zinc-900 dark:border-zinc-200 dark:bg-zinc-200 dark:text-zinc-900 dark:hover:bg-white"
-                        >
-                          참가자
-                        </Link>
-                        <Link
-                          href={`/client/tournaments/${t.id}`}
-                          className="rounded-sm border border-zinc-300 px-2 py-1 text-[11px] font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                        >
-                          콘솔 상세
-                        </Link>
-                      </div>
-                    </ConsoleTableTd>
-                  </ConsoleTableRow>
+                  <OperationsTournamentMobileCard
+                    key={t.id}
+                    t={{
+                      id: t.id,
+                      name: t.name,
+                      startAt: t.startAt,
+                      status: t.status,
+                      venue: t.venue,
+                      confirmed,
+                      max,
+                    }}
+                  />
                 );
               })}
-            </ConsoleTableBody>
-          </ConsoleTable>
+            </div>
+          </>
         )}
       </ConsoleSection>
     </div>

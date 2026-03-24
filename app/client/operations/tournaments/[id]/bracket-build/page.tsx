@@ -6,6 +6,7 @@ import { canUseFeature, FEATURE_CODES, isAnnualMembershipActive } from "@/lib/fe
 import { canAccessClientDashboard } from "@/types/auth";
 import { FeatureGateNotice } from "@/components/client/FeatureGateNotice";
 import { ClientBracketBuildConsole } from "@/components/client/console/ClientBracketBuildConsole";
+import { toTournamentOperationPhaseSnapshot } from "@/lib/client-tournament-operation-phase";
 
 export const metadata = { title: "대진 생성 콘솔" };
 
@@ -46,7 +47,7 @@ export default async function ClientOperationsBracketBuildPage({
     include: {
       rule: true,
       matchVenues: { orderBy: { sortOrder: "asc" } },
-      _count: { select: { rounds: true } },
+      _count: { select: { rounds: true, finalMatches: true } },
     },
   });
   if (!tournament) notFound();
@@ -82,7 +83,10 @@ export default async function ClientOperationsBracketBuildPage({
       defaultVenueCount={venueCountFromDb}
       defaultTablesPerVenue={defaultTableCount}
       listHref="/client/operations"
-      legacyBracketHref={`/client/tournaments/${tournament.id}/bracket`}
+      operationPhase={{
+        snapshot: toTournamentOperationPhaseSnapshot(tournament),
+        currentView: "bracket-build",
+      }}
     />
   );
 }

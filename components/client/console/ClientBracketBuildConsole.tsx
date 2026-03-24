@@ -18,6 +18,16 @@ import {
 import { cx } from "@/components/client/console/ui/cx";
 import { consoleTextBody, consoleTextMuted } from "@/components/client/console/ui/tokens";
 import {
+  OperationsStepFlowBar,
+  OperationsTournamentFlowNav,
+} from "@/components/client/console/OperationsTournamentFlowNav";
+import { OperationsTournamentPhaseStepper } from "@/components/client/console/OperationsTournamentPhaseStepper";
+import {
+  buildOperationPhaseSteps,
+  type OperationsPhaseView,
+  type TournamentOperationPhaseSnapshot,
+} from "@/lib/client-tournament-operation-phase";
+import {
   computeBracketBuildPlan,
   type BracketBuildGameFormat,
   type BracketBuildInputs,
@@ -43,7 +53,7 @@ export function ClientBracketBuildConsole({
   defaultVenueCount,
   defaultTablesPerVenue,
   listHref,
-  legacyBracketHref,
+  operationPhase,
 }: {
   tournamentId: string;
   tournamentName: string;
@@ -56,7 +66,10 @@ export function ClientBracketBuildConsole({
   defaultVenueCount: number;
   defaultTablesPerVenue: number;
   listHref: string;
-  legacyBracketHref: string;
+  operationPhase?: {
+    snapshot: TournamentOperationPhaseSnapshot;
+    currentView: OperationsPhaseView;
+  };
 }) {
   const [gameFormat, setGameFormat] = useState<BracketBuildGameFormat>("single_elim_tournament");
   const [venueCount, setVenueCount] = useState(String(defaultVenueCount));
@@ -166,38 +179,17 @@ export function ClientBracketBuildConsole({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <ConsolePageHeader
-        eyebrow="운영 관리 · 대진"
-        title="대진표 생성 콘솔"
-        description={`「${tournamentName}」 — 변수 입력 시 우측에 미리보기·검증 엔진(lib/bracket-build-simulation)이 즉시 반영됩니다.`}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={listHref}
-              className="rounded-sm border border-zinc-400 bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-900 hover:bg-zinc-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
-            >
-              대회 목록
-            </Link>
-            <Link
-              href={`/client/operations/tournaments/${tournamentId}/participant-roster`}
-              className="rounded-sm border border-zinc-400 px-2.5 py-1 text-[11px] font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
-            >
-              명단 확정
-            </Link>
-            <Link
-              href={`/client/operations/tournaments/${tournamentId}/participants`}
-              className="rounded-sm border border-zinc-400 px-2.5 py-1 text-[11px] font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
-            >
-              참가자
-            </Link>
-            <Link
-              href={`/client/operations/tournaments/${tournamentId}/bracket`}
-              className="rounded-sm border border-indigo-600 px-2.5 py-1 text-[11px] font-medium text-indigo-800 hover:bg-indigo-50 dark:border-indigo-500 dark:text-indigo-200 dark:hover:bg-indigo-950/50"
-            >
-              브래킷 편집
-            </Link>
-          </div>
-        }
+        eyebrow="대회 운영"
+        title="대진 생성 콘솔"
+        description={`「${tournamentName}」 — 변수 입력 시 우측에 미리보기·검증이 즉시 반영됩니다.`}
       />
+      {operationPhase && (
+        <OperationsTournamentPhaseStepper
+          steps={buildOperationPhaseSteps(tournamentId, operationPhase.snapshot, operationPhase.currentView)}
+        />
+      )}
+      <OperationsTournamentFlowNav tournamentId={tournamentId} listHref={listHref} active="bracket-build" />
+      <OperationsStepFlowBar tournamentId={tournamentId} listHref={listHref} activeStep="bracket-build" />
 
       <div className="grid flex-1 gap-3 lg:grid-cols-[minmax(0,22rem)_1fr] lg:items-start">
         <ConsoleFormPanel
@@ -572,10 +564,10 @@ export function ClientBracketBuildConsole({
         }
         right={
           <Link
-            href={legacyBracketHref}
-            className="rounded-sm border border-zinc-800 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-900 dark:border-zinc-200 dark:bg-zinc-200 dark:text-zinc-900 dark:hover:bg-white"
+            href={`/client/operations/tournaments/${tournamentId}/bracket`}
+            className="inline-flex min-h-[44px] items-center rounded-md border border-zinc-800 bg-zinc-800 px-4 text-xs font-semibold text-white hover:bg-zinc-900 dark:border-zinc-200 dark:bg-zinc-200 dark:text-zinc-900 dark:hover:bg-white"
           >
-            실제 대진 생성·편집 (기존 화면)
+            대진표 보기·수정으로 이동
           </Link>
         }
       />

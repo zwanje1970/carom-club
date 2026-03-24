@@ -8,7 +8,7 @@
 | `POST /api/admin/site-settings/logo` | 사이트 로고 | ✅ `uploadToBlob(processed)` | 503 (catch) |
 | `POST /api/admin/site-settings/footer-partner-logo` | 푸터 협력업체 로고 | ✅ `uploadToBlob(processed)` | 503 (catch) |
 | `POST /api/community/upload-image` | 커뮤니티 게시글 첨부 | ✅ `uploadToBlob(processed)` | 503 (catch) |
-| `POST /api/community/billiard-notes/upload-image` | 당구노트 테이블 이미지 | ✅ `uploadToBlob(processed)` | 503 (catch) |
+| `POST /api/community/billiard-notes/upload-image` | 난구노트 테이블 이미지 | ✅ `uploadToBlob(processed)` | 503 (catch) |
 | `POST /api/mypage/avg-proof` | 마이페이지 AVG 증빙 | ✅ `uploadToBlob(processed)` | 503 (catch) |
 | `POST /api/tournaments/apply/upload-avg-proof` | 대회 신청 AVG 증빙 | ✅ `uploadToBlob(processed)` | 503 (catch) |
 

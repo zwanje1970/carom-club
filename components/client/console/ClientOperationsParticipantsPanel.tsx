@@ -18,6 +18,16 @@ import {
 } from "@/components/client/console/ui";
 import { cx } from "@/components/client/console/ui/cx";
 import { consoleTextMuted } from "@/components/client/console/ui/tokens";
+import {
+  OperationsStepFlowBar,
+  OperationsTournamentFlowNav,
+} from "@/components/client/console/OperationsTournamentFlowNav";
+import { OperationsTournamentPhaseStepper } from "@/components/client/console/OperationsTournamentPhaseStepper";
+import {
+  buildOperationPhaseSteps,
+  type OperationsPhaseView,
+  type TournamentOperationPhaseSnapshot,
+} from "@/lib/client-tournament-operation-phase";
 
 export type ConsoleParticipantRow = {
   id: string;
@@ -117,10 +127,15 @@ export function ClientOperationsParticipantsPanel({
   tournamentId,
   tournamentName,
   listHref,
+  operationPhase,
 }: {
   tournamentId: string;
   tournamentName: string;
   listHref: string;
+  operationPhase?: {
+    snapshot: TournamentOperationPhaseSnapshot;
+    currentView: OperationsPhaseView;
+  };
 }) {
   const [rows, setRows] = useState<ConsoleParticipantRow[]>([]);
   const [meta, setMeta] = useState<{
@@ -320,32 +335,34 @@ export function ClientOperationsParticipantsPanel({
   return (
     <div className="space-y-4">
       <ConsolePageHeader
-        eyebrow="운영 관리 · 대회"
-        title="참가자 관리"
-        description={tournamentName}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={listHref}
-              className="rounded-sm border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
-            >
-              운영 · 대회 목록
-            </Link>
-            <Link
-              href={`/client/operations/tournaments/${tournamentId}/participant-roster`}
-              className="rounded-sm border border-zinc-800 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-900 dark:border-zinc-200 dark:bg-zinc-200 dark:text-zinc-900 dark:hover:bg-white"
-            >
-              명단 확정
-            </Link>
-            <Link
-              href={`/client/tournaments/${tournamentId}`}
-              className="rounded-sm border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              대회 상세
-            </Link>
-          </div>
-        }
+        eyebrow="대회 운영"
+        title="참가자 관리(운영)"
+        description={`「${tournamentName}」 — 승인·입금 확인 후 다음 단계로 이동하세요.`}
       />
+
+      {operationPhase && (
+        <OperationsTournamentPhaseStepper
+          steps={buildOperationPhaseSteps(tournamentId, operationPhase.snapshot, operationPhase.currentView)}
+        />
+      )}
+
+      <OperationsTournamentFlowNav tournamentId={tournamentId} listHref={listHref} active="participants" />
+      <OperationsStepFlowBar tournamentId={tournamentId} listHref={listHref} activeStep="participants" />
+
+      <div className="grid grid-cols-2 gap-2 lg:hidden">
+        <Link
+          href={`/client/operations/tournaments/${tournamentId}/participant-roster`}
+          className="inline-flex min-h-[48px] items-center justify-center rounded-md border border-zinc-800 bg-zinc-800 px-2 text-center text-xs font-semibold text-white dark:border-zinc-200 dark:bg-zinc-200 dark:text-zinc-900"
+        >
+          명단 확정
+        </Link>
+        <Link
+          href={`/client/operations/tournaments/${tournamentId}/bracket-build`}
+          className="inline-flex min-h-[48px] items-center justify-center rounded-md border border-zinc-300 px-2 text-center text-xs font-semibold text-zinc-900 dark:border-zinc-600 dark:text-zinc-100"
+        >
+          대진 생성
+        </Link>
+      </div>
 
       {rosterLocked && (
         <p className="rounded-sm border border-zinc-600 bg-zinc-800 px-3 py-2 text-xs text-zinc-100 dark:border-zinc-500 dark:bg-zinc-900">

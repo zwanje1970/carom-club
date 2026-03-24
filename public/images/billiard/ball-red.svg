@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="21.3624mm" height="21.3624mm" version="1.1"
+  style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd"
+  viewBox="0 0 733.12 733.12">
+  <defs>
+    <style type="text/css">
+      <![CDATA[
+    .str2 {stroke:yellow;stroke-width:8.47;stroke-miterlimit:22.9256}
+    .str0 {stroke:#B42E2C;stroke-width:6.05;stroke-miterlimit:22.9256}
+    .str1 {stroke:yellow;stroke-width:8.47;stroke-miterlimit:22.9256;stroke-dasharray:16.946387 25.419581}
+    .fil0 {fill:none}
+   ]]>
+    </style>
+    <radialGradient id="redBallFill" cx="36%" cy="32%" r="68%" fx="32%" fy="28%">
+      <stop offset="0%" stop-color="#F27876" />
+      <stop offset="42%" stop-color="#D63E3C" />
+      <stop offset="100%" stop-color="#8B1F1C" />
+    </radialGradient>
+  </defs>
+  <g id="ball-red">
+    <circle cx="366.56" cy="366.56" r="363.53" fill="url(#redBallFill)" />
+    <circle id="ball-base" class="fil0 str0" cx="366.56" cy="366.56" r="363.53" />
+    <g id="aim-line">
+      <line class="fil0 str1" x1="411.96" y1="232.8" x2="411.96" y2="500.32" />
+      <line class="fil0 str1" x1="502.78" y1="232.8" x2="502.78" y2="500.32" />
+      <line class="fil0 str2" x1="548.19" y1="186.85" x2="548.19" y2="546.27" />
+      <line class="fil0 str2" x1="366.56" y1="186.85" x2="366.56" y2="546.27" />
+      <line class="fil0 str2" x1="3.02" y1="366.56" x2="730.09" y2="366.56" />
+      <line class="fil0 str1" x1="684.41" y1="232.8" x2="684.41" y2="500.32" />
+      <line class="fil0 str1" x1="593.6" y1="232.8" x2="593.6" y2="500.32" />
+      <line class="fil0 str1" x1="321.15" y1="232.8" x2="321.15" y2="500.32" />
+      <line class="fil0 str1" x1="230.33" y1="232.8" x2="230.33" y2="500.32" />
+      <line class="fil0 str2" x1="184.93" y1="186.85" x2="184.93" y2="546.27" />
+      <line class="fil0 str2" x1="275.74" y1="186.85" x2="275.74" y2="546.27" />
+      <line class="fil0 str2" x1="457.37" y1="186.85" x2="457.37" y2="546.27" />
+      <line class="fil0 str2" x1="639" y1="186.85" x2="639" y2="546.27" />
+      <line class="fil0 str2" x1="94.11" y1="186.85" x2="94.11" y2="546.27" />
+      <line class="fil0 str1" x1="139.52" y1="232.8" x2="139.52" y2="500.32" />
+      <line class="fil0 str1" x1="48.7" y1="232.8" x2="48.7" y2="500.32" />
+    </g>
+  </g>
+</svg>

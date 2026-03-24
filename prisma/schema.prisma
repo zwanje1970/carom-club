@@ -1140,7 +1140,7 @@ model Notice {
   @@index([isActive, type])
 }
 
-// ============== Community: 당구노트 (개인 기록, 공개 게시판 아님) ==============
+// ============== Community: 난구노트 (개인 기록, 공개 게시판 아님) ==============
 // 회원 본인만 관리. 난구해결로 보내기 시 게시판 글에 전달용.
 
 model BilliardNote {
@@ -1438,7 +1438,7 @@ model CommunityScoreLog {
 model TroubleShotPost {
   id                 String   @id @default(cuid())
   postId             String   @unique  // CommunityPost (board=trouble)
-  sourceNoteId       String?  // 당구노트에서 보낸 경우
+  sourceNoteId       String?  // 난구노트에서 보낸 경우
   layoutImageUrl     String?  // 공배치 이미지
   ballPlacementJson  String?  @db.Text // NanguBallPlacement JSON (from-note 시 노트 컬럼에서 조합)
   difficulty         String?  // 난이도 표시

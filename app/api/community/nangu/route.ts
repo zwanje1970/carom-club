@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { normalizeCueBallType } from "@/lib/billiard-table-constants";
 import { prisma } from "@/lib/db";
@@ -114,6 +115,7 @@ export async function POST(request: Request) {
         ballPlacementJson,
       },
     });
+    revalidateTag("community-nangu-list");
     return NextResponse.json({ id: post.id, createdAt: post.createdAt });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

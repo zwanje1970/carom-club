@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
-import { isCommunityAdmin, isCommunityModerator } from "@/lib/community-roles";
-import { parseTroubleBallPlacementJson } from "@/lib/trouble-ball-placement";
+import { isCommunityAdmin } from "@/lib/community-roles";
+import { loadCommunityPostDetail } from "@/lib/community-post-detail-server";
 import { revalidateCommunityNoticePinned } from "@/lib/community-notice-pinned-revalidate";
 
 /** 게시글 상세 조회. 조회수는 POST /view 에서만 증가 */
@@ -16,104 +16,19 @@ export async function GET(
   }
   const { id } = await params;
   const session = await getSession();
-  const canSeeHidden = isCommunityModerator(session);
-
-  const post = await prisma.communityPost.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      boardId: true,
-      authorId: true,
-      title: true,
-      content: true,
-      imageUrls: true,
-      isPinned: true,
-      isHidden: true,
-      isSolved: true,
-      viewCount: true,
-      createdAt: true,
-      updatedAt: true,
-      board: { select: { slug: true, name: true } },
-      author: { select: { id: true, name: true } },
-      _count: { select: { likes: true, comments: true } },
-      troubleShot: {
-        select: {
-          layoutImageUrl: true,
-          ballPlacementJson: true,
-          difficulty: true,
-          sourceNoteId: true,
-          acceptedSolutionId: true,
-        },
-      },
-    },
-  });
-  if (!post) {
-    return NextResponse.json({ error: "글을 찾을 수 없습니다." }, { status: 404 });
+  const result = await loadCommunityPostDetail(id, session);
+  if (!result.ok) {
+    if (result.reason === "no_db") {
+      return NextResponse.json({ error: "DB 연결되지 않음" }, { status: 503 });
+    }
+    if (result.reason === "not_found") {
+      return NextResponse.json({ error: "글을 찾을 수 없습니다." }, { status: 404 });
+    }
+    if (result.reason === "trouble_requires_login") {
+      return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+    }
   }
-  if (post.board.slug === "trouble" && !session) {
-    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
-  }
-  if (post.isHidden && !canSeeHidden) {
-    return NextResponse.json({
-      id: post.id,
-      boardSlug: post.board.slug,
-      boardName: post.board.name,
-      isHidden: true,
-      hiddenMessage: "관리자에 의해 숨김 처리된 내용입니다.",
-    });
-  }
-
-  let liked = false;
-  let bookmarked = false;
-  if (session) {
-    const [likeRow, bookmarkRow] = await Promise.all([
-      prisma.communityPostLike.findUnique({
-        where: { postId_userId: { postId: id, userId: session.id } },
-      }),
-      prisma.communityBookmark.findUnique({
-        where: { userId_postId: { userId: session.id, postId: id } },
-      }),
-    ]);
-    liked = !!likeRow;
-    bookmarked = !!bookmarkRow;
-  }
-
-  const imageUrls = post.imageUrls ? (JSON.parse(post.imageUrls) as string[]) : [];
-  const payload: Record<string, unknown> = {
-    id: post.id,
-    boardId: post.boardId,
-    boardSlug: post.board.slug,
-    boardName: post.board.name,
-    authorId: post.authorId,
-    authorName: post.author.name,
-    title: post.title,
-    content: post.content,
-    imageUrls,
-    isPinned: post.isPinned,
-    isHidden: post.isHidden,
-    isSolved: post.isSolved ?? false,
-    viewCount: post.viewCount,
-    likeCount: post._count.likes,
-    commentCount: post._count.comments,
-    createdAt: post.createdAt.toISOString(),
-    updatedAt: post.updatedAt.toISOString(),
-    isAuthor: session?.id === post.authorId,
-    canEdit: session?.id === post.authorId || isCommunityAdmin(session),
-    canDelete: session?.id === post.authorId || isCommunityAdmin(session),
-    isLoggedIn: !!session,
-    liked,
-    bookmarked,
-  };
-  if (post.board.slug === "trouble" && post.troubleShot) {
-    payload.troubleShot = {
-      layoutImageUrl: post.troubleShot.layoutImageUrl,
-      ballPlacement: parseTroubleBallPlacementJson(post.troubleShot.ballPlacementJson),
-      difficulty: post.troubleShot.difficulty,
-      sourceNoteId: post.troubleShot.sourceNoteId,
-      acceptedSolutionId: post.troubleShot.acceptedSolutionId,
-    };
-  }
-  return NextResponse.json(payload);
+  return NextResponse.json(result.post);
 }
 
 /** 게시글 수정. 작성자 또는 관리자 */

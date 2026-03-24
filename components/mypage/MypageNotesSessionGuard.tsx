@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 type SessionPayload = { user: unknown };
 
 /**
- * 모바일: 클라이언트 네비·bfcache 등으로 미들웨어/SSR과 어긋날 때 당구노트 본문 노출을 막기 위한 재검증.
+ * 모바일: 클라이언트 네비·bfcache 등으로 미들웨어/SSR과 어긋날 때 난구노트 본문 노출을 막기 위한 재검증.
  * 서버에서 세션이 있다고 판단된 경우에만 마운트됨(initialShow=true).
  */
 export function MypageNotesSessionGuard({

@@ -5,7 +5,7 @@ import { loadCommunityBoardPageData } from "@/lib/community-board-page-data";
 import { communityBoardSsrPerf } from "@/lib/community-board-ssr-perf";
 import { CommunityBoardPageShell } from "@/components/community/CommunityBoardPageShell";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 function loginNextForBoard(
   boardSlug: string,

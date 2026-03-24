@@ -1,14 +1,6 @@
-import { ClientConsolePlaceholder } from "@/components/client/console/ClientConsolePlaceholder";
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "콘텐츠 관리",
-};
-
+/** 콘텐츠·홍보는 /client/promo 로 통합 */
 export default function ClientContentPage() {
-  return (
-    <ClientConsolePlaceholder
-      title="콘텐츠 관리"
-      description="게시·노출·문구 등 콘텐츠 운영 영역(예정)"
-    />
-  );
+  redirect("/client/promo");
 }

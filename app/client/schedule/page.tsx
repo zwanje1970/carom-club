@@ -1,14 +1,6 @@
-import { ClientConsolePlaceholder } from "@/components/client/console/ClientConsolePlaceholder";
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "일정 / 예약",
-};
-
+/** 일정/예약 UI는 추후 제공 — 대시보드의 오늘 일정으로 안내 */
 export default function ClientSchedulePage() {
-  return (
-    <ClientConsolePlaceholder
-      title="일정 / 예약"
-      description="캘린더·예약·코트/레인 배정 등(예정)"
-    />
-  );
+  redirect("/client/dashboard");
 }

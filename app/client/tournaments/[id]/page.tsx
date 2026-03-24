@@ -189,8 +189,8 @@ export default async function ClientTournamentDetailPage({
         </div>
       )}
       <p className="text-sm text-gray-500">
-        <Link href="/client/tournaments" className="text-site-primary hover:underline">
-          ← 대회 목록
+        <Link href="/client/operations" className="text-site-primary hover:underline">
+          ← 대회관리
         </Link>
       </p>
     </div>

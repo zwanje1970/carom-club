@@ -22,7 +22,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "현재 커뮤니티 글쓰기가 중단되었습니다." }, { status: 503 });
   }
 
-  let body: { noteId: string; title: string; content: string; imageUrl?: string | null };
+  let body: {
+    noteId: string;
+    title?: string;
+    content?: string;
+    imageUrl?: string | null;
+    /** true면 동일 노트에서 이미 만든 글이 있어도 새로 만든다 */
+    forceNew?: boolean;
+  };
   try {
     body = await request.json();
   } catch (e) {
@@ -31,10 +38,7 @@ export async function POST(request: Request) {
   }
 
   const noteId = (body.noteId ?? "").trim();
-  const title = (body.title ?? "").trim();
-  const content = (body.content ?? "").trim();
   if (!noteId) return NextResponse.json({ error: "노트 ID가 필요합니다." }, { status: 400 });
-  if (!title) return NextResponse.json({ error: "제목을 입력하세요." }, { status: 400 });
 
   try {
     const note = await prisma.billiardNote.findUnique({
@@ -43,6 +47,7 @@ export async function POST(request: Request) {
         id: true,
         authorId: true,
         imageUrl: true,
+        memo: true,
         redBallX: true,
         redBallY: true,
         yellowBallX: true,
@@ -54,8 +59,27 @@ export async function POST(request: Request) {
     });
     if (!note || note.authorId !== session.id) {
       console.log(LOG_PREFIX, "노트 조회 실패 또는 권한 없음:", { noteId, note: note ?? null, sessionId: session.id });
-      return NextResponse.json({ error: "해당 노트를 찾을 수 없거나 권한이 없습니다." }, { status: 404 });
+      return NextResponse.json({ error: "해당 난구노트를 찾을 수 없거나 권한이 없습니다." }, { status: 404 });
     }
+
+    if (!body.forceNew) {
+      const existing = await prisma.troubleShotPost.findFirst({
+        where: { sourceNoteId: noteId },
+        orderBy: { post: { createdAt: "desc" } },
+        select: { postId: true },
+      });
+      if (existing) {
+        return NextResponse.json({ id: existing.postId, reused: true });
+      }
+    }
+
+    const bodyTitle = (body.title ?? "").trim();
+    const bodyContent = (body.content ?? "").trim();
+    const memoTrim = note.memo?.trim() ?? "";
+    const title =
+      bodyTitle ||
+      "이 배치 해결 방법 부탁드립니다";
+    const content = bodyContent || memoTrim || " ";
 
     let board = await prisma.communityBoard.findUnique({
       where: { slug: "trouble" },

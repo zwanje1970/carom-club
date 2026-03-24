@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
-import { isCommunityModerator } from "@/lib/community-roles";
 import { isFeatureEnabled } from "@/lib/site-feature-flags";
+import { getCommunityPostCommentsTree } from "@/lib/community-post-detail-server";
 
 /** 댓글 목록 (대댓글 포함, parentId 기준 트리). 숨김 댓글은 관리자만 내용 표시 */
 export async function GET(
@@ -15,64 +15,7 @@ export async function GET(
   }
   const postId = (await params).id;
   const session = await getSession();
-  const canSeeHidden = isCommunityModerator(session);
-
-  const comments = await prisma.communityComment.findMany({
-    where: { postId },
-    orderBy: { createdAt: "asc" },
-    select: {
-      id: true,
-      parentId: true,
-      authorId: true,
-      content: true,
-      isHidden: true,
-      createdAt: true,
-      author: { select: { name: true } },
-      _count: { select: { likes: true } },
-    },
-  });
-
-  const userId = session?.id;
-  const likedIds = userId
-    ? (
-        await prisma.communityCommentLike.findMany({
-          where: { userId, commentId: { in: comments.map((c) => c.id) } },
-          select: { commentId: true },
-        })
-      ).map((r) => r.commentId)
-    : [];
-
-  const mapOne = (c: (typeof comments)[0]) => ({
-    id: c.id,
-    parentId: c.parentId,
-    authorId: c.authorId,
-    authorName: c.author.name,
-    content: c.isHidden && !canSeeHidden ? "관리자에 의해 숨김 처리된 내용입니다." : c.content,
-    isHidden: c.isHidden,
-    likeCount: c._count.likes,
-    createdAt: c.createdAt.toISOString(),
-    isAuthor: userId === c.authorId,
-    liked: likedIds.includes(c.id),
-  });
-
-  const byParent = new Map<string | null, ReturnType<typeof mapOne>[]>();
-  byParent.set(null, []);
-  comments.forEach((c) => {
-    const item = mapOne(c);
-    const key = c.parentId ?? null;
-    if (!byParent.has(key)) byParent.set(key, []);
-    byParent.get(key)!.push(item);
-  });
-
-  const withReplies = (parentKey: string | null): ReturnType<typeof mapOne>[] => {
-    const list = byParent.get(parentKey) ?? [];
-    return list.map((item) => ({
-      ...item,
-      replies: withReplies(item.id),
-    }));
-  };
-
-  const topLevel = withReplies(null);
+  const topLevel = await getCommunityPostCommentsTree(postId, session);
   return NextResponse.json(topLevel);
 }
 

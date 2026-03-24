@@ -83,7 +83,7 @@
 - **미리보기**(해법 화면의 배치도): **보기 전용**. 경로선·스팟은 표시만 하고, 스팟 생성·이동·경로 편집·줌·애니메이션은 하지 않는다. 탭/클릭 시 **전체화면 경로 편집**으로 진입.
 - **전체화면만**: 스팟 생성·이동, 경로선 생성/수정, Trouble **1목 경로**, 확대/축소, 애니메이션 시연. 상단 **취소**(변경 폐기·복귀) / **완료**(경로 반영·복귀). `Escape` → 취소.
 - **수구 경로 스팟 규칙** (`lib/cue-path-cushion-rules.ts`, `lib/cue-path-ray-resolve.ts`): 선은 항상 **수구**에서 시작. **수구 직후 첫 스팟**은 **1목 후보(수구를 제외한 두 공 중 탭에 가까운 쪽 중심)** 또는 **플레이필드·쿠션 안쪽 테두리**(`getNonCueBallNorms` + `snapCuePathTap`). **쿠션·프레임**을 탭하면 직전 점에서 탭으로 잇는 직선이 먼저 만나는 **쿠션 라인** 또는 **목적구 원 둘레**에 스팟이 잡힌다. 광선상 먼저 맞는 1목은 `cueFirstObjectHitAmongNormalized`로 계산. 이후 쿠션 체인은 테두리끼리만; 그 밖은 **end**(화살표). 난구 해법 저장 시 `reflectionObjectBall`로 재생 시 움직일 공(red/yellow/white)을 기록.
-- 구현: `components/nangu/SolutionPathEditorFullscreen.tsx` — 난구해결사 `NanguSolutionEditor`·난구해법 `TroubleSolutionEditor` 모두 `presentation="noteBallPlacementFullscreen"`(당구노트 공배치와 동일한 `z-[9999]` 셸·`BallPlacementFullscreenContext`). Trouble **이미지 전용**(`ballPlacement` 없음)도 동일 셸에서 `layoutImageUrl` 배경(재생은 배치 없으면 비활성). 미리보기는 `useTableOrientation`으로 당구노트와 같은 가로세로 비율 전환.
+- 구현: `components/nangu/SolutionPathEditorFullscreen.tsx` — 난구해결사 `NanguSolutionEditor`·난구해법 `TroubleSolutionEditor` 모두 `presentation="noteBallPlacementFullscreen"`(난구노트 공배치와 동일한 `z-[9999]` 셸·`BallPlacementFullscreenContext`). Trouble **이미지 전용**(`ballPlacement` 없음)도 동일 셸에서 `layoutImageUrl` 배경(재생은 배치 없으면 비활성). 미리보기는 `useTableOrientation`으로 난구노트와 같은 가로세로 비율 전환.
 
 ## 사용 예
 

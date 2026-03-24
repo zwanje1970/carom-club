@@ -2,7 +2,7 @@
 
 /**
  * 공통 당구대 편집기
- * - 당구노트, 난구풀이, 해법 작성에서 동일한 편집기를 재사용합니다.
+ * - 난구노트, 난구풀이, 해법 작성에서 동일한 편집기를 재사용합니다.
  * - mode: ball(공 배치) / path(경로 편집). 두 모드가 섞이지 않음.
  */
 import React, { useState, useRef, forwardRef, useImperativeHandle, useEffect, useCallback } from "react";
@@ -60,7 +60,7 @@ export interface BilliardTableEditorProps {
   initialPaths?: BilliardPath[];
   showGrid?: boolean;
   interactive?: boolean;
-  /** ball = 공 배치만, path = 경로만. 기본 ball (당구노트 호환) */
+  /** ball = 공 배치만, path = 경로만. 기본 ball (난구노트 호환) */
   defaultMode?: BilliardEditorMode;
   /** 편집기 아래에 렌더할 추가 UI (예: 메모, 저장 버튼) */
   children?: React.ReactNode;
@@ -485,6 +485,9 @@ const BilliardTableEditor = forwardRef<
           drawStyle={tableDrawStyle}
           /** 줌 셀(W×H) 좌표와 히트검사 일치 — 미전달 시 dvh 기준 크기로 가운데 정렬되어 isEmptyForPan과 어긋남 */
           embedFill={tableEmbedFill}
+          clientToTablePx={
+            tableEmbedFill && zoomShellCtx ? zoomShellCtx.viewportClientToCanvasPx : undefined
+          }
           showCueBallSpot={
             placementMode
               ? cueBallSpotEnabled && !isDragging

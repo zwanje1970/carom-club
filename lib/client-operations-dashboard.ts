@@ -133,7 +133,7 @@ export async function loadClientOperationsDashboard(orgId: string): Promise<Clie
     pendingTasks.push({
       kind: "entries",
       label: "참가 승인 대기",
-      href: "/client/participants",
+      href: "/client/operations",
       count: pendingEntryApprovals,
     });
   }

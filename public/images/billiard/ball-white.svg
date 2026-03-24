@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="21.3624mm" height="21.3624mm" version="1.1"
+  style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd"
+  viewBox="0 0 340.1 340.1">
+  <defs>
+    <style type="text/css">
+      <![CDATA[
+    .str0 {stroke:#EEEBD1;stroke-width:2.81;stroke-miterlimit:22.9256}
+    .str5 {stroke:#888888;stroke-width:1.85;stroke-miterlimit:22.9256}
+    .str2 {stroke:#888888;stroke-width:1.85;stroke-miterlimit:22.9256}
+    .str3 {stroke:#888888;stroke-width:1.85;stroke-miterlimit:22.9256}
+    .str4 {stroke:#888888;stroke-width:1.85;stroke-miterlimit:22.9256}
+    .str1 {stroke:#888888;stroke-width:1.59;stroke-miterlimit:22.9256}
+    .fil0 {fill:none}
+   ]]>
+    </style>
+    <radialGradient id="whiteBallFill" cx="36%" cy="32%" r="68%" fx="32%" fy="28%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="50%" stop-color="#F7F5EF" />
+      <stop offset="100%" stop-color="#DDD8CC" />
+    </radialGradient>
+  </defs>
+  <g id="ball-white">
+    <circle cx="170.05" cy="170.05" r="168.64" fill="url(#whiteBallFill)" />
+    <circle id="ball-base" class="fil0 str0" cx="170.05" cy="170.05" r="168.64" />
+    <g id="guide-line">
+      <g>
+        <path class="fil0 str1" d="M170.05 25.12l0 289.86m-72.47 -270.45l144.93 251.03m-197.98 -197.98l251.03 144.93m-270.45 -72.46l289.86 0m-270.44 72.46l251.03 -144.93m-197.98 197.98l144.93 -251.03" />
+      </g>
+      <g>
+        <g>
+          <g>
+            <path class="fil0 str2" d="M170.05 104.23c36.35,0 65.81,29.47 65.81,65.81 0,36.35 -29.47,65.81 -65.81,65.81 -36.35,0 -65.81,-29.47 -65.81,-65.81 0,-36.35 29.47,-65.81 65.81,-65.81z" />
+          </g>
+          <g>
+            <path class="fil0 str2" d="M170.05 104.23c36.35,0 65.81,29.47 65.81,65.81 0,36.35 -29.47,65.81 -65.81,65.81 -36.35,0 -65.81,-29.47 -65.81,-65.81 0,-36.35 29.47,-65.81 65.81,-65.81z" />
+          </g>
+        </g>
+        <g>
+          <g>
+            <path class="fil0 str3" d="M170.05 71.33c54.52,0 98.72,44.2 98.72,98.72 0,54.52 -44.2,98.72 -98.72,98.72 -54.52,0 -98.72,-44.2 -98.72,-98.72 0,-54.52 44.2,-98.72 98.72,-98.72z" />
+          </g>
+          <g>
+            <path class="fil0 str3" d="M170.05 71.33c54.52,0 98.72,44.2 98.72,98.72 0,54.52 -44.2,98.72 -98.72,98.72 -54.52,0 -98.72,-44.2 -98.72,-98.72 0,-54.52 44.2,-98.72 98.72,-98.72z" />
+          </g>
+        </g>
+        <g>
+          <g>
+            <path class="fil0 str4" d="M170.05 38.42c72.7,0 131.63,58.93 131.63,131.63 0,72.7 -58.93,131.63 -131.63,131.63 -72.7,0 -131.63,-58.93 -131.63,-131.63 0,-72.7 58.93,-131.63 131.63,-131.63z" />
+          </g>
+          <g>
+            <path class="fil0 str4" d="M170.05 38.42c72.7,0 131.63,58.93 131.63,131.63 0,72.7 -58.93,131.63 -131.63,131.63 -72.7,0 -131.63,-58.93 -131.63,-131.63 0,-72.7 58.93,-131.63 131.63,-131.63z" />
+          </g>
+        </g>
+        <g>
+          <g>
+            <path class="fil0 str5" d="M170.05 137.14c18.17,0 32.91,14.73 32.91,32.91 0,18.17 -14.73,32.91 -32.91,32.91 -18.17,0 -32.91,-14.73 -32.91,-32.91 0,-18.17 14.73,-32.91 32.91,-32.91z" />
+          </g>
+          <g>
+            <path class="fil0 str5" d="M170.05 137.14c18.17,0 32.91,14.73 32.91,32.91 0,18.17 -14.73,32.91 -32.91,32.91 -18.17,0 -32.91,-14.73 -32.91,-32.91 0,-18.17 14.73,-32.91 32.91,-32.91z" />
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

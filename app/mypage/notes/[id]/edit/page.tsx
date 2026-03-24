@@ -43,7 +43,7 @@ export default function MypageEditNotePage() {
   useEffect(() => {
     fetch(`/api/community/billiard-notes/${id}`, { credentials: "include" })
       .then((res) => {
-        if (!res.ok) throw new Error("노트를 불러올 수 없습니다.");
+        if (!res.ok) throw new Error("난구노트를 불러올 수 없습니다.");
         return res.json();
       })
       .then((data) => {

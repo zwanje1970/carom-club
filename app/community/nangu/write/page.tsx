@@ -35,7 +35,7 @@ export default function NanguWritePage() {
     }
     fetch(`/api/community/billiard-notes/${fromNoteId}`, { credentials: "include" })
       .then((res) => {
-        if (!res.ok) throw new Error("노트를 불러올 수 없습니다.");
+        if (!res.ok) throw new Error("난구노트를 불러올 수 없습니다.");
         return res.json();
       })
       .then((data) => {
@@ -113,7 +113,7 @@ export default function NanguWritePage() {
     return (
       <main className="min-h-screen bg-site-bg text-site-text">
         <div className="mx-auto max-w-2xl px-4 py-6">
-          <p className="text-red-600">노트를 불러올 수 없습니다.</p>
+          <p className="text-red-600">난구노트를 불러올 수 없습니다.</p>
           <Link href="/community/nangu" className="mt-2 inline-block text-site-primary underline">목록으로</Link>
         </div>
       </main>
@@ -139,7 +139,7 @@ export default function NanguWritePage() {
           <>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               {source?.type === "fromNote"
-                ? "당구노트에서 가져온 공 배치입니다. 이 배치로 문제를 등록합니다. 게시 후에는 공 배치를 수정할 수 없습니다."
+                ? "난구노트에서 가져온 공 배치입니다. 이 배치로 문제를 등록합니다. 게시 후에는 공 배치를 수정할 수 없습니다."
                 : "문제가 되는 공 배치를 설정하세요. 게시 후에는 수정할 수 없습니다."}
             </p>
             {source?.type === "fromNote" && placement && (

@@ -64,7 +64,10 @@ export function formatKoreanDate(v: string | number | Date): string {
   return `${p.year}년 ${p.month}월 ${p.day}일`;
 }
 
-/** `YYYY년 M월 D일 오전/오후 h시 mm분 ss초` (서울 기준, 12시 표기) */
+/**
+ * `YYYY년 M월 D일 오전/오후 h시 mm분` (서울 기준, 12시 표기).
+ * **초는 표시하지 않음** — 입력이 ISO 문자열(초 포함)이어도 분·시만 노출.
+ */
 export function formatKoreanDateTime(v: string | number | Date): string {
   const p = toSeoulWallParts(new Date(v));
   if (!p) return "—";
@@ -72,7 +75,7 @@ export function formatKoreanDateTime(v: string | number | Date): string {
   const period = isPm ? "오후" : "오전";
   let h12 = p.hour % 12;
   if (h12 === 0) h12 = 12;
-  return `${p.year}년 ${p.month}월 ${p.day}일 ${period} ${h12}시 ${pad2(p.minute)}분 ${pad2(p.second)}초`;
+  return `${p.year}년 ${p.month}월 ${p.day}일 ${period} ${h12}시 ${pad2(p.minute)}분`;
 }
 
 /**
@@ -123,4 +126,25 @@ export function formatCommunityListDate(v: string | number | Date): string {
   const p = toSeoulWallParts(new Date(v));
   if (!p) return "—";
   return `${pad2(p.month)}.${pad2(p.day)}`;
+}
+
+/**
+ * DTO/JSON 직렬화·`unstable_cache` 등으로 `Date`가 문자열로 들어온 경우까지 처리해
+ * UTC ISO 8601 문자열로 통일한다.
+ *
+ * - `Date` → `toISOString()` (Invalid Date면 빈 문자열)
+ * - 파싱 가능한 문자열 → `new Date(v).toISOString()`
+ * - 파싱 불가 문자열 → 원문 유지(디버깅·하위 호환)
+ */
+export function toIsoString(value: Date | string): string {
+  if (value instanceof Date) {
+    const t = value.getTime();
+    if (Number.isNaN(t)) return "";
+    return value.toISOString();
+  }
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) {
+    return value;
+  }
+  return d.toISOString();
 }

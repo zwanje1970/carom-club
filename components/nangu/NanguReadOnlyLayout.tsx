@@ -28,6 +28,7 @@ export function NanguReadOnlyLayout({
   orientation = "landscape",
   betweenTableAndBallsLayer,
   pathOverlayAboveBalls = false,
+  cueTipNorm = null,
 }: {
   ballPlacement: NanguBallPlacement;
   width?: number;
@@ -49,12 +50,14 @@ export function NanguReadOnlyLayout({
   objectBallSpotKey?: BallColor | null;
   /** 실사 | 단순보기(와이어프레임) */
   drawStyle?: TableDrawStyle;
-  /** 당구노트 전체화면과 동일하게 기기 방향 반영 */
+  /** 난구노트 전체화면과 동일하게 기기 방향 반영 */
   orientation?: TableOrientation;
   /** 테이블·공 사이 레이어(경로 SVG) — 지정 시 공이 경로선 위에 그려짐 */
   betweenTableAndBallsLayer?: ReactNode;
   /** 기본 false. true면 경로 SVG를 공 위(z-30)로 — 난구 해법은 공 최상위 유지를 위해 보통 사용 안 함 */
   pathOverlayAboveBalls?: boolean;
+  /** 해법 패널 당점 — 수구 위 점 표시만 */
+  cueTipNorm?: { x: number; y: number } | null;
 }) {
   return (
     <div
@@ -75,6 +78,7 @@ export function NanguReadOnlyLayout({
         objectBallSpotKey={objectBallSpotKey}
         hideRedBall={hideObjectBall}
         ballNormOverrides={ballNormOverrides}
+        cueTipNorm={cueTipNorm}
         drawStyle={drawStyle}
         embedFill={embedFill}
         orientation={orientation}

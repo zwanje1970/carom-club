@@ -39,6 +39,7 @@ export function AdminLayoutSidebar({ copy, onLogout, mobileOpen, onMobileClose }
 
   useEffect(() => {
     if (expandedIndex >= 0) setOpenIndex(expandedIndex);
+    else setOpenIndex(-1);
   }, [expandedIndex]);
 
   const isActive = (href: string) => {

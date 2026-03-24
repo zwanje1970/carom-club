@@ -1,4 +1,4 @@
-# 당구 관련 기능 구조 (당구노트 / 난구풀이 / 해법)
+# 당구 관련 기능 구조 (난구노트 / 난구풀이 / 해법)
 
 ## 현재 구조 요약
 
@@ -16,16 +16,16 @@
 - **좌표·규격**  
   `lib/billiard-table-constants.ts`: 2:1 테이블, 플레이필드 inset, 공 반지름, 정규화 0..1, `clampBallToPlayfield` 등.
 
-### 당구노트 (구현됨)
+### 난구노트 (구현됨)
 
 - **페이지**: `app/community/notes/`, `new/`, `[id]/`, `[id]/edit/`.
 - **편집**: `BilliardNoteEditor` = `BilliardTableEditor` + 메모 + 저장 버튼.
 - **저장**: 테이블 이미지 업로드 → `BilliardNote` (redBallX/Y, yellowBallX/Y, whiteBallX/Y, cueBall, memo, imageUrl, visibility).
 
-### 난구해결 (trouble) + 당구노트 연동
+### 난구해결 (trouble) + 난구노트 연동
 
-- **당구노트 → 난구**: `POST /api/community/trouble/from-note` 가 `BilliardNote`의 공 좌표 컬럼을 `NanguBallPlacement` JSON으로 조합해 `TroubleShotPost.ballPlacementJson`에 저장.
-- **표시·해법**: 상세 `CommunityPostDetailView`는 `ballPlacement`가 있으면 `NanguReadOnlyLayout`(당구노트와 동일 테이블 UI), 없으면 `layoutImageUrl` 이미지. 해법 작성 `TroubleSolutionEditor`는 미리보기·전체화면을 난구해결사 해법과 동일하게(`noteBallPlacementFullscreen`, `useTableOrientation`).
+- **난구노트 → 난구**: `POST /api/community/trouble/from-note` 가 `BilliardNote`의 공 좌표 컬럼을 `NanguBallPlacement` JSON으로 조합해 `TroubleShotPost.ballPlacementJson`에 저장.
+- **표시·해법**: 상세 `CommunityPostDetailView`는 `ballPlacement`가 있으면 `NanguReadOnlyLayout`(난구노트와 동일 테이블 UI), 없으면 `layoutImageUrl` 이미지. 해법 작성 `TroubleSolutionEditor`는 미리보기·전체화면을 난구해결사 해법과 동일하게(`noteBallPlacementFullscreen`, `useTableOrientation`).
 
 ### 난구풀이 / 해법 작성 (미구현)
 
@@ -39,7 +39,7 @@
   예: `pathSegments?: { from: {x,y}, to: {x,y} }[]` 또는 polyline 정규화 좌표 배열.  
   캔버스는 `BilliardTableCanvas` 확장 또는 오버레이로 경로만 그리면 됨.
 
-### 저장 구조 (당구노트 기준)
+### 저장 구조 (난구노트 기준)
 
 - **BilliardNote**: redBallX/Y, yellowBallX/Y, whiteBallX/Y, cueBall("white"|"yellow"), memo, imageUrl, visibility, authorId.
 - 공 배치: 플레이필드 내만 허용(공 반지름 기준 클램프).

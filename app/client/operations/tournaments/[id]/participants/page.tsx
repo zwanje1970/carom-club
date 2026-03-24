@@ -6,6 +6,7 @@ import { canUseFeature, FEATURE_CODES, isAnnualMembershipActive } from "@/lib/fe
 import { canAccessClientDashboard } from "@/types/auth";
 import { FeatureGateNotice } from "@/components/client/FeatureGateNotice";
 import { ClientOperationsParticipantsPanel } from "@/components/client/console/ClientOperationsParticipantsPanel";
+import { toTournamentOperationPhaseSnapshot } from "@/lib/client-tournament-operation-phase";
 
 export const metadata = { title: "참가자 관리" };
 
@@ -30,7 +31,13 @@ export default async function ClientOperationsTournamentParticipantsPage({
 
   const tournament = await prisma.tournament.findFirst({
     where: { id: tournamentId, organizationId: orgId },
-    select: { id: true, name: true },
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      participantRosterLockedAt: true,
+      _count: { select: { finalMatches: true } },
+    },
   });
   if (!tournament) notFound();
 
@@ -54,6 +61,10 @@ export default async function ClientOperationsTournamentParticipantsPage({
       tournamentId={tournament.id}
       tournamentName={tournament.name}
       listHref="/client/operations"
+      operationPhase={{
+        snapshot: toTournamentOperationPhaseSnapshot(tournament),
+        currentView: "participants",
+      }}
     />
   );
 }

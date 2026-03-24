@@ -1,5 +1,6 @@
 import type { BallSpeed } from "@/lib/ball-speed-constants";
-import type { NanguPathPoint } from "@/lib/nangu-types";
+import type { NanguCurveNode, NanguPathPoint } from "@/lib/nangu-types";
+import { cloneNanguCurveNodes } from "@/lib/nangu-curve-nodes";
 
 export type NanguActivePanel =
   | "thickness"
@@ -20,6 +21,8 @@ export type NanguSolutionEditorUndoSnapshot = {
   followStrokeLevel: number;
   ballSpeed: BallSpeed;
   pathPoints: NanguPathPoint[];
+  cuePathCurveNodes: NanguCurveNode[];
+  objectPathCurveNodes: NanguCurveNode[];
   explanationText: string;
 };
 
@@ -31,6 +34,8 @@ export function cloneNanguSolutionEditorSnapshot(
   return {
     ...s,
     pathPoints: s.pathPoints.map((p) => ({ ...p })),
+    cuePathCurveNodes: cloneNanguCurveNodes(s.cuePathCurveNodes),
+    objectPathCurveNodes: cloneNanguCurveNodes(s.objectPathCurveNodes),
   };
 }
 
@@ -41,10 +46,12 @@ export function createInitialNanguSolutionEditorSnapshot(): NanguSolutionEditorU
     thicknessOffsetX: 0.5,
     spinX: 0,
     spinY: 0,
-    backstrokeLevel: 5,
+    backstrokeLevel: 0,
     followStrokeLevel: 5,
     ballSpeed: 3.0,
     pathPoints: [],
+    cuePathCurveNodes: [],
+    objectPathCurveNodes: [],
     explanationText: "",
   };
 }

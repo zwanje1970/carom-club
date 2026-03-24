@@ -47,7 +47,7 @@ export function ballPairKey(
 
 /**
  * 경로 그리기 **전** 배치 기준으로 이미 원둘레가 맞닿아 있던 공 쌍.
- * 재생 중 해당 쌍의 맞닿음은 충돌로 보지 않는다(당구노트 난구의 초기 밀착 배치).
+ * 재생 중 해당 쌍의 맞닿음은 충돌로 보지 않는다(난구노트 난구의 초기 밀착 배치).
  */
 export function collectInitialTouchingBallPairs(
   placement: NanguBallPlacement,

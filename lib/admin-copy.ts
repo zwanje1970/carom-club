@@ -84,7 +84,7 @@ export const DEFAULT_ADMIN_COPY: Record<string, string> = {
   "site.home.venues.subtitleWithList": "대표 구장을 만나보세요.",
   "site.home.venues.empty": "등록된 당구장이 없습니다.",
   "site.home.venues.btnViewAll": "전체 보기 →",
-  "site.home.community.notes.title": "당구노트",
+  "site.home.community.notes.title": "난구노트",
   "site.home.community.notes.desc": "연습·경기 기록을 남기고 언제든 복기해 보세요.",
   "site.home.community.nangu.title": "난구해결사",
   "site.home.community.nangu.desc": "문제구 질문 및 해법 토론 게시판입니다.",
@@ -104,7 +104,7 @@ export const DEFAULT_ADMIN_COPY: Record<string, string> = {
   "site.venues.title": "당구장 소개",
   "site.venues.subtitle": "제휴 당구장을 소개합니다.",
   "site.venues.empty": "등록된 당구장이 없습니다.",
-  "site.community.billiardNotes.title": "당구노트",
+  "site.community.billiardNotes.title": "난구노트",
   "site.tournamentDetail.tabInfo": "대회 안내",
   "site.tournamentDetail.infoEmpty": "안내 내용이 없습니다.",
   // 대회/권역 용어 (관리자 메뉴·문구에서 변경 가능)
