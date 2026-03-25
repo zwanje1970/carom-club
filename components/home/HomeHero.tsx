@@ -86,7 +86,7 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
 
   const titleBlock = (
     <div
-      className={`hero-html prose prose-p:my-0.5 max-w-none text-3xl md:text-6xl ${titleAlignClass} ${isOverlay ? "text-white [&_*]:text-inherit" : "text-site-text"}`}
+      className={`hero-html prose prose-p:my-0.5 max-w-none text-3xl md:text-6xl min-h-[3.25rem] md:min-h-[5.5rem] ${titleAlignClass} ${isOverlay ? "text-white [&_*]:text-inherit" : "text-site-text"}`}
       style={Object.keys(titleStyle).length ? titleStyle : undefined}
       dangerouslySetInnerHTML={{ __html: titleHtml || "<p>CAROM.CLUB</p>" }}
     />
@@ -112,7 +112,7 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
 
   const content = (
     <div
-      className={`relative z-10 w-full flex flex-col justify-center px-4 leading-tight py-4 md:py-6 ${
+      className={`relative z-10 w-full flex flex-col justify-center px-4 leading-tight py-4 md:py-6 min-h-[140px] md:min-h-[180px] ${
         isOverlay ? "text-white [&_.hero-html]:text-inherit" : ""
       }`}
     >
@@ -127,7 +127,7 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
   return (
     <section className="relative overflow-hidden border-b border-site-border bg-gradient-to-b from-site-card to-[var(--site-bg)] flex-shrink-0 w-full">
       {safeBannerSrc ? (
-        <div className="relative min-h-[240px] md:min-h-[420px] flex flex-col items-center justify-center py-6 md:py-12 w-full">
+        <div className="relative w-full aspect-[16/9] min-h-[240px] max-h-[min(56.25vw,85vh)] md:min-h-[280px] md:max-h-[min(56.25vw,560px)] flex flex-col items-center justify-center py-6 md:py-12">
           <div className="absolute inset-0">
             {isOptimizableImageSrc(safeBannerSrc) ? (
               <Image
@@ -135,8 +135,9 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
                 alt="히어로 배너"
                 fill
                 priority
-                className="object-cover pointer-events-none"
+                quality={75}
                 sizes="100vw"
+                className="object-cover pointer-events-none"
                 data-debug-src={safeBannerSrc}
               />
             ) : (
@@ -144,7 +145,10 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
                 src={safeBannerSrc}
                 alt="히어로 배너"
                 fetchPriority="high"
-                className="absolute inset-0 h-full w-full object-cover pointer-events-none min-h-[120px]"
+                width={1920}
+                height={1080}
+                decoding="async"
+                className="absolute inset-0 h-full w-full object-cover pointer-events-none"
                 data-debug-src={safeBannerSrc}
               />
             )}
@@ -199,17 +203,20 @@ function HomeHeroFromSettings({ settings }: { settings: HeroSettings }) {
   ) : null;
 
   const textBlock = (
-    <div className={`w-full ${textAlignClass}`} style={{ maxWidth: s.heroTextMaxWidth }}>
+    <div
+      className={`w-full min-h-[7.5rem] sm:min-h-[8rem] ${textAlignClass}`}
+      style={{ maxWidth: s.heroTextMaxWidth }}
+    >
       {s.heroEyebrowText && (
-        <p className="mb-1 text-white/90" style={{ fontSize: s.heroSubtitleSize }}>
+        <p className="mb-1 min-h-[1.25em] text-white/90" style={{ fontSize: s.heroSubtitleSize }}>
           {s.heroEyebrowText}
         </p>
       )}
-      <h1 className="font-bold leading-tight text-white" style={{ fontSize: s.heroTitleSize }}>
+      <h1 className="font-bold leading-tight text-white min-h-[2.5em]" style={{ fontSize: s.heroTitleSize }}>
         {s.heroTitle || "CAROM.CLUB"}
       </h1>
       {s.heroSubtitle && (
-        <p className="mt-1 text-white/95" style={{ fontSize: s.heroSubtitleSize }}>
+        <p className="mt-1 min-h-[1.25em] text-white/95" style={{ fontSize: s.heroSubtitleSize }}>
           {s.heroSubtitle}
         </p>
       )}
@@ -221,7 +228,9 @@ function HomeHeroFromSettings({ settings }: { settings: HeroSettings }) {
   const itemsClass =
     s.heroTextAlign === "left" ? "items-start" : s.heroTextAlign === "right" ? "items-end" : "items-center";
   const content = (
-    <div className={`relative z-10 flex w-full flex-1 flex-col px-4 py-6 ${justifyClass} ${itemsClass}`}>
+    <div
+      className={`relative z-10 flex w-full flex-1 flex-col px-4 py-6 min-h-[160px] ${justifyClass} ${itemsClass}`}
+    >
       {textBlock}
       {s.heroButtonsPosition === "bottom" && <div className="mt-auto pt-6">{buttonsBlock}</div>}
     </div>
@@ -249,9 +258,10 @@ function HomeHeroFromSettings({ settings }: { settings: HeroSettings }) {
                   alt="히어로 배경"
                   fill
                   priority
+                  quality={75}
+                  sizes="100vw"
                   className="object-cover pointer-events-none"
                   style={{ filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined }}
-                  sizes="100vw"
                   data-debug-src={safeBg}
                 />
               ) : (
@@ -259,7 +269,10 @@ function HomeHeroFromSettings({ settings }: { settings: HeroSettings }) {
                   src={safeBg}
                   alt="히어로 배경"
                   fetchPriority="high"
-                  className="absolute inset-0 h-full w-full object-cover pointer-events-none min-h-[120px]"
+                  width={1920}
+                  height={1080}
+                  decoding="async"
+                  className="absolute inset-0 h-full w-full object-cover pointer-events-none"
                   style={{ filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined }}
                   data-debug-src={safeBg}
                 />

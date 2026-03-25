@@ -257,20 +257,33 @@ export function VenueCarousel({
                   {(() => {
                     const src = sanitizeImageSrc(imageUrl(v) ?? "");
                     if (!src) {
-                      return <img src={IMAGE_PLACEHOLDER_SRC} alt="" className="absolute inset-0 w-full h-full object-cover" />;
+                      return (
+                        <img
+                          src={IMAGE_PLACEHOLDER_SRC}
+                          alt=""
+                          width={96}
+                          height={96}
+                          className="absolute inset-0 h-full w-full object-cover"
+                          decoding="async"
+                          loading="lazy"
+                        />
+                      );
                     }
                     return (
                       <img
                         src={src}
                         alt=""
-                        className="absolute inset-0 w-full h-full object-cover"
+                        width={96}
+                        height={96}
+                        className="absolute inset-0 h-full w-full object-cover"
+                        decoding="async"
                         loading="lazy"
                         data-debug-src={src}
                       />
                     );
                   })()}
                 </div>
-                <p className="mt-2 text-center text-sm font-medium text-site-text line-clamp-2 break-words w-full px-0.5">
+                <p className="mt-2 min-h-[2.5rem] text-center text-sm font-medium text-site-text line-clamp-2 break-words w-full px-0.5">
                   {v.name}
                 </p>
               </Link>

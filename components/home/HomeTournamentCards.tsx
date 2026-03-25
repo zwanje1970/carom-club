@@ -43,11 +43,11 @@ export function HomeTournamentCards({
     <section className="px-4 py-10 sm:px-6 sm:py-12">
       <div className="mx-auto max-w-5xl">
         <div className="flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <h2 className="text-xl font-bold text-site-text sm:text-2xl">
+          <div className="min-h-[4.5rem]">
+            <h2 className="text-xl font-bold text-site-text sm:text-2xl min-h-[1.75rem]">
               {getCopyValue(c, "site.home.tournaments.title")}
             </h2>
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="mt-1 min-h-[2.5rem] text-sm text-gray-600 line-clamp-2">
               {getCopyValue(c, "site.home.tournaments.subtitle")}
             </p>
           </div>

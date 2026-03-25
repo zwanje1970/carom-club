@@ -111,8 +111,13 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: buildRemotePatterns(),
     localPatterns: [{ pathname: "/uploads/**" }, { pathname: "/images/**" }],
-    unoptimized:
-      process.env.VERCEL === "1" || process.env.NEXT_IMAGE_UNOPTIMIZED === "1",
+    /** AVIF 우선 → WebP 폴백 (기본 파이프라인) */
+    formats: ["image/avif", "image/webp"],
+    /** 모바일 LCP용으로 과대 해상도(3840 등) 제거, 흔한 단말·뷰포트 위주 */
+    deviceSizes: [360, 390, 414, 640, 750, 828, 1080, 1200, 1280, 1920],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256],
+    /** Vercel에서도 최적화 사용. 필요 시에만 NEXT_IMAGE_UNOPTIMIZED=1 */
+    unoptimized: process.env.NEXT_IMAGE_UNOPTIMIZED === "1",
   },
 };
 

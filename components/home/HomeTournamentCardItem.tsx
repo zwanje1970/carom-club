@@ -75,19 +75,31 @@ export function HomeTournamentCardItem({
         aria-hidden={duplicate}
         className="group flex h-full min-h-[200px] flex-col overflow-hidden rounded-2xl border border-site-border bg-site-card shadow-sm transition hover:border-site-primary/30 hover:shadow-md sm:min-h-0"
       >
-        <div className="relative w-full h-28 md:h-40 bg-gray-100 shrink-0">
+        <div className="relative w-full aspect-[5/2] min-h-[7rem] shrink-0 overflow-hidden bg-gray-100 md:aspect-[7/4] md:min-h-[10rem]">
           {(() => {
             const src = sanitizeImageSrc((t.posterImageUrl || t.imageUrl) ?? "");
             if (!src) {
               return (
-                <img src={IMAGE_PLACEHOLDER_SRC} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                <img
+                  src={IMAGE_PLACEHOLDER_SRC}
+                  alt=""
+                  width={280}
+                  height={160}
+                  className="absolute inset-0 h-full w-full object-cover"
+                  decoding="async"
+                  loading="lazy"
+                />
               );
             }
             return (
               <img
                 src={src}
                 alt=""
-                className="absolute inset-0 w-full h-full object-cover"
+                width={280}
+                height={160}
+                className="absolute inset-0 h-full w-full object-cover"
+                decoding="async"
+                loading="lazy"
                 data-debug-src={src}
               />
             );
@@ -119,8 +131,8 @@ export function HomeTournamentCardItem({
             ) : null;
           })()}
         </div>
-        <div className="flex flex-1 flex-col p-3 gap-2">
-          <h3 className="font-semibold text-site-text group-hover:text-site-primary text-sm md:text-base">
+        <div className="flex flex-1 flex-col p-3 gap-2 min-h-[7.5rem]">
+          <h3 className="font-semibold text-site-text group-hover:text-site-primary text-sm md:text-base line-clamp-2 min-h-[2.5rem]">
             {t.name}
           </h3>
           {t.organization && (
