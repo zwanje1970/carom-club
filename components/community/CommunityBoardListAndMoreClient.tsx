@@ -58,7 +58,11 @@ export function CommunityBoardListAndMoreClient({
     if (q.trim()) sp.set("q", q.trim());
     if (boardSlug === "trouble" && statusFilter !== "all") sp.set("status", statusFilter);
 
-    fetch(`/api/community/boards/${boardSlug}/posts?${sp}`, { credentials: "include" })
+    // 브라우저/중간 캐시가 동작하도록 캐시 힌트 부여(서버 Revalidate는 Route Handler Cache-Control로 제어)
+    fetch(`/api/community/boards/${boardSlug}/posts?${sp}`, {
+      credentials: "include",
+      cache: "force-cache",
+    })
       .then((res) => {
         if (!res.ok) throw new Error("목록을 불러올 수 없습니다.");
         return res.json();

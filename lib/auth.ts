@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import type { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { cache } from "react";
 import type { SessionUser } from "@/types/auth";
 
 const COOKIE_NAME = "carom_session";
@@ -70,7 +71,7 @@ export async function createSession(
     .sign(SECRET);
 }
 
-export async function getSession(): Promise<SessionUser | null> {
+async function getSessionUncached(): Promise<SessionUser | null> {
   const { cookies } = await import("next/headers");
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
@@ -104,6 +105,9 @@ export async function getSession(): Promise<SessionUser | null> {
     return null;
   }
 }
+
+/** 동일 RSC 요청에서 중복 호출 시 JWT 검증 한 번만 수행 */
+export const getSession = cache(getSessionUncached);
 
 export async function setSessionCookie(token: string): Promise<void> {
   const { cookies } = await import("next/headers");

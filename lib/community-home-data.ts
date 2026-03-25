@@ -1,0 +1,157 @@
+/**
+ * 커뮤니티 홈 인기글·게시판 목록 — unstable_cache로 요청 간 재사용.
+ * 태그 `community-home` — 글 작성/삭제 등에서 revalidateTag로 무효화.
+ */
+
+import { unstable_cache } from "next/cache";
+import { prisma } from "@/lib/db";
+import { isDatabaseConfigured } from "@/lib/db-mode";
+
+const TAKE = 10;
+const REVALIDATE_SECONDS = 45;
+
+export const COMMUNITY_HOME_CACHE_TAG = "community-home";
+
+const listSelect = {
+  id: true,
+  title: true,
+  viewCount: true,
+  createdAt: true,
+  likeCount: true,
+  commentCount: true,
+  board: { select: { slug: true, name: true } },
+  author: { select: { name: true } },
+} as const;
+
+export type CommunityHomePostItem = {
+  id: string;
+  title: string;
+  authorName: string;
+  likeCount: number;
+  commentCount: number;
+  viewCount: number;
+  createdAt: string;
+  boardSlug: string;
+  boardName: string;
+};
+
+export type CommunityHomePopular = {
+  today: CommunityHomePostItem[];
+  weekly: CommunityHomePostItem[];
+  mostLiked: CommunityHomePostItem[];
+  mostComments: CommunityHomePostItem[];
+};
+
+function format(p: {
+  id: string;
+  title: string;
+  viewCount: number;
+  createdAt: Date;
+  likeCount: number;
+  commentCount: number;
+  board: { slug: string; name: string };
+  author: { name: string };
+}): CommunityHomePostItem {
+  return {
+    id: p.id,
+    title: p.title,
+    authorName: p.author.name,
+    likeCount: p.likeCount,
+    commentCount: p.commentCount,
+    viewCount: p.viewCount,
+    createdAt: p.createdAt.toISOString(),
+    boardSlug: p.board.slug,
+    boardName: p.board.name,
+  };
+}
+
+export async function getCachedCommunityBoards(): Promise<
+  { id: string; slug: string; name: string; type: string }[]
+> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    return await unstable_cache(
+      async () =>
+        prisma.communityBoard.findMany({
+          where: { isActive: true },
+          orderBy: { sortOrder: "asc" },
+          select: { id: true, slug: true, name: true, type: true },
+        }),
+      ["community-home-boards"],
+      { revalidate: REVALIDATE_SECONDS, tags: [COMMUNITY_HOME_CACHE_TAG] }
+    )();
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * @param excludeTroubleBoard 비로그인 시 true — 인기글에서 난구해결(trouble) 제외
+ */
+export async function getCachedCommunityPopular(
+  excludeTroubleBoard: boolean
+): Promise<CommunityHomePopular> {
+  const empty: CommunityHomePopular = {
+    today: [],
+    weekly: [],
+    mostLiked: [],
+    mostComments: [],
+  };
+  if (!isDatabaseConfigured()) return empty;
+
+  const variant = excludeTroubleBoard ? "anon" : "auth";
+
+  try {
+    return await unstable_cache(
+      async () => {
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const weekStart = new Date(todayStart);
+        weekStart.setDate(weekStart.getDate() - 7);
+
+        const hiddenFilter = {
+          isHidden: false,
+          ...(excludeTroubleBoard ? { board: { slug: { not: "trouble" as const } } } : {}),
+        };
+
+        const [todayPosts, weekPosts, mostLikedPosts, mostCommentPosts] = await Promise.all([
+          prisma.communityPost.findMany({
+            where: { ...hiddenFilter, createdAt: { gte: todayStart } },
+            orderBy: [{ viewCount: "desc" }, { createdAt: "desc" }],
+            take: TAKE,
+            select: listSelect,
+          }),
+          prisma.communityPost.findMany({
+            where: { ...hiddenFilter, createdAt: { gte: weekStart } },
+            orderBy: [{ viewCount: "desc" }, { createdAt: "desc" }],
+            take: TAKE,
+            select: listSelect,
+          }),
+          prisma.communityPost.findMany({
+            where: hiddenFilter,
+            orderBy: [{ likeCount: "desc" }, { createdAt: "desc" }],
+            take: TAKE,
+            select: listSelect,
+          }),
+          prisma.communityPost.findMany({
+            where: hiddenFilter,
+            orderBy: [{ commentCount: "desc" }, { createdAt: "desc" }],
+            take: TAKE,
+            select: listSelect,
+          }),
+        ]);
+
+        return {
+          today: todayPosts.map(format),
+          weekly: weekPosts.map(format),
+          mostLiked: mostLikedPosts.map(format),
+          mostComments: mostCommentPosts.map(format),
+        };
+      },
+      ["community-home-popular", variant],
+      { revalidate: REVALIDATE_SECONDS, tags: [COMMUNITY_HOME_CACHE_TAG] }
+    )();
+  } catch {
+    return empty;
+  }
+}

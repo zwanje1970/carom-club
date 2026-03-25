@@ -6,7 +6,7 @@ import { PrismaClient } from "prisma-generated";
 
 ensureDatabaseUrlForDevelopment();
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
 
 export const prisma =
   globalForPrisma.prisma ??
@@ -17,4 +17,5 @@ export const prisma =
         : ["error"],
   });
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+/** 서버리스/프로덕션에서도 동일 프로세스 내 단일 인스턴스 재사용(커넥션 폭증 방지) */
+globalForPrisma.prisma = prisma;

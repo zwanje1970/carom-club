@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { revalidateCommunityHome } from "@/lib/community-home-revalidate";
 import { ensureDefaultCommunityBoards } from "@/lib/community-ensure-boards";
 import type { TroubleFromNoteRequest } from "@/lib/services/bridge/trouble-from-note-validator";
 
@@ -102,5 +103,6 @@ export async function createTroublePostFromNote(input: {
     },
   });
 
+  revalidateCommunityHome();
   return { id: post.id };
 }

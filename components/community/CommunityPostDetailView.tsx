@@ -7,8 +7,21 @@ import { IMAGE_PLACEHOLDER_SRC, sanitizeImageSrc } from "@/lib/image-src";
 import { formatKoreanDateTime } from "@/lib/format-date";
 import { DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT } from "@/lib/billiard-table-constants";
 import type { NanguBallPlacement } from "@/lib/nangu-types";
-import { NanguReadOnlyLayout } from "@/components/nangu/NanguReadOnlyLayout";
+import dynamic from "next/dynamic";
 import type { CommunityPostDetailJson, TroubleSolutionListItem } from "@/lib/community-post-detail-server";
+
+const NanguReadOnlyLayoutLazy = dynamic(
+  () =>
+    import("@/components/nangu/NanguReadOnlyLayout").then((m) => ({
+      default: m.NanguReadOnlyLayout,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full animate-pulse bg-site-card/50" aria-hidden />
+    ),
+  }
+);
 
 const VIEWER_KEY_STORAGE = "community_viewer_key";
 
@@ -475,7 +488,7 @@ export function CommunityPostDetailView({
                 aspectRatio: `${DEFAULT_TABLE_WIDTH} / ${DEFAULT_TABLE_HEIGHT}`,
               }}
             >
-              <NanguReadOnlyLayout
+              <NanguReadOnlyLayoutLazy
                 ballPlacement={post.troubleShot.ballPlacement}
                 fillContainer
                 embedFill

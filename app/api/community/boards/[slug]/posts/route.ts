@@ -16,6 +16,7 @@ import {
 } from "@/lib/community-board-list-query";
 import { communityListPerfStart } from "@/lib/community-list-perf";
 import { revalidateCommunityNoticePinned } from "@/lib/community-notice-pinned-revalidate";
+import { revalidateCommunityHome } from "@/lib/community-home-revalidate";
 
 /** 게시판별 글 목록. 본문·imageUrls·에디터 JSON 미포함. 검색은 제목만(본문 LIKE 제거로 부하 감소). */
 export async function GET(
@@ -171,6 +172,7 @@ export async function POST(
   if (board.slug === "notice") {
     revalidateCommunityNoticePinned(board.id);
   }
+  revalidateCommunityHome();
   if (board.slug !== "notice") {
     try {
       await awardPostCreated(session.id, post.id);

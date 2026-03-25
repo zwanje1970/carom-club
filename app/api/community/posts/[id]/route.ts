@@ -5,6 +5,7 @@ import { isDatabaseConfigured } from "@/lib/db-mode";
 import { isCommunityAdmin } from "@/lib/community-roles";
 import { loadCommunityPostDetail } from "@/lib/community-post-detail-server";
 import { revalidateCommunityNoticePinned } from "@/lib/community-notice-pinned-revalidate";
+import { revalidateCommunityHome } from "@/lib/community-home-revalidate";
 
 /** 게시글 상세 조회. 조회수는 POST /view 에서만 증가 */
 export async function GET(
@@ -76,6 +77,7 @@ export async function PATCH(
   if (existing.board.slug === "notice") {
     revalidateCommunityNoticePinned(existing.boardId);
   }
+  revalidateCommunityHome();
   return NextResponse.json({ id: updated.id, updatedAt: updated.updatedAt.toISOString() });
 }
 
@@ -109,5 +111,6 @@ export async function DELETE(
   if (existing.board.slug === "notice") {
     revalidateCommunityNoticePinned(existing.boardId);
   }
+  revalidateCommunityHome();
   return NextResponse.json({ ok: true });
 }
