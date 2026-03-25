@@ -4,6 +4,8 @@ import { getSession } from "@/lib/auth";
 import { loadCommunityBoardPageData } from "@/lib/community-board-page-data";
 import { communityBoardSsrPerf } from "@/lib/community-board-ssr-perf";
 import { CommunityBoardPageShell } from "@/components/community/CommunityBoardPageShell";
+import { isPlatformAdmin } from "@/types/auth";
+import { canShowSolverEntry } from "@/lib/entry-visibility";
 
 export const revalidate = 60;
 
@@ -57,11 +59,14 @@ export default async function CommunityBoardSlugPage({
     notFound();
   }
 
+  const showSolverEntry = canShowSolverEntry(isPlatformAdmin(session));
+
   return (
     <CommunityBoardPageShell
       key={result.data.initialQueryKey}
       boardSlug={boardSlug}
       data={result.data}
+      showSolverEntry={showSolverEntry}
     />
   );
 }

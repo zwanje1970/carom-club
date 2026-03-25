@@ -13,13 +13,14 @@ const BASE_ITEMS = [
 export interface MypageQuickMenuProps {
   /** 클라이언트 회원이 일반회원 모드로 로그인한 경우에만 true. 일반회원(USER)은 false. */
   showClient?: boolean;
+  showNoteEntry: boolean;
 }
 
-export function MypageQuickMenu({ showClient = false }: MypageQuickMenuProps) {
+export function MypageQuickMenu({ showClient = false, showNoteEntry }: MypageQuickMenuProps) {
   const items = [
     ...BASE_ITEMS,
     ...(showClient ? [{ href: "/client/dashboard" as const, label: "클라이언트" as const }] : []),
-  ];
+  ].filter((item) => showNoteEntry || item.href !== "/mypage/notes");
   return (
     <div className="grid grid-cols-2 gap-3">
       {items.map(({ href, label }) => (

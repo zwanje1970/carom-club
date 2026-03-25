@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { normalizeCueBallType } from "@/lib/billiard-table-constants";
-import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
+import {
+  deleteBilliardNote,
+  getBilliardNoteAuthor,
+  getBilliardNoteDetail,
+  updateBilliardNote,
+} from "@/lib/services/note/billiard-note-service";
+import { parseBilliardNoteWriteBody } from "@/lib/services/note/billiard-note-validator";
 
 export async function GET(
   _request: Request,
@@ -20,28 +25,7 @@ export async function GET(
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  const note = await prisma.billiardNote.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      authorId: true,
-      title: true,
-      noteDate: true,
-      redBallX: true,
-      redBallY: true,
-      yellowBallX: true,
-      yellowBallY: true,
-      whiteBallX: true,
-      whiteBallY: true,
-      cueBall: true,
-      memo: true,
-      imageUrl: true,
-      visibility: true,
-      createdAt: true,
-      updatedAt: true,
-      author: { select: { id: true, name: true } },
-    },
-  });
+  const note = await getBilliardNoteDetail(id);
   if (!note) {
     return NextResponse.json({ error: "난구노트를 찾을 수 없습니다." }, { status: 404 });
   }
@@ -85,10 +69,18 @@ export async function PATCH(
   }
   const { id } = await params;
 
-  const existing = await prisma.billiardNote.findUnique({
-    where: { id },
-    select: { authorId: true },
-  });
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+  }
+  const parsed = parseBilliardNoteWriteBody(body);
+  if (!parsed) {
+    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+  }
+
+  const existing = await getBilliardNoteAuthor(id);
   if (!existing) {
     return NextResponse.json({ error: "난구노트를 찾을 수 없습니다." }, { status: 404 });
   }
@@ -96,56 +88,8 @@ export async function PATCH(
     return NextResponse.json({ error: "수정 권한이 없습니다." }, { status: 403 });
   }
 
-  let body: {
-    title?: string | null;
-    noteDate?: string | null;
-    redBall?: { x: number; y: number };
-    yellowBall?: { x: number; y: number };
-    whiteBall?: { x: number; y: number };
-    cueBall?: string;
-    memo?: string | null;
-    imageUrl?: string | null;
-    visibility?: string;
-  };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
-  }
-
-  const data: Record<string, unknown> = {};
-  if (body.title !== undefined) data.title = body.title?.trim() || null;
-  if (body.noteDate !== undefined) data.noteDate = body.noteDate ? new Date(body.noteDate) : null;
-  if (body.redBall != null) {
-    data.redBallX = body.redBall.x;
-    data.redBallY = body.redBall.y;
-  }
-  if (body.yellowBall != null) {
-    data.yellowBallX = body.yellowBall.x;
-    data.yellowBallY = body.yellowBall.y;
-  }
-  if (body.whiteBall != null) {
-    data.whiteBallX = body.whiteBall.x;
-    data.whiteBallY = body.whiteBall.y;
-  }
-  if (body.cueBall != null) {
-    data.cueBall = normalizeCueBallType(body.cueBall);
-  }
-  if (body.memo !== undefined) data.memo = body.memo?.trim() || null;
-  if (body.imageUrl !== undefined) data.imageUrl = body.imageUrl?.trim() || null;
-  if (body.visibility != null) {
-    data.visibility = body.visibility === "community" ? "community" : "private";
-  }
-
-  const updated = await prisma.billiardNote.update({
-    where: { id },
-    data,
-  });
-  return NextResponse.json({
-    id: updated.id,
-    visibility: updated.visibility,
-    updatedAt: updated.updatedAt.toISOString(),
-  });
+  const updated = await updateBilliardNote(id, parsed);
+  return NextResponse.json(updated);
 }
 
 export async function DELETE(
@@ -164,10 +108,7 @@ export async function DELETE(
   }
   const { id } = await params;
 
-  const existing = await prisma.billiardNote.findUnique({
-    where: { id },
-    select: { authorId: true },
-  });
+  const existing = await getBilliardNoteAuthor(id);
   if (!existing) {
     return NextResponse.json({ error: "난구노트를 찾을 수 없습니다." }, { status: 404 });
   }
@@ -175,6 +116,6 @@ export async function DELETE(
     return NextResponse.json({ error: "삭제 권한이 없습니다." }, { status: 403 });
   }
 
-  await prisma.billiardNote.delete({ where: { id } });
-  return NextResponse.json({ ok: true });
+  const deleted = await deleteBilliardNote(id);
+  return NextResponse.json(deleted);
 }

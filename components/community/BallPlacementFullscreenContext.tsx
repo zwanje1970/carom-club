@@ -2,30 +2,54 @@
 
 import React, { createContext, useContext, useState, useCallback } from "react";
 
-type BallPlacementFullscreenContextValue = {
-  isFullscreen: boolean;
-  setFullscreen: (value: boolean) => void;
+type GlobalChromeModeContextValue = {
+  hideGlobalChrome: boolean;
+  setGlobalChromeHidden: (value: boolean) => void;
 };
 
-const BallPlacementFullscreenContext =
-  createContext<BallPlacementFullscreenContextValue | null>(null);
+const GlobalChromeModeContext =
+  createContext<GlobalChromeModeContextValue | null>(null);
 
+export function GlobalChromeModeProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [hideGlobalChrome, setHideGlobalChrome] = useState(false);
+  const setGlobalChromeHidden = useCallback((value: boolean) => {
+    setHideGlobalChrome(value);
+  }, []);
+
+  return (
+    <GlobalChromeModeContext.Provider
+      value={{ hideGlobalChrome, setGlobalChromeHidden }}
+    >
+      {children}
+    </GlobalChromeModeContext.Provider>
+  );
+}
+
+export function useGlobalChromeMode() {
+  return useContext(GlobalChromeModeContext);
+}
+
+/**
+ * Backward-compatible adapter:
+ * existing note/solver fullscreen callers still use this API.
+ */
 export function BallPlacementFullscreenProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [isFullscreen, setFullscreen] = useState(false);
-  return (
-    <BallPlacementFullscreenContext.Provider
-      value={{ isFullscreen, setFullscreen }}
-    >
-      {children}
-    </BallPlacementFullscreenContext.Provider>
-  );
+  return <GlobalChromeModeProvider>{children}</GlobalChromeModeProvider>;
 }
 
 export function useBallPlacementFullscreen() {
-  const ctx = useContext(BallPlacementFullscreenContext);
-  return ctx;
+  const ctx = useGlobalChromeMode();
+  if (!ctx) return null;
+  return {
+    isFullscreen: ctx.hideGlobalChrome,
+    setFullscreen: ctx.setGlobalChromeHidden,
+  };
 }

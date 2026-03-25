@@ -4,6 +4,8 @@ import { canManageReports } from "@/lib/community-roles";
 import { CommunityMainClient } from "./CommunityMainClient";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
+import { isPlatformAdmin } from "@/types/auth";
+import { canShowSolverEntry } from "@/lib/entry-visibility";
 
 const TAKE = 10;
 type PostItem = {
@@ -125,10 +127,17 @@ export default async function CommunityPage() {
     }
   }
 
+  const showSolverEntry = canShowSolverEntry(isPlatformAdmin(session));
+
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
       <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
-        <CommunityMainClient boards={boards} popular={popular} canManageReports={canManageReports_} />
+        <CommunityMainClient
+          boards={boards}
+          popular={popular}
+          canManageReports={canManageReports_}
+          showSolverEntry={showSolverEntry}
+        />
       </div>
     </main>
   );

@@ -11,7 +11,7 @@ type BottomNavItem = {
 };
 
 /** 모바일 하단 네비: 1줄 5개 메뉴 */
-const ITEMS: BottomNavItem[] = [
+const BASE_ITEMS: BottomNavItem[] = [
   { href: "/tournaments", label: "대회 찾기", icon: TrophyIcon },
   { href: "/mypage/notes", label: "난구노트", icon: NoteIcon, emphasize: true },
   { href: "/venues", label: "당구장 찾기", icon: VenueIcon },
@@ -96,8 +96,11 @@ function NavLink({
 }
 
 /** 모바일(768px 이하) 전용 하단 고정 네비게이션. 1줄 5개 메뉴 */
-export function BottomNav() {
+export function BottomNav({ showNoteEntry }: { showNoteEntry: boolean }) {
   const pathname = usePathname() ?? "";
+  const items = showNoteEntry
+    ? BASE_ITEMS
+    : BASE_ITEMS.filter((item) => item.href !== "/mypage/notes");
 
   return (
     <nav
@@ -105,7 +108,7 @@ export function BottomNav() {
       aria-label="하단 메뉴"
     >
       <div className="flex justify-around items-stretch min-h-[52px]">
-        {ITEMS.map((item) => (
+        {items.map((item) => (
           <NavLink
             key={item.href}
             href={item.href}

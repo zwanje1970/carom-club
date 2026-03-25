@@ -7,6 +7,11 @@ import { getTournamentsListRaw, getVenuesForCarousel, type TournamentListRow, ty
 import { MOCK_TOURNAMENTS_LIST, MOCK_VENUES_LIST } from "@/lib/mock-data";
 import { logServerTiming } from "@/lib/perf";
 import type { SiteSettings } from "@/lib/site-settings";
+import { getSession } from "@/lib/auth";
+import {
+  canShowNoteEntryFromSession,
+  canShowSolverEntryFromSession,
+} from "@/lib/entry-visibility";
 
 /** 초기 페인트 후 스트리밍: DB(대회/당구장)만 조회해 하단 섹션 렌더. 첫 화면 블로킹 제거용. */
 export async function HomeDeferredSections({
@@ -19,6 +24,9 @@ export async function HomeDeferredSections({
   const dbStart = Date.now();
   let tournaments: TournamentListRow[] = [];
   let carouselVenues: VenueCarouselRow[] = [];
+  const session = await getSession();
+  const showNoteEntry = canShowNoteEntryFromSession(session);
+  const showSolverEntry = canShowSolverEntryFromSession(session);
 
   if (isDatabaseConfigured()) {
     const [tList, cList] = await Promise.all([
@@ -53,7 +61,11 @@ export async function HomeDeferredSections({
           당구장 전체 보기 →
         </Link>
       </div>
-      <HomeNoticeCommunity copy={copy} />
+      <HomeNoticeCommunity
+        copy={copy}
+        showNoteEntry={showNoteEntry}
+        showSolverEntry={showSolverEntry}
+      />
       {/* 모바일 메인: 하단 푸터 생략(하단 탭 네비와 겹침·화면 단순화) */}
       <div className="hidden md:block">
         <SiteFooter

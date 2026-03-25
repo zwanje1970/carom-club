@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { BilliardNoteDetailClient } from "@/components/community/BilliardNoteDetailClient";
+import { MypageNoteDetailContent } from "@/components/note/MypageNoteDetailContent";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { notFound, redirect } from "next/navigation";
@@ -47,36 +46,24 @@ export default async function MypageNoteDetailPage({
   });
 
   return (
-    <main className="min-h-screen bg-site-bg text-site-text">
-      <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">
-        <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4" aria-label="breadcrumb">
-          <Link href="/mypage" className="hover:text-site-primary">마이페이지</Link>
-          <span aria-hidden>/</span>
-          <Link href="/mypage/notes" className="hover:text-site-primary">난구노트</Link>
-          <span aria-hidden>/</span>
-          <span className="text-site-text font-medium">상세</span>
-        </nav>
-        <h1 className="text-xl font-bold mb-6">{note.title || "난구노트"}</h1>
-        <BilliardNoteDetailClient
-          note={{
-            id: note.id,
-            authorName: note.author.name,
-            title: note.title,
-            noteDate: note.noteDate ?? null,
-            redBall: { x: note.redBallX, y: note.redBallY },
-            yellowBall: { x: note.yellowBallX, y: note.yellowBallY },
-            whiteBall: { x: note.whiteBallX, y: note.whiteBallY },
-            cueBall: note.cueBall as "white" | "yellow",
-            memo: note.memo,
-            imageUrl: note.imageUrl,
-            visibility: note.visibility,
-            createdAt: note.createdAt,
-            isAuthor,
-          }}
-          linkedTroublePostId={linkedTrouble?.postId ?? null}
-          basePath="/mypage/notes"
-        />
-      </div>
-    </main>
+    <MypageNoteDetailContent
+      note={{
+        id: note.id,
+        authorName: note.author.name,
+        title: note.title,
+        noteDate: note.noteDate ?? null,
+        redBall: { x: note.redBallX, y: note.redBallY },
+        yellowBall: { x: note.yellowBallX, y: note.yellowBallY },
+        whiteBall: { x: note.whiteBallX, y: note.whiteBallY },
+        cueBall: note.cueBall as "white" | "yellow",
+        memo: note.memo,
+        imageUrl: note.imageUrl,
+        visibility: note.visibility,
+        createdAt: note.createdAt,
+        isAuthor,
+      }}
+      linkedTroublePostId={linkedTrouble?.postId ?? null}
+      basePath="/mypage/notes"
+    />
   );
 }

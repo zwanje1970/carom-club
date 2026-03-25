@@ -3,12 +3,15 @@ import "./globals.css";
 import { IntroRoot } from "@/components/intro/IntroRoot";
 import { MainSiteHeaderWrapper } from "@/components/layout/MainSiteHeaderWrapper";
 import { MobileBottomNavWrapper } from "@/components/layout/MobileBottomNavWrapper";
-import { BallPlacementFullscreenProvider } from "@/components/community/BallPlacementFullscreenContext";
+import { GlobalChromeModeProvider } from "@/components/community/BallPlacementFullscreenContext";
 import { AdminFloatButton } from "@/components/AdminFloatButton";
 import { ClientFloatButton } from "@/components/ClientFloatButton";
 import NotificationBanner from "@/components/NotificationBanner";
 import { RegisterServiceWorker } from "@/components/push/RegisterServiceWorker";
 import { getCommonGlobalData } from "@/lib/common-page-data";
+import { getSession } from "@/lib/auth";
+import { canShowNoteEntry } from "@/lib/entry-visibility";
+import { isPlatformAdmin } from "@/types/auth";
 import { DEFAULT_PRIMARY_COLOR, DEFAULT_SECONDARY_COLOR } from "@/lib/site-settings";
 import { SiteSettingsProvider } from "@/components/SiteSettingsProvider";
 import { SiteThemeStyles } from "@/components/SiteThemeStyles";
@@ -88,6 +91,9 @@ export default async function RootLayout({
     // use defaults
   }
 
+  const session = await getSession();
+  const showMainSiteNoteEntry = canShowNoteEntry(isPlatformAdmin(session));
+
   return (
     <html lang="ko" className="scroll-smooth">
       <head>
@@ -119,12 +125,14 @@ export default async function RootLayout({
           <ClientPerfLogger />
           <RegisterServiceWorker />
           <NotificationBanner />
-          <BallPlacementFullscreenProvider>
+          <GlobalChromeModeProvider>
           <IntroRoot>
             <MainSiteHeaderWrapper />
-            <MobileBottomNavWrapper>{children}</MobileBottomNavWrapper>
+            <MobileBottomNavWrapper showMainSiteNoteEntry={showMainSiteNoteEntry}>
+              {children}
+            </MobileBottomNavWrapper>
           </IntroRoot>
-        </BallPlacementFullscreenProvider>
+        </GlobalChromeModeProvider>
           <AdminFloatButton />
           <ClientFloatButton />
         </SiteSettingsProvider>

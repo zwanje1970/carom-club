@@ -5,15 +5,18 @@ import { CommunityBoardPopularNav } from "@/components/community/CommunityBoardP
 import { CommunityBoardTroubleStatusNav } from "@/components/community/CommunityBoardTroubleStatusNav";
 import { CommunityBoardListAndMoreClient } from "@/components/community/CommunityBoardListAndMoreClient";
 import { CommunityWriteFab } from "@/components/community/CommunityWriteFab";
-
 export function CommunityBoardPageShell({
   boardSlug,
   data,
+  showSolverEntry,
 }: {
   boardSlug: string;
   data: CommunityBoardPagePayload;
+  showSolverEntry: boolean;
 }) {
   const formAction = boardSlug === "trouble" ? "/community/trouble" : `/community/${boardSlug}`;
+  const solverBoard = boardSlug === "trouble" || boardSlug === "nangu";
+  const showWriteFab = solverBoard ? showSolverEntry : true;
 
   return (
     <main className="min-h-screen bg-site-bg text-site-text pb-24">
@@ -30,7 +33,11 @@ export function CommunityBoardPageShell({
         </nav>
 
         {data.hubBoards.length > 0 && (
-          <CommunityBoardTabBar boards={data.hubBoards} activeSlug={boardSlug} />
+          <CommunityBoardTabBar
+            boards={data.hubBoards}
+            activeSlug={boardSlug}
+            showSolverEntry={showSolverEntry}
+          />
         )}
 
         <CommunityBoardPopularNav
@@ -103,9 +110,11 @@ export function CommunityBoardPageShell({
         </div>
       </div>
 
-      <CommunityWriteFab
-        href={boardSlug === "trouble" ? "/community/trouble/write" : `/community/${boardSlug}/write`}
-      />
+      {showWriteFab && (
+        <CommunityWriteFab
+          href={boardSlug === "trouble" ? "/community/trouble/write" : `/community/${boardSlug}/write`}
+        />
+      )}
     </main>
   );
 }

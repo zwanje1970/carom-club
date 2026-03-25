@@ -16,6 +16,7 @@ import {
   computeStrokeAnimationDurationMs,
   computeStrokeAnimationDurationSec,
 } from "@/lib/path-animation-timing";
+import { isTroublePlaybackVerboseLogEnabled } from "@/lib/trouble-playback-verbose-log";
 import {
   polylineSegmentLengthsPx,
   polylineTotalLengthPx,
@@ -48,6 +49,13 @@ import {
 import { computeTroubleThicknessSplit } from "@/lib/trouble-thickness-split";
 import { troubleHitStepFromThicknessOffsetX } from "@/lib/trouble-thickness-split";
 import { objectBallKeyForBallSpot } from "@/lib/trouble-first-object-ball";
+import {
+  cuePositionFromPlacement,
+  countCushionsInPath,
+  objectReflectionPolylineNormalized,
+  verticesFromCueAndSpots,
+} from "@/lib/solver-engine/core/path-motion-core-helpers";
+import { buildMoveParamsFromSolution } from "@/lib/solver-engine/policies/path-motion-policy";
 
 export type { NormPoint, PositionAlongPathResult };
 
@@ -122,59 +130,6 @@ export interface PathMotionPlan {
   playbackCurveDampingApplied?: boolean;
   playbackCurveDampingMeanCoefficient?: number;
   playbackCurveDampingCurveSegmentCount?: number;
-}
-
-function cuePositionFromPlacement(placement: NanguBallPlacement): NormPoint {
-  return placement.cueBall === "yellow" ? placement.yellowBall : placement.whiteBall;
-}
-
-function countCushionsInPath(path: NanguSolutionPath | undefined): number {
-  const typed = path?.pointsWithType;
-  if (typed?.length) return typed.filter((p) => p.type === "cushion").length;
-  return 0;
-}
-
-function verticesFromCueAndSpots(cue: NormPoint, spotCoords: { x: number; y: number }[]): NormPoint[] {
-  if (spotCoords.length === 0) return [cue];
-  return [cue, ...spotCoords.map((p) => ({ x: p.x, y: p.y }))];
-}
-
-/** reflectionPath: pts[0]=시작, pts[1..]↔typed[0..] — 시연 시 스팟 표시 중심과 재생 폴리라인 일치 */
-function objectReflectionPolylineNormalized(
-  firstVertex: NormPoint,
-  pts: readonly { x: number; y: number }[],
-  typed: NanguPathPoint[] | undefined,
-  rect: PlayfieldRect,
-  options?: BuildPathMotionPlanOptions
-): NormPoint[] {
-  const rawTail = pts.slice(1).map((p) => ({ x: p.x, y: p.y }));
-  const canUseSpotDraw =
-    Boolean(options?.visualizationPlayback) &&
-    (options?.objectBallNormsForSpotDraw?.length ?? 0) > 0 &&
-    Boolean(typed) &&
-    typed!.length === pts.length - 1;
-
-  if (!canUseSpotDraw) {
-    return [{ x: firstVertex.x, y: firstVertex.y }, ...rawTail];
-  }
-
-  const spotOpts = { objectBallNorms: options!.objectBallNormsForSpotDraw! };
-  const tail = typed!.map((p) => spotCenterNormForDraw(p, rect, spotOpts));
-  return [{ x: firstVertex.x, y: firstVertex.y }, ...tail];
-}
-
-function buildMoveParamsFromSolution(
-  data: Pick<NanguSolutionData, "isBankShot" | "thicknessOffsetX" | "ballSpeed" | "speedLevel" | "speed">,
-  cushionCount: number
-): MoveDistanceParams {
-  return {
-    ballSpeed: data.ballSpeed,
-    speedLevel: data.speedLevel,
-    speed: data.speed,
-    cushionCount,
-    isBankShot: data.isBankShot,
-    thicknessOffsetX: data.thicknessOffsetX,
-  };
 }
 
 /**
@@ -326,7 +281,7 @@ export function buildCuePathMotionPlan(
       playbackCueDistanceAfterHitAppliedPx = 0;
       playbackObjectDistanceAfterHitAppliedPx = V * L;
     }
-    if (process.env.NODE_ENV !== "production") {
+    if (isTroublePlaybackVerboseLogEnabled()) {
       console.debug("[trouble-playback:cue-plan]", {
         V,
         L,
@@ -603,11 +558,16 @@ export function buildObjectPathMotionPlan(
       ? Math.min(pathLengthPx, objectPlayablePx ?? 0)
       : pathLengthPx
     : physicsMoveDistancePx;
-  if (!ignorePhysics && options?.visualizationPlayback && troubleModel && process.env.NODE_ENV !== "production") {
+  if (
+    !ignorePhysics &&
+    options?.visualizationPlayback &&
+    troubleModel &&
+    isTroublePlaybackVerboseLogEnabled()
+  ) {
     console.debug("[trouble-playback:object-plan]", {
       objectPostAppliedPx: moveDistancePx,
     });
-  } else if (ignorePhysics && process.env.NODE_ENV !== "production") {
+  } else if (ignorePhysics && isTroublePlaybackVerboseLogEnabled()) {
     console.debug("[trouble-playback:path-only]", {
       ignorePhysics: true,
       appliedPx: pathLengthPx,

@@ -31,10 +31,12 @@ export function CommunityMainClient({
   boards,
   popular,
   canManageReports = false,
+  showSolverEntry,
 }: {
   boards: { id: string; slug: string; name: string; type?: string }[];
   popular: Popular;
   canManageReports?: boolean;
+  showSolverEntry: boolean;
 }) {
   const hubBoards = orderedHubBoards(boards);
   const [popularTab, setPopularTab] = useState<PopularPillKey>("today");
@@ -63,7 +65,7 @@ export function CommunityMainClient({
         </div>
       )}
 
-      <CommunityBoardTabBar boards={hubBoards} activeSlug="" />
+      <CommunityBoardTabBar boards={hubBoards} activeSlug="" showSolverEntry={showSolverEntry} />
 
       <CommunityPopularPills value={popularTab} onChange={setPopularTab} className="mt-2" />
 

@@ -16,6 +16,9 @@ type SolutionSettingsSummaryBarProps = {
   onThicknessClick: () => void;
   onTipClick: () => void;
   onRailClick: () => void;
+  onPlayClick?: () => void;
+  playDisabled?: boolean;
+  playActive?: boolean;
   className?: string;
 };
 
@@ -27,6 +30,9 @@ export function SolutionSettingsSummaryBar({
   onThicknessClick,
   onTipClick,
   onRailClick,
+  onPlayClick,
+  playDisabled = false,
+  playActive = false,
   className = "",
 }: SolutionSettingsSummaryBarProps) {
   const v = mergeSolutionSettings(value ?? DEFAULT_SOLUTION_SETTINGS, DEFAULT_SOLUTION_SETTINGS);
@@ -78,6 +84,19 @@ export function SolutionSettingsSummaryBar({
           R{railDisplayInt}
         </span>
       </button>
+      {onPlayClick && (
+        <button
+          type="button"
+          className={`${segmentBtn} whitespace-nowrap border-r-0 bg-amber-500/20 hover:bg-amber-500/30 disabled:opacity-50`}
+          onClick={onPlayClick}
+          disabled={playDisabled}
+          aria-label={playActive ? "애니메이션 재생 중" : "애니메이션 재생"}
+        >
+          <span className="text-base font-bold leading-tight text-amber-200 tabular-nums" aria-hidden>
+            {playActive ? "||" : "▶"}
+          </span>
+        </button>
+      )}
     </div>
   );
 }

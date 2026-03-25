@@ -8,6 +8,8 @@ import { MypageProfileCard } from "@/components/mypage/MypageProfileCard";
 import { MypageActionButtons } from "@/components/mypage/MypageActionButtons";
 import { MypageQuickMenu } from "@/components/mypage/MypageQuickMenu";
 import { MypageAccordion } from "@/components/mypage/MypageAccordion";
+import { isPlatformAdmin } from "@/types/auth";
+import { canShowNoteEntry } from "@/lib/entry-visibility";
 
 export default async function MypagePage() {
   const session = await getSession();
@@ -97,6 +99,7 @@ export default async function MypagePage() {
           <h2 className="mb-3 text-sm font-semibold text-gray-600 dark:text-gray-400">퀵메뉴</h2>
           <MypageQuickMenu
             showClient={session.role === "CLIENT_ADMIN" && session.loginMode === "user"}
+            showNoteEntry={canShowNoteEntry(isPlatformAdmin(session))}
           />
         </div>
 

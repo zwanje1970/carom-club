@@ -1,4 +1,12 @@
-import { normalizeBallSpeed, type BallSpeed } from "@/lib/ball-speed-constants";
+import type { BallSpeed } from "@/lib/ball-speed-constants";
+import {
+  clampIntegerInRange,
+  clampUnitCircle,
+} from "@/lib/solver-engine/core/settings-normalization";
+import {
+  clampRailCount,
+  deriveBallSpeedFromRailCount,
+} from "@/lib/solver-engine/policies/solution-settings-policy";
 
 export type CueSide = "left" | "right";
 
@@ -33,7 +41,7 @@ export const DEFAULT_SOLUTION_SETTINGS: SolutionSettingsValue = {
 };
 
 function clampThicknessStep(n: number): number {
-  return Math.max(0, Math.min(16, Math.round(n)));
+  return clampIntegerInRange(n, 0, 16);
 }
 
 function clampFine(_n: number): number {
@@ -41,35 +49,24 @@ function clampFine(_n: number): number {
 }
 
 function clampBackstroke(n: number): number {
-  return Math.max(0, Math.min(6, Math.round(n)));
+  return clampIntegerInRange(n, 0, 6);
 }
 
 function clampFollow(n: number): number {
-  return Math.max(0, Math.min(6, Math.round(n)));
-}
-
-function clampRailCount(n: number): number {
-  return Math.max(1, Math.min(5, Math.round(Number(n) || 3)));
+  return clampIntegerInRange(n, 0, 6);
 }
 
 export function clampSolutionSettings(v: SolutionSettingsValue): SolutionSettingsValue {
-  const tip = v.tipNorm;
-  const len = Math.hypot(tip.x, tip.y);
-  let nx = tip.x;
-  let ny = tip.y;
-  if (len > 1 && len > 1e-9) {
-    nx /= len;
-    ny /= len;
-  }
+  const normalizedTip = clampUnitCircle(v.tipNorm);
   const railCount = clampRailCount(v.railCount ?? 3);
   return {
     cueSide: v.cueSide === "right" ? "right" : "left",
     thicknessStep: clampThicknessStep(v.thicknessStep),
     fineDx: clampFine(v.fineDx),
     fineDy: clampFine(v.fineDy),
-    tipNorm: { x: nx, y: ny },
+    tipNorm: normalizedTip,
     // Distance source-of-truth is railCount; ballSpeed is derived for physics helpers.
-    ballSpeed: normalizeBallSpeed(railCount),
+    ballSpeed: deriveBallSpeedFromRailCount(railCount),
     railCount,
     backstroke: clampBackstroke(v.backstroke),
     followStroke: clampFollow(v.followStroke),

@@ -64,6 +64,7 @@ import {
   tableCanvasClampedToPlayfieldLandscapeNorm,
 } from "@/lib/cue-path-ray-resolve";
 import { normalizeBallSpeed, type BallSpeed } from "@/lib/ball-speed-constants";
+import { isTroublePlaybackVerboseLogEnabled } from "@/lib/trouble-playback-verbose-log";
 import { useSolutionPathPlayback } from "@/hooks/useSolutionPathPlayback";
 import { TROUBLE_SOLUTION_CONSOLE } from "@/components/trouble/trouble-console-contract";
 import { CollisionWarningToast } from "@/components/trouble/CollisionWarningToast";
@@ -594,6 +595,8 @@ export function SolutionPathEditorFullscreen({
   const [playbackPathLinesVisible, setPlaybackPathLinesVisible] = useState(true);
   const [playbackGridVisible, setPlaybackGridVisible] = useState(true);
   const [playbackDrawStyle, setPlaybackDrawStyle] = useState<TableDrawStyle>("realistic");
+  const [playbackRate, setPlaybackRate] = useState<0.5 | 1>(1);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   const rect = getPlayfieldRect(DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT);
   const layoutSrc =
@@ -1094,10 +1097,11 @@ export function SolutionPathEditorFullscreen({
     /** 1紐?寃쎈줈 洹몃━湲?紐⑤뱶 + ?ㅽ뙚 1媛??댁긽???뚮쭔 ?ъ깮 異⑸룎 ?앹뾽 */
     collisionWarningsEnabled:
       variant === "trouble" && objectPathEditing && objectPathPoints.length >= 1,
+    playbackRate,
   });
 
   useEffect(() => {
-    if (process.env.NODE_ENV === "production") return;
+    if (!isTroublePlaybackVerboseLogEnabled()) return;
     if (variant !== "trouble" || !settingsValue) return;
     console.debug("[trouble-playback:settings-source]", {
       ballSpeedRaw: playbackBallSpeed,
@@ -1173,6 +1177,14 @@ export function SolutionPathEditorFullscreen({
       setPathMode(true);
     }
   }, [resetPathPlayback, variant, pushPathUndoSnapshot]);
+
+  const resetPlacementAndPaths = useCallback(() => {
+    resetPathPlayback();
+    setCueBallChoice(ballPlacement?.cueBall ?? "white");
+    setTroubleCurveEditMode(false);
+    setPlaybackRate(1);
+    clearAllPaths();
+  }, [resetPathPlayback, ballPlacement?.cueBall, clearAllPaths]);
 
   const onUndoPathClick = useCallback(() => {
     if (pathPlayback.isPlaybackActive) return;
@@ -1554,14 +1566,12 @@ export function SolutionPathEditorFullscreen({
     !pathPlayback.isPlaybackActive || playbackPathLinesVisible;
 
   const allowCurveHandleInteraction =
-    variant === "trouble" &&
     troubleCurveEditMode &&
     (cuePathEditing || objectPathEditing) &&
     !pathPlayback.isPlaybackActive &&
     curveLineVisible;
 
   const curveHandlesShowSubtle =
-    variant === "trouble" &&
     (cuePathCurveControls.length > 0 ||
       objectPathCurveControls.length > 0 ||
       cuePathCurveNodes.length > 0 ||
@@ -1749,13 +1759,17 @@ export function SolutionPathEditorFullscreen({
               data-path-editor-fs-chrome=""
               id="path-fs-left-drawer"
               aria-hidden={!troubleLeftDrawerOpen}
-              className={`fixed left-0 top-0 z-[205] flex h-full w-[min(52.8vw,180px)] flex-col border-r border-white/20 bg-black/30 text-white shadow-[6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md ${
+              className={`fixed left-0 z-[205] flex w-[min(52.8vw,180px)] flex-col border-r border-white/20 bg-black/30 text-white shadow-[6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md ${
+                viewportMdUp
+                  ? "top-[45.5%] h-[min(72vh,34rem)] -translate-y-1/2 rounded-r-xl"
+                  : "top-0 h-full"
+              } ${
                 troubleLeftDrawerOpen ? "pointer-events-auto" : "pointer-events-none -translate-x-full"
               } ${troubleLeftDrawerDragging ? "!duration-0" : "transition-transform duration-300 ease-out"}`}
               style={
                 troubleLeftDrawerOpen
                   ? {
-                      transform: `translateX(${-troubleLeftDrawerDragPx}px)`,
+                      transform: `${viewportMdUp ? "translateY(-50%) " : ""}translateX(${-troubleLeftDrawerDragPx}px)`,
                       transition: troubleLeftDrawerDragging ? "none" : undefined,
                     }
                   : undefined
@@ -1829,33 +1843,66 @@ export function SolutionPathEditorFullscreen({
                     setTroubleLeftDrawerOpen(false);
                   }}
                 >
-                  {troubleCurveEditMode ? "곡선을 직선으로 변경" : "곡선 켜기(구간더블탭)"}
+                  {troubleCurveEditMode ? "곡선 비활성" : "곡선 활성"}
                 </button>
                 <button
                   type="button"
-                  disabled={!pathPlayback.canPlayback || pathPlayback.isPlaybackActive}
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-45"
-                  onClick={() => {
-                    pathPlayback.startPlayback();
-                    setTroubleLeftDrawerOpen(false);
-                  }}
+                  disabled
+                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 text-white/55 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-55"
                 >
-                  {pathPlayback.isPlaybackActive ? "애니메이션 재생 중" : "애니메이션 재생"}
+                  애니메이션
                 </button>
-                <div className="ml-2 flex flex-col gap-2 border-l border-white/20 pl-2">
+                <div className="ml-2 flex items-center gap-1 border-l border-white/20 pl-2">
+                  <span className="px-1 text-[11px] font-semibold text-white/70">배속</span>
                   <button
                     type="button"
-                    className="w-full rounded-xl px-4 py-3 text-left text-sm font-semibold bg-black/20 hover:bg-black/30 active:bg-black/35 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
-                    onClick={() => setPlaybackPathLinesVisible((v) => !v)}
+                    className={cx(
+                      "rounded-md px-2 py-1 text-[11px] font-semibold touch-manipulation",
+                      playbackRate === 0.5
+                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
+                        : "bg-black/20 text-white/55 hover:bg-black/30"
+                    )}
+                    onClick={() => setPlaybackRate(0.5)}
                   >
-                    {playbackPathLinesVisible ? "경로선 숨기기" : "경로선 보이기"}
+                    0.5x
                   </button>
                   <button
                     type="button"
-                    className="w-full rounded-xl px-4 py-3 text-left text-sm font-semibold bg-black/20 hover:bg-black/30 active:bg-black/35 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                    className={cx(
+                      "rounded-md px-2 py-1 text-[11px] font-semibold touch-manipulation",
+                      playbackRate === 1
+                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
+                        : "bg-black/20 text-white/55 hover:bg-black/30"
+                    )}
+                    onClick={() => setPlaybackRate(1)}
+                  >
+                    1x
+                  </button>
+                </div>
+                <div className="ml-2 flex flex-col gap-2 border-l border-white/20 pl-2">
+                  <button
+                    type="button"
+                    className={cx(
+                      "w-full rounded-xl px-4 py-3 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors",
+                      playbackPathLinesVisible
+                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
+                        : "bg-black/20 text-white/55 hover:bg-black/30"
+                    )}
+                    onClick={() => setPlaybackPathLinesVisible((v) => !v)}
+                  >
+                    경로선
+                  </button>
+                  <button
+                    type="button"
+                    className={cx(
+                      "w-full rounded-xl px-4 py-3 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors",
+                      playbackGridVisible
+                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
+                        : "bg-black/20 text-white/55 hover:bg-black/30"
+                    )}
                     onClick={() => setPlaybackGridVisible((v) => !v)}
                   >
-                    {playbackGridVisible ? "그리드 숨기기" : "그리드 보이기"}
+                    그리드
                   </button>
                 </div>
                 <button
@@ -1926,7 +1973,11 @@ export function SolutionPathEditorFullscreen({
               data-path-editor-fs-chrome=""
               id="path-fs-left-drawer-nangu"
               aria-hidden={!leftPathDrawerOpen}
-              className={`fixed left-0 top-0 z-[205] flex h-full w-[min(52.8vw,180px)] flex-col border-r border-white/20 bg-black/30 text-white shadow-[6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md transition-transform duration-300 ease-out ${
+              className={`fixed left-0 z-[205] flex w-[min(52.8vw,180px)] flex-col border-r border-white/20 bg-black/30 text-white shadow-[6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md transition-transform duration-300 ease-out ${
+                viewportMdUp
+                  ? "top-[45.5%] h-[min(72vh,34rem)] -translate-y-1/2 rounded-r-xl"
+                  : "top-0 h-full"
+              } ${
                 leftPathDrawerOpen ? "pointer-events-auto" : "pointer-events-none -translate-x-full"
               }`}
             >
@@ -1967,20 +2018,21 @@ export function SolutionPathEditorFullscreen({
                 <button
                   type="button"
                   role="switch"
-                  aria-checked={false}
-                  disabled
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 text-white/70 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-55"
+                  aria-checked={troubleCurveEditMode}
+                  data-state={troubleCurveEditMode ? "on" : "off"}
+                  disabled={pathPlayback.isPlaybackActive}
+                  className={cx(
+                    "w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors disabled:opacity-45",
+                    troubleCurveEditMode
+                      ? "bg-site-primary/35 ring-2 ring-site-primary/80"
+                      : "bg-black/25 hover:bg-black/35 active:bg-black/40"
+                  )}
+                  onClick={() => {
+                    setTroubleCurveEditMode((v) => !v);
+                    setLeftPathDrawerOpen(false);
+                  }}
                 >
-                  곡선 켜기(구간더블탭)
-                </button>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={false}
-                  disabled
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 text-white/70 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-55"
-                >
-                  곡선을 직선으로 변경
+                  {troubleCurveEditMode ? "곡선 비활성" : "곡선 활성"}
                 </button>
                 <button
                   type="button"
@@ -1995,29 +2047,62 @@ export function SolutionPathEditorFullscreen({
                 </button>
                 <button
                   type="button"
-                  disabled={!pathPlayback.canPlayback || pathPlayback.isPlaybackActive}
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-45"
-                  onClick={() => {
-                    pathPlayback.startPlayback();
-                    setLeftPathDrawerOpen(false);
-                  }}
+                  disabled
+                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 text-white/55 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-55"
                 >
-                  {pathPlayback.isPlaybackActive ? "애니메이션 재생 중" : "애니메이션 재생"}
+                  애니메이션
                 </button>
-                <div className="ml-2 flex flex-col gap-2 border-l border-white/20 pl-2">
+                <div className="ml-2 flex items-center gap-1 border-l border-white/20 pl-2">
+                  <span className="px-1 text-[11px] font-semibold text-white/70">배속</span>
                   <button
                     type="button"
-                    className="w-full rounded-xl px-4 py-3 text-left text-sm font-semibold bg-black/20 hover:bg-black/30 active:bg-black/35 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
-                    onClick={() => setPlaybackPathLinesVisible((v) => !v)}
+                    className={cx(
+                      "rounded-md px-2 py-1 text-[11px] font-semibold touch-manipulation",
+                      playbackRate === 0.5
+                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
+                        : "bg-black/20 text-white/55 hover:bg-black/30"
+                    )}
+                    onClick={() => setPlaybackRate(0.5)}
                   >
-                    {playbackPathLinesVisible ? "경로선 숨기기" : "경로선 보이기"}
+                    0.5x
                   </button>
                   <button
                     type="button"
-                    className="w-full rounded-xl px-4 py-3 text-left text-sm font-semibold bg-black/20 hover:bg-black/30 active:bg-black/35 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                    className={cx(
+                      "rounded-md px-2 py-1 text-[11px] font-semibold touch-manipulation",
+                      playbackRate === 1
+                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
+                        : "bg-black/20 text-white/55 hover:bg-black/30"
+                    )}
+                    onClick={() => setPlaybackRate(1)}
+                  >
+                    1x
+                  </button>
+                </div>
+                <div className="ml-2 flex flex-col gap-2 border-l border-white/20 pl-2">
+                  <button
+                    type="button"
+                    className={cx(
+                      "w-full rounded-xl px-4 py-3 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors",
+                      playbackPathLinesVisible
+                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
+                        : "bg-black/20 text-white/55 hover:bg-black/30"
+                    )}
+                    onClick={() => setPlaybackPathLinesVisible((v) => !v)}
+                  >
+                    경로선
+                  </button>
+                  <button
+                    type="button"
+                    className={cx(
+                      "w-full rounded-xl px-4 py-3 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors",
+                      playbackGridVisible
+                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
+                        : "bg-black/20 text-white/55 hover:bg-black/30"
+                    )}
                     onClick={() => setPlaybackGridVisible((v) => !v)}
                   >
-                    {playbackGridVisible ? "그리드 숨기기" : "그리드 보이기"}
+                    그리드
                   </button>
                 </div>
                 <button
@@ -2072,13 +2157,17 @@ export function SolutionPathEditorFullscreen({
               data-path-editor-fs-chrome=""
               id="path-fs-right-drawer-common"
               aria-hidden={!rightPathDrawerOpen}
-              className={`fixed right-0 top-0 z-[205] flex h-full w-[min(52.8vw,180px)] flex-col border-l border-white/20 bg-black/30 text-white shadow-[-6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md ${
+              className={`fixed right-0 z-[205] flex w-[min(52.8vw,180px)] flex-col border-l border-white/20 bg-black/30 text-white shadow-[-6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md ${
+                viewportMdUp
+                  ? "top-[45.5%] h-[min(72vh,34rem)] -translate-y-1/2 rounded-l-xl"
+                  : "top-0 h-full"
+              } ${
                 rightPathDrawerOpen ? "pointer-events-auto" : "pointer-events-none translate-x-full"
               } ${troubleDrawerDragging ? "!duration-0" : "transition-transform duration-300 ease-out"}`}
               style={
                 rightPathDrawerOpen
                   ? {
-                      transform: `translateX(${troubleDrawerDragPx}px)`,
+                      transform: `${viewportMdUp ? "translateY(-50%) " : ""}translateX(${troubleDrawerDragPx}px)`,
                       transition: troubleDrawerDragging ? "none" : undefined,
                     }
                   : undefined
@@ -2112,34 +2201,49 @@ export function SolutionPathEditorFullscreen({
                 </button>
                 <button
                   type="button"
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                  className={cx(
+                    "w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors",
+                    gridVisibleForTable
+                      ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
+                      : "bg-black/25 text-white/55 hover:bg-black/35"
+                  )}
                   onClick={() => toggleGrid()}
                 >
-                  {gridVisibleForTable ? "그리드 숨기기" : "그리드 보이기"}
+                  그리드 표시
                 </button>
                 <button
                   type="button"
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                  className={cx(
+                    "w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors",
+                    cueSpotOn
+                      ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
+                      : "bg-black/25 text-white/55 hover:bg-black/35"
+                  )}
                   onClick={() => setCueSpotOn((v) => !v)}
                 >
-                  {cueSpotOn ? "수구 숨기기" : "수구 보이기"}
+                  수구 표시
                 </button>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={spotMagnifierEnabled}
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                  className={cx(
+                    "w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors",
+                    spotMagnifierEnabled
+                      ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
+                      : "bg-black/25 text-white/55 hover:bg-black/35"
+                  )}
                   onClick={() => setSpotMagnifierEnabled((v) => !v)}
                 >
-                  {spotMagnifierEnabled ? "스팟 확대 ON" : "스팟 확대 OFF"}
+                  스팟 확대
                 </button>
                 <p className="mt-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-white/60">지원</p>
                 <button
                   type="button"
                   className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
-                  onClick={() => showMenuInfo("사용법 메뉴는 준비 중입니다.")}
+                  onClick={() => showMenuInfo("사용방법은 준비 중입니다.")}
                 >
-                  사용법 메뉴
+                  사용방법
                 </button>
                 <button
                   type="button"
@@ -2394,30 +2498,16 @@ export function SolutionPathEditorFullscreen({
                               }
                               cuePathCurveNodes={variant === "trouble" ? cuePathCurveNodes : []}
                               objectPathCurveNodes={variant === "trouble" ? objectPathCurveNodes : []}
-                              troubleCurveEditMode={variant === "trouble" && troubleCurveEditMode}
+                              troubleCurveEditMode={troubleCurveEditMode}
                               curveHandleInteraction={allowCurveHandleInteraction}
                               curveHandlesShowSubtle={curveHandlesShowSubtle}
-                              onUpsertCueDisplayCurve={
-                                variant === "trouble" ? upsertCueDisplayCurve : undefined
-                              }
-                              onUpsertObjectDisplayCurve={
-                                variant === "trouble" ? upsertObjectDisplayCurve : undefined
-                              }
-                              onMoveCueDisplayCurve={
-                                variant === "trouble" ? moveCueDisplayCurve : undefined
-                              }
-                              onMoveObjectDisplayCurve={
-                                variant === "trouble" ? moveObjectDisplayCurve : undefined
-                              }
-                              onRemoveCueDisplayCurve={
-                                variant === "trouble" ? removeCueDisplayCurve : undefined
-                              }
-                              onRemoveObjectDisplayCurve={
-                                variant === "trouble" ? removeObjectDisplayCurve : undefined
-                              }
-                              onCurveHandleDragBegin={
-                                variant === "trouble" ? onCurveHandleDragBegin : undefined
-                              }
+                              onUpsertCueDisplayCurve={upsertCueDisplayCurve}
+                              onUpsertObjectDisplayCurve={upsertObjectDisplayCurve}
+                              onMoveCueDisplayCurve={moveCueDisplayCurve}
+                              onMoveObjectDisplayCurve={moveObjectDisplayCurve}
+                              onRemoveCueDisplayCurve={removeCueDisplayCurve}
+                              onRemoveObjectDisplayCurve={removeObjectDisplayCurve}
+                              onCurveHandleDragBegin={onCurveHandleDragBegin}
                               magnifierDrawStyle={drawStyleForTable}
                               magnifierEnabled={spotMagnifierEnabled}
                             />
@@ -2514,30 +2604,16 @@ export function SolutionPathEditorFullscreen({
                         }
                         cuePathCurveNodes={variant === "trouble" ? cuePathCurveNodes : []}
                         objectPathCurveNodes={variant === "trouble" ? objectPathCurveNodes : []}
-                        troubleCurveEditMode={variant === "trouble" && troubleCurveEditMode}
+                        troubleCurveEditMode={troubleCurveEditMode}
                         curveHandleInteraction={allowCurveHandleInteraction}
                         curveHandlesShowSubtle={curveHandlesShowSubtle}
-                        onUpsertCueDisplayCurve={
-                          variant === "trouble" ? upsertCueDisplayCurve : undefined
-                        }
-                        onUpsertObjectDisplayCurve={
-                          variant === "trouble" ? upsertObjectDisplayCurve : undefined
-                        }
-                        onMoveCueDisplayCurve={
-                          variant === "trouble" ? moveCueDisplayCurve : undefined
-                        }
-                        onMoveObjectDisplayCurve={
-                          variant === "trouble" ? moveObjectDisplayCurve : undefined
-                        }
-                        onRemoveCueDisplayCurve={
-                          variant === "trouble" ? removeCueDisplayCurve : undefined
-                        }
-                        onRemoveObjectDisplayCurve={
-                          variant === "trouble" ? removeObjectDisplayCurve : undefined
-                        }
-                        onCurveHandleDragBegin={
-                          variant === "trouble" ? onCurveHandleDragBegin : undefined
-                        }
+                        onUpsertCueDisplayCurve={upsertCueDisplayCurve}
+                        onUpsertObjectDisplayCurve={upsertObjectDisplayCurve}
+                        onMoveCueDisplayCurve={moveCueDisplayCurve}
+                        onMoveObjectDisplayCurve={moveObjectDisplayCurve}
+                        onRemoveCueDisplayCurve={removeCueDisplayCurve}
+                        onRemoveObjectDisplayCurve={removeObjectDisplayCurve}
+                        onCurveHandleDragBegin={onCurveHandleDragBegin}
                         magnifierDrawStyle={drawStyleForTable}
                         magnifierEnabled={spotMagnifierEnabled}
                       />
@@ -2688,13 +2764,33 @@ export function SolutionPathEditorFullscreen({
         )}
         {isNoteShell && onSettingsChange && (
           <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-[220] flex justify-center px-0 pb-[env(safe-area-inset-bottom,0px)]">
-            <SolutionSettingsSummaryBar
-              value={settingsValue}
-              onThicknessClick={() => onSettingsOpen?.("thickness")}
-              onTipClick={() => onSettingsOpen?.("tip")}
-              onRailClick={() => onSettingsOpen?.("rail")}
-              className="w-full max-w-[min(100%,42rem)] rounded-none border-x-0 border-b-0"
-            />
+            <div className="pointer-events-auto flex w-full max-w-[min(100%,42rem)] items-stretch gap-1 px-1">
+              <button
+                type="button"
+                onClick={() => setResetConfirmOpen(true)}
+                className="h-12 shrink-0 rounded-t-lg border border-amber-900/90 bg-gradient-to-b from-stone-900 to-black px-3 text-xs font-semibold text-amber-200 shadow-[0_-4px_24px_rgba(0,0,0,0.55)] hover:bg-stone-900/90"
+                aria-label="배치 초기화"
+              >
+                배치초기화
+              </button>
+              <SolutionSettingsSummaryBar
+                value={settingsValue}
+                onThicknessClick={() => onSettingsOpen?.("thickness")}
+                onTipClick={() => onSettingsOpen?.("tip")}
+                onRailClick={() => onSettingsOpen?.("rail")}
+                onPlayClick={() => {
+                  if (pathPlayback.isPlaybackActive) {
+                    resetPathPlayback();
+                    return;
+                  }
+                  if (!pathPlayback.canPlayback) return;
+                  pathPlayback.startPlayback();
+                }}
+                playDisabled={!pathPlayback.canPlayback && !pathPlayback.isPlaybackActive}
+                playActive={pathPlayback.isPlaybackActive}
+                className="w-full rounded-none border-x-0 border-b-0"
+              />
+            </div>
           </div>
         )}
       </div>
@@ -2770,6 +2866,40 @@ export function SolutionPathEditorFullscreen({
                     boxShadow: "inset 0 2px 4px rgba(255,255,255,0.5), inset 0 -2px 4px rgba(0,0,0,0.25)",
                   }}
                 />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {resetConfirmOpen && (
+        <div className="fixed inset-0 z-[10055] flex items-center justify-center" role="dialog" aria-modal="true">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/45"
+            aria-label="초기화 확인 닫기"
+            onClick={() => setResetConfirmOpen(false)}
+          />
+          <div className="relative z-[1] w-[min(92vw,22rem)] rounded-xl border border-white/20 bg-black/80 p-4 text-white shadow-xl">
+            <p className="text-sm font-semibold">배치를 초기화할까요?</p>
+            <p className="mt-2 text-xs text-white/80">현재 편집한 경로와 곡선 설정이 삭제됩니다.</p>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-white/25 px-3 py-1.5 text-sm text-white/90 hover:bg-white/10"
+                onClick={() => setResetConfirmOpen(false)}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-site-primary px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90"
+                onClick={() => {
+                  setResetConfirmOpen(false);
+                  resetPlacementAndPaths();
+                }}
+              >
+                초기화
               </button>
             </div>
           </div>

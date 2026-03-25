@@ -8,13 +8,16 @@ type Props = {
   boards: Board[];
   /** 현재 게시판 slug (커뮤니티 홈이면 `""`) */
   activeSlug: string;
+  showSolverEntry: boolean;
 };
 
 /**
  * 상단 게시판 탭 — 서버 렌더, `activeSlug`로 활성 표시
  */
-export function CommunityBoardTabBar({ boards, activeSlug }: Props) {
-  const ordered = orderedHubBoards(boards);
+export function CommunityBoardTabBar({ boards, activeSlug, showSolverEntry }: Props) {
+  const ordered = orderedHubBoards(boards).filter((b) =>
+    showSolverEntry ? true : b.slug !== "trouble" && b.slug !== "nangu"
+  );
 
   return (
     <nav

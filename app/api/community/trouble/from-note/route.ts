@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { isFeatureEnabled } from "@/lib/site-feature-flags";
-import { ensureDefaultCommunityBoards } from "@/lib/community-ensure-boards";
+import {
+  createTroublePostFromNote,
+  ensureTroubleBoardId,
+  findAuthorOwnedSourceNote,
+  findExistingTroublePostIdFromNote,
+  mapBallPlacementJson,
+  mapTroubleFromNoteContent,
+} from "@/lib/services/bridge/trouble-from-note-service";
+import {
+  parseTroubleFromNoteBody,
+  validateTroubleFromNote,
+} from "@/lib/services/bridge/trouble-from-note-validator";
 
 const LOG_PREFIX = "[trouble/from-note]";
 
@@ -22,14 +32,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "현재 커뮤니티 글쓰기가 중단되었습니다." }, { status: 503 });
   }
 
-  let body: {
-    noteId: string;
-    title?: string;
-    content?: string;
-    imageUrl?: string | null;
-    /** true면 동일 노트에서 이미 만든 글이 있어도 새로 만든다 */
-    forceNew?: boolean;
-  };
+  let body: unknown;
   try {
     body = await request.json();
   } catch (e) {
@@ -37,138 +40,48 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const noteId = (body.noteId ?? "").trim();
-  if (!noteId) return NextResponse.json({ error: "노트 ID가 필요합니다." }, { status: 400 });
+  const parsed = parseTroubleFromNoteBody(body);
+  if (!parsed) return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+  const valid = validateTroubleFromNote(parsed);
+  if (!valid.ok) return NextResponse.json({ error: valid.error }, { status: 400 });
+  const noteId = valid.noteId;
 
   try {
-    const note = await prisma.billiardNote.findUnique({
-      where: { id: noteId },
-      select: {
-        id: true,
-        authorId: true,
-        imageUrl: true,
-        memo: true,
-        redBallX: true,
-        redBallY: true,
-        yellowBallX: true,
-        yellowBallY: true,
-        whiteBallX: true,
-        whiteBallY: true,
-        cueBall: true,
-      },
-    });
-    if (!note || note.authorId !== session.id) {
+    const note = await findAuthorOwnedSourceNote(noteId, session.id);
+    if (!note) {
       console.log(LOG_PREFIX, "노트 조회 실패 또는 권한 없음:", { noteId, note: note ?? null, sessionId: session.id });
       return NextResponse.json({ error: "해당 난구노트를 찾을 수 없거나 권한이 없습니다." }, { status: 404 });
     }
 
-    if (!body.forceNew) {
-      const existing = await prisma.troubleShotPost.findFirst({
-        where: { sourceNoteId: noteId },
-        orderBy: { post: { createdAt: "desc" } },
-        select: { postId: true },
-      });
-      if (existing) {
-        return NextResponse.json({ id: existing.postId, reused: true });
+    if (!parsed.forceNew) {
+      const existingPostId = await findExistingTroublePostIdFromNote(noteId);
+      if (existingPostId) {
+        return NextResponse.json({ id: existingPostId, reused: true });
       }
     }
 
-    const bodyTitle = (body.title ?? "").trim();
-    const bodyContent = (body.content ?? "").trim();
-    const memoTrim = note.memo?.trim() ?? "";
-    const title =
-      bodyTitle ||
-      "이 배치 해결 방법 부탁드립니다";
-    const content = bodyContent || memoTrim || " ";
+    const { title, content } = mapTroubleFromNoteContent(note, parsed);
 
-    let board = await prisma.communityBoard.findUnique({
-      where: { slug: "trouble" },
-      select: { id: true },
-    });
-    console.log(LOG_PREFIX, "게시판 조회(1차):", board ? "성공" : "없음", board ?? null);
-    if (!board) {
-      await ensureDefaultCommunityBoards();
-      board = await prisma.communityBoard.findUnique({
-        where: { slug: "trouble" },
-        select: { id: true },
-      });
-      console.log(LOG_PREFIX, "게시판 조회(2차, ensure 후):", board ? "성공" : "없음", board ?? null);
-    }
-    if (!board) {
+    const boardId = await ensureTroubleBoardId();
+    if (!boardId) {
       return NextResponse.json({ error: "난구해결 게시판을 찾을 수 없습니다." }, { status: 404 });
     }
 
-    const layoutImageUrl = (body.imageUrl ?? note.imageUrl)?.trim() || null;
+    const layoutImageUrl = (parsed.imageUrl ?? note.imageUrl)?.trim() || null;
 
-    /** BilliardNote는 컬럼 저장 — TroubleShotPost·난구와 동일 NanguBallPlacement JSON */
-    const ballPlacementJson = JSON.stringify({
-      redBall: { x: note.redBallX, y: note.redBallY },
-      yellowBall: { x: note.yellowBallX, y: note.yellowBallY },
-      whiteBall: { x: note.whiteBallX, y: note.whiteBallY },
-      cueBall: note.cueBall === "yellow" ? "yellow" : "white",
+    const ballPlacementJson = mapBallPlacementJson(note);
+
+    const created = await createTroublePostFromNote({
+      boardId,
+      authorId: session.id,
+      noteId: note.id,
+      title,
+      content,
+      layoutImageUrl,
+      ballPlacementJson,
     });
 
-    const postPayload = {
-      boardId: board.id,
-      authorId: session.id,
-      title,
-      content: content || " ",
-    };
-    const troublePayload = {
-      postId: "(create 직후 채움)" as unknown as string,
-      sourceNoteId: note.id,
-      layoutImageUrl,
-      difficulty: null,
-    };
-    console.log(LOG_PREFIX, "CommunityPost create 직전 payload:", JSON.stringify(postPayload, null, 2));
-    console.log(LOG_PREFIX, "TroubleShotPost 예정 payload:", JSON.stringify({ ...troublePayload, postId: "(post.id)" }, null, 2));
-
-    let post: { id: string };
-    try {
-      post = await prisma.communityPost.create({
-        data: postPayload,
-      });
-    } catch (createErr) {
-      const err = createErr as Error & { code?: string; meta?: unknown };
-      console.error(LOG_PREFIX, "CommunityPost.create 실패:", {
-        message: err.message,
-        stack: err.stack,
-        code: err.code,
-        meta: err.meta,
-        payload: postPayload,
-      });
-      throw createErr;
-    }
-
-    try {
-      await prisma.troubleShotPost.create({
-        data: {
-          postId: post.id,
-          sourceNoteId: note.id,
-          layoutImageUrl,
-          ballPlacementJson,
-          difficulty: null,
-        },
-      });
-    } catch (createErr) {
-      const err = createErr as Error & { code?: string; meta?: unknown };
-      console.error(LOG_PREFIX, "TroubleShotPost.create 실패:", {
-        message: err.message,
-        stack: err.stack,
-        code: err.code,
-        meta: err.meta,
-        payload: {
-          postId: post.id,
-          sourceNoteId: note.id,
-          layoutImageUrl,
-          ballPlacementJson: "(from note)",
-          difficulty: null,
-        },
-      });
-      throw createErr;
-    }
-
-    return NextResponse.json({ id: post.id });
+    return NextResponse.json({ id: created.id });
   } catch (e) {
     const err = e as Error & { code?: string; meta?: unknown };
     console.error(LOG_PREFIX, "catch:", {
@@ -176,7 +89,15 @@ export async function POST(request: Request) {
       stack: err.stack,
       code: err.code,
       meta: err.meta,
-      requestBody: { noteId: body?.noteId, title: body?.title?.slice(0, 50), contentLength: body?.content?.length, imageUrl: body?.imageUrl ? "(있음)" : null },
+      requestBody:
+        parsed
+          ? {
+              noteId: parsed.noteId,
+              title: parsed.title?.slice(0, 50),
+              contentLength: parsed.content?.length,
+              imageUrl: parsed.imageUrl ? "(있음)" : null,
+            }
+          : null,
     });
     const msg = err.message || "등록에 실패했습니다.";
     return NextResponse.json({ error: msg }, { status: 500 });

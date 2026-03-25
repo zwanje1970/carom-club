@@ -25,10 +25,16 @@ import {
 } from "@/lib/nangu-types";
 import { computePolylinePlaybackDurationMs } from "@/lib/path-animation-timing";
 import {
-  distancePxAfterTimeMsAlongEqualEdgeTimes,
-  timeMsForDistanceAlongEqualEdgeTimes,
+  buildSegmentTimesMsProportionalToLength,
+  distancePxAfterTimeMsAlongVariableEdgeTimes,
+  timeMsForDistanceAlongVariableEdgeTimes,
   troublePlaybackSpeedFactorFromRailCount,
 } from "@/lib/trouble-playback-rail-timing";
+import {
+  clamp01,
+  easeOutCue,
+  easeOutObject,
+} from "@/lib/solver-engine/core/easing";
 import { polylineSegmentLengthsPx } from "@/lib/path-motion-geometry";
 import {
   buildCuePathMotionPlan,
@@ -43,8 +49,102 @@ import { resolveTroubleFirstObjectBallKey } from "@/lib/trouble-first-object-bal
 import { getCuePlayableDistanceFromBallSpeed } from "@/lib/trouble-playback-distance";
 import { getThicknessLossRatio } from "@/lib/trouble-thickness-split";
 import type { PathSegmentCurveControl } from "@/lib/path-curve-display";
+import { buildTroublePlaybackSolutionData } from "@/lib/solver-engine/policies/trouble-playback-solution-data";
+import { isTroublePlaybackVerboseLogEnabled } from "@/lib/trouble-playback-verbose-log";
 
 export const COLLISION_POPUP_MESSAGE = "異⑸룎??諛쒖깮?섏??듬땲??" as const;
+const PLAYBACK_RESTORE_DELAY_MS = 3000;
+
+/**
+ * 개발 전용: 비례 세그먼트 시간이 `distancePxAfterTimeMsAlongVariableEdgeTimes`까지 그대로 쓰이는지(중간 균등화 없음)와
+ * τ-공간 속도 L/T가 세그먼트마다 동일한지 로그로 증명한다.
+ * 벽시계 속도는 이후 `easeOutCue` / `easeOutObject` 때문에 τ와 다르게 변함 — 별도 안내.
+ */
+function logSegmentPlaybackTimingAudit(
+  phase: "cue" | "object",
+  segmentLensPx: readonly number[],
+  segmentTimesMs: readonly number[],
+  tTotalMs: number
+): void {
+  if (process.env.NODE_ENV === "production" || !isTroublePlaybackVerboseLogEnabled()) return;
+  const n = segmentLensPx.length;
+  if (n === 0 || segmentTimesMs.length !== n) {
+    console.debug(`[trouble-playback:segment-audit:${phase}]`, {
+      skipped: true,
+      segmentCount: n,
+      timesLength: segmentTimesMs.length,
+    });
+    return;
+  }
+
+  const sumL = segmentLensPx.reduce((a, b) => a + b, 0);
+  const sumTAlloc = segmentTimesMs.reduce((a, b) => a + b, 0);
+  /** 비례 배분이면 모든 세그먼트에서 L_i/T_i = sumL/tTotalMs (τ-공간 등속) */
+  const expectedTauSpeed = sumL > 1e-9 && tTotalMs > 1e-9 ? sumL / tTotalMs : 0;
+
+  let prevTauSpeed: number | null = null;
+  const segments: Array<{
+    segmentIndex: number;
+    segmentLength: number;
+    allocatedSegmentDuration: number;
+    segmentSpeed: number;
+    deltaFromPreviousSegmentSpeed: number | null;
+  }> = [];
+
+  for (let i = 0; i < n; i++) {
+    const len = segmentLensPx[i]!;
+    const dur = segmentTimesMs[i]!;
+    const speed = dur > 1e-12 ? len / dur : 0;
+    segments.push({
+      segmentIndex: i,
+      segmentLength: len,
+      allocatedSegmentDuration: dur,
+      segmentSpeed: speed,
+      deltaFromPreviousSegmentSpeed: prevTauSpeed != null ? speed - prevTauSpeed : null,
+    });
+    prevTauSpeed = speed;
+  }
+
+  const distAtFullTau = distancePxAfterTimeMsAlongVariableEdgeTimes(
+    tTotalMs,
+    segmentLensPx,
+    segmentTimesMs
+  );
+  const distMismatch = Math.abs(distAtFullTau - sumL);
+
+  let cumulativeOk = true;
+  let accT = 0;
+  for (let i = 0; i < n; i++) {
+    accT += segmentTimesMs[i]!;
+    const accL = segmentLensPx.slice(0, i + 1).reduce((a, b) => a + b, 0);
+    const d = distancePxAfterTimeMsAlongVariableEdgeTimes(accT, segmentLensPx, segmentTimesMs);
+    if (Math.abs(d - accL) > 0.5) cumulativeOk = false;
+  }
+
+  console.debug(`[trouble-playback:segment-audit:${phase}]`, {
+    allocationSource:
+      "lib/solver-engine/core/equal-edge-timing.ts → buildSegmentTimesMsProportionalToLength(totalMs, segmentLensPx)",
+    appliedPositionSource:
+      "distancePxAfterTimeMsAlongVariableEdgeTimes(τ, segmentLensPx, segmentTimesMs) — same segmentTimesMs[]; no equal-edge / per-segment re-normalize between these steps",
+    tTotalMs,
+    sumSegmentLengthsPx: sumL,
+    sumAllocatedSegmentTimesMs: sumTAlloc,
+    sumAllocatedMatchesTTotal: Math.abs(sumTAlloc - tTotalMs) < 0.01,
+    expectedUniformTauSpeed_pxPerMs: expectedTauSpeed,
+    tauDistanceAtFullT_vs_sumLen: { distAtFullTau, sumL, mismatchPx: distMismatch },
+    cumulativeTauDistanceChecksOk: cumulativeOk && distMismatch < 0.5,
+    wallClockNote:
+      "stepPlayback: τCue = easeOutCue(wall/tCue)*tCue, τObj = easeOutObj(...)*tObj. 이징 A/B: .env에 NEXT_PUBLIC_DEBUG_DISABLE_PATH_PLAYBACK_EASING=true → τ=wall 비율 선형. τ 행 L/T는 segments[]로 확인.",
+    segments,
+  });
+
+  if (!cumulativeOk || distMismatch >= 0.5) {
+    console.warn(`[trouble-playback:segment-audit:${phase}] τ-distance consistency failed`, {
+      cumulativeOk,
+      distMismatch,
+    });
+  }
+}
 
 export type BallNormOverrides = Partial<Record<"red" | "yellow" | "white", NormPoint>>;
 
@@ -72,75 +172,6 @@ function ballCenterNormForKey(
   return { x: placement.whiteBall.x, y: placement.whiteBall.y };
 }
 
-function clamp01(n: number): number {
-  return Math.max(0, Math.min(1, n));
-}
-
-/** 전체 구간 단일 자연 감속(ease-out), 마지막 0.5%는 1로 스냅 */
-function easeOutPower135(t: number): number {
-  const x = clamp01(t);
-  if (x >= 0.995) return 1;
-  return 1 - Math.pow(1 - x, 3);
-}
-
-function buildPlaybackSolutionData(params: {
-  ballPlacement: NanguBallPlacement;
-  pathPoints: NanguPathPoint[];
-  objectPathPoints: NanguPathPoint[];
-  ballSpeed: BallSpeed;
-  isBankShot: boolean;
-  thicknessOffsetX: number;
-  rect: PlayfieldRect;
-}): NanguSolutionData | null {
-  const { ballPlacement, pathPoints, objectPathPoints, ballSpeed, isBankShot, thicknessOffsetX, rect } =
-    params;
-  if (pathPoints.length < 1) return null;
-
-  const cuePos =
-    ballPlacement.cueBall === "yellow" ? ballPlacement.yellowBall : ballPlacement.whiteBall;
-  const pointsForPath = pathPoints.map((p) => ({ x: p.x, y: p.y }));
-  const firstHit = cueFirstObjectHitFromBallPlacement(cuePos, pathPoints[0], ballPlacement, rect);
-  /**
-   * ?뚮뜑쨌1紐??섏씠?쇱씠?몄? ?숈씪: `type==="ball"` ?ㅽ뙚 ?쒖꽌(`resolveTroubleFirstObjectBallKey`).
-   * 愿묒꽑 湲고븯留??곕㈃ ?ㅽ뙚? ?덈뒗??`cueFirstObjectHitFromBallPlacement`媛 null??寃쎌슦 reflectionPath媛
-   * ??留뚮뱾?댁졇 ?뚮? ?좊쭔 蹂댁씠怨??ъ깮 ??1紐⑹씠 ???吏곸씠??遺덉씪移섍? ?쒕떎.
-   */
-  const resolvedStruckKey = resolveTroubleFirstObjectBallKey({
-    placement: ballPlacement,
-    cuePos,
-    pathPoints,
-    objectPathPoints,
-    rect,
-  });
-  const struckKey = resolvedStruckKey ?? firstHit?.objectKey ?? null;
-
-  let reflectionPath: NanguSolutionData["reflectionPath"];
-  /** points[0] = 1紐?**以묒떖** ??異⑸룎 norm ?щ?? 臾닿?, ?ㅽ뙚?쇰줈 ?뺤젙??struckKey留??덉쑝硫?援ъ꽦 */
-  if (struckKey && objectPathPoints.length >= 1) {
-    const objPts = objectPathPoints.map((p) => ({ x: p.x, y: p.y }));
-    const startNorm = ballCenterNormForKey(ballPlacement, struckKey);
-    reflectionPath = {
-      points: [{ x: startNorm.x, y: startNorm.y }, ...objPts],
-      pointsWithType: objectPathPoints,
-    };
-  }
-
-  return {
-    isBankShot,
-    thicknessOffsetX: isBankShot ? undefined : thicknessOffsetX,
-    tipX: 0,
-    tipY: 0,
-    spinX: 0,
-    spinY: 0,
-    paths: [{ points: pointsForPath, pointsWithType: pathPoints }],
-    reflectionPath,
-    /** ?ъ깮 ??寃쎈줈瑜??곕씪 ?吏곸씪 怨???誘몄?????red濡??섎せ ?≫? 1紐⑹씠 ???吏곸씤 寃껋쿂??蹂댁엫 */
-    reflectionObjectBall: reflectionPath && struckKey ? struckKey : undefined,
-    ballSpeed,
-    speedLevel: ballSpeedToLegacySpeedLevel(ballSpeed),
-    speed: ballSpeedToLegacySpeed(ballSpeed),
-  };
-}
 
 export function useTroublePathPlayback(options: {
   ballPlacement: NanguBallPlacement | null;
@@ -164,6 +195,8 @@ export function useTroublePathPlayback(options: {
    * ??紐⑹쟻援?寃쎈줈??洹몃━湲겹띾? 耳쒓퀬 1紐??ㅽ뙚??1媛??댁긽???뚮쭔 true濡??먮뒗 寃껋쓣 沅뚯옣.
    */
   collisionWarningsEnabled?: boolean;
+  /** 재생 배속(0.5=절반 속도, 1=기본 속도) */
+  playbackRate?: number;
 }): {
   ballNormOverrides: BallNormOverrides | null;
   playbackPhase: "idle" | "cue" | "object";
@@ -245,7 +278,7 @@ export function useTroublePathPlayback(options: {
 
   const playbackData = useMemo(() => {
     if (!options.ballPlacement) return null;
-    return buildPlaybackSolutionData({
+    return buildTroublePlaybackSolutionData({
       ballPlacement: options.ballPlacement,
       pathPoints: options.pathPoints,
       objectPathPoints: options.objectPathPoints,
@@ -341,6 +374,7 @@ export function useTroublePathPlayback(options: {
   const [collisionMessage, setCollisionMessage] = useState<string | null>(null);
   const [playbackTimingDebug, setPlaybackTimingDebug] = useState<TroublePlaybackTimingDebug | null>(null);
   const rafRef = useRef<number>(0);
+  const restoreTimerRef = useRef<number | null>(null);
 
   const cancelRaf = useCallback(() => {
     if (rafRef.current) {
@@ -349,12 +383,20 @@ export function useTroublePathPlayback(options: {
     }
   }, []);
 
+  const clearRestoreTimer = useCallback(() => {
+    if (restoreTimerRef.current != null) {
+      window.clearTimeout(restoreTimerRef.current);
+      restoreTimerRef.current = null;
+    }
+  }, []);
+
   const resetPlayback = useCallback(() => {
+    clearRestoreTimer();
     cancelRaf();
     setBallNormOverrides(null);
     setPlaybackPhase("idle");
     setPlaybackTimingDebug(null);
-  }, [cancelRaf]);
+  }, [cancelRaf, clearRestoreTimer]);
 
   const dismissCollisionMessage = useCallback(() => {
     setCollisionMessage(null);
@@ -379,11 +421,18 @@ export function useTroublePathPlayback(options: {
     resetPlayback,
   ]);
 
-  useEffect(() => () => cancelRaf(), [cancelRaf]);
+  useEffect(
+    () => () => {
+      cancelRaf();
+      clearRestoreTimer();
+    },
+    [cancelRaf, clearRestoreTimer]
+  );
 
   const startPlayback = useCallback(() => {
     const placement = options.ballPlacement;
     if (!placement || !playbackData || !cuePlan) return;
+    clearRestoreTimer();
     cancelRaf();
     setCollisionMessage(null);
     /** ?ъ깮? ??긽 諛곗튂 湲곗? ?쒖옉?먯뿉???쒖옉 */
@@ -459,52 +508,72 @@ export function useTroublePathPlayback(options: {
         : null;
 
     const ignorePhy = Boolean(options.ignorePhysics);
+    /**
+     * 실험: `NEXT_PUBLIC_DEBUG_DISABLE_PATH_PLAYBACK_EASING=true` 이면 wallMs 비율을 τ에 **선형**으로 넣고
+     * `easeOutCue` / `easeOutObject`를 끈다. 세그먼트 길이 비례 시간은 그대로(`cueSegmentTimesMs` 등).
+     * 쿠션 직후 느려짐이 사라지면 이징이 화면 속도 출렁임의 원인으로 확정 가능.
+     */
+    const playbackEasingDisabled =
+      process.env.NEXT_PUBLIC_DEBUG_DISABLE_PATH_PLAYBACK_EASING === "true";
+    const playbackRate = Number.isFinite(options.playbackRate) ? Math.max(0.1, options.playbackRate as number) : 1;
     const railCount = ballSpeedToRailCount(options.ballSpeed);
     const speedFactor = ignorePhy ? 1 : troublePlaybackSpeedFactorFromRailCount(railCount);
     const dHit = pHitFirst * dTotal;
-    const cueEdges = Math.max(1, segmentLens.length);
     const objSegLens = objPlan ? polylineSegmentLengthsPx(objPlan.polylineNormalized, rect) : [];
-    const objEdges = Math.max(1, objSegLens.length);
 
-    let timePerRailMsCue: number;
-    let timePerRailMsObj: number;
     let tCueTotalMs: number;
     let tObjTotalMs: number;
 
     const cueDurationSourcePx = Math.max(1, cuePlan.effectiveTravelPx);
     const baseCueDurationMs = Math.max(1, Math.round(computePolylinePlaybackDurationMs(cueDurationSourcePx, rect)));
-    tCueTotalMs = Math.max(1, Math.round(baseCueDurationMs / speedFactor));
-    timePerRailMsCue = tCueTotalMs / cueEdges;
+    tCueTotalMs = Math.max(1, Math.round(baseCueDurationMs / speedFactor / playbackRate));
+    /** 세그먼트마다 동일 시간이 아니라 **길이 비율**로 시간 분배 → 경로상 속도가 구간 길이에 덜 의존 */
+    const cueSegmentTimesMs = buildSegmentTimesMsProportionalToLength(tCueTotalMs, segmentLens);
     const objectDurationSourcePx = hasReflectionPath && objPlan ? Math.max(1, objPlan.effectiveTravelPx) : 0;
     const baseObjectDurationMs =
       objectDurationSourcePx > 0 ? Math.max(1, Math.round(computePolylinePlaybackDurationMs(objectDurationSourcePx, rect))) : 0;
     tObjTotalMs =
-      objectDurationSourcePx > 0 ? Math.max(1, Math.round(baseObjectDurationMs / speedFactor)) : 0;
-    timePerRailMsObj = tObjTotalMs > 0 ? tObjTotalMs / objEdges : 1;
+      objectDurationSourcePx > 0
+        ? Math.max(1, Math.round(baseObjectDurationMs / speedFactor / playbackRate))
+        : 0;
+    const objSegmentTimesMs =
+      tObjTotalMs > 0 && objSegLens.length > 0
+        ? buildSegmentTimesMsProportionalToLength(tObjTotalMs, objSegLens)
+        : [];
 
-    const tHitMs = timeMsForDistanceAlongEqualEdgeTimes(dHit, segmentLens, timePerRailMsCue);
+    const tHitMs = timeMsForDistanceAlongVariableEdgeTimes(dHit, segmentLens, cueSegmentTimesMs);
     const totalWallMs = Math.max(tCueTotalMs, tHitMs + tObjTotalMs);
-    const cueAlongMaxRaw = distancePxAfterTimeMsAlongEqualEdgeTimes(
+    const cueAlongMaxRaw = distancePxAfterTimeMsAlongVariableEdgeTimes(
       tCueTotalMs,
       segmentLens,
-      timePerRailMsCue
+      cueSegmentTimesMs
     );
     const cueAlongMax = Math.max(1e-6, cueAlongMaxRaw);
     const objAlongMaxRaw =
-      tObjTotalMs > 0
-        ? distancePxAfterTimeMsAlongEqualEdgeTimes(tObjTotalMs, objSegLens, timePerRailMsObj)
+      tObjTotalMs > 0 && objSegmentTimesMs.length > 0
+        ? distancePxAfterTimeMsAlongVariableEdgeTimes(tObjTotalMs, objSegLens, objSegmentTimesMs)
         : 0;
     const objAlongMax = Math.max(1e-6, objAlongMaxRaw);
 
-    if (process.env.NODE_ENV !== "production") {
-      console.debug("[trouble-playback:rail-time]", {
+    logSegmentPlaybackTimingAudit("cue", segmentLens, cueSegmentTimesMs, tCueTotalMs);
+    if (tObjTotalMs > 0 && objSegmentTimesMs.length > 0) {
+      logSegmentPlaybackTimingAudit("object", objSegLens, objSegmentTimesMs, tObjTotalMs);
+    }
+
+    if (isTroublePlaybackVerboseLogEnabled()) {
+      console.debug("[trouble-playback:rail-time-summary]", {
         railCount,
         speedFactor,
-        timePerRail: null,
-        totalDuration: totalWallMs / 1000,
+        playbackRate,
+        totalWallMs,
         ignorePhysics: ignorePhy,
-        averageCueSpeedPxPerMs: cuePlan.effectiveTravelPx / Math.max(1, tCueTotalMs),
+        playbackEasingDisabled,
       });
+    }
+    if (playbackEasingDisabled && isTroublePlaybackVerboseLogEnabled()) {
+      console.info(
+        "[trouble-playback] easing OFF for this run — compare cushion short-leg jank; set env to false to restore easeOutCue/object"
+      );
     }
 
     const movingKey = (playbackData.reflectionObjectBall ?? "red") as "red" | "yellow" | "white";
@@ -570,24 +639,27 @@ export function useTroublePathPlayback(options: {
       const playbackDone = wallMs >= totalWallMs;
 
       const cueRawProgress = tCueTotalMs > 0 ? clamp01(wallMs / tCueTotalMs) : 1;
-      const cueEasedProgress = easeOutPower135(cueRawProgress);
+      const cueEasedProgress = playbackEasingDisabled
+        ? cueRawProgress
+        : easeOutCue(cueRawProgress);
       const cueWallForMotion = cueEasedProgress * tCueTotalMs;
-      const dAlongRaw = distancePxAfterTimeMsAlongEqualEdgeTimes(
+      const dAlongRaw = distancePxAfterTimeMsAlongVariableEdgeTimes(
         cueWallForMotion,
         segmentLens,
-        timePerRailMsCue
+        cueSegmentTimesMs
       );
       const cueCap = Math.min(cuePlan.moveDistancePx, cuePlan.pathLengthPx);
       const cueAlongRatio = clamp01(dAlongRaw / cueAlongMax);
       const dCue = cueCap * cueAlongRatio;
       const cueProgress01 = cueCap > 0 ? dCue / cueCap : 1;
       const cueNorm = sampleCueMotion(cuePlan, cueProgress01, rect).normalized;
-      if (process.env.NODE_ENV !== "production") {
+      if (isTroublePlaybackVerboseLogEnabled()) {
         const cueBucket = Math.floor(cueRawProgress * 10);
         const nearTail = cueRawProgress >= 0.85;
         if (nearTail || cueBucket !== lastCueLogBucket) {
           lastCueLogBucket = cueBucket;
           console.debug("[trouble-playback:ease-cue]", {
+            easingDisabled: playbackEasingDisabled,
             wallMs: Math.round(wallMs),
             rawProgress: Number(cueRawProgress.toFixed(4)),
             easedProgress: Number(cueEasedProgress.toFixed(4)),
@@ -629,12 +701,14 @@ export function useTroublePathPlayback(options: {
           }
           const objElapsed = wallMs - tHitMs;
           const objRawProgress = tObjTotalMs > 0 ? clamp01(objElapsed / tObjTotalMs) : 1;
-          const objEasedProgress = easeOutPower135(objRawProgress);
+          const objEasedProgress = playbackEasingDisabled
+            ? objRawProgress
+            : easeOutObject(objRawProgress);
           const objMotionMs = objEasedProgress * tObjTotalMs;
-          const dObjRaw = distancePxAfterTimeMsAlongEqualEdgeTimes(
+          const dObjRaw = distancePxAfterTimeMsAlongVariableEdgeTimes(
             objMotionMs,
             objSegLens,
-            timePerRailMsObj
+            objSegmentTimesMs
           );
           const objCap = Math.min(objPlan.moveDistancePx, objPlan.pathLengthPx);
           const objAlongRatio = clamp01(dObjRaw / objAlongMax);
@@ -642,12 +716,13 @@ export function useTroublePathPlayback(options: {
           tObj01 = objCap > 0 ? dObj / objCap : 1;
           const objPos = sampleObjectMotion(objPlan, tObj01, rect);
           overrides[movingKey] = objPos.normalized;
-          if (process.env.NODE_ENV !== "production") {
+          if (isTroublePlaybackVerboseLogEnabled()) {
             const objBucket = Math.floor(objRawProgress * 10);
             const nearTail = objRawProgress >= 0.85;
             if (nearTail || objBucket !== lastObjLogBucket) {
               lastObjLogBucket = objBucket;
               console.debug("[trouble-playback:ease-object]", {
+                easingDisabled: playbackEasingDisabled,
                 wallMs: Math.round(wallMs),
                 objElapsed: Math.round(objElapsed),
                 rawProgress: Number(objRawProgress.toFixed(4)),
@@ -728,6 +803,12 @@ export function useTroublePathPlayback(options: {
         setPlaybackPhase("idle");
         setPlaybackTimingDebug((d) => (d ? { ...d, playbackPhaseAtEnd: "idle" } : null));
         rafRef.current = 0;
+        /** 재생 종료 후 3초간 최종 위치를 보여준 뒤 원래 배치로 복귀 */
+        clearRestoreTimer();
+        restoreTimerRef.current = window.setTimeout(() => {
+          setBallNormOverrides(null);
+          restoreTimerRef.current = null;
+        }, PLAYBACK_RESTORE_DELAY_MS);
       }
     };
     rafRef.current = requestAnimationFrame(stepPlayback);
@@ -746,6 +827,8 @@ export function useTroublePathPlayback(options: {
     options.cuePathCurveNodes,
     options.objectPathCurveNodes,
     options.ignorePhysics,
+    options.playbackRate,
+    clearRestoreTimer,
   ]);
 
   const cuePlaybackPathDebug = useMemo(() => {

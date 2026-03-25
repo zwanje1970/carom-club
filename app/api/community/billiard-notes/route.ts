@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { normalizeCueBallType } from "@/lib/billiard-table-constants";
-import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import type { SessionUser } from "@/types/auth";
+import {
+  createBilliardNote,
+  listCommunityNotes,
+  listMineOrAllNotes,
+} from "@/lib/services/note/billiard-note-service";
+import {
+  parseBilliardNoteWriteBody,
+  validateBallPlacementForCreate,
+} from "@/lib/services/note/billiard-note-validator";
 
 function logBilliardNotesAuthDebug(request: Request, session: SessionUser | null) {
   if (process.env.AUTH_DEBUG_COOKIE !== "1") return;
@@ -49,60 +56,20 @@ export async function GET(request: Request) {
     if (!session) {
       return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
     }
-    const list = await prisma.billiardNote.findMany({
-      where: { visibility: "community" },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-      select: {
-        id: true,
-        memo: true,
-        imageUrl: true,
-        visibility: true,
-        createdAt: true,
-        author: { select: { id: true, name: true } },
-      },
-    });
-    return NextResponse.json(
-      list.map((n) => ({
-        id: n.id,
-        memo: n.memo,
-        imageUrl: n.imageUrl,
-        visibility: n.visibility,
-        createdAt: n.createdAt.toISOString(),
-        authorName: n.author.name,
-      }))
-    );
+    const list = await listCommunityNotes();
+    return NextResponse.json(list);
   }
 
   if (!session) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  const list = await prisma.billiardNote.findMany({
-    where: mine ? { authorId: session.id } : undefined,
-    orderBy: { createdAt: "desc" },
-    take: 100,
-    select: {
-      id: true,
-      title: true,
-      memo: true,
-      imageUrl: true,
-      visibility: true,
-      createdAt: true,
-      _count: { select: { troubleShotsFromNote: true } },
-    },
+  const list = await listMineOrAllNotes({
+    mine,
+    visibility,
+    sessionUserId: session.id,
   });
-  return NextResponse.json(
-    list.map((n) => ({
-      id: n.id,
-      title: n.title,
-      memo: n.memo,
-      imageUrl: n.imageUrl,
-      visibility: n.visibility,
-      createdAt: n.createdAt.toISOString(),
-      sentToTroubleCount: n._count.troubleShotsFromNote,
-    }))
-  );
+  return NextResponse.json(list);
 }
 
 /** 노트 생성. 이미지 URL은 먼저 upload-image로 업로드 후 전달. */
@@ -118,64 +85,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  let body: {
-    title?: string | null;
-    noteDate?: string | null;
-    redBall?: { x: number; y: number };
-    yellowBall?: { x: number; y: number };
-    whiteBall?: { x: number; y: number };
-    cueBall?: string;
-    memo?: string | null;
-    imageUrl?: string | null;
-    visibility?: string;
-  };
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
-
-  const redBall = body.redBall;
-  const yellowBall = body.yellowBall;
-  const whiteBall = body.whiteBall;
-  if (
-    !redBall || typeof redBall.x !== "number" || typeof redBall.y !== "number" ||
-    !yellowBall || typeof yellowBall.x !== "number" || typeof yellowBall.y !== "number" ||
-    !whiteBall || typeof whiteBall.x !== "number" || typeof whiteBall.y !== "number"
-  ) {
-    return NextResponse.json(
-      { error: "공 배치 정보(redBall, yellowBall, whiteBall)가 필요합니다." },
-      { status: 400 }
-    );
+  const parsed = parseBilliardNoteWriteBody(body);
+  if (!parsed) {
+    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+  }
+  const valid = validateBallPlacementForCreate(parsed);
+  if (!valid.ok) {
+    return NextResponse.json({ error: valid.error }, { status: 400 });
   }
 
-  const visibility = body.visibility === "community" ? "community" : "private";
-  const cueBall = normalizeCueBallType(body.cueBall);
-  const noteDate = body.noteDate ? new Date(body.noteDate) : null;
-
   try {
-    const note = await prisma.billiardNote.create({
-      data: {
-        authorId: session.id,
-        title: body.title?.trim() || null,
-        noteDate,
-        redBallX: redBall.x,
-        redBallY: redBall.y,
-        yellowBallX: yellowBall.x,
-        yellowBallY: yellowBall.y,
-        whiteBallX: whiteBall.x,
-        whiteBallY: whiteBall.y,
-        cueBall,
-        memo: body.memo?.trim() || null,
-        imageUrl: body.imageUrl?.trim() || null,
-        visibility,
-      },
+    const created = await createBilliardNote(session.id, parsed, {
+      redBall: valid.redBall,
+      yellowBall: valid.yellowBall,
+      whiteBall: valid.whiteBall,
     });
-    return NextResponse.json({
-    id: note.id,
-    visibility: note.visibility,
-    createdAt: note.createdAt.toISOString(),
-  });
+    return NextResponse.json(created);
   } catch (e) {
     console.error("[billiard-notes] POST create error:", e);
     return NextResponse.json(

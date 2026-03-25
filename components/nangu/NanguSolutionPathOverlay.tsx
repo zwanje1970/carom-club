@@ -27,7 +27,7 @@ import {
   type NanguPathPoint,
   type ObjectBallColorKey,
 } from "@/lib/nangu-types";
-import { isLastSegmentEndpointSpotIndex, type PathPointerAim } from "@/lib/cue-path-cushion-rules";
+import { type PathPointerAim } from "@/lib/cue-path-cushion-rules";
 import { classifySolutionPathPointerHit } from "@/lib/solution-path-pointer-classify";
 import {
   ballCircumferenceNormFacingApproach,
@@ -49,12 +49,14 @@ const CUE_PATH_STROKE = "rgb(239, 68, 68)";
 /** 1목적구(반사) 진행 경로 — 진한 파랑 */
 const OBJECT_PATH_STROKE = "rgb(29, 78, 216)";
 const LINE_WIDTH = 2.5;
-/** 수구 경로 스팟: 공과 동일 반지름 — 깜빡임은 `fillOpacity`에 곱함 */
+/** 수구 경로 스팟: 공과 동일 반지름 — 활성 스팟은 SMIL `<animate>`로 fillOpacity 토글 */
 const SPOT_FILL = CUE_PATH_STROKE;
 const SPOT_FILL_OPACITY = 0.7;
 /** 1목 경로 스팟: 경로선과 동일 진한 파랑·60% 불투명 */
 const OBJECT_SPOT_FILL = OBJECT_PATH_STROKE;
 const OBJECT_SPOT_FILL_OPACITY = 0.6;
+/** 기존 `Math.sin(Date.now()/180)` 한 주기(ms). SMIL `<animate>`로 깜빡임 — rAF·setState 없음 */
+const SPOT_BLINK_CYCLE_MS = 2 * Math.PI * 180;
 
 const CURVE_HANDLE_HIT_PX = 26;
 const CURVE_LONG_PRESS_MS = 480;
@@ -622,6 +624,37 @@ export function NanguSolutionPathOverlay({
     return objectActiveSpotOverrideId ?? objectPathPoints[objectPathPoints.length - 1]!.id;
   }, [objectPathPoints, objectActiveSpotOverrideId]);
 
+  /** 활성 스팟에 딸린 세그먼트의 곡선 노드만 표시/조작 */
+  const activeCueCurveKey = useMemo(() => {
+    if (!effectiveCueActiveId) return null;
+    const idx = pathPoints.findIndex((p) => p.id === effectiveCueActiveId);
+    if (idx < 0) return null;
+    return cueSegmentCurveKey(pathPoints, idx);
+  }, [effectiveCueActiveId, pathPoints]);
+
+  const activeObjectCurveKey = useMemo(() => {
+    if (!effectiveObjectActiveId) return null;
+    const idx = objectPathPoints.findIndex((p) => p.id === effectiveObjectActiveId);
+    if (idx < 0) return null;
+    return objectSegmentCurveKey(objectPathPoints, idx);
+  }, [effectiveObjectActiveId, objectPathPoints]);
+
+  const activeCueCurveControlsForHit = useMemo(
+    () =>
+      activeCueCurveKey
+        ? mergedCueCurveControlsForHit.filter((ctl) => ctl.key === activeCueCurveKey)
+        : [],
+    [mergedCueCurveControlsForHit, activeCueCurveKey]
+  );
+
+  const activeObjectCurveControlsForHit = useMemo(
+    () =>
+      activeObjectCurveKey
+        ? mergedObjectCurveControlsForHit.filter((ctl) => ctl.key === activeObjectCurveKey)
+        : [],
+    [mergedObjectCurveControlsForHit, activeObjectCurveKey]
+  );
+
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       const aim = resolvePointerAimFromClient(e.clientX, e.clientY);
@@ -745,7 +778,7 @@ export function NanguSolutionPathOverlay({
         if (pathMode && !objectPathMode) {
           const stopped = tryHit(
             "cue",
-            mergedCueCurveControlsForHit,
+            activeCueCurveControlsForHit,
             (key) => isValidCueCurveKey(key, pathPoints),
             onRemoveCueDisplayCurve
           );
@@ -754,7 +787,7 @@ export function NanguSolutionPathOverlay({
         if (objectPathMode && !pathMode) {
           const stopped = tryHit(
             "object",
-            mergedObjectCurveControlsForHit,
+            activeObjectCurveControlsForHit,
             (key) => isValidObjectCurveKey(key, objectPathPoints),
             onRemoveObjectDisplayCurve
           );
@@ -844,14 +877,11 @@ export function NanguSolutionPathOverlay({
       if (c.kind === "objectSpot") {
         const p = objectPathPoints.find((x) => x.id === c.id);
         if (!p) return;
-        const objIdx = objectPathPoints.findIndex((x) => x.id === c.id);
         const last = lastClickRef.current;
         if (last?.kind === "obj" && last?.id === p.id && now - last.t < 400) {
           lastClickRef.current = null;
           if (p.id !== effectiveObjectActiveId) {
             onObjectActiveSpotChange?.(p.id);
-          } else if (objIdx >= 0 && isLastSegmentEndpointSpotIndex(objectPathPoints, objIdx)) {
-            onRemoveObjectPoint?.(p.id);
           }
           e.stopPropagation();
           e.preventDefault();
@@ -873,12 +903,7 @@ export function NanguSolutionPathOverlay({
       }
 
       if (c.kind === "objectSegment") {
-        if (
-          troubleCurveEditMode &&
-          curveHandleInteraction &&
-          objectPathMode &&
-          !pathMode
-        ) {
+        if (troubleCurveEditMode && objectPathMode && !pathMode) {
           const tkey = `curve-obj-${c.segmentIndex}`;
           const lastC = curveSegmentDblRef.current;
           if (lastC?.key === tkey && now - lastC.t < 420) {
@@ -896,8 +921,7 @@ export function NanguSolutionPathOverlay({
         const lastS = segmentDblRef.current;
         if (lastS?.key === key && now - lastS.t < 400) {
           segmentDblRef.current = null;
-          if (onInsertObjectPathAim) onInsertObjectPathAim(c.segmentIndex, aim);
-          else onInsertObjectBetween?.(c.segmentIndex, norm);
+          /** 경로선 더블탭으로 스팟 생성 금지 */
         } else {
           segmentDblRef.current = { key, t: now };
         }
@@ -922,8 +946,6 @@ export function NanguSolutionPathOverlay({
           lastClickRef.current = null;
           if (p.id !== effectiveCueActiveId) {
             onCueActiveSpotChange?.(p.id);
-          } else {
-            onRemovePoint?.(p.id);
           }
           e.stopPropagation();
           e.preventDefault();
@@ -945,7 +967,7 @@ export function NanguSolutionPathOverlay({
       }
 
       if (c.kind === "cueSegment") {
-        if (troubleCurveEditMode && curveHandleInteraction && pathMode && !objectPathMode) {
+        if (troubleCurveEditMode && pathMode && !objectPathMode) {
           const tkey = `curve-cue-${c.segmentIndex}`;
           const lastC = curveSegmentDblRef.current;
           if (lastC?.key === tkey && now - lastC.t < 420) {
@@ -963,8 +985,7 @@ export function NanguSolutionPathOverlay({
         const lastS = segmentDblRef.current;
         if (lastS?.key === key && now - lastS.t < 400) {
           segmentDblRef.current = null;
-          if (onInsertCuePathAim) onInsertCuePathAim(c.segmentIndex, aim);
-          else onInsertBetween?.(c.segmentIndex, norm);
+          /** 경로선 더블탭으로 스팟 생성 금지 */
         } else {
           segmentDblRef.current = { key, t: now };
         }
@@ -1029,6 +1050,8 @@ export function NanguSolutionPathOverlay({
       pathLinesVisible,
       mergedCueCurveControlsForHit,
       mergedObjectCurveControlsForHit,
+      activeCueCurveControlsForHit,
+      activeObjectCurveControlsForHit,
       cueCurveByKey,
       objectCurveByKey,
       troubleCurveEditMode,
@@ -1099,18 +1122,10 @@ export function NanguSolutionPathOverlay({
           return;
         }
         const siblings = kind === "cue" ? pathPoints : objectPathPoints;
-        /** 그리드 1칸 이내 간격(≤ 1칸 변 길이)이면 자동 확대 — 정확히 1칸일 때도 포함 */
-        const hasNearSibling = siblings.some((p) => {
-          if (p.id === id) return false;
-          return (
-            distanceNormPointsInPlayfieldPx(targetNorm, { x: p.x, y: p.y }, collisionRect) <=
-            gridOneCellPx
-          );
-        });
         setSpotMagnifier((prev) => {
           /** 이미 열린 확대창은 드래그 종료까지 유지 — 이동 중 형제와 멀어져도 사라지지 않게 */
           if (prev) return prev;
-          if (!hasNearSibling) return null;
+          /** 확대 옵션이 켜져 있으면 스팟 드래그 시 항상 확대창 표시 */
           const { px: cx, py: cy } = toPx(targetNorm.x, targetNorm.y);
           // 확대창 위치/시야를 고정하고, 내부에서 스팟만 이동시킨다.
           return { clientX: e.clientX, clientY: e.clientY, cx, cy };
@@ -1139,8 +1154,6 @@ export function NanguSolutionPathOverlay({
       onMoveCueDisplayCurve,
       onMoveObjectDisplayCurve,
       magnifierEnabled,
-      gridOneCellPx,
-      collisionRect,
       toPx,
     ]
   );
@@ -1173,19 +1186,6 @@ export function NanguSolutionPathOverlay({
   );
 
   const interactive = pathMode || objectPathMode || Boolean(allowCuePlaybackGestures);
-
-  /** 이동 가능한 스팟만 깜빡임에 사용 — `Date.now()/180` 기준 sin 부호 → 0|1 (`BilliardTableCanvas` showCueBallSpot) */
-  const [spotBlink01, setSpotBlink01] = useState(1);
-  useEffect(() => {
-    let frame = 0;
-    const tick = () => {
-      const t = Date.now() / 180;
-      setSpotBlink01(Math.sin(t) >= 0 ? 1 : 0);
-      frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, []);
 
   return (
     <div
@@ -1264,7 +1264,7 @@ export function NanguSolutionPathOverlay({
           )}
         {(curveHandleInteraction || curveHandlesShowSubtle) &&
           pathLinesVisible &&
-          mergedCueCurveControlsForHit.map((ctl) => {
+          activeCueCurveControlsForHit.map((ctl) => {
             if (!isValidCueCurveKey(ctl.key, pathPoints)) return null;
             const { px, py } = toPx(ctl.x, ctl.y);
             const subtle = !curveHandleInteraction || !pathMode || objectPathMode;
@@ -1284,7 +1284,7 @@ export function NanguSolutionPathOverlay({
           })}
         {(curveHandleInteraction || curveHandlesShowSubtle) &&
           pathLinesVisible &&
-          mergedObjectCurveControlsForHit.map((ctl) => {
+          activeObjectCurveControlsForHit.map((ctl) => {
             if (!isValidObjectCurveKey(ctl.key, objectPathPoints)) return null;
             const { px, py } = toPx(ctl.x, ctl.y);
             const subtle = !curveHandleInteraction || !objectPathMode || pathMode;
@@ -1313,7 +1313,6 @@ export function NanguSolutionPathOverlay({
           pathPoints.map((p, i) => {
           const n = cueSpotDisplayNorms[i]!;
           const { px, py } = toPx(n.x, n.y);
-          const blinkFactor = p.id === effectiveCueActiveId ? spotBlink01 : 1;
           const isDraggingThis = draggingId === p.id;
           const isActive = p.id === effectiveCueActiveId;
           const strokeW = isDraggingThis ? 3 : isActive ? 2 : 0;
@@ -1326,7 +1325,7 @@ export function NanguSolutionPathOverlay({
               cy={py}
               r={r}
               fill={SPOT_FILL}
-              fillOpacity={SPOT_FILL_OPACITY * blinkFactor}
+              fillOpacity={SPOT_FILL_OPACITY}
               stroke={
                 isDraggingThis
                   ? "rgba(255,255,255,0.95)"
@@ -1335,7 +1334,18 @@ export function NanguSolutionPathOverlay({
                     : "none"
               }
               strokeWidth={strokeW}
-            />
+            >
+              {isActive ? (
+                <animate
+                  attributeName="fillOpacity"
+                  values={`${SPOT_FILL_OPACITY};0`}
+                  keyTimes="0;0.5"
+                  dur={`${SPOT_BLINK_CYCLE_MS}ms`}
+                  repeatCount="indefinite"
+                  calcMode="discrete"
+                />
+              ) : null}
+            </circle>
           );
         })}
 
@@ -1344,7 +1354,6 @@ export function NanguSolutionPathOverlay({
           objectPathPoints.map((p, i) => {
           const n = objectSpotDisplayNorms[i]!;
           const { px, py } = toPx(n.x, n.y);
-          const blinkFactor = p.id === effectiveObjectActiveId ? spotBlink01 : 1;
           const isDraggingThis = draggingObjectId === p.id;
           const isActive = p.id === effectiveObjectActiveId;
           const strokeW = isDraggingThis ? 3 : isActive ? 2 : 0;
@@ -1357,7 +1366,7 @@ export function NanguSolutionPathOverlay({
               cy={py}
               r={r}
               fill={OBJECT_SPOT_FILL}
-              fillOpacity={OBJECT_SPOT_FILL_OPACITY * blinkFactor}
+              fillOpacity={OBJECT_SPOT_FILL_OPACITY}
               stroke={
                 isDraggingThis
                   ? "rgba(255,255,255,0.95)"
@@ -1366,7 +1375,18 @@ export function NanguSolutionPathOverlay({
                     : "none"
               }
               strokeWidth={strokeW}
-            />
+            >
+              {isActive ? (
+                <animate
+                  attributeName="fillOpacity"
+                  values={`${OBJECT_SPOT_FILL_OPACITY};0`}
+                  keyTimes="0;0.5"
+                  dur={`${SPOT_BLINK_CYCLE_MS}ms`}
+                  repeatCount="indefinite"
+                  calcMode="discrete"
+                />
+              ) : null}
+            </circle>
           );
         })}
       </svg>
@@ -1487,7 +1507,6 @@ export function NanguSolutionPathOverlay({
             {pathPoints.map((p, i) => {
               const n = cueSpotDisplayNorms[i]!;
               const { px, py } = toPx(n.x, n.y);
-              const blinkFactor = p.id === effectiveCueActiveId ? spotBlink01 : 1;
               const isDraggingThis = draggingId === p.id;
               const isActive = p.id === effectiveCueActiveId;
               const strokeW = isDraggingThis ? 3 : isActive ? 2 : 0;
@@ -1500,7 +1519,7 @@ export function NanguSolutionPathOverlay({
                   cy={py}
                   r={sr}
                   fill={SPOT_FILL}
-                  fillOpacity={SPOT_FILL_OPACITY * blinkFactor}
+                  fillOpacity={SPOT_FILL_OPACITY}
                   stroke={
                     isDraggingThis
                       ? "rgba(255,255,255,0.95)"
@@ -1509,13 +1528,23 @@ export function NanguSolutionPathOverlay({
                         : "none"
                   }
                   strokeWidth={strokeW}
-                />
+                >
+                  {isActive ? (
+                    <animate
+                      attributeName="fillOpacity"
+                      values={`${SPOT_FILL_OPACITY};0`}
+                      keyTimes="0;0.5"
+                      dur={`${SPOT_BLINK_CYCLE_MS}ms`}
+                      repeatCount="indefinite"
+                      calcMode="discrete"
+                    />
+                  ) : null}
+                </circle>
               );
             })}
             {objectPathPoints.map((p, i) => {
               const n = objectSpotDisplayNorms[i]!;
               const { px, py } = toPx(n.x, n.y);
-              const blinkFactor = p.id === effectiveObjectActiveId ? spotBlink01 : 1;
               const isDraggingThis = draggingObjectId === p.id;
               const isActive = p.id === effectiveObjectActiveId;
               const strokeW = isDraggingThis ? 3 : isActive ? 2 : 0;
@@ -1528,7 +1557,7 @@ export function NanguSolutionPathOverlay({
                   cy={py}
                   r={sr}
                   fill={OBJECT_SPOT_FILL}
-                  fillOpacity={OBJECT_SPOT_FILL_OPACITY * blinkFactor}
+                  fillOpacity={OBJECT_SPOT_FILL_OPACITY}
                   stroke={
                     isDraggingThis
                       ? "rgba(255,255,255,0.95)"
@@ -1537,7 +1566,18 @@ export function NanguSolutionPathOverlay({
                         : "none"
                   }
                   strokeWidth={strokeW}
-                />
+                >
+                  {isActive ? (
+                    <animate
+                      attributeName="fillOpacity"
+                      values={`${OBJECT_SPOT_FILL_OPACITY};0`}
+                      keyTimes="0;0.5"
+                      dur={`${SPOT_BLINK_CYCLE_MS}ms`}
+                      repeatCount="indefinite"
+                      calcMode="discrete"
+                    />
+                  ) : null}
+                </circle>
               );
             })}
           </svg>
