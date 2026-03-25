@@ -15,7 +15,7 @@ export type BoardListFiltersKeyInput = {
   qTitle?: string;
   statusFilter: "all" | "open" | "solved";
   popular: "today" | "weekly" | "liked" | "comments" | null;
-  sort: "likes" | "latest";
+  sort: "likes" | "comments" | "latest";
 };
 
 export type BoardListCursorPayloadV1 = {
@@ -46,6 +46,7 @@ export function sortKindFromListParams(params: BoardListFiltersKeyInput): BoardL
   if (popular === "liked" || sort === "likes") return "likeCount";
   if (popular === "comments") return "commentCount";
   if (popular === "today" || popular === "weekly") return "viewCount";
+  if (sort === "comments") return "commentCount";
   return "createdAt";
 }
 

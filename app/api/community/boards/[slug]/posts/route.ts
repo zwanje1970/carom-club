@@ -35,7 +35,11 @@ export async function GET(
     popularRaw === "today" || popularRaw === "weekly" || popularRaw === "liked" || popularRaw === "comments"
       ? popularRaw
       : null;
-  const sort = searchParams.get("sort") === "likes" ? "likes" : "latest";
+  const sortRaw = searchParams.get("sort");
+  const sort =
+    sortRaw === "likes" || sortRaw === "comments"
+      ? sortRaw
+      : "latest";
   const statusRaw = searchParams.get("status");
   const statusFilter: BoardListQueryParams["statusFilter"] =
     slug === "trouble" && (statusRaw === "open" || statusRaw === "solved") ? statusRaw : "all";

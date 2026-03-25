@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { CommunityBoardPagePayload } from "@/lib/community-board-page-data";
 import { CommunityBoardTabBar } from "@/components/community/CommunityBoardTabBar";
-import { CommunityBoardPopularNav } from "@/components/community/CommunityBoardPopularNav";
 import { CommunityBoardTroubleStatusNav } from "@/components/community/CommunityBoardTroubleStatusNav";
 import { CommunityBoardListAndMoreClient } from "@/components/community/CommunityBoardListAndMoreClient";
 import { CommunityWriteFab } from "@/components/community/CommunityWriteFab";
@@ -39,14 +38,6 @@ export function CommunityBoardPageShell({
             showSolverEntry={showSolverEntry}
           />
         )}
-
-        <CommunityBoardPopularNav
-          boardSlug={boardSlug}
-          current={data.popular}
-          q={data.q}
-          statusFilter={data.statusFilter}
-          className="mt-2"
-        />
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <h1 className="text-lg font-bold text-site-text">{data.board.name}</h1>
@@ -101,6 +92,7 @@ export function CommunityBoardPageShell({
             popular={data.popular}
             q={data.q}
             statusFilter={data.statusFilter}
+            sort={data.sort}
             take={data.take}
             initialPinned={data.pinned}
             initialPosts={data.posts}

@@ -26,7 +26,7 @@ export type BoardListQueryParams = {
   qTitle?: string;
   statusFilter: "all" | "open" | "solved";
   popular: "today" | "weekly" | "liked" | "comments" | null;
-  sort: "likes" | "latest";
+  sort: "likes" | "comments" | "latest";
   page: number;
   take: number;
 };
@@ -84,6 +84,9 @@ export function buildBoardListOrderBy(params: BoardListQueryParams): Prisma.Comm
   }
   if (sort === "likes") {
     return [{ likeCount: "desc" }, { createdAt: "desc" }];
+  }
+  if (sort === "comments") {
+    return [{ commentCount: "desc" }, { createdAt: "desc" }];
   }
   return { createdAt: "desc" };
 }

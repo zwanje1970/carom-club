@@ -32,7 +32,7 @@ export default function MobileHeader({
   };
 
   return (
-    <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-gray-100 bg-white/80 px-4 backdrop-blur-md shadow-sm">
+    <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4">
       <div className="w-10">
         {showBack && (
           <button

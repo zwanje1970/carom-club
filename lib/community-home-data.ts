@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 
 const TAKE = 10;
+const LATEST_TAKE = 25;
 const REVALIDATE_SECONDS = 45;
 
 export const COMMUNITY_HOME_CACHE_TAG = "community-home";
@@ -41,6 +42,8 @@ export type CommunityHomePopular = {
   mostLiked: CommunityHomePostItem[];
   mostComments: CommunityHomePostItem[];
 };
+
+export type CommunityHomeLatest = CommunityHomePostItem[];
 
 function format(p: {
   id: string;
@@ -153,5 +156,37 @@ export async function getCachedCommunityPopular(
     )();
   } catch {
     return empty;
+  }
+}
+
+/**
+ * 커뮤니티 홈 통합 뷰: 전체 게시글 최신순.
+ * @param excludeTroubleBoard 비로그인 시 true — trouble 제외
+ */
+export async function getCachedCommunityLatest(
+  excludeTroubleBoard: boolean
+): Promise<CommunityHomeLatest> {
+  if (!isDatabaseConfigured()) return [];
+  const variant = excludeTroubleBoard ? "anon" : "auth";
+  try {
+    return await unstable_cache(
+      async () => {
+        const where = {
+          isHidden: false,
+          ...(excludeTroubleBoard ? { board: { slug: { not: "trouble" as const } } } : {}),
+        };
+        const rows = await prisma.communityPost.findMany({
+          where,
+          orderBy: [{ createdAt: "desc" }],
+          take: LATEST_TAKE,
+          select: listSelect,
+        });
+        return rows.map(format);
+      },
+      ["community-home-latest", variant],
+      { revalidate: REVALIDATE_SECONDS, tags: [COMMUNITY_HOME_CACHE_TAG] }
+    )();
+  } catch {
+    return [];
   }
 }

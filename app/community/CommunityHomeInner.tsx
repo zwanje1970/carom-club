@@ -6,17 +6,14 @@ import { isPlatformAdmin } from "@/types/auth";
 import { canShowSolverEntry } from "@/lib/entry-visibility";
 import { ContentLayer } from "@/components/content/ContentLayer";
 import { PageSectionsRenderer } from "@/components/content/PageSectionsRenderer";
-import { getCachedCommunityBoards, getCachedCommunityPopular } from "@/lib/community-home-data";
+import { getCachedCommunityLatest } from "@/lib/community-home-data";
 
 export async function CommunityHomeInner() {
   const [common, session] = await Promise.all([getCommonPageData("community"), getSession()]);
   const { noticeBars, popups, pageSections } = common;
   const canManageReports_ = canManageReports(session);
 
-  const [boards, popular] = await Promise.all([
-    getCachedCommunityBoards(),
-    getCachedCommunityPopular(!session),
-  ]);
+  const latest = await getCachedCommunityLatest(!session);
 
   const showSolverEntry = canShowSolverEntry(isPlatformAdmin(session));
 
@@ -26,8 +23,7 @@ export async function CommunityHomeInner() {
       <PageSectionsRenderer sections={pageSections} />
       <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
         <CommunityMainClient
-          boards={boards}
-          popular={popular}
+          latest={latest}
           canManageReports={canManageReports_}
           showSolverEntry={showSolverEntry}
         />

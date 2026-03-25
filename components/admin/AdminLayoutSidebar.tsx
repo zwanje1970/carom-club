@@ -78,13 +78,16 @@ export function AdminLayoutSidebar({ copy, onLogout, mobileOpen, onMobileClose }
               );
             }
             if (item.menu && item.menu.length > 0) {
-              const isOpen = openIndex === idx;
+              const isOpen = isMobile || openIndex === idx;
               const hasActiveChild = item.menu.some((m) => m.href && isActive(m.href));
               return (
                 <li key={idx}>
                   <button
                     type="button"
-                    onClick={() => setOpenIndex(isOpen ? -1 : idx)}
+                    onClick={() => {
+                      if (isMobile) return;
+                      setOpenIndex(isOpen ? -1 : idx);
+                    }}
                     className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition ${
                       hasActiveChild
                         ? "bg-site-primary/10 font-medium text-site-primary dark:bg-site-primary/20"
@@ -95,7 +98,7 @@ export function AdminLayoutSidebar({ copy, onLogout, mobileOpen, onMobileClose }
                       {item.icon && <Icon path={item.icon} size={20} />}
                       <span>{item.label}</span>
                     </span>
-                    <Icon path={isOpen ? mdiChevronDown : mdiChevronRight} size={20} />
+                    {!isMobile && <Icon path={isOpen ? mdiChevronDown : mdiChevronRight} size={20} />}
                   </button>
                   <ul
                     className={`overflow-hidden pl-4 ${isOpen ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"}`}

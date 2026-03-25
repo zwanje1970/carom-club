@@ -30,6 +30,8 @@ export type CommunityBoardPagePayload = {
   page: number;
   q: string;
   statusFilter: "all" | "open" | "solved";
+  /** 게시판 정렬 탭 */
+  sort: "latest" | "likes" | "comments";
   initialQueryKey: string;
 };
 
@@ -45,6 +47,11 @@ function parseStatus(
   if (slug !== "trouble") return "all";
   if (raw === "open" || raw === "solved") return raw;
   return "all";
+}
+
+function parseSort(raw: string | undefined): "latest" | "likes" | "comments" {
+  if (raw === "likes" || raw === "comments") return raw;
+  return "latest";
 }
 
 /**
@@ -64,6 +71,8 @@ export async function loadCommunityBoardPageData(
 
   const popularRaw = typeof searchParams.popular === "string" ? searchParams.popular : undefined;
   const popular = parsePopular(popularRaw);
+  const sortRaw = typeof searchParams.sort === "string" ? searchParams.sort : undefined;
+  const sort = parseSort(sortRaw);
   const qRaw = typeof searchParams.q === "string" ? searchParams.q.trim() : "";
   const pageRaw = typeof searchParams.page === "string" ? Number(searchParams.page) : 0;
   const page = Math.max(0, Number.isFinite(pageRaw) ? Math.floor(pageRaw) : 0);
@@ -112,7 +121,7 @@ export async function loadCommunityBoardPageData(
     qTitle: qRaw || undefined,
     statusFilter,
     popular: popularParam,
-    sort: "latest",
+    sort,
     page,
     take,
   };
@@ -144,6 +153,7 @@ export async function loadCommunityBoardPageData(
       page,
       q: qRaw,
       statusFilter,
+      sort,
       initialQueryKey,
     },
   };
