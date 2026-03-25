@@ -9,6 +9,7 @@ import { DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT } from "@/lib/billiard-table-
 import type { NanguBallPlacement } from "@/lib/nangu-types";
 import dynamic from "next/dynamic";
 import type { CommunityPostDetailJson, TroubleSolutionListItem } from "@/lib/community-post-detail-server";
+import MobileHeader from "@/components/common/MobileHeader";
 
 const NanguReadOnlyLayoutLazy = dynamic(
   () =>
@@ -468,7 +469,8 @@ export function CommunityPostDetailView({
 
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
-      <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
+      <MobileHeader title={post.title || "게시글"} showBack showClose onClosePath="/community" />
+      <div className="mx-auto w-full max-w-3xl px-4 py-6 pt-14 sm:px-6">
         <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4" aria-label="breadcrumb">
           <Link href="/community" className="hover:text-site-primary">커뮤니티</Link>
           <span aria-hidden>/</span>

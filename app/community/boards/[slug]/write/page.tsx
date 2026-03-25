@@ -3,6 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useRef } from "react";
+import MobileHeader from "@/components/common/MobileHeader";
 
 export default function CommunityBoardWritePage() {
   const params = useParams();
@@ -57,7 +58,8 @@ export default function CommunityBoardWritePage() {
 
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
-      <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">
+      <MobileHeader title="글쓰기" showBack showClose onClosePath="/community" confirmClose />
+      <div className="mx-auto w-full max-w-2xl px-4 py-6 pt-14 sm:px-6">
         <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4" aria-label="breadcrumb">
           <Link href="/community" className="hover:text-site-primary">커뮤니티</Link>
           <span aria-hidden>/</span>

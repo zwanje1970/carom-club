@@ -6,6 +6,7 @@ import { BilliardNoteFormScreen } from "@/components/community/BilliardNoteFormS
 import { MobileBallPlacementFullscreen } from "@/components/community/MobileBallPlacementFullscreen";
 import type { PlacementPayload } from "@/components/community/BilliardNoteFormScreen";
 import { normalizeCueBallType } from "@/lib/billiard-table-constants";
+import MobileHeader from "@/components/common/MobileHeader";
 import {
   BALL_LAYOUT_IMAGE_KEY,
   BALL_LAYOUT_PLACEMENT_KEY,
@@ -218,7 +219,8 @@ export default function MypageNewNotePage() {
 
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
-      <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">
+      <MobileHeader title="난구노트 작성" showBack showClose onClosePath="/mypage/notes" confirmClose />
+      <div className="mx-auto w-full max-w-2xl px-4 py-6 pt-14 sm:px-6">
         <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4" aria-label="breadcrumb">
           <Link href="/mypage" className="hover:text-site-primary">마이페이지</Link>
           <span aria-hidden>/</span>

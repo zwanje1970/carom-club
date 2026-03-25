@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import MobileHeader from "@/components/common/MobileHeader";
 
 export default function CommunityPostEditPage() {
   const params = useParams();
@@ -78,13 +79,17 @@ export default function CommunityPostEditPage() {
   if (loading) {
     return (
       <main className="min-h-screen bg-site-bg text-site-text">
-        <div className="mx-auto max-w-2xl px-4 py-6"><p className="text-gray-500">불러오는 중…</p></div>
+        <MobileHeader title="글 수정" showBack showClose={false} />
+        <div className="mx-auto max-w-2xl px-4 py-6 pt-14">
+          <p className="text-gray-500">불러오는 중…</p>
+        </div>
       </main>
     );
   }
   if (!post) {
     return (
       <main className="min-h-screen bg-site-bg text-site-text">
+        <MobileHeader title="글 수정" showBack showClose={false} />
         <div className="mx-auto max-w-2xl px-4 py-6">
           <p className="text-red-600">글을 찾을 수 없습니다.</p>
           <Link href="/community" className="mt-2 inline-block text-site-primary underline">커뮤니티로</Link>
@@ -95,7 +100,8 @@ export default function CommunityPostEditPage() {
 
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
-      <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">
+      <MobileHeader title="글 수정" showBack showClose onClosePath="/community" confirmClose />
+      <div className="mx-auto w-full max-w-2xl px-4 py-6 pt-14 sm:px-6">
         <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4" aria-label="breadcrumb">
           <Link href="/community" className="hover:text-site-primary">커뮤니티</Link>
           <span aria-hidden>/</span>

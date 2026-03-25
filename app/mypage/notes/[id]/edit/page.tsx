@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { MobileBallPlacementFullscreen } from "@/components/community/MobileBallPlacementFullscreen";
 import type { CueBallType } from "@/lib/billiard-table-constants";
+import MobileHeader from "@/components/common/MobileHeader";
 
 type NoteSavePayload = {
   redBall: { x: number; y: number };
@@ -102,7 +103,8 @@ export default function MypageEditNotePage() {
   if (loading) {
     return (
       <main className="min-h-screen bg-site-bg text-site-text">
-        <div className="mx-auto max-w-2xl px-4 py-6">
+        <MobileHeader title="난구노트 수정" showBack showClose={false} />
+        <div className="mx-auto max-w-2xl px-4 py-6 pt-14">
           <p className="text-gray-500">불러오는 중…</p>
         </div>
       </main>
@@ -111,7 +113,8 @@ export default function MypageEditNotePage() {
   if (error || !note) {
     return (
       <main className="min-h-screen bg-site-bg text-site-text">
-        <div className="mx-auto max-w-2xl px-4 py-6">
+        <MobileHeader title="난구노트 수정" showBack showClose={false} />
+        <div className="mx-auto max-w-2xl px-4 py-6 pt-14">
           <p className="text-red-600">{error}</p>
           <Link href="/mypage/notes" className="mt-2 inline-block text-site-primary underline">
             목록으로

@@ -86,13 +86,13 @@ export function CommunityBoardListAndMoreClient({
       .finally(() => setLoading(false));
   }, [boardSlug, popular, q, statusFilter, take, nextCursor, loading]);
 
-  const renderRow = (p: BoardListPostDto, isPin: boolean) => (
+  const renderRow = (p: BoardListPostDto, isPin: boolean, priorityThumb: boolean) => (
     <li key={p.id} className={isPin ? "bg-amber-50/30 dark:bg-amber-900/5" : ""}>
       <Link
         href={postHref(p.id)}
         className="flex items-start gap-3 px-1 py-3.5 hover:bg-gray-50/80 dark:hover:bg-slate-800/40 sm:px-0"
       >
-        <CommunityBoardPostThumb url={p.thumbnailUrl} />
+        <CommunityBoardPostThumb url={p.thumbnailUrl} priority={priorityThumb} />
         <div className="min-w-0 flex-1">
           <p className="font-medium text-site-text line-clamp-2 leading-snug">
             {isPin && (
@@ -114,8 +114,23 @@ export function CommunityBoardListAndMoreClient({
   return (
     <>
       <ul className="divide-y divide-gray-200 dark:divide-slate-700">
-        {pinned.map((p) => renderRow(p, true))}
-        {posts.map((p) => renderRow(p, false))}
+        {(() => {
+          let used = false;
+          const rows: Array<JSX.Element> = [];
+          for (let i = 0; i < pinned.length; i++) {
+            const p = pinned[i]!;
+            const prio: boolean = !used;
+            used = used || prio;
+            rows.push(renderRow(p, true, prio));
+          }
+          for (let i = 0; i < posts.length; i++) {
+            const p = posts[i]!;
+            const prio: boolean = !used;
+            used = used || prio;
+            rows.push(renderRow(p, false, prio));
+          }
+          return rows;
+        })()}
         {pinned.length === 0 && posts.length === 0 && (
           <li className="py-10 text-center text-sm text-gray-500">글이 없습니다.</li>
         )}

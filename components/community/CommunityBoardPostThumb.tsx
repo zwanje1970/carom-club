@@ -9,7 +9,14 @@ const QUALITY = 75;
 /**
  * 목록 썸네일: 로컬(`/uploads` 등)은 next/image로 리사이즈·작은 페이로드, 그 외는 일반 img + lazy.
  */
-export function CommunityBoardPostThumb({ url }: { url: string | null | undefined }) {
+export function CommunityBoardPostThumb({
+  url,
+  priority = false,
+}: {
+  url: string | null | undefined;
+  /** 목록 첫 아이템 등 LCP 후보에만 true */
+  priority?: boolean;
+}) {
   const raw = url?.trim();
   const src = sanitizeImageSrc(raw ?? null);
   if (!src) return null;
@@ -23,7 +30,8 @@ export function CommunityBoardPostThumb({ url }: { url: string | null | undefine
         height={SIZE}
         quality={QUALITY}
         sizes={`${SIZE}px`}
-        loading="lazy"
+        priority={priority}
+        loading={priority ? "eager" : "lazy"}
         className="h-14 w-14 shrink-0 rounded-md object-cover bg-gray-100 dark:bg-slate-700"
       />
     );
