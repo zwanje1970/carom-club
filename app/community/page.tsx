@@ -6,6 +6,8 @@ import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { isPlatformAdmin } from "@/types/auth";
 import { canShowSolverEntry } from "@/lib/entry-visibility";
+import { ContentLayer } from "@/components/content/ContentLayer";
+import { PageSectionsRenderer } from "@/components/content/PageSectionsRenderer";
 
 const TAKE = 10;
 type PostItem = {
@@ -28,7 +30,8 @@ type Popular = {
 };
 
 export default async function CommunityPage() {
-  const [, session] = await Promise.all([getCommonPageData("community"), getSession()]);
+  const [common, session] = await Promise.all([getCommonPageData("community"), getSession()]);
+  const { noticeBars, popups, pageSections } = common;
   const canManageReports_ = canManageReports(session);
 
   let boards: { id: string; slug: string; name: string; type: string }[] = [];
@@ -131,6 +134,8 @@ export default async function CommunityPage() {
 
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
+      <ContentLayer noticeBars={noticeBars} popups={popups} />
+      <PageSectionsRenderer sections={pageSections} />
       <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
         <CommunityMainClient
           boards={boards}

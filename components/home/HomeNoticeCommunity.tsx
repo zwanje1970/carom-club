@@ -1,6 +1,19 @@
+"use client";
+
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
-import { NanguSolverIcon } from "@/components/community/NanguSolverIcon";
+
+const NanguSolverIconLazy = dynamic(
+  () =>
+    import("@/components/community/NanguSolverIcon").then((mod) => ({
+      default: mod.NanguSolverIcon,
+    })),
+  {
+    ssr: false,
+    loading: () => <span className="inline-flex h-[104px] w-[104px] shrink-0" aria-hidden />,
+  }
+);
 
 function BilliardNotesHomeIcon({ className }: { className?: string }) {
   return (
@@ -68,7 +81,7 @@ export function HomeNoticeCommunity({
               className="flex items-center gap-4 rounded-2xl border border-sky-300 bg-gradient-to-br from-sky-100 to-sky-50 p-5 shadow-sm transition hover:border-sky-400 hover:from-sky-200 hover:to-sky-100 hover:shadow-md dark:border-sky-600 dark:bg-gradient-to-br dark:from-sky-950 dark:to-sky-900/90 dark:hover:border-sky-500 dark:hover:from-sky-900 dark:hover:to-sky-950"
             >
               <span className="flex shrink-0 items-center justify-center overflow-visible">
-                <NanguSolverIcon size={104} priority />
+                <NanguSolverIconLazy size={104} priority />
               </span>
               <div className="min-w-0">
                 <h3 className="font-semibold text-site-text">

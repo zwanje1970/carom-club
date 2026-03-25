@@ -29,9 +29,8 @@ export type CommonPageData = {
 const REVALIDATE_SECONDS = 60;
 
 async function getCommonPageDataUncached(page: PageSlug): Promise<CommonPageData> {
-  const [copy, siteSettings, noticeBars, popups, pageSections] = await Promise.all([
-    getAdminCopy(),
-    getSiteSettings(),
+  const [{ copy, siteSettings }, noticeBars, popups, pageSections] = await Promise.all([
+    getCommonGlobalData(),
     getNoticeBarsForPage(page),
     getPopupsForPage(page),
     getPageSectionsForPage(page),

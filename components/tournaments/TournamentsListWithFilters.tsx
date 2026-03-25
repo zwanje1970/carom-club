@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { TournamentListRow } from "@/lib/db-tournaments";
@@ -35,22 +35,35 @@ const SORT_OPTIONS: Record<TabId, { id: SortId; label: string }[]> = {
   ],
 };
 
+function normalizeTournamentItem(r: TournamentItem): TournamentItem {
+  return {
+    ...r,
+    startAt: typeof r.startAt === "string" ? new Date(r.startAt) : r.startAt,
+    endAt: r.endAt ? (typeof r.endAt === "string" ? new Date(r.endAt) : r.endAt) : null,
+  };
+}
+
 export function TournamentsListWithFilters({
   copy,
-  useMock,
+  initialList,
+  initialQuery,
 }: {
   copy: Record<string, string>;
-  useMock: boolean;
+  /** 서버(또는 RSC)에서 채운 첫 목록 — 첫 페인트에 카드 HTML */
+  initialList: TournamentItem[];
+  /** 서버가 목록을 만들 때 사용한 필터(같으면 첫 클라이언트 fetch 생략) */
+  initialQuery: { tab: TabId; sortBy: SortId; national: boolean };
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tab = (searchParams.get("tab") || "upcoming") as TabId;
-  const sortBy = (searchParams.get("sortBy") || (tab === "upcoming" ? "date" : "date")) as SortId;
+  const sortBy = (searchParams.get("sortBy") || "date") as SortId;
   const national = searchParams.get("national") === "1";
 
-  const [list, setList] = useState<TournamentItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [list, setList] = useState<TournamentItem[]>(() => initialList.map(normalizeTournamentItem));
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const leftInitialQueryRef = useRef(false);
 
   const setParams = useCallback(
     (updates: { tab?: TabId; sortBy?: SortId; national?: boolean }) => {
@@ -68,13 +81,32 @@ export function TournamentsListWithFilters({
     [router, searchParams]
   );
 
+  const sortOptions = SORT_OPTIONS[tab];
+  const effectiveSortBy = sortOptions.some((s) => s.id === sortBy) ? sortBy : "date";
+
   useEffect(() => {
+    const matchInitial =
+      tab === initialQuery.tab &&
+      effectiveSortBy === initialQuery.sortBy &&
+      national === initialQuery.national;
+
+    if (!leftInitialQueryRef.current && matchInitial) {
+      setList(initialList.map(normalizeTournamentItem));
+      setLoading(false);
+      setError("");
+      return;
+    }
+
+    if (!matchInitial) {
+      leftInitialQueryRef.current = true;
+    }
+
     let cancelled = false;
     setLoading(true);
     setError("");
     const params = new URLSearchParams();
     params.set("tab", tab);
-    params.set("sortBy", sortBy);
+    params.set("sortBy", effectiveSortBy);
     if (national) params.set("national", "1");
     fetch(`/api/public/tournaments?${params.toString()}`)
       .then((res) => {
@@ -82,7 +114,7 @@ export function TournamentsListWithFilters({
         return res.json();
       })
       .then((data) => {
-        if (!cancelled) setList(Array.isArray(data) ? data : []);
+        if (!cancelled) setList((Array.isArray(data) ? data : []).map(normalizeTournamentItem));
       })
       .catch((err) => {
         if (!cancelled) setError(err.message || "목록을 불러올 수 없습니다.");
@@ -93,14 +125,10 @@ export function TournamentsListWithFilters({
     return () => {
       cancelled = true;
     };
-  }, [tab, sortBy, national]);
-
-  const sortOptions = SORT_OPTIONS[tab];
-  const effectiveSortBy = sortOptions.some((s) => s.id === sortBy) ? sortBy : "date";
+  }, [tab, effectiveSortBy, national, initialList, initialQuery]);
 
   return (
     <div className="mt-8 space-y-4">
-      {/* 탭 */}
       <nav className="flex border-b border-site-border" role="tablist">
         {TABS.map((t) => (
           <button
@@ -120,7 +148,6 @@ export function TournamentsListWithFilters({
         ))}
       </nav>
 
-      {/* 정렬 + 필터 */}
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-sm font-medium text-site-text-muted">정렬</span>
         <select
