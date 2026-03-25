@@ -3,7 +3,7 @@
  * JSON blob이 아닌 Match 행이 운영 정본이며, 승자 진출은 nextMatchId/nextSlot + PATCH 로직과 연동.
  */
 
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "prisma-generated";
 import { prisma } from "@/lib/db";
 import type { FinalMatchCreate } from "@/lib/final-bracket";
 

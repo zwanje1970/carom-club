@@ -106,6 +106,7 @@ export async function getSession(): Promise<SessionUser | null> {
 }
 
 export async function setSessionCookie(token: string): Promise<void> {
+  const { cookies } = await import("next/headers");
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, token, getSessionCookieOptions(60 * 60 * 24 * 7));
 }
