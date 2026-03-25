@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { TournamentListRow } from "@/lib/db-tournaments";
 import { formatKoreanDateWithWeekday } from "@/lib/format-date";
-import { sanitizeImageSrc } from "@/lib/image-src";
+import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
 import { formatDistanceKm } from "@/lib/distance";
 import { PUBLIC_TOURNAMENTS_PAGE_SIZE } from "@/lib/public-tournaments-list-request";
 
@@ -13,6 +14,10 @@ type TabId = "upcoming" | "closed" | "finished";
 type SortId = "distance" | "deadline" | "date";
 
 type TournamentItem = TournamentListRow & { distanceKm?: number | null };
+
+/** 모바일 1열 100vw · md 2열이면 약 절반 뷰포트 */
+const TOURNAMENT_LIST_POSTER_SIZES =
+  "(max-width: 768px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 40vw, 520px";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "upcoming", label: "예정대회" },
@@ -284,7 +289,7 @@ export function TournamentsListWithFilters({
                     href={`/tournaments/${t.id}`}
                     className="block rounded-lg border border-site-border bg-site-card overflow-hidden shadow-sm transition hover:border-site-primary/40 hover:shadow-md"
                   >
-                    <div className="relative aspect-[2/1] w-full overflow-hidden bg-site-bg flex flex-col justify-end p-3">
+                    <div className="relative aspect-[2/1] w-full min-h-[120px] overflow-hidden bg-site-bg flex flex-col justify-end p-3">
                       {(() => {
                         const src = sanitizeImageSrc(hasImage);
                         if (!src) {
@@ -295,10 +300,26 @@ export function TournamentsListWithFilters({
                             />
                           );
                         }
+                        if (isOptimizableImageSrc(src)) {
+                          return (
+                            <Image
+                              src={src}
+                              alt=""
+                              fill
+                              sizes={TOURNAMENT_LIST_POSTER_SIZES}
+                              quality={75}
+                              className="object-contain"
+                              loading="lazy"
+                              data-debug-src={src}
+                            />
+                          );
+                        }
                         return (
                           <img
                             src={src}
                             alt=""
+                            width={800}
+                            height={400}
                             loading="lazy"
                             decoding="async"
                             className="absolute inset-0 h-full w-full object-contain"
@@ -306,9 +327,11 @@ export function TournamentsListWithFilters({
                           />
                         );
                       })()}
-                      <div className="relative z-10">
-                        <h2 className="font-semibold text-site-text line-clamp-2 text-sm sm:text-base">{t.name}</h2>
-                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-site-text-muted">
+                      <div className="relative z-10 min-h-[3.5rem]">
+                        <h2 className="font-semibold text-site-text line-clamp-2 min-h-[2.5rem] text-sm sm:text-base">
+                          {t.name}
+                        </h2>
+                        <div className="mt-1 min-h-[1.25rem] flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-site-text-muted">
                           {t.gameFormat && <span>{t.gameFormat}</span>}
                           {t.prizeInfo && <span>· {t.prizeInfo}</span>}
                         </div>

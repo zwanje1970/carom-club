@@ -73,9 +73,14 @@ export function MainSiteHeader({ hideOnMobile = false }: MainSiteHeaderProps) {
     >
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:gap-4">
         <div className="flex items-center gap-2 min-w-0">
-          <LogoLink variant="white" data-main-logo />
+          <LogoLink
+            variant="white"
+            data-main-logo
+            runIntroOnClick
+            aria-label="홈 (인트로 보기)"
+          />
         </div>
-        <nav className="flex flex-wrap items-center gap-3 sm:gap-6 min-w-0">
+        <nav className="flex flex-wrap items-center gap-3 sm:gap-6 min-w-0 md:min-h-[40px]">
           {NAV.map(({ href, label }) => {
             const isActive =
               href === "/"
@@ -92,6 +97,7 @@ export function MainSiteHeader({ hideOnMobile = false }: MainSiteHeaderProps) {
               </Link>
             );
           })}
+          <div className="flex flex-wrap items-center justify-end gap-3 sm:gap-6 md:min-h-[40px] md:min-w-[200px] lg:min-w-[280px]">
           {isLoggedIn ? (
             <>
               <Link
@@ -143,6 +149,7 @@ export function MainSiteHeader({ hideOnMobile = false }: MainSiteHeaderProps) {
               로그인 · 회원가입
             </Link>
           )}
+          </div>
         </nav>
       </div>
     </header>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { sanitizeImageSrc } from "@/lib/image-src";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { formatDistanceKm } from "@/lib/distance";
@@ -34,51 +34,41 @@ export function VenuesListWithLocation({ initialVenues, copy }: Props) {
   const [venueFilter, setVenueFilter] = useState<"all" | "daedae_only" | "mixed">("all");
   const [sortByDistance, setSortByDistance] = useState(false);
   const [locationRefining, setLocationRefining] = useState(false);
-  const [locationError, setLocationError] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   const filteredVenues =
     venueFilter === "all"
       ? venues
       : venues.filter((v) => v.venueCategory === venueFilter);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    function fetchWithCoords(lat: number, lng: number) {
-      setLocationRefining(true);
-      const params = new URLSearchParams({ lat: String(lat), lng: String(lng), take: "100" });
-      fetch(`/api/home/venues?${params}`)
-        .then((r) => r.json())
-        .then((list: VenueItem[]) => {
-          if (cancelled) return;
-          setVenues(list);
-          setSortByDistance(list.some((v) => v.distanceKm != null));
-        })
-        .finally(() => {
-          if (!cancelled) setLocationRefining(false);
-        });
-    }
-
-    if (!navigator.geolocation) {
+  const requestNearbyVenues = useCallback(() => {
+    setLocationError(null);
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLocationError("이 기기에서는 위치를 사용할 수 없습니다.");
       return;
     }
-
+    setLocationRefining(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        if (cancelled) return;
-        fetchWithCoords(pos.coords.latitude, pos.coords.longitude);
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const params = new URLSearchParams({ lat: String(lat), lng: String(lng), take: "100" });
+        fetch(`/api/home/venues?${params}`)
+          .then((r) => (r.ok ? r.json() : Promise.reject(new Error("fetch"))))
+          .then((list: VenueItem[]) => {
+            setVenues(list);
+            setSortByDistance(list.some((v) => v.distanceKm != null));
+          })
+          .catch(() => setLocationError("목록을 불러오지 못했습니다."))
+          .finally(() => setLocationRefining(false));
       },
       () => {
-        if (cancelled) return;
-        setLocationError(true);
+        setLocationError("위치 권한이 필요합니다. 버튼을 다시 누르고 허용해 주세요.");
+        setLocationRefining(false);
       },
-      { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 600_000 }
     );
-
-    return () => {
-      cancelled = true;
-    };
-  }, [initialVenues.length]);
+  }, []);
 
   const c = copy as Record<AdminCopyKey, string>;
 
@@ -94,6 +84,14 @@ export function VenuesListWithLocation({ initialVenues, copy }: Props) {
     <div className="mt-8 space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium text-site-text">찾기:</span>
+        <button
+          type="button"
+          onClick={requestNearbyVenues}
+          disabled={locationRefining}
+          className="rounded-lg border border-site-border bg-site-card px-3 py-1.5 text-sm font-medium text-site-text hover:border-site-primary/50 disabled:opacity-60"
+        >
+          {locationRefining ? "위치 확인 중…" : "내 주변 당구장"}
+        </button>
         {VENUE_CATEGORY_OPTIONS.map((opt) => (
           <button
             key={opt.value}
@@ -118,9 +116,12 @@ export function VenuesListWithLocation({ initialVenues, copy }: Props) {
       {!locationRefining && sortByDistance && (
         <p className="text-sm font-medium text-site-primary">가까운 순으로 보여드립니다.</p>
       )}
-      {!locationRefining && !sortByDistance && locationError && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-          위치를 허용하면 가까운 당구장부터 볼 수 있습니다. 이름 순으로 표시 중입니다.
+      {locationError && (
+        <p
+          className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200"
+          role="alert"
+        >
+          {locationError}
         </p>
       )}
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

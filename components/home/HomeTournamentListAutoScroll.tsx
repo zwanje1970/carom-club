@@ -110,7 +110,7 @@ export function HomeTournamentListAutoScroll({ flowSpeed, children }: Props) {
           pausedRef.current = false;
         }, 2200);
       }}
-      className="mt-6 -mx-4 sm:-mx-6 flex flex-nowrap gap-4 overflow-x-auto overflow-y-hidden touch-pan-x pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="mt-6 -mx-4 sm:-mx-6 flex min-h-[292px] flex-nowrap gap-4 overflow-x-auto overflow-y-hidden touch-pan-x pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       style={{ WebkitOverflowScrolling: "touch" }}
     >
       {children}

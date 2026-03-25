@@ -47,8 +47,8 @@ export function MobileSiteHeader() {
 
   return (
     <header
-      className="sticky top-0 z-20 flex h-[56px] items-center justify-between px-4 md:hidden"
-      style={{ backgroundColor: HEADER_BG, height: "56px" }}
+      className="sticky top-0 z-20 flex h-[56px] min-h-[56px] max-h-[56px] shrink-0 items-center justify-between px-4 md:hidden"
+      style={{ backgroundColor: HEADER_BG, height: "56px", minHeight: "56px" }}
       role="banner"
     >
       {/* 왼쪽: 홈 아이콘 */}

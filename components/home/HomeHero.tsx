@@ -7,6 +7,9 @@ import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
 import type { HeroContent as HeroContentType } from "@/lib/content/hero-from-section";
 import type { HeroSettings } from "@/lib/hero-settings";
 
+/** 뷰포트별 요청 너비 — 모바일 100vw, 태블릿·데스크톱은 과대 픽셀 방지 */
+const HERO_IMAGE_SIZES = "(max-width: 768px) 100vw, (max-width: 1280px) 90vw, min(1200px, 85vw)";
+
 function getHeroTitleStyle(copy: Record<string, string>): { style: React.CSSProperties; alignClass: string } {
   const style: React.CSSProperties = {};
   const font = (copy["site.hero.titleFont"] ?? "").trim();
@@ -136,7 +139,7 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
                 fill
                 priority
                 quality={75}
-                sizes="100vw"
+                sizes={HERO_IMAGE_SIZES}
                 className="object-cover pointer-events-none"
                 data-debug-src={safeBannerSrc}
               />
@@ -240,7 +243,7 @@ function HomeHeroFromSettings({ settings }: { settings: HeroSettings }) {
   const desktopHeight = s.heroHeightDesktop || "380px";
 
   return (
-    <section className="hero-section-new relative overflow-hidden border-b border-site-border flex-shrink-0 w-full">
+    <section className="hero-section-new relative min-h-[280px] overflow-hidden border-b border-site-border flex-shrink-0 w-full md:min-h-[320px]">
       <style
         dangerouslySetInnerHTML={{
           __html: `.hero-section-new{min-height:${mobileHeight}}@media(min-width:768px){.hero-section-new{min-height:${desktopHeight}}}.hero-block-new{position:absolute;inset:0;min-height:${mobileHeight}}@media(min-width:768px){.hero-block-new{min-height:${desktopHeight}}}`,
@@ -259,7 +262,7 @@ function HomeHeroFromSettings({ settings }: { settings: HeroSettings }) {
                   fill
                   priority
                   quality={75}
-                  sizes="100vw"
+                  sizes={HERO_IMAGE_SIZES}
                   className="object-cover pointer-events-none"
                   style={{ filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined }}
                   data-debug-src={safeBg}

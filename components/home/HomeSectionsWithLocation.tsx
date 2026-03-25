@@ -1,21 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { HomeTournamentCards } from "./HomeTournamentCards";
 import { VenueCarousel } from "./VenueCarousel";
 import type { TournamentListRow } from "@/lib/db-tournaments";
 import type { VenueCarouselItem } from "./VenueCarousel";
 
-/** 정렬 우선순위: 1) GPS → /api/home/venues·tournaments?lat=&lng= (Haversine), 2) API 내부에서 회원 주소 좌표 사용, 3) 기존 정렬 */
+/** 거리순 목록은 버튼 클릭 시에만 geolocation 요청 (로드 직후 권한 팝업 방지) */
 
 type TournamentItem = TournamentListRow & { distanceKm?: number | null };
 
 type Props = {
   initialTournaments: TournamentListRow[];
   copy: Record<string, string>;
-  /** 당구장 소개 캐러셀용 (진행중 대회 다음에 표시) */
   carouselVenues?: VenueCarouselItem[];
-  /** 메인 대회·당구장 가로 흐름 속도(1~100) */
   homeCarouselFlowSpeed?: number;
 };
 
@@ -32,52 +30,18 @@ export function HomeSectionsWithLocation({
       endAt: t.endAt ? (typeof t.endAt === "string" ? new Date(t.endAt) : t.endAt) : null,
     }))
   );
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+  const [nearbyError, setNearbyError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    function fetchWithCoords(lat: number, lng: number) {
-      const params = new URLSearchParams({ lat: String(lat), lng: String(lng), take: "6" });
-      fetch(`/api/home/tournaments?${params}`)
-        .then((tRes) => {
-          if (cancelled) return tRes.json();
-          return tRes.json();
-        })
-        .then((tList: TournamentItem[]) => {
-          if (cancelled) return;
-          setTournaments(
-            (tList || []).map((t) => ({
-              ...t,
-              startAt: typeof t.startAt === "string" ? new Date(t.startAt) : t.startAt,
-              endAt: t.endAt ? (typeof t.endAt === "string" ? new Date(t.endAt) : t.endAt) : null,
-            }))
-          );
-        });
-    }
-
-    function fetchWithoutCoords() {
-      fetch("/api/home/tournaments?take=6")
-        .then((tRes) => tRes.json())
-        .then((tList: TournamentItem[]) => {
-          if (cancelled) return;
-          setTournaments(
-            (tList || []).map((t) => ({
-              ...t,
-              startAt: typeof t.startAt === "string" ? new Date(t.startAt) : t.startAt,
-              endAt: t.endAt ? (typeof t.endAt === "string" ? new Date(t.endAt) : t.endAt) : null,
-            }))
-          );
-        });
-    }
-
-    if (!navigator.geolocation) {
-      fetchWithoutCoords();
+  const handleFindNearby = useCallback(() => {
+    setNearbyError(null);
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setNearbyError("이 기기에서는 위치를 사용할 수 없습니다.");
       return;
     }
-
+    setNearbyLoading(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        if (cancelled) return;
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         fetch(`/api/auth/me`, {
@@ -85,18 +49,27 @@ export function HomeSectionsWithLocation({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ latitude: lat, longitude: lng }),
         }).catch(() => {});
-        fetchWithCoords(lat, lng);
+        const params = new URLSearchParams({ lat: String(lat), lng: String(lng), take: "6" });
+        fetch(`/api/home/tournaments?${params}`)
+          .then((r) => (r.ok ? r.json() : Promise.reject(new Error("fetch"))))
+          .then((tList: TournamentItem[]) => {
+            setTournaments(
+              (tList || []).map((t) => ({
+                ...t,
+                startAt: typeof t.startAt === "string" ? new Date(t.startAt) : t.startAt,
+                endAt: t.endAt ? (typeof t.endAt === "string" ? new Date(t.endAt) : t.endAt) : null,
+              }))
+            );
+          })
+          .catch(() => setNearbyError("목록을 불러오지 못했습니다."))
+          .finally(() => setNearbyLoading(false));
       },
       () => {
-        if (cancelled) return;
-        fetchWithoutCoords();
+        setNearbyError("위치 권한이 필요합니다. 버튼을 다시 누르고 허용해 주세요.");
+        setNearbyLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 }
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 600_000 }
     );
-
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   return (
@@ -105,6 +78,11 @@ export function HomeSectionsWithLocation({
         tournaments={tournaments}
         copy={copy}
         homeCarouselFlowSpeed={homeCarouselFlowSpeed}
+        nearbyFind={{
+          onClick: handleFindNearby,
+          loading: nearbyLoading,
+          error: nearbyError,
+        }}
       />
       {carouselVenues.length > 0 && (
         <VenueCarousel venues={carouselVenues} homeCarouselFlowSpeed={homeCarouselFlowSpeed} />

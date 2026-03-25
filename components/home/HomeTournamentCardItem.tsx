@@ -1,7 +1,13 @@
+"use client";
+
+import Image from "next/image";
 import Link from "next/link";
 import { formatDistanceKm } from "@/lib/distance";
 import { formatKoreanMonthDayWeekday } from "@/lib/format-date";
-import { IMAGE_PLACEHOLDER_SRC, sanitizeImageSrc } from "@/lib/image-src";
+import { IMAGE_PLACEHOLDER_SRC, isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
+
+/** 캐러셀 카드 폭 ~260–280px · 모바일 한 장이 뷰포트 대부분 */
+const CARD_POSTER_SIZES = "(max-width: 640px) 88vw, (max-width: 768px) 300px, 320px";
 
 export type HomeTournamentCardModel = {
   id: string;
@@ -88,6 +94,20 @@ export function HomeTournamentCardItem({
                   className="absolute inset-0 h-full w-full object-cover"
                   decoding="async"
                   loading="lazy"
+                />
+              );
+            }
+            if (isOptimizableImageSrc(src)) {
+              return (
+                <Image
+                  src={src}
+                  alt=""
+                  fill
+                  sizes={CARD_POSTER_SIZES}
+                  quality={75}
+                  className="object-cover"
+                  loading="lazy"
+                  data-debug-src={src}
                 />
               );
             }

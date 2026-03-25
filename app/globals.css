@@ -45,6 +45,10 @@
 
 /* 사이트 기본 글꼴: Pretendard (모바일/PC 공통) */
 @layer base {
+  /* 인트로 종료 후 스크롤바 유무로 가로가 흔들리지 않도록 */
+  html {
+    scrollbar-gutter: stable;
+  }
   body {
     @apply antialiased;
     background-color: var(--site-bg);
@@ -56,7 +60,8 @@
   [style*="font-family"] {
     font-feature-settings: normal;
   }
-  img,
+  /* next/image(data-nimg)는 fill·고정 레이아웃용 — height:auto 가 CLS를 유발할 수 있음 */
+  img:not([data-nimg]),
   video {
     max-width: 100%;
     height: auto;
