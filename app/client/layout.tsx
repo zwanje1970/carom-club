@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getAdminCopy, getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
@@ -70,6 +69,7 @@ export default async function ClientLayout({
   }
 
   const organizations = await getAccessibleClientOrganizationsCached(session.id);
+  const { cookies } = await import("next/headers");
   const cookieStore = await cookies();
   const preferredOrgId = cookieStore.get(CLIENT_CONSOLE_ORG_COOKIE)?.value ?? null;
   const activeOrganizationId = pickActiveOrganizationId(organizations, preferredOrgId);

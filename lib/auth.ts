@@ -1,5 +1,4 @@
 import { SignJWT, jwtVerify } from "jose";
-import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import type { SessionUser } from "@/types/auth";
@@ -72,6 +71,7 @@ export async function createSession(
 }
 
 export async function getSession(): Promise<SessionUser | null> {
+  const { cookies } = await import("next/headers");
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
   if (!token) return null;
@@ -120,6 +120,7 @@ export function setSessionCookieOnResponse(
 }
 
 export async function clearSessionCookie(): Promise<void> {
+  const { cookies } = await import("next/headers");
   const cookieStore = await cookies();
   const opts = getSessionCookieOptions(0);
   if (opts.domain) {

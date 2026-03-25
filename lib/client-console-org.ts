@@ -4,7 +4,6 @@
  * - 활성 조직: HttpOnly 쿠키 `client_console_org_id` (Path=/client)
  */
 import { cache } from "react";
-import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import type {
   ClientOrganization,
@@ -136,6 +135,7 @@ export function getClientConsoleOrgCookieOptions(maxAgeSeconds: number) {
 }
 
 export async function clearClientConsoleOrgCookie(): Promise<void> {
+  const { cookies } = await import("next/headers");
   const store = await cookies();
   store.set(CLIENT_CONSOLE_ORG_COOKIE, "", {
     ...getClientConsoleOrgCookieOptions(0),

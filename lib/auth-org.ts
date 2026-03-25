@@ -3,7 +3,6 @@
  * 활성 조직은 쿠키 `client_console_org_id` + `pickActiveOrganizationId` 로 결정.
  * PLATFORM_ADMIN은 플랫폼 관리자(/admin) 전용; 여기서는 세션 없이 빈 값 처리.
  */
-import { cookies } from "next/headers";
 import type { SessionUser } from "@/types/auth";
 import { isClientAdmin, isPlatformAdmin } from "@/types/auth";
 import {
@@ -21,6 +20,7 @@ export async function getClientAdminOrganizationId(
 ): Promise<string | null> {
   if (!session || !isClientAdmin(session)) return null;
   const orgs = await getAccessibleClientOrganizationsCached(session.id);
+  const { cookies } = await import("next/headers");
   const cookieStore = await cookies();
   const preferred = cookieStore.get(CLIENT_CONSOLE_ORG_COOKIE)?.value ?? null;
   return pickActiveOrganizationId(orgs, preferred);
