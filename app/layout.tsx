@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { pretendard, notoSansKr } from "./fonts";
 import { IntroRoot } from "@/components/intro/IntroRoot";
 import { MainSiteHeaderWrapper } from "@/components/layout/MainSiteHeaderWrapper";
 import { MobileBottomNavWrapper } from "@/components/layout/MobileBottomNavWrapper";
@@ -84,37 +85,29 @@ export default async function RootLayout({
     headerTextColor: null as string | null,
     headerActiveColor: null as string | null,
   };
-  try {
-    const globalData = await getCommonGlobalData();
+
+  const [globalData, session] = await Promise.all([
+    getCommonGlobalData().catch(() => null),
+    getSession(),
+  ]);
+
+  if (globalData) {
     settings = globalData.siteSettings;
-  } catch {
-    // use defaults
   }
 
-  const session = await getSession();
   const showMainSiteNoteEntry = canShowNoteEntry(isPlatformAdmin(session));
 
   return (
-    <html lang="ko" className="scroll-smooth">
+    <html
+      lang="ko"
+      className={`scroll-smooth ${pretendard.variable} ${notoSansKr.variable}`}
+    >
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#000000" />
         <link rel="apple-touch-icon" href="/icons/app-icon.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-        {/* 웹폰트: Google Fonts는 display=swap 적용. CDN 폰트는 초기 렌더 후 로드 권장. */}
-        <link
-          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css"
-          rel="stylesheet"
-        />
-        <link
-          href="https://spoqa.github.io/spoqa-han-sans/css/SpoqaHanSansNeo.css"
-          rel="stylesheet"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Nanum+Gothic&family=Nanum+Myeongjo&family=Black+Han+Sans&family=Do+Hyeon&family=Gothic+A1:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap"
-          rel="stylesheet"
-        />
       </head>
       <body className="min-h-screen antialiased">
         <SiteThemeStyles
@@ -126,13 +119,13 @@ export default async function RootLayout({
           <RegisterServiceWorker />
           <NotificationBanner />
           <GlobalChromeModeProvider>
-          <IntroRoot>
-            <MainSiteHeaderWrapper />
-            <MobileBottomNavWrapper showMainSiteNoteEntry={showMainSiteNoteEntry}>
-              {children}
-            </MobileBottomNavWrapper>
-          </IntroRoot>
-        </GlobalChromeModeProvider>
+            <IntroRoot>
+              <MainSiteHeaderWrapper />
+              <MobileBottomNavWrapper showMainSiteNoteEntry={showMainSiteNoteEntry}>
+                {children}
+              </MobileBottomNavWrapper>
+            </IntroRoot>
+          </GlobalChromeModeProvider>
           <AdminFloatButton />
           <ClientFloatButton />
         </SiteSettingsProvider>
@@ -140,4 +133,3 @@ export default async function RootLayout({
     </html>
   );
 }
-

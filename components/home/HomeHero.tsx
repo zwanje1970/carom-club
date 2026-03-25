@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
-import { sanitizeImageSrc } from "@/lib/image-src";
+import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
 import type { HeroContent as HeroContentType } from "@/lib/content/hero-from-section";
 import type { HeroSettings } from "@/lib/hero-settings";
 
@@ -128,12 +129,25 @@ export function HomeHero({ copy, hero, heroSettings }: HomeHeroProps) {
       {safeBannerSrc ? (
         <div className="relative min-h-[240px] md:min-h-[420px] flex flex-col items-center justify-center py-6 md:py-12 w-full">
           <div className="absolute inset-0">
-            <img
-              src={safeBannerSrc}
-              alt="히어로 배너"
-              className="absolute inset-0 w-full h-full object-cover pointer-events-none min-h-[120px]"
-              data-debug-src={safeBannerSrc}
-            />
+            {isOptimizableImageSrc(safeBannerSrc) ? (
+              <Image
+                src={safeBannerSrc}
+                alt="히어로 배너"
+                fill
+                priority
+                className="object-cover pointer-events-none"
+                sizes="100vw"
+                data-debug-src={safeBannerSrc}
+              />
+            ) : (
+              <img
+                src={safeBannerSrc}
+                alt="히어로 배너"
+                fetchPriority="high"
+                className="absolute inset-0 h-full w-full object-cover pointer-events-none min-h-[120px]"
+                data-debug-src={safeBannerSrc}
+              />
+            )}
           </div>
           <div className="absolute inset-0 bg-black/40 pointer-events-none" />
           <div className="relative z-10 w-full flex flex-col items-center justify-center px-4 text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]">
@@ -229,13 +243,27 @@ function HomeHeroFromSettings({ settings }: { settings: HeroSettings }) {
           if (!safeBg) return null;
           return (
             <div className="absolute inset-0">
-              <img
-                src={safeBg}
-                alt="히어로 배경"
-                className="absolute inset-0 w-full h-full object-cover pointer-events-none min-h-[120px]"
-                style={{ filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined }}
-                data-debug-src={safeBg}
-              />
+              {isOptimizableImageSrc(safeBg) ? (
+                <Image
+                  src={safeBg}
+                  alt="히어로 배경"
+                  fill
+                  priority
+                  className="object-cover pointer-events-none"
+                  style={{ filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined }}
+                  sizes="100vw"
+                  data-debug-src={safeBg}
+                />
+              ) : (
+                <img
+                  src={safeBg}
+                  alt="히어로 배경"
+                  fetchPriority="high"
+                  className="absolute inset-0 h-full w-full object-cover pointer-events-none min-h-[120px]"
+                  style={{ filter: s.heroBlurAmount > 0 ? `blur(${s.heroBlurAmount}px)` : undefined }}
+                  data-debug-src={safeBg}
+                />
+              )}
             </div>
           );
         })()}

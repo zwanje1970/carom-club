@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import type { TournamentsListTab } from "@/lib/db-tournaments";
-import { getPublicTournamentsListFromQuery, PUBLIC_TOURNAMENTS_TABS } from "@/lib/public-tournaments-list-request";
+import {
+  getPublicTournamentsListFromQuery,
+  parsePublicTournamentsQuery,
+  PUBLIC_TOURNAMENTS_TABS,
+} from "@/lib/public-tournaments-list-request";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 
 /** 공개 대회 목록. query: tab, sortBy, national, lat, lng */
@@ -18,6 +22,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid tab" }, { status: 400 });
   }
 
+  const parsed = parsePublicTournamentsQuery(searchParams);
   const { list } = await getPublicTournamentsListFromQuery(searchParams);
-  return NextResponse.json(list);
+  return NextResponse.json({
+    list,
+    hasMore: list.length === parsed.take,
+  });
 }

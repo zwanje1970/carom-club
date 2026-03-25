@@ -120,10 +120,13 @@ export function NanguSolutionPathOverlay({
   ballNormOverrides,
   /** 경로 입력 모드가 꺼져 있어도 수구 탭 히트(노트 전체화면 재생 UX) */
   allowCuePlaybackGestures = false,
-  /** 수구 단일 탭(예: 재생 종료 후 원위치) */
+  /** 재생 중일 때만 수구 탭을 cueBallPlayback으로 분류 */
+  pathPlaybackActive = false,
+  /** 수구 단일 탭 — 재생 중이면 원위치 리셋 등 */
   onCueBallSingleTap,
-  /** 수구 더블 탭(예: 재생 후 재시작) */
-  onCueBallDoubleTap,
+  /** 수구/1목 공 표식 단일 탭 시 해당 경로 편집 레이어 활성화 */
+  onPathEditCueBallTap,
+  onPathEditObjectBallTap,
   /** null이면 마지막 끝 스팟만 활성 — 다른 스팟 더블클릭 시 전환 */
   cueActiveSpotOverrideId = null,
   objectActiveSpotOverrideId = null,
@@ -180,8 +183,10 @@ export function NanguSolutionPathOverlay({
   tableBallPlacement?: NanguBallPlacement | null;
   ballNormOverrides?: Partial<Record<"red" | "yellow" | "white", { x: number; y: number }>>;
   allowCuePlaybackGestures?: boolean;
+  pathPlaybackActive?: boolean;
   onCueBallSingleTap?: () => void;
-  onCueBallDoubleTap?: () => void;
+  onPathEditCueBallTap?: () => void;
+  onPathEditObjectBallTap?: () => void;
   cueActiveSpotOverrideId?: string | null;
   objectActiveSpotOverrideId?: string | null;
   onCueActiveSpotChange?: (id: string | null) => void;
@@ -228,8 +233,6 @@ export function NanguSolutionPathOverlay({
   const segmentDblRef = useRef<{ key: string; t: number } | null>(null);
   /** 곡선 편집 모드 전용 — `segmentDblRef`와 분리(직선 삽입과 동시 타이밍 충돌 방지) */
   const curveSegmentDblRef = useRef<{ key: string; t: number } | null>(null);
-  /** 브라우저 setTimeout 핸들 (number). Node `Timeout`과 병합 타입 충돌 방지 */
-  const cueBallGestureRef = useRef<{ t: number; timer: number } | null>(null);
   const [draggingCurve, setDraggingCurve] = useState<null | { kind: "cue" | "object"; key: string }>(
     null
   );
@@ -262,8 +265,6 @@ export function NanguSolutionPathOverlay({
 
   useEffect(() => {
     return () => {
-      const p = cueBallGestureRef.current;
-      if (p?.timer) clearTimeout(p.timer);
       const lp = curveLongPressRef.current;
       if (lp?.timer) window.clearTimeout(lp.timer);
       const st = spotPrecisionTimerRef.current;
@@ -678,15 +679,37 @@ export function NanguSolutionPathOverlay({
           ]) {
             const { px, py } = toPx(b.x, b.y);
             if (Math.hypot(cx - px, cy - py) <= ballTapR) {
-              /** 1목 경로: 목적구 탭은 스팟 — 수구 탭만 줌 */
-              if (objectPathMode && collisionNorm && onAddObjectPathAim && !isCueBallKey(key)) {
+              if (isCueBallKey(key)) {
+                if (pathPlaybackActive && allowCuePlaybackGestures && onCueBallSingleTap && pathPoints.length >= 1) {
+                  onCueBallSingleTap();
+                  e.stopPropagation();
+                  e.preventDefault();
+                  return;
+                }
+                if ((pathMode || objectPathMode) && onPathEditCueBallTap) {
+                  onPathEditCueBallTap();
+                  e.stopPropagation();
+                  e.preventDefault();
+                  return;
+                }
+                onZoomSetFocusCanvasPx(px, py);
+                e.stopPropagation();
+                e.preventDefault();
+                return;
+              }
+              if ((pathMode || objectPathMode) && onPathEditObjectBallTap) {
+                onPathEditObjectBallTap();
+                e.stopPropagation();
+                e.preventDefault();
+                return;
+              }
+              if (objectPathMode && collisionNorm && onAddObjectPathAim) {
                 onAddObjectPathAim(aim);
                 e.stopPropagation();
                 e.preventDefault();
                 return;
               }
-              /** 수구 경로: 목적구 넓은 터치 반경 → 반직선 스냅으로 스팟(수구 탭만 줌) */
-              if (pathMode && onAddCuePathAim && !isCueBallKey(key)) {
+              if (pathMode && onAddCuePathAim) {
                 onAddCuePathAim(aim);
                 e.stopPropagation();
                 e.preventDefault();
@@ -809,51 +832,37 @@ export function NanguSolutionPathOverlay({
         width: DEFAULT_TABLE_WIDTH,
         height: DEFAULT_TABLE_HEIGHT,
         allowCuePlaybackGestures: Boolean(allowCuePlaybackGestures),
+        pathPlaybackActive: Boolean(pathPlaybackActive),
       });
 
       if (c.kind === "inactive") return;
 
       const cueGestureLayout = ballPickLayout ?? tableBallPlacement ?? null;
-      const hasCuePlaybackHandlers = Boolean(onCueBallSingleTap || onCueBallDoubleTap);
-      let isCueBallHitForGesture = c.kind === "cueBallPlayback";
-      if (!isCueBallHitForGesture && c.kind === "ball" && cueGestureLayout) {
+
+      if (c.kind === "cueBallPlayback" && onCueBallSingleTap) {
+        onCueBallSingleTap();
+        e.stopPropagation();
+        e.preventDefault();
+        return;
+      }
+
+      if (
+        (pathMode || objectPathMode) &&
+        onPathEditCueBallTap &&
+        cueGestureLayout &&
+        c.kind === "ball"
+      ) {
         const ck = cueGestureLayout.cueBall === "yellow" ? "yellow" : ("white" as const);
         const cn =
           ballNormOverrides?.[ck] ??
           (ck === "yellow" ? cueGestureLayout.yellowBall : cueGestureLayout.whiteBall);
         const tapR = getSolutionPathBallTapRadiusPx(collisionRect);
-        isCueBallHitForGesture =
-          distanceNormPointsInPlayfieldPx(norm, cn, collisionRect) <= tapR;
-      }
-      if (
-        hasCuePlaybackHandlers &&
-        cueGestureLayout &&
-        pathPoints.length >= 1 &&
-        isCueBallHitForGesture
-      ) {
-        const now = Date.now();
-        const prev = cueBallGestureRef.current;
-        if (prev && now - prev.t < 400) {
-          if (prev.timer) clearTimeout(prev.timer);
-          cueBallGestureRef.current = null;
-          if (onCueBallDoubleTap) {
-            onCueBallDoubleTap();
-          } else {
-            onCueBallSingleTap?.();
-          }
+        if (distanceNormPointsInPlayfieldPx(norm, cn, collisionRect) <= tapR) {
+          onPathEditCueBallTap();
           e.stopPropagation();
           e.preventDefault();
           return;
         }
-        const tRef = cueBallGestureRef;
-        const timer = window.setTimeout(() => {
-          tRef.current = null;
-          onCueBallSingleTap?.();
-        }, 400);
-        cueBallGestureRef.current = { t: now, timer };
-        e.stopPropagation();
-        e.preventDefault();
-        return;
       }
 
       if (c.kind === "ball") {
@@ -880,6 +889,7 @@ export function NanguSolutionPathOverlay({
         const last = lastClickRef.current;
         if (last?.kind === "obj" && last?.id === p.id && now - last.t < 400) {
           lastClickRef.current = null;
+          onPathEditObjectBallTap?.();
           if (p.id !== effectiveObjectActiveId) {
             onObjectActiveSpotChange?.(p.id);
           }
@@ -930,6 +940,13 @@ export function NanguSolutionPathOverlay({
         return;
       }
 
+      if (c.kind === "objectBallMarkingTap") {
+        onPathEditObjectBallTap?.();
+        e.stopPropagation();
+        e.preventDefault();
+        return;
+      }
+
       if (c.kind === "emptyObject") {
         if (onAddObjectPathAim) onAddObjectPathAim(aim);
         else onAddObjectPoint?.(norm);
@@ -944,6 +961,7 @@ export function NanguSolutionPathOverlay({
         const last = lastClickRef.current;
         if (last?.kind === "cue" && last?.id === p.id && now - last.t < 400) {
           lastClickRef.current = null;
+          onPathEditCueBallTap?.();
           if (p.id !== effectiveCueActiveId) {
             onCueActiveSpotChange?.(p.id);
           }
@@ -995,6 +1013,12 @@ export function NanguSolutionPathOverlay({
       }
 
       if (c.kind === "emptyCue" || c.kind === "pathObjectBallTap") {
+        if (c.kind === "pathObjectBallTap" && onPathEditObjectBallTap) {
+          onPathEditObjectBallTap();
+          e.stopPropagation();
+          e.preventDefault();
+          return;
+        }
         /** 마지막이 쿠션(스팟점)이면 플레이필드 어디를 탭해도 스냅 기준으로 다음 스팟 연결 — 반직선 실패 없이 */
         const lastCue = pathPoints[pathPoints.length - 1];
         if (lastCue?.type === "cushion") {
@@ -1040,8 +1064,10 @@ export function NanguSolutionPathOverlay({
       collisionRect,
       collisionNorm,
       allowCuePlaybackGestures,
+      pathPlaybackActive,
       onCueBallSingleTap,
-      onCueBallDoubleTap,
+      onPathEditCueBallTap,
+      onPathEditObjectBallTap,
       effectiveCueActiveId,
       effectiveObjectActiveId,
       onCueActiveSpotChange,

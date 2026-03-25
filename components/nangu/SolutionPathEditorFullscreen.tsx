@@ -1076,7 +1076,7 @@ export function SolutionPathEditorFullscreen({
   const cuePathEditing =
     variant === "trouble" ? troublePathEditLayer === "cue" : pathMode;
   const objectPathEditing =
-    variant === "trouble" ? troublePathEditLayer === "object" : false;
+    variant === "trouble" ? troublePathEditLayer === "object" : objectPathMode;
 
   const playbackBallSpeed = normalizeBallSpeed(
     settingsValue?.railCount != null ? Number(settingsValue.railCount) : Number(ballSpeed)
@@ -1160,6 +1160,22 @@ export function SolutionPathEditorFullscreen({
   }, [isNoteShell, variant]);
 
   const { resetPlayback: resetPathPlayback } = pathPlayback;
+
+  const onPathEditCueBallTap = useCallback(() => {
+    if (variant === "trouble") setTroublePathEditLayer("cue");
+    else {
+      setPathMode(true);
+      setObjectPathMode(false);
+    }
+  }, [variant]);
+
+  const onPathEditObjectBallTap = useCallback(() => {
+    if (variant === "trouble") setTroublePathEditLayer("object");
+    else {
+      setObjectPathMode(true);
+      setPathMode(false);
+    }
+  }, [variant]);
 
   const clearAllPaths = useCallback(() => {
     pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
@@ -1415,6 +1431,7 @@ export function SolutionPathEditorFullscreen({
         width: DEFAULT_TABLE_WIDTH,
         height: DEFAULT_TABLE_HEIGHT,
         allowCuePlaybackGestures,
+        pathPlaybackActive: pathPlayback.isPlaybackActive,
       });
     };
 
@@ -1437,7 +1454,10 @@ export function SolutionPathEditorFullscreen({
         }
         const c = classifyAt(clientX, clientY);
         if (!c) return;
-        if (c.kind === "emptyCue" || c.kind === "pathObjectBallTap") {
+        if (c.kind === "pathObjectBallTap") {
+          return;
+        }
+        if (c.kind === "emptyCue") {
           const norm = getNormalizedFromEvent(clientX, clientY);
           if (!norm) return;
           const dupThresholdPx = SPOT_APPEND_DUP_THRESHOLD_PX;
@@ -1446,6 +1466,8 @@ export function SolutionPathEditorFullscreen({
           ) {
             runCueAppend(norm);
           }
+        } else if (c.kind === "objectBallMarkingTap") {
+          return;
         } else if (c.kind === "emptyObject") {
           const norm = getNormalizedFromEvent(clientX, clientY);
           if (!norm || !collisionNorm) return;
@@ -1479,6 +1501,7 @@ export function SolutionPathEditorFullscreen({
     isNoteShell,
     rect,
     allowCuePlaybackGestures,
+    pathPlayback.isPlaybackActive,
   ]);
 
   const rootClass = isNoteShell
@@ -2478,16 +2501,20 @@ export function SolutionPathEditorFullscreen({
                               onInsertObjectPathAim={insertObjectPathPointBetweenAim}
                               pathLinesVisible={!pathPlayback.isPlaybackActive || playbackPathLinesVisible}
                               allowCuePlaybackGestures={allowCuePlaybackGestures}
+                              pathPlaybackActive={pathPlayback.isPlaybackActive}
                               onCueBallSingleTap={
                                 allowCuePlaybackGestures ? () => resetPathPlayback() : undefined
                               }
-                              onCueBallDoubleTap={
-                                allowCuePlaybackGestures
-                                  ? () => {
-                                      if (!pathPlayback.canPlayback) return;
-                                      resetPathPlayback();
-                                      pathPlayback.startPlayback();
-                                    }
+                              onPathEditCueBallTap={
+                                layoutForCue && !pathPlayback.isPlaybackActive
+                                  ? onPathEditCueBallTap
+                                  : undefined
+                              }
+                              onPathEditObjectBallTap={
+                                layoutForCue &&
+                                !pathPlayback.isPlaybackActive &&
+                                (variant === "nangu" || showObjectPath)
+                                  ? onPathEditObjectBallTap
                                   : undefined
                               }
                               cueDisplayCurveControls={
@@ -2584,16 +2611,20 @@ export function SolutionPathEditorFullscreen({
                         onInsertObjectPathAim={insertObjectPathPointBetweenAim}
                         pathLinesVisible={!pathPlayback.isPlaybackActive || playbackPathLinesVisible}
                         allowCuePlaybackGestures={allowCuePlaybackGestures}
+                        pathPlaybackActive={pathPlayback.isPlaybackActive}
                         onCueBallSingleTap={
                           allowCuePlaybackGestures ? () => resetPathPlayback() : undefined
                         }
-                        onCueBallDoubleTap={
-                          allowCuePlaybackGestures
-                            ? () => {
-                                if (!pathPlayback.canPlayback) return;
-                                resetPathPlayback();
-                                pathPlayback.startPlayback();
-                              }
+                        onPathEditCueBallTap={
+                          layoutForCue && !pathPlayback.isPlaybackActive
+                            ? onPathEditCueBallTap
+                            : undefined
+                        }
+                        onPathEditObjectBallTap={
+                          layoutForCue &&
+                          !pathPlayback.isPlaybackActive &&
+                          (variant === "nangu" || showObjectPath)
+                            ? onPathEditObjectBallTap
                             : undefined
                         }
                         cueDisplayCurveControls={

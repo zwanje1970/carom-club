@@ -10,7 +10,6 @@ import {
   ORGANIZATION_SELECT_ADMIN_EDIT,
   TOURNAMENT_SELECT_BASIC,
 } from "@/lib/db-selects";
-import { haversineKm } from "@/lib/distance";
 import { normalizeSlug } from "@/lib/normalize-slug";
 
 /** 대회 수정 페이지용: organization은 select만 사용 (promo/venue 등 불필요 컬럼 미조회) */
@@ -54,6 +53,29 @@ export type TournamentListRow = {
 export type TournamentsListTab = "upcoming" | "closed" | "finished";
 export type TournamentsListSort = "distance" | "deadline" | "date";
 
+const ENTRY_CONFIRMED_COUNTS_SQL = `
+LEFT JOIN (
+  SELECT e."tournamentId", COUNT(*)::int AS cnt
+  FROM "TournamentEntry" e
+  WHERE e.status = 'CONFIRMED'
+  GROUP BY e."tournamentId"
+) ec ON ec."tournamentId" = t.id
+`;
+
+/** 거리순 + 좌표 있음: 하버사인(km)을 SQL에서 계산 후 정렬 */
+function sqlDistanceKmSelect(lat: number, lng: number): string {
+  return `CASE
+    WHEN o.latitude IS NULL OR o.longitude IS NULL THEN NULL::double precision
+    ELSE (
+      6371.0 * acos(LEAST(1.0::double precision, GREATEST(-1.0::double precision,
+        cos(radians($3::double precision)) * cos(radians(o.latitude::double precision)) *
+        cos(radians(o.longitude::double precision) - radians($4::double precision)) +
+        sin(radians($3::double precision)) * sin(radians(o.latitude::double precision))
+      )))
+    )
+  END`;
+}
+
 export async function getTournamentsListForPublicPage(options: {
   tab: TournamentsListTab;
   sortBy: TournamentsListSort;
@@ -61,9 +83,11 @@ export async function getTournamentsListForPublicPage(options: {
   lat?: number;
   lng?: number;
   take?: number;
+  skip?: number;
 }): Promise<(TournamentListRow & { distanceKm?: number | null })[]> {
-  const { tab, sortBy, nationalOnly = false, lat, lng, take = 200 } = options;
+  const { tab, sortBy, nationalOnly = false, lat, lng, take = 20, skip = 0 } = options;
   const hasCoords = typeof lat === "number" && typeof lng === "number" && !Number.isNaN(lat) && !Number.isNaN(lng);
+  const useSqlDistance = sortBy === "distance" && hasCoords;
 
   const tabWhere: string =
     tab === "upcoming"
@@ -71,13 +95,16 @@ export async function getTournamentsListForPublicPage(options: {
       : tab === "closed"
         ? "t.status IN ('CLOSED','BRACKET_GENERATED') AND t.\"startAt\" >= CURRENT_DATE"
         : "(t.status = 'FINISHED' OR t.\"startAt\" < CURRENT_DATE)";
-  const nationalWhere = nationalOnly
-    ? " AND (t.region = '전국' OR t.region ILIKE '%전국%')"
-    : "";
+  const nationalWhere = nationalOnly ? ` AND t."nationalTournament" = true` : "";
   const dateOrder =
     tab === "finished"
       ? "t.\"startAt\" DESC"
       : "t.\"startAt\" ASC";
+
+  const distanceSelect = useSqlDistance ? sqlDistanceKmSelect(lat!, lng!) : `NULL::double precision`;
+  const orderClause = useSqlDistance
+    ? `ORDER BY "distanceKm" ASC NULLS LAST, ${dateOrder}`
+    : `ORDER BY ${dateOrder}`;
 
   try {
     const rows = await prisma.$queryRawUnsafe<
@@ -96,29 +123,32 @@ export async function getTournamentsListForPublicPage(options: {
         posterImageUrl: string | null;
         summary: string | null;
         maxParticipants: number | null;
-        confirmedCount: bigint;
+        confirmedCount: number | bigint;
         orgId: string | null;
         orgName: string | null;
         orgSlug: string | null;
         orgLatitude: number | null;
         orgLongitude: number | null;
+        distanceKm: number | null;
       }[]
     >(
       `SELECT t.id, t.name, t."startAt", t."endAt", t.status, t."organizationId",
               t.venue, t."venueName", t."gameFormat", t."prizeInfo", t."imageUrl", t."posterImageUrl", t.summary,
               t."maxParticipants",
-              (SELECT COUNT(*) FROM "TournamentEntry" e WHERE e."tournamentId" = t.id AND e.status = 'CONFIRMED')::int AS "confirmedCount",
+              COALESCE(ec.cnt, 0) AS "confirmedCount",
               o.id AS "orgId", o.name AS "orgName", o.slug AS "orgSlug",
-              o.latitude AS "orgLatitude", o.longitude AS "orgLongitude"
+              o.latitude AS "orgLatitude", o.longitude AS "orgLongitude",
+              ${distanceSelect} AS "distanceKm"
        FROM "Tournament" t
+       ${ENTRY_CONFIRMED_COUNTS_SQL}
        LEFT JOIN "Organization" o ON o.id = t."organizationId"
        WHERE t.status NOT IN ('DRAFT', 'HIDDEN') AND (${tabWhere})${nationalWhere}
-       ORDER BY ${dateOrder}
-       LIMIT $1`,
-      take
+       ${orderClause}
+       LIMIT $1 OFFSET $2`,
+      ...(useSqlDistance ? [take, skip, lat, lng] : [take, skip])
     );
 
-    const list = rows.map((r) => ({
+    return rows.map((r) => ({
       id: r.id,
       name: r.name,
       startAt: r.startAt,
@@ -138,27 +168,8 @@ export async function getTournamentsListForPublicPage(options: {
         r.orgId && r.orgName
           ? normalizeSlug({ id: r.orgId, name: r.orgName, slug: r.orgSlug })
           : null,
-      distanceKm: null as number | null,
+      distanceKm: useSqlDistance ? (r.distanceKm != null ? Number(r.distanceKm) : null) : null,
     }));
-
-    if (sortBy === "distance" && hasCoords && list.length > 0) {
-      const withDist = list.map((t) => {
-        const r = rows.find((x) => x.id === t.id)!;
-        const km = haversineKm(lat!, lng!, r.orgLatitude, r.orgLongitude);
-        return { ...t, distanceKm: km };
-      });
-      withDist.sort((a, b) => {
-        const ka = a.distanceKm;
-        const kb = b.distanceKm;
-        if (ka == null && kb == null) return 0;
-        if (ka == null) return 1;
-        if (kb == null) return -1;
-        return ka - kb;
-      });
-      return withDist;
-    }
-
-    return list;
   } catch {
     return [];
   }

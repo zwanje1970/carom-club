@@ -1264,7 +1264,7 @@ export function SettingsPanel({
                 className="flex flex-wrap items-baseline gap-x-1.5 text-sm font-semibold text-white"
               >
                 <span>설정</span>
-                <span className="text-[11px] font-normal text-slate-400">(수구더블탭시 당점설정)</span>
+                <span className="text-[11px] font-normal text-slate-400">(수구 표식 탭 시 당점)</span>
               </h2>
               <button
                 type="button"
@@ -1318,7 +1318,7 @@ export function SettingsPanel({
                 className="flex flex-wrap items-baseline gap-x-1.5 text-sm font-semibold text-white"
               >
                 <span>설정</span>
-                <span className="text-[11px] font-normal text-slate-400">(수구더블탭시 당점설정)</span>
+                <span className="text-[11px] font-normal text-slate-400">(수구 표식 탭 시 당점)</span>
               </h2>
               <button
                 type="button"

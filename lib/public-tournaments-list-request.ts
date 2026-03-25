@@ -21,6 +21,9 @@ function firstParam(v: string | string[] | undefined): string | undefined {
 }
 
 /** Next.js page `searchParams` 또는 URLSearchParams 모두에서 동일 파싱 */
+/** 목록 1페이지 기본 크기(무한 스크롤 청크) */
+export const PUBLIC_TOURNAMENTS_PAGE_SIZE = 20;
+
 export function parsePublicTournamentsQuery(
   input: URLSearchParams | Record<string, string | string[] | undefined>
 ): {
@@ -28,6 +31,7 @@ export function parsePublicTournamentsQuery(
   sortBy: TournamentsListSort;
   nationalOnly: boolean;
   take: number;
+  skip: number;
   latFromQuery: number;
   lngFromQuery: number;
 } {
@@ -44,7 +48,15 @@ export function parsePublicTournamentsQuery(
   const sortBy = sortByRaw as TournamentsListSort;
   const nationalOnly = get("national") === "1";
   const takeRaw = Number(get("take"));
-  const take = Math.min(Number.isFinite(takeRaw) && takeRaw > 0 ? takeRaw : 200, 200);
+  const take = Math.min(
+    Number.isFinite(takeRaw) && takeRaw > 0 ? takeRaw : PUBLIC_TOURNAMENTS_PAGE_SIZE,
+    200
+  );
+  const skipRaw = Number(get("skip"));
+  const skip = Math.max(
+    0,
+    Math.min(Number.isFinite(skipRaw) && skipRaw >= 0 ? Math.floor(skipRaw) : 0, 10_000)
+  );
   const latFromQuery = Number(get("lat"));
   const lngFromQuery = Number(get("lng"));
 
@@ -56,6 +68,7 @@ export function parsePublicTournamentsQuery(
     sortBy: effectiveSort,
     nationalOnly,
     take,
+    skip,
     latFromQuery,
     lngFromQuery,
   };
@@ -101,6 +114,7 @@ export async function getPublicTournamentsListFromQuery(
     lat: Number.isFinite(lat) ? lat : undefined,
     lng: Number.isFinite(lng) ? lng : undefined,
     take: parsed.take,
+    skip: parsed.skip,
   });
 
   return { ok: true, list };

@@ -253,6 +253,8 @@ model Tournament {
   venue            String?
   venueName        String?
   region           String?
+  /// 전국대회 필터용 — region 문자열 파싱 대신 등치 인덱스 조회 (마이그레이션으로 기존 행 백필)
+  nationalTournament Boolean @default(false)
   startAt          DateTime
   endAt            DateTime?
   entryFee         Int?
@@ -295,6 +297,7 @@ model Tournament {
   settlement          TournamentSettlement?
 
   @@index([status, startAt])
+  @@index([nationalTournament])
 }
 
 /// 대회 종료 후 참가비·환불·상금·비용 등을 기록 (대회별 1건 + 라인 아이템)

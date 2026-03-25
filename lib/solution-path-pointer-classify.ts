@@ -101,7 +101,7 @@ function distNormPointToSegmentPx(
 export type PathPointerClassification =
   | { kind: "inactive" }
   | { kind: "ball" }
-  /** 경로 입력 모드가 꺼져 있어도 수구 탭(재생 초기화·더블탭 CTA)용 */
+  /** 경로 입력 모드가 꺼져 있어도 수구 탭(재생 중 초기화)용 */
   | { kind: "cueBallPlayback" }
   | { kind: "cueSpot"; id: string }
   | { kind: "objectSpot"; id: string }
@@ -110,6 +110,8 @@ export type PathPointerClassification =
   | { kind: "emptyCue" }
   /** pathMode에서 목적구(비수구) 넓은 터치 반경 — `emptyCue`와 동일 처리, 패닝용 빈 영역으로 보지 않음 */
   | { kind: "pathObjectBallTap" }
+  /** objectPathMode에서 목적구(1목) 공 표면 탭 — 빈 테이블 `emptyObject`와 구분 */
+  | { kind: "objectBallMarkingTap" }
   | { kind: "emptyObject" };
 
 export function isClassificationEmptyForPan(c: PathPointerClassification): boolean {
@@ -132,6 +134,8 @@ export function classifySolutionPathPointerHit(params: {
   height?: number;
   /** true: path/object 모드가 꺼져 있어도 수구만 먼저 히트 판정 */
   allowCuePlaybackGestures?: boolean;
+  /** true일 때만 수구 탭을 재생 제스처(cueBallPlayback)로 분류 — 재생 중이 아니면 공 탭으로 넘겨 경로 레이어 전환에 사용 */
+  pathPlaybackActive?: boolean;
 }): PathPointerClassification {
   const {
     norm,
@@ -147,6 +151,7 @@ export function classifySolutionPathPointerHit(params: {
     width = DEFAULT_TABLE_WIDTH,
     height = DEFAULT_TABLE_HEIGHT,
     allowCuePlaybackGestures = false,
+    pathPlaybackActive = false,
   } = params;
 
   const rect = getPlayfieldRect(width, height);
@@ -156,6 +161,7 @@ export function classifySolutionPathPointerHit(params: {
 
   if (
     allowCuePlaybackGestures &&
+    pathPlaybackActive &&
     layoutForCollision &&
     pathPoints.length >= 1
   ) {
@@ -285,9 +291,9 @@ export function classifySolutionPathPointerHit(params: {
       { key: "white" as const, b: wb },
     ]) {
       if (distanceNormPointsInPlayfieldPx(norm, b, rect) <= ballTapPx) {
-        /** 1목 경로 모드: 목적구(비수구) 탭은 스팟 추가 — 수구 탭만 줌용 `ball` */
+        /** 1목 경로 모드: 목적구(비수구) 공 표식 탭 — 스팟 추가와 구분 */
         if (objectPathMode && !isCueBallKey(key)) {
-          return { kind: "emptyObject" };
+          return { kind: "objectBallMarkingTap" };
         }
         /** 수구 경로: 목적구 터치 반경이면 끝점이 공에 안 닿아도 목적구에 스팟 스냅 */
         if (pathMode && !isCueBallKey(key)) {

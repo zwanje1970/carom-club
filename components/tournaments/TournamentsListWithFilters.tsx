@@ -7,6 +7,7 @@ import type { TournamentListRow } from "@/lib/db-tournaments";
 import { formatKoreanDateWithWeekday } from "@/lib/format-date";
 import { sanitizeImageSrc } from "@/lib/image-src";
 import { formatDistanceKm } from "@/lib/distance";
+import { PUBLIC_TOURNAMENTS_PAGE_SIZE } from "@/lib/public-tournaments-list-request";
 
 type TabId = "upcoming" | "closed" | "finished";
 type SortId = "distance" | "deadline" | "date";
@@ -43,15 +44,34 @@ function normalizeTournamentItem(r: TournamentItem): TournamentItem {
   };
 }
 
+function parseListResponse(data: unknown): { rows: TournamentItem[]; hasMore: boolean } {
+  if (Array.isArray(data)) {
+    return {
+      rows: data as TournamentItem[],
+      hasMore: data.length === PUBLIC_TOURNAMENTS_PAGE_SIZE,
+    };
+  }
+  if (data && typeof data === "object" && "list" in data) {
+    const list = (data as { list: unknown; hasMore?: unknown }).list;
+    const hasMore = (data as { hasMore?: unknown }).hasMore;
+    const rows = Array.isArray(list) ? (list as TournamentItem[]) : [];
+    return {
+      rows,
+      hasMore: typeof hasMore === "boolean" ? hasMore : rows.length === PUBLIC_TOURNAMENTS_PAGE_SIZE,
+    };
+  }
+  return { rows: [], hasMore: false };
+}
+
 export function TournamentsListWithFilters({
   copy,
   initialList,
+  initialHasMore,
   initialQuery,
 }: {
   copy: Record<string, string>;
-  /** 서버(또는 RSC)에서 채운 첫 목록 — 첫 페인트에 카드 HTML */
   initialList: TournamentItem[];
-  /** 서버가 목록을 만들 때 사용한 필터(같으면 첫 클라이언트 fetch 생략) */
+  initialHasMore: boolean;
   initialQuery: { tab: TabId; sortBy: SortId; national: boolean };
 }) {
   const router = useRouter();
@@ -61,9 +81,13 @@ export function TournamentsListWithFilters({
   const national = searchParams.get("national") === "1";
 
   const [list, setList] = useState<TournamentItem[]>(() => initialList.map(normalizeTournamentItem));
+  const [hasMore, setHasMore] = useState(initialHasMore);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const leftInitialQueryRef = useRef(false);
+  const loadMoreLockRef = useRef(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const setParams = useCallback(
     (updates: { tab?: TabId; sortBy?: SortId; national?: boolean }) => {
@@ -84,6 +108,53 @@ export function TournamentsListWithFilters({
   const sortOptions = SORT_OPTIONS[tab];
   const effectiveSortBy = sortOptions.some((s) => s.id === sortBy) ? sortBy : "date";
 
+  const buildListParams = useCallback(
+    (skip: number) => {
+      const params = new URLSearchParams();
+      params.set("tab", tab);
+      params.set("sortBy", effectiveSortBy);
+      params.set("take", String(PUBLIC_TOURNAMENTS_PAGE_SIZE));
+      params.set("skip", String(skip));
+      if (national) params.set("national", "1");
+      return params;
+    },
+    [tab, effectiveSortBy, national]
+  );
+
+  const loadMore = useCallback(async () => {
+    if (!hasMore || loading || loadingMore || loadMoreLockRef.current) return;
+    loadMoreLockRef.current = true;
+    setLoadingMore(true);
+    setError("");
+    try {
+      const params = buildListParams(list.length);
+      const res = await fetch(`/api/public/tournaments?${params.toString()}`);
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error((d as { error?: string }).error || "목록 조회 실패");
+      }
+      const { rows, hasMore: more } = parseListResponse(await res.json());
+      setList((prev) => {
+        const ids = new Set(prev.map((x) => x.id));
+        const merged = [...prev];
+        for (const raw of rows) {
+          const item = normalizeTournamentItem(raw);
+          if (!ids.has(item.id)) {
+            ids.add(item.id);
+            merged.push(item);
+          }
+        }
+        return merged;
+      });
+      setHasMore(more);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "목록을 불러올 수 없습니다.");
+    } finally {
+      loadMoreLockRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [hasMore, loading, loadingMore, list.length, buildListParams]);
+
   useEffect(() => {
     const matchInitial =
       tab === initialQuery.tab &&
@@ -92,6 +163,7 @@ export function TournamentsListWithFilters({
 
     if (!leftInitialQueryRef.current && matchInitial) {
       setList(initialList.map(normalizeTournamentItem));
+      setHasMore(initialHasMore);
       setLoading(false);
       setError("");
       return;
@@ -104,17 +176,17 @@ export function TournamentsListWithFilters({
     let cancelled = false;
     setLoading(true);
     setError("");
-    const params = new URLSearchParams();
-    params.set("tab", tab);
-    params.set("sortBy", effectiveSortBy);
-    if (national) params.set("national", "1");
+    const params = buildListParams(0);
     fetch(`/api/public/tournaments?${params.toString()}`)
       .then((res) => {
         if (!res.ok) return res.json().then((d) => Promise.reject(new Error(d.error || "목록 조회 실패")));
         return res.json();
       })
       .then((data) => {
-        if (!cancelled) setList((Array.isArray(data) ? data : []).map(normalizeTournamentItem));
+        if (cancelled) return;
+        const { rows, hasMore: more } = parseListResponse(data);
+        setList(rows.map(normalizeTournamentItem));
+        setHasMore(more);
       })
       .catch((err) => {
         if (!cancelled) setError(err.message || "목록을 불러올 수 없습니다.");
@@ -125,7 +197,20 @@ export function TournamentsListWithFilters({
     return () => {
       cancelled = true;
     };
-  }, [tab, effectiveSortBy, national, initialList, initialQuery]);
+  }, [tab, effectiveSortBy, national, initialList, initialQuery, initialHasMore, buildListParams]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore || loading || loadingMore) return;
+    const ob = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) void loadMore();
+      },
+      { root: null, rootMargin: "280px", threshold: 0 }
+    );
+    ob.observe(el);
+    return () => ob.disconnect();
+  }, [hasMore, loading, loadingMore, loadMore, list.length]);
 
   return (
     <div className="mt-8 space-y-4">
@@ -183,82 +268,93 @@ export function TournamentsListWithFilters({
       )}
 
       {!loading && !error && list.length > 0 && (
-        <ul className="space-y-3 sm:grid sm:grid-cols-1 sm:gap-3 md:grid-cols-2">
-          {list.map((t) => {
-            const max = t.maxParticipants ?? 0;
-            const confirmed = t.confirmedCount ?? 0;
-            const remaining = max > 0 ? Math.max(0, max - confirmed) : null;
-            const almostFull = remaining !== null && remaining > 0 && remaining <= 3;
-            const isFull = remaining !== null && remaining <= 0;
-            const statusBadge = isFull ? "정원 마감" : almostFull ? `마지막 ${remaining}자리` : null;
-            const hasImage = (t.posterImageUrl || t.imageUrl)?.trim();
-            return (
-              <li key={t.id}>
-                <Link
-                  href={`/tournaments/${t.id}`}
-                  className="block rounded-lg border border-site-border bg-site-card overflow-hidden shadow-sm transition hover:border-site-primary/40 hover:shadow-md"
-                >
-                  <div
-                    className={`relative ${hasImage ? "aspect-[2/1] bg-site-bg" : "min-h-[80px] bg-site-primary/10"} flex flex-col justify-end p-3`}
+        <div className="space-y-3">
+          <ul className="space-y-3 sm:grid sm:grid-cols-1 sm:gap-3 md:grid-cols-2">
+            {list.map((t) => {
+              const max = t.maxParticipants ?? 0;
+              const confirmed = t.confirmedCount ?? 0;
+              const remaining = max > 0 ? Math.max(0, max - confirmed) : null;
+              const almostFull = remaining !== null && remaining > 0 && remaining <= 3;
+              const isFull = remaining !== null && remaining <= 0;
+              const statusBadge = isFull ? "정원 마감" : almostFull ? `마지막 ${remaining}자리` : null;
+              const hasImage = (t.posterImageUrl || t.imageUrl)?.trim();
+              return (
+                <li key={t.id}>
+                  <Link
+                    href={`/tournaments/${t.id}`}
+                    className="block rounded-lg border border-site-border bg-site-card overflow-hidden shadow-sm transition hover:border-site-primary/40 hover:shadow-md"
                   >
-                    {(() => {
-                      const src = sanitizeImageSrc(hasImage);
-                      if (!src) return null;
-                      return (
-                        <div className="absolute inset-0 flex items-center justify-center min-h-[80px]">
+                    <div className="relative aspect-[2/1] w-full overflow-hidden bg-site-bg flex flex-col justify-end p-3">
+                      {(() => {
+                        const src = sanitizeImageSrc(hasImage);
+                        if (!src) {
+                          return (
+                            <div
+                              className="absolute inset-0 bg-gradient-to-br from-site-primary/15 to-site-bg"
+                              aria-hidden
+                            />
+                          );
+                        }
+                        return (
                           <img
                             src={src}
                             alt=""
-                            className="absolute inset-0 w-full h-full object-contain"
+                            loading="lazy"
+                            decoding="async"
+                            className="absolute inset-0 h-full w-full object-contain"
                             data-debug-src={src}
                           />
+                        );
+                      })()}
+                      <div className="relative z-10">
+                        <h2 className="font-semibold text-site-text line-clamp-2 text-sm sm:text-base">{t.name}</h2>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-site-text-muted">
+                          {t.gameFormat && <span>{t.gameFormat}</span>}
+                          {t.prizeInfo && <span>· {t.prizeInfo}</span>}
                         </div>
-                      );
-                    })()}
-                    <div className="relative z-10">
-                      <h2 className="font-semibold text-site-text line-clamp-2 text-sm sm:text-base">{t.name}</h2>
-                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-site-text-muted">
-                        {t.gameFormat && <span>{t.gameFormat}</span>}
-                        {t.prizeInfo && <span>· {t.prizeInfo}</span>}
                       </div>
                     </div>
-                  </div>
-                  <div className="p-3 border-t border-site-border">
-                    <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-site-text-muted">
-                      <span>{formatKoreanDateWithWeekday(t.startAt)}</span>
-                      {statusBadge && (
-                        <span
-                          className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                            statusBadge === "정원 마감"
-                              ? "bg-site-bg text-site-text-muted"
-                              : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
-                          }`}
-                        >
-                          {statusBadge}
-                        </span>
+                    <div className="p-3 border-t border-site-border">
+                      <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-site-text-muted">
+                        <span>{formatKoreanDateWithWeekday(t.startAt)}</span>
+                        {statusBadge && (
+                          <span
+                            className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                              statusBadge === "정원 마감"
+                                ? "bg-site-bg text-site-text-muted"
+                                : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                            }`}
+                          >
+                            {statusBadge}
+                          </span>
+                        )}
+                      </div>
+                      {(t.venue || t.organization?.name) && (
+                        <p className="mt-1 text-xs text-site-text-muted truncate">
+                          {t.venue || t.organization?.name}
+                        </p>
+                      )}
+                      {"distanceKm" in t && t.distanceKm != null && (
+                        <p className="mt-1 text-xs text-site-text-muted">
+                          {formatDistanceKm(t.distanceKm)}
+                        </p>
+                      )}
+                      {max > 0 && (
+                        <p className="mt-1 text-xs font-medium text-site-text">
+                          신청 현황 <span className="text-site-primary">{confirmed}</span>/{max}명
+                        </p>
                       )}
                     </div>
-                    {(t.venue || t.organization?.name) && (
-                      <p className="mt-1 text-xs text-site-text-muted truncate">
-                        {t.venue || t.organization?.name}
-                      </p>
-                    )}
-                    {"distanceKm" in t && t.distanceKm != null && (
-                      <p className="mt-1 text-xs text-site-text-muted">
-                        {formatDistanceKm(t.distanceKm)}
-                      </p>
-                    )}
-                    {max > 0 && (
-                      <p className="mt-1 text-xs font-medium text-site-text">
-                        신청 현황 <span className="text-site-primary">{confirmed}</span>/{max}명
-                      </p>
-                    )}
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          {hasMore && <div ref={sentinelRef} className="h-4 w-full shrink-0" aria-hidden />}
+          {loadingMore && (
+            <p className="text-center text-sm text-site-text-muted py-2">더 불러오는 중...</p>
+          )}
+        </div>
       )}
     </div>
   );

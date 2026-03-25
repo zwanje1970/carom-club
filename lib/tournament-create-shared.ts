@@ -3,6 +3,7 @@
  */
 import { prisma } from "@/lib/db";
 import { createListingPurchaseRecord } from "@/lib/listing-registration";
+import { inferNationalTournamentFromRegion } from "@/lib/tournament-national";
 
 export type TournamentCreateRulePayload = {
   entryFee?: number | null;
@@ -66,6 +67,9 @@ export function buildTournamentCreateData(
     venue: f.venue != null ? String(f.venue).trim() || null : null,
     venueName: f.venueName != null ? String(f.venueName).trim() || null : null,
     region: f.region != null ? String(f.region).trim() || null : null,
+    nationalTournament: inferNationalTournamentFromRegion(
+      f.region != null ? String(f.region).trim() || null : null
+    ),
     status: validStatus,
     gameFormat: f.gameFormat != null ? String(f.gameFormat).trim() || null : null,
     title: f.title != null ? String(f.title).trim() || null : null,
