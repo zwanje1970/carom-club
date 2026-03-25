@@ -17,13 +17,17 @@ import {
 
 const LOG_PREFIX = "[trouble/from-note]";
 
+function devLog(...args: unknown[]) {
+  if (process.env.NODE_ENV === "development") console.log(LOG_PREFIX, ...args);
+}
+
 /** 노트에서 난구해결(community/trouble) 게시글 생성. CommunityPost + TroubleShotPost 생성 후 postId 반환 */
 export async function POST(request: Request) {
   if (!isDatabaseConfigured()) {
     return NextResponse.json({ error: "DB 연결되지 않음" }, { status: 503 });
   }
   const session = await getSession();
-  console.log(LOG_PREFIX, "세션:", session ? { id: session.id, role: session.role } : null);
+  devLog("세션:", session ? { id: session.id, role: session.role } : null);
   if (!session) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
@@ -49,7 +53,7 @@ export async function POST(request: Request) {
   try {
     const note = await findAuthorOwnedSourceNote(noteId, session.id);
     if (!note) {
-      console.log(LOG_PREFIX, "노트 조회 실패 또는 권한 없음:", { noteId, note: note ?? null, sessionId: session.id });
+      devLog("노트 조회 실패 또는 권한 없음:", { noteId, note: note ?? null, sessionId: session.id });
       return NextResponse.json({ error: "해당 난구노트를 찾을 수 없거나 권한이 없습니다." }, { status: 404 });
     }
 
@@ -84,21 +88,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ id: created.id });
   } catch (e) {
     const err = e as Error & { code?: string; meta?: unknown };
-    console.error(LOG_PREFIX, "catch:", {
-      message: err.message,
-      stack: err.stack,
-      code: err.code,
-      meta: err.meta,
-      requestBody:
-        parsed
-          ? {
-              noteId: parsed.noteId,
-              title: parsed.title?.slice(0, 50),
-              contentLength: parsed.content?.length,
-              imageUrl: parsed.imageUrl ? "(있음)" : null,
-            }
-          : null,
-    });
+    if (process.env.NODE_ENV === "development") {
+      console.error(LOG_PREFIX, "catch:", {
+        message: err.message,
+        stack: err.stack,
+        code: err.code,
+        meta: err.meta,
+        requestBody:
+          parsed
+            ? {
+                noteId: parsed.noteId,
+                title: parsed.title?.slice(0, 50),
+                contentLength: parsed.content?.length,
+                imageUrl: parsed.imageUrl ? "(있음)" : null,
+              }
+            : null,
+      });
+    } else {
+      console.error(LOG_PREFIX, err.message);
+    }
     const msg = err.message || "등록에 실패했습니다.";
     return NextResponse.json({ error: msg }, { status: 500 });
   }

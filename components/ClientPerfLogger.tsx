@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { logNavigationTiming, logClientTiming } from "@/lib/perf";
 
-/** 마운트 시 Navigation Timing + hydration 구간 로그 (NEXT_PUBLIC_PERF_LOG !== "0" 일 때) */
+/** 마운트 시 Navigation Timing + hydration 구간 로그 (NEXT_PUBLIC_PERF_LOG === "1" 일 때만) */
 export function ClientPerfLogger() {
   useEffect(() => {
     logNavigationTiming();

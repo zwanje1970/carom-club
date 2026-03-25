@@ -175,6 +175,11 @@ export function SiteFooter({ footer, defaultTagline }: SiteFooterProps) {
                       rel="noopener noreferrer"
                       className="flex items-center"
                       style={linkStyle}
+                      aria-label={
+                        p.name
+                          ? `${p.name} 공식 웹사이트(새 창)`
+                          : "협력업체 웹사이트(새 창)"
+                      }
                     >
                       {content}
                     </Link>

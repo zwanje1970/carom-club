@@ -268,7 +268,9 @@ export function RichEditor({
         event.preventDefault();
         uploadImage(file).then(
           (url) => editor?.commands.setImage({ src: url }),
-          (err) => console.error(err)
+          (err) => {
+            if (process.env.NODE_ENV === "development") console.error(err);
+          }
         );
         return true;
       },
@@ -282,7 +284,9 @@ export function RichEditor({
               event.preventDefault();
               uploadImage(file).then(
                 (url) => editor?.commands.setImage({ src: url }),
-                (err) => console.error(err)
+                (err) => {
+                  if (process.env.NODE_ENV === "development") console.error(err);
+                }
               );
               return true;
             }

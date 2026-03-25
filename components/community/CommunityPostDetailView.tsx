@@ -531,10 +531,17 @@ export function CommunityPostDetailView({
                     );
                   }
                   return (
-                    <a key={safeSrc} href={safeSrc} target="_blank" rel="noopener noreferrer" className="block">
+                    <a
+                      key={safeSrc}
+                      href={safeSrc}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block"
+                      aria-label="첨부 이미지 원본 보기(새 창)"
+                    >
                       <img
                         src={safeSrc}
-                        alt=""
+                        alt="게시글 첨부 이미지"
                         width={240}
                         height={160}
                         className="rounded-lg object-cover w-[240px] h-[160px]"

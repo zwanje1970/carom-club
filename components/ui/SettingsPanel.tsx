@@ -627,7 +627,9 @@ export function SettingsPanel({
   }, [cueOverlapsRed, redCenter.x, redCenter.y, cueCenter.x, cueCenter.y]);
 
   const onBallImgError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
-    console.error("image load failed:", e.currentTarget.src);
+    if (process.env.NODE_ENV === "development") {
+      console.error("image load failed:", e.currentTarget.src);
+    }
   }, []);
 
   const onCuePointerUp = useCallback(() => {

@@ -38,10 +38,7 @@ import {
   pruneCuePathCurveNodes,
   pruneObjectPathCurveNodes,
 } from "@/lib/nangu-curve-nodes";
-import {
-  ballCircumferenceNormFacingApproach,
-  cueFirstObjectHitFromBallPlacement,
-} from "@/lib/solution-path-geometry";
+import { resolveEffectiveFirstObjectCollisionFromCuePath } from "@/lib/solution-path-geometry";
 import {
   appendCuePathPlayfieldWithAutoCushion,
   appendCuePathSpotWithAim,
@@ -73,7 +70,6 @@ import {
   classifySolutionPathPointerHit,
   isClassificationEmptyForPan,
 } from "@/lib/solution-path-pointer-classify";
-import { resolveTroubleFirstObjectBallKey } from "@/lib/trouble-first-object-ball";
 import { isPathTooCloseToNonCueBalls } from "@/lib/solution-path-ball-clearance";
 import {
   type PathSegmentCurveControl,
@@ -618,31 +614,10 @@ export function SolutionPathEditorFullscreen({
     return getNonCueBallNorms(layoutForCue).map(({ x, y }) => ({ x, y }));
   }, [layoutForCue]);
 
-  /**
-   * ?섍뎄 寃쎈줈 泥??ㅽ뙚???덉쑝硫?愿묒꽑 異⑸룎?? ?놁쑝硫??섍뎄??媛??媛源뚯슫 1紐??꾨낫 怨듭쓽 ?먯＜(?섍뎄 諛⑺뼢) ??1紐?寃쎈줈留?癒쇱? 洹몃┫ ???ъ슜.
-   */
+  /** 광선상 1목 + 수구 폴리라인이 그 충돌점에 닿을 때만 유효 */
   const cueToFirstObjectHit = useMemo(() => {
     if (!layoutForCue) return null;
-    if (pathPoints.length >= 1) {
-      return cueFirstObjectHitFromBallPlacement(cuePos, pathPoints[0], layoutForCue, rect);
-    }
-    const nonCue = getNonCueBallNorms(layoutForCue);
-    if (nonCue.length === 0) return null;
-    let nearest = nonCue[0]!;
-    let bestD = Infinity;
-    for (const b of nonCue) {
-      const d = distanceNormPointsInPlayfieldPx(cuePos, { x: b.x, y: b.y }, rect);
-      if (d < bestD) {
-        bestD = d;
-        nearest = b;
-      }
-    }
-    const collision = ballCircumferenceNormFacingApproach(
-      { x: nearest.x, y: nearest.y },
-      cuePos,
-      rect
-    );
-    return { collision, objectKey: nearest.key };
+    return resolveEffectiveFirstObjectCollisionFromCuePath(layoutForCue, cuePos, pathPoints, rect);
   }, [layoutForCue, pathPoints, cuePos, rect]);
   const collisionNorm = cueToFirstObjectHit?.collision ?? null;
 
@@ -1170,12 +1145,13 @@ export function SolutionPathEditorFullscreen({
   }, [variant]);
 
   const onPathEditObjectBallTap = useCallback(() => {
+    if (!collisionNorm) return;
     if (variant === "trouble") setTroublePathEditLayer("object");
     else {
       setObjectPathMode(true);
       setPathMode(false);
     }
-  }, [variant]);
+  }, [variant, collisionNorm]);
 
   const clearAllPaths = useCallback(() => {
     pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
@@ -1432,6 +1408,7 @@ export function SolutionPathEditorFullscreen({
         height: DEFAULT_TABLE_HEIGHT,
         allowCuePlaybackGestures,
         pathPlaybackActive: pathPlayback.isPlaybackActive,
+        objectPathCollisionNormOverride: layoutForCue ? collisionNorm : undefined,
       });
     };
 
@@ -1520,17 +1497,10 @@ export function SolutionPathEditorFullscreen({
   const showCueSpot =
     (isNoteShell ? cueSpotOn : true) && !pathPlayback.isPlaybackActive;
 
-  /** 1紐⑹쟻援????꾩옱 ?쒖꽦 寃쎈줈??`type==="ball"` ?ㅽ뙚 ?쒖꽌留뚯쑝濡??뚯깮 (`resolveTroubleFirstObjectBallKey`) */
   const objectPathHighlightBallKey = useMemo((): "red" | "yellow" | "white" | null => {
     if (!layoutForCue || !showObjectPath) return null;
-    return resolveTroubleFirstObjectBallKey({
-      placement: layoutForCue,
-      cuePos,
-      pathPoints,
-      objectPathPoints,
-      rect,
-    });
-  }, [layoutForCue, showObjectPath, pathPoints, objectPathPoints, cuePos, rect]);
+    return cueToFirstObjectHit?.objectKey ?? null;
+  }, [layoutForCue, showObjectPath, cueToFirstObjectHit]);
 
   /** ?섍뎄 ?ㅽ뙚怨??숈씪: 1紐⑹씠 ?좏슚?????덉씠?댁? 臾닿??섍쾶 怨?罹붾쾭?ㅼ뿉 源쒕묀??(?몄쭛 ?덉씠?대쭔 耳??뚮줈 ?쒗븳?섏? ?딆쓬) */
   const showObjectBallSpot =

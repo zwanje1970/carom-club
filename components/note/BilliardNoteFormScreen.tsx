@@ -75,7 +75,7 @@ export function BilliardNoteFormScreen({
       const id = await onSubmit({ title, noteDate, content });
       if (id) window.location.href = `${redirectBasePath}/${id}`;
     } catch (e) {
-      console.error(e);
+      if (process.env.NODE_ENV === "development") console.error(e);
       setError(e instanceof Error ? e.message : "저장에 실패했습니다.");
     } finally {
       setSaving(false);

@@ -98,7 +98,7 @@ export function normalizeCueBallType(v: unknown): CueBallType {
   if (v === "yellow") return "yellow";
   if (v === "white") return "white";
   if (v === "red" || (typeof v === "string" && v.trim().toLowerCase() === "red")) {
-    if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test") {
+    if (typeof process !== "undefined" && process.env?.NODE_ENV === "development") {
       console.warn("[normalizeCueBallType] invalid cueBall value 'red' received; using 'white'. red is object-only.");
     }
   }

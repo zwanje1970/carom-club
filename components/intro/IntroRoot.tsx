@@ -10,8 +10,8 @@ function IntroGate({ children }: { children: React.ReactNode }) {
   const isAdminRoute = pathname?.startsWith("/admin") ?? false;
   return (
     <>
-      {isIntroVisible && !isAdminRoute && <IntroScreen />}
       {children}
+      {isIntroVisible && !isAdminRoute && <IntroScreen />}
     </>
   );
 }

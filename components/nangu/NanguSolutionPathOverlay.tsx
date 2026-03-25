@@ -30,12 +30,11 @@ import {
 import { type PathPointerAim } from "@/lib/cue-path-cushion-rules";
 import { classifySolutionPathPointerHit } from "@/lib/solution-path-pointer-classify";
 import {
-  ballCircumferenceNormFacingApproach,
   cueFirstObjectHitAmongNormalized,
+  resolveEffectiveFirstObjectCollisionFromCuePath,
 } from "@/lib/solution-path-geometry";
 import { outwardOffsetFromBallCenterTowardPointNorm } from "@/lib/path-motion-geometry";
 import { buildCuePathSegments, buildObjectPathSegments } from "@/lib/solution-path-types";
-import { resolveTroubleFirstObjectBallKey } from "@/lib/trouble-first-object-ball";
 import {
   type PathSegmentCurveControl,
   cueSegmentCurveKey,
@@ -398,7 +397,7 @@ export function NanguSolutionPathOverlay({
     [firstObjectBallsForCollision]
   );
 
-  /** 수구→첫 스팟 광선의 1목 충돌점(저장 좌표계=landscape). 스팟 표시는 `collisionRect`로 계산해야 선·스팟이 맞음 */
+  /** 수구→첫 스팟 광선의 1목 충돌점. 첫 스팟 공 스냅·시각 보조용(폴리라인 닿음과 무관) */
   const cueFirstHit = useMemo(() => {
     if (!firstObjectBallsForCollision?.length || pathPoints.length < 1) return null;
     return cueFirstObjectHitAmongNormalized(
@@ -409,48 +408,23 @@ export function NanguSolutionPathOverlay({
     );
   }, [firstObjectBallsForCollision, pathPoints, cuePos, collisionRect]);
 
-  const collisionNorm = cueFirstHit?.collision ?? null;
-
-  /**
-   * 수구 경로 스팟이 없을 때 — `SolutionPathEditorFullscreen.cueToFirstObjectHit`와 동일한 가상 접점.
-   * (스팟만 object 경로에 있을 때 파란 선이 `collisionNorm` 없이 비지 않게)
-   */
-  const cuePathEmptyVirtualHitNorm = useMemo(() => {
-    if (pathPoints.length >= 1) return null;
-    const placement = tableBallPlacement ?? ballPickLayout ?? null;
-    if (!placement) return null;
-    const nonCue = getNonCueBallNorms(placement);
-    if (nonCue.length === 0) return null;
-    let nearest = nonCue[0]!;
-    let bestD = Infinity;
-    for (const b of nonCue) {
-      const d = distanceNormPointsInPlayfieldPx(cuePos, { x: b.x, y: b.y }, collisionRect);
-      if (d < bestD) {
-        bestD = d;
-        nearest = b;
-      }
-    }
-    return ballCircumferenceNormFacingApproach({ x: nearest.x, y: nearest.y }, cuePos, collisionRect);
-  }, [pathPoints.length, tableBallPlacement, ballPickLayout, cuePos, collisionRect]);
-
-  /** 1목 경로 시작 구슬: 스팟으로 확정된 1목만 — 광선·거리 폴백 없음 (`lib/trouble-first-object-ball`) */
   const placementForFirstObject = tableBallPlacement ?? ballPickLayout ?? null;
-  const resolvedFirstObjectBallKey = useMemo((): ObjectBallColorKey | null => {
-    if (!placementForFirstObject) return null;
-    return resolveTroubleFirstObjectBallKey({
-      placement: placementForFirstObject,
+  /** 1목 경로·표식·분류 — 수구 폴리라인이 광선상 충돌점에 닿을 때만 */
+  const effectiveFirstObjectHit = useMemo(() => {
+    if (!placementForFirstObject || pathPoints.length < 1) return null;
+    return resolveEffectiveFirstObjectCollisionFromCuePath(
+      placementForFirstObject,
       cuePos,
       pathPoints,
-      objectPathPoints,
-      rect: collisionRect,
-    });
-  }, [placementForFirstObject, cuePos, pathPoints, objectPathPoints, collisionRect]);
+      collisionRect
+    );
+  }, [placementForFirstObject, pathPoints, cuePos, collisionRect]);
 
-  const objectPathLineStartNorm = useMemo(() => {
-    if (!resolvedFirstObjectBallKey || !firstObjectBallsForCollision) return null;
-    const b = firstObjectBallsForCollision.find((x) => x.key === resolvedFirstObjectBallKey);
-    return b ? { x: b.x, y: b.y } : null;
-  }, [resolvedFirstObjectBallKey, firstObjectBallsForCollision]);
+  const objectPathCollisionNormForUi = effectiveFirstObjectHit?.collision ?? null;
+  const resolvedFirstObjectBallKey: ObjectBallColorKey | null =
+    effectiveFirstObjectHit?.objectKey ?? null;
+
+  const objectPathRenderStartNorm = objectPathCollisionNormForUi;
 
   /** 경로선은 스팟 원 중심(쿠션 clamp + 목적구 원 비침범 보정)까지만 이어짐 — 저장 좌표와 다를 수 있음 */
   const cueSpotDisplayNorms = useMemo(
@@ -480,10 +454,6 @@ export function NanguSolutionPathOverlay({
     () => objectPathPoints.map((p) => spotCenterNormForDraw(p, collisionRect, spotDrawOpts)),
     [objectPathPoints, collisionRect, spotDrawOpts]
   );
-
-  /** 표시 전용 시작점 — 재생·경고와 무관 (`objectPathPoints` 있으면 선을 그릴 수 있게 분기) */
-  const objectPathRenderStartNorm =
-    objectPathLineStartNorm ?? collisionNorm ?? cuePathEmptyVirtualHitNorm;
 
   const objectSegmentsNorm = useMemo(() => {
     if (objectSpotDisplayNorms.length < 1) return [];
@@ -697,13 +667,13 @@ export function NanguSolutionPathOverlay({
                 e.preventDefault();
                 return;
               }
-              if ((pathMode || objectPathMode) && onPathEditObjectBallTap) {
+              if ((pathMode || objectPathMode) && onPathEditObjectBallTap && objectPathCollisionNormForUi) {
                 onPathEditObjectBallTap();
                 e.stopPropagation();
                 e.preventDefault();
                 return;
               }
-              if (objectPathMode && collisionNorm && onAddObjectPathAim) {
+              if (objectPathMode && objectPathCollisionNormForUi && onAddObjectPathAim) {
                 onAddObjectPathAim(aim);
                 e.stopPropagation();
                 e.preventDefault();
@@ -722,7 +692,7 @@ export function NanguSolutionPathOverlay({
             }
           }
         }
-        if (objectPathMode && collisionNorm && onAddObjectPathAim) {
+        if (objectPathMode && objectPathCollisionNormForUi && onAddObjectPathAim) {
           onAddObjectPathAim(aim);
           e.stopPropagation();
           e.preventDefault();
@@ -833,6 +803,9 @@ export function NanguSolutionPathOverlay({
         height: DEFAULT_TABLE_HEIGHT,
         allowCuePlaybackGestures: Boolean(allowCuePlaybackGestures),
         pathPlaybackActive: Boolean(pathPlaybackActive),
+        objectPathCollisionNormOverride: placementForFirstObject
+          ? objectPathCollisionNormForUi
+          : undefined,
       });
 
       if (c.kind === "inactive") return;
@@ -1062,7 +1035,8 @@ export function NanguSolutionPathOverlay({
       onZoomSetFocusCanvasPx,
       toPx,
       collisionRect,
-      collisionNorm,
+      objectPathCollisionNormForUi,
+      placementForFirstObject,
       allowCuePlaybackGestures,
       pathPlaybackActive,
       onCueBallSingleTap,

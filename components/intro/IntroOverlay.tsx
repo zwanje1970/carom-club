@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 const INTRO_TEXT = "CAROM.CLUB";
 const START_SIZE_VMIN = 220;
@@ -85,6 +85,20 @@ export function IntroOverlay({ onEnd }: { onEnd: () => void }) {
   const metricsRef = useRef<LogoMetrics | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const timelineStartedRef = useRef(false);
+  /** 첫 페인트에서 opacity 0 → 히어로 등 본문이 LCP 후보가 되기 쉽게 한 뒤 오버레이 표시 */
+  const [overlayPaintVisible, setOverlayPaintVisible] = useState(false);
+
+  useLayoutEffect(() => {
+    let idOuter = 0;
+    let idInner = 0;
+    idOuter = requestAnimationFrame(() => {
+      idInner = requestAnimationFrame(() => setOverlayPaintVisible(true));
+    });
+    return () => {
+      cancelAnimationFrame(idOuter);
+      cancelAnimationFrame(idInner);
+    };
+  }, []);
 
   useEffect(() => {
     if (timelineStartedRef.current) return;
@@ -182,8 +196,9 @@ export function IntroOverlay({ onEnd }: { onEnd: () => void }) {
   return (
     <div
       ref={overlayRef}
-      className="pointer-events-none fixed inset-0 z-[100] flex flex-col bg-black"
-      style={{ opacity: 1 }}
+      className={`pointer-events-none fixed inset-0 z-[100] flex flex-col bg-black transition-opacity duration-150 ${
+        overlayPaintVisible ? "opacity-100" : "opacity-0"
+      }`}
       aria-hidden
     >
       {/* Balls — position/size controlled by JS (인트로 공 색상: LogoLink variant="white"와 동일) */}

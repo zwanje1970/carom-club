@@ -136,6 +136,11 @@ export function classifySolutionPathPointerHit(params: {
   allowCuePlaybackGestures?: boolean;
   /** true일 때만 수구 탭을 재생 제스처(cueBallPlayback)로 분류 — 재생 중이 아니면 공 탭으로 넘겨 경로 레이어 전환에 사용 */
   pathPlaybackActive?: boolean;
+  /**
+   * 정의되면 내부 계산 대신 이 값을 1목 충돌점으로 사용(null이면 1목 경로·pathObjectBallTap 비활성).
+   * 에디터에서 “수구 경로가 광선상 충돌에 실제로 닿음”을 반영할 때 전달.
+   */
+  objectPathCollisionNormOverride?: { x: number; y: number } | null;
 }): PathPointerClassification {
   const {
     norm,
@@ -152,6 +157,7 @@ export function classifySolutionPathPointerHit(params: {
     height = DEFAULT_TABLE_HEIGHT,
     allowCuePlaybackGestures = false,
     pathPlaybackActive = false,
+    objectPathCollisionNormOverride,
   } = params;
 
   const rect = getPlayfieldRect(width, height);
@@ -223,6 +229,10 @@ export function classifySolutionPathPointerHit(params: {
     );
   }
 
+  if (objectPathCollisionNormOverride !== undefined) {
+    collisionNorm = objectPathCollisionNormOverride;
+  }
+
   /**
    * 1목·수구 스팟/세그먼트가 공(줌)보다 먼저 — 공 표면에 찍힌 스팟도 드래그·삭제·세그먼트 삽입 가능.
    * 그 다음 공 탭(줌), 마지막에 빈 영역(emptyCue / emptyObject).
@@ -291,12 +301,14 @@ export function classifySolutionPathPointerHit(params: {
       { key: "white" as const, b: wb },
     ]) {
       if (distanceNormPointsInPlayfieldPx(norm, b, rect) <= ballTapPx) {
-        /** 1목 경로 모드: 목적구(비수구) 공 표식 탭 — 스팟 추가와 구분 */
+        /** 1목 경로 모드: 목적구 표식 — 수구 경로가 1목에 닿은 경우에만(충돌점 유효) */
         if (objectPathMode && !isCueBallKey(key)) {
+          if (!collisionNorm) return { kind: "ball" };
           return { kind: "objectBallMarkingTap" };
         }
-        /** 수구 경로: 목적구 터치 반경이면 끝점이 공에 안 닿아도 목적구에 스팟 스냅 */
+        /** 수구 경로: 1목으로 전환 탭 — 광선 1목 + 폴리라인 닿음이 있을 때만 */
         if (pathMode && !isCueBallKey(key)) {
+          if (!collisionNorm) return { kind: "ball" };
           return { kind: "pathObjectBallTap" };
         }
         return { kind: "ball" };

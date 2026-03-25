@@ -1,9 +1,10 @@
 /**
  * 페이지/구간별 로딩 시간 측정 (개발·운영에서 병목 구간 확인용).
  * 서버: getServerTiming() / logServerTiming(). 클라이언트: performance.now() 또는 Navigation Timing.
- * NODE_ENV=production 에서는 로그 레벨에 따라 출력 생략 가능.
+ * 클라이언트·서버 perf 로그는 NEXT_PUBLIC_PERF_LOG=1 일 때만 출력.
  */
-const ENABLED = process.env.NEXT_PUBLIC_PERF_LOG !== "0";
+/** 명시적으로 켤 때만 로그 (배포 기본값: 출력 없음) */
+const ENABLED = process.env.NEXT_PUBLIC_PERF_LOG === "1";
 
 export type TimingLabel =
   | "page"
@@ -49,7 +50,7 @@ export async function measureAsync<T>(
 }
 
 // --- 클라이언트 전용 (브라우저에서만 동작) ---
-const CLIENT_ENABLED = typeof window !== "undefined" && process.env.NEXT_PUBLIC_PERF_LOG !== "0";
+const CLIENT_ENABLED = typeof window !== "undefined" && process.env.NEXT_PUBLIC_PERF_LOG === "1";
 
 /** 클라이언트: 페이지 진입 후 첫 렌더/ hydration 구간 측정용. mount 시점에 호출 */
 export function logClientTiming(label: string, startMs: number): number {

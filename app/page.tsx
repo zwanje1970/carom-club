@@ -32,8 +32,8 @@ export default async function HomePage() {
 
   return (
     <main className="min-h-screen bg-[var(--site-bg)] text-site-text">
-      <ContentLayer noticeBars={noticeBars} popups={popups} />
       <HomeHero copy={copy} hero={heroData} heroSettings={heroSettings} />
+      <ContentLayer noticeBars={noticeBars} popups={popups} />
       <PageSectionsRenderer sections={otherSections} />
 
       {/* DB(대회/당구장)는 스트리밍으로 후속 로딩 → 첫 페인트 블로킹 제거 */}

@@ -86,7 +86,7 @@ export function Popup({ popup, onClose }: Props) {
               <div className="relative mt-4 aspect-video w-full overflow-hidden rounded">
                 <img
                   src={safeSrc}
-                  alt=""
+                  alt={popup.title ? `${popup.title} 안내 이미지` : "팝업 이미지"}
                   className="absolute inset-0 w-full h-full object-cover min-h-[80px]"
                   data-debug-src={safeSrc}
                 />

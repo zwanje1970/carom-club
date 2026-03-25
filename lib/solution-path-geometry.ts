@@ -98,6 +98,81 @@ export function cueFirstObjectHitFromBallPlacement(
   return cueFirstObjectHitAmongNormalized(cueNorm, firstSpotNorm, getNonCueBallNorms(placement), rect);
 }
 
+/** 수구 폴리라인과 충돌점의 최대 허용 거리(px) — 스냅·표시 오차 허용 */
+export const SOLUTION_PATH_FIRST_OBJECT_POLYLINE_CONTACT_PX = 24;
+
+function distNormPointToSegmentPx(
+  nx: number,
+  ny: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  rect: PlayfieldRect
+): number {
+  const p = normalizedToPixel(nx, ny, rect);
+  const a = normalizedToPixel(ax, ay, rect);
+  const b = normalizedToPixel(bx, by, rect);
+  const dx = b.px - a.px;
+  const dy = b.py - a.py;
+  const len = Math.hypot(dx, dy) || 1e-6;
+  let t = ((p.px - a.px) * dx + (p.py - a.py) * dy) / (len * len);
+  t = Math.max(0, Math.min(1, t));
+  const qx = a.px + t * dx;
+  const qy = a.py + t * dy;
+  return Math.hypot(p.px - qx, p.py - qy);
+}
+
+export function minDistanceNormPointToOpenPolylinePx(
+  nx: number,
+  ny: number,
+  vertices: readonly { x: number; y: number }[],
+  rect: PlayfieldRect
+): number {
+  if (vertices.length < 2) return Infinity;
+  let best = Infinity;
+  for (let i = 0; i < vertices.length - 1; i++) {
+    const a = vertices[i]!;
+    const b = vertices[i + 1]!;
+    const d = distNormPointToSegmentPx(nx, ny, a.x, a.y, b.x, b.y, rect);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+/**
+ * 수구→첫 스팟 광선상 1목 충돌점이, 실제로 그린 수구 경로(수구—스팟 폴리라인)와 맞닿는지.
+ * 쿠션 등으로 광선과 다른 궤적이면 false.
+ */
+export function cuePolylineReachesFirstObjectCollision(
+  cueNorm: { x: number; y: number },
+  pathPoints: readonly { x: number; y: number }[],
+  collisionNorm: { x: number; y: number },
+  rect: PlayfieldRect,
+  touchPx: number = SOLUTION_PATH_FIRST_OBJECT_POLYLINE_CONTACT_PX
+): boolean {
+  if (pathPoints.length < 1) return false;
+  const chain: { x: number; y: number }[] = [cueNorm, ...pathPoints];
+  return minDistanceNormPointToOpenPolylinePx(collisionNorm.x, collisionNorm.y, chain, rect) <= touchPx;
+}
+
+/** 1목 경로·표식용 — 광선 1목 + 폴리라인 닿음이 동시에 만족할 때만 충돌 반환 */
+export function resolveEffectiveFirstObjectCollisionFromCuePath(
+  placement: NanguBallPlacement,
+  cueNorm: { x: number; y: number },
+  pathPoints: readonly { x: number; y: number }[],
+  rect: PlayfieldRect,
+  touchPx: number = SOLUTION_PATH_FIRST_OBJECT_POLYLINE_CONTACT_PX
+): { collision: { x: number; y: number }; objectKey: LabeledBallNorm["key"] } | null {
+  if (pathPoints.length < 1) return null;
+  const hit = cueFirstObjectHitFromBallPlacement(cueNorm, pathPoints[0], placement, rect);
+  if (!hit) return null;
+  if (!cuePolylineReachesFirstObjectCollision(cueNorm, pathPoints, hit.collision, rect, touchPx)) {
+    return null;
+  }
+  return hit;
+}
+
 /**
  * 목적구(또는 1목 후보) **중심**과 **접근 방향 기준점**(수구·충돌점·직전 스팟)이 있을 때,
  * 그 방향으로 가장 가까운 **공 원주 위** 정규화 좌표 (경로가 공 내부를 관통하지 않게 할 때 사용).
