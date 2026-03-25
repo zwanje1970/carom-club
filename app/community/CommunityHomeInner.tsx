@@ -8,7 +8,11 @@ import { ContentLayer } from "@/components/content/ContentLayer";
 import { PageSectionsRenderer } from "@/components/content/PageSectionsRenderer";
 import { getCachedCommunityLatest } from "@/lib/community-home-data";
 
-export async function CommunityHomeInner() {
+export async function CommunityHomeInner({
+  category,
+}: {
+  category: "all" | "free" | "qna" | "trouble" | "notice";
+}) {
   const [common, session] = await Promise.all([getCommonPageData("community"), getSession()]);
   const { noticeBars, popups, pageSections } = common;
   const canManageReports_ = canManageReports(session);
@@ -24,6 +28,7 @@ export async function CommunityHomeInner() {
       <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
         <CommunityMainClient
           latest={latest}
+          initialCategory={category}
           canManageReports={canManageReports_}
           showSolverEntry={showSolverEntry}
         />

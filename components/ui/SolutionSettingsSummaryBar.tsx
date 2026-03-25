@@ -1,6 +1,9 @@
 "use client";
 
-import { CUE_TIP_NORM_DISPLAY_FRAC } from "@/lib/solution-panel-ball-layout";
+import {
+  CUE_TIP_NORM_DISPLAY_FRAC,
+  thicknessDisplayOverlapStep16,
+} from "@/lib/solution-panel-ball-layout";
 import {
   DEFAULT_SOLUTION_SETTINGS,
   mergeSolutionSettings,
@@ -37,8 +40,7 @@ export function SolutionSettingsSummaryBar({
 }: SolutionSettingsSummaryBarProps) {
   const v = mergeSolutionSettings(value ?? DEFAULT_SOLUTION_SETTINGS, DEFAULT_SOLUTION_SETTINGS);
   const { tipNorm, thicknessStep } = v;
-  /** SettingsPanel과 동일: 내부 step(0=겹침,16=분리) -> 표시 n/16 (16=겹침,0=분리) */
-  const thicknessDisplay = 16 - Math.max(0, Math.min(16, Math.round(thicknessStep)));
+  const thicknessDisplay = thicknessDisplayOverlapStep16(thicknessStep);
   const railDisplayInt = Math.max(1, Math.min(5, Math.round(v.railCount)));
 
   const segmentBtn =

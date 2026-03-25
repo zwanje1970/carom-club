@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -26,6 +27,7 @@ import {
   indexOfNearestDiscreteCueDx,
   listDiscreteCueLayoutDx,
   snapCueLayoutToDiscreteDx,
+  thicknessDisplayOverlapStep16,
 } from "@/lib/solution-panel-ball-layout";
 import { useIsMobileViewport } from "@/hooks/useIsMobileViewport";
 
@@ -73,12 +75,6 @@ const TRACK_PAD_FRAC = 0.06;
 const STROKE_MAX = 6;
 /** ?뺢킅 ?뚮?(?쒖븞) ???щ씪?대뜑 梨꾩? */
 const SLIDER_GLOW_FILL = "rgba(0, 245, 255, 0.52)";
-
-/** ?대? step(0=寃뱀묠??6=?⑥뼱吏? ???쒖떆 n/16 (16=?꾩쟾 寃뱀묠, 0=?꾩쟾 遺꾨━) */
-function thicknessDisplayStep16(storedStep: number): number {
-  const s = Math.max(0, Math.min(16, Math.round(storedStep)));
-  return 16 - s;
-}
 
 type ArrowStrokeSliderProps = {
   label: string;
@@ -523,6 +519,20 @@ export function SettingsPanel({
     [current, value, onChange]
   );
 
+  const lastTapRef = useRef<number>(0);
+  const cueSingleTapToThicknessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cueArenaSuppressPointerUntilRef = useRef(0);
+  const miniArenaRef = useRef<HTMLDivElement>(null);
+  const tipOverlayRef = useRef<HTMLDivElement>(null);
+  const cueTipEditorRef = useRef<HTMLDivElement>(null);
+  const tipDraggingRef = useRef(false);
+  const cueInteractRef = useRef<{
+    active: boolean;
+    moved: boolean;
+    startPointerX: number;
+    startLayoutDx: number;
+  } | null>(null);
+
   /** 鍮꾩젣?? ?⑤꼸?????뚮쭏???섍뎄쨌鍮④컙 怨??먮몮??留욌떯??16/16), 寃뱀묠 ?놁쓬 */
   useEffect(() => {
     if (!open || value !== undefined) return;
@@ -540,13 +550,28 @@ export function SettingsPanel({
     );
   }, [open, value]);
 
-  useEffect(() => {
+  /** 열릴 때 모드는 페인트 전에 맞춤 — 첫 프레임에 당점 가이드만 보이는 현상 방지 */
+  useLayoutEffect(() => {
     if (!open) {
       setActiveControl(null);
       setThicknessUiActive(false);
       setTipEditMode(false);
+      lastTapRef.current = 0;
+      cueArenaSuppressPointerUntilRef.current = 0;
+      if (cueSingleTapToThicknessTimerRef.current) {
+        clearTimeout(cueSingleTapToThicknessTimerRef.current);
+        cueSingleTapToThicknessTimerRef.current = null;
+      }
       return;
     }
+    /** 설정 버튼 탭 직후 남은 lastTapRef 때문에 수구 pointerup이 "더블탭"으로 오인 → 당점 모드로 켜짐 방지 */
+    lastTapRef.current = 0;
+    if (cueSingleTapToThicknessTimerRef.current) {
+      clearTimeout(cueSingleTapToThicknessTimerRef.current);
+      cueSingleTapToThicknessTimerRef.current = null;
+    }
+    cueArenaSuppressPointerUntilRef.current =
+      typeof performance !== "undefined" ? performance.now() + 420 : 0;
     miniArenaRef.current?.focus({ preventScroll: true });
     if (focusSectionOnOpen === "thickness") {
       setThicknessUiActive(true);
@@ -561,7 +586,8 @@ export function SettingsPanel({
       setThicknessUiActive(false);
       setTipEditMode(false);
     } else {
-      setThicknessUiActive(false);
+      /** 섹션 미지정: 두께 드래그 우선, 당점은 수구 더블탭으로만 */
+      setThicknessUiActive(true);
       setTipEditMode(false);
       setActiveControl(null);
     }
@@ -580,19 +606,6 @@ export function SettingsPanel({
     current;
 
   const isMobileDock = useIsMobileViewport();
-
-  const lastTapRef = useRef<number>(0);
-  const cueSingleTapToThicknessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const miniArenaRef = useRef<HTMLDivElement>(null);
-  const tipOverlayRef = useRef<HTMLDivElement>(null);
-  const cueTipEditorRef = useRef<HTMLDivElement>(null);
-  const tipDraggingRef = useRef(false);
-  const cueInteractRef = useRef<{
-    active: boolean;
-    moved: boolean;
-    startPointerX: number;
-    startLayoutDx: number;
-  } | null>(null);
 
   const bounds = useMemo(() => discreteCueLayoutDxRange(), []);
   const discreteCueLayouts = useMemo(() => listDiscreteCueLayoutDx(), []);
@@ -634,6 +647,14 @@ export function SettingsPanel({
 
   const onCuePointerUp = useCallback(() => {
     const now = performance.now();
+    if (now < cueArenaSuppressPointerUntilRef.current) {
+      lastTapRef.current = 0;
+      if (cueSingleTapToThicknessTimerRef.current) {
+        clearTimeout(cueSingleTapToThicknessTimerRef.current);
+        cueSingleTapToThicknessTimerRef.current = null;
+      }
+      return;
+    }
     if (now - lastTapRef.current < 320) {
       if (cueSingleTapToThicknessTimerRef.current) {
         clearTimeout(cueSingleTapToThicknessTimerRef.current);
@@ -813,7 +834,7 @@ export function SettingsPanel({
     if (activeControl === "rail") {
       return `레일거리 ${railDisplayInt}/5`;
     }
-    const t = thicknessDisplayStep16(thicknessStep);
+    const t = thicknessDisplayOverlapStep16(thicknessStep);
     if (thicknessUiActive) return `두께 설정 ${t}/16`;
     return `두께 ${t}/16`;
   }, [

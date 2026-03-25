@@ -82,6 +82,8 @@ export type BuildPathMotionPlanOptions = {
   troublePlaybackModel?: boolean;
   /** true면 물리 계산(ballSpeed/thickness/damping)을 무시하고 경로 길이 100% 재생 */
   ignorePhysics?: boolean;
+  /** trouble 시연: 충돌 전 수구 사용 후 남은 예산(px). object post 캡에 우선 사용 */
+  playbackRemainingAfterPrePx?: number;
 };
 
 export interface PathMotionPlan {
@@ -119,7 +121,9 @@ export interface PathMotionPlan {
   playbackThicknessLossRatioL?: number;
   /** trouble 시연: 충돌 직전 기준 이동 가능 거리 V(px) — 볼스피드 모델 */
   playbackCueDistanceBeforeHitPx?: number;
-  /** trouble 시연: 충돌 후 수구 경로에 허용되는 거리 상한 V×(1−L)(px) */
+  /** trouble 시연: 충돌 전 수구 사용 후 남은 예산(px) */
+  playbackRemainingAfterPrePx?: number;
+  /** trouble 시연: 충돌 후 수구 경로에 허용되는 거리 상한 remaining×(1−L)(px) */
   playbackCueDistanceAfterHitCapPx?: number;
   /** trouble 시연: 1목 반사 경로가 있을 때 두께 분배를 수구 pre/post·1목에 적용했는지 */
   playbackThicknessSplitApplied?: boolean;
@@ -232,6 +236,7 @@ export function buildCuePathMotionPlan(
   let playbackCueDistanceAfterHitCapPx: number | undefined;
   let playbackCueDistanceBeforeHitPx: number | undefined;
   let playbackThicknessLossRatioL: number | undefined;
+  let playbackRemainingAfterPrePx: number | undefined;
   let playbackCueDistanceBeforeHitAppliedPx: number | undefined;
   let playbackCueDistanceAfterHitAppliedPx: number | undefined;
   let playbackObjectDistanceAfterHitAppliedPx: number | undefined;
@@ -268,13 +273,15 @@ export function buildCuePathMotionPlan(
       const dHit = hitAlong.pHit01 * pathLengthPx;
       const dPost = Math.max(0, pathLengthPx - dHit);
       const cuePreLimit = Math.min(dHit, V);
-      const cuePostLimit = Math.min(dPost, V * (1 - L));
+      const remaining = Math.max(0, V - cuePreLimit);
+      const cuePostLimit = Math.min(dPost, remaining * (1 - L));
       moveDistancePx = cuePreLimit + cuePostLimit;
+      playbackRemainingAfterPrePx = remaining;
       playbackCueDistanceBeforeHitAppliedPx = cuePreLimit;
       playbackCueDistanceAfterHitAppliedPx = cuePostLimit;
-      playbackObjectDistanceAfterHitAppliedPx = V * L;
+      playbackObjectDistanceAfterHitAppliedPx = remaining * L;
       playbackThicknessSplitApplied = true;
-      playbackCueDistanceAfterHitCapPx = V * (1 - L);
+      playbackCueDistanceAfterHitCapPx = remaining * (1 - L);
     } else {
       moveDistancePx = Math.min(pathLengthPx, V);
       playbackCueDistanceBeforeHitAppliedPx = moveDistancePx;
@@ -336,6 +343,7 @@ export function buildCuePathMotionPlan(
     playbackCuePlayableDistancePx: cuePlayablePx,
     playbackThicknessLossRatioL,
     playbackCueDistanceBeforeHitPx,
+    playbackRemainingAfterPrePx,
     playbackCueDistanceAfterHitCapPx,
     playbackThicknessSplitApplied,
     playbackEffectivePathCostPx: curveDampingPlan?.effectivePathCostPx,
@@ -540,9 +548,17 @@ export function buildObjectPathMotionPlan(
   const totalMovablePx = troubleModel ? troubleTotalMovableDistancePx(rect, ballSpeedVal) : undefined;
   const V0 = !ignorePhysics ? getCuePlayableDistanceFromBallSpeed(rect, ballSpeedVal) : 0;
   const L = split.objectTransfer;
+  const remainingAfterPre =
+    !ignorePhysics &&
+    troubleModel &&
+    options?.visualizationPlayback &&
+    typeof options?.playbackRemainingAfterPrePx === "number" &&
+    Number.isFinite(options.playbackRemainingAfterPrePx)
+      ? Math.max(0, options.playbackRemainingAfterPrePx)
+      : undefined;
   const objectPlayablePx =
     !ignorePhysics && troubleModel && options?.visualizationPlayback
-      ? V0 * L
+      ? (remainingAfterPre ?? V0) * L
       : undefined;
   const strokeTotalPowerReferencePx =
     ignorePhysics
@@ -672,9 +688,17 @@ export function buildObjectPathMotionPlanWithStartVertex(
   const ballSpeedVal = data.ballSpeed ?? 3;
   const V0 = !ignorePhysics ? getCuePlayableDistanceFromBallSpeed(rect, ballSpeedVal) : 0;
   const L = split.objectTransfer;
+  const remainingAfterPre =
+    !ignorePhysics &&
+    troubleModel &&
+    options?.visualizationPlayback &&
+    typeof options?.playbackRemainingAfterPrePx === "number" &&
+    Number.isFinite(options.playbackRemainingAfterPrePx)
+      ? Math.max(0, options.playbackRemainingAfterPrePx)
+      : undefined;
   const objectPlayablePx =
     !ignorePhysics && troubleModel && options?.visualizationPlayback
-      ? V0 * L
+      ? (remainingAfterPre ?? V0) * L
       : undefined;
   const moveDistancePx = ignorePhysics
     ? pathLengthPx

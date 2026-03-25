@@ -21,7 +21,8 @@ import {
 export type SolutionTablePanPointerPolicy = {
   /** target: 포인터 이벤트 타깃(캡처 단계). 오버레이 UI 등에서 패닝 제외용 */
   isEmptyForPan: (clientX: number, clientY: number, target?: EventTarget | null) => boolean;
-  onEmptyTap?: (clientX: number, clientY: number) => void;
+  /** pointerId: 확대 뷰 `pointerup`과 경로 오버레이 `pointerdown` 이중 처리 방지용 */
+  onEmptyTap?: (clientX: number, clientY: number, pointerId: number) => void;
 };
 
 const EMPTY_PAN_MOVE_THRESHOLD_PX = 6;
@@ -665,7 +666,7 @@ export const SolutionTableZoomShell = forwardRef<HTMLDivElement, SolutionTableZo
         const g = emptyPanGestureRef.current;
         if (g && g.pointerId === e.pointerId) {
           if (!g.panStarted) {
-            panPointerPolicy?.onEmptyTap?.(e.clientX, e.clientY);
+            panPointerPolicy?.onEmptyTap?.(e.clientX, e.clientY, e.pointerId);
           }
           try {
             viewportRef.current?.releasePointerCapture(e.pointerId);

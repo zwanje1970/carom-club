@@ -47,6 +47,17 @@ export function centerDistPxForThicknessStep(step: number): number {
   return (s / 16) * PANEL_LAYOUT_REF_BALL_PX;
 }
 
+/**
+ * 미니 아레나·요약 바의 `n/16` 라벨 — **겹침 정도**만 표시 (물리 L과 무관).
+ * `thicknessStep`과 `cueCenterOffsetPxFromRed`와 동일 소스.
+ * - 16/16: 중심거리 0 → 최대 겹침
+ * - 0/16: 중심거리 D → 맞닿음(프리뷰상 최대 분리)
+ */
+export function thicknessDisplayOverlapStep16(thicknessStep: number): number {
+  const s = Math.max(0, Math.min(16, Math.round(thicknessStep)));
+  return 16 - s;
+}
+
 /** 빨간 공 중심 기준 수구 중심 오프셋(미니 아레나 px) — SettingsPanel과 동일 */
 export function cueCenterOffsetPxFromRed(
   thicknessStep: number,

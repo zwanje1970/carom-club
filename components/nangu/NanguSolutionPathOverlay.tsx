@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { TableDrawStyle } from "@/components/billiard";
 import {
   getPlayfieldRect,
@@ -28,13 +29,17 @@ import {
   type ObjectBallColorKey,
 } from "@/lib/nangu-types";
 import { type PathPointerAim } from "@/lib/cue-path-cushion-rules";
-import { classifySolutionPathPointerHit } from "@/lib/solution-path-pointer-classify";
+import {
+  canActivatePathEditForObjectBallTap,
+  classifySolutionPathPointerHit,
+} from "@/lib/solution-path-pointer-classify";
 import {
   cueFirstObjectHitAmongNormalized,
   resolveEffectiveFirstObjectCollisionFromCuePath,
 } from "@/lib/solution-path-geometry";
 import { outwardOffsetFromBallCenterTowardPointNorm } from "@/lib/path-motion-geometry";
 import { buildCuePathSegments, buildObjectPathSegments } from "@/lib/solution-path-types";
+import { Search } from "lucide-react";
 import {
   type PathSegmentCurveControl,
   cueSegmentCurveKey,
@@ -58,12 +63,28 @@ const OBJECT_SPOT_FILL_OPACITY = 0.6;
 const SPOT_BLINK_CYCLE_MS = 2 * Math.PI * 180;
 
 const CURVE_HANDLE_HIT_PX = 26;
-const CURVE_LONG_PRESS_MS = 480;
+/** 1초 이상 누르면 미세조정 UI — 곡선 노드 삭제는 더블탭만 */
+const PATH_FINE_TUNE_LONG_PRESS_MS = 1000;
 const CURVE_HANDLE_MOVE_CANCEL_PX = 10;
+/** 당구노트 공배치 미세조정과 동일 그리드(정규화 플레이필드) */
+const FINE_GRID_STEP_LONG = 1 / 80;
+const FINE_GRID_STEP_SHORT = 1 / 40;
 /** 곡선 제어 노드 — 작은 원 + 초록 (수구/1목 공통) */
 const CURVE_HANDLE_FILL = "#22c55e";
 const CURVE_HANDLE_FILL_SUBTLE = "rgba(34, 197, 94, 0.5)";
 const CURVE_HANDLE_STROKE = "#15803d";
+
+function clampCurveControlNormPath(n: { x: number; y: number }): { x: number; y: number } {
+  return { x: Math.min(1, Math.max(0, n.x)), y: Math.min(1, Math.max(0, n.y)) };
+}
+
+const FT_BTN_CLASS =
+  "box-border flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-full border-0 text-[20px] font-bold leading-none text-white bg-black/40 shadow-md active:bg-black/55 active:scale-[0.97] touch-manipulation select-none";
+const FT_SPACER_CLASS = "h-[48px] w-[48px] shrink-0";
+
+type PathFineTuneTarget =
+  | { kind: "curve"; curveKind: "cue" | "object"; key: string }
+  | { kind: "spot"; spotKind: "cue" | "object"; id: string };
 
 /** 스팟 드래그: 롱프레스 후 정밀 이동(속도 감소) */
 const SPOT_PRECISION_LONG_PRESS_MS = 300;
@@ -126,6 +147,8 @@ export function NanguSolutionPathOverlay({
   /** 수구/1목 공 표식 단일 탭 시 해당 경로 편집 레이어 활성화 */
   onPathEditCueBallTap,
   onPathEditObjectBallTap,
+  /** 1목 공 키 — 탭으로 경로 레이어 전환 시 권한 검사(미전달 시 기존 동작) */
+  pathEditFirstObjectBallKey,
   /** null이면 마지막 끝 스팟만 활성 — 다른 스팟 더블클릭 시 전환 */
   cueActiveSpotOverrideId = null,
   objectActiveSpotOverrideId = null,
@@ -136,7 +159,7 @@ export function NanguSolutionPathOverlay({
   /** 1단계 곡선 노드 — 렌더 시 display 제어점보다 우선 */
   cuePathCurveNodes = [] as NanguCurveNode[],
   objectPathCurveNodes = [] as NanguCurveNode[],
-  troubleCurveEditMode = false,
+  troubleCurveEditMode = true,
   curveHandleInteraction = false,
   curveHandlesShowSubtle = false,
   onUpsertCueDisplayCurve,
@@ -148,6 +171,8 @@ export function NanguSolutionPathOverlay({
   onCurveHandleDragBegin,
   magnifierDrawStyle = "realistic",
   magnifierEnabled = false,
+  /** 확대 뷰 `pointerup` onEmptyTap 과 같은 탭에서 이중 스팟 추가 방지 — 경로 추가 직전 pointerId 전달 */
+  onPathAppendPointerDown,
 }: {
   pathPoints: NanguPathPoint[];
   cuePos: { x: number; y: number };
@@ -186,6 +211,7 @@ export function NanguSolutionPathOverlay({
   onCueBallSingleTap?: () => void;
   onPathEditCueBallTap?: () => void;
   onPathEditObjectBallTap?: () => void;
+  pathEditFirstObjectBallKey?: "red" | "yellow" | "white" | null;
   cueActiveSpotOverrideId?: string | null;
   objectActiveSpotOverrideId?: string | null;
   onCueActiveSpotChange?: (id: string | null) => void;
@@ -216,6 +242,7 @@ export function NanguSolutionPathOverlay({
   magnifierDrawStyle?: TableDrawStyle;
   /** 우측 설정에서 켠 경우에만 자동 정밀 확대를 허용 */
   magnifierEnabled?: boolean;
+  onPathAppendPointerDown?: (pointerId: number) => void;
 }) {
   /** 저장/충돌 계산은 항상 landscape 플레이필드 기준 */
   const collisionRect = useMemo(
@@ -261,6 +288,39 @@ export function NanguSolutionPathOverlay({
   const spotPrecisionActiveRef = useRef(false);
   const spotPrecisionSlopRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const spotPointerCaptureIdRef = useRef<number | null>(null);
+  const curvePointerCaptureRef = useRef<{ el: HTMLElement; pointerId: number } | null>(null);
+  const spotDragCaptureRef = useRef<{ el: HTMLElement; pointerId: number } | null>(null);
+  const spotFineTuneTimerRef = useRef<number | null>(null);
+  const draggingIdRef = useRef<string | null>(null);
+  const draggingObjectIdRef = useRef<string | null>(null);
+  const pathFineTuneTargetRef = useRef<PathFineTuneTarget | null>(null);
+  const pathFineTuneDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pathFineTuneIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pathFineTuneDirectionRef = useRef<{ dx: number; dy: number } | null>(null);
+  const pathFineTunePressStartRef = useRef(0);
+  const pathFineTuneLastMoveRef = useRef(0);
+  const pathFineTuneMoveRef = useRef<(dx: number, dy: number) => void>(() => {});
+
+  const [pathFineTuneTarget, setPathFineTuneTarget] = useState<PathFineTuneTarget | null>(null);
+  const [pathFineTuneMagnifier, setPathFineTuneMagnifier] = useState(false);
+  /** 확대창을 패널 기준으로 드래그 이동(px) */
+  const [pathFineTuneMagOffset, setPathFineTuneMagOffset] = useState({ x: 0, y: 0 });
+  const pathFineTuneMagOffsetRef = useRef({ x: 0, y: 0 });
+  const pathFineTuneMagDragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    origX: number;
+    origY: number;
+  } | null>(null);
+
+  useEffect(() => {
+    pathFineTuneMagOffsetRef.current = pathFineTuneMagOffset;
+  }, [pathFineTuneMagOffset]);
+
+  useEffect(() => {
+    pathFineTuneTargetRef.current = pathFineTuneTarget;
+  }, [pathFineTuneTarget]);
 
   useEffect(() => {
     return () => {
@@ -268,6 +328,16 @@ export function NanguSolutionPathOverlay({
       if (lp?.timer) window.clearTimeout(lp.timer);
       const st = spotPrecisionTimerRef.current;
       if (st != null) window.clearTimeout(st);
+      const sft = spotFineTuneTimerRef.current;
+      if (sft != null) window.clearTimeout(sft);
+      if (pathFineTuneDelayRef.current) {
+        clearTimeout(pathFineTuneDelayRef.current);
+        pathFineTuneDelayRef.current = null;
+      }
+      if (pathFineTuneIntervalRef.current) {
+        clearInterval(pathFineTuneIntervalRef.current);
+        pathFineTuneIntervalRef.current = null;
+      }
     };
   }, []);
 
@@ -330,7 +400,16 @@ export function NanguSolutionPathOverlay({
     [resolvePointerAimFromClient]
   );
 
+  const clearSpotFineTuneTimer = useCallback(() => {
+    const t = spotFineTuneTimerRef.current;
+    if (t != null) {
+      window.clearTimeout(t);
+      spotFineTuneTimerRef.current = null;
+    }
+  }, []);
+
   const clearSpotDragGestureState = useCallback(() => {
+    clearSpotFineTuneTimer();
     const t = spotPrecisionTimerRef.current;
     if (t != null) window.clearTimeout(t);
     spotPrecisionTimerRef.current = null;
@@ -340,14 +419,16 @@ export function NanguSolutionPathOverlay({
     spotDragSpotNormRef.current = null;
     setSpotPrecisionUi(false);
     setSpotMagnifier(null);
-  }, []);
+  }, [clearSpotFineTuneTimer]);
 
   const beginActiveSpotDrag = useCallback(
     (
       e: React.PointerEvent,
       norm: { x: number; y: number },
-      spot: { x: number; y: number }
+      spot: { x: number; y: number },
+      spotTrack: { spotKind: "cue" | "object"; spotId: string }
     ) => {
+      clearSpotFineTuneTimer();
       spotDragPointerNormRef.current = { x: norm.x, y: norm.y };
       spotDragSpotNormRef.current = { x: spot.x, y: spot.y };
       spotPrecisionSlopRef.current = { clientX: e.clientX, clientY: e.clientY };
@@ -365,11 +446,42 @@ export function NanguSolutionPathOverlay({
       try {
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
         spotPointerCaptureIdRef.current = e.pointerId;
+        spotDragCaptureRef.current = {
+          el: e.currentTarget as HTMLElement,
+          pointerId: e.pointerId,
+        };
       } catch {
         /* ignore */
       }
+      const { spotKind, spotId } = spotTrack;
+      spotFineTuneTimerRef.current = window.setTimeout(() => {
+        spotFineTuneTimerRef.current = null;
+        const stillCue = spotKind === "cue" && draggingIdRef.current === spotId;
+        const stillObj = spotKind === "object" && draggingObjectIdRef.current === spotId;
+        if (!stillCue && !stillObj) return;
+        const cap = spotDragCaptureRef.current;
+        if (cap) {
+          try {
+            cap.el.releasePointerCapture(cap.pointerId);
+          } catch {
+            /* ignore */
+          }
+          spotDragCaptureRef.current = null;
+        }
+        spotPointerCaptureIdRef.current = null;
+        if (spotKind === "cue") {
+          draggingIdRef.current = null;
+          setDraggingId(null);
+        } else {
+          draggingObjectIdRef.current = null;
+          setDraggingObjectId(null);
+        }
+        clearSpotDragGestureState();
+        onPathSpotDragEnd?.();
+        setPathFineTuneTarget({ kind: "spot", spotKind, id: spotId });
+      }, PATH_FINE_TUNE_LONG_PRESS_MS);
     },
-    [toPx]
+    [toPx, clearSpotFineTuneTimer, clearSpotDragGestureState, onPathSpotDragEnd]
   );
 
   const firstObjectBallsForCollision = useMemo(() => {
@@ -424,7 +536,18 @@ export function NanguSolutionPathOverlay({
   const resolvedFirstObjectBallKey: ObjectBallColorKey | null =
     effectiveFirstObjectHit?.objectKey ?? null;
 
-  const objectPathRenderStartNorm = objectPathCollisionNormForUi;
+  /** 1목 경로선은 1목적구 중심에서 출발(충돌 접점 아님) */
+  const firstObjectBallCenterNorm = useMemo(() => {
+    if (!placementForFirstObject) return null;
+    const key =
+      resolvedFirstObjectBallKey ?? pathEditFirstObjectBallKey ?? cueFirstHit?.objectKey ?? null;
+    if (!key) return null;
+    const balls = getNonCueBallNorms(placementForFirstObject);
+    const b = balls.find((x) => x.key === key);
+    return b ? { x: b.x, y: b.y } : null;
+  }, [placementForFirstObject, resolvedFirstObjectBallKey, pathEditFirstObjectBallKey, cueFirstHit?.objectKey]);
+
+  const objectPathRenderStartNorm = firstObjectBallCenterNorm ?? objectPathCollisionNormForUi;
 
   /** 경로선은 스팟 원 중심(쿠션 clamp + 목적구 원 비침범 보정)까지만 이어짐 — 저장 좌표와 다를 수 있음 */
   const cueSpotDisplayNorms = useMemo(
@@ -476,7 +599,6 @@ export function NanguSolutionPathOverlay({
     return [first, ...cueSegmentsNorm.slice(1)];
   }, [cueSegmentsNorm, collisionRect]);
 
-  /** 1목 경로 첫 점은 광선 충돌 접점(원주) — 수구용 outwardOffset은 중심→외곽용이라 여기 적용 시 중심에서 출발하는 것처럼 보임 */
   const objectSegmentsNormForDraw = objectSegmentsNorm;
 
   const cuePxSegs = useMemo(
@@ -618,11 +740,212 @@ export function NanguSolutionPathOverlay({
     [mergedObjectCurveControlsForHit, activeObjectCurveKey]
   );
 
+  const fineTuneContextRef = useRef<{
+    cueCurveByKey: Map<string, { x: number; y: number }>;
+    objectCurveByKey: Map<string, { x: number; y: number }>;
+    pathPoints: NanguPathPoint[];
+    objectPathPoints: NanguPathPoint[];
+    onMoveCueDisplayCurve?: typeof onMoveCueDisplayCurve;
+    onMoveObjectDisplayCurve?: typeof onMoveObjectDisplayCurve;
+    onMovePoint?: typeof onMovePoint;
+    onMoveObjectPoint?: typeof onMoveObjectPoint;
+  }>(null!);
+  fineTuneContextRef.current = {
+    cueCurveByKey,
+    objectCurveByKey,
+    pathPoints,
+    objectPathPoints,
+    onMoveCueDisplayCurve,
+    onMoveObjectDisplayCurve,
+    onMovePoint,
+    onMoveObjectPoint,
+  };
+
+  const pathFineTuneStep = useCallback((dx: number, dy: number) => {
+    const t = pathFineTuneTargetRef.current;
+    if (!t) return;
+    const ctx = fineTuneContextRef.current;
+    if (t.kind === "curve") {
+      const m = t.curveKind === "cue" ? ctx.cueCurveByKey : ctx.objectCurveByKey;
+      const cur = m.get(t.key);
+      if (!cur) return;
+      const next = clampCurveControlNormPath({ x: cur.x + dx, y: cur.y + dy });
+      if (t.curveKind === "cue") ctx.onMoveCueDisplayCurve?.(t.key, next);
+      else ctx.onMoveObjectDisplayCurve?.(t.key, next);
+    } else {
+      const pts = t.spotKind === "cue" ? ctx.pathPoints : ctx.objectPathPoints;
+      const p = pts.find((x) => x.id === t.id);
+      if (!p) return;
+      const next = { x: p.x + dx, y: p.y + dy };
+      if (t.spotKind === "cue") ctx.onMovePoint?.(t.id, next);
+      else ctx.onMoveObjectPoint?.(t.id, next);
+    }
+  }, []);
+
+  useEffect(() => {
+    pathFineTuneMoveRef.current = pathFineTuneStep;
+  }, [pathFineTuneStep]);
+
+  const clearPathFineTuneTimers = useCallback(() => {
+    if (pathFineTuneDelayRef.current) {
+      clearTimeout(pathFineTuneDelayRef.current);
+      pathFineTuneDelayRef.current = null;
+    }
+    if (pathFineTuneIntervalRef.current) {
+      clearInterval(pathFineTuneIntervalRef.current);
+      pathFineTuneIntervalRef.current = null;
+    }
+    pathFineTuneDirectionRef.current = null;
+  }, []);
+
+  const startPathFineTune = useCallback(
+    (dx: number, dy: number) => {
+      pathFineTuneStep(dx, dy);
+      pathFineTunePressStartRef.current = Date.now();
+      pathFineTuneLastMoveRef.current = pathFineTunePressStartRef.current;
+      pathFineTuneDirectionRef.current = { dx, dy };
+      clearPathFineTuneTimers();
+      pathFineTuneDelayRef.current = setTimeout(() => {
+        pathFineTuneDelayRef.current = null;
+        const move = () => {
+          const dir = pathFineTuneDirectionRef.current;
+          if (!dir) return;
+          const elapsed = Date.now() - pathFineTunePressStartRef.current;
+          if (elapsed < 250) return;
+          const intervalMs = elapsed < 500 ? 80 : elapsed < 1500 ? 40 : 20;
+          if (Date.now() - pathFineTuneLastMoveRef.current >= intervalMs) {
+            pathFineTuneLastMoveRef.current = Date.now();
+            pathFineTuneMoveRef.current(dir.dx, dir.dy);
+          }
+        };
+        pathFineTuneIntervalRef.current = setInterval(move, 20);
+      }, 250);
+    },
+    [pathFineTuneStep, clearPathFineTuneTimers]
+  );
+
+  const handlePathFineTuneEnd = useCallback(() => {
+    clearPathFineTuneTimers();
+  }, [clearPathFineTuneTimers]);
+
+  const clampPathFineTuneMagOffset = useCallback((x: number, y: number) => {
+    if (typeof window === "undefined") return { x, y };
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const margin = 8;
+    const boxW = SPOT_MAGNIFIER_BOX_PX + 4;
+    const totalH = SPOT_MAGNIFIER_BOX_PX + 4;
+    const maxX = Math.max(margin, vw * 0.48 - boxW / 2);
+    const maxY = Math.max(margin, vh * 0.48 - totalH / 2);
+    return {
+      x: Math.round(Math.max(-maxX, Math.min(maxX, x))),
+      y: Math.round(Math.max(-maxY, Math.min(maxY, y))),
+    };
+  }, []);
+
+  const handlePathFineTuneMagDragPointerDown = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const o = pathFineTuneMagOffsetRef.current;
+    pathFineTuneMagDragRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: o.x,
+      origY: o.y,
+    };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }, []);
+
+  const handlePathFineTuneMagDragPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      const d = pathFineTuneMagDragRef.current;
+      if (!d || e.pointerId !== d.pointerId) return;
+      const nx = d.origX + (e.clientX - d.startX);
+      const ny = d.origY + (e.clientY - d.startY);
+      setPathFineTuneMagOffset(clampPathFineTuneMagOffset(nx, ny));
+    },
+    [clampPathFineTuneMagOffset]
+  );
+
+  const handlePathFineTuneMagDragPointerUp = useCallback((e: React.PointerEvent) => {
+    const d = pathFineTuneMagDragRef.current;
+    if (!d || e.pointerId !== d.pointerId) return;
+    pathFineTuneMagDragRef.current = null;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!pathFineTuneTarget) {
+      setPathFineTuneMagOffset({ x: 0, y: 0 });
+    }
+  }, [pathFineTuneTarget]);
+
+  useEffect(() => {
+    if (!pathFineTuneTarget) return;
+    if (!pathMode && !objectPathMode) {
+      clearPathFineTuneTimers();
+      setPathFineTuneTarget(null);
+      setPathFineTuneMagnifier(false);
+    }
+  }, [pathMode, objectPathMode, pathFineTuneTarget, clearPathFineTuneTimers]);
+
+  const pathFineTuneMagnifierCenter = useMemo(() => {
+    if (!pathFineTuneTarget || !pathFineTuneMagnifier) return null;
+    if (pathFineTuneTarget.kind === "curve") {
+      const m =
+        pathFineTuneTarget.curveKind === "cue" ? cueCurveByKey : objectCurveByKey;
+      const c = m.get(pathFineTuneTarget.key);
+      if (!c) return null;
+      return toPx(c.x, c.y);
+    }
+    if (pathFineTuneTarget.spotKind === "cue") {
+      const idx = pathPoints.findIndex((p) => p.id === pathFineTuneTarget.id);
+      if (idx < 0) return null;
+      const n = cueSpotDisplayNorms[idx];
+      if (!n) return null;
+      return toPx(n.x, n.y);
+    }
+    const idx = objectPathPoints.findIndex((p) => p.id === pathFineTuneTarget.id);
+    if (idx < 0) return null;
+    const n = objectSpotDisplayNorms[idx];
+    if (!n) return null;
+    return toPx(n.x, n.y);
+  }, [
+    pathFineTuneTarget,
+    pathFineTuneMagnifier,
+    cueCurveByKey,
+    objectCurveByKey,
+    pathPoints,
+    objectPathPoints,
+    cueSpotDisplayNorms,
+    objectSpotDisplayNorms,
+    toPx,
+  ]);
+
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
+      if (pathFineTuneTarget) {
+        const el = e.target as HTMLElement;
+        if (!el.closest("[data-path-fine-tune]")) {
+          clearPathFineTuneTimers();
+          setPathFineTuneTarget(null);
+          setPathFineTuneMagnifier(false);
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
       const aim = resolvePointerAimFromClient(e.clientX, e.clientY);
       if (!aim) return;
       const now = Date.now();
+      const markPathAppendForZoomDupGuard = () => {
+        onPathAppendPointerDown?.(e.pointerId);
+      };
 
       if (aim.kind === "tableCanvas") {
         const { cx, cy } = aim;
@@ -659,19 +982,33 @@ export function NanguSolutionPathOverlay({
                 e.preventDefault();
                 return;
               }
-              if ((pathMode || objectPathMode) && onPathEditObjectBallTap && objectPathCollisionNormForUi) {
-                onPathEditObjectBallTap();
+              if ((pathMode || objectPathMode) && onPathEditObjectBallTap) {
+                if (
+                  canActivatePathEditForObjectBallTap({
+                    hitBallKey: key,
+                    pathEditFirstObjectBallKey,
+                    objectPathPointsLength: objectPathPoints.length,
+                  })
+                ) {
+                  onPathEditObjectBallTap();
+                  e.stopPropagation();
+                  e.preventDefault();
+                  return;
+                }
+                onZoomSetFocusCanvasPx(px, py);
                 e.stopPropagation();
                 e.preventDefault();
                 return;
               }
               if (objectPathMode && objectPathCollisionNormForUi && onAddObjectPathAim) {
+                markPathAppendForZoomDupGuard();
                 onAddObjectPathAim(aim);
                 e.stopPropagation();
                 e.preventDefault();
                 return;
               }
               if (pathMode && onAddCuePathAim) {
+                markPathAppendForZoomDupGuard();
                 onAddCuePathAim(aim);
                 e.stopPropagation();
                 e.preventDefault();
@@ -685,12 +1022,14 @@ export function NanguSolutionPathOverlay({
           }
         }
         if (objectPathMode && objectPathCollisionNormForUi && onAddObjectPathAim) {
+          markPathAppendForZoomDupGuard();
           onAddObjectPathAim(aim);
           e.stopPropagation();
           e.preventDefault();
           return;
         }
         if (pathMode && onAddCuePathAim) {
+          markPathAppendForZoomDupGuard();
           onAddCuePathAim(aim);
           e.stopPropagation();
           e.preventDefault();
@@ -701,7 +1040,7 @@ export function NanguSolutionPathOverlay({
 
       const norm = aim.norm;
 
-      /** 곡선 노드(드래그·더블탭 삭제·길게 눌러 삭제) — 활성 경로 레이어만 */
+      /** 곡선 노드(드래그·더블탭 삭제·1초 롱프레스 미세조정) — 활성 경로 레이어만 */
       if (curveHandleInteraction && pathLinesVisible && aim.kind === "playfield") {
         const tryHit = (
           kind: "cue" | "object",
@@ -734,12 +1073,20 @@ export function NanguSolutionPathOverlay({
             const k = ctl.key;
             const tRef = curveLongPressRef;
             const timer = window.setTimeout(() => {
-              if (tRef.current?.key === k) {
-                onRemove?.(k);
-                setDraggingCurve(null);
-                tRef.current = null;
+              if (tRef.current?.key !== k) return;
+              const cap = curvePointerCaptureRef.current;
+              if (cap) {
+                try {
+                  cap.el.releasePointerCapture(cap.pointerId);
+                } catch {
+                  /* ignore */
+                }
+                curvePointerCaptureRef.current = null;
               }
-            }, CURVE_LONG_PRESS_MS);
+              tRef.current = null;
+              setDraggingCurve(null);
+              setPathFineTuneTarget({ kind: "curve", curveKind: kind, key: k });
+            }, PATH_FINE_TUNE_LONG_PRESS_MS);
             curveLongPressRef.current = {
               kind,
               key: k,
@@ -749,7 +1096,9 @@ export function NanguSolutionPathOverlay({
             };
             setDraggingCurve({ kind, key: k });
             try {
-              (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+              const el = e.currentTarget as HTMLElement;
+              el.setPointerCapture(e.pointerId);
+              curvePointerCaptureRef.current = { el, pointerId: e.pointerId };
             } catch {
               /* ignore */
             }
@@ -795,9 +1144,9 @@ export function NanguSolutionPathOverlay({
         height: DEFAULT_TABLE_HEIGHT,
         allowCuePlaybackGestures: Boolean(allowCuePlaybackGestures),
         pathPlaybackActive: Boolean(pathPlaybackActive),
-        objectPathCollisionNormOverride: placementForFirstObject
-          ? objectPathCollisionNormForUi
-          : undefined,
+        objectPathCollisionNormOverride:
+          objectPathCollisionNormForUi != null ? objectPathCollisionNormForUi : undefined,
+        pathEditFirstObjectBallKey,
       });
 
       if (c.kind === "inactive") return;
@@ -869,8 +1218,12 @@ export function NanguSolutionPathOverlay({
         }
         if (p.id === effectiveObjectActiveId) {
           onPathSpotDragStart?.("object", p.id);
-          beginActiveSpotDrag(e, norm, { x: p.x, y: p.y });
+          draggingObjectIdRef.current = p.id;
           setDraggingObjectId(p.id);
+          beginActiveSpotDrag(e, norm, { x: p.x, y: p.y }, {
+            spotKind: "object",
+            spotId: p.id,
+          });
         }
         e.stopPropagation();
         e.preventDefault();
@@ -913,6 +1266,7 @@ export function NanguSolutionPathOverlay({
       }
 
       if (c.kind === "emptyObject") {
+        markPathAppendForZoomDupGuard();
         if (onAddObjectPathAim) onAddObjectPathAim(aim);
         else onAddObjectPoint?.(norm);
         e.stopPropagation();
@@ -941,8 +1295,12 @@ export function NanguSolutionPathOverlay({
         }
         if (p.id === effectiveCueActiveId) {
           onPathSpotDragStart?.("cue", p.id);
-          beginActiveSpotDrag(e, norm, { x: p.x, y: p.y });
+          draggingIdRef.current = p.id;
           setDraggingId(p.id);
+          beginActiveSpotDrag(e, norm, { x: p.x, y: p.y }, {
+            spotKind: "cue",
+            spotId: p.id,
+          });
         }
         e.stopPropagation();
         e.preventDefault();
@@ -989,12 +1347,14 @@ export function NanguSolutionPathOverlay({
         if (lastCue?.type === "cushion") {
           const n = resolveLandscapeNormFromClient(e.clientX, e.clientY);
           if (n) {
+            markPathAppendForZoomDupGuard();
             onAddPoint?.(n);
             e.stopPropagation();
             e.preventDefault();
             return;
           }
         }
+        markPathAppendForZoomDupGuard();
         if (onAddCuePathAim) onAddCuePathAim(aim);
         else onAddPoint?.(norm);
         e.stopPropagation();
@@ -1034,6 +1394,7 @@ export function NanguSolutionPathOverlay({
       onCueBallSingleTap,
       onPathEditCueBallTap,
       onPathEditObjectBallTap,
+      pathEditFirstObjectBallKey,
       effectiveCueActiveId,
       effectiveObjectActiveId,
       onCueActiveSpotChange,
@@ -1053,6 +1414,9 @@ export function NanguSolutionPathOverlay({
       onUpsertObjectDisplayCurve,
       onCurveHandleDragBegin,
       beginActiveSpotDrag,
+      onPathAppendPointerDown,
+      pathFineTuneTarget,
+      clearPathFineTuneTimers,
     ]
   );
 
@@ -1085,13 +1449,19 @@ export function NanguSolutionPathOverlay({
         kind: "cue" | "object"
       ) => {
         const slop = spotPrecisionSlopRef.current;
-        if (slop && spotPrecisionTimerRef.current != null) {
+        if (slop) {
           const dx = e.clientX - slop.clientX;
           const dy = e.clientY - slop.clientY;
           if (Math.hypot(dx, dy) > SPOT_PRECISION_MOVE_SLOP_PX) {
-            window.clearTimeout(spotPrecisionTimerRef.current);
-            spotPrecisionTimerRef.current = null;
-            spotPrecisionSlopRef.current = null;
+            if (spotPrecisionTimerRef.current != null) {
+              window.clearTimeout(spotPrecisionTimerRef.current);
+              spotPrecisionTimerRef.current = null;
+              spotPrecisionSlopRef.current = null;
+            }
+            if (spotFineTuneTimerRef.current != null) {
+              window.clearTimeout(spotFineTuneTimerRef.current);
+              spotFineTuneTimerRef.current = null;
+            }
           }
         }
         const pn = spotDragPointerNormRef.current;
@@ -1155,6 +1525,15 @@ export function NanguSolutionPathOverlay({
       const lp = curveLongPressRef.current;
       if (lp?.timer) window.clearTimeout(lp.timer);
       curveLongPressRef.current = null;
+      const cr = curvePointerCaptureRef.current;
+      if (cr && (!e || e.pointerId === cr.pointerId)) {
+        try {
+          cr.el.releasePointerCapture(cr.pointerId);
+        } catch {
+          /* ignore */
+        }
+        curvePointerCaptureRef.current = null;
+      }
       setDraggingCurve(null);
       const wasSpotDrag = draggingId != null || draggingObjectId != null;
       if (e?.currentTarget && spotPointerCaptureIdRef.current === e.pointerId) {
@@ -1164,9 +1543,13 @@ export function NanguSolutionPathOverlay({
           /* ignore */
         }
         spotPointerCaptureIdRef.current = null;
+        spotDragCaptureRef.current = null;
       } else if (spotPointerCaptureIdRef.current != null && e == null) {
         spotPointerCaptureIdRef.current = null;
+        spotDragCaptureRef.current = null;
       }
+      draggingIdRef.current = null;
+      draggingObjectIdRef.current = null;
       setDraggingId(null);
       setDraggingObjectId(null);
       if (wasSpotDrag) {
@@ -1179,7 +1562,283 @@ export function NanguSolutionPathOverlay({
 
   const interactive = pathMode || objectPathMode || Boolean(allowCuePlaybackGestures);
 
+  const pathFineTunePortal =
+    pathFineTuneTarget && typeof document !== "undefined"
+      ? createPortal(
+          <>
+            <div
+              className="fixed inset-0 z-[10060] flex items-center justify-center pointer-events-none"
+              aria-label="경로 미세조정"
+            >
+              <div
+                className="pointer-events-auto flex max-h-[min(100dvh,100vh)] flex-col items-center gap-4 rounded-2xl bg-black/20 p-3 shadow-lg backdrop-blur-sm"
+                data-path-fine-tune=""
+              >
+                <div className="grid grid-cols-3 shrink-0 gap-3 items-center justify-center w-max">
+                  <span className={FT_SPACER_CLASS} aria-hidden />
+                  <button
+                    type="button"
+                    aria-label="위로 1칸 이동"
+                    className={FT_BTN_CLASS}
+                    onPointerDown={(ev) => {
+                      ev.preventDefault();
+                      startPathFineTune(
+                        orientation === "landscape" ? 0 : -FINE_GRID_STEP_SHORT,
+                        orientation === "landscape" ? -FINE_GRID_STEP_SHORT : 0
+                      );
+                    }}
+                    onPointerUp={handlePathFineTuneEnd}
+                    onPointerLeave={handlePathFineTuneEnd}
+                    onPointerCancel={handlePathFineTuneEnd}
+                    onContextMenu={(ev) => ev.preventDefault()}
+                  >
+                    ▲
+                  </button>
+                  <span className={FT_SPACER_CLASS} aria-hidden />
+                  <button
+                    type="button"
+                    aria-label="왼쪽으로 1칸 이동"
+                    className={FT_BTN_CLASS}
+                    onPointerDown={(ev) => {
+                      ev.preventDefault();
+                      startPathFineTune(
+                        orientation === "landscape" ? -FINE_GRID_STEP_LONG : 0,
+                        orientation === "landscape" ? 0 : FINE_GRID_STEP_LONG
+                      );
+                    }}
+                    onPointerUp={handlePathFineTuneEnd}
+                    onPointerLeave={handlePathFineTuneEnd}
+                    onPointerCancel={handlePathFineTuneEnd}
+                    onContextMenu={(ev) => ev.preventDefault()}
+                  >
+                    ◀
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={pathFineTuneMagnifier ? "돋보기 끄기" : "돋보기 켜기"}
+                    aria-pressed={pathFineTuneMagnifier}
+                    className={`${FT_BTN_CLASS} ${pathFineTuneMagnifier ? "ring-2 ring-white/80" : ""}`}
+                    onClick={() => setPathFineTuneMagnifier((v) => !v)}
+                  >
+                    <Search className="mx-auto h-6 w-6" strokeWidth={2.25} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="오른쪽으로 1칸 이동"
+                    className={FT_BTN_CLASS}
+                    onPointerDown={(ev) => {
+                      ev.preventDefault();
+                      startPathFineTune(
+                        orientation === "landscape" ? FINE_GRID_STEP_LONG : 0,
+                        orientation === "landscape" ? 0 : -FINE_GRID_STEP_LONG
+                      );
+                    }}
+                    onPointerUp={handlePathFineTuneEnd}
+                    onPointerLeave={handlePathFineTuneEnd}
+                    onPointerCancel={handlePathFineTuneEnd}
+                    onContextMenu={(ev) => ev.preventDefault()}
+                  >
+                    ▶
+                  </button>
+                  <span className={FT_SPACER_CLASS} aria-hidden />
+                  <button
+                    type="button"
+                    aria-label="아래로 1칸 이동"
+                    className={FT_BTN_CLASS}
+                    onPointerDown={(ev) => {
+                      ev.preventDefault();
+                      startPathFineTune(
+                        orientation === "landscape" ? 0 : FINE_GRID_STEP_SHORT,
+                        orientation === "landscape" ? FINE_GRID_STEP_SHORT : 0
+                      );
+                    }}
+                    onPointerUp={handlePathFineTuneEnd}
+                    onPointerLeave={handlePathFineTuneEnd}
+                    onPointerCancel={handlePathFineTuneEnd}
+                    onContextMenu={(ev) => ev.preventDefault()}
+                  >
+                    ▼
+                  </button>
+                  <span className={FT_SPACER_CLASS} aria-hidden />
+                </div>
+                {pathFineTuneMagnifier && pathFineTuneMagnifierCenter && pathLinesVisible ? (
+              <div
+                className="shrink-0 cursor-grab touch-none select-none rounded-xl border-2 border-white/85 bg-slate-950/95 shadow-2xl active:cursor-grabbing"
+                style={{
+                  transform: `translate(${pathFineTuneMagOffset.x}px, ${pathFineTuneMagOffset.y}px)`,
+                  width: SPOT_MAGNIFIER_BOX_PX,
+                  height: SPOT_MAGNIFIER_BOX_PX,
+                }}
+                onPointerDown={handlePathFineTuneMagDragPointerDown}
+                onPointerMove={handlePathFineTuneMagDragPointerMove}
+                onPointerUp={handlePathFineTuneMagDragPointerUp}
+                onPointerCancel={handlePathFineTuneMagDragPointerUp}
+                aria-label="확대창 위치 이동"
+              >
+                <div className="relative h-full w-full overflow-hidden pointer-events-none" aria-hidden>
+                <svg
+                  width={SPOT_MAGNIFIER_BOX_PX}
+                  height={SPOT_MAGNIFIER_BOX_PX}
+                  viewBox={`${pathFineTuneMagnifierCenter.px - SPOT_MAGNIFIER_VIEW_RADIUS_PX} ${pathFineTuneMagnifierCenter.py - SPOT_MAGNIFIER_VIEW_RADIUS_PX} ${SPOT_MAGNIFIER_VIEW_RADIUS_PX * 2} ${SPOT_MAGNIFIER_VIEW_RADIUS_PX * 2}`}
+                  className="block"
+                >
+                  <rect
+                    x={0}
+                    y={0}
+                    width={canvasW}
+                    height={canvasH}
+                    fill={isWireframeMagnifier ? "#dbeafe" : "#2563eb"}
+                  />
+                  <rect
+                    x={drawRect.left}
+                    y={drawRect.top}
+                    width={drawRect.width}
+                    height={drawRect.height}
+                    rx={Math.max(2, ballR * 0.55)}
+                    ry={Math.max(2, ballR * 0.55)}
+                    fill={isWireframeMagnifier ? "#bae6fd" : "#7dd3fc"}
+                    stroke={isWireframeMagnifier ? "#000000" : "rgba(0,0,0,0.22)"}
+                    strokeWidth={isWireframeMagnifier ? 1 : 1}
+                  />
+                  {magnifierPlacement &&
+                    (["red", "yellow", "white"] as const).map((key) => {
+                      const base =
+                        key === "red"
+                          ? magnifierPlacement.redBall
+                          : key === "yellow"
+                            ? magnifierPlacement.yellowBall
+                            : magnifierPlacement.whiteBall;
+                      const norm = ballNormOverrides?.[key] ?? base;
+                      const { px, py } = toPx(norm.x, norm.y);
+                      const fill =
+                        key === "red" ? "#ef4444" : key === "yellow" ? "#facc15" : "#f8fafc";
+                      const cueKey = magnifierPlacement.cueBall === "yellow" ? "yellow" : "white";
+                      const isCue = key === cueKey;
+                      return (
+                        <circle
+                          key={`ft-mag-ball-${key}`}
+                          cx={px}
+                          cy={py}
+                          r={ballR}
+                          fill={fill}
+                          stroke={isCue ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,0.35)"}
+                          strokeWidth={isCue ? 1.7 : 1}
+                        />
+                      );
+                    })}
+                  {cueSegmentRender.map((seg) =>
+                    seg.mode === "line" ? (
+                      <line
+                        key={`ft-mag-cue-${seg.i}`}
+                        x1={seg.x1}
+                        y1={seg.y1}
+                        x2={seg.x2}
+                        y2={seg.y2}
+                        stroke={CUE_PATH_STROKE}
+                        strokeWidth={LINE_WIDTH}
+                        strokeLinecap="round"
+                      />
+                    ) : (
+                      <path
+                        key={`ft-mag-cue-${seg.i}`}
+                        d={`M ${seg.x1} ${seg.y1} Q ${seg.cx} ${seg.cy} ${seg.x2} ${seg.y2}`}
+                        fill="none"
+                        stroke={CUE_PATH_STROKE}
+                        strokeWidth={LINE_WIDTH}
+                        strokeLinecap="round"
+                      />
+                    )
+                  )}
+                  {objectSegmentRender.map((seg) =>
+                    seg.mode === "line" ? (
+                      <line
+                        key={`ft-mag-obj-${seg.i}`}
+                        x1={seg.x1}
+                        y1={seg.y1}
+                        x2={seg.x2}
+                        y2={seg.y2}
+                        stroke={OBJECT_PATH_STROKE}
+                        strokeWidth={LINE_WIDTH}
+                        strokeLinecap="round"
+                      />
+                    ) : (
+                      <path
+                        key={`ft-mag-obj-${seg.i}`}
+                        d={`M ${seg.x1} ${seg.y1} Q ${seg.cx} ${seg.cy} ${seg.x2} ${seg.y2}`}
+                        fill="none"
+                        stroke={OBJECT_PATH_STROKE}
+                        strokeWidth={LINE_WIDTH}
+                        strokeLinecap="round"
+                      />
+                    )
+                  )}
+                  {pathPoints.map((p, i) => {
+                    const n = cueSpotDisplayNorms[i]!;
+                    const { px, py } = toPx(n.x, n.y);
+                    const isDraggingThis = draggingId === p.id;
+                    const isActive = pathMode && p.id === effectiveCueActiveId;
+                    const strokeW = isDraggingThis ? 3 : isActive ? 2 : 0;
+                    const sr = Math.max(0, ballR - strokeW / 2);
+                    return (
+                      <circle
+                        key={`ft-mag-cspot-${p.id}`}
+                        cx={px}
+                        cy={py}
+                        r={sr}
+                        fill={SPOT_FILL}
+                        fillOpacity={SPOT_FILL_OPACITY}
+                        stroke={
+                          isDraggingThis
+                            ? "rgba(255,255,255,0.95)"
+                            : isActive
+                              ? "rgba(255,255,255,0.55)"
+                              : "none"
+                        }
+                        strokeWidth={strokeW}
+                      />
+                    );
+                  })}
+                  {objectPathPoints.map((p, i) => {
+                    const n = objectSpotDisplayNorms[i]!;
+                    const { px, py } = toPx(n.x, n.y);
+                    const isDraggingThis = draggingObjectId === p.id;
+                    const isActive = objectPathMode && p.id === effectiveObjectActiveId;
+                    const strokeW = isDraggingThis ? 3 : isActive ? 2 : 0;
+                    const sr = Math.max(0, ballR - strokeW / 2);
+                    return (
+                      <circle
+                        key={`ft-mag-ospot-${p.id}`}
+                        cx={px}
+                        cy={py}
+                        r={sr}
+                        fill={OBJECT_SPOT_FILL}
+                        fillOpacity={OBJECT_SPOT_FILL_OPACITY}
+                        stroke={
+                          isDraggingThis
+                            ? "rgba(255,255,255,0.95)"
+                            : isActive
+                              ? "rgba(255,255,255,0.55)"
+                              : "none"
+                        }
+                        strokeWidth={strokeW}
+                      />
+                    );
+                  })}
+                </svg>
+                <div className="pointer-events-none absolute left-1/2 top-1/2 z-[5] h-5 w-px -translate-x-1/2 -translate-y-1/2 bg-white/75" />
+                <div className="pointer-events-none absolute left-1/2 top-1/2 z-[5] h-px w-5 -translate-x-1/2 -translate-y-1/2 bg-white/75" />
+                </div>
+              </div>
+            ) : null}
+              </div>
+            </div>
+          </>,
+          document.body
+        )
+      : null;
+
   return (
+    <>
     <div
       data-testid="nangu-solution-path-overlay"
       data-cue-path-segment-count={cuePxSegs.length}
@@ -1306,7 +1965,7 @@ export function NanguSolutionPathOverlay({
           const n = cueSpotDisplayNorms[i]!;
           const { px, py } = toPx(n.x, n.y);
           const isDraggingThis = draggingId === p.id;
-          const isActive = p.id === effectiveCueActiveId;
+          const isActive = pathMode && p.id === effectiveCueActiveId;
           const strokeW = isDraggingThis ? 3 : isActive ? 2 : 0;
           /** 흰 라인(stroke) 포함 최종 외곽 반지름을 공 반지름(ballR)과 동일하게 유지 */
           const r = Math.max(0, ballR - strokeW / 2);
@@ -1347,7 +2006,7 @@ export function NanguSolutionPathOverlay({
           const n = objectSpotDisplayNorms[i]!;
           const { px, py } = toPx(n.x, n.y);
           const isDraggingThis = draggingObjectId === p.id;
-          const isActive = p.id === effectiveObjectActiveId;
+          const isActive = objectPathMode && p.id === effectiveObjectActiveId;
           const strokeW = isDraggingThis ? 3 : isActive ? 2 : 0;
           /** 흰 라인(stroke) 포함 최종 외곽 반지름을 공 반지름(ballR)과 동일하게 유지 */
           const r = Math.max(0, ballR - strokeW / 2);
@@ -1500,7 +2159,7 @@ export function NanguSolutionPathOverlay({
               const n = cueSpotDisplayNorms[i]!;
               const { px, py } = toPx(n.x, n.y);
               const isDraggingThis = draggingId === p.id;
-              const isActive = p.id === effectiveCueActiveId;
+              const isActive = pathMode && p.id === effectiveCueActiveId;
               const strokeW = isDraggingThis ? 3 : isActive ? 2 : 0;
               /** 확대 프리뷰도 본 화면과 동일: stroke 포함 외곽=공 크기 */
               const sr = Math.max(0, ballR - strokeW / 2);
@@ -1538,7 +2197,7 @@ export function NanguSolutionPathOverlay({
               const n = objectSpotDisplayNorms[i]!;
               const { px, py } = toPx(n.x, n.y);
               const isDraggingThis = draggingObjectId === p.id;
-              const isActive = p.id === effectiveObjectActiveId;
+              const isActive = objectPathMode && p.id === effectiveObjectActiveId;
               const strokeW = isDraggingThis ? 3 : isActive ? 2 : 0;
               /** 확대 프리뷰도 본 화면과 동일: stroke 포함 외곽=공 크기 */
               const sr = Math.max(0, ballR - strokeW / 2);
@@ -1578,5 +2237,7 @@ export function NanguSolutionPathOverlay({
         </div>
       )}
     </div>
+    {pathFineTunePortal}
+    </>
   );
 }

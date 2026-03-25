@@ -118,6 +118,21 @@ export function isClassificationEmptyForPan(c: PathPointerClassification): boole
   return c.kind === "emptyCue" || c.kind === "emptyObject";
 }
 
+/**
+ * 탭으로 경로 편집 레이어 전환: 1목은 언제나 전환 가능, 2목은 1목 경로에 스팟이 붙은 뒤에만.
+ * `undefined` → 기존(하위 호환) 동작 유지.
+ */
+export function canActivatePathEditForObjectBallTap(params: {
+  hitBallKey: "red" | "yellow" | "white";
+  pathEditFirstObjectBallKey: "red" | "yellow" | "white" | null | undefined;
+  objectPathPointsLength: number;
+}): boolean {
+  const { hitBallKey, pathEditFirstObjectBallKey } = params;
+  if (pathEditFirstObjectBallKey === undefined) return true;
+  if (pathEditFirstObjectBallKey === null) return false;
+  return hitBallKey === pathEditFirstObjectBallKey;
+}
+
 export function classifySolutionPathPointerHit(params: {
   norm: { x: number; y: number };
   pathMode: boolean;
@@ -141,6 +156,11 @@ export function classifySolutionPathPointerHit(params: {
    * 에디터에서 “수구 경로가 광선상 충돌에 실제로 닿음”을 반영할 때 전달.
    */
   objectPathCollisionNormOverride?: { x: number; y: number } | null;
+  /**
+   * 1목 공 키(광선·충돌 기준). 전달 시 `pathObjectBallTap` / `objectBallMarkingTap`에 탭 권한 검사 적용.
+   * 미전달(`undefined`)이면 기존 분류(하위 호환).
+   */
+  pathEditFirstObjectBallKey?: "red" | "yellow" | "white" | null;
 }): PathPointerClassification {
   const {
     norm,
@@ -158,6 +178,7 @@ export function classifySolutionPathPointerHit(params: {
     allowCuePlaybackGestures = false,
     pathPlaybackActive = false,
     objectPathCollisionNormOverride,
+    pathEditFirstObjectBallKey,
   } = params;
 
   const rect = getPlayfieldRect(width, height);
@@ -304,11 +325,29 @@ export function classifySolutionPathPointerHit(params: {
         /** 1목 경로 모드: 목적구 표식 — 수구 경로가 1목에 닿은 경우에만(충돌점 유효) */
         if (objectPathMode && !isCueBallKey(key)) {
           if (!collisionNorm) return { kind: "ball" };
+          if (
+            !canActivatePathEditForObjectBallTap({
+              hitBallKey: key,
+              pathEditFirstObjectBallKey,
+              objectPathPointsLength: objectPathPoints.length,
+            })
+          ) {
+            return { kind: "ball" };
+          }
           return { kind: "objectBallMarkingTap" };
         }
         /** 수구 경로: 1목으로 전환 탭 — 광선 1목 + 폴리라인 닿음이 있을 때만 */
         if (pathMode && !isCueBallKey(key)) {
           if (!collisionNorm) return { kind: "ball" };
+          if (
+            !canActivatePathEditForObjectBallTap({
+              hitBallKey: key,
+              pathEditFirstObjectBallKey,
+              objectPathPointsLength: objectPathPoints.length,
+            })
+          ) {
+            return { kind: "ball" };
+          }
           return { kind: "pathObjectBallTap" };
         }
         return { kind: "ball" };

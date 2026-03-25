@@ -5,10 +5,24 @@ import Link from "next/link";
 import { useState, useRef } from "react";
 import MobileHeader from "@/components/common/MobileHeader";
 
+const BOARD_OPTIONS = [
+  { value: "notice", label: "공지사항(관리자 전용)" },
+  { value: "free", label: "자유게시판" },
+  { value: "qna", label: "질문게시판" },
+  { value: "trouble", label: "난구해결사" },
+] as const;
+
+function normalizeBoardSlug(raw: string): string {
+  return BOARD_OPTIONS.some((o) => o.value === raw) ? raw : "";
+}
+
 export default function CommunityBoardWritePage() {
   const params = useParams();
   const router = useRouter();
   const slug = params.slug as string;
+  const [selectedBoardSlug, setSelectedBoardSlug] = useState<string>(() =>
+    normalizeBoardSlug(slug)
+  );
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -36,11 +50,15 @@ export default function CommunityBoardWritePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedBoardSlug) {
+      alert("카테고리를 선택하세요.");
+      return;
+    }
     if (!title.trim()) { setError("제목을 입력하세요."); return; }
     setError("");
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/community/boards/${slug}/posts`, {
+      const res = await fetch(`/api/community/boards/${selectedBoardSlug}/posts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -48,7 +66,11 @@ export default function CommunityBoardWritePage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "저장 실패");
-      router.push(`/community/posts/${data.id}`);
+      const detailHref =
+        selectedBoardSlug === "trouble"
+          ? `/community/trouble/${data.id}`
+          : `/community/${selectedBoardSlug}/${data.id}`;
+      router.push(detailHref);
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장 실패");
     } finally {
@@ -71,6 +93,25 @@ export default function CommunityBoardWritePage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
+            <label htmlFor="post-category" className="block text-sm font-medium mb-1">
+              카테고리
+            </label>
+            <select
+              id="post-category"
+              value={selectedBoardSlug}
+              onChange={(e) => setSelectedBoardSlug(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm"
+              required
+            >
+              <option value="">카테고리 선택</option>
+              {BOARD_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label htmlFor="post-title" className="block text-sm font-medium mb-1">제목</label>
             <input
               id="post-title"
@@ -82,7 +123,7 @@ export default function CommunityBoardWritePage() {
               placeholder="제목"
             />
           </div>
-          {slug === "notice" && (
+          {selectedBoardSlug === "notice" && (
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={isPinned} onChange={(e) => setIsPinned(e.target.checked)} />
               <span className="text-sm">상단 고정</span>
@@ -127,7 +168,11 @@ export default function CommunityBoardWritePage() {
           </div>
           {error && <p className="text-red-600 text-sm">{error}</p>}
           <div className="flex gap-3">
-            <button type="submit" disabled={submitting} className="py-2 px-4 rounded-lg bg-site-primary text-white font-medium disabled:opacity-50">
+            <button
+              type="submit"
+              disabled={submitting || !selectedBoardSlug}
+              className="py-2 px-4 rounded-lg bg-site-primary text-white font-medium disabled:opacity-50"
+            >
               {submitting ? "등록 중…" : "등록"}
             </button>
             <Link href={`/community/boards/${slug}`} className="py-2 px-4 rounded-lg border border-gray-300 dark:border-slate-600 font-medium">
