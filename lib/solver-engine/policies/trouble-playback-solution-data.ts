@@ -1,21 +1,15 @@
 import { ballSpeedToLegacySpeed, ballSpeedToLegacySpeedLevel, type BallSpeed } from "@/lib/ball-speed-constants";
 import type { PlayfieldRect } from "@/lib/billiard-table-constants";
-import { cueFirstObjectHitFromBallPlacement } from "@/lib/solution-path-geometry";
+import {
+  cueFirstObjectHitFromBallPlacement,
+  resolveEffectiveFirstObjectCollisionFromCuePath,
+} from "@/lib/solution-path-geometry";
 import { resolveTroubleFirstObjectBallKey } from "@/lib/trouble-first-object-ball";
 import type {
   NanguBallPlacement,
   NanguPathPoint,
   NanguSolutionData,
 } from "@/lib/nangu-types";
-
-function ballCenterNormForKey(
-  placement: NanguBallPlacement,
-  key: "red" | "yellow" | "white"
-) {
-  if (key === "red") return { x: placement.redBall.x, y: placement.redBall.y };
-  if (key === "yellow") return { x: placement.yellowBall.x, y: placement.yellowBall.y };
-  return { x: placement.whiteBall.x, y: placement.whiteBall.y };
-}
 
 export function buildTroublePlaybackSolutionData(params: {
   ballPlacement: NanguBallPlacement;
@@ -34,6 +28,12 @@ export function buildTroublePlaybackSolutionData(params: {
     ballPlacement.cueBall === "yellow" ? ballPlacement.yellowBall : ballPlacement.whiteBall;
   const pointsForPath = pathPoints.map((p) => ({ x: p.x, y: p.y }));
   const firstHit = cueFirstObjectHitFromBallPlacement(cuePos, pathPoints[0], ballPlacement, rect);
+  const effectiveContact = resolveEffectiveFirstObjectCollisionFromCuePath(
+    ballPlacement,
+    cuePos,
+    pathPoints,
+    rect
+  );
   const resolvedStruckKey = resolveTroubleFirstObjectBallKey({
     placement: ballPlacement,
     cuePos,
@@ -44,11 +44,12 @@ export function buildTroublePlaybackSolutionData(params: {
   const struckKey = resolvedStruckKey ?? firstHit?.objectKey ?? null;
 
   let reflectionPath: NanguSolutionData["reflectionPath"];
-  if (struckKey && objectPathPoints.length >= 1) {
+  /** 1목 경로: 수구 폴리라인이 광선 충돌에 닿을 때만, 첫 점은 접촉점(원주) — 공 중심 아님 */
+  if (effectiveContact && objectPathPoints.length >= 1) {
     const objPts = objectPathPoints.map((p) => ({ x: p.x, y: p.y }));
-    const startNorm = ballCenterNormForKey(ballPlacement, struckKey);
+    const c = effectiveContact.collision;
     reflectionPath = {
-      points: [{ x: startNorm.x, y: startNorm.y }, ...objPts],
+      points: [{ x: c.x, y: c.y }, ...objPts],
       pointsWithType: objectPathPoints,
     };
   }
@@ -62,7 +63,7 @@ export function buildTroublePlaybackSolutionData(params: {
     spinY: 0,
     paths: [{ points: pointsForPath, pointsWithType: pathPoints }],
     reflectionPath,
-    reflectionObjectBall: reflectionPath && struckKey ? struckKey : undefined,
+    reflectionObjectBall: reflectionPath && effectiveContact ? effectiveContact.objectKey : undefined,
     ballSpeed,
     speedLevel: ballSpeedToLegacySpeedLevel(ballSpeed),
     speed: ballSpeedToLegacySpeed(ballSpeed),

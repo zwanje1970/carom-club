@@ -1,11 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { sanitizeImageSrc } from "@/lib/image-src";
+import { isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
 import type { Popup as PopupType } from "@/types/popup";
 
 const STORAGE_PREFIX = "carom_popup_hide_";
+
+/** LCP: Lighthouse가 메인 콘텐츠를 먼저 측정하도록 팝업 DOM·이미지 요청을 지연 */
+const POPUP_SHOW_DELAY_MS = 4000;
 
 type Props = {
   popup: PopupType;
@@ -27,7 +31,8 @@ export function Popup({ popup, onClose }: Props) {
         }
       }
     }
-    setVisible(true);
+    const id = window.setTimeout(() => setVisible(true), POPUP_SHOW_DELAY_MS);
+    return () => clearTimeout(id);
   }, [popup.id, popup.hideForTodayEnabled, storageKey, onClose]);
 
   const handleClose = () => {
@@ -84,12 +89,24 @@ export function Popup({ popup, onClose }: Props) {
             if (!safeSrc) return null;
             return (
               <div className="relative mt-4 aspect-video w-full overflow-hidden rounded">
-                <img
-                  src={safeSrc}
-                  alt={popup.title ? `${popup.title} 안내 이미지` : "팝업 이미지"}
-                  className="absolute inset-0 w-full h-full object-cover min-h-[80px]"
-                  data-debug-src={safeSrc}
-                />
+                {isOptimizableImageSrc(safeSrc) ? (
+                  <Image
+                    src={safeSrc}
+                    alt={popup.title ? `${popup.title} 안내 이미지` : "팝업 이미지"}
+                    fill
+                    sizes="(max-width: 448px) 100vw, 448px"
+                    quality={78}
+                    className="object-cover"
+                    data-debug-src={safeSrc}
+                  />
+                ) : (
+                  <img
+                    src={safeSrc}
+                    alt={popup.title ? `${popup.title} 안내 이미지` : "팝업 이미지"}
+                    className="absolute inset-0 w-full h-full object-cover min-h-[80px]"
+                    data-debug-src={safeSrc}
+                  />
+                )}
               </div>
             );
           })()}

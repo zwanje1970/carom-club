@@ -476,16 +476,8 @@ export function NanguSolutionPathOverlay({
     return [first, ...cueSegmentsNorm.slice(1)];
   }, [cueSegmentsNorm, collisionRect]);
 
-  const objectSegmentsNormForDraw = useMemo(() => {
-    if (objectSegmentsNorm.length < 1) return objectSegmentsNorm;
-    const first = { ...objectSegmentsNorm[0]! };
-    first.start = outwardOffsetFromBallCenterTowardPointNorm(
-      first.start,
-      first.end,
-      collisionRect
-    );
-    return [first, ...objectSegmentsNorm.slice(1)];
-  }, [objectSegmentsNorm, collisionRect]);
+  /** 1목 경로 첫 점은 광선 충돌 접점(원주) — 수구용 outwardOffset은 중심→외곽용이라 여기 적용 시 중심에서 출발하는 것처럼 보임 */
+  const objectSegmentsNormForDraw = objectSegmentsNorm;
 
   const cuePxSegs = useMemo(
     () =>

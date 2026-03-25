@@ -53,8 +53,8 @@
     @apply antialiased;
     background-color: var(--site-bg);
     color: var(--site-text);
-    font-family: var(--font-pretendard), var(--font-noto-sans-kr), -apple-system, BlinkMacSystemFont,
-      system-ui, "Apple SD Gothic Neo", sans-serif;
+    font-family: var(--font-pretendard), -apple-system, BlinkMacSystemFont, system-ui,
+      "Apple SD Gothic Neo", sans-serif;
   }
   /* 편집기/콘텐츠에서 선택 가능한 웹폰트가 정상 적용되도록 font-family 사용 시 fallback */
   [style*="font-family"] {

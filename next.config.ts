@@ -104,6 +104,10 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  /** barrel import 트리쉐이킹 — 레거시 JS·미사용 청크 완화에 도움 */
+  experimental: {
+    optimizePackageImports: ["@tiptap/react", "@tiptap/starter-kit"],
+  },
   outputFileTracingRoot: path.join(__dirname),
 
   /** www/apex·HTTP 정규화 redirects 는 사용하지 않음 — Vercel Domains(리다이렉트·HTTPS)와 중복 시 ERR_TOO_MANY_REDIRECTS 발생 가능 */

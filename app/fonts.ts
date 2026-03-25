@@ -1,5 +1,4 @@
 import localFont from "next/font/local";
-import { Noto_Sans_KR } from "next/font/google";
 
 /** CDN 제거 — 빌드 시 자체 호스팅 (node_modules/pretendard) */
 export const pretendard = localFont({
@@ -28,13 +27,4 @@ export const pretendard = localFont({
   variable: "--font-pretendard",
   display: "swap",
   preload: true,
-});
-
-/** Google Fonts 링크 대체 — Next가 최적화·로컬 번들 */
-export const notoSansKr = Noto_Sans_KR({
-  weight: ["300", "400", "500", "700"],
-  subsets: ["latin"],
-  variable: "--font-noto-sans-kr",
-  display: "swap",
-  preload: false,
 });

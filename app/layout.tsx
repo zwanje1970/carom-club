@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { pretendard, notoSansKr } from "./fonts";
+import { pretendard } from "./fonts";
 import { IntroRoot } from "@/components/intro/IntroRoot";
 import { MainSiteHeaderWrapper } from "@/components/layout/MainSiteHeaderWrapper";
 import { MobileBottomNavWrapper } from "@/components/layout/MobileBottomNavWrapper";
@@ -100,7 +100,7 @@ export default async function RootLayout({
   return (
     <html
       lang="ko"
-      className={`scroll-smooth ${pretendard.variable} ${notoSansKr.variable}`}
+      className={`scroll-smooth ${pretendard.variable}`}
     >
       <head>
         <link rel="manifest" href="/manifest.json" />

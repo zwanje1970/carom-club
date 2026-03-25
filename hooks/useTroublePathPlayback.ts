@@ -44,7 +44,10 @@ import {
   sampleCueMotion,
   sampleObjectMotion,
 } from "@/lib/solution-path-motion";
-import { cueFirstObjectHitFromBallPlacement } from "@/lib/solution-path-geometry";
+import {
+  cueFirstObjectHitFromBallPlacement,
+  resolveEffectiveFirstObjectCollisionFromCuePath,
+} from "@/lib/solution-path-geometry";
 import { resolveTroubleFirstObjectBallKey } from "@/lib/trouble-first-object-ball";
 import { getCuePlayableDistanceFromBallSpeed } from "@/lib/trouble-playback-distance";
 import { getThicknessLossRatio } from "@/lib/trouble-thickness-split";
@@ -162,16 +165,6 @@ export type TroublePlaybackTimingDebug = {
   warningTriggeredRelMs: number | null;
   playbackPhaseAtEnd: "cue" | "object" | "idle";
 };
-
-function ballCenterNormForKey(
-  placement: NanguBallPlacement,
-  key: "red" | "yellow" | "white"
-): NormPoint {
-  if (key === "red") return { x: placement.redBall.x, y: placement.redBall.y };
-  if (key === "yellow") return { x: placement.yellowBall.x, y: placement.yellowBall.y };
-  return { x: placement.whiteBall.x, y: placement.whiteBall.y };
-}
-
 
 export function useTroublePathPlayback(options: {
   ballPlacement: NanguBallPlacement | null;
@@ -450,6 +443,21 @@ export function useTroublePathPlayback(options: {
     const lastCueVertex =
       cuePlan.polylineNormalized[cuePlan.polylineNormalized.length - 1]!;
 
+    const cuePosStart =
+      placement.cueBall === "yellow" ? placement.yellowBall : placement.whiteBall;
+    const firstHitInfo = cueFirstObjectHitFromBallPlacement(
+      cuePosStart,
+      options.pathPoints[0]!,
+      placement,
+      rect
+    );
+    const effectiveContactPlayback = resolveEffectiveFirstObjectCollisionFromCuePath(
+      placement,
+      cuePosStart,
+      options.pathPoints,
+      rect
+    );
+
     const dTotal = cuePlan.pathLengthPx;
     /**
      * 1紐?object ?섏씠利??쒖옉: **泥?* 1紐?怨??ㅽ뙚源뚯???嫄곕━ 鍮꾩쑉(?꾩껜 鍮④컙 湲몄씠 ?鍮?.
@@ -476,14 +484,18 @@ export function useTroublePathPlayback(options: {
     /** 泥??묒큺 援ш컙???앸궃 ?ㅼ뿉留??섍뎄??紐?留욌떯?뚯쓣 ?ъ땐?뚮줈 ?먯젙(泥??우쓬 吏곹썑 ?꾨젅???ㅽ깘 諛⑹?) */
     const pWarnRecontactAfter = Math.min(1, pHitFirst + recontactBump01);
 
-    /** ?뚮? 寃쎈줈 ?쒖옉?? 1紐?以묒떖(?섍뎄 ?꾩튂? ?낅┰) */
+    /** 1목 경로 시작: 광선상 충돌 접점(수구 폴리라인이 닿을 때만 유효) — 공 중심 아님 */
     let objectPathStartNorm: NormPoint;
     if (
       playbackData.reflectionPath?.points &&
       playbackData.reflectionPath.points.length >= 2 &&
-      playbackData.reflectionObjectBall
+      playbackData.reflectionObjectBall &&
+      effectiveContactPlayback
     ) {
-      objectPathStartNorm = ballCenterNormForKey(placement, playbackData.reflectionObjectBall);
+      objectPathStartNorm = {
+        x: effectiveContactPlayback.collision.x,
+        y: effectiveContactPlayback.collision.y,
+      };
     } else if (playbackData.reflectionPath?.points?.[0]) {
       const p0 = playbackData.reflectionPath.points[0];
       objectPathStartNorm = { x: p0.x, y: p0.y };
@@ -596,18 +608,6 @@ export function useTroublePathPlayback(options: {
     let lastCueLogBucket = -1;
     let lastObjLogBucket = -1;
 
-    /**
-     * ?ㅼ쐞移?1紐⑷낵???섎룄??泥??묒큺): ?섍뎄 愿묒꽑??癒쇱? 留욌뒗 1紐??꾨낫 ???섍뎄 援ш컙 ?꾩껜?먯꽌 ?대떦 怨듦낵??留욌떯?뚯? 異⑸룎濡?蹂댁? ?딆쓬.
-     * (?ㅽ뙚 洹쇱쿂 8px 議곌굔? ?쒖떆 醫뚰몴쨌?ㅽ뙚 蹂댁젙 李⑤줈 ?ㅽ깘???섏? ?쒓굅??)
-     */
-    const cuePosStart =
-      placement.cueBall === "yellow" ? placement.yellowBall : placement.whiteBall;
-    const firstHitInfo = cueFirstObjectHitFromBallPlacement(
-      cuePosStart,
-      options.pathPoints[0]!,
-      placement,
-      rect
-    );
     /**
      * 1紐?異⑸룎 寃쎄퀬 ?쒖쇅??"?ㅼ젣 ?ъ깮?먯꽌 1紐⑹쑝濡??吏곸씠??怨?怨?諛섎뱶???숈씪?댁빞 ?쒕떎.
      * ?곗꽑?쒖쐞:
