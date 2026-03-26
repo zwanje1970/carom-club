@@ -115,7 +115,7 @@ export function NanguPostDetailClient({
         <div className="flex items-center justify-between gap-4">
           <h2 id="nangu-solutions" className="text-lg font-semibold">해법 ({solutions.length})</h2>
           <Link
-            href={`/community/nangu/${post.id}/solution/new`}
+            href={`/community/nangu/${post.id}/solve`}
             className="shrink-0 py-2 px-4 rounded-lg bg-site-primary text-white text-sm font-medium"
           >
             해법 제시
