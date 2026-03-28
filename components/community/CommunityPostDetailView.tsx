@@ -32,6 +32,7 @@ function CommentItem({
   onDelete,
   onReply,
   onReport,
+  canReply,
   depth = 0,
 }: {
   comment: Comment;
@@ -39,6 +40,7 @@ function CommentItem({
   onDelete: (commentId: string) => void;
   onReply: (commentId: string) => void;
   onReport: (commentId: string) => void;
+  canReply: boolean;
   depth?: number;
 }) {
   return (
@@ -57,9 +59,11 @@ function CommentItem({
               <button type="button" onClick={() => onLike(comment.id)} className={comment.liked ? "text-site-primary font-medium" : ""}>
                 추천 {comment.likeCount}
               </button>
-              <button type="button" onClick={() => onReply(comment.id)} className="text-site-primary">
-                답글
-              </button>
+              {canReply && (
+                <button type="button" onClick={() => onReply(comment.id)} className="text-site-primary">
+                  답글
+                </button>
+              )}
               {comment.isAuthor && (
                 <button type="button" onClick={() => onDelete(comment.id)} className="text-red-600">삭제</button>
               )}
@@ -78,6 +82,7 @@ function CommentItem({
               onDelete={onDelete}
               onReply={onReply}
               onReport={onReport}
+              canReply={canReply}
               depth={depth + 1}
             />
           ))}
@@ -137,6 +142,8 @@ type CommunityPostDetailPostState = {
   isHidden?: boolean;
   isSolved?: boolean;
   isLoggedIn?: boolean;
+  canCreateTroubleSolution?: boolean;
+  canAcceptTroubleSolution?: boolean;
   troubleShot?: {
     layoutImageUrl: string | null;
     difficulty: string | null;
@@ -183,6 +190,7 @@ export function CommunityPostDetailView({
   initialPostJson,
   initialComments,
   initialTroubleSolutions,
+  canCreateComment = false,
 }: {
   postId: string;
   linkOverrides?: CommunityPostDetailViewLinkOverrides;
@@ -191,6 +199,7 @@ export function CommunityPostDetailView({
   initialPostJson?: CommunityPostDetailJson;
   initialComments?: Comment[];
   initialTroubleSolutions?: TroubleSolutionListItem[];
+  canCreateComment?: boolean;
 }) {
   const router = useRouter();
   const [post, setPost] = useState<CommunityPostDetailPostState | null>(() =>
@@ -469,9 +478,8 @@ export function CommunityPostDetailView({
 
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
-      <MobileHeader title={post.title || "게시글"} showBack showClose onClosePath="/community" />
-      <div className="mx-auto w-full max-w-3xl px-4 py-6 pt-14 sm:px-6">
-        <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4" aria-label="breadcrumb">
+      <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
+        <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4 md:flex hidden" aria-label="breadcrumb">
           <Link href="/community" className="hover:text-site-primary">커뮤니티</Link>
           <span aria-hidden>/</span>
           <Link href={listHref} className="hover:text-site-primary">{post.boardName}</Link>
@@ -606,21 +614,21 @@ export function CommunityPostDetailView({
                 신고
               </button>
               {post.boardSlug === "trouble" && (
-                post.isLoggedIn ? (
+                post.isLoggedIn && post.canCreateTroubleSolution ? (
                   <Link
                     href={`/community/trouble/${postId}/solution/new`}
                     className="py-2 px-4 rounded-lg text-sm font-medium bg-site-primary text-white hover:opacity-90"
                   >
                     난구해법 제시
                   </Link>
-                ) : (
+                ) : !post.isLoggedIn ? (
                   <Link
                     href={`/login?redirect=${encodeURIComponent(`/community/trouble/${postId}`)}`}
                     className="py-2 px-4 rounded-lg text-sm font-medium border border-site-primary text-site-primary hover:bg-site-primary/10"
                   >
                     로그인하면 난구해법 제시 가능
                   </Link>
-                )
+                ) : null
               )}
             </div>
           </div>
@@ -637,7 +645,7 @@ export function CommunityPostDetailView({
             ) : troubleSolutions.length === 0 ? (
               <div className="rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 p-6 text-center">
                 <p className="text-gray-500 dark:text-gray-400">아직 등록된 난구해법이 없습니다.</p>
-                {post.isLoggedIn && (
+                {post.isLoggedIn && post.canCreateTroubleSolution && (
                   <Link
                     href={`/community/trouble/${postId}/solution/new`}
                     className="mt-3 inline-block py-2 px-4 rounded-lg text-sm font-medium bg-site-primary text-white hover:opacity-90"
@@ -650,7 +658,7 @@ export function CommunityPostDetailView({
               <ul className="space-y-6">
                 {troubleSolutions.map((sol) => {
                   const busy = troubleSolutionBusyId === sol.id;
-                  const canAdopt = post.isAuthor && !sol.isAccepted;
+                  const canAdopt = !!post.canAcceptTroubleSolution && !sol.isAccepted;
                   const acceptedId = post.troubleShot?.acceptedSolutionId;
                   const isAccepted = acceptedId === sol.id;
                   return (
@@ -793,22 +801,24 @@ export function CommunityPostDetailView({
 
         <section className="mt-8" aria-labelledby="comments-heading">
           <h2 id="comments-heading" className="text-lg font-semibold mb-4">댓글 ({post.commentCount})</h2>
-          <form onSubmit={handleSubmitComment} className="mb-4">
-            {replyToId && (
-              <p className="text-sm text-gray-500 mb-1">답글 작성 중 <button type="button" onClick={() => setReplyToId(null)} className="text-site-primary underline">취소</button></p>
-            )}
-            <textarea
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              rows={3}
-              placeholder={replyToId ? "답글을 입력하세요." : "댓글을 입력하세요."}
-              className="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2"
-              id="comment-input"
-            />
-            <button type="submit" disabled={submittingComment || !commentText.trim()} className="mt-2 py-2 px-4 rounded-lg bg-site-primary text-white text-sm font-medium disabled:opacity-50">
-              {submittingComment ? "등록 중…" : replyToId ? "답글 등록" : "댓글 등록"}
-            </button>
-          </form>
+          {canCreateComment && (
+            <form onSubmit={handleSubmitComment} className="mb-4">
+              {replyToId && (
+                <p className="text-sm text-gray-500 mb-1">답글 작성 중 <button type="button" onClick={() => setReplyToId(null)} className="text-site-primary underline">취소</button></p>
+              )}
+              <textarea
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                rows={3}
+                placeholder={replyToId ? "답글을 입력하세요." : "댓글을 입력하세요."}
+                className="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2"
+                id="comment-input"
+              />
+              <button type="submit" disabled={submittingComment || !commentText.trim()} className="mt-2 py-2 px-4 rounded-lg bg-site-primary text-white text-sm font-medium disabled:opacity-50">
+                {submittingComment ? "등록 중…" : replyToId ? "답글 등록" : "댓글 등록"}
+              </button>
+            </form>
+          )}
           <ul className="space-y-3">
             {comments.map((c) => (
               <CommentItem
@@ -818,6 +828,7 @@ export function CommunityPostDetailView({
                 onDelete={handleDeleteComment}
                 onReply={setReplyToId}
                 onReport={(targetId) => handleReport("comment", targetId)}
+                canReply={canCreateComment}
               />
             ))}
           </ul>

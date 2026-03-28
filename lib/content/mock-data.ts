@@ -37,6 +37,7 @@ export const mockPageSections: PageSection[] = [
     sortOrder: 10,
     startAt: past,
     endAt: future,
+    sectionStyleJson: null,
     createdAt: now,
     updatedAt: now,
   },
@@ -63,30 +64,13 @@ export const mockPageSections: PageSection[] = [
     sortOrder: 5,
     startAt: null,
     endAt: null,
+    sectionStyleJson: null,
     createdAt: now,
     updatedAt: now,
   },
 ];
 
-export const mockPopups: Popup[] = [
-  {
-    id: "pop-1",
-    title: "신규 대회 안내",
-    description: "이번 달 대회가 오픈되었습니다.",
-    imageUrl: null,
-    buttonName: "자세히 보기",
-    buttonLink: "/tournaments",
-    page: "home",
-    startAt: past,
-    endAt: future,
-    hideForTodayEnabled: true,
-    showCloseButton: true,
-    isVisible: true,
-    sortOrder: 0,
-    createdAt: now,
-    updatedAt: now,
-  },
-];
+export const mockPopups: Popup[] = [];
 
 export const mockNoticeBars: NoticeBar[] = [
   {

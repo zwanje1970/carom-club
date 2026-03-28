@@ -7,9 +7,10 @@ import { LogoLink } from "@/components/intro/LogoLink";
 import { useSiteSettings } from "@/components/SiteSettingsProvider";
 import type { SessionUser } from "@/types/auth";
 
-const DEFAULT_HEADER_BG = "#0a0a0a";
-const DEFAULT_HEADER_TEXT = "#d1d5db";
-const DEFAULT_HEADER_ACTIVE = "#fbbf24";
+/** 폴백은 globals.css :root --site-header-* 와 동일 */
+const DEFAULT_HEADER_BG = "var(--site-header-bg, #0a0a0a)";
+const DEFAULT_HEADER_TEXT = "var(--site-header-text, #d1d5db)";
+const DEFAULT_HEADER_ACTIVE = "var(--site-header-active, #fbbf24)";
 
 const NAV = [
   { href: "/", label: "HOME" },

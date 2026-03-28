@@ -15,6 +15,8 @@ interface NoteItem {
   imageUrl: string | null;
   visibility: string;
   createdAt: string;
+  sentToSolverCount?: number;
+  /** @deprecated — sentToSolverCount와 동일(호환) */
   sentToTroubleCount?: number;
 }
 
@@ -189,7 +191,8 @@ export function BilliardNotesListClient({ basePath = "/mypage/notes" }: Billiard
                   </p>
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     {formatKoreanDate(n.createdAt)} · {n.visibility === "community" ? "공개" : "비공개"}
-                    {(n.sentToTroubleCount ?? 0) > 0 && ` · 난구 ${n.sentToTroubleCount}회`}
+                    {(n.sentToSolverCount ?? n.sentToTroubleCount ?? 0) > 0 &&
+                      ` · 난구 ${n.sentToSolverCount ?? n.sentToTroubleCount}회`}
                   </p>
                 </div>
               </Link>

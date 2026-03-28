@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { getAdminCopy, updateAdminCopy } from "@/lib/admin-copy";
+import { getAdminCopy, updateAdminCopy } from "@/lib/admin-copy-server";
 
 export async function GET() {
   const session = await getSession();

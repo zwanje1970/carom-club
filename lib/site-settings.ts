@@ -31,6 +31,8 @@ export type SiteSettings = {
   withdrawRejoinDays: number;
   /** 메인 진행중 대회·당구장 가로 흐름 속도(1~100) */
   homeCarouselFlowSpeed: number;
+  /** 일반회원(USER) 난구해결사 해법 등록 최소 LEVEL */
+  minSolutionLevelForUser: number;
   headerBgColor: string | null;
   headerTextColor: string | null;
   headerActiveColor: string | null;
@@ -45,6 +47,7 @@ const DEFAULTS: SiteSettings = {
   secondaryColor: DEFAULT_SECONDARY_COLOR,
   withdrawRejoinDays: 0,
   homeCarouselFlowSpeed: 50,
+  minSolutionLevelForUser: 1,
   headerBgColor: null,
   headerTextColor: null,
   headerActiveColor: null,
@@ -110,6 +113,7 @@ type SiteSettingRow = {
   secondaryColor: string;
   withdrawRejoinDays?: number;
   homeCarouselFlowSpeed?: number;
+  minSolutionLevelForUser?: number;
   headerBgColor?: string | null;
   headerTextColor?: string | null;
   headerActiveColor?: string | null;
@@ -132,6 +136,10 @@ type SiteSettingRow = {
 
 function dbRowToSettings(row: SiteSettingRow): SiteSettings {
   const footer = dbRowToFooterSettings(row as Parameters<typeof dbRowToFooterSettings>[0]);
+  const minSolutionLevelForUser = Math.min(
+    15,
+    Math.max(1, Math.floor(Number(row.minSolutionLevelForUser ?? DEFAULTS.minSolutionLevelForUser)) || 1)
+  );
   return {
     siteName: row.siteName,
     siteDescription: row.siteDescription,
@@ -140,6 +148,7 @@ function dbRowToSettings(row: SiteSettingRow): SiteSettings {
     secondaryColor: row.secondaryColor,
     withdrawRejoinDays: row.withdrawRejoinDays ?? 0,
     homeCarouselFlowSpeed: clampFlowSpeed(row.homeCarouselFlowSpeed),
+    minSolutionLevelForUser,
     headerBgColor: row.headerBgColor ?? null,
     headerTextColor: row.headerTextColor ?? null,
     headerActiveColor: row.headerActiveColor ?? null,
@@ -166,6 +175,13 @@ export async function updateSiteSettings(
           headerActiveColor: data.headerActiveColor ?? null,
         }
       : null;
+  const minSolutionLevelForUser =
+    data.minSolutionLevelForUser !== undefined
+      ? Math.min(15, Math.max(1, Math.floor(Number(data.minSolutionLevelForUser)) || 1))
+      : undefined;
+  const headerBgColor = headerPayload?.headerBgColor ?? null;
+  const headerTextColor = headerPayload?.headerTextColor ?? null;
+  const headerActiveColor = headerPayload?.headerActiveColor ?? null;
 
   if (!existing) {
     const created = await prisma.siteSetting.create({
@@ -178,12 +194,13 @@ export async function updateSiteSettings(
         withdrawRejoinDays: data.withdrawRejoinDays ?? DEFAULTS.withdrawRejoinDays,
       },
     });
-    if (headerPayload) {
+    if (headerPayload || minSolutionLevelForUser !== undefined) {
       await prisma.$executeRaw`
         UPDATE "SiteSetting"
-        SET "headerBgColor" = ${headerPayload.headerBgColor},
-            "headerTextColor" = ${headerPayload.headerTextColor},
-            "headerActiveColor" = ${headerPayload.headerActiveColor},
+        SET "headerBgColor" = ${headerBgColor},
+            "headerTextColor" = ${headerTextColor},
+            "headerActiveColor" = ${headerActiveColor},
+            "minSolutionLevelForUser" = ${minSolutionLevelForUser ?? DEFAULTS.minSolutionLevelForUser},
             "updatedAt" = ${new Date()}
         WHERE "id" = ${created.id}
       `;
@@ -219,12 +236,13 @@ export async function updateSiteSettings(
     where: { id: existing.id },
     data: updatePayload,
   });
-  if (headerPayload) {
+  if (headerPayload || minSolutionLevelForUser !== undefined) {
     await prisma.$executeRaw`
       UPDATE "SiteSetting"
-      SET "headerBgColor" = ${headerPayload.headerBgColor},
-          "headerTextColor" = ${headerPayload.headerTextColor},
-          "headerActiveColor" = ${headerPayload.headerActiveColor},
+      SET "headerBgColor" = CASE WHEN ${headerPayload !== null} THEN ${headerBgColor} ELSE "headerBgColor" END,
+          "headerTextColor" = CASE WHEN ${headerPayload !== null} THEN ${headerTextColor} ELSE "headerTextColor" END,
+          "headerActiveColor" = CASE WHEN ${headerPayload !== null} THEN ${headerActiveColor} ELSE "headerActiveColor" END,
+          "minSolutionLevelForUser" = COALESCE(${minSolutionLevelForUser}, "minSolutionLevelForUser"),
           "updatedAt" = ${new Date()}
       WHERE "id" = ${existing.id}
     `;

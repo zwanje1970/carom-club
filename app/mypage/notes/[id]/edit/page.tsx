@@ -132,6 +132,7 @@ export default function MypageEditNotePage() {
         initialYellow={note.yellowBall}
         initialWhite={note.whiteBall}
         initialCueBall={note.cueBall}
+        showCuePickerOnStart={false}
         includeMemoField
         initialMemo={note.memo ?? ""}
         onSave={handleSaveCore}

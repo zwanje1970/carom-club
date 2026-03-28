@@ -68,8 +68,10 @@ function newLine(): DraftLine {
 
 export function ClientBillingSettlementConsole({
   initialTournamentId,
+  showPlatformBillingLink,
 }: {
   initialTournamentId: string | null;
+  showPlatformBillingLink: boolean;
 }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -131,14 +133,20 @@ export function ClientBillingSettlementConsole({
       <ConsolePageHeader
         eyebrow="정산 관리"
         title="대회 정산"
-        description="종료 대회의 참가비·환불·상금·비용을 입력하고, 대회별·기간별 순이익을 확인합니다. 플랫폼 구독·결제는 「플랫폼 이용」에서 다룹니다."
+        description={
+          showPlatformBillingLink
+            ? "종료 대회의 참가비·환불·상금·비용을 입력하고, 대회별·기간별 순이익을 확인합니다. 플랫폼 구독·결제는 「플랫폼 이용」에서 다룹니다."
+            : "종료 대회의 참가비·환불·상금·비용을 입력하고, 대회별·기간별 순이익을 확인합니다."
+        }
         actions={
-          <Link
-            href="/client/billing/platform"
-            className="rounded-sm border border-zinc-400 px-2.5 py-1.5 text-[11px] font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-500 dark:text-zinc-200 dark:hover:bg-zinc-800"
-          >
-            플랫폼 이용·구독 →
-          </Link>
+          showPlatformBillingLink ? (
+            <Link
+              href="/client/billing/platform"
+              className="rounded-sm border border-zinc-400 px-2.5 py-1.5 text-[11px] font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-500 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            >
+              플랫폼 이용·구독 →
+            </Link>
+          ) : undefined
         }
       />
 

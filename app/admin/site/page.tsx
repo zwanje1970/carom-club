@@ -16,6 +16,8 @@ import {
   mdiFormatListBulleted,
   mdiTable,
   mdiChevronRight,
+  mdiForum,
+  mdiToggleSwitch,
 } from "@mdi/js";
 import Icon from "@/components/admin/_components/Icon";
 import SectionMain from "@/components/admin/_components/Section/Main";
@@ -34,13 +36,15 @@ type HubStats = {
 };
 
 const SHORTCUTS = [
-  { href: "/admin/site/design", label: "스타일 설정", icon: mdiPalette, desc: "메인 컬러, 버튼·카드 스타일, 테두리·간격" },
-  { href: "/admin/site/main", label: "메인페이지 구성", icon: mdiPageLayoutBody, desc: "섹션 노출/숨김, 순서, 제목·배경" },
-  { href: "/admin/site/hero", label: "히어로 설정", icon: mdiViewCarousel, desc: "히어로 제목, 설명, 배경 이미지, 버튼" },
-  { href: "/admin/notice-bars", label: "공지바 관리", icon: mdiBullhorn, desc: "상단 공지줄 제목·내용·노출 기간" },
-  { href: "/admin/popups", label: "팝업 관리", icon: mdiWindowRestore, desc: "레이어 팝업 제목·본문·노출 기간" },
-  { href: "/admin/site/copy", label: "문구 관리", icon: mdiFormatListBulleted, desc: "고정 문구, 메뉴명, 페이지 제목, 안내 문구" },
-  { href: "/admin/site/footer", label: "푸터 관리", icon: mdiTable, desc: "로고, 소개, 연락처, 링크, 푸터 색상" },
+  { href: "/admin/site/settings", label: "디자인/브랜드 설정", icon: mdiPalette, desc: "로고, 테마 색, 헤더 색, 캐러셀 속도, 탈퇴 재가입" },
+  { href: "/admin/site/home", label: "홈 화면 설정", icon: mdiPageLayoutBody, desc: "메인 구성·히어로로 이동" },
+  { href: "/admin/site/community", label: "커뮤니티 설정", icon: mdiPageLayoutBody, desc: "해법 제시 최소 레벨 등 정책" },
+  { href: "/admin/site/hero", label: "히어로 설정", icon: mdiViewCarousel, desc: "메인 상단 히어로(정본 편집)" },
+  { href: "/admin/site/features", label: "기능 설정", icon: mdiViewCarousel, desc: "가입·대회 등 기능 ON/OFF" },
+  { href: "/admin/notice-bars", label: "공지바 관리", icon: mdiBullhorn, desc: "콘텐츠: 상단 공지줄" },
+  { href: "/admin/popups", label: "팝업 관리", icon: mdiWindowRestore, desc: "콘텐츠: 레이어 팝업" },
+  { href: "/admin/site/copy", label: "문구 관리", icon: mdiFormatListBulleted, desc: "메뉴명·안내 문구·고정 문구" },
+  { href: "/admin/site/footer", label: "푸터 관리", icon: mdiTable, desc: "하단 푸터 정보·협력사" },
 ];
 
 export default function AdminSiteDashboardPage() {
@@ -80,8 +84,9 @@ export default function AdminSiteDashboardPage() {
   return (
     <SectionMain>
       <SectionTitleLineWithButton icon={mdiViewDashboard} title="사이트관리 대시보드" />
-      <p className="mb-6 text-sm text-gray-600 dark:text-slate-400">
-        색상·메인 구성·히어로·공지·팝업·문구·푸터를 한 곳에서 확인하고 각 메뉴로 이동할 수 있습니다.
+      <p className="mb-6 text-sm text-gray-600 dark:text-slate-400 max-w-3xl">
+        <strong>사이트 운영</strong>(브랜드·정책·문구·히어로)과 <strong>콘텐츠</strong>(섹션·팝업·공지)를 구분해 안내합니다. 왼쪽
+        「사이트관리」하위 메뉴에서 항목별로 이동할 수 있습니다.
       </p>
 
       {loading ? (

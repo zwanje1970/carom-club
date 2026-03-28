@@ -82,6 +82,7 @@ export async function POST(request: Request) {
       email: true,
       password: true,
       role: true,
+      roleId: true,
       status: true,
       withdrawnAt: true,
     } as const;
@@ -101,6 +102,7 @@ export async function POST(request: Request) {
       email: string;
       password: string;
       role: string;
+      roleId?: string | null;
       status?: string | null;
       withdrawnAt?: Date | null;
     };
@@ -132,7 +134,7 @@ export async function POST(request: Request) {
           });
           user =
             fallbackUser != null
-              ? { ...fallbackUser, status: null, withdrawnAt: null }
+              ? { ...fallbackUser, roleId: null, status: null, withdrawnAt: null }
               : null;
         } catch (fallbackError) {
           const fe = fallbackError as { code?: string; meta?: unknown };
@@ -231,6 +233,7 @@ export async function POST(request: Request) {
         username: user.username,
         email: user.email,
         role: effectiveRole,
+        roleId: user.roleId ?? null,
         loginMode,
         authChannel,
         isClientAccount,
@@ -244,8 +247,12 @@ export async function POST(request: Request) {
     setSessionCookieOnResponse(res, token, maxAge);
     return res;
   } catch (e) {
-    const err = e as Error;
-    console.error("[login] error:", err?.message ?? e);
+    const err = e as Error & { code?: string; meta?: unknown };
+    console.error("[login] unhandled error:", err?.message ?? e);
+    console.error("[login] error name:", err?.name);
+    console.error("[login] error code:", err?.code);
+    console.error("[login] error meta:", err?.meta != null ? JSON.stringify(err.meta, null, 2) : undefined);
+    console.error("[login] full error object:", e);
     if (process.env.NODE_ENV === "development" && err?.stack) {
       console.error("[login] stack:", err.stack);
     }

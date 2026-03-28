@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
+import { hasPermission, PERMISSION_KEYS } from "@/lib/auth/permissions.server";
 import {
   awardSolutionGood,
   awardSolutionBad,
@@ -43,6 +44,13 @@ export async function POST(
   const vote = body.vote === "bad" ? "BAD" : body.vote === "good" ? "GOOD" : null;
   if (!vote) {
     return NextResponse.json({ error: "vote는 good 또는 bad 여야 합니다." }, { status: 400 });
+  }
+  const hasVotePermission =
+    vote === "GOOD"
+      ? await hasPermission(session, PERMISSION_KEYS.SOLVER_SOLUTION_GOOD)
+      : await hasPermission(session, PERMISSION_KEYS.SOLVER_SOLUTION_BAD);
+  if (!hasVotePermission) {
+    return NextResponse.json({ error: "해당 평가 권한이 없습니다." }, { status: 403 });
   }
 
   const solution = await prisma.nanguSolution.findUnique({

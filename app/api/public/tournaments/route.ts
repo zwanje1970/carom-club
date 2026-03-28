@@ -4,7 +4,7 @@ import {
   getPublicTournamentsListFromQuery,
   parsePublicTournamentsQuery,
   PUBLIC_TOURNAMENTS_TABS,
-} from "@/lib/public-tournaments-list-request";
+} from "@/lib/public-tournaments-list-request.server";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 
 /** 공개 대회 목록. query: tab, sortBy, national, lat, lng */

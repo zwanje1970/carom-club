@@ -3,11 +3,15 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BilliardTableCanvas } from "@/components/billiard";
 import { formatKoreanDate } from "@/lib/format-date";
-import { NanguSolutionLayerCanvas } from "@/components/nangu/NanguSolutionLayerCanvas";
+import { NanguReadOnlyLayout } from "@/components/nangu/NanguReadOnlyLayout";
+import { useTableOrientation } from "@/hooks/useTableOrientation";
+import {
+  DEFAULT_TABLE_WIDTH,
+  DEFAULT_TABLE_HEIGHT,
+} from "@/lib/billiard-table-constants";
+import { NanguSolutionSummaryCard } from "@/components/nangu/NanguSolutionSummaryCard";
 import { CommunityLevelBadge } from "@/components/community/CommunityLevelBadge";
-import { DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT } from "@/lib/billiard-table-constants";
 import type { NanguBallPlacement } from "@/lib/nangu-types";
 import type { NanguSolutionData } from "@/lib/nangu-types";
 
@@ -42,13 +46,17 @@ export function NanguPostDetailClient({
     ballPlacement: NanguBallPlacement;
     createdAt: string;
     isAuthor: boolean;
+    canDeletePost: boolean;
+    canCreateSolution: boolean;
+    canAcceptSolution: boolean;
   };
   solutions: SolutionItem[];
 }) {
   const router = useRouter();
-  const [expandedSolutionId, setExpandedSolutionId] = useState<string | null>(null);
+  const previewOrientation = useTableOrientation();
   const [voteLoading, setVoteLoading] = useState<string | null>(null);
   const [adoptLoading, setAdoptLoading] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const handleVote = async (solutionId: string, vote: "good" | "bad") => {
     setVoteLoading(solutionId);
@@ -78,6 +86,26 @@ export function NanguPostDetailClient({
     }
   };
 
+  const handleDeletePost = async () => {
+    if (deleteLoading) return;
+    if (!confirm("게시글을 삭제할까요?")) return;
+    setDeleteLoading(true);
+    try {
+      const res = await fetch(`/api/community/nangu/${post.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (res.ok) {
+        router.push("/community/nangu");
+        return;
+      }
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      alert(data?.error ?? "게시글 삭제에 실패했습니다.");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <p className="text-sm text-gray-500 dark:text-gray-400 flex flex-wrap items-center gap-2">
@@ -92,130 +120,80 @@ export function NanguPostDetailClient({
         )}
         <span>· {formatKoreanDate(post.createdAt)}</span>
       </p>
-      <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{post.content}</p>
 
-      <section aria-labelledby="nangu-problem-table">
-        <h2 id="nangu-problem-table" className="sr-only">문제 공배치</h2>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-          원본 공배치 (게시 후 수정 불가, 보기 전용)
+      <section aria-labelledby="nangu-problem-layout-viewer" className="space-y-2">
+        <h2 id="nangu-problem-layout-viewer" className="sr-only">
+          문제 공배치
+        </h2>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          문제 공배치 (읽기 전용 · 게시글에 저장된 원본)
         </p>
-        <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/50">
-          <BilliardTableCanvas
-            redBall={post.ballPlacement.redBall}
-            yellowBall={post.ballPlacement.yellowBall}
-            whiteBall={post.ballPlacement.whiteBall}
-            cueBall={post.ballPlacement.cueBall}
-            interactive={false}
-            showGrid={true}
+        <div
+          className="relative w-full overflow-hidden rounded-lg border border-gray-200 dark:border-slate-600"
+          style={{
+            maxWidth: DEFAULT_TABLE_WIDTH,
+            aspectRatio:
+              previewOrientation === "portrait"
+                ? `${DEFAULT_TABLE_HEIGHT} / ${DEFAULT_TABLE_WIDTH}`
+                : `${DEFAULT_TABLE_WIDTH} / ${DEFAULT_TABLE_HEIGHT}`,
+          }}
+        >
+          <NanguReadOnlyLayout
+            ballPlacement={post.ballPlacement}
+            fillContainer
+            embedFill
+            className="absolute inset-0 w-full h-full rounded-none border-0 overflow-hidden"
+            showGrid
+            drawStyle="realistic"
+            showCueBallSpot
+            orientation={previewOrientation}
           />
         </div>
       </section>
 
+      <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{post.content}</p>
+
+      {post.canDeletePost && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleDeletePost}
+            disabled={deleteLoading}
+            className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 disabled:opacity-60"
+          >
+            {deleteLoading ? "삭제 중…" : "게시글 삭제"}
+          </button>
+        </div>
+      )}
+
       <section aria-labelledby="nangu-solutions">
         <div className="flex items-center justify-between gap-4">
           <h2 id="nangu-solutions" className="text-lg font-semibold">해법 ({solutions.length})</h2>
-          <Link
-            href={`/community/nangu/${post.id}/solve`}
-            className="shrink-0 py-2 px-4 rounded-lg bg-site-primary text-white text-sm font-medium"
-          >
-            해법 제시
-          </Link>
+          {post.canCreateSolution && (
+            <Link
+              href={`/community/nangu/${post.id}/solve`}
+              className="shrink-0 py-2 px-4 rounded-lg bg-site-primary text-white text-sm font-medium"
+            >
+              해법 제시
+            </Link>
+          )}
         </div>
         {solutions.length === 0 && (
           <p className="text-gray-500 dark:text-gray-400 text-sm">아직 해법이 없습니다.</p>
         )}
-        <ul className="space-y-4">
+        <ul className="grid gap-4 sm:grid-cols-1" role="list">
           {solutions.map((s) => (
-            <li
+            <NanguSolutionSummaryCard
               key={s.id}
-              className="rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 overflow-hidden"
-            >
-              <button
-                type="button"
-                onClick={() => setExpandedSolutionId(expandedSolutionId === s.id ? null : s.id)}
-                className="w-full flex items-center justify-between gap-4 p-4 text-left hover:bg-gray-50 dark:hover:bg-slate-800"
-              >
-                <span className="font-medium text-site-text flex items-center gap-2">
-                  {s.isAdopted && (
-                    <span className="text-xs px-2 py-0.5 rounded bg-site-primary/20 text-site-primary font-medium">
-                      채택
-                    </span>
-                  )}
-                  {s.title ?? "해법"}
-                </span>
-                <span className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                  <span>{s.authorName}</span>
-                  <CommunityLevelBadge
-                    level={s.authorLevel ?? 1}
-                    tierName={s.authorTierName ?? "입문"}
-                    tierColor={s.authorTierColor}
-                    size="sm"
-                  />
-                  <span>· 추천 {s.voteCount}</span>
-                </span>
-              </button>
-              {expandedSolutionId === s.id && (
-                <div className="border-t border-gray-200 dark:border-slate-600 p-4">
-                  {s.comment && (
-                    <p className="text-sm text-gray-700 dark:text-gray-300 mb-4 whitespace-pre-wrap">
-                      {s.comment}
-                    </p>
-                  )}
-                  <div
-                    className="relative rounded-lg overflow-hidden bg-site-bg w-full max-w-full"
-                    style={{
-                      maxWidth: DEFAULT_TABLE_WIDTH,
-                      aspectRatio: `${DEFAULT_TABLE_WIDTH} / ${DEFAULT_TABLE_HEIGHT}`,
-                    }}
-                  >
-                    <BilliardTableCanvas
-                      width={DEFAULT_TABLE_WIDTH}
-                      height={DEFAULT_TABLE_HEIGHT}
-                      redBall={post.ballPlacement.redBall}
-                      yellowBall={post.ballPlacement.yellowBall}
-                      whiteBall={post.ballPlacement.whiteBall}
-                      cueBall={post.ballPlacement.cueBall}
-                      interactive={false}
-                      showGrid={true}
-                    />
-                    <NanguSolutionLayerCanvas
-                      width={DEFAULT_TABLE_WIDTH}
-                      height={DEFAULT_TABLE_HEIGHT}
-                      data={s.data}
-                      className="pointer-events-none absolute inset-0"
-                    />
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 mt-4">
-                    {post.isAuthor && !s.isAdopted && (
-                      <button
-                        type="button"
-                        onClick={() => handleAdopt(s.id)}
-                        disabled={!!adoptLoading}
-                        className="px-3 py-1.5 rounded-lg border border-site-primary text-site-primary text-sm font-medium disabled:opacity-50"
-                      >
-                        {adoptLoading === s.id ? "처리 중…" : "질문자 채택"}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleVote(s.id, "good")}
-                      disabled={!!voteLoading}
-                      className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-slate-600 text-site-text text-sm disabled:opacity-50"
-                    >
-                      {voteLoading === s.id ? "…" : "GOOD"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleVote(s.id, "bad")}
-                      disabled={!!voteLoading}
-                      className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-slate-600 text-site-text text-sm disabled:opacity-50"
-                    >
-                      {voteLoading === s.id ? "…" : "BAD"}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </li>
+              postId={post.id}
+              ballPlacement={post.ballPlacement}
+              solution={s}
+              canAcceptSolution={post.canAcceptSolution}
+              adoptLoading={adoptLoading}
+              voteLoading={voteLoading}
+              onVote={handleVote}
+              onAdopt={handleAdopt}
+            />
           ))}
         </ul>
       </section>

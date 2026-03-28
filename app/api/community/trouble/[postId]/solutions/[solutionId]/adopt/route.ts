@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
+import { hasPermission, PERMISSION_KEYS } from "@/lib/auth/permissions.server";
 
 /**
  * 질문자(원글 작성자)가 해법 채택.
@@ -26,6 +27,10 @@ export async function POST(
   });
   if (!post || post.board.slug !== "trouble") {
     return NextResponse.json({ error: "해당 난구해결 글을 찾을 수 없습니다." }, { status: 404 });
+  }
+  const canAcceptSolution = await hasPermission(session, PERMISSION_KEYS.SOLVER_SOLUTION_ACCEPT);
+  if (!canAcceptSolution) {
+    return NextResponse.json({ error: "해법 채택 권한이 없습니다." }, { status: 403 });
   }
   if (post.authorId !== session.id) {
     return NextResponse.json({ error: "질문자만 해법을 채택할 수 있습니다." }, { status: 403 });
@@ -63,6 +68,22 @@ export async function POST(
       data: { isAccepted: true },
     });
   });
+
+  try {
+    const acceptedSolution = await prisma.troubleShotSolution.findUnique({
+      where: { id: solutionId },
+      select: { authorId: true },
+    });
+    if (acceptedSolution?.authorId) {
+      const { grantUserPoints } = await import("@/lib/activity-point-service");
+      await grantUserPoints(acceptedSolution.authorId, "SOLVER_SOLUTION_ACCEPT", undefined, {
+        refType: "trouble_solution_accept",
+        refId: solutionId,
+        description: "난구해결 해법 채택",
+        idempotencyKey: `solver_solution_accept:trouble:${solutionId}`,
+      });
+    }
+  } catch (_) {}
 
   return NextResponse.json({ ok: true });
 }

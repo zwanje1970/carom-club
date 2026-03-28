@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { isFeatureEnabled } from "@/lib/site-feature-flags";
+import { hasPermission, PERMISSION_KEYS } from "@/lib/auth/permissions.server";
 import { getCommunityPostCommentsTree } from "@/lib/community-post-detail-server";
 
 /** 댓글 목록 (대댓글 포함, parentId 기준 트리). 숨김 댓글은 관리자만 내용 표시 */
@@ -30,6 +31,10 @@ export async function POST(
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
+  const canCreateComment = await hasPermission(session, PERMISSION_KEYS.COMMUNITY_COMMENT_CREATE);
+  if (!canCreateComment) {
+    return NextResponse.json({ error: "댓글 작성 권한이 없습니다." }, { status: 403 });
   }
   const commentEnabled = await isFeatureEnabled("community_comment_enabled");
   if (!commentEnabled) {

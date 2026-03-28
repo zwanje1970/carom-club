@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
 import { isAnnualMembershipActive } from "@/lib/feature-access";
+import { isAnnualMembershipEnforced, isAnnualMembershipVisible } from "@/lib/site-feature-flags";
 import { canAccessClientDashboard } from "@/types/auth";
 
 const now = new Date();
@@ -24,7 +25,33 @@ export async function GET() {
   });
   if (!org) return NextResponse.json({ error: "조직을 찾을 수 없습니다." }, { status: 404 });
 
-  const annualActive = await isAnnualMembershipActive(orgId);
+  const [annualMembershipVisible, annualMembershipEnforced, annualActive] = await Promise.all([
+    isAnnualMembershipVisible(),
+    isAnnualMembershipEnforced(),
+    isAnnualMembershipActive(orgId),
+  ]);
+
+  if (!annualMembershipEnforced) {
+    const allFeatures = await prisma.feature.findMany({
+      where: { isActive: true },
+      orderBy: { name: "asc" },
+      select: { code: true, name: true },
+    });
+
+    return NextResponse.json({
+      organization: {
+        clientType: org.clientType ?? "GENERAL",
+        membershipType: annualMembershipVisible ? (org.membershipType ?? "NONE") : "NONE",
+      },
+      annualMembershipActive: annualMembershipVisible ? annualActive : false,
+      features: allFeatures.map((feature) => ({
+        code: feature.code,
+        name: feature.name,
+        source: "PLAN" as const,
+        status: "ACTIVE" as const,
+      })),
+    });
+  }
 
   // 활성 구독의 플랜에 포함된 기능
   const activeSubs = await prisma.organizationPlanSubscription.findMany({
@@ -64,7 +91,12 @@ export async function GET() {
       byCode[acc.feature.code] = {
         code: acc.feature.code,
         name: acc.feature.name,
-        source: acc.sourceType === "MEMBERSHIP" ? "ANNUAL_PLAN" : acc.sourceType === "PLAN" ? "PLAN" : (acc.sourceType as "MANUAL" | "PURCHASE"),
+        source:
+          acc.sourceType === "MEMBERSHIP" && annualMembershipVisible
+            ? "ANNUAL_PLAN"
+            : acc.sourceType === "PLAN" || acc.sourceType === "MEMBERSHIP"
+              ? "PLAN"
+              : (acc.sourceType as "MANUAL" | "PURCHASE"),
         status,
         expiresAt: acc.expiresAt?.toISOString() ?? undefined,
       };
@@ -79,7 +111,7 @@ export async function GET() {
         byCode[pf.feature.code] = {
           code: pf.feature.code,
           name: pf.feature.name,
-          source: isAnnual ? "ANNUAL_PLAN" : "PLAN",
+          source: isAnnual && annualMembershipVisible ? "ANNUAL_PLAN" : "PLAN",
           status: subStatus,
           expiresAt: sub.expiresAt?.toISOString() ?? undefined,
         };
@@ -87,8 +119,11 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    organization: { clientType: org.clientType ?? "GENERAL", membershipType: org.membershipType ?? "NONE" },
-    annualMembershipActive: annualActive,
+    organization: {
+      clientType: org.clientType ?? "GENERAL",
+      membershipType: annualMembershipVisible ? (org.membershipType ?? "NONE") : "NONE",
+    },
+    annualMembershipActive: annualMembershipVisible ? annualActive : false,
     features: Object.values(byCode),
   });
 }

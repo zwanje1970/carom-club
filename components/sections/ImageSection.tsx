@@ -12,7 +12,11 @@ const SECTION_IMAGE_SIZES = "(max-width: 639px) 100vw, min(1200px, 100vw)";
 const PLACEHOLDER =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='400' viewBox='0 0 800 400'%3E%3Crect fill='%23e5e7eb' width='800' height='400'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='14'%3E이미지%3C/text%3E%3C/svg%3E";
 
-type Props = { section: PageSection };
+type Props = {
+  section: PageSection;
+  /** PageSectionsRenderer 외곽에서 배경·보더 처리 시 내부 배경 제거 */
+  embedded?: boolean;
+};
 
 function SectionImageCell({ src, alt }: { src: string; alt: string }) {
   const safeSrc = sanitizeImageSrc(src);
@@ -42,7 +46,7 @@ function SectionImageCell({ src, alt }: { src: string; alt: string }) {
   );
 }
 
-export function ImageSection({ section }: Props) {
+export function ImageSection({ section, embedded = false }: Props) {
   const imgUrl = section.imageUrl?.trim() || PLACEHOLDER;
   const imgUrlMobile = section.imageUrlMobile?.trim() || imgUrl;
   const heightPc = section.imageHeightPc ?? 320;
@@ -70,10 +74,10 @@ export function ImageSection({ section }: Props) {
     </>
   );
 
-  const bg = section.backgroundColor?.trim();
+  const bg = embedded ? undefined : section.backgroundColor?.trim();
   const wrapper = (
     <div
-      className={`relative w-full overflow-hidden ${!bg ? "bg-gray-100" : ""}`}
+      className={`relative w-full overflow-hidden ${!embedded && !bg ? "bg-gray-100" : ""}`}
       style={bg ? { backgroundColor: bg } : undefined}
     >
       {image}

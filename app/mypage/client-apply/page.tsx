@@ -4,8 +4,10 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { ClientApplyForm } from "@/components/mypage/ClientApplyForm";
+import { isAnnualMembershipVisible } from "@/lib/site-feature-flags";
 
 export default async function MypageClientApplyPage() {
+  const allowRegisteredClientType = await isAnnualMembershipVisible();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -100,6 +102,7 @@ export default async function MypageClientApplyPage() {
         <ClientApplyForm
           successRedirect="/mypage"
           successLinkLabel="마이페이지로"
+          allowRegisteredClientType={allowRegisteredClientType}
           initialData={initialData}
           existingApplication={existingApplication}
         />

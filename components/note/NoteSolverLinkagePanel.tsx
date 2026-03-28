@@ -41,6 +41,9 @@ interface NoteSolverLinkagePanelProps {
   noteId: string;
   noteImageUrl: string | null;
   isAuthor: boolean;
+  /** 난구해결사(NanguPost) 게시글 id — 노트에서 요청으로 생성·연결된 글 (우선) */
+  linkedNanguPostId?: string | null;
+  /** 구 trouble 게시판(CommunityPost id) — nangu가 없을 때만 */
   linkedTroublePostId?: string | null;
   ballPlacement: NanguBallPlacement;
   cuePos: { x: number; y: number };
@@ -51,6 +54,7 @@ export function NoteSolverLinkagePanel({
   noteId,
   noteImageUrl,
   isAuthor,
+  linkedNanguPostId = null,
   linkedTroublePostId = null,
   ballPlacement,
   cuePos,
@@ -75,6 +79,18 @@ export function NoteSolverLinkagePanel({
     []
   );
 
+  const linkedPostHref = useMemo(() => {
+    if (linkedNanguPostId) return `/community/nangu/${linkedNanguPostId}`;
+    if (linkedTroublePostId) return `/community/trouble/${linkedTroublePostId}`;
+    return null;
+  }, [linkedNanguPostId, linkedTroublePostId]);
+
+  const linkedPostLabel = linkedNanguPostId
+    ? "연결된 난구해결 글 보기"
+    : linkedTroublePostId
+      ? "연결된 글 보기 (구 게시판)"
+      : "";
+
   const firstObjectBallKey = useMemo(() => {
     if (!pathOverlay || pathOverlay.pathPoints.length === 0) return null;
     return resolveTroubleFirstObjectBallKey({
@@ -90,7 +106,7 @@ export function NoteSolverLinkagePanel({
     onError("");
     setRequesting(true);
     try {
-      const res = await fetch("/api/community/trouble/from-note", {
+      const res = await fetch("/api/community/nangu/from-note", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -102,7 +118,7 @@ export function NoteSolverLinkagePanel({
       const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
       if (!res.ok) throw new Error(data.error ?? "요청에 실패했습니다.");
       if (!data.id) throw new Error("응답이 올바르지 않습니다.");
-      router.push(`/community/trouble/${data.id}/solution/new`);
+      router.push(`/community/nangu/${data.id}`);
     } catch (e) {
       onError(e instanceof Error ? e.message : "오류");
     } finally {
@@ -111,13 +127,19 @@ export function NoteSolverLinkagePanel({
   }, [noteId, noteImageUrl, onError, router]);
 
   const loadSolutionOverlay = useCallback(async () => {
-    if (!linkedTroublePostId) return;
+    const troubleId = linkedTroublePostId;
+    if (!linkedNanguPostId && !troubleId) return;
     setImportError("");
     setImportLoading(true);
     try {
-      const res = await fetch(`/api/community/trouble/${linkedTroublePostId}/solutions`, {
-        credentials: "include",
-      });
+      const res = linkedNanguPostId
+        ? await fetch(
+            `/api/community/nangu/${linkedNanguPostId}/solutions?includeData=1`,
+            { credentials: "include" }
+          )
+        : await fetch(`/api/community/trouble/${troubleId}/solutions`, {
+            credentials: "include",
+          });
       const list = (await res.json()) as TroubleSolutionRow[];
       if (!res.ok || !Array.isArray(list)) {
         throw new Error("해법 목록을 불러오지 못했습니다.");
@@ -151,7 +173,7 @@ export function NoteSolverLinkagePanel({
     } finally {
       setImportLoading(false);
     }
-  }, [linkedTroublePostId]);
+  }, [linkedNanguPostId, linkedTroublePostId]);
 
   const toggleImportPaths = async () => {
     if (pathOverlay) {
@@ -175,25 +197,27 @@ export function NoteSolverLinkagePanel({
         >
           {requesting ? "이동 중…" : "난구해결 요청"}
         </button>
-        {linkedTroublePostId && (
+        {linkedPostHref && (
           <Link
-            href={`/community/trouble/${linkedTroublePostId}`}
+            href={linkedPostHref}
             className="py-2.5 px-4 rounded-lg border border-site-primary/60 text-site-primary font-medium text-sm min-h-[44px] inline-flex items-center"
           >
-            연결된 난구해결 글 보기
+            {linkedPostLabel}
           </Link>
         )}
       </div>
 
-      {linkedTroublePostId && (
+      {linkedPostHref && (
         <div className="rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/40 p-4 space-y-3">
-          <p className="text-sm font-medium text-site-text">난구해결 연결</p>
+          <p className="text-sm font-medium text-site-text">
+            {linkedNanguPostId ? "난구해결 연결" : "난구해결 연결 (구 게시판)"}
+          </p>
           <div className="flex flex-wrap gap-2">
             <Link
-              href={`/community/trouble/${linkedTroublePostId}`}
+              href={linkedPostHref}
               className="inline-flex items-center justify-center rounded-lg bg-site-primary px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 touch-manipulation min-h-[44px]"
             >
-              연결된 난구해결 글 보기
+              {linkedPostLabel}
             </Link>
             <button
               type="button"

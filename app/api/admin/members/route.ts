@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { hasAllPermissions, PERMISSION_KEYS } from "@/lib/auth/permissions.server";
+import { getSuggestedRoleByPoints } from "@/lib/activity-point-service";
+import { getLevelFromScore, getTierName } from "@/lib/community-level";
 
 export type MemberRow = {
   id: string;
@@ -8,6 +11,16 @@ export type MemberRow = {
   username: string;
   email: string;
   role: string;
+  roleId?: string | null;
+  rbacRoleKey?: string | null;
+  rbacRoleLabel?: string | null;
+  activityPoint?: number;
+  communityScore?: number;
+  communityLevel?: number;
+  communityTierName?: string;
+  roleManualLocked?: boolean;
+  suggestedRoleKey?: string | null;
+  suggestedRoleLabel?: string | null;
   status: string | null;
   withdrawnAt: string | null;
   createdAt: string;
@@ -41,7 +54,13 @@ type UserWhere = {
 export async function GET(request: Request) {
   try {
     const session = await getSession();
-    if (!session || session.role !== "PLATFORM_ADMIN") {
+    if (
+      !session ||
+      !(await hasAllPermissions(session, [
+        PERMISSION_KEYS.ADMIN_ACCESS,
+        PERMISSION_KEYS.ADMIN_USER_MANAGE,
+      ]))
+    ) {
       return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
     }
 
@@ -72,6 +91,11 @@ export async function GET(request: Request) {
           username: true,
           email: true,
           role: true,
+          roleId: true,
+          roleManualLocked: true,
+          activityPoint: true,
+          communityScore: true,
+          rbacRole: { select: { key: true, label: true } },
           status: true,
           withdrawnAt: true,
           createdAt: true,
@@ -98,6 +122,11 @@ export async function GET(request: Request) {
         username: true,
         email: true,
         role: true,
+        roleId: true,
+        roleManualLocked: true,
+        activityPoint: true,
+        communityScore: true,
+        rbacRole: { select: { key: true, label: true } },
         status: true,
         withdrawnAt: true,
         createdAt: true,
@@ -223,6 +252,11 @@ function toMemberRow(
     username: string;
     email: string;
     role: string;
+    roleId: string | null;
+    roleManualLocked: boolean;
+    activityPoint: number;
+    communityScore: number;
+    rbacRole: { key: string; label: string } | null;
     status: string | null;
     withdrawnAt: Date | null;
     createdAt: Date;
@@ -230,12 +264,24 @@ function toMemberRow(
   },
   org?: { clientType: string | null; approvalStatus: string | null; status: string | null } | null
 ): MemberRow {
+  const suggestedRole = getSuggestedRoleByPoints(u.activityPoint ?? 0);
+  const communityLevel = getLevelFromScore(u.communityScore ?? 0);
   return {
     id: u.id,
     name: u.name,
     username: u.username,
     email: u.email,
     role: u.role,
+    roleId: u.roleId ?? null,
+    rbacRoleKey: u.rbacRole?.key ?? null,
+    rbacRoleLabel: u.rbacRole?.label ?? null,
+    activityPoint: u.activityPoint ?? 0,
+    communityScore: u.communityScore ?? 0,
+    communityLevel,
+    communityTierName: getTierName(communityLevel),
+    roleManualLocked: u.roleManualLocked ?? false,
+    suggestedRoleKey: suggestedRole.roleKey,
+    suggestedRoleLabel: suggestedRole.label,
     status: u.status ?? null,
     withdrawnAt: u.withdrawnAt ? u.withdrawnAt.toISOString() : null,
     createdAt: u.createdAt.toISOString(),

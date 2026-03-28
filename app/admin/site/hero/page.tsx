@@ -15,27 +15,26 @@ export default async function AdminSiteHeroPage() {
   return (
     <SectionMain>
       <p className="mb-4 text-sm">
-        <Link
-          href="/admin/site/main"
-          className="text-site-primary hover:underline"
-        >
-          ← 메인페이지 구성
+        <Link href="/admin/site/home" className="text-site-primary hover:underline">
+          ← 홈 화면 설정
         </Link>
       </p>
-      <SectionTitleLineWithButton icon={mdiImageText} title="히어로 관리" />
-      <p className="mb-6 text-sm text-gray-600 dark:text-slate-400">
-        메인페이지 상단 히어로(배경·텍스트·버튼·높이 등)를 설정합니다. 저장 후 메인에 바로 반영됩니다.
-        아래에서 &quot;신규 히어로&quot;를 끄면, CMS의 메인 비주얼 이미지 섹션·고정문구가 사용됩니다.
+      <SectionTitleLineWithButton icon={mdiImageText} title="히어로 설정" />
+      <p className="mb-6 text-sm text-gray-600 dark:text-slate-400 max-w-3xl">
+        메인 상단 히어로의 <strong>유일한 편집 화면</strong>입니다. 배경(업로드)·제목·버튼·높이는 모두 여기서만 바꿉니다.
+        저장 후 공개 메인에 반영됩니다(캐시로 최대 약 60초 지연 가능). &quot;히어로 사용&quot;을 끄면 레거시 폴백(아래 CMS
+        섹션)이 사용됩니다.
       </p>
       <CardBox>
         <HeroSettingsForm />
       </CardBox>
       <CardBox className="mt-6">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100 mb-2">
-          구형 메인 비주얼 (CMS 이미지 섹션)
+          레거시 폴백: 메인 비주얼 섹션 (콘텐츠 관리)
         </h3>
         <p className="text-sm text-gray-600 dark:text-slate-400 mb-3">
-          히어로 설정에서 사용 여부를 끈 경우, 아래 CMS 섹션의 배너 이미지·버튼·페이지별 문구가 메인 상단에 쓰입니다.
+          히어로를 끈 경우에만 메인 비주얼 섹션의 이미지·버튼이 폴백으로 쓰입니다. 제목·스타일 문구는 이 화면의 JSON 히어로가
+          정본이며, 섹션 편집에서는 더 이상 히어로 전용 문구를 수정하지 않습니다.
         </p>
         {heroCmsSection ? (
           <Link

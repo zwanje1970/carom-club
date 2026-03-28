@@ -19,6 +19,44 @@ enum UserRole {
   ZONE_MANAGER
 }
 
+model Role {
+  id            String           @id @default(cuid())
+  key           String           @unique
+  label         String
+  description   String?
+  isSystem      Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  users         User[]           @relation("UserRbacRole")
+  rolePermissions RolePermission[]
+}
+
+model Permission {
+  id            String           @id @default(cuid())
+  key           String           @unique
+  label         String
+  category      String
+  description   String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  rolePermissions RolePermission[]
+}
+
+model RolePermission {
+  id            String     @id @default(cuid())
+  roleId        String
+  permissionId  String
+
+  role          Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission    Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+}
+
 // ============== User & MemberProfile ==============
 // 회원탈퇴는 soft delete만 사용 (status=DELETED, withdrawnAt 설정). User 행을 DELETE 하지 않음.
 // 게시글/문의/신청/참가 등 작성 데이터는 유지하고, 화면에서 작성자만 "탈퇴회원"으로 표시.
@@ -31,6 +69,8 @@ model User {
   email       String
   phone       String?
   role        UserRole  @default(USER)
+  roleId      String?
+  roleManualLocked Boolean @default(false)
   status      String?   // ACTIVE(일반) | DELETED(탈퇴)
   withdrawnAt DateTime? // 탈퇴 시각 (설정 시 로그인 불가, 재가입 제한 기간 적용)
   latitude    Float?    // 회원 주소 좌표 (거리 정렬 폴백용)
@@ -67,8 +107,32 @@ model User {
   troubleShotSolutionVotes TroubleShotSolutionVote[]
   communityScoreLogs     CommunityScoreLog[]
   nanguSolutionVotes    NanguSolutionVote[]
+  activityPoints        UserActivityPoint[]
 
   communityScore        Int      @default(0)  // 커뮤니티 신뢰도 누적 점수 (레벨 계산용)
+  activityPoint         Int      @default(0)  // 활동 점수 캐시 (승급/랭킹용)
+  rbacRole              Role?    @relation("UserRbacRole", fields: [roleId], references: [id], onDelete: SetNull)
+
+  @@index([roleId])
+}
+
+model UserActivityPoint {
+  id             String   @id @default(cuid())
+  userId         String
+  type           String
+  points         Int
+  refType        String?
+  refId          String?
+  description    String?
+  idempotencyKey String?  @unique
+  createdAt      DateTime @default(now())
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([refType, refId])
 }
 
 model PasswordResetToken {
@@ -729,21 +793,13 @@ model SiteSetting {
   headerBgColor     String?
   headerTextColor   String?
   headerActiveColor String?
-  // 홈페이지 Hero 배너 (관리자 > 홈페이지 관리)
-  heroImageUrl    String?
-  heroTitle       String?
-  heroDescription String?
-  heroLinkUrl     String?
-  // 메인 히어로 전용 설정 (JSON)
+  // 메인 히어로 전용 설정 (JSON, 단일 소스)
   heroSettingsJson String?
-  // 플랫폼 소개 이미지
-  introImageUrl   String?
-  // 추천 대회 배너
-  featuredBannerImageUrl String?
-  featuredBannerLinkUrl  String?
   withdrawRejoinDays    Int      @default(0) // 탈퇴 후 재가입 가능 일수 (0=즉시 가능)
   // 메인 대회·당구장 가로 흐름 속도(1=느림 ~ 100=빠름), 관리자 사이트 설정
   homeCarouselFlowSpeed Int @default(50)
+  // 일반회원(USER)이 난구해결사 해법을 등록할 수 있는 최소 커뮤니티 LEVEL
+  minSolutionLevelForUser Int @default(1)
   // 푸터 설정 (관리자 설정)
   footerEnabled       Boolean  @default(false)
   footerBgColor       String?
@@ -1074,6 +1130,7 @@ model PageSection {
   titleIconName     String?
   titleIconImageUrl String?
   titleIconSize     String?  // small | medium
+  sectionStyleJson  String?  // JSON: 애니메이션·구분선 등 (배경은 backgroundColor와 병합)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -1166,6 +1223,7 @@ model BilliardNote {
 
   author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
   troubleShotsFromNote TroubleShotPost[]
+  nanguPostsFromNote NanguPost[]
 
   @@index([authorId])
   @@index([visibility, createdAt])
@@ -1182,10 +1240,12 @@ model NanguPost {
   content            String   @db.Text  // 문제 설명
   ballPlacementJson  String   @db.Text  // JSON: { redBall, yellowBall, whiteBall, cueBall } 정규화 0..1, 수정 불가
   adoptedSolutionId  String?  @unique // 채택된 해법 id (채택 시 질문자 +2, 해법 작성자 +6)
+  sourceNoteId       String?  @unique // 난구노트에서 요청으로 생성 시 (노트당 최대 1건)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
   author            User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  sourceNote        BilliardNote?   @relation(fields: [sourceNoteId], references: [id], onDelete: SetNull)
   solutions         NanguSolution[]
   adoptedSolution   NanguSolution?  @relation("AdoptedSolution", fields: [adoptedSolutionId], references: [id], onDelete: SetNull)
 

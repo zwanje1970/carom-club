@@ -6,7 +6,6 @@ import { HomeDeferredSections } from "@/components/home/HomeDeferredSections";
 import { HomeSectionsSkeleton } from "@/components/home/HomeSectionsSkeleton";
 import { getCommonPageData } from "@/lib/common-page-data";
 import { getHeroSettings } from "@/lib/hero-settings";
-import { heroFromSection } from "@/lib/content/hero-from-section";
 import { getServerTiming, logServerTiming } from "@/lib/perf";
 
 /** 메인·대회·당구장 목록은 60초 캐시. 체감 속도 개선용 */
@@ -21,20 +20,13 @@ export default async function HomePage() {
   ]);
   const { copy, noticeBars, popups, pageSections, siteSettings } = common;
   logServerTiming("fetch_sections");
-  const heroSection = pageSections.find(
-    (s) => s.placement === "main_visual_bg" && s.type === "image"
-  );
-  const heroData = heroSection ? heroFromSection(heroSection, copy) : null;
-  const otherSections = heroSection
-    ? pageSections.filter((s) => s.id !== heroSection.id)
-    : pageSections;
   logServerTiming("page");
 
   return (
     <main className="min-h-screen bg-[var(--site-bg)] text-site-text">
-      <HomeHero copy={copy} hero={heroData} heroSettings={heroSettings} />
+      <HomeHero heroSettings={heroSettings} />
       <ContentLayer noticeBars={noticeBars} popups={popups} />
-      <PageSectionsRenderer sections={otherSections} />
+      <PageSectionsRenderer sections={pageSections} />
 
       {/* DB(대회/당구장)는 스트리밍으로 후속 로딩 → 첫 페인트 블로킹 제거 */}
       <Suspense fallback={<HomeSectionsSkeleton />}>

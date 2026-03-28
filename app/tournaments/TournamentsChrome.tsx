@@ -14,9 +14,9 @@ export async function TournamentsChrome() {
     <>
       <ContentLayer noticeBars={noticeBars} popups={popups} />
       <PageSectionsRenderer sections={pageSections} />
-      <div className="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6">
-        <h1 className="text-2xl font-bold text-site-text">{getCopyValue(c, "site.tournaments.title")}</h1>
-        <p className="mt-2 text-gray-600">{getCopyValue(c, "site.tournaments.subtitle")}</p>
+      <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
+        <h1 className="text-2xl font-bold text-site-text md:block hidden">{getCopyValue(c, "site.tournaments.title")}</h1>
+        <p className="mt-2 text-gray-600 md:block hidden">{getCopyValue(c, "site.tournaments.subtitle")}</p>
       </div>
     </>
   );

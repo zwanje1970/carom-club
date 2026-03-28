@@ -35,6 +35,14 @@ function IconTable({ className }: { className?: string }) {
     </svg>
   );
 }
+function IconBell({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 21a2 2 0 0 0 4 0" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 type Props = {
   firstTournamentId: string | null;
@@ -50,7 +58,7 @@ export function OperationsQuickActions({ firstTournamentId }: Props) {
       className="rounded-lg border border-zinc-200 bg-zinc-50/90 p-3 dark:border-zinc-700 dark:bg-zinc-900/40"
     >
       <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">빠른 실행</p>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3">
         <Link href="/client/operations/tournaments/new" className={cx(card, "border-zinc-800 bg-zinc-800 text-white dark:border-zinc-200 dark:bg-zinc-200 dark:text-zinc-900")}>
           <IconPlus className="text-white dark:text-zinc-900" />
           대회 생성
@@ -79,6 +87,10 @@ export function OperationsQuickActions({ firstTournamentId }: Props) {
           <IconTable className="text-zinc-700 dark:text-zinc-200" />
           대진표 보기
           {!base && <span className="text-[9px] font-normal text-zinc-500">(대회 선택)</span>}
+        </Link>
+        <Link href="/client/operations/push" className={card}>
+          <IconBell className="text-zinc-700 dark:text-zinc-200" />
+          푸시 발송
         </Link>
       </div>
     </div>

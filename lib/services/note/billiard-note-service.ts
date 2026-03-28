@@ -38,7 +38,12 @@ export async function listMineOrAllNotes(params: BilliardNoteListParams) {
       imageUrl: true,
       visibility: true,
       createdAt: true,
-      _count: { select: { troubleShotsFromNote: true } },
+      _count: {
+        select: {
+          troubleShotsFromNote: true,
+          nanguPostsFromNote: true,
+        },
+      },
     },
   });
   return list.map((n) => ({
@@ -48,8 +53,12 @@ export async function listMineOrAllNotes(params: BilliardNoteListParams) {
     imageUrl: n.imageUrl,
     visibility: n.visibility,
     createdAt: n.createdAt.toISOString(),
-    // Keep existing response contract for backward compatibility.
-    sentToTroubleCount: n._count.troubleShotsFromNote,
+    /** 난구해결사(nangu) + 구 trouble 게시판으로 보낸 횟수 합산 */
+    sentToSolverCount:
+      n._count.nanguPostsFromNote + n._count.troubleShotsFromNote,
+    /** @deprecated API 호환용 — sentToSolverCount 사용 */
+    sentToTroubleCount:
+      n._count.nanguPostsFromNote + n._count.troubleShotsFromNote,
   }));
 }
 

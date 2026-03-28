@@ -3,7 +3,7 @@
  */
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
-import type { Prisma } from "prisma-generated";
+import type { Prisma } from "@/generated/prisma";
 import { boardListOffset } from "@/lib/community-board-list-pagination";
 import { communityListPerfMeasure } from "@/lib/community-list-perf";
 import { communityNoticePinnedTag } from "@/lib/community-notice-pinned-revalidate";

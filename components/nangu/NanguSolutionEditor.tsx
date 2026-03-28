@@ -141,13 +141,16 @@ export function NanguSolutionEditor({
     (section?: "thickness" | "tip" | "rail") => {
       setSettingsFocusSection(section ?? null);
       setPanelSettings((prev) => {
+        /** 에디터 동기화 병합이 덮어쓰지 않도록, 열기 직전 사용자 선택 유지 */
+        const preserveIgnorePhysics = prev.ignorePhysics;
         const base = {
           ballSpeed: editor.ballSpeed,
           backstroke: editor.backstrokeLevel,
           followStroke: editor.followStrokeLevel,
         };
+        let merged: SolutionSettingsValue;
         if (!settingsPanelBallSpeedAuthoritative) {
-          return clampSolutionSettings(
+          merged = clampSolutionSettings(
             mergeSolutionSettings(
               {
                 ...base,
@@ -157,8 +160,12 @@ export function NanguSolutionEditor({
               prev
             )
           );
+        } else {
+          merged = clampSolutionSettings(mergeSolutionSettings(base, prev));
         }
-        return clampSolutionSettings(mergeSolutionSettings(base, prev));
+        return clampSolutionSettings(
+          mergeSolutionSettings({ ignorePhysics: preserveIgnorePhysics }, merged)
+        );
       });
       setSettingsPanelBallSpeedAuthoritative(true);
       setSettingsPanelOpen(true);

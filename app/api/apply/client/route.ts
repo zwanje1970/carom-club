@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { ensureDatabaseUrlForDevelopment, isDatabaseConfigured } from "@/lib/db-mode";
 import { getSession } from "@/lib/auth";
+import { isAnnualMembershipVisible } from "@/lib/site-feature-flags";
 
 /** Prisma 연결 실패 전용 코드 (네트워크/연결 불가). 스키마·제약조건 오류(P2002 등)는 제외 */
 const DB_CONNECTION_ERROR_CODES = ["P1001", "P1002", "P1017", "P1033"];
@@ -34,6 +35,10 @@ export async function POST(request: Request) {
     typeof body?.requestedClientType === "string" && VALID_CLIENT_TYPES.includes(body.requestedClientType as (typeof VALID_CLIENT_TYPES)[number])
       ? (body.requestedClientType as (typeof VALID_CLIENT_TYPES)[number])
       : "GENERAL";
+  const annualMembershipVisible = await isAnnualMembershipVisible();
+  if (requestedClientType === "REGISTERED" && !annualMembershipVisible) {
+    return NextResponse.json({ error: "페이지를 찾을 수 없습니다." }, { status: 404 });
+  }
   const organizationName = typeof body?.organizationName === "string" ? body.organizationName : "";
   const applicantName = typeof body?.applicantName === "string" ? body.applicantName : "";
   const phone = typeof body?.phone === "string" ? body.phone : "";

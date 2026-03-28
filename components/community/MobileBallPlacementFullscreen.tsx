@@ -57,6 +57,11 @@ export interface MobileBallPlacementFullscreenProps {
    */
   includeMemoField?: boolean;
   initialMemo?: string;
+  /**
+   * true면 마운트 직후 수구 선택 모달을 연다. 이미 저장된 배치를 다시 열 때는 false로 끈다.
+   * @default true
+   */
+  showCuePickerOnStart?: boolean;
 }
 
 export function MobileBallPlacementFullscreen({
@@ -69,6 +74,7 @@ export function MobileBallPlacementFullscreen({
   returnOnly = false,
   includeMemoField = false,
   initialMemo = "",
+  showCuePickerOnStart = true,
 }: MobileBallPlacementFullscreenProps) {
   const router = useRouter();
   const editorRef = useRef<BilliardTableEditorHandle>(null);
@@ -77,9 +83,8 @@ export function MobileBallPlacementFullscreen({
   useEffect(() => {
     setNoteMemo(initialMemo);
   }, [initialMemo]);
-  /** 공배치 시작 시 수구 선택 UI 없음 — 기본 흰공(또는 initial). 변경은 상단「수구」 */
   const [cueBall, setCueBall] = useState<CueBallType>(initialCueBall ?? "white");
-  const [cuePickerOpen, setCuePickerOpen] = useState(false);
+  const [cuePickerOpen, setCuePickerOpen] = useState(showCuePickerOnStart);
   const [saving, setSaving] = useState(false);
   const [toolsDrawerOpen, setToolsDrawerOpen] = useState(false);
   /** 우측 패널 드래그로 닫기 — 열린 상태 기준 오른쪽으로 밀린 px (0 = 완전히 열림) */
@@ -521,7 +526,6 @@ export function MobileBallPlacementFullscreen({
             }}
           </SolutionTableZoomShell>
 
-          {/* 상단「수구」로만 열림 — 공배치 시작 시에는 표시하지 않음 */}
           {cuePickerOpen && (
             <div
               className="absolute inset-0 z-[220] flex items-center justify-center rounded-lg bg-transparent"

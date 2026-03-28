@@ -4,6 +4,7 @@
  */
 import { prisma } from "@/lib/db";
 import { isAnnualMembershipActive } from "@/lib/feature-access";
+import { isAnnualMembershipVisible } from "@/lib/site-feature-flags";
 
 const now = new Date();
 
@@ -67,6 +68,10 @@ export type MyBillingData = {
 };
 
 export async function getMyBillingData(orgId: string): Promise<MyBillingData | null> {
+  if (!(await isAnnualMembershipVisible())) {
+    return null;
+  }
+
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
     select: { id: true, name: true, clientType: true, membershipType: true, approvalStatus: true },

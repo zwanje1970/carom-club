@@ -174,6 +174,10 @@ const BilliardTableEditor = forwardRef<
   /** 그리드 1칸 = 정규화 좌표 (플레이필드 80x40 그리드 기준) */
   const GRID_STEP_LONG = 1 / 80;
   const GRID_STEP_SHORT = 1 / 40;
+  /** 미세조정(▲◀▶▼) 한 번 클릭 이동량 — 그리드 1칸의 20% */
+  const FINE_TUNE_MOVE_SCALE = 0.2;
+  const fineTuneStepLong = GRID_STEP_LONG * FINE_TUNE_MOVE_SCALE;
+  const fineTuneStepShort = GRID_STEP_SHORT * FINE_TUNE_MOVE_SCALE;
 
   const gridOn = gridOnProp ?? gridOnInternal;
   const setGridOn = (v: boolean) => {
@@ -519,13 +523,13 @@ const BilliardTableEditor = forwardRef<
               <span className={ftSpacerClass} aria-hidden />
               <button
                 type="button"
-                aria-label="위로 1칸 이동"
+                aria-label="위로 미세 이동"
                 className={ftBtnClass}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   startFineTune(
-                    effectiveOrientation === "landscape" ? 0 : -GRID_STEP_SHORT,
-                    effectiveOrientation === "landscape" ? -GRID_STEP_SHORT : 0
+                    effectiveOrientation === "landscape" ? 0 : -fineTuneStepShort,
+                    effectiveOrientation === "landscape" ? -fineTuneStepShort : 0
                   );
                 }}
                 onPointerUp={handleFineTuneEnd}
@@ -538,13 +542,13 @@ const BilliardTableEditor = forwardRef<
               <span className={ftSpacerClass} aria-hidden />
               <button
                 type="button"
-                aria-label="왼쪽으로 1칸 이동"
+                aria-label="왼쪽으로 미세 이동"
                 className={ftBtnClass}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   startFineTune(
-                    effectiveOrientation === "landscape" ? -GRID_STEP_LONG : 0,
-                    effectiveOrientation === "landscape" ? 0 : GRID_STEP_LONG
+                    effectiveOrientation === "landscape" ? -fineTuneStepLong : 0,
+                    effectiveOrientation === "landscape" ? 0 : fineTuneStepLong
                   );
                 }}
                 onPointerUp={handleFineTuneEnd}
@@ -557,13 +561,13 @@ const BilliardTableEditor = forwardRef<
               <span className={ftSpacerClass} aria-hidden />
               <button
                 type="button"
-                aria-label="오른쪽으로 1칸 이동"
+                aria-label="오른쪽으로 미세 이동"
                 className={ftBtnClass}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   startFineTune(
-                    effectiveOrientation === "landscape" ? GRID_STEP_LONG : 0,
-                    effectiveOrientation === "landscape" ? 0 : -GRID_STEP_LONG
+                    effectiveOrientation === "landscape" ? fineTuneStepLong : 0,
+                    effectiveOrientation === "landscape" ? 0 : -fineTuneStepLong
                   );
                 }}
                 onPointerUp={handleFineTuneEnd}
@@ -576,13 +580,13 @@ const BilliardTableEditor = forwardRef<
               <span className={ftSpacerClass} aria-hidden />
               <button
                 type="button"
-                aria-label="아래로 1칸 이동"
+                aria-label="아래로 미세 이동"
                 className={ftBtnClass}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   startFineTune(
-                    effectiveOrientation === "landscape" ? 0 : GRID_STEP_SHORT,
-                    effectiveOrientation === "landscape" ? GRID_STEP_SHORT : 0
+                    effectiveOrientation === "landscape" ? 0 : fineTuneStepShort,
+                    effectiveOrientation === "landscape" ? fineTuneStepShort : 0
                   );
                 }}
                 onPointerUp={handleFineTuneEnd}
@@ -627,13 +631,13 @@ const BilliardTableEditor = forwardRef<
               <span className={ftSpacerClass} aria-hidden />
               <button
                 type="button"
-                aria-label="위로 1칸 이동"
+                aria-label="위로 미세 이동"
                 className={ftBtnClass}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   startFineTune(
-                    effectiveOrientation === "landscape" ? 0 : -GRID_STEP_SHORT,
-                    effectiveOrientation === "landscape" ? -GRID_STEP_SHORT : 0
+                    effectiveOrientation === "landscape" ? 0 : -fineTuneStepShort,
+                    effectiveOrientation === "landscape" ? -fineTuneStepShort : 0
                   );
                 }}
                 onPointerUp={handleFineTuneEnd}
@@ -646,13 +650,13 @@ const BilliardTableEditor = forwardRef<
               <span className={ftSpacerClass} aria-hidden />
               <button
                 type="button"
-                aria-label="왼쪽으로 1칸 이동"
+                aria-label="왼쪽으로 미세 이동"
                 className={ftBtnClass}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   startFineTune(
-                    effectiveOrientation === "landscape" ? -GRID_STEP_LONG : 0,
-                    effectiveOrientation === "landscape" ? 0 : GRID_STEP_LONG
+                    effectiveOrientation === "landscape" ? -fineTuneStepLong : 0,
+                    effectiveOrientation === "landscape" ? 0 : fineTuneStepLong
                   );
                 }}
                 onPointerUp={handleFineTuneEnd}
@@ -665,13 +669,13 @@ const BilliardTableEditor = forwardRef<
               <span className={ftSpacerClass} aria-hidden />
               <button
                 type="button"
-                aria-label="오른쪽으로 1칸 이동"
+                aria-label="오른쪽으로 미세 이동"
                 className={ftBtnClass}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   startFineTune(
-                    effectiveOrientation === "landscape" ? GRID_STEP_LONG : 0,
-                    effectiveOrientation === "landscape" ? 0 : -GRID_STEP_LONG
+                    effectiveOrientation === "landscape" ? fineTuneStepLong : 0,
+                    effectiveOrientation === "landscape" ? 0 : -fineTuneStepLong
                   );
                 }}
                 onPointerUp={handleFineTuneEnd}
@@ -684,13 +688,13 @@ const BilliardTableEditor = forwardRef<
               <span className={ftSpacerClass} aria-hidden />
               <button
                 type="button"
-                aria-label="아래로 1칸 이동"
+                aria-label="아래로 미세 이동"
                 className={ftBtnClass}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   startFineTune(
-                    effectiveOrientation === "landscape" ? 0 : GRID_STEP_SHORT,
-                    effectiveOrientation === "landscape" ? GRID_STEP_SHORT : 0
+                    effectiveOrientation === "landscape" ? 0 : fineTuneStepShort,
+                    effectiveOrientation === "landscape" ? fineTuneStepShort : 0
                   );
                 }}
                 onPointerUp={handleFineTuneEnd}

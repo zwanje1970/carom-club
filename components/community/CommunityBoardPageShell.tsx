@@ -14,14 +14,13 @@ export function CommunityBoardPageShell({
   showSolverEntry: boolean;
 }) {
   const formAction = boardSlug === "trouble" ? "/community/trouble" : `/community/${boardSlug}`;
-  const solverBoard = boardSlug === "trouble" || boardSlug === "nangu";
-  const showWriteFab = solverBoard ? showSolverEntry : true;
+  const showWriteFab = showSolverEntry;
 
   return (
     <main className="min-h-screen bg-site-bg text-site-text pb-24">
       <div className="mx-auto w-full max-w-3xl px-4 py-5 sm:px-6">
         <nav
-          className="mb-3 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
+          className="mb-3 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 md:flex hidden"
           aria-label="breadcrumb"
         >
           <Link href="/community" className="hover:text-site-primary">
@@ -39,7 +38,7 @@ export function CommunityBoardPageShell({
           />
         )}
 
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 md:block hidden">
           <h1 className="text-lg font-bold text-site-text">{data.board.name}</h1>
         </div>
 
@@ -104,7 +103,7 @@ export function CommunityBoardPageShell({
 
       {showWriteFab && (
         <CommunityWriteFab
-          href={boardSlug === "trouble" ? "/community/trouble/write" : `/community/${boardSlug}/write`}
+          href={boardSlug === "trouble" ? "/community/nangu/write" : `/community/${boardSlug}/write`}
         />
       )}
     </main>

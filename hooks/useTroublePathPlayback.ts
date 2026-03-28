@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from "react";
 import {
   DEFAULT_TABLE_HEIGHT,
   DEFAULT_TABLE_WIDTH,
@@ -213,7 +220,10 @@ export function useTroublePathPlayback(options: {
   /** 재생 배속(0.5=절반 속도, 1=기본 속도) */
   playbackRate?: number;
 }): {
+  /** 재생 종료 후 복귀·충돌 스냅샷 등 커밋된 표시값(루프 중 매 프레임 갱신 아님) */
   ballNormOverrides: BallNormOverrides | null;
+  /** 재생 루프가 매 프레임 갱신하는 위치 — 캔버스는 이 ref를 읽어 그림 */
+  ballNormOverridesLiveRef: MutableRefObject<BallNormOverrides | null>;
   playbackPhase: "idle" | "cue" | "object";
   collisionMessage: string | null;
   dismissCollisionMessage: () => void;
@@ -289,7 +299,6 @@ export function useTroublePathPlayback(options: {
         : { visualizationPlayback: true as const },
     [options.ballPlacement]
   );
-  const collisionWarningsEnabled = options.collisionWarningsEnabled ?? false;
 
   const playbackData = useMemo(() => {
     if (!options.ballPlacement) return null;
@@ -384,18 +393,61 @@ export function useTroublePathPlayback(options: {
     options.ignorePhysics,
   ]);
 
-  const [ballNormOverrides, setBallNormOverrides] = useState<BallNormOverrides | null>(null);
+  /** rAF 루프는 ref로만 읽고, 렌더용 state와 동기화 — startPlayback 의존성 고정 */
+  const playbackBundleRef = useRef({
+    options,
+    playbackData,
+    cuePlan,
+    rect,
+    objectPathVizOptions,
+  });
+  playbackBundleRef.current = {
+    options,
+    playbackData,
+    cuePlan,
+    rect,
+    objectPathVizOptions,
+  };
+
+  const ballNormOverridesRef = useRef<BallNormOverrides | null>(null);
+  const playbackPhaseRef = useRef<"idle" | "cue" | "object">("idle");
+  const isPlayingRef = useRef(false);
+
+  /** 재생 루프 밖(UI·복구)에서만 갱신 — 루프 중 setState 금지 */
+  const [committedBallNormOverrides, setCommittedBallNormOverrides] =
+    useState<BallNormOverrides | null>(null);
   const [playbackPhase, setPlaybackPhase] = useState<"idle" | "cue" | "object">("idle");
   const [collisionMessage, setCollisionMessage] = useState<string | null>(null);
   const [playbackTimingDebug, setPlaybackTimingDebug] = useState<TroublePlaybackTimingDebug | null>(null);
-  const rafRef = useRef<number>(0);
+  const frameRef = useRef<number>(0);
   const restoreTimerRef = useRef<number | null>(null);
 
-  const cancelRaf = useCallback(() => {
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = 0;
+  /** rAF 루프 전용: ref만 갱신, setState 없음 */
+  const writeBallNormOverridesRefOnly = useCallback((next: BallNormOverrides | null) => {
+    if (!ballNormOverridesEqual(ballNormOverridesRef.current, next)) {
+      ballNormOverridesRef.current = next;
     }
+  }, []);
+
+  /** 재생 시작/종료/리셋·충돌 스냅샷 등 — ref와 표시 state 동시 반영 */
+  const flushCommittedBallNormOverrides = useCallback((next: BallNormOverrides | null) => {
+    ballNormOverridesRef.current = next;
+    setCommittedBallNormOverrides(next);
+  }, []);
+
+  const commitPlaybackPhase = useCallback((next: "idle" | "cue" | "object") => {
+    if (playbackPhaseRef.current !== next) {
+      playbackPhaseRef.current = next;
+      setPlaybackPhase(next);
+    }
+  }, []);
+
+  const cancelRaf = useCallback(() => {
+    if (frameRef.current) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = 0;
+    }
+    isPlayingRef.current = false;
   }, []);
 
   const clearRestoreTimer = useCallback(() => {
@@ -408,10 +460,10 @@ export function useTroublePathPlayback(options: {
   const resetPlayback = useCallback(() => {
     clearRestoreTimer();
     cancelRaf();
-    setBallNormOverrides(null);
-    setPlaybackPhase("idle");
+    flushCommittedBallNormOverrides(null);
+    commitPlaybackPhase("idle");
     setPlaybackTimingDebug(null);
-  }, [cancelRaf, clearRestoreTimer]);
+  }, [cancelRaf, clearRestoreTimer, flushCommittedBallNormOverrides, commitPlaybackPhase]);
 
   const dismissCollisionMessage = useCallback(() => {
     setCollisionMessage(null);
@@ -445,14 +497,16 @@ export function useTroublePathPlayback(options: {
   );
 
   const startPlayback = useCallback(() => {
+    const { options, playbackData, cuePlan, rect, objectPathVizOptions } = playbackBundleRef.current;
     const placement = options.ballPlacement;
     if (!placement || !playbackData || !cuePlan) return;
     clearRestoreTimer();
     cancelRaf();
     setCollisionMessage(null);
-    /** ?ъ깮? ??긽 諛곗튂 湲곗? ?쒖옉?먯뿉???쒖옉 */
-    setBallNormOverrides(null);
-    setPlaybackPhase("cue");
+    flushCommittedBallNormOverrides(null);
+    commitPlaybackPhase("cue");
+    isPlayingRef.current = true;
+    const collisionWarningsEnabled = options.collisionWarningsEnabled ?? false;
     const hasReflectionPath =
       Boolean(playbackData.reflectionPath?.points) &&
       (playbackData.reflectionPath!.points!.length >= 2);
@@ -724,7 +778,7 @@ export function useTroublePathPlayback(options: {
           if (!objectStarted) {
             objectStarted = true;
             objectStartWallMs = wallMs;
-            setPlaybackPhase("object");
+            commitPlaybackPhase("object");
             const rel = wallMs;
             setPlaybackTimingDebug((d) =>
               d
@@ -775,9 +829,7 @@ export function useTroublePathPlayback(options: {
         }
       }
 
-      setBallNormOverrides((prev) =>
-        ballNormOverridesEqual(prev, overrides) ? prev : overrides
-      );
+      writeBallNormOverridesRefOnly(overrides);
 
       const needsObjectPhase =
         hasReflectionPath && Boolean(objPlan) && Boolean(playbackData.reflectionObjectBall);
@@ -798,7 +850,12 @@ export function useTroublePathPlayback(options: {
             })
           ) {
             setCollisionMessage(COLLISION_POPUP_MESSAGE);
-            setPlaybackPhase("idle");
+            commitPlaybackPhase("idle");
+            isPlayingRef.current = false;
+            {
+              const snap = ballNormOverridesRef.current;
+              flushCommittedBallNormOverrides(snap ? { ...snap } : null);
+            }
             setPlaybackTimingDebug((d) =>
               d
                 ? {
@@ -808,7 +865,7 @@ export function useTroublePathPlayback(options: {
                   }
                 : null
             );
-            rafRef.current = 0;
+            frameRef.current = 0;
             return;
           }
         }
@@ -828,7 +885,12 @@ export function useTroublePathPlayback(options: {
             )
           ) {
             setCollisionMessage(COLLISION_POPUP_MESSAGE);
-            setPlaybackPhase("idle");
+            commitPlaybackPhase("idle");
+            isPlayingRef.current = false;
+            {
+              const snap = ballNormOverridesRef.current;
+              flushCommittedBallNormOverrides(snap ? { ...snap } : null);
+            }
             setPlaybackTimingDebug((d) =>
               d
                 ? {
@@ -838,45 +900,33 @@ export function useTroublePathPlayback(options: {
                   }
                 : null
             );
-            rafRef.current = 0;
+            frameRef.current = 0;
             return;
           }
         }
       }
 
       if (!playbackDone) {
-        rafRef.current = requestAnimationFrame(stepPlayback);
+        frameRef.current = requestAnimationFrame(stepPlayback);
       } else {
-        setPlaybackPhase("idle");
+        commitPlaybackPhase("idle");
+        isPlayingRef.current = false;
+        {
+          const snap = ballNormOverridesRef.current;
+          flushCommittedBallNormOverrides(snap ? { ...snap } : null);
+        }
         setPlaybackTimingDebug((d) => (d ? { ...d, playbackPhaseAtEnd: "idle" } : null));
-        rafRef.current = 0;
+        frameRef.current = 0;
         /** 재생 종료 후 3초간 최종 위치를 보여준 뒤 원래 배치로 복귀 */
         clearRestoreTimer();
         restoreTimerRef.current = window.setTimeout(() => {
-          setBallNormOverrides(null);
+          flushCommittedBallNormOverrides(null);
           restoreTimerRef.current = null;
         }, PLAYBACK_RESTORE_DELAY_MS);
       }
     };
-    rafRef.current = requestAnimationFrame(stepPlayback);
-  }, [
-    options.ballPlacement,
-    playbackData,
-    cuePlan,
-    options.pathPoints,
-    options.objectPathPoints,
-    rect,
-    cancelRaf,
-    collisionWarningsEnabled,
-    objectPathVizOptions,
-    options.objectPathCurveControls,
-    options.cuePathCurveControls,
-    options.cuePathCurveNodes,
-    options.objectPathCurveNodes,
-    options.ignorePhysics,
-    options.playbackRate,
-    clearRestoreTimer,
-  ]);
+    frameRef.current = requestAnimationFrame(stepPlayback);
+  }, [cancelRaf, clearRestoreTimer, flushCommittedBallNormOverrides, commitPlaybackPhase]);
 
   const cuePlaybackPathDebug = useMemo(() => {
     if (!cuePlan) return null;
@@ -989,10 +1039,11 @@ export function useTroublePathPlayback(options: {
   const canPlayback = Boolean(options.ballPlacement && playbackData && cuePlan);
 
   const isPlaybackActive = playbackPhase !== "idle" && collisionMessage === null;
-  const stoppedOnCollision = collisionMessage !== null && ballNormOverrides !== null;
+  const stoppedOnCollision = collisionMessage !== null && committedBallNormOverrides !== null;
 
   return {
-    ballNormOverrides,
+    ballNormOverrides: committedBallNormOverrides,
+    ballNormOverridesLiveRef: ballNormOverridesRef,
     playbackPhase,
     collisionMessage,
     dismissCollisionMessage,

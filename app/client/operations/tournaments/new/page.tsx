@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
 import { canAccessClientDashboard } from "@/types/auth";
-import { OperationsTournamentEditorClient } from "@/components/client/OperationsTournamentEditorClient";
+import { OperationsTournamentNewPageClient } from "./OperationsTournamentNewPageClient";
 
 export const metadata = { title: "대회 등록" };
 
@@ -20,8 +20,7 @@ export default async function ClientOperationsTournamentNewPage() {
   });
 
   return (
-    <OperationsTournamentEditorClient
-      mode="create"
+    <OperationsTournamentNewPageClient
       organizationId={orgId}
       organizationName={org?.name ?? "—"}
     />

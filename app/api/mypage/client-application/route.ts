@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ensureDatabaseUrlForDevelopment, isDatabaseConfigured } from "@/lib/db-mode";
+import { isAnnualMembershipVisible } from "@/lib/site-feature-flags";
 
 /** GET: 현재 로그인 사용자의 클라이언트 신청 내역 (가장 최근 1건). Prisma 스키마 오류 회피를 위해 raw SQL만 사용 */
 export async function GET() {
   ensureDatabaseUrlForDevelopment();
+  const annualMembershipVisible = await isAnnualMembershipVisible();
   let session;
   try {
     session = await getSession();
@@ -53,7 +55,10 @@ export async function GET() {
           id: rows[0].id,
           type: rows[0].type,
           status: rows[0].status,
-          requestedClientType: rows[0].requestedClientType ?? "GENERAL",
+          requestedClientType:
+            !annualMembershipVisible && rows[0].requestedClientType === "REGISTERED"
+              ? "GENERAL"
+              : (rows[0].requestedClientType ?? "GENERAL"),
           organizationName: rows[0].organizationName,
           applicantName: rows[0].applicantName,
           phone: rows[0].phone,
@@ -79,6 +84,7 @@ const VALID_TYPES = ["VENUE", "CLUB", "FEDERATION", "HOST", "INSTRUCTOR"] as con
 /** PATCH: 현재 사용자의 PENDING 신청 1건 수정 (신청내역 확인 후 수정용) */
 export async function PATCH(request: Request) {
   ensureDatabaseUrlForDevelopment();
+  const annualMembershipVisible = await isAnnualMembershipVisible();
   let session;
   try {
     session = await getSession();
@@ -106,6 +112,9 @@ export async function PATCH(request: Request) {
     typeof body?.requestedClientType === "string"
       ? (body.requestedClientType === "REGISTERED" ? "REGISTERED" : "GENERAL")
       : undefined;
+  if (requestedClientType === "REGISTERED" && !annualMembershipVisible) {
+    return NextResponse.json({ error: "페이지를 찾을 수 없습니다." }, { status: 404 });
+  }
   const organizationName = typeof body?.organizationName === "string" ? body.organizationName : "";
   const applicantName = typeof body?.applicantName === "string" ? body.applicantName : "";
   const phone = typeof body?.phone === "string" ? body.phone : "";

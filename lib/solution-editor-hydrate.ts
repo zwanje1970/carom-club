@@ -17,6 +17,9 @@ import {
   createInitialNanguSolutionEditorSnapshot,
   type NanguSolutionEditorUndoSnapshot,
 } from "@/lib/nangu-solution-editor-undo";
+import type { NanguBallPlacement } from "@/lib/nangu-types";
+import { getPlayfieldRect, DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT } from "@/lib/billiard-table-constants";
+import { resolveEffectiveFirstObjectCollisionFromCuePath } from "@/lib/solution-path-geometry";
 
 function pathPointsFromFirstPath(
   path: NanguSolutionData["paths"][number] | undefined
@@ -35,14 +38,53 @@ function pathPointsFromFirstPath(
 }
 
 function objectPathPointsFromReflection(
-  ref: NanguSolutionData["reflectionPath"]
+  ref: NanguSolutionData["reflectionPath"],
+  options?: {
+    ballPlacement?: NanguBallPlacement | null;
+    pathPoints?: NanguPathPoint[];
+  }
 ): NanguPathPoint[] {
   if (!ref) return [];
   if (ref.pointsWithType && ref.pointsWithType.length > 0) {
     return ref.pointsWithType.map((p) => ({ ...p }));
   }
   if (!ref.points?.length) return [];
-  return ref.points.map((p, i) => ({
+
+  let sourcePoints = ref.points;
+  const ballPlacement = options?.ballPlacement ?? null;
+  const pathPoints = options?.pathPoints ?? [];
+  if (ballPlacement && pathPoints.length >= 1) {
+    const cueNorm =
+      ballPlacement.cueBall === "yellow" ? ballPlacement.yellowBall : ballPlacement.whiteBall;
+    const rect = getPlayfieldRect(DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT);
+    const effectiveContact = resolveEffectiveFirstObjectCollisionFromCuePath(
+      ballPlacement,
+      cueNorm,
+      pathPoints,
+      rect
+    );
+    const first = ref.points[0];
+    const isLegacyCenterStart =
+      !!first &&
+      [
+        ballPlacement.redBall,
+        ballPlacement.yellowBall,
+        ballPlacement.whiteBall,
+      ].some(
+        (ball) => Math.abs(ball.x - first.x) < 1e-6 && Math.abs(ball.y - first.y) < 1e-6
+      );
+    const isCollisionStart =
+      !!first &&
+      !!effectiveContact &&
+      Math.abs(effectiveContact.collision.x - first.x) < 1e-6 &&
+      Math.abs(effectiveContact.collision.y - first.y) < 1e-6;
+
+    if (isLegacyCenterStart && !isCollisionStart) {
+      sourcePoints = ref.points.slice(1);
+    }
+  }
+
+  return sourcePoints.map((p, i) => ({
     id: `obj-restored-${i}`,
     x: p.x,
     y: p.y,
@@ -165,7 +207,7 @@ const TROUBLE_HYDRATE_DEFAULT: TroubleSolutionEditorHydratedState = {
 
 export function hydrateTroubleSolutionEditorFromPartial(
   data: Partial<NanguSolutionData> | null | undefined,
-  options?: { initialContent?: string | null }
+  options?: { initialContent?: string | null; ballPlacement?: NanguBallPlacement | null }
 ): TroubleSolutionEditorHydratedState {
   if (!data) {
     return {
@@ -204,7 +246,10 @@ export function hydrateTroubleSolutionEditorFromPartial(
 
   const path0 = data.paths?.[0];
   const pathPoints = pathPointsFromFirstPath(path0);
-  const objectPathPoints = objectPathPointsFromReflection(data.reflectionPath);
+  const objectPathPoints = objectPathPointsFromReflection(data.reflectionPath, {
+    ballPlacement: options?.ballPlacement ?? null,
+    pathPoints,
+  });
 
   const explanationText =
     options?.initialContent !== undefined && options?.initialContent !== null
@@ -240,10 +285,14 @@ export function hydrateTroubleSolutionEditorFromPartial(
 export function createTroubleSolutionEditorInitialState(
   initialSolutionData?: Partial<NanguSolutionData> | null,
   initialPersistedSettings?: SolutionSettingsValue | null,
-  initialContent?: string | null
+  initialContent?: string | null,
+  ballPlacement?: NanguBallPlacement | null
 ): TroubleSolutionEditorHydratedState {
   const merged =
     initialSolutionData ??
     (initialPersistedSettings ? { settings: initialPersistedSettings } : null);
-  return hydrateTroubleSolutionEditorFromPartial(merged, { initialContent });
+  return hydrateTroubleSolutionEditorFromPartial(merged, {
+    initialContent,
+    ballPlacement,
+  });
 }

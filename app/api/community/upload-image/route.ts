@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { processUploadedImage, uploadToBlob, isBlobConfigError, BLOB_SERVICE_UNAVAILABLE_MESSAGE } from "@/lib/image-upload";
 import { IMAGE_POLICIES } from "@/lib/image-policies";
 
 export const runtime = "nodejs";
@@ -17,6 +16,13 @@ export async function POST(request: Request) {
   if (!file || !file.size) {
     return NextResponse.json({ error: "이미지 파일을 선택해주세요." }, { status: 400 });
   }
+
+  const {
+    processUploadedImage,
+    uploadToBlob,
+    isBlobConfigError,
+    BLOB_SERVICE_UNAVAILABLE_MESSAGE,
+  } = await import("@/lib/image-upload");
 
   const policy = IMAGE_POLICIES.community;
   try {

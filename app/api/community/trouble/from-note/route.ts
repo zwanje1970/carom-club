@@ -1,15 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { isDatabaseConfigured } from "@/lib/db-mode";
-import { isFeatureEnabled } from "@/lib/site-feature-flags";
-import {
-  createTroublePostFromNote,
-  ensureTroubleBoardId,
-  findAuthorOwnedSourceNote,
-  findExistingTroublePostIdFromNote,
-  mapBallPlacementJson,
-  mapTroubleFromNoteContent,
-} from "@/lib/services/bridge/trouble-from-note-service";
 import {
   parseTroubleFromNoteBody,
   validateTroubleFromNote,
@@ -31,6 +22,7 @@ export async function POST(request: Request) {
   if (!session) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
+  const { isFeatureEnabled } = await import("@/lib/site-feature-flags");
   const writeEnabled = await isFeatureEnabled("community_write_enabled");
   if (!writeEnabled) {
     return NextResponse.json({ error: "현재 커뮤니티 글쓰기가 중단되었습니다." }, { status: 503 });
@@ -51,6 +43,15 @@ export async function POST(request: Request) {
   const noteId = valid.noteId;
 
   try {
+    const {
+      createTroublePostFromNote,
+      ensureTroubleBoardId,
+      findAuthorOwnedSourceNote,
+      findExistingTroublePostIdFromNote,
+      mapBallPlacementJson,
+      mapTroubleFromNoteContent,
+    } = await import("@/lib/services/bridge/trouble-from-note-service");
+
     const note = await findAuthorOwnedSourceNote(noteId, session.id);
     if (!note) {
       devLog("노트 조회 실패 또는 권한 없음:", { noteId, note: note ?? null, sessionId: session.id });
@@ -84,6 +85,16 @@ export async function POST(request: Request) {
       layoutImageUrl,
       ballPlacementJson,
     });
+
+    try {
+      const { grantUserPoints } = await import("@/lib/activity-point-service");
+      await grantUserPoints(session.id, "NOTE_SEND_TO_SOLVER", undefined, {
+        refType: "note_to_solver",
+        refId: created.id,
+        description: "노트에서 난구해결사 전송",
+        idempotencyKey: `note_send_to_solver:${note.id}:${created.id}`,
+      });
+    } catch (_) {}
 
     return NextResponse.json({ id: created.id });
   } catch (e) {

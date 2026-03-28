@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAdminCopy } from "@/lib/admin-copy";
+import { getAdminCopy } from "@/lib/admin-copy-server";
 
 /** 사이트 전역 안내/설명 문구 (관리자 메뉴·문구에서 수정한 값). 인증 없이 호출 가능. */
 export async function GET() {

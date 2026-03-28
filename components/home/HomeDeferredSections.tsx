@@ -8,10 +8,26 @@ import { MOCK_TOURNAMENTS_LIST, MOCK_VENUES_LIST } from "@/lib/mock-data";
 import { logServerTiming } from "@/lib/perf";
 import type { SiteSettings } from "@/lib/site-settings";
 import { getSession } from "@/lib/auth";
+import { canShowNoteEntryFromSession } from "@/lib/entry-visibility";
 import {
-  canShowNoteEntryFromSession,
-  canShowSolverEntryFromSession,
-} from "@/lib/entry-visibility";
+  getLegacyFallbackPermissions,
+  PERMISSION_KEYS,
+  type PermissionSubject,
+} from "@/lib/auth/permissions";
+
+async function canShowHomeSolverEntry(
+  session: PermissionSubject
+): Promise<boolean> {
+  if (!session) return false;
+  if (!session.roleId) {
+    return getLegacyFallbackPermissions(session.role).includes(
+      PERMISSION_KEYS.COMMUNITY_POST_CREATE
+    );
+  }
+
+  const { hasPermission } = await import("@/lib/auth/permissions.server");
+  return hasPermission(session, PERMISSION_KEYS.COMMUNITY_POST_CREATE);
+}
 
 /** 초기 페인트 후 스트리밍: DB(대회/당구장)만 조회해 하단 섹션 렌더. 첫 화면 블로킹 제거용. */
 export async function HomeDeferredSections({
@@ -26,7 +42,7 @@ export async function HomeDeferredSections({
   let carouselVenues: VenueCarouselRow[] = [];
   const session = await getSession();
   const showNoteEntry = canShowNoteEntryFromSession(session);
-  const showSolverEntry = canShowSolverEntryFromSession(session);
+  const showSolverEntry = await canShowHomeSolverEntry(session);
 
   if (isDatabaseConfigured()) {
     const [tList, cList] = await Promise.all([

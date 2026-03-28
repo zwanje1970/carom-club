@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { getAllPageSections, savePageSection, deletePageSection } from "@/lib/content/service";
 import type { PageSection } from "@/types/page-section";
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
   try {
     const data = (await request.json()) as Omit<PageSection, "createdAt" | "updatedAt">;
     const saved = await savePageSection(data);
+    revalidatePath("/", "layout");
     return NextResponse.json(saved);
   } catch (e) {
     console.error("[content/page-sections] POST error:", e);
@@ -48,6 +50,7 @@ export async function DELETE(request: Request) {
   }
   try {
     await deletePageSection(id.trim());
+    revalidatePath("/", "layout");
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[content/page-sections] DELETE error:", e);

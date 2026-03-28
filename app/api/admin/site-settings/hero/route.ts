@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { getHeroSettings, updateHeroSettings, getDefaultHeroSettings, type HeroSettings } from "@/lib/hero-settings";
+import { getHeroSettings, updateHeroSettings, type HeroSettings } from "@/lib/hero-settings";
 import { revalidatePath } from "next/cache";
 
 export async function GET() {
@@ -10,7 +10,7 @@ export async function GET() {
   }
   try {
     const settings = await getHeroSettings();
-    return NextResponse.json(settings ?? getDefaultHeroSettings());
+    return NextResponse.json(settings);
   } catch (e) {
     console.error("[admin/site-settings/hero] GET error:", e);
     return NextResponse.json(

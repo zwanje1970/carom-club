@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { hasPermission, PERMISSION_KEYS } from "@/lib/auth/permissions.server";
+import { isFeatureEnabled } from "@/lib/site-feature-flags";
 import {
   getCommunityPostCommentsTree,
   getTroubleShotSolutionsForPost,
@@ -42,6 +44,9 @@ export default async function CommunityPostDetailPage({
     getCommunityPostCommentsTree(id, session),
     result.post.boardSlug === "trouble" ? getTroubleShotSolutionsForPost(id, session) : Promise.resolve([]),
   ]);
+  const commentFeatureEnabled = await isFeatureEnabled("community_comment_enabled");
+  const canCreateComment =
+    !!session && commentFeatureEnabled && (await hasPermission(session, PERMISSION_KEYS.COMMUNITY_COMMENT_CREATE));
 
   return (
     <CommunityPostDetailView
@@ -50,6 +55,7 @@ export default async function CommunityPostDetailPage({
       initialPostJson={result.post}
       initialComments={comments}
       initialTroubleSolutions={troubleSolutions}
+      canCreateComment={canCreateComment}
     />
   );
 }

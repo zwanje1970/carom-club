@@ -27,6 +27,8 @@ export default async function AdminMePage() {
       phone: null,
       password: "",
       role: "PLATFORM_ADMIN",
+      roleId: null,
+      roleManualLocked: false,
       status: null,
       withdrawnAt: null,
       latitude: null,
@@ -36,6 +38,7 @@ export default async function AdminMePage() {
       createdAt: new Date(),
       updatedAt: new Date(),
       communityScore: 0,
+      activityPoint: 0,
     };
   }
   if (!user) redirect("/login");

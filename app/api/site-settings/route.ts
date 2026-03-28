@@ -17,6 +17,7 @@ export async function GET() {
         primaryColor: "#d97706",
         secondaryColor: "#b91c1c",
         homeCarouselFlowSpeed: 50,
+        minSolutionLevelForUser: 1,
       },
       { status: 200 }
     );

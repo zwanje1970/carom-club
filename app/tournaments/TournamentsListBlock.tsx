@@ -4,7 +4,7 @@ import { getCommonPageData } from "@/lib/common-page-data";
 import {
   getPublicTournamentsListFromQuery,
   parsePublicTournamentsQuery,
-} from "@/lib/public-tournaments-list-request";
+} from "@/lib/public-tournaments-list-request.server";
 import { logServerTiming } from "@/lib/perf";
 
 type Props = {

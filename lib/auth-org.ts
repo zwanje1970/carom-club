@@ -9,7 +9,7 @@ import {
   CLIENT_CONSOLE_ORG_COOKIE,
   getAccessibleClientOrganizationsCached,
   pickActiveOrganizationId,
-} from "@/lib/client-console-org";
+} from "@/lib/client-console-org.server";
 
 /**
  * 클라이언트 콘솔에서 현재 컨텍스트 조직 ID.

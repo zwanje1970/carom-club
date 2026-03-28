@@ -4,7 +4,7 @@ import {
   CLIENT_CONSOLE_ORG_COOKIE,
   getClientConsoleOrgCookieOptions,
   userCanAccessOrganizationForClientConsole,
-} from "@/lib/client-console-org";
+} from "@/lib/client-console-org.server";
 import { canAccessClientDashboard } from "@/types/auth";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;

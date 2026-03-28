@@ -8,7 +8,7 @@ const STORAGE_KEY = "floating-dashboard-button-position";
 const DEFAULT_OFFSET = 24; // 24px from right and bottom (tailwind right-6 bottom-6)
 const DRAG_THRESHOLD_PX = 6;
 
-type SessionUser = { role?: string };
+type SessionUser = { role?: string; canAccessAdmin?: boolean };
 
 type SavedPosition = { left: number; top: number };
 
@@ -68,7 +68,7 @@ export function AdminFloatButton() {
   } | null>(null);
   const hasDraggedThisGestureRef = useRef(false);
 
-  const isAdminLoggedIn = user?.role === "PLATFORM_ADMIN";
+  const isAdminLoggedIn = user?.canAccessAdmin === true;
   const showButton = pathname === "/login" || isAdminLoggedIn;
   const label = isAdminLoggedIn ? "대시보드" : "관리자";
   const href = isAdminLoggedIn ? "/admin" : "/admin/login";

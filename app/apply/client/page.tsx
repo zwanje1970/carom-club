@@ -1,9 +1,10 @@
-"use client";
-
 import Link from "next/link";
 import { ClientApplyForm } from "@/components/mypage/ClientApplyForm";
+import { isAnnualMembershipVisible } from "@/lib/site-feature-flags";
 
-export default function ApplyClientPage() {
+export default async function ApplyClientPage() {
+  const allowRegisteredClientType = await isAnnualMembershipVisible();
+
   return (
     <main className="min-h-screen bg-site-bg p-4 py-10">
       <div className="mx-auto max-w-lg">
@@ -16,6 +17,7 @@ export default function ApplyClientPage() {
         <ClientApplyForm
           successRedirect="/"
           successLinkLabel="메인으로"
+          allowRegisteredClientType={allowRegisteredClientType}
           initialData={undefined}
         />
         <p className="mt-4 text-center text-sm text-gray-500">

@@ -15,11 +15,28 @@ import {
   mdiViewCarousel,
   mdiMessageQuestion,
   mdiCog,
+  mdiPageLayoutBody,
+  mdiForum,
+  mdiPalette,
+  mdiToggleSwitch,
 } from "@mdi/js";
 import type { MenuAsideItem } from "./_interfaces";
 
 const CLIENT_CHILD_HREFS = ["/admin/venues", "/admin/client-applications", "/admin/fee-ledger"] as const;
 const CONTENT_CHILD_HREFS = ["/admin/page-sections", "/admin/popups", "/admin/notice-bars"] as const;
+/** 사이트관리 하위(사이드바 그룹 펼침용) */
+export const SITE_CHILD_HREFS = [
+  "/admin/site",
+  "/admin/site/home",
+  "/admin/site/community",
+  "/admin/site/copy",
+  "/admin/site/settings",
+  "/admin/site/features",
+  "/admin/site/main",
+  "/admin/site/hero",
+  "/admin/site/footer",
+  "/admin/site/design",
+] as const;
 
 /** 현재 pathname이 해당 그룹에 속하는지 */
 export function isGroupActive(pathname: string, hrefs: string[]): boolean {
@@ -58,13 +75,24 @@ export function getAdminMenuAside(copy?: Record<string, string> | undefined): Me
       ],
     },
     { href: "/admin/inquiries", label: L("menu.inquiries", "문의관리"), icon: mdiMessageQuestion },
-    { href: "/admin/site", label: L("menu.settings", "설정"), icon: mdiCog },
+    {
+      label: L("menu.siteManagement", "사이트관리"),
+      icon: mdiCog,
+      menu: [
+        { href: "/admin/site", label: "사이트관리 홈", icon: mdiViewDashboard },
+        { href: "/admin/site/home", label: "홈 화면 설정", icon: mdiPageLayoutBody },
+        { href: "/admin/site/community", label: "커뮤니티 설정", icon: mdiForum },
+        { href: "/admin/site/copy", label: "문구 관리", icon: mdiFormatListBulleted },
+        { href: "/admin/site/settings", label: "디자인/브랜드 설정", icon: mdiPalette },
+        { href: "/admin/site/features", label: "기능 설정", icon: mdiToggleSwitch },
+      ],
+    },
   ];
 }
 
 /**
  * pathname 기준으로 펼칠 그룹 인덱스 (getAdminMenuAside 반환 배열의 인덱스)
- * 0=대시보드, 1=대회관리, 2=클라이언트 관리, 3=회원·권한, 4=콘텐츠, 5=문의, 6=설정
+ * 0=대시보드, 1=대회관리, 2=클라이언트 관리, 3=회원·권한, 4=콘텐츠, 5=문의, 6=사이트관리
  * -1: 펼침 없음(대시보드·대회관리 등 단일 링크이거나 해당 없음)
  */
 export function getExpandedGroupIndex(pathname: string): number {
@@ -74,7 +102,8 @@ export function getExpandedGroupIndex(pathname: string): number {
   if (pathname === "/admin/members" || pathname.startsWith("/admin/members/")) return 3;
   if (CONTENT_CHILD_HREFS.some((h) => pathname === h || pathname.startsWith(`${h}/`))) return 4;
   if (pathname === "/admin/inquiries" || pathname.startsWith("/admin/inquiries/")) return 5;
-  if (pathname === "/admin/site" || pathname.startsWith("/admin/site/")) return 6;
+  if (SITE_CHILD_HREFS.some((h) => pathname === h || pathname.startsWith(`${h}/`))) return 6;
+  if (pathname === "/admin/settings" || pathname.startsWith("/admin/settings/")) return 6;
 
   return -1;
 }

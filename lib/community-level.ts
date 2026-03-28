@@ -85,8 +85,8 @@ export const MIN_LEVEL = {
   POST_CREATE: 1,
   /** 댓글 / 좋아요 */
   COMMENT_LIKE: 2,
-  /** 당구해결사(난구) 문제 등록 */
-  NANGU_POST_CREATE: 3,
+  /** 당구해결사(난구) 문제 등록 (레벨 제한 없음 — 일반 글쓰기와 동일 기준) */
+  NANGU_POST_CREATE: 1,
   /** 해법 등록 */
   NANGU_SOLUTION_CREATE: 4,
   /** 추가 기능 확장 */
@@ -98,7 +98,7 @@ export const MIN_LEVEL = {
   // 호환용 별칭
   POST: 1,
   COMMENT_AND_LIKE: 2,
-  NANGU_PROBLEM: 3,
+  NANGU_PROBLEM: 1,
   NANGU_SOLUTION: 4,
 } as const;
 

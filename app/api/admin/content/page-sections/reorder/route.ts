@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { reorderPageSections } from "@/lib/content/service";
 import type { PageSlug, PlacementSlug } from "@/types/page-section";
@@ -42,6 +43,7 @@ export async function PATCH(request: Request) {
 
   try {
     await reorderPageSections(page as PageSlug, placement as PlacementSlug, sectionIds);
+    revalidatePath("/", "layout");
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[content/page-sections/reorder] error:", e);

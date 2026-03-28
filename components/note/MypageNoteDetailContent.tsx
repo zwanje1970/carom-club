@@ -17,12 +17,15 @@ interface MypageNoteDetailContentProps {
     createdAt: Date;
     isAuthor: boolean;
   };
+  linkedNanguPostId?: string | null;
+  /** 구 trouble 게시판(CommunityPost id)만 연결된 경우 — nangu가 없을 때만 사용 */
   linkedTroublePostId?: string | null;
   basePath?: string;
 }
 
 export function MypageNoteDetailContent({
   note,
+  linkedNanguPostId = null,
   linkedTroublePostId = null,
   basePath = "/mypage/notes",
 }: MypageNoteDetailContentProps) {
@@ -39,6 +42,7 @@ export function MypageNoteDetailContent({
         <h1 className="text-xl font-bold mb-6">{note.title || "난구노트"}</h1>
         <BilliardNoteDetailClient
           note={note}
+          linkedNanguPostId={linkedNanguPostId}
           linkedTroublePostId={linkedTroublePostId}
           basePath={basePath}
         />

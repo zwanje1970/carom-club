@@ -101,17 +101,18 @@ export function getDefaultHeroSettings(): HeroSettings {
   return { ...DEFAULT_HERO_SETTINGS };
 }
 
-/** DB에서 히어로 설정 조회. 없거나 파싱 실패 시 null (메인에서는 기존 section/copy 사용) */
-export async function getHeroSettings(): Promise<HeroSettings | null> {
-  if (!isDatabaseConfigured()) return null;
+/** DB에서 히어로 설정 조회. 항상 병합된 HeroSettings (JSON 단일 소스) */
+export async function getHeroSettings(): Promise<HeroSettings> {
+  if (!isDatabaseConfigured()) return { ...DEFAULT_HERO_SETTINGS };
   try {
     const row = await prisma.siteSetting.findFirst({
       orderBy: { updatedAt: "desc" },
       select: { heroSettingsJson: true },
     });
-    return parseHeroSettingsJson(row?.heroSettingsJson ?? null);
+    const parsed = parseHeroSettingsJson(row?.heroSettingsJson ?? null);
+    return parsed ?? { ...DEFAULT_HERO_SETTINGS };
   } catch {
-    return null;
+    return { ...DEFAULT_HERO_SETTINGS };
   }
 }
 

@@ -2,11 +2,38 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { NanguBoardLayoutViewer } from "./NanguBoardLayoutViewer";
+import { NanguReadOnlyLayout } from "@/components/nangu/NanguReadOnlyLayout";
+import {
+  DEFAULT_TABLE_WIDTH,
+  DEFAULT_TABLE_HEIGHT,
+} from "@/lib/billiard-table-constants";
+import type { NanguBallPlacement } from "@/lib/nangu-types";
 
 interface BallPos {
   x: number;
   y: number;
+}
+
+function viewerPositionsToPlacement(
+  cueBall: BallPos,
+  objectBall1: BallPos,
+  objectBall2: BallPos,
+  cueBallColor: "white" | "yellow" = "white"
+): NanguBallPlacement {
+  if (cueBallColor === "white") {
+    return {
+      redBall: objectBall2,
+      whiteBall: cueBall,
+      yellowBall: objectBall1,
+      cueBall: "white",
+    };
+  }
+  return {
+    redBall: objectBall2,
+    whiteBall: objectBall1,
+    yellowBall: cueBall,
+    cueBall: "yellow",
+  };
 }
 
 interface NanguSolutionEditorShellProps {
@@ -65,17 +92,31 @@ export function NanguSolutionEditorShell({
     }
   };
 
+  const ballPlacement = viewerPositionsToPlacement(cueBall, objectBall1, objectBall2);
+
   return (
     <div className="space-y-6 bg-slate-900 p-6 rounded-2xl shadow-xl">
       {/* 상단: 원본 배치 뷰어 */}
       <section>
         <h3 className="text-sm font-medium text-slate-400 mb-3 ml-1">문제 공배치 (참고용)</h3>
-        <NanguBoardLayoutViewer 
-          cueBall={cueBall}
-          objectBall1={objectBall1}
-          objectBall2={objectBall2}
-          className="border-slate-700"
-        />
+        <div
+          className="relative w-full max-w-full overflow-hidden rounded-lg border border-slate-700"
+          style={{
+            maxWidth: DEFAULT_TABLE_WIDTH,
+            aspectRatio: `${DEFAULT_TABLE_WIDTH} / ${DEFAULT_TABLE_HEIGHT}`,
+          }}
+        >
+          <NanguReadOnlyLayout
+            ballPlacement={ballPlacement}
+            fillContainer
+            embedFill
+            orientation="landscape"
+            showGrid
+            drawStyle="realistic"
+            showCueBallSpot
+            className="absolute inset-0 w-full h-full rounded-none border-0 overflow-hidden"
+          />
+        </div>
       </section>
 
       {/* 중앙: 해법 설명 입력창 */}

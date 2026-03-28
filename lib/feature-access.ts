@@ -11,6 +11,7 @@
 import { prisma } from "@/lib/db";
 import type { OrgLike } from "@/lib/permissions";
 import { isAnnualClient } from "@/lib/permissions";
+import { isAnnualMembershipEnforced } from "@/lib/site-feature-flags";
 
 const now = () => new Date();
 
@@ -87,6 +88,11 @@ export async function canUseFeature(
   if (!org?.id) return false;
 
   const orgId = org.id;
+
+  // 시범 운영 중에는 연회원 전용 기능 제한을 전체 해제한다.
+  if (!(await isAnnualMembershipEnforced())) {
+    return true;
+  }
 
   // 연회원: 연회원 플랜에 포함된 기능이면 허용
   if (isAnnualClient(org)) {

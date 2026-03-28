@@ -13,6 +13,7 @@ export interface SessionUser {
   username: string;
   email: string;
   role: UserRole;
+  roleId?: string | null;
   /** 로그인 시 선택한 모드. 클라이언트 계정이라도 체크 안 하면 "user" */
   loginMode: LoginMode;
   /** DB상 클라이언트 계정 여부. 권한 부여는 loginMode 기준으로만 함 */

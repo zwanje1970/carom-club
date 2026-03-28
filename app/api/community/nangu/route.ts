@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { normalizeCueBallType } from "@/lib/billiard-table-constants";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
+import { hasPermission, PERMISSION_KEYS } from "@/lib/auth/permissions.server";
 
 /** 난구해결사 게시글 목록. 목록에는 해법 이미지 없이 제목·작성자·투표수만 */
 export async function GET() {
@@ -72,14 +73,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.id },
-    select: { communityScore: true },
-  });
-  const { getLevelFromScore } = await import("@/lib/community-level");
-  const level = user ? getLevelFromScore(user.communityScore ?? 0) : 1;
-  if (level < 3) {
-    return NextResponse.json({ error: "당구해결사 문제 등록은 레벨 3 이상부터 가능합니다." }, { status: 403 });
+  const canCreatePost = await hasPermission(session, PERMISSION_KEYS.COMMUNITY_POST_CREATE);
+  if (!canCreatePost) {
+    return NextResponse.json({ error: "게시글 작성 권한이 없습니다." }, { status: 403 });
   }
 
   let body: {

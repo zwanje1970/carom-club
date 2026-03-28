@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { getAllPopups, savePopup } from "@/lib/content/service";
 import type { Popup } from "@/types/popup";
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
   try {
     const data = (await request.json()) as Omit<Popup, "createdAt" | "updatedAt">;
     const saved = await savePopup(data);
+    revalidateTag("common-page-data");
     return NextResponse.json(saved);
   } catch (e) {
     console.error("[content/popups] POST error:", e);

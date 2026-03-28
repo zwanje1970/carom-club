@@ -9,7 +9,7 @@ export function NanguTroubleLoginGate() {
       title="난구해결사"
       description="난구해결사는 로그인 후 이용할 수 있습니다."
       titleId="nangu-trouble-login-title"
-      fallbackPath="/community/trouble"
+      fallbackPath="/community/nangu"
     />
   );
 }

@@ -14,7 +14,6 @@ export default async function TournamentsPage({
 
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
-      <TournamentsChrome />
       <Suspense
         fallback={
           <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
@@ -22,6 +21,7 @@ export default async function TournamentsPage({
           </div>
         }
       >
+        <TournamentsChrome />
         <TournamentsListBlock searchParams={sp} />
       </Suspense>
     </main>

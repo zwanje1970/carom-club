@@ -1,9 +1,15 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { NoteSolverLinkagePanel } from "@/components/note/NoteSolverLinkagePanel";
+import { NanguReadOnlyLayout } from "@/components/nangu/NanguReadOnlyLayout";
+import { useTableOrientation } from "@/hooks/useTableOrientation";
+import {
+  DEFAULT_TABLE_WIDTH,
+  DEFAULT_TABLE_HEIGHT,
+} from "@/lib/billiard-table-constants";
 import type { NanguBallPlacement } from "@/lib/nangu-types";
 import { formatKoreanDate, formatKoreanDateTime } from "@/lib/format-date";
 
@@ -26,18 +32,22 @@ interface NoteData {
 
 export interface BilliardNoteDetailClientProps {
   note: NoteData;
-  /** 이 노트에서 생성·연결된 난구해결(community/trouble) 게시글 id */
+  /** 이 노트에서 생성·연결된 난구해결사(NanguPost) 게시글 id */
+  linkedNanguPostId?: string | null;
+  /** 구 trouble 게시판 글 id — nangu 연결이 없을 때만 전달 */
   linkedTroublePostId?: string | null;
   basePath?: string;
 }
 
 export function BilliardNoteDetailClient({
   note,
+  linkedNanguPostId = null,
   linkedTroublePostId = null,
   basePath = "/mypage/notes",
 }: BilliardNoteDetailClientProps) {
   const router = useRouter();
   const [error, setError] = useState("");
+  const previewOrientation = useTableOrientation();
 
   const ballPlacement: NanguBallPlacement = useMemo(
     () => ({
@@ -67,15 +77,27 @@ export function BilliardNoteDetailClient({
     router.push(basePath);
   };
 
-  const tableImage = note.imageUrl ? (
-    <img
-      src={note.imageUrl}
-      alt="저장된 당구대 배치"
-      className="max-w-full h-auto block w-full"
-    />
-  ) : (
-    <div className="w-full aspect-[2/1] flex items-center justify-center text-gray-500 bg-gray-100 dark:bg-slate-800">
-      이미지 없음
+  const tableViewer = (
+    <div
+      className="relative w-full max-w-full overflow-hidden rounded-lg border border-gray-200 dark:border-slate-600"
+      style={{
+        maxWidth: DEFAULT_TABLE_WIDTH,
+        aspectRatio:
+          previewOrientation === "portrait"
+            ? `${DEFAULT_TABLE_HEIGHT} / ${DEFAULT_TABLE_WIDTH}`
+            : `${DEFAULT_TABLE_WIDTH} / ${DEFAULT_TABLE_HEIGHT}`,
+      }}
+    >
+      <NanguReadOnlyLayout
+        ballPlacement={ballPlacement}
+        fillContainer
+        embedFill
+        className="absolute inset-0 w-full h-full rounded-none border-0 overflow-hidden"
+        showGrid
+        drawStyle="realistic"
+        showCueBallSpot
+        orientation={previewOrientation}
+      />
     </div>
   );
 
@@ -99,17 +121,17 @@ export function BilliardNoteDetailClient({
 
   return (
     <div className="space-y-6 pb-28 md:pb-0">
-      <div className="rounded-lg overflow-hidden bg-gray-900 flex justify-center">
+      <div className="rounded-lg flex justify-center">
         {note.isAuthor ? (
           <Link
             href={`${basePath}/${note.id}/edit`}
-            className="flex justify-center focus:outline-none focus:ring-2 focus:ring-site-primary/50 rounded-lg"
+            className="flex w-full justify-center focus:outline-none focus:ring-2 focus:ring-site-primary/50 rounded-lg"
             aria-label="당구공 배치 화면으로 이동"
           >
-            {tableImage}
+            {tableViewer}
           </Link>
         ) : (
-          tableImage
+          tableViewer
         )}
       </div>
 
@@ -117,6 +139,7 @@ export function BilliardNoteDetailClient({
         noteId={note.id}
         noteImageUrl={note.imageUrl}
         isAuthor={note.isAuthor}
+        linkedNanguPostId={linkedNanguPostId}
         linkedTroublePostId={linkedTroublePostId}
         ballPlacement={ballPlacement}
         cuePos={cuePos}

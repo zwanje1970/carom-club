@@ -42,13 +42,20 @@ const REQUESTED_CLIENT_TYPES = [
 type Props = {
   successRedirect: string;
   successLinkLabel?: string;
+  allowRegisteredClientType?: boolean;
   /** 마이페이지 등에서 넘겨주면 신청자 이름·이메일·연락처 자동 채움 */
   initialData?: ClientApplyInitialData | null;
   /** PENDING 신청이 있으면 폼에 채우고 수정 가능 */
   existingApplication?: ExistingApplication | null;
 };
 
-export function ClientApplyForm({ successRedirect, successLinkLabel = "확인", initialData, existingApplication }: Props) {
+export function ClientApplyForm({
+  successRedirect,
+  successLinkLabel = "확인",
+  allowRegisteredClientType = true,
+  initialData,
+  existingApplication,
+}: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -59,7 +66,9 @@ export function ClientApplyForm({ successRedirect, successLinkLabel = "확인", 
 
   const [form, setForm] = useState({
     type: (existingApplication?.type ?? "VENUE") as (typeof CLIENT_TYPES)[number]["value"],
-    requestedClientType: (existingApplication?.requestedClientType ?? "GENERAL") as (typeof REQUESTED_CLIENT_TYPES)[number]["value"],
+    requestedClientType: (
+      allowRegisteredClientType && existingApplication?.requestedClientType === "REGISTERED" ? "REGISTERED" : "GENERAL"
+    ) as (typeof REQUESTED_CLIENT_TYPES)[number]["value"],
     organizationName: existingApplication?.organizationName ?? "",
     applicantName: existingApplication?.applicantName ?? initialData?.applicantName ?? "",
     phone: existingApplication?.phone ?? initialData?.phone ?? "",
@@ -74,7 +83,9 @@ export function ClientApplyForm({ successRedirect, successLinkLabel = "확인", 
       const n = (s: string | null | undefined) => toHalfwidth(String(s ?? "").trim());
       const snapshot = {
         type: n(existingApplication.type ?? "VENUE"),
-        requestedClientType: n(existingApplication.requestedClientType ?? "GENERAL"),
+        requestedClientType: n(
+          allowRegisteredClientType && existingApplication.requestedClientType === "REGISTERED" ? "REGISTERED" : "GENERAL"
+        ),
         organizationName: n(existingApplication.organizationName ?? ""),
         applicantName: n(existingApplication.applicantName ?? ""),
         phone: n(existingApplication.phone ?? ""),
@@ -86,7 +97,9 @@ export function ClientApplyForm({ successRedirect, successLinkLabel = "확인", 
       initialEditSnapshot.current = snapshot;
       setForm({
         type: (existingApplication.type ?? "VENUE") as (typeof CLIENT_TYPES)[number]["value"],
-        requestedClientType: (existingApplication.requestedClientType ?? "GENERAL") as (typeof REQUESTED_CLIENT_TYPES)[number]["value"],
+        requestedClientType: (
+          allowRegisteredClientType && existingApplication.requestedClientType === "REGISTERED" ? "REGISTERED" : "GENERAL"
+        ) as (typeof REQUESTED_CLIENT_TYPES)[number]["value"],
         organizationName: existingApplication.organizationName ?? "",
         applicantName: existingApplication.applicantName ?? "",
         phone: existingApplication.phone ?? "",
@@ -112,7 +125,7 @@ export function ClientApplyForm({ successRedirect, successLinkLabel = "확인", 
         }
       })
       .catch(() => {});
-  }, [initialData, existingApplication]);
+  }, [allowRegisteredClientType, initialData, existingApplication]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -156,7 +169,10 @@ export function ClientApplyForm({ successRedirect, successLinkLabel = "확인", 
         method,
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          requestedClientType: allowRegisteredClientType ? form.requestedClientType : "GENERAL",
+        }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string; demo?: boolean };
       if (!res.ok) {
@@ -237,13 +253,15 @@ export function ClientApplyForm({ successRedirect, successLinkLabel = "확인", 
             setForm((f) => ({ ...f, requestedClientType: e.target.value as typeof form.requestedClientType }))
           }
         >
-          {REQUESTED_CLIENT_TYPES.map((t) => (
+          {REQUESTED_CLIENT_TYPES.filter((t) => allowRegisteredClientType || t.value !== "REGISTERED").map((t) => (
             <option key={t.value} value={t.value}>
               {t.label}
             </option>
           ))}
         </select>
-        <p className="mt-1 text-xs text-gray-500">일반업체와 등록업체를 구분합니다. 등록업체 승인 시 연회원으로 처리됩니다.</p>
+        {allowRegisteredClientType && (
+          <p className="mt-1 text-xs text-gray-500">일반업체와 등록업체를 구분합니다. 등록업체 승인 시 연회원으로 처리됩니다.</p>
+        )}
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">업체/단체명 *</label>

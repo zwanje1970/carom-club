@@ -35,6 +35,8 @@ export default async function MypagePage() {
         phone: null,
         password: "",
         role: "USER",
+        roleId: null,
+        roleManualLocked: false,
         status: null,
         withdrawnAt: null,
         latitude: null,
@@ -44,6 +46,7 @@ export default async function MypagePage() {
         createdAt: new Date(),
         updatedAt: new Date(),
         communityScore: 0,
+        activityPoint: 0,
         memberProfile: null,
       };
     }
@@ -56,6 +59,8 @@ export default async function MypagePage() {
       phone: null,
       password: "",
       role: "USER",
+      roleId: null,
+      roleManualLocked: false,
       status: null,
       withdrawnAt: null,
       latitude: null,
@@ -65,6 +70,7 @@ export default async function MypagePage() {
       createdAt: new Date(),
       updatedAt: new Date(),
       communityScore: 0,
+      activityPoint: 0,
       memberProfile: null,
     };
   }
@@ -82,7 +88,7 @@ export default async function MypagePage() {
   return (
     <main className="min-h-screen bg-site-bg p-4 md:p-8">
       <div className="mx-auto w-full max-w-2xl">
-        <h1 className="mb-4 text-xl font-bold md:text-2xl">마이페이지</h1>
+        <h1 className="mb-4 text-xl font-bold md:text-2xl md:block hidden">마이페이지</h1>
 
         {/* 프로필 카드: 이름, 로그인 상태, 계정 유형 */}
         <div className="mb-4">

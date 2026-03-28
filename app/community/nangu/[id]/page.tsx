@@ -5,6 +5,9 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { getLevelFromScore, getTierName, getTierColor } from "@/lib/community-level";
 import type { NanguBallPlacement } from "@/lib/nangu-types";
+import { hasPermission, PERMISSION_KEYS } from "@/lib/auth/permissions.server";
+import { isCommunityAdmin } from "@/lib/community-roles";
+import { getNanguSolutionAccessState } from "@/lib/nangu-solution-policy.server";
 import { NanguPostDetailClient } from "./NanguPostDetailClient";
 
 export default async function NanguPostDetailPage({
@@ -59,12 +62,21 @@ export default async function NanguPostDetailPage({
 
   const ballPlacement = JSON.parse(post.ballPlacementJson) as NanguBallPlacement;
   const isAuthor = session?.id === post.authorId;
+  const isAdmin = isCommunityAdmin(session);
   const postAuthorLevel = post.author ? getLevelFromScore(post.author.communityScore ?? 0) : 1;
+  const solutionAccess = session
+    ? await getNanguSolutionAccessState(session)
+    : { allowed: false };
+  const canCreateSolution = !!solutionAccess.allowed;
+  const canAcceptSolution =
+    !!session &&
+    isAuthor &&
+    (await hasPermission(session, PERMISSION_KEYS.SOLVER_SOLUTION_ACCEPT));
 
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
       <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">
-        <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4" aria-label="breadcrumb">
+        <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4 md:flex hidden" aria-label="breadcrumb">
           <Link href="/community" className="hover:text-site-primary">커뮤니티</Link>
           <span aria-hidden>/</span>
           <Link href="/community/nangu" className="hover:text-site-primary">난구해결사</Link>
@@ -73,7 +85,7 @@ export default async function NanguPostDetailPage({
         </nav>
         <div className="flex items-start gap-0 mb-6">
           <NanguSolverIcon size={48} className="mt-0.5 shrink-0" />
-          <h1 className="text-xl font-bold flex-1 min-w-0 break-words">{post.title}</h1>
+          <h1 className="text-xl font-bold flex-1 min-w-0 break-words md:block hidden">{post.title}</h1>
         </div>
         <NanguPostDetailClient
           post={{
@@ -87,6 +99,9 @@ export default async function NanguPostDetailPage({
             ballPlacement,
             createdAt: post.createdAt.toISOString(),
             isAuthor,
+            canDeletePost: isAuthor || isAdmin,
+            canCreateSolution,
+            canAcceptSolution,
           }}
           solutions={sorted.map((s) => {
             const level = s.author ? getLevelFromScore(s.author.communityScore ?? 0) : 1;

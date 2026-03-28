@@ -4,7 +4,7 @@
  */
 
 import { unstable_cache } from "next/cache";
-import { getAdminCopy } from "@/lib/admin-copy";
+import { getAdminCopy } from "@/lib/admin-copy-server";
 import { getSiteSettings } from "@/lib/site-settings";
 import {
   getNoticeBarsForPage,

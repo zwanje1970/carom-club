@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { getMyBillingData } from "@/lib/billing-client";
 import { formatPrice, formatPostingMonths } from "@/lib/feature-access";
 import { formatKoreanDate, formatKoreanDateTime } from "@/lib/format-date";
+import { isAnnualMembershipVisible } from "@/lib/site-feature-flags";
 
 export const metadata = {
   title: "플랫폼 이용",
@@ -35,6 +37,10 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 export default async function ClientBillingPlatformPage() {
+  if (!(await isAnnualMembershipVisible())) {
+    notFound();
+  }
+
   const session = await getSession();
   if (!session || session.role !== "CLIENT_ADMIN") return null;
 

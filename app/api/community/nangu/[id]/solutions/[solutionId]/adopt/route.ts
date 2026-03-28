@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { awardSolutionAdopted, awardAdopterBonus } from "@/lib/community-score-service";
+import { hasPermission, PERMISSION_KEYS } from "@/lib/auth/permissions.server";
 
 /** 질문자(게시글 작성자)가 해법 채택. 채택 시 해법 작성자 +6점, 질문자 +2점 */
 export async function POST(
@@ -24,6 +25,10 @@ export async function POST(
   });
   if (!post) {
     return NextResponse.json({ error: "게시글을 찾을 수 없습니다." }, { status: 404 });
+  }
+  const canAcceptSolution = await hasPermission(session, PERMISSION_KEYS.SOLVER_SOLUTION_ACCEPT);
+  if (!canAcceptSolution) {
+    return NextResponse.json({ error: "해법 채택 권한이 없습니다." }, { status: 403 });
   }
   if (post.authorId !== session.id) {
     return NextResponse.json({ error: "질문자만 해법을 채택할 수 있습니다." }, { status: 403 });
@@ -48,6 +53,15 @@ export async function POST(
   try {
     await awardSolutionAdopted(solution.authorId, solutionId, postId);
     await awardAdopterBonus(post.authorId, postId, solutionId);
+  } catch (_) {}
+  try {
+    const { grantUserPoints } = await import("@/lib/activity-point-service");
+    await grantUserPoints(solution.authorId, "SOLVER_SOLUTION_ACCEPT", undefined, {
+      refType: "nangu_solution_accept",
+      refId: solutionId,
+      description: "난구해결사 해법 채택",
+      idempotencyKey: `solver_solution_accept:nangu:${solutionId}`,
+    });
   } catch (_) {}
 
   return NextResponse.json({ ok: true });

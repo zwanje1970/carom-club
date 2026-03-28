@@ -5,8 +5,8 @@ import { isDatabaseConfigured } from "@/lib/db-mode";
 import { canWriteNotice, isCommunityModerator } from "@/lib/community-roles";
 import { isFeatureEnabled } from "@/lib/site-feature-flags";
 import { awardPostCreated } from "@/lib/community-score-service";
-import { getLevelFromScore } from "@/lib/community-level";
 import { ensureDefaultCommunityBoards } from "@/lib/community-ensure-boards";
+import { hasPermission, PERMISSION_KEYS } from "@/lib/auth/permissions.server";
 import {
   BOARD_LIST_TAKE_DEFAULT,
   BOARD_LIST_TAKE_MAX,
@@ -141,13 +141,9 @@ export async function POST(
   if (!writeEnabled) {
     return NextResponse.json({ error: "현재 커뮤니티 글쓰기가 중단되었습니다." }, { status: 503 });
   }
-  const user = await prisma.user.findUnique({
-    where: { id: session.id },
-    select: { communityScore: true },
-  });
-  const level = user ? getLevelFromScore(user.communityScore) : 1;
-  if (level < 1) {
-    return NextResponse.json({ error: "게시글 작성 권한이 없습니다. (레벨 1 이상 필요)" }, { status: 403 });
+  const canCreatePost = await hasPermission(session, PERMISSION_KEYS.COMMUNITY_POST_CREATE);
+  if (!canCreatePost) {
+    return NextResponse.json({ error: "게시글 작성 권한이 없습니다." }, { status: 403 });
   }
 
   let body: { title: string; content: string; imageUrls?: string[]; isPinned?: boolean };

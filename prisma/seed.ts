@@ -10,6 +10,185 @@ const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? "admin1234";
 // 대진표 테스트용 회원 64명 공통 비밀번호
 const TEST_USER_PASSWORD = process.env.SEED_TEST_USER_PASSWORD ?? "test1234";
 
+const RBAC_PERMISSIONS = [
+  { key: "community.post.create", label: "커뮤니티 글 작성", category: "community", description: "커뮤니티 게시글 작성" },
+  { key: "community.post.edit.own", label: "내 글 수정", category: "community", description: "본인 게시글 수정" },
+  { key: "community.post.delete.own", label: "내 글 삭제", category: "community", description: "본인 게시글 삭제" },
+  { key: "community.comment.create", label: "댓글 작성", category: "community", description: "커뮤니티 댓글 작성" },
+  { key: "community.comment.edit.own", label: "내 댓글 수정", category: "community", description: "본인 댓글 수정" },
+  { key: "community.comment.delete.own", label: "내 댓글 삭제", category: "community", description: "본인 댓글 삭제" },
+  { key: "community.vote.like", label: "추천/좋아요", category: "community", description: "게시글/댓글 추천" },
+  { key: "solver.solution.view", label: "해법 조회", category: "solver", description: "난구해결사 해법 조회" },
+  { key: "solver.solution.create", label: "해법 작성", category: "solver", description: "난구해결사 해법 작성" },
+  { key: "solver.solution.edit.own", label: "내 해법 수정", category: "solver", description: "본인 해법 수정" },
+  { key: "solver.solution.delete.own", label: "내 해법 삭제", category: "solver", description: "본인 해법 삭제" },
+  { key: "solver.solution.good", label: "해법 GOOD", category: "solver", description: "해법 GOOD 평가" },
+  { key: "solver.solution.bad", label: "해법 BAD", category: "solver", description: "해법 BAD 평가" },
+  { key: "solver.solution.accept", label: "해법 채택", category: "solver", description: "질문자의 해법 채택" },
+  { key: "note.use", label: "당구노트 사용", category: "note", description: "당구노트 사용" },
+  { key: "note.send_to_solver", label: "노트에서 난구해결로 보내기", category: "note", description: "노트를 난구해결사로 전송" },
+  { key: "admin.access", label: "관리자 접근", category: "admin", description: "관리자 콘솔 접근" },
+  { key: "admin.user.manage", label: "회원 관리", category: "admin", description: "회원 레벨/상태 관리" },
+  { key: "admin.role.manage", label: "레벨(Role) 관리", category: "admin", description: "역할 조회/관리" },
+  { key: "admin.permission.manage", label: "권한 관리", category: "admin", description: "레벨별 권한 저장" },
+  { key: "admin.post.delete.any", label: "게시글 임의 삭제", category: "admin", description: "모든 게시글 삭제" },
+  { key: "admin.solution.delete.any", label: "해법 임의 삭제", category: "admin", description: "모든 해법 삭제" },
+  { key: "admin.user.ban", label: "회원 차단", category: "admin", description: "회원 정지/차단" },
+] as const;
+
+const ALL_RBAC_PERMISSION_KEYS = RBAC_PERMISSIONS.map((permission) => permission.key);
+
+const USER_ROLE_PERMISSION_KEYS = [
+  "community.post.create",
+  "community.post.edit.own",
+  "community.post.delete.own",
+  "community.comment.create",
+  "community.comment.edit.own",
+  "community.comment.delete.own",
+  "community.vote.like",
+  "solver.solution.view",
+  "solver.solution.create",
+  "solver.solution.edit.own",
+  "solver.solution.delete.own",
+  "solver.solution.good",
+  "solver.solution.bad",
+] as const;
+
+const NOTE_USER_ROLE_PERMISSION_KEYS = [
+  ...USER_ROLE_PERMISSION_KEYS,
+  "note.use",
+  "note.send_to_solver",
+  "solver.solution.accept",
+] as const;
+
+const SOLVER_ROLE_PERMISSION_KEYS = [...USER_ROLE_PERMISSION_KEYS] as const;
+
+const RBAC_ROLES = [
+  { key: "USER", label: "일반회원", description: "기본 커뮤니티/해법 작성 권한", permissionKeys: USER_ROLE_PERMISSION_KEYS },
+  { key: "NOTE_USER", label: "당구노트 사용자", description: "당구노트와 채택 권한 포함", permissionKeys: NOTE_USER_ROLE_PERMISSION_KEYS },
+  { key: "SOLVER", label: "해결사", description: "표시용 확장 역할, 1차는 USER와 동일 권한", permissionKeys: SOLVER_ROLE_PERMISSION_KEYS },
+  { key: "ADMIN", label: "관리자", description: "모든 권한 허용", permissionKeys: ALL_RBAC_PERMISSION_KEYS },
+] as const;
+
+async function seedRbac() {
+  for (const permission of RBAC_PERMISSIONS) {
+    await prisma.permission.upsert({
+      where: { key: permission.key },
+      create: {
+        key: permission.key,
+        label: permission.label,
+        category: permission.category,
+      },
+      update: {
+        label: permission.label,
+        category: permission.category,
+      },
+    });
+  }
+
+  await Promise.all(
+    RBAC_PERMISSIONS.map((permission) =>
+      prisma.$executeRaw`
+        UPDATE "Permission"
+        SET "label" = ${permission.label}, "category" = ${permission.category}
+        WHERE "key" = ${permission.key}
+      `
+    )
+  );
+
+  for (const role of RBAC_ROLES) {
+    await prisma.role.upsert({
+      where: { key: role.key },
+      create: {
+        key: role.key,
+        label: role.label,
+        description: role.description ?? null,
+        isSystem: true,
+      },
+      update: {
+        label: role.label,
+        description: role.description ?? null,
+        isSystem: true,
+      },
+    });
+  }
+
+  const [roles, permissions] = await Promise.all([
+    prisma.role.findMany({
+      where: { key: { in: RBAC_ROLES.map((role) => role.key) } },
+      select: { id: true, key: true },
+    }),
+    prisma.permission.findMany({
+      where: { key: { in: ALL_RBAC_PERMISSION_KEYS } },
+      select: { id: true, key: true },
+    }),
+  ]);
+
+  const roleIdByKey = new Map(roles.map((role) => [role.key, role.id]));
+  const permissionIdByKey = new Map(permissions.map((permission) => [permission.key, permission.id]));
+
+  for (const role of RBAC_ROLES) {
+    const roleId = roleIdByKey.get(role.key);
+    if (!roleId) continue;
+
+    const targetPermissionIds = role.permissionKeys
+      .map((permissionKey) => permissionIdByKey.get(permissionKey))
+      .filter((permissionId): permissionId is string => typeof permissionId === "string");
+
+    const existingRolePermissions = await prisma.rolePermission.findMany({
+      where: { roleId },
+      select: { permissionId: true },
+    });
+
+    const existingPermissionIds = new Set(existingRolePermissions.map((item) => item.permissionId));
+    const targetPermissionIdSet = new Set(targetPermissionIds);
+    const permissionIdsToAdd = targetPermissionIds.filter((permissionId) => !existingPermissionIds.has(permissionId));
+    const permissionIdsToRemove = existingRolePermissions
+      .map((item) => item.permissionId)
+      .filter((permissionId) => !targetPermissionIdSet.has(permissionId));
+
+    if (permissionIdsToRemove.length > 0) {
+      await prisma.rolePermission.deleteMany({
+        where: {
+          roleId,
+          permissionId: { in: permissionIdsToRemove },
+        },
+      });
+    }
+
+    if (permissionIdsToAdd.length > 0) {
+      await prisma.$transaction(
+        permissionIdsToAdd.map((permissionId) =>
+          prisma.$executeRaw`
+            INSERT INTO "RolePermission" ("roleId", "permissionId")
+            VALUES (${roleId}, ${permissionId})
+            ON CONFLICT ("roleId", "permissionId") DO NOTHING
+          `
+        )
+      );
+    }
+  }
+
+  const adminRoleId = roleIdByKey.get("ADMIN");
+  const userRoleId = roleIdByKey.get("USER");
+
+  if (adminRoleId) {
+    await prisma.user.updateMany({
+      where: { role: "PLATFORM_ADMIN" },
+      data: { roleId: adminRoleId },
+    });
+  }
+
+  if (userRoleId) {
+    await prisma.user.updateMany({
+      where: { role: "USER" },
+      data: { roleId: userRoleId },
+    });
+  }
+
+  console.log("RBAC Role / Permission / RolePermission 시드와 기본 roleId 보정이 완료되었습니다.");
+}
+
 async function main() {
   const hashedAdmin = await bcrypt.hash(ADMIN_PASSWORD, 12);
   const hashedTest = await bcrypt.hash(TEST_USER_PASSWORD, 12);
@@ -64,6 +243,8 @@ async function main() {
     }
   }
   console.log("대진표 테스트용 회원 64명이 생성/업데이트되었습니다. (test1~test64, 비밀번호 동일)");
+
+  await seedRbac();
 
   // 기본 당구장(업체 타입 VENUE) 1개 생성 (DB 스키마가 맞을 때만)
   try {

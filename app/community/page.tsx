@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import CommunityLoading from "./loading";
 import { CommunityHomeInner } from "./CommunityHomeInner";
 
@@ -13,11 +14,13 @@ export default async function CommunityPage({
 }) {
   const sp = await searchParams;
   const rawCategory = typeof sp.category === "string" ? sp.category : "all";
+  if (rawCategory === "trouble") {
+    redirect("/community/nangu");
+  }
   const category =
     rawCategory === "all" ||
     rawCategory === "free" ||
     rawCategory === "qna" ||
-    rawCategory === "trouble" ||
     rawCategory === "notice"
       ? rawCategory
       : "all";

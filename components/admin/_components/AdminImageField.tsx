@@ -9,8 +9,8 @@ type Props = {
   label: string;
   value: string | null | undefined;
   onChange: (url: string | null) => void;
-  /** 업로드 시 사용할 정책 (section → 최적화 적용) */
-  policy?: "content" | "section";
+  /** 업로드 시 사용할 정책 (`/api/admin/upload-image`와 동일) */
+  policy?: "content" | "section" | "banner" | "logo" | "thumbnail" | "venue" | "tournament";
   recommendedSize?: string;
   required?: boolean;
 };
@@ -36,7 +36,11 @@ export function AdminImageField({
       const formData = new FormData();
       formData.set("file", file);
       formData.set("policy", policy);
-      const res = await fetch("/api/admin/upload-image", { method: "POST", body: formData });
+      const res = await fetch("/api/admin/upload-image", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data.error || "업로드에 실패했습니다.");

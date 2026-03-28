@@ -529,6 +529,12 @@ export function SolutionPathEditorFullscreen({
   const [leftPathDrawerOpen, setLeftPathDrawerOpen] = useState(false);
   /** ?명듃 ?? ?곗륫 ?щ씪?대뱶 ??醫뚯륫怨??낅┰ 硫붾돱 ?곸뿭) */
   const [rightPathDrawerOpen, setRightPathDrawerOpen] = useState(false);
+  /** nangu 노트 전체화면 좌측 드로어 드래그 닫기(trouble 좌측과 동시 마운트되지 않음) */
+  const [leftPathDrawerDragPx, setLeftPathDrawerDragPx] = useState(0);
+  const [leftPathDrawerDragging, setLeftPathDrawerDragging] = useState(false);
+  const leftPathDrawerAsideRef = useRef<HTMLElement | null>(null);
+  const leftPathDrawerDragRef = useRef<{ startX: number; basePx: number } | null>(null);
+  const leftPathDrawerDragPxRef = useRef(0);
   /** ?쒓뎄(trouble): ?곗륫 ?⑤꼸???쒕옒洹몃줈 ?リ린 ???대┝ 湲곗? ?ㅻⅨ履쎌쑝濡?諛由?px(0=?꾩쟾???대┝) */
   const [troubleDrawerDragPx, setTroubleDrawerDragPx] = useState(0);
   const [troubleDrawerDragging, setTroubleDrawerDragging] = useState(false);
@@ -562,6 +568,14 @@ export function SolutionPathEditorFullscreen({
   useEffect(() => {
     setTroubleLeftDrawerDragPx(0);
   }, [troubleLeftDrawerOpen]);
+
+  useEffect(() => {
+    leftPathDrawerDragPxRef.current = leftPathDrawerDragPx;
+  }, [leftPathDrawerDragPx]);
+
+  useEffect(() => {
+    setLeftPathDrawerDragPx(0);
+  }, [leftPathDrawerOpen]);
 
   const [tableGridOn, setTableGridOn] = useState(true);
   const [tableDrawStyle, setTableDrawStyle] = useState<TableDrawStyle>("realistic");
@@ -1177,11 +1191,21 @@ export function SolutionPathEditorFullscreen({
 
   const cuePosWithPlayback = useMemo(() => {
     if (!layoutForCue) return cuePos;
+    const k = layoutForCue.cueBall === "yellow" ? "yellow" : "white";
+    if (pathPlayback.isPlaybackActive) {
+      const pb = pathPlayback.ballNormOverridesLiveRef.current;
+      return pb?.[k] ?? cuePos;
+    }
     const pb = pathPlayback.ballNormOverrides;
     if (!pb) return cuePos;
-    const k = layoutForCue.cueBall === "yellow" ? "yellow" : "white";
     return pb[k] ?? cuePos;
-  }, [cuePos, layoutForCue, pathPlayback.ballNormOverrides]);
+  }, [
+    cuePos,
+    layoutForCue,
+    pathPlayback.isPlaybackActive,
+    pathPlayback.ballNormOverrides,
+    pathPlayback.ballNormOverridesLiveRef,
+  ]);
 
   const allowCuePlaybackGestures =
     isNoteShell && Boolean(layoutForCue && pathPoints.length >= 1 && !pathPlayback.isPlaybackActive);
@@ -1221,12 +1245,13 @@ export function SolutionPathEditorFullscreen({
       return;
     }
     if (!pathPlayback.canPlayback) return;
-    if ((settingsValue?.thicknessStep ?? 0) >= 16) {
+    const thicknessUnset = (settingsValue?.thicknessStep ?? 0) >= 16;
+    if (!settingsValue?.ignorePhysics && thicknessUnset) {
       setThicknessNotSetDialogOpen(true);
       return;
     }
     pathPlayback.startPlayback();
-  }, [pathPlayback, resetPathPlayback, settingsValue?.thicknessStep]);
+  }, [pathPlayback, resetPathPlayback, settingsValue?.thicknessStep, settingsValue?.ignorePhysics]);
 
   const onPathEditCueBallTap = useCallback(() => {
     if (variant === "trouble") setTroublePathEditLayer("cue");
@@ -1246,12 +1271,18 @@ export function SolutionPathEditorFullscreen({
     setPathMode(false);
   }, [variant, collisionNorm]);
 
-  /** 1목이 아직 확정되지 않으면(공 스팟 없음) 항상 수구 경로 레이어를 유지 */
+  /**
+   * 1목 충돌이 아직 유효하지 않을 때: 수구 스팟이 하나도 없으면 수구 레이어만 유지.
+   * trouble에서 `cueToFirstObjectHit`가 null인 경우는 첫 스팟은 있으나 폴리라인이 충돌점에
+   * 아직 닿지 않은 경우도 포함되므로, 그때마다 cue로 되돌리면 1목 레이어 전환이 영구히 막힌다.
+   */
   useEffect(() => {
     if (!layoutForCue) return;
     if (cueToFirstObjectHit?.objectKey != null) return;
     if (variant === "trouble") {
-      if (troublePathEditLayer !== "cue") setTroublePathEditLayer("cue");
+      if (pathPoints.length === 0 && troublePathEditLayer !== "cue") {
+        setTroublePathEditLayer("cue");
+      }
       return;
     }
     if (!pathMode || objectPathMode) {
@@ -1265,6 +1296,7 @@ export function SolutionPathEditorFullscreen({
     troublePathEditLayer,
     pathMode,
     objectPathMode,
+    pathPoints.length,
   ]);
 
   const clearAllPaths = useCallback(() => {
@@ -1520,6 +1552,51 @@ export function SolutionPathEditorFullscreen({
       const dx = e.clientX - startX;
       const next = Math.max(0, Math.min(basePx - dx, w));
       setTroubleLeftDrawerDragPx(next);
+    },
+    [isNoteShell]
+  );
+
+  const endLeftPathDrawerDrag = useCallback((e: React.PointerEvent) => {
+    if (!isNoteShell) return;
+    leftPathDrawerDragRef.current = null;
+    setLeftPathDrawerDragging(false);
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    const w = leftPathDrawerAsideRef.current?.offsetWidth ?? 180;
+    const threshold = Math.min(72, w * 0.25);
+    setLeftPathDrawerDragPx((px) => {
+      if (px >= threshold) {
+        queueMicrotask(() => setLeftPathDrawerOpen(false));
+      }
+      return 0;
+    });
+  }, [isNoteShell]);
+
+  const onLeftPathDrawerHandlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (!isNoteShell) return;
+      e.preventDefault();
+      leftPathDrawerDragRef.current = {
+        startX: e.clientX,
+        basePx: leftPathDrawerDragPxRef.current,
+      };
+      setLeftPathDrawerDragging(true);
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [isNoteShell]
+  );
+
+  const onLeftPathDrawerHandlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!isNoteShell || !leftPathDrawerDragRef.current) return;
+      const w = leftPathDrawerAsideRef.current?.offsetWidth ?? 180;
+      const { startX, basePx } = leftPathDrawerDragRef.current;
+      const dx = e.clientX - startX;
+      const next = Math.max(0, Math.min(basePx - dx, w));
+      setLeftPathDrawerDragPx(next);
     },
     [isNoteShell]
   );
@@ -1927,7 +2004,7 @@ export function SolutionPathEditorFullscreen({
                 <div
                   data-path-fs-drawer-drag=""
                   aria-hidden
-                  className="absolute right-0 top-0 z-10 h-full w-4 cursor-grab touch-none active:cursor-grabbing"
+                  className="absolute right-0 top-0 z-10 h-full w-10 cursor-grab touch-none active:cursor-grabbing"
                   style={{ touchAction: "none" }}
                   onPointerDown={onTroubleLeftDrawerHandlePointerDown}
                   onPointerMove={onTroubleLeftDrawerHandlePointerMove}
@@ -2118,17 +2195,38 @@ export function SolutionPathEditorFullscreen({
               onClick={() => setLeftPathDrawerOpen(false)}
             />
             <aside
+              ref={leftPathDrawerAsideRef}
               data-path-editor-fs-chrome=""
               id="path-fs-left-drawer-nangu"
               aria-hidden={!leftPathDrawerOpen}
-              className={`fixed left-0 z-[205] flex w-[min(52.8vw,180px)] flex-col border-r border-white/20 bg-black/30 text-white shadow-[6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md transition-transform duration-300 ease-out ${
+              className={`fixed left-0 z-[205] flex w-[min(52.8vw,180px)] flex-col border-r border-white/20 bg-black/30 text-white shadow-[6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md ${
                 viewportMdUp
                   ? "top-[45.5%] h-[min(72vh,34rem)] -translate-y-1/2 rounded-r-xl"
                   : "top-0 h-full"
               } ${
                 leftPathDrawerOpen ? "pointer-events-auto" : "pointer-events-none -translate-x-full"
-              }`}
+              } ${leftPathDrawerDragging ? "!duration-0" : "transition-transform duration-300 ease-out"}`}
+              style={
+                leftPathDrawerOpen
+                  ? {
+                      transform: `${viewportMdUp ? "translateY(-50%) " : ""}translateX(${-leftPathDrawerDragPx}px)`,
+                      transition: leftPathDrawerDragging ? "none" : undefined,
+                    }
+                  : undefined
+              }
             >
+              {leftPathDrawerOpen && (
+                <div
+                  data-path-fs-drawer-drag=""
+                  aria-hidden
+                  className="absolute right-0 top-0 z-10 h-full w-10 cursor-grab touch-none active:cursor-grabbing"
+                  style={{ touchAction: "none" }}
+                  onPointerDown={onLeftPathDrawerHandlePointerDown}
+                  onPointerMove={onLeftPathDrawerHandlePointerMove}
+                  onPointerUp={endLeftPathDrawerDrag}
+                  onPointerCancel={endLeftPathDrawerDrag}
+                />
+              )}
               <div className="border-b border-white/15 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
                 <h2 className="text-sm font-semibold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                   해법 편집
@@ -2325,7 +2423,7 @@ export function SolutionPathEditorFullscreen({
                 <div
                   data-path-fs-drawer-drag=""
                   aria-hidden
-                  className="absolute left-0 top-0 z-10 h-full w-4 cursor-grab touch-none active:cursor-grabbing"
+                  className="absolute left-0 top-0 z-10 h-full w-10 cursor-grab touch-none active:cursor-grabbing"
                   style={{ touchAction: "none" }}
                   onPointerDown={onTroubleDrawerHandlePointerDown}
                   onPointerMove={onTroubleDrawerHandlePointerMove}
@@ -2557,6 +2655,8 @@ export function SolutionPathEditorFullscreen({
                           className="absolute inset-0 w-full h-full rounded-none border-0 overflow-hidden"
                           hideObjectBall={false}
                           ballNormOverrides={mergedBallNormOverridesForCanvas}
+                          ballNormOverridesLiveRef={pathPlayback.ballNormOverridesLiveRef}
+                          playbackBallAnimActive={pathPlayback.isPlaybackActive}
                           cueTipNorm={panelCueTipNorm}
                           showCueBallSpot={showCueSpot}
                           showObjectBallSpot={showObjectBallSpot}

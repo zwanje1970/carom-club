@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { clearSessionCookie } from "@/lib/auth";
-import { clearClientConsoleOrgCookie } from "@/lib/client-console-org";
+import { clearClientConsoleOrgCookie } from "@/lib/client-console-org.server";
 
 export async function POST() {
   await clearSessionCookie();

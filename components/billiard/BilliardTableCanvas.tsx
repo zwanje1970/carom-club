@@ -7,6 +7,7 @@ import React, {
   forwardRef,
   useCallback,
   type ReactNode,
+  type RefObject,
 } from "react";
 import {
   DEFAULT_TABLE_WIDTH,
@@ -182,6 +183,15 @@ export interface BilliardTableCanvasProps {
   pathOverlayAboveBalls?: boolean;
   /** `splitBallLayer`일 때 테이블과 공 사이에 렌더 (경로 오버레이 등) */
   children?: ReactNode;
+  /**
+   * 난구 재생: 훅이 rAF 루프에서 ref만 갱신할 때 — prop `ballNormOverrides`와 병합해 매 프레임 읽음.
+   * React state로 매 tick 갱신하지 않으므로 별도 ref 전달.
+   */
+  ballNormOverridesLiveRef?: RefObject<
+    Partial<Record<"red" | "yellow" | "white", { x: number; y: number }>> | null | undefined
+  >;
+  /** true면 스팟 깜빡임 없이도 재생 중 공 레이어를 rAF로 다시 그림 */
+  playbackBallAnimActive?: boolean;
 }
 
 export interface BilliardTableCanvasHandle {
@@ -760,6 +770,8 @@ const BilliardTableCanvas = forwardRef<
     splitBallLayer = false,
     pathOverlayAboveBalls = false,
     children,
+    ballNormOverridesLiveRef,
+    playbackBallAnimActive = false,
   },
   ref
 ) {
@@ -781,6 +793,11 @@ const BilliardTableCanvas = forwardRef<
       objectBallSpotOpacity?: number,
       noSelectionForExport?: boolean
     ) => {
+      const ballNormMerged =
+        ballNormOverridesLiveRef?.current && Object.keys(ballNormOverridesLiveRef.current).length > 0
+          ? { ...(ballNormOverrides ?? {}), ...ballNormOverridesLiveRef.current }
+          : ballNormOverrides;
+
       const isWireframe = style === "wireframe";
       const sel = noSelectionForExport ? null : selectedBall;
       const rect = getPlayfieldRect(width, height);
@@ -788,9 +805,9 @@ const BilliardTableCanvas = forwardRef<
         isPortrait ? landscapeToPortraitNorm(lx, ly) : { x: lx, y: ly };
 
       /** 재생 시 이동한 공의 배치 원점 — 반투명 고정 공 (cueOrigin / firstObject 등 각 색별로 별도, 식별 링 미사용) */
-      if (ballNormOverrides) {
+      if (ballNormMerged) {
         for (const key of ["red", "yellow", "white"] as const) {
-          const ovr = ballNormOverrides[key];
+          const ovr = ballNormMerged[key];
           if (!ovr) continue;
           const orig = key === "red" ? redBall : key === "yellow" ? yellowBall : whiteBall;
           if (distanceNormPointsInPlayfieldPx(orig, ovr, rect) <= LAYOUT_REST_MOVE_EPS_PX) continue;
@@ -800,9 +817,9 @@ const BilliardTableCanvas = forwardRef<
         }
       }
 
-      const redDraw = ballNormOverrides?.red ?? redBall;
-      const yellowDraw = ballNormOverrides?.yellow ?? yellowBall;
-      const whiteDraw = ballNormOverrides?.white ?? whiteBall;
+      const redDraw = ballNormMerged?.red ?? redBall;
+      const yellowDraw = ballNormMerged?.yellow ?? yellowBall;
+      const whiteDraw = ballNormMerged?.white ?? whiteBall;
       const rView = toView(redDraw.x, redDraw.y);
       const yView = toView(yellowDraw.x, yellowDraw.y);
       const wView = toView(whiteDraw.x, whiteDraw.y);
@@ -873,6 +890,7 @@ const BilliardTableCanvas = forwardRef<
       showCrosshairAtSelected,
       hideRedBall,
       ballNormOverrides,
+      ballNormOverridesLiveRef,
       objectBallSpotKey,
       cueTipNorm,
     ]
@@ -930,9 +948,9 @@ const BilliardTableCanvas = forwardRef<
     drawBallsAndDecorations(bCtx, true, drawStyle, undefined, undefined, false);
   }, [splitBallLayer, width, height, showGrid, orientation, drawStyle, drawBallsAndDecorations]);
 
-  // 수구·1목 스팟 깜빡임: showCueBallSpot / showObjectBallSpot 시에만 rAF (저장 이미지 미포함)
+  // 수구·1목 스팟 깜빡임 + 경로 재생( ref만 갱신 ): rAF (저장 이미지 미포함)
   useEffect(() => {
-    if (!showCueBallSpot && !showObjectBallSpot) return;
+    if (!showCueBallSpot && !showObjectBallSpot && !playbackBallAnimActive) return;
     let frameId: number;
     if (splitBallLayer) {
       const bCan = ballLayerRef.current;
@@ -986,6 +1004,7 @@ const BilliardTableCanvas = forwardRef<
   }, [
     showCueBallSpot,
     showObjectBallSpot,
+    playbackBallAnimActive,
     splitBallLayer,
     draw,
     drawBallsAndDecorations,

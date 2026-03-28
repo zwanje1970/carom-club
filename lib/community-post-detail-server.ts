@@ -4,6 +4,7 @@
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { isCommunityAdmin, isCommunityModerator } from "@/lib/community-roles";
+import { hasPermission, PERMISSION_KEYS } from "@/lib/auth/permissions.server";
 import { parseTroubleBallPlacementJson } from "@/lib/trouble-ball-placement";
 import type { SessionUser } from "@/types/auth";
 
@@ -200,6 +201,17 @@ export async function loadCommunityPostDetail(
     liked,
     bookmarked,
   };
+  if (post.board.slug === "trouble") {
+    const canCreateTroubleSolution = session
+      ? await hasPermission(session, PERMISSION_KEYS.SOLVER_SOLUTION_CREATE)
+      : false;
+    const canAcceptTroubleSolution =
+      !!session &&
+      session.id === post.authorId &&
+      (await hasPermission(session, PERMISSION_KEYS.SOLVER_SOLUTION_ACCEPT));
+    payload.canCreateTroubleSolution = canCreateTroubleSolution;
+    payload.canAcceptTroubleSolution = canAcceptTroubleSolution;
+  }
   if (post.board.slug === "trouble" && post.troubleShot) {
     payload.troubleShot = {
       layoutImageUrl: post.troubleShot.layoutImageUrl,

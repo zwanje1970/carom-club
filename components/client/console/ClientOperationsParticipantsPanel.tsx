@@ -328,6 +328,7 @@ export function ClientOperationsParticipantsPanel({
     return { paymentPending, paymentMarked, confirmed, waiting, canceled };
   }, [rows]);
 
+
   if (loading) {
     return <p className={cx(consoleTextMuted, "py-12 text-center text-sm")}>불러오는 중…</p>;
   }

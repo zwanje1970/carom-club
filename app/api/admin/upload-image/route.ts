@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { processUploadedImage, uploadToBlob, isBlobConfigError, BLOB_SERVICE_UNAVAILABLE_MESSAGE } from "@/lib/image-upload";
 import { IMAGE_POLICIES, type ImageKind } from "@/lib/image-policies";
 
 export const runtime = "nodejs";
@@ -22,6 +21,13 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+
+  const {
+    processUploadedImage,
+    uploadToBlob,
+    isBlobConfigError,
+    BLOB_SERVICE_UNAVAILABLE_MESSAGE,
+  } = await import("@/lib/image-upload");
 
   if (process.env.NODE_ENV === "production" && !process.env.BLOB_READ_WRITE_TOKEN) {
     return NextResponse.json(

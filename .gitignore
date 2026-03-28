@@ -48,3 +48,7 @@ prisma/migrations/**/migration_lock.toml
 
 # 로컬 업로드 파일 (BLOB 토큰 없을 때 public/uploads 사용)
 /public/uploads
+
+# 로컬 개발용 쿠키/토큰 파일 (GitHub 업로드 금지)
+*cookie*.txt
+admin-cookies.txt

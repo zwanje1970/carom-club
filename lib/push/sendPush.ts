@@ -2,7 +2,12 @@ import webPush from "web-push";
 import { prisma } from "@/lib/db";
 import { getVapidPublicKey, getVapidPrivateKey, isPushConfigured } from "./vapid";
 
-export type NotificationType = "ENTRY_APPROVED" | "BRACKET_GENERATED" | "VENUE_REMINDER" | "PRIZE";
+export type NotificationType =
+  | "ENTRY_APPROVED"
+  | "BRACKET_GENERATED"
+  | "VENUE_REMINDER"
+  | "PRIZE"
+  | "CLIENT_CUSTOM";
 
 export type SendPushOptions = {
   userId: string;

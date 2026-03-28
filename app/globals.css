@@ -17,6 +17,46 @@
   --site-border: #E5E7EB;
   --site-primary: #991b1b;
   --site-secondary: #78350f;
+  --site-header-bg: #0a0a0a;
+  --site-header-text: #d1d5db;
+  --site-header-active: #fbbf24;
+}
+
+/* 홈 CMS 섹션 애니메이션 (sectionStyleJson.animationPreset) */
+@keyframes section-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes section-snap-in {
+  from {
+    opacity: 0.35;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes section-flow-in {
+  from {
+    opacity: 0.88;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.section-anim-fade {
+  animation: section-fade-in 0.55s ease-out both;
+}
+.section-anim-snap {
+  animation: section-snap-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.section-anim-flow {
+  animation: section-flow-in 0.85s ease-in-out both;
 }
 
 /* 버튼: primary(빨강), secondary(노랑) */
@@ -52,11 +92,14 @@
   body {
     @apply antialiased;
     background-color: var(--site-bg);
-    color: var(--site-text);
+    color: #111827;
     font-family: var(--font-pretendard), -apple-system, BlinkMacSystemFont, system-ui,
       "Apple SD Gothic Neo", sans-serif;
   }
-  /* Lighthouse 대비 경고 완화: 보조 텍스트를 한 단계 진하게 */
+  /* Lighthouse 대비: 연한 회색 텍스트를 한 단계 이상 진하게 */
+  .text-gray-400 {
+    color: rgb(75 85 99) !important;
+  }
   .text-gray-500 {
     color: rgb(75 85 99) !important;
   }

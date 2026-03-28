@@ -1,6 +1,6 @@
 "use client";
 
-import React, { type ReactNode } from "react";
+import React, { type ReactNode, type RefObject } from "react";
 import { BilliardTableCanvas, type TableDrawStyle } from "@/components/billiard";
 import {
   DEFAULT_TABLE_WIDTH,
@@ -29,6 +29,8 @@ export function NanguReadOnlyLayout({
   betweenTableAndBallsLayer,
   pathOverlayAboveBalls = false,
   cueTipNorm = null,
+  ballNormOverridesLiveRef,
+  playbackBallAnimActive = false,
 }: {
   ballPlacement: NanguBallPlacement;
   width?: number;
@@ -58,6 +60,10 @@ export function NanguReadOnlyLayout({
   pathOverlayAboveBalls?: boolean;
   /** 해법 패널 당점 — 수구 위 점 표시만 */
   cueTipNorm?: { x: number; y: number } | null;
+  ballNormOverridesLiveRef?: RefObject<
+    Partial<Record<"red" | "yellow" | "white", { x: number; y: number }>> | null | undefined
+  >;
+  playbackBallAnimActive?: boolean;
 }) {
   return (
     <div
@@ -84,6 +90,8 @@ export function NanguReadOnlyLayout({
         orientation={orientation}
         splitBallLayer={Boolean(betweenTableAndBallsLayer)}
         pathOverlayAboveBalls={pathOverlayAboveBalls}
+        ballNormOverridesLiveRef={ballNormOverridesLiveRef}
+        playbackBallAnimActive={playbackBallAnimActive}
       >
         {betweenTableAndBallsLayer}
       </BilliardTableCanvas>

@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import Link from "next/link";
 import { ClientBillingSettlementConsole } from "@/components/client/console/ClientBillingSettlementConsole";
+import { isAnnualMembershipVisible } from "@/lib/site-feature-flags";
 
 export const metadata = {
   title: "정산",
@@ -14,6 +15,7 @@ export default async function ClientBillingPage({
 }) {
   const session = await getSession();
   if (!session || session.role !== "CLIENT_ADMIN") return null;
+  const showPlatformBillingLink = await isAnnualMembershipVisible();
 
   const orgId = await getClientAdminOrganizationId(session);
   const sp = await searchParams;
@@ -32,5 +34,10 @@ export default async function ClientBillingPage({
     );
   }
 
-  return <ClientBillingSettlementConsole initialTournamentId={sp.tournament ?? null} />;
+  return (
+    <ClientBillingSettlementConsole
+      initialTournamentId={sp.tournament ?? null}
+      showPlatformBillingLink={showPlatformBillingLink}
+    />
+  );
 }

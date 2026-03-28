@@ -47,6 +47,8 @@ export default function AdminSiteCopyPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  /** 레거시 히어로(구 copy 키) — 기본 숨김, 히어로 설정이 정본 */
+  const [showLegacyHeroKeys, setShowLegacyHeroKeys] = useState(false);
   const [copy, setCopy] = useState<Record<string, string>>({ ...DEFAULT_ADMIN_COPY });
   const [systemTextItems, setSystemTextItems] = useState<SystemTextItem[]>([]);
   const [bulkFind, setBulkFind] = useState("");
@@ -106,7 +108,14 @@ export default function AdminSiteCopyPage() {
     return [...adminRows, ...stRows];
   }, [copy, systemTextItems]);
 
-  const filteredRows = useMemo(() => rows.filter((r) => matchSearch(r, searchQuery)), [rows, searchQuery]);
+  const filteredRows = useMemo(() => {
+    return rows.filter((r) => {
+      if (!showLegacyHeroKeys && r.type === "admin_copy" && r.key.startsWith("site.hero.")) {
+        return false;
+      }
+      return matchSearch(r, searchQuery);
+    });
+  }, [rows, searchQuery, showLegacyHeroKeys]);
 
   const handleCopyChange = (key: string, value: string) => {
     setCopy((prev) => ({ ...prev, [key]: value }));
@@ -319,13 +328,18 @@ export default function AdminSiteCopyPage() {
   return (
     <SectionMain>
       <p className="mb-4 text-sm">
-        <Link href="/admin/site/main" className="text-site-primary hover:underline">
-          ← 메인페이지 구성
+        <Link href="/admin/site" className="text-site-primary hover:underline">
+          ← 사이트관리 홈
         </Link>
       </p>
-      <SectionTitleLineWithButton icon={mdiFormatListBulleted} title="고정문구 · 페이지별 문구" />
-      <p className="mb-6 text-sm text-gray-600 dark:text-slate-400">
-        <strong>페이지별 문구(메뉴·문구)</strong>와 <strong>고정문구</strong>를 한 화면에서 검색·수정합니다. 메뉴명·버튼·페이지 제목·에러 안내 등은 파란 유형 행에서 일괄 저장하고, 고정문구는 행별 수정·시드·치환 도구를 사용하세요.
+      <SectionTitleLineWithButton icon={mdiFormatListBulleted} title="문구 관리" />
+      <p className="mb-6 text-sm text-gray-600 dark:text-slate-400 max-w-3xl">
+        메뉴명·페이지 안내·버튼 문구·상태 메시지 등 <strong>사이트 운영 문구</strong>를 다룹니다. 콘텐츠 본문·섹션 데이터는「콘텐츠
+        관리」, 메인 히어로 화면은{" "}
+        <Link href="/admin/site/hero" className="text-site-primary underline font-medium">
+          히어로 설정
+        </Link>
+        이 정본입니다. 아래 목록에서 일괄 저장(메뉴·문구) 또는 고정문구 행 편집을 사용하세요.
       </p>
 
       <CardBox className="mb-6">
@@ -337,8 +351,19 @@ export default function AdminSiteCopyPage() {
           placeholder="키 또는 문구로 검색"
           className="w-full rounded-lg border border-site-border bg-white dark:bg-slate-800 px-3 py-2 text-site-text placeholder:text-gray-400"
         />
+        <label className="mt-3 flex items-center gap-2 text-sm text-site-text cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showLegacyHeroKeys}
+            onChange={(e) => setShowLegacyHeroKeys(e.target.checked)}
+            className="rounded border-site-border"
+          />
+          <span>
+            레거시 히어로 문구 키(<code className="text-xs bg-gray-100 dark:bg-slate-700 px-1 rounded">site.hero.*</code>) 표시
+          </span>
+        </label>
         <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">
-          {filteredRows.length}개 문구 표시 (전체 {rows.length}개)
+          {filteredRows.length}개 문구 표시 (전체 {rows.length}개, 레거시 히어로 키는 기본 숨김)
         </p>
       </CardBox>
 

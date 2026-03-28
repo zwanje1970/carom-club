@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { hasAllPermissions, PERMISSION_KEYS } from "@/lib/auth/permissions.server";
+import { isAnnualMembershipVisible } from "@/lib/site-feature-flags";
 
 const ALLOWED_ROLES = ["USER", "CLIENT_ADMIN", "PLATFORM_ADMIN", "ZONE_MANAGER"] as const;
 const ALLOWED_STATUSES = ["ACTIVE", "SUSPENDED", "DELETED"] as const;
@@ -16,7 +18,13 @@ export async function PATCH(
 ) {
   try {
     const session = await getSession();
-    if (!session || session.role !== "PLATFORM_ADMIN") {
+    if (
+      !session ||
+      !(await hasAllPermissions(session, [
+        PERMISSION_KEYS.ADMIN_ACCESS,
+        PERMISSION_KEYS.ADMIN_USER_MANAGE,
+      ]))
+    ) {
       return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
     }
 
@@ -46,8 +54,12 @@ export async function PATCH(
       updates.status = body.status === "" || body.status === null ? null : body.status;
     }
 
+    const annualMembershipVisible = await isAnnualMembershipVisible();
     const orgUpdates: { clientType?: string; approvalStatus?: string } = {};
     if (body.orgClientType !== undefined && ["GENERAL", "REGISTERED"].includes(body.orgClientType)) {
+      if (body.orgClientType === "REGISTERED" && !annualMembershipVisible) {
+        return NextResponse.json({ error: "연회원 기능이 비활성화되어 있습니다." }, { status: 404 });
+      }
       orgUpdates.clientType = body.orgClientType;
     }
     if (body.orgApprovalStatus !== undefined && ["PENDING", "APPROVED", "REJECTED"].includes(body.orgApprovalStatus)) {

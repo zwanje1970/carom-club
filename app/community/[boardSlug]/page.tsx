@@ -4,8 +4,7 @@ import { getSession } from "@/lib/auth";
 import { loadCommunityBoardPageData } from "@/lib/community-board-page-data";
 import { communityBoardSsrPerf } from "@/lib/community-board-ssr-perf";
 import { CommunityBoardPageShell } from "@/components/community/CommunityBoardPageShell";
-import { isPlatformAdmin } from "@/types/auth";
-import { canShowSolverEntry } from "@/lib/entry-visibility";
+import { hasPermission, PERMISSION_KEYS } from "@/lib/auth/permissions.server";
 
 export const revalidate = 60;
 
@@ -59,7 +58,9 @@ export default async function CommunityBoardSlugPage({
     notFound();
   }
 
-  const showSolverEntry = canShowSolverEntry(isPlatformAdmin(session));
+  const showSolverEntry = session
+    ? await hasPermission(session, PERMISSION_KEYS.COMMUNITY_POST_CREATE)
+    : false;
 
   return (
     <CommunityBoardPageShell

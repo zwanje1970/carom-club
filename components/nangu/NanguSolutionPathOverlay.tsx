@@ -66,9 +66,10 @@ const CURVE_HANDLE_HIT_PX = 26;
 /** 1초 이상 누르면 미세조정 UI — 곡선 노드 삭제는 더블탭만 */
 const PATH_FINE_TUNE_LONG_PRESS_MS = 1000;
 const CURVE_HANDLE_MOVE_CANCEL_PX = 10;
-/** 당구노트 공배치 미세조정과 동일 그리드(정규화 플레이필드) */
-const FINE_GRID_STEP_LONG = 1 / 80;
-const FINE_GRID_STEP_SHORT = 1 / 40;
+/** 당구노트 공배치와 동일 기준 그리드(80×40)의 1칸 대비 20% — 미세조정 버튼 한 스텝 */
+const FINE_TUNE_MOVE_SCALE = 0.2;
+const FINE_GRID_STEP_LONG = (1 / 80) * FINE_TUNE_MOVE_SCALE;
+const FINE_GRID_STEP_SHORT = (1 / 40) * FINE_TUNE_MOVE_SCALE;
 /** 곡선 제어 노드 — 작은 원 + 초록 (수구/1목 공통) */
 const CURVE_HANDLE_FILL = "#22c55e";
 const CURVE_HANDLE_FILL_SUBTLE = "rgba(34, 197, 94, 0.5)";
@@ -1571,14 +1572,14 @@ export function NanguSolutionPathOverlay({
               aria-label="경로 미세조정"
             >
               <div
-                className="pointer-events-auto flex max-h-[min(100dvh,100vh)] flex-col items-center gap-4 rounded-2xl bg-black/20 p-3 shadow-lg backdrop-blur-sm"
+                className="pointer-events-auto flex max-h-[min(100dvh,100vh)] flex-col items-center gap-4 rounded-2xl bg-transparent p-3 shadow-none"
                 data-path-fine-tune=""
               >
                 <div className="grid grid-cols-3 shrink-0 gap-3 items-center justify-center w-max">
                   <span className={FT_SPACER_CLASS} aria-hidden />
                   <button
                     type="button"
-                    aria-label="위로 1칸 이동"
+                    aria-label="위로 미세 이동"
                     className={FT_BTN_CLASS}
                     onPointerDown={(ev) => {
                       ev.preventDefault();
@@ -1597,7 +1598,7 @@ export function NanguSolutionPathOverlay({
                   <span className={FT_SPACER_CLASS} aria-hidden />
                   <button
                     type="button"
-                    aria-label="왼쪽으로 1칸 이동"
+                    aria-label="왼쪽으로 미세 이동"
                     className={FT_BTN_CLASS}
                     onPointerDown={(ev) => {
                       ev.preventDefault();
@@ -1624,7 +1625,7 @@ export function NanguSolutionPathOverlay({
                   </button>
                   <button
                     type="button"
-                    aria-label="오른쪽으로 1칸 이동"
+                    aria-label="오른쪽으로 미세 이동"
                     className={FT_BTN_CLASS}
                     onPointerDown={(ev) => {
                       ev.preventDefault();
@@ -1643,7 +1644,7 @@ export function NanguSolutionPathOverlay({
                   <span className={FT_SPACER_CLASS} aria-hidden />
                   <button
                     type="button"
-                    aria-label="아래로 1칸 이동"
+                    aria-label="아래로 미세 이동"
                     className={FT_BTN_CLASS}
                     onPointerDown={(ev) => {
                       ev.preventDefault();

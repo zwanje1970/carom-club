@@ -28,6 +28,13 @@ export default function AdminPopupsPage() {
     load();
   }, []);
 
+  const formatDateTime = (value: string | null) => {
+    if (!value) return "제한 없음";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString("ko-KR");
+  };
+
   const handleSubmit = async (data: Omit<Popup, "createdAt" | "updatedAt">) => {
     const res = await fetch("/api/admin/content/popups", {
       method: "POST",
@@ -40,6 +47,17 @@ export default function AdminPopupsPage() {
     }
     setAdding(false);
     setEditingId(null);
+    load();
+  };
+
+  const handleDelete = async (id: string) => {
+    const res = await fetch(`/api/admin/content/popups/${id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error ?? "팝업 삭제에 실패했습니다.");
+    }
     load();
   };
 
@@ -100,13 +118,21 @@ export default function AdminPopupsPage() {
                   <p className="text-sm text-gray-500">
                     {POPUP_PAGE_LABELS[p.page]} · {p.isVisible ? "표시" : "숨김"}
                   </p>
+                  <p className="text-xs text-gray-500">
+                    시작: {formatDateTime(p.startAt)} · 종료: {formatDateTime(p.endAt)}
+                  </p>
                 </div>
                 <div className="flex gap-2">
                   <Button label="수정" color="info" small onClick={() => setEditingId(p.id)} />
                   <button
                     type="button"
-                    onClick={() => {
-                      if (window.confirm("삭제하시겠습니까?")) setList((prev) => prev.filter((x) => x.id !== p.id));
+                    onClick={async () => {
+                      if (!window.confirm("삭제하시겠습니까?")) return;
+                      try {
+                        await handleDelete(p.id);
+                      } catch (error) {
+                        window.alert(error instanceof Error ? error.message : "팝업 삭제에 실패했습니다.");
+                      }
                     }}
                     className="text-sm text-red-600 hover:underline"
                   >

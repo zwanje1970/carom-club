@@ -70,6 +70,8 @@ export interface PageSection {
   endAt: string | null;   // ISO date
   /** 섹션 배경색 (hex 등). 없으면 기존 스타일 유지 */
   backgroundColor?: string | null;
+  /** JSON: 애니메이션·구분선 등 (section-style.ts) */
+  sectionStyleJson?: string | null;
   /** 제목 왼쪽 아이콘: none | icon | image */
   titleIconType?: "none" | "icon" | "image" | null;
   titleIconName?: string | null;

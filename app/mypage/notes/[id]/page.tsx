@@ -39,11 +39,20 @@ export default async function MypageNoteDetailPage({
   const isAuthor = session?.id === note.authorId;
   if (!isAuthor) notFound();
 
-  const linkedTrouble = await prisma.troubleShotPost.findFirst({
+  const linkedNangu = await prisma.nanguPost.findFirst({
     where: { sourceNoteId: id },
-    orderBy: { post: { createdAt: "desc" } },
-    select: { postId: true },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
   });
+
+  const linkedTrouble =
+    linkedNangu == null
+      ? await prisma.troubleShotPost.findFirst({
+          where: { sourceNoteId: id },
+          orderBy: { post: { createdAt: "desc" } },
+          select: { postId: true },
+        })
+      : null;
 
   return (
     <MypageNoteDetailContent
@@ -62,6 +71,7 @@ export default async function MypageNoteDetailPage({
         createdAt: note.createdAt,
         isAuthor,
       }}
+      linkedNanguPostId={linkedNangu?.id ?? null}
       linkedTroublePostId={linkedTrouble?.postId ?? null}
       basePath="/mypage/notes"
     />

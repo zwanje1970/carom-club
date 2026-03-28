@@ -209,6 +209,9 @@ export default function MypageNewNotePage() {
           initialYellow={placementPayload?.yellowBall}
           initialWhite={placementPayload?.whiteBall}
           initialCueBall={placementPayload?.cueBall}
+          showCuePickerOnStart={
+            placementPayload?.cueBall !== "white" && placementPayload?.cueBall !== "yellow"
+          }
           onSave={async (payload) => handlePlacementComplete(payload)}
           onExitFullscreen={() => setShowPlacement(false)}
           returnOnly={true}

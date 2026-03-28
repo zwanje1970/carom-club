@@ -37,6 +37,8 @@ export default async function MypageEditPage() {
         phone: null,
         password: "",
         role: "USER",
+        roleId: null,
+        roleManualLocked: false,
         status: null,
         withdrawnAt: null,
         latitude: null,
@@ -46,6 +48,7 @@ export default async function MypageEditPage() {
         createdAt: new Date(),
         updatedAt: new Date(),
         communityScore: 0,
+        activityPoint: 0,
         memberProfile: null,
       };
     }
@@ -58,6 +61,8 @@ export default async function MypageEditPage() {
       phone: null,
       password: "",
       role: "USER",
+      roleId: null,
+      roleManualLocked: false,
       status: null,
       withdrawnAt: null,
       latitude: null,
@@ -67,6 +72,7 @@ export default async function MypageEditPage() {
       createdAt: new Date(),
       updatedAt: new Date(),
       communityScore: 0,
+      activityPoint: 0,
       memberProfile: null,
     };
   }

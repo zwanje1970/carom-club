@@ -4,7 +4,8 @@ import SectionMain from "@/components/admin/_components/Section/Main";
 import SectionTitleLineWithButton from "@/components/admin/_components/Section/TitleLineWithButton";
 import CardBox from "@/components/admin/_components/CardBox";
 import Button from "@/components/admin/_components/Button";
-import { getAdminCopy, getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import { getAdminCopy } from "@/lib/admin-copy-server";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 

@@ -11,6 +11,10 @@ import type {
   NanguSolutionData,
 } from "@/lib/nangu-types";
 
+function isSameNormPoint(a: { x: number; y: number }, b: { x: number; y: number }): boolean {
+  return Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6;
+}
+
 export function buildTroublePlaybackSolutionData(params: {
   ballPlacement: NanguBallPlacement;
   pathPoints: NanguPathPoint[];
@@ -48,8 +52,9 @@ export function buildTroublePlaybackSolutionData(params: {
   if (effectiveContact && objectPathPoints.length >= 1) {
     const objPts = objectPathPoints.map((p) => ({ x: p.x, y: p.y }));
     const c = effectiveContact.collision;
+    const startsAtCollision = objectPathPoints.length > 0 && isSameNormPoint(objectPathPoints[0]!, c);
     reflectionPath = {
-      points: [{ x: c.x, y: c.y }, ...objPts],
+      points: startsAtCollision ? objPts : [{ x: c.x, y: c.y }, ...objPts],
       pointsWithType: objectPathPoints,
     };
   }

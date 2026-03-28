@@ -1,23 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { pretendard } from "./fonts";
-import { IntroRoot } from "@/components/intro/IntroRoot";
-import { MainSiteHeaderWrapper } from "@/components/layout/MainSiteHeaderWrapper";
-import { MobileBottomNavWrapper } from "@/components/layout/MobileBottomNavWrapper";
-import { GlobalChromeModeProvider } from "@/components/community/BallPlacementFullscreenContext";
-import { AdminFloatButton } from "@/components/AdminFloatButton";
-import { ClientFloatButton } from "@/components/ClientFloatButton";
-import NotificationBanner from "@/components/NotificationBanner";
-import { RegisterServiceWorker } from "@/components/push/RegisterServiceWorker";
 import { getCommonGlobalData } from "@/lib/common-page-data";
-import { getSession } from "@/lib/auth";
-import { canShowNoteEntry } from "@/lib/entry-visibility";
-import { isPlatformAdmin } from "@/types/auth";
 import { DEFAULT_PRIMARY_COLOR, DEFAULT_SECONDARY_COLOR } from "@/lib/site-settings";
 import { SiteSettingsProvider } from "@/components/SiteSettingsProvider";
 import { SiteThemeStyles } from "@/components/SiteThemeStyles";
-import { ClientPerfLogger } from "@/components/ClientPerfLogger";
 import { SITE_NAME, DEFAULT_SITE_URL } from "@/lib/site-settings";
+import { RootLayoutChrome } from "./RootLayoutChrome";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -86,16 +75,11 @@ export default async function RootLayout({
     headerActiveColor: null as string | null,
   };
 
-  const [globalData, session] = await Promise.all([
-    getCommonGlobalData().catch(() => null),
-    getSession(),
-  ]);
+  const globalData = await getCommonGlobalData().catch(() => null);
 
   if (globalData) {
     settings = globalData.siteSettings;
   }
-
-  const showMainSiteNoteEntry = canShowNoteEntry(isPlatformAdmin(session));
 
   return (
     <html
@@ -109,25 +93,16 @@ export default async function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black" />
       </head>
-      <body className="min-h-screen antialiased">
+      <body className={`min-h-screen antialiased ${pretendard.className}`}>
         <SiteThemeStyles
           primaryColor={settings.primaryColor ?? DEFAULT_PRIMARY_COLOR}
           secondaryColor={settings.secondaryColor ?? DEFAULT_SECONDARY_COLOR}
+          headerBgColor={settings.headerBgColor}
+          headerTextColor={settings.headerTextColor}
+          headerActiveColor={settings.headerActiveColor}
         />
         <SiteSettingsProvider initial={settings}>
-          <ClientPerfLogger />
-          <RegisterServiceWorker />
-          <NotificationBanner />
-          <GlobalChromeModeProvider>
-            <IntroRoot>
-              <MainSiteHeaderWrapper />
-              <MobileBottomNavWrapper showMainSiteNoteEntry={showMainSiteNoteEntry}>
-                {children}
-              </MobileBottomNavWrapper>
-            </IntroRoot>
-          </GlobalChromeModeProvider>
-          <AdminFloatButton />
-          <ClientFloatButton />
+          <RootLayoutChrome>{children}</RootLayoutChrome>
         </SiteSettingsProvider>
       </body>
     </html>

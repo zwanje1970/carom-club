@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import type { PageSection, SectionButton } from "@/types/page-section";
 import type { InternalPageSlug } from "@/types/page-section";
 import {
@@ -15,13 +16,10 @@ import {
 import Button from "@/components/admin/_components/Button";
 import NotificationBar from "@/components/admin/_components/NotificationBar";
 import { AdminImageField } from "@/components/admin/_components/AdminImageField";
+import { AdminColorField } from "@/components/admin/_components/AdminColorField";
 import { SectionPositionPreviewPanel } from "./SectionPositionPreviewPanel";
-import { ColorPalette64 } from "@/components/editor/ColorPalette64";
-import { SpecialCharsPicker } from "@/components/editor/SpecialCharsPicker";
-import type { Editor } from "@tiptap/core";
-import { HeroBlockEditor } from "@/components/admin/hero/HeroBlockEditor";
-import { HeroPreview } from "@/components/admin/hero/HeroPreview";
-import { FONT_FAMILIES, FONT_SIZES_PX } from "@/lib/editor-fonts";
+import type { SectionAnimationPreset } from "@/lib/section-style";
+import { resolveSectionStyle, serializeSectionStyleJson } from "@/lib/section-style";
 
 type PageSectionFormState = Omit<PageSection, "createdAt" | "updatedAt"> & {
   title: string;
@@ -39,6 +37,11 @@ type PageSectionFormState = Omit<PageSection, "createdAt" | "updatedAt"> & {
   titleIconSize: "small" | "medium" | null;
   startAt: string | null;
   endAt: string | null;
+  animationPreset: SectionAnimationPreset;
+  dividerEnabled: boolean;
+  dividerStyle: "solid" | "dashed";
+  dividerWidthPx: number;
+  dividerColor: string;
 };
 
 const emptySection = (): PageSectionFormState => ({
@@ -69,10 +72,18 @@ const emptySection = (): PageSectionFormState => ({
   titleIconName: null,
   titleIconImageUrl: null,
   titleIconSize: null,
+  sectionStyleJson: null,
+  animationPreset: "static",
+  dividerEnabled: false,
+  dividerStyle: "solid",
+  dividerWidthPx: 1,
+  dividerColor: "#e5e7eb",
 });
 
 /** 서버/initial 데이터를 폼 상태로 정규화. undefined 제거 → 문자열 '', nullable은 null */
 function normalizeSectionForForm(s: PageSection): PageSectionFormState {
+  const resolved = resolveSectionStyle(s);
+  const divStyle = resolved.divider.style === "dashed" ? "dashed" : "solid";
   return {
     ...s,
     title: s.title ?? "",
@@ -84,12 +95,18 @@ function normalizeSectionForForm(s: PageSection): PageSectionFormState {
     internalPath: s.internalPath ?? null,
     externalUrl: s.externalUrl ?? null,
     backgroundColor: s.backgroundColor ?? null,
+    sectionStyleJson: s.sectionStyleJson ?? null,
     titleIconType: (s.titleIconType === "icon" || s.titleIconType === "image" ? s.titleIconType : "none") as PageSectionFormState["titleIconType"],
     titleIconName: s.titleIconName ?? null,
     titleIconImageUrl: s.titleIconImageUrl ?? null,
     titleIconSize: s.titleIconSize === "medium" ? "medium" : s.titleIconSize === "small" ? "small" : null,
     startAt: s.startAt ? s.startAt.slice(0, 16) : null,
     endAt: s.endAt ? s.endAt.slice(0, 16) : null,
+    animationPreset: resolved.animationPreset,
+    dividerEnabled: resolved.divider.enabled,
+    dividerStyle: divStyle,
+    dividerWidthPx: resolved.divider.widthPx,
+    dividerColor: resolved.divider.color,
   };
 }
 
@@ -101,78 +118,9 @@ type Props = {
   onCancel: () => void;
 };
 
-const HERO_COPY_KEYS = {
-  titleHtml: "site.hero.titleHtml",
-  titleLineHeight: "site.hero.titleLineHeight",
-  titleFont: "site.hero.titleFont",
-  titleSize: "site.hero.titleSize",
-  titleColor: "site.hero.titleColor",
-  titleBold: "site.hero.titleBold",
-  titleItalic: "site.hero.titleItalic",
-  titleUnderline: "site.hero.titleUnderline",
-  titleAlign: "site.hero.titleAlign",
-  btnTournaments: "site.hero.btnTournaments",
-  btnApply: "site.hero.btnApply",
-  btnPosition: "site.hero.btnPosition",
-  btn1Size: "site.hero.btn1Size",
-  btn2Size: "site.hero.btn2Size",
-  btn1InternalPage: "site.hero.btn1InternalPage",
-  btn2InternalPage: "site.hero.btn2InternalPage",
-} as const;
-
-const HERO_BTN_POSITION_OPTIONS = [
-  { value: "below", label: "텍스트 아래" },
-  { value: "above", label: "텍스트 위" },
-] as const;
-
-const HERO_BTN_SIZE_OPTIONS = [
-  { value: "sm", label: "작게" },
-  { value: "md", label: "보통" },
-  { value: "lg", label: "크게" },
-] as const;
-
-const HERO_ALIGN_OPTIONS = [
-  { value: "", label: "기본" },
-  { value: "left", label: "왼쪽" },
-  { value: "center", label: "가운데" },
-  { value: "right", label: "오른쪽" },
-] as const;
-
-
 export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: Props) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [heroExtra, setHeroExtra] = useState<{
-    heroTitleHtml: string;
-    titleLineHeight: string;
-    titleFont: string;
-    titleSize: string;
-    titleColor: string;
-    titleBold: string;
-    titleItalic: string;
-    titleUnderline: string;
-    titleAlign: string;
-    btnTournaments: string;
-    btnApply: string;
-    btnPosition: string;
-    btn1Size: string;
-    btn2Size: string;
-    btn1InternalPage: string;
-    btn2InternalPage: string;
-  } | null>(null);
-
-  const HERO_LINE_HEIGHT_OPTIONS = [
-    { value: "", label: "기본" },
-    { value: "1", label: "1" },
-    { value: "1.25", label: "1.25" },
-    { value: "1.5", label: "1.5" },
-    { value: "1.75", label: "1.75" },
-    { value: "2", label: "2" },
-  ] as const;
-
-  const [heroSpecialCharsOpen, setHeroSpecialCharsOpen] = useState(false);
-  const heroEditorRef = useRef<Editor | null>(null);
-  const heroSpecialCharsRef = useRef<HTMLDivElement>(null);
   const [form, setForm] = useState<PageSectionFormState>(() => {
     if (initial) {
       return { ...normalizeSectionForForm(initial), id: initial.id };
@@ -181,72 +129,6 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
   });
 
   const isHeroSection = form.placement === "main_visual_bg" && form.type === "image";
-  useEffect(() => {
-    if (!isHeroSection) {
-      setHeroExtra(null);
-      return;
-    }
-    let cancelled = false;
-    Promise.all([
-      fetch("/api/site-settings").then((r) => r.json()),
-      fetch("/api/admin/copy").then((r) => r.json()),
-    ])
-      .then(([settings, copy]) => {
-        if (cancelled) return;
-        const c = copy ?? {};
-        const titleHtmlRaw = (c["site.hero.titleHtml"] ?? "").trim();
-        const fallbackHtml =
-          titleHtmlRaw ||
-          [c["site.hero.tagline"], c["site.hero.titleText"] || settings?.siteName || "CAROM.CLUB", c["site.hero.subtitleText"] || settings?.siteDescription || "당구 대회와 커뮤니티를 한곳에서."]
-            .filter(Boolean)
-            .map((t) => `<p>${(t ?? "").trim()}</p>`)
-            .join("");
-        setHeroExtra({
-          heroTitleHtml: titleHtmlRaw || fallbackHtml,
-          titleLineHeight: c[HERO_COPY_KEYS.titleLineHeight] ?? "",
-          titleFont: c[HERO_COPY_KEYS.titleFont] ?? "",
-          titleSize: c[HERO_COPY_KEYS.titleSize] ?? "",
-          titleColor: c[HERO_COPY_KEYS.titleColor] ?? "",
-          titleBold: c[HERO_COPY_KEYS.titleBold] ?? "",
-          titleItalic: c[HERO_COPY_KEYS.titleItalic] ?? "",
-          titleUnderline: c[HERO_COPY_KEYS.titleUnderline] ?? "",
-          titleAlign: c[HERO_COPY_KEYS.titleAlign] ?? "",
-          btnTournaments: c[HERO_COPY_KEYS.btnTournaments] ?? "진행중 대회 보기",
-          btnApply: c[HERO_COPY_KEYS.btnApply] ?? "대회 참가 신청",
-          btnPosition: c[HERO_COPY_KEYS.btnPosition] ?? "below",
-          btn1Size: c[HERO_COPY_KEYS.btn1Size] ?? "md",
-          btn2Size: c[HERO_COPY_KEYS.btn2Size] ?? "md",
-          btn1InternalPage: c[HERO_COPY_KEYS.btn1InternalPage] ?? "tournaments",
-          btn2InternalPage: c[HERO_COPY_KEYS.btn2InternalPage] ?? "tournaments",
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setHeroExtra(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isHeroSection]);
-
-  useEffect(() => {
-    if (!heroSpecialCharsOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (heroSpecialCharsRef.current && !heroSpecialCharsRef.current.contains(e.target as Node)) {
-        setHeroSpecialCharsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [heroSpecialCharsOpen]);
-
-  const onHeroParagraphLineHeight = useCallback((lh: string | null) => {
-    setHeroExtra((h) => {
-      if (!h) return h;
-      const next = lh ?? "";
-      if (h.titleLineHeight === next) return h;
-      return { ...h, titleLineHeight: next };
-    });
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -264,69 +146,35 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
     }
     setSaving(true);
     try {
-      const payload = {
-        ...form,
+      const sectionStyleJson = serializeSectionStyleJson({
+        animationPreset: form.animationPreset,
+        divider: {
+          enabled: form.dividerEnabled,
+          style: form.dividerEnabled ? form.dividerStyle : "solid",
+          widthPx: form.dividerWidthPx,
+          color: form.dividerColor,
+        },
+      });
+      const {
+        animationPreset: _anim,
+        dividerEnabled: _de,
+        dividerStyle: _ds,
+        dividerWidthPx: _dw,
+        dividerColor: _dc,
+        ...pageFields
+      } = form;
+      const payload: Omit<PageSection, "createdAt" | "updatedAt"> = {
+        ...pageFields,
         startAt: form.startAt ? new Date(form.startAt).toISOString() : null,
         endAt: form.endAt ? new Date(form.endAt).toISOString() : null,
+        sectionStyleJson,
       };
-      if (isHeroSection && heroExtra) {
+      if (isHeroSection) {
         payload.title = "Hero";
         payload.subtitle = null;
         payload.description = null;
-        const path1 = INTERNAL_PAGE_PATHS[heroExtra.btn1InternalPage as InternalPageSlug] ?? (heroExtra.btn1InternalPage || "/tournaments");
-        const path2 = INTERNAL_PAGE_PATHS[heroExtra.btn2InternalPage as InternalPageSlug] ?? (heroExtra.btn2InternalPage || "/tournaments");
-        payload.buttons = [
-          {
-            id: form.buttons[0]?.id ?? `btn-${Date.now()}-1`,
-            name: heroExtra.btnTournaments.trim() || "진행중 대회 보기",
-            linkType: "internal",
-            href: path1,
-            openInNewTab: false,
-            isPrimary: true,
-            size: (heroExtra.btn1Size === "sm" || heroExtra.btn1Size === "lg" ? heroExtra.btn1Size : "md") as SectionButton["size"],
-          },
-          {
-            id: form.buttons[1]?.id ?? `btn-${Date.now()}-2`,
-            name: heroExtra.btnApply.trim() || "대회 참가 신청",
-            linkType: "internal",
-            href: path2,
-            openInNewTab: false,
-            isPrimary: false,
-            size: (heroExtra.btn2Size === "sm" || heroExtra.btn2Size === "lg" ? heroExtra.btn2Size : "md") as SectionButton["size"],
-          },
-        ];
       }
       await onSubmit(payload);
-      if (isHeroSection && heroExtra) {
-        const copyRes = await fetch("/api/admin/copy", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            copy: {
-              [HERO_COPY_KEYS.titleHtml]: heroExtra.heroTitleHtml.trim(),
-              [HERO_COPY_KEYS.titleLineHeight]: heroExtra.titleLineHeight.trim(),
-              [HERO_COPY_KEYS.titleFont]: heroExtra.titleFont.trim(),
-              [HERO_COPY_KEYS.titleSize]: heroExtra.titleSize.trim(),
-              [HERO_COPY_KEYS.titleColor]: heroExtra.titleColor.trim(),
-              [HERO_COPY_KEYS.titleBold]: heroExtra.titleBold.trim(),
-              [HERO_COPY_KEYS.titleItalic]: heroExtra.titleItalic.trim(),
-              [HERO_COPY_KEYS.titleUnderline]: heroExtra.titleUnderline.trim(),
-              [HERO_COPY_KEYS.titleAlign]: heroExtra.titleAlign.trim(),
-              [HERO_COPY_KEYS.btnTournaments]: heroExtra.btnTournaments.trim() || "진행중 대회 보기",
-              [HERO_COPY_KEYS.btnApply]: heroExtra.btnApply.trim() || "대회 참가 신청",
-              [HERO_COPY_KEYS.btnPosition]: heroExtra.btnPosition || "below",
-              [HERO_COPY_KEYS.btn1Size]: heroExtra.btn1Size || "md",
-              [HERO_COPY_KEYS.btn2Size]: heroExtra.btn2Size || "md",
-              [HERO_COPY_KEYS.btn1InternalPage]: heroExtra.btn1InternalPage || "tournaments",
-              [HERO_COPY_KEYS.btn2InternalPage]: heroExtra.btn2InternalPage || "tournaments",
-            },
-          }),
-        });
-        if (!copyRes.ok) {
-          const d = await copyRes.json().catch(() => ({}));
-          throw new Error(d.error ?? "Hero 문구 저장에 실패했습니다.");
-        }
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장에 실패했습니다.");
     } finally {
@@ -372,268 +220,16 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       {isHeroSection && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-          <p className="font-medium">메인 페이지 상단 히어로 영역</p>
-          <p className="mt-1 text-amber-800 dark:text-amber-300/90">
-            히어로 제목(본문)을 하나의 에디터로 자유롭게 편집하고, 버튼 크기·위치·링크 페이지를 설정하세요.
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100">
+          <p className="font-medium">메인 비주얼 이미지 섹션</p>
+          <p className="mt-1 text-blue-900/90 dark:text-blue-200/90">
+            상단 히어로 <strong>제목·버튼·오버레이</strong>는{" "}
+            <Link href="/admin/site/hero" className="font-medium text-site-primary underline">
+              사이트관리 → 홈 화면 설정 → 히어로 설정
+            </Link>
+            의 JSON에서만 편집합니다. 여기서는 본 이미지 섹션(배너·링크·섹션 스타일)만 설정합니다.
           </p>
         </div>
-      )}
-
-      {isHeroSection && heroExtra && (
-        <section className="rounded-lg border border-site-border bg-gray-50/50 dark:bg-slate-800/30 p-4 space-y-4">
-          <h3 className="text-base font-semibold text-site-text">히어로 제목</h3>
-          <p className="text-xs text-gray-600 dark:text-slate-400">
-            내용은 편집자가 자유롭게 넣을 수 있습니다. 텍스트 선택 후 오른쪽 툴에서 글꼴·크기·색상 등을 적용하세요.
-          </p>
-
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
-            <div className="flex-1 space-y-3 min-w-0">
-              <div className="rounded-lg border-2 border-site-border bg-white dark:bg-slate-800/50 p-4 min-h-[120px]">
-                <HeroBlockEditor
-                  value={heroExtra.heroTitleHtml}
-                  onChange={(v) => setHeroExtra((h) => (h ? { ...h, heroTitleHtml: v } : h))}
-                  placeholder="예: CAROM.CLUB, 태그라인, 부제목 등 원하는 내용을 입력하세요."
-                  onEditorReady={(ed) => { heroEditorRef.current = ed; }}
-                  lineHeight={heroExtra.titleLineHeight}
-                  onParagraphLineHeight={onHeroParagraphLineHeight}
-                  plainView
-                  minHeight="120px"
-                />
-              </div>
-              <div className="rounded-lg border border-site-border bg-gray-100 dark:bg-slate-800 p-4 overflow-visible">
-                <span className="block text-xs font-medium text-gray-500 mb-2">미리보기 (배경·위치·서식 반영)</span>
-                <HeroPreview
-                  heroTitleHtml={heroExtra.heroTitleHtml}
-                  titleAlign={heroExtra.titleAlign}
-                  btnPosition={heroExtra.btnPosition}
-                  btn1Label={heroExtra.btnTournaments}
-                  btn2Label={heroExtra.btnApply}
-                  btn1Size={heroExtra.btn1Size}
-                  btn2Size={heroExtra.btn2Size}
-                  backgroundImageUrl={form.imageUrl}
-                />
-              </div>
-            </div>
-
-            <div className="lg:w-56 shrink-0 rounded-lg border border-site-border bg-white dark:bg-slate-700/80 p-4 shadow-sm">
-              <p className="text-sm font-medium text-site-text mb-3">글자 편집 툴</p>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">글꼴</label>
-                  <select
-                    value={heroExtra.titleFont}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setHeroExtra((h) => (h ? { ...h, titleFont: v } : h));
-                      heroEditorRef.current?.chain().focus().setFontFamily(v).run();
-                    }}
-                    className="w-full rounded border border-site-border bg-white px-2 py-1.5 text-sm dark:bg-slate-700"
-                  >
-                    {FONT_FAMILIES.map((o) => (
-                      <option key={o.value || "default"} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">글자 크기</label>
-                  <select
-                    value={heroExtra.titleSize}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setHeroExtra((h) => (h ? { ...h, titleSize: v } : h));
-                      if (v) heroEditorRef.current?.chain().focus().setFontSize(v).run();
-                    }}
-                    className="w-full rounded border border-site-border bg-white px-2 py-1.5 text-sm dark:bg-slate-700"
-                  >
-                    <option value="">글자 크기</option>
-                    {FONT_SIZES_PX.map((px) => (
-                      <option key={px} value={px}>{px}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">색상</label>
-                  <ColorPalette64
-                    applyMode="text"
-                    selectedHex={heroExtra.titleColor || undefined}
-                    onSelect={(hex) => {
-                      setHeroExtra((h) => (h ? { ...h, titleColor: hex } : h));
-                      heroEditorRef.current?.chain().focus().setColor(hex).run();
-                    }}
-                    cellSize={18}
-                  />
-                </div>
-                <div className="flex flex-wrap gap-1 items-center">
-                  <span className="text-xs text-gray-500 w-full">볼드 / 이탤릭 / 밑줄</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setHeroExtra((h) => (h ? { ...h, titleBold: h.titleBold ? "" : "1" } : h));
-                      heroEditorRef.current?.chain().focus().toggleBold().run();
-                    }}
-                    className={`px-2 py-1 rounded border text-sm font-bold ${heroExtra.titleBold ? "bg-site-primary/20 border-site-primary" : "border-site-border bg-white"}`}
-                    title="굵게"
-                  >B</button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setHeroExtra((h) => (h ? { ...h, titleItalic: h.titleItalic ? "" : "1" } : h));
-                      heroEditorRef.current?.chain().focus().toggleItalic().run();
-                    }}
-                    className={`px-2 py-1 rounded border text-sm italic ${heroExtra.titleItalic ? "bg-site-primary/20 border-site-primary" : "border-site-border bg-white"}`}
-                    title="기울임"
-                  >I</button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setHeroExtra((h) => (h ? { ...h, titleUnderline: h.titleUnderline ? "" : "1" } : h));
-                      heroEditorRef.current?.chain().focus().toggleUnderline().run();
-                    }}
-                    className={`px-2 py-1 rounded border text-sm underline ${heroExtra.titleUnderline ? "bg-site-primary/20 border-site-primary" : "border-site-border bg-white"}`}
-                    title="밑줄"
-                  >U</button>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">정렬</label>
-                  <select
-                    value={heroExtra.titleAlign}
-                    onChange={(e) => setHeroExtra((h) => (h ? { ...h, titleAlign: e.target.value } : h))}
-                    className="w-full rounded border border-site-border bg-white px-2 py-1.5 text-sm dark:bg-slate-700"
-                  >
-                    {HERO_ALIGN_OPTIONS.map((o) => (
-                      <option key={o.value || "default"} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">줄간격 (커서 둔 단락만)</label>
-                  <select
-                    value={heroExtra.titleLineHeight}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setHeroExtra((h) => (h ? { ...h, titleLineHeight: v } : h));
-                      (heroEditorRef.current?.chain().focus() as unknown as { setParagraphLineHeight: (lh: string | null) => { run: () => void }; run: () => void })?.setParagraphLineHeight(v || null).run();
-                    }}
-                    className="w-full rounded border border-site-border bg-white px-2 py-1.5 text-sm dark:bg-slate-700"
-                  >
-                    {HERO_LINE_HEIGHT_OPTIONS.map((o) => (
-                      <option key={o.value || "default"} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="relative" ref={heroSpecialCharsRef}>
-                  <button
-                    type="button"
-                    onClick={() => setHeroSpecialCharsOpen((o) => !o)}
-                    className="w-full rounded border border-site-border bg-white px-2 py-1.5 text-sm dark:bg-slate-700 hover:bg-gray-50"
-                  >
-                    Ω 특수문자
-                  </button>
-                  {heroSpecialCharsOpen && (
-                    <div className="absolute left-0 top-full z-50 mt-1 min-w-[280px] rounded-lg border border-site-border bg-white p-3 shadow-lg">
-                      <SpecialCharsPicker
-                        onInsert={(char) => heroEditorRef.current?.chain().focus().insertContent(char).run()}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-site-border pt-4 space-y-4">
-            <h4 className="text-sm font-semibold text-site-text">히어로 버튼</h4>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">버튼 위치</label>
-              <select
-                value={heroExtra.btnPosition}
-                onChange={(e) => setHeroExtra((h) => (h ? { ...h, btnPosition: e.target.value } : h))}
-                className="w-full max-w-xs rounded border border-site-border bg-white px-2 py-1.5 text-sm dark:bg-slate-700"
-              >
-                {HERO_BTN_POSITION_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-lg border border-site-border bg-white dark:bg-slate-800/50 p-4 space-y-3">
-                <span className="block text-sm font-medium text-site-text">첫 번째 버튼</span>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">문구</label>
-                  <input
-                    type="text"
-                    value={heroExtra.btnTournaments}
-                    onChange={(e) => setHeroExtra((h) => (h ? { ...h, btnTournaments: e.target.value } : h))}
-                    className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-700"
-                    placeholder="진행중 대회 보기"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">크기</label>
-                  <select
-                    value={heroExtra.btn1Size}
-                    onChange={(e) => setHeroExtra((h) => (h ? { ...h, btn1Size: e.target.value } : h))}
-                    className="w-full rounded border border-site-border bg-white px-2 py-1.5 text-sm dark:bg-slate-700"
-                  >
-                    {HERO_BTN_SIZE_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">링크 페이지</label>
-                  <select
-                    value={heroExtra.btn1InternalPage}
-                    onChange={(e) => setHeroExtra((h) => (h ? { ...h, btn1InternalPage: e.target.value } : h))}
-                    className="w-full rounded border border-site-border bg-white px-2 py-1.5 text-sm dark:bg-slate-700"
-                  >
-                    {(Object.entries(INTERNAL_PAGE_LABELS) as [InternalPageSlug, string][]).map(([k, label]) => (
-                      <option key={k} value={k}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="rounded-lg border border-site-border bg-white dark:bg-slate-800/50 p-4 space-y-3">
-                <span className="block text-sm font-medium text-site-text">두 번째 버튼</span>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">문구</label>
-                  <input
-                    type="text"
-                    value={heroExtra.btnApply}
-                    onChange={(e) => setHeroExtra((h) => (h ? { ...h, btnApply: e.target.value } : h))}
-                    className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-700"
-                    placeholder="대회 참가 신청"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">크기</label>
-                  <select
-                    value={heroExtra.btn2Size}
-                    onChange={(e) => setHeroExtra((h) => (h ? { ...h, btn2Size: e.target.value } : h))}
-                    className="w-full rounded border border-site-border bg-white px-2 py-1.5 text-sm dark:bg-slate-700"
-                  >
-                    {HERO_BTN_SIZE_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">링크 페이지</label>
-                  <select
-                    value={heroExtra.btn2InternalPage}
-                    onChange={(e) => setHeroExtra((h) => (h ? { ...h, btn2InternalPage: e.target.value } : h))}
-                    className="w-full rounded border border-site-border bg-white px-2 py-1.5 text-sm dark:bg-slate-700"
-                  >
-                    {(Object.entries(INTERNAL_PAGE_LABELS) as [InternalPageSlug, string][]).map(([k, label]) => (
-                      <option key={k} value={k}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
       )}
 
       <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
@@ -641,24 +237,76 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
       <section>
         <h3 className="mb-4 text-lg font-semibold">기본 정보</h3>
         <div className="space-y-4">
+          <AdminColorField
+            label="섹션 배경색"
+            value={form.backgroundColor}
+            onChange={(hex) => setForm((f) => ({ ...f, backgroundColor: hex }))}
+            nullable
+            helperText="비우면 기존 스타일 유지"
+          />
           <div>
-            <label className="block text-sm font-medium mb-1">섹션 배경색</label>
-            <div className="flex items-center gap-2 flex-wrap">
+            <label className="block text-sm font-medium mb-1">섹션 등장 애니메이션</label>
+            <select
+              value={form.animationPreset}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, animationPreset: e.target.value as SectionAnimationPreset }))
+              }
+              className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-700"
+            >
+              <option value="static">없음 (static)</option>
+              <option value="fade">페이드 (fade)</option>
+              <option value="snap">스냅 (snap)</option>
+              <option value="flow">플로우 (flow)</option>
+            </select>
+          </div>
+          <div className="rounded-lg border border-site-border p-4 space-y-3">
+            <label className="flex items-center gap-2 text-sm font-medium">
               <input
-                type="text"
-                value={form.backgroundColor ?? ""}
-                onChange={(e) => setForm((f) => ({ ...f, backgroundColor: e.target.value.trim() || null }))}
-                className="w-28 rounded border border-site-border bg-white px-2 py-1.5 text-sm dark:bg-slate-700"
-                placeholder="#ffffff"
+                type="checkbox"
+                checked={form.dividerEnabled}
+                onChange={(e) => setForm((f) => ({ ...f, dividerEnabled: e.target.checked }))}
               />
-              <ColorPalette64
-                applyMode="background"
-                selectedHex={form.backgroundColor || undefined}
-                onSelect={(hex) => setForm((f) => ({ ...f, backgroundColor: hex }))}
-                cellSize={20}
-              />
-            </div>
-            <p className="mt-1 text-xs text-gray-500">비우면 기존 스타일 유지</p>
+              하단 구분선 표시
+            </label>
+            {form.dividerEnabled && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium mb-1">구분선 스타일</label>
+                  <select
+                    value={form.dividerStyle}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, dividerStyle: e.target.value as "solid" | "dashed" }))
+                    }
+                    className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-700"
+                  >
+                    <option value="solid">실선</option>
+                    <option value="dashed">파선</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">두께 (px)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={16}
+                    value={form.dividerWidthPx}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        dividerWidthPx: Math.min(16, Math.max(1, parseInt(e.target.value, 10) || 1)),
+                      }))
+                    }
+                    className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-700"
+                  />
+                </div>
+                <AdminColorField
+                  label="구분선 색"
+                  value={form.dividerColor}
+                  onChange={(hex) => setForm((f) => ({ ...f, dividerColor: hex ?? "#e5e7eb" }))}
+                  nullable={false}
+                />
+              </>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">제목 아이콘 유형</label>
@@ -930,9 +578,18 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
         </div>
       </section>
 
-      {(form.type === "text" || form.type === "cta") && (
+      {(form.type === "text" || form.type === "cta" || (isHeroSection && form.type === "image")) && (
         <section>
-          <h3 className="mb-4 text-lg font-semibold">버튼 설정 (최대 3개)</h3>
+          <h3 className="mb-4 text-lg font-semibold">
+            {isHeroSection && form.type === "image"
+              ? "버튼 설정 (레거시 폴백, 최대 3개)"
+              : "버튼 설정 (최대 3개)"}
+          </h3>
+          {isHeroSection && form.type === "image" && (
+            <p className="mb-3 text-sm text-gray-600 dark:text-slate-400">
+              신규 히어로(JSON)가 꺼져 있을 때만 이 버튼이 메인에 쓰입니다. 우선은 히어로 설정 화면을 사용하세요.
+            </p>
+          )}
           {form.buttons.map((btn, i) => (
             <div key={btn.id} className="mb-4 rounded border border-site-border bg-gray-50 p-4 dark:bg-slate-800">
               <div className="flex flex-wrap gap-4">

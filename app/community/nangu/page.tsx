@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { hasPermission, PERMISSION_KEYS } from "@/lib/auth/permissions.server";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { getCachedNanguBoardList } from "@/lib/community-nangu-list-server";
 import { formatKoreanDate } from "@/lib/format-date";
 import { NanguSolverIcon } from "@/components/community/NanguSolverIcon";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export default async function NanguBoardPage() {
   if (!isDatabaseConfigured()) {
@@ -27,12 +28,13 @@ export default async function NanguBoardPage() {
     redirect(`/login?next=${encodeURIComponent("/community/nangu")}`);
   }
 
+  const canCreatePost = await hasPermission(session, PERMISSION_KEYS.COMMUNITY_POST_CREATE);
   const posts = await getCachedNanguBoardList();
 
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
       <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">
-        <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4" aria-label="breadcrumb">
+        <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4 md:flex hidden" aria-label="breadcrumb">
           <Link href="/community" className="hover:text-site-primary">
             커뮤니티
           </Link>
@@ -42,14 +44,16 @@ export default async function NanguBoardPage() {
         <div className="flex items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-0 min-w-0">
             <NanguSolverIcon size={56} />
-            <h1 className="text-xl font-bold truncate">난구해결사</h1>
+            <h1 className="text-xl font-bold truncate md:block hidden">난구해결사</h1>
           </div>
-          <Link
-            href="/community/nangu/write"
-            className="shrink-0 py-2 px-4 rounded-lg bg-site-primary text-white text-sm font-medium"
-          >
-            글쓰기
-          </Link>
+          {canCreatePost && (
+            <Link
+              href="/community/nangu/write"
+              className="shrink-0 py-2 px-4 rounded-lg bg-site-primary text-white text-sm font-medium"
+            >
+              글쓰기
+            </Link>
+          )}
         </div>
         <p className="text-gray-600 dark:text-gray-400 mb-6">문제구 질문 및 해법 토론용 게시판입니다.</p>
         {posts.length === 0 ? (

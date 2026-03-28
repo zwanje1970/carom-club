@@ -2,14 +2,13 @@
 
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import MobileHeader from "@/components/common/MobileHeader";
 
 const BOARD_OPTIONS = [
   { value: "notice", label: "공지사항(관리자 전용)" },
   { value: "free", label: "자유게시판" },
   { value: "qna", label: "질문게시판" },
-  { value: "trouble", label: "난구해결사" },
 ] as const;
 
 function normalizeBoardSlug(raw: string): string {
@@ -30,6 +29,12 @@ export default function CommunityBoardSlugWritePage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (boardSlug === "trouble") {
+      router.replace("/community/nangu/write");
+    }
+  }, [boardSlug, router]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -66,10 +71,7 @@ export default function CommunityBoardSlugWritePage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "저장 실패");
-      const detailHref =
-        selectedBoardSlug === "trouble"
-          ? `/community/trouble/${data.id}`
-          : `/community/${selectedBoardSlug}/${data.id}`;
+      const detailHref = `/community/${selectedBoardSlug}/${data.id}`;
       router.push(detailHref);
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장 실패");

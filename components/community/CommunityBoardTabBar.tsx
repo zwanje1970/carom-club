@@ -14,10 +14,8 @@ type Props = {
 /**
  * 상단 게시판 탭 — 서버 렌더, `activeSlug`로 활성 표시
  */
-export function CommunityBoardTabBar({ boards, activeSlug, showSolverEntry }: Props) {
-  const ordered = orderedHubBoards(boards).filter((b) =>
-    showSolverEntry ? true : b.slug !== "trouble" && b.slug !== "nangu"
-  );
+export function CommunityBoardTabBar({ boards, activeSlug }: Props) {
+  const ordered = orderedHubBoards(boards);
 
   return (
     <nav
@@ -26,11 +24,11 @@ export function CommunityBoardTabBar({ boards, activeSlug, showSolverEntry }: Pr
     >
       <div className="flex gap-0 overflow-x-auto scrollbar-none pb-px">
         {ordered.map((b) => {
-          const href = b.slug === "trouble" ? "/community/trouble" : `/community/${b.slug}`;
+          const href = b.slug === "trouble" ? "/community/nangu" : `/community/${b.slug}`;
           const active =
             activeSlug !== "" &&
             (b.slug === "trouble"
-              ? activeSlug === "trouble"
+              ? activeSlug === "trouble" || activeSlug === "nangu"
               : activeSlug === b.slug);
           const label = tabLabelForSlug(b.slug, b.name);
           return (

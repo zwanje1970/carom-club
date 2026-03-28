@@ -15,7 +15,10 @@ const config: Config = {
         site: {
           bg: "#F6F8FB",
           card: "#FFFFFF",
-          text: "#111827",
+          text: {
+            DEFAULT: "#111827",
+            muted: "#4b5563",
+          },
           border: "#E5E7EB",
           primary: "var(--site-primary)",
           secondary: "var(--site-secondary)",

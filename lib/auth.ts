@@ -1,6 +1,4 @@
-import { SignJWT, jwtVerify } from "jose";
 import type { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { cache } from "react";
 import type { SessionUser } from "@/types/auth";
 
@@ -46,6 +44,7 @@ function getSessionSecret(): string {
 const SECRET = new TextEncoder().encode(getSessionSecret());
 
 export async function hashPassword(password: string): Promise<string> {
+  const { default: bcrypt } = await import("bcryptjs");
   return bcrypt.hash(password, 12);
 }
 
@@ -53,6 +52,7 @@ export async function verifyPassword(
   password: string,
   hashed: string
 ): Promise<boolean> {
+  const { default: bcrypt } = await import("bcryptjs");
   return bcrypt.compare(password, hashed);
 }
 
@@ -64,6 +64,7 @@ export async function createSession(
   if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
     throw new Error("SESSION_SECRET is required in production. Set it in your environment.");
   }
+  const { SignJWT } = await import("jose");
   return new SignJWT({ ...user })
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime(`${expiresInDays}d`)
@@ -73,6 +74,7 @@ export async function createSession(
 
 async function getSessionUncached(): Promise<SessionUser | null> {
   const { cookies } = await import("next/headers");
+  const { jwtVerify } = await import("jose");
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
   if (!token) return null;
@@ -91,12 +93,15 @@ async function getSessionUncached(): Promise<SessionUser | null> {
     }
     const isClientAccount =
       typeof raw.isClientAccount === "boolean" ? raw.isClientAccount : role === "CLIENT_ADMIN";
+    const roleId =
+      typeof raw.roleId === "string" ? raw.roleId : raw.roleId === null ? null : null;
     return {
       id: String(raw.id),
       name: String(raw.name),
       username: String(raw.username),
       email: String(raw.email),
       role,
+      roleId,
       loginMode,
       isClientAccount,
       authChannel,

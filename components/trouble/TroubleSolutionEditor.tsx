@@ -39,6 +39,10 @@ import {
   createTroubleSolutionEditorInitialState,
   resolvePanelSettingsAndAuthority,
 } from "@/lib/solution-editor-hydrate";
+import {
+  cueFirstObjectHitFromBallPlacement,
+  resolveEffectiveFirstObjectCollisionFromCuePath,
+} from "@/lib/solution-path-geometry";
 
 export interface TroubleSolutionEditorProps {
   /** ?대?吏留??덉쓣 ???ъ슜. ballPlacement ?덉쑝硫?臾댁떆 媛??*/
@@ -63,8 +67,14 @@ export function TroubleSolutionEditor({
   onSubmit,
 }: TroubleSolutionEditorProps) {
   const ih = useMemo(
-    () => createTroubleSolutionEditorInitialState(initialSolutionData, initialPersistedSettings, initialContent),
-    [initialSolutionData, initialPersistedSettings, initialContent]
+    () =>
+      createTroubleSolutionEditorInitialState(
+        initialSolutionData,
+        initialPersistedSettings,
+        initialContent,
+        ballPlacement
+      ),
+    [initialSolutionData, initialPersistedSettings, initialContent, ballPlacement]
   );
 
   const [isBankShot, setIsBankShot] = useState(ih.isBankShot);
@@ -115,13 +125,16 @@ export function TroubleSolutionEditor({
     (section?: "thickness" | "tip" | "rail") => {
       setSettingsFocusSection(section ?? null);
       setPanelSettings((prev) => {
+        /** 에디터 동기화 병합이 덮어쓰지 않도록, 열기 직전 사용자 선택 유지 */
+        const preserveIgnorePhysics = prev.ignorePhysics;
         const base = {
           ballSpeed,
           backstroke: backstrokeLevel,
           followStroke: followStrokeLevel,
         };
+        let merged: SolutionSettingsValue;
         if (!settingsPanelBallSpeedAuthoritative) {
-          return clampSolutionSettings(
+          merged = clampSolutionSettings(
             mergeSolutionSettings(
               {
                 ...base,
@@ -131,8 +144,12 @@ export function TroubleSolutionEditor({
               prev
             )
           );
+        } else {
+          merged = clampSolutionSettings(mergeSolutionSettings(base, prev));
         }
-        return clampSolutionSettings(mergeSolutionSettings(base, prev));
+        return clampSolutionSettings(
+          mergeSolutionSettings({ ignorePhysics: preserveIgnorePhysics }, merged)
+        );
       });
       setSettingsPanelBallSpeedAuthoritative(true);
       setSettingsPanelOpen(true);
@@ -203,6 +220,11 @@ export function TroubleSolutionEditor({
     });
   }, [ballPlacement, cuePos, pathPoints, objectPathPoints, rect]);
 
+  const firstObjectCollision = useMemo(() => {
+    if (!ballPlacement || pathPoints.length < 1) return null;
+    return resolveEffectiveFirstObjectCollisionFromCuePath(ballPlacement, cuePos, pathPoints, rect);
+  }, [ballPlacement, cuePos, pathPoints, rect]);
+
   const openPathFullscreen = useCallback(() => {
     setPathFsKey((k) => k + 1);
     setPathFsOpen(true);
@@ -225,25 +247,35 @@ export function TroubleSolutionEditor({
       const pointsForPath = pathPoints.length >= 1 ? pathPoints.map((p) => ({ x: p.x, y: p.y })) : [];
       let reflectionPath: NanguSolutionData["reflectionPath"];
       let reflectionObjectBall: NanguSolutionData["reflectionObjectBall"];
-      if (
-        firstObjectBallKey &&
-        objectPathPoints.length >= 1 &&
-        ballPlacement &&
-        pathPoints.length >= 1
-      ) {
-        const key = firstObjectBallKey;
-        const objPts = objectPathPoints.map((p) => ({ x: p.x, y: p.y }));
-        const startNorm =
-          key === "red"
-            ? ballPlacement.redBall
-            : key === "yellow"
-              ? ballPlacement.yellowBall
-              : ballPlacement.whiteBall;
-        reflectionPath = {
-          points: [{ x: startNorm.x, y: startNorm.y }, ...objPts],
-          pointsWithType: objectPathPoints,
-        };
-        reflectionObjectBall = key;
+      /**
+       * 저장용 충돌점/1목 키: `resolveEffectiveFirstObjectCollisionFromCuePath`는 폴리라인이 광선 충돌점에
+       * 닿았을 때만 유효(편집·표시 게이트). 제출 시에는 화면에 그린 1목 경로가 있으면 광선 1목만으로도
+       * 직렬화해 재진입 복원이 되게 한다. 재생/물리/rAF는 사용하지 않음.
+       */
+      if (objectPathPoints.length >= 1 && ballPlacement && pathPoints.length >= 1) {
+        const rayHit = cueFirstObjectHitFromBallPlacement(
+          cuePos,
+          pathPoints[0]!,
+          ballPlacement,
+          rect
+        );
+        const collisionForSave = firstObjectCollision ?? rayHit;
+        const objectKeyForSave = firstObjectBallKey ?? rayHit?.objectKey ?? null;
+        if (collisionForSave) {
+          const objPts = objectPathPoints.map((p) => ({ x: p.x, y: p.y }));
+          const startNorm = collisionForSave.collision;
+          const startsAtCollision =
+            objectPathPoints.length > 0 &&
+            Math.abs(objectPathPoints[0]!.x - startNorm.x) < 1e-6 &&
+            Math.abs(objectPathPoints[0]!.y - startNorm.y) < 1e-6;
+          reflectionPath = {
+            points: startsAtCollision ? objPts : [{ x: startNorm.x, y: startNorm.y }, ...objPts],
+            pointsWithType: objectPathPoints,
+          };
+          if (objectKeyForSave) {
+            reflectionObjectBall = objectKeyForSave;
+          }
+        }
       }
 
       const solutionData: NanguSolutionData = {

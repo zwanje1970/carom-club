@@ -3,7 +3,7 @@
  * - 필터 키 `fk`가 현재 요청과 일치할 때만 적용 (오래된 커서 무시)
  * - 정렬 종류별로 (메트릭, createdAt, id) 사전순 이전 구간만 조회
  */
-import type { Prisma } from "prisma-generated";
+import type { Prisma } from "@/generated/prisma";
 
 export type BoardListCursorSortKind = "createdAt" | "viewCount" | "likeCount" | "commentCount";
 

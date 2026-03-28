@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { nameToSlug, ensureUniqueSlug } from "@/lib/slug";
+import { isAnnualMembershipVisible } from "@/lib/site-feature-flags";
 
 /** PATCH: 상태 변경 (PENDING | APPROVED | REJECTED). 승인/거절 후 되돌리기 및 재변경 가능 */
 export async function PATCH(
@@ -89,6 +90,10 @@ export async function PATCH(
     });
 
     const requestedType = (app as { requestedClientType?: string | null }).requestedClientType ?? "GENERAL";
+    const annualMembershipVisible = await isAnnualMembershipVisible();
+    if (status === "APPROVED" && requestedType === "REGISTERED" && !annualMembershipVisible) {
+      return NextResponse.json({ error: "연회원 기능이 비활성화되어 있습니다." }, { status: 404 });
+    }
     const orgClientType = requestedType === "REGISTERED" ? "REGISTERED" : "GENERAL";
     const orgMembershipType = requestedType === "REGISTERED" ? "ANNUAL" : "NONE";
 

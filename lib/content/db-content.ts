@@ -43,6 +43,7 @@ function rowToPageSection(r: {
   titleIconName?: string | null;
   titleIconImageUrl?: string | null;
   titleIconSize?: string | null;
+  sectionStyleJson?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }): PageSection {
@@ -79,6 +80,7 @@ function rowToPageSection(r: {
     titleIconName: r.titleIconName ?? null,
     titleIconImageUrl: r.titleIconImageUrl ?? null,
     titleIconSize: (r.titleIconSize as PageSection["titleIconSize"]) ?? null,
+    sectionStyleJson: r.sectionStyleJson ?? null,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   };
@@ -201,7 +203,10 @@ export async function getAllPageSectionsFromDb(): Promise<PageSection[]> {
 }
 
 export async function getAllPopupsFromDb(): Promise<Popup[]> {
-  const list = await prisma.popup.findMany({ orderBy: { sortOrder: "asc" } });
+  const list = await prisma.popup.findMany({
+    where: { isVisible: true },
+    orderBy: { sortOrder: "asc" },
+  });
   return list.map((r) => rowToPopup(r));
 }
 
@@ -257,6 +262,7 @@ export async function upsertPageSectionInDb(data: PageSectionInput): Promise<Pag
     titleIconName: data.titleIconName ?? null,
     titleIconImageUrl: data.titleIconImageUrl ?? null,
     titleIconSize: data.titleIconSize ?? null,
+    sectionStyleJson: data.sectionStyleJson ?? null,
   };
   const r = await prisma.pageSection.upsert({
     where: { id: data.id },

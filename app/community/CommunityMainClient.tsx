@@ -24,7 +24,7 @@ export function CommunityMainClient({
   showSolverEntry,
 }: {
   latest: PostItem[];
-  initialCategory: "all" | "free" | "qna" | "trouble" | "notice";
+  initialCategory: "all" | "free" | "qna" | "notice";
   canManageReports?: boolean;
   showSolverEntry: boolean;
 }) {
@@ -33,13 +33,12 @@ export function CommunityMainClient({
   const postLink = (p: PostItem) =>
     p.boardSlug === "trouble" ? `/community/trouble/${p.id}` : `/community/${p.boardSlug}/${p.id}`;
 
-  const fabHref = showSolverEntry ? "/community/trouble/write" : "/community/free/write";
+  const fabHref = showSolverEntry ? "/community/nangu/write" : "/community/free/write";
   const categoryRaw = searchParams?.get("category") ?? initialCategory;
   const category =
     categoryRaw === "all" ||
     categoryRaw === "free" ||
     categoryRaw === "qna" ||
-    categoryRaw === "trouble" ||
     categoryRaw === "notice"
       ? categoryRaw
       : "all";
@@ -48,12 +47,11 @@ export function CommunityMainClient({
     { value: "all", label: "전체" },
     { value: "free", label: "자유게시판" },
     { value: "qna", label: "질문게시판" },
-    { value: "trouble", label: "난구해결사" },
     { value: "notice", label: "공지사항" },
   ] as const;
 
   const updateCategory = (
-    next: "all" | "free" | "qna" | "trouble" | "notice"
+    next: "all" | "free" | "qna" | "notice"
   ) => {
     const params = new URLSearchParams(searchParams?.toString() ?? "");
     if (next === "all") params.delete("category");
@@ -76,11 +74,33 @@ export function CommunityMainClient({
     return slug;
   };
 
-  const filtered =
-    category === "all" ? latest : latest.filter((p) => p.boardSlug === category);
+  // Filter out trouble and nangu from the general list
+  const filtered = latest.filter((p) => p.boardSlug !== "trouble" && p.boardSlug !== "nangu").filter((p) => 
+    category === "all" ? true : p.boardSlug === category
+  );
 
   return (
-    <div className="mt-4 pb-20">
+    <div className="pb-20">
+      {/* Nangu Solver Special Section */}
+      <div className="mb-6">
+        <Link 
+          href="/community/nangu" 
+          className="block rounded-xl bg-gradient-to-br from-site-primary/10 to-site-primary/5 border border-site-primary/20 p-5 shadow-sm hover:shadow-md transition-shadow dark:from-site-primary/20 dark:to-site-primary/10 dark:border-site-primary/30"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-site-primary dark:text-site-primary">난구해결사</h2>
+              <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">난구를 올리고 해법을 받아보세요</p>
+            </div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-site-primary/10 text-site-primary dark:bg-site-primary/20">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </div>
+        </Link>
+      </div>
+
       {canManageReports && (
         <div className="mb-3 flex justify-end">
           <Link href="/community/admin/reports" className="text-sm text-site-primary hover:underline">
@@ -89,11 +109,6 @@ export function CommunityMainClient({
         </div>
       )}
 
-      {/*
-        오픈 전 심플 모드:
-        - 게시판 통합 최신순만 노출
-        - 오늘/주간/추천(인기) UI는 숨김 처리
-      */}
       <div
         className="sticky top-14 z-10 border-b border-gray-100 bg-white shadow-sm dark:border-slate-100/80 dark:bg-slate-950 md:top-16"
       >
@@ -160,7 +175,7 @@ export function CommunityMainClient({
         ))}
       </ul>
 
-      <CommunityWriteFab href={fabHref} />
+      {showSolverEntry && <CommunityWriteFab href={fabHref} />}
     </div>
   );
 }

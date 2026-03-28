@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { put } from "@vercel/blob";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
 
 export const runtime = "nodejs";
 
@@ -46,6 +43,13 @@ export async function POST(request: Request) {
   const hasBlobToken = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 
   try {
+    const [{ put }, fsPromises, pathModule] = await Promise.all([
+      import("@vercel/blob"),
+      import("fs/promises"),
+      import("path"),
+    ]);
+    const { mkdir, writeFile } = fsPromises;
+    const path = pathModule.default;
     const buffer = Buffer.from(await file.arrayBuffer());
     if (hasBlobToken) {
       const blob = await put(blobPath, buffer, {

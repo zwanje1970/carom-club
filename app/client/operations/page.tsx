@@ -93,12 +93,20 @@ export default async function ClientOperationsPage() {
         title="대회 운영"
         description={`조직 「${org?.name ?? "—"}」 소속 대회만 표시됩니다.`}
         actions={
-          <Link
-            href="/client/operations/tournaments/new"
-            className="hidden min-h-[44px] items-center rounded-md border border-zinc-800 bg-zinc-800 px-3 text-xs font-medium text-white hover:bg-zinc-900 dark:border-zinc-200 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white lg:inline-flex"
-          >
-            새 대회
-          </Link>
+          <div className="hidden items-center gap-2 lg:flex">
+            <Link
+              href="/client/operations/push"
+              className="min-h-[44px] items-center rounded-md border border-zinc-300 px-3 text-xs font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800 inline-flex"
+            >
+              푸시 발송
+            </Link>
+            <Link
+              href="/client/operations/tournaments/new"
+              className="inline-flex min-h-[44px] items-center rounded-md border border-zinc-800 bg-zinc-800 px-3 text-xs font-medium text-white hover:bg-zinc-900 dark:border-zinc-200 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+            >
+              새 대회
+            </Link>
+          </div>
         }
       />
 

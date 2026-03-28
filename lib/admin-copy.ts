@@ -1,11 +1,9 @@
 /**
  * 플랫폼 관리자 메뉴명·문구 커스텀
- * - 기본값은 아래 DEFAULT_ADMIN_COPY
- * - DB AdminCopy 테이블에 저장된 값으로 덮어씀
+ * - 이 파일은 공유 상수/헬퍼만 제공한다.
+ * - 클라이언트에서도 import되므로 브라우저 안전 코드를 유지한다.
+ * - DB 접근은 `lib/admin-copy-server.ts`에서만 처리한다.
  */
-
-import { prisma } from "@/lib/db";
-import { isDatabaseConfigured } from "@/lib/db-mode";
 
 /** 편집 가능한 메뉴/문구 키와 기본값 (라벨 설정 페이지에서 표시 순서·그룹용) */
 export const DEFAULT_ADMIN_COPY: Record<string, string> = {
@@ -36,42 +34,6 @@ export const DEFAULT_ADMIN_COPY: Record<string, string> = {
   "settings.menu.labels": "메뉴/문구",
 
   // ----- 사이트 안내/설명 (메인·대회·당구장·커뮤니티 등) -----
-  "site.hero.tagline": "당구장 홍보 · 대회 신청",
-  "site.hero.titleText": "CAROM.CLUB",
-  "site.hero.subtitleText": "당구 대회와 커뮤니티를 한곳에서.",
-  "site.hero.descriptionText": "",
-  "site.hero.btnTournaments": "진행중 대회 보기",
-  "site.hero.btnApply": "대회 참가 신청",
-  "site.hero.taglineFont": "",
-  "site.hero.taglineSize": "",
-  "site.hero.taglineColor": "",
-  "site.hero.taglineBold": "",
-  "site.hero.taglineItalic": "",
-  "site.hero.taglineUnderline": "",
-  "site.hero.taglineAlign": "",
-  "site.hero.titleFont": "",
-  "site.hero.titleSize": "",
-  "site.hero.titleColor": "",
-  "site.hero.titleBold": "",
-  "site.hero.titleItalic": "",
-  "site.hero.titleUnderline": "",
-  "site.hero.titleAlign": "",
-  "site.hero.subtitleFont": "",
-  "site.hero.subtitleSize": "",
-  "site.hero.subtitleColor": "",
-  "site.hero.subtitleBold": "",
-  "site.hero.subtitleItalic": "",
-  "site.hero.subtitleUnderline": "",
-  "site.hero.subtitleAlign": "",
-  "site.hero.taglineLineHeight": "",
-  "site.hero.titleLineHeight": "",
-  "site.hero.subtitleLineHeight": "",
-  "site.hero.titleHtml": "",
-  "site.hero.btnPosition": "below",
-  "site.hero.btn1Size": "md",
-  "site.hero.btn2Size": "md",
-  "site.hero.btn1InternalPage": "tournaments",
-  "site.hero.btn2InternalPage": "tournaments",
   "site.home.tournaments.title": "진행중 대회",
   "site.home.tournaments.subtitle": "참가 신청 가능한 대회를 확인하세요.",
   "site.home.tournaments.subtitleEmpty": "곧 새로운 대회가 올라올 예정입니다.",
@@ -274,50 +236,11 @@ export const DEFAULT_ADMIN_COPY: Record<string, string> = {
   "client.sidebar.zoneOps": "권역 운영",
 };
 
-const COPY_KEYS = Object.keys(DEFAULT_ADMIN_COPY) as (keyof typeof DEFAULT_ADMIN_COPY)[];
-
 export type AdminCopyKey = keyof typeof DEFAULT_ADMIN_COPY;
-
-/** DB에서 커스텀 값 조회 후 기본값과 병합 */
-export async function getAdminCopy(): Promise<Record<string, string>> {
-  const base = { ...DEFAULT_ADMIN_COPY };
-  if (!isDatabaseConfigured()) return base;
-  try {
-    const rows = await prisma.adminCopy.findMany();
-    for (const row of rows) {
-      if (COPY_KEYS.includes(row.key as AdminCopyKey)) {
-        base[row.key] = row.value;
-      }
-    }
-    return base;
-  } catch {
-    return base;
-  }
-}
 
 /** 특정 키 값만 (키 없으면 기본값) */
 export function getCopyValue(copy: Record<string, string>, key: AdminCopyKey): string {
   return copy[key] ?? DEFAULT_ADMIN_COPY[key] ?? key;
-}
-
-/** 여러 키-값 저장 (Prisma upsert로 SQLite/PostgreSQL 공통) */
-export async function updateAdminCopy(updates: Record<string, string>): Promise<void> {
-  if (!isDatabaseConfigured()) return;
-  for (const key of Object.keys(updates)) {
-    if (!COPY_KEYS.includes(key)) continue;
-    const value = updates[key]?.trim() ?? "";
-    const finalValue = value || (DEFAULT_ADMIN_COPY[key] ?? key);
-    try {
-      await prisma.adminCopy.upsert({
-        where: { key },
-        create: { key, value: finalValue },
-        update: { value: finalValue },
-      });
-    } catch (e) {
-      console.error("[admin-copy] upsert error for key:", key, e);
-      throw e;
-    }
-  }
 }
 
 /** 설정 페이지에서 그룹별 키 목록 */
@@ -329,18 +252,6 @@ export const ADMIN_COPY_GROUPS: { group: string; keys: (keyof typeof DEFAULT_ADM
   {
     group: "사이트 안내/설명",
     keys: [
-      "site.hero.tagline", "site.hero.titleText", "site.hero.subtitleText", "site.hero.descriptionText",
-      "site.hero.titleHtml", "site.hero.titleLineHeight",
-      "site.hero.btnTournaments", "site.hero.btnApply",
-      "site.hero.btnPosition", "site.hero.btn1Size", "site.hero.btn2Size",
-      "site.hero.btn1InternalPage", "site.hero.btn2InternalPage",
-      "site.hero.taglineFont", "site.hero.taglineSize", "site.hero.taglineColor",
-      "site.hero.taglineBold", "site.hero.taglineItalic", "site.hero.taglineUnderline", "site.hero.taglineAlign",
-      "site.hero.titleFont", "site.hero.titleSize", "site.hero.titleColor",
-      "site.hero.titleBold", "site.hero.titleItalic", "site.hero.titleUnderline", "site.hero.titleAlign",
-      "site.hero.subtitleFont", "site.hero.subtitleSize", "site.hero.subtitleColor",
-      "site.hero.subtitleBold", "site.hero.subtitleItalic", "site.hero.subtitleUnderline", "site.hero.subtitleAlign",
-      "site.hero.taglineLineHeight", "site.hero.subtitleLineHeight",
       "site.home.tournaments.title", "site.home.tournaments.subtitle", "site.home.tournaments.subtitleEmpty",
       "site.home.tournaments.empty", "site.home.tournaments.btnList", "site.home.tournaments.btnViewAll", "site.home.tournaments.btnJoin",
       "site.home.venues.title", "site.home.venues.subtitle", "site.home.venues.subtitleWithList",

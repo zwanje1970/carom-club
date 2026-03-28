@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
 import { canAccessClientDashboard } from "@/types/auth";
-import { OperationsTournamentEditorClient } from "@/components/client/OperationsTournamentEditorClient";
+import { OperationsTournamentEditPageClient } from "./OperationsTournamentEditPageClient";
 
 export const metadata = { title: "대회 수정" };
 
@@ -34,8 +34,7 @@ export default async function ClientOperationsTournamentEditPage({
   if (!tournament) notFound();
 
   return (
-    <OperationsTournamentEditorClient
-      mode="edit"
+    <OperationsTournamentEditPageClient
       tournamentId={id}
       organizationId={orgId}
       organizationName={org?.name ?? "—"}

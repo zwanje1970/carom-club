@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
-import { getAdminCopy, getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import { getAdminCopy } from "@/lib/admin-copy-server";
 import { prisma } from "@/lib/db";
 import { normalizeSlug } from "@/lib/normalize-slug";
 import { ClientLoginWelcomeBanner } from "@/components/client/ClientLoginWelcomeBanner";
@@ -20,6 +21,7 @@ import {
 import { formatKoreanDateTime } from "@/lib/format-date";
 import { cx } from "@/components/client/console/ui/cx";
 import { consoleTextMuted } from "@/components/client/console/ui/tokens";
+import { isAnnualMembershipVisible } from "@/lib/site-feature-flags";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "초안",
@@ -54,6 +56,7 @@ export default async function ClientDashboardPage({
   const c = copy as Record<AdminCopyKey, string>;
   const params = await searchParams;
   const welcome = params.welcome;
+  const annualMembershipVisible = await isAnnualMembershipVisible();
 
   const orgId = await getClientAdminOrganizationId(session);
   let org: {
@@ -383,7 +386,9 @@ export default async function ClientDashboardPage({
                 업체:{" "}
                 {org.approvalStatus === "APPROVED"
                   ? org.clientType === "REGISTERED"
-                    ? "등록업체 (연회원)"
+                    ? annualMembershipVisible
+                      ? "등록업체 (연회원)"
+                      : "등록업체"
                     : "일반업체"
                   : "승인 대기"}
               </p>

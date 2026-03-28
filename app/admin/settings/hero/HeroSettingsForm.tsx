@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import type { HeroSettings, HeroButtonItem } from "@/lib/hero-settings";
 import { DEFAULT_HERO_SETTINGS } from "@/lib/hero-settings";
 import NotificationBar from "@/components/admin/_components/NotificationBar";
+import { AdminImageField } from "@/components/admin/_components/AdminImageField";
 import HeroPreviewBlock from "./HeroPreviewBlock";
 
 const TEXT_ALIGN_OPTIONS = [
@@ -101,18 +102,6 @@ export default function HeroSettingsForm() {
     }));
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("policy", "banner");
-    const res = await fetch("/api/admin/upload-image", { method: "POST", body: fd });
-    const data = await res.json();
-    if (res.ok && data.url) update("heroBackgroundImageUrl", data.url);
-    else setError(data.error || "이미지 업로드 실패");
-  };
-
   if (loading) {
     return <p className="py-8 text-center text-gray-500">불러오는 중...</p>;
   }
@@ -139,22 +128,16 @@ export default function HeroSettingsForm() {
             />
             <span>히어로 사용</span>
           </label>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">배경 이미지</label>
-            <div className="mt-1 flex gap-2">
-              <input
-                type="url"
-                value={form.heroBackgroundImageUrl ?? ""}
-                onChange={(e) => update("heroBackgroundImageUrl", e.target.value || null)}
-                placeholder="https://..."
-                className="flex-1 rounded border border-gray-300 px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              />
-              <label className="cursor-pointer rounded border border-gray-300 px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
-                업로드
-                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-              </label>
-            </div>
-          </div>
+          <AdminImageField
+            label="배경 이미지"
+            value={form.heroBackgroundImageUrl ?? null}
+            onChange={(url) => update("heroBackgroundImageUrl", url)}
+            policy="banner"
+            recommendedSize="가로 1920px 전후 권장"
+          />
+          <p className="text-xs text-gray-500 dark:text-slate-400">
+            URL 직접 입력은 사용하지 않습니다. 파일을 업로드하면 저장 경로가 자동으로 들어갑니다. 업로드 실패 시 기존 이미지가 유지됩니다.
+          </p>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">PC 높이</label>
