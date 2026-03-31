@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useState, type MouseEvent, type ReactNode } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -37,6 +37,10 @@ type SectionEditorProps = {
   renderRowBelow?: (s: PageSection, index: number) => ReactNode;
   /** 슬롯 타입·순서·상태 배지 등 */
   renderStatusBadges?: (s: PageSection, index: number) => ReactNode;
+  /** 행 클릭(편집 진입 등) */
+  onRowClick?: (s: PageSection, index: number) => void;
+  /** 현재 활성 행 */
+  activeRowId?: string | null;
 };
 
 function SortableRow({
@@ -48,6 +52,8 @@ function SortableRow({
   renderRowActions,
   renderRowBelow,
   renderStatusBadges,
+  onRowClick,
+  activeRowId,
 }: {
   section: PageSection;
   index: number;
@@ -57,6 +63,8 @@ function SortableRow({
   renderRowActions: (s: PageSection, index: number) => ReactNode;
   renderRowBelow?: (s: PageSection, index: number) => ReactNode;
   renderStatusBadges?: (s: PageSection, index: number) => ReactNode;
+  onRowClick?: (s: PageSection, index: number) => void;
+  activeRowId?: string | null;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: section.id,
@@ -70,12 +78,26 @@ function SortableRow({
   };
 
   const below = renderRowBelow?.(section, index);
+  const isActive = activeRowId === section.id;
+
+  const handleRowClick = (e: MouseEvent<HTMLElement>) => {
+    if (!onRowClick) return;
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    // 버튼/입력/링크 등 상호작용 요소 클릭은 행 클릭으로 취급하지 않는다.
+    if (target.closest("button,a,input,textarea,select,label")) return;
+    onRowClick(section, index);
+  };
 
   return (
     <li
       ref={setNodeRef}
+      data-row-id={section.id}
       style={style}
-      className={`border-b border-gray-200 py-3 last:border-b-0 dark:border-slate-700 ${
+      onClick={handleRowClick}
+      className={`cursor-pointer border-b border-gray-200 py-3 last:border-b-0 dark:border-slate-700 ${
+        isActive ? "rounded-md bg-red-50/60 dark:bg-red-950/20" : ""
+      } ${
         !section.isVisible || section.deletedAt ? "opacity-60" : ""
       }`}
     >
@@ -145,6 +167,8 @@ export function SectionEditor({
   renderRowActions,
   renderRowBelow,
   renderStatusBadges,
+  onRowClick,
+  activeRowId,
 }: SectionEditorProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -208,6 +232,8 @@ export function SectionEditor({
               renderRowActions={renderRowActions}
               renderRowBelow={renderRowBelow}
               renderStatusBadges={renderStatusBadges}
+              onRowClick={onRowClick}
+              activeRowId={activeRowId}
             />
           ))}
         </ul>

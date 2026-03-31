@@ -129,7 +129,7 @@ export function PageSectionList({
                     {s.slotType ? (
                       <Button href="/admin/page-builder" label="페이지 빌더" color="contrast" small />
                     ) : isLegacyHomeHeroCmsBlock(s) ? (
-                      <Button href="/admin/site/hero" label="히어로 설정" color="info" small />
+                      <Button href="/admin/site/settings" label="헤더/푸터/인트로 관리" color="info" small />
                     ) : (
                       <Button href={`/admin/page-sections/${s.id}/edit`} label="내용 편집" color="info" small />
                     )}

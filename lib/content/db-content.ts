@@ -3,6 +3,7 @@
  * service.ts 에서 DATABASE_URL 이 있을 때만 사용
  */
 
+import type { Prisma } from "@/generated/prisma";
 import { prisma } from "@/lib/db";
 import type { PageSection, SectionButton } from "@/types/page-section";
 import type { Popup } from "@/types/popup";
@@ -314,21 +315,20 @@ export async function updatePageSectionVisibilityInDb(id: string, isVisible: boo
   }
 }
 
-export async function upsertPageSectionInDb(data: PageSectionInput): Promise<PageSection> {
-  const existing = await prisma.pageSection.findUnique({
-    where: { id: data.id },
-    select: { deletedAt: true },
-  });
+function buildPageSectionUpsertPayload(
+  data: PageSectionInput,
+  existingDeletedAt: Date | null | undefined
+) {
   let mergedDeletedAt: Date | null;
   if (data.deletedAt === undefined) {
-    mergedDeletedAt = existing?.deletedAt ?? null;
+    mergedDeletedAt = existingDeletedAt ?? null;
   } else if (!data.deletedAt) {
     mergedDeletedAt = null;
   } else {
     mergedDeletedAt = new Date(data.deletedAt);
   }
 
-  const payload = {
+  return {
     type: data.type,
     title: data.title,
     subtitle: data.subtitle ?? null,
@@ -345,7 +345,11 @@ export async function upsertPageSectionInDb(data: PageSectionInput): Promise<Pag
     internalPath: data.internalPath ?? null,
     externalUrl: data.externalUrl ?? null,
     openInNewTab: data.openInNewTab,
-    buttons: Array.isArray(data.buttons) ? JSON.stringify(data.buttons) : (data.buttons != null ? JSON.stringify(data.buttons) : null),
+    buttons: Array.isArray(data.buttons)
+      ? JSON.stringify(data.buttons)
+      : data.buttons != null
+        ? JSON.stringify(data.buttons)
+        : null,
     isVisible: data.isVisible,
     sortOrder: data.sortOrder,
     startAt: data.startAt ? new Date(data.startAt) : null,
@@ -360,12 +364,60 @@ export async function upsertPageSectionInDb(data: PageSectionInput): Promise<Pag
     slotConfigJson: data.slotConfigJson ?? null,
     deletedAt: mergedDeletedAt,
   };
+}
+
+export async function upsertPageSectionInDb(data: PageSectionInput): Promise<PageSection> {
+  const existing = await prisma.pageSection.findUnique({
+    where: { id: data.id },
+    select: { deletedAt: true },
+  });
+  const payload = buildPageSectionUpsertPayload(data, existing?.deletedAt);
   const r = await prisma.pageSection.upsert({
     where: { id: data.id },
     create: { id: data.id, ...payload },
     update: payload,
   });
   return rowToPageSection(r);
+}
+
+/** 게시(draft → PageSection) 시 트랜잭션 내에서 동일 upsert */
+export async function upsertPageSectionInDbTx(tx: Prisma.TransactionClient, data: PageSectionInput): Promise<PageSection> {
+  const existing = await tx.pageSection.findUnique({
+    where: { id: data.id },
+    select: { deletedAt: true },
+  });
+  const payload = buildPageSectionUpsertPayload(data, existing?.deletedAt);
+  const r = await tx.pageSection.upsert({
+    where: { id: data.id },
+    create: { id: data.id, ...payload },
+    update: payload,
+  });
+  return rowToPageSection(r);
+}
+
+/** 초안 게시: `page`의 공개 `PageSection` 행을 `sections` 스냅샷과 일치시킴(추가·갱신·삭제) */
+export async function replacePageSectionsForPublishedPageInDb(page: PageSlug, sections: PageSection[]): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    if (sections.length === 0) {
+      await tx.pageSection.deleteMany({ where: { page } });
+      return;
+    }
+    const ids = new Set(sections.map((s) => s.id));
+    const existing = await tx.pageSection.findMany({ where: { page }, select: { id: true } });
+    for (const e of existing) {
+      if (!ids.has(e.id)) {
+        await tx.pageSection.delete({ where: { id: e.id } });
+      }
+    }
+    for (const s of sections) {
+      await upsertPageSectionInDbTx(tx, stripSectionForDbUpsert({ ...s, page }));
+    }
+  });
+}
+
+function stripSectionForDbUpsert(s: PageSection): PageSectionInput {
+  const { createdAt: _c, updatedAt: _u, ...rest } = s;
+  return rest;
 }
 
 export async function upsertPopupInDb(data: PopupInput): Promise<Popup> {

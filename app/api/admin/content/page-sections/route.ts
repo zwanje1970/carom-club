@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
+import { isCmsPageDraftKey } from "@/lib/content/cms-page-draft";
 import {
   assertPageSectionAllowedOnPage,
-  getAllPageSections,
-  savePageSection,
   deletePageSection,
+  getAllPageSections,
+  getPageSectionByIdForAdmin,
+  savePageSection,
 } from "@/lib/content/service";
 import { pageNotAllowedMessage } from "@/lib/content/page-section-page-rules";
 import type { PageSection, PageSlug } from "@/types/page-section";
@@ -45,7 +47,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: pageNotAllowedMessage() }, { status: 400 });
     }
     const saved = await savePageSection(data);
-    revalidatePathsForPage(saved.page);
+    if (!isCmsPageDraftKey(saved.page)) {
+      revalidatePathsForPage(saved.page);
+    }
     return NextResponse.json(saved);
   } catch (e) {
     console.error("[content/page-sections] POST error:", e);
@@ -66,10 +70,11 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "id가 필요합니다." }, { status: 400 });
   }
   try {
+    const existing = await getPageSectionByIdForAdmin(id.trim());
     await deletePageSection(id.trim());
-    revalidatePath("/", "layout");
-    revalidatePath("/community", "layout");
-    revalidatePath("/tournaments", "layout");
+    if (existing && !isCmsPageDraftKey(existing.page)) {
+      revalidatePathsForPage(existing.page);
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[content/page-sections] DELETE error:", e);

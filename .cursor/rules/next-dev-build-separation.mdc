@@ -1,0 +1,12 @@
+---
+description: next dev와 next build를 동시에 돌리지 않음 — .next 청크 충돌 방지
+alwaysApply: true
+---
+
+# Next.js 로컬 — `dev` / `build` 분리
+
+- **`next dev`(또는 `npm run dev`)가 실행 중일 때는 `next build`(`npm run build`)를 돌리지 않는다.**
+- **`npm run build`를 하기 전에 dev 서버를 완전히 종료한다.**
+- **`Cannot find module './xxxx.js'`** 등 `.next/server` 청크 오류는 **우선 CMS/앱 로직이 아니라 `.next` 산출물 불일치**로 본다. 재발 시 **`.next` 삭제 후 dev 재시작**한다.
+
+상세: `docs/LOCAL_DEV.md` (Next.js dev/build 섹션).

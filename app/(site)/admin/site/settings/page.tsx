@@ -11,6 +11,7 @@ import Button from "@/components/admin/_components/Button";
 import NotificationBar from "@/components/admin/_components/NotificationBar";
 import { AdminColorField } from "@/components/admin/_components/AdminColorField";
 import { AdminImageField } from "@/components/admin/_components/AdminImageField";
+import FooterSettingsForm from "@/app/(site)/admin/settings/footer/FooterSettingsForm";
 import { SITE_NAME } from "@/lib/site-settings";
 
 type SiteSettings = {
@@ -19,11 +20,20 @@ type SiteSettings = {
   logoUrl: string | null;
   primaryColor: string;
   secondaryColor: string;
-  withdrawRejoinDays: number;
   homeCarouselFlowSpeed: number;
   headerBgColor: string | null;
   headerTextColor: string | null;
   headerActiveColor: string | null;
+  introSettings: {
+    enabled: boolean;
+    title: string;
+    description: string;
+    mediaType: "image" | "video";
+    mediaUrl: string;
+    linkUrl: string | null;
+    displaySeconds: number;
+    showSkipButton: boolean;
+  };
 };
 
 const DEFAULT_SETTINGS: SiteSettings = {
@@ -32,11 +42,20 @@ const DEFAULT_SETTINGS: SiteSettings = {
   logoUrl: null,
   primaryColor: "#d97706",
   secondaryColor: "#b91c1c",
-  withdrawRejoinDays: 0,
   homeCarouselFlowSpeed: 50,
   headerBgColor: null,
   headerTextColor: null,
   headerActiveColor: null,
+  introSettings: {
+    enabled: false,
+    title: SITE_NAME,
+    description: "",
+    mediaType: "image",
+    mediaUrl: "",
+    linkUrl: null,
+    displaySeconds: 4,
+    showSkipButton: true,
+  },
 };
 
 export default function AdminSiteSettingsPage() {
@@ -66,8 +85,6 @@ export default function AdminSiteSettingsPage() {
           logoUrl: data.logoUrl ?? null,
           primaryColor: data.primaryColor ?? DEFAULT_SETTINGS.primaryColor,
           secondaryColor: data.secondaryColor ?? DEFAULT_SETTINGS.secondaryColor,
-          withdrawRejoinDays:
-            typeof data.withdrawRejoinDays === "number" ? data.withdrawRejoinDays : DEFAULT_SETTINGS.withdrawRejoinDays,
           homeCarouselFlowSpeed:
             typeof data.homeCarouselFlowSpeed === "number"
               ? data.homeCarouselFlowSpeed
@@ -75,6 +92,16 @@ export default function AdminSiteSettingsPage() {
           headerBgColor: data.headerBgColor ?? null,
           headerTextColor: data.headerTextColor ?? null,
           headerActiveColor: data.headerActiveColor ?? null,
+          introSettings: {
+            enabled: Boolean(data.introSettings?.enabled),
+            title: String(data.introSettings?.title ?? SITE_NAME),
+            description: String(data.introSettings?.description ?? ""),
+            mediaType: data.introSettings?.mediaType === "video" ? "video" : "image",
+            mediaUrl: String(data.introSettings?.mediaUrl ?? ""),
+            linkUrl: typeof data.introSettings?.linkUrl === "string" ? data.introSettings.linkUrl : null,
+            displaySeconds: Math.max(1, Math.min(30, Number(data.introSettings?.displaySeconds) || 4)),
+            showSkipButton: data.introSettings?.showSkipButton !== false,
+          },
         });
       })
       .catch(() => setForm(DEFAULT_SETTINGS))
@@ -85,6 +112,10 @@ export default function AdminSiteSettingsPage() {
     e.preventDefault();
     setError("");
     setSuccess(false);
+    if (form.introSettings.enabled && !form.introSettings.mediaUrl.trim()) {
+      setError("인트로 사용 시 미디어 첨부(이미지 또는 영상 URL)는 필수입니다.");
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/site-settings", {
@@ -96,11 +127,20 @@ export default function AdminSiteSettingsPage() {
           logoUrl: form.logoUrl,
           primaryColor: form.primaryColor,
           secondaryColor: form.secondaryColor,
-          withdrawRejoinDays: Math.max(0, Math.floor(Number(form.withdrawRejoinDays)) || 0),
           homeCarouselFlowSpeed: Math.max(1, Math.min(100, Math.floor(Number(form.homeCarouselFlowSpeed)) || 50)),
           headerBgColor: form.headerBgColor?.trim() || null,
           headerTextColor: form.headerTextColor?.trim() || null,
           headerActiveColor: form.headerActiveColor?.trim() || null,
+          introSettings: {
+            enabled: Boolean(form.introSettings.enabled),
+            title: form.introSettings.title.trim() || SITE_NAME,
+            description: form.introSettings.description.trim(),
+            mediaType: form.introSettings.mediaType,
+            mediaUrl: form.introSettings.mediaUrl.trim(),
+            linkUrl: form.introSettings.linkUrl?.trim() || null,
+            displaySeconds: Math.max(1, Math.min(30, Math.floor(Number(form.introSettings.displaySeconds)) || 4)),
+            showSkipButton: Boolean(form.introSettings.showSkipButton),
+          },
         }),
       });
       if (!res.ok) {
@@ -121,11 +161,11 @@ export default function AdminSiteSettingsPage() {
     return (
       <SectionMain>
         <p className="mb-4 text-sm">
-          <Link href="/admin/site" className="text-site-primary hover:underline">
-            ← 사이트관리 홈
+          <Link href="/admin" className="text-site-primary hover:underline">
+            ← 관리자 홈
           </Link>
         </p>
-        <SectionTitleLineWithButton icon={mdiPalette} title="디자인/브랜드 설정" />
+        <SectionTitleLineWithButton icon={mdiPalette} title="헤더 / 푸터 / 인트로 관리" />
         <CardBox>
           <p className="text-gray-500 dark:text-slate-400">불러오는 중...</p>
         </CardBox>
@@ -136,25 +176,23 @@ export default function AdminSiteSettingsPage() {
   return (
     <SectionMain>
       <p className="mb-4 text-sm">
-        <Link href="/admin/site" className="text-site-primary hover:underline">
-          ← 사이트관리 홈
+        <Link href="/admin" className="text-site-primary hover:underline">
+          ← 관리자 홈
         </Link>
       </p>
-      <SectionTitleLineWithButton icon={mdiPalette} title="디자인/브랜드 설정" />
+      <SectionTitleLineWithButton icon={mdiPalette} title="헤더 / 푸터 / 인트로 관리" />
       <p className="mb-6 text-sm text-gray-600 dark:text-slate-400 max-w-3xl">
-        전역 브랜드·헤더·홈 캐러셀 속도·가입/탈퇴 정책(일수)만 설정합니다.{" "}
+        헤더(로고/메뉴 색상), 푸터(회사 정보/링크/SNS), 인트로(ON/OFF/첨부 미디어)를 이 화면에서 관리합니다.{" "}
         <strong>검증된 색 조합(프리셋)</strong>은{" "}
         <Link href="/admin/site/color-theme" className="font-medium text-site-primary hover:underline">
-          색상 테마
+          색상 / 테마
         </Link>
-        에서 선택하세요. 메인/보조 색을 직접 바꾸면 프리셋은 해제됩니다.{" "}
-        <strong>히어로</strong>는「홈 화면 설정 → 히어로 설정」, <strong>커뮤니티 정책</strong>은「커뮤니티 설정」,
-        <strong>문구</strong>는「문구 관리」에서 다룹니다. 저장 후 공개 사이트 레이아웃 캐시(최대 약 60초) 반영 지연이 있을 수 있습니다.
+        에서 선택하세요. 저장 후 공개 사이트 반영에는 최대 약 60초 캐시 지연이 있을 수 있습니다.
       </p>
       <CardBox className="max-w-3xl">
         <form onSubmit={handleSubmit} className="space-y-10">
           <section className="space-y-4">
-            <h2 className="text-base font-semibold text-site-text border-b border-site-border pb-2">브랜드</h2>
+            <h2 className="text-base font-semibold text-site-text border-b border-site-border pb-2">헤더</h2>
             <div>
               <label className="block text-sm font-medium text-site-text mb-1">사이트명</label>
               <input
@@ -197,6 +235,136 @@ export default function AdminSiteSettingsPage() {
                 helperText="보조 강조색입니다."
               />
             </div>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-base font-semibold text-site-text border-b border-site-border pb-2">인트로</h2>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.introSettings.enabled}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    introSettings: { ...f.introSettings, enabled: e.target.checked },
+                  }))
+                }
+              />
+              인트로 사용 여부
+            </label>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-site-text">제목</span>
+                <input
+                  type="text"
+                  value={form.introSettings.title}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, introSettings: { ...f.introSettings, title: e.target.value } }))
+                  }
+                  className="rounded-lg border border-site-border bg-white px-3 py-2 text-site-text"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-site-text">표시 시간(초)</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={form.introSettings.displaySeconds}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      introSettings: {
+                        ...f.introSettings,
+                        displaySeconds: Math.max(1, Math.min(30, parseInt(e.target.value, 10) || 4)),
+                      },
+                    }))
+                  }
+                  className="w-28 rounded-lg border border-site-border bg-white px-3 py-2 text-site-text"
+                />
+              </label>
+            </div>
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-site-text">설명</span>
+              <textarea
+                rows={2}
+                value={form.introSettings.description}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, introSettings: { ...f.introSettings, description: e.target.value } }))
+                }
+                className="rounded-lg border border-site-border bg-white px-3 py-2 text-site-text"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-site-text">미디어 유형</span>
+              <select
+                value={form.introSettings.mediaType}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    introSettings: { ...f.introSettings, mediaType: e.target.value as "image" | "video" },
+                  }))
+                }
+                className="max-w-[220px] rounded-lg border border-site-border bg-white px-3 py-2 text-site-text"
+              >
+                <option value="image">이미지</option>
+                <option value="video">영상</option>
+              </select>
+            </label>
+            {form.introSettings.mediaType === "image" ? (
+              <div>
+                <AdminImageField
+                  label="미디어 첨부 (이미지 필수)"
+                  value={form.introSettings.mediaUrl || null}
+                  onChange={(url) =>
+                    setForm((f) => ({ ...f, introSettings: { ...f.introSettings, mediaUrl: url ?? "" } }))
+                  }
+                  policy="banner"
+                  recommendedSize="1920x1080"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
+                  업로드 기반 사용(권장) / 자동 리사이즈·압축 / 권장 비율 16:9
+                </p>
+              </div>
+            ) : (
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-site-text">영상 URL (필수)</span>
+                <input
+                  type="url"
+                  value={form.introSettings.mediaUrl}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, introSettings: { ...f.introSettings, mediaUrl: e.target.value } }))
+                  }
+                  className="rounded-lg border border-site-border bg-white px-3 py-2 text-site-text"
+                  placeholder="https://..."
+                />
+              </label>
+            )}
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-site-text">링크 (선택)</span>
+              <input
+                type="url"
+                value={form.introSettings.linkUrl ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, introSettings: { ...f.introSettings, linkUrl: e.target.value || null } }))
+                }
+                className="rounded-lg border border-site-border bg-white px-3 py-2 text-site-text"
+                placeholder="https://..."
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.introSettings.showSkipButton}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    introSettings: { ...f.introSettings, showSkipButton: e.target.checked },
+                  }))
+                }
+              />
+              스킵 버튼 표시
+            </label>
           </section>
 
           <section id="header-menu-colors" className="space-y-4 scroll-mt-24">
@@ -253,33 +421,17 @@ export default function AdminSiteSettingsPage() {
             </div>
           </section>
 
-          <section className="space-y-4">
-            <h2 className="text-base font-semibold text-site-text border-b border-site-border pb-2">가입 · 회원 (전역)</h2>
-            <div>
-              <label className="block text-sm font-medium text-site-text mb-1">회원탈퇴 후 재가입 가능 기간 (일)</label>
-              <input
-                type="number"
-                min={0}
-                value={form.withdrawRejoinDays}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    withdrawRejoinDays: Math.max(0, parseInt(e.target.value, 10) || 0),
-                  }))
-                }
-                className="w-24 rounded-lg border border-site-border bg-white px-3 py-2 text-site-text"
-              />
-              <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">0이면 즉시 재가입 가능합니다.</p>
-            </div>
-          </section>
-
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button type="submit" label={saving ? "저장중" : "저장"} color="info" disabled={saving} />
-            <Button href="/admin/site" label="취소" color="contrast" outline />
+            <Button href="/admin" label="취소" color="contrast" outline />
             {error && <NotificationBar color="danger">{error}</NotificationBar>}
             {success && <NotificationBar color="success">저장되었습니다.</NotificationBar>}
           </div>
         </form>
+      </CardBox>
+      <CardBox className="mt-6 max-w-4xl">
+        <h2 className="mb-4 text-base font-semibold text-site-text">푸터</h2>
+        <FooterSettingsForm />
       </CardBox>
     </SectionMain>
   );

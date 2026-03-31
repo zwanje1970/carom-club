@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import {
   duplicatePageSection,
-  getPageSectionById,
+  getPageSectionByIdForAdmin,
   getPageSectionsForAdminLayoutPage,
   movePageSectionToPage,
   restorePageSection,
@@ -20,12 +19,6 @@ import { parseSectionStyleJson } from "@/lib/section-style";
 import type { PageSlug, PlacementSlug } from "@/types/page-section";
 
 const BUILDER_PAGES: PageSlug[] = ["home", "community", "tournaments"];
-
-function revalidatePublicForPage(page: PageSlug) {
-  revalidatePath("/", "layout");
-  if (page === "community") revalidatePath("/community", "layout");
-  if (page === "tournaments") revalidatePath("/tournaments", "layout");
-}
 
 /** 관리자: 페이지별 섹션 전체 목록(빌더용) */
 export async function GET(request: Request) {
@@ -122,7 +115,6 @@ export async function PATCH(request: Request) {
     }
     try {
       await setPageSectionOrderForPage(page, orderedIds);
-      revalidatePublicForPage(page);
       return NextResponse.json({ ok: true });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
@@ -147,7 +139,6 @@ export async function PATCH(request: Request) {
       if (!updated) {
         return NextResponse.json({ error: "섹션을 찾을 수 없습니다." }, { status: 404 });
       }
-      revalidatePublicForPage(updated.page);
       return NextResponse.json(updated);
     } catch (e) {
       console.error("[content/page-layout] visibility error:", e);
@@ -161,11 +152,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "id, targetPage가 필요합니다." }, { status: 400 });
     }
     try {
-      const beforeMove = await getPageSectionById(id.trim());
-      const sourcePage = beforeMove?.page ?? null;
       const updated = await movePageSectionToPage(id.trim(), targetPage);
-      if (sourcePage && sourcePage !== targetPage) revalidatePublicForPage(sourcePage as PageSlug);
-      revalidatePublicForPage(targetPage);
       return NextResponse.json(updated);
     } catch (e) {
       const m = mapSectionLayoutError(e);
@@ -184,7 +171,6 @@ export async function PATCH(request: Request) {
     }
     try {
       const created = await duplicatePageSection(id.trim(), targetPage);
-      revalidatePublicForPage(targetPage);
       return NextResponse.json(created);
     } catch (e) {
       const m = mapSectionLayoutError(e);
@@ -203,7 +189,6 @@ export async function PATCH(request: Request) {
       if (!updated) {
         return NextResponse.json({ error: "섹션을 찾을 수 없습니다." }, { status: 404 });
       }
-      revalidatePublicForPage(updated.page);
       return NextResponse.json(updated);
     } catch (e) {
       console.error("[content/page-layout] softDeleteSection error:", e);
@@ -221,7 +206,6 @@ export async function PATCH(request: Request) {
       if (!updated) {
         return NextResponse.json({ error: "섹션을 찾을 수 없습니다." }, { status: 404 });
       }
-      revalidatePublicForPage(updated.page);
       return NextResponse.json(updated);
     } catch (e) {
       console.error("[content/page-layout] restoreSection error:", e);
@@ -249,7 +233,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "유효하지 않은 placement입니다." }, { status: 400 });
     }
     try {
-      const existing = await getPageSectionById(id.trim());
+      const existing = await getPageSectionByIdForAdmin(id.trim());
       if (!existing) {
         return NextResponse.json({ error: "섹션을 찾을 수 없습니다." }, { status: 404 });
       }
@@ -313,7 +297,6 @@ export async function PATCH(request: Request) {
       if (!updated) {
         return NextResponse.json({ error: "섹션을 찾을 수 없습니다." }, { status: 404 });
       }
-      revalidatePublicForPage(updated.page);
       return NextResponse.json(updated);
     } catch (e) {
       const m = mapSectionLayoutError(e);

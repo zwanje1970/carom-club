@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { getSiteSettings, updateSiteSettings, SITE_NAME } from "@/lib/site-settings";
+import { getSiteSettings, updateSiteSettings, SITE_NAME, type IntroSettings } from "@/lib/site-settings";
 import {
   SITE_CUSTOM_COLOR_THEME_PRESET,
   parseSiteThemeCustomTokens,
@@ -26,6 +26,16 @@ export async function GET() {
         colorThemeCustom: null,
         homeCarouselFlowSpeed: 50,
         minSolutionLevelForUser: 1,
+        introSettings: {
+          enabled: false,
+          title: SITE_NAME,
+          description: "",
+          mediaType: "image",
+          mediaUrl: "",
+          linkUrl: null,
+          displaySeconds: 4,
+          showSkipButton: true,
+        } satisfies IntroSettings,
       },
       { status: 200 }
     );
@@ -49,6 +59,7 @@ export async function PUT(request: Request) {
     headerTextColor?: string | null;
     headerActiveColor?: string | null;
     homeCarouselFlowSpeed?: number;
+    introSettings?: IntroSettings;
     colorThemePreset?: SiteColorThemeId | typeof SITE_CUSTOM_COLOR_THEME_PRESET | null;
     colorThemeCustom?: SiteThemeCssTokens | null;
   };
@@ -83,6 +94,7 @@ export async function PUT(request: Request) {
       headerTextColor: body.headerTextColor,
       headerActiveColor: body.headerActiveColor,
       homeCarouselFlowSpeed: body.homeCarouselFlowSpeed,
+      introSettings: body.introSettings,
       colorThemePreset: body.colorThemePreset,
       colorThemeCustom: body.colorThemeCustom,
     });

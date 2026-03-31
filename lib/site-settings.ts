@@ -14,7 +14,6 @@ import {
   SITE_CUSTOM_COLOR_THEME_PRESET,
   parseSiteThemeCustomTokens,
   themePrimarySecondaryForPreset,
-  type SiteColorThemeId,
   type SiteColorThemeMode,
   type SiteThemeCssTokens,
 } from "@/lib/site-color-themes";
@@ -49,7 +48,19 @@ export type SiteSettings = {
   headerBgColor: string | null;
   headerTextColor: string | null;
   headerActiveColor: string | null;
+  introSettings: IntroSettings;
   footer: FooterSettings;
+};
+
+export type IntroSettings = {
+  enabled: boolean;
+  title: string;
+  description: string;
+  mediaType: "image" | "video";
+  mediaUrl: string;
+  linkUrl: string | null;
+  displaySeconds: number;
+  showSkipButton: boolean;
 };
 
 const DEFAULTS: SiteSettings = {
@@ -66,6 +77,16 @@ const DEFAULTS: SiteSettings = {
   headerBgColor: null,
   headerTextColor: null,
   headerActiveColor: null,
+  introSettings: {
+    enabled: false,
+    title: "CAROM.CLUB",
+    description: "",
+    mediaType: "image",
+    mediaUrl: "",
+    linkUrl: null,
+    displaySeconds: 4,
+    showSkipButton: true,
+  },
   footer: {
     footerEnabled: false,
     footerBgColor: null,
@@ -128,6 +149,7 @@ type SiteSettingRow = {
   secondaryColor: string;
   colorThemePreset?: string | null;
   colorThemeCustomJson?: string | null;
+  introSettingsJson?: string | null;
   withdrawRejoinDays?: number;
   homeCarouselFlowSpeed?: number;
   minSolutionLevelForUser?: number;
@@ -159,43 +181,86 @@ type SiteSettingRow = {
  * (`SiteSetting` 에 컬럼이 생기면 마이그레이션과 함께 이 목록을 갱신)
  */
 async function querySiteSettingFullRowById(id: string): Promise<SiteSettingRow | null> {
-  const rows = await prisma.$queryRaw<SiteSettingRow[]>`
-    SELECT
-      "id",
-      "siteName",
-      "siteDescription",
-      "logoUrl",
-      "primaryColor",
-      "secondaryColor",
-      "updatedAt",
-      "heroSettingsJson",
-      "withdrawRejoinDays",
-      "footerAddress",
-      "footerBgColor",
-      "footerBusinessNumber",
-      "footerCeoName",
-      "footerCompanyName",
-      "footerCopyright",
-      "footerEmail",
-      "footerEnabled",
-      "footerPartnersJson",
-      "footerPhone",
-      "footerTextColor",
-      "footerTitle",
-      "headerActiveColor",
-      "headerBgColor",
-      "headerTextColor",
-      "footerFontSize",
-      "footerFontSizesJson",
-      "footerFontFamiliesJson",
-      "homeCarouselFlowSpeed",
-      "minSolutionLevelForUser",
-      "colorThemePreset",
-      "colorThemeCustomJson"
-    FROM "SiteSetting"
-    WHERE "id" = ${id}
-  `;
-  return rows[0] ?? null;
+  try {
+    const rows = await prisma.$queryRaw<SiteSettingRow[]>`
+      SELECT
+        "id",
+        "siteName",
+        "siteDescription",
+        "logoUrl",
+        "primaryColor",
+        "secondaryColor",
+        "updatedAt",
+        "heroSettingsJson",
+        "withdrawRejoinDays",
+        "footerAddress",
+        "footerBgColor",
+        "footerBusinessNumber",
+        "footerCeoName",
+        "footerCompanyName",
+        "footerCopyright",
+        "footerEmail",
+        "footerEnabled",
+        "footerPartnersJson",
+        "footerPhone",
+        "footerTextColor",
+        "footerTitle",
+        "headerActiveColor",
+        "headerBgColor",
+        "headerTextColor",
+        "introSettingsJson",
+        "footerFontSize",
+        "footerFontSizesJson",
+        "footerFontFamiliesJson",
+        "homeCarouselFlowSpeed",
+        "minSolutionLevelForUser",
+        "colorThemePreset",
+        "colorThemeCustomJson"
+      FROM "SiteSetting"
+      WHERE "id" = ${id}
+    `;
+    return rows[0] ?? null;
+  } catch {
+    const rows = await prisma.$queryRaw<SiteSettingRow[]>`
+      SELECT
+        "id",
+        "siteName",
+        "siteDescription",
+        "logoUrl",
+        "primaryColor",
+        "secondaryColor",
+        "updatedAt",
+        "heroSettingsJson",
+        "withdrawRejoinDays",
+        "footerAddress",
+        "footerBgColor",
+        "footerBusinessNumber",
+        "footerCeoName",
+        "footerCompanyName",
+        "footerCopyright",
+        "footerEmail",
+        "footerEnabled",
+        "footerPartnersJson",
+        "footerPhone",
+        "footerTextColor",
+        "footerTitle",
+        "headerActiveColor",
+        "headerBgColor",
+        "headerTextColor",
+        "footerFontSize",
+        "footerFontSizesJson",
+        "footerFontFamiliesJson",
+        "homeCarouselFlowSpeed",
+        "minSolutionLevelForUser",
+        "colorThemePreset",
+        "colorThemeCustomJson"
+      FROM "SiteSetting"
+      WHERE "id" = ${id}
+    `;
+    const row = rows[0] ?? null;
+    if (!row) return null;
+    return { ...row, introSettingsJson: null };
+  }
 }
 
 type ThemeExisting = {
@@ -229,6 +294,23 @@ function presetAndCustomFromRow(row: SiteSettingRow): {
     return { colorThemePreset: presetRaw, colorThemeCustom: null };
   }
   return { colorThemePreset: null, colorThemeCustom: null };
+}
+
+function normalizeIntroSettings(input: unknown): IntroSettings {
+  if (!input || typeof input !== "object") return DEFAULTS.introSettings;
+  const raw = input as Record<string, unknown>;
+  const mediaType = raw.mediaType === "video" ? "video" : "image";
+  const displaySeconds = Math.max(1, Math.min(30, Math.floor(Number(raw.displaySeconds)) || 4));
+  return {
+    enabled: Boolean(raw.enabled),
+    title: typeof raw.title === "string" ? raw.title : DEFAULTS.introSettings.title,
+    description: typeof raw.description === "string" ? raw.description : "",
+    mediaType,
+    mediaUrl: typeof raw.mediaUrl === "string" ? raw.mediaUrl : "",
+    linkUrl: typeof raw.linkUrl === "string" && raw.linkUrl.trim() ? raw.linkUrl : null,
+    displaySeconds,
+    showSkipButton: raw.showSkipButton === undefined ? true : Boolean(raw.showSkipButton),
+  };
 }
 
 /** 색상 테마 프리셋·커스텀 JSON·수동 primary/secondary 병합 (PUT 본문 기준) */
@@ -304,6 +386,13 @@ function dbRowToSettings(row: SiteSettingRow): SiteSettings {
     Math.max(1, Math.floor(Number(row.minSolutionLevelForUser ?? DEFAULTS.minSolutionLevelForUser)) || 1)
   );
   const { colorThemePreset, colorThemeCustom } = presetAndCustomFromRow(row);
+  let introSettings = DEFAULTS.introSettings;
+  try {
+    const parsed = row.introSettingsJson ? JSON.parse(row.introSettingsJson) : null;
+    introSettings = normalizeIntroSettings(parsed);
+  } catch {
+    introSettings = DEFAULTS.introSettings;
+  }
   return {
     siteName: row.siteName,
     siteDescription: row.siteDescription,
@@ -318,6 +407,7 @@ function dbRowToSettings(row: SiteSettingRow): SiteSettings {
     headerBgColor: row.headerBgColor ?? null,
     headerTextColor: row.headerTextColor ?? null,
     headerActiveColor: row.headerActiveColor ?? null,
+    introSettings,
     footer,
   };
 }
@@ -327,7 +417,12 @@ export async function updateSiteSettings(
 ): Promise<SiteSettings> {
   if (!isDatabaseConfigured()) {
     const themePatch = mergeThemePatch(data, null);
-    return { ...DEFAULTS, ...data, ...themePatch };
+    return {
+      ...DEFAULTS,
+      ...data,
+      ...themePatch,
+      introSettings: data.introSettings ? normalizeIntroSettings(data.introSettings) : DEFAULTS.introSettings,
+    };
   }
   const existing = await prisma.siteSetting.findFirst({
     orderBy: { updatedAt: "desc" },
@@ -349,6 +444,10 @@ export async function updateSiteSettings(
   const headerBgColor = headerPayload?.headerBgColor ?? null;
   const headerTextColor = headerPayload?.headerTextColor ?? null;
   const headerActiveColor = headerPayload?.headerActiveColor ?? null;
+  const introSettingsJson =
+    data.introSettings !== undefined
+      ? JSON.stringify(normalizeIntroSettings(data.introSettings))
+      : undefined;
 
   const existingRow = existing ? await querySiteSettingFullRowById(existing.id) : null;
   const themeExisting: ThemeExisting = existingRow
@@ -383,13 +482,14 @@ export async function updateSiteSettings(
         WHERE "id" = ${created.id}
       `;
     }
-    if (headerPayload || minSolutionLevelForUser !== undefined) {
+    if (headerPayload || minSolutionLevelForUser !== undefined || introSettingsJson !== undefined) {
       await prisma.$executeRaw`
         UPDATE "SiteSetting"
         SET "headerBgColor" = ${headerBgColor},
             "headerTextColor" = ${headerTextColor},
             "headerActiveColor" = ${headerActiveColor},
             "minSolutionLevelForUser" = ${minSolutionLevelForUser ?? DEFAULTS.minSolutionLevelForUser},
+            "introSettingsJson" = COALESCE(${introSettingsJson}, "introSettingsJson"),
             "updatedAt" = ${new Date()}
         WHERE "id" = ${created.id}
       `;
@@ -432,13 +532,14 @@ export async function updateSiteSettings(
       WHERE "id" = ${existing.id}
     `;
   }
-  if (headerPayload || minSolutionLevelForUser !== undefined) {
+  if (headerPayload || minSolutionLevelForUser !== undefined || introSettingsJson !== undefined) {
     await prisma.$executeRaw`
       UPDATE "SiteSetting"
       SET "headerBgColor" = CASE WHEN ${headerPayload !== null} THEN ${headerBgColor} ELSE "headerBgColor" END,
           "headerTextColor" = CASE WHEN ${headerPayload !== null} THEN ${headerTextColor} ELSE "headerTextColor" END,
           "headerActiveColor" = CASE WHEN ${headerPayload !== null} THEN ${headerActiveColor} ELSE "headerActiveColor" END,
           "minSolutionLevelForUser" = COALESCE(${minSolutionLevelForUser}, "minSolutionLevelForUser"),
+          "introSettingsJson" = COALESCE(${introSettingsJson}, "introSettingsJson"),
           "updatedAt" = ${new Date()}
       WHERE "id" = ${existing.id}
     `;

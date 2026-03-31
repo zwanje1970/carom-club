@@ -28,7 +28,7 @@ export function getHomeSlotContentGuide(slotType: HomeStructureSlotType): HomeSl
       return {
         summary: "난구노트·난구해결사 진입 카드는 사이트 정책과 커뮤니티 콘텐츠와 연동됩니다.",
         links: [
-          { href: "/admin/site/community", label: "커뮤니티 설정" },
+          { href: "/admin/members", label: "회원·권한 관리" },
           { href: "/community/nangu", label: "사이트에서 미리보기" },
         ],
       };

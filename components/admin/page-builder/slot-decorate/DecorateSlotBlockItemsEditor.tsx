@@ -1,6 +1,7 @@
 "use client";
 
 import Button from "@/components/admin/_components/Button";
+import { AdminImageField } from "@/components/admin/_components/AdminImageField";
 import type { HomeStructureSlotType } from "@/lib/home-structure-slots";
 import type { SlotBlockItemsBundle, SlotBlockManualItem, SlotBlockManualEntryRole } from "@/lib/slot-block-items";
 import {
@@ -49,7 +50,20 @@ function ItemEditor({
         />
       </div>
       <div>
-        <FieldLabel>이미지 주소 (URL)</FieldLabel>
+        <FieldLabel>이미지 첨부 (권장)</FieldLabel>
+        <AdminImageField
+          label="카드 이미지"
+          value={item.imageUrl ?? null}
+          onChange={(url) => onPatch({ imageUrl: url ?? null })}
+          policy="section"
+          recommendedSize="1200x675"
+        />
+        <p className="mt-1 text-[11px] text-gray-500 dark:text-slate-500">
+          권장 크기 1200x675 · 최대 용량 2MB · JPG/PNG/WEBP · 비율이 다르면 잘릴 수 있습니다.
+        </p>
+      </div>
+      <div>
+        <FieldLabel>이미지 URL (보조 입력)</FieldLabel>
         <input
           className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-900"
           value={item.imageUrl ?? ""}

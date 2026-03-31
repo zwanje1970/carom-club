@@ -23,6 +23,12 @@ import {
   type PageBuilderKey,
   isSectionAllowedOnPage,
 } from "./page-section-page-rules";
+import {
+  getDraftSectionsForPage,
+  isCmsPageDraftKey,
+  loadDraftOrPublishedForAdmin,
+  upsertDraftSections,
+} from "./cms-page-draft";
 import type { PageSection, PageSlug, PlacementSlug } from "@/types/page-section";
 import type { Popup } from "@/types/popup";
 import type { NoticeBar } from "@/types/notice-bar";
@@ -132,7 +138,28 @@ export async function getNoticeBarsForPage(page: NoticeBarPageSlug): Promise<Not
 export async function getAllPageSections(): Promise<PageSection[]> {
   const mock = [...mockPageSections].sort((a, b) => a.sortOrder - b.sortOrder);
   if (!isDatabaseConfigured()) return mock;
-  return withFallback(() => db.getAllPageSectionsFromDb(), mock);
+  return withFallback(async () => {
+    const fromDb = await db.getAllPageSectionsFromDb();
+    const merged: PageSection[] = [];
+    const builderKeys = new Set<string>(PAGE_BUILDER_KEYS as unknown as string[]);
+    for (const p of PAGE_BUILDER_KEYS) {
+      const draft = await getDraftSectionsForPage(p);
+      if (draft) {
+        merged.push(...draft);
+      } else {
+        merged.push(...fromDb.filter((s) => s.page === p));
+      }
+    }
+    for (const row of fromDb) {
+      if (!builderKeys.has(row.page)) {
+        merged.push(row);
+      }
+    }
+    return merged.sort((a, b) => {
+      if (a.page !== b.page) return a.page.localeCompare(b.page);
+      return a.sortOrder - b.sortOrder;
+    });
+  }, mock);
 }
 
 export async function getAllPopups(): Promise<Popup[]> {
@@ -154,6 +181,31 @@ export async function getPageSectionById(id: string): Promise<PageSection | null
   return withFallback(() => db.getPageSectionByIdFromDb(id), mock);
 }
 
+/** 관리자용: 빌더 페이지 초안에만 있는 행은 DB 조회로는 없을 수 있음 → 초안에서 우선 조회 */
+export async function getPageSectionByIdForAdmin(id: string): Promise<PageSection | null> {
+  if (!isDatabaseConfigured()) {
+    return getPageSectionById(id);
+  }
+  try {
+    for (const page of PAGE_BUILDER_KEYS) {
+      const draft = await getDraftSectionsForPage(page);
+      if (draft) {
+        const found = draft.find((s) => s.id === id);
+        if (found) return found;
+      }
+    }
+    return await db.getPageSectionByIdFromDb(id);
+  } catch (e) {
+    console.warn("[content/service] getPageSectionByIdForAdmin:", (e as Error)?.message ?? e);
+    return getPageSectionById(id);
+  }
+}
+
+function stripSectionForSave(s: PageSection): Omit<PageSection, "createdAt" | "updatedAt"> {
+  const { createdAt: _c, updatedAt: _u, ...rest } = s;
+  return rest;
+}
+
 export async function getPopupById(id: string): Promise<Popup | null> {
   const mock = mockPopups.find((p) => p.id === id) ?? null;
   if (!isDatabaseConfigured()) return mock;
@@ -166,10 +218,30 @@ export async function getNoticeBarById(id: string): Promise<NoticeBar | null> {
   return withFallback(() => db.getNoticeBarByIdFromDb(id), mock);
 }
 
-/** 저장 (create or update). DB 연결 시에만 반영됨. */
+async function savePageSectionToDraft(
+  data: Omit<PageSection, "createdAt" | "updatedAt">
+): Promise<PageSection> {
+  const sections = await loadDraftOrPublishedForAdmin(data.page as PageBuilderKey);
+  const idx = sections.findIndex((s) => s.id === data.id);
+  const t = now();
+  const row: PageSection = {
+    ...data,
+    createdAt: idx >= 0 ? sections[idx].createdAt : t,
+    updatedAt: t,
+  };
+  const next =
+    idx >= 0 ? sections.map((s) => (s.id === data.id ? row : s)) : [...sections, row];
+  await upsertDraftSections(data.page as PageBuilderKey, next);
+  return row;
+}
+
+/** 저장 (create or update). DB 연결 시 빌더 페이지(home·커뮤니티·대회)는 초안 스냅샷에만 기록되고, 게시 시 공개에 반영됨. */
 export async function savePageSection(
   data: Omit<PageSection, "createdAt" | "updatedAt">
 ): Promise<PageSection> {
+  if (isDatabaseConfigured() && isCmsPageDraftKey(data.page)) {
+    return savePageSectionToDraft(data);
+  }
   if (isDatabaseConfigured()) {
     return db.upsertPageSectionInDb(data);
   }
@@ -208,6 +280,15 @@ export async function saveNoticeBar(
 
 export async function deletePageSection(id: string): Promise<void> {
   if (isDatabaseConfigured()) {
+    const existing = await getPageSectionByIdForAdmin(id);
+    if (existing && isCmsPageDraftKey(existing.page)) {
+      const sections = await loadDraftOrPublishedForAdmin(existing.page);
+      await upsertDraftSections(
+        existing.page,
+        sections.filter((s) => s.id !== id)
+      );
+      return;
+    }
     await db.deletePageSectionInDb(id);
   } else {
     deleteMockPageSectionFromStore(id);
@@ -216,6 +297,14 @@ export async function deletePageSection(id: string): Promise<void> {
 
 export async function softDeletePageSection(id: string): Promise<PageSection | null> {
   if (isDatabaseConfigured()) {
+    const existing = await getPageSectionByIdForAdmin(id);
+    if (!existing) return null;
+    if (isCmsPageDraftKey(existing.page)) {
+      return savePageSection({
+        ...stripSectionForSave(existing),
+        deletedAt: new Date().toISOString(),
+      });
+    }
     return db.softDeletePageSectionInDb(id);
   }
   return softDeleteMockPageSection(id);
@@ -223,6 +312,14 @@ export async function softDeletePageSection(id: string): Promise<PageSection | n
 
 export async function restorePageSection(id: string): Promise<PageSection | null> {
   if (isDatabaseConfigured()) {
+    const existing = await getPageSectionByIdForAdmin(id);
+    if (!existing) return null;
+    if (isCmsPageDraftKey(existing.page)) {
+      return savePageSection({
+        ...stripSectionForSave(existing),
+        deletedAt: null,
+      });
+    }
     return db.restorePageSectionInDb(id);
   }
   return restoreMockPageSection(id);
@@ -250,11 +347,31 @@ function compareSectionsForAdminLayout(a: PageSection, b: PageSection): number {
 
 /** 관리자 페이지 빌더: 해당 `page`의 전체 섹션(숨김·기간 무관), 정렬은 sortOrder 우선 */
 export async function getPageSectionsForAdminLayoutPage(page: PageSlug): Promise<PageSection[]> {
+  if (isDatabaseConfigured() && isCmsPageDraftKey(page)) {
+    return loadDraftOrPublishedForAdmin(page);
+  }
   const all = await getAllPageSections();
   return all.filter((s) => s.page === page).sort(compareSectionsForAdminLayout);
 }
 
 export async function setPageSectionOrderForPage(page: PageSlug, orderedIds: string[]): Promise<void> {
+  if (isDatabaseConfigured() && isCmsPageDraftKey(page)) {
+    const sections = await loadDraftOrPublishedForAdmin(page);
+    const map = new Map(sections.map((s) => [s.id, s]));
+    if (orderedIds.length === 0) {
+      if (sections.length !== 0) throw new Error("PAGE_LAYOUT_ORDER_MISMATCH");
+      return;
+    }
+    if (orderedIds.length !== sections.length || orderedIds.some((id) => !map.has(id))) {
+      throw new Error("PAGE_LAYOUT_ORDER_MISMATCH");
+    }
+    const next = orderedIds.map((id, index) => {
+      const s = map.get(id)!;
+      return { ...s, sortOrder: index };
+    });
+    await upsertDraftSections(page, next);
+    return;
+  }
   if (isDatabaseConfigured()) {
     await db.setPageSectionOrderForPageInDb(page, orderedIds);
   } else {
@@ -263,10 +380,13 @@ export async function setPageSectionOrderForPage(page: PageSlug, orderedIds: str
 }
 
 export async function updatePageSectionVisibility(id: string, isVisible: boolean): Promise<PageSection | null> {
-  const existing = await getPageSectionById(id);
+  const existing = await getPageSectionByIdForAdmin(id);
   if (!existing) return null;
   if (!isDatabaseConfigured()) {
-    return savePageSection({ ...existing, isVisible });
+    return savePageSection({ ...stripSectionForSave(existing), isVisible });
+  }
+  if (isCmsPageDraftKey(existing.page)) {
+    return savePageSection({ ...stripSectionForSave(existing), isVisible });
   }
   const updated = await db.updatePageSectionVisibilityInDb(id, isVisible);
   if (!updated) return null;
@@ -285,11 +405,6 @@ const ALL_PLACEMENTS: PlacementSlug[] = [
   "content_bottom",
 ];
 
-function stripSectionForSave(s: PageSection): Omit<PageSection, "createdAt" | "updatedAt"> {
-  const { createdAt: _c, updatedAt: _u, ...rest } = s;
-  return rest;
-}
-
 /** 저장 전 검증용 — 위반 시 throw */
 export function assertPageSectionAllowedOnPage(
   page: PageSlug,
@@ -302,7 +417,7 @@ export function assertPageSectionAllowedOnPage(
 }
 
 export async function movePageSectionToPage(id: string, targetPage: PageSlug): Promise<PageSection> {
-  const existing = await getPageSectionById(id);
+  const existing = await getPageSectionByIdForAdmin(id);
   if (!existing) throw new Error("NOT_FOUND");
   if (!PAGE_BUILDER_KEYS.includes(targetPage as PageBuilderKey)) {
     throw new Error("INVALID_TARGET_PAGE");
@@ -310,6 +425,55 @@ export async function movePageSectionToPage(id: string, targetPage: PageSlug): P
   assertPageSectionAllowedOnPage(targetPage, existing.slotType, existing.type);
   const sourcePage = existing.page;
   if (sourcePage === targetPage) throw new Error("SAME_PAGE");
+
+  if (!isDatabaseConfigured()) {
+    const targetRows = await getPageSectionsForAdminLayoutPage(targetPage);
+    const maxOrder = targetRows.reduce((m, r) => Math.max(m, r.sortOrder), -1);
+    await savePageSection({
+      ...stripSectionForSave(existing),
+      page: targetPage,
+      sortOrder: maxOrder + 1,
+    });
+    const sourceRows = await getPageSectionsForAdminLayoutPage(sourcePage);
+    await setPageSectionOrderForPage(
+      sourcePage,
+      sourceRows.map((r) => r.id)
+    );
+    const result = await getPageSectionByIdForAdmin(id);
+    if (!result) throw new Error("NOT_FOUND");
+    return result;
+  }
+
+  if (!isCmsPageDraftKey(sourcePage) && isCmsPageDraftKey(targetPage)) {
+    await db.deletePageSectionInDb(id);
+    const targetRows = await loadDraftOrPublishedForAdmin(targetPage);
+    const maxOrder = targetRows.reduce((m, r) => Math.max(m, r.sortOrder), -1);
+    return savePageSection({
+      ...stripSectionForSave(existing),
+      page: targetPage,
+      sortOrder: maxOrder + 1,
+    });
+  }
+
+  if (isCmsPageDraftKey(sourcePage) && isCmsPageDraftKey(targetPage)) {
+    const sourceRows = await loadDraftOrPublishedForAdmin(sourcePage);
+    const targetRows = await loadDraftOrPublishedForAdmin(targetPage);
+    const maxOrder = targetRows.reduce((m, r) => Math.max(m, r.sortOrder), -1);
+    const moved: PageSection = {
+      ...existing,
+      page: targetPage,
+      sortOrder: maxOrder + 1,
+      updatedAt: now(),
+    };
+    const nextSource = sourceRows.filter((s) => s.id !== id);
+    const reindexedSource = nextSource.map((s, i) => ({ ...s, sortOrder: i }));
+    const nextTarget = [...targetRows, moved];
+    await upsertDraftSections(sourcePage, reindexedSource);
+    await upsertDraftSections(targetPage, nextTarget);
+    const result = await getPageSectionByIdForAdmin(id);
+    if (!result) throw new Error("NOT_FOUND");
+    return result;
+  }
 
   const targetRows = await getPageSectionsForAdminLayoutPage(targetPage);
   const maxOrder = targetRows.reduce((m, r) => Math.max(m, r.sortOrder), -1);
@@ -328,13 +492,13 @@ export async function movePageSectionToPage(id: string, targetPage: PageSlug): P
     );
   }
 
-  const result = await getPageSectionById(id);
+  const result = await getPageSectionByIdForAdmin(id);
   if (!result) throw new Error("NOT_FOUND");
   return result;
 }
 
 export async function duplicatePageSection(id: string, targetPage: PageSlug): Promise<PageSection> {
-  const existing = await getPageSectionById(id);
+  const existing = await getPageSectionByIdForAdmin(id);
   if (!existing) throw new Error("NOT_FOUND");
   if (!PAGE_BUILDER_KEYS.includes(targetPage as PageBuilderKey)) {
     throw new Error("INVALID_TARGET_PAGE");
@@ -366,7 +530,7 @@ export async function updatePageSectionStructure(
     sectionStyleJson?: string | null;
   }
 ): Promise<PageSection | null> {
-  const existing = await getPageSectionById(id);
+  const existing = await getPageSectionByIdForAdmin(id);
   if (!existing) return null;
   if (patch.placement !== undefined && !ALL_PLACEMENTS.includes(patch.placement)) {
     throw new Error("INVALID_PLACEMENT");
@@ -392,3 +556,10 @@ export async function deleteNoticeBar(id: string): Promise<void> {
     await db.deleteNoticeBarInDb(id);
   }
 }
+
+export {
+  publishCmsPageLayoutDraft,
+  deleteDraftForPage as resetCmsPageDraft,
+  ensureDraftFromPublished,
+  getCmsDraftMetaForPage,
+} from "./cms-page-draft";

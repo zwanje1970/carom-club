@@ -13,7 +13,10 @@ function getSessionSecret(): string {
   );
 }
 
-const SECRET = new TextEncoder().encode(getSessionSecret());
+/** Edge 런타임에서 매 요청마다 읽음 — 모듈 로드 시점에 빈 값이 박히는 빌드/콜드스타트 이슈 완화 */
+function getSessionSecretKey(): Uint8Array {
+  return new TextEncoder().encode(getSessionSecret());
+}
 
 type JwtPayload = {
   role?: string;
@@ -40,7 +43,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
     try {
-      const { payload } = await jwtVerify(token, SECRET);
+      const { payload } = await jwtVerify(token, getSessionSecretKey());
       const raw = payload as unknown as JwtPayload;
       const authChannelRaw = raw.authChannel;
       const authChannel =
@@ -75,7 +78,7 @@ export async function middleware(request: NextRequest) {
       return res;
     }
     try {
-      await jwtVerify(token, SECRET);
+      await jwtVerify(token, getSessionSecretKey());
     } catch {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("next", pathname);

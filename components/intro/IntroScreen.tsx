@@ -3,8 +3,9 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useIntroController } from "./useIntroController";
 import { IntroOverlay } from "./IntroOverlay";
+import type { IntroSettings } from "@/lib/site-settings";
 
-export function IntroScreen() {
+export function IntroScreen({ introSettings }: { introSettings: IntroSettings }) {
   const { stopIntro } = useIntroController();
   const pathname = usePathname();
   const router = useRouter();
@@ -16,5 +17,5 @@ export function IntroScreen() {
     }
   };
 
-  return <IntroOverlay onEnd={handleEnd} />;
+  return <IntroOverlay onEnd={handleEnd} introSettings={introSettings} />;
 }

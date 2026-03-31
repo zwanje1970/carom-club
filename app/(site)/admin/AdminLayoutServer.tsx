@@ -71,7 +71,7 @@ export async function AdminLayoutServer({ children }: Props) {
       userName={session.name ?? session.username ?? "관리자"}
       footer={siteSettings.footer}
     >
-      <div className="w-full min-w-0 max-w-full">{children}</div>
+      <div className="w-full min-w-0">{children}</div>
     </AdminLayout>
   );
 }

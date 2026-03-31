@@ -313,8 +313,8 @@ export default function AdminSiteCopyPage() {
     return (
       <SectionMain>
         <p className="mb-4 text-sm">
-          <Link href="/admin/site/main" className="text-site-primary hover:underline">
-            ← 메인페이지 구성
+          <Link href="/admin/page-builder" className="text-site-primary hover:underline">
+            ← 페이지 빌더
           </Link>
         </p>
         <SectionTitleLineWithButton icon={mdiFormatListBulleted} title="고정문구 · 페이지별 문구" />
@@ -328,18 +328,17 @@ export default function AdminSiteCopyPage() {
   return (
     <SectionMain>
       <p className="mb-4 text-sm">
-        <Link href="/admin/site" className="text-site-primary hover:underline">
-          ← 사이트관리 홈
+        <Link href="/admin" className="text-site-primary hover:underline">
+          ← 관리자 홈
         </Link>
       </p>
       <SectionTitleLineWithButton icon={mdiFormatListBulleted} title="문구 관리" />
       <p className="mb-6 text-sm text-gray-600 dark:text-slate-400 max-w-3xl">
-        메뉴명·페이지 안내·버튼 문구·상태 메시지 등 <strong>사이트 운영 문구</strong>를 다룹니다. 콘텐츠 본문·섹션 데이터는「콘텐츠
-        관리」, 메인 히어로 화면은{" "}
-        <Link href="/admin/site/hero" className="text-site-primary underline font-medium">
-          히어로 설정
+        메뉴명·페이지 안내·버튼 문구·상태 메시지 등 <strong>사이트 운영 문구</strong>를 다룹니다. 콘텐츠 본문·섹션 데이터는{" "}
+        <Link href="/admin/page-builder" className="text-site-primary underline font-medium">
+          페이지 빌더
         </Link>
-        이 정본입니다. 아래 목록에서 일괄 저장(메뉴·문구) 또는 고정문구 행 편집을 사용하세요.
+        가 정본입니다. 아래 목록에서 일괄 저장(메뉴·문구) 또는 고정문구 행 편집을 사용하세요.
       </p>
 
       <CardBox className="mb-6">

@@ -17,6 +17,10 @@ type AdminPageActionsProps = {
   copy?: Record<string, string>;
   /** 액션바 왼쪽에 표시할 요소 (예: 모바일 메뉴 토글) */
   leftSlot?: React.ReactNode;
+  /** 데스크톱 사이드바가 보이지 않을 때 액션바를 왼쪽부터 꽉 채움 */
+  desktopSidebarVisible?: boolean;
+  /** true면 액션바 내부 max-width 제한을 제거 */
+  fullWidth?: boolean;
 };
 
 /** 이전 페이지가 /admin 내부일 때만 history.back(), 아니면 대시보드(/admin)로 이동 (메인으로 나가지 않음) */
@@ -46,7 +50,13 @@ function handleAdminBack(router: ReturnType<typeof useRouter>) {
  * 관리자 본문 상단 공통 액션: 뒤로 가기, 대시보드로 가기
  * 뒤로 가기는 대시보드(/admin) 안에서만 동작, 메인으로는 나가지 않음.
  */
-export function AdminPageActions({ topOffset = 64, copy, leftSlot }: AdminPageActionsProps) {
+export function AdminPageActions({
+  topOffset = 64,
+  copy,
+  leftSlot,
+  desktopSidebarVisible = true,
+  fullWidth = false,
+}: AdminPageActionsProps) {
   const router = useRouter();
   const c = (copy ?? {}) as Record<AdminCopyKey, string>;
   const backLabel = getCopyValue(c, "admin.common.back");
@@ -54,10 +64,16 @@ export function AdminPageActions({ topOffset = 64, copy, leftSlot }: AdminPageAc
 
   return (
     <div
-      className={`fixed left-0 right-0 z-[60] ${ACTION_BAR_HEIGHT} flex items-center border-b border-gray-200 bg-gray-50 shadow-sm dark:border-slate-600 dark:bg-slate-800 lg:left-[280px]`}
+      className={`fixed left-0 right-0 z-[60] ${ACTION_BAR_HEIGHT} flex items-center border-b border-gray-200 bg-gray-50 shadow-sm dark:border-slate-600 dark:bg-slate-800 ${
+        desktopSidebarVisible ? "lg:left-[280px]" : "lg:left-0"
+      }`}
       style={{ top: `${topOffset}px` }}
     >
-      <div className={`flex w-full min-w-0 flex-wrap items-center gap-2 px-4 py-1.5 sm:gap-3 sm:px-6 ${containerMaxW} mx-auto`}>
+      <div
+        className={`flex w-full min-w-0 flex-wrap items-center gap-2 ${
+          fullWidth ? "px-2 py-1 sm:px-3" : "px-4 py-1.5 sm:gap-3 sm:px-6"
+        } ${fullWidth ? "" : `${containerMaxW} mx-auto`}`}
+      >
         {leftSlot != null ? <div className="flex shrink-0 items-center">{leftSlot}</div> : null}
         <button
           type="button"

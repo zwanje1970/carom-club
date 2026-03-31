@@ -14,6 +14,14 @@ GitHub/배포는 나중으로 미루고, **로컬에서 안정적으로 실행·
 
 - **Lint:** `.eslintrc.json` 있으면 `npm run lint` 사용 가능. 설정 없으면 나중 작업으로 두어도 됨.
 
+### Next.js `next dev` / `next build` — `.next` 충돌 방지
+
+`next dev`와 `next build`는 **같은 `.next` 디렉터리**를 쓰므로, 동시에 돌리면 `Cannot find module './xxxx.js'` 같은 **서버 청크 불일치**가 날 수 있습니다. **앱/CMS 코드 결함이 아니라 로컬 산출물 충돌**로 본다.
+
+- **`next dev`가 떠 있는 동안 `next build`를 실행하지 않는다.**
+- **`npm run build` 전에는 dev 서버를 완전히 종료한다.**
+- 위 증상이 재발하면 **`.next` 폴더를 삭제**한 뒤(`Remove-Item .next -Recurse -Force` 등) **`npm run dev`를 다시 시작**한다.
+
 ---
 
 ## 2. SESSION_SECRET — 로컬 안전성 / dev·prod 차이

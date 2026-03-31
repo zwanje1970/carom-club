@@ -14,7 +14,7 @@ export function filterPageBlocksForPublicView(rows: PageSection[]): PageSection[
   return rows.filter((s) => s.isVisible && !s.deletedAt && inRange(s.startAt, s.endAt));
 }
 
-/** 레거시 홈 메인 비주얼 CMS 이미지 — 내용은 `/admin/site/hero` JSON 정본만 사용 */
+/** 레거시 홈 메인 비주얼 CMS 이미지 — 내용은 `/admin/site/settings` 인트로/상단 설정 정본만 사용 */
 export function isLegacyHomeHeroCmsBlock(b: PageSection): boolean {
   return (
     b.page === "home" &&

@@ -212,7 +212,7 @@ export default function AdminSiteColorThemePage() {
   return (
     <SectionMain>
       <SectionTitleLineWithButton icon={mdiBrushVariant} title="색상 테마">
-        <Button href="/admin/site/settings" label="디자인/브랜드 설정" color="contrast" small />
+        <Button href="/admin/site/settings" label="헤더/푸터/인트로 관리" color="contrast" small />
       </SectionTitleLineWithButton>
       <p className="mb-4 max-w-3xl text-sm text-gray-600 dark:text-slate-400">
         검증된 <strong>프리셋 4종</strong>을 그대로 쓰거나, 프리셋을 복제한 뒤 색을 직접 조정한{" "}

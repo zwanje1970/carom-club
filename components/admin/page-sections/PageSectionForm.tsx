@@ -225,8 +225,8 @@ export function PageSectionForm({ initial, onSubmit, onCancel }: Props) {
           <p className="font-medium">메인 비주얼 이미지 섹션</p>
           <p className="mt-1 text-blue-900/90 dark:text-blue-200/90">
             상단 히어로 <strong>제목·버튼·오버레이</strong>는{" "}
-            <Link href="/admin/site/hero" className="font-medium text-site-primary underline">
-              사이트관리 → 홈 화면 설정 → 히어로 설정
+            <Link href="/admin/site/settings" className="font-medium text-site-primary underline">
+              사이트관리 → 헤더/푸터/인트로 관리
             </Link>
             의 JSON에서만 편집합니다. 여기서는 본 이미지 섹션(배너·링크·섹션 스타일)만 설정합니다.
           </p>

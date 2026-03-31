@@ -730,6 +730,8 @@ model SiteSetting {
   colorThemePreset        String?
   /// colorThemePreset === custom 일 때 토큰 JSON (마이그레이션 20260329140000)
   colorThemeCustomJson    String?
+  /// 사이트 인트로 설정(JSON). ON/OFF, 제목/설명, 미디어, 링크, 표시시간, 스킵버튼
+  introSettingsJson       String?
 }
 
 model AdminCopy {
@@ -984,6 +986,19 @@ model ListingPurchaseRecord {
   @@index([organizationId])
   @@index([listingProductId])
   @@index([status, expiresAt])
+}
+
+/// 홈·커뮤니티·대회 페이지 빌더용 초안 스냅샷. 게시 시 `PageSection`에 반영 후 행 삭제.
+model CmsPageLayoutDraft {
+  id        String   @id @default(cuid())
+  /// home | community | tournaments
+  page      String   @unique
+  /// PageSection[] JSON (동일 스키마)
+  sections  Json
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([page])
 }
 
 model PageSection {
