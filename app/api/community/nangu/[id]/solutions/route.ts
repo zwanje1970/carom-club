@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@/generated/prisma";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import type { NanguSolutionData } from "@/lib/nangu-types";
 import { getLevelFromScore, getTierName, getTierColor } from "@/lib/community-level";
@@ -169,6 +170,8 @@ export async function POST(
       authorId: session.id,
       title: body.title?.trim() || null,
       comment: body.comment?.trim() || null,
+      pathData: data.paths as unknown as Prisma.InputJsonValue,
+      settings: (data.settings ?? {}) as unknown as Prisma.InputJsonValue,
       dataJson,
     },
   });

@@ -183,7 +183,7 @@ SolutionTableZoomShell
 - **시작:** `startPlayback` — `playbackBundleRef.current` 스냅샷 사용, `commitPlaybackPhase("cue")`, `isPlayingRef.current = true`, 첫 `requestAnimationFrame(stepPlayback)`.
 - **정지/리셋:** `resetPlayback` / `cancelRaf` — `cancelAnimationFrame`, phase idle, 커밋 오버라이드 null.
 - **속도:** `playbackRate` 옵션 → 훅 내부 duration 계산에 반영 (훅 내부 상세 식은 **수정 시** `.cursor/rules/trouble-playback-constraints.mdc` 준수).
-- **종료 후:** `PLAYBACK_RESTORE_DELAY_MS`(3000ms) 타이머로 최종 위치 표시 후 배치 복귀 (922~925행 부근).
+- **종료 후:** `flushCommittedBallNormOverrides`로 최종 프레임을 state에 반영한 뒤 idle — **자동 원위치 타이머 없음**. 배치 복귀는 재생 다시 시작(새 세션)·`resetPlayback`·경로/배치 의존 `useEffect`에서 `flushCommittedBallNormOverrides(null)`로 처리.
 
 ### 난구(nangu)에서의 재생 데이터
 

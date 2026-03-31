@@ -1,8 +1,20 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
-import { getAllPageSections, savePageSection, deletePageSection } from "@/lib/content/service";
-import type { PageSection } from "@/types/page-section";
+import {
+  assertPageSectionAllowedOnPage,
+  getAllPageSections,
+  savePageSection,
+  deletePageSection,
+} from "@/lib/content/service";
+import { pageNotAllowedMessage } from "@/lib/content/page-section-page-rules";
+import type { PageSection, PageSlug } from "@/types/page-section";
+
+function revalidatePathsForPage(page: PageSlug) {
+  revalidatePath("/", "layout");
+  if (page === "community") revalidatePath("/community", "layout");
+  if (page === "tournaments") revalidatePath("/tournaments", "layout");
+}
 
 /** 목록 조회 (관리자) */
 export async function GET() {
@@ -27,8 +39,13 @@ export async function POST(request: Request) {
   }
   try {
     const data = (await request.json()) as Omit<PageSection, "createdAt" | "updatedAt">;
+    try {
+      assertPageSectionAllowedOnPage(data.page, data.slotType, data.type);
+    } catch {
+      return NextResponse.json({ error: pageNotAllowedMessage() }, { status: 400 });
+    }
     const saved = await savePageSection(data);
-    revalidatePath("/", "layout");
+    revalidatePathsForPage(saved.page);
     return NextResponse.json(saved);
   } catch (e) {
     console.error("[content/page-sections] POST error:", e);
@@ -51,6 +68,8 @@ export async function DELETE(request: Request) {
   try {
     await deletePageSection(id.trim());
     revalidatePath("/", "layout");
+    revalidatePath("/community", "layout");
+    revalidatePath("/tournaments", "layout");
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[content/page-sections] DELETE error:", e);

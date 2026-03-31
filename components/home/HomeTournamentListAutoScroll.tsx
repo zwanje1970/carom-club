@@ -7,13 +7,19 @@ type Props = {
   /** 관리자 설정 1~100 (느림~빠름) */
   flowSpeed: number;
   children: React.ReactNode;
+  /** false면 마우스 올려도 자동 스크롤 유지 */
+  pauseOnHover?: boolean;
 };
 
 /**
  * 가로 목록을 연속 흐름(무한 루프)으로 자동 스크롤 — 모바일·데스크톱 공통.
  * 자식에 동일 카드가 두 번 나열되어 있어야 하며, scrollWidth의 절반에서 루프 리셋.
  */
-export function HomeTournamentListAutoScroll({ flowSpeed, children }: Props) {
+export function HomeTournamentListAutoScroll({
+  flowSpeed,
+  children,
+  pauseOnHover = true,
+}: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(false);
   const inAutoFlowRef = useRef(false);
@@ -97,10 +103,10 @@ export function HomeTournamentListAutoScroll({ flowSpeed, children }: Props) {
     <div
       ref={ref}
       onMouseEnter={() => {
-        pausedRef.current = true;
+        if (pauseOnHover) pausedRef.current = true;
       }}
       onMouseLeave={() => {
-        pausedRef.current = false;
+        if (pauseOnHover) pausedRef.current = false;
       }}
       onTouchStart={() => {
         pausedRef.current = true;

@@ -19,11 +19,18 @@ import {
   mdiForum,
   mdiPalette,
   mdiToggleSwitch,
+  mdiSitemap,
+  mdiBrushVariant,
 } from "@mdi/js";
 import type { MenuAsideItem } from "./_interfaces";
 
 const CLIENT_CHILD_HREFS = ["/admin/venues", "/admin/client-applications", "/admin/fee-ledger"] as const;
-const CONTENT_CHILD_HREFS = ["/admin/page-sections", "/admin/popups", "/admin/notice-bars"] as const;
+const CONTENT_CHILD_HREFS = [
+  "/admin/page-builder",
+  "/admin/page-sections",
+  "/admin/popups",
+  "/admin/notice-bars",
+] as const;
 /** 사이트관리 하위(사이드바 그룹 펼침용) */
 export const SITE_CHILD_HREFS = [
   "/admin/site",
@@ -36,6 +43,8 @@ export const SITE_CHILD_HREFS = [
   "/admin/site/hero",
   "/admin/site/footer",
   "/admin/site/design",
+  "/admin/site/color-theme",
+  "/admin/settings/platform-billing",
 ] as const;
 
 /** 현재 pathname이 해당 그룹에 속하는지 */
@@ -69,7 +78,8 @@ export function getAdminMenuAside(copy?: Record<string, string> | undefined): Me
       label: L("menu.content", "콘텐츠 관리"),
       icon: mdiFormatSection,
       menu: [
-        { href: "/admin/page-sections", label: L("menu.pageSections", "페이지 섹션 관리"), icon: mdiFormatListBulleted },
+        { href: "/admin/page-builder", label: L("menu.pageBuilder", "페이지 빌더 (구조)"), icon: mdiSitemap },
+        { href: "/admin/page-sections", label: L("menu.pageSections", "콘텐츠 편집 (CMS)"), icon: mdiFormatListBulleted },
         { href: "/admin/popups", label: L("menu.popups", "팝업 관리"), icon: mdiWindowRestore },
         { href: "/admin/notice-bars", label: L("menu.noticeBars", "공지 배너 관리"), icon: mdiViewCarousel },
       ],
@@ -84,7 +94,9 @@ export function getAdminMenuAside(copy?: Record<string, string> | undefined): Me
         { href: "/admin/site/community", label: "커뮤니티 설정", icon: mdiForum },
         { href: "/admin/site/copy", label: "문구 관리", icon: mdiFormatListBulleted },
         { href: "/admin/site/settings", label: "디자인/브랜드 설정", icon: mdiPalette },
+        { href: "/admin/site/color-theme", label: "색상 테마", icon: mdiBrushVariant },
         { href: "/admin/site/features", label: "기능 설정", icon: mdiToggleSwitch },
+        { href: "/admin/settings/platform-billing", label: "플랫폼 빌링 설정", icon: mdiCashMultiple },
       ],
     },
   ];

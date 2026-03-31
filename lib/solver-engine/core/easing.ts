@@ -5,11 +5,11 @@ export function clamp01(n: number): number {
 /** cue easing: preserve existing playback feel */
 export function easeOutCue(t: number): number {
   const x = clamp01(t);
-  return 1 - Math.pow(1 - x, 1.35);
+  return 1 - Math.pow(1 - x, 1.45);
 }
 
 /** object easing: faster decay than cue */
 export function easeOutObject(t: number): number {
   const x = clamp01(t);
-  return 1 - Math.pow(1 - x, 2.2);
+  return 1 - Math.pow(1 - x, 2.35);
 }

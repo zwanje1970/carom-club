@@ -17,6 +17,7 @@ import {
   mdiViewCarousel,
   mdiFormatListBulleted,
   mdiCashMultiple,
+  mdiSitemap,
 } from "@mdi/js";
 import type { MenuAsideItem, MenuNavBarItem } from "./_interfaces";
 
@@ -24,7 +25,8 @@ const defaultCopy: Record<string, string> = {
   "menu.home": "메인으로",
   "menu.dashboard": "대시보드",
   "menu.content": "콘텐츠 관리",
-  "menu.pageSections": "페이지 섹션 관리",
+  "menu.pageSections": "콘텐츠 편집 (CMS)",
+  "menu.pageBuilder": "페이지 빌더 (구조)",
   "menu.popups": "팝업 관리",
   "menu.noticeBars": "공지 배너 관리",
   "menu.tournaments": "대회관리",
@@ -67,6 +69,7 @@ export function getMenuAside(copy?: Record<string, string>): MenuAsideItem[] {
       label: L(copy, "menu.content"),
       icon: mdiFormatSection,
       menu: [
+        { href: "/admin/page-builder", label: L(copy, "menu.pageBuilder"), icon: mdiSitemap },
         { href: "/admin/page-sections", label: L(copy, "menu.pageSections"), icon: mdiFormatListBulleted },
         { href: "/admin/popups", label: L(copy, "menu.popups"), icon: mdiWindowRestore },
         { href: "/admin/notice-bars", label: L(copy, "menu.noticeBars"), icon: mdiViewCarousel },

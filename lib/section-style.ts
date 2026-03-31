@@ -18,6 +18,16 @@ export type SectionStyleJson = {
   backgroundColor?: string | null;
   animationPreset?: SectionAnimationPreset;
   divider?: Partial<SectionDividerConfig>;
+  /** 페이지 빌더 홈 구조 슬롯 카드 스타일 — `lib/slot-block-card-style.ts`에서 해석 */
+  slotBlockCard?: Record<string, unknown>;
+  /** 홈 구조 슬롯 CTA — `lib/slot-block-cta.ts` */
+  slotBlockCta?: Record<string, unknown>;
+  /** 홈 구조 슬롯 레이아웃(grid/carousel·열 수) — `lib/slot-block-layout-motion.ts` */
+  slotBlockLayout?: Record<string, unknown>;
+  /** 홈 구조 슬롯 모션(자동재생·속도·호버 정지) — `lib/slot-block-layout-motion.ts` */
+  slotBlockMotion?: Record<string, unknown>;
+  /** 직접 구성 카드 등(확장용). 공개 렌더는 단계적으로 반영 */
+  slotBlockItems?: Record<string, unknown> | unknown[] | null;
 };
 
 const DEFAULT_DIVIDER: SectionDividerConfig = {
@@ -81,10 +91,12 @@ export function sectionAnimationClass(preset: SectionAnimationPreset): string {
   }
 }
 
-/** 폼 → DB JSON (기본값이면 null) */
+/** 폼 → DB JSON (기본값이면 null). `slotBlockCardPreserve`가 있으면 CMS 저장 시에도 유지 */
 export function serializeSectionStyleJson(opts: {
   animationPreset: SectionAnimationPreset;
   divider: SectionDividerConfig;
+  slotBlockCardPreserve?: Record<string, unknown> | undefined;
+  slotBlockCtaPreserve?: Record<string, unknown> | undefined;
 }): string | null {
   const animDefault = opts.animationPreset === "static";
   const d = opts.divider;
@@ -93,9 +105,15 @@ export function serializeSectionStyleJson(opts: {
     d.style === "solid" &&
     d.widthPx === 1 &&
     d.color === DEFAULT_DIVIDER.color;
-  if (animDefault && divDefault) return null;
+  const slot = opts.slotBlockCardPreserve;
+  const hasSlot = slot != null && typeof slot === "object" && Object.keys(slot).length > 0;
+  const cta = opts.slotBlockCtaPreserve;
+  const hasCta = cta != null && typeof cta === "object" && Object.keys(cta).length > 0;
+  if (animDefault && divDefault && !hasSlot && !hasCta) return null;
   const obj: SectionStyleJson = {};
   if (!animDefault) obj.animationPreset = opts.animationPreset;
   if (!divDefault) obj.divider = { ...d };
+  if (hasSlot) obj.slotBlockCard = slot;
+  if (hasCta) obj.slotBlockCta = cta;
   return JSON.stringify(obj);
 }

@@ -36,11 +36,14 @@ import {
 } from "@/lib/ball-speed-constants";
 import { SolutionPathEditorFullscreen } from "./SolutionPathEditorFullscreen";
 import { NanguTablePreviewHitLayer } from "./NanguTablePreviewHitLayer";
-import { useTableOrientation } from "@/hooks/useTableOrientation";
 import {
   createInitialNanguSnapshotFromEditorProps,
   resolvePanelSettingsAndAuthority,
 } from "@/lib/solution-editor-hydrate";
+import {
+  pickInitialIgnorePhysics,
+  writeIgnorePhysicsPreference,
+} from "@/lib/solution-ignore-physics-preference";
 import {
   type NanguSolutionEditorUndoSnapshot,
   cloneNanguSolutionEditorSnapshot,
@@ -133,9 +136,12 @@ export function NanguSolutionEditor({
   const [settingsPanelBallSpeedAuthoritative, setSettingsPanelBallSpeedAuthoritative] = useState(
     () => resolvePanelSettingsAndAuthority(initialSolutionData, initialPersistedSettings).authoritative
   );
-  const [panelSettings, setPanelSettings] = useState<SolutionSettingsValue>(() =>
-    resolvePanelSettingsAndAuthority(initialSolutionData, initialPersistedSettings).settings
-  );
+  const [panelSettings, setPanelSettings] = useState<SolutionSettingsValue>(() => {
+    const resolved = resolvePanelSettingsAndAuthority(initialSolutionData, initialPersistedSettings);
+    const rawSettings = initialPersistedSettings ?? initialSolutionData?.settings;
+    const ignorePhysics = pickInitialIgnorePhysics(rawSettings, resolved.settings);
+    return clampSolutionSettings(mergeSolutionSettings({ ignorePhysics }, resolved.settings));
+  });
 
   const openSettingsPanel = useCallback(
     (section?: "thickness" | "tip" | "rail") => {
@@ -178,8 +184,6 @@ export function NanguSolutionEditor({
       editor.thicknessOffsetX,
     ]
   );
-
-  const previewOrientation = useTableOrientation();
 
   const rectLandscape = useMemo(
     () => getPlayfieldRect(DEFAULT_TABLE_WIDTH, DEFAULT_TABLE_HEIGHT),
@@ -313,6 +317,7 @@ export function NanguSolutionEditor({
           onSettingsChange={(next) => {
             setSettingsPanelBallSpeedAuthoritative(true);
             setPanelSettings(next);
+            writeIgnorePhysicsPreference(next.ignorePhysics);
             if (next.railCount != null && !Number.isNaN(Number(next.railCount))) {
               commit((prev) => ({ ...prev, ballSpeed: normalizeBallSpeed(next.railCount) }));
             }
@@ -351,10 +356,7 @@ export function NanguSolutionEditor({
           className="relative mx-auto w-full max-w-full overflow-hidden rounded-lg border border-gray-200 dark:border-slate-600"
           style={{
             maxWidth: DEFAULT_TABLE_WIDTH,
-            aspectRatio:
-              previewOrientation === "portrait"
-                ? `${DEFAULT_TABLE_HEIGHT} / ${DEFAULT_TABLE_WIDTH}`
-                : `${DEFAULT_TABLE_WIDTH} / ${DEFAULT_TABLE_HEIGHT}`,
+            aspectRatio: `${DEFAULT_TABLE_WIDTH} / ${DEFAULT_TABLE_HEIGHT}`,
           }}
         >
           {/* 罹붾쾭?ㅒ톁VG???ъ씤???듦낵 ???덊듃 ?덉씠?대쭔 ???섏떊 */}
@@ -372,7 +374,7 @@ export function NanguSolutionEditor({
                 showGrid
                 drawStyle="realistic"
                 showCueBallSpot
-                orientation={previewOrientation}
+                orientation="landscape"
                 betweenTableAndBallsLayer={
                   <NanguSolutionPathOverlay
                     pathPoints={pathPoints}
@@ -380,7 +382,7 @@ export function NanguSolutionEditor({
                     tableBallPlacement={ballPlacement}
                     objectPathPoints={[]}
                     cuePathCurveNodes={cuePathCurveNodes}
-                    orientation={previewOrientation}
+                    orientation="landscape"
                     pathMode={false}
                     objectPathMode={false}
                     pathLinesVisible={true}

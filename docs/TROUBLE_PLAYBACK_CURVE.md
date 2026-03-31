@@ -41,3 +41,7 @@
 - `lib/solution-path-motion.ts` — 곡선 폴리라인, `spotEndVertexIndices`, 난구 거리/두께  
 - `hooks/useTroublePathPlayback.ts` — 곡선 제어·`troublePlaybackModel` 전달  
 - `components/nangu/SolutionPathEditorFullscreen.tsx` — 곡선 상태 전달  
+
+## 관련 문서
+
+- 출발(스팟)·감속·두께 **요구 이해** 및 **이징 지수 현행값**: [`trouble-playback-motion-spec.md`](./trouble-playback-motion-spec.md)

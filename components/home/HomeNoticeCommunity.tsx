@@ -1,8 +1,16 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
+import { PAGE_CONTENT_PAD_X } from "@/components/layout/pageContentStyles";
+import { cn } from "@/lib/utils";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import { SlotBlockCtaLink } from "@/components/home/SlotBlockCtaLink";
+import type { SlotBlockCtaConfig } from "@/lib/slot-block-cta";
+import { resolveSlotBlockCtaConfig } from "@/lib/slot-block-cta";
+import type { SlotBlockCardStyle } from "@/lib/slot-block-card-style";
+import { nanguEntryCardComposeClasses, nanguEntryDescClampClass, nanguEntryGridClass } from "@/lib/slot-block-card-style";
+import type { SlotBlockItemsBundle } from "@/lib/slot-block-items";
+import { sanitizeImageSrc } from "@/lib/image-src";
 
 const NanguSolverIconLazy = dynamic(
   () =>
@@ -42,58 +50,122 @@ export function HomeNoticeCommunity({
   copy,
   showNoteEntry,
   showSolverEntry,
+  cardStyle,
+  ctaConfig,
+  blockBackgroundColor,
+  slotItems,
 }: {
   copy: Record<string, string>;
   showNoteEntry: boolean;
   showSolverEntry: boolean;
+  cardStyle?: SlotBlockCardStyle;
+  ctaConfig?: SlotBlockCtaConfig;
+  blockBackgroundColor?: string;
+  slotItems?: SlotBlockItemsBundle;
 }) {
   const c = copy as Record<AdminCopyKey, string>;
+  const cta = ctaConfig ?? resolveSlotBlockCtaConfig("nanguEntry", null);
   const showNote = showNoteEntry;
   const showSolver = showSolverEntry;
 
   if (!showNote && !showSolver) return null;
 
+  const manual = slotItems?.mode === "manual" ? slotItems.items : null;
+  const manualNote = manual?.find((i) => i.entryRole === "nanguNotes");
+  const manualSolver = manual?.find((i) => i.entryRole === "nanguSolver");
+
+  const noteCardClass = cardStyle
+    ? nanguEntryCardComposeClasses(cardStyle, "emerald")
+    : "flex items-center gap-4 rounded-2xl border border-emerald-300 bg-gradient-to-br from-emerald-100 to-emerald-50 p-5 shadow-sm transition hover:border-emerald-400 hover:from-emerald-200 hover:to-emerald-100 hover:shadow-md dark:border-emerald-700 dark:bg-gradient-to-br dark:from-emerald-950 dark:to-emerald-900/90 dark:hover:border-emerald-500 dark:hover:from-emerald-900 dark:hover:to-emerald-950";
+  const solverCardClass = cardStyle
+    ? nanguEntryCardComposeClasses(cardStyle, "sky")
+    : "flex items-center gap-4 rounded-2xl border border-sky-300 bg-gradient-to-br from-sky-100 to-sky-50 p-5 shadow-sm transition hover:border-sky-400 hover:from-sky-200 hover:to-sky-100 hover:shadow-md dark:border-sky-600 dark:bg-gradient-to-br dark:from-sky-950 dark:to-sky-900/90 dark:hover:border-sky-500 dark:hover:from-sky-900 dark:hover:to-sky-950";
+  const descClamp = cardStyle ? nanguEntryDescClampClass(cardStyle) : "";
+  const gridWrap = cardStyle ? nanguEntryGridClass(cardStyle) : "mx-auto flex max-w-xl flex-col gap-4";
+
   return (
-    <section className="px-4 py-10 sm:px-6 sm:py-12">
+    <section
+      style={blockBackgroundColor ? { backgroundColor: blockBackgroundColor } : undefined}
+      className={cn(PAGE_CONTENT_PAD_X, "py-10 sm:py-12")}
+    >
       <div className="mx-auto max-w-5xl">
-        <div className="mx-auto flex max-w-xl flex-col gap-4">
+        <div className={gridWrap}>
           {showNote && (
-            <Link
-              href="/mypage/notes"
-              className="flex items-center gap-4 rounded-2xl border border-emerald-300 bg-gradient-to-br from-emerald-100 to-emerald-50 p-5 shadow-sm transition hover:border-emerald-400 hover:from-emerald-200 hover:to-emerald-100 hover:shadow-md dark:border-emerald-700 dark:bg-gradient-to-br dark:from-emerald-950 dark:to-emerald-900/90 dark:hover:border-emerald-500 dark:hover:from-emerald-900 dark:hover:to-emerald-950"
-              aria-label={`${getCopyValue(c, "site.home.community.notes.title")} — ${getCopyValue(c, "site.home.community.notes.desc")}`}
+            <SlotBlockCtaLink
+              layer={cta.nanguNotes}
+              ctx={{
+                itemDirectHref: manualNote?.linkUrl?.trim() || undefined,
+              }}
+              className={noteCardClass}
+              aria-label={`${manualNote?.title?.trim() || getCopyValue(c, "site.home.community.notes.title")} — ${manualNote?.description?.trim() || getCopyValue(c, "site.home.community.notes.desc")}`}
             >
               <span className="flex h-[5.5rem] w-[5.5rem] shrink-0 items-center justify-center overflow-visible rounded-xl bg-white/70 shadow-inner dark:bg-emerald-950/50">
-                <BilliardNotesHomeIcon className="h-14 w-14" />
+                {manualNote?.imageUrl?.trim() && sanitizeImageSrc(manualNote.imageUrl.trim()) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={sanitizeImageSrc(manualNote.imageUrl.trim()) ?? ""}
+                    alt=""
+                    className="h-full w-full rounded-xl object-cover"
+                    width={88}
+                    height={88}
+                    decoding="async"
+                    loading="lazy"
+                  />
+                ) : (
+                  <BilliardNotesHomeIcon className="h-14 w-14" />
+                )}
               </span>
               <div className="min-w-0">
                 <h3 className="font-semibold text-site-text">
-                  {getCopyValue(c, "site.home.community.notes.title")}
+                  {manualNote?.title?.trim() || getCopyValue(c, "site.home.community.notes.title")}
                 </h3>
-                <p className="mt-0.5 text-sm text-emerald-900/75 dark:text-emerald-200/80">
-                  {getCopyValue(c, "site.home.community.notes.desc")}
+                <p
+                  className={cn(
+                    "mt-0.5 text-sm text-emerald-900/75 dark:text-emerald-200/80",
+                    descClamp
+                  )}
+                >
+                  {manualNote?.description?.trim() || getCopyValue(c, "site.home.community.notes.desc")}
                 </p>
               </div>
-            </Link>
+            </SlotBlockCtaLink>
           )}
           {showSolver && (
-            <Link
-              href="/community/nangu"
-              className="flex items-center gap-4 rounded-2xl border border-sky-300 bg-gradient-to-br from-sky-100 to-sky-50 p-5 shadow-sm transition hover:border-sky-400 hover:from-sky-200 hover:to-sky-100 hover:shadow-md dark:border-sky-600 dark:bg-gradient-to-br dark:from-sky-950 dark:to-sky-900/90 dark:hover:border-sky-500 dark:hover:from-sky-900 dark:hover:to-sky-950"
-              aria-label={`${getCopyValue(c, "site.home.community.nangu.title")} — ${getCopyValue(c, "site.home.community.nangu.desc")}`}
+            <SlotBlockCtaLink
+              layer={cta.nanguSolver}
+              ctx={{
+                itemDirectHref: manualSolver?.linkUrl?.trim() || undefined,
+              }}
+              className={solverCardClass}
+              aria-label={`${manualSolver?.title?.trim() || getCopyValue(c, "site.home.community.nangu.title")} — ${manualSolver?.description?.trim() || getCopyValue(c, "site.home.community.nangu.desc")}`}
             >
               <span className="flex shrink-0 items-center justify-center overflow-visible">
-                <NanguSolverIconLazy size={104} priority />
+                {manualSolver?.imageUrl?.trim() && sanitizeImageSrc(manualSolver.imageUrl.trim()) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={sanitizeImageSrc(manualSolver.imageUrl.trim()) ?? ""}
+                    alt=""
+                    className="h-[104px] w-[104px] rounded-2xl object-cover"
+                    width={104}
+                    height={104}
+                    decoding="async"
+                    loading="lazy"
+                  />
+                ) : (
+                  <NanguSolverIconLazy size={104} priority />
+                )}
               </span>
               <div className="min-w-0">
                 <h3 className="font-semibold text-site-text">
-                  {getCopyValue(c, "site.home.community.nangu.title")}
+                  {manualSolver?.title?.trim() || getCopyValue(c, "site.home.community.nangu.title")}
                 </h3>
-                <p className="mt-0.5 text-sm text-sky-900/70 dark:text-sky-200/75">
-                  {getCopyValue(c, "site.home.community.nangu.desc")}
+                <p
+                  className={cn("mt-0.5 text-sm text-sky-900/70 dark:text-sky-200/75", descClamp)}
+                >
+                  {manualSolver?.description?.trim() || getCopyValue(c, "site.home.community.nangu.desc")}
                 </p>
               </div>
-            </Link>
+            </SlotBlockCtaLink>
           )}
         </div>
       </div>

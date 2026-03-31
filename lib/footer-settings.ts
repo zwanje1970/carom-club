@@ -21,22 +21,15 @@ export const FOOTER_FONT_SIZE_OPTIONS: { value: FooterFontSize; label: string }[
   { value: "lg", label: "크게 (18px)" },
 ];
 
-/** 푸터에서 선택 가능한 글꼴 (layout에서 로드된 웹폰트 기준) */
+/** 푸터에서 선택 가능한 글꼴 (사이트 로드 폰트: Pretendard·Noto Sans KR만) */
 export const FOOTER_FONT_FAMILY_OPTIONS: { value: string; label: string; fontFamily: string }[] = [
   { value: "", label: "기본", fontFamily: "inherit" },
   { value: "Pretendard", label: "Pretendard", fontFamily: "Pretendard, sans-serif" },
-  { value: "Spoqa Han Sans Neo", label: "Spoqa Han Sans Neo", fontFamily: '"Spoqa Han Sans Neo", sans-serif' },
   { value: "Noto Sans KR", label: "Noto Sans KR", fontFamily: '"Noto Sans KR", sans-serif' },
-  { value: "Nanum Gothic", label: "나눔고딕", fontFamily: '"Nanum Gothic", sans-serif' },
-  { value: "Nanum Myeongjo", label: "나눔명조", fontFamily: '"Nanum Myeongjo", serif' },
-  { value: "Black Han Sans", label: "Black Han Sans", fontFamily: '"Black Han Sans", sans-serif' },
-  { value: "Do Hyeon", label: "Do Hyeon", fontFamily: '"Do Hyeon", sans-serif' },
-  { value: "Gothic A1", label: "Gothic A1", fontFamily: '"Gothic A1", sans-serif' },
-  { value: "IBM Plex Sans KR", label: "IBM Plex Sans KR", fontFamily: '"IBM Plex Sans KR", sans-serif' },
   { value: "system-ui", label: "system-ui", fontFamily: "system-ui, sans-serif" },
 ];
 
-/** 저장된 글꼴 value → CSS font-family */
+/** 저장된 글꼴 value → CSS font-family (제거된 레거시 value는 inherit) */
 export function getFooterFontFamilyCss(value: string | null | undefined): string {
   if (!value) return "inherit";
   const opt = FOOTER_FONT_FAMILY_OPTIONS.find((o) => o.value === value);

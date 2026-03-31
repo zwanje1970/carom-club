@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { CommunityBoardPagePayload } from "@/lib/community-board-page-data";
+import { PageContentContainer } from "@/components/layout/PageContentContainer";
 import { CommunityBoardTabBar } from "@/components/community/CommunityBoardTabBar";
 import { CommunityBoardTroubleStatusNav } from "@/components/community/CommunityBoardTroubleStatusNav";
 import { CommunityBoardListAndMoreClient } from "@/components/community/CommunityBoardListAndMoreClient";
@@ -18,7 +19,7 @@ export function CommunityBoardPageShell({
 
   return (
     <main className="min-h-screen bg-site-bg text-site-text pb-24">
-      <div className="mx-auto w-full max-w-3xl px-4 py-5 sm:px-6">
+      <PageContentContainer className="py-5">
         <nav
           className="mb-3 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 md:flex hidden"
           aria-label="breadcrumb"
@@ -99,7 +100,7 @@ export function CommunityBoardPageShell({
             initialHasMore={data.hasMore}
           />
         </div>
-      </div>
+      </PageContentContainer>
 
       {showWriteFab && (
         <CommunityWriteFab

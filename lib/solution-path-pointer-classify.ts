@@ -62,6 +62,25 @@ function pickNearestObjectSpotId(
   return bestId;
 }
 
+function pickNearestSecondObjectSpotId(
+  norm: { x: number; y: number },
+  secondObjectPathPoints: NanguPathPoint[],
+  rect: PlayfieldRect
+): string | null {
+  let bestId: string | null = null;
+  let bestD = Infinity;
+  for (let pi = 0; pi < secondObjectPathPoints.length; pi++) {
+    const p = secondObjectPathPoints[pi]!;
+    const maxHitPx = pi === secondObjectPathPoints.length - 1 ? SPOT_HIT_LAST_PX : SPOT_HIT_PX;
+    const d = distanceNormPointsInPlayfieldPx(norm, { x: p.x, y: p.y }, rect);
+    if (d <= maxHitPx && d < bestD) {
+      bestD = d;
+      bestId = p.id;
+    }
+  }
+  return bestId;
+}
+
 /** @deprecated zoom 포커스용; 공 탭은 getSolutionPathBallTapRadiusPx(rect) 사용 */
 export const SOLUTION_PATH_BALL_PICK_ZOOM_NORM = 0.055;
 
@@ -105,31 +124,41 @@ export type PathPointerClassification =
   | { kind: "cueBallPlayback" }
   | { kind: "cueSpot"; id: string }
   | { kind: "objectSpot"; id: string }
+  | { kind: "secondObjectSpot"; id: string }
   | { kind: "cueSegment"; segmentIndex: number }
   | { kind: "objectSegment"; segmentIndex: number }
+  | { kind: "secondObjectSegment"; segmentIndex: number }
   | { kind: "emptyCue" }
+  /** pathMode에서 수구 경로 스팟 추가: 탭이 목적구 원 안 — 반직선으로 공 접촉 스팟 생성(버튼으로 레이어 선택 시) */
+  | { kind: "cueBallContactAppend"; ballKey: "red" | "yellow" | "white" }
   /** pathMode에서 목적구(비수구) 넓은 터치 반경 — `emptyCue`와 동일 처리, 패닝용 빈 영역으로 보지 않음 */
   | { kind: "pathObjectBallTap" }
   /** objectPathMode에서 목적구(1목) 공 표면 탭 — 빈 테이블 `emptyObject`와 구분 */
   | { kind: "objectBallMarkingTap" }
+  | { kind: "pathSecondObjectBallTap" }
+  | { kind: "emptyObject2" }
   | { kind: "emptyObject" };
 
 export function isClassificationEmptyForPan(c: PathPointerClassification): boolean {
-  return c.kind === "emptyCue" || c.kind === "emptyObject";
+  return c.kind === "emptyCue" || c.kind === "emptyObject" || c.kind === "emptyObject2";
 }
 
 /**
- * 탭으로 경로 편집 레이어 전환: 1목은 언제나 전환 가능, 2목은 1목 경로에 스팟이 붙은 뒤에만.
- * `undefined` → 기존(하위 호환) 동작 유지.
+ * 목적구 탭이 **1목 편집 대상 공**과 일치할 때만 1목 경로 편집 활성으로 인정한다.
+ * 2목 레이어 활성 여부는 에디터의 2목 접촉 geometry(수구·1목 경로 스팟)로 별도 결정된다.
+ * `pathEditFirstObjectBallKey === undefined` → 제한 없음(하위 호환).
+ * `pathEditFirstObjectBallKey === null` 이고 수구 경로 스팟이 아직 없으면(`cuePathPointsLength === 0`)
+ * `cueToFirstObjectHit`가 비어 있어 생긴 상태이므로 목적구 탭을 막지 않는다(공 표면 스팟·레이어 전환).
  */
 export function canActivatePathEditForObjectBallTap(params: {
   hitBallKey: "red" | "yellow" | "white";
   pathEditFirstObjectBallKey: "red" | "yellow" | "white" | null | undefined;
   objectPathPointsLength: number;
+  cuePathPointsLength: number;
 }): boolean {
-  const { hitBallKey, pathEditFirstObjectBallKey } = params;
+  const { hitBallKey, pathEditFirstObjectBallKey, cuePathPointsLength } = params;
   if (pathEditFirstObjectBallKey === undefined) return true;
-  if (pathEditFirstObjectBallKey === null) return false;
+  if (pathEditFirstObjectBallKey === null) return cuePathPointsLength === 0;
   return hitBallKey === pathEditFirstObjectBallKey;
 }
 
@@ -137,9 +166,11 @@ export function classifySolutionPathPointerHit(params: {
   norm: { x: number; y: number };
   pathMode: boolean;
   objectPathMode: boolean;
+  secondObjectPathMode?: boolean;
   cuePos: { x: number; y: number };
   pathPoints: NanguPathPoint[];
   objectPathPoints: NanguPathPoint[];
+  secondObjectPathPoints?: NanguPathPoint[];
   objectBallNorm?: { x: number; y: number } | null;
   ballPickLayout?: NanguBallPlacement | null;
   /** 1목 충돌 계산용 배치 — `ballPickLayout` 없을 때(미리보기 등) */
@@ -157,18 +188,29 @@ export function classifySolutionPathPointerHit(params: {
    */
   objectPathCollisionNormOverride?: { x: number; y: number } | null;
   /**
+   * 2목 충돌점 오버라이드. 2목 경로 시작점.
+   */
+  secondObjectPathCollisionNormOverride?: { x: number; y: number } | null;
+  /**
    * 1목 공 키(광선·충돌 기준). 전달 시 `pathObjectBallTap` / `objectBallMarkingTap`에 탭 권한 검사 적용.
    * 미전달(`undefined`)이면 기존 분류(하위 호환).
    */
   pathEditFirstObjectBallKey?: "red" | "yellow" | "white" | null;
+  /**
+   * true(기본): 수구 경로 모드에서 목적구 탭 시 1목 레이어 전환(`pathObjectBallTap`) 가능.
+   * false: 레이어는 버튼으로만 전환 — 목적구 탭은 수구 경로에 **공 접촉 스팟** 추가로 처리.
+   */
+  objectBallTapSwitchesCueToObjectLayer?: boolean;
 }): PathPointerClassification {
   const {
     norm,
     pathMode,
     objectPathMode,
+    secondObjectPathMode = false,
     cuePos,
     pathPoints,
     objectPathPoints,
+    secondObjectPathPoints = [],
     objectBallNorm,
     ballPickLayout,
     collisionLayout,
@@ -178,7 +220,9 @@ export function classifySolutionPathPointerHit(params: {
     allowCuePlaybackGestures = false,
     pathPlaybackActive = false,
     objectPathCollisionNormOverride,
+    secondObjectPathCollisionNormOverride,
     pathEditFirstObjectBallKey,
+    objectBallTapSwitchesCueToObjectLayer = true,
   } = params;
 
   const rect = getPlayfieldRect(width, height);
@@ -206,7 +250,7 @@ export function classifySolutionPathPointerHit(params: {
     }
   }
 
-  if (!pathMode && !objectPathMode) return { kind: "inactive" };
+  if (!pathMode && !objectPathMode && !secondObjectPathMode) return { kind: "inactive" };
 
   /**
    * 1목 경로 시작점(충돌점) — `SolutionPathEditorFullscreen`의 cueToFirstObjectHit와 동일.
@@ -254,6 +298,35 @@ export function classifySolutionPathPointerHit(params: {
     collisionNorm = objectPathCollisionNormOverride;
   }
 
+  let secondObjectCollisionNorm: { x: number; y: number } | null = null;
+  if (secondObjectPathCollisionNormOverride !== undefined) {
+    secondObjectCollisionNorm = secondObjectPathCollisionNormOverride;
+  }
+
+  if (secondObjectPathMode && secondObjectCollisionNorm) {
+    const nearestSecond = pickNearestSecondObjectSpotId(norm, secondObjectPathPoints, rect);
+    if (nearestSecond) {
+      return { kind: "secondObjectSpot", id: nearestSecond };
+    }
+    const secondChain = [secondObjectCollisionNorm, ...secondObjectPathPoints.map((p) => ({ x: p.x, y: p.y }))];
+    for (let i = 0; i < secondChain.length - 1; i++) {
+      const a = secondChain[i];
+      const b = secondChain[i + 1];
+      const dist = distNormPointToSegmentPx(norm.x, norm.y, a.x, a.y, b.x, b.y, rect);
+      if (dist < SEGMENT_HIT_PX) {
+        const lastSecond = secondObjectPathPoints[secondObjectPathPoints.length - 1];
+        if (
+          lastSecond &&
+          i === secondChain.length - 2 &&
+          distanceNormPointsInPlayfieldPx(norm, { x: b.x, y: b.y }, rect) < SPOT_HIT_LAST_PX
+        ) {
+          continue;
+        }
+        return { kind: "secondObjectSegment", segmentIndex: i };
+      }
+    }
+  }
+
   /**
    * 1목·수구 스팟/세그먼트가 공(줌)보다 먼저 — 공 표면에 찍힌 스팟도 드래그·삭제·세그먼트 삽입 가능.
    * 그 다음 공 탭(줌), 마지막에 빈 영역(emptyCue / emptyObject).
@@ -282,10 +355,48 @@ export function classifySolutionPathPointerHit(params: {
     }
   }
 
+  if (secondObjectPathMode && secondObjectCollisionNorm) {
+    return { kind: "emptyObject2" };
+  }
   if (pathMode) {
     const nearestCue = pickNearestCueSpotId(norm, pathPoints, rect);
     if (nearestCue) {
       return { kind: "cueSpot", id: nearestCue };
+    }
+    /**
+     * 목적구 표면 탭이 수구 경로 세그먼트(22px) 근접보다 뒤지면 cueSegment로만 분류되어
+     * 공 접촉 스팟 추가·1목 레이어 전환이 되지 않는다. 스팟 미스 후보가 없을 때만 우선한다.
+     */
+    if (ballPickLayout) {
+      const rb = ballNormOverrides?.red ?? ballPickLayout.redBall;
+      const yb = ballNormOverrides?.yellow ?? ballPickLayout.yellowBall;
+      const wb = ballNormOverrides?.white ?? ballPickLayout.whiteBall;
+      const cueBall = ballPickLayout.cueBall === "yellow" ? "yellow" : "white";
+      const isCueBallKey = (key: "red" | "yellow" | "white") =>
+        key !== "red" && key === cueBall;
+      for (const { key, b } of [
+        { key: "red" as const, b: rb },
+        { key: "yellow" as const, b: yb },
+        { key: "white" as const, b: wb },
+      ]) {
+        if (distanceNormPointsInPlayfieldPx(norm, b, rect) > ballTapPx) continue;
+        if (isCueBallKey(key)) continue;
+        if (objectBallTapSwitchesCueToObjectLayer) {
+          if (!collisionNorm) return { kind: "ball" };
+          if (
+            !canActivatePathEditForObjectBallTap({
+              hitBallKey: key,
+              pathEditFirstObjectBallKey,
+              objectPathPointsLength: objectPathPoints.length,
+              cuePathPointsLength: pathPoints.length,
+            })
+          ) {
+            return { kind: "ball" };
+          }
+          return { kind: "pathObjectBallTap" };
+        }
+        return { kind: "cueBallContactAppend", ballKey: key };
+      }
     }
     const allPts = [cuePos, ...pathPoints];
     for (let i = 0; i < allPts.length - 1; i++) {
@@ -307,7 +418,7 @@ export function classifySolutionPathPointerHit(params: {
     }
   }
 
-  if ((pathMode || objectPathMode) && ballPickLayout) {
+  if ((pathMode || objectPathMode || secondObjectPathMode) && ballPickLayout) {
     const rb = ballNormOverrides?.red ?? ballPickLayout.redBall;
     const yb = ballNormOverrides?.yellow ?? ballPickLayout.yellowBall;
     const wb = ballNormOverrides?.white ?? ballPickLayout.whiteBall;
@@ -322,33 +433,42 @@ export function classifySolutionPathPointerHit(params: {
       { key: "white" as const, b: wb },
     ]) {
       if (distanceNormPointsInPlayfieldPx(norm, b, rect) <= ballTapPx) {
+        /** 2목 경로 모드: 2목 공 표면 탭 (현재는 1목과 동일 처리) */
+        if (secondObjectPathMode && !isCueBallKey(key)) {
+          if (!secondObjectCollisionNorm) return { kind: "ball" };
+          const isFirstObj = key === pathEditFirstObjectBallKey;
+          if (isFirstObj) return { kind: "ball" }; // 1목은 2목 모드에서 조작 대상 아님
+          return { kind: "objectBallMarkingTap" }; // 2목 모드에서 2목 클릭 = 마킹/스팟 추가
+        }
+
         /** 1목 경로 모드: 목적구 표식 — 수구 경로가 1목에 닿은 경우에만(충돌점 유효) */
         if (objectPathMode && !isCueBallKey(key)) {
           if (!collisionNorm) return { kind: "ball" };
-          if (
-            !canActivatePathEditForObjectBallTap({
-              hitBallKey: key,
-              pathEditFirstObjectBallKey,
-              objectPathPointsLength: objectPathPoints.length,
-            })
-          ) {
-            return { kind: "ball" };
+          const isFirstObj = key === pathEditFirstObjectBallKey;
+          if (!isFirstObj) {
+            // 2목 클릭 시 2목 모드로 전환 유도 (pathSecondObjectBallTap)
+            return { kind: "pathSecondObjectBallTap" };
           }
           return { kind: "objectBallMarkingTap" };
         }
-        /** 수구 경로: 1목으로 전환 탭 — 광선 1목 + 폴리라인 닿음이 있을 때만 */
+
+        /** 수구 경로: 목적구 탭 — 레이어 전환 vs 공 접촉 스팟 추가 */
         if (pathMode && !isCueBallKey(key)) {
-          if (!collisionNorm) return { kind: "ball" };
-          if (
-            !canActivatePathEditForObjectBallTap({
-              hitBallKey: key,
-              pathEditFirstObjectBallKey,
-              objectPathPointsLength: objectPathPoints.length,
-            })
-          ) {
-            return { kind: "ball" };
+          if (objectBallTapSwitchesCueToObjectLayer) {
+            if (!collisionNorm) return { kind: "ball" };
+            if (
+              !canActivatePathEditForObjectBallTap({
+                hitBallKey: key,
+                pathEditFirstObjectBallKey,
+                objectPathPointsLength: objectPathPoints.length,
+                cuePathPointsLength: pathPoints.length,
+              })
+            ) {
+              return { kind: "ball" };
+            }
+            return { kind: "pathObjectBallTap" };
           }
-          return { kind: "pathObjectBallTap" };
+          return { kind: "cueBallContactAppend", ballKey: key };
         }
         return { kind: "ball" };
       }

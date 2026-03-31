@@ -8,21 +8,13 @@ export const FONT_SIZES_PX = [
 ];
 
 /**
- * 편집기·Hero 등에서 공통 사용하는 글꼴 목록.
- * value는 CSS font-family 값 (웹폰트/시스템 폰트명).
+ * 편집기·Hero 등에서 선택 가능한 글꼴.
+ * 사이트에서 로드하는 웹폰트는 Pretendard·Noto Sans KR만 사용한다.
+ * value는 CSS font-family 문자열.
  */
 export const FONT_FAMILIES = [
-  { label: "기본", value: "" },
-  { label: "굴림", value: "Gulim, 굴림, sans-serif" },
-  { label: "돋움", value: "Dotum, 돋움, sans-serif" },
-  { label: "명조", value: "Batang, 명조, serif" },
+  { label: "기본(상속)", value: "" },
   { label: "Pretendard", value: "Pretendard, -apple-system, BlinkMacSystemFont, sans-serif" },
   { label: "Noto Sans KR", value: '"Noto Sans KR", sans-serif' },
-  { label: "Nanum Gothic", value: '"Nanum Gothic", sans-serif' },
-  { label: "Nanum Myeongjo", value: '"Nanum Myeongjo", serif' },
-  { label: "Spoqa Han Sans Neo", value: '"Spoqa Han Sans Neo", sans-serif' },
-  { label: "Black Han Sans", value: '"Black Han Sans", sans-serif' },
-  { label: "Do Hyeon", value: '"Do Hyeon", sans-serif' },
-  { label: "Gothic A1", value: '"Gothic A1", sans-serif' },
-  { label: "IBM Plex Sans KR", value: '"IBM Plex Sans KR", sans-serif' },
+  { label: "system-ui", value: "system-ui, sans-serif" },
 ] as const;

@@ -1,8 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { pretendard } from "./fonts";
 import { getCommonGlobalData } from "@/lib/common-page-data";
 import { DEFAULT_PRIMARY_COLOR, DEFAULT_SECONDARY_COLOR } from "@/lib/site-settings";
+import {
+  resolveSiteThemeCssTokens,
+  type SiteColorThemeMode,
+  type SiteThemeCssTokens,
+} from "@/lib/site-color-themes";
 import { SiteSettingsProvider } from "@/components/SiteSettingsProvider";
 import { SiteThemeStyles } from "@/components/SiteThemeStyles";
 import { SITE_NAME, DEFAULT_SITE_URL } from "@/lib/site-settings";
@@ -69,6 +73,8 @@ export default async function RootLayout({
     logoUrl: null as string | null,
     primaryColor: DEFAULT_PRIMARY_COLOR,
     secondaryColor: DEFAULT_SECONDARY_COLOR,
+    colorThemePreset: null as SiteColorThemeMode,
+    colorThemeCustom: null as SiteThemeCssTokens | null,
     withdrawRejoinDays: 0,
     headerBgColor: null as string | null,
     headerTextColor: null as string | null,
@@ -81,11 +87,15 @@ export default async function RootLayout({
     settings = globalData.siteSettings;
   }
 
+  const themeTokens = resolveSiteThemeCssTokens({
+    colorThemePreset: settings.colorThemePreset ?? null,
+    colorThemeCustomTokens: settings.colorThemeCustom ?? null,
+    primaryColor: settings.primaryColor ?? DEFAULT_PRIMARY_COLOR,
+    secondaryColor: settings.secondaryColor ?? DEFAULT_SECONDARY_COLOR,
+  });
+
   return (
-    <html
-      lang="ko"
-      className={`scroll-smooth ${pretendard.variable}`}
-    >
+    <html lang="ko" className="scroll-smooth">
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#000000" />
@@ -93,10 +103,9 @@ export default async function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black" />
       </head>
-      <body className={`min-h-screen antialiased ${pretendard.className}`}>
+      <body className="min-h-screen antialiased">
         <SiteThemeStyles
-          primaryColor={settings.primaryColor ?? DEFAULT_PRIMARY_COLOR}
-          secondaryColor={settings.secondaryColor ?? DEFAULT_SECONDARY_COLOR}
+          tokens={themeTokens}
           headerBgColor={settings.headerBgColor}
           headerTextColor={settings.headerTextColor}
           headerActiveColor={settings.headerActiveColor}

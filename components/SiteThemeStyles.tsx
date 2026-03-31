@@ -1,25 +1,48 @@
+import type { SiteThemeCssTokens } from "@/lib/site-color-themes";
+
 export function SiteThemeStyles({
-  primaryColor,
-  secondaryColor,
+  tokens,
   headerBgColor,
   headerTextColor,
   headerActiveColor,
 }: {
-  primaryColor: string;
-  secondaryColor: string;
+  tokens: SiteThemeCssTokens;
   headerBgColor?: string | null;
   headerTextColor?: string | null;
   headerActiveColor?: string | null;
 }) {
-  const primary = escapeCssValue(primaryColor);
-  const secondary = escapeCssValue(secondaryColor);
+  const p = escapeCssValue(tokens.primary);
+  const s = escapeCssValue(tokens.secondary);
+  const bg = escapeCssValue(tokens.bg);
+  const card = escapeCssValue(tokens.card);
+  const text = escapeCssValue(tokens.text);
+  const muted = escapeCssValue(tokens.textMuted);
+  const border = escapeCssValue(tokens.border);
   const hb = headerBgColor ? escapeCssValue(headerBgColor) : "#0a0a0a";
   const ht = headerTextColor ? escapeCssValue(headerTextColor) : "#d1d5db";
   const ha = headerActiveColor ? escapeCssValue(headerActiveColor) : "#fbbf24";
   return (
     <style
       dangerouslySetInnerHTML={{
-        __html: `:root { --site-primary: ${primary}; --site-secondary: ${secondary}; --site-header-bg: ${hb}; --site-header-text: ${ht}; --site-header-active: ${ha}; }`,
+        __html: `:root {
+  --site-primary: ${p};
+  --site-secondary: ${s};
+  --site-bg: ${bg};
+  --site-card: ${card};
+  --site-text: ${text};
+  --site-text-muted: ${muted};
+  --site-border: ${border};
+  --color-primary: ${p};
+  --color-secondary: ${s};
+  --color-background: ${bg};
+  --color-surface: ${card};
+  --color-text: ${text};
+  --color-muted: ${muted};
+  --site-header-bg: ${hb};
+  --site-header-text: ${ht};
+  --site-header-active: ${ha};
+}
+body { color: var(--site-text); }`,
       }}
     />
   );

@@ -1,117 +1,98 @@
-// CAROM.CLUB Platform - Neon PostgreSQL
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/prisma"
-}
-
-// ============== DB와 일치: User.role 은 PostgreSQL UserRole enum ==============
-enum UserRole {
-  USER
-  MODERATOR   // 커뮤니티: 신고 관리, 숨김 처리
-  CLIENT_ADMIN
-  PLATFORM_ADMIN  // 커뮤니티 ADMIN: 공지 작성, 게시판/글 삭제, 권한 변경
-  ZONE_MANAGER
-}
-
 model Role {
-  id            String           @id @default(cuid())
-  key           String           @unique
-  label         String
-  description   String?
-  isSystem      Boolean          @default(true)
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-
-  users         User[]           @relation("UserRbacRole")
+  id              String           @id @default(cuid())
+  key             String           @unique
+  label           String
+  isSystem        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  description     String?
   rolePermissions RolePermission[]
+  users           User[]           @relation("UserRbacRole")
 }
 
 model Permission {
-  id            String           @id @default(cuid())
-  key           String           @unique
-  label         String
-  category      String
-  description   String?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-
+  id              String           @id @default(cuid())
+  key             String           @unique
+  label           String
+  category        String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   rolePermissions RolePermission[]
 }
 
 model RolePermission {
-  id            String     @id @default(cuid())
-  roleId        String
-  permissionId  String
+  roleId       String
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
-  role          Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission    Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-
+  @@id([roleId, permissionId])
   @@unique([roleId, permissionId])
   @@index([roleId])
   @@index([permissionId])
 }
 
-// ============== User & MemberProfile ==============
-// 회원탈퇴는 soft delete만 사용 (status=DELETED, withdrawnAt 설정). User 행을 DELETE 하지 않음.
-// 게시글/문의/신청/참가 등 작성 데이터는 유지하고, 화면에서 작성자만 "탈퇴회원"으로 표시.
-
 model User {
-  id          String    @id @default(cuid())
-  name        String
-  username    String    @unique
-  password    String
-  email       String
-  phone       String?
-  role        UserRole  @default(USER)
-  roleId      String?
-  roleManualLocked Boolean @default(false)
-  status      String?   // ACTIVE(일반) | DELETED(탈퇴)
-  withdrawnAt DateTime? // 탈퇴 시각 (설정 시 로그인 불가, 재가입 제한 기간 적용)
-  latitude    Float?    // 회원 주소 좌표 (거리 정렬 폴백용)
-  longitude   Float?
-  address     String?   // 기본주소 (주소검색)
-  addressDetail String?  // 상세주소
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  memberProfile    MemberProfile?
-  orgMemberships   OrganizationMember[]
-  tournamentEntries     TournamentEntry[]
-  tournamentAttendances TournamentAttendance[]
-  inquiries        Inquiry[]
-  notifications    Notification[]
-  clientApplications ClientApplication[]
-  passwordResetTokens PasswordResetToken[]
-  tournamentsCreated   Tournament[]           // 대회 생성자 (감사용)
-  zoneManagerAssignments ZoneManagerAssignment[]
-  entryZoneAssignmentsGranted TournamentEntryZoneAssignment[]  // 권역 배정 수행자
-  pushSubscriptions PushSubscription[]
-  billiardNotes     BilliardNote[]
-  nanguPosts        NanguPost[]
-  nanguSolutions    NanguSolution[]
-  communityPosts    CommunityPost[]
-  communityComments CommunityComment[]
-  communityPostLikes    CommunityPostLike[]
-  communityCommentLikes CommunityCommentLike[]
-  communityBookmarks    CommunityBookmark[]
-  communityNotifications         CommunityNotification[]
-  communityNotificationsAsRelated CommunityNotification[] @relation("NotificationActor")
-  communityReports       CommunityReport[]
-  troubleShotSolutions   TroubleShotSolution[]
-  troubleShotSolutionVotes TroubleShotSolutionVote[]
-  communityScoreLogs     CommunityScoreLog[]
-  nanguSolutionVotes    NanguSolutionVote[]
-  activityPoints        UserActivityPoint[]
-
-  communityScore        Int      @default(0)  // 커뮤니티 신뢰도 누적 점수 (레벨 계산용)
-  activityPoint         Int      @default(0)  // 활동 점수 캐시 (승급/랭킹용)
-  rbacRole              Role?    @relation("UserRbacRole", fields: [roleId], references: [id], onDelete: SetNull)
+  id                              String                          @id @default(cuid())
+  name                            String
+  username                        String                          @unique
+  password                        String
+  email                           String
+  phone                           String?
+  createdAt                       DateTime                        @default(now())
+  updatedAt                       DateTime                        @updatedAt
+  withdrawnAt                     DateTime?
+  status                          String?
+  address                         String?
+  addressDetail                   String?
+  latitude                        Float?
+  longitude                       Float?
+  role                            UserRole                        @default(USER)
+  communityScore                  Int                             @default(0)
+  roleId                          String?
+  activityPoint                   Int                             @default(0)
+  roleManualLocked                Boolean                         @default(false)
+  billiardNotes                   BilliardNote[]
+  clientApplications              ClientApplication[]
+  communityBookmarks              CommunityBookmark[]
+  communityComments               CommunityComment[]
+  communityCommentLikes           CommunityCommentLike[]
+  communityPosts                  CommunityPost[]
+  communityPostLikes              CommunityPostLike[]
+  communityReports                CommunityReport[]
+  communityScoreLogs              CommunityScoreLog[]
+  inquiries                       Inquiry[]
+  memberProfile                   MemberProfile?
+  nanguPosts                      NanguPost[]
+  nanguSolutions                  NanguSolution[]
+  NanguSolutionComment            NanguSolutionComment[]
+  NanguSolutionReaction           NanguSolutionReaction[]
+  notifications                   Notification[]
+  orgMemberships                  OrganizationMember[]
+  passwordResetTokens             PasswordResetToken[]
+  pushSubscriptions               PushSubscription[]
+  tournamentsCreated              Tournament[]
+  tournamentAttendances           TournamentAttendance[]
+  tournamentEntries               TournamentEntry[]
+  entryZoneAssignmentsGranted     TournamentEntryZoneAssignment[]
+  troubleShotSolutions            TroubleShotSolution[]
+  troubleShotSolutionVotes        TroubleShotSolutionVote[]
+  rbacRole                        Role?                           @relation("UserRbacRole", fields: [roleId], references: [id])
+  activityPoints                  UserActivityPoint[]
+  zoneManagerAssignments          ZoneManagerAssignment[]
+  communityNotificationsAsRelated CommunityNotification[]         @relation("NotificationActor")
+  communityNotifications          CommunityNotification[]
 
   @@index([roleId])
 }
@@ -124,9 +105,8 @@ model UserActivityPoint {
   refType        String?
   refId          String?
   description    String?
-  idempotencyKey String?  @unique
+  idempotencyKey String?
   createdAt      DateTime @default(now())
-
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -141,8 +121,7 @@ model PasswordResetToken {
   token     String   @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([token])
   @@index([userId])
@@ -151,23 +130,19 @@ model PasswordResetToken {
 model MemberProfile {
   id                String    @id @default(cuid())
   userId            String    @unique
-  handicap          String?   // 핸디
-  avg               String?   // AVG
-  avgProofUrl       String?   // AVG 증빙 URL (Vercel Blob 등)
-  avgProofExpiresAt DateTime? // 증빙 만료일
+  handicap          String?
+  avg               String?
+  avgProofUrl       String?
+  avgProofExpiresAt DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// ============== Client Application (클라이언트 신청) ==============
-
 model ClientApplication {
-  id                   String    @id @default(cuid())
-  type                 String    // VENUE | CLUB | FEDERATION | HOST | INSTRUCTOR
-  status               String    @default("PENDING") // PENDING | APPROVED | REJECTED
-  requestedClientType  String?    @default("GENERAL") // GENERAL | REGISTERED (일반업체 vs 등록업체)
+  id                  String    @id @default(cuid())
+  type                String
+  status              String    @default("PENDING")
   applicantUserId     String?
   organizationName    String
   applicantName       String
@@ -178,187 +153,173 @@ model ClientApplication {
   referenceLink       String?
   rejectedReason      String?
   reviewedAt          DateTime?
-  reviewedByUserId    String?    // 승인/반려 처리한 플랫폼 관리자
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
-
-  applicant User? @relation(fields: [applicantUserId], references: [id], onDelete: SetNull)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  requestedClientType String?   @default("GENERAL")
+  reviewedByUserId    String?
+  applicant           User?     @relation(fields: [applicantUserId], references: [id])
 
   @@index([status])
   @@index([applicantUserId])
 }
 
-// ============== Organization (당구장/동호회/연맹/주최자/강사) ==============
-
 model Organization {
-  id               String   @id @default(cuid())
-  ownerUserId      String?  // 1계정 1업체 시 대표 관리자
-  slug             String?  @unique // URL용 (carom.club/hmc). nullable: 기존 데이터 호환
-  name             String
-  type             String   @default("CLUB") // VENUE | CLUB | FEDERATION | HOST | INSTRUCTOR | OTHER
-  shortDescription String?
-  description      String?
-  fullDescription  String?
-  logoImageUrl     String?
-  coverImageUrl    String?
-  phone            String?
-  email            String?
-  website          String?
-  address          String?
-  addressDetail    String?   // 상세주소
-  addressNaverMapEnabled Boolean? @default(false) // 지번 주소 네이버 지도 연동 여부
-  region           String?
-  latitude         Float?
-  longitude        Float?
-  isPublished      Boolean  @default(false)
-  setupCompleted   Boolean  @default(false)
-  promoDraft       String?
-  promoPublished   String?
-  promoPublishedAt DateTime?
-  promoPdfUrl      String?   // 홍보용 PDF
-  promoImageUrl    String?   // 홍보용 대표 이미지
-  typeSpecificJson String? // 업체 종류별 JSON: 당구장/동호회/연맹/레슨
-  // 플랫폼 관리: 권한 정지/제명, 비고
-  status       String  @default("ACTIVE") // ACTIVE | SUSPENDED | EXPELLED
-  adminRemarks String? // 비고 (사유 등)
-  // 클라이언트 구분 (2단계 정책): 일반업체/등록업체, 승인 상태, 연회원 여부
-  clientType           String?   @default("GENERAL")  // GENERAL | REGISTERED
-  approvalStatus       String?   // PENDING | APPROVED | REJECTED (승인된 클라이언트만 운영)
-  membershipType       String?   // NONE | ANNUAL (연회원 적용 시 ANNUAL). 현재 무료 운영 중심, 확장용.
-  membershipExpireDate DateTime? // 연회원 만료일. membershipType=ANNUAL일 때 사용. 없으면 무제한 또는 별도 구독으로 판단.
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-
-  members           OrganizationMember[]
-  tournaments       Tournament[]
-  tournamentVenues  TournamentVenue[]  // 이 당구장이 개최지로 지정된 대회들
-  feeSetting       OrganizationFeeSetting?
-  feePayments      OrganizationFeePayment[]
-  clientMemberships ClientMembership[]  // 연회원: 유효 시 대회 무제한 생성
-  // 10단계: 요금/기능/등록상품
-  planSubscriptions OrganizationPlanSubscription[]
-  featureAccesses   OrganizationFeatureAccess[]
-  paymentRecords    PaymentRecord[]
-  listingPurchases  ListingPurchaseRecord[]
+  id                     String                         @id @default(cuid())
+  slug                   String?                        @unique
+  name                   String
+  description            String?
+  promoDraft             String?
+  promoPublished         String?
+  promoPublishedAt       DateTime?
+  createdAt              DateTime                       @default(now())
+  updatedAt              DateTime                       @updatedAt
+  status                 String                         @default("ACTIVE")
+  adminRemarks           String?
+  address                String?
+  addressNaverMapEnabled Boolean?                       @default(false)
+  coverImageUrl          String?
+  email                  String?
+  fullDescription        String?
+  isPublished            Boolean                        @default(false)
+  latitude               Float?
+  logoImageUrl           String?
+  longitude              Float?
+  ownerUserId            String?
+  phone                  String?
+  region                 String?
+  setupCompleted         Boolean                        @default(false)
+  shortDescription       String?
+  typeSpecificJson       String?
+  website                String?
+  type                   String                         @default("CLUB")
+  addressDetail          String?
+  approvalStatus         String?
+  clientType             String?                        @default("GENERAL")
+  membershipType         String?
+  membershipExpireDate   DateTime?
+  promoPdfUrl            String?
+  promoImageUrl          String?
+  clientMemberships      ClientMembership[]
+  listingPurchases       ListingPurchaseRecord[]
+  featureAccesses        OrganizationFeatureAccess[]
+  feePayments            OrganizationFeePayment[]
+  feeSetting             OrganizationFeeSetting?
+  members                OrganizationMember[]
+  planSubscriptions      OrganizationPlanSubscription[]
+  paymentRecords         PaymentRecord[]
+  tournaments            Tournament[]
+  tournamentVenues       TournamentVenue[]
 }
 
-// 클라이언트 회비 설정: 월회비/연회비 택일
 model OrganizationFeeSetting {
-  id             String   @id @default(cuid())
-  organizationId String   @unique
-  feeType        String   // MONTHLY | ANNUAL
-  amountInWon    Int?     // 권장 금액 (원)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  feeType        String
+  amountInWon    Int?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
 
-// 클라이언트 회비 입금 장부
 model OrganizationFeePayment {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
-  amountInWon    Int      // 입금액 (원)
-  paidAt         DateTime // 입금일
-  period         String   // 월회비: "2025-01", 연회비: "2025"
+  amountInWon    Int
+  paidAt         DateTime
+  period         String
   memo           String?
-  createdAt      DateTime @default(now())
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([organizationId, period])
 }
 
 model OrganizationMember {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
   userId         String
-  role           String   @default("MEMBER") // OWNER | ADMIN | MEMBER | GUEST
-  status         String   @default("ACTIVE")  // ACTIVE | PENDING | SUSPENDED | LEFT
-  joinedAt       DateTime               @default(now())
+  joinedAt       DateTime     @default(now())
   leftAt         DateTime?
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           String       @default("MEMBER")
+  status         String       @default("ACTIVE")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, userId])
   @@index([organizationId])
   @@index([userId])
 }
 
-// 홍보 페이지 템플릿 (편집기에서 불러오기/저장)
 model PromoPageTemplate {
-  id            String   @id @default(cuid())
-  name          String   // 템플릿명
-  description   String?  // 용도 설명
-  category      String   // VENUE_INTRO | TOURNAMENT | LESSON | EVENT | CUSTOM
-  thumbnailUrl  String?  // 썸네일 (선택)
-  contentHtml   String   @db.Text // 편집기 HTML 내용 (복사본으로 불러옴)
-  isDefault     Boolean  @default(false) // 기본 제공 템플릿
-  createdById   String?  // 관리자가 저장한 경우
-  createdAt     DateTime @default(now())
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  category     String
+  thumbnailUrl String?
+  contentHtml  String
+  isDefault    Boolean  @default(false)
+  createdById  String?
+  createdAt    DateTime @default(now())
 
   @@index([isDefault])
   @@index([category])
 }
 
 model Tournament {
-  id               String    @id @default(cuid())
-  organizationId   String
-  createdByUserId  String?   // 대회 생성자 (감사/권한 보조용, 소유권은 organizationId 기준)
-  name             String
-  title            String?   // 표제 (name 대신 사용 가능)
-  slug             String?
-  summary          String?
-  description      String?
-  posterImageUrl   String?
-  imageUrl         String?  // 레거시
-  venue            String?
-  venueName        String?
-  region           String?
-  /// 전국대회 필터용 — region 문자열 파싱 대신 등치 인덱스 조회 (마이그레이션으로 기존 행 백필)
-  nationalTournament Boolean @default(false)
-  startAt          DateTime
-  endAt            DateTime?
-  entryFee         Int?
-  prizeInfo        String?
-  gameFormat       String?
-  qualification    String?
-  entryCondition   String?   // 참가 조건 (예: 평균 0.5 미만)
-  maxParticipants  Int?
-  status           String    @default("OPEN")   // DRAFT | OPEN | CLOSED | BRACKET_GENERATED | FINISHED | HIDDEN
-  tournamentStage  String    @default("SETUP")  // SETUP | QUALIFIER_RUNNING | QUALIFIER_COMPLETED | FINAL_READY | FINAL_RUNNING | COMPLETED (권역 예선→본선 진행)
-  approvalType     String    @default("HOST_APPROVAL") // HOST_APPROVAL | AUTO_APPROVAL | OCR_APPROVAL
-  rules            String?   // 경기 요강 (긴 텍스트)
-  promoContent     String?   // 대회 홍보 HTML (당구장 홍보와 동일 에디터)
-  outlineDraft     String?
-  outlinePublished String?
-  outlinePublishedAt DateTime?
-  outlinePdfUrl    String?   // 요강용 PDF
+  id                        String                         @id @default(cuid())
+  organizationId            String
+  name                      String
+  slug                      String?
+  description               String?
+  startAt                   DateTime
+  endAt                     DateTime?
+  imageUrl                  String?
+  venue                     String?
+  gameFormat                String?
+  status                    String                         @default("OPEN")
+  outlineDraft              String?
+  outlinePublished          String?
+  outlinePublishedAt        DateTime?
+  createdAt                 DateTime                       @default(now())
+  updatedAt                 DateTime                       @updatedAt
+  title                     String?
+  approvalType              String                         @default("HOST_APPROVAL")
+  entryCondition            String?
+  entryFee                  Int?
+  maxParticipants           Int?
+  posterImageUrl            String?
+  prizeInfo                 String?
+  promoContent              String?
+  qualification             String?
+  region                    String?
+  rules                     String?
+  summary                   String?
+  venueName                 String?
+  createdByUserId           String?
+  tournamentStage           String                         @default("SETUP")
+  isPromoted                Boolean                        @default(false)
+  promotionLevel            Int?
+  promotionEndDate          DateTime?
+  outlinePdfUrl             String?
   /// 대진표 생성 전 참가 명단 확정 시각. 설정 후 확정자 목록 스냅샷과 함께 고정되며, 신청/입금확인/취소 등 변경이 제한됨.
   participantRosterLockedAt DateTime?
   /// 확정 시점 CONFIRMED entry id 목록 등 JSON (lib/tournament-participant-roster.ts 스키마)
-  participantRosterSnapshot   String?
-  // 유료화 확장용: 대회 홍보 상품. 현재 무료 운영, 구조만 확보.
-  isPromoted       Boolean   @default(false)  // 홍보 상품 적용 여부
-  promotionLevel   Int?      // 1=기본, 2=프리미엄 등. 상품별 레벨
-  promotionEndDate DateTime? // 홍보 노출 종료일
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdBy    User?            @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
-  rule         TournamentRule?
-  entries      TournamentEntry[]
-  rounds       TournamentRound[]
-  tournamentVenues     TournamentVenue[]       // 연맹/동호회 대회 시 개최 당구장 목록 (Organization 참조)
-  matchVenues         TournamentMatchVenue[]   // 당구장 대회 MVP: 1경기장, 2경기장… (표시/정보용)
-  tournamentZones     TournamentZone[]         // 대회별 권역 연결 (예선 권역 등, 연맹대회용)
-  finalQualifiers     TournamentFinalQualifier[]
-  finalMatches        TournamentFinalMatch[]
-  finalMatchAuditLogs TournamentFinalMatchAuditLog[]
-  settlement          TournamentSettlement?
+  participantRosterSnapshot String?
+  /// 전국대회 필터용 — region 문자열 파싱 대신 등치 인덱스 조회 (마이그레이션으로 기존 행 백필)
+  nationalTournament        Boolean                        @default(false)
+  createdBy                 User?                          @relation(fields: [createdByUserId], references: [id])
+  organization              Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  entries                   TournamentEntry[]
+  finalMatches              TournamentFinalMatch[]
+  finalMatchAuditLogs       TournamentFinalMatchAuditLog[]
+  finalQualifiers           TournamentFinalQualifier[]
+  matchVenues               TournamentMatchVenue[]
+  rounds                    TournamentRound[]
+  rule                      TournamentRule?
+  settlement                TournamentSettlement?
+  tournamentVenues          TournamentVenue[]
+  tournamentZones           TournamentZone[]
 
   @@index([status, startAt])
   @@index([nationalTournament])
@@ -366,65 +327,60 @@ model Tournament {
 
 /// 대회 종료 후 참가비·환불·상금·비용 등을 기록 (대회별 1건 + 라인 아이템)
 model TournamentSettlement {
-  id             String    @id @default(cuid())
-  tournamentId   String    @unique
-  status         String    @default("DRAFT") // DRAFT | LOCKED
+  id             String                     @id @default(cuid())
+  tournamentId   String                     @unique
+  status         String                     @default("DRAFT")
   memo           String?
   lockedAt       DateTime?
   lockedByUserId String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  tournament Tournament               @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  lines      TournamentSettlementLine[]
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  tournament     Tournament                 @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  lines          TournamentSettlementLine[]
 }
 
 model TournamentSettlementLine {
-  id           String   @id @default(cuid())
+  id           String               @id @default(cuid())
   settlementId String
-  category     String // ENTRY_FEE | REFUND | PRIZE | OPERATING | VENUE_RENT | LABOR | OTHER
+  category     String
   label        String?
-  flow         String // INCOME | EXPENSE
+  flow         String
   amountKrw    Int
   note         String?
-  sortOrder    Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  settlement TournamentSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  sortOrder    Int                  @default(0)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  settlement   TournamentSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
 
   @@index([settlementId])
 }
 
-// 당구장 대회 MVP: 대회별 경기장 슬롯 (1경기장, 2경기장 …). 표시/정보용, 대진 분산은 추후.
 model TournamentMatchVenue {
-  id           String   @id @default(cuid())
-  tournamentId String
-  venueNumber  Int      // 1, 2, 3 …
-  displayLabel String  // "1경기장"
-  venueName    String?  // 경기장명
-  address      String?
-  phone        String?
-  sortOrder    Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  tournament      Tournament             @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  bracketMatches  TournamentFinalMatch[]
+  id             String                 @id @default(cuid())
+  tournamentId   String
+  venueNumber    Int
+  displayLabel   String
+  venueName      String?
+  address        String?
+  phone          String?
+  sortOrder      Int                    @default(0)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  bracketMatches TournamentFinalMatch[]
+  tournament     Tournament             @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
   @@unique([tournamentId, venueNumber])
   @@index([tournamentId])
 }
 
 model TournamentVenue {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   tournamentId   String
-  organizationId String   // 당구장(Organization type=VENUE) id
-  sortOrder      Int      @default(0)
-  createdAt      DateTime @default(now())
-
-  tournament   Tournament   @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tournament     Tournament   @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
   @@unique([tournamentId, organizationId])
   @@index([tournamentId])
@@ -432,54 +388,47 @@ model TournamentVenue {
 }
 
 model TournamentRule {
-  id            String   @id @default(cuid())
-  tournamentId  String   @unique
-  // 참가
-  entryFee      Int?
-  operatingFee  Int?
-  maxEntries    Int?
-  useWaiting      Boolean  @default(false)
+  id              String     @id @default(cuid())
+  tournamentId    String     @unique
+  entryFee        Int?
+  operatingFee    Int?
+  maxEntries      Int?
+  useWaiting      Boolean    @default(false)
   entryConditions String?
-  // 대진표/진행 (SQLite: Json 미지원 → String 저장)
-  bracketType   String?  // 죽방(jukbang), 서바이벌(survival), 토너먼트(tournament)
-  bracketConfig String?  // JSON string: tableCount, maxPerGroup, finalistCount, noRematch, detailFormat
-  // 상금
-  prizeType     String?  // fixed, ratio, score_proportional
-  prizeInfo     String?  // JSON string: fixed ranks, ratio %, score config
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  bracketType     String?
+  bracketConfig   String?
+  prizeType       String?
+  prizeInfo       String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  tournament      Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 }
 
-// ============== Tournament Entry (참가 신청) ==============
-
 model TournamentEntry {
-  id               String   @id @default(cuid())
-  tournamentId     String
-  userId           String
-  slotNumber       Int      @default(1)  // 중복 참가 시 1, 2, 3... (같은 user가 여러 슬롯 보유 가능)
-  status           String   @default("APPLIED") // APPLIED(신청대기) | CONFIRMED(참가확정) | REJECTED | CANCELED
-  depositorName    String?  // 입금자명 등 (참가비 연동 시 사용)
-  clubOrAffiliation String? // 소속/클럽 (신청 시 선택 입력, 확장용)
-  handicap         String?  // 핸디 (참가 신청 시 입력)
-  avg              String?  // AVG (참가 신청 시 입력)
-  avgProofUrl      String?  // AVG 인증서 이미지 URL (참가 신청 시 첨부)
-  entryFeeAmount   Int?    // 이 슬롯의 참가비 (1슬롯=1배, 2슬롯부터=2배 적용 시 저장)
-  paymentMarkedByApplicantAt DateTime? // 신청자 입금완료 체크 시각, 관리자 입금확인 가능 조건
-  paidAt           DateTime?  // 관리자 입금확인 시각 (중복 확인 방지)
-  rejectionReason String?  // 반려 시 사유 (CLIENT_ADMIN 입력)
-  reviewedAt       DateTime? // 승인/반려 처리 시각
-  round            String?
-  prize            Int?
-  waitingListOrder Int?   // 웨이팅 순번 (입금확인 시 정원 초과면 자동 부여, 확정 취소 시 자동 갱신)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  attendances TournamentAttendance[]
-  zoneAssignment TournamentEntryZoneAssignment?  // 대회별 권역 배정 (1:1)
+  id                         String                         @id @default(cuid())
+  tournamentId               String
+  userId                     String
+  depositorName              String?
+  paidAt                     DateTime?
+  round                      String?
+  prize                      Int?
+  waitingListOrder           Int?
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+  status                     String                         @default("APPLIED")
+  clubOrAffiliation          String?
+  paymentMarkedByApplicantAt DateTime?
+  rejectionReason            String?
+  reviewedAt                 DateTime?
+  entryFeeAmount             Int?
+  slotNumber                 Int                            @default(1)
+  avg                        String?
+  avgProofUrl                String?
+  handicap                   String?
+  attendances                TournamentAttendance[]
+  tournament                 Tournament                     @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user                       User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  zoneAssignment             TournamentEntryZoneAssignment?
 
   @@unique([tournamentId, userId, slotNumber])
   @@index([tournamentId])
@@ -487,191 +436,170 @@ model TournamentEntry {
 }
 
 model TournamentAttendance {
-  id        String   @id @default(cuid())
+  id        String          @id @default(cuid())
   entryId   String
   userId    String
-  attended  Boolean  @default(true) // 출석 여부
-  createdAt DateTime @default(now())
-
-  entry TournamentEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
-  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attended  Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  entry     TournamentEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([entryId, userId])
   @@index([entryId])
   @@index([userId])
 }
 
-// ============== Tournament Round / Group / Result ==============
-
 model TournamentRound {
-  id            String   @id @default(cuid())
-  tournamentId  String
-  name          String   // 예: "예선", "본선 1라운드"
-  sortOrder     Int      @default(0)
-  bracketData   String?  // 레거시/조편성용 JSON. 단판 토너먼트 본선은 TournamentFinalMatch가 정본.
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  tournament   Tournament            @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  groups       TournamentGroup[]
+  id           String                 @id @default(cuid())
+  tournamentId String
+  name         String
+  sortOrder    Int                    @default(0)
+  bracketData  String?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
   finalMatches TournamentFinalMatch[]
+  groups       TournamentGroup[]
+  tournament   Tournament             @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 }
 
 model TournamentGroup {
-  id        String   @id @default(cuid())
+  id        String                  @id @default(cuid())
   roundId   String
-  name      String?  // 조 이름 (A조, B조 등)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  round   TournamentRound        @relation(fields: [roundId], references: [id], onDelete: Cascade)
-  members TournamentGroupMember[]
-  results TournamentResult[]
+  name      String?
+  sortOrder Int                     @default(0)
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+  round     TournamentRound         @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  members   TournamentGroupMember[]
+  results   TournamentResult[]
 }
 
 model TournamentGroupMember {
-  id       String   @id @default(cuid())
-  groupId  String
-  entryId  String   // TournamentEntry 참조 목적 (실제 FK는 없을 수 있음 - 엔트리와 매핑)
-  sortOrder Int     @default(0)
-  createdAt DateTime @default(now())
-
-  group TournamentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  id        String          @id @default(cuid())
+  groupId   String
+  entryId   String
+  sortOrder Int             @default(0)
+  createdAt DateTime        @default(now())
+  group     TournamentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@index([groupId])
 }
 
 model TournamentResult {
-  id        String   @id @default(cuid())
+  id        String          @id @default(cuid())
   groupId   String
-  entryId   String?  // 우승/준우승 등 매핑
+  entryId   String?
   rank      Int?
   score     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  group TournamentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  group     TournamentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@index([groupId])
 }
 
-// ============== Zone (권역) & 대회-권역 연결 & 권역 관리자 배정 ==============
-// ZONE_MANAGER 역할 사용자는 배정된 권역만 결과 입력·진출 확정 가능.
-// TournamentZone: 어떤 zone이 어떤 tournament에 연결되어 있는지 (권역별 예선·본선 연결용).
-
 model Zone {
-  id        String   @id @default(cuid())
-  name      String   // 권역명 (예: 서울권, 부산권)
-  code      String?  // 짧은 코드 (예: SEOUL, BUSAN)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  managerAssignments ZoneManagerAssignment[]
+  id                 String                  @id @default(cuid())
+  name               String
+  code               String?
+  sortOrder          Int                     @default(0)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
   tournamentZones    TournamentZone[]
+  managerAssignments ZoneManagerAssignment[]
 }
 
 model TournamentZone {
-  id               String   @id @default(cuid())
-  tournamentId     String
-  zoneId           String
-  name             String?  // 대회 안에서의 표시명 (없으면 Zone.name 사용)
-  code             String?  // 대회 안에서의 코드
-  sortOrder        Int      @default(0)
-  status           String?  // ACTIVE | DRAFT | CLOSED 등 (선택)
-  advanceCount     Int      @default(1)   // 본선 진출 인원 수 (TOP_N 시)
-  advanceRuleType  String   @default("WINNER_ONLY")  // WINNER_ONLY | TOP_N
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  zone       Zone       @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  id              String                          @id @default(cuid())
+  tournamentId    String
+  zoneId          String
+  name            String?
+  code            String?
+  sortOrder       Int                             @default(0)
+  status          String?
+  advanceCount    Int                             @default(1)
+  advanceRuleType String                          @default("WINNER_ONLY")
+  createdAt       DateTime                        @default(now())
+  updatedAt       DateTime                        @updatedAt
   zoneAssignments TournamentEntryZoneAssignment[]
-  zoneMatches     TournamentZoneMatch[]
   finalQualifiers TournamentFinalQualifier[]
+  tournament      Tournament                      @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  zone            Zone                            @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  zoneMatches     TournamentZoneMatch[]
 
   @@unique([tournamentId, zoneId])
   @@index([tournamentId])
   @@index([zoneId])
 }
 
-// 권역별 대진표 경기 1건. TournamentZone 단위로 생성·관리.
 model TournamentZoneMatch {
-  id               String   @id @default(cuid())
+  id               String         @id @default(cuid())
   tournamentId     String
   tournamentZoneId String
-  roundIndex       Int      // 0 = 1라운드
-  matchIndex       Int      // 라운드 내 순번
-  entryIdA         String?  // TournamentEntry id, BYE 시 null
+  roundIndex       Int
+  matchIndex       Int
+  entryIdA         String?
   entryIdB         String?
-  scoreA           Int?     // 점수(선택)
+  scoreA           Int?
   scoreB           Int?
-  winnerEntryId    String?  // 확정 시
-  status           String   @default("PENDING")  // PENDING | BYE | IN_PROGRESS | COMPLETED
-  nextMatchId      String?  // 승자 진출 경기 id
-  nextSlot         String?  // A | B (다음 경기 슬롯)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  tournamentZone TournamentZone @relation(fields: [tournamentZoneId], references: [id], onDelete: Cascade)
+  winnerEntryId    String?
+  status           String         @default("PENDING")
+  nextMatchId      String?
+  nextSlot         String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  tournamentZone   TournamentZone @relation(fields: [tournamentZoneId], references: [id], onDelete: Cascade)
 
   @@index([tournamentZoneId])
   @@index([tournamentId])
 }
 
-// 본선 진출자 1명. 권역 결과에서 추출 후 취합.
 model TournamentFinalQualifier {
-  id                String   @id @default(cuid())
-  tournamentId      String
-  tournamentZoneId  String
-  entryId           String   // TournamentEntry id
-  qualifiedRank     Int      // 1=우승, 2=준우승, 3=3위, ...
-  sourceMatchId     String?  // 출처 경기 (TournamentZoneMatch id)
-  seedOrder         Int      @default(0)  // 본선 시드/배정 순서
-  createdAt         DateTime @default(now())
-
-  tournament     Tournament    @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  tournamentZone TournamentZone @relation(fields: [tournamentZoneId], references: [id], onDelete: Cascade)
+  id               String         @id @default(cuid())
+  tournamentId     String
+  tournamentZoneId String
+  entryId          String
+  qualifiedRank    Int
+  sourceMatchId    String?
+  seedOrder        Int            @default(0)
+  createdAt        DateTime       @default(now())
+  tournament       Tournament     @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  tournamentZone   TournamentZone @relation(fields: [tournamentZoneId], references: [id], onDelete: Cascade)
 
   @@unique([tournamentId, tournamentZoneId, qualifiedRank])
   @@index([tournamentId])
   @@index([tournamentZoneId])
 }
 
-// 대회 단위 단판/본선 브래킷 경기 1건 (운영 정본). entryIdA/B = 선수 슬롯 1·2, winnerEntryId = 승자.
-// 예선(TournamentZoneMatch)·본선을 bracketPhase로 구분해 동일 패턴으로 확장 가능.
 model TournamentFinalMatch {
-  id               String   @id @default(cuid())
-  tournamentId     String
+  id                String                @id @default(cuid())
+  tournamentId      String
+  roundIndex        Int
+  matchIndex        Int
+  entryIdA          String?
+  entryIdB          String?
+  scoreA            Int?
+  scoreB            Int?
+  winnerEntryId     String?
+  status            String                @default("PENDING")
+  nextMatchId       String?
+  nextSlot          String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
   /// 라운드 묶음(예: 단판 본체 / 본선 브래킷). 없으면 null — 레거시·권역 본선 전용 생성분.
   tournamentRoundId String?
   /// 당구장 대회 MVP 경기장 슬롯(1경기장, 2경기장…). 미배정 시 null.
-  matchVenueId     String?
+  matchVenueId      String?
   /// MAIN=일반 본선/단판, QUALIFIER=예선권역과 구분 시, PLAY_IN 등
-  bracketPhase     String   @default("MAIN")
-
-  roundIndex       Int      // 0 = 1라운드 (32강/64강 등)
-  matchIndex       Int      // 라운드 내 경기 번호(0부터). 화면 표시용은 +1 가능.
-  entryIdA         String?  // player1 슬롯 (TournamentEntry id)
-  entryIdB         String?  // player2 슬롯
-  scoreA           Int?
-  scoreB           Int?
-  winnerEntryId    String?
-  status           String   @default("PENDING") // PENDING | READY | BYE | IN_PROGRESS | COMPLETED
-  nextMatchId      String?  // 승자 진출 경기 id (TournamentFinalMatch.id)
-  nextSlot         String?  // A | B — 다음 경기의 어느 슬롯으로 승자가 들어가는지
+  bracketPhase      String                @default("MAIN")
   /// 운영 콘솔 예정 시작 시각 (로컬 표시는 클라이언트에서 변환)
-  scheduledStartAt DateTime?
+  scheduledStartAt  DateTime?
   /// 문제 경기 플래그 (현장 이슈·재배정 필요 등)
-  hasIssue         Boolean  @default(false)
-  issueNote        String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  tournament       Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  tournamentRound  TournamentRound? @relation(fields: [tournamentRoundId], references: [id], onDelete: SetNull)
-  matchVenue       TournamentMatchVenue? @relation(fields: [matchVenueId], references: [id], onDelete: SetNull)
+  hasIssue          Boolean               @default(false)
+  issueNote         String?
+  matchVenue        TournamentMatchVenue? @relation(fields: [matchVenueId], references: [id])
+  tournament        Tournament            @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  tournamentRound   TournamentRound?      @relation(fields: [tournamentRoundId], references: [id])
 
   @@index([tournamentId])
   @@index([tournamentRoundId])
@@ -681,35 +609,32 @@ model TournamentFinalMatch {
 
 /// 본선/단판 Match 수정 감사(결과·상태 변경 추적). bracketConfig 정책과 별도로 이력 적재.
 model TournamentFinalMatchAuditLog {
-  id           String   @id @default(cuid())
+  id           String     @id @default(cuid())
   tournamentId String
   matchId      String
   actorUserId  String
-  action       String   // PATCH | START | RESULT
-  summaryJson  String   @db.Text
-  createdAt    DateTime @default(now())
-
-  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  action       String
+  summaryJson  String
+  createdAt    DateTime   @default(now())
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
   @@index([tournamentId, matchId])
   @@index([createdAt])
 }
 
-// 참가자 → 대회별 권역(TournamentZone) 배정. 한 참가자는 같은 대회에서 하나의 권역에만 배정.
 model TournamentEntryZoneAssignment {
-  id                String    @id @default(cuid())
-  tournamentEntryId String    @unique  // 1:1
+  id                String          @id @default(cuid())
+  tournamentEntryId String          @unique
   tournamentZoneId  String
-  assignmentType    String    // AUTO | MANUAL
-  assignedAt        DateTime  @default(now())
+  assignmentType    String
+  assignedAt        DateTime        @default(now())
   assignedByUserId  String?
   notes             String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  entry    TournamentEntry @relation(fields: [tournamentEntryId], references: [id], onDelete: Cascade)
-  tournamentZone TournamentZone @relation(fields: [tournamentZoneId], references: [id], onDelete: Cascade)
-  assignedBy User? @relation(fields: [assignedByUserId], references: [id], onDelete: SetNull)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  assignedBy        User?           @relation(fields: [assignedByUserId], references: [id])
+  entry             TournamentEntry @relation(fields: [tournamentEntryId], references: [id], onDelete: Cascade)
+  tournamentZone    TournamentZone  @relation(fields: [tournamentZoneId], references: [id], onDelete: Cascade)
 
   @@index([tournamentZoneId])
 }
@@ -719,121 +644,106 @@ model ZoneManagerAssignment {
   userId    String
   zoneId    String
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  zone Zone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  zone      Zone     @relation(fields: [zoneId], references: [id], onDelete: Cascade)
 
   @@unique([userId, zoneId])
   @@index([userId])
   @@index([zoneId])
 }
 
-// ============== Notification ==============
-
 model Notification {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
   message   String
   readAt    DateTime?
   createdAt DateTime  @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
-// ============== Web Push ==============
-// 사용자별 브라우저 구독. 한 사용자가 여러 기기에서 구독 가능.
-
 model PushSubscription {
   id        String   @id @default(cuid())
   userId    String
-  endpoint  String   // 브라우저 push subscription endpoint
-  p256dh    String   // 클라이언트 public key
-  auth      String   // auth secret
+  endpoint  String
+  p256dh    String
+  auth      String
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, endpoint])
   @@index([userId])
 }
 
-// Web Push 발송 기록
 model NotificationLog {
-  id            String    @id @default(cuid())
-  userId        String
-  tournamentId  String?
-  type          String    // ENTRY_APPROVED | BRACKET_GENERATED | VENUE_REMINDER | PRIZE
-  title         String
-  body          String?
-  url           String?
-  status        String    @default("PENDING") // PENDING | SENT | FAILED
-  errorMessage  String?
-  createdAt     DateTime  @default(now())
-  sentAt        DateTime?
+  id           String    @id @default(cuid())
+  userId       String
+  tournamentId String?
+  type         String
+  title        String
+  body         String?
+  url          String?
+  status       String    @default("PENDING")
+  errorMessage String?
+  createdAt    DateTime  @default(now())
+  sentAt       DateTime?
 
   @@index([userId])
   @@index([tournamentId])
   @@index([type, createdAt])
 }
 
-// ============== Site settings (singleton) ==============
-
 model SiteSetting {
-  id              String   @id @default(cuid())
-  siteName        String   @default("CAROM.CLUB")
-  siteDescription String?
-  logoUrl         String?
-  primaryColor    String   @default("#d97706")  // amber-600
-  secondaryColor  String   @default("#b91c1c")  // red-700
-  // 헤더·메뉴 색상 (관리자 > 사이트 설정)
-  headerBgColor     String?
-  headerTextColor   String?
-  headerActiveColor String?
-  // 메인 히어로 전용 설정 (JSON, 단일 소스)
-  heroSettingsJson String?
-  withdrawRejoinDays    Int      @default(0) // 탈퇴 후 재가입 가능 일수 (0=즉시 가능)
-  // 메인 대회·당구장 가로 흐름 속도(1=느림 ~ 100=빠름), 관리자 사이트 설정
-  homeCarouselFlowSpeed Int @default(50)
-  // 일반회원(USER)이 난구해결사 해법을 등록할 수 있는 최소 커뮤니티 LEVEL
-  minSolutionLevelForUser Int @default(1)
-  // 푸터 설정 (관리자 설정)
-  footerEnabled       Boolean  @default(false)
-  footerBgColor       String?
-  footerTextColor     String?
-  footerTitle         String?
-  footerCompanyName   String?
-  footerBusinessNumber String?
-  footerCeoName       String?
-  footerAddress       String?
-  footerPhone         String?
-  footerEmail         String?
-  footerCopyright     String?
-  footerFontSize      String?  // 푸터 전체 기본 글꼴 크기: xs | sm | base | lg
-  footerFontSizesJson    String?  // JSON: 주관사 정보 항목별 글자크기 { title?, companyName?, ... }
-  footerFontFamiliesJson String?  // JSON: 주관사 정보 항목별 글꼴 { title?, companyName?, ... }
-  footerPartnersJson     String?   // JSON: FooterPartner[] (id, name, category, logoUrl, websiteUrl, sortOrder, enabled)
-  updatedAt           DateTime @updatedAt
+  id                      String   @id @default(cuid())
+  siteName                String   @default("CAROM.CLUB")
+  siteDescription         String?
+  logoUrl                 String?
+  primaryColor            String   @default("#d97706")
+  secondaryColor          String   @default("#b91c1c")
+  updatedAt               DateTime @updatedAt
+  heroSettingsJson        String?
+  withdrawRejoinDays      Int      @default(0)
+  footerAddress           String?
+  footerBgColor           String?
+  footerBusinessNumber    String?
+  footerCeoName           String?
+  footerCompanyName       String?
+  footerCopyright         String?
+  footerEmail             String?
+  footerEnabled           Boolean  @default(false)
+  footerPartnersJson      String?
+  footerPhone             String?
+  footerTextColor         String?
+  footerTitle             String?
+  headerActiveColor       String?
+  headerBgColor           String?
+  headerTextColor         String?
+  footerFontSize          String?
+  footerFontSizesJson     String?
+  footerFontFamiliesJson  String?
+  homeCarouselFlowSpeed   Int      @default(50)
+  minSolutionLevelForUser Int      @default(1)
+  /// 색상 테마 프리셋(saas|dark|brand|nature|custom). null이면 primary/secondary만 커스텀
+  colorThemePreset        String?
+  /// colorThemePreset === custom 일 때 토큰 JSON (마이그레이션 20260329140000)
+  colorThemeCustomJson    String?
 }
 
-// 관리자 메뉴명·문구 커스텀 (플랫폼 관리자 > 설정 > 메뉴/문구)
 model AdminCopy {
   id    String @id @default(cuid())
-  key   String @unique // 예: menu.dashboard, nav.logout
+  key   String @unique
   value String
 }
 
-// 사이트 기능 플래그 (회원가입/대회생성/참가신청/커뮤니티 등 ON·OFF)
 model SiteFeatureFlag {
   id      String  @id @default(cuid())
-  key     String  @unique // signup_enabled, tournament_create_enabled, ...
+  key     String  @unique
   enabled Boolean @default(true)
 }
 
-// 고정 문구 (플랫폼 관리자 > 설정 > 고정 문구)
 model SystemText {
   id           String   @id @default(cuid())
   key          String   @unique
@@ -850,13 +760,12 @@ model SystemText {
   @@index([key])
 }
 
-// 고정 문구 변경 이력
 model SystemTextHistory {
   id        String   @id @default(cuid())
   textId    String
   key       String
   value     String?
-  action    String   // update | clear | reset_default | restore
+  action    String
   adminId   String
   createdAt DateTime @default(now())
 
@@ -864,15 +773,14 @@ model SystemTextHistory {
   @@index([createdAt])
 }
 
-// 관리자 활동 로그
 model AdminLog {
   id          String   @id @default(cuid())
   adminId     String
-  actionType  String   // create | update | delete | toggle
-  targetType  String   // notice | system_text | user_role | tournament | site_feature | etc
+  actionType  String
+  targetType  String
   targetId    String?
-  beforeValue String?  @db.Text // JSON or summary
-  afterValue  String?  @db.Text
+  beforeValue String?
+  afterValue  String?
   createdAt   DateTime @default(now())
 
   @@index([adminId])
@@ -880,10 +788,9 @@ model AdminLog {
   @@index([createdAt])
 }
 
-// 추천 콘텐츠 (홈/관리자: 대회·장소·게시글 추천)
 model FeaturedContent {
   id        String   @id @default(cuid())
-  type      String   // tournament | venue | post
+  type      String
   targetId  String
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
@@ -892,7 +799,6 @@ model FeaturedContent {
   @@index([type, sortOrder])
 }
 
-// 관리자 DB 백업 기록
 model BackupRecord {
   id        String   @id @default(cuid())
   filename  String
@@ -903,93 +809,79 @@ model BackupRecord {
   @@index([createdAt])
 }
 
-// ============== Integration settings (singleton, API 키 등) ==============
-
 model IntegrationSetting {
-  id                 String   @id @default(cuid())
-  naverMapClientId   String?  // 네이버 지도 JavaScript API 클라이언트 ID (관리자 입력 또는 env)
-  updatedAt          DateTime @updatedAt
+  id               String   @id @default(cuid())
+  naverMapClientId String?
+  updatedAt        DateTime @updatedAt
 }
-
-// ============== Notification settings (singleton) ==============
 
 model NotificationSetting {
-  id                      String   @id @default(cuid())
-  adminEmail              String?  // 관리자 알림 수신 이메일
-  notifyNewRegistration   Boolean  @default(true)   // 참가 신청 접수 시 관리자 알림
-  notifyRegistrationConfirmed Boolean @default(true) // 참가자 신청 완료 이메일 발송
-  notifyPaymentConfirmed  Boolean  @default(true)   // 입금 확인 알림
-  notifyAnnouncement      Boolean  @default(true)   // 공지사항 알림
-  updatedAt               DateTime @updatedAt
+  id                          String   @id @default(cuid())
+  adminEmail                  String?
+  notifyNewRegistration       Boolean  @default(true)
+  notifyRegistrationConfirmed Boolean  @default(true)
+  notifyPaymentConfirmed      Boolean  @default(true)
+  notifyAnnouncement          Boolean  @default(true)
+  updatedAt                   DateTime @updatedAt
 }
-
-// ============== Platform billing (요금 정책) ==============
-// 단일 행. billing_enabled=false 이면 2026년처럼 모든 기능 무료.
 
 model PlatformSettings {
-  id                    String   @id @default(cuid())
-  billingEnabled        Boolean  @default(false)  // true 시 결제 시스템 적용 (2027년~)
-  tournamentFee         Int      @default(30000)   // 대회 1회 이용권 (원)
-  clientMembershipFee   Int      @default(180000)  // 클라이언트 당구장 연회원 (원)
-  updatedAt             DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  billingEnabled      Boolean  @default(false)
+  tournamentFee       Int      @default(30000)
+  clientMembershipFee Int      @default(180000)
+  updatedAt           DateTime @updatedAt
 }
 
-// 클라이언트 당구장 연회원: 유효 기간 내면 대회 무제한 생성 가능.
 model ClientMembership {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
-  validFrom      DateTime @default(now())
-  validUntil     DateTime // 이 날짜까지(포함) 연회원 유효
-  createdAt      DateTime @default(now())
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  validFrom      DateTime     @default(now())
+  validUntil     DateTime
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([validUntil])
 }
 
-// ============== 10단계: 요금제/기능/등록상품 ==============
-
 model Feature {
-  id          String   @id @default(cuid())
-  code        String   @unique // TOURNAMENT_PROMO_PAGE, PARTICIPANT_MANAGEMENT 등
-  name        String
-  description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  planFeatures        PlanFeature[]
-  organizationAccess  OrganizationFeatureAccess[]
+  id                 String                      @id @default(cuid())
+  code               String                      @unique
+  name               String
+  description        String?
+  isActive           Boolean                     @default(true)
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+  organizationAccess OrganizationFeatureAccess[]
+  planFeatures       PlanFeature[]
 }
 
 model PricingPlan {
-  id          String   @id @default(cuid())
-  code        String   @unique // annual_membership, tournament_all_in_one_package 등
-  name        String
-  description String?
-  planType    String   // ANNUAL | PACKAGE | FEATURE
-  billingType String   // ONE_TIME | YEARLY
-  price       Int      @default(0)  // 원 단위, DB 저장
-  currency    String   @default("KRW")
-  isActive    Boolean  @default(true)
-  validDays   Int?     // 유효 일수 (연회원 365 등)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  planFeatures    PlanFeature[]
-  subscriptions   OrganizationPlanSubscription[]
-  paymentRecords  PaymentRecord[]
+  id             String                         @id @default(cuid())
+  code           String                         @unique
+  name           String
+  description    String?
+  planType       String
+  billingType    String
+  price          Int                            @default(0)
+  currency       String                         @default("KRW")
+  isActive       Boolean                        @default(true)
+  validDays      Int?
+  createdAt      DateTime                       @default(now())
+  updatedAt      DateTime                       @updatedAt
+  subscriptions  OrganizationPlanSubscription[]
+  paymentRecords PaymentRecord[]
+  planFeatures   PlanFeature[]
 }
 
 model PlanFeature {
-  id        String   @id @default(cuid())
+  id        String      @id @default(cuid())
   planId    String
   featureId String
-  createdAt DateTime @default(now())
-
-  plan   PricingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
-  feature Feature    @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+  feature   Feature     @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  plan      PricingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
   @@unique([planId, featureId])
   @@index([planId])
@@ -997,20 +889,19 @@ model PlanFeature {
 }
 
 model OrganizationPlanSubscription {
-  id              String    @id @default(cuid())
+  id              String       @id @default(cuid())
   organizationId  String
   planId          String
-  status          String    // ACTIVE | EXPIRED | CANCELLED
-  startedAt       DateTime  @default(now())
+  status          String
+  startedAt       DateTime     @default(now())
   expiresAt       DateTime?
   grantedByUserId String?
-  sourceType      String    // MANUAL | PURCHASE | APPROVAL
+  sourceType      String
   notes           String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  plan         PricingPlan  @relation(fields: [planId], references: [id], onDelete: Cascade)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan            PricingPlan  @relation(fields: [planId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([planId])
@@ -1018,45 +909,42 @@ model OrganizationPlanSubscription {
 }
 
 model OrganizationFeatureAccess {
-  id           String    @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
-  featureId    String
-  status       String    // ACTIVE | EXPIRED | REVOKED
-  startedAt    DateTime  @default(now())
-  expiresAt    DateTime?
-  sourceType   String    // PLAN | PURCHASE | MANUAL | MEMBERSHIP
-  sourceRefId  String?   // 구독/결제 id 등
-  notes        String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  feature      Feature      @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  featureId      String
+  status         String
+  startedAt      DateTime     @default(now())
+  expiresAt      DateTime?
+  sourceType     String
+  sourceRefId    String?
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  feature        Feature      @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([featureId])
   @@index([status, expiresAt])
 }
 
-// 결제 기록. 연회원/대회홍보/기능상품 등 통합. 현재는 수동·테스트 위주, PG 연동 시 확장.
 model PaymentRecord {
-  id                 String    @id @default(cuid())
-  organizationId     String
-  planId             String?
-  paymentType        String?   // MEMBERSHIP | TOURNAMENT_PROMO | FEATURE | PLAN | 기타. 확장 시 결제 유형 구분
-  amount             Int       @default(0)  // 원
-  currency           String    @default("KRW")
-  status             String    // PENDING | PAID | FAILED | CANCELLED | MANUAL_GRANTED
-  paidAt             DateTime?
-  sourceType         String    // MANUAL | MOCK | PG_FUTURE
-  externalPaymentId  String?
-  createdByUserId    String?
-  memo               String?
-  createdAt          DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  plan         PricingPlan?  @relation(fields: [planId], references: [id], onDelete: SetNull)
+  id                String       @id @default(cuid())
+  organizationId    String
+  planId            String?
+  amount            Int          @default(0)
+  currency          String       @default("KRW")
+  status            String
+  paidAt            DateTime?
+  sourceType        String
+  externalPaymentId String?
+  createdByUserId   String?
+  memo              String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  paymentType       String?
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan              PricingPlan? @relation(fields: [planId], references: [id])
 
   @@index([organizationId])
   @@index([planId])
@@ -1064,125 +952,127 @@ model PaymentRecord {
 }
 
 model ListingProduct {
-  id                  String   @id @default(cuid())
-  code                String   @unique // VENUE_PROMOTION, TOURNAMENT_POSTING, LESSON_POSTING, CLUB_POSTING
-  name                String
-  description         String?
-  postingMonths       Int      @default(1)  // 게시기간(개월)
-  price               Int      @default(0)  // 원, 0이면 무료
-  currency            String   @default("KRW")
-  isActive            Boolean  @default(true)
-  appliesToGeneralOnly Boolean @default(true)  // true = 일반업체만 적용, 등록업체 제외
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  purchases ListingPurchaseRecord[]
+  id                   String                  @id @default(cuid())
+  code                 String                  @unique
+  name                 String
+  description          String?
+  postingMonths        Int                     @default(1)
+  price                Int                     @default(0)
+  currency             String                  @default("KRW")
+  isActive             Boolean                 @default(true)
+  appliesToGeneralOnly Boolean                 @default(true)
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  purchases            ListingPurchaseRecord[]
 }
 
 model ListingPurchaseRecord {
-  id                String    @id @default(cuid())
-  organizationId    String
-  listingProductId  String
-  targetType        String    // VENUE_PROMO | TOURNAMENT | LESSON | CLUB
-  targetId          String?   // 대상 레코드 id (선택)
-  postingMonths     Int       @default(1)
-  amount            Int       @default(0)
-  status            String    @default("ACTIVE")  // ACTIVE | EXPIRED | CANCELLED
-  startedAt         DateTime  @default(now())
-  expiresAt         DateTime?
-  createdAt         DateTime  @default(now())
-
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  listingProduct ListingProduct @relation(fields: [listingProductId], references: [id], onDelete: Cascade)
+  id               String         @id @default(cuid())
+  organizationId   String
+  listingProductId String
+  targetType       String
+  targetId         String?
+  postingMonths    Int            @default(1)
+  amount           Int            @default(0)
+  status           String         @default("ACTIVE")
+  startedAt        DateTime       @default(now())
+  expiresAt        DateTime?
+  createdAt        DateTime       @default(now())
+  listingProduct   ListingProduct @relation(fields: [listingProductId], references: [id], onDelete: Cascade)
+  organization     Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([listingProductId])
   @@index([status, expiresAt])
 }
 
-// ============== CMS: Page Sections, Popups, Notice Bars ==============
-
 model PageSection {
-  id                String   @id @default(cuid())
-  type              String   // image | text | cta
+  id                String    @id @default(cuid())
+  type              String
   title             String
   subtitle          String?
   description       String?
-  textAlign         String   @default("center") // left | center | right
-  page              String   // home | venues | tournaments | community | mypage
-  placement         String   // below_header | main_visual_bg | ...
+  textAlign         String    @default("center")
+  page              String
+  placement         String
   imageUrl          String?
   imageUrlMobile    String?
   imageHeightPc     Int?
   imageHeightMobile Int?
-  linkType          String   @default("none") // none | internal | external
+  linkType          String    @default("none")
   internalPage      String?
   internalPath      String?
   externalUrl       String?
-  openInNewTab      Boolean  @default(false)
-  buttons           String?  // JSON string: SectionButton[] (SQLite Json 미지원)
-  isVisible         Boolean  @default(true)
-  sortOrder         Int      @default(0)
+  openInNewTab      Boolean   @default(false)
+  buttons           String?
+  isVisible         Boolean   @default(true)
+  sortOrder         Int       @default(0)
   startAt           DateTime?
   endAt             DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
   backgroundColor   String?
-  titleIconType     String?  // none | icon | image
-  titleIconName     String?
   titleIconImageUrl String?
-  titleIconSize     String?  // small | medium
-  sectionStyleJson  String?  // JSON: 애니메이션·구분선 등 (배경은 backgroundColor와 병합)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  titleIconName     String?
+  titleIconSize     String?
+  titleIconType     String?
+  sectionStyleJson  String?
+  /// 페이지 구조 슬롯(hero, postList 등). null이면 레거시 CMS 행 — type(image|text|cta)만 사용
+  slotType          String?
+  /// 슬롯별 소량 설정 JSON. 자유 HTML 금지
+  slotConfigJson    String?
+  /// 페이지 빌더 소프트 삭제(복원 가능). DB 컬럼은 `20260329170000_page_section_deleted_at` 한 곳에서만 추가(중복 마이그레이션 금지).
+  deletedAt         DateTime?
 
   @@index([page, placement])
   @@index([page])
+  @@index([page, slotType, sortOrder])
 }
 
 model Popup {
-  id                 String   @id @default(cuid())
-  title              String
-  description        String?
-  imageUrl           String?
-  buttonName         String?
-  buttonLink         String?
-  page               String    // all | home | venues | tournaments | community
-  startAt            DateTime?
-  endAt              DateTime?
-  hideForTodayEnabled Boolean  @default(true)
-  showCloseButton    Boolean   @default(true)
-  isVisible         Boolean   @default(true)
-  sortOrder         Int       @default(0)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                  String    @id @default(cuid())
+  title               String
+  description         String?
+  imageUrl            String?
+  buttonName          String?
+  buttonLink          String?
+  page                String
+  startAt             DateTime?
+  endAt               DateTime?
+  hideForTodayEnabled Boolean   @default(true)
+  showCloseButton     Boolean   @default(true)
+  isVisible           Boolean   @default(true)
+  sortOrder           Int       @default(0)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@index([page])
 }
 
 model NoticeBar {
-  id             String   @id @default(cuid())
-  message        String
-  linkType       String   @default("none") // none | internal | external
-  internalPath   String?
-  externalUrl    String?
-  openInNewTab   Boolean   @default(false)
-  backgroundColor String  @default("#1e3a5f")
-  textColor      String    @default("#ffffff")
-  page           String    // all | home | venues | tournaments
-  position       String    @default("below_header") // below_header | fixed_top
-  startAt        DateTime?
-  endAt          DateTime?
-  isVisible     Boolean   @default(true)
-  sortOrder     Int       @default(0)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  message         String
+  linkType        String    @default("none")
+  internalPath    String?
+  externalUrl     String?
+  openInNewTab    Boolean   @default(false)
+  backgroundColor String    @default("#1e3a5f")
+  textColor       String    @default("#ffffff")
+  page            String
+  position        String    @default("below_header")
+  startAt         DateTime?
+  endAt           DateTime?
+  isVisible       Boolean   @default(true)
+  sortOrder       Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([page])
 }
 
-// 플랫폼 공지 (관리자: bar | popup | emergency)
 model Notice {
   id          String    @id @default(cuid())
-  type        String    // bar | popup | emergency
+  type        String
   title       String
   content     String    @default("")
   linkUrl     String?
@@ -1200,172 +1090,140 @@ model Notice {
   @@index([isActive, type])
 }
 
-// ============== Community: 난구노트 (개인 기록, 공개 게시판 아님) ==============
-// 회원 본인만 관리. 난구해결로 보내기 시 게시판 글에 전달용.
-
 model BilliardNote {
-  id          String    @id @default(cuid())
-  authorId    String
-  title       String?   // 제목
-  noteDate    DateTime? // 기록 날짜 (표시용)
-  redBallX    Float     // 0..1 playfield normalized
-  redBallY    Float
-  yellowBallX Float
-  yellowBallY Float
-  whiteBallX  Float
-  whiteBallY  Float
-  cueBall     String    // "white" | "yellow"
-  memo        String?   @db.Text // 내용
-  imageUrl    String?
-  visibility  String    @default("private") // "private" | "community" (레거시)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  id                   String            @id @default(cuid())
+  authorId             String
+  title                String?
+  noteDate             DateTime?
+  redBallX             Float
+  redBallY             Float
+  yellowBallX          Float
+  yellowBallY          Float
+  whiteBallX           Float
+  whiteBallY           Float
+  cueBall              String
+  memo                 String?
+  imageUrl             String?
+  visibility           String            @default("private")
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  author               User              @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  nanguPostsFromNote   NanguPost?
   troubleShotsFromNote TroubleShotPost[]
-  nanguPostsFromNote NanguPost[]
 
   @@index([authorId])
   @@index([visibility, createdAt])
 }
 
-// ============== Community: 난구해결사 (문제 + 해법 레이어) ==============
-// 원본 공배치는 글쓰기 단계에서만 생성·저장되며, 게시 후에는 모두 보기 전용.
-// 해법은 별도 레이어(좌표 기반)로 저장.
-
 model NanguPost {
-  id                 String   @id @default(cuid())
-  authorId           String
-  title              String
-  content            String   @db.Text  // 문제 설명
-  ballPlacementJson  String   @db.Text  // JSON: { redBall, yellowBall, whiteBall, cueBall } 정규화 0..1, 수정 불가
-  adoptedSolutionId  String?  @unique // 채택된 해법 id (채택 시 질문자 +2, 해법 작성자 +6)
-  sourceNoteId       String?  @unique // 난구노트에서 요청으로 생성 시 (노트당 최대 1건)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
+  id                String          @id @default(cuid())
+  authorId          String
+  title             String
+  content           String
+  ballPlacementJson String
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  adoptedSolutionId String?         @unique(map: "NanguPost_adoptedSolutionId_key_v2")
+  sourceNoteId      String?         @unique
+  adoptedSolution   NanguSolution?  @relation("AdoptedSolution", fields: [adoptedSolutionId], references: [id])
   author            User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  sourceNote        BilliardNote?   @relation(fields: [sourceNoteId], references: [id], onDelete: SetNull)
+  sourceNote        BilliardNote?   @relation(fields: [sourceNoteId], references: [id])
   solutions         NanguSolution[]
-  adoptedSolution   NanguSolution?  @relation("AdoptedSolution", fields: [adoptedSolutionId], references: [id], onDelete: SetNull)
 
   @@index([authorId])
   @@index([createdAt])
 }
 
 model NanguSolution {
-  id        String   @id @default(cuid())
-  postId    String
-  authorId  String
-  title     String?  // 해법 제목 (선택)
-  comment   String?  @db.Text
-  dataJson  String   @db.Text  // 좌표 기반: paths, thicknessOffsetX, tipX, tipY, speed, depth, isBankShot 등
-  voteCount Int     @default(0)  // goodCount - badCount (정렬용 캐시)
-  goodCount Int     @default(0)
-  badCount  Int     @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  post          NanguPost    @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author        User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  votes         NanguSolutionVote[]
-  adoptedByPost NanguPost?   @relation("AdoptedSolution")
+  id                    String                  @id @default(cuid())
+  postId                String
+  authorId              String
+  createdAt             DateTime                @default(now())
+  description           String?
+  isAccepted            Boolean                 @default(false)
+  pathData              Json
+  playbackFrames        Json?
+  settings              Json
+  thumbnailSvg          String?
+  title                 String?
+  comment               String?
+  dataJson              String                  @default("{}")
+  voteCount             Int                     @default(0)
+  goodCount             Int                     @default(0)
+  badCount              Int                     @default(0)
+  updatedAt             DateTime                @default(now()) @updatedAt
+  adoptedByPost         NanguPost?              @relation("AdoptedSolution")
+  author                User                    @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  post                  NanguPost               @relation(fields: [postId], references: [id], onDelete: Cascade)
+  NanguSolutionComment  NanguSolutionComment[]
+  NanguSolutionReaction NanguSolutionReaction[]
 
   @@index([postId])
   @@index([authorId])
 }
 
-enum NanguSolutionVoteType {
-  GOOD
-  BAD
-}
-
-model NanguSolutionVote {
-  id         String              @id @default(cuid())
-  solutionId String
-  userId     String
-  vote       NanguSolutionVoteType
-  createdAt  DateTime            @default(now())
-
-  solution NanguSolution @relation(fields: [solutionId], references: [id], onDelete: Cascade)
-  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([solutionId, userId])
-  @@index([solutionId])
-  @@index([userId])
-}
-
-// ============== Community (게시판/게시글/댓글/추천/북마크) ==============
-// type: notice | free | qna | tips | reviews | trouble (난구해결사)
-// UI: notice/free=list, qna=list+해결표시, tips/reviews=card, trouble=특수 Q&A
-
 model CommunityBoard {
-  id          String   @id @default(cuid())
-  slug        String   @unique  // notice, free, qna, tips, reviews, trouble
+  id          String          @id @default(cuid())
+  slug        String          @unique
   name        String
-  description String?  @db.Text
-  type        String   @default("free")  // notice | free | qna | tips | reviews | trouble
-  isActive    Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  posts CommunityPost[]
+  description String?
+  sortOrder   Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  type        String          @default("free")
+  isActive    Boolean         @default(true)
+  posts       CommunityPost[]
 
   @@index([sortOrder])
   @@index([type, isActive])
 }
 
 model CommunityPost {
-  id           String   @id @default(cuid())
+  id           String              @id @default(cuid())
   boardId      String
   authorId     String
   title        String
-  content      String   @db.Text
-  thumbnailUrl String?  // 대표 이미지 (카드형 게시판용)
-  imageUrls    String?  // JSON array of URLs
-  isPinned     Boolean  @default(false)
-  isHidden     Boolean  @default(false)
-  viewCount    Int      @default(0)
-  likeCount    Int      @default(0)   // 캐시, CommunityPostLike 기준 갱신
-  commentCount Int      @default(0)   // 캐시, CommunityComment 기준 갱신
-  isSolved     Boolean  @default(false)  // qna 게시판: 채택 완료 여부
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  board   CommunityBoard   @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  author  User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  comments    CommunityComment[]
-  likes       CommunityPostLike[]
-  bookmarks   CommunityBookmark[]
-  postViews   CommunityPostView[]
-  reports     CommunityReport[]
-  troubleShot TroubleShotPost?
+  content      String
+  imageUrls    String?
+  isPinned     Boolean             @default(false)
+  isHidden     Boolean             @default(false)
+  viewCount    Int                 @default(0)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  thumbnailUrl String?
+  likeCount    Int                 @default(0)
+  commentCount Int                 @default(0)
+  isSolved     Boolean             @default(false)
+  bookmarks    CommunityBookmark[]
+  comments     CommunityComment[]
+  author       User                @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  board        CommunityBoard      @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  likes        CommunityPostLike[]
+  postViews    CommunityPostView[]
+  reports      CommunityReport[]
+  troubleShot  TroubleShotPost?
 
   @@index([boardId])
   @@index([authorId])
   @@index([boardId, isPinned, createdAt])
-  /// 목록: board + 숨김 제외 + 최신순
   @@index([boardId, isHidden, createdAt])
-  /// 인기(조회/추천/댓글) — 목록 where에 맞춤
   @@index([boardId, isHidden, viewCount])
   @@index([boardId, isHidden, likeCount])
   @@index([boardId, isHidden, commentCount])
   @@index([boardId, isHidden, isSolved, createdAt])
-  /// 제목 검색·정렬 보조 (board + 숨김 + title)
   @@index([boardId, isHidden, title])
   @@index([createdAt])
   @@index([isHidden])
+  @@index([title(ops: raw("gin_trgm_ops"))], map: "CommunityPost_title_gin_trgm_idx", type: Gin)
 }
 
 model CommunityPostView {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   postId    String
-  viewerKey String   // 로그인: 세션 기반 키, 비로그인: localStorage/cookie UUID (중복 조회 방지)
-  userId    String?  // 로그인 시
-  viewedAt  DateTime @default(now())
-
-  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  viewerKey String
+  userId    String?
+  viewedAt  DateTime      @default(now())
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@unique([postId, viewerKey])
   @@index([postId])
@@ -1373,21 +1231,20 @@ model CommunityPostView {
 }
 
 model CommunityComment {
-  id        String   @id @default(cuid())
+  id        String                 @id @default(cuid())
   postId    String
-  parentId  String?  // 대댓글
+  parentId  String?
   authorId  String
-  content   String   @db.Text
-  isHidden  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  post     CommunityPost  @relation(fields: [postId], references: [id], onDelete: Cascade)
-  parent   CommunityComment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  children CommunityComment[] @relation("CommentReplies")
-  author   User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  likes    CommunityCommentLike[]
-  reports  CommunityReport[]
+  content   String
+  isHidden  Boolean                @default(false)
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+  author    User                   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent    CommunityComment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  children  CommunityComment[]     @relation("CommentReplies")
+  post      CommunityPost          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  likes     CommunityCommentLike[]
+  reports   CommunityReport[]
 
   @@index([postId])
   @@index([parentId])
@@ -1395,13 +1252,12 @@ model CommunityComment {
 }
 
 model CommunityPostLike {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   postId    String
   userId    String
-  createdAt DateTime @default(now())
-
-  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([postId, userId])
   @@index([postId])
@@ -1409,13 +1265,12 @@ model CommunityPostLike {
 }
 
 model CommunityCommentLike {
-  id        String   @id @default(cuid())
+  id        String           @id @default(cuid())
   commentId String
   userId    String
-  createdAt DateTime @default(now())
-
-  comment CommunityComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now())
+  comment   CommunityComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([commentId, userId])
   @@index([commentId])
@@ -1423,94 +1278,83 @@ model CommunityCommentLike {
 }
 
 model CommunityBookmark {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   userId    String
   postId    String
-  createdAt DateTime @default(now())
-
-  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, postId])
   @@index([userId])
   @@index([postId])
 }
 
-// 댓글/답글 알림: 내 글에 댓글, 내 댓글에 답글
 model CommunityNotification {
   id            String    @id @default(cuid())
   userId        String
-  type          String    // comment_on_post | reply_to_comment
+  type          String
   postId        String
-  commentId     String?   // 이동 대상 댓글
+  commentId     String?
   relatedUserId String
   readAt        DateTime?
   createdAt     DateTime  @default(now())
-
-  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  relatedUser User @relation("NotificationActor", fields: [relatedUserId], references: [id], onDelete: Cascade)
+  relatedUser   User      @relation("NotificationActor", fields: [relatedUserId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, readAt])
   @@map("community_notifications")
 }
 
-// 신고: 게시글/댓글, 사유 선택, 동일 사용자 중복 신고 불가
 model CommunityReport {
-  id          String   @id @default(cuid())
+  id          String            @id @default(cuid())
   reporterId  String
-  targetType  String   // post | comment
-  targetId    String   // postId or commentId (중복 체크용)
+  targetType  String
+  targetId    String
   postId      String?
   commentId   String?
-  reason      String   // PROFANITY | AD_SPAM | INAPPROPRIATE | MISINFO | CONFLICT | OTHER
-  status      String   @default("PENDING") // PENDING | REVIEWED | RESOLVED | DISMISSED
-  adminMemo   String?  @db.Text
+  reason      String
+  status      String            @default("PENDING")
+  adminMemo   String?
   processedAt DateTime?
   processedBy String?
-  createdAt   DateTime @default(now())
-
-  post    CommunityPost?    @relation(fields: [postId], references: [id], onDelete: Cascade)
-  comment CommunityComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  reporter User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  createdAt   DateTime          @default(now())
+  comment     CommunityComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  post        CommunityPost?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reporter    User              @relation(fields: [reporterId], references: [id], onDelete: Cascade)
 
   @@unique([reporterId, targetType, targetId])
   @@index([targetType, targetId])
   @@index([status])
 }
 
-// ============== 커뮤니티 신뢰도 점수 (레벨/등급) ==============
 model CommunityScoreLog {
   id        String   @id @default(cuid())
   userId    String
-  type      String   // post_created | comment_like_received | solution_created | solution_good | solution_bad | solution_adopted | adopter_bonus | tournament_apply | tournament_cancel | tournament_attend
-  amount    Int      // +2, +1, +4, +6, -10, +10 등
-  refType   String?  // post | comment | solution | entry | attendance
+  type      String
+  amount    Int
+  refType   String?
   refId     String?
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([createdAt])
 }
 
-// ============== 난구해결사 (CommunityPost 기반 확장) ==============
-// trouble 게시판 글 1개 = CommunityPost 1개 + TroubleShotPost 1개 (공배치·난이도·채택해법)
-
 model TroubleShotPost {
-  id                 String   @id @default(cuid())
-  postId             String   @unique  // CommunityPost (board=trouble)
-  sourceNoteId       String?  // 난구노트에서 보낸 경우
-  layoutImageUrl     String?  // 공배치 이미지
-  ballPlacementJson  String?  @db.Text // NanguBallPlacement JSON (from-note 시 노트 컬럼에서 조합)
-  difficulty         String?  // 난이도 표시
-  isSolved           Boolean  @default(false)
-  acceptedSolutionId String?  // 채택된 TroubleShotSolution id
-
-  post     CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  sourceNote BilliardNote? @relation(fields: [sourceNoteId], references: [id], onDelete: SetNull)
-  solutions TroubleShotSolution[]
+  id                 String                @id @default(cuid())
+  postId             String                @unique
+  sourceNoteId       String?
+  layoutImageUrl     String?
+  difficulty         String?
+  isSolved           Boolean               @default(false)
+  acceptedSolutionId String?
+  ballPlacementJson  String?
+  post               CommunityPost         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  sourceNote         BilliardNote?         @relation(fields: [sourceNoteId], references: [id])
+  solutions          TroubleShotSolution[]
 
   @@index([postId])
   @@index([sourceNoteId])
@@ -1518,26 +1362,86 @@ model TroubleShotPost {
 }
 
 model TroubleShotSolution {
-  id              String   @id @default(cuid())
+  id                String                    @id @default(cuid())
   troubleShotPostId String
-  authorId        String
-  title           String?
-  content         String   @db.Text
-  solutionImageUrl String?
-  solutionDataJson String?  @db.Text  // NanguSolutionData 호환 JSON (두께/당점/경로 등)
-  voteCount       Int      @default(0)
-  goodCount       Int      @default(0)
-  badCount        Int      @default(0)
-  isAccepted      Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  troubleShotPost TroubleShotPost @relation(fields: [troubleShotPostId], references: [id], onDelete: Cascade)
-  author         User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  votes          TroubleShotSolutionVote[]
+  authorId          String
+  title             String?
+  content           String
+  solutionImageUrl  String?
+  voteCount         Int                       @default(0)
+  isAccepted        Boolean                   @default(false)
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  goodCount         Int                       @default(0)
+  badCount          Int                       @default(0)
+  solutionDataJson  String?
+  author            User                      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  troubleShotPost   TroubleShotPost           @relation(fields: [troubleShotPostId], references: [id], onDelete: Cascade)
+  votes             TroubleShotSolutionVote[]
 
   @@index([troubleShotPostId])
   @@index([authorId])
+}
+
+model TroubleShotSolutionVote {
+  id         String                      @id @default(cuid())
+  solutionId String
+  userId     String
+  vote       TroubleShotSolutionVoteType
+  createdAt  DateTime                    @default(now())
+  solution   TroubleShotSolution         @relation(fields: [solutionId], references: [id], onDelete: Cascade)
+  user       User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([solutionId, userId])
+  @@index([solutionId])
+  @@index([userId])
+}
+
+model Inquiry {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  content   String
+  reply     String?
+  replyAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model NanguSolutionComment {
+  id            String        @id
+  solutionId    String
+  userId        String
+  content       String
+  createdAt     DateTime      @default(now())
+  NanguSolution NanguSolution @relation(fields: [solutionId], references: [id], onDelete: Cascade)
+  User          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([solutionId])
+  @@index([userId])
+}
+
+model NanguSolutionReaction {
+  solutionId    String
+  userId        String
+  type          NanguSolutionReactionType
+  NanguSolution NanguSolution             @relation(fields: [solutionId], references: [id], onDelete: Cascade)
+  User          User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([solutionId, userId])
+  @@index([solutionId])
+  @@index([userId])
+}
+
+enum UserRole {
+  USER
+  CLIENT_ADMIN
+  PLATFORM_ADMIN
+  MODERATOR
+  ZONE_MANAGER
 }
 
 enum TroubleShotSolutionVoteType {
@@ -1545,34 +1449,7 @@ enum TroubleShotSolutionVoteType {
   BAD
 }
 
-model TroubleShotSolutionVote {
-  id         String                     @id @default(cuid())
-  solutionId String
-  userId     String
-  vote       TroubleShotSolutionVoteType
-  createdAt  DateTime                   @default(now())
-
-  solution TroubleShotSolution @relation(fields: [solutionId], references: [id], onDelete: Cascade)
-  user     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([solutionId, userId])
-  @@index([solutionId])
-  @@index([userId])
-}
-
-// ============== Inquiry ==============
-
-model Inquiry {
-  id        String   @id @default(cuid())
-  userId    String
-  title     String
-  content   String
-  reply     String?
-  replyAt   DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
+enum NanguSolutionReactionType {
+  GOOD
+  BAD
 }

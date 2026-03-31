@@ -2,7 +2,7 @@
 
 /**
  * 두께 + 당점 통합 패널 (해법 설명용).
- * 공 2개(1목적구 고정, 수구 이동)가 겹치는 하나의 화면에서
+ * 공 2개(비수구 1개는 무대 중심에 고정, 수구만 이동)가 겹치는 하나의 화면에서
  * 두께(수구 위치)와 당점(수구 위 빨간 점)을 동시에 조정.
  */
 import React, { useRef, useEffect, useCallback, useState } from "react";
@@ -31,7 +31,7 @@ const SPEED_LEVELS = 5;
 const DEPTH_LEVELS = 5;
 
 export interface BilliardContactPanelProps {
-  /** 1목적구 색: red | yellow */
+  /** 미니 다이어그램에서 중심에 그릴 비수구의 색 키(red | yellow). first object ball 역할 고정 아님 */
   objectBallColor?: "red" | "yellow";
   /** 수구 색: white | yellow (선택된 수구 기준) */
   cueBallColor?: "white" | "yellow";
@@ -121,7 +121,7 @@ export function BilliardContactPanel({
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // 1목적구 (고정)
+    // 비수구(중심 고정) — 색은 objectBallColor
     ctx.fillStyle = objColor;
     ctx.beginPath();
     ctx.arc(CENTER, CENTER, BALL_R, 0, Math.PI * 2);

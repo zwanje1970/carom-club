@@ -10,7 +10,7 @@ import { getObjectBallColor, getObjectBallYellowColor } from "@/lib/billiard-tab
 import type { BilliardShotPanelData } from "@/lib/billiard-path-types";
 
 export interface BilliardShotPanelProps {
-  /** 1목적구 색 (빨강/노랑) - 두께 UI 색상 */
+  /** 두께 UI에서 중심에 둘 비수구 표시 색 키(빨강/노랑). first object ball 고정 아님 */
   targetBallColor?: "red" | "yellow";
   value?: Partial<BilliardShotPanelData>;
   onChange?: (data: Partial<BilliardShotPanelData>) => void;

@@ -30,7 +30,7 @@ export interface NanguSolutionData {
   paths: NanguSolutionPath[];
   /** 1목적구 반사각 경로 (선택) */
   reflectionPath?: NanguSolutionPath;
-  /** 1목 경로 재생 시 이동하는 공(수구 제외 2개 중 실제 맞은 쪽). 없으면 red로 간주(구버전) */
+  /** 1목적구 반사 경로 재생 시 움직이는 공의 색 키. 없으면 재생·빌더에서 경로/스팟으로 해석(특정 색 기본값 없음) */
   reflectionObjectBall?: ObjectBallColorKey;
   /** 백스트로크 0~10 (오른쪽=짧음, 왼쪽=김) */
   backstrokeLevel?: number;

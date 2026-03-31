@@ -7,40 +7,89 @@ import {
   DEFAULT_TABLE_WIDTH,
   DEFAULT_TABLE_HEIGHT,
 } from "@/lib/billiard-table-constants";
-import type { NanguBallPlacement } from "@/lib/nangu-types";
+import type { NanguBallPlacement, ObjectBallColorKey } from "@/lib/nangu-types";
 
 interface BallPos {
   x: number;
   y: number;
 }
 
+function normPosForKey(
+  key: ObjectBallColorKey,
+  cueBallColor: "white" | "yellow",
+  cueBall: BallPos,
+  reflectionObjectBall: ObjectBallColorKey,
+  secondReflectionObjectBall: ObjectBallColorKey,
+  objectBallFirstContact: BallPos,
+  objectBallSecondContact: BallPos
+): BallPos {
+  if (key === cueBallColor) return cueBall;
+  if (key === reflectionObjectBall) return objectBallFirstContact;
+  if (key === secondReflectionObjectBall) return objectBallSecondContact;
+  throw new Error(
+    `viewerPositionsToPlacement: key ${key} is not cue or a reflection object`
+  );
+}
+
+/** 재생·해법과 동일: `reflectionObjectBall` / `secondReflectionObjectBall` 키에 좌표를 싣는다(red 고정 슬롯 없음). */
 function viewerPositionsToPlacement(
   cueBall: BallPos,
-  objectBall1: BallPos,
-  objectBall2: BallPos,
+  objectBallFirstContact: BallPos,
+  objectBallSecondContact: BallPos,
+  reflectionObjectBall: ObjectBallColorKey,
+  secondReflectionObjectBall: ObjectBallColorKey,
   cueBallColor: "white" | "yellow" = "white"
 ): NanguBallPlacement {
-  if (cueBallColor === "white") {
-    return {
-      redBall: objectBall2,
-      whiteBall: cueBall,
-      yellowBall: objectBall1,
-      cueBall: "white",
-    };
+  const nonCue = (["red", "yellow", "white"] as const).filter((k) => k !== cueBallColor);
+  if (
+    secondReflectionObjectBall === reflectionObjectBall ||
+    !nonCue.includes(reflectionObjectBall) ||
+    !nonCue.includes(secondReflectionObjectBall)
+  ) {
+    throw new Error(
+      "reflectionObjectBall and secondReflectionObjectBall must be the two distinct non-cue keys"
+    );
   }
   return {
-    redBall: objectBall2,
-    whiteBall: objectBall1,
-    yellowBall: cueBall,
-    cueBall: "yellow",
+    cueBall: cueBallColor,
+    redBall: normPosForKey(
+      "red",
+      cueBallColor,
+      cueBall,
+      reflectionObjectBall,
+      secondReflectionObjectBall,
+      objectBallFirstContact,
+      objectBallSecondContact
+    ),
+    yellowBall: normPosForKey(
+      "yellow",
+      cueBallColor,
+      cueBall,
+      reflectionObjectBall,
+      secondReflectionObjectBall,
+      objectBallFirstContact,
+      objectBallSecondContact
+    ),
+    whiteBall: normPosForKey(
+      "white",
+      cueBallColor,
+      cueBall,
+      reflectionObjectBall,
+      secondReflectionObjectBall,
+      objectBallFirstContact,
+      objectBallSecondContact
+    ),
   };
 }
 
 interface NanguSolutionEditorShellProps {
   postId: string;
   cueBall: BallPos;
-  objectBall1: BallPos;
-  objectBall2: BallPos;
+  objectBallFirstContact: BallPos;
+  objectBallSecondContact: BallPos;
+  reflectionObjectBall: ObjectBallColorKey;
+  secondReflectionObjectBall: ObjectBallColorKey;
+  cueBallColor?: "white" | "yellow";
 }
 
 /**
@@ -49,8 +98,11 @@ interface NanguSolutionEditorShellProps {
 export function NanguSolutionEditorShell({
   postId,
   cueBall,
-  objectBall1,
-  objectBall2,
+  objectBallFirstContact,
+  objectBallSecondContact,
+  reflectionObjectBall,
+  secondReflectionObjectBall,
+  cueBallColor = "white",
 }: NanguSolutionEditorShellProps) {
   const router = useRouter();
   const [description, setDescription] = useState("");
@@ -67,7 +119,7 @@ export function NanguSolutionEditorShell({
       const payload = {
         description,
         pathData: {}, // 드로잉 기능 구현 전 dummy 데이터
-        settings: {},  // 드로잉 기능 구현 전 dummy 데이터
+        settings: {}, // 드로잉 기능 구현 전 dummy 데이터
       };
 
       const res = await fetch(`/api/community/nangu/${postId}/solutions`, {
@@ -92,7 +144,14 @@ export function NanguSolutionEditorShell({
     }
   };
 
-  const ballPlacement = viewerPositionsToPlacement(cueBall, objectBall1, objectBall2);
+  const ballPlacement = viewerPositionsToPlacement(
+    cueBall,
+    objectBallFirstContact,
+    objectBallSecondContact,
+    reflectionObjectBall,
+    secondReflectionObjectBall,
+    cueBallColor
+  );
 
   return (
     <div className="space-y-6 bg-slate-900 p-6 rounded-2xl shadow-xl">

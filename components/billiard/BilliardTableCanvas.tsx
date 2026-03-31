@@ -154,11 +154,22 @@ export interface BilliardTableCanvasProps {
   showObjectBallSpot?: boolean;
   /** `showObjectBallSpot`일 때 점선을 그릴 공 (수구 제외 목적구) */
   objectBallSpotKey?: BallColor | null;
+  /** 2목 경로 그리기 모드: 해당 공에 진한 초록 점선 스팟 깜빡임 (저장 이미지 미포함) */
+  showSecondObjectBallSpot?: boolean;
+  /** `showSecondObjectBallSpot`일 때 점선을 그릴 공 */
+  secondObjectBallSpotKey?: BallColor | null;
+  /**
+   * 경로 편집: 해당 레이어의 활성 스팟이 공/쿠션에 닿으면 공 주변 점선 식별 링을 검정으로
+   * (스팟 SVG 테두리와 동일 조건)
+   */
+  cueBallSpotRingBlackStroke?: boolean;
+  objectBallSpotRingBlackStroke?: boolean;
+  secondObjectBallSpotRingBlackStroke?: boolean;
   /** 난구 공배치 모드: 선택 시 지름 4배 검정 반투명 원, 크로스헤어 미표시 */
   placementMode?: boolean;
   /** 공배치 시 선택된 공 기준 플레이필드 전체 십자선(+) 표시 */
   showCrosshairAtSelected?: boolean;
-  /** true면 1목적구(red) 미표시 — 애니메이션 시연 등 */
+  /** true면 색 키 `red` 공만 미표시(레거시 prop명). 1·2목적구 역할과 동일시하지 말 것 */
   hideRedBall?: boolean;
   /** 경로 재생 등: landscape 정규화 좌표로 공 위치 덮어쓰기 (미지정 색은 placement 유지) */
   ballNormOverrides?: Partial<Record<"red" | "yellow" | "white", { x: number; y: number }>>;
@@ -177,7 +188,7 @@ export interface BilliardTableCanvasProps {
    */
   splitBallLayer?: boolean;
   /**
-   * splitBallLayer일 때 기본: children z-10, 공 z-20 → 1목적구 경로(1적구 중심 출발)가 공 스프라이트에 가려짐.
+   * splitBallLayer일 때 기본: children z-10, 공 z-20 → 첫 목적구 반사 경로(출발이 `reflectionObjectBall` 해당 공 중심)가 공 스프라이트에 가려질 수 있음.
    * true면 children을 z-30으로 올려 경로·스팟이 공 위에 보이게 함. 재생 중 공이 선 위에 보여야 할 때는 false 유지.
    */
   pathOverlayAboveBalls?: boolean;
@@ -192,6 +203,8 @@ export interface BilliardTableCanvasProps {
   >;
   /** true면 스팟 깜빡임 없이도 재생 중 공 레이어를 rAF로 다시 그림 */
   playbackBallAnimActive?: boolean;
+  /** true면 재생 중 배치 원점 반투명 고정 공(ghost) 미표시 — 시각 옵션만 */
+  hideOriginGhostBalls?: boolean;
 }
 
 export interface BilliardTableCanvasHandle {
@@ -609,10 +622,12 @@ function drawOriginGhostBall(
 /** 수구·1목 식별 링: 보이는 최외곽 반지름 = 공 반지름 × 이 값 (지름 기준 약 2배) */
 const SPOT_RING_OUTER_RADIUS_FACTOR = 2;
 
-/** 수구 식별 링 — 형광 빨강 */
-const CUE_SPOT_RING_RGB = { r: 255, g: 0, b: 90 } as const;
-/** 1목 식별 링 — 형광 파랑 */
-const OBJECT_SPOT_RING_RGB = { r: 0, g: 200, b: 255 } as const;
+/** 수구 식별 링 — `NanguSolutionPathOverlay` 수구 경로선(CUE_PATH_STROKE)과 동일 */
+const CUE_SPOT_RING_RGB = { r: 239, g: 68, b: 68 } as const;
+/** 1목 식별 링 — 1목 경로선(OBJECT_PATH_STROKE)과 동일 */
+const OBJECT_SPOT_RING_RGB = { r: 29, g: 78, b: 216 } as const;
+/** 2목 식별 링 — 2목 경로선(SECOND_OBJECT_PATH_STROKE)과 동일 */
+const SECOND_OBJECT_SPOT_RING_RGB = { r: 34, g: 197, b: 94 } as const;
 
 /**
  * 난구 해법: 수구·1목 **식별용 스팟 깜빡임** 전용 점선 링 — 공 지름의 `SPOT_RING_OUTER_RADIUS_FACTOR`배, `showCueBallSpot` / `showObjectBallSpot` 전용.
@@ -626,7 +641,9 @@ function drawColoredBallSpotRing(
   normY: number,
   ballKey: BallColor,
   opacity: number,
-  variant: "cueSpot" | "objectSpot"
+  variant: "cueSpot" | "objectSpot" | "secondObjectSpot",
+  /** 활성 경로 스팟이 공/쿠션에 닿은 뒤 — 점선 링을 검정으로 */
+  useBlackStroke?: boolean
 ) {
   const { px, py } = normalizedToPixel(normX, normY, rect);
   const longSide = getPlayfieldLongSide(rect);
@@ -642,11 +659,27 @@ function drawColoredBallSpotRing(
   const outerR = R * SPOT_RING_OUTER_RADIUS_FACTOR;
   const pathRadius = Math.max(R * 0.12, outerR - S_outer / 2);
 
-  const mainRgb = variant === "cueSpot" ? CUE_SPOT_RING_RGB : OBJECT_SPOT_RING_RGB;
-  const mainStroke = `rgba(${mainRgb.r},${mainRgb.g},${mainRgb.b},${opacity})`;
-
   ctx.save();
   ctx.setLineDash(dash);
+  if (useBlackStroke) {
+    const stroke = `rgba(0,0,0,${opacity})`;
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = ballKey === "white" ? lineW + whiteOutlineExtraPx : lineW;
+    ctx.beginPath();
+    ctx.arc(px, py, pathRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  const mainRgb =
+    variant === "cueSpot"
+      ? CUE_SPOT_RING_RGB
+      : variant === "objectSpot"
+        ? OBJECT_SPOT_RING_RGB
+        : SECOND_OBJECT_SPOT_RING_RGB;
+  const mainStroke = `rgba(${mainRgb.r},${mainRgb.g},${mainRgb.b},${opacity})`;
+
   if (ballKey === "white") {
     ctx.strokeStyle = `rgba(0,0,0,${opacity * 0.5})`;
     ctx.lineWidth = lineW + whiteOutlineExtraPx;
@@ -669,21 +702,32 @@ function drawCueBallSpot(
   cueNormX: number,
   cueNormY: number,
   opacity: number,
-  cueBallColor: BallColor
+  cueBallColor: BallColor,
+  useBlackStroke?: boolean
 ) {
-  drawColoredBallSpotRing(ctx, rect, cueNormX, cueNormY, cueBallColor, opacity, "cueSpot");
+  drawColoredBallSpotRing(ctx, rect, cueNormX, cueNormY, cueBallColor, opacity, "cueSpot", useBlackStroke);
 }
 
-/** 1목 스팟 — 형광 파랑, 수구 링과 동일 크기·선 스타일 */
+/** 1목 스팟 — 1목 경로선 색과 동일, 수구 링과 동일 크기·선 스타일 */
 function drawObjectBallSpot(
   ctx: CanvasRenderingContext2D,
   rect: PlayfieldRect,
   normX: number,
   normY: number,
   opacity: number,
-  objectBallKey: BallColor
+  objectBallKey: BallColor,
+  useBlackStroke?: boolean
 ) {
-  drawColoredBallSpotRing(ctx, rect, normX, normY, objectBallKey, opacity, "objectSpot");
+  drawColoredBallSpotRing(
+    ctx,
+    rect,
+    normX,
+    normY,
+    objectBallKey,
+    opacity,
+    "objectSpot",
+    useBlackStroke
+  );
 }
 
 /** 선택된 공 중심 + 좌표선 (배치 시에만, 저장 이미지 제외). 실선·붉은색·가늘게. */
@@ -760,6 +804,11 @@ const BilliardTableCanvas = forwardRef<
     showCueBallSpot = false,
     showObjectBallSpot = false,
     objectBallSpotKey = null,
+    showSecondObjectBallSpot = false,
+    secondObjectBallSpotKey = null,
+    cueBallSpotRingBlackStroke = false,
+    objectBallSpotRingBlackStroke = false,
+    secondObjectBallSpotRingBlackStroke = false,
     placementMode = false,
     showCrosshairAtSelected = false,
     hideRedBall = false,
@@ -772,6 +821,7 @@ const BilliardTableCanvas = forwardRef<
     children,
     ballNormOverridesLiveRef,
     playbackBallAnimActive = false,
+    hideOriginGhostBalls = false,
   },
   ref
 ) {
@@ -791,6 +841,7 @@ const BilliardTableCanvas = forwardRef<
       style: TableDrawStyle = drawStyle,
       cueBallSpotOpacity?: number,
       objectBallSpotOpacity?: number,
+      secondObjectBallSpotOpacity?: number,
       noSelectionForExport?: boolean
     ) => {
       const ballNormMerged =
@@ -805,7 +856,7 @@ const BilliardTableCanvas = forwardRef<
         isPortrait ? landscapeToPortraitNorm(lx, ly) : { x: lx, y: ly };
 
       /** 재생 시 이동한 공의 배치 원점 — 반투명 고정 공 (cueOrigin / firstObject 등 각 색별로 별도, 식별 링 미사용) */
-      if (ballNormMerged) {
+      if (ballNormMerged && !hideOriginGhostBalls) {
         for (const key of ["red", "yellow", "white"] as const) {
           const ovr = ballNormMerged[key];
           if (!ovr) continue;
@@ -847,7 +898,15 @@ const BilliardTableCanvas = forwardRef<
         const cuePos = cueBall === "white" ? whiteDraw : yellowDraw;
         const cueView = toView(cuePos.x, cuePos.y);
         const cueColor: BallColor = cueBall === "white" ? "white" : "yellow";
-        drawCueBallSpot(ctx, rect, cueView.x, cueView.y, cueBallSpotOpacity, cueColor);
+        drawCueBallSpot(
+          ctx,
+          rect,
+          cueView.x,
+          cueView.y,
+          cueBallSpotOpacity,
+          cueColor,
+          cueBallSpotRingBlackStroke
+        );
       }
       if (
         objectBallSpotOpacity != null &&
@@ -867,7 +926,31 @@ const BilliardTableCanvas = forwardRef<
           objView.x,
           objView.y,
           objectBallSpotOpacity,
-          objectBallSpotKey
+          objectBallSpotKey,
+          objectBallSpotRingBlackStroke
+        );
+      }
+      if (
+        secondObjectBallSpotOpacity != null &&
+        secondObjectBallSpotOpacity > 0 &&
+        secondObjectBallSpotKey
+      ) {
+        const obj2Draw =
+          secondObjectBallSpotKey === "red"
+            ? redDraw
+            : secondObjectBallSpotKey === "yellow"
+              ? yellowDraw
+              : whiteDraw;
+        const obj2View = toView(obj2Draw.x, obj2Draw.y);
+        drawColoredBallSpotRing(
+          ctx,
+          rect,
+          obj2View.x,
+          obj2View.y,
+          secondObjectBallSpotKey,
+          secondObjectBallSpotOpacity,
+          "secondObjectSpot",
+          secondObjectBallSpotRingBlackStroke
         );
       }
       if (cueTipNorm) {
@@ -893,6 +976,10 @@ const BilliardTableCanvas = forwardRef<
       ballNormOverridesLiveRef,
       objectBallSpotKey,
       cueTipNorm,
+      hideOriginGhostBalls,
+      cueBallSpotRingBlackStroke,
+      objectBallSpotRingBlackStroke,
+      secondObjectBallSpotRingBlackStroke,
     ]
   );
 
@@ -904,6 +991,7 @@ const BilliardTableCanvas = forwardRef<
       style: TableDrawStyle = drawStyle,
       cueBallSpotOpacity?: number,
       objectBallSpotOpacity?: number,
+      secondObjectBallSpotOpacity?: number,
       /** true면 저장/보내기용 — 선택 링·크로스헤어 미표시 */
       noSelectionForExport?: boolean
     ) => {
@@ -914,6 +1002,7 @@ const BilliardTableCanvas = forwardRef<
         style,
         cueBallSpotOpacity,
         objectBallSpotOpacity,
+        secondObjectBallSpotOpacity,
         noSelectionForExport
       );
     },
@@ -928,7 +1017,7 @@ const BilliardTableCanvas = forwardRef<
     if (!ctx) return;
     canvas.width = width;
     canvas.height = height;
-    draw(ctx, showGrid, true, drawStyle, undefined, undefined, false);
+    draw(ctx, showGrid, true, drawStyle, undefined, undefined, undefined, false);
   }, [splitBallLayer, draw, showGrid, drawStyle, width, height]);
 
   useEffect(() => {
@@ -945,12 +1034,12 @@ const BilliardTableCanvas = forwardRef<
     bCan.height = height;
     drawTable(tCtx, width, height, showGrid, orientation, drawStyle);
     bCtx.clearRect(0, 0, width, height);
-    drawBallsAndDecorations(bCtx, true, drawStyle, undefined, undefined, false);
+    drawBallsAndDecorations(bCtx, true, drawStyle, undefined, undefined, undefined, false);
   }, [splitBallLayer, width, height, showGrid, orientation, drawStyle, drawBallsAndDecorations]);
 
-  // 수구·1목 스팟 깜빡임 + 경로 재생( ref만 갱신 ): rAF (저장 이미지 미포함)
+  // 수구·1목·2목 스팟 깜빡임 + 경로 재생( ref만 갱신 ): rAF (저장 이미지 미포함)
   useEffect(() => {
-    if (!showCueBallSpot && !showObjectBallSpot && !playbackBallAnimActive) return;
+    if (!showCueBallSpot && !showObjectBallSpot && !showSecondObjectBallSpot && !playbackBallAnimActive) return;
     let frameId: number;
     if (splitBallLayer) {
       const bCan = ballLayerRef.current;
@@ -967,6 +1056,7 @@ const BilliardTableCanvas = forwardRef<
           drawStyle,
           showCueBallSpot ? opacity : undefined,
           showObjectBallSpot ? opacity : undefined,
+          showSecondObjectBallSpot ? opacity : undefined,
           false
         );
         frameId = requestAnimationFrame(tick);
@@ -975,7 +1065,7 @@ const BilliardTableCanvas = forwardRef<
       return () => {
         cancelAnimationFrame(frameId);
         bCtx.clearRect(0, 0, width, height);
-        drawBallsAndDecorations(bCtx, true, drawStyle, undefined, undefined, false);
+        drawBallsAndDecorations(bCtx, true, drawStyle, undefined, undefined, undefined, false);
       };
     }
     const canvas = canvasRef.current;
@@ -992,6 +1082,7 @@ const BilliardTableCanvas = forwardRef<
         drawStyle,
         showCueBallSpot ? opacity : undefined,
         showObjectBallSpot ? opacity : undefined,
+        showSecondObjectBallSpot ? opacity : undefined,
         false
       );
       frameId = requestAnimationFrame(tickSingle);
@@ -999,11 +1090,12 @@ const BilliardTableCanvas = forwardRef<
     frameId = requestAnimationFrame(tickSingle);
     return () => {
       cancelAnimationFrame(frameId);
-      draw(ctx, showGrid, true, drawStyle, undefined, undefined, false);
+      draw(ctx, showGrid, true, drawStyle, undefined, undefined, undefined, false);
     };
   }, [
     showCueBallSpot,
     showObjectBallSpot,
+    showSecondObjectBallSpot,
     playbackBallAnimActive,
     splitBallLayer,
     draw,
@@ -1012,6 +1104,9 @@ const BilliardTableCanvas = forwardRef<
     drawStyle,
     width,
     height,
+    cueBallSpotRingBlackStroke,
+    objectBallSpotRingBlackStroke,
+    secondObjectBallSpotRingBlackStroke,
   ]);
 
   useImperativeHandle(ref, () => ({
@@ -1043,7 +1138,7 @@ const BilliardTableCanvas = forwardRef<
       exportCanvas.height = height;
       const ctx = exportCanvas.getContext("2d");
       if (!ctx) return "";
-      draw(ctx, includeGrid, false, styleToUse, undefined, undefined, true);
+      draw(ctx, includeGrid, false, styleToUse, undefined, undefined, undefined, true);
       return exportCanvas.toDataURL("image/png");
     },
   }));

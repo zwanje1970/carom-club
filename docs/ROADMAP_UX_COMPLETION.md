@@ -9,7 +9,7 @@
 | # | 기능 | 상태 | 비고 |
 |---|------|------|------|
 | 1 | **접수중 대회 상단 노출** | ✅ 완료 | 메인 대회 API에서 **OPEN** 상태를 1순위로 정렬. (위치 정렬 시에도 OPEN 우선, 그 다음 거리 순.) |
-| 2 | **위치 기반 대회/당구장 정렬** | ✅ 완료 | GPS → 회원 주소 좌표 → 기존 정렬. Haversine 거리 ASC. `/api/home/venues`, `/api/home/tournaments` + `HomeSectionsWithLocation`. |
+| 2 | **위치 기반 대회/당구장 정렬** | ✅ 완료 | GPS → 회원 주소 좌표 → 기존 정렬. Haversine 거리 ASC. `/api/home/venues`, `/api/home/tournaments` + 홈 `PageRenderer` 슬롯(대회 안내 등). |
 | 3 | **모바일 Bottom Navigation** | ✅ 완료 | 768px 이하 고정 하단 메뉴(홈/대회/당구장/커뮤니티/마이페이지), `/admin` 제외, `pb-24` 여백. |
 
 ---

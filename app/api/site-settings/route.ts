@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getSiteSettings, updateSiteSettings, SITE_NAME } from "@/lib/site-settings";
-import { revalidatePath } from "next/cache";
+import {
+  SITE_CUSTOM_COLOR_THEME_PRESET,
+  parseSiteThemeCustomTokens,
+  type SiteColorThemeId,
+  type SiteThemeCssTokens,
+} from "@/lib/site-color-themes";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 export async function GET() {
   try {
@@ -16,6 +22,8 @@ export async function GET() {
         logoUrl: null,
         primaryColor: "#d97706",
         secondaryColor: "#b91c1c",
+        colorThemePreset: null,
+        colorThemeCustom: null,
         homeCarouselFlowSpeed: 50,
         minSolutionLevelForUser: 1,
       },
@@ -41,12 +49,24 @@ export async function PUT(request: Request) {
     headerTextColor?: string | null;
     headerActiveColor?: string | null;
     homeCarouselFlowSpeed?: number;
+    colorThemePreset?: SiteColorThemeId | typeof SITE_CUSTOM_COLOR_THEME_PRESET | null;
+    colorThemeCustom?: SiteThemeCssTokens | null;
   };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json(
       { error: "잘못된 요청입니다." },
+      { status: 400 }
+    );
+  }
+
+  if (
+    body.colorThemePreset === SITE_CUSTOM_COLOR_THEME_PRESET &&
+    !parseSiteThemeCustomTokens(body.colorThemeCustom ?? null)
+  ) {
+    return NextResponse.json(
+      { error: "커스텀 테마는 primary·secondary·배경·표면·텍스트·muted·테두리 색상(hex)이 모두 필요합니다." },
       { status: 400 }
     );
   }
@@ -63,8 +83,12 @@ export async function PUT(request: Request) {
       headerTextColor: body.headerTextColor,
       headerActiveColor: body.headerActiveColor,
       homeCarouselFlowSpeed: body.homeCarouselFlowSpeed,
+      colorThemePreset: body.colorThemePreset,
+      colorThemeCustom: body.colorThemeCustom,
     });
     revalidatePath("/", "layout");
+    revalidateTag("common-page-data");
+    revalidateTag("site-settings");
     return NextResponse.json(settings);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

@@ -65,6 +65,8 @@
   - 예: Neon 사용 시  
     `postgresql://사용자명:비밀번호@ep-xxx-xxx.region.aws.neon.tech/neondb?sslmode=require`  
   - Neon 콘솔(https://console.neon.tech) → 프로젝트 → Connection string 복사 후 그대로 붙여넣기.
+  - **Pooled 연결**(호스트에 `-pooler` 포함)을 쓰는 경우 Prisma 권장에 맞게 `&pgbouncer=true` 를 붙이는 것을 권장합니다. 그렇지 않으면 pooler·캐시된 prepared plan과 맞물려 `cached plan must not change result type` 류 오류가 날 수 있습니다.
+  - **`DIRECT_URL`** 은 동일 DB의 **non-pooler**(직접 `ep-...`) 호스트로 두고, 마이그레이션·`prisma db push` 에 사용합니다 (`schema.prisma` 의 `directUrl`).
 
 #### ② SESSION_SECRET (필수)
 - **Key:** `SESSION_SECRET`

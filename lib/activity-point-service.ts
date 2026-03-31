@@ -88,7 +88,7 @@ async function createPointLedgerEntry(
   }
 
   if (options.idempotencyKey) {
-    const existing = await tx.userActivityPoint.findUnique({
+    const existing = await tx.userActivityPoint.findFirst({
       where: { idempotencyKey: options.idempotencyKey },
       select: { id: true },
     });

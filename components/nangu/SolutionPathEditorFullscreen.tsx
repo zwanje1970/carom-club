@@ -38,7 +38,10 @@ import {
   pruneCuePathCurveNodes,
   pruneObjectPathCurveNodes,
 } from "@/lib/nangu-curve-nodes";
-import { resolveEffectiveFirstObjectCollisionFromCuePath } from "@/lib/solution-path-geometry";
+import {
+  resolveEffectiveFirstObjectCollisionFromCuePath,
+  resolveEffectiveSecondObjectCollisionFromPaths,
+} from "@/lib/solution-path-geometry";
 import {
   appendCuePathSpot,
   appendCuePathSpotWithAim,
@@ -79,7 +82,11 @@ import {
 } from "@/lib/path-curve-display";
 import { cx } from "@/components/client/console/ui/cx";
 import { SettingsPanel, type SolutionSettingsValue } from "@/components/ui/SettingsPanel";
-import { SolutionSettingsSummaryBar } from "@/components/ui/SolutionSettingsSummaryBar";
+import {
+  CUE_TIP_NORM_DISPLAY_FRAC,
+  thicknessDisplayOverlapStep16,
+} from "@/lib/solution-panel-ball-layout";
+
 
 /** nangu??1紐?寃쎈줈 ?놁쓬. 留??뚮뜑 `[]`瑜??섍린硫??ъ깮 ?낆쓽 ?섏〈?깆씠 諛붾뚯뼱 留ㅻ쾲 reset?섏뼱 ?좊땲硫붿씠?섏씠 ?숈옉?섏? ?딆쓬 */
 const EMPTY_NANGU_OBJECT_PATH_POINTS: NanguPathPoint[] = [];
@@ -158,6 +165,7 @@ function UndoStrokeIcon({ className }: { className?: string }) {
 type PathEditorPairSnapshot = {
   cue: NanguPathPoint[];
   obj: NanguPathPoint[];
+  obj2: NanguPathPoint[];
   cueCurves?: PathSegmentCurveControl[];
   objCurves?: PathSegmentCurveControl[];
   cueCurveNodes?: NanguCurveNode[];
@@ -173,13 +181,15 @@ function clampCurveControlNorm(n: { x: number; y: number }): { x: number; y: num
 }
 
 /** ?쒓뎄(trouble)쨌nangu 怨듯넻 ??寃쎈줈 紐⑤뱶 ?좉? ?숈씪 ?ш린, ?쒖꽦 而щ윭 / 鍮꾪솢???묐갚 */
-function pathLayerToggleClass(active: boolean, layer: "cue" | "object") {
+function pathLayerToggleClass(active: boolean, layer: "cue" | "object" | "object2") {
   return cx(
     "inline-flex h-10 w-[9rem] flex-shrink-0 items-center justify-center rounded-xl border-2 px-2 text-center text-[11px] font-semibold leading-snug transition-all duration-200 touch-manipulation shadow-sm sm:text-xs",
     active
       ? layer === "cue"
         ? "border-site-primary bg-site-primary/15 text-site-primary shadow-md ring-2 ring-site-primary/25 grayscale-0"
-        : "border-sky-600 bg-sky-500/12 text-sky-900 shadow-md ring-2 ring-sky-500/20 grayscale-0 dark:border-sky-500 dark:bg-sky-950/50 dark:text-sky-50"
+        : layer === "object"
+          ? "border-sky-600 bg-sky-500/12 text-sky-900 shadow-md ring-2 ring-sky-500/20 grayscale-0 dark:border-sky-500 dark:bg-sky-950/50 dark:text-sky-50"
+          : "border-green-600 bg-green-500/12 text-green-900 shadow-md ring-2 ring-green-500/20 grayscale-0 dark:border-green-500 dark:bg-green-950/50 dark:text-green-50"
       : "border-zinc-200/95 bg-zinc-50 text-zinc-500 grayscale hover:border-zinc-300 dark:border-zinc-600 dark:bg-zinc-800/95 dark:text-zinc-400"
   );
 }
@@ -203,6 +213,10 @@ const toolbarDanger =
   "border-red-200 bg-red-50 text-red-700 hover:bg-red-100/90 dark:border-red-800/70 dark:bg-red-950/50 dark:text-red-200 dark:hover:bg-red-950/80";
 const toolbarAccent =
   "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100/90 dark:border-amber-700 dark:bg-amber-950/45 dark:text-amber-100 dark:hover:bg-amber-950/70";
+
+/** 하단 한 줄: 보이기·활성·설정~시연 동일 탭 높이(모바일 터치) */
+const pathBarMiniBtn =
+  "inline-flex h-9 min-h-9 shrink-0 items-center justify-center rounded-lg border-2 px-2 text-[11px] font-semibold leading-tight transition-colors touch-manipulation sm:text-xs disabled:pointer-events-none disabled:opacity-40 disabled:grayscale";
 
 export type SolutionPathEditorPresentation = "overlay" | "noteBallPlacementFullscreen";
 
@@ -286,28 +300,35 @@ export function SolutionPathEditorFullscreen({
   }
   const [pathPoints, setPathPoints] = useState<NanguPathPoint[]>(initialPathPoints);
   const [objectPathPoints, setObjectPathPoints] = useState<NanguPathPoint[]>(initialObjectPathPoints);
+  const [secondObjectPathPoints, setSecondObjectPathPoints] = useState<NanguPathPoint[]>([]);
   const [pathMode, setPathMode] = useState(true);
   const [objectPathMode, setObjectPathMode] = useState(false);
+  const [secondObjectPathMode, setSecondObjectPathMode] = useState(false);
   /**
    * ?쒓뎄(trouble): ?섍뎄寃쎈줈 / 1?곴뎄寃쎈줈 ???숈떆 ?쒖꽦 遺덇?, ?숈떆 鍮꾪솢??媛???대븣 寃쎈줈??異붽? 遺덇?).
    * nangu??湲곗〈 pathMode쨌objectPathMode留??ъ슜.
    */
-  const [troublePathEditLayer, setTroublePathEditLayer] = useState<"cue" | "object" | null>("cue");
+  const [troublePathEditLayer, setTroublePathEditLayer] = useState<"cue" | "object" | "object2" | null>("cue");
   /** ?ㅽ뙚 異붽?쨌?쎌엯쨌??젣쨌?쒕옒洹??대룞쨌?꾩껜 ??젣 吏곸쟾 ?ㅻ깄?????섎룎由ш린 1??= 吏곸쟾 ?숈옉 痍⑥냼 */
   const [pathUndoStack, setPathUndoStack] = useState<PathEditorPairSnapshot[]>([]);
   const pathPointsRef = useRef(pathPoints);
   const objectPathPointsRef = useRef(objectPathPoints);
+  const secondObjectPathPointsRef = useRef(secondObjectPathPoints);
   useEffect(() => {
     pathPointsRef.current = pathPoints;
   }, [pathPoints]);
   useEffect(() => {
     objectPathPointsRef.current = objectPathPoints;
   }, [objectPathPoints]);
+  useEffect(() => {
+    secondObjectPathPointsRef.current = secondObjectPathPoints;
+  }, [secondObjectPathPoints]);
 
   /** 확대 뷰 `pointerup`의 onEmptyTap 과 경로 오버레이 `pointerdown` 이중 추가 방지 */
   const suppressZoomEmptyTapPointerIdRef = useRef<number | null>(null);
   const lastCuePlayfieldAppendDedupeRef = useRef<{ t: number; key: string } | null>(null);
   const lastObjectPlayfieldAppendDedupeRef = useRef<{ t: number; key: string } | null>(null);
+  const lastSecondObjectPlayfieldAppendDedupeRef = useRef<{ t: number; key: string } | null>(null);
   const onPathAppendPointerDown = useCallback((pointerId: number) => {
     suppressZoomEmptyTapPointerIdRef.current = pointerId;
   }, []);
@@ -355,6 +376,7 @@ export function SolutionPathEditorFullscreen({
       const nextSnap: PathEditorPairSnapshot = {
         cue: clonePathPointsForUndo(cueSnap),
         obj: clonePathPointsForUndo(objSnap),
+        obj2: clonePathPointsForUndo(secondObjectPathPointsRef.current),
         cueCurves: clonePathCurveControls(cueCurveControlsRef.current),
         objCurves: clonePathCurveControls(objectCurveControlsRef.current),
         cueCurveNodes: cloneNanguCurveNodes(cueCurveNodesRef.current),
@@ -365,6 +387,7 @@ export function SolutionPathEditorFullscreen({
         last &&
         arePathPointsEqual(last.cue, nextSnap.cue) &&
         arePathPointsEqual(last.obj, nextSnap.obj) &&
+        arePathPointsEqual(last.obj2 ?? [], nextSnap.obj2 ?? []) &&
         areCurveControlsEqual(last.cueCurves ?? [], nextSnap.cueCurves ?? []) &&
         areCurveControlsEqual(last.objCurves ?? [], nextSnap.objCurves ?? []) &&
         areNanguCurveNodesEqual(last.cueCurveNodes ?? [], nextSnap.cueCurveNodes ?? []) &&
@@ -378,7 +401,7 @@ export function SolutionPathEditorFullscreen({
 
   /** ?ㅽ뙚 ?쒕옒洹?1??= ?섎룎由ш린 1???쒕옒洹??쒖옉 吏곸쟾 ?곹깭瑜??ㅽ깮?????. noop ?대룞???ы븿. */
   const onPathSpotDragStart = useCallback(
-    (_kind: "cue" | "object", _spotId: string) => {
+    (_kind: "cue" | "object" | "object2", _spotId: string) => {
       pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
     },
     [pushPathUndoSnapshot]
@@ -559,7 +582,6 @@ export function SolutionPathEditorFullscreen({
   const troubleLeftDrawerDragPxRef = useRef(0);
   const [pathSaveFeedback, setPathSaveFeedback] = useState<"idle" | "saving" | "ok" | "err">("idle");
   const [menuInfoFeedback, setMenuInfoFeedback] = useState<string | null>(null);
-  const [spotMagnifierEnabled, setSpotMagnifierEnabled] = useState(false);
 
   useEffect(() => {
     troubleLeftDrawerDragPxRef.current = troubleLeftDrawerDragPx;
@@ -587,6 +609,7 @@ export function SolutionPathEditorFullscreen({
   /** 寃쎈줈 ?ㅽ뙚: 湲곕낯 留덉?留????ㅽ뙚留??쒖꽦 ???ㅻⅨ ?ㅽ뙚 ?붾툝?대┃ ???꾪솚(??긽 1媛? */
   const [cuePathActiveSpotId, setCuePathActiveSpotId] = useState<string | null>(null);
   const [objectPathActiveSpotId, setObjectPathActiveSpotId] = useState<string | null>(null);
+  const [secondObjectPathActiveSpotId, setSecondObjectPathActiveSpotId] = useState<string | null>(null);
 
   useEffect(() => {
     if (ballPlacement?.cueBall) setCueBallChoice(ballPlacement.cueBall);
@@ -600,12 +623,11 @@ export function SolutionPathEditorFullscreen({
   }, [ballPlacement, cueBallChoice, readOnlyCueAndBalls]);
 
   /**
-   * ?명듃 ?? ?뚯씠釉?湲?蹂 ?몃줈 ??湲곌린 ?몃줈 紐⑤뱶?닿굅??PC/?쒕툝由?768px ?댁긽)????
-   * 醫곸? ?붾㈃?먯꽌留?媛濡?landscape) 酉고룷?몃㈃ 湲?蹂 媛濡??좎?.
+   * 경로선 편집화면(isNoteShell)은 항상 portrait(짧은 변 가로, 긴 변 세로)로 표시하여
+   * 화면을 최대한 활용한다.
    */
-  const effectivePortrait =
-    isNoteShell && (deviceOrientation === "portrait" || viewportMdUp);
-  const noteShellTableOrientation: TableOrientation = effectivePortrait ? "portrait" : "landscape";
+  const effectivePortrait = true;
+  const editorOrientation: TableOrientation = "portrait";
   const tableCanvasW = effectivePortrait ? DEFAULT_TABLE_HEIGHT : DEFAULT_TABLE_WIDTH;
   const tableCanvasH = effectivePortrait ? DEFAULT_TABLE_WIDTH : DEFAULT_TABLE_HEIGHT;
   const pointerRect = useMemo(
@@ -620,6 +642,12 @@ export function SolutionPathEditorFullscreen({
   const [playbackGridVisible, setPlaybackGridVisible] = useState(true);
   const [playbackDrawStyle, setPlaybackDrawStyle] = useState<TableDrawStyle>("realistic");
   const [playbackRate, setPlaybackRate] = useState<0.5 | 1>(1);
+  /** 편집기에서 수구/1목 경로선만 각각 숨김(데이터 유지) */
+  const [editorCuePathVisible, setEditorCuePathVisible] = useState(true);
+  const [editorObjectPathVisible, setEditorObjectPathVisible] = useState(true);
+  const [editorSecondObjectPathVisible, setEditorSecondObjectPathVisible] = useState(true);
+  const [spotContactToast, setSpotContactToast] = useState<string | null>(null);
+  const [spotNavMode, setSpotNavMode] = useState<"move" | "delete">("move");
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [thicknessNotSetDialogOpen, setThicknessNotSetDialogOpen] = useState(false);
 
@@ -650,6 +678,23 @@ export function SolutionPathEditorFullscreen({
   }, [layoutForCue, pathPoints, cuePos, rect]);
   const collisionNorm = cueToFirstObjectHit?.collision ?? null;
 
+  /** 2목 충돌 — 수구 경로 또는 1목 경로 스팟 폴리라인 중 어느 쪽이든 2목 접촉에 닿으면(1목 경로 우선) */
+  const objectToSecondObjectHit = useMemo(() => {
+    if (!layoutForCue || !collisionNorm) return null;
+    const firstObjectKey = cueToFirstObjectHit?.objectKey;
+    if (!firstObjectKey) return null;
+    return resolveEffectiveSecondObjectCollisionFromPaths(
+      layoutForCue,
+      cuePos,
+      pathPoints,
+      collisionNorm,
+      objectPathPoints,
+      firstObjectKey,
+      rect
+    );
+  }, [layoutForCue, collisionNorm, cuePos, pathPoints, objectPathPoints, cueToFirstObjectHit?.objectKey, rect]);
+  const secondObjectCollisionNorm = objectToSecondObjectHit?.collision ?? null;
+
   useEffect(() => {
     setCuePathActiveSpotId(null);
   }, [pathPoints.length]);
@@ -657,6 +702,9 @@ export function SolutionPathEditorFullscreen({
   useEffect(() => {
     setObjectPathActiveSpotId(null);
   }, [objectPathPoints.length]);
+  useEffect(() => {
+    setSecondObjectPathActiveSpotId(null);
+  }, [secondObjectPathPoints.length]);
 
   const getNormalizedFromEvent = useCallback(
     (clientX: number, clientY: number): { x: number; y: number } | null => {
@@ -737,6 +785,14 @@ export function SolutionPathEditorFullscreen({
       lastCuePlayfieldAppendDedupeRef.current = { t: now, key };
 
       setPathPoints((prev) => {
+        if (prev.length >= 2 && prev[prev.length - 1]!.type === "free") {
+          queueMicrotask(() => {
+            setSpotContactToast("현재 스팟이 공이나 쿠션에 닿아야 다음 스팟을 추가할 수 있습니다.");
+            window.setTimeout(() => setSpotContactToast(null), 2800);
+          });
+          lastCuePlayfieldAppendDedupeRef.current = prevDedupe;
+          return prev;
+        }
         const r = appendCuePathSpot(prev, norm, cuePathSnapFn, newCueSpotId);
         if (!r.ok) {
           lastCuePlayfieldAppendDedupeRef.current = prevDedupe;
@@ -766,6 +822,14 @@ export function SolutionPathEditorFullscreen({
         lastCuePlayfieldAppendDedupeRef.current = { t: now, key };
         const dupThresholdPx = SPOT_APPEND_DUP_THRESHOLD_PX;
         setPathPoints((prev) => {
+          if (prev.length >= 2 && prev[prev.length - 1]!.type === "free") {
+            queueMicrotask(() => {
+              setSpotContactToast("현재 스팟이 공이나 쿠션에 닿아야 다음 스팟을 추가할 수 있습니다.");
+              window.setTimeout(() => setSpotContactToast(null), 2800);
+            });
+            lastCuePlayfieldAppendDedupeRef.current = prevDedupe;
+            return prev;
+          }
           const r = appendCuePathSpot(prev, aim.norm, cuePathSnapFn, newCueSpotId);
           if (!r.ok) {
             lastCuePlayfieldAppendDedupeRef.current = prevDedupe;
@@ -791,6 +855,13 @@ export function SolutionPathEditorFullscreen({
 
       const dupThresholdPx = SPOT_APPEND_DUP_THRESHOLD_PX;
       setPathPoints((prev) => {
+        if (prev.length >= 2 && prev[prev.length - 1]!.type === "free") {
+          queueMicrotask(() => {
+            setSpotContactToast("현재 스팟이 공이나 쿠션에 닿아야 다음 스팟을 추가할 수 있습니다.");
+            window.setTimeout(() => setSpotContactToast(null), 2800);
+          });
+          return prev;
+        }
         const r = appendCuePathSpotWithAim(prev, aim, cuePathSnapFn, newCueSpotId, rayAppendCtx);
         if (!r.ok) {
           return prev;
@@ -828,6 +899,13 @@ export function SolutionPathEditorFullscreen({
       }
       const newId = () => `o-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       setObjectPathPoints((prev) => {
+        if (prev.length >= 2 && prev[prev.length - 1]!.type === "free") {
+          queueMicrotask(() => {
+            setSpotContactToast("현재 스팟이 공이나 쿠션에 닿아야 다음 스팟을 추가할 수 있습니다.");
+            window.setTimeout(() => setSpotContactToast(null), 2800);
+          });
+          return prev;
+        }
         if (type != null) {
           pushPathUndoSnapshot(pathPointsRef.current, prev);
           return [...prev, { id: newId(), x: norm.x, y: norm.y, type }];
@@ -1142,10 +1220,355 @@ export function SolutionPathEditorFullscreen({
     ]
   );
 
+  const addSecondObjectPathPoint = useCallback(
+    (norm: { x: number; y: number }, type?: "ball" | "cushion" | "free") => {
+      if (type == null) {
+        const now = Date.now();
+        const key = cuePlayfieldAppendDedupeKey(norm);
+        const last = lastSecondObjectPlayfieldAppendDedupeRef.current;
+        if (
+          last &&
+          now - last.t < CUE_PLAYFIELD_APPEND_DEBOUNCE_MS &&
+          last.key === key
+        ) {
+          return;
+        }
+        lastSecondObjectPlayfieldAppendDedupeRef.current = { t: now, key };
+      }
+      const newId = () => `o2-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      setSecondObjectPathPoints((prev) => {
+        if (prev.length >= 2 && prev[prev.length - 1]!.type === "free") {
+          queueMicrotask(() => {
+            setSpotContactToast("현재 스팟이 공이나 쿠션에 닿아야 다음 스팟을 추가할 수 있습니다.");
+            window.setTimeout(() => setSpotContactToast(null), 2800);
+          });
+          return prev;
+        }
+        if (type != null) {
+          pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
+          return [...prev, { id: newId(), x: norm.x, y: norm.y, type }];
+        }
+        if (!layoutForCue || !secondObjectCollisionNorm) {
+          const snapped = snapToPlayfieldCushionJunction(norm.x, norm.y);
+          pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
+          return [...prev, { id: newId(), x: snapped.x, y: snapped.y, type: snapped.type }];
+        }
+        const last = prev.length > 0 ? prev[prev.length - 1]! : null;
+        const fromForSnap = last ?? secondObjectCollisionNorm;
+        if (last && last.type !== "cushion") {
+          const aimCanvasPx = landscapeNormToPlayfieldCanvasPx(
+            norm,
+            tableCanvasW,
+            tableCanvasH,
+            effectivePortrait
+          );
+          const cushionHit = resolveObjectPathRayHitLandscape({
+            fromLandscape: { x: last.x, y: last.y },
+            aimCanvasPx,
+            canvasW: tableCanvasW,
+            canvasH: tableCanvasH,
+            portrait: effectivePortrait,
+            collisionRectLandscape: rect,
+            ballPlacement: layoutForCue,
+            allowNonCueBallCircle: false,
+          });
+          if (cushionHit && cushionHit.type === "cushion") {
+            const maxAutoPx = pathAutoChainNearCushionMaxDistancePx(rect, effectivePortrait);
+            const distToCushion = distanceNormPointsInPlayfieldPx(
+              { x: last.x, y: last.y },
+              { x: cushionHit.x, y: cushionHit.y },
+              rect
+            );
+            if (distToCushion <= maxAutoPx) {
+              const snapped = snapObjectPathPlayfieldTap(
+                norm.x,
+                norm.y,
+                { x: cushionHit.x, y: cushionHit.y },
+                getNonCueBallNorms(layoutForCue).map(({ x, y }) => ({ x, y })),
+                rect
+              );
+              const id1 = newId();
+              const id2 = newId();
+              pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
+              return [
+                ...prev,
+                { id: id1, x: cushionHit.x, y: cushionHit.y, type: "cushion" },
+                { id: id2, x: snapped.x, y: snapped.y, type: snapped.type },
+              ];
+            }
+          }
+        }
+        const snapped = snapObjectPathPlayfieldTap(
+          norm.x,
+          norm.y,
+          fromForSnap,
+          getNonCueBallNorms(layoutForCue).map(({ x, y }) => ({ x, y })),
+          rect
+        );
+        pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
+        return [...prev, { id: newId(), x: snapped.x, y: snapped.y, type: snapped.type }];
+      });
+    },
+    [layoutForCue, secondObjectCollisionNorm, rect, tableCanvasW, tableCanvasH, effectivePortrait, pushPathUndoSnapshot]
+  );
+
+  const addSecondObjectPathAim = useCallback(
+    (aim: PathPointerAim) => {
+      if (!layoutForCue || !secondObjectCollisionNorm) return;
+      const dupThresholdPx = SPOT_APPEND_DUP_THRESHOLD_PX;
+      const newId = () => `o2-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      if (aim.kind === "playfield") {
+        addSecondObjectPathPoint(aim.norm);
+        return;
+      }
+      setSecondObjectPathPoints((prev) => {
+        if (prev.length >= 2 && prev[prev.length - 1]!.type === "free") {
+          queueMicrotask(() => {
+            setSpotContactToast("현재 스팟이 공이나 쿠션에 닿아야 다음 스팟을 추가할 수 있습니다.");
+            window.setTimeout(() => setSpotContactToast(null), 2800);
+          });
+          return prev;
+        }
+        const from =
+          prev.length > 0
+            ? {
+                x: prev[prev.length - 1]!.x,
+                y: prev[prev.length - 1]!.y,
+              }
+            : secondObjectCollisionNorm;
+        const last = prev.length > 0 ? prev[prev.length - 1]! : null;
+
+        if (last && last.type !== "cushion") {
+          const cushionOnly = resolveObjectPathRayHitLandscape({
+            fromLandscape: from,
+            aimCanvasPx: { x: aim.cx, y: aim.cy },
+            canvasW: tableCanvasW,
+            canvasH: tableCanvasH,
+            portrait: effectivePortrait,
+            collisionRectLandscape: rect,
+            ballPlacement: layoutForCue,
+            allowNonCueBallCircle: false,
+          });
+          if (cushionOnly && cushionOnly.type === "cushion") {
+            const maxAutoPx = pathAutoChainNearCushionMaxDistancePx(rect, effectivePortrait);
+            const distToCushion = distanceNormPointsInPlayfieldPx(
+              from,
+              { x: cushionOnly.x, y: cushionOnly.y },
+              rect
+            );
+            if (distToCushion <= maxAutoPx) {
+              const tapNorm = tableCanvasClampedToPlayfieldLandscapeNorm(
+                aim.cx,
+                aim.cy,
+                tableCanvasW,
+                tableCanvasH,
+                effectivePortrait
+              );
+              const snapped = snapObjectPathPlayfieldTap(
+                tapNorm.x,
+                tapNorm.y,
+                { x: cushionOnly.x, y: cushionOnly.y },
+                getNonCueBallNorms(layoutForCue).map(({ x, y }) => ({ x, y })),
+                rect
+              );
+              const newPoints: NanguPathPoint[] = [
+                { id: newId(), x: cushionOnly.x, y: cushionOnly.y, type: "cushion" },
+                { id: newId(), x: snapped.x, y: snapped.y, type: snapped.type },
+              ];
+              const isDup = newPoints.some((added) =>
+                prev.some(
+                  (p) =>
+                    distanceNormPointsInPlayfieldPx({ x: added.x, y: added.y }, { x: p.x, y: p.y }, rect) <
+                    dupThresholdPx
+                )
+              );
+              if (isDup) return prev;
+              pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
+              return [...prev, ...newPoints];
+            }
+          }
+        }
+
+        const hit = resolveObjectPathRayHitLandscape({
+          fromLandscape: from,
+          aimCanvasPx: { x: aim.cx, y: aim.cy },
+          canvasW: tableCanvasW,
+          canvasH: tableCanvasH,
+          portrait: effectivePortrait,
+          collisionRectLandscape: rect,
+          ballPlacement: layoutForCue,
+          allowNonCueBallCircle:
+            prev.length === 0 || prev[prev.length - 1]?.type === "cushion",
+          excludeBallKeys:
+            cueToFirstObjectHit && prev.length === 0 ? [cueToFirstObjectHit.objectKey] : undefined,
+        });
+        if (!hit) {
+          return prev;
+        }
+        const isDup =
+          prev.length > 0 &&
+          prev.some(
+            (p) =>
+              distanceNormPointsInPlayfieldPx({ x: hit.x, y: hit.y }, { x: p.x, y: p.y }, rect) <
+              dupThresholdPx
+          );
+        if (isDup) return prev;
+        pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
+        return [
+          ...prev,
+          {
+            id: newId(),
+            x: hit.x,
+            y: hit.y,
+            type: hit.type,
+          },
+        ];
+      });
+    },
+    [
+      secondObjectCollisionNorm,
+      objectToSecondObjectHit,
+      layoutForCue,
+      tableCanvasW,
+      tableCanvasH,
+      effectivePortrait,
+      rect,
+      addSecondObjectPathPoint,
+      pushPathUndoSnapshot,
+    ]
+  );
+
+  const moveSecondObjectPathPoint = useCallback(
+    (id: string, norm: { x: number; y: number }) => {
+      setSecondObjectPathPoints((prev) => {
+        const idx = prev.findIndex((p) => p.id === id);
+        if (idx < 0) return prev;
+        if (!isLastSegmentEndpointSpotIndex(prev, idx) && secondObjectPathActiveSpotId !== id) return prev;
+        const snapped =
+          !layoutForCue || !secondObjectCollisionNorm
+            ? snapToPlayfieldCushionJunction(norm.x, norm.y)
+            : snapObjectPathPlayfieldTap(
+                norm.x,
+                norm.y,
+                idx === 0 ? secondObjectCollisionNorm : prev[idx - 1]!,
+                getNonCueBallNorms(layoutForCue).map(({ x, y }) => ({ x, y })),
+                rect
+              );
+        return prev.map((p) =>
+          p.id === id ? { ...p, x: snapped.x, y: snapped.y, type: snapped.type } : p
+        );
+      });
+    },
+    [layoutForCue, secondObjectCollisionNorm, rect, secondObjectPathActiveSpotId]
+  );
+
+  const removeSecondObjectPathPoint = useCallback(
+    (id: string) => {
+      setSecondObjectPathPoints((prev) => {
+        const idx = prev.findIndex((p) => p.id === id);
+        if (idx < 0) return prev;
+        if (!isLastSegmentEndpointSpotIndex(prev, idx)) return prev;
+        pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
+        return prev.filter((p) => p.id !== id);
+      });
+    },
+    [pushPathUndoSnapshot]
+  );
+
+  const insertSecondObjectPathPointBetween = useCallback(
+    (segmentIndex: number, norm: { x: number; y: number }) => {
+      if (!layoutForCue || !secondObjectCollisionNorm) return;
+      const chain: { x: number; y: number }[] = [
+        secondObjectCollisionNorm,
+        ...secondObjectPathPoints.map((p) => ({ x: p.x, y: p.y })),
+      ];
+      const fromNorm = chain[segmentIndex];
+      if (!fromNorm) return;
+      const snapped = snapObjectPathPlayfieldTap(
+        norm.x,
+        norm.y,
+        fromNorm,
+        getNonCueBallNorms(layoutForCue).map(({ x, y }) => ({ x, y })),
+        rect
+      );
+      const newPoint: NanguPathPoint = {
+        id: `o2-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        x: snapped.x,
+        y: snapped.y,
+        type: snapped.type,
+      };
+      setSecondObjectPathPoints((prev) => {
+        const next = [...prev];
+        next.splice(segmentIndex, 0, newPoint);
+        pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
+        return next;
+      });
+    },
+    [secondObjectCollisionNorm, layoutForCue, secondObjectPathPoints, rect, pushPathUndoSnapshot]
+  );
+
+  const insertSecondObjectPathPointBetweenAim = useCallback(
+    (segmentIndex: number, aim: PathPointerAim) => {
+      if (!layoutForCue || !secondObjectCollisionNorm) return;
+      if (aim.kind === "playfield") {
+        insertSecondObjectPathPointBetween(segmentIndex, aim.norm);
+        return;
+      }
+      const chain: { x: number; y: number }[] = [
+        secondObjectCollisionNorm,
+        ...secondObjectPathPoints.map((p) => ({ x: p.x, y: p.y })),
+      ];
+      const from = chain[segmentIndex];
+      if (!from) return;
+      const hit = resolveObjectPathRayHitLandscape({
+        fromLandscape: from,
+        aimCanvasPx: { x: aim.cx, y: aim.cy },
+        canvasW: tableCanvasW,
+        canvasH: tableCanvasH,
+        portrait: effectivePortrait,
+        collisionRectLandscape: rect,
+        ballPlacement: layoutForCue,
+        allowNonCueBallCircle:
+          segmentIndex === 0 || secondObjectPathPoints[segmentIndex - 1]?.type === "cushion",
+        excludeBallKeys:
+          cueToFirstObjectHit && segmentIndex === 0 ? [cueToFirstObjectHit.objectKey] : undefined,
+      });
+      if (!hit) {
+        return;
+      }
+      const newPoint: NanguPathPoint = {
+        id: `o2-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        x: hit.x,
+        y: hit.y,
+        type: hit.type,
+      };
+      setSecondObjectPathPoints((prev) => {
+        const next = [...prev];
+        next.splice(segmentIndex, 0, newPoint);
+        pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
+        return next;
+      });
+    },
+    [
+      secondObjectCollisionNorm,
+      cueToFirstObjectHit,
+      layoutForCue,
+      secondObjectPathPoints,
+      tableCanvasW,
+      tableCanvasH,
+      effectivePortrait,
+      rect,
+      insertSecondObjectPathPointBetween,
+      pushPathUndoSnapshot,
+    ]
+  );
+
   const cuePathEditing =
     variant === "trouble" ? troublePathEditLayer === "cue" : pathMode;
   const objectPathEditing =
     variant === "trouble" ? troublePathEditLayer === "object" : objectPathMode;
+  const secondObjectPathEditing =
+    variant === "trouble" ? troublePathEditLayer === "object2" : secondObjectPathMode;
 
   const playbackBallSpeed = normalizeBallSpeed(
     settingsValue?.railCount != null ? Number(settingsValue.railCount) : Number(ballSpeed)
@@ -1154,20 +1577,114 @@ export function SolutionPathEditorFullscreen({
   const pathPlayback = useSolutionPathPlayback({
     ballPlacement: layoutForCue,
     pathPoints,
-    objectPathPoints: variant === "trouble" ? objectPathPoints : EMPTY_NANGU_OBJECT_PATH_POINTS,
+    objectPathPoints,
     ballSpeed: playbackBallSpeed,
     isBankShot,
     thicknessOffsetX,
     ignorePhysics: Boolean(settingsValue?.ignorePhysics),
-    cuePathCurveControls: variant === "trouble" ? cuePathCurveControls : undefined,
-    cuePathCurveNodes: variant === "trouble" ? cuePathCurveNodes : undefined,
-    objectPathCurveControls: variant === "trouble" ? objectPathCurveControls : undefined,
-    objectPathCurveNodes: variant === "trouble" ? objectPathCurveNodes : undefined,
-    /** 1紐?寃쎈줈 洹몃━湲?紐⑤뱶 + ?ㅽ뙚 1媛??댁긽???뚮쭔 ?ъ깮 異⑸룎 ?앹뾽 */
-    collisionWarningsEnabled:
-      variant === "trouble" && objectPathEditing && objectPathPoints.length >= 1,
+    cuePathCurveControls,
+    cuePathCurveNodes,
+    objectPathCurveControls,
+    objectPathCurveNodes,
+    secondObjectPathPoints,
+    secondObjectPathCurveControls: undefined,
+    secondObjectPathCurveNodes: undefined,
+    /** 1목 경로 그리기 모드 + 스팟 1개 이상일 때만 재생 충돌 팝업 */
+    collisionWarningsEnabled: objectPathEditing && objectPathPoints.length >= 1,
     playbackRate,
   });
+
+  const pathPlaybackBusy = pathPlayback.isPlaybackActive || pathPlayback.isPlaybackPaused;
+
+  const activeSpotMoveState = useMemo(() => {
+    if (pathPlaybackBusy) return null;
+    const layer: "cue" | "object" | "object2" | null = cuePathEditing
+      ? "cue"
+      : objectPathEditing
+        ? "object"
+        : secondObjectPathEditing
+          ? "object2"
+          : null;
+    if (!layer) return null;
+    const points = layer === "cue" ? pathPoints : layer === "object" ? objectPathPoints : secondObjectPathPoints;
+    if (points.length < 2) return null;
+    const activeId =
+      layer === "cue"
+        ? cuePathActiveSpotId
+        : layer === "object"
+          ? objectPathActiveSpotId
+          : secondObjectPathActiveSpotId;
+    const currentId = activeId ?? points[points.length - 1]!.id;
+    const currentIndexRaw = points.findIndex((p) => p.id === currentId);
+    const currentIndex = currentIndexRaw >= 0 ? currentIndexRaw : points.length - 1;
+    return {
+      layer,
+      points,
+      currentIndex,
+      canPrev: currentIndex > 0,
+      canNext: currentIndex < points.length - 1,
+    };
+  }, [
+    cuePathEditing,
+    objectPathEditing,
+    secondObjectPathEditing,
+    pathPlaybackBusy,
+    pathPoints,
+    objectPathPoints,
+    secondObjectPathPoints,
+    cuePathActiveSpotId,
+    objectPathActiveSpotId,
+    secondObjectPathActiveSpotId,
+  ]);
+
+  const moveActiveSpot = useCallback(
+    (delta: -1 | 1) => {
+      if (!activeSpotMoveState) return;
+      const nextIndex = activeSpotMoveState.currentIndex + delta;
+      if (nextIndex < 0 || nextIndex >= activeSpotMoveState.points.length) return;
+      const nextId = activeSpotMoveState.points[nextIndex]!.id;
+      if (activeSpotMoveState.layer === "cue") {
+        setCuePathActiveSpotId(nextId);
+    } else if (activeSpotMoveState.layer === "object") {
+        setObjectPathActiveSpotId(nextId);
+    } else {
+      setSecondObjectPathActiveSpotId(nextId);
+      }
+    },
+    [activeSpotMoveState]
+  );
+
+  const deleteAdjacentSpot = useCallback(
+    (delta: -1 | 1) => {
+      if (!activeSpotMoveState) return;
+      const targetIndex = activeSpotMoveState.currentIndex + delta;
+      if (targetIndex < 0 || targetIndex >= activeSpotMoveState.points.length) return;
+      const targetId = activeSpotMoveState.points[targetIndex]!.id;
+      if (activeSpotMoveState.layer === "cue") {
+        setPathPoints((prev) => {
+          const idx = prev.findIndex((p) => p.id === targetId);
+          if (idx < 0) return prev;
+          pushPathUndoSnapshot(prev, objectPathPointsRef.current);
+          return prev.filter((p) => p.id !== targetId);
+        });
+      } else if (activeSpotMoveState.layer === "object") {
+        setObjectPathPoints((prev) => {
+          const idx = prev.findIndex((p) => p.id === targetId);
+          if (idx < 0) return prev;
+          pushPathUndoSnapshot(pathPointsRef.current, prev);
+          return prev.filter((p) => p.id !== targetId);
+        });
+      } else {
+        setSecondObjectPathPoints((prev) => {
+          const idx = prev.findIndex((p) => p.id === targetId);
+          if (idx < 0) return prev;
+          pushPathUndoSnapshot(pathPointsRef.current, objectPathPointsRef.current);
+          return prev.filter((p) => p.id !== targetId);
+        });
+      }
+    },
+    [activeSpotMoveState, pushPathUndoSnapshot]
+  );
 
   useEffect(() => {
     if (!isTroublePlaybackVerboseLogEnabled()) return;
@@ -1188,6 +1705,19 @@ export function SolutionPathEditorFullscreen({
     if (!a && !b) return undefined;
     return { ...(a ?? {}), ...(b ?? {}) };
   }, [panelBallNormOverrides, pathPlayback.ballNormOverrides]);
+
+  const overlayCuePathLinesVisible = useMemo(
+    () => (!pathPlaybackBusy || playbackPathLinesVisible) && editorCuePathVisible,
+    [pathPlaybackBusy, playbackPathLinesVisible, editorCuePathVisible]
+  );
+  const overlayObjectPathLinesVisible = useMemo(
+    () => (!pathPlaybackBusy || playbackPathLinesVisible) && editorObjectPathVisible,
+    [pathPlaybackBusy, playbackPathLinesVisible, editorObjectPathVisible]
+  );
+  const overlaySecondObjectPathLinesVisible = useMemo(
+    () => (!pathPlaybackBusy || playbackPathLinesVisible) && editorSecondObjectPathVisible,
+    [pathPlaybackBusy, playbackPathLinesVisible, editorSecondObjectPathVisible]
+  );
 
   const cuePosWithPlayback = useMemo(() => {
     if (!layoutForCue) return cuePos;
@@ -1238,10 +1768,14 @@ export function SolutionPathEditorFullscreen({
     }
   }, [isNoteShell, variant]);
 
-  const { resetPlayback: resetPathPlayback } = pathPlayback;
+  const { resetPlayback: resetPathPlayback, pausePlayback: pausePathPlayback } = pathPlayback;
   const handlePlayTap = useCallback(() => {
     if (pathPlayback.isPlaybackActive) {
-      resetPathPlayback();
+      pausePathPlayback();
+      return;
+    }
+    if (pathPlayback.isPlaybackPaused) {
+      pathPlayback.startPlayback();
       return;
     }
     if (!pathPlayback.canPlayback) return;
@@ -1251,52 +1785,138 @@ export function SolutionPathEditorFullscreen({
       return;
     }
     pathPlayback.startPlayback();
-  }, [pathPlayback, resetPathPlayback, settingsValue?.thicknessStep, settingsValue?.ignorePhysics]);
+  }, [pathPlayback, pausePathPlayback, settingsValue?.thicknessStep, settingsValue?.ignorePhysics]);
 
   const onPathEditCueBallTap = useCallback(() => {
     if (variant === "trouble") setTroublePathEditLayer("cue");
     else {
       setPathMode(true);
       setObjectPathMode(false);
+      setSecondObjectPathMode(false);
     }
   }, [variant]);
 
   const onPathEditObjectBallTap = useCallback(() => {
+    if (!collisionNorm) return;
     if (variant === "trouble") {
       setTroublePathEditLayer("object");
       return;
     }
-    if (!collisionNorm) return;
     setObjectPathMode(true);
     setPathMode(false);
   }, [variant, collisionNorm]);
 
+  const objectPathLayerEnabled = Boolean(layoutForCue);
+  /** 1목·2목: 스팟 폴리라인이 해당 공에 닿을 때만(geometry `resolveEffective*`) 활성 */
+  const objectActiveLayerEnabled = Boolean(layoutForCue && collisionNorm);
+  /** 수구·1목 경로 중 폴리라인이 2목 공 접촉에 닿을 때 */
+  const secondObjectPathLayerEnabled = Boolean(layoutForCue && secondObjectCollisionNorm);
+
+  const activateCueEditLayer = useCallback(() => {
+    if (pathPlaybackBusy) return;
+    if (variant === "trouble") setTroublePathEditLayer("cue");
+    else {
+      setPathMode(true);
+      setObjectPathMode(false);
+      setSecondObjectPathMode(false);
+    }
+  }, [variant, pathPlaybackBusy]);
+
+  const activateObjectEditLayer = useCallback(() => {
+    if (pathPlaybackBusy) return;
+    if (!objectActiveLayerEnabled) return;
+    if (variant === "trouble") {
+      setTroublePathEditLayer("object");
+      return;
+    }
+    setObjectPathMode(true);
+    setPathMode(false);
+    setSecondObjectPathMode(false);
+  }, [variant, pathPlaybackBusy, objectActiveLayerEnabled]);
+
+  const activateSecondObjectEditLayer = useCallback(() => {
+    if (pathPlaybackBusy) return;
+    if (!secondObjectPathLayerEnabled) return;
+    if (variant === "trouble") setTroublePathEditLayer("object2");
+    else {
+      setSecondObjectPathMode(true);
+      setObjectPathMode(false);
+      setPathMode(false);
+    }
+  }, [variant, pathPlaybackBusy, secondObjectPathLayerEnabled]);
+
   /**
-   * 1목 충돌이 아직 유효하지 않을 때: 수구 스팟이 하나도 없으면 수구 레이어만 유지.
-   * trouble에서 `cueToFirstObjectHit`가 null인 경우는 첫 스팟은 있으나 폴리라인이 충돌점에
-   * 아직 닿지 않은 경우도 포함되므로, 그때마다 cue로 되돌리면 1목 레이어 전환이 영구히 막힌다.
+   * 스팟이 공에 닿지 않으면 1목·2목 레이어 비활성: 접촉 무효 시 수구(또는 가능한 상위 레이어)로 복귀.
    */
   useEffect(() => {
     if (!layoutForCue) return;
-    if (cueToFirstObjectHit?.objectKey != null) return;
+
     if (variant === "trouble") {
-      if (pathPoints.length === 0 && troublePathEditLayer !== "cue") {
-        setTroublePathEditLayer("cue");
+      if (pathPoints.length === 0) {
+        if (troublePathEditLayer !== "cue" && troublePathEditLayer !== null) {
+          setTroublePathEditLayer("cue");
+        }
+        return;
+      }
+      if (objectPathPoints.length === 0 && troublePathEditLayer === "object2") {
+        setTroublePathEditLayer(collisionNorm ? "object" : "cue");
+        return;
+      }
+      if (!collisionNorm) {
+        if (troublePathEditLayer === "object" || troublePathEditLayer === "object2") {
+          setTroublePathEditLayer("cue");
+        }
+        return;
+      }
+      if (!secondObjectCollisionNorm && troublePathEditLayer === "object2") {
+        setTroublePathEditLayer("object");
       }
       return;
     }
-    if (!pathMode || objectPathMode) {
-      setPathMode(true);
-      setObjectPathMode(false);
+
+    if (pathPoints.length === 0) {
+      if (!pathMode || objectPathMode || secondObjectPathMode) {
+        setPathMode(true);
+        setObjectPathMode(false);
+        setSecondObjectPathMode(false);
+      }
+      return;
+    }
+    if (objectPathPoints.length === 0 && secondObjectPathMode) {
+      setSecondObjectPathMode(false);
+      if (collisionNorm) {
+        setObjectPathMode(true);
+        setPathMode(false);
+      } else {
+        setPathMode(true);
+        setObjectPathMode(false);
+      }
+      return;
+    }
+    if (!collisionNorm) {
+      if (objectPathMode || secondObjectPathMode) {
+        setPathMode(true);
+        setObjectPathMode(false);
+        setSecondObjectPathMode(false);
+      }
+      return;
+    }
+    if (!secondObjectCollisionNorm && secondObjectPathMode) {
+      setSecondObjectPathMode(false);
+      setObjectPathMode(true);
+      setPathMode(false);
     }
   }, [
     layoutForCue,
-    cueToFirstObjectHit?.objectKey,
     variant,
+    collisionNorm,
+    secondObjectCollisionNorm,
     troublePathEditLayer,
     pathMode,
     objectPathMode,
+    secondObjectPathMode,
     pathPoints.length,
+    objectPathPoints.length,
   ]);
 
   const clearAllPaths = useCallback(() => {
@@ -1304,6 +1924,7 @@ export function SolutionPathEditorFullscreen({
     resetPathPlayback();
     setPathPoints([]);
     setObjectPathPoints([]);
+    setSecondObjectPathPoints([]);
     setCuePathCurveControls([]);
     setObjectPathCurveControls([]);
     setCuePathCurveNodes([]);
@@ -1311,6 +1932,7 @@ export function SolutionPathEditorFullscreen({
     if (variant === "trouble") {
       setTroublePathEditLayer("cue");
     } else {
+      setSecondObjectPathMode(false);
       setObjectPathMode(false);
       setPathMode(true);
     }
@@ -1325,7 +1947,7 @@ export function SolutionPathEditorFullscreen({
   }, [resetPathPlayback, ballPlacement?.cueBall, clearAllPaths]);
 
   const onUndoPathClick = useCallback(() => {
-    if (pathPlayback.isPlaybackActive) return;
+    if (pathPlaybackBusy) return;
     setPathUndoStack((stack) => {
       if (stack.length === 0) {
         queueMicrotask(() => showUndoLimitToast());
@@ -1336,6 +1958,7 @@ export function SolutionPathEditorFullscreen({
       queueMicrotask(() => {
         setPathPoints(clonePathPointsForUndo(snap.cue));
         setObjectPathPoints(clonePathPointsForUndo(snap.obj));
+        setSecondObjectPathPoints(clonePathPointsForUndo(snap.obj2 ?? []));
         setCuePathCurveControls(clonePathCurveControls(snap.cueCurves ?? []));
         setObjectPathCurveControls(clonePathCurveControls(snap.objCurves ?? []));
         setCuePathCurveNodes(cloneNanguCurveNodes(snap.cueCurveNodes ?? []));
@@ -1346,14 +1969,16 @@ export function SolutionPathEditorFullscreen({
       });
       return next;
     });
-  }, [pathPlayback.isPlaybackActive, showUndoLimitToast]);
+  }, [pathPlaybackBusy, showUndoLimitToast]);
 
   useEffect(() => {
     if (pathPoints.length === 0) {
       setObjectPathPoints([]);
+      setSecondObjectPathPoints([]);
       if (variant === "trouble") {
         setTroublePathEditLayer("cue");
       } else {
+        setSecondObjectPathMode(false);
         setObjectPathMode(false);
         setPathMode(true);
       }
@@ -1381,6 +2006,24 @@ export function SolutionPathEditorFullscreen({
     },
     [pushPathUndoSnapshot]
   );
+
+  const removeActiveSpot = useCallback(() => {
+    if (!activeSpotMoveState) return;
+    const currentId =
+      activeSpotMoveState.points[activeSpotMoveState.currentIndex]!.id;
+    if (activeSpotMoveState.layer === "cue") {
+      removePathPoint(currentId);
+    } else if (activeSpotMoveState.layer === "object") {
+      removeObjectPathPoint(currentId);
+    } else {
+      removeSecondObjectPathPoint(currentId);
+    }
+  }, [
+    activeSpotMoveState,
+    removePathPoint,
+    removeObjectPathPoint,
+    removeSecondObjectPathPoint,
+  ]);
 
   const insertPathPointBetween = useCallback(
     (segmentIndex: number, norm: { x: number; y: number }) => {
@@ -1427,25 +2070,15 @@ export function SolutionPathEditorFullscreen({
           if (t.closest("input, textarea, select")) return;
           if (t.isContentEditable) return;
         }
-        if (pathPlayback.isPlaybackActive) return;
+        if (pathPlaybackBusy) return;
         e.preventDefault();
         onUndoPathClick();
         return;
       }
       if (e.key !== "Escape") return;
-      if (isNoteShell && variant === "trouble" && troubleLeftDrawerOpen) {
-        e.preventDefault();
-        setTroubleLeftDrawerOpen(false);
-        return;
-      }
       if (isNoteShell && rightPathDrawerOpen) {
         e.preventDefault();
         setRightPathDrawerOpen(false);
-        return;
-      }
-      if (isNoteShell && leftPathDrawerOpen) {
-        e.preventDefault();
-        setLeftPathDrawerOpen(false);
         return;
       }
       onCancel();
@@ -1455,12 +2088,10 @@ export function SolutionPathEditorFullscreen({
   }, [
     onCancel,
     onUndoPathClick,
-    pathPlayback.isPlaybackActive,
+    pathPlaybackBusy,
     isNoteShell,
-    leftPathDrawerOpen,
     rightPathDrawerOpen,
     variant,
-    troubleLeftDrawerOpen,
   ]);
 
   const endTroubleDrawerDrag = useCallback((e: React.PointerEvent) => {
@@ -1602,14 +2233,16 @@ export function SolutionPathEditorFullscreen({
   );
 
   const C = TROUBLE_SOLUTION_CONSOLE;
-  const showObjectPath = variant === "trouble";
+  const showObjectPath = true;
 
   const panPointerPolicy = useMemo((): SolutionTablePanPointerPolicy => {
     const ballPickLayout =
       layoutForCue && (cuePathEditing || objectPathEditing) ? layoutForCue : undefined;
     const ballNormOverrides = mergedBallNormOverridesForCanvas ?? undefined;
     const objectPts = showObjectPath ? objectPathPoints : [];
+    const secondObjectPts = showObjectPath ? secondObjectPathPoints : [];
     const objMode = objectPathEditing;
+    const obj2Mode = secondObjectPathEditing;
 
     const classifyAt = (clientX: number, clientY: number) => {
       const norm = getNormalizedFromEvent(clientX, clientY);
@@ -1618,18 +2251,23 @@ export function SolutionPathEditorFullscreen({
         norm,
         pathMode: cuePathEditing,
         objectPathMode: objMode,
+        secondObjectPathMode: obj2Mode,
         cuePos: cuePosWithPlayback,
         pathPoints,
         objectPathPoints: objectPts,
+        secondObjectPathPoints: secondObjectPts,
         ballPickLayout,
         collisionLayout: layoutForCue ?? null,
         ballNormOverrides,
         width: DEFAULT_TABLE_WIDTH,
         height: DEFAULT_TABLE_HEIGHT,
         allowCuePlaybackGestures,
-        pathPlaybackActive: pathPlayback.isPlaybackActive,
+        pathPlaybackActive: pathPlaybackBusy,
         objectPathCollisionNormOverride: layoutForCue && collisionNorm ? collisionNorm : undefined,
+        secondObjectPathCollisionNormOverride:
+          layoutForCue && secondObjectCollisionNorm ? secondObjectCollisionNorm : undefined,
         pathEditFirstObjectBallKey: layoutForCue ? (cueToFirstObjectHit?.objectKey ?? null) : undefined,
+        objectBallTapSwitchesCueToObjectLayer: variant !== "trouble",
       });
     };
 
@@ -1653,11 +2291,29 @@ export function SolutionPathEditorFullscreen({
         if (aimMargin?.kind === "tableCanvas") {
           if (cuePathEditing) runCueAppendAim(aimMargin);
           else if (objMode && collisionNorm) addObjectPathAim(aimMargin);
+          else if (obj2Mode && collisionNorm) addSecondObjectPathAim(aimMargin);
           return;
         }
         const c = classifyAt(clientX, clientY);
         if (!c) return;
         if (c.kind === "pathObjectBallTap") {
+          return;
+        }
+        if (c.kind === "cueBallContactAppend") {
+          const aimMargin = getPointerAimFromEvent(clientX, clientY);
+          if (aimMargin?.kind === "tableCanvas" && cuePathEditing) {
+            runCueAppendAim(aimMargin);
+            return;
+          }
+          const norm = getNormalizedFromEvent(clientX, clientY);
+          if (!norm) return;
+          const dupThresholdPx = SPOT_APPEND_DUP_THRESHOLD_PX;
+          const latestCuePoints = pathPointsRef.current;
+          if (
+            !cuePathAppendWouldDuplicateExistingSpot(latestCuePoints, norm, rect, dupThresholdPx)
+          ) {
+            runCueAppend(norm);
+          }
           return;
         }
         if (c.kind === "emptyCue") {
@@ -1684,10 +2340,23 @@ export function SolutionPathEditorFullscreen({
                 distanceNormPointsInPlayfieldPx(norm, { x: p.x, y: p.y }, rect) < dupThresholdPx
             );
           if (!isDup) addObjectPathPoint(norm);
+        } else if (c.kind === "emptyObject2") {
+          const norm = getNormalizedFromEvent(clientX, clientY);
+          if (!norm || !collisionNorm) return;
+          const dupThresholdPx = SPOT_APPEND_DUP_THRESHOLD_PX;
+          const latestSecondPoints = secondObjectPathPointsRef.current;
+          const isDup =
+            latestSecondPoints.length > 0 &&
+            latestSecondPoints.some(
+              (p) =>
+                distanceNormPointsInPlayfieldPx(norm, { x: p.x, y: p.y }, rect) < dupThresholdPx
+            );
+          if (!isDup) addSecondObjectPathPoint(norm);
         }
       },
     };
   }, [
+    variant,
     layoutForCue,
     cuePathEditing,
     objectPathEditing,
@@ -1698,16 +2367,20 @@ export function SolutionPathEditorFullscreen({
     cuePosWithPlayback,
     pathPoints,
     objectPathPoints,
+    secondObjectPathPoints,
     runCueAppend,
     runCueAppendAim,
     addObjectPathPoint,
     addObjectPathAim,
+    addSecondObjectPathPoint,
+    addSecondObjectPathAim,
     collisionNorm,
     isNoteShell,
     rect,
     allowCuePlaybackGestures,
-    pathPlayback.isPlaybackActive,
+    pathPlaybackBusy,
     cueToFirstObjectHit?.objectKey,
+    secondObjectCollisionNorm,
   ]);
 
   const rootClass = isNoteShell
@@ -1721,9 +2394,9 @@ export function SolutionPathEditorFullscreen({
       }
     : undefined;
 
-  const gridVisibleForTable = pathPlayback.isPlaybackActive ? playbackGridVisible : tableGridOn;
-  const drawStyleForTable = pathPlayback.isPlaybackActive ? playbackDrawStyle : tableDrawStyle;
-  const baseSpotChromeVisible = (isNoteShell ? cueSpotOn : true) && !pathPlayback.isPlaybackActive;
+  const gridVisibleForTable = pathPlaybackBusy ? playbackGridVisible : tableGridOn;
+  const drawStyleForTable = pathPlaybackBusy ? playbackDrawStyle : tableDrawStyle;
+  const baseSpotChromeVisible = (isNoteShell ? cueSpotOn : true) && !pathPlaybackBusy;
   /** 점선 깜빡임: 해당 경로 편집 레이어가 켜진 공에만 (비활성 레이어 공에는 표식 없음) */
   const showCueSpot = baseSpotChromeVisible && cuePathEditing;
 
@@ -1738,6 +2411,49 @@ export function SolutionPathEditorFullscreen({
     showObjectPath &&
     objectPathHighlightBallKey != null;
 
+  const secondObjectPathHighlightBallKey = useMemo((): "red" | "yellow" | "white" | null => {
+    if (!layoutForCue) return null;
+    const cueBall = layoutForCue.cueBall;
+    const hitBall = cueToFirstObjectHit?.objectKey;
+    if (!hitBall) return null;
+    const keys: ("red" | "yellow" | "white")[] = ["red", "yellow", "white"];
+    return keys.find((k) => k !== cueBall && k !== hitBall) ?? null;
+  }, [layoutForCue, cueToFirstObjectHit]);
+
+  const showSecondObjectBallSpot =
+    baseSpotChromeVisible &&
+    secondObjectPathEditing &&
+    secondObjectPathHighlightBallKey != null;
+
+  const cuePathActiveSpotForRing = useMemo(() => {
+    if (pathPoints.length === 0) return null;
+    const id = cuePathActiveSpotId ?? pathPoints[pathPoints.length - 1]!.id;
+    return pathPoints.find((p) => p.id === id) ?? null;
+  }, [pathPoints, cuePathActiveSpotId]);
+
+  const objectPathActiveSpotForRing = useMemo(() => {
+    if (objectPathPoints.length === 0) return null;
+    const id = objectPathActiveSpotId ?? objectPathPoints[objectPathPoints.length - 1]!.id;
+    return objectPathPoints.find((p) => p.id === id) ?? null;
+  }, [objectPathPoints, objectPathActiveSpotId]);
+
+  const secondObjectPathActiveSpotForRing = useMemo(() => {
+    if (secondObjectPathPoints.length === 0) return null;
+    const id =
+      secondObjectPathActiveSpotId ?? secondObjectPathPoints[secondObjectPathPoints.length - 1]!.id;
+    return secondObjectPathPoints.find((p) => p.id === id) ?? null;
+  }, [secondObjectPathPoints, secondObjectPathActiveSpotId]);
+
+  const spotTouchesBallOrCushion = (p: { type: string } | null) =>
+    Boolean(p && (p.type === "ball" || p.type === "cushion"));
+
+  const cueBallSpotRingBlackStroke =
+    showCueSpot && spotTouchesBallOrCushion(cuePathActiveSpotForRing);
+  const objectBallSpotRingBlackStroke =
+    showObjectBallSpot && spotTouchesBallOrCushion(objectPathActiveSpotForRing);
+  const secondObjectBallSpotRingBlackStroke =
+    showSecondObjectBallSpot && spotTouchesBallOrCushion(secondObjectPathActiveSpotForRing);
+
   /** ?섍뎄 ?쒖쇅 怨듭뿉 寃쎈줈?좎씠 ?ㅽ뙚 諛섏?由꾨낫??媛源앷쾶 遺숈? 寃쎌슦 ???뚯씠釉?以묒븰 ?덈궡 */
   const pathClearanceWarning = useMemo(() => {
     if (!layoutForCue) return false;
@@ -1751,6 +2467,7 @@ export function SolutionPathEditorFullscreen({
       collisionStruckBallKey: cueToFirstObjectHit?.objectKey ?? null,
       checkCuePath: cuePathEditing && pathPoints.length >= 1,
       checkObjectPath: objectPathEditing && Boolean(collisionNorm) && objectPathPoints.length >= 1,
+      checkSecondObjectPath: secondObjectPathEditing && secondObjectPathPoints.length >= 1,
     });
   }, [
     layoutForCue,
@@ -1758,24 +2475,26 @@ export function SolutionPathEditorFullscreen({
     cuePos,
     pathPoints,
     objectPathPoints,
+    secondObjectPathPoints,
     collisionNorm,
     cueToFirstObjectHit?.objectKey,
     cuePathEditing,
     objectPathEditing,
+    secondObjectPathEditing,
   ]);
 
   const toggleGrid = useCallback(() => {
-    if (pathPlayback.isPlaybackActive) setPlaybackGridVisible((v) => !v);
+    if (pathPlaybackBusy) setPlaybackGridVisible((v) => !v);
     else setTableGridOn((v) => !v);
-  }, [pathPlayback.isPlaybackActive]);
+  }, [pathPlaybackBusy]);
 
   const toggleDrawStyle = useCallback(() => {
-    if (pathPlayback.isPlaybackActive) {
+    if (pathPlaybackBusy) {
       setPlaybackDrawStyle((d) => (d === "realistic" ? "wireframe" : "realistic"));
     } else {
       setTableDrawStyle((d) => (d === "realistic" ? "wireframe" : "realistic"));
     }
-  }, [pathPlayback.isPlaybackActive]);
+  }, [pathPlaybackBusy]);
 
   const showMenuInfo = useCallback((message: string) => {
     setMenuInfoFeedback(message);
@@ -1785,15 +2504,16 @@ export function SolutionPathEditorFullscreen({
   const objectPathLinesRequestedVisible =
     showObjectPath &&
     objectPathPoints.length > 0 &&
-    (!pathPlayback.isPlaybackActive || playbackPathLinesVisible);
+    (!pathPlaybackBusy || playbackPathLinesVisible) &&
+    editorObjectPathVisible;
 
   const curveLineVisible =
-    !pathPlayback.isPlaybackActive || playbackPathLinesVisible;
+    !pathPlaybackBusy || playbackPathLinesVisible;
 
   const allowCurveHandleInteraction =
     troubleCurveEditMode &&
-    (cuePathEditing || objectPathEditing) &&
-    !pathPlayback.isPlaybackActive &&
+    (cuePathEditing || objectPathEditing || secondObjectPathEditing) &&
+    !pathPlaybackBusy &&
     curveLineVisible;
 
   const curveHandlesShowSubtle =
@@ -1803,12 +2523,16 @@ export function SolutionPathEditorFullscreen({
       objectPathCurveNodes.length > 0) &&
     curveLineVisible &&
     !allowCurveHandleInteraction &&
-    !pathPlayback.isPlaybackActive;
+    !pathPlaybackBusy;
 
   const cuePbDbg = pathPlayback.cuePlaybackPathDebug;
   const objPbDbg = pathPlayback.objectPlaybackPathDebug;
   const cueDistDbg = pathPlayback.cuePlaybackDistanceDebug;
   const objDistDbg = pathPlayback.objectPlaybackDistanceDebug;
+
+  const isPathClearanceWarningVisible = useMemo(() => {
+    return pathClearanceWarning && layoutForCue && (cuePathEditing || objectPathEditing || secondObjectPathEditing);
+  }, [pathClearanceWarning, layoutForCue, cuePathEditing, objectPathEditing, secondObjectPathEditing]);
 
   return (
     <div
@@ -1969,425 +2693,6 @@ export function SolutionPathEditorFullscreen({
       </h1>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        {isNoteShell && variant === "trouble" && (
-          <>
-            <div
-              data-path-editor-fs-chrome=""
-              aria-hidden={!troubleLeftDrawerOpen}
-              className={`fixed inset-0 z-[200] bg-black/30 transition-opacity duration-300 ease-out ${
-                troubleLeftDrawerOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
-              }`}
-              onClick={() => setTroubleLeftDrawerOpen(false)}
-            />
-            <aside
-              ref={troubleLeftDrawerAsideRef}
-              data-path-editor-fs-chrome=""
-              id="path-fs-left-drawer"
-              aria-hidden={!troubleLeftDrawerOpen}
-              className={`fixed left-0 z-[205] flex w-[min(52.8vw,180px)] flex-col border-r border-white/20 bg-black/30 text-white shadow-[6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md ${
-                viewportMdUp
-                  ? "top-[45.5%] h-[min(72vh,34rem)] -translate-y-1/2 rounded-r-xl"
-                  : "top-0 h-full"
-              } ${
-                troubleLeftDrawerOpen ? "pointer-events-auto" : "pointer-events-none -translate-x-full"
-              } ${troubleLeftDrawerDragging ? "!duration-0" : "transition-transform duration-300 ease-out"}`}
-              style={
-                troubleLeftDrawerOpen
-                  ? {
-                      transform: `${viewportMdUp ? "translateY(-50%) " : ""}translateX(${-troubleLeftDrawerDragPx}px)`,
-                      transition: troubleLeftDrawerDragging ? "none" : undefined,
-                    }
-                  : undefined
-              }
-            >
-              {troubleLeftDrawerOpen && (
-                <div
-                  data-path-fs-drawer-drag=""
-                  aria-hidden
-                  className="absolute right-0 top-0 z-10 h-full w-10 cursor-grab touch-none active:cursor-grabbing"
-                  style={{ touchAction: "none" }}
-                  onPointerDown={onTroubleLeftDrawerHandlePointerDown}
-                  onPointerMove={onTroubleLeftDrawerHandlePointerMove}
-                  onPointerUp={endTroubleLeftDrawerDrag}
-                  onPointerCancel={endTroubleLeftDrawerDrag}
-                />
-              )}
-              <div className="border-b border-white/15 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-                <h2 className="text-sm font-semibold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                  해법 편집
-                </h2>
-              </div>
-              <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                <button
-                  type="button"
-                  data-testid="trouble-e2e-cue-path-toggle"
-                  data-state={cuePathEditing ? "on" : "off"}
-                  {...{ "data-trouble-action": C.action.togglePathMode }}
-                  onClick={() => {
-                    setTroublePathEditLayer((cur) => (cur === "cue" ? null : "cue"));
-                    setTroubleLeftDrawerOpen(false);
-                  }}
-                  className={cx(
-                    "w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors",
-                    cuePathEditing
-                      ? "bg-site-primary/35 ring-2 ring-site-primary/80"
-                      : "bg-black/25 hover:bg-black/35 active:bg-black/40"
-                  )}
-                  aria-pressed={cuePathEditing}
-                >
-                  수구경로
-                </button>
-                <button
-                  type="button"
-                  data-testid="trouble-e2e-object-path-toggle"
-                  data-state={objectPathEditing ? "on" : "off"}
-                  {...{ "data-trouble-action": C.action.toggleObjectPathMode }}
-                  onClick={() => {
-                    setTroublePathEditLayer((cur) => (cur === "object" ? null : "object"));
-                    setTroubleLeftDrawerOpen(false);
-                  }}
-                  className={cx(
-                    "w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors",
-                    objectPathEditing
-                      ? "bg-site-primary/35 ring-2 ring-site-primary/80"
-                      : "bg-black/25 hover:bg-black/35 active:bg-black/40"
-                  )}
-                  aria-pressed={objectPathEditing}
-                >
-                  1적구경로
-                </button>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={troubleCurveEditMode}
-                  data-state={troubleCurveEditMode ? "on" : "off"}
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 hover:bg-black/35 active:bg-black/40 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-45"
-                  disabled={pathPlayback.isPlaybackActive}
-                  onClick={() => {
-                    setTroubleCurveEditMode((v) => !v);
-                    setTroubleLeftDrawerOpen(false);
-                  }}
-                >
-                  {troubleCurveEditMode ? "곡선 비활성" : "곡선 활성"}
-                </button>
-                <button
-                  type="button"
-                  disabled
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 text-white/55 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-55"
-                >
-                  애니메이션
-                </button>
-                <div className="ml-2 flex items-center gap-1 border-l border-white/20 pl-2">
-                  <span className="px-1 text-[11px] font-semibold text-white/70">배속</span>
-                  <button
-                    type="button"
-                    className={cx(
-                      "rounded-md px-2 py-1 text-[11px] font-semibold touch-manipulation",
-                      playbackRate === 0.5
-                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
-                        : "bg-black/20 text-white/55 hover:bg-black/30"
-                    )}
-                    onClick={() => setPlaybackRate(0.5)}
-                  >
-                    0.5x
-                  </button>
-                  <button
-                    type="button"
-                    className={cx(
-                      "rounded-md px-2 py-1 text-[11px] font-semibold touch-manipulation",
-                      playbackRate === 1
-                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
-                        : "bg-black/20 text-white/55 hover:bg-black/30"
-                    )}
-                    onClick={() => setPlaybackRate(1)}
-                  >
-                    1x
-                  </button>
-                </div>
-                <div className="ml-2 flex flex-col gap-2 border-l border-white/20 pl-2">
-                  <button
-                    type="button"
-                    className={cx(
-                      "w-full rounded-xl px-4 py-3 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors",
-                      playbackPathLinesVisible
-                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
-                        : "bg-black/20 text-white/55 hover:bg-black/30"
-                    )}
-                    onClick={() => setPlaybackPathLinesVisible((v) => !v)}
-                  >
-                    경로선
-                  </button>
-                  <button
-                    type="button"
-                    className={cx(
-                      "w-full rounded-xl px-4 py-3 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors",
-                      playbackGridVisible
-                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
-                        : "bg-black/20 text-white/55 hover:bg-black/30"
-                    )}
-                    onClick={() => setPlaybackGridVisible((v) => !v)}
-                  >
-                    그리드
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  data-testid="trouble-e2e-path-save-confirm"
-                  disabled={pathSaveFeedback === "saving" || pathPlayback.isPlaybackActive}
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-site-primary/90 text-white hover:bg-site-primary touch-manipulation shadow-md disabled:opacity-50"
-                  onClick={() => {
-                    setPathSaveFeedback("saving");
-                    try {
-                      onConfirm({
-                        pathPoints,
-                        objectPathPoints,
-                        cuePathDisplayCurves: cuePathCurveControls,
-                        objectPathDisplayCurves: objectPathCurveControls,
-                        cuePathCurveNodes,
-                        objectPathCurveNodes,
-                      });
-                      setPathSaveFeedback("ok");
-                      window.setTimeout(() => setPathSaveFeedback("idle"), 1400);
-                      setTroubleLeftDrawerOpen(false);
-                    } catch {
-                      setPathSaveFeedback("err");
-                      window.setTimeout(() => setPathSaveFeedback("idle"), 2000);
-                    }
-                  }}
-                >
-                  저장
-                </button>
-                <button
-                  type="button"
-                  data-testid="trouble-e2e-clear-all-paths"
-                  {...{ "data-trouble-action": C.action.clearAllPaths }}
-                  className="mt-1 w-full rounded-lg px-2 py-2 text-center text-[11px] font-medium text-red-200/95 underline-offset-2 hover:underline touch-manipulation disabled:opacity-40"
-                  disabled={
-                    (pathPoints.length === 0 && objectPathPoints.length === 0) ||
-                    pathPlayback.isPlaybackActive
-                  }
-                  onClick={() => {
-                    clearAllPaths();
-                    setTroubleLeftDrawerOpen(false);
-                  }}
-                >
-                  전체 경로 삭제
-                </button>
-                {pathSaveFeedback !== "idle" && (
-                  <p className="px-1 text-[11px] font-medium text-white/85">
-                    {pathSaveFeedback === "saving" && "저장중..."}
-                    {pathSaveFeedback === "ok" && "저장 완료"}
-                    {pathSaveFeedback === "err" && "저장 실패"}
-                  </p>
-                )}
-              </div>
-            </aside>
-          </>
-        )}
-        {isNoteShell && variant !== "trouble" && (
-          <>
-            <div
-              data-path-editor-fs-chrome=""
-              aria-hidden={!leftPathDrawerOpen}
-              className={`fixed inset-0 z-[200] bg-black/30 transition-opacity duration-300 ease-out ${
-                leftPathDrawerOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
-              }`}
-              onClick={() => setLeftPathDrawerOpen(false)}
-            />
-            <aside
-              ref={leftPathDrawerAsideRef}
-              data-path-editor-fs-chrome=""
-              id="path-fs-left-drawer-nangu"
-              aria-hidden={!leftPathDrawerOpen}
-              className={`fixed left-0 z-[205] flex w-[min(52.8vw,180px)] flex-col border-r border-white/20 bg-black/30 text-white shadow-[6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md ${
-                viewportMdUp
-                  ? "top-[45.5%] h-[min(72vh,34rem)] -translate-y-1/2 rounded-r-xl"
-                  : "top-0 h-full"
-              } ${
-                leftPathDrawerOpen ? "pointer-events-auto" : "pointer-events-none -translate-x-full"
-              } ${leftPathDrawerDragging ? "!duration-0" : "transition-transform duration-300 ease-out"}`}
-              style={
-                leftPathDrawerOpen
-                  ? {
-                      transform: `${viewportMdUp ? "translateY(-50%) " : ""}translateX(${-leftPathDrawerDragPx}px)`,
-                      transition: leftPathDrawerDragging ? "none" : undefined,
-                    }
-                  : undefined
-              }
-            >
-              {leftPathDrawerOpen && (
-                <div
-                  data-path-fs-drawer-drag=""
-                  aria-hidden
-                  className="absolute right-0 top-0 z-10 h-full w-10 cursor-grab touch-none active:cursor-grabbing"
-                  style={{ touchAction: "none" }}
-                  onPointerDown={onLeftPathDrawerHandlePointerDown}
-                  onPointerMove={onLeftPathDrawerHandlePointerMove}
-                  onPointerUp={endLeftPathDrawerDrag}
-                  onPointerCancel={endLeftPathDrawerDrag}
-                />
-              )}
-              <div className="border-b border-white/15 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-                <h2 className="text-sm font-semibold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                  해법 편집
-                </h2>
-              </div>
-              <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                <button
-                  type="button"
-                  data-state={pathMode ? "on" : "off"}
-                  onClick={() => {
-                    setPathMode((v) => {
-                      const next = !v;
-                      if (next) setObjectPathMode(false);
-                      return next;
-                    });
-                    setLeftPathDrawerOpen(false);
-                  }}
-                  className={cx(
-                    "w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors",
-                    pathMode ? "bg-site-primary/35 ring-2 ring-site-primary/80" : "bg-black/25 hover:bg-black/35 active:bg-black/40"
-                  )}
-                  aria-pressed={pathMode}
-                >
-                  수구경로
-                </button>
-                <button
-                  type="button"
-                  data-state={objectPathMode ? "on" : "off"}
-                  disabled
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 text-white/70 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-55"
-                  aria-pressed={false}
-                >
-                  1적구경로
-                </button>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={troubleCurveEditMode}
-                  data-state={troubleCurveEditMode ? "on" : "off"}
-                  disabled={pathPlayback.isPlaybackActive}
-                  className={cx(
-                    "w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors disabled:opacity-45",
-                    troubleCurveEditMode
-                      ? "bg-site-primary/35 ring-2 ring-site-primary/80"
-                      : "bg-black/25 hover:bg-black/35 active:bg-black/40"
-                  )}
-                  onClick={() => {
-                    setTroubleCurveEditMode((v) => !v);
-                    setLeftPathDrawerOpen(false);
-                  }}
-                >
-                  {troubleCurveEditMode ? "곡선 비활성" : "곡선 활성"}
-                </button>
-                <button
-                  type="button"
-                  className="mt-1 w-full rounded-lg px-2 py-2 text-center text-[11px] font-medium text-red-200/95 underline-offset-2 hover:underline touch-manipulation disabled:opacity-40"
-                  disabled={pathPoints.length === 0 || pathPlayback.isPlaybackActive}
-                  onClick={() => {
-                    clearAllPaths();
-                    setLeftPathDrawerOpen(false);
-                  }}
-                >
-                  전체 경로 삭제
-                </button>
-                <button
-                  type="button"
-                  disabled
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-black/25 text-white/55 touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] disabled:opacity-55"
-                >
-                  애니메이션
-                </button>
-                <div className="ml-2 flex items-center gap-1 border-l border-white/20 pl-2">
-                  <span className="px-1 text-[11px] font-semibold text-white/70">배속</span>
-                  <button
-                    type="button"
-                    className={cx(
-                      "rounded-md px-2 py-1 text-[11px] font-semibold touch-manipulation",
-                      playbackRate === 0.5
-                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
-                        : "bg-black/20 text-white/55 hover:bg-black/30"
-                    )}
-                    onClick={() => setPlaybackRate(0.5)}
-                  >
-                    0.5x
-                  </button>
-                  <button
-                    type="button"
-                    className={cx(
-                      "rounded-md px-2 py-1 text-[11px] font-semibold touch-manipulation",
-                      playbackRate === 1
-                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
-                        : "bg-black/20 text-white/55 hover:bg-black/30"
-                    )}
-                    onClick={() => setPlaybackRate(1)}
-                  >
-                    1x
-                  </button>
-                </div>
-                <div className="ml-2 flex flex-col gap-2 border-l border-white/20 pl-2">
-                  <button
-                    type="button"
-                    className={cx(
-                      "w-full rounded-xl px-4 py-3 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors",
-                      playbackPathLinesVisible
-                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
-                        : "bg-black/20 text-white/55 hover:bg-black/30"
-                    )}
-                    onClick={() => setPlaybackPathLinesVisible((v) => !v)}
-                  >
-                    경로선
-                  </button>
-                  <button
-                    type="button"
-                    className={cx(
-                      "w-full rounded-xl px-4 py-3 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors",
-                      playbackGridVisible
-                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
-                        : "bg-black/20 text-white/55 hover:bg-black/30"
-                    )}
-                    onClick={() => setPlaybackGridVisible((v) => !v)}
-                  >
-                    그리드
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  disabled={pathSaveFeedback === "saving" || pathPlayback.isPlaybackActive}
-                  className="w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold bg-site-primary/90 text-white hover:bg-site-primary touch-manipulation shadow-md disabled:opacity-50"
-                  onClick={() => {
-                    setPathSaveFeedback("saving");
-                    try {
-                      onConfirm({
-                        pathPoints,
-                        objectPathPoints: [],
-                        cuePathDisplayCurves: cuePathCurveControls,
-                        objectPathDisplayCurves: objectPathCurveControls,
-                        cuePathCurveNodes,
-                        objectPathCurveNodes,
-                      });
-                      setPathSaveFeedback("ok");
-                      window.setTimeout(() => setPathSaveFeedback("idle"), 1400);
-                    } catch {
-                      setPathSaveFeedback("err");
-                      window.setTimeout(() => setPathSaveFeedback("idle"), 2000);
-                    }
-                    setLeftPathDrawerOpen(false);
-                  }}
-                >
-                  저장
-                </button>
-                {pathSaveFeedback !== "idle" && (
-                  <p className="px-1 text-[11px] font-medium text-white/85">
-                    {pathSaveFeedback === "saving" && "저장중..."}
-                    {pathSaveFeedback === "ok" && "저장 완료"}
-                    {pathSaveFeedback === "err" && "저장 실패"}
-                  </p>
-                )}
-              </div>
-            </aside>
-          </>
-        )}
         {isNoteShell && (
           <>
             <div
@@ -2405,7 +2710,7 @@ export function SolutionPathEditorFullscreen({
               aria-hidden={!rightPathDrawerOpen}
               className={`fixed right-0 z-[205] flex w-[min(52.8vw,180px)] flex-col border-l border-white/20 bg-black/30 text-white shadow-[-6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md ${
                 viewportMdUp
-                  ? "top-[45.5%] h-[min(72vh,34rem)] -translate-y-1/2 rounded-l-xl"
+                  ? "top-[40%] h-[min(72vh,34rem)] -translate-y-1/2 rounded-l-xl"
                   : "top-0 h-full"
               } ${
                 rightPathDrawerOpen ? "pointer-events-auto" : "pointer-events-none translate-x-full"
@@ -2469,20 +2774,62 @@ export function SolutionPathEditorFullscreen({
                 >
                   수구 표시
                 </button>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={spotMagnifierEnabled}
-                  className={cx(
-                    "w-full rounded-xl px-4 py-3.5 text-left text-sm font-semibold touch-manipulation drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-colors",
-                    spotMagnifierEnabled
-                      ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
-                      : "bg-black/25 text-white/55 hover:bg-black/35"
-                  )}
-                  onClick={() => setSpotMagnifierEnabled((v) => !v)}
-                >
-                  스팟 확대
-                </button>
+                <p className="mt-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-white/60">
+                  애니메이션
+                </p>
+                <div className="flex flex-wrap items-center gap-1.5 rounded-lg bg-black/20 px-2 py-2">
+                  <span className="text-[10px] font-semibold text-white/65">배속</span>
+                  <button
+                    type="button"
+                    className={cx(
+                      "rounded px-2 py-1 text-[10px] font-semibold touch-manipulation",
+                      playbackRate === 0.5
+                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
+                        : "bg-black/30 text-white/55 hover:bg-black/40"
+                    )}
+                    onClick={() => setPlaybackRate(0.5)}
+                  >
+                    0.5x
+                  </button>
+                  <button
+                    type="button"
+                    className={cx(
+                      "rounded px-2 py-1 text-[10px] font-semibold touch-manipulation",
+                      playbackRate === 1
+                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
+                        : "bg-black/30 text-white/55 hover:bg-black/40"
+                    )}
+                    onClick={() => setPlaybackRate(1)}
+                  >
+                    1x
+                  </button>
+                </div>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    className={cx(
+                      "flex-1 rounded-lg px-2 py-2 text-[10px] font-semibold touch-manipulation",
+                      playbackPathLinesVisible
+                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
+                        : "bg-black/25 text-white/55 hover:bg-black/35"
+                    )}
+                    onClick={() => setPlaybackPathLinesVisible((v) => !v)}
+                  >
+                    경로선
+                  </button>
+                  <button
+                    type="button"
+                    className={cx(
+                      "flex-1 rounded-lg px-2 py-2 text-[10px] font-semibold touch-manipulation",
+                      playbackGridVisible
+                        ? "bg-site-primary/35 ring-1 ring-site-primary/80 text-white"
+                        : "bg-black/25 text-white/55 hover:bg-black/35"
+                    )}
+                    onClick={() => setPlaybackGridVisible((v) => !v)}
+                  >
+                    그리드
+                  </button>
+                </div>
                 <p className="mt-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-white/60">지원</p>
                 <button
                   type="button"
@@ -2514,18 +2861,14 @@ export function SolutionPathEditorFullscreen({
         )}
         <div
           className={`flex min-h-0 w-full flex-1 flex-col ${
-            /* 媛濡쒕뒗 ?뚯씠釉???max-w-2xl)留??곌퀬 酉고룷??以묒븰 ?뺣젹 (stretch+w-full 議고빀? ??긽 醫뚯륫 ?뺣젹?? */
-            isNoteShell ? "items-center justify-center p-2" : ""
+            /* 노트 전체화면: 상단 여백 최소(px·pb만), 당구대는 남는 세로를 아래로 두고 위로 붙임 */
+            isNoteShell ? "items-center px-2 pb-2 pt-0" : ""
           }`}
         >
         <div
           className={
             isNoteShell
-              ? `relative flex h-full min-h-0 w-[min(100%,42rem)] max-w-2xl min-w-0 flex-1 flex-col pt-2${
-                  onSettingsChange
-                    ? " pb-[max(5.75rem,env(safe-area-inset-bottom,0px))]"
-                    : ""
-                }`
+              ? "relative flex h-full min-h-0 w-[min(100%,42rem)] max-w-2xl min-w-0 flex-1 flex-col pt-0"
               : "relative mx-auto flex w-full max-w-4xl min-h-0 min-w-0 flex-1 flex-col px-2 pt-2"
           }
         >
@@ -2536,9 +2879,9 @@ export function SolutionPathEditorFullscreen({
                 data-path-editor-fs-chrome=""
                 data-testid="trouble-e2e-path-close"
                 onClick={onCancel}
-                className="absolute z-[125] flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full border border-white/35 bg-black/50 text-white shadow-lg backdrop-blur-md touch-manipulation hover:bg-black/60 active:scale-95"
+                className="absolute z-[125] flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full border border-white/25 bg-black/25 text-white shadow-md backdrop-blur-sm touch-manipulation hover:bg-black/40 active:scale-95"
                 style={{
-                  top: "max(0.5rem, env(safe-area-inset-top, 0px))",
+                  top: "max(0.125rem, env(safe-area-inset-top, 0px))",
                   left: "max(0.5rem, env(safe-area-inset-left, 0px))",
                 }}
                 aria-label="닫기"
@@ -2551,12 +2894,12 @@ export function SolutionPathEditorFullscreen({
                 data-testid="trouble-e2e-undo-last-spot-toolbar"
                 data-undo-count={String(pathUndoStack.length)}
                 {...(variant === "trouble" ? { "data-trouble-action": C.action.undoLastPathSpot } : {})}
-                disabled={pathPlayback.isPlaybackActive || pathUndoStack.length === 0}
+                disabled={pathPlaybackBusy || pathUndoStack.length === 0}
                 title={`직전 편집 1회 취소 · 남은 ${pathUndoStack.length}회`}
                 onClick={() => onUndoPathClick()}
-                className="absolute z-[125] flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full border border-white/35 bg-black/50 text-white shadow-lg backdrop-blur-md touch-manipulation hover:bg-black/60 active:scale-95 disabled:pointer-events-none disabled:opacity-40"
+                className="absolute z-[125] flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full border border-white/25 bg-black/25 text-white shadow-md backdrop-blur-sm touch-manipulation hover:bg-black/40 active:scale-95 disabled:pointer-events-none disabled:opacity-40"
                 style={{
-                  top: "max(0.5rem, env(safe-area-inset-top, 0px))",
+                  top: "max(0.125rem, env(safe-area-inset-top, 0px))",
                   right: "max(0.5rem, env(safe-area-inset-right, 0px))",
                 }}
                 aria-label="되돌리기"
@@ -2565,35 +2908,12 @@ export function SolutionPathEditorFullscreen({
               </button>
               <button
                 type="button"
-                data-testid="trouble-e2e-path-drawer-open"
-                data-path-editor-fs-chrome=""
-                aria-label="해법 편집 메뉴 열기"
-                aria-expanded={variant === "trouble" ? troubleLeftDrawerOpen : leftPathDrawerOpen}
-                aria-controls={variant === "trouble" ? "path-fs-left-drawer" : "path-fs-left-drawer-nangu"}
-                onClick={() =>
-                  variant === "trouble" ? setTroubleLeftDrawerOpen(true) : setLeftPathDrawerOpen(true)
-                }
-                className="absolute left-0 top-[45.5%] z-[125] flex h-11 w-[1.215rem] -translate-y-1/2 items-center justify-center rounded-r-lg border border-l-0 border-gray-300/60 bg-white/20 text-gray-800 shadow-md backdrop-blur-sm touch-manipulation hover:bg-white/30 active:bg-white/25 dark:border-slate-500/60 dark:bg-white/20 dark:text-gray-900"
-              >
-                <svg
-                  className="h-3.5 w-3.5 shrink-0 opacity-90"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.2}
-                  aria-hidden
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" />
-                </svg>
-              </button>
-              <button
-                type="button"
                 data-path-editor-fs-chrome=""
                 aria-label="우측 메뉴 열기"
                 aria-expanded={rightPathDrawerOpen}
                 aria-controls="path-fs-right-drawer-common"
                 onClick={() => setRightPathDrawerOpen(true)}
-                className="absolute right-0 top-[45.5%] z-[125] flex h-11 w-[1.215rem] -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-gray-300/60 bg-white/20 text-gray-800 shadow-md backdrop-blur-sm touch-manipulation hover:bg-white/30 active:bg-white/25 dark:border-slate-500/60 dark:bg-white/20 dark:text-gray-900"
+                className="absolute right-0 top-[40%] z-[125] flex h-11 w-11 min-h-[44px] min-w-[44px] -translate-y-1/2 items-center justify-center rounded-l-xl border border-r-0 border-white/25 bg-black/25 text-white shadow-md backdrop-blur-sm touch-manipulation hover:bg-black/40 active:scale-95 dark:border-white/20 dark:text-white"
               >
                 <svg
                   className="h-3.5 w-3.5 shrink-0 opacity-90"
@@ -2611,23 +2931,31 @@ export function SolutionPathEditorFullscreen({
           <div
             className={
               isNoteShell
-                ? "relative mx-auto w-full flex-1 min-h-[min(52dvh,620px)] max-h-[min(88dvh,820px)] min-w-0 cursor-crosshair touch-manipulation"
+                ? "relative mx-auto flex min-h-0 w-full min-w-0 flex-1 cursor-crosshair touch-manipulation items-start justify-center"
                 : "relative mx-auto h-full max-h-[min(52vh,480px)] w-full cursor-crosshair touch-manipulation"
             }
-            style={{ aspectRatio: `${tableCanvasW} / ${tableCanvasH}` }}
+            style={isNoteShell ? { minHeight: 0 } : undefined}
           >
+            <div
+              className={
+                isNoteShell
+                  ? "relative max-h-full min-h-0 w-full min-w-0 cursor-crosshair touch-manipulation"
+                  : "relative h-full w-full min-h-0"
+              }
+              style={{ aspectRatio: `${tableCanvasW} / ${tableCanvasH}` }}
+            >
             <SolutionTableZoomShell
               ref={containerRef}
               contentWidth={tableCanvasW}
               contentHeight={tableCanvasH}
               focusCanvasX={zoomFocus.x}
               focusCanvasY={zoomFocus.y}
-              interactionLocked={pathPlayback.isPlaybackActive}
+              interactionLocked={pathPlaybackBusy}
               panPointerPolicy={panPointerPolicy}
               zoomApiRef={zoomShellApiRef}
               forceShowZoomControls={!isNoteShell}
               fitMode="contain"
-              panResetKey={isNoteShell ? noteShellTableOrientation : undefined}
+              panResetKey={editorOrientation}
               className="relative h-full w-full min-h-0 overflow-hidden rounded-lg border border-gray-200 dark:border-slate-600"
             >
               {(zoom) => {
@@ -2635,7 +2963,7 @@ export function SolutionPathEditorFullscreen({
                 return (
                   <>
                     <div className="absolute inset-0 w-full h-full">
-                      {pathClearanceWarning && layoutForCue && (cuePathEditing || objectPathEditing) && (
+                      {isPathClearanceWarningVisible && (
                         <div className="pointer-events-none absolute inset-0 z-[130] flex items-center justify-center px-3">
                           <div className="max-w-[min(92%,20rem)] rounded-lg bg-black/60 px-3 py-2.5 text-center text-[11px] font-semibold leading-snug text-white shadow-lg sm:text-xs">
                             경로에 공이 있습니다.
@@ -2657,11 +2985,19 @@ export function SolutionPathEditorFullscreen({
                           ballNormOverrides={mergedBallNormOverridesForCanvas}
                           ballNormOverridesLiveRef={pathPlayback.ballNormOverridesLiveRef}
                           playbackBallAnimActive={pathPlayback.isPlaybackActive}
+                          hideOriginGhostBalls={
+                            pathPlaybackBusy && !playbackGridVisible
+                          }
                           cueTipNorm={panelCueTipNorm}
                           showCueBallSpot={showCueSpot}
                           showObjectBallSpot={showObjectBallSpot}
                           objectBallSpotKey={objectPathHighlightBallKey}
-                          orientation={isNoteShell ? noteShellTableOrientation : "landscape"}
+                          showSecondObjectBallSpot={showSecondObjectBallSpot}
+                          secondObjectBallSpotKey={secondObjectPathHighlightBallKey}
+                          cueBallSpotRingBlackStroke={cueBallSpotRingBlackStroke}
+                          objectBallSpotRingBlackStroke={objectBallSpotRingBlackStroke}
+                          secondObjectBallSpotRingBlackStroke={secondObjectBallSpotRingBlackStroke}
+                          orientation={editorOrientation}
                           pathOverlayAboveBalls={false}
                           betweenTableAndBallsLayer={
                             <NanguSolutionPathOverlay
@@ -2669,20 +3005,24 @@ export function SolutionPathEditorFullscreen({
                               cuePos={cuePos}
                               tableBallPlacement={layoutForCue}
                               objectPathPoints={showObjectPath ? objectPathPoints : []}
-                              orientation={isNoteShell ? noteShellTableOrientation : "landscape"}
+                              secondObjectPathPoints={showObjectPath ? secondObjectPathPoints : []}
+                              orientation={editorOrientation}
                               pathMode={cuePathEditing}
                               objectPathMode={objectPathEditing}
+                              secondObjectPathMode={secondObjectPathEditing}
                               cueActiveSpotOverrideId={cuePathActiveSpotId}
                               objectActiveSpotOverrideId={objectPathActiveSpotId}
+                              secondObjectActiveSpotOverrideId={secondObjectPathActiveSpotId}
                               onCueActiveSpotChange={setCuePathActiveSpotId}
                               onObjectActiveSpotChange={setObjectPathActiveSpotId}
+                              onSecondObjectActiveSpotChange={setSecondObjectPathActiveSpotId}
                               getNormalizedFromEvent={getNormalizedFromEvent}
                               getPointerAimFromEvent={getPointerAimFromEvent}
                               onZoomSetFocusCanvasPx={
                                 isNoteShell ? undefined : (cx, cy) => setZoomFocusOverlay({ x: cx, y: cy })
                               }
                               ballPickLayout={
-                                layoutForCue && (cuePathEditing || objectPathEditing)
+                                layoutForCue && (cuePathEditing || objectPathEditing || secondObjectPathEditing)
                                   ? layoutForCue
                                   : undefined
                               }
@@ -2724,35 +3064,42 @@ export function SolutionPathEditorFullscreen({
                               onMoveObjectPoint={moveObjectPathPoint}
                               onInsertObjectBetween={insertObjectPathPointBetween}
                               onInsertObjectPathAim={insertObjectPathPointBetweenAim}
-                              pathLinesVisible={!pathPlayback.isPlaybackActive || playbackPathLinesVisible}
+                              onAddSecondObjectPoint={(norm) => {
+                                if (!secondObjectCollisionNorm) return;
+                                const dupThresholdPx = SPOT_APPEND_DUP_THRESHOLD_PX;
+                                const isDup =
+                                  secondObjectPathPoints.length > 0 &&
+                                  secondObjectPathPoints.some(
+                                    (p) =>
+                                      distanceNormPointsInPlayfieldPx(norm, { x: p.x, y: p.y }, rect) <
+                                      dupThresholdPx
+                                  );
+                                if (!isDup) addSecondObjectPathPoint(norm);
+                              }}
+                              onAddSecondObjectPathAim={addSecondObjectPathAim}
+                              onRemoveSecondObjectPoint={removeSecondObjectPathPoint}
+                              onMoveSecondObjectPoint={moveSecondObjectPathPoint}
+                              onInsertSecondObjectBetween={insertSecondObjectPathPointBetween}
+                              onInsertSecondObjectPathAim={insertSecondObjectPathPointBetweenAim}
+                              pathLinesVisible={!pathPlaybackBusy || playbackPathLinesVisible}
+                              cuePathLinesVisible={overlayCuePathLinesVisible}
+                              objectPathLinesVisible={overlayObjectPathLinesVisible}
+                              secondObjectPathLinesVisible={overlaySecondObjectPathLinesVisible}
                               allowCuePlaybackGestures={allowCuePlaybackGestures}
-                              pathPlaybackActive={pathPlayback.isPlaybackActive}
+                              pathPlaybackActive={pathPlaybackBusy}
                               onCueBallSingleTap={
                                 allowCuePlaybackGestures ? () => resetPathPlayback() : undefined
                               }
-                              onPathEditCueBallTap={
-                                layoutForCue && !pathPlayback.isPlaybackActive
-                                  ? onPathEditCueBallTap
-                                  : undefined
-                              }
-                              onPathEditObjectBallTap={
-                                layoutForCue &&
-                                !pathPlayback.isPlaybackActive &&
-                                (variant === "nangu" || showObjectPath)
-                                  ? onPathEditObjectBallTap
-                                  : undefined
-                              }
+                              onPathEditCueBallTap={undefined}
+                              onPathEditObjectBallTap={undefined}
                               pathEditFirstObjectBallKey={
                                 layoutForCue ? (cueToFirstObjectHit?.objectKey ?? null) : undefined
                               }
-                              cueDisplayCurveControls={
-                                variant === "trouble" ? cuePathCurveControls : []
-                              }
-                              objectDisplayCurveControls={
-                                variant === "trouble" ? objectPathCurveControls : []
-                              }
-                              cuePathCurveNodes={variant === "trouble" ? cuePathCurveNodes : []}
-                              objectPathCurveNodes={variant === "trouble" ? objectPathCurveNodes : []}
+                              objectBallTapSwitchesCueToObjectLayer={variant !== "trouble"}
+                              cueDisplayCurveControls={cuePathCurveControls}
+                              objectDisplayCurveControls={objectPathCurveControls}
+                              cuePathCurveNodes={cuePathCurveNodes}
+                              objectPathCurveNodes={objectPathCurveNodes}
                               troubleCurveEditMode={troubleCurveEditMode}
                               curveHandleInteraction={allowCurveHandleInteraction}
                               curveHandlesShowSubtle={curveHandlesShowSubtle}
@@ -2764,7 +3111,7 @@ export function SolutionPathEditorFullscreen({
                               onRemoveObjectDisplayCurve={removeObjectDisplayCurve}
                               onCurveHandleDragBegin={onCurveHandleDragBegin}
                               magnifierDrawStyle={drawStyleForTable}
-                              magnifierEnabled={spotMagnifierEnabled}
+                              magnifierEnabled={false}
                               onPathAppendPointerDown={onPathAppendPointerDown}
                             />
                           }
@@ -2788,13 +3135,17 @@ export function SolutionPathEditorFullscreen({
                         pathPoints={pathPoints}
                         cuePos={cuePos}
                         objectPathPoints={showObjectPath ? objectPathPoints : []}
-                        orientation={isNoteShell ? noteShellTableOrientation : "landscape"}
+                        secondObjectPathPoints={showObjectPath ? secondObjectPathPoints : []}
+                        orientation={editorOrientation}
                         pathMode={cuePathEditing}
                         objectPathMode={objectPathEditing}
+                        secondObjectPathMode={secondObjectPathEditing}
                         cueActiveSpotOverrideId={cuePathActiveSpotId}
                         objectActiveSpotOverrideId={objectPathActiveSpotId}
+                        secondObjectActiveSpotOverrideId={secondObjectPathActiveSpotId}
                         onCueActiveSpotChange={setCuePathActiveSpotId}
                         onObjectActiveSpotChange={setObjectPathActiveSpotId}
+                        onSecondObjectActiveSpotChange={setSecondObjectPathActiveSpotId}
                         getNormalizedFromEvent={getNormalizedFromEvent}
                         getPointerAimFromEvent={getPointerAimFromEvent}
                         onZoomSetFocusCanvasPx={
@@ -2838,35 +3189,42 @@ export function SolutionPathEditorFullscreen({
                         onMoveObjectPoint={moveObjectPathPoint}
                         onInsertObjectBetween={insertObjectPathPointBetween}
                         onInsertObjectPathAim={insertObjectPathPointBetweenAim}
-                        pathLinesVisible={!pathPlayback.isPlaybackActive || playbackPathLinesVisible}
+                        onAddSecondObjectPoint={(norm) => {
+                          if (!secondObjectCollisionNorm) return;
+                          const dupThresholdPx = SPOT_APPEND_DUP_THRESHOLD_PX;
+                          const isDup =
+                            secondObjectPathPoints.length > 0 &&
+                            secondObjectPathPoints.some(
+                              (p) =>
+                                distanceNormPointsInPlayfieldPx(norm, { x: p.x, y: p.y }, rect) <
+                                dupThresholdPx
+                            );
+                          if (!isDup) addSecondObjectPathPoint(norm);
+                        }}
+                        onAddSecondObjectPathAim={addSecondObjectPathAim}
+                        onRemoveSecondObjectPoint={removeSecondObjectPathPoint}
+                        onMoveSecondObjectPoint={moveSecondObjectPathPoint}
+                        onInsertSecondObjectBetween={insertSecondObjectPathPointBetween}
+                        onInsertSecondObjectPathAim={insertSecondObjectPathPointBetweenAim}
+                        pathLinesVisible={!pathPlaybackBusy || playbackPathLinesVisible}
+                        cuePathLinesVisible={overlayCuePathLinesVisible}
+                        objectPathLinesVisible={overlayObjectPathLinesVisible}
+                        secondObjectPathLinesVisible={overlaySecondObjectPathLinesVisible}
                         allowCuePlaybackGestures={allowCuePlaybackGestures}
-                        pathPlaybackActive={pathPlayback.isPlaybackActive}
+                        pathPlaybackActive={pathPlaybackBusy}
                         onCueBallSingleTap={
                           allowCuePlaybackGestures ? () => resetPathPlayback() : undefined
                         }
-                        onPathEditCueBallTap={
-                          layoutForCue && !pathPlayback.isPlaybackActive
-                            ? onPathEditCueBallTap
-                            : undefined
-                        }
-                        onPathEditObjectBallTap={
-                          layoutForCue &&
-                          !pathPlayback.isPlaybackActive &&
-                          (variant === "nangu" || showObjectPath)
-                            ? onPathEditObjectBallTap
-                            : undefined
-                        }
+                        onPathEditCueBallTap={undefined}
+                        onPathEditObjectBallTap={undefined}
                         pathEditFirstObjectBallKey={
                           layoutForCue ? (cueToFirstObjectHit?.objectKey ?? null) : undefined
                         }
-                        cueDisplayCurveControls={
-                          variant === "trouble" ? cuePathCurveControls : []
-                        }
-                        objectDisplayCurveControls={
-                          variant === "trouble" ? objectPathCurveControls : []
-                        }
-                        cuePathCurveNodes={variant === "trouble" ? cuePathCurveNodes : []}
-                        objectPathCurveNodes={variant === "trouble" ? objectPathCurveNodes : []}
+                        objectBallTapSwitchesCueToObjectLayer={variant !== "trouble"}
+                        cueDisplayCurveControls={cuePathCurveControls}
+                        objectDisplayCurveControls={objectPathCurveControls}
+                        cuePathCurveNodes={cuePathCurveNodes}
+                        objectPathCurveNodes={objectPathCurveNodes}
                         troubleCurveEditMode={troubleCurveEditMode}
                         curveHandleInteraction={allowCurveHandleInteraction}
                         curveHandlesShowSubtle={curveHandlesShowSubtle}
@@ -2878,14 +3236,14 @@ export function SolutionPathEditorFullscreen({
                         onRemoveObjectDisplayCurve={removeObjectDisplayCurve}
                         onCurveHandleDragBegin={onCurveHandleDragBegin}
                         magnifierDrawStyle={drawStyleForTable}
-                        magnifierEnabled={spotMagnifierEnabled}
+                        magnifierEnabled={false}
                         onPathAppendPointerDown={onPathAppendPointerDown}
                       />
                     )}
                     {!isNoteShell && (
                       <PathPlaybackViewOverlay
                         variant={variant === "trouble" ? "trouble" : "nangu"}
-                        active={pathPlayback.isPlaybackActive}
+                        active={pathPlaybackBusy}
                         pathLinesVisible={playbackPathLinesVisible}
                         onPathLinesVisibleChange={setPlaybackPathLinesVisible}
                         gridVisible={playbackGridVisible}
@@ -2898,7 +3256,236 @@ export function SolutionPathEditorFullscreen({
                 );
               }}
             </SolutionTableZoomShell>
+            </div>
           </div>
+          {isNoteShell && onSettingsChange && (
+            <div className="relative z-[220] mt-0.5 w-full max-w-[min(100%,42rem)] shrink-0 self-center px-1 pb-1">
+              <div className="flex w-full flex-col gap-0.5 border-t border-white/10 bg-black/90 px-1 pt-1 shadow-[0_-6px_24px_rgba(0,0,0,0.45)]">
+              {(() => {
+                const summaryThickness = thicknessDisplayOverlapStep16(settingsValue?.thicknessStep ?? 16);
+                const summaryRail = Math.max(1, Math.min(5, Math.round(settingsValue?.railCount ?? 3)));
+                const summaryTip = settingsValue?.tipNorm ?? { x: 0, y: 0 };
+                const settingsApplyOff = Boolean(settingsValue?.ignorePhysics);
+                const btnBase =
+                  "rounded-md bg-black py-1 font-semibold touch-manipulation transition-colors border border-zinc-500 [@media(max-height:520px)]:py-0.5";
+                const dockCellMinH =
+                  "min-h-11 [@media(max-height:680px)]:min-h-10 [@media(max-height:580px)]:min-h-9 [@media(max-height:480px)]:min-h-8 [@media(max-height:400px)]:min-h-7";
+                const dockRowGrowBtn = cx(
+                  btnBase,
+                  dockCellMinH,
+                  "flex min-w-0 grow items-center justify-center px-0.5 text-center text-[9px] leading-tight disabled:pointer-events-none disabled:opacity-40 disabled:grayscale [@media(max-height:480px)]:text-[8px]"
+                );
+
+                return (
+                  <>
+                    <div className="flex w-full min-w-0 items-stretch gap-0.5 pb-0.5">
+                      <span className="shrink-0 self-center px-0.5 text-[9px] font-bold leading-tight text-zinc-400 [@media(max-height:480px)]:text-[8px]">
+                        보이기
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setEditorCuePathVisible((v) => !v)}
+                        className={cx(
+                          dockRowGrowBtn,
+                          editorCuePathVisible ? "border-red-500 text-red-400" : "text-zinc-500"
+                        )}
+                      >
+                        수구경로선
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!objectPathLayerEnabled}
+                        onClick={() => objectPathLayerEnabled && setEditorObjectPathVisible((v) => !v)}
+                        className={cx(
+                          dockRowGrowBtn,
+                          editorObjectPathVisible ? "border-blue-500 text-blue-400" : "text-zinc-500"
+                        )}
+                      >
+                        1목경로선
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!secondObjectPathLayerEnabled}
+                        onClick={() =>
+                          secondObjectPathLayerEnabled && setEditorSecondObjectPathVisible((v) => !v)
+                        }
+                        className={cx(
+                          dockRowGrowBtn,
+                          editorSecondObjectPathVisible ? "border-emerald-500 text-emerald-400" : "text-zinc-500"
+                        )}
+                      >
+                        2목경로선
+                      </button>
+                      <span className="shrink-0 self-center px-0.5 text-[9px] font-bold leading-tight text-zinc-400 [@media(max-height:480px)]:text-[8px]">
+                        활성
+                      </span>
+                      <button
+                        type="button"
+                        disabled={pathPlaybackBusy}
+                        onClick={activateCueEditLayer}
+                        className={cx(
+                          dockRowGrowBtn,
+                          cuePathEditing ? "border-red-500 text-red-400" : "text-zinc-500"
+                        )}
+                      >
+                        수구
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pathPlaybackBusy || !objectActiveLayerEnabled}
+                        onClick={activateObjectEditLayer}
+                        className={cx(
+                          dockRowGrowBtn,
+                          objectPathEditing ? "border-blue-500 text-blue-400" : "text-zinc-500"
+                        )}
+                      >
+                        1목적구
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pathPlaybackBusy || !secondObjectPathLayerEnabled}
+                        onClick={activateSecondObjectEditLayer}
+                        className={cx(
+                          dockRowGrowBtn,
+                          secondObjectPathEditing ? "border-emerald-500 text-emerald-400" : "text-zinc-500"
+                        )}
+                      >
+                        2목적구
+                      </button>
+                    </div>
+                    <div className="grid w-full grid-cols-8 gap-0.5 pb-0.5">
+                      <button
+                        type="button"
+                        className={cx(
+                          btnBase,
+                          dockCellMinH,
+                          "flex w-full items-center justify-center text-[9px] text-amber-200 disabled:opacity-40 [@media(max-height:480px)]:text-[8px]"
+                        )}
+                        disabled={pathPlaybackBusy}
+                        onClick={() => {
+                          if (!window.confirm("저장된 수구·1목 경로를 모두 지울까요?")) return;
+                          clearAllPaths();
+                        }}
+                      >
+                        초기화
+                      </button>
+                      <button
+                        type="button"
+                        className={cx(
+                          btnBase,
+                          dockCellMinH,
+                          "col-span-2 flex w-full items-center justify-around px-1 text-yellow-300 [@media(max-height:480px)]:text-[8px]"
+                        )}
+                        onClick={() => onSettingsOpen?.()}
+                      >
+                        {settingsApplyOff ? (
+                          <span className="px-1 text-center text-[11px] font-bold leading-snug text-yellow-200 [@media(max-height:480px)]:text-[10px]">
+                            설정적용안함
+                          </span>
+                        ) : (
+                          <>
+                            <div className="flex flex-col items-center">
+                              <span className="text-[8px] opacity-70">두께</span>
+                              <span className="text-[10px] font-bold [@media(max-height:480px)]:text-[9px]">
+                                {summaryThickness}/16
+                              </span>
+                            </div>
+                            <div className="flex flex-col items-center justify-center px-0.5">
+                              <div className="relative h-6 w-6 shrink-0 [@media(max-height:480px)]:h-5 [@media(max-height:480px)]:w-5">
+                                <div
+                                  className="h-full w-full rounded-full bg-white"
+                                  style={{
+                                    boxShadow:
+                                      "inset 0 1px 2px rgba(255,255,255,0.95), inset 0 -1px 2px rgba(0,0,0,0.14)",
+                                  }}
+                                />
+                                <div
+                                  className="absolute h-1.5 w-1.5 rounded-full bg-red-500 [@media(max-height:480px)]:h-1 [@media(max-height:480px)]:w-1"
+                                  style={{
+                                    left: `${50 + summaryTip.x * 50 * CUE_TIP_NORM_DISPLAY_FRAC}%`,
+                                    top: `${50 + summaryTip.y * 50 * CUE_TIP_NORM_DISPLAY_FRAC}%`,
+                                    transform: "translate(-50%, -50%)",
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-center">
+                              <span className="text-[8px] opacity-70">속도</span>
+                              <span className="text-[10px] font-bold [@media(max-height:480px)]:text-[9px]">
+                                R{summaryRail}
+                              </span>
+                            </div>
+                          </>
+                        )}
+                      </button>
+
+                      <div
+                        className={cx(
+                          btnBase,
+                          dockCellMinH,
+                          "col-span-3 flex w-full items-stretch overflow-hidden p-0"
+                        )}
+                      >
+                        <button
+                          type="button"
+                          className="flex h-full flex-1 items-center justify-center font-bold text-yellow-300 hover:bg-zinc-800 disabled:opacity-30 [@media(max-height:480px)]:text-sm"
+                          disabled={!activeSpotMoveState?.canPrev}
+                          onClick={() => moveActiveSpot(-1)}
+                          aria-label="이전 스팟"
+                        >
+                          ◀
+                        </button>
+                        <div className="flex h-full flex-[2] items-center justify-center border-x border-zinc-500 text-[9px] text-yellow-300 [@media(max-height:480px)]:text-[8px]">
+                          스팟이동
+                        </div>
+                        <button
+                          type="button"
+                          className="flex h-full flex-1 items-center justify-center font-bold text-yellow-300 hover:bg-zinc-800 disabled:opacity-30 [@media(max-height:480px)]:text-sm"
+                          disabled={!activeSpotMoveState?.canNext}
+                          onClick={() => moveActiveSpot(1)}
+                          aria-label="다음 스팟"
+                        >
+                          ▶
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        className={cx(
+                          btnBase,
+                          dockCellMinH,
+                          "flex w-full items-center justify-center text-[9px] text-red-400 disabled:opacity-40 [@media(max-height:480px)]:text-[8px]"
+                        )}
+                        onClick={removeActiveSpot}
+                        disabled={!activeSpotMoveState}
+                      >
+                        스팟삭제
+                      </button>
+
+                      <button
+                        type="button"
+                        className={cx(
+                          btnBase,
+                          dockCellMinH,
+                          "flex w-full items-center justify-center text-[9px] font-semibold",
+                          pathPlayback.isPlaybackActive ? "text-yellow-300" : "text-white"
+                        )}
+                        disabled={
+                          !pathPlayback.canPlayback &&
+                          !pathPlayback.isPlaybackActive &&
+                          !pathPlayback.isPlaybackPaused
+                        }
+                        onClick={handlePlayTap}
+                      >
+                        {pathPlayback.isPlaybackActive ? "멈춤" : "재생"}
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+              </div>
+            </div>
+          )}
         </div>
         </div>
 
@@ -2909,146 +3496,150 @@ export function SolutionPathEditorFullscreen({
           {...(variant === "trouble" ? { "data-trouble-region": C.region.pathToolbar } : {})}
         >
           <>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">진행경로</span>
-            {variant === "trouble" && showObjectPath && layoutForCue ? (
-              <>
-                <button
-                  type="button"
-                  data-testid="trouble-e2e-cue-path-toggle"
-                  data-state={cuePathEditing ? "on" : "off"}
-                  {...{ "data-trouble-action": C.action.togglePathMode }}
-                  onClick={() =>
-                    setTroublePathEditLayer((cur) => (cur === "cue" ? null : "cue"))
-                  }
-                  className={pathLayerToggleClass(cuePathEditing, "cue")}
-                  aria-pressed={cuePathEditing}
-                  aria-label={cuePathEditing ? "수구경로 그리기 끄기" : "수구경로 그리기 켜기"}
-                >
-                  수구경로
-                </button>
-                <button
-                  type="button"
-                  data-testid="trouble-e2e-object-path-toggle"
-                  data-state={objectPathEditing ? "on" : "off"}
-                  {...{ "data-trouble-action": C.action.toggleObjectPathMode }}
-                  onClick={() =>
-                    setTroublePathEditLayer((cur) => (cur === "object" ? null : "object"))
-                  }
-                  className={pathLayerToggleClass(objectPathEditing, "object")}
-                  aria-pressed={objectPathEditing}
-                  aria-label={objectPathEditing ? "1적구경로 그리기 끄기" : "1적구경로 그리기 켜기"}
-                >
-                  1적구경로
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPathMode((v) => {
-                      const next = !v;
-                      if (next) setObjectPathMode(false);
-                      return next;
-                    });
-                  }}
-                  className={pathLayerToggleClass(pathMode, "cue")}
-                  aria-pressed={pathMode}
-                  aria-label={pathMode ? "수구 경로 입력 끄기" : "수구 경로 입력 켜기"}
-                >
-                  수구경로
-                </button>
-                {showObjectPath && layoutForCue && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setObjectPathMode((v) => {
-                        const next = !v;
-                        if (next) setPathMode(false);
-                        else setPathMode(true);
-                        return next;
-                      });
-                    }}
-                    className={pathLayerToggleClass(objectPathMode, "object")}
-                    aria-pressed={objectPathMode}
-                    aria-label={
-                      objectPathMode
-                        ? "1목적구 경로 그리기 끄기"
-                        : "1목적구 경로 그리기 켜기"
-                    }
-                  >
-                    1적구경로
-                  </button>
-                )}
-              </>
-            )}
-            <button
-              type="button"
-              onClick={() => onSettingsOpen?.()}
-              className={cx(toolbarBtn, toolbarGhost)}
-            >
-              설정
-            </button>
-            <button
-              type="button"
-              data-undo-count={String(pathUndoStack.length)}
-              {...(variant === "trouble" ? { "data-trouble-action": C.action.undoLastPathSpot } : {})}
-              disabled={pathPlayback.isPlaybackActive}
-              title={`직전 편집 1회 취소 · 남은 ${pathUndoStack.length}회`}
-              onClick={() => onUndoPathClick()}
-              className={cx(toolbarBtn, toolbarGhost)}
-            >
-              ?섎룎由ш린쨌{pathUndoStack.length}
-            </button>
-            <button
-              type="button"
-              {...(variant === "trouble" ? { "data-trouble-action": C.action.clearAllPaths } : {})}
-              disabled={
-                (pathPoints.length === 0 && objectPathPoints.length === 0) ||
-                pathPlayback.isPlaybackActive
-              }
-              onClick={() => clearAllPaths()}
-              className={cx(toolbarBtn, toolbarDanger)}
-            >
-              ?꾩껜 ??젣
-            </button>
-            <button
-              type="button"
-              {...(variant === "trouble" ? { "data-trouble-action": C.action.playPath } : {})}
-              disabled={!pathPlayback.canPlayback || pathPlayback.isPlaybackActive}
-              onClick={handlePlayTap}
-              className={cx(toolbarBtn, toolbarAccent, "font-semibold")}
-            >
-              {pathPlayback.isPlaybackActive ? "재생 중..." : "애니메이션 시연"}
-            </button>
-          </div>
-          </>
-        </div>
-        )}
-        {isNoteShell && onSettingsChange && (
-          <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-[220] flex justify-center px-0 pb-[env(safe-area-inset-bottom,0px)]">
-            <div className="pointer-events-auto flex w-full max-w-[min(100%,42rem)] items-stretch gap-1 px-1">
+            <div className="flex w-full min-w-0 flex-nowrap items-stretch gap-1 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <span className="shrink-0 self-center px-0.5 text-[11px] font-bold tracking-tight text-zinc-500 dark:text-zinc-400 sm:text-xs">
+                보이기
+              </span>
               <button
                 type="button"
-                onClick={() => setResetConfirmOpen(true)}
-                className="h-12 shrink-0 rounded-t-lg border border-amber-900/90 bg-gradient-to-b from-stone-900 to-black px-3 text-xs font-semibold text-amber-200 shadow-[0_-4px_24px_rgba(0,0,0,0.55)] hover:bg-stone-900/90"
-                aria-label="배치 초기화"
+                onClick={() => setEditorCuePathVisible((v) => !v)}
+                className={cx(
+                  pathBarMiniBtn,
+                  "min-w-0 grow text-center",
+                  editorCuePathVisible
+                    ? "border-red-400 bg-red-50 text-red-700 dark:border-red-500 dark:bg-red-950/40 dark:text-red-200"
+                    : "border-zinc-200 bg-white text-zinc-600 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-300"
+                )}
               >
-                배치초기화
+                수구경로선
               </button>
-              <SolutionSettingsSummaryBar
-                value={settingsValue}
-                onThicknessClick={() => onSettingsOpen?.()}
-                onTipClick={() => onSettingsOpen?.()}
-                onRailClick={() => onSettingsOpen?.()}
-                onPlayClick={handlePlayTap}
-                playDisabled={!pathPlayback.canPlayback && !pathPlayback.isPlaybackActive}
-                playActive={pathPlayback.isPlaybackActive}
-                className="w-full rounded-none border-x-0 border-b-0"
+              <button
+                type="button"
+                disabled={!objectPathLayerEnabled}
+                onClick={() => objectPathLayerEnabled && setEditorObjectPathVisible((v) => !v)}
+                className={cx(
+                  pathBarMiniBtn,
+                  "min-w-0 grow text-center",
+                  editorObjectPathVisible
+                    ? "border-blue-400 bg-blue-50 text-blue-800 dark:border-blue-500 dark:bg-blue-950/40 dark:text-blue-200"
+                    : "border-zinc-200 bg-white text-zinc-600 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-300"
+                )}
+              >
+                1목경로선
+              </button>
+              <button
+                type="button"
+                disabled={!secondObjectPathLayerEnabled}
+                onClick={() =>
+                  secondObjectPathLayerEnabled && setEditorSecondObjectPathVisible((v) => !v)
+                }
+                className={cx(
+                  pathBarMiniBtn,
+                  "min-w-0 grow text-center",
+                  editorSecondObjectPathVisible
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:border-emerald-500 dark:bg-emerald-950/40 dark:text-emerald-200"
+                    : "border-zinc-200 bg-white text-zinc-600 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-300"
+                )}
+              >
+                2목경로선
+              </button>
+              <span className="shrink-0 self-center px-0.5 text-[11px] font-bold tracking-tight text-zinc-500 dark:text-zinc-400 sm:text-xs">
+                활성
+              </span>
+              <button
+                type="button"
+                disabled={pathPlaybackBusy}
+                onClick={activateCueEditLayer}
+                className={cx(
+                  pathBarMiniBtn,
+                  "min-w-0 grow text-center",
+                  cuePathEditing
+                    ? "border-red-400 bg-red-50 text-red-700 dark:border-red-500 dark:bg-red-950/40 dark:text-red-200"
+                    : "border-zinc-200 bg-white text-zinc-600 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-300"
+                )}
+              >
+                수구
+              </button>
+              <button
+                type="button"
+                disabled={pathPlaybackBusy || !objectActiveLayerEnabled}
+                onClick={activateObjectEditLayer}
+                className={cx(
+                  pathBarMiniBtn,
+                  "min-w-0 grow text-center",
+                  objectPathEditing
+                    ? "border-blue-400 bg-blue-50 text-blue-800 dark:border-blue-500 dark:bg-blue-950/40 dark:text-blue-200"
+                    : "border-zinc-200 bg-white text-zinc-600 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-300"
+                )}
+              >
+                1목적구
+              </button>
+              <button
+                type="button"
+                disabled={pathPlaybackBusy || !secondObjectPathLayerEnabled}
+                onClick={activateSecondObjectEditLayer}
+                className={cx(
+                  pathBarMiniBtn,
+                  "min-w-0 grow text-center",
+                  secondObjectPathEditing
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:border-emerald-500 dark:bg-emerald-950/40 dark:text-emerald-200"
+                    : "border-zinc-200 bg-white text-zinc-600 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-300"
+                )}
+              >
+                2목적구
+              </button>
+              <span
+                className="mx-0.5 h-9 w-px shrink-0 self-center bg-zinc-300 dark:bg-zinc-600"
+                aria-hidden
               />
+              <button
+                type="button"
+                onClick={() => onSettingsOpen?.()}
+                className={cx(pathBarMiniBtn, "shrink-0", toolbarGhost)}
+              >
+                설정
+              </button>
+              <button
+                type="button"
+                data-undo-count={String(pathUndoStack.length)}
+                {...(variant === "trouble" ? { "data-trouble-action": C.action.undoLastPathSpot } : {})}
+                disabled={pathPlaybackBusy}
+                title={`직전 편집 1회 취소 · 남은 ${pathUndoStack.length}회`}
+                onClick={() => onUndoPathClick()}
+                className={cx(pathBarMiniBtn, "shrink-0", toolbarGhost)}
+              >
+                되돌리기·{pathUndoStack.length}
+              </button>
+              <button
+                type="button"
+                {...(variant === "trouble" ? { "data-trouble-action": C.action.clearAllPaths } : {})}
+                disabled={
+                  (pathPoints.length === 0 &&
+                    objectPathPoints.length === 0 &&
+                    secondObjectPathPoints.length === 0) ||
+                  pathPlaybackBusy
+                }
+                onClick={() => clearAllPaths()}
+                className={cx(pathBarMiniBtn, "shrink-0", toolbarDanger)}
+              >
+                전체삭제
+              </button>
+              <button
+                type="button"
+                {...(variant === "trouble" ? { "data-trouble-action": C.action.playPath } : {})}
+                disabled={!pathPlayback.canPlayback || pathPlayback.isPlaybackActive}
+                onClick={handlePlayTap}
+                className={cx(pathBarMiniBtn, "shrink-0", toolbarAccent, "px-2.5 font-semibold")}
+              >
+                {pathPlayback.isPlaybackActive
+                  ? "재생중"
+                  : pathPlayback.isPlaybackPaused
+                    ? "재생"
+                    : "시연"}
+              </button>
             </div>
-          </div>
+          </>
+        </div>
         )}
       </div>
 
@@ -3197,6 +3788,18 @@ export function SolutionPathEditorFullscreen({
         >
           <p className="rounded-xl bg-black/80 px-5 py-3 text-center text-sm font-semibold text-white shadow-lg ring-1 ring-white/10">
             ???댁긽 ?섎룎由????놁뒿?덈떎
+          </p>
+        </div>
+      )}
+
+      {spotContactToast && (
+        <div
+          className="pointer-events-none fixed inset-0 z-[10058] flex items-center justify-center px-4"
+          role="status"
+          aria-live="polite"
+        >
+          <p className="max-w-[min(92vw,22rem)] rounded-xl bg-black/85 px-4 py-3 text-center text-sm font-semibold text-white shadow-lg ring-1 ring-white/15">
+            {spotContactToast}
           </p>
         </div>
       )}

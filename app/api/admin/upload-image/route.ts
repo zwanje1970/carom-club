@@ -24,17 +24,10 @@ export async function POST(request: Request) {
 
   const {
     processUploadedImage,
-    uploadToBlob,
-    isBlobConfigError,
+    uploadProcessedImage,
     BLOB_SERVICE_UNAVAILABLE_MESSAGE,
+    STORAGE_UNAVAILABLE_PREFIX,
   } = await import("@/lib/image-upload");
-
-  if (process.env.NODE_ENV === "production" && !process.env.BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json(
-      { error: BLOB_SERVICE_UNAVAILABLE_MESSAGE },
-      { status: 503 }
-    );
-  }
 
   const policyKey = (formData.get("policy") as string) || "content";
   const policy = ALLOWED_POLICIES.includes(policyKey as ImageKind)
@@ -43,7 +36,7 @@ export async function POST(request: Request) {
 
   try {
     const processed = await processUploadedImage(file, policy, session.id);
-    const { url } = await uploadToBlob(processed);
+    const { url } = await uploadProcessedImage(processed);
     return NextResponse.json({ url });
   } catch (e) {
     const message = e instanceof Error ? e.message : "업로드 중 오류가 발생했습니다.";
@@ -51,7 +44,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
     console.error("[admin/upload-image] error:", e);
-    if (isBlobConfigError(message)) {
+    if (message.startsWith(STORAGE_UNAVAILABLE_PREFIX)) {
       return NextResponse.json(
         { error: BLOB_SERVICE_UNAVAILABLE_MESSAGE },
         { status: 503 }

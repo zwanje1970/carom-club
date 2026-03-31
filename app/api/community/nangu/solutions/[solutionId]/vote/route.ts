@@ -10,7 +10,7 @@ import {
   revokeSolutionBad,
 } from "@/lib/community-score-service";
 import { getLevelFromScore } from "@/lib/community-level";
-import { NanguSolutionVoteType } from "@/generated/prisma";
+import { NanguSolutionReactionType } from "@/generated/prisma";
 
 /** 해법 good/bad 투표. 자기 해법에는 투표 불가. 한 유저당 1회만 (변경 시 이전 취소 후 반영) */
 export async function POST(
@@ -41,12 +41,17 @@ export async function POST(
   } catch {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
-  const vote = body.vote === "bad" ? "BAD" : body.vote === "good" ? "GOOD" : null;
+  const vote: NanguSolutionReactionType | null =
+    body.vote === "bad"
+      ? NanguSolutionReactionType.BAD
+      : body.vote === "good"
+        ? NanguSolutionReactionType.GOOD
+        : null;
   if (!vote) {
     return NextResponse.json({ error: "vote는 good 또는 bad 여야 합니다." }, { status: 400 });
   }
   const hasVotePermission =
-    vote === "GOOD"
+    vote === NanguSolutionReactionType.GOOD
       ? await hasPermission(session, PERMISSION_KEYS.SOLVER_SOLUTION_GOOD)
       : await hasPermission(session, PERMISSION_KEYS.SOLVER_SOLUTION_BAD);
   if (!hasVotePermission) {
@@ -64,16 +69,16 @@ export async function POST(
     return NextResponse.json({ error: "자신의 해법에는 투표할 수 없습니다." }, { status: 403 });
   }
 
-  const existing = await prisma.nanguSolutionVote.findUnique({
+  const existing = await prisma.nanguSolutionReaction.findUnique({
     where: { solutionId_userId: { solutionId, userId: session.id } },
   });
 
-  const prevGood = existing?.vote === NanguSolutionVoteType.GOOD ? 1 : 0;
-  const prevBad = existing?.vote === NanguSolutionVoteType.BAD ? 1 : 0;
+  const prevGood = existing?.type === NanguSolutionReactionType.GOOD ? 1 : 0;
+  const prevBad = existing?.type === NanguSolutionReactionType.BAD ? 1 : 0;
 
   await prisma.$transaction(async (tx) => {
     if (existing) {
-      await tx.nanguSolutionVote.delete({
+      await tx.nanguSolutionReaction.delete({
         where: { solutionId_userId: { solutionId, userId: session.id } },
       });
       await tx.nanguSolution.update({
@@ -85,18 +90,18 @@ export async function POST(
         },
       });
     }
-    if (!existing || existing.vote !== vote) {
-      if (vote === "GOOD") {
-        await tx.nanguSolutionVote.create({
-          data: { solutionId, userId: session.id, vote: NanguSolutionVoteType.GOOD },
+    if (!existing || existing.type !== vote) {
+      if (vote === NanguSolutionReactionType.GOOD) {
+        await tx.nanguSolutionReaction.create({
+          data: { solutionId, userId: session.id, type: NanguSolutionReactionType.GOOD },
         });
         await tx.nanguSolution.update({
           where: { id: solutionId },
           data: { goodCount: { increment: 1 }, voteCount: { increment: 1 } },
         });
       } else {
-        await tx.nanguSolutionVote.create({
-          data: { solutionId, userId: session.id, vote: NanguSolutionVoteType.BAD },
+        await tx.nanguSolutionReaction.create({
+          data: { solutionId, userId: session.id, type: NanguSolutionReactionType.BAD },
         });
         await tx.nanguSolution.update({
           where: { id: solutionId },
@@ -116,8 +121,8 @@ export async function POST(
       await revokeSolutionBad(solution.authorId, solutionId);
     } catch (_) {}
   }
-  if (!existing || existing.vote !== vote) {
-    if (vote === "GOOD") {
+  if (!existing || existing.type !== vote) {
+    if (vote === NanguSolutionReactionType.GOOD) {
       try {
         await awardSolutionGood(solution.authorId, solutionId);
       } catch (_) {}

@@ -17,9 +17,8 @@ import Button from "@/components/admin/_components/Button";
 import NotificationBar from "@/components/admin/_components/NotificationBar";
 import { AdminImageField } from "@/components/admin/_components/AdminImageField";
 import { AdminColorField } from "@/components/admin/_components/AdminColorField";
-import { SectionPositionPreviewPanel } from "./SectionPositionPreviewPanel";
 import type { SectionAnimationPreset } from "@/lib/section-style";
-import { resolveSectionStyle, serializeSectionStyleJson } from "@/lib/section-style";
+import { parseSectionStyleJson, resolveSectionStyle, serializeSectionStyleJson } from "@/lib/section-style";
 
 type PageSectionFormState = Omit<PageSection, "createdAt" | "updatedAt"> & {
   title: string;
@@ -73,6 +72,8 @@ const emptySection = (): PageSectionFormState => ({
   titleIconImageUrl: null,
   titleIconSize: null,
   sectionStyleJson: null,
+  slotType: null,
+  slotConfigJson: null,
   animationPreset: "static",
   dividerEnabled: false,
   dividerStyle: "solid",
@@ -112,13 +113,11 @@ function normalizeSectionForForm(s: PageSection): PageSectionFormState {
 
 type Props = {
   initial?: PageSection | null;
-  /** 같은 페이지의 다른 섹션 목록 (미니맵·충돌 경고용). 없으면 빈 배열 사용 */
-  sections?: PageSection[];
   onSubmit: (data: Omit<PageSection, "createdAt" | "updatedAt">) => Promise<void>;
   onCancel: () => void;
 };
 
-export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: Props) {
+export function PageSectionForm({ initial, onSubmit, onCancel }: Props) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<PageSectionFormState>(() => {
@@ -146,6 +145,7 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
     }
     setSaving(true);
     try {
+      const parsedStyle = parseSectionStyleJson(initial?.sectionStyleJson ?? null);
       const sectionStyleJson = serializeSectionStyleJson({
         animationPreset: form.animationPreset,
         divider: {
@@ -154,6 +154,8 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
           widthPx: form.dividerWidthPx,
           color: form.dividerColor,
         },
+        slotBlockCardPreserve: parsedStyle.slotBlockCard,
+        slotBlockCtaPreserve: parsedStyle.slotBlockCta,
       });
       const {
         animationPreset: _anim,
@@ -215,7 +217,6 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
   };
 
   const internalPathFromPage = form.internalPage ? INTERNAL_PAGE_PATHS[form.internalPage] : form.internalPath ?? "";
-  const sectionsForPage = sections.filter((s) => s.page === form.page);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
@@ -232,8 +233,6 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
         </div>
       )}
 
-      <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
-        <div className="min-w-0 flex-1 space-y-8">
       <section>
         <h3 className="mb-4 text-lg font-semibold">기본 정보</h3>
         <div className="space-y-4">
@@ -416,34 +415,45 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
         </div>
       </section>
 
-      <section>
-        <h3 className="mb-4 text-lg font-semibold">페이지 위치 설정</h3>
-        <div className="grid gap-4 sm:grid-cols-2">
+      <section className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-slate-600 dark:bg-slate-800/50">
+        <h3 className="mb-3 text-lg font-semibold">페이지·위치·순서·노출 (읽기 전용)</h3>
+        <p className="mb-3 text-sm text-gray-600 dark:text-slate-400">
+          이 값들은{" "}
+          <Link href="/admin/page-builder" className="font-medium text-site-primary hover:underline">
+            페이지 빌더
+          </Link>
+          의 「구조 설정」에서만 바꿀 수 있습니다.
+        </p>
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium mb-1">노출 페이지</label>
-            <select
-              value={form.page}
-              onChange={(e) => setForm((f) => ({ ...f, page: e.target.value as PageSection["page"] }))}
-              className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-700"
-            >
-              {(Object.entries(PAGE_LABELS) as [keyof typeof PAGE_LABELS, string][]).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </select>
+            <dt className="text-gray-500 dark:text-slate-400">노출 페이지</dt>
+            <dd className="font-medium text-site-text">{PAGE_LABELS[form.page]}</dd>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">노출 위치</label>
-            <select
-              value={form.placement}
-              onChange={(e) => setForm((f) => ({ ...f, placement: e.target.value as PageSection["placement"] }))}
-              className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-700"
-            >
-              {(Object.entries(PLACEMENT_LABELS) as [keyof typeof PLACEMENT_LABELS, string][]).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </select>
+            <dt className="text-gray-500 dark:text-slate-400">노출 위치</dt>
+            <dd className="font-medium text-site-text">{PLACEMENT_LABELS[form.placement]}</dd>
           </div>
-        </div>
+          <div>
+            <dt className="text-gray-500 dark:text-slate-400">정렬 순서</dt>
+            <dd className="font-medium text-site-text">{form.sortOrder}</dd>
+          </div>
+          <div>
+            <dt className="text-gray-500 dark:text-slate-400">노출 여부</dt>
+            <dd className="font-medium text-site-text">{form.isVisible ? "표시" : "숨김"}</dd>
+          </div>
+          <div>
+            <dt className="text-gray-500 dark:text-slate-400">노출 시작</dt>
+            <dd className="font-medium text-site-text">
+              {form.startAt ? new Date(form.startAt).toLocaleString("ko-KR") : "제한 없음"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-gray-500 dark:text-slate-400">노출 종료</dt>
+            <dd className="font-medium text-site-text">
+              {form.endAt ? new Date(form.endAt).toLocaleString("ko-KR") : "제한 없음"}
+            </dd>
+          </div>
+        </dl>
       </section>
 
       {form.type === "image" && (
@@ -643,66 +653,10 @@ export function PageSectionForm({ initial, sections = [], onSubmit, onCancel }: 
         </section>
       )}
 
-      <section>
-        <h3 className="mb-4 text-lg font-semibold">표시 설정</h3>
-        <div className="flex flex-wrap gap-6">
-          <div>
-            <label className="block text-sm font-medium mb-1">노출 여부</label>
-            <select
-              value={form.isVisible ? "visible" : "hidden"}
-              onChange={(e) => setForm((f) => ({ ...f, isVisible: e.target.value === "visible" }))}
-              className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-700"
-            >
-              <option value="visible">표시</option>
-              <option value="hidden">숨김</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">정렬 순서 (낮을수록 먼저)</label>
-            <input
-              type="number"
-              min={0}
-              value={form.sortOrder}
-              onChange={(e) => setForm((f) => ({ ...f, sortOrder: parseInt(e.target.value, 10) || 0 }))}
-              className="w-24 rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-700"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">노출 시작일</label>
-            <input
-              type="datetime-local"
-              value={form.startAt ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, startAt: e.target.value || null }))}
-              className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-700"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">노출 종료일</label>
-            <input
-              type="datetime-local"
-              value={form.endAt ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, endAt: e.target.value || null }))}
-              className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-700"
-            />
-          </div>
-        </div>
-      </section>
-
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" label={saving ? "저장 중…" : "저장"} color="info" disabled={saving} />
         <Button type="button" label="취소" color="contrast" outline onClick={onCancel} />
         {error && <NotificationBar color="danger">{error}</NotificationBar>}
-      </div>
-        </div>
-
-        <SectionPositionPreviewPanel
-          placement={form.placement}
-          page={form.page}
-          sortOrder={form.sortOrder}
-          currentSectionId={form.id}
-          sections={sectionsForPage}
-          onPlacementChange={(p) => setForm((f) => ({ ...f, placement: p }))}
-        />
       </div>
     </form>
   );

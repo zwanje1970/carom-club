@@ -20,10 +20,18 @@ function logDatabaseUrlDiagnosticOnce(): void {
       ? `postgresql://${trimmed.slice("prisma://".length)}`
       : trimmed;
     const u = new URL(normalized);
+    const poolerHost = u.hostname.includes("-pooler") || u.hostname.includes("pooler");
+    const pgbouncer = u.searchParams.get("pgbouncer");
+    if (poolerHost && pgbouncer !== "true") {
+      console.warn(
+        "[db-mode] DATABASE_URL이 pooler 호스트인데 `pgbouncer=true`가 없습니다. Prisma + raw query에서 prepared statement 오류가 나면 URL에 `&pgbouncer=true` 를 추가하세요. (DIRECT_URL 은 비-pooler 권장)"
+      );
+    }
     console.log("[db-mode] DATABASE_URL: present", {
       protocol: u.protocol,
       host: u.hostname,
       pathname: u.pathname || "/",
+      pgbouncer: pgbouncer === "true",
     });
   } catch {
     console.log("[db-mode] DATABASE_URL: present (unparseable URL, length)", trimmed.length);

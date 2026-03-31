@@ -9,6 +9,15 @@ import {
   footerFontFamiliesToJson,
 } from "@/lib/footer-settings";
 import { clampFlowSpeed } from "@/lib/home-carousel-flow";
+import {
+  isSiteColorThemeId,
+  SITE_CUSTOM_COLOR_THEME_PRESET,
+  parseSiteThemeCustomTokens,
+  themePrimarySecondaryForPreset,
+  type SiteColorThemeId,
+  type SiteColorThemeMode,
+  type SiteThemeCssTokens,
+} from "@/lib/site-color-themes";
 
 /** 사이트 영문 브랜드명 */
 export const SITE_NAME = "CAROM.CLUB";
@@ -28,6 +37,10 @@ export type SiteSettings = {
   logoUrl: string | null;
   primaryColor: string;
   secondaryColor: string;
+  /** null: 레거시(primary/secondary만·기본 셸). custom: colorThemeCustom 토큰 전체 */
+  colorThemePreset: SiteColorThemeMode;
+  /** colorThemePreset === custom 일 때만 유효 */
+  colorThemeCustom: SiteThemeCssTokens | null;
   withdrawRejoinDays: number;
   /** 메인 진행중 대회·당구장 가로 흐름 속도(1~100) */
   homeCarouselFlowSpeed: number;
@@ -45,6 +58,8 @@ const DEFAULTS: SiteSettings = {
   logoUrl: null,
   primaryColor: DEFAULT_PRIMARY_COLOR,
   secondaryColor: DEFAULT_SECONDARY_COLOR,
+  colorThemePreset: null,
+  colorThemeCustom: null,
   withdrawRejoinDays: 0,
   homeCarouselFlowSpeed: 50,
   minSolutionLevelForUser: 1,
@@ -88,9 +103,7 @@ async function getSiteSettingsUncached(): Promise<SiteSettings> {
       });
       return dbRowToSettings(created);
     }
-    const [fullRow] = await prisma.$queryRaw<SiteSettingRow[]>`
-      SELECT * FROM "SiteSetting" WHERE "id" = ${row.id}
-    `;
+    const fullRow = await querySiteSettingFullRowById(row.id);
     return dbRowToSettings(fullRow ?? row);
   } catch {
     return DEFAULTS;
@@ -106,11 +119,15 @@ export async function getSiteSettings(): Promise<SiteSettings> {
 }
 
 type SiteSettingRow = {
+  id?: string;
+  updatedAt?: Date;
   siteName: string;
   siteDescription: string | null;
   logoUrl: string | null;
   primaryColor: string;
   secondaryColor: string;
+  colorThemePreset?: string | null;
+  colorThemeCustomJson?: string | null;
   withdrawRejoinDays?: number;
   homeCarouselFlowSpeed?: number;
   minSolutionLevelForUser?: number;
@@ -132,7 +149,153 @@ type SiteSettingRow = {
   footerFontSizesJson?: string | null;
   footerFontFamiliesJson?: string | null;
   footerPartnersJson?: string | null;
+  heroSettingsJson?: string | null;
 };
+
+/**
+ * Neon pooler(PgBouncer) + prepared statement: `SELECT *` 는 컬럼 추가 후
+ * 동일 이름의 prepared plan이 예전 결과 타입을 기대해
+ * `cached plan must not change result type` 가 날 수 있다. 컬럼을 고정한다.
+ * (`SiteSetting` 에 컬럼이 생기면 마이그레이션과 함께 이 목록을 갱신)
+ */
+async function querySiteSettingFullRowById(id: string): Promise<SiteSettingRow | null> {
+  const rows = await prisma.$queryRaw<SiteSettingRow[]>`
+    SELECT
+      "id",
+      "siteName",
+      "siteDescription",
+      "logoUrl",
+      "primaryColor",
+      "secondaryColor",
+      "updatedAt",
+      "heroSettingsJson",
+      "withdrawRejoinDays",
+      "footerAddress",
+      "footerBgColor",
+      "footerBusinessNumber",
+      "footerCeoName",
+      "footerCompanyName",
+      "footerCopyright",
+      "footerEmail",
+      "footerEnabled",
+      "footerPartnersJson",
+      "footerPhone",
+      "footerTextColor",
+      "footerTitle",
+      "headerActiveColor",
+      "headerBgColor",
+      "headerTextColor",
+      "footerFontSize",
+      "footerFontSizesJson",
+      "footerFontFamiliesJson",
+      "homeCarouselFlowSpeed",
+      "minSolutionLevelForUser",
+      "colorThemePreset",
+      "colorThemeCustomJson"
+    FROM "SiteSetting"
+    WHERE "id" = ${id}
+  `;
+  return rows[0] ?? null;
+}
+
+type ThemeExisting = {
+  primaryColor: string;
+  secondaryColor: string;
+  colorThemePreset: SiteColorThemeMode;
+} | null;
+
+function presetAndCustomFromRow(row: SiteSettingRow): {
+  colorThemePreset: SiteColorThemeMode;
+  colorThemeCustom: SiteThemeCssTokens | null;
+} {
+  const presetRaw = row.colorThemePreset ?? null;
+  if (presetRaw === SITE_CUSTOM_COLOR_THEME_PRESET) {
+    try {
+      const parsed = row.colorThemeCustomJson
+        ? parseSiteThemeCustomTokens(JSON.parse(row.colorThemeCustomJson))
+        : null;
+      if (parsed) {
+        return {
+          colorThemePreset: SITE_CUSTOM_COLOR_THEME_PRESET,
+          colorThemeCustom: parsed,
+        };
+      }
+    } catch {
+      /* fall through */
+    }
+    return { colorThemePreset: null, colorThemeCustom: null };
+  }
+  if (isSiteColorThemeId(presetRaw)) {
+    return { colorThemePreset: presetRaw, colorThemeCustom: null };
+  }
+  return { colorThemePreset: null, colorThemeCustom: null };
+}
+
+/** 색상 테마 프리셋·커스텀 JSON·수동 primary/secondary 병합 (PUT 본문 기준) */
+function mergeThemePatch(
+  data: Partial<Omit<SiteSettings, "footer">>,
+  existing: ThemeExisting
+): {
+  colorThemePreset?: SiteColorThemeMode;
+  colorThemeCustomJson?: string | null;
+  primaryColor?: string;
+  secondaryColor?: string;
+} {
+  const out: {
+    colorThemePreset?: SiteColorThemeMode;
+    colorThemeCustomJson?: string | null;
+    primaryColor?: string;
+    secondaryColor?: string;
+  } = {};
+
+  if (data.colorThemePreset !== undefined) {
+    if (data.colorThemePreset === null) {
+      out.colorThemePreset = null;
+      out.colorThemeCustomJson = null;
+      if (data.primaryColor !== undefined) out.primaryColor = data.primaryColor;
+      if (data.secondaryColor !== undefined) out.secondaryColor = data.secondaryColor;
+      return out;
+    }
+    if (data.colorThemePreset === SITE_CUSTOM_COLOR_THEME_PRESET) {
+      const parsed =
+        data.colorThemeCustom != null ? parseSiteThemeCustomTokens(data.colorThemeCustom) : null;
+      if (!parsed) {
+        return out;
+      }
+      out.colorThemePreset = SITE_CUSTOM_COLOR_THEME_PRESET;
+      out.colorThemeCustomJson = JSON.stringify(parsed);
+      out.primaryColor = parsed.primary;
+      out.secondaryColor = parsed.secondary;
+      return out;
+    }
+    if (isSiteColorThemeId(data.colorThemePreset)) {
+      out.colorThemePreset = data.colorThemePreset;
+      out.colorThemeCustomJson = null;
+      const ps = themePrimarySecondaryForPreset(data.colorThemePreset);
+      out.primaryColor = ps.primary;
+      out.secondaryColor = ps.secondary;
+      return out;
+    }
+    return out;
+  }
+
+  if (data.primaryColor !== undefined || data.secondaryColor !== undefined) {
+    const primaryChanged =
+      data.primaryColor !== undefined &&
+      (existing == null || data.primaryColor !== existing.primaryColor);
+    const secondaryChanged =
+      data.secondaryColor !== undefined &&
+      (existing == null || data.secondaryColor !== existing.secondaryColor);
+    if (primaryChanged || secondaryChanged) {
+      out.colorThemePreset = null;
+      out.colorThemeCustomJson = null;
+    }
+    if (data.primaryColor !== undefined) out.primaryColor = data.primaryColor;
+    if (data.secondaryColor !== undefined) out.secondaryColor = data.secondaryColor;
+  }
+
+  return out;
+}
 
 function dbRowToSettings(row: SiteSettingRow): SiteSettings {
   const footer = dbRowToFooterSettings(row as Parameters<typeof dbRowToFooterSettings>[0]);
@@ -140,12 +303,15 @@ function dbRowToSettings(row: SiteSettingRow): SiteSettings {
     15,
     Math.max(1, Math.floor(Number(row.minSolutionLevelForUser ?? DEFAULTS.minSolutionLevelForUser)) || 1)
   );
+  const { colorThemePreset, colorThemeCustom } = presetAndCustomFromRow(row);
   return {
     siteName: row.siteName,
     siteDescription: row.siteDescription,
     logoUrl: row.logoUrl,
     primaryColor: row.primaryColor,
     secondaryColor: row.secondaryColor,
+    colorThemePreset,
+    colorThemeCustom,
     withdrawRejoinDays: row.withdrawRejoinDays ?? 0,
     homeCarouselFlowSpeed: clampFlowSpeed(row.homeCarouselFlowSpeed),
     minSolutionLevelForUser,
@@ -160,7 +326,8 @@ export async function updateSiteSettings(
   data: Partial<Omit<SiteSettings, "footer">>
 ): Promise<SiteSettings> {
   if (!isDatabaseConfigured()) {
-    return { ...DEFAULTS, ...data };
+    const themePatch = mergeThemePatch(data, null);
+    return { ...DEFAULTS, ...data, ...themePatch };
   }
   const existing = await prisma.siteSetting.findFirst({
     orderBy: { updatedAt: "desc" },
@@ -183,17 +350,39 @@ export async function updateSiteSettings(
   const headerTextColor = headerPayload?.headerTextColor ?? null;
   const headerActiveColor = headerPayload?.headerActiveColor ?? null;
 
+  const existingRow = existing ? await querySiteSettingFullRowById(existing.id) : null;
+  const themeExisting: ThemeExisting = existingRow
+    ? {
+        primaryColor: existingRow.primaryColor,
+        secondaryColor: existingRow.secondaryColor,
+        colorThemePreset: presetAndCustomFromRow(existingRow).colorThemePreset,
+      }
+    : null;
+  const themePatch = mergeThemePatch(data, themeExisting);
+
   if (!existing) {
     const created = await prisma.siteSetting.create({
       data: {
         siteName: data.siteName ?? DEFAULTS.siteName,
         siteDescription: data.siteDescription ?? null,
         logoUrl: data.logoUrl ?? null,
-        primaryColor: data.primaryColor ?? DEFAULTS.primaryColor,
-        secondaryColor: data.secondaryColor ?? DEFAULTS.secondaryColor,
+        primaryColor: themePatch.primaryColor ?? data.primaryColor ?? DEFAULTS.primaryColor,
+        secondaryColor: themePatch.secondaryColor ?? data.secondaryColor ?? DEFAULTS.secondaryColor,
         withdrawRejoinDays: data.withdrawRejoinDays ?? DEFAULTS.withdrawRejoinDays,
       },
     });
+    if (
+      themePatch.colorThemePreset !== undefined ||
+      themePatch.colorThemeCustomJson !== undefined
+    ) {
+      await prisma.$executeRaw`
+        UPDATE "SiteSetting" SET
+          "colorThemePreset" = ${themePatch.colorThemePreset ?? null},
+          "colorThemeCustomJson" = ${themePatch.colorThemeCustomJson ?? null},
+          "updatedAt" = ${new Date()}
+        WHERE "id" = ${created.id}
+      `;
+    }
     if (headerPayload || minSolutionLevelForUser !== undefined) {
       await prisma.$executeRaw`
         UPDATE "SiteSetting"
@@ -204,12 +393,9 @@ export async function updateSiteSettings(
             "updatedAt" = ${new Date()}
         WHERE "id" = ${created.id}
       `;
-      const [row] = await prisma.$queryRaw<SiteSettingRow[]>`
-        SELECT * FROM "SiteSetting" WHERE "id" = ${created.id}
-      `;
-      return dbRowToSettings(row);
     }
-    return dbRowToSettings(created);
+    const row = await querySiteSettingFullRowById(created.id);
+    return dbRowToSettings(row!);
   }
 
   // Header fields are updated via raw SQL below so old Prisma clients (without header columns in runtime) still work
@@ -219,12 +405,8 @@ export async function updateSiteSettings(
       siteDescription: data.siteDescription,
     }),
     ...(data.logoUrl !== undefined && { logoUrl: data.logoUrl }),
-    ...(data.primaryColor !== undefined && {
-      primaryColor: data.primaryColor,
-    }),
-    ...(data.secondaryColor !== undefined && {
-      secondaryColor: data.secondaryColor,
-    }),
+    ...(themePatch.primaryColor !== undefined && { primaryColor: themePatch.primaryColor }),
+    ...(themePatch.secondaryColor !== undefined && { secondaryColor: themePatch.secondaryColor }),
     ...(data.withdrawRejoinDays !== undefined && {
       withdrawRejoinDays: Math.max(0, Math.floor(Number(data.withdrawRejoinDays)) || 0),
     }),
@@ -232,10 +414,24 @@ export async function updateSiteSettings(
       homeCarouselFlowSpeed: clampFlowSpeed(data.homeCarouselFlowSpeed),
     }),
   };
-  await prisma.siteSetting.update({
-    where: { id: existing.id },
-    data: updatePayload,
-  });
+  if (Object.keys(updatePayload).length > 0) {
+    await prisma.siteSetting.update({
+      where: { id: existing.id },
+      data: updatePayload,
+    });
+  }
+  if (
+    themePatch.colorThemePreset !== undefined ||
+    themePatch.colorThemeCustomJson !== undefined
+  ) {
+    await prisma.$executeRaw`
+      UPDATE "SiteSetting" SET
+        "colorThemePreset" = ${themePatch.colorThemePreset ?? null},
+        "colorThemeCustomJson" = ${themePatch.colorThemeCustomJson ?? null},
+        "updatedAt" = ${new Date()}
+      WHERE "id" = ${existing.id}
+    `;
+  }
   if (headerPayload || minSolutionLevelForUser !== undefined) {
     await prisma.$executeRaw`
       UPDATE "SiteSetting"
@@ -246,14 +442,10 @@ export async function updateSiteSettings(
           "updatedAt" = ${new Date()}
       WHERE "id" = ${existing.id}
     `;
-    const [row] = await prisma.$queryRaw<SiteSettingRow[]>`
-      SELECT * FROM "SiteSetting" WHERE "id" = ${existing.id}
-    `;
-    return dbRowToSettings(row);
+    const row = await querySiteSettingFullRowById(existing.id);
+    return dbRowToSettings(row!);
   }
-  const row = await prisma.siteSetting.findFirst({
-    orderBy: { updatedAt: "desc" },
-  });
+  const row = await querySiteSettingFullRowById(existing.id);
   return dbRowToSettings(row!);
 }
 
@@ -301,9 +493,7 @@ export async function updateFooterSettings(
         UPDATE "SiteSetting" SET "footerFontSizesJson" = ${sizesJson}, "footerFontFamiliesJson" = ${familiesJson}, "updatedAt" = ${new Date()}
         WHERE "id" = ${createdRow!.id}
       `;
-      const [row] = await prisma.$queryRaw<SiteSettingRow[]>`
-        SELECT * FROM "SiteSetting" WHERE "id" = ${createdRow!.id}
-      `;
+      const row = await querySiteSettingFullRowById(createdRow!.id);
       return dbRowToFooterSettings((row ?? createdRow) as Parameters<typeof dbRowToFooterSettings>[0]);
     }
     return dbRowToFooterSettings(createdRow as Parameters<typeof dbRowToFooterSettings>[0]);
@@ -344,8 +534,6 @@ export async function updateFooterSettings(
     `;
   }
 
-  const [row] = await prisma.$queryRaw<SiteSettingRow[]>`
-    SELECT * FROM "SiteSetting" WHERE "id" = ${existing.id}
-  `;
+  const row = await querySiteSettingFullRowById(existing.id);
   return dbRowToFooterSettings(row! as Parameters<typeof dbRowToFooterSettings>[0]);
 }

@@ -145,6 +145,28 @@ export function positionOnPolylineAtDistancePx(
 }
 
 /**
+ * 시작점에서 distancePx 만큼 진행했을 때의 세그먼트 인덱스 (0 .. vertices.length-2).
+ * {@link positionOnPolylineAtDistancePx}와 동일한 누적 길이 규칙.
+ */
+export function polylineSegmentIndexAtDistancePx(
+  vertices: NormPoint[],
+  distancePx: number,
+  rect: PlayfieldRect
+): number {
+  if (vertices.length < 2) return 0;
+  const lengths = polylineSegmentLengthsPx(vertices, rect);
+  const total = lengths.reduce((s, l) => s + l, 0);
+  const clamped = Math.max(0, Math.min(distancePx, total));
+  let remaining = clamped;
+  for (let i = 0; i < lengths.length; i++) {
+    const len = lengths[i]!;
+    if (remaining <= len + 1e-9) return i;
+    remaining -= len;
+  }
+  return Math.max(0, lengths.length - 1);
+}
+
+/**
  * 이동 거리(moveDistancePx)와 경로 길이(pathLengthPx) 중 짧은 쪽까지를 0..1 진행률로 샘플.
  * - progress01=1 → 실제로는 min(moveDistancePx, pathLengthPx) 만큼 이동한 위치
  */

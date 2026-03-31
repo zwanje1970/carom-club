@@ -24,6 +24,11 @@ export function NanguReadOnlyLayout({
   showCueBallSpot = true,
   showObjectBallSpot = false,
   objectBallSpotKey = null,
+  showSecondObjectBallSpot = false,
+  secondObjectBallSpotKey = null,
+  cueBallSpotRingBlackStroke = false,
+  objectBallSpotRingBlackStroke = false,
+  secondObjectBallSpotRingBlackStroke = false,
   drawStyle = "realistic",
   orientation = "landscape",
   betweenTableAndBallsLayer,
@@ -31,6 +36,7 @@ export function NanguReadOnlyLayout({
   cueTipNorm = null,
   ballNormOverridesLiveRef,
   playbackBallAnimActive = false,
+  hideOriginGhostBalls = false,
 }: {
   ballPlacement: NanguBallPlacement;
   width?: number;
@@ -41,15 +47,22 @@ export function NanguReadOnlyLayout({
   fillContainer?: boolean;
   /** 줌 월드 고정 크기(W×H) 안에서 캔버스만 100% 채움 — BilliardTableCanvas.embedFill */
   embedFill?: boolean;
-  /** 1목적구(red) 숨김 — 1목 경로 미입력 시 애니메이션 시연 등 */
+  /** `BilliardTableCanvas.hideRedBall`로 전달 — 색 키 red 스프라이트만 숨김. 1목적구=red가 아님 */
   hideObjectBall?: boolean;
   /** 경로 재생 시 공 위치 덮어쓰기 */
   ballNormOverrides?: Partial<Record<"red" | "yellow" | "white", { x: number; y: number }>>;
   /** 재생 중 rAF 충돌 방지용으로 끄기 */
   showCueBallSpot?: boolean;
-  /** 1목 경로 그리기 모드: 목적구 점선 스팟 깜빡임 */
+  /** 첫 목적구(reflection) 경로 편집 모드: `objectBallSpotKey` 해당 공 점선 스팟 깜빡임 */
   showObjectBallSpot?: boolean;
   objectBallSpotKey?: BallColor | null;
+  /** 2목 경로 그리기 모드 */
+  showSecondObjectBallSpot?: boolean;
+  secondObjectBallSpotKey?: BallColor | null;
+  /** 활성 경로 스팟이 공/쿠션에 닿으면 점선 링 검정 */
+  cueBallSpotRingBlackStroke?: boolean;
+  objectBallSpotRingBlackStroke?: boolean;
+  secondObjectBallSpotRingBlackStroke?: boolean;
   /** 실사 | 단순보기(와이어프레임) */
   drawStyle?: TableDrawStyle;
   /** 난구노트 전체화면과 동일하게 기기 방향 반영 */
@@ -64,6 +77,8 @@ export function NanguReadOnlyLayout({
     Partial<Record<"red" | "yellow" | "white", { x: number; y: number }>> | null | undefined
   >;
   playbackBallAnimActive?: boolean;
+  /** 재생 중 배치 원점 ghost 미표시(시각만) */
+  hideOriginGhostBalls?: boolean;
 }) {
   return (
     <div
@@ -82,6 +97,11 @@ export function NanguReadOnlyLayout({
         showCueBallSpot={showCueBallSpot}
         showObjectBallSpot={showObjectBallSpot}
         objectBallSpotKey={objectBallSpotKey}
+        showSecondObjectBallSpot={showSecondObjectBallSpot}
+        secondObjectBallSpotKey={secondObjectBallSpotKey}
+        cueBallSpotRingBlackStroke={cueBallSpotRingBlackStroke}
+        objectBallSpotRingBlackStroke={objectBallSpotRingBlackStroke}
+        secondObjectBallSpotRingBlackStroke={secondObjectBallSpotRingBlackStroke}
         hideRedBall={hideObjectBall}
         ballNormOverrides={ballNormOverrides}
         cueTipNorm={cueTipNorm}
@@ -92,6 +112,7 @@ export function NanguReadOnlyLayout({
         pathOverlayAboveBalls={pathOverlayAboveBalls}
         ballNormOverridesLiveRef={ballNormOverridesLiveRef}
         playbackBallAnimActive={playbackBallAnimActive}
+        hideOriginGhostBalls={hideOriginGhostBalls}
       >
         {betweenTableAndBallsLayer}
       </BilliardTableCanvas>

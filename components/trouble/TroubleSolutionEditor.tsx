@@ -40,6 +40,10 @@ import {
   resolvePanelSettingsAndAuthority,
 } from "@/lib/solution-editor-hydrate";
 import {
+  pickInitialIgnorePhysics,
+  writeIgnorePhysicsPreference,
+} from "@/lib/solution-ignore-physics-preference";
+import {
   cueFirstObjectHitFromBallPlacement,
   resolveEffectiveFirstObjectCollisionFromCuePath,
 } from "@/lib/solution-path-geometry";
@@ -117,9 +121,12 @@ export function TroubleSolutionEditor({
   const [settingsPanelBallSpeedAuthoritative, setSettingsPanelBallSpeedAuthoritative] = useState(
     () => resolvePanelSettingsAndAuthority(initialSolutionData, initialPersistedSettings).authoritative
   );
-  const [panelSettings, setPanelSettings] = useState<SolutionSettingsValue>(() =>
-    resolvePanelSettingsAndAuthority(initialSolutionData, initialPersistedSettings).settings
-  );
+  const [panelSettings, setPanelSettings] = useState<SolutionSettingsValue>(() => {
+    const resolved = resolvePanelSettingsAndAuthority(initialSolutionData, initialPersistedSettings);
+    const rawSettings = initialPersistedSettings ?? initialSolutionData?.settings;
+    const ignorePhysics = pickInitialIgnorePhysics(rawSettings, resolved.settings);
+    return clampSolutionSettings(mergeSolutionSettings({ ignorePhysics }, resolved.settings));
+  });
 
   const openSettingsPanel = useCallback(
     (section?: "thickness" | "tip" | "rail") => {
@@ -363,6 +370,7 @@ export function TroubleSolutionEditor({
           onSettingsChange={(next) => {
             setSettingsPanelBallSpeedAuthoritative(true);
             setPanelSettings(next);
+            writeIgnorePhysicsPreference(next.ignorePhysics);
             if (next.railCount != null && !Number.isNaN(Number(next.railCount))) {
               setBallSpeed(normalizeBallSpeed(next.railCount));
             }

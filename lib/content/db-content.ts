@@ -44,6 +44,9 @@ function rowToPageSection(r: {
   titleIconImageUrl?: string | null;
   titleIconSize?: string | null;
   sectionStyleJson?: string | null;
+  slotType?: string | null;
+  slotConfigJson?: string | null;
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }): PageSection {
@@ -81,6 +84,9 @@ function rowToPageSection(r: {
     titleIconImageUrl: r.titleIconImageUrl ?? null,
     titleIconSize: (r.titleIconSize as PageSection["titleIconSize"]) ?? null,
     sectionStyleJson: r.sectionStyleJson ?? null,
+    slotType: (r.slotType as PageSection["slotType"]) ?? null,
+    slotConfigJson: r.slotConfigJson ?? null,
+    deletedAt: toISO(r.deletedAt ?? null),
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   };
@@ -169,7 +175,29 @@ function isInRange(startAt: string | null, endAt: string | null): boolean {
 
 export async function getPageSectionsForPageFromDb(page: PageSlug): Promise<PageSection[]> {
   const list = await prisma.pageSection.findMany({
-    where: { page, isVisible: true },
+    where: { page, isVisible: true, deletedAt: null },
+    orderBy: { sortOrder: "asc" },
+  });
+  return list
+    .filter((s) => isInRange(s.startAt?.toISOString() ?? null, s.endAt?.toISOString() ?? null))
+    .map((r) => rowToPageSection(r));
+}
+
+/** 구조 슬롯 행만: `page` + 노출 + 기간 내, `sortOrder` 오름차순 */
+export async function getPageLayoutSlotsForPageFromDb(page: PageSlug): Promise<PageSection[]> {
+  const list = await prisma.pageSection.findMany({
+    where: { page, isVisible: true, slotType: { not: null }, deletedAt: null },
+    orderBy: { sortOrder: "asc" },
+  });
+  return list
+    .filter((s) => isInRange(s.startAt?.toISOString() ?? null, s.endAt?.toISOString() ?? null))
+    .map((r) => rowToPageSection(r));
+}
+
+/** 동일 `page`의 CMS+슬롯 전부 한 목록으로(구조 편집·미리보기용). 공개 렌더는 기존 API 유지 */
+export async function getOrderedPageBlocksForPageFromDb(page: PageSlug): Promise<PageSection[]> {
+  const list = await prisma.pageSection.findMany({
+    where: { page, isVisible: true, deletedAt: null },
     orderBy: { sortOrder: "asc" },
   });
   return list
@@ -234,7 +262,72 @@ type PageSectionInput = Omit<PageSection, "createdAt" | "updatedAt">;
 type PopupInput = Omit<Popup, "createdAt" | "updatedAt">;
 type NoticeBarInput = Omit<NoticeBar, "createdAt" | "updatedAt">;
 
+/** DB가 아직 `sectionStyleJson` 컬럼이 없을 때(P2022)에도 표시 토글이 동작하도록, 해당 컬럼을 읽지 않는 select */
+const PAGE_SECTION_SELECT_VISIBILITY_PATCH = {
+  id: true,
+  type: true,
+  title: true,
+  subtitle: true,
+  description: true,
+  textAlign: true,
+  page: true,
+  placement: true,
+  imageUrl: true,
+  imageUrlMobile: true,
+  imageHeightPc: true,
+  imageHeightMobile: true,
+  linkType: true,
+  internalPage: true,
+  internalPath: true,
+  externalUrl: true,
+  openInNewTab: true,
+  buttons: true,
+  isVisible: true,
+  sortOrder: true,
+  startAt: true,
+  endAt: true,
+  backgroundColor: true,
+  titleIconType: true,
+  titleIconName: true,
+  titleIconImageUrl: true,
+  titleIconSize: true,
+  slotType: true,
+  slotConfigJson: true,
+  deletedAt: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+/** `isVisible`만 갱신. 전체 upsert는 스키마에만 있고 DB에 없는 컬럼이 있으면 P2022가 나므로 토글 전용 경로로 분리 */
+export async function updatePageSectionVisibilityInDb(id: string, isVisible: boolean): Promise<PageSection | null> {
+  try {
+    const r = await prisma.pageSection.update({
+      where: { id },
+      data: { isVisible },
+      select: PAGE_SECTION_SELECT_VISIBILITY_PATCH,
+    });
+    return rowToPageSection({ ...r, sectionStyleJson: null });
+  } catch (e) {
+    const err = e as { code?: string };
+    if (err.code === "P2025") return null;
+    throw e;
+  }
+}
+
 export async function upsertPageSectionInDb(data: PageSectionInput): Promise<PageSection> {
+  const existing = await prisma.pageSection.findUnique({
+    where: { id: data.id },
+    select: { deletedAt: true },
+  });
+  let mergedDeletedAt: Date | null;
+  if (data.deletedAt === undefined) {
+    mergedDeletedAt = existing?.deletedAt ?? null;
+  } else if (!data.deletedAt) {
+    mergedDeletedAt = null;
+  } else {
+    mergedDeletedAt = new Date(data.deletedAt);
+  }
+
   const payload = {
     type: data.type,
     title: data.title,
@@ -263,6 +356,9 @@ export async function upsertPageSectionInDb(data: PageSectionInput): Promise<Pag
     titleIconImageUrl: data.titleIconImageUrl ?? null,
     titleIconSize: data.titleIconSize ?? null,
     sectionStyleJson: data.sectionStyleJson ?? null,
+    slotType: data.slotType ?? null,
+    slotConfigJson: data.slotConfigJson ?? null,
+    deletedAt: mergedDeletedAt,
   };
   const r = await prisma.pageSection.upsert({
     where: { id: data.id },
@@ -323,6 +419,34 @@ export async function deletePageSectionInDb(id: string): Promise<void> {
   await prisma.pageSection.delete({ where: { id } }).catch(() => {});
 }
 
+export async function softDeletePageSectionInDb(id: string): Promise<PageSection | null> {
+  try {
+    const r = await prisma.pageSection.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+    return rowToPageSection(r);
+  } catch (e) {
+    const err = e as { code?: string };
+    if (err.code === "P2025") return null;
+    throw e;
+  }
+}
+
+export async function restorePageSectionInDb(id: string): Promise<PageSection | null> {
+  try {
+    const r = await prisma.pageSection.update({
+      where: { id },
+      data: { deletedAt: null },
+    });
+    return rowToPageSection(r);
+  } catch (e) {
+    const err = e as { code?: string };
+    if (err.code === "P2025") return null;
+    throw e;
+  }
+}
+
 export async function deletePopupInDb(id: string): Promise<void> {
   await prisma.popup.delete({ where: { id } }).catch(() => {});
 }
@@ -331,15 +455,24 @@ export async function deleteNoticeBarInDb(id: string): Promise<void> {
   await prisma.noticeBar.delete({ where: { id } }).catch(() => {});
 }
 
-export async function reorderPageSectionsInDb(
-  page: PageSlug,
-  placement: PlacementSlug,
-  sectionIds: string[]
-): Promise<void> {
+/** 동일 `page`의 모든 섹션 `sortOrder`를 `orderedIds` 순으로 0…n-1 재부여 (페이지 빌더용) */
+export async function setPageSectionOrderForPageInDb(page: PageSlug, orderedIds: string[]): Promise<void> {
+  const existing = await prisma.pageSection.findMany({
+    where: { page },
+    select: { id: true },
+  });
+  const idSet = new Set(existing.map((e) => e.id));
+  if (orderedIds.length === 0) {
+    if (idSet.size !== 0) throw new Error("PAGE_LAYOUT_ORDER_MISMATCH");
+    return;
+  }
+  if (orderedIds.length !== idSet.size || orderedIds.some((id) => !idSet.has(id))) {
+    throw new Error("PAGE_LAYOUT_ORDER_MISMATCH");
+  }
   await prisma.$transaction(
-    sectionIds.map((id, index) =>
-      prisma.pageSection.updateMany({
-        where: { id, page, placement },
+    orderedIds.map((id, index) =>
+      prisma.pageSection.update({
+        where: { id },
         data: { sortOrder: index },
       })
     )

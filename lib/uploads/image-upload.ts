@@ -4,11 +4,15 @@
  */
 export {
   processUploadedImage,
+  uploadProcessedImage,
   uploadToBlob,
+  putToVercelBlob,
+  saveToLocalUploads,
   uploadToLocal,
   buildBlobPath,
   BLOB_TOKEN_MISSING_MESSAGE,
   BLOB_SERVICE_UNAVAILABLE_MESSAGE,
+  STORAGE_UNAVAILABLE_PREFIX,
   UPLOAD_DEPLOY_REQUIRES_BLOB_MESSAGE,
   isBlobConfigError,
   type ProcessedImage,

@@ -70,7 +70,7 @@ export function getCueBallColor(cueBallType: CueBallType): string {
   return cueBallType === "yellow" ? "#f5d033" : "#f8f8f8";
 }
 
-/** 목적구 색상 → 렌더용 hex. red 고정. */
+/** 렌더용 hex 하나 반환(레거시). 실제 비수구 색은 공 키·배치에 따라 `getObjectBallYellowColor` 등과 조합 */
 export function getObjectBallColor(_objectBallType?: ObjectBallType): string {
   return "#c41e3a";
 }
@@ -85,7 +85,7 @@ export function isCueBall(ballColor: BallColor, cueBallType: CueBallType): boole
   return ballColor === cueBallType;
 }
 
-/** ballColor가 목적구이면 true (수구가 아닌 공). red는 항상 목적구. */
+/** `ballColor`가 현재 수구 타입이 아니면 true(비수구). red/yellow/white 중 수구가 아닌 키는 모두 목적구 후보 */
 export function isObjectBall(ballColor: BallColor, cueBallType: CueBallType): boolean {
   return ballColor !== cueBallType;
 }
@@ -215,7 +215,7 @@ export function distanceNormPointsInPlayfieldPx(
  * 난구노트 공 배치(`BilliardTableEditor` placementMode)와 동일 — `hitTestBall` 의 반지름 배수.
  * 난구해법·경로 편집의 공/수구 탭도 이 값과 맞춤.
  */
-export const BALL_PLACEMENT_TOUCH_RADIUS_SCALE = 6;
+export const BALL_PLACEMENT_TOUCH_RADIUS_SCALE = 1.5;
 
 /** 난구노트 공 배치 터치 반경(px) — 공 반지름 × {@link BALL_PLACEMENT_TOUCH_RADIUS_SCALE} */
 export function getBallPlacementTouchRadiusPx(rect: PlayfieldRect): number {

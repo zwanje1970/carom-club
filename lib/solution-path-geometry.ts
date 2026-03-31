@@ -10,7 +10,13 @@ import {
   normalizedToPixel,
   pixelToNormalized,
 } from "@/lib/billiard-table-constants";
-import { getNonCueBallNorms, type LabeledBallNorm, type NanguBallPlacement } from "@/lib/nangu-types";
+import {
+  ballLabeledNormForKey,
+  getNonCueBallNorms,
+  getSecondObjectBallKeyExclusive,
+  type LabeledBallNorm,
+  type NanguBallPlacement,
+} from "@/lib/nangu-types";
 
 function normToPx(x: number, y: number, rect: PlayfieldRect) {
   return normalizedToPixel(x, y, rect);
@@ -141,6 +147,78 @@ export function minDistanceNormPointToOpenPolylinePx(
 }
 
 /**
+ * 열린 폴리라인(정규화 꼭짓점 순서) 위에서 `targetNorm`에 가장 가까운 점까지의 **누적 호장(px)**.
+ * 재생: 스팟 인덱스 없이도 기하 충돌점과 `dCue`/`dObj` 맞춤 거리를 맞출 때 사용.
+ */
+export function distanceAlongOpenPolylineToClosestNormPointPx(
+  vertices: readonly { x: number; y: number }[],
+  targetNorm: { x: number; y: number },
+  rect: PlayfieldRect
+): number {
+  if (vertices.length < 2) return 0;
+  const T = normToPx(targetNorm.x, targetNorm.y, rect);
+  let bestPointDist = Infinity;
+  let bestAlong = 0;
+  let cumulative = 0;
+  for (let i = 0; i < vertices.length - 1; i++) {
+    const a = normToPx(vertices[i]!.x, vertices[i]!.y, rect);
+    const b = normToPx(vertices[i + 1]!.x, vertices[i + 1]!.y, rect);
+    const dx = b.px - a.px;
+    const dy = b.py - a.py;
+    const segLen = Math.hypot(dx, dy);
+    if (segLen < 1e-6) continue;
+    let u = ((T.px - a.px) * dx + (T.py - a.py) * dy) / (segLen * segLen);
+    u = Math.max(0, Math.min(1, u));
+    const qx = a.px + u * dx;
+    const qy = a.py + u * dy;
+    const d = Math.hypot(T.px - qx, T.py - qy);
+    if (d < bestPointDist) {
+      bestPointDist = d;
+      bestAlong = cumulative + u * segLen;
+    }
+    cumulative += segLen;
+  }
+  return bestAlong;
+}
+
+/** 재생: 이동 공 **중심**이 스팟 **중심**과 맞닿았다고 볼 픽셀 허용치(`path-spot-display`의 공 중심 근접과 동일 계열) */
+export const PLAYBACK_SPOT_CENTER_ALIGN_EPS_PX = 1.5;
+
+/**
+ * 재생 폴리라인을 **시작에서부터** 따라갈 때, 꼭짓점을 잇는 각 세그먼트 위에 목표 정규화점과의 거리가
+ * `epsPx` 이하인 **첫** 위치까지의 누적 호장(px). (공-공 2R 접촉 시점이 아니라 **스팟 중심 도달**용)
+ */
+export function distanceAlongOpenPolylineToFirstReachNormPointPx(
+  vertices: readonly { x: number; y: number }[],
+  targetNorm: { x: number; y: number },
+  rect: PlayfieldRect,
+  epsPx: number = PLAYBACK_SPOT_CENTER_ALIGN_EPS_PX
+): number | null {
+  const T = normToPx(targetNorm.x, targetNorm.y, rect);
+  let cumulative = 0;
+  for (let i = 0; i < vertices.length - 1; i++) {
+    const a = normToPx(vertices[i]!.x, vertices[i]!.y, rect);
+    const b = normToPx(vertices[i + 1]!.x, vertices[i + 1]!.y, rect);
+    const dx = b.px - a.px;
+    const dy = b.py - a.py;
+    const segLen = Math.hypot(dx, dy);
+    if (segLen < 1e-6) continue;
+    const wx = T.px - a.px;
+    const wy = T.py - a.py;
+    let t = (wx * dx + wy * dy) / (segLen * segLen);
+    t = Math.max(0, Math.min(1, t));
+    const qx = a.px + t * dx;
+    const qy = a.py + t * dy;
+    const dist = Math.hypot(T.px - qx, T.py - qy);
+    if (dist <= epsPx) {
+      return cumulative + t * segLen;
+    }
+    cumulative += segLen;
+  }
+  return null;
+}
+
+/**
  * 수구→첫 스팟 광선상 1목 충돌점이, 실제로 그린 수구 경로(수구—스팟 폴리라인)와 맞닿는지.
  * 쿠션 등으로 광선과 다른 궤적이면 false.
  */
@@ -171,6 +249,110 @@ export function resolveEffectiveFirstObjectCollisionFromCuePath(
     return null;
   }
   return hit;
+}
+
+/** 2목 경로·표식용 — 1목 경로 스팟 폴리라인이 2목(남은 공) 접촉에 닿을 때만 충돌 반환(스팟 1개 이상 필요) */
+export function resolveEffectiveSecondObjectCollisionFromObjectPath(
+  placement: NanguBallPlacement,
+  objectPathStartNorm: { x: number; y: number },
+  objectPathPoints: readonly { x: number; y: number }[],
+  firstObjectKey: LabeledBallNorm["key"],
+  rect: PlayfieldRect,
+  touchPx: number = SOLUTION_PATH_FIRST_OBJECT_POLYLINE_CONTACT_PX
+): { collision: { x: number; y: number }; objectKey: LabeledBallNorm["key"] } | null {
+  const secondKey = getSecondObjectBallKeyExclusive(placement, firstObjectKey);
+  if (secondKey == null) return null;
+  const remainingBall = ballLabeledNormForKey(placement, secondKey);
+  if (objectPathPoints.length < 1) return null;
+
+  let hit: { collision: { x: number; y: number }; objectKey: LabeledBallNorm["key"] } | null = null;
+
+  let start = objectPathStartNorm;
+  for (const pt of objectPathPoints) {
+    hit = cueFirstObjectHitAmongNormalized(start, pt, [remainingBall], rect);
+    if (hit) break;
+    start = pt;
+  }
+
+  if (!hit) return null;
+
+  if (
+    !cuePolylineReachesFirstObjectCollision(
+      objectPathStartNorm,
+      objectPathPoints,
+      hit.collision,
+      rect,
+      touchPx
+    )
+  ) {
+    return null;
+  }
+  return hit;
+}
+
+/** 2목 경로·표식용 — 수구 경로 스팟 폴리라인이 2목(남은 공) 접촉에 닿을 때만 충돌 반환 */
+export function resolveEffectiveSecondObjectCollisionFromCuePath(
+  placement: NanguBallPlacement,
+  cueNorm: { x: number; y: number },
+  pathPoints: readonly { x: number; y: number }[],
+  firstObjectKey: LabeledBallNorm["key"],
+  rect: PlayfieldRect,
+  touchPx: number = SOLUTION_PATH_FIRST_OBJECT_POLYLINE_CONTACT_PX
+): { collision: { x: number; y: number }; objectKey: LabeledBallNorm["key"] } | null {
+  const secondKey = getSecondObjectBallKeyExclusive(placement, firstObjectKey);
+  if (secondKey == null) return null;
+  const remainingBall = ballLabeledNormForKey(placement, secondKey);
+  if (pathPoints.length < 1) return null;
+
+  const targets: LabeledBallNorm[] = [{ key: remainingBall.key, x: remainingBall.x, y: remainingBall.y }];
+
+  let hit: { collision: { x: number; y: number }; objectKey: LabeledBallNorm["key"] } | null = null;
+  let start = cueNorm;
+  for (const pt of pathPoints) {
+    hit = cueFirstObjectHitAmongNormalized(start, pt, targets, rect);
+    if (hit) break;
+    start = pt;
+  }
+  if (!hit) return null;
+  if (!cuePolylineReachesFirstObjectCollision(cueNorm, pathPoints, hit.collision, rect, touchPx)) {
+    return null;
+  }
+  return hit;
+}
+
+/**
+ * 수구 경로 또는 1목 경로 중 **어느 쪽 스팟 폴리라인이든** 2목 공 접촉에 닿으면 충돌 반환(1목 경로 우선).
+ */
+export function resolveEffectiveSecondObjectCollisionFromPaths(
+  placement: NanguBallPlacement,
+  cueNorm: { x: number; y: number },
+  cuePathPoints: readonly { x: number; y: number }[],
+  objectPathStartNorm: { x: number; y: number } | null,
+  objectPathPoints: readonly { x: number; y: number }[],
+  firstObjectKey: LabeledBallNorm["key"],
+  rect: PlayfieldRect,
+  touchPx: number = SOLUTION_PATH_FIRST_OBJECT_POLYLINE_CONTACT_PX
+): { collision: { x: number; y: number }; objectKey: LabeledBallNorm["key"] } | null {
+  const fromObject =
+    objectPathStartNorm != null
+      ? resolveEffectiveSecondObjectCollisionFromObjectPath(
+          placement,
+          objectPathStartNorm,
+          objectPathPoints,
+          firstObjectKey,
+          rect,
+          touchPx
+        )
+      : null;
+  const fromCue = resolveEffectiveSecondObjectCollisionFromCuePath(
+    placement,
+    cueNorm,
+    cuePathPoints,
+    firstObjectKey,
+    rect,
+    touchPx
+  );
+  return fromObject ?? fromCue;
 }
 
 /**

@@ -14,12 +14,19 @@
   --site-bg: #F6F8FB;
   --site-card: #FFFFFF;
   --site-text: #111827;
+  --site-text-muted: #4b5563;
   --site-border: #E5E7EB;
   --site-primary: #991b1b;
   --site-secondary: #78350f;
   --site-header-bg: #0a0a0a;
   --site-header-text: #d1d5db;
   --site-header-active: #fbbf24;
+  --color-primary: #991b1b;
+  --color-secondary: #78350f;
+  --color-background: #F6F8FB;
+  --color-surface: #FFFFFF;
+  --color-text: #111827;
+  --color-muted: #4b5563;
 }
 
 /* 홈 CMS 섹션 애니메이션 (sectionStyleJson.animationPreset) */
@@ -83,7 +90,7 @@
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
 }
 
-/* 사이트 기본 글꼴: Pretendard (모바일/PC 공통) */
+/* 기본 글꼴은 레이아웃에서만 지정: (site)=Pretendard, (content)=Noto Sans KR. body에 font-family를 두지 않는다. */
 @layer base {
   /* 인트로 종료 후 스크롤바 유무로 가로가 흔들리지 않도록 */
   html {
@@ -92,9 +99,7 @@
   body {
     @apply antialiased;
     background-color: var(--site-bg);
-    color: #111827;
-    font-family: var(--font-pretendard), -apple-system, BlinkMacSystemFont, system-ui,
-      "Apple SD Gothic Neo", sans-serif;
+    color: var(--site-text);
   }
   /* Lighthouse 대비: 연한 회색 텍스트를 한 단계 이상 진하게 */
   .text-gray-400 {

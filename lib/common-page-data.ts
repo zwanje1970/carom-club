@@ -8,6 +8,7 @@ import { getAdminCopy } from "@/lib/admin-copy-server";
 import { getSiteSettings } from "@/lib/site-settings";
 import {
   getNoticeBarsForPage,
+  getOrderedPageBlocksForPage,
   getPopupsForPage,
   getPageSectionsForPage,
 } from "@/lib/content/service";
@@ -23,17 +24,21 @@ export type CommonPageData = {
   siteSettings: SiteSettings;
   noticeBars: NoticeBar[];
   popups: Popup[];
+  /** CMS만 (`slotType` 없음). 레거시·일부 화면용 */
   pageSections: PageSection[];
+  /** CMS+슬롯 정렬 스택. `PageRenderer`·미리보기와 동일 소스 */
+  pageBlocks: PageSection[];
 };
 
 const REVALIDATE_SECONDS = 60;
 
 async function getCommonPageDataUncached(page: PageSlug): Promise<CommonPageData> {
-  const [{ copy, siteSettings }, noticeBars, popups, pageSections] = await Promise.all([
+  const [{ copy, siteSettings }, noticeBars, popups, pageSections, pageBlocks] = await Promise.all([
     getCommonGlobalData(),
     getNoticeBarsForPage(page),
     getPopupsForPage(page),
     getPageSectionsForPage(page),
+    getOrderedPageBlocksForPage(page),
   ]);
   return {
     copy,
@@ -41,6 +46,7 @@ async function getCommonPageDataUncached(page: PageSlug): Promise<CommonPageData
     noticeBars,
     popups,
     pageSections,
+    pageBlocks,
   };
 }
 

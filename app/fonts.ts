@@ -1,8 +1,9 @@
 import localFont from "next/font/local";
 
 /**
- * Pretendard: 한글 서브셋 woff2 2개만 사용 (Regular + Bold).
- * 풀 정적(9가지 weight 등) 대비 용량 대폭 절감. variable 풀(약 2MB)은 배포 크기상 미사용.
+ * Pretendard: 한글 서브셋 woff2 (Regular 400 + Bold 700).
+ * 600 Semibold는 `public/fonts/pretendard-semibold-subset.woff2` 추가 후 src에 weight "600" 항목으로 확장.
+ * app/(site)/layout.tsx 에서만 import (전역 루트에서는 import 금지).
  */
 export const pretendard = localFont({
   src: [

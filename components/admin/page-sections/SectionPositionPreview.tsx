@@ -73,8 +73,8 @@ export function SectionPositionPreview({
                 title={tooltip}
                 className={`
                   rounded-lg border-2 px-3 py-2.5 text-center text-xs font-medium
-                  transition-colors cursor-pointer
-                  hover:border-site-primary/50 hover:bg-site-primary/5
+                  transition-colors
+                  ${onPlacementChange ? "cursor-pointer hover:border-site-primary/50 hover:bg-site-primary/5" : "cursor-default"}
                   ${isSelected ? "border-site-primary bg-amber-50 dark:bg-amber-900/20 dark:border-amber-500" : "border-gray-200 bg-white dark:border-slate-600 dark:bg-slate-700/50"}
                 `}
               >
@@ -128,7 +128,10 @@ export function SectionPositionPreview({
             ⚠ 섹션 충돌 경고
           </p>
           <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-            이 위치에 동일한 정렬 순서({sortOrder})의 섹션이 이미 존재합니다. 정렬 순서를 변경해 주세요.
+            이 위치에 동일한 정렬 순서({sortOrder})의 섹션이 있습니다.{" "}
+            {onPlacementChange
+              ? "정렬 순서를 변경해 주세요."
+              : "페이지 빌더에서 순서·위치를 조정해 주세요."}
           </p>
         </div>
       )}

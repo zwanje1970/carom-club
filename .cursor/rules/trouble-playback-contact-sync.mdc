@@ -1,0 +1,17 @@
+---
+description: 수구가 1목·2목 접촉 스팟에 닿는 프레임에 각 목적구가 해당 경로선 이동을 시작·동기
+alwaysApply: true
+---
+
+# 난구 재생 — 접촉 스팟과 목적구 경로 동기
+
+**용어**: 본 문서의 **1목·2목**은 **1목적구·2목적구**(= 1적구·2적구, first/second object ball)의 줄임말이다. **적구**는 **목적+구(공)**의 줄임말(= 목적구 계열). **「1」과 「목/적구」를 떼어 해석하지 않는다.** 역할은 `reflectionObjectBall` / `secondReflectionObjectBall`·경로 스팟으로 정해지며 **red/yellow/white 색 키와 고정 대응되지 않는다.** 한국어 **빨간공·노란공·흰공**은 **그 색의 공을 직접 가리힐 때만** 쓴다 — 상세는 `carom-object-ball-terminology.mdc`.
+
+- **1목·2목 “즉시 출발”**: **1목**은 수구가 1목에 붙은 **경로 스팟**에 닿는 판정과 같은 프레임에서 1목 경로 이동을 시작한다. **2목**은 1목 공이 2목에 붙은 **경로 스팟**에 닿는 판정과 같은 프레임에서 2목 경로 이동을 시작한다. (수구가 멈춘 뒤·1목이 멈춘 뒤에야 다음 공이 움직이는 식의 순차 지연은 맞지 않음.)
+- **1목**: 수구가 **1목 접촉 스팟**에 도달한 것과 같은 판정(수구 경로상 거리 `dCue`가 1목 맞춤 거리에 이른 프레임)에서, **1목이 1목 경로선**을 따라 이동을 시작한다. 벽시계만으로 맞추지 않고, 수구에 쓰는 것과 **동일한 거리 파이프라인**으로 출발 시점을 잡는다.
+- **2목**: **1목**이 **2목 접촉 스팟**에 도달한 것과 같은 판정(1목 경로상 거리 `dObj`가 2목 맞춤 거리에 이른 프레임)에서, **2목이 2목 경로선**을 따라 이동을 시작한다. 맞춤 거리: `secondReflectionObjectBall` 등으로 키를 잡은 뒤 경로상 **마지막** 일치 공 스팟(`struckBallMatch: "last"`) — 앞쪽 잘못된 스팟·**first-any 폴백 금지**(1목 경로 첫 공 스팟이 1목이면 2목이 스팟 전에 출발함). 구현 `resolveTroubleSecondObjectHitProgress01`.
+- **1목** 맞춤 거리: 우선 `reflectionObjectBall`, 다음 `resolveTroubleFirstObjectBallKey`, 그다음 수구 경로 first-any — 구현 `resolveTroubleCueHitProgress01`. (`reflectionObjectBall`만 쓰고 스팟 근접 판정과 어긋나면 `pHit01 === 1`이 되어 수구가 끝까지 간 뒤에야 1목이 나가는 현상이 난다.)
+- 수구는 **스팟에서 멈추지 않고** 경로를 따라 계속 진행할 수 있다(별도 UX 규칙). 위 규칙은 **목적구 경로 재생 시작 시점**이 접촉 판정과 **동시(동일 프레임·동일 거리 게이트)**임을 뜻한다.
+- 구현 참고: `hooks/useTroublePathPlayback.ts` — `reachedFirstObjectHit` / `reachedSecondObjectHit`, `objectStartWallMs` / `object2StartWallMs`.
+- τ→표시 거리: `distancePxAfterTimeMsAlongVariableEdgeTimes`의 누적 `dAlongRaw`는 **전체 폴리라인** 기준이므로, 이동 예산(`cueCap`/`objCap`)이 더 짧을 때는 **`min(누적, cap)`** 으로 샘플·맞춤 판정한다. `cap * 누적/전체길이`만 쓰면 맞춤이 타임라인 끝으로 밀린다.
+- **거리·시간·이징 수식** 자체를 바꿔 이 동기를 깨는 수정은 `trouble-playback-constraints.mdc`와 충돌할 수 있으므로, 변경 시 양쪽을 함께 검토한다.

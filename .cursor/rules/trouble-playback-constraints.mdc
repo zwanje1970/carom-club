@@ -12,6 +12,7 @@ alwaysApply: true
 1. 이 수정이 **거리 모델**에 영향을 주는가?
 2. 이 수정이 **시간 모델**을 변경하는가?
 3. 이 수정이 **이징 적용 위치**를 바꾸는가?
+4. 이 수정이 **[[10] τ→cap 거리 합성(ratio)]** 을 바꾸는가? (YES면 감속 체감 회귀 위험 — 해당 변경 금지 또는 별도 합의)
 
 ---
 
@@ -123,8 +124,32 @@ alwaysApply: true
 
 ---
 
+## [10] τ→cap 거리 합성(감속·마무리) 고정
+
+**현재 기준은 안정화됨.** `cap < pathLength`여도 벽시계 전 구간에 이징 곡선이 `[0, cap]` 이동 거리에 **끝까지** 매핑되어 자연스러운 감속·정지로 끝난다. 이 체감을 깨지 않는다.
+
+**필수 구현 (`hooks/useTroublePathPlayback.ts` `stepPlayback` 및 그 직전 상수)**
+
+- **수구**: `cueAlongMaxRaw = distancePxAfterTimeMsAlongVariableEdgeTimes(tCueTotalMs, segmentLens, cueSegmentTimesMs)`, `cueAlongMax = max(1e-6, cueAlongMaxRaw)`, `cueAlongRatio = clamp01(dAlongRaw / cueAlongMax)`, **`dCue = cueCap * cueAlongRatio`**, `cueProgress01 = dCue / cueCap`.
+- **1목**: 동일 패턴 — `objAlongMax` / `objAlongRatio`, **`dObj = objCap * objAlongRatio`**.
+- **2목**: 1목과 동일 원칙 — `obj2AlongMax` / `obj2AlongRatio`, **`dObj2 = obj2Cap * obj2AlongRatio`**.
+- `dAlongRaw`·`dObjRaw`·`dObj2Raw`는 기존대로 `easedProgress * tTotalMs`를 넣은 `distancePxAfterTimeMsAlongVariableEdgeTimes` 결과([[2]] 세그먼트 시간 배분과 동일 배열 사용).
+
+**금지**
+
+- **`dCue = Math.min(dAlongRaw, cueCap)`**, **`dObj = Math.min(dObjRaw, objCap)`**, 2목 동일 — cap에 **직접** 잘라 이징 **후반**이 잘리며 끝이 “툭” 멈추는 회귀가 난다.
+- 위 ratio 패턴을 다른 합성으로 **대체**하여 τ→표시 거리만 재정의하기. (맞춤·히트 타이밍 조정이 필요하면 **`reachTarget*`·스팟 거리 계산 등 좁은 범위**에서 하고, 이 합식은 유지.)
+- **페이즈 전환(1목·2목 출발)** 을 `dCue`/`dObj`(ratio 스케일값)와 `reachTarget*Px`를 직접 비교하는 방식으로 구현하기 — `reachTarget`은 raw 폴리라인 누적 거리(px) 기준이므로 **`dAlongRaw` / `dObjRaw`** 와 비교해야 스팟 맞춤과 동기된다.
+
+**허용**
+
+- `easeOutCue` / `easeOutObject` **함수 본문**은 [[8]]·제품 합의 없이 바꾸지 않는다(별도 튜닝 이슈).
+- 디버그 로그·이름 정리 등 **합식과 동치**인 리팩터만.
+
+---
+
 ## 관련 코드(참고)
 
-- 재생 훅: `hooks/useTroublePathPlayback.ts`
+- 재생 훅: `hooks/useTroublePathPlayback.ts` (`cueAlongMax`·`cueAlongRatio`·`dCue = cueCap * cueAlongRatio` 및 1·2목 동일)
 - 세그먼트 시간 비례: `lib/solver-engine/core/equal-edge-timing.ts` (`buildSegmentTimesMsProportionalToLength` 등)
 - 거리/레일 정책: `lib/trouble-playback-distance.ts`, `lib/solver-engine/policies/trouble-distance-policy.ts` 등 (기존 구조 유지)

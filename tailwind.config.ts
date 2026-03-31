@@ -13,13 +13,13 @@ const config: Config = {
       /* 메인/보조 색상은 CSS 변수로 통일. 기본값: app/globals.css :root, 런타임: SiteThemeStyles가 DB 설정으로 덮어씀 */
       colors: {
         site: {
-          bg: "#F6F8FB",
-          card: "#FFFFFF",
+          bg: "var(--site-bg)",
+          card: "var(--site-card)",
           text: {
-            DEFAULT: "#111827",
-            muted: "#4b5563",
+            DEFAULT: "var(--site-text)",
+            muted: "var(--site-text-muted)",
           },
-          border: "#E5E7EB",
+          border: "var(--site-border)",
           primary: "var(--site-primary)",
           secondary: "var(--site-secondary)",
         },

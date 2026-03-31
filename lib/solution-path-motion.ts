@@ -4,7 +4,9 @@
  */
 import type { PlayfieldRect } from "@/lib/billiard-table-constants";
 import {
+  ballLabeledNormForKey,
   getNonCueBallNorms,
+  getSecondObjectBallKeyExclusive,
   type NanguBallPlacement,
   type NanguCurveNode,
   type NanguPathPoint,
@@ -40,7 +42,11 @@ import type { RailCount } from "@/lib/rail-power-constants";
 import type { PathSegmentCurveControl } from "@/lib/path-curve-display";
 import { buildCueCurvedPlaybackPolyline, buildObjectCurvedPlaybackPolyline } from "@/lib/path-bezier-playback";
 import { spotCenterNormForDraw } from "@/lib/path-spot-display";
-import { cueFirstObjectHitFromBallPlacement } from "@/lib/solution-path-geometry";
+import {
+  cueFirstObjectHitFromBallPlacement,
+  distanceAlongOpenPolylineToFirstReachNormPointPx,
+  PLAYBACK_SPOT_CENTER_ALIGN_EPS_PX,
+} from "@/lib/solution-path-geometry";
 import { computeThicknessCollisionSplitFromSolution } from "@/lib/thickness-power-split";
 import {
   getCuePlayableDistanceFromBallSpeed,
@@ -48,7 +54,10 @@ import {
 } from "@/lib/trouble-playback-distance";
 import { computeTroubleThicknessSplit } from "@/lib/trouble-thickness-split";
 import { troubleHitStepFromThicknessOffsetX } from "@/lib/trouble-thickness-split";
-import { objectBallKeyForBallSpot } from "@/lib/trouble-first-object-ball";
+import {
+  objectBallKeyForBallSpot,
+  resolveTroubleFirstObjectBallKey,
+} from "@/lib/trouble-first-object-ball";
 import {
   cuePositionFromPlacement,
   countCushionsInPath,
@@ -161,8 +170,9 @@ export function buildCuePathMotionPlan(
     typed[0]?.type === "ball"
       ? cueFirstObjectHitFromBallPlacement(cue, typed[0], placement, rect)
       : null;
-  const struckForFirst =
-    firstHitForViz && objectNorms.find((b) => b.key === firstHitForViz.objectKey);
+  const struckForFirst = firstHitForViz
+    ? ballLabeledNormForKey(placement, firstHitForViz.objectKey)
+    : null;
   const polyStraight =
     options?.visualizationPlayback && typed && typed.length === spots.length
       ? [
@@ -263,12 +273,15 @@ export function buildCuePathMotionPlan(
         effectiveTravelPx: pathLengthPx,
         spotEndVertexIndices,
       };
-      const hitAlong = computeCueProgress01ForFirstObjectHitAlongFullPath(
+      const objectPtsForResolve: NanguPathPoint[] = data.reflectionPath?.pointsWithType ?? [];
+      const hitAlong = resolveTroubleCueHitProgress01(
         tempPlan,
         typed,
+        objectPtsForResolve,
         placement,
+        cue,
         rect,
-        data.reflectionObjectBall ?? null
+        data.reflectionObjectBall
       );
       const dHit = hitAlong.pHit01 * pathLengthPx;
       const dPost = Math.max(0, pathLengthPx - dHit);
@@ -361,16 +374,20 @@ export function buildCuePathMotionPlan(
  */
 export type CueFirstObjectHitProgressSource =
   | "struck-first-ball"
+  | "struck-last-ball"
   | "first-any-ball"
   | "last-ball"
+  | "geometry-hit"
   | "end";
 
 /**
- * Trouble 시연: **전체** 빨간 수구 폴리라인에서 1목과의 **첫** 의도 충돌 지점까지의 거리 비율(0..1).
- * - `reflectionObjectBall`과 일치하는 **첫** `ball` 스팟 우선
- * - 없으면 첫 유효 공 스팟 → 마지막 공 스팟(레거시) → 1
+ * Trouble 시연: **전체** 폴리라인에서 **맞춤 공**과 연결된 **첫** `ball` 스팟까지의 거리 비율(0..1).
+ * - `struckKey`가 있으면: 그 키와 일치하는 **첫** 공 스팟만 사용한다. 없으면 `pHit01: 1`(end) — 다른 공 스팟(first-any)으로
+ *   잡으면 1목 경로에서 2목 맞춤이 1목 스팟에 붙는 순간으로 밀리거나, 수구 경로에서 잘못된 조기 히트가 난다.
+ * - `struckKey`가 없으면: 첫 유효 공 스팟 → 마지막 공 스팟(레거시) → 1
  *
  * `pathProgress`(감속 τ 기준 경로 진행률)가 이 값에 도달하면 1목 object 페이즈를 시작해도 됨.
+ * 거리는 재생 폴리라인상 **스팟 중심 꼭짓점**까지의 호장 — 공 중심이 스팟 중심과 일치할 때 해당 지점에 도달한다.
  * (과거: 마지막 ball 스팟 비율을 쓰면 1목이 수구 시연 끝까지 밀림.)
  */
 export function computeCueProgress01ForFirstObjectHitAlongFullPath(
@@ -378,7 +395,8 @@ export function computeCueProgress01ForFirstObjectHitAlongFullPath(
   pathPoints: readonly NanguPathPoint[],
   placement: NanguBallPlacement,
   rect: PlayfieldRect,
-  struckKey: "red" | "yellow" | "white" | null | undefined
+  struckKey: "red" | "yellow" | "white" | null | undefined,
+  options?: { struckBallMatch?: "first" | "last" }
 ): {
   pHit01: number;
   hitPathPointIndex: number | null;
@@ -398,8 +416,30 @@ export function computeCueProgress01ForFirstObjectHitAlongFullPath(
     return cum;
   };
   const toP = (cum: number) => (dTotal > 0 ? Math.min(1, cum / dTotal) : 1);
+  const struckBallMatch = options?.struckBallMatch ?? "first";
 
   if (struckKey) {
+    if (struckBallMatch === "last") {
+      let lastIdx: number | null = null;
+      let lastCum = 0;
+      for (let i = 0; i < pathPoints.length; i++) {
+        const p = pathPoints[i]!;
+        if (p.type !== "ball") continue;
+        const k = objectBallKeyForBallSpot(p, placement, rect);
+        if (k === struckKey) {
+          lastIdx = i;
+          lastCum = cumToSpotIndex(i);
+        }
+      }
+      if (lastIdx != null) {
+        return {
+          pHit01: toP(lastCum),
+          hitPathPointIndex: lastIdx,
+          source: "struck-last-ball",
+        };
+      }
+      return { pHit01: 1, hitPathPointIndex: null, source: "end" };
+    }
     for (let i = 0; i < pathPoints.length; i++) {
       const p = pathPoints[i]!;
       if (p.type !== "ball") continue;
@@ -412,6 +452,7 @@ export function computeCueProgress01ForFirstObjectHitAlongFullPath(
         };
       }
     }
+    return { pHit01: 1, hitPathPointIndex: null, source: "end" };
   }
 
   for (let i = 0; i < pathPoints.length; i++) {
@@ -440,6 +481,211 @@ export function computeCueProgress01ForFirstObjectHitAlongFullPath(
       hitPathPointIndex: lastBallIdx,
       source: "last-ball",
     };
+  }
+
+  return { pHit01: 1, hitPathPointIndex: null, source: "end" };
+}
+
+/**
+ * 난구 재생: 1목 출발 거리 비율 — 저장된 `reflectionObjectBall`과 스팟→공 키가 어긋나도
+ * `resolveTroubleFirstObjectBallKey`·첫 공 스팟(first-any) 순으로 맞춰 **수구가 1목 스팟에 닿는 지점**을 잡는다.
+ */
+export function resolveTroubleCueHitProgress01(
+  plan: PathMotionPlan,
+  cuePathPoints: readonly NanguPathPoint[],
+  objectPathPoints: readonly NanguPathPoint[],
+  placement: NanguBallPlacement,
+  cuePosNorm: { x: number; y: number },
+  rect: PlayfieldRect,
+  playbackReflectionObjectBall: "red" | "yellow" | "white" | undefined
+): {
+  pHit01: number;
+  hitPathPointIndex: number | null;
+  source: CueFirstObjectHitProgressSource;
+} {
+  const tryKey = (k: "red" | "yellow" | "white" | undefined) =>
+    computeCueProgress01ForFirstObjectHitAlongFullPath(plan, cuePathPoints, placement, rect, k);
+
+  const orderedKeys: ("red" | "yellow" | "white")[] = [];
+  const push = (k: "red" | "yellow" | "white" | null | undefined) => {
+    if (k && !orderedKeys.includes(k)) orderedKeys.push(k);
+  };
+  push(playbackReflectionObjectBall);
+  push(
+    resolveTroubleFirstObjectBallKey({
+      placement,
+      cuePos: cuePosNorm,
+      pathPoints: cuePathPoints as NanguPathPoint[],
+      objectPathPoints: objectPathPoints as NanguPathPoint[],
+      rect,
+    })
+  );
+
+  for (const k of orderedKeys) {
+    const r = tryKey(k);
+    if (r.source === "struck-first-ball") return r;
+  }
+
+  const loose = tryKey(undefined);
+  if (loose.pHit01 < 1 - 1e-9) return loose;
+
+  /** 키 매칭 실패 등으로 위에서 못 잡았을 때: **2R 접촉이 아니라** 표시 스팟 중심이 폴리라인상 처음 일치하는 지점 */
+  const objectNormsForSpot = getNonCueBallNorms(placement).map((b) => ({ x: b.x, y: b.y }));
+  for (let i = 0; i < cuePathPoints.length; i++) {
+    const p = cuePathPoints[i]!;
+    if (p.type !== "ball") continue;
+    const struckForFirst =
+      i === 0
+        ? (() => {
+            const hit = cueFirstObjectHitFromBallPlacement(cuePosNorm, p, placement, rect);
+            return hit ? ballLabeledNormForKey(placement, hit.objectKey) : null;
+          })()
+        : null;
+    const spotCenter = spotCenterNormForDraw(p, rect, {
+      objectBallNorms: objectNormsForSpot,
+      ...(struckForFirst ? { cueFirstSpotStruckBallNorm: { x: struckForFirst.x, y: struckForFirst.y } } : {}),
+    });
+    const along = distanceAlongOpenPolylineToFirstReachNormPointPx(
+      plan.polylineNormalized,
+      spotCenter,
+      rect,
+      PLAYBACK_SPOT_CENTER_ALIGN_EPS_PX
+    );
+    if (along != null && plan.pathLengthPx > 1e-6) {
+      const pHit = Math.min(1, along / plan.pathLengthPx);
+      if (pHit < 1 - 1e-9) {
+        return { pHit01: pHit, hitPathPointIndex: i, source: "geometry-hit" };
+      }
+    }
+  }
+
+  return { pHit01: 1, hitPathPointIndex: null, source: "end" };
+}
+
+/**
+ * 수구 경로 `pathPoints`의 한 스팟에 대해, 재생·오버레이와 같은 **스팟 중심(정규화)**.
+ * 첫 스팟(i===0)은 수구 출발·점탭 광선 기준 `cueFirstSpotStruckBallNorm`을 반영한다.
+ */
+export function cuePathSpotCenterNormForPlaybackIndex(
+  pathPoints: readonly NanguPathPoint[],
+  pathPointIndex: number,
+  placement: NanguBallPlacement,
+  cuePosNorm: { x: number; y: number },
+  rect: PlayfieldRect
+): { x: number; y: number } | null {
+  const p = pathPoints[pathPointIndex];
+  if (!p) return null;
+  const objectNormsForSpot = getNonCueBallNorms(placement).map((b) => ({ x: b.x, y: b.y }));
+  if (pathPointIndex === 0 && p.type === "ball") {
+    const hit = cueFirstObjectHitFromBallPlacement(cuePosNorm, p, placement, rect);
+    const struckForFirst = hit != null ? ballLabeledNormForKey(placement, hit.objectKey) : null;
+    return spotCenterNormForDraw(p, rect, {
+      objectBallNorms: objectNormsForSpot,
+      ...(struckForFirst ? { cueFirstSpotStruckBallNorm: { x: struckForFirst.x, y: struckForFirst.y } } : {}),
+    });
+  }
+  return spotCenterNormForDraw(p, rect, { objectBallNorms: objectNormsForSpot });
+}
+
+/**
+ * 난구 재생: 2목 접촉까지의 거리 비율 — `plan` 폴리라인 + `pathPoints`(수구 경로 또는 1목 경로)에서 last-match 등으로 산출.
+ * 재생에서 2목 페이즈 시작은 **수구** 기준이면 `cuePlan` + 수구 `pathPoints`를 넘긴다.
+ */
+export function resolveTroubleSecondObjectHitProgress01(
+  objPlan: PathMotionPlan,
+  objectPathPoints: readonly NanguPathPoint[],
+  placement: NanguBallPlacement,
+  rect: PlayfieldRect,
+  playbackSecondObjectBall: "red" | "yellow" | "white" | undefined,
+  firstObjectKey: "red" | "yellow" | "white"
+): {
+  pHit01: number;
+  hitPathPointIndex: number | null;
+  source: CueFirstObjectHitProgressSource;
+} {
+  /** 2목: 경로상 **마지막** 일치 스팟(접촉은 보통 후반). `first`면 1목 경로 앞쪽 잘못된 공 스팟에 걸려 2목이 너무 일찍 출발한다. */
+  const tryKeyLast = (k: "red" | "yellow" | "white" | undefined) =>
+    computeCueProgress01ForFirstObjectHitAlongFullPath(objPlan, objectPathPoints, placement, rect, k, {
+      struckBallMatch: "last",
+    });
+
+  const orderedKeys: ("red" | "yellow" | "white")[] = [];
+  const push = (k: "red" | "yellow" | "white" | null | undefined) => {
+    if (k && !orderedKeys.includes(k)) orderedKeys.push(k);
+  };
+  push(playbackSecondObjectBall);
+  const exclusiveSecondKey = getSecondObjectBallKeyExclusive(placement, firstObjectKey);
+  push(exclusiveSecondKey ?? undefined);
+
+  for (const k of orderedKeys) {
+    const r = tryKeyLast(k);
+    if (r.source === "struck-first-ball" || r.source === "struck-last-ball") return r;
+  }
+
+  const dTotalGeom = objPlan.pathLengthPx;
+  const lens = polylineSegmentLengthsPx(objPlan.polylineNormalized, rect);
+  const cumToSpotIndex = (pathPointIndex: number): number => {
+    const idx = objPlan.spotEndVertexIndices?.[pathPointIndex];
+    if (idx != null && idx >= 0 && idx < objPlan.polylineNormalized.length) {
+      const sub = objPlan.polylineNormalized.slice(0, idx + 1);
+      return polylineTotalLengthPx(sub, rect);
+    }
+    let cum = 0;
+    const lastSeg = Math.min(pathPointIndex, lens.length - 1);
+    for (let s = 0; s <= lastSeg && s < lens.length; s++) cum += lens[s] ?? 0;
+    return cum;
+  };
+  const toP = (cum: number) => (dTotalGeom > 0 ? Math.min(1, cum / dTotalGeom) : 1);
+
+  let lastNonFirstIdx: number | null = null;
+  let lastNonFirstCum = 0;
+  for (let i = 0; i < objectPathPoints.length; i++) {
+    const p = objectPathPoints[i]!;
+    if (p.type !== "ball") continue;
+    const k = objectBallKeyForBallSpot(p, placement, rect);
+    if (k != null && k !== firstObjectKey) {
+      lastNonFirstIdx = i;
+      lastNonFirstCum = cumToSpotIndex(i);
+    }
+  }
+  if (lastNonFirstIdx != null) {
+    return {
+      pHit01: toP(lastNonFirstCum),
+      hitPathPointIndex: lastNonFirstIdx,
+      source: "struck-last-ball",
+    };
+  }
+
+  /** 키 매칭 실패·탭 반경 밖 등: 마지막 `ball` 스팟이 2목(남은 공)이면 스팟 **중심**까지 순방향 호장으로만 폴백(2R 금지) */
+  const secondKeyGeom = getSecondObjectBallKeyExclusive(placement, firstObjectKey);
+  const remainingBall =
+    secondKeyGeom != null ? ballLabeledNormForKey(placement, secondKeyGeom) : null;
+  let lastBallIdx: number | null = null;
+  for (let i = objectPathPoints.length - 1; i >= 0; i--) {
+    if (objectPathPoints[i]?.type === "ball") {
+      lastBallIdx = i;
+      break;
+    }
+  }
+  if (lastBallIdx != null && remainingBall && objPlan.polylineNormalized.length >= 2) {
+    const p = objectPathPoints[lastBallIdx]!;
+    const kb = objectBallKeyForBallSpot(p, placement, rect);
+    if (kb == null || kb === remainingBall.key) {
+      const objectNormsForSpot = getNonCueBallNorms(placement).map((b) => ({ x: b.x, y: b.y }));
+      const spotCenter = spotCenterNormForDraw(p, rect, { objectBallNorms: objectNormsForSpot });
+      const along = distanceAlongOpenPolylineToFirstReachNormPointPx(
+        objPlan.polylineNormalized,
+        spotCenter,
+        rect,
+        PLAYBACK_SPOT_CENTER_ALIGN_EPS_PX
+      );
+      if (along != null && dTotalGeom > 1e-6) {
+        const pHit = Math.min(1, along / dTotalGeom);
+        if (pHit < 1 - 1e-9) {
+          return { pHit01: pHit, hitPathPointIndex: lastBallIdx, source: "geometry-hit" };
+        }
+      }
+    }
   }
 
   return { pHit01: 1, hitPathPointIndex: null, source: "end" };

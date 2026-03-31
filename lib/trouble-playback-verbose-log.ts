@@ -5,3 +5,11 @@
 export function isTroublePlaybackVerboseLogEnabled(): boolean {
   return process.env.NEXT_PUBLIC_DEBUG_TROUBLE_PLAYBACK_LOGS === "true";
 }
+
+/**
+ * 재생 이징(raw vs eased, motionMs, dAlong, cap) 감사 — 기본 OFF.
+ * `.env.local`에 `NEXT_PUBLIC_DEBUG_PATH_PLAYBACK_EASING_AUDIT=true` 후 재생 시 콘솔 확인.
+ */
+export function isPathPlaybackEasingAuditEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_DEBUG_PATH_PLAYBACK_EASING_AUDIT === "true";
+}

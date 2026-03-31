@@ -23,11 +23,18 @@ import {
   type PlayfieldRect,
 } from "@/lib/billiard-table-constants";
 import {
-  getNonCueBallNorms,
+  ballLabeledNormForKey,
   type NanguBallPlacement,
   type NanguPathPoint,
   type ObjectBallColorKey,
 } from "@/lib/nangu-types";
+
+/** 동일 거리 동률 시 배열/색 선호 없이 고정 순서(white→yellow→red)로만 결정 */
+const STABLE_KEY_RANK: Record<ObjectBallColorKey, number> = {
+  white: 0,
+  yellow: 1,
+  red: 2,
+};
 
 /** `type === "ball"` 스팟이 어느 비수구 공에 붙었는지 — 탭 반경 이내만 유효 */
 export function objectBallKeyForBallSpot(
@@ -36,14 +43,19 @@ export function objectBallKeyForBallSpot(
   rect: PlayfieldRect
 ): ObjectBallColorKey | null {
   if (p.type !== "ball") return null;
-  const nonCue = getNonCueBallNorms(placement);
-  if (nonCue.length === 0) return null;
   const tapR = getSolutionPathBallTapRadiusPx(rect);
   let best: { key: ObjectBallColorKey; d: number } | null = null;
-  for (const b of nonCue) {
+  for (const k of ["red", "yellow", "white"] as const) {
+    if (k === placement.cueBall) continue;
+    const b = ballLabeledNormForKey(placement, k);
     const d = distanceNormPointsInPlayfieldPx({ x: p.x, y: p.y }, { x: b.x, y: b.y }, rect);
-    if (d <= tapR && (!best || d < best.d)) {
-      best = { key: b.key, d };
+    if (
+      d <= tapR &&
+      (!best ||
+        d < best.d ||
+        (d === best.d && STABLE_KEY_RANK[k] < STABLE_KEY_RANK[best.key]))
+    ) {
+      best = { key: k, d };
     }
   }
   return best?.key ?? null;
