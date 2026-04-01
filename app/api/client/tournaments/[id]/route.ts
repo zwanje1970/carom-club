@@ -5,6 +5,10 @@ import { assertClientCanMutateTournamentById } from "@/lib/client-tournament-acc
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { sendPrizeNotifications } from "@/lib/push/prizeNotifications";
+import {
+  normalizeTournamentVerificationInput,
+} from "@/lib/tournament-certification";
+import { Prisma } from "@/generated/prisma";
 import { canAccessClientDashboard } from "@/types/auth";
 
 /** GET: 클라이언트 로그인 모드일 때만 본인 소유 업체의 대회 1건 */
@@ -72,6 +76,18 @@ export async function PATCH(
     prizeInfo,
     rules,
     promoContent,
+    verificationMode,
+    verificationReviewRequired,
+    eligibilityType,
+    eligibilityValue,
+    verificationGuideText,
+    divisionEnabled,
+    divisionMetricType,
+    divisionRulesJson,
+    certificationRequestMode,
+    manualReviewRequired,
+    eligibilityLimitType,
+    eligibilityLimitValue,
   } = body as {
     name?: string;
     startAt?: string;
@@ -89,6 +105,18 @@ export async function PATCH(
     prizeInfo?: string | null;
     rules?: string | null;
     promoContent?: string | null;
+    verificationMode?: string;
+    verificationReviewRequired?: boolean;
+    eligibilityType?: string | null;
+    eligibilityValue?: number | null;
+    verificationGuideText?: string | null;
+    divisionEnabled?: boolean;
+    divisionMetricType?: string;
+    divisionRulesJson?: unknown;
+    certificationRequestMode?: string;
+    manualReviewRequired?: boolean;
+    eligibilityLimitType?: string | null;
+    eligibilityLimitValue?: number | null;
   };
 
   const validStatuses = ["DRAFT", "OPEN", "CLOSED", "BRACKET_GENERATED", "FINISHED", "HIDDEN"] as const;
@@ -113,6 +141,58 @@ export async function PATCH(
         { status: 409 }
       );
     }
+  }
+
+  const hasVerificationPatch =
+    verificationMode !== undefined ||
+    verificationReviewRequired !== undefined ||
+    eligibilityType !== undefined ||
+    eligibilityValue !== undefined ||
+    verificationGuideText !== undefined ||
+    divisionEnabled !== undefined ||
+    divisionMetricType !== undefined ||
+    divisionRulesJson !== undefined ||
+    certificationRequestMode !== undefined ||
+    manualReviewRequired !== undefined ||
+    eligibilityLimitType !== undefined ||
+    eligibilityLimitValue !== undefined;
+  const verificationPatch = hasVerificationPatch
+    ? normalizeTournamentVerificationInput({
+        verificationMode:
+          verificationMode !== undefined
+            ? verificationMode
+            : certificationRequestMode !== undefined
+              ? certificationRequestMode
+              : tournament.verificationMode ?? tournament.certificationRequestMode,
+        verificationReviewRequired:
+          verificationReviewRequired !== undefined
+            ? verificationReviewRequired
+            : manualReviewRequired !== undefined
+              ? manualReviewRequired
+              : tournament.verificationReviewRequired ?? tournament.manualReviewRequired,
+        eligibilityType:
+          eligibilityType !== undefined
+            ? eligibilityType
+            : eligibilityLimitType !== undefined
+              ? eligibilityLimitType
+              : tournament.eligibilityType,
+        eligibilityValue:
+          eligibilityValue !== undefined
+            ? eligibilityValue
+            : eligibilityLimitValue !== undefined
+              ? eligibilityLimitValue
+              : tournament.eligibilityValue,
+        verificationGuideText:
+          verificationGuideText !== undefined ? verificationGuideText : tournament.verificationGuideText,
+        divisionEnabled: divisionEnabled !== undefined ? divisionEnabled : tournament.divisionEnabled,
+        divisionMetricType:
+          divisionMetricType !== undefined ? divisionMetricType : tournament.divisionMetricType,
+        divisionRulesJson:
+          divisionRulesJson !== undefined ? divisionRulesJson : tournament.divisionRulesJson,
+      })
+    : null;
+  if (verificationPatch && !verificationPatch.ok) {
+    return NextResponse.json({ error: verificationPatch.error }, { status: 400 });
   }
 
   try {
@@ -140,6 +220,28 @@ export async function PATCH(
         ...(prizeInfo !== undefined && { prizeInfo: prizeInfo?.trim() || null }),
         ...(rules !== undefined && { rules: rules?.trim() || null }),
         ...(promoContent !== undefined && { promoContent: promoContent?.trim() || null }),
+        ...(verificationPatch &&
+          verificationPatch.ok && {
+            verificationMode: verificationPatch.data.verificationMode,
+            verificationReviewRequired: verificationPatch.data.verificationReviewRequired,
+            eligibilityType: verificationPatch.data.eligibilityType,
+            eligibilityValue: verificationPatch.data.eligibilityValue,
+            verificationGuideText: verificationPatch.data.verificationGuideText,
+            divisionEnabled: verificationPatch.data.divisionEnabled,
+            divisionMetricType: verificationPatch.data.divisionMetricType,
+            divisionRulesJson:
+              verificationPatch.data.divisionRulesJson == null
+                ? Prisma.JsonNull
+                : (verificationPatch.data.divisionRulesJson as Prisma.InputJsonValue),
+            // 구 필드 동시 저장(호환)
+            certificationRequestMode: verificationPatch.data.verificationMode,
+            manualReviewRequired: verificationPatch.data.verificationReviewRequired,
+            eligibilityLimitType: verificationPatch.data.eligibilityType === "UNDER" ? "UNDER" : null,
+            eligibilityLimitValue:
+              verificationPatch.data.eligibilityType === "UNDER"
+                ? verificationPatch.data.eligibilityValue
+                : null,
+          }),
       },
     });
     if (becomingFinished) {

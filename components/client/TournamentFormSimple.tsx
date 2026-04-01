@@ -2,6 +2,17 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { DEFAULT_ADMIN_COPY, getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import {
+  DIVISION_METRIC_TYPE_FORM_OPTIONS,
+  ELIGIBILITY_TYPE_FORM_OPTIONS,
+  VERIFICATION_MODE_FORM_OPTIONS,
+  parseDivisionRulesJson,
+  type DivisionRule,
+  type DivisionMetricType,
+  type EligibilityType,
+  type VerificationMode,
+} from "@/lib/tournament-certification";
 import { TOURNAMENT_STATUSES } from "@/types/tournament";
 
 // 경기 방식: 토너먼트 / 스카치 / 서바이벌 / 4구대회
@@ -54,6 +65,14 @@ export type TournamentFormValues = {
   durationDays: number;
   allowMultipleSlots: boolean;
   participantsListPublic: boolean;
+  verificationMode: VerificationMode;
+  verificationReviewRequired: boolean;
+  eligibilityType: EligibilityType;
+  eligibilityValue: string;
+  verificationGuideText: string;
+  divisionEnabled: boolean;
+  divisionMetricType: DivisionMetricType;
+  divisionRules: DivisionRule[];
   startAt: string;
   endAt: string;
   venue: string;
@@ -83,6 +102,14 @@ const defaultFormValues: TournamentFormValues = {
   durationDays: 1,
   allowMultipleSlots: false,
   participantsListPublic: true,
+  verificationMode: "NONE",
+  verificationReviewRequired: true,
+  eligibilityType: "NONE",
+  eligibilityValue: "",
+  verificationGuideText: "",
+  divisionEnabled: false,
+  divisionMetricType: "AVERAGE",
+  divisionRules: [],
   startAt: "",
   endAt: "",
   venue: "",
@@ -122,6 +149,14 @@ type TournamentFormSimpleProps = {
   initialData?: Partial<TournamentFormValues> & {
     matchVenues?: { venueNumber: number; displayLabel?: string; venueName?: string; address?: string; phone?: string }[];
     rule?: { bracketConfig?: unknown };
+    verificationMode?: VerificationMode;
+    verificationReviewRequired?: boolean;
+    eligibilityType?: EligibilityType;
+    eligibilityValue?: number | string | null;
+    verificationGuideText?: string | null;
+    divisionEnabled?: boolean;
+    divisionMetricType?: DivisionMetricType;
+    divisionRulesJson?: unknown;
   };
   onSubmit: (values: TournamentFormValues, bracketConfig: BracketConfigExtra, venues: VenueSlot[]) => Promise<void>;
   onCancelHref: string;
@@ -236,6 +271,25 @@ export function TournamentFormSimple({
       if (typeof bc.allowMultipleSlots === "boolean") base.allowMultipleSlots = bc.allowMultipleSlots;
       if (typeof bc.participantsListPublic === "boolean") base.participantsListPublic = bc.participantsListPublic;
       if (bc.accountNumber) base.accountNumber = bc.accountNumber;
+      if (initialData.verificationMode) base.verificationMode = initialData.verificationMode;
+      if (typeof initialData.verificationReviewRequired === "boolean") {
+        base.verificationReviewRequired = initialData.verificationReviewRequired;
+      }
+      if (initialData.eligibilityType) base.eligibilityType = initialData.eligibilityType;
+      if (initialData.eligibilityValue != null && initialData.eligibilityValue !== "") {
+        base.eligibilityValue = String(initialData.eligibilityValue);
+      }
+      if (typeof initialData.verificationGuideText === "string") {
+        base.verificationGuideText = initialData.verificationGuideText;
+      }
+      if (typeof initialData.divisionEnabled === "boolean") {
+        base.divisionEnabled = initialData.divisionEnabled;
+      }
+      if (initialData.divisionMetricType) {
+        base.divisionMetricType = initialData.divisionMetricType;
+      }
+      const parsedDivisionRules = parseDivisionRulesJson(initialData.divisionRulesJson);
+      if (parsedDivisionRules.length > 0) base.divisionRules = parsedDivisionRules;
     }
     return base;
   });
@@ -318,6 +372,18 @@ export function TournamentFormSimple({
     }
     if (!form.startAt) {
       setError("경기 일정(시작일시)을 선택해 주세요.");
+      return;
+    }
+    if (form.eligibilityType === "UNDER") {
+      const v = form.eligibilityValue.trim();
+      const n = Number.parseFloat(v.replace(",", "."));
+      if (!Number.isFinite(n)) {
+        setError("참가 제한 기준 에버를 입력해 주세요.");
+        return;
+      }
+    }
+    if (form.divisionEnabled && form.divisionRules.length === 0) {
+      setError("자동 부 분배를 사용하려면 부 규칙을 1개 이상 추가해 주세요.");
       return;
     }
     const hasVenue = venues.some((v) => (v.venueName || v.address || "").trim());
@@ -625,6 +691,208 @@ export function TournamentFormSimple({
               참가자 명단 공개
             </label>
           </div>
+        </div>
+      </section>
+
+      {/* 인증파일 요청 · 참가 제한 */}
+      <section className={chrome.section}>
+        <h2 className={chrome.sectionTitle}>
+          {getCopyValue(DEFAULT_ADMIN_COPY, "client.tournamentForm.sectionCert")}
+        </h2>
+        <div>
+          <label className={chrome.label}>{getCopyValue(DEFAULT_ADMIN_COPY, "client.tournamentForm.certMode.label")}</label>
+          <div className="flex flex-wrap gap-2">
+            {VERIFICATION_MODE_FORM_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  form.verificationMode === opt.value ? chrome.pillPrimary : chrome.pillOff
+                }`}
+                onClick={() => setForm((f) => ({ ...f, verificationMode: opt.value }))}
+              >
+                {getCopyValue(DEFAULT_ADMIN_COPY, opt.labelKey as AdminCopyKey)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-start gap-2">
+          <input
+            type="checkbox"
+            id="verificationReviewRequired"
+            className={chrome.checkbox}
+            checked={form.verificationReviewRequired}
+            onChange={(e) => setForm((f) => ({ ...f, verificationReviewRequired: e.target.checked }))}
+          />
+          <div>
+            <label htmlFor="verificationReviewRequired" className={chrome.inlineLabel}>
+              {getCopyValue(DEFAULT_ADMIN_COPY, "client.tournamentForm.manualReview.label")}
+            </label>
+            <p className={`mt-0.5 ${chrome.muted}`}>
+              {getCopyValue(DEFAULT_ADMIN_COPY, "client.tournamentForm.manualReview.hint")}
+            </p>
+          </div>
+        </div>
+        <div>
+          <label className={chrome.label}>
+            {getCopyValue(DEFAULT_ADMIN_COPY, "client.tournamentForm.verificationGuide.label")}
+          </label>
+          <textarea
+            rows={2}
+            className={chrome.select}
+            value={form.verificationGuideText}
+            onChange={(e) => setForm((f) => ({ ...f, verificationGuideText: e.target.value }))}
+            placeholder={getCopyValue(DEFAULT_ADMIN_COPY, "client.tournamentForm.verificationGuide.placeholder")}
+          />
+        </div>
+        <div>
+          <label className={chrome.label}>{getCopyValue(DEFAULT_ADMIN_COPY, "client.tournamentForm.eligibility.label")}</label>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {ELIGIBILITY_TYPE_FORM_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
+                  form.eligibilityType === opt.value ? chrome.pillPrimary : chrome.pillOff
+                }`}
+                onClick={() =>
+                  setForm((f) => ({
+                    ...f,
+                    eligibilityType: opt.value,
+                    eligibilityValue: opt.value === "NONE" ? "" : f.eligibilityValue,
+                  }))
+                }
+              >
+                {getCopyValue(DEFAULT_ADMIN_COPY, opt.labelKey as AdminCopyKey)}
+              </button>
+            ))}
+          </div>
+          {form.eligibilityType === "UNDER" && (
+            <input
+              type="text"
+              inputMode="decimal"
+              className={chrome.select}
+              placeholder={getCopyValue(DEFAULT_ADMIN_COPY, "client.tournamentForm.eligibility.valuePlaceholder")}
+              value={form.eligibilityValue}
+              onChange={(e) => setForm((f) => ({ ...f, eligibilityValue: e.target.value }))}
+            />
+          )}
+        </div>
+        <div className="space-y-2 rounded-sm border border-zinc-300 p-3 dark:border-zinc-600">
+          <div>
+            <label className={chrome.label}>
+              {getCopyValue(DEFAULT_ADMIN_COPY, "client.tournamentForm.division.metric.label")}
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {DIVISION_METRIC_TYPE_FORM_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
+                    form.divisionMetricType === opt.value ? chrome.pillPrimary : chrome.pillOff
+                  }`}
+                  onClick={() => setForm((f) => ({ ...f, divisionMetricType: opt.value }))}
+                >
+                  {getCopyValue(DEFAULT_ADMIN_COPY, opt.labelKey as AdminCopyKey)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              id="divisionEnabled"
+              type="checkbox"
+              className={chrome.checkbox}
+              checked={form.divisionEnabled}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  divisionEnabled: e.target.checked,
+                  divisionRules: e.target.checked ? f.divisionRules : [],
+                }))
+              }
+            />
+            <label htmlFor="divisionEnabled" className={chrome.inlineLabel}>
+              {getCopyValue(DEFAULT_ADMIN_COPY, "client.tournamentForm.division.enabled")}
+            </label>
+          </div>
+          {form.divisionEnabled && (
+            <div className="space-y-2">
+              {form.divisionRules.map((rule, idx) => (
+                <div key={`${idx}-${rule.name}`} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_6rem_6rem_auto]">
+                  <input
+                    type="text"
+                    className={chrome.select}
+                    placeholder={getCopyValue(DEFAULT_ADMIN_COPY, "client.tournamentForm.division.namePlaceholder")}
+                    value={rule.name}
+                    onChange={(e) =>
+                      setForm((f) => {
+                        const next = [...f.divisionRules];
+                        if (!next[idx]) return f;
+                        next[idx] = { ...next[idx], name: e.target.value };
+                        return { ...f, divisionRules: next };
+                      })
+                    }
+                  />
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    className={chrome.select}
+                    placeholder={getCopyValue(DEFAULT_ADMIN_COPY, "client.tournamentForm.division.minPlaceholder")}
+                    value={rule.min == null ? "" : String(rule.min)}
+                    onChange={(e) =>
+                      setForm((f) => {
+                        const next = [...f.divisionRules];
+                        if (!next[idx]) return f;
+                        const val = e.target.value.trim();
+                        const parsed = val === "" ? null : Number.parseFloat(val);
+                        next[idx] = { ...next[idx], min: parsed != null && Number.isFinite(parsed) ? parsed : null };
+                        return { ...f, divisionRules: next };
+                      })
+                    }
+                  />
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    className={chrome.select}
+                    placeholder={getCopyValue(DEFAULT_ADMIN_COPY, "client.tournamentForm.division.maxPlaceholder")}
+                    value={rule.max == null ? "" : String(rule.max)}
+                    onChange={(e) =>
+                      setForm((f) => {
+                        const next = [...f.divisionRules];
+                        if (!next[idx]) return f;
+                        const val = e.target.value.trim();
+                        const parsed = val === "" ? null : Number.parseFloat(val);
+                        next[idx] = { ...next[idx], max: parsed != null && Number.isFinite(parsed) ? parsed : null };
+                        return { ...f, divisionRules: next };
+                      })
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="rounded-sm border border-red-300 px-2 py-1 text-xs text-red-700"
+                    onClick={() =>
+                      setForm((f) => ({ ...f, divisionRules: f.divisionRules.filter((_, i) => i !== idx) }))
+                    }
+                  >
+                    삭제
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className={chrome.addVenueBtn}
+                onClick={() =>
+                  setForm((f) => ({ ...f, divisionRules: [...f.divisionRules, { name: "", min: null, max: null }] }))
+                }
+              >
+                {getCopyValue(DEFAULT_ADMIN_COPY, "client.tournamentForm.division.add")}
+              </button>
+              <p className={chrome.muted}>
+                {getCopyValue(DEFAULT_ADMIN_COPY, "client.tournamentForm.division.ruleHint")}
+              </p>
+            </div>
+          )}
         </div>
       </section>
 

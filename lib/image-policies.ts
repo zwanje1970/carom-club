@@ -12,6 +12,7 @@ export type ImageKind =
   | "content"
   | "section"
   | "proof"
+  | "certification"
   | "thumbnail"
   | "footerPartner"
   | "billiard"
@@ -101,6 +102,16 @@ export const IMAGE_POLICIES: Record<ImageKind, ImagePolicy> = {
     maxFileSize: 8 * 1024 * 1024,
     allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
     blobPathPrefix: "proof",
+  },
+  /** 대회 인증 이미지 (참가 신청) — 정책은 proof와 동일, 저장 경로만 분리 */
+  certification: {
+    maxWidth: 2000,
+    maxHeight: 0,
+    format: "jpeg",
+    quality: 85,
+    maxFileSize: 8 * 1024 * 1024,
+    allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
+    blobPathPrefix: "certification",
   },
   thumbnail: {
     maxWidth: 400,

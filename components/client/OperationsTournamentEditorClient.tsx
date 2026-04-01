@@ -77,6 +77,22 @@ export function OperationsTournamentEditorClient({
           durationType: (bc?.durationType as "1_DAY" | "2_DAYS" | "3_PLUS") ?? "1_DAY",
           allowMultipleSlots: (bc?.allowMultipleSlots as boolean) ?? false,
           participantsListPublic: (bc?.participantsListPublic as boolean) ?? true,
+          verificationMode: t.verificationMode ?? t.certificationRequestMode ?? "NONE",
+          verificationReviewRequired:
+            t.verificationReviewRequired !== undefined
+              ? t.verificationReviewRequired !== false
+              : t.manualReviewRequired !== false,
+          eligibilityType: t.eligibilityType ?? (t.eligibilityLimitType === "UNDER" ? "UNDER" : "NONE"),
+          eligibilityValue:
+            t.eligibilityValue != null && Number.isFinite(Number(t.eligibilityValue))
+              ? t.eligibilityValue
+              : t.eligibilityLimitValue != null && Number.isFinite(Number(t.eligibilityLimitValue))
+                ? t.eligibilityLimitValue
+              : "",
+          verificationGuideText: typeof t.verificationGuideText === "string" ? t.verificationGuideText : "",
+          divisionEnabled: t.divisionEnabled === true,
+          divisionMetricType: t.divisionMetricType ?? "AVERAGE",
+          divisionRulesJson: t.divisionRulesJson ?? null,
           startAt: startAt ? `${startAt.toISOString().slice(0, 16)}` : "",
           endAt: endAt ? `${endAt.toISOString().slice(0, 16)}` : "",
           venue: t.venue ?? "",
@@ -143,6 +159,17 @@ export function OperationsTournamentEditorClient({
       prizeInfo: values.prizeInfo.trim() || null,
       rules: values.rules.trim() || null,
       promoContent: promoContent.trim() || null,
+      verificationMode: values.verificationMode,
+      verificationReviewRequired: values.verificationReviewRequired,
+      eligibilityType: values.eligibilityType,
+      eligibilityValue:
+        values.eligibilityType === "UNDER"
+          ? Number.parseFloat(String(values.eligibilityValue).replace(",", "."))
+          : null,
+      verificationGuideText: values.verificationGuideText.trim() || null,
+      divisionEnabled: values.divisionEnabled,
+      divisionMetricType: values.divisionMetricType,
+      divisionRulesJson: values.divisionEnabled ? values.divisionRules : null,
     };
 
     if (mode === "create") {

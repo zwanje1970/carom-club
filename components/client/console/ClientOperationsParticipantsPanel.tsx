@@ -18,6 +18,13 @@ import {
 } from "@/components/client/console/ui";
 import { cx } from "@/components/client/console/ui/cx";
 import { consoleTextMuted } from "@/components/client/console/ui/tokens";
+import { DEFAULT_ADMIN_COPY, fillAdminCopyTemplate, getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import { parseVerificationMode } from "@/lib/tournament-certification";
+import {
+  getUnassignedDivisionLabel,
+  groupEntriesByDivision,
+  sortEntriesByDivision,
+} from "@/lib/tournament-division-grouping";
 import {
   OperationsStepFlowBar,
   OperationsTournamentFlowNav,
@@ -50,6 +57,13 @@ export type ConsoleParticipantRow = {
   rejectionReason: string | null;
   createdAt: string;
   attended: boolean | null;
+  verificationImageUrl: string | null;
+  verificationOcrText: string | null;
+  verificationOcrStatus: string | null;
+  verificationReviewStatus: string | null;
+  divisionName: string | null;
+  divisionMatchedValue: number | null;
+  divisionMatchedAverage: number | null;
 };
 
 type DisplayState =
@@ -104,6 +118,9 @@ function approvalColumnLabel(e: ConsoleParticipantRow): string {
 }
 
 type SortKey =
+  | "default"
+  | "division"
+  | "averageDesc"
   | "createdAt"
   | "paymentMarkedAt"
   | "paidAt"
@@ -143,11 +160,16 @@ export function ClientOperationsParticipantsPanel({
     useWaiting: boolean;
     tournamentStatus: string;
     participantRosterLockedAt: string | null;
+    verificationMode: string;
+    verificationReviewRequired: boolean;
+    divisionEnabled: boolean;
+    divisionMetricType: string;
+    divisionRulesJson: unknown;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterKey>("");
-  const [sort, setSort] = useState<SortKey>("paymentMarkedAt");
+  const [sort, setSort] = useState<SortKey>("default");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -178,6 +200,12 @@ export function ClientOperationsParticipantsPanel({
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!meta) return;
+    if (meta.divisionEnabled) setSort("division");
+    else setSort("default");
+  }, [meta?.divisionEnabled]);
+
   const filteredSorted = useMemo(() => {
     let list = [...rows];
     if (filter === "APPROVAL_PENDING") {
@@ -198,6 +226,16 @@ export function ClientOperationsParticipantsPanel({
     }
     list.sort((a, b) => {
       switch (sort) {
+        case "default":
+          return 0;
+        case "averageDesc": {
+          const aa = a.divisionMatchedValue ?? a.divisionMatchedAverage;
+          const bb = b.divisionMatchedValue ?? b.divisionMatchedAverage;
+          if (aa == null && bb == null) return 0;
+          if (aa == null) return 1;
+          if (bb == null) return -1;
+          return bb - aa;
+        }
         case "createdAt":
           return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
         case "depositorName":
@@ -226,8 +264,11 @@ export function ClientOperationsParticipantsPanel({
           return 0;
       }
     });
+    if (meta?.divisionEnabled && sort === "division") {
+      return sortEntriesByDivision(list, meta.divisionRulesJson);
+    }
     return list;
-  }, [rows, filter, search, sort]);
+  }, [rows, filter, search, sort, meta?.divisionEnabled, meta?.divisionRulesJson]);
 
   const toggleAllVisible = () => {
     const allSelected = filteredSorted.length > 0 && filteredSorted.every((r) => selected.has(r.id));
@@ -328,6 +369,16 @@ export function ClientOperationsParticipantsPanel({
     return { paymentPending, paymentMarked, confirmed, waiting, canceled };
   }, [rows]);
 
+  const unassignedDivisionLabel = getCopyValue(DEFAULT_ADMIN_COPY, "client.operations.participants.unassignedDivision");
+  const grouped = useMemo(() => {
+    if (!meta?.divisionEnabled) return null;
+    return groupEntriesByDivision(
+      filteredSorted,
+      meta.divisionRulesJson,
+      getUnassignedDivisionLabel(unassignedDivisionLabel)
+    );
+  }, [meta?.divisionEnabled, meta?.divisionRulesJson, filteredSorted, unassignedDivisionLabel]);
+
 
   if (loading) {
     return <p className={cx(consoleTextMuted, "py-12 text-center text-sm")}>불러오는 중…</p>;
@@ -382,6 +433,16 @@ export function ClientOperationsParticipantsPanel({
           {error}
         </p>
       )}
+      {meta?.divisionEnabled && grouped && grouped.rules.length === 0 && (
+        <p className="rounded-sm border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100">
+          자동 부 분배가 켜져 있으나 규칙이 비어 있어 기존 목록 표시로 대체합니다.
+        </p>
+      )}
+      {meta?.divisionEnabled && grouped?.hasUnknownDivisionName && (
+        <p className="rounded-sm border border-zinc-300 bg-zinc-50 px-3 py-2 text-xs text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+          현재 부 규칙에 없는 저장 divisionName 항목이 있어 미배정 그룹으로 표시했습니다.
+        </p>
+      )}
 
       <ConsoleFilterBar hint="상태·검색·정렬은 클라이언트에서 적용됩니다. 저장 후 목록이 갱신됩니다.">
         <div className="flex flex-wrap gap-1.5">
@@ -410,6 +471,11 @@ export function ClientOperationsParticipantsPanel({
             onChange={(e) => setSort(e.target.value as SortKey)}
             className="rounded-sm border border-zinc-300 bg-white px-2 py-1 text-xs dark:border-zinc-600 dark:bg-zinc-950"
           >
+            <option value="default">{getCopyValue(DEFAULT_ADMIN_COPY, "client.operations.participants.sortByDefault")}</option>
+            {meta?.divisionEnabled && (
+              <option value="division">{getCopyValue(DEFAULT_ADMIN_COPY, "client.operations.participants.sortByDivision")}</option>
+            )}
+            <option value="averageDesc">{getCopyValue(DEFAULT_ADMIN_COPY, "client.operations.participants.sortByAverage")}</option>
             <option value="createdAt">신청순</option>
             <option value="paymentMarkedAt">입금표시 시각순</option>
             <option value="paidAt">입금확인(관리자) 시각순</option>
@@ -469,7 +535,151 @@ export function ClientOperationsParticipantsPanel({
                 </ConsoleTableRow>
               </ConsoleTableHead>
               <ConsoleTableBody>
-                {filteredSorted.map((e) => {
+                {(() => {
+                  if (meta?.divisionEnabled && grouped && grouped.rules.length > 0) {
+                    return grouped.groups.flatMap((g) => {
+                      const header = (
+                        <ConsoleTableRow key={`group-${g.key}`}>
+                          <ConsoleTableTd colSpan={11} className="bg-zinc-50 text-[11px] font-semibold text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                            {fillAdminCopyTemplate(
+                              getCopyValue(DEFAULT_ADMIN_COPY, "client.operations.participants.divisionCountFormat"),
+                              { name: g.label, count: g.entries.length }
+                            )}
+                          </ConsoleTableTd>
+                        </ConsoleTableRow>
+                      );
+                      const rowsEl = g.entries.map((e) => {
+                        const state = getDisplayState(e);
+                        const rowBusy = busy || loadingId === e.id;
+                        return (
+                          <ConsoleTableRow key={e.id}>
+                            <ConsoleTableTd>
+                              <input
+                                type="checkbox"
+                                className="rounded border-zinc-400"
+                                checked={selected.has(e.id)}
+                                onChange={() => toggleRow(e.id)}
+                                disabled={busy}
+                              />
+                            </ConsoleTableTd>
+                            <ConsoleTableTd className="max-w-[7rem] font-medium">
+                              <span className="line-clamp-2">
+                                {e.slotNumber > 1 ? `${e.userName} (슬롯${e.slotNumber})` : e.userName}
+                              </span>
+                            </ConsoleTableTd>
+                            <ConsoleTableTd className="max-w-[9rem] text-[11px]">
+                              <div className="line-clamp-2">{e.userPhone ?? "—"}</div>
+                              {e.userEmail && (
+                                <div className="line-clamp-1 text-zinc-500 dark:text-zinc-400">{e.userEmail}</div>
+                              )}
+                            </ConsoleTableTd>
+                            <ConsoleTableTd className="whitespace-nowrap text-[11px]">
+                              {e.divisionName ?? unassignedDivisionLabel}
+                              {" · "}
+                              {e.round?.trim() || `슬롯 ${e.slotNumber}`}
+                              {(e.divisionMatchedValue ?? e.divisionMatchedAverage) != null && (
+                                <> · 기준 {(e.divisionMatchedValue ?? e.divisionMatchedAverage)!.toFixed(3)}</>
+                              )}
+                            </ConsoleTableTd>
+                            <ConsoleTableTd className="text-[11px]">{e.status}</ConsoleTableTd>
+                            <ConsoleTableTd className="text-[11px]">{paymentColumnLabel(e)}</ConsoleTableTd>
+                            <ConsoleTableTd className="text-[11px]">{approvalColumnLabel(e)}</ConsoleTableTd>
+                            <ConsoleTableTd>
+                              {state === "WAITING" ? (
+                                <ConsoleBadge tone="info">대기 {e.waitingListOrder ?? "-"}</ConsoleBadge>
+                              ) : (
+                                <span className="text-zinc-400">—</span>
+                              )}
+                            </ConsoleTableTd>
+                            <ConsoleTableTd className="whitespace-nowrap text-[11px] text-zinc-600 dark:text-zinc-400">
+                              {formatKoreanDateTime(e.createdAt)}
+                            </ConsoleTableTd>
+                            <ConsoleTableTd className="whitespace-nowrap text-[11px] text-zinc-600 dark:text-zinc-400">
+                              {e.paidAt
+                                ? formatKoreanDateTime(e.paidAt)
+                                : e.paymentMarkedByApplicantAt
+                                  ? `표시 ${formatKoreanDateTime(e.paymentMarkedByApplicantAt)}`
+                                  : "—"}
+                            </ConsoleTableTd>
+                            <ConsoleTableTd className="text-right">
+                              <div className="flex flex-wrap justify-end gap-1">
+                                {!actionsDisabled && state === "PAYMENT_MARKED" && (
+                                  <button
+                                    type="button"
+                                    disabled={rowBusy || busy}
+                                    className="rounded-sm border border-zinc-600 bg-zinc-700 px-2 py-0.5 text-[10px] font-medium text-white disabled:opacity-40 dark:border-zinc-500 dark:bg-zinc-600"
+                                    onClick={() =>
+                                      singleAction(
+                                        e.id,
+                                        `/api/client/tournaments/${tournamentId}/participants/${e.id}/confirm`,
+                                        "POST"
+                                      )
+                                    }
+                                  >
+                                    입금확인
+                                  </button>
+                                )}
+                                {!actionsDisabled && (state === "PAYMENT_PENDING" || state === "PAYMENT_MARKED") && (
+                                  <button
+                                    type="button"
+                                    disabled={rowBusy || busy}
+                                    className="rounded-sm border border-zinc-300 px-2 py-0.5 text-[10px] text-zinc-700 dark:border-zinc-600 dark:text-zinc-300"
+                                    onClick={() => {
+                                      const reason = window.prompt("반려 사유 (선택):");
+                                      if (reason === null) return;
+                                      void singleAction(
+                                        e.id,
+                                        `/api/client/tournaments/${tournamentId}/participants/${e.id}/reject`,
+                                        "POST",
+                                        { rejectionReason: reason.trim() || null }
+                                      );
+                                    }}
+                                  >
+                                    반려
+                                  </button>
+                                )}
+                                {!actionsDisabled && state === "WAITING" && (
+                                  <button
+                                    type="button"
+                                    disabled={rowBusy || busy}
+                                    className="rounded-sm border border-emerald-600 px-2 py-0.5 text-[10px] font-medium text-emerald-800 disabled:opacity-40 dark:text-emerald-200"
+                                    onClick={() =>
+                                      singleAction(
+                                        e.id,
+                                        `/api/client/tournaments/${tournamentId}/participants/${e.id}/promote`,
+                                        "POST"
+                                      )
+                                    }
+                                  >
+                                    대기승격
+                                  </button>
+                                )}
+                                {!actionsDisabled && (e.status === "APPLIED" || e.status === "CONFIRMED") && (
+                                  <button
+                                    type="button"
+                                    disabled={rowBusy || busy}
+                                    className="rounded-sm border border-red-300 px-2 py-0.5 text-[10px] text-red-700 dark:border-red-800 dark:text-red-300"
+                                    onClick={() => {
+                                      if (!confirm("이 신청을 취소 처리할까요?")) return;
+                                      void singleAction(
+                                        e.id,
+                                        `/api/client/tournaments/${tournamentId}/participants/${e.id}/cancel`,
+                                        "POST"
+                                      );
+                                    }}
+                                  >
+                                    취소
+                                  </button>
+                                )}
+                              </div>
+                            </ConsoleTableTd>
+                          </ConsoleTableRow>
+                        );
+                      });
+                      return [header, ...rowsEl];
+                    });
+                  }
+                  return filteredSorted.map((e) => {
                   const state = getDisplayState(e);
                   const rowBusy = busy || loadingId === e.id;
                   return (
@@ -591,7 +801,8 @@ export function ClientOperationsParticipantsPanel({
                       </ConsoleTableTd>
                     </ConsoleTableRow>
                   );
-                })}
+                  });
+                })()}
               </ConsoleTableBody>
             </ConsoleTable>
           )}
@@ -624,6 +835,101 @@ export function ClientOperationsParticipantsPanel({
                   {primarySelected.handicap ?? "—"} / {primarySelected.avg ?? "—"}
                 </dd>
               </div>
+              {meta &&
+                parseVerificationMode(meta.verificationMode) !== "NONE" && (
+                  <div className="rounded-sm border border-zinc-200 p-2 dark:border-zinc-600">
+                    <div className={consoleTextMuted}>
+                      {getCopyValue(DEFAULT_ADMIN_COPY, "client.operations.certReview.sectionTitle")}
+                    </div>
+                    <div className="mt-1 space-y-1">
+                      <div className="text-[11px]">
+                        {getCopyValue(DEFAULT_ADMIN_COPY, "client.tournamentForm.certMode.label")}:{" "}
+                        {getCopyValue(
+                          DEFAULT_ADMIN_COPY,
+                          `client.operations.certificationMode.${meta.verificationMode}` as AdminCopyKey
+                        )}
+                      </div>
+                      {primarySelected.verificationImageUrl ? (
+                        <a
+                          href={primarySelected.verificationImageUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[11px] text-blue-600 underline dark:text-blue-400"
+                        >
+                          {getCopyValue(DEFAULT_ADMIN_COPY, "admin.common.preview")}
+                        </a>
+                      ) : (
+                        <span className="text-[11px] text-zinc-500">첨부 없음</span>
+                      )}
+                      {meta.verificationMode === "AUTO" && (
+                        <>
+                          <div className="text-[11px]">
+                            OCR:{" "}
+                            {primarySelected.verificationOcrStatus
+                              ? getCopyValue(
+                                  DEFAULT_ADMIN_COPY,
+                                  `client.operations.certOcr.${primarySelected.verificationOcrStatus.toLowerCase()}` as AdminCopyKey
+                                )
+                              : "—"}
+                          </div>
+                          <div className="max-h-24 overflow-auto whitespace-pre-wrap break-words text-[11px] text-zinc-600 dark:text-zinc-300">
+                            {primarySelected.verificationOcrText || "—"}
+                          </div>
+                        </>
+                      )}
+                      {meta.verificationMode === "MANUAL" && (
+                        <p className="text-[11px] text-zinc-500">
+                          OCR 미사용. 이미지로 수동 확인하세요.
+                        </p>
+                      )}
+                      <div className="text-[11px]">부 배정: {primarySelected.divisionName ?? unassignedDivisionLabel}</div>
+                      <div className="text-[11px]">
+                        검토:{" "}
+                        {primarySelected.verificationReviewStatus
+                          ? getCopyValue(
+                              DEFAULT_ADMIN_COPY,
+                              `client.operations.certReview.${primarySelected.verificationReviewStatus.toLowerCase()}` as AdminCopyKey
+                            )
+                          : "—"}
+                      </div>
+                      {primarySelected.verificationReviewStatus === "PENDING" &&
+                        primarySelected.verificationImageUrl && (
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            <button
+                              type="button"
+                              disabled={busy || loadingId === primarySelected.id}
+                              className="rounded-sm border border-emerald-600 px-2 py-0.5 text-[10px] font-medium text-emerald-800 dark:text-emerald-200"
+                              onClick={() =>
+                                singleAction(
+                                  primarySelected.id,
+                                  `/api/client/tournaments/${tournamentId}/participants/${primarySelected.id}/certification-review`,
+                                  "POST",
+                                  { action: "approve" }
+                                )
+                              }
+                            >
+                              {getCopyValue(DEFAULT_ADMIN_COPY, "client.operations.certReview.approve")}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy || loadingId === primarySelected.id}
+                              className="rounded-sm border border-zinc-400 px-2 py-0.5 text-[10px] text-zinc-700 dark:border-zinc-500 dark:text-zinc-300"
+                              onClick={() =>
+                                singleAction(
+                                  primarySelected.id,
+                                  `/api/client/tournaments/${tournamentId}/participants/${primarySelected.id}/certification-review`,
+                                  "POST",
+                                  { action: "reject" }
+                                )
+                              }
+                            >
+                              {getCopyValue(DEFAULT_ADMIN_COPY, "client.operations.certReview.reject")}
+                            </button>
+                          </div>
+                        )}
+                    </div>
+                  </div>
+                )}
               {primarySelected.rejectionReason && (
                 <div>
                   <dt className={consoleTextMuted}>반려 사유</dt>

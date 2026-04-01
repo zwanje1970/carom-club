@@ -9,6 +9,7 @@ import {
   insertTournamentWithRuleAndListing,
   type TournamentCreateFields,
 } from "@/lib/tournament-create-shared";
+import { normalizeTournamentVerificationInput } from "@/lib/tournament-certification";
 
 /**
  * 클라이언트 운영 콘솔 전용 대회 생성.
@@ -91,11 +92,38 @@ export async function POST(request: Request) {
     outlinePublished,
     approvalType,
     rule,
+    verificationMode,
+    verificationReviewRequired,
+    eligibilityType,
+    eligibilityValue,
+    verificationGuideText,
+    divisionEnabled,
+    divisionMetricType,
+    divisionRulesJson,
+    // 구 필드 입력 호환
+    certificationRequestMode,
+    manualReviewRequired,
+    eligibilityLimitType,
+    eligibilityLimitValue,
   } = body as Record<string, unknown>;
 
   const nameStr = typeof name === "string" ? name.trim() : "";
   if (!nameStr || startAt == null || startAt === "") {
     return NextResponse.json({ error: "대회명, 일시를 입력해주세요." }, { status: 400 });
+  }
+
+  const verificationNorm = normalizeTournamentVerificationInput({
+    verificationMode: verificationMode ?? certificationRequestMode,
+    verificationReviewRequired: verificationReviewRequired ?? manualReviewRequired,
+    eligibilityType: eligibilityType ?? eligibilityLimitType,
+    eligibilityValue: eligibilityValue ?? eligibilityLimitValue,
+    verificationGuideText,
+    divisionEnabled,
+    divisionMetricType,
+    divisionRulesJson,
+  });
+  if (!verificationNorm.ok) {
+    return NextResponse.json({ error: verificationNorm.error }, { status: 400 });
   }
 
   const fields: TournamentCreateFields = {
@@ -124,6 +152,7 @@ export async function POST(request: Request) {
     outlinePublished: outlinePublished as string | null | undefined,
     approvalType: approvalType as string | null | undefined,
     rule: rule && typeof rule === "object" ? rule : null,
+    verification: verificationNorm.data,
   };
 
   const createData = buildTournamentCreateData(gate.organizationId, session.id, fields);

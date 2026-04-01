@@ -73,6 +73,7 @@ model User {
   communityReports                CommunityReport[]
   communityScoreLogs              CommunityScoreLog[]
   inquiries                       Inquiry[]
+  clientFeedbacks                 ClientFeedback[]
   memberProfile                   MemberProfile?
   nanguPosts                      NanguPost[]
   nanguSolutions                  NanguSolution[]
@@ -308,6 +309,27 @@ model Tournament {
   participantRosterSnapshot String?
   /// 전국대회 필터용 — region 문자열 파싱 대신 등치 인덱스 조회 (마이그레이션으로 기존 행 백필)
   nationalTournament        Boolean                        @default(false)
+  /// 인증파일 요청 mode (신규 표준)
+  verificationMode          VerificationMode               @default(NONE)
+  /// 인증·자격 운영 검토 필요 여부
+  verificationReviewRequired Boolean                       @default(true)
+  /// 참가 제한 type (신규 표준)
+  eligibilityType           EligibilityType                @default(NONE)
+  /// eligibilityType=UNDER일 때 회원 AVG가 이 값 **미만**이어야 신청 가능 (엄격한 `<`)
+  eligibilityValue          Float?
+  /// 신청 페이지 인증 안내 문구 (선택)
+  verificationGuideText     String?
+  /// 자동 부 분배 ON/OFF
+  divisionEnabled           Boolean                        @default(false)
+  /// 자동 부 분배 기준값 타입 (AVERAGE|SCORE)
+  divisionMetricType        DivisionMetricType             @default(AVERAGE)
+  /// [{name,min,max}, ...] JSON 규칙
+  divisionRulesJson         Json?
+  /// 구 필드(호환 전용, 신규 로직에서 직접 사용 금지)
+  certificationRequestMode  String                         @default("NONE")
+  manualReviewRequired      Boolean                        @default(true)
+  eligibilityLimitType      String?
+  eligibilityLimitValue     Float?
   createdBy                 User?                          @relation(fields: [createdByUserId], references: [id])
   organization              Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   entries                   TournamentEntry[]
@@ -425,6 +447,23 @@ model TournamentEntry {
   avg                        String?
   avgProofUrl                String?
   handicap                   String?
+  /// 인증파일(신규 표준)
+  verificationImageUrl              String?
+  verificationOcrText               String?
+  verificationOcrStatus             VerificationOcrStatus?
+  verificationReviewStatus          VerificationReviewStatus?
+  divisionName                      String?
+  divisionMatchedValue              Float?
+  divisionMatchedAverage            Float?
+  /// 구 필드(호환 전용)
+  certificationImageUrl             String?
+  certificationOriginalFilename     String?
+  certificationMimeType             String?
+  certificationOcrText              String?
+  certificationOcrStatus            String?
+  certificationReviewStatus         String?
+  certificationReviewedAt           DateTime?
+  certificationReviewedById         String?
   attendances                TournamentAttendance[]
   tournament                 Tournament                     @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   user                       User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1426,6 +1465,21 @@ model Inquiry {
   @@index([userId])
 }
 
+model ClientFeedback {
+  id        String   @id @default(cuid())
+  type      String
+  title     String
+  content   String
+  imageUrl  String?
+  pagePath  String?
+  userId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
 model NanguSolutionComment {
   id            String        @id
   solutionId    String
@@ -1467,4 +1521,33 @@ enum TroubleShotSolutionVoteType {
 enum NanguSolutionReactionType {
   GOOD
   BAD
+}
+
+enum VerificationMode {
+  NONE
+  AUTO
+  MANUAL
+}
+
+enum EligibilityType {
+  NONE
+  UNDER
+}
+
+enum VerificationOcrStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  SKIPPED
+}
+
+enum VerificationReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum DivisionMetricType {
+  AVERAGE
+  SCORE
 }

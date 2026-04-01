@@ -4,6 +4,10 @@ import { assertClientCanMutateTournamentById } from "@/lib/client-tournament-acc
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { getDisplayName } from "@/lib/display-name";
+import {
+  parseVerificationOcrStatus,
+  parseVerificationReviewStatus,
+} from "@/lib/tournament-certification";
 
 /** 클라 콘솔: 조직 소속 대회 참가자 목록 (JSON) */
 export async function GET(
@@ -31,6 +35,13 @@ export async function GET(
       maxParticipants: true,
       status: true,
       participantRosterLockedAt: true,
+      verificationMode: true,
+      verificationReviewRequired: true,
+      divisionEnabled: true,
+      divisionMetricType: true,
+      divisionRulesJson: true,
+      certificationRequestMode: true,
+      manualReviewRequired: true,
       rule: { select: { maxEntries: true, useWaiting: true } },
     },
   });
@@ -68,6 +79,24 @@ export async function GET(
     rejectionReason: e.rejectionReason ?? null,
     createdAt: e.createdAt.toISOString(),
     attended: e.attendances[0]?.attended ?? null,
+    verificationImageUrl: e.verificationImageUrl ?? e.certificationImageUrl ?? null,
+    verificationOcrText: e.verificationOcrText ?? e.certificationOcrText ?? null,
+    verificationOcrStatus:
+      e.verificationOcrStatus ?? parseVerificationOcrStatus(e.certificationOcrStatus) ?? null,
+    verificationReviewStatus:
+      e.verificationReviewStatus ?? parseVerificationReviewStatus(e.certificationReviewStatus) ?? null,
+    divisionName: e.divisionName ?? null,
+    divisionMatchedValue: e.divisionMatchedValue ?? e.divisionMatchedAverage ?? null,
+    divisionMatchedAverage: e.divisionMatchedAverage ?? e.divisionMatchedValue ?? null,
+    // 구 필드 (호환)
+    certificationImageUrl: e.certificationImageUrl ?? null,
+    certificationOriginalFilename: e.certificationOriginalFilename ?? null,
+    certificationMimeType: e.certificationMimeType ?? null,
+    certificationOcrText: e.certificationOcrText ?? null,
+    certificationOcrStatus: e.certificationOcrStatus ?? null,
+    certificationReviewStatus: e.certificationReviewStatus ?? null,
+    certificationReviewedAt: e.certificationReviewedAt?.toISOString() ?? null,
+    certificationReviewedById: e.certificationReviewedById ?? null,
   }));
 
   return NextResponse.json({
@@ -78,6 +107,12 @@ export async function GET(
       useWaiting: tournament.rule?.useWaiting ?? false,
       tournamentStatus: tournament.status,
       participantRosterLockedAt: tournament.participantRosterLockedAt?.toISOString() ?? null,
+      verificationMode: tournament.verificationMode ?? tournament.certificationRequestMode,
+      verificationReviewRequired:
+        tournament.verificationReviewRequired ?? tournament.manualReviewRequired,
+      divisionEnabled: tournament.divisionEnabled === true,
+      divisionMetricType: tournament.divisionMetricType ?? "AVERAGE",
+      divisionRulesJson: tournament.divisionRulesJson ?? null,
     },
     entries: rows,
   });

@@ -40,7 +40,9 @@ function isClientNavActive(id: ClientConsoleNavId, pathname: string): boolean {
       return pathname === "/client/setup" || pathname.startsWith("/client/setup/");
     case "tournament":
       return (
-        pathname.startsWith("/client/operations") || pathname.startsWith("/client/tournaments")
+        pathname.startsWith("/client/operations") ||
+        pathname.startsWith("/client/tournaments") ||
+        pathname.startsWith("/client/feedback")
       );
     case "promo":
       return pathname.startsWith("/client/promo") || pathname.startsWith("/client/content");
@@ -57,6 +59,7 @@ function resolveConsoleTitle(pathname: string, c: Record<AdminCopyKey, string>):
   if (pathname === "/client" || pathname === "/client/dashboard") return getCopyValue(c, "client.console.title.dash");
   if (pathname.startsWith("/client/setup")) return getCopyValue(c, "client.console.title.org");
   if (pathname.startsWith("/client/operations")) return getCopyValue(c, "client.console.title.operations");
+  if (pathname.startsWith("/client/feedback")) return getCopyValue(c, "client.console.title.operations");
   if (pathname.startsWith("/client/tournaments")) return getCopyValue(c, "client.console.title.tournamentInfo");
   if (pathname.startsWith("/client/billing/platform")) return getCopyValue(c, "client.console.title.billingPlatform");
   if (pathname.startsWith("/client/billing")) return getCopyValue(c, "client.console.title.billing");

@@ -1,8 +1,15 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
+import { getAdminCopy } from "@/lib/admin-copy-server";
+import { fillAdminCopyTemplate, getCopyValue } from "@/lib/admin-copy";
 import { getTournamentBasic, getTournamentEntries } from "@/lib/db-tournaments";
+import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
+import {
+  parseEligibilityType,
+  parseVerificationMode,
+} from "@/lib/tournament-certification";
 import { TournamentApplySection } from "@/components/tournament/TournamentApplySection";
 
 export default async function TournamentApplyPage({
@@ -15,10 +22,20 @@ export default async function TournamentApplyPage({
   const tournament = isDatabaseConfigured() ? await getTournamentBasic(id) : null;
   if (!tournament) notFound();
 
-  const [entries, session] = await Promise.all([
+  const [entries, session, copy] = await Promise.all([
     getTournamentEntries(id),
     getSession(),
+    getAdminCopy(),
   ]);
+
+  let userMemberAvg: string | null = null;
+  if (session && isDatabaseConfigured()) {
+    const u = await prisma.user.findUnique({
+      where: { id: session.id },
+      include: { memberProfile: true },
+    });
+    userMemberAvg = u?.memberProfile?.avg?.trim() || null;
+  }
 
   const myEntries = session
     ? entries.filter((e) => e.userId === session.id).map((e) => ({
@@ -89,6 +106,34 @@ export default async function TournamentApplyPage({
 
   const entryFee = t.entryFee ?? t.rule?.entryFee ?? null;
 
+  const tCert = tournament as typeof tournament & {
+    verificationMode?: string;
+    verificationGuideText?: string | null;
+    divisionEnabled?: boolean;
+    eligibilityType?: string | null;
+    eligibilityValue?: number | null;
+    // 구 필드 fallback
+    certificationRequestMode?: string;
+    eligibilityLimitType?: string | null;
+    eligibilityLimitValue?: number | null;
+  };
+  const verificationMode = parseVerificationMode(tCert.verificationMode ?? tCert.certificationRequestMode);
+  const eligibilityType = parseEligibilityType(
+    tCert.eligibilityType ?? (tCert.eligibilityLimitType === "UNDER" ? "UNDER" : "NONE")
+  );
+  const eligibilityValue =
+    tCert.eligibilityValue != null && Number.isFinite(Number(tCert.eligibilityValue))
+      ? Number(tCert.eligibilityValue)
+      : tCert.eligibilityLimitValue != null && Number.isFinite(Number(tCert.eligibilityLimitValue))
+        ? Number(tCert.eligibilityLimitValue)
+      : null;
+  const eligibilityLine =
+    eligibilityType === "UNDER" && eligibilityValue != null
+      ? fillAdminCopyTemplate(getCopyValue(copy, "site.tournament.apply.eligibilityUnderLine"), {
+          value: String(eligibilityValue),
+        })
+      : null;
+
   return (
     <main className="min-h-screen overflow-x-hidden bg-site-bg">
       <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
@@ -111,6 +156,11 @@ export default async function TournamentApplyPage({
           canApplyFirstSlot={canApplyFirstSlot}
           canApplyAdditionalSlot={canApplyAdditionalSlot}
           applyClosedReason={applyClosedReason}
+          verificationMode={verificationMode}
+          verificationGuideText={tCert.verificationGuideText ?? null}
+          divisionEnabled={tCert.divisionEnabled === true}
+          eligibilityLine={eligibilityLine}
+          userMemberAvg={userMemberAvg}
         />
       </div>
     </main>

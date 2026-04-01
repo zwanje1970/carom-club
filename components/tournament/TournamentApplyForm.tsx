@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { DEFAULT_ADMIN_COPY, getCopyValue } from "@/lib/admin-copy";
+import { requiresVerificationImage, type VerificationMode } from "@/lib/tournament-certification";
 import { PushSubscribeButton } from "@/components/push/PushSubscribeButton";
 
 export function TournamentApplyForm({
@@ -11,6 +13,11 @@ export function TournamentApplyForm({
   accountNumber,
   entryConditionsHtml,
   additionalSlot = false,
+  verificationMode,
+  verificationGuideText,
+  divisionEnabled,
+  eligibilityLine,
+  userMemberAvg,
 }: {
   tournamentId: string;
   entryFee: number | null;
@@ -18,6 +25,11 @@ export function TournamentApplyForm({
   accountNumber: string | null;
   entryConditionsHtml: string | null;
   additionalSlot?: boolean;
+  verificationMode: VerificationMode;
+  verificationGuideText: string | null;
+  divisionEnabled: boolean;
+  eligibilityLine: string | null;
+  userMemberAvg: string | null;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -29,7 +41,18 @@ export function TournamentApplyForm({
   const [avg, setAvg] = useState("");
   const [avgProofUrl, setAvgProofUrl] = useState("");
   const [avgProofUploading, setAvgProofUploading] = useState(false);
+  const [certificationImageUrl, setCertificationImageUrl] = useState("");
+  const [certUploading, setCertUploading] = useState(false);
+  const [certPreviewUrl, setCertPreviewUrl] = useState<string | null>(null);
   const [agreed, setAgreed] = useState(false);
+
+  const needCert = requiresVerificationImage(verificationMode);
+
+  useEffect(() => {
+    return () => {
+      if (certPreviewUrl) URL.revokeObjectURL(certPreviewUrl);
+    };
+  }, [certPreviewUrl]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -41,6 +64,10 @@ export function TournamentApplyForm({
     }
     if (!agreed) {
       setError("참가요건에 동의해주세요.");
+      return;
+    }
+    if (needCert && !certificationImageUrl.trim()) {
+      setError(getCopyValue(DEFAULT_ADMIN_COPY, "site.tournament.apply.certRequired"));
       return;
     }
     setLoading(true);
@@ -55,6 +82,9 @@ export function TournamentApplyForm({
           handicap: handicap.trim() || undefined,
           avg: avg.trim() || undefined,
           avgProofUrl: avgProofUrl.trim() || undefined,
+          ...(needCert && {
+            verificationImageUrl: certificationImageUrl.trim(),
+          }),
           ...(additionalSlot && { additionalSlot: true }),
         }),
       });
@@ -75,6 +105,9 @@ export function TournamentApplyForm({
       setHandicap("");
       setAvg("");
       setAvgProofUrl("");
+      setCertificationImageUrl("");
+      if (certPreviewUrl) URL.revokeObjectURL(certPreviewUrl);
+      setCertPreviewUrl(null);
       setAgreed(false);
       router.refresh();
     } finally {
@@ -97,6 +130,26 @@ export function TournamentApplyForm({
       )}
       {error && (
         <p className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-300 p-2 rounded">{error}</p>
+      )}
+      {eligibilityLine && (
+        <p className="text-sm text-site-text border border-site-border rounded-lg px-3 py-2 bg-site-bg/50">
+          {eligibilityLine}
+        </p>
+      )}
+      {verificationGuideText && (
+        <p className="text-sm text-site-text border border-site-border rounded-lg px-3 py-2 bg-site-bg/50">
+          {verificationGuideText}
+        </p>
+      )}
+      {divisionEnabled && (
+        <p className="text-sm text-site-text-muted">
+          {getCopyValue(DEFAULT_ADMIN_COPY, "site.tournament.apply.divisionAutoNotice")}
+        </p>
+      )}
+      {userMemberAvg && (
+        <p className="text-sm text-site-text-muted">
+          내 프로필 에버(avg): <strong className="text-site-text">{userMemberAvg}</strong>
+        </p>
       )}
       <p className="text-sm text-gray-600">
         {additionalSlot ? "추가 슬롯 참가비 (2배): " : "참가비: "}
@@ -174,6 +227,75 @@ export function TournamentApplyForm({
           />
         </div>
       </div>
+      {needCert && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+            인증 이미지 <span className="text-red-500">*</span>
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/webp"
+              className="text-sm text-gray-600 file:mr-2 file:rounded file:border-0 file:bg-site-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-white file:hover:opacity-90"
+              disabled={certUploading}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (certPreviewUrl) URL.revokeObjectURL(certPreviewUrl);
+                setCertPreviewUrl(URL.createObjectURL(file));
+                setCertUploading(true);
+                setError("");
+                try {
+                  const formData = new FormData();
+                  formData.set("file", file);
+                  const res = await fetch("/api/tournaments/apply/upload-certification", {
+                    method: "POST",
+                    credentials: "include",
+                    body: formData,
+                  });
+                  const data = await res.json().catch(() => ({}));
+                  if (!res.ok) {
+                    setError((data as { error?: string }).error ?? "인증 이미지 업로드에 실패했습니다.");
+                    setCertificationImageUrl("");
+                    return;
+                  }
+                  setCertificationImageUrl((data as { url?: string }).url ?? "");
+                } catch {
+                  setError("인증 이미지 업로드에 실패했습니다.");
+                  setCertificationImageUrl("");
+                } finally {
+                  setCertUploading(false);
+                  e.target.value = "";
+                }
+              }}
+            />
+            {certUploading && <span className="text-sm text-gray-500">업로드 중…</span>}
+            {certificationImageUrl && (
+              <span className="text-sm text-green-600 dark:text-green-400">
+                첨부됨
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCertificationImageUrl("");
+                    if (certPreviewUrl) URL.revokeObjectURL(certPreviewUrl);
+                    setCertPreviewUrl(null);
+                  }}
+                  className="ml-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                >
+                  제거
+                </button>
+              </span>
+            )}
+          </div>
+          {certPreviewUrl && (
+            <div className="mt-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={certPreviewUrl} alt="인증 미리보기" className="max-h-48 rounded border border-gray-200 dark:border-slate-600" />
+            </div>
+          )}
+          <p className="mt-1 text-xs text-gray-500">JPG, PNG, WebP (최대 8MB)</p>
+        </div>
+      )}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">AVG 인증서 첨부 (선택)</label>
         <div className="flex flex-wrap items-center gap-2">

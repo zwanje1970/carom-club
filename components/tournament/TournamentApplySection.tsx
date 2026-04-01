@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TournamentApplyForm } from "./TournamentApplyForm";
 import { CancelEntryButton } from "./CancelEntryButton";
+import type { VerificationMode } from "@/lib/tournament-certification";
 
 export type TournamentApplySectionProps = {
   tournamentId: string;
@@ -12,6 +13,13 @@ export type TournamentApplySectionProps = {
   accountNumber: string | null;
   entryConditionsHtml: string | null;
   isLoggedIn: boolean;
+  verificationMode: VerificationMode;
+  verificationGuideText: string | null;
+  divisionEnabled: boolean;
+  /** 참가 제한 안내 (서버에서 copy로 생성) */
+  eligibilityLine: string | null;
+  /** 회원 프로필 에버 표시용 */
+  userMemberAvg: string | null;
   myEntries: Array<{
     id: string;
     status: string;
@@ -34,6 +42,11 @@ export function TournamentApplySection({
   canApplyFirstSlot,
   canApplyAdditionalSlot,
   applyClosedReason,
+  verificationMode,
+  verificationGuideText,
+  divisionEnabled,
+  eligibilityLine,
+  userMemberAvg,
 }: TournamentApplySectionProps) {
   const router = useRouter();
   const [markingPaid, setMarkingPaid] = useState<string | null>(null);
@@ -116,6 +129,11 @@ export function TournamentApplySection({
           entryFee={entryFee}
           accountNumber={accountNumber}
           entryConditionsHtml={entryConditionsHtml}
+          verificationMode={verificationMode}
+          verificationGuideText={verificationGuideText}
+          divisionEnabled={divisionEnabled}
+          eligibilityLine={eligibilityLine}
+          userMemberAvg={userMemberAvg}
         />
       )}
       {canApplyAdditionalSlot && isLoggedIn && (
@@ -124,6 +142,11 @@ export function TournamentApplySection({
           entryFee={entryFee != null ? entryFee * 2 : null}
           accountNumber={accountNumber}
           entryConditionsHtml={entryConditionsHtml}
+          verificationMode={verificationMode}
+          verificationGuideText={verificationGuideText}
+          divisionEnabled={divisionEnabled}
+          eligibilityLine={eligibilityLine}
+          userMemberAvg={userMemberAvg}
           additionalSlot
         />
       )}
