@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { cx } from "@/components/client/console/ui/cx";
 
 /** 참가 승인·명단 등 ‘참가’ 업무 구간 */
@@ -18,38 +19,43 @@ function matchOperationsRoute(p: string): boolean {
   return true;
 }
 
-const items = [
+const BOTTOM_ITEMS: {
+  href: string;
+  labelKey: AdminCopyKey;
+  match: (p: string) => boolean;
+  Icon: typeof IconHome;
+}[] = [
   {
     href: "/client/dashboard",
-    label: "홈",
+    labelKey: "client.console.bottomNav.home",
     match: (p: string) => p === "/client" || p === "/client/dashboard",
     Icon: IconHome,
   },
   {
     href: "/client/operations",
-    label: "대회",
+    labelKey: "client.console.bottomNav.tournaments",
     match: matchOperationsRoute,
     Icon: IconTrophy,
   },
   {
     href: "/client/operations/participants",
-    label: "참가",
+    labelKey: "client.console.bottomNav.entries",
     match: matchEntriesRoute,
     Icon: IconUsers,
   },
   {
     href: "/client/billing",
-    label: "정산",
+    labelKey: "client.console.bottomNav.billing",
     match: (p: string) => p.startsWith("/client/billing"),
     Icon: IconWallet,
   },
   {
     href: "/client/settings",
-    label: "설정",
+    labelKey: "client.console.bottomNav.settings",
     match: (p: string) => p.startsWith("/client/settings"),
     Icon: IconCog,
   },
-] as const;
+];
 
 function IconHome({ className }: { className?: string }) {
   return (
@@ -90,16 +96,17 @@ function IconCog({ className }: { className?: string }) {
 }
 
 /** 모바일 전용 하단 탭 (lg 이상 숨김) */
-export function ClientConsoleBottomNav() {
+export function ClientConsoleBottomNav({ copy }: { copy: Record<string, string> }) {
   const pathname = usePathname() ?? "";
+  const c = copy as Record<AdminCopyKey, string>;
 
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-300 bg-white/95 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-950/95 lg:hidden"
-      aria-label="클라이언트 콘솔 하단 메뉴"
+      aria-label={getCopyValue(c, "client.console.bottomNav.aria")}
     >
       <ul className="mx-auto flex max-w-lg items-stretch justify-around">
-        {items.map(({ href, label, match, Icon }) => {
+        {BOTTOM_ITEMS.map(({ href, labelKey, match, Icon }) => {
           const active = match(pathname);
           return (
             <li key={href} className="min-w-0 flex-1">
@@ -113,7 +120,7 @@ export function ClientConsoleBottomNav() {
                 )}
               >
                 <Icon className={cx("shrink-0", active ? "text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400")} />
-                <span className="truncate">{label}</span>
+                <span className="truncate">{getCopyValue(c, labelKey)}</span>
               </Link>
             </li>
           );

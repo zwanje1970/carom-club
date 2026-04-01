@@ -41,34 +41,34 @@ export default async function AdminPage() {
           href="/"
           color="whiteDark"
           className="touch-manipulation"
-          aria-label="사이트 홈으로 이동"
+          aria-label={getCopyValue(c, "admin.dashboard.siteHomeAria")}
         />
       </SectionTitleLineWithButton>
       <p className="mb-6 text-sm text-gray-600 dark:text-slate-400">
         {getCopyValue(c, "admin.dashboard.subtitle")}
       </p>
 
-      <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <CardBox>
-          <Link href="/admin/venues" className="block">
+          <Link href="/admin/venues" className="block min-h-[44px] touch-manipulation py-1">
             <p className="text-2xl font-semibold text-site-text">{stats.organizationCount}</p>
             <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">{getCopyValue(c, "admin.dashboard.statClients")}</p>
           </Link>
         </CardBox>
         <CardBox>
-          <Link href="/admin/client-applications" className="block">
+          <Link href="/admin/client-applications" className="block min-h-[44px] touch-manipulation py-1">
             <p className="text-2xl font-semibold text-site-text">{stats.pendingApplications}</p>
             <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">{getCopyValue(c, "admin.dashboard.statPending")}</p>
           </Link>
         </CardBox>
         <CardBox>
-          <Link href="/admin/tournaments" className="block">
+          <Link href="/admin/tournaments" className="block min-h-[44px] touch-manipulation py-1">
             <p className="text-2xl font-semibold text-site-text">{stats.tournamentCount}</p>
             <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">{getCopyValue(c, "admin.dashboard.statTournaments")}</p>
           </Link>
         </CardBox>
         <CardBox>
-          <Link href="/admin/inquiries" className="block">
+          <Link href="/admin/inquiries" className="block min-h-[44px] touch-manipulation py-1">
             <p className="text-2xl font-semibold text-site-text">{stats.inquiryCount}</p>
             <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">{getCopyValue(c, "admin.dashboard.statInquiries")}</p>
           </Link>

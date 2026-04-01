@@ -11,6 +11,7 @@ import { AdminLayoutSidebar, AdminMobileMenuButton, ADMIN_SIDEBAR_WIDTH } from "
 import { hasAnyDrafts, clearAllDrafts } from "@/lib/admin-drafts";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import type { FooterSettings } from "@/lib/footer-settings";
+import { CONSOLE_ADMIN_MAIN_CLASS } from "@/lib/console-layout";
 
 const ACTION_BAR_HEIGHT = 48;
 
@@ -83,8 +84,8 @@ export function AdminLayout({ children, copy, footer }: Props) {
         />
         <main
           className={`${ADMIN_ACTION_BAR_PT_CLASS} w-full min-w-0 ${
-            isEditorWorkspace ? "p-0" : "p-4 sm:p-6"
-          } overflow-x-hidden`}
+            isEditorWorkspace ? "overflow-x-hidden p-0" : CONSOLE_ADMIN_MAIN_CLASS
+          }`}
           style={{ minHeight: `calc(100vh - ${ACTION_BAR_HEIGHT}px)` }}
         >
           {isEditorWorkspace && desktopSidebarVisible ? (

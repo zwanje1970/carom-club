@@ -10,6 +10,10 @@ import { MobileLandscapeLockButton } from "@/components/MobileLandscapeLockButto
 import { ClientConsoleBottomNav } from "@/components/client/console/ClientConsoleBottomNav";
 import { ClientConsoleMobileOverflowMenu } from "@/components/client/console/ClientConsoleMobileOverflowMenu";
 import { ClientConsoleNewTournamentFab } from "@/components/client/console/ClientConsoleNewTournamentFab";
+import {
+  CLIENT_CONSOLE_HEADER_INNER_CLASS,
+  CLIENT_CONSOLE_MAIN_SCROLL_CLASS,
+} from "@/lib/console-layout";
 
 /**
  * 클라이언트 콘솔 사이드바 — 상위 대표 진입점 6개만 노출
@@ -17,16 +21,18 @@ import { ClientConsoleNewTournamentFab } from "@/components/client/console/Clien
  * - 정보·탭 보기: /client/tournaments… → 「대회 운영」활성 + 헤더 타이틀은 「대회 정보」
  * - 레거시 호환 경로(/client/participants 등)는 operations로 리다이렉트되며, 활성/타이틀 판단에는 넣지 않음
  */
-const CLIENT_CONSOLE_NAV = [
-  { id: "dash", href: "/client/dashboard", label: "운영 대시보드" },
-  { id: "org", href: "/client/setup", label: "내 정보/사업장 관리" },
-  { id: "tournament", href: "/client/operations", label: "대회 운영" },
-  { id: "promo", href: "/client/promo", label: "콘텐츠/홍보" },
-  { id: "billing", href: "/client/billing", label: "정산" },
-  { id: "settings", href: "/client/settings", label: "설정" },
-] as const;
+type ClientConsoleNavId = "dash" | "org" | "tournament" | "promo" | "billing" | "settings";
 
-function isClientNavActive(id: (typeof CLIENT_CONSOLE_NAV)[number]["id"], pathname: string): boolean {
+const CLIENT_CONSOLE_NAV: { id: ClientConsoleNavId; href: string; labelKey: AdminCopyKey }[] = [
+  { id: "dash", href: "/client/dashboard", labelKey: "client.console.nav.dash" },
+  { id: "org", href: "/client/setup", labelKey: "client.console.nav.org" },
+  { id: "tournament", href: "/client/operations", labelKey: "client.console.nav.tournament" },
+  { id: "promo", href: "/client/promo", labelKey: "client.console.nav.promo" },
+  { id: "billing", href: "/client/billing", labelKey: "client.console.nav.billing" },
+  { id: "settings", href: "/client/settings", labelKey: "client.console.nav.settings" },
+];
+
+function isClientNavActive(id: ClientConsoleNavId, pathname: string): boolean {
   switch (id) {
     case "dash":
       return pathname === "/client" || pathname === "/client/dashboard";
@@ -47,19 +53,20 @@ function isClientNavActive(id: (typeof CLIENT_CONSOLE_NAV)[number]["id"], pathna
   }
 }
 
-function resolveConsoleTitle(pathname: string): string {
-  if (pathname === "/client" || pathname === "/client/dashboard") return "운영 대시보드";
-  if (pathname.startsWith("/client/setup")) return "내 정보/사업장 관리";
-  if (pathname.startsWith("/client/operations")) return "대회 운영";
-  if (pathname.startsWith("/client/tournaments")) return "대회 정보";
-  if (pathname.startsWith("/client/billing/platform")) return "플랫폼 이용";
-  if (pathname.startsWith("/client/billing")) return "정산";
-  if (pathname.startsWith("/client/settings")) return "설정";
-  if (pathname.startsWith("/client/promo") || pathname.startsWith("/client/content")) return "콘텐츠/홍보";
-  if (pathname.startsWith("/client/schedule")) return "일정 / 예약";
-  if (pathname.startsWith("/client/zones")) return "부/권역";
-  if (pathname.startsWith("/client/co-admins")) return "공동관리자";
-  return "클라이언트 콘솔";
+function resolveConsoleTitle(pathname: string, c: Record<AdminCopyKey, string>): string {
+  if (pathname === "/client" || pathname === "/client/dashboard") return getCopyValue(c, "client.console.title.dash");
+  if (pathname.startsWith("/client/setup")) return getCopyValue(c, "client.console.title.org");
+  if (pathname.startsWith("/client/operations")) return getCopyValue(c, "client.console.title.operations");
+  if (pathname.startsWith("/client/tournaments")) return getCopyValue(c, "client.console.title.tournamentInfo");
+  if (pathname.startsWith("/client/billing/platform")) return getCopyValue(c, "client.console.title.billingPlatform");
+  if (pathname.startsWith("/client/billing")) return getCopyValue(c, "client.console.title.billing");
+  if (pathname.startsWith("/client/settings")) return getCopyValue(c, "client.console.title.settings");
+  if (pathname.startsWith("/client/promo") || pathname.startsWith("/client/content"))
+    return getCopyValue(c, "client.console.title.promo");
+  if (pathname.startsWith("/client/schedule")) return getCopyValue(c, "client.console.title.schedule");
+  if (pathname.startsWith("/client/zones")) return getCopyValue(c, "client.console.title.zones");
+  if (pathname.startsWith("/client/co-admins")) return getCopyValue(c, "client.console.title.coAdmins");
+  return getCopyValue(c, "client.console.title.fallback");
 }
 
 const navBtn =
@@ -80,7 +87,7 @@ export function ClientConsoleShell({
 }) {
   const pathname = usePathname() ?? "";
   const c = copy as Record<AdminCopyKey, string>;
-  const title = resolveConsoleTitle(pathname);
+  const title = resolveConsoleTitle(pathname, c);
 
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-zinc-100 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
@@ -95,14 +102,16 @@ export function ClientConsoleShell({
         </div>
 
         <nav className="min-h-0 flex-1 overflow-y-auto p-2">
-          <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">메뉴</p>
+          <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+            {getCopyValue(c, "client.console.menuSection")}
+          </p>
           <ul className="space-y-0.5">
             {CLIENT_CONSOLE_NAV.map((item) => {
               const active = isClientNavActive(item.id, pathname);
               return (
                 <li key={item.id}>
                   <Link href={item.href} className={`${navBtn} ${active ? navBtnActive : ""}`}>
-                    {item.label}
+                    {getCopyValue(c, item.labelKey)}
                   </Link>
                 </li>
               );
@@ -121,25 +130,27 @@ export function ClientConsoleShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-zinc-300 bg-white px-4 dark:border-zinc-700 dark:bg-zinc-950 lg:px-4">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <Link
-              href="/"
-              className="shrink-0 rounded-sm border border-zinc-400 bg-zinc-50 px-2 py-1 text-[11px] font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-              title="사이트 메인으로"
-            >
-              {getCopyValue(c, "client.console.homeButton")}
-            </Link>
-            <h1 className="min-w-0 truncate text-[13px] font-semibold text-zinc-900 dark:text-zinc-100">{title}</h1>
+        <header className="sticky top-0 z-20 w-full min-w-0 shrink-0 border-b border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-950">
+          <div className={CLIENT_CONSOLE_HEADER_INNER_CLASS}>
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <Link
+                href="/"
+                className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-md border border-zinc-400 bg-zinc-50 px-2 text-[11px] font-medium text-zinc-800 hover:bg-zinc-100 touch-manipulation dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                title={getCopyValue(c, "client.console.siteMainTitle")}
+              >
+                {getCopyValue(c, "client.console.homeButton")}
+              </Link>
+              <h1 className="min-w-0 truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100 sm:text-[13px]">
+                {title}
+              </h1>
+            </div>
+            <MobileLandscapeLockButton />
+            <ClientConsoleMobileOverflowMenu />
+            <ClientOrganizationSelect organizations={organizations} activeOrganizationId={activeOrganizationId} />
           </div>
-          <MobileLandscapeLockButton />
-          <ClientConsoleMobileOverflowMenu />
-          <ClientOrganizationSelect organizations={organizations} activeOrganizationId={activeOrganizationId} />
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto bg-zinc-100 p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] dark:bg-zinc-950 md:p-6 lg:pb-6">
-          {children}
-        </main>
-        <ClientConsoleBottomNav />
+        <main className={CLIENT_CONSOLE_MAIN_SCROLL_CLASS}>{children}</main>
+        <ClientConsoleBottomNav copy={copy} />
         <ClientConsoleNewTournamentFab />
       </div>
     </div>

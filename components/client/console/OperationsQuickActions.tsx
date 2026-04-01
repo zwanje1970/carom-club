@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { getCopyValue } from "@/lib/admin-copy";
 import { cx } from "@/components/client/console/ui/cx";
 
 const card =
-  "flex min-h-[72px] flex-col items-center justify-center gap-1 rounded-lg border border-zinc-300 bg-white px-2 py-3 text-center text-[11px] font-semibold text-zinc-900 shadow-sm transition active:scale-[0.98] dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100";
+  "flex min-h-[80px] flex-col items-center justify-center gap-1 rounded-lg border border-zinc-300 bg-white px-2 py-3 text-center text-[11px] font-semibold text-zinc-900 shadow-sm transition active:scale-[0.98] touch-manipulation dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 md:min-h-[72px]";
 
 function IconPlus({ className }: { className?: string }) {
   return (
@@ -46,10 +47,11 @@ function IconBell({ className }: { className?: string }) {
 
 type Props = {
   firstTournamentId: string | null;
+  copy: Record<string, string>;
 };
 
 /** /client/operations 상단 빠른 실행 (아이콘 + 2×2) */
-export function OperationsQuickActions({ firstTournamentId }: Props) {
+export function OperationsQuickActions({ firstTournamentId, copy }: Props) {
   const base = firstTournamentId ? `/client/operations/tournaments/${firstTournamentId}` : null;
 
   return (
@@ -57,40 +59,57 @@ export function OperationsQuickActions({ firstTournamentId }: Props) {
       id="operations-quick-actions"
       className="rounded-lg border border-zinc-200 bg-zinc-50/90 p-3 dark:border-zinc-700 dark:bg-zinc-900/40"
     >
-      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">빠른 실행</p>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3">
-        <Link href="/client/operations/tournaments/new" className={cx(card, "border-zinc-800 bg-zinc-800 text-white dark:border-zinc-200 dark:bg-zinc-200 dark:text-zinc-900")}>
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        {getCopyValue(copy, "client.operations.quick.sectionTitle")}
+      </p>
+      <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 md:mx-0 md:grid md:grid-cols-5 md:gap-3 md:overflow-visible md:pb-0">
+        <Link
+          href="/client/operations/tournaments/new"
+          className={cx(card, "min-w-[140px] shrink-0 snap-start border-zinc-800 bg-zinc-800 text-white md:min-w-0 dark:border-zinc-200 dark:bg-zinc-200 dark:text-zinc-900")}
+        >
           <IconPlus className="text-white dark:text-zinc-900" />
-          대회 생성
+          {getCopyValue(copy, "client.operations.quick.newTournament")}
         </Link>
         <Link
           href={base ? `${base}/participants` : "/client/operations/participants"}
-          className={cx(card, !base && "opacity-90")}
+          className={cx(card, "min-w-[140px] shrink-0 snap-start md:min-w-0", !base && "opacity-90")}
           aria-disabled={!base}
         >
           <IconUsers className="text-zinc-700 dark:text-zinc-200" />
-          참가자 관리
-          {!base && <span className="text-[9px] font-normal text-zinc-500">(대회 없음)</span>}
+          {getCopyValue(copy, "client.operations.quick.participants")}
+          {!base && (
+            <span className="text-[9px] font-normal text-zinc-500">
+              {getCopyValue(copy, "client.operations.quick.noTournamentHint")}
+            </span>
+          )}
         </Link>
         <Link
           href={base ? `${base}/bracket-build` : "/client/operations/participants"}
-          className={cx(card, !base && "opacity-90")}
+          className={cx(card, "min-w-[140px] shrink-0 snap-start md:min-w-0", !base && "opacity-90")}
         >
           <IconGrid className="text-zinc-700 dark:text-zinc-200" />
-          대진 생성
-          {!base && <span className="text-[9px] font-normal text-zinc-500">(대회 선택)</span>}
+          {getCopyValue(copy, "client.operations.quick.bracketBuild")}
+          {!base && (
+            <span className="text-[9px] font-normal text-zinc-500">
+              {getCopyValue(copy, "client.operations.quick.selectTournamentHint")}
+            </span>
+          )}
         </Link>
         <Link
           href={base ? `${base}/bracket` : "/client/operations/participants"}
-          className={cx(card, !base && "opacity-90")}
+          className={cx(card, "min-w-[140px] shrink-0 snap-start md:min-w-0", !base && "opacity-90")}
         >
           <IconTable className="text-zinc-700 dark:text-zinc-200" />
-          대진표 보기
-          {!base && <span className="text-[9px] font-normal text-zinc-500">(대회 선택)</span>}
+          {getCopyValue(copy, "client.operations.quick.bracketView")}
+          {!base && (
+            <span className="text-[9px] font-normal text-zinc-500">
+              {getCopyValue(copy, "client.operations.quick.selectTournamentHint")}
+            </span>
+          )}
         </Link>
-        <Link href="/client/operations/push" className={card}>
+        <Link href="/client/operations/push" className={cx(card, "min-w-[140px] shrink-0 snap-start md:min-w-0")}>
           <IconBell className="text-zinc-700 dark:text-zinc-200" />
-          푸시 발송
+          {getCopyValue(copy, "client.operations.quick.push")}
         </Link>
       </div>
     </div>

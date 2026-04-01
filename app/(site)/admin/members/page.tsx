@@ -8,8 +8,11 @@ import { AdminMembersList } from "./AdminMembersList";
 import { CommunityMinLevelPolicyCard } from "./CommunityMinLevelPolicyCard";
 import { WithdrawRejoinPolicyCard } from "./WithdrawRejoinPolicyCard";
 import { hasAllPermissions, PERMISSION_KEYS } from "@/lib/auth/permissions.server";
+import { getAdminCopy } from "@/lib/admin-copy-server";
+import { getCopyValue } from "@/lib/admin-copy";
 
 export default async function AdminMembersPage() {
+  const copy = await getAdminCopy();
   const session = await getSession();
   if (
     !session ||
@@ -23,12 +26,12 @@ export default async function AdminMembersPage() {
 
   return (
     <SectionMain>
-      <SectionTitleLineWithButton icon={mdiShieldAccount} title="회원·권한 관리" />
+      <SectionTitleLineWithButton icon={mdiShieldAccount} title={getCopyValue(copy, "admin.members.pageTitle")} />
       <CardBox>
         <p className="mb-4 text-sm text-gray-600 dark:text-slate-400">
-          회원/클라이언트/관리자를 검색·필터·정렬로 조회하고 권한 및 상태를 변경할 수 있습니다.
+          {getCopyValue(copy, "admin.members.pageIntro")}
         </p>
-        <AdminMembersList />
+        <AdminMembersList copy={copy} />
       </CardBox>
       {session.role === "PLATFORM_ADMIN" ? (
         <div className="mt-6 grid gap-4 xl:grid-cols-2">

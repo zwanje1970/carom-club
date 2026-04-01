@@ -6,6 +6,8 @@ import SectionMain from "@/components/admin/_components/Section/Main";
 import SectionTitleLineWithButton from "@/components/admin/_components/Section/TitleLineWithButton";
 import CardBox from "@/components/admin/_components/CardBox";
 import VenueListTable from "./VenueListTable";
+import { getAdminCopy } from "@/lib/admin-copy-server";
+import { getCopyValue } from "@/lib/admin-copy";
 
 const CLIENT_TYPES = ["VENUE", "CLUB", "FEDERATION", "INSTRUCTOR"] as const;
 
@@ -21,6 +23,7 @@ export type ClientListRow = {
 };
 
 export default async function AdminVenuesPage() {
+  const copy = await getAdminCopy();
   let rows: ClientListRow[] = [];
   try {
     const [orgs, applications] = await Promise.all([
@@ -106,13 +109,11 @@ export default async function AdminVenuesPage() {
 
   return (
     <SectionMain>
-      <SectionTitleLineWithButton icon={mdiOfficeBuilding} title="클라이언트 목록" />
-      <p className="mb-4 text-sm text-gray-600 dark:text-slate-400">
-        승인된 클라이언트 목록입니다. 신규 등록은「신청 관리」에서 승인 처리하세요.
-      </p>
+      <SectionTitleLineWithButton icon={mdiOfficeBuilding} title={getCopyValue(copy, "admin.venues.pageTitle")} />
+      <p className="mb-4 text-sm text-gray-600 dark:text-slate-400">{getCopyValue(copy, "admin.venues.pageIntro")}</p>
 
       <CardBox hasTable>
-        <VenueListTable rows={rows} />
+        <VenueListTable rows={rows} copy={copy} />
       </CardBox>
     </SectionMain>
   );

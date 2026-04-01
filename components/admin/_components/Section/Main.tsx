@@ -1,10 +1,10 @@
 import React, { ReactNode } from "react";
-import { containerMaxW } from "../../_lib/config";
 
 type Props = {
   children: ReactNode;
 };
 
+/** 셸 main이 max-w·좌우 패딩을 담당하므로 섹션은 세로 간격만 */
 export default function SectionMain({ children }: Props) {
-  return <section className={`p-6 ${containerMaxW}`}>{children}</section>;
+  return <section className="w-full py-6 first:pt-0">{children}</section>;
 }

@@ -43,8 +43,12 @@ export async function GET(request: Request) {
     }
 
     if (page === "community") {
+      const common = await getCommonPageData("community");
       const community = await buildCommunityHomeSlotCommunityPayload("all");
-      const body: PageSlotRenderContext = { page: "community", community };
+      const body: PageSlotRenderContext = {
+        page: "community",
+        community: { ...community, copy: common.copy },
+      };
       return NextResponse.json(body);
     }
 

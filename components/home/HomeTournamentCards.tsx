@@ -21,6 +21,9 @@ export function HomeTournamentCards({
   slotMotion,
   blockBackgroundColor,
   homeCarouselFlowSpeed,
+  /** `PageSection` 행 제목·부제 — 비우면 관리자 문구 키 사용 */
+  sectionTitle,
+  sectionSubtitle,
 }: {
   tournaments: HomeTournamentCarouselInput[];
   copy: Record<string, string>;
@@ -33,9 +36,20 @@ export function HomeTournamentCards({
   blockBackgroundColor?: string;
   /** 사이트 전역 흐름 속도(1~100) — 블록 `speed` 배율의 기준 */
   homeCarouselFlowSpeed: number;
+  sectionTitle?: string | null;
+  sectionSubtitle?: string | null;
 }) {
   const c = copy as Record<AdminCopyKey, string>;
   const cta = ctaConfig;
+  const headingTitle = sectionTitle?.trim() || getCopyValue(c, "site.home.tournaments.title");
+  const headingSubtitle =
+    sectionSubtitle != null && sectionSubtitle.trim() !== ""
+      ? sectionSubtitle.trim()
+      : getCopyValue(c, "site.home.tournaments.subtitle");
+  const headingSubtitleEmpty =
+    sectionSubtitle != null && sectionSubtitle.trim() !== ""
+      ? sectionSubtitle.trim()
+      : getCopyValue(c, "site.home.tournaments.subtitleEmpty");
   const sectionSurface = blockBackgroundColor ? { backgroundColor: blockBackgroundColor } : undefined;
   const flowOneToHundred = slotMotionEffectiveFlowSpeed(homeCarouselFlowSpeed, slotMotion);
   const isCarousel = slotLayout.type === "carousel";
@@ -48,12 +62,8 @@ export function HomeTournamentCards({
       >
         <div className="mx-auto max-w-5xl">
           <SlotBlockCtaLink layer={cta.block} ctx={{}} className="block text-left">
-            <h2 className="text-xl font-bold text-site-text sm:text-2xl">
-              {getCopyValue(c, "site.home.tournaments.title")}
-            </h2>
-            <p className="mt-1 text-sm text-gray-600">
-              {getCopyValue(c, "site.home.tournaments.subtitleEmpty")}
-            </p>
+            <h2 className="text-xl font-bold text-site-text sm:text-2xl">{headingTitle}</h2>
+            <p className="mt-1 text-sm text-gray-600">{headingSubtitleEmpty}</p>
           </SlotBlockCtaLink>
           {nearbyFind?.error && (
             <p className="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">
@@ -75,7 +85,9 @@ export function HomeTournamentCards({
                   disabled={nearbyFind.loading}
                   className="rounded-xl border border-site-border bg-site-bg px-5 py-2.5 text-sm font-medium text-site-text hover:border-site-primary/50 disabled:opacity-60"
                 >
-                  {nearbyFind.loading ? "위치 확인 중…" : "내 주변 대회 찾기"}
+                  {nearbyFind.loading
+                    ? getCopyValue(c, "site.home.tournaments.nearbyLoading")
+                    : getCopyValue(c, "site.home.tournaments.nearbyFind")}
                 </button>
               )}
               <SlotBlockCtaLink
@@ -105,12 +117,8 @@ export function HomeTournamentCards({
             className="min-h-[4.5rem] min-w-0 flex-1 block text-left"
           >
             <div className="min-h-[4.5rem] min-w-0 flex-1">
-              <h2 className="text-xl font-bold text-site-text sm:text-2xl min-h-[1.75rem]">
-                {getCopyValue(c, "site.home.tournaments.title")}
-              </h2>
-              <p className="mt-1 min-h-[2.5rem] text-sm text-gray-600 line-clamp-2">
-                {getCopyValue(c, "site.home.tournaments.subtitle")}
-              </p>
+              <h2 className="text-xl font-bold text-site-text sm:text-2xl min-h-[1.75rem]">{headingTitle}</h2>
+              <p className="mt-1 min-h-[2.5rem] text-sm text-gray-600 line-clamp-2">{headingSubtitle}</p>
             </div>
           </SlotBlockCtaLink>
           <div className="flex flex-wrap items-center justify-end gap-2 shrink-0 min-h-[44px]">
@@ -121,7 +129,9 @@ export function HomeTournamentCards({
                 disabled={nearbyFind.loading}
                 className="rounded-lg border border-site-border bg-site-card px-3 py-2 text-sm font-medium text-site-text hover:border-site-primary/50 disabled:opacity-60"
               >
-                {nearbyFind.loading ? "위치 확인 중…" : "내 주변 대회 찾기"}
+                {nearbyFind.loading
+                  ? getCopyValue(c, "site.home.tournaments.nearbyLoading")
+                  : getCopyValue(c, "site.home.tournaments.nearbyFind")}
               </button>
             )}
             <SlotBlockCtaLink
@@ -129,7 +139,7 @@ export function HomeTournamentCards({
               ctx={{}}
               className="inline-flex items-center text-sm font-medium text-site-primary hover:underline py-2"
             >
-              전체보기 →
+              {getCopyValue(c, "site.home.tournaments.btnViewAll")}
             </SlotBlockCtaLink>
           </div>
         </div>

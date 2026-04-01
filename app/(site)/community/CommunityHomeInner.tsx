@@ -16,14 +16,14 @@ export async function CommunityHomeInner({
     getCommonPageData("community"),
     buildCommunityHomeSlotCommunityPayload(category),
   ]);
-  const { noticeBars, popups, pageBlocks } = common;
+  const { noticeBars, popups, pageBlocks, copy } = common;
   const pageBlocksRendered = applyPublicHeroSingleCanonical("community", pageBlocks);
   const hasPostListSlot = pageBlocksRendered.some((b) => b.slotType === "postList");
   const hasNanguListSlot = pageBlocksRendered.some((b) => b.slotType === "nanguList");
 
   const slotContext = {
     page: "community" as const,
-    community: communityPayload,
+    community: { ...communityPayload, copy },
   };
 
   return (
@@ -31,13 +31,14 @@ export async function CommunityHomeInner({
       <ContentLayer noticeBars={noticeBars} popups={popups} />
       {!hasNanguListSlot && hasPostListSlot ? (
         <PageContentContainer className="py-6">
-          <CommunityNanguPromoCard />
+          <CommunityNanguPromoCard copy={copy} />
         </PageContentContainer>
       ) : null}
       <PageRenderer blocks={pageBlocksRendered} slotContext={slotContext} />
       {!hasPostListSlot ? (
         <PageContentContainer className="py-6">
           <CommunityMainClient
+            copy={copy}
             latest={communityPayload.latest}
             initialCategory={category}
             canManageReports={communityPayload.canManageReports}

@@ -22,7 +22,7 @@ export function ConsoleBadge({ className, tone = "neutral", ...props }: ConsoleB
   return (
     <span
       className={cx(
-        "inline-flex items-center border px-1.5 py-0.5 text-[11px] font-medium leading-none",
+        "inline-flex min-h-[26px] items-center border px-2 py-1 text-xs font-medium leading-tight sm:min-h-0 sm:px-1.5 sm:py-0.5 sm:text-[11px]",
         toneClass[tone],
         className
       )}

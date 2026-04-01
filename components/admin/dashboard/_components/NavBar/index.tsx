@@ -2,7 +2,7 @@
 
 import React, { ReactNode, useState } from "react";
 import { mdiClose, mdiDotsVertical } from "@mdi/js";
-import { containerMaxW } from "../../../_lib/config";
+import { CONSOLE_INNER_MAX_CLASS, CONSOLE_PAD_X_CLASS } from "@/lib/console-layout";
 import Icon from "../../../_components/Icon";
 import NavBarItemPlain from "./Item/Plain";
 import NavBarMenuList from "./MenuList";
@@ -34,7 +34,9 @@ export default function NavBar({ menu, className = "", children, userName, onLog
       className={`${className} fixed left-0 right-0 z-50 h-16 bg-gray-50 transition-[margin-left] dark:bg-slate-800 shadow-sm shrink-0`}
       style={{ top: "64px", height: "64px" }}
     >
-      <div className={`flex lg:items-stretch ${containerMaxW}`}>
+      <div
+        className={`flex w-full min-w-0 lg:items-stretch ${CONSOLE_INNER_MAX_CLASS} ${CONSOLE_PAD_X_CLASS}`}
+      >
         <div className="flex h-16 flex-1 items-stretch">{children}</div>
         {hasMenu && (
           <>

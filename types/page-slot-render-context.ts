@@ -41,6 +41,8 @@ export type PageSlotRenderContext = {
     initialCategory: "all" | "free" | "qna" | "notice";
     canManageReports?: boolean;
     showSolverEntry: boolean;
+    /** 관리자 문구(커뮤니티 진입 카드 등). 없으면 `getCopyValue` 기본값 */
+    copy?: Record<string, string>;
   };
   tournaments?: {
     copy: Record<AdminCopyKey, string>;

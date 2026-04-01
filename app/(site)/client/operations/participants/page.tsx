@@ -8,19 +8,13 @@ import { canAccessClientDashboard } from "@/types/auth";
 import { ConsolePageHeader } from "@/components/client/console/ui/ConsolePageHeader";
 import { ConsoleBadge } from "@/components/client/console/ui/ConsoleBadge";
 import { OperationsTournamentMobileCard } from "@/components/client/console/OperationsTournamentMobileCard";
+import { getAdminCopy } from "@/lib/admin-copy-server";
+import { fillAdminCopyTemplate, getClientOperationsTournamentStatus, getCopyValue } from "@/lib/admin-copy";
 
 export const metadata = { title: "참가 관리" };
 
-const STATUS_LABEL: Record<string, string> = {
-  DRAFT: "임시저장",
-  OPEN: "모집중",
-  CLOSED: "마감",
-  BRACKET_GENERATED: "대진 확정",
-  FINISHED: "종료",
-  HIDDEN: "숨김",
-};
-
 export default async function ClientOperationsParticipantsHubPage() {
+  const copy = await getAdminCopy();
   const session = await getSession();
   if (!session || !canAccessClientDashboard(session)) redirect("/");
 
@@ -28,12 +22,15 @@ export default async function ClientOperationsParticipantsHubPage() {
   if (!orgId) {
     return (
       <div className="space-y-4">
-        <ConsolePageHeader title="참가 관리" description="먼저 업체를 선택·설정해 주세요." />
+        <ConsolePageHeader
+          title={getCopyValue(copy, "client.operations.participants.title")}
+          description={getCopyValue(copy, "client.operations.participants.descriptionNoOrg")}
+        />
         <Link
           href="/client/setup"
           className="inline-flex min-h-[44px] items-center rounded-md border border-zinc-300 px-4 text-sm font-medium"
         >
-          업체 설정
+          {getCopyValue(copy, "client.operations.participants.setupCta")}
         </Link>
       </div>
     );
@@ -71,21 +68,23 @@ export default async function ClientOperationsParticipantsHubPage() {
   return (
     <div className="space-y-4">
       <ConsolePageHeader
-        eyebrow="대회 운영"
-        title="참가 관리"
-        description={`「${org?.name ?? "—"}」 대회별로 참가 승인·명단으로 이동합니다.`}
+        eyebrow={getCopyValue(copy, "client.operations.eyebrow")}
+        title={getCopyValue(copy, "client.operations.participants.title")}
+        description={fillAdminCopyTemplate(getCopyValue(copy, "client.operations.participants.descriptionWithOrg"), {
+          orgName: org?.name ?? "—",
+        })}
         actions={
           <Link
             href="/client/operations"
             className="inline-flex min-h-[44px] items-center rounded-md border border-zinc-300 px-3 text-xs font-medium dark:border-zinc-600"
           >
-            대회 목록
+            {getCopyValue(copy, "client.operations.participants.backToTournamentList")}
           </Link>
         }
       />
 
       {tournaments.length === 0 ? (
-        <p className="text-sm text-zinc-500">등록된 대회가 없습니다. 대회 목록에서 새 대회를 만드세요.</p>
+        <p className="text-sm text-zinc-500">{getCopyValue(copy, "client.operations.participants.emptyNoTournaments")}</p>
       ) : (
         <>
           <ul className="hidden lg:block lg:divide-y lg:divide-zinc-200 lg:rounded-lg lg:border lg:border-zinc-200 dark:lg:divide-zinc-700 dark:lg:border-zinc-700">
@@ -97,17 +96,20 @@ export default async function ClientOperationsParticipantsHubPage() {
                   <div className="min-w-0">
                     <p className="font-medium text-zinc-900 dark:text-zinc-100">{t.name}</p>
                     <p className="text-[11px] text-zinc-500">
-                      {formatKoreanDateWithWeekday(t.startAt)} · 확정 {confirmed}
-                      {max != null && max > 0 ? ` / ${max}` : ""}
+                      {fillAdminCopyTemplate(getCopyValue(copy, "client.operations.tournamentRowMeta"), {
+                        date: formatKoreanDateWithWeekday(t.startAt),
+                        confirmed,
+                        maxSuffix: max != null && max > 0 ? ` / ${max}` : "",
+                      })}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <ConsoleBadge tone="neutral">{STATUS_LABEL[t.status] ?? t.status}</ConsoleBadge>
+                    <ConsoleBadge tone="neutral">{getClientOperationsTournamentStatus(copy, t.status)}</ConsoleBadge>
                     <Link
                       href={`/client/operations/tournaments/${t.id}/participants`}
                       className="inline-flex min-h-[44px] items-center rounded-md border border-zinc-900 bg-zinc-900 px-3 text-xs font-semibold text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
                     >
-                      참가자 관리
+                      {getCopyValue(copy, "client.operations.participants.btnParticipantAdmin")}
                     </Link>
                   </div>
                 </li>
@@ -121,6 +123,7 @@ export default async function ClientOperationsParticipantsHubPage() {
               return (
                 <OperationsTournamentMobileCard
                   key={t.id}
+                  copy={copy}
                   t={{
                     id: t.id,
                     name: t.name,

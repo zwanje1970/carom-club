@@ -18,15 +18,18 @@ import type { SlotBlockLayout, SlotBlockMotion } from "@/lib/slot-block-layout-m
 import type { SlotBlockItemsBundle, SlotBlockManualItem } from "@/lib/slot-block-items";
 import { HomeTournamentListAutoScroll } from "@/components/home/HomeTournamentListAutoScroll";
 import { slotMotionEffectiveFlowSpeed } from "@/lib/slot-block-layout-motion";
+import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 
 function ManualVenueLinkCard({
   item,
   cardStyle,
   cardCta,
+  titleFallback,
 }: {
   item: SlotBlockManualItem;
   cardStyle: SlotBlockCardStyle;
   cardCta: SlotBlockCtaLayer | undefined;
+  titleFallback: string;
 }) {
   const src = sanitizeImageSrc(item.imageUrl?.trim() ?? "");
   return (
@@ -51,7 +54,7 @@ function ManualVenueLinkCard({
         )}
       </div>
       <div className="flex min-h-[4rem] flex-1 flex-col gap-1 p-3">
-        <h3 className="text-sm font-semibold text-site-text line-clamp-2">{item.title || "제목 없음"}</h3>
+        <h3 className="text-sm font-semibold text-site-text line-clamp-2">{item.title || titleFallback}</h3>
         {item.description?.trim() ? (
           <p className="text-xs text-site-text-muted line-clamp-3">{item.description}</p>
         ) : null}
@@ -65,6 +68,7 @@ function ManualVenueLinkCard({
 
 /** 홈 `venueLink` — 자동: 단일 블록 링크 / 직접 구성: 카드 목록 */
 export function HomeVenueLinkSlot({
+  copy,
   cardStyle,
   ctaConfig,
   slotLayout,
@@ -73,6 +77,7 @@ export function HomeVenueLinkSlot({
   slotItems,
   homeCarouselFlowSpeed,
 }: {
+  copy: Record<string, string>;
   cardStyle: SlotBlockCardStyle;
   ctaConfig: SlotBlockCtaConfig;
   slotLayout: SlotBlockLayout;
@@ -81,6 +86,8 @@ export function HomeVenueLinkSlot({
   slotItems: SlotBlockItemsBundle;
   homeCarouselFlowSpeed: number;
 }) {
+  const c = copy as Record<AdminCopyKey, string>;
+  const titleFallback = getCopyValue(c, "site.home.venues.manualTitleFallback");
   const sectionStyle = blockBackgroundColor ? { backgroundColor: blockBackgroundColor } : undefined;
   const flowOneToHundred = slotMotionEffectiveFlowSpeed(homeCarouselFlowSpeed, slotMotion);
   const isCarousel = slotLayout.type === "carousel";
@@ -100,7 +107,7 @@ export function HomeVenueLinkSlot({
               ctx={{}}
               className="text-site-primary hover:underline font-medium"
             >
-              당구장 전체 보기 →
+              {getCopyValue(c, "site.home.venues.linkVenueListCta")}
             </SlotBlockCtaLink>
           </div>
         </PageContentContainer>
@@ -115,7 +122,12 @@ export function HomeVenueLinkSlot({
       <ul className={cn("flex w-max min-w-0 flex-nowrap", gapClass(cardStyle.cardGap))}>
         {items.map((it) => (
           <li key={it.id} className="w-[220px] min-w-[220px] shrink-0 sm:w-[240px] sm:min-w-[240px]">
-            <ManualVenueLinkCard item={it} cardStyle={cardStyle} cardCta={cardCta} />
+            <ManualVenueLinkCard
+              item={it}
+              cardStyle={cardStyle}
+              cardCta={cardCta}
+              titleFallback={titleFallback}
+            />
           </li>
         ))}
       </ul>
@@ -143,7 +155,12 @@ export function HomeVenueLinkSlot({
         <ul className={cn(tournamentGridUlClass(gridCols, cardStyle), "w-full")}>
           {items.map((it) => (
             <li key={it.id} className="min-w-0">
-              <ManualVenueLinkCard item={it} cardStyle={cardStyle} cardCta={cardCta} />
+              <ManualVenueLinkCard
+                item={it}
+                cardStyle={cardStyle}
+                cardCta={cardCta}
+                titleFallback={titleFallback}
+              />
             </li>
           ))}
         </ul>

@@ -81,6 +81,7 @@ import {
   pruneObjectPathCurveControls,
 } from "@/lib/path-curve-display";
 import { cx } from "@/components/client/console/ui/cx";
+import { PATH_EDITOR_TOUCH_NO_SELECT_CLASS } from "@/lib/path-editor-touch-ui";
 import { SettingsPanel, type SolutionSettingsValue } from "@/components/ui/SettingsPanel";
 import {
   CUE_TIP_NORM_DISPLAY_FRAC,
@@ -203,8 +204,7 @@ function cueSpotToggleClass(on: boolean) {
   );
 }
 
-const toolbarBtn =
-  "inline-flex items-center justify-center rounded-xl border px-3 py-2 text-sm font-medium shadow-sm transition-colors touch-manipulation disabled:pointer-events-none disabled:opacity-45";
+const toolbarBtn = `inline-flex items-center justify-center rounded-xl border px-3 py-2 text-sm font-medium shadow-sm transition-colors touch-manipulation disabled:pointer-events-none disabled:opacity-45 ${PATH_EDITOR_TOUCH_NO_SELECT_CLASS}`;
 const toolbarGhost =
   "border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
 const toolbarPrimary =
@@ -215,8 +215,7 @@ const toolbarAccent =
   "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100/90 dark:border-amber-700 dark:bg-amber-950/45 dark:text-amber-100 dark:hover:bg-amber-950/70";
 
 /** 하단 한 줄: 보이기·활성·설정~시연 동일 탭 높이(모바일 터치) */
-const pathBarMiniBtn =
-  "inline-flex h-9 min-h-9 shrink-0 items-center justify-center rounded-lg border-2 px-2 text-[11px] font-semibold leading-tight transition-colors touch-manipulation sm:text-xs disabled:pointer-events-none disabled:opacity-40 disabled:grayscale";
+const pathBarMiniBtn = `inline-flex h-9 min-h-9 shrink-0 items-center justify-center rounded-lg border-2 px-2 text-[11px] font-semibold leading-tight transition-colors touch-manipulation sm:text-xs disabled:pointer-events-none disabled:opacity-40 disabled:grayscale ${PATH_EDITOR_TOUCH_NO_SELECT_CLASS}`;
 
 export type SolutionPathEditorPresentation = "overlay" | "noteBallPlacementFullscreen";
 
@@ -2384,8 +2383,8 @@ export function SolutionPathEditorFullscreen({
   ]);
 
   const rootClass = isNoteShell
-    ? "fixed inset-0 z-[10050] flex h-[100dvh] min-h-[100dvh] w-screen flex-col overflow-hidden overscroll-none bg-site-bg text-site-text"
-    : "fixed inset-0 z-[200] flex flex-col bg-site-bg text-site-text";
+    ? `fixed inset-0 z-[10050] flex h-[100dvh] min-h-[100dvh] w-screen flex-col overflow-hidden overscroll-none bg-site-bg text-site-text ${PATH_EDITOR_TOUCH_NO_SELECT_CLASS}`
+    : `fixed inset-0 z-[200] flex flex-col bg-site-bg text-site-text ${PATH_EDITOR_TOUCH_NO_SELECT_CLASS}`;
 
   const rootStyle: React.CSSProperties | undefined = isNoteShell
     ? {
@@ -2692,13 +2691,15 @@ export function SolutionPathEditorFullscreen({
         {variant === "trouble" ? "난구해결 경로 편집 전체화면" : "해법 경로 편집 전체화면"}
       </h1>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div
+        className={`flex min-h-0 flex-1 flex-col overflow-hidden ${PATH_EDITOR_TOUCH_NO_SELECT_CLASS}`}
+      >
         {isNoteShell && (
           <>
             <div
               data-path-editor-fs-chrome=""
               aria-hidden={!rightPathDrawerOpen}
-              className={`fixed inset-0 z-[200] bg-black/30 transition-opacity duration-300 ease-out ${
+              className={`fixed inset-0 z-[200] bg-black/30 transition-opacity duration-300 ease-out ${PATH_EDITOR_TOUCH_NO_SELECT_CLASS} ${
                 rightPathDrawerOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
               }`}
               onClick={() => setRightPathDrawerOpen(false)}
@@ -2708,7 +2709,7 @@ export function SolutionPathEditorFullscreen({
               data-path-editor-fs-chrome=""
               id="path-fs-right-drawer-common"
               aria-hidden={!rightPathDrawerOpen}
-              className={`fixed right-0 z-[205] flex w-[min(52.8vw,180px)] flex-col border-l border-white/20 bg-black/30 text-white shadow-[-6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md ${
+              className={`fixed right-0 z-[205] flex w-[min(52.8vw,180px)] flex-col border-l border-white/20 bg-black/30 text-white shadow-[-6px_0_20px_rgba(0,0,0,0.25)] backdrop-blur-md ${PATH_EDITOR_TOUCH_NO_SELECT_CLASS} ${
                 viewportMdUp
                   ? "top-[40%] h-[min(72vh,34rem)] -translate-y-1/2 rounded-l-xl"
                   : "top-0 h-full"
@@ -2853,7 +2854,11 @@ export function SolutionPathEditorFullscreen({
                   오류신고
                 </button>
                 {menuInfoFeedback && (
-                  <p className="px-1 text-[11px] font-medium text-white/85">{menuInfoFeedback}</p>
+                  <p
+                    className={`px-1 text-[11px] font-medium text-white/85 ${PATH_EDITOR_TOUCH_NO_SELECT_CLASS}`}
+                  >
+                    {menuInfoFeedback}
+                  </p>
                 )}
               </div>
             </aside>
@@ -3266,8 +3271,7 @@ export function SolutionPathEditorFullscreen({
                 const summaryRail = Math.max(1, Math.min(5, Math.round(settingsValue?.railCount ?? 3)));
                 const summaryTip = settingsValue?.tipNorm ?? { x: 0, y: 0 };
                 const settingsApplyOff = Boolean(settingsValue?.ignorePhysics);
-                const btnBase =
-                  "rounded-md bg-black py-1 font-semibold touch-manipulation transition-colors border border-zinc-500 [@media(max-height:520px)]:py-0.5";
+                const btnBase = `rounded-md bg-black py-1 font-semibold touch-manipulation transition-colors border border-zinc-500 [@media(max-height:520px)]:py-0.5 ${PATH_EDITOR_TOUCH_NO_SELECT_CLASS}`;
                 const dockCellMinH =
                   "min-h-11 [@media(max-height:680px)]:min-h-10 [@media(max-height:580px)]:min-h-9 [@media(max-height:480px)]:min-h-8 [@media(max-height:400px)]:min-h-7";
                 const dockRowGrowBtn = cx(
@@ -3435,8 +3439,11 @@ export function SolutionPathEditorFullscreen({
                         >
                           ◀
                         </button>
-                        <div className="flex h-full flex-[2] items-center justify-center border-x border-zinc-500 text-[9px] text-yellow-300 [@media(max-height:480px)]:text-[8px]">
-                          스팟이동
+                        <div
+                          className={`flex h-full flex-[2] items-center justify-center border-x border-zinc-500 text-[9px] text-yellow-300 [@media(max-height:480px)]:text-[8px] ${PATH_EDITOR_TOUCH_NO_SELECT_CLASS}`}
+                          role="presentation"
+                        >
+                          <span className="pointer-events-none">스팟이동</span>
                         </div>
                         <button
                           type="button"
@@ -3491,7 +3498,7 @@ export function SolutionPathEditorFullscreen({
 
         {!isNoteShell && (
         <div
-          className="shrink-0 space-y-2 overflow-y-auto border-t border-zinc-200/90 bg-gradient-to-b from-zinc-50/90 to-white px-3 py-3 dark:border-slate-700 dark:from-zinc-900/90 dark:to-slate-900 max-h-[min(28vh,320px)] sm:max-h-[38vh]"
+          className={`shrink-0 space-y-2 overflow-y-auto border-t border-zinc-200/90 bg-gradient-to-b from-zinc-50/90 to-white px-3 py-3 dark:border-slate-700 dark:from-zinc-900/90 dark:to-slate-900 max-h-[min(28vh,320px)] sm:max-h-[38vh] ${PATH_EDITOR_TOUCH_NO_SELECT_CLASS}`}
           style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
           {...(variant === "trouble" ? { "data-trouble-region": C.region.pathToolbar } : {})}
         >

@@ -19,21 +19,15 @@ import { ConsoleBadge } from "@/components/client/console/ui/ConsoleBadge";
 import { OperationsQuickActions } from "@/components/client/console/OperationsQuickActions";
 import { OperationsTournamentMobileCard } from "@/components/client/console/OperationsTournamentMobileCard";
 import { OperationsTournamentListRowActions } from "@/components/client/console/OperationsTournamentListRowActions";
+import { getAdminCopy } from "@/lib/admin-copy-server";
+import { fillAdminCopyTemplate, getClientOperationsTournamentStatus, getCopyValue } from "@/lib/admin-copy";
 
 export const metadata = {
   title: "대회 운영",
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  DRAFT: "임시저장",
-  OPEN: "모집중",
-  CLOSED: "마감",
-  BRACKET_GENERATED: "대진 확정",
-  FINISHED: "종료",
-  HIDDEN: "숨김",
-};
-
 export default async function ClientOperationsPage() {
+  const copy = await getAdminCopy();
   const session = await getSession();
   if (!session || !canAccessClientDashboard(session)) redirect("/");
 
@@ -41,12 +35,15 @@ export default async function ClientOperationsPage() {
   if (!orgId) {
     return (
       <div className="space-y-4">
-        <ConsolePageHeader title="대회 운영" description="먼저 업체를 선택·설정해 주세요." />
+        <ConsolePageHeader
+          title={getCopyValue(copy, "client.operations.pageTitle")}
+          description={getCopyValue(copy, "client.operations.participants.descriptionNoOrg")}
+        />
         <Link
           href="/client/setup"
           className="inline-flex min-h-[44px] items-center rounded-md border border-zinc-300 px-4 text-xs font-medium dark:border-zinc-600"
         >
-          업체 설정
+          {getCopyValue(copy, "client.operations.participants.setupCta")}
         </Link>
       </div>
     );
@@ -89,45 +86,62 @@ export default async function ClientOperationsPage() {
   return (
     <div className="space-y-4">
       <ConsolePageHeader
-        eyebrow="대회 운영"
-        title="대회 운영"
-        description={`조직 「${org?.name ?? "—"}」 소속 대회만 표시됩니다.`}
+        eyebrow={getCopyValue(copy, "client.operations.eyebrow")}
+        title={getCopyValue(copy, "client.operations.pageTitle")}
+        description={fillAdminCopyTemplate(getCopyValue(copy, "client.operations.pageDescriptionWithOrg"), {
+          orgName: org?.name ?? "—",
+        })}
         actions={
-          <div className="hidden items-center gap-2 lg:flex">
+          <div className="hidden items-center gap-2 md:flex">
             <Link
               href="/client/operations/push"
               className="min-h-[44px] items-center rounded-md border border-zinc-300 px-3 text-xs font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800 inline-flex"
             >
-              푸시 발송
+              {getCopyValue(copy, "client.operations.linkPush")}
             </Link>
             <Link
               href="/client/operations/tournaments/new"
               className="inline-flex min-h-[44px] items-center rounded-md border border-zinc-800 bg-zinc-800 px-3 text-xs font-medium text-white hover:bg-zinc-900 dark:border-zinc-200 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
             >
-              새 대회
+              {getCopyValue(copy, "client.operations.linkNewTournament")}
             </Link>
           </div>
         }
       />
 
-      <OperationsQuickActions firstTournamentId={firstId} />
+      <div className="grid grid-cols-2 gap-2 md:hidden">
+        <Link
+          href="/client/operations/push"
+          className="inline-flex min-h-[48px] items-center justify-center rounded-lg border border-zinc-300 px-3 text-center text-xs font-medium text-zinc-800 touch-manipulation hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800"
+        >
+          {getCopyValue(copy, "client.operations.linkPush")}
+        </Link>
+        <Link
+          href="/client/operations/tournaments/new"
+          className="inline-flex min-h-[48px] items-center justify-center rounded-lg border border-zinc-800 bg-zinc-800 px-3 text-center text-xs font-medium text-white touch-manipulation hover:bg-zinc-900 dark:border-zinc-200 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+        >
+          {getCopyValue(copy, "client.operations.linkNewTournament")}
+        </Link>
+      </div>
 
-      <ConsoleSection title="등록된 대회" flush>
+      <OperationsQuickActions firstTournamentId={firstId} copy={copy} />
+
+      <ConsoleSection title={getCopyValue(copy, "client.operations.sectionTournaments")} flush>
         {tournaments.length === 0 ? (
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">등록된 대회가 없습니다.</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">{getCopyValue(copy, "client.operations.emptyTournaments")}</p>
         ) : (
           <>
-            <div className="hidden lg:block">
+            <div className="hidden md:block">
               <ConsoleTable>
                 <ConsoleTableHead>
                   <ConsoleTableRow>
-                    <ConsoleTableTh>대회명</ConsoleTableTh>
-                    <ConsoleTableTh>일정</ConsoleTableTh>
-                    <ConsoleTableTh>장소</ConsoleTableTh>
-                    <ConsoleTableTh>참가비</ConsoleTableTh>
-                    <ConsoleTableTh>신청</ConsoleTableTh>
-                    <ConsoleTableTh>상태</ConsoleTableTh>
-                    <ConsoleTableTh className="text-right">작업</ConsoleTableTh>
+                    <ConsoleTableTh>{getCopyValue(copy, "client.operations.thName")}</ConsoleTableTh>
+                    <ConsoleTableTh>{getCopyValue(copy, "client.operations.thSchedule")}</ConsoleTableTh>
+                    <ConsoleTableTh>{getCopyValue(copy, "admin.list.thVenue")}</ConsoleTableTh>
+                    <ConsoleTableTh>{getCopyValue(copy, "client.operations.thEntryFee")}</ConsoleTableTh>
+                    <ConsoleTableTh>{getCopyValue(copy, "client.operations.thApplications")}</ConsoleTableTh>
+                    <ConsoleTableTh>{getCopyValue(copy, "admin.list.thStatus")}</ConsoleTableTh>
+                    <ConsoleTableTh className="text-right">{getCopyValue(copy, "admin.list.thActions")}</ConsoleTableTh>
                   </ConsoleTableRow>
                 </ConsoleTableHead>
                 <ConsoleTableBody>
@@ -144,21 +158,27 @@ export default async function ClientOperationsPage() {
                         </ConsoleTableTd>
                         <ConsoleTableTd className="max-w-[10rem]">
                           <span className="line-clamp-2 text-zinc-600 dark:text-zinc-400">
-                            {t.venue?.trim() || "—"}
+                            {t.venue?.trim() || getCopyValue(copy, "admin.list.emptyDash")}
                           </span>
                         </ConsoleTableTd>
                         <ConsoleTableTd>
-                          {t.entryFee != null ? `${Number(t.entryFee).toLocaleString()}원` : "—"}
+                          {t.entryFee != null
+                            ? fillAdminCopyTemplate(getCopyValue(copy, "client.operations.format.entryFee"), {
+                                amount: Number(t.entryFee).toLocaleString(),
+                              })
+                            : getCopyValue(copy, "admin.list.emptyDash")}
                         </ConsoleTableTd>
                         <ConsoleTableTd>
-                          {confirmed}
-                          {max != null && max > 0 ? ` / ${max}` : ""}
+                          {fillAdminCopyTemplate(getCopyValue(copy, "client.operations.format.applicationsCell"), {
+                            confirmed,
+                            maxSuffix: max != null && max > 0 ? ` / ${max}` : "",
+                          })}
                         </ConsoleTableTd>
                         <ConsoleTableTd>
-                          <ConsoleBadge tone="neutral">{STATUS_LABEL[t.status] ?? t.status}</ConsoleBadge>
+                          <ConsoleBadge tone="neutral">{getClientOperationsTournamentStatus(copy, t.status)}</ConsoleBadge>
                         </ConsoleTableTd>
                         <ConsoleTableTd className="text-right">
-                          <OperationsTournamentListRowActions tournamentId={t.id} />
+                          <OperationsTournamentListRowActions tournamentId={t.id} copy={copy} />
                         </ConsoleTableTd>
                       </ConsoleTableRow>
                     );
@@ -167,13 +187,14 @@ export default async function ClientOperationsPage() {
               </ConsoleTable>
             </div>
 
-            <div className="flex flex-col gap-3 lg:hidden">
+            <div className="flex flex-col gap-3 md:hidden">
               {tournaments.map((t) => {
                 const confirmed = countMap[t.id] ?? 0;
                 const max = t.maxParticipants;
                 return (
                   <OperationsTournamentMobileCard
                     key={t.id}
+                    copy={copy}
                     t={{
                       id: t.id,
                       name: t.name,

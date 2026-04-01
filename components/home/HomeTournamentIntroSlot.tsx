@@ -9,6 +9,7 @@ import type { SlotBlockCtaConfig } from "@/lib/slot-block-cta";
 import type { SlotBlockLayout, SlotBlockMotion } from "@/lib/slot-block-layout-motion";
 import type { SlotBlockItemsBundle } from "@/lib/slot-block-items";
 import { manualItemsToTournamentCarouselInput } from "@/lib/slot-block-items";
+import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 
 type TournamentItem = TournamentListRow & { distanceKm?: number | null };
 
@@ -23,6 +24,8 @@ export function HomeTournamentIntroSlot({
   blockBackgroundColor,
   homeCarouselFlowSpeed,
   slotItems,
+  sectionTitle,
+  sectionSubtitle,
 }: {
   initialTournaments: TournamentListRow[];
   copy: Record<string, string>;
@@ -33,6 +36,9 @@ export function HomeTournamentIntroSlot({
   blockBackgroundColor?: string;
   homeCarouselFlowSpeed: number;
   slotItems: SlotBlockItemsBundle;
+  /** `PageSection` 제목·부제(페이지 빌더·CMS 행) */
+  sectionTitle?: string | null;
+  sectionSubtitle?: string | null;
 }) {
   const useManualContent = slotItems.mode === "manual";
 
@@ -47,9 +53,10 @@ export function HomeTournamentIntroSlot({
   const [nearbyError, setNearbyError] = useState<string | null>(null);
 
   const handleFindNearby = useCallback(() => {
+    const c = copy as Record<AdminCopyKey, string>;
     setNearbyError(null);
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setNearbyError("이 기기에서는 위치를 사용할 수 없습니다.");
+      setNearbyError(getCopyValue(c, "site.home.tournaments.nearbyErrorGeolocation"));
       return;
     }
     setNearbyLoading(true);
@@ -74,16 +81,16 @@ export function HomeTournamentIntroSlot({
               }))
             );
           })
-          .catch(() => setNearbyError("목록을 불러오지 못했습니다."))
+          .catch(() => setNearbyError(getCopyValue(c, "site.home.tournaments.nearbyErrorFetch")))
           .finally(() => setNearbyLoading(false));
       },
       () => {
-        setNearbyError("위치 권한이 필요합니다. 버튼을 다시 누르고 허용해 주세요.");
+        setNearbyError(getCopyValue(c, "site.home.tournaments.nearbyErrorPermission"));
         setNearbyLoading(false);
       },
       { enableHighAccuracy: false, timeout: 15000, maximumAge: 600_000 }
     );
-  }, []);
+  }, [copy]);
 
   const manualList: HomeTournamentCarouselInput[] = useManualContent
     ? manualItemsToTournamentCarouselInput(slotItems.items)
@@ -100,6 +107,8 @@ export function HomeTournamentIntroSlot({
         slotMotion={slotMotion}
         blockBackgroundColor={blockBackgroundColor}
         homeCarouselFlowSpeed={homeCarouselFlowSpeed}
+        sectionTitle={sectionTitle}
+        sectionSubtitle={sectionSubtitle}
       />
     );
   }
@@ -114,6 +123,8 @@ export function HomeTournamentIntroSlot({
       slotMotion={slotMotion}
       blockBackgroundColor={blockBackgroundColor}
       homeCarouselFlowSpeed={homeCarouselFlowSpeed}
+      sectionTitle={sectionTitle}
+      sectionSubtitle={sectionSubtitle}
       nearbyFind={{
         onClick: handleFindNearby,
         loading: nearbyLoading,

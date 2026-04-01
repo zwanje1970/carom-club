@@ -17,6 +17,7 @@ import {
   type TableOrientation,
 } from "@/lib/billiard-table-constants";
 import type { BilliardPath } from "@/lib/billiard-path-types";
+import { PATH_EDITOR_TOUCH_NO_SELECT_CLASS } from "@/lib/path-editor-touch-ui";
 
 const SPOT_HIT_RADIUS_PX = 14;
 const CUE_HIT_RADIUS_PX = 16;
@@ -193,7 +194,7 @@ export function BilliardPathLayer({
 
   return (
     <div
-      className="absolute inset-0 cursor-crosshair touch-none"
+      className={`absolute inset-0 cursor-crosshair touch-none ${PATH_EDITOR_TOUCH_NO_SELECT_CLASS}`}
       style={{ pointerEvents: "auto" }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}

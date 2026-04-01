@@ -10,6 +10,7 @@ import { manualItemsToVenueCarouselItems } from "@/lib/slot-block-items";
 /** 홈 `venueIntro` 슬롯 — `PageSlotBlock`에서만 마운트 */
 export function HomeVenueIntroSlot({
   venues,
+  copy,
   homeCarouselFlowSpeed = 50,
   cardStyle,
   ctaConfig,
@@ -17,8 +18,10 @@ export function HomeVenueIntroSlot({
   slotMotion,
   blockBackgroundColor,
   slotItems,
+  sectionTitle,
 }: {
   venues: VenueCarouselItem[];
+  copy: Record<string, string>;
   /** `slotMotion`이 없을 때만 페이지 자동 슬라이드 간격에 사용 */
   homeCarouselFlowSpeed?: number;
   cardStyle?: SlotBlockCardStyle;
@@ -27,6 +30,8 @@ export function HomeVenueIntroSlot({
   slotMotion: SlotBlockMotion;
   blockBackgroundColor?: string;
   slotItems: SlotBlockItemsBundle;
+  /** `PageSection` 제목 — 비우면 관리자 문구 */
+  sectionTitle?: string | null;
 }) {
   const list =
     slotItems.mode === "manual" && slotItems.items.length > 0
@@ -38,12 +43,14 @@ export function HomeVenueIntroSlot({
   return (
     <VenueCarousel
       venues={list}
+      copy={copy}
       homeCarouselFlowSpeed={homeCarouselFlowSpeed}
       cardStyle={cardStyle}
       ctaConfig={ctaConfig}
       slotLayout={slotLayout}
       slotMotion={slotMotion}
       blockBackgroundColor={blockBackgroundColor}
+      sectionTitle={sectionTitle}
     />
   );
 }

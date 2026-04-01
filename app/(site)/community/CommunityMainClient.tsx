@@ -5,11 +5,13 @@ import { CommunityPostListSection } from "@/components/community/CommunityPostLi
 import type { CommunityHubPostItem } from "@/types/page-slot-render-context";
 
 export function CommunityMainClient({
+  copy,
   latest,
   initialCategory,
   canManageReports = false,
   showSolverEntry,
 }: {
+  copy: Record<string, string>;
   latest: CommunityHubPostItem[];
   initialCategory: "all" | "free" | "qna" | "notice";
   canManageReports?: boolean;
@@ -17,7 +19,7 @@ export function CommunityMainClient({
 }) {
   return (
     <div className="pb-20">
-      <CommunityNanguPromoCard />
+      <CommunityNanguPromoCard copy={copy} />
       <CommunityPostListSection
         latest={latest}
         initialCategory={initialCategory}

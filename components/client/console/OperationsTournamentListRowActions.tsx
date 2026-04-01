@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { getCopyValue } from "@/lib/admin-copy";
 import { cx } from "@/components/client/console/ui/cx";
 
 const btn =
@@ -11,18 +12,25 @@ const btnPrimary =
   "border-zinc-800 bg-zinc-800 text-white hover:bg-zinc-900 dark:border-zinc-200 dark:bg-zinc-200 dark:text-zinc-900 dark:hover:bg-white";
 
 /** 대회 목록 테이블 — 행당 운영 진입 (모바일: 주요 2개 + 더보기) */
-export function OperationsTournamentListRowActions({ tournamentId }: { tournamentId: string }) {
+export function OperationsTournamentListRowActions({
+  tournamentId,
+  copy,
+}: {
+  tournamentId: string;
+  copy: Record<string, string>;
+}) {
   const base = `/client/operations/tournaments/${tournamentId}`;
   const info = `/client/tournaments/${tournamentId}`;
 
   const links = [
-    { href: `${base}/participants`, label: "운영 콘솔", primary: true },
-    { href: `${base}/bracket`, label: "대진표", primary: true },
-    { href: info, label: "대회 정보", primary: false },
-    { href: `${base}/participant-roster`, label: "참가 명단 확정", primary: false },
-    { href: `${base}/bracket-build`, label: "대진 생성", primary: false },
+    { href: `${base}/participants`, label: getCopyValue(copy, "client.operations.mobile.btnOpsConsole"), primary: true },
+    { href: `${base}/bracket`, label: getCopyValue(copy, "client.operations.mobile.btnBracket"), primary: true },
+    { href: info, label: getCopyValue(copy, "client.operations.mobile.linkTournamentInfo"), primary: false },
+    { href: `${base}/participant-roster`, label: getCopyValue(copy, "client.operations.mobile.linkRoster"), primary: false },
+    { href: `${base}/bracket-build`, label: getCopyValue(copy, "client.operations.mobile.linkBracketBuild"), primary: false },
   ];
   const editHref = `${base}/edit`;
+  const editLabel = getCopyValue(copy, "client.operations.mobile.linkEditTournament");
 
   const primaryLinks = links.filter((l) => l.primary);
   const moreLinks = links.filter((l) => !l.primary);
@@ -37,7 +45,7 @@ export function OperationsTournamentListRowActions({ tournamentId }: { tournamen
           </Link>
         ))}
         <Link href={editHref} className={cx(btn, btnSecondary)}>
-          대회 설정 수정
+          {editLabel}
         </Link>
       </div>
 
@@ -58,7 +66,7 @@ export function OperationsTournamentListRowActions({ tournamentId }: { tournamen
               "inline-block list-none cursor-pointer select-none [&::-webkit-details-marker]:hidden"
             )}
           >
-            운영 메뉴 ▾
+            {getCopyValue(copy, "client.operations.rowActions.menuSummary")}
           </summary>
           <div className="absolute right-0 top-full z-20 mt-1 min-w-[11rem] rounded-md border border-zinc-200 bg-white py-1 shadow-md dark:border-zinc-600 dark:bg-zinc-900">
             {moreLinks.map((l) => (
@@ -74,7 +82,7 @@ export function OperationsTournamentListRowActions({ tournamentId }: { tournamen
               href={editHref}
               className="block px-3 py-1.5 text-left text-[11px] font-medium text-zinc-800 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800"
             >
-              대회 설정 수정
+              {editLabel}
             </Link>
           </div>
         </details>

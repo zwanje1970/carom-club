@@ -48,6 +48,7 @@ import {
   isValidCueCurveKey,
   isValidObjectCurveKey,
 } from "@/lib/path-curve-display";
+import { PATH_EDITOR_TOUCH_NO_SELECT_CLASS } from "@/lib/path-editor-touch-ui";
 
 /** 수구 진행 경로 */
 const CUE_PATH_STROKE = "rgb(239, 68, 68)";
@@ -84,9 +85,8 @@ function clampCurveControlNormPath(n: { x: number; y: number }): { x: number; y:
   return { x: Math.min(1, Math.max(0, n.x)), y: Math.min(1, Math.max(0, n.y)) };
 }
 
-const FT_BTN_CLASS =
-  "box-border flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-full border-0 text-[20px] font-bold leading-none text-white bg-black/40 shadow-md active:bg-black/55 active:scale-[0.97] touch-manipulation select-none";
-const FT_SPACER_CLASS = "h-[48px] w-[48px] shrink-0";
+const FT_BTN_CLASS = `box-border flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-full border-0 text-[20px] font-bold leading-none text-white bg-black/40 shadow-md active:bg-black/55 active:scale-[0.97] touch-manipulation ${PATH_EDITOR_TOUCH_NO_SELECT_CLASS}`;
+const FT_SPACER_CLASS = `h-[48px] w-[48px] shrink-0 ${PATH_EDITOR_TOUCH_NO_SELECT_CLASS}`;
 
 type PathFineTuneTarget =
   | { kind: "curve"; curveKind: "cue" | "object"; key: string }
@@ -1753,11 +1753,11 @@ export function NanguSolutionPathOverlay({
       ? createPortal(
           <>
             <div
-              className="fixed inset-0 z-[10060] flex items-center justify-center pointer-events-none"
+              className={`fixed inset-0 z-[10060] flex items-center justify-center pointer-events-none ${PATH_EDITOR_TOUCH_NO_SELECT_CLASS}`}
               aria-label="경로 미세조정"
             >
               <div
-                className="pointer-events-auto flex max-h-[min(100dvh,100vh)] flex-col items-center gap-4 rounded-2xl bg-transparent p-3 shadow-none"
+                className={`pointer-events-auto flex max-h-[min(100dvh,100vh)] flex-col items-center gap-4 rounded-2xl bg-transparent p-3 shadow-none ${PATH_EDITOR_TOUCH_NO_SELECT_CLASS}`}
                 data-path-fine-tune=""
               >
                 <div className="grid grid-cols-3 shrink-0 gap-3 items-center justify-center w-max">
@@ -1848,8 +1848,8 @@ export function NanguSolutionPathOverlay({
                   <span className={FT_SPACER_CLASS} aria-hidden />
                 </div>
                 {pathFineTuneMagnifier && pathFineTuneMagnifierCenter && pathLinesVisible ? (
-              <div
-                className="shrink-0 cursor-grab touch-none select-none rounded-xl border-2 border-white/85 bg-slate-950/95 shadow-2xl active:cursor-grabbing"
+                <div
+                className={`shrink-0 cursor-grab touch-none rounded-xl border-2 border-white/85 bg-slate-950/95 shadow-2xl active:cursor-grabbing ${PATH_EDITOR_TOUCH_NO_SELECT_CLASS}`}
                 style={{
                   transform: `translate(${pathFineTuneMagOffset.x}px, ${pathFineTuneMagOffset.y}px)`,
                   width: SPOT_MAGNIFIER_BOX_PX,
@@ -2068,7 +2068,7 @@ export function NanguSolutionPathOverlay({
       data-object-line-visible={
         objectPathLinesVisible && objectPxSegs.length > 0 ? "1" : "0"
       }
-      className="absolute inset-0 w-full h-full"
+      className={`absolute inset-0 h-full w-full ${PATH_EDITOR_TOUCH_NO_SELECT_CLASS}`}
       style={{ pointerEvents: interactive ? "auto" : "none" }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -2077,7 +2077,7 @@ export function NanguSolutionPathOverlay({
       onPointerCancel={(e) => void handlePointerUp(e)}
     >
       <svg
-        className="absolute inset-0 w-full h-full pointer-events-none"
+        className={`absolute inset-0 h-full w-full pointer-events-none ${PATH_EDITOR_TOUCH_NO_SELECT_CLASS}`}
         width={canvasW}
         height={canvasH}
         viewBox={`0 0 ${canvasW} ${canvasH}`}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { containerMaxW } from "./_lib/config";
+import { CONSOLE_INNER_MAX_CLASS, CONSOLE_PAD_X_CLASS } from "@/lib/console-layout";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { MobileLandscapeLockButton } from "@/components/MobileLandscapeLockButton";
 
@@ -71,8 +71,10 @@ export function AdminPageActions({
     >
       <div
         className={`flex w-full min-w-0 flex-wrap items-center gap-2 ${
-          fullWidth ? "px-2 py-1 sm:px-3" : "px-4 py-1.5 sm:gap-3 sm:px-6"
-        } ${fullWidth ? "" : `${containerMaxW} mx-auto`}`}
+          fullWidth
+            ? "px-2 py-1 sm:px-3"
+            : `${CONSOLE_INNER_MAX_CLASS} ${CONSOLE_PAD_X_CLASS} py-1.5 sm:gap-3`
+        }`}
       >
         {leftSlot != null ? <div className="flex shrink-0 items-center">{leftSlot}</div> : null}
         <button

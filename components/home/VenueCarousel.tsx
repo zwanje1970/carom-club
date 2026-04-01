@@ -20,6 +20,7 @@ import {
 } from "@/lib/slot-block-card-style";
 import type { SlotBlockLayout, SlotBlockMotion } from "@/lib/slot-block-layout-motion";
 import { slotMotionEffectiveFlowSpeed } from "@/lib/slot-block-layout-motion";
+import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 
 export type VenueCarouselItem = {
   id: string;
@@ -33,12 +34,6 @@ export type VenueCarouselItem = {
   /** 직접 구성 카드: 링크(있으면 venueSlug 자동 연결보다 우선) */
   manualLinkUrl?: string | null;
 };
-
-const VENUE_CATEGORY_OPTIONS: { value: "all" | "daedae_only" | "mixed"; label: string }[] = [
-  { value: "all", label: "전체" },
-  { value: "daedae_only", label: "대대전용" },
-  { value: "mixed", label: "복합구장" },
-];
 
 const GAP = 16;
 
@@ -67,14 +62,17 @@ function gapPxFromStyle(cardStyle: SlotBlockCardStyle | undefined): number {
 
 export function VenueCarousel({
   venues,
+  copy,
   homeCarouselFlowSpeed = 50,
   cardStyle,
   ctaConfig,
   slotLayout,
   slotMotion,
   blockBackgroundColor,
+  sectionTitle,
 }: {
   venues: VenueCarouselItem[];
+  copy: Record<string, string>;
   /** 메인 가로 흐름 속도(1~100) — `slotMotion` 없을 때만 */
   homeCarouselFlowSpeed?: number;
   cardStyle?: SlotBlockCardStyle;
@@ -82,7 +80,16 @@ export function VenueCarousel({
   slotLayout?: SlotBlockLayout;
   slotMotion?: SlotBlockMotion;
   blockBackgroundColor?: string;
+  /** `PageSection` 제목 — 비우면 관리자 문구 */
+  sectionTitle?: string | null;
 }) {
+  const c = copy as Record<AdminCopyKey, string>;
+  const headingTitle = sectionTitle?.trim() || getCopyValue(c, "site.home.venues.title");
+  const categoryOptions: { value: "all" | "daedae_only" | "mixed"; label: string }[] = [
+    { value: "all", label: getCopyValue(c, "site.home.venues.categoryAll") },
+    { value: "daedae_only", label: getCopyValue(c, "site.home.venues.categoryDaedae") },
+    { value: "mixed", label: getCopyValue(c, "site.home.venues.categoryMixed") },
+  ];
   const cta = ctaConfig ?? resolveSlotBlockCtaConfig("venueIntro", null);
   const useGrid = slotLayout
     ? slotLayout.type === "grid"
@@ -245,7 +252,7 @@ export function VenueCarousel({
       <div className="mx-auto max-w-6xl">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <SlotBlockCtaLink layer={cta.block} ctx={{}} className="min-w-0 text-left">
-            <h2 className="text-xl font-bold text-site-text sm:text-2xl">당구장 소개</h2>
+            <h2 className="text-xl font-bold text-site-text sm:text-2xl">{headingTitle}</h2>
           </SlotBlockCtaLink>
           {!hideVenueCategoryFilter ? (
             <select
@@ -257,9 +264,9 @@ export function VenueCarousel({
                 scrollRef.current?.scrollTo({ left: 0, behavior: "auto" });
               }}
               className="rounded-md border border-site-border bg-site-card px-3 py-1.5 text-sm text-site-text focus:outline-none focus:ring-2 focus:ring-site-primary"
-              aria-label="당구장 구분"
+              aria-label={getCopyValue(c, "site.home.venues.filterAria")}
             >
-              {VENUE_CATEGORY_OPTIONS.map((opt) => (
+              {categoryOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
@@ -271,7 +278,12 @@ export function VenueCarousel({
         <div className="relative mt-5">
           {filteredVenues.length === 0 ? (
             <p className="text-site-text-muted text-sm py-6 text-center">
-              {venueFilter === "all" ? "등록된 당구장이 없습니다." : `해당 구분의 당구장이 없습니다. (${VENUE_CATEGORY_OPTIONS.find((o) => o.value === venueFilter)?.label ?? venueFilter})`}
+              {venueFilter === "all"
+                ? getCopyValue(c, "site.home.venues.empty")
+                : getCopyValue(c, "site.home.venues.emptyFiltered").replace(
+                    "{label}",
+                    categoryOptions.find((o) => o.value === venueFilter)?.label ?? venueFilter
+                  )}
             </p>
           ) : useGrid && cardStyle ? (
             <div className={cn("mt-5", tournamentGridUlClass(gridCols, cardStyle))}>
@@ -343,7 +355,7 @@ export function VenueCarousel({
             <>
               <button
                 type="button"
-                aria-label="이전"
+                aria-label={getCopyValue(c, "site.home.venues.carouselPrev")}
                 onClick={() => scrollToPage(currentPage - 1)}
                 className="absolute left-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-site-card shadow-md border border-site-border w-10 h-10 flex items-center justify-center text-site-text hover:bg-site-bg hidden md:flex"
               >
@@ -351,7 +363,7 @@ export function VenueCarousel({
               </button>
               <button
                 type="button"
-                aria-label="다음"
+                aria-label={getCopyValue(c, "site.home.venues.carouselNext")}
                 onClick={() => scrollToPage(currentPage + 1)}
                 className="absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-site-card shadow-md border border-site-border w-10 h-10 flex items-center justify-center text-site-text hover:bg-site-bg hidden md:flex"
               >
@@ -474,7 +486,10 @@ export function VenueCarousel({
                 <button
                   key={i}
                   type="button"
-                  aria-label={`${i + 1}페이지`}
+                  aria-label={getCopyValue(c, "site.home.venues.carouselPageAria").replace(
+                    "{n}",
+                    String(i + 1)
+                  )}
                   onClick={() => scrollToPage(i)}
                   className={`w-2 h-2 rounded-full transition-colors ${
                     i === currentPage ? "bg-site-primary scale-125" : "bg-site-border hover:bg-site-text-muted"

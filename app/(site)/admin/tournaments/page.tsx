@@ -8,6 +8,8 @@ import { normalizeSlug } from "@/lib/normalize-slug";
 import { isPlatformAdmin } from "@/types/auth";
 import { getTournamentsListAdminRaw, type TournamentListRow } from "@/lib/db-tournaments";
 import { MOCK_TOURNAMENTS_LIST } from "@/lib/mock-data";
+import { getAdminCopy } from "@/lib/admin-copy-server";
+import { getCopyValue, getDashboardTournamentStatusLabel } from "@/lib/admin-copy";
 import SectionMain from "@/components/admin/_components/Section/Main";
 import SectionTitleLineWithButton from "@/components/admin/_components/Section/TitleLineWithButton";
 import CardBox from "@/components/admin/_components/CardBox";
@@ -28,23 +30,15 @@ function statusColor(
       return "light";
     case "HIDDEN":
       return "dark";
+    case "BRACKET_GENERATED":
+      return "info";
     default:
       return "light";
   }
 }
 
-function statusLabel(status: string): string {
-  const map: Record<string, string> = {
-    DRAFT: "초안",
-    OPEN: "모집중",
-    CLOSED: "마감",
-    FINISHED: "종료",
-    HIDDEN: "숨김",
-  };
-  return map[status] ?? status;
-}
-
 export default async function AdminTournamentsPage() {
+  const copy = await getAdminCopy();
   let tournaments: TournamentListRow[] = await getTournamentsListAdminRaw();
   if (tournaments.length === 0) {
     tournaments = MOCK_TOURNAMENTS_LIST.map((t) => {
@@ -89,13 +83,26 @@ export default async function AdminTournamentsPage() {
     }
   }
 
+  const dash = getCopyValue(copy, "admin.list.datePlaceholder");
+
   return (
     <SectionMain>
-      <SectionTitleLineWithButton icon={mdiTrophy} title={isPlatform ? "대회 현황" : "대회 목록"}>
+      <SectionTitleLineWithButton
+        icon={mdiTrophy}
+        title={getCopyValue(
+          copy,
+          isPlatform ? "admin.tournaments.pageTitlePlatform" : "admin.tournaments.pageTitleClient"
+        )}
+      >
         {canCreateTournament && (
           <div className="flex flex-wrap items-center gap-2">
-            <Button href="/admin/tournaments/new" label="이전 대회 불러오기" color="contrast" outline />
-            <Button href="/admin/tournaments/new" label="대회 생성" color="info" />
+            <Button
+              href="/admin/tournaments/new"
+              label={getCopyValue(copy, "admin.tournaments.btnLoadPrevious")}
+              color="contrast"
+              outline
+            />
+            <Button href="/admin/tournaments/new" label={getCopyValue(copy, "admin.tournaments.btnCreate")} color="info" />
           </div>
         )}
       </SectionTitleLineWithButton>
@@ -106,22 +113,22 @@ export default async function AdminTournamentsPage() {
             <thead className="bg-gray-50 dark:bg-slate-800/50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-slate-400">
-                  대회명
+                  {getCopyValue(copy, "admin.list.thTournamentName")}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-slate-400">
-                  주최 클라이언트
+                  {getCopyValue(copy, "admin.tournaments.thHostClient")}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-slate-400">
-                  일시
+                  {getCopyValue(copy, "admin.list.thDateTime")}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-slate-400">
-                  장소
+                  {getCopyValue(copy, "admin.list.thVenue")}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-slate-400">
-                  상태
+                  {getCopyValue(copy, "admin.list.thStatus")}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-slate-400">
-                  경기방식
+                  {getCopyValue(copy, "admin.tournaments.thGameFormat")}
                 </th>
               </tr>
             </thead>
@@ -129,7 +136,7 @@ export default async function AdminTournamentsPage() {
               {tournaments.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-gray-500 dark:text-slate-400">
-                    등록된 대회가 없습니다.
+                    {getCopyValue(copy, "site.tournaments.empty")}
                   </td>
                 </tr>
               ) : (
@@ -144,19 +151,23 @@ export default async function AdminTournamentsPage() {
                       </Link>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600 dark:text-slate-400">
-                      {t.organization?.name ?? "-"}
+                      {t.organization?.name ?? dash}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600 dark:text-slate-400">
                       {formatKoreanDateTime(t.startAt)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600 dark:text-slate-400">
-                      {t.venue ?? "-"}
+                      {t.venue ?? dash}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm">
-                      <PillTag color={statusColor(t.status)} label={statusLabel(t.status)} small />
+                      <PillTag
+                        color={statusColor(t.status)}
+                        label={getDashboardTournamentStatusLabel(copy, t.status)}
+                        small
+                      />
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600 dark:text-slate-400">
-                      {t.gameFormat ?? "-"}
+                      {t.gameFormat ?? dash}
                     </td>
                   </tr>
                 ))

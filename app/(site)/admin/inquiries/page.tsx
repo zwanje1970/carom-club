@@ -2,13 +2,17 @@ import { mdiMessageQuestion } from "@mdi/js";
 import SectionMain from "@/components/admin/_components/Section/Main";
 import SectionTitleLineWithButton from "@/components/admin/_components/Section/TitleLineWithButton";
 import CardBox from "@/components/admin/_components/CardBox";
+import { getAdminCopy } from "@/lib/admin-copy-server";
+import { getCopyValue } from "@/lib/admin-copy";
 
-export default function AdminInquiriesPage() {
+export default async function AdminInquiriesPage() {
+  const copy = await getAdminCopy();
+
   return (
     <SectionMain>
-      <SectionTitleLineWithButton icon={mdiMessageQuestion} title="문의관리" />
+      <SectionTitleLineWithButton icon={mdiMessageQuestion} title={getCopyValue(copy, "admin.inquiries.pageTitle")} />
       <CardBox>
-        <p className="text-gray-600 dark:text-slate-400">문의 목록 및 답변 관리입니다.</p>
+        <p className="text-gray-600 dark:text-slate-400">{getCopyValue(copy, "admin.inquiries.pageIntro")}</p>
       </CardBox>
     </SectionMain>
   );

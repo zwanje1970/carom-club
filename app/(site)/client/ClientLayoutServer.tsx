@@ -28,13 +28,13 @@ export async function ClientLayoutServer({ children }: Props) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-site-bg p-4">
         <div className="max-w-sm text-center">
-          <h1 className="text-xl font-bold text-site-text">로그인이 필요합니다</h1>
+          <h1 className="text-xl font-bold text-site-text">{getCopyValue(c, "client.gate.loginRequiredTitle")}</h1>
           <p className="mt-2 text-gray-600">{getCopyValue(c, "client.dashboard.loginPrompt")}</p>
           <Link
             href="/login"
             className="mt-6 inline-block rounded-lg bg-site-primary px-5 py-2.5 font-medium text-white hover:opacity-90"
           >
-            로그인
+            {getCopyValue(c, "client.gate.loginButton")}
           </Link>
         </div>
       </div>
@@ -50,13 +50,13 @@ export async function ClientLayoutServer({ children }: Props) {
       return (
         <div className="flex min-h-screen items-center justify-center bg-site-bg p-4">
           <div className="max-w-sm text-center">
-            <h1 className="text-xl font-bold text-site-text">클라이언트 권한이 없습니다</h1>
-            <p className="mt-2 text-gray-600">당구장·동호회·연맹·주최자·강사로 등록하시려면 마이페이지에서 클라이언트 등록 신청을 해 주세요.</p>
+            <h1 className="text-xl font-bold text-site-text">{getCopyValue(c, "client.gate.noClientRoleTitle")}</h1>
+            <p className="mt-2 text-gray-600">{getCopyValue(c, "client.gate.noClientRoleBody")}</p>
             <Link
               href="/mypage"
               className="mt-6 inline-block rounded-lg bg-site-primary px-5 py-2.5 font-medium text-white hover:opacity-90"
             >
-              마이페이지로
+              {getCopyValue(c, "client.gate.goMypage")}
             </Link>
           </div>
         </div>

@@ -1,45 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { MemberRow } from "@/app/api/admin/members/route";
 import { formatKoreanDate } from "@/lib/format-date";
+import { DEFAULT_ADMIN_COPY, fillAdminCopyTemplate, getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 
-const ROLE_TYPE_OPTIONS = [
-  { value: "all", label: "전체" },
-  { value: "user", label: "일반회원" },
-  { value: "client_general", label: "일반 클라이언트" },
-  { value: "client_registered", label: "등록 클라이언트(연회원)" },
-  { value: "admin", label: "관리자" },
-] as const;
-
-const STATUS_OPTIONS = [
-  { value: "all", label: "전체" },
-  { value: "active", label: "정상" },
-  { value: "pending", label: "승인대기" },
-  { value: "suspended", label: "정지" },
-  { value: "withdrawn", label: "탈퇴" },
-] as const;
-
-const SORT_BY_OPTIONS = [
-  { value: "createdAt", label: "날짜순" },
-  { value: "name", label: "이름순" },
-  { value: "role", label: "구분순" },
-] as const;
-
-const SORT_ORDER_OPTIONS = [
-  { value: "desc", label: "내림차순" },
-  { value: "asc", label: "오름차순" },
-] as const;
-
+/** API/DB에서 오는 동적 문자열(이번 배치에서 copy로 치환하지 않음): rbacRoleLabel, RBAC 역할 목록 option label, permission.label·description, 활동 점수 행 description·type, 해결사 랭킹 suggestedRoleLabel·currentRoleLabel 등 */
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
-const CATEGORY_LABELS: Record<string, string> = {
-  community: "커뮤니티",
-  solver: "난구해결사",
-  note: "당구노트",
-  admin: "운영자",
-};
-
 const ROLE_ORDER: Record<string, number> = {
   PLATFORM_ADMIN: 0,
   CLIENT_ADMIN: 1,
@@ -106,45 +74,205 @@ function sortRolesByPriority(roles: RoleSummary[]): RoleSummary[] {
   });
 }
 
-function getRoleDisplayLabel(row: MemberRow): string {
-  if (row.role === "PLATFORM_ADMIN") return "플랫폼 관리자";
-  if (row.role === "ZONE_MANAGER") return "권역 관리자";
+function getRoleDisplayLabel(row: MemberRow, copy: Record<string, string>): string {
+  if (row.role === "PLATFORM_ADMIN") return getCopyValue(copy, "admin.members.role.platformAdmin");
+  if (row.role === "ZONE_MANAGER") return getCopyValue(copy, "admin.members.role.zoneManager");
   if (row.role === "CLIENT_ADMIN") {
-    if (row.orgClientType === "REGISTERED") return "등록 클라이언트(연회원)";
-    return "일반 클라이언트";
+    if (row.orgClientType === "REGISTERED") return getCopyValue(copy, "admin.members.role.clientRegistered");
+    return getCopyValue(copy, "admin.members.role.clientGeneral");
   }
-  return "일반회원";
+  return getCopyValue(copy, "admin.members.role.user");
 }
 
-function getStatusDisplayLabel(row: MemberRow): string {
-  if (row.withdrawnAt) return "탈퇴";
-  if (row.status === "SUSPENDED") return "정지";
-  if (row.orgApprovalStatus === "PENDING" && row.role === "CLIENT_ADMIN") return "승인대기";
-  if (row.orgStatus === "SUSPENDED") return "정지";
-  return "정상";
+function getStatusDisplayLabel(row: MemberRow, copy: Record<string, string>): string {
+  if (row.withdrawnAt) return getCopyValue(copy, "admin.members.status.withdrawn");
+  if (row.status === "SUSPENDED") return getCopyValue(copy, "admin.members.status.suspended");
+  if (row.orgApprovalStatus === "PENDING" && row.role === "CLIENT_ADMIN")
+    return getCopyValue(copy, "admin.members.status.pendingApproval");
+  if (row.orgStatus === "SUSPENDED") return getCopyValue(copy, "admin.members.status.suspended");
+  return getCopyValue(copy, "admin.members.status.active");
 }
 
-function getDisplayName(row: MemberRow): string {
+function getDisplayName(row: MemberRow, copy: Record<string, string>): string {
   const name = (row.name ?? "").trim();
   if (name) return name;
-  return row.username?.trim() || row.email?.trim() || "-";
+  const u = row.username?.trim() || row.email?.trim();
+  if (u) return u;
+  return getCopyValue(copy, "admin.members.display.nameFallback");
 }
 
-function getResolvedRoleLabel(row: MemberRow): string {
-  return row.rbacRoleLabel?.trim() || getRoleDisplayLabel(row);
+function getResolvedRoleLabel(row: MemberRow, copy: Record<string, string>): string {
+  return row.rbacRoleLabel?.trim() || getRoleDisplayLabel(row, copy);
 }
 
-function getCommunityLevelLabel(row: MemberRow): string {
+function getCommunityLevelLabel(row: MemberRow, copy: Record<string, string>): string {
   const level = row.communityLevel ?? 1;
   const tierName = row.communityTierName?.trim();
-  return tierName ? `${level} (${tierName})` : String(level);
+  return tierName
+    ? fillAdminCopyTemplate(getCopyValue(copy, "admin.members.display.levelWithTier"), { level, tierName })
+    : String(level);
 }
 
 function getPermissionDisplayLabel(permission: PermissionItem): string {
   return permission.label?.trim() || permission.description?.trim() || permission.key;
 }
 
-export function AdminMembersList() {
+function getPermissionCategoryLabel(copy: Record<string, string>, category: string): string {
+  const k = `admin.members.permCategory.${category}` as AdminCopyKey;
+  if (k in DEFAULT_ADMIN_COPY) return getCopyValue(copy, k);
+  return category;
+}
+
+type MembersFilterPanelProps = {
+  copy: Record<string, string>;
+  search: string;
+  roleType: string;
+  status: string;
+  sortBy: string;
+  sortOrder: string;
+  pageSize: number;
+  setParams: (updates: Record<string, string | number>) => void;
+  roleTypeOptions: { value: string; label: string }[];
+  statusOptions: { value: string; label: string }[];
+  sortByOptions: { value: string; label: string }[];
+  sortOrderOptions: { value: string; label: string }[];
+  sortByLabel: string;
+  sortOrderLabel: string;
+  /** 모바일 터치 영역 확대 */
+  touchFriendly?: boolean;
+};
+
+function AdminMembersFilterPanel({
+  copy,
+  search,
+  roleType,
+  status,
+  sortBy,
+  sortOrder,
+  pageSize,
+  setParams,
+  roleTypeOptions,
+  statusOptions,
+  sortByOptions,
+  sortOrderOptions,
+  sortByLabel,
+  sortOrderLabel,
+  touchFriendly,
+}: MembersFilterPanelProps) {
+  const inputClass = touchFriendly
+    ? "w-full rounded border border-site-border bg-site-card px-3 py-3 text-base text-site-text min-h-[44px] focus:border-site-primary focus:outline-none focus:ring-1 focus:ring-site-primary md:min-h-0 md:py-2 md:text-sm"
+    : "w-full rounded border border-site-border bg-site-card px-3 py-2 text-sm text-site-text focus:border-site-primary focus:outline-none focus:ring-1 focus:ring-site-primary";
+  const selectClass = touchFriendly
+    ? "w-full rounded border border-site-border bg-site-card px-3 py-3 text-base text-site-text min-h-[44px] focus:border-site-primary focus:outline-none focus:ring-1 focus:ring-site-primary md:min-h-0 md:py-2 md:text-sm"
+    : "w-full rounded border border-site-border bg-site-card px-3 py-2 text-sm text-site-text focus:border-site-primary focus:outline-none focus:ring-1 focus:ring-site-primary";
+  const sortSelectClass = touchFriendly
+    ? "rounded border border-site-border bg-site-card px-3 py-2.5 text-base text-site-text min-h-[44px] focus:border-site-primary focus:outline-none focus:ring-1 focus:ring-site-primary md:min-h-0 md:py-1.5 md:text-sm"
+    : "rounded border border-site-border bg-site-card px-3 py-1.5 text-sm text-site-text focus:border-site-primary focus:outline-none focus:ring-1 focus:ring-site-primary";
+  const pageSizeSelectClass = touchFriendly
+    ? "mx-1 rounded border border-site-border bg-site-card px-2 py-2 text-base min-h-[44px] md:min-h-0 md:py-1 md:text-sm"
+    : "mx-1 rounded border border-site-border bg-site-card px-2 py-1 text-sm";
+
+  return (
+    <>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-xs font-medium text-site-text-muted">
+            {getCopyValue(copy, "admin.members.searchLabel")}
+          </label>
+          <input
+            type="search"
+            placeholder={getCopyValue(copy, "admin.members.searchPlaceholder")}
+            aria-label={getCopyValue(copy, "admin.members.searchPlaceholder")}
+            value={search}
+            onChange={(e) => setParams({ search: e.target.value, page: 1 })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-site-text-muted">
+            {getCopyValue(copy, "admin.members.filterRoleTypeLabel")}
+          </label>
+          <select
+            value={roleType}
+            onChange={(e) => setParams({ roleType: e.target.value, page: 1 })}
+            className={selectClass}
+          >
+            {roleTypeOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-site-text-muted">
+            {getCopyValue(copy, "admin.members.filterStatusLabel")}
+          </label>
+          <select
+            value={status}
+            onChange={(e) => setParams({ status: e.target.value, page: 1 })}
+            className={selectClass}
+          >
+            {statusOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <span className="text-xs font-medium text-site-text-muted">{getCopyValue(copy, "admin.list.sortLabel")}</span>
+        <select value={sortBy} onChange={(e) => setParams({ sortBy: e.target.value })} className={sortSelectClass}>
+          {sortByOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <select value={sortOrder} onChange={(e) => setParams({ sortOrder: e.target.value })} className={sortSelectClass}>
+          {sortOrderOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-site-text-muted">
+          {fillAdminCopyTemplate(getCopyValue(copy, "admin.members.sortCurrent"), {
+            sortBy: sortByLabel,
+            sortOrder: sortOrderLabel,
+          })}
+        </span>
+        <button
+          type="button"
+          onClick={() => setParams({ status: "pending", page: 1 })}
+          className={`rounded border border-amber-200 bg-amber-50 font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200 ${
+            touchFriendly ? "min-h-[44px] px-4 py-2.5 text-sm md:min-h-0 md:px-2.5 md:py-1.5 md:text-xs" : "px-2.5 py-1.5 text-xs"
+          }`}
+        >
+          {getCopyValue(copy, "admin.members.quickPendingOnly")}
+        </button>
+        <span className={`text-xs text-site-text-muted ${touchFriendly ? "sm:ml-auto" : "ml-auto"}`}>
+          {getCopyValue(copy, "admin.list.perPageLabel")}
+          <select
+            value={pageSize}
+            onChange={(e) => setParams({ pageSize: e.target.value, page: 1 })}
+            className={pageSizeSelectClass}
+          >
+            {PAGE_SIZE_OPTIONS.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+          {getCopyValue(copy, "admin.list.perPageSuffix")}
+        </span>
+      </div>
+    </>
+  );
+}
+
+export function AdminMembersList({ copy }: { copy: Record<string, string> }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [items, setItems] = useState<MemberRow[]>([]);
@@ -176,6 +304,42 @@ export function AdminMembersList() {
   const sortOrder = searchParams.get("sortOrder") ?? "desc";
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
   const pageSize = Math.max(10, Math.min(100, parseInt(searchParams.get("pageSize") ?? "20", 10) || 20));
+
+  const roleTypeOptions = useMemo(
+    () => [
+      { value: "all", label: getCopyValue(copy, "admin.list.filter.all") },
+      { value: "user", label: getCopyValue(copy, "admin.members.filter.roleType.user") },
+      { value: "client_general", label: getCopyValue(copy, "admin.members.filter.roleType.client_general") },
+      { value: "client_registered", label: getCopyValue(copy, "admin.members.filter.roleType.client_registered") },
+      { value: "admin", label: getCopyValue(copy, "admin.members.filter.roleType.admin") },
+    ],
+    [copy]
+  );
+  const statusOptions = useMemo(
+    () => [
+      { value: "all", label: getCopyValue(copy, "admin.list.filter.all") },
+      { value: "active", label: getCopyValue(copy, "admin.members.filter.status.active") },
+      { value: "pending", label: getCopyValue(copy, "admin.members.filter.status.pending") },
+      { value: "suspended", label: getCopyValue(copy, "admin.members.filter.status.suspended") },
+      { value: "withdrawn", label: getCopyValue(copy, "admin.members.filter.status.withdrawn") },
+    ],
+    [copy]
+  );
+  const sortByOptions = useMemo(
+    () => [
+      { value: "createdAt", label: getCopyValue(copy, "admin.members.sortBy.createdAt") },
+      { value: "name", label: getCopyValue(copy, "admin.members.sortBy.name") },
+      { value: "role", label: getCopyValue(copy, "admin.members.sortBy.role") },
+    ],
+    [copy]
+  );
+  const sortOrderOptions = useMemo(
+    () => [
+      { value: "desc", label: getCopyValue(copy, "admin.members.sortOrder.desc") },
+      { value: "asc", label: getCopyValue(copy, "admin.members.sortOrder.asc") },
+    ],
+    [copy]
+  );
 
   const setParams = useCallback(
     (updates: Record<string, string | number>) => {
@@ -214,7 +378,7 @@ export function AdminMembersList() {
           error?: string;
         };
         if (!res.ok) {
-          return Promise.reject(new Error(data.error ?? "목록 조회 실패"));
+          return Promise.reject(new Error(data.error ?? getCopyValue(copy, "admin.members.errorListQuery")));
         }
         return data;
       })
@@ -225,7 +389,7 @@ export function AdminMembersList() {
         }
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message ?? "목록을 불러올 수 없습니다.");
+        if (!cancelled) setError(err.message ?? getCopyValue(copy, "admin.members.errorListLoad"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -233,7 +397,7 @@ export function AdminMembersList() {
     return () => {
       cancelled = true;
     };
-  }, [search, roleType, status, sortBy, sortOrder, page, pageSize, refreshKey]);
+  }, [search, roleType, status, sortBy, sortOrder, page, pageSize, refreshKey, copy]);
 
   useEffect(() => {
     let cancelled = false;
@@ -246,7 +410,7 @@ export function AdminMembersList() {
           error?: string;
         };
         if (!res.ok) {
-          return Promise.reject(new Error(data.error ?? "레벨 조회 실패"));
+          return Promise.reject(new Error(data.error ?? getCopyValue(copy, "admin.members.errorRolesQuery")));
         }
         return data;
       })
@@ -257,7 +421,7 @@ export function AdminMembersList() {
         setSelectedRoleId((prev) => prev || nextRoles[0]?.id || "");
       })
       .catch((err) => {
-        if (!cancelled) setRolesError(err.message ?? "레벨 조회 실패");
+        if (!cancelled) setRolesError(err.message ?? getCopyValue(copy, "admin.members.errorRolesQuery"));
       })
       .finally(() => {
         if (!cancelled) setRolesLoading(false);
@@ -265,7 +429,7 @@ export function AdminMembersList() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [copy]);
 
   useEffect(() => {
     if (!selectedRoleId) return;
@@ -286,7 +450,7 @@ export function AdminMembersList() {
           error?: string;
         };
         if (!res.ok) {
-          return Promise.reject(new Error(data.error ?? "권한 목록 조회 실패"));
+          return Promise.reject(new Error(data.error ?? getCopyValue(copy, "admin.members.errorPermissionsQuery")));
         }
         return data;
       })
@@ -304,7 +468,7 @@ export function AdminMembersList() {
       })
       .catch((err) => {
         if (!cancelled) {
-          setPermissionLoadError(err.message ?? "권한 목록을 불러올 수 없습니다.");
+          setPermissionLoadError(err.message ?? getCopyValue(copy, "admin.members.errorPermissionsLoad"));
           setSelectedPermissionKeys([]);
           setAllPermissions([]);
         }
@@ -315,7 +479,7 @@ export function AdminMembersList() {
     return () => {
       cancelled = true;
     };
-  }, [selectedRoleId]);
+  }, [selectedRoleId, copy]);
 
   useEffect(() => {
     let cancelled = false;
@@ -328,7 +492,7 @@ export function AdminMembersList() {
           error?: string;
         };
         if (!res.ok) {
-          return Promise.reject(new Error(data.error ?? "랭킹 조회 실패"));
+          return Promise.reject(new Error(data.error ?? getCopyValue(copy, "admin.members.errorRankingQuery")));
         }
         return data;
       })
@@ -338,7 +502,7 @@ export function AdminMembersList() {
         }
       })
       .catch((err) => {
-        if (!cancelled) setRankingError(err.message ?? "랭킹 조회 실패");
+        if (!cancelled) setRankingError(err.message ?? getCopyValue(copy, "admin.members.errorRankingQuery"));
       })
       .finally(() => {
         if (!cancelled) setRankingLoading(false);
@@ -346,11 +510,13 @@ export function AdminMembersList() {
     return () => {
       cancelled = true;
     };
-  }, [refreshKey]);
+  }, [refreshKey, copy]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const sortByLabel = SORT_BY_OPTIONS.find((o) => o.value === sortBy)?.label ?? "날짜순";
-  const sortOrderLabel = SORT_ORDER_OPTIONS.find((o) => o.value === sortOrder)?.label ?? "내림차순";
+  const sortByLabel =
+    sortByOptions.find((o) => o.value === sortBy)?.label ?? getCopyValue(copy, "admin.members.sortBy.createdAt");
+  const sortOrderLabel =
+    sortOrderOptions.find((o) => o.value === sortOrder)?.label ?? getCopyValue(copy, "admin.members.sortOrder.desc");
 
   const handlePatch = useCallback(
     async (id: string, body: { role?: string; status?: string; orgClientType?: string; orgApprovalStatus?: string }) => {
@@ -363,7 +529,7 @@ export function AdminMembersList() {
         });
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         if (!res.ok) {
-          throw new Error(data?.error ?? "저장에 실패했습니다.");
+          throw new Error(data?.error ?? getCopyValue(copy, "admin.members.patchSaveFailed"));
         }
         setManageRow(null);
         setRefreshKey((k) => k + 1);
@@ -372,7 +538,7 @@ export function AdminMembersList() {
         setSaving(false);
       }
     },
-    [router]
+    [router, copy]
   );
 
   const handleRoleAssignment = useCallback(
@@ -384,10 +550,10 @@ export function AdminMembersList() {
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
-        throw new Error(data.error ?? "레벨 저장에 실패했습니다.");
+        throw new Error(data.error ?? getCopyValue(copy, "admin.members.roleSaveFailed"));
       }
     },
-    []
+    [copy]
   );
 
   const togglePermission = useCallback((permissionKey: string) => {
@@ -402,7 +568,7 @@ export function AdminMembersList() {
     if (!selectedRoleId) return;
     const selectedRole = roles.find((role) => role.id === selectedRoleId);
     if (selectedRole?.key === "ADMIN") {
-      const confirmed = window.confirm("ADMIN 권한을 변경하면 관리자 기능에 직접 영향을 줄 수 있습니다. 계속하시겠습니까?");
+      const confirmed = window.confirm(getCopyValue(copy, "admin.members.confirmAdminPermissionChange"));
       if (!confirmed) return;
     }
 
@@ -416,14 +582,14 @@ export function AdminMembersList() {
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string; permissionKeys?: string[] };
       if (!res.ok) {
-        setPermissionMessage(data.error ?? "권한 저장에 실패했습니다.");
+        setPermissionMessage(data.error ?? getCopyValue(copy, "admin.members.permissionSaveFailed"));
         return;
       }
-      setPermissionMessage("권한이 저장되었습니다.");
+      setPermissionMessage(getCopyValue(copy, "admin.members.permissionSaved"));
     } finally {
       setPermissionSaving(false);
     }
-  }, [roles, selectedPermissionKeys, selectedRoleId]);
+  }, [roles, selectedPermissionKeys, selectedRoleId, copy]);
 
   const selectedRole = roles.find((role) => role.id === selectedRoleId) ?? null;
   const permissionsByCategory = allPermissions.reduce<Record<string, PermissionItem[]>>((acc, permission) => {
@@ -435,126 +601,85 @@ export function AdminMembersList() {
 
   return (
     <div className="space-y-4">
-      {/* 검색 / 필터 / 정렬 — 상단, 모바일 2줄·아코디언 가능 */}
-      <div className="flex flex-col gap-4 rounded-lg border border-site-border bg-site-bg/50 p-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-site-text-muted mb-1">검색 (이름·아이디·이메일)</label>
-            <input
-              type="search"
-              placeholder="이름, 아이디 또는 이메일"
-              value={search}
-              onChange={(e) => setParams({ search: e.target.value, page: 1 })}
-              className="w-full rounded border border-site-border bg-site-card px-3 py-2 text-sm text-site-text focus:border-site-primary focus:outline-none focus:ring-1 focus:ring-site-primary"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-site-text-muted mb-1">구분</label>
-            <select
-              value={roleType}
-              onChange={(e) => setParams({ roleType: e.target.value, page: 1 })}
-              className="w-full rounded border border-site-border bg-site-card px-3 py-2 text-sm text-site-text focus:border-site-primary focus:outline-none focus:ring-1 focus:ring-site-primary"
-            >
-              {ROLE_TYPE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-site-text-muted mb-1">상태</label>
-            <select
-              value={status}
-              onChange={(e) => setParams({ status: e.target.value, page: 1 })}
-              className="w-full rounded border border-site-border bg-site-card px-3 py-2 text-sm text-site-text focus:border-site-primary focus:outline-none focus:ring-1 focus:ring-site-primary"
-            >
-              {STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-xs font-medium text-site-text-muted">정렬</span>
-          <select
-            value={sortBy}
-            onChange={(e) => setParams({ sortBy: e.target.value })}
-            className="rounded border border-site-border bg-site-card px-3 py-1.5 text-sm text-site-text focus:border-site-primary focus:outline-none focus:ring-1 focus:ring-site-primary"
-          >
-            {SORT_BY_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={sortOrder}
-            onChange={(e) => setParams({ sortOrder: e.target.value })}
-            className="rounded border border-site-border bg-site-card px-3 py-1.5 text-sm text-site-text focus:border-site-primary focus:outline-none focus:ring-1 focus:ring-site-primary"
-          >
-            {SORT_ORDER_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <span className="text-xs text-site-text-muted">
-            현재: {sortByLabel} / {sortOrderLabel}
+      {/* 검색 / 필터 / 정렬 — 모바일: 접기, md+: 항상 표시 */}
+      <details className="rounded-lg border border-site-border bg-site-bg/50 md:hidden">
+        <summary className="flex min-h-[48px] cursor-pointer list-none items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-site-text outline-none [&::-webkit-details-marker]:hidden focus-visible:ring-2 focus-visible:ring-site-primary/70 focus-visible:ring-offset-2">
+          <span className="min-w-0 flex-1">{getCopyValue(copy, "admin.list.searchAria")}</span>
+          <span className="shrink-0 text-site-text-muted" aria-hidden>
+            ▼
           </span>
-          <button
-            type="button"
-            onClick={() => setParams({ status: "pending", page: 1 })}
-            className="rounded border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
-          >
-            승인대기만 보기
-          </button>
-          <span className="ml-auto text-xs text-site-text-muted">
-            페이지당
-            <select
-              value={pageSize}
-              onChange={(e) => setParams({ pageSize: e.target.value, page: 1 })}
-              className="mx-1 rounded border border-site-border bg-site-card px-2 py-1 text-sm"
-            >
-              {PAGE_SIZE_OPTIONS.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-            건
-          </span>
+        </summary>
+        <div className="space-y-4 border-t border-site-border p-4">
+          <AdminMembersFilterPanel
+            copy={copy}
+            search={search}
+            roleType={roleType}
+            status={status}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            pageSize={pageSize}
+            setParams={setParams}
+            roleTypeOptions={roleTypeOptions}
+            statusOptions={statusOptions}
+            sortByOptions={sortByOptions}
+            sortOrderOptions={sortOrderOptions}
+            sortByLabel={sortByLabel}
+            sortOrderLabel={sortOrderLabel}
+            touchFriendly
+          />
         </div>
+      </details>
+      <div className="hidden flex-col gap-4 rounded-lg border border-site-border bg-site-bg/50 p-4 md:flex">
+        <AdminMembersFilterPanel
+          copy={copy}
+          search={search}
+          roleType={roleType}
+          status={status}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          pageSize={pageSize}
+          setParams={setParams}
+          roleTypeOptions={roleTypeOptions}
+          statusOptions={statusOptions}
+          sortByOptions={sortByOptions}
+          sortOrderOptions={sortOrderOptions}
+          sortByLabel={sortByLabel}
+          sortOrderLabel={sortOrderLabel}
+        />
       </div>
 
-      {loading && <p className="text-sm text-site-text-muted">불러오는 중...</p>}
+      {loading && <p className="text-sm text-site-text-muted">{getCopyValue(copy, "admin.list.loading")}</p>}
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       {flashMessage && <p className="text-sm text-emerald-600 dark:text-emerald-400">{flashMessage}</p>}
 
       {!loading && !error && (
         <>
-          <div className="overflow-x-auto rounded-lg border border-site-border bg-site-card">
+          <div className="hidden overflow-x-auto rounded-lg border border-site-border bg-site-card md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-site-border bg-gray-50 dark:bg-slate-800/50">
-                  <th className="p-3 text-left font-medium text-site-text">이름</th>
-                  <th className="p-3 text-left font-medium text-site-text">아이디 / 이메일</th>
-                  <th className="p-3 text-left font-medium text-site-text">회원구분</th>
-                  <th className="p-3 text-left font-medium text-site-text">활동 점수</th>
-                  <th className="p-3 text-left font-medium text-site-text">LEVEL</th>
-                  <th className="p-3 text-left font-medium text-site-text">상태</th>
-                  <th className="p-3 text-left font-medium text-site-text">가입일</th>
-                  <th className="p-3 text-left font-medium text-site-text">최근 수정일</th>
-                  <th className="p-3 text-left font-medium text-site-text">관리</th>
+                  <th className="p-3 text-left font-medium text-site-text">{getCopyValue(copy, "admin.members.thName")}</th>
+                  <th className="p-3 text-left font-medium text-site-text">
+                    {getCopyValue(copy, "admin.members.thUsernameEmail")}
+                  </th>
+                  <th className="p-3 text-left font-medium text-site-text">
+                    {getCopyValue(copy, "admin.members.thMemberCategory")}
+                  </th>
+                  <th className="p-3 text-left font-medium text-site-text">
+                    {getCopyValue(copy, "admin.members.thActivityScore")}
+                  </th>
+                  <th className="p-3 text-left font-medium text-site-text">{getCopyValue(copy, "admin.members.thLevel")}</th>
+                  <th className="p-3 text-left font-medium text-site-text">{getCopyValue(copy, "admin.list.thStatus")}</th>
+                  <th className="p-3 text-left font-medium text-site-text">{getCopyValue(copy, "admin.members.thJoined")}</th>
+                  <th className="p-3 text-left font-medium text-site-text">{getCopyValue(copy, "admin.members.thUpdated")}</th>
+                  <th className="p-3 text-left font-medium text-site-text">{getCopyValue(copy, "admin.members.thManage")}</th>
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="p-6 text-center text-site-text-muted">
-                      조건에 맞는 회원이 없습니다. 검색·필터를 바꿔 보세요.
+                      {getCopyValue(copy, "admin.members.emptyFiltered")}
                     </td>
                   </tr>
                 ) : (
@@ -563,16 +688,21 @@ export function AdminMembersList() {
                       key={row.id}
                       className="border-b border-site-border last:border-0 hover:bg-gray-50/50 dark:hover:bg-slate-800/30"
                     >
-                      <td className="p-3 text-site-text">{getDisplayName(row)}</td>
+                      <td className="p-3 text-site-text">{getDisplayName(row, copy)}</td>
                       <td className="p-3 text-site-text">
                         {row.username || "-"} {row.username && row.email ? " / " : ""} {row.email || ""}
                       </td>
-                      <td className="p-3 text-site-text">{getResolvedRoleLabel(row)}</td>
+                      <td className="p-3 text-site-text">{getResolvedRoleLabel(row, copy)}</td>
                       <td className="p-3 text-site-text">{row.activityPoint ?? 0}</td>
-                      <td className="p-3 text-site-text" title={`communityScore ${row.communityScore ?? 0}`}>
-                        {getCommunityLevelLabel(row)}
+                      <td
+                        className="p-3 text-site-text"
+                        title={fillAdminCopyTemplate(getCopyValue(copy, "admin.members.display.communityScoreTooltip"), {
+                          score: row.communityScore ?? 0,
+                        })}
+                      >
+                        {getCommunityLevelLabel(row, copy)}
                       </td>
-                      <td className="p-3 text-site-text">{getStatusDisplayLabel(row)}</td>
+                      <td className="p-3 text-site-text">{getStatusDisplayLabel(row, copy)}</td>
                       <td className="p-3 text-site-text-muted">
                         {row.createdAt ? formatKoreanDate(row.createdAt) : "-"}
                       </td>
@@ -585,7 +715,7 @@ export function AdminMembersList() {
                           onClick={() => setManageRow(row)}
                           className="rounded bg-site-primary/10 px-2.5 py-1.5 text-xs font-medium text-site-primary hover:bg-site-primary/20"
                         >
-                          관리
+                          {getCopyValue(copy, "admin.members.btnManage")}
                         </button>
                       </td>
                     </tr>
@@ -595,34 +725,95 @@ export function AdminMembersList() {
             </table>
           </div>
 
+          <div className="space-y-4 md:hidden">
+            {items.length === 0 ? (
+              <p className="rounded-lg border border-site-border bg-site-card p-6 text-center text-sm text-site-text-muted">
+                {getCopyValue(copy, "admin.members.emptyFiltered")}
+              </p>
+            ) : (
+              items.map((row) => (
+                <div
+                  key={row.id}
+                  className="rounded-lg border border-site-border bg-site-card p-4 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-base font-semibold leading-snug text-site-text">{getDisplayName(row, copy)}</p>
+                      <p className="mt-1 break-words text-sm text-site-text-muted">
+                        {row.username || "-"}
+                        {row.username && row.email ? " · " : ""}
+                        {row.email || ""}
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full border border-site-border bg-site-bg px-2.5 py-1 text-xs font-medium text-site-text whitespace-nowrap">
+                      {getStatusDisplayLabel(row, copy)}
+                    </span>
+                  </div>
+                  <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt className="text-xs text-site-text-muted">{getCopyValue(copy, "admin.members.thMemberCategory")}</dt>
+                      <dd className="font-medium text-site-text">{getResolvedRoleLabel(row, copy)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-site-text-muted">{getCopyValue(copy, "admin.members.thActivityScore")}</dt>
+                      <dd className="text-site-text">{row.activityPoint ?? 0}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-site-text-muted">{getCopyValue(copy, "admin.members.thLevel")}</dt>
+                      <dd className="text-site-text">{getCommunityLevelLabel(row, copy)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-site-text-muted">{getCopyValue(copy, "admin.members.thJoined")}</dt>
+                      <dd className="text-site-text-muted">{row.createdAt ? formatKoreanDate(row.createdAt) : "-"}</dd>
+                    </div>
+                  </dl>
+                  <button
+                    type="button"
+                    onClick={() => setManageRow(row)}
+                    className="mt-4 flex min-h-[44px] w-full touch-manipulation items-center justify-center rounded-lg bg-site-primary/10 px-4 text-sm font-medium text-site-primary hover:bg-site-primary/20"
+                  >
+                    {getCopyValue(copy, "admin.members.btnManage")}
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
           {totalPages > 1 && (
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-site-text-muted">
-                전체 {total}명 · {page} / {totalPages} 페이지
+                {fillAdminCopyTemplate(getCopyValue(copy, "admin.members.paginationSummary"), {
+                  total,
+                  page,
+                  totalPages,
+                })}
               </p>
               <div className="flex gap-1">
-                <button
-                  type="button"
-                  disabled={page <= 1}
-                  onClick={() => setParams({ page: page - 1 })}
-                  className="rounded border border-site-border bg-site-card px-3 py-1.5 text-sm disabled:opacity-50"
-                >
-                  이전
-                </button>
-                <button
-                  type="button"
-                  disabled={page >= totalPages}
-                  onClick={() => setParams({ page: page + 1 })}
-                  className="rounded border border-site-border bg-site-card px-3 py-1.5 text-sm disabled:opacity-50"
-                >
-                  다음
-                </button>
+                <nav className="flex gap-1" aria-label={getCopyValue(copy, "admin.list.paginationNavAria")}>
+                  <button
+                    type="button"
+                    disabled={page <= 1}
+                    onClick={() => setParams({ page: page - 1 })}
+                    className="min-h-[44px] rounded border border-site-border bg-site-card px-3 py-2 text-sm disabled:opacity-50 md:min-h-0 md:py-1.5"
+                  >
+                    {getCopyValue(copy, "admin.list.paginationPrev")}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={page >= totalPages}
+                    onClick={() => setParams({ page: page + 1 })}
+                    className="min-h-[44px] rounded border border-site-border bg-site-card px-3 py-2 text-sm disabled:opacity-50 md:min-h-0 md:py-1.5"
+                  >
+                    {getCopyValue(copy, "admin.list.paginationNext")}
+                  </button>
+                </nav>
               </div>
             </div>
           )}
 
           {manageRow && (
             <ManageModal
+              copy={copy}
               row={manageRow}
               roles={roles}
               onClose={() => setManageRow(null)}
@@ -641,9 +832,9 @@ export function AdminMembersList() {
 
       <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
         <section className="rounded-lg border border-site-border bg-site-card p-4">
-          <h2 className="text-base font-semibold text-site-text">권한 역할 목록</h2>
-          <p className="mt-1 text-xs text-site-text-muted">권한을 볼 회원구분을 선택하세요.</p>
-          {rolesLoading && <p className="mt-3 text-sm text-site-text-muted">불러오는 중...</p>}
+          <h2 className="text-base font-semibold text-site-text">{getCopyValue(copy, "admin.members.rolesSectionTitle")}</h2>
+          <p className="mt-1 text-xs text-site-text-muted">{getCopyValue(copy, "admin.members.rolesSectionHint")}</p>
+          {rolesLoading && <p className="mt-3 text-sm text-site-text-muted">{getCopyValue(copy, "admin.list.loading")}</p>}
           {rolesError && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{rolesError}</p>}
           <div className="mt-3 space-y-2">
             {roles.map((role) => {
@@ -664,13 +855,16 @@ export function AdminMembersList() {
                     <span className="text-xs text-site-text-muted">{role.key}</span>
                   </div>
                   <p className="mt-1 text-xs text-site-text-muted">
-                    회원 {role.userCount}명 · 권한 {role.permissionCount}개
+                    {fillAdminCopyTemplate(getCopyValue(copy, "admin.members.roleCardMeta"), {
+                      userCount: role.userCount,
+                      permCount: role.permissionCount,
+                    })}
                   </p>
                 </button>
               );
             })}
             {!rolesLoading && !rolesError && roles.length === 0 && (
-              <p className="text-sm text-site-text-muted">권한 역할이 없습니다.</p>
+              <p className="text-sm text-site-text-muted">{getCopyValue(copy, "admin.members.rolesEmpty")}</p>
             )}
           </div>
         </section>
@@ -679,7 +873,9 @@ export function AdminMembersList() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold text-site-text">
-                {selectedRole ? `${selectedRole.label} 권한` : "권한 체크리스트"}
+                {selectedRole
+                  ? `${selectedRole.label}${getCopyValue(copy, "admin.members.permissionTitleSuffix")}`
+                  : getCopyValue(copy, "admin.members.permissionTitleFallback")}
               </h2>
               {selectedRole?.description && (
                 <p className="mt-1 text-sm text-site-text-muted">{selectedRole.description}</p>
@@ -691,7 +887,9 @@ export function AdminMembersList() {
               disabled={!selectedRoleId || permissionsLoading || permissionSaving}
               className="rounded-lg bg-site-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
-              {permissionSaving ? "저장 중..." : "권한 저장"}
+              {permissionSaving
+                ? getCopyValue(copy, "admin.members.permissionSaving")
+                : getCopyValue(copy, "admin.members.permissionSave")}
             </button>
           </div>
 
@@ -708,15 +906,15 @@ export function AdminMembersList() {
           )}
 
           {permissionsLoading ? (
-            <p className="mt-4 text-sm text-site-text-muted">권한 목록을 불러오는 중...</p>
+            <p className="mt-4 text-sm text-site-text-muted">{getCopyValue(copy, "admin.members.permissionsLoading")}</p>
           ) : permissionLoadError ? null : allPermissions.length === 0 ? (
-            <p className="mt-4 text-sm text-site-text-muted">권한이 없습니다.</p>
+            <p className="mt-4 text-sm text-site-text-muted">{getCopyValue(copy, "admin.members.permissionsEmpty")}</p>
           ) : (
             <div className="mt-4 space-y-5">
               {Object.entries(permissionsByCategory).map(([category, permissions]) => (
                 <div key={category}>
                   <h3 className="mb-2 text-sm font-semibold text-site-text">
-                    {CATEGORY_LABELS[category] ?? category}
+                    {getPermissionCategoryLabel(copy, category)}
                   </h3>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {permissions.map((permission) => {
@@ -752,56 +950,103 @@ export function AdminMembersList() {
       <section className="rounded-lg border border-site-border bg-site-card p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-site-text">해결사 랭킹</h2>
-            <p className="mt-1 text-xs text-site-text-muted">
-              채택 수, GOOD 수, 해법 수, 활동 점수 기준 상위 10명
-            </p>
+            <h2 className="text-base font-semibold text-site-text">{getCopyValue(copy, "admin.members.rankingTitle")}</h2>
+            <p className="mt-1 text-xs text-site-text-muted">{getCopyValue(copy, "admin.members.rankingSubtitle")}</p>
           </div>
         </div>
         {rankingLoading ? (
-          <p className="mt-4 text-sm text-site-text-muted">랭킹을 불러오는 중...</p>
+          <p className="mt-4 text-sm text-site-text-muted">{getCopyValue(copy, "admin.members.rankingLoading")}</p>
         ) : rankingError ? (
           <p className="mt-4 text-sm text-red-600 dark:text-red-400">{rankingError}</p>
         ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-site-border bg-gray-50 dark:bg-slate-800/50">
-                  <th className="p-3 text-left font-medium text-site-text">순위</th>
-                  <th className="p-3 text-left font-medium text-site-text">회원</th>
-                  <th className="p-3 text-left font-medium text-site-text">현재 ROLE / 추천 ROLE</th>
-                  <th className="p-3 text-left font-medium text-site-text">해법 수</th>
-                  <th className="p-3 text-left font-medium text-site-text">채택 수</th>
-                  <th className="p-3 text-left font-medium text-site-text">GOOD 수</th>
-                  <th className="p-3 text-left font-medium text-site-text">활동 점수</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ranking.map((item) => (
-                  <tr key={item.userId} className="border-b border-site-border last:border-0">
-                    <td className="p-3 text-site-text">{item.rank}</td>
-                    <td className="p-3 text-site-text">
-                      {item.name || item.username} ({item.username})
-                    </td>
-                    <td className="p-3 text-site-text">
-                      {(item.currentRoleLabel ?? "-") + " / " + item.suggestedRoleLabel}
-                    </td>
-                    <td className="p-3 text-site-text">{item.solutionCount}</td>
-                    <td className="p-3 text-site-text">{item.acceptedCount}</td>
-                    <td className="p-3 text-site-text">{item.goodCount}</td>
-                    <td className="p-3 text-site-text">{item.activityPoint}</td>
+          <>
+            <div className="mt-4 hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-site-border bg-gray-50 dark:bg-slate-800/50">
+                    <th className="p-3 text-left font-medium text-site-text">{getCopyValue(copy, "admin.members.rankingThRank")}</th>
+                    <th className="p-3 text-left font-medium text-site-text">{getCopyValue(copy, "admin.members.rankingThMember")}</th>
+                    <th className="p-3 text-left font-medium text-site-text">{getCopyValue(copy, "admin.members.rankingThRoles")}</th>
+                    <th className="p-3 text-left font-medium text-site-text">
+                      {getCopyValue(copy, "admin.members.rankingThSolutions")}
+                    </th>
+                    <th className="p-3 text-left font-medium text-site-text">
+                      {getCopyValue(copy, "admin.members.rankingThAccepted")}
+                    </th>
+                    <th className="p-3 text-left font-medium text-site-text">{getCopyValue(copy, "admin.members.rankingThGood")}</th>
+                    <th className="p-3 text-left font-medium text-site-text">
+                      {getCopyValue(copy, "admin.members.rankingThActivity")}
+                    </th>
                   </tr>
-                ))}
-                {ranking.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="p-6 text-center text-site-text-muted">
-                      랭킹이 없습니다.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {ranking.map((item) => (
+                    <tr key={item.userId} className="border-b border-site-border last:border-0">
+                      <td className="p-3 text-site-text">{item.rank}</td>
+                      <td className="p-3 text-site-text">
+                        {item.name || item.username} ({item.username})
+                      </td>
+                      <td className="p-3 text-site-text">
+                        {(item.currentRoleLabel ?? "-") + " / " + item.suggestedRoleLabel}
+                      </td>
+                      <td className="p-3 text-site-text">{item.solutionCount}</td>
+                      <td className="p-3 text-site-text">{item.acceptedCount}</td>
+                      <td className="p-3 text-site-text">{item.goodCount}</td>
+                      <td className="p-3 text-site-text">{item.activityPoint}</td>
+                    </tr>
+                  ))}
+                  {ranking.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="p-6 text-center text-site-text-muted">
+                        {getCopyValue(copy, "admin.members.rankingEmpty")}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-4 space-y-3 md:hidden">
+              {ranking.length === 0 ? (
+                <p className="rounded-lg border border-site-border bg-site-bg p-4 text-center text-sm text-site-text-muted">
+                  {getCopyValue(copy, "admin.members.rankingEmpty")}
+                </p>
+              ) : (
+                ranking.map((item) => (
+                  <div key={item.userId} className="rounded-lg border border-site-border bg-site-bg p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-base font-semibold text-site-text">
+                        {getCopyValue(copy, "admin.members.rankingThRank")} #{item.rank}
+                      </p>
+                      <span className="shrink-0 rounded-full border border-site-border px-2 py-0.5 text-xs font-medium text-site-text">
+                        {getCopyValue(copy, "admin.members.rankingThActivity")} {item.activityPoint}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-site-text">
+                      {item.name || item.username}{" "}
+                      <span className="text-site-text-muted">({item.username})</span>
+                    </p>
+                    <p className="mt-2 text-xs text-site-text-muted">
+                      {getCopyValue(copy, "admin.members.rankingThRoles")}: {(item.currentRoleLabel ?? "-") + " / " + item.suggestedRoleLabel}
+                    </p>
+                    <dl className="mt-3 grid grid-cols-3 gap-2 text-center text-sm">
+                      <div>
+                        <dt className="text-[10px] uppercase text-site-text-muted">{getCopyValue(copy, "admin.members.rankingThSolutions")}</dt>
+                        <dd className="font-semibold text-site-text">{item.solutionCount}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[10px] uppercase text-site-text-muted">{getCopyValue(copy, "admin.members.rankingThAccepted")}</dt>
+                        <dd className="font-semibold text-site-text">{item.acceptedCount}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[10px] uppercase text-site-text-muted">{getCopyValue(copy, "admin.members.rankingThGood")}</dt>
+                        <dd className="font-semibold text-site-text">{item.goodCount}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                ))
+              )}
+            </div>
+          </>
         )}
       </section>
     </div>
@@ -809,6 +1054,7 @@ export function AdminMembersList() {
 }
 
 function ManageModal({
+  copy,
   row,
   roles,
   onClose,
@@ -817,6 +1063,7 @@ function ManageModal({
   saving,
   onSuccess,
 }: {
+  copy: Record<string, string>;
   row: MemberRow;
   roles: RoleSummary[];
   onClose: () => void;
@@ -859,7 +1106,7 @@ function ManageModal({
           error?: string;
         };
         if (!res.ok) {
-          return Promise.reject(new Error(data.error ?? "점수 이력 조회 실패"));
+          return Promise.reject(new Error(data.error ?? getCopyValue(copy, "admin.members.modalPointsQueryFailed")));
         }
         return data;
       })
@@ -868,7 +1115,7 @@ function ManageModal({
         setPointRows(Array.isArray(data.recentPoints) ? (data.recentPoints as UserActivityPointItem[]) : []);
       })
       .catch((err) => {
-        if (!cancelled) setPointError(err.message ?? "점수 이력을 불러올 수 없습니다.");
+        if (!cancelled) setPointError(err.message ?? getCopyValue(copy, "admin.members.modalPointsLoadFailed"));
       })
       .finally(() => {
         if (!cancelled) setPointLoading(false);
@@ -876,7 +1123,7 @@ function ManageModal({
     return () => {
       cancelled = true;
     };
-  }, [row.id]);
+  }, [row.id, copy]);
 
   const handleSubmit = async () => {
     if (hasChanges && !confirmChange) {
@@ -901,11 +1148,11 @@ function ManageModal({
         });
       }
       if (Object.keys(body).length > 0 || roleIdChanged || roleManualLockChanged) {
-        onSuccess("회원 레벨/상태가 저장되었습니다.");
+        onSuccess(getCopyValue(copy, "admin.members.patchSaveSuccess"));
       }
       onClose();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "저장에 실패했습니다.");
+      alert(error instanceof Error ? error.message : getCopyValue(copy, "admin.members.patchSaveFailed"));
     }
   };
 
@@ -915,34 +1162,39 @@ function ManageModal({
         className="w-full max-w-lg rounded-xl border border-site-border bg-site-card p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-lg font-semibold text-site-text mb-4">권한 · 상태 변경</h3>
+        <h3 className="text-lg font-semibold text-site-text mb-4">{getCopyValue(copy, "admin.members.modalTitle")}</h3>
         <p className="text-sm text-site-text-muted mb-4">
-          {getDisplayName(row)} ({row.username})
+          {getDisplayName(row, copy)} ({row.username})
         </p>
 
         <div className="space-y-4">
           <div className="rounded-lg border border-site-border bg-site-bg p-3 text-sm">
             <p className="text-site-text">
-              회원구분: <strong>{getResolvedRoleLabel(row)}</strong>
+              {getCopyValue(copy, "admin.members.info.lineMemberCategory")}{" "}
+              <strong>{getResolvedRoleLabel(row, copy)}</strong>
             </p>
             <p className="mt-1 text-site-text">
-              활동 점수: <strong>{row.activityPoint ?? 0}</strong>
+              {getCopyValue(copy, "admin.members.info.lineActivityScore")}{" "}
+              <strong>{row.activityPoint ?? 0}</strong>
             </p>
             <p className="mt-1 text-site-text">
-              커뮤니티 LEVEL: <strong>{getCommunityLevelLabel(row)}</strong>
+              {getCopyValue(copy, "admin.members.info.lineCommunityLevel")}{" "}
+              <strong>{getCommunityLevelLabel(row, copy)}</strong>
             </p>
             <p className="mt-1 text-site-text-muted">
-              communityScore: {row.communityScore ?? 0}
+              {getCopyValue(copy, "admin.members.info.lineCommunityScore")} {row.communityScore ?? 0}
             </p>
           </div>
           <div>
-            <label className="block text-xs font-medium text-site-text-muted mb-1">변경할 RBAC 역할</label>
+            <label className="block text-xs font-medium text-site-text-muted mb-1">
+              {getCopyValue(copy, "admin.members.modalChangeRbac")}
+            </label>
             <select
               value={roleId}
               onChange={(e) => setRoleId(e.target.value)}
               className="w-full rounded border border-site-border bg-site-card px-3 py-2 text-sm text-site-text"
             >
-              <option value="">선택 안 함</option>
+              <option value="">{getCopyValue(copy, "admin.members.modalRbacNone")}</option>
               {roles.map((roleOption) => (
                 <option key={roleOption.id} value={roleOption.id}>
                   {roleOption.label} ({roleOption.key})
@@ -956,56 +1208,66 @@ function ManageModal({
               checked={roleManualLocked}
               onChange={(e) => setRoleManualLocked(e.target.checked)}
             />
-            <span className="text-sm text-site-text">관리자 수동 고정</span>
+            <span className="text-sm text-site-text">{getCopyValue(copy, "admin.members.modalManualLock")}</span>
           </label>
           <div>
-            <label className="block text-xs font-medium text-site-text-muted mb-1">구분 (권한)</label>
+            <label className="block text-xs font-medium text-site-text-muted mb-1">
+              {getCopyValue(copy, "admin.members.modalRoleLabel")}
+            </label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value)}
               className="w-full rounded border border-site-border bg-site-card px-3 py-2 text-sm text-site-text"
             >
-              <option value="USER">일반회원</option>
-              <option value="CLIENT_ADMIN">일반 클라이언트 / 등록 클라이언트</option>
-              <option value="ZONE_MANAGER">권역 관리자</option>
-              <option value="PLATFORM_ADMIN">플랫폼 관리자</option>
+              <option value="USER">{getCopyValue(copy, "admin.members.modal.option.role.USER")}</option>
+              <option value="CLIENT_ADMIN">{getCopyValue(copy, "admin.members.modal.option.role.CLIENT_ADMIN")}</option>
+              <option value="ZONE_MANAGER">{getCopyValue(copy, "admin.members.modal.option.role.ZONE_MANAGER")}</option>
+              <option value="PLATFORM_ADMIN">{getCopyValue(copy, "admin.members.modal.option.role.PLATFORM_ADMIN")}</option>
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-site-text-muted mb-1">상태</label>
+            <label className="block text-xs font-medium text-site-text-muted mb-1">
+              {getCopyValue(copy, "admin.members.modalStatusLabel")}
+            </label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
               className="w-full rounded border border-site-border bg-site-card px-3 py-2 text-sm text-site-text"
             >
-              <option value="ACTIVE">정상</option>
-              <option value="SUSPENDED">정지</option>
-              <option value="DELETED">탈퇴</option>
+              <option value="ACTIVE">{getCopyValue(copy, "admin.members.modal.option.memberStatus.ACTIVE")}</option>
+              <option value="SUSPENDED">{getCopyValue(copy, "admin.members.modal.option.memberStatus.SUSPENDED")}</option>
+              <option value="DELETED">{getCopyValue(copy, "admin.members.modal.option.memberStatus.DELETED")}</option>
             </select>
           </div>
           {role === "CLIENT_ADMIN" && (
             <>
               <div>
-                <label className="block text-xs font-medium text-site-text-muted mb-1">클라이언트 등급</label>
+                <label className="block text-xs font-medium text-site-text-muted mb-1">
+                  {getCopyValue(copy, "admin.members.modalClientTier")}
+                </label>
                 <select
                   value={orgClientType}
                   onChange={(e) => setOrgClientType(e.target.value)}
                   className="w-full rounded border border-site-border bg-site-card px-3 py-2 text-sm text-site-text"
                 >
-                  <option value="GENERAL">일반 클라이언트</option>
-                  <option value="REGISTERED">등록 클라이언트(연회원)</option>
+                  <option value="GENERAL">{getCopyValue(copy, "admin.members.modal.option.orgClient.GENERAL")}</option>
+                  <option value="REGISTERED">
+                    {getCopyValue(copy, "admin.members.modal.option.orgClient.REGISTERED")}
+                  </option>
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-site-text-muted mb-1">승인 상태</label>
+                <label className="block text-xs font-medium text-site-text-muted mb-1">
+                  {getCopyValue(copy, "admin.members.modalApprovalStatus")}
+                </label>
                 <select
                   value={orgApprovalStatus}
                   onChange={(e) => setOrgApprovalStatus(e.target.value)}
                   className="w-full rounded border border-site-border bg-site-card px-3 py-2 text-sm text-site-text"
                 >
-                  <option value="PENDING">승인대기</option>
-                  <option value="APPROVED">승인</option>
-                  <option value="REJECTED">반려</option>
+                  <option value="PENDING">{getCopyValue(copy, "admin.members.modal.option.orgApproval.PENDING")}</option>
+                  <option value="APPROVED">{getCopyValue(copy, "admin.members.modal.option.orgApproval.APPROVED")}</option>
+                  <option value="REJECTED">{getCopyValue(copy, "admin.members.modal.option.orgApproval.REJECTED")}</option>
                 </select>
               </div>
             </>
@@ -1013,13 +1275,13 @@ function ManageModal({
         </div>
 
         <div className="mt-4 rounded-lg border border-site-border bg-site-bg p-3">
-          <h4 className="text-sm font-semibold text-site-text">최근 활동 점수</h4>
+          <h4 className="text-sm font-semibold text-site-text">{getCopyValue(copy, "admin.members.modalRecentPoints")}</h4>
           {pointLoading ? (
-            <p className="mt-2 text-xs text-site-text-muted">불러오는 중...</p>
+            <p className="mt-2 text-xs text-site-text-muted">{getCopyValue(copy, "admin.list.loading")}</p>
           ) : pointError ? (
             <p className="mt-2 text-xs text-red-600 dark:text-red-400">{pointError}</p>
           ) : pointRows.length === 0 ? (
-            <p className="mt-2 text-xs text-site-text-muted">점수 이력이 없습니다.</p>
+            <p className="mt-2 text-xs text-site-text-muted">{getCopyValue(copy, "admin.members.modalPointsEmpty")}</p>
           ) : (
             <div className="mt-2 max-h-48 overflow-auto">
               <table className="w-full text-xs">
@@ -1045,7 +1307,7 @@ function ManageModal({
 
         {hasChanges && confirmChange && (
           <p className="mt-4 text-sm text-amber-600 dark:text-amber-400">
-            변경 내용을 적용하시겠습니까? 잘못 변경하면 서비스 이용에 영향을 줄 수 있습니다.
+            {getCopyValue(copy, "admin.members.modalConfirmApply")}
           </p>
         )}
 
@@ -1055,7 +1317,7 @@ function ManageModal({
             onClick={onClose}
             className="rounded-lg border border-site-border px-4 py-2 text-sm font-medium text-site-text hover:bg-site-bg"
           >
-            취소
+            {getCopyValue(copy, "admin.common.cancel")}
           </button>
           <button
             type="button"
@@ -1063,7 +1325,11 @@ function ManageModal({
             disabled={saving || (!hasChanges && !confirmChange)}
             className="rounded-lg bg-site-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
           >
-            {saving ? "저장 중..." : hasChanges && !confirmChange ? "변경 확인" : "저장"}
+            {saving
+              ? getCopyValue(copy, "admin.members.permissionSaving")
+              : hasChanges && !confirmChange
+                ? getCopyValue(copy, "admin.members.modalBtnConfirm")
+                : getCopyValue(copy, "admin.common.save")}
           </button>
         </div>
       </div>
