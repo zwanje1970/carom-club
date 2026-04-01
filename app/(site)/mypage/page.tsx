@@ -112,7 +112,7 @@ export default async function MypagePage() {
         {/* 아코디언 메뉴 */}
         <div className="mb-6">
           <h2 className="mb-3 text-sm font-semibold text-gray-600 dark:text-gray-400">메뉴</h2>
-          <MypageAccordion />
+          <MypageAccordion session={{ role: session.role, loginMode: session.loginMode }} />
         </div>
 
         {/* 회원탈퇴는 내 정보 수정 페이지에서 진행 */}
