@@ -72,7 +72,7 @@ export function BracketGenerateButton({
       <button
         type="button"
         onClick={handleGenerate}
-        disabled={loading || tournamentDisabled}
+        disabled={loading || tournamentDisabled || tournamentNeedClosed}
         className="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50"
       >
         {loading ? "생성 중..." : "대진표 생성"}

@@ -302,12 +302,6 @@ export default async function ClientDashboardPage({
           <ConsoleSection title={getCopyValue(c, "client.dashboard.home.sectionQuick")} plain>
             <div className="grid grid-cols-2 gap-3 md:flex md:flex-wrap md:gap-2 md:text-[11px]">
               <Link
-                href="/client/operations/tournaments/new"
-                className="inline-flex min-h-[48px] items-center justify-center rounded-lg border border-zinc-800 bg-zinc-800 px-3 py-2 text-center text-xs font-medium text-white touch-manipulation dark:border-zinc-200 dark:bg-zinc-200 dark:text-zinc-900 md:min-h-0 md:rounded-sm md:px-2.5 md:py-1.5"
-              >
-                {getCopyValue(c, "client.dashboard.home.quickNewTournament")}
-              </Link>
-              <Link
                 href="/client/operations"
                 className="inline-flex min-h-[48px] items-center justify-center rounded-lg border border-zinc-400 px-3 py-2 text-center text-xs font-medium touch-manipulation hover:bg-zinc-200/60 dark:border-zinc-600 dark:hover:bg-zinc-800 md:min-h-0 md:rounded-sm md:px-2.5 md:py-1.5"
               >

@@ -23,6 +23,30 @@ function nextBracketSize(count: number): BracketSize {
   return size as BracketSize;
 }
 
+/** Prisma `rule.bracketConfig` — 문자열 JSON 또는 객체 */
+function parseRuleBracketConfig(
+  raw: unknown
+): { ok: true; config: Record<string, unknown> } | { ok: false; error: string } {
+  if (raw == null) return { ok: true, config: {} };
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    return { ok: true, config: raw as Record<string, unknown> };
+  }
+  if (typeof raw === "string") {
+    const s = raw.trim();
+    if (!s) return { ok: true, config: {} };
+    try {
+      const p = JSON.parse(s) as unknown;
+      if (typeof p !== "object" || p === null || Array.isArray(p)) {
+        return { ok: false, error: "대회 규칙(bracketConfig) 형식이 올바르지 않습니다." };
+      }
+      return { ok: true, config: p as Record<string, unknown> };
+    } catch {
+      return { ok: false, error: "대회 규칙(bracketConfig) JSON이 올바르지 않습니다." };
+    }
+  }
+  return { ok: true, config: {} };
+}
+
 /** Fisher–Yates shuffle (참가확정자 무작위 배치) */
 function shuffle<T>(arr: T[]): T[] {
   const out = [...arr];
@@ -74,9 +98,11 @@ export async function POST(
     type?: "carom" | "jukbang" | "survival" | "tournament";
     groupingMode?: "random" | "fixed";
   };
-  const rawConfig = tournament.rule?.bracketConfig;
-  const config: Record<string, unknown> =
-    typeof rawConfig === "string" ? (rawConfig ? JSON.parse(rawConfig) : {}) : (rawConfig ?? {});
+  const parsedConfig = parseRuleBracketConfig(tournament.rule?.bracketConfig);
+  if (!parsedConfig.ok) {
+    return NextResponse.json({ error: parsedConfig.error }, { status: 400 });
+  }
+  const config = parsedConfig.config;
 
   const gameType = (config.gameFormatMain as string) ?? tournament.rule?.bracketType ?? "carom";
 
