@@ -5,18 +5,12 @@ import { usePathname } from "next/navigation";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { cx } from "@/components/client/console/ui/cx";
 
-/** 참가 승인·명단 등 ‘참가’ 업무 구간 */
-function matchEntriesRoute(p: string): boolean {
-  if (p === "/client/operations/participants" || p.startsWith("/client/operations/participants/")) return true;
-  if (!p.includes("/client/operations/tournaments/")) return false;
-  return p.includes("/participant-roster") || p.includes("/participants");
-}
-
-/** 대회 목록·대진 등 (참가 전용 하위 제외) */
 function matchOperationsRoute(p: string): boolean {
-  if (!p.startsWith("/client/operations")) return false;
-  if (matchEntriesRoute(p)) return false;
-  return true;
+  return (
+    p.startsWith("/client/operations") ||
+    p.startsWith("/client/tournaments") ||
+    p.startsWith("/client/feedback")
+  );
 }
 
 const BOTTOM_ITEMS: {
@@ -36,12 +30,6 @@ const BOTTOM_ITEMS: {
     labelKey: "client.console.bottomNav.tournaments",
     match: matchOperationsRoute,
     Icon: IconTrophy,
-  },
-  {
-    href: "/client/operations/participants",
-    labelKey: "client.console.bottomNav.entries",
-    match: matchEntriesRoute,
-    Icon: IconUsers,
   },
   {
     href: "/client/billing",
@@ -68,13 +56,6 @@ function IconTrophy({ className }: { className?: string }) {
   return (
     <svg className={className} width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
       <path d="M8 21h8m-4-4v4M6 3h12v5a6 6 0 0 1-12 0V3zM6 9H4a2 2 0 0 1-2-2V5h4M18 9h2a2 2 0 0 0 2-2V5h-4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-function IconUsers({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

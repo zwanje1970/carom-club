@@ -39,6 +39,29 @@ export default async function ClientSettingsPage() {
         </div>
       </ConsoleSection>
 
+      <ConsoleSection title="운영 설정 바로가기" plain>
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+          <Link
+            href="/client/setup"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-zinc-300 px-3 text-xs font-semibold text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            내 정보
+          </Link>
+          <Link
+            href="/client/setup"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-zinc-300 px-3 text-xs font-semibold text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            당구장 정보
+          </Link>
+          <Link
+            href="/client/promo"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-zinc-300 px-3 text-xs font-semibold text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            홍보 페이지 연동
+          </Link>
+        </div>
+      </ConsoleSection>
+
       <ConsoleSection title="예정 항목" plain>
         <ul className="list-inside list-disc space-y-1 text-[13px] text-zinc-600 dark:text-zinc-400">
           <li>알림 수신</li>

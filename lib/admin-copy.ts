@@ -680,11 +680,11 @@ export const DEFAULT_ADMIN_COPY: Record<string, string> = {
   /** 클라이언트 콘솔 — 사이드/헤더/하단 (라벨·제목·aria) */
   "client.console.menuSection": "메뉴",
   "client.console.siteMainTitle": "사이트 메인으로",
-  "client.console.nav.dash": "운영 대시보드",
+  "client.console.nav.dash": "관리자홈",
   "client.console.nav.org": "내 정보/사업장 관리",
-  "client.console.nav.tournament": "대회 운영",
+  "client.console.nav.tournament": "전체대회",
   "client.console.nav.promo": "콘텐츠/홍보",
-  "client.console.nav.billing": "정산",
+  "client.console.nav.billing": "전체정산",
   "client.console.nav.settings": "설정",
   "client.console.title.dash": "운영 대시보드",
   "client.console.title.org": "내 정보/사업장 관리",
@@ -699,10 +699,10 @@ export const DEFAULT_ADMIN_COPY: Record<string, string> = {
   "client.console.title.coAdmins": "공동관리자",
   "client.console.title.fallback": "클라이언트 콘솔",
   "client.console.bottomNav.aria": "클라이언트 콘솔 하단 메뉴",
-  "client.console.bottomNav.home": "홈",
-  "client.console.bottomNav.tournaments": "대회",
+  "client.console.bottomNav.home": "관리자홈",
+  "client.console.bottomNav.tournaments": "전체대회",
   "client.console.bottomNav.entries": "참가",
-  "client.console.bottomNav.billing": "정산",
+  "client.console.bottomNav.billing": "전체정산",
   "client.console.bottomNav.settings": "설정",
 
   /** 클라이언트 운영 대시보드 홈 (`/client/dashboard`) */
