@@ -124,49 +124,63 @@ export async function insertTournamentWithRuleAndListing(
   createData: ReturnType<typeof buildTournamentCreateData>,
   rule: TournamentCreateRulePayload | null | undefined
 ): Promise<{ id: string }> {
-  const tournament = await prisma.tournament.create({
-    data: createData,
+  console.time("createTournament");
+  const tournament = await (async () => {
+    try {
+      return await prisma.tournament.create({
+        data: createData,
+        select: { id: true },
+      });
+    } finally {
+      console.timeEnd("createTournament");
+    }
+  })();
+  Promise.resolve().then(async () => {
+    try {
+      if (rule && typeof rule === "object") {
+        const bracketConfigStr =
+          rule.bracketConfig !== undefined && rule.bracketConfig !== null
+            ? typeof rule.bracketConfig === "string"
+              ? rule.bracketConfig
+              : JSON.stringify(rule.bracketConfig)
+            : undefined;
+        await prisma.tournamentRule.upsert({
+          where: { tournamentId: tournament.id },
+          create: {
+            tournamentId: tournament.id,
+            entryFee: rule.entryFee ?? undefined,
+            operatingFee: rule.operatingFee ?? undefined,
+            maxEntries: rule.maxEntries ?? undefined,
+            useWaiting: rule.useWaiting ?? false,
+            entryConditions: rule.entryConditions ?? undefined,
+            bracketType: rule.bracketType ?? undefined,
+            bracketConfig: bracketConfigStr ?? undefined,
+            prizeType: rule.prizeType ?? undefined,
+            prizeInfo: rule.prizeInfo ?? undefined,
+          },
+          update: {
+            entryFee: rule.entryFee ?? undefined,
+            operatingFee: rule.operatingFee ?? undefined,
+            maxEntries: rule.maxEntries ?? undefined,
+            useWaiting: rule.useWaiting ?? false,
+            entryConditions: rule.entryConditions ?? undefined,
+            bracketType: rule.bracketType ?? undefined,
+            bracketConfig: bracketConfigStr ?? undefined,
+            prizeType: rule.prizeType ?? undefined,
+            prizeInfo: rule.prizeInfo ?? undefined,
+          },
+        });
+      }
+      await createListingPurchaseRecord({
+        organizationId: createData.organizationId,
+        listingCode: "TOURNAMENT_POSTING",
+        targetType: "TOURNAMENT",
+        targetId: tournament.id,
+      });
+    } catch (err) {
+      console.warn("post-create background tasks failed:", err);
+    }
   });
-  if (rule && typeof rule === "object") {
-    const bracketConfigStr =
-      rule.bracketConfig !== undefined && rule.bracketConfig !== null
-        ? typeof rule.bracketConfig === "string"
-          ? rule.bracketConfig
-          : JSON.stringify(rule.bracketConfig)
-        : undefined;
-    await prisma.tournamentRule.upsert({
-      where: { tournamentId: tournament.id },
-      create: {
-        tournamentId: tournament.id,
-        entryFee: rule.entryFee ?? undefined,
-        operatingFee: rule.operatingFee ?? undefined,
-        maxEntries: rule.maxEntries ?? undefined,
-        useWaiting: rule.useWaiting ?? false,
-        entryConditions: rule.entryConditions ?? undefined,
-        bracketType: rule.bracketType ?? undefined,
-        bracketConfig: bracketConfigStr ?? undefined,
-        prizeType: rule.prizeType ?? undefined,
-        prizeInfo: rule.prizeInfo ?? undefined,
-      },
-      update: {
-        entryFee: rule.entryFee ?? undefined,
-        operatingFee: rule.operatingFee ?? undefined,
-        maxEntries: rule.maxEntries ?? undefined,
-        useWaiting: rule.useWaiting ?? false,
-        entryConditions: rule.entryConditions ?? undefined,
-        bracketType: rule.bracketType ?? undefined,
-        bracketConfig: bracketConfigStr ?? undefined,
-        prizeType: rule.prizeType ?? undefined,
-        prizeInfo: rule.prizeInfo ?? undefined,
-      },
-    });
-  }
-  await createListingPurchaseRecord({
-    organizationId: tournament.organizationId,
-    listingCode: "TOURNAMENT_POSTING",
-    targetType: "TOURNAMENT",
-    targetId: tournament.id,
-  }).catch((err) => console.warn("listing purchase record create (tournament) skipped:", err));
 
   return { id: tournament.id };
 }

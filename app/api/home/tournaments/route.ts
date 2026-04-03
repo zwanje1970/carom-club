@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   let lat = Number(searchParams.get("lat"));
   let lng = Number(searchParams.get("lng"));
-  const take = Math.min(Number(searchParams.get("take")) || 6, 50);
+  const take = Math.min(Number(searchParams.get("take")) || 5, 50);
 
   if ((!Number.isFinite(lat) || !Number.isFinite(lng)) && (lat !== 0 || lng !== 0)) {
     const session = await getSession();

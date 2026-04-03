@@ -1,3 +1,6 @@
+"use client";
+
+import { useRef } from "react";
 import Link from "next/link";
 import { orderedHubBoards, tabLabelForSlug } from "./communityBoardConstants";
 import { NanguSolverIcon } from "./NanguSolverIcon";
@@ -16,6 +19,25 @@ type Props = {
  */
 export function CommunityBoardTabBar({ boards, activeSlug }: Props) {
   const ordered = orderedHubBoards(boards);
+  const warmedRef = useRef<Set<string>>(new Set());
+
+  const prewarmBoardList = (slug: string) => {
+    if (slug === "trouble") return;
+    if (warmedRef.current.has(slug)) return;
+    warmedRef.current.add(slug);
+    const params = new URLSearchParams({
+      popular: "today",
+      sort: "latest",
+      take: "15",
+    });
+    fetch(`/api/community/boards/${slug}/posts?${params.toString()}`, {
+      method: "GET",
+      credentials: "include",
+      cache: "force-cache",
+    }).catch(() => {
+      // prewarm failure is non-blocking
+    });
+  };
 
   return (
     <nav
@@ -35,7 +57,11 @@ export function CommunityBoardTabBar({ boards, activeSlug }: Props) {
             <Link
               key={b.id}
               href={href}
+              prefetch={false}
               scroll={false}
+              onMouseEnter={() => prewarmBoardList(b.slug)}
+              onFocus={() => prewarmBoardList(b.slug)}
+              onClick={() => prewarmBoardList(b.slug)}
               className={`shrink-0 inline-flex items-center gap-0 px-3 sm:px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 active
                   ? "border-site-primary text-site-text"

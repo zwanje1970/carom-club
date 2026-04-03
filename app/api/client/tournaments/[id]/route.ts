@@ -266,7 +266,7 @@ export async function PATCH(
         ...(teamScoreRule !== undefined && {
           teamScoreRule: (isScotchTournament ? (teamScoreRule === "LT" ? "LT" : "LTE") : null) as TeamScoreRule | null,
         }),
-      }) as any,
+      }) as Prisma.TournamentUpdateInput,
     });
     if (becomingFinished) {
       try {

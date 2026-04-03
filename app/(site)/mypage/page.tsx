@@ -17,61 +17,28 @@ export default async function MypagePage() {
     redirect("/login");
   }
 
-  type UserWithProfile = Awaited<ReturnType<typeof prisma.user.findUnique<{ where: { id: string }; include: { memberProfile: true } }>>>;
-  let user: UserWithProfile = null;
+  type BasicUser = { id: string; name: string };
+  let user: BasicUser | null = null;
 
   if (isDatabaseConfigured()) {
     try {
       user = await prisma.user.findUnique({
         where: { id: session.id },
-        include: { memberProfile: true },
+        select: {
+          id: true,
+          name: true,
+        },
       });
     } catch {
       user = {
         id: session.id,
         name: session.name,
-        username: session.username,
-        email: "",
-        phone: null,
-        password: "",
-        role: "USER",
-        roleId: null,
-        roleManualLocked: false,
-        status: null,
-        withdrawnAt: null,
-        latitude: null,
-        longitude: null,
-        address: null,
-        addressDetail: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        communityScore: 0,
-        activityPoint: 0,
-        memberProfile: null,
       };
     }
   } else {
     user = {
       id: session.id,
       name: session.name,
-      username: session.username,
-      email: "",
-      phone: null,
-      password: "",
-      role: "USER",
-      roleId: null,
-      roleManualLocked: false,
-      status: null,
-      withdrawnAt: null,
-      latitude: null,
-      longitude: null,
-      address: null,
-      addressDetail: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      communityScore: 0,
-      activityPoint: 0,
-      memberProfile: null,
     };
   }
   if (!user) {
@@ -120,6 +87,7 @@ export default async function MypagePage() {
           {session.role === "USER" && (
             <Link
               href="/mypage/edit"
+              prefetch={false}
               className="mt-4 inline-block text-sm text-red-600 hover:text-red-700 hover:underline"
             >
               회원탈퇴

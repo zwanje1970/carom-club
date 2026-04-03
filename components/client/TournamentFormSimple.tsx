@@ -14,6 +14,7 @@ import {
   type VerificationMode,
 } from "@/lib/tournament-certification";
 import { TOURNAMENT_STATUSES } from "@/types/tournament";
+import { processImage } from "@/lib/process-image.client";
 
 // 경기 방식: 토너먼트 / 스카치 / 서바이벌 / 4구대회
 const GAME_FORMAT_OPTIONS = [
@@ -328,18 +329,37 @@ export function TournamentFormSimple({
   const showScotchFields = form.gameFormat === "SCOTCH" || form.isScotch;
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const selectedFiles = Array.from(e.target.files ?? []);
+    if (selectedFiles.length === 0) return;
+    const imageFiles = selectedFiles.filter(
+      (file) => typeof file.type === "string" && file.type.startsWith("image/")
+    );
+    if (imageFiles.length === 0) {
+      e.target.value = "";
+      return;
+    }
     setUploading(true);
     setError("");
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("policy", "banner");
-      const res = await fetch("/api/admin/upload-image", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "업로드 실패");
-      setForm((f) => ({ ...f, posterImageUrl: data.url }));
+      const processedList = await Promise.all(imageFiles.map((file) => processImage(file)));
+      const uploadedUrls = await Promise.all(
+        processedList.map(async ({ main, thumbnail }) => {
+          const fd = new FormData();
+          fd.append("file", main);
+          fd.append("thumbnail", thumbnail);
+          fd.append("policy", "banner");
+          const res = await fetch("/api/admin/upload-image", {
+            method: "POST",
+            body: fd,
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "업로드 실패");
+          return typeof data.url === "string" ? data.url : "";
+        })
+      );
+      const primaryUrl = uploadedUrls.find((url) => url.trim());
+      if (!primaryUrl) throw new Error("업로드 결과 URL이 없습니다.");
+      setForm((f) => ({ ...f, posterImageUrl: primaryUrl }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "이미지 업로드에 실패했습니다.");
     } finally {
@@ -462,6 +482,7 @@ export function TournamentFormSimple({
             ref={fileInputRef}
             type="file"
             accept="image/*"
+            multiple
             className="hidden"
             onChange={handleImageUpload}
           />

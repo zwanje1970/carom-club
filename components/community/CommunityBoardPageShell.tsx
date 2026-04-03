@@ -88,6 +88,7 @@ export function CommunityBoardPageShell({
 
         <div className="mt-2">
           <CommunityBoardListAndMoreClient
+            key={boardSlug}
             boardSlug={boardSlug}
             popular={data.popular}
             q={data.q}

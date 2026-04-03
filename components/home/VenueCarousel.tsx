@@ -1,9 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PAGE_CONTENT_PAD_X } from "@/components/layout/pageContentStyles";
 import { cn } from "@/lib/utils";
-import { IMAGE_PLACEHOLDER_SRC, sanitizeImageSrc } from "@/lib/image-src";
+import { IMAGE_PLACEHOLDER_SRC, isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
 import { clampFlowSpeed } from "@/lib/home-carousel-flow";
 import { SlotBlockCtaLink } from "@/components/home/SlotBlockCtaLink";
 import type { SlotBlockCtaConfig } from "@/lib/slot-block-cta";
@@ -26,6 +27,8 @@ export type VenueCarouselItem = {
   id: string;
   name: string;
   slug: string;
+  thumbnailUrl?: string | null;
+  imageUrl?: string | null;
   logoImageUrl: string | null;
   coverImageUrl: string | null;
   venueCategory?: "daedae_only" | "mixed" | null;
@@ -242,7 +245,12 @@ export function VenueCarousel({
   if (venues.length === 0) return null;
 
   const imageUrl = (v: VenueCarouselItem) =>
-    (v.logoImageUrl?.trim() || v.coverImageUrl?.trim() || "") || null;
+    (v.thumbnailUrl?.trim() ||
+      v.imageUrl?.trim() ||
+      v.logoImageUrl?.trim() ||
+      v.coverImageUrl?.trim() ||
+      "") ||
+    null;
 
   return (
     <section
@@ -287,7 +295,7 @@ export function VenueCarousel({
             </p>
           ) : useGrid && cardStyle ? (
             <div className={cn("mt-5", tournamentGridUlClass(gridCols, cardStyle))}>
-              {filteredVenues.map((v) => (
+              {filteredVenues.map((v, index) => (
                 <SlotBlockCtaLink
                   key={v.id}
                   layer={cta.card}
@@ -300,28 +308,33 @@ export function VenueCarousel({
                   <div className={venueThumbShellClasses(cardStyle, true)}>
                     {(() => {
                       const src = sanitizeImageSrc(imageUrl(v) ?? "");
+                      const isPriority = index === 0;
                       if (!src) {
                         return (
-                          <img
+                          <Image
                             src={IMAGE_PLACEHOLDER_SRC}
                             alt=""
                             width={96}
                             height={96}
+                            sizes="(max-width: 768px) 100vw, 800px"
+                            priority={isPriority}
+                            loading={isPriority ? undefined : "lazy"}
+                            unoptimized
                             className="absolute inset-0 h-full w-full object-cover"
-                            decoding="async"
-                            loading="lazy"
                           />
                         );
                       }
                       return (
-                        <img
+                        <Image
                           src={src}
                           alt=""
                           width={96}
                           height={96}
+                          sizes="(max-width: 768px) 100vw, 800px"
+                          priority={isPriority}
+                          loading={isPriority ? undefined : "lazy"}
+                          unoptimized={!isOptimizableImageSrc(src)}
                           className="absolute inset-0 h-full w-full object-cover"
-                          decoding="async"
-                          loading="lazy"
                           data-debug-src={src}
                         />
                       );
@@ -403,7 +416,7 @@ export function VenueCarousel({
             onMouseMove={onDragMove}
             onMouseUp={onDragEnd}
           >
-            {filteredVenues.map((v) => (
+            {filteredVenues.map((v, index) => (
               <SlotBlockCtaLink
                 key={v.id}
                 layer={cta.card}
@@ -430,28 +443,33 @@ export function VenueCarousel({
                 >
                   {(() => {
                     const src = sanitizeImageSrc(imageUrl(v) ?? "");
+                    const isPriority = index === 0;
                     if (!src) {
                       return (
-                        <img
+                        <Image
                           src={IMAGE_PLACEHOLDER_SRC}
                           alt=""
                           width={96}
                           height={96}
+                          sizes="(max-width: 768px) 100vw, 800px"
+                          priority={isPriority}
+                          loading={isPriority ? undefined : "lazy"}
+                          unoptimized
                           className="absolute inset-0 h-full w-full object-cover"
-                          decoding="async"
-                          loading="lazy"
                         />
                       );
                     }
                     return (
-                      <img
+                      <Image
                         src={src}
                         alt=""
                         width={96}
                         height={96}
+                        sizes="(max-width: 768px) 100vw, 800px"
+                        priority={isPriority}
+                        loading={isPriority ? undefined : "lazy"}
+                        unoptimized={!isOptimizableImageSrc(src)}
                         className="absolute inset-0 h-full w-full object-cover"
-                        decoding="async"
-                        loading="lazy"
                         data-debug-src={src}
                       />
                     );

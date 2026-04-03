@@ -20,6 +20,8 @@ import {
 
 /** 캐러셀 카드 폭 ~260–280px · 모바일 한 장이 뷰포트 대부분 */
 const CARD_POSTER_SIZES = "(max-width: 640px) 88vw, (max-width: 768px) 300px, 320px";
+const CARD_POSTER_WIDTH = 400;
+const CARD_POSTER_HEIGHT = 300;
 
 export type HomeTournamentCardModel = {
   id: string;
@@ -31,6 +33,7 @@ export type HomeTournamentCardModel = {
   status: string;
   imageUrl: string | null;
   posterImageUrl?: string | null;
+  thumbnailUrl?: string | null;
   summary?: string | null;
   maxParticipants?: number | null;
   confirmedCount?: number;
@@ -81,12 +84,14 @@ function statusColor(status: string) {
 
 export function HomeTournamentCardItem({
   t,
+  index,
   duplicate,
   cardStyle,
   cardCta,
   layout = "carousel",
 }: {
   t: HomeTournamentCardModel;
+  index?: number;
   duplicate?: boolean;
   /** 없으면 기존 하드코딩과 동일한 기본(빌더 미연동 경로) */
   cardStyle?: SlotBlockCardStyle;
@@ -112,6 +117,7 @@ export function HomeTournamentCardItem({
 
   const simple = Boolean(t.manualSimple);
   const direct = t.directCardHref?.trim() || "";
+  const isFirstSlide = (index ?? -1) === 0 && !duplicate;
 
   return (
     <li aria-hidden={duplicate} className={liClass}>
@@ -127,43 +133,34 @@ export function HomeTournamentCardItem({
       >
         <div className={posterClass}>
           {(() => {
-            const src = sanitizeImageSrc((t.posterImageUrl || t.imageUrl) ?? "");
+            const imageUrl = t.thumbnailUrl ?? t.posterImageUrl ?? t.imageUrl;
+            const src = sanitizeImageSrc(imageUrl ?? "");
             if (!src) {
               return (
-                <img
+                <Image
                   src={IMAGE_PLACEHOLDER_SRC}
                   alt=""
-                  width={280}
-                  height={160}
+                  width={CARD_POSTER_WIDTH}
+                  height={CARD_POSTER_HEIGHT}
                   className="absolute inset-0 h-full w-full object-cover"
-                  decoding="async"
-                  loading="lazy"
-                />
-              );
-            }
-            if (isOptimizableImageSrc(src)) {
-              return (
-                <Image
-                  src={src}
-                  alt=""
-                  fill
-                  sizes={CARD_POSTER_SIZES}
-                  quality={75}
-                  className="object-cover"
-                  loading="lazy"
-                  data-debug-src={src}
+                  priority={isFirstSlide}
+                  loading={isFirstSlide ? undefined : "lazy"}
+                  unoptimized
                 />
               );
             }
             return (
-              <img
+              <Image
                 src={src}
                 alt=""
-                width={280}
-                height={160}
+                width={CARD_POSTER_WIDTH}
+                height={CARD_POSTER_HEIGHT}
+                sizes={CARD_POSTER_SIZES}
+                quality={75}
+                priority={isFirstSlide}
+                loading={isFirstSlide ? undefined : "lazy"}
+                unoptimized={!isOptimizableImageSrc(src)}
                 className="absolute inset-0 h-full w-full object-cover"
-                decoding="async"
-                loading="lazy"
                 data-debug-src={src}
               />
             );

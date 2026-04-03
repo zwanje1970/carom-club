@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -13,11 +13,107 @@ import { PUBLIC_TOURNAMENTS_PAGE_SIZE } from "@/lib/public-tournaments-list-requ
 type TabId = "upcoming" | "closed" | "finished";
 type SortId = "distance" | "deadline" | "date";
 
-type TournamentItem = TournamentListRow & { distanceKm?: number | null };
+type TournamentItem = TournamentListRow & {
+  distanceKm?: number | null;
+  thumbnailUrl?: string | null;
+};
 
-/** 모바일 1열 100vw · md 2열이면 약 절반 뷰포트 */
+/** 모바일 100vw · 태블릿 50vw · 데스크탑 400px */
 const TOURNAMENT_LIST_POSTER_SIZES =
-  "(max-width: 768px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 40vw, 520px";
+  "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 400px";
+const TOURNAMENT_POSTER_WIDTH = 400;
+const TOURNAMENT_POSTER_HEIGHT = 300;
+const TOURNAMENT_PRIORITY_COUNT = 2;
+
+const TournamentListCard = memo(function TournamentListCard({
+  t,
+  index,
+}: {
+  t: TournamentItem;
+  index: number;
+}) {
+  const max = t.maxParticipants ?? 0;
+  const confirmed = t.confirmedCount ?? 0;
+  const remaining = max > 0 ? Math.max(0, max - confirmed) : null;
+  const almostFull = remaining !== null && remaining > 0 && remaining <= 3;
+  const isFull = remaining !== null && remaining <= 0;
+  const statusBadge = isFull ? "정원 마감" : almostFull ? `마지막 ${remaining}자리` : null;
+  const imageUrl = t.thumbnailUrl ?? t.posterImageUrl ?? t.imageUrl;
+  const src = sanitizeImageSrc(imageUrl?.trim());
+  const isPriority = index < TOURNAMENT_PRIORITY_COUNT;
+
+  return (
+    <li>
+      <Link
+        href={`/tournaments/${t.id}`}
+        className="block rounded-lg border border-site-border bg-site-card overflow-hidden shadow-sm transition hover:border-site-primary/40 hover:shadow-md"
+      >
+        <div className="relative aspect-[2/1] w-full min-h-[120px] overflow-hidden bg-site-bg flex flex-col justify-end p-3">
+          {!src ? (
+            <div
+              className="absolute inset-0 bg-gradient-to-br from-site-primary/15 to-site-bg"
+              aria-hidden
+            />
+          ) : (
+            <Image
+              src={src}
+              alt="tournament"
+              width={TOURNAMENT_POSTER_WIDTH}
+              height={TOURNAMENT_POSTER_HEIGHT}
+              sizes={TOURNAMENT_LIST_POSTER_SIZES}
+              quality={75}
+              priority={isPriority}
+              loading={isPriority ? undefined : "lazy"}
+              unoptimized={!isOptimizableImageSrc(src)}
+              className="absolute inset-0 h-full w-full object-contain"
+              data-debug-src={src}
+            />
+          )}
+          <div className="relative z-10 min-h-[3.5rem]">
+            <h2 className="font-semibold text-site-text line-clamp-2 min-h-[2.5rem] text-sm sm:text-base">
+              {t.name}
+            </h2>
+            <div className="mt-1 min-h-[1.25rem] flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-site-text-muted">
+              {t.gameFormat && <span>{t.gameFormat}</span>}
+              {t.prizeInfo && <span>· {t.prizeInfo}</span>}
+            </div>
+          </div>
+        </div>
+        <div className="p-3 border-t border-site-border">
+          <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-site-text-muted">
+            <span>{formatKoreanDateWithWeekday(t.startAt)}</span>
+            {statusBadge && (
+              <span
+                className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                  statusBadge === "정원 마감"
+                    ? "bg-site-bg text-site-text-muted"
+                    : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                }`}
+              >
+                {statusBadge}
+              </span>
+            )}
+          </div>
+          {(t.venue || t.organization?.name) && (
+            <p className="mt-1 text-xs text-site-text-muted truncate">
+              {t.venue || t.organization?.name}
+            </p>
+          )}
+          {"distanceKm" in t && t.distanceKm != null && (
+            <p className="mt-1 text-xs text-site-text-muted">
+              {formatDistanceKm(t.distanceKm)}
+            </p>
+          )}
+          {max > 0 && (
+            <p className="mt-1 text-xs font-medium text-site-text">
+              신청 현황 <span className="text-site-primary">{confirmed}</span>/{max}명
+            </p>
+          )}
+        </div>
+      </Link>
+    </li>
+  );
+});
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "upcoming", label: "예정대회" },
@@ -275,103 +371,9 @@ export function TournamentsListWithFilters({
       {!loading && !error && list.length > 0 && (
         <div className="space-y-3">
           <ul className="space-y-3 sm:grid sm:grid-cols-1 sm:gap-3 md:grid-cols-2">
-            {list.map((t) => {
-              const max = t.maxParticipants ?? 0;
-              const confirmed = t.confirmedCount ?? 0;
-              const remaining = max > 0 ? Math.max(0, max - confirmed) : null;
-              const almostFull = remaining !== null && remaining > 0 && remaining <= 3;
-              const isFull = remaining !== null && remaining <= 0;
-              const statusBadge = isFull ? "정원 마감" : almostFull ? `마지막 ${remaining}자리` : null;
-              const hasImage = (t.posterImageUrl || t.imageUrl)?.trim();
-              return (
-                <li key={t.id}>
-                  <Link
-                    href={`/tournaments/${t.id}`}
-                    className="block rounded-lg border border-site-border bg-site-card overflow-hidden shadow-sm transition hover:border-site-primary/40 hover:shadow-md"
-                  >
-                    <div className="relative aspect-[2/1] w-full min-h-[120px] overflow-hidden bg-site-bg flex flex-col justify-end p-3">
-                      {(() => {
-                        const src = sanitizeImageSrc(hasImage);
-                        if (!src) {
-                          return (
-                            <div
-                              className="absolute inset-0 bg-gradient-to-br from-site-primary/15 to-site-bg"
-                              aria-hidden
-                            />
-                          );
-                        }
-                        if (isOptimizableImageSrc(src)) {
-                          return (
-                            <Image
-                              src={src}
-                              alt=""
-                              fill
-                              sizes={TOURNAMENT_LIST_POSTER_SIZES}
-                              quality={75}
-                              className="object-contain"
-                              loading="lazy"
-                              data-debug-src={src}
-                            />
-                          );
-                        }
-                        return (
-                          <img
-                            src={src}
-                            alt=""
-                            width={800}
-                            height={400}
-                            loading="lazy"
-                            decoding="async"
-                            className="absolute inset-0 h-full w-full object-contain"
-                            data-debug-src={src}
-                          />
-                        );
-                      })()}
-                      <div className="relative z-10 min-h-[3.5rem]">
-                        <h2 className="font-semibold text-site-text line-clamp-2 min-h-[2.5rem] text-sm sm:text-base">
-                          {t.name}
-                        </h2>
-                        <div className="mt-1 min-h-[1.25rem] flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-site-text-muted">
-                          {t.gameFormat && <span>{t.gameFormat}</span>}
-                          {t.prizeInfo && <span>· {t.prizeInfo}</span>}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="p-3 border-t border-site-border">
-                      <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-site-text-muted">
-                        <span>{formatKoreanDateWithWeekday(t.startAt)}</span>
-                        {statusBadge && (
-                          <span
-                            className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                              statusBadge === "정원 마감"
-                                ? "bg-site-bg text-site-text-muted"
-                                : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
-                            }`}
-                          >
-                            {statusBadge}
-                          </span>
-                        )}
-                      </div>
-                      {(t.venue || t.organization?.name) && (
-                        <p className="mt-1 text-xs text-site-text-muted truncate">
-                          {t.venue || t.organization?.name}
-                        </p>
-                      )}
-                      {"distanceKm" in t && t.distanceKm != null && (
-                        <p className="mt-1 text-xs text-site-text-muted">
-                          {formatDistanceKm(t.distanceKm)}
-                        </p>
-                      )}
-                      {max > 0 && (
-                        <p className="mt-1 text-xs font-medium text-site-text">
-                          신청 현황 <span className="text-site-primary">{confirmed}</span>/{max}명
-                        </p>
-                      )}
-                    </div>
-                  </Link>
-                </li>
-              );
-            })}
+            {list.map((t, index) => (
+              <TournamentListCard key={t.id} t={t} index={index} />
+            ))}
           </ul>
           {hasMore && <div ref={sentinelRef} className="h-4 w-full shrink-0" aria-hidden />}
           {loadingMore && (

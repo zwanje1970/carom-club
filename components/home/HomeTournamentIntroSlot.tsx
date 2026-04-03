@@ -69,7 +69,7 @@ export function HomeTournamentIntroSlot({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ latitude: lat, longitude: lng }),
         }).catch(() => {});
-        const params = new URLSearchParams({ lat: String(lat), lng: String(lng), take: "6" });
+        const params = new URLSearchParams({ lat: String(lat), lng: String(lng), take: "5" });
         fetch(`/api/home/tournaments?${params}`)
           .then((r) => (r.ok ? r.json() : Promise.reject(new Error("fetch"))))
           .then((tList: TournamentItem[]) => {

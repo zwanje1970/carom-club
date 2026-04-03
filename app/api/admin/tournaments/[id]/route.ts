@@ -6,7 +6,7 @@ import { isDatabaseConfigured } from "@/lib/db-mode";
 import { normalizeSlug } from "@/lib/normalize-slug";
 import { canViewTournament, canManageTournament, isPlatformAdmin } from "@/lib/permissions";
 import { sendPrizeNotifications } from "@/lib/push/prizeNotifications";
-import type { TeamScoreRule } from "@/generated/prisma";
+import type { Prisma, TeamScoreRule } from "@/generated/prisma";
 
 /** 이전 대회 복사용: 대회 + 규칙 전체 반환 (원본과 연결 없음). GET → canViewTournament */
 export async function GET(
@@ -221,7 +221,7 @@ export async function PATCH(
         ...(teamScoreRule !== undefined && {
           teamScoreRule: (isScotchTournament ? (teamScoreRule === "LT" ? "LT" : "LTE") : null) as TeamScoreRule | null,
         }),
-      }) as any,
+      }) as Prisma.TournamentUpdateInput,
     });
     if (becomingFinished) {
       try {

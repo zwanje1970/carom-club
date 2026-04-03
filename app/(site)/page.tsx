@@ -1,5 +1,5 @@
+import dynamic from "next/dynamic";
 import { HomeHero } from "@/components/home/HomeHero";
-import { HomeDeferredFooterOnly } from "@/components/home/HomeDeferredFooterOnly";
 import { ContentLayer } from "@/components/content/ContentLayer";
 import { PageRenderer } from "@/components/content/PageRenderer";
 import { getCommonPageData } from "@/lib/common-page-data";
@@ -7,6 +7,11 @@ import { applyPublicHeroSingleCanonical } from "@/lib/content/filter-page-blocks
 import { buildHomeSlotRenderPayload } from "@/lib/home-slot-render-data.server";
 import { getHeroSettings } from "@/lib/hero-settings";
 import { getServerTiming, logServerTiming } from "@/lib/perf";
+
+const HomeDeferredFooterOnly = dynamic(
+  () => import("@/components/home/HomeDeferredFooterOnly").then((m) => m.HomeDeferredFooterOnly),
+  { loading: () => null }
+);
 
 /** 메인·대회·당구장 목록은 60초 캐시. 체감 속도 개선용 */
 export const revalidate = 60;

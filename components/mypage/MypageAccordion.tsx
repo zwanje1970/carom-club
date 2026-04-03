@@ -106,7 +106,7 @@ export function MypageAccordion({ session }: { session: SessionInfo }) {
             {isOpen && (
               <div className="border-t border-gray-100 dark:border-slate-600">
                 {group.links.map(({ href, label }) => (
-                  <Link key={href + label} href={href} className={itemClass}>
+                  <Link key={href + label} href={href} prefetch={false} className={itemClass}>
                     {label}
                   </Link>
                 ))}
@@ -131,7 +131,7 @@ export function MypageAccordion({ session }: { session: SessionInfo }) {
           <div className="border-t border-gray-100 dark:border-slate-600">
             {clientItems.map((item) =>
               item.kind === "link" ? (
-                <Link key={item.href + item.label} href={item.href} className={itemClass}>
+                <Link key={item.href + item.label} href={item.href} prefetch={false} className={itemClass}>
                   {item.label}
                 </Link>
               ) : (
@@ -170,7 +170,7 @@ export function MypageAccordion({ session }: { session: SessionInfo }) {
             {isOpen && (
               <div className="border-t border-gray-100 dark:border-slate-600">
                 {group.links.map(({ href, label }) => (
-                  <Link key={href + label} href={href} className={itemClass}>
+                  <Link key={href + label} href={href} prefetch={false} className={itemClass}>
                     {label}
                   </Link>
                 ))}

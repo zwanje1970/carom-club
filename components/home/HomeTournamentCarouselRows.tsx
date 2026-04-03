@@ -62,8 +62,15 @@ export function HomeTournamentCarouselRows({
     const cols = (listLayout?.type === "grid" ? listLayout.columns : cardStyle.columns) as 1 | 2 | 3 | 4;
     return (
       <ul className={cn(tournamentGridUlClass(cols, cardStyle), "px-4 sm:px-6 w-full max-w-full")}>
-        {normalized.map((t) => (
-          <HomeTournamentCardItem key={t.id} t={t} cardStyle={cardStyle} cardCta={cardCta} layout="grid" />
+        {normalized.map((t, index) => (
+          <HomeTournamentCardItem
+            key={t.id}
+            t={t}
+            index={index}
+            cardStyle={cardStyle}
+            cardCta={cardCta}
+            layout="grid"
+          />
         ))}
       </ul>
     );
@@ -73,14 +80,22 @@ export function HomeTournamentCarouselRows({
 
   return (
     <ul className={cn("flex w-max min-w-0 flex-nowrap px-4 sm:px-6", rowGap)}>
-      {normalized.map((t) => (
-        <HomeTournamentCardItem key={t.id} t={t} cardStyle={cardStyle} cardCta={cardCta} layout="carousel" />
+      {normalized.map((t, index) => (
+        <HomeTournamentCardItem
+          key={t.id}
+          t={t}
+          index={index}
+          cardStyle={cardStyle}
+          cardCta={cardCta}
+          layout="carousel"
+        />
       ))}
       {loopDup &&
-        normalized.map((t) => (
+        normalized.map((t, index) => (
           <HomeTournamentCardItem
             key={`marq-${t.id}`}
             t={t}
+            index={index}
             duplicate
             cardStyle={cardStyle}
             cardCta={cardCta}
