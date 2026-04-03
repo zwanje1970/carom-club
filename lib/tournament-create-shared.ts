@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { createListingPurchaseRecord } from "@/lib/listing-registration";
 import type { TournamentVerificationDbInput } from "@/lib/tournament-certification";
 import { inferNationalTournamentFromRegion } from "@/lib/tournament-national";
+import type { TeamScoreRule } from "@/generated/prisma";
 
 export type TournamentCreateRulePayload = {
   entryFee?: number | null;
@@ -97,7 +98,7 @@ export function buildTournamentCreateData(
     isScotch: f.isScotch === true,
     teamScoreLimit:
       f.teamScoreLimit != null && Number.isFinite(Number(f.teamScoreLimit)) ? Number(f.teamScoreLimit) : null,
-    teamScoreRule: f.teamScoreRule === "LT" ? "LT" : "LTE",
+    teamScoreRule: (f.teamScoreRule === "LT" ? "LT" : "LTE") as TeamScoreRule,
     ...(f.verification != null && {
       verificationMode: f.verification.verificationMode,
       verificationReviewRequired: f.verification.verificationReviewRequired,

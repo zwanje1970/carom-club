@@ -9,6 +9,7 @@ import {
   normalizeTournamentVerificationInput,
 } from "@/lib/tournament-certification";
 import { Prisma } from "@/generated/prisma";
+import type { TeamScoreRule } from "@/generated/prisma";
 import { canAccessClientDashboard } from "@/types/auth";
 
 /** GET: 클라이언트 로그인 모드일 때만 본인 소유 업체의 대회 1건 */
@@ -117,7 +118,7 @@ export async function PATCH(
     divisionMetricType?: string;
     divisionRulesJson?: unknown;
     isScotch?: boolean;
-    teamScoreLimit?: number | null;
+    teamScoreLimit?: number | string | null;
     teamScoreRule?: "LTE" | "LT" | null;
     certificationRequestMode?: string;
     manualReviewRequired?: boolean;
@@ -211,7 +212,7 @@ export async function PATCH(
   try {
     await prisma.tournament.update({
       where: { id },
-      data: {
+      data: ({
         ...(name !== undefined && { name }),
         ...(startAt !== undefined && { startAt: new Date(startAt) }),
         ...(endAt !== undefined && { endAt: endAt != null && endAt !== "" ? new Date(endAt) : null }),
@@ -263,9 +264,9 @@ export async function PATCH(
               : null,
         }),
         ...(teamScoreRule !== undefined && {
-          teamScoreRule: isScotchTournament ? (teamScoreRule === "LT" ? "LT" : "LTE") : null,
+          teamScoreRule: (isScotchTournament ? (teamScoreRule === "LT" ? "LT" : "LTE") : null) as TeamScoreRule | null,
         }),
-      },
+      }) as any,
     });
     if (becomingFinished) {
       try {

@@ -134,7 +134,7 @@ export async function POST(request: Request) {
     outlinePublished?: string | null;
     approvalType?: string | null;
     isScotch?: boolean;
-    teamScoreLimit?: number | null;
+    teamScoreLimit?: number | string | null;
     teamScoreRule?: "LTE" | "LT" | null;
     rule?: {
       entryFee?: number | null;

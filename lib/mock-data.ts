@@ -35,6 +35,7 @@ export const MOCK_TOURNAMENT_DETAIL = {
   startAt: nextMonth,
   endAt: nextMonth,
   gameFormat: "3구",
+  isScotch: false,
   status: "OPEN",
   organization: MOCK_ORGANIZATION,
   rule: {
