@@ -1,6 +1,6 @@
 /**
  * ZONE_MANAGER: 배정된 권역(Zone) 조회.
- * API/페이지에서 권역 스코핑 시 사용.
+ * 새 기준은 TournamentZoneManager이며, 구형 ZoneManagerAssignment는 호환용으로만 유지.
  */
 import { prisma } from "@/lib/db";
 import type { SessionUser } from "@/types/auth";
@@ -11,11 +11,16 @@ export async function getAssignedZoneIds(
   session: SessionUser | null
 ): Promise<string[] | null> {
   if (!session || !isZoneManager(session)) return null;
-  const assignments = await prisma.zoneManagerAssignment.findMany({
+  const managed = await prisma.tournamentZoneManager.findMany({
     where: { userId: session.id },
     select: { zoneId: true },
   });
-  return assignments.map((a) => a.zoneId);
+  if (managed.length > 0) return managed.map((a) => a.zoneId);
+  const legacy = await prisma.zoneManagerAssignment.findMany({
+    where: { userId: session.id },
+    select: { zoneId: true },
+  });
+  return legacy.map((a) => a.zoneId);
 }
 
 /** ZONE_MANAGER인 경우 본인에게 배정된 Zone 목록(이름·코드 등). 없으면 []. */
@@ -23,6 +28,19 @@ export async function getAssignedZones(
   session: SessionUser | null
 ): Promise<{ id: string; name: string; code: string | null; sortOrder: number }[]> {
   if (!session || !isZoneManager(session)) return [];
+  const managed = await prisma.tournamentZoneManager.findMany({
+    where: { userId: session.id },
+    include: { zone: { include: { zone: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+  if (managed.length > 0) {
+    return managed.map((a) => ({
+      id: a.zone.zone.id,
+      name: a.zone.name ?? a.zone.zone.name,
+      code: a.zone.code ?? a.zone.zone.code,
+      sortOrder: a.zone.sortOrder,
+    }));
+  }
   const list = await prisma.zoneManagerAssignment.findMany({
     where: { userId: session.id },
     include: { zone: true },
@@ -42,6 +60,11 @@ export async function canManageTournamentZone(
   tournamentZoneId: string
 ): Promise<boolean> {
   if (!session || !isZoneManager(session)) return false;
+  const managed = await prisma.tournamentZoneManager.findUnique({
+    where: { zoneId_userId: { zoneId: tournamentZoneId, userId: session.id } },
+    select: { id: true },
+  });
+  if (managed) return true;
   const assigned = await getAssignedZoneIds(session);
   if (!assigned?.length) return false;
   const tz = await prisma.tournamentZone.findUnique({
@@ -64,6 +87,27 @@ export async function getAssignedTournamentZones(
   session: SessionUser | null
 ): Promise<{ tournamentZoneId: string; tournamentId: string; tournamentName: string; zoneName: string; zoneCode: string | null }[]> {
   if (!session || !isZoneManager(session)) return [];
+  const managed = await prisma.tournamentZoneManager.findMany({
+    where: { userId: session.id },
+    include: {
+      zone: {
+        include: {
+          tournament: { select: { id: true, name: true, startAt: true } },
+          zone: { select: { name: true, code: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  if (managed.length > 0) {
+    return managed.map((tzm) => ({
+      tournamentZoneId: tzm.zoneId,
+      tournamentId: tzm.zone.tournamentId,
+      tournamentName: tzm.zone.tournament.name,
+      zoneName: tzm.zone.name ?? tzm.zone.zone.name,
+      zoneCode: tzm.zone.code ?? tzm.zone.zone.code,
+    }));
+  }
   const assignedZoneIds = await getAssignedZoneIds(session);
   if (!assignedZoneIds?.length) return [];
   const list = await prisma.tournamentZone.findMany({

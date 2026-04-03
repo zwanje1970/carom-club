@@ -5,7 +5,6 @@ import { CommunityMainClient } from "./CommunityMainClient";
 import { ContentLayer } from "@/components/content/ContentLayer";
 import { PageRenderer } from "@/components/content/PageRenderer";
 import { PageContentContainer } from "@/components/layout/PageContentContainer";
-import { CommunityNanguPromoCard } from "@/components/community/CommunityNanguPromoCard";
 
 export async function CommunityHomeInner({
   category,
@@ -19,7 +18,6 @@ export async function CommunityHomeInner({
   const { noticeBars, popups, pageBlocks, copy } = common;
   const pageBlocksRendered = applyPublicHeroSingleCanonical("community", pageBlocks);
   const hasPostListSlot = pageBlocksRendered.some((b) => b.slotType === "postList");
-  const hasNanguListSlot = pageBlocksRendered.some((b) => b.slotType === "nanguList");
 
   const slotContext = {
     page: "community" as const,
@@ -29,11 +27,6 @@ export async function CommunityHomeInner({
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
       <ContentLayer noticeBars={noticeBars} popups={popups} />
-      {!hasNanguListSlot && hasPostListSlot ? (
-        <PageContentContainer className="py-6">
-          <CommunityNanguPromoCard copy={copy} />
-        </PageContentContainer>
-      ) : null}
       <PageRenderer blocks={pageBlocksRendered} slotContext={slotContext} />
       {!hasPostListSlot ? (
         <PageContentContainer className="py-6">

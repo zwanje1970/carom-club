@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { assertClientCanMutateTournamentById } from "@/lib/client-tournament-access";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
-import { syncBracketMatchProgressStates } from "@/lib/tournament-match-progress";
+import { syncMainBracketMatchProgressStates, fetchOrImportBracketSnapshotByKind } from "@/lib/bracket-match-service";
 
 /** 부전승 연쇄·READY 정리 수동 실행 */
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -17,6 +17,10 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: gate.error }, { status: gate.status });
   }
 
-  await syncBracketMatchProgressStates(prisma, tournamentId);
+  const bracket = await fetchOrImportBracketSnapshotByKind(tournamentId, "MAIN");
+  if (!bracket) {
+    return NextResponse.json({ error: "대진표가 생성되지 않았습니다." }, { status: 404 });
+  }
+  await syncMainBracketMatchProgressStates(prisma, tournamentId);
   return NextResponse.json({ ok: true });
 }

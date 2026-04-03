@@ -125,7 +125,10 @@ export default async function AdminTournamentEditPage({
             venue: tournament.venue ?? (readOnlyVenueInfo?.address ?? ""),
             venueName: tournament.venueName ?? (readOnlyVenueInfo?.name ?? ""),
             status: tournament.status,
-            gameFormat: tournament.gameFormat ?? "",
+            gameFormat: tournament.isScotch === true ? "SCOTCH" : (tournament.gameFormat ?? ""),
+            isScotch: tournament.isScotch === true,
+            teamScoreLimit: tournament.teamScoreLimit ?? "",
+            teamScoreRule: tournament.teamScoreRule ?? "LTE",
           }}
           isVenueClient={isVenueClient}
           readOnlyVenueInfo={readOnlyVenueInfo}

@@ -13,6 +13,10 @@ export function TournamentApplyForm({
   accountNumber,
   entryConditionsHtml,
   additionalSlot = false,
+  isScotch = false,
+  currentUserName = null,
+  teamScoreLimit = null,
+  teamScoreRule = null,
   verificationMode,
   verificationGuideText,
   divisionEnabled,
@@ -25,6 +29,10 @@ export function TournamentApplyForm({
   accountNumber: string | null;
   entryConditionsHtml: string | null;
   additionalSlot?: boolean;
+  isScotch?: boolean;
+  currentUserName?: string | null;
+  teamScoreLimit?: number | null;
+  teamScoreRule?: "LTE" | "LT" | null;
   verificationMode: VerificationMode;
   verificationGuideText: string | null;
   divisionEnabled: boolean;
@@ -45,6 +53,12 @@ export function TournamentApplyForm({
   const [certUploading, setCertUploading] = useState(false);
   const [certPreviewUrl, setCertPreviewUrl] = useState<string | null>(null);
   const [agreed, setAgreed] = useState(false);
+  const [playerAName, setPlayerAName] = useState(currentUserName ?? "");
+  const [playerAScore, setPlayerAScore] = useState("");
+  const [playerBName, setPlayerBName] = useState("");
+  const [playerBScore, setPlayerBScore] = useState("");
+  const [playerBProofUrl, setPlayerBProofUrl] = useState("");
+  const [playerBUploading, setPlayerBUploading] = useState(false);
 
   const needCert = requiresVerificationImage(verificationMode);
 
@@ -53,6 +67,12 @@ export function TournamentApplyForm({
       if (certPreviewUrl) URL.revokeObjectURL(certPreviewUrl);
     };
   }, [certPreviewUrl]);
+
+  useEffect(() => {
+    if (currentUserName) {
+      setPlayerAName(currentUserName);
+    }
+  }, [currentUserName]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -70,8 +90,43 @@ export function TournamentApplyForm({
       setError(getCopyValue(DEFAULT_ADMIN_COPY, "site.tournament.apply.certRequired"));
       return;
     }
+    if (isScotch) {
+      const aName = playerAName.trim();
+      const bName = playerBName.trim();
+      const aScore = Number(playerAScore);
+      const bScore = Number(playerBScore);
+      if (!aName || !bName) {
+        setError("스카치 대회는 두 명의 이름을 모두 입력해야 합니다.");
+        return;
+      }
+      if (!Number.isFinite(aScore) || !Number.isFinite(bScore)) {
+        setError("스카치 대회는 두 명의 점수를 모두 숫자로 입력해야 합니다.");
+        return;
+      }
+      if (!certificationImageUrl.trim() || !playerBProofUrl.trim()) {
+        setError("스카치 대회는 두 명 모두 증빙을 첨부해야 합니다.");
+        return;
+      }
+      const teamTotalScore = aScore + bScore;
+      const limit = teamScoreLimit != null && Number.isFinite(Number(teamScoreLimit)) ? Number(teamScoreLimit) : null;
+      if (limit != null && teamScoreRule) {
+        const valid = teamScoreRule === "LT" ? teamTotalScore < limit : teamTotalScore <= limit;
+        if (!valid) {
+          setError(
+            teamScoreRule === "LT"
+              ? `팀 합산 점수는 ${limit} 미만이어야 합니다.`
+              : `팀 합산 점수는 ${limit} 이하이어야 합니다.`
+          );
+          return;
+        }
+      }
+    }
     setLoading(true);
     try {
+      const teamTotalScore =
+        isScotch && Number.isFinite(Number(playerAScore)) && Number.isFinite(Number(playerBScore))
+          ? Number(playerAScore) + Number(playerBScore)
+          : null;
       const res = await fetch("/api/tournaments/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -84,6 +139,15 @@ export function TournamentApplyForm({
           avgProofUrl: avgProofUrl.trim() || undefined,
           ...(needCert && {
             verificationImageUrl: certificationImageUrl.trim(),
+          }),
+          ...(isScotch && {
+            playerAName: playerAName.trim() || currentUserName?.trim() || undefined,
+            playerAScore: Number(playerAScore),
+            playerAProofUrl: certificationImageUrl.trim(),
+            playerBName: playerBName.trim(),
+            playerBScore: Number(playerBScore),
+            playerBProofUrl: playerBProofUrl.trim(),
+            teamTotalScore,
           }),
           ...(additionalSlot && { additionalSlot: true }),
         }),
@@ -106,6 +170,11 @@ export function TournamentApplyForm({
       setAvg("");
       setAvgProofUrl("");
       setCertificationImageUrl("");
+      setPlayerAName(currentUserName ?? "");
+      setPlayerAScore("");
+      setPlayerBName("");
+      setPlayerBScore("");
+      setPlayerBProofUrl("");
       if (certPreviewUrl) URL.revokeObjectURL(certPreviewUrl);
       setCertPreviewUrl(null);
       setAgreed(false);
@@ -227,7 +296,7 @@ export function TournamentApplyForm({
           />
         </div>
       </div>
-      {needCert && (
+      {needCert && !isScotch && (
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
             인증 이미지 <span className="text-red-500">*</span>
@@ -294,6 +363,195 @@ export function TournamentApplyForm({
             </div>
           )}
           <p className="mt-1 text-xs text-gray-500">JPG, PNG, WebP (최대 8MB)</p>
+        </div>
+      )}
+      {isScotch && (
+        <div className="space-y-4 rounded-lg border border-site-border bg-site-bg/30 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-site-text">스카치 팀 정보</h3>
+            {teamScoreLimit != null && (
+              <span className="text-xs text-site-text-muted">
+                합산 {teamScoreRule === "LT" ? "미만" : "이하"} {teamScoreLimit}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                본인 이름 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={playerAName}
+                onChange={(e) => setPlayerAName(e.target.value)}
+                className="w-full border border-gray-300 rounded px-3 py-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                placeholder="본인 이름"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                본인 점수 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                min={0}
+                step="1"
+                value={playerAScore}
+                onChange={(e) => setPlayerAScore(e.target.value)}
+                className="w-full border border-gray-300 rounded px-3 py-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                placeholder="예: 25"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                본인 증빙 <span className="text-red-500">*</span>
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  className="text-sm text-gray-600 file:mr-2 file:rounded file:border-0 file:bg-site-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-white file:hover:opacity-90"
+                  disabled={certUploading}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (certPreviewUrl) URL.revokeObjectURL(certPreviewUrl);
+                    setCertPreviewUrl(URL.createObjectURL(file));
+                    setCertUploading(true);
+                    setError("");
+                    try {
+                      const formData = new FormData();
+                      formData.set("file", file);
+                      const res = await fetch("/api/tournaments/apply/upload-certification", {
+                        method: "POST",
+                        credentials: "include",
+                        body: formData,
+                      });
+                      const data = await res.json().catch(() => ({}));
+                      if (!res.ok) {
+                        setError((data as { error?: string }).error ?? "인증 이미지 업로드에 실패했습니다.");
+                        setCertificationImageUrl("");
+                        return;
+                      }
+                      setCertificationImageUrl((data as { url?: string }).url ?? "");
+                    } catch {
+                      setError("인증 이미지 업로드에 실패했습니다.");
+                      setCertificationImageUrl("");
+                    } finally {
+                      setCertUploading(false);
+                      e.target.value = "";
+                    }
+                  }}
+                />
+                {certUploading && <span className="text-sm text-gray-500">업로드 중…</span>}
+                {certificationImageUrl && (
+                  <span className="text-sm text-green-600 dark:text-green-400">
+                    첨부됨
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCertificationImageUrl("");
+                        if (certPreviewUrl) URL.revokeObjectURL(certPreviewUrl);
+                        setCertPreviewUrl(null);
+                      }}
+                      className="ml-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    >
+                      제거
+                    </button>
+                  </span>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                동행자 이름 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={playerBName}
+                onChange={(e) => setPlayerBName(e.target.value)}
+                className="w-full border border-gray-300 rounded px-3 py-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                placeholder="동행자 이름"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                동행자 점수 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                min={0}
+                step="1"
+                value={playerBScore}
+                onChange={(e) => setPlayerBScore(e.target.value)}
+                className="w-full border border-gray-300 rounded px-3 py-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                placeholder="예: 25"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                동행자 증빙 <span className="text-red-500">*</span>
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  className="text-sm text-gray-600 file:mr-2 file:rounded file:border-0 file:bg-site-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-white file:hover:opacity-90"
+                  disabled={playerBUploading}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setPlayerBUploading(true);
+                    setError("");
+                    try {
+                      const formData = new FormData();
+                      formData.set("file", file);
+                      const res = await fetch("/api/tournaments/apply/upload-certification", {
+                        method: "POST",
+                        credentials: "include",
+                        body: formData,
+                      });
+                      const data = await res.json().catch(() => ({}));
+                      if (!res.ok) {
+                        setError((data as { error?: string }).error ?? "인증 이미지 업로드에 실패했습니다.");
+                        setPlayerBProofUrl("");
+                        return;
+                      }
+                      setPlayerBProofUrl((data as { url?: string }).url ?? "");
+                    } catch {
+                      setError("인증 이미지 업로드에 실패했습니다.");
+                      setPlayerBProofUrl("");
+                    } finally {
+                      setPlayerBUploading(false);
+                      e.target.value = "";
+                    }
+                  }}
+                />
+                {playerBUploading && <span className="text-sm text-gray-500">업로드 중…</span>}
+                {playerBProofUrl && (
+                  <span className="text-sm text-green-600 dark:text-green-400">
+                    첨부됨
+                    <button
+                      type="button"
+                      onClick={() => setPlayerBProofUrl("")}
+                      className="ml-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    >
+                      제거
+                    </button>
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="sm:col-span-2 rounded-md border border-site-border bg-white/60 p-3 text-sm text-site-text-muted">
+              팀 합산 점수는
+              {" "}
+              <strong className="text-site-text">
+                {teamScoreRule === "LT" ? "미만" : "이하"} {teamScoreLimit ?? "제한 없음"}
+              </strong>
+              {" "}
+              기준으로 검증됩니다.
+            </div>
+          </div>
         </div>
       )}
       <div>

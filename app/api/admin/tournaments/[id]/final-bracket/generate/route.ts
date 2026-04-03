@@ -4,13 +4,7 @@ import { prisma } from "@/lib/db";
 import { ORGANIZATION_SELECT_OWNER } from "@/lib/db-selects";
 import { canManageTournament } from "@/lib/permissions";
 import { buildFinalBracketPlan, orderQualifiersForAutoAssign } from "@/lib/final-bracket";
-import {
-  createBracketMatchesFromPlan,
-  fetchMatchVenueIdsOrdered,
-  getOrCreateTournamentRoundByName,
-  sortFinalBracketPlan,
-} from "@/lib/tournament-bracket-matches";
-import { syncBracketMatchProgressStates } from "@/lib/tournament-match-progress";
+import { createBracketMatchesFromPlanByKind, sortBracketPlan, syncBracketMatchProgressStatesByKind } from "@/lib/bracket-match-service";
 
 /** 본선 대진표 생성. POST → canManageTournament. body: size (32|64), assignMode (auto|manual), forceRegenerate? (PLATFORM_ADMIN만) */
 export async function POST(
@@ -38,14 +32,15 @@ export async function POST(
   }
   const forceRegenerate = body?.forceRegenerate === true && session.role === "PLATFORM_ADMIN";
 
-  const existing = await prisma.tournamentFinalMatch.findFirst({
-    where: { tournamentId },
+  const existing = await prisma.bracket.findFirst({
+    where: { tournamentId, kind: "FINAL" },
+    select: { id: true },
   });
   if (existing && !forceRegenerate) {
     return NextResponse.json({ error: "이미 본선 대진이 생성되어 있습니다." }, { status: 400 });
   }
 
-  const size = (body?.size === 64 ? 64 : 32) as 32 | 64;
+  const size = ((tournament.targetFinalSize === 64 ? 64 : tournament.targetFinalSize === 32 ? 32 : body?.size === 64 ? 64 : 32) as 32 | 64);
   const assignMode = body?.assignMode === "manual" ? "manual" : "auto";
 
   const qualifiers = await prisma.tournamentFinalQualifier.findMany({
@@ -70,19 +65,22 @@ export async function POST(
     slotEntries = qualifiers.slice(0, size).map((q) => q.entryId);
   }
 
-  const plan = buildFinalBracketPlan(slotEntries, size);
-  const sorted = sortFinalBracketPlan(plan);
+  const plan = sortBracketPlan(buildFinalBracketPlan(slotEntries, size));
 
   await prisma.$transaction(async (tx) => {
-    await tx.tournamentFinalMatch.deleteMany({ where: { tournamentId } });
-    const round = await getOrCreateTournamentRoundByName(tx, tournamentId, "본선 브래킷");
-    const venueIds = await fetchMatchVenueIdsOrdered(tx, tournamentId);
-    await createBracketMatchesFromPlan(tx, {
+    await tx.bracketMatch.deleteMany({
+      where: { bracket: { tournamentId, kind: "FINAL" } },
+    });
+    await tx.bracketRound.deleteMany({
+      where: { bracket: { tournamentId, kind: "FINAL" } },
+    });
+    await tx.bracket.deleteMany({
+      where: { tournamentId, kind: "FINAL" },
+    });
+    await createBracketMatchesFromPlanByKind(tx, {
       tournamentId,
-      tournamentRoundId: round.id,
-      sortedPlan: sorted,
-      bracketPhase: "MAIN",
-      matchVenueIdsInOrder: venueIds.length ? venueIds : undefined,
+      kind: "FINAL",
+      sortedPlan: plan,
     });
     await tx.tournament.update({
       where: { id: tournamentId },
@@ -90,7 +88,7 @@ export async function POST(
     });
   });
 
-  await syncBracketMatchProgressStates(prisma, tournamentId);
+  await syncBracketMatchProgressStatesByKind(prisma, tournamentId, "FINAL");
 
   return NextResponse.json({ ok: true, matchCount: plan.length, size });
 }

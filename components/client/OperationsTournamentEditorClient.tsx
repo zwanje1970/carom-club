@@ -70,7 +70,11 @@ export function OperationsTournamentEditorClient({
           status: t.status ?? "OPEN",
           entryFee: t.entryFee != null ? t.entryFee : "",
           prizeInfo: t.prizeInfo ?? "",
-          gameFormat: (bc?.gameFormatType as string) ?? t.gameFormat ?? "TOURNAMENT",
+          gameFormat:
+            (bc?.gameFormatType as string) ?? (t.isScotch === true ? "SCOTCH" : t.gameFormat) ?? "TOURNAMENT",
+          isScotch: t.isScotch === true || (bc?.gameFormatType as string) === "SCOTCH",
+          teamScoreLimit: t.teamScoreLimit != null ? t.teamScoreLimit : "",
+          teamScoreRule: t.teamScoreRule ?? "LTE",
           entryCondition: t.entryCondition ?? "",
           maxParticipants: t.maxParticipants != null ? t.maxParticipants : "",
           scope: (bc?.scope as "REGIONAL" | "NATIONAL") ?? "REGIONAL",
@@ -149,6 +153,12 @@ export function OperationsTournamentEditorClient({
       venue: venueSummary,
       status: values.status,
       gameFormat: values.gameFormat,
+      isScotch: values.gameFormat === "SCOTCH",
+      teamScoreLimit:
+        values.gameFormat === "SCOTCH" && values.teamScoreLimit !== ""
+          ? Number(values.teamScoreLimit)
+          : null,
+      teamScoreRule: values.gameFormat === "SCOTCH" ? values.teamScoreRule : null,
       summary: values.summary.trim() || null,
       description: description.trim() || null,
       posterImageUrl: values.posterImageUrl.trim() || null,

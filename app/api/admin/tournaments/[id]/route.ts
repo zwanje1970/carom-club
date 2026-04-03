@@ -67,6 +67,9 @@ export async function GET(
       promoContent: tournament.promoContent,
       outlineDraft: tournament.outlineDraft,
       outlinePublished: tournament.outlinePublished,
+      isScotch: tournament.isScotch,
+      teamScoreLimit: tournament.teamScoreLimit,
+      teamScoreRule: tournament.teamScoreRule,
     },
     rule: tournament.rule
       ? {
@@ -131,6 +134,9 @@ export async function PATCH(
     prizeInfo,
     rules,
     promoContent,
+    isScotch,
+    teamScoreLimit,
+    teamScoreRule,
   } = body as {
     name?: string;
     startAt?: string;
@@ -148,6 +154,9 @@ export async function PATCH(
     prizeInfo?: string | null;
     rules?: string | null;
     promoContent?: string | null;
+    isScotch?: boolean;
+    teamScoreLimit?: number | null;
+    teamScoreRule?: "LTE" | "LT" | null;
   };
 
   const validStatuses = ["DRAFT", "OPEN", "CLOSED", "BRACKET_GENERATED", "FINISHED", "HIDDEN"] as const;
@@ -173,6 +182,13 @@ export async function PATCH(
       );
     }
   }
+  const isScotchTournament = isScotch === true || gameFormat === "SCOTCH";
+  if (isScotchTournament) {
+    const limitValue = teamScoreLimit == null || teamScoreLimit === "" ? null : Number(teamScoreLimit);
+    if (!Number.isFinite(limitValue)) {
+      return NextResponse.json({ error: "스카치 대회는 팀 점수 제한을 입력해 주세요." }, { status: 400 });
+    }
+  }
 
   try {
     await prisma.tournament.update({
@@ -194,6 +210,16 @@ export async function PATCH(
         ...(prizeInfo !== undefined && { prizeInfo: prizeInfo?.trim() || null }),
         ...(rules !== undefined && { rules: rules?.trim() || null }),
         ...(promoContent !== undefined && { promoContent: promoContent?.trim() || null }),
+        ...(isScotch !== undefined && { isScotch: isScotchTournament }),
+        ...(teamScoreLimit !== undefined && {
+          teamScoreLimit:
+            isScotchTournament && teamScoreLimit != null && Number.isFinite(Number(teamScoreLimit))
+              ? Number(teamScoreLimit)
+              : null,
+        }),
+        ...(teamScoreRule !== undefined && {
+          teamScoreRule: isScotchTournament ? (teamScoreRule === "LT" ? "LT" : "LTE") : null,
+        }),
       },
     });
     if (becomingFinished) {

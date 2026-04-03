@@ -43,6 +43,9 @@ export type TournamentCreateFields = {
   outlineDraft?: string | null;
   outlinePublished?: string | null;
   approvalType?: string | null;
+  isScotch?: boolean;
+  teamScoreLimit?: number | null;
+  teamScoreRule?: "LTE" | "LT" | null;
   rule?: TournamentCreateRulePayload | null;
   verification?: TournamentVerificationDbInput | null;
 };
@@ -91,6 +94,10 @@ export function buildTournamentCreateData(
     outlineDraft: f.outlineDraft != null ? String(f.outlineDraft).trim() || null : null,
     outlinePublished: f.outlinePublished != null ? String(f.outlinePublished).trim() || null : null,
     approvalType: f.approvalType != null ? String(f.approvalType).trim() || undefined : undefined,
+    isScotch: f.isScotch === true,
+    teamScoreLimit:
+      f.teamScoreLimit != null && Number.isFinite(Number(f.teamScoreLimit)) ? Number(f.teamScoreLimit) : null,
+    teamScoreRule: f.teamScoreRule === "LT" ? "LT" : "LTE",
     ...(f.verification != null && {
       verificationMode: f.verification.verificationMode,
       verificationReviewRequired: f.verification.verificationReviewRequired,

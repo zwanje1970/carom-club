@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { getCommonPageData } from "@/lib/common-page-data";
 import { getPublicTournamentOrNull } from "@/lib/public-tournament";
+import { fetchOrImportBracketSnapshotByKind } from "@/lib/bracket-match-service";
 import { PublicFinalBracket } from "@/components/public/PublicFinalBracket";
 
 export default async function PublicFinalBracketPage({
@@ -19,8 +20,8 @@ export default async function PublicFinalBracketPage({
   if (!tournament) notFound();
   const c = common.copy as Record<AdminCopyKey, string>;
 
-  const finalMatchCount = await prisma.tournamentFinalMatch.count({ where: { tournamentId } });
-  if (finalMatchCount === 0) {
+  const bracket = await fetchOrImportBracketSnapshotByKind(tournamentId, "FINAL");
+  if (!bracket || bracket.matches.length === 0) {
     return (
       <main className="min-h-screen bg-site-bg text-site-text">
         <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">

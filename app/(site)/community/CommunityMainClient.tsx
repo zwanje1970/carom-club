@@ -1,6 +1,5 @@
 "use client";
 
-import { CommunityNanguPromoCard } from "@/components/community/CommunityNanguPromoCard";
 import { CommunityPostListSection } from "@/components/community/CommunityPostListSection";
 import type { CommunityHubPostItem } from "@/types/page-slot-render-context";
 
@@ -19,7 +18,6 @@ export function CommunityMainClient({
 }) {
   return (
     <div className="pb-20">
-      <CommunityNanguPromoCard copy={copy} />
       <CommunityPostListSection
         latest={latest}
         initialCategory={initialCategory}

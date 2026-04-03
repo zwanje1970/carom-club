@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { ORGANIZATION_SELECT_OWNER } from "@/lib/db-selects";
 import { canViewTournament, canManageTournament } from "@/lib/permissions";
 import { isQualifierLocked } from "@/lib/tournament-stage";
+import { assignTournamentEntryToZone } from "@/lib/tournaments/national";
 
 /** 대회 기준: 전체 참가자, 미배정, 권역별 배정 현황. ?tournamentZoneId= 시 해당 권역 참가자만. GET → canViewTournament */
 export async function GET(
@@ -30,27 +31,26 @@ export async function GET(
     prisma.tournamentEntry.findMany({
       where: {
         tournamentId,
-        ...(filterZoneId
-          ? { zoneAssignment: { tournamentZoneId: filterZoneId } }
-          : {}),
+        ...(filterZoneId ? { zoneId: filterZoneId } : {}),
       },
       orderBy: [{ status: "asc" }, { waitingListOrder: "asc" }, { createdAt: "asc" }],
       include: {
-        user: { select: { id: true, name: true }, include: { memberProfile: { select: { handicap: true, avg: true } } } },
-        zoneAssignment: {
-          include: {
-            tournamentZone: {
-              include: { zone: { select: { id: true, name: true, code: true } } },
-            },
-          },
+        user: {
+          select: { id: true, name: true },
+          include: { memberProfile: { select: { handicap: true, avg: true } } },
         },
+        zone: { include: { zone: { select: { id: true, name: true, code: true } } } },
       },
     }),
     prisma.tournamentEntryZoneAssignment.findMany({
       where: { entry: { tournamentId } },
-      include: {
-        tournamentZone: { include: { zone: { select: { name: true, code: true } } } },
-        entry: { select: { id: true, userId: true } },
+      select: {
+        id: true,
+        tournamentEntryId: true,
+        tournamentZoneId: true,
+        assignmentType: true,
+        assignedAt: true,
+        notes: true,
       },
     }),
     prisma.tournamentZone.findMany({
@@ -60,12 +60,13 @@ export async function GET(
     }),
   ]);
 
-  const unassignedCount = entries.filter((e) => !e.zoneAssignment).length;
-  const zoneCounts: { tournamentZoneId: string; zoneName: string; zoneCode: string | null; count: number }[] = tournamentZones.map((tz) => ({
+  const unassignedCount = entries.filter((e) => !e.zoneId).length;
+  const assignmentMap = new Map(assignments.map((a) => [a.tournamentEntryId, a]));
+  const zoneCounts = tournamentZones.map((tz) => ({
     tournamentZoneId: tz.id,
     zoneName: tz.name ?? tz.zone.name,
     zoneCode: tz.code ?? tz.zone.code,
-    count: assignments.filter((a) => a.tournamentZoneId === tz.id).length,
+    count: entries.filter((e) => e.zoneId === tz.id).length,
   }));
 
   return NextResponse.json({
@@ -77,15 +78,15 @@ export async function GET(
       handicap: e.user.memberProfile?.handicap ?? null,
       avg: e.user.memberProfile?.avg ?? null,
       status: e.status,
-      zoneAssignment: e.zoneAssignment
+      zoneAssignment: e.zone
         ? {
-            id: e.zoneAssignment.id,
-            tournamentZoneId: e.zoneAssignment.tournamentZoneId,
-            zoneName: e.zoneAssignment.tournamentZone.name ?? e.zoneAssignment.tournamentZone.zone.name,
-            zoneCode: e.zoneAssignment.tournamentZone.zone.code,
-            assignmentType: e.zoneAssignment.assignmentType,
-            assignedAt: e.zoneAssignment.assignedAt.toISOString(),
-            notes: e.zoneAssignment.notes,
+            id: assignmentMap.get(e.id)?.id ?? e.zoneId ?? e.id,
+            tournamentZoneId: e.zoneId,
+            zoneName: e.zone.name ?? e.zone.zone.name,
+            zoneCode: e.zone.code ?? e.zone.zone.code,
+            assignmentType: assignmentMap.get(e.id)?.assignmentType ?? "AUTO",
+            assignedAt: (assignmentMap.get(e.id)?.assignedAt ?? e.updatedAt).toISOString(),
+            notes: assignmentMap.get(e.id)?.notes ?? null,
           }
         : null,
     })),
@@ -136,49 +137,16 @@ export async function POST(
     return NextResponse.json({ error: "entryId, tournamentZoneId가 필요합니다." }, { status: 400 });
   }
 
-  const entry = await prisma.tournamentEntry.findFirst({
-    where: { id: entryId, tournamentId },
+  const updated = await assignTournamentEntryToZone({
+    tournamentId,
+    entryId,
+    tournamentZoneId,
+    actorUserId: session.id,
+    assignmentType: body.assignmentType === "AUTO" ? "AUTO" : "MANUAL",
+    notes: typeof body?.notes === "string" ? body.notes.trim() || null : null,
   });
-  if (!entry) return NextResponse.json({ error: "참가 신청을 찾을 수 없습니다." }, { status: 404 });
-
-  const tz = await prisma.tournamentZone.findFirst({
-    where: { id: tournamentZoneId, tournamentId },
-  });
-  if (!tz) return NextResponse.json({ error: "해당 대회의 권역을 찾을 수 없습니다." }, { status: 404 });
-
-  const existing = await prisma.tournamentEntryZoneAssignment.findUnique({
-    where: { tournamentEntryId: entryId },
-  });
-  if (existing) {
-    const updated = await prisma.tournamentEntryZoneAssignment.update({
-      where: { id: existing.id },
-      data: {
-        tournamentZoneId,
-        assignmentType: body.assignmentType === "AUTO" ? "AUTO" : "MANUAL",
-        assignedAt: new Date(),
-        assignedByUserId: session.id,
-        notes: typeof body?.notes === "string" ? body.notes.trim() || null : existing.notes,
-      },
-      include: {
-        tournamentZone: { include: { zone: { select: { name: true, code: true } } } },
-      },
-    });
-    return NextResponse.json(updated);
+  if (!updated) {
+    return NextResponse.json({ error: "참가 신청 또는 권역을 찾을 수 없습니다." }, { status: 404 });
   }
-
-  const assignmentType = body.assignmentType === "AUTO" ? "AUTO" : "MANUAL";
-  const notes = typeof body?.notes === "string" ? body.notes.trim() || null : null;
-  const created = await prisma.tournamentEntryZoneAssignment.create({
-    data: {
-      tournamentEntryId: entryId,
-      tournamentZoneId,
-      assignmentType,
-      assignedByUserId: session.id,
-      notes,
-    },
-    include: {
-      tournamentZone: { include: { zone: { select: { name: true, code: true } } } },
-    },
-  });
-  return NextResponse.json(created);
+  return NextResponse.json(updated);
 }

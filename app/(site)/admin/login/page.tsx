@@ -13,6 +13,14 @@ export default function AdminLoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
+  async function parseResponseJsonSafe(res: Response): Promise<Record<string, unknown>> {
+    try {
+      return (await res.json()) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -23,12 +31,18 @@ export default function AdminLoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
-      const data = await res.json();
+      const data = await parseResponseJsonSafe(res);
       if (!res.ok) {
-        setError(data.error || "로그인에 실패했습니다.");
+        const errorMessage =
+          typeof data.error === "string" && data.error.trim()
+            ? data.error
+            : "로그인에 실패했습니다.";
+        setError(errorMessage);
         return;
       }
       window.location.href = "/admin";
+    } catch {
+      setError("로그인 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setLoading(false);
     }

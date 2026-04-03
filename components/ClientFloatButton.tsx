@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SessionUser } from "@/types/auth";
 import { canAccessClientDashboard } from "@/types/auth";
@@ -52,6 +52,7 @@ function clampPosition(
  */
 export function ClientFloatButton() {
   const router = useRouter();
+  const pathname = usePathname() ?? "";
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined);
   const [mounted, setMounted] = useState(false);
   const [position, setPosition] = useState<SavedPosition | null>(null);
@@ -66,7 +67,7 @@ export function ClientFloatButton() {
   const hasDraggedThisGestureRef = useRef(false);
 
   const isClientDashboard = user != null && canAccessClientDashboard(user);
-  const showButton = isClientDashboard;
+  const showButton = isClientDashboard && !pathname.startsWith("/tv");
   const label = "대시보드";
   const href = "/client/dashboard";
   const isDraggable = isClientDashboard;

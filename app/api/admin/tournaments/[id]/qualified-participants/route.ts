@@ -5,6 +5,7 @@ import { ORGANIZATION_SELECT_OWNER } from "@/lib/db-selects";
 import { canViewTournament, canManageTournament } from "@/lib/permissions";
 import { computeAllZoneQualifiers } from "@/lib/final-qualification";
 import { isCollectAllowed } from "@/lib/tournament-stage";
+import { autoExcludeDuplicateSecondDayEntries, buildNationalFinalTargets } from "@/lib/tournaments/national";
 
 /** 본선 진출자 현황. GET → canViewTournament. 저장된 진출자 + 권역별 추출 가능 인원. */
 export async function GET(
@@ -34,6 +35,7 @@ export async function GET(
     }),
     computeAllZoneQualifiers(tournamentId),
   ]);
+  const targetByZone = await buildNationalFinalTargets(tournamentId);
 
   const entryIds = new Set(savedQualifiers.map((q) => q.entryId));
   const entries = await prisma.tournamentEntry.findMany({
@@ -82,6 +84,7 @@ export async function GET(
     tournamentId,
     savedCount: savedQualifiers.length,
     computedTotal: computed.total,
+    targetByZone,
     byZone: Object.entries(byZone).map(([tzId, v]) => ({ tournamentZoneId: tzId, ...v })),
     canCollect,
     tournamentStage: tournament.tournamentStage,
@@ -147,5 +150,7 @@ export async function POST(
     where: { id: tournamentId },
     data: { tournamentStage: "FINAL_READY" },
   });
-  return NextResponse.json({ ok: true, collected: total });
+  const qualifiedEntryIds = byZone.flatMap((z) => z.qualifiers.map((q) => q.entryId));
+  const autoExcluded = await autoExcludeDuplicateSecondDayEntries(tournamentId, qualifiedEntryIds);
+  return NextResponse.json({ ok: true, collected: total, autoExcluded });
 }

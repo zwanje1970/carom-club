@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { canViewTournamentZone } from "@/lib/auth-zone";
+import { formatTournamentEntryDisplayName } from "@/lib/tournament-entry-display";
 
 /** ZONE_MANAGER: 해당 권역(TournamentZone) 참가자 목록. GET → 본인 배정 권역만. */
 export async function GET(
@@ -17,26 +18,33 @@ export async function GET(
 
   const tz = await prisma.tournamentZone.findUnique({
     where: { id: tzId },
-    include: { tournament: { select: { id: true, name: true } }, zone: { select: { name: true, code: true } } },
+    include: {
+      tournament: { select: { id: true, name: true, isScotch: true } },
+      zone: { select: { name: true, code: true } },
+    },
   });
   if (!tz) return NextResponse.json({ error: "권역을 찾을 수 없습니다." }, { status: 404 });
 
-  const assignments = await prisma.tournamentEntryZoneAssignment.findMany({
-    where: { tournamentZoneId: tzId },
-    include: {
-      entry: {
-        include: { user: { include: { memberProfile: { select: { handicap: true, avg: true } } } } },
-      },
-    },
+  const entries = await prisma.tournamentEntry.findMany({
+    where: { tournamentId: tz.tournamentId, zoneId: tzId },
+    include: { user: { include: { memberProfile: { select: { handicap: true, avg: true } } } } },
+    orderBy: [{ status: "asc" }, { createdAt: "asc" }],
   });
 
-  const participants = assignments.map((a) => ({
-    entryId: a.entry.id,
-    userId: a.entry.userId,
-    userName: a.entry.user.name,
-    handicap: a.entry.user.memberProfile?.handicap ?? null,
-    avg: a.entry.user.memberProfile?.avg ?? null,
-    status: a.entry.status,
+  const participants = entries.map((entry) => ({
+    entryId: entry.id,
+    userId: entry.userId,
+    userName: formatTournamentEntryDisplayName({
+      displayName: entry.displayName,
+      playerAName: entry.playerAName,
+      playerBName: entry.playerBName,
+      user: entry.user,
+      slotNumber: entry.slotNumber,
+      isScotch: tz.tournament.isScotch === true,
+    }),
+    handicap: entry.user.memberProfile?.handicap ?? null,
+    avg: entry.user.memberProfile?.avg ?? null,
+    status: entry.status,
   }));
 
   return NextResponse.json({

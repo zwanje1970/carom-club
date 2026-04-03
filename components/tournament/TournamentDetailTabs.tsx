@@ -23,6 +23,7 @@ type TournamentDetailTabsProps = {
     gameFormat: string | null;
     status: string;
     maxParticipants?: number | null;
+    isScotch?: boolean;
     rule: {
       entryFee: number | null;
       operatingFee: number | null;
@@ -47,6 +48,9 @@ type TournamentDetailTabsProps = {
     id: string;
     userId: string;
     userName: string;
+    displayName?: string | null;
+    playerAName?: string | null;
+    playerBName?: string | null;
     handicap: string | null;
     avg: string | null;
     depositorName: string | null;
@@ -159,7 +163,7 @@ export function TournamentDetailTabs({
                     {entries.filter((e) => e.status === "CONFIRMED" || (e.status === "APPLIED" && e.waitingListOrder != null)).map((e) => (
                       <tr key={e.id}>
                         <td className="px-4 py-2 text-sm text-site-text">
-                          {e.slotNumber > 1 ? `${e.userName} (슬롯${e.slotNumber})` : e.userName}
+                          {e.displayName ?? (e.slotNumber > 1 ? `${e.userName} (슬롯${e.slotNumber})` : e.userName)}
                         </td>
                         <td className="px-4 py-2 text-sm text-site-text-muted">{e.handicap ?? "-"}</td>
                         <td className="px-4 py-2 text-sm text-site-text-muted">{e.avg ?? "-"}</td>

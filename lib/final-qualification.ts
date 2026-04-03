@@ -4,6 +4,7 @@
  * - TOP_N: 결승 승·패, 준결승 패자 등 순위별 N명
  */
 import { prisma } from "@/lib/db";
+import { fetchOrImportZoneBracketSnapshotByZoneId } from "@/lib/bracket-match-service";
 
 export type AdvanceRule = { advanceCount: number; advanceRuleType: string };
 
@@ -20,10 +21,22 @@ export async function extractZoneQualifiers(
   tournamentZoneId: string,
   rule: AdvanceRule
 ): Promise<ExtractedQualifier[]> {
-  const matches = await prisma.tournamentZoneMatch.findMany({
-    where: { tournamentZoneId },
-    orderBy: [{ roundIndex: "asc" }, { matchIndex: "asc" }],
+  const zone = await prisma.tournamentZone.findUnique({
+    where: { id: tournamentZoneId },
+    select: { tournamentId: true },
   });
+  if (!zone) return [];
+
+  const bracket = await fetchOrImportZoneBracketSnapshotByZoneId(zone.tournamentId, tournamentZoneId);
+  const matches = bracket?.rounds.flatMap((round) => round.matches.map((match) => ({
+    id: match.id,
+    roundIndex: round.roundNumber,
+    matchIndex: match.matchNumber,
+    entryIdA: match.entryIdA,
+    entryIdB: match.entryIdB,
+    winnerEntryId: match.winnerEntryId,
+    status: match.status,
+  }))) ?? [];
   if (matches.length === 0) return [];
 
   const maxRound = Math.max(...matches.map((m) => m.roundIndex));

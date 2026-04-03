@@ -84,6 +84,9 @@ export async function PATCH(
     divisionEnabled,
     divisionMetricType,
     divisionRulesJson,
+      isScotch,
+      teamScoreLimit,
+      teamScoreRule,
     certificationRequestMode,
     manualReviewRequired,
     eligibilityLimitType,
@@ -113,6 +116,9 @@ export async function PATCH(
     divisionEnabled?: boolean;
     divisionMetricType?: string;
     divisionRulesJson?: unknown;
+    isScotch?: boolean;
+    teamScoreLimit?: number | null;
+    teamScoreRule?: "LTE" | "LT" | null;
     certificationRequestMode?: string;
     manualReviewRequired?: boolean;
     eligibilityLimitType?: string | null;
@@ -194,6 +200,13 @@ export async function PATCH(
   if (verificationPatch && !verificationPatch.ok) {
     return NextResponse.json({ error: verificationPatch.error }, { status: 400 });
   }
+  const isScotchTournament = isScotch === true || gameFormat === "SCOTCH";
+  if (isScotchTournament) {
+    const limitValue = teamScoreLimit == null || teamScoreLimit === "" ? null : Number(teamScoreLimit);
+    if (!Number.isFinite(limitValue)) {
+      return NextResponse.json({ error: "스카치 대회는 팀 점수 제한을 입력해 주세요." }, { status: 400 });
+    }
+  }
 
   try {
     await prisma.tournament.update({
@@ -242,6 +255,16 @@ export async function PATCH(
                 ? verificationPatch.data.eligibilityValue
                 : null,
           }),
+        ...(isScotch !== undefined && { isScotch: isScotchTournament }),
+        ...(teamScoreLimit !== undefined && {
+          teamScoreLimit:
+            isScotchTournament && teamScoreLimit != null && Number.isFinite(Number(teamScoreLimit))
+              ? Number(teamScoreLimit)
+              : null,
+        }),
+        ...(teamScoreRule !== undefined && {
+          teamScoreRule: isScotchTournament ? (teamScoreRule === "LT" ? "LT" : "LTE") : null,
+        }),
       },
     });
     if (becomingFinished) {

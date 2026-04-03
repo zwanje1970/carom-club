@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/auth";
 import { getDisplayName } from "@/lib/display-name";
+import { formatTournamentEntryDisplayName } from "@/lib/tournament-entry-display";
 import { getTournamentEntries } from "@/lib/db-tournaments";
 import { TournamentDetailView } from "./TournamentDetailView";
 
@@ -21,6 +22,7 @@ type BasicTournament = {
   prizeInfo: string | null;
   entryCondition: string | null;
   maxParticipants: number | null;
+  isScotch?: boolean;
   rule: {
     entryFee: number | null;
     operatingFee: number | null;
@@ -74,6 +76,16 @@ export async function TournamentDetailWithEntries({
     handicap: e.user.memberProfile?.handicap ?? null,
     avg: e.user.memberProfile?.avg ?? null,
     depositorName: e.depositorName,
+    displayName: formatTournamentEntryDisplayName({
+      displayName: e.displayName,
+      playerAName: e.playerAName,
+      playerBName: e.playerBName,
+      user: e.user,
+      slotNumber: e.slotNumber,
+      isScotch: tournament.isScotch === true,
+    }),
+    playerAName: e.playerAName ?? null,
+    playerBName: e.playerBName ?? null,
     status: e.status,
     waitingListOrder: e.waitingListOrder,
     slotNumber: e.slotNumber ?? 1,

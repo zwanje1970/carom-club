@@ -94,6 +94,14 @@ model User {
   zoneManagerAssignments          ZoneManagerAssignment[]
   communityNotificationsAsRelated CommunityNotification[]         @relation("NotificationActor")
   communityNotifications          CommunityNotification[]
+  clientMemberships               ClientMembership[]
+  zoneManagerApplications         ZoneManagerApplication[]
+  zoneManagerApplicationsReviewed  ZoneManagerApplication[]         @relation("ZoneManagerApplicationReviewedBy")
+  zoneManagerManagedZones          TournamentZoneManager[]
+  zoneManagerApprovedZones         TournamentZoneManager[]          @relation("TournamentZoneManagerApprovedBy")
+  waitlistEntries                 TournamentWaitlistEntry[]
+  bracketAuditLogs                BracketAuditLog[]
+  leagueAuditLogs                 LeagueAuditLog[]
 
   @@index([roleId])
 }
@@ -200,7 +208,7 @@ model Organization {
   membershipExpireDate   DateTime?
   promoPdfUrl            String?
   promoImageUrl          String?
-  clientMemberships      ClientMembership[]
+  organizationMemberships OrganizationMembership[]
   listingPurchases       ListingPurchaseRecord[]
   featureAccesses        OrganizationFeatureAccess[]
   feePayments            OrganizationFeePayment[]
@@ -210,6 +218,35 @@ model Organization {
   paymentRecords         PaymentRecord[]
   tournaments            Tournament[]
   tournamentVenues       TournamentVenue[]
+}
+
+model Client {
+  id                String             @id @default(cuid())
+  name              String
+  slug              String             @unique
+  defaultTableCount Int                @default(1)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  memberships       ClientMembership[]
+  venues            Venue[]
+  tournaments       Tournament[]
+}
+
+model ClientMembership {
+  id        String                @id @default(cuid())
+  userId    String
+  clientId  String
+  role      ClientMembershipRole   @default(MEMBER)
+  status    ClientMembershipStatus @default(PENDING)
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client    Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clientId])
+  @@index([clientId])
+  @@index([userId])
+  @@map("TournamentClientMembership")
 }
 
 model OrganizationFeeSetting {
@@ -270,6 +307,7 @@ model PromoPageTemplate {
 model Tournament {
   id                        String                         @id @default(cuid())
   organizationId            String
+  clientId                  String?
   name                      String
   slug                      String?
   description               String?
@@ -298,6 +336,20 @@ model Tournament {
   summary                   String?
   venueName                 String?
   createdByUserId           String?
+  type                      TournamentType                 @default(NORMAL)
+  recruitmentStatus         TournamentRecruitmentStatus    @default(RECRUITING)
+  bracketMode               BracketMode                    @default(SINGLE_ELIM)
+  seedingMode               BracketSeedingMode             @default(RANDOM)
+  byeStrategy               ByeStrategy                    @default(EARLY)
+  targetFinalSize           Int?
+  duplicateApplyAllowed     Boolean                        @default(false)
+  recruitOpenAt             DateTime?
+  recruitCloseAt            DateTime?
+  tvAccessToken             String?                        @unique
+  tvAccessTokenIssuedAt      DateTime?
+  isScotch                  Boolean                        @default(false)
+  teamScoreLimit            Int?
+  teamScoreRule             TeamScoreRule                  @default(LTE)
   tournamentStage           String                         @default("SETUP")
   isPromoted                Boolean                        @default(false)
   promotionLevel            Int?
@@ -331,8 +383,17 @@ model Tournament {
   eligibilityLimitType      String?
   eligibilityLimitValue     Float?
   createdBy                 User?                          @relation(fields: [createdByUserId], references: [id])
+  client                    Client?                        @relation(fields: [clientId], references: [id], onDelete: SetNull)
   organization              Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   entries                   TournamentEntry[]
+  matchDays                 TournamentMatchDay[]
+  venues                    Venue[]
+  brackets                  Bracket[]
+  waitlistEntries           TournamentWaitlistEntry[]
+  zoneManagerApplications   ZoneManagerApplication[]
+  bracketAuditLogs          BracketAuditLog[]
+  leagues                   League[]
+  leagueAuditLogs           LeagueAuditLog[]
   finalMatches              TournamentFinalMatch[]
   finalMatchAuditLogs       TournamentFinalMatchAuditLog[]
   finalQualifiers           TournamentFinalQualifier[]
@@ -345,6 +406,8 @@ model Tournament {
 
   @@index([status, startAt])
   @@index([nationalTournament])
+  @@index([clientId])
+  @@index([tvAccessToken])
 }
 
 /// 대회 종료 후 참가비·환불·상금·비용 등을 기록 (대회별 1건 + 라인 아이템)
@@ -444,6 +507,17 @@ model TournamentEntry {
   reviewedAt                 DateTime?
   entryFeeAmount             Int?
   slotNumber                 Int                            @default(1)
+  matchDayId                 String?
+  zoneId                     String?
+  displayName                String?
+  levelCode                  String?
+  levelConfirmed             Boolean                        @default(false)
+  entryStatus                TournamentEntryStatus          @default(APPLIED)
+  isWaitlist                 Boolean                        @default(false)
+  duplicateGroupKey          String?
+  checkedInAt                DateTime?
+  seedNumber                 Int?
+  bracketOrder               Int?
   avg                        String?
   avgProofUrl                String?
   handicap                   String?
@@ -455,6 +529,13 @@ model TournamentEntry {
   divisionName                      String?
   divisionMatchedValue              Float?
   divisionMatchedAverage            Float?
+  playerAName                      String?
+  playerAScore                     Int?
+  playerAProof                     String?
+  playerBName                      String?
+  playerBScore                     Int?
+  playerBProof                     String?
+  teamTotalScore                   Int?
   /// 구 필드(호환 전용)
   certificationImageUrl             String?
   certificationOriginalFilename     String?
@@ -467,11 +548,21 @@ model TournamentEntry {
   attendances                TournamentAttendance[]
   tournament                 Tournament                     @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   user                       User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  matchDay                   TournamentMatchDay?            @relation(fields: [matchDayId], references: [id], onDelete: SetNull)
+  zone                       TournamentZone?                @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  bracketMatchesAsA          BracketMatch[]                  @relation("BracketMatchEntryA")
+  bracketMatchesAsB          BracketMatch[]                  @relation("BracketMatchEntryB")
+  bracketMatchesAsWinner     BracketMatch[]                  @relation("BracketMatchWinner")
+  leagueMatchesAsA           LeagueMatch[]                   @relation("LeagueMatchEntryA")
+  leagueMatchesAsB           LeagueMatch[]                   @relation("LeagueMatchEntryB")
+  leagueStandings            LeagueStanding[]
+  leagueEntries              LeagueEntry[]
   zoneAssignment             TournamentEntryZoneAssignment?
 
   @@unique([tournamentId, userId, slotNumber])
   @@index([tournamentId])
   @@index([userId])
+  @@index([tournamentId, duplicateGroupKey])
 }
 
 model TournamentAttendance {
@@ -552,23 +643,37 @@ model TournamentZone {
   id              String                          @id @default(cuid())
   tournamentId    String
   zoneId          String
+  matchDayId      String?
+  venueId         String?
   name            String?
   code            String?
   sortOrder       Int                             @default(0)
   status          String?
+  workflowStatus  TournamentZoneStatus            @default(READY)
+  qualifierTarget Int?
   advanceCount    Int                             @default(1)
   advanceRuleType String                          @default("WINNER_ONLY")
   createdAt       DateTime                        @default(now())
   updatedAt       DateTime                        @updatedAt
   zoneAssignments TournamentEntryZoneAssignment[]
+  managers        TournamentZoneManager[]
+  applications    ZoneManagerApplication[]
+  entries         TournamentEntry[]
+  waitlistEntries TournamentWaitlistEntry[]
+  leagues         League[]
   finalQualifiers TournamentFinalQualifier[]
   tournament      Tournament                      @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  matchDay        TournamentMatchDay?             @relation(fields: [matchDayId], references: [id], onDelete: SetNull)
+  venue           Venue?                          @relation(fields: [venueId], references: [id], onDelete: SetNull)
   zone            Zone                            @relation(fields: [zoneId], references: [id], onDelete: Cascade)
   zoneMatches     TournamentZoneMatch[]
+  brackets        Bracket[]
 
   @@unique([tournamentId, zoneId])
   @@index([tournamentId])
   @@index([zoneId])
+  @@index([matchDayId])
+  @@index([venueId])
 }
 
 model TournamentZoneMatch {
@@ -676,6 +781,378 @@ model TournamentEntryZoneAssignment {
   tournamentZone    TournamentZone  @relation(fields: [tournamentZoneId], references: [id], onDelete: Cascade)
 
   @@index([tournamentZoneId])
+}
+
+model TournamentMatchDay {
+  id           String         @id @default(cuid())
+  tournamentId String
+  name         String
+  date         DateTime
+  startTime    String?
+  sortOrder    Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  tournament   Tournament     @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  zones        TournamentZone[]
+  entries      TournamentEntry[]
+  waitlistEntries TournamentWaitlistEntry[]
+  leagueRounds LeagueRound[]
+  rounds       BracketRound[]
+
+  @@index([tournamentId])
+  @@index([tournamentId, sortOrder])
+}
+
+model Venue {
+  id           String      @id @default(cuid())
+  clientId     String
+  tournamentId String?
+  name         String
+  tableCount   Int         @default(1)
+  address      String?
+  sortOrder    Int         @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  client       Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tournament   Tournament? @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  zones        TournamentZone[]
+  matches      BracketMatch[]
+  leagueMatches LeagueMatch[]
+
+  @@index([clientId])
+  @@index([tournamentId])
+  @@index([clientId, sortOrder])
+}
+
+model TournamentZoneManager {
+  id               String      @id @default(cuid())
+  zoneId           String
+  userId           String
+  approvedByUserId  String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  zone             TournamentZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  approvedByUser   User?         @relation("TournamentZoneManagerApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([zoneId, userId])
+  @@index([zoneId])
+  @@index([userId])
+}
+
+model ZoneManagerApplication {
+  id               String                      @id @default(cuid())
+  tournamentId     String
+  zoneId           String?
+  userId           String
+  status           ZoneManagerApplicationStatus @default(PENDING)
+  message          String?
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  tournament       Tournament                  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  zone             TournamentZone?             @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  user             User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedByUser   User?                       @relation("ZoneManagerApplicationReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tournamentId])
+  @@index([zoneId])
+  @@index([userId])
+}
+
+model TournamentWaitlistEntry {
+  id           String              @id @default(cuid())
+  tournamentId String
+  matchDayId   String?
+  zoneId       String?
+  userId       String?
+  displayName  String
+  levelCode    String?
+  priorityOrder Int
+  status       WaitlistStatus      @default(WAITING)
+  invitedAt    DateTime?
+  joinedAt     DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  tournament   Tournament          @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  matchDay     TournamentMatchDay? @relation(fields: [matchDayId], references: [id], onDelete: SetNull)
+  zone         TournamentZone?     @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  user         User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tournamentId])
+  @@index([tournamentId, zoneId])
+  @@index([tournamentId, priorityOrder])
+}
+
+model Bracket {
+  id            String           @id @default(cuid())
+  tournamentId  String
+  zoneId        String?
+  kind          BracketKind
+  status        BracketStatus    @default(DRAFT)
+  seedingMode   BracketSeedingMode @default(RANDOM)
+  byeStrategy   ByeStrategy      @default(EARLY)
+  generatedAt   DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  tournament    Tournament       @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  zone          TournamentZone?  @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  rounds        BracketRound[]
+  matches       BracketMatch[]
+  auditLogs     BracketAuditLog[]
+
+  @@unique([tournamentId, zoneId, kind])
+  @@index([tournamentId])
+  @@index([zoneId])
+}
+
+model BracketRound {
+  id           String        @id @default(cuid())
+  bracketId    String
+  matchDayId   String?
+  roundType    BracketRoundType @default(NORMAL)
+  roundNumber  Int
+  name         String
+  targetSize   Int
+  sortOrder    Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  bracket      Bracket       @relation(fields: [bracketId], references: [id], onDelete: Cascade)
+  matchDay     TournamentMatchDay? @relation(fields: [matchDayId], references: [id], onDelete: SetNull)
+  matches      BracketMatch[]
+
+  @@unique([bracketId, roundNumber])
+  @@index([bracketId])
+  @@index([matchDayId])
+}
+
+model BracketMatch {
+  id              String              @id @default(cuid())
+  bracketId       String
+  roundId         String
+  venueId         String?
+  matchNumber     Int
+  tableOrder      Int?
+  displayOrder    Int?
+  entryIdA        String?
+  entryIdB        String?
+  winnerEntryId   String?
+  scoreA          Int?
+  scoreB          Int?
+  status          BracketMatchStatus  @default(PENDING)
+  isBye           Boolean             @default(false)
+  isReduction     Boolean             @default(false)
+  isManualOverride Boolean            @default(false)
+  nextMatchId     String?
+  nextSlot        String?
+  scheduledStartAt DateTime?
+  hasIssue        Boolean             @default(false)
+  issueNote       String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  note            String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  bracket         Bracket             @relation(fields: [bracketId], references: [id], onDelete: Cascade)
+  round           BracketRound        @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  venue           Venue?              @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  entryA          TournamentEntry?    @relation("BracketMatchEntryA", fields: [entryIdA], references: [id], onDelete: SetNull)
+  entryB          TournamentEntry?    @relation("BracketMatchEntryB", fields: [entryIdB], references: [id], onDelete: SetNull)
+  winnerEntry     TournamentEntry?    @relation("BracketMatchWinner", fields: [winnerEntryId], references: [id], onDelete: SetNull)
+  nextMatch       BracketMatch?       @relation("BracketMatchNext", fields: [nextMatchId], references: [id], onDelete: SetNull)
+  previousMatches BracketMatch[]      @relation("BracketMatchNext")
+  auditLogs       BracketAuditLog[]
+
+  @@index([bracketId, roundId, matchNumber])
+  @@index([venueId])
+  @@index([nextMatchId])
+}
+
+model BracketAuditLog {
+  id           String      @id @default(cuid())
+  tournamentId String
+  bracketId    String?
+  matchId      String?
+  actorUserId  String
+  actorRole    String
+  actionType   String
+  beforeJson   String?
+  afterJson    String?
+  reason       String?
+  createdAt    DateTime    @default(now())
+  tournament   Tournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  bracket      Bracket?    @relation(fields: [bracketId], references: [id], onDelete: SetNull)
+  match        BracketMatch? @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  actorUser    User        @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  @@index([tournamentId])
+  @@index([bracketId])
+  @@index([matchId])
+  @@index([actorUserId, createdAt])
+}
+
+model League {
+  id            String        @id @default(cuid())
+  tournamentId  String
+  zoneId        String?
+  kind          LeagueKind
+  status        LeagueStatus  @default(DRAFT)
+  pointsForWin  Int           @default(3)
+  pointsForDraw Int           @default(1)
+  pointsForLoss Int           @default(0)
+  tieBreaker    LeagueTieBreaker @default(HEAD_TO_HEAD)
+  generatedAt   DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  tournament    Tournament    @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  zone          TournamentZone? @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  entries       LeagueEntry[]
+  rounds        LeagueRound[]
+  matches       LeagueMatch[]
+  standings     LeagueStanding[]
+  auditLogs     LeagueAuditLog[]
+
+  @@unique([tournamentId, zoneId, kind])
+  @@index([tournamentId])
+  @@index([zoneId])
+}
+
+model LeagueEntry {
+  id                String            @id @default(cuid())
+  leagueId          String
+  tournamentEntryId String
+  displayName       String
+  levelCode         String?
+  seedNumber        Int?
+  sortOrder         Int               @default(0)
+  status            LeagueEntryStatus  @default(ACTIVE)
+  isAutoRegistered  Boolean           @default(false)
+  registeredAt      DateTime          @default(now())
+  withdrawnAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  league            League            @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  tournamentEntry   TournamentEntry   @relation(fields: [tournamentEntryId], references: [id], onDelete: Cascade)
+  matchesAsA        LeagueMatch[]      @relation("LeagueMatchLeagueEntryA")
+  matchesAsB        LeagueMatch[]      @relation("LeagueMatchLeagueEntryB")
+  wonMatches        LeagueMatch[]      @relation("LeagueMatchWinnerLeagueEntry")
+  standings         LeagueStanding[]
+
+  @@unique([leagueId, tournamentEntryId])
+  @@index([leagueId])
+  @@index([tournamentEntryId])
+}
+
+model LeagueRound {
+  id           String      @id @default(cuid())
+  leagueId     String
+  matchDayId   String?
+  roundNumber  Int
+  name         String
+  sortOrder    Int         @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  league       League      @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  matchDay     TournamentMatchDay? @relation(fields: [matchDayId], references: [id], onDelete: SetNull)
+  matches      LeagueMatch[]
+
+  @@unique([leagueId, roundNumber])
+  @@index([leagueId])
+  @@index([matchDayId])
+}
+
+model LeagueMatch {
+  id              String           @id @default(cuid())
+  leagueId        String
+  roundId         String
+  venueId         String?
+  matchNumber     Int
+  tableOrder      Int?
+  displayOrder    Int?
+  entryIdA        String?
+  entryIdB        String?
+  leagueEntryIdA  String?
+  leagueEntryIdB  String?
+  winnerLeagueEntryId String?
+  scoreA          Int?
+  scoreB          Int?
+  status          LeagueMatchStatus @default(PENDING)
+  isWalkover      Boolean          @default(false)
+  isManualOverride Boolean         @default(false)
+  isForcedZeroPoint Boolean        @default(false)
+  scheduledStartAt DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  note            String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  league          League           @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  round           LeagueRound      @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  venue           Venue?           @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  entryA          TournamentEntry? @relation("LeagueMatchEntryA", fields: [entryIdA], references: [id], onDelete: SetNull)
+  entryB          TournamentEntry? @relation("LeagueMatchEntryB", fields: [entryIdB], references: [id], onDelete: SetNull)
+  leagueEntryA    LeagueEntry?     @relation("LeagueMatchLeagueEntryA", fields: [leagueEntryIdA], references: [id], onDelete: SetNull)
+  leagueEntryB    LeagueEntry?     @relation("LeagueMatchLeagueEntryB", fields: [leagueEntryIdB], references: [id], onDelete: SetNull)
+  winnerLeagueEntry LeagueEntry?   @relation("LeagueMatchWinnerLeagueEntry", fields: [winnerLeagueEntryId], references: [id], onDelete: SetNull)
+  auditLogs       LeagueAuditLog[]
+
+  @@index([leagueId, roundId, matchNumber])
+  @@index([venueId])
+  @@index([leagueEntryIdA])
+  @@index([leagueEntryIdB])
+  @@index([winnerLeagueEntryId])
+}
+
+model LeagueStanding {
+  id           String        @id @default(cuid())
+  leagueId     String
+  entryId      String
+  leagueEntryId String?
+  played       Int           @default(0)
+  won          Int           @default(0)
+  drawn        Int           @default(0)
+  lost         Int           @default(0)
+  points       Int           @default(0)
+  scoreFor     Int           @default(0)
+  scoreAgainst Int           @default(0)
+  scoreDiff    Int           @default(0)
+  rank         Int?
+  updatedAt    DateTime      @updatedAt
+  createdAt    DateTime      @default(now())
+  league       League        @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  entry        TournamentEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  leagueEntry  LeagueEntry?  @relation(fields: [leagueEntryId], references: [id], onDelete: SetNull)
+
+  @@unique([leagueId, entryId])
+  @@unique([leagueId, leagueEntryId])
+  @@index([leagueId])
+  @@index([entryId])
+  @@index([leagueEntryId])
+}
+
+model LeagueAuditLog {
+  id           String      @id @default(cuid())
+  tournamentId String
+  leagueId     String?
+  matchId      String?
+  actorUserId  String
+  actorRole    String
+  actionType   String
+  beforeJson   String?
+  afterJson    String?
+  reason       String?
+  createdAt    DateTime    @default(now())
+  tournament   Tournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  league       League?     @relation(fields: [leagueId], references: [id], onDelete: SetNull)
+  match        LeagueMatch? @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  actorUser    User        @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  @@index([tournamentId])
+  @@index([leagueId])
+  @@index([matchId])
+  @@index([actorUserId, createdAt])
 }
 
 model ZoneManagerAssignment {
@@ -874,7 +1351,7 @@ model PlatformSettings {
   updatedAt           DateTime @updatedAt
 }
 
-model ClientMembership {
+model OrganizationMembership {
   id             String       @id @default(cuid())
   organizationId String
   validFrom      DateTime     @default(now())
@@ -884,6 +1361,7 @@ model ClientMembership {
 
   @@index([organizationId])
   @@index([validUntil])
+  @@map("ClientMembership")
 }
 
 model Feature {
@@ -1550,4 +2028,143 @@ enum VerificationReviewStatus {
 enum DivisionMetricType {
   AVERAGE
   SCORE
+}
+
+enum ClientMembershipRole {
+  MEMBER
+  CLIENT_ADMIN
+  ZONE_MANAGER
+}
+
+enum ClientMembershipStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TournamentType {
+  NORMAL
+  NATIONAL
+}
+
+enum TournamentRecruitmentStatus {
+  DRAFT
+  RECRUITING
+  WAITLIST_OPEN
+  RECRUIT_CLOSED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum BracketMode {
+  SINGLE_ELIM
+}
+
+enum BracketSeedingMode {
+  RANDOM
+  LEVEL_BASED
+  MANUAL
+}
+
+enum ByeStrategy {
+  EARLY
+  ROUND_BASED
+}
+
+enum BracketKind {
+  MAIN
+  ZONE
+  FINAL
+}
+
+enum BracketRoundType {
+  NORMAL
+  REDUCTION
+}
+
+enum BracketStatus {
+  DRAFT
+  GENERATED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum BracketMatchStatus {
+  PENDING
+  READY
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TournamentEntryStatus {
+  APPLIED
+  CONFIRMED
+  WAITLIST
+  ELIMINATED
+  QUALIFIED
+  AUTO_EXCLUDED
+  WITHDRAWN
+  NO_SHOW
+}
+
+enum TournamentZoneStatus {
+  READY
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ZoneManagerApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum WaitlistStatus {
+  WAITING
+  INVITED
+  JOINED
+  SKIPPED
+  CANCELLED
+}
+
+enum LeagueKind {
+  MAIN
+  ZONE
+  FINAL
+}
+
+enum LeagueStatus {
+  DRAFT
+  GENERATED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum LeagueMatchStatus {
+  PENDING
+  READY
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum LeagueTieBreaker {
+  HEAD_TO_HEAD
+  SCORE_DIFF
+  SCORE_FOR
+  DRAW_COUNT
+}
+
+enum TeamScoreRule {
+  LTE
+  LT
+}
+
+enum LeagueEntryStatus {
+  ACTIVE
+  WITHDRAWN
+  EXCLUDED
 }

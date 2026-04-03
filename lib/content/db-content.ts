@@ -16,6 +16,17 @@ function toISO(d: Date | null): string | null {
   return d ? d.toISOString() : null;
 }
 
+function parseSectionButtonsSafe(raw: string): SectionButton[] {
+  const text = raw.trim();
+  if (!text) return [];
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    return Array.isArray(parsed) ? (parsed as SectionButton[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 function rowToPageSection(r: {
   id: string;
   type: string;
@@ -54,7 +65,7 @@ function rowToPageSection(r: {
   const buttonsRaw = r.buttons;
   const buttons: SectionButton[] =
     typeof buttonsRaw === "string"
-      ? (buttonsRaw ? (JSON.parse(buttonsRaw) as SectionButton[]) : [])
+      ? parseSectionButtonsSafe(buttonsRaw)
       : (Array.isArray(buttonsRaw) ? buttonsRaw : []);
   return {
     id: r.id,

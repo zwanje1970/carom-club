@@ -1,13 +1,10 @@
 "use client";
 
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
-import { resolvePageSectionLinkHref } from "@/lib/page-section-slot-href";
 import type { PageSection } from "@/types/page-section";
 import type { PageSlotRenderContext } from "@/types/page-slot-render-context";
-import { CommunityNanguPromoCard } from "@/components/community/CommunityNanguPromoCard";
 import { CommunityPostListSection } from "@/components/community/CommunityPostListSection";
 import { HomeHero } from "@/components/home/HomeHero";
-import { HomeNoticeCommunity } from "@/components/home/HomeNoticeCommunity";
 import { HomeTournamentIntroSlot } from "@/components/home/HomeTournamentIntroSlot";
 import { HomeVenueIntroSlot } from "@/components/home/HomeVenueIntroSlot";
 import { PageContentContainer } from "@/components/layout/PageContentContainer";
@@ -136,23 +133,7 @@ export function PageSlotBlock({
       );
     }
     case "nanguEntry": {
-      const h = ctx?.home;
-      if (!h && surface === "public") return null;
-      if (!h) return maybePlaceholder("난구노트·난구해결사", surface, ctx);
-      const frame = resolveHomeStructureSlotFrame(block);
-      if (!frame) return maybePlaceholder("난구노트·난구해결사", surface, ctx);
-      const slotItems = parseSlotBlockItemsBundle(block.sectionStyleJson, "nanguEntry");
-      return (
-        <HomeNoticeCommunity
-          copy={h.copy}
-          showNoteEntry={h.showNoteEntry}
-          showSolverEntry={h.showSolverEntry}
-          cardStyle={cardStyleWithResolvedLayout(frame.cardStyle, frame.layout)}
-          ctaConfig={frame.ctaConfig}
-          blockBackgroundColor={frame.blockBackgroundColor}
-          slotItems={slotItems}
-        />
-      );
+      return maybePlaceholder("난구노트·난구해결사", surface, ctx);
     }
     case "postList": {
       const c = ctx?.community;
@@ -169,14 +150,7 @@ export function PageSlotBlock({
       );
     }
     case "nanguList": {
-      const c = slotPreviewCopy(ctx) as Record<AdminCopyKey, string>;
-      const href =
-        resolvePageSectionLinkHref(block) ?? getCopyValue(c, "site.community.nanguPromo.href");
-      return (
-        <PageContentContainer className="py-6">
-          <CommunityNanguPromoCard copy={c} href={href} />
-        </PageContentContainer>
-      );
+      return maybePlaceholder("난구해결사", surface, ctx);
     }
     case "tournamentList": {
       const t = ctx?.tournaments;

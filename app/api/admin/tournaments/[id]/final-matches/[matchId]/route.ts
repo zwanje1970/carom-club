@@ -4,7 +4,8 @@ import { prisma } from "@/lib/db";
 import { ORGANIZATION_SELECT_OWNER } from "@/lib/db-selects";
 import { parseBracketOpsPolicy } from "@/lib/bracket-ops-policy";
 import { canManageTournament, isPlatformAdmin } from "@/lib/permissions";
-import { patchTournamentFinalMatch, type FinalMatchPatchBody } from "@/lib/tournament-final-match-patch";
+import { fetchOrImportBracketSnapshotByKind, patchBracketMatchByKind } from "@/lib/bracket-match-service";
+import type { FinalMatchPatchBody } from "@/lib/tournament-final-match-patch";
 
 /**
  * 본선 경기 강제 수정. PATCH → canManageTournament
@@ -40,9 +41,14 @@ export async function PATCH(
     select: { bracketConfig: true },
   });
   const policy = parseBracketOpsPolicy(rule?.bracketConfig);
+  const bracket = await fetchOrImportBracketSnapshotByKind(tournamentId, "FINAL");
   const allowCompleted = isPlatformAdmin(session) || policy.allowBracketCompletedResultEdit;
 
-  const r = await patchTournamentFinalMatch(prisma, tournamentId, matchId, body, {
+  if (!bracket) {
+    return NextResponse.json({ error: "대진표가 생성되지 않았습니다." }, { status: 404 });
+  }
+
+  const r = await patchBracketMatchByKind(prisma, tournamentId, "FINAL", matchId, body, {
     actorUserId: session.id,
     allowCompletedResultEdit: allowCompleted,
   });

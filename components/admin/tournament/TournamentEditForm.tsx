@@ -18,6 +18,9 @@ type BasicInfo = {
   venueName?: string;
   status: string;
   gameFormat: string;
+  isScotch?: boolean;
+  teamScoreLimit?: number | "";
+  teamScoreRule?: "LTE" | "LT";
 };
 
 type TournamentVenueItem = {
@@ -84,6 +87,10 @@ export function TournamentEditForm({
     e.preventDefault();
     setError("");
     setSuccess(false);
+    if (basic.gameFormat === "SCOTCH" && (basic.teamScoreLimit === "" || !Number.isFinite(Number(basic.teamScoreLimit)))) {
+      setError("스카치 대회는 팀 점수 제한을 입력해 주세요.");
+      return;
+    }
     setLoading(true);
     try {
       const [basicRes, ruleRes] = await Promise.all([
@@ -97,6 +104,12 @@ export function TournamentEditForm({
             venueName: basic.venueName || undefined,
             status: basic.status,
             gameFormat: basic.gameFormat || undefined,
+            isScotch: basic.gameFormat === "SCOTCH" || basic.isScotch === true,
+            teamScoreLimit:
+              basic.gameFormat === "SCOTCH" && basic.teamScoreLimit !== ""
+                ? Number(basic.teamScoreLimit)
+                : null,
+            teamScoreRule: basic.gameFormat === "SCOTCH" ? basic.teamScoreRule ?? "LTE" : null,
           }),
         }),
         fetch(`/api/admin/tournaments/${tournamentId}/rule`, {
@@ -320,6 +333,51 @@ export function TournamentEditForm({
               />
             </div>
           </div>
+          {basic.gameFormat === "SCOTCH" && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-gray-800">스카치 설정</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">팀 점수 제한</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={basic.teamScoreLimit === "" ? "" : basic.teamScoreLimit ?? ""}
+                    onChange={(e) =>
+                      setBasic((b) => ({
+                        ...b,
+                        teamScoreLimit: e.target.value === "" ? "" : Number(e.target.value),
+                      }))
+                    }
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                    placeholder="예: 50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">비교 방식</label>
+                  <div className="flex gap-2">
+                    {[
+                      { value: "LTE", label: "이하(<=)" },
+                      { value: "LT", label: "미만(<)" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        className={`rounded-lg px-3 py-2 text-sm font-medium ${
+                          (basic.teamScoreRule ?? "LTE") === opt.value
+                            ? "bg-gray-800 text-white"
+                            : "border border-gray-300 bg-white text-gray-700"
+                        }`}
+                        onClick={() => setBasic((b) => ({ ...b, teamScoreRule: opt.value as "LTE" | "LT" }))}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

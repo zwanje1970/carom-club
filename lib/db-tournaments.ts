@@ -265,7 +265,7 @@ export async function getTournamentsListAdminRaw(): Promise<TournamentListRow[]>
         posterImageUrl: string | null;
         summary: string | null;
         maxParticipants: number | null;
-        confirmedCount: bigint;
+        confirmedCount: number | bigint;
         orgId: string | null;
         orgName: string | null;
         orgSlug: string | null;
@@ -273,10 +273,16 @@ export async function getTournamentsListAdminRaw(): Promise<TournamentListRow[]>
     >(
       `SELECT t.id, t.name, t."startAt", t."endAt", t.status, t."organizationId",
               t.venue, t."venueName", t."gameFormat", t."prizeInfo", t."imageUrl", t."posterImageUrl", t.summary, t."maxParticipants",
-              (SELECT COUNT(*)::int FROM "TournamentEntry" e WHERE e."tournamentId" = t.id AND e.status = 'CONFIRMED') AS "confirmedCount",
+              COALESCE(ec.cnt, 0)::int AS "confirmedCount",
               o.id AS "orgId", o.name AS "orgName", o.slug AS "orgSlug"
        FROM "Tournament" t
        LEFT JOIN "Organization" o ON o.id = t."organizationId"
+       LEFT JOIN (
+         SELECT e."tournamentId", COUNT(*)::int AS cnt
+         FROM "TournamentEntry" e
+         WHERE e.status = 'CONFIRMED'
+         GROUP BY e."tournamentId"
+       ) ec ON ec."tournamentId" = t.id
        ORDER BY t."startAt" DESC
        LIMIT $1`,
       500
@@ -338,35 +344,48 @@ export type VenueCarouselRow = {
 
 export async function getVenuesForCarousel(take = 50): Promise<VenueCarouselRow[]> {
   try {
-    const rows = await prisma.organization.findMany({
-      where: { type: "VENUE", slug: { not: null } },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        logoImageUrl: true,
-        coverImageUrl: true,
-        clientType: true,
-        typeSpecificJson: true,
-      },
-      take: take * 2,
-    });
-    const withCategory = rows.map((r) => ({
-      ...r,
-      venueCategory: venueCategoryFromTypeSpecific(r.typeSpecificJson),
-    }));
-    const sorted = [...withCategory].sort((a, b) => {
-      const order = (c: string | null) => (c === "REGISTERED" ? 0 : 1);
-      const clientOrder = order(a.clientType) - order(b.clientType);
-      if (clientOrder !== 0) return clientOrder;
-      const catOrder = (x: "daedae_only" | "mixed" | null) =>
-        x === "daedae_only" ? 0 : x === "mixed" ? 1 : 2;
-      return catOrder(a.venueCategory) - catOrder(b.venueCategory) || a.name.localeCompare(b.name);
-    });
-    return sorted.slice(0, take).map(({ id, name, slug, logoImageUrl, coverImageUrl, venueCategory }) => ({
+    const rows = await prisma.$queryRawUnsafe<
+      {
+        id: string;
+        name: string;
+        slug: string;
+        logoImageUrl: string | null;
+        coverImageUrl: string | null;
+        venueCategory: "daedae_only" | "mixed" | null;
+      }[]
+    >(
+      `SELECT
+         o.id,
+         o.name,
+         o.slug,
+         o."logoImageUrl",
+         o."coverImageUrl",
+         CASE
+           WHEN o."typeSpecificJson" LIKE '%"venueCategory"%daedae_only%' THEN 'daedae_only'
+           WHEN o."typeSpecificJson" LIKE '%"venueCategory"%mixed%' THEN 'mixed'
+           WHEN o."typeSpecificJson" LIKE '%"jungdae"%' OR o."typeSpecificJson" LIKE '%"pocket"%' THEN 'mixed'
+           WHEN o."typeSpecificJson" LIKE '%"daedae"%' THEN 'daedae_only'
+           ELSE NULL
+         END AS "venueCategory"
+       FROM "Organization" o
+       WHERE o.type = 'VENUE' AND o.slug IS NOT NULL
+       ORDER BY
+         CASE WHEN o."clientType" = 'REGISTERED' THEN 0 ELSE 1 END ASC,
+         CASE
+           WHEN o."typeSpecificJson" LIKE '%"venueCategory"%daedae_only%' THEN 0
+           WHEN o."typeSpecificJson" LIKE '%"venueCategory"%mixed%' THEN 1
+           WHEN o."typeSpecificJson" LIKE '%"jungdae"%' OR o."typeSpecificJson" LIKE '%"pocket"%' THEN 1
+           WHEN o."typeSpecificJson" LIKE '%"daedae"%' THEN 0
+           ELSE 2
+         END ASC,
+         o.name ASC
+       LIMIT $1`,
+      take
+    );
+    return rows.map(({ id, name, slug, logoImageUrl, coverImageUrl, venueCategory }) => ({
       id,
       name,
-      slug: slug!,
+      slug,
       logoImageUrl: logoImageUrl ?? null,
       coverImageUrl: coverImageUrl ?? null,
       venueCategory,

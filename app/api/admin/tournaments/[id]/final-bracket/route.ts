@@ -3,6 +3,8 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ORGANIZATION_SELECT_OWNER } from "@/lib/db-selects";
 import { canViewTournament } from "@/lib/permissions";
+import { fetchOrImportBracketSnapshotByKind } from "@/lib/bracket-match-service";
+import { formatTournamentEntryDisplayName } from "@/lib/tournament-entry-display";
 
 /** 본선 대진표 조회. GET → canViewTournament */
 export async function GET(
@@ -22,45 +24,44 @@ export async function GET(
     return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
   }
 
-  const matches = await prisma.tournamentFinalMatch.findMany({
-    where: { tournamentId },
-    orderBy: [{ roundIndex: "asc" }, { matchIndex: "asc" }],
-  });
-
-  const entryIds = new Set<string>();
-  matches.forEach((m) => {
-    if (m.entryIdA) entryIds.add(m.entryIdA);
-    if (m.entryIdB) entryIds.add(m.entryIdB);
-    if (m.winnerEntryId) entryIds.add(m.winnerEntryId);
-  });
+  const bracket = await fetchOrImportBracketSnapshotByKind(tournamentId, "FINAL");
+  if (!bracket) {
+    return NextResponse.json({ error: "대진표가 생성되지 않았습니다." }, { status: 404 });
+  }
   const entries = await prisma.tournamentEntry.findMany({
-    where: { id: { in: Array.from(entryIds) } },
+    where: { tournamentId, status: "CONFIRMED" },
     include: { user: { select: { name: true } } },
   });
   const entryMap = Object.fromEntries(entries.map((e) => [e.id, e]));
   const entryDisplayName = (entryId: string | null) => {
     if (!entryId) return null;
     const e = entryMap[entryId];
-    if (!e?.user?.name) return null;
-    const slot = e.slotNumber ?? 1;
-    return slot > 1 ? `${e.user.name} (슬롯${slot})` : e.user.name;
+    if (!e) return null;
+    return (
+      formatTournamentEntryDisplayName({
+        displayName: e.displayName,
+        playerAName: e.playerAName,
+        playerBName: e.playerBName,
+        user: e.user,
+        slotNumber: e.slotNumber,
+        isScotch: tournament.isScotch === true,
+      }) || null
+    );
   };
-
   const stats = {
-    total: matches.length,
-    completed: matches.filter((m) => m.status === "COMPLETED").length,
-    pending: matches.filter((m) => m.status === "PENDING" || m.status === "BYE").length,
+    total: bracket.matches.length,
+    completed: bracket.matches.filter((m) => m.status === "COMPLETED").length,
+    pending: bracket.matches.filter((m) => m.status === "PENDING" || m.status === "READY" || m.isBye).length,
   };
-
   return NextResponse.json({
     tournamentId,
-    matches: matches.map((m) => ({
+    matches: bracket.matches.map((m) => ({
       id: m.id,
-      tournamentRoundId: m.tournamentRoundId,
-      matchVenueId: m.matchVenueId,
-      bracketPhase: m.bracketPhase,
-      roundIndex: m.roundIndex,
-      matchIndex: m.matchIndex,
+      tournamentRoundId: m.roundId,
+      matchVenueId: m.venueId,
+      bracketPhase: bracket.kind,
+      roundIndex: bracket.rounds.find((r) => r.id === m.roundId)?.roundNumber ?? 0,
+      matchIndex: m.matchNumber,
       entryIdA: m.entryIdA,
       entryIdB: m.entryIdB,
       entryAName: entryDisplayName(m.entryIdA),
@@ -68,9 +69,12 @@ export async function GET(
       scoreA: m.scoreA,
       scoreB: m.scoreB,
       winnerEntryId: m.winnerEntryId,
-      status: m.status,
+      status: m.isBye && m.status !== "COMPLETED" ? "BYE" : m.status,
       nextMatchId: m.nextMatchId,
       nextSlot: m.nextSlot,
+      scheduledStartAt: m.scheduledStartAt ?? null,
+      hasIssue: m.hasIssue ?? false,
+      issueNote: m.issueNote ?? null,
     })),
     stats,
   });

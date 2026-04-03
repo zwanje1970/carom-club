@@ -56,7 +56,17 @@ export async function POST(
     return NextResponse.json({ error: "해당 대회를 수정할 권한이 없습니다." }, { status: 403 });
   }
 
-  let body: { zoneId?: string; name?: string; code?: string; sortOrder?: number; status?: string };
+  let body: {
+    zoneId?: string;
+    name?: string;
+    code?: string;
+    sortOrder?: number;
+    status?: string;
+    matchDayId?: string | null;
+    venueId?: string | null;
+    qualifierTarget?: number | null;
+    workflowStatus?: string | null;
+  };
   try {
     body = await request.json();
   } catch {
@@ -89,6 +99,10 @@ export async function POST(
   const name = typeof body.name === "string" ? body.name.trim() || null : null;
   const code = typeof body.code === "string" ? body.code.trim() || null : null;
   const status = typeof body.status === "string" ? body.status.trim() || null : null;
+  const matchDayId = typeof body.matchDayId === "string" ? body.matchDayId.trim() || null : body.matchDayId ?? null;
+  const venueId = typeof body.venueId === "string" ? body.venueId.trim() || null : body.venueId ?? null;
+  const qualifierTarget = typeof body.qualifierTarget === "number" ? body.qualifierTarget : null;
+  const workflowStatus = typeof body.workflowStatus === "string" ? body.workflowStatus.trim() || null : null;
 
   const tz = await prisma.tournamentZone.create({
     data: {
@@ -98,6 +112,10 @@ export async function POST(
       code,
       sortOrder,
       status,
+      matchDayId,
+      venueId,
+      qualifierTarget,
+      ...(workflowStatus ? { workflowStatus: workflowStatus as "READY" | "IN_PROGRESS" | "COMPLETED" } : {}),
     },
     include: { zone: { select: { id: true, name: true, code: true } } },
   });

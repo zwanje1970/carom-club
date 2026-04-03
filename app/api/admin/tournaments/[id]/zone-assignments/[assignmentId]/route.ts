@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { ORGANIZATION_SELECT_OWNER } from "@/lib/db-selects";
 import { canManageTournament } from "@/lib/permissions";
 import { isQualifierLocked } from "@/lib/tournament-stage";
+import { assignTournamentEntryToZone, clearTournamentEntryZoneAssignment } from "@/lib/tournaments/national";
 
 /** 배정 변경. PATCH → canManageTournament. body: tournamentZoneId?, notes? */
 export async function PATCH(
@@ -44,30 +45,18 @@ export async function PATCH(
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const data: { tournamentZoneId?: string; notes?: string | null; assignedAt?: Date; assignedByUserId?: string } = {};
-  if (typeof body?.tournamentZoneId === "string" && body.tournamentZoneId.trim()) {
-    const tz = await prisma.tournamentZone.findFirst({
-      where: { id: body.tournamentZoneId.trim(), tournamentId },
-    });
-    if (!tz) return NextResponse.json({ error: "해당 대회의 권역을 찾을 수 없습니다." }, { status: 404 });
-    data.tournamentZoneId = tz.id;
-    data.assignedAt = new Date();
-    data.assignedByUserId = session.id;
-  }
-  if (body?.notes !== undefined) data.notes = typeof body.notes === "string" ? body.notes.trim() || null : null;
-
-  if (Object.keys(data).length === 0) {
-    return NextResponse.json(assignment);
-  }
-
-  const updated = await prisma.tournamentEntryZoneAssignment.update({
-    where: { id: assignmentId },
-    data,
-    include: {
-      tournamentZone: { include: { zone: { select: { name: true, code: true } } } },
-    },
+  const updated = await assignTournamentEntryToZone({
+    tournamentId,
+    entryId: assignment.entry.id,
+    tournamentZoneId:
+      typeof body?.tournamentZoneId === "string" && body.tournamentZoneId.trim()
+        ? body.tournamentZoneId.trim()
+        : assignment.tournamentZoneId,
+    actorUserId: session.id,
+    assignmentType: "MANUAL",
+    notes: typeof body?.notes === "string" ? body.notes.trim() || null : null,
   });
-  return NextResponse.json(updated);
+  return NextResponse.json(updated ?? assignment);
 }
 
 /** 배정 해제. DELETE → canManageTournament */
@@ -102,8 +91,9 @@ export async function DELETE(
     return NextResponse.json({ error: "배정을 찾을 수 없습니다." }, { status: 404 });
   }
 
-  await prisma.tournamentEntryZoneAssignment.delete({
-    where: { id: assignmentId },
+  await clearTournamentEntryZoneAssignment({
+    tournamentId,
+    entryId: assignment.entry.id,
   });
   return NextResponse.json({ ok: true });
 }

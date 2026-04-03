@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { getCommonPageData } from "@/lib/common-page-data";
 import { getPublicTournamentOrNull } from "@/lib/public-tournament";
+import { fetchOrImportZoneBracketSnapshotByZoneId } from "@/lib/bracket-match-service";
 
 export default async function PublicTournamentZonesPage({
   params,
@@ -24,27 +25,29 @@ export default async function PublicTournamentZonesPage({
     include: { zone: { select: { name: true, code: true } } },
   });
 
-  const zoneIds = zones.map((z) => z.id);
-  const [matchCounts, completedCounts, participantCounts] = await Promise.all([
-    prisma.tournamentZoneMatch.groupBy({
-      by: ["tournamentZoneId"],
-      where: { tournamentZoneId: { in: zoneIds } },
-      _count: { id: true },
-    }),
-    prisma.tournamentZoneMatch.groupBy({
-      by: ["tournamentZoneId"],
-      where: { tournamentZoneId: { in: zoneIds }, status: "COMPLETED" },
-      _count: { id: true },
-    }),
-    prisma.tournamentEntryZoneAssignment.groupBy({
-      by: ["tournamentZoneId"],
-      where: { tournamentZoneId: { in: zoneIds }, entry: { status: "CONFIRMED" } },
-      _count: { id: true },
-    }),
-  ]);
-  const totalByZone = Object.fromEntries(matchCounts.map((m) => [m.tournamentZoneId, m._count.id]));
-  const completedByZone = Object.fromEntries(completedCounts.map((m) => [m.tournamentZoneId, m._count.id]));
-  const participantByZone = Object.fromEntries(participantCounts.map((m) => [m.tournamentZoneId, m._count.id]));
+  const zoneStats = await Promise.all(
+    zones.map(async (z) => {
+      const bracket = await fetchOrImportZoneBracketSnapshotByZoneId(tournamentId, z.id);
+      const matches = bracket?.rounds.flatMap((round) => round.matches) ?? [];
+      const reductionMatches = bracket?.rounds
+        .filter((round) => round.roundType === "REDUCTION")
+        .reduce((sum, round) => sum + round.matches.length, 0) ?? 0;
+      const participants = await prisma.tournamentEntry.count({
+        where: { tournamentId, zoneId: z.id, status: "CONFIRMED" },
+      });
+      return {
+        zoneId: z.id,
+        total: matches.length,
+        completed: matches.filter((m) => m.status === "COMPLETED").length,
+        reductionMatches,
+        participants,
+      };
+    })
+  );
+  const totalByZone = Object.fromEntries(zoneStats.map((z) => [z.zoneId, z.total]));
+  const completedByZone = Object.fromEntries(zoneStats.map((z) => [z.zoneId, z.completed]));
+  const reductionByZone = Object.fromEntries(zoneStats.map((z) => [z.zoneId, z.reductionMatches]));
+  const participantByZone = Object.fromEntries(zoneStats.map((z) => [z.zoneId, z.participants]));
 
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
@@ -85,6 +88,7 @@ export default async function PublicTournamentZonesPage({
                   <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-600">
                     <span>참가 {participants}명</span>
                     <span>경기 {completed} / {total}</span>
+                    <span>감축경기 {reductionByZone[z.id] ?? 0}개</span>
                   </div>
                   {total > 0 && (
                     <div className="mt-2 h-1.5 w-full rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">

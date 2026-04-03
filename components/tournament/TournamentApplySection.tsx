@@ -13,6 +13,10 @@ export type TournamentApplySectionProps = {
   accountNumber: string | null;
   entryConditionsHtml: string | null;
   isLoggedIn: boolean;
+  currentUserName: string | null;
+  isScotch: boolean;
+  teamScoreLimit: number | null;
+  teamScoreRule: "LTE" | "LT" | null;
   verificationMode: VerificationMode;
   verificationGuideText: string | null;
   divisionEnabled: boolean;
@@ -38,6 +42,10 @@ export function TournamentApplySection({
   accountNumber,
   entryConditionsHtml,
   isLoggedIn,
+  currentUserName,
+  isScotch,
+  teamScoreLimit,
+  teamScoreRule,
   myEntries,
   canApplyFirstSlot,
   canApplyAdditionalSlot,
@@ -134,6 +142,10 @@ export function TournamentApplySection({
           divisionEnabled={divisionEnabled}
           eligibilityLine={eligibilityLine}
           userMemberAvg={userMemberAvg}
+          currentUserName={currentUserName}
+          isScotch={isScotch}
+          teamScoreLimit={teamScoreLimit}
+          teamScoreRule={teamScoreRule}
         />
       )}
       {canApplyAdditionalSlot && isLoggedIn && (
@@ -147,6 +159,10 @@ export function TournamentApplySection({
           divisionEnabled={divisionEnabled}
           eligibilityLine={eligibilityLine}
           userMemberAvg={userMemberAvg}
+          currentUserName={currentUserName}
+          isScotch={isScotch}
+          teamScoreLimit={teamScoreLimit}
+          teamScoreRule={teamScoreRule}
           additionalSlot
         />
       )}

@@ -23,11 +23,48 @@ type JwtPayload = {
   authChannel?: string;
 };
 
+const EXTERNAL_NANGU_ORIGIN =
+  process.env.NANGU_NOTE_APP_URL?.replace(/\/+$/, "") || "http://localhost:3001";
+
+const NANGU_PAGE_PREFIXES = [
+  "/community/nangu",
+  "/community/trouble",
+  "/community/notes",
+] as const;
+
+const NANGU_API_PREFIXES = [
+  "/api/community/nangu",
+  "/api/community/trouble",
+  "/api/community/billiard-notes",
+] as const;
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const requestHeaders = new Headers(request.headers);
   /** `app/mypage/notes/layout.tsx` 등에서 `login?next=` 복귀 경로용 */
   requestHeaders.set("x-pathname", pathname);
+
+  const isNanguPageRoute = NANGU_PAGE_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+  if (isNanguPageRoute) {
+    const target = new URL(`${EXTERNAL_NANGU_ORIGIN}${pathname}`);
+    target.search = request.nextUrl.search;
+    return NextResponse.redirect(target);
+  }
+
+  const isNanguApiRoute = NANGU_API_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+  if (isNanguApiRoute) {
+    return NextResponse.json(
+      {
+        error: "메인 사이트에서는 난구 기능 API를 제공하지 않습니다.",
+        externalUrl: `${EXTERNAL_NANGU_ORIGIN}${pathname}`,
+      },
+      { status: 410 }
+    );
+  }
 
   const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
   const isAdminLogin =

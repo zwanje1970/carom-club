@@ -51,7 +51,15 @@ export async function POST(request: Request) {
     // 기존 세션 제거 (이전 관리자/다른 계정 쿠키가 새 로그인에 섞이지 않도록)
     await clearSessionCookie();
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "요청 형식이 올바르지 않습니다. JSON 본문으로 다시 시도해 주세요." },
+        { status: 400 }
+      );
+    }
     const { username, password, rememberMe, isClientLogin } = body as {
       username?: string;
       password?: string;

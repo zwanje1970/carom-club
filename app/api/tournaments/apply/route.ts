@@ -54,6 +54,13 @@ export async function POST(request: Request) {
     avg?: string;
     avgProofUrl?: string;
     verificationImageUrl?: string;
+    playerAName?: string;
+    playerAScore?: number | string;
+    playerAProofUrl?: string;
+    playerBName?: string;
+    playerBScore?: number | string;
+    playerBProofUrl?: string;
+    teamTotalScore?: number | string;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -72,6 +79,12 @@ export async function POST(request: Request) {
     avg,
     avgProofUrl,
     verificationImageUrl,
+    playerAName,
+    playerAScore,
+    playerAProofUrl,
+    playerBName,
+    playerBScore,
+    playerBProofUrl,
   } = body;
   const club = typeof clubOrAffiliation === "string" ? clubOrAffiliation.trim() || null : null;
   const handicapVal = typeof handicap === "string" ? handicap.trim() || null : null;
@@ -138,6 +151,9 @@ export async function POST(request: Request) {
     divisionMetricType === "SCORE"
       ? memberScore ?? submittedScore
       : memberAvg ?? submittedAvg;
+  const isScotch = tournamentWithRule.isScotch === true;
+  const teamScoreLimit = tournamentWithRule.teamScoreLimit ?? null;
+  const teamScoreRule = tournamentWithRule.teamScoreRule === "LT" ? "LT" : "LTE";
 
   // 1) 참가 제한 검증
   if (eligibilityType === "UNDER" && eligibilityValue != null && Number.isFinite(eligibilityValue)) {
@@ -172,6 +188,44 @@ export async function POST(request: Request) {
     }
     if (!isTrustedCertificationImageUrl(verificationImageUrlRaw)) {
       return NextResponse.json({ error: "인증 이미지 URL이 유효하지 않습니다. 다시 업로드해 주세요." }, { status: 400 });
+    }
+  }
+
+  const playerANameRaw = typeof playerAName === "string" ? playerAName.trim() : "";
+  const playerBNameRaw = typeof playerBName === "string" ? playerBName.trim() : "";
+  const playerAScoreNum = playerAScore === "" || playerAScore == null ? NaN : Number(playerAScore);
+  const playerBScoreNum = playerBScore === "" || playerBScore == null ? NaN : Number(playerBScore);
+  const playerAProofRaw = typeof playerAProofUrl === "string" ? playerAProofUrl.trim() : "";
+  const playerBProofRaw = typeof playerBProofUrl === "string" ? playerBProofUrl.trim() : "";
+
+  if (isScotch) {
+    const applicantName = playerANameRaw || userRow?.name?.trim() || session.username?.trim() || "";
+    if (!applicantName || !playerBNameRaw) {
+      return NextResponse.json({ error: "스카치 대회는 두 명의 이름을 모두 입력해야 합니다." }, { status: 400 });
+    }
+    if (!Number.isInteger(playerAScoreNum) || !Number.isInteger(playerBScoreNum)) {
+      return NextResponse.json({ error: "스카치 대회는 두 명의 점수를 모두 숫자로 입력해야 합니다." }, { status: 400 });
+    }
+    if (!playerAProofRaw || !playerBProofRaw) {
+      return NextResponse.json({ error: "스카치 대회는 두 명 모두 증빙을 첨부해야 합니다." }, { status: 400 });
+    }
+    if (!isTrustedCertificationImageUrl(playerAProofRaw) || !isTrustedCertificationImageUrl(playerBProofRaw)) {
+      return NextResponse.json({ error: "스카치 증빙 이미지 URL이 유효하지 않습니다. 다시 업로드해 주세요." }, { status: 400 });
+    }
+    const teamTotal = playerAScoreNum + playerBScoreNum;
+    if (teamScoreLimit != null) {
+      const valid = teamScoreRule === "LT" ? teamTotal < teamScoreLimit : teamTotal <= teamScoreLimit;
+      if (!valid) {
+        return NextResponse.json(
+          {
+            error:
+              teamScoreRule === "LT"
+                ? `팀 합산 점수는 ${teamScoreLimit} 미만이어야 합니다.`
+                : `팀 합산 점수는 ${teamScoreLimit} 이하이어야 합니다.`,
+          },
+          { status: 400 }
+        );
+      }
     }
   }
 
@@ -268,6 +322,18 @@ export async function POST(request: Request) {
         handicap: handicapVal,
         avg: avgVal,
         avgProofUrl: avgProofVal,
+        displayName: isScotch
+          ? [playerANameRaw || userRow?.name?.trim() || session.username?.trim() || "", playerBNameRaw]
+              .filter((v) => v.trim())
+              .join(" / ")
+          : null,
+        playerAName: isScotch ? (playerANameRaw || userRow?.name?.trim() || session.username?.trim() || null) : null,
+        playerAScore: isScotch ? (Number.isInteger(playerAScoreNum) ? playerAScoreNum : null) : null,
+        playerAProof: isScotch ? (playerAProofRaw || verificationImageUrlRaw || null) : null,
+        playerBName: isScotch ? playerBNameRaw : null,
+        playerBScore: isScotch ? (Number.isInteger(playerBScoreNum) ? playerBScoreNum : null) : null,
+        playerBProof: isScotch ? playerBProofRaw : null,
+        teamTotalScore: isScotch ? playerAScoreNum + playerBScoreNum : null,
         entryFeeAmount: baseEntryFee > 0 ? entryFeeAmount : null,
         verificationImageUrl: needsVerificationImage ? verificationImageUrlRaw : null,
         verificationOcrText: null,

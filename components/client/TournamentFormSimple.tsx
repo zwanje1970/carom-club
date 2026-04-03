@@ -56,6 +56,9 @@ export type TournamentFormValues = {
   prizeThird2: string;
   prizeExtra: string;
   gameFormat: string;
+  isScotch: boolean;
+  teamScoreLimit: string | number;
+  teamScoreRule: "LTE" | "LT";
   entryQualificationType: "SCORE" | "EVER";
   entryCondition: string;
   maxParticipants: string | number;
@@ -93,6 +96,9 @@ const defaultFormValues: TournamentFormValues = {
   prizeThird2: "",
   prizeExtra: "",
   gameFormat: "TOURNAMENT",
+  isScotch: false,
+  teamScoreLimit: "",
+  teamScoreRule: "LTE",
   entryQualificationType: "EVER",
   entryCondition: "",
   maxParticipants: "",
@@ -271,6 +277,11 @@ export function TournamentFormSimple({
       if (typeof bc.allowMultipleSlots === "boolean") base.allowMultipleSlots = bc.allowMultipleSlots;
       if (typeof bc.participantsListPublic === "boolean") base.participantsListPublic = bc.participantsListPublic;
       if (bc.accountNumber) base.accountNumber = bc.accountNumber;
+      if (typeof initialData.isScotch === "boolean") base.isScotch = initialData.isScotch;
+      if (initialData.teamScoreLimit != null && initialData.teamScoreLimit !== "") {
+        base.teamScoreLimit = initialData.teamScoreLimit;
+      }
+      if (initialData.teamScoreRule) base.teamScoreRule = initialData.teamScoreRule;
       if (initialData.verificationMode) base.verificationMode = initialData.verificationMode;
       if (typeof initialData.verificationReviewRequired === "boolean") {
         base.verificationReviewRequired = initialData.verificationReviewRequired;
@@ -314,6 +325,7 @@ export function TournamentFormSimple({
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const submitAsDraftRef = useRef(false);
+  const showScotchFields = form.gameFormat === "SCOTCH" || form.isScotch;
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -385,6 +397,13 @@ export function TournamentFormSimple({
     if (form.divisionEnabled && form.divisionRules.length === 0) {
       setError("자동 부 분배를 사용하려면 부 규칙을 1개 이상 추가해 주세요.");
       return;
+    }
+    if (showScotchFields) {
+      const limitValue = form.teamScoreLimit === "" ? null : Number(form.teamScoreLimit);
+      if (!Number.isFinite(limitValue ?? Number.NaN)) {
+        setError("스카치 대회는 팀 점수 제한을 입력해 주세요.");
+        return;
+      }
     }
     const hasVenue = venues.some((v) => (v.venueName || v.address || "").trim());
     if (!asDraft && !hasVenue) {
@@ -600,13 +619,68 @@ export function TournamentFormSimple({
                     ? chrome.pillPrimary
                     : chrome.pillOff
                 }`}
-                onClick={() => setForm((f) => ({ ...f, gameFormat: opt.value }))}
+                onClick={() =>
+                  setForm((f) => ({
+                    ...f,
+                    gameFormat: opt.value,
+                    isScotch: opt.value === "SCOTCH",
+                  }))
+                }
               >
                 {opt.label}
               </button>
             ))}
           </div>
         </div>
+        {showScotchFields && (
+          <div className="rounded-lg border border-site-border bg-site-bg/50 p-3 space-y-3">
+            <h3 className="text-sm font-semibold text-site-text">스카치 설정</h3>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className={chrome.label}>팀 점수 제한 *</label>
+                <input
+                  type="number"
+                  min={0}
+                  className={chrome.inputNum}
+                  placeholder="예: 50"
+                  value={form.teamScoreLimit === "" ? "" : form.teamScoreLimit}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      teamScoreLimit: e.target.value === "" ? "" : Number(e.target.value),
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className={chrome.label}>비교 방식</label>
+                <div className="flex gap-2">
+                  {[
+                    { value: "LTE", label: "이하(<=)" },
+                    { value: "LT", label: "미만(<)" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      className={`rounded-lg px-3 py-2 text-sm font-medium ${
+                        form.teamScoreRule === opt.value ? chrome.pillPrimary : chrome.pillOff
+                      }`}
+                      onClick={() =>
+                        setForm((f) => ({
+                          ...f,
+                          teamScoreRule: opt.value as "LTE" | "LT",
+                        }))
+                      }
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <p className={chrome.muted}>스카치 대회는 참가 신청 시 2인 팀 점수 합으로 자동 검증됩니다.</p>
+          </div>
+        )}
         <div>
           <label className={chrome.label}>참가 조건 *</label>
           <div className="flex flex-wrap gap-2 mb-2">

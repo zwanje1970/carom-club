@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getPublicTournamentOrNull } from "@/lib/public-tournament";
+import { fetchOrImportZoneBracketSnapshotByZoneId } from "@/lib/bracket-match-service";
 import { PublicZoneBracket } from "@/components/public/PublicZoneBracket";
 
 export default async function PublicZoneDetailPage({
@@ -19,13 +20,18 @@ export default async function PublicZoneDetailPage({
   });
   if (!tz) notFound();
 
-  const [matchTotal, matchCompleted, participantCount] = await Promise.all([
-    prisma.tournamentZoneMatch.count({ where: { tournamentZoneId: tzId } }),
-    prisma.tournamentZoneMatch.count({ where: { tournamentZoneId: tzId, status: "COMPLETED" } }),
-    prisma.tournamentEntryZoneAssignment.count({
-      where: { tournamentZoneId: tzId, entry: { status: "CONFIRMED" } },
+  const [bracket, participantCount] = await Promise.all([
+    fetchOrImportZoneBracketSnapshotByZoneId(tournamentId, tzId),
+    prisma.tournamentEntry.count({
+      where: { tournamentId, zoneId: tzId, status: "CONFIRMED" },
     }),
   ]);
+  const matches = bracket?.rounds.flatMap((round) => round.matches) ?? [];
+  const matchTotal = matches.length;
+  const matchCompleted = matches.filter((m) => m.status === "COMPLETED").length;
+  const reductionCount = bracket?.rounds
+    .filter((round) => round.roundType === "REDUCTION")
+    .reduce((sum, round) => sum + round.matches.length, 0) ?? 0;
 
   const zoneName = tz.name ?? tz.zone.name;
 
@@ -44,6 +50,8 @@ export default async function PublicZoneDetailPage({
             <dd className="font-medium">{participantCount}명</dd>
             <dt className="text-gray-500">경기</dt>
             <dd className="font-medium">{matchCompleted} / {matchTotal}</dd>
+            <dt className="text-gray-500">감축경기</dt>
+            <dd className="font-medium">{reductionCount}개</dd>
           </dl>
           {matchTotal > 0 && (
             <div className="mt-2 h-1.5 w-full rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">

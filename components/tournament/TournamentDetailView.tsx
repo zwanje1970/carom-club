@@ -26,6 +26,7 @@ export type TournamentDetailViewProps = {
     prizeInfo: string | null;
     entryCondition: string | null;
     maxParticipants: number | null;
+    isScotch?: boolean;
     rule: {
       entryFee: number | null;
       operatingFee: number | null;
@@ -52,6 +53,9 @@ export type TournamentDetailViewProps = {
     id: string;
     userId: string;
     userName: string;
+    displayName?: string | null;
+    playerAName?: string | null;
+    playerBName?: string | null;
     handicap: string | null;
     avg: string | null;
     depositorName: string | null;

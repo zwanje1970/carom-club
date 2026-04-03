@@ -69,7 +69,7 @@ export function AdminFloatButton() {
   const hasDraggedThisGestureRef = useRef(false);
 
   const isAdminLoggedIn = user?.canAccessAdmin === true;
-  const showButton = pathname === "/login" || isAdminLoggedIn;
+  const showButton = (pathname === "/login" || isAdminLoggedIn) && !pathname.startsWith("/tv");
   const label = isAdminLoggedIn ? "대시보드" : "관리자";
   const href = isAdminLoggedIn ? "/admin" : "/admin/login";
   const isDraggable = isAdminLoggedIn;

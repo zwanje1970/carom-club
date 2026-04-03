@@ -9,18 +9,19 @@ export type Top3 = {
 
 /**
  * 단판 토너먼트 브래킷에서 1·2·3위 사용자 추출.
- * TournamentRound.bracketData 또는 TournamentFinalMatch 사용.
+ * `BracketMatch` 우선, 레거시 `TournamentRound.bracketData`는 호환용.
  */
 export async function getTop3FromTournament(tournamentId: string): Promise<Top3> {
   const result: Top3 = { firstUserId: null, secondUserId: null, thirdUserIds: [] };
 
-  const finalMatches = await prisma.tournamentFinalMatch.findMany({
-    where: { tournamentId },
-    orderBy: [{ roundIndex: "desc" }, { matchIndex: "asc" }],
+  const finalMatches = await prisma.bracketMatch.findMany({
+    where: { bracket: { tournamentId, kind: "MAIN" } },
+    include: { round: { select: { roundNumber: true } } },
+    orderBy: [{ round: { roundNumber: "desc" } }, { matchNumber: "asc" }],
   });
   if (finalMatches.length > 0) {
-    const maxRound = Math.max(...finalMatches.map((m) => m.roundIndex));
-    const finalMatch = finalMatches.find((m) => m.roundIndex === maxRound && m.matchIndex === 0);
+    const maxRound = Math.max(...finalMatches.map((m) => m.round.roundNumber));
+    const finalMatch = finalMatches.find((m) => m.round.roundNumber === maxRound && m.matchNumber === 0);
     if (finalMatch?.winnerEntryId && (finalMatch.entryIdA || finalMatch.entryIdB)) {
       const winnerId = finalMatch.winnerEntryId;
       const loserId = finalMatch.entryIdA === winnerId ? finalMatch.entryIdB : finalMatch.entryIdA;
@@ -31,7 +32,7 @@ export async function getTop3FromTournament(tournamentId: string): Promise<Top3>
     }
     const semiRound = maxRound - 1;
     if (semiRound >= 0) {
-      const semiMatches = finalMatches.filter((m) => m.roundIndex === semiRound);
+      const semiMatches = finalMatches.filter((m) => m.round.roundNumber === semiRound);
       const semiLoserEntryIds = semiMatches
         .map((m) => (m.winnerEntryId === m.entryIdA ? m.entryIdB : m.entryIdA))
         .filter((id): id is string => !!id);

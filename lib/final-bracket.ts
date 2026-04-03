@@ -2,6 +2,8 @@
  * 12C: 본선 32강/64강 브래킷 생성.
  * 진출자 슬롯 순서로 1라운드 매치 생성, 상위 라운드 빈 슬롯 연결.
  */
+import { buildSingleElimPlan } from "@/lib/bracket-engine";
+
 export type FinalMatchCreate = {
   roundIndex: number;
   matchIndex: number;
@@ -23,31 +25,22 @@ export function buildFinalBracketPlan(
   slotEntries: (string | null)[],
   size: BracketSize
 ): FinalMatchCreate[] {
-  const slots = [...slotEntries];
-  while (slots.length < size) slots.push(null);
-
-  const totalRounds = Math.round(Math.log2(size)); // 4->2, 8->3, 16->4, 32->5, 64->6
-  const result: FinalMatchCreate[] = [];
-
-  for (let r = 0; r < totalRounds; r++) {
-    const matchesInRound = size / Math.pow(2, r + 1);
-    for (let i = 0; i < matchesInRound; i++) {
-      const entryIdA = r === 0 ? (slots[i * 2] ?? null) : null;
-      const entryIdB = r === 0 ? (slots[i * 2 + 1] ?? null) : null;
-      const isBye = (entryIdA == null && entryIdB != null) || (entryIdA != null && entryIdB == null);
-      result.push({
-        roundIndex: r,
-        matchIndex: i,
-        entryIdA,
-        entryIdB,
-        status: isBye ? "BYE" : "PENDING",
-        nextMatchId: null,
-        nextSlot: null,
-      });
-    }
-  }
-
-  return result;
+  return buildSingleElimPlan({
+    entries: slotEntries.flatMap((entry, bracketOrder) =>
+      entry ? [{ entryId: entry, bracketOrder }] : []
+    ),
+    targetFinalSize: size,
+    seedMode: "MANUAL",
+    byeStrategy: "EARLY",
+  }).map((row) => ({
+    roundIndex: row.roundNumber,
+    matchIndex: row.matchNumber,
+    entryIdA: row.entryIdA,
+    entryIdB: row.entryIdB,
+    status: row.isBye ? "BYE" : "PENDING",
+    nextMatchId: null,
+    nextSlot: null,
+  }));
 }
 
 /**

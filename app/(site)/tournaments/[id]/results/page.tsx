@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
 import { getCommonPageData } from "@/lib/common-page-data";
 import { getPublicTournamentOrNull } from "@/lib/public-tournament";
+import { fetchOrImportBracketSnapshotByKind, fetchOrImportZoneBracketSnapshotByZoneId } from "@/lib/bracket-match-service";
 import { STAGE_LABELS, TOURNAMENT_STAGES } from "@/lib/tournament-stage";
 
 export default async function PublicTournamentResultsPage({
@@ -24,14 +25,29 @@ export default async function PublicTournamentResultsPage({
     orderBy: { sortOrder: "asc" },
     include: { zone: { select: { name: true, code: true } } },
   });
-  const zoneIds = zones.map((z) => z.id);
-
-  const [zoneTotal, zoneCompleted, finalTotal, finalCompleted] = await Promise.all([
-    prisma.tournamentZoneMatch.count({ where: { tournamentZoneId: { in: zoneIds } } }),
-    prisma.tournamentZoneMatch.count({ where: { tournamentZoneId: { in: zoneIds }, status: "COMPLETED" } }),
-    prisma.tournamentFinalMatch.count({ where: { tournamentId } }),
-    prisma.tournamentFinalMatch.count({ where: { tournamentId, status: "COMPLETED" } }),
+  const [zoneStats, bracket] = await Promise.all([
+    Promise.all(
+      zones.map(async (z) => {
+        const zoneBracket = await fetchOrImportZoneBracketSnapshotByZoneId(tournamentId, z.id);
+        const matches = zoneBracket?.rounds.flatMap((round) => round.matches) ?? [];
+        const reductionMatches = zoneBracket?.rounds
+          .filter((round) => round.roundType === "REDUCTION")
+          .reduce((sum, round) => sum + round.matches.length, 0) ?? 0;
+        return {
+          total: matches.length,
+          completed: matches.filter((m) => m.status === "COMPLETED").length,
+          reductionMatches,
+        };
+      })
+    ),
+    fetchOrImportBracketSnapshotByKind(tournamentId, "FINAL"),
   ]);
+  const leagueCount = await prisma.league.count({ where: { tournamentId } });
+  const zoneTotal = zoneStats.reduce((sum, z) => sum + z.total, 0);
+  const zoneCompleted = zoneStats.reduce((sum, z) => sum + z.completed, 0);
+  const zoneReductionTotal = zoneStats.reduce((sum, z) => sum + z.reductionMatches, 0);
+  const finalTotal = bracket?.matches.length ?? 0;
+  const finalCompleted = bracket?.matches.filter((m) => m.status === "COMPLETED").length ?? 0;
 
   const stage = (tournament.tournamentStage ?? "SETUP") as keyof typeof STAGE_LABELS;
   const stageLabel = TOURNAMENT_STAGES.includes(stage as (typeof TOURNAMENT_STAGES)[number])
@@ -59,6 +75,9 @@ export default async function PublicTournamentResultsPage({
             <p className="text-sm text-gray-600">
               완료 <span className="font-semibold text-site-text">{zoneCompleted}</span> / 전체{" "}
               <span className="font-semibold">{zoneTotal}</span> 경기
+            </p>
+            <p className="mt-1 text-sm text-gray-600">
+              감축경기 <span className="font-semibold text-site-text">{zoneReductionTotal}</span>개
             </p>
             {zoneTotal > 0 && (
               <div className="mt-2 h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
@@ -110,6 +129,17 @@ export default async function PublicTournamentResultsPage({
           ) : (
             <p className="text-sm text-gray-500">{getCopyValue(c, "site.tournament.finalBracketNotCreated")}</p>
           )}
+        </section>
+
+        <section className="mt-8 rounded-xl border border-site-border bg-site-card p-4">
+          <h2 className="text-lg font-semibold text-site-text mb-2">리그전</h2>
+          <p className="text-sm text-gray-600 mb-3">리그 경기표와 순위표를 확인합니다.</p>
+          <Link
+            href={`/tournaments/${tournamentId}/leagues`}
+            className="inline-flex items-center rounded-lg bg-site-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          >
+            리그전 보기{leagueCount > 0 ? ` (${leagueCount})` : ""}
+          </Link>
         </section>
       </div>
     </main>

@@ -13,6 +13,7 @@ import CardBox from "@/components/admin/_components/CardBox";
 import Button from "@/components/admin/_components/Button";
 import Buttons from "@/components/admin/_components/Buttons";
 import PillTag from "@/components/admin/_components/PillTag";
+import { TournamentTvAccessCard } from "@/components/admin/TournamentTvAccessCard";
 
 function statusColor(s: string): "success" | "info" | "contrast" | "light" {
   switch (s) {
@@ -93,6 +94,7 @@ export default async function AdminTournamentDetailPage({
               <Button href={`/admin/tournaments/${id}/outline`} label="대회요강 편집" color="contrast" outline small />
               <Button href={`/admin/tournaments/${id}/participants`} label="참가자 관리" color="contrast" outline small />
               <Button href={`/admin/tournaments/${id}/bracket`} label="대진표" color="contrast" outline small />
+              <Button href={`/admin/tournaments/${id}/leagues`} label="리그전" color="contrast" outline small />
               <Button href={`/admin/tournaments/${id}/maintenance`} label="유지보수" color="warning" outline small />
             </>
           )}
@@ -124,6 +126,8 @@ export default async function AdminTournamentDetailPage({
           tournamentStatus={tournament.status}
         />
       )}
+
+      {canManage && <div className="mt-4 max-w-3xl"><TournamentTvAccessCard tournamentId={id} /></div>}
     </SectionMain>
   );
 }

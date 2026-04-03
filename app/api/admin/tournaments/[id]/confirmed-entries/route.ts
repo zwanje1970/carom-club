@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ORGANIZATION_SELECT_OWNER } from "@/lib/db-selects";
 import { canViewTournament } from "@/lib/permissions";
-import { getDisplayName } from "@/lib/display-name";
+import { formatTournamentEntryDisplayName } from "@/lib/tournament-entry-display";
 
 /** 참가확정자 목록 (수동 배치 드롭다운 등). GET → canViewTournament. 대기자 제외. */
 export async function GET(
@@ -30,8 +30,15 @@ export async function GET(
   });
 
   const list = entries.map((e) => {
-    const name = getDisplayName(e.user);
-    const label = (e.slotNumber ?? 1) > 1 ? `${name} (슬롯${e.slotNumber})` : name;
+    const name = formatTournamentEntryDisplayName({
+      displayName: e.displayName,
+      playerAName: e.playerAName,
+      playerBName: e.playerBName,
+      user: e.user,
+      slotNumber: e.slotNumber,
+      isScotch: tournament.isScotch === true,
+    });
+    const label = name;
     return {
       id: e.id,
       userId: e.userId,

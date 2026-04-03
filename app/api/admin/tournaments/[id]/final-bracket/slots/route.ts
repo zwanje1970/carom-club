@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ORGANIZATION_SELECT_OWNER } from "@/lib/db-selects";
 import { canManageTournament } from "@/lib/permissions";
+import { fetchOrImportBracketSnapshotByKind, patchBracketMatchByKind } from "@/lib/bracket-match-service";
 
 /** 본선 1라운드 슬롯 수동 배정. PATCH → canManageTournament. body: { slots: { slotIndex: number, entryId: string }[] } */
 export async function PATCH(
@@ -31,9 +32,14 @@ export async function PATCH(
   const slots = Array.isArray(body?.slots) ? body.slots : [];
   if (slots.length === 0) return NextResponse.json({ ok: true });
 
-  const round0 = await prisma.tournamentFinalMatch.findMany({
-    where: { tournamentId, roundIndex: 0 },
-    orderBy: { matchIndex: "asc" },
+  const bracket = await fetchOrImportBracketSnapshotByKind(tournamentId, "FINAL");
+  if (!bracket) {
+    return NextResponse.json({ error: "대진표가 생성되지 않았습니다." }, { status: 404 });
+  }
+
+  const round0 = await prisma.bracketMatch.findMany({
+    where: { bracket: { tournamentId, kind: "FINAL" }, round: { roundNumber: 0 } },
+    orderBy: { matchNumber: "asc" },
   });
   for (const { slotIndex, entryId } of slots) {
     if (slotIndex < 0 || slotIndex >= round0.length * 2) continue;
@@ -43,10 +49,7 @@ export async function PATCH(
     if (!match) continue;
     const value = entryId === undefined || entryId === "" ? null : entryId;
     const data = slot === "A" ? { entryIdA: value } : { entryIdB: value };
-    await prisma.tournamentFinalMatch.update({
-      where: { id: match.id },
-      data: { ...data, status: "PENDING" },
-    });
+    await patchBracketMatchByKind(prisma, tournamentId, "FINAL", match.id, { ...data, status: "PENDING" }, { actorUserId: session.id, allowCompletedResultEdit: true });
   }
   return NextResponse.json({ ok: true });
 }

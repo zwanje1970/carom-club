@@ -30,14 +30,29 @@ export async function POST(
   const action = body?.action;
   if (action === "reset_zone_results") {
     const zoneIds = tournament.tournamentZones.map((z) => z.id);
-    const deleted = await prisma.tournamentZoneMatch.deleteMany({
-      where: { tournamentZoneId: { in: zoneIds } },
-    });
+    const [deletedLegacy, deletedMatches, deletedRounds, deletedBrackets] = await Promise.all([
+      prisma.tournamentZoneMatch.deleteMany({
+        where: { tournamentZoneId: { in: zoneIds } },
+      }),
+      prisma.bracketMatch.deleteMany({
+        where: { bracket: { tournamentId, kind: "ZONE" } },
+      }),
+      prisma.bracketRound.deleteMany({
+        where: { bracket: { tournamentId, kind: "ZONE" } },
+      }),
+      prisma.bracket.deleteMany({
+        where: { tournamentId, kind: "ZONE" },
+      }),
+    ]);
     await prisma.tournament.update({
       where: { id: tournamentId },
       data: { tournamentStage: "SETUP" },
     });
-    return NextResponse.json({ ok: true, message: "권역 결과를 초기화했습니다.", deleted: deleted.count });
+    return NextResponse.json({
+      ok: true,
+      message: "권역 결과를 초기화했습니다.",
+      deleted: deletedLegacy.count + deletedMatches.count + deletedRounds.count + deletedBrackets.count,
+    });
   }
 
   if (action === "reset_qualifiers") {
@@ -52,14 +67,21 @@ export async function POST(
   }
 
   if (action === "reset_final_bracket") {
-    const deleted = await prisma.tournamentFinalMatch.deleteMany({
-      where: { tournamentId },
-    });
+    const [deletedLegacy, deletedMatches, deletedRounds, deletedBracket] = await Promise.all([
+      prisma.tournamentFinalMatch.deleteMany({ where: { tournamentId } }),
+      prisma.bracketMatch.deleteMany({ where: { bracket: { tournamentId, kind: "FINAL" } } }),
+      prisma.bracketRound.deleteMany({ where: { bracket: { tournamentId, kind: "FINAL" } } }),
+      prisma.bracket.deleteMany({ where: { tournamentId, kind: "FINAL" } }),
+    ]);
     await prisma.tournament.update({
       where: { id: tournamentId },
       data: { tournamentStage: "FINAL_READY" },
     });
-    return NextResponse.json({ ok: true, message: "본선 대진을 초기화했습니다.", deleted: deleted.count });
+    return NextResponse.json({
+      ok: true,
+      message: "본선 대진을 초기화했습니다.",
+      deleted: deletedLegacy.count + deletedMatches.count + deletedRounds.count + deletedBracket.count,
+    });
   }
 
   if (action === "set_stage" && typeof body?.tournamentStage === "string") {

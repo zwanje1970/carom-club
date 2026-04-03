@@ -112,6 +112,9 @@ export default async function TournamentApplyPage({
     divisionEnabled?: boolean;
     eligibilityType?: string | null;
     eligibilityValue?: number | null;
+    isScotch?: boolean;
+    teamScoreLimit?: number | null;
+    teamScoreRule?: "LTE" | "LT" | null;
     // 구 필드 fallback
     certificationRequestMode?: string;
     eligibilityLimitType?: string | null;
@@ -161,6 +164,10 @@ export default async function TournamentApplyPage({
           divisionEnabled={tCert.divisionEnabled === true}
           eligibilityLine={eligibilityLine}
           userMemberAvg={userMemberAvg}
+          currentUserName={session?.name ?? null}
+          isScotch={tCert.isScotch === true}
+          teamScoreLimit={tCert.teamScoreLimit ?? null}
+          teamScoreRule={tCert.teamScoreRule ?? "LTE"}
         />
       </div>
     </main>

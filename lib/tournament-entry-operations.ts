@@ -6,6 +6,8 @@ import { revokeTournamentCancel } from "@/lib/community-score-service";
 import { prisma } from "@/lib/db";
 import { sendPushToUser } from "@/lib/push/sendPush";
 import { isParticipantRosterLocked, ROSTER_LOCKED_ENTRY_ERROR } from "@/lib/tournament-roster-lock";
+import { syncNationalWaitlistEntries } from "@/lib/tournaments/national";
+import { syncLeagueEntriesForTournamentEntry } from "@/lib/league-service";
 
 export type EntryOpFail = { ok: false; error: string; status: number };
 export type EntryOpOk<T = Record<string, unknown>> = { ok: true } & T;
@@ -85,6 +87,7 @@ export async function confirmTournamentEntryPayment(
             reviewedAt: now,
             rejectionReason: null,
             waitingListOrder: null,
+            isWaitlist: false,
           },
         }),
         prisma.notification.create({
@@ -106,6 +109,12 @@ export async function confirmTournamentEntryPayment(
       } catch {
         // ignore
       }
+      await syncNationalWaitlistEntries(tournamentId);
+      await syncLeagueEntriesForTournamentEntry({
+        tournamentId,
+        tournamentEntryId: entryId,
+        nextStatus: "CONFIRMED",
+      });
       return { ok: true, result: "CONFIRMED" };
     }
 
@@ -123,6 +132,7 @@ export async function confirmTournamentEntryPayment(
           reviewedAt: now,
           waitingListOrder: nextOrder,
           rejectionReason: null,
+          isWaitlist: true,
         },
       }),
       prisma.notification.create({
@@ -143,6 +153,7 @@ export async function confirmTournamentEntryPayment(
     } catch {
       // ignore
     }
+    await syncNationalWaitlistEntries(tournamentId);
     return { ok: true, result: "WAITING", waitingListOrder: nextOrder };
   } catch (e) {
     console.error("[confirmTournamentEntryPayment]", e);
@@ -217,6 +228,7 @@ export async function cancelTournamentEntryWithWaitlist(
           });
         }
       });
+      await syncNationalWaitlistEntries(tournamentId);
 
       if (promotedUserId) {
         try {
@@ -254,6 +266,7 @@ export async function cancelTournamentEntryWithWaitlist(
           });
         }
       }
+      await syncNationalWaitlistEntries(tournamentId);
     }
 
     try {
@@ -378,6 +391,7 @@ export async function promoteWaitingTournamentEntry(
           status: "CONFIRMED",
           waitingListOrder: null,
           reviewedAt: now,
+          isWaitlist: false,
         },
       });
       const remainingWaitlist = await tx.tournamentEntry.findMany({
@@ -395,6 +409,7 @@ export async function promoteWaitingTournamentEntry(
         });
       }
     });
+    await syncNationalWaitlistEntries(tournamentId);
 
     await prisma.notification.create({
       data: {

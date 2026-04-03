@@ -91,6 +91,9 @@ export async function POST(request: Request) {
     outlineDraft,
     outlinePublished,
     approvalType,
+    isScotch,
+    teamScoreLimit,
+    teamScoreRule,
     rule,
     verificationMode,
     verificationReviewRequired,
@@ -125,6 +128,11 @@ export async function POST(request: Request) {
   if (!verificationNorm.ok) {
     return NextResponse.json({ error: verificationNorm.error }, { status: 400 });
   }
+  const isScotchTournament = isScotch === true || gameFormat === "SCOTCH";
+  const teamLimitValue = teamScoreLimit == null || teamScoreLimit === "" ? null : Number(teamScoreLimit);
+  if (isScotchTournament && !Number.isFinite(teamLimitValue)) {
+    return NextResponse.json({ error: "스카치 대회는 팀 점수 제한을 입력해 주세요." }, { status: 400 });
+  }
 
   const fields: TournamentCreateFields = {
     name: nameStr,
@@ -151,6 +159,9 @@ export async function POST(request: Request) {
     outlineDraft: outlineDraft as string | null | undefined,
     outlinePublished: outlinePublished as string | null | undefined,
     approvalType: approvalType as string | null | undefined,
+    isScotch: isScotchTournament,
+    teamScoreLimit: isScotchTournament ? teamLimitValue : null,
+    teamScoreRule: isScotchTournament ? (teamScoreRule === "LT" ? "LT" : "LTE") : null,
     rule: rule && typeof rule === "object" ? rule : null,
     verification: verificationNorm.data,
   };

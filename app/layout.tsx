@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { getCommonGlobalData } from "@/lib/common-page-data";
 import { DEFAULT_PRIMARY_COLOR, DEFAULT_SECONDARY_COLOR } from "@/lib/site-settings";
 import {
   resolveSiteThemeCssTokens,
@@ -10,6 +9,7 @@ import {
 import { SiteSettingsProvider } from "@/components/SiteSettingsProvider";
 import { SiteThemeStyles } from "@/components/SiteThemeStyles";
 import { SITE_NAME, DEFAULT_SITE_URL } from "@/lib/site-settings";
+import { getSiteSettings } from "@/lib/site-settings";
 import { RootLayoutChrome } from "./RootLayoutChrome";
 
 export const viewport: Viewport = {
@@ -26,7 +26,7 @@ function getSiteUrl(): string {
 export async function generateMetadata(): Promise<Metadata> {
   const baseUrl = getSiteUrl();
   try {
-    const { siteSettings } = await getCommonGlobalData();
+    const siteSettings = await getSiteSettings();
     const title = siteSettings.siteName || SITE_NAME;
     const description =
       siteSettings.siteDescription || "당구 대회, 모임, 레슨을 한 곳에서.";
@@ -81,10 +81,9 @@ export default async function RootLayout({
     headerActiveColor: null as string | null,
   };
 
-  const globalData = await getCommonGlobalData().catch(() => null);
-
-  if (globalData) {
-    settings = globalData.siteSettings;
+  const siteSettings = await getSiteSettings().catch(() => null);
+  if (siteSettings) {
+    settings = siteSettings;
   }
 
   const themeTokens = resolveSiteThemeCssTokens({

@@ -1,8 +1,10 @@
 /**
  * 본선/단판 Match 진행 상태 — READY, 승자 전파, 부전승 연쇄, 동기화.
+ *
+ * 레거시 이름은 유지하지만 내부 저장소는 `BracketMatch`다.
  */
 
-import type { PrismaClient, TournamentFinalMatch } from "@/generated/prisma";
+import type { PrismaClient, BracketMatch } from "@/generated/prisma";
 
 export async function fillNextWinnerSlot(
   db: PrismaClient,
@@ -11,33 +13,32 @@ export async function fillNextWinnerSlot(
   winnerEntryId: string
 ): Promise<void> {
   const data = slot === "A" ? { entryIdA: winnerEntryId } : { entryIdB: winnerEntryId };
-  await db.tournamentFinalMatch.update({
+  await db.bracketMatch.update({
     where: { id: nextMatchId },
     data: data as Record<string, unknown>,
   });
 }
 
 /**
- * 양쪽 선수 배정 시 READY, 인원 부족 시 PENDING으로 되돌림. COMPLETED/BYE/IN_PROGRESS는 유지(단, 진행 중 선수 빠짐은 PENDING).
+ * 양쪽 선수 배정 시 READY, 인원 부족 시 PENDING으로 되돌림.
  */
 export async function refreshMatchProgressState(
   db: PrismaClient,
   tournamentId: string,
   matchId: string
 ): Promise<void> {
-  const m = await db.tournamentFinalMatch.findFirst({
-    where: { id: matchId, tournamentId },
+  const m = await db.bracketMatch.findFirst({
+    where: { id: matchId, bracket: { tournamentId } },
   });
   if (!m) return;
-  if (m.status === "COMPLETED") return;
-  if (m.status === "BYE") return;
+  if (m.status === "COMPLETED" || m.isBye) return;
 
   const hasA = m.entryIdA != null && m.entryIdA !== "";
   const hasB = m.entryIdB != null && m.entryIdB !== "";
 
   if (!hasA || !hasB) {
     if (m.status === "READY" || m.status === "IN_PROGRESS") {
-      await db.tournamentFinalMatch.update({
+      await db.bracketMatch.update({
         where: { id: matchId },
         data: { status: "PENDING" },
       });
@@ -46,7 +47,7 @@ export async function refreshMatchProgressState(
   }
 
   if (m.status === "PENDING") {
-    await db.tournamentFinalMatch.update({
+    await db.bracketMatch.update({
       where: { id: matchId },
       data: { status: "READY" },
     });
@@ -59,7 +60,7 @@ export async function refreshMatchProgressState(
 export async function onMatchCompletedWithWinner(
   db: PrismaClient,
   tournamentId: string,
-  completed: TournamentFinalMatch
+  completed: BracketMatch
 ): Promise<void> {
   if (!completed.winnerEntryId || !completed.nextMatchId || !completed.nextSlot) return;
 
@@ -70,28 +71,28 @@ export async function onMatchCompletedWithWinner(
   let cursor: string | null = completed.nextMatchId;
   for (let guard = 0; guard < 64; guard++) {
     if (!cursor) break;
-    const m: TournamentFinalMatch | null = await db.tournamentFinalMatch.findFirst({
-      where: { id: cursor, tournamentId },
+    const m: BracketMatch | null = await db.bracketMatch.findFirst({
+      where: { id: cursor, bracket: { tournamentId } },
     });
     if (!m) break;
 
-    if (m.status !== "BYE") break;
+    if (!m.isBye) break;
 
-    const sole =
-      m.entryIdA && !m.entryIdB ? m.entryIdA : !m.entryIdA && m.entryIdB ? m.entryIdB : null;
+    const sole = m.entryIdA && !m.entryIdB ? m.entryIdA : !m.entryIdA && m.entryIdB ? m.entryIdB : null;
     if (!sole) break;
 
-    await db.tournamentFinalMatch.update({
+    await db.bracketMatch.update({
       where: { id: m.id },
       data: {
         winnerEntryId: sole,
         status: "COMPLETED",
         scoreA: m.entryIdA ? 1 : 0,
         scoreB: m.entryIdB ? 1 : 0,
-      } as Record<string, unknown>,
+        completedAt: new Date(),
+      },
     });
 
-    const u: TournamentFinalMatch | null = await db.tournamentFinalMatch.findUnique({
+    const u: BracketMatch | null = await db.bracketMatch.findUnique({
       where: { id: m.id },
     });
     if (!u?.winnerEntryId || !u.nextMatchId || !u.nextSlot) {
@@ -112,36 +113,36 @@ export async function syncBracketMatchProgressStates(
   tournamentId: string
 ): Promise<void> {
   for (let pass = 0; pass < 12; pass++) {
-    const list = await db.tournamentFinalMatch.findMany({
-      where: { tournamentId },
-      orderBy: [{ roundIndex: "asc" }, { matchIndex: "asc" }],
+    const list = await db.bracketMatch.findMany({
+      where: { bracket: { tournamentId } },
+      orderBy: [{ round: { roundNumber: "asc" } }, { matchNumber: "asc" }],
     });
 
     let progressed = false;
     for (const m of list) {
-      if (m.status !== "BYE") continue;
-      const sole =
-        m.entryIdA && !m.entryIdB ? m.entryIdA : !m.entryIdA && m.entryIdB ? m.entryIdB : null;
+      if (!m.isBye) continue;
+      const sole = m.entryIdA && !m.entryIdB ? m.entryIdA : !m.entryIdA && m.entryIdB ? m.entryIdB : null;
       if (!sole) continue;
 
-      await db.tournamentFinalMatch.update({
+      await db.bracketMatch.update({
         where: { id: m.id },
         data: {
           winnerEntryId: sole,
           status: "COMPLETED",
           scoreA: m.entryIdA ? 1 : 0,
           scoreB: m.entryIdB ? 1 : 0,
-        } as Record<string, unknown>,
+          completedAt: new Date(),
+        },
       });
 
-      const u = await db.tournamentFinalMatch.findUnique({ where: { id: m.id } });
+      const u = await db.bracketMatch.findUnique({ where: { id: m.id } });
       if (u?.winnerEntryId && u.nextMatchId && u.nextSlot) {
         await onMatchCompletedWithWinner(db, tournamentId, u);
       }
       progressed = true;
     }
 
-    for (const m of await db.tournamentFinalMatch.findMany({ where: { tournamentId } })) {
+    for (const m of list) {
       await refreshMatchProgressState(db, tournamentId, m.id);
     }
 

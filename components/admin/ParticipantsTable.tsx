@@ -75,6 +75,9 @@ type Entry = {
   id: string;
   userId: string;
   userName: string;
+  displayName?: string | null;
+  playerAName?: string | null;
+  playerBName?: string | null;
   userPhone: string | null;
   handicap: string | null;
   avg: string | null;
@@ -93,7 +96,7 @@ type Entry = {
 };
 
 function entryDisplayName(e: Entry): string {
-  return e.slotNumber > 1 ? `${e.userName} (슬롯${e.slotNumber})` : e.userName;
+  return e.displayName ?? (e.slotNumber > 1 ? `${e.userName} (슬롯${e.slotNumber})` : e.userName);
 }
 
 export function ParticipantsTable({
@@ -119,6 +122,7 @@ export function ParticipantsTable({
       const q = search.trim().toLowerCase();
       list = list.filter(
         (e) =>
+          (e.displayName && e.displayName.toLowerCase().includes(q)) ||
           (e.userName && e.userName.toLowerCase().includes(q)) ||
           (e.depositorName && e.depositorName.toLowerCase().includes(q))
       );

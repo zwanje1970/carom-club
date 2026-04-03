@@ -108,6 +108,9 @@ export const TOURNAMENT_SELECT_BASIC = {
   maxParticipants: true,
   status: true,
   tournamentStage: true,
+  isScotch: true,
+  teamScoreLimit: true,
+  teamScoreRule: true,
   approvalType: true,
   rules: true,
   promoContent: true,
@@ -161,6 +164,9 @@ export const TOURNAMENT_SELECT_ADMIN_EDIT = {
   venueName: true,
   status: true,
   gameFormat: true,
+  isScotch: true,
+  teamScoreLimit: true,
+  teamScoreRule: true,
 } satisfies Prisma.TournamentSelect;
 
 /** @deprecated TOURNAMENT_SELECT_LIST 사용 */

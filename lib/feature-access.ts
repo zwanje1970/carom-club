@@ -37,7 +37,7 @@ export async function isAnnualMembershipActive(orgId: string): Promise<boolean> 
   if (activeSub) return true;
 
   // 기존 ClientMembership 유효기간 (레거시 호환)
-  const membership = await prisma.clientMembership.findFirst({
+  const membership = await prisma.organizationMembership.findFirst({
     where: { organizationId: orgId },
     orderBy: { validUntil: "desc" },
   });

@@ -40,6 +40,9 @@ export type ConsoleParticipantRow = {
   id: string;
   userId: string;
   userName: string;
+  displayName?: string | null;
+  playerAName?: string | null;
+  playerBName?: string | null;
   userPhone: string | null;
   userEmail: string | null;
   handicap: string | null;
@@ -217,6 +220,7 @@ export function ClientOperationsParticipantsPanel({
       const q = search.trim().toLowerCase();
       list = list.filter(
         (e) =>
+          (e.displayName && e.displayName.toLowerCase().includes(q)) ||
           e.userName.toLowerCase().includes(q) ||
           (e.depositorName && e.depositorName.toLowerCase().includes(q)) ||
           (e.userPhone && e.userPhone.includes(q)) ||
@@ -564,7 +568,7 @@ export function ClientOperationsParticipantsPanel({
                             </ConsoleTableTd>
                             <ConsoleTableTd className="max-w-[7rem] font-medium">
                               <span className="line-clamp-2">
-                                {e.slotNumber > 1 ? `${e.userName} (슬롯${e.slotNumber})` : e.userName}
+                                {e.displayName ?? (e.slotNumber > 1 ? `${e.userName} (슬롯${e.slotNumber})` : e.userName)}
                               </span>
                             </ConsoleTableTd>
                             <ConsoleTableTd className="max-w-[9rem] text-[11px]">
@@ -695,7 +699,7 @@ export function ClientOperationsParticipantsPanel({
                       </ConsoleTableTd>
                       <ConsoleTableTd className="max-w-[7rem] font-medium">
                         <span className="line-clamp-2">
-                          {e.slotNumber > 1 ? `${e.userName} (슬롯${e.slotNumber})` : e.userName}
+                          {e.displayName ?? (e.slotNumber > 1 ? `${e.userName} (슬롯${e.slotNumber})` : e.userName)}
                         </span>
                       </ConsoleTableTd>
                       <ConsoleTableTd className="max-w-[9rem] text-[11px]">

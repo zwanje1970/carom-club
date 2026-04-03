@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getPublicTournamentOrNull } from "@/lib/public-tournament";
+import { fetchOrImportZoneBracketSnapshotByZoneId } from "@/lib/bracket-match-service";
 
 /** 공개 권역 상세. 참가자 수, 경기 수 등. */
 export async function GET(
@@ -17,13 +18,15 @@ export async function GET(
   });
   if (!tz) return NextResponse.json({ error: "권역을 찾을 수 없습니다." }, { status: 404 });
 
-  const [matchTotal, matchCompleted, participantCount] = await Promise.all([
-    prisma.tournamentZoneMatch.count({ where: { tournamentZoneId: tzId } }),
-    prisma.tournamentZoneMatch.count({ where: { tournamentZoneId: tzId, status: "COMPLETED" } }),
-    prisma.tournamentEntryZoneAssignment.count({
-      where: { tournamentZoneId: tzId, entry: { status: "CONFIRMED" } },
+  const [bracket, participantCount] = await Promise.all([
+    fetchOrImportZoneBracketSnapshotByZoneId(tournamentId, tzId),
+    prisma.tournamentEntry.count({
+      where: { tournamentId, zoneId: tzId, status: "CONFIRMED" },
     }),
   ]);
+  const matches = bracket?.rounds.flatMap((round) => round.matches) ?? [];
+  const matchTotal = matches.length;
+  const matchCompleted = matches.filter((m) => m.status === "COMPLETED").length;
 
   return NextResponse.json({
     tournamentId,

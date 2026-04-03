@@ -54,7 +54,7 @@ export async function loadClientOperationsDashboard(orgId: string): Promise<Clie
       where: {
         organizationId: orgId,
         participantRosterLockedAt: { not: null },
-        finalMatches: { none: {} },
+        brackets: { none: { kind: "MAIN" } },
         status: { notIn: ["DRAFT", "HIDDEN", "FINISHED"] },
       },
     }),
@@ -78,13 +78,13 @@ export async function loadClientOperationsDashboard(orgId: string): Promise<Clie
       take: 8,
       select: { id: true, name: true, status: true, updatedAt: true },
     }),
-    prisma.tournamentFinalMatchAuditLog.findMany({
+    prisma.bracketAuditLog.findMany({
       where: { tournament: { organizationId: orgId } },
       orderBy: { createdAt: "desc" },
       take: 8,
       select: {
         createdAt: true,
-        action: true,
+        actionType: true,
         matchId: true,
         tournament: { select: { name: true } },
       },
@@ -97,9 +97,9 @@ export async function loadClientOperationsDashboard(orgId: string): Promise<Clie
     (t) => getKstYmd(new Date(t.startAt)) === todayKst
   );
 
-  const todayMatchRows = await prisma.tournamentFinalMatch.findMany({
+  const todayMatchRows = await prisma.bracketMatch.findMany({
     where: {
-      tournament: { organizationId: orgId },
+      bracket: { tournament: { organizationId: orgId }, kind: "MAIN" },
       scheduledStartAt: {
         gte: new Date(`${todayKst}T00:00:00+09:00`),
         lt: new Date(`${todayKst}T23:59:59.999+09:00`),
@@ -109,21 +109,20 @@ export async function loadClientOperationsDashboard(orgId: string): Promise<Clie
     take: 20,
     select: {
       id: true,
-      tournamentId: true,
-      roundIndex: true,
-      matchIndex: true,
+      bracket: { select: { tournamentId: true, tournament: { select: { name: true } } } },
+      round: { select: { roundNumber: true } },
+      matchNumber: true,
       status: true,
       scheduledStartAt: true,
-      tournament: { select: { name: true } },
     },
   });
 
   const todayMatches = todayMatchRows.map((m) => ({
     id: m.id,
-    tournamentId: m.tournamentId,
-    tournamentName: m.tournament.name,
-    roundIndex: m.roundIndex,
-    matchIndex: m.matchIndex,
+    tournamentId: m.bracket.tournamentId,
+    tournamentName: m.bracket.tournament.name,
+    roundIndex: m.round.roundNumber,
+    matchIndex: m.matchNumber,
     status: m.status,
     scheduledStartAt: m.scheduledStartAt,
   }));
@@ -188,8 +187,8 @@ export async function loadClientOperationsDashboard(orgId: string): Promise<Clie
     recentAudit: recentAuditLogs.map((a) => ({
       at: a.createdAt,
       tournamentName: a.tournament.name,
-      action: a.action,
-      matchId: a.matchId,
+      action: a.actionType,
+      matchId: a.matchId ?? "",
     })),
     alerts,
   };

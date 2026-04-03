@@ -44,6 +44,7 @@ export default function NotificationBanner() {
   }
 
   if (pathname?.toLowerCase() === "/notifications-popup") return null;
+  if (pathname?.startsWith("/tv")) return null;
   if (notifications.length === 0 || dismissed) return null;
 
   return (

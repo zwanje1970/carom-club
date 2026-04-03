@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { ORGANIZATION_SELECT_OWNER } from "@/lib/db-selects";
 import { canManageTournament } from "@/lib/permissions";
 import { isQualifierLocked } from "@/lib/tournament-stage";
+import { autoAssignTournamentEntriesToZones } from "@/lib/tournaments/national";
 
 /** 자동 배정: 미배정 참가자를 권역에 균등 분배. POST → canManageTournament */
 export async function POST(
@@ -29,43 +30,16 @@ export async function POST(
     );
   }
 
-  const [unassignedEntries, tournamentZones] = await Promise.all([
-    prisma.tournamentEntry.findMany({
-      where: {
-        tournamentId,
-        zoneAssignment: null,
-      },
-      orderBy: [{ status: "asc" }, { waitingListOrder: "asc" }, { createdAt: "asc" }],
-    }),
-    prisma.tournamentZone.findMany({
-      where: { tournamentId },
-      orderBy: { sortOrder: "asc" },
-    }),
-  ]);
-
+  const tournamentZones = await prisma.tournamentZone.findMany({
+    where: { tournamentId },
+    orderBy: { sortOrder: "asc" },
+  });
   if (tournamentZones.length === 0) {
     return NextResponse.json({ error: "권역이 없습니다. 먼저 부/권역 설정에서 권역을 연결해 주세요." }, { status: 400 });
   }
-  if (unassignedEntries.length === 0) {
+  const result = await autoAssignTournamentEntriesToZones(tournamentId, session.id);
+  if (result.assigned === 0) {
     return NextResponse.json({ assigned: 0, message: "미배정 참가자가 없습니다." });
   }
-
-  let zoneIndex = 0;
-  const created: { id: string; entryId: string; tournamentZoneId: string }[] = [];
-
-  for (const entry of unassignedEntries) {
-    const tz = tournamentZones[zoneIndex % tournamentZones.length];
-    const a = await prisma.tournamentEntryZoneAssignment.create({
-      data: {
-        tournamentEntryId: entry.id,
-        tournamentZoneId: tz.id,
-        assignmentType: "AUTO",
-        assignedByUserId: session.id,
-      },
-    });
-    created.push({ id: a.id, entryId: entry.id, tournamentZoneId: tz.id });
-    zoneIndex++;
-  }
-
-  return NextResponse.json({ assigned: created.length, assignments: created });
+  return NextResponse.json({ assigned: result.assigned, assignments: result.assignments });
 }

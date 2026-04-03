@@ -4,6 +4,7 @@ import { assertClientCanMutateTournamentById } from "@/lib/client-tournament-acc
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { getDisplayName } from "@/lib/display-name";
+import { formatTournamentEntryDisplayName } from "@/lib/tournament-entry-display";
 import {
   parseVerificationOcrStatus,
   parseVerificationReviewStatus,
@@ -40,6 +41,7 @@ export async function GET(
       divisionEnabled: true,
       divisionMetricType: true,
       divisionRulesJson: true,
+      isScotch: true,
       certificationRequestMode: true,
       manualReviewRequired: true,
       rule: { select: { maxEntries: true, useWaiting: true } },
@@ -69,6 +71,21 @@ export async function GET(
     avgProofUrl: e.avgProofUrl ?? e.user.memberProfile?.avgProofUrl ?? null,
     depositorName: e.depositorName,
     clubOrAffiliation: e.clubOrAffiliation ?? null,
+    displayName: formatTournamentEntryDisplayName({
+      displayName: e.displayName,
+      playerAName: e.playerAName,
+      playerBName: e.playerBName,
+      user: e.user,
+      slotNumber: e.slotNumber,
+      isScotch: tournament.isScotch === true,
+    }),
+    playerAName: e.playerAName ?? null,
+    playerAScore: e.playerAScore ?? null,
+    playerAProof: e.playerAProof ?? null,
+    playerBName: e.playerBName ?? null,
+    playerBScore: e.playerBScore ?? null,
+    playerBProof: e.playerBProof ?? null,
+    teamTotalScore: e.teamTotalScore ?? null,
     round: e.round ?? null,
     status: e.status,
     waitingListOrder: e.waitingListOrder,

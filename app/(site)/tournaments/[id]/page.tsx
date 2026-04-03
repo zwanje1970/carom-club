@@ -74,6 +74,7 @@ export default async function TournamentDetailPage({
         startAt: mock.startAt,
         endAt: mock.endAt ?? null,
         gameFormat: mock.gameFormat,
+        isScotch: mock.isScotch ?? false,
         status: mock.status,
         organizationId: mock.organization.id,
         organization: mock.organization,
@@ -98,6 +99,7 @@ export default async function TournamentDetailPage({
       startAt: mock.startAt,
       endAt: mock.endAt ?? null,
       gameFormat: mock.gameFormat,
+      isScotch: mock.isScotch ?? false,
       status: mock.status,
       organizationId: mock.organization.id,
       organization: mock.organization,
@@ -125,6 +127,7 @@ export default async function TournamentDetailPage({
     startAt: Date;
     endAt: Date | null;
     gameFormat: string | null;
+    isScotch?: boolean;
     status: string;
     entryFee: number | null;
     prizeInfo: string | null;
@@ -203,6 +206,7 @@ export default async function TournamentDetailPage({
     startAt: t.startAt,
     endAt: t.endAt,
     gameFormat: t.gameFormat ?? null,
+    isScotch: t.isScotch === true,
     status: t.status,
     entryFee: t.entryFee ?? t.rule?.entryFee ?? null,
     prizeInfo: t.prizeInfo ?? null,

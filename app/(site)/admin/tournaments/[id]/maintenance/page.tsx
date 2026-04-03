@@ -33,8 +33,8 @@ export default async function AdminTournamentMaintenancePage({
   });
   if (!tournament) notFound();
 
-  const zoneMatchCount = await prisma.tournamentZoneMatch.count({
-    where: { tournamentZoneId: { in: tournament.tournamentZones.map((z) => z.id) } },
+  const zoneMatchCount = await prisma.bracketMatch.count({
+    where: { bracket: { tournamentId: id, kind: "ZONE" } },
   });
 
   return (

@@ -102,7 +102,7 @@ export async function updatePlatformSettings(data: {
 export async function hasActiveClientMembership(organizationId: string): Promise<boolean> {
   if (!isDatabaseConfigured()) return false;
   const now = new Date();
-  const active = await prisma.clientMembership.findFirst({
+  const active = await prisma.organizationMembership.findFirst({
     where: {
       organizationId,
       validUntil: { gte: now },
