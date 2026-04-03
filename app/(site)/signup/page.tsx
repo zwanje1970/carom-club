@@ -60,12 +60,12 @@ export default function SignupPage() {
 
   const labelClass = "mb-1.5 block text-sm font-medium text-site-text";
   const inputClass =
-    "w-full rounded-lg border border-site-border bg-site-card px-3 py-2.5 text-sm font-input-halfwidth text-site-text placeholder:text-gray-400 focus:border-site-primary focus:outline-none focus:ring-2 focus:ring-site-primary/20";
+    "w-full rounded-lg border border-site-border bg-white px-3 py-2.5 text-sm font-input-halfwidth text-site-text placeholder:text-gray-400 focus:border-site-primary focus:outline-none focus:ring-2 focus:ring-site-primary/20";
   const helperClass = "mt-1 text-xs text-gray-500";
 
   return (
     <main className="min-h-screen bg-site-bg px-4 py-8 sm:py-10">
-      <div className="mx-auto w-full max-w-2xl">
+      <div className="mx-auto w-full max-w-[38rem]">
         <div className="rounded-2xl border border-site-border bg-site-card p-5 shadow-sm sm:p-7">
           <div className="mb-6 text-center sm:mb-8">
             <h1 className="text-2xl font-bold tracking-tight text-site-text sm:text-3xl">회원가입</h1>
@@ -107,11 +107,11 @@ export default function SignupPage() {
                 <label className={labelClass}>
                   닉네임 <span className="text-red-500">*</span>
                 </label>
-                <div className="flex flex-col gap-2 sm:flex-row">
+                <div className="relative">
                   <input
                     type="text"
                     required
-                    className={inputClass}
+                    className={`${inputClass} pr-28`}
                     value={form.username}
                     onChange={(e) => {
                       setForm((f) => ({ ...f, username: toHalfwidth(e.target.value) }));
@@ -142,7 +142,7 @@ export default function SignupPage() {
                         setCheckLoading(false);
                       }
                     }}
-                    className="shrink-0 rounded-lg border border-site-border bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 sm:min-w-[112px]"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md border border-site-border bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                   >
                     {checkLoading ? "확인 중..." : "중복 체크"}
                   </button>
@@ -173,21 +173,23 @@ export default function SignupPage() {
               </div>
 
               <div className="sm:col-span-2">
-                <label className={labelClass}>
-                  주소 <span className="text-gray-400">(선택)</span>
-                </label>
-                <div className="flex flex-col gap-2 sm:flex-row">
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <label className="block text-sm font-medium text-site-text">
+                    주소 <span className="text-gray-400">(선택)</span>
+                  </label>
+                  <AddressSearchButton
+                    onSelect={(r) => setForm((f) => ({ ...f, address: r.address }))}
+                    label="주소 검색"
+                    className="shrink-0 rounded-lg border border-site-border bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
                   <input
                     type="text"
                     className={inputClass}
                     placeholder="주소 검색 버튼을 눌러 기본주소를 입력하세요"
                     value={form.address}
                     onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                  />
-                  <AddressSearchButton
-                    onSelect={(r) => setForm((f) => ({ ...f, address: r.address }))}
-                    label="주소 검색"
-                    className="shrink-0 rounded-lg border border-site-border bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:min-w-[112px]"
                   />
                 </div>
                 <input

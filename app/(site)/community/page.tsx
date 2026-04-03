@@ -11,6 +11,7 @@ export default async function CommunityPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  console.time("community_page_total");
   const sp = await searchParams;
   const rawCategory = typeof sp.category === "string" ? sp.category : "all";
   const category =
@@ -20,6 +21,7 @@ export default async function CommunityPage({
     rawCategory === "notice"
       ? rawCategory
       : "all";
+  console.timeEnd("community_page_total");
 
   return (
     <Suspense fallback={<CommunityLoading />}>

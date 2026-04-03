@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { getDisplayName } from "@/lib/display-name";
 import { formatTournamentEntryDisplayName } from "@/lib/tournament-entry-display";
 import { getTournamentEntries } from "@/lib/db-tournaments";
@@ -55,20 +56,30 @@ export async function TournamentDetailWithEntries({
   participantsListPublic,
   allowMultipleSlots,
 }: TournamentDetailWithEntriesProps) {
-  const [entries, session] = await Promise.all([
-    getTournamentEntries(tournamentId),
-    getSession(),
-  ]);
-  const myEntries = session
-    ? entries.filter((e) => e.userId === session.id).map((e) => ({
-        id: e.id,
-        status: e.status,
-        waitingListOrder: e.waitingListOrder,
-        paymentMarkedByApplicantAt: e.paymentMarkedByApplicantAt?.toISOString() ?? null,
-        slotNumber: e.slotNumber ?? 1,
-      }))
+  console.time("tournament_participants");
+  const session = await getSession();
+  console.time("tournament_participants_count");
+  const confirmedCount = await getTournamentEntriesCountOnly(tournamentId);
+  console.timeEnd("tournament_participants_count");
+
+  console.time("tournament_participants_my_entries");
+  const myEntriesRows = session
+    ? await getTournamentMyEntriesOnly(tournamentId, session.id)
     : [];
-  const confirmedCount = entries.filter((e) => e.status === "CONFIRMED").length;
+  console.timeEnd("tournament_participants_my_entries");
+
+  const shouldLoadEntriesList = currentTab === "participants" && participantsListPublic;
+  console.time("tournament_participants_entries_list");
+  const entries = shouldLoadEntriesList ? await getTournamentEntries(tournamentId) : [];
+  console.timeEnd("tournament_participants_entries_list");
+  console.timeEnd("tournament_participants");
+  const myEntries = myEntriesRows.map((e) => ({
+    id: e.id,
+    status: e.status,
+    waitingListOrder: e.waitingListOrder,
+    paymentMarkedByApplicantAt: e.paymentMarkedByApplicantAt?.toISOString() ?? null,
+    slotNumber: e.slotNumber ?? 1,
+  }));
   const entriesForView = entries.map((e) => ({
     id: e.id,
     userId: e.userId,
@@ -126,4 +137,24 @@ export async function TournamentDetailWithEntries({
       entries={entriesForView}
     />
   );
+}
+
+async function getTournamentEntriesCountOnly(tournamentId: string): Promise<number> {
+  return prisma.tournamentEntry.count({
+    where: { tournamentId, status: "CONFIRMED" },
+  });
+}
+
+async function getTournamentMyEntriesOnly(tournamentId: string, userId: string) {
+  return prisma.tournamentEntry.findMany({
+    where: { tournamentId, userId },
+    select: {
+      id: true,
+      status: true,
+      waitingListOrder: true,
+      paymentMarkedByApplicantAt: true,
+      slotNumber: true,
+    },
+    orderBy: [{ createdAt: "asc" }],
+  });
 }

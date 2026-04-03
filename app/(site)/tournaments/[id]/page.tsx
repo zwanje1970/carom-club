@@ -52,14 +52,17 @@ export default async function TournamentDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ tab?: string }>;
 }) {
+  console.time("tournament_page_total");
   const { id } = await params;
   const { tab: tabParam } = await searchParams;
 
+  console.time("tournament_main");
   const dbStart = Date.now();
   const [tournamentFromDb, common] = await Promise.all([
     isDatabaseConfigured() ? getTournamentBasic(id) : Promise.resolve(null),
     getCommonPageData("tournaments"),
   ]);
+  console.timeEnd("tournament_main");
   let tournament = tournamentFromDb;
   let useMock = false;
   if (!tournament && isDatabaseConfigured()) {
@@ -248,6 +251,7 @@ export default async function TournamentDetailPage({
     participantsListPublic,
     allowMultipleSlots,
   };
+  console.timeEnd("tournament_page_total");
   logServerTiming("page");
 
   if (useMock) {

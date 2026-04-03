@@ -14,13 +14,19 @@ type Props = {
 
 /** 공통 데이터 + 대회 목록 병렬 페칭 후 클라이언트 목록에 전달 */
 export async function TournamentsListBlock({ searchParams: sp }: Props) {
+  console.time("tournaments_list_block_total");
   const t0 = Date.now();
   const parsed = parsePublicTournamentsQuery(sp);
+  console.time("tournaments_list_block_common");
+  const commonPromise = getCommonPageData("tournaments");
+  console.time("tournaments_list_block_data");
+  const listPromise = getPublicTournamentsListFromQuery(sp);
   const [{ copy }, { list: initialTournaments }] = await Promise.all([
-    getCommonPageData("tournaments"),
-    getPublicTournamentsListFromQuery(sp),
+    commonPromise.finally(() => console.timeEnd("tournaments_list_block_common")),
+    listPromise.finally(() => console.timeEnd("tournaments_list_block_data")),
   ]);
   logServerTiming("fetch_tournaments", t0);
+  console.timeEnd("tournaments_list_block_total");
   const initialHasMore = initialTournaments.length === parsed.take;
   const c = copy as Record<AdminCopyKey, string>;
 

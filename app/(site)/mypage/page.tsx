@@ -12,7 +12,10 @@ import { isPlatformAdmin } from "@/types/auth";
 import { canShowNoteEntry } from "@/lib/entry-visibility";
 
 export default async function MypagePage() {
+  console.time("mypage_total");
+  console.time("mypage_session");
   const session = await getSession();
+  console.timeEnd("mypage_session");
   if (!session) {
     redirect("/login");
   }
@@ -22,6 +25,7 @@ export default async function MypagePage() {
 
   if (isDatabaseConfigured()) {
     try {
+      console.time("mypage_main_query");
       user = await prisma.user.findUnique({
         where: { id: session.id },
         select: {
@@ -29,7 +33,9 @@ export default async function MypagePage() {
           name: true,
         },
       });
+      console.timeEnd("mypage_main_query");
     } catch {
+      console.timeEnd("mypage_main_query");
       user = {
         id: session.id,
         name: session.name,
@@ -44,6 +50,7 @@ export default async function MypagePage() {
   if (!user) {
     redirect("/login");
   }
+  console.timeEnd("mypage_total");
 
   const sessionInfo = {
     name: session.name,

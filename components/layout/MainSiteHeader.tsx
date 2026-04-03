@@ -63,6 +63,32 @@ export function MainSiteHeader({ hideOnMobile = false }: MainSiteHeaderProps) {
       ? { color: headerActive }
       : { color: headerText };
 
+  const prewarmRoute = (href: string) => {
+    if (href === "/community") {
+      fetch("/api/community/main?take=10", {
+        method: "GET",
+        credentials: "include",
+        cache: "force-cache",
+      }).catch(() => {});
+      return;
+    }
+    if (href === "/tournaments") {
+      fetch("/api/public/tournaments?tab=upcoming&sortBy=date&take=20&skip=0", {
+        method: "GET",
+        credentials: "include",
+        cache: "force-cache",
+      }).catch(() => {});
+      return;
+    }
+    if (href === "/mypage") {
+      fetch("/api/auth/session", {
+        method: "GET",
+        credentials: "include",
+        cache: "force-cache",
+      }).catch(() => {});
+    }
+  };
+
   return (
     <header
       className={`sticky top-0 z-20 h-16 min-h-[64px] border-b relative flex items-center transition-colors ${hideOnMobile ? "hidden md:flex" : ""}`}
@@ -91,6 +117,10 @@ export function MainSiteHeader({ hideOnMobile = false }: MainSiteHeaderProps) {
               <Link
                 key={href}
                 href={href}
+                prefetch={false}
+                onMouseEnter={() => prewarmRoute(href)}
+                onFocus={() => prewarmRoute(href)}
+                onClick={() => prewarmRoute(href)}
                 className="text-sm font-medium transition hover:opacity-90"
                 style={linkStyle(isActive)}
               >
@@ -103,6 +133,7 @@ export function MainSiteHeader({ hideOnMobile = false }: MainSiteHeaderProps) {
             <>
               <Link
                 href="/community/notifications"
+                prefetch={false}
                 className="relative inline-flex items-center justify-center w-9 h-9 rounded-full hover:opacity-90"
                 style={{ color: headerText }}
                 aria-label={notificationUnread > 0 ? `알림 ${notificationUnread}건` : "알림"}
@@ -118,6 +149,10 @@ export function MainSiteHeader({ hideOnMobile = false }: MainSiteHeaderProps) {
               </Link>
               <Link
                 href="/mypage"
+                prefetch={false}
+                onMouseEnter={() => prewarmRoute("/mypage")}
+                onFocus={() => prewarmRoute("/mypage")}
+                onClick={() => prewarmRoute("/mypage")}
                 className="text-sm font-medium transition hover:opacity-90"
                 style={linkStyle(pathname === "/mypage")}
               >
@@ -126,6 +161,7 @@ export function MainSiteHeader({ hideOnMobile = false }: MainSiteHeaderProps) {
               {user?.loginMode === "client" && (
                 <Link
                   href="/client/dashboard"
+                  prefetch={false}
                   className="text-sm font-medium transition hover:opacity-90"
                   style={linkStyle(pathname?.startsWith("/client") ?? false)}
                 >
@@ -144,6 +180,7 @@ export function MainSiteHeader({ hideOnMobile = false }: MainSiteHeaderProps) {
           ) : (
             <Link
               href="/login"
+              prefetch={false}
               className="text-sm font-medium transition hover:opacity-90"
               style={linkStyle(pathname === "/login" || pathname === "/signup")}
             >

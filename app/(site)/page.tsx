@@ -18,15 +18,21 @@ export const revalidate = 60;
 
 /** 홈: `PageRenderer` 단일 스택 + 히어로 슬롯 보정. 구조 슬롯 데이터는 `buildHomeSlotRenderPayload`. */
 export default async function HomePage() {
+  console.time("home_page_total");
   getServerTiming();
+  console.time("home_main_query");
   const common = await getCommonPageData("home");
+  console.timeEnd("home_main_query");
   const { copy, noticeBars, popups, pageBlocks, siteSettings } = common;
+  console.time("home_secondary_query");
   const [heroSettings, homeSlotPayload] = await Promise.all([
     getHeroSettings(),
     buildHomeSlotRenderPayload({ copy, siteSettings }),
   ]);
+  console.timeEnd("home_secondary_query");
   const pageBlocksRendered = applyPublicHeroSingleCanonical("home", pageBlocks);
   const hasHeroSlot = pageBlocksRendered.some((b) => b.slotType === "hero");
+  console.timeEnd("home_page_total");
   logServerTiming("fetch_sections");
   logServerTiming("page");
 

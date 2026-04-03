@@ -11,10 +11,13 @@ export async function CommunityHomeInner({
 }: {
   category: "all" | "free" | "qna" | "notice";
 }) {
+  console.time("community_home_total");
+  console.time("community_home_main_query");
   const [common, communityPayload] = await Promise.all([
     getCommonPageData("community"),
     buildCommunityHomeSlotCommunityPayload(category),
   ]);
+  console.timeEnd("community_home_main_query");
   const { noticeBars, popups, pageBlocks, copy } = common;
   const pageBlocksRendered = applyPublicHeroSingleCanonical("community", pageBlocks);
   const hasPostListSlot = pageBlocksRendered.some((b) => b.slotType === "postList");
@@ -23,6 +26,7 @@ export async function CommunityHomeInner({
     page: "community" as const,
     community: { ...communityPayload, copy },
   };
+  console.timeEnd("community_home_total");
 
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
@@ -31,6 +35,7 @@ export async function CommunityHomeInner({
       {!hasPostListSlot ? (
         <PageContentContainer className="py-6">
           <CommunityMainClient
+            key={category}
             copy={copy}
             latest={communityPayload.latest}
             initialCategory={category}

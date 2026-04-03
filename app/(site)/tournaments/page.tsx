@@ -21,11 +21,16 @@ async function TournamentsMainBody({
 }: {
   searchParams: Record<string, string | string[] | undefined>;
 }) {
+  console.time("tournaments_page_total");
   const t0 = Date.now();
   const parsed = parsePublicTournamentsQuery(searchParams);
+  console.time("tournaments_page_common");
+  const commonPromise = getCommonPageData("tournaments");
+  console.time("tournaments_page_list");
+  const listPromise = getPublicTournamentsListFromQuery(searchParams);
   const [common, listRes] = await Promise.all([
-    getCommonPageData("tournaments"),
-    getPublicTournamentsListFromQuery(searchParams),
+    commonPromise.finally(() => console.timeEnd("tournaments_page_common")),
+    listPromise.finally(() => console.timeEnd("tournaments_page_list")),
   ]);
   logServerTiming("fetch_tournaments", t0);
   const { noticeBars, popups, pageBlocks, copy } = common;
@@ -47,6 +52,7 @@ async function TournamentsMainBody({
       },
     },
   };
+  console.timeEnd("tournaments_page_total");
 
   return (
     <>

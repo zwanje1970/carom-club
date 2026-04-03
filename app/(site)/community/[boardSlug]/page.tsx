@@ -31,17 +31,22 @@ export default async function CommunityBoardSlugPage({
   params: Promise<{ boardSlug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  console.time("community_board_page_total");
   const { boardSlug } = await params;
   const sp = await searchParams;
 
+  console.time("community_board_session");
   const session = await getSession();
+  console.timeEnd("community_board_session");
   if (boardSlug === "trouble" && !session) {
     redirect(`/login?next=${encodeURIComponent(loginNextForBoard(boardSlug, sp))}`);
   }
 
+  console.time("community_board_main_query");
   const endSsr = communityBoardSsrPerf(boardSlug);
   const result = await loadCommunityBoardPageData(boardSlug, sp, session);
   endSsr();
+  console.timeEnd("community_board_main_query");
 
   if (result.ok === false) {
     if (result.reason === "no_db") {
@@ -62,6 +67,7 @@ export default async function CommunityBoardSlugPage({
   const showSolverEntry = session
     ? await hasPermission(session, PERMISSION_KEYS.COMMUNITY_POST_CREATE)
     : false;
+  console.timeEnd("community_board_page_total");
 
   return (
     <CommunityBoardPageShell

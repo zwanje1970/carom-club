@@ -1,10 +1,10 @@
-import Link from "next/link";
 import type { CommunityBoardPagePayload } from "@/lib/community-board-page-data";
 import { PageContentContainer } from "@/components/layout/PageContentContainer";
 import { CommunityBoardTabBar } from "@/components/community/CommunityBoardTabBar";
 import { CommunityBoardTroubleStatusNav } from "@/components/community/CommunityBoardTroubleStatusNav";
 import { CommunityBoardListAndMoreClient } from "@/components/community/CommunityBoardListAndMoreClient";
 import { CommunityWriteFab } from "@/components/community/CommunityWriteFab";
+import { CommunityHubLink } from "@/components/community/CommunityHubLink";
 export function CommunityBoardPageShell({
   boardSlug,
   data,
@@ -24,9 +24,7 @@ export function CommunityBoardPageShell({
           className="mb-3 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 md:flex hidden"
           aria-label="breadcrumb"
         >
-          <Link href="/community" className="hover:text-site-primary">
-            커뮤니티
-          </Link>
+          <CommunityHubLink className="hover:text-site-primary" />
           <span aria-hidden>/</span>
           <span className="text-site-text font-medium">{data.board.name}</span>
         </nav>
