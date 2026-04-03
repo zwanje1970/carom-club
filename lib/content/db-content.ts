@@ -4,6 +4,7 @@
  */
 
 import type { Prisma } from "@/generated/prisma";
+import { cache } from "react";
 import { prisma } from "@/lib/db";
 import type { PageSection, SectionButton } from "@/types/page-section";
 import type { Popup } from "@/types/popup";
@@ -185,7 +186,7 @@ function isInRange(startAt: string | null, endAt: string | null): boolean {
   return true;
 }
 
-export async function getPageSectionsForPageFromDb(page: PageSlug): Promise<PageSection[]> {
+const loadVisiblePageSectionsForPageFromDb = cache(async (page: PageSlug): Promise<PageSection[]> => {
   const list = await prisma.pageSection.findMany({
     where: { page, isVisible: true, deletedAt: null },
     orderBy: { sortOrder: "asc" },
@@ -193,6 +194,10 @@ export async function getPageSectionsForPageFromDb(page: PageSlug): Promise<Page
   return list
     .filter((s) => isInRange(s.startAt?.toISOString() ?? null, s.endAt?.toISOString() ?? null))
     .map((r) => rowToPageSection(r));
+});
+
+export async function getPageSectionsForPageFromDb(page: PageSlug): Promise<PageSection[]> {
+  return (await loadVisiblePageSectionsForPageFromDb(page)).filter((s) => !s.slotType);
 }
 
 /** 구조 슬롯 행만: `page` + 노출 + 기간 내, `sortOrder` 오름차순 */
@@ -208,13 +213,7 @@ export async function getPageLayoutSlotsForPageFromDb(page: PageSlug): Promise<P
 
 /** 동일 `page`의 CMS+슬롯 전부 한 목록으로(구조 편집·미리보기용). 공개 렌더는 기존 API 유지 */
 export async function getOrderedPageBlocksForPageFromDb(page: PageSlug): Promise<PageSection[]> {
-  const list = await prisma.pageSection.findMany({
-    where: { page, isVisible: true, deletedAt: null },
-    orderBy: { sortOrder: "asc" },
-  });
-  return list
-    .filter((s) => isInRange(s.startAt?.toISOString() ?? null, s.endAt?.toISOString() ?? null))
-    .map((r) => rowToPageSection(r));
+  return loadVisiblePageSectionsForPageFromDb(page);
 }
 
 export async function getPopupsForPageFromDb(page: PopupPageSlug): Promise<Popup[]> {

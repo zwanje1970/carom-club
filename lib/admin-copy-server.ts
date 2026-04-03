@@ -1,16 +1,22 @@
 import "server-only";
+import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { AdminCopyKey, DEFAULT_ADMIN_COPY } from "@/lib/admin-copy";
 
 const COPY_KEYS = Object.keys(DEFAULT_ADMIN_COPY) as AdminCopyKey[];
 
-/** DB에서 커스텀 값 조회 후 기본값과 병합 */
-export async function getAdminCopy(): Promise<Record<string, string>> {
+async function getAdminCopyUncached(keys?: readonly string[]): Promise<Record<string, string>> {
   const base = { ...DEFAULT_ADMIN_COPY };
   if (!isDatabaseConfigured()) return base;
   try {
-    const rows = await prisma.adminCopy.findMany();
+    const requestedKeys = keys
+      ? keys.filter((key): key is AdminCopyKey => COPY_KEYS.includes(key as AdminCopyKey))
+      : COPY_KEYS;
+    if (requestedKeys.length === 0) return base;
+    const rows = await prisma.adminCopy.findMany({
+      where: { key: { in: requestedKeys } },
+    });
     for (const row of rows) {
       if (COPY_KEYS.includes(row.key as AdminCopyKey)) {
         base[row.key] = row.value;
@@ -20,6 +26,17 @@ export async function getAdminCopy(): Promise<Record<string, string>> {
   } catch {
     return base;
   }
+}
+
+const getAdminCopyCached = cache(
+  async (cacheKey: string, keys?: readonly string[]) => getAdminCopyUncached(keys)
+);
+
+/** DB에서 커스텀 값 조회 후 기본값과 병합 */
+export async function getAdminCopy(keys?: readonly string[]): Promise<Record<string, string>> {
+  const requestedKeys = keys && keys.length > 0 ? [...keys].sort() : undefined;
+  const cacheKey = requestedKeys ? requestedKeys.join("|") : "all";
+  return getAdminCopyCached(cacheKey, requestedKeys);
 }
 
 /** 여러 키-값 저장 (Prisma upsert로 SQLite/PostgreSQL 공통) */

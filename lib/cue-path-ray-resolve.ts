@@ -182,8 +182,8 @@ export function resolveCuePathRayHitLandscape(params: {
   const fromPx = normalizedToPixel(fromView.x, fromView.y, pfCanvas);
   const ox = fromPx.px;
   const oy = fromPx.py;
-  let dx = aimCanvasPx.x - ox;
-  let dy = aimCanvasPx.y - oy;
+  const dx = aimCanvasPx.x - ox;
+  const dy = aimCanvasPx.y - oy;
   const len = Math.hypot(dx, dy);
   if (len < 0.5) return null;
 

@@ -6,10 +6,7 @@ import { isDatabaseConfigured } from "@/lib/db-mode";
 import { ClientApplyBottomCta } from "@/components/mypage/ClientApplyBottomCta";
 import { MypageProfileCard } from "@/components/mypage/MypageProfileCard";
 import { MypageActionButtons } from "@/components/mypage/MypageActionButtons";
-import { MypageQuickMenu } from "@/components/mypage/MypageQuickMenu";
 import { MypageAccordion } from "@/components/mypage/MypageAccordion";
-import { isPlatformAdmin } from "@/types/auth";
-import { canShowNoteEntry } from "@/lib/entry-visibility";
 
 export default async function MypagePage() {
   console.time("mypage_total");
@@ -20,7 +17,7 @@ export default async function MypagePage() {
     redirect("/login");
   }
 
-  type BasicUser = { id: string; name: string };
+  type BasicUser = { id: string };
   let user: BasicUser | null = null;
 
   if (isDatabaseConfigured()) {
@@ -30,7 +27,6 @@ export default async function MypagePage() {
         where: { id: session.id },
         select: {
           id: true,
-          name: true,
         },
       });
       console.timeEnd("mypage_main_query");
@@ -38,13 +34,11 @@ export default async function MypagePage() {
       console.timeEnd("mypage_main_query");
       user = {
         id: session.id,
-        name: session.name,
       };
     }
   } else {
     user = {
       id: session.id,
-      name: session.name,
     };
   }
   if (!user) {
@@ -72,15 +66,6 @@ export default async function MypagePage() {
         {/* 로그인 전환 / 로그아웃 버튼 */}
         <div className="mb-6">
           <MypageActionButtons session={sessionInfo} />
-        </div>
-
-        {/* 퀵메뉴 2x2: 난구노트, 내 정보 수정 포함. 클라이언트는 클라이언트 회원이 일반회원으로 로그인했을 때만 표시 */}
-        <div className="mb-6">
-          <h2 className="mb-3 text-sm font-semibold text-gray-600 dark:text-gray-400">퀵메뉴</h2>
-          <MypageQuickMenu
-            showClient={session.role === "CLIENT_ADMIN" && session.loginMode === "user"}
-            showNoteEntry={canShowNoteEntry(isPlatformAdmin(session))}
-          />
         </div>
 
         {/* 아코디언 메뉴 */}

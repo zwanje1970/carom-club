@@ -281,7 +281,38 @@ export function serializeLeagueDetail(league: {
     };
   }>;
 }): LeagueDetailView {
-  const serializeEntry = (entry: any): LeagueEntryView => ({
+  type LeagueEntrySource = {
+    id: string;
+    tournamentEntryId: string;
+    displayName: string;
+    levelCode: string | null;
+    seedNumber: number | null;
+    sortOrder: number;
+    status: "ACTIVE" | "WITHDRAWN" | "EXCLUDED";
+    isAutoRegistered: boolean;
+    registeredAt: Date | string;
+    withdrawnAt: Date | string | null;
+  };
+  type LeagueMatchSource = {
+    id: string;
+    roundId: string;
+    matchNumber: number;
+    leagueEntryIdA: string | null;
+    leagueEntryIdB: string | null;
+    scoreA: number | null;
+    scoreB: number | null;
+    status: LeagueMatchView["status"];
+    isWalkover: boolean;
+    isManualOverride: boolean;
+    isForcedZeroPoint?: boolean;
+    winnerLeagueEntryId: string | null;
+    note: string | null;
+    leagueEntryA?: LeagueEntrySource | null;
+    leagueEntryB?: LeagueEntrySource | null;
+    winnerLeagueEntry?: LeagueEntrySource | null;
+  };
+
+  const serializeEntry = (entry: LeagueEntrySource): LeagueEntryView => ({
     id: entry.id,
     tournamentEntryId: entry.tournamentEntryId,
     displayName: entry.displayName,
@@ -294,7 +325,7 @@ export function serializeLeagueDetail(league: {
     withdrawnAt: toIso(entry.withdrawnAt),
   });
 
-  const serializeMatch = (match: any): LeagueMatchView => ({
+  const serializeMatch = (match: LeagueMatchSource): LeagueMatchView => ({
     id: match.id,
     roundId: match.roundId,
     matchNumber: match.matchNumber,
@@ -305,7 +336,7 @@ export function serializeLeagueDetail(league: {
     status: match.status,
     isWalkover: match.isWalkover,
     isManualOverride: match.isManualOverride,
-    isForcedZeroPoint: match.isForcedZeroPoint,
+    isForcedZeroPoint: match.isForcedZeroPoint ?? false,
     winnerLeagueEntryId: match.winnerLeagueEntryId,
     note: match.note,
     leagueEntryA: match.leagueEntryA ? serializeEntry(match.leagueEntryA) : null,

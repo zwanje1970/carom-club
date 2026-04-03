@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getCommonPageData } from "@/lib/common-page-data";
-import { getTournamentBasic } from "@/lib/db-tournaments";
+import { getTournamentSummary, type TournamentDetailSummary } from "@/lib/db-tournaments";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { getMockTournamentById } from "@/lib/mock-data";
 import { normalizeSlugs } from "@/lib/normalize-slug";
@@ -45,6 +45,16 @@ function TournamentDetailSkeleton() {
   );
 }
 
+type TournamentPageTournament = Omit<TournamentDetailSummary, "rule"> & {
+  description: string | null;
+  promoContent?: string | null;
+  rule: {
+    maxEntries: number | null;
+    useWaiting: boolean;
+    bracketConfig: string | object | null;
+  } | null;
+};
+
 export default async function TournamentDetailPage({
   params,
   searchParams,
@@ -58,12 +68,9 @@ export default async function TournamentDetailPage({
 
   console.time("tournament_main");
   const dbStart = Date.now();
-  const [tournamentFromDb, common] = await Promise.all([
-    isDatabaseConfigured() ? getTournamentBasic(id) : Promise.resolve(null),
-    getCommonPageData("tournaments"),
-  ]);
+  const tournamentFromDb = await (isDatabaseConfigured() ? getTournamentSummary(id) : Promise.resolve(null));
   console.timeEnd("tournament_main");
-  let tournament = tournamentFromDb;
+  let tournament: TournamentPageTournament | null = tournamentFromDb as TournamentPageTournament | null;
   let useMock = false;
   if (!tournament && isDatabaseConfigured()) {
     try {
@@ -72,20 +79,32 @@ export default async function TournamentDetailPage({
         id: mock.id,
         name: mock.name,
         description: mock.description,
+        summary: mock.description,
         outlinePublished: mock.outlinePublished,
+        outlinePdfUrl: null,
+        posterImageUrl: null,
         venue: mock.venue,
         startAt: mock.startAt,
         endAt: mock.endAt ?? null,
         gameFormat: mock.gameFormat,
         isScotch: mock.isScotch ?? false,
         status: mock.status,
-        organizationId: mock.organization.id,
-        organization: mock.organization,
-        rule: mock.rule,
+        entryFee: mock.rule.entryFee ?? null,
+        prizeInfo: null,
+        entryCondition: mock.rule.entryConditions ?? null,
+        maxParticipants: mock.rule.maxEntries ?? null,
+        tournamentStage: null,
+        rule: mock.rule
+          ? {
+              maxEntries: mock.rule.maxEntries ?? null,
+              useWaiting: mock.rule.useWaiting ?? false,
+              bracketConfig: null,
+            }
+          : null,
         matchVenues: [],
         tournamentVenues: [],
-        _count: { tournamentZones: 0, finalMatches: 0 },
-      } as unknown as Awaited<ReturnType<typeof getTournamentBasic>>;
+        _count: { finalMatches: 0 },
+      };
       useMock = true;
     } catch {
       tournament = null;
@@ -97,20 +116,32 @@ export default async function TournamentDetailPage({
       id: mock.id,
       name: mock.name,
       description: mock.description,
+      summary: mock.description,
       outlinePublished: mock.outlinePublished,
+      outlinePdfUrl: null,
+      posterImageUrl: null,
       venue: mock.venue,
       startAt: mock.startAt,
       endAt: mock.endAt ?? null,
       gameFormat: mock.gameFormat,
       isScotch: mock.isScotch ?? false,
       status: mock.status,
-      organizationId: mock.organization.id,
-      organization: mock.organization,
-      rule: mock.rule,
+      entryFee: mock.rule.entryFee ?? null,
+      prizeInfo: null,
+      entryCondition: mock.rule.entryConditions ?? null,
+      maxParticipants: mock.rule.maxEntries ?? null,
+      tournamentStage: null,
+      rule: mock.rule
+        ? {
+            maxEntries: mock.rule.maxEntries ?? null,
+            useWaiting: mock.rule.useWaiting ?? false,
+            bracketConfig: null,
+          }
+        : null,
       matchVenues: [],
       tournamentVenues: [],
-      _count: { tournamentZones: 0, finalMatches: 0 },
-    } as unknown as Awaited<ReturnType<typeof getTournamentBasic>>;
+      _count: { finalMatches: 0 },
+    };
     useMock = true;
   }
   logServerTiming("db", dbStart);
@@ -121,10 +152,10 @@ export default async function TournamentDetailPage({
     id: string;
     name: string;
     summary: string | null;
-    description: string | null;
-    outlinePublished: boolean | null;
+    description?: string | null;
+    outlinePublished: string | null;
     outlinePdfUrl: string | null;
-    promoContent: string | null;
+    promoContent?: string | null;
     posterImageUrl: string | null;
     venue: string | null;
     startAt: Date;
@@ -139,20 +170,14 @@ export default async function TournamentDetailPage({
     tournamentStage?: string | null;
     rule?: {
       bracketConfig?: string | object | null;
-      entryFee?: number | null;
-      operatingFee?: number | null;
       maxEntries?: number | null;
       useWaiting?: boolean;
-      entryConditions?: string | null;
     } | null;
     matchVenues?: { displayLabel: string; venueName: string; address: string | null; phone: string | null }[];
     tournamentVenues?: { organization: { id: string; name: string; slug: string | null } }[];
     _count?: { finalMatches?: number };
   };
   const t = tournament as unknown as TournamentShape;
-
-  logServerTiming("fetch_copy", dbStart);
-  const c = common.copy as Record<AdminCopyKey, string>;
 
   const tabs = buildTabs();
   const currentTab = (() => {
@@ -211,17 +236,14 @@ export default async function TournamentDetailPage({
     gameFormat: t.gameFormat ?? null,
     isScotch: t.isScotch === true,
     status: t.status,
-    entryFee: t.entryFee ?? t.rule?.entryFee ?? null,
+    entryFee: t.entryFee ?? null,
     prizeInfo: t.prizeInfo ?? null,
     entryCondition: t.entryCondition ?? null,
     maxParticipants: t.maxParticipants ?? null,
     rule: t.rule
       ? {
-          entryFee: t.rule.entryFee,
-          operatingFee: t.rule.operatingFee,
           maxEntries: t.rule.maxEntries,
           useWaiting: t.rule.useWaiting,
-          entryConditions: t.rule.entryConditions,
           accountNumber,
         }
       : null,
@@ -232,12 +254,14 @@ export default async function TournamentDetailPage({
     outlinePublished: tournamentPayload.outlinePublished != null ? String(tournamentPayload.outlinePublished) : null,
     rule: tournamentPayload.rule
       ? {
-          entryFee: tournamentPayload.rule.entryFee ?? null,
-          operatingFee: tournamentPayload.rule.operatingFee ?? null,
+          bracketConfig:
+            typeof t.rule?.bracketConfig === "string"
+              ? t.rule.bracketConfig
+              : t.rule?.bracketConfig
+                ? JSON.stringify(t.rule.bracketConfig)
+                : null,
           maxEntries: tournamentPayload.rule.maxEntries ?? null,
           useWaiting: tournamentPayload.rule.useWaiting ?? false,
-          entryConditions: tournamentPayload.rule.entryConditions ?? null,
-          accountNumber: accountNumber ?? null,
         }
       : null,
   };
@@ -270,11 +294,11 @@ export default async function TournamentDetailPage({
               endAt: t.endAt != null ? (t.endAt instanceof Date ? t.endAt.toISOString() : String(t.endAt)) : null,
               rule: tournamentPayload.rule
                 ? {
-                    entryFee: tournamentPayload.rule.entryFee ?? null,
-                    operatingFee: tournamentPayload.rule.operatingFee ?? null,
                     maxEntries: tournamentPayload.rule.maxEntries ?? null,
                     useWaiting: tournamentPayload.rule.useWaiting ?? false,
-                    entryConditions: tournamentPayload.rule.entryConditions ?? null,
+                    entryFee: null,
+                    operatingFee: null,
+                    entryConditions: null,
                     accountNumber: accountNumber ?? null,
                   }
                 : null,
@@ -285,7 +309,7 @@ export default async function TournamentDetailPage({
             isLoggedIn={false}
             myEntries={[]}
             allowMultipleSlots={allowMultipleSlots}
-            entryFee={t.entryFee ?? t.rule?.entryFee ?? null}
+            entryFee={t.entryFee ?? null}
             entries={[]}
           />
         </div>
@@ -301,39 +325,64 @@ export default async function TournamentDetailPage({
         </Suspense>
 
         {"tournamentStage" in t && t._count && (
-          <section className="mt-8 rounded-xl border border-site-border bg-site-card p-4">
-            <h2 className="text-sm font-semibold text-site-text mb-2">{getCopyValue(c, "site.tournament.bracketSectionTitle")}</h2>
-            <p className="text-xs text-site-text-muted mb-3">
-              진행 상태:{" "}
-              {TOURNAMENT_STAGES.includes((t.tournamentStage ?? "SETUP") as (typeof TOURNAMENT_STAGES)[number])
-                ? getCopyValue(c, `site.tournament.stage.${(t.tournamentStage as string) ?? "SETUP"}` as AdminCopyKey)
-                : (STAGE_LABELS[(t.tournamentStage as keyof typeof STAGE_LABELS) ?? "SETUP"] ?? t.tournamentStage ?? "설정")}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href={`/tournaments/${id}/zones`}
-                className="inline-flex items-center rounded-lg bg-blue-100 px-3 py-1.5 text-sm font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
-              >
-                {getCopyValue(c, "site.tournament.qualifierLabel")}
-              </Link>
-              {(t._count?.finalMatches ?? 0) > 0 && (
-                <Link
-                  href={`/tournaments/${id}/bracket`}
-                  className="inline-flex items-center rounded-lg bg-violet-100 px-3 py-1.5 text-sm font-medium text-violet-800 dark:bg-violet-900/40 dark:text-violet-200"
-                >
-                  {getCopyValue(c, "site.tournament.finalBracketLabel")}
-                </Link>
-              )}
-              <Link
-                href={`/tournaments/${id}/results`}
-                className="inline-flex items-center rounded-lg bg-emerald-100 px-3 py-1.5 text-sm font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
-              >
-                {getCopyValue(c, "site.tournament.resultsLabel")}
-              </Link>
-            </div>
-          </section>
+          <Suspense fallback={null}>
+            <TournamentStageSection
+              tournamentId={id}
+              tournamentStage={t.tournamentStage ?? null}
+              finalMatchesCount={t._count?.finalMatches ?? 0}
+            />
+          </Suspense>
         )}
       </div>
     </main>
+  );
+}
+
+async function TournamentStageSection({
+  tournamentId,
+  tournamentStage,
+  finalMatchesCount,
+}: {
+  tournamentId: string;
+  tournamentStage: string | null;
+  finalMatchesCount: number;
+}) {
+  console.time("tournament_related");
+  const common = await getCommonPageData("tournaments");
+  const c = common.copy as Record<AdminCopyKey, string>;
+  const stageLabel = TOURNAMENT_STAGES.includes((tournamentStage ?? "SETUP") as (typeof TOURNAMENT_STAGES)[number])
+    ? getCopyValue(c, `site.tournament.stage.${(tournamentStage as string) ?? "SETUP"}` as AdminCopyKey)
+    : (STAGE_LABELS[(tournamentStage as keyof typeof STAGE_LABELS) ?? "SETUP"] ?? tournamentStage ?? "설정");
+  console.timeEnd("tournament_related");
+
+  return (
+    <section className="mt-8 rounded-xl border border-site-border bg-site-card p-4">
+      <h2 className="text-sm font-semibold text-site-text mb-2">{getCopyValue(c, "site.tournament.bracketSectionTitle")}</h2>
+      <p className="text-xs text-site-text-muted mb-3">
+        진행 상태: {stageLabel}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href={`/tournaments/${tournamentId}/zones`}
+          className="inline-flex items-center rounded-lg bg-blue-100 px-3 py-1.5 text-sm font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
+        >
+          {getCopyValue(c, "site.tournament.qualifierLabel")}
+        </Link>
+        {finalMatchesCount > 0 && (
+          <Link
+            href={`/tournaments/${tournamentId}/bracket`}
+            className="inline-flex items-center rounded-lg bg-violet-100 px-3 py-1.5 text-sm font-medium text-violet-800 dark:bg-violet-900/40 dark:text-violet-200"
+          >
+            {getCopyValue(c, "site.tournament.finalBracketLabel")}
+          </Link>
+        )}
+        <Link
+          href={`/tournaments/${tournamentId}/results`}
+          className="inline-flex items-center rounded-lg bg-emerald-100 px-3 py-1.5 text-sm font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
+        >
+          {getCopyValue(c, "site.tournament.resultsLabel")}
+        </Link>
+      </div>
+    </section>
   );
 }

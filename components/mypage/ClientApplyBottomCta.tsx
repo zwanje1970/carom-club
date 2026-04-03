@@ -1,44 +1,57 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-
-const STATUS_LABEL: Record<string, string> = {
-  PENDING: "신청중",
-  REJECTED: "승인거절",
-  APPROVED: "등록완료",
-};
+import { useEffect, useState } from "react";
 
 type Application = {
   id: string;
   status: string;
-  organizationName: string;
   rejectedReason?: string | null;
   rejectReason?: string | null;
 };
+
+type CtaResponse = {
+  application?: Application | null;
+};
+
+const CTA_FETCH_URL = "/api/mypage/client-application?view=cta";
 
 export function ClientApplyBottomCta() {
   const [loading, setLoading] = useState(true);
   const [application, setApplication] = useState<Application | null>(null);
 
   useEffect(() => {
-    fetch("/api/mypage/client-application")
+    const controller = new AbortController();
+
+    fetch(CTA_FETCH_URL, { signal: controller.signal })
       .then((res) => res.json())
-      .then((data: { application?: Application | null }) => {
+      .then((data: CtaResponse) => {
         setApplication(data.application ?? null);
       })
       .catch(() => setApplication(null))
       .finally(() => setLoading(false));
+
+    return () => controller.abort();
   }, []);
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div
+        className="mt-6 min-h-[52px] rounded border-t border-site-border px-2 pt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-gray-500"
+        aria-busy="true"
+        aria-live="polite"
+      >
+        <span className="h-3 w-24 rounded bg-gray-200/80 dark:bg-slate-700/80" />
+        <span className="h-6 w-16 rounded border border-site-border bg-site-card" />
+      </div>
+    );
+  }
 
   const rejectReason =
     application?.status === "REJECTED"
       ? (application.rejectedReason ?? application.rejectReason ?? "").trim()
       : "";
 
-  // 미신청: 클라이언트 신청 버튼만
   if (!application) {
     return (
       <div className="mt-6 pt-4 border-t border-site-border flex flex-wrap items-center justify-center gap-2 text-xs text-gray-500">
@@ -52,7 +65,6 @@ export function ClientApplyBottomCta() {
     );
   }
 
-  // 신청중 / 승인거절 / 등록완료: "클라이언트 | 상태(사유)" 1개 표시, 신청 버튼 없음
   const displayText =
     application.status === "REJECTED"
       ? `클라이언트 | 승인거절${rejectReason ? `(${rejectReason})` : ""}`
@@ -60,7 +72,7 @@ export function ClientApplyBottomCta() {
         ? "클라이언트 | 신청중"
         : application.status === "APPROVED"
           ? "클라이언트 | 등록완료"
-          : `클라이언트 | ${STATUS_LABEL[application.status] ?? application.status}`;
+          : `클라이언트 | ${application.status}`;
 
   return (
     <div className="mt-6 pt-4 border-t border-site-border flex flex-wrap items-center justify-center gap-2 text-xs text-gray-500">

@@ -4,10 +4,92 @@ import { prisma } from "@/lib/db";
 import { ensureDatabaseUrlForDevelopment, isDatabaseConfigured } from "@/lib/db-mode";
 import { isAnnualMembershipVisible } from "@/lib/site-feature-flags";
 
-/** GET: 현재 로그인 사용자의 클라이언트 신청 내역 (가장 최근 1건). Prisma 스키마 오류 회피를 위해 raw SQL만 사용 */
-export async function GET() {
-  ensureDatabaseUrlForDevelopment();
+type ClientApplicationCtaRow = {
+  id: string;
+  status: string;
+  rejectedReason: string | null;
+};
+
+type ClientApplicationDetailRow = {
+  id: string;
+  type: string;
+  status: string;
+  requestedClientType: string | null;
+  organizationName: string;
+  applicantName: string;
+  phone: string;
+  email: string;
+  region: string | null;
+  shortDescription: string | null;
+  referenceLink: string | null;
+  createdAt: Date;
+  reviewedAt: Date | null;
+  rejectedReason: string | null;
+};
+
+function isCtaMode(request: Request): boolean {
+  const url = new URL(request.url);
+  return url.searchParams.get("view") === "cta";
+}
+
+async function getLatestApplicationCta(sessionId: string, email: string) {
+  const rows = await prisma.$queryRawUnsafe<ClientApplicationCtaRow[]>(
+    `SELECT id, status, "rejectedReason"
+     FROM "ClientApplication"
+     WHERE "applicantUserId" = $1 OR email = $2
+     ORDER BY "createdAt" DESC
+     LIMIT 1`,
+    sessionId,
+    email
+  );
+
+  return rows[0]
+    ? {
+        id: rows[0].id,
+        status: rows[0].status,
+        rejectedReason: rows[0].rejectedReason,
+      }
+    : null;
+}
+
+async function getLatestApplicationDetail(sessionId: string, email: string) {
   const annualMembershipVisible = await isAnnualMembershipVisible();
+  const rows = await prisma.$queryRawUnsafe<ClientApplicationDetailRow[]>(
+    `SELECT id, type, status, "requestedClientType", "organizationName", "applicantName", phone, email, region, "shortDescription", "referenceLink", "createdAt", "reviewedAt", "rejectedReason"
+     FROM "ClientApplication"
+     WHERE "applicantUserId" = $1 OR email = $2
+     ORDER BY "createdAt" DESC
+     LIMIT 1`,
+    sessionId,
+    email
+  );
+
+  return rows[0]
+    ? {
+        id: rows[0].id,
+        type: rows[0].type,
+        status: rows[0].status,
+        requestedClientType:
+          !annualMembershipVisible && rows[0].requestedClientType === "REGISTERED"
+            ? "GENERAL"
+            : (rows[0].requestedClientType ?? "GENERAL"),
+        organizationName: rows[0].organizationName,
+        applicantName: rows[0].applicantName,
+        phone: rows[0].phone,
+        email: rows[0].email,
+        region: rows[0].region,
+        shortDescription: rows[0].shortDescription,
+        referenceLink: rows[0].referenceLink,
+        createdAt: rows[0].createdAt,
+        reviewedAt: rows[0].reviewedAt,
+        rejectedReason: rows[0].rejectedReason,
+      }
+    : null;
+}
+
+/** GET: 현재 로그인 사용자의 클라이언트 신청 내역. CTA 모드는 최소 필드만 반환한다. */
+export async function GET(request: Request) {
+  ensureDatabaseUrlForDevelopment();
   let session;
   try {
     session = await getSession();
@@ -24,54 +106,9 @@ export async function GET() {
   }
 
   try {
-    const rows = await prisma.$queryRawUnsafe<
-      {
-        id: string;
-        type: string;
-        status: string;
-        requestedClientType: string | null;
-        organizationName: string;
-        applicantName: string;
-        phone: string;
-        email: string;
-        region: string | null;
-        shortDescription: string | null;
-        referenceLink: string | null;
-        createdAt: Date;
-        reviewedAt: Date | null;
-        rejectedReason: string | null;
-      }[]
-    >(
-      `SELECT id, type, status, "requestedClientType", "organizationName", "applicantName", phone, email, region, "shortDescription", "referenceLink", "createdAt", "reviewedAt", "rejectedReason"
-       FROM "ClientApplication"
-       WHERE "applicantUserId" = $1 OR email = $2
-       ORDER BY "createdAt" DESC
-       LIMIT 1`,
-      session.id,
-      session.email ?? ""
-    );
-    const application = rows[0]
-      ? {
-          id: rows[0].id,
-          type: rows[0].type,
-          status: rows[0].status,
-          requestedClientType:
-            !annualMembershipVisible && rows[0].requestedClientType === "REGISTERED"
-              ? "GENERAL"
-              : (rows[0].requestedClientType ?? "GENERAL"),
-          organizationName: rows[0].organizationName,
-          applicantName: rows[0].applicantName,
-          phone: rows[0].phone,
-          email: rows[0].email,
-          region: rows[0].region,
-          shortDescription: rows[0].shortDescription,
-          referenceLink: rows[0].referenceLink,
-          createdAt: rows[0].createdAt,
-          reviewedAt: rows[0].reviewedAt,
-          rejectedReason: rows[0].rejectedReason,
-          rejectReason: rows[0].rejectedReason,
-        }
-      : null;
+    const application = isCtaMode(request)
+      ? await getLatestApplicationCta(session.id, session.email ?? "")
+      : await getLatestApplicationDetail(session.id, session.email ?? "");
     return NextResponse.json({ application });
   } catch (e) {
     console.error("[mypage/client-application] GET error:", e);

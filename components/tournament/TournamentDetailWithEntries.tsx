@@ -2,41 +2,34 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getDisplayName } from "@/lib/display-name";
 import { formatTournamentEntryDisplayName } from "@/lib/tournament-entry-display";
-import { getTournamentEntries } from "@/lib/db-tournaments";
+import {
+  getTournamentDetailPromoContent,
+  getTournamentEntries,
+  type TournamentDetailSummary,
+} from "@/lib/db-tournaments";
 import { TournamentDetailView } from "./TournamentDetailView";
-
-type BasicTournament = {
-  id: string;
-  name: string;
-  summary: string | null;
-  description: string | null;
-  outlinePublished: string | null;
-  outlinePdfUrl: string | null;
-  promoContent: string | null;
-  posterImageUrl: string | null;
-  venue: string | null;
-  startAt: Date;
-  endAt: Date | null;
-  gameFormat: string | null;
-  status: string;
-  entryFee: number | null;
-  prizeInfo: string | null;
-  entryCondition: string | null;
-  maxParticipants: number | null;
-  isScotch?: boolean;
-  rule: {
-    entryFee: number | null;
-    operatingFee: number | null;
-    maxEntries: number | null;
-    useWaiting: boolean;
-    entryConditions: string | null;
-    accountNumber?: string | null;
-  } | null;
-};
 
 export type TournamentDetailWithEntriesProps = {
   tournamentId: string;
-  tournament: BasicTournament;
+  tournament: Pick<
+    TournamentDetailSummary,
+    | "name"
+    | "summary"
+    | "outlinePublished"
+    | "outlinePdfUrl"
+    | "posterImageUrl"
+    | "venue"
+    | "startAt"
+    | "endAt"
+    | "gameFormat"
+    | "status"
+    | "entryFee"
+    | "prizeInfo"
+    | "entryCondition"
+    | "maxParticipants"
+    | "isScotch"
+    | "rule"
+  >;
   matchVenues: Array<{ displayLabel: string; venueName?: string | null; address?: string | null; phone?: string | null }>;
   tournamentVenues: Array<{ id: string; name: string; slug: string }>;
   tabs: readonly { id: string; label: string }[];
@@ -57,21 +50,31 @@ export async function TournamentDetailWithEntries({
   allowMultipleSlots,
 }: TournamentDetailWithEntriesProps) {
   console.time("tournament_participants");
-  const session = await getSession();
-  console.time("tournament_participants_count");
-  const confirmedCount = await getTournamentEntriesCountOnly(tournamentId);
-  console.timeEnd("tournament_participants_count");
-
-  console.time("tournament_participants_my_entries");
-  const myEntriesRows = session
-    ? await getTournamentMyEntriesOnly(tournamentId, session.id)
-    : [];
-  console.timeEnd("tournament_participants_my_entries");
-
   const shouldLoadEntriesList = currentTab === "participants" && participantsListPublic;
+  const sessionPromise = getSession();
+  console.time("tournament_participants_count");
+  const confirmedCountPromise = getTournamentEntriesCountOnly(tournamentId).finally(() =>
+    console.timeEnd("tournament_participants_count")
+  );
   console.time("tournament_participants_entries_list");
-  const entries = shouldLoadEntriesList ? await getTournamentEntries(tournamentId) : [];
-  console.timeEnd("tournament_participants_entries_list");
+  const entriesPromise = (shouldLoadEntriesList ? getTournamentEntries(tournamentId) : Promise.resolve([])).finally(
+    () => console.timeEnd("tournament_participants_entries_list")
+  );
+  const promoContentPromise = currentTab === "outline" && !tournament.outlinePublished?.trim()
+    ? getTournamentDetailPromoContent(tournamentId)
+    : Promise.resolve(null);
+  const myEntriesPromise = sessionPromise.then((session) =>
+    session ? getTournamentMyEntriesOnly(tournamentId, session.id) : []
+  );
+
+  const [session, confirmedCount, entries, myEntriesRows, promoContent] = await Promise.all([
+    sessionPromise,
+    confirmedCountPromise,
+    entriesPromise,
+    myEntriesPromise,
+    promoContentPromise,
+  ]);
+
   console.timeEnd("tournament_participants");
   const myEntries = myEntriesRows.map((e) => ({
     id: e.id,
@@ -101,6 +104,7 @@ export async function TournamentDetailWithEntries({
     waitingListOrder: e.waitingListOrder,
     slotNumber: e.slotNumber ?? 1,
   }));
+  const resolvedPromoContent = promoContent ?? null;
 
   return (
     <TournamentDetailView
@@ -111,10 +115,10 @@ export async function TournamentDetailWithEntries({
       tournament={{
         name: tournament.name,
         summary: tournament.summary ?? null,
-        description: tournament.description ?? null,
+        description: null,
         outlinePublished: tournament.outlinePublished ?? null,
         outlinePdfUrl: tournament.outlinePdfUrl ?? null,
-        promoContent: tournament.promoContent ?? null,
+        promoContent: resolvedPromoContent,
         posterImageUrl: tournament.posterImageUrl ?? null,
         venue: tournament.venue ?? null,
         startAt: tournament.startAt instanceof Date ? tournament.startAt.toISOString() : String(tournament.startAt),
@@ -125,7 +129,28 @@ export async function TournamentDetailWithEntries({
         prizeInfo: tournament.prizeInfo ?? null,
         entryCondition: tournament.entryCondition ?? null,
         maxParticipants: tournament.maxParticipants ?? null,
-        rule: tournament.rule,
+        rule: tournament.rule
+          ? {
+              entryFee: null,
+              operatingFee: null,
+              maxEntries: tournament.rule.maxEntries,
+              useWaiting: tournament.rule.useWaiting,
+              entryConditions: null,
+              accountNumber: tournament.rule.bracketConfig
+                ? (() => {
+                    try {
+                      const raw = typeof tournament.rule?.bracketConfig === "string"
+                        ? JSON.parse(tournament.rule.bracketConfig)
+                        : tournament.rule.bracketConfig;
+                      const v = (raw as Record<string, unknown>)?.accountNumber;
+                      return typeof v === "string" && v.trim() ? v.trim() : null;
+                    } catch {
+                      return null;
+                    }
+                  })()
+                : null,
+            }
+          : null,
       }}
       matchVenues={matchVenues}
       tournamentVenues={tournamentVenues}

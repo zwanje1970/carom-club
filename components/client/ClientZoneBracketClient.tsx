@@ -69,6 +69,61 @@ export function ClientZoneBracketClient({
     load();
   }, [tournamentId, tzId]);
 
+  const rounds = useMemo(() => {
+    if (!data) return [];
+    return data.rounds?.length
+      ? data.rounds
+      : Object.entries(
+          data.matches.reduce<Record<number, Match[]>>((acc, m) => {
+            if (!acc[m.roundIndex]) acc[m.roundIndex] = [];
+            acc[m.roundIndex].push(m);
+            return acc;
+          }, {})
+        )
+          .sort(([a], [b]) => Number(a) - Number(b))
+          .map(([roundIndex, matches]) => ({
+            roundType: "NORMAL" as const,
+            roundIndex: Number(roundIndex) + 1,
+            name: `${Number(roundIndex) + 1}라운드`,
+            targetSize: matches.length,
+            matches,
+          }));
+  }, [data]);
+
+  const participantOptions = useMemo(() => {
+    if (!data) return [];
+    const map = new Map<string, string>();
+    data.matches.forEach((match) => {
+      if (match.entryIdA && match.entryAName) map.set(match.entryIdA, match.entryAName);
+      if (match.entryIdB && match.entryBName) map.set(match.entryIdB, match.entryBName);
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [data]);
+
+  const reductionRounds = useMemo(() => (data ? rounds.filter((round) => round.roundType === "REDUCTION") : []), [
+    data,
+    rounds,
+  ]);
+
+  useEffect(() => {
+    if (!data) return;
+    if (reductionRounds.length === 0) {
+      setManualMode(false);
+      setManualDraft({});
+      return;
+    }
+    const draft: Record<string, ManualDraftItem> = {};
+    reductionRounds.forEach((round) => {
+      round.matches.forEach((match) => {
+        draft[match.id] = {
+          entryIdA: match.entryIdA ?? "",
+          entryIdB: match.entryIdB ?? "",
+        };
+      });
+    });
+    setManualDraft(draft);
+  }, [data, reductionRounds]);
+
   async function setResult(matchId: string, winnerEntryId: string | null) {
     setUpdating(matchId);
     try {
@@ -94,52 +149,6 @@ export function ClientZoneBracketClient({
 
   if (loading) return <p className="text-sm text-gray-500">불러오는 중...</p>;
   if (!data) return <p className="text-sm text-gray-500">데이터를 불러올 수 없습니다.</p>;
-
-  const rounds = data.rounds?.length
-    ? data.rounds
-    : Object.entries(
-        data.matches.reduce<Record<number, Match[]>>((acc, m) => {
-          if (!acc[m.roundIndex]) acc[m.roundIndex] = [];
-          acc[m.roundIndex].push(m);
-          return acc;
-        }, {})
-      )
-        .sort(([a], [b]) => Number(a) - Number(b))
-        .map(([roundIndex, matches]) => ({
-          roundType: "NORMAL" as const,
-          roundIndex: Number(roundIndex) + 1,
-          name: `${Number(roundIndex) + 1}라운드`,
-          targetSize: matches.length,
-          matches,
-        }));
-
-  const reductionRounds = useMemo(() => rounds.filter((round) => round.roundType === "REDUCTION"), [rounds]);
-  const participantOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    data.matches.forEach((match) => {
-      if (match.entryIdA && match.entryAName) map.set(match.entryIdA, match.entryAName);
-      if (match.entryIdB && match.entryBName) map.set(match.entryIdB, match.entryBName);
-    });
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
-  }, [data]);
-
-  useEffect(() => {
-    if (reductionRounds.length === 0) {
-      setManualMode(false);
-      setManualDraft({});
-      return;
-    }
-    const draft: Record<string, ManualDraftItem> = {};
-    reductionRounds.forEach((round) => {
-      round.matches.forEach((match) => {
-        draft[match.id] = {
-          entryIdA: match.entryIdA ?? "",
-          entryIdB: match.entryIdB ?? "",
-        };
-      });
-    });
-    setManualDraft(draft);
-  }, [data, reductionRounds]);
 
   async function rerollReduction() {
     setUpdating("reduction-reroll");

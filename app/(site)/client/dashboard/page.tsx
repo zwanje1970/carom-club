@@ -54,11 +54,10 @@ export default async function ClientDashboardPage() {
   const session = await getSession();
   if (!session || session.role !== "CLIENT_ADMIN") return null;
 
-  const copy = await getAdminCopy();
-  const c = copy as Record<AdminCopyKey, string>;
-
   const orgId = await getClientAdminOrganizationId(session);
   if (!orgId) {
+    const copy = await getAdminCopy();
+    const c = copy as Record<AdminCopyKey, string>;
     return (
       <div className="space-y-4">
         <ConsolePageHeader
@@ -105,24 +104,21 @@ export default async function ClientDashboardPage() {
   });
 
   const ids = tournaments.map((t) => t.id);
-  const [approvedRows, pendingRows] =
+  const statusRows =
     ids.length > 0
-      ? await Promise.all([
-          prisma.tournamentEntry.groupBy({
-            by: ["tournamentId"],
-            where: { tournamentId: { in: ids }, status: "CONFIRMED" },
-            _count: { id: true },
-          }),
-          prisma.tournamentEntry.groupBy({
-            by: ["tournamentId"],
-            where: { tournamentId: { in: ids }, status: "APPLIED" },
-            _count: { id: true },
-          }),
-        ])
-      : [[], []];
+      ? await prisma.tournamentEntry.groupBy({
+          by: ["tournamentId", "status"],
+          where: { tournamentId: { in: ids }, status: { in: ["CONFIRMED", "APPLIED"] } },
+          _count: { id: true },
+        })
+      : [];
 
-  const approvedMap = Object.fromEntries(approvedRows.map((r) => [r.tournamentId, r._count.id]));
-  const pendingMap = Object.fromEntries(pendingRows.map((r) => [r.tournamentId, r._count.id]));
+  const approvedMap = new Map<string, number>();
+  const pendingMap = new Map<string, number>();
+  for (const row of statusRows) {
+    if (row.status === "CONFIRMED") approvedMap.set(row.tournamentId, row._count.id);
+    if (row.status === "APPLIED") pendingMap.set(row.tournamentId, row._count.id);
+  }
 
   const cards: HomeTournament[] = tournaments.map((t) => ({
     id: t.id,
@@ -132,8 +128,8 @@ export default async function ClientDashboardPage() {
     nationalTournament: t.nationalTournament,
     tournamentStage: t.tournamentStage,
     applicantCount: t._count.entries,
-    approvedCount: approvedMap[t.id] ?? 0,
-    pendingCount: pendingMap[t.id] ?? 0,
+    approvedCount: approvedMap.get(t.id) ?? 0,
+    pendingCount: pendingMap.get(t.id) ?? 0,
   }));
 
   return (

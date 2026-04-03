@@ -34,14 +34,20 @@ export default function MobileHeader({
   onClosePath,
 }: MobileHeaderProps) {
   const router = useRouter();
+  type ReactNativeWebViewWindow = Window & {
+    ReactNativeWebView?: {
+      postMessage: (message: string) => void;
+    };
+  };
 
   const finalShowExit = showExit || showClose;
   const finalExitPath = onClosePath || onExitPath;
 
   const handleExit = () => {
     // WebView 환경에서 앱 종료 인터페이스 호출
-    if (typeof window !== "undefined" && (window as any).ReactNativeWebView) {
-      (window as any).ReactNativeWebView.postMessage(JSON.stringify({ type: "EXIT_APP" }));
+    const webViewWindow = window as ReactNativeWebViewWindow;
+    if (typeof window !== "undefined" && webViewWindow.ReactNativeWebView) {
+      webViewWindow.ReactNativeWebView.postMessage(JSON.stringify({ type: "EXIT_APP" }));
       return;
     }
     // 웹 환경에서는 홈 이동

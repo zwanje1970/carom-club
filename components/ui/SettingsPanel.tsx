@@ -738,8 +738,8 @@ export function SettingsPanel({
       const cx = r.left + r.width / 2;
       const cy = r.top + r.height / 2;
       const maxR = BALL_R * TIP_MAX_FRAC;
-      let dx = (clientX - cx) / maxR;
-      let dy = (clientY - cy) / maxR;
+      const dx = (clientX - cx) / maxR;
+      const dy = (clientY - cy) / maxR;
       const c = clampToUnitDisk(dx, dy);
       emit({ tipNorm: c });
     },

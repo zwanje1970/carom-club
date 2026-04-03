@@ -20,11 +20,12 @@ type Props = {
  * Keeps auth/session/organization loading out of `app/client/layout.tsx`.
  */
 export async function ClientLayoutServer({ children }: Props) {
+  const copyPromise = getAdminCopy();
   const session = await getSession();
-  const copy = await getAdminCopy();
-  const c = copy as Record<AdminCopyKey, string>;
 
   if (!session) {
+    const copy = await copyPromise;
+    const c = copy as Record<AdminCopyKey, string>;
     return (
       <div className="flex min-h-screen items-center justify-center bg-site-bg p-4">
         <div className="max-w-sm text-center">
@@ -46,6 +47,8 @@ export async function ClientLayoutServer({ children }: Props) {
   }
 
   if (!canAccessClientDashboard(session)) {
+    const copy = await copyPromise;
+    const c = copy as Record<AdminCopyKey, string>;
     if (session.role !== "CLIENT_ADMIN") {
       return (
         <div className="flex min-h-screen items-center justify-center bg-site-bg p-4">
@@ -65,7 +68,11 @@ export async function ClientLayoutServer({ children }: Props) {
     redirect("/");
   }
 
-  const organizations = await getAccessibleClientOrganizationsCached(session.id);
+  const [copy, organizations] = await Promise.all([
+    copyPromise,
+    getAccessibleClientOrganizationsCached(session.id),
+  ]);
+  const c = copy as Record<AdminCopyKey, string>;
   const { cookies } = await import("next/headers");
   const cookieStore = await cookies();
   const preferredOrgId = cookieStore.get(CLIENT_CONSOLE_ORG_COOKIE)?.value ?? null;

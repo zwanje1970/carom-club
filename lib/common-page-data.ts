@@ -19,6 +19,13 @@ import type { NoticeBar } from "@/types/notice-bar";
 
 export type PageSlug = "home" | "tournaments" | "venues" | "community";
 
+const COMMUNITY_COPY_KEYS = [
+  "site.pageBuilder.noticeOverlay.hint",
+  "site.pageBuilder.slotFallback.template",
+  "site.pageBuilder.placeholder.quickMenu",
+  "site.pageBuilder.placeholder.homeCarousels",
+] as const;
+
 export type CommonPageData = {
   copy: Record<string, string>;
   siteSettings: SiteSettings;
@@ -34,10 +41,10 @@ const REVALIDATE_SECONDS = 60;
 
 async function getCommonPageDataUncached(page: PageSlug): Promise<CommonPageData> {
   const [{ copy, siteSettings }, noticeBars, popups, pageSections, pageBlocks] = await Promise.all([
-    getCommonGlobalData(),
+    getCommonGlobalData(page === "community" ? COMMUNITY_COPY_KEYS : undefined),
     getNoticeBarsForPage(page),
     getPopupsForPage(page),
-    getPageSectionsForPage(page),
+    page === "community" ? Promise.resolve([] as PageSection[]) : getPageSectionsForPage(page),
     getOrderedPageBlocksForPage(page),
   ]);
   return {
@@ -64,19 +71,21 @@ export function getCommonPageData(page: PageSlug): Promise<CommonPageData> {
 /**
  * copy + siteSettings 만 필요할 때 (레이아웃 등). 60초 캐시.
  */
-export async function getCommonGlobalData(): Promise<{
+export async function getCommonGlobalData(keys?: readonly string[]): Promise<{
   copy: Record<string, string>;
   siteSettings: SiteSettings;
 }> {
+  const requestedKeys = keys && keys.length > 0 ? [...keys] : undefined;
+  const cacheKey = requestedKeys ? requestedKeys.join("|") : "all";
   return unstable_cache(
     async () => {
       const [copy, siteSettings] = await Promise.all([
-        getAdminCopy(),
+        getAdminCopy(requestedKeys),
         getSiteSettings(),
       ]);
       return { copy, siteSettings };
     },
-    ["common-global-data"],
+    ["common-global-data", cacheKey],
     { revalidate: REVALIDATE_SECONDS, tags: ["common-page-data"] }
   )();
 }

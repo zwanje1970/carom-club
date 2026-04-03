@@ -477,6 +477,68 @@ async function getApprovedApplicantUserIds(): Promise<string[]> {
 }
 
 /** 공개 상세용 경량 relation select (무거운 entries/rounds/brackets 제외) */
+export type TournamentDetailSummary = {
+  id: string;
+  name: string;
+  summary: string | null;
+  outlinePublished: string | null;
+  outlinePdfUrl: string | null;
+  posterImageUrl: string | null;
+  venue: string | null;
+  startAt: Date;
+  endAt: Date | null;
+  gameFormat: string | null;
+  status: string;
+  entryFee: number | null;
+  prizeInfo: string | null;
+  entryCondition: string | null;
+  maxParticipants: number | null;
+  tournamentStage: string | null;
+  isScotch: boolean;
+  rule: {
+    maxEntries: number | null;
+    useWaiting: boolean;
+    bracketConfig: string | null;
+  } | null;
+  matchVenues: Array<{
+    displayLabel: string;
+    venueName: string | null;
+    address: string | null;
+    phone: string | null;
+  }>;
+  tournamentVenues: Array<{
+    organization: { id: string; name: string; slug: string | null };
+  }>;
+  _count: { finalMatches: number };
+};
+
+/** 공개 상세 첫 화면용 경량 relation select: 명단/운영 상세를 제외하고 화면 즉시 필요한 값만 */
+const TOURNAMENT_SUMMARY_RELATIONS = {
+  rule: {
+    select: {
+      maxEntries: true,
+      useWaiting: true,
+      bracketConfig: true,
+    },
+  },
+  _count: { select: { finalMatches: true } },
+  matchVenues: {
+    orderBy: { sortOrder: "asc" as const },
+    select: {
+      displayLabel: true,
+      venueName: true,
+      address: true,
+      phone: true,
+    },
+  },
+  tournamentVenues: {
+    orderBy: { sortOrder: "asc" as const },
+    select: {
+      organization: { select: ORGANIZATION_SELECT_PUBLIC },
+    },
+  },
+} as const;
+
 const TOURNAMENT_BASIC_RELATIONS = {
   organization: { select: ORGANIZATION_SELECT_PUBLIC },
   rule: true,
@@ -508,6 +570,75 @@ const TOURNAMENT_BASIC_RELATIONS = {
     },
   },
 } as const;
+
+export async function getTournamentSummary(id: string) {
+  try {
+    return await prisma.tournament.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        summary: true,
+        outlinePublished: true,
+        outlinePdfUrl: true,
+        posterImageUrl: true,
+        venue: true,
+        startAt: true,
+        endAt: true,
+        gameFormat: true,
+        status: true,
+        entryFee: true,
+        prizeInfo: true,
+        entryCondition: true,
+        maxParticipants: true,
+        tournamentStage: true,
+        isScotch: true,
+        ...TOURNAMENT_SUMMARY_RELATIONS,
+      },
+    });
+  } catch (e) {
+    const err = e as { message?: string; code?: string };
+    const isMissingColumn =
+      err?.message?.includes("outlinePdfUrl") || err?.code === "P2010";
+    if (!isMissingColumn) throw e;
+    const row = await prisma.tournament.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        summary: true,
+        outlinePublished: true,
+        posterImageUrl: true,
+        venue: true,
+        startAt: true,
+        endAt: true,
+        gameFormat: true,
+        status: true,
+        entryFee: true,
+        prizeInfo: true,
+        entryCondition: true,
+        maxParticipants: true,
+        tournamentStage: true,
+        isScotch: true,
+        ...TOURNAMENT_SUMMARY_RELATIONS,
+      },
+    });
+    if (!row) return null;
+    return { ...row, outlinePdfUrl: null as string | null };
+  }
+}
+
+export async function getTournamentDetailPromoContent(id: string): Promise<string | null> {
+  try {
+    const row = await prisma.tournament.findUnique({
+      where: { id },
+      select: { promoContent: true },
+    });
+    return row?.promoContent ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /** 대회 상세 첫 화면: TOURNAMENT_SELECT_BASIC + organization, rule, matchVenues, tournamentVenues, _count만. entries/rounds/brackets 별도 조회. */
 /** outlinePdfUrl·promoPdfUrl 미존재 DB 호환: 실패 시 해당 컬럼 제외 select로 재시도 후 null 보정. */
