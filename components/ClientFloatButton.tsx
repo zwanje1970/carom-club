@@ -48,7 +48,9 @@ function clampPosition(
 
 /**
  * 오른쪽 아래 고정 클라이언트 대시보드 버튼 (플랫폼 관리자 `AdminFloatButton`과 동일 형태·드래그, 색만 파란색)
- * - CLIENT_ADMIN + 클라이언트 로그인 모드일 때만 표시 → /client/dashboard
+ * - CLIENT_ADMIN + 클라이언트 로그인 모드일 때만 표시
+ *   - /client 외: "대시보드" → /client/dashboard
+ *   - /client 내부: "메인으로" → /
  */
 export function ClientFloatButton() {
   const router = useRouter();
@@ -67,9 +69,10 @@ export function ClientFloatButton() {
   const hasDraggedThisGestureRef = useRef(false);
 
   const isClientDashboard = user != null && canAccessClientDashboard(user);
+  const isInClientDashboard = pathname === "/client" || pathname.startsWith("/client/");
   const showButton = isClientDashboard && !pathname.startsWith("/tv");
-  const label = "대시보드";
-  const href = "/client/dashboard";
+  const label = isInClientDashboard ? "메인으로" : "대시보드";
+  const href = isInClientDashboard ? "/" : "/client/dashboard";
   const isDraggable = isClientDashboard;
   /** 관리자 검정 플로팅(z-110)과 겹침 완화: 기본 bottom을 한 단 올림 */
   const defaultBottomPx = DEFAULT_OFFSET + 56;

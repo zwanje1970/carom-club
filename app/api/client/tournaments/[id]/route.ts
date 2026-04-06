@@ -77,6 +77,7 @@ export async function PATCH(
     prizeInfo,
     rules,
     promoContent,
+    outlinePdfUrl,
     verificationMode,
     verificationReviewRequired,
     eligibilityType,
@@ -109,6 +110,7 @@ export async function PATCH(
     prizeInfo?: string | null;
     rules?: string | null;
     promoContent?: string | null;
+    outlinePdfUrl?: string | null;
     verificationMode?: string;
     verificationReviewRequired?: boolean;
     eligibilityType?: string | null;
@@ -234,6 +236,7 @@ export async function PATCH(
         ...(prizeInfo !== undefined && { prizeInfo: prizeInfo?.trim() || null }),
         ...(rules !== undefined && { rules: rules?.trim() || null }),
         ...(promoContent !== undefined && { promoContent: promoContent?.trim() || null }),
+        ...(outlinePdfUrl !== undefined && { outlinePdfUrl: outlinePdfUrl?.trim() || null }),
         ...(verificationPatch &&
           verificationPatch.ok && {
             verificationMode: verificationPatch.data.verificationMode,
@@ -280,6 +283,30 @@ export async function PATCH(
   } catch (e) {
     console.error("[client/tournaments PATCH]", e);
     return NextResponse.json({ error: "저장 중 오류가 발생했습니다." }, { status: 500 });
+  }
+}
+
+/** DELETE: 클라이언트 조직 권한과 동일 기준으로 대회 삭제 (생성·수정과 같은 게이트) */
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  if (!isDatabaseConfigured()) {
+    return NextResponse.json({ error: "데이터베이스가 연결되지 않았습니다." }, { status: 503 });
+  }
+  const session = await getSession();
+  const { id } = await params;
+  const gate = await assertClientCanMutateTournamentById(session, id);
+  if (!gate.ok) {
+    return NextResponse.json({ error: gate.error }, { status: gate.status });
+  }
+
+  try {
+    await prisma.tournament.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error("[client/tournaments DELETE]", e);
+    return NextResponse.json({ error: "삭제 중 오류가 발생했습니다." }, { status: 500 });
   }
 }
 

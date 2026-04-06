@@ -49,7 +49,7 @@ function clampPosition(
 /**
  * 오른쪽 아래 고정 관리자/대시보드 버튼
  * - 비로그인 또는 일반회원: "관리자" → /admin/login
- * - 관리자(PLATFORM_ADMIN): "대시보드" → /admin, 드래그로 위치 이동 가능, 위치 localStorage 저장
+ * - 관리자(PLATFORM_ADMIN): 대시보드 외 페이지에서는 "대시보드"(/admin), /admin 내부에서는 "메인으로"(/)
  * - /login 에서만 비로그인 시에도 "관리자" 버튼 표시
  */
 export function AdminFloatButton() {
@@ -69,9 +69,10 @@ export function AdminFloatButton() {
   const hasDraggedThisGestureRef = useRef(false);
 
   const isAdminLoggedIn = user?.canAccessAdmin === true;
+  const isInAdminDashboard = pathname === "/admin" || pathname.startsWith("/admin/");
   const showButton = (pathname === "/login" || isAdminLoggedIn) && !pathname.startsWith("/tv");
-  const label = isAdminLoggedIn ? "대시보드" : "관리자";
-  const href = isAdminLoggedIn ? "/admin" : "/admin/login";
+  const label = isAdminLoggedIn ? (isInAdminDashboard ? "메인으로" : "대시보드") : "관리자";
+  const href = isAdminLoggedIn ? (isInAdminDashboard ? "/" : "/admin") : "/admin/login";
   const isDraggable = isAdminLoggedIn;
 
   // Session: client-only fetch

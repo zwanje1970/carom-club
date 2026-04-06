@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import CardBox from "@/components/admin/_components/CardBox";
 import Button from "@/components/admin/_components/Button";
-import NotificationBar from "@/components/admin/_components/NotificationBar";
 import { AdminImageField } from "@/components/admin/_components/AdminImageField";
 import { SITE_NAME } from "@/lib/site-settings";
 
@@ -40,6 +39,12 @@ export default function AdminSiteHeroPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (!success) return;
+    const t = setTimeout(() => setSuccess(""), 2200);
+    return () => clearTimeout(t);
+  }, [success]);
+
   const save = async () => {
     setSaving(true);
     setError("");
@@ -55,10 +60,10 @@ export default function AdminSiteHeroPage() {
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "저장에 실패했습니다.");
-      setSuccess("저장되었습니다.");
+      if (!res.ok) throw new Error(data.error || "저장 실패");
+      setSuccess("저장 완료");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "저장에 실패했습니다.");
+      setError(e instanceof Error ? "저장 실패" : "저장 실패");
     } finally {
       setSaving(false);
     }
@@ -104,9 +109,10 @@ export default function AdminSiteHeroPage() {
             />
             <div className="flex flex-wrap items-center gap-2">
               <Button label={saving ? "저장 중..." : "저장"} color="info" disabled={saving} onClick={() => void save()} />
+              {saving ? <span className="text-xs text-gray-600 dark:text-slate-400">저장 중...</span> : null}
+              {!saving && success ? <span className="text-xs text-green-700 dark:text-green-300">{success}</span> : null}
+              {!saving && error ? <span className="text-xs text-red-600 dark:text-red-300">{error}</span> : null}
               <Button href="/admin/site" label="취소" color="contrast" outline />
-              {error ? <NotificationBar color="danger">{error}</NotificationBar> : null}
-              {success ? <NotificationBar color="success">{success}</NotificationBar> : null}
             </div>
           </>
         )}

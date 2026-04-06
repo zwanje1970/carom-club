@@ -5,7 +5,6 @@ import { mdiCardText } from "@mdi/js";
 import SectionMain from "@/components/admin/_components/Section/Main";
 import SectionTitleLineWithButton from "@/components/admin/_components/Section/TitleLineWithButton";
 import CardBox from "@/components/admin/_components/CardBox";
-import NotificationBar from "@/components/admin/_components/NotificationBar";
 import Button from "@/components/admin/_components/Button";
 import { BasicCard, HighlightCard } from "@/components/cards/TournamentPublishedCard";
 import {
@@ -117,6 +116,12 @@ export default function AdminPlatformCardTemplatesPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (!ok) return;
+    const t = setTimeout(() => setOk(""), 2200);
+    return () => clearTimeout(t);
+  }, [ok]);
+
   const save = async () => {
     setSaving(true);
     setError("");
@@ -150,14 +155,13 @@ export default function AdminPlatformCardTemplatesPage() {
           },
         }),
       });
-      const data = await res.json().catch(() => null);
       if (!res.ok) {
-        setError(typeof data?.error === "string" ? data.error : "저장에 실패했습니다.");
+        setError("저장 실패");
         return;
       }
-      setOk("카드 스타일 설정이 저장되었습니다.");
+      setOk("저장 완료");
     } catch {
-      setError("저장 중 오류가 발생했습니다.");
+      setError("저장 실패");
     } finally {
       setSaving(false);
     }
@@ -240,8 +244,6 @@ export default function AdminPlatformCardTemplatesPage() {
           템플릿은 basic / highlight 2종 고정입니다. 템플릿 구조는 유지하고 카드 스타일만 조정합니다.
         </p>
       </CardBox>
-      {error ? <NotificationBar color="danger">{error}</NotificationBar> : null}
-      {ok ? <NotificationBar color="success">{ok}</NotificationBar> : null}
 
       <div className="space-y-4">
         {policies.map((template) => (
@@ -448,8 +450,11 @@ export default function AdminPlatformCardTemplatesPage() {
           </CardBox>
         ))}
       </div>
-      <div className="mt-4">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button label={loading ? "불러오는 중..." : saving ? "저장 중..." : "카드 스타일 저장"} color="info" disabled={loading || saving} onClick={() => void save()} />
+        {saving ? <span className="text-xs text-gray-600 dark:text-slate-400">저장 중...</span> : null}
+        {!saving && ok ? <span className="text-xs text-green-700 dark:text-green-300">{ok}</span> : null}
+        {!saving && error ? <span className="text-xs text-red-600 dark:text-red-300">{error}</span> : null}
       </div>
     </SectionMain>
   );

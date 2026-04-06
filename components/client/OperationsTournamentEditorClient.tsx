@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TournamentFormSimple } from "@/components/client/TournamentFormSimple";
-import { RichEditorLazy } from "@/components/RichEditorLazy";
 import { ConsolePageHeader } from "@/components/client/console/ui/ConsolePageHeader";
 import { ConsoleSection } from "@/components/client/console/ui/ConsoleSection";
 import { ConsoleBadge } from "@/components/client/console/ui/ConsoleBadge";
@@ -16,6 +15,8 @@ import {
   type TournamentCardPublishData,
 } from "@/lib/client-card-publish";
 import { CardPublishEditorClient } from "@/app/(site)/client/operations/tournaments/[id]/card-publish/CardPublishEditorClient";
+import { ClientTournamentOutlineSection } from "@/components/client/console/ClientTournamentOutlineSection";
+import type { OutlineDisplayMode } from "@/lib/client-outline-templates";
 
 function parseBracketConfig(config: unknown): Record<string, unknown> | null {
   if (config == null) return null;
@@ -28,6 +29,22 @@ function parseBracketConfig(config: unknown): Record<string, unknown> | null {
     }
   }
   return null;
+}
+
+function extractImgFromPromo(html: string): string {
+  const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+  return m?.[1]?.trim() ?? "";
+}
+
+function inferOutlineMode(
+  t: { outlinePdfUrl?: string | null; promoContent?: string | null },
+  bc: Record<string, unknown> | null
+): OutlineDisplayMode {
+  const m = bc?.outlineDisplayMode as string | undefined;
+  if (m === "direct" || m === "load" || m === "image" || m === "pdf") return m;
+  if (t.outlinePdfUrl) return "pdf";
+  if (bc?.outlineImageUrl) return "image";
+  return "direct";
 }
 
 type Props = {
@@ -54,6 +71,9 @@ export function OperationsTournamentEditorClient({
 }: Props) {
   const router = useRouter();
   const [promoContent, setPromoContent] = useState("");
+  const [outlineDisplayMode, setOutlineDisplayMode] = useState<OutlineDisplayMode>("direct");
+  const [outlinePdfUrl, setOutlinePdfUrl] = useState("");
+  const [outlineImageUrl, setOutlineImageUrl] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(mode === "edit");
   const [initialData, setInitialData] = useState<
@@ -79,6 +99,12 @@ export function OperationsTournamentEditorClient({
         const startAt = t.startAt ? new Date(t.startAt) : null;
         const endAt = t.endAt ? new Date(t.endAt) : null;
         const bc = parseBracketConfig(t.rule?.bracketConfig);
+        const om = inferOutlineMode(t, bc);
+        setOutlineDisplayMode(om);
+        setOutlinePdfUrl(typeof t.outlinePdfUrl === "string" ? t.outlinePdfUrl : "");
+        const imgFromRule = typeof bc?.outlineImageUrl === "string" ? bc.outlineImageUrl : "";
+        const imgFromPromo = extractImgFromPromo(typeof t.promoContent === "string" ? t.promoContent : "");
+        setOutlineImageUrl(imgFromRule || imgFromPromo);
         setDescription(typeof t.description === "string" ? t.description : "");
         setInitialData({
           name: t.name ?? "",
@@ -163,6 +189,14 @@ export function OperationsTournamentEditorClient({
         ? [venues[0].venueName, venues[0].address].filter(Boolean).join(" ").trim() || null
         : null;
 
+    const outlineImg =
+      outlineDisplayMode === "image" ? outlineImageUrl.trim() || extractImgFromPromo(promoContent) : "";
+    const mergedBracketConfig = {
+      ...bracketConfig,
+      outlineDisplayMode,
+      outlineImageUrl: outlineDisplayMode === "image" && outlineImg ? outlineImg : null,
+    };
+
     const baseJson = {
       name: values.name.trim(),
       startAt: startAt.toISOString(),
@@ -182,10 +216,11 @@ export function OperationsTournamentEditorClient({
       entryFee: values.entryFee === "" || values.entryFee === null ? null : Number(values.entryFee),
       maxParticipants:
         values.maxParticipants === "" || values.maxParticipants === null ? null : Number(values.maxParticipants),
-      entryCondition: values.entryCondition.trim() || null,
+      entryCondition: values.entryQualificationType === "NONE" ? null : values.entryCondition.trim() || null,
       prizeInfo: values.prizeInfo.trim() || null,
       rules: values.rules.trim() || null,
       promoContent: promoContent.trim() || null,
+      outlinePdfUrl: outlineDisplayMode === "pdf" ? outlinePdfUrl.trim() || null : null,
       verificationMode: values.verificationMode,
       verificationReviewRequired: values.verificationReviewRequired,
       eligibilityType: values.eligibilityType,
@@ -206,9 +241,7 @@ export function OperationsTournamentEditorClient({
         body: JSON.stringify({
           ...baseJson,
           rule: {
-            bracketConfig: {
-              ...bracketConfig,
-            },
+            bracketConfig: mergedBracketConfig,
           },
         }),
       });
@@ -261,7 +294,7 @@ export function OperationsTournamentEditorClient({
     const ruleRes = await fetch(`/api/client/tournaments/${tournamentId}/rule`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bracketConfig }),
+      body: JSON.stringify({ bracketConfig: mergedBracketConfig }),
     });
     const ruleData = await ruleRes.json().catch(() => ({}));
     if (!ruleRes.ok) {
@@ -327,14 +360,21 @@ export function OperationsTournamentEditorClient({
             onCancelHref="/client/tournaments"
             submitLabel={mode === "create" ? "저장" : "저장"}
           >
-            <div>
-              <RichEditorLazy
-                value={promoContent}
-                onChange={setPromoContent}
-                placeholder="경기 요강·홍보 문구를 입력하세요"
-                minHeight="200px"
-              />
-            </div>
+            <ClientTournamentOutlineSection
+              organizationId={organizationId}
+              outlineDisplayMode={outlineDisplayMode}
+              setOutlineDisplayMode={(m) => {
+                setOutlineDisplayMode(m);
+                if (m !== "pdf") setOutlinePdfUrl("");
+                if (m !== "image") setOutlineImageUrl("");
+              }}
+              promoContent={promoContent}
+              setPromoContent={setPromoContent}
+              outlinePdfUrl={outlinePdfUrl}
+              setOutlinePdfUrl={setOutlinePdfUrl}
+              outlineImageUrl={outlineImageUrl}
+              setOutlineImageUrl={setOutlineImageUrl}
+            />
           </TournamentFormSimple>
         </div>
 

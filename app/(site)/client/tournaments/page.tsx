@@ -5,6 +5,8 @@ import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
 import { formatKoreanDateWithWeekday } from "@/lib/format-date";
 import { canAccessClientDashboard } from "@/types/auth";
+import { getClientOrgTournamentMutationRole } from "@/lib/client-tournament-access";
+import { ClientTournamentDeleteControl } from "@/components/client/console/ClientTournamentDeleteControl";
 import { ConsolePageHeader } from "@/components/client/console/ui/ConsolePageHeader";
 import {
   ConsoleTable,
@@ -49,6 +51,8 @@ export default async function ClientTournamentsPage({
     where: { id: orgId },
     select: { name: true },
   });
+
+  const canMutate = (await getClientOrgTournamentMutationRole(session.id, orgId)) != null;
 
   const { tab } = await searchParams;
   const activeTab = tab === "progress" || tab === "finished" || tab === "planned" ? tab : "all";
@@ -150,7 +154,7 @@ export default async function ClientTournamentsPage({
                     <ConsoleTableTh className="text-right">승인</ConsoleTableTh>
                     <ConsoleTableTh className="text-right">미승인</ConsoleTableTh>
                     <ConsoleTableTh>상태</ConsoleTableTh>
-                    <ConsoleTableTh className="text-right">이동</ConsoleTableTh>
+                    <ConsoleTableTh className="text-right">관리</ConsoleTableTh>
                   </ConsoleTableRow>
                 </ConsoleTableHead>
                 <ConsoleTableBody>
@@ -170,9 +174,14 @@ export default async function ClientTournamentsPage({
                         </span>
                       </ConsoleTableTd>
                       <ConsoleTableTd className="text-right">
-                        <Link href={`/client/tournaments/${t.id}`} className="text-xs font-semibold text-indigo-800 underline dark:text-indigo-300">
-                          대회현황
-                        </Link>
+                        <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end sm:gap-2">
+                          <Link href={`/client/tournaments/${t.id}`} className="text-xs font-semibold text-indigo-800 underline dark:text-indigo-300">
+                            대회현황
+                          </Link>
+                          {canMutate ? (
+                            <ClientTournamentDeleteControl tournamentId={t.id} tournamentName={t.name} variant="list-table" />
+                          ) : null}
+                        </div>
                       </ConsoleTableTd>
                     </ConsoleTableRow>
                   ))}
@@ -182,23 +191,31 @@ export default async function ClientTournamentsPage({
 
             <div className="space-y-3 p-2 md:hidden">
               {tournaments.map((t) => (
-                <Link
+                <div
                   key={t.id}
-                  href={`/client/tournaments/${t.id}`}
-                  className="block rounded-lg border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-700 dark:bg-zinc-900"
+                  className="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-700 dark:bg-zinc-900"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{t.name}</h3>
-                    <span className={`rounded border px-2 py-0.5 text-[10px] font-semibold ${statusTone(t.status)}`}>
-                      {statusLabel(t.status)}
-                    </span>
+                    <Link href={`/client/tournaments/${t.id}`} className="min-w-0 flex-1">
+                      <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{t.name}</h3>
+                    </Link>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span className={`rounded border px-2 py-0.5 text-[10px] font-semibold ${statusTone(t.status)}`}>
+                        {statusLabel(t.status)}
+                      </span>
+                      {canMutate ? (
+                        <ClientTournamentDeleteControl tournamentId={t.id} tournamentName={t.name} variant="list-card" />
+                      ) : null}
+                    </div>
                   </div>
-                  <p className="mt-1 text-[11px] text-zinc-500">{formatKoreanDateWithWeekday(t.startAt)}</p>
-                  <p className="mt-2 text-[11px] text-zinc-700 dark:text-zinc-300">
+                  <Link href={`/client/tournaments/${t.id}`} className="mt-1 block text-[11px] text-zinc-500">
+                    {formatKoreanDateWithWeekday(t.startAt)}
+                  </Link>
+                  <Link href={`/client/tournaments/${t.id}`} className="mt-2 block text-[11px] text-zinc-700 dark:text-zinc-300">
                     신청자 {t._count.entries}
                     {t.maxParticipants ? ` / ${t.maxParticipants}` : ""} · 승인 {approvedMap[t.id] ?? 0} · 미승인 {pendingMap[t.id] ?? 0}
-                  </p>
-                </Link>
+                  </Link>
+                </div>
               ))}
             </div>
           </>

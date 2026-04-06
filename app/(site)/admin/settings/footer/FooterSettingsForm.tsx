@@ -6,7 +6,6 @@ import { mdiPlus, mdiMinus } from "@mdi/js";
 import Icon from "@mdi/react";
 import CardBox from "@/components/admin/_components/CardBox";
 import Button from "@/components/admin/_components/Button";
-import NotificationBar from "@/components/admin/_components/NotificationBar";
 import type { FooterSettings, FooterPartner, FooterFontSize, FooterItemFontSizeKey } from "@/lib/footer-settings";
 import {
   FOOTER_PARTNER_CATEGORIES,
@@ -91,12 +90,12 @@ export default function FooterSettingsForm({ cancelHref = "/admin/settings" }: F
         body: JSON.stringify(form),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "저장에 실패했습니다.");
+      if (!res.ok) throw new Error(data.error || "저장 실패");
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "저장에 실패했습니다.");
+      setError(err instanceof Error ? "저장 실패" : "저장 실패");
     } finally {
       setSaving(false);
     }
@@ -434,9 +433,10 @@ export default function FooterSettingsForm({ cancelHref = "/admin/settings" }: F
           color="info"
           disabled={saving}
         />
+        {saving ? <span className="text-xs text-gray-600 dark:text-slate-400">저장 중...</span> : null}
+        {!saving && success ? <span className="text-xs text-green-700 dark:text-green-300">저장 완료</span> : null}
+        {!saving && error ? <span className="text-xs text-red-600 dark:text-red-300">{error}</span> : null}
         <Button href={cancelHref} label="취소" color="contrast" outline />
-        {error && <NotificationBar color="danger">{error}</NotificationBar>}
-        {success && <NotificationBar color="success">저장되었습니다.</NotificationBar>}
       </div>
     </form>
   );

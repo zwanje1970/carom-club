@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Button from "@/components/admin/_components/Button";
 import CardBox from "@/components/admin/_components/CardBox";
-import NotificationBar from "@/components/admin/_components/NotificationBar";
 import type { SiteCardStyle } from "@/lib/site-card-style";
 
 const DEFAULT_STYLE: SiteCardStyle = {
@@ -42,6 +41,12 @@ export default function AdminSiteCardStylePage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (!ok) return;
+    const t = setTimeout(() => setOk(""), 2200);
+    return () => clearTimeout(t);
+  }, [ok]);
+
   const save = async () => {
     setSaving(true);
     setError("");
@@ -54,12 +59,12 @@ export default function AdminSiteCardStylePage() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        setError(typeof data?.error === "string" ? data.error : "저장에 실패했습니다.");
+        setError("저장 실패");
         return;
       }
-      setOk("기본 카드 설정이 저장되었습니다.");
+      setOk("저장 완료");
     } catch {
-      setError("저장 중 오류가 발생했습니다.");
+      setError("저장 실패");
     } finally {
       setSaving(false);
     }
@@ -73,9 +78,6 @@ export default function AdminSiteCardStylePage() {
           페이지빌더에서 &quot;기본 카드 사용&quot;을 선택한 블록에 공통으로 적용됩니다.
         </p>
       </CardBox>
-
-      {error ? <NotificationBar color="danger">{error}</NotificationBar> : null}
-      {ok ? <NotificationBar color="success">{ok}</NotificationBar> : null}
 
       <CardBox className="space-y-4">
         {loading ? (
@@ -193,7 +195,12 @@ export default function AdminSiteCardStylePage() {
           </>
         )}
         <div className="pt-1">
-          <Button label={saving ? "저장 중..." : "기본 카드 저장"} color="info" disabled={saving || loading} onClick={() => void save()} />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button label={saving ? "저장 중..." : "기본 카드 저장"} color="info" disabled={saving || loading} onClick={() => void save()} />
+            {saving ? <span className="text-xs text-gray-600 dark:text-slate-400">저장 중...</span> : null}
+            {!saving && ok ? <span className="text-xs text-green-700 dark:text-green-300">{ok}</span> : null}
+            {!saving && error ? <span className="text-xs text-red-600 dark:text-red-300">{error}</span> : null}
+          </div>
         </div>
       </CardBox>
     </div>

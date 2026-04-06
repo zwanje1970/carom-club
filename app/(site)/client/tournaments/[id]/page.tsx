@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
+import { getClientOrgTournamentMutationRole } from "@/lib/client-tournament-access";
+import { ClientTournamentDeleteControl } from "@/components/client/console/ClientTournamentDeleteControl";
 import { canAccessClientDashboard } from "@/types/auth";
 import { formatKoreanDateWithWeekday } from "@/lib/format-date";
 import { CloseRecruitButton } from "@/app/(site)/client/operations/tournaments/[id]/CloseRecruitButton";
@@ -55,6 +57,8 @@ export default async function ClientTournamentDetailPage({
 
   const orgId = await getClientAdminOrganizationId(session);
   if (!orgId) redirect("/client/setup");
+
+  const canMutate = (await getClientOrgTournamentMutationRole(session.id, orgId)) != null;
 
   const { id } = await params;
   const tournament = await prisma.tournament.findFirst({
@@ -172,10 +176,13 @@ export default async function ClientTournamentDetailPage({
         </Link>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Link href="/client/tournaments" className="text-xs font-semibold text-indigo-800 underline dark:text-indigo-300">
           ← 전체대회
         </Link>
+        {canMutate ? (
+          <ClientTournamentDeleteControl tournamentId={tournament.id} tournamentName={tournament.name} variant="detail" />
+        ) : null}
       </div>
     </div>
   );

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AddressSearchButton } from "@/components/AddressSearchButton";
 
@@ -184,11 +183,11 @@ function OrgImageUpload({
 }
 
 export default function ClientSetupPage() {
-  const router = useRouter();
   const [org, setOrg] = useState<Org | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"" | "saving" | "success" | "failed">("");
+  const [saveFailure, setSaveFailure] = useState("");
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     slug: "",
@@ -284,8 +283,8 @@ export default function ClientSetupPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
-    setSuccess(false);
+    setSaveFailure("");
+    setSaveStatus("saving");
     setSaving(true);
     try {
       const typeSpecificJson =
@@ -318,14 +317,13 @@ export default function ClientSetupPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "저장에 실패했습니다.");
+        setSaveFailure("저장 실패");
+        setSaveStatus("failed");
         return;
       }
-      setSuccess(true);
-      setTimeout(() => {
-        router.push("/client/dashboard");
-        router.refresh();
-      }, 1000);
+      setSaveStatus("success");
+      setTimeout(() => setSaveStatus(""), 2200);
+      setSaveFailure("");
     } finally {
       setSaving(false);
     }
@@ -368,9 +366,6 @@ export default function ClientSetupPage() {
       <form onSubmit={handleSubmit} className="space-y-6 rounded-lg border border-site-border bg-site-card p-6">
         {error && (
           <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</p>
-        )}
-        {success && (
-          <p className="text-sm text-green-700 bg-green-50 p-2 rounded">저장되었습니다.</p>
         )}
 
         <div>
@@ -858,6 +853,9 @@ export default function ClientSetupPage() {
           >
             {saving ? "저장중" : "저장하고 완료"}
           </button>
+          {saveStatus === "saving" ? <span className="self-center text-sm text-gray-600">저장 중...</span> : null}
+          {saveStatus === "success" ? <span className="self-center text-sm text-green-700">저장 완료</span> : null}
+          {saveStatus === "failed" ? <span className="self-center text-sm text-red-600">{saveFailure || "저장 실패"}</span> : null}
           <Link
             href="/client/dashboard"
             className="rounded-lg border border-site-border px-5 py-2.5 font-medium text-gray-700 hover:bg-gray-50"

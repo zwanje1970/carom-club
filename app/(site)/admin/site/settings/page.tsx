@@ -8,7 +8,6 @@ import SectionMain from "@/components/admin/_components/Section/Main";
 import SectionTitleLineWithButton from "@/components/admin/_components/Section/TitleLineWithButton";
 import CardBox from "@/components/admin/_components/CardBox";
 import Button from "@/components/admin/_components/Button";
-import NotificationBar from "@/components/admin/_components/NotificationBar";
 import { AdminColorField } from "@/components/admin/_components/AdminColorField";
 import { AdminImageField } from "@/components/admin/_components/AdminImageField";
 import FooterSettingsForm from "@/app/(site)/admin/settings/footer/FooterSettingsForm";
@@ -151,7 +150,7 @@ export default function AdminSiteSettingsPage() {
       setTimeout(() => setSuccess(false), 3000);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "저장에 실패했습니다.");
+      setError("저장 실패");
     } finally {
       setSaving(false);
     }
@@ -423,9 +422,10 @@ export default function AdminSiteSettingsPage() {
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button type="submit" label={saving ? "저장중" : "저장"} color="info" disabled={saving} />
+            {saving ? <span className="text-xs text-gray-600 dark:text-slate-400">저장 중...</span> : null}
+            {!saving && success ? <span className="text-xs text-green-700 dark:text-green-300">저장 완료</span> : null}
+            {!saving && error ? <span className="text-xs text-red-600 dark:text-red-300">{error}</span> : null}
             <Button href="/admin" label="취소" color="contrast" outline />
-            {error && <NotificationBar color="danger">{error}</NotificationBar>}
-            {success && <NotificationBar color="success">저장되었습니다.</NotificationBar>}
           </div>
         </form>
       </CardBox>

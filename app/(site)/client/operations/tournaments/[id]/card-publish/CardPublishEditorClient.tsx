@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { AdminImageField } from "@/components/admin/_components/AdminImageField";
 import { BasicCard, HighlightCard } from "@/components/cards/TournamentPublishedCard";
 import type { TournamentCardPublishData } from "@/lib/client-card-publish";
@@ -34,7 +33,6 @@ export function CardPublishEditorClient({
   initialPublished,
   hasSavedCardData,
 }: Props) {
-  const router = useRouter();
   const [cardData, setCardData] = useState<TournamentCardPublishData>(initialCardData);
   const [published, setPublished] = useState<TournamentCardPublishData | null>(initialPublished);
   const [saving, setSaving] = useState(false);
@@ -107,6 +105,12 @@ export function CardPublishEditorClient({
     };
   }, [hasSavedCardData]);
 
+  useEffect(() => {
+    if (!message) return;
+    const t = setTimeout(() => setMessage(""), 2200);
+    return () => clearTimeout(t);
+  }, [message]);
+
   const preview = useMemo(() => {
     const selectedTemplate = templateOptions.find((item) => item.templateType === cardData.templateType);
     const showDetailButton =
@@ -130,19 +134,14 @@ export function CardPublishEditorClient({
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data) {
-        setError(typeof data?.error === "string" ? data.error : "저장에 실패했습니다.");
+        setError("저장 실패");
         return;
       }
       setCardData(data.cardData as TournamentCardPublishData);
       setPublished((data.published as TournamentCardPublishData | null) ?? null);
-      if (action === "publish") {
-        router.push("/");
-        return;
-      }
-      setMessage("초안 저장 완료");
-      router.refresh();
+      setMessage("저장 완료");
     } catch {
-      setError("저장 중 오류가 발생했습니다.");
+      setError("저장 실패");
     } finally {
       setSaving(false);
     }
@@ -160,8 +159,6 @@ export function CardPublishEditorClient({
         </Link>
       </div>
 
-      {message ? <p className="text-xs text-green-700 dark:text-green-300">{message}</p> : null}
-      {error ? <p className="text-xs text-red-600 dark:text-red-300">{error}</p> : null}
       <p className="text-xs text-zinc-500 dark:text-zinc-400">
         현재 발행 상태: {published?.isPublished ? "발행됨" : "미발행"}
       </p>
@@ -218,6 +215,9 @@ export function CardPublishEditorClient({
               >
                 저장후발행
               </button>
+              {saving ? <span className="inline-flex items-center text-xs text-zinc-600 dark:text-zinc-400">저장 중...</span> : null}
+              {!saving && message ? <span className="inline-flex items-center text-xs text-green-700 dark:text-green-300">{message}</span> : null}
+              {!saving && error ? <span className="inline-flex items-center text-xs text-red-600 dark:text-red-300">{error}</span> : null}
             </div>
           </div>
         </section>

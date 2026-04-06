@@ -15,6 +15,7 @@ import {
 } from "@/lib/tournament-certification";
 import { TOURNAMENT_STATUSES } from "@/types/tournament";
 import { processImage } from "@/lib/process-image.client";
+import { formatKoreanSchedule } from "@/lib/format-date";
 
 // 경기 방식: 토너먼트 / 스카치 / 서바이벌 / 4구대회
 const GAME_FORMAT_OPTIONS = [
@@ -29,9 +30,33 @@ const SCOPE_OPTIONS = [
   { value: "NATIONAL", label: "전국대회" },
 ] as const;
 
+/** datetime-local 문자열 → 날짜·시각 분리 (브라우저 기본 달력은 날짜만 빠르게 확정되도록 분리 입력용) */
+function splitDatetimeLocal(iso: string): { date: string; time: string } {
+  if (!iso || typeof iso !== "string") return { date: "", time: "" };
+  const s = iso.trim();
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})[Tt](\d{1,2}):(\d{2})/);
+  if (m) {
+    const hh = m[2].padStart(2, "0");
+    return { date: m[1], time: `${hh}:${m[3]}` };
+  }
+  const dm = s.match(/^(\d{4}-\d{2}-\d{2})$/);
+  if (dm) return { date: dm[1], time: "09:00" };
+  return { date: "", time: "" };
+}
+
+function joinDatetimeLocal(date: string, time: string): string {
+  const d = date.trim();
+  if (!d) return "";
+  const tRaw = time.trim();
+  const tm = tRaw.match(/^(\d{1,2}):(\d{2})$/);
+  const t = tm ? `${tm[1].padStart(2, "0")}:${tm[2]}` : "09:00";
+  return `${d}T${t}`;
+}
+
 const ENTRY_QUALIFICATION_OPTIONS = [
   { value: "SCORE", label: "점수 기준" },
   { value: "EVER", label: "에버 기준" },
+  { value: "NONE", label: "상관없음" },
 ] as const;
 
 export type BracketConfigExtra = {
@@ -40,7 +65,7 @@ export type BracketConfigExtra = {
   allowMultipleSlots?: boolean;
   participantsListPublic?: boolean;
   durationType?: "1_DAY" | "2_DAYS" | "3_PLUS";
-  entryQualificationType?: "SCORE" | "EVER";
+  entryQualificationType?: "SCORE" | "EVER" | "NONE";
   accountNumber?: string;
 };
 
@@ -60,7 +85,7 @@ export type TournamentFormValues = {
   isScotch: boolean;
   teamScoreLimit: string | number;
   teamScoreRule: "LTE" | "LT";
-  entryQualificationType: "SCORE" | "EVER";
+  entryQualificationType: "SCORE" | "EVER" | "NONE";
   entryCondition: string;
   maxParticipants: string | number;
   accountNumber: string;
@@ -335,6 +360,12 @@ export function TournamentFormSimple({
   const submitAsDraftRef = useRef(false);
   const showScotchFields = form.gameFormat === "SCOTCH" || form.isScotch;
 
+  useEffect(() => {
+    if (!success) return;
+    const t = setTimeout(() => setSuccess(false), 2200);
+    return () => clearTimeout(t);
+  }, [success]);
+
   function applyDefaultVenueInfo() {
     const nextVenueName = (defaultVenueInfo?.venueName ?? "").trim();
     const nextAddress = (defaultVenueInfo?.address ?? "").trim();
@@ -446,6 +477,12 @@ export function TournamentFormSimple({
       setError("경기 일정(시작일시)을 선택해 주세요.");
       return;
     }
+    if (form.entryQualificationType === "SCORE" || form.entryQualificationType === "EVER") {
+      if (!form.entryCondition.trim()) {
+        setError("참가 조건(점수·에버 설명)을 입력해 주세요.");
+        return;
+      }
+    }
     if (form.eligibilityType === "UNDER") {
       const v = form.eligibilityValue.trim();
       const n = Number.parseFloat(v.replace(",", "."));
@@ -496,11 +533,6 @@ export function TournamentFormSimple({
 
   return (
     <form id={formDomId} onSubmit={handleSubmit} className={chrome.form}>
-      {success && (
-        <p className="text-sm text-green-700 bg-green-50 dark:bg-green-900/20 p-3 rounded-lg" role="status">
-          저장되었습니다.
-        </p>
-      )}
 
       {/* 1. 기본 정보 */}
       <section className={chrome.section}>
@@ -754,20 +786,32 @@ export function TournamentFormSimple({
                     ? chrome.pillPrimary
                     : chrome.pillOff
                 }`}
-                onClick={() => setForm((f) => ({ ...f, entryQualificationType: opt.value }))}
+                onClick={() =>
+                  setForm((f) => ({
+                    ...f,
+                    entryQualificationType: opt.value,
+                    entryCondition: opt.value === "NONE" ? "" : f.entryCondition,
+                  }))
+                }
               >
                 {opt.label}
               </button>
             ))}
           </div>
-          <input
-            type="text"
-            required
-            className={chrome.select}
-            placeholder="예: 에버 0.5 미만 / 점수 10점 이상"
-            value={form.entryCondition}
-            onChange={(e) => setForm((f) => ({ ...f, entryCondition: e.target.value }))}
-          />
+          {form.entryQualificationType === "NONE" ? (
+            <p className={`rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-200`}>
+              참가 신청에 점수·에버 조건을 적용하지 않습니다.
+            </p>
+          ) : (
+            <input
+              type="text"
+              required
+              className={chrome.select}
+              placeholder="예: 에버 0.5 미만 / 점수 10점 이상"
+              value={form.entryCondition}
+              onChange={(e) => setForm((f) => ({ ...f, entryCondition: e.target.value }))}
+            />
+          )}
         </div>
         <div>
           <label className={chrome.label}>지역 / 전국 *</label>
@@ -1034,25 +1078,110 @@ export function TournamentFormSimple({
       {/* 3. 일정 · 장소 */}
       <section className={chrome.section}>
         <h2 className={chrome.sectionTitle}>일정 · 장소</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className={chrome.label}>시작 일시 *</label>
-            <input
-              type="datetime-local"
-              required
-              className={chrome.select}
-              value={form.startAt}
-              onChange={(e) => setForm((f) => ({ ...f, startAt: e.target.value }))}
-            />
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-2 rounded-lg border border-zinc-200 bg-zinc-50/80 p-3 dark:border-zinc-600 dark:bg-zinc-800/40">
+              <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-100">시작 일시 *</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div>
+                  <label className={`${chrome.label} !mb-0.5 text-[11px]`}>시작 날짜</label>
+                  <input
+                    type="date"
+                    required
+                    className={`${chrome.select} ${splitDatetimeLocal(form.startAt).date ? "ring-2 ring-site-primary/40 dark:ring-site-primary/50" : ""}`}
+                    value={splitDatetimeLocal(form.startAt).date}
+                    onChange={(e) => {
+                      const nd = e.target.value;
+                      setForm((f) => {
+                        const prev = splitDatetimeLocal(f.startAt);
+                        return { ...f, startAt: joinDatetimeLocal(nd, prev.time || "09:00") };
+                      });
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className={`${chrome.label} !mb-0.5 text-[11px]`}>시작 시각</label>
+                  <input
+                    type="time"
+                    step={60}
+                    className={chrome.select}
+                    value={splitDatetimeLocal(form.startAt).time}
+                    onChange={(e) => {
+                      const nt = e.target.value;
+                      setForm((f) => {
+                        const prev = splitDatetimeLocal(f.startAt);
+                        if (!prev.date) return f;
+                        return { ...f, startAt: joinDatetimeLocal(prev.date, nt) };
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2 rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-600 dark:bg-zinc-900">
+              <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-100">종료 일시</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div>
+                  <label className={`${chrome.label} !mb-0.5 text-[11px]`}>종료 날짜</label>
+                  <input
+                    type="date"
+                    className={`${chrome.select} ${splitDatetimeLocal(form.endAt).date ? "ring-2 ring-amber-400/70 dark:ring-amber-500/50" : ""}`}
+                    value={splitDatetimeLocal(form.endAt).date}
+                    onChange={(e) => {
+                      const nd = e.target.value;
+                      setForm((f) => {
+                        const prev = splitDatetimeLocal(f.endAt);
+                        return { ...f, endAt: nd ? joinDatetimeLocal(nd, prev.time || "18:00") : "" };
+                      });
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className={`${chrome.label} !mb-0.5 text-[11px]`}>종료 시각</label>
+                  <input
+                    type="time"
+                    step={60}
+                    className={chrome.select}
+                    value={splitDatetimeLocal(form.endAt).time}
+                    onChange={(e) => {
+                      const nt = e.target.value;
+                      setForm((f) => {
+                        const prev = splitDatetimeLocal(f.endAt);
+                        if (!prev.date) return f;
+                        return { ...f, endAt: joinDatetimeLocal(prev.date, nt) };
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-          <div>
-            <label className={chrome.label}>종료 일시</label>
-            <input
-              type="datetime-local"
-              className={chrome.select}
-              value={form.endAt}
-              onChange={(e) => setForm((f) => ({ ...f, endAt: e.target.value }))}
-            />
+          <div
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-800 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+            role="status"
+            aria-live="polite"
+          >
+            {form.startAt ? (
+              <p>
+                <span className="font-semibold text-site-primary">시작</span>{" "}
+                {formatKoreanSchedule(form.startAt)}
+              </p>
+            ) : (
+              <p className="text-zinc-500 dark:text-zinc-400">시작 날짜를 선택하면 여기에 표시됩니다.</p>
+            )}
+            {form.endAt ? (
+              <p className="mt-1">
+                <span className="font-semibold text-amber-700 dark:text-amber-400">종료</span>{" "}
+                {formatKoreanSchedule(form.endAt)}
+              </p>
+            ) : form.startAt ? (
+              <p className="mt-1 text-zinc-500 dark:text-zinc-400">종료는 비워 두면 저장 시 대회 기간(일)으로 자동 계산됩니다.</p>
+            ) : null}
+            {form.startAt && form.endAt ? (
+              <p className="mt-2 border-t border-zinc-100 pt-2 text-[11px] text-zinc-600 dark:border-zinc-700 dark:text-zinc-300">
+                구간: {formatKoreanSchedule(form.startAt, form.endAt)}
+              </p>
+            ) : null}
           </div>
         </div>
         <div>
@@ -1178,6 +1307,11 @@ export function TournamentFormSimple({
         >
           {saving ? "저장 중..." : submitLabel ?? (mode === "create" ? "등록" : "저장")}
         </button>
+        {saving ? (
+          <span className="text-sm text-gray-600 dark:text-slate-400" role="status">저장 중...</span>
+        ) : success ? (
+          <span className="text-sm text-green-700 dark:text-green-300" role="status">저장 완료</span>
+        ) : null}
         {error && (
           <span className="text-sm text-red-600 dark:text-red-400" role="alert">
             {error}

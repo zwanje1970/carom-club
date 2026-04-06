@@ -41,6 +41,7 @@ export type TournamentCreateFields = {
   prizeInfo?: string | null;
   rules?: string | null;
   promoContent?: string | null;
+  outlinePdfUrl?: string | null;
   outlineDraft?: string | null;
   outlinePublished?: string | null;
   approvalType?: string | null;
@@ -92,6 +93,7 @@ export function buildTournamentCreateData(
     prizeInfo: f.prizeInfo != null ? String(f.prizeInfo).trim() || null : null,
     rules: f.rules != null ? String(f.rules).trim() || null : null,
     promoContent: f.promoContent != null ? String(f.promoContent).trim() || null : null,
+    outlinePdfUrl: f.outlinePdfUrl != null ? String(f.outlinePdfUrl).trim() || null : null,
     outlineDraft: f.outlineDraft != null ? String(f.outlineDraft).trim() || null : null,
     outlinePublished: f.outlinePublished != null ? String(f.outlinePublished).trim() || null : null,
     approvalType: f.approvalType != null ? String(f.approvalType).trim() || undefined : undefined,

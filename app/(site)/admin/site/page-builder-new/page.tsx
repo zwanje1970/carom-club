@@ -984,6 +984,57 @@ export default function AdminSitePageBuilderNewPage() {
                   />
                 ))
               ) : null}
+              <div className="space-y-2 rounded border border-site-border p-3 sm:col-span-2">
+                <p className="text-xs font-semibold text-gray-700 dark:text-slate-300">슬라이드 설정</p>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(style.slideEnabled)}
+                    onChange={(e) => updateStyle({ slideEnabled: e.target.checked })}
+                  />
+                  슬라이드 사용
+                </label>
+                {Boolean(style.slideEnabled) ? (
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <label className="space-y-1">
+                      <span className="block text-[11px] text-gray-600 dark:text-slate-400">자동 재생</span>
+                      <select
+                        value={String(style.slideAutoPlay ?? "true")}
+                        onChange={(e) => updateStyle({ slideAutoPlay: e.target.value === "true" })}
+                        className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                      >
+                        <option value="true">켜기</option>
+                        <option value="false">끄기</option>
+                      </select>
+                    </label>
+                    <label className="space-y-1">
+                      <span className="block text-[11px] text-gray-600 dark:text-slate-400">속도</span>
+                      <select
+                        value={String(style.slideSpeed ?? "normal")}
+                        onChange={(e) => updateStyle({ slideSpeed: e.target.value })}
+                        className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                      >
+                        <option value="slow">느리게</option>
+                        <option value="normal">보통</option>
+                        <option value="fast">빠르게</option>
+                      </select>
+                    </label>
+                    <label className="space-y-1">
+                      <span className="block text-[11px] text-gray-600 dark:text-slate-400">호버 시 동작</span>
+                      <select
+                        value={String(style.slidePauseOnHover ?? "true")}
+                        onChange={(e) => updateStyle({ slidePauseOnHover: e.target.value === "true" })}
+                        className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                      >
+                        <option value="true">멈춤</option>
+                        <option value="false">계속 이동</option>
+                      </select>
+                    </label>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-gray-500 dark:text-slate-400">슬라이드가 꺼져 있으면 일반 카드 목록으로 표시됩니다.</p>
+                )}
+              </div>
               <button type="button" onClick={() => updateStyle({ contentExtras: [...(((style.contentExtras as unknown[]) ?? [])), ""] })} className="rounded border border-site-border px-3 py-1 text-xs hover:bg-gray-50 dark:hover:bg-slate-800">
                 내용추가+
               </button>
