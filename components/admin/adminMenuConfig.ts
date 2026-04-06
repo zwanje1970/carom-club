@@ -19,6 +19,22 @@ import type { MenuAsideItem } from "./_interfaces";
 const CLIENT_CHILD_HREFS = ["/admin/venues", "/admin/client-applications", "/admin/fee-ledger"] as const;
 /** 사이트관리 진입(사이드바 활성화용) */
 export const SITE_CHILD_HREFS = ["/admin/site", "/admin/site/page-builder-new"] as const;
+const PLATFORM_SITE_CHILD_HREFS = [
+  "/admin/site",
+  "/admin/site/page-builder-new",
+  "/admin/site/page-builder-next",
+  "/admin/site/page-builder-v2",
+  "/admin/site/content",
+  "/admin/site/community",
+  "/admin/site/copy",
+  "/admin/site/header",
+  "/admin/site/hero",
+  "/admin/site/footer",
+  "/admin/site/intro",
+  "/admin/site/card-style",
+  "/admin/site/settings",
+  "/admin/site/color-theme",
+] as const;
 
 /** 현재 pathname이 해당 그룹에 속하는지 */
 export function isGroupActive(pathname: string, hrefs: string[]): boolean {
@@ -54,7 +70,7 @@ export function getAdminMenuAside(copy?: Record<string, string> | undefined): Me
 
 /**
  * 플랫폼 운영 전용 사이드바 메뉴 구조
- * 순서: 플랫폼 대시보드 → 클라이언트 관리 → 승인 관리 → 권한 관리 → 정산/결제 → 카드 템플릿
+ * 순서: 플랫폼 대시보드 → 클라이언트 관리 → 승인 관리 → 권한 관리 → 정산/결제 → 카드 템플릿 → 사이트관리
  */
 export function getPlatformMenuAside(copy?: Record<string, string> | undefined): MenuAsideItem[] {
   const L = (key: string, fallback: string) =>
@@ -67,6 +83,24 @@ export function getPlatformMenuAside(copy?: Record<string, string> | undefined):
     { href: "/admin/members", label: L("menu.membersUnified", "권한 관리"), icon: mdiAccountMultiple },
     { href: "/admin/fee-ledger", label: L("menu.feeLedger", "정산/결제"), icon: mdiCashMultiple },
     { href: "/admin/platform/card-templates", label: L("menu.platformCardTemplates", "카드 템플릿"), icon: mdiCardText },
+    {
+      label: L("menu.siteManagement", "사이트관리"),
+      icon: mdiCog,
+      menu: [
+        { href: "/admin/site", label: L("menu.siteManagementHome", "사이트관리 홈") },
+        { href: "/admin/site/page-builder-new", label: L("menu.pageBuilder", "페이지빌더") },
+        { href: "/admin/site/content", label: L("menu.contentManagement", "콘텐츠 관리") },
+        { href: "/admin/site/community", label: L("menu.communityManagement", "커뮤니티 관리") },
+        { href: "/admin/site/copy", label: L("menu.copyManagement", "문구 관리") },
+        { href: "/admin/site/header", label: L("menu.headerManagement", "헤더 관리") },
+        { href: "/admin/site/hero", label: L("menu.heroEditor", "히어로 편집") },
+        { href: "/admin/site/footer", label: L("menu.footerEditor", "푸터 편집") },
+        { href: "/admin/site/intro", label: L("menu.introSettings", "인트로 설정") },
+        { href: "/admin/site/card-style", label: L("menu.cardStyleManagement", "카드 스타일 관리") },
+        { href: "/admin/site/settings", label: L("menu.siteSettings", "사이트 설정") },
+        { href: "/admin/site/color-theme", label: L("menu.colorTheme", "색상 테마") },
+      ],
+    },
   ];
 }
 
@@ -85,5 +119,12 @@ export function getExpandedGroupIndex(pathname: string): number {
 }
 
 export function getPlatformExpandedGroupIndex(_pathname: string): number {
+  const pathname = _pathname ?? "";
+  if (
+    pathname === "/admin/site" ||
+    PLATFORM_SITE_CHILD_HREFS.some((h) => pathname === h || pathname.startsWith(`${h}/`))
+  ) {
+    return 6;
+  }
   return -1;
 }

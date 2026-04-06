@@ -304,7 +304,7 @@ export function OperationsTournamentEditorClient({
     await persistVenues(tournamentId, venues);
 
     setTimeout(() => {
-      router.push("/client/operations");
+      router.push("/client/tournaments");
       router.refresh();
     }, 600);
   }
@@ -319,7 +319,7 @@ export function OperationsTournamentEditorClient({
     return (
       <div className="space-y-4">
         <p className="text-sm text-red-600 dark:text-red-400">대회 정보를 불러올 수 없거나 이 조직 소속이 아닙니다.</p>
-        <Link href="/client/operations" className="text-sm text-zinc-700 underline dark:text-zinc-300">
+        <Link href="/client/tournaments" className="text-sm text-zinc-700 underline dark:text-zinc-300">
           운영 · 대회 목록으로
         </Link>
       </div>
