@@ -22,6 +22,18 @@ export type LoadCommunityPostDetailResult =
   | { ok: false; reason: "no_db" }
   | { ok: false; reason: "trouble_requires_login" };
 
+export type CommunityPostPreviewJson = {
+  id: string;
+  boardSlug: string;
+  boardName: string;
+  title: string;
+  content: string;
+  imageUrls: string[];
+  createdAt: string;
+  isHidden?: boolean;
+  hiddenMessage?: string;
+};
+
 function buildCommentsTree(
   comments: {
     id: string;
@@ -58,16 +70,12 @@ function buildCommentsTree(
     if (!byParent.has(key)) byParent.set(key, []);
     byParent.get(key)!.push(item);
   });
-
-  const withReplies = (parentKey: string | null): ReturnType<typeof mapOne>[] => {
-    const list = byParent.get(parentKey) ?? [];
-    return list.map((item) => ({
-      ...item,
-      replies: withReplies(item.id),
-    }));
-  };
-
-  return withReplies(null);
+  const topLevel = byParent.get(null) ?? [];
+  return topLevel.map((item) => ({
+    ...item,
+    // 성능: 댓글 초기 응답은 1단계 답글까지만 구성한다.
+    replies: byParent.get(item.id) ?? [],
+  }));
 }
 
 /** GET /api/community/posts/[id]/comments 와 동일 트리 */
@@ -75,8 +83,8 @@ export async function getCommunityPostCommentsTree(postId: string, session: Sess
   if (!isDatabaseConfigured()) return [];
   const canSeeHidden = isCommunityModerator(session);
 
-  const comments = await prisma.communityComment.findMany({
-    where: { postId },
+  const topLevelRows = await prisma.communityComment.findMany({
+    where: { postId, parentId: null },
     orderBy: { createdAt: "asc" },
     select: {
       id: true,
@@ -89,20 +97,72 @@ export async function getCommunityPostCommentsTree(postId: string, session: Sess
       _count: { select: { likes: true } },
     },
   });
+  const topLevelIds = topLevelRows.map((c) => c.id);
+  const replyRows =
+    topLevelIds.length > 0
+      ? await prisma.communityComment.findMany({
+          where: { postId, parentId: { in: topLevelIds } },
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            parentId: true,
+            authorId: true,
+            content: true,
+            isHidden: true,
+            createdAt: true,
+            author: { select: { name: true } },
+            _count: { select: { likes: true } },
+          },
+        })
+      : [];
+  const comments = [...topLevelRows, ...replyRows];
 
   const userId = session?.id;
-  const likedIds = userId
-    ? new Set(
-        (
-          await prisma.communityCommentLike.findMany({
-            where: { userId, commentId: { in: comments.map((c) => c.id) } },
-            select: { commentId: true },
-          })
-        ).map((r) => r.commentId)
-      )
-    : new Set<string>();
+  // 성능: 상세 초기 댓글 로딩에서는 사용자별 댓글 좋아요 상태를 조회하지 않는다.
+  const likedIds = new Set<string>();
 
   return buildCommentsTree(comments, canSeeHidden, userId, likedIds);
+}
+
+/** 상세 첫 화면용 본문 프리뷰: 댓글/조회수/추천 상태 없이 제목·본문만 먼저 */
+export async function loadCommunityPostPreview(
+  id: string
+): Promise<
+  | { ok: true; post: CommunityPostPreviewJson }
+  | { ok: false; reason: "not_found" }
+  | { ok: false; reason: "no_db" }
+> {
+  if (!isDatabaseConfigured()) return { ok: false, reason: "no_db" };
+
+  const post = await prisma.communityPost.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      title: true,
+      content: true,
+      imageUrls: true,
+      isHidden: true,
+      createdAt: true,
+      board: { select: { slug: true, name: true } },
+      author: { select: { name: true } },
+    },
+  });
+  if (!post) return { ok: false, reason: "not_found" };
+
+  return {
+    ok: true,
+    post: {
+      id: post.id,
+      boardSlug: post.board.slug,
+      boardName: post.board.name,
+      title: post.title,
+      content: post.content,
+      imageUrls: post.imageUrls ? (JSON.parse(post.imageUrls) as string[]) : [],
+      createdAt: post.createdAt.toISOString(),
+      isHidden: post.isHidden,
+      hiddenMessage: post.isHidden ? "관리자에 의해 숨김 처리된 내용입니다." : undefined,
+    },
+  };
 }
 
 /** GET /api/community/posts/[id] 와 동일 JSON */
@@ -118,29 +178,12 @@ export async function loadCommunityPostDetail(
     where: { id },
     select: {
       id: true,
-      boardId: true,
-      authorId: true,
       title: true,
       content: true,
       imageUrls: true,
-      isPinned: true,
       isHidden: true,
-      isSolved: true,
-      viewCount: true,
       createdAt: true,
-      updatedAt: true,
       board: { select: { slug: true, name: true } },
-      author: { select: { id: true, name: true } },
-      _count: { select: { likes: true, comments: true } },
-      troubleShot: {
-        select: {
-          layoutImageUrl: true,
-          ballPlacementJson: true,
-          difficulty: true,
-          sourceNoteId: true,
-          acceptedSolutionId: true,
-        },
-      },
     },
   });
   if (!post) return { ok: false, reason: "not_found" };
@@ -159,68 +202,17 @@ export async function loadCommunityPostDetail(
       },
     };
   }
-
-  let liked = false;
-  let bookmarked = false;
-  if (session) {
-    const [likeRow, bookmarkRow] = await Promise.all([
-      prisma.communityPostLike.findUnique({
-        where: { postId_userId: { postId: id, userId: session.id } },
-      }),
-      prisma.communityBookmark.findUnique({
-        where: { userId_postId: { userId: session.id, postId: id } },
-      }),
-    ]);
-    liked = !!likeRow;
-    bookmarked = !!bookmarkRow;
-  }
-
   const imageUrls = post.imageUrls ? (JSON.parse(post.imageUrls) as string[]) : [];
   const payload: CommunityPostDetailJson = {
     id: post.id,
-    boardId: post.boardId,
     boardSlug: post.board.slug,
     boardName: post.board.name,
-    authorId: post.authorId,
-    authorName: post.author.name,
     title: post.title,
     content: post.content,
     imageUrls,
-    isPinned: post.isPinned,
     isHidden: post.isHidden,
-    isSolved: post.isSolved ?? false,
-    viewCount: post.viewCount,
-    likeCount: post._count.likes,
-    commentCount: post._count.comments,
     createdAt: post.createdAt.toISOString(),
-    updatedAt: post.updatedAt.toISOString(),
-    isAuthor: session?.id === post.authorId,
-    canEdit: session?.id === post.authorId || isCommunityAdmin(session),
-    canDelete: session?.id === post.authorId || isCommunityAdmin(session),
-    isLoggedIn: !!session,
-    liked,
-    bookmarked,
   };
-  if (post.board.slug === "trouble") {
-    const canCreateTroubleSolution = session
-      ? await hasPermission(session, PERMISSION_KEYS.SOLVER_SOLUTION_CREATE)
-      : false;
-    const canAcceptTroubleSolution =
-      !!session &&
-      session.id === post.authorId &&
-      (await hasPermission(session, PERMISSION_KEYS.SOLVER_SOLUTION_ACCEPT));
-    payload.canCreateTroubleSolution = canCreateTroubleSolution;
-    payload.canAcceptTroubleSolution = canAcceptTroubleSolution;
-  }
-  if (post.board.slug === "trouble" && post.troubleShot) {
-    payload.troubleShot = {
-      layoutImageUrl: post.troubleShot.layoutImageUrl,
-      ballPlacement: parseTroubleBallPlacementJson(post.troubleShot.ballPlacementJson),
-      difficulty: post.troubleShot.difficulty,
-      sourceNoteId: post.troubleShot.sourceNoteId,
-      acceptedSolutionId: post.troubleShot.acceptedSolutionId,
-    };
-  }
   return { ok: true, post: payload };
 }
 

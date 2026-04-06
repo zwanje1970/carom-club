@@ -10,17 +10,19 @@ import {
 import { canShowNoteEntryFromSession } from "@/lib/entry-visibility";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import {
-  getTournamentsListRaw,
   getVenuesForCarousel,
-  type TournamentListRow,
   type VenueCarouselRow,
 } from "@/lib/db-tournaments";
-import { MOCK_TOURNAMENTS_LIST, MOCK_VENUES_LIST } from "@/lib/mock-data";
+import {
+  getHomePublishedTournamentCards,
+} from "@/lib/home-published-tournament-cards.server";
+import type { HomePublishedTournamentCard } from "@/lib/home-published-tournament-cards";
+import { MOCK_VENUES_LIST } from "@/lib/mock-data";
 import type { SiteSettings } from "@/lib/site-settings";
 import type { HomeSlotRenderContextPayload } from "@/types/page-slot-render-context";
 
 const HOME_SLOT_REVALIDATE_SECONDS = 60;
-const HOME_INITIAL_TOURNAMENT_TAKE = 4;
+const HOME_INITIAL_TOURNAMENT_TAKE = 6;
 const HOME_VENUE_CAROUSEL_TAKE = 16;
 
 async function canShowHomeSolverEntry(session: PermissionSubject): Promise<boolean> {
@@ -36,7 +38,7 @@ async function canShowHomeSolverEntry(session: PermissionSubject): Promise<boole
 
 /** 홈 구조 슬롯(`tournamentIntro` 등)에 넣는 DB·세션 기반 데이터 */
 export type HomeSlotBlocksData = {
-  initialTournaments: TournamentListRow[];
+  initialTournaments: HomePublishedTournamentCard[];
   carouselVenues: VenueCarouselRow[];
   showNoteEntry: boolean;
   showSolverEntry: boolean;
@@ -47,18 +49,20 @@ type HomeSlotDbData = Pick<HomeSlotBlocksData, "initialTournaments" | "carouselV
 async function loadHomeSlotDbDataUncached(): Promise<HomeSlotDbData> {
   if (isDatabaseConfigured()) {
     const [tList, cList] = await Promise.all([
-      getTournamentsListRaw({ orderBy: "asc", take: HOME_INITIAL_TOURNAMENT_TAKE }),
+      getHomePublishedTournamentCards({
+        sortBy: "latest",
+        take: HOME_INITIAL_TOURNAMENT_TAKE,
+      }),
       getVenuesForCarousel(HOME_VENUE_CAROUSEL_TAKE),
     ]);
     return {
-      initialTournaments:
-        tList.length > 0 ? tList : (MOCK_TOURNAMENTS_LIST as unknown as TournamentListRow[]),
+      initialTournaments: tList,
       carouselVenues: cList,
     };
   }
 
   return {
-    initialTournaments: MOCK_TOURNAMENTS_LIST as unknown as TournamentListRow[],
+    initialTournaments: [] as HomePublishedTournamentCard[],
     carouselVenues: MOCK_VENUES_LIST.map((v, i) => ({
       id: v.id,
       name: v.name,

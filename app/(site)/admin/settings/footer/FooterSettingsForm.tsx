@@ -24,7 +24,11 @@ function generateId(): string {
   return `fp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
-export default function FooterSettingsForm() {
+type FooterSettingsFormProps = {
+  cancelHref?: string;
+};
+
+export default function FooterSettingsForm({ cancelHref = "/admin/settings" }: FooterSettingsFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -430,7 +434,7 @@ export default function FooterSettingsForm() {
           color="info"
           disabled={saving}
         />
-        <Button href="/admin/settings" label="취소" color="contrast" outline />
+        <Button href={cancelHref} label="취소" color="contrast" outline />
         {error && <NotificationBar color="danger">{error}</NotificationBar>}
         {success && <NotificationBar color="success">저장되었습니다.</NotificationBar>}
       </div>

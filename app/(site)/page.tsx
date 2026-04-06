@@ -5,7 +5,7 @@ import { PageRenderer } from "@/components/content/PageRenderer";
 import { getCommonPageData } from "@/lib/common-page-data";
 import { applyPublicHeroSingleCanonical } from "@/lib/content/filter-page-blocks-public-view";
 import { buildHomeSlotRenderPayload } from "@/lib/home-slot-render-data.server";
-import { getHeroSettings } from "@/lib/hero-settings";
+import { resolveHeroSettingsForSlot } from "@/lib/hero-settings-defaults";
 import { getServerTiming, logServerTiming } from "@/lib/perf";
 
 const HomeDeferredFooterOnly = dynamic(
@@ -24,14 +24,10 @@ export default async function HomePage() {
   const common = await getCommonPageData("home");
   console.timeEnd("home_main_query");
   const { copy, noticeBars, popups, pageBlocks, siteSettings } = common;
-  console.time("home_secondary_query");
-  const [heroSettings, homeSlotPayload] = await Promise.all([
-    getHeroSettings(),
-    buildHomeSlotRenderPayload({ copy, siteSettings }),
-  ]);
-  console.timeEnd("home_secondary_query");
+  const homeSlotPayload = await buildHomeSlotRenderPayload({ copy, siteSettings });
   const pageBlocksRendered = applyPublicHeroSingleCanonical("home", pageBlocks);
   const hasHeroSlot = pageBlocksRendered.some((b) => b.slotType === "hero");
+  const heroSettings = resolveHeroSettingsForSlot(siteSettings.heroSettings);
   console.timeEnd("home_page_total");
   logServerTiming("fetch_sections");
   logServerTiming("page");

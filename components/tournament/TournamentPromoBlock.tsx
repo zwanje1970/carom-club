@@ -24,7 +24,7 @@ export type TournamentPromoBlockProps = {
   endAt: Date | string | null;
   venue: string | null;
   matchVenues?: Array<{ displayLabel: string; venueName?: string | null; address?: string | null; phone?: string | null }>;
-  tournamentVenues?: Array<{ id: string; name: string; slug: string }>;
+  tournamentVenues?: Array<{ id: string; name: string; slug: string; address?: string | null; phone?: string | null }>;
   maxParticipants: number | null;
   confirmedCount: number;
   useWaiting: boolean;
@@ -203,12 +203,16 @@ export function TournamentPromoBlock({
               {tournamentVenues?.map((tv) => (
                 <div key={tv.id} className="rounded-lg border border-site-border bg-site-bg/50 p-3 text-sm">
                   <div className="font-medium text-site-text">{tv.name}</div>
-                  <Link
-                    href={`/v/${tv.slug}`}
-                    className="mt-2 inline-flex items-center rounded-md bg-site-primary/10 px-2.5 py-1 text-xs font-medium text-site-primary hover:bg-site-primary/20"
-                  >
-                    당구장 홍보 바로가기 →
-                  </Link>
+                  {tv.address && <div className="text-site-text-muted">{tv.address}</div>}
+                  {tv.phone && <div className="text-site-text-muted">{tv.phone}</div>}
+                  {tv.slug ? (
+                    <Link
+                      href={`/v/${tv.slug}`}
+                      className="mt-2 inline-flex items-center rounded-md bg-site-primary/10 px-2.5 py-1 text-xs font-medium text-site-primary hover:bg-site-primary/20"
+                    >
+                      당구장 홍보 바로가기 →
+                    </Link>
+                  ) : null}
                 </div>
               ))}
               {matchVenues?.map((v, i) => (

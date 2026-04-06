@@ -55,7 +55,7 @@ export function PageRenderer({
             data-block-id={block.id}
             onClick={() => onBlockClick?.(block.id)}
             className={`relative ${
-              isSelected ? "outline outline-2 outline-site-primary outline-offset-[-2px]" : ""
+              isSelected ? "rounded-sm outline outline-2 outline-blue-500 outline-offset-[-2px]" : ""
             } ${onBlockClick ? "cursor-pointer" : ""}`}
           >
             {body}

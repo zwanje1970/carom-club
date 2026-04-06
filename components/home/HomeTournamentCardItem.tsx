@@ -7,6 +7,7 @@ import { IMAGE_PLACEHOLDER_SRC, isOptimizableImageSrc, sanitizeImageSrc } from "
 import type { SlotBlockCtaLayer } from "@/lib/slot-block-cta";
 import type { SlotBlockCardStyle } from "@/lib/slot-block-card-style";
 import { SlotBlockCtaLink } from "@/components/home/SlotBlockCtaLink";
+import { BasicCard, HighlightCard } from "@/components/cards/TournamentPublishedCard";
 import { cn } from "@/lib/utils";
 import {
   tournamentCardBodyClasses,
@@ -43,6 +44,15 @@ export type HomeTournamentCardModel = {
   manualSimple?: boolean;
   /** 카드에 직접 넣은 링크(있으면 CTA 자동 연결보다 우선) */
   directCardHref?: string | null;
+  /** 발행본 카드 데이터 기반 렌더링 여부 */
+  isPublishedData?: boolean;
+  templateType?: "basic" | "highlight";
+  cardTitle?: string | null;
+  displayDateText?: string | null;
+  displayRegionText?: string | null;
+  statusText?: string | null;
+  buttonText?: string | null;
+  shortDescription?: string | null;
 };
 
 function statusLabel(status: string) {
@@ -89,6 +99,7 @@ export function HomeTournamentCardItem({
   cardStyle,
   cardCta,
   layout = "carousel",
+  showDetailButtonByTemplate,
 }: {
   t: HomeTournamentCardModel;
   index?: number;
@@ -97,6 +108,10 @@ export function HomeTournamentCardItem({
   cardStyle?: SlotBlockCardStyle;
   cardCta?: SlotBlockCtaLayer;
   layout?: "carousel" | "grid";
+  showDetailButtonByTemplate?: {
+    basic: boolean;
+    highlight: boolean;
+  };
 }) {
   const liClass =
     layout === "grid"
@@ -117,15 +132,60 @@ export function HomeTournamentCardItem({
 
   const simple = Boolean(t.manualSimple);
   const direct = t.directCardHref?.trim() || "";
+  const published = t.isPublishedData === true;
   const isFirstSlide = (index ?? -1) === 0 && !duplicate;
+  const displayTitle = published ? (t.cardTitle || "") : t.name;
+  const displayStatus = published ? (t.statusText || "") : statusLabel(t.status);
+  const displayDateRegion = published
+    ? [t.displayDateText ?? "", t.displayRegionText ?? ""].filter(Boolean).join(" · ")
+    : `${formatKoreanMonthDayWeekday(t.startAt)}${t.venue ? ` · ${t.venue}` : ""}`;
+  const displayButtonText = published ? (t.buttonText || "") : "";
+  const displayDescription = published ? (t.shortDescription || "") : "";
+  const cardHref = published ? `/tournaments/${t.id}` : direct;
+  const showDetailButton =
+    t.templateType === "highlight"
+      ? (showDetailButtonByTemplate?.highlight ?? true)
+      : (showDetailButtonByTemplate?.basic ?? false);
+
+  if (published) {
+    const publishedData = {
+      templateType: t.templateType === "highlight" ? "highlight" : "basic",
+      thumbnailUrl: t.thumbnailUrl ?? t.posterImageUrl ?? t.imageUrl ?? "",
+      cardTitle: displayTitle,
+      displayDateText: t.displayDateText ?? "",
+      displayRegionText: t.displayRegionText ?? "",
+      statusText: displayStatus,
+      buttonText: displayButtonText,
+      shortDescription: displayDescription,
+    } as const;
+    return (
+      <li aria-hidden={duplicate} className={liClass}>
+        <SlotBlockCtaLink
+          layer={cardCta}
+          ctx={{
+            itemDirectHref: cardHref || undefined,
+          }}
+          tabIndex={duplicate ? -1 : undefined}
+          aria-hidden={duplicate ? true : undefined}
+          className="block"
+        >
+          {publishedData.templateType === "highlight" ? (
+            <HighlightCard data={publishedData} compact showDetailButton={showDetailButton} />
+          ) : (
+            <BasicCard data={publishedData} compact showDetailButton={showDetailButton} />
+          )}
+        </SlotBlockCtaLink>
+      </li>
+    );
+  }
 
   return (
     <li aria-hidden={duplicate} className={liClass}>
       <SlotBlockCtaLink
         layer={cardCta}
         ctx={{
-          tournamentId: t.manualSimple ? undefined : t.id,
-          itemDirectHref: direct || undefined,
+          tournamentId: t.manualSimple || published ? undefined : t.id,
+          itemDirectHref: cardHref || undefined,
         }}
         tabIndex={duplicate ? -1 : undefined}
         aria-hidden={duplicate ? true : undefined}
@@ -170,9 +230,10 @@ export function HomeTournamentCardItem({
               <span
                 className={`absolute right-2 top-2 rounded-full px-2.5 py-1 text-xs font-semibold shadow-sm ${statusColor(t.status)}`}
               >
-                {statusLabel(t.status)}
+                {displayStatus}
               </span>
-              {(() => {
+              {!published
+                ? (() => {
                 const max = t.maxParticipants ?? 0;
                 const confirmed = t.confirmedCount ?? 0;
                 const ratio = max > 0 ? confirmed / max : 0;
@@ -192,25 +253,36 @@ export function HomeTournamentCardItem({
                     {badge}
                   </span>
                 ) : null;
-              })()}
+                })()
+                : null}
             </>
           ) : null}
         </div>
         <div className={bodyClass}>
           <h3 className={titleClass}>
-            {t.name}
+            {displayTitle}
           </h3>
-          {!simple && t.organization && (
+          {!simple && !published && t.organization && (
             <p className="mt-0.5 text-xs text-gray-500 md:text-sm">{t.organization.name}</p>
           )}
-          {!simple && t.distanceKm != null && (
+          {!simple && !published && t.distanceKm != null && (
             <p className="mt-0.5 text-xs text-gray-500 md:text-sm">{formatDistanceKm(t.distanceKm)}</p>
           )}
-          {!simple && typeof t.maxParticipants === "number" && t.maxParticipants > 0 && (
+          {!simple && !published && typeof t.maxParticipants === "number" && t.maxParticipants > 0 && (
             <p className="text-xs font-medium text-site-text md:text-sm">
               참가 현황 <span className="text-site-primary">{t.confirmedCount ?? 0}명</span> / {t.maxParticipants}명
             </p>
           )}
+          {published && t.templateType === "highlight" && displayDescription ? (
+            <p
+              className={cn(
+                "mt-1 text-xs text-gray-600 md:text-sm",
+                cardStyle ? slotBlockLineClampClass(cardStyle) : "line-clamp-3"
+              )}
+            >
+              {displayDescription}
+            </p>
+          ) : null}
           {simple && t.summary?.trim() ? (
             <p
               className={cn(
@@ -223,9 +295,15 @@ export function HomeTournamentCardItem({
           ) : null}
           {!simple ? (
             <p className="mt-1 text-xs text-gray-600 md:text-sm">
-              {formatKoreanMonthDayWeekday(t.startAt)}
-              {t.venue && ` · ${t.venue}`}
+              {displayDateRegion}
             </p>
+          ) : null}
+          {published ? (
+            <div className="mt-1">
+              <span className="inline-flex items-center rounded-lg border border-site-border bg-site-bg px-2.5 py-1 text-xs font-medium text-site-text">
+                {displayButtonText}
+              </span>
+            </div>
           ) : null}
         </div>
       </SlotBlockCtaLink>

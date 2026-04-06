@@ -39,7 +39,7 @@ function resolveActionForBracket(t: HomeTournament): { href: string; label: stri
     return { href: "#", label: "대진표", disabled: true };
   }
   if (!t.nationalTournament) {
-    return { href: `/client/operations/tournaments/${t.id}/bracket`, label: "대진표", disabled: false };
+    return { href: `/client/tournaments/${t.id}/bracket`, label: "대진표", disabled: false };
   }
 
   const stage = t.tournamentStage ?? "SETUP";
@@ -47,7 +47,7 @@ function resolveActionForBracket(t: HomeTournament): { href: string; label: stri
   if (zoneStage) {
     return { href: `/client/tournaments/${t.id}/zones`, label: "권역배정", disabled: false };
   }
-  return { href: `/client/operations/tournaments/${t.id}/bracket`, label: "대진표", disabled: false };
+  return { href: `/client/tournaments/${t.id}/bracket`, label: "대진표", disabled: false };
 }
 
 export default async function ClientDashboardPage() {
@@ -153,7 +153,7 @@ export default async function ClientDashboardPage() {
                   className="relative rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900"
                 >
                   <Link
-                    href={`/client/operations/tournaments/${t.id}`}
+                    href={`/client/tournaments/${t.id}`}
                     className="absolute inset-0 z-0"
                     aria-label={`${t.name} 대회현황으로 이동`}
                   />
@@ -177,7 +177,7 @@ export default async function ClientDashboardPage() {
 
                     <div className="mt-3 grid grid-cols-3 gap-2">
                       <Link
-                        href={`/client/operations/tournaments/${t.id}/participants`}
+                        href={`/client/tournaments/${t.id}/participants`}
                         className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-zinc-900 bg-zinc-900 px-2 text-[11px] font-semibold text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
                       >
                         신청자관리

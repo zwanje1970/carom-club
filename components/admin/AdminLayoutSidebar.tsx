@@ -5,7 +5,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { mdiMenu, mdiChevronDown, mdiChevronRight, mdiLogout } from "@mdi/js";
 import Icon from "./_components/Icon";
-import { getAdminMenuAside, getExpandedGroupIndex } from "./adminMenuConfig";
+import {
+  getAdminMenuAside,
+  getExpandedGroupIndex,
+  getPlatformExpandedGroupIndex,
+  getPlatformMenuAside,
+} from "./adminMenuConfig";
 import type { MenuAsideItem } from "./_interfaces";
 
 const SIDEBAR_WIDTH = 280;
@@ -28,13 +33,21 @@ type SidebarProps = {
   onLogout?: () => void;
   mobileOpen: boolean;
   onMobileClose: () => void;
+  scope?: "admin" | "platform";
 };
 
-export function AdminLayoutSidebar({ copy, onLogout, mobileOpen, onMobileClose }: SidebarProps) {
+export function AdminLayoutSidebar({ copy, onLogout, mobileOpen, onMobileClose, scope = "admin" }: SidebarProps) {
   const pathname = usePathname();
   const isMobile = useIsMobile();
-  const menu = useMemo(() => getAdminMenuAside(copy), [copy]);
-  const expandedIndex = useMemo(() => getExpandedGroupIndex(pathname ?? ""), [pathname]);
+  const isPlatformScope = scope === "platform";
+  const menu = useMemo(
+    () => (isPlatformScope ? getPlatformMenuAside(copy) : getAdminMenuAside(copy)),
+    [copy, isPlatformScope]
+  );
+  const expandedIndex = useMemo(
+    () => (isPlatformScope ? getPlatformExpandedGroupIndex(pathname ?? "") : getExpandedGroupIndex(pathname ?? "")),
+    [isPlatformScope, pathname]
+  );
   const [openIndex, setOpenIndex] = useState(expandedIndex >= 0 ? expandedIndex : -1);
 
   useEffect(() => {
@@ -51,7 +64,11 @@ export function AdminLayoutSidebar({ copy, onLogout, mobileOpen, onMobileClose }
   const sidebarContent = (
     <>
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 px-4 dark:border-slate-700">
-        <Link href="/admin" className="font-bold text-gray-900 dark:text-slate-100" onClick={onMobileClose}>
+        <Link
+          href={isPlatformScope ? "/admin/platform" : "/admin"}
+          className="font-bold text-gray-900 dark:text-slate-100"
+          onClick={onMobileClose}
+        >
           캐롬클럽 관리자
         </Link>
       </div>

@@ -28,6 +28,7 @@ import { SectionEditor } from "@/components/admin/page-builder/SectionEditor";
 import { PageBuilderMobilePreview } from "@/components/admin/page-builder/PageBuilderMobilePreview";
 import { CmsDraftToolbar } from "@/components/admin/cms-v2/CmsDraftToolbar";
 import { isHomeStructureSlotType } from "@/lib/home-structure-slots";
+import { DEFAULT_SITE_CARD_STYLE, type SiteCardStyle } from "@/lib/site-card-style";
 const BUILDER_PAGES: PageBuilderKey[] = ["home", "community", "tournaments"];
 const AUTO_CARD_SOURCE_OPTIONS = [
   { key: "tournament", label: "대회" },
@@ -91,6 +92,10 @@ export type PageBuilderClientProps = {
   terminology?: "section" | "block";
   /** 사이트관리 → 콘텐츠 편집: 초안·게시 툴바 */
   draftToolbar?: boolean;
+  /** 초기 페이지(목록에서 선택 진입 시) */
+  initialPage?: PageBuilderKey;
+  /** 편집 후 돌아갈 페이지빌더 기준 경로 */
+  builderBasePath?: string;
 };
 
 function emptyListMessage(term: "section" | "block") {
@@ -169,16 +174,22 @@ function normalizeAutoDataTypes(value: unknown): string[] {
   return normalized.length > 0 ? normalized : ["tournament"];
 }
 
-export function PageBuilderClient({ terminology = "section", draftToolbar = false }: PageBuilderClientProps) {
+export function PageBuilderClient({
+  terminology = "section",
+  draftToolbar = false,
+  initialPage = "home",
+  builderBasePath = "/admin/site/page-builder",
+}: PageBuilderClientProps) {
   type BuilderToolMode = "edit" | "move" | "duplicate";
   const term = terminology;
-  const [page, setPage] = useState<PageBuilderKey>("home");
+  const [page, setPage] = useState<PageBuilderKey>(initialPage);
   const [rows, setRows] = useState<PageSection[]>([]);
   const rowsRef = useRef<PageSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [addValue, setAddValue] = useState<AddOptionValue>("cms:text");
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [activeTool, setActiveTool] = useState<{ id: string; mode: BuilderToolMode } | null>(null);
   /** 홈 구조 슬롯 스타일·CTA 미리보기용 `sectionStyleJson` 누적 (패널을 닫거나 다른 행을 열면 초기화) */
   const [slotSectionStyleDraft, setSlotSectionStyleDraft] = useState<Record<string, string>>({});
@@ -187,23 +198,25 @@ export function PageBuilderClient({ terminology = "section", draftToolbar = fals
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [draftMeta, setDraftMeta] = useState<{ hasDraft: boolean; updatedAt: string | null } | null>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [mobileStep, setMobileStep] = useState<"list" | "edit" | "preview">("list");
+  const [mobileStep, setMobileStep] = useState<"preview" | "edit">("preview");
   const [editorDraft, setEditorDraft] = useState<PageSection | null>(null);
   const [editorSaveState, setEditorSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [defaultCardStyle, setDefaultCardStyle] = useState<SiteCardStyle>(DEFAULT_SITE_CARD_STYLE);
   const lastSavedRef = useRef<Record<string, string>>({});
   const listPanelRef = useRef<HTMLDivElement | null>(null);
 
   const closeEditor = () => {
     if (isMobile) {
-      setMobileStep("list");
+      setMobileStep("preview");
       return;
     }
     setActiveTool(null);
   };
 
   const openTool = (id: string, mode: BuilderToolMode) => {
+    setSelectedBlockId(id);
     setActiveTool({ id, mode });
-    if (isMobile) setMobileStep(mode === "edit" ? "edit" : "list");
+    if (isMobile) setMobileStep(mode === "edit" ? "edit" : "preview");
   };
 
   useEffect(() => {
@@ -222,10 +235,15 @@ export function PageBuilderClient({ terminology = "section", draftToolbar = fals
   useEffect(() => {
     // 페이지 전환 시 선택 상태/입력 드래프트를 초기화한다.
     setActiveTool(null);
+    setSelectedBlockId(null);
     setSlotSectionStyleDraft({});
     setContentDraftById({});
-    setMobileStep("list");
+    setMobileStep("preview");
   }, [page]);
+
+  useEffect(() => {
+    setPage(initialPage);
+  }, [initialPage]);
 
   useEffect(() => {
     const mql = window.matchMedia("(max-width: 1023px)");
@@ -233,6 +251,24 @@ export function PageBuilderClient({ terminology = "section", draftToolbar = fals
     onChange();
     mql.addEventListener("change", onChange);
     return () => mql.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/admin/site-card-style", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data || typeof data !== "object") return;
+        setDefaultCardStyle({
+          shape: data.shape === "circle" ? "circle" : "square",
+          width: Number(data.width) || DEFAULT_SITE_CARD_STYLE.width,
+          height: Number(data.height) || DEFAULT_SITE_CARD_STYLE.height,
+          style: data.style === "flat" || data.style === "shadow" ? data.style : "border",
+          thumbFit: data.thumbFit === "contain" ? "contain" : "cover",
+          linkMode: data.linkMode === "button" ? "button" : "block",
+          radius: Number(data.radius) || DEFAULT_SITE_CARD_STYLE.radius,
+        });
+      })
+      .catch(() => {});
   }, []);
 
   const load = useCallback(async () => {
@@ -498,6 +534,7 @@ export function PageBuilderClient({ terminology = "section", draftToolbar = fals
         return syncRowsPlacement([...prev, saved]);
       });
       rowsRef.current = syncRowsPlacement([...rowsRef.current.filter((r) => r.id !== saved.id), saved]);
+      setSelectedBlockId(saved.id);
       setActiveTool({ id: saved.id, mode: "edit" });
       if (isMobile) setMobileStep("edit");
     } catch (err) {
@@ -546,6 +583,21 @@ export function PageBuilderClient({ terminology = "section", draftToolbar = fals
   };
 
   const reorderDisabled = busyId !== null;
+  const encodedBuilderBasePath = encodeURIComponent(builderBasePath);
+  const goToBlockEditPage = useCallback((id: string) => {
+    window.location.assign(
+      `/admin/site/page-builder/edit/${encodeURIComponent(id)}?page=${encodeURIComponent(page)}&builderBase=${encodedBuilderBasePath}`
+    );
+  }, [page, encodedBuilderBasePath]);
+  const handleSelectFromPreview = useCallback(
+    (id: string) => {
+      setSelectedBlockId(id);
+      if (isMobile) {
+        goToBlockEditPage(id);
+      }
+    },
+    [isMobile, goToBlockEditPage]
+  );
 
   const mergedRows = useMemo(() => {
     return rows.map((r) => contentDraftById[r.id] ?? r);
@@ -563,6 +615,10 @@ export function PageBuilderClient({ terminology = "section", draftToolbar = fals
     if (!activeTool) return null;
     return mergedRows.find((r) => r.id === activeTool.id) ?? null;
   }, [mergedRows, activeTool]);
+  const selectedSection = useMemo(
+    () => (selectedBlockId ? mergedRows.find((r) => r.id === selectedBlockId) ?? null : null),
+    [mergedRows, selectedBlockId]
+  );
 
   useEffect(() => {
     setEditorDraft(activeSection ? { ...activeSection, buttons: [...activeSection.buttons] } : null);
@@ -576,10 +632,14 @@ export function PageBuilderClient({ terminology = "section", draftToolbar = fals
   }, [activeSection?.id, activeSection?.placement, editorDraft]);
 
   useEffect(() => {
-    if (mergedRows.length === 0) return;
-    if (activeSection) return;
-    setActiveTool({ id: mergedRows[0].id, mode: "edit" });
-  }, [mergedRows, activeSection]);
+    if (mergedRows.length === 0) {
+      if (selectedBlockId !== null) setSelectedBlockId(null);
+      return;
+    }
+    if (!selectedBlockId || !mergedRows.some((r) => r.id === selectedBlockId)) {
+      setSelectedBlockId(mergedRows[0].id);
+    }
+  }, [mergedRows, selectedBlockId]);
 
   useEffect(() => {
     if (!editorDraft) return;
@@ -632,8 +692,8 @@ export function PageBuilderClient({ terminology = "section", draftToolbar = fals
     <div className="min-w-0 space-y-3">
       <CardBox>
         <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
-          <Link href="/admin" className="rounded border border-gray-300 px-2.5 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-slate-600 dark:hover:bg-slate-800">
-            뒤로가기
+          <Link href="/admin/site" className="rounded border border-gray-300 px-2.5 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-slate-600 dark:hover:bg-slate-800">
+            사이트 관리
           </Link>
           <label className="flex items-center gap-2 text-sm">
             <span className="text-gray-600 dark:text-slate-400">페이지</span>
@@ -679,7 +739,7 @@ export function PageBuilderClient({ terminology = "section", draftToolbar = fals
       {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
 
       <div className="grid min-w-0 items-start gap-3 lg:grid-cols-[30%_50%_20%]">
-        <div className={`min-w-0 overflow-hidden ${isMobile && mobileStep !== "list" ? "hidden" : ""}`}>
+        <div className={`min-w-0 overflow-hidden ${isMobile ? "hidden" : ""}`}>
           <CardBox className="h-[calc(100dvh-12rem)] overflow-y-auto">
             <div ref={listPanelRef} className="min-w-0">
             <div className="mb-3 flex flex-wrap items-end gap-2">
@@ -706,6 +766,38 @@ export function PageBuilderClient({ terminology = "section", draftToolbar = fals
               </label>
               <Button label="블록 추가" color="info" small disabled={loading || reorderDisabled} onClick={() => void addSection()} />
             </div>
+            {selectedSection ? (
+              <div className="mb-3 rounded border border-blue-200 bg-blue-50/70 p-2 dark:border-blue-900/60 dark:bg-blue-950/20">
+                <div className="mb-2 text-xs font-medium text-blue-800 dark:text-blue-200">
+                  선택됨: {rowLabel(selectedSection)}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  <Button
+                    label="수정"
+                    color="info"
+                    small
+                    disabled={reorderDisabled}
+                    onClick={() => openTool(selectedSection.id, "edit")}
+                  />
+                  <Button
+                    label="삭제"
+                    color="danger"
+                    small
+                    outline
+                    disabled={reorderDisabled || Boolean(selectedSection.deletedAt)}
+                    onClick={() => void softRemove(selectedSection.id)}
+                  />
+                  <Button
+                    label="+추가"
+                    color="contrast"
+                    small
+                    outline
+                    disabled={loading || reorderDisabled}
+                    onClick={() => void addSection()}
+                  />
+                </div>
+              </div>
+            ) : null}
             {loading ? (
               <p className="text-gray-500">불러오는 중…</p>
             ) : rows.length === 0 ? (
@@ -717,8 +809,7 @@ export function PageBuilderClient({ terminology = "section", draftToolbar = fals
                 rowLabel={rowLabel}
                 metaLine={metaLine}
                 onReorderCommit={handleReorderCommit}
-                activeRowId={activeTool?.id ?? null}
-                onRowClick={(section) => openTool(section.id, "edit")}
+                activeRowId={selectedBlockId}
                 renderStatusBadges={(s) => (
                   <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-700 dark:bg-slate-700 dark:text-slate-200">
                     {s.slotType ? (PAGE_SECTION_SLOT_LABELS[s.slotType] ?? s.slotType) : SECTION_TYPE_LABELS[s.type]}
@@ -732,11 +823,14 @@ export function PageBuilderClient({ terminology = "section", draftToolbar = fals
                         title="블록 편집"
                         disabled={reorderDisabled}
                         className={`rounded border px-3 py-1 text-xs font-semibold disabled:opacity-40 ${
-                          activeTool?.id === s.id && activeTool.mode === "edit"
-                            ? "border-site-primary bg-site-primary text-white dark:border-red-900 dark:bg-site-primary"
+                          selectedBlockId === s.id
+                            ? "border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-600"
                             : "border-site-primary/40 bg-white text-site-primary hover:bg-red-50 dark:border-red-900/70 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-red-950/30"
                         }`}
-                        onClick={() => openTool(s.id, "edit")}
+                        onClick={() => {
+                          setSelectedBlockId(s.id);
+                          openTool(s.id, "edit");
+                        }}
                       >
                         편집
                       </button>
@@ -925,13 +1019,35 @@ export function PageBuilderClient({ terminology = "section", draftToolbar = fals
 
                 <section className="rounded border border-gray-200 p-3 dark:border-slate-700">
                   <h3 className="text-sm font-semibold">6. 카드 설정</h3>
+                  <div className="mt-2 space-y-2">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="radio"
+                          name={`card-preset-mode-${editorDraft.id}`}
+                          checked={Boolean(getStyleValue(editorDraft, "cardUseDefault", true))}
+                          onChange={() => patchStyle({ cardUseDefault: true })}
+                        />
+                        기본 카드 사용
+                      </label>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="radio"
+                          name={`card-preset-mode-${editorDraft.id}`}
+                          checked={!Boolean(getStyleValue(editorDraft, "cardUseDefault", true))}
+                          onChange={() => patchStyle({ cardUseDefault: false })}
+                        />
+                        개별 설정
+                      </label>
+                    </div>
+                    {Boolean(getStyleValue(editorDraft, "cardUseDefault", true)) ? (
+                      <p className="text-xs text-gray-500 dark:text-slate-400">
+                        공통값 적용: {defaultCardStyle.shape === "circle" ? "원형" : "사각형"} · {defaultCardStyle.width}x{defaultCardStyle.height} · {defaultCardStyle.style}
+                      </p>
+                    ) : null}
+                  </div>
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
                     <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(getStyleValue(editorDraft, "cardEnabled", false))} onChange={(e) => patchStyle({ cardEnabled: e.target.checked })} />카드 사용 ON/OFF</label>
-                    <select className="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-900" value={String(getStyleValue(editorDraft, "cardDisplayMode", "slide"))} onChange={(e) => patchStyle({ cardDisplayMode: e.target.value })}>
-                      <option value="slide">슬라이드</option>
-                      <option value="fade">페이드</option>
-                      <option value="stack">스택</option>
-                    </select>
                   </div>
                 </section>
 
@@ -1099,8 +1215,8 @@ export function PageBuilderClient({ terminology = "section", draftToolbar = fals
               page={page}
               rows={loading ? [] : previewRows}
               variant="mobile"
-              selectedBlockId={activeSection?.id ?? null}
-              onSelectBlock={(id) => openTool(id, "edit")}
+              selectedBlockId={selectedBlockId}
+              onSelectBlock={handleSelectFromPreview}
             />
           </CardBox>
         </div>
@@ -1115,16 +1231,25 @@ export function PageBuilderClient({ terminology = "section", draftToolbar = fals
               disabled={busyId !== null}
               onClick={() => void runDraftAction("ensureSave")}
             />
-            <Button label="나가기" color="contrast" small onClick={() => setMobileStep("list")} />
             <Button label="미리보기" color="contrast" small onClick={() => setMobileStep("preview")} />
+            <Button label="사이트 관리" color="contrast" small onClick={() => window.location.assign("/admin/site")} />
           </div>
         </div>
       ) : null}
       {isMobile && mobileStep === "preview" ? (
         <div className="fixed inset-x-0 bottom-0 z-[70] border-t border-gray-200 bg-white/95 p-2 dark:border-slate-700 dark:bg-slate-900/95">
           <div className="mx-auto flex max-w-xl items-center justify-between gap-2">
-            <Button label="편집으로" color="info" small onClick={() => setMobileStep("edit")} />
-            <Button label="나가기" color="contrast" small onClick={() => setMobileStep("list")} />
+            <Button
+              label="선택 블록 수정"
+              color="info"
+              small
+              disabled={!selectedBlockId}
+              onClick={() => {
+                if (!selectedBlockId) return;
+                goToBlockEditPage(selectedBlockId);
+              }}
+            />
+            <Button label="사이트 관리" color="contrast" small onClick={() => window.location.assign("/admin/site")} />
           </div>
         </div>
       ) : null}

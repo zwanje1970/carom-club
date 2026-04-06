@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { formatCommunityListDate } from "@/lib/format-date";
-import { CommunityBoardPostThumb } from "@/components/community/CommunityBoardPostThumb";
 import type { BoardListPostDto } from "@/lib/community-board-page-data";
 import type { CommunityBoardPopularMode } from "@/lib/community-board-query-key";
 import { communityBoardClientPerf } from "@/lib/community-board-client-perf";
@@ -155,27 +154,23 @@ export function CommunityBoardListAndMoreClient({
       .finally(() => setLoading(false));
   }, [boardSlug, popular, q, statusFilter, take, nextCursor, loading, currentSort]);
 
-  const renderRow = (p: BoardListPostDto, isPin: boolean, priorityThumb: boolean) => (
-    <li key={p.id} className={isPin ? "bg-amber-50/30 dark:bg-amber-900/5" : ""}>
+  const renderRow = (p: BoardListPostDto, _isPin: boolean, _priorityThumb: boolean) => (
+    <li key={p.id}>
       <Link
         href={postHref(p.id)}
-        className="flex items-start gap-3 px-1 py-3.5 hover:bg-gray-50/80 dark:hover:bg-slate-800/40 sm:px-0"
+        className="block px-1 py-3.5 hover:bg-gray-50/80 dark:hover:bg-slate-800/40 sm:px-0"
       >
-        <CommunityBoardPostThumb url={p.thumbnailUrl} priority={priorityThumb} />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0">
           <p className="font-medium text-site-text line-clamp-2 leading-snug">
-            {isPin && (
+            {_isPin && (
               <span className="mr-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">공지</span>
             )}
             {p.title}
           </p>
           <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
-            {p.authorName} · {formatCommunityListDate(p.createdAt)} · 조회 {p.viewCount}
+            {formatCommunityListDate(p.createdAt)}
           </p>
         </div>
-        <span className="shrink-0 self-start rounded-md border border-gray-200 dark:border-slate-600 px-2 py-0.5 text-xs text-gray-500 dark:text-slate-400 tabular-nums">
-          {p.commentCount}
-        </span>
       </Link>
     </li>
   );

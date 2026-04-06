@@ -1,5 +1,6 @@
 import type { AdminCopyKey } from "@/lib/admin-copy";
-import type { TournamentListRow, VenueCarouselRow } from "@/lib/db-tournaments";
+import type { PublicTournamentListRow, VenueCarouselRow } from "@/lib/db-tournaments";
+import type { HomePublishedTournamentCard } from "@/lib/home-published-tournament-cards";
 import type { HeroSettings } from "@/lib/hero-settings-defaults";
 import type { SiteSettings } from "@/lib/site-settings";
 
@@ -26,7 +27,7 @@ export type PageSlotRenderContextPage = "home" | "community" | "tournaments";
 export type HomeSlotRenderContextPayload = {
   copy: Record<string, string>;
   siteSettings: SiteSettings;
-  initialTournaments: TournamentListRow[];
+  initialTournaments: HomePublishedTournamentCard[];
   carouselVenues: VenueCarouselRow[];
   showNoteEntry: boolean;
   showSolverEntry: boolean;
@@ -46,7 +47,7 @@ export type PageSlotRenderContext = {
   };
   tournaments?: {
     copy: Record<AdminCopyKey, string>;
-    initialList: TournamentListRow[];
+    initialList: PublicTournamentListRow[];
     initialHasMore: boolean;
     initialQuery: {
       tab: "upcoming" | "closed" | "finished";

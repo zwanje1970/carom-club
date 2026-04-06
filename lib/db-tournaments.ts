@@ -49,6 +49,16 @@ export type TournamentListRow = {
   organization: { id: string; name: string; slug: string } | null;
 };
 
+export type PublicTournamentListRow = {
+  id: string;
+  name: string;
+  startAt: Date;
+  endAt: Date | null;
+  status: string;
+  venue: string | null;
+  venueName: string | null;
+};
+
 /** 공개 대회 목록 페이지용: 탭(예정/마감/종료) + 정렬(거리/마감임박/날짜) + 전국대회 필터. */
 export type TournamentsListTab = "upcoming" | "closed" | "finished";
 export type TournamentsListSort = "distance" | "deadline" | "date";
@@ -84,7 +94,7 @@ export async function getTournamentsListForPublicPage(options: {
   lng?: number;
   take?: number;
   skip?: number;
-}): Promise<(TournamentListRow & { distanceKm?: number | null })[]> {
+}): Promise<(PublicTournamentListRow & { distanceKm?: number | null })[]> {
   const { tab, sortBy, nationalOnly = false, lat, lng, take = 20, skip = 0 } = options;
   const hasCoords = typeof lat === "number" && typeof lng === "number" && !Number.isNaN(lat) && !Number.isNaN(lng);
   const useSqlDistance = sortBy === "distance" && hasCoords;
@@ -114,33 +124,15 @@ export async function getTournamentsListForPublicPage(options: {
         startAt: Date;
         endAt: Date | null;
         status: string;
-        organizationId: string;
         venue: string | null;
         venueName: string | null;
-        gameFormat: string | null;
-        prizeInfo: string | null;
-        imageUrl: string | null;
-        posterImageUrl: string | null;
-        summary: string | null;
-        maxParticipants: number | null;
-        confirmedCount: number | bigint;
-        orgId: string | null;
-        orgName: string | null;
-        orgSlug: string | null;
-        orgLatitude: number | null;
-        orgLongitude: number | null;
         distanceKm: number | null;
       }[]
     >(
-      `SELECT t.id, t.name, t."startAt", t."endAt", t.status, t."organizationId",
-              t.venue, t."venueName", t."gameFormat", t."prizeInfo", t."imageUrl", t."posterImageUrl", t.summary,
-              t."maxParticipants",
-              COALESCE(ec.cnt, 0) AS "confirmedCount",
-              o.id AS "orgId", o.name AS "orgName", o.slug AS "orgSlug",
-              o.latitude AS "orgLatitude", o.longitude AS "orgLongitude",
+      `SELECT t.id, t.name, t."startAt", t."endAt", t.status,
+              t.venue, t."venueName",
               ${distanceSelect} AS "distanceKm"
        FROM "Tournament" t
-       ${ENTRY_CONFIRMED_COUNTS_SQL}
        LEFT JOIN "Organization" o ON o.id = t."organizationId"
        WHERE t.status NOT IN ('DRAFT', 'HIDDEN') AND (${tabWhere})${nationalWhere}
        ${orderClause}
@@ -154,20 +146,8 @@ export async function getTournamentsListForPublicPage(options: {
       startAt: r.startAt,
       endAt: r.endAt,
       status: r.status,
-      organizationId: r.organizationId,
       venue: r.venue,
       venueName: r.venueName,
-      gameFormat: r.gameFormat,
-      prizeInfo: r.prizeInfo ?? null,
-      imageUrl: r.imageUrl,
-      posterImageUrl: r.posterImageUrl ?? null,
-      summary: r.summary,
-      maxParticipants: r.maxParticipants,
-      confirmedCount: Number(r.confirmedCount ?? 0),
-      organization:
-        r.orgId && r.orgName
-          ? normalizeSlug({ id: r.orgId, name: r.orgName, slug: r.orgSlug })
-          : null,
       distanceKm: useSqlDistance ? (r.distanceKm != null ? Number(r.distanceKm) : null) : null,
     }));
   } catch {
@@ -507,7 +487,13 @@ export type TournamentDetailSummary = {
     phone: string | null;
   }>;
   tournamentVenues: Array<{
-    organization: { id: string; name: string; slug: string | null };
+    organization: {
+      id: string;
+      name: string;
+      slug: string | null;
+      address: string | null;
+      phone: string | null;
+    };
   }>;
   _count: { finalMatches: number };
 };
@@ -521,7 +507,6 @@ const TOURNAMENT_SUMMARY_RELATIONS = {
       bracketConfig: true,
     },
   },
-  _count: { select: { finalMatches: true } },
   matchVenues: {
     orderBy: { sortOrder: "asc" as const },
     select: {
@@ -534,13 +519,20 @@ const TOURNAMENT_SUMMARY_RELATIONS = {
   tournamentVenues: {
     orderBy: { sortOrder: "asc" as const },
     select: {
-      organization: { select: ORGANIZATION_SELECT_PUBLIC },
+      organization: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          address: true,
+          phone: true,
+        },
+      },
     },
   },
 } as const;
 
 const TOURNAMENT_BASIC_RELATIONS = {
-  organization: { select: ORGANIZATION_SELECT_PUBLIC },
   rule: true,
   _count: { select: { tournamentZones: true, finalMatches: true } },
   matchVenues: {
@@ -591,7 +583,6 @@ export async function getTournamentSummary(id: string) {
         prizeInfo: true,
         entryCondition: true,
         maxParticipants: true,
-        tournamentStage: true,
         isScotch: true,
         ...TOURNAMENT_SUMMARY_RELATIONS,
       },
@@ -618,7 +609,6 @@ export async function getTournamentSummary(id: string) {
         prizeInfo: true,
         entryCondition: true,
         maxParticipants: true,
-        tournamentStage: true,
         isScotch: true,
         ...TOURNAMENT_SUMMARY_RELATIONS,
       },

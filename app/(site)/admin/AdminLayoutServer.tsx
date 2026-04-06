@@ -11,16 +11,35 @@ import { hasPermission, PERMISSION_KEYS } from "@/lib/auth/permissions.server";
 
 type Props = {
   children: React.ReactNode;
+  requirePlatformAdmin?: boolean;
+  scope?: "admin" | "platform";
 };
 
 /**
  * Admin shell server gate.
  * Keeps auth/permission/settings loading out of `app/admin/layout.tsx`.
  */
-export async function AdminLayoutServer({ children }: Props) {
+export async function AdminLayoutServer({
+  children,
+  requirePlatformAdmin = false,
+  scope = "admin",
+}: Props) {
   const session = await getSession();
   const headersList = await headers();
   const pathname = headersList.get("x-pathname") ?? "";
+  const isPlatformArea =
+    pathname === "/admin/platform" ||
+    pathname.startsWith("/admin/platform/") ||
+    pathname === "/admin/venues" ||
+    pathname.startsWith("/admin/venues/") ||
+    pathname === "/admin/client-applications" ||
+    pathname.startsWith("/admin/client-applications/") ||
+    pathname === "/admin/members" ||
+    pathname.startsWith("/admin/members/") ||
+    pathname === "/admin/fee-ledger" ||
+    pathname.startsWith("/admin/fee-ledger/");
+  const resolvedScope: "admin" | "platform" = scope === "platform" || isPlatformArea ? "platform" : "admin";
+  const shouldRequirePlatformAdmin = requirePlatformAdmin || isPlatformArea;
   const isLoginPage = pathname === "/admin/login" || pathname.startsWith("/admin/login/");
 
   if (!session) {
@@ -30,6 +49,10 @@ export async function AdminLayoutServer({ children }: Props) {
 
   if (session.role === "ZONE_MANAGER") {
     redirect("/zone");
+  }
+
+  if (shouldRequirePlatformAdmin && session.role !== "PLATFORM_ADMIN") {
+    redirect("/admin/site");
   }
 
   const canAccessAdmin = await hasPermission(session, PERMISSION_KEYS.ADMIN_ACCESS);
@@ -70,6 +93,7 @@ export async function AdminLayoutServer({ children }: Props) {
       copy={copy}
       userName={session.name ?? session.username ?? "관리자"}
       footer={siteSettings.footer}
+      scope={resolvedScope}
     >
       <div className="w-full min-w-0">{children}</div>
     </AdminLayout>

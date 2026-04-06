@@ -7,11 +7,14 @@ import { canUseFeature, FEATURE_CODES, isAnnualMembershipActive } from "@/lib/fe
 import { FeatureGateNotice } from "@/components/client/FeatureGateNotice";
 
 const tabs = [
-  { href: "", label: "기본정보" },
-  { href: "/outline", label: "대회요강" },
+  { href: "", label: "대회현황" },
+  { href: "/edit", label: "대회수정" },
   { href: "/participants", label: "참가자" },
-  { href: "/zones", label: "경기장" },
   { href: "/bracket", label: "대진표" },
+  { href: "/card-publish", label: "카드발행" },
+  { href: "/settlement", label: "정산" },
+  { href: "/outline", label: "대회요강" },
+  { href: "/zones", label: "경기장" },
   { href: "/results", label: "결과" },
   { href: "/co-admins", label: "공동관리자" },
   { href: "/promo", label: "홍보페이지" },
@@ -64,7 +67,7 @@ export default async function ClientTournamentPromoPage({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-site-text">홍보페이지</h1>
         <Link
-          href={`/client/operations/tournaments/${id}/edit`}
+          href={`/client/tournaments/${id}/edit`}
           className="rounded-lg bg-site-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90"
         >
           기본 정보·홍보 수정

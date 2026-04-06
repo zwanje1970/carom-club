@@ -6,7 +6,7 @@ import { isFeatureEnabled } from "@/lib/site-feature-flags";
 import { hasPermission, PERMISSION_KEYS } from "@/lib/auth/permissions.server";
 import { getCommunityPostCommentsTree } from "@/lib/community-post-detail-server";
 
-/** 댓글 목록 (대댓글 포함, parentId 기준 트리). 숨김 댓글은 관리자만 내용 표시 */
+/** 댓글 목록 (1단계 답글 트리). 숨김 댓글은 관리자만 내용 표시 */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }

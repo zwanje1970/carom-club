@@ -10,6 +10,11 @@ import {
 } from "@/lib/footer-settings";
 import { clampFlowSpeed } from "@/lib/home-carousel-flow";
 import {
+  getDefaultHeroSettings,
+  parseHeroSettingsJson,
+  type HeroSettings,
+} from "@/lib/hero-settings-defaults";
+import {
   isSiteColorThemeId,
   SITE_CUSTOM_COLOR_THEME_PRESET,
   parseSiteThemeCustomTokens,
@@ -45,6 +50,7 @@ export type SiteSettings = {
   homeCarouselFlowSpeed: number;
   /** 일반회원(USER) 난구해결사 해법 등록 최소 LEVEL */
   minSolutionLevelForUser: number;
+  heroSettings: HeroSettings;
   headerBgColor: string | null;
   headerTextColor: string | null;
   headerActiveColor: string | null;
@@ -74,6 +80,7 @@ const DEFAULTS: SiteSettings = {
   withdrawRejoinDays: 0,
   homeCarouselFlowSpeed: 50,
   minSolutionLevelForUser: 1,
+  heroSettings: getDefaultHeroSettings(),
   headerBgColor: null,
   headerTextColor: null,
   headerActiveColor: null,
@@ -404,6 +411,7 @@ function dbRowToSettings(row: SiteSettingRow): SiteSettings {
     withdrawRejoinDays: row.withdrawRejoinDays ?? 0,
     homeCarouselFlowSpeed: clampFlowSpeed(row.homeCarouselFlowSpeed),
     minSolutionLevelForUser,
+    heroSettings: parseHeroSettingsJson(row.heroSettingsJson ?? null) ?? DEFAULTS.heroSettings,
     headerBgColor: row.headerBgColor ?? null,
     headerTextColor: row.headerTextColor ?? null,
     headerActiveColor: row.headerActiveColor ?? null,

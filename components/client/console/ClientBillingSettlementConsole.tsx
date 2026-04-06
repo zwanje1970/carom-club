@@ -68,9 +68,11 @@ function newLine(): DraftLine {
 
 export function ClientBillingSettlementConsole({
   initialTournamentId,
+  fixedTournamentId = null,
   showPlatformBillingLink,
 }: {
   initialTournamentId: string | null;
+  fixedTournamentId?: string | null;
   showPlatformBillingLink: boolean;
 }) {
   const [from, setFrom] = useState("");
@@ -78,7 +80,7 @@ export function ClientBillingSettlementConsole({
   const [rows, setRows] = useState<OverviewRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(initialTournamentId);
+  const [selectedId, setSelectedId] = useState<string | null>(fixedTournamentId ?? initialTournamentId);
 
   useEffect(() => {
     const end = new Date();
@@ -110,8 +112,12 @@ export function ClientBillingSettlementConsole({
   }, [loadOverview]);
 
   useEffect(() => {
+    if (fixedTournamentId) {
+      setSelectedId(fixedTournamentId);
+      return;
+    }
     if (initialTournamentId) setSelectedId(initialTournamentId);
-  }, [initialTournamentId]);
+  }, [initialTournamentId, fixedTournamentId]);
 
   const selected = useMemo(
     () => rows.find((r) => r.id === selectedId) ?? null,
@@ -206,11 +212,11 @@ export function ClientBillingSettlementConsole({
                 <ConsoleTableTh className="text-right">수입</ConsoleTableTh>
                 <ConsoleTableTh className="text-right">비용</ConsoleTableTh>
                 <ConsoleTableTh className="text-right">순</ConsoleTableTh>
-                <ConsoleTableTh className="text-right">작업</ConsoleTableTh>
+                {fixedTournamentId ? null : <ConsoleTableTh className="text-right">작업</ConsoleTableTh>}
               </ConsoleTableRow>
             </ConsoleTableHead>
             <ConsoleTableBody>
-              {rows.map((r) => (
+              {(fixedTournamentId ? rows.filter((row) => row.id === fixedTournamentId) : rows).map((r) => (
                 <ConsoleTableRow key={r.id}>
                   <ConsoleTableTd className="max-w-[14rem] font-medium">
                     <span className="line-clamp-2">{r.name}</span>
@@ -239,15 +245,17 @@ export function ClientBillingSettlementConsole({
                   <ConsoleTableTd className="text-right font-mono text-[11px] font-semibold">
                     {r.net.toLocaleString()}
                   </ConsoleTableTd>
-                  <ConsoleTableTd className="text-right">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedId(r.id)}
-                      className="rounded-sm border border-zinc-500 px-2 py-0.5 text-[10px] font-medium hover:bg-zinc-100 dark:border-zinc-500 dark:hover:bg-zinc-800"
-                    >
-                      {selectedId === r.id ? "선택됨" : "편집"}
-                    </button>
-                  </ConsoleTableTd>
+                  {fixedTournamentId ? null : (
+                    <ConsoleTableTd className="text-right">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedId(r.id)}
+                        className="rounded-sm border border-zinc-500 px-2 py-0.5 text-[10px] font-medium hover:bg-zinc-100 dark:border-zinc-500 dark:hover:bg-zinc-800"
+                      >
+                        {selectedId === r.id ? "선택됨" : "편집"}
+                      </button>
+                    </ConsoleTableTd>
+                  )}
                 </ConsoleTableRow>
               ))}
             </ConsoleTableBody>

@@ -1,17 +1,15 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { HomeTournamentCards } from "@/components/home/HomeTournamentCards";
-import type { HomeTournamentCarouselInput } from "@/components/home/HomeTournamentCarouselRows";
-import type { TournamentListRow } from "@/lib/db-tournaments";
 import type { SlotBlockCardStyle } from "@/lib/slot-block-card-style";
 import type { SlotBlockCtaConfig } from "@/lib/slot-block-cta";
 import type { SlotBlockLayout, SlotBlockMotion } from "@/lib/slot-block-layout-motion";
-import type { SlotBlockItemsBundle } from "@/lib/slot-block-items";
-import { manualItemsToTournamentCarouselInput } from "@/lib/slot-block-items";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import type { HomePublishedTournamentCard, HomeTournamentSortBy } from "@/lib/home-published-tournament-cards";
+import type { SlotBlockTournamentListSettings } from "@/lib/slot-block-tournament-list";
 
-type TournamentItem = TournamentListRow & { distanceKm?: number | null };
+type TournamentItem = HomePublishedTournamentCard;
 
 /** 홈 `tournamentIntro` 슬롯 — `PageSlotBlock`에서만 마운트 */
 export function HomeTournamentIntroSlot({
@@ -23,11 +21,11 @@ export function HomeTournamentIntroSlot({
   slotMotion,
   blockBackgroundColor,
   homeCarouselFlowSpeed,
-  slotItems,
+  listSettings,
   sectionTitle,
   sectionSubtitle,
 }: {
-  initialTournaments: TournamentListRow[];
+  initialTournaments: HomePublishedTournamentCard[];
   copy: Record<string, string>;
   cardStyle?: SlotBlockCardStyle;
   ctaConfig: SlotBlockCtaConfig;
@@ -35,22 +33,49 @@ export function HomeTournamentIntroSlot({
   slotMotion: SlotBlockMotion;
   blockBackgroundColor?: string;
   homeCarouselFlowSpeed: number;
-  slotItems: SlotBlockItemsBundle;
+  listSettings: SlotBlockTournamentListSettings;
   /** `PageSection` 제목·부제(페이지 빌더·CMS 행) */
   sectionTitle?: string | null;
   sectionSubtitle?: string | null;
 }) {
-  const useManualContent = slotItems.mode === "manual";
-
-  const [tournaments, setTournaments] = useState<TournamentItem[]>(() =>
-    initialTournaments.map((t) => ({
-      ...t,
-      startAt: typeof t.startAt === "string" ? new Date(t.startAt) : t.startAt,
-      endAt: t.endAt ? (typeof t.endAt === "string" ? new Date(t.endAt) : t.endAt) : null,
-    }))
-  );
+  const [activeSort, setActiveSort] = useState<HomeTournamentSortBy>(listSettings.sortBy);
+  const [sortMap, setSortMap] = useState<Record<HomeTournamentSortBy, TournamentItem[]>>({
+    latest: initialTournaments,
+    deadline: [],
+    distance: [],
+  });
+  const [sortLoading, setSortLoading] = useState<HomeTournamentSortBy | null>(null);
+  const [tournaments, setTournaments] = useState<TournamentItem[]>(initialTournaments);
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [nearbyError, setNearbyError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setActiveSort(listSettings.sortBy);
+  }, [listSettings.sortBy]);
+
+  const loadBySort = useCallback(
+    async (sortBy: HomeTournamentSortBy, params?: { lat?: number; lng?: number }) => {
+      setSortLoading(sortBy);
+      const query = new URLSearchParams({
+        sortBy,
+        take: String(listSettings.displayCount),
+      });
+      if (params?.lat != null && params?.lng != null) {
+        query.set("lat", String(params.lat));
+        query.set("lng", String(params.lng));
+      }
+      try {
+        const res = await fetch(`/api/home/tournaments?${query.toString()}`);
+        if (!res.ok) throw new Error("fetch");
+        const list = (await res.json()) as TournamentItem[];
+        setSortMap((prev) => ({ ...prev, [sortBy]: list }));
+        return list;
+      } finally {
+        setSortLoading((prev) => (prev === sortBy ? null : prev));
+      }
+    },
+    [listSettings.displayCount]
+  );
 
   const handleFindNearby = useCallback(() => {
     const c = copy as Record<AdminCopyKey, string>;
@@ -69,17 +94,10 @@ export function HomeTournamentIntroSlot({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ latitude: lat, longitude: lng }),
         }).catch(() => {});
-        const params = new URLSearchParams({ lat: String(lat), lng: String(lng), take: "5" });
-        fetch(`/api/home/tournaments?${params}`)
-          .then((r) => (r.ok ? r.json() : Promise.reject(new Error("fetch"))))
-          .then((tList: TournamentItem[]) => {
-            setTournaments(
-              (tList || []).map((t) => ({
-                ...t,
-                startAt: typeof t.startAt === "string" ? new Date(t.startAt) : t.startAt,
-                endAt: t.endAt ? (typeof t.endAt === "string" ? new Date(t.endAt) : t.endAt) : null,
-              }))
-            );
+        loadBySort("distance", { lat, lng })
+          .then((list) => {
+            setTournaments(list);
+            setActiveSort("distance");
           })
           .catch(() => setNearbyError(getCopyValue(c, "site.home.tournaments.nearbyErrorFetch")))
           .finally(() => setNearbyLoading(false));
@@ -90,28 +108,48 @@ export function HomeTournamentIntroSlot({
       },
       { enableHighAccuracy: false, timeout: 15000, maximumAge: 600_000 }
     );
-  }, [copy]);
+  }, [copy, loadBySort]);
 
-  const manualList: HomeTournamentCarouselInput[] = useManualContent
-    ? manualItemsToTournamentCarouselInput(slotItems.items)
-    : [];
+  useEffect(() => {
+    const initialTake = initialTournaments.slice(0, listSettings.displayCount);
+    setSortMap({
+      latest: initialTake,
+      deadline: [],
+      distance: [],
+    });
+    if (listSettings.sortBy === "latest") {
+      setTournaments(initialTake);
+      return;
+    }
+    setTournaments([]);
+    void loadBySort(listSettings.sortBy)
+      .then((selected) => setTournaments(selected))
+      .catch(() => {
+        setTournaments([]);
+      });
+  }, [initialTournaments, listSettings.displayCount, listSettings.sortBy, loadBySort]);
 
-  if (useManualContent) {
-    return (
-      <HomeTournamentCards
-        tournaments={manualList}
-        copy={copy}
-        cardStyle={cardStyle}
-        ctaConfig={ctaConfig}
-        slotLayout={slotLayout}
-        slotMotion={slotMotion}
-        blockBackgroundColor={blockBackgroundColor}
-        homeCarouselFlowSpeed={homeCarouselFlowSpeed}
-        sectionTitle={sectionTitle}
-        sectionSubtitle={sectionSubtitle}
-      />
-    );
-  }
+  const tabs = useMemo(
+    () => [
+      { id: "latest" as const, label: "최신순" },
+      { id: "deadline" as const, label: "마감임박" },
+      { id: "distance" as const, label: "위치순" },
+    ],
+    []
+  );
+
+  const handleTabChange = useCallback(
+    (next: HomeTournamentSortBy) => {
+      setActiveSort(next);
+      const existing = sortMap[next];
+      if (existing.length > 0) {
+        setTournaments(existing);
+        return;
+      }
+      void loadBySort(next).then((list) => setTournaments(list));
+    },
+    [loadBySort, sortMap]
+  );
 
   return (
     <HomeTournamentCards
@@ -120,11 +158,18 @@ export function HomeTournamentIntroSlot({
       cardStyle={cardStyle}
       ctaConfig={ctaConfig}
       slotLayout={slotLayout}
-      slotMotion={slotMotion}
+      slotMotion={{ ...slotMotion, autoPlay: listSettings.slideEnabled && slotMotion.autoPlay }}
       blockBackgroundColor={blockBackgroundColor}
       homeCarouselFlowSpeed={homeCarouselFlowSpeed}
       sectionTitle={sectionTitle}
       sectionSubtitle={sectionSubtitle}
+      showMoreButton={listSettings.showMoreButton}
+      sortTabs={{
+        items: tabs,
+        active: activeSort,
+        loading: sortLoading,
+        onChange: handleTabChange,
+      }}
       nearbyFind={{
         onClick: handleFindNearby,
         loading: nearbyLoading,

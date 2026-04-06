@@ -95,8 +95,8 @@ function SortableRow({
       data-row-id={section.id}
       style={style}
       onClick={handleRowClick}
-      className={`cursor-pointer border-b border-gray-200 py-3 last:border-b-0 dark:border-slate-700 ${
-        isActive ? "rounded-md bg-red-50/60 dark:bg-red-950/20" : ""
+      className={`${onRowClick ? "cursor-pointer" : ""} border-b border-gray-200 py-3 last:border-b-0 dark:border-slate-700 ${
+        isActive ? "rounded-md bg-blue-50/70 ring-1 ring-blue-300 dark:bg-blue-950/20 dark:ring-blue-800" : ""
       } ${
         !section.isVisible || section.deletedAt ? "opacity-60" : ""
       }`}

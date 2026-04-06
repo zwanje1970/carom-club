@@ -7,13 +7,11 @@ export function CommunityMainClient({
   copy,
   latest,
   initialCategory,
-  canManageReports = false,
   showSolverEntry,
 }: {
   copy: Record<string, string>;
   latest: CommunityHubPostItem[];
   initialCategory: "all" | "free" | "qna" | "notice";
-  canManageReports?: boolean;
   showSolverEntry: boolean;
 }) {
   return (
@@ -21,7 +19,6 @@ export function CommunityMainClient({
       <CommunityPostListSection
         latest={latest}
         initialCategory={initialCategory}
-        canManageReports={canManageReports}
         showSolverEntry={showSolverEntry}
       />
     </div>

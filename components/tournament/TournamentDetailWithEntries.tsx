@@ -1,12 +1,9 @@
+import { Suspense } from "react";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { getTournamentDetailPromoContent, getTournamentEntries, type TournamentDetailSummary } from "@/lib/db-tournaments";
 import { getDisplayName } from "@/lib/display-name";
 import { formatTournamentEntryDisplayName } from "@/lib/tournament-entry-display";
-import {
-  getTournamentDetailPromoContent,
-  getTournamentEntries,
-  type TournamentDetailSummary,
-} from "@/lib/db-tournaments";
 import { TournamentDetailView } from "./TournamentDetailView";
 
 export type TournamentDetailWithEntriesProps = {
@@ -31,7 +28,7 @@ export type TournamentDetailWithEntriesProps = {
     | "rule"
   >;
   matchVenues: Array<{ displayLabel: string; venueName?: string | null; address?: string | null; phone?: string | null }>;
-  tournamentVenues: Array<{ id: string; name: string; slug: string }>;
+  tournamentVenues: Array<{ id: string; name: string; slug: string; address?: string | null; phone?: string | null }>;
   tabs: readonly { id: string; label: string }[];
   currentTab: string;
   participantsListPublic: boolean;
@@ -49,22 +46,80 @@ export async function TournamentDetailWithEntries({
   participantsListPublic,
   allowMultipleSlots,
 }: TournamentDetailWithEntriesProps) {
-  console.time("tournament_participants");
+  return (
+    <div className="space-y-6">
+      <section className="rounded-xl border border-site-border bg-site-card p-4 sm:p-6">
+        <h1 className="text-xl font-bold text-site-text sm:text-2xl">{tournament.name}</h1>
+        <p className="mt-2 text-sm text-site-text-muted">
+          {tournament.startAt instanceof Date ? tournament.startAt.toISOString() : String(tournament.startAt)}
+          {tournament.endAt != null
+            ? ` ~ ${tournament.endAt instanceof Date ? tournament.endAt.toISOString() : String(tournament.endAt)}`
+            : ""}
+        </p>
+        {tournament.venue ? <p className="mt-1 text-sm text-site-text-muted">{tournament.venue}</p> : null}
+        <p className="mt-1 text-sm text-site-text-muted">{tournament.status}</p>
+        {tournament.summary ? <p className="mt-4 whitespace-pre-wrap text-site-text">{tournament.summary}</p> : null}
+      </section>
+
+      <Suspense fallback={null}>
+        <TournamentDetailDeferredView
+          tournamentId={tournamentId}
+          tournament={tournament}
+          tabs={tabs}
+          currentTab={currentTab}
+          participantsListPublic={participantsListPublic}
+          matchVenues={matchVenues}
+          tournamentVenues={tournamentVenues}
+          allowMultipleSlots={allowMultipleSlots}
+        />
+      </Suspense>
+    </div>
+  );
+}
+
+async function TournamentDetailDeferredView({
+  tournamentId,
+  tournament,
+  tabs,
+  currentTab,
+  participantsListPublic,
+  matchVenues,
+  tournamentVenues,
+  allowMultipleSlots,
+}: {
+  tournamentId: string;
+  tournament: TournamentDetailWithEntriesProps["tournament"];
+  tabs: TournamentDetailWithEntriesProps["tabs"];
+  currentTab: string;
+  participantsListPublic: boolean;
+  matchVenues: TournamentDetailWithEntriesProps["matchVenues"];
+  tournamentVenues: TournamentDetailWithEntriesProps["tournamentVenues"];
+  allowMultipleSlots: boolean;
+}) {
   const shouldLoadEntriesList = currentTab === "participants" && participantsListPublic;
   const sessionPromise = getSession();
-  console.time("tournament_participants_count");
-  const confirmedCountPromise = getTournamentEntriesCountOnly(tournamentId).finally(() =>
-    console.timeEnd("tournament_participants_count")
-  );
-  console.time("tournament_participants_entries_list");
-  const entriesPromise = (shouldLoadEntriesList ? getTournamentEntries(tournamentId) : Promise.resolve([])).finally(
-    () => console.timeEnd("tournament_participants_entries_list")
-  );
-  const promoContentPromise = currentTab === "outline" && !tournament.outlinePublished?.trim()
-    ? getTournamentDetailPromoContent(tournamentId)
-    : Promise.resolve(null);
+  const confirmedCountPromise = prisma.tournamentEntry.count({
+    where: { tournamentId, status: "CONFIRMED" },
+  });
+  const entriesPromise = shouldLoadEntriesList ? getTournamentEntries(tournamentId) : Promise.resolve([]);
+  const promoContentPromise =
+    currentTab === "outline" && !tournament.outlinePublished?.trim()
+      ? getTournamentDetailPromoContent(tournamentId)
+      : Promise.resolve(null);
   const myEntriesPromise = sessionPromise.then((session) =>
-    session ? getTournamentMyEntriesOnly(tournamentId, session.id) : []
+    session
+      ? prisma.tournamentEntry.findMany({
+          where: { tournamentId, userId: session.id },
+          select: {
+            id: true,
+            status: true,
+            waitingListOrder: true,
+            paymentMarkedByApplicantAt: true,
+            slotNumber: true,
+          },
+          orderBy: [{ createdAt: "asc" }],
+        })
+      : []
   );
 
   const [session, confirmedCount, entries, myEntriesRows, promoContent] = await Promise.all([
@@ -75,7 +130,6 @@ export async function TournamentDetailWithEntries({
     promoContentPromise,
   ]);
 
-  console.timeEnd("tournament_participants");
   const myEntries = myEntriesRows.map((e) => ({
     id: e.id,
     status: e.status,
@@ -83,7 +137,7 @@ export async function TournamentDetailWithEntries({
     paymentMarkedByApplicantAt: e.paymentMarkedByApplicantAt?.toISOString() ?? null,
     slotNumber: e.slotNumber ?? 1,
   }));
-  const entriesForView = entries.map((e) => ({
+  const entriesForView = entries.map((e: Awaited<ReturnType<typeof getTournamentEntries>>[number]) => ({
     id: e.id,
     userId: e.userId,
     userName: getDisplayName(e.user),
@@ -162,24 +216,4 @@ export async function TournamentDetailWithEntries({
       entries={entriesForView}
     />
   );
-}
-
-async function getTournamentEntriesCountOnly(tournamentId: string): Promise<number> {
-  return prisma.tournamentEntry.count({
-    where: { tournamentId, status: "CONFIRMED" },
-  });
-}
-
-async function getTournamentMyEntriesOnly(tournamentId: string, userId: string) {
-  return prisma.tournamentEntry.findMany({
-    where: { tournamentId, userId },
-    select: {
-      id: true,
-      status: true,
-      waitingListOrder: true,
-      paymentMarkedByApplicantAt: true,
-      slotNumber: true,
-    },
-    orderBy: [{ createdAt: "asc" }],
-  });
 }

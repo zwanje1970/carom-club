@@ -15,6 +15,7 @@ import { pageNotAllowedMessage } from "@/lib/content/page-section-page-rules";
 import { coerceSlotBlockCardStyle, resolveSlotBlockCardStyle } from "@/lib/slot-block-card-style";
 import { coerceSlotBlockCtaConfig } from "@/lib/slot-block-cta";
 import { coerceSlotBlockLayout, coerceSlotBlockMotion } from "@/lib/slot-block-layout-motion";
+import { coerceSlotBlockTournamentListSettings } from "@/lib/slot-block-tournament-list";
 import { parseSectionStyleJson } from "@/lib/section-style";
 import type { PageSlug, PlacementSlug } from "@/types/page-section";
 
@@ -85,6 +86,7 @@ type PatchBody =
       slotBlockCta?: Record<string, unknown>;
       slotBlockLayout?: Record<string, unknown>;
       slotBlockMotion?: Record<string, unknown>;
+      slotBlockTournamentList?: Record<string, unknown>;
       /** `sectionStyleJson.backgroundColor` (블록 배경) */
       backgroundColor?: string | null;
       /** 직접 구성 카드 등 — 객체·배열만 허용, null이면 필드 제거 */
@@ -223,6 +225,7 @@ export async function PATCH(request: Request) {
       slotBlockCta,
       slotBlockLayout,
       slotBlockMotion,
+      slotBlockTournamentList,
       backgroundColor,
       slotBlockItems,
     } = body;
@@ -248,6 +251,7 @@ export async function PATCH(request: Request) {
         slotBlockCta !== undefined ||
         slotBlockLayout !== undefined ||
         slotBlockMotion !== undefined ||
+        slotBlockTournamentList !== undefined ||
         backgroundColor !== undefined ||
         slotBlockItems !== undefined
       ) {
@@ -277,6 +281,11 @@ export async function PATCH(request: Request) {
         if (slotBlockMotion !== undefined) {
           nextJson.slotBlockMotion = coerceSlotBlockMotion(
             slotBlockMotion
+          ) as unknown as Record<string, unknown>;
+        }
+        if (slotBlockTournamentList !== undefined) {
+          nextJson.slotBlockTournamentList = coerceSlotBlockTournamentListSettings(
+            slotBlockTournamentList
           ) as unknown as Record<string, unknown>;
         }
         if (backgroundColor !== undefined) {

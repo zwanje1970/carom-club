@@ -40,11 +40,12 @@ export type CommonPageData = {
 const REVALIDATE_SECONDS = 60;
 
 async function getCommonPageDataUncached(page: PageSlug): Promise<CommonPageData> {
+  const shouldLoadPageSections = page === "tournaments" || page === "venues";
   const [{ copy, siteSettings }, noticeBars, popups, pageSections, pageBlocks] = await Promise.all([
     getCommonGlobalData(page === "community" ? COMMUNITY_COPY_KEYS : undefined),
     getNoticeBarsForPage(page),
     getPopupsForPage(page),
-    page === "community" ? Promise.resolve([] as PageSection[]) : getPageSectionsForPage(page),
+    shouldLoadPageSections ? getPageSectionsForPage(page) : Promise.resolve([] as PageSection[]),
     getOrderedPageBlocksForPage(page),
   ]);
   return {

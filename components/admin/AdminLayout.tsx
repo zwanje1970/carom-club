@@ -22,15 +22,19 @@ type Props = {
   copy?: Record<string, string>;
   /** 푸터 설정 (관리자 설정에서 저장한 값). footerEnabled 시 SiteFooter 사용 */
   footer?: FooterSettings;
+  scope?: "admin" | "platform";
 };
 
-export function AdminLayout({ children, copy, footer }: Props) {
+export function AdminLayout({ children, copy, footer, scope = "admin" }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [workspaceSidebarOpen, setWorkspaceSidebarOpen] = useState(false);
 
-  const isEditorWorkspace = pathname?.startsWith("/admin/page-builder");
+  const isEditorWorkspace =
+    pathname?.startsWith("/admin/page-builder") ||
+    pathname?.startsWith("/admin/site/page-builder-v2") ||
+    pathname?.startsWith("/admin/site/page-builder-new");
   const desktopSidebarVisible = !isEditorWorkspace || workspaceSidebarOpen;
 
   const handleLogout = async () => {
@@ -54,6 +58,7 @@ export function AdminLayout({ children, copy, footer }: Props) {
       {desktopSidebarVisible || mobileMenuOpen ? (
         <AdminLayoutSidebar
           copy={copy}
+          scope={scope}
           onLogout={handleLogout}
           mobileOpen={mobileMenuOpen}
           onMobileClose={() => setMobileMenuOpen(false)}

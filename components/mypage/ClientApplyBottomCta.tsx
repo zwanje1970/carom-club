@@ -22,16 +22,33 @@ export function ClientApplyBottomCta() {
 
   useEffect(() => {
     const controller = new AbortController();
-
-    fetch(CTA_FETCH_URL, { signal: controller.signal })
-      .then((res) => res.json())
-      .then((data: CtaResponse) => {
-        setApplication(data.application ?? null);
-      })
-      .catch(() => setApplication(null))
-      .finally(() => setLoading(false));
-
-    return () => controller.abort();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const run = () => {
+      fetch(CTA_FETCH_URL, { signal: controller.signal })
+        .then((res) => res.json())
+        .then((data: CtaResponse) => {
+          setApplication(data.application ?? null);
+        })
+        .catch(() => setApplication(null))
+        .finally(() => setLoading(false));
+    };
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      const id = (window as Window & {
+        requestIdleCallback: (cb: IdleRequestCallback) => number;
+        cancelIdleCallback: (id: number) => void;
+      }).requestIdleCallback(() => run());
+      return () => {
+        (window as Window & {
+          cancelIdleCallback: (idleId: number) => void;
+        }).cancelIdleCallback(id);
+        controller.abort();
+      };
+    }
+    timer = setTimeout(run, 500);
+    return () => {
+      if (timer) clearTimeout(timer);
+      controller.abort();
+    };
   }, []);
 
   if (loading) {

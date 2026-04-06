@@ -20,7 +20,7 @@ type ClientConsoleNavId = "dash" | "tournament" | "billing" | "settings";
 
 const CLIENT_CONSOLE_NAV: { id: ClientConsoleNavId; href: string; labelKey: AdminCopyKey }[] = [
   { id: "dash", href: "/client/dashboard", labelKey: "client.console.nav.dash" },
-  { id: "tournament", href: "/client/operations", labelKey: "client.console.nav.tournament" },
+  { id: "tournament", href: "/client/tournaments", labelKey: "client.console.nav.tournament" },
   { id: "billing", href: "/client/billing", labelKey: "client.console.nav.billing" },
   { id: "settings", href: "/client/settings", labelKey: "client.console.nav.settings" },
 ];

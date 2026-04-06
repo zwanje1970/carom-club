@@ -39,7 +39,6 @@ export async function CommunityHomeInner({
             copy={copy}
             latest={communityPayload.latest}
             initialCategory={category}
-            canManageReports={communityPayload.canManageReports}
             showSolverEntry={communityPayload.showSolverEntry}
           />
         </PageContentContainer>

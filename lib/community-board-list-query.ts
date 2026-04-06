@@ -34,14 +34,10 @@ export type BoardListQueryParams = {
 const listSelect = {
   id: true,
   title: true,
-  thumbnailUrl: true,
-  viewCount: true,
-  isPinned: true,
-  isSolved: true,
   createdAt: true,
+  viewCount: true,
   likeCount: true,
   commentCount: true,
-  author: { select: { name: true } },
 } satisfies Prisma.CommunityPostSelect;
 
 export function buildBoardListWhere(params: BoardListQueryParams): Prisma.CommunityPostWhereInput {
@@ -94,14 +90,10 @@ export function buildBoardListOrderBy(params: BoardListQueryParams): Prisma.Comm
 export type BoardListRow = {
   id: string;
   title: string;
-  thumbnailUrl: string | null;
-  viewCount: number;
-  isPinned: boolean;
-  isSolved: boolean | null;
   createdAt: Date;
+  viewCount: number;
   likeCount: number;
   commentCount: number;
-  author: { name: string };
 };
 
 /** 공지 고정글 캐시 키 — 필터·로컬 달력(오늘/주간)·검색어 반영 */
@@ -150,13 +142,6 @@ export function formatBoardListRow(p: BoardListRow) {
   return {
     id: p.id,
     title: p.title,
-    thumbnailUrl: p.thumbnailUrl ?? null,
-    authorName: p.author.name,
-    likeCount: p.likeCount,
-    commentCount: p.commentCount,
-    viewCount: p.viewCount,
-    isPinned: p.isPinned,
-    isSolved: p.isSolved ?? false,
     createdAt: p.createdAt.toISOString(),
   };
 }

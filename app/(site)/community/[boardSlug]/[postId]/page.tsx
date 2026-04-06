@@ -1,13 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { hasPermission, PERMISSION_KEYS } from "@/lib/auth/permissions.server";
-import { isFeatureEnabled } from "@/lib/site-feature-flags";
-import {
-  getCommunityPostCommentsTree,
-  getTroubleShotSolutionsForPost,
-  loadCommunityPostDetail,
-} from "@/lib/community-post-detail-server";
+import { isCommunityModerator } from "@/lib/community-roles";
+import { loadCommunityPostPreview } from "@/lib/community-post-detail-server";
 import { CommunityPostDetailView } from "@/components/community/CommunityPostDetailView";
 
 export const revalidate = 60;
@@ -18,11 +13,10 @@ export default async function CommunityBoardSlugPostDetailPage({
   params: Promise<{ boardSlug: string; postId: string }>;
 }) {
   const { boardSlug, postId } = await params;
-  const session = await getSession();
-  const result = await loadCommunityPostDetail(postId, session);
+  const previewResult = await loadCommunityPostPreview(postId);
 
-  if (!result.ok) {
-    if (result.reason === "no_db") {
+  if (!previewResult.ok) {
+    if (previewResult.reason === "no_db") {
       return (
         <main className="min-h-screen bg-site-bg text-site-text">
           <div className="mx-auto max-w-3xl px-4 py-6">
@@ -34,28 +28,49 @@ export default async function CommunityBoardSlugPostDetailPage({
         </main>
       );
     }
-    if (result.reason === "trouble_requires_login") {
-      redirect(`/login?next=${encodeURIComponent(`/community/${boardSlug}/${postId}`)}`);
-    }
     notFound();
   }
 
-  const [comments, troubleSolutions] = await Promise.all([
-    getCommunityPostCommentsTree(postId, session),
-    result.post.boardSlug === "trouble" ? getTroubleShotSolutionsForPost(postId, session) : Promise.resolve([]),
-  ]);
-  const commentFeatureEnabled = await isFeatureEnabled("community_comment_enabled");
-  const canCreateComment =
-    !!session && commentFeatureEnabled && (await hasPermission(session, PERMISSION_KEYS.COMMUNITY_COMMENT_CREATE));
+  const preview = previewResult.post;
+  const needsSession = preview.boardSlug === "trouble" || Boolean(preview.isHidden);
+  const session = needsSession ? await getSession() : null;
+
+  if (preview.boardSlug === "trouble" && !session) {
+    redirect(`/login?next=${encodeURIComponent(`/community/${boardSlug}/${postId}`)}`);
+  }
+
+  if (preview.isHidden && !isCommunityModerator(session)) {
+    return (
+      <main className="min-h-screen bg-site-bg text-site-text">
+        <div className="mx-auto max-w-3xl px-4 py-6">
+          <nav className="flex items-center gap-2 text-sm text-gray-500 mb-4">
+            <Link href="/community" className="hover:text-site-primary">
+              커뮤니티
+            </Link>
+            <span>/</span>
+            <Link href={`/community/${boardSlug}`} className="hover:text-site-primary">
+              {preview.boardName}
+            </Link>
+          </nav>
+          <p className="rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 p-6 text-gray-600 dark:text-gray-400">
+            {preview.hiddenMessage ?? "관리자에 의해 숨김 처리된 내용입니다."}
+          </p>
+          <Link href={`/community/${boardSlug}`} className="mt-4 inline-block text-site-primary underline">
+            목록으로
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <CommunityPostDetailView
       postId={postId}
       serverHydrated
-      initialPostJson={result.post}
-      initialComments={comments}
-      initialTroubleSolutions={troubleSolutions}
-      canCreateComment={canCreateComment}
+      initialPostJson={preview}
+      initialComments={[]}
+      initialTroubleSolutions={[]}
+      canCreateComment={false}
       linkOverrides={{
         listHref: `/community/${boardSlug}`,
         editHref: `/community/posts/${postId}/edit`,

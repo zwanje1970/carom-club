@@ -20,6 +20,10 @@ type Props = {
   variant?: "mobile" | "page";
   /** 선택 블록 id 표시용 */
   selectedBlockId?: string | null;
+  /** 선택 시 자동 스크롤 여부 (기본: true) */
+  autoScrollOnSelect?: boolean;
+  /** 상단 제목 표시 여부 (기본: true) */
+  showTitle?: boolean;
   onSelectBlock?: (id: string) => void;
 };
 
@@ -41,6 +45,8 @@ export function PageBuilderMobilePreview({
   rows,
   variant = "mobile",
   selectedBlockId = null,
+  autoScrollOnSelect = true,
+  showTitle = true,
   onSelectBlock,
 }: Props) {
   const blocks = useMemo(
@@ -120,17 +126,20 @@ export function PageBuilderMobilePreview({
   };
 
   useEffect(() => {
+    if (!autoScrollOnSelect) return;
     if (!selectedBlockId) return;
     const viewport = document.getElementById(viewportId);
     if (!viewport) return;
     const target = viewport.querySelector(`[data-block-id="${selectedBlockId}"]`) as HTMLElement | null;
     if (!target) return;
     target.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [selectedBlockId, viewportId, blocks.length]);
+  }, [autoScrollOnSelect, selectedBlockId, viewportId, blocks.length]);
 
   return (
     <CardBox className={isPageVariant ? undefined : "lg:sticky lg:top-4"}>
-      <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-200">모바일 미리보기</h3>
+      {showTitle ? (
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-200">모바일 미리보기</h3>
+      ) : null}
       {ctxError ? (
         <p className="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
           {ctxError} (슬롯은 자리 표시만 될 수 있습니다.)

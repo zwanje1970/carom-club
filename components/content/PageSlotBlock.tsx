@@ -12,8 +12,8 @@ import { TournamentsListWithFilters } from "@/components/tournaments/Tournaments
 import { TournamentsPageChromeTitles } from "@/components/tournaments/TournamentsPageChromeTitles";
 import { resolveHeroSettingsForSlot } from "@/lib/hero-settings-defaults";
 import { resolveHomeStructureSlotFrame } from "@/lib/home-structure-slot-resolve";
-import { cardStyleWithResolvedLayout } from "@/lib/slot-block-layout-motion";
 import { parseSlotBlockItemsBundle } from "@/lib/slot-block-items";
+import { resolveSlotBlockTournamentListSettings } from "@/lib/slot-block-tournament-list";
 import { HomeVenueLinkSlot } from "@/components/home/HomeVenueLinkSlot";
 
 export type PageSlotSurface = "public" | "adminPreview";
@@ -73,7 +73,7 @@ export function PageSlotBlock({
       if (!h) return maybePlaceholder("대회 안내", surface, ctx);
       const frame = resolveHomeStructureSlotFrame(block);
       if (!frame) return maybePlaceholder("대회 안내", surface, ctx);
-      const slotItems = parseSlotBlockItemsBundle(block.sectionStyleJson, "tournamentIntro");
+      const listSettings = resolveSlotBlockTournamentListSettings(block.sectionStyleJson);
       return (
         <HomeTournamentIntroSlot
           initialTournaments={h.initialTournaments}
@@ -84,7 +84,7 @@ export function PageSlotBlock({
           slotMotion={frame.motion}
           blockBackgroundColor={frame.blockBackgroundColor}
           homeCarouselFlowSpeed={h.siteSettings.homeCarouselFlowSpeed}
-          slotItems={slotItems}
+          listSettings={listSettings}
           sectionTitle={block.title}
           sectionSubtitle={block.subtitle}
         />
@@ -143,7 +143,6 @@ export function PageSlotBlock({
           <CommunityPostListSection
             latest={c.latest}
             initialCategory={c.initialCategory}
-            canManageReports={c.canManageReports}
             showSolverEntry={c.showSolverEntry}
           />
         </PageContentContainer>

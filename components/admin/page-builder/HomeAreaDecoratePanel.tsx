@@ -421,43 +421,6 @@ export function HomeAreaDecoratePanel({
             </button>
           </div>
 
-          <div>
-            <div className="mb-2 text-xs font-semibold text-gray-700 dark:text-slate-300">전환 방식</div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setMotion((m) => ({ ...m, transition: "continuous" }))}
-                className={cn(
-                  decorateChoiceWrapClass(motion.transition === "continuous"),
-                  "min-h-[2.5rem] flex-1 px-2 py-2 text-xs font-semibold text-gray-900 dark:text-slate-100"
-                )}
-              >
-                연속 흐름
-              </button>
-              <button
-                type="button"
-                disabled
-                title="곧 지원 예정입니다. 지금은 연속 흐름과 동일하게 보입니다."
-                className={cn(
-                  decorateChoiceWrapClass(false),
-                  "min-h-[2.5rem] flex-1 cursor-not-allowed px-2 py-2 text-xs font-semibold opacity-45 text-gray-900 dark:text-slate-100"
-                )}
-              >
-                슬라이드 (준비 중)
-              </button>
-              <button
-                type="button"
-                disabled
-                title="곧 지원 예정입니다. 지금은 연속 흐름과 동일하게 보입니다."
-                className={cn(
-                  decorateChoiceWrapClass(false),
-                  "min-h-[2.5rem] flex-1 cursor-not-allowed px-2 py-2 text-xs font-semibold opacity-45 text-gray-900 dark:text-slate-100"
-                )}
-              >
-                페이드 (준비 중)
-              </button>
-            </div>
-          </div>
         </SectionShell>
 
         <SectionShell title="클릭 동작">

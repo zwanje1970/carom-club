@@ -32,7 +32,6 @@ type Data = {
   tournamentZone: { id: string; name: string; code: string | null };
   rounds?: Round[];
   matches: Match[];
-  stats: { total: number; completed: number; pending: number; inProgress: number };
 };
 
 function roundLabel(round: Round) {
@@ -200,12 +199,6 @@ export function ClientZoneBracketClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-4 text-sm">
-        <span>전체 {data.stats.total}경기</span>
-        <span className="text-green-600">완료 {data.stats.completed}</span>
-        <span className="text-amber-600">대기 {data.stats.pending}</span>
-      </div>
-
       {reductionRounds.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
           <div className="flex flex-wrap items-center gap-2">

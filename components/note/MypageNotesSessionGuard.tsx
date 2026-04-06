@@ -19,6 +19,7 @@ export function MypageNotesSessionGuard({
 }) {
   const pathname = usePathname() ?? "/mypage/notes";
   const [show, setShow] = useState(initialShow);
+  const shouldVerify = !initialShow;
 
   const verifySession = useCallback(() => {
     fetch("/api/auth/session", { credentials: "include", cache: "no-store" })
@@ -40,11 +41,13 @@ export function MypageNotesSessionGuard({
   }, [pathname]);
 
   useEffect(() => {
+    if (!shouldVerify) return;
     verifySession();
-  }, [verifySession]);
+  }, [verifySession, shouldVerify]);
 
   /** iOS Safari 등: 뒤로가기 복원 시 이전(로그인) 화면이 그대로 나오는 경우 방지 */
   useEffect(() => {
+    if (!shouldVerify) return;
     const onPageShow = (e: PageTransitionEvent) => {
       if (e.persisted) {
         verifySession();
@@ -52,7 +55,7 @@ export function MypageNotesSessionGuard({
     };
     window.addEventListener("pageshow", onPageShow);
     return () => window.removeEventListener("pageshow", onPageShow);
-  }, [verifySession]);
+  }, [verifySession, shouldVerify]);
 
   if (!show) {
     return (

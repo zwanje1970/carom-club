@@ -26,7 +26,7 @@ const BOTTOM_ITEMS: {
     Icon: IconHome,
   },
   {
-    href: "/client/operations",
+    href: "/client/tournaments",
     labelKey: "client.console.bottomNav.tournaments",
     match: matchOperationsRoute,
     Icon: IconTrophy,

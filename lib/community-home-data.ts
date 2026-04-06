@@ -16,11 +16,8 @@ export const COMMUNITY_HOME_CACHE_TAG = "community-home";
 const listSelect = {
   id: true,
   title: true,
-  viewCount: true,
   createdAt: true,
-  likeCount: true,
-  commentCount: true,
-  board: { select: { slug: true, name: true } },
+  board: { select: { slug: true } },
   author: { select: { name: true } },
 } as const;
 
@@ -48,23 +45,20 @@ export type CommunityHomeLatest = CommunityHomePostItem[];
 function format(p: {
   id: string;
   title: string;
-  viewCount: number;
   createdAt: Date;
-  likeCount: number;
-  commentCount: number;
-  board: { slug: string; name: string };
+  board: { slug: string };
   author: { name: string };
 }): CommunityHomePostItem {
   return {
     id: p.id,
     title: p.title,
     authorName: p.author.name,
-    likeCount: p.likeCount,
-    commentCount: p.commentCount,
-    viewCount: p.viewCount,
+    likeCount: 0,
+    commentCount: 0,
+    viewCount: 0,
     createdAt: p.createdAt.toISOString(),
     boardSlug: p.board.slug,
-    boardName: p.board.name,
+    boardName: "",
   };
 }
 

@@ -16,13 +16,16 @@ export default async function ClientOperationsTournamentNewPage() {
 
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
-    select: { name: true },
+    select: { name: true, address: true, addressDetail: true, phone: true },
   });
 
   return (
     <OperationsTournamentNewPageClient
       organizationId={orgId}
       organizationName={org?.name ?? "—"}
+      defaultVenueName={org?.name ?? ""}
+      defaultVenueAddress={[org?.address ?? "", org?.addressDetail ?? ""].filter(Boolean).join(" ").trim()}
+      defaultVenuePhone={org?.phone ?? ""}
     />
   );
 }

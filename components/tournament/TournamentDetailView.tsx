@@ -37,7 +37,7 @@ export type TournamentDetailViewProps = {
     } | null;
   };
   matchVenues: Array<{ displayLabel: string; venueName?: string | null; address?: string | null; phone?: string | null }>;
-  tournamentVenues: Array<{ id: string; name: string; slug: string }>;
+  tournamentVenues: Array<{ id: string; name: string; slug: string; address?: string | null; phone?: string | null }>;
   confirmedCount: number;
   isLoggedIn: boolean;
   myEntries: Array<{

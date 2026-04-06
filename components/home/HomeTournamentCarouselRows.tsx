@@ -37,6 +37,7 @@ export function HomeTournamentCarouselRows({
   cardStyle,
   cardCta,
   listLayout,
+  showDetailButtonByTemplate,
 }: {
   tournaments: HomeTournamentCarouselInput[];
   /** 없으면 기존 캐러셀 한 줄 레이아웃 */
@@ -44,6 +45,10 @@ export function HomeTournamentCarouselRows({
   cardCta?: SlotBlockCtaLayer;
   /** 있으면 `slotBlockLayout` 우선(카드 columns 대신) */
   listLayout?: SlotBlockLayout;
+  showDetailButtonByTemplate?: {
+    basic: boolean;
+    highlight: boolean;
+  };
 }) {
   const [loopDup, setLoopDup] = useState(false);
 
@@ -70,6 +75,7 @@ export function HomeTournamentCarouselRows({
             cardStyle={cardStyle}
             cardCta={cardCta}
             layout="grid"
+            showDetailButtonByTemplate={showDetailButtonByTemplate}
           />
         ))}
       </ul>
@@ -88,6 +94,7 @@ export function HomeTournamentCarouselRows({
           cardStyle={cardStyle}
           cardCta={cardCta}
           layout="carousel"
+          showDetailButtonByTemplate={showDetailButtonByTemplate}
         />
       ))}
       {loopDup &&
@@ -100,6 +107,7 @@ export function HomeTournamentCarouselRows({
             cardStyle={cardStyle}
             cardCta={cardCta}
             layout="carousel"
+            showDetailButtonByTemplate={showDetailButtonByTemplate}
           />
         ))}
     </ul>

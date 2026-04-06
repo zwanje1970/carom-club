@@ -9,6 +9,7 @@ import type { NoticeBar } from "@/types/notice-bar";
 import type { Popup } from "@/types/popup";
 import type { SiteSettings } from "@/lib/site-settings";
 import type { TournamentListRow, VenueCarouselRow } from "@/lib/db-tournaments";
+import type { HomePublishedTournamentCard } from "@/lib/home-published-tournament-cards";
 
 /** `getCommonPageData` / 히어로와 맞춘 페이지 키 */
 export type SectionLayoutPageKey = "home" | "community" | "tournaments" | "venues";
@@ -61,7 +62,7 @@ export type QuickMenuSlotProps = {
 };
 
 export type HomeCarouselsSlotProps = {
-  initialTournaments: TournamentListRow[];
+  initialTournaments: HomePublishedTournamentCard[];
   carouselVenues: VenueCarouselRow[];
   copy: Record<string, string>;
   homeCarouselFlowSpeed: SiteSettings["homeCarouselFlowSpeed"];

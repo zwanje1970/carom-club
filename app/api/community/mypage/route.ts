@@ -26,10 +26,10 @@ export async function GET(request: Request) {
       select: {
         id: true,
         title: true,
-        viewCount: true,
+        likeCount: true,
+        commentCount: true,
         createdAt: true,
         board: { select: { slug: true, name: true } },
-        _count: { select: { likes: true, comments: true } },
       },
     });
     return NextResponse.json({
@@ -39,9 +39,8 @@ export async function GET(request: Request) {
         title: p.title,
         boardSlug: p.board.slug,
         boardName: p.board.name,
-        likeCount: p._count.likes,
-        commentCount: p._count.comments,
-        viewCount: p.viewCount,
+        likeCount: p.likeCount,
+        commentCount: p.commentCount,
         createdAt: p.createdAt.toISOString(),
       })),
     });
@@ -56,8 +55,8 @@ export async function GET(request: Request) {
         id: true,
         content: true,
         createdAt: true,
-        post: { select: { id: true, title: true, board: { select: { slug: true, name: true } } } },
         _count: { select: { likes: true } },
+        post: { select: { id: true, title: true, board: { select: { slug: true, name: true } } } },
       },
     });
     return NextResponse.json({
@@ -83,10 +82,10 @@ export async function GET(request: Request) {
       select: {
         id: true,
         title: true,
-        viewCount: true,
+        likeCount: true,
+        commentCount: true,
         createdAt: true,
         board: { select: { slug: true, name: true } },
-        _count: { select: { likes: true, comments: true } },
       },
     });
     return NextResponse.json({
@@ -96,9 +95,8 @@ export async function GET(request: Request) {
         title: p.title,
         boardSlug: p.board.slug,
         boardName: p.board.name,
-        likeCount: p._count.likes,
-        commentCount: p._count.comments,
-        viewCount: p.viewCount,
+        likeCount: p.likeCount,
+        commentCount: p.commentCount,
         createdAt: p.createdAt.toISOString(),
       })),
     });
@@ -116,10 +114,10 @@ export async function GET(request: Request) {
           select: {
             id: true,
             title: true,
-            viewCount: true,
+            likeCount: true,
+            commentCount: true,
             createdAt: true,
             board: { select: { slug: true, name: true } },
-            _count: { select: { likes: true, comments: true } },
           },
         },
       },
@@ -131,9 +129,8 @@ export async function GET(request: Request) {
         title: b.post.title,
         boardSlug: b.post.board.slug,
         boardName: b.post.board.name,
-        likeCount: b.post._count.likes,
-        commentCount: b.post._count.comments,
-        viewCount: b.post.viewCount,
+        likeCount: b.post.likeCount,
+        commentCount: b.post.commentCount,
         createdAt: b.post.createdAt.toISOString(),
         bookmarkedAt: b.createdAt.toISOString(),
       })),

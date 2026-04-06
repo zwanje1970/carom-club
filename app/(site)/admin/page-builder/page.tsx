@@ -1,11 +1,5 @@
-"use client";
-
-import { PageBuilderClient } from "@/components/admin/page-builder/PageBuilderClient";
+import { redirect } from "next/navigation";
 
 export default function AdminPageBuilderPage() {
-  return (
-    <div className="w-full min-w-0">
-      <PageBuilderClient terminology="block" draftToolbar />
-    </div>
-  );
+  redirect("/admin/site/page-builder");
 }

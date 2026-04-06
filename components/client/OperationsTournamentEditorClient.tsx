@@ -10,6 +10,12 @@ import { ConsoleSection } from "@/components/client/console/ui/ConsoleSection";
 import { ConsoleBadge } from "@/components/client/console/ui/ConsoleBadge";
 import { consoleTextBody, consoleTextMuted } from "@/components/client/console/ui/tokens";
 import { cx } from "@/components/client/console/ui/cx";
+import { formatKoreanDateWithWeekday } from "@/lib/format-date";
+import {
+  buildDefaultTournamentCardPublishData,
+  type TournamentCardPublishData,
+} from "@/lib/client-card-publish";
+import { CardPublishEditorClient } from "@/app/(site)/client/operations/tournaments/[id]/card-publish/CardPublishEditorClient";
 
 function parseBracketConfig(config: unknown): Record<string, unknown> | null {
   if (config == null) return null;
@@ -29,6 +35,9 @@ type Props = {
   tournamentId?: string;
   organizationName: string;
   organizationId: string;
+  defaultVenueName?: string;
+  defaultVenueAddress?: string;
+  defaultVenuePhone?: string;
 };
 
 /**
@@ -39,6 +48,9 @@ export function OperationsTournamentEditorClient({
   tournamentId,
   organizationName,
   organizationId,
+  defaultVenueName,
+  defaultVenueAddress,
+  defaultVenuePhone,
 }: Props) {
   const router = useRouter();
   const [promoContent, setPromoContent] = useState("");
@@ -47,6 +59,11 @@ export function OperationsTournamentEditorClient({
   const [initialData, setInitialData] = useState<
     Parameters<typeof TournamentFormSimple>[0]["initialData"]
   >(undefined);
+  const [createdTournament, setCreatedTournament] = useState<{
+    id: string;
+    name: string;
+    initialCardData: TournamentCardPublishData;
+  } | null>(null);
 
   useEffect(() => {
     if (mode !== "edit" || !tournamentId) return;
@@ -198,11 +215,30 @@ export function OperationsTournamentEditorClient({
       const data = await res.json();
       if (!res.ok) throw new Error((data as { error?: string }).error || "저장에 실패했습니다.");
       const id = (data as { id?: string }).id;
-      if (id) await persistVenues(id, venues);
-      setTimeout(() => {
-        router.push("/client/operations");
+      if (id) {
+        await persistVenues(id, venues);
+        const initialCardData = buildDefaultTournamentCardPublishData(id, values.name.trim());
+        if (!initialCardData.displayDateText) {
+          initialCardData.displayDateText = formatKoreanDateWithWeekday(startAt);
+        }
+        if (!initialCardData.displayRegionText) {
+          initialCardData.displayRegionText = venueSummary ?? "";
+        }
+        if (!initialCardData.statusText) {
+          initialCardData.statusText =
+            values.status === "OPEN"
+              ? "모집중"
+              : values.status === "FINISHED"
+                ? "종료"
+                : "진행중";
+        }
+        setCreatedTournament({
+          id,
+          name: values.name.trim(),
+          initialCardData,
+        });
         router.refresh();
-      }, 600);
+      }
       return;
     }
 
@@ -265,7 +301,7 @@ export function OperationsTournamentEditorClient({
         description="현재 선택된 조직 기준으로 저장됩니다. 공개 페이지는 상태·노출 설정에 따라 달라질 수 있습니다."
         actions={
           <Link
-            href="/client/operations"
+            href="/client/tournaments"
             className="rounded-sm border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
           >
             목록으로
@@ -281,8 +317,14 @@ export function OperationsTournamentEditorClient({
             appearance="console"
             showDraftSaveButton
             initialData={initialData}
+            defaultVenueInfo={{
+              venueName: defaultVenueName ?? "",
+              address: defaultVenueAddress ?? "",
+              phone: defaultVenuePhone ?? "",
+              organizerName: organizationName ?? "",
+            }}
             onSubmit={handleSubmit}
-            onCancelHref="/client/operations"
+            onCancelHref="/client/tournaments"
             submitLabel={mode === "create" ? "저장" : "저장"}
           >
             <div>
@@ -339,6 +381,23 @@ export function OperationsTournamentEditorClient({
           </ConsoleSection>
         </aside>
       </div>
+      {mode === "create" && createdTournament ? (
+        <ConsoleSection
+          title="카드 발행"
+          description="대회 생성 후 카드 템플릿 선택/입력/미리보기/저장/발행을 같은 화면에서 이어서 진행합니다."
+          flush
+        >
+          <div className="p-3">
+            <CardPublishEditorClient
+              tournamentId={createdTournament.id}
+              tournamentName={createdTournament.name}
+              initialCardData={createdTournament.initialCardData}
+              initialPublished={null}
+              hasSavedCardData={false}
+            />
+          </div>
+        </ConsoleSection>
+      ) : null}
     </div>
   );
 }

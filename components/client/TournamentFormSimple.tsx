@@ -165,6 +165,12 @@ type TournamentFormSimpleProps = {
     divisionMetricType?: DivisionMetricType;
     divisionRulesJson?: unknown;
   };
+  defaultVenueInfo?: {
+    venueName?: string;
+    address?: string;
+    phone?: string;
+    organizerName?: string;
+  };
   onSubmit: (values: TournamentFormValues, bracketConfig: BracketConfigExtra, venues: VenueSlot[]) => Promise<void>;
   onCancelHref: string;
   submitLabel?: string;
@@ -177,6 +183,7 @@ export function TournamentFormSimple({
   appearance = "site",
   showDraftSaveButton = false,
   initialData,
+  defaultVenueInfo,
   onSubmit,
   onCancelHref,
   submitLabel,
@@ -327,6 +334,39 @@ export function TournamentFormSimple({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const submitAsDraftRef = useRef(false);
   const showScotchFields = form.gameFormat === "SCOTCH" || form.isScotch;
+
+  function applyDefaultVenueInfo() {
+    const nextVenueName = (defaultVenueInfo?.venueName ?? "").trim();
+    const nextAddress = (defaultVenueInfo?.address ?? "").trim();
+    const nextPhone = (defaultVenueInfo?.phone ?? "").trim();
+    const hasAnyDefault = Boolean(nextVenueName || nextAddress || nextPhone);
+    if (!hasAnyDefault) {
+      setError("불러올 기본정보가 없습니다.");
+      return;
+    }
+    setError("");
+    setVenues((prev) => {
+      if (prev.length === 0) {
+        return [
+          {
+            venueNumber: 1,
+            displayLabel: "1경기장",
+            venueName: nextVenueName,
+            address: nextAddress,
+            phone: nextPhone,
+          },
+        ];
+      }
+      const next = [...prev];
+      next[0] = {
+        ...next[0],
+        venueName: nextVenueName,
+        address: nextAddress,
+        phone: nextPhone,
+      };
+      return next;
+    });
+  }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const selectedFiles = Array.from(e.target.files ?? []);
@@ -1018,20 +1058,32 @@ export function TournamentFormSimple({
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className={chrome.label}>대회 장소 * (1곳 이상)</label>
-            <button
-              type="button"
-              onClick={() => {
-                const nextNum = venues.length ? Math.max(...venues.map((v) => v.venueNumber), 0) + 1 : 1;
-                setVenues((prev) => [
-                  ...prev,
-                  { venueNumber: nextNum, displayLabel: `${nextNum}경기장`, venueName: "", address: "", phone: "" },
-                ]);
-              }}
-              className={chrome.addVenueBtn}
-            >
-              대회장소 추가
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={applyDefaultVenueInfo}
+                className={chrome.addVenueBtn}
+              >
+                기본정보 불러오기
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const nextNum = venues.length ? Math.max(...venues.map((v) => v.venueNumber), 0) + 1 : 1;
+                  setVenues((prev) => [
+                    ...prev,
+                    { venueNumber: nextNum, displayLabel: `${nextNum}경기장`, venueName: "", address: "", phone: "" },
+                  ]);
+                }}
+                className={chrome.addVenueBtn}
+              >
+                대회장소 추가
+              </button>
+            </div>
           </div>
+          {defaultVenueInfo?.organizerName ? (
+            <p className={`mb-2 ${chrome.muted}`}>기본정보 기준: {defaultVenueInfo.organizerName}</p>
+          ) : null}
           <div className="space-y-3">
             {venues.map((v, idx) => (
               <div key={v.venueNumber} className={chrome.venueCard}>

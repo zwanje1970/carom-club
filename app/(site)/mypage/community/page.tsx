@@ -11,7 +11,6 @@ type PostRow = {
   boardName: string;
   likeCount: number;
   commentCount: number;
-  viewCount: number;
   createdAt: string;
 };
 
@@ -90,7 +89,7 @@ export default function MypageCommunityPage() {
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-site-text line-clamp-2 leading-snug">{p.title}</p>
                     <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
-                      [{p.boardName}] 추천 {p.likeCount} · 댓글 {p.commentCount} · 조회 {p.viewCount} · {formatKoreanDate(p.createdAt)}
+                      [{p.boardName}] 추천 {p.likeCount} · 댓글 {p.commentCount} · {formatKoreanDate(p.createdAt)}
                     </p>
                   </div>
                   <span className="shrink-0 self-start rounded-md border border-gray-200 dark:border-slate-600 px-2 py-0.5 text-xs text-gray-500 dark:text-slate-400 tabular-nums">
@@ -137,7 +136,7 @@ export default function MypageCommunityPage() {
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-site-text line-clamp-2 leading-snug">{p.title}</p>
                     <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
-                      [{p.boardName}] 추천 {p.likeCount} · 댓글 {p.commentCount} · 조회 {p.viewCount} · {formatKoreanDate(p.createdAt)}
+                      [{p.boardName}] 추천 {p.likeCount} · 댓글 {p.commentCount} · {formatKoreanDate(p.createdAt)}
                     </p>
                   </div>
                   <span className="shrink-0 self-start rounded-md border border-gray-200 dark:border-slate-600 px-2 py-0.5 text-xs text-gray-500 dark:text-slate-400 tabular-nums">

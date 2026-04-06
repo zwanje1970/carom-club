@@ -30,14 +30,24 @@ type Row =
 
 function matchSearch(row: Row, search: string): boolean {
   if (!search.trim()) return true;
-  const q = search.trim().toLowerCase();
-  return (
-    row.key.toLowerCase().includes(q) ||
-    row.group.toLowerCase().includes(q) ||
-    (row.label ?? "").toLowerCase().includes(q) ||
-    (row.value ?? "").toLowerCase().includes(q) ||
-    (row.defaultValue ?? "").toLowerCase().includes(q)
-  );
+  const tokens = search
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  const haystack = [
+    row.key.toLowerCase(),
+    row.group.toLowerCase(),
+    (row.label ?? "").toLowerCase(),
+    (row.value ?? "").toLowerCase(),
+    (row.defaultValue ?? "").toLowerCase(),
+  ].join(" ");
+  return tokens.every((token) => haystack.includes(token));
+}
+
+function keyScope(key: string): string {
+  const idx = key.lastIndexOf(".");
+  return idx > 0 ? key.slice(0, idx) : key;
 }
 
 export default function AdminSiteCopyPage() {
@@ -50,6 +60,7 @@ export default function AdminSiteCopyPage() {
   /** 레거시 히어로(구 copy 키) — 기본 숨김, 히어로 설정이 정본 */
   const [showLegacyHeroKeys, setShowLegacyHeroKeys] = useState(false);
   const [copy, setCopy] = useState<Record<string, string>>({ ...DEFAULT_ADMIN_COPY });
+  const [baselineCopy, setBaselineCopy] = useState<Record<string, string>>({ ...DEFAULT_ADMIN_COPY });
   const [systemTextItems, setSystemTextItems] = useState<SystemTextItem[]>([]);
   const [bulkFind, setBulkFind] = useState("");
   const [bulkReplace, setBulkReplace] = useState("");
@@ -58,6 +69,9 @@ export default function AdminSiteCopyPage() {
   const [editSystemTextEnabled, setEditSystemTextEnabled] = useState(true);
   const [systemTextBulkFind, setSystemTextBulkFind] = useState("");
   const [systemTextBulkReplace, setSystemTextBulkReplace] = useState("");
+  const [selectedCopyKey, setSelectedCopyKey] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileStep, setMobileStep] = useState<"search" | "list" | "edit" | "confirm">("search");
 
   useEffect(() => {
     Promise.all([
@@ -66,12 +80,22 @@ export default function AdminSiteCopyPage() {
     ])
       .then(([copyData, stData]) => {
         if (copyData && typeof copyData === "object" && !copyData.error) {
-          setCopy({ ...DEFAULT_ADMIN_COPY, ...copyData });
+          const merged = { ...DEFAULT_ADMIN_COPY, ...copyData };
+          setCopy(merged);
+          setBaselineCopy(merged);
         }
         setSystemTextItems(Array.isArray(stData?.items) ? stData.items : []);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 1023px)");
+    const update = () => setIsMobile(mql.matches);
+    update();
+    mql.addEventListener("change", update);
+    return () => mql.removeEventListener("change", update);
   }, []);
 
   const loadSystemText = () => {
@@ -117,6 +141,25 @@ export default function AdminSiteCopyPage() {
     });
   }, [rows, searchQuery, showLegacyHeroKeys]);
 
+  const copyRows = useMemo(
+    () => filteredRows.filter((r): r is Extract<Row, { type: "admin_copy" }> => r.type === "admin_copy"),
+    [filteredRows]
+  );
+
+  const selectedCopyRow = useMemo(
+    () => copyRows.find((r) => r.key === selectedCopyKey) ?? null,
+    [copyRows, selectedCopyKey]
+  );
+
+  const relatedCopyRows = useMemo(() => {
+    if (!selectedCopyRow) return [];
+    const scope = keyScope(selectedCopyRow.key);
+    return copyRows
+      .filter((r) => r.key !== selectedCopyRow.key)
+      .filter((r) => keyScope(r.key) === scope || r.group === selectedCopyRow.group)
+      .slice(0, 8);
+  }, [copyRows, selectedCopyRow]);
+
   const handleCopyChange = (key: string, value: string) => {
     setCopy((prev) => ({ ...prev, [key]: value }));
   };
@@ -137,7 +180,11 @@ export default function AdminSiteCopyPage() {
         return;
       }
       setSuccess("메뉴·문구가 저장되었습니다.");
-      if (data && typeof data === "object") setCopy(data);
+      if (data && typeof data === "object") {
+        const next = { ...DEFAULT_ADMIN_COPY, ...data };
+        setCopy(next);
+        setBaselineCopy(next);
+      }
       setTimeout(() => setSuccess(""), 2500);
       router.refresh();
     } catch {
@@ -148,7 +195,7 @@ export default function AdminSiteCopyPage() {
   };
 
   const handleResetCopy = () => {
-    setCopy({ ...DEFAULT_ADMIN_COPY });
+    setCopy({ ...baselineCopy });
     setSuccess("기본값으로 되돌렸습니다. 저장 버튼을 누르면 반영됩니다.");
     setTimeout(() => setSuccess(""), 2500);
   };
@@ -301,13 +348,20 @@ export default function AdminSiteCopyPage() {
 
   const currentSystemText = editSystemTextId ? systemTextItems.find((i) => i.id === editSystemTextId) : null;
   const hasCopyChanges = useMemo(() => {
-    for (const k of Object.keys(DEFAULT_ADMIN_COPY)) {
+    for (const k of Object.keys(copy)) {
       const current = copy[k];
-      const def = DEFAULT_ADMIN_COPY[k];
+      const def = baselineCopy[k] ?? DEFAULT_ADMIN_COPY[k];
       if ((current ?? "") !== (def ?? "")) return true;
     }
     return false;
-  }, [copy]);
+  }, [copy, baselineCopy]);
+
+  useEffect(() => {
+    if (!selectedCopyKey && copyRows.length > 0) setSelectedCopyKey(copyRows[0].key);
+    if (selectedCopyKey && !copyRows.some((r) => r.key === selectedCopyKey)) {
+      setSelectedCopyKey(copyRows[0]?.key ?? null);
+    }
+  }, [copyRows, selectedCopyKey]);
 
   if (loading) {
     return (
@@ -362,9 +416,45 @@ export default function AdminSiteCopyPage() {
           </span>
         </label>
         <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">
-          {filteredRows.length}개 문구 표시 (전체 {rows.length}개, 레거시 히어로 키는 기본 숨김)
+          {filteredRows.length}개 문구 표시 (전체 {rows.length}개, 부분 검색 지원)
         </p>
       </CardBox>
+
+      {selectedCopyRow ? (
+        <CardBox className="mb-6">
+          <h3 className="mb-2 font-semibold text-gray-900 dark:text-slate-100">선택 문구 정보</h3>
+          <p className="text-sm text-gray-600 dark:text-slate-400">
+            위치: <strong>{selectedCopyRow.group}</strong> &gt; <code>{selectedCopyRow.key}</code>
+          </p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div className="rounded border border-site-border p-2">
+              <p className="mb-1 text-xs text-gray-500">수정 전</p>
+              <p className="text-sm text-site-text break-words">{baselineCopy[selectedCopyRow.key] ?? ""}</p>
+            </div>
+            <div className="rounded border border-site-border p-2">
+              <p className="mb-1 text-xs text-gray-500">수정 후</p>
+              <p className="text-sm text-site-text break-words">{copy[selectedCopyRow.key] ?? ""}</p>
+            </div>
+          </div>
+          {relatedCopyRows.length > 0 ? (
+            <div className="mt-3">
+              <p className="mb-2 text-xs text-gray-500">연관 문구</p>
+              <div className="flex flex-wrap gap-1">
+                {relatedCopyRows.map((row) => (
+                  <button
+                    key={row.key}
+                    type="button"
+                    className="rounded border border-site-border px-2 py-1 text-xs text-site-text hover:bg-gray-50 dark:hover:bg-slate-800"
+                    onClick={() => setSelectedCopyKey(row.key)}
+                  >
+                    {row.key}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </CardBox>
+      ) : null}
 
       <CardBox className="mb-6">
         <h3 className="font-semibold text-gray-900 dark:text-slate-100 mb-2">일괄 변경 (메뉴·문구)</h3>
@@ -424,6 +514,81 @@ export default function AdminSiteCopyPage() {
       </div>
 
       <CardBox>
+        {isMobile ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-4 gap-1 rounded border border-site-border p-1 text-xs">
+              <button type="button" className={`rounded px-2 py-1 ${mobileStep === "search" ? "bg-site-primary text-white" : ""}`} onClick={() => setMobileStep("search")}>검색</button>
+              <button type="button" className={`rounded px-2 py-1 ${mobileStep === "list" ? "bg-site-primary text-white" : ""}`} onClick={() => setMobileStep("list")}>목록</button>
+              <button type="button" className={`rounded px-2 py-1 ${mobileStep === "edit" ? "bg-site-primary text-white" : ""}`} onClick={() => setMobileStep("edit")} disabled={!selectedCopyRow}>편집</button>
+              <button type="button" className={`rounded px-2 py-1 ${mobileStep === "confirm" ? "bg-site-primary text-white" : ""}`} onClick={() => setMobileStep("confirm")}>확인</button>
+            </div>
+
+            {mobileStep === "search" ? (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="부분 검색 (예: tournament status)"
+                  className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm text-site-text dark:bg-slate-900"
+                />
+                <Button label="목록 보기" color="info" small onClick={() => setMobileStep("list")} />
+              </div>
+            ) : null}
+
+            {mobileStep === "list" ? (
+              <div className="space-y-2">
+                {copyRows.map((row) => (
+                  <button
+                    key={row.key}
+                    type="button"
+                    className="w-full rounded border border-site-border p-3 text-left"
+                    onClick={() => {
+                      setSelectedCopyKey(row.key);
+                      setMobileStep("edit");
+                    }}
+                  >
+                    <p className="text-xs text-gray-500">{row.group}</p>
+                    <p className="text-xs font-mono text-gray-500">{row.key}</p>
+                    <p className="mt-1 text-sm text-site-text">{row.value || "(비움)"}</p>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {mobileStep === "edit" && selectedCopyRow ? (
+              <div className="space-y-2">
+                <p className="text-xs text-gray-500">위치: {selectedCopyRow.group} &gt; {selectedCopyRow.key}</p>
+                <input
+                  type="text"
+                  value={copy[selectedCopyRow.key] ?? ""}
+                  onChange={(e) => handleCopyChange(selectedCopyRow.key, e.target.value)}
+                  className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm text-site-text dark:bg-slate-900"
+                />
+                <Button label="확인 단계로" color="info" small onClick={() => setMobileStep("confirm")} />
+              </div>
+            ) : null}
+
+            {mobileStep === "confirm" ? (
+              <div className="space-y-2">
+                <p className="text-sm text-site-text">변경된 문구 {hasCopyChanges ? "있음" : "없음"}</p>
+                {selectedCopyRow ? (
+                  <div className="grid gap-2">
+                    <div className="rounded border border-site-border p-2">
+                      <p className="text-xs text-gray-500">수정 전</p>
+                      <p className="text-sm">{baselineCopy[selectedCopyRow.key] ?? ""}</p>
+                    </div>
+                    <div className="rounded border border-site-border p-2">
+                      <p className="text-xs text-gray-500">수정 후</p>
+                      <p className="text-sm">{copy[selectedCopyRow.key] ?? ""}</p>
+                    </div>
+                  </div>
+                ) : null}
+                <Button label={saving ? "저장 중…" : "저장"} color="info" small disabled={saving || !hasCopyChanges} onClick={() => void handleSaveCopy()} />
+              </div>
+            ) : null}
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -448,13 +613,17 @@ export default function AdminSiteCopyPage() {
                   <td className="p-2 font-mono text-xs break-all">{row.key}</td>
                   <td className="p-2">
                     {row.type === "admin_copy" ? (
-                      <input
-                        type="text"
-                        value={row.value}
-                        onChange={(e) => handleCopyChange(row.key, e.target.value)}
-                        className="w-full max-w-md rounded border border-site-border bg-white dark:bg-slate-800 px-2 py-1 text-site-text text-sm"
-                        placeholder={row.defaultValue || "비움"}
-                      />
+                      <div className="space-y-1">
+                        <input
+                          type="text"
+                          value={row.value}
+                          onChange={(e) => handleCopyChange(row.key, e.target.value)}
+                          onFocus={() => setSelectedCopyKey(row.key)}
+                          className="w-full max-w-md rounded border border-site-border bg-white dark:bg-slate-800 px-2 py-1 text-site-text text-sm"
+                          placeholder={row.defaultValue || "비움"}
+                        />
+                        <p className="text-[11px] text-gray-500">위치: {row.group} &gt; {row.key}</p>
+                      </div>
                     ) : (
                       <span className="block max-w-md truncate" title={row.value}>
                         {row.value || "(비움)"}
@@ -503,6 +672,7 @@ export default function AdminSiteCopyPage() {
             </p>
           )}
         </div>
+        )}
       </CardBox>
 
       {currentSystemText && editSystemTextId && (

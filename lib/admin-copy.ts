@@ -19,6 +19,17 @@ export const DEFAULT_ADMIN_COPY: Record<string, string> = {
   "menu.venues": "클라이언트 관리",
   "menu.venueList": "클라이언트 목록",
   "menu.clientApplications": "클라이언트 신규신청",
+  "menu.platformCardTemplates": "카드 템플릿",
+  "platform.cardTemplate.basic.style":
+    "{\"cardWidth\":320,\"cardHeight\":300,\"outerMargin\":0,\"imageAreaHeight\":170,\"textAreaPadding\":12,\"ratioPreset\":\"3:5\",\"titlePosition\":\"top\",\"titleAlign\":\"left\",\"shortDescriptionPosition\":\"title-below\",\"shortDescriptionAlign\":\"left\",\"statusPosition\":\"top-right\",\"statusAlign\":\"right\",\"titleFontSize\":16,\"shortDescriptionFontSize\":12,\"statusFontSize\":12,\"textColor\":\"#111827\",\"backgroundColor\":\"#ffffff\",\"paddingTop\":12,\"paddingBottom\":12,\"paddingLeft\":12,\"paddingRight\":12,\"titleContentGap\":6,\"gapBetweenElements\":8}",
+  "platform.cardTemplate.highlight.style":
+    "{\"cardWidth\":320,\"cardHeight\":340,\"outerMargin\":0,\"imageAreaHeight\":200,\"textAreaPadding\":12,\"ratioPreset\":\"3:5\",\"titlePosition\":\"top\",\"titleAlign\":\"left\",\"shortDescriptionPosition\":\"title-below\",\"shortDescriptionAlign\":\"left\",\"statusPosition\":\"top-left\",\"statusAlign\":\"left\",\"titleFontSize\":16,\"shortDescriptionFontSize\":12,\"statusFontSize\":12,\"textColor\":\"#111827\",\"backgroundColor\":\"#ffffff\",\"paddingTop\":12,\"paddingBottom\":12,\"paddingLeft\":12,\"paddingRight\":12,\"titleContentGap\":6,\"gapBetweenElements\":8}",
+  "platform.cardTemplate.basic.isActive": "true",
+  "platform.cardTemplate.highlight.isActive": "true",
+  "platform.cardTemplate.basic.isDefault": "true",
+  "platform.cardTemplate.highlight.isDefault": "false",
+  "platform.cardTemplate.basic.showDetailButton": "false",
+  "platform.cardTemplate.highlight.showDetailButton": "true",
   "menu.settings": "설정",
   // 상단 유저 메뉴
   "nav.myInfo": "내 정보",
@@ -97,6 +108,14 @@ export const DEFAULT_ADMIN_COPY: Record<string, string> = {
   "site.pageBuilder.slotFallback.template": "「{label}」슬롯 — 미리보기·데이터가 없어 자리만 표시합니다.",
   "site.pageBuilder.placeholder.quickMenu": "퀵 메뉴(홈 상단 메뉴는 별도 컴포넌트 — 2차 연동)",
   "site.pageBuilder.placeholder.homeCarousels": "홈 캐러셀(미연결 슬롯 — tournamentIntro·venueIntro 슬롯 사용)",
+  /** 공통 카드 스타일 기본값 */
+  "site.card.default.shape": "square",
+  "site.card.default.width": "320",
+  "site.card.default.height": "180",
+  "site.card.default.style": "border",
+  "site.card.default.thumbFit": "cover",
+  "site.card.default.linkMode": "block",
+  "site.card.default.radius": "16",
   "site.tournamentDetail.tabInfo": "대회 안내",
   "site.tournamentDetail.infoEmpty": "안내 내용이 없습니다.",
   // 대회/권역 용어 (관리자 메뉴·문구에서 변경 가능)

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PAGE_CONTENT_PAD_X } from "@/components/layout/pageContentStyles";
 import { cn } from "@/lib/utils";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
@@ -10,6 +11,8 @@ import type { SlotBlockCardStyle } from "@/lib/slot-block-card-style";
 import { tournamentCardLinkClasses } from "@/lib/slot-block-card-style";
 import type { SlotBlockLayout, SlotBlockMotion } from "@/lib/slot-block-layout-motion";
 import { slotMotionEffectiveFlowSpeed } from "@/lib/slot-block-layout-motion";
+import type { HomeTournamentSortBy } from "@/lib/home-published-tournament-cards";
+import { resolvePlatformCardTemplatePolicies } from "@/lib/platform-card-templates";
 
 export function HomeTournamentCards({
   tournaments,
@@ -24,6 +27,8 @@ export function HomeTournamentCards({
   /** `PageSection` 행 제목·부제 — 비우면 관리자 문구 키 사용 */
   sectionTitle,
   sectionSubtitle,
+  showMoreButton = true,
+  sortTabs,
 }: {
   tournaments: HomeTournamentCarouselInput[];
   copy: Record<string, string>;
@@ -38,6 +43,13 @@ export function HomeTournamentCards({
   homeCarouselFlowSpeed: number;
   sectionTitle?: string | null;
   sectionSubtitle?: string | null;
+  showMoreButton?: boolean;
+  sortTabs?: {
+    items: Array<{ id: HomeTournamentSortBy; label: string }>;
+    active: HomeTournamentSortBy;
+    loading: HomeTournamentSortBy | null;
+    onChange: (next: HomeTournamentSortBy) => void;
+  };
 }) {
   const c = copy as Record<AdminCopyKey, string>;
   const cta = ctaConfig;
@@ -53,6 +65,12 @@ export function HomeTournamentCards({
   const sectionSurface = blockBackgroundColor ? { backgroundColor: blockBackgroundColor } : undefined;
   const flowOneToHundred = slotMotionEffectiveFlowSpeed(homeCarouselFlowSpeed, slotMotion);
   const isCarousel = slotLayout.type === "carousel";
+  const templatePolicies = resolvePlatformCardTemplatePolicies(copy);
+  const showDetailButtonByTemplate = {
+    basic: templatePolicies.find((item) => item.templateType === "basic")?.showDetailButton ?? false,
+    highlight:
+      templatePolicies.find((item) => item.templateType === "highlight")?.showDetailButton ?? true,
+  } as const;
 
   if (tournaments.length === 0) {
     return (
@@ -122,6 +140,25 @@ export function HomeTournamentCards({
             </div>
           </SlotBlockCtaLink>
           <div className="flex flex-wrap items-center justify-end gap-2 shrink-0 min-h-[44px]">
+            {sortTabs ? (
+              <div className="flex items-center gap-1">
+                {sortTabs.items.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => sortTabs.onChange(tab.id)}
+                    className={
+                      sortTabs.active === tab.id
+                        ? "rounded-lg border border-site-primary bg-site-primary px-2.5 py-1.5 text-xs font-semibold text-white"
+                        : "rounded-lg border border-site-border bg-site-card px-2.5 py-1.5 text-xs font-semibold text-site-text hover:border-site-primary/50"
+                    }
+                  >
+                    {tab.label}
+                    {sortTabs.loading === tab.id ? "..." : ""}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             {nearbyFind && (
               <button
                 type="button"
@@ -134,13 +171,11 @@ export function HomeTournamentCards({
                   : getCopyValue(c, "site.home.tournaments.nearbyFind")}
               </button>
             )}
-            <SlotBlockCtaLink
-              layer={cta.button}
-              ctx={{}}
-              className="inline-flex items-center text-sm font-medium text-site-primary hover:underline py-2"
-            >
-              {getCopyValue(c, "site.home.tournaments.btnViewAll")}
-            </SlotBlockCtaLink>
+            {showMoreButton ? (
+              <Link href="/tournaments" className="inline-flex items-center text-sm font-medium text-site-primary hover:underline py-2">
+                {getCopyValue(c, "site.home.tournaments.btnViewAll")}
+              </Link>
+            ) : null}
           </div>
         </div>
         {nearbyFind?.error && (
@@ -154,6 +189,7 @@ export function HomeTournamentCards({
             cardStyle={cardStyle}
             cardCta={cta.card}
             listLayout={slotLayout}
+            showDetailButtonByTemplate={showDetailButtonByTemplate}
           />
         ) : slotMotion.autoPlay ? (
           <HomeTournamentListAutoScroll
@@ -165,6 +201,7 @@ export function HomeTournamentCards({
               cardStyle={cardStyle}
               cardCta={cta.card}
               listLayout={slotLayout}
+              showDetailButtonByTemplate={showDetailButtonByTemplate}
             />
           </HomeTournamentListAutoScroll>
         ) : (
@@ -174,6 +211,7 @@ export function HomeTournamentCards({
               cardStyle={cardStyle}
               cardCta={cta.card}
               listLayout={slotLayout}
+              showDetailButtonByTemplate={showDetailButtonByTemplate}
             />
           </div>
         )}

@@ -9,11 +9,14 @@ import { OutlineEditor } from "@/components/admin/OutlineEditor";
 import CardBox from "@/components/admin/_components/CardBox";
 
 const tabs = [
-  { href: "", label: "기본정보" },
-  { href: "/outline", label: "대회요강" },
+  { href: "", label: "대회현황" },
+  { href: "/edit", label: "대회수정" },
   { href: "/participants", label: "참가자" },
-  { href: "/zones", label: "경기장" },
   { href: "/bracket", label: "대진표" },
+  { href: "/card-publish", label: "카드발행" },
+  { href: "/settlement", label: "정산" },
+  { href: "/outline", label: "대회요강" },
+  { href: "/zones", label: "경기장" },
   { href: "/results", label: "결과" },
   { href: "/co-admins", label: "공동관리자" },
   { href: "/promo", label: "홍보페이지" },

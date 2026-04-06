@@ -28,6 +28,8 @@ export type SectionStyleJson = {
   slotBlockMotion?: Record<string, unknown>;
   /** 직접 구성 카드 등(확장용). 공개 렌더는 단계적으로 반영 */
   slotBlockItems?: Record<string, unknown> | unknown[] | null;
+  /** 홈 대회 카드 리스트 블록 설정(정렬·개수·슬라이드·더보기) */
+  slotBlockTournamentList?: Record<string, unknown>;
 };
 
 const DEFAULT_DIVIDER: SectionDividerConfig = {

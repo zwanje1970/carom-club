@@ -7,12 +7,14 @@ export function TournamentsListSkeleton() {
         {[1, 2, 3, 4].map((i) => (
           <li
             key={i}
-            className="rounded-lg border border-site-border bg-site-card overflow-hidden"
+            className="rounded-lg border border-site-border bg-site-card p-3"
           >
-            <div className="aspect-[2/1] animate-pulse bg-site-border" />
-            <div className="space-y-2 p-3">
-              <div className="h-4 w-full max-w-[85%] rounded bg-site-border" />
-              <div className="h-3 w-full max-w-[50%] rounded bg-site-border" />
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="h-4 w-full max-w-[85%] rounded bg-site-border" />
+                <div className="h-3 w-full max-w-[60%] rounded bg-site-border" />
+              </div>
+              <div className="h-6 w-16 shrink-0 rounded-full bg-site-border" />
             </div>
           </li>
         ))}

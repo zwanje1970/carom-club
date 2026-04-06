@@ -13,12 +13,10 @@ import { CommunityWriteFab } from "@/components/community/CommunityWriteFab";
 export function CommunityPostListSection({
   latest,
   initialCategory,
-  canManageReports = false,
   showSolverEntry,
 }: {
   latest: CommunityHubPostItem[];
   initialCategory: "all" | "free" | "qna" | "notice";
-  canManageReports?: boolean;
   showSolverEntry: boolean;
 }) {
   const router = useRouter();
@@ -51,34 +49,12 @@ export function CommunityPostListSection({
     router.replace(qs ? `/community?${qs}` : "/community", { scroll: false });
   };
 
-  const badge = (p: CommunityHubPostItem): "N" | "HOT" | null => {
-    if (p.commentCount > 0) return "N";
-    if (p.viewCount >= 100) return "HOT";
-    return null;
-  };
-
-  const categoryTag = (slug: string): string => {
-    if (slug === "free") return "자유";
-    if (slug === "qna") return "질문";
-    if (slug === "trouble") return "난구";
-    if (slug === "notice") return "공지";
-    return slug;
-  };
-
   const filtered = latest
     .filter((p) => p.boardSlug !== "trouble" && p.boardSlug !== "nangu")
     .filter((p) => (category === "all" ? true : p.boardSlug === category));
 
   return (
     <>
-      {canManageReports && (
-        <div className="mb-3 flex justify-end">
-          <Link href="/community/admin/reports" className="text-sm text-site-primary hover:underline">
-            신고 관리
-          </Link>
-        </div>
-      )}
-
       <div className="sticky top-14 z-10 border-b border-gray-100 bg-white shadow-sm dark:border-slate-100/80 dark:bg-slate-950 md:top-16">
         <div className="py-4">
           <div
@@ -117,27 +93,16 @@ export function CommunityPostListSection({
           <li key={p.id}>
             <Link
               href={postLink(p)}
-              className="flex items-start gap-3 py-3.5 px-1 hover:bg-gray-50/80 dark:hover:bg-slate-800/40"
+              className="block py-3.5 px-1 hover:bg-gray-50/80 dark:hover:bg-slate-800/40"
             >
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0">
                 <p className="font-medium text-site-text line-clamp-2 leading-snug">
-                  <span className="mr-1 inline-flex align-middle rounded border border-gray-300 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600 dark:border-slate-600 dark:text-slate-300">
-                    {categoryTag(p.boardSlug)}
-                  </span>
                   <span className="truncate">{p.title}</span>
-                  {badge(p) === "N" ? (
-                    <span className="ml-1 inline-flex align-middle text-[11px] font-semibold text-site-primary">N</span>
-                  ) : badge(p) === "HOT" ? (
-                    <span className="ml-1 inline-flex align-middle text-[11px] font-semibold text-rose-600">HOT</span>
-                  ) : null}
                 </p>
                 <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
-                  {p.boardName} · {p.authorName} · {formatCommunityListDate(p.createdAt)} · 조회 {p.viewCount}
+                  {formatCommunityListDate(p.createdAt)}
                 </p>
               </div>
-              <span className="shrink-0 rounded-md border border-gray-200 dark:border-slate-600 px-2 py-0.5 text-xs text-gray-500 dark:text-slate-400 tabular-nums">
-                {p.commentCount}
-              </span>
             </Link>
           </li>
         ))}

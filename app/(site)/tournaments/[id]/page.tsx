@@ -1,15 +1,12 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getCommonPageData } from "@/lib/common-page-data";
 import { getTournamentSummary, type TournamentDetailSummary } from "@/lib/db-tournaments";
 import { isDatabaseConfigured } from "@/lib/db-mode";
 import { getMockTournamentById } from "@/lib/mock-data";
 import { normalizeSlugs } from "@/lib/normalize-slug";
 import { TournamentDetailView, type TournamentDetailViewProps } from "@/components/tournament/TournamentDetailView";
 import { TournamentDetailWithEntries } from "@/components/tournament/TournamentDetailWithEntries";
-import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
-import { STAGE_LABELS, TOURNAMENT_STAGES } from "@/lib/tournament-stage";
 import { logServerTiming } from "@/lib/perf";
 
 function parseParticipantsListPublic(rule: { bracketConfig?: string | object | null } | null): boolean {
@@ -28,9 +25,6 @@ function parseParticipantsListPublic(rule: { bracketConfig?: string | object | n
 function buildTabs() {
   return [
     { id: "outline", label: "대회요강" },
-    { id: "participants", label: "참가자 명단" },
-    { id: "results", label: "대회결과" },
-    { id: "inquiry", label: "시합문의" },
   ] as const;
 }
 
@@ -174,7 +168,15 @@ export default async function TournamentDetailPage({
       useWaiting?: boolean;
     } | null;
     matchVenues?: { displayLabel: string; venueName: string; address: string | null; phone: string | null }[];
-    tournamentVenues?: { organization: { id: string; name: string; slug: string | null } }[];
+    tournamentVenues?: {
+      organization: {
+        id: string;
+        name: string;
+        slug: string | null;
+        address: string | null;
+        phone: string | null;
+      };
+    }[];
     _count?: { finalMatches?: number };
   };
   const t = tournament as unknown as TournamentShape;
@@ -219,6 +221,8 @@ export default async function TournamentDetailPage({
           id: tv.organization.id,
           name: tv.organization.name,
           slug: tv.organization.slug,
+          address: tv.organization.address ?? null,
+          phone: tv.organization.phone ?? null,
         }))
       )
     : [];
@@ -324,65 +328,7 @@ export default async function TournamentDetailPage({
           <TournamentDetailWithEntries {...baseProps} />
         </Suspense>
 
-        {"tournamentStage" in t && t._count && (
-          <Suspense fallback={null}>
-            <TournamentStageSection
-              tournamentId={id}
-              tournamentStage={t.tournamentStage ?? null}
-              finalMatchesCount={t._count?.finalMatches ?? 0}
-            />
-          </Suspense>
-        )}
       </div>
     </main>
-  );
-}
-
-async function TournamentStageSection({
-  tournamentId,
-  tournamentStage,
-  finalMatchesCount,
-}: {
-  tournamentId: string;
-  tournamentStage: string | null;
-  finalMatchesCount: number;
-}) {
-  console.time("tournament_related");
-  const common = await getCommonPageData("tournaments");
-  const c = common.copy as Record<AdminCopyKey, string>;
-  const stageLabel = TOURNAMENT_STAGES.includes((tournamentStage ?? "SETUP") as (typeof TOURNAMENT_STAGES)[number])
-    ? getCopyValue(c, `site.tournament.stage.${(tournamentStage as string) ?? "SETUP"}` as AdminCopyKey)
-    : (STAGE_LABELS[(tournamentStage as keyof typeof STAGE_LABELS) ?? "SETUP"] ?? tournamentStage ?? "설정");
-  console.timeEnd("tournament_related");
-
-  return (
-    <section className="mt-8 rounded-xl border border-site-border bg-site-card p-4">
-      <h2 className="text-sm font-semibold text-site-text mb-2">{getCopyValue(c, "site.tournament.bracketSectionTitle")}</h2>
-      <p className="text-xs text-site-text-muted mb-3">
-        진행 상태: {stageLabel}
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <Link
-          href={`/tournaments/${tournamentId}/zones`}
-          className="inline-flex items-center rounded-lg bg-blue-100 px-3 py-1.5 text-sm font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
-        >
-          {getCopyValue(c, "site.tournament.qualifierLabel")}
-        </Link>
-        {finalMatchesCount > 0 && (
-          <Link
-            href={`/tournaments/${tournamentId}/bracket`}
-            className="inline-flex items-center rounded-lg bg-violet-100 px-3 py-1.5 text-sm font-medium text-violet-800 dark:bg-violet-900/40 dark:text-violet-200"
-          >
-            {getCopyValue(c, "site.tournament.finalBracketLabel")}
-          </Link>
-        )}
-        <Link
-          href={`/tournaments/${tournamentId}/results`}
-          className="inline-flex items-center rounded-lg bg-emerald-100 px-3 py-1.5 text-sm font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
-        >
-          {getCopyValue(c, "site.tournament.resultsLabel")}
-        </Link>
-      </div>
-    </section>
   );
 }

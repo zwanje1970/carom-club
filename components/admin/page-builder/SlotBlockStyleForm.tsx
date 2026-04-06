@@ -20,6 +20,11 @@ import {
   resolveSlotBlockLayout,
   resolveSlotBlockMotion,
 } from "@/lib/slot-block-layout-motion";
+import {
+  mergeSlotBlockTournamentListIntoSectionStyleJson,
+  resolveSlotBlockTournamentListSettings,
+  type SlotBlockTournamentListSettings,
+} from "@/lib/slot-block-tournament-list";
 import { resolveSectionStyle } from "@/lib/section-style";
 import { AdminColorField } from "@/components/admin/_components/AdminColorField";
 import { cn } from "@/lib/utils";
@@ -178,6 +183,9 @@ export function SlotBlockStyleForm({
     resolveSlotBlockMotion(section.sectionStyleJson)
   );
   const [blockBg, setBlockBg] = useState(() => resolveSectionStyle(section).backgroundColor ?? "");
+  const [tournamentList, setTournamentList] = useState<SlotBlockTournamentListSettings>(() =>
+    resolveSlotBlockTournamentListSettings(section.sectionStyleJson)
+  );
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   useEffect(() => {
@@ -186,7 +194,8 @@ export function SlotBlockStyleForm({
     setLayout(resolveSlotBlockLayout(section.sectionStyleJson, c));
     setMotion(resolveSlotBlockMotion(section.sectionStyleJson));
     setBlockBg(resolveSectionStyle(section).backgroundColor ?? "");
-  }, [section.id, section.sectionStyleJson, section.backgroundColor, section.slotType]);
+    setTournamentList(resolveSlotBlockTournamentListSettings(section.sectionStyleJson));
+  }, [section, section.id, section.sectionStyleJson, section.backgroundColor, section.slotType]);
 
   useEffect(() => {
     const base = styleMergeBase ?? section.sectionStyleJson;
@@ -196,8 +205,9 @@ export function SlotBlockStyleForm({
       slotBlockMotion: motion,
       backgroundColor: blockBg.trim() ? blockBg.trim() : null,
     });
+    merged = mergeSlotBlockTournamentListIntoSectionStyleJson(merged, tournamentList);
     onDraftRef.current(merged);
-  }, [card, layout, motion, blockBg, styleMergeBase, section.sectionStyleJson]);
+  }, [card, layout, motion, blockBg, tournamentList, styleMergeBase, section.sectionStyleJson]);
 
   const patch = <K extends keyof SlotBlockCardStyle>(key: K, value: SlotBlockCardStyle[K]) => {
     setCard((prev) => ({ ...prev, [key]: value }));
@@ -215,6 +225,7 @@ export function SlotBlockStyleForm({
           slotBlockCard: card,
           slotBlockLayout: layout,
           slotBlockMotion: motion,
+          slotBlockTournamentList: tournamentList,
           backgroundColor: blockBg.trim() || null,
         }),
       });
@@ -306,6 +317,69 @@ export function SlotBlockStyleForm({
           onChange={(hex) => setBlockBg(hex ?? "")}
           nullable
         />
+        {section.slotType === "tournamentIntro" ? (
+          <div className="space-y-2 rounded border border-amber-200 bg-amber-50/40 p-2 dark:border-amber-900/40 dark:bg-amber-950/20">
+            <label className="flex flex-col gap-0.5">
+              <span className="text-gray-600 dark:text-slate-400">대회 카드 정렬</span>
+              <select
+                className="rounded border border-gray-300 bg-white px-1 py-1 dark:border-slate-600 dark:bg-slate-900"
+                value={tournamentList.sortBy}
+                onChange={(e) =>
+                  setTournamentList((prev) => ({
+                    ...prev,
+                    sortBy: e.target.value as SlotBlockTournamentListSettings["sortBy"],
+                  }))
+                }
+              >
+                <option value="latest">latest</option>
+                <option value="deadline">deadline</option>
+                <option value="distance">distance</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-0.5">
+              <span className="text-gray-600 dark:text-slate-400">표시 개수</span>
+              <input
+                type="number"
+                min={1}
+                max={24}
+                value={tournamentList.displayCount}
+                onChange={(e) =>
+                  setTournamentList((prev) => ({
+                    ...prev,
+                    displayCount: Math.max(1, Math.min(24, Math.floor(Number(e.target.value) || 6))),
+                  }))
+                }
+                className="rounded border border-gray-300 bg-white px-1 py-1 dark:border-slate-600 dark:bg-slate-900"
+              />
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={tournamentList.slideEnabled}
+                onChange={(e) =>
+                  setTournamentList((prev) => ({
+                    ...prev,
+                    slideEnabled: e.target.checked,
+                  }))
+                }
+              />
+              슬라이드 사용
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={tournamentList.showMoreButton}
+                onChange={(e) =>
+                  setTournamentList((prev) => ({
+                    ...prev,
+                    showMoreButton: e.target.checked,
+                  }))
+                }
+              />
+              더보기 버튼 사용
+            </label>
+          </div>
+        ) : null}
       </div>
 
       <div className="space-y-5 rounded-lg border border-gray-100 bg-white/60 p-3 dark:border-slate-700/80 dark:bg-slate-900/40">
