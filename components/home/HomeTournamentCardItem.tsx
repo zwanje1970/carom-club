@@ -1,9 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { formatDistanceKm } from "@/lib/distance";
 import { formatKoreanMonthDayWeekday } from "@/lib/format-date";
-import { IMAGE_PLACEHOLDER_SRC, isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
+import { IMAGE_PLACEHOLDER_SRC, sanitizeImageSrc } from "@/lib/image-src";
 import type { SlotBlockCtaLayer } from "@/lib/slot-block-cta";
 import type { SlotBlockCardStyle } from "@/lib/slot-block-card-style";
 import { SlotBlockCtaLink } from "@/components/home/SlotBlockCtaLink";
@@ -18,11 +17,6 @@ import {
   tournamentTitleClasses,
   slotBlockLineClampClass,
 } from "@/lib/slot-block-card-style";
-
-/** 캐러셀 카드 폭 ~260–280px · 모바일 한 장이 뷰포트 대부분 */
-const CARD_POSTER_SIZES = "(max-width: 640px) 88vw, (max-width: 768px) 300px, 320px";
-const CARD_POSTER_WIDTH = 400;
-const CARD_POSTER_HEIGHT = 300;
 
 export type HomeTournamentCardModel = {
   id: string;
@@ -197,30 +191,24 @@ export function HomeTournamentCardItem({
             const src = sanitizeImageSrc(imageUrl ?? "");
             if (!src) {
               return (
-                <Image
+                // eslint-disable-next-line @next/next/no-img-element -- 메인 카드는 Next 이미지 최적화 없이 원본 URL 로드
+                <img
                   src={IMAGE_PLACEHOLDER_SRC}
                   alt=""
-                  width={CARD_POSTER_WIDTH}
-                  height={CARD_POSTER_HEIGHT}
                   className="absolute inset-0 h-full w-full object-cover"
-                  priority={isFirstSlide}
-                  loading={isFirstSlide ? undefined : "lazy"}
-                  unoptimized
+                  loading={isFirstSlide ? "eager" : "lazy"}
+                  fetchPriority={isFirstSlide ? "high" : undefined}
                 />
               );
             }
             return (
-              <Image
+              // eslint-disable-next-line @next/next/no-img-element -- 메인 카드는 Next 이미지 최적화 없이 원본 URL 로드
+              <img
                 src={src}
                 alt=""
-                width={CARD_POSTER_WIDTH}
-                height={CARD_POSTER_HEIGHT}
-                sizes={CARD_POSTER_SIZES}
-                quality={75}
-                priority={isFirstSlide}
-                loading={isFirstSlide ? undefined : "lazy"}
-                unoptimized={!isOptimizableImageSrc(src)}
                 className="absolute inset-0 h-full w-full object-cover"
+                loading={isFirstSlide ? "eager" : "lazy"}
+                fetchPriority={isFirstSlide ? "high" : undefined}
                 data-debug-src={src}
               />
             );
