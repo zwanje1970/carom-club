@@ -210,9 +210,13 @@ export function HomeAreaDecoratePanel({
           slotBlockCta: sanitized,
           slotBlockItems:
             itemsBundle.mode === "auto"
-              ? null
+              ? {
+                  mode: "auto",
+                  publishedType: itemsBundle.publishedType,
+                }
               : {
                   mode: "manual",
+                  publishedType: itemsBundle.publishedType,
                   items: itemsBundle.items.map((i) => ({
                     id: i.id,
                     title: i.title,

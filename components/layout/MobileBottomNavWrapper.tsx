@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { BottomNav } from "./BottomNav";
 import { MainPageSwipeArea } from "./MainPageSwipeArea";
@@ -18,13 +19,22 @@ export function MobileBottomNavWrapper({ children, showMainSiteNoteEntry }: Prop
   const pathname = usePathname() ?? "";
   const chromeMode = useGlobalChromeMode();
   const hideNav = shouldHideGlobalChromeByPathname(pathname) || Boolean(chromeMode?.hideGlobalChrome);
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const apply = () => setIsMobile(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
 
   return (
     <>
       <div className={hideNav ? "" : "pb-28 md:pb-0"}>
         <MainPageSwipeArea>{children}</MainPageSwipeArea>
       </div>
-      {!hideNav && <BottomNav showNoteEntry={showMainSiteNoteEntry} />}
+      {!hideNav && isMobile === true ? <BottomNav showNoteEntry={showMainSiteNoteEntry} /> : null}
     </>
   );
 }

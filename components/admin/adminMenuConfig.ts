@@ -15,6 +15,7 @@ import {
   mdiCog,
 } from "@mdi/js";
 import type { MenuAsideItem } from "./_interfaces";
+import { PLATFORM_CARD_TEMPLATES_MENU_LABEL } from "@/lib/platform-card-templates";
 
 const CLIENT_CHILD_HREFS = ["/admin/venues", "/admin/client-applications", "/admin/fee-ledger"] as const;
 /** 사이트관리 진입(사이드바 활성화용) */
@@ -70,7 +71,7 @@ export function getAdminMenuAside(copy?: Record<string, string> | undefined): Me
 
 /**
  * 플랫폼 운영 전용 사이드바 메뉴 구조
- * 순서: 플랫폼 대시보드 → 클라이언트 관리 → 승인 관리 → 권한 관리 → 정산/결제 → 카드 템플릿 → 사이트관리
+ * 순서: 플랫폼 대시보드 → 클라이언트 관리 → 승인 관리 → 권한 관리 → 정산/결제 → 메인용 게시카드 → 사이트관리
  */
 export function getPlatformMenuAside(copy?: Record<string, string> | undefined): MenuAsideItem[] {
   const L = (key: string, fallback: string) =>
@@ -80,9 +81,9 @@ export function getPlatformMenuAside(copy?: Record<string, string> | undefined):
     { href: "/admin/platform", label: L("menu.platformDashboard", "플랫폼 대시보드"), icon: mdiViewDashboard },
     { href: "/admin/venues", label: L("menu.venueList", "클라이언트 관리"), icon: mdiOfficeBuilding },
     { href: "/admin/client-applications", label: L("menu.clientApplications", "승인 관리"), icon: mdiClipboardCheck },
-    { href: "/admin/members", label: L("menu.membersUnified", "권한 관리"), icon: mdiAccountMultiple },
+    { href: "/admin/members", label: "회원·권한 관리", icon: mdiAccountMultiple },
     { href: "/admin/fee-ledger", label: L("menu.feeLedger", "정산/결제"), icon: mdiCashMultiple },
-    { href: "/admin/platform/card-templates", label: L("menu.platformCardTemplates", "카드 템플릿"), icon: mdiCardText },
+    { href: "/admin/platform/card-templates", label: L("menu.platformCardTemplates", PLATFORM_CARD_TEMPLATES_MENU_LABEL), icon: mdiCardText },
     {
       label: L("menu.siteManagement", "사이트관리"),
       icon: mdiCog,

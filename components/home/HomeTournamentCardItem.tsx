@@ -17,6 +17,7 @@ import {
   tournamentTitleClasses,
   slotBlockLineClampClass,
 } from "@/lib/slot-block-card-style";
+import type { PlatformCardTemplateStylePolicy } from "@/lib/platform-card-templates";
 
 export type HomeTournamentCardModel = {
   id: string;
@@ -94,6 +95,7 @@ export function HomeTournamentCardItem({
   cardCta,
   layout = "carousel",
   showDetailButtonByTemplate,
+  templateStyleByType,
 }: {
   t: HomeTournamentCardModel;
   index?: number;
@@ -105,6 +107,10 @@ export function HomeTournamentCardItem({
   showDetailButtonByTemplate?: {
     basic: boolean;
     highlight: boolean;
+  };
+  templateStyleByType?: {
+    basic: PlatformCardTemplateStylePolicy;
+    highlight: PlatformCardTemplateStylePolicy;
   };
 }) {
   const liClass =
@@ -142,8 +148,13 @@ export function HomeTournamentCardItem({
       : (showDetailButtonByTemplate?.basic ?? false);
 
   if (published) {
+    const templateType = t.templateType === "highlight" ? "highlight" : "basic";
+    const publishedLiClass =
+      layout === "grid"
+        ? "flex h-full min-h-0 min-w-0 justify-center"
+        : "flex h-full min-h-0 min-w-0 shrink-0";
     const publishedData = {
-      templateType: t.templateType === "highlight" ? "highlight" : "basic",
+      templateType,
       thumbnailUrl: t.thumbnailUrl ?? t.posterImageUrl ?? t.imageUrl ?? "",
       cardTitle: displayTitle,
       displayDateText: t.displayDateText ?? "",
@@ -153,7 +164,7 @@ export function HomeTournamentCardItem({
       shortDescription: displayDescription,
     } as const;
     return (
-      <li aria-hidden={duplicate} className={liClass}>
+      <li aria-hidden={duplicate} className={publishedLiClass}>
         <SlotBlockCtaLink
           layer={cardCta}
           ctx={{
@@ -164,9 +175,19 @@ export function HomeTournamentCardItem({
           className="block"
         >
           {publishedData.templateType === "highlight" ? (
-            <HighlightCard data={publishedData} compact showDetailButton={showDetailButton} />
+            <HighlightCard
+              data={publishedData}
+              compact
+              stylePolicy={templateStyleByType?.highlight}
+              showDetailButton={showDetailButton}
+            />
           ) : (
-            <BasicCard data={publishedData} compact showDetailButton={showDetailButton} />
+            <BasicCard
+              data={publishedData}
+              compact
+              stylePolicy={templateStyleByType?.basic}
+              showDetailButton={showDetailButton}
+            />
           )}
         </SlotBlockCtaLink>
       </li>

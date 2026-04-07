@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { flowSpeedToPxPerSec } from "@/lib/home-carousel-flow";
 
 type Props = {
@@ -10,6 +10,8 @@ type Props = {
   /** false면 마우스 올려도 자동 스크롤 유지 */
   pauseOnHover?: boolean;
 };
+
+const AUTO_SCROLL_START_DELAY_MS = 1700;
 
 /**
  * 가로 목록을 연속 흐름(무한 루프)으로 자동 스크롤 — 모바일·데스크톱 공통.
@@ -26,6 +28,12 @@ export function HomeTournamentListAutoScroll({
   const userPauseUntilRef = useRef(0);
   const lastTsRef = useRef<number | null>(null);
   const reducedMotionRef = useRef(false);
+  const [autoReady, setAutoReady] = useState(false);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setAutoReady(true), AUTO_SCROLL_START_DELAY_MS);
+    return () => window.clearTimeout(id);
+  }, []);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -38,6 +46,7 @@ export function HomeTournamentListAutoScroll({
   }, []);
 
   useEffect(() => {
+    if (!autoReady) return;
     const el = ref.current;
     if (!el) return;
 
@@ -47,9 +56,10 @@ export function HomeTournamentListAutoScroll({
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [autoReady]);
 
   useEffect(() => {
+    if (!autoReady) return;
     let rafId = 0;
     const speedPx = flowSpeedToPxPerSec(flowSpeed);
 
@@ -97,7 +107,7 @@ export function HomeTournamentListAutoScroll({
 
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, [flowSpeed]);
+  }, [flowSpeed, autoReady]);
 
   return (
     <div

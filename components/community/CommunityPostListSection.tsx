@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { formatCommunityListDate } from "@/lib/format-date";
 import type { CommunityHubPostItem } from "@/types/page-slot-render-context";
 import { CommunityWriteFab } from "@/components/community/CommunityWriteFab";
@@ -19,20 +19,15 @@ export function CommunityPostListSection({
   initialCategory: "all" | "free" | "qna" | "notice";
   showSolverEntry: boolean;
 }) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const postLink = (p: CommunityHubPostItem) =>
     p.boardSlug === "trouble" ? `/community/trouble/${p.id}` : `/community/${p.boardSlug}/${p.id}`;
 
   const fabHref = showSolverEntry ? "/community/nangu/write" : "/community/free/write";
-  const categoryRaw = searchParams?.get("category") ?? initialCategory;
-  const category =
-    categoryRaw === "all" ||
-    categoryRaw === "free" ||
-    categoryRaw === "qna" ||
-    categoryRaw === "notice"
-      ? categoryRaw
-      : "all";
+  const [category, setCategory] = useState<"all" | "free" | "qna" | "notice">(initialCategory);
+
+  useEffect(() => {
+    setCategory(initialCategory);
+  }, [initialCategory]);
 
   const categoryTabs = [
     { value: "all", label: "전체" },
@@ -42,11 +37,15 @@ export function CommunityPostListSection({
   ] as const;
 
   const updateCategory = (next: "all" | "free" | "qna" | "notice") => {
-    const params = new URLSearchParams(searchParams?.toString() ?? "");
-    if (next === "all") params.delete("category");
-    else params.set("category", next);
-    const qs = params.toString();
-    router.replace(qs ? `/community?${qs}` : "/community", { scroll: false });
+    setCategory(next);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (next === "all") {
+      url.searchParams.delete("category");
+    } else {
+      url.searchParams.set("category", next);
+    }
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
   };
 
   const filtered = latest

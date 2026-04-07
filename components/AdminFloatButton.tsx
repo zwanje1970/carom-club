@@ -77,11 +77,41 @@ export function AdminFloatButton() {
 
   // Session: client-only fetch
   useEffect(() => {
-    fetch("/api/auth/session")
-      .then((res) => res.json())
-      .then((data) => setUser(data.user ?? null))
-      .catch(() => setUser(null));
-  }, []);
+    if (pathname.startsWith("/tv")) return;
+    let cancelled = false;
+    let timeoutId: number | null = null;
+    let idleId: number | null = null;
+    const run = () => {
+      if (cancelled) return;
+      fetch("/api/auth/session")
+        .then((res) => res.json())
+        .then((data) => {
+          if (!cancelled) setUser(data.user ?? null);
+        })
+        .catch(() => {
+          if (!cancelled) setUser(null);
+        });
+    };
+    timeoutId = window.setTimeout(() => {
+      const w = window as Window & {
+        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+        cancelIdleCallback?: (id: number) => void;
+      };
+      if (typeof w.requestIdleCallback === "function") {
+        idleId = w.requestIdleCallback(run, { timeout: 1200 });
+      } else {
+        run();
+      }
+    }, 1400);
+    return () => {
+      cancelled = true;
+      if (timeoutId != null) window.clearTimeout(timeoutId);
+      const w = window as Window & { cancelIdleCallback?: (id: number) => void };
+      if (idleId != null && typeof w.cancelIdleCallback === "function") {
+        w.cancelIdleCallback(idleId);
+      }
+    };
+  }, [pathname]);
 
   // Mount + load saved position (client-only, avoid hydration mismatch)
   useEffect(() => {

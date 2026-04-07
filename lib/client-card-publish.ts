@@ -1,7 +1,4 @@
-import {
-  PLATFORM_CARD_TEMPLATE_POLICIES,
-  type PlatformCardTemplateType,
-} from "@/lib/platform-card-templates";
+import { type PlatformCardTemplateType } from "@/lib/platform-card-templates";
 
 export type TournamentCardPublishData = {
   tournamentId: string;
@@ -39,8 +36,7 @@ function toRecord(input: unknown): Record<string, unknown> {
 }
 
 function getDefaultTemplateType(): PlatformCardTemplateType {
-  const found = PLATFORM_CARD_TEMPLATE_POLICIES.find((item) => item.isDefault);
-  return found?.templateType ?? "basic";
+  return "basic";
 }
 
 function normalizeCardData(

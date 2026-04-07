@@ -1,7 +1,10 @@
-import { getCommonPageData } from "@/lib/common-page-data";
+import { Suspense } from "react";
+import { getAdminCopy } from "@/lib/admin-copy-server";
 import { applyPublicHeroSingleCanonical } from "@/lib/content/filter-page-blocks-public-view";
+import { getNoticeBarsForPage, getOrderedPageBlocksForPage } from "@/lib/content/service";
 import { buildCommunityHomeSlotCommunityPayload } from "@/lib/community-home-slot-context.server";
 import { CommunityMainClient } from "./CommunityMainClient";
+import { CommunityDeferredPopupLayer } from "@/components/community/CommunityDeferredPopupLayer";
 import { ContentLayer } from "@/components/content/ContentLayer";
 import { PageRenderer } from "@/components/content/PageRenderer";
 import { PageContentContainer } from "@/components/layout/PageContentContainer";
@@ -13,12 +16,13 @@ export async function CommunityHomeInner({
 }) {
   console.time("community_home_total");
   console.time("community_home_main_query");
-  const [common, communityPayload] = await Promise.all([
-    getCommonPageData("community"),
+  const [copy, noticeBars, pageBlocks, communityPayload] = await Promise.all([
+    getAdminCopy(),
+    getNoticeBarsForPage("community"),
+    getOrderedPageBlocksForPage("community"),
     buildCommunityHomeSlotCommunityPayload(category),
   ]);
   console.timeEnd("community_home_main_query");
-  const { noticeBars, popups, pageBlocks, copy } = common;
   const pageBlocksRendered = applyPublicHeroSingleCanonical("community", pageBlocks);
   const hasPostListSlot = pageBlocksRendered.some((b) => b.slotType === "postList");
 
@@ -30,19 +34,21 @@ export async function CommunityHomeInner({
 
   return (
     <main className="min-h-screen bg-site-bg text-site-text">
-      <ContentLayer noticeBars={noticeBars} popups={popups} />
+      <ContentLayer noticeBars={noticeBars} />
       <PageRenderer blocks={pageBlocksRendered} slotContext={slotContext} />
       {!hasPostListSlot ? (
         <PageContentContainer className="py-6">
           <CommunityMainClient
             key={category}
-            copy={copy}
             latest={communityPayload.latest}
             initialCategory={category}
             showSolverEntry={communityPayload.showSolverEntry}
           />
         </PageContentContainer>
       ) : null}
+      <Suspense fallback={null}>
+        <CommunityDeferredPopupLayer />
+      </Suspense>
     </main>
   );
 }

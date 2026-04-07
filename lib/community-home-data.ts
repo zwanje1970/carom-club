@@ -18,7 +18,6 @@ const listSelect = {
   title: true,
   createdAt: true,
   board: { select: { slug: true } },
-  author: { select: { name: true } },
 } as const;
 
 export type CommunityHomePostItem = {
@@ -47,12 +46,11 @@ function format(p: {
   title: string;
   createdAt: Date;
   board: { slug: string };
-  author: { name: string };
 }): CommunityHomePostItem {
   return {
     id: p.id,
     title: p.title,
-    authorName: p.author.name,
+    authorName: "",
     likeCount: 0,
     commentCount: 0,
     viewCount: 0,

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { PAGE_CONTENT_PAD_X } from "@/components/layout/pageContentStyles";
 import { cn } from "@/lib/utils";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
@@ -6,13 +5,22 @@ import { HomeTournamentListAutoScroll } from "@/components/home/HomeTournamentLi
 import { HomeTournamentCarouselRows } from "@/components/home/HomeTournamentCarouselRows";
 import type { HomeTournamentCarouselInput } from "@/components/home/HomeTournamentCarouselRows";
 import { SlotBlockCtaLink } from "@/components/home/SlotBlockCtaLink";
-import type { SlotBlockCtaConfig } from "@/lib/slot-block-cta";
+import {
+  ctaButtonPlacementWrapClass,
+  isOutsideCtaButtonPlacement,
+  resolveCtaButtonPlacement,
+  type SlotBlockCtaConfig,
+} from "@/lib/slot-block-cta";
 import type { SlotBlockCardStyle } from "@/lib/slot-block-card-style";
 import { tournamentCardLinkClasses } from "@/lib/slot-block-card-style";
 import type { SlotBlockLayout, SlotBlockMotion } from "@/lib/slot-block-layout-motion";
 import { slotMotionEffectiveFlowSpeed } from "@/lib/slot-block-layout-motion";
 import type { HomeTournamentSortBy } from "@/lib/home-published-tournament-cards";
-import { resolvePlatformCardTemplatePolicies } from "@/lib/platform-card-templates";
+import {
+  PLATFORM_CARD_TEMPLATE_STYLE_COPY_KEYS,
+  resolvePlatformCardTemplatePolicies,
+  resolvePlatformCardTemplateStylePolicy,
+} from "@/lib/platform-card-templates";
 
 export function HomeTournamentCards({
   tournaments,
@@ -53,6 +61,12 @@ export function HomeTournamentCards({
 }) {
   const c = copy as Record<AdminCopyKey, string>;
   const cta = ctaConfig;
+  const buttonPlacement = resolveCtaButtonPlacement(cta.button);
+  const outsideButton = isOutsideCtaButtonPlacement(buttonPlacement);
+  const topRightButton = buttonPlacement === "headerRight";
+  const inlineBottomButton = !outsideButton && !topRightButton;
+  const buttonLabel = getCopyValue(c, "site.home.tournaments.btnViewAll");
+  const buttonClass = "inline-flex items-center text-sm font-medium text-site-primary hover:underline py-2";
   const headingTitle = sectionTitle?.trim() || getCopyValue(c, "site.home.tournaments.title");
   const headingSubtitle =
     sectionSubtitle != null && sectionSubtitle.trim() !== ""
@@ -66,6 +80,16 @@ export function HomeTournamentCards({
   const flowOneToHundred = slotMotionEffectiveFlowSpeed(homeCarouselFlowSpeed, slotMotion);
   const isCarousel = slotLayout.type === "carousel";
   const templatePolicies = resolvePlatformCardTemplatePolicies(copy);
+  const templateStyleByType = {
+    basic: resolvePlatformCardTemplateStylePolicy(
+      copy?.[PLATFORM_CARD_TEMPLATE_STYLE_COPY_KEYS.basic] ?? null,
+      "basic"
+    ),
+    highlight: resolvePlatformCardTemplateStylePolicy(
+      copy?.[PLATFORM_CARD_TEMPLATE_STYLE_COPY_KEYS.highlight] ?? null,
+      "highlight"
+    ),
+  } as const;
   const showDetailButtonByTemplate = {
     basic: templatePolicies.find((item) => item.templateType === "basic")?.showDetailButton ?? false,
     highlight:
@@ -171,10 +195,10 @@ export function HomeTournamentCards({
                   : getCopyValue(c, "site.home.tournaments.nearbyFind")}
               </button>
             )}
-            {showMoreButton ? (
-              <Link href="/tournaments" className="inline-flex items-center text-sm font-medium text-site-primary hover:underline py-2">
-                {getCopyValue(c, "site.home.tournaments.btnViewAll")}
-              </Link>
+            {showMoreButton && topRightButton ? (
+              <SlotBlockCtaLink layer={cta.button} ctx={{}} className={buttonClass}>
+                {buttonLabel}
+              </SlotBlockCtaLink>
             ) : null}
           </div>
         </div>
@@ -190,6 +214,7 @@ export function HomeTournamentCards({
             cardCta={cta.card}
             listLayout={slotLayout}
             showDetailButtonByTemplate={showDetailButtonByTemplate}
+            templateStyleByType={templateStyleByType}
           />
         ) : slotMotion.autoPlay ? (
           <HomeTournamentListAutoScroll
@@ -202,6 +227,7 @@ export function HomeTournamentCards({
               cardCta={cta.card}
               listLayout={slotLayout}
               showDetailButtonByTemplate={showDetailButtonByTemplate}
+              templateStyleByType={templateStyleByType}
             />
           </HomeTournamentListAutoScroll>
         ) : (
@@ -212,10 +238,25 @@ export function HomeTournamentCards({
               cardCta={cta.card}
               listLayout={slotLayout}
               showDetailButtonByTemplate={showDetailButtonByTemplate}
+              templateStyleByType={templateStyleByType}
             />
           </div>
         )}
+        {showMoreButton && inlineBottomButton ? (
+          <div className={cn("mt-5", ctaButtonPlacementWrapClass(buttonPlacement))}>
+            <SlotBlockCtaLink layer={cta.button} ctx={{}} className={buttonClass}>
+              {buttonLabel}
+            </SlotBlockCtaLink>
+          </div>
+        ) : null}
       </div>
+      {showMoreButton && outsideButton ? (
+        <div className={cn("mx-auto mt-4 max-w-5xl", ctaButtonPlacementWrapClass(buttonPlacement))}>
+          <SlotBlockCtaLink layer={cta.button} ctx={{}} className={buttonClass}>
+            {buttonLabel}
+          </SlotBlockCtaLink>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -1,7 +1,5 @@
 import "server-only";
 
-import { getSession } from "@/lib/auth";
-import { canManageReports } from "@/lib/community-roles";
 import { getCachedCommunityLatest } from "@/lib/community-home-data";
 import type { CommunityHubPostItem } from "@/types/page-slot-render-context";
 
@@ -14,12 +12,11 @@ export async function buildCommunityHomeSlotCommunityPayload(
   canManageReports: boolean;
   showSolverEntry: boolean;
 }> {
-  const [session, latest] = await Promise.all([getSession(), getCachedCommunityLatest(true)]);
-  const canManageReports_ = canManageReports(session);
+  const latest = await getCachedCommunityLatest(true);
   return {
     latest,
     initialCategory: category,
-    canManageReports: canManageReports_,
+    canManageReports: false,
     showSolverEntry: false,
   };
 }

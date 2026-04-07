@@ -20,8 +20,39 @@ export default function NotificationBanner() {
   }
 
   useEffect(() => {
-    fetchNotifications();
-  }, []);
+    if (pathname?.toLowerCase() === "/notifications-popup") return;
+    if (pathname?.startsWith("/tv")) return;
+
+    let cancelled = false;
+    let timeoutId: number | null = null;
+    let idleId: number | null = null;
+
+    const run = () => {
+      if (cancelled) return;
+      fetchNotifications();
+    };
+
+    timeoutId = window.setTimeout(() => {
+      const w = window as Window & {
+        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+        cancelIdleCallback?: (id: number) => void;
+      };
+      if (typeof w.requestIdleCallback === "function") {
+        idleId = w.requestIdleCallback(run, { timeout: 1500 });
+      } else {
+        run();
+      }
+    }, 1600);
+
+    return () => {
+      cancelled = true;
+      if (timeoutId != null) window.clearTimeout(timeoutId);
+      const w = window as Window & { cancelIdleCallback?: (id: number) => void };
+      if (idleId != null && typeof w.cancelIdleCallback === "function") {
+        w.cancelIdleCallback(idleId);
+      }
+    };
+  }, [pathname]);
 
   async function handleConfirm() {
     if (notifications.length === 0) return;

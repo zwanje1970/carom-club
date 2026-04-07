@@ -5,6 +5,7 @@
  * - DB 접근은 `lib/admin-copy-server.ts`에서만 처리한다.
  * - 키 네이밍·공용/전용 기준·통합 이력: `docs/ADMIN_COPY_KEY_REGISTRY.md`
  */
+import { PLATFORM_CARD_TEMPLATES_MENU_LABEL } from "@/lib/platform-card-templates";
 
 /** 편집 가능한 메뉴/문구 키와 기본값 (라벨 설정 페이지에서 표시 순서·그룹용) */
 export const DEFAULT_ADMIN_COPY: Record<string, string> = {
@@ -19,7 +20,7 @@ export const DEFAULT_ADMIN_COPY: Record<string, string> = {
   "menu.venues": "클라이언트 관리",
   "menu.venueList": "클라이언트 목록",
   "menu.clientApplications": "클라이언트 신규신청",
-  "menu.platformCardTemplates": "카드 템플릿",
+  "menu.platformCardTemplates": PLATFORM_CARD_TEMPLATES_MENU_LABEL,
   "platform.cardTemplate.basic.style":
     "{\"cardWidth\":320,\"cardHeight\":300,\"outerMargin\":0,\"imageAreaHeight\":170,\"textAreaPadding\":12,\"ratioPreset\":\"3:5\",\"titlePosition\":\"top\",\"titleAlign\":\"left\",\"shortDescriptionPosition\":\"title-below\",\"shortDescriptionAlign\":\"left\",\"statusPosition\":\"top-right\",\"statusAlign\":\"right\",\"titleFontSize\":16,\"shortDescriptionFontSize\":12,\"statusFontSize\":12,\"textColor\":\"#111827\",\"backgroundColor\":\"#ffffff\",\"paddingTop\":12,\"paddingBottom\":12,\"paddingLeft\":12,\"paddingRight\":12,\"titleContentGap\":6,\"gapBetweenElements\":8}",
   "platform.cardTemplate.highlight.style":

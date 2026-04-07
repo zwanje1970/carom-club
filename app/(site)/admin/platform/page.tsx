@@ -3,6 +3,7 @@ import { mdiViewDashboard } from "@mdi/js";
 import SectionMain from "@/components/admin/_components/Section/Main";
 import SectionTitleLineWithButton from "@/components/admin/_components/Section/TitleLineWithButton";
 import CardBox from "@/components/admin/_components/CardBox";
+import { PLATFORM_CARD_TEMPLATES_MENU_LABEL } from "@/lib/platform-card-templates";
 
 export default async function AdminPlatformPage() {
   return (
@@ -22,7 +23,7 @@ export default async function AdminPlatformPage() {
         </CardBox>
         <CardBox>
           <Link href="/admin/members" className="block min-h-[44px] touch-manipulation py-1">
-            <p className="text-base font-semibold text-site-text">권한 관리</p>
+            <p className="text-base font-semibold text-site-text">회원·권한 관리</p>
           </Link>
         </CardBox>
         <CardBox>
@@ -32,7 +33,7 @@ export default async function AdminPlatformPage() {
         </CardBox>
         <CardBox>
           <Link href="/admin/platform/card-templates" className="block min-h-[44px] touch-manipulation py-1">
-            <p className="text-base font-semibold text-site-text">카드 템플릿</p>
+            <p className="text-base font-semibold text-site-text">{PLATFORM_CARD_TEMPLATES_MENU_LABEL}</p>
           </Link>
         </CardBox>
       </div>

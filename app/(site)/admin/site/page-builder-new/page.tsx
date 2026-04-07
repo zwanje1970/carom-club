@@ -3,13 +3,37 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PageBuilderMobilePreview } from "@/components/admin/page-builder/PageBuilderMobilePreview";
 import { AdminImageField } from "@/components/admin/_components/AdminImageField";
+import { BasicCard, HighlightCard } from "@/components/cards/TournamentPublishedCard";
 import type { PageBuilderKey } from "@/lib/content/page-section-page-rules";
+import { DEFAULT_PLATFORM_CARD_TEMPLATE_STYLES } from "@/lib/platform-card-templates";
 
 type BuilderPage = "home" | "community" | "tournaments";
 type SectionType = "text" | "image" | "cta";
 type TextAlign = "left" | "center" | "right";
 type StepKey = "step1" | "step2" | "step3" | "step4";
 type StepState = "open" | "done" | "locked";
+type CardKind = "default" | "custom" | "publishedTournament" | "publishedVenue";
+type SpacingPreset = "compact" | "normal" | "wide";
+type ElementType = "text" | "card" | "cta";
+type ElementCtaPlacement =
+  | "headerRight"
+  | "blockBottomLeft"
+  | "blockBottomCenter"
+  | "blockBottomRight"
+  | "outsideBottomLeft"
+  | "outsideBottomCenter"
+  | "outsideBottomRight";
+
+type BuilderElement = {
+  id: string;
+  type: ElementType;
+  textTitle?: string;
+  textBody?: string;
+  cardKind?: CardKind;
+  ctaLabel?: string;
+  ctaHref?: string;
+  ctaPlacement?: ElementCtaPlacement;
+};
 
 type SectionButton = {
   id: string;
@@ -75,6 +99,120 @@ const INITIAL_STEPS: Record<StepKey, StepState> = {
   step3: "locked",
   step4: "locked",
 };
+
+function resolveCardKind(raw: unknown): CardKind {
+  return raw === "custom" ||
+    raw === "publishedTournament" ||
+    raw === "publishedVenue"
+    ? (raw as CardKind)
+    : "default";
+}
+
+function isPublishedCardKind(kind: CardKind): boolean {
+  return kind === "publishedTournament" || kind === "publishedVenue";
+}
+
+function normalizeSpacingPreset(raw: unknown, fallback: SpacingPreset = "normal"): SpacingPreset {
+  return raw === "compact" || raw === "wide" || raw === "normal"
+    ? (raw as SpacingPreset)
+    : fallback;
+}
+
+function spacingPresetPx(group: "block" | "element" | "card", preset: SpacingPreset): number {
+  if (group === "block") {
+    if (preset === "compact") return 8;
+    if (preset === "wide") return 22;
+    return 14;
+  }
+  if (group === "element") {
+    if (preset === "compact") return 4;
+    if (preset === "wide") return 12;
+    return 8;
+  }
+  if (preset === "compact") return 8;
+  if (preset === "wide") return 18;
+  return 12;
+}
+
+function normalizeSpacingPx(raw: unknown, fallback: number): number {
+  const n = Math.round(Number(raw));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0, Math.min(48, n));
+}
+
+function normalizeElementCtaPlacement(raw: unknown): ElementCtaPlacement {
+  return raw === "blockBottomLeft" ||
+    raw === "blockBottomCenter" ||
+    raw === "blockBottomRight" ||
+    raw === "outsideBottomLeft" ||
+    raw === "outsideBottomCenter" ||
+    raw === "outsideBottomRight"
+    ? (raw as ElementCtaPlacement)
+    : "headerRight";
+}
+
+function emptyBuilderElement(type: ElementType): BuilderElement {
+  if (type === "text") return { id: makeId("el"), type, textTitle: "제목", textBody: "설명" };
+  if (type === "card") return { id: makeId("el"), type, cardKind: "default" };
+  return {
+    id: makeId("el"),
+    type,
+    ctaLabel: "전체보기",
+    ctaHref: "/tournaments",
+    ctaPlacement: "blockBottomRight",
+  };
+}
+
+function toBuilderElement(raw: unknown): BuilderElement | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const o = raw as Record<string, unknown>;
+  if (o.type !== "text" && o.type !== "card" && o.type !== "cta") return null;
+  return {
+    id: typeof o.id === "string" && o.id.trim() ? o.id : makeId("el"),
+    type: o.type as ElementType,
+    textTitle: typeof o.textTitle === "string" ? o.textTitle : "",
+    textBody: typeof o.textBody === "string" ? o.textBody : "",
+    cardKind: resolveCardKind(o.cardKind),
+    ctaLabel: typeof o.ctaLabel === "string" ? o.ctaLabel : "전체보기",
+    ctaHref: typeof o.ctaHref === "string" ? o.ctaHref : "/tournaments",
+    ctaPlacement: normalizeElementCtaPlacement(o.ctaPlacement),
+  };
+}
+
+function resolveBuilderElements(style: StyleMap, draft: PageSection | null): BuilderElement[] {
+  const raw = style.contentElements;
+  if (Array.isArray(raw)) {
+    const normalized = raw.map((it) => toBuilderElement(it)).filter(Boolean) as BuilderElement[];
+    if (normalized.length > 0) return normalized;
+  }
+  const fallback: BuilderElement[] = [];
+  fallback.push({
+    id: makeId("el"),
+    type: "text",
+    textTitle: draft?.title ?? "",
+    textBody: draft?.description ?? "",
+  });
+  if (Array.isArray(style.contentExtras)) {
+    for (const item of style.contentExtras as unknown[]) {
+      const text = String(item ?? "").trim();
+      if (!text) continue;
+      fallback.push({ id: makeId("el"), type: "text", textTitle: "", textBody: text });
+    }
+  }
+  if (Boolean(style.cardEnabled)) {
+    fallback.push({ id: makeId("el"), type: "card", cardKind: resolveCardKind(style.cardKind) });
+  }
+  if (String(style.contentMode ?? "cms") === "cta" && String(style.contentCtaLink ?? "").trim()) {
+    fallback.push({
+      id: makeId("el"),
+      type: "cta",
+      ctaLabel: "전체보기",
+      ctaHref: String(style.contentCtaLink ?? ""),
+      ctaPlacement: normalizeElementCtaPlacement(style.contentCtaPlacement),
+    });
+  }
+  return fallback;
+}
 
 function parseStyle(json: string | null | undefined): StyleMap {
   if (!json) return {};
@@ -200,6 +338,24 @@ export default function AdminSitePageBuilderNewPage() {
   }, []);
 
   const style = useMemo(() => parseStyle(draft?.sectionStyleJson), [draft?.sectionStyleJson]);
+  const legacySpacing = normalizeSpacingPreset(style.contentSpacingPreset, "normal");
+  const spacingMode = String(style.spacingMode ?? "preset") === "custom" ? "custom" : "preset";
+  const blockSpacingPreset = normalizeSpacingPreset(style.blockSpacingPreset, legacySpacing);
+  const elementSpacingPreset = normalizeSpacingPreset(style.elementSpacingPreset, legacySpacing);
+  const cardSpacingPreset = normalizeSpacingPreset(style.cardSpacingPreset, legacySpacing);
+  const blockSpacingPx =
+    spacingMode === "custom"
+      ? normalizeSpacingPx(style.blockSpacingPx, spacingPresetPx("block", blockSpacingPreset))
+      : spacingPresetPx("block", blockSpacingPreset);
+  const elementSpacingPx =
+    spacingMode === "custom"
+      ? normalizeSpacingPx(style.elementSpacingPx, spacingPresetPx("element", elementSpacingPreset))
+      : spacingPresetPx("element", elementSpacingPreset);
+  const cardSpacingPx =
+    spacingMode === "custom"
+      ? normalizeSpacingPx(style.cardSpacingPx, spacingPresetPx("card", cardSpacingPreset))
+      : spacingPresetPx("card", cardSpacingPreset);
+  const elements = useMemo(() => resolveBuilderElements(style, draft), [style, draft]);
 
   const previewRows = useMemo(() => {
     if (!selectedId || !draft) return rows;
@@ -288,6 +444,41 @@ export default function AdminSitePageBuilderNewPage() {
   const updateDraft = (patch: Partial<PageSection>) => {
     setDraft((prev) => (prev ? { ...prev, ...patch } : prev));
   };
+
+  const updateElements = (next: BuilderElement[]) => {
+    const firstText = next.find((it) => it.type === "text");
+    const extraTexts = next
+      .filter((it) => it.type === "text")
+      .slice(1)
+      .map((it) => String(it.textBody ?? ""));
+    const firstCard = next.find((it) => it.type === "card");
+    const firstCta = next.find((it) => it.type === "cta");
+    updateStyle({
+      contentElements: next.map((it) => ({
+        id: it.id,
+        type: it.type,
+        textTitle: it.textTitle ?? "",
+        textBody: it.textBody ?? "",
+        cardKind: it.cardKind ?? "default",
+        ctaLabel: it.ctaLabel ?? "전체보기",
+        ctaHref: it.ctaHref ?? "",
+        ctaPlacement: it.ctaPlacement ?? "headerRight",
+      })),
+      contentExtras: extraTexts,
+      cardEnabled: Boolean(firstCard),
+      cardKind: firstCard?.cardKind ?? style.cardKind ?? "default",
+      contentMode: firstCta && String(firstCta.ctaHref ?? "").trim() ? "cta" : "cms",
+      contentCtaLink: firstCta?.ctaHref ?? "",
+      contentCtaPlacement: firstCta?.ctaPlacement ?? "headerRight",
+    });
+    if (firstText) {
+      updateDraft({
+        title: String(firstText.textTitle ?? ""),
+        description: String(firstText.textBody ?? ""),
+      });
+    }
+  };
+
 
   const openStep = (step: StepKey) => {
     if (step === "step1") setStep1EditMode(true);
@@ -649,6 +840,7 @@ export default function AdminSitePageBuilderNewPage() {
       <div className="min-h-0 flex-[1.3] rounded-xl border border-site-border bg-white p-2 dark:bg-slate-900">
         <div className="mx-auto h-full w-full max-w-[460px] overflow-y-auto">
           {draft ? (
+            <>
             <div
               className="rounded-xl border border-site-border bg-white p-2 dark:bg-slate-900"
               style={{
@@ -680,6 +872,20 @@ export default function AdminSitePageBuilderNewPage() {
                   {draft.title || "제목"}
                 </p>
               ) : null}
+              {(() => {
+                const contentMode = String(style.contentMode ?? "cms");
+                const contentCtaLink = String(style.contentCtaLink ?? "").trim();
+                const contentCtaPlacement = String(style.contentCtaPlacement ?? "headerRight");
+                const hasContentCta = contentMode === "cta" && contentCtaLink.length > 0;
+                if (!hasContentCta || contentCtaPlacement !== "headerRight") return null;
+                return (
+                  <div className="mt-2 flex justify-end">
+                    <span className="inline-flex rounded border border-site-primary/40 bg-site-primary/10 px-2.5 py-1 text-xs font-medium text-site-primary">
+                      CTA
+                    </span>
+                  </div>
+                );
+              })()}
 
               <p
                 className={String(style.titlePosition ?? "top") === "middle" ? "mt-3" : "mt-2"}
@@ -688,6 +894,7 @@ export default function AdminSitePageBuilderNewPage() {
                   fontSize: `${Number(style.contentSize ?? 14)}px`,
                   fontWeight: Number(style.contentWeight ?? "400"),
                   color: String(style.contentColor ?? "#374151"),
+                  marginTop: `${elementSpacingPx}px`,
                 }}
               >
                 {draft.description || ""}
@@ -703,6 +910,7 @@ export default function AdminSitePageBuilderNewPage() {
                         fontSize: `${Number(style.contentSize ?? 14)}px`,
                         fontWeight: Number(style.contentWeight ?? "400"),
                         color: String(style.contentColor ?? "#374151"),
+                        marginTop: `${Math.max(2, Math.round(elementSpacingPx * 0.7))}px`,
                       }}
                     >
                       {String(item ?? "")}
@@ -736,12 +944,15 @@ export default function AdminSitePageBuilderNewPage() {
                       String(style.cardShape ?? "square") === "circle"
                         ? "9999px"
                         : `${Number(style.cardRadius ?? 12)}px`,
-                    width: Number(style.cardWidth ?? 320) > 0 ? `${Math.min(Number(style.cardWidth ?? 320), 420)}px` : "100%",
-                    maxWidth: "100%",
+                    marginTop: `${cardSpacingPx}px`,
                   }}
                 >
                   {(() => {
-                    const isDefaultCard = String(style.cardKind ?? "default") === "default";
+                    const cardKind = resolveCardKind(style.cardKind);
+                    const isDefaultCard = cardKind === "default";
+                    const isPublishedCard = isPublishedCardKind(cardKind);
+                    const publishedLabel =
+                      cardKind === "publishedVenue" ? "당구장 메인 게시용카드" : "대회 메인 게시용카드";
                     const titleFromField =
                       String(style.defaultTitleSource ?? "direct") === "field"
                         ? String((draft as unknown as Record<string, unknown>)[String(style.cardTitleField ?? "title")] ?? "")
@@ -764,9 +975,41 @@ export default function AdminSitePageBuilderNewPage() {
                       ? (imageFromField || String(style.cardBackgroundImage ?? draft.imageUrl ?? ""))
                       : String(style.cardBackgroundImage ?? draft.imageUrl ?? "");
                     const ctaLink =
-                      String(style.cardKind ?? "default") === "custom"
+                      cardKind === "custom"
                         ? String(style.cardCustomCtaLink ?? style.cardCtaLink ?? "")
                         : String(style.cardCtaLink ?? "");
+                    if (isPublishedCard) {
+                      const previewData = {
+                        templateType: cardKind === "publishedVenue" ? "highlight" : "basic",
+                        thumbnailUrl: resolvedImage || "",
+                        cardTitle: resolvedTitle || (cardKind === "publishedVenue" ? "당구장 상호명" : "대회 제목"),
+                        displayDateText: "2026-04-06",
+                        displayRegionText: "서울",
+                        statusText: "접수중",
+                        buttonText: "자세히 보기",
+                        shortDescription: resolvedBody || "",
+                      } as const;
+                      return (
+                        <div className="space-y-2 p-3">
+                          <p className="text-xs font-semibold text-site-text">{publishedLabel}</p>
+                          <div className="flex justify-center">
+                            {cardKind === "publishedVenue" ? (
+                              <HighlightCard
+                                data={previewData}
+                                stylePolicy={DEFAULT_PLATFORM_CARD_TEMPLATE_STYLES.highlight}
+                                showDetailButton={false}
+                              />
+                            ) : (
+                              <BasicCard
+                                data={previewData}
+                                stylePolicy={DEFAULT_PLATFORM_CARD_TEMPLATE_STYLES.basic}
+                                showDetailButton={false}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
                     return (
                       <>
                         {resolvedImage ? (
@@ -798,7 +1041,48 @@ export default function AdminSitePageBuilderNewPage() {
                   })()}
                 </div>
               ) : null}
+              {(() => {
+                const contentMode = String(style.contentMode ?? "cms");
+                const contentCtaLink = String(style.contentCtaLink ?? "").trim();
+                const contentCtaPlacement = String(style.contentCtaPlacement ?? "headerRight");
+                const hasContentCta = contentMode === "cta" && contentCtaLink.length > 0;
+                if (!hasContentCta || !contentCtaPlacement.startsWith("blockBottom")) return null;
+                const align =
+                  contentCtaPlacement.endsWith("Right")
+                    ? "justify-end"
+                    : contentCtaPlacement.endsWith("Center")
+                      ? "justify-center"
+                      : "justify-start";
+                return (
+                  <div className={`flex ${align}`} style={{ marginTop: `${blockSpacingPx}px` }}>
+                    <span className="inline-flex rounded border border-site-primary/40 bg-site-primary/10 px-2.5 py-1 text-xs font-medium text-site-primary">
+                      CTA
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
+            {(() => {
+              const contentMode = String(style.contentMode ?? "cms");
+              const contentCtaLink = String(style.contentCtaLink ?? "").trim();
+              const contentCtaPlacement = String(style.contentCtaPlacement ?? "headerRight");
+              const hasContentCta = contentMode === "cta" && contentCtaLink.length > 0;
+              if (!hasContentCta || !contentCtaPlacement.startsWith("outsideBottom")) return null;
+              const align =
+                contentCtaPlacement.endsWith("Right")
+                  ? "justify-end"
+                  : contentCtaPlacement.endsWith("Center")
+                    ? "justify-center"
+                    : "justify-start";
+              return (
+                <div className={`flex ${align}`} style={{ marginTop: `${blockSpacingPx}px` }}>
+                  <span className="inline-flex rounded border border-site-primary/40 bg-site-primary/10 px-2.5 py-1 text-xs font-medium text-site-primary">
+                    CTA
+                  </span>
+                </div>
+              );
+            })()}
+            </>
           ) : (
             <div className="rounded-lg border border-dashed border-site-border p-4 text-sm text-gray-500 dark:text-slate-400">
               선택된 블록이 없습니다.
@@ -950,6 +1234,83 @@ export default function AdminSitePageBuilderNewPage() {
                 <option value="center">내용 위치: 가운데</option>
                 <option value="right">내용 위치: 오른쪽</option>
               </select>
+              <div className="space-y-2 rounded border border-site-border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-gray-700 dark:text-slate-300">간격 설정</p>
+                  <select
+                    value={spacingMode}
+                    onChange={(e) => updateStyle({ spacingMode: e.target.value })}
+                    className="rounded border border-site-border bg-white px-2 py-1 text-xs dark:bg-slate-900"
+                  >
+                    <option value="preset">간편 설정</option>
+                    <option value="custom">사용자 설정</option>
+                  </select>
+                </div>
+                {spacingMode === "custom" ? (
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <input
+                      type="number"
+                      value={Number(style.blockSpacingPx ?? blockSpacingPx)}
+                      onChange={(e) => updateStyle({ blockSpacingPx: Number(e.target.value || 0) })}
+                      placeholder="블록 간격(px)"
+                      className="rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                    />
+                    <input
+                      type="number"
+                      value={Number(style.elementSpacingPx ?? elementSpacingPx)}
+                      onChange={(e) => updateStyle({ elementSpacingPx: Number(e.target.value || 0) })}
+                      placeholder="요소 간격(px)"
+                      className="rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                    />
+                    <input
+                      type="number"
+                      value={Number(style.cardSpacingPx ?? cardSpacingPx)}
+                      onChange={(e) => updateStyle({ cardSpacingPx: Number(e.target.value || 0) })}
+                      placeholder="카드 간격(px)"
+                      className="rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                    />
+                  </div>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <label className="space-y-1">
+                      <span className="block text-[11px] text-gray-600 dark:text-slate-400">블록 간격</span>
+                      <select
+                        value={blockSpacingPreset}
+                        onChange={(e) => updateStyle({ blockSpacingPreset: e.target.value })}
+                        className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                      >
+                        <option value="compact">좁게</option>
+                        <option value="normal">보통</option>
+                        <option value="wide">넓게</option>
+                      </select>
+                    </label>
+                    <label className="space-y-1">
+                      <span className="block text-[11px] text-gray-600 dark:text-slate-400">요소 간격</span>
+                      <select
+                        value={elementSpacingPreset}
+                        onChange={(e) => updateStyle({ elementSpacingPreset: e.target.value })}
+                        className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                      >
+                        <option value="compact">좁게</option>
+                        <option value="normal">보통</option>
+                        <option value="wide">넓게</option>
+                      </select>
+                    </label>
+                    <label className="space-y-1">
+                      <span className="block text-[11px] text-gray-600 dark:text-slate-400">카드 간격</span>
+                      <select
+                        value={cardSpacingPreset}
+                        onChange={(e) => updateStyle({ cardSpacingPreset: e.target.value })}
+                        className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                      >
+                        <option value="compact">좁게</option>
+                        <option value="normal">보통</option>
+                        <option value="wide">넓게</option>
+                      </select>
+                    </label>
+                  </div>
+                )}
+              </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 <select value={String(style.contentMode ?? "cms")} onChange={(e) => updateStyle({ contentMode: e.target.value })} className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900">
                   <option value="cms">CMS</option>
@@ -959,6 +1320,24 @@ export default function AdminSitePageBuilderNewPage() {
                   <input value={String(style.contentCtaLink ?? "")} onChange={(e) => updateStyle({ contentCtaLink: e.target.value })} placeholder="CTA 링크 입력" className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900" />
                 ) : null}
               </div>
+              {String(style.contentMode ?? "cms") === "cta" ? (
+                <div className="space-y-1 rounded border border-sky-200 bg-sky-50 p-3 dark:border-sky-900/50 dark:bg-sky-950/30">
+                  <p className="text-xs font-semibold text-sky-900 dark:text-sky-100">CTA 위치</p>
+                  <select
+                    value={String(style.contentCtaPlacement ?? "headerRight")}
+                    onChange={(e) => updateStyle({ contentCtaPlacement: e.target.value })}
+                    className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                  >
+                    <option value="headerRight">상단 오른쪽</option>
+                    <option value="blockBottomLeft">블록 하단 왼쪽</option>
+                    <option value="blockBottomCenter">블록 하단 가운데</option>
+                    <option value="blockBottomRight">블록 하단 오른쪽</option>
+                    <option value="outsideBottomLeft">블록 바깥 아래 왼쪽</option>
+                    <option value="outsideBottomCenter">블록 바깥 아래 가운데</option>
+                    <option value="outsideBottomRight">블록 바깥 아래 오른쪽</option>
+                  </select>
+                </div>
+              ) : null}
               <textarea value={draft.description ?? ""} onChange={(e) => updateDraft({ description: e.target.value })} placeholder="내용 입력" className="min-h-24 w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900" />
               <div className="grid gap-2 sm:grid-cols-3">
                 <input type="number" value={Number(style.contentSize ?? 14)} onChange={(e) => updateStyle({ contentSize: Number(e.target.value || 14) })} placeholder="폰트 크기" className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900" />
@@ -969,21 +1348,163 @@ export default function AdminSitePageBuilderNewPage() {
                 </select>
                 <input type="color" value={String(style.contentColor ?? "#374151")} onChange={(e) => updateStyle({ contentColor: e.target.value })} className="h-10 rounded border border-site-border bg-white px-1 dark:bg-slate-900" />
               </div>
-              {Array.isArray(style.contentExtras) ? (
-                (style.contentExtras as unknown[]).map((item, idx) => (
-                  <input
-                    key={`extra-${idx}`}
-                    value={String(item ?? "")}
-                    onChange={(e) => {
-                      const next = [...((style.contentExtras as unknown[]) ?? [])];
-                      next[idx] = e.target.value;
-                      updateStyle({ contentExtras: next });
-                    }}
-                    placeholder={`추가 내용 ${idx + 1}`}
-                    className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900"
-                  />
-                ))
-              ) : null}
+              <div className="space-y-2 rounded border border-site-border p-3">
+                <p className="text-xs font-semibold text-gray-700 dark:text-slate-300">요소 추가</p>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={() => updateElements([...elements, emptyBuilderElement("text")])}
+                    className="rounded border border-site-border px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-slate-800"
+                  >
+                    텍스트
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateElements([...elements, emptyBuilderElement("card")])}
+                    className="rounded border border-site-border px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-slate-800"
+                  >
+                    카드
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateElements([...elements, emptyBuilderElement("cta")])}
+                    className="rounded border border-site-border px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-slate-800"
+                  >
+                    CTA
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {elements.map((el, idx) => (
+                    <div key={el.id} className="space-y-2 rounded border border-site-border p-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium text-gray-600 dark:text-slate-400">
+                          {idx + 1}. {el.type === "text" ? "텍스트 요소" : el.type === "card" ? "카드 요소" : "CTA 요소"}
+                        </p>
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            disabled={idx === 0}
+                            onClick={() => {
+                              const next = [...elements];
+                              [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+                              updateElements(next);
+                            }}
+                            className="rounded border border-site-border px-2 py-1 text-[11px] disabled:opacity-40"
+                          >
+                            위
+                          </button>
+                          <button
+                            type="button"
+                            disabled={idx === elements.length - 1}
+                            onClick={() => {
+                              const next = [...elements];
+                              [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
+                              updateElements(next);
+                            }}
+                            className="rounded border border-site-border px-2 py-1 text-[11px] disabled:opacity-40"
+                          >
+                            아래
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateElements(elements.filter((it) => it.id !== el.id))}
+                            className="rounded border border-site-border px-2 py-1 text-[11px]"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      </div>
+                      {el.type === "text" ? (
+                        <div className="grid gap-2">
+                          <input
+                            value={String(el.textTitle ?? "")}
+                            onChange={(e) =>
+                              updateElements(
+                                elements.map((it) => (it.id === el.id ? { ...it, textTitle: e.target.value } : it))
+                              )
+                            }
+                            placeholder="텍스트 제목"
+                            className="rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                          />
+                          <textarea
+                            value={String(el.textBody ?? "")}
+                            onChange={(e) =>
+                              updateElements(
+                                elements.map((it) => (it.id === el.id ? { ...it, textBody: e.target.value } : it))
+                              )
+                            }
+                            placeholder="텍스트 설명"
+                            className="min-h-20 rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                          />
+                        </div>
+                      ) : null}
+                      {el.type === "card" ? (
+                        <select
+                          value={el.cardKind ?? "default"}
+                          onChange={(e) =>
+                            updateElements(
+                              elements.map((it) =>
+                                it.id === el.id ? { ...it, cardKind: resolveCardKind(e.target.value) } : it
+                              )
+                            )
+                          }
+                          className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                        >
+                          <option value="publishedTournament">대회 메인 게시용카드</option>
+                          <option value="publishedVenue">당구장 메인 게시용카드</option>
+                          <option value="default">디폴트카드</option>
+                          <option value="custom">사용자설정카드</option>
+                        </select>
+                      ) : null}
+                      {el.type === "cta" ? (
+                        <div className="grid gap-2">
+                          <input
+                            value={String(el.ctaLabel ?? "전체보기")}
+                            onChange={(e) =>
+                              updateElements(
+                                elements.map((it) => (it.id === el.id ? { ...it, ctaLabel: e.target.value } : it))
+                              )
+                            }
+                            placeholder="CTA 버튼명"
+                            className="rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                          />
+                          <input
+                            value={String(el.ctaHref ?? "")}
+                            onChange={(e) =>
+                              updateElements(
+                                elements.map((it) => (it.id === el.id ? { ...it, ctaHref: e.target.value } : it))
+                              )
+                            }
+                            placeholder="CTA 링크"
+                            className="rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                          />
+                          <select
+                            value={el.ctaPlacement ?? "headerRight"}
+                            onChange={(e) =>
+                              updateElements(
+                                elements.map((it) =>
+                                  it.id === el.id
+                                    ? { ...it, ctaPlacement: normalizeElementCtaPlacement(e.target.value) }
+                                    : it
+                                )
+                              )
+                            }
+                            className="rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                          >
+                            <option value="headerRight">상단 오른쪽</option>
+                            <option value="blockBottomLeft">블록 하단 왼쪽</option>
+                            <option value="blockBottomCenter">블록 하단 가운데</option>
+                            <option value="blockBottomRight">블록 하단 오른쪽</option>
+                            <option value="outsideBottomLeft">블록 바깥 아래 왼쪽</option>
+                            <option value="outsideBottomCenter">블록 바깥 아래 가운데</option>
+                            <option value="outsideBottomRight">블록 바깥 아래 오른쪽</option>
+                          </select>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
               <div className="space-y-2 rounded border border-site-border p-3 sm:col-span-2">
                 <p className="text-xs font-semibold text-gray-700 dark:text-slate-300">슬라이드 설정</p>
                 <label className="flex items-center gap-2 text-sm">
@@ -1035,9 +1556,6 @@ export default function AdminSitePageBuilderNewPage() {
                   <p className="text-[11px] text-gray-500 dark:text-slate-400">슬라이드가 꺼져 있으면 일반 카드 목록으로 표시됩니다.</p>
                 )}
               </div>
-              <button type="button" onClick={() => updateStyle({ contentExtras: [...(((style.contentExtras as unknown[]) ?? [])), ""] })} className="rounded border border-site-border px-3 py-1 text-xs hover:bg-gray-50 dark:hover:bg-slate-800">
-                내용추가+
-              </button>
               <div className="pt-1">
                 <button type="button" onClick={() => void completeStep2()} disabled={saving} className="rounded border border-site-border px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-50 dark:hover:bg-slate-800">
                   STEP 2 완료
@@ -1091,17 +1609,31 @@ export default function AdminSitePageBuilderNewPage() {
                     카드 외곽선
                   </label>
                   <input type="color" value={String(style.cardBorderColor ?? "#d1d5db")} onChange={(e) => updateStyle({ cardBorderColor: e.target.value })} className="h-10 rounded border border-site-border bg-white px-1 dark:bg-slate-900" />
-                  <select value={String(style.cardKind ?? "default")} onChange={(e) => updateStyle({ cardKind: e.target.value })} className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900">
-                    <option value="default">디폴트 카드</option>
-                    <option value="custom">사용자설정 카드</option>
+                  <select
+                    value={resolveCardKind(style.cardKind)}
+                    onChange={(e) => updateStyle({ cardKind: e.target.value })}
+                    className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900"
+                  >
+                    <option value="publishedTournament">대회 메인 게시용카드</option>
+                    <option value="publishedVenue">당구장 메인 게시용카드</option>
+                    <option value="default">디폴트카드</option>
+                    <option value="custom">사용자설정카드</option>
                   </select>
-                  <select value={String(style.cardMode ?? "cms")} onChange={(e) => updateStyle({ cardMode: e.target.value })} className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900">
-                    <option value="cms">CMS</option>
-                    <option value="cta">CTA</option>
-                  </select>
-                  {String(style.cardMode ?? "cms") === "cta" ? (
-                    <input value={String(style.cardCtaLink ?? "")} onChange={(e) => updateStyle({ cardCtaLink: e.target.value })} placeholder="CTA 링크 입력" className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900 sm:col-span-2" />
-                  ) : null}
+                  {!isPublishedCardKind(resolveCardKind(style.cardKind)) ? (
+                    <>
+                      <select value={String(style.cardMode ?? "cms")} onChange={(e) => updateStyle({ cardMode: e.target.value })} className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900">
+                        <option value="cms">CMS</option>
+                        <option value="cta">CTA</option>
+                      </select>
+                      {String(style.cardMode ?? "cms") === "cta" ? (
+                        <input value={String(style.cardCtaLink ?? "")} onChange={(e) => updateStyle({ cardCtaLink: e.target.value })} placeholder="CTA 링크 입력" className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900 sm:col-span-2" />
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="rounded border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/40 dark:text-sky-100 sm:col-span-2">
+                      메인 게시용카드 선택 시 STEP 4에서 게시카드 불러오기 방식이 열립니다.
+                    </div>
+                  )}
                 </div>
               ) : null}
               <button type="button" onClick={() => void completeStep3()} disabled={saving} className="rounded border border-site-border px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-50 dark:hover:bg-slate-800">
@@ -1127,50 +1659,79 @@ export default function AdminSitePageBuilderNewPage() {
           <h2 className="text-sm font-semibold text-site-text">STEP 4: 카드 내용 입력</h2>
           {draft ? (
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <select value={String(style.cardThumbShape ?? "round")} onChange={(e) => updateStyle({ cardThumbShape: e.target.value })} className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900">
-                <option value="circle">원형 썸네일</option>
-                <option value="round">둥근 썸네일</option>
-              </select>
-              <select value={String(style.cardThumbPosition ?? "left")} onChange={(e) => updateStyle({ cardThumbPosition: e.target.value })} className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900">
-                <option value="left">이미지 위치: 좌</option>
-                <option value="right">이미지 위치: 우</option>
-              </select>
-              <select value={String(style.cardSplit ?? "top-bottom")} onChange={(e) => updateStyle({ cardSplit: e.target.value })} className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900">
-                <option value="top-bottom">분할형: 상/하</option>
-                <option value="left-right">분할형: 좌/우</option>
-              </select>
-              <select value={String(style.cardRatio ?? "1:1")} onChange={(e) => updateStyle({ cardRatio: e.target.value })} className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900">
-                <option value="1:3">비율 1:3</option>
-                <option value="1:2">비율 1:2</option>
-                <option value="1:1">비율 1:1</option>
-              </select>
-              <div className="space-y-2 sm:col-span-2">
-                <select
-                  value={String(style.cardImageInputMode ?? "link")}
-                  onChange={(e) => updateStyle({ cardImageInputMode: e.target.value })}
-                  className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900"
-                >
-                  <option value="link">이미지 방식: 링크 사용</option>
-                  <option value="attach">이미지 방식: 첨부 사용</option>
-                </select>
-                {String(style.cardImageInputMode ?? "link") === "link" ? (
-                  <input
-                    value={String(style.cardBackgroundImage ?? "")}
-                    onChange={(e) => updateStyle({ cardBackgroundImage: e.target.value })}
-                    placeholder="배경이미지 링크 입력"
-                    className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900"
-                  />
-                ) : (
-                  <AdminImageField
-                    label="카드 이미지 첨부"
-                    value={String(style.cardBackgroundImage ?? "") || null}
-                    onChange={(url) => updateStyle({ cardBackgroundImage: url ?? "" })}
-                    policy="section"
-                    recommendedSize="1200x675"
-                  />
-                )}
-              </div>
-              {String(style.cardKind ?? "default") === "default" ? (
+              {!isPublishedCardKind(resolveCardKind(style.cardKind)) ? (
+                <>
+                  <select value={String(style.cardThumbShape ?? "round")} onChange={(e) => updateStyle({ cardThumbShape: e.target.value })} className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900">
+                    <option value="circle">원형 썸네일</option>
+                    <option value="round">둥근 썸네일</option>
+                  </select>
+                  <select value={String(style.cardThumbPosition ?? "left")} onChange={(e) => updateStyle({ cardThumbPosition: e.target.value })} className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900">
+                    <option value="left">이미지 위치: 좌</option>
+                    <option value="right">이미지 위치: 우</option>
+                  </select>
+                  <select value={String(style.cardSplit ?? "top-bottom")} onChange={(e) => updateStyle({ cardSplit: e.target.value })} className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900">
+                    <option value="top-bottom">분할형: 상/하</option>
+                    <option value="left-right">분할형: 좌/우</option>
+                  </select>
+                  <select value={String(style.cardRatio ?? "1:1")} onChange={(e) => updateStyle({ cardRatio: e.target.value })} className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900">
+                    <option value="1:3">비율 1:3</option>
+                    <option value="1:2">비율 1:2</option>
+                    <option value="1:1">비율 1:1</option>
+                  </select>
+                  <div className="space-y-2 sm:col-span-2">
+                    <select
+                      value={String(style.cardImageInputMode ?? "link")}
+                      onChange={(e) => updateStyle({ cardImageInputMode: e.target.value })}
+                      className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900"
+                    >
+                      <option value="link">이미지 방식: 링크 사용</option>
+                      <option value="attach">이미지 방식: 첨부 사용</option>
+                    </select>
+                    {String(style.cardImageInputMode ?? "link") === "link" ? (
+                      <input
+                        value={String(style.cardBackgroundImage ?? "")}
+                        onChange={(e) => updateStyle({ cardBackgroundImage: e.target.value })}
+                        placeholder="배경이미지 링크 입력"
+                        className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900"
+                      />
+                    ) : (
+                      <AdminImageField
+                        label="카드 이미지 첨부"
+                        value={String(style.cardBackgroundImage ?? "") || null}
+                        onChange={(url) => updateStyle({ cardBackgroundImage: url ?? "" })}
+                        policy="section"
+                        recommendedSize="1200x675"
+                      />
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-2 rounded border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-100 sm:col-span-2">
+                  <p className="font-semibold">
+                    {resolveCardKind(style.cardKind) === "publishedVenue" ? "당구장 메인 게시용카드" : "대회 메인 게시용카드"} 불러오기
+                  </p>
+                  <select
+                    value={String(style.publishedCardLoadMode ?? "latest")}
+                    onChange={(e) => updateStyle({ publishedCardLoadMode: e.target.value })}
+                    className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                  >
+                    <option value="latest">최신 게시카드 자동 불러오기</option>
+                    <option value="manual">목록에서 직접 선택</option>
+                  </select>
+                  {String(style.publishedCardLoadMode ?? "latest") === "manual" ? (
+                    <input
+                      value={String(style.publishedCardPickKey ?? "")}
+                      onChange={(e) => updateStyle({ publishedCardPickKey: e.target.value })}
+                      placeholder="선택할 게시카드 ID/키 입력"
+                      className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                    />
+                  ) : null}
+                  <p className="text-[11px] text-sky-800 dark:text-sky-200">
+                    저장 후 메인 화면에서는 선택한 운영용 게시카드 스냅샷으로 렌더됩니다.
+                  </p>
+                </div>
+              )}
+              {!isPublishedCardKind(resolveCardKind(style.cardKind)) && resolveCardKind(style.cardKind) === "default" ? (
                 <>
                   <label className="space-y-1">
                     <span className="block text-xs text-gray-600 dark:text-slate-400">제목 값 설정</span>
@@ -1228,13 +1789,13 @@ export default function AdminSitePageBuilderNewPage() {
                   </label>
                 </>
               ) : null}
-              {String(style.defaultTitleSource ?? "direct") !== "field" ? (
+              {!isPublishedCardKind(resolveCardKind(style.cardKind)) && String(style.defaultTitleSource ?? "direct") !== "field" ? (
                 <input value={String(style.cardTitleText ?? "")} onChange={(e) => updateStyle({ cardTitleText: e.target.value })} placeholder="카드 제목 입력" className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900 sm:col-span-2" />
               ) : null}
-              {String(style.defaultBodySource ?? "direct") !== "field" ? (
+              {!isPublishedCardKind(resolveCardKind(style.cardKind)) && String(style.defaultBodySource ?? "direct") !== "field" ? (
                 <textarea value={String(style.cardBodyText ?? "")} onChange={(e) => updateStyle({ cardBodyText: e.target.value })} placeholder="카드 내용 입력" className="min-h-20 rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900 sm:col-span-2" />
               ) : null}
-              {Array.isArray(style.cardExtras) ? (
+              {!isPublishedCardKind(resolveCardKind(style.cardKind)) && Array.isArray(style.cardExtras) ? (
                 (style.cardExtras as unknown[]).map((item, idx) => (
                   <input
                     key={`card-extra-${idx}`}
@@ -1249,10 +1810,12 @@ export default function AdminSitePageBuilderNewPage() {
                   />
                 ))
               ) : null}
+              {!isPublishedCardKind(resolveCardKind(style.cardKind)) ? (
               <button type="button" onClick={() => updateStyle({ cardExtras: [...(((style.cardExtras as unknown[]) ?? [])), ""] })} className="rounded border border-site-border px-3 py-1 text-xs hover:bg-gray-50 dark:hover:bg-slate-800 sm:col-span-2">
-                내용추가+
-              </button>
-              {String(style.cardKind ?? "default") === "custom" && String(style.cardMode ?? "cms") === "cta" ? (
+                카드 항목추가+
+                </button>
+              ) : null}
+              {!isPublishedCardKind(resolveCardKind(style.cardKind)) && resolveCardKind(style.cardKind) === "custom" && String(style.cardMode ?? "cms") === "cta" ? (
                 <input value={String(style.cardCustomCtaLink ?? "")} onChange={(e) => updateStyle({ cardCustomCtaLink: e.target.value })} placeholder="사용자설정 카드 CTA 링크 입력" className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900 sm:col-span-2" />
               ) : null}
               <button type="button" onClick={() => void completeStep4()} disabled={saving} className="rounded border border-site-border px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-50 dark:hover:bg-slate-800 sm:col-span-2">

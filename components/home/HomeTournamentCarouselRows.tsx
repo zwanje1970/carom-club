@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   HomeTournamentCardItem,
   type HomeTournamentCardModel,
@@ -10,6 +10,7 @@ import type { SlotBlockCardStyle } from "@/lib/slot-block-card-style";
 import { tournamentGridUlClass, tournamentListRowGapClass } from "@/lib/slot-block-card-style";
 import type { SlotBlockLayout } from "@/lib/slot-block-layout-motion";
 import { cn } from "@/lib/utils";
+import type { PlatformCardTemplateStylePolicy } from "@/lib/platform-card-templates";
 
 export type HomeTournamentCarouselInput = Omit<HomeTournamentCardModel, "startAt" | "endAt"> & {
   startAt: Date | string;
@@ -17,6 +18,8 @@ export type HomeTournamentCarouselInput = Omit<HomeTournamentCardModel, "startAt
   /** 직접 구성 카드: 요약·날짜·뱃지 최소 표시 */
   manualSimple?: boolean;
 };
+
+const LOOP_DUP_PREPARE_DELAY_MS = 1400;
 
 function toCardModel(t: HomeTournamentCarouselInput): HomeTournamentCardModel {
   return {
@@ -38,6 +41,7 @@ export function HomeTournamentCarouselRows({
   cardCta,
   listLayout,
   showDetailButtonByTemplate,
+  templateStyleByType,
 }: {
   tournaments: HomeTournamentCarouselInput[];
   /** 없으면 기존 캐러셀 한 줄 레이아웃 */
@@ -49,13 +53,18 @@ export function HomeTournamentCarouselRows({
     basic: boolean;
     highlight: boolean;
   };
+  templateStyleByType?: {
+    basic: PlatformCardTemplateStylePolicy;
+    highlight: PlatformCardTemplateStylePolicy;
+  };
 }) {
   const [loopDup, setLoopDup] = useState(false);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     if (mq.matches) return;
-    setLoopDup(true);
+    const id = window.setTimeout(() => setLoopDup(true), LOOP_DUP_PREPARE_DELAY_MS);
+    return () => window.clearTimeout(id);
   }, []);
 
   const normalized = tournaments.map(toCardModel);
@@ -76,6 +85,7 @@ export function HomeTournamentCarouselRows({
             cardCta={cardCta}
             layout="grid"
             showDetailButtonByTemplate={showDetailButtonByTemplate}
+            templateStyleByType={templateStyleByType}
           />
         ))}
       </ul>
@@ -95,6 +105,7 @@ export function HomeTournamentCarouselRows({
           cardCta={cardCta}
           layout="carousel"
           showDetailButtonByTemplate={showDetailButtonByTemplate}
+          templateStyleByType={templateStyleByType}
         />
       ))}
       {loopDup &&
@@ -108,6 +119,7 @@ export function HomeTournamentCarouselRows({
             cardCta={cardCta}
             layout="carousel"
             showDetailButtonByTemplate={showDetailButtonByTemplate}
+            templateStyleByType={templateStyleByType}
           />
         ))}
     </ul>

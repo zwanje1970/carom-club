@@ -24,6 +24,7 @@ import type { HomeSlotRenderContextPayload } from "@/types/page-slot-render-cont
 const HOME_SLOT_REVALIDATE_SECONDS = 60;
 const HOME_INITIAL_TOURNAMENT_TAKE = 6;
 const HOME_VENUE_CAROUSEL_TAKE = 16;
+const HOME_SLOT_CACHE_TAG = "home-slot-data";
 
 async function canShowHomeSolverEntry(session: PermissionSubject): Promise<boolean> {
   if (!session) return false;
@@ -46,14 +47,23 @@ export type HomeSlotBlocksData = {
 
 type HomeSlotDbData = Pick<HomeSlotBlocksData, "initialTournaments" | "carouselVenues">;
 
-async function loadHomeSlotDbDataUncached(): Promise<HomeSlotDbData> {
+type HomeSlotDataNeeds = {
+  requireTournaments: boolean;
+  requireVenues: boolean;
+};
+
+async function loadHomeSlotDbDataUncached(needs: HomeSlotDataNeeds): Promise<HomeSlotDbData> {
   if (isDatabaseConfigured()) {
     const [tList, cList] = await Promise.all([
-      getHomePublishedTournamentCards({
-        sortBy: "latest",
-        take: HOME_INITIAL_TOURNAMENT_TAKE,
-      }),
-      getVenuesForCarousel(HOME_VENUE_CAROUSEL_TAKE),
+      needs.requireTournaments
+        ? getHomePublishedTournamentCards({
+            sortBy: "latest",
+            take: HOME_INITIAL_TOURNAMENT_TAKE,
+          })
+        : Promise.resolve([] as HomePublishedTournamentCard[]),
+      needs.requireVenues
+        ? getVenuesForCarousel(HOME_VENUE_CAROUSEL_TAKE)
+        : Promise.resolve([] as VenueCarouselRow[]),
     ]);
     return {
       initialTournaments: tList,
@@ -62,43 +72,72 @@ async function loadHomeSlotDbDataUncached(): Promise<HomeSlotDbData> {
   }
 
   return {
-    initialTournaments: [] as HomePublishedTournamentCard[],
-    carouselVenues: MOCK_VENUES_LIST.map((v, i) => ({
-      id: v.id,
-      name: v.name,
-      slug: v.slug,
-      logoImageUrl: null as string | null,
-      coverImageUrl: null as string | null,
-      venueCategory: (i === 0 ? "daedae_only" : "mixed") as VenueCarouselRow["venueCategory"],
-    })),
+    initialTournaments: needs.requireTournaments ? ([] as HomePublishedTournamentCard[]) : [],
+    carouselVenues: needs.requireVenues
+      ? MOCK_VENUES_LIST.map((v, i) => ({
+          id: v.id,
+          name: v.name,
+          slug: v.slug,
+          logoImageUrl: null as string | null,
+          coverImageUrl: null as string | null,
+          venueCategory: (i === 0 ? "daedae_only" : "mixed") as VenueCarouselRow["venueCategory"],
+        }))
+      : [],
   };
 }
 
-const loadHomeSlotDbDataCached = unstable_cache(
-  loadHomeSlotDbDataUncached,
-  ["home-slot-db-data"],
-  { revalidate: HOME_SLOT_REVALIDATE_SECONDS, tags: ["home-slot-data"] }
-);
+function loadHomeSlotDbDataCached(needs: HomeSlotDataNeeds): Promise<HomeSlotDbData> {
+  const key = `t-${needs.requireTournaments ? 1 : 0}-v-${needs.requireVenues ? 1 : 0}`;
+  return unstable_cache(
+    () => loadHomeSlotDbDataUncached(needs),
+    ["home-slot-db-data", key],
+    { revalidate: HOME_SLOT_REVALIDATE_SECONDS, tags: [HOME_SLOT_CACHE_TAG] }
+  )();
+}
 
-export async function loadHomeSlotBlocksData(): Promise<HomeSlotBlocksData> {
-  const session = await getSession();
-  const showNoteEntry = canShowNoteEntryFromSession(session);
-  const showSolverEntry = await canShowHomeSolverEntry(session);
-  const dbData = await loadHomeSlotDbDataCached();
+export async function loadHomeSlotBlocksData(options?: {
+  requireTournaments?: boolean;
+  requireVenues?: boolean;
+  includeSessionFlags?: boolean;
+}): Promise<HomeSlotBlocksData> {
+  const needs: HomeSlotDataNeeds = {
+    requireTournaments: options?.requireTournaments !== false,
+    requireVenues: options?.requireVenues !== false,
+  };
+  const includeSessionFlags = options?.includeSessionFlags !== false;
+  const [sessionInfo, dbData] = await Promise.all([
+    includeSessionFlags
+      ? (async () => {
+          const session = await getSession();
+          return {
+            showNoteEntry: canShowNoteEntryFromSession(session),
+            showSolverEntry: await canShowHomeSolverEntry(session),
+          };
+        })()
+      : Promise.resolve({ showNoteEntry: false, showSolverEntry: false }),
+    loadHomeSlotDbDataCached(needs),
+  ]);
 
   return {
     initialTournaments: dbData.initialTournaments,
     carouselVenues: dbData.carouselVenues,
-    showNoteEntry,
-    showSolverEntry,
+    showNoteEntry: sessionInfo.showNoteEntry,
+    showSolverEntry: sessionInfo.showSolverEntry,
   };
 }
 
 export async function buildHomeSlotRenderPayload(input: {
   copy: Record<string, string>;
   siteSettings: SiteSettings;
+  requireTournaments?: boolean;
+  requireVenues?: boolean;
+  includeSessionFlags?: boolean;
 }): Promise<HomeSlotRenderContextPayload> {
-  const base = await loadHomeSlotBlocksData();
+  const base = await loadHomeSlotBlocksData({
+    requireTournaments: input.requireTournaments,
+    requireVenues: input.requireVenues,
+    includeSessionFlags: input.includeSessionFlags,
+  });
   return {
     ...base,
     copy: input.copy,

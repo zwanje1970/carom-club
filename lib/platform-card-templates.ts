@@ -1,4 +1,8 @@
 export type PlatformCardTemplateType = "basic" | "highlight";
+
+/** 플랫폼 카드 관리 화면/메뉴 표시 문구 단일 소스 */
+export const PLATFORM_CARD_TEMPLATES_PAGE_TITLE = "메인 게시카드 관리";
+export const PLATFORM_CARD_TEMPLATES_MENU_LABEL = "메인용 게시카드";
 export type PlatformCardRatioPreset = "1:1" | "2:3" | "3:5" | "1:2";
 export type PlatformCardTextPosition = "top" | "center" | "bottom";
 export type PlatformCardDescriptionPosition = "title-below" | "center" | "bottom";
@@ -64,16 +68,16 @@ export const PLATFORM_CARD_TEMPLATE_POLICIES: PlatformCardTemplatePolicy[] = [
     supportsWholeCardClick: true,
     showDetailButton: false,
     isActive: true,
-    isDefault: true,
+    isDefault: false,
     sortOrder: 1,
   },
   {
     templateType: "highlight",
-    label: "강조형",
-    description: "큰 이미지, 상태/강조 뱃지, 대회명, 짧은 설명, 카드 전체 클릭",
-    fields: ["image", "statusBadge", "title", "shortDescription"],
+    label: "당구장 홍보용",
+    description: "원형 대표 썸네일 + 상호명 중심의 당구장 소개 카드",
+    fields: ["image", "title"],
     supportsWholeCardClick: true,
-    showDetailButton: true,
+    showDetailButton: false,
     isActive: true,
     isDefault: false,
     sortOrder: 2,
@@ -144,10 +148,11 @@ export const DEFAULT_PLATFORM_CARD_TEMPLATE_STYLES: Record<
   },
   highlight: {
     ...DEFAULT_STYLE,
-    cardHeight: 340,
-    imageAreaHeight: 200,
-    ratioPreset: "3:5",
-    statusPosition: "top-left",
+    cardWidth: 112,
+    cardHeight: 112,
+    imageAreaHeight: 112,
+    ratioPreset: "1:1",
+    statusPosition: "top-right",
   },
 };
 
@@ -199,8 +204,8 @@ export function resolvePlatformCardTemplateStylePolicy(
   try {
     const p = JSON.parse(raw) as Record<string, unknown>;
     return {
-      cardWidth: clampInt(p.cardWidth, 180, 800, fallback.cardWidth),
-      cardHeight: clampInt(p.cardHeight, 180, 1000, fallback.cardHeight),
+      cardWidth: clampInt(p.cardWidth, 100, 800, fallback.cardWidth),
+      cardHeight: clampInt(p.cardHeight, 100, 1000, fallback.cardHeight),
       outerMargin: clampInt(p.outerMargin, 0, 80, fallback.outerMargin),
       imageAreaHeight: clampInt(p.imageAreaHeight, 60, 700, fallback.imageAreaHeight),
       textAreaPadding: clampInt(p.textAreaPadding, 0, 80, fallback.textAreaPadding),
@@ -260,7 +265,7 @@ export function resolvePlatformCardTemplatePolicies(
   const list = PLATFORM_CARD_TEMPLATE_POLICIES.map((item) => ({
     ...item,
     isActive: toBool(copy?.[PLATFORM_CARD_TEMPLATE_ACTIVE_COPY_KEYS[item.templateType]], item.isActive),
-    isDefault: toBool(copy?.[PLATFORM_CARD_TEMPLATE_DEFAULT_COPY_KEYS[item.templateType]], item.isDefault),
+    isDefault: false,
     showDetailButton: toBool(
       copy?.[PLATFORM_CARD_TEMPLATE_DETAIL_BUTTON_COPY_KEYS[item.templateType]],
       item.showDetailButton
@@ -268,20 +273,12 @@ export function resolvePlatformCardTemplatePolicies(
   }));
 
   const active = list.filter((item) => item.isActive);
-  const activeWithDefault = active.filter((item) => item.isDefault);
   if (active.length === 0) {
-    return list.map((item, index) => ({
+    return list.map((item) => ({
       ...item,
       isActive: item.templateType === "basic",
-      isDefault: item.templateType === "basic" || index === 0,
+      isDefault: false,
     }));
   }
-  if (activeWithDefault.length === 1) return list;
-
-  const defaultType =
-    activeWithDefault[0]?.templateType ?? active.find((item) => item.templateType === "basic")?.templateType ?? active[0].templateType;
-  return list.map((item) => ({
-    ...item,
-    isDefault: item.isActive && item.templateType === defaultType,
-  }));
+  return list.map((item) => ({ ...item, isDefault: false }));
 }

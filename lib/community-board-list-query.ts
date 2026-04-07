@@ -31,14 +31,19 @@ export type BoardListQueryParams = {
   take: number;
 };
 
-const listSelect = {
-  id: true,
-  title: true,
-  createdAt: true,
-  viewCount: true,
-  likeCount: true,
-  commentCount: true,
-} satisfies Prisma.CommunityPostSelect;
+function buildListSelect(
+  params: BoardListQueryParams
+): Prisma.CommunityPostSelect {
+  const sortKind = sortKindFromListParams(params);
+  return {
+    id: true,
+    title: true,
+    createdAt: true,
+    ...(sortKind === "viewCount" ? { viewCount: true } : {}),
+    ...(sortKind === "likeCount" ? { likeCount: true } : {}),
+    ...(sortKind === "commentCount" ? { commentCount: true } : {}),
+  } satisfies Prisma.CommunityPostSelect;
+}
 
 export function buildBoardListWhere(params: BoardListQueryParams): Prisma.CommunityPostWhereInput {
   const { boardId, showHidden, qTitle, statusFilter, popular, slug } = params;
@@ -91,9 +96,9 @@ export type BoardListRow = {
   id: string;
   title: string;
   createdAt: Date;
-  viewCount: number;
-  likeCount: number;
-  commentCount: number;
+  viewCount?: number;
+  likeCount?: number;
+  commentCount?: number;
 };
 
 /** 공지 고정글 캐시 키 — 필터·로컬 달력(오늘/주간)·검색어 반영 */
@@ -115,10 +120,11 @@ function noticePinnedCacheKeyParts(params: BoardListQueryParams): string[] {
 
 async function fetchNoticePinnedUncached(params: BoardListQueryParams): Promise<BoardListRow[]> {
   const where: Prisma.CommunityPostWhereInput = { ...buildBoardListWhere(params), isPinned: true };
+  const select = buildListSelect(params);
   const rows = await prisma.communityPost.findMany({
     where,
     orderBy: { createdAt: "desc" },
-    select: listSelect,
+    select,
   });
   return rows as BoardListRow[];
 }
@@ -171,6 +177,7 @@ export async function queryBoardPostLists(
   const { skip } = useCursor ? { skip: 0 } : boardListOffset(page, take);
 
   const qLog = params.qTitle?.trim() ? "search" : "nosearch";
+  const select = buildListSelect(params);
 
   const [pinned, list] = await Promise.all([
     slug === "notice"
@@ -182,7 +189,7 @@ export async function queryBoardPostLists(
         orderBy,
         skip,
         take: limit,
-        select: listSelect,
+        select,
       })
     ),
   ]);
@@ -191,7 +198,19 @@ export async function queryBoardPostLists(
   let nextCursor: string | null = null;
   if (rows.length === limit && rows.length > 0) {
     const last = rows[rows.length - 1]!;
-    nextCursor = encodeBoardListCursor(rowToCursorPayload(last, fk, sortKind));
+    nextCursor = encodeBoardListCursor(
+      rowToCursorPayload(
+        {
+          id: last.id,
+          createdAt: last.createdAt,
+          viewCount: last.viewCount ?? 0,
+          likeCount: last.likeCount ?? 0,
+          commentCount: last.commentCount ?? 0,
+        },
+        fk,
+        sortKind
+      )
+    );
   }
 
   return {

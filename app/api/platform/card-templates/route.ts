@@ -14,7 +14,6 @@ export async function GET() {
         templateType: item.templateType,
         label: item.label,
         isActive: item.isActive,
-        isDefault: item.isDefault,
         showDetailButton: item.showDetailButton,
         fields: item.fields,
       }))
@@ -25,7 +24,6 @@ export async function GET() {
         templateType: item.templateType,
         label: item.label,
         isActive: item.isActive,
-        isDefault: item.isDefault,
         showDetailButton: item.showDetailButton,
         fields: item.fields,
       }))

@@ -23,7 +23,11 @@ export async function GET(request: Request) {
   let lng = Number(searchParams.get("lng"));
   const take = Math.min(Number(searchParams.get("take")) || 6, 50);
 
-  if ((!Number.isFinite(lat) || !Number.isFinite(lng)) && (lat !== 0 || lng !== 0)) {
+  if (
+    sortBy === "distance" &&
+    (!Number.isFinite(lat) || !Number.isFinite(lng)) &&
+    (lat !== 0 || lng !== 0)
+  ) {
     const session = await getSession();
     if (session?.id) {
       const user = await prisma.user.findUnique({

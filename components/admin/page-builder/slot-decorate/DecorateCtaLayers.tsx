@@ -5,6 +5,7 @@ import type {
   SlotBlockCtaConfig,
   SlotBlockCtaLayer,
   SlotBlockCtaLayerRole,
+  SlotBlockCtaButtonPlacement,
   SlotBlockCtaType,
   SlotBlockInternalTarget,
 } from "@/lib/slot-block-cta";
@@ -19,6 +20,15 @@ const TYPE_CHOICES: { value: SlotBlockCtaType; label: string; hint: string }[] =
 ];
 
 const ACTION_OPTS = [{ value: "scroll_top", label: "맨 위로 스크롤" }] as const;
+const BUTTON_PLACEMENT_OPTS: { value: SlotBlockCtaButtonPlacement; label: string }[] = [
+  { value: "headerRight", label: "상단 오른쪽 (기존)" },
+  { value: "blockBottomLeft", label: "블록 하단 왼쪽" },
+  { value: "blockBottomCenter", label: "블록 하단 가운데" },
+  { value: "blockBottomRight", label: "블록 하단 오른쪽" },
+  { value: "outsideBottomLeft", label: "블록 바깥 아래 왼쪽" },
+  { value: "outsideBottomCenter", label: "블록 바깥 아래 가운데" },
+  { value: "outsideBottomRight", label: "블록 바깥 아래 오른쪽" },
+];
 
 /** 운영자용 질문형 제목 (역할 키는 UI에 노출하지 않음) */
 export function decorateClickHeading(role: SlotBlockCtaLayerRole): string {
@@ -228,6 +238,32 @@ function LayerEditor({
                       )}
                     >
                       {o.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {role === "button" ? (
+            <div>
+              <div className="mb-2 text-[11px] font-semibold text-gray-600 dark:text-slate-400">
+                버튼 배치 위치
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {BUTTON_PLACEMENT_OPTS.map((opt) => {
+                  const sel = (layer.buttonPlacement ?? "headerRight") === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => onChange({ ...layer, buttonPlacement: opt.value })}
+                      className={cn(
+                        decorateChoiceWrapClass(sel),
+                        "px-2 py-1.5 text-left text-[11px] font-medium text-gray-800 dark:text-slate-200"
+                      )}
+                    >
+                      {opt.label}
                     </button>
                   );
                 })}

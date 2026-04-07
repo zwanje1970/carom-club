@@ -10,11 +10,11 @@ import { BasicCard, HighlightCard } from "@/components/cards/TournamentPublished
 import {
   DEFAULT_PLATFORM_CARD_TEMPLATE_STYLES,
   PLATFORM_CARD_TEMPLATE_ACTIVE_COPY_KEYS,
-  PLATFORM_CARD_TEMPLATE_DEFAULT_COPY_KEYS,
   PLATFORM_CARD_TEMPLATE_DETAIL_BUTTON_COPY_KEYS,
   PLATFORM_CARD_TEMPLATE_FIELD_LABELS,
   PLATFORM_CARD_TEMPLATE_POLICIES,
   PLATFORM_CARD_TEMPLATE_STYLE_COPY_KEYS,
+  PLATFORM_CARD_TEMPLATES_PAGE_TITLE,
   resolvePlatformCardTemplatePolicies,
   resolvePlatformCardTemplateStylePolicy,
   toPlatformCardTemplateStyleRaw,
@@ -33,6 +33,21 @@ function ratioToImageHeight(cardHeight: number, ratio: PlatformCardRatioPreset):
   const total = a + b;
   if (!total) return Math.floor(cardHeight / 2);
   return Math.floor((cardHeight * a) / total);
+}
+
+function normalizePoliciesForSelection(
+  list: PlatformCardTemplatePolicy[]
+): PlatformCardTemplatePolicy[] {
+  const copied = list.map((item) => ({ ...item }));
+  const active = copied.filter((item) => item.isActive);
+  if (active.length === 0) {
+    return copied.map((item) => ({
+      ...item,
+      isActive: item.templateType === "basic",
+      isDefault: false,
+    }));
+  }
+  return copied.map((item) => ({ ...item, isDefault: false }));
 }
 
 function NumberField({
@@ -97,10 +112,20 @@ export default function AdminPlatformCardTemplatesPage() {
   });
 
   useEffect(() => {
-    fetch("/api/admin/copy", { cache: "no-store" })
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    let alive = true;
+    setError("");
+
+    fetch("/api/admin/copy", { cache: "no-store", signal: controller.signal })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error("fetch"))))
       .then((copy) => {
-        setPolicies(resolvePlatformCardTemplatePolicies(copy));
+        if (!alive) return;
+        const normalized = normalizePoliciesForSelection(
+          resolvePlatformCardTemplatePolicies(copy)
+        );
+        setError("");
+        setPolicies(normalized);
         setStyles({
           basic: resolvePlatformCardTemplateStylePolicy(
             copy?.[PLATFORM_CARD_TEMPLATE_STYLE_COPY_KEYS.basic] ?? null,
@@ -111,9 +136,27 @@ export default function AdminPlatformCardTemplatesPage() {
             "highlight"
           ),
         });
+
       })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (!alive) return;
+        if (err instanceof DOMException && err.name === "AbortError") {
+          setError("불러오기 실패");
+          return;
+        }
+        setError("불러오기 실패");
+      })
+      .finally(() => {
+        if (!alive) return;
+        clearTimeout(timeout);
+        setLoading(false);
+      });
+
+    return () => {
+      alive = false;
+      clearTimeout(timeout);
+      controller.abort();
+    };
   }, []);
 
   useEffect(() => {
@@ -127,6 +170,8 @@ export default function AdminPlatformCardTemplatesPage() {
     setError("");
     setOk("");
     try {
+      const normalized = normalizePoliciesForSelection(policies);
+      setPolicies(normalized);
       const res = await fetch("/api/admin/copy", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -135,22 +180,16 @@ export default function AdminPlatformCardTemplatesPage() {
             [PLATFORM_CARD_TEMPLATE_STYLE_COPY_KEYS.basic]: toPlatformCardTemplateStyleRaw(styles.basic),
             [PLATFORM_CARD_TEMPLATE_STYLE_COPY_KEYS.highlight]: toPlatformCardTemplateStyleRaw(styles.highlight),
             [PLATFORM_CARD_TEMPLATE_ACTIVE_COPY_KEYS.basic]: String(
-              policies.find((item) => item.templateType === "basic")?.isActive ?? true
+              normalized.find((item) => item.templateType === "basic")?.isActive ?? true
             ),
             [PLATFORM_CARD_TEMPLATE_ACTIVE_COPY_KEYS.highlight]: String(
-              policies.find((item) => item.templateType === "highlight")?.isActive ?? true
-            ),
-            [PLATFORM_CARD_TEMPLATE_DEFAULT_COPY_KEYS.basic]: String(
-              policies.find((item) => item.templateType === "basic")?.isDefault ?? true
-            ),
-            [PLATFORM_CARD_TEMPLATE_DEFAULT_COPY_KEYS.highlight]: String(
-              policies.find((item) => item.templateType === "highlight")?.isDefault ?? false
+              normalized.find((item) => item.templateType === "highlight")?.isActive ?? true
             ),
             [PLATFORM_CARD_TEMPLATE_DETAIL_BUTTON_COPY_KEYS.basic]: String(
-              policies.find((item) => item.templateType === "basic")?.showDetailButton ?? false
+              normalized.find((item) => item.templateType === "basic")?.showDetailButton ?? false
             ),
             [PLATFORM_CARD_TEMPLATE_DETAIL_BUTTON_COPY_KEYS.highlight]: String(
-              policies.find((item) => item.templateType === "highlight")?.showDetailButton ?? true
+              normalized.find((item) => item.templateType === "highlight")?.showDetailButton ?? true
             ),
           },
         }),
@@ -181,12 +220,12 @@ export default function AdminPlatformCardTemplatesPage() {
       highlight: {
         templateType: "highlight" as const,
         thumbnailUrl: "",
-        cardTitle: "강조형 대회명 샘플",
-        displayDateText: "2026-04-05",
-        displayRegionText: "서울",
-        statusText: "마감임박",
-        buttonText: "자세히 보기",
-        shortDescription: "짧은 설명 샘플 텍스트",
+        cardTitle: "당구장 상호명 샘플",
+        displayDateText: "",
+        displayRegionText: "",
+        statusText: "",
+        buttonText: "",
+        shortDescription: "",
       },
     }),
     []
@@ -204,44 +243,23 @@ export default function AdminPlatformCardTemplatesPage() {
 
   const patchPolicy = (
     templateType: PlatformCardTemplateType,
-    patch: Partial<Pick<PlatformCardTemplatePolicy, "isActive" | "isDefault" | "showDetailButton">>
+    patch: Partial<Pick<PlatformCardTemplatePolicy, "isActive" | "showDetailButton">>
   ) => {
     setPolicies((prev) => {
       const next = prev.map((item) =>
         item.templateType === templateType ? { ...item, ...patch } : { ...item }
       );
-      if (patch.isDefault === true) {
-        return next.map((item) => ({
-          ...item,
-          isDefault: item.templateType === templateType ? true : false,
-        }));
-      }
-      const active = next.filter((item) => item.isActive);
-      if (active.length === 0) {
-        return next.map((item) => ({
-          ...item,
-          isActive: item.templateType === "basic",
-          isDefault: item.templateType === "basic",
-        }));
-      }
-      if (!active.some((item) => item.isDefault)) {
-        const fallback = active.find((item) => item.templateType === "basic") ?? active[0];
-        return next.map((item) => ({
-          ...item,
-          isDefault: item.templateType === fallback.templateType,
-        }));
-      }
-      return next;
+      return normalizePoliciesForSelection(next);
     });
   };
 
   return (
     <SectionMain>
-      <SectionTitleLineWithButton icon={mdiCardText} title="카드 템플릿" main />
+      <SectionTitleLineWithButton icon={mdiCardText} title={PLATFORM_CARD_TEMPLATES_PAGE_TITLE} main />
 
       <CardBox className="mb-5">
         <p className="text-sm text-gray-600 dark:text-slate-400">
-          템플릿은 basic / highlight 2종 고정입니다. 템플릿 구조는 유지하고 카드 스타일만 조정합니다.
+          게시카드는 기본형 / 당구장 홍보용 2종 고정입니다. 게시카드 구조는 유지하고 카드 스타일만 조정합니다.
         </p>
       </CardBox>
 
@@ -251,6 +269,7 @@ export default function AdminPlatformCardTemplatesPage() {
             {(() => {
               const style = styles[template.templateType];
               if (!style) return null;
+              const isVenuePromoTemplate = template.templateType === "highlight";
               return (
                 <>
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -283,59 +302,76 @@ export default function AdminPlatformCardTemplatesPage() {
                 />
                 사용 여부
               </label>
-              <label className="flex items-center gap-2 rounded border border-site-border px-3 py-2 text-sm">
-                <input
-                  type="radio"
-                  name="platform-card-template-default"
-                  checked={template.isDefault}
-                  onChange={() =>
-                    patchPolicy(template.templateType, {
-                      isDefault: true,
-                    })
-                  }
-                />
-                기본 템플릿
-              </label>
             </div>
-            <div className="mt-2 rounded border border-site-border px-3 py-2">
-              <p className="text-xs font-medium text-gray-600 dark:text-slate-400">자세히보기 버튼 표시</p>
-              <div className="mt-2 flex flex-wrap gap-3 text-sm">
-                <label className="inline-flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name={`show-detail-button-${template.templateType}`}
-                    checked={template.showDetailButton}
-                    onChange={() =>
-                      patchPolicy(template.templateType, {
-                        showDetailButton: true,
-                      })
-                    }
-                  />
-                  사용
-                </label>
-                <label className="inline-flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name={`show-detail-button-${template.templateType}`}
-                    checked={!template.showDetailButton}
-                    onChange={() =>
-                      patchPolicy(template.templateType, {
-                        showDetailButton: false,
-                      })
-                    }
-                  />
-                  사용 안 함
-                </label>
+            {!isVenuePromoTemplate ? (
+              <div className="mt-2 rounded border border-site-border px-3 py-2">
+                <p className="text-xs font-medium text-gray-600 dark:text-slate-400">자세히보기 버튼 표시</p>
+                <div className="mt-2 flex flex-wrap gap-3 text-sm">
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name={`show-detail-button-${template.templateType}`}
+                      checked={template.showDetailButton}
+                      onChange={() =>
+                        patchPolicy(template.templateType, {
+                          showDetailButton: true,
+                        })
+                      }
+                    />
+                    사용
+                  </label>
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name={`show-detail-button-${template.templateType}`}
+                      checked={!template.showDetailButton}
+                      onChange={() =>
+                        patchPolicy(template.templateType, {
+                          showDetailButton: false,
+                        })
+                      }
+                    />
+                    사용 안 함
+                  </label>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="mt-2 rounded border border-site-border px-3 py-2 text-xs text-gray-600 dark:text-slate-400">
+                당구장 홍보용 게시카드는 원형 썸네일 + 상호명만 표시합니다.
+              </div>
+            )}
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <NumberField label="카드 너비" value={style.cardWidth} min={180} max={800} onChange={(v) => patchStyle(template.templateType, { cardWidth: v })} />
-              <NumberField label="카드 높이" value={style.cardHeight} min={180} max={1000} onChange={(v) => patchStyle(template.templateType, { cardHeight: v })} />
-              <NumberField label="바깥 여백" value={style.outerMargin} min={0} max={80} onChange={(v) => patchStyle(template.templateType, { outerMargin: v })} />
-              <NumberField label="내용 여백(전체)" value={style.textAreaPadding} min={0} max={80} onChange={(v) => patchStyle(template.templateType, { textAreaPadding: v, paddingTop: v, paddingBottom: v, paddingLeft: v, paddingRight: v })} />
+              {isVenuePromoTemplate ? (
+                <>
+                  <NumberField
+                    label="카드 크기(원형)"
+                    value={style.cardWidth}
+                    min={100}
+                    max={360}
+                    onChange={(v) =>
+                      patchStyle(template.templateType, {
+                        cardWidth: v,
+                        cardHeight: v,
+                        imageAreaHeight: v,
+                        ratioPreset: "1:1",
+                      })
+                    }
+                  />
+                  <NumberField label="바깥 여백" value={style.outerMargin} min={0} max={80} onChange={(v) => patchStyle(template.templateType, { outerMargin: v })} />
+                </>
+              ) : (
+                <>
+                  <NumberField label="카드 너비" value={style.cardWidth} min={100} max={800} onChange={(v) => patchStyle(template.templateType, { cardWidth: v })} />
+                  <NumberField label="카드 높이" value={style.cardHeight} min={100} max={1000} onChange={(v) => patchStyle(template.templateType, { cardHeight: v })} />
+                  <NumberField label="바깥 여백" value={style.outerMargin} min={0} max={80} onChange={(v) => patchStyle(template.templateType, { outerMargin: v })} />
+                  <NumberField label="내용 여백(전체)" value={style.textAreaPadding} min={0} max={80} onChange={(v) => patchStyle(template.templateType, { textAreaPadding: v, paddingTop: v, paddingBottom: v, paddingLeft: v, paddingRight: v })} />
+                </>
+              )}
             </div>
 
+            {!isVenuePromoTemplate ? (
+            <>
             <div className="mt-3 space-y-2">
               <NumberField label="이미지 높이" value={style.imageAreaHeight} min={60} max={700} onChange={(v) => patchStyle(template.templateType, { imageAreaHeight: v })} />
               <p className="mb-1 text-xs font-medium text-gray-600 dark:text-slate-400">이미지 비율</p>
@@ -428,6 +464,8 @@ export default function AdminPlatformCardTemplatesPage() {
               <NumberField label="요소 간 간격" value={style.gapBetweenElements} min={0} max={48} onChange={(v) => patchStyle(template.templateType, { gapBetweenElements: v })} />
               <NumberField label="제목-내용 간격" value={style.titleContentGap} min={0} max={48} onChange={(v) => patchStyle(template.templateType, { titleContentGap: v })} />
             </div>
+            </>
+            ) : null}
 
             <div className="mt-4 rounded border border-site-border bg-gray-50 p-3 dark:bg-slate-900/40">
               {template.templateType === "highlight" ? (

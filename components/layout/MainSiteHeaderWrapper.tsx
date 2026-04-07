@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { MainSiteHeader } from "./MainSiteHeader";
 import MobileHeader from "@/components/common/MobileHeader";
@@ -14,9 +15,20 @@ import { shouldHideGlobalChromeByPathname } from "@/components/layout/globalChro
 export function MainSiteHeaderWrapper() {
   const pathname = usePathname() ?? "";
   const chromeMode = useGlobalChromeMode();
+  const [isDesktop, setIsDesktop] = useState<boolean | null>(null);
 
-  if (shouldHideGlobalChromeByPathname(pathname)) return null;
-  if (chromeMode?.hideGlobalChrome) return null;
+  const shouldHideByPath = shouldHideGlobalChromeByPathname(pathname);
+  const shouldHideByMode = Boolean(chromeMode?.hideGlobalChrome);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const apply = () => setIsDesktop(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  if (shouldHideByPath || shouldHideByMode) return null;
 
   // 경로별 제목 설정
   const getTitle = (path: string) => {
@@ -61,10 +73,14 @@ export function MainSiteHeaderWrapper() {
 
   return (
     <>
-      <div className="md:hidden">
-        <MobileHeader title={getTitle(pathname)} />
-      </div>
-      <MainSiteHeader hideOnMobile={true} />
+      {isDesktop === true ? (
+        <MainSiteHeader hideOnMobile={false} />
+      ) : (
+        <div className="md:hidden">
+          <MobileHeader title={getTitle(pathname)} />
+        </div>
+      )}
+      {isDesktop === null ? <div aria-hidden className="hidden h-16 md:block" /> : null}
     </>
   );
 }

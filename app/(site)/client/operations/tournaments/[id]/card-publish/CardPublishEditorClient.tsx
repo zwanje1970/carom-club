@@ -22,7 +22,6 @@ type TemplateOption = {
   templateType: PlatformCardTemplateType;
   label: string;
   isActive: boolean;
-  isDefault: boolean;
   showDetailButton: boolean;
 };
 
@@ -43,7 +42,6 @@ export function CardPublishEditorClient({
       templateType: item.templateType,
       label: item.label,
       isActive: item.isActive,
-      isDefault: item.isDefault,
       showDetailButton: item.showDetailButton,
     })).filter((item) => item.isActive)
   );
@@ -62,20 +60,17 @@ export function CardPublishEditorClient({
                 : "basic",
             label: typeof row?.label === "string" && row.label.trim() ? row.label.trim() : String(row?.templateType ?? "basic"),
             isActive: row?.isActive === true,
-            isDefault: row?.isDefault === true,
             showDetailButton: row?.showDetailButton === true,
           }))
           .filter((row) => row.isActive) as TemplateOption[];
         if (parsed.length === 0) return;
         setTemplateOptions(parsed);
-        const defaultType =
-          parsed.find((item) => item.isDefault)?.templateType ??
-          parsed.find((item) => item.templateType === "basic")?.templateType ??
-          parsed[0].templateType;
         setCardData((prev) => {
           const hasCurrent = parsed.some((item) => item.templateType === prev.templateType);
-          if (!hasCurrent || !hasSavedCardData) return { ...prev, templateType: defaultType };
-          return prev;
+          if (hasCurrent && hasSavedCardData) return prev;
+          const fallbackType =
+            parsed.find((item) => item.templateType === "basic")?.templateType ?? parsed[0].templateType;
+          return { ...prev, templateType: fallbackType };
         });
       })
       .catch(() => {
@@ -84,19 +79,17 @@ export function CardPublishEditorClient({
           templateType: item.templateType,
           label: item.label,
           isActive: item.isActive,
-          isDefault: item.isDefault,
           showDetailButton: item.showDetailButton,
         })).filter((item) => item.isActive);
         setTemplateOptions(fallback);
         if (fallback.length > 0) {
-          const fallbackDefault =
-            fallback.find((item) => item.isDefault)?.templateType ??
-            fallback.find((item) => item.templateType === "basic")?.templateType ??
-            fallback[0].templateType;
           setCardData((prev) => {
             const hasCurrent = fallback.some((item) => item.templateType === prev.templateType);
-            if (!hasCurrent || !hasSavedCardData) return { ...prev, templateType: fallbackDefault };
-            return prev;
+            if (hasCurrent && hasSavedCardData) return prev;
+            const fallbackType =
+              fallback.find((item) => item.templateType === "basic")?.templateType ??
+              fallback[0].templateType;
+            return { ...prev, templateType: fallbackType };
           });
         }
       });

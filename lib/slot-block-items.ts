@@ -6,6 +6,7 @@ import type { HomeStructureSlotType } from "@/lib/home-structure-slots";
 import type { VenueCarouselItem } from "@/components/home/VenueCarousel";
 
 export type SlotBlockManualEntryRole = "nanguNotes" | "nanguSolver";
+export type SlotBlockPublishedType = "tournament" | "venue";
 
 export type SlotBlockManualItem = {
   id: string;
@@ -22,8 +23,21 @@ export type SlotBlockManualItem = {
 
 export type SlotBlockItemsBundle = {
   mode: "auto" | "manual";
+  /** 자동 연결 시 메인 게시카드 종류 */
+  publishedType: SlotBlockPublishedType;
   items: SlotBlockManualItem[];
 };
+
+function defaultPublishedTypeForSlot(slotType: HomeStructureSlotType): SlotBlockPublishedType {
+  switch (slotType) {
+    case "venueIntro":
+    case "venueLink":
+      return "venue";
+    case "tournamentIntro":
+    default:
+      return "tournament";
+  }
+}
 
 function newId(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
@@ -100,10 +114,14 @@ export function parseSlotBlockItemsBundle(
   const j = parseSectionStyleJson(sectionStyleJson);
   const raw = j.slotBlockItems;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    return { mode: "auto", items: [] };
+    return { mode: "auto", publishedType: defaultPublishedTypeForSlot(slotType), items: [] };
   }
   const o = raw as Record<string, unknown>;
   const mode = o.mode === "manual" ? "manual" : "auto";
+  const publishedType =
+    o.publishedType === "venue" || o.publishedType === "tournament"
+      ? (o.publishedType as SlotBlockPublishedType)
+      : defaultPublishedTypeForSlot(slotType);
   const itemsRaw = o.items;
   const items: SlotBlockManualItem[] = [];
   if (Array.isArray(itemsRaw)) {
@@ -113,9 +131,9 @@ export function parseSlotBlockItemsBundle(
     }
   }
   if (slotType === "nanguEntry" && mode === "manual") {
-    return { mode, items: normalizeNanguManualItems(items) };
+    return { mode, publishedType, items: normalizeNanguManualItems(items) };
   }
-  return { mode, items };
+  return { mode, publishedType, items };
 }
 
 function normalizeNanguManualItems(items: SlotBlockManualItem[]): SlotBlockManualItem[] {
@@ -131,11 +149,15 @@ export function mergeSlotBlockItemsIntoSectionStyleJson(
   const parsed = parseSectionStyleJson(existingRaw);
   const next: SectionStyleJson = { ...parsed };
   if (bundle.mode === "auto") {
-    delete next.slotBlockItems;
+    next.slotBlockItems = {
+      mode: "auto",
+      publishedType: bundle.publishedType,
+    };
     return JSON.stringify(next);
   }
   next.slotBlockItems = {
     mode: "manual",
+    publishedType: bundle.publishedType,
     items: bundle.items.map((i) => ({
       id: i.id,
       title: i.title,

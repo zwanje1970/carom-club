@@ -27,6 +27,14 @@ export type SlotBlockInternalTarget =
   | "custom";
 
 export type SlotBlockCtaActionKey = "none" | "scroll_top";
+export type SlotBlockCtaButtonPlacement =
+  | "headerRight"
+  | "blockBottomLeft"
+  | "blockBottomCenter"
+  | "blockBottomRight"
+  | "outsideBottomLeft"
+  | "outsideBottomCenter"
+  | "outsideBottomRight";
 
 export type SlotBlockCtaLayer = {
   enabled: boolean;
@@ -38,6 +46,8 @@ export type SlotBlockCtaLayer = {
   externalUrl?: string | null;
   openInNewTab?: boolean;
   actionKey?: SlotBlockCtaActionKey | null;
+  /** 버튼·보조 CTA 배치 (role=button에서만 사용) */
+  buttonPlacement?: SlotBlockCtaButtonPlacement | null;
 };
 
 export type SlotBlockCtaLayerRole = "block" | "card" | "button" | "nanguNotes" | "nanguSolver";
@@ -66,6 +76,7 @@ const OFF: SlotBlockCtaLayer = {
   externalUrl: null,
   openInNewTab: false,
   actionKey: "none",
+  buttonPlacement: "headerRight",
 };
 
 const STATIC_INTERNAL: Partial<Record<SlotBlockInternalTarget, string>> = {
@@ -200,6 +211,22 @@ function normalizeActionKey(v: unknown): SlotBlockCtaActionKey {
   return "none";
 }
 
+function normalizeButtonPlacement(v: unknown): SlotBlockCtaButtonPlacement {
+  const opts: SlotBlockCtaButtonPlacement[] = [
+    "headerRight",
+    "blockBottomLeft",
+    "blockBottomCenter",
+    "blockBottomRight",
+    "outsideBottomLeft",
+    "outsideBottomCenter",
+    "outsideBottomRight",
+  ];
+  if (typeof v === "string" && opts.includes(v as SlotBlockCtaButtonPlacement)) {
+    return v as SlotBlockCtaButtonPlacement;
+  }
+  return "headerRight";
+}
+
 function partialLayer(raw: unknown): Partial<SlotBlockCtaLayer> {
   if (!raw || typeof raw !== "object") return {};
   const o = raw as Record<string, unknown>;
@@ -212,6 +239,10 @@ function partialLayer(raw: unknown): Partial<SlotBlockCtaLayer> {
     externalUrl: o.externalUrl != null ? String(o.externalUrl) : undefined,
     openInNewTab: typeof o.openInNewTab === "boolean" ? o.openInNewTab : undefined,
     actionKey: o.actionKey !== undefined ? normalizeActionKey(o.actionKey) : undefined,
+    buttonPlacement:
+      o.buttonPlacement !== undefined
+        ? normalizeButtonPlacement(o.buttonPlacement)
+        : undefined,
   };
 }
 
@@ -227,6 +258,7 @@ function mergeLayer(base: SlotBlockCtaLayer, partial: Partial<SlotBlockCtaLayer>
     externalUrl: partial.externalUrl !== undefined ? partial.externalUrl : base.externalUrl,
     openInNewTab: partial.openInNewTab ?? base.openInNewTab,
     actionKey: partial.actionKey ?? base.actionKey,
+    buttonPlacement: partial.buttonPlacement ?? base.buttonPlacement,
   };
 }
 
@@ -265,6 +297,8 @@ export function sanitizeCtaLayerForRole(
   role: SlotBlockCtaLayerRole
 ): SlotBlockCtaLayer {
   const l = { ...layer };
+  l.buttonPlacement = normalizeButtonPlacement(l.buttonPlacement);
+  if (role !== "button") l.buttonPlacement = "headerRight";
   if (l.type === "external") {
     const u = (l.externalUrl ?? "").trim();
     if (!u) l.type = "none";
@@ -294,6 +328,40 @@ export function sanitizeCtaLayerForRole(
     }
   }
   return l;
+}
+
+export function resolveCtaButtonPlacement(
+  layer: SlotBlockCtaLayer | undefined
+): SlotBlockCtaButtonPlacement {
+  return normalizeButtonPlacement(layer?.buttonPlacement);
+}
+
+export function isOutsideCtaButtonPlacement(
+  placement: SlotBlockCtaButtonPlacement
+): boolean {
+  return (
+    placement === "outsideBottomLeft" ||
+    placement === "outsideBottomCenter" ||
+    placement === "outsideBottomRight"
+  );
+}
+
+export function ctaButtonPlacementWrapClass(
+  placement: SlotBlockCtaButtonPlacement
+): string {
+  switch (placement) {
+    case "headerRight":
+    case "blockBottomRight":
+    case "outsideBottomRight":
+      return "flex justify-end";
+    case "blockBottomCenter":
+    case "outsideBottomCenter":
+      return "flex justify-center";
+    case "blockBottomLeft":
+    case "outsideBottomLeft":
+    default:
+      return "flex justify-start";
+  }
 }
 
 export function sanitizeFullCtaConfig(

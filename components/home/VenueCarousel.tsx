@@ -1,27 +1,34 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PAGE_CONTENT_PAD_X } from "@/components/layout/pageContentStyles";
 import { cn } from "@/lib/utils";
-import { IMAGE_PLACEHOLDER_SRC, isOptimizableImageSrc, sanitizeImageSrc } from "@/lib/image-src";
+import { sanitizeImageSrc } from "@/lib/image-src";
 import { clampFlowSpeed } from "@/lib/home-carousel-flow";
 import { SlotBlockCtaLink } from "@/components/home/SlotBlockCtaLink";
 import type { SlotBlockCtaConfig } from "@/lib/slot-block-cta";
-import { resolveSlotBlockCtaConfig } from "@/lib/slot-block-cta";
+import {
+  ctaButtonPlacementWrapClass,
+  isOutsideCtaButtonPlacement,
+  resolveCtaButtonPlacement,
+  resolveSlotBlockCtaConfig,
+} from "@/lib/slot-block-cta";
 import type { SlotBlockCardStyle } from "@/lib/slot-block-card-style";
 import {
   gapClass,
-  slotBlockLineClampClass,
   tournamentGridUlClass,
   venueCarouselLinkExtraClasses,
   venueGridCardLinkClasses,
-  venueThumbShellClasses,
   hoverClasses,
 } from "@/lib/slot-block-card-style";
 import type { SlotBlockLayout, SlotBlockMotion } from "@/lib/slot-block-layout-motion";
 import { slotMotionEffectiveFlowSpeed } from "@/lib/slot-block-layout-motion";
 import { getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
+import { HighlightCard } from "@/components/cards/TournamentPublishedCard";
+import {
+  PLATFORM_CARD_TEMPLATE_STYLE_COPY_KEYS,
+  resolvePlatformCardTemplateStylePolicy,
+} from "@/lib/platform-card-templates";
 
 export type VenueCarouselItem = {
   id: string;
@@ -39,6 +46,7 @@ export type VenueCarouselItem = {
 };
 
 const GAP = 16;
+const VENUE_MOTION_START_DELAY_MS = 1700;
 
 /** 모바일 4, 태블릿 5, PC 6~8 */
 function getVisibleCount(): number {
@@ -88,12 +96,22 @@ export function VenueCarousel({
 }) {
   const c = copy as Record<AdminCopyKey, string>;
   const headingTitle = sectionTitle?.trim() || getCopyValue(c, "site.home.venues.title");
+  const venuePromoStyle = resolvePlatformCardTemplateStylePolicy(
+    copy?.[PLATFORM_CARD_TEMPLATE_STYLE_COPY_KEYS.highlight] ?? null,
+    "highlight"
+  );
   const categoryOptions: { value: "all" | "daedae_only" | "mixed"; label: string }[] = [
     { value: "all", label: getCopyValue(c, "site.home.venues.categoryAll") },
     { value: "daedae_only", label: getCopyValue(c, "site.home.venues.categoryDaedae") },
     { value: "mixed", label: getCopyValue(c, "site.home.venues.categoryMixed") },
   ];
   const cta = ctaConfig ?? resolveSlotBlockCtaConfig("venueIntro", null);
+  const buttonPlacement = resolveCtaButtonPlacement(cta.button);
+  const outsideButton = isOutsideCtaButtonPlacement(buttonPlacement);
+  const topRightButton = buttonPlacement === "headerRight";
+  const inlineBottomButton = !outsideButton && !topRightButton;
+  const buttonClass = "inline-flex items-center text-sm font-medium text-site-primary hover:underline py-2";
+  const buttonLabel = getCopyValue(c, "site.home.venues.btnViewAll");
   const useGrid = slotLayout
     ? slotLayout.type === "grid"
     : Boolean(cardStyle && cardStyle.columns !== "carousel");
@@ -114,6 +132,7 @@ export function VenueCarousel({
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [motionReady, setMotionReady] = useState(false);
   const dragStart = useRef({ x: 0, scrollLeft: 0 });
   const isDraggingRef = useRef(false);
   const userScrollPauseUntilRef = useRef(0);
@@ -152,6 +171,11 @@ export function VenueCarousel({
     setVisibleCount(n);
     setTotalPages(Math.max(1, Math.ceil(filteredVenues.length / n)));
   }, [filteredVenues.length]);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setMotionReady(true), VENUE_MOTION_START_DELAY_MS);
+    return () => window.clearTimeout(id);
+  }, []);
 
   useEffect(() => {
     if (useGrid) return;
@@ -195,12 +219,13 @@ export function VenueCarousel({
   }, [visibleCount, totalPages, filteredVenues.length, measureStridePx]);
 
   useEffect(() => {
+    if (!motionReady) return;
     if (useGrid) return;
     const el = scrollRef.current;
     if (!el) return;
     el.addEventListener("scroll", handleScroll, { passive: true });
     return () => el.removeEventListener("scroll", handleScroll);
-  }, [handleScroll, useGrid]);
+  }, [handleScroll, useGrid, motionReady]);
 
   useEffect(() => {
     isDraggingRef.current = isDragging;
@@ -212,6 +237,7 @@ export function VenueCarousel({
 
   /** 페이지 단위 자동 슬라이드 (속도 설정 → 대기 간격). 1페이지만이면 생략 */
   useEffect(() => {
+    if (!motionReady) return;
     if (useGrid) return;
     if (slotMotion && !slotMotion.autoPlay) return;
     if (filteredVenues.length === 0 || totalPages <= 1) return;
@@ -228,7 +254,7 @@ export function VenueCarousel({
     }, autoplayMs);
 
     return () => clearInterval(id);
-  }, [filteredVenues.length, totalPages, flowForAutoplay, scrollToPage, useGrid, slotMotion]);
+  }, [filteredVenues.length, totalPages, flowForAutoplay, scrollToPage, useGrid, slotMotion, motionReady]);
 
   const onDragStart = (e: React.MouseEvent) => {
     if (!scrollRef.current) return;
@@ -262,25 +288,32 @@ export function VenueCarousel({
           <SlotBlockCtaLink layer={cta.block} ctx={{}} className="min-w-0 text-left">
             <h2 className="text-xl font-bold text-site-text sm:text-2xl">{headingTitle}</h2>
           </SlotBlockCtaLink>
-          {!hideVenueCategoryFilter ? (
-            <select
-              value={venueFilter}
-              onChange={(e) => {
-                setVenueFilter(e.target.value as "all" | "daedae_only" | "mixed");
-                setCurrentPage(0);
-                currentPageRef.current = 0;
-                scrollRef.current?.scrollTo({ left: 0, behavior: "auto" });
-              }}
-              className="rounded-md border border-site-border bg-site-card px-3 py-1.5 text-sm text-site-text focus:outline-none focus:ring-2 focus:ring-site-primary"
-              aria-label={getCopyValue(c, "site.home.venues.filterAria")}
-            >
-              {categoryOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-3">
+            {!hideVenueCategoryFilter ? (
+              <select
+                value={venueFilter}
+                onChange={(e) => {
+                  setVenueFilter(e.target.value as "all" | "daedae_only" | "mixed");
+                  setCurrentPage(0);
+                  currentPageRef.current = 0;
+                  scrollRef.current?.scrollTo({ left: 0, behavior: "auto" });
+                }}
+                className="rounded-md border border-site-border bg-site-card px-3 py-1.5 text-sm text-site-text focus:outline-none focus:ring-2 focus:ring-site-primary"
+                aria-label={getCopyValue(c, "site.home.venues.filterAria")}
+              >
+                {categoryOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            {topRightButton ? (
+              <SlotBlockCtaLink layer={cta.button} ctx={{}} className={buttonClass}>
+                {buttonLabel}
+              </SlotBlockCtaLink>
+            ) : null}
+          </div>
         </div>
 
         <div className="relative mt-5">
@@ -295,7 +328,7 @@ export function VenueCarousel({
             </p>
           ) : useGrid && cardStyle ? (
             <div className={cn("mt-5", tournamentGridUlClass(gridCols, cardStyle))}>
-              {filteredVenues.map((v, index) => (
+              {filteredVenues.map((v) => (
                 <SlotBlockCtaLink
                   key={v.id}
                   layer={cta.card}
@@ -303,61 +336,22 @@ export function VenueCarousel({
                     venueSlug: v.slug,
                     itemDirectHref: v.manualLinkUrl?.trim() || undefined,
                   }}
-                  className={cn(venueGridCardLinkClasses(cardStyle), "max-w-[180px] mx-auto w-full")}
+                  className={cn(venueGridCardLinkClasses(cardStyle), "mx-auto w-auto")}
                 >
-                  <div className={venueThumbShellClasses(cardStyle, true)}>
-                    {(() => {
-                      const src = sanitizeImageSrc(imageUrl(v) ?? "");
-                      const isPriority = index === 0;
-                      if (!src) {
-                        return (
-                          <Image
-                            src={IMAGE_PLACEHOLDER_SRC}
-                            alt=""
-                            width={96}
-                            height={96}
-                            sizes="(max-width: 768px) 100vw, 800px"
-                            priority={isPriority}
-                            loading={isPriority ? undefined : "lazy"}
-                            unoptimized
-                            className="absolute inset-0 h-full w-full object-cover"
-                          />
-                        );
-                      }
-                      return (
-                        <Image
-                          src={src}
-                          alt=""
-                          width={96}
-                          height={96}
-                          sizes="(max-width: 768px) 100vw, 800px"
-                          priority={isPriority}
-                          loading={isPriority ? undefined : "lazy"}
-                          unoptimized={!isOptimizableImageSrc(src)}
-                          className="absolute inset-0 h-full w-full object-cover"
-                          data-debug-src={src}
-                        />
-                      );
-                    })()}
-                  </div>
-                  <p
-                    className={cn(
-                      "mt-2 min-h-[2.5rem] text-center text-sm font-medium text-site-text break-words w-full px-0.5",
-                      slotBlockLineClampClass(cardStyle)
-                    )}
-                  >
-                    {v.name}
-                  </p>
-                  {v.manualDescription?.trim() ? (
-                    <p
-                      className={cn(
-                        "mt-1 text-center text-xs text-site-text-muted break-words w-full px-0.5",
-                        slotBlockLineClampClass(cardStyle)
-                      )}
-                    >
-                      {v.manualDescription}
-                    </p>
-                  ) : null}
+                  <HighlightCard
+                    data={{
+                      templateType: "highlight",
+                      thumbnailUrl: sanitizeImageSrc(imageUrl(v) ?? "") || "",
+                      cardTitle: v.name,
+                      displayDateText: "",
+                      displayRegionText: "",
+                      statusText: "",
+                      buttonText: "",
+                      shortDescription: "",
+                    }}
+                    stylePolicy={venuePromoStyle}
+                    showDetailButton={false}
+                  />
                 </SlotBlockCtaLink>
               ))}
             </div>
@@ -416,7 +410,7 @@ export function VenueCarousel({
             onMouseMove={onDragMove}
             onMouseUp={onDragEnd}
           >
-            {filteredVenues.map((v, index) => (
+            {filteredVenues.map((v) => (
               <SlotBlockCtaLink
                 key={v.id}
                 layer={cta.card}
@@ -428,71 +422,26 @@ export function VenueCarousel({
                   if (isDragging) e.preventDefault();
                 }}
                 className={cn(
-                  "flex flex-col items-center shrink-0 w-[calc((100%-3*1rem)/4)] min-w-[calc((100%-3*1rem)/4)] sm:w-[calc((100%-4*1rem)/5)] sm:min-w-[calc((100%-4*1rem)/5)] md:w-[calc((100%-5*1rem)/6)] md:min-w-[calc((100%-5*1rem)/6)] lg:w-[calc((100%-7*1rem)/8)] lg:min-w-[calc((100%-7*1rem)/8)] max-w-[140px] group py-3 px-2 min-h-[120px] active:bg-gray-100/50 dark:active:bg-slate-800/50",
+                  "flex flex-col items-center shrink-0 group py-3 px-2 min-h-[120px] active:bg-gray-100/50 dark:active:bg-slate-800/50",
                   cardStyle
                     ? cn(venueCarouselLinkExtraClasses(cardStyle), hoverClasses(cardStyle.hoverEffect))
                     : "rounded-xl"
                 )}
               >
-                <div
-                  className={
-                    cardStyle
-                      ? venueThumbShellClasses(cardStyle, true)
-                      : "relative w-[88px] h-[88px] sm:w-[96px] sm:h-[96px] rounded-full overflow-hidden bg-site-bg border border-site-border flex-shrink-0 transition-transform duration-200 group-hover:scale-105"
-                  }
-                >
-                  {(() => {
-                    const src = sanitizeImageSrc(imageUrl(v) ?? "");
-                    const isPriority = index === 0;
-                    if (!src) {
-                      return (
-                        <Image
-                          src={IMAGE_PLACEHOLDER_SRC}
-                          alt=""
-                          width={96}
-                          height={96}
-                          sizes="(max-width: 768px) 100vw, 800px"
-                          priority={isPriority}
-                          loading={isPriority ? undefined : "lazy"}
-                          unoptimized
-                          className="absolute inset-0 h-full w-full object-cover"
-                        />
-                      );
-                    }
-                    return (
-                      <Image
-                        src={src}
-                        alt=""
-                        width={96}
-                        height={96}
-                        sizes="(max-width: 768px) 100vw, 800px"
-                        priority={isPriority}
-                        loading={isPriority ? undefined : "lazy"}
-                        unoptimized={!isOptimizableImageSrc(src)}
-                        className="absolute inset-0 h-full w-full object-cover"
-                        data-debug-src={src}
-                      />
-                    );
-                  })()}
-                </div>
-                <p
-                  className={cn(
-                    "mt-2 min-h-[2.5rem] text-center text-sm font-medium text-site-text break-words w-full px-0.5",
-                    cardStyle ? slotBlockLineClampClass(cardStyle) : "line-clamp-2"
-                  )}
-                >
-                  {v.name}
-                </p>
-                {v.manualDescription?.trim() ? (
-                  <p
-                    className={cn(
-                      "mt-0.5 text-center text-[11px] text-site-text-muted break-words w-full px-0.5",
-                      cardStyle ? slotBlockLineClampClass(cardStyle) : "line-clamp-2"
-                    )}
-                  >
-                    {v.manualDescription}
-                  </p>
-                ) : null}
+                <HighlightCard
+                  data={{
+                    templateType: "highlight",
+                    thumbnailUrl: sanitizeImageSrc(imageUrl(v) ?? "") || "",
+                    cardTitle: v.name,
+                    displayDateText: "",
+                    displayRegionText: "",
+                    statusText: "",
+                    buttonText: "",
+                    shortDescription: "",
+                  }}
+                  stylePolicy={venuePromoStyle}
+                  showDetailButton={false}
+                />
               </SlotBlockCtaLink>
             ))}
           </div>
@@ -519,7 +468,21 @@ export function VenueCarousel({
           </>
           )}
         </div>
+        {inlineBottomButton ? (
+          <div className={cn("mt-5", ctaButtonPlacementWrapClass(buttonPlacement))}>
+            <SlotBlockCtaLink layer={cta.button} ctx={{}} className={buttonClass}>
+              {buttonLabel}
+            </SlotBlockCtaLink>
+          </div>
+        ) : null}
       </div>
+      {outsideButton ? (
+        <div className={cn("mx-auto mt-4 max-w-6xl", ctaButtonPlacementWrapClass(buttonPlacement))}>
+          <SlotBlockCtaLink layer={cta.button} ctx={{}} className={buttonClass}>
+            {buttonLabel}
+          </SlotBlockCtaLink>
+        </div>
+      ) : null}
     </section>
   );
 }

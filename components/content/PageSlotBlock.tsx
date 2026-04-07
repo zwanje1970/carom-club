@@ -18,6 +18,15 @@ import { HomeVenueLinkSlot } from "@/components/home/HomeVenueLinkSlot";
 
 export type PageSlotSurface = "public" | "adminPreview";
 
+function toSurfaceSectionTitle(
+  value: string | null | undefined,
+  surface: PageSlotSurface
+): string | null | undefined {
+  if (!value) return value;
+  if (surface !== "public") return value;
+  return value.replace(/^\s*구조\s*:\s*/u, "");
+}
+
 function slotPreviewCopy(ctx: PageSlotRenderContext | null | undefined): Record<string, string> {
   if (!ctx) return {};
   if (ctx.home?.copy) return ctx.home.copy;
@@ -74,6 +83,23 @@ export function PageSlotBlock({
       const frame = resolveHomeStructureSlotFrame(block);
       if (!frame) return maybePlaceholder("대회 안내", surface, ctx);
       const listSettings = resolveSlotBlockTournamentListSettings(block.sectionStyleJson);
+      const slotItems = parseSlotBlockItemsBundle(block.sectionStyleJson, "tournamentIntro");
+      if (slotItems.mode === "auto" && slotItems.publishedType === "venue") {
+        return (
+          <HomeVenueIntroSlot
+            venues={h.carouselVenues}
+            copy={h.copy}
+            homeCarouselFlowSpeed={h.siteSettings.homeCarouselFlowSpeed}
+            cardStyle={frame.cardStyle}
+            ctaConfig={frame.ctaConfig}
+            slotLayout={frame.layout}
+            slotMotion={frame.motion}
+            blockBackgroundColor={frame.blockBackgroundColor}
+            slotItems={slotItems}
+            sectionTitle={toSurfaceSectionTitle(block.title, surface)}
+          />
+        );
+      }
       return (
         <HomeTournamentIntroSlot
           initialTournaments={h.initialTournaments}
@@ -85,7 +111,8 @@ export function PageSlotBlock({
           blockBackgroundColor={frame.blockBackgroundColor}
           homeCarouselFlowSpeed={h.siteSettings.homeCarouselFlowSpeed}
           listSettings={listSettings}
-          sectionTitle={block.title}
+          slotItems={slotItems}
+          sectionTitle={toSurfaceSectionTitle(block.title, surface)}
           sectionSubtitle={block.subtitle}
         />
       );
@@ -97,6 +124,25 @@ export function PageSlotBlock({
       const frame = resolveHomeStructureSlotFrame(block);
       if (!frame) return maybePlaceholder("당구장 소개", surface, ctx);
       const slotItems = parseSlotBlockItemsBundle(block.sectionStyleJson, "venueIntro");
+      if (slotItems.mode === "auto" && slotItems.publishedType === "tournament") {
+        const listSettings = resolveSlotBlockTournamentListSettings(block.sectionStyleJson);
+        return (
+          <HomeTournamentIntroSlot
+            initialTournaments={h.initialTournaments}
+            copy={h.copy}
+            cardStyle={frame.cardStyle}
+            ctaConfig={frame.ctaConfig}
+            slotLayout={frame.layout}
+            slotMotion={frame.motion}
+            blockBackgroundColor={frame.blockBackgroundColor}
+            homeCarouselFlowSpeed={h.siteSettings.homeCarouselFlowSpeed}
+            listSettings={listSettings}
+            slotItems={slotItems}
+            sectionTitle={toSurfaceSectionTitle(block.title, surface)}
+            sectionSubtitle={block.subtitle}
+          />
+        );
+      }
       return (
         <HomeVenueIntroSlot
           venues={h.carouselVenues}
@@ -108,7 +154,7 @@ export function PageSlotBlock({
           slotMotion={frame.motion}
           blockBackgroundColor={frame.blockBackgroundColor}
           slotItems={slotItems}
-          sectionTitle={block.title}
+          sectionTitle={toSurfaceSectionTitle(block.title, surface)}
         />
       );
     }
