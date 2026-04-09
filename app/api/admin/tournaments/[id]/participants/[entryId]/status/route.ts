@@ -6,7 +6,6 @@ import { isDatabaseConfigured } from "@/lib/db-mode";
 import { canManageTournament } from "@/lib/permissions";
 import { ROSTER_LOCKED_ENTRY_ERROR } from "@/lib/tournament-roster-lock";
 import { syncNationalWaitlistEntries } from "@/lib/tournaments/national";
-import { syncLeagueEntriesForTournamentEntry } from "@/lib/league-service";
 
 const ALLOWED_STATUSES = ["APPLIED", "CONFIRMED", "CANCELED", "REJECTED"] as const;
 
@@ -81,11 +80,6 @@ export async function PATCH(
       },
     });
     await syncNationalWaitlistEntries(tournamentId);
-    await syncLeagueEntriesForTournamentEntry({
-      tournamentId,
-      tournamentEntryId: entryId,
-      nextStatus: status as "APPLIED" | "CONFIRMED" | "CANCELED" | "REJECTED",
-    });
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("admin force status error", e);

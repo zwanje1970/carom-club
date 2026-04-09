@@ -25,7 +25,7 @@ export async function GET(
   const bracket = await fetchOrImportZoneBracketSnapshotByZoneId(tz.tournamentId, tzId);
   const matches = bracket?.rounds.flatMap((round) => round.matches.map((match) => ({
     id: match.id,
-    roundType: round.roundType,
+    roundType: match.isReduction ? "REDUCTION" : "NORMAL",
     roundIndex: round.roundNumber,
     matchIndex: match.matchNumber,
     isBye: match.isBye,
@@ -68,13 +68,13 @@ export async function GET(
       tournamentName: tz.tournament.name,
     },
     rounds: bracket?.rounds.map((round) => ({
-      roundType: round.roundType,
+      roundType: round.matches.some((m) => m.isReduction) ? "REDUCTION" : "NORMAL",
       roundIndex: round.roundNumber,
       name: round.name,
       targetSize: round.targetSize,
       matches: round.matches.map((match) => ({
         id: match.id,
-        roundType: round.roundType,
+        roundType: match.isReduction ? "REDUCTION" : "NORMAL",
         roundIndex: round.roundNumber,
         matchIndex: match.matchNumber,
         isBye: match.isBye,

@@ -205,7 +205,9 @@ export function TournamentApplyForm({
       }
       if (!res.ok) {
         setError(data.error || "신청에 실패했습니다.");
-        const resultRows = Array.isArray(data.participantResults)
+        const resultRows: Array<{ name: string; phone: string; result: "APPLIED" | "ALREADY_APPLIED" }> = Array.isArray(
+          data.participantResults
+        )
           ? data.participantResults
               .filter((r) => typeof r?.name === "string")
               .map((r) => ({
@@ -218,7 +220,9 @@ export function TournamentApplyForm({
         return;
       }
       setSuccessMessage(data.message || "참가 신청이 접수되었습니다. 운영자 승인 후 참가가 확정됩니다.");
-      const resultRows = Array.isArray(data.participantResults)
+      const resultRows: Array<{ name: string; phone: string; result: "APPLIED" | "ALREADY_APPLIED" }> = Array.isArray(
+        data.participantResults
+      )
         ? data.participantResults
             .filter((r) => typeof r?.name === "string")
             .map((r) => ({

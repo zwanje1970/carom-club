@@ -36,8 +36,8 @@ export async function POST(
   if (!bracket) return NextResponse.json({ error: "감축경기를 찾을 수 없습니다." }, { status: 404 });
 
   const reductionMatches = bracket.rounds
-    .filter((round) => round.roundType === "REDUCTION")
     .flatMap((round) => round.matches)
+    .filter((match) => match.isReduction)
     .sort((a, b) => a.matchNumber - b.matchNumber);
 
   if (reductionMatches.length === 0) {

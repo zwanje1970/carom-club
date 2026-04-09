@@ -286,7 +286,7 @@ function SummaryCard({
 }: {
   label: string;
   value: number;
-  hint: string;
+  hint?: string;
   warn?: boolean;
 }) {
   return (

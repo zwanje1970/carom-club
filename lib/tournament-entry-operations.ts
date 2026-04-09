@@ -7,7 +7,6 @@ import { prisma } from "@/lib/db";
 import { sendPushToUser } from "@/lib/push/sendPush";
 import { isParticipantRosterLocked, ROSTER_LOCKED_ENTRY_ERROR } from "@/lib/tournament-roster-lock";
 import { syncNationalWaitlistEntries } from "@/lib/tournaments/national";
-import { syncLeagueEntriesForTournamentEntry } from "@/lib/league-service";
 
 export type EntryOpFail = { ok: false; error: string; status: number };
 export type EntryOpOk<T = Record<string, unknown>> = { ok: true } & T;
@@ -110,11 +109,6 @@ export async function confirmTournamentEntryPayment(
         // ignore
       }
       await syncNationalWaitlistEntries(tournamentId);
-      await syncLeagueEntriesForTournamentEntry({
-        tournamentId,
-        tournamentEntryId: entryId,
-        nextStatus: "CONFIRMED",
-      });
       return { ok: true, result: "CONFIRMED" };
     }
 

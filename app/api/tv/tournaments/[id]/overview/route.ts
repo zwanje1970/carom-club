@@ -35,8 +35,9 @@ export async function GET(
         const rounds = zoneBracket?.rounds ?? [];
         const matches = rounds.flatMap((round) => round.matches);
         const reductionMatches = rounds
-          .filter((round) => round.roundType === "REDUCTION")
-          .reduce((sum, round) => sum + round.matches.length, 0);
+          .flatMap((round) => round.matches)
+          .filter((match) => match.isReduction)
+          .length;
         const currentRound = rounds.find((round) => round.matches.some((match) => match.status !== "COMPLETED")) ?? rounds[rounds.length - 1] ?? null;
 
         return {
@@ -47,7 +48,7 @@ export async function GET(
           completed: matches.filter((match) => match.status === "COMPLETED").length,
           pending: matches.filter((match) => match.status === "PENDING" || match.status === "READY").length,
           reductionMatches,
-          currentRoundLabel: currentRound ? (currentRound.roundType === "REDUCTION" ? "감축경기" : currentRound.name) : null,
+          currentRoundLabel: currentRound ? (currentRound.matches.some((match) => match.isReduction) ? "감축경기" : currentRound.name) : null,
         };
       })
     ),

@@ -30,8 +30,9 @@ export default async function PublicTournamentZonesPage({
       const bracket = await fetchOrImportZoneBracketSnapshotByZoneId(tournamentId, z.id);
       const matches = bracket?.rounds.flatMap((round) => round.matches) ?? [];
       const reductionMatches = bracket?.rounds
-        .filter((round) => round.roundType === "REDUCTION")
-        .reduce((sum, round) => sum + round.matches.length, 0) ?? 0;
+        .flatMap((round) => round.matches)
+        .filter((match) => match.isReduction)
+        .length ?? 0;
       const participants = await prisma.tournamentEntry.count({
         where: { tournamentId, zoneId: z.id, status: "CONFIRMED" },
       });

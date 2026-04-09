@@ -33,6 +33,10 @@ import {
   parseSlotBlockItemsBundle,
   type SlotBlockItemsBundle,
 } from "@/lib/slot-block-items";
+import {
+  resolveSlotBlockTournamentListSettings,
+  type SlotBlockTournamentListSettings,
+} from "@/lib/slot-block-tournament-list";
 import { PLACEMENT_LABELS } from "@/lib/content/constants";
 import { cn } from "@/lib/utils";
 import { decorateChoiceWrapClass } from "@/components/admin/page-builder/slot-decorate/decorateChoice";
@@ -141,6 +145,9 @@ export function HomeAreaDecoratePanel({
   const [itemsBundle, setItemsBundle] = useState<SlotBlockItemsBundle>(() =>
     parseSlotBlockItemsBundle(section.sectionStyleJson, slotType)
   );
+  const [tournamentList, setTournamentList] = useState<SlotBlockTournamentListSettings>(() =>
+    resolveSlotBlockTournamentListSettings(section.sectionStyleJson)
+  );
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   useEffect(() => {
@@ -154,6 +161,7 @@ export function HomeAreaDecoratePanel({
     setStartLocal(isoToDatetimeLocal(section.startAt));
     setEndLocal(isoToDatetimeLocal(section.endAt));
     setItemsBundle(parseSlotBlockItemsBundle(section.sectionStyleJson, slotType));
+    setTournamentList(resolveSlotBlockTournamentListSettings(section.sectionStyleJson));
   }, [section.id, section.sectionStyleJson, section.backgroundColor, section.slotType, section.placement, section.startAt, section.endAt]);
 
   useEffect(() => {

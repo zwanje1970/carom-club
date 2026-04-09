@@ -93,7 +93,6 @@ export async function createMainBracketMatchesFromPlan(
       data: {
         bracketId: bracket.id,
         matchDayId: null,
-        roundType: "NORMAL",
         roundNumber,
         name: deriveRoundName(roundNumber),
         targetSize,
@@ -223,7 +222,6 @@ async function materializeLegacyFinalMatchesAsBracket(
       data: {
         bracketId: bracket.id,
         matchDayId: null,
-        roundType: "NORMAL",
         roundNumber,
         name: deriveRoundName(roundNumber),
         targetSize: legacyMatches.filter((m) => m.roundIndex === roundNumber).length,
@@ -331,7 +329,6 @@ async function materializeLegacyZoneMatchesAsBracket(
       data: {
         bracketId: bracket.id,
         matchDayId: null,
-        roundType: "NORMAL",
         roundNumber,
         name: deriveRoundName(roundNumber),
         targetSize: legacyMatches.filter((m) => m.roundIndex === roundNumber).length,
@@ -439,7 +436,6 @@ export async function createBracketMatchesFromPlanByKind(
       data: {
         bracketId: bracket.id,
         matchDayId: null,
-        roundType: "NORMAL",
         roundNumber,
         name: deriveRoundName(roundNumber),
         targetSize,
@@ -530,7 +526,6 @@ export async function createZoneBracketMatchesFromPlan(
       data: {
         bracketId: bracket.id,
         matchDayId: null,
-        roundType: round.roundType,
         roundNumber: round.roundNumber,
         name: round.name,
         targetSize: round.matches.length,

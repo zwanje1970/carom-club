@@ -94,7 +94,6 @@ export default async function AdminTournamentDetailPage({
               <Button href={`/admin/tournaments/${id}/outline`} label="대회요강 편집" color="contrast" outline small />
               <Button href={`/admin/tournaments/${id}/participants`} label="참가자 관리" color="contrast" outline small />
               <Button href={`/admin/tournaments/${id}/bracket`} label="대진표" color="contrast" outline small />
-              <Button href={`/admin/tournaments/${id}/leagues`} label="리그전" color="contrast" outline small />
               <Button href={`/admin/tournaments/${id}/maintenance`} label="유지보수" color="warning" outline small />
             </>
           )}

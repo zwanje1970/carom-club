@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/auth";
 import { getAdminCopy } from "@/lib/admin-copy-server";
+import type { AdminCopyKey } from "@/lib/admin-copy";
 import {
   CLIENT_CONSOLE_ORG_COOKIE,
   getAccessibleClientOrganizationsCached,

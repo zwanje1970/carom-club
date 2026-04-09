@@ -31,8 +31,9 @@ export default async function PublicTournamentResultsPage({
         const zoneBracket = await fetchOrImportZoneBracketSnapshotByZoneId(tournamentId, z.id);
         const matches = zoneBracket?.rounds.flatMap((round) => round.matches) ?? [];
         const reductionMatches = zoneBracket?.rounds
-          .filter((round) => round.roundType === "REDUCTION")
-          .reduce((sum, round) => sum + round.matches.length, 0) ?? 0;
+          .flatMap((round) => round.matches)
+          .filter((match) => match.isReduction)
+          .length ?? 0;
         return {
           total: matches.length,
           completed: matches.filter((m) => m.status === "COMPLETED").length,
@@ -42,7 +43,6 @@ export default async function PublicTournamentResultsPage({
     ),
     fetchOrImportBracketSnapshotByKind(tournamentId, "FINAL"),
   ]);
-  const leagueCount = await prisma.league.count({ where: { tournamentId } });
   const zoneTotal = zoneStats.reduce((sum, z) => sum + z.total, 0);
   const zoneCompleted = zoneStats.reduce((sum, z) => sum + z.completed, 0);
   const zoneReductionTotal = zoneStats.reduce((sum, z) => sum + z.reductionMatches, 0);
@@ -131,16 +131,6 @@ export default async function PublicTournamentResultsPage({
           )}
         </section>
 
-        <section className="mt-8 rounded-xl border border-site-border bg-site-card p-4">
-          <h2 className="text-lg font-semibold text-site-text mb-2">리그전</h2>
-          <p className="text-sm text-gray-600 mb-3">리그 경기표와 순위표를 확인합니다.</p>
-          <Link
-            href={`/tournaments/${tournamentId}/leagues`}
-            className="inline-flex items-center rounded-lg bg-site-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-          >
-            리그전 보기{leagueCount > 0 ? ` (${leagueCount})` : ""}
-          </Link>
-        </section>
       </div>
     </main>
   );

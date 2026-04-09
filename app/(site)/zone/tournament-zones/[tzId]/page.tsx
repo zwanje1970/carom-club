@@ -25,8 +25,9 @@ export default async function ZoneTournamentZoneOverviewPage({
   ]);
   const matches = bracket?.rounds.flatMap((round) => round.matches) ?? [];
   const reductionCount = bracket?.rounds
-    .filter((round) => round.roundType === "REDUCTION")
-    .reduce((sum, round) => sum + round.matches.length, 0) ?? 0;
+    .flatMap((round) => round.matches)
+    .filter((match) => match.isReduction)
+    .length ?? 0;
 
   const total = matches.length;
   const completed = matches.filter((m) => m.status === "COMPLETED").length;
