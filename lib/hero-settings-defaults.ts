@@ -21,6 +21,8 @@ export type HeroButtonItem = {
 
 export type HeroSettings = {
   heroEnabled: boolean;
+  heroDesktopEnabled: boolean;
+  heroMobileEnabled: boolean;
   heroBackgroundImageUrl: string | null;
   heroHeightDesktop: string;
   heroHeightMobile: string;
@@ -49,7 +51,9 @@ const DEFAULT_BUTTON: HeroButtonItem = {
 };
 
 export const DEFAULT_HERO_SETTINGS: HeroSettings = {
-  heroEnabled: true,
+  heroEnabled: false,
+  heroDesktopEnabled: false,
+  heroMobileEnabled: false,
   heroBackgroundImageUrl: null,
   heroHeightDesktop: "380px",
   heroHeightMobile: "280px",

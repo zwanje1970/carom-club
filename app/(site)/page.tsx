@@ -1,5 +1,6 @@
 import dynamic from "next/dynamic";
 import { Suspense } from "react";
+import { headers } from "next/headers";
 import { HomeHero } from "@/components/home/HomeHero";
 import { ContentLayer } from "@/components/content/ContentLayer";
 import { PageRenderer } from "@/components/content/PageRenderer";
@@ -11,6 +12,8 @@ import { resolveHeroSettingsForSlot } from "@/lib/hero-settings-defaults";
 import { parseSlotBlockItemsBundle } from "@/lib/slot-block-items";
 import { getNoticeBarsForPage, getOrderedPageBlocksForPage } from "@/lib/content/service";
 import type { PageSection } from "@/types/page-section";
+import { isLikelyMobileRequest } from "@/lib/request-device";
+import { isHomeStructureSlotType } from "@/lib/home-structure-slots";
 
 const HomeDeferredFooterOnly = dynamic(
   () => import("@/components/home/HomeDeferredFooterOnly").then((m) => m.HomeDeferredFooterOnly),
@@ -27,7 +30,7 @@ function resolveHomeSlotDataNeeds(blocks: PageSection[]): { requireTournaments: 
   let requireTournaments = false;
   let requireVenues = false;
   for (const block of blocks) {
-    if (block.slotType !== "tournamentIntro" && block.slotType !== "venueIntro") continue;
+    if (!isHomeStructureSlotType(block.slotType)) continue;
     const bundle = parseSlotBlockItemsBundle(block.sectionStyleJson, block.slotType);
     if (bundle.mode !== "auto") continue;
     if (bundle.publishedType === "tournament") requireTournaments = true;
@@ -42,6 +45,8 @@ export const revalidate = 60;
 
 /** 홈: `PageRenderer` 단일 스택 + 히어로 슬롯 보정. 구조 슬롯 데이터는 `buildHomeSlotRenderPayload`. */
 export default async function HomePage() {
+  const h = await headers();
+  const isMobileRequest = isLikelyMobileRequest(h.get("user-agent"));
   const [{ copy, siteSettings }, noticeBars, pageBlocks] = await Promise.all([
     getCommonGlobalData(),
     getNoticeBarsForPage("home"),
@@ -58,25 +63,28 @@ export default async function HomePage() {
   });
   const hasHeroSlot = pageBlocksRendered.some((b) => b.slotType === "hero");
   const heroSettings = resolveHeroSettingsForSlot(siteSettings.heroSettings);
+  const heroEnabledForDevice =
+    heroSettings.heroEnabled &&
+    (isMobileRequest ? heroSettings.heroMobileEnabled : heroSettings.heroDesktopEnabled);
   const immediateBlocks = pageBlocksRendered.slice(0, HOME_IMMEDIATE_BLOCK_COUNT);
   const deferredBlocks = pageBlocksRendered.slice(HOME_IMMEDIATE_BLOCK_COUNT);
 
   return (
     <main className="min-h-screen bg-[var(--site-bg)] text-site-text">
-      {!hasHeroSlot ? <HomeHero heroSettings={heroSettings} /> : null}
+      {!hasHeroSlot && heroEnabledForDevice ? <HomeHero heroSettings={heroSettings} /> : null}
       <ContentLayer noticeBars={noticeBars} />
       <PageRenderer
         blocks={immediateBlocks}
-        slotContext={{ page: "home", heroSettings, home: homeSlotPayload }}
+        slotContext={{ page: "home", isMobileRequest, heroSettings, home: homeSlotPayload }}
       />
       <HomeDeferredBlocks
         blocks={deferredBlocks}
-        slotContext={{ page: "home", heroSettings, home: homeSlotPayload }}
+        slotContext={{ page: "home", isMobileRequest, heroSettings, home: homeSlotPayload }}
       />
       <Suspense fallback={null}>
         <HomeDeferredPopupLayer />
       </Suspense>
-      <HomeDeferredFooterOnly copy={copy} siteSettings={siteSettings} />
+      <HomeDeferredFooterOnly copy={copy} siteSettings={siteSettings} isMobileRequest={isMobileRequest} />
     </main>
   );
 }

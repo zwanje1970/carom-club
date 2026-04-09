@@ -272,7 +272,17 @@ function AdminMembersFilterPanel({
   );
 }
 
-export function AdminMembersList({ copy }: { copy: Record<string, string> }) {
+export function AdminMembersList({
+  copy,
+  view = "full",
+  basePath = "/admin/members",
+}: {
+  copy: Record<string, string>;
+  view?: "full" | "membersOnly" | "permissionsOnly";
+  basePath?: string;
+}) {
+  const showMembersArea = view !== "permissionsOnly";
+  const showPermissionsArea = view !== "membersOnly";
   const router = useRouter();
   const searchParams = useSearchParams();
   const [items, setItems] = useState<MemberRow[]>([]);
@@ -352,9 +362,9 @@ export function AdminMembersList({ copy }: { copy: Record<string, string> }) {
           next.set(k, s);
         }
       });
-      router.push(`/admin/members?${next.toString()}`);
+      router.push(`${basePath}?${next.toString()}`);
     },
-    [router, searchParams]
+    [router, searchParams, basePath]
   );
 
   useEffect(() => {
@@ -601,58 +611,62 @@ export function AdminMembersList({ copy }: { copy: Record<string, string> }) {
 
   return (
     <div className="space-y-4">
-      {/* 검색 / 필터 / 정렬 — 모바일: 접기, md+: 항상 표시 */}
-      <details className="rounded-lg border border-site-border bg-site-bg/50 md:hidden">
-        <summary className="flex min-h-[48px] cursor-pointer list-none items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-site-text outline-none [&::-webkit-details-marker]:hidden focus-visible:ring-2 focus-visible:ring-site-primary/70 focus-visible:ring-offset-2">
-          <span className="min-w-0 flex-1">{getCopyValue(copy, "admin.list.searchAria")}</span>
-          <span className="shrink-0 text-site-text-muted" aria-hidden>
-            ▼
-          </span>
-        </summary>
-        <div className="space-y-4 border-t border-site-border p-4">
-          <AdminMembersFilterPanel
-            copy={copy}
-            search={search}
-            roleType={roleType}
-            status={status}
-            sortBy={sortBy}
-            sortOrder={sortOrder}
-            pageSize={pageSize}
-            setParams={setParams}
-            roleTypeOptions={roleTypeOptions}
-            statusOptions={statusOptions}
-            sortByOptions={sortByOptions}
-            sortOrderOptions={sortOrderOptions}
-            sortByLabel={sortByLabel}
-            sortOrderLabel={sortOrderLabel}
-            touchFriendly
-          />
-        </div>
-      </details>
-      <div className="hidden flex-col gap-4 rounded-lg border border-site-border bg-site-bg/50 p-4 md:flex">
-        <AdminMembersFilterPanel
-          copy={copy}
-          search={search}
-          roleType={roleType}
-          status={status}
-          sortBy={sortBy}
-          sortOrder={sortOrder}
-          pageSize={pageSize}
-          setParams={setParams}
-          roleTypeOptions={roleTypeOptions}
-          statusOptions={statusOptions}
-          sortByOptions={sortByOptions}
-          sortOrderOptions={sortOrderOptions}
-          sortByLabel={sortByLabel}
-          sortOrderLabel={sortOrderLabel}
-        />
-      </div>
+      {showMembersArea ? (
+        <>
+          {/* 검색 / 필터 / 정렬 — 모바일: 접기, md+: 항상 표시 */}
+          <details className="rounded-lg border border-site-border bg-site-bg/50 md:hidden">
+            <summary className="flex min-h-[48px] cursor-pointer list-none items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-site-text outline-none [&::-webkit-details-marker]:hidden focus-visible:ring-2 focus-visible:ring-site-primary/70 focus-visible:ring-offset-2">
+              <span className="min-w-0 flex-1">{getCopyValue(copy, "admin.list.searchAria")}</span>
+              <span className="shrink-0 text-site-text-muted" aria-hidden>
+                ▼
+              </span>
+            </summary>
+            <div className="space-y-4 border-t border-site-border p-4">
+              <AdminMembersFilterPanel
+                copy={copy}
+                search={search}
+                roleType={roleType}
+                status={status}
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                pageSize={pageSize}
+                setParams={setParams}
+                roleTypeOptions={roleTypeOptions}
+                statusOptions={statusOptions}
+                sortByOptions={sortByOptions}
+                sortOrderOptions={sortOrderOptions}
+                sortByLabel={sortByLabel}
+                sortOrderLabel={sortOrderLabel}
+                touchFriendly
+              />
+            </div>
+          </details>
+          <div className="hidden flex-col gap-4 rounded-lg border border-site-border bg-site-bg/50 p-4 md:flex">
+            <AdminMembersFilterPanel
+              copy={copy}
+              search={search}
+              roleType={roleType}
+              status={status}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              pageSize={pageSize}
+              setParams={setParams}
+              roleTypeOptions={roleTypeOptions}
+              statusOptions={statusOptions}
+              sortByOptions={sortByOptions}
+              sortOrderOptions={sortOrderOptions}
+              sortByLabel={sortByLabel}
+              sortOrderLabel={sortOrderLabel}
+            />
+          </div>
+        </>
+      ) : null}
 
       {loading && <p className="text-sm text-site-text-muted">{getCopyValue(copy, "admin.list.loading")}</p>}
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       {flashMessage && <p className="text-sm text-emerald-600 dark:text-emerald-400">{flashMessage}</p>}
 
-      {!loading && !error && (
+      {showMembersArea && !loading && !error && (
         <>
           <div className="hidden overflow-x-auto rounded-lg border border-site-border bg-site-card md:block">
             <table className="w-full text-sm">
@@ -830,6 +844,8 @@ export function AdminMembersList({ copy }: { copy: Record<string, string> }) {
         </>
       )}
 
+      {showPermissionsArea ? (
+      <>
       <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
         <section className="rounded-lg border border-site-border bg-site-card p-4">
           <h2 className="text-base font-semibold text-site-text">{getCopyValue(copy, "admin.members.rolesSectionTitle")}</h2>
@@ -1049,6 +1065,8 @@ export function AdminMembersList({ copy }: { copy: Record<string, string> }) {
           </>
         )}
       </section>
+      </>
+      ) : null}
     </div>
   );
 }

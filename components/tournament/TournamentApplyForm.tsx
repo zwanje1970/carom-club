@@ -12,9 +12,11 @@ export function TournamentApplyForm({
   entryFee,
   accountNumber,
   entryConditionsHtml,
+  entryQualificationLabels,
   additionalSlot = false,
   isScotch = false,
   currentUserName = null,
+  currentUserPhone = null,
   teamScoreLimit = null,
   teamScoreRule = null,
   verificationMode,
@@ -28,9 +30,11 @@ export function TournamentApplyForm({
   /** 계좌번호(은행명, 예금주) — 참가신청 시 입금용으로 복사 버튼과 함께 표시 */
   accountNumber: string | null;
   entryConditionsHtml: string | null;
+  entryQualificationLabels: string[];
   additionalSlot?: boolean;
   isScotch?: boolean;
   currentUserName?: string | null;
+  currentUserPhone?: string | null;
   teamScoreLimit?: number | null;
   teamScoreRule?: "LTE" | "LT" | null;
   verificationMode: VerificationMode;
@@ -59,8 +63,15 @@ export function TournamentApplyForm({
   const [playerBScore, setPlayerBScore] = useState("");
   const [playerBProofUrl, setPlayerBProofUrl] = useState("");
   const [playerBUploading, setPlayerBUploading] = useState(false);
+  const [applicantName, setApplicantName] = useState(currentUserName ?? "");
+  const [applicantPhone, setApplicantPhone] = useState(currentUserPhone ?? "");
+  const [proxyParticipants, setProxyParticipants] = useState<Array<{ name: string; phone: string }>>([]);
+  const [participantResults, setParticipantResults] = useState<
+    Array<{ name: string; phone: string; result: "APPLIED" | "ALREADY_APPLIED" }>
+  >([]);
 
   const needCert = requiresVerificationImage(verificationMode);
+  const showVerificationNotice = verificationMode !== "NONE";
 
   useEffect(() => {
     return () => {
@@ -71,15 +82,36 @@ export function TournamentApplyForm({
   useEffect(() => {
     if (currentUserName) {
       setPlayerAName(currentUserName);
+      setApplicantName(currentUserName);
     }
   }, [currentUserName]);
+
+  useEffect(() => {
+    if (currentUserPhone) {
+      setApplicantPhone(currentUserPhone);
+    }
+  }, [currentUserPhone]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setSuccessMessage("");
+    setParticipantResults([]);
     if (!depositorName.trim()) {
       setError("입금자명을 입력해주세요.");
+      return;
+    }
+    if (!applicantName.trim()) {
+      setError("참가자 본인 이름을 입력해주세요.");
+      return;
+    }
+    if (!applicantPhone.trim()) {
+      setError("참가자 본인 전화번호를 입력해주세요.");
+      return;
+    }
+    const invalidProxy = proxyParticipants.find((p) => !p.name.trim() || !p.phone.trim());
+    if (invalidProxy) {
+      setError("추가 참가자의 이름과 전화번호를 모두 입력해주세요.");
       return;
     }
     if (!agreed) {
@@ -132,6 +164,8 @@ export function TournamentApplyForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tournamentId,
+          applicantName: applicantName.trim(),
+          applicantPhone: applicantPhone.trim(),
           depositorName: depositorName.trim(),
           clubOrAffiliation: clubOrAffiliation.trim() || undefined,
           handicap: handicap.trim() || undefined,
@@ -150,9 +184,19 @@ export function TournamentApplyForm({
             teamTotalScore,
           }),
           ...(additionalSlot && { additionalSlot: true }),
+          ...(proxyParticipants.length > 0 && {
+            proxyParticipants: proxyParticipants.map((p) => ({
+              name: p.name.trim(),
+              phone: p.phone.trim(),
+            })),
+          }),
         }),
       });
-      let data: { error?: string; message?: string } = {};
+      let data: {
+        error?: string;
+        message?: string;
+        participantResults?: Array<{ name?: string; phone?: string; result?: "APPLIED" | "ALREADY_APPLIED" }>;
+      } = {};
       try {
         const text = await res.text();
         if (text) data = JSON.parse(text);
@@ -161,9 +205,29 @@ export function TournamentApplyForm({
       }
       if (!res.ok) {
         setError(data.error || "신청에 실패했습니다.");
+        const resultRows = Array.isArray(data.participantResults)
+          ? data.participantResults
+              .filter((r) => typeof r?.name === "string")
+              .map((r) => ({
+                name: String(r.name ?? "").trim(),
+                phone: String(r.phone ?? "").trim(),
+                result: r.result === "ALREADY_APPLIED" ? "ALREADY_APPLIED" : "APPLIED",
+              }))
+          : [];
+        if (resultRows.length > 0) setParticipantResults(resultRows);
         return;
       }
       setSuccessMessage(data.message || "참가 신청이 접수되었습니다. 운영자 승인 후 참가가 확정됩니다.");
+      const resultRows = Array.isArray(data.participantResults)
+        ? data.participantResults
+            .filter((r) => typeof r?.name === "string")
+            .map((r) => ({
+              name: String(r.name ?? "").trim(),
+              phone: String(r.phone ?? "").trim(),
+              result: r.result === "ALREADY_APPLIED" ? "ALREADY_APPLIED" : "APPLIED",
+            }))
+        : [];
+      setParticipantResults(resultRows);
       setDepositorName("");
       setClubOrAffiliation("");
       setHandicap("");
@@ -175,6 +239,7 @@ export function TournamentApplyForm({
       setPlayerBName("");
       setPlayerBScore("");
       setPlayerBProofUrl("");
+      setProxyParticipants([]);
       if (certPreviewUrl) URL.revokeObjectURL(certPreviewUrl);
       setCertPreviewUrl(null);
       setAgreed(false);
@@ -200,20 +265,50 @@ export function TournamentApplyForm({
       {error && (
         <p className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-300 p-2 rounded">{error}</p>
       )}
-      {eligibilityLine && (
+      {participantResults.length > 0 && (
+        <div className="rounded-lg border border-site-border bg-site-bg/40 p-3">
+          <p className="text-sm font-semibold text-site-text">신청 결과</p>
+          <ul className="mt-2 space-y-1 text-sm">
+            {participantResults.map((r, idx) => (
+              <li key={`result-${idx}`} className="flex items-center justify-between gap-2">
+                <span>
+                  {r.name}
+                  {r.phone ? ` (${r.phone})` : ""}
+                </span>
+                <span
+                  className={
+                    r.result === "ALREADY_APPLIED"
+                      ? "rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800"
+                      : "rounded border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800"
+                  }
+                >
+                  {r.result === "ALREADY_APPLIED" ? "신청완료" : "신청접수"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {showVerificationNotice && eligibilityLine && (
         <p className="text-sm text-site-text border border-site-border rounded-lg px-3 py-2 bg-site-bg/50">
           {eligibilityLine}
         </p>
       )}
-      {verificationGuideText && (
+      {showVerificationNotice && verificationGuideText && (
         <p className="text-sm text-site-text border border-site-border rounded-lg px-3 py-2 bg-site-bg/50">
           {verificationGuideText}
         </p>
       )}
-      {divisionEnabled && (
+      {showVerificationNotice && divisionEnabled && (
         <p className="text-sm text-site-text-muted">
           {getCopyValue(DEFAULT_ADMIN_COPY, "site.tournament.apply.divisionAutoNotice")}
         </p>
+      )}
+      {entryQualificationLabels.length > 0 && (
+        <div className="rounded-lg border border-site-border bg-site-bg/50 px-3 py-2 text-sm text-site-text">
+          <p className="font-medium">참가 조건 기준</p>
+          <p>{entryQualificationLabels.join(" · ")}</p>
+        </div>
       )}
       {userMemberAvg && (
         <p className="text-sm text-site-text-muted">
@@ -251,6 +346,92 @@ export function TournamentApplyForm({
           />
         </div>
       )}
+      <div className="rounded-lg border border-site-border bg-site-bg/40 p-3">
+        <p className="text-sm font-semibold text-site-text">참가자 정보</p>
+        <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+              참가자 본인 이름 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={applicantName}
+              onChange={(e) => setApplicantName(e.target.value)}
+              className="w-full border border-gray-300 rounded px-3 py-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              placeholder="신청자 이름"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+              참가자 본인 전화번호 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={applicantPhone}
+              onChange={(e) => setApplicantPhone(e.target.value)}
+              className="w-full border border-gray-300 rounded px-3 py-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              placeholder="010-0000-0000"
+            />
+          </div>
+        </div>
+      </div>
+      <div className="rounded-lg border border-site-border bg-site-bg/40 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-site-text">참가자 추가 (대리신청)</p>
+          <button
+            type="button"
+            onClick={() => setProxyParticipants((prev) => [...prev, { name: "", phone: "" }])}
+            className="rounded border border-zinc-300 px-2 py-1 text-xs font-semibold text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            참가자 추가
+          </button>
+        </div>
+        {proxyParticipants.length > 0 ? (
+          <div className="mt-2 space-y-2">
+            {proxyParticipants.map((p, idx) => (
+              <div key={`proxy-${idx}`} className="grid grid-cols-1 gap-2 rounded border border-zinc-200 p-2 sm:grid-cols-[1fr_1fr_auto] dark:border-zinc-700">
+                <input
+                  type="text"
+                  value={p.name}
+                  onChange={(e) =>
+                    setProxyParticipants((prev) => {
+                      const next = [...prev];
+                      if (!next[idx]) return prev;
+                      next[idx] = { ...next[idx], name: e.target.value };
+                      return next;
+                    })
+                  }
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  placeholder="참가자 이름"
+                />
+                <input
+                  type="text"
+                  value={p.phone}
+                  onChange={(e) =>
+                    setProxyParticipants((prev) => {
+                      const next = [...prev];
+                      if (!next[idx]) return prev;
+                      next[idx] = { ...next[idx], phone: e.target.value };
+                      return next;
+                    })
+                  }
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  placeholder="전화번호"
+                />
+                <button
+                  type="button"
+                  onClick={() => setProxyParticipants((prev) => prev.filter((_, i) => i !== idx))}
+                  className="rounded border border-red-300 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/30"
+                >
+                  삭제
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-gray-500">추가 참가자가 없으면 본인 신청만 진행됩니다.</p>
+        )}
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">

@@ -30,7 +30,6 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [rememberUsername, setRememberUsername] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [clientMode, setClientMode] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -63,7 +62,6 @@ function LoginForm() {
           username,
           password,
           rememberMe,
-          isClientLogin: clientMode,
         }),
       });
       const data = await res.json();
@@ -141,6 +139,12 @@ function LoginForm() {
               type="text"
               required
               autoComplete="username"
+              inputMode="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              lang="en"
+              enterKeyHint="next"
               className="w-full border border-gray-300 rounded px-3 py-2 font-input-halfwidth"
               value={username}
               onChange={(e) => setUsername(toHalfwidth(e.target.value))}
@@ -154,6 +158,12 @@ function LoginForm() {
               type="password"
               required
               autoComplete="current-password"
+              inputMode="text"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              lang="en"
+              enterKeyHint="done"
               className="w-full border border-gray-300 rounded px-3 py-2 font-input-halfwidth"
               value={password}
               onChange={(e) => setPassword(toHalfwidth(e.target.value))}
@@ -178,15 +188,6 @@ function LoginForm() {
             {loading ? "로그인 중..." : "로그인"}
           </button>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-4 text-sm text-gray-500">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={clientMode}
-                onChange={(e) => setClientMode(e.target.checked)}
-                className="rounded border-gray-300 text-site-primary focus:ring-site-primary"
-              />
-              클라이언트로 로그인 (당구장·동호회 등 운영자만 해당)
-            </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"

@@ -16,10 +16,11 @@ export default async function MypageClientApplyPage() {
     redirect("/mypage");
   }
 
-  let initialData: { applicantName: string; email: string; phone: string } | null = {
+  let initialData: { applicantName: string; email: string; phone: string; addressFull?: string } | null = {
     applicantName: session.name ?? "",
     email: session.email ?? "",
     phone: "",
+    addressFull: "",
   };
   let existingApplication: {
     id: string;
@@ -38,13 +39,15 @@ export default async function MypageClientApplyPage() {
     try {
       const user = await prisma.user.findUnique({
         where: { id: session.id },
-        select: { name: true, email: true, phone: true },
+        select: { name: true, email: true, phone: true, address: true, addressDetail: true },
       });
       if (user) {
+        const addressFull = [user.address ?? "", user.addressDetail ?? ""].map((v) => String(v).trim()).filter(Boolean).join(" ").trim();
         initialData = {
           applicantName: user.name ?? "",
           email: user.email ?? "",
           phone: user.phone ?? "",
+          addressFull,
         };
       }
       const app = await prisma.clientApplication.findFirst({

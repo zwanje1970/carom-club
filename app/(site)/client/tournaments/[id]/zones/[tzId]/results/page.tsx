@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
 import { ClientZoneBracketClient } from "@/components/client/ClientZoneBracketClient";
+import { canAccessClientDashboard } from "@/types/auth";
 
 export default async function ClientTournamentZoneResultsPage({
   params,
@@ -12,7 +13,7 @@ export default async function ClientTournamentZoneResultsPage({
 }) {
   const { id: tournamentId, tzId } = await params;
   const session = await getSession();
-  if (!session || session.role !== "CLIENT_ADMIN") return null;
+  if (!session || !canAccessClientDashboard(session)) return null;
 
   const orgId = await getClientAdminOrganizationId(session);
   if (!orgId) notFound();

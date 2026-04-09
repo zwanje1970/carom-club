@@ -5,17 +5,24 @@ import CardBox from "@/components/admin/_components/CardBox";
 import Button from "@/components/admin/_components/Button";
 import { AdminImageField } from "@/components/admin/_components/AdminImageField";
 import { SITE_NAME } from "@/lib/site-settings";
+import { DEFAULT_HERO_SETTINGS, type HeroSettings as HeroFullSettings } from "@/lib/hero-settings";
 
 type HeroSettings = {
   siteName: string;
   siteDescription: string | null;
   logoUrl: string | null;
+  heroEnabled: boolean;
+  heroDesktopEnabled: boolean;
+  heroMobileEnabled: boolean;
 };
 
 const DEFAULT_HERO: HeroSettings = {
   siteName: SITE_NAME,
   siteDescription: null,
   logoUrl: null,
+  heroEnabled: false,
+  heroDesktopEnabled: false,
+  heroMobileEnabled: false,
 };
 
 export default function AdminSiteHeroPage() {
@@ -24,17 +31,30 @@ export default function AdminSiteHeroPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [form, setForm] = useState<HeroSettings>(DEFAULT_HERO);
+  const [heroFullSettings, setHeroFullSettings] = useState<HeroFullSettings>(DEFAULT_HERO_SETTINGS);
 
   useEffect(() => {
-    fetch("/api/site-settings")
-      .then((res) => res.json())
-      .then((data) =>
+    Promise.all([
+      fetch("/api/site-settings").then((res) => res.json()),
+      fetch("/api/admin/site-settings/hero", { credentials: "include" }).then((res) =>
+        res.ok ? res.json() : Promise.resolve(DEFAULT_HERO_SETTINGS)
+      ),
+    ])
+      .then(([siteData, heroData]) => {
+        const loadedHero: HeroFullSettings =
+          heroData && typeof heroData === "object"
+            ? ({ ...DEFAULT_HERO_SETTINGS, ...heroData } as HeroFullSettings)
+            : DEFAULT_HERO_SETTINGS;
+        setHeroFullSettings(loadedHero);
         setForm({
-          siteName: data?.siteName ?? SITE_NAME,
-          siteDescription: data?.siteDescription ?? null,
-          logoUrl: data?.logoUrl ?? null,
-        })
-      )
+          siteName: siteData?.siteName ?? SITE_NAME,
+          siteDescription: siteData?.siteDescription ?? null,
+          logoUrl: siteData?.logoUrl ?? null,
+          heroEnabled: loadedHero.heroEnabled ?? false,
+          heroDesktopEnabled: loadedHero.heroDesktopEnabled ?? false,
+          heroMobileEnabled: loadedHero.heroMobileEnabled ?? false,
+        });
+      })
       .catch(() => setForm(DEFAULT_HERO))
       .finally(() => setLoading(false));
   }, []);
@@ -61,6 +81,25 @@ export default function AdminSiteHeroPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "저장 실패");
+      const heroRes = await fetch("/api/admin/site-settings/hero", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          ...heroFullSettings,
+          heroEnabled: form.heroEnabled,
+          heroDesktopEnabled: form.heroDesktopEnabled,
+          heroMobileEnabled: form.heroMobileEnabled,
+        }),
+      });
+      const heroData = await heroRes.json().catch(() => ({}));
+      if (!heroRes.ok) throw new Error(heroData.error || "저장 실패");
+      setHeroFullSettings((prev) => ({
+        ...prev,
+        heroEnabled: form.heroEnabled,
+        heroDesktopEnabled: form.heroDesktopEnabled,
+        heroMobileEnabled: form.heroMobileEnabled,
+      }));
       setSuccess("저장 완료");
     } catch (e) {
       setError(e instanceof Error ? "저장 실패" : "저장 실패");
@@ -82,6 +121,38 @@ export default function AdminSiteHeroPage() {
           <p className="text-sm text-gray-500 dark:text-slate-400">불러오는 중...</p>
         ) : (
           <>
+            <div>
+              <h3 className="text-base font-semibold text-site-text">히어로 사용</h3>
+              <label className="mt-2 flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.heroEnabled}
+                  onChange={(e) => setForm((f) => ({ ...f, heroEnabled: e.target.checked }))}
+                  className="rounded border-site-border"
+                />
+                <span className="text-sm text-site-text">히어로 영역 표시 (체크 시 상단 히어로가 노출됩니다)</span>
+              </label>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.heroDesktopEnabled}
+                    onChange={(e) => setForm((f) => ({ ...f, heroDesktopEnabled: e.target.checked }))}
+                    className="rounded border-site-border"
+                  />
+                  <span className="text-sm text-site-text">데스크톱에서 사용</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.heroMobileEnabled}
+                    onChange={(e) => setForm((f) => ({ ...f, heroMobileEnabled: e.target.checked }))}
+                    className="rounded border-site-border"
+                  />
+                  <span className="text-sm text-site-text">모바일에서 사용</span>
+                </label>
+              </div>
+            </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-site-text">사이트명</label>
               <input

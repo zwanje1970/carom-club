@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { ChevronLeft, LogOut } from "lucide-react";
+import { useSiteSettings } from "@/components/SiteSettingsProvider";
 
 export type MobileHeaderProps = {
   title: string;
@@ -34,6 +35,7 @@ export default function MobileHeader({
   onClosePath,
 }: MobileHeaderProps) {
   const router = useRouter();
+  const settings = useSiteSettings();
   type ReactNativeWebViewWindow = Window & {
     ReactNativeWebView?: {
       postMessage: (message: string) => void;
@@ -42,6 +44,10 @@ export default function MobileHeader({
 
   const finalShowExit = showExit || showClose;
   const finalExitPath = onClosePath || onExitPath;
+  const headerBg = settings.mobileHeaderBgColor ?? settings.headerBgColor ?? null;
+  const headerText = settings.mobileHeaderTextColor ?? settings.headerTextColor ?? null;
+  const headerActive = settings.mobileHeaderActiveColor ?? settings.headerActiveColor ?? null;
+  const logoText = settings.mobileHeaderLogoText?.trim() || title;
 
   const handleExit = () => {
     // WebView 환경에서 앱 종료 인터페이스 호출
@@ -55,7 +61,12 @@ export default function MobileHeader({
   };
 
   return (
-    <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4 dark:bg-slate-950 dark:border-slate-800 md:hidden">
+    <header
+      className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4 dark:bg-slate-950 dark:border-slate-800 md:hidden"
+      style={{
+        ...(headerBg ? { backgroundColor: headerBg, borderColor: headerBg } : null),
+      }}
+    >
       {/* 좌측: 나가기 버튼 */}
       <div className="w-10">
         {finalShowExit && (
@@ -63,6 +74,7 @@ export default function MobileHeader({
             type="button"
             onClick={handleExit}
             className="rounded-full p-2 -ml-2 transition-transform transition-colors active:bg-gray-100 active:scale-95 text-gray-700 dark:text-slate-300"
+            style={headerActive ? { color: headerActive } : headerText ? { color: headerText } : undefined}
             aria-label="나가기"
           >
             <LogOut size={24} />
@@ -71,8 +83,11 @@ export default function MobileHeader({
       </div>
 
       {/* 중앙: 제목 */}
-      <h1 className="flex-1 truncate text-center text-base font-semibold text-gray-900 dark:text-white">
-        {title}
+      <h1
+        className="flex-1 truncate text-center text-base font-semibold text-gray-900 dark:text-white"
+        style={headerText ? { color: headerText } : undefined}
+      >
+        {logoText}
       </h1>
 
       {/* 우측: 뒤로가기 버튼 */}
@@ -82,6 +97,7 @@ export default function MobileHeader({
             type="button"
             onClick={() => router.back()}
             className="rounded-full p-2 -mr-2 transition-transform transition-colors active:bg-gray-100 active:scale-95 text-gray-700 dark:text-slate-300"
+            style={headerActive ? { color: headerActive } : headerText ? { color: headerText } : undefined}
             aria-label="뒤로가기"
           >
             <ChevronLeft size={24} />

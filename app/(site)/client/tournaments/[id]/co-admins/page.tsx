@@ -5,6 +5,7 @@ import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
 import { canUseFeature, FEATURE_CODES, isAnnualMembershipActive } from "@/lib/feature-access";
 import { FeatureGateNotice } from "@/components/client/FeatureGateNotice";
+import { canAccessClientDashboard } from "@/types/auth";
 
 const tabs = [
   { href: "", label: "대회현황" },
@@ -27,7 +28,7 @@ export default async function ClientTournamentCoAdminsPage({
 }) {
   const { id } = await params;
   const session = await getSession();
-  if (!session || session.role !== "CLIENT_ADMIN") return null;
+  if (!session || !canAccessClientDashboard(session)) return null;
 
   const orgId = await getClientAdminOrganizationId(session);
   if (!orgId) notFound();
@@ -87,7 +88,7 @@ export default async function ClientTournamentCoAdminsPage({
       <div className="rounded-lg border border-site-border bg-site-card p-6">
         <p className="text-sm text-gray-600">{tournament.name}</p>
         <p className="mt-4 text-gray-500">
-          공동관리자(권역 관리자 등) 배정 기능은 추후 제공 예정입니다. 여기에서 대회별 공동관리자를 지정할 수 있습니다.
+          대회별 공동관리자를 지정할 수 있습니다.
         </p>
       </div>
     </div>

@@ -35,6 +35,7 @@ export const CONSOLE_ADMIN_MAIN_CLASS = [
 export const CLIENT_CONSOLE_MAIN_SCROLL_CLASS = [
   CONSOLE_INNER_MAX_CLASS,
   CONSOLE_PAD_X_CLASS,
+  "lg:max-w-none lg:px-4 xl:px-5 2xl:px-6",
   "min-h-0 flex-1 overflow-x-hidden overflow-y-auto bg-zinc-100 dark:bg-zinc-950",
   "pt-4 md:pt-6",
   "pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-6",
@@ -44,5 +45,6 @@ export const CLIENT_CONSOLE_MAIN_SCROLL_CLASS = [
 export const CLIENT_CONSOLE_HEADER_INNER_CLASS = [
   CONSOLE_INNER_MAX_CLASS,
   CONSOLE_PAD_X_CLASS,
+  "lg:max-w-none lg:px-4 xl:px-5 2xl:px-6",
   "flex min-h-12 w-full items-center justify-between gap-3",
 ].join(" ");

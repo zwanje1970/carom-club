@@ -7,6 +7,7 @@ import { canUseFeature, FEATURE_CODES, isAnnualMembershipActive } from "@/lib/fe
 import { FeatureGateNotice } from "@/components/client/FeatureGateNotice";
 import { FinalStageSection } from "@/components/client/FinalStageSection";
 import { STAGE_LABELS } from "@/lib/tournament-stage";
+import { canAccessClientDashboard } from "@/types/auth";
 
 const tabs = [
   { href: "", label: "대회현황" },
@@ -29,7 +30,7 @@ export default async function ClientTournamentResultsPage({
 }) {
   const { id } = await params;
   const session = await getSession();
-  if (!session || session.role !== "CLIENT_ADMIN") return null;
+  if (!session || !canAccessClientDashboard(session)) return null;
 
   const orgId = await getClientAdminOrganizationId(session);
   if (!orgId) notFound();
@@ -104,7 +105,7 @@ export default async function ClientTournamentResultsPage({
       <div className="rounded-lg border border-site-border bg-site-card p-6">
         <h2 className="mb-2 text-lg font-semibold text-site-text">권역 예선 → 본선</h2>
         <p className="mb-6 text-sm text-gray-500">
-          권역별 대진표·결과 입력 후 진출자를 취합하고, 본선 32강/64강을 생성해 결과를 입력할 수 있습니다.
+          권역 결과를 바탕으로 본선을 진행할 수 있습니다.
         </p>
         <FinalStageSection
           tournamentId={id}

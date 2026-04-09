@@ -18,6 +18,7 @@ export type ClientApplyInitialData = {
   applicantName?: string;
   email?: string;
   phone?: string;
+  addressFull?: string;
 };
 
 export type ExistingApplication = {
@@ -59,7 +60,7 @@ export function ClientApplyForm({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [done, setDone] = useState(false);
+  const [stage, setStage] = useState<"edit" | "confirm" | "done">("edit");
   const [demoMode, setDemoMode] = useState(false);
   const isEditMode = existingApplication?.status === "PENDING";
   const initialEditSnapshot = useRef<Record<string, string> | null>(null);
@@ -73,7 +74,7 @@ export function ClientApplyForm({
     applicantName: existingApplication?.applicantName ?? initialData?.applicantName ?? "",
     phone: existingApplication?.phone ?? initialData?.phone ?? "",
     email: existingApplication?.email ?? initialData?.email ?? "",
-    region: existingApplication?.region ?? "",
+    region: existingApplication?.region ?? initialData?.addressFull ?? "",
     shortDescription: existingApplication?.shortDescription ?? "",
     referenceLink: existingApplication?.referenceLink ?? "",
   });
@@ -104,31 +105,32 @@ export function ClientApplyForm({
         applicantName: existingApplication.applicantName ?? "",
         phone: existingApplication.phone ?? "",
         email: existingApplication.email ?? "",
-        region: existingApplication.region ?? "",
+        region: existingApplication.region ?? initialData?.addressFull ?? "",
         shortDescription: existingApplication.shortDescription ?? "",
         referenceLink: existingApplication.referenceLink ?? "",
       });
       return;
     }
     initialEditSnapshot.current = null;
-    if (initialData) return;
+    if (initialData?.addressFull && initialData.addressFull.trim()) return;
     fetch("/api/auth/me")
       .then((res) => res.json())
-      .then((data: { name?: string; email?: string; phone?: string }) => {
-        if (data.name || data.email || data.phone) {
+      .then((data: { name?: string; email?: string; phone?: string; address?: string; addressDetail?: string }) => {
+        const fullAddress = [data.address ?? "", data.addressDetail ?? ""].map((v) => String(v).trim()).filter(Boolean).join(" ").trim();
+        if (data.name || data.email || data.phone || fullAddress) {
           setForm((f) => ({
             ...f,
             applicantName: data.name ?? f.applicantName,
             email: data.email ?? f.email,
             phone: data.phone ?? f.phone,
+            region: f.region?.trim() ? f.region : fullAddress || f.region,
           }));
         }
       })
       .catch(() => {});
   }, [allowRegisteredClientType, initialData, existingApplication]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submitApplication() {
     setError("");
 
     if (isEditMode && initialEditSnapshot.current) {
@@ -180,14 +182,19 @@ export function ClientApplyForm({
         return;
       }
       setDemoMode(!!data.demo);
-      setDone(true);
-      setTimeout(() => router.push(successRedirect), 1500);
+      setStage("done");
     } finally {
       setLoading(false);
     }
   }
 
-  if (done) {
+  function handleOpenConfirm(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setStage("confirm");
+  }
+
+  if (stage === "done") {
     return (
       <div className="bg-site-card rounded-lg border border-site-border p-6 text-center">
         <h2 className="text-xl font-bold text-site-text">
@@ -201,19 +208,68 @@ export function ClientApplyForm({
             데모 모드: DB 미연결로 저장되지 않았습니다. .env에 DATABASE_URL을 설정하면 실제 저장됩니다.
           </p>
         )}
-        <Link
-          href={successRedirect}
+        <button
+          type="button"
+          onClick={() => router.push(successRedirect)}
           className="mt-6 inline-block rounded-lg bg-site-primary px-5 py-2.5 text-sm font-medium text-white hover:opacity-90"
         >
           {successLinkLabel}
-        </Link>
+        </button>
+      </div>
+    );
+  }
+
+  if (stage === "confirm") {
+    return (
+      <div className="bg-site-card rounded-lg border border-site-border p-6 space-y-4">
+        <h2 className="text-lg font-semibold text-site-text">신청 내용 확인</h2>
+        {error && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            {error}
+          </div>
+        )}
+        <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-[120px_1fr]">
+          <dt className="text-gray-500">신청 유형</dt><dd>{CLIENT_TYPES.find((t) => t.value === form.type)?.label ?? form.type}</dd>
+          <dt className="text-gray-500">등록 구분</dt><dd>{REQUESTED_CLIENT_TYPES.find((t) => t.value === form.requestedClientType)?.label ?? form.requestedClientType}</dd>
+          <dt className="text-gray-500">업체/단체명</dt><dd>{form.organizationName || "-"}</dd>
+          <dt className="text-gray-500">신청자 이름</dt><dd>{form.applicantName || "-"}</dd>
+          <dt className="text-gray-500">연락처</dt><dd>{form.phone || "-"}</dd>
+          <dt className="text-gray-500">이메일</dt><dd>{form.email || "-"}</dd>
+          <dt className="text-gray-500">주소</dt><dd>{form.region || "-"}</dd>
+          <dt className="text-gray-500">한줄 소개</dt><dd>{form.shortDescription || "-"}</dd>
+          <dt className="text-gray-500">참고 링크</dt><dd>{form.referenceLink || "-"}</dd>
+        </dl>
+        <div className="flex gap-2 pt-2">
+          <button
+            type="button"
+            onClick={() => router.push(successRedirect)}
+            className="rounded-lg border border-site-border px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            신청취소
+          </button>
+          <button
+            type="button"
+            onClick={() => setStage("edit")}
+            className="rounded-lg border border-site-border px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            내용수정
+          </button>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => void submitApplication()}
+            className="flex-1 rounded-lg bg-site-primary py-2.5 font-medium text-white hover:opacity-90 disabled:opacity-50"
+          >
+            {loading ? (isEditMode ? "저장 중..." : "제출 중...") : "신청하기"}
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
     <form
-      onSubmit={handleSubmit}
+      onSubmit={handleOpenConfirm}
       className="bg-site-card rounded-lg border border-site-border p-6 space-y-4"
     >
       {error && (
@@ -354,7 +410,7 @@ export function ClientApplyForm({
           disabled={loading}
           className="flex-1 rounded-lg bg-site-primary py-2.5 font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
-          {loading ? (isEditMode ? "저장 중..." : "제출 중...") : isEditMode ? "수정 완료" : "신청하기"}
+          {isEditMode ? "신청내용 확인" : "신청내용 확인"}
         </button>
         <Link
           href={successRedirect}

@@ -29,12 +29,14 @@ export default async function TournamentApplyPage({
   ]);
 
   let userMemberAvg: string | null = null;
+  let userPhone: string | null = null;
   if (session && isDatabaseConfigured()) {
     const u = await prisma.user.findUnique({
       where: { id: session.id },
       include: { memberProfile: true },
     });
     userMemberAvg = u?.memberProfile?.avg?.trim() || null;
+    userPhone = u?.phone?.trim() || null;
   }
 
   const myEntries = session
@@ -85,6 +87,20 @@ export default async function TournamentApplyPage({
       return (raw as Record<string, unknown>)?.allowMultipleSlots === true;
     } catch {
       return false;
+    }
+  })();
+
+  const entryQualificationLabels = (() => {
+    try {
+      const bc = t.rule?.bracketConfig;
+      const raw = bc == null ? null : typeof bc === "string" ? JSON.parse(bc) : bc;
+      const type = String((raw as Record<string, unknown> | null)?.entryQualificationType ?? "NONE");
+      if (type === "SCORE") return ["점수 기준"];
+      if (type === "EVER") return ["에버 기준"];
+      if (type === "BOTH") return ["점수 기준", "에버 기준"];
+      return [];
+    } catch {
+      return [];
     }
   })();
 
@@ -154,6 +170,7 @@ export default async function TournamentApplyPage({
           entryFee={entryFee}
           accountNumber={accountNumber}
           entryConditionsHtml={t.rule?.entryConditions ?? null}
+          entryQualificationLabels={entryQualificationLabels}
           isLoggedIn={!!session}
           myEntries={myEntries}
           canApplyFirstSlot={canApplyFirstSlot}
@@ -165,6 +182,7 @@ export default async function TournamentApplyPage({
           eligibilityLine={eligibilityLine}
           userMemberAvg={userMemberAvg}
           currentUserName={session?.name ?? null}
+          currentUserPhone={userPhone}
           isScotch={tCert.isScotch === true}
           teamScoreLimit={tCert.teamScoreLimit ?? null}
           teamScoreRule={tCert.teamScoreRule ?? "LTE"}

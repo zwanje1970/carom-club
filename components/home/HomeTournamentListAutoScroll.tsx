@@ -14,8 +14,8 @@ type Props = {
 const AUTO_SCROLL_START_DELAY_MS = 1700;
 
 /**
- * 가로 목록을 연속 흐름(무한 루프)으로 자동 스크롤 — 모바일·데스크톱 공통.
- * 자식에 동일 카드가 두 번 나열되어 있어야 하며, scrollWidth의 절반에서 루프 리셋.
+ * 가로 목록을 연속 흐름으로 자동 스크롤 — 모바일·데스크톱 공통.
+ * 실제 카드 배열만 렌더하고, 끝에 도달하면 처음으로 되돌린다.
  */
 export function HomeTournamentListAutoScroll({
   flowSpeed,
@@ -82,8 +82,8 @@ export function HomeTournamentListAutoScroll({
         return;
       }
 
-      const half = el.scrollWidth / 2;
-      if (half < 8 || el.scrollWidth <= el.clientWidth + 2) {
+      const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+      if (maxScroll < 2) {
         lastTsRef.current = null;
         rafId = requestAnimationFrame(tick);
         return;
@@ -95,8 +95,8 @@ export function HomeTournamentListAutoScroll({
 
       inAutoFlowRef.current = true;
       el.scrollLeft += speedPx * dt;
-      if (el.scrollLeft >= half - 0.5) {
-        el.scrollLeft -= half;
+      if (el.scrollLeft >= maxScroll - 0.5) {
+        el.scrollLeft = 0;
       }
       queueMicrotask(() => {
         inAutoFlowRef.current = false;

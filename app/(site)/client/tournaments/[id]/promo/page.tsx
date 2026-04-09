@@ -5,6 +5,7 @@ import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
 import { canUseFeature, FEATURE_CODES, isAnnualMembershipActive } from "@/lib/feature-access";
 import { FeatureGateNotice } from "@/components/client/FeatureGateNotice";
+import { canAccessClientDashboard } from "@/types/auth";
 
 const tabs = [
   { href: "", label: "대회현황" },
@@ -27,7 +28,7 @@ export default async function ClientTournamentPromoPage({
 }) {
   const { id } = await params;
   const session = await getSession();
-  if (!session || session.role !== "CLIENT_ADMIN") return null;
+  if (!session || !canAccessClientDashboard(session)) return null;
 
   const orgId = await getClientAdminOrganizationId(session);
   if (!orgId) notFound();

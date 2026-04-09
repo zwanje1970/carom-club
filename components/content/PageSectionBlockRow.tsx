@@ -12,7 +12,13 @@ import { cn } from "@/lib/utils";
  * 단일 `PageSection` 행 — 셸 + image|text|cta.
  * `PageSectionsRenderer`·`PageRenderer`가 공유 (CMS 행, `slotType` 없음 전제).
  */
-export function PageSectionBlockRow({ section }: { section: PageSection }) {
+export function PageSectionBlockRow({
+  section,
+  previewMode = "public",
+}: {
+  section: PageSection;
+  previewMode?: "public" | "adminPreview";
+}) {
   const resolved = resolveSectionStyle(section);
   const shellStyle: CSSProperties = {};
   if (resolved.backgroundColor) {

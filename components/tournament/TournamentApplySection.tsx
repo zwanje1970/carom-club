@@ -12,8 +12,10 @@ export type TournamentApplySectionProps = {
   entryFee: number | null;
   accountNumber: string | null;
   entryConditionsHtml: string | null;
+  entryQualificationLabels: string[];
   isLoggedIn: boolean;
   currentUserName: string | null;
+  currentUserPhone: string | null;
   isScotch: boolean;
   teamScoreLimit: number | null;
   teamScoreRule: "LTE" | "LT" | null;
@@ -41,8 +43,10 @@ export function TournamentApplySection({
   entryFee,
   accountNumber,
   entryConditionsHtml,
+  entryQualificationLabels,
   isLoggedIn,
   currentUserName,
+  currentUserPhone,
   isScotch,
   teamScoreLimit,
   teamScoreRule,
@@ -137,12 +141,14 @@ export function TournamentApplySection({
           entryFee={entryFee}
           accountNumber={accountNumber}
           entryConditionsHtml={entryConditionsHtml}
+          entryQualificationLabels={entryQualificationLabels}
           verificationMode={verificationMode}
           verificationGuideText={verificationGuideText}
           divisionEnabled={divisionEnabled}
           eligibilityLine={eligibilityLine}
           userMemberAvg={userMemberAvg}
           currentUserName={currentUserName}
+          currentUserPhone={currentUserPhone}
           isScotch={isScotch}
           teamScoreLimit={teamScoreLimit}
           teamScoreRule={teamScoreRule}
@@ -154,12 +160,14 @@ export function TournamentApplySection({
           entryFee={entryFee != null ? entryFee * 2 : null}
           accountNumber={accountNumber}
           entryConditionsHtml={entryConditionsHtml}
+          entryQualificationLabels={entryQualificationLabels}
           verificationMode={verificationMode}
           verificationGuideText={verificationGuideText}
           divisionEnabled={divisionEnabled}
           eligibilityLine={eligibilityLine}
           userMemberAvg={userMemberAvg}
           currentUserName={currentUserName}
+          currentUserPhone={currentUserPhone}
           isScotch={isScotch}
           teamScoreLimit={teamScoreLimit}
           teamScoreRule={teamScoreRule}

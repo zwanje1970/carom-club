@@ -54,6 +54,10 @@ export type SiteSettings = {
   headerBgColor: string | null;
   headerTextColor: string | null;
   headerActiveColor: string | null;
+  mobileHeaderBgColor: string | null;
+  mobileHeaderTextColor: string | null;
+  mobileHeaderActiveColor: string | null;
+  mobileHeaderLogoText: string | null;
   introSettings: IntroSettings;
   footer: FooterSettings;
 };
@@ -84,6 +88,10 @@ const DEFAULTS: SiteSettings = {
   headerBgColor: null,
   headerTextColor: null,
   headerActiveColor: null,
+  mobileHeaderBgColor: null,
+  mobileHeaderTextColor: null,
+  mobileHeaderActiveColor: null,
+  mobileHeaderLogoText: null,
   introSettings: {
     enabled: false,
     title: "CAROM.CLUB",
@@ -96,6 +104,8 @@ const DEFAULTS: SiteSettings = {
   },
   footer: {
     footerEnabled: false,
+    footerDesktopEnabled: true,
+    footerMobileEnabled: false,
     footerBgColor: null,
     footerTextColor: null,
     footerTitle: null,
@@ -163,6 +173,10 @@ type SiteSettingRow = {
   headerBgColor?: string | null;
   headerTextColor?: string | null;
   headerActiveColor?: string | null;
+  mobileHeaderBgColor?: string | null;
+  mobileHeaderTextColor?: string | null;
+  mobileHeaderActiveColor?: string | null;
+  mobileHeaderLogoText?: string | null;
   footerEnabled?: boolean | null;
   footerBgColor?: string | null;
   footerTextColor?: string | null;
@@ -215,6 +229,10 @@ async function querySiteSettingFullRowById(id: string): Promise<SiteSettingRow |
         "headerActiveColor",
         "headerBgColor",
         "headerTextColor",
+        "mobileHeaderActiveColor",
+        "mobileHeaderBgColor",
+        "mobileHeaderLogoText",
+        "mobileHeaderTextColor",
         "introSettingsJson",
         "footerFontSize",
         "footerFontSizesJson",
@@ -266,7 +284,14 @@ async function querySiteSettingFullRowById(id: string): Promise<SiteSettingRow |
     `;
     const row = rows[0] ?? null;
     if (!row) return null;
-    return { ...row, introSettingsJson: null };
+    return {
+      ...row,
+      introSettingsJson: null,
+      mobileHeaderActiveColor: null,
+      mobileHeaderBgColor: null,
+      mobileHeaderLogoText: null,
+      mobileHeaderTextColor: null,
+    };
   }
 }
 
@@ -415,6 +440,10 @@ function dbRowToSettings(row: SiteSettingRow): SiteSettings {
     headerBgColor: row.headerBgColor ?? null,
     headerTextColor: row.headerTextColor ?? null,
     headerActiveColor: row.headerActiveColor ?? null,
+    mobileHeaderBgColor: row.mobileHeaderBgColor ?? null,
+    mobileHeaderTextColor: row.mobileHeaderTextColor ?? null,
+    mobileHeaderActiveColor: row.mobileHeaderActiveColor ?? null,
+    mobileHeaderLogoText: row.mobileHeaderLogoText ?? null,
     introSettings,
     footer,
   };
@@ -445,6 +474,18 @@ export async function updateSiteSettings(
           headerActiveColor: data.headerActiveColor ?? null,
         }
       : null;
+  const mobileHeaderPayload =
+    data.mobileHeaderBgColor !== undefined ||
+    data.mobileHeaderTextColor !== undefined ||
+    data.mobileHeaderActiveColor !== undefined ||
+    data.mobileHeaderLogoText !== undefined
+      ? {
+          mobileHeaderBgColor: data.mobileHeaderBgColor ?? null,
+          mobileHeaderTextColor: data.mobileHeaderTextColor ?? null,
+          mobileHeaderActiveColor: data.mobileHeaderActiveColor ?? null,
+          mobileHeaderLogoText: data.mobileHeaderLogoText ?? null,
+        }
+      : null;
   const minSolutionLevelForUser =
     data.minSolutionLevelForUser !== undefined
       ? Math.min(15, Math.max(1, Math.floor(Number(data.minSolutionLevelForUser)) || 1))
@@ -452,6 +493,10 @@ export async function updateSiteSettings(
   const headerBgColor = headerPayload?.headerBgColor ?? null;
   const headerTextColor = headerPayload?.headerTextColor ?? null;
   const headerActiveColor = headerPayload?.headerActiveColor ?? null;
+  const mobileHeaderBgColor = mobileHeaderPayload?.mobileHeaderBgColor ?? null;
+  const mobileHeaderTextColor = mobileHeaderPayload?.mobileHeaderTextColor ?? null;
+  const mobileHeaderActiveColor = mobileHeaderPayload?.mobileHeaderActiveColor ?? null;
+  const mobileHeaderLogoText = mobileHeaderPayload?.mobileHeaderLogoText ?? null;
   const introSettingsJson =
     data.introSettings !== undefined
       ? JSON.stringify(normalizeIntroSettings(data.introSettings))
@@ -490,12 +535,16 @@ export async function updateSiteSettings(
         WHERE "id" = ${created.id}
       `;
     }
-    if (headerPayload || minSolutionLevelForUser !== undefined || introSettingsJson !== undefined) {
+    if (headerPayload || mobileHeaderPayload || minSolutionLevelForUser !== undefined || introSettingsJson !== undefined) {
       await prisma.$executeRaw`
         UPDATE "SiteSetting"
         SET "headerBgColor" = ${headerBgColor},
             "headerTextColor" = ${headerTextColor},
             "headerActiveColor" = ${headerActiveColor},
+            "mobileHeaderBgColor" = ${mobileHeaderBgColor},
+            "mobileHeaderTextColor" = ${mobileHeaderTextColor},
+            "mobileHeaderActiveColor" = ${mobileHeaderActiveColor},
+            "mobileHeaderLogoText" = ${mobileHeaderLogoText},
             "minSolutionLevelForUser" = ${minSolutionLevelForUser ?? DEFAULTS.minSolutionLevelForUser},
             "introSettingsJson" = COALESCE(${introSettingsJson}, "introSettingsJson"),
             "updatedAt" = ${new Date()}
@@ -540,12 +589,16 @@ export async function updateSiteSettings(
       WHERE "id" = ${existing.id}
     `;
   }
-  if (headerPayload || minSolutionLevelForUser !== undefined || introSettingsJson !== undefined) {
+  if (headerPayload || mobileHeaderPayload || minSolutionLevelForUser !== undefined || introSettingsJson !== undefined) {
     await prisma.$executeRaw`
       UPDATE "SiteSetting"
       SET "headerBgColor" = CASE WHEN ${headerPayload !== null} THEN ${headerBgColor} ELSE "headerBgColor" END,
           "headerTextColor" = CASE WHEN ${headerPayload !== null} THEN ${headerTextColor} ELSE "headerTextColor" END,
           "headerActiveColor" = CASE WHEN ${headerPayload !== null} THEN ${headerActiveColor} ELSE "headerActiveColor" END,
+          "mobileHeaderBgColor" = CASE WHEN ${mobileHeaderPayload !== null} THEN ${mobileHeaderBgColor} ELSE "mobileHeaderBgColor" END,
+          "mobileHeaderTextColor" = CASE WHEN ${mobileHeaderPayload !== null} THEN ${mobileHeaderTextColor} ELSE "mobileHeaderTextColor" END,
+          "mobileHeaderActiveColor" = CASE WHEN ${mobileHeaderPayload !== null} THEN ${mobileHeaderActiveColor} ELSE "mobileHeaderActiveColor" END,
+          "mobileHeaderLogoText" = CASE WHEN ${mobileHeaderPayload !== null} THEN ${mobileHeaderLogoText} ELSE "mobileHeaderLogoText" END,
           "minSolutionLevelForUser" = COALESCE(${minSolutionLevelForUser}, "minSolutionLevelForUser"),
           "introSettingsJson" = COALESCE(${introSettingsJson}, "introSettingsJson"),
           "updatedAt" = ${new Date()}
@@ -565,7 +618,12 @@ export async function updateFooterSettings(
 ): Promise<FooterSettings> {
   const defaults = DEFAULTS.footer;
   if (!isDatabaseConfigured()) {
-    return { ...defaults, ...data };
+    return {
+      ...defaults,
+      ...data,
+      footerDesktopEnabled: data.footerDesktopEnabled ?? defaults.footerDesktopEnabled,
+      footerMobileEnabled: data.footerMobileEnabled ?? defaults.footerMobileEnabled,
+    };
   }
   const existing = await prisma.siteSetting.findFirst({
     orderBy: { updatedAt: "desc" },
@@ -577,6 +635,13 @@ export async function updateFooterSettings(
         primaryColor: DEFAULTS.primaryColor,
         secondaryColor: DEFAULTS.secondaryColor,
         footerEnabled: data.footerEnabled ?? defaults.footerEnabled,
+        footerFontFamiliesJson: footerFontFamiliesToJson(
+          data.footerFontFamilies ?? {},
+          {
+            footerDesktopEnabled: data.footerDesktopEnabled ?? defaults.footerDesktopEnabled,
+            footerMobileEnabled: data.footerMobileEnabled ?? defaults.footerMobileEnabled,
+          }
+        ),
         footerBgColor: data.footerBgColor ?? null,
         footerTextColor: data.footerTextColor ?? null,
         footerTitle: data.footerTitle ?? null,
@@ -595,11 +660,10 @@ export async function updateFooterSettings(
       },
     });
     const createdRow = await prisma.siteSetting.findFirst({ orderBy: { updatedAt: "desc" } });
-    if (data.footerFontSizes != null || data.footerFontFamilies != null) {
+    if (data.footerFontSizes != null) {
       const sizesJson = data.footerFontSizes != null ? footerFontSizesToJson(data.footerFontSizes) : null;
-      const familiesJson = data.footerFontFamilies != null ? footerFontFamiliesToJson(data.footerFontFamilies) : null;
       await prisma.$executeRaw`
-        UPDATE "SiteSetting" SET "footerFontSizesJson" = ${sizesJson}, "footerFontFamiliesJson" = ${familiesJson}, "updatedAt" = ${new Date()}
+        UPDATE "SiteSetting" SET "footerFontSizesJson" = ${sizesJson}, "updatedAt" = ${new Date()}
         WHERE "id" = ${createdRow!.id}
       `;
       const row = await querySiteSettingFullRowById(createdRow!.id);
@@ -631,12 +695,28 @@ export async function updateFooterSettings(
   });
 
   const hasFooterJson =
-    data.footerFontSizes !== undefined || data.footerFontFamilies !== undefined;
+    data.footerFontSizes !== undefined ||
+    data.footerFontFamilies !== undefined ||
+    data.footerDesktopEnabled !== undefined ||
+    data.footerMobileEnabled !== undefined;
   if (hasFooterJson) {
+    const existingRow = await querySiteSettingFullRowById(existing.id);
+    const existingFooter = dbRowToFooterSettings(existingRow as Parameters<typeof dbRowToFooterSettings>[0]);
     const sizesJson =
-      data.footerFontSizes !== undefined ? footerFontSizesToJson(data.footerFontSizes ?? {}) : null;
+      data.footerFontSizes !== undefined
+        ? footerFontSizesToJson(data.footerFontSizes ?? {})
+        : existingRow?.footerFontSizesJson ?? null;
+    const familiesBase =
+      data.footerFontFamilies !== undefined ? (data.footerFontFamilies ?? {}) : existingFooter.footerFontFamilies;
     const familiesJson =
-      data.footerFontFamilies !== undefined ? footerFontFamiliesToJson(data.footerFontFamilies ?? {}) : null;
+      data.footerFontFamilies !== undefined ||
+      data.footerDesktopEnabled !== undefined ||
+      data.footerMobileEnabled !== undefined
+        ? footerFontFamiliesToJson(familiesBase, {
+            footerDesktopEnabled: data.footerDesktopEnabled ?? existingFooter.footerDesktopEnabled,
+            footerMobileEnabled: data.footerMobileEnabled ?? existingFooter.footerMobileEnabled,
+          })
+        : existingRow?.footerFontFamiliesJson ?? null;
     await prisma.$executeRaw`
       UPDATE "SiteSetting" SET "footerFontSizesJson" = ${sizesJson}, "footerFontFamiliesJson" = ${familiesJson}, "updatedAt" = ${new Date()}
       WHERE "id" = ${existing.id}

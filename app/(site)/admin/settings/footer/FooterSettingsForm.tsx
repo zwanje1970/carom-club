@@ -35,6 +35,8 @@ export default function FooterSettingsForm({ cancelHref = "/admin/settings" }: F
   const [success, setSuccess] = useState(false);
   const [form, setForm] = useState<FooterSettings>({
     footerEnabled: false,
+    footerDesktopEnabled: true,
+    footerMobileEnabled: false,
     footerBgColor: null,
     footerTextColor: null,
     footerFontSize: null,
@@ -57,6 +59,8 @@ export default function FooterSettingsForm({ cancelHref = "/admin/settings" }: F
       .then((data: FooterSettings) => {
         setForm({
           footerEnabled: data.footerEnabled ?? false,
+          footerDesktopEnabled: data.footerDesktopEnabled ?? true,
+          footerMobileEnabled: data.footerMobileEnabled ?? false,
           footerBgColor: data.footerBgColor ?? null,
           footerTextColor: data.footerTextColor ?? null,
           footerFontSize: data.footerFontSize ?? null,
@@ -185,6 +189,30 @@ export default function FooterSettingsForm({ cancelHref = "/admin/settings" }: F
           />
           <span className="text-sm text-site-text">푸터 영역 표시 (체크 시 설정한 내용이 하단에 노출됩니다)</span>
         </label>
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.footerDesktopEnabled}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, footerDesktopEnabled: e.target.checked }))
+              }
+              className="rounded border-site-border"
+            />
+            <span className="text-sm text-site-text">데스크톱에서 사용</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.footerMobileEnabled}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, footerMobileEnabled: e.target.checked }))
+              }
+              className="rounded border-site-border"
+            />
+            <span className="text-sm text-site-text">모바일에서 사용</span>
+          </label>
+        </div>
       </CardBox>
 
       <CardBox>

@@ -17,6 +17,10 @@ export type SiteSettings = {
   headerBgColor: string | null;
   headerTextColor: string | null;
   headerActiveColor: string | null;
+  mobileHeaderBgColor?: string | null;
+  mobileHeaderTextColor?: string | null;
+  mobileHeaderActiveColor?: string | null;
+  mobileHeaderLogoText?: string | null;
   footer?: FooterSettings;
 };
 
@@ -51,6 +55,10 @@ export function useSiteSettings(): SiteSettings {
       headerBgColor: null,
       headerTextColor: null,
       headerActiveColor: null,
+      mobileHeaderBgColor: null,
+      mobileHeaderTextColor: null,
+      mobileHeaderActiveColor: null,
+      mobileHeaderLogoText: null,
     }
   );
 }

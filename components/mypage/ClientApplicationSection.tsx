@@ -104,12 +104,15 @@ export function ClientApplicationSection() {
                 {buttonLabel}
               </Link>
             ) : application.status === "APPROVED" ? (
-              <Link
-                href="/client/dashboard"
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/client/dashboard";
+                }}
                 className="inline-flex items-center rounded-lg bg-site-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90"
               >
                 {buttonLabel}
-              </Link>
+              </button>
             ) : (
               <span className="inline-flex items-center rounded-lg border border-site-border bg-site-card px-4 py-2 text-sm font-medium text-gray-600">
                 {buttonLabel}

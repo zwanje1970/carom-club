@@ -35,6 +35,8 @@ export type HomeSlotRenderContextPayload = {
 
 export type PageSlotRenderContext = {
   page: PageSlotRenderContextPage;
+  /** 서버 요청 기준 기기 판별값(홈 공개 렌더에서 hero/푸터 기기별 미노출 분기용) */
+  isMobileRequest?: boolean;
   heroSettings?: HeroSettings | null;
   home?: HomeSlotRenderContextPayload | null;
   community?: {

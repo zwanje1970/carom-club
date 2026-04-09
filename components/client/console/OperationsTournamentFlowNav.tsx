@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { cx } from "@/components/client/console/ui/cx";
 
-/** operations 하위 대회별 화면 — 상단 공통 이동 (순서: 목록 → 대회 정보 → 참가자 → 대진표 → 대진 생성) */
+/** operations 하위 대회별 화면 — 상단 공통 이동 (순서: 목록 → 대회관리 → 참가자 → 대진표 → 대진 생성) */
 export type OperationsFlowStep = "participants" | "roster" | "bracket-build" | "bracket";
 
 const navBtn =
@@ -32,15 +32,15 @@ export function OperationsTournamentFlowNav({
   const info = `/client/tournaments/${tournamentId}`;
   const base = `/client/operations/tournaments/${tournamentId}`;
   const all: NavItem[] = [
-    { key: "list", href: listHref, label: "대회 목록", step: null },
-    { key: "info", href: info, label: "대회 정보", step: null },
+    { key: "list", href: listHref, label: "대회관리", step: null },
+    { key: "info", href: info, label: "대회관리", step: null },
     { key: "participants", href: `${base}/participants`, label: "참가자 관리", step: "participants" },
     { key: "roster", href: `${base}/participant-roster`, label: "참가 명단 확정", step: "roster" },
     { key: "bracket", href: `${base}/bracket`, label: "대진표 보기·수정", step: "bracket" },
     { key: "build", href: `${base}/bracket-build`, label: "대진 생성", step: "bracket-build" },
   ];
 
-  /** 현재 화면 기준 2~4개만(데스크톱): 목록·대회 정보 + 단계별 연관 링크 */
+  /** 현재 화면 기준 2~4개만(데스크톱): 목록·대회관리 + 단계별 연관 링크 */
   const desktopKeys: Record<OperationsFlowStep, string[]> = {
     participants: ["list", "info", "participants", "roster"],
     roster: ["list", "info", "roster", "build"],
@@ -59,7 +59,7 @@ export function OperationsTournamentFlowNav({
 
   return (
     <div className="space-y-2">
-      {/* 모바일: 목록·대회 정보 + 나머지는 드롭다운 */}
+      {/* 모바일: 목록·대회관리 + 나머지는 드롭다운 */}
       <div className="flex flex-wrap items-center gap-2 md:hidden">
         {primary.map((it) => (
           <Link key={it.key} href={it.href} className={cx(navBtn, navBtnIdle)}>

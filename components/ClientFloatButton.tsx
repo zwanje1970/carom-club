@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SessionUser } from "@/types/auth";
 import { canAccessClientDashboard } from "@/types/auth";
@@ -53,7 +52,6 @@ function clampPosition(
  *   - /client 내부: "메인으로" → /
  */
 export function ClientFloatButton() {
-  const router = useRouter();
   const pathname = usePathname() ?? "";
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined);
   const [mounted, setMounted] = useState(false);
@@ -255,10 +253,10 @@ export function ClientFloatButton() {
       }
       if (isDraggable) {
         e.preventDefault();
-        router.push(href);
+        window.location.href = href;
       }
     },
-    [isDraggable, href, router]
+    [isDraggable, href]
   );
 
   const onKeyDown = useCallback(
@@ -270,11 +268,11 @@ export function ClientFloatButton() {
         }
         if (isDraggable) {
           e.preventDefault();
-          router.push(href);
+          window.location.href = href;
         }
       }
     },
-    [isDraggable, href, router]
+    [isDraggable, href]
   );
 
   if (!showButton) return null;
@@ -284,14 +282,14 @@ export function ClientFloatButton() {
 
   if (!mounted) {
     return (
-      <Link
+      <a
         href={href}
         className={`${baseClass} right-6`}
         style={{ bottom: defaultBottomPx }}
         aria-label={label}
       >
         {label}
-      </Link>
+      </a>
     );
   }
 

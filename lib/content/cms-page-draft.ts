@@ -89,7 +89,10 @@ export async function loadDraftOrPublishedForAdmin(page: PageBuilderKey): Promis
 }
 
 export async function upsertDraftSections(page: PageBuilderKey, sections: PageSection[]): Promise<void> {
-  const normalized = sections.map((s) => normalizeTrustedSectionForDraft(page, s));
+  const normalized = sections
+    .map((s) => normalizeTrustedSectionForDraft(page, s))
+    .sort(compareSectionsForAdminLayout)
+    .map((s, index) => ({ ...s, sortOrder: index }));
   const payload = {
     schemaVersion: CMS_DRAFT_SCHEMA_VERSION,
     sections: normalized,
@@ -136,8 +139,11 @@ export async function publishCmsPageLayoutDraft(page: PageBuilderKey): Promise<{
   }
   const arr = extractRawSectionsArrayFromStoredJson(row.sections);
   const coerced = arr.map((item, i) => coercePageSectionFromDraftJson(page, item, i));
-  assertPublishableDraftSections(page, coerced);
-  const forDb = coerced.map((s) => ({ ...s, page }));
+  const normalizedForPublish = coerced
+    .sort(compareSectionsForAdminLayout)
+    .map((s, index) => ({ ...s, sortOrder: index }));
+  assertPublishableDraftSections(page, normalizedForPublish);
+  const forDb = normalizedForPublish.map((s) => ({ ...s, page }));
   await db.replacePageSectionsForPublishedPageInDb(page, forDb);
   await prisma.cmsPageLayoutDraft.delete({ where: { page } });
   return { publishedAt: new Date().toISOString() };

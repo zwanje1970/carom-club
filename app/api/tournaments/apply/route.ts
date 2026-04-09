@@ -33,6 +33,17 @@ function parseAllowMultipleSlots(rule: { bracketConfig?: string | object | null 
   }
 }
 
+function normalizePhone(value: string | null | undefined): string {
+  if (!value) return "";
+  return value.replace(/[^0-9]/g, "");
+}
+
+function buildParticipantDisplayName(name: string, phoneRaw: string): string {
+  const n = name.trim();
+  const p = normalizePhone(phoneRaw);
+  return p ? `${n} (${p})` : n;
+}
+
 export async function POST(request: Request) {
   if (!isDatabaseConfigured()) {
     return NextResponse.json(
@@ -47,6 +58,8 @@ export async function POST(request: Request) {
 
   let body: {
     tournamentId?: string;
+    applicantName?: string;
+    applicantPhone?: string;
     depositorName?: string;
     clubOrAffiliation?: string;
     additionalSlot?: boolean;
@@ -61,6 +74,7 @@ export async function POST(request: Request) {
     playerBScore?: number | string;
     playerBProofUrl?: string;
     teamTotalScore?: number | string;
+    proxyParticipants?: Array<{ name?: string; phone?: string }>;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -72,6 +86,8 @@ export async function POST(request: Request) {
   }
   const {
     tournamentId,
+    applicantName,
+    applicantPhone,
     depositorName,
     clubOrAffiliation,
     additionalSlot,
@@ -85,17 +101,26 @@ export async function POST(request: Request) {
     playerBName,
     playerBScore,
     playerBProofUrl,
+    proxyParticipants,
   } = body;
   const club = typeof clubOrAffiliation === "string" ? clubOrAffiliation.trim() || null : null;
   const handicapVal = typeof handicap === "string" ? handicap.trim() || null : null;
   const avgVal = typeof avg === "string" ? avg.trim() || null : null;
   const avgProofVal = typeof avgProofUrl === "string" ? avgProofUrl.trim() || null : null;
+  const applicantNameVal = typeof applicantName === "string" ? applicantName.trim() : "";
+  const applicantPhoneVal = typeof applicantPhone === "string" ? applicantPhone.trim() : "";
 
   const copy = await getAdminCopy();
 
   if (!tournamentId || !depositorName?.trim()) {
     return NextResponse.json(
       { error: "대회 선택과 입금자명이 필요합니다." },
+      { status: 400 }
+    );
+  }
+  if (!applicantNameVal || !applicantPhoneVal) {
+    return NextResponse.json(
+      { error: "참가자 본인 이름과 전화번호를 입력해 주세요." },
       { status: 400 }
     );
   }
@@ -232,41 +257,73 @@ export async function POST(request: Request) {
   const allowMultipleSlots = parseAllowMultipleSlots(tournamentWithRule.rule);
   const baseEntryFee = tournamentWithRule.rule?.entryFee ?? tournamentWithRule.entryFee ?? 0;
 
-  const existingEntries = await prisma.tournamentEntry.findMany({
+  const existingEntriesByUser = await prisma.tournamentEntry.findMany({
     where: { tournamentId, userId: session.id },
     select: { id: true, status: true, slotNumber: true },
     orderBy: { slotNumber: "asc" },
   });
+  const nonCanceledByUser = existingEntriesByUser.filter((e) => e.status !== "CANCELED");
+  const maxSlot = existingEntriesByUser.length > 0 ? Math.max(...existingEntriesByUser.map((e) => e.slotNumber)) : 0;
 
-  const nonCanceled = existingEntries.filter((e) => e.status !== "CANCELED");
-  const maxSlot = existingEntries.length > 0 ? Math.max(...existingEntries.map((e) => e.slotNumber)) : 0;
-  const nextSlotNumber = maxSlot + 1;
+  const normalizedProxyParticipants = Array.isArray(proxyParticipants)
+    ? proxyParticipants
+        .map((p) => ({
+          name: typeof p?.name === "string" ? p.name.trim() : "",
+          phone: typeof p?.phone === "string" ? p.phone.trim() : "",
+        }))
+        .filter((p) => p.name && p.phone)
+    : [];
 
-  if (!allowMultipleSlots) {
-    if (nonCanceled.length > 0) {
-      return NextResponse.json(
-        { error: "이미 참가 신청하셨습니다. 이 대회는 중복 참가를 허용하지 않습니다." },
-        { status: 400 }
-      );
-    }
-    const canceled = existingEntries.find((e) => e.status === "CANCELED");
-    if (canceled) {
-      await prisma.tournamentEntry.delete({ where: { id: canceled.id } });
-    }
-  } else {
-    if (additionalSlot && nonCanceled.length === 0) {
-      return NextResponse.json(
-        { error: "먼저 1슬롯 참가 신청을 완료한 후 추가 슬롯을 신청할 수 있습니다." },
-        { status: 400 }
-      );
-    }
-    if (!additionalSlot && nonCanceled.length > 0) {
-      return NextResponse.json(
-        {
-          error: "이미 참가 신청하셨습니다. 추가 슬롯을 원하시면 '추가 슬롯 신청 (참가비 2배)'을 이용해 주세요.",
-        },
-        { status: 400 }
-      );
+  const primaryParticipant = {
+    name:
+      applicantNameVal ||
+      (isScotch ? playerANameRaw || userRow?.name?.trim() || session.username?.trim() || "" : userRow?.name?.trim() || session.username?.trim() || ""),
+    phone: applicantPhoneVal,
+    isPrimary: true,
+  };
+  const participantTargets = [
+    primaryParticipant,
+    ...normalizedProxyParticipants.map((p) => ({
+      name: p.name,
+      phone: p.phone,
+      isPrimary: false,
+    })),
+  ];
+  const hasProxyTargets = participantTargets.some((p) => p.isPrimary === false);
+  if (isScotch && hasProxyTargets) {
+    return NextResponse.json(
+      { error: "스카치 대회는 참가자 추가(대리신청)를 지원하지 않습니다." },
+      { status: 400 }
+    );
+  }
+
+  if (!hasProxyTargets) {
+    if (!allowMultipleSlots) {
+      if (nonCanceledByUser.length > 0) {
+        return NextResponse.json(
+          { error: "이미 참가 신청하셨습니다. 이 대회는 중복 참가를 허용하지 않습니다." },
+          { status: 400 }
+        );
+      }
+      const canceled = existingEntriesByUser.find((e) => e.status === "CANCELED");
+      if (canceled) {
+        await prisma.tournamentEntry.delete({ where: { id: canceled.id } });
+      }
+    } else {
+      if (additionalSlot && nonCanceledByUser.length === 0) {
+        return NextResponse.json(
+          { error: "먼저 1슬롯 참가 신청을 완료한 후 추가 슬롯을 신청할 수 있습니다." },
+          { status: 400 }
+        );
+      }
+      if (!additionalSlot && nonCanceledByUser.length > 0) {
+        return NextResponse.json(
+          {
+            error: "이미 참가 신청하셨습니다. 추가 슬롯을 원하시면 '추가 슬롯 신청 (참가비 2배)'을 이용해 주세요.",
+          },
+          { status: 400 }
+        );
+      }
     }
   }
 
@@ -284,9 +341,6 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-
-    const isAdditionalSlot = allowMultipleSlots && nextSlotNumber >= 2;
-    const entryFeeAmount = isAdditionalSlot ? baseEntryFee * 2 : baseEntryFee;
 
     const needsVerificationImage = requiresVerificationImage(verificationMode);
     const divisionMatch = divisionEnabled
@@ -308,127 +362,161 @@ export async function POST(request: Request) {
           : verificationMode === "AUTO"
             ? "PENDING"
             : null;
-
-    // 3) division 매칭 반영 후
-    // 4) 신청 저장
-    const entry = await prisma.tournamentEntry.create({
-      data: {
-        tournamentId,
-        userId: session.id,
-        slotNumber: nextSlotNumber,
-        status: "APPLIED",
-        depositorName: depositorName.trim(),
-        clubOrAffiliation: club,
-        handicap: handicapVal,
-        avg: avgVal,
-        avgProofUrl: avgProofVal,
-        displayName: isScotch
-          ? [playerANameRaw || userRow?.name?.trim() || session.username?.trim() || "", playerBNameRaw]
-              .filter((v) => v.trim())
-              .join(" / ")
-          : null,
-        playerAName: isScotch ? (playerANameRaw || userRow?.name?.trim() || session.username?.trim() || null) : null,
-        playerAScore: isScotch ? (Number.isInteger(playerAScoreNum) ? playerAScoreNum : null) : null,
-        playerAProof: isScotch ? (playerAProofRaw || verificationImageUrlRaw || null) : null,
-        playerBName: isScotch ? playerBNameRaw : null,
-        playerBScore: isScotch ? (Number.isInteger(playerBScoreNum) ? playerBScoreNum : null) : null,
-        playerBProof: isScotch ? playerBProofRaw : null,
-        teamTotalScore: isScotch ? playerAScoreNum + playerBScoreNum : null,
-        entryFeeAmount: baseEntryFee > 0 ? entryFeeAmount : null,
-        verificationImageUrl: needsVerificationImage ? verificationImageUrlRaw : null,
-        verificationOcrText: null,
-        verificationOcrStatus: ocrInitial,
-        verificationReviewStatus: reviewInitial,
-        divisionName: divisionMatch.divisionName,
-        divisionMatchedValue: divisionMatch.divisionMatchedValue,
-        divisionMatchedAverage: divisionMatch.divisionMatchedAverage,
-        // 구 필드 동시 저장(호환)
-        certificationImageUrl: needsVerificationImage ? verificationImageUrlRaw : null,
-        certificationOcrText: null,
-        certificationOcrStatus:
-          ocrInitial == null
-            ? null
-            : ocrInitial === "PENDING"
-              ? "pending"
-              : ocrInitial === "SKIPPED"
-                ? "skipped"
-                : ocrInitial === "FAILED"
-                  ? "failed"
-                  : "success",
-        certificationReviewStatus:
-          reviewInitial == null
-            ? null
-            : reviewInitial === "PENDING"
-              ? "pending"
-              : "approved",
-      },
+    const existingNonCanceledInTournament = await prisma.tournamentEntry.findMany({
+      where: { tournamentId, status: { not: "CANCELED" } },
+      select: { displayName: true, user: { select: { name: true } } },
     });
+    const existingNameSet = new Set(
+      existingNonCanceledInTournament
+        .map((e) => (e.displayName?.trim() || e.user?.name?.trim() || "").toLowerCase())
+        .filter((v) => v)
+    );
 
-    // 5) OCR 실행 (AUTO, 1회)
-    if (shouldRunServerOcr(verificationMode) && verificationImageUrlRaw) {
-      try {
-        const imgRes = await fetch(verificationImageUrlRaw);
-        if (!imgRes.ok) throw new Error(`fetch ${imgRes.status}`);
-        const buf = Buffer.from(await imgRes.arrayBuffer());
-        const ocr = await runGoogleOcrOnImageBuffer(buf);
-        const ocrStatus = ocr.status === "success" ? "SUCCESS" : "FAILED";
-        await prisma.tournamentEntry.update({
-          where: { id: entry.id },
-          data: {
-            verificationOcrText: ocr.text || null,
-            verificationOcrStatus: ocrStatus,
-            verificationReviewStatus: ocrStatus === "FAILED" ? "PENDING" : reviewInitial,
-            // 구 필드 동시 저장(호환)
-            certificationOcrText: ocr.text || null,
-            certificationOcrStatus: ocr.status === "success" ? "success" : "failed",
-            certificationReviewStatus:
-              ocrStatus === "FAILED"
-                ? "pending"
-                : reviewInitial == null
-                  ? null
-                  : reviewInitial === "PENDING"
-                    ? "pending"
-                    : "approved",
-          },
+    let nextSlotNumber = maxSlot + 1;
+    const participantResults: Array<{ name: string; phone: string; result: "APPLIED" | "ALREADY_APPLIED" }> = [];
+    const createdEntryIds: string[] = [];
+
+    for (const participant of participantTargets) {
+      const displayName = buildParticipantDisplayName(participant.name, participant.phone);
+      const key = displayName.toLowerCase();
+      if (!displayName || existingNameSet.has(key)) {
+        participantResults.push({
+          name: participant.name,
+          phone: participant.phone,
+          result: "ALREADY_APPLIED",
         });
-      } catch (ocrErr) {
-        console.error("[tournaments/apply] OCR error", ocrErr);
-        await prisma.tournamentEntry.update({
-          where: { id: entry.id },
-          data: {
-            verificationOcrStatus: "FAILED",
-            verificationOcrText: null,
-            verificationReviewStatus: "PENDING",
-            // 구 필드 동시 저장(호환)
-            certificationOcrStatus: "failed",
-            certificationOcrText: null,
-            certificationReviewStatus: "pending",
-          },
-        });
+        continue;
       }
+
+      const isAdditionalSlot = nextSlotNumber >= 2;
+      const entryFeeAmount = isAdditionalSlot ? baseEntryFee * 2 : baseEntryFee;
+      const entry = await prisma.tournamentEntry.create({
+        data: {
+          tournamentId,
+          userId: session.id,
+          slotNumber: nextSlotNumber,
+          status: "APPLIED",
+          depositorName: depositorName.trim(),
+          clubOrAffiliation: club,
+          handicap: handicapVal,
+          avg: avgVal,
+          avgProofUrl: avgProofVal,
+          displayName: isScotch
+            ? [playerANameRaw || userRow?.name?.trim() || session.username?.trim() || "", playerBNameRaw]
+                .filter((v) => v.trim())
+                .join(" / ")
+            : displayName,
+          playerAName: isScotch ? (playerANameRaw || userRow?.name?.trim() || session.username?.trim() || null) : null,
+          playerAScore: isScotch ? (Number.isInteger(playerAScoreNum) ? playerAScoreNum : null) : null,
+          playerAProof: isScotch ? (playerAProofRaw || verificationImageUrlRaw || null) : null,
+          playerBName: isScotch ? playerBNameRaw : null,
+          playerBScore: isScotch ? (Number.isInteger(playerBScoreNum) ? playerBScoreNum : null) : null,
+          playerBProof: isScotch ? playerBProofRaw : null,
+          teamTotalScore: isScotch ? playerAScoreNum + playerBScoreNum : null,
+          entryFeeAmount: baseEntryFee > 0 ? entryFeeAmount : null,
+          verificationImageUrl: needsVerificationImage ? verificationImageUrlRaw : null,
+          verificationOcrText: null,
+          verificationOcrStatus: ocrInitial,
+          verificationReviewStatus: reviewInitial,
+          divisionName: divisionMatch.divisionName,
+          divisionMatchedValue: divisionMatch.divisionMatchedValue,
+          divisionMatchedAverage: divisionMatch.divisionMatchedAverage,
+          certificationImageUrl: needsVerificationImage ? verificationImageUrlRaw : null,
+          certificationOcrText: null,
+          certificationOcrStatus:
+            ocrInitial == null
+              ? null
+              : ocrInitial === "PENDING"
+                ? "pending"
+                : ocrInitial === "SKIPPED"
+                  ? "skipped"
+                  : ocrInitial === "FAILED"
+                    ? "failed"
+                    : "success",
+          certificationReviewStatus:
+            reviewInitial == null
+              ? null
+              : reviewInitial === "PENDING"
+                ? "pending"
+                : "approved",
+        },
+      });
+
+      if (participant.isPrimary && shouldRunServerOcr(verificationMode) && verificationImageUrlRaw) {
+        try {
+          const imgRes = await fetch(verificationImageUrlRaw);
+          if (!imgRes.ok) throw new Error(`fetch ${imgRes.status}`);
+          const buf = Buffer.from(await imgRes.arrayBuffer());
+          const ocr = await runGoogleOcrOnImageBuffer(buf);
+          const ocrStatus = ocr.status === "success" ? "SUCCESS" : "FAILED";
+          await prisma.tournamentEntry.update({
+            where: { id: entry.id },
+            data: {
+              verificationOcrText: ocr.text || null,
+              verificationOcrStatus: ocrStatus,
+              verificationReviewStatus: ocrStatus === "FAILED" ? "PENDING" : reviewInitial,
+              certificationOcrText: ocr.text || null,
+              certificationOcrStatus: ocr.status === "success" ? "success" : "failed",
+              certificationReviewStatus:
+                ocrStatus === "FAILED"
+                  ? "pending"
+                  : reviewInitial == null
+                    ? null
+                    : reviewInitial === "PENDING"
+                      ? "pending"
+                      : "approved",
+            },
+          });
+        } catch (ocrErr) {
+          console.error("[tournaments/apply] OCR error", ocrErr);
+          await prisma.tournamentEntry.update({
+            where: { id: entry.id },
+            data: {
+              verificationOcrStatus: "FAILED",
+              verificationOcrText: null,
+              verificationReviewStatus: "PENDING",
+              certificationOcrStatus: "failed",
+              certificationOcrText: null,
+              certificationReviewStatus: "pending",
+            },
+          });
+        }
+      }
+
+      try {
+        await awardTournamentApply(session.id, entry.id);
+      } catch {}
+
+      existingNameSet.add(key);
+      createdEntryIds.push(entry.id);
+      participantResults.push({
+        name: participant.name,
+        phone: participant.phone,
+        result: "APPLIED",
+      });
+      nextSlotNumber += 1;
     }
 
-    try {
-      await awardTournamentApply(session.id, entry.id);
-    } catch (_) {}
-
-    const feeMessage =
-      nextSlotNumber === 1
-        ? baseEntryFee > 0
-          ? `참가비 ${baseEntryFee.toLocaleString()}원`
-          : ""
-        : baseEntryFee > 0
-          ? `추가 슬롯 참가비 ${(baseEntryFee * 2).toLocaleString()}원 (2배)`
-          : "";
+    if (createdEntryIds.length === 0) {
+      return NextResponse.json(
+        {
+          error: "이미 신청한 참가자입니다.",
+          participantResults,
+        },
+        { status: 409 }
+      );
+    }
 
     return NextResponse.json({
       ok: true,
       status: "APPLIED",
-      slotNumber: nextSlotNumber,
+      slotNumber: maxSlot + 1,
+      createdCount: createdEntryIds.length,
+      participantResults,
       message:
-        nextSlotNumber >= 2
-          ? `추가 슬롯(슬롯${nextSlotNumber}) 신청이 접수되었습니다. ${feeMessage} 입금 후 '입금 완료'를 체크해 주세요.`
-          : "참가 신청이 접수되었습니다. 입금 후 아래에서 '입금 완료'를 체크해 주세요. 관리자 입금확인 순으로 참가가 확정됩니다.",
+        createdEntryIds.length === 1
+          ? "참가 신청이 접수되었습니다. 입금 후 아래에서 '입금 완료'를 체크해 주세요. 관리자 입금확인 순으로 참가가 확정됩니다."
+          : `${createdEntryIds.length}명의 참가 신청이 접수되었습니다. 중복 참가자는 신청완료로 표시되었습니다.`,
     });
   } catch (e) {
     console.error("apply error", e);

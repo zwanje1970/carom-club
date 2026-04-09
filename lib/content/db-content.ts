@@ -4,7 +4,6 @@
  */
 
 import type { Prisma } from "@/generated/prisma";
-import { cache } from "react";
 import { prisma } from "@/lib/db";
 import type { PageSection, SectionButton } from "@/types/page-section";
 import type { Popup } from "@/types/popup";
@@ -186,7 +185,7 @@ function isInRange(startAt: string | null, endAt: string | null): boolean {
   return true;
 }
 
-const loadVisiblePageSectionsForPageFromDb = cache(async (page: PageSlug): Promise<PageSection[]> => {
+const loadVisiblePageSectionsForPageFromDb = async (page: PageSlug): Promise<PageSection[]> => {
   const list = await prisma.pageSection.findMany({
     where: { page, isVisible: true, deletedAt: null },
     orderBy: { sortOrder: "asc" },
@@ -194,7 +193,7 @@ const loadVisiblePageSectionsForPageFromDb = cache(async (page: PageSlug): Promi
   return list
     .filter((s) => isInRange(s.startAt?.toISOString() ?? null, s.endAt?.toISOString() ?? null))
     .map((r) => rowToPageSection(r));
-});
+};
 
 export async function getPageSectionsForPageFromDb(page: PageSlug): Promise<PageSection[]> {
   return (await loadVisiblePageSectionsForPageFromDb(page)).filter((s) => !s.slotType);

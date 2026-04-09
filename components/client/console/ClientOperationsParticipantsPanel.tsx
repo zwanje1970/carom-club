@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { formatKoreanDateTime } from "@/lib/format-date";
 import {
   ConsoleActionBar,
@@ -18,20 +17,13 @@ import {
 } from "@/components/client/console/ui";
 import { cx } from "@/components/client/console/ui/cx";
 import { consoleTextMuted } from "@/components/client/console/ui/tokens";
-import { DEFAULT_ADMIN_COPY, fillAdminCopyTemplate, getCopyValue, type AdminCopyKey } from "@/lib/admin-copy";
-import { parseVerificationMode } from "@/lib/tournament-certification";
+import { DEFAULT_ADMIN_COPY, fillAdminCopyTemplate, getCopyValue } from "@/lib/admin-copy";
 import {
   getUnassignedDivisionLabel,
   groupEntriesByDivision,
   sortEntriesByDivision,
 } from "@/lib/tournament-division-grouping";
 import {
-  OperationsStepFlowBar,
-  OperationsTournamentFlowNav,
-} from "@/components/client/console/OperationsTournamentFlowNav";
-import { OperationsTournamentPhaseStepper } from "@/components/client/console/OperationsTournamentPhaseStepper";
-import {
-  buildOperationPhaseSteps,
   type OperationsPhaseView,
   type TournamentOperationPhaseSnapshot,
 } from "@/lib/client-tournament-operation-phase";
@@ -146,12 +138,10 @@ const FILTER_OPTIONS: { value: FilterKey; label: string }[] = [
 export function ClientOperationsParticipantsPanel({
   tournamentId,
   tournamentName,
-  listHref,
-  operationPhase,
 }: {
   tournamentId: string;
   tournamentName: string;
-  listHref: string;
+  listHref?: string;
   operationPhase?: {
     snapshot: TournamentOperationPhaseSnapshot;
     currentView: OperationsPhaseView;
@@ -350,12 +340,6 @@ export function ClientOperationsParticipantsPanel({
     }
   }
 
-  const selectedRows = useMemo(
-    () => filteredSorted.filter((r) => selected.has(r.id)),
-    [filteredSorted, selected]
-  );
-  const primarySelected = selectedRows.length === 1 ? selectedRows[0] : null;
-
   const counts = useMemo(() => {
     let paymentPending = 0;
     let paymentMarked = 0;
@@ -393,32 +377,8 @@ export function ClientOperationsParticipantsPanel({
       <ConsolePageHeader
         eyebrow="대회 운영"
         title="참가자 관리(운영)"
-        description={`「${tournamentName}」 — 승인·입금 확인 후 다음 단계로 이동하세요.`}
+        description={`「${tournamentName}」`}
       />
-
-      {operationPhase && (
-        <OperationsTournamentPhaseStepper
-          steps={buildOperationPhaseSteps(tournamentId, operationPhase.snapshot, operationPhase.currentView)}
-        />
-      )}
-
-      <OperationsTournamentFlowNav tournamentId={tournamentId} listHref={listHref} active="participants" />
-      <OperationsStepFlowBar tournamentId={tournamentId} listHref={listHref} activeStep="participants" />
-
-      <div className="grid grid-cols-2 gap-2 lg:hidden">
-        <Link
-          href={`/client/operations/tournaments/${tournamentId}/participant-roster`}
-          className="inline-flex min-h-[48px] items-center justify-center rounded-md border border-zinc-800 bg-zinc-800 px-2 text-center text-xs font-semibold text-white dark:border-zinc-200 dark:bg-zinc-200 dark:text-zinc-900"
-        >
-          명단 확정
-        </Link>
-        <Link
-          href={`/client/operations/tournaments/${tournamentId}/bracket-build`}
-          className="inline-flex min-h-[48px] items-center justify-center rounded-md border border-zinc-300 px-2 text-center text-xs font-semibold text-zinc-900 dark:border-zinc-600 dark:text-zinc-100"
-        >
-          대진 생성
-        </Link>
-      </div>
 
       {rosterLocked && (
         <p className="rounded-sm border border-zinc-600 bg-zinc-800 px-3 py-2 text-xs text-zinc-100 dark:border-zinc-500 dark:bg-zinc-900">
@@ -448,7 +408,7 @@ export function ClientOperationsParticipantsPanel({
         </p>
       )}
 
-      <ConsoleFilterBar hint="상태·검색·정렬은 클라이언트에서 적용됩니다. 저장 후 목록이 갱신됩니다.">
+      <ConsoleFilterBar>
         <div className="flex flex-wrap gap-1.5">
           {FILTER_OPTIONS.map((opt) => (
             <button
@@ -507,7 +467,7 @@ export function ClientOperationsParticipantsPanel({
         {meta?.useWaiting ? " · 대기 허용" : ""}
       </p>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_16rem] lg:items-start">
+      <div className="grid gap-4">
         <ConsoleSection title="참가자 표" flush>
           {filteredSorted.length === 0 ? (
             <div className="p-6 text-center text-xs text-zinc-500">조건에 맞는 참가자가 없습니다.</div>
@@ -809,138 +769,6 @@ export function ClientOperationsParticipantsPanel({
                 })()}
               </ConsoleTableBody>
             </ConsoleTable>
-          )}
-        </ConsoleSection>
-
-        <ConsoleSection title="선택 행 상세">
-          {!primarySelected ? (
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              {selectedRows.length === 0
-                ? "행을 선택하면 요약이 표시됩니다."
-                : `${selectedRows.length}건 선택됨 (일괄 작업은 하단 바를 사용하세요)`}
-            </p>
-          ) : (
-            <dl className="space-y-2 text-xs">
-              <div>
-                <dt className={consoleTextMuted}>표시명</dt>
-                <dd className="font-medium text-zinc-900 dark:text-zinc-100">{entryStatusLabel(primarySelected)}</dd>
-              </div>
-              <div>
-                <dt className={consoleTextMuted}>입금자명</dt>
-                <dd>{primarySelected.depositorName ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className={consoleTextMuted}>소속</dt>
-                <dd>{primarySelected.clubOrAffiliation ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className={consoleTextMuted}>핸디 / AVG</dt>
-                <dd>
-                  {primarySelected.handicap ?? "—"} / {primarySelected.avg ?? "—"}
-                </dd>
-              </div>
-              {meta &&
-                parseVerificationMode(meta.verificationMode) !== "NONE" && (
-                  <div className="rounded-sm border border-zinc-200 p-2 dark:border-zinc-600">
-                    <div className={consoleTextMuted}>
-                      {getCopyValue(DEFAULT_ADMIN_COPY, "client.operations.certReview.sectionTitle")}
-                    </div>
-                    <div className="mt-1 space-y-1">
-                      <div className="text-[11px]">
-                        {getCopyValue(DEFAULT_ADMIN_COPY, "client.tournamentForm.certMode.label")}:{" "}
-                        {getCopyValue(
-                          DEFAULT_ADMIN_COPY,
-                          `client.operations.certificationMode.${meta.verificationMode}` as AdminCopyKey
-                        )}
-                      </div>
-                      {primarySelected.verificationImageUrl ? (
-                        <a
-                          href={primarySelected.verificationImageUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[11px] text-blue-600 underline dark:text-blue-400"
-                        >
-                          {getCopyValue(DEFAULT_ADMIN_COPY, "admin.common.preview")}
-                        </a>
-                      ) : (
-                        <span className="text-[11px] text-zinc-500">첨부 없음</span>
-                      )}
-                      {meta.verificationMode === "AUTO" && (
-                        <>
-                          <div className="text-[11px]">
-                            OCR:{" "}
-                            {primarySelected.verificationOcrStatus
-                              ? getCopyValue(
-                                  DEFAULT_ADMIN_COPY,
-                                  `client.operations.certOcr.${primarySelected.verificationOcrStatus.toLowerCase()}` as AdminCopyKey
-                                )
-                              : "—"}
-                          </div>
-                          <div className="max-h-24 overflow-auto whitespace-pre-wrap break-words text-[11px] text-zinc-600 dark:text-zinc-300">
-                            {primarySelected.verificationOcrText || "—"}
-                          </div>
-                        </>
-                      )}
-                      {meta.verificationMode === "MANUAL" && (
-                        <p className="text-[11px] text-zinc-500">
-                          OCR 미사용. 이미지로 수동 확인하세요.
-                        </p>
-                      )}
-                      <div className="text-[11px]">부 배정: {primarySelected.divisionName ?? unassignedDivisionLabel}</div>
-                      <div className="text-[11px]">
-                        검토:{" "}
-                        {primarySelected.verificationReviewStatus
-                          ? getCopyValue(
-                              DEFAULT_ADMIN_COPY,
-                              `client.operations.certReview.${primarySelected.verificationReviewStatus.toLowerCase()}` as AdminCopyKey
-                            )
-                          : "—"}
-                      </div>
-                      {primarySelected.verificationReviewStatus === "PENDING" &&
-                        primarySelected.verificationImageUrl && (
-                          <div className="flex flex-wrap gap-1 pt-1">
-                            <button
-                              type="button"
-                              disabled={busy || loadingId === primarySelected.id}
-                              className="rounded-sm border border-emerald-600 px-2 py-0.5 text-[10px] font-medium text-emerald-800 dark:text-emerald-200"
-                              onClick={() =>
-                                singleAction(
-                                  primarySelected.id,
-                                  `/api/client/tournaments/${tournamentId}/participants/${primarySelected.id}/certification-review`,
-                                  "POST",
-                                  { action: "approve" }
-                                )
-                              }
-                            >
-                              {getCopyValue(DEFAULT_ADMIN_COPY, "client.operations.certReview.approve")}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={busy || loadingId === primarySelected.id}
-                              className="rounded-sm border border-zinc-400 px-2 py-0.5 text-[10px] text-zinc-700 dark:border-zinc-500 dark:text-zinc-300"
-                              onClick={() =>
-                                singleAction(
-                                  primarySelected.id,
-                                  `/api/client/tournaments/${tournamentId}/participants/${primarySelected.id}/certification-review`,
-                                  "POST",
-                                  { action: "reject" }
-                                )
-                              }
-                            >
-                              {getCopyValue(DEFAULT_ADMIN_COPY, "client.operations.certReview.reject")}
-                            </button>
-                          </div>
-                        )}
-                    </div>
-                  </div>
-                )}
-              {primarySelected.rejectionReason && (
-                <div>
-                  <dt className={consoleTextMuted}>반려 사유</dt>
-                  <dd className="text-red-700 dark:text-red-300">{primarySelected.rejectionReason}</dd>
-                </div>
-              )}
-            </dl>
           )}
         </ConsoleSection>
       </div>

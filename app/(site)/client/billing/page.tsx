@@ -3,6 +3,7 @@ import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import Link from "next/link";
 import { ClientBillingSettlementConsole } from "@/components/client/console/ClientBillingSettlementConsole";
 import { isAnnualMembershipVisible } from "@/lib/site-feature-flags";
+import { canAccessClientDashboard } from "@/types/auth";
 
 export const metadata = {
   title: "정산",
@@ -14,7 +15,7 @@ export default async function ClientBillingPage({
   searchParams: Promise<{ tournament?: string }>;
 }) {
   const session = await getSession();
-  if (!session || session.role !== "CLIENT_ADMIN") return null;
+  if (!session || !canAccessClientDashboard(session)) return null;
   const showPlatformBillingLink = await isAnnualMembershipVisible();
 
   const orgId = await getClientAdminOrganizationId(session);

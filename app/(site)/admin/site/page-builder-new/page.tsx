@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PageBuilderMobilePreview } from "@/components/admin/page-builder/PageBuilderMobilePreview";
 import { AdminImageField } from "@/components/admin/_components/AdminImageField";
-import { BasicCard, HighlightCard } from "@/components/cards/TournamentPublishedCard";
 import type { PageBuilderKey } from "@/lib/content/page-section-page-rules";
-import { DEFAULT_PLATFORM_CARD_TEMPLATE_STYLES } from "@/lib/platform-card-templates";
+import {
+  PLATFORM_CARD_TEMPLATE_STYLE_COPY_KEYS,
+  resolvePlatformCardTemplateStylePolicy,
+} from "@/lib/platform-card-templates";
 
 type BuilderPage = "home" | "community" | "tournaments";
 type SectionType = "text" | "image" | "cta";
@@ -15,24 +17,44 @@ type StepState = "open" | "done" | "locked";
 type CardKind = "default" | "custom" | "publishedTournament" | "publishedVenue";
 type SpacingPreset = "compact" | "normal" | "wide";
 type ElementType = "text" | "card" | "cta";
-type ElementCtaPlacement =
-  | "headerRight"
-  | "blockBottomLeft"
-  | "blockBottomCenter"
-  | "blockBottomRight"
+type ButtonShape = "square" | "circle";
+type TextMode = "cms" | "cta";
+type ElementPlacement =
+  | "topLeft"
+  | "topCenter"
+  | "topRight"
+  | "insideLeft"
+  | "insideCenter"
+  | "insideRight"
+  | "bottomLeft"
+  | "bottomCenter"
+  | "bottomRight"
+  | "outsideTopLeft"
+  | "outsideTopCenter"
+  | "outsideTopRight"
   | "outsideBottomLeft"
   | "outsideBottomCenter"
   | "outsideBottomRight";
+type ElementRegion = "blockTop" | "blockInside" | "blockBottom" | "outsideTop" | "outsideBottom";
+type ElementAlign = "left" | "center" | "right";
 
 type BuilderElement = {
   id: string;
   type: ElementType;
+  textMode?: TextMode;
   textTitle?: string;
   textBody?: string;
+  textHref?: string;
+  textAlign?: ElementAlign;
+  textColor?: string;
+  textSize?: number;
   cardKind?: CardKind;
   ctaLabel?: string;
   ctaHref?: string;
-  ctaPlacement?: ElementCtaPlacement;
+  buttonAlign?: ElementAlign;
+  buttonColor?: string;
+  buttonShape?: ButtonShape;
+  placement?: ElementPlacement;
 };
 
 type SectionButton = {
@@ -140,26 +162,211 @@ function normalizeSpacingPx(raw: unknown, fallback: number): number {
   return Math.max(0, Math.min(48, n));
 }
 
-function normalizeElementCtaPlacement(raw: unknown): ElementCtaPlacement {
-  return raw === "blockBottomLeft" ||
-    raw === "blockBottomCenter" ||
-    raw === "blockBottomRight" ||
+function normalizeElementPlacement(raw: unknown): ElementPlacement {
+  if (
+    raw === "topLeft" ||
+    raw === "topCenter" ||
+    raw === "topRight" ||
+    raw === "insideLeft" ||
+    raw === "insideCenter" ||
+    raw === "insideRight" ||
+    raw === "bottomLeft" ||
+    raw === "bottomCenter" ||
+    raw === "bottomRight" ||
+    raw === "outsideTopLeft" ||
+    raw === "outsideTopCenter" ||
+    raw === "outsideTopRight" ||
     raw === "outsideBottomLeft" ||
     raw === "outsideBottomCenter" ||
     raw === "outsideBottomRight"
-    ? (raw as ElementCtaPlacement)
-    : "headerRight";
+  ) {
+    return raw as ElementPlacement;
+  }
+  if (raw === "top") return "topCenter";
+  if (raw === "bottom") return "bottomCenter";
+  if (raw === "outsideLeft") return "outsideBottomLeft";
+  if (raw === "outsideCenter") return "outsideBottomCenter";
+  if (raw === "outsideRight") return "outsideBottomRight";
+  if (raw === "headerRight") return "topRight";
+  if (raw === "blockBottomLeft") return "insideLeft";
+  if (raw === "blockBottomCenter") return "insideCenter";
+  if (raw === "blockBottomRight") return "insideRight";
+  if (raw === "outsideBottomLeft") return "outsideBottomLeft";
+  if (raw === "outsideBottomCenter") return "outsideBottomCenter";
+  if (raw === "outsideBottomRight") return "outsideBottomRight";
+  return "topCenter";
+}
+
+function normalizeElementRegion(raw: unknown): ElementRegion {
+  return raw === "blockTop" ||
+    raw === "blockInside" ||
+    raw === "blockBottom" ||
+    raw === "outsideTop" ||
+    raw === "outsideBottom"
+    ? (raw as ElementRegion)
+    : "blockTop";
+}
+
+function normalizeElementAlign(raw: unknown): ElementAlign {
+  return raw === "center" || raw === "right" ? (raw as ElementAlign) : "left";
+}
+
+function placementFromRegionAlign(region: ElementRegion, align: ElementAlign): ElementPlacement {
+  if (region === "blockTop") {
+    if (align === "center") return "topCenter";
+    if (align === "right") return "topRight";
+    return "topLeft";
+  }
+  if (region === "blockInside") {
+    if (align === "center") return "insideCenter";
+    if (align === "right") return "insideRight";
+    return "insideLeft";
+  }
+  if (region === "blockBottom") {
+    if (align === "center") return "bottomCenter";
+    if (align === "right") return "bottomRight";
+    return "bottomLeft";
+  }
+  if (region === "outsideTop") {
+    if (align === "center") return "outsideTopCenter";
+    if (align === "right") return "outsideTopRight";
+    return "outsideTopLeft";
+  }
+  if (align === "center") return "outsideBottomCenter";
+  if (align === "right") return "outsideBottomRight";
+  return "outsideBottomLeft";
+}
+
+function regionAlignFromPlacement(raw: unknown): { region: ElementRegion; align: ElementAlign } {
+  const placement = normalizeElementPlacement(raw);
+  if (placement === "topLeft") return { region: "blockTop", align: "left" };
+  if (placement === "topCenter") return { region: "blockTop", align: "center" };
+  if (placement === "topRight") return { region: "blockTop", align: "right" };
+  if (placement === "insideLeft") return { region: "blockInside", align: "left" };
+  if (placement === "insideCenter") return { region: "blockInside", align: "center" };
+  if (placement === "insideRight") return { region: "blockInside", align: "right" };
+  if (placement === "bottomLeft") return { region: "blockBottom", align: "left" };
+  if (placement === "bottomCenter") return { region: "blockBottom", align: "center" };
+  if (placement === "bottomRight") return { region: "blockBottom", align: "right" };
+  if (placement === "outsideTopLeft") return { region: "outsideTop", align: "left" };
+  if (placement === "outsideTopCenter") return { region: "outsideTop", align: "center" };
+  if (placement === "outsideTopRight") return { region: "outsideTop", align: "right" };
+  if (placement === "outsideBottomLeft") return { region: "outsideBottom", align: "left" };
+  if (placement === "outsideBottomCenter") return { region: "outsideBottom", align: "center" };
+  return { region: "outsideBottom", align: "right" };
+}
+
+function allowedPlacementsForElement(type: ElementType): ElementPlacement[] {
+  if (type === "card") return ["insideLeft", "insideCenter", "insideRight"];
+  if (type === "cta") {
+    return [
+      "topLeft",
+      "topCenter",
+      "topRight",
+      "bottomLeft",
+      "bottomCenter",
+      "bottomRight",
+      "outsideTopLeft",
+      "outsideTopCenter",
+      "outsideTopRight",
+      "outsideBottomLeft",
+      "outsideBottomCenter",
+      "outsideBottomRight",
+    ];
+  }
+  return [
+    "topLeft",
+    "topCenter",
+    "topRight",
+    "insideLeft",
+    "insideCenter",
+    "insideRight",
+    "bottomLeft",
+    "bottomCenter",
+    "bottomRight",
+    "outsideTopLeft",
+    "outsideTopCenter",
+    "outsideTopRight",
+    "outsideBottomLeft",
+    "outsideBottomCenter",
+    "outsideBottomRight",
+  ];
+}
+
+function normalizePlacementForElement(type: ElementType, raw: unknown): ElementPlacement {
+  const normalized = normalizeElementPlacement(raw);
+  const allowed = allowedPlacementsForElement(type);
+  return allowed.includes(normalized) ? normalized : allowed[0];
+}
+
+function normalizeElementColor(raw: unknown, fallback: string): string {
+  const value = String(raw ?? "").trim();
+  if (!/^#[0-9a-fA-F]{6}$/.test(value)) return fallback;
+  return value;
+}
+
+function normalizeElementTextSize(raw: unknown, fallback: number): number {
+  const n = Math.round(Number(raw));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(10, Math.min(48, n));
+}
+
+function normalizeTextMode(raw: unknown): TextMode {
+  return raw === "cta" ? "cta" : "cms";
+}
+
+function normalizeButtonShape(raw: unknown): ButtonShape {
+  return raw === "circle" ? "circle" : "square";
+}
+
+function placementAlignClass(value: ElementPlacement): "justify-start" | "justify-center" | "justify-end" {
+  const { align } = regionAlignFromPlacement(value);
+  if (align === "center") return "justify-center";
+  if (align === "right") return "justify-end";
+  return "justify-start";
+}
+
+function placementLabel(value: ElementPlacement): string {
+  const { region, align } = regionAlignFromPlacement(value);
+  const alignLabel = align === "center" ? "가운데" : align === "right" ? "우" : "좌";
+  if (region === "blockTop") return `블록 상단: ${alignLabel}`;
+  if (region === "blockInside") return `블록 내부: ${alignLabel}`;
+  if (region === "blockBottom") return `블록 하단: ${alignLabel}`;
+  if (region === "outsideTop") return `블록 외부 상단: ${alignLabel}`;
+  return `블록 외부 하단: ${alignLabel}`;
+}
+
+function elementTypeLabel(type: ElementType): string {
+  if (type === "text") return "텍스트";
+  if (type === "card") return "카드";
+  return "버튼";
 }
 
 function emptyBuilderElement(type: ElementType): BuilderElement {
-  if (type === "text") return { id: makeId("el"), type, textTitle: "제목", textBody: "설명" };
-  if (type === "card") return { id: makeId("el"), type, cardKind: "default" };
+  if (type === "text") {
+    return {
+      id: makeId("el"),
+      type,
+      textMode: "cms",
+      textTitle: "제목",
+      textBody: "설명",
+      textHref: "",
+      textAlign: "left",
+      textColor: "#374151",
+      textSize: 14,
+      placement: "topLeft",
+    };
+  }
+  if (type === "card") return { id: makeId("el"), type, cardKind: "default", placement: "insideCenter" };
   return {
     id: makeId("el"),
     type,
     ctaLabel: "전체보기",
     ctaHref: "/tournaments",
-    ctaPlacement: "blockBottomRight",
+    buttonAlign: "left",
+    buttonColor: "#2563eb",
+    buttonShape: "square",
+    placement: "bottomLeft",
   };
 }
 
@@ -170,12 +377,23 @@ function toBuilderElement(raw: unknown): BuilderElement | null {
   return {
     id: typeof o.id === "string" && o.id.trim() ? o.id : makeId("el"),
     type: o.type as ElementType,
+    textMode: normalizeTextMode(o.textMode),
     textTitle: typeof o.textTitle === "string" ? o.textTitle : "",
     textBody: typeof o.textBody === "string" ? o.textBody : "",
+    textHref: typeof o.textHref === "string" ? o.textHref : "",
+    textAlign: normalizeElementAlign(o.textAlign),
+    textColor: normalizeElementColor(o.textColor, "#374151"),
+    textSize: normalizeElementTextSize(o.textSize, 14),
     cardKind: resolveCardKind(o.cardKind),
     ctaLabel: typeof o.ctaLabel === "string" ? o.ctaLabel : "전체보기",
     ctaHref: typeof o.ctaHref === "string" ? o.ctaHref : "/tournaments",
-    ctaPlacement: normalizeElementCtaPlacement(o.ctaPlacement),
+    buttonAlign: normalizeElementAlign(o.buttonAlign),
+    buttonColor: normalizeElementColor(o.buttonColor, "#2563eb"),
+    buttonShape: normalizeButtonShape(o.buttonShape),
+    placement: normalizePlacementForElement(
+      o.type as ElementType,
+      (o.placement ?? o.ctaPlacement) as unknown
+    ),
   };
 }
 
@@ -189,18 +407,40 @@ function resolveBuilderElements(style: StyleMap, draft: PageSection | null): Bui
   fallback.push({
     id: makeId("el"),
     type: "text",
+    textMode: "cms",
     textTitle: draft?.title ?? "",
     textBody: draft?.description ?? "",
+    textHref: "",
+    textAlign: "left",
+    textColor: normalizeElementColor(style.contentColor, "#374151"),
+    textSize: normalizeElementTextSize(style.contentSize, 14),
+    placement: "topLeft",
   });
   if (Array.isArray(style.contentExtras)) {
     for (const item of style.contentExtras as unknown[]) {
       const text = String(item ?? "").trim();
       if (!text) continue;
-      fallback.push({ id: makeId("el"), type: "text", textTitle: "", textBody: text });
+      fallback.push({
+        id: makeId("el"),
+        type: "text",
+        textMode: "cms",
+        textTitle: "",
+        textBody: text,
+        textHref: "",
+        textAlign: "left",
+        textColor: normalizeElementColor(style.contentColor, "#374151"),
+        textSize: normalizeElementTextSize(style.contentSize, 14),
+        placement: "topLeft",
+      });
     }
   }
   if (Boolean(style.cardEnabled)) {
-    fallback.push({ id: makeId("el"), type: "card", cardKind: resolveCardKind(style.cardKind) });
+    fallback.push({
+      id: makeId("el"),
+      type: "card",
+      cardKind: resolveCardKind(style.cardKind),
+      placement: normalizePlacementForElement("card", style.cardPlacement),
+    });
   }
   if (String(style.contentMode ?? "cms") === "cta" && String(style.contentCtaLink ?? "").trim()) {
     fallback.push({
@@ -208,7 +448,10 @@ function resolveBuilderElements(style: StyleMap, draft: PageSection | null): Bui
       type: "cta",
       ctaLabel: "전체보기",
       ctaHref: String(style.contentCtaLink ?? ""),
-      ctaPlacement: normalizeElementCtaPlacement(style.contentCtaPlacement),
+      buttonAlign: "left",
+      buttonColor: "#2563eb",
+      buttonShape: "square",
+      placement: normalizePlacementForElement("cta", style.contentCtaPlacement),
     });
   }
   return fallback;
@@ -226,6 +469,62 @@ function parseStyle(json: string | null | undefined): StyleMap {
 
 function toStyleJson(map: StyleMap): string {
   return JSON.stringify(map);
+}
+
+function normalizePublishedTournamentAutoStyle(style: StyleMap, section: PageSection | null): StyleMap {
+  if (!section || section.slotType !== "tournamentIntro") return style;
+  const kind = resolveCardKind(style.cardKind);
+  const loadMode = String(style.publishedCardLoadMode ?? "latest");
+  if (kind !== "publishedTournament" || loadMode !== "latest") return style;
+
+  const takeRaw = Number(style.publishedCardTake ?? 6);
+  const displayCount = [4, 6, 8].includes(takeRaw) ? takeRaw : 6;
+  const currentList =
+    style.slotBlockTournamentList && typeof style.slotBlockTournamentList === "object"
+      ? (style.slotBlockTournamentList as Record<string, unknown>)
+      : null;
+
+  return {
+    ...style,
+    slotBlockItems: {
+      mode: "auto",
+      publishedType: "tournament",
+    },
+    slotBlockTournamentList: {
+      sortBy: "latest",
+      displayCount,
+      slideEnabled: currentList?.slideEnabled !== false,
+      showMoreButton: currentList?.showMoreButton !== false,
+    },
+  };
+}
+
+function buildStep1StylePatch(input: {
+  s1Layout: "full" | "boxed";
+  s1Mode: "cms" | "cta";
+  s1CtaLink: string;
+  s1Shape: "circle" | "square";
+  s1Width: number;
+  s1Height: number;
+  s1Radius: number;
+  s1BorderEnabled: boolean;
+  s1BorderColor: string;
+  s1BgImageMode: "link" | "attach";
+  s1BgImage: string;
+}): StyleMap {
+  return {
+    blockLayout: input.s1Layout,
+    blockMode: input.s1Mode,
+    blockCtaLink: input.s1CtaLink.trim(),
+    blockShape: input.s1Shape,
+    blockWidth: input.s1Width,
+    blockHeight: input.s1Height,
+    blockRadius: input.s1Radius,
+    blockBorderEnabled: input.s1BorderEnabled,
+    blockBorderColor: input.s1BorderColor,
+    blockBgImageInputMode: input.s1BgImageMode,
+    blockBgImage: input.s1BgImage.trim(),
+  };
 }
 
 function makeId(prefix: string): string {
@@ -275,11 +574,13 @@ export default function AdminSitePageBuilderNewPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const [createType, setCreateType] = useState<SectionType>("text");
   const [step1EditMode, setStep1EditMode] = useState(false);
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
 
   const [s1Layout, setS1Layout] = useState<"full" | "boxed">("boxed");
   const [s1Mode, setS1Mode] = useState<"cms" | "cta">("cms");
@@ -293,25 +594,7 @@ export default function AdminSitePageBuilderNewPage() {
   const [s1BorderColor, setS1BorderColor] = useState("#d1d5db");
   const [s1BgImageMode, setS1BgImageMode] = useState<"link" | "attach">("link");
   const [s1BgImage, setS1BgImage] = useState("");
-  const previewFrameRef = useRef<HTMLDivElement | null>(null);
-  const dragStateRef = useRef<{
-    pointerId: number | null;
-    startX: number;
-    startY: number;
-    startScrollTop: number;
-    dragging: boolean;
-    viewport: HTMLElement | null;
-  }>({
-    pointerId: null,
-    startX: 0,
-    startY: 0,
-    startScrollTop: 0,
-    dragging: false,
-    viewport: null,
-  });
-  const suppressSelectUntilRef = useRef(0);
-  const DRAG_THRESHOLD_PX = 7;
-
+  const [adminCopy, setAdminCopy] = useState<Record<string, string>>({});
   const resetStep1Inputs = () => {
     setStep1EditMode(false);
     setCreateType("text");
@@ -337,7 +620,86 @@ export default function AdminSitePageBuilderNewPage() {
     return () => media.removeEventListener("change", onChange);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/admin/copy", { credentials: "include", cache: "no-store" });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data || typeof data !== "object") return;
+        if (!cancelled) setAdminCopy(data as Record<string, string>);
+      } catch {
+        // keep current copy fallback
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [page]);
+
   const style = useMemo(() => parseStyle(draft?.sectionStyleJson), [draft?.sectionStyleJson]);
+  const step1StylePatch = useMemo(
+    () =>
+      buildStep1StylePatch({
+        s1Layout,
+        s1Mode,
+        s1CtaLink,
+        s1Shape,
+        s1Width,
+        s1Height,
+        s1Radius,
+        s1BorderEnabled,
+        s1BorderColor,
+        s1BgImageMode,
+        s1BgImage,
+      }),
+    [
+      s1Layout,
+      s1Mode,
+      s1CtaLink,
+      s1Shape,
+      s1Width,
+      s1Height,
+      s1Radius,
+      s1BorderEnabled,
+      s1BorderColor,
+      s1BgImageMode,
+      s1BgImage,
+    ]
+  );
+  const step1PreviewDraft = useMemo(() => {
+    if (steps.step1 !== "open") return null;
+    if (step1EditMode && draft) {
+      return {
+        ...draft,
+        backgroundColor: s1BgColor,
+        sectionStyleJson: toStyleJson({
+          ...parseStyle(draft.sectionStyleJson),
+          ...step1StylePatch,
+        }),
+      };
+    }
+    if (step1EditMode) return null;
+    const tempSort = rows.length > 0 ? Math.max(...rows.map((r) => r.sortOrder)) + 1 : 0;
+    return {
+      ...buildNewSection(page, createType, tempSort),
+      id: "__step1_preview__",
+      backgroundColor: s1BgColor,
+      externalUrl: s1Mode === "cta" ? s1CtaLink.trim() : null,
+      sectionStyleJson: toStyleJson(step1StylePatch),
+    } as PageSection;
+  }, [
+    steps.step1,
+    step1EditMode,
+    draft,
+    s1BgColor,
+    step1StylePatch,
+    rows,
+    page,
+    createType,
+    s1Mode,
+    s1CtaLink,
+  ]);
   const legacySpacing = normalizeSpacingPreset(style.contentSpacingPreset, "normal");
   const spacingMode = String(style.spacingMode ?? "preset") === "custom" ? "custom" : "preset";
   const blockSpacingPreset = normalizeSpacingPreset(style.blockSpacingPreset, legacySpacing);
@@ -356,12 +718,52 @@ export default function AdminSitePageBuilderNewPage() {
       ? normalizeSpacingPx(style.cardSpacingPx, spacingPresetPx("card", cardSpacingPreset))
       : spacingPresetPx("card", cardSpacingPreset);
   const elements = useMemo(() => resolveBuilderElements(style, draft), [style, draft]);
+  const selectedElement = useMemo(
+    () => elements.find((el) => el.id === selectedElementId) ?? elements[0] ?? null,
+    [elements, selectedElementId]
+  );
+  useEffect(() => {
+    if (elements.length === 0) {
+      if (selectedElementId !== null) setSelectedElementId(null);
+      return;
+    }
+    if (!selectedElementId || !elements.some((el) => el.id === selectedElementId)) {
+      setSelectedElementId(elements[0].id);
+    }
+  }, [elements, selectedElementId]);
+  const publishedTemplateStyles = useMemo(
+    () => ({
+      basic: resolvePlatformCardTemplateStylePolicy(
+        adminCopy?.[PLATFORM_CARD_TEMPLATE_STYLE_COPY_KEYS.basic] ?? null,
+        "basic"
+      ),
+      highlight: resolvePlatformCardTemplateStylePolicy(
+        adminCopy?.[PLATFORM_CARD_TEMPLATE_STYLE_COPY_KEYS.highlight] ?? null,
+        "highlight"
+      ),
+    }),
+    [adminCopy]
+  );
 
   const previewRows = useMemo(() => {
+    if (step1PreviewDraft) {
+      if (step1EditMode && selectedId) {
+        return rows.map((r) => (r.id === selectedId ? step1PreviewDraft : r));
+      }
+      return [...rows, step1PreviewDraft].sort((a, b) => a.sortOrder - b.sortOrder);
+    }
     if (!selectedId || !draft) return rows;
     return rows.map((r) => (r.id === selectedId ? draft : r));
-  }, [rows, selectedId, draft]);
-
+  }, [rows, selectedId, draft, step1PreviewDraft, step1EditMode]);
+  const selectedBlockPreviewRows = useMemo(() => {
+    if (selectedId) {
+      const found = previewRows.find((r) => r.id === selectedId);
+      return found ? [found] : [];
+    }
+    if (step1PreviewDraft) return [step1PreviewDraft];
+    if (draft) return [draft];
+    return [];
+  }, [previewRows, selectedId, step1PreviewDraft, draft]);
   const selectedIndex = useMemo(() => {
     if (!selectedId) return -1;
     return rows.findIndex((r) => r.id === selectedId);
@@ -369,7 +771,10 @@ export default function AdminSitePageBuilderNewPage() {
 
   const selected = useMemo(() => (selectedId ? rows.find((r) => r.id === selectedId) ?? null : null), [rows, selectedId]);
 
-  const loadRows = async (targetPage: BuilderPage) => {
+  const loadRows = async (
+    targetPage: BuilderPage,
+    options?: { preserveSelectedId?: string | null }
+  ) => {
     setLoading(true);
     setError("");
     setMessage("");
@@ -392,8 +797,11 @@ export default function AdminSitePageBuilderNewPage() {
         setSteps(INITIAL_STEPS);
         return;
       }
-      setSelectedId(nextRows[0].id);
-      setDraft({ ...nextRows[0], buttons: Array.isArray(nextRows[0].buttons) ? [...nextRows[0].buttons] : [] });
+      const preserveId = options?.preserveSelectedId ?? selectedId;
+      const preserved = preserveId ? nextRows.find((row) => row.id === preserveId) ?? null : null;
+      const target = preserved ?? nextRows[0];
+      setSelectedId(target.id);
+      setDraft({ ...target, buttons: Array.isArray(target.buttons) ? [...target.buttons] : [] });
       setSteps({ step1: "done", step2: "open", step3: "locked", step4: "locked" });
     } catch {
       setError("목록을 불러오지 못했습니다.");
@@ -410,14 +818,41 @@ export default function AdminSitePageBuilderNewPage() {
     void loadRows(page);
   }, [page]);
 
+  const publishCurrentPage = async (targetPage: BuilderPage): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/admin/content/cms-page-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "publish", page: targetPage }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(typeof data?.error === "string" ? data.error : "저장 반영(게시)에 실패했습니다.");
+        return false;
+      }
+      return true;
+    } catch {
+      setError("저장 반영(게시) 중 오류가 발생했습니다.");
+      return false;
+    }
+  };
+
   const persist = async (next: PageSection): Promise<PageSection | null> => {
     setSaving(true);
     try {
       const { createdAt: _createdAt, updatedAt: _updatedAt, ...body } = next;
+      const normalizedStyle = normalizePublishedTournamentAutoStyle(
+        parseStyle(body.sectionStyleJson),
+        next
+      );
+      const bodyWithNormalizedStyle = {
+        ...body,
+        sectionStyleJson: toStyleJson(normalizedStyle),
+      };
       const res = await fetch("/api/admin/content/page-sections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(bodyWithNormalizedStyle),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data) {
@@ -433,10 +868,49 @@ export default function AdminSitePageBuilderNewPage() {
     }
   };
 
+  const saveDraftOnly = async () => {
+    if (!draft) {
+      setError("선택된 블록이 없습니다.");
+      return;
+    }
+    setError("");
+    setMessage("");
+    const saved = await persist(draft);
+    if (!saved) return;
+    setRows((prev) => prev.map((r) => (r.id === saved.id ? saved : r)));
+    setDraft(saved);
+    setMessage("초안 저장 완료 (메인 미반영)");
+  };
+
+  const publishNow = async () => {
+    if (publishing || saving || busy) return;
+    if (!window.confirm("현재 초안을 메인에 반영하시겠습니까?")) return;
+    setPublishing(true);
+    setError("");
+    setMessage("");
+    try {
+      let targetDraft = draft;
+      if (targetDraft) {
+        const saved = await persist(targetDraft);
+        if (!saved) return;
+        setRows((prev) => prev.map((r) => (r.id === saved.id ? saved : r)));
+        setDraft(saved);
+      }
+      const published = await publishCurrentPage(page);
+      if (!published) return;
+      setMessage("게시 완료 (메인 반영)");
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   const updateStyle = (patch: StyleMap) => {
     setDraft((prev) => {
       if (!prev) return prev;
-      const nextStyle = { ...parseStyle(prev.sectionStyleJson), ...patch };
+      const nextStyle = normalizePublishedTournamentAutoStyle(
+        { ...parseStyle(prev.sectionStyleJson), ...patch },
+        prev
+      );
       return { ...prev, sectionStyleJson: toStyleJson(nextStyle) };
     });
   };
@@ -447,6 +921,7 @@ export default function AdminSitePageBuilderNewPage() {
 
   const updateElements = (next: BuilderElement[]) => {
     const firstText = next.find((it) => it.type === "text");
+    const firstTextPlacement = normalizePlacementForElement("text", firstText?.placement ?? "topLeft");
     const extraTexts = next
       .filter((it) => it.type === "text")
       .slice(1)
@@ -457,19 +932,47 @@ export default function AdminSitePageBuilderNewPage() {
       contentElements: next.map((it) => ({
         id: it.id,
         type: it.type,
+        textMode: normalizeTextMode(it.textMode),
         textTitle: it.textTitle ?? "",
         textBody: it.textBody ?? "",
+        textHref: it.textHref ?? "",
+        textAlign: normalizeElementAlign(it.textAlign),
+        textColor: normalizeElementColor(it.textColor, "#374151"),
+        textSize: normalizeElementTextSize(it.textSize, 14),
         cardKind: it.cardKind ?? "default",
         ctaLabel: it.ctaLabel ?? "전체보기",
         ctaHref: it.ctaHref ?? "",
-        ctaPlacement: it.ctaPlacement ?? "headerRight",
+        buttonAlign: normalizeElementAlign(it.buttonAlign),
+        buttonColor: normalizeElementColor(it.buttonColor, "#2563eb"),
+        buttonShape: normalizeButtonShape(it.buttonShape),
+        placement: normalizePlacementForElement(it.type, it.placement),
       })),
       contentExtras: extraTexts,
       cardEnabled: Boolean(firstCard),
       cardKind: firstCard?.cardKind ?? style.cardKind ?? "default",
+      cardPlacement: firstCard ? normalizePlacementForElement("card", firstCard.placement) : style.cardPlacement ?? "insideCenter",
       contentMode: firstCta && String(firstCta.ctaHref ?? "").trim() ? "cta" : "cms",
       contentCtaLink: firstCta?.ctaHref ?? "",
-      contentCtaPlacement: firstCta?.ctaPlacement ?? "headerRight",
+      contentCtaPlacement: firstCta ? normalizePlacementForElement("cta", firstCta.placement) : "topCenter",
+      titlePosition:
+        regionAlignFromPlacement(firstTextPlacement).region === "blockTop"
+          ? "top"
+          : regionAlignFromPlacement(firstTextPlacement).region === "blockBottom"
+            ? "bottom"
+            : "middle",
+      titleAlign:
+        regionAlignFromPlacement(firstTextPlacement).align === "center"
+          ? "center"
+          : regionAlignFromPlacement(firstTextPlacement).align === "right"
+            ? "right"
+            : "left",
+      contentAlign:
+        regionAlignFromPlacement(firstTextPlacement).align === "center"
+          ? "center"
+          : regionAlignFromPlacement(firstTextPlacement).align === "right"
+            ? "right"
+            : "left",
+      textPlacement: firstTextPlacement,
     });
     if (firstText) {
       updateDraft({
@@ -479,9 +982,35 @@ export default function AdminSitePageBuilderNewPage() {
     }
   };
 
+  const addElement = (type: ElementType) => {
+    const created = emptyBuilderElement(type);
+    updateElements([...elements, created]);
+    setSelectedElementId(created.id);
+  };
+
+  const loadStep1FromDraft = (source: PageSection | null) => {
+    if (!source) return;
+    const s = parseStyle(source.sectionStyleJson);
+    setS1Layout(String(s.blockLayout ?? "boxed") === "full" ? "full" : "boxed");
+    setS1Mode(String(s.blockMode ?? "cms") === "cta" ? "cta" : "cms");
+    setS1CtaLink(String(s.blockCtaLink ?? source.externalUrl ?? ""));
+    setS1Shape(String(s.blockShape ?? "square") === "circle" ? "circle" : "square");
+    setS1Width(Number(s.blockWidth ?? 0) || 0);
+    setS1Height(Number(s.blockHeight ?? 0) || 0);
+    setS1Radius(Number(s.blockRadius ?? 12) || 12);
+    setS1BorderEnabled(Boolean(s.blockBorderEnabled));
+    setS1BorderColor(String(s.blockBorderColor ?? "#d1d5db"));
+    setS1BgColor(String(source.backgroundColor ?? "#ffffff"));
+    setS1BgImageMode(String(s.blockBgImageInputMode ?? "link") === "attach" ? "attach" : "link");
+    setS1BgImage(String(s.blockBgImage ?? ""));
+  };
+
 
   const openStep = (step: StepKey) => {
-    if (step === "step1") setStep1EditMode(true);
+    if (step === "step1") {
+      setStep1EditMode(true);
+      loadStep1FromDraft(draft);
+    }
     setSteps({
       step1: step === "step1" ? "open" : "done",
       step2: step === "step2" ? "open" : step === "step1" ? "locked" : "done",
@@ -505,19 +1034,7 @@ export default function AdminSitePageBuilderNewPage() {
       setError("CTA를 선택하면 링크를 입력해야 합니다.");
       return;
     }
-    const stylePatch: StyleMap = {
-      blockLayout: s1Layout,
-      blockMode: s1Mode,
-      blockCtaLink: s1CtaLink.trim(),
-      blockShape: s1Shape,
-      blockWidth: s1Width,
-      blockHeight: s1Height,
-      blockRadius: s1Radius,
-      blockBorderEnabled: s1BorderEnabled,
-      blockBorderColor: s1BorderColor,
-      blockBgImageInputMode: s1BgImageMode,
-      blockBgImage: s1BgImage.trim(),
-    };
+    const stylePatch: StyleMap = step1StylePatch;
 
     if (step1EditMode && draft) {
       const next = {
@@ -710,6 +1227,7 @@ export default function AdminSitePageBuilderNewPage() {
 
   const moveSelected = async (direction: -1 | 1) => {
     if (selectedIndex < 0) return;
+    const currentSelectedId = selectedId;
     const to = selectedIndex + direction;
     if (to < 0 || to >= rows.length) return;
     const reordered = [...rows];
@@ -730,7 +1248,7 @@ export default function AdminSitePageBuilderNewPage() {
         setError(typeof data?.error === "string" ? data.error : "순서 변경에 실패했습니다.");
         return;
       }
-      await loadRows(page);
+      await loadRows(page, { preserveSelectedId: currentSelectedId });
       setMessage("순서 변경 완료");
     } catch {
       setError("순서 변경 중 오류가 발생했습니다.");
@@ -746,72 +1264,10 @@ export default function AdminSitePageBuilderNewPage() {
     setSteps({ step1: "open", step2: "locked", step3: "locked", step4: "locked" });
   };
 
-  const onPreviewPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    const frame = previewFrameRef.current;
-    if (!frame) return;
-    const viewport = frame.querySelector('[id^="preview-viewport-"]') as HTMLElement | null;
-    if (!viewport) return;
-    dragStateRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      startScrollTop: viewport.scrollTop,
-      dragging: false,
-      viewport,
-    };
-  };
-
-  const onPreviewPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const state = dragStateRef.current;
-    if (state.pointerId !== event.pointerId || !state.viewport) return;
-    const dx = event.clientX - state.startX;
-    const dy = event.clientY - state.startY;
-    if (!state.dragging && Math.max(Math.abs(dx), Math.abs(dy)) >= DRAG_THRESHOLD_PX) {
-      state.dragging = true;
-      if (previewFrameRef.current && !previewFrameRef.current.hasPointerCapture(event.pointerId)) {
-        previewFrameRef.current.setPointerCapture(event.pointerId);
-      }
-    }
-    if (!state.dragging) return;
-    state.viewport.scrollTop = state.startScrollTop - dy;
-    event.preventDefault();
-  };
-
-  const endPreviewPointer = (event: React.PointerEvent<HTMLDivElement>) => {
-    const state = dragStateRef.current;
-    if (state.pointerId !== event.pointerId) return;
-    if (state.dragging) {
-      suppressSelectUntilRef.current = Date.now() + 180;
-    }
-    dragStateRef.current = {
-      pointerId: null,
-      startX: 0,
-      startY: 0,
-      startScrollTop: 0,
-      dragging: false,
-      viewport: null,
-    };
-    if (previewFrameRef.current?.hasPointerCapture(event.pointerId)) {
-      previewFrameRef.current.releasePointerCapture(event.pointerId);
-    }
-  };
-
-  const onPreviewSelectBlock = (id: string) => {
-    if (Date.now() < suppressSelectUntilRef.current) return;
-    selectRow(id);
-  };
-
   const previewPanel = (
     <div className="flex h-full min-h-0 flex-col gap-2">
       <div className="min-h-0 rounded-xl border border-site-border bg-white p-2 dark:bg-slate-900">
-        <div
-          ref={previewFrameRef}
-          className="mx-auto w-full max-w-[360px] select-none cursor-grab active:cursor-grabbing"
-          onPointerDown={onPreviewPointerDown}
-          onPointerMove={onPreviewPointerMove}
-          onPointerUp={endPreviewPointer}
-          onPointerCancel={endPreviewPointer}
-        >
+        <div className="mx-auto w-full max-w-[360px]">
           <PageBuilderMobilePreview
             page={page as PageBuilderKey}
             rows={previewRows as unknown as import("@/types/page-section").PageSection[]}
@@ -819,7 +1275,7 @@ export default function AdminSitePageBuilderNewPage() {
             selectedBlockId={selectedId}
             autoScrollOnSelect={false}
             showTitle={false}
-            onSelectBlock={onPreviewSelectBlock}
+            onSelectBlock={selectRow}
           />
         </div>
         <div className="mx-auto mt-2 w-max max-w-none">
@@ -838,257 +1294,15 @@ export default function AdminSitePageBuilderNewPage() {
         {!selectedId ? <p className="mx-auto mt-2 w-full max-w-[320px] text-xs text-gray-500 dark:text-slate-400">선택된 블록이 없습니다.</p> : null}
       </div>
       <div className="min-h-0 flex-[1.3] rounded-xl border border-site-border bg-white p-2 dark:bg-slate-900">
-        <div className="mx-auto h-full w-full max-w-[460px] overflow-y-auto">
-          {draft ? (
-            <>
-            <div
-              className="rounded-xl border border-site-border bg-white p-2 dark:bg-slate-900"
-              style={{
-                backgroundColor: String(draft.backgroundColor ?? "#ffffff"),
-                borderStyle: Boolean(style.blockBorderEnabled) ? "solid" : "none",
-                borderColor: String(style.blockBorderColor ?? "#d1d5db"),
-                borderWidth: Boolean(style.blockBorderEnabled) ? 1 : 0,
-                borderRadius:
-                  String(style.blockShape ?? "square") === "circle"
-                    ? "9999px"
-                    : `${Number(style.blockRadius ?? 12)}px`,
-                width: Number(style.blockWidth ?? 0) > 0 ? `${Math.min(Number(style.blockWidth), 440)}px` : "100%",
-                maxWidth: "100%",
-                minHeight: Number(style.blockHeight ?? 0) > 0 ? `${Math.min(Number(style.blockHeight), 420)}px` : undefined,
-                backgroundImage: String(style.blockBgImage ?? "") ? `url(${String(style.blockBgImage)})` : undefined,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
-            >
-              {String(style.titlePosition ?? "top") === "top" ? (
-                <p
-                  style={{
-                    textAlign: String(style.titleAlign ?? draft.textAlign) as "left" | "center" | "right",
-                    fontSize: `${Number(style.titleSize ?? 18)}px`,
-                    fontWeight: Number(style.titleWeight ?? "700"),
-                    color: String(style.titleColor ?? "#111827"),
-                  }}
-                >
-                  {draft.title || "제목"}
-                </p>
-              ) : null}
-              {(() => {
-                const contentMode = String(style.contentMode ?? "cms");
-                const contentCtaLink = String(style.contentCtaLink ?? "").trim();
-                const contentCtaPlacement = String(style.contentCtaPlacement ?? "headerRight");
-                const hasContentCta = contentMode === "cta" && contentCtaLink.length > 0;
-                if (!hasContentCta || contentCtaPlacement !== "headerRight") return null;
-                return (
-                  <div className="mt-2 flex justify-end">
-                    <span className="inline-flex rounded border border-site-primary/40 bg-site-primary/10 px-2.5 py-1 text-xs font-medium text-site-primary">
-                      CTA
-                    </span>
-                  </div>
-                );
-              })()}
-
-              <p
-                className={String(style.titlePosition ?? "top") === "middle" ? "mt-3" : "mt-2"}
-                style={{
-                  textAlign: String(style.contentAlign ?? draft.textAlign) as "left" | "center" | "right",
-                  fontSize: `${Number(style.contentSize ?? 14)}px`,
-                  fontWeight: Number(style.contentWeight ?? "400"),
-                  color: String(style.contentColor ?? "#374151"),
-                  marginTop: `${elementSpacingPx}px`,
-                }}
-              >
-                {draft.description || ""}
-              </p>
-
-              {Array.isArray(style.contentExtras)
-                ? (style.contentExtras as unknown[]).map((item, idx) => (
-                    <p
-                      key={`preview-extra-${idx}`}
-                      className="mt-1"
-                      style={{
-                        textAlign: String(style.contentAlign ?? draft.textAlign) as "left" | "center" | "right",
-                        fontSize: `${Number(style.contentSize ?? 14)}px`,
-                        fontWeight: Number(style.contentWeight ?? "400"),
-                        color: String(style.contentColor ?? "#374151"),
-                        marginTop: `${Math.max(2, Math.round(elementSpacingPx * 0.7))}px`,
-                      }}
-                    >
-                      {String(item ?? "")}
-                    </p>
-                  ))
-                : null}
-
-              {String(style.titlePosition ?? "top") === "middle" || String(style.titlePosition ?? "top") === "bottom" ? (
-                <p
-                  className={String(style.titlePosition ?? "top") === "bottom" ? "mt-3" : "mt-2"}
-                  style={{
-                    textAlign: String(style.titleAlign ?? draft.textAlign) as "left" | "center" | "right",
-                    fontSize: `${Number(style.titleSize ?? 18)}px`,
-                    fontWeight: Number(style.titleWeight ?? "700"),
-                    color: String(style.titleColor ?? "#111827"),
-                  }}
-                >
-                  {draft.title || "제목"}
-                </p>
-              ) : null}
-
-              {Boolean(style.cardEnabled) ? (
-                <div
-                  className="mt-3 overflow-hidden"
-                  style={{
-                    backgroundColor: String(style.cardColor ?? "#ffffff"),
-                    borderStyle: Boolean(style.cardBorderEnabled) ? "solid" : "none",
-                    borderColor: String(style.cardBorderColor ?? "#d1d5db"),
-                    borderWidth: Boolean(style.cardBorderEnabled) ? 1 : 0,
-                    borderRadius:
-                      String(style.cardShape ?? "square") === "circle"
-                        ? "9999px"
-                        : `${Number(style.cardRadius ?? 12)}px`,
-                    marginTop: `${cardSpacingPx}px`,
-                  }}
-                >
-                  {(() => {
-                    const cardKind = resolveCardKind(style.cardKind);
-                    const isDefaultCard = cardKind === "default";
-                    const isPublishedCard = isPublishedCardKind(cardKind);
-                    const publishedLabel =
-                      cardKind === "publishedVenue" ? "당구장 메인 게시용카드" : "대회 메인 게시용카드";
-                    const titleFromField =
-                      String(style.defaultTitleSource ?? "direct") === "field"
-                        ? String((draft as unknown as Record<string, unknown>)[String(style.cardTitleField ?? "title")] ?? "")
-                        : "";
-                    const bodyFromField =
-                      String(style.defaultBodySource ?? "direct") === "field"
-                        ? String((draft as unknown as Record<string, unknown>)[String(style.cardBodyField ?? "description")] ?? "")
-                        : "";
-                    const imageFromField =
-                      String(style.defaultImageSource ?? "direct") === "field"
-                        ? String((draft as unknown as Record<string, unknown>)[String(style.cardImageField ?? "imageUrl")] ?? "")
-                        : "";
-                    const resolvedTitle = isDefaultCard
-                      ? (titleFromField || String(style.cardTitleText ?? "카드 제목"))
-                      : String(style.cardTitleText ?? "카드 제목");
-                    const resolvedBody = isDefaultCard
-                      ? (bodyFromField || String(style.cardBodyText ?? "카드 내용"))
-                      : String(style.cardBodyText ?? "카드 내용");
-                    const resolvedImage = isDefaultCard
-                      ? (imageFromField || String(style.cardBackgroundImage ?? draft.imageUrl ?? ""))
-                      : String(style.cardBackgroundImage ?? draft.imageUrl ?? "");
-                    const ctaLink =
-                      cardKind === "custom"
-                        ? String(style.cardCustomCtaLink ?? style.cardCtaLink ?? "")
-                        : String(style.cardCtaLink ?? "");
-                    if (isPublishedCard) {
-                      const previewData = {
-                        templateType: cardKind === "publishedVenue" ? "highlight" : "basic",
-                        thumbnailUrl: resolvedImage || "",
-                        cardTitle: resolvedTitle || (cardKind === "publishedVenue" ? "당구장 상호명" : "대회 제목"),
-                        displayDateText: "2026-04-06",
-                        displayRegionText: "서울",
-                        statusText: "접수중",
-                        buttonText: "자세히 보기",
-                        shortDescription: resolvedBody || "",
-                      } as const;
-                      return (
-                        <div className="space-y-2 p-3">
-                          <p className="text-xs font-semibold text-site-text">{publishedLabel}</p>
-                          <div className="flex justify-center">
-                            {cardKind === "publishedVenue" ? (
-                              <HighlightCard
-                                data={previewData}
-                                stylePolicy={DEFAULT_PLATFORM_CARD_TEMPLATE_STYLES.highlight}
-                                showDetailButton={false}
-                              />
-                            ) : (
-                              <BasicCard
-                                data={previewData}
-                                stylePolicy={DEFAULT_PLATFORM_CARD_TEMPLATE_STYLES.basic}
-                                showDetailButton={false}
-                              />
-                            )}
-                          </div>
-                        </div>
-                      );
-                    }
-                    return (
-                      <>
-                        {resolvedImage ? (
-                          <div
-                            style={{
-                              height: `${Math.min(Number(style.cardHeight ?? 180), 220)}px`,
-                              backgroundImage: `url(${resolvedImage})`,
-                              backgroundSize: "cover",
-                              backgroundPosition: "center",
-                            }}
-                          />
-                        ) : null}
-                        <div className="space-y-1 p-2">
-                          <p className="text-sm font-semibold text-site-text">{resolvedTitle}</p>
-                          <p className="text-xs text-gray-600 dark:text-slate-400">{resolvedBody}</p>
-                          {Array.isArray(style.cardExtras)
-                            ? (style.cardExtras as unknown[]).map((item, idx) => (
-                                <p key={`preview-card-extra-${idx}`} className="text-xs text-gray-600 dark:text-slate-400">
-                                  {String(item ?? "")}
-                                </p>
-                              ))
-                            : null}
-                          {String(style.cardMode ?? "cms") === "cta" && ctaLink ? (
-                            <p className="text-xs font-medium text-site-primary">CTA: {ctaLink}</p>
-                          ) : null}
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-              ) : null}
-              {(() => {
-                const contentMode = String(style.contentMode ?? "cms");
-                const contentCtaLink = String(style.contentCtaLink ?? "").trim();
-                const contentCtaPlacement = String(style.contentCtaPlacement ?? "headerRight");
-                const hasContentCta = contentMode === "cta" && contentCtaLink.length > 0;
-                if (!hasContentCta || !contentCtaPlacement.startsWith("blockBottom")) return null;
-                const align =
-                  contentCtaPlacement.endsWith("Right")
-                    ? "justify-end"
-                    : contentCtaPlacement.endsWith("Center")
-                      ? "justify-center"
-                      : "justify-start";
-                return (
-                  <div className={`flex ${align}`} style={{ marginTop: `${blockSpacingPx}px` }}>
-                    <span className="inline-flex rounded border border-site-primary/40 bg-site-primary/10 px-2.5 py-1 text-xs font-medium text-site-primary">
-                      CTA
-                    </span>
-                  </div>
-                );
-              })()}
-            </div>
-            {(() => {
-              const contentMode = String(style.contentMode ?? "cms");
-              const contentCtaLink = String(style.contentCtaLink ?? "").trim();
-              const contentCtaPlacement = String(style.contentCtaPlacement ?? "headerRight");
-              const hasContentCta = contentMode === "cta" && contentCtaLink.length > 0;
-              if (!hasContentCta || !contentCtaPlacement.startsWith("outsideBottom")) return null;
-              const align =
-                contentCtaPlacement.endsWith("Right")
-                  ? "justify-end"
-                  : contentCtaPlacement.endsWith("Center")
-                    ? "justify-center"
-                    : "justify-start";
-              return (
-                <div className={`flex ${align}`} style={{ marginTop: `${blockSpacingPx}px` }}>
-                  <span className="inline-flex rounded border border-site-primary/40 bg-site-primary/10 px-2.5 py-1 text-xs font-medium text-site-primary">
-                    CTA
-                  </span>
-                </div>
-              );
-            })()}
-            </>
-          ) : (
-            <div className="rounded-lg border border-dashed border-site-border p-4 text-sm text-gray-500 dark:text-slate-400">
-              선택된 블록이 없습니다.
-            </div>
-          )}
-        </div>
+        <PageBuilderMobilePreview
+          page={page as PageBuilderKey}
+          rows={selectedBlockPreviewRows as unknown as import("@/types/page-section").PageSection[]}
+          variant="page"
+          selectedBlockId={selectedId}
+          autoScrollOnSelect={false}
+          showTitle={false}
+          onSelectBlock={selectRow}
+        />
       </div>
     </div>
   );
@@ -1102,16 +1316,37 @@ export default function AdminSitePageBuilderNewPage() {
 
   const editorHeader = (
     <div className="rounded-xl border border-site-border bg-white p-2 dark:bg-slate-900">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-base font-semibold text-site-text">페이지빌더 NEW</h1>
-        <select value={page} onChange={(e) => setPage(e.target.value as BuilderPage)} className="rounded border border-site-border bg-white px-2 py-1.5 text-sm dark:bg-slate-900">
-          {PAGE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-base font-semibold text-site-text">페이지빌더 NEW</h1>
+          <select value={page} onChange={(e) => setPage(e.target.value as BuilderPage)} className="rounded border border-site-border bg-white px-2 py-1.5 text-sm dark:bg-slate-900">
+            {PAGE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void saveDraftOnly()}
+            disabled={!draft || saving || busy || publishing}
+            className="rounded border border-site-border px-3 py-1.5 text-xs hover:bg-gray-50 disabled:opacity-50 dark:hover:bg-slate-800"
+          >
+            {saving ? "저장 중..." : "초안 저장"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void publishNow()}
+            disabled={loading || saving || busy || publishing}
+            className="rounded border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-200 dark:hover:bg-blue-950/50"
+          >
+            {publishing ? "게시 중..." : "게시"}
+          </button>
+        </div>
       </div>
+      <p className="mt-1 text-[11px] text-gray-500 dark:text-slate-400">초안 저장만으로는 메인에 반영되지 않습니다. 메인 반영은 게시 버튼을 눌러야 합니다.</p>
       {message ? <p className="mt-1 text-xs text-green-700 dark:text-green-300">{message}</p> : null}
       {error ? <p className="mt-1 text-xs text-red-600 dark:text-red-300">{error}</p> : null}
     </div>
@@ -1207,244 +1442,275 @@ export default function AdminSitePageBuilderNewPage() {
           <h2 className="text-sm font-semibold text-site-text">STEP 2: 블록 내용 입력</h2>
           {draft ? (
             <div className="mt-3 space-y-3">
-              <p className="text-xs font-medium text-gray-600 dark:text-slate-400">제목</p>
-              <select value={String(style.titlePosition ?? "top")} onChange={(e) => updateStyle({ titlePosition: e.target.value })} className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900">
-                <option value="top">제목 위치: 상단</option>
-                <option value="middle">제목 위치: 중앙</option>
-                <option value="bottom">제목 위치: 하단</option>
-              </select>
-              <input value={draft.title} onChange={(e) => updateDraft({ title: e.target.value })} placeholder="제목 입력" className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900" />
-              <div className="grid gap-2 sm:grid-cols-3">
-                <input type="number" value={Number(style.titleSize ?? 18)} onChange={(e) => updateStyle({ titleSize: Number(e.target.value || 18) })} placeholder="폰트 크기" className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900" />
-                <select value={String(style.titleWeight ?? "700")} onChange={(e) => updateStyle({ titleWeight: e.target.value })} className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900">
-                  <option value="400">보통</option>
-                  <option value="500">중간</option>
-                  <option value="700">굵게</option>
-                </select>
-                <input type="color" value={String(style.titleColor ?? "#111827")} onChange={(e) => updateStyle({ titleColor: e.target.value })} className="h-10 rounded border border-site-border bg-white px-1 dark:bg-slate-900" />
-                <select value={String(style.titleAlign ?? draft.textAlign)} onChange={(e) => { updateStyle({ titleAlign: e.target.value }); updateDraft({ textAlign: e.target.value as TextAlign }); }} className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900">
-                  <option value="left">왼쪽 정렬</option>
-                  <option value="center">가운데 정렬</option>
-                  <option value="right">오른쪽 정렬</option>
-                </select>
-              </div>
-              <p className="text-xs font-medium text-gray-600 dark:text-slate-400">내용</p>
-              <select value={String(style.contentAlign ?? draft.textAlign)} onChange={(e) => updateStyle({ contentAlign: e.target.value })} className="w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900">
-                <option value="left">내용 위치: 왼쪽</option>
-                <option value="center">내용 위치: 가운데</option>
-                <option value="right">내용 위치: 오른쪽</option>
-              </select>
               <div className="space-y-2 rounded border border-site-border p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-semibold text-gray-700 dark:text-slate-300">간격 설정</p>
-                  <select
-                    value={spacingMode}
-                    onChange={(e) => updateStyle({ spacingMode: e.target.value })}
-                    className="rounded border border-site-border bg-white px-2 py-1 text-xs dark:bg-slate-900"
-                  >
-                    <option value="preset">간편 설정</option>
-                    <option value="custom">사용자 설정</option>
-                  </select>
+                <p className="text-xs font-semibold text-gray-700 dark:text-slate-300">요소 목록</p>
+                <div className="space-y-2">
+                  {elements.map((el, idx) => {
+                    const isSelected = selectedElement?.id === el.id;
+                    return (
+                      <div
+                        key={el.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSelectedElementId(el.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            setSelectedElementId(el.id);
+                          }
+                        }}
+                        className={`w-full rounded border px-3 py-2 text-left ${
+                          isSelected
+                            ? "border-site-primary bg-site-primary/10"
+                            : "border-site-border bg-white dark:bg-slate-900"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-medium text-site-text">
+                            {idx + 1}. {elementTypeLabel(el.type)}
+                          </p>
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              disabled={idx === 0}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                const next = [...elements];
+                                [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+                                updateElements(next);
+                              }}
+                              className="rounded border border-site-border px-2 py-1 text-[11px] disabled:opacity-40"
+                            >
+                              위
+                            </button>
+                            <button
+                              type="button"
+                              disabled={idx === elements.length - 1}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                const next = [...elements];
+                                [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
+                                updateElements(next);
+                              }}
+                              className="rounded border border-site-border px-2 py-1 text-[11px] disabled:opacity-40"
+                            >
+                              아래
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                updateElements(elements.filter((it) => it.id !== el.id));
+                              }}
+                              className="rounded border border-site-border px-2 py-1 text-[11px]"
+                            >
+                              삭제
+                            </button>
+                          </div>
+                        </div>
+                        <p className="mt-1 text-[11px] text-gray-500 dark:text-slate-400">
+                          위치: {placementLabel(normalizePlacementForElement(el.type, el.placement))}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
-                {spacingMode === "custom" ? (
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <input
-                      type="number"
-                      value={Number(style.blockSpacingPx ?? blockSpacingPx)}
-                      onChange={(e) => updateStyle({ blockSpacingPx: Number(e.target.value || 0) })}
-                      placeholder="블록 간격(px)"
-                      className="rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
-                    />
-                    <input
-                      type="number"
-                      value={Number(style.elementSpacingPx ?? elementSpacingPx)}
-                      onChange={(e) => updateStyle({ elementSpacingPx: Number(e.target.value || 0) })}
-                      placeholder="요소 간격(px)"
-                      className="rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
-                    />
-                    <input
-                      type="number"
-                      value={Number(style.cardSpacingPx ?? cardSpacingPx)}
-                      onChange={(e) => updateStyle({ cardSpacingPx: Number(e.target.value || 0) })}
-                      placeholder="카드 간격(px)"
-                      className="rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
-                    />
-                  </div>
-                ) : (
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <label className="space-y-1">
-                      <span className="block text-[11px] text-gray-600 dark:text-slate-400">블록 간격</span>
-                      <select
-                        value={blockSpacingPreset}
-                        onChange={(e) => updateStyle({ blockSpacingPreset: e.target.value })}
-                        className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
-                      >
-                        <option value="compact">좁게</option>
-                        <option value="normal">보통</option>
-                        <option value="wide">넓게</option>
-                      </select>
-                    </label>
-                    <label className="space-y-1">
-                      <span className="block text-[11px] text-gray-600 dark:text-slate-400">요소 간격</span>
-                      <select
-                        value={elementSpacingPreset}
-                        onChange={(e) => updateStyle({ elementSpacingPreset: e.target.value })}
-                        className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
-                      >
-                        <option value="compact">좁게</option>
-                        <option value="normal">보통</option>
-                        <option value="wide">넓게</option>
-                      </select>
-                    </label>
-                    <label className="space-y-1">
-                      <span className="block text-[11px] text-gray-600 dark:text-slate-400">카드 간격</span>
-                      <select
-                        value={cardSpacingPreset}
-                        onChange={(e) => updateStyle({ cardSpacingPreset: e.target.value })}
-                        className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
-                      >
-                        <option value="compact">좁게</option>
-                        <option value="normal">보통</option>
-                        <option value="wide">넓게</option>
-                      </select>
-                    </label>
-                  </div>
-                )}
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <select value={String(style.contentMode ?? "cms")} onChange={(e) => updateStyle({ contentMode: e.target.value })} className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900">
-                  <option value="cms">CMS</option>
-                  <option value="cta">CTA</option>
-                </select>
-                {String(style.contentMode ?? "cms") === "cta" ? (
-                  <input value={String(style.contentCtaLink ?? "")} onChange={(e) => updateStyle({ contentCtaLink: e.target.value })} placeholder="CTA 링크 입력" className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900" />
-                ) : null}
-              </div>
-              {String(style.contentMode ?? "cms") === "cta" ? (
-                <div className="space-y-1 rounded border border-sky-200 bg-sky-50 p-3 dark:border-sky-900/50 dark:bg-sky-950/30">
-                  <p className="text-xs font-semibold text-sky-900 dark:text-sky-100">CTA 위치</p>
-                  <select
-                    value={String(style.contentCtaPlacement ?? "headerRight")}
-                    onChange={(e) => updateStyle({ contentCtaPlacement: e.target.value })}
-                    className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
-                  >
-                    <option value="headerRight">상단 오른쪽</option>
-                    <option value="blockBottomLeft">블록 하단 왼쪽</option>
-                    <option value="blockBottomCenter">블록 하단 가운데</option>
-                    <option value="blockBottomRight">블록 하단 오른쪽</option>
-                    <option value="outsideBottomLeft">블록 바깥 아래 왼쪽</option>
-                    <option value="outsideBottomCenter">블록 바깥 아래 가운데</option>
-                    <option value="outsideBottomRight">블록 바깥 아래 오른쪽</option>
-                  </select>
-                </div>
-              ) : null}
-              <textarea value={draft.description ?? ""} onChange={(e) => updateDraft({ description: e.target.value })} placeholder="내용 입력" className="min-h-24 w-full rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900" />
-              <div className="grid gap-2 sm:grid-cols-3">
-                <input type="number" value={Number(style.contentSize ?? 14)} onChange={(e) => updateStyle({ contentSize: Number(e.target.value || 14) })} placeholder="폰트 크기" className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900" />
-                <select value={String(style.contentWeight ?? "400")} onChange={(e) => updateStyle({ contentWeight: e.target.value })} className="rounded border border-site-border bg-white px-3 py-2 dark:bg-slate-900">
-                  <option value="400">보통</option>
-                  <option value="500">중간</option>
-                  <option value="700">굵게</option>
-                </select>
-                <input type="color" value={String(style.contentColor ?? "#374151")} onChange={(e) => updateStyle({ contentColor: e.target.value })} className="h-10 rounded border border-site-border bg-white px-1 dark:bg-slate-900" />
               </div>
               <div className="space-y-2 rounded border border-site-border p-3">
                 <p className="text-xs font-semibold text-gray-700 dark:text-slate-300">요소 추가</p>
                 <div className="grid gap-2 sm:grid-cols-3">
                   <button
                     type="button"
-                    onClick={() => updateElements([...elements, emptyBuilderElement("text")])}
+                    onClick={() => addElement("text")}
                     className="rounded border border-site-border px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-slate-800"
                   >
-                    텍스트
+                    + 텍스트 추가
                   </button>
                   <button
                     type="button"
-                    onClick={() => updateElements([...elements, emptyBuilderElement("card")])}
+                    onClick={() => addElement("card")}
                     className="rounded border border-site-border px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-slate-800"
                   >
-                    카드
+                    + 카드 추가
                   </button>
                   <button
                     type="button"
-                    onClick={() => updateElements([...elements, emptyBuilderElement("cta")])}
+                    onClick={() => addElement("cta")}
                     className="rounded border border-site-border px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-slate-800"
                   >
-                    CTA
+                    + 버튼 추가
                   </button>
                 </div>
-                <div className="space-y-2">
-                  {elements.map((el, idx) => (
-                    <div key={el.id} className="space-y-2 rounded border border-site-border p-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-medium text-gray-600 dark:text-slate-400">
-                          {idx + 1}. {el.type === "text" ? "텍스트 요소" : el.type === "card" ? "카드 요소" : "CTA 요소"}
-                        </p>
-                        <div className="flex gap-1">
-                          <button
-                            type="button"
-                            disabled={idx === 0}
-                            onClick={() => {
-                              const next = [...elements];
-                              [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
-                              updateElements(next);
-                            }}
-                            className="rounded border border-site-border px-2 py-1 text-[11px] disabled:opacity-40"
-                          >
-                            위
-                          </button>
-                          <button
-                            type="button"
-                            disabled={idx === elements.length - 1}
-                            onClick={() => {
-                              const next = [...elements];
-                              [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
-                              updateElements(next);
-                            }}
-                            className="rounded border border-site-border px-2 py-1 text-[11px] disabled:opacity-40"
-                          >
-                            아래
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => updateElements(elements.filter((it) => it.id !== el.id))}
-                            className="rounded border border-site-border px-2 py-1 text-[11px]"
-                          >
-                            삭제
-                          </button>
-                        </div>
-                      </div>
-                      {el.type === "text" ? (
-                        <div className="grid gap-2">
-                          <input
-                            value={String(el.textTitle ?? "")}
-                            onChange={(e) =>
-                              updateElements(
-                                elements.map((it) => (it.id === el.id ? { ...it, textTitle: e.target.value } : it))
-                              )
-                            }
-                            placeholder="텍스트 제목"
-                            className="rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
-                          />
-                          <textarea
-                            value={String(el.textBody ?? "")}
-                            onChange={(e) =>
-                              updateElements(
-                                elements.map((it) => (it.id === el.id ? { ...it, textBody: e.target.value } : it))
-                              )
-                            }
-                            placeholder="텍스트 설명"
-                            className="min-h-20 rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
-                          />
-                        </div>
-                      ) : null}
-                      {el.type === "card" ? (
+              </div>
+              {selectedElement ? (
+                <div className="space-y-2 rounded border border-site-border p-3">
+                  <p className="text-xs font-semibold text-gray-700 dark:text-slate-300">
+                    선택된 요소 설정: {elementTypeLabel(selectedElement.type)}
+                  </p>
+                  {selectedElement.type === "text" ? (
+                    <div className="grid gap-2">
+                      <label className="space-y-1">
+                        <span className="block text-[11px] text-gray-600 dark:text-slate-400">용도</span>
                         <select
-                          value={el.cardKind ?? "default"}
+                          value={normalizeTextMode(selectedElement.textMode)}
                           onChange={(e) =>
                             updateElements(
                               elements.map((it) =>
-                                it.id === el.id ? { ...it, cardKind: resolveCardKind(e.target.value) } : it
+                                it.id === selectedElement.id
+                                  ? { ...it, textMode: normalizeTextMode(e.target.value) }
+                                  : it
+                              )
+                            )
+                          }
+                          className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                        >
+                          <option value="cms">CMS</option>
+                          <option value="cta">CTA</option>
+                        </select>
+                      </label>
+                      <input
+                        value={String(selectedElement.textTitle ?? "")}
+                        onChange={(e) =>
+                          updateElements(
+                            elements.map((it) =>
+                              it.id === selectedElement.id ? { ...it, textTitle: e.target.value } : it
+                            )
+                          )
+                        }
+                        placeholder="텍스트 제목"
+                        className="rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                      />
+                      <textarea
+                        value={String(selectedElement.textBody ?? "")}
+                        onChange={(e) =>
+                          updateElements(
+                            elements.map((it) =>
+                              it.id === selectedElement.id ? { ...it, textBody: e.target.value } : it
+                            )
+                          )
+                        }
+                        placeholder="텍스트 내용"
+                        className="min-h-20 rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                      />
+                      {normalizeTextMode(selectedElement.textMode) === "cta" ? (
+                        <input
+                          value={String(selectedElement.textHref ?? "")}
+                          onChange={(e) =>
+                            updateElements(
+                              elements.map((it) =>
+                                it.id === selectedElement.id ? { ...it, textHref: e.target.value } : it
+                              )
+                            )
+                          }
+                          placeholder="CTA 링크 경로"
+                          className="rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                        />
+                      ) : null}
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <label className="space-y-1">
+                          <span className="block text-[11px] text-gray-600 dark:text-slate-400">색상</span>
+                          <input
+                            type="color"
+                            value={normalizeElementColor(selectedElement.textColor, "#374151")}
+                            onChange={(e) =>
+                              updateElements(
+                                elements.map((it) =>
+                                  it.id === selectedElement.id
+                                    ? { ...it, textColor: normalizeElementColor(e.target.value, "#374151") }
+                                    : it
+                                )
+                              )
+                            }
+                            className="h-10 w-full rounded border border-site-border bg-white px-1 dark:bg-slate-900"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="block text-[11px] text-gray-600 dark:text-slate-400">크기</span>
+                          <input
+                            type="number"
+                            value={normalizeElementTextSize(selectedElement.textSize, 14)}
+                            onChange={(e) =>
+                              updateElements(
+                                elements.map((it) =>
+                                  it.id === selectedElement.id
+                                    ? { ...it, textSize: normalizeElementTextSize(e.target.value, 14) }
+                                    : it
+                                )
+                              )
+                            }
+                            className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                          />
+                        </label>
+                      </div>
+                      <label className="space-y-1">
+                        <span className="block text-[11px] text-gray-600 dark:text-slate-400">정렬</span>
+                        <select
+                          value={normalizeElementAlign(selectedElement.textAlign)}
+                          onChange={(e) =>
+                            updateElements(
+                              elements.map((it) =>
+                                it.id === selectedElement.id
+                                  ? {
+                                      ...it,
+                                      textAlign: normalizeElementAlign(e.target.value),
+                                      placement: placementFromRegionAlign(
+                                        normalizeElementRegion(regionAlignFromPlacement(it.placement).region),
+                                        normalizeElementAlign(e.target.value)
+                                      ),
+                                    }
+                                  : it
+                              )
+                            )
+                          }
+                          className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                        >
+                          <option value="left">좌</option>
+                          <option value="center">가운데</option>
+                          <option value="right">우</option>
+                        </select>
+                      </label>
+                      <label className="space-y-1">
+                        <span className="block text-[11px] text-gray-600 dark:text-slate-400">위치 영역</span>
+                        <select
+                          value={normalizeElementRegion(regionAlignFromPlacement(selectedElement.placement).region)}
+                          onChange={(e) =>
+                            updateElements(
+                              elements.map((it) =>
+                                it.id === selectedElement.id
+                                  ? {
+                                      ...it,
+                                      placement: placementFromRegionAlign(
+                                        normalizeElementRegion(e.target.value),
+                                        normalizeElementAlign(it.textAlign)
+                                      ),
+                                    }
+                                  : it
+                              )
+                            )
+                          }
+                          className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                        >
+                          <option value="blockTop">블록 상단</option>
+                          <option value="blockInside">블록 내부</option>
+                          <option value="blockBottom">블록 하단</option>
+                          <option value="outsideTop">블록 외부 상단</option>
+                          <option value="outsideBottom">블록 외부 하단</option>
+                        </select>
+                      </label>
+                    </div>
+                  ) : null}
+                  {selectedElement.type === "card" ? (
+                    <div className="grid gap-2">
+                      <label className="space-y-1">
+                        <span className="block text-[11px] text-gray-600 dark:text-slate-400">카드 종류 선택</span>
+                        <select
+                          value={selectedElement.cardKind ?? "default"}
+                          onChange={(e) =>
+                            updateElements(
+                              elements.map((it) =>
+                                it.id === selectedElement.id
+                                  ? { ...it, cardKind: resolveCardKind(e.target.value) }
+                                  : it
                               )
                             )
                           }
@@ -1455,107 +1721,154 @@ export default function AdminSitePageBuilderNewPage() {
                           <option value="default">디폴트카드</option>
                           <option value="custom">사용자설정카드</option>
                         </select>
-                      ) : null}
-                      {el.type === "cta" ? (
-                        <div className="grid gap-2">
-                          <input
-                            value={String(el.ctaLabel ?? "전체보기")}
-                            onChange={(e) =>
-                              updateElements(
-                                elements.map((it) => (it.id === el.id ? { ...it, ctaLabel: e.target.value } : it))
+                      </label>
+                      <label className="space-y-1">
+                        <span className="block text-[11px] text-gray-600 dark:text-slate-400">정렬</span>
+                        <select
+                          value={normalizePlacementForElement("card", selectedElement.placement)}
+                          onChange={(e) =>
+                            updateElements(
+                              elements.map((it) =>
+                                it.id === selectedElement.id
+                                  ? { ...it, placement: normalizePlacementForElement("card", e.target.value) }
+                                  : it
                               )
-                            }
-                            placeholder="CTA 버튼명"
-                            className="rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
-                          />
-                          <input
-                            value={String(el.ctaHref ?? "")}
-                            onChange={(e) =>
-                              updateElements(
-                                elements.map((it) => (it.id === el.id ? { ...it, ctaHref: e.target.value } : it))
+                            )
+                          }
+                          className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                        >
+                          <option value="insideLeft">좌</option>
+                          <option value="insideCenter">가운데</option>
+                          <option value="insideRight">우</option>
+                        </select>
+                      </label>
+                      <div className="rounded border border-site-border px-3 py-2 text-xs text-gray-600 dark:text-slate-400">
+                        위치: 블록 내부(1열 고정)
+                      </div>
+                    </div>
+                  ) : null}
+                  {selectedElement.type === "cta" ? (
+                    <div className="grid gap-2">
+                      <input
+                        value={String(selectedElement.ctaLabel ?? "전체보기")}
+                        onChange={(e) =>
+                          updateElements(
+                            elements.map((it) =>
+                              it.id === selectedElement.id ? { ...it, ctaLabel: e.target.value } : it
+                            )
+                          )
+                        }
+                        placeholder="버튼 텍스트"
+                        className="rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                      />
+                      <input
+                        value={String(selectedElement.ctaHref ?? "")}
+                        onChange={(e) =>
+                          updateElements(
+                            elements.map((it) =>
+                              it.id === selectedElement.id ? { ...it, ctaHref: e.target.value } : it
+                            )
+                          )
+                        }
+                        placeholder="버튼 링크"
+                        className="rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                      />
+                      <label className="space-y-1">
+                        <span className="block text-[11px] text-gray-600 dark:text-slate-400">위치 영역</span>
+                        <select
+                          value={normalizeElementRegion(regionAlignFromPlacement(selectedElement.placement).region)}
+                          onChange={(e) =>
+                            updateElements(
+                              elements.map((it) =>
+                                it.id === selectedElement.id
+                                  ? {
+                                      ...it,
+                                      placement: placementFromRegionAlign(
+                                        normalizeElementRegion(e.target.value),
+                                        normalizeElementAlign(it.buttonAlign)
+                                      ),
+                                    }
+                                  : it
                               )
-                            }
-                            placeholder="CTA 링크"
-                            className="rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
-                          />
-                          <select
-                            value={el.ctaPlacement ?? "headerRight"}
+                            )
+                          }
+                          className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                        >
+                          <option value="blockTop">블록 상단</option>
+                          <option value="blockBottom">블록 하단</option>
+                          <option value="outsideTop">블록 외부 상단</option>
+                          <option value="outsideBottom">블록 외부 하단</option>
+                        </select>
+                      </label>
+                      <label className="space-y-1">
+                        <span className="block text-[11px] text-gray-600 dark:text-slate-400">정렬</span>
+                        <select
+                          value={normalizeElementAlign(selectedElement.buttonAlign)}
+                          onChange={(e) =>
+                            updateElements(
+                              elements.map((it) =>
+                                it.id === selectedElement.id
+                                  ? {
+                                      ...it,
+                                      buttonAlign: normalizeElementAlign(e.target.value),
+                                      placement: placementFromRegionAlign(
+                                        normalizeElementRegion(regionAlignFromPlacement(it.placement).region),
+                                        normalizeElementAlign(e.target.value)
+                                      ),
+                                    }
+                                  : it
+                              )
+                            )
+                          }
+                          className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                        >
+                          <option value="left">좌</option>
+                          <option value="center">가운데</option>
+                          <option value="right">우</option>
+                        </select>
+                      </label>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <label className="space-y-1">
+                          <span className="block text-[11px] text-gray-600 dark:text-slate-400">버튼 색상</span>
+                          <input
+                            type="color"
+                            value={normalizeElementColor(selectedElement.buttonColor, "#2563eb")}
                             onChange={(e) =>
                               updateElements(
                                 elements.map((it) =>
-                                  it.id === el.id
-                                    ? { ...it, ctaPlacement: normalizeElementCtaPlacement(e.target.value) }
+                                  it.id === selectedElement.id
+                                    ? { ...it, buttonColor: normalizeElementColor(e.target.value, "#2563eb") }
                                     : it
                                 )
                               )
                             }
-                            className="rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
+                            className="h-10 w-full rounded border border-site-border bg-white px-1 dark:bg-slate-900"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="block text-[11px] text-gray-600 dark:text-slate-400">버튼 모양</span>
+                          <select
+                            value={normalizeButtonShape(selectedElement.buttonShape)}
+                            onChange={(e) =>
+                              updateElements(
+                                elements.map((it) =>
+                                  it.id === selectedElement.id
+                                    ? { ...it, buttonShape: normalizeButtonShape(e.target.value) }
+                                    : it
+                                )
+                              )
+                            }
+                            className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
                           >
-                            <option value="headerRight">상단 오른쪽</option>
-                            <option value="blockBottomLeft">블록 하단 왼쪽</option>
-                            <option value="blockBottomCenter">블록 하단 가운데</option>
-                            <option value="blockBottomRight">블록 하단 오른쪽</option>
-                            <option value="outsideBottomLeft">블록 바깥 아래 왼쪽</option>
-                            <option value="outsideBottomCenter">블록 바깥 아래 가운데</option>
-                            <option value="outsideBottomRight">블록 바깥 아래 오른쪽</option>
+                            <option value="square">사각형</option>
+                            <option value="circle">원형</option>
                           </select>
-                        </div>
-                      ) : null}
+                        </label>
+                      </div>
                     </div>
-                  ))}
+                  ) : null}
                 </div>
-              </div>
-              <div className="space-y-2 rounded border border-site-border p-3 sm:col-span-2">
-                <p className="text-xs font-semibold text-gray-700 dark:text-slate-300">슬라이드 설정</p>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(style.slideEnabled)}
-                    onChange={(e) => updateStyle({ slideEnabled: e.target.checked })}
-                  />
-                  슬라이드 사용
-                </label>
-                {Boolean(style.slideEnabled) ? (
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <label className="space-y-1">
-                      <span className="block text-[11px] text-gray-600 dark:text-slate-400">자동 재생</span>
-                      <select
-                        value={String(style.slideAutoPlay ?? "true")}
-                        onChange={(e) => updateStyle({ slideAutoPlay: e.target.value === "true" })}
-                        className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
-                      >
-                        <option value="true">켜기</option>
-                        <option value="false">끄기</option>
-                      </select>
-                    </label>
-                    <label className="space-y-1">
-                      <span className="block text-[11px] text-gray-600 dark:text-slate-400">속도</span>
-                      <select
-                        value={String(style.slideSpeed ?? "normal")}
-                        onChange={(e) => updateStyle({ slideSpeed: e.target.value })}
-                        className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
-                      >
-                        <option value="slow">느리게</option>
-                        <option value="normal">보통</option>
-                        <option value="fast">빠르게</option>
-                      </select>
-                    </label>
-                    <label className="space-y-1">
-                      <span className="block text-[11px] text-gray-600 dark:text-slate-400">호버 시 동작</span>
-                      <select
-                        value={String(style.slidePauseOnHover ?? "true")}
-                        onChange={(e) => updateStyle({ slidePauseOnHover: e.target.value === "true" })}
-                        className="w-full rounded border border-site-border bg-white px-3 py-2 text-sm dark:bg-slate-900"
-                      >
-                        <option value="true">멈춤</option>
-                        <option value="false">계속 이동</option>
-                      </select>
-                    </label>
-                  </div>
-                ) : (
-                  <p className="text-[11px] text-gray-500 dark:text-slate-400">슬라이드가 꺼져 있으면 일반 카드 목록으로 표시됩니다.</p>
-                )}
-              </div>
+              ) : null}
               <div className="pt-1">
                 <button type="button" onClick={() => void completeStep2()} disabled={saving} className="rounded border border-site-border px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-50 dark:hover:bg-slate-800">
                   STEP 2 완료
@@ -1718,6 +2031,34 @@ export default function AdminSitePageBuilderNewPage() {
                     <option value="latest">최신 게시카드 자동 불러오기</option>
                     <option value="manual">목록에서 직접 선택</option>
                   </select>
+                  {String(style.publishedCardLoadMode ?? "latest") === "latest" ? (
+                    <div className="space-y-2 rounded border border-sky-200 bg-sky-100/40 p-2 dark:border-sky-900/60 dark:bg-sky-950/20">
+                      <div className="text-[11px] font-semibold text-sky-900 dark:text-sky-100">자동 불러오기 설정</div>
+                      <div className="space-y-1">
+                        <span className="block text-[11px] text-sky-800 dark:text-sky-200">불러올 개수</span>
+                        <div className="flex flex-wrap gap-2">
+                          {[4, 6, 8].map((n) => {
+                            const selected = Number(style.publishedCardTake ?? 6) === n;
+                            return (
+                              <button
+                                key={`published-card-take-${n}`}
+                                type="button"
+                                onClick={() => updateStyle({ publishedCardTake: n })}
+                                className={
+                                  selected
+                                    ? "rounded border border-site-primary bg-site-primary/15 px-2.5 py-1 text-xs font-semibold text-site-primary"
+                                    : "rounded border border-site-border px-2.5 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                                }
+                              >
+                                {n}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-sky-800 dark:text-sky-200">정렬 방식: 최신순(고정)</p>
+                    </div>
+                  ) : null}
                   {String(style.publishedCardLoadMode ?? "latest") === "manual" ? (
                     <input
                       value={String(style.publishedCardPickKey ?? "")}
@@ -1847,17 +2188,17 @@ export default function AdminSitePageBuilderNewPage() {
       ) : isMobile ? (
         <div className="space-y-2">
           {editorHeader}
-          {previewPanel}
           {blockSettingsPanel}
           {cardSettingsPanel}
+          {previewPanel}
         </div>
       ) : (
         <>
           {editorHeader}
-          <div className="grid min-h-[calc(100vh-7rem)] grid-cols-1 gap-2 xl:grid-cols-[1.2fr_1fr_1fr]">
-            <div className="min-h-0 overflow-y-auto pr-1">{previewPanel}</div>
+          <div className="grid min-h-[calc(100vh-7rem)] grid-cols-1 gap-2 xl:grid-cols-[1fr_1fr_1.2fr]">
             {blockSettingsPanel}
             {cardSettingsPanel}
+            <div className="min-h-0 overflow-y-auto pl-1">{previewPanel}</div>
           </div>
         </>
       )}

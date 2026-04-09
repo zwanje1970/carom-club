@@ -54,7 +54,7 @@ function resolveConsoleTitle(pathname: string, c: Record<AdminCopyKey, string>):
   if (pathname.startsWith("/client/setup")) return getCopyValue(c, "client.console.title.settings");
   if (pathname.startsWith("/client/operations")) return getCopyValue(c, "client.console.title.operations");
   if (pathname.startsWith("/client/feedback")) return getCopyValue(c, "client.console.title.settings");
-  if (pathname.startsWith("/client/tournaments")) return getCopyValue(c, "client.console.title.tournamentInfo");
+  if (pathname.startsWith("/client/tournaments")) return "대회관리";
   if (pathname.startsWith("/client/billing/platform")) return getCopyValue(c, "client.console.title.billingPlatform");
   if (pathname.startsWith("/client/billing")) return getCopyValue(c, "client.console.title.billing");
   if (pathname.startsWith("/client/settings")) return getCopyValue(c, "client.console.title.settings");
@@ -108,7 +108,7 @@ export function ClientConsoleShell({
               return (
                 <li key={item.id}>
                   <Link href={item.href} className={`${navBtn} ${active ? navBtnActive : ""}`}>
-                    {getCopyValue(c, item.labelKey)}
+                    {item.id === "tournament" ? "대회관리" : getCopyValue(c, item.labelKey)}
                   </Link>
                 </li>
               );

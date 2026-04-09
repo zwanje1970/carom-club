@@ -9,6 +9,7 @@ import { formatKoreanDateWithWeekday } from "@/lib/format-date";
 import { normalizeSlug } from "@/lib/normalize-slug";
 import { ConsolePageHeader } from "@/components/client/console/ui/ConsolePageHeader";
 import { ConsoleSection } from "@/components/client/console/ui/ConsoleSection";
+import { canAccessClientDashboard } from "@/types/auth";
 
 export const metadata = {
   title: "관리자홈",
@@ -52,7 +53,7 @@ function resolveActionForBracket(t: HomeTournament): { href: string; label: stri
 
 export default async function ClientDashboardPage() {
   const session = await getSession();
-  if (!session || session.role !== "CLIENT_ADMIN") return null;
+  if (!session || !canAccessClientDashboard(session)) return null;
 
   const orgId = await getClientAdminOrganizationId(session);
   if (!orgId) {

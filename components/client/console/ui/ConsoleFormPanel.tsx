@@ -26,16 +26,16 @@ export function ConsoleFormPanel({ title, description, children, footer, classNa
   return (
     <div className={cx(consoleBorder, consoleRadius, consoleSurface, "overflow-hidden", className)}>
       {(title || description) && (
-        <div className={cx("px-3 py-2.5", consoleBorderB)}>
+        <div className={cx("px-3 py-2.5 lg:px-4 lg:py-3", consoleBorderB)}>
           {title ? <h2 className={consoleTextTitle}>{title}</h2> : null}
           {description ? <p className={cx("mt-1 max-w-2xl", consoleTextBody)}>{description}</p> : null}
         </div>
       )}
-      <div className="space-y-3 p-3">{children}</div>
+      <div className="space-y-3 p-3 lg:p-4">{children}</div>
       {footer ? (
         <div
           className={cx(
-            "flex flex-wrap items-center justify-end gap-2 px-3 py-2.5",
+            "flex flex-wrap items-center justify-end gap-2 px-3 py-2.5 lg:px-4 lg:py-3",
             consoleBorderT
           )}
         >

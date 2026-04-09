@@ -103,12 +103,15 @@ export function ClientApplyBottomCta() {
         </Link>
       )}
       {application.status === "APPROVED" && (
-        <Link
-          href="/client/dashboard"
+        <button
+          type="button"
+          onClick={() => {
+            window.location.href = "/client/dashboard";
+          }}
           className="inline-flex items-center rounded border border-site-border bg-site-card px-2.5 py-1 text-site-primary hover:bg-site-primary/5"
         >
           대시보드
-        </Link>
+        </button>
       )}
       {application.status === "REJECTED" && (
         <Link

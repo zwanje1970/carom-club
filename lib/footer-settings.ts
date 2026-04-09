@@ -79,6 +79,8 @@ export type FooterItemFontFamilies = Partial<Record<FooterItemFontSizeKey, strin
 
 export type FooterSettings = {
   footerEnabled: boolean;
+  footerDesktopEnabled: boolean;
+  footerMobileEnabled: boolean;
   footerBgColor: string | null;
   footerTextColor: string | null;
   footerFontSize: FooterFontSize | null;
@@ -97,6 +99,8 @@ export type FooterSettings = {
 
 const DEFAULT_FOOTER: FooterSettings = {
   footerEnabled: false,
+  footerDesktopEnabled: true,
+  footerMobileEnabled: false,
   footerBgColor: null,
   footerTextColor: null,
   footerFontSize: null,
@@ -220,22 +224,67 @@ function parseFooterFontFamiliesJson(json: string | null): FooterItemFontFamilie
   }
 }
 
-export function footerFontFamiliesToJson(families: FooterItemFontFamilies): string {
-  const obj: Record<string, string | null> = {};
+const FOOTER_DESKTOP_ENABLED_KEY = "__footerDesktopEnabled";
+const FOOTER_MOBILE_ENABLED_KEY = "__footerMobileEnabled";
+
+function parseFooterDeviceEnabledFromFontFamiliesJson(json: string | null): {
+  footerDesktopEnabled: boolean;
+  footerMobileEnabled: boolean;
+} {
+  if (!json?.trim()) {
+    return {
+      footerDesktopEnabled: DEFAULT_FOOTER.footerDesktopEnabled,
+      footerMobileEnabled: DEFAULT_FOOTER.footerMobileEnabled,
+    };
+  }
+  try {
+    const raw = JSON.parse(json) as Record<string, unknown>;
+    return {
+      footerDesktopEnabled:
+        typeof raw[FOOTER_DESKTOP_ENABLED_KEY] === "boolean"
+          ? (raw[FOOTER_DESKTOP_ENABLED_KEY] as boolean)
+          : DEFAULT_FOOTER.footerDesktopEnabled,
+      footerMobileEnabled:
+        typeof raw[FOOTER_MOBILE_ENABLED_KEY] === "boolean"
+          ? (raw[FOOTER_MOBILE_ENABLED_KEY] as boolean)
+          : DEFAULT_FOOTER.footerMobileEnabled,
+    };
+  } catch {
+    return {
+      footerDesktopEnabled: DEFAULT_FOOTER.footerDesktopEnabled,
+      footerMobileEnabled: DEFAULT_FOOTER.footerMobileEnabled,
+    };
+  }
+}
+
+export function footerFontFamiliesToJson(
+  families: FooterItemFontFamilies,
+  deviceEnabled?: { footerDesktopEnabled?: boolean; footerMobileEnabled?: boolean }
+): string {
+  const obj: Record<string, unknown> = {};
   for (const key of FOOTER_ITEM_FONT_SIZE_KEYS) {
     if (families[key] !== undefined) obj[key] = families[key] ?? null;
+  }
+  if (deviceEnabled?.footerDesktopEnabled !== undefined) {
+    obj[FOOTER_DESKTOP_ENABLED_KEY] = deviceEnabled.footerDesktopEnabled;
+  }
+  if (deviceEnabled?.footerMobileEnabled !== undefined) {
+    obj[FOOTER_MOBILE_ENABLED_KEY] = deviceEnabled.footerMobileEnabled;
   }
   return Object.keys(obj).length ? JSON.stringify(obj) : "";
 }
 
 export function dbRowToFooterSettings(row: FooterRow | null): FooterSettings {
   if (!row) return { ...DEFAULT_FOOTER };
+  const deviceEnabled = parseFooterDeviceEnabledFromFontFamiliesJson(row.footerFontFamiliesJson);
   const footerFontSize =
     row.footerFontSize && VALID_FOOTER_FONT_SIZES.includes(row.footerFontSize as FooterFontSize)
       ? (row.footerFontSize as FooterFontSize)
       : null;
   return {
     footerEnabled: row.footerEnabled ?? false,
+    footerDesktopEnabled: deviceEnabled.footerDesktopEnabled,
+    footerMobileEnabled: deviceEnabled.footerMobileEnabled,
     footerBgColor: row.footerBgColor ?? null,
     footerTextColor: row.footerTextColor ?? null,
     footerFontSize,

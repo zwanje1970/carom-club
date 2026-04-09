@@ -6,6 +6,7 @@ import { getMyBillingData } from "@/lib/billing-client";
 import { formatPrice, formatPostingMonths } from "@/lib/feature-access";
 import { formatKoreanDate, formatKoreanDateTime } from "@/lib/format-date";
 import { isAnnualMembershipVisible } from "@/lib/site-feature-flags";
+import { canAccessClientDashboard } from "@/types/auth";
 
 export const metadata = {
   title: "플랫폼 이용",
@@ -42,7 +43,7 @@ export default async function ClientBillingPlatformPage() {
   }
 
   const session = await getSession();
-  if (!session || session.role !== "CLIENT_ADMIN") return null;
+  if (!session || !canAccessClientDashboard(session)) return null;
 
   const orgId = await getClientAdminOrganizationId(session);
   if (!orgId) {

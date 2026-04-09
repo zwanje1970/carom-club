@@ -1,4 +1,7 @@
 import { ClientLayoutServer } from "./ClientLayoutServer";
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
+import { canAccessClientDashboard } from "@/types/auth";
 
 export const metadata = {
   title: { template: "%s | 대회 운영 콘솔", default: "캐롬클럽 대회 운영 콘솔" },
@@ -12,5 +15,9 @@ export default async function ClientLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const session = await getSession();
+  if (!canAccessClientDashboard(session)) {
+    redirect("/mypage");
+  }
   return <ClientLayoutServer>{children}</ClientLayoutServer>;
 }

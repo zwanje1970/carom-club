@@ -181,7 +181,7 @@ export function ClientBracketBuildConsole({
       <ConsolePageHeader
         eyebrow="대회 운영"
         title="대진 생성 콘솔"
-        description={`「${tournamentName}」 — 변수 입력 시 우측에 미리보기·검증이 즉시 반영됩니다.`}
+        description={`「${tournamentName}」`}
       />
       {operationPhase && (
         <OperationsTournamentPhaseStepper
@@ -194,7 +194,6 @@ export function ClientBracketBuildConsole({
       <div className="grid flex-1 gap-3 lg:grid-cols-[minmax(0,22rem)_1fr] lg:items-start">
         <ConsoleFormPanel
           title="변수 입력"
-          description="값이 바뀌면 우측 요약이 즉시 재계산됩니다."
         >
           <div>
             <label className={labelCls}>확정 참가자 수 (DB)</label>

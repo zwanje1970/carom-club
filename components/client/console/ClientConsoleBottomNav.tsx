@@ -101,7 +101,7 @@ export function ClientConsoleBottomNav({ copy }: { copy: Record<string, string> 
                 )}
               >
                 <Icon className={cx("shrink-0", active ? "text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400")} />
-                <span className="truncate">{getCopyValue(c, labelKey)}</span>
+                <span className="truncate">{labelKey === "client.console.bottomNav.tournaments" ? "대회관리" : getCopyValue(c, labelKey)}</span>
               </Link>
             </li>
           );

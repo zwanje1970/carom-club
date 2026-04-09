@@ -24,14 +24,27 @@ export function MypageQuickMenu({ showClient = false, showNoteEntry }: MypageQui
   return (
     <div className="grid grid-cols-2 gap-3">
       {items.map(({ href, label }) => (
-        <Link
-          key={href + label}
-          href={href}
-          prefetch={false}
-          className="flex items-center justify-center rounded-xl border border-gray-200 bg-white py-4 text-sm font-medium text-site-text shadow-sm hover:bg-gray-50 active:bg-gray-100 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700 dark:active:bg-slate-600"
-        >
-          {label}
-        </Link>
+        href.startsWith("/client") ? (
+          <button
+            key={href + label}
+            type="button"
+            onClick={() => {
+              window.location.href = href;
+            }}
+            className="flex items-center justify-center rounded-xl border border-gray-200 bg-white py-4 text-sm font-medium text-site-text shadow-sm hover:bg-gray-50 active:bg-gray-100 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700 dark:active:bg-slate-600"
+          >
+            {label}
+          </button>
+        ) : (
+          <Link
+            key={href + label}
+            href={href}
+            prefetch={false}
+            className="flex items-center justify-center rounded-xl border border-gray-200 bg-white py-4 text-sm font-medium text-site-text shadow-sm hover:bg-gray-50 active:bg-gray-100 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700 dark:active:bg-slate-600"
+          >
+            {label}
+          </Link>
+        )
       ))}
     </div>
   );

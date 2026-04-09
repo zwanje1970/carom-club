@@ -149,7 +149,7 @@ export function ClientOperationsParticipantRosterPanel({
       <ConsolePageHeader
         eyebrow="대회 운영"
         title="참가 명단 확정"
-        description={`「${data.tournamentName}」 — 대진 생성 전 최종 확정자 집합을 고정합니다.`}
+        description={`「${data.tournamentName}」`}
       />
 
       {phaseBlock}
@@ -186,13 +186,12 @@ export function ClientOperationsParticipantRosterPanel({
 
       <ConsoleSection title="요약">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <SummaryCard label="총 신청·파이프라인 인원" value={data.totalActiveApplicants} hint="APPLIED+CONFIRMED (취소·반려 제외)" />
-          <SummaryCard label="참가 확정자 수" value={data.confirmedCount} hint="스냅샷 대상" />
-          <SummaryCard label="대기자 수" value={data.waitingCount} hint="입금확인된 대기열" />
+          <SummaryCard label="총 신청·파이프라인 인원" value={data.totalActiveApplicants} />
+          <SummaryCard label="참가 확정자 수" value={data.confirmedCount} />
+          <SummaryCard label="대기자 수" value={data.waitingCount} />
           <SummaryCard
             label="중복 의심 인원"
             value={data.duplicateSuspectEntryCount}
-            hint="동일 입금자명·다른 계정(휴리스틱)"
             warn={data.duplicateSuspectEntryCount > 0}
           />
           <SummaryCard
@@ -204,7 +203,6 @@ export function ClientOperationsParticipantRosterPanel({
           <SummaryCard
             label="최종 확정 예정(참고)"
             value={data.projectedConfirmedAfterPromoteAll}
-            hint="정원·대기 허용 가정 시 상한(실제는 일괄 승격 후 갱신)"
           />
         </div>
         <p className={cx("mt-3 text-[11px]", consoleTextMuted)}>

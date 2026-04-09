@@ -245,7 +245,7 @@ export function ClientTournamentOutlineSection({
               </a>
             </p>
           ) : (
-            <p className="text-[11px] text-zinc-500">PDF를 선택하면 바로 연결됩니다.</p>
+            null
           )}
         </div>
       ) : null}

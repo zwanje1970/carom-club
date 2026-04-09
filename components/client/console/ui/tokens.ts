@@ -9,8 +9,8 @@ export const consoleRadius = "rounded-sm";
 export const consoleSurface = "bg-white dark:bg-zinc-900";
 export const consoleSurfaceMuted = "bg-zinc-50 dark:bg-zinc-900";
 export const consoleTextTitle = "text-sm font-semibold text-zinc-900 dark:text-zinc-100";
-export const consoleTextBody = "text-xs text-zinc-600 dark:text-zinc-400";
-export const consoleTextMuted = "text-[11px] text-zinc-500 dark:text-zinc-500";
+export const consoleTextBody = "text-xs lg:text-sm text-zinc-600 dark:text-zinc-400";
+export const consoleTextMuted = "text-[11px] lg:text-[13px] text-zinc-500 dark:text-zinc-500";
 export const consoleFocusRing =
   "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500";
 
@@ -28,10 +28,10 @@ export const consoleBtnDanger =
   consoleFocusRing;
 
 /** 필터·폼 인풋 래퍼에 붙이는 라벨 */
-export const consoleLabelClass = "mb-0.5 block text-[11px] font-medium text-zinc-600 dark:text-zinc-400";
+export const consoleLabelClass = "mb-0.5 block text-[11px] lg:text-[13px] font-medium text-zinc-600 dark:text-zinc-400";
 
 export const consoleInputClass =
-  "w-full min-w-[8rem] border border-zinc-300 bg-white px-2 py-1.5 text-xs text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100 " +
+  "w-full min-w-[8rem] border border-zinc-300 bg-white px-2 py-1.5 lg:py-2 text-xs lg:text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100 " +
   consoleRadius +
   " " +
   consoleFocusRing;

@@ -20,6 +20,10 @@ type Props = {
   slotType: HomeStructureSlotType;
   bundle: SlotBlockItemsBundle;
   onChange: (next: SlotBlockItemsBundle) => void;
+  tournamentAutoSettings?: {
+    displayCount: number;
+    onChangeDisplayCount: (next: number) => void;
+  };
 };
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
@@ -100,7 +104,12 @@ function ItemEditor({
   );
 }
 
-export function DecorateSlotBlockItemsEditor({ slotType, bundle, onChange }: Props) {
+export function DecorateSlotBlockItemsEditor({
+  slotType,
+  bundle,
+  onChange,
+  tournamentAutoSettings,
+}: Props) {
   const canChoosePublishedType = slotType === "tournamentIntro" || slotType === "venueIntro";
   const publishedTypeLabel = bundle.publishedType === "venue" ? "당구장 홍보용 게시카드" : "대회용 게시카드";
 
@@ -178,7 +187,7 @@ export function DecorateSlotBlockItemsEditor({ slotType, bundle, onChange }: Pro
             "min-h-[2.5rem] flex-1 px-3 py-2 text-left text-xs font-semibold text-gray-900 dark:text-slate-100"
           )}
         >
-          메인 게시용카드 불러오기
+          자동 데이터 연결 사용함
         </button>
         <button
           type="button"
@@ -188,41 +197,86 @@ export function DecorateSlotBlockItemsEditor({ slotType, bundle, onChange }: Pro
             "min-h-[2.5rem] flex-1 px-3 py-2 text-left text-xs font-semibold text-gray-900 dark:text-slate-100"
           )}
         >
-          직접 입력 카드
+          자동 데이터 연결 사용 안 함
         </button>
       </div>
 
       {bundle.mode === "auto" ? (
         <div className="space-y-2 rounded-lg border border-sky-200/80 bg-sky-50/60 p-3 dark:border-sky-800 dark:bg-sky-950/30">
-          <div className="text-[11px] font-semibold text-sky-950 dark:text-sky-100">게시카드 선택</div>
-          {canChoosePublishedType ? (
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setPublishedType("tournament")}
-                className={cn(
-                  decorateChoiceWrapClass(bundle.publishedType === "tournament"),
-                  "min-h-[2.25rem] px-3 py-1.5 text-xs font-semibold text-gray-900 dark:text-slate-100"
-                )}
-              >
-                대회용 게시카드
-              </button>
-              <button
-                type="button"
-                onClick={() => setPublishedType("venue")}
-                className={cn(
-                  decorateChoiceWrapClass(bundle.publishedType === "venue"),
-                  "min-h-[2.25rem] px-3 py-1.5 text-xs font-semibold text-gray-900 dark:text-slate-100"
-                )}
-              >
-                당구장 홍보용 게시카드
-              </button>
-            </div>
-          ) : null}
-          {canChoosePublishedType ? (
-            <p className="text-[11px] leading-relaxed text-sky-900 dark:text-sky-200">
-              현재 블록은 <span className="font-semibold">{publishedTypeLabel}</span>를 메인에 저장된 게시 스냅샷 기준으로 렌더링합니다.
-            </p>
+          <div className="text-[11px] font-semibold text-sky-950 dark:text-sky-100">자동 데이터 연결 설정</div>
+          {slotType === "tournamentIntro" ? (
+            <>
+              <div>
+                <FieldLabel>데이터 종류</FieldLabel>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPublishedType("tournament")}
+                    className={cn(
+                      decorateChoiceWrapClass(true),
+                      "min-h-[2.25rem] px-3 py-1.5 text-xs font-semibold text-gray-900 dark:text-slate-100"
+                    )}
+                  >
+                    대회카드
+                  </button>
+                </div>
+              </div>
+              <div>
+                <FieldLabel>불러올 개수</FieldLabel>
+                <div className="flex flex-wrap gap-2">
+                  {[4, 6, 8].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => tournamentAutoSettings?.onChangeDisplayCount(n)}
+                      className={cn(
+                        decorateChoiceWrapClass((tournamentAutoSettings?.displayCount ?? 6) === n),
+                        "min-h-[2.25rem] px-3 py-1.5 text-xs font-semibold text-gray-900 dark:text-slate-100"
+                      )}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <FieldLabel>정렬 방식</FieldLabel>
+                <div className="rounded border border-sky-200 bg-sky-100/60 px-2.5 py-1.5 text-xs font-semibold text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200">
+                  최신순 (고정)
+                </div>
+              </div>
+              <p className="text-[11px] leading-relaxed text-sky-900 dark:text-sky-200">
+                발행된 대회카드 기준으로 최신 카드가 선택 개수만큼 자동 반영됩니다.
+              </p>
+            </>
+          ) : canChoosePublishedType ? (
+            <>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPublishedType("tournament")}
+                  className={cn(
+                    decorateChoiceWrapClass(bundle.publishedType === "tournament"),
+                    "min-h-[2.25rem] px-3 py-1.5 text-xs font-semibold text-gray-900 dark:text-slate-100"
+                  )}
+                >
+                  대회용 게시카드
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPublishedType("venue")}
+                  className={cn(
+                    decorateChoiceWrapClass(bundle.publishedType === "venue"),
+                    "min-h-[2.25rem] px-3 py-1.5 text-xs font-semibold text-gray-900 dark:text-slate-100"
+                  )}
+                >
+                  당구장 홍보용 게시카드
+                </button>
+              </div>
+              <p className="text-[11px] leading-relaxed text-sky-900 dark:text-sky-200">
+                현재 블록은 <span className="font-semibold">{publishedTypeLabel}</span>를 메인에 저장된 게시 스냅샷 기준으로 렌더링합니다.
+              </p>
+            </>
           ) : (
             <p className="text-[11px] leading-relaxed text-sky-900 dark:text-sky-200">
               이 블록은 게시카드 자동 불러오기만 지원합니다.

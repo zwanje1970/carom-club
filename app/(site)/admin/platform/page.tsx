@@ -3,7 +3,6 @@ import { mdiViewDashboard } from "@mdi/js";
 import SectionMain from "@/components/admin/_components/Section/Main";
 import SectionTitleLineWithButton from "@/components/admin/_components/Section/TitleLineWithButton";
 import CardBox from "@/components/admin/_components/CardBox";
-import { PLATFORM_CARD_TEMPLATES_MENU_LABEL } from "@/lib/platform-card-templates";
 
 export default async function AdminPlatformPage() {
   return (
@@ -29,11 +28,6 @@ export default async function AdminPlatformPage() {
         <CardBox>
           <Link href="/admin/fee-ledger" className="block min-h-[44px] touch-manipulation py-1">
             <p className="text-base font-semibold text-site-text">정산/결제</p>
-          </Link>
-        </CardBox>
-        <CardBox>
-          <Link href="/admin/platform/card-templates" className="block min-h-[44px] touch-manipulation py-1">
-            <p className="text-base font-semibold text-site-text">{PLATFORM_CARD_TEMPLATES_MENU_LABEL}</p>
           </Link>
         </CardBox>
       </div>

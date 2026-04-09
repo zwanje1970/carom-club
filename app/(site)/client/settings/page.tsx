@@ -68,13 +68,6 @@ export default async function ClientSettingsPage() {
           <li>외부 연동</li>
           <li>권한·세션</li>
         </ul>
-        <p className="mt-3 text-[12px] text-zinc-500">
-          사업장 주소·소개·이미지 등은{" "}
-          <Link href="/client/setup" className="font-medium text-indigo-800 underline dark:text-indigo-300">
-            내 정보/사업장 관리
-          </Link>
-          로 이동하세요.
-        </p>
       </ConsoleSection>
     </div>
   );

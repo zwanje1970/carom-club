@@ -178,7 +178,7 @@ export default async function ClientTournamentDetailPage({
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Link href="/client/tournaments" className="text-xs font-semibold text-indigo-800 underline dark:text-indigo-300">
-          ← 전체대회
+          ← 대회관리
         </Link>
         {canMutate ? (
           <ClientTournamentDeleteControl tournamentId={tournament.id} tournamentName={tournament.name} variant="detail" />

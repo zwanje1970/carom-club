@@ -5,16 +5,19 @@ import type { SiteSettings } from "@/lib/site-settings";
 export function HomeDeferredFooterOnly({
   copy,
   siteSettings,
+  isMobileRequest,
 }: {
   copy: Record<string, string>;
   siteSettings: SiteSettings;
+  isMobileRequest: boolean;
 }) {
+  const footer = siteSettings.footer;
+  const enabledByDevice = isMobileRequest ? footer.footerMobileEnabled : footer.footerDesktopEnabled;
+  if (!footer.footerEnabled || !enabledByDevice) return null;
   return (
-    <div className="hidden md:block">
-      <SiteFooter
-        footer={siteSettings.footer}
-        defaultTagline={copy["site.footer.tagline"] ?? undefined}
-      />
-    </div>
+    <SiteFooter
+      footer={footer}
+      defaultTagline={copy["site.footer.tagline"] ?? undefined}
+    />
   );
 }

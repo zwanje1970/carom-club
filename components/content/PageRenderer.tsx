@@ -46,7 +46,7 @@ export function PageRenderer({
             surface={slotSurface}
           />
         ) : (
-          <PageSectionBlockRow key={block.id} section={block} />
+          <PageSectionBlockRow key={block.id} section={block} previewMode={slotSurface} />
         );
         const isSelected = selectedBlockId === block.id;
         return (

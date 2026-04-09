@@ -24,6 +24,13 @@ export async function GET() {
         secondaryColor: "#b91c1c",
         colorThemePreset: null,
         colorThemeCustom: null,
+        headerBgColor: null,
+        headerTextColor: null,
+        headerActiveColor: null,
+        mobileHeaderBgColor: null,
+        mobileHeaderTextColor: null,
+        mobileHeaderActiveColor: null,
+        mobileHeaderLogoText: null,
         homeCarouselFlowSpeed: 50,
         minSolutionLevelForUser: 1,
         introSettings: {
@@ -58,6 +65,10 @@ export async function PUT(request: Request) {
     headerBgColor?: string | null;
     headerTextColor?: string | null;
     headerActiveColor?: string | null;
+    mobileHeaderBgColor?: string | null;
+    mobileHeaderTextColor?: string | null;
+    mobileHeaderActiveColor?: string | null;
+    mobileHeaderLogoText?: string | null;
     homeCarouselFlowSpeed?: number;
     introSettings?: IntroSettings;
     colorThemePreset?: SiteColorThemeId | typeof SITE_CUSTOM_COLOR_THEME_PRESET | null;
@@ -93,6 +104,10 @@ export async function PUT(request: Request) {
       headerBgColor: body.headerBgColor,
       headerTextColor: body.headerTextColor,
       headerActiveColor: body.headerActiveColor,
+      mobileHeaderBgColor: body.mobileHeaderBgColor,
+      mobileHeaderTextColor: body.mobileHeaderTextColor,
+      mobileHeaderActiveColor: body.mobileHeaderActiveColor,
+      mobileHeaderLogoText: body.mobileHeaderLogoText,
       homeCarouselFlowSpeed: body.homeCarouselFlowSpeed,
       introSettings: body.introSettings,
       colorThemePreset: body.colorThemePreset,

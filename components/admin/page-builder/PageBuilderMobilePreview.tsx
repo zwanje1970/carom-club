@@ -10,6 +10,8 @@ import {
 } from "@/lib/content/filter-page-blocks-public-view";
 import { PageRenderer } from "@/components/content/PageRenderer";
 import CardBox from "@/components/admin/_components/CardBox";
+import { parseSlotBlockItemsBundle } from "@/lib/slot-block-items";
+import { isHomeStructureSlotType } from "@/lib/home-structure-slots";
 
 type Props = {
   /** 현재 빌더에서 편집 중인 페이지(슬롯 미리보기 컨텍스트와 일치) */
@@ -37,6 +39,23 @@ function toError(err: unknown, fallback: string): Error {
   return new Error(fallback);
 }
 
+function resolveHomePreviewDataNeeds(blocks: PageSection[]): {
+  requireTournaments: boolean;
+  requireVenues: boolean;
+} {
+  let requireTournaments = false;
+  let requireVenues = false;
+  for (const block of blocks) {
+    if (!isHomeStructureSlotType(block.slotType)) continue;
+    const bundle = parseSlotBlockItemsBundle(block.sectionStyleJson, block.slotType);
+    if (bundle.mode !== "auto") continue;
+    if (bundle.publishedType === "tournament") requireTournaments = true;
+    if (bundle.publishedType === "venue") requireVenues = true;
+    if (requireTournaments && requireVenues) break;
+  }
+  return { requireTournaments, requireVenues };
+}
+
 /**
  * 관리자 전용: 좁은 뷰포트에서 공개와 동일 `PageRenderer` + 슬롯 컨텍스트로 스택 확인.
  */
@@ -53,6 +72,7 @@ export function PageBuilderMobilePreview({
     () => applyPublicHeroSingleCanonical(page, filterPageBlocksForPublicView(rows)),
     [page, rows]
   );
+  const homeNeeds = useMemo(() => resolveHomePreviewDataNeeds(blocks), [blocks]);
   const [slotContext, setSlotContext] = useState<PageSlotRenderContext | null>(null);
   const [ctxError, setCtxError] = useState<string | null>(null);
 
@@ -61,8 +81,13 @@ export function PageBuilderMobilePreview({
     setCtxError(null);
     void (async () => {
       try {
+        const qs = new URLSearchParams({ page });
+        if (page === "home") {
+          qs.set("requireTournaments", homeNeeds.requireTournaments ? "1" : "0");
+          qs.set("requireVenues", homeNeeds.requireVenues ? "1" : "0");
+        }
         const res = await fetch(
-          `/api/admin/content/page-preview-context?page=${encodeURIComponent(page)}`,
+          `/api/admin/content/page-preview-context?${qs.toString()}`,
           { cache: "no-store" }
         );
         const data = await res.json().catch(() => null);
@@ -95,7 +120,7 @@ export function PageBuilderMobilePreview({
     return () => {
       cancelled = true;
     };
-  }, [page]);
+  }, [page, homeNeeds.requireTournaments, homeNeeds.requireVenues]);
 
   const emptyHint =
     blocks.length === 0 ? (

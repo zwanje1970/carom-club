@@ -50,9 +50,26 @@ export function BasicCard({
   stylePolicy?: PlatformCardTemplateStylePolicy;
   showDetailButton?: boolean;
 }) {
+  const compactMobileWidthPx = compact && stylePolicy ? "46vw" : null;
+  const responsiveCardWidth = stylePolicy
+    ? compactMobileWidthPx
+      ? `min(${stylePolicy.cardWidth}px, ${compactMobileWidthPx})`
+      : `${stylePolicy.cardWidth}px`
+    : undefined;
+  const responsiveCardHeight = stylePolicy
+    ? compactMobileWidthPx
+      ? `min(${stylePolicy.cardHeight}px, calc(${compactMobileWidthPx} * ${stylePolicy.cardHeight / Math.max(1, stylePolicy.cardWidth)}))`
+      : `${stylePolicy.cardHeight}px`
+    : undefined;
   const imageAreaHeight = stylePolicy
     ? Math.max(0, Math.min(stylePolicy.imageAreaHeight, stylePolicy.cardHeight))
     : undefined;
+  const responsiveImageAreaHeight =
+    stylePolicy && imageAreaHeight != null
+      ? compactMobileWidthPx
+        ? `min(${imageAreaHeight}px, calc(${compactMobileWidthPx} * ${imageAreaHeight / Math.max(1, stylePolicy.cardWidth)}))`
+        : `${imageAreaHeight}px`
+      : undefined;
   const textPadding = stylePolicy
     ? {
         paddingTop: `${stylePolicy.paddingTop}px`,
@@ -81,7 +98,18 @@ export function BasicCard({
         color: stylePolicy?.textColor || undefined,
       }}
     >
-      {[data.displayDateText, data.displayRegionText].filter(Boolean).join(" · ") || "날짜 · 지역"}
+      {data.displayDateText || "날짜"}
+    </p>
+  );
+  const regionBlock = (
+    <p
+      className="line-clamp-1 text-xs text-gray-600"
+      style={{
+        fontSize: stylePolicy ? `${stylePolicy.shortDescriptionFontSize}px` : undefined,
+        color: stylePolicy?.textColor || undefined,
+      }}
+    >
+      {data.displayRegionText || "장소"}
     </p>
   );
   const statusInline = (
@@ -99,9 +127,9 @@ export function BasicCard({
       style={
         stylePolicy
           ? {
-              width: `${stylePolicy.cardWidth}px`,
+              width: responsiveCardWidth,
               maxWidth: "100%",
-              height: `${stylePolicy.cardHeight}px`,
+              height: responsiveCardHeight,
               margin: `${stylePolicy.outerMargin}px`,
               backgroundColor: stylePolicy.backgroundColor,
             }
@@ -110,7 +138,7 @@ export function BasicCard({
     >
       <div
         className="relative w-full shrink-0 overflow-hidden bg-gray-100"
-        style={imageAreaHeight != null ? { height: `${imageAreaHeight}px` } : undefined}
+        style={responsiveImageAreaHeight != null ? { height: responsiveImageAreaHeight } : undefined}
       >
         {data.thumbnailUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -142,13 +170,31 @@ export function BasicCard({
         {stylePolicy?.statusPosition === "title-below" ? statusInline : null}
         <div className="grid min-h-0 flex-1 grid-rows-3 overflow-hidden" style={{ marginTop: `${stylePolicy?.titleContentGap ?? 6}px` }}>
           <div className={`flex ${textAlignClass(stylePolicy?.shortDescriptionAlign ?? "left")} ${descriptionPositionClass(stylePolicy?.shortDescriptionPosition ?? "title-below")}`}>
-            {(stylePolicy?.shortDescriptionPosition ?? "title-below") === "title-below" ? dateBlock : null}
+            {(stylePolicy?.shortDescriptionPosition ?? "title-below") === "title-below" ? (
+              <div className="w-full">
+                {data.displayDateText ? dateBlock : null}
+                {data.displayRegionText ? regionBlock : null}
+                {!data.displayDateText && !data.displayRegionText ? dateBlock : null}
+              </div>
+            ) : null}
           </div>
           <div className={`flex ${textAlignClass(stylePolicy?.shortDescriptionAlign ?? "left")} ${descriptionPositionClass(stylePolicy?.shortDescriptionPosition ?? "title-below")}`}>
-            {(stylePolicy?.shortDescriptionPosition ?? "title-below") === "center" ? dateBlock : null}
+            {(stylePolicy?.shortDescriptionPosition ?? "title-below") === "center" ? (
+              <div className="w-full">
+                {data.displayDateText ? dateBlock : null}
+                {data.displayRegionText ? regionBlock : null}
+                {!data.displayDateText && !data.displayRegionText ? dateBlock : null}
+              </div>
+            ) : null}
           </div>
           <div className={`flex ${textAlignClass(stylePolicy?.shortDescriptionAlign ?? "left")} ${descriptionPositionClass(stylePolicy?.shortDescriptionPosition ?? "title-below")}`}>
-            {(stylePolicy?.shortDescriptionPosition ?? "title-below") === "bottom" ? dateBlock : null}
+            {(stylePolicy?.shortDescriptionPosition ?? "title-below") === "bottom" ? (
+              <div className="w-full">
+                {data.displayDateText ? dateBlock : null}
+                {data.displayRegionText ? regionBlock : null}
+                {!data.displayDateText && !data.displayRegionText ? dateBlock : null}
+              </div>
+            ) : null}
           </div>
         </div>
         {showDetailButton ? (
@@ -168,7 +214,6 @@ export function HighlightCard({
   data,
   compact = false,
   stylePolicy,
-  showDetailButton = true,
 }: {
   data: TournamentPublishedCardViewModel;
   compact?: boolean;
@@ -176,6 +221,10 @@ export function HighlightCard({
   showDetailButton?: boolean;
 }) {
   const circleSize = Math.max(100, Math.min(stylePolicy?.cardWidth ?? 112, 360));
+  const compactMobileWidthPx = compact && stylePolicy ? "46vw" : null;
+  const responsiveCircleSize = compactMobileWidthPx
+    ? `min(${circleSize}px, ${compactMobileWidthPx})`
+    : `${circleSize}px`;
 
   return (
     <div
@@ -183,7 +232,7 @@ export function HighlightCard({
       style={
         stylePolicy
           ? {
-              width: `${circleSize}px`,
+              width: responsiveCircleSize,
               maxWidth: "100%",
               margin: `${stylePolicy.outerMargin}px`,
             }
@@ -192,7 +241,7 @@ export function HighlightCard({
     >
       <div
         className="relative overflow-hidden rounded-full border border-site-border bg-gray-100"
-        style={{ width: `${circleSize}px`, height: `${circleSize}px` }}
+        style={{ width: responsiveCircleSize, height: responsiveCircleSize }}
       >
         {data.thumbnailUrl ? (
           // eslint-disable-next-line @next/next/no-img-element

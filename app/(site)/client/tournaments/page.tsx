@@ -7,6 +7,10 @@ import { formatKoreanDateWithWeekday } from "@/lib/format-date";
 import { canAccessClientDashboard } from "@/types/auth";
 import { getClientOrgTournamentMutationRole } from "@/lib/client-tournament-access";
 import { ClientTournamentDeleteControl } from "@/components/client/console/ClientTournamentDeleteControl";
+import {
+  ClientTournamentStatusChangeSelect,
+  type TournamentStatusChangeChoice,
+} from "@/components/client/console/ClientTournamentStatusChangeSelect";
 import { ConsolePageHeader } from "@/components/client/console/ui/ConsolePageHeader";
 import {
   ConsoleTable,
@@ -17,9 +21,10 @@ import {
   ConsoleTableTh,
 } from "@/components/client/console/ui/ConsoleTable";
 import { ConsoleSection } from "@/components/client/console/ui/ConsoleSection";
+import { parseTournamentCardPublishState } from "@/lib/client-card-publish";
 
 export const metadata = {
-  title: "전체대회",
+  title: "대회관리",
 };
 
 function statusLabel(status: string): "계획중" | "모집중" | "마감" | "종료" {
@@ -34,6 +39,34 @@ function statusTone(status: string): string {
   if (status === "FINISHED") return "border-zinc-300 bg-zinc-100 text-zinc-700";
   if (status === "DRAFT" || status === "HIDDEN") return "border-amber-300 bg-amber-50 text-amber-900";
   return "border-indigo-300 bg-indigo-50 text-indigo-900";
+}
+
+function mapOperationalStatusToChoice(status: string): TournamentStatusChangeChoice {
+  if (status === "OPEN") return "모집중";
+  if (status === "FINISHED") return "종료";
+  if (status === "CLOSED" || status === "BRACKET_GENERATED") return "마감";
+  return "모집중";
+}
+
+const STATUS_CHANGE_OPTIONS: readonly TournamentStatusChangeChoice[] = [
+  "모집중",
+  "마감",
+  "마감임박",
+  "종료",
+  "대기자모집",
+];
+
+function normalizeSnapshotStatusText(
+  value: string | null | undefined
+): TournamentStatusChangeChoice | null {
+  const text = (value ?? "").trim();
+  if (
+    text &&
+    (STATUS_CHANGE_OPTIONS as readonly string[]).includes(text)
+  ) {
+    return text as TournamentStatusChangeChoice;
+  }
+  return null;
 }
 
 export default async function ClientTournamentsPage({
@@ -76,6 +109,7 @@ export default async function ClientTournamentsPage({
       status: true,
       maxParticipants: true,
       _count: { select: { entries: true } },
+      rule: { select: { bracketConfig: true } },
     },
   });
 
@@ -97,6 +131,20 @@ export default async function ClientTournamentsPage({
       : [[], []];
   const approvedMap = Object.fromEntries(approvedRows.map((r) => [r.tournamentId, r._count.id]));
   const pendingMap = Object.fromEntries(pendingRows.map((r) => [r.tournamentId, r._count.id]));
+  const statusChoiceById = Object.fromEntries(
+    tournaments.map((t) => {
+      const state = parseTournamentCardPublishState(
+        t.rule?.bracketConfig ?? null,
+        t.id,
+        t.name
+      );
+      const snapshotChoice =
+        normalizeSnapshotStatusText(state.published?.statusText) ??
+        normalizeSnapshotStatusText(state.draft?.statusText);
+      const choice = snapshotChoice ?? mapOperationalStatusToChoice(t.status);
+      return [t.id, choice];
+    })
+  ) as Record<string, TournamentStatusChangeChoice>;
 
   const tabs = [
     { id: "all", label: "전체" },
@@ -109,7 +157,7 @@ export default async function ClientTournamentsPage({
     <div className="space-y-4">
       <ConsolePageHeader
         eyebrow="운영"
-        title="전체대회"
+        title="대회관리"
         description={org ? `「${org.name}」 대회 목록 및 기록` : "대회 목록 및 기록"}
         actions={
           <Link
@@ -153,14 +201,21 @@ export default async function ClientTournamentsPage({
                     <ConsoleTableTh className="text-right">신청자</ConsoleTableTh>
                     <ConsoleTableTh className="text-right">승인</ConsoleTableTh>
                     <ConsoleTableTh className="text-right">미승인</ConsoleTableTh>
-                    <ConsoleTableTh>상태</ConsoleTableTh>
+                    <ConsoleTableTh>상태변경</ConsoleTableTh>
                     <ConsoleTableTh className="text-right">관리</ConsoleTableTh>
                   </ConsoleTableRow>
                 </ConsoleTableHead>
                 <ConsoleTableBody>
                   {tournaments.map((t) => (
                     <ConsoleTableRow key={t.id}>
-                      <ConsoleTableTd className="font-medium">{t.name}</ConsoleTableTd>
+                      <ConsoleTableTd className="font-medium">
+                        <Link
+                          href={`/client/tournaments/${t.id}`}
+                          className="text-zinc-900 underline decoration-zinc-300 underline-offset-2 hover:text-indigo-800 dark:text-zinc-100 dark:decoration-zinc-600 dark:hover:text-indigo-300"
+                        >
+                          {t.name}
+                        </Link>
+                      </ConsoleTableTd>
                       <ConsoleTableTd>{formatKoreanDateWithWeekday(t.startAt)}</ConsoleTableTd>
                       <ConsoleTableTd className="text-right tabular-nums">
                         {t._count.entries}
@@ -169,15 +224,19 @@ export default async function ClientTournamentsPage({
                       <ConsoleTableTd className="text-right tabular-nums">{approvedMap[t.id] ?? 0}</ConsoleTableTd>
                       <ConsoleTableTd className="text-right tabular-nums">{pendingMap[t.id] ?? 0}</ConsoleTableTd>
                       <ConsoleTableTd>
-                        <span className={`rounded border px-2 py-0.5 text-[10px] font-semibold ${statusTone(t.status)}`}>
-                          {statusLabel(t.status)}
-                        </span>
+                        {canMutate ? (
+                          <ClientTournamentStatusChangeSelect
+                            tournamentId={t.id}
+                            initialChoice={statusChoiceById[t.id] ?? mapOperationalStatusToChoice(t.status)}
+                          />
+                        ) : (
+                          <span className={`rounded border px-2 py-0.5 text-[10px] font-semibold ${statusTone(t.status)}`}>
+                            {statusChoiceById[t.id] ?? statusLabel(t.status)}
+                          </span>
+                        )}
                       </ConsoleTableTd>
                       <ConsoleTableTd className="text-right">
                         <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end sm:gap-2">
-                          <Link href={`/client/tournaments/${t.id}`} className="text-xs font-semibold text-indigo-800 underline dark:text-indigo-300">
-                            대회현황
-                          </Link>
                           {canMutate ? (
                             <ClientTournamentDeleteControl tournamentId={t.id} tournamentName={t.name} variant="list-table" />
                           ) : null}
@@ -200,9 +259,16 @@ export default async function ClientTournamentsPage({
                       <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{t.name}</h3>
                     </Link>
                     <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className={`rounded border px-2 py-0.5 text-[10px] font-semibold ${statusTone(t.status)}`}>
-                        {statusLabel(t.status)}
-                      </span>
+                      {canMutate ? (
+                        <ClientTournamentStatusChangeSelect
+                          tournamentId={t.id}
+                          initialChoice={statusChoiceById[t.id] ?? mapOperationalStatusToChoice(t.status)}
+                        />
+                      ) : (
+                        <span className={`rounded border px-2 py-0.5 text-[10px] font-semibold ${statusTone(t.status)}`}>
+                          {statusChoiceById[t.id] ?? statusLabel(t.status)}
+                        </span>
+                      )}
                       {canMutate ? (
                         <ClientTournamentDeleteControl tournamentId={t.id} tournamentName={t.name} variant="list-card" />
                       ) : null}

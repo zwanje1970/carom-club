@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 
 type SessionInfo = {
@@ -49,12 +48,15 @@ export function MypageActionButtons({ session }: { session: SessionInfo }) {
         </button>
       )}
       {isClientAccount && isClientMode && (
-        <Link
-          href="/client/dashboard"
+        <button
+          type="button"
+          onClick={() => {
+            window.location.href = "/client/dashboard";
+          }}
           className="inline-flex items-center justify-center rounded-lg border-2 border-site-primary bg-site-primary px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
         >
           클라이언트 대시보드
-        </Link>
+        </button>
       )}
       <button
         type="button"

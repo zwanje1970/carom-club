@@ -3,12 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AdminImageField } from "@/components/admin/_components/AdminImageField";
-import { BasicCard, HighlightCard } from "@/components/cards/TournamentPublishedCard";
+import { BasicCard } from "@/components/cards/TournamentPublishedCard";
 import type { TournamentCardPublishData } from "@/lib/client-card-publish";
-import {
-  PLATFORM_CARD_TEMPLATE_POLICIES,
-  type PlatformCardTemplateType,
-} from "@/lib/platform-card-templates";
 
 type Props = {
   tournamentId: string;
@@ -18,13 +14,6 @@ type Props = {
   hasSavedCardData: boolean;
 };
 
-type TemplateOption = {
-  templateType: PlatformCardTemplateType;
-  label: string;
-  isActive: boolean;
-  showDetailButton: boolean;
-};
-
 export function CardPublishEditorClient({
   tournamentId,
   tournamentName,
@@ -32,70 +21,19 @@ export function CardPublishEditorClient({
   initialPublished,
   hasSavedCardData,
 }: Props) {
-  const [cardData, setCardData] = useState<TournamentCardPublishData>(initialCardData);
+  const [cardData, setCardData] = useState<TournamentCardPublishData>({
+    ...initialCardData,
+    templateType: "basic",
+  });
   const [published, setPublished] = useState<TournamentCardPublishData | null>(initialPublished);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [templateOptions, setTemplateOptions] = useState<TemplateOption[]>(
-    PLATFORM_CARD_TEMPLATE_POLICIES.map((item) => ({
-      templateType: item.templateType,
-      label: item.label,
-      isActive: item.isActive,
-      showDetailButton: item.showDetailButton,
-    })).filter((item) => item.isActive)
-  );
 
   useEffect(() => {
-    let cancelled = false;
-    fetch("/api/platform/card-templates", { cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("fetch"))))
-      .then((rows) => {
-        if (cancelled || !Array.isArray(rows)) return;
-        const parsed = rows
-          .map((row) => ({
-            templateType:
-              row?.templateType === "highlight" || row?.templateType === "basic"
-                ? row.templateType
-                : "basic",
-            label: typeof row?.label === "string" && row.label.trim() ? row.label.trim() : String(row?.templateType ?? "basic"),
-            isActive: row?.isActive === true,
-            showDetailButton: row?.showDetailButton === true,
-          }))
-          .filter((row) => row.isActive) as TemplateOption[];
-        if (parsed.length === 0) return;
-        setTemplateOptions(parsed);
-        setCardData((prev) => {
-          const hasCurrent = parsed.some((item) => item.templateType === prev.templateType);
-          if (hasCurrent && hasSavedCardData) return prev;
-          const fallbackType =
-            parsed.find((item) => item.templateType === "basic")?.templateType ?? parsed[0].templateType;
-          return { ...prev, templateType: fallbackType };
-        });
-      })
-      .catch(() => {
-        if (cancelled) return;
-        const fallback = PLATFORM_CARD_TEMPLATE_POLICIES.map((item) => ({
-          templateType: item.templateType,
-          label: item.label,
-          isActive: item.isActive,
-          showDetailButton: item.showDetailButton,
-        })).filter((item) => item.isActive);
-        setTemplateOptions(fallback);
-        if (fallback.length > 0) {
-          setCardData((prev) => {
-            const hasCurrent = fallback.some((item) => item.templateType === prev.templateType);
-            if (hasCurrent && hasSavedCardData) return prev;
-            const fallbackType =
-              fallback.find((item) => item.templateType === "basic")?.templateType ??
-              fallback[0].templateType;
-            return { ...prev, templateType: fallbackType };
-          });
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
+    setCardData((prev) =>
+      prev.templateType === "basic" ? prev : { ...prev, templateType: "basic" }
+    );
   }, [hasSavedCardData]);
 
   useEffect(() => {
@@ -105,15 +43,8 @@ export function CardPublishEditorClient({
   }, [message]);
 
   const preview = useMemo(() => {
-    const selectedTemplate = templateOptions.find((item) => item.templateType === cardData.templateType);
-    const showDetailButton =
-      selectedTemplate?.showDetailButton ?? (cardData.templateType === "highlight");
-    return cardData.templateType === "highlight" ? (
-      <HighlightCard data={cardData} showDetailButton={showDetailButton} />
-    ) : (
-      <BasicCard data={cardData} showDetailButton={showDetailButton} />
-    );
-  }, [cardData, templateOptions]);
+    return <BasicCard data={{ ...cardData, templateType: "basic" }} showDetailButton={false} />;
+  }, [cardData]);
 
   const onSave = async (action: "saveDraft" | "publish") => {
     setSaving(true);
@@ -123,14 +54,14 @@ export function CardPublishEditorClient({
       const res = await fetch(`/api/client/tournaments/${tournamentId}/card-publish`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, cardData }),
+        body: JSON.stringify({ action, cardData: { ...cardData, templateType: "basic" } }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data) {
         setError("저장 실패");
         return;
       }
-      setCardData(data.cardData as TournamentCardPublishData);
+      setCardData({ ...(data.cardData as TournamentCardPublishData), templateType: "basic" });
       setPublished((data.published as TournamentCardPublishData | null) ?? null);
       setMessage("저장 완료");
     } catch {
@@ -160,20 +91,6 @@ export function CardPublishEditorClient({
         <section className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
           <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">입력</h2>
           <div className="mt-3 space-y-3">
-            <div className="grid gap-2 sm:grid-cols-2">
-              {templateOptions.map((item) => (
-                <label key={item.templateType} className="flex items-center gap-2 rounded border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600">
-                  <input
-                    type="radio"
-                    name="templateType"
-                    checked={cardData.templateType === item.templateType}
-                    onChange={() => setCardData((prev) => ({ ...prev, templateType: item.templateType }))}
-                  />
-                  {item.label}
-                </label>
-              ))}
-            </div>
-
             <AdminImageField
               label="썸네일 이미지"
               value={cardData.thumbnailUrl || null}
@@ -187,9 +104,6 @@ export function CardPublishEditorClient({
             <input value={cardData.displayRegionText} onChange={(e) => setCardData((prev) => ({ ...prev, displayRegionText: e.target.value }))} placeholder="지역 텍스트 (displayRegionText)" className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900" />
             <input value={cardData.statusText} onChange={(e) => setCardData((prev) => ({ ...prev, statusText: e.target.value }))} placeholder="상태 텍스트 (statusText)" className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900" />
             <input value={cardData.buttonText} onChange={(e) => setCardData((prev) => ({ ...prev, buttonText: e.target.value }))} placeholder="버튼 텍스트 (buttonText)" className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900" />
-            {cardData.templateType === "highlight" ? (
-              <textarea value={cardData.shortDescription ?? ""} onChange={(e) => setCardData((prev) => ({ ...prev, shortDescription: e.target.value }))} placeholder="짧은 설명 (shortDescription)" className="min-h-20 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900" />
-            ) : null}
 
             <div className="flex flex-wrap gap-2 pt-1">
               <button

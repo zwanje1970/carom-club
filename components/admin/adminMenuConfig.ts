@@ -9,7 +9,6 @@ import {
   mdiClipboardCheck,
   mdiCashMultiple,
   mdiAccountMultiple,
-  mdiCardText,
   mdiFormatListBulleted,
   mdiMessageQuestion,
   mdiCog,
@@ -17,11 +16,23 @@ import {
 import type { MenuAsideItem } from "./_interfaces";
 import { PLATFORM_CARD_TEMPLATES_MENU_LABEL } from "@/lib/platform-card-templates";
 
-const CLIENT_CHILD_HREFS = ["/admin/venues", "/admin/client-applications", "/admin/fee-ledger"] as const;
+const CLIENT_CHILD_HREFS = [
+  "/admin/venues",
+  "/admin/client-applications",
+  "/admin/settings/platform-billing",
+  "/admin/fee-ledger",
+] as const;
+const CLIENT_MANAGEMENT_CHILD_HREFS = [
+  "/admin/venues",
+  "/admin/client-applications",
+  "/admin/settings/platform-billing",
+] as const;
+const MEMBERS_CHILD_HREFS = ["/admin/members", "/admin/members/users"] as const;
 /** 사이트관리 진입(사이드바 활성화용) */
 export const SITE_CHILD_HREFS = ["/admin/site", "/admin/site/page-builder-new"] as const;
 const PLATFORM_SITE_CHILD_HREFS = [
   "/admin/site",
+  "/admin/platform/card-templates",
   "/admin/site/page-builder-new",
   "/admin/site/page-builder-next",
   "/admin/site/page-builder-v2",
@@ -29,6 +40,7 @@ const PLATFORM_SITE_CHILD_HREFS = [
   "/admin/site/community",
   "/admin/site/copy",
   "/admin/site/header",
+  "/admin/site/mobile-header",
   "/admin/site/hero",
   "/admin/site/footer",
   "/admin/site/intro",
@@ -60,10 +72,18 @@ export function getAdminMenuAside(copy?: Record<string, string> | undefined): Me
       menu: [
         { href: "/admin/venues", label: L("menu.venueList", "클라이언트 목록"), icon: mdiFormatListBulleted },
         { href: "/admin/client-applications", label: L("menu.clientApplications", "신청 관리"), icon: mdiClipboardCheck },
+        { href: "/admin/settings/platform-billing", label: "연회원 설정", icon: mdiCashMultiple },
         { href: "/admin/fee-ledger", label: L("menu.feeLedger", "정산"), icon: mdiCashMultiple },
       ],
     },
-    { href: "/admin/members", label: L("menu.membersUnified", "회원·권한 관리"), icon: mdiAccountMultiple },
+    {
+      label: L("menu.membersUnified", "회원·권한 관리"),
+      icon: mdiAccountMultiple,
+      menu: [
+        { href: "/admin/members/users", label: "회원관리", icon: mdiFormatListBulleted },
+        { href: "/admin/members", label: "권한관리", icon: mdiAccountMultiple },
+      ],
+    },
     { href: "/admin/inquiries", label: L("menu.inquiries", "문의관리"), icon: mdiMessageQuestion },
     { href: "/admin/site", label: L("menu.siteManagement", "사이트관리"), icon: mdiCog },
   ];
@@ -71,7 +91,7 @@ export function getAdminMenuAside(copy?: Record<string, string> | undefined): Me
 
 /**
  * 플랫폼 운영 전용 사이드바 메뉴 구조
- * 순서: 플랫폼 대시보드 → 클라이언트 관리 → 승인 관리 → 권한 관리 → 정산/결제 → 메인용 게시카드 → 사이트관리
+ * 순서: 플랫폼 대시보드 → 클라이언트 관리 → 승인 관리 → 권한 관리 → 정산/결제 → 사이트관리
  */
 export function getPlatformMenuAside(copy?: Record<string, string> | undefined): MenuAsideItem[] {
   const L = (key: string, fallback: string) =>
@@ -79,11 +99,24 @@ export function getPlatformMenuAside(copy?: Record<string, string> | undefined):
 
   return [
     { href: "/admin/platform", label: L("menu.platformDashboard", "플랫폼 대시보드"), icon: mdiViewDashboard },
-    { href: "/admin/venues", label: L("menu.venueList", "클라이언트 관리"), icon: mdiOfficeBuilding },
-    { href: "/admin/client-applications", label: L("menu.clientApplications", "승인 관리"), icon: mdiClipboardCheck },
-    { href: "/admin/members", label: "회원·권한 관리", icon: mdiAccountMultiple },
+    {
+      label: L("menu.clientSection", "클라이언트 관리"),
+      icon: mdiOfficeBuilding,
+      menu: [
+        { href: "/admin/venues", label: L("menu.venueList", "클라이언트 관리"), icon: mdiFormatListBulleted },
+        { href: "/admin/client-applications", label: L("menu.clientApplications", "승인 관리"), icon: mdiClipboardCheck },
+        { href: "/admin/settings/platform-billing", label: "연회원 설정", icon: mdiCashMultiple },
+      ],
+    },
+    {
+      label: "회원·권한 관리",
+      icon: mdiAccountMultiple,
+      menu: [
+        { href: "/admin/members/users", label: "회원관리", icon: mdiFormatListBulleted },
+        { href: "/admin/members", label: "권한관리", icon: mdiAccountMultiple },
+      ],
+    },
     { href: "/admin/fee-ledger", label: L("menu.feeLedger", "정산/결제"), icon: mdiCashMultiple },
-    { href: "/admin/platform/card-templates", label: L("menu.platformCardTemplates", PLATFORM_CARD_TEMPLATES_MENU_LABEL), icon: mdiCardText },
     {
       label: L("menu.siteManagement", "사이트관리"),
       icon: mdiCog,
@@ -94,10 +127,12 @@ export function getPlatformMenuAside(copy?: Record<string, string> | undefined):
         { href: "/admin/site/community", label: L("menu.communityManagement", "커뮤니티 관리") },
         { href: "/admin/site/copy", label: L("menu.copyManagement", "문구 관리") },
         { href: "/admin/site/header", label: L("menu.headerManagement", "헤더 관리") },
+        { href: "/admin/site/mobile-header", label: L("menu.mobileHeaderManagement", "모바일 헤더 관리") },
         { href: "/admin/site/hero", label: L("menu.heroEditor", "히어로 편집") },
         { href: "/admin/site/footer", label: L("menu.footerEditor", "푸터 편집") },
         { href: "/admin/site/intro", label: L("menu.introSettings", "인트로 설정") },
         { href: "/admin/site/card-style", label: L("menu.cardStyleManagement", "카드 스타일 관리") },
+        { href: "/admin/platform/card-templates", label: L("menu.platformCardTemplates", PLATFORM_CARD_TEMPLATES_MENU_LABEL) },
         { href: "/admin/site/settings", label: L("menu.siteSettings", "사이트 설정") },
         { href: "/admin/site/color-theme", label: L("menu.colorTheme", "색상 테마") },
       ],
@@ -114,7 +149,7 @@ export function getExpandedGroupIndex(pathname: string): number {
   if (!pathname || pathname === "/admin" || pathname === "/admin/dashboard") return -1;
 
   if (CLIENT_CHILD_HREFS.some((h) => pathname === h || pathname.startsWith(`${h}/`))) return 2;
-  if (pathname === "/admin/members" || pathname.startsWith("/admin/members/")) return 3;
+  if (MEMBERS_CHILD_HREFS.some((h) => pathname === h || pathname.startsWith(`${h}/`))) return 3;
   if (pathname === "/admin/inquiries" || pathname.startsWith("/admin/inquiries/")) return 4;
   return -1;
 }
@@ -122,10 +157,18 @@ export function getExpandedGroupIndex(pathname: string): number {
 export function getPlatformExpandedGroupIndex(_pathname: string): number {
   const pathname = _pathname ?? "";
   if (
+    CLIENT_MANAGEMENT_CHILD_HREFS.some((h) => pathname === h || pathname.startsWith(`${h}/`))
+  ) {
+    return 1;
+  }
+  if (MEMBERS_CHILD_HREFS.some((h) => pathname === h || pathname.startsWith(`${h}/`))) {
+    return 2;
+  }
+  if (
     pathname === "/admin/site" ||
     PLATFORM_SITE_CHILD_HREFS.some((h) => pathname === h || pathname.startsWith(`${h}/`))
   ) {
-    return 6;
+    return 4;
   }
   return -1;
 }

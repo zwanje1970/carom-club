@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { PLATFORM_CARD_TEMPLATES_MENU_LABEL } from "@/lib/platform-card-templates";
 
 const SITE_MENU = [
   { href: "/admin/site/page-builder-new", label: "페이지빌더" },
@@ -9,10 +10,12 @@ const SITE_MENU = [
   { href: "/admin/site/community", label: "커뮤니티 관리" },
   { href: "/admin/site/copy", label: "문구 관리" },
   { href: "/admin/site/header", label: "헤더 관리" },
+  { href: "/admin/site/mobile-header", label: "모바일 헤더 관리" },
   { href: "/admin/site/hero", label: "히어로 편집" },
   { href: "/admin/site/footer", label: "푸터 편집" },
   { href: "/admin/site/intro", label: "인트로 설정" },
   { href: "/admin/site/card-style", label: "카드 스타일 관리" },
+  { href: "/admin/platform/card-templates", label: PLATFORM_CARD_TEMPLATES_MENU_LABEL },
 ] as const;
 
 export default function AdminSiteLayout({

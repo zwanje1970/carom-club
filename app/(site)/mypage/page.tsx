@@ -14,6 +14,7 @@ export default async function MypagePage() {
   const session = await getSession();
   console.timeEnd("mypage_session");
   if (!session) {
+    console.timeEnd("mypage_total");
     redirect("/login");
   }
 
@@ -42,6 +43,7 @@ export default async function MypagePage() {
     };
   }
   if (!user) {
+    console.timeEnd("mypage_total");
     redirect("/login");
   }
   console.timeEnd("mypage_total");

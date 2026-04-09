@@ -11,6 +11,11 @@ import {
 import { Prisma } from "@/generated/prisma";
 import type { TeamScoreRule } from "@/generated/prisma";
 import { canAccessClientDashboard } from "@/types/auth";
+import {
+  buildDefaultTournamentCardPublishData,
+  parseTournamentCardPublishState,
+  upsertTournamentCardPublishState,
+} from "@/lib/client-card-publish";
 
 /** GET: 클라이언트 로그인 모드일 때만 본인 소유 업체의 대회 1건 */
 export async function GET(
@@ -54,7 +59,10 @@ export async function PATCH(
     return NextResponse.json({ error: gate.error }, { status: gate.status });
   }
 
-  const tournament = await prisma.tournament.findUnique({ where: { id } });
+  const tournament = await prisma.tournament.findUnique({
+    where: { id },
+    include: { rule: { select: { id: true, bracketConfig: true } } },
+  });
   if (!tournament) {
     return NextResponse.json({ error: "대회를 찾을 수 없습니다." }, { status: 404 });
   }
@@ -93,6 +101,7 @@ export async function PATCH(
     manualReviewRequired,
     eligibilityLimitType,
     eligibilityLimitValue,
+    cardStatusText,
   } = body as {
     name?: string;
     startAt?: string;
@@ -126,7 +135,10 @@ export async function PATCH(
     manualReviewRequired?: boolean;
     eligibilityLimitType?: string | null;
     eligibilityLimitValue?: number | null;
+    cardStatusText?: string | null;
   };
+  const nextCardStatusText = typeof cardStatusText === "string" ? cardStatusText.trim() : null;
+  const shouldUpdateCardStatusText = typeof cardStatusText === "string";
 
   const validStatuses = ["DRAFT", "OPEN", "CLOSED", "BRACKET_GENERATED", "FINISHED", "HIDDEN"] as const;
   const statusValue =
@@ -277,6 +289,48 @@ export async function PATCH(
         if (t) await sendPrizeNotifications(id, t.name);
       } catch (pushErr) {
         console.error("prize push error", pushErr);
+      }
+    }
+    if (shouldUpdateCardStatusText) {
+      const fallbackTitle = typeof name === "string" && name.trim() ? name.trim() : tournament.name;
+      const state = parseTournamentCardPublishState(
+        tournament.rule?.bracketConfig ?? null,
+        tournament.id,
+        fallbackTitle
+      );
+      const nowIso = new Date().toISOString();
+      const draftBase =
+        state.draft ??
+        state.published ??
+        buildDefaultTournamentCardPublishData(tournament.id, fallbackTitle);
+      const nextDraft = {
+        ...draftBase,
+        statusText: nextCardStatusText ?? "",
+        updatedAt: nowIso,
+      };
+      const nextPublished = state.published
+        ? {
+            ...state.published,
+            statusText: nextCardStatusText ?? "",
+            updatedAt: nowIso,
+          }
+        : null;
+      const nextConfig = upsertTournamentCardPublishState(tournament.rule?.bracketConfig ?? null, {
+        draft: nextDraft,
+        published: nextPublished,
+      });
+      if (tournament.rule?.id) {
+        await prisma.tournamentRule.update({
+          where: { id: tournament.rule.id },
+          data: { bracketConfig: nextConfig },
+        });
+      } else {
+        await prisma.tournamentRule.create({
+          data: {
+            tournamentId: tournament.id,
+            bracketConfig: nextConfig,
+          },
+        });
       }
     }
     return NextResponse.json({ ok: true });

@@ -1,11 +1,12 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import type { PageSection } from "@/types/page-section";
 
-type Props = { section: PageSection; title: string; className?: string };
+type Props = { section: PageSection; title: string; className?: string; titleStyle?: CSSProperties };
 
 /** 제목 왼쪽에 아이콘/이미지(관리자 설정) + 제목. 값 없으면 제목만. */
-export function SectionTitleWithIcon({ section, title, className = "" }: Props) {
+export function SectionTitleWithIcon({ section, title, className = "", titleStyle }: Props) {
   const type = section.titleIconType ?? "none";
   const size = section.titleIconSize === "medium" ? "medium" : "small";
   const sizeClass = size === "medium" ? "w-6 h-6" : "w-[18px] h-[18px]";
@@ -30,7 +31,10 @@ export function SectionTitleWithIcon({ section, title, className = "" }: Props) 
     ) : null;
 
   return (
-    <h2 className={`inline-flex items-center gap-2 text-2xl font-bold text-site-text sm:text-3xl ${className}`}>
+    <h2
+      className={`inline-flex items-center gap-2 text-2xl font-bold text-site-text sm:text-3xl ${className}`}
+      style={titleStyle}
+    >
       {iconEl}
       <span>{title}</span>
     </h2>

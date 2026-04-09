@@ -358,11 +358,9 @@ export default function ClientSetupPage() {
       : null;
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl lg:max-w-none space-y-6">
       <h1 className="text-2xl font-bold text-site-text">업체 설정</h1>
-      <p className="text-sm text-gray-600">
-        승인된 업체 프로필을 보완해 주세요. 저장 후 대시보드에서 대회·레슨을 운영할 수 있습니다.
-      </p>
+      <p className="text-sm text-gray-600">업체 프로필을 설정해 주세요.</p>
       <form onSubmit={handleSubmit} className="space-y-6 rounded-lg border border-site-border bg-site-card p-6">
         {error && (
           <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</p>
@@ -551,7 +549,7 @@ export default function ClientSetupPage() {
                   <span className="text-sm text-gray-700">복합구장</span>
                 </label>
               </div>
-              <p className="mt-1 text-xs text-gray-500">대대만 있으면 대대전용, 중대·포켓이 있으면 복합구장으로 선택하세요.</p>
+              <p className="mt-1 text-xs text-gray-500">구장 유형을 선택해 주세요.</p>
             </div>
             {/* 대대 */}
             <div className="rounded border border-gray-200 bg-white p-3">

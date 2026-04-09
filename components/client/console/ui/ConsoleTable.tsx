@@ -20,7 +20,7 @@ export function ConsoleTable({ children, className, scroll = true, embedded }: C
   const inner = (
     <table
       className={cx(
-        "w-full min-w-[36rem] border-collapse text-left text-xs tabular-nums text-zinc-800 dark:text-zinc-200",
+        "w-full min-w-[36rem] border-collapse text-left text-xs lg:text-sm tabular-nums text-zinc-800 dark:text-zinc-200",
         className
       )}
     >
@@ -56,7 +56,7 @@ export function ConsoleTableHead({ className, ...props }: HTMLAttributes<HTMLTab
   return (
     <thead
       className={cx(
-        "border-b border-zinc-200 bg-zinc-50 text-[11px] font-semibold uppercase tracking-wide text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-400",
+        "border-b border-zinc-200 bg-zinc-50 text-[11px] lg:text-[13px] font-semibold uppercase tracking-wide text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-400",
         className
       )}
       {...props}
@@ -83,7 +83,7 @@ export function ConsoleTableRow({ className, ...props }: HTMLAttributes<HTMLTabl
 export function ConsoleTableTh({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
-      className={cx("whitespace-nowrap px-3 py-2 text-left font-semibold", className)}
+      className={cx("whitespace-nowrap px-3 py-2 lg:px-4 lg:py-3 text-left font-semibold", className)}
       {...props}
     />
   );
@@ -91,6 +91,6 @@ export function ConsoleTableTh({ className, ...props }: ThHTMLAttributes<HTMLTab
 
 export function ConsoleTableTd({ className, ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
   return (
-    <td className={cx("px-3 py-2 align-middle text-zinc-800 dark:text-zinc-200", className)} {...props} />
+    <td className={cx("px-3 py-2 lg:px-4 lg:py-3 align-middle text-zinc-800 dark:text-zinc-200", className)} {...props} />
   );
 }

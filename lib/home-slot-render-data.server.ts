@@ -22,7 +22,7 @@ import type { SiteSettings } from "@/lib/site-settings";
 import type { HomeSlotRenderContextPayload } from "@/types/page-slot-render-context";
 
 const HOME_SLOT_REVALIDATE_SECONDS = 60;
-const HOME_INITIAL_TOURNAMENT_TAKE = 6;
+const HOME_INITIAL_TOURNAMENT_TAKE = 8;
 const HOME_VENUE_CAROUSEL_TAKE = 16;
 const HOME_SLOT_CACHE_TAG = "home-slot-data";
 

@@ -3,13 +3,11 @@ import { redirect } from "next/navigation";
 import { mdiShieldAccount } from "@mdi/js";
 import SectionMain from "@/components/admin/_components/Section/Main";
 import SectionTitleLineWithButton from "@/components/admin/_components/Section/TitleLineWithButton";
-import CardBox from "@/components/admin/_components/CardBox";
 import { AdminMembersList } from "./AdminMembersList";
 import { CommunityMinLevelPolicyCard } from "./CommunityMinLevelPolicyCard";
 import { WithdrawRejoinPolicyCard } from "./WithdrawRejoinPolicyCard";
 import { hasAllPermissions, PERMISSION_KEYS } from "@/lib/auth/permissions.server";
 import { getAdminCopy } from "@/lib/admin-copy-server";
-import { getCopyValue } from "@/lib/admin-copy";
 
 export default async function AdminMembersPage() {
   const copy = await getAdminCopy();
@@ -26,19 +24,18 @@ export default async function AdminMembersPage() {
 
   return (
     <SectionMain>
-      <SectionTitleLineWithButton icon={mdiShieldAccount} title={getCopyValue(copy, "admin.members.pageTitle")} />
-      <CardBox>
-        <p className="mb-4 text-sm text-gray-600 dark:text-slate-400">
-          {getCopyValue(copy, "admin.members.pageIntro")}
-        </p>
-        <AdminMembersList copy={copy} />
-      </CardBox>
+      <SectionTitleLineWithButton icon={mdiShieldAccount} title="권한관리" />
+      <AdminMembersList copy={copy} view="permissionsOnly" />
       {session.role === "PLATFORM_ADMIN" ? (
-        <div className="mt-6 grid gap-4 xl:grid-cols-2">
+        <div className="grid gap-4 xl:grid-cols-2">
           <WithdrawRejoinPolicyCard />
           <CommunityMinLevelPolicyCard />
         </div>
-      ) : null}
+      ) : (
+        <p className="text-sm text-gray-600 dark:text-slate-400">
+          권한관리 설정은 플랫폼 관리자에게만 표시됩니다.
+        </p>
+      )}
     </SectionMain>
   );
 }

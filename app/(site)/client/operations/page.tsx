@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 export const metadata = {
-  title: "전체대회",
+  title: "대회관리",
 };
 
 export default async function ClientOperationsPage() {

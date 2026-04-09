@@ -159,14 +159,16 @@ export function MainSiteHeader({ hideOnMobile = false }: MainSiteHeaderProps) {
                 마이페이지
               </Link>
               {user?.loginMode === "client" && (
-                <Link
-                  href="/client/dashboard"
-                  prefetch={false}
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = "/client/dashboard";
+                  }}
                   className="text-sm font-medium transition hover:opacity-90"
                   style={linkStyle(pathname?.startsWith("/client") ?? false)}
                 >
                   클라이언트 대시보드
-                </Link>
+                </button>
               )}
               <button
                 type="button"

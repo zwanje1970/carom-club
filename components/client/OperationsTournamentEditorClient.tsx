@@ -6,8 +6,7 @@ import { useRouter } from "next/navigation";
 import { TournamentFormSimple } from "@/components/client/TournamentFormSimple";
 import { ConsolePageHeader } from "@/components/client/console/ui/ConsolePageHeader";
 import { ConsoleSection } from "@/components/client/console/ui/ConsoleSection";
-import { ConsoleBadge } from "@/components/client/console/ui/ConsoleBadge";
-import { consoleTextBody, consoleTextMuted } from "@/components/client/console/ui/tokens";
+import { consoleTextMuted } from "@/components/client/console/ui/tokens";
 import { cx } from "@/components/client/console/ui/cx";
 import { formatKoreanDateWithWeekday } from "@/lib/format-date";
 import {
@@ -223,15 +222,16 @@ export function OperationsTournamentEditorClient({
       outlinePdfUrl: outlineDisplayMode === "pdf" ? outlinePdfUrl.trim() || null : null,
       verificationMode: values.verificationMode,
       verificationReviewRequired: values.verificationReviewRequired,
-      eligibilityType: values.eligibilityType,
+      eligibilityType: values.verificationMode === "AUTO" ? values.eligibilityType : "NONE",
       eligibilityValue:
-        values.eligibilityType === "UNDER"
+        values.verificationMode === "AUTO" && values.eligibilityType === "UNDER"
           ? Number.parseFloat(String(values.eligibilityValue).replace(",", "."))
           : null,
       verificationGuideText: values.verificationGuideText.trim() || null,
-      divisionEnabled: values.divisionEnabled,
+      divisionEnabled: values.verificationMode === "AUTO" ? values.divisionEnabled : false,
       divisionMetricType: values.divisionMetricType,
-      divisionRulesJson: values.divisionEnabled ? values.divisionRules : null,
+      divisionRulesJson:
+        values.verificationMode === "AUTO" && values.divisionEnabled ? values.divisionRules : null,
     };
 
     if (mode === "create") {
@@ -331,7 +331,7 @@ export function OperationsTournamentEditorClient({
       <ConsolePageHeader
         eyebrow="운영 관리"
         title={mode === "create" ? "대회 등록" : "대회 수정"}
-        description="현재 선택된 조직 기준으로 저장됩니다. 공개 페이지는 상태·노출 설정에 따라 달라질 수 있습니다."
+        description="현재 선택된 조직 기준으로 저장됩니다."
         actions={
           <Link
             href="/client/tournaments"
@@ -342,7 +342,7 @@ export function OperationsTournamentEditorClient({
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_17.5rem] lg:items-start">
+      <div className="space-y-4">
         <div className="min-w-0">
           <TournamentFormSimple
             mode={mode === "create" ? "create" : "edit"}
@@ -377,54 +377,10 @@ export function OperationsTournamentEditorClient({
             />
           </TournamentFormSimple>
         </div>
-
-        <aside className="space-y-3 lg:sticky lg:top-4">
-          <ConsoleSection title="조직·소유">
-            <p className={cx(consoleTextBody, "text-xs")}>
-              <span className={consoleTextMuted}>조직 ID</span>
-              <br />
-              <code className="mt-1 block break-all text-[11px] text-zinc-700 dark:text-zinc-300">{organizationId}</code>
-            </p>
-            <p className={cx(consoleTextBody, "mt-2 text-xs")}>
-              <span className={consoleTextMuted}>조직명</span>
-              <br />
-              <strong className="text-zinc-900 dark:text-zinc-100">{organizationName}</strong>
-            </p>
-            <p className={cx(consoleTextMuted, "mt-3 text-[11px] leading-relaxed")}>
-              이 대회는 위 조직에 귀속됩니다. 다른 조직으로 옮기려면 플랫폼 관리자에게 문의하세요.
-            </p>
-          </ConsoleSection>
-
-          <ConsoleSection title="설명(텍스트)">
-            <label className="mb-1 block text-xs font-medium text-zinc-700 dark:text-zinc-300">
-              공개용 짧은 설명 / 메모
-            </label>
-            <textarea
-              rows={5}
-              className="w-full rounded-sm border border-zinc-300 bg-white px-2 py-2 text-xs text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
-              placeholder="참가자에게 보이는 요약 설명 등"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </ConsoleSection>
-
-          <ConsoleSection title="검토">
-            <div className="flex flex-wrap gap-1.5">
-              <ConsoleBadge tone="neutral">조직 스코프</ConsoleBadge>
-              <ConsoleBadge tone="neutral">클라 API</ConsoleBadge>
-            </div>
-            <ul className={cx(consoleTextMuted, "mt-2 list-inside list-disc space-y-1 text-[11px]")}>
-              <li>저장 시 `/api/client/tournaments` 경로만 사용합니다.</li>
-              <li>임시저장은 상태를 DRAFT로 둡니다.</li>
-              <li>참가비·상금은 좌측 폼과 동일 데이터로 반영됩니다.</li>
-            </ul>
-          </ConsoleSection>
-        </aside>
       </div>
       {mode === "create" && createdTournament ? (
         <ConsoleSection
           title="카드 발행"
-          description="대회 생성 후 카드 템플릿 선택/입력/미리보기/저장/발행을 같은 화면에서 이어서 진행합니다."
           flush
         >
           <div className="p-3">

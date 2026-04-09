@@ -5,10 +5,11 @@ import { getClientAdminOrganizationId } from "@/lib/auth-org";
 import { prisma } from "@/lib/db";
 import { PromoEditor } from "@/components/admin/PromoEditor";
 import { ListingProductBanner } from "@/components/client/ListingProductBanner";
+import { canAccessClientDashboard } from "@/types/auth";
 
 export default async function ClientPromoPage() {
   const session = await getSession();
-  if (!session || session.role !== "CLIENT_ADMIN") return null;
+  if (!session || !canAccessClientDashboard(session)) return null;
 
   const orgId = await getClientAdminOrganizationId(session);
   if (!orgId) {
@@ -41,7 +42,7 @@ export default async function ClientPromoPage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-3xl lg:max-w-none space-y-6">
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-bold text-site-text">홍보 페이지 편집</h1>
         <Link

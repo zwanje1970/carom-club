@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
   HomeTournamentCardItem,
   type HomeTournamentCardModel,
@@ -18,8 +17,6 @@ export type HomeTournamentCarouselInput = Omit<HomeTournamentCardModel, "startAt
   /** 직접 구성 카드: 요약·날짜·뱃지 최소 표시 */
   manualSimple?: boolean;
 };
-
-const LOOP_DUP_PREPARE_DELAY_MS = 1400;
 
 function toCardModel(t: HomeTournamentCarouselInput): HomeTournamentCardModel {
   return {
@@ -58,15 +55,6 @@ export function HomeTournamentCarouselRows({
     highlight: PlatformCardTemplateStylePolicy;
   };
 }) {
-  const [loopDup, setLoopDup] = useState(false);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (mq.matches) return;
-    const id = window.setTimeout(() => setLoopDup(true), LOOP_DUP_PREPARE_DELAY_MS);
-    return () => window.clearTimeout(id);
-  }, []);
-
   const normalized = tournaments.map(toCardModel);
   const useCarousel = listLayout
     ? listLayout.type === "carousel"
@@ -108,20 +96,6 @@ export function HomeTournamentCarouselRows({
           templateStyleByType={templateStyleByType}
         />
       ))}
-      {loopDup &&
-        normalized.map((t, index) => (
-          <HomeTournamentCardItem
-            key={`marq-${t.id}`}
-            t={t}
-            index={index}
-            duplicate
-            cardStyle={cardStyle}
-            cardCta={cardCta}
-            layout="carousel"
-            showDetailButtonByTemplate={showDetailButtonByTemplate}
-            templateStyleByType={templateStyleByType}
-          />
-        ))}
     </ul>
   );
 }

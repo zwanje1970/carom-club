@@ -488,7 +488,7 @@ export function ClientBracketEditor({
       <ConsolePageHeader
         eyebrow="운영 관리 · 대진"
         title="대진표 보기·수정"
-        description={`「${tournamentName}」 — Match 데이터 직결. 카드 선택 후 우측에서 수정·저장합니다.`}
+        description={`「${tournamentName}」`}
         actions={
           <div className="flex flex-wrap gap-2">
             <Link

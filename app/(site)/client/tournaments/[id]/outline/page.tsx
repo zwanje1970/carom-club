@@ -7,6 +7,7 @@ import { canUseFeature, FEATURE_CODES, isAnnualMembershipActive } from "@/lib/fe
 import { FeatureGateNotice } from "@/components/client/FeatureGateNotice";
 import { OutlineEditor } from "@/components/admin/OutlineEditor";
 import CardBox from "@/components/admin/_components/CardBox";
+import { canAccessClientDashboard } from "@/types/auth";
 
 const tabs = [
   { href: "", label: "대회현황" },
@@ -29,7 +30,7 @@ export default async function ClientTournamentOutlinePage({
 }) {
   const { id } = await params;
   const session = await getSession();
-  if (!session || session.role !== "CLIENT_ADMIN") return null;
+  if (!session || !canAccessClientDashboard(session)) return null;
 
   const orgId = await getClientAdminOrganizationId(session);
   if (!orgId) notFound();

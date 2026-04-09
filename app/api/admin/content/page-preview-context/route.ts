@@ -20,7 +20,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
   }
 
-  const page = new URL(request.url).searchParams.get("page") as PageSlug | null;
+  const { searchParams } = new URL(request.url);
+  const page = searchParams.get("page") as PageSlug | null;
   if (!page || !BUILDER_PAGES.includes(page)) {
     return NextResponse.json(
       { error: "page는 home, community, tournaments 중 하나여야 합니다." },
@@ -30,12 +31,16 @@ export async function GET(request: Request) {
 
   try {
     if (page === "home") {
+      const requireTournaments = searchParams.get("requireTournaments") !== "0";
+      const requireVenues = searchParams.get("requireVenues") !== "0";
       const common = await getCommonPageData("home");
       const [heroSettings, home] = await Promise.all([
         getHeroSettings(),
         buildHomeSlotRenderPayload({
           copy: common.copy,
           siteSettings: common.siteSettings,
+          requireTournaments,
+          requireVenues,
         }),
       ]);
       const body: PageSlotRenderContext = { page: "home", heroSettings, home };

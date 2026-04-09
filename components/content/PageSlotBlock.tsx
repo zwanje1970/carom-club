@@ -74,6 +74,9 @@ export function PageSlotBlock({
   switch (st) {
     case "hero": {
       const hs = resolveHeroSettingsForSlot(ctx?.heroSettings);
+      const isMobileRequest = !!ctx?.isMobileRequest;
+      const enabledByDevice = isMobileRequest ? hs.heroMobileEnabled : hs.heroDesktopEnabled;
+      if (!hs.heroEnabled || !enabledByDevice) return null;
       return <HomeHero heroSettings={hs} />;
     }
     case "tournamentIntro": {
@@ -164,7 +167,26 @@ export function PageSlotBlock({
       if (!h) return maybePlaceholder("당구장 목록 링크", surface, ctx);
       const frame = resolveHomeStructureSlotFrame(block);
       if (!frame) return maybePlaceholder("당구장 목록 링크", surface, ctx);
+      const listSettings = resolveSlotBlockTournamentListSettings(block.sectionStyleJson);
       const slotItems = parseSlotBlockItemsBundle(block.sectionStyleJson, "venueLink");
+      if (slotItems.mode === "auto" && slotItems.publishedType === "tournament") {
+        return (
+          <HomeTournamentIntroSlot
+            initialTournaments={h.initialTournaments}
+            copy={h.copy}
+            cardStyle={frame.cardStyle}
+            ctaConfig={frame.ctaConfig}
+            slotLayout={frame.layout}
+            slotMotion={frame.motion}
+            blockBackgroundColor={frame.blockBackgroundColor}
+            homeCarouselFlowSpeed={h.siteSettings.homeCarouselFlowSpeed}
+            listSettings={listSettings}
+            slotItems={slotItems}
+            sectionTitle={toSurfaceSectionTitle(block.title, surface)}
+            sectionSubtitle={block.subtitle}
+          />
+        );
+      }
       return (
         <HomeVenueLinkSlot
           copy={h.copy}
@@ -179,6 +201,31 @@ export function PageSlotBlock({
       );
     }
     case "nanguEntry": {
+      const h = ctx?.home;
+      if (!h && surface === "public") return null;
+      if (!h) return maybePlaceholder("난구노트·난구해결사", surface, ctx);
+      const frame = resolveHomeStructureSlotFrame(block);
+      if (!frame) return maybePlaceholder("난구노트·난구해결사", surface, ctx);
+      const listSettings = resolveSlotBlockTournamentListSettings(block.sectionStyleJson);
+      const slotItems = parseSlotBlockItemsBundle(block.sectionStyleJson, "nanguEntry");
+      if (slotItems.mode === "auto" && slotItems.publishedType === "tournament") {
+        return (
+          <HomeTournamentIntroSlot
+            initialTournaments={h.initialTournaments}
+            copy={h.copy}
+            cardStyle={frame.cardStyle}
+            ctaConfig={frame.ctaConfig}
+            slotLayout={frame.layout}
+            slotMotion={frame.motion}
+            blockBackgroundColor={frame.blockBackgroundColor}
+            homeCarouselFlowSpeed={h.siteSettings.homeCarouselFlowSpeed}
+            listSettings={listSettings}
+            slotItems={slotItems}
+            sectionTitle={toSurfaceSectionTitle(block.title, surface)}
+            sectionSubtitle={block.subtitle}
+          />
+        );
+      }
       return maybePlaceholder("난구노트·난구해결사", surface, ctx);
     }
     case "postList": {

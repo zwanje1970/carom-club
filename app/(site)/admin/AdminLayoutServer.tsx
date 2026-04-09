@@ -34,6 +34,10 @@ export async function AdminLayoutServer({
     pathname.startsWith("/admin/venues/") ||
     pathname === "/admin/client-applications" ||
     pathname.startsWith("/admin/client-applications/") ||
+    pathname === "/admin/pricing-plans" ||
+    pathname.startsWith("/admin/pricing-plans/") ||
+    pathname === "/admin/settings/platform-billing" ||
+    pathname.startsWith("/admin/settings/platform-billing/") ||
     pathname === "/admin/members" ||
     pathname.startsWith("/admin/members/") ||
     pathname === "/admin/fee-ledger" ||
@@ -42,8 +46,9 @@ export async function AdminLayoutServer({
   const shouldRequirePlatformAdmin = requirePlatformAdmin || isPlatformArea;
   const isLoginPage = pathname === "/admin/login" || pathname.startsWith("/admin/login/");
 
+  if (isLoginPage) return <>{children}</>;
+
   if (!session) {
-    if (isLoginPage) return <>{children}</>;
     redirect("/admin/login");
   }
 

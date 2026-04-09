@@ -79,6 +79,10 @@ export default async function RootLayout({
     headerBgColor: null as string | null,
     headerTextColor: null as string | null,
     headerActiveColor: null as string | null,
+    mobileHeaderBgColor: null as string | null,
+    mobileHeaderTextColor: null as string | null,
+    mobileHeaderActiveColor: null as string | null,
+    mobileHeaderLogoText: null as string | null,
   };
 
   const siteSettings = await getSiteSettings().catch(() => null);

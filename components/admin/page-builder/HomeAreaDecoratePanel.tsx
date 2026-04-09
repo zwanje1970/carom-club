@@ -191,6 +191,18 @@ export function HomeAreaDecoratePanel({
       const L = sanitized[r];
       if (L) sanitized[r] = sanitizeCtaLayerForRole(L, r);
     }
+    const normalizedDisplayCount = [4, 6, 8].includes(tournamentList.displayCount)
+      ? tournamentList.displayCount
+      : 6;
+    const tournamentListForSave =
+      slotType === "tournamentIntro" && itemsBundle.mode === "auto"
+        ? {
+            ...tournamentList,
+            sortBy: "latest" as const,
+            displayCount: normalizedDisplayCount,
+          }
+        : tournamentList;
+
     const cardOut = cardStyleWithResolvedLayout(card, layout);
     setBusy(section.id);
     try {
@@ -208,6 +220,7 @@ export function HomeAreaDecoratePanel({
           slotBlockMotion: motion,
           backgroundColor: blockBg.trim() || null,
           slotBlockCta: sanitized,
+          slotBlockTournamentList: tournamentListForSave,
           slotBlockItems:
             itemsBundle.mode === "auto"
               ? {
@@ -432,7 +445,30 @@ export function HomeAreaDecoratePanel({
         </SectionShell>
 
         <SectionShell title="카드 내용">
-          <DecorateSlotBlockItemsEditor slotType={slotType} bundle={itemsBundle} onChange={setItemsBundle} />
+          <DecorateSlotBlockItemsEditor
+            slotType={slotType}
+            bundle={itemsBundle}
+            onChange={(next) => {
+              if (slotType === "tournamentIntro" && next.mode === "auto" && next.publishedType !== "tournament") {
+                setItemsBundle({ ...next, publishedType: "tournament" });
+                return;
+              }
+              setItemsBundle(next);
+            }}
+            tournamentAutoSettings={
+              slotType === "tournamentIntro"
+                ? {
+                    displayCount: tournamentList.displayCount,
+                    onChangeDisplayCount: (count) =>
+                      setTournamentList((prev) => ({
+                        ...prev,
+                        displayCount: count,
+                        sortBy: "latest",
+                      })),
+                  }
+                : undefined
+            }
+          />
           {itemsBundle.mode === "auto" ? (
             <div className="rounded-md border border-sky-200/80 bg-sky-50/50 p-2 text-[11px] leading-relaxed text-sky-950 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-100">
               <p>{contentGuide.summary}</p>
