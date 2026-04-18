@@ -1,0 +1,476 @@
+.slideDeck {
+  --slide-card-max-width: min(90%, 387px);
+  --slide-card-max-height: calc(var(--slide-card-max-width) / 2);
+  --slide-layer-padding-y: 48px;
+  /* 슬라이드 창 전용: 위·아래는 더 어둡고 중앙이 살짝 밝은 비네트형 세로 그라데이션 */
+  --slide-deck-edge: #121212;
+  --slide-deck-mid: #2b2b2f;
+  width: 100%;
+  /* 높이 약 10% 축소(325→292.5) — 모바일에서 하단 버튼 노출 여유 */
+  aspect-ratio: 380 / 292.5;
+  height: auto;
+  margin-top: 8px;
+  position: relative;
+  border-radius: 0;
+  border-bottom: 1px solid #94a3b8;
+  overflow: hidden;
+  background-color: var(--slide-deck-mid);
+  background-image: linear-gradient(
+    180deg,
+    var(--slide-deck-edge) 0%,
+    var(--slide-deck-mid) 48%,
+    #141416 100%
+  );
+  box-shadow: none;
+  touch-action: none;
+}
+
+/* 메인 홈: 슬라이드 상단을 다크 배경 상단과 맞춤 */
+:global(.site-home-page) .slideDeck {
+  margin-top: 0;
+}
+
+/*
+ * 모바일도 데스크톱과 동일: 너비 기준 aspect-ratio(380/292.5)로 창 크기 고정.
+ * (남는 세로를 슬라이드에 채우지 않음 — globals 의 .site-home-slide-stack 이 flex 고정 해제)
+ */
+
+/* 상·하단 안쪽 그림자(슬라이드 영역 가장자리 딥닝) — 카드·배경 위에 얹고 라벨 아래 */
+.slideDeck::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 150;
+  box-shadow:
+    inset 0 22px 32px rgba(0, 0, 0, 0.42),
+    inset 0 -22px 32px rgba(0, 0, 0, 0.42);
+}
+
+.slideDeckLabel {
+  position: absolute;
+  top: 12px;
+  /* 하단 그리드 첫 열(대회안내) 왼쪽 — .site-home-nav-grid padding-left 와 동일 */
+  left: max(0.85rem, env(safe-area-inset-left, 0px));
+  right: auto;
+  z-index: 200;
+  margin: 0;
+  text-align: left;
+  font-size: 0.84rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  text-shadow:
+    0 1px 10px rgba(0, 0, 0, 0.75),
+    0 0 1px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+}
+
+.slideDeckLayer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 14px;
+  box-sizing: border-box;
+  pointer-events: none;
+  container-type: size;
+}
+
+.slideDeckCard {
+  width: 100%;
+  max-width: var(--slide-card-max-width);
+  transform-origin: center center;
+  will-change: transform, opacity;
+}
+
+.slideDeckCard .tournamentPostCard {
+  width: 100%;
+}
+
+.slideDeckCard .tournamentPostCardInner {
+  padding: 11px 13px 12px;
+}
+
+.slideDeckCard .tournamentPostCardTop {
+  gap: 6px;
+}
+
+.slideDeckCard .tournamentPostCardBadge {
+  padding: 6px 13px;
+  font-size: 11px;
+}
+
+.slideDeckCard .tournamentPostCardMain {
+  gap: 4px;
+}
+
+.slideDeckCard .tournamentPostCardLead {
+  font-size: clamp(0.86rem, 3.7vw, 1.02rem);
+  line-height: 1.22;
+}
+
+.slideDeckCard .tournamentPostCardTitle {
+  font-size: clamp(1rem, 4.8vw, 1.3rem);
+  line-height: 1.16;
+}
+
+.slideDeckCard .tournamentPostCardDesc {
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.slideDeckCard .tournamentPostCardMeta {
+  gap: 2px;
+}
+
+.slideDeckCard .tournamentPostCardDate,
+.slideDeckCard .tournamentPostCardPlace {
+  font-size: calc(0.76rem + 2pt);
+  line-height: 1.22;
+}
+
+.tournamentPostCard {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  border-radius: 16px;
+  overflow: hidden;
+  border: none;
+  box-shadow:
+    0 -30px 48px rgba(0, 0, 0, 0.58),
+    0 -16px 28px rgba(0, 0, 0, 0.42),
+    0 -6px 14px rgba(0, 0, 0, 0.32);
+}
+
+.tournamentPostCard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: 2;
+  pointer-events: none;
+  padding: 2px;
+  box-sizing: border-box;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.52) 0%,
+    rgba(255, 255, 255, 0.2) 22%,
+    rgba(255, 255, 255, 0.2) 78%,
+    rgba(255, 255, 255, 0.52) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+
+.tournamentPostCardBg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.tournamentPostCardBgFallback {
+  position: absolute;
+  inset: 0;
+  background-color: #2b2b2f;
+}
+
+.tournamentPostCardOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.28) 0%,
+    rgba(0, 0, 0, 0.22) 35%,
+    rgba(0, 0, 0, 0.55) 65%,
+    rgba(0, 0, 0, 0.88) 100%
+  );
+  pointer-events: none;
+}
+
+.tournamentPostCardInner {
+  position: relative;
+  z-index: 3;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+/*
+ * 상단 행: 텍스트(왼쪽) + 상태 배지(오른쪽). 배지 우상단 위치·이 구조는 유지할 것(변경 시 디자인 합의).
+ */
+.tournamentPostCardTop {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+
+.tournamentPostCardMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 날짜 · 장소 — 카드 하단 고정 */
+.tournamentPostCardMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  margin-top: auto;
+  padding-top: 10px;
+}
+
+.tournamentPostCardLead {
+  margin: 0;
+  width: 100%;
+  font-size: clamp(1.02rem, 4.2vw, 1.22rem);
+  font-weight: 600;
+  line-height: 1.28;
+  letter-spacing: -0.02em;
+  color: rgba(255, 255, 255, 0.96);
+  text-shadow:
+    0 2px 14px rgba(0, 0, 0, 0.55),
+    0 1px 3px rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tournamentPostCardTitle {
+  margin: 0;
+  width: 100%;
+  font-size: clamp(1.25rem, 5.5vw, 1.65rem);
+  font-weight: 800;
+  line-height: 1.22;
+  letter-spacing: -0.03em;
+  color: #ffe566;
+  text-shadow:
+    0 2px 20px rgba(0, 0, 0, 0.6),
+    0 1px 4px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tournamentPostCardDesc {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  font-weight: 400;
+  color: rgba(228, 228, 231, 0.9);
+  text-shadow:
+    0 1px 12px rgba(0, 0, 0, 0.55),
+    0 0 1px rgba(0, 0, 0, 0.8);
+  word-break: keep-all;
+}
+
+.tournamentPostCardDate,
+.tournamentPostCardPlace {
+  margin: 0;
+  font-size: calc(0.82rem * 1.1 + 2pt);
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  color: rgba(245, 245, 244, 0.94);
+  text-shadow:
+    0 1px 12px rgba(0, 0, 0, 0.55),
+    0 0 1px rgba(0, 0, 0, 0.8);
+}
+
+.tournamentPostCardDate {
+  font-weight: 600;
+}
+
+.tournamentPostCardPlace {
+  color: rgba(228, 228, 231, 0.9);
+  font-weight: 400;
+}
+
+.tournamentPostCardTop .tournamentPostCardBadge {
+  align-self: flex-start;
+}
+
+.tournamentPostCardBadge {
+  display: inline-block;
+  flex-shrink: 0;
+  align-self: flex-end;
+  padding: 8px 17px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  color: #fafaf9;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 2px 7px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.badgeRecruiting {
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.badgeClosing {
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.badgeWaitlist {
+  background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.badgeFull {
+  background: linear-gradient(180deg, #5d4037 0%, #3e2723 100%);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.badgeEnded {
+  background: linear-gradient(180deg, #3f3f46 0%, #18181b 100%);
+  color: rgba(244, 244, 245, 0.92);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* ---- 테마 전용 배경 (이미지 없음) — blur 없음 ---- */
+.themeOnlyBg {
+  background: linear-gradient(145deg, #27272a 0%, #18181b 100%);
+}
+
+.themeLight .themeOnlyBg {
+  background: linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+.themeNatural .themeOnlyBg {
+  background: linear-gradient(145deg, #44403c 0%, #1c1917 100%);
+}
+
+.themeLight .tournamentPostCardLead,
+.themeLight .tournamentPostCardTitle,
+.themeLight .tournamentPostCardDesc,
+.themeLight .tournamentPostCardDate,
+.themeLight .tournamentPostCardPlace {
+  color: #27272a;
+  text-shadow: none;
+}
+
+.themeLight .tournamentPostCardTitle {
+  color: #0f172a;
+}
+
+.themeNatural .tournamentPostCardLead {
+  color: rgba(250, 250, 249, 0.95);
+}
+
+.themeNatural .tournamentPostCardTitle {
+  color: #fde68a;
+}
+
+/* ---- 템플릿 B (프레임형) ---- */
+.tplBOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    165deg,
+    rgba(15, 18, 28, 0.72) 0%,
+    rgba(0, 0, 0, 0.32) 45%,
+    rgba(0, 0, 0, 0.78) 100%
+  );
+  pointer-events: none;
+}
+
+.themeLight .tplBOverlay {
+  background: linear-gradient(
+    165deg,
+    rgba(248, 250, 252, 0.92) 0%,
+    rgba(226, 232, 240, 0.55) 50%,
+    rgba(148, 163, 184, 0.45) 100%
+  );
+}
+
+.tplBInner {
+  position: relative;
+  z-index: 3;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: center;
+}
+
+.tplBBadgeRow {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.tplBCenter {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 0;
+  padding: 4px 8px 8px;
+}
+
+.tplBMetaBar {
+  margin-top: auto;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.themeLight .tplBMetaBar {
+  background: rgba(255, 255, 255, 0.75);
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+.tplBMetaLine {
+  margin: 0;
+  font-size: calc(0.74rem + 2pt);
+  line-height: 1.35;
+  color: rgba(248, 250, 252, 0.95);
+  font-weight: 600;
+}
+
+.themeLight .tplBMetaLine {
+  color: #0f172a;
+}
+
+.tplMetaDot {
+  opacity: 0.5;
+}

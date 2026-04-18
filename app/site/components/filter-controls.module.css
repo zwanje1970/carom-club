@@ -1,0 +1,71 @@
+/* 사이트 필터 UI 표준 — 대회안내 기준 */
+
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.dropdown {
+  box-sizing: border-box;
+  font: inherit;
+  padding: 0.45rem 0.65rem;
+  border-radius: var(--ui-radius, 0.75rem);
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  min-height: 2.25rem;
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+  appearance: auto;
+  -webkit-appearance: menulist;
+}
+
+.dropdownFullWidth {
+  width: 100%;
+  min-width: 0;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 0.45rem 0.85rem;
+  min-height: 2.25rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.button:hover {
+  background: #f8fafc;
+}
+
+.button:active {
+  background: #f1f5f9;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.filterGrid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  width: 100%;
+  align-items: stretch;
+}
+
+.filterGridCell {
+  min-width: 0;
+}
+
+.filterSection {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--v3-border, #e5e7eb);
+}

@@ -1,0 +1,17 @@
+CaromWebView — 안드로이드 웹뷰 + FCM 토큰 등록
+
+1) Firebase 콘솔에서 Android 앱 패키지 com.caromclub.webview 추가 후,
+   다운로드한 google-services.json 으로 app/google-services.json 을 교체하세요.
+
+2) 로컬 개발 서버 주소
+   - 에뮬레이터: 기본 http://10.0.2.2:3000 (PC에서 npm run dev 가 3000 포트)
+   - 실제 기기: PC의 LAN IP (예: http://192.168.0.10:3000)
+   android-webview/local.properties 에 한 줄 추가 가능:
+   siteBaseUrl=http://192.168.x.x:3000
+
+3) 빌드
+   Android Studio에서 android-webview 폴더를 열고 Run,
+   또는 Gradle: ./gradlew assembleDebug
+
+4) 토큰 저장 확인
+   - 앱에서 사이트 로그인 후 data/v3-dev-store.json 의 fcmDeviceTokens 배열 확인

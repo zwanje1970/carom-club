@@ -1,0 +1,1 @@
+# Keep Firebase / OkHttp defaults
