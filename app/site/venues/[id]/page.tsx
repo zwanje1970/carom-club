@@ -2,7 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";
 import { isEmptyOutlineHtml } from "../../../../lib/outline-content-helpers";
-import { getSiteVenueDetailById } from "../../../../lib/server/dev-store";
+import {
+  getOutlinePdfAssetById,
+  getSiteVenueDetailById,
+  outlineFileKindFromAsset,
+  outlinePdfIdFromPublicUrl,
+} from "../../../../lib/server/dev-store";
+import SiteOutlineDocumentCard from "../../components/SiteOutlineDocumentCard";
+import SiteShellFrame from "../../components/SiteShellFrame";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +127,10 @@ export default async function SiteVenueDetailPage({
   const venue = await getSiteVenueDetailById(id);
   if (!venue) notFound();
 
+  const introPdfId = outlinePdfIdFromPublicUrl(venue.introPdfUrl);
+  const introPdfAsset = introPdfId ? await getOutlinePdfAssetById(introPdfId) : null;
+  const introPdfFileKind = outlineFileKindFromAsset(introPdfAsset);
+
   const images = venue.galleryImageUrls;
   const pt = venue.pricingType;
   const showGeneralFees = pt === "GENERAL" || pt === "MIXED";
@@ -156,13 +167,11 @@ export default async function SiteVenueDetailPage({
     images.length > 0 || introTextBlocks.length > 0 || showPdf;
 
   return (
-    <main className="v3-page v3-stack" style={{ gap: "1rem" }}>
+    <SiteShellFrame brandTitle={<span className="site-home-brand-ellipsis">{venue.name}</span>}>
+      <section className="site-site-gray-main v3-stack" style={{ gap: "1rem" }}>
       <section className="v3-box v3-stack" style={{ gap: "0.65rem" }}>
         <p style={{ margin: 0, fontWeight: 600 }}>기본정보</p>
         <div className="v3-row" style={{ alignItems: "center", gap: "0.65rem", flexWrap: "wrap", justifyContent: "space-between" }}>
-          <h1 className="v3-h1" style={{ fontSize: "1.4rem", margin: 0 }}>
-            {venue.name}
-          </h1>
           {showWebsiteBtn && linkParts ? (
             <a
               href={websiteUrl}
@@ -261,11 +270,11 @@ export default async function SiteVenueDetailPage({
             </p>
           ))}
           {showPdf ? (
-            <p style={{ margin: 0 }}>
-              <a href={venue.introPdfUrl!} target="_blank" rel="noopener noreferrer">
-                소개 PDF 보기
-              </a>
-            </p>
+            <SiteOutlineDocumentCard
+              url={venue.introPdfUrl!}
+              fileKind={introPdfFileKind}
+              caption="소개 보기"
+            />
           ) : null}
         </section>
       ) : null}
@@ -288,6 +297,7 @@ export default async function SiteVenueDetailPage({
       <Link className="v3-btn" href="/site/venues">
         당구장안내 목록으로
       </Link>
-    </main>
+      </section>
+    </SiteShellFrame>
   );
 }

@@ -7,6 +7,7 @@ import {
   parseCommunityBoardTypeParam,
   type SiteCommunityBoardKey,
 } from "../../../../../lib/server/dev-store";
+import SiteShellFrame from "../../../components/SiteShellFrame";
 import CommunityPostWriteForm from "./CommunityPostWriteForm";
 
 type Props = {
@@ -29,16 +30,15 @@ export default async function SiteCommunityWritePage({ params }: Props) {
   }
 
   return (
-    <main className="v3-page v3-stack">
-      <h1 className="v3-h1" style={{ fontSize: "1.4rem" }}>
-        글쓰기 · {board.label}
-      </h1>
+    <SiteShellFrame brandTitle={`글쓰기 · ${board.label}`}>
+      <section className="site-site-gray-main v3-stack">
       <CommunityPostWriteForm boardType={boardType} />
       <div className="v3-row">
         <Link className="v3-btn" href={`/site/community/${boardType}`}>
           목록
         </Link>
       </div>
-    </main>
+      </section>
+    </SiteShellFrame>
   );
 }

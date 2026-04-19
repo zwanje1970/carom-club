@@ -101,14 +101,14 @@ export default function OutlineContentEditor({
       const res = await fetch("/api/client/upload-outline-pdf", { method: "POST", body: fd });
       const data = (await res.json()) as { error?: string; url?: string };
       if (!res.ok) {
-        setPdfErr(data.error ?? "PDF 업로드에 실패했습니다.");
+        setPdfErr(data.error ?? "문서 업로드에 실패했습니다.");
         return;
       }
       if (typeof data.url === "string" && data.url) {
         onOutlinePdfUrlChange(data.url);
       }
     } catch {
-      setPdfErr("PDF 업로드 중 오류가 발생했습니다.");
+      setPdfErr("문서 업로드 중 오류가 발생했습니다.");
     } finally {
       setPdfBusy(false);
       if (pdfInputRef.current) pdfInputRef.current.value = "";
@@ -129,7 +129,7 @@ export default function OutlineContentEditor({
           [
             { v: "TEXT" as const, label: "직접입력" },
             { v: "IMAGE" as const, label: "이미지" },
-            { v: "PDF" as const, label: "PDF" },
+            { v: "PDF" as const, label: "PDF·DOCX" },
           ] as const
         ).map(({ v, label }) => (
           <label
@@ -192,13 +192,19 @@ export default function OutlineContentEditor({
       {displayMode === "PDF" ? (
         <div className="v3-stack" style={{ gap: "0.5rem" }}>
           <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
-            <input ref={pdfInputRef} type="file" accept="application/pdf" hidden onChange={(e) => onOutlinePdfFile(e.target.files)} />
+            <input
+              ref={pdfInputRef}
+              type="file"
+              accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.pdf,.docx"
+              hidden
+              onChange={(e) => onOutlinePdfFile(e.target.files)}
+            />
             <button type="button" className="v3-btn" disabled={pdfBusy} onClick={() => pdfInputRef.current?.click()}>
-              {pdfBusy ? "업로드 중…" : "PDF 선택"}
+              {pdfBusy ? "업로드 중…" : "PDF/DOCX 선택"}
             </button>
             {outlinePdfUrl ? (
               <button type="button" className="v3-btn" onClick={() => onOutlinePdfUrlChange("")}>
-                PDF 제거
+                문서 제거
               </button>
             ) : null}
           </div>
@@ -211,7 +217,7 @@ export default function OutlineContentEditor({
             </p>
           ) : (
             <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
-              PDF를 올리면 저장 시 함께 연결됩니다. 직접입력 내용은 그대로 유지됩니다.
+              PDF 또는 DOCX를 올리면 저장 시 함께 연결됩니다. 직접입력 내용은 그대로 유지됩니다.
             </p>
           )}
         </div>

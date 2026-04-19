@@ -1,7 +1,14 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { getTournamentById } from "../../../../../lib/server/dev-store";
+import { notFound } from "next/navigation";
+import {
+  getOutlinePdfAssetById,
+  getTournamentById,
+  outlineFileKindFromAsset,
+  outlinePdfIdFromPublicUrl,
+} from "../../../../../lib/server/dev-store";
 import { isEmptyOutlineHtml } from "../../../../../lib/outline-content-helpers";
+import SiteOutlineDocumentCard from "../../../components/SiteOutlineDocumentCard";
+import SiteShellFrame from "../../../components/SiteShellFrame";
 
 export default async function TournamentOutlineViewPage({
   params,
@@ -18,9 +25,9 @@ export default async function TournamentOutlineViewPage({
   const hasText = htmlRaw !== "" && !isEmptyOutlineHtml(htmlRaw);
   const mode = t.outlineDisplayMode;
 
-  if (pdf) {
-    redirect(pdf);
-  }
+  const outlinePdfId = outlinePdfIdFromPublicUrl(t.outlinePdfUrl);
+  const outlinePdfAsset = outlinePdfId ? await getOutlinePdfAssetById(outlinePdfId) : null;
+  const outlinePdfFileKind = outlineFileKindFromAsset(outlinePdfAsset);
 
   const back = (
     <div className="v3-row" style={{ gap: "0.5rem" }}>
@@ -30,56 +37,77 @@ export default async function TournamentOutlineViewPage({
     </div>
   );
 
+  if (pdf) {
+    return (
+      <SiteShellFrame brandTitle="대회요강">
+        <section className="site-site-gray-main v3-stack" style={{ maxWidth: "48rem", margin: "0 auto" }}>
+          {back}
+          <div style={{ marginTop: "0.75rem" }}>
+            <SiteOutlineDocumentCard url={pdf} fileKind={outlinePdfFileKind} caption="요강 보기" />
+          </div>
+        </section>
+      </SiteShellFrame>
+    );
+  }
+
   if (mode === "TEXT" && hasText) {
     return (
-      <main className="v3-page v3-stack" style={{ maxWidth: "48rem", margin: "0 auto" }}>
-        {back}
-        <div
-          className="v3-box v3-stack outline-view-html"
-          style={{ marginTop: "0.75rem" }}
-          dangerouslySetInnerHTML={{ __html: t.outlineHtml ?? "" }}
-        />
-      </main>
+      <SiteShellFrame brandTitle="대회요강">
+        <section className="site-site-gray-main v3-stack" style={{ maxWidth: "48rem", margin: "0 auto" }}>
+          {back}
+          <div
+            className="v3-box v3-stack outline-view-html"
+            style={{ marginTop: "0.75rem" }}
+            dangerouslySetInnerHTML={{ __html: t.outlineHtml ?? "" }}
+          />
+        </section>
+      </SiteShellFrame>
     );
   }
   if (mode === "IMAGE" && img) {
     return (
-      <main className="v3-page v3-stack" style={{ maxWidth: "48rem", margin: "0 auto" }}>
-        {back}
-        <div className="v3-box v3-stack" style={{ marginTop: "0.75rem" }}>
-          <img
-            src={img}
-            alt="대회요강"
-            style={{ width: "100%", maxWidth: "100%", height: "auto", display: "block" }}
-          />
-        </div>
-      </main>
+      <SiteShellFrame brandTitle="대회요강">
+        <section className="site-site-gray-main v3-stack" style={{ maxWidth: "48rem", margin: "0 auto" }}>
+          {back}
+          <div className="v3-box v3-stack" style={{ marginTop: "0.75rem" }}>
+            <img
+              src={img}
+              alt="대회요강"
+              style={{ width: "100%", maxWidth: "100%", height: "auto", display: "block" }}
+            />
+          </div>
+        </section>
+      </SiteShellFrame>
     );
   }
   if (hasText) {
     return (
-      <main className="v3-page v3-stack" style={{ maxWidth: "48rem", margin: "0 auto" }}>
-        {back}
-        <div
-          className="v3-box v3-stack outline-view-html"
-          style={{ marginTop: "0.75rem" }}
-          dangerouslySetInnerHTML={{ __html: t.outlineHtml ?? "" }}
-        />
-      </main>
+      <SiteShellFrame brandTitle="대회요강">
+        <section className="site-site-gray-main v3-stack" style={{ maxWidth: "48rem", margin: "0 auto" }}>
+          {back}
+          <div
+            className="v3-box v3-stack outline-view-html"
+            style={{ marginTop: "0.75rem" }}
+            dangerouslySetInnerHTML={{ __html: t.outlineHtml ?? "" }}
+          />
+        </section>
+      </SiteShellFrame>
     );
   }
   if (img) {
     return (
-      <main className="v3-page v3-stack" style={{ maxWidth: "48rem", margin: "0 auto" }}>
-        {back}
-        <div className="v3-box v3-stack" style={{ marginTop: "0.75rem" }}>
-          <img
-            src={img}
-            alt="대회요강"
-            style={{ width: "100%", maxWidth: "100%", height: "auto", display: "block" }}
-          />
-        </div>
-      </main>
+      <SiteShellFrame brandTitle="대회요강">
+        <section className="site-site-gray-main v3-stack" style={{ maxWidth: "48rem", margin: "0 auto" }}>
+          {back}
+          <div className="v3-box v3-stack" style={{ marginTop: "0.75rem" }}>
+            <img
+              src={img}
+              alt="대회요강"
+              style={{ width: "100%", maxWidth: "100%", height: "auto", display: "block" }}
+            />
+          </div>
+        </section>
+      </SiteShellFrame>
     );
   }
 

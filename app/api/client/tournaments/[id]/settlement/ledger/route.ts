@@ -7,6 +7,7 @@ import {
   getTournamentLedgerLinesForClient,
   getUserById,
   replaceSettlementLedgerLines,
+  tournamentHasActivePublishedCard,
 } from "../../../../../../../lib/server/dev-store";
 
 export const runtime = "nodejs";
@@ -35,6 +36,10 @@ async function requireSettlementAccess(tournamentId: string) {
   }
   if (tournament.createdBy !== user.id) {
     return { ok: false as const, status: 403, error: "본인 대회만 접근할 수 있습니다." };
+  }
+  const published = await tournamentHasActivePublishedCard(tournament.id);
+  if (!published) {
+    return { ok: false as const, status: 403, error: "게시된 대회만 정산 장부를 사용할 수 있습니다." };
   }
   return { ok: true as const, tournament, user };
 }
@@ -82,8 +87,14 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
     return NextResponse.json({ error: "lines 배열이 필요합니다." }, { status: 400 });
   }
 
-  const lines: Array<{ category: string; flow: string; amountKrw: number; label?: string | null; note?: string | null }> =
-    [];
+  const lines: Array<{
+    category: string;
+    flow: string;
+    amountKrw: number;
+    label?: string | null;
+    note?: string | null;
+    entryDate?: string | null;
+  }> = [];
   for (const row of body.lines) {
     if (!row || typeof row !== "object") {
       return NextResponse.json({ error: "lines 항목 형식이 올바르지 않습니다." }, { status: 400 });
@@ -95,6 +106,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
       amountKrw: typeof o.amountKrw === "number" ? o.amountKrw : Number(o.amountKrw),
       label: o.label != null && typeof o.label === "string" ? o.label : null,
       note: o.note != null && typeof o.note === "string" ? o.note : null,
+      entryDate: o.entryDate != null && typeof o.entryDate === "string" ? o.entryDate : null,
     });
   }
 

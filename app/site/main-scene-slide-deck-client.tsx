@@ -18,11 +18,23 @@ export default function MainSceneSlideDeckClient(props: Props) {
 
   if (!mounted) {
     const label = props.sectionLabel?.trim() || "진행중 대회";
-    return (
+    const notice = props.siteNoticeText?.trim();
+    const deck = (
       <div aria-hidden className={styles.slideDeck}>
         <p className={styles.slideDeckLabel}>{label}</p>
       </div>
     );
+    if (notice) {
+      return (
+        <div className={styles.slideDeckShell}>
+          <div className={styles.slideDeckNotice}>
+            <span className={styles.slideDeckNoticeMarquee}>{notice}</span>
+          </div>
+          {deck}
+        </div>
+      );
+    }
+    return deck;
   }
 
   return <MainSceneSlideDeck {...props} />;

@@ -74,7 +74,9 @@ export default function SiteShellFrame({
       {prependMain}
       <div className="site-home-shell" style={shellStyle}>
         <div className={topWhiteClass}>
-          <div className="site-home-brand">{brandTitle}</div>
+          <div className="site-home-brand">
+            <div className="site-mobile-page-title-block">{brandTitle}</div>
+          </div>
           {hasAuxiliarySlot ? (
             <section className={auxiliarySectionClass}>
               {auxiliary}

@@ -1,3 +1,53 @@
+/* 공지 + 슬라이드 한 카드(경계·여백 없음) */
+.slideDeckShell {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: hidden;
+  border-radius: 0;
+  border-bottom: 1px solid #94a3b8;
+}
+
+.slideDeckNotice {
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: 2.5rem;
+  box-sizing: border-box;
+  padding: 0.4rem 0.75rem;
+  background: #0f172a;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.slideDeckNoticeMarquee {
+  display: inline-block;
+  white-space: nowrap;
+  color: #fef08a;
+  font-size: 0.86rem;
+  line-height: 1.35;
+  animation: slideDeckNoticeMarquee 14s linear infinite;
+  will-change: transform;
+}
+
+@keyframes slideDeckNoticeMarquee {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+.slideDeckShell .slideDeck {
+  margin-top: 0;
+  border-bottom: none;
+}
+
+:global(.site-home-page) .slideDeckShell {
+  margin-top: 0;
+}
+
 .slideDeck {
   --slide-card-max-width: min(90%, 387px);
   --slide-card-max-height: calc(var(--slide-card-max-width) / 2);

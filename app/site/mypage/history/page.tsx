@@ -8,6 +8,7 @@ import {
   listTournamentApplicationsByUserId,
   TournamentApplicationStatus,
 } from "../../../../lib/server/dev-store";
+import SiteShellFrame from "../../components/SiteShellFrame";
 
 function isTournamentOngoing(dateText: string): boolean {
   const parsed = new Date(`${dateText}T23:59:59`);
@@ -60,8 +61,8 @@ export default async function SiteMypageHistoryPage() {
     });
 
   return (
-    <main className="v3-page v3-stack">
-      <h1 className="v3-h1">지난 대회</h1>
+    <SiteShellFrame brandTitle="지난 대회">
+      <section className="site-site-gray-main v3-stack">
       <p className="v3-muted">종료/지난 신청 기록</p>
 
       {historyRows.length === 0 ? (
@@ -82,6 +83,7 @@ export default async function SiteMypageHistoryPage() {
       <Link className="v3-btn" href="/site/mypage">
         진행 중 신청으로
       </Link>
-    </main>
+      </section>
+    </SiteShellFrame>
   );
 }

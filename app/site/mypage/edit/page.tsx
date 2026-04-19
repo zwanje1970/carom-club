@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
 import { getUserById } from "../../../../lib/server/dev-store";
+import SiteShellFrame from "../../components/SiteShellFrame";
 import ProfileEditForm from "../ProfileEditForm";
 
 export default async function SiteMypageEditPage() {
@@ -18,8 +19,8 @@ export default async function SiteMypageEditPage() {
   }
 
   return (
-    <main className="v3-page v3-stack">
-      <h1 className="v3-h1">내 정보 수정</h1>
+    <SiteShellFrame brandTitle="내 정보 수정">
+      <section className="site-site-gray-main v3-stack">
       <section className="v3-box v3-stack">
         <h2 className="v3-h2">수정용 화면</h2>
         <ProfileEditForm
@@ -35,6 +36,7 @@ export default async function SiteMypageEditPage() {
           마이페이지로
         </Link>
       </div>
-    </main>
+      </section>
+    </SiteShellFrame>
   );
 }

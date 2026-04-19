@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { SiteMainNavIcon } from "../site/main-nav-icon";
 
 function isInquiryDetailWithComposer(pathname: string): boolean {
   return (
@@ -9,7 +10,42 @@ function isInquiryDetailWithComposer(pathname: string): boolean {
   );
 }
 
-/** 전역 홈 FAB — 항상 `/site`로 이동 (사이트·클라이언트·플랫폼 레이아웃 공통) */
+function SiteBottomNavHomeIcon() {
+  return (
+    <svg
+      width={15}
+      height={15}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.9}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden={true}
+    >
+      <path d="M3 11.5L12 4l9 7.5" />
+      <path d="M5 10.5V20h14v-9.5" />
+      <path d="M9.5 20v-5h5v5" />
+    </svg>
+  );
+}
+
+const SITE_NAV_ITEMS = [
+  { href: "/site", label: "홈", icon: "home" as const },
+  { href: "/site/tournaments", label: "대회안내", icon: "tournament" as const },
+  { href: "/site/venues", label: "당구장안내", icon: "venue" as const },
+  { href: "/site/community", label: "커뮤니티", icon: "community" as const },
+  { href: "/site/mypage", label: "MY", icon: "user" as const },
+];
+
+function navItemActive(pathname: string, href: string): boolean {
+  if (href === "/site") {
+    return pathname === "/site" || pathname === "/";
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/** 모바일: 하단 5버튼 / 데스크톱: 기존 단일 홈 FAB */
 export default function GlobalHomeButton() {
   const pathname = usePathname() ?? "";
   const overInquiryComposer = isInquiryDetailWithComposer(pathname);
@@ -19,28 +55,41 @@ export default function GlobalHomeButton() {
       className="site-home-fab-root"
       style={{
         bottom: overInquiryComposer
-          ? "calc(7.75rem + env(safe-area-inset-bottom, 0px))"
+          ? "calc(3.875rem + env(safe-area-inset-bottom, 0px))"
           : 0,
         zIndex: 70,
       }}
     >
-      <div className="site-home-fab-bar">
+      <nav className="site-mobile-bottom-nav" aria-label="사이트 하단 메뉴">
+        {SITE_NAV_ITEMS.map((item) => {
+          const active = navItemActive(pathname, item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`site-mobile-bottom-nav__link${active ? " site-mobile-bottom-nav__link--active" : ""}`}
+              aria-current={active ? "page" : undefined}
+            >
+              <span className="site-mobile-bottom-nav__icon">
+                {item.icon === "home" ? (
+                  <SiteBottomNavHomeIcon />
+                ) : (
+                  <SiteMainNavIcon variant={item.icon} size={15} />
+                )}
+              </span>
+              <span className="site-mobile-bottom-nav__label">{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="site-home-fab-bar site-home-fab-bar--desktop-single">
         <Link
           href="/site"
           className="site-home-fab site-home-fab--soft site-home-fab-link"
           aria-label="홈"
         >
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M3 11.5L12 4l9 7.5" />
             <path d="M5 10.5V20h14v-9.5" />
             <path d="M9.5 20v-5h5v5" />

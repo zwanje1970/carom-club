@@ -5,7 +5,7 @@ import {
   createClientInquiry,
   getClientStatusByUserId,
   getUserById,
-  listClientInquiriesByClientUserId,
+  listClientInquiriesByClientUserIdWithAdminReplyFlag,
   type ClientInquiryType,
 } from "../../../../lib/server/dev-store";
 
@@ -26,15 +26,15 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
   }
-  const items = await listClientInquiriesByClientUserId(user.id);
+  const items = await listClientInquiriesByClientUserIdWithAdminReplyFlag(user.id);
   return NextResponse.json({
-    items: items.map((x) => ({
+    items: items.map(({ inquiry: x, hasAdminReply }) => ({
       id: x.id,
       type: x.type,
       title: x.title,
-      status: x.status,
       createdAt: x.createdAt,
       updatedAt: x.updatedAt,
+      hasAdminReply,
     })),
   });
 }

@@ -5,6 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import MobilePreview from "./mobile-preview";
 import ColorPalettePicker from "./color-palette-picker";
+import {
+  PageBuilderCanvasShell,
+  usePageBuilderViewportMode,
+  type MobilePageBuilderCanvasHandle,
+} from "./mobile-page-builder-canvas";
 import { isCommonPaletteColor } from "../../../../lib/shared/common-color-palette";
 
 type BlockAlignment = "LEFT" | "CENTER" | "RIGHT";
@@ -703,6 +708,9 @@ function PlatformSitePagesPageContent() {
   const [previewRefreshToken, setPreviewRefreshToken] = useState(0);
   const previewSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastPreviewSyncedSectionsRef = useRef<string>("");
+  const viewportMode = usePageBuilderViewportMode();
+  const mobileCanvasRef = useRef<MobilePageBuilderCanvasHandle | null>(null);
+  const isMobileCanvas = viewportMode === "mobile-landscape";
 
   const selectedBlockMeta = useMemo(() => {
     if (!selectedBlockId) return null;
@@ -1882,9 +1890,26 @@ function PlatformSitePagesPageContent() {
     );
   }
 
+  if (viewportMode === "mobile-portrait") {
+    return (
+      <main
+        className="v3-page v3-stack platform-page-builder-fullwidth"
+        style={{
+          width: "100%",
+          maxWidth: "none",
+          margin: 0,
+          padding: 0,
+          height: "100vh",
+          overflow: "hidden",
+          background: "#ffffff",
+        }}
+      />
+    );
+  }
+
   return (
     <main
-      className="v3-page v3-stack platform-page-builder-fullwidth"
+      className={`${isMobileCanvas ? "platform-page-builder-root--mobile-canvas " : ""}v3-page v3-stack platform-page-builder-fullwidth`}
       style={{
         width: "100%",
         maxWidth: "none",
@@ -1894,6 +1919,9 @@ function PlatformSitePagesPageContent() {
         paddingTop: "5.2rem",
         height: "100vh",
         overflow: "hidden",
+        ...(isMobileCanvas
+          ? { display: "flex", flexDirection: "column" as const, minHeight: 0 }
+          : {}),
       }}
     >
       <div className="platform-page-builder-topbar">
@@ -1903,7 +1931,41 @@ function PlatformSitePagesPageContent() {
             <li>{differsFromPublished ? "게시본과 다름" : "게시본과 동일"}</li>
             <li>섹션 {sectionCountLabel}</li>
           </ul>
-          <div className="v3-row">
+          <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.45rem", alignItems: "center" }}>
+            {isMobileCanvas ? (
+              <>
+                <button
+                  type="button"
+                  className="v3-btn"
+                  aria-label="캔버스 축소"
+                  onClick={() => mobileCanvasRef.current?.zoomOut()}
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  className="v3-btn"
+                  aria-label="캔버스 확대"
+                  onClick={() => mobileCanvasRef.current?.zoomIn()}
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  className="v3-btn"
+                  onClick={() => mobileCanvasRef.current?.resetToDefaultScale()}
+                >
+                  기본
+                </button>
+                <button
+                  type="button"
+                  className="v3-btn"
+                  onClick={() => mobileCanvasRef.current?.setScale100()}
+                >
+                  100%
+                </button>
+              </>
+            ) : null}
             <button type="button" className="v3-btn" disabled={saveLoading} onClick={handleSaveDraft}>
               {saveLoading ? "초안 저장 중..." : "초안 저장"}
             </button>
@@ -1913,7 +1975,11 @@ function PlatformSitePagesPageContent() {
           </div>
         </div>
       </div>
-      <div id="layout-fixed" className="platform-page-builder-workspace">
+      <PageBuilderCanvasShell enabled={isMobileCanvas} canvasRef={mobileCanvasRef}>
+      <div
+        id="layout-fixed"
+        className={`platform-page-builder-workspace${isMobileCanvas ? " platform-page-builder-workspace--in-canvas" : ""}`}
+      >
         <aside className="v3-box v3-stack platform-page-builder-settings" onWheelCapture={(event) => event.stopPropagation()}>
           <h2 className="v3-h2" style={{ marginBottom: 0 }}>
             선택 블록 설정
@@ -2739,7 +2805,18 @@ function PlatformSitePagesPageContent() {
           />
         </div>
       </div>
+      </PageBuilderCanvasShell>
       <style jsx>{`
+        .platform-page-builder-root--mobile-canvas {
+          min-height: 0;
+        }
+
+        .platform-page-builder-workspace--in-canvas {
+          height: auto !important;
+          min-height: 480px;
+          overflow: visible !important;
+        }
+
         .platform-page-builder-topbar {
           position: fixed;
           top: 0;

@@ -73,7 +73,7 @@ export default async function ClientHomePage() {
             style={{ flex: "1 1 14rem", textDecoration: "none", color: "inherit", minHeight: "6rem" }}
           >
             <h2 className="v3-h2" style={{ marginBottom: "0.25rem" }}>
-              대회
+              대회관리
             </h2>
             <p className="v3-muted" style={{ margin: 0, fontSize: "0.95rem" }}>
               대회 생성 · 목록 · 참가자 · 대진표
@@ -85,7 +85,7 @@ export default async function ClientHomePage() {
             style={{ flex: "1 1 14rem", textDecoration: "none", color: "inherit", minHeight: "6rem" }}
           >
             <h2 className="v3-h2" style={{ marginBottom: "0.25rem" }}>
-              정산
+              정산관리
             </h2>
             <p className="v3-muted" style={{ margin: 0, fontSize: "0.95rem" }}>
               전체정산 · 대회별 정산
@@ -97,7 +97,7 @@ export default async function ClientHomePage() {
             style={{ flex: "1 1 14rem", textDecoration: "none", color: "inherit", minHeight: "6rem" }}
           >
             <h2 className="v3-h2" style={{ marginBottom: "0.25rem" }}>
-              회원
+              회원관리
             </h2>
             <p className="v3-muted" style={{ margin: 0, fontSize: "0.95rem" }}>
               회원 목록 · 푸시 발송
@@ -109,10 +109,10 @@ export default async function ClientHomePage() {
             style={{ flex: "1 1 14rem", textDecoration: "none", color: "inherit", minHeight: "6rem" }}
           >
             <h2 className="v3-h2" style={{ marginBottom: "0.25rem" }}>
-              설정
+              부가기능
             </h2>
             <p className="v3-muted" style={{ margin: 0, fontSize: "0.95rem" }}>
-              당구장 소개 · 제보 · 제안
+              업체설정 · 당구장 소개 · 문의 내역 · 빈 대진표 출력
             </p>
           </Link>
         </div>

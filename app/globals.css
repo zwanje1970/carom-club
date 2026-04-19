@@ -337,8 +337,8 @@ body:has(.site-home-page) {
     padding-left: 0;
     padding-right: 0;
     padding-top: 0;
-    /* 모바일 고정형: 홈 바까지 동일 다크 톤(흰 여백 띠 없음) */
-    padding-bottom: calc(108px + env(safe-area-inset-bottom, 0px) + 4px);
+    /* 모바일 고정형: 홈 바까지 동일 다크 톤(흰 여백 띠 없음) — 홈 바 높이 절반에 맞춰 여백 절반 */
+    padding-bottom: calc(54px + env(safe-area-inset-bottom, 0px) + 4px);
   }
 
   /* 슬라이드: 뷰포트 남는 높이를 먹지 않음 — .slideDeck aspect-ratio 로 크기 고정 */
@@ -428,6 +428,53 @@ body:has(.site-home-page) {
   color: inherit;
 }
 
+@keyframes site-notice-marquee {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+/* 공지관리(siteNotice) 전용: 상단 한 줄 좌측 흐름 */
+.site-home-site-notice-marquee {
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  overflow: hidden;
+  white-space: nowrap;
+  border-radius: 0.65rem;
+  border: 1px solid #f3ead0;
+  background: #fffef6;
+  box-sizing: border-box;
+  padding: 0.45rem 0.85rem;
+}
+
+.site-home-site-notice-marquee__inner {
+  display: inline-block;
+  white-space: nowrap;
+  color: #dc2626;
+  font-size: 0.86rem;
+  line-height: 1.35;
+  animation: site-notice-marquee 14s linear infinite;
+  will-change: transform;
+}
+
+/* 모바일 메인: 검은 배경·슬라이드와 빈틈 없이 연결 */
+@media (max-width: 767px) {
+  .site-home-site-notice-marquee {
+    border-radius: 0;
+    border: none;
+    background: #0f172a;
+    padding: 0.4rem 0.75rem;
+  }
+
+  .site-home-site-notice-marquee__inner {
+    color: #fef08a;
+  }
+}
+
 /* 대회안내·대회상세: 공지 박스와 동일 높이의 빈 보조 슬롯(레이아웃 정렬용) */
 .site-home-notice-slot-empty {
   min-height: 2.75rem;
@@ -443,6 +490,72 @@ body:has(.site-home-page) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 메인 로고: ●●● 뒤 한 칸 */
+.site-main-logo-name {
+  margin-left: 0.35em;
+}
+
+/* 모바일: 공통 상단 타이틀 블록(동일 높이·정렬) — PC는 기존 브랜드 영역 유지 */
+@media (max-width: 767px) {
+  .site-mobile-page-title-block {
+    min-height: 2.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    box-sizing: border-box;
+    padding-top: 0.1rem;
+    padding-bottom: 0.1rem;
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.25;
+    text-align: center;
+  }
+
+  .site-main-logo {
+    display: inline-flex;
+    align-items: baseline;
+    justify-content: center;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    font-size: 1.05rem;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+
+  .site-main-logo-dots {
+    color: #94a3b8;
+    font-weight: 500;
+  }
+
+  .site-main-logo-name {
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  /* 메인: 공지 ↔ 슬라이드 사이 빈틈 제거 */
+  .site-home-top-white--main {
+    padding-bottom: 0;
+  }
+
+  .site-home-top-white--main .site-home-notice-stack {
+    gap: 0;
+    margin-bottom: 0;
+  }
+
+  .site-home-slide-stack--flush {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .site-mobile-page-title-block {
+    display: block;
+  }
 }
 
 /* 메인 흰 상단 + 동일 셸 아래: 회색 본문(대회 목록·상세) — 상단은 공통 변수만 사용 */
@@ -473,7 +586,7 @@ body:has(.site-home-page) {
     margin-right: 0;
     padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
     padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
-    padding-bottom: calc(108px + env(safe-area-inset-bottom, 0px) + 4px);
+    padding-bottom: calc(54px + env(safe-area-inset-bottom, 0px) + 4px);
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
@@ -629,7 +742,7 @@ body:has(.site-home-page) {
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08) !important;
 }
 
-/* 모바일: 하단 흰 바(비탭) + 중앙 홈 버튼만 탭 — safe-area는 바 padding으로 반영 */
+/* 모바일: 하단 흰 바 + 5버튼 네비 — safe-area는 바 padding으로 반영 */
 .site-home-fab-root {
   position: fixed;
   left: 0;
@@ -639,20 +752,73 @@ body:has(.site-home-page) {
   pointer-events: none;
 }
 
-.site-home-fab-bar {
+/* 모바일 전용 5버튼 */
+.site-mobile-bottom-nav {
   pointer-events: none;
   width: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  /* 풀블리드(모서리 라운드 없음) · 높이는 safe-area 포함 */
-  min-height: calc(96px + env(safe-area-inset-bottom, 0px));
-  padding-top: 12px;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 0;
+  min-height: calc(48px + env(safe-area-inset-bottom, 0px));
+  padding-top: 4px;
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: max(0.15rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.15rem, env(safe-area-inset-right, 0px));
   box-sizing: border-box;
   background: #fff;
-  /* 다크 본문과 이어지도록 상단 구분선 제거(끊김 완화) */
   border-top: none;
+}
+
+.site-mobile-bottom-nav__link {
+  pointer-events: auto;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 3px 1px 5px;
+  min-height: 44px;
+  text-decoration: none !important;
+  color: #475569;
+  font-size: 0.52rem;
+  line-height: 1.05;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.site-mobile-bottom-nav__link--active {
+  color: var(--ui-primary);
+}
+
+.site-mobile-bottom-nav__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+}
+
+.site-mobile-bottom-nav__icon svg {
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+.site-mobile-bottom-nav__label {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 데스크톱: 기존 단일 홈 FAB만 */
+.site-home-fab-bar--desktop-single {
+  display: none;
+  pointer-events: none;
+  width: 100%;
 }
 
 .site-home-fab-link {
@@ -669,8 +835,17 @@ body:has(.site-home-page) {
   font-weight: 700;
 }
 
+.site-home-fab-bar--desktop-single .site-home-fab-link svg {
+  width: 24px;
+  height: 24px;
+}
+
 @media (min-width: 768px) {
-  .site-home-fab-bar {
+  .site-mobile-bottom-nav {
+    display: none !important;
+  }
+
+  .site-home-fab-bar--desktop-single {
     display: block;
     background: transparent !important;
     border: none !important;
@@ -694,7 +869,7 @@ body:has(.site-home-page) {
 .community-write-fab {
   position: fixed;
   right: 16px;
-  bottom: calc(128px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   z-index: 68;
   width: 56px;
   height: 56px;
@@ -968,33 +1143,6 @@ body:has(.site-home-page) {
 .site-footer-muted {
   color: #555;
   margin-top: 0.25rem;
-}
-
-.site-home-notice-stack {
-  overflow: hidden;
-}
-
-.site-home-notice-stack p {
-  display: inline-block;
-  overflow: hidden;
-  white-space: nowrap;
-  will-change: transform;
-  animation: site-notice-marquee 18s linear infinite;
-}
-
-.site-home-notice-stack:hover p,
-.site-home-notice-stack:active p,
-.site-home-notice-stack:focus-within p {
-  animation-play-state: paused;
-}
-
-@keyframes site-notice-marquee {
-  0% {
-    transform: translateX(100%);
-  }
-  100% {
-    transform: translateX(-100%);
-  }
 }
 
 /* Narrow viewport: same as server mobile branch (no layout header/footer).

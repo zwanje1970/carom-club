@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SiteOutlineDocumentCard from "../../components/SiteOutlineDocumentCard";
 import AccountNumberCopyInline from "./account-number-copy-inline";
 import {
   formatTournamentScheduleLabel,
@@ -17,6 +18,8 @@ type Props = {
   listBackHref: string;
   /** client: 요강 보기는 /client 경로만 사용 (사이트 공개 URL로 이동하는 버튼 없음) */
   audience?: "site" | "client";
+  /** outlinePdfUrl이 API 문서 URL일 때 자산 메타 기준 */
+  outlinePdfFileKind?: "pdf" | "docx";
 };
 
 /** 일반 참가자격: [기준유형] [기준값] [이하/미만] — 부자동배정과 분리 */
@@ -75,7 +78,13 @@ function BasicInfoDivider() {
   );
 }
 
-export default function SiteTournamentDetailSections({ tournament, applyHref, listBackHref, audience = "site" }: Props) {
+export default function SiteTournamentDetailSections({
+  tournament,
+  applyHref,
+  listBackHref,
+  audience = "site",
+  outlinePdfFileKind = "pdf",
+}: Props) {
   const posterUrl = resolveSitePosterDisplayUrl(tournament.posterImageUrl ?? null);
   const scheduleLabel = formatTournamentScheduleLabel(tournament);
   const eligibilityLine = eligibilityOneLine(tournament.rule);
@@ -222,15 +231,7 @@ export default function SiteTournamentDetailSections({ tournament, applyHref, li
         >
           {hasOutlineData ? (
             outlinePdf ? (
-              <a
-                className="v3-btn"
-                href={outlinePdf}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ padding: "0.55rem 1rem", fontWeight: 600, display: "inline-flex" }}
-              >
-                대회요강 보기
-              </a>
+              <SiteOutlineDocumentCard url={outlinePdf} fileKind={outlinePdfFileKind} caption="요강 보기" />
             ) : (
               <Link
                 className="v3-btn"

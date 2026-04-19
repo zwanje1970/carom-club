@@ -10,6 +10,7 @@ import {
   parseCommunityBoardTypeParam,
   type SiteCommunityBoardKey,
 } from "../../../../../../lib/server/dev-store";
+import SiteShellFrame from "../../../../components/SiteShellFrame";
 import CommunityPostEditForm from "./CommunityPostEditForm";
 
 type Props = {
@@ -46,10 +47,8 @@ export default async function SiteCommunityPostEditPage({ params }: Props) {
   }
 
   return (
-    <main className="v3-page v3-stack">
-      <h1 className="v3-h1" style={{ fontSize: "1.4rem" }}>
-        수정 · {board.label}
-      </h1>
+    <SiteShellFrame brandTitle={`수정 · ${board.label}`}>
+      <section className="site-site-gray-main v3-stack">
       <CommunityPostEditForm
         boardType={boardType}
         postId={postId}
@@ -63,6 +62,7 @@ export default async function SiteCommunityPostEditPage({ params }: Props) {
           취소
         </Link>
       </div>
-    </main>
+      </section>
+    </SiteShellFrame>
   );
 }

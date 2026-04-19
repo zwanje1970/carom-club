@@ -3,13 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-function localYmd(d: Date) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
 type Row = { tournamentId: string; title: string; income: number; expense: number; net: number };
 
 type LedgerOverviewOk = {
@@ -23,19 +16,15 @@ function formatWon(n: number) {
 }
 
 export default function ClientSettlementHubPage() {
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [data, setData] = useState<LedgerOverviewOk | null>(null);
 
   const loadOverview = useCallback(async () => {
-    if (!from || !to) return;
     setLoading(true);
     setError("");
     try {
-      const qs = new URLSearchParams({ from, to });
-      const res = await fetch(`/api/client/settlements/ledger-overview?${qs}`);
+      const res = await fetch("/api/client/settlements/ledger-overview", { credentials: "same-origin" });
       const json = (await res.json()) as LedgerOverviewOk | { error?: string };
       if (!res.ok || !("ok" in json) || json.ok !== true) {
         setData(null);
@@ -49,19 +38,11 @@ export default function ClientSettlementHubPage() {
     } finally {
       setLoading(false);
     }
-  }, [from, to]);
-
-  useEffect(() => {
-    const end = new Date();
-    const start = new Date(end.getTime() - 90 * 86400000);
-    setFrom(localYmd(start));
-    setTo(localYmd(end));
   }, []);
 
   useEffect(() => {
-    if (!from || !to) return;
     void loadOverview();
-  }, [from, to, loadOverview]);
+  }, [loadOverview]);
 
   return (
     <main className="v3-page v3-stack ui-client-dashboard" style={{ gap: "1rem" }}>
@@ -88,31 +69,10 @@ export default function ClientSettlementHubPage() {
             정산
           </h1>
         </div>
-        <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-          <label className="v3-row" style={{ alignItems: "center", gap: "0.35rem", fontSize: "0.9rem" }}>
-            <span className="v3-muted">기간</span>
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              style={{ padding: "0.4rem", border: "1px solid #cbd5e1", borderRadius: "0.35rem" }}
-            />
-            <span className="v3-muted">~</span>
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              style={{ padding: "0.4rem", border: "1px solid #cbd5e1", borderRadius: "0.35rem" }}
-            />
-          </label>
-          <button type="button" className="ui-btn-primary-solid" disabled={loading} onClick={() => void loadOverview()}>
-            조회
-          </button>
-        </div>
       </header>
 
       <p className="v3-muted" style={{ margin: 0, fontSize: "0.88rem" }}>
-        대회 일정(`date`)이 기간에 포함되며, 장부 라인(v2)만 합산합니다.
+        메인에 <strong>게시 중인 대회</strong>만 아래에 표시됩니다. 대회일과 관계없이 게시 후부터 장부를 사용할 수 있습니다.
       </p>
 
       {error ? (
@@ -121,9 +81,9 @@ export default function ClientSettlementHubPage() {
         </p>
       ) : null}
 
-      <section className="v3-box v3-stack" aria-label="기간 합계" style={{ padding: "1.1rem 1.15rem" }}>
+      <section className="v3-box v3-stack" aria-label="전체 합계" style={{ padding: "1.1rem 1.15rem" }}>
         <h2 className="v3-h2" style={{ margin: "0 0 0.75rem", fontSize: "0.95rem", fontWeight: 700, color: "#64748b" }}>
-          총정산
+          합계
         </h2>
         {loading && !data ? (
           <p className="v3-muted" style={{ margin: 0 }}>
@@ -155,7 +115,7 @@ export default function ClientSettlementHubPage() {
             </div>
             <div>
               <p className="v3-muted" style={{ margin: "0 0 0.2rem", fontSize: "0.85rem" }}>
-                총 순이익
+                최종 합계 (수입 − 지출)
               </p>
               <p
                 style={{
@@ -187,7 +147,7 @@ export default function ClientSettlementHubPage() {
           </p>
         ) : data && data.rows.length === 0 ? (
           <p className="v3-muted" style={{ margin: 0 }}>
-            데이터 없음
+            게시된 대회가 없습니다. 대회를 메인에 게시하면 여기에서 장부로 이동할 수 있습니다.
           </p>
         ) : data && data.rows.length > 0 ? (
           <ul className="v3-stack" style={{ gap: "0.75rem", listStyle: "none", margin: 0, padding: 0 }}>
@@ -252,7 +212,7 @@ export default function ClientSettlementHubPage() {
                               <strong>{formatWon(r.expense)}</strong>
                             </span>
                             <span>
-                              <span className="v3-muted">순이익 </span>
+                              <span className="v3-muted">차액 </span>
                               <strong>{formatWon(r.net)}</strong>
                             </span>
                           </div>
@@ -269,7 +229,7 @@ export default function ClientSettlementHubPage() {
                             flexShrink: 0,
                           }}
                         >
-                          정산
+                          장부
                         </span>
                       </div>
                     </section>

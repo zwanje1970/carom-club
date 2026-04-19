@@ -1,33 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  SETTLEMENT_CATEGORIES,
-  SETTLEMENT_CATEGORY_LABEL,
-  type SettlementCategoryV2,
-  type SettlementFlowV2,
-  computeLedgerTotalsFromLines,
-} from "../../../../lib/settlement-ledger-v2";
+import { computeLedgerTotalsFromLines } from "../../../../lib/settlement-ledger-v2";
 
 type DraftLine = {
   key: string;
-  category: SettlementCategoryV2;
-  flow: SettlementFlowV2;
+  flow: "INCOME" | "EXPENSE";
   amountKrw: number;
   label: string;
   note: string;
+  entryDate: string;
 };
+
+function todayYmd() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 function newDraftLine(): DraftLine {
   return {
     key: `k-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-    category: "ENTRY_FEE",
     flow: "INCOME",
     amountKrw: 0,
     label: "",
     note: "",
+    entryDate: todayYmd(),
   };
 }
 
@@ -45,11 +47,9 @@ function parseAmountDigits(raw: string): number {
 
 export default function ClientSettlementLedgerEditPage() {
   const params = useParams<{ tournamentId: string }>();
-  const router = useRouter();
   const tournamentId = typeof params.tournamentId === "string" ? params.tournamentId : "";
 
   const [title, setTitle] = useState("");
-  const [dateStr, setDateStr] = useState("");
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -69,12 +69,12 @@ export default function ClientSettlementLedgerEditPage() {
       const json = (await res.json()) as {
         tournament?: { title: string; date: string };
         lines?: Array<{
-          category: string;
           flow: string;
           amountKrw: number;
           label: string | null;
           note: string | null;
           id: string;
+          entryDate?: string | null;
         }>;
         error?: string;
       };
@@ -84,17 +84,15 @@ export default function ClientSettlementLedgerEditPage() {
       }
       if (json.tournament) {
         setTitle(json.tournament.title);
-        setDateStr(json.tournament.date);
       }
       const loaded: DraftLine[] = (json.lines ?? []).map((L) => ({
         key: L.id,
-        category: (SETTLEMENT_CATEGORIES as readonly string[]).includes(L.category)
-          ? (L.category as SettlementCategoryV2)
-          : "OTHER",
         flow: L.flow === "EXPENSE" ? "EXPENSE" : "INCOME",
         amountKrw: L.amountKrw,
         label: L.label ?? "",
         note: L.note ?? "",
+        entryDate:
+          typeof L.entryDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(L.entryDate) ? L.entryDate : todayYmd(),
       }));
       setLines(loaded.length > 0 ? loaded : [newDraftLine()]);
     } catch {
@@ -119,11 +117,12 @@ export default function ClientSettlementLedgerEditPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           lines: lines.map((L) => ({
-            category: L.category,
+            category: "OTHER",
             flow: L.flow,
             amountKrw: L.amountKrw,
             label: L.label.trim() || null,
             note: L.note.trim() || null,
+            entryDate: /^\d{4}-\d{2}-\d{2}$/.test(L.entryDate.trim()) ? L.entryDate.trim() : null,
           })),
         }),
       });
@@ -134,7 +133,7 @@ export default function ClientSettlementLedgerEditPage() {
         return;
       }
       setSaveState("success");
-      router.push("/client/settlement");
+      await load();
     } catch {
       setError("저장 중 오류가 발생했습니다.");
       setSaveState("error");
@@ -163,7 +162,6 @@ export default function ClientSettlementLedgerEditPage() {
         gap: 0,
       }}
     >
-      {/* 상단: 목록으로 · 대회명 · 일정 */}
       <header
         style={{
           flexShrink: 0,
@@ -182,8 +180,8 @@ export default function ClientSettlementLedgerEditPage() {
             <h1 className="v3-h1" style={{ margin: 0, fontSize: "1.2rem", fontWeight: 800, lineHeight: 1.35 }}>
               {title || "—"}
             </h1>
-            <p className="v3-muted" style={{ margin: "0.25rem 0 0", fontSize: "0.92rem" }}>
-              {dateStr || "—"}
+            <p className="v3-muted" style={{ margin: "0.35rem 0 0", fontSize: "0.88rem" }}>
+              게시된 대회 장부 · 수입·지출을 날짜순으로 기록합니다.
             </p>
           </div>
         ) : (
@@ -197,7 +195,6 @@ export default function ClientSettlementLedgerEditPage() {
         <p style={{ color: "#b91c1c", margin: "0 0 0.5rem", flexShrink: 0, fontSize: "0.9rem" }}>{error}</p>
       ) : null}
 
-      {/* 본문: 장부 행만 (스크롤) */}
       {!loading ? (
         <div
           style={{
@@ -209,7 +206,7 @@ export default function ClientSettlementLedgerEditPage() {
         >
           <div className="v3-row" style={{ marginBottom: "0.5rem", justifyContent: "flex-start" }}>
             <button type="button" className="v3-btn" onClick={() => setLines((p) => [...p, newDraftLine()])}>
-              행 추가
+              항목 추가
             </button>
           </div>
 
@@ -219,43 +216,32 @@ export default function ClientSettlementLedgerEditPage() {
                 width: "100%",
                 borderCollapse: "collapse",
                 fontSize: "0.82rem",
-                minWidth: "720px",
+                minWidth: "28rem",
               }}
             >
               <thead>
                 <tr style={{ background: "#f3f4f6", borderBottom: "1px solid #d1d5db", textAlign: "left" }}>
-                  <th style={{ padding: "0.45rem 0.5rem", fontWeight: 700, whiteSpace: "nowrap" }}>카테고리</th>
-                  <th style={{ padding: "0.45rem 0.5rem", fontWeight: 700, whiteSpace: "nowrap" }}>수입/지출</th>
+                  <th style={{ padding: "0.45rem 0.5rem", fontWeight: 700, whiteSpace: "nowrap" }}>날짜</th>
+                  <th style={{ padding: "0.45rem 0.5rem", fontWeight: 700, whiteSpace: "nowrap" }}>유형</th>
+                  <th style={{ padding: "0.45rem 0.5rem", fontWeight: 700 }}>항목명</th>
                   <th style={{ padding: "0.45rem 0.5rem", fontWeight: 700, whiteSpace: "nowrap" }}>금액</th>
-                  <th style={{ padding: "0.45rem 0.5rem", fontWeight: 700 }}>라벨</th>
-                  <th style={{ padding: "0.45rem 0.5rem", fontWeight: 700 }}>비고</th>
-                  <th style={{ padding: "0.45rem 0.5rem", fontWeight: 700, width: "4.5rem", textAlign: "center" }}>
-                    삭제
-                  </th>
+                  <th style={{ padding: "0.45rem 0.5rem", fontWeight: 700 }}>메모</th>
+                  <th style={{ padding: "0.45rem 0.5rem", fontWeight: 700, width: "4rem", textAlign: "center" }}>삭제</th>
                 </tr>
               </thead>
               <tbody>
                 {lines.map((L) => (
                   <tr key={L.key} style={{ borderBottom: "1px solid #e5e7eb" }}>
                     <td style={{ padding: "0.35rem 0.45rem", verticalAlign: "middle" }}>
-                      <select
-                        value={L.category}
+                      <input
+                        type="date"
+                        value={L.entryDate}
                         onChange={(e) =>
-                          setLines((prev) =>
-                            prev.map((x) =>
-                              x.key === L.key ? { ...x, category: e.target.value as SettlementCategoryV2 } : x
-                            )
-                          )
+                          setLines((prev) => prev.map((x) => (x.key === L.key ? { ...x, entryDate: e.target.value } : x)))
                         }
                         disabled={saving}
-                        style={{ padding: "0.3rem 0.25rem", width: "100%", maxWidth: "10rem", fontSize: "0.82rem" }}
-                      >
-                        {SETTLEMENT_CATEGORIES.map((c) => (
-                          <option key={c} value={c}>
-                            {SETTLEMENT_CATEGORY_LABEL[c]}
-                          </option>
-                        ))}
-                      </select>
+                        style={{ padding: "0.3rem 0.25rem", fontSize: "0.82rem", maxWidth: "10rem" }}
+                      />
                     </td>
                     <td style={{ padding: "0.35rem 0.45rem", verticalAlign: "middle", whiteSpace: "nowrap" }}>
                       <select
@@ -263,7 +249,7 @@ export default function ClientSettlementLedgerEditPage() {
                         onChange={(e) =>
                           setLines((prev) =>
                             prev.map((x) =>
-                              x.key === L.key ? { ...x, flow: e.target.value as SettlementFlowV2 } : x
+                              x.key === L.key ? { ...x, flow: e.target.value === "EXPENSE" ? "EXPENSE" : "INCOME" } : x
                             )
                           )
                         }
@@ -273,6 +259,17 @@ export default function ClientSettlementLedgerEditPage() {
                         <option value="INCOME">수입</option>
                         <option value="EXPENSE">지출</option>
                       </select>
+                    </td>
+                    <td style={{ padding: "0.35rem 0.45rem", verticalAlign: "middle" }}>
+                      <input
+                        value={L.label}
+                        onChange={(e) =>
+                          setLines((prev) => prev.map((x) => (x.key === L.key ? { ...x, label: e.target.value } : x)))
+                        }
+                        disabled={saving}
+                        placeholder="항목명"
+                        style={{ padding: "0.3rem 0.35rem", width: "100%", minWidth: "5rem", fontSize: "0.82rem" }}
+                      />
                     </td>
                     <td style={{ padding: "0.35rem 0.45rem", verticalAlign: "middle" }}>
                       <input
@@ -288,31 +285,18 @@ export default function ClientSettlementLedgerEditPage() {
                           )
                         }
                         disabled={saving}
-                        style={{ padding: "0.3rem 0.35rem", textAlign: "right", width: "100%", minWidth: "6rem", fontSize: "0.82rem" }}
-                      />
-                    </td>
-                    <td style={{ padding: "0.35rem 0.45rem", verticalAlign: "middle" }}>
-                      <input
-                        value={L.label}
-                        onChange={(e) =>
-                          setLines((prev) =>
-                            prev.map((x) => (x.key === L.key ? { ...x, label: e.target.value } : x))
-                          )
-                        }
-                        disabled={saving}
-                        style={{ padding: "0.3rem 0.35rem", width: "100%", minWidth: "5rem", fontSize: "0.82rem" }}
+                        style={{ padding: "0.3rem 0.35rem", textAlign: "right", width: "100%", minWidth: "5rem", fontSize: "0.82rem" }}
                       />
                     </td>
                     <td style={{ padding: "0.35rem 0.45rem", verticalAlign: "middle" }}>
                       <input
                         value={L.note}
                         onChange={(e) =>
-                          setLines((prev) =>
-                            prev.map((x) => (x.key === L.key ? { ...x, note: e.target.value } : x))
-                          )
+                          setLines((prev) => prev.map((x) => (x.key === L.key ? { ...x, note: e.target.value } : x)))
                         }
                         disabled={saving}
-                        style={{ padding: "0.3rem 0.35rem", width: "100%", minWidth: "6rem", fontSize: "0.82rem" }}
+                        placeholder="선택"
+                        style={{ padding: "0.3rem 0.35rem", width: "100%", minWidth: "4rem", fontSize: "0.82rem" }}
                       />
                     </td>
                     <td style={{ padding: "0.35rem 0.45rem", verticalAlign: "middle", textAlign: "center" }}>
@@ -334,7 +318,6 @@ export default function ClientSettlementLedgerEditPage() {
         </div>
       ) : null}
 
-      {/* 하단 고정: 합계 + 저장 */}
       {!loading ? (
         <div
           style={{
@@ -378,7 +361,7 @@ export default function ClientSettlementLedgerEditPage() {
                   총 지출 <strong>{formatWon(totals.expense)}</strong>
                 </span>
                 <span>
-                  순이익 <strong>{formatWon(totals.net)}</strong>
+                  차액 <strong>{formatWon(totals.net)}</strong>
                 </span>
               </div>
               <div className="v3-row" style={{ alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
@@ -390,7 +373,7 @@ export default function ClientSettlementLedgerEditPage() {
                       color: saveState === "success" ? "#15803d" : saveState === "error" ? "#b91c1c" : "#6b7280",
                     }}
                   >
-                    {saveState === "success" ? "저장성공" : saveState === "error" ? "저장실패" : "저장중"}
+                    {saveState === "success" ? "저장됨" : saveState === "error" ? "저장 실패" : "저장 중"}
                   </span>
                 ) : null}
                 <button

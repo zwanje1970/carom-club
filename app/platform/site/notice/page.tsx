@@ -37,7 +37,12 @@ export default function PlatformSiteNoticePage() {
   }, []);
 
   async function handleSave() {
-    if (saving) return;
+    console.log("저장 클릭");
+    if (saving) {
+      console.log("막힘: saving true → return (fetch 미실행)");
+      return;
+    }
+    console.log("fetch 직전");
     setSaving(true);
     setMessage("");
     try {

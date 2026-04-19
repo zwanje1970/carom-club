@@ -1,19 +1,25 @@
 /** 메인 4메뉴 — 이모지 대신 동일 스타일 라인 아이콘 */
 const stroke = "#2563eb";
 
-const svgProps = {
-  width: 26,
-  height: 26,
-  viewBox: "0 0 24 24",
-  fill: "none" as const,
-  stroke,
-  strokeWidth: 1.75,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-  "aria-hidden": true as const,
-};
+export function SiteMainNavIcon({
+  variant,
+  size = 26,
+}: {
+  variant: "tournament" | "venue" | "community" | "user";
+  size?: number;
+}) {
+  const svgProps = {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none" as const,
+    stroke,
+    strokeWidth: 1.75,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true as const,
+  };
 
-export function SiteMainNavIcon({ variant }: { variant: "tournament" | "venue" | "community" | "user" }) {
   switch (variant) {
     case "tournament":
       return (

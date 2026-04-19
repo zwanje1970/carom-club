@@ -8,12 +8,14 @@ import { getCommonPaletteColorHex, isCommonPaletteColor } from "../../lib/shared
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../lib/auth/session";
 import {
   getClientStatusByUserId,
+  getSiteNotice,
   getSitePageBuilderDraftByPageId,
   getSitePageBuilderPublishedByPageId,
   getUserById,
   listTournamentSnapshotsForMainSite,
 } from "../../lib/server/dev-store";
 import SiteShellFrame from "./components/SiteShellFrame";
+import SiteMainLogo from "./components/SiteMainLogo";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -137,30 +139,6 @@ function normalizeBlockStyle(input: unknown): CommonBlockStyle | undefined {
     if (Object.keys(border).length > 0) style.border = border;
   }
   return Object.keys(style).length > 0 ? style : undefined;
-}
-
-function toBoxStyle(style: CommonBlockStyle | undefined): Record<string, string | undefined> {
-  if (!style) return {};
-  const backgroundColor = getCommonPaletteColorHex(style.background);
-  const textColor = getCommonPaletteColorHex(style.textColor);
-  const borderColor = getCommonPaletteColorHex(style.border?.color);
-  return {
-    padding:
-      style.padding === "lg" ? "1rem" : style.padding === "md" ? "0.8rem" : style.padding === "sm" ? "0.55rem" : undefined,
-    margin:
-      style.margin === "lg" ? "1rem 0" : style.margin === "md" ? "0.75rem 0" : style.margin === "sm" ? "0.45rem 0" : undefined,
-    background:
-      backgroundColor ??
-      style.background === "accent" ? "#dbeafe" : style.background === "light" ? "#f8fafc" : style.background === "none" ? "#fff" : undefined,
-    border:
-      style.border?.width === "none"
-        ? "none"
-        : style.border
-          ? `${style.border.width === "thick" ? "2px" : "1px"} ${style.border.style === "dashed" ? "dashed" : "solid"} ${style.border.color === "strong" ? "#111827" : style.border.color === "light" ? "#e5e7eb" : "#d1d5db"}`
-          : undefined,
-    borderColor,
-    color: textColor ?? (style.textColor === "primary" ? "#1d4ed8" : style.textColor === "muted" ? "#6b7280" : undefined),
-  };
 }
 
 function isSlideSortType(value: unknown): value is SlideSortType {
@@ -340,11 +318,12 @@ export default async function SiteHomePage({
   const clientDashboardApproved = currentUser?.role === "CLIENT" && clientApplicationStatus === "APPROVED";
   const canUseDraftPreview = previewMode ? Boolean(currentUser && currentUser.role === "PLATFORM") : false;
 
-  const [publishedPage, mainSlideSnapshots] = await Promise.all([
+  const [publishedPage, mainSlideSnapshots, siteNotice] = await Promise.all([
     canUseDraftPreview
       ? getSitePageBuilderDraftByPageId(requestedPageId)
       : getSitePageBuilderPublishedByPageId(requestedPageId),
     listTournamentSnapshotsForMainSite(),
+    getSiteNotice().catch(() => ({ enabled: false, text: "" })),
   ]);
 
   const sections = publishedPage
@@ -363,11 +342,6 @@ export default async function SiteHomePage({
       block,
     }))
   );
-  const noticeBlocks = flattenedBlocks.filter(
-    (item): item is { sectionId: string; block: Extract<HomeBlock, { type: "NOTICE" }> } => item.block.type === "NOTICE"
-  );
-  const primaryNotice =
-    noticeBlocks.find((item) => item.block.data.visible !== false && item.block.data.text.trim().length > 0) ?? null;
   const tournamentSlideEntry = flattenedBlocks.find(
     (item): item is { sectionId: string; block: Extract<HomeBlock, { type: "SLIDE_CARDS" }> } =>
       item.block.type === "SLIDE_CARDS" && item.block.data.cardSourceType === "TOURNAMENT_SNAPSHOT"
@@ -456,6 +430,8 @@ export default async function SiteHomePage({
   ];
   const forcedMainSlideItems =
     liveSlideItems.length > 0 ? liveSlideItems : dummySlideItems.map((item) => ({ ...item }));
+
+  const showSiteNoticeBar = siteNotice.enabled === true && siteNotice.text.trim().length > 0;
 
   return (
     <SiteShellFrame
@@ -591,75 +567,10 @@ export default async function SiteHomePage({
       ) : null}
         </>
       }
-      brandTitle="CAROM.CLUB"
-      auxiliary={
-        <>
-            {primaryNotice ? (
-              (() => {
-                const noticeStyle = toBoxStyle(primaryNotice.block.data.style);
-                const node = (
-                  <div
-                    data-section-id={primaryNotice.sectionId}
-                    data-block-id={primaryNotice.block.id}
-                    style={{
-                      minHeight: "2.75rem",
-                      display: "flex",
-                      alignItems: "center",
-                      padding: "0.45rem 0.85rem",
-                      borderRadius: "0.65rem",
-                      border: "1px solid #f3ead0",
-                      background: "#fffef6",
-                      ...noticeStyle,
-                    }}
-                  >
-                    <p
-                      style={{
-                        margin: 0,
-                        width: "100%",
-                        lineHeight: 1.35,
-                        fontSize: "0.86rem",
-                        overflow: "hidden",
-                        whiteSpace: "nowrap",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {primaryNotice.block.data.text.trim()}
-                    </p>
-                  </div>
-                );
-                if (primaryNotice.block.data.link?.trim()) {
-                  return (
-                    <Link href={primaryNotice.block.data.link} style={{ textDecoration: "none", color: "inherit" }}>
-                      {node}
-                    </Link>
-                  );
-                }
-                return node;
-              })()
-            ) : (
-              <div
-                className="site-home-notice-placeholder"
-                style={{
-                  minHeight: "2.75rem",
-                  borderRadius: "0.65rem",
-                  border: "1px solid #f0e8d4",
-                  background: "linear-gradient(180deg, #fffef8 0%, #fff9eb 100%)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "0.35rem 0.75rem",
-                }}
-              >
-                <span className="v3-muted" style={{ fontSize: "0.82rem" }}>
-                  등록된 공지가 없습니다
-                </span>
-              </div>
-            )}
-        </>
-      }
+      brandTitle={<SiteMainLogo />}
     >
         <section id="main-content-group" className="v3-stack site-home-dark-main site-home-dark-main--stack">
-          <section className="v3-stack site-home-slide-stack" style={{ gap: "0.35rem" }}>
+          <section className="v3-stack site-home-slide-stack site-home-slide-stack--flush" style={{ gap: 0 }}>
             <section
               className="site-home-slide-anchor"
               data-section-id={tournamentSlideEntry?.sectionId ?? "section-tournament-forced"}
@@ -670,6 +581,7 @@ export default async function SiteHomePage({
               <MainSceneSlideDeckClient
                 items={forcedMainSlideItems}
                 sectionLabel={tournamentTitleEntry?.block.data.text?.trim() || "진행중 대회"}
+                siteNoticeText={showSiteNoticeBar ? siteNotice.text.trim() : undefined}
               />
             </section>
           </section>

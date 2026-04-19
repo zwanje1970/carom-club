@@ -28,7 +28,6 @@ type CommentRow = {
 };
 
 const TYPE_LABEL: Record<string, string> = { ERROR: "오류 제보", FEATURE: "기능 제안" };
-const STATUS_LABEL: Record<string, string> = { OPEN: "접수", CHECKED: "확인", DONE: "완료" };
 
 const COMPOSER_TEXTAREA_STYLE: CSSProperties = {
   flex: 1,
@@ -235,6 +234,8 @@ export default function InquiryDetailClient() {
 
   const canEdit = row && row.status !== "DONE";
 
+  const hasAdminReply = comments.some((c) => c.authorRole === "PLATFORM");
+
   const composer = (
     <>
       {draftImages.length > 0 ? (
@@ -340,7 +341,7 @@ export default function InquiryDetailClient() {
                   ← 목록
                 </Link>
                 <h1 className="v3-h1" style={{ marginBottom: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
-                  문의 상세
+                  문의
                 </h1>
               </div>
 
@@ -349,7 +350,7 @@ export default function InquiryDetailClient() {
                   <strong>유형</strong> {TYPE_LABEL[row.type] ?? row.type}
                 </p>
                 <p style={{ margin: 0, fontSize: "0.9rem" }}>
-                  <strong>상태</strong> {STATUS_LABEL[row.status] ?? row.status}
+                  <strong>상태</strong> {hasAdminReply ? "답변완료" : "답변대기"}
                 </p>
                 <p style={{ margin: 0, fontSize: "0.85rem", color: "#64748b" }}>
                   작성 {new Date(row.createdAt).toLocaleString("ko-KR")} · 수정{" "}
@@ -520,9 +521,12 @@ export default function InquiryDetailClient() {
               )}
 
               <section className="v3-stack" style={{ gap: "0.5rem", marginTop: "0.75rem" }}>
+                <h2 className="v3-h2" style={{ margin: 0, fontSize: "1rem" }}>
+                  댓글
+                </h2>
                 {comments.length === 0 ? (
                   <p className="v3-muted" style={{ margin: 0, fontSize: "0.88rem" }}>
-                    답변 없음
+                    아직 댓글이 없습니다.
                   </p>
                 ) : (
                   <div className="v3-stack" style={{ gap: "0.65rem" }}>

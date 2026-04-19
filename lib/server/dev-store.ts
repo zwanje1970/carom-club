@@ -632,6 +632,8 @@ export type SettlementLedgerLineStored = {
   label: string | null;
   note: string | null;
   sortOrder: number;
+  /** YYYY-MM-DD 기록일(없으면 과거 데이터) */
+  entryDate?: string | null;
 };
 
 export type TournamentSettlement = {
@@ -687,11 +689,13 @@ export type ProofImageAsset = {
   sitePublic?: boolean;
 };
 
-/** 클라이언트 업로드 경기요강 PDF (data/outline-pdfs 파일과 대응) */
+/** 클라이언트 업로드 경기요강·소개 문서 (data/outline-pdfs 파일과 대응) */
 export type OutlinePdfAsset = {
   id: string;
   uploaderUserId: string;
   createdAt: string;
+  /** 없으면 기존 데이터와 동일하게 `.pdf` 파일로 간주 */
+  fileKind?: "pdf" | "docx";
 };
 
 export type AuditLog = {
@@ -2271,7 +2275,9 @@ function buildDevStoreFromParsed(parsed: Partial<DevStore> & { mainCardTemplate?
             const uploaderUserId = typeof r.uploaderUserId === "string" ? r.uploaderUserId.trim() : "";
             const createdAt = typeof r.createdAt === "string" ? r.createdAt : new Date().toISOString();
             if (!id || !uploaderUserId) return null;
-            return { id, uploaderUserId, createdAt } satisfies OutlinePdfAsset;
+            const fk = r.fileKind;
+            const fileKind = fk === "docx" ? ("docx" as const) : fk === "pdf" ? ("pdf" as const) : undefined;
+            return { id, uploaderUserId, createdAt, ...(fileKind ? { fileKind } : {}) } satisfies OutlinePdfAsset;
           })
           .filter((item): item is OutlinePdfAsset => item !== null)
       : [],
@@ -3860,6 +3866,20 @@ export async function listClientInquiriesByClientUserId(userId: string): Promise
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+/** 클라이언트 목록: 관리자(플랫폼) 댓글 여부 — 답변대기/답변완료 표시용 */
+export async function listClientInquiriesByClientUserIdWithAdminReplyFlag(
+  userId: string
+): Promise<Array<{ inquiry: ClientInquiryStored; hasAdminReply: boolean }>> {
+  const rows = await listClientInquiriesByClientUserId(userId);
+  const store = await readStore();
+  return rows.map((inquiry) => ({
+    inquiry,
+    hasAdminReply: store.inquiryComments.some(
+      (c) => c.inquiryId === inquiry.id && c.authorRole === "PLATFORM"
+    ),
+  }));
+}
+
 export async function listClientInquiriesForPlatform(params?: {
   type?: ClientInquiryType;
 }): Promise<ClientInquiryStored[]> {
@@ -4679,13 +4699,12 @@ function tournamentDateToYmdForFilter(dateStr: string): string | null {
 }
 
 /**
- * v2 장부 라인만으로 기간 내 대회별·전체 수입·지출·순이익 (조회 전용, store에 새 정산 레코드 생성 안 함)
+ * v2 장부 라인만으로 대회별·전체 수입·지출·순이익 (조회 전용).
+ * 게시된 대회(`tournamentPublishedCards` 중 isPublished·isActive)만 포함 — 대회일 기간 필터 없음.
  */
 export async function getSettlementLedgerOverviewForClient(params: {
   userId: string;
   role: AuthRole;
-  fromYmd: string;
-  toYmd: string;
 }): Promise<
   | {
       ok: true;
@@ -4694,35 +4713,26 @@ export async function getSettlementLedgerOverviewForClient(params: {
     }
   | { ok: false; error: string }
 > {
-  const fromYmd = params.fromYmd.trim();
-  const toYmd = params.toYmd.trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(fromYmd) || !/^\d{4}-\d{2}-\d{2}$/.test(toYmd)) {
-    return { ok: false, error: "from/to 날짜 형식이 올바르지 않습니다." };
-  }
-  if (fromYmd > toYmd) {
-    return { ok: false, error: "시작일이 종료일보다 늦을 수 없습니다." };
-  }
-
   const tournaments =
     params.role === "PLATFORM" ? await listAllTournaments() : await listTournamentsByCreator(params.userId);
 
-  const inRange = tournaments.filter((t) => {
-    const ymd = tournamentDateToYmdForFilter(t.date);
-    if (!ymd) return false;
-    return ymd >= fromYmd && ymd <= toYmd;
-  });
+  const store = await readStore();
+  const published = tournaments.filter((t) =>
+    store.tournamentPublishedCards.some(
+      (c) => c.tournamentId === t.id && c.isPublished === true && c.isActive === true
+    )
+  );
 
-  inRange.sort((a, b) => {
+  published.sort((a, b) => {
     const ay = tournamentDateToYmdForFilter(a.date) ?? "";
     const by = tournamentDateToYmdForFilter(b.date) ?? "";
     return by.localeCompare(ay);
   });
 
-  const store = await readStore();
   const rows: { tournamentId: string; title: string; income: number; expense: number; net: number }[] = [];
   let gin = 0;
   let gex = 0;
-  for (const t of inRange) {
+  for (const t of published) {
     const s = store.settlements.find((item) => item.tournamentId === t.id);
     const lines = normalizeLedgerLinesArray(s?.ledgerLines);
     const { income, expense, net } = computeLedgerTotalsFromLines(lines);
@@ -4736,6 +4746,16 @@ export async function getSettlementLedgerOverviewForClient(params: {
     rows,
     grand: { income: gin, expense: gex, net: gin - gex },
   };
+}
+
+/** 메인·사이트에 게시 중인 대회 카드가 있을 때 true — 정산 허브·장부 노출 기준 */
+export async function tournamentHasActivePublishedCard(tournamentId: string): Promise<boolean> {
+  const store = await readStore();
+  const id = tournamentId.trim();
+  if (!id) return false;
+  return store.tournamentPublishedCards.some(
+    (c) => c.tournamentId === id && c.isPublished === true && c.isActive === true
+  );
 }
 
 export async function getTournamentById(tournamentId: string): Promise<Tournament | null> {
@@ -5056,6 +5076,8 @@ function normalizeLedgerLineStored(raw: unknown): SettlementLedgerLineStored | n
   const amountKrw = Number.isFinite(Number(o.amountKrw)) ? Math.max(0, Math.round(Number(o.amountKrw))) : 0;
   if (!id || !category || !flow) return null;
   const sortOrder = Number.isFinite(Number(o.sortOrder)) ? Math.floor(Number(o.sortOrder)) : 0;
+  const ed =
+    typeof o.entryDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(o.entryDate.trim()) ? o.entryDate.trim() : null;
   return {
     id,
     category,
@@ -5064,6 +5086,7 @@ function normalizeLedgerLineStored(raw: unknown): SettlementLedgerLineStored | n
     label: o.label != null && typeof o.label === "string" ? o.label : null,
     note: o.note != null && typeof o.note === "string" ? o.note : null,
     sortOrder,
+    ...(ed ? { entryDate: ed } : {}),
   };
 }
 
@@ -5347,7 +5370,12 @@ export async function getTournamentLedgerLinesForClient(
   if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다." };
   const store = await readStore();
   const s = store.settlements.find((item) => item.tournamentId === tournamentId);
-  const lines = normalizeLedgerLinesArray(s?.ledgerLines);
+  const lines = normalizeLedgerLinesArray(s?.ledgerLines).sort((a, b) => {
+    const ad = a.entryDate ?? "";
+    const bd = b.entryDate ?? "";
+    if (ad !== bd) return bd.localeCompare(ad);
+    return (b.sortOrder ?? 0) - (a.sortOrder ?? 0);
+  });
   return { ok: true, tournament, lines };
 }
 
@@ -5359,6 +5387,7 @@ export async function replaceSettlementLedgerLines(params: {
     amountKrw: number;
     label?: string | null;
     note?: string | null;
+    entryDate?: string | null;
   }>;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const tournamentId = params.tournamentId.trim();
@@ -5381,6 +5410,8 @@ export async function replaceSettlementLedgerLines(params: {
     if (!Number.isFinite(amountKrw) || amountKrw < 0) {
       return { ok: false, error: "금액은 0 이상이어야 합니다." };
     }
+    const entryDateRaw = row.entryDate != null && typeof row.entryDate === "string" ? row.entryDate.trim() : "";
+    const entryDate = /^\d{4}-\d{2}-\d{2}$/.test(entryDateRaw) ? entryDateRaw : null;
     built.push({
       id: randomUUID(),
       category: cat,
@@ -5389,6 +5420,7 @@ export async function replaceSettlementLedgerLines(params: {
       label: row.label != null && String(row.label).trim() ? String(row.label).trim() : null,
       note: row.note != null && String(row.note).trim() ? String(row.note).trim() : null,
       sortOrder: i,
+      entryDate,
     });
   }
 
@@ -5531,9 +5563,27 @@ export function buildOutlinePdfPublicUrl(pdfId: string): string {
   return `/api/client/outline-pdf/${encodeURIComponent(id)}`;
 }
 
+/** 저장된 공개 URL(`/api/client/outline-pdf/{id}`)에서 자산 id 추출 */
+export function outlinePdfIdFromPublicUrl(url: string | null | undefined): string | null {
+  const u = url?.trim();
+  if (!u) return null;
+  try {
+    const pathPart = u.startsWith("http://") || u.startsWith("https://") ? new URL(u).pathname : u;
+    const m = pathPart.match(/\/api\/client\/outline-pdf\/([^/?]+)/);
+    return m?.[1] ? decodeURIComponent(m[1]) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function outlineFileKindFromAsset(asset: OutlinePdfAsset | null): "pdf" | "docx" {
+  return asset?.fileKind === "docx" ? "docx" : "pdf";
+}
+
 export async function createOutlinePdfAsset(params: {
   pdfId: string;
   uploaderUserId: string;
+  fileKind: "pdf" | "docx";
 }): Promise<{ ok: true; asset: OutlinePdfAsset } | { ok: false; error: string }> {
   const pdfId = params.pdfId.trim();
   const uploaderUserId = params.uploaderUserId.trim();
@@ -5555,6 +5605,7 @@ export async function createOutlinePdfAsset(params: {
     id: pdfId,
     uploaderUserId: user.id,
     createdAt: new Date().toISOString(),
+    fileKind: params.fileKind,
   };
   store.outlinePdfAssets.push(asset);
   await writeStore(store);
@@ -5592,6 +5643,28 @@ export async function isOutlinePdfLinkedToAnyTournament(pdfId: string): Promise<
   const store = await readStore();
   const url = buildOutlinePdfPublicUrl(id);
   return store.tournaments.some((t) => t.outlinePdfUrl === url);
+}
+
+/** 비로그인 열람: 대회 요강 또는 게시된 당구장 소개에 연결된 문서 */
+export async function isOutlinePdfLinkedForPublicSite(pdfId: string): Promise<boolean> {
+  const id = pdfId.trim();
+  if (!id) return false;
+  if (await isOutlinePdfLinkedToAnyTournament(id)) return true;
+  const store = await readStore();
+  const url = buildOutlinePdfPublicUrl(id);
+  for (const intro of store.clientVenueIntros) {
+    if (intro.outlinePdfUrl !== url) continue;
+    const org = store.clientOrganizations.find(
+      (o) =>
+        o.clientUserId === intro.clientUserId &&
+        o.type === "VENUE" &&
+        o.approvalStatus === "APPROVED" &&
+        o.status === "ACTIVE" &&
+        o.isPublished === true
+    );
+    if (org) return true;
+  }
+  return false;
 }
 
 export async function getTournamentApplicationByProofImageId(imageId: string): Promise<TournamentApplication | null> {

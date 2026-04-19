@@ -110,7 +110,7 @@ export default function InquiryNewClient() {
           ← 목록
         </Link>
         <h1 className="v3-h1" style={{ marginBottom: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
-          문의 작성
+          글 작성
         </h1>
       </div>
 

@@ -15,6 +15,16 @@ export const runtime = "nodejs";
 
 const MAX_BYTES = 15 * 1024 * 1024;
 
+const PDF_MIME = "application/pdf";
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+function detectOutlineFileKind(file: File): "pdf" | "docx" | null {
+  const name = file.name.trim().toLowerCase();
+  if (file.type === PDF_MIME || name.endsWith(".pdf")) return "pdf";
+  if (file.type === DOCX_MIME || name.endsWith(".docx")) return "docx";
+  return null;
+}
+
 async function getAuthorizedUploader() {
   const cookieStore = await cookies();
   const raw = cookieStore.get(SESSION_COOKIE_NAME)?.value;
@@ -52,11 +62,12 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const file = formData.get("file");
   if (!(file instanceof File)) {
-    return NextResponse.json({ error: "PDF 파일이 필요합니다." }, { status: 400 });
+    return NextResponse.json({ error: "파일이 필요합니다." }, { status: 400 });
   }
 
-  if (file.type !== "application/pdf") {
-    return NextResponse.json({ error: "PDF 파일만 업로드할 수 있습니다." }, { status: 400 });
+  const fileKind = detectOutlineFileKind(file);
+  if (!fileKind) {
+    return NextResponse.json({ error: "PDF 또는 DOCX 파일만 업로드할 수 있습니다." }, { status: 400 });
   }
 
   const buf = Buffer.from(await file.arrayBuffer());
@@ -64,16 +75,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "빈 파일입니다." }, { status: 400 });
   }
   if (buf.length > MAX_BYTES) {
-    return NextResponse.json({ error: "PDF는 15MB 이하만 업로드할 수 있습니다." }, { status: 400 });
+    return NextResponse.json({ error: "문서는 15MB 이하만 업로드할 수 있습니다." }, { status: 400 });
   }
 
   const pdfId = randomUUID();
   const dir = path.join(process.cwd(), "data", "outline-pdfs");
   await mkdir(dir, { recursive: true });
-  const filePath = path.join(dir, `${pdfId}.pdf`);
+  const ext = fileKind === "docx" ? "docx" : "pdf";
+  const filePath = path.join(dir, `${pdfId}.${ext}`);
   await writeFile(filePath, buf);
 
-  const meta = await createOutlinePdfAsset({ pdfId, uploaderUserId: auth.user.id });
+  const meta = await createOutlinePdfAsset({ pdfId, uploaderUserId: auth.user.id, fileKind });
   if (!meta.ok) {
     return NextResponse.json({ error: meta.error }, { status: 500 });
   }

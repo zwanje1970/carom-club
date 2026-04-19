@@ -183,10 +183,13 @@ function sceneRoleForCard(cardIndex: number, n: number, sceneId: number): SceneR
 export default function MainSceneSlideDeck({
   items,
   sectionLabel = "진행중 대회",
+  siteNoticeText,
 }: {
   items: SlideDeckItem[];
   /** 슬라이드 영역 상단 왼쪽 라벨 (기본: 진행중 대회) */
   sectionLabel?: string;
+  /** 공지관리(siteNotice) — 슬라이드 박스 내부 상단 검은 박스 (enabled + text 있을 때만 전달) */
+  siteNoticeText?: string | null;
 }) {
   const t0 = useRef(Date.now());
   const [frameTime, setFrameTime] = useState(() => Date.now());
@@ -285,15 +288,16 @@ export default function MainSceneSlideDeck({
   const sceneId = Math.floor(clampedElapsed / SCENE_S);
   const tInScene = clampedElapsed % SCENE_S;
 
-  return (
-    <div
-      className={styles.slideDeck}
-      onWheel={onWheel}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
-    >
+  const trimmedNotice = siteNoticeText?.trim() ?? "";
+  const noticeBlock =
+    trimmedNotice.length > 0 ? (
+      <div className={styles.slideDeckNotice}>
+        <span className={styles.slideDeckNoticeMarquee}>{trimmedNotice}</span>
+      </div>
+    ) : null;
+
+  const deckInner = (
+    <>
       {sectionLabel.trim() ? <p className={styles.slideDeckLabel}>{sectionLabel.trim()}</p> : null}
       {items.map((item, i) => {
         const role = sceneRoleForCard(i, n, sceneId);
@@ -315,7 +319,31 @@ export default function MainSceneSlideDeck({
           </div>
         );
       })}
+    </>
+  );
+
+  const deck = (
+    <div
+      className={styles.slideDeck}
+      onWheel={onWheel}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+    >
+      {deckInner}
     </div>
   );
+
+  if (noticeBlock) {
+    return (
+      <div className={styles.slideDeckShell}>
+        {noticeBlock}
+        {deck}
+      </div>
+    );
+  }
+
+  return deck;
 }
 

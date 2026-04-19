@@ -9,7 +9,7 @@ import {
 
 export const runtime = "nodejs";
 
-export async function GET(request: Request) {
+export async function GET() {
   const cookieStore = await cookies();
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
   if (!session) {
@@ -21,16 +21,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "사용자를 찾을 수 없습니다." }, { status: 401 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const from = searchParams.get("from") ?? "";
-  const to = searchParams.get("to") ?? "";
-
   if (user.role === "PLATFORM") {
     const result = await getSettlementLedgerOverviewForClient({
       userId: user.id,
       role: "PLATFORM",
-      fromYmd: from,
-      toYmd: to,
     });
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
@@ -50,8 +44,6 @@ export async function GET(request: Request) {
   const result = await getSettlementLedgerOverviewForClient({
     userId: user.id,
     role: "CLIENT",
-    fromYmd: from,
-    toYmd: to,
   });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });

@@ -1,9 +1,15 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
-import { getTournamentById } from "../../../../../lib/server/dev-store";
+import {
+  getOutlinePdfAssetById,
+  getTournamentById,
+  outlineFileKindFromAsset,
+  outlinePdfIdFromPublicUrl,
+} from "../../../../../lib/server/dev-store";
 import { isEmptyOutlineHtml } from "../../../../../lib/outline-content-helpers";
+import SiteOutlineDocumentCard from "../../../../site/components/SiteOutlineDocumentCard";
 
 export default async function ClientTournamentOutlinePage({
   params,
@@ -26,9 +32,9 @@ export default async function ClientTournamentOutlinePage({
   const hasText = htmlRaw !== "" && !isEmptyOutlineHtml(htmlRaw);
   const mode = t.outlineDisplayMode;
 
-  if (pdf) {
-    redirect(pdf);
-  }
+  const outlinePdfId = outlinePdfIdFromPublicUrl(t.outlinePdfUrl);
+  const outlinePdfAsset = outlinePdfId ? await getOutlinePdfAssetById(outlinePdfId) : null;
+  const outlinePdfFileKind = outlineFileKindFromAsset(outlinePdfAsset);
 
   const back = (
     <div className="v3-row" style={{ gap: "0.5rem" }}>
@@ -37,6 +43,17 @@ export default async function ClientTournamentOutlinePage({
       </Link>
     </div>
   );
+
+  if (pdf) {
+    return (
+      <main className="v3-page v3-stack" style={{ maxWidth: "48rem", margin: "0 auto" }}>
+        {back}
+        <div style={{ marginTop: "0.75rem" }}>
+          <SiteOutlineDocumentCard url={pdf} fileKind={outlinePdfFileKind} caption="요강 보기" />
+        </div>
+      </main>
+    );
+  }
 
   if (mode === "TEXT" && hasText) {
     return (

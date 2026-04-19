@@ -1,5 +1,6 @@
 "use client";
 
+import SiteShellFrame from "../../../components/SiteShellFrame";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -122,8 +123,8 @@ export default function SiteTournamentApplyPage() {
   }
 
   return (
-    <main className="v3-page v3-stack" style={{ maxWidth: "36rem", margin: "0 auto" }}>
-      <h1 className="v3-h1">참가신청서</h1>
+    <SiteShellFrame brandTitle="참가신청서">
+      <section className="site-site-gray-main v3-stack" style={{ maxWidth: "36rem", margin: "0 auto" }}>
       <p className="v3-muted">대회 ID: {tournamentId}</p>
       <p className="v3-muted">로그인 사용자 기준 최소 신청 흐름입니다.</p>
 
@@ -194,6 +195,7 @@ export default function SiteTournamentApplyPage() {
           목록으로
         </Link>
       </div>
-    </main>
+      </section>
+    </SiteShellFrame>
   );
 }

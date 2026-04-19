@@ -15,26 +15,20 @@ const ITEMS: {
   {
     key: "venue-intro",
     href: "/client/setup/venue-intro",
-    title: "당구장 소개 페이지 작성",
+    title: "당구장 소개",
     description: "회원에게 보여줄 소개 내용 작성",
   },
   {
     key: "inquiries",
     href: "/client/settings/inquiries",
     title: "문의 내역",
-    description: "제출한 오류 제보·기능 제안 보기",
+    description: "오류 제보·기능 제안 작성 및 내 글·댓글 확인",
   },
   {
-    key: "bug",
-    href: "/client/settings/inquiries/new?type=error",
-    title: "오류 제보",
-    description: "문제 발생 시 운영팀에 전달",
-  },
-  {
-    key: "feature",
-    href: "/client/settings/inquiries/new?type=feature",
-    title: "기능 제안",
-    description: "필요한 기능을 제안",
+    key: "blank-bracket-print",
+    href: "/client/settings/blank-bracket-print",
+    title: "빈 대진표 출력",
+    description: "강수와 스타일을 지정해 인쇄용 대진표 출력",
   },
 ];
 
@@ -50,7 +44,7 @@ export default function ClientSettingsHubPage() {
             ← 대시보드
           </Link>
           <h1 className="v3-h1" style={{ marginBottom: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
-            설정
+            부가기능
           </h1>
         </div>
       </div>

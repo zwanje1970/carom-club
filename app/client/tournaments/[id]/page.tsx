@@ -2,7 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
-import { getTournamentById } from "../../../../lib/server/dev-store";
+import {
+  getOutlinePdfAssetById,
+  getTournamentById,
+  outlineFileKindFromAsset,
+  outlinePdfIdFromPublicUrl,
+} from "../../../../lib/server/dev-store";
 import SiteTournamentDetailSections from "../../../site/tournaments/[id]/site-tournament-detail-sections";
 import TournamentBadgeCardManageRow from "./TournamentBadgeCardManageRow";
 
@@ -25,6 +30,10 @@ export default async function ClientTournamentManagePage({
     notFound();
   }
 
+  const outlinePdfId = outlinePdfIdFromPublicUrl(tournament.outlinePdfUrl);
+  const outlinePdfAsset = outlinePdfId ? await getOutlinePdfAssetById(outlinePdfId) : null;
+  const outlinePdfFileKind = outlineFileKindFromAsset(outlinePdfAsset);
+
   return (
     <main className="v3-page v3-stack">
       <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem" }}>
@@ -39,6 +48,7 @@ export default async function ClientTournamentManagePage({
         tournament={tournament}
         listBackHref="/client/tournament"
         audience="client"
+        outlinePdfFileKind={outlinePdfFileKind}
       />
     </main>
   );

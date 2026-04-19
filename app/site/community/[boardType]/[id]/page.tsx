@@ -15,6 +15,7 @@ import {
   parseCommunityBoardTypeParam,
   type SiteCommunityBoardKey,
 } from "../../../../../lib/server/dev-store";
+import SiteShellFrame from "../../../components/SiteShellFrame";
 import CommunityPostCommentsSection from "./CommunityPostCommentsSection";
 import CommunityPostDetailActions from "./CommunityPostDetailActions";
 
@@ -72,12 +73,10 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
   );
 
   return (
-    <main className="v3-page v3-stack">
+    <SiteShellFrame brandTitle={<span className="site-home-brand-ellipsis">{post.title}</span>}>
+      <section className="site-site-gray-main v3-stack">
       <CommunityPostDetailActions canManage={canManage} postId={postId} boardType={boardType} />
       <article className="v3-box v3-stack">
-        <h1 className="v3-h1" style={{ fontSize: "1.35rem", marginBottom: "0.5rem" }}>
-          {post.title}
-        </h1>
         <p className="v3-muted" style={{ fontSize: "0.88rem", margin: 0 }}>
           {post.authorNickname} · {formatDetailDateTime(post.createdAt)} · 조회 {post.viewCount}
         </p>
@@ -162,6 +161,7 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
           목록으로
         </Link>
       </div>
-    </main>
+      </section>
+    </SiteShellFrame>
   );
 }
