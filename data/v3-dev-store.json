@@ -618,8 +618,8 @@
     }
   },
   "siteNotice": {
-    "enabled": false,
-    "text": ""
+    "enabled": true,
+    "text": "전국 당구대회 통합플랫폼"
   },
   "siteCommunityConfig": {
     "free": {
@@ -930,7 +930,29 @@
       "deadlineSortValue": "2026-05-03"
     }
   ],
-  "sitePageBuilderDrafts": [],
+  "sitePageBuilderDrafts": [
+    {
+      "pageId": "home",
+      "sections": [
+        {
+          "id": "section-initial",
+          "order": 1,
+          "blocks": [
+            {
+              "id": "block-initial-title",
+              "type": "TITLE",
+              "data": {
+                "text": "새 섹션 제목",
+                "alignment": "LEFT"
+              }
+            }
+          ]
+        }
+      ],
+      "savedAt": "2026-04-18T14:05:57.106Z",
+      "savedBy": "c0b97eee-5271-4564-bdd5-7e29ea6a5f99"
+    }
+  ],
   "sitePageBuilderPublishedPages": [],
   "webPushSubscriptions": [],
   "fcmDeviceTokens": [],
