@@ -546,14 +546,26 @@ export default function ClientTournamentNewPage() {
       const fd = new FormData();
       fd.append("file", file);
       fd.append("sitePublic", "1");
-      const res = await fetch("/api/upload/image", { method: "POST", body: fd });
-      const data = (await res.json()) as { error?: string; w640Url?: string };
+      const res = await fetch("/api/upload/image", {
+        method: "POST",
+        body: fd,
+        credentials: "include",
+      });
+      let data: { error?: string; w640Url?: string };
+      try {
+        data = (await res.json()) as { error?: string; w640Url?: string };
+      } catch {
+        setPosterError(`서버 응답을 읽을 수 없습니다. (${res.status})`);
+        return;
+      }
       if (!res.ok) {
         setPosterError(data.error ?? "업로드에 실패했습니다.");
         return;
       }
       if (typeof data.w640Url === "string" && data.w640Url) {
         setPosterImageUrl(data.w640Url);
+      } else {
+        setPosterError("업로드는 되었으나 이미지 주소를 받지 못했습니다. 다시 시도해 주세요.");
       }
     } catch {
       setPosterError("업로드 중 오류가 발생했습니다.");

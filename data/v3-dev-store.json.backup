@@ -377,6 +377,51 @@
         "teamScoreLimit": null,
         "teamScoreRule": "LTE"
       }
+    },
+    {
+      "id": "6242b4e3-c0ab-4c42-bc37-24cdcdcb2e9b",
+      "title": "캐롬클럽대회",
+      "date": "2026-05-31",
+      "eventDates": null,
+      "location": "zzz당구장\n충남 아산시 둔포면 아산밸리중앙로 79-8 5층\n01000000000",
+      "extraVenues": null,
+      "maxParticipants": 24,
+      "entryFee": 30000,
+      "createdBy": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
+      "createdAt": "2026-04-19T13:13:14.697Z",
+      "posterImageUrl": "/api/site-images/af21abea-c360-4749-8176-f45f99e12f24?variant=w640",
+      "statusBadge": "모집중",
+      "summary": "21232133ㅇㅂㅇㄴㅁㅁㄴㅇㅇㄴㅇㄹㅇㄹ",
+      "prizeInfo": "우승: 30\n준우승: 10",
+      "outlineDisplayMode": "PDF",
+      "outlineHtml": null,
+      "outlineImageUrl": null,
+      "outlinePdfUrl": "/api/client/outline-pdf/6e03b4e1-1f5f-408c-8df0-f4a2f7abfd6b",
+      "venueGuideVenueId": null,
+      "rule": {
+        "entryCondition": null,
+        "entryQualificationType": "SCORE",
+        "verificationMode": "NONE",
+        "verificationReviewRequired": true,
+        "verificationGuideText": null,
+        "eligibilityType": "UNDER",
+        "eligibilityValue": 20,
+        "eligibilityCompare": "LTE",
+        "divisionEnabled": false,
+        "divisionMetricType": "AVERAGE",
+        "divisionRulesJson": null,
+        "scope": "REGIONAL",
+        "region": null,
+        "nationalTournament": false,
+        "accountNumber": null,
+        "allowMultipleSlots": false,
+        "participantsListPublic": false,
+        "durationType": "1_DAY",
+        "durationDays": null,
+        "isScotch": false,
+        "teamScoreLimit": null,
+        "teamScoreRule": "LTE"
+      }
     }
   ],
   "tournamentApplications": [
@@ -468,9 +513,29 @@
       "uploaderUserId": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
       "originalExt": "jpg",
       "createdAt": "2026-04-18T03:17:03.666Z"
+    },
+    {
+      "id": "af21abea-c360-4749-8176-f45f99e12f24",
+      "uploaderUserId": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
+      "originalExt": "png",
+      "createdAt": "2026-04-19T13:11:47.161Z",
+      "sitePublic": true
+    },
+    {
+      "id": "c7604580-7c22-4d1a-b0cc-96d87de629f0",
+      "uploaderUserId": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
+      "originalExt": "jpg",
+      "createdAt": "2026-04-19T13:13:33.020Z"
     }
   ],
-  "outlinePdfAssets": [],
+  "outlinePdfAssets": [
+    {
+      "id": "6e03b4e1-1f5f-408c-8df0-f4a2f7abfd6b",
+      "uploaderUserId": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
+      "createdAt": "2026-04-19T13:12:51.183Z",
+      "fileKind": "pdf"
+    }
+  ],
   "auditLogs": [
     {
       "id": "06490905-6a41-4b04-8252-9f237bc6fc3f",
@@ -928,6 +993,50 @@
       "publishedBy": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
       "showOnMainSlide": true,
       "deadlineSortValue": "2026-05-03"
+    },
+    {
+      "snapshotId": "a288df2c-e767-41ae-bf7e-9650e3be18b6",
+      "tournamentId": "6242b4e3-c0ab-4c42-bc37-24cdcdcb2e9b",
+      "title": "캐롬클럽대회",
+      "textLine1": null,
+      "textLine2": null,
+      "templateType": "A",
+      "backgroundType": "image",
+      "themeType": "dark",
+      "image320Url": "/api/proof-images/c7604580-7c22-4d1a-b0cc-96d87de629f0?variant=w320",
+      "imageId": "c7604580-7c22-4d1a-b0cc-96d87de629f0",
+      "status": "초안",
+      "targetDetailUrl": "/site/tournaments/6242b4e3-c0ab-4c42-bc37-24cdcdcb2e9b",
+      "publishedAt": "2026-04-19T13:13:38.098Z",
+      "updatedAt": "2026-04-19T13:13:38.098Z",
+      "isPublished": true,
+      "isActive": false,
+      "version": 1,
+      "publishedBy": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
+      "showOnMainSlide": false,
+      "deadlineSortValue": "2026-05-31"
+    },
+    {
+      "snapshotId": "c03c9ca1-56e7-49d4-b43b-aae2a1db881e",
+      "tournamentId": "6242b4e3-c0ab-4c42-bc37-24cdcdcb2e9b",
+      "title": "캐롬클럽대회",
+      "textLine1": null,
+      "textLine2": null,
+      "templateType": "A",
+      "backgroundType": "image",
+      "themeType": "dark",
+      "image320Url": "/api/proof-images/c7604580-7c22-4d1a-b0cc-96d87de629f0?variant=w320",
+      "imageId": "c7604580-7c22-4d1a-b0cc-96d87de629f0",
+      "status": "모집중",
+      "targetDetailUrl": "/site/tournaments/6242b4e3-c0ab-4c42-bc37-24cdcdcb2e9b",
+      "publishedAt": "2026-04-19T13:13:53.358Z",
+      "updatedAt": "2026-04-19T13:13:53.358Z",
+      "isPublished": true,
+      "isActive": true,
+      "version": 2,
+      "publishedBy": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
+      "showOnMainSlide": true,
+      "deadlineSortValue": "2026-05-31"
     }
   ],
   "sitePageBuilderDrafts": [

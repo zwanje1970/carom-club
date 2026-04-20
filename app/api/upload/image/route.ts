@@ -16,9 +16,19 @@ import {
 export const runtime = "nodejs";
 
 function getExtFromMimeType(mimeType: string): "jpg" | "png" | "webp" | null {
-  if (mimeType === "image/jpeg") return "jpg";
-  if (mimeType === "image/png") return "png";
-  if (mimeType === "image/webp") return "webp";
+  const m = mimeType.trim().toLowerCase();
+  if (m === "image/jpeg" || m === "image/jpg" || m === "image/pjpeg") return "jpg";
+  if (m === "image/png") return "png";
+  if (m === "image/webp") return "webp";
+  return null;
+}
+
+/** 브라우저/OS에 따라 type 이 비어 있을 수 있어 확장자로만 판별 */
+function getExtFromFileName(fileName: string): "jpg" | "png" | "webp" | null {
+  const n = fileName.trim().toLowerCase();
+  if (n.endsWith(".jpg") || n.endsWith(".jpeg")) return "jpg";
+  if (n.endsWith(".png")) return "png";
+  if (n.endsWith(".webp")) return "webp";
   return null;
 }
 
@@ -49,7 +59,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "업로드 파일이 필요합니다." }, { status: 400 });
   }
 
-  const ext = getExtFromMimeType(imageFile.type);
+  let ext = getExtFromMimeType(imageFile.type);
+  if (!ext) {
+    ext = getExtFromFileName(imageFile.name);
+  }
   if (!ext) {
     return NextResponse.json({ error: "지원하지 않는 이미지 형식입니다. (jpg/png/webp)" }, { status: 400 });
   }
@@ -73,15 +86,23 @@ export async function POST(request: Request) {
   const w320Path = path.join(w320Dir, w320FileName);
   const w640Path = path.join(w640Dir, w640FileName);
 
-  await writeFile(originalPath, buffer);
-  await sharp(buffer)
-    .resize({ width: 320, withoutEnlargement: true })
-    .jpeg({ quality: 85 })
-    .toFile(w320Path);
-  await sharp(buffer)
-    .resize({ width: 640, withoutEnlargement: true })
-    .jpeg({ quality: 88 })
-    .toFile(w640Path);
+  try {
+    await writeFile(originalPath, buffer);
+    await sharp(buffer)
+      .resize({ width: 320, withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toFile(w320Path);
+    await sharp(buffer)
+      .resize({ width: 640, withoutEnlargement: true })
+      .jpeg({ quality: 88 })
+      .toFile(w640Path);
+  } catch (err) {
+    console.error("[api/upload/image] 저장 또는 이미지 처리 실패:", err);
+    return NextResponse.json(
+      { error: "이미지를 처리하지 못했습니다. jpg/png/webp 파일인지 확인 후 다시 시도해 주세요." },
+      { status: 400 }
+    );
+  }
 
   const createAssetResult = await createProofImageAsset({
     imageId,

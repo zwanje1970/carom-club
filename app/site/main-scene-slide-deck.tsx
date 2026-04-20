@@ -188,7 +188,7 @@ export default function MainSceneSlideDeck({
   items: SlideDeckItem[];
   /** 슬라이드 영역 상단 왼쪽 라벨 (기본: 진행중 대회) */
   sectionLabel?: string;
-  /** 공지관리(siteNotice) — 슬라이드 박스 내부 상단 검은 박스 (enabled + text 있을 때만 전달) */
+  /** 공지관리(siteNotice) — 슬라이드 박스 내부 상단 공지 바 (enabled + text 있을 때만 전달) */
   siteNoticeText?: string | null;
 }) {
   const t0 = useRef(Date.now());
