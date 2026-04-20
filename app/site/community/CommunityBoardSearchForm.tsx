@@ -1,20 +1,22 @@
-/** GET 검색만 — 자동완성·실시간 검색 없음 */
+/** GET 검색만 — 엔터/버튼 제출 시에만 (자동 검색 없음) */
 
 export default function CommunityBoardSearchForm({
-  boardType,
+  actionPath,
+  inputId,
   defaultQuery,
 }: {
-  boardType: string;
+  actionPath: string;
+  inputId: string;
   defaultQuery: string;
 }) {
   return (
-    <form className="ui-community-search" method="get" action={`/site/community/${boardType}`} role="search">
-      <label className="ui-community-search-label v3-muted" htmlFor={`community-q-${boardType}`}>
+    <form className="ui-community-search" method="get" action={actionPath} role="search">
+      <label className="ui-community-search-label v3-muted" htmlFor={inputId}>
         제목 검색
       </label>
       <div className="ui-community-search-row">
         <input
-          id={`community-q-${boardType}`}
+          id={inputId}
           className="ui-community-search-input"
           type="search"
           name="q"

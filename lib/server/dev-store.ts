@@ -489,6 +489,8 @@ export type CommunityBoardPost = {
 /** 목록 조회 전용(가벼운 필드) */
 export type CommunityPostListItem = {
   id: string;
+  /** 목록·링크용 — 전체 탭에서 글별 상세 경로 구분 */
+  boardType: SiteCommunityBoardKey;
   title: string;
   nickname: string;
   createdAt: string;
@@ -7245,6 +7247,40 @@ export function parseCommunityBoardTypeParam(raw: string): SiteCommunityBoardKey
 /** 커뮤니티 허브 상단 탭(4칸): 자유·질문·대회후기·구인구직 매핑용 */
 export const COMMUNITY_PRIMARY_BOARD_KEYS: SiteCommunityBoardKey[] = ["free", "qna", "reviews", "extra1"];
 
+function mapPostToListItem(p: CommunityBoardPost): CommunityPostListItem {
+  const imageUrls = normalizeCommunityPostImageUrls(p.imageUrls);
+  const thumbnailUrl = imageUrls.length > 0 ? imageUrls[0]! : null;
+  return {
+    id: p.id,
+    boardType: p.boardType,
+    title: p.title,
+    nickname: p.authorNickname,
+    createdAt: p.createdAt,
+    viewCount: p.viewCount,
+    commentCount: p.commentCount,
+    thumbnailUrl,
+  };
+}
+
+/** primary 4개 게시판만 한 번에 필터·정렬 — 프론트에서 게시판별 다중 요청 금지 */
+export async function listCommunityPostsAllPrimary(
+  visibleBoardKeys: SiteCommunityBoardKey[],
+  options?: { q?: string }
+): Promise<CommunityPostListItem[]> {
+  const store = await readStore();
+  const q = options?.q?.trim().toLowerCase() ?? "";
+  const primaryAllow = new Set(
+    COMMUNITY_PRIMARY_BOARD_KEYS.filter((k) => visibleBoardKeys.includes(k)),
+  );
+  let rows = store.communityPosts.filter(
+    (p) => primaryAllow.has(p.boardType) && p.isDeleted !== true,
+  );
+  if (q.length > 0) {
+    rows = rows.filter((p) => p.title.toLowerCase().includes(q));
+  }
+  return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(mapPostToListItem);
+}
+
 export async function listCommunityPosts(
   boardType: SiteCommunityBoardKey,
   options?: { q?: string }
@@ -7255,19 +7291,7 @@ export async function listCommunityPosts(
   if (q.length > 0) {
     rows = rows.filter((p) => p.title.toLowerCase().includes(q));
   }
-  return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((p) => {
-    const imageUrls = normalizeCommunityPostImageUrls(p.imageUrls);
-    const thumbnailUrl = imageUrls.length > 0 ? imageUrls[0]! : null;
-    return {
-      id: p.id,
-      title: p.title,
-      nickname: p.authorNickname,
-      createdAt: p.createdAt,
-      viewCount: p.viewCount,
-      commentCount: p.commentCount,
-      thumbnailUrl,
-    };
-  });
+  return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(mapPostToListItem);
 }
 
 export async function getCommunityPostById(postId: string): Promise<CommunityPostDetail | null> {

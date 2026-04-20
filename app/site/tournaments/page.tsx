@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { SITE_TOURNAMENT_LIST_EXCLUDED_BADGES } from "../../../lib/site-tournament-badges";
 import {
@@ -87,6 +88,58 @@ function tournamentBracketParen(t: Tournament): string | null {
 
 function tournamentLocationLine(t: Tournament): string {
   return typeof t.location === "string" ? t.location.trim() : "";
+}
+
+/** 대회목록 상태 뱃지 색 — 모집중·마감임박·마감·종료 */
+function tournamentListStatusBadgeStyle(statusBadge: string): CSSProperties {
+  const s = statusBadge.trim();
+  const base: CSSProperties = {
+    display: "inline-block",
+    fontSize: "0.72rem",
+    fontWeight: 600,
+    lineHeight: 1.2,
+    padding: "0.2rem 0.45rem",
+    borderRadius: "999px",
+    whiteSpace: "nowrap",
+    marginBottom: "0.35rem",
+  };
+  switch (s) {
+    case "모집중":
+      return {
+        ...base,
+        background: "#dbeafe",
+        color: "#1d4ed8",
+        border: "1px solid #2563eb",
+      };
+    case "마감임박":
+      return {
+        ...base,
+        background: "#fee2e2",
+        color: "#b91c1c",
+        border: "1px solid #dc2626",
+      };
+    case "마감":
+      return {
+        ...base,
+        background: "#dcfce7",
+        color: "#15803d",
+        border: "1px solid #16a34a",
+      };
+    case "종료":
+      return {
+        ...base,
+        background: "#171717",
+        color: "#fafafa",
+        border: "1px solid #262626",
+      };
+    default:
+      return {
+        ...base,
+        background: "#f1f5f9",
+        color: "#334155",
+        border: "1px solid var(--v3-border, #e5e7eb)",
+      };
+  }
 }
 
 export default async function SiteTournamentsPage({
@@ -197,21 +250,7 @@ export default async function SiteTournamentsPage({
                 }}
               >
                 <div style={{ minWidth: 0, flex: "1 1 auto" }}>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      fontSize: "0.72rem",
-                      fontWeight: 600,
-                      lineHeight: 1.2,
-                      padding: "0.2rem 0.45rem",
-                      borderRadius: "999px",
-                      border: "1px solid var(--v3-border, #e5e7eb)",
-                      background: "#f1f5f9",
-                      color: "#334155",
-                      whiteSpace: "nowrap",
-                      marginBottom: "0.35rem",
-                    }}
-                  >
+                  <span style={tournamentListStatusBadgeStyle(tournament.statusBadge)}>
                     {tournament.statusBadge}
                   </span>
                   <strong

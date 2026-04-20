@@ -49,7 +49,7 @@
   box-sizing: border-box;
   min-height: 0;
   padding: 0.22rem 0.6rem;
-  border-radius: 8px;
+  border-radius: 0;
   background: #fff176;
   border: 1px solid #c9a227;
   box-shadow:

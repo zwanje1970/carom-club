@@ -7,23 +7,11 @@ import {
   parseCommunityBoardTypeParam,
   type SiteCommunityBoardKey,
 } from "../../../../lib/server/dev-store";
+import { COMMUNITY_PRIMARY_TAB_LABEL, isPrimaryTabKey } from "../community-tab-config";
 import CommunityBoardPostList from "../CommunityBoardPostList";
 import CommunityBoardSearchForm from "../CommunityBoardSearchForm";
 import CommunityBoardTabs from "../CommunityBoardTabs";
 import SiteShellFrame from "../../components/SiteShellFrame";
-
-const PRIMARY_TAB_LABEL = {
-  free: "자유",
-  qna: "질문",
-  reviews: "대회후기",
-  extra1: "구인구직",
-} as const;
-
-type PrimaryTabKey = keyof typeof PRIMARY_TAB_LABEL;
-
-function isPrimaryTabKey(k: SiteCommunityBoardKey): k is PrimaryTabKey {
-  return k in PRIMARY_TAB_LABEL;
-}
 
 type Props = {
   params: Promise<{ boardType: string }>;
@@ -48,23 +36,28 @@ export default async function SiteCommunityBoardListPage({ params, searchParams 
   const writeHref = `/site/community/${boardType}/write`;
 
   const qSuffix = q ? `?q=${encodeURIComponent(q)}` : "";
-  const tabItems = COMMUNITY_PRIMARY_BOARD_KEYS.filter((k) => config[k].visible).map((k) => ({
-    key: k,
-    label: PRIMARY_TAB_LABEL[k as PrimaryTabKey],
-    href: `/site/community/${k}${qSuffix}`,
-  }));
+  const tabItems = [
+    { key: "all" as const, label: "전체", href: `/site/community${qSuffix}` },
+    ...COMMUNITY_PRIMARY_BOARD_KEYS.filter((k) => config[k].visible).map((k) => ({
+      key: k,
+      label: COMMUNITY_PRIMARY_TAB_LABEL[k as keyof typeof COMMUNITY_PRIMARY_TAB_LABEL],
+      href: `/site/community/${k}${qSuffix}`,
+    })),
+  ];
+
+  const listBoardLabel = isPrimaryTabKey(boardType) ? COMMUNITY_PRIMARY_TAB_LABEL[boardType] : board.label;
 
   return (
     <SiteShellFrame brandTitle="커뮤니티">
       <section className="site-site-gray-main v3-stack ui-community-page ui-community-board-hub">
         <CommunityBoardTabs tabs={tabItems} currentKey={boardType} />
-        <CommunityBoardSearchForm boardType={boardType} defaultQuery={q} />
-        <CommunityBoardPostList
-          boardType={boardType}
-          boardLabel={isPrimaryTabKey(boardType) ? PRIMARY_TAB_LABEL[boardType] : board.label}
-          items={items}
+        <CommunityBoardSearchForm
+          actionPath={`/site/community/${boardType}`}
+          inputId={`community-q-${boardType}`}
+          defaultQuery={q}
         />
-        <Link href={writeHref} className="community-write-fab" aria-label="글쓰기">
+        <CommunityBoardPostList showRoomPrefix={false} items={items} />
+        <Link href={writeHref} className="community-write-fab" aria-label={`${listBoardLabel} 글쓰기`}>
           <span aria-hidden>+</span>
         </Link>
       </section>

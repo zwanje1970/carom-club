@@ -14,8 +14,8 @@ function isInquiryDetailWithComposer(pathname: string): boolean {
 function SiteBottomNavHomeIcon() {
   return (
     <svg
-      width={15}
-      height={15}
+      width={23}
+      height={23}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -71,7 +71,7 @@ export default function GlobalHomeButton() {
                 {item.icon === "home" ? (
                   <SiteBottomNavHomeIcon />
                 ) : (
-                  <SiteMainNavIcon variant={item.icon} size={15} />
+                  <SiteMainNavIcon variant={item.icon} size={23} />
                 )}
               </span>
               <span className="site-mobile-bottom-nav__label">{item.label}</span>

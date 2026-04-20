@@ -192,6 +192,8 @@ body {
   overflow: hidden;
   width: 100%;
   min-height: 0;
+  /* 세로 스크롤은 브라우저 기본 — 가로만 JS에서 판정 (none 금지) */
+  touch-action: pan-y;
 }
 
 .site-root-swipe-track {
@@ -391,7 +393,7 @@ body:has(.site-home-page) {
     padding-right: 0;
     padding-top: 0;
     /* 모바일 고정형: 홈 바까지 동일 다크 톤(흰 여백 띠 없음) — 홈 바 높이 절반에 맞춰 여백 절반 */
-    padding-bottom: calc(54px + env(safe-area-inset-bottom, 0px) + 4px);
+    padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px) + 4px);
   }
 
   /* 슬라이드: 뷰포트 남는 높이를 먹지 않음 — .slideDeck aspect-ratio 로 크기 고정 */
@@ -497,7 +499,7 @@ body:has(.site-home-page) {
   min-height: 2.75rem;
   overflow: hidden;
   white-space: nowrap;
-  border-radius: 0.65rem;
+  border-radius: 0;
   border: 1px solid #f3ead0;
   background: #fffef6;
   box-sizing: border-box;
@@ -531,7 +533,7 @@ body:has(.site-home-page) {
 /* 대회안내·대회상세: 공지 박스와 동일 높이의 빈 보조 슬롯(레이아웃 정렬용) */
 .site-home-notice-slot-empty {
   min-height: 2.75rem;
-  border-radius: 0.65rem;
+  border-radius: 0;
   border: 1px solid #f0e8d4;
   background: linear-gradient(180deg, #fffef8 0%, #fff9eb 100%);
   box-sizing: border-box;
@@ -629,7 +631,7 @@ body:has(.site-home-page) {
     margin-right: 0;
     padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
     padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
-    padding-bottom: calc(54px + env(safe-area-inset-bottom, 0px) + 4px);
+    padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px) + 4px);
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
@@ -790,8 +792,8 @@ body:has(.site-home-page) {
   align-items: stretch;
   justify-content: space-between;
   gap: 0;
-  min-height: calc(48px + env(safe-area-inset-bottom, 0px));
-  padding-top: 4px;
+  min-height: calc(58px + env(safe-area-inset-bottom, 0px));
+  padding-top: 5px;
   padding-bottom: env(safe-area-inset-bottom, 0px);
   padding-left: max(0.15rem, env(safe-area-inset-left, 0px));
   padding-right: max(0.15rem, env(safe-area-inset-right, 0px));
@@ -808,13 +810,13 @@ body:has(.site-home-page) {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
-  padding: 3px 1px 5px;
-  min-height: 44px;
+  gap: 2px;
+  padding: 4px 1px 6px;
+  min-height: 52px;
   text-decoration: none !important;
   color: #475569;
-  font-size: 0.52rem;
-  line-height: 1.05;
+  font-size: 0.78rem;
+  line-height: 1.08;
   font-weight: 600;
   text-align: center;
   white-space: nowrap;
@@ -854,7 +856,7 @@ body:has(.site-home-page) {
 .community-write-fab {
   position: fixed;
   right: 16px;
-  bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(74px + env(safe-area-inset-bottom, 0px));
   z-index: 68;
   width: 56px;
   height: 56px;
@@ -904,17 +906,17 @@ body:has(.site-home-page) {
 
 .ui-community-tabs-link {
   display: inline-block;
-  padding: 0.38rem 0.55rem;
-  font-size: 0.9rem;
+  padding: 0.32rem 0.45rem;
+  font-size: 0.88rem;
   color: #475569;
   text-decoration: none;
-  border-radius: 4px;
+  border-radius: 2px;
 }
 
 .ui-community-tabs-link--active {
   font-weight: 700;
   color: var(--ui-primary, #2563eb);
-  background: #eff6ff;
+  background: #f1f5f9;
 }
 
 .ui-community-search-label {

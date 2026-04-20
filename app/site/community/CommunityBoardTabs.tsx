@@ -1,9 +1,9 @@
 import Link from "next/link";
-import type { SiteCommunityBoardKey } from "../../../lib/server/dev-store";
+import type { CommunityHubTabKey } from "./community-tab-config";
 
-type TabItem = { key: SiteCommunityBoardKey; label: string; href: string };
+type TabItem = { key: CommunityHubTabKey; label: string; href: string };
 
-export default function CommunityBoardTabs({ tabs, currentKey }: { tabs: TabItem[]; currentKey: SiteCommunityBoardKey }) {
+export default function CommunityBoardTabs({ tabs, currentKey }: { tabs: TabItem[]; currentKey: CommunityHubTabKey }) {
   if (tabs.length === 0) return null;
   return (
     <nav className="ui-community-tabs" aria-label="게시판 구분">

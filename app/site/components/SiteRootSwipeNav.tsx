@@ -19,11 +19,18 @@ function normalizePathname(pathname: string): string {
 
 function isSiteRootSwipePath(pathname: string): boolean {
   const p = normalizePathname(pathname);
-  return (SITE_ROOT_SWIPE_HREFS as readonly string[]).includes(p);
+  if ((SITE_ROOT_SWIPE_HREFS as readonly string[]).includes(p)) return true;
+  /** 커뮤니티만 하위 경로(전체·게시판·글)에서도 스와이프 허용 */
+  if (p === "/site/community" || p.startsWith("/site/community/")) return true;
+  return false;
 }
 
 function rootSwipeIndex(pathname: string): number {
   const p = normalizePathname(pathname);
+  const communityIdx = SITE_ROOT_SWIPE_HREFS.indexOf("/site/community");
+  if (p === "/site/community" || p.startsWith("/site/community/")) {
+    return communityIdx >= 0 ? communityIdx : 3;
+  }
   return SITE_ROOT_SWIPE_HREFS.findIndex((h) => h === p);
 }
 
@@ -33,10 +40,8 @@ const NAV_COOLDOWN_MS = 480;
 const FOLLOW_RATIO = 0.78;
 /** 완료 판정: 뷰포트 너비 대비 (25~30%) */
 const COMPLETE_FRACTION = 0.28;
-/** 가로 우세일 때만 스와이프로 인식 */
-const HORIZONTAL_VS_VERTICAL = 1.35;
-/** 방향 판정 전 최소 이동 */
-const LOCK_MIN_PX = 12;
+/** 방향 판정 전 최소 이동 (px) — 그 전에는 preventDefault 금지 */
+const LOCK_MIN_PX = 10;
 /** 빠른 스와이프 시 짧은 거리로도 완료 (px/ms) */
 const VELOCITY_COMPLETE = 0.42;
 const TRANSITION_MS = 300;
@@ -49,6 +54,23 @@ function touchTargetBlocksSwipe(el: EventTarget | null): boolean {
   if (el.closest('[contenteditable="true"]')) return true;
   if (el.closest('[role="button"],[role="tab"],[role="tablist"]')) return true;
   if (el.closest("label")) return true;
+  return false;
+}
+
+/** 뷰포트보다 작은 세로 스크롤 박스(중첩) — 기본 스크롤 우선, 루트 스와이프 제외 */
+function touchTargetInNestedVerticalScroller(el: EventTarget | null): boolean {
+  if (!el || !(el instanceof Element)) return false;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+  const nestedMaxH = vh * 0.55;
+  let node: Element | null = el;
+  for (let i = 0; i < 14 && node; i++, node = node.parentElement) {
+    const h = node as HTMLElement;
+    if (h.scrollHeight <= h.clientHeight + 2) continue;
+    const st = window.getComputedStyle(h);
+    const oy = st.overflowY;
+    if (oy !== "auto" && oy !== "scroll" && oy !== "overlay") continue;
+    if (h.clientHeight < nestedMaxH) return true;
+  }
   return false;
 }
 
@@ -85,6 +107,7 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
     blocked: boolean;
     startedOnLink: boolean;
     horizontalLocked: boolean;
+    /** 세로 우선으로 확정되면 제스처 끝까지 스와이프 안 함 */
     verticalDominant: boolean;
   } | null>(null);
   const samplesRef = useRef<{ t: number; x: number }[]>([]);
@@ -119,7 +142,8 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       const w = window.innerWidth;
       const x = t.clientX;
       const edgeSkip = x < EDGE_EXCLUDE_PX || x > w - EDGE_EXCLUDE_PX;
-      const blocked = touchTargetBlocksSwipe(e.target) || edgeSkip;
+      const blocked =
+        touchTargetBlocksSwipe(e.target) || edgeSkip || touchTargetInNestedVerticalScroller(e.target);
       const startedOnLink = e.target instanceof Element && !!e.target.closest("a[href]");
       startRef.current = {
         x: t.clientX,
@@ -145,20 +169,18 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       const adx = Math.abs(dx);
       const ady = Math.abs(dy);
 
+      if (start.verticalDominant) return;
+
       if (!start.horizontalLocked) {
-        if (adx < LOCK_MIN_PX && ady < LOCK_MIN_PX) return;
-        if (ady >= adx * HORIZONTAL_VS_VERTICAL) {
+        if (adx < LOCK_MIN_PX && ady < LOCK_MIN_PX) {
+          return;
+        }
+        if (ady >= adx) {
           start.verticalDominant = true;
           return;
         }
-        if (adx >= ady * HORIZONTAL_VS_VERTICAL) {
-          start.horizontalLocked = true;
-        } else {
-          return;
-        }
+        start.horizontalLocked = true;
       }
-
-      if (start.verticalDominant) return;
 
       e.preventDefault();
 
