@@ -51,7 +51,7 @@ export default function TournamentsFilterBar({
         useNextLink={hasViewerCoordinate}
         {...(!hasViewerCoordinate ? { "data-distance-trigger": "true" as const } : {})}
       >
-        위치순
+        거리순
       </FilterButton>
     </div>
   );

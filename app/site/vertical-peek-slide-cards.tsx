@@ -258,6 +258,7 @@ export default function VerticalPeekSlideCards({
 
   return (
     <div
+      data-no-root-swipe
       ref={containerRef}
       style={{
         overflow: "hidden",

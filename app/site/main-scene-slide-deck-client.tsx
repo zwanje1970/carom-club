@@ -20,16 +20,18 @@ export default function MainSceneSlideDeckClient(props: Props) {
     const label = props.sectionLabel?.trim() || "진행중 대회";
     const notice = props.siteNoticeText?.trim();
     const deck = (
-      <div aria-hidden className={styles.slideDeck}>
+      <div data-no-root-swipe aria-hidden className={styles.slideDeck}>
+        <div className={styles.slideDeckNoticeWrap}>
+          <div className={styles.slideDeckNotice}>
+            <span className={styles.slideDeckNoticeMarquee}>{notice}</span>
+          </div>
+        </div>
         <p className={styles.slideDeckLabel}>{label}</p>
       </div>
     );
     if (notice) {
       return (
-        <div className={styles.slideDeckShell}>
-          <div className={styles.slideDeckNotice}>
-            <span className={styles.slideDeckNoticeMarquee}>{notice}</span>
-          </div>
+        <div data-no-root-swipe className={styles.slideDeckShell}>
           {deck}
         </div>
       );

@@ -380,7 +380,11 @@ export default async function SiteHomePage({
       : clientDashboardApproved
         ? "/client"
         : null;
-  const dashboardLabel = dashboardHref ? "대시보드" : null;
+  const dashboardLabel = dashboardHref
+    ? currentUser?.role === "PLATFORM"
+      ? "플랫폼관리자"
+      : "대시보드"
+    : null;
   const liveSlideItems = mainSlideSnapshots.map((snapshot) => ({
     snapshotId: snapshot.snapshotId,
     title: snapshot.title,
@@ -439,56 +443,6 @@ export default async function SiteHomePage({
       mainId="main-layout"
       prependMain={
         <>
-          <Script id="home-distance-sort-geolocation" strategy="afterInteractive">
-        {`
-          (() => {
-            if (typeof window === "undefined") return;
-            document.addEventListener("click", (event) => {
-              const target = event.target;
-              if (!(target instanceof Element)) return;
-              const trigger = target.closest("a[data-distance-trigger='true']");
-              if (!(trigger instanceof HTMLAnchorElement)) return;
-
-              event.preventDefault();
-
-              const latKey = trigger.dataset.latKey;
-              const lngKey = trigger.dataset.lngKey;
-              const deniedKey = trigger.dataset.deniedKey;
-              if (!latKey || !lngKey || !deniedKey) {
-                window.location.assign(trigger.href);
-                return;
-              }
-
-              const moveWithDenied = () => {
-                const deniedUrl = new URL(trigger.href, window.location.origin);
-                deniedUrl.searchParams.set(deniedKey, "1");
-                deniedUrl.searchParams.delete(latKey);
-                deniedUrl.searchParams.delete(lngKey);
-                window.location.assign(deniedUrl.pathname + deniedUrl.search + deniedUrl.hash);
-              };
-
-              if (!("geolocation" in navigator)) {
-                moveWithDenied();
-                return;
-              }
-
-              navigator.geolocation.getCurrentPosition(
-                (position) => {
-                  const okUrl = new URL(trigger.href, window.location.origin);
-                  okUrl.searchParams.set(latKey, String(position.coords.latitude));
-                  okUrl.searchParams.set(lngKey, String(position.coords.longitude));
-                  okUrl.searchParams.delete(deniedKey);
-                  window.location.assign(okUrl.pathname + okUrl.search + okUrl.hash);
-                },
-                () => {
-                  moveWithDenied();
-                },
-                { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
-              );
-            });
-          })();
-        `}
-      </Script>
       {previewMode ? (
         <Script id="site-preview-selection-bridge" strategy="afterInteractive">
           {`

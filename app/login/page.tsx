@@ -125,7 +125,7 @@ export default function LoginPage() {
           <input
             value={loginId}
             onChange={(event) => setLoginId(event.target.value)}
-            placeholder="admin"
+            placeholder="아이디 입력"
             autoComplete="username"
             style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
           />
@@ -147,7 +147,12 @@ export default function LoginPage() {
           <span>자동로그인</span>
         </label>
 
-        <button type="submit" className="v3-btn" disabled={loading} style={{ padding: "0.7rem 1rem" }}>
+        <button
+          type="submit"
+          className="v3-btn v3-btn--login-submit"
+          disabled={loading}
+          style={{ padding: "0.7rem 1rem" }}
+        >
           {loading ? "처리 중..." : "로그인"}
         </button>
 
@@ -179,9 +184,6 @@ export default function LoginPage() {
       <div className="v3-row">
         <Link className="v3-btn" href="/signup">
           회원가입
-        </Link>
-        <Link className="v3-btn" href="/client-apply">
-          클라이언트 신청
         </Link>
         <Link className="v3-btn" href="/">
           홈으로

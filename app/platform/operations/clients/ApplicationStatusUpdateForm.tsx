@@ -75,7 +75,7 @@ export default function ApplicationStatusUpdateForm({
           className="v3-input"
           style={{ maxWidth: "12rem", padding: "0.45rem 0.5rem" }}
         >
-          <option value="PENDING">대기</option>
+          <option value="PENDING">미확인</option>
           <option value="APPROVED">승인</option>
           <option value="REJECTED">거절</option>
         </select>

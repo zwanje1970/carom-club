@@ -129,6 +129,10 @@ export default async function SiteMypagePage() {
           <Link className="v3-btn" href="/client-status/pending">
             클라이언트 승인 대기
           </Link>
+        ) : user.role === "PLATFORM" ? (
+          <Link className="v3-btn" href="/platform">
+            플랫폼 대시보드
+          </Link>
         ) : (
           <Link className="v3-btn" href="/client-apply">
             클라이언트 신청

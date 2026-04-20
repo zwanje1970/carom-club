@@ -134,6 +134,19 @@ export default function BlankBracketPrintClient() {
     };
   }, [mobilePreviewOpen]);
 
+  const [mobileVw, setMobileVw] = useState(0);
+  const [mobileVh, setMobileVh] = useState(0);
+  useEffect(() => {
+    if (!mobilePreviewOpen) return;
+    const update = () => {
+      setMobileVw(window.innerWidth);
+      setMobileVh(window.innerHeight);
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [mobilePreviewOpen]);
+
   /** A4 가로 PDF — html2canvas 로 `.bbp-print-svg` 캡처 후 jsPDF 에 277×190mm 로 삽입 */
   const handleExportPDF = useCallback(async () => {
     if (pdfBusyRef.current) return;
@@ -274,98 +287,17 @@ export default function BlankBracketPrintClient() {
         </main>
       </div>
 
-      {/* 모바일: 인앱 전체 화면 미리보기 (브라우저 새 창 미사용) */}
+      {/* 모바일: A4 출력 미리보기 전용 레이어 (PDF/프린트 로직과 무관) */}
       {mobilePreviewOpen && scene && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="대진표 미리보기"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 99999,
-            display: "flex",
-            flexDirection: "column",
-            background: "#0f172a",
-            boxSizing: "border-box",
-          }}
-        >
-          <div
-            style={{
-              flexShrink: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "flex-end",
-              minHeight: "48px",
-              padding: "8px 12px",
-              background: "#1e293b",
-              borderBottom: "1px solid #334155",
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setMobilePreviewOpen(false)}
-              aria-label="닫기"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "44px",
-                height: "44px",
-                padding: 0,
-                border: "none",
-                borderRadius: "8px",
-                background: "transparent",
-                color: "#f8fafc",
-                fontSize: "28px",
-                lineHeight: 1,
-                cursor: "pointer",
-                WebkitTapHighlightColor: "transparent",
-              }}
-            >
-              ×
-            </button>
-          </div>
-          <div
-            style={{
-              flex: 1,
-              minHeight: 0,
-              overflow: "auto",
-              WebkitOverflowScrolling: "touch",
-              padding: "12px",
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "flex-start",
-              boxSizing: "border-box",
-            }}
-          >
-            <div
-              style={{
-                background: "#fff",
-                boxShadow: "0 4px 24px rgba(0,0,0,0.35)",
-                boxSizing: "border-box",
-                width: "297mm",
-                minWidth: "min(297mm, 100%)",
-                minHeight: "210mm",
-                padding: `${MARGIN_MM}mm`,
-              }}
-            >
-              <BracketSVG scene={scene} matchType={matchType} />
-            </div>
-          </div>
-          <p
-            style={{
-              flexShrink: 0,
-              margin: 0,
-              padding: "10px 16px 16px",
-              fontSize: "12px",
-              color: "#94a3b8",
-              textAlign: "center",
-            }}
-          >
-            인쇄는 브라우저 메뉴에서 가능합니다.
-          </p>
-        </div>
+        <MobilePrintPreviewLayer
+          scene={scene}
+          matchType={matchType}
+          style={style}
+          treeLayout={treeLayout}
+          viewportWidth={mobileVw}
+          viewportHeight={mobileVh}
+          onBackdropClose={() => setMobilePreviewOpen(false)}
+        />
       )}
 
       {/* html2canvas·데스크톱 새창 미리보기 공용: 277×190mm SVG (화면 밖) */}
@@ -375,6 +307,119 @@ export default function BlankBracketPrintClient() {
         </div>
       )}
     </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 모바일 전용: A4 px + scale (BracketSVG / PDF 코드와 분리)
+// ─────────────────────────────────────────────────────────────────────────────
+const A4_PORTRAIT_W = 794;
+const A4_PORTRAIT_H = 1123;
+const A4_LANDSCAPE_W = 1123;
+const A4_LANDSCAPE_H = 794;
+
+function paperPxForPreview(
+  style: BracketStyle,
+  treeLayout: TreeLayout,
+  vw: number,
+  vh: number
+): { paperW: number; paperH: number } {
+  let landscape: boolean;
+  if (style === "CENTER") {
+    landscape = true;
+  } else if (style === "TREE" && treeLayout === "VERTICAL") {
+    landscape = false;
+  } else if (style === "TREE" && treeLayout === "HORIZONTAL") {
+    landscape = true;
+  } else {
+    landscape = vw > vh;
+  }
+  return landscape
+    ? { paperW: A4_LANDSCAPE_W, paperH: A4_LANDSCAPE_H }
+    : { paperW: A4_PORTRAIT_W, paperH: A4_PORTRAIT_H };
+}
+
+type MobilePreviewLayerProps = {
+  scene: Exclude<ReturnType<typeof buildBracketScene>, null>;
+  matchType: MatchType;
+  style: BracketStyle;
+  treeLayout: TreeLayout;
+  viewportWidth: number;
+  viewportHeight: number;
+  onBackdropClose: () => void;
+};
+
+function MobilePrintPreviewLayer({
+  scene,
+  matchType,
+  style,
+  treeLayout,
+  viewportWidth,
+  viewportHeight,
+  onBackdropClose,
+}: MobilePreviewLayerProps) {
+  const vw = viewportWidth > 0 ? viewportWidth : 400;
+  const vh = viewportHeight > 0 ? viewportHeight : 700;
+  const { paperW, paperH } = paperPxForPreview(style, treeLayout, vw, vh);
+  const scale = Math.min(Math.max(vw - 32, 1) / paperW, Math.max(vh - 32, 1) / paperH);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="출력 미리보기"
+      onClick={onBackdropClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 99999,
+        background: "#e5e7eb",
+        boxSizing: "border-box",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          pointerEvents: "none",
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "flex-start",
+          padding: "16px",
+          boxSizing: "border-box",
+        }}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            pointerEvents: "auto",
+            transform: `scale(${scale})`,
+            transformOrigin: "top center",
+          }}
+        >
+          <div
+            style={{
+              width: paperW,
+              height: paperH,
+              background: "#ffffff",
+              boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
+              borderRadius: "4px",
+              boxSizing: "border-box",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: `${MARGIN_MM}mm`,
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ lineHeight: 0 }}>
+              <BracketSVG scene={scene} matchType={matchType} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

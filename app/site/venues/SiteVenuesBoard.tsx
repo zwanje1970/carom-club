@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import FilterButton from "../components/FilterButton";
 import FilterDropdown from "../components/FilterDropdown";
+import { VENUES_GEO_STORAGE_LAT, VENUES_GEO_STORAGE_LNG } from "../components/SiteVenuesGeolocationNav";
 import SiteShellFrame from "../components/SiteShellFrame";
 import filterStyles from "../components/filter-controls.module.css";
 
@@ -49,60 +51,51 @@ function feeTypeLabel(pt: SiteVenueBoardRow["pricingType"]): string {
   return "일반요금";
 }
 
-function rowMatchesRegion(rowRegion: string, province: string): boolean {
-  if (province === "all") return true;
-  const r = rowRegion.trim();
-  return r.startsWith(province);
-}
-
 type VenueTypeFilter = "all" | "daedae_only" | "mixed";
 type FeeTypeFilter = "all" | "normal" | "flat";
 
 const VENUE_TYPE_OPTIONS: { value: VenueTypeFilter; label: string }[] = [
-  { value: "all", label: "전체" },
   { value: "daedae_only", label: "대대전용" },
   { value: "mixed", label: "복합구장" },
+  { value: "all", label: "전체" },
 ];
 
 const FEE_TYPE_OPTIONS: { value: FeeTypeFilter; label: string }[] = [
-  { value: "all", label: "전체" },
   { value: "normal", label: "일반요금" },
   { value: "flat", label: "정액제" },
-];
-
-const REGION_OPTIONS: { value: string; label: string }[] = [
-  { value: "all", label: "지역 전체" },
-  { value: "서울", label: "서울" },
-  { value: "경기", label: "경기" },
-  { value: "인천", label: "인천" },
-  { value: "부산", label: "부산" },
-  { value: "대구", label: "대구" },
-  { value: "광주", label: "광주" },
-  { value: "대전", label: "대전" },
-  { value: "울산", label: "울산" },
-  { value: "세종", label: "세종" },
-  { value: "강원", label: "강원" },
-  { value: "충북", label: "충북" },
-  { value: "충남", label: "충남" },
-  { value: "전북", label: "전북" },
-  { value: "전남", label: "전남" },
-  { value: "경북", label: "경북" },
-  { value: "경남", label: "경남" },
-  { value: "제주", label: "제주" },
+  { value: "all", label: "전체" },
 ];
 
 type Props = {
   initialRows: SiteVenueBoardRow[];
   distanceSort: { lat: number; lng: number } | null;
+  locationDenied?: boolean;
+  distanceButtonHref: string;
+  hasViewerCoordinate: boolean;
 };
 
-export default function SiteVenuesBoard({ initialRows, distanceSort }: Props) {
+export default function SiteVenuesBoard({
+  initialRows,
+  distanceSort,
+  locationDenied,
+  distanceButtonHref,
+  hasViewerCoordinate,
+}: Props) {
   const [venueType, setVenueType] = useState<VenueTypeFilter>("all");
   const [feeType, setFeeType] = useState<FeeTypeFilter>("all");
-  const [region, setRegion] = useState<string>("all");
+
+  useEffect(() => {
+    if (!distanceSort) return;
+    try {
+      sessionStorage.setItem(VENUES_GEO_STORAGE_LAT, String(distanceSort.lat));
+      sessionStorage.setItem(VENUES_GEO_STORAGE_LNG, String(distanceSort.lng));
+    } catch {
+      /* ignore */
+    }
+  }, [distanceSort]);
 
   const filtered = useMemo(() => {
-    if (venueType === "all" && feeType === "all" && region === "all") {
+    if (venueType === "all" && feeType === "all") {
       return initialRows;
     }
     return initialRows.filter((row) => {
@@ -117,12 +110,9 @@ export default function SiteVenuesBoard({ initialRows, distanceSort }: Props) {
           if (pt !== "FLAT" && pt !== "MIXED") return false;
         }
       }
-      if (region !== "all") {
-        if (!rowMatchesRegion(row.region, region)) return false;
-      }
       return true;
     });
-  }, [initialRows, venueType, feeType, region]);
+  }, [initialRows, venueType, feeType]);
 
   const ordered = useMemo(() => {
     let list = [...filtered];
@@ -181,19 +171,21 @@ export default function SiteVenuesBoard({ initialRows, distanceSort }: Props) {
         </FilterDropdown>
       </div>
       <div className={filterStyles.filterGridCell}>
-        <FilterDropdown
-          id="site-venues-filter-region"
-          value={region}
-          onChange={(e) => setRegion(e.target.value)}
-          fullWidth
-          aria-label="지역"
+        <FilterButton
+          href={distanceButtonHref}
+          useNextLink={hasViewerCoordinate}
+          style={{ width: "100%", justifyContent: "center", boxSizing: "border-box" }}
+          {...(!hasViewerCoordinate
+            ? {
+                "data-distance-trigger": "true" as const,
+                "data-lat-key": "distanceLat",
+                "data-lng-key": "distanceLng",
+                "data-denied-key": "distanceDenied",
+              }
+            : {})}
         >
-          {REGION_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </FilterDropdown>
+          거리순
+        </FilterButton>
       </div>
     </div>
   );
@@ -201,6 +193,22 @@ export default function SiteVenuesBoard({ initialRows, distanceSort }: Props) {
   return (
     <SiteShellFrame brandTitle="당구장안내" auxiliary={auxiliary} auxiliaryCompact>
       <section className="site-site-gray-main v3-stack">
+        {locationDenied ? (
+          <p
+            role="status"
+            className="v3-muted"
+            style={{
+              margin: "0 0 1rem",
+              padding: "0.65rem 0.75rem",
+              borderRadius: "8px",
+              background: "var(--v3-surface-2, #eef0f3)",
+              fontSize: "0.9rem",
+              lineHeight: 1.45,
+            }}
+          >
+            위치 권한을 허용해야 주변 당구장을 거리순으로 볼 수 있습니다. 브라우저 설정에서 위치를 허용한 뒤「거리순」을 다시 눌러 주세요.
+          </p>
+        ) : null}
         <ul className="site-board-card-list" style={{ margin: 0 }}>
           {ordered.map((row) => (
             <li key={row.venueId} className="site-board-card">

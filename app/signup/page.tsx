@@ -158,9 +158,6 @@ export default function SignupPage() {
         <Link className="v3-btn" href="/login">
           로그인으로
         </Link>
-        <Link className="v3-btn" href="/client-apply">
-          클라이언트 신청
-        </Link>
         <Link className="v3-btn" href="/">
           홈으로
         </Link>

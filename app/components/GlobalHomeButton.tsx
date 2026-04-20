@@ -45,7 +45,7 @@ function navItemActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-/** 모바일: 하단 5버튼 / 데스크톱: 기존 단일 홈 FAB */
+/** 모바일: 하단 5버튼 (데스크톱은 CSS로 숨김) */
 export default function GlobalHomeButton() {
   const pathname = usePathname() ?? "";
   const overInquiryComposer = isInquiryDetailWithComposer(pathname);
@@ -69,6 +69,14 @@ export default function GlobalHomeButton() {
               href={item.href}
               className={`site-mobile-bottom-nav__link${active ? " site-mobile-bottom-nav__link--active" : ""}`}
               aria-current={active ? "page" : undefined}
+              {...(item.href.startsWith("/site/venues")
+                ? {
+                    "data-distance-trigger": "true",
+                    "data-lat-key": "distanceLat",
+                    "data-lng-key": "distanceLng",
+                    "data-denied-key": "distanceDenied",
+                  }
+                : {})}
             >
               <span className="site-mobile-bottom-nav__icon">
                 {item.icon === "home" ? (
@@ -82,20 +90,6 @@ export default function GlobalHomeButton() {
           );
         })}
       </nav>
-
-      <div className="site-home-fab-bar site-home-fab-bar--desktop-single">
-        <Link
-          href="/site"
-          className="site-home-fab site-home-fab--soft site-home-fab-link"
-          aria-label="홈"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M3 11.5L12 4l9 7.5" />
-            <path d="M5 10.5V20h14v-9.5" />
-            <path d="M9.5 20v-5h5v5" />
-          </svg>
-        </Link>
-      </div>
     </div>
   );
 }

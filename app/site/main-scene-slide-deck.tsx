@@ -289,10 +289,12 @@ export default function MainSceneSlideDeck({
   const tInScene = clampedElapsed % SCENE_S;
 
   const trimmedNotice = siteNoticeText?.trim() ?? "";
-  const noticeBlock =
+  const noticeOverlay =
     trimmedNotice.length > 0 ? (
-      <div className={styles.slideDeckNotice}>
-        <span className={styles.slideDeckNoticeMarquee}>{trimmedNotice}</span>
+      <div className={styles.slideDeckNoticeWrap} aria-live="polite">
+        <div className={styles.slideDeckNotice}>
+          <span className={styles.slideDeckNoticeMarquee}>{trimmedNotice}</span>
+        </div>
       </div>
     ) : null;
 
@@ -324,6 +326,7 @@ export default function MainSceneSlideDeck({
 
   const deck = (
     <div
+      data-no-root-swipe
       className={styles.slideDeck}
       onWheel={onWheel}
       onPointerDown={onPointerDown}
@@ -331,14 +334,14 @@ export default function MainSceneSlideDeck({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
     >
+      {noticeOverlay}
       {deckInner}
     </div>
   );
 
-  if (noticeBlock) {
+  if (trimmedNotice.length > 0) {
     return (
-      <div className={styles.slideDeckShell}>
-        {noticeBlock}
+      <div data-no-root-swipe className={styles.slideDeckShell}>
         {deck}
       </div>
     );

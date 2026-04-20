@@ -22,6 +22,19 @@ import { computeLegacyAutoSettlementSummary } from "./settlement-legacy-summary"
 import { MAX_COMMUNITY_POST_IMAGE_COUNT } from "../community-post-images";
 import { normalizeCommunityPostImageSizeLevels } from "../community-post-content-images";
 import { tournamentStatusEligibleForMainSlide } from "../site-tournament-badges";
+import {
+  firestoreCreateUser,
+  firestoreFindByLoginIdAndPhoneDigits,
+  firestoreFindByLoginIdNorm,
+  firestoreFindByPhoneDigits,
+  firestoreGetUserById,
+  firestoreHasDuplicateIdentity,
+  firestoreHasOtherUserWithPhoneDigits,
+  firestoreIsNicknameKeyTaken,
+  firestoreReplaceUser,
+  firestoreUpdatePassword,
+  isFirestoreUsersBackendConfigured,
+} from "./firestore-users";
 
 export type {
   TournamentDivisionMetricType,
@@ -750,6 +763,11 @@ const STORE_BACKUP_PATH = path.join(STORE_DIR_PATH, "v3-dev-store.json.backup");
 const STORE_BACKUP_TIMESTAMP_PATH = path.join(STORE_DIR_PATH, "v3-dev-store.json.backup.timestamp");
 /** 메인 파일이 깨졌을 때 우선 복구에 사용하는 마지막 정상 스냅샷(원자적 저장으로 갱신) */
 const STORE_LAST_GOOD_PATH = path.join(STORE_DIR_PATH, "v3-dev-store.json.last-good.json");
+
+/** 운영(production) + Firebase 자격 증명이 있을 때만: 회원·로그인 사용자 레코드는 Firestore, dev-store JSON 사용자 테이블은 보조(시드 관리자 등) */
+function useFirestoreUsersInProduction(): boolean {
+  return process.env.NODE_ENV === "production" && isFirestoreUsersBackendConfigured();
+}
 
 /** dev-store JSON 파일 접근 직렬화(동시 rename/read·쓰기로 인한 Windows EBUSY 완화). 내부는 writeStoreImpl로 재진입 없이 처리. */
 let storeIoChain: Promise<void> = Promise.resolve();
@@ -2615,6 +2633,12 @@ async function readStoreImpl(): Promise<DevStore> {
 }
 
 async function writeStoreImpl(store: DevStore): Promise<void> {
+  if (process.env.NODE_ENV === "production") {
+    const msg =
+      "[dev-store] 운영 환경에서는 v3-dev-store.json 파일 쓰기(백업/tmp/atomic write)를 사용할 수 없습니다. 해당 기능은 영구 저장소로 이전해야 합니다.";
+    console.error(msg);
+    throw new Error(msg);
+  }
   await snapshotValidMainToBackupAndLastGoodBeforeWrite();
   const baseline = await loadDevStoreFromFirstReadableDiskFile();
   const combined = baseline ? mergeShallowDefinedKeysFromIncoming(baseline, store) : store;
@@ -2773,8 +2797,18 @@ export async function checkNicknameAvailability(
 ): Promise<{ ok: true; nickname: string } | { ok: false; error: string }> {
   const parsed = parseNicknameInput(raw);
   if (!parsed.ok) return parsed;
-  const store = await readStore();
   const key = nicknameCompareKey(parsed.nickname);
+  if (useFirestoreUsersInProduction()) {
+    try {
+      if (await firestoreIsNicknameKeyTaken(key, excludeUserId)) {
+        return { ok: false, error: "이미 사용중" };
+      }
+    } catch (e) {
+      console.error("[dev-store] checkNicknameAvailability Firestore 실패", e);
+      return { ok: false, error: "닉네임 확인 중 오류가 발생했습니다." };
+    }
+  }
+  const store = await readStore();
   if (isNicknameKeyTakenInStore(store, key, excludeUserId)) {
     return { ok: false, error: "이미 사용중" };
   }
@@ -3206,6 +3240,51 @@ export async function createUser(params: {
   if (!password) return { ok: false, error: "비밀번호를 입력해 주세요." };
   if (!nickResult.ok) return { ok: false, error: nickResult.error };
 
+  if (process.env.NODE_ENV === "production") {
+    if (!isFirestoreUsersBackendConfigured()) {
+      console.error(
+        "[dev-store] production 회원가입: Firestore 자격 증명(FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY)이 없습니다."
+      );
+      return { ok: false, error: "일시적으로 가입을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요." };
+    }
+    try {
+      const duplicatedFs = await firestoreHasDuplicateIdentity({
+        loginIdNorm: loginId,
+        email,
+        phoneDigits: phone,
+      });
+      if (duplicatedFs) {
+        return { ok: false, error: "이미 가입된 계정 정보입니다." };
+      }
+      const nickKey = nicknameCompareKey(nickResult.nickname);
+      if (await firestoreIsNicknameKeyTaken(nickKey)) {
+        return { ok: false, error: "이미 사용중" };
+      }
+      const now = new Date().toISOString();
+      const pushMarketingAgreed = typeof params.pushMarketingAgreed === "boolean" ? params.pushMarketingAgreed : true;
+      const newUser: DevUser = {
+        id: stableUserIdFromDevIdentity({ email, phone }),
+        loginId,
+        nickname: nickResult.nickname,
+        name,
+        email,
+        phone,
+        password,
+        role: "USER",
+        status: "ACTIVE",
+        createdAt: now,
+        updatedAt: now,
+        linkedVenueId: null,
+        pushMarketingAgreed,
+      };
+      await firestoreCreateUser(newUser);
+      return { ok: true, user: newUser };
+    } catch (e) {
+      console.error("[dev-store] createUser Firestore 저장 실패", e);
+      return { ok: false, error: "회원가입 처리 중 오류가 발생했습니다." };
+    }
+  }
+
   const store = await readStore();
   const duplicated = store.users.some((user) => {
     const uPhone = normalizePhone(user.phone ?? "");
@@ -3249,6 +3328,15 @@ export async function findUserByIdentifier(identifier: string): Promise<DevUser 
   const loginId = normalizeLoginId(identifier);
   if (!loginId) return null;
 
+  if (useFirestoreUsersInProduction()) {
+    try {
+      const u = await firestoreFindByLoginIdNorm(loginId);
+      if (u) return u;
+    } catch (e) {
+      console.error("[dev-store] findUserByIdentifier Firestore 조회 실패", e);
+    }
+  }
+
   const store = await readStore();
   return store.users.find((item) => item.loginId.toLowerCase() === loginId) ?? null;
 }
@@ -3257,6 +3345,14 @@ export async function findUserByIdentifier(identifier: string): Promise<DevUser 
 export async function findUserByPhone(phone: string): Promise<DevUser | null> {
   const p = normalizePhone(phone);
   if (!p) return null;
+  if (useFirestoreUsersInProduction()) {
+    try {
+      const u = await firestoreFindByPhoneDigits(p);
+      if (u) return u;
+    } catch (e) {
+      console.error("[dev-store] findUserByPhone Firestore 조회 실패", e);
+    }
+  }
   const store = await readStore();
   const matches = store.users.filter((u) => normalizePhone(u.phone ?? "") === p);
   if (matches.length === 0) return null;
@@ -3269,6 +3365,14 @@ export async function findUserByLoginIdAndPhone(loginId: string, phone: string):
   if (!p) return null;
   const raw = loginId.trim().toLowerCase();
   if (!raw) return null;
+  if (useFirestoreUsersInProduction()) {
+    try {
+      const u = await firestoreFindByLoginIdAndPhoneDigits(raw, p);
+      if (u) return u;
+    } catch (e) {
+      console.error("[dev-store] findUserByLoginIdAndPhone Firestore 조회 실패", e);
+    }
+  }
   const store = await readStore();
   return (
     store.users.find((u) => {
@@ -3289,6 +3393,14 @@ export function maskLoginIdForDisplay(loginId: string): string {
 export async function updateUserPasswordByUserId(userId: string, newPassword: string): Promise<boolean> {
   const pw = newPassword.trim();
   if (!pw) return false;
+  if (useFirestoreUsersInProduction()) {
+    try {
+      const ok = await firestoreUpdatePassword(userId, pw);
+      if (ok) return true;
+    } catch (e) {
+      console.error("[dev-store] updateUserPasswordByUserId Firestore 실패", e);
+    }
+  }
   const store = await readStore();
   const user = findUserByRawId(store, userId);
   if (!user) return false;
@@ -3299,6 +3411,14 @@ export async function updateUserPasswordByUserId(userId: string, newPassword: st
 }
 
 export async function getUserById(userId: string): Promise<DevUser | null> {
+  if (useFirestoreUsersInProduction()) {
+    try {
+      const u = await firestoreGetUserById(userId);
+      if (u) return u;
+    } catch (e) {
+      console.error("[dev-store] getUserById Firestore 조회 실패", e);
+    }
+  }
   const store = await readStore();
   return findUserByRawId(store, userId);
 }
@@ -3421,6 +3541,51 @@ export async function updateUserProfile(params: {
   if (!userId) return { ok: false, error: "잘못된 요청입니다." };
   if (!name) return { ok: false, error: "이름을 입력해 주세요." };
   if (!nickResult.ok) return { ok: false, error: nickResult.error };
+
+  if (useFirestoreUsersInProduction()) {
+    try {
+      const fsUser = await firestoreGetUserById(userId);
+      if (fsUser) {
+        const store = await readStore();
+        const newKey = nicknameCompareKey(nickResult.nickname);
+        const currentKey = nicknameCompareKey(fsUser.nickname);
+        if (newKey !== currentKey) {
+          if (await firestoreIsNicknameKeyTaken(newKey, userId)) {
+            return { ok: false, error: "이미 사용중" };
+          }
+          if (isNicknameKeyTakenInStore(store, newKey, userId)) {
+            return { ok: false, error: "이미 사용중" };
+          }
+        }
+        if (phone) {
+          const dupFile = store.users.some(
+            (item) => item.id !== userId && normalizePhone(item.phone ?? "") === phone
+          );
+          if (dupFile) {
+            return { ok: false, error: "이미 사용 중인 전화번호입니다." };
+          }
+          if (await firestoreHasOtherUserWithPhoneDigits(phone, userId)) {
+            return { ok: false, error: "이미 사용 중인 전화번호입니다." };
+          }
+        }
+        fsUser.name = name;
+        fsUser.nickname = nickResult.nickname;
+        fsUser.phone = phone;
+        if (password) {
+          fsUser.password = password;
+        }
+        if (typeof params.pushMarketingAgreed === "boolean") {
+          fsUser.pushMarketingAgreed = params.pushMarketingAgreed;
+        }
+        fsUser.updatedAt = new Date().toISOString();
+        await firestoreReplaceUser(fsUser);
+        return { ok: true, user: fsUser };
+      }
+    } catch (e) {
+      console.error("[dev-store] updateUserProfile Firestore 실패", e);
+      return { ok: false, error: "프로필 저장 중 오류가 발생했습니다." };
+    }
+  }
 
   const store = await readStore();
   const user = findUserByRawId(store, userId);

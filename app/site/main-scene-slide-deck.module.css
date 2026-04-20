@@ -1,23 +1,41 @@
-/* 공지 + 슬라이드 한 카드(경계·여백 없음) */
+/* 공지 있을 때: 슬라이드 덱만 감싸 외곽선 유지 */
 .slideDeckShell {
   width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  overflow: hidden;
+  display: block;
+  overflow: visible;
   border-radius: 0;
   border-bottom: 1px solid #94a3b8;
 }
 
-.slideDeckNotice {
-  flex: 0 0 auto;
-  width: 100%;
-  min-height: 2.5rem;
+/* 슬라이드창 안 상단 — 좌우 여백 두고 떠 있는 공지 카드 (슬라이드 배경·비네트 위, 섹션 라벨 아래) */
+.slideDeckNoticeWrap {
+  position: absolute;
+  left: max(0.75rem, env(safe-area-inset-left, 0px));
+  right: max(0.75rem, env(safe-area-inset-right, 0px));
+  top: 2.7rem;
+  z-index: 180;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
   box-sizing: border-box;
-  padding: 0.5rem 0.85rem;
-  border-radius: 0;
-  background: rgba(255, 235, 59, 0.5);
-  border: 1px solid rgba(180, 140, 0, 0.35);
+}
+
+.slideDeck:not(:has(.slideDeckLabel)) .slideDeckNoticeWrap {
+  top: 0.65rem;
+}
+
+.slideDeckNotice {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-height: 0;
+  padding: 0.42rem 0.7rem;
+  border-radius: 10px;
+  background: #fff176;
+  border: 1px solid #c9a227;
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.06),
+    0 8px 18px rgba(0, 0, 0, 0.22);
   overflow: hidden;
   white-space: nowrap;
 }

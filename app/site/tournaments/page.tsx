@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Script from "next/script";
 import { SITE_TOURNAMENT_LIST_EXCLUDED_BADGES } from "../../../lib/site-tournament-badges";
 import {
   formatTournamentScheduleLabel,
@@ -9,6 +8,7 @@ import {
 } from "../../../lib/server/dev-store";
 import SiteShellFrame from "../components/SiteShellFrame";
 import TournamentsFilterBar from "./tournaments-filter-bar";
+import TournamentsGeoStorageSync from "./TournamentsGeoStorageSync";
 import { buildTournamentListHref, parseTournamentStatusFilter } from "./tournament-list-url";
 
 export const dynamic = "force-dynamic";
@@ -105,6 +105,10 @@ export default async function SiteTournamentsPage({
   const viewerCoordinate =
     viewerLat != null && viewerLng != null ? normalizeCoordinate(viewerLat, viewerLng) : null;
 
+  const rawDenied = resolvedSearchParams.distanceDenied;
+  const deniedStr = Array.isArray(rawDenied) ? rawDenied[0] : rawDenied;
+  const locationDenied = deniedStr === "1" || deniedStr === "true";
+
   const statusFilter = parseTournamentStatusFilter(resolvedSearchParams.status);
 
   const tournaments = await listAllTournaments();
@@ -142,47 +146,6 @@ export default async function SiteTournamentsPage({
 
   return (
     <SiteShellFrame
-      prependMain={
-        <Script id="site-tournaments-distance-geolocation" strategy="afterInteractive">
-          {`
-          (() => {
-            if (typeof window === "undefined") return;
-            document.addEventListener("click", (event) => {
-              const target = event.target;
-              if (!(target instanceof Element)) return;
-              const trigger = target.closest("a[data-distance-trigger='true']");
-              if (!(trigger instanceof HTMLAnchorElement)) return;
-              event.preventDefault();
-
-              const moveWithDenied = () => {
-                const deniedUrl = new URL(trigger.href, window.location.origin);
-                deniedUrl.searchParams.set("distanceDenied", "1");
-                deniedUrl.searchParams.delete("distanceLat");
-                deniedUrl.searchParams.delete("distanceLng");
-                window.location.assign(deniedUrl.pathname + deniedUrl.search + deniedUrl.hash);
-              };
-
-              if (!("geolocation" in navigator)) {
-                moveWithDenied();
-                return;
-              }
-
-              navigator.geolocation.getCurrentPosition(
-                (position) => {
-                  const okUrl = new URL(trigger.href, window.location.origin);
-                  okUrl.searchParams.set("distanceLat", String(position.coords.latitude));
-                  okUrl.searchParams.set("distanceLng", String(position.coords.longitude));
-                  okUrl.searchParams.delete("distanceDenied");
-                  window.location.assign(okUrl.pathname + okUrl.search + okUrl.hash);
-                },
-                () => moveWithDenied(),
-                { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
-              );
-            });
-          })();
-        `}
-        </Script>
-      }
       brandTitle="대회안내"
       auxiliary={
         <TournamentsFilterBar
@@ -193,7 +156,24 @@ export default async function SiteTournamentsPage({
         />
       }
     >
+      <TournamentsGeoStorageSync viewerCoordinate={viewerCoordinate} />
       <section className="site-site-gray-main v3-stack">
+        {sortType === "DISTANCE" && locationDenied ? (
+          <p
+            role="status"
+            className="v3-muted"
+            style={{
+              margin: "0 0 1rem",
+              padding: "0.65rem 0.75rem",
+              borderRadius: "8px",
+              background: "var(--v3-surface-2, #eef0f3)",
+              fontSize: "0.9rem",
+              lineHeight: 1.45,
+            }}
+          >
+            위치 권한을 허용해야 거리순으로 볼 수 있습니다. 브라우저 설정에서 위치를 허용한 뒤「거리순」을 다시 눌러 주세요.
+          </p>
+        ) : null}
       {ordered.length === 0 ? (
         <p className="v3-muted">등록된 대회가 없습니다.</p>
       ) : (

@@ -1,5 +1,6 @@
 import { getSiteVenuesBoardRows } from "../../../lib/server/dev-store";
 import SiteVenuesBoard from "./SiteVenuesBoard";
+import { buildVenuesDistanceHref } from "./venues-list-url";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,20 @@ export default async function SiteVenuesPage({
       ? { lat, lng }
       : null;
 
+  const rawDenied = sp.distanceDenied;
+  const deniedStr = Array.isArray(rawDenied) ? rawDenied[0] : rawDenied;
+  const locationDenied = deniedStr === "1" || deniedStr === "true";
+
+  const hasViewerCoordinate = distanceSort != null;
+  const distanceButtonHref = `/site/venues${buildVenuesDistanceHref(sp, distanceSort)}`;
+
   return (
-    <SiteVenuesBoard initialRows={rows} distanceSort={distanceSort} />
+    <SiteVenuesBoard
+      initialRows={rows}
+      distanceSort={distanceSort}
+      locationDenied={locationDenied}
+      distanceButtonHref={distanceButtonHref}
+      hasViewerCoordinate={hasViewerCoordinate}
+    />
   );
 }
