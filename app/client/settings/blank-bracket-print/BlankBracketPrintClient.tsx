@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { buildBracketScene } from "./bracket-render-engine";
@@ -30,6 +30,12 @@ type MatchType    = "NORMAL" | "SCOTCH";
 type BracketStyle = "TREE" | "CENTER";
 type TreeLayout   = "HORIZONTAL" | "VERTICAL";
 
+/** 모바일·좁은 화면: 팝업 대신 인앱 전체 화면 미리보기 */
+function isMobilePreviewViewport(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(max-width: 768px)").matches;
+}
+
 export default function BlankBracketPrintClient() {
   const [matchType,    setMatchType]    = useState<MatchType>("NORMAL");
   const [startPlayers, setStartPlayers] = useState(32);
@@ -39,6 +45,7 @@ export default function BlankBracketPrintClient() {
   const [pdfExporting, setPdfExporting] = useState(false);
   const pdfRootRef = useRef<HTMLDivElement>(null);
   const pdfBusyRef = useRef(false);
+  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
 
   const endOptions = useMemo(() => validEndOptions(startPlayers), [startPlayers]);
   const rounds = useMemo(() => {
@@ -59,9 +66,13 @@ export default function BlankBracketPrintClient() {
     return buildBracketScene({ rounds, style, treeLayout });
   }, [rounds, style, treeLayout]);
 
-  /** 새 창에 277×190mm 대진표만 표시 — 사용자가 Ctrl+P 등으로 인쇄 */
+  /** 새 창(데스크톱) 또는 인앱 전체 화면(모바일) 미리보기 */
   const handleOpenPreviewWindow = useCallback(() => {
     if (!rounds.length || !scene) return;
+    if (isMobilePreviewViewport()) {
+      setMobilePreviewOpen(true);
+      return;
+    }
     const open = () => {
       const root = pdfRootRef.current;
       if (!root) return;
@@ -108,6 +119,20 @@ export default function BlankBracketPrintClient() {
     };
     requestAnimationFrame(() => requestAnimationFrame(open));
   }, [rounds.length, scene]);
+
+  useEffect(() => {
+    if (!mobilePreviewOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobilePreviewOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [mobilePreviewOpen]);
 
   /** A4 가로 PDF — html2canvas 로 `.bbp-print-svg` 캡처 후 jsPDF 에 277×190mm 로 삽입 */
   const handleExportPDF = useCallback(async () => {
@@ -249,7 +274,101 @@ export default function BlankBracketPrintClient() {
         </main>
       </div>
 
-      {/* html2canvas·새창 미리보기 공용: 277×190mm SVG (화면 밖) */}
+      {/* 모바일: 인앱 전체 화면 미리보기 (브라우저 새 창 미사용) */}
+      {mobilePreviewOpen && scene && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="대진표 미리보기"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 99999,
+            display: "flex",
+            flexDirection: "column",
+            background: "#0f172a",
+            boxSizing: "border-box",
+          }}
+        >
+          <div
+            style={{
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              minHeight: "48px",
+              padding: "8px 12px",
+              background: "#1e293b",
+              borderBottom: "1px solid #334155",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setMobilePreviewOpen(false)}
+              aria-label="닫기"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "44px",
+                height: "44px",
+                padding: 0,
+                border: "none",
+                borderRadius: "8px",
+                background: "transparent",
+                color: "#f8fafc",
+                fontSize: "28px",
+                lineHeight: 1,
+                cursor: "pointer",
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >
+              ×
+            </button>
+          </div>
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflow: "auto",
+              WebkitOverflowScrolling: "touch",
+              padding: "12px",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "flex-start",
+              boxSizing: "border-box",
+            }}
+          >
+            <div
+              style={{
+                background: "#fff",
+                boxShadow: "0 4px 24px rgba(0,0,0,0.35)",
+                boxSizing: "border-box",
+                width: "297mm",
+                minWidth: "min(297mm, 100%)",
+                minHeight: "210mm",
+                padding: `${MARGIN_MM}mm`,
+              }}
+            >
+              <BracketSVG scene={scene} matchType={matchType} />
+            </div>
+          </div>
+          <p
+            style={{
+              flexShrink: 0,
+              margin: 0,
+              padding: "10px 16px 16px",
+              fontSize: "12px",
+              color: "#94a3b8",
+              textAlign: "center",
+            }}
+          >
+            인쇄는 브라우저 메뉴에서 가능합니다.
+          </p>
+        </div>
+      )}
+
+      {/* html2canvas·데스크톱 새창 미리보기 공용: 277×190mm SVG (화면 밖) */}
       {scene && (
         <div ref={pdfRootRef} className="bbp-print-svg" id="bbp-print-svg-root">
           <BracketSVG scene={scene} matchType={matchType} />
