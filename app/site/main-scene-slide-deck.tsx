@@ -298,9 +298,16 @@ export default function MainSceneSlideDeck({
       </div>
     ) : null;
 
-  const deckInner = (
-    <>
-      {sectionLabel.trim() ? <p className={styles.slideDeckLabel}>{sectionLabel.trim()}</p> : null}
+  const deck = (
+    <div
+      data-no-root-swipe
+      className={styles.slideDeck}
+      onWheel={onWheel}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+    >
       {items.map((item, i) => {
         const role = sceneRoleForCard(i, n, sceneId);
         const style = cardStyleForRole(
@@ -321,21 +328,20 @@ export default function MainSceneSlideDeck({
           </div>
         );
       })}
-    </>
-  );
-
-  const deck = (
-    <div
-      data-no-root-swipe
-      className={styles.slideDeck}
-      onWheel={onWheel}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
-    >
-      {noticeOverlay}
-      {deckInner}
+      {/* 카드(transform)보다 위에 두기 위해 레이어 뒤·높은 z-index·flex로 창 안에 고정 */}
+      <div className={styles.slideDeckFrameOverlay}>
+        <div className={styles.slideDeckTopChrome}>
+          {noticeOverlay}
+          {sectionLabel.trim() ? (
+            <p className={styles.slideDeckLabel}>{sectionLabel.trim()}</p>
+          ) : null}
+        </div>
+        <div className={styles.slideDeckBottomDots} aria-hidden="true">
+          <span className={styles.slideDeckBottomDotY}>●</span>
+          <span className={styles.slideDeckBottomDotR}>●</span>
+          <span className={styles.slideDeckBottomDotW}>●</span>
+        </div>
+      </div>
     </div>
   );
 

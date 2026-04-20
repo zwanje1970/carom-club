@@ -1,10 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import FilterButton from "../components/FilterButton";
 import FilterDropdown from "../components/FilterDropdown";
-import { VENUES_GEO_STORAGE_LAT, VENUES_GEO_STORAGE_LNG } from "../components/SiteVenuesGeolocationNav";
+import {
+  performGeolocationThenNavigate,
+  VENUES_GEO_STORAGE_LAT,
+  VENUES_GEO_STORAGE_LNG,
+} from "../lib/site-geolocation-flow";
 import SiteShellFrame from "../components/SiteShellFrame";
 import filterStyles from "../components/filter-controls.module.css";
 
@@ -81,8 +86,9 @@ export default function SiteVenuesBoard({
   distanceButtonHref,
   hasViewerCoordinate,
 }: Props) {
-  const [venueType, setVenueType] = useState<VenueTypeFilter>("all");
-  const [feeType, setFeeType] = useState<FeeTypeFilter>("all");
+  const router = useRouter();
+  const [venueType, setVenueType] = useState<VenueTypeFilter>("daedae_only");
+  const [feeType, setFeeType] = useState<FeeTypeFilter>("normal");
 
   useEffect(() => {
     if (!distanceSort) return;
@@ -175,14 +181,14 @@ export default function SiteVenuesBoard({
           href={distanceButtonHref}
           useNextLink={hasViewerCoordinate}
           style={{ width: "100%", justifyContent: "center", boxSizing: "border-box" }}
-          {...(!hasViewerCoordinate
-            ? {
-                "data-distance-trigger": "true" as const,
-                "data-lat-key": "distanceLat",
-                "data-lng-key": "distanceLng",
-                "data-denied-key": "distanceDenied",
-              }
-            : {})}
+          onClick={
+            hasViewerCoordinate
+              ? undefined
+              : (e) => {
+                  e.preventDefault();
+                  performGeolocationThenNavigate(distanceButtonHref, (path) => router.push(path));
+                }
+          }
         >
           거리순
         </FilterButton>

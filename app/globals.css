@@ -187,6 +187,37 @@ body {
   touch-action: manipulation;
 }
 
+/* 루트 5탭 스와이프: [prev|현재|next] 가로 트랙 — 드래그 팔로우 (SiteRootSwipeNav) */
+.site-root-swipe-viewport {
+  overflow: hidden;
+  width: 100%;
+  min-height: 0;
+}
+
+.site-root-swipe-track {
+  display: flex;
+  flex-direction: row;
+  width: 300vw;
+  transform: translateX(-100vw);
+  will-change: transform;
+}
+
+.site-root-swipe-panel {
+  flex: 0 0 100vw;
+  width: 100vw;
+  max-width: 100vw;
+  box-sizing: border-box;
+}
+
+.site-root-swipe-panel--placeholder {
+  min-height: 100dvh;
+  background: var(--ui-bg-page);
+}
+
+.site-root-swipe-panel--main {
+  min-height: min-content;
+}
+
 /* PC 사이트: 본문이 짧을 때 푸터를 뷰포트 하단에 맞춤 (sticky footer, flex 흐름) */
 .site-shell--pc-sticky-footer {
   display: flex;
@@ -514,11 +545,6 @@ body:has(.site-home-page) {
   white-space: nowrap;
 }
 
-/* 메인 로고: ●●● 뒤 한 칸 */
-.site-main-logo-name {
-  margin-left: 0.35em;
-}
-
 /* 모바일: 공통 상단 타이틀 블록(동일 높이·정렬) — PC는 기존 브랜드 영역 유지 */
 @media (max-width: 767px) {
   .site-mobile-page-title-block {
@@ -546,11 +572,6 @@ body:has(.site-home-page) {
     font-size: 1.05rem;
     line-height: 1.2;
     letter-spacing: -0.02em;
-  }
-
-  .site-main-logo-dots {
-    color: #94a3b8;
-    font-weight: 500;
   }
 
   .site-main-logo-name {
@@ -864,6 +885,136 @@ body:has(.site-home-page) {
 .ui-community-page {
   gap: 1.1rem !important;
   padding-bottom: 2rem;
+}
+
+/* 커뮤니티 허브: 가벼운 텍스트 탭 + 게시판형 목록 */
+.ui-community-board-hub {
+  gap: 0.75rem !important;
+}
+
+.ui-community-tabs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0.45rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.35rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.ui-community-tabs-link {
+  display: inline-block;
+  padding: 0.38rem 0.55rem;
+  font-size: 0.9rem;
+  color: #475569;
+  text-decoration: none;
+  border-radius: 4px;
+}
+
+.ui-community-tabs-link--active {
+  font-weight: 700;
+  color: var(--ui-primary, #2563eb);
+  background: #eff6ff;
+}
+
+.ui-community-search-label {
+  font-size: 0.78rem;
+  display: block;
+}
+
+.ui-community-search-row {
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.ui-community-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  font-size: 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.ui-community-search-btn {
+  flex: 0 0 auto;
+  padding: 0.45rem 0.85rem;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.ui-community-board-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ui-community-board-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e8e8e8;
+  min-width: 0;
+}
+
+.ui-community-board-row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ui-community-board-title-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  font-size: 0.95rem;
+  line-height: 1.38;
+  font-weight: 600;
+}
+
+.ui-community-board-prefix {
+  font-weight: 500;
+  color: #64748b;
+  margin-right: 0.2rem;
+}
+
+.ui-community-board-title {
+  color: #0f172a;
+}
+
+.ui-community-board-meta {
+  margin: 0.22rem 0 0;
+  font-size: 0.78rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+.ui-community-board-row-aside {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+}
+
+.ui-community-board-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 3px;
+  background: #f1f5f9;
+  display: block;
+}
+
+.ui-community-board-comments {
+  font-size: 0.74rem;
+  color: #64748b;
+  white-space: nowrap;
 }
 
 .ui-community-board-list {

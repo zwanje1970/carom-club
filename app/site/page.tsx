@@ -16,6 +16,7 @@ import {
 } from "../../lib/server/dev-store";
 import SiteShellFrame from "./components/SiteShellFrame";
 import SiteMainLogo from "./components/SiteMainLogo";
+import VenuesDistanceNavLink from "./components/VenuesDistanceNavLink";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -549,32 +550,36 @@ export default async function SiteHomePage({
               gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
             }}
           >
-            {fixedMainButtons.map((row) => (
-              <Link
-                key={`fixed-main-nav-${row.label}`}
-                href={row.href}
-                className="site-home-nav-tile"
-                {...(row.label === "주변당구장"
-                  ? {
-                      "data-distance-trigger": "true",
-                      "data-lat-key": "distanceLat",
-                      "data-lng-key": "distanceLng",
-                      "data-denied-key": "distanceDenied",
-                    }
-                  : {})}
-                style={{
-                  textDecoration: "none",
-                  color: "inherit",
-                  textAlign: "center",
-                  minHeight: "3.35rem",
-                }}
-              >
-                <span className="site-home-nav-icon">
-                  <SiteMainNavIcon variant={mainNavVariants[row.label]} />
-                </span>
-                <span className="site-home-nav-label">{row.label}</span>
-              </Link>
-            ))}
+            {fixedMainButtons.map((row) => {
+              const tileStyle = {
+                textDecoration: "none" as const,
+                color: "inherit",
+                textAlign: "center" as const,
+                minHeight: "3.35rem",
+              };
+              const inner = (
+                <>
+                  <span className="site-home-nav-icon">
+                    <SiteMainNavIcon variant={mainNavVariants[row.label]} />
+                  </span>
+                  <span className="site-home-nav-label">{row.label}</span>
+                </>
+              );
+              return row.label === "주변당구장" ? (
+                <VenuesDistanceNavLink
+                  key={`fixed-main-nav-${row.label}`}
+                  href={row.href}
+                  className="site-home-nav-tile"
+                  style={tileStyle}
+                >
+                  {inner}
+                </VenuesDistanceNavLink>
+              ) : (
+                <Link key={`fixed-main-nav-${row.label}`} href={row.href} className="site-home-nav-tile" style={tileStyle}>
+                  {inner}
+                </Link>
+              );
+            })}
           </section>
           {dashboardHref ? (
             <Link href={dashboardHref} className="site-home-cta-primary">

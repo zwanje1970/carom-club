@@ -21,12 +21,23 @@ export default function MainSceneSlideDeckClient(props: Props) {
     const notice = props.siteNoticeText?.trim();
     const deck = (
       <div data-no-root-swipe aria-hidden className={styles.slideDeck}>
-        <div className={styles.slideDeckNoticeWrap}>
-          <div className={styles.slideDeckNotice}>
-            <span className={styles.slideDeckNoticeMarquee}>{notice}</span>
+        <div className={styles.slideDeckFrameOverlay}>
+          <div className={styles.slideDeckTopChrome}>
+            {notice ? (
+              <div className={styles.slideDeckNoticeWrap}>
+                <div className={styles.slideDeckNotice}>
+                  <span className={styles.slideDeckNoticeMarquee}>{notice}</span>
+                </div>
+              </div>
+            ) : null}
+            <p className={styles.slideDeckLabel}>{label}</p>
+          </div>
+          <div className={styles.slideDeckBottomDots} aria-hidden="true">
+            <span className={styles.slideDeckBottomDotY}>●</span>
+            <span className={styles.slideDeckBottomDotR}>●</span>
+            <span className={styles.slideDeckBottomDotW}>●</span>
           </div>
         </div>
-        <p className={styles.slideDeckLabel}>{label}</p>
       </div>
     );
     if (notice) {

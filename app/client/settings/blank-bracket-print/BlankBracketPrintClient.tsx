@@ -122,14 +122,11 @@ export default function BlankBracketPrintClient() {
 
   useEffect(() => {
     if (!mobilePreviewOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setMobilePreviewOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => {
-      document.body.style.overflow = prev;
       window.removeEventListener("keydown", onKey);
     };
   }, [mobilePreviewOpen]);
@@ -318,23 +315,16 @@ const A4_PORTRAIT_H = 1123;
 const A4_LANDSCAPE_W = 1123;
 const A4_LANDSCAPE_H = 794;
 
-function paperPxForPreview(
-  style: BracketStyle,
-  treeLayout: TreeLayout,
-  vw: number,
-  vh: number
-): { paperW: number; paperH: number } {
-  let landscape: boolean;
-  if (style === "CENTER") {
-    landscape = true;
-  } else if (style === "TREE" && treeLayout === "VERTICAL") {
-    landscape = false;
-  } else if (style === "TREE" && treeLayout === "HORIZONTAL") {
-    landscape = true;
-  } else {
-    landscape = vw > vh;
-  }
-  return landscape
+/** 미리보기 paper 방향: 대진표 레이아웃 기준(뷰포트/기기 방향 사용 안 함) */
+function paperOrientationFromBracket(style: BracketStyle, treeLayout: TreeLayout): "portrait" | "landscape" {
+  if (style === "CENTER") return "landscape";
+  if (style === "TREE" && treeLayout === "VERTICAL") return "portrait";
+  if (style === "TREE" && treeLayout === "HORIZONTAL") return "landscape";
+  return "landscape";
+}
+
+function paperPxForOrientation(orientation: "portrait" | "landscape"): { paperW: number; paperH: number } {
+  return orientation === "landscape"
     ? { paperW: A4_LANDSCAPE_W, paperH: A4_LANDSCAPE_H }
     : { paperW: A4_PORTRAIT_W, paperH: A4_PORTRAIT_H };
 }
@@ -358,13 +348,33 @@ function MobilePrintPreviewLayer({
   viewportHeight,
   onBackdropClose,
 }: MobilePreviewLayerProps) {
+  const derivedOrientation = useMemo(() => paperOrientationFromBracket(style, treeLayout), [style, treeLayout]);
+  const [previewOrientation, setPreviewOrientation] = useState<"portrait" | "landscape">(derivedOrientation);
+
+  useEffect(() => {
+    setPreviewOrientation(derivedOrientation);
+  }, [derivedOrientation]);
+
   const vw = viewportWidth > 0 ? viewportWidth : 400;
   const vh = viewportHeight > 0 ? viewportHeight : 700;
-  const { paperW, paperH } = paperPxForPreview(style, treeLayout, vw, vh);
-  const scale = Math.min(Math.max(vw - 32, 1) / paperW, Math.max(vh - 32, 1) / paperH);
+
+  const { paperW, paperH } = useMemo(
+    () => paperPxForOrientation(previewOrientation),
+    [previewOrientation],
+  );
+
+  const scale = useMemo(
+    () => Math.min(Math.max(vw - 32, 1) / paperW, Math.max(vh - 32, 1) / paperH),
+    [vw, vh, paperW, paperH],
+  );
+
+  const togglePaperOrientation = useCallback(() => {
+    setPreviewOrientation((o) => (o === "landscape" ? "portrait" : "landscape"));
+  }, []);
 
   return (
     <div
+      className="bbp-preview-root"
       role="dialog"
       aria-modal="true"
       aria-label="출력 미리보기"
@@ -376,21 +386,36 @@ function MobilePrintPreviewLayer({
         background: "#e5e7eb",
         boxSizing: "border-box",
         overflow: "hidden",
+        overscrollBehavior: "contain",
+        touchAction: "none",
       }}
     >
       <div
+        className="bbp-preview-center"
         style={{
           pointerEvents: "none",
           width: "100%",
           height: "100%",
           display: "flex",
-          justifyContent: "center",
-          alignItems: "flex-start",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "flex-start",
           padding: "16px",
           boxSizing: "border-box",
+          gap: "10px",
         }}
       >
         <div
+          className="bbp-preview-toolbar"
+          onClick={(e) => e.stopPropagation()}
+          style={{ pointerEvents: "auto", flexShrink: 0 }}
+        >
+          <button type="button" className="v3-btn" onClick={togglePaperOrientation} style={{ minHeight: "40px" }}>
+            종이 방향: {previewOrientation === "landscape" ? "가로(A4)" : "세로(A4)"} (탭하여 전환)
+          </button>
+        </div>
+        <div
+          className="bbp-preview-paper-frame"
           onClick={(e) => e.stopPropagation()}
           style={{
             pointerEvents: "auto",
@@ -399,6 +424,7 @@ function MobilePrintPreviewLayer({
           }}
         >
           <div
+            className="bbp-preview-paper"
             style={{
               width: paperW,
               height: paperH,
@@ -413,7 +439,7 @@ function MobilePrintPreviewLayer({
               overflow: "hidden",
             }}
           >
-            <div style={{ lineHeight: 0 }}>
+            <div className="bbp-preview-bracket-scene" style={{ lineHeight: 0 }}>
               <BracketSVG scene={scene} matchType={matchType} />
             </div>
           </div>

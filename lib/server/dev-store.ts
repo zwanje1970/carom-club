@@ -494,6 +494,8 @@ export type CommunityPostListItem = {
   createdAt: string;
   viewCount: number;
   commentCount: number;
+  /** 첫 번째 이미지 URL(없으면 null) — 목록 썸네일용 */
+  thumbnailUrl: string | null;
 };
 
 /** 상세 조회 전용 */
@@ -7240,19 +7242,32 @@ export function parseCommunityBoardTypeParam(raw: string): SiteCommunityBoardKey
   return isSiteCommunityBoardKey(t) ? t : null;
 }
 
-export async function listCommunityPosts(boardType: SiteCommunityBoardKey): Promise<CommunityPostListItem[]> {
+/** 커뮤니티 허브 상단 탭(4칸): 자유·질문·대회후기·구인구직 매핑용 */
+export const COMMUNITY_PRIMARY_BOARD_KEYS: SiteCommunityBoardKey[] = ["free", "qna", "reviews", "extra1"];
+
+export async function listCommunityPosts(
+  boardType: SiteCommunityBoardKey,
+  options?: { q?: string }
+): Promise<CommunityPostListItem[]> {
   const store = await readStore();
-  return store.communityPosts
-    .filter((p) => p.boardType === boardType && p.isDeleted !== true)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .map((p) => ({
+  const q = options?.q?.trim().toLowerCase() ?? "";
+  let rows = store.communityPosts.filter((p) => p.boardType === boardType && p.isDeleted !== true);
+  if (q.length > 0) {
+    rows = rows.filter((p) => p.title.toLowerCase().includes(q));
+  }
+  return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((p) => {
+    const imageUrls = normalizeCommunityPostImageUrls(p.imageUrls);
+    const thumbnailUrl = imageUrls.length > 0 ? imageUrls[0]! : null;
+    return {
       id: p.id,
       title: p.title,
       nickname: p.authorNickname,
       createdAt: p.createdAt,
       viewCount: p.viewCount,
       commentCount: p.commentCount,
-    }));
+      thumbnailUrl,
+    };
+  });
 }
 
 export async function getCommunityPostById(postId: string): Promise<CommunityPostDetail | null> {

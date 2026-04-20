@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import GlobalHomeButton from "../components/GlobalHomeButton";
 import SiteRootSwipeNav from "./components/SiteRootSwipeNav";
 import SiteVenuesGeolocationNav from "./components/SiteVenuesGeolocationNav";
+import VenuesDistanceNavLink from "./components/VenuesDistanceNavLink";
 import { getSiteLayoutConfig, getSiteNotice, type SiteLayoutMenuItem } from "../../lib/server/dev-store";
 
 /** 공개 /site 전용: 핀치 줌·사용자 확대 비허용(루트 viewport와 병합). 플랫폼/클라이언트 레이아웃에는 적용되지 않음 */
@@ -48,22 +49,17 @@ function SiteHeaderMobile({ menuItems }: { menuItems: SiteLayoutMenuItem[] }) {
         </Link>
       </div>
       <nav className="site-nav site-nav-mobile" aria-label="사이트 메뉴">
-        {main.map((item, index) => (
-          <Link
-            key={`mobile-main-${index}-${item.href}`}
-            href={item.href}
-            {...(item.href.startsWith("/site/venues")
-              ? {
-                  "data-distance-trigger": "true",
-                  "data-lat-key": "distanceLat",
-                  "data-lng-key": "distanceLng",
-                  "data-denied-key": "distanceDenied",
-                }
-              : {})}
-          >
-            {item.label}
-          </Link>
-        ))}
+        {main.map((item, index) =>
+          item.href.startsWith("/site/venues") ? (
+            <VenuesDistanceNavLink key={`mobile-main-${index}-${item.href}`} href={item.href}>
+              {item.label}
+            </VenuesDistanceNavLink>
+          ) : (
+            <Link key={`mobile-main-${index}-${item.href}`} href={item.href}>
+              {item.label}
+            </Link>
+          ),
+        )}
       </nav>
       <nav className="site-nav-aux site-nav-aux-mobile" aria-label="테스트 진입 메뉴">
         {auxiliary.map((item, index) => (
@@ -85,22 +81,17 @@ function SiteHeaderDesktop({ menuItems }: { menuItems: SiteLayoutMenuItem[] }) {
           캐롬클럽
         </Link>
         <nav className="site-nav site-nav-desktop" aria-label="사이트 메뉴">
-          {main.map((item, index) => (
-            <Link
-              key={`desktop-main-${index}-${item.href}`}
-              href={item.href}
-              {...(item.href.startsWith("/site/venues")
-                ? {
-                    "data-distance-trigger": "true",
-                    "data-lat-key": "distanceLat",
-                    "data-lng-key": "distanceLng",
-                    "data-denied-key": "distanceDenied",
-                  }
-                : {})}
-            >
-              {item.label}
-            </Link>
-          ))}
+          {main.map((item, index) =>
+            item.href.startsWith("/site/venues") ? (
+              <VenuesDistanceNavLink key={`desktop-main-${index}-${item.href}`} href={item.href}>
+                {item.label}
+              </VenuesDistanceNavLink>
+            ) : (
+              <Link key={`desktop-main-${index}-${item.href}`} href={item.href}>
+                {item.label}
+              </Link>
+            ),
+          )}
         </nav>
         <nav className="site-nav-aux site-nav-aux-desktop" aria-label="테스트 진입 메뉴">
           {auxiliary.map((item, index) => (
@@ -176,8 +167,7 @@ export default async function SiteLayout({
     return (
       <div className="site-shell">
         <SiteVenuesGeolocationNav />
-        {children}
-        <SiteRootSwipeNav />
+        <SiteRootSwipeNav>{children}</SiteRootSwipeNav>
         <GlobalHomeButton />
       </div>
     );

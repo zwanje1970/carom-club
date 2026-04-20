@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import VenuesDistanceNavLink from "../site/components/VenuesDistanceNavLink";
 import { SiteMainNavIcon } from "../site/main-nav-icon";
 
 function isInquiryDetailWithComposer(pathname: string): boolean {
@@ -63,21 +64,9 @@ export default function GlobalHomeButton() {
       <nav className="site-mobile-bottom-nav" aria-label="사이트 하단 메뉴">
         {SITE_NAV_ITEMS.map((item) => {
           const active = navItemActive(pathname, item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`site-mobile-bottom-nav__link${active ? " site-mobile-bottom-nav__link--active" : ""}`}
-              aria-current={active ? "page" : undefined}
-              {...(item.href.startsWith("/site/venues")
-                ? {
-                    "data-distance-trigger": "true",
-                    "data-lat-key": "distanceLat",
-                    "data-lng-key": "distanceLng",
-                    "data-denied-key": "distanceDenied",
-                  }
-                : {})}
-            >
+          const cls = `site-mobile-bottom-nav__link${active ? " site-mobile-bottom-nav__link--active" : ""}`;
+          const inner = (
+            <>
               <span className="site-mobile-bottom-nav__icon">
                 {item.icon === "home" ? (
                   <SiteBottomNavHomeIcon />
@@ -86,6 +75,20 @@ export default function GlobalHomeButton() {
                 )}
               </span>
               <span className="site-mobile-bottom-nav__label">{item.label}</span>
+            </>
+          );
+          return item.href.startsWith("/site/venues") ? (
+            <VenuesDistanceNavLink
+              key={item.href}
+              href={item.href}
+              className={cls}
+              aria-current={active ? "page" : undefined}
+            >
+              {inner}
+            </VenuesDistanceNavLink>
+          ) : (
+            <Link key={item.href} href={item.href} className={cls} aria-current={active ? "page" : undefined}>
+              {inner}
             </Link>
           );
         })}

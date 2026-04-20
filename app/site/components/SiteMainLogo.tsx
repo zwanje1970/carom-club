@@ -2,9 +2,6 @@
 export default function SiteMainLogo() {
   return (
     <span className="site-main-logo">
-      <span className="site-main-logo-dots" aria-hidden="true">
-        ●●●
-      </span>
       <span className="site-main-logo-name">CAROM.CLUB</span>
     </span>
   );

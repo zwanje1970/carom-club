@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import FilterButton from "../components/FilterButton";
 import FilterDropdown from "../components/FilterDropdown";
 import filterStyles from "../components/filter-controls.module.css";
+import { performGeolocationThenNavigate } from "../lib/site-geolocation-flow";
 import {
   buildTournamentListHref,
   TOURNAMENT_STATUS_FILTER_OPTIONS,
@@ -49,7 +50,16 @@ export default function TournamentsFilterBar({
       <FilterButton
         href={`/site/tournaments${distanceSortHref}`}
         useNextLink={hasViewerCoordinate}
-        {...(!hasViewerCoordinate ? { "data-distance-trigger": "true" as const } : {})}
+        onClick={
+          hasViewerCoordinate
+            ? undefined
+            : (e) => {
+                e.preventDefault();
+                performGeolocationThenNavigate(`/site/tournaments${distanceSortHref}`, (path) =>
+                  router.push(path),
+                );
+              }
+        }
       >
         거리순
       </FilterButton>
