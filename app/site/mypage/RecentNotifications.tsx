@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 type NotificationItem = {
@@ -13,9 +13,8 @@ type NotificationItem = {
 };
 
 export default function RecentNotifications({ initialItems }: { initialItems: NotificationItem[] }) {
-  const router = useRouter();
   const [items, setItems] = useState(initialItems);
-  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [markingAll, setMarkingAll] = useState(false);
 
   const hasUnread = useMemo(() => items.some((row) => !row.isRead), [items]);
@@ -27,27 +26,24 @@ export default function RecentNotifications({ initialItems }: { initialItems: No
     return true;
   }
 
-  async function handleRowClick(item: NotificationItem) {
-    if (loadingId || markingAll) return;
-    setLoadingId(item.id);
-    try {
-      if (!item.isRead) {
-        try {
-          await markOneRead(item.id);
-        } catch {
-          /* 읽음 API 실패 시에도 대회 이동은 시도 */
+  function toggleItem(item: NotificationItem) {
+    if (markingAll) return;
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(item.id)) {
+        next.delete(item.id);
+      } else {
+        next.add(item.id);
+        if (!item.isRead) {
+          void markOneRead(item.id);
         }
       }
-      if (item.relatedTournamentId) {
-        router.push(`/site/tournaments/${item.relatedTournamentId}`);
-      }
-    } finally {
-      setLoadingId(null);
-    }
+      return next;
+    });
   }
 
   async function handleMarkAllRead() {
-    if (markingAll || loadingId || !hasUnread) return;
+    if (markingAll || !hasUnread) return;
     setMarkingAll(true);
     try {
       const response = await fetch("/api/site/notifications/read-all", { method: "POST" });
@@ -64,47 +60,52 @@ export default function RecentNotifications({ initialItems }: { initialItems: No
   }
 
   return (
-    <div className="v3-stack" style={{ gap: "0.65rem" }}>
+    <div className="v3-stack site-mypage-notifications" style={{ gap: "0.65rem" }}>
       <div className="v3-row" style={{ justifyContent: "flex-end", flexWrap: "wrap" }}>
         <button
           type="button"
           className="v3-btn"
-          disabled={!hasUnread || markingAll || loadingId !== null}
+          disabled={!hasUnread || markingAll}
           onClick={() => void handleMarkAllRead()}
           style={{ fontSize: "0.88rem", padding: "0.4rem 0.75rem" }}
         >
           {markingAll ? "처리 중…" : "모두 읽음으로 표시"}
         </button>
       </div>
-      <ul className="v3-list">
-        {items.map((item) => (
-          <li key={item.id}>
-            <button
-              type="button"
-              className="v3-btn"
-              disabled={loadingId === item.id || markingAll}
-              onClick={() => void handleRowClick(item)}
-              style={{
-                display: "block",
-                width: "100%",
-                textAlign: "left",
-                border: "none",
-                background: item.isRead ? "#f5f5f5" : "#eef6ff",
-                padding: "0.25rem",
-                cursor: loadingId === item.id ? "wait" : "pointer",
-              }}
-            >
-              <strong style={{ fontWeight: item.isRead ? 600 : 700 }}>{item.title}</strong>
-              <br />
-              <span className="v3-muted">{item.message}</span>
-              <br />
-              <span className="v3-muted">
-                {new Date(item.createdAt).toLocaleString("ko-KR")} · {item.isRead ? "읽음" : "안읽음"}
-                {item.relatedTournamentId ? " · 대회 상세로 이동" : ""}
-              </span>
-            </button>
-          </li>
-        ))}
+      <ul className="site-mypage-notification-list">
+        {items.map((item) => {
+          const open = expandedIds.has(item.id);
+          return (
+            <li key={item.id} className="site-mypage-notification-item">
+              <button
+                type="button"
+                className={`site-mypage-notification-title-btn${item.isRead ? " is-read" : ""}`}
+                onClick={() => toggleItem(item)}
+                aria-expanded={open}
+              >
+                <span className="site-mypage-notification-title-text">{item.title}</span>
+                <span className="site-mypage-notification-chevron" aria-hidden>
+                  {open ? "▾" : "▸"}
+                </span>
+              </button>
+              {open ? (
+                <div className="site-mypage-notification-body">
+                  <p className="site-mypage-notification-message">{item.message}</p>
+                  <p className="v3-muted site-mypage-notification-meta">
+                    {new Date(item.createdAt).toLocaleString("ko-KR")} · {item.isRead ? "읽음" : "안읽음"}
+                  </p>
+                  {item.relatedTournamentId ? (
+                    <p style={{ marginTop: "0.5rem" }}>
+                      <Link className="v3-btn" href={`/site/tournaments/${item.relatedTournamentId}`} style={{ fontSize: "0.86rem", padding: "0.35rem 0.65rem" }}>
+                        대회 상세 보기
+                      </Link>
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

@@ -289,8 +289,6 @@ export default function BlankBracketPrintClient() {
         <MobilePrintPreviewLayer
           scene={scene}
           matchType={matchType}
-          style={style}
-          treeLayout={treeLayout}
           viewportWidth={mobileVw}
           viewportHeight={mobileVh}
           onBackdropClose={() => setMobilePreviewOpen(false)}
@@ -308,32 +306,14 @@ export default function BlankBracketPrintClient() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 모바일 전용: A4 px + scale (BracketSVG / PDF 코드와 분리)
+// 모바일 전용: A4 가로 px + scale (BracketSVG / PDF·인쇄와 동일 — 빈 대진표는 항상 가로 용지)
 // ─────────────────────────────────────────────────────────────────────────────
-const A4_PORTRAIT_W = 794;
-const A4_PORTRAIT_H = 1123;
 const A4_LANDSCAPE_W = 1123;
 const A4_LANDSCAPE_H = 794;
-
-/** 미리보기 paper 방향: 대진표 레이아웃 기준(뷰포트/기기 방향 사용 안 함) */
-function paperOrientationFromBracket(style: BracketStyle, treeLayout: TreeLayout): "portrait" | "landscape" {
-  if (style === "CENTER") return "landscape";
-  if (style === "TREE" && treeLayout === "VERTICAL") return "portrait";
-  if (style === "TREE" && treeLayout === "HORIZONTAL") return "landscape";
-  return "landscape";
-}
-
-function paperPxForOrientation(orientation: "portrait" | "landscape"): { paperW: number; paperH: number } {
-  return orientation === "landscape"
-    ? { paperW: A4_LANDSCAPE_W, paperH: A4_LANDSCAPE_H }
-    : { paperW: A4_PORTRAIT_W, paperH: A4_PORTRAIT_H };
-}
 
 type MobilePreviewLayerProps = {
   scene: Exclude<ReturnType<typeof buildBracketScene>, null>;
   matchType: MatchType;
-  style: BracketStyle;
-  treeLayout: TreeLayout;
   viewportWidth: number;
   viewportHeight: number;
   onBackdropClose: () => void;
@@ -342,35 +322,20 @@ type MobilePreviewLayerProps = {
 function MobilePrintPreviewLayer({
   scene,
   matchType,
-  style,
-  treeLayout,
   viewportWidth,
   viewportHeight,
   onBackdropClose,
 }: MobilePreviewLayerProps) {
-  const derivedOrientation = useMemo(() => paperOrientationFromBracket(style, treeLayout), [style, treeLayout]);
-  const [previewOrientation, setPreviewOrientation] = useState<"portrait" | "landscape">(derivedOrientation);
-
-  useEffect(() => {
-    setPreviewOrientation(derivedOrientation);
-  }, [derivedOrientation]);
-
   const vw = viewportWidth > 0 ? viewportWidth : 400;
   const vh = viewportHeight > 0 ? viewportHeight : 700;
 
-  const { paperW, paperH } = useMemo(
-    () => paperPxForOrientation(previewOrientation),
-    [previewOrientation],
-  );
+  const paperW = A4_LANDSCAPE_W;
+  const paperH = A4_LANDSCAPE_H;
 
   const scale = useMemo(
     () => Math.min(Math.max(vw - 32, 1) / paperW, Math.max(vh - 32, 1) / paperH),
     [vw, vh, paperW, paperH],
   );
-
-  const togglePaperOrientation = useCallback(() => {
-    setPreviewOrientation((o) => (o === "landscape" ? "portrait" : "landscape"));
-  }, []);
 
   return (
     <div
@@ -410,9 +375,9 @@ function MobilePrintPreviewLayer({
           onClick={(e) => e.stopPropagation()}
           style={{ pointerEvents: "auto", flexShrink: 0 }}
         >
-          <button type="button" className="v3-btn" onClick={togglePaperOrientation} style={{ minHeight: "40px" }}>
-            종이 방향: {previewOrientation === "landscape" ? "가로(A4)" : "세로(A4)"} (탭하여 전환)
-          </button>
+          <p className="v3-muted" style={{ margin: 0, fontSize: "0.85rem", textAlign: "center" }}>
+            A4 가로 (인쇄·PDF와 동일)
+          </p>
         </div>
         <div
           className="bbp-preview-paper-frame"

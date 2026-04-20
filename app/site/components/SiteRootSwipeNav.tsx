@@ -57,23 +57,6 @@ function touchTargetBlocksSwipe(el: EventTarget | null): boolean {
   return false;
 }
 
-/** 뷰포트보다 작은 세로 스크롤 박스(중첩) — 기본 스크롤 우선, 루트 스와이프 제외 */
-function touchTargetInNestedVerticalScroller(el: EventTarget | null): boolean {
-  if (!el || !(el instanceof Element)) return false;
-  const vh = typeof window !== "undefined" ? window.innerHeight : 800;
-  const nestedMaxH = vh * 0.55;
-  let node: Element | null = el;
-  for (let i = 0; i < 14 && node; i++, node = node.parentElement) {
-    const h = node as HTMLElement;
-    if (h.scrollHeight <= h.clientHeight + 2) continue;
-    const st = window.getComputedStyle(h);
-    const oy = st.overflowY;
-    if (oy !== "auto" && oy !== "scroll" && oy !== "overlay") continue;
-    if (h.clientHeight < nestedMaxH) return true;
-  }
-  return false;
-}
-
 function velocityFromSamples(samples: { t: number; x: number }[]): number {
   if (samples.length < 2) return 0;
   const last = samples[samples.length - 1]!;
@@ -97,6 +80,7 @@ function velocityFromSamples(samples: { t: number; x: number }[]): number {
 export default function SiteRootSwipeNav({ children }: { children?: React.ReactNode }) {
   const pathname = usePathname() ?? "";
   const router = useRouter();
+  const viewportRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const dragPxRef = useRef(0);
   const animatingRef = useRef(false);
@@ -142,8 +126,7 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       const w = window.innerWidth;
       const x = t.clientX;
       const edgeSkip = x < EDGE_EXCLUDE_PX || x > w - EDGE_EXCLUDE_PX;
-      const blocked =
-        touchTargetBlocksSwipe(e.target) || edgeSkip || touchTargetInNestedVerticalScroller(e.target);
+      const blocked = touchTargetBlocksSwipe(e.target) || edgeSkip;
       const startedOnLink = e.target instanceof Element && !!e.target.closest("a[href]");
       startRef.current = {
         x: t.clientX,
@@ -298,23 +281,26 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       if (dragPxRef.current !== 0 && !animatingRef.current) applyTransform(0, true);
     };
 
-    window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove", onTouchMove, { passive: false });
-    window.addEventListener("touchend", onTouchEnd, { passive: true });
-    window.addEventListener("touchcancel", onTouchCancel, { passive: true });
+    const el = viewportRef.current;
+    if (!el) return;
+
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
+    el.addEventListener("touchcancel", onTouchCancel, { passive: true });
 
     return () => {
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchmove", onTouchMove);
-      window.removeEventListener("touchend", onTouchEnd);
-      window.removeEventListener("touchcancel", onTouchCancel);
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchCancel);
     };
   }, [pathname, router, applyTransform]);
 
   if (children == null) return null;
 
   return (
-    <div className="site-root-swipe-viewport">
+    <div ref={viewportRef} className="site-root-swipe-viewport">
       <div className="site-root-swipe-track" ref={trackRef}>
         <div className="site-root-swipe-panel site-root-swipe-panel--placeholder" aria-hidden />
         <div className="site-root-swipe-panel site-root-swipe-panel--main">{children}</div>

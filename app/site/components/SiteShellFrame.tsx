@@ -70,7 +70,11 @@ export default function SiteShellFrame({
     .join(" ");
 
   return (
-    <main id={mainId} className="v3-page site-home-page" style={mainStyle}>
+    <main
+      id={mainId}
+      className={`v3-page site-home-page site-home-page--${shellVariant}`}
+      style={mainStyle}
+    >
       {prependMain}
       <div className="site-home-shell" style={shellStyle}>
         <div className={topWhiteClass}>
