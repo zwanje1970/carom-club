@@ -2790,10 +2790,6 @@ function PlatformSitePagesPageContent() {
           {renderQuickPresetInsertButtons(sections.length)}
         </div>
       )}
-
-      <Link className="v3-btn" href="/platform/site" onClick={confirmLeaveWhenUnsaved}>
-        사이트 관리로
-      </Link>
         </div>
         <div className="platform-page-builder-preview-panel" onWheelCapture={(event) => event.stopPropagation()}>
           <MobilePreview

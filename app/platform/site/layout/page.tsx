@@ -211,9 +211,6 @@ export default function PlatformSiteLayoutPage() {
         <button type="button" className="v3-btn" onClick={handleSave} disabled={saving || loading}>
           {saving ? "저장 중..." : "저장"}
         </button>
-        <Link className="v3-btn" href="/platform/site">
-          사이트 관리로
-        </Link>
       </div>
 
       {message ? <p className="v3-muted">{message}</p> : null}

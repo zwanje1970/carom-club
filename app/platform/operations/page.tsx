@@ -50,10 +50,6 @@ export default function PlatformOperationsPage() {
           </li>
         </ul>
       </section>
-
-      <Link className="v3-btn" href="/platform">
-        플랫폼 홈
-      </Link>
     </main>
   );
 }

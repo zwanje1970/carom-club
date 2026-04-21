@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -94,14 +93,9 @@ export default function BracketPreviewPage() {
 
   return (
     <main className="v3-page v3-stack">
-      <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem" }}>
-        <Link className="v3-btn" href={`/client/tournaments/${tournamentId}`} style={{ padding: "0.5rem 0.9rem" }}>
-          ← 대회 상세
-        </Link>
-        <h1 className="v3-h1" style={{ marginBottom: 0 }}>
-          브래킷 미리보기
-        </h1>
-      </div>
+      <h1 className="v3-h1" style={{ marginBottom: 0 }}>
+        브래킷 미리보기
+      </h1>
 
       <p className="v3-muted">이 화면은 임시 배정 결과 확인 단계입니다. 확정 저장 전에는 실제 브래킷이 바뀌지 않습니다.</p>
       {message ? <p className="v3-muted">{message}</p> : null}

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import deckStyles from "../../../../site/main-scene-slide-deck.module.css";
@@ -368,15 +367,6 @@ export default function ClientTournamentCardPublishPage() {
       </form>
 
       {message ? <p className="v3-muted">{message}</p> : null}
-
-      <div className="v3-row">
-        <Link className="v3-btn" href={`/client/tournaments/${tournamentId}`}>
-          대회 상세로
-        </Link>
-        <Link className="v3-btn" href="/client/tournament">
-          대회 목록
-        </Link>
-      </div>
     </main>
   );
 }

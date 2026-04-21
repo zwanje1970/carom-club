@@ -10,9 +10,6 @@ export default function PlatformMembershipSettingsPage() {
         <Link className="v3-btn" href="/platform/operations/clients">
           신청 관리
         </Link>
-        <Link className="v3-btn" href="/platform/operations">
-          운영 관리
-        </Link>
       </div>
     </main>
   );

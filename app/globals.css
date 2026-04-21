@@ -9,10 +9,14 @@
   --ui-radius: 0.75rem;
   --ui-radius-lg: 1rem;
 
-  /* 메인 제외 사이트 페이지: SiteShellFrame 표준(shellVariant: standard) 단일 여백 기준 */
+  /* 상단 청 헤더: safe-area는 헤더 패딩에만 — 메인/standard 동일 높이 기준 */
+  --site-shell-header-safe-top: env(safe-area-inset-top, 0px);
+  --site-shell-header-pad-y: 0.45rem;
+  --site-shell-title-min-height: 2.75rem;
+  --site-shell-brand-padding-bottom: 0.45rem;
+  /* 레거시 호환(일부 규칙에서 참조) */
   --site-shell-top-white-padding-top: 0.75rem;
   --site-shell-top-white-padding-bottom: 0.65rem;
-  --site-shell-brand-padding-bottom: 0.5rem;
   --site-shell-aux-gap: 0.5rem;
   --site-shell-aux-min-height: 2.75rem;
   --site-shell-aux-compact-gap: 0.45rem;
@@ -293,8 +297,38 @@ body {
   background: var(--ui-bg-page);
 }
 
+/* 좌우 스와이프 이웃 탭 미리보기(iframe — 터치는 뷰포트 캡처로 처리, iframe은 시각만) */
+.site-root-swipe-panel--neighbor {
+  min-height: 100dvh;
+  background: var(--ui-bg-page);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.site-root-swipe-panel-embed {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 100dvh;
+  border: none;
+  display: block;
+  pointer-events: none;
+  background: var(--ui-bg-page);
+}
+
 .site-root-swipe-panel--main {
-  min-height: min-content;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.site-root-swipe-panel--main > .site-home-page--standard,
+.site-root-swipe-panel--main > .site-home-page--main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* PC 사이트: 본문이 짧을 때 푸터를 뷰포트 하단에 맞춤 (sticky footer, flex 흐름) */
@@ -305,17 +339,26 @@ body {
 
 .site-shell--pc-sticky-footer .site-shell-main {
   flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.site-shell--pc-sticky-footer .site-shell-main > .site-home-page--standard {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  align-self: stretch;
 }
 
 /* —— Reference UI: 메인(폰 셸) —— */
-/* 상·하단: 실제 기기 safe area + 12px (상태바/노치/제스처 영역과 겹침 방지) */
-/* 페이지 기본: 흰색 — 다크 배경은 슬라이드 블록(.site-home-dark-main)에만 */
+/* 바깥 페이지: 상단 여백 없음 — safe-area·세로 패딩은 .site-home-top-white 내부에서만 */
 .site-home-page {
   position: relative;
   isolation: isolate;
   background-color: #ffffff;
-  padding-top: calc(env(safe-area-inset-top) + 12px);
-  padding-bottom: calc(env(safe-area-inset-bottom) + 12px);
+  padding-top: 0;
+  padding-bottom: 0;
   padding-left: 0.7rem;
   padding-right: 0.7rem;
   color: #0f172a;
@@ -344,6 +387,9 @@ body:has(.site-home-page) {
   box-shadow: none !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
 }
 
 .site-home-page--standard .site-home-top-white {
@@ -360,6 +406,34 @@ body:has(.site-home-page) {
   padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
 }
 
+/* 상단 고정: flex 셸에서 스크롤은 .site-shell-scroll-body만 — 별도 viewport sticky 불필요 */
+.site-shell-sticky-dock {
+  flex-shrink: 0;
+  align-self: stretch;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 40;
+}
+
+.site-shell-scroll-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background-color: var(--ui-bg-page);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.site-shell-scroll-body .site-site-gray-main {
+  flex: none;
+  min-height: 100%;
+  overflow: visible;
+}
+
 /* 로그인: 페이지 바깥은 풀폭, 폼만 좁게(로그인 페이지 루트에 .login-page-outer) */
 .login-page-outer.v3-page {
   max-width: none !important;
@@ -367,8 +441,10 @@ body:has(.site-home-page) {
   margin-right: 0 !important;
   width: 100% !important;
   box-sizing: border-box;
+  padding-top: calc(var(--site-shell-header-safe-top) + var(--site-shell-header-pad-y));
   padding-left: max(1rem, env(safe-area-inset-left, 0px));
   padding-right: max(1rem, env(safe-area-inset-right, 0px));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
 }
 
 .login-page-inner {
@@ -385,27 +461,27 @@ body:has(.site-home-page) {
   margin-right: -0.85rem;
   padding-left: 0.85rem;
   padding-right: 0.85rem;
+  padding-top: calc(var(--site-shell-header-safe-top) + var(--site-shell-header-pad-y));
+  padding-bottom: var(--site-shell-header-pad-y);
   background: #0f2744;
   color: #ffffff;
   position: relative;
   z-index: 2;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  box-sizing: border-box;
+  min-height: calc(
+    var(--site-shell-header-safe-top) + 2 * var(--site-shell-header-pad-y) + var(--site-shell-title-min-height)
+  );
 }
 
-/* 메인(/) 전용: 기존 메인 상단 밀착 규칙 유지 */
-.site-home-top-white--main {
-  padding-top: 0.35rem;
-  padding-bottom: 0.55rem;
-}
-
+/* 메인(/) 전용: 슬라이드와 맞닿게 하단 패딩만 0 (높이는 min-height로 통일) */
 .site-home-top-white--main.site-home-top-white--no-notice {
   padding-bottom: 0;
 }
 
-/* 메인 제외 사이트 페이지 공통: 제목·보조·회색 본문 사이 여백 */
+/* standard 청 헤더: 메인과 동일 세로 치수 — 하단 패딩은 제거(컨트롤은 .site-shell-controls 별도 블록) */
 .site-home-top-white--standard {
-  padding-top: var(--site-shell-top-white-padding-top);
-  padding-bottom: var(--site-shell-top-white-padding-bottom);
+  padding-bottom: 0;
 }
 
 /* 슬라이드 ~ 하단 CTA: 참고 UI에 가까운 깊은 네이비 그라데이션 + 노이즈(슬라이드 창은 별도 .slideDeck) */
@@ -516,10 +592,28 @@ body:has(.site-home-page) {
   }
 
   .site-home-page--standard {
-    overflow: visible;
+    flex: 1 1 auto;
+    min-height: 0 !important;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .site-home-page--standard .site-home-shell {
+    flex: 1 1 auto;
+    min-height: 0 !important;
     height: auto;
-    max-height: none;
-    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 
   .site-home-page--main .site-home-shell {
@@ -612,10 +706,7 @@ body:has(.site-home-page) {
   letter-spacing: 0.04em;
 }
 
-.site-home-top-white--main .site-home-brand {
-  padding-bottom: 0.45rem;
-}
-
+.site-home-top-white--main .site-home-brand,
 .site-home-top-white--standard .site-home-brand {
   padding-bottom: var(--site-shell-brand-padding-bottom);
 }
@@ -631,6 +722,8 @@ body:has(.site-home-page) {
   padding-bottom: 0.75rem;
   padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
   padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
+  position: relative;
+  z-index: 1;
 }
 
 .site-shell-controls--compact {
@@ -853,6 +946,12 @@ body:has(.site-home-page) {
     min-height: 0;
     overflow-y: auto;
   }
+
+  .site-shell-scroll-body .site-site-gray-main {
+    flex: none;
+    min-height: 100%;
+    overflow: visible;
+  }
 }
 
 .site-home-nav-grid {
@@ -936,6 +1035,10 @@ body:has(.site-home-page) {
   border-color: #e2e8f0 !important;
 }
 
+.site-home-cta-primary__text {
+  min-width: 0;
+}
+
 .site-home-cta-primary {
   width: 100%;
   min-height: 38px;
@@ -978,6 +1081,21 @@ body:has(.site-home-page) {
   content: "›";
   font-size: 0.88rem;
   opacity: 0.9;
+}
+
+/* 클라이언트(/client) CTA: 긴 라벨도 1줄 — 좁은 폭에서 clamp로 글자만 축소 */
+.site-home-cta-primary.site-home-cta-primary--client-ops {
+  max-width: 100%;
+  font-size: clamp(0.46rem, 2.2vw + 0.14rem, 0.8rem) !important;
+  padding-left: 0.45rem !important;
+  padding-right: 0.45rem !important;
+  letter-spacing: -0.055em;
+}
+
+.site-home-cta-primary.site-home-cta-primary--client-ops .site-home-cta-primary__text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
 }
 
 /* 모바일: 하단 흰 바 + 5버튼 네비 — safe-area는 바 padding으로 반영 */

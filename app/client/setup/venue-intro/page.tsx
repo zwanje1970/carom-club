@@ -243,9 +243,6 @@ export default function ClientVenueIntroEditPage() {
     return (
       <main className="v3-page v3-stack ui-client-dashboard" style={{ maxWidth: "48rem" }}>
         <p style={{ color: "#b91c1c", marginBottom: "1rem" }}>{loadError}</p>
-        <Link className="v3-btn" href="/client/settings">
-          부가기능으로
-        </Link>
       </main>
     );
   }
@@ -254,9 +251,6 @@ export default function ClientVenueIntroEditPage() {
     <main className="v3-page v3-stack ui-client-dashboard" style={{ maxWidth: "48rem" }}>
       <div className="v3-row ui-client-dashboard-header" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
         <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-          <Link className="v3-btn" href="/client/settings" style={{ padding: "0.5rem 0.9rem" }}>
-            ← 부가기능
-          </Link>
           <h1 className="v3-h1" style={{ marginBottom: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
             당구장 소개 페이지 작성
           </h1>

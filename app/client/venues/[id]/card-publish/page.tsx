@@ -327,9 +327,6 @@ export default function ClientVenueCardPublishPage() {
       </section>
 
       <div className="v3-row">
-        <Link className="v3-btn" href="/client/venues">
-          당구장 목록으로
-        </Link>
         <Link className="v3-btn" href={`/site/venues/${venueId}`}>
           사이트 상세 확인
         </Link>

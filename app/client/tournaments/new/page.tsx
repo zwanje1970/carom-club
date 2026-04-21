@@ -754,12 +754,6 @@ export default function ClientTournamentNewPage() {
             <Link className="v3-btn" href={`/client/tournaments/${createSuccessId}`}>
               상세 보기
             </Link>
-            <Link className="v3-btn" href="/client/tournaments">
-              목록으로 돌아가기
-            </Link>
-            <Link className="v3-btn" href="/client">
-              나중에 하기
-            </Link>
           </div>
         </section>
       ) : (
@@ -1597,14 +1591,6 @@ export default function ClientTournamentNewPage() {
         </div>
       ) : null}
 
-      <div className="v3-row">
-        <Link className="v3-btn" href="/client/tournaments">
-          대회 목록
-        </Link>
-        <Link className="v3-btn" href="/client">
-          클라이언트 홈
-        </Link>
-      </div>
         </>
       )}
     </main>

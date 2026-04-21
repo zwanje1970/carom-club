@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getClientOrganizationByIdForPlatform } from "../../../../../lib/server/dev-store";
 import ClientOrganizationDetailForm from "./ClientOrganizationDetailForm";
@@ -34,15 +33,6 @@ export default async function PlatformClientDetailPage({
           adminRemarks: org.adminRemarks,
         }}
       />
-
-      <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
-        <Link className="v3-btn" href="/platform/operations/clients/list">
-          클라이언트 목록
-        </Link>
-        <Link className="v3-btn" href="/platform/operations/clients">
-          신청 관리
-        </Link>
-      </div>
     </main>
   );
 }

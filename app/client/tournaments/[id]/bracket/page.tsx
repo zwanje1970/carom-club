@@ -235,14 +235,9 @@ export default function TournamentBracketSnapshotPage() {
 
   return (
     <main className="v3-page v3-stack">
-      <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem" }}>
-        <Link className="v3-btn" href={`/client/tournaments/${tournamentId}`} style={{ padding: "0.5rem 0.9rem" }}>
-          ← 대회 상세
-        </Link>
-        <h1 className="v3-h1" style={{ marginBottom: 0 }}>
-          브래킷 허브
-        </h1>
-      </div>
+      <h1 className="v3-h1" style={{ marginBottom: 0 }}>
+        브래킷 허브
+      </h1>
 
       <p className="v3-muted">
         자동배정/수동배정에서 임시 배정 후 미리보기에서 확인하고, 확정 저장 시점에만 실제 브래킷이 반영됩니다.

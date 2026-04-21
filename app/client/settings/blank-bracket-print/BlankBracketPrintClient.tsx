@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
@@ -8,6 +7,10 @@ import { buildBracketScene, buildStartPairLabels, type StartPairLabel } from "./
 
 // @page 여백 = 10mm → 출력 영역 = 277 × 190 mm
 const MARGIN_MM = 10;
+/** 대진표(277×190mm) 도면 기준 우상단 — 용지 @page 여백과 별개 */
+const SERVICE_MARK_INSET_MM = 0.6;
+/** 기존 2.8mm 대비 50% */
+const SERVICE_MARK_FONT_MM = 1.4;
 
 const ROUND_LABEL: Record<number, string> = {
   128: "128강", 64: "64강", 32: "32강", 16: "16강",
@@ -108,13 +111,13 @@ export default function BlankBracketPrintClient() {
   .bbp-print-page-sheet { position: relative; width: 100%; height: 100%; box-sizing: border-box; overflow: hidden; }
   .bbp-print-service-mark {
     position: absolute;
-    top: ${MARGIN_MM}mm;
-    right: ${MARGIN_MM}mm;
+    top: ${SERVICE_MARK_INSET_MM}mm;
+    right: ${SERVICE_MARK_INSET_MM}mm;
     z-index: 10;
     margin: 0;
     padding: 0;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    font-size: 2.8mm;
+    font-size: ${SERVICE_MARK_FONT_MM}mm;
     font-weight: 300;
     line-height: 1.2;
     color: #888888;
@@ -133,8 +136,8 @@ export default function BlankBracketPrintClient() {
     .hint { display: none; }
     .bbp-print-service-mark {
       position: absolute;
-      top: ${MARGIN_MM}mm;
-      right: ${MARGIN_MM}mm;
+      top: ${SERVICE_MARK_INSET_MM}mm;
+      right: ${SERVICE_MARK_INSET_MM}mm;
     }
     @page { size: A4 landscape; margin: ${MARGIN_MM}mm; }
   }
@@ -228,13 +231,13 @@ export default function BlankBracketPrintClient() {
         }
         .bbp-print-service-mark {
           position: absolute;
-          top: ${MARGIN_MM}mm;
-          right: ${MARGIN_MM}mm;
+          top: ${SERVICE_MARK_INSET_MM}mm;
+          right: ${SERVICE_MARK_INSET_MM}mm;
           z-index: 10;
           margin: 0;
           padding: 0;
           font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-          font-size: 2.8mm;
+          font-size: ${SERVICE_MARK_FONT_MM}mm;
           font-weight: 300;
           line-height: 1.2;
           color: #888888;
@@ -248,8 +251,8 @@ export default function BlankBracketPrintClient() {
         @media print {
           .bbp-print-service-mark {
             position: absolute;
-            top: ${MARGIN_MM}mm;
-            right: ${MARGIN_MM}mm;
+            top: ${SERVICE_MARK_INSET_MM}mm;
+            right: ${SERVICE_MARK_INSET_MM}mm;
           }
         }
       `}</style>
@@ -261,7 +264,6 @@ export default function BlankBracketPrintClient() {
           <div className="v3-row"
             style={{ justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
             <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem" }}>
-              <Link className="v3-btn" href="/client/settings" style={{ padding: "0.5rem 0.9rem" }}>← 부가기능</Link>
               <h1 className="v3-h1" style={{ margin: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>빈 대진표 출력</h1>
             </div>
           </div>
@@ -415,22 +417,22 @@ function MobilePrintPreviewLayer({
     [vw, vh, paperW, paperH],
   );
 
-  const paperRef = useRef<HTMLDivElement>(null);
+  const bracketSceneRef = useRef<HTMLDivElement>(null);
   const [serviceMarkOverlay, setServiceMarkOverlay] = useState<CSSProperties | null>(null);
 
   useLayoutEffect(() => {
-    const paper = paperRef.current;
-    if (!paper) return;
-    const r = paper.getBoundingClientRect();
-    const mm10px = (MARGIN_MM / 25.4) * 96;
+    const scene = bracketSceneRef.current;
+    if (!scene) return;
+    const r = scene.getBoundingClientRect();
+    const insetPx = 2;
     setServiceMarkOverlay({
       position: "fixed",
-      top: r.top + mm10px,
-      right: Math.max(0, window.innerWidth - r.right + mm10px),
+      top: r.top + insetPx,
+      right: Math.max(0, window.innerWidth - r.right + insetPx),
       left: "auto",
       bottom: "auto",
       zIndex: 100000,
-      fontSize: "11px",
+      fontSize: "5.5px",
       fontWeight: 300,
       lineHeight: 1.2,
       color: "#888888",
@@ -498,7 +500,6 @@ function MobilePrintPreviewLayer({
           }}
         >
           <div
-            ref={paperRef}
             className="bbp-preview-paper"
             style={{
               width: paperW,
@@ -514,7 +515,7 @@ function MobilePrintPreviewLayer({
               overflow: "hidden",
             }}
           >
-            <div className="bbp-preview-bracket-scene" style={{ lineHeight: 0 }}>
+            <div ref={bracketSceneRef} className="bbp-preview-bracket-scene" style={{ lineHeight: 0 }}>
               <BracketSVG scene={scene} matchType={matchType} startPairLabels={startPairLabels} />
             </div>
           </div>
@@ -540,7 +541,8 @@ function BracketPrintServiceMark({ overlayStyle }: { overlayStyle?: CSSPropertie
 // style 에 width/height/min-width/min-height 를 모두 인라인으로 강제해서
 // 프로젝트 전역 CSS (svg { max-width:100% } 등) 에 눌리지 않게 한다.
 // ─────────────────────────────────────────────────────────────────────────────
-const PAIR_LABEL_FONT_MM = 2.05;
+/** 조번호 SVG 텍스트 (기존 2.05mm 의 50%) */
+const PAIR_LABEL_FONT_MM = 1.025;
 
 function BracketSVG({
   scene,

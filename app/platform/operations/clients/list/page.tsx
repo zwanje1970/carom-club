@@ -68,15 +68,6 @@ export default async function PlatformClientsListPage({
           </ul>
         )}
       </section>
-
-      <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
-        <Link className="v3-btn" href="/platform/operations/clients">
-          신청 관리
-        </Link>
-        <Link className="v3-btn" href="/platform/operations">
-          운영 관리
-        </Link>
-      </div>
     </main>
   );
 }

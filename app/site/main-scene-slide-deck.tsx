@@ -35,6 +35,8 @@ const OUTGOING_SCALE_TARGET = 0;
 const MANUAL_RESUME_DELAY_MS = 1800;
 const WHEEL_SCENE_STEP = 240;
 const DRAG_SCENE_STEP = 220;
+/** 루트 스와이프 `LOCK_MIN_PX` 와 동일 — 미확정 시 포인터 캡처·세로 드래그 금지 */
+const AXIS_LOCK_MIN_PX = 10;
 
 const RETREAT_PTS: {
   p: number;
@@ -199,7 +201,9 @@ export default function MainSceneSlideDeck({
   const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draggingRef = useRef(false);
   const dragStartYRef = useRef(0);
+  const dragStartXRef = useRef(0);
   const dragStartSceneOffsetRef = useRef(0);
+  const axisRef = useRef<"undecided" | "vertical" | "horizontal">("undecided");
 
   useEffect(() => {
     let rafId = 0;
@@ -249,21 +253,45 @@ export default function MainSceneSlideDeck({
     if (e.button !== 0) return;
     draggingRef.current = true;
     pauseAuto();
+    axisRef.current = "undecided";
+    dragStartXRef.current = e.clientX;
     dragStartYRef.current = e.clientY;
     dragStartSceneOffsetRef.current = sceneOffsetRef.current;
-    e.currentTarget.setPointerCapture(e.pointerId);
   };
 
   const onPointerMove: PointerEventHandler<HTMLDivElement> = (e) => {
     if (!draggingRef.current) return;
+    const dx = e.clientX - dragStartXRef.current;
     const dy = e.clientY - dragStartYRef.current;
-    sceneOffsetRef.current = dragStartSceneOffsetRef.current - dy / DRAG_SCENE_STEP;
+    const adx = Math.abs(dx);
+    const ady = Math.abs(dy);
+
+    if (axisRef.current === "undecided") {
+      if (adx < AXIS_LOCK_MIN_PX && ady < AXIS_LOCK_MIN_PX) return;
+      if (ady >= adx) {
+        axisRef.current = "vertical";
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          /* noop */
+        }
+      } else {
+        axisRef.current = "horizontal";
+        return;
+      }
+    }
+
+    if (axisRef.current === "horizontal") return;
+
+    const dyMove = e.clientY - dragStartYRef.current;
+    sceneOffsetRef.current = dragStartSceneOffsetRef.current - dyMove / DRAG_SCENE_STEP;
     setFrameTime(Date.now());
   };
 
   const endDragging = (pointerId: number, target: HTMLDivElement) => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
+    axisRef.current = "undecided";
     try {
       target.releasePointerCapture(pointerId);
     } catch {
@@ -300,7 +328,6 @@ export default function MainSceneSlideDeck({
 
   const deck = (
     <div
-      data-no-root-swipe
       className={styles.slideDeck}
       onWheel={onWheel}
       onPointerDown={onPointerDown}
@@ -347,7 +374,7 @@ export default function MainSceneSlideDeck({
 
   if (trimmedNotice.length > 0) {
     return (
-      <div data-no-root-swipe className={styles.slideDeckShell}>
+      <div className={styles.slideDeckShell}>
         {deck}
       </div>
     );

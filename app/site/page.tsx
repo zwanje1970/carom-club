@@ -384,7 +384,7 @@ export default async function SiteHomePage({
   const dashboardLabel = dashboardHref
     ? currentUser?.role === "PLATFORM"
       ? "플랫폼관리자"
-      : "대시보드"
+      : "클라이언트 운영관리"
     : null;
   const liveSlideItems = mainSlideSnapshots.map((snapshot) => ({
     snapshotId: snapshot.snapshotId,
@@ -582,8 +582,15 @@ export default async function SiteHomePage({
             })}
           </section>
           {dashboardHref ? (
-            <Link href={dashboardHref} className="site-home-cta-primary">
-              {dashboardLabel}
+            <Link
+              href={dashboardHref}
+              className={
+                clientDashboardApproved
+                  ? "site-home-cta-primary site-home-cta-primary--client-ops"
+                  : "site-home-cta-primary"
+              }
+            >
+              <span className="site-home-cta-primary__text">{dashboardLabel}</span>
             </Link>
           ) : null}
         </section>

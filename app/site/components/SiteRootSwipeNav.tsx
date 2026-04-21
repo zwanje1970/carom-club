@@ -40,7 +40,7 @@ const NAV_COOLDOWN_MS = 480;
 const FOLLOW_RATIO = 0.78;
 /** 완료 판정: 뷰포트 너비 대비 (25~30%) */
 const COMPLETE_FRACTION = 0.28;
-/** 방향 판정 전 최소 이동 (px) — 그 전에는 preventDefault 금지 */
+/** 방향 판정 전 최소 이동 (px) — 그 전에는 preventDefault 금지 (슬라이드 덱과 동일 값) */
 const LOCK_MIN_PX = 10;
 /** 빠른 스와이프 시 짧은 거리로도 완료 (px/ms) */
 const VELOCITY_COMPLETE = 0.42;
@@ -55,6 +55,11 @@ function touchTargetBlocksSwipe(el: EventTarget | null): boolean {
   if (el.closest('[role="button"],[role="tab"],[role="tablist"]')) return true;
   if (el.closest("label")) return true;
   return false;
+}
+
+/** 메인(/)은 iframe 미리보기 없이 가볍게 — 이웃이 메인일 때도 iframe 생략 */
+function allowNeighborIframePreview(href: string | null): href is string {
+  return Boolean(href && href !== "/site");
 }
 
 function velocityFromSamples(samples: { t: number; x: number }[]): number {
@@ -173,6 +178,7 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
         if (vp) vp.style.setProperty("touch-action", "none");
       }
 
+      if (!start.horizontalLocked) return;
       e.preventDefault();
 
       samplesRef.current.push({ t: Date.now(), x: t.clientX });
@@ -310,12 +316,40 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
 
   if (children == null) return null;
 
+  const swipeIdx = rootSwipeIndex(pathname);
+  const onHome = normalizePathname(pathname) === "/site";
+  const prevHref = swipeIdx > 0 ? SITE_ROOT_SWIPE_HREFS[swipeIdx - 1]! : null;
+  const nextHref =
+    swipeIdx >= 0 && swipeIdx < SITE_ROOT_SWIPE_HREFS.length - 1 ? SITE_ROOT_SWIPE_HREFS[swipeIdx + 1]! : null;
+
+  const leftPanel =
+    swipeIdx <= 0 || onHome ? (
+      <div key="swipe-left-ph" className="site-root-swipe-panel site-root-swipe-panel--placeholder" aria-hidden />
+    ) : allowNeighborIframePreview(prevHref) ? (
+      <div key={`swipe-left-${prevHref}`} className="site-root-swipe-panel site-root-swipe-panel--neighbor">
+        <iframe className="site-root-swipe-panel-embed" src={prevHref} title="이전 탭" loading="lazy" />
+      </div>
+    ) : (
+      <div key="swipe-left-edge" className="site-root-swipe-panel site-root-swipe-panel--placeholder" aria-hidden />
+    );
+
+  const rightPanel =
+    swipeIdx < 0 || swipeIdx >= SITE_ROOT_SWIPE_HREFS.length - 1 || onHome ? (
+      <div key="swipe-right-ph" className="site-root-swipe-panel site-root-swipe-panel--placeholder" aria-hidden />
+    ) : allowNeighborIframePreview(nextHref) ? (
+      <div key={`swipe-right-${nextHref}`} className="site-root-swipe-panel site-root-swipe-panel--neighbor">
+        <iframe className="site-root-swipe-panel-embed" src={nextHref} title="다음 탭" loading="lazy" />
+      </div>
+    ) : (
+      <div key="swipe-right-edge" className="site-root-swipe-panel site-root-swipe-panel--placeholder" aria-hidden />
+    );
+
   return (
     <div ref={viewportRef} className="site-root-swipe-viewport">
       <div className="site-root-swipe-track" ref={trackRef}>
-        <div className="site-root-swipe-panel site-root-swipe-panel--placeholder" aria-hidden />
+        {leftPanel}
         <div className="site-root-swipe-panel site-root-swipe-panel--main">{children}</div>
-        <div className="site-root-swipe-panel site-root-swipe-panel--placeholder" aria-hidden />
+        {rightPanel}
       </div>
     </div>
   );

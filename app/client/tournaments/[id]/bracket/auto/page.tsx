@@ -144,18 +144,12 @@ export default function BracketAutoAssignPage() {
   }
 
   const participantsPath = `/client/tournaments/${tournamentId}/participants`;
-  const tournamentDetailPath = `/client/tournaments/${tournamentId}`;
 
   return (
     <main className="v3-page v3-stack">
-      <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-        <Link className="v3-btn" href={tournamentDetailPath} style={{ padding: "0.5rem 0.9rem" }}>
-          ← 대회 상세
-        </Link>
-        <h1 className="v3-h1" style={{ marginBottom: 0 }}>
-          자동 대진표
-        </h1>
-      </div>
+      <h1 className="v3-h1" style={{ marginBottom: 0 }}>
+        자동 대진표
+      </h1>
 
       <p style={{ margin: 0, fontSize: "0.98rem", lineHeight: 1.55 }}>
         승인된 참가자를 기준으로 대진표를 자동 생성합니다.

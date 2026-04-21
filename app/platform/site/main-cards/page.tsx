@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import deckStyles from "../../../site/main-scene-slide-deck.module.css";
 import PublishedSnapshotCard from "../../../site/published-snapshot-card";
@@ -304,14 +303,6 @@ export default function PlatformMainCardsPage() {
 
       {message ? <p className="v3-muted">{message}</p> : null}
 
-      <div className="v3-row">
-        <Link className="v3-btn" href="/platform/site">
-          사이트 관리로
-        </Link>
-        <Link className="v3-btn" href="/platform">
-          플랫폼 홈
-        </Link>
-      </div>
       <style jsx>{`
         .template-ui-grid {
           display: grid;

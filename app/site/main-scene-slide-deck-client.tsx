@@ -20,7 +20,7 @@ export default function MainSceneSlideDeckClient(props: Props) {
     const label = props.sectionLabel?.trim() || "진행중 대회";
     const notice = props.siteNoticeText?.trim();
     const deck = (
-      <div data-no-root-swipe aria-hidden className={styles.slideDeck}>
+      <div aria-hidden className={styles.slideDeck}>
         <div className={styles.slideDeckFrameOverlay}>
           <div className={styles.slideDeckTopChrome}>
             {notice ? (
@@ -42,7 +42,7 @@ export default function MainSceneSlideDeckClient(props: Props) {
     );
     if (notice) {
       return (
-        <div data-no-root-swipe className={styles.slideDeckShell}>
+        <div className={styles.slideDeckShell}>
           {deck}
         </div>
       );

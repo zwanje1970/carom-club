@@ -72,11 +72,6 @@ export default async function ClientTournamentParticipantsPage({
           borderBottom: "1px solid #e5e5e5",
         }}
       >
-        <div className="v3-row" style={{ alignItems: "center", gap: "0.65rem", flexWrap: "wrap" }}>
-          <Link className="v3-btn" href={`/client/tournaments/${id}`} style={{ padding: "0.45rem 0.75rem" }}>
-            ← 대회로 돌아가기
-          </Link>
-        </div>
         <h1 className="v3-h1" style={{ margin: "0.5rem 0 0.25rem", fontWeight: 800, letterSpacing: "-0.02em" }}>
           {tournament.title}
         </h1>

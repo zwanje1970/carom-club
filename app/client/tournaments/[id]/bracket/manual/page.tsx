@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -123,14 +122,9 @@ export default function BracketManualAssignPage() {
 
   return (
     <main className="v3-page v3-stack">
-      <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem" }}>
-        <Link className="v3-btn" href={`/client/tournaments/${tournamentId}/bracket`} style={{ padding: "0.5rem 0.9rem" }}>
-          ← 브래킷 허브
-        </Link>
-        <h1 className="v3-h1" style={{ marginBottom: 0 }}>
-          수동배정
-        </h1>
-      </div>
+      <h1 className="v3-h1" style={{ marginBottom: 0 }}>
+        수동배정
+      </h1>
 
       <p className="v3-muted">최신 스냅샷 참가자를 운영자가 2명씩 직접 묶습니다. 이 단계에서는 저장하지 않습니다.</p>
       {message ? <p className="v3-muted">{message}</p> : null}

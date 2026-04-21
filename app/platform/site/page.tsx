@@ -26,9 +26,6 @@ export default function PlatformSitePage() {
           <Link href="/platform/site/community">커뮤니티 설정</Link>
         </li>
       </ul>
-      <Link className="v3-btn" href="/platform">
-        플랫폼 홈
-      </Link>
     </main>
   );
 }

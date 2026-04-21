@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../lib/auth/session";
@@ -43,14 +42,9 @@ export default async function ClientTournamentParticipantDetailPage({
 
   return (
     <main className="v3-page v3-stack">
-      <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem" }}>
-        <Link className="v3-btn" href={`/client/tournaments/${id}/participants`} style={{ padding: "0.5rem 0.9rem" }}>
-          ← 신청자 목록
-        </Link>
-        <h1 className="v3-h1" style={{ marginBottom: 0 }}>
-          신청자 상세
-        </h1>
-      </div>
+      <h1 className="v3-h1" style={{ marginBottom: 0 }}>
+        신청자 상세
+      </h1>
 
       <section className="v3-box v3-stack">
         <p>

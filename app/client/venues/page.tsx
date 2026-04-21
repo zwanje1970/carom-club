@@ -34,9 +34,6 @@ export default function ClientVenuesPage() {
           ))}
         </ul>
       </section>
-      <Link className="v3-btn" href="/client">
-        클라이언트 홈
-      </Link>
     </main>
   );
 }

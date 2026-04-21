@@ -31,9 +31,6 @@ export default async function ClientTournamentsListPage() {
         <Link className="v3-btn" href="/client/tournaments/new">
           대회 생성
         </Link>
-        <Link className="v3-btn" href="/client">
-          클라이언트 홈
-        </Link>
       </div>
 
       <section className="v3-box v3-stack">

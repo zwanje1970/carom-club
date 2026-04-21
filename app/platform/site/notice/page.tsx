@@ -101,9 +101,6 @@ export default function PlatformSiteNoticePage() {
         <button className="v3-btn" type="button" onClick={handleSave} disabled={loading || saving}>
           {saving ? "저장 중..." : "저장"}
         </button>
-        <Link className="v3-btn" href="/platform/site">
-          사이트 관리로
-        </Link>
       </div>
 
       {message ? <p className="v3-muted">{message}</p> : null}

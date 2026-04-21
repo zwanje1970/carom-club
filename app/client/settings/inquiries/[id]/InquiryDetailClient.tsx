@@ -1,7 +1,6 @@
 "use client";
 
 import InquiryComposerShell from "../../../../components/InquiryComposerShell";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 
@@ -337,9 +336,6 @@ export default function InquiryDetailClient() {
           scroll={
             <div style={{ padding: "1rem", paddingBottom: "0.5rem" }}>
               <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
-                <Link className="v3-btn" href="/client/settings/inquiries" style={{ padding: "0.5rem 0.9rem" }}>
-                  ← 목록
-                </Link>
                 <h1 className="v3-h1" style={{ marginBottom: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
                   문의
                 </h1>

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 
 type CopyItemType = "HARDCODE" | "DATA" | "CONFIG";
@@ -97,10 +96,6 @@ export default function PlatformSiteCopyPage() {
           ))}
         </ul>
       ) : null}
-
-      <Link className="v3-btn" href="/platform/site">
-        사이트 관리로
-      </Link>
     </main>
   );
 }

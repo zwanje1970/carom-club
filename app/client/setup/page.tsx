@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
   isOrgType,
@@ -296,9 +295,6 @@ export default function ClientSetupPage() {
     return (
       <main className="v3-page v3-stack ui-client-dashboard" style={{ maxWidth: "42rem" }}>
         <p style={{ color: "#b91c1c", marginBottom: "1rem" }}>{loadError}</p>
-        <Link className="v3-btn" href="/client/settings">
-          부가기능으로
-        </Link>
       </main>
     );
   }
@@ -307,9 +303,6 @@ export default function ClientSetupPage() {
     <main className="v3-page v3-stack ui-client-dashboard" style={{ maxWidth: "42rem" }}>
       <div className="v3-row ui-client-dashboard-header" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
         <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-          <Link className="v3-btn" href="/client/settings" style={{ padding: "0.5rem 0.9rem" }}>
-            ← 부가기능
-          </Link>
           <h1 className="v3-h1" style={{ marginBottom: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
             업체 설정
           </h1>
@@ -703,9 +696,6 @@ export default function ClientSetupPage() {
               {saveState === "success" ? "저장성공" : saveState === "error" ? "저장실패" : "저장중"}
             </span>
           ) : null}
-          <Link className="v3-btn" href="/client/settings">
-            나가기
-          </Link>
         </div>
       </form>
     </main>

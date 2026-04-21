@@ -144,9 +144,6 @@ export default function ClientMemberWorkspace() {
     <main className="v3-page v3-stack ui-client-dashboard" style={{ gap: "1rem" }}>
       <div className="v3-row ui-client-dashboard-header" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem" }}>
         <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-          <Link className="v3-btn" href="/client" style={{ padding: "0.5rem 0.9rem" }}>
-            ← 대시보드
-          </Link>
           <h1 className="v3-h1" style={{ marginBottom: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
             회원
           </h1>

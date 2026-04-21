@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { computeLedgerTotalsFromLines } from "../../../../lib/settlement-ledger-v2";
@@ -146,7 +145,6 @@ export default function ClientSettlementLedgerEditPage() {
     return (
       <main className="v3-page v3-stack">
         <p className="v3-muted">잘못된 경로입니다.</p>
-        <Link href="/client/settlement">정산으로</Link>
       </main>
     );
   }
@@ -170,11 +168,6 @@ export default function ClientSettlementLedgerEditPage() {
           marginBottom: "0.65rem",
         }}
       >
-        <div className="v3-row" style={{ alignItems: "center", gap: "0.65rem", flexWrap: "wrap" }}>
-          <Link className="v3-btn" href="/client/settlement" style={{ padding: "0.5rem 0.9rem" }}>
-            ← 정산 목록
-          </Link>
-        </div>
         {!loading ? (
           <div style={{ marginTop: "0.5rem" }}>
             <h1 className="v3-h1" style={{ margin: 0, fontSize: "1.2rem", fontWeight: 800, lineHeight: 1.35 }}>

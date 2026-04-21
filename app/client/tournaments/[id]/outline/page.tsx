@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
@@ -36,18 +35,9 @@ export default async function ClientTournamentOutlinePage({
   const outlinePdfAsset = outlinePdfId ? await getOutlinePdfAssetById(outlinePdfId) : null;
   const outlinePdfFileKind = outlineFileKindFromAsset(outlinePdfAsset);
 
-  const back = (
-    <div className="v3-row" style={{ gap: "0.5rem" }}>
-      <Link className="v3-btn" href={`/client/tournaments/${id}`} style={{ padding: "0.5rem 0.9rem" }}>
-        ← 대회 상세
-      </Link>
-    </div>
-  );
-
   if (pdf) {
     return (
       <main className="v3-page v3-stack" style={{ maxWidth: "48rem", margin: "0 auto" }}>
-        {back}
         <div style={{ marginTop: "0.75rem" }}>
           <SiteOutlineDocumentCard url={pdf} fileKind={outlinePdfFileKind} caption="요강 보기" />
         </div>
@@ -58,7 +48,6 @@ export default async function ClientTournamentOutlinePage({
   if (mode === "TEXT" && hasText) {
     return (
       <main className="v3-page v3-stack" style={{ maxWidth: "48rem", margin: "0 auto" }}>
-        {back}
         <div
           className="v3-box v3-stack outline-view-html"
           style={{ marginTop: "0.75rem" }}
@@ -70,7 +59,6 @@ export default async function ClientTournamentOutlinePage({
   if (mode === "IMAGE" && img) {
     return (
       <main className="v3-page v3-stack" style={{ maxWidth: "48rem", margin: "0 auto" }}>
-        {back}
         <div className="v3-box v3-stack" style={{ marginTop: "0.75rem" }}>
           <img
             src={img}
@@ -84,7 +72,6 @@ export default async function ClientTournamentOutlinePage({
   if (hasText) {
     return (
       <main className="v3-page v3-stack" style={{ maxWidth: "48rem", margin: "0 auto" }}>
-        {back}
         <div
           className="v3-box v3-stack outline-view-html"
           style={{ marginTop: "0.75rem" }}
@@ -96,7 +83,6 @@ export default async function ClientTournamentOutlinePage({
   if (img) {
     return (
       <main className="v3-page v3-stack" style={{ maxWidth: "48rem", margin: "0 auto" }}>
-        {back}
         <div className="v3-box v3-stack" style={{ marginTop: "0.75rem" }}>
           <img
             src={img}

@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 export default function PlatformOperationsSettlementPage() {
   return (
     <main className="v3-page v3-stack">
@@ -9,9 +7,6 @@ export default function PlatformOperationsSettlementPage() {
         <p>정산 건수: 0 (더미)</p>
         <p>미처리: 0 (더미)</p>
       </div>
-      <Link className="v3-btn" href="/platform/operations">
-        운영 관리
-      </Link>
     </main>
   );
 }

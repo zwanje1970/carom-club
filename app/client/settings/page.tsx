@@ -40,9 +40,6 @@ export default function ClientSettingsHubPage() {
         style={{ justifyContent: "space-between", flexWrap: "wrap", alignItems: "center", gap: "0.75rem" }}
       >
         <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-          <Link className="v3-btn" href="/client" style={{ padding: "0.5rem 0.9rem" }}>
-            ← 대시보드
-          </Link>
           <h1 className="v3-h1" style={{ marginBottom: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
             부가기능
           </h1>

@@ -33,10 +33,6 @@ export default async function PlatformOperationsClientsPage() {
           연회원 설정
         </Link>
       </div>
-
-      <Link className="v3-btn" href="/platform/operations">
-        운영 관리
-      </Link>
     </main>
   );
 }

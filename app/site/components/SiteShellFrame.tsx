@@ -98,6 +98,21 @@ export default function SiteShellFrame({
   const mainStyle = isHomeShell ? mainStyleHome : mainStyleStandard;
   const shellStyle = isHomeShell ? shellStyleHome : shellStyleStandard;
 
+  const headerBlock = (
+    <div className={topWhiteClass}>
+      <div className="site-home-brand">
+        <div className="site-mobile-page-title-block">{brandTitle}</div>
+      </div>
+    </div>
+  );
+
+  const controlsBlock =
+    hasControls ? (
+      <div className={controlsBarClass}>
+        <div className="site-shell-controls-inner v3-stack">{auxiliary}</div>
+      </div>
+    ) : null;
+
   return (
     <main
       id={mainId}
@@ -106,17 +121,21 @@ export default function SiteShellFrame({
     >
       {prependMain}
       <div className="site-home-shell" style={shellStyle}>
-        <div className={topWhiteClass}>
-          <div className="site-home-brand">
-            <div className="site-mobile-page-title-block">{brandTitle}</div>
-          </div>
-        </div>
-        {hasControls ? (
-          <div className={controlsBarClass}>
-            <div className="site-shell-controls-inner v3-stack">{auxiliary}</div>
-          </div>
-        ) : null}
-        {children}
+        {isHomeShell ? (
+          <>
+            {headerBlock}
+            {controlsBlock}
+            {children}
+          </>
+        ) : (
+          <>
+            <div className="site-shell-sticky-dock">
+              {headerBlock}
+              {controlsBlock}
+            </div>
+            <div className="site-shell-scroll-body">{children}</div>
+          </>
+        )}
       </div>
     </main>
   );
