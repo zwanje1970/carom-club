@@ -429,24 +429,8 @@ type MutableBracket = Bracket & {
 
 export type MainCardTemplateType = "tournament" | "venue";
 
-export type MainCardTemplate = {
-  id: string;
-  type: MainCardTemplateType;
-  layout: "fixed";
-  style: "default";
-  createdAt: string;
-  updatedAt: string;
-};
-
-type LegacyMainCardTemplate = {
-  id: string;
-  name: string;
-  textAreaStructure: string;
-  imageSlotStructure: string;
-  defaultLayout: string;
-  createdAt: string;
-  updatedAt: string;
-};
+/** 대회 게시 스냅샷에 기록되는 templateId (고정) */
+const TOURNAMENT_SNAPSHOT_TEMPLATE_ID = "main-card-template-tournament";
 
 export type SiteLayoutMenuItem = {
   label: string;
@@ -600,6 +584,13 @@ export type TournamentPublishedCard = {
   /** 메인 홈 슬라이드에 노출(저장 시점 대회 상태·동기화로 결정, 사이트는 재판단하지 않음) */
   showOnMainSlide: boolean;
   deadlineSortValue?: string;
+  /** 이미지 뒤 깔리는 CSS background (색·그라데이션). 저장된 행에만 존재 */
+  mediaBackground?: string | null;
+  imageOverlayBlend?: boolean | null;
+  imageOverlayOpacity?: number | null;
+  /** 카드 하단 날짜·장소 표시(대회 기본값에서 수정 가능) */
+  cardDisplayDate?: string | null;
+  cardDisplayLocation?: string | null;
 };
 
 export type PublishedCardSnapshot = {
@@ -619,6 +610,12 @@ export type PublishedCardSnapshot = {
   /** 대회 카드: 제목과 날짜 사이 자유 문구(각 최대 1줄 권장) */
   cardExtraLine1?: string | null;
   cardExtraLine2?: string | null;
+  /** 미디어 영역 배경(CSS). 스냅샷에만 선택적으로 저장 */
+  tournamentMediaBackground?: string | null;
+  tournamentImageOverlayBlend?: boolean | null;
+  tournamentImageOverlayOpacity?: number | null;
+  tournamentCardDisplayDate?: string | null;
+  tournamentCardDisplayLocation?: string | null;
   title: string;
   subtitle: string;
   imageId: string;
@@ -767,7 +764,6 @@ type DevStore = {
   proofImages: ProofImageAsset[];
   outlinePdfAssets: OutlinePdfAsset[];
   auditLogs: AuditLog[];
-  mainCardTemplates: MainCardTemplate[];
   siteLayoutConfig: SiteLayoutConfig;
   siteNotice: SiteNotice;
   siteCommunityConfig: SiteCommunityConfig;
@@ -1025,7 +1021,6 @@ const EMPTY_STORE: DevStore = {
   proofImages: [],
   outlinePdfAssets: [],
   auditLogs: [],
-  mainCardTemplates: [],
   siteLayoutConfig: createDefaultSiteLayoutConfig(),
   siteNotice: createDefaultSiteNotice(),
   siteCommunityConfig: createDefaultSiteCommunityConfig(),
@@ -1590,7 +1585,7 @@ async function loadDevStoreFromFirstReadableDiskFile(): Promise<DevStore | null>
     try {
       const raw = await readFile(p, "utf-8");
       if (!raw.trim()) continue;
-      const parsed = JSON.parse(raw) as Partial<DevStore> & { mainCardTemplate?: unknown };
+      const parsed = JSON.parse(raw) as Partial<DevStore>;
       if (parsedCriticalStoreFieldsInvalid(parsed)) continue;
       return buildDevStoreFromParsed(parsed);
     } catch {
@@ -2277,7 +2272,7 @@ function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedC
   const deadlineSortValue = typeof r.deadlineSortValue === "string" ? r.deadlineSortValue : undefined;
   const showOnMainSlide =
     typeof r.showOnMainSlide === "boolean" ? r.showOnMainSlide : tournamentStatusEligibleForMainSlide(status);
-  return {
+  const base: TournamentPublishedCard = {
     snapshotId,
     tournamentId,
     title,
@@ -2299,9 +2294,27 @@ function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedC
     showOnMainSlide,
     deadlineSortValue,
   };
+  if ("mediaBackground" in r) {
+    base.mediaBackground = typeof r.mediaBackground === "string" ? r.mediaBackground : null;
+  }
+  if ("imageOverlayBlend" in r) {
+    base.imageOverlayBlend = typeof r.imageOverlayBlend === "boolean" ? r.imageOverlayBlend : null;
+  }
+  if ("imageOverlayOpacity" in r) {
+    const x = r.imageOverlayOpacity;
+    base.imageOverlayOpacity =
+      typeof x === "number" && Number.isFinite(x) ? Math.min(1, Math.max(0.15, x)) : null;
+  }
+  if ("cardDisplayDate" in r) {
+    base.cardDisplayDate = typeof r.cardDisplayDate === "string" ? r.cardDisplayDate : null;
+  }
+  if ("cardDisplayLocation" in r) {
+    base.cardDisplayLocation = typeof r.cardDisplayLocation === "string" ? r.cardDisplayLocation : null;
+  }
+  return base;
 }
 
-function buildDevStoreFromParsed(parsed: Partial<DevStore> & { mainCardTemplate?: unknown }): DevStore {
+function buildDevStoreFromParsed(parsed: Partial<DevStore>): DevStore {
   const clientOrganizations: ClientOrganizationStored[] = Array.isArray(parsed.clientOrganizations)
     ? (parsed.clientOrganizations as unknown[])
         .map((row) => normalizeClientOrganizationStoredRow(row))
@@ -2345,28 +2358,6 @@ function buildDevStoreFromParsed(parsed: Partial<DevStore> & { mainCardTemplate?
           .filter((item): item is OutlinePdfAsset => item !== null)
       : [],
     auditLogs: Array.isArray(parsed.auditLogs) ? parsed.auditLogs : [],
-    mainCardTemplates: Array.isArray(parsed.mainCardTemplates)
-      ? (parsed.mainCardTemplates as MainCardTemplate[])
-      : parsed.mainCardTemplate && typeof parsed.mainCardTemplate === "object"
-        ? [
-            {
-              id: "main-card-template-tournament",
-              type: "tournament",
-              layout: "fixed",
-              style: "default",
-              createdAt: (parsed.mainCardTemplate as LegacyMainCardTemplate).createdAt ?? new Date().toISOString(),
-              updatedAt: (parsed.mainCardTemplate as LegacyMainCardTemplate).updatedAt ?? new Date().toISOString(),
-            },
-            {
-              id: "main-card-template-venue",
-              type: "venue",
-              layout: "fixed",
-              style: "default",
-              createdAt: (parsed.mainCardTemplate as LegacyMainCardTemplate).createdAt ?? new Date().toISOString(),
-              updatedAt: (parsed.mainCardTemplate as LegacyMainCardTemplate).updatedAt ?? new Date().toISOString(),
-            },
-          ]
-        : [],
     siteLayoutConfig: normalizeSiteLayoutConfig(parsed.siteLayoutConfig),
     siteNotice: normalizeSiteNotice(parsed.siteNotice),
     siteCommunityConfig: normalizeSiteCommunityConfig(parsed.siteCommunityConfig),
@@ -2439,7 +2430,7 @@ async function tryRecoverFromLastGood(): Promise<DevStore | null> {
   try {
     const raw = await readFile(STORE_LAST_GOOD_PATH, "utf-8");
     if (!raw.trim()) return null;
-    const parsed = JSON.parse(raw) as Partial<DevStore> & { mainCardTemplate?: unknown };
+    const parsed = JSON.parse(raw) as Partial<DevStore>;
     const store = buildDevStoreFromParsed(parsed);
     ensureDefaultPlatformAdminInStore(store);
     reconcileDevStoreLoginIds(store);
@@ -2455,7 +2446,7 @@ async function tryRecoverFromBackup(): Promise<DevStore | null> {
   try {
     const raw = await readFile(STORE_BACKUP_PATH, "utf-8");
     if (!raw.trim()) return null;
-    const parsed = JSON.parse(raw) as Partial<DevStore> & { mainCardTemplate?: unknown };
+    const parsed = JSON.parse(raw) as Partial<DevStore>;
     const store = buildDevStoreFromParsed(parsed);
     ensureDefaultPlatformAdminInStore(store);
     reconcileDevStoreLoginIds(store);
@@ -2488,7 +2479,7 @@ async function tryRecoverFromCorruptBackupsNewestFirst(): Promise<DevStore | nul
     if (size === 0) continue;
     try {
       const raw = await readFile(filePath, "utf-8");
-      const parsed = JSON.parse(raw) as Partial<DevStore> & { mainCardTemplate?: unknown };
+      const parsed = JSON.parse(raw) as Partial<DevStore>;
       const store = buildDevStoreFromParsed(parsed);
       ensureDefaultPlatformAdminInStore(store);
       reconcileDevStoreLoginIds(store);
@@ -2561,7 +2552,7 @@ async function readStoreImpl(): Promise<DevStore> {
 
   let content = "";
   try {
-    let parsed: Partial<DevStore> & { mainCardTemplate?: unknown } | null = null;
+    let parsed: Partial<DevStore> | null = null;
     for (let attempt = 0; attempt <= STORE_IO_READ_RETRY_DELAYS_MS.length; attempt += 1) {
       try {
         content = await readFile(STORE_FILE_PATH, "utf-8");
@@ -2574,7 +2565,7 @@ async function readStoreImpl(): Promise<DevStore> {
       }
 
       try {
-        parsed = JSON.parse(content) as Partial<DevStore> & { mainCardTemplate?: unknown };
+        parsed = JSON.parse(content) as Partial<DevStore>;
         break;
       } catch (parseErr) {
         if (!isRetriableJsonParseError(parseErr, content) || attempt === STORE_IO_READ_RETRY_DELAYS_MS.length) {
@@ -2632,7 +2623,6 @@ async function readStoreImpl(): Promise<DevStore> {
       proofImages: [],
       outlinePdfAssets: [],
       auditLogs: [],
-      mainCardTemplates: [],
       siteLayoutConfig: createDefaultSiteLayoutConfig(),
       siteNotice: createDefaultSiteNotice(),
       siteCommunityConfig: createDefaultSiteCommunityConfig(),
@@ -7111,86 +7101,6 @@ export async function upsertSitePageBuilderPublishedPage(params: {
   return { ok: true, published: nextPublished };
 }
 
-function createDefaultMainCardTemplates(now: string): MainCardTemplate[] {
-  return [
-    {
-      id: "main-card-template-tournament",
-      type: "tournament",
-      layout: "fixed",
-      style: "default",
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: "main-card-template-venue",
-      type: "venue",
-      layout: "fixed",
-      style: "default",
-      createdAt: now,
-      updatedAt: now,
-    },
-  ];
-}
-
-export async function getMainCardTemplates(): Promise<MainCardTemplate[]> {
-  const store = await readStore();
-  const now = new Date().toISOString();
-  const defaults = createDefaultMainCardTemplates(now);
-  const existing = Array.isArray(store.mainCardTemplates) ? store.mainCardTemplates : [];
-  const tournament = existing.find((item) => item.type === "tournament") ?? defaults[0];
-  const venue = existing.find((item) => item.type === "venue") ?? defaults[1];
-  const templates = [tournament, venue];
-  store.mainCardTemplates = templates;
-  await writeStore(store);
-  return templates;
-}
-
-export async function getMainCardTemplate(): Promise<LegacyMainCardTemplate> {
-  const templates = await getMainCardTemplates();
-  const tournament = templates.find((item) => item.type === "tournament") ?? templates[0];
-  const now = new Date().toISOString();
-  return {
-    id: tournament?.id ?? "main-card-template-tournament",
-    name: "기본 메인 게시카드 템플릿",
-    textAreaStructure: "상단 제목 + 하단 보조문구",
-    imageSlotStructure: "대표 이미지 1칸",
-    defaultLayout: "고정 레이아웃",
-    createdAt: tournament?.createdAt ?? now,
-    updatedAt: tournament?.updatedAt ?? now,
-  };
-}
-
-export async function upsertMainCardTemplate(params: {
-  type: MainCardTemplateType;
-}): Promise<MainCardTemplate> {
-  const targetType: MainCardTemplateType = params.type === "venue" ? "venue" : "tournament";
-  const store = await readStore();
-  const now = new Date().toISOString();
-  const defaults = createDefaultMainCardTemplates(now);
-  const existing = Array.isArray(store.mainCardTemplates) ? store.mainCardTemplates : [];
-  const templates: MainCardTemplate[] = [
-    existing.find((item) => item.type === "tournament") ?? defaults[0],
-    existing.find((item) => item.type === "venue") ?? defaults[1],
-  ];
-  const index = templates.findIndex((item) => item.type === targetType);
-  const current = index >= 0 ? templates[index] : defaults[targetType === "venue" ? 1 : 0];
-  const updated: MainCardTemplate = {
-    ...current,
-    type: targetType,
-    layout: "fixed",
-    style: "default",
-    updatedAt: now,
-  };
-  if (index >= 0) {
-    templates[index] = updated;
-  } else {
-    templates.push(updated);
-  }
-  store.mainCardTemplates = templates;
-  await writeStore(store);
-  return updated;
-}
-
 export async function getSiteLayoutConfig(): Promise<SiteLayoutConfig> {
   const readStrategy = resolveSiteLayoutConfigReadStrategy();
   if (readStrategy === "firestore-kv") {
@@ -7643,14 +7553,32 @@ function getSnapshotSourceKey(snapshot: PublishedCardSnapshot): string {
   return `${snapshot.snapshotSourceType}:${snapshot.tournamentId}`;
 }
 
+function tournamentDateLocationMeta(
+  store: DevStore,
+  tournamentId: string
+): { date: string; location: string } {
+  const tour = store.tournaments.find((item) => item.id === tournamentId.trim());
+  return {
+    date: typeof tour?.date === "string" ? tour.date : "",
+    location: typeof tour?.location === "string" ? tour.location : "",
+  };
+}
+
 function tournamentPublishedCardToPublishedSnapshot(
   t: TournamentPublishedCard,
-  templateId: string
+  templateId: string,
+  tournamentMeta?: { date: string; location: string } | null
 ): PublishedCardSnapshot {
   const line1 = t.textLine1?.trim() ?? "";
   const line2 = t.textLine2?.trim() ?? "";
-  const subtitle = [line1, line2].filter((x) => x.length > 0).join(" · ");
-  return {
+  const storedDate = typeof t.cardDisplayDate === "string" ? t.cardDisplayDate.trim() : "";
+  const storedLoc = typeof t.cardDisplayLocation === "string" ? t.cardDisplayLocation.trim() : "";
+  const fbDate = (tournamentMeta?.date ?? "").trim();
+  const fbLoc = (tournamentMeta?.location ?? "").trim();
+  const datePart = storedDate || fbDate;
+  const locPart = storedLoc || fbLoc;
+  const subtitle = [datePart, locPart].filter((x) => x.length > 0).join(" · ");
+  const snap: PublishedCardSnapshot = {
     snapshotId: t.snapshotId,
     tournamentId: t.tournamentId,
     snapshotSourceType: "TOURNAMENT_SNAPSHOT",
@@ -7678,6 +7606,22 @@ function tournamentPublishedCardToPublishedSnapshot(
     updatedAt: t.updatedAt,
     publishedBy: t.publishedBy,
   };
+  if (typeof t.mediaBackground === "string") {
+    snap.tournamentMediaBackground = t.mediaBackground;
+  }
+  if (typeof t.imageOverlayBlend === "boolean") {
+    snap.tournamentImageOverlayBlend = t.imageOverlayBlend;
+  }
+  if (typeof t.imageOverlayOpacity === "number") {
+    snap.tournamentImageOverlayOpacity = t.imageOverlayOpacity;
+  }
+  if (typeof t.cardDisplayDate === "string") {
+    snap.tournamentCardDisplayDate = t.cardDisplayDate;
+  }
+  if (typeof t.cardDisplayLocation === "string") {
+    snap.tournamentCardDisplayLocation = t.cardDisplayLocation;
+  }
+  return snap;
 }
 
 /** 대회 게시카드 v2 저장·게시 */
@@ -7694,6 +7638,11 @@ export async function upsertTournamentPublishedCard(params: {
   targetDetailUrl: string;
   publishedBy: string;
   draftOnly: boolean;
+  mediaBackground?: string | null;
+  imageOverlayBlend?: boolean;
+  imageOverlayOpacity?: number;
+  cardDisplayDate?: string | null;
+  cardDisplayLocation?: string | null;
 }): Promise<{ ok: true; snapshot: PublishedCardSnapshot } | { ok: false; error: string }> {
   const title = params.title.trim();
   if (!title) return { ok: false, error: "카드 제목을 입력해 주세요." };
@@ -7718,24 +7667,22 @@ export async function upsertTournamentPublishedCard(params: {
     return { ok: false, error: "대회를 찾을 수 없습니다." };
   }
 
-  const templateRow = store.mainCardTemplates.find((m) => m.type === "tournament");
-  const templateId = templateRow?.id ?? "main-card-template-tournament";
+  const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
 
   const statusStr = String(normalizeTournamentStatusBadge(tournament.statusBadge));
   const showOnMainSlide = tournamentStatusEligibleForMainSlide(statusStr);
   const now = new Date().toISOString();
 
-  const sameTournament = store.tournamentPublishedCards.filter((c) => c.tournamentId === params.tournamentId.trim());
-  const nextVersion = sameTournament.reduce((max, c) => Math.max(max, c.version), 0) + 1;
-
-  if (!params.draftOnly) {
-    for (const c of store.tournamentPublishedCards) {
-      if (c.tournamentId === params.tournamentId.trim() && c.isActive) {
-        c.isActive = false;
-        c.updatedAt = now;
-      }
-    }
+  const tid = params.tournamentId.trim();
+  /** 초안 저장: 이전 초안(비활성)만 제거. 게시: 해당 대회 카드 전부 제거 후 새 게시 스냅샷 1건만 둔다. */
+  if (params.draftOnly) {
+    store.tournamentPublishedCards = store.tournamentPublishedCards.filter((c) => !(c.tournamentId === tid && !c.isActive));
+  } else {
+    store.tournamentPublishedCards = store.tournamentPublishedCards.filter((c) => c.tournamentId !== tid);
   }
+
+  const sameTournament = store.tournamentPublishedCards.filter((c) => c.tournamentId === tid);
+  const nextVersion = sameTournament.reduce((max, c) => Math.max(max, c.version), 0) + 1;
 
   const row: TournamentPublishedCard = {
     snapshotId: randomUUID(),
@@ -7759,10 +7706,31 @@ export async function upsertTournamentPublishedCard(params: {
     showOnMainSlide,
     deadlineSortValue: typeof tournament.date === "string" && tournament.date.trim() ? tournament.date : "9999-12-31",
   };
+  if (params.mediaBackground !== undefined) {
+    row.mediaBackground = params.mediaBackground;
+  }
+  if (params.imageOverlayBlend !== undefined) {
+    row.imageOverlayBlend = params.imageOverlayBlend;
+  }
+  if (params.imageOverlayOpacity !== undefined) {
+    row.imageOverlayOpacity = Math.min(1, Math.max(0.15, params.imageOverlayOpacity));
+  }
+  if (params.cardDisplayDate !== undefined) {
+    row.cardDisplayDate = params.cardDisplayDate;
+  }
+  if (params.cardDisplayLocation !== undefined) {
+    row.cardDisplayLocation = params.cardDisplayLocation;
+  }
 
   store.tournamentPublishedCards.push(row);
   await writeStore(store);
-  return { ok: true, snapshot: tournamentPublishedCardToPublishedSnapshot(row, templateId) };
+  return {
+    ok: true,
+    snapshot: tournamentPublishedCardToPublishedSnapshot(row, templateId, {
+      date: typeof tournament.date === "string" ? tournament.date : "",
+      location: typeof tournament.location === "string" ? tournament.location : "",
+    }),
+  };
 }
 
 export async function publishVenueCardSnapshot(params: {
@@ -7837,10 +7805,12 @@ export async function publishVenueCardSnapshot(params: {
 
 export async function listPublishedCardSnapshots(): Promise<PublishedCardSnapshot[]> {
   const store = await readStore();
-  const templateId = store.mainCardTemplates.find((m) => m.type === "tournament")?.id ?? "main-card-template-tournament";
+  const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
   const fromTournament = store.tournamentPublishedCards
     .filter((c) => c.isPublished && c.isActive)
-    .map((c) => tournamentPublishedCardToPublishedSnapshot(c, templateId));
+    .map((c) =>
+      tournamentPublishedCardToPublishedSnapshot(c, templateId, tournamentDateLocationMeta(store, c.tournamentId))
+    );
 
   const normalized = store.publishedCardSnapshots
     .map((item) => {
@@ -7923,33 +7893,42 @@ export async function listTournamentSnapshotsForMainSite(options?: {
       : DEFAULT_MAIN_SITE_TOURNAMENT_SLIDE_LIMIT;
 
   const store = await readStore();
-  const templateId = store.mainCardTemplates.find((m) => m.type === "tournament")?.id ?? "main-card-template-tournament";
+  const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
   const rows = store.tournamentPublishedCards
     .filter((c) => c.isPublished && c.isActive && c.showOnMainSlide)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, limit);
 
-  return rows.map((c) => tournamentPublishedCardToPublishedSnapshot(c, templateId));
+  return rows.map((c) =>
+    tournamentPublishedCardToPublishedSnapshot(c, templateId, tournamentDateLocationMeta(store, c.tournamentId))
+  );
 }
 
 export async function getLatestPublishedCardSnapshotByTournamentId(
   tournamentId: string
 ): Promise<PublishedCardSnapshot | null> {
   const store = await readStore();
-  const templateId = store.mainCardTemplates.find((m) => m.type === "tournament")?.id ?? "main-card-template-tournament";
+  const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
   const active = store.tournamentPublishedCards
     .filter((c) => c.tournamentId === tournamentId.trim() && c.isPublished && c.isActive)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-  return active ? tournamentPublishedCardToPublishedSnapshot(active, templateId) : null;
+  return active
+    ? tournamentPublishedCardToPublishedSnapshot(
+        active,
+        templateId,
+        tournamentDateLocationMeta(store, tournamentId)
+      )
+    : null;
 }
 
 export async function listCardSnapshotsByTournamentId(tournamentId: string): Promise<PublishedCardSnapshot[]> {
   const store = await readStore();
-  const templateId = store.mainCardTemplates.find((m) => m.type === "tournament")?.id ?? "main-card-template-tournament";
+  const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
+  const meta = tournamentDateLocationMeta(store, tournamentId);
   return store.tournamentPublishedCards
     .filter((c) => c.tournamentId === tournamentId.trim())
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .map((c) => tournamentPublishedCardToPublishedSnapshot(c, templateId));
+    .map((c) => tournamentPublishedCardToPublishedSnapshot(c, templateId, meta));
 }
 
 export async function listCardSnapshotsByVenueId(venueId: string): Promise<PublishedCardSnapshot[]> {
@@ -7976,9 +7955,14 @@ export async function listCardSnapshotsByVenueId(venueId: string): Promise<Publi
 
 export async function getCardSnapshotById(snapshotId: string): Promise<PublishedCardSnapshot | null> {
   const store = await readStore();
-  const templateId = store.mainCardTemplates.find((m) => m.type === "tournament")?.id ?? "main-card-template-tournament";
+  const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
   const tc = store.tournamentPublishedCards.find((c) => c.snapshotId === snapshotId);
-  if (tc) return tournamentPublishedCardToPublishedSnapshot(tc, templateId);
+  if (tc)
+    return tournamentPublishedCardToPublishedSnapshot(
+      tc,
+      templateId,
+      tournamentDateLocationMeta(store, tc.tournamentId)
+    );
   const snapshot = store.publishedCardSnapshots.find((item) => item.snapshotId === snapshotId);
   if (!snapshot) return null;
   const publishedAt = snapshot.publishedAt || new Date().toISOString();
@@ -8001,7 +7985,7 @@ export async function setCardSnapshotActive(params: {
   isActive: boolean;
 }): Promise<{ ok: true; snapshot: PublishedCardSnapshot } | { ok: false; error: string }> {
   const store = await readStore();
-  const templateId = store.mainCardTemplates.find((m) => m.type === "tournament")?.id ?? "main-card-template-tournament";
+  const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
   const tc = store.tournamentPublishedCards.find((c) => c.snapshotId === params.snapshotId);
   const now = new Date().toISOString();
 
@@ -8024,7 +8008,13 @@ export async function setCardSnapshotActive(params: {
       tc.showOnMainSlide = tournamentStatusEligibleForMainSlide(badge);
     }
     await writeStore(store);
-    return { ok: true, snapshot: tournamentPublishedCardToPublishedSnapshot(tc, templateId) };
+    return {
+      ok: true,
+      snapshot: tournamentPublishedCardToPublishedSnapshot(tc, templateId, {
+        date: typeof tour?.date === "string" ? tour.date : "",
+        location: typeof tour?.location === "string" ? tour.location : "",
+      }),
+    };
   }
 
   const snapshot = store.publishedCardSnapshots.find((item) => item.snapshotId === params.snapshotId);

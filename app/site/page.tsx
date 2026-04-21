@@ -397,6 +397,15 @@ export default async function SiteHomePage({
     cardTemplate: snapshot.tournamentCardTemplate ?? "A",
     backgroundType: snapshot.tournamentBackgroundType ?? (snapshot.image320Url?.trim() ? "image" : "theme"),
     themeType: snapshot.tournamentTheme ?? "dark",
+    ...(typeof snapshot.tournamentMediaBackground === "string"
+      ? { mediaBackground: snapshot.tournamentMediaBackground }
+      : {}),
+    ...(typeof snapshot.tournamentImageOverlayBlend === "boolean"
+      ? { imageOverlayBlend: snapshot.tournamentImageOverlayBlend }
+      : {}),
+    ...(typeof snapshot.tournamentImageOverlayOpacity === "number"
+      ? { imageOverlayOpacity: snapshot.tournamentImageOverlayOpacity }
+      : {}),
   }));
   const dummySlideItems = [
     {

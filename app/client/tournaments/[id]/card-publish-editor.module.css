@@ -1,0 +1,277 @@
+/* 게시카드 작성 — 단계형 편집 + 상단 고정 미리보기 */
+
+.pageWrap {
+  max-width: 40rem;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 0.75rem 1.5rem;
+}
+
+.previewSticky {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 12px 0 14px;
+  margin: 0 -0.25rem;
+  background: linear-gradient(180deg, #fafafa 0%, #fafafa 88%, transparent 100%);
+  border-bottom: 1px solid #e4e4e7;
+}
+
+.previewInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.previewTitle {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #18181b;
+  text-align: center;
+}
+
+.previewHint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #52525b;
+  line-height: 1.35;
+  text-align: center;
+  max-width: 28rem;
+}
+
+.previewCardWrap {
+  width: 100%;
+  max-width: 420px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e4e4e7;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.templateRadioRow {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem 1.75rem;
+  margin-top: 4px;
+  padding: 2px 0 0;
+  width: 100%;
+  max-width: 420px;
+  box-sizing: border-box;
+}
+
+.templateRadioLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #18181b;
+  cursor: pointer;
+  user-select: none;
+}
+
+.templateRadioLabel input {
+  margin: 0;
+  width: 1rem;
+  height: 1rem;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
+.formPanel {
+  padding: 14px 0 8px;
+  box-sizing: border-box;
+}
+
+.stepTabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 14px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #d4d4d8;
+}
+
+.stepTab {
+  flex: 1 1 50%;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: none;
+  background: #f4f4f5;
+  color: #52525b;
+  cursor: pointer;
+}
+
+.stepTab:hover {
+  background: #e4e4e7;
+}
+
+.stepTabActive {
+  background: #fff;
+  color: #18181b;
+  box-shadow: inset 0 -2px 0 #3b82f6;
+}
+
+.hint {
+  margin: 0 0 12px;
+  font-size: 0.78rem;
+  color: #52525b;
+  line-height: 1.4;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  text-align: left;
+}
+
+.fieldLabel {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #52525b;
+}
+
+.fieldInput {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #a1a1aa;
+  background: #fff;
+  color: #18181b;
+  outline: none;
+}
+
+.fieldInput:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.fieldTextarea {
+  resize: vertical;
+  min-height: 3.5rem;
+  font-family: ui-monospace, monospace;
+  font-size: 0.82rem;
+}
+
+.fieldFile {
+  font-size: 0.85rem;
+}
+
+.fieldCheck {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: #3f3f46;
+  cursor: pointer;
+}
+
+.fieldCheck input {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.fieldCheck input:disabled + span {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.rangeBlock {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldLabelRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.rangeOut {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #52525b;
+}
+
+.range {
+  width: 100%;
+}
+
+.microhint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #71717a;
+  line-height: 1.35;
+}
+
+.clearBtn {
+  margin-top: 6px;
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #a1a1aa;
+  background: #fff;
+  cursor: pointer;
+}
+
+.clearBtn:hover {
+  background: #f4f4f5;
+}
+
+.bgRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.colorPick {
+  width: 44px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #a1a1aa;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.bgTextFlex {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.actions {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #e4e4e7;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.statusNote {
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  color: #71717a;
+}

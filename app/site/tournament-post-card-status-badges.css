@@ -1,0 +1,72 @@
+/* carom-postcard-template-test: src/components/TournamentPostCardStatusBadges.css (그대로) */
+
+.tournament-post-card__badge {
+  display: inline-flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 3.35rem;
+  height: 3.35rem;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  text-align: center;
+  color: #fafaf9;
+  /* 백색 테두리 — 두께 2px (모든 상태 공통) */
+  border: 2px solid #fff;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.tournament-post-card__badge-line {
+  display: block;
+}
+
+/* 모집중 — 파란색 · 1줄 */
+.tournament-post-card__badge--recruiting {
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+  font-size: 0.7rem;
+  letter-spacing: -0.03em;
+}
+
+/* 마감임박 — 빨간색 · 2줄(마감 / 임박) */
+.tournament-post-card__badge--closing {
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+  font-size: calc(0.58rem + 1pt);
+  letter-spacing: -0.04em;
+  line-height: 1.08;
+}
+
+.tournament-post-card__badge--closing .tournament-post-card__badge-line {
+  font-size: inherit;
+}
+
+/* 마감 — 초록색 · 1줄 */
+.tournament-post-card__badge--full {
+  background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+  font-size: 0.74rem;
+}
+
+/* 종료 — 검은색 · 1줄 */
+.tournament-post-card__badge--ended {
+  background: linear-gradient(180deg, #171717 0%, #0a0a0a 100%);
+  color: #f4f4f5;
+  font-size: 0.72rem;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* v3 스냅샷 데이터 전용(템플릿 원본에 없음): 대기자모집 */
+.tournament-post-card__badge--waitlist {
+  background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+  font-size: 0.56rem;
+  letter-spacing: -0.04em;
+  line-height: 1.08;
+}

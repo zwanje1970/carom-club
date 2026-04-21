@@ -1,0 +1,235 @@
+/* carom-postcard-template-test: src/components/tournament-slide-card-previews.module.css (그대로) */
+
+/* 공통: 슬라이드형 게시 카드 미리보기 — 높이는 2:1 대비 +40% (aspect 10/7) */
+
+.cardRoot {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 10 / 7;
+  border-radius: 8px;
+  overflow: hidden;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  box-shadow:
+    0 -30px 48px rgba(0, 0, 0, 0.58),
+    0 -16px 28px rgba(0, 0, 0, 0.42),
+    0 -6px 14px rgba(0, 0, 0, 0.32);
+}
+
+/* 상태 배지 위치 고정 — top/right는 .statusBadgeWrap 에서만 */
+.media {
+  --status-badge-slot: 3.35rem;
+  position: relative;
+  flex: 4 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 미디어 영역 기준 우상단 — 클래식·프레임·SlideDeck 카드 동일 */
+.statusBadgeWrap {
+  position: absolute;
+  top: 13px;
+  right: 12px;
+  z-index: 4;
+  display: flex;
+  justify-content: flex-end;
+  width: auto;
+  margin: 0;
+  pointer-events: none;
+}
+
+/* 이미지 아래 깔리는 단색·그라데이션 (클래식·프레임 공통) */
+.mediaPaint {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: #2a2a30;
+}
+
+/* 프레임: mediaBackground 미지정 시 기본 녹색 */
+.mediaPaintFrameDefault {
+  background: #15803d;
+}
+
+.bg {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+/* 하단 20%: 백색 · 시합날짜(좌) · 장소(우) — TournamentPostCard 와 동일 비율 */
+.cardFooter {
+  position: relative;
+  z-index: 3;
+  flex: 1 1 0;
+  min-height: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 12px;
+  background: #fff;
+}
+
+.footerDate,
+.footerPlace {
+  margin: 0;
+  font-size: calc(0.78rem + 1pt);
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  color: #18181b;
+}
+
+.footerDate {
+  font-weight: 700;
+  flex: 0 1 auto;
+  min-width: 0;
+  text-align: left;
+}
+
+.footerPlace {
+  font-weight: 500;
+  color: #3f3f46;
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- 클래식 (메인 슬라이드와 동일 구조) ---------- */
+
+.classicInner {
+  position: relative;
+  z-index: 3;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.classicTop {
+  width: 100%;
+}
+
+.classicMain {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding-right: calc(var(--status-badge-slot) + 10px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 미디어 영역 공통 텍스트 — 클래식/프레임 동일(정렬·패딩만 템플릿별 상이) */
+.classicLead,
+.frameLead {
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  font-size: clamp(0.95rem, 3.8vw, 1.12rem);
+  font-weight: 600;
+  line-height: 1.28;
+  letter-spacing: -0.02em;
+  color: #fff;
+  text-shadow:
+    0 2px 14px rgba(0, 0, 0, 0.55),
+    0 1px 3px rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.classicTitle,
+.frameTitle {
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  font-size: clamp(1.15rem, 4.8vw, 1.5rem);
+  font-weight: 800;
+  line-height: 1.22;
+  letter-spacing: -0.03em;
+  color: #ffe566;
+  text-shadow:
+    0 2px 20px rgba(0, 0, 0, 0.6),
+    0 1px 4px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.classicDesc,
+.frameDesc {
+  margin: 0.65rem 0 0;
+  font-size: calc(0.78rem + 1pt);
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  font-weight: 400;
+  color: #fff;
+  text-shadow:
+    0 1px 12px rgba(0, 0, 0, 0.55),
+    0 0 1px rgba(0, 0, 0, 0.8);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+  max-height: calc(1.35em * 5);
+  overflow: hidden;
+}
+
+/* 상태 배지는 TournamentPostCardStatusBadges.css 의 tournament-post-card__badge 와 동일 */
+
+/* ---------- 프레임: 텍스트 상단 — 제목 세로 중심 ≈ 배지 중앙 ---------- */
+
+.frameInner {
+  --frame-badge-size: 3.35rem;
+  position: relative;
+  z-index: 3;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: center;
+}
+
+.frameCenter {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  min-height: 0;
+  /*
+   * 배지 중심: inset-top + badge/2
+   * 제목 한 줄 광학 중심 보정(~0.68rem) — +0.55rem 여백으로 전체를 살짝 아래로
+   */
+  padding-top: calc(
+    13px + (var(--frame-badge-size) / 2) - 0.68rem + 0.55rem
+  );
+  padding-left: 6px;
+  padding-right: calc(6px + var(--frame-badge-size) + 6px);
+  padding-bottom: 6px;
+}
+
+/* 리드 한 줄 있을 때 제목 위치 보정 */
+.frameCenter:has(.frameLead) {
+  padding-top: calc(
+    13px + (var(--frame-badge-size) / 2) - 0.68rem - 1.32em + 0.55rem
+  );
+}

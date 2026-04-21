@@ -68,6 +68,11 @@ export async function POST(request: Request) {
     imageId?: unknown;
     image320Url?: unknown;
     draftOnly?: unknown;
+    mediaBackground?: unknown;
+    imageOverlayBlend?: unknown;
+    imageOverlayOpacity?: unknown;
+    cardDisplayDate?: unknown;
+    cardDisplayLocation?: unknown;
   } = {};
 
   try {
@@ -94,6 +99,32 @@ export async function POST(request: Request) {
   const imageId = typeof body.imageId === "string" ? body.imageId : "";
   const image320Url = typeof body.image320Url === "string" ? body.image320Url : "";
 
+  const mediaBackground =
+    body.mediaBackground === null
+      ? null
+      : typeof body.mediaBackground === "string"
+        ? body.mediaBackground
+        : undefined;
+  const imageOverlayBlend = typeof body.imageOverlayBlend === "boolean" ? body.imageOverlayBlend : undefined;
+  const imageOverlayOpacityRaw = body.imageOverlayOpacity;
+  const imageOverlayOpacity =
+    typeof imageOverlayOpacityRaw === "number" && Number.isFinite(imageOverlayOpacityRaw)
+      ? imageOverlayOpacityRaw
+      : undefined;
+
+  const cardDisplayDate =
+    body.cardDisplayDate === null
+      ? null
+      : typeof body.cardDisplayDate === "string"
+        ? body.cardDisplayDate
+        : undefined;
+  const cardDisplayLocation =
+    body.cardDisplayLocation === null
+      ? null
+      : typeof body.cardDisplayLocation === "string"
+        ? body.cardDisplayLocation
+        : undefined;
+
   const result = await upsertTournamentPublishedCard({
     tournamentId,
     title,
@@ -107,6 +138,11 @@ export async function POST(request: Request) {
     targetDetailUrl: `/site/tournaments/${tournamentId}`,
     publishedBy: publisher.user.id,
     draftOnly,
+    ...(mediaBackground !== undefined ? { mediaBackground } : {}),
+    ...(imageOverlayBlend !== undefined ? { imageOverlayBlend } : {}),
+    ...(imageOverlayOpacity !== undefined ? { imageOverlayOpacity } : {}),
+    ...(cardDisplayDate !== undefined ? { cardDisplayDate } : {}),
+    ...(cardDisplayLocation !== undefined ? { cardDisplayLocation } : {}),
   });
 
   if (!result.ok) {

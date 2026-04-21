@@ -422,6 +422,96 @@
         "teamScoreLimit": null,
         "teamScoreRule": "LTE"
       }
+    },
+    {
+      "id": "52b8c3b8-da28-4a69-b1e4-86b18646fd4b",
+      "title": "가나다라마바사아자차카",
+      "date": "2026-05-16",
+      "eventDates": null,
+      "location": "zzz당구장\n충남 아산시 둔포면 아산밸리중앙로 79-8 5층\n01000000000",
+      "extraVenues": null,
+      "maxParticipants": 24,
+      "entryFee": 30000,
+      "createdBy": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
+      "createdAt": "2026-04-21T10:43:39.448Z",
+      "posterImageUrl": "/api/site-images/41752ab3-9af8-4651-a4e2-2a719502716e?variant=w640",
+      "statusBadge": "초안",
+      "summary": null,
+      "prizeInfo": "우승: 50\n준우승: 10",
+      "outlineDisplayMode": null,
+      "outlineHtml": null,
+      "outlineImageUrl": null,
+      "outlinePdfUrl": null,
+      "venueGuideVenueId": null,
+      "rule": {
+        "entryCondition": null,
+        "entryQualificationType": "SCORE",
+        "verificationMode": "NONE",
+        "verificationReviewRequired": true,
+        "verificationGuideText": null,
+        "eligibilityType": "UNDER",
+        "eligibilityValue": 25,
+        "eligibilityCompare": "LTE",
+        "divisionEnabled": false,
+        "divisionMetricType": "AVERAGE",
+        "divisionRulesJson": null,
+        "scope": "REGIONAL",
+        "region": null,
+        "nationalTournament": false,
+        "accountNumber": null,
+        "allowMultipleSlots": false,
+        "participantsListPublic": false,
+        "durationType": "1_DAY",
+        "durationDays": null,
+        "isScotch": false,
+        "teamScoreLimit": null,
+        "teamScoreRule": "LTE"
+      }
+    },
+    {
+      "id": "32128b35-beec-4b53-b2ae-55ff2fcc0e22",
+      "title": "빌리언당구클럽의 64강대회",
+      "date": "2026-05-09",
+      "eventDates": null,
+      "location": "zzz당구장\n충남 아산시 둔포면 아산밸리중앙로 79-8 5층\n01000000000",
+      "extraVenues": null,
+      "maxParticipants": 64,
+      "entryFee": 30000,
+      "createdBy": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
+      "createdAt": "2026-04-21T11:20:42.111Z",
+      "posterImageUrl": "/api/site-images/96501f89-bdd0-4ad8-a019-b4d320adba8b?variant=w640",
+      "statusBadge": "모집중",
+      "summary": null,
+      "prizeInfo": "우승: 50\n준우승: 30\n3위: 20\n3위: 20",
+      "outlineDisplayMode": null,
+      "outlineHtml": null,
+      "outlineImageUrl": null,
+      "outlinePdfUrl": null,
+      "venueGuideVenueId": null,
+      "rule": {
+        "entryCondition": null,
+        "entryQualificationType": "SCORE",
+        "verificationMode": "NONE",
+        "verificationReviewRequired": true,
+        "verificationGuideText": null,
+        "eligibilityType": "UNDER",
+        "eligibilityValue": 20,
+        "eligibilityCompare": "LTE",
+        "divisionEnabled": false,
+        "divisionMetricType": "AVERAGE",
+        "divisionRulesJson": null,
+        "scope": "REGIONAL",
+        "region": null,
+        "nationalTournament": false,
+        "accountNumber": "카카오 5555022220000 카카오",
+        "allowMultipleSlots": false,
+        "participantsListPublic": false,
+        "durationType": "1_DAY",
+        "durationDays": null,
+        "isScotch": false,
+        "teamScoreLimit": null,
+        "teamScoreRule": "LTE"
+      }
     }
   ],
   "tournamentApplications": [
@@ -526,6 +616,44 @@
       "uploaderUserId": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
       "originalExt": "jpg",
       "createdAt": "2026-04-19T13:13:33.020Z"
+    },
+    {
+      "id": "41752ab3-9af8-4651-a4e2-2a719502716e",
+      "uploaderUserId": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
+      "originalExt": "jpg",
+      "createdAt": "2026-04-21T10:42:41.955Z",
+      "sitePublic": true
+    },
+    {
+      "id": "96501f89-bdd0-4ad8-a019-b4d320adba8b",
+      "uploaderUserId": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
+      "originalExt": "jpg",
+      "createdAt": "2026-04-21T11:18:55.813Z",
+      "sitePublic": true
+    },
+    {
+      "id": "a2c1d8d9-b7fd-43fb-aafd-add6d5f88127",
+      "uploaderUserId": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
+      "originalExt": "jpg",
+      "createdAt": "2026-04-21T11:56:50.610Z"
+    },
+    {
+      "id": "6b1b2f82-6217-456d-826a-ea8881c0ba0d",
+      "uploaderUserId": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
+      "originalExt": "jpg",
+      "createdAt": "2026-04-21T11:57:06.685Z"
+    },
+    {
+      "id": "e92d33bc-599e-49cc-b1cf-c00fa8cf943a",
+      "uploaderUserId": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
+      "originalExt": "jpg",
+      "createdAt": "2026-04-21T11:57:48.476Z"
+    },
+    {
+      "id": "b4f64474-39ec-4afa-9e25-b7ee915e3839",
+      "uploaderUserId": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
+      "originalExt": "jpg",
+      "createdAt": "2026-04-21T11:58:34.655Z"
     }
   ],
   "outlinePdfAssets": [
@@ -586,24 +714,6 @@
         "tournamentId": "ccf10ef7-1316-4507-a7fc-897a664b1b68"
       },
       "createdAt": "2026-04-16T15:59:24.779Z"
-    }
-  ],
-  "mainCardTemplates": [
-    {
-      "id": "main-card-template-tournament",
-      "type": "tournament",
-      "layout": "fixed",
-      "style": "default",
-      "createdAt": "2026-04-16T15:10:32.039Z",
-      "updatedAt": "2026-04-16T15:10:32.039Z"
-    },
-    {
-      "id": "main-card-template-venue",
-      "type": "venue",
-      "layout": "fixed",
-      "style": "default",
-      "createdAt": "2026-04-16T15:10:32.039Z",
-      "updatedAt": "2026-04-16T15:10:32.039Z"
     }
   ],
   "siteLayoutConfig": {
@@ -1037,6 +1147,33 @@
       "publishedBy": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
       "showOnMainSlide": true,
       "deadlineSortValue": "2026-05-31"
+    },
+    {
+      "snapshotId": "af38b575-7a42-4deb-8216-fb2c110ada63",
+      "tournamentId": "32128b35-beec-4b53-b2ae-55ff2fcc0e22",
+      "title": "빌리언당구클럽의 64강대회",
+      "textLine1": "가나다라마바사",
+      "textLine2": "안녕하세요\n대회에 참가하세요.\n테스트입니다.\n테스트라이니까요..",
+      "templateType": "B",
+      "backgroundType": "image",
+      "themeType": "dark",
+      "image320Url": "/api/proof-images/b4f64474-39ec-4afa-9e25-b7ee915e3839?variant=w320",
+      "imageId": "b4f64474-39ec-4afa-9e25-b7ee915e3839",
+      "status": "모집중",
+      "targetDetailUrl": "/site/tournaments/32128b35-beec-4b53-b2ae-55ff2fcc0e22",
+      "publishedAt": "2026-04-21T12:00:24.175Z",
+      "updatedAt": "2026-04-21T12:00:24.175Z",
+      "isPublished": true,
+      "isActive": true,
+      "version": 1,
+      "publishedBy": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
+      "showOnMainSlide": true,
+      "deadlineSortValue": "2026-05-09",
+      "mediaBackground": "#9b222e",
+      "imageOverlayBlend": true,
+      "imageOverlayOpacity": 0.77,
+      "cardDisplayDate": "2026-05-09 (토)",
+      "cardDisplayLocation": "zzz당구장"
     }
   ],
   "sitePageBuilderDrafts": [

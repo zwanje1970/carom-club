@@ -25,6 +25,13 @@ type CardSnapshotRow = {
   tournamentCardTemplate?: "A" | "B";
   tournamentBackgroundType?: "image" | "theme";
   tournamentTheme?: "dark" | "light" | "natural";
+  tournamentMediaBackground?: string | null;
+  tournamentImageOverlayBlend?: boolean | null;
+  tournamentImageOverlayOpacity?: number | null;
+  tournamentCardDisplayDate?: string | null;
+  tournamentCardDisplayLocation?: string | null;
+  /** false면 초안(게시카드 작성 저장분). 게시 시 최신 초안을 우선한다. */
+  isActive?: boolean;
 };
 
 function isCompleteCard(s: CardSnapshotRow | null | undefined): s is CardSnapshotRow {
@@ -40,12 +47,17 @@ function isCompleteCard(s: CardSnapshotRow | null | undefined): s is CardSnapsho
   return true;
 }
 
-/** 목록은 최신순 — 카드 작성에서 저장한 비활성 스냅샷이 있으면 그것을 게시 대상으로 삼음 */
+/**
+ * 목록은 최신순(서버). 게시 시 본문은 마지막으로 저장한 초안(`isActive !== true`)을 우선하고,
+ * 없으면 현재 게시 중인 카드로 재게시한다.
+ */
 function pickCardForPublish(data: {
   snapshots?: CardSnapshotRow[];
   activeSnapshot?: CardSnapshotRow | null;
 }): CardSnapshotRow | null {
   const list = data.snapshots ?? [];
+  const draft = list.find((row) => row.isActive === false && isCompleteCard(row));
+  if (draft) return draft;
   const fromList = list.find((row) => isCompleteCard(row));
   if (fromList) return fromList;
   if (isCompleteCard(data.activeSnapshot)) return data.activeSnapshot;
@@ -140,6 +152,21 @@ export default function TournamentBadgeCardManageRow({
           imageId: latest.imageId?.trim() ?? "",
           image320Url: latest.image320Url?.trim() ?? "",
           draftOnly: false,
+          ...(typeof latest.tournamentMediaBackground === "string"
+            ? { mediaBackground: latest.tournamentMediaBackground }
+            : {}),
+          ...(typeof latest.tournamentImageOverlayBlend === "boolean"
+            ? { imageOverlayBlend: latest.tournamentImageOverlayBlend }
+            : {}),
+          ...(typeof latest.tournamentImageOverlayOpacity === "number"
+            ? { imageOverlayOpacity: latest.tournamentImageOverlayOpacity }
+            : {}),
+          ...(typeof latest.tournamentCardDisplayDate === "string"
+            ? { cardDisplayDate: latest.tournamentCardDisplayDate }
+            : {}),
+          ...(typeof latest.tournamentCardDisplayLocation === "string"
+            ? { cardDisplayLocation: latest.tournamentCardDisplayLocation }
+            : {}),
         }),
       });
       const postData = (await postRes.json()) as { error?: string; snapshot?: { snapshotId?: string } };

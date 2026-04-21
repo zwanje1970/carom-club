@@ -4,7 +4,6 @@ import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/au
 import {
   getCardSnapshotById,
   getClientStatusByUserId,
-  getMainCardTemplates,
   getUserById,
   listCardSnapshotsByVenueId,
   publishVenueCardSnapshot,
@@ -63,14 +62,9 @@ export async function POST(request: Request) {
   if (!isSupportedVenueId(venueId)) {
     return NextResponse.json({ error: "지원하지 않는 당구장 ID입니다." }, { status: 400 });
   }
-  const templates = await getMainCardTemplates();
-  const template = templates.find((item) => item.type === "venue") ?? templates[0];
-  if (!template) {
-    return NextResponse.json({ error: "Venue template not found." }, { status: 500 });
-  }
   const result = await publishVenueCardSnapshot({
     venueId,
-    templateId: template.id,
+    templateId: "main-card-template-venue",
     templateType: "venue",
     title: typeof body.title === "string" ? body.title : "",
     subtitle: typeof body.subtitle === "string" ? body.subtitle : "",

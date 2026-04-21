@@ -1,9 +1,65 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import deckStyles from "../../../../site/main-scene-slide-deck.module.css";
-import { SlideDeckCard, type SlideDeckItem } from "../../../../site/tournament-slide-card";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  TournamentSnapshotCardView,
+  type SlideDeckItem,
+} from "../../../../site/tournament-snapshot-card-view";
+import editorStyles from "../card-publish-editor.module.css";
+
+const DESCRIPTION_MAX_LINES = 5;
+
+const KO_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
+
+/** `2026-05-09 (일)` — 저장/미리보기 입력값과 동일 형식 */
+function formatCardDateForDisplay(raw: string): string {
+  const s = raw.trim();
+  if (!s) return "";
+  const withoutWeek = s.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  const m = withoutWeek.match(/^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})$/);
+  let d: Date | null = null;
+  if (m) {
+    const y = Number(m[1]);
+    const mo = Number(m[2]);
+    const da = Number(m[3]);
+    const cand = new Date(y, mo - 1, da);
+    if (
+      cand.getFullYear() === y &&
+      cand.getMonth() === mo - 1 &&
+      cand.getDate() === da
+    ) {
+      d = cand;
+    }
+  }
+  if (!d) {
+    const t = Date.parse(withoutWeek.replace(/\./g, "-"));
+    if (!Number.isNaN(t)) d = new Date(t);
+  }
+  if (!d || Number.isNaN(d.getTime())) return s;
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const da = String(d.getDate()).padStart(2, "0");
+  return `${y}-${mo}-${da} (${KO_WEEKDAYS[d.getDay()]})`;
+}
+
+/** 당구장명만: 첫 줄·쉼표 앞만(주소 꼬리 제거). 빈 값은 "" */
+function venueNameOnly(raw: string): string {
+  let s = raw.trim();
+  if (!s) return "";
+  s = s.split(/\r?\n/)[0].trim();
+  const comma = s.indexOf(",");
+  if (comma > 0) {
+    s = s.slice(0, comma).trim();
+  }
+  return s;
+}
+
+function clampDescriptionToMaxLines(value: string, maxLines: number): string {
+  const lines = value.split(/\r?\n/);
+  return lines.slice(0, maxLines).join("\n");
+}
+
 type UploadedImage = {
   imageId: string;
   w320Url: string;
@@ -20,33 +76,76 @@ type TournamentSummary = {
   statusBadge?: string;
 };
 
+type SnapshotPick = {
+  title?: string;
+  cardExtraLine1?: string | null;
+  cardExtraLine2?: string | null;
+  tournamentCardTemplate?: "A" | "B";
+  tournamentTheme?: "dark" | "light" | "natural";
+  tournamentBackgroundType?: "image" | "theme";
+  image320Url?: string;
+  imageId?: string;
+  image640Url?: string;
+  tournamentMediaBackground?: string | null;
+  tournamentImageOverlayBlend?: boolean | null;
+  tournamentImageOverlayOpacity?: number | null;
+  tournamentCardDisplayDate?: string | null;
+  tournamentCardDisplayLocation?: string | null;
+};
+
+function hasStoredV2Media(pick: SnapshotPick): boolean {
+  return (
+    typeof pick.tournamentMediaBackground === "string" ||
+    typeof pick.tournamentImageOverlayBlend === "boolean" ||
+    typeof pick.tournamentImageOverlayOpacity === "number"
+  );
+}
+
 export default function ClientTournamentCardPublishPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const tournamentId = useMemo(() => (typeof params.id === "string" ? params.id : ""), [params.id]);
 
   const [tournamentStatusForPreview, setTournamentStatusForPreview] = useState("");
-  const [tournamentDateForPreview, setTournamentDateForPreview] = useState("");
-  const [tournamentLocationForPreview, setTournamentLocationForPreview] = useState("");
+  const [cardDate, setCardDate] = useState("");
+  const [cardPlace, setCardPlace] = useState("");
   const [cardTemplate, setCardTemplate] = useState<CardTemplate>("A");
   const [title, setTitle] = useState("");
   const [textLine1, setTextLine1] = useState("");
   const [textLine2, setTextLine2] = useState("");
   const [themeType, setThemeType] = useState<CardTheme>("dark");
   const [uploadedImage, setUploadedImage] = useState<UploadedImage | null>(null);
-  const [showStyleOptions, setShowStyleOptions] = useState(false);
+
+  const [mediaBackground, setMediaBackground] = useState("");
+  const [imageOverlayBlend, setImageOverlayBlend] = useState(true);
+  const [imageOverlayOpacity, setImageOverlayOpacity] = useState(0.78);
+  const [v2MediaMode, setV2MediaMode] = useState<"inherit" | "on">("on");
+
+  const [editorStep, setEditorStep] = useState<1 | 2>(1);
 
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
 
+  const bgFileInputRef = useRef<HTMLInputElement>(null);
+
   const backgroundType = uploadedImage ? "image" : "theme";
 
-  const cardPublishSlidePreview: SlideDeckItem = useMemo(
-    () => ({
+  /** 배경색·배경 이미지 미설정 시 미리보기 기본(짙은 청색)만 — 저장 payload는 그대로 */
+  const DEFAULT_PREVIEW_MEDIA_BG = "#0f2747";
+
+  const cardPublishSlidePreview: SlideDeckItem = useMemo(() => {
+    const datePart = formatCardDateForDisplay(cardDate) || cardDate.trim() || "-";
+    const placePart = venueNameOnly(cardPlace) || "-";
+    const subtitle = `${datePart} · ${placePart}`;
+    const noBgImage = !uploadedImage?.w320Url;
+    const noCssBg = !(mediaBackground || "").trim();
+    const resolvedPreviewMediaBg =
+      noBgImage && noCssBg ? DEFAULT_PREVIEW_MEDIA_BG : mediaBackground.trim();
+    const base: SlideDeckItem = {
       snapshotId: "card-publish-preview",
       title: title.trim() || "(제목)",
-      subtitle: `${tournamentDateForPreview} · ${tournamentLocationForPreview}`.trim(),
+      subtitle: subtitle.length ? subtitle : "·",
       statusBadge: tournamentStatusForPreview,
       cardExtraLine1: textLine1 || null,
       cardExtraLine2: textLine2 || null,
@@ -54,48 +153,39 @@ export default function ClientTournamentCardPublishPage() {
       cardTemplate,
       backgroundType,
       themeType,
-    }),
-    [
-      title,
-      tournamentDateForPreview,
-      tournamentLocationForPreview,
-      tournamentStatusForPreview,
-      textLine1,
-      textLine2,
-      uploadedImage?.w320Url,
-      cardTemplate,
-      backgroundType,
-      themeType,
-    ]
-  );
+      mediaBackground: resolvedPreviewMediaBg,
+      imageOverlayBlend: v2MediaMode === "on" ? imageOverlayBlend : true,
+      imageOverlayOpacity: v2MediaMode === "on" ? imageOverlayOpacity : 1,
+    };
+    return base;
+  }, [
+    title,
+    cardDate,
+    cardPlace,
+    tournamentStatusForPreview,
+    textLine1,
+    textLine2,
+    uploadedImage?.w320Url,
+    cardTemplate,
+    backgroundType,
+    themeType,
+    v2MediaMode,
+    mediaBackground,
+    imageOverlayBlend,
+    imageOverlayOpacity,
+  ]);
+
+  function activateV2Media() {
+    setV2MediaMode("on");
+  }
 
   const loadSnapshots = useCallback(async () => {
     if (!tournamentId) return;
     try {
       const response = await fetch(`/api/client/card-snapshots?tournamentId=${encodeURIComponent(tournamentId)}`);
       const result = (await response.json()) as {
-        snapshots?: Array<{
-          title?: string;
-          cardExtraLine1?: string | null;
-          cardExtraLine2?: string | null;
-          tournamentCardTemplate?: "A" | "B";
-          tournamentTheme?: "dark" | "light" | "natural";
-          tournamentBackgroundType?: "image" | "theme";
-          image320Url?: string;
-          imageId?: string;
-          image640Url?: string;
-        }>;
-        activeSnapshot?: {
-          title?: string;
-          cardExtraLine1?: string | null;
-          cardExtraLine2?: string | null;
-          tournamentCardTemplate?: "A" | "B";
-          tournamentTheme?: "dark" | "light" | "natural";
-          tournamentBackgroundType?: "image" | "theme";
-          image320Url?: string;
-          imageId?: string;
-          image640Url?: string;
-        } | null;
+        snapshots?: SnapshotPick[];
+        activeSnapshot?: SnapshotPick | null;
         tournament?: TournamentSummary;
         error?: string;
       };
@@ -107,8 +197,6 @@ export default function ClientTournamentCardPublishPage() {
       setTournamentStatusForPreview(
         typeof t.statusBadge === "string" && t.statusBadge.trim() ? t.statusBadge.trim() : ""
       );
-      setTournamentDateForPreview(typeof t.date === "string" ? t.date : "");
-      setTournamentLocationForPreview(typeof t.location === "string" ? t.location : "");
 
       const newest = result.snapshots?.[0];
       const active = result.activeSnapshot;
@@ -135,11 +223,48 @@ export default function ClientTournamentCardPublishPage() {
         } else {
           setUploadedImage(null);
         }
+        if (hasStoredV2Media(pick)) {
+          setV2MediaMode("on");
+          setMediaBackground(typeof pick.tournamentMediaBackground === "string" ? pick.tournamentMediaBackground : "");
+          setImageOverlayBlend(
+            typeof pick.tournamentImageOverlayBlend === "boolean" ? pick.tournamentImageOverlayBlend : true
+          );
+          setImageOverlayOpacity(
+            typeof pick.tournamentImageOverlayOpacity === "number" ? pick.tournamentImageOverlayOpacity : 0.78
+          );
+        } else {
+          setV2MediaMode("inherit");
+          setMediaBackground("");
+          setImageOverlayBlend(false);
+          setImageOverlayOpacity(1);
+        }
+        const dRaw =
+          typeof pick.tournamentCardDisplayDate === "string"
+            ? pick.tournamentCardDisplayDate
+            : typeof t.date === "string"
+              ? t.date
+              : "";
+        const locRaw =
+          typeof pick.tournamentCardDisplayLocation === "string"
+            ? pick.tournamentCardDisplayLocation
+            : typeof t.location === "string"
+              ? t.location
+              : "";
+        setCardDate(dRaw ? formatCardDateForDisplay(dRaw) : "");
+        setCardPlace(locRaw ? venueNameOnly(locRaw) : "");
       } else {
         setTitle(t.title);
         setTextLine1("");
         setTextLine2("");
         setUploadedImage(null);
+        setV2MediaMode("on");
+        setMediaBackground("");
+        setImageOverlayBlend(true);
+        setImageOverlayOpacity(0.78);
+        const d0 = typeof t.date === "string" ? t.date : "";
+        const loc0 = typeof t.location === "string" ? t.location : "";
+        setCardDate(d0 ? formatCardDateForDisplay(d0) : "");
+        setCardPlace(loc0 ? venueNameOnly(loc0) : "");
       }
     } catch {
       /* noop */
@@ -166,21 +291,29 @@ export default function ClientTournamentCardPublishPage() {
     setLoading(true);
     setMessage("");
     try {
+      const body: Record<string, unknown> = {
+        tournamentId,
+        title: title.trim(),
+        textLine1: textLine1.trim(),
+        textLine2: textLine2.trim(),
+        cardTemplate,
+        backgroundType,
+        themeType,
+        imageId: uploadedImage?.imageId ?? "",
+        image320Url: uploadedImage?.w320Url ?? "",
+        draftOnly: true,
+        cardDisplayDate: cardDate.trim(),
+        cardDisplayLocation: cardPlace.trim(),
+      };
+      if (v2MediaMode === "on") {
+        body.mediaBackground = mediaBackground;
+        body.imageOverlayBlend = imageOverlayBlend;
+        body.imageOverlayOpacity = imageOverlayOpacity;
+      }
       const response = await fetch("/api/client/card-snapshots", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tournamentId,
-          title: title.trim(),
-          textLine1: textLine1.trim(),
-          textLine2: textLine2.trim(),
-          cardTemplate,
-          backgroundType,
-          themeType,
-          imageId: uploadedImage?.imageId ?? "",
-          image320Url: uploadedImage?.w320Url ?? "",
-          draftOnly: true,
-        }),
+        body: JSON.stringify(body),
       });
       const result = (await response.json()) as { error?: string };
       if (!response.ok) {
@@ -217,6 +350,8 @@ export default function ClientTournamentCardPublishPage() {
         w320Url: result.w320Url,
         w640Url: result.w640Url,
       });
+      activateV2Media();
+      setEditorStep(2);
       setMessage("이미지가 적용되었습니다.");
     } catch {
       setMessage("이미지 업로드 중 오류가 발생했습니다.");
@@ -230,143 +365,240 @@ export default function ClientTournamentCardPublishPage() {
     setMessage("이미지를 제거했습니다. 테마 배경으로 표시됩니다.");
   }
 
+  function clearBackgroundFileSelection() {
+    if (bgFileInputRef.current) bgFileInputRef.current.value = "";
+    if (uploadedImage) clearImage();
+  }
+
+  const colorPickerValue = /^#[0-9A-Fa-f]{6}$/.test(mediaBackground.trim())
+    ? mediaBackground.trim()
+    : "#1e293b";
+
+  function onColorPick(e: ChangeEvent<HTMLInputElement>) {
+    activateV2Media();
+    setMediaBackground(e.target.value);
+  }
+
   return (
-    <main className="v3-page v3-stack" style={{ maxWidth: "40rem", margin: "0 auto" }}>
-      <h1 className="v3-h1">게시카드 작성</h1>
+    <main className="v3-page v3-stack" style={{ maxWidth: "none", margin: 0, width: "100%" }}>
+      <h1 className="v3-h1" style={{ paddingLeft: "0.75rem", paddingRight: "0.75rem" }}>
+        게시카드 작성
+      </h1>
 
-      <form className="v3-box v3-stack" onSubmit={handlePublish}>
-        <fieldset className="v3-stack" style={{ border: "none", padding: 0, margin: 0 }}>
-          <legend className="v3-muted" style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-            템플릿
-          </legend>
-          <div className="v3-row" style={{ gap: "1rem", flexWrap: "wrap" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: "0.35rem", cursor: "pointer" }}>
-              <input
-                type="radio"
-                name="cardTemplate"
-                checked={cardTemplate === "A"}
-                onChange={() => setCardTemplate("A")}
-              />
-              템플릿 A
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: "0.35rem", cursor: "pointer" }}>
-              <input
-                type="radio"
-                name="cardTemplate"
-                checked={cardTemplate === "B"}
-                onChange={() => setCardTemplate("B")}
-              />
-              템플릿 B
-            </label>
-          </div>
-        </fieldset>
-
-        <label className="v3-stack">
-          <span>제목</span>
-          <input
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            required
-            style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
-          />
-        </label>
-        <label className="v3-stack">
-          <span>문구 1줄</span>
-          <input
-            value={textLine1}
-            onChange={(event) => setTextLine1(event.target.value)}
-            style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
-          />
-        </label>
-        <label className="v3-stack">
-          <span>문구 2줄</span>
-          <input
-            value={textLine2}
-            onChange={(event) => setTextLine2(event.target.value)}
-            style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
-          />
-        </label>
-
-        <label className="v3-stack">
-          <span>이미지 (선택)</span>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) {
-                void handleUploadImage(file);
-              }
-            }}
-            style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem", background: "#fff" }}
-          />
-          <p className="v3-muted" style={{ margin: 0 }}>
-            {uploadedImage ? "이미지 적용됨 · 테마는 글자 대비용으로만 사용" : uploading ? "업로드 중…" : "없으면 자동 테마 배경"}
-          </p>
-          {uploadedImage ? (
-            <button type="button" className="v3-btn" onClick={clearImage} style={{ alignSelf: "flex-start" }}>
-              이미지 제거
-            </button>
-          ) : null}
-        </label>
-
-        <button
-          type="button"
-          className="v3-btn"
-          onClick={() => setShowStyleOptions((v) => !v)}
-          style={{ alignSelf: "flex-start", background: "#f4f4f5" }}
-        >
-          {showStyleOptions ? "스타일 옵션 닫기" : "스타일 변경 (테마)"}
-        </button>
-        {showStyleOptions ? (
-          <fieldset className="v3-stack" style={{ border: "1px dashed #ccc", padding: "0.75rem", borderRadius: "0.4rem" }}>
-            <legend className="v3-muted" style={{ fontSize: "0.8rem" }}>
-              테마
-            </legend>
-            <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap" }}>
-              {(["dark", "light", "natural"] as const).map((th) => (
-                <label key={th} style={{ display: "flex", alignItems: "center", gap: "0.35rem", cursor: "pointer" }}>
-                  <input type="radio" name="theme" checked={themeType === th} onChange={() => setThemeType(th)} />
-                  {th === "dark" ? "Dark" : th === "light" ? "Light" : "Natural"}
-                </label>
-              ))}
+      <div className={editorStyles.pageWrap}>
+        <div className={editorStyles.previewSticky}>
+          <div className={editorStyles.previewInner}>
+            <div className={editorStyles.previewCardWrap}>
+              <TournamentSnapshotCardView item={cardPublishSlidePreview} />
             </div>
-          </fieldset>
-        ) : null}
-
-        {tournamentStatusForPreview ? (
-          <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
-            상태: <strong>{tournamentStatusForPreview}</strong> (대회 관리에서 변경)
-          </p>
-        ) : null}
-
-        <section className="v3-box v3-stack" style={{ background: "#fafafa" }}>
-          <p style={{ fontWeight: 700, margin: 0 }}>미리보기</p>
-          <p className="v3-muted" style={{ margin: 0, fontSize: "0.78rem" }}>
-            저장 후 사이트 메인 슬라이드에 반영됩니다 (게시 시).
-          </p>
-          <div
-            style={{
-              borderRadius: "12px",
-              overflow: "hidden",
-              border: "1px solid #e4e4e7",
-              maxWidth: "360px",
-            }}
-          >
-            <div className={deckStyles.slideDeckCard} style={{ width: "100%", maxWidth: "min(90%, 387px)" }}>
-              <SlideDeckCard item={cardPublishSlidePreview} />
+            <div className={editorStyles.templateRadioRow} role="radiogroup" aria-label="슬라이드 템플릿">
+              <label className={editorStyles.templateRadioLabel}>
+                <input
+                  type="radio"
+                  name="cardPublishCardTemplate"
+                  value="A"
+                  checked={cardTemplate === "A"}
+                  onChange={() => setCardTemplate("A")}
+                />
+                좌측 정렬형
+              </label>
+              <label className={editorStyles.templateRadioLabel}>
+                <input
+                  type="radio"
+                  name="cardPublishCardTemplate"
+                  value="B"
+                  checked={cardTemplate === "B"}
+                  onChange={() => setCardTemplate("B")}
+                />
+                가운데 정렬형
+              </label>
             </div>
           </div>
-        </section>
-
-        <div className="v3-row">
-          <button type="submit" className="v3-btn" disabled={loading}>
-            {loading ? "처리 중…" : "저장"}
-          </button>
         </div>
-      </form>
 
-      {message ? <p className="v3-muted">{message}</p> : null}
+        <form className={editorStyles.formPanel} onSubmit={handlePublish}>
+          <div className={editorStyles.stepTabs} role="tablist" aria-label="편집 단계">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={editorStep === 1}
+              className={`${editorStyles.stepTab} ${editorStep === 1 ? editorStyles.stepTabActive : ""}`}
+              onClick={() => setEditorStep(1)}
+            >
+              1. 내용 입력
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={editorStep === 2}
+              className={`${editorStyles.stepTab} ${editorStep === 2 ? editorStyles.stepTabActive : ""}`}
+              onClick={() => setEditorStep(2)}
+            >
+              2. 배경 설정
+            </button>
+          </div>
+
+          {editorStep === 1 ? (
+            <>
+              <label className={editorStyles.field}>
+                <span className={editorStyles.fieldLabel}>제목 위 한 줄</span>
+                <input
+                  className={editorStyles.fieldInput}
+                  type="text"
+                  value={textLine1}
+                  onChange={(e) => setTextLine1(e.target.value)}
+                  autoComplete="off"
+                  placeholder="비우면 표시 안 함"
+                />
+              </label>
+
+              <label className={editorStyles.field}>
+                <span className={editorStyles.fieldLabel}>제목 (1줄)</span>
+                <input
+                  className={editorStyles.fieldInput}
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                  required
+                />
+              </label>
+
+              <label className={editorStyles.field}>
+                <span className={editorStyles.fieldLabel}>
+                  설명 (최대 {DESCRIPTION_MAX_LINES}줄 · Enter 줄바꿈)
+                </span>
+                <textarea
+                  className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea}`}
+                  rows={5}
+                  value={textLine2}
+                  onChange={(e) =>
+                    setTextLine2(clampDescriptionToMaxLines(e.target.value, DESCRIPTION_MAX_LINES))
+                  }
+                  spellCheck={false}
+                  placeholder="비우면 카드에 표시하지 않음"
+                />
+              </label>
+
+              <label className={editorStyles.field}>
+                <span className={editorStyles.fieldLabel}>날짜</span>
+                <input
+                  className={editorStyles.fieldInput}
+                  type="text"
+                  value={cardDate}
+                  onChange={(e) => setCardDate(e.target.value)}
+                  autoComplete="off"
+                  placeholder="예: 2026-05-09 (일)"
+                />
+              </label>
+
+              <label className={editorStyles.field}>
+                <span className={editorStyles.fieldLabel}>장소</span>
+                <input
+                  className={editorStyles.fieldInput}
+                  type="text"
+                  value={cardPlace}
+                  onChange={(e) => setCardPlace(e.target.value)}
+                  autoComplete="off"
+                  placeholder="예: 캐롬클럽 빌리어즈"
+                />
+              </label>
+            </>
+          ) : (
+            <>
+              <label className={editorStyles.field}>
+                <span className={editorStyles.fieldLabel}>카드 배경색</span>
+                <div className={editorStyles.bgRow}>
+                  <input
+                    type="color"
+                    aria-label="카드 배경색"
+                    className={editorStyles.colorPick}
+                    value={colorPickerValue}
+                    onChange={onColorPick}
+                  />
+                </div>
+              </label>
+
+              <div className={editorStyles.field}>
+                <span className={editorStyles.fieldLabel}>배경 이미지</span>
+                <div className={editorStyles.bgRow}>
+                  <input
+                    ref={bgFileInputRef}
+                    className={editorStyles.fieldFile}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void handleUploadImage(file);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className={editorStyles.clearBtn}
+                    style={{ marginTop: 0 }}
+                    onClick={clearBackgroundFileSelection}
+                  >
+                    선택해제
+                  </button>
+                </div>
+                {uploadedImage || uploading ? (
+                  <p className="v3-muted" style={{ margin: 0, fontSize: "0.78rem" }}>
+                    {uploadedImage ? "이미지 적용됨" : "업로드 중…"}
+                  </p>
+                ) : null}
+                <label className={editorStyles.fieldCheck}>
+                  <input
+                    type="checkbox"
+                    checked={imageOverlayBlend}
+                    disabled={!uploadedImage}
+                    onChange={(e) => {
+                      activateV2Media();
+                      setImageOverlayBlend(e.target.checked);
+                    }}
+                  />
+                  <span>이미지 오버레이 (배경색 위에 반투명으로 겹침 · 끄면 이미지 불투명)</span>
+                </label>
+                <div className={editorStyles.rangeBlock}>
+                  <span className={`${editorStyles.fieldLabel} ${editorStyles.fieldLabelRow}`}>
+                    배경그림 투명도
+                    <output className={editorStyles.rangeOut}>{Math.round(imageOverlayOpacity * 100)}%</output>
+                  </span>
+                  <input
+                    className={editorStyles.range}
+                    type="range"
+                    min={15}
+                    max={100}
+                    step={1}
+                    value={Math.round(imageOverlayOpacity * 100)}
+                    disabled={!uploadedImage || !imageOverlayBlend}
+                    aria-label="배경그림 투명도"
+                    onChange={(e) => {
+                      activateV2Media();
+                      setImageOverlayOpacity(Number(e.target.value) / 100);
+                    }}
+                  />
+                  <p className={editorStyles.microhint}>
+                    낮추면 배경이 더 보이고, 높이면 이미지가 진해집니다.
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className={editorStyles.actions}>
+            <button type="submit" className="v3-btn" disabled={loading}>
+              {loading ? "처리 중…" : "저장"}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {message ? (
+        <p className="v3-muted" style={{ paddingLeft: "0.75rem" }}>
+          {message}
+        </p>
+      ) : null}
     </main>
   );
 }
