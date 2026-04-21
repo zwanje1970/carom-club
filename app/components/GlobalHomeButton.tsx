@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import VenuesDistanceNavLink from "../site/components/VenuesDistanceNavLink";
+import { SITE_ROOT_SWIPE_NAV } from "../site/lib/site-root-swipe-order";
 
 function isInquiryDetailWithComposer(pathname: string): boolean {
   return (
@@ -10,13 +11,10 @@ function isInquiryDetailWithComposer(pathname: string): boolean {
   );
 }
 
-const SITE_NAV_ITEMS = [
-  { href: "/site", label: "홈" },
-  { href: "/site/tournaments", label: "대회안내" },
-  { href: "/site/venues", label: "당구장안내" },
-  { href: "/site/community", label: "커뮤니티" },
-  { href: "/site/mypage", label: "마이페이지" },
-] as const;
+const SITE_NAV_ITEMS = SITE_ROOT_SWIPE_NAV.map((item) => ({
+  href: item.href,
+  label: item.label,
+}));
 
 function navItemActive(pathname: string, href: string): boolean {
   if (href === "/site") {

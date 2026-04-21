@@ -10,9 +10,6 @@ const VELOCITY_COMPLETE = 0.42;
 const TRANSITION_MS = 300;
 const EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 
-/** 중앙 패널 기준 오프셋(px): -100vw + drag */
-const CENTER_OFFSET_VW = -100;
-
 type Tab = { key: string; href: string };
 
 function pathOnly(href: string): string {
@@ -76,7 +73,8 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
     if (!track) return;
     dragPxRef.current = dragPx;
     track.style.transition = withTransition ? `transform ${TRANSITION_MS}ms ${EASING}` : "none";
-    track.style.transform = `translate3d(calc(${CENTER_OFFSET_VW}vw + ${dragPx}px), 0, 0)`;
+    /* % 는 트랙(300% 너비) 기준 — 부모 뷰포트와 정확히 맞춰 한 패널만 노출 */
+    track.style.transform = `translate3d(calc(-100% / 3 + ${dragPx}px), 0, 0)`;
   }, []);
 
   useLayoutEffect(() => {
@@ -204,7 +202,7 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
 
       const track = trackRef.current;
       const endTransform =
-        nextIdx > activeIdx ? `translate3d(calc(-200vw), 0, 0)` : `translate3d(0px, 0, 0)`;
+        nextIdx > activeIdx ? `translate3d(calc(-200% / 3), 0, 0)` : `translate3d(0px, 0, 0)`;
       if (track) {
         track.style.transition = `transform ${TRANSITION_MS}ms ${EASING}`;
         track.style.transform = endTransform;
@@ -265,24 +263,17 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
     return <>{children}</>;
   }
 
-  const prevHref = activeIdx > 0 ? tabs[activeIdx - 1]!.href : null;
-  const nextHref = activeIdx < n - 1 ? tabs[activeIdx + 1]!.href : null;
-
   return (
     <div ref={viewportRef} className="community-board-swipe-viewport" data-community-inner-swipe>
       <div ref={trackRef} className="community-board-swipe-track">
-        {prevHref ? (
-          <div className="community-board-swipe-panel community-board-swipe-panel--neighbor" aria-hidden>
-            <iframe className="community-board-swipe-embed" src={prevHref} title="이전 게시판" loading="lazy" />
-          </div>
+        {activeIdx > 0 ? (
+          <div className="community-board-swipe-panel community-board-swipe-panel--peek" aria-hidden />
         ) : (
           <div className="community-board-swipe-panel community-board-swipe-panel--edge" aria-hidden />
         )}
         <div className="community-board-swipe-panel community-board-swipe-panel--main">{children}</div>
-        {nextHref ? (
-          <div className="community-board-swipe-panel community-board-swipe-panel--neighbor" aria-hidden>
-            <iframe className="community-board-swipe-embed" src={nextHref} title="다음 게시판" loading="lazy" />
-          </div>
+        {activeIdx < n - 1 ? (
+          <div className="community-board-swipe-panel community-board-swipe-panel--peek" aria-hidden />
         ) : (
           <div className="community-board-swipe-panel community-board-swipe-panel--edge" aria-hidden />
         )}

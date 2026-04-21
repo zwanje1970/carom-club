@@ -2,37 +2,13 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
-
-/** 하단 5버튼(`GlobalHomeButton`의 `SITE_NAV_ITEMS`) 순서와 동일 */
-const SITE_ROOT_SWIPE_HREFS = [
-  "/site",
-  "/site/tournaments",
-  "/site/venues",
-  "/site/community",
-  "/site/mypage",
-] as const;
-
-function normalizePathname(pathname: string): string {
-  if (pathname === "/") return "/";
-  return pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
-}
-
-function isSiteRootSwipePath(pathname: string): boolean {
-  const p = normalizePathname(pathname);
-  if ((SITE_ROOT_SWIPE_HREFS as readonly string[]).includes(p)) return true;
-  /** 커뮤니티만 하위 경로(전체·게시판·글)에서도 스와이프 허용 */
-  if (p === "/site/community" || p.startsWith("/site/community/")) return true;
-  return false;
-}
-
-function rootSwipeIndex(pathname: string): number {
-  const p = normalizePathname(pathname);
-  const communityIdx = SITE_ROOT_SWIPE_HREFS.indexOf("/site/community");
-  if (p === "/site/community" || p.startsWith("/site/community/")) {
-    return communityIdx >= 0 ? communityIdx : 3;
-  }
-  return SITE_ROOT_SWIPE_HREFS.findIndex((h) => h === p);
-}
+import {
+  isSiteRootSwipePath,
+  siteRootSwipeHrefAt,
+  siteRootSwipeIndex,
+  siteRootSwipePathnameNow,
+  SITE_ROOT_SWIPE_NAV,
+} from "../lib/site-root-swipe-order";
 
 const EDGE_EXCLUDE_PX = 24;
 const NAV_COOLDOWN_MS = 480;
@@ -58,7 +34,7 @@ function touchTargetBlocksSwipe(el: EventTarget | null): boolean {
   return false;
 }
 
-/** 메인(/)은 iframe 미리보기 없이 가볍게 — 이웃이 메인일 때도 iframe 생략 */
+/** home 전용: 이웃 미리보기 iframe 생략(가벼움). tournaments·venues 등은 그대로 iframe 허용 */
 function allowNeighborIframePreview(href: string | null): href is string {
   return Boolean(href && href !== "/site");
 }
@@ -155,7 +131,8 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       if (!window.matchMedia("(max-width: 767px)").matches) return;
       const start = startRef.current;
       if (!start || start.blocked || animatingRef.current) return;
-      if (!isSiteRootSwipePath(pathname)) return;
+      const live = siteRootSwipePathnameNow(pathname);
+      if (!isSiteRootSwipePath(live)) return;
       const t = e.touches[0];
       if (!t) return;
 
@@ -186,13 +163,13 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       const tail = samplesRef.current;
       if (tail.length > 12) samplesRef.current = tail.slice(-12);
 
-      const idx = rootSwipeIndex(pathname);
+      const idx = siteRootSwipeIndex(live);
       if (idx < 0) return;
 
       let raw = dx * FOLLOW_RATIO;
       const vw = window.innerWidth;
       if (idx <= 0 && raw > 0) raw = 0;
-      if (idx >= SITE_ROOT_SWIPE_HREFS.length - 1 && raw < 0) raw = 0;
+      if (idx >= SITE_ROOT_SWIPE_NAV.length - 1 && raw < 0) raw = 0;
       raw = Math.max(-vw, Math.min(vw, raw));
 
       applyTransform(raw, false);
@@ -221,7 +198,8 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       releaseViewportTouchAxisLock();
 
       if (!start || start.blocked || animatingRef.current) return;
-      if (!isSiteRootSwipePath(pathname)) return;
+      const live = siteRootSwipePathnameNow(pathname);
+      if (!isSiteRootSwipePath(live)) return;
 
       if (!t) return;
 
@@ -230,7 +208,7 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
         return;
       }
 
-      const idx = rootSwipeIndex(pathname);
+      const idx = siteRootSwipeIndex(live);
       if (idx < 0) return;
 
       const vw = window.innerWidth;
@@ -239,7 +217,7 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       const vx = velocityFromSamples(velocitySamples);
 
       let nextIdx: number | null = null;
-      if (dragPx < 0 && idx < SITE_ROOT_SWIPE_HREFS.length - 1) {
+      if (dragPx < 0 && idx < SITE_ROOT_SWIPE_NAV.length - 1) {
         const wantNext = dragPx <= -threshold || vx < -VELOCITY_COMPLETE;
         if (wantNext) nextIdx = idx + 1;
       } else if (dragPx > 0 && idx > 0) {
@@ -252,7 +230,12 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
         return;
       }
 
-      const nextHref = SITE_ROOT_SWIPE_HREFS[nextIdx]!;
+      const nextHref = siteRootSwipeHrefAt(nextIdx);
+      if (!nextHref) {
+        applyTransform(0, true);
+        return;
+      }
+
       cooldownUntilRef.current = Date.now() + NAV_COOLDOWN_MS;
       animatingRef.current = true;
 
@@ -317,10 +300,10 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
 
   if (children == null) return null;
 
-  const swipeIdx = rootSwipeIndex(pathname);
-  const prevHref = swipeIdx > 0 ? SITE_ROOT_SWIPE_HREFS[swipeIdx - 1]! : null;
-  const nextHref =
-    swipeIdx >= 0 && swipeIdx < SITE_ROOT_SWIPE_HREFS.length - 1 ? SITE_ROOT_SWIPE_HREFS[swipeIdx + 1]! : null;
+  const swipePath = siteRootSwipePathnameNow(pathname);
+  const swipeIdx = siteRootSwipeIndex(swipePath);
+  const prevHref = siteRootSwipeHrefAt(swipeIdx - 1);
+  const nextHref = siteRootSwipeHrefAt(swipeIdx + 1);
 
   const leftPanel =
     swipeIdx <= 0 ? (
@@ -334,7 +317,7 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
     );
 
   const rightPanel =
-    swipeIdx < 0 || swipeIdx >= SITE_ROOT_SWIPE_HREFS.length - 1 ? (
+    swipeIdx < 0 || swipeIdx >= SITE_ROOT_SWIPE_NAV.length - 1 ? (
       <div key="swipe-right-ph" className="site-root-swipe-panel site-root-swipe-panel--placeholder" aria-hidden />
     ) : allowNeighborIframePreview(nextHref) ? (
       <div key={`swipe-right-${nextHref}`} className="site-root-swipe-panel site-root-swipe-panel--neighbor">

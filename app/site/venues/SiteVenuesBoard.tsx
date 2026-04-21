@@ -147,17 +147,17 @@ export default function SiteVenuesBoard({
   const distanceSortActive = distanceSort != null;
 
   const auxiliary = (
-    <div className={filterStyles.filterGrid3}>
-      <div className={filterStyles.filterGridCell}>
+    <div className={filterStyles.filterVenuesAux}>
+      <div className={filterStyles.filterVenuesRow}>
         <div className={filterStyles.filterField}>
           <span className={filterStyles.filterFieldLabel} id="site-venues-filter-venue-type-label">
             유형
           </span>
           <FilterDropdown
             id="site-venues-filter-venue-type"
+            className={filterStyles.dropdownFlex}
             value={venueType}
             onChange={(e) => setVenueType(e.target.value as VenueTypeFilter)}
-            fullWidth
             aria-labelledby="site-venues-filter-venue-type-label"
           >
             {VENUE_TYPE_OPTIONS.map((o) => (
@@ -168,16 +168,16 @@ export default function SiteVenuesBoard({
           </FilterDropdown>
         </div>
       </div>
-      <div className={filterStyles.filterGridCell}>
+      <div className={filterStyles.filterVenuesRow}>
         <div className={filterStyles.filterField}>
           <span className={filterStyles.filterFieldLabel} id="site-venues-filter-fee-type-label">
             요금제
           </span>
           <FilterDropdown
             id="site-venues-filter-fee-type"
+            className={filterStyles.dropdownFlex}
             value={feeType}
             onChange={(e) => setFeeType(e.target.value as FeeTypeFilter)}
-            fullWidth
             aria-labelledby="site-venues-filter-fee-type-label"
           >
             {FEE_TYPE_OPTIONS.map((o) => (
@@ -187,13 +187,12 @@ export default function SiteVenuesBoard({
             ))}
           </FilterDropdown>
         </div>
-      </div>
-      <div className={filterStyles.filterGridCell}>
         <FilterButton
-          className={distanceSortActive ? filterStyles.buttonDistanceActive : undefined}
+          className={[filterStyles.filterVenuesDistance, distanceSortActive ? filterStyles.buttonDistanceActive : ""]
+            .filter(Boolean)
+            .join(" ")}
           href={distanceButtonHref}
           useNextLink={hasViewerCoordinate}
-          style={{ width: "100%", justifyContent: "center", boxSizing: "border-box" }}
           onClick={
             hasViewerCoordinate
               ? undefined

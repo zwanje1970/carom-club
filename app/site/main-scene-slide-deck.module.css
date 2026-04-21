@@ -1,10 +1,11 @@
-/* 공지 있을 때: 슬라이드 덱만 감싸 외곽선 유지 */
+/* 슬라이드 덱 바깥 래퍼 — 공지 유무와 동일한 테두리·흐름 */
 .slideDeckShell {
   width: 100%;
   display: block;
   overflow: visible;
   border-radius: 0;
   border-bottom: 1px solid #94a3b8;
+  margin-top: 0;
 }
 
 /* 슬라이드 창 전체를 덮는 UI층 — 카드(transform)보다 위, 비네트(::after)보다 위 */
@@ -16,20 +17,20 @@
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
-  padding: max(0.5rem, env(safe-area-inset-top, 0px)) max(0.75rem, env(safe-area-inset-right, 0px))
-    max(0.5rem, env(safe-area-inset-bottom, 0px)) max(0.75rem, env(safe-area-inset-left, 0px));
+  padding: max(0.42rem, env(safe-area-inset-top, 0px)) max(0.75rem, env(safe-area-inset-right, 0px))
+    max(0.45rem, env(safe-area-inset-bottom, 0px)) max(0.75rem, env(safe-area-inset-left, 0px));
   box-sizing: border-box;
   pointer-events: none;
 }
 
-/* 슬라이드창 상단: 공지 → 그 아래 「진행중 대회」 — 간격 = 라벨 글자 크기 */
+/* 슬라이드창 상단: 공지 → 라벨 — 공지 유무에 따른 세로 출렁임 최소화 */
 .slideDeckTopChrome {
   position: relative;
   flex: 0 0 auto;
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: var(--slide-deck-section-label-size);
+  gap: 0.35rem;
   align-items: stretch;
   pointer-events: none;
   box-sizing: border-box;
@@ -47,8 +48,8 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  min-height: 0;
-  padding: 0.22rem 0.6rem;
+  min-height: 1.5rem;
+  padding: 0.18rem 0.55rem;
   border-radius: 0;
   background: #fff176;
   border: 1px solid #c9a227;
@@ -57,6 +58,8 @@
     0 8px 18px rgba(0, 0, 0, 0.22);
   overflow: hidden;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
 }
 
 .slideDeckNoticeMarquee {
@@ -64,7 +67,7 @@
   white-space: nowrap;
   color: #d00000;
   font-size: 0.8rem;
-  line-height: 1.22;
+  line-height: 1.25;
   animation: slideDeckNoticeMarquee 14s linear infinite;
   will-change: transform;
 }
@@ -141,6 +144,7 @@
   position: static;
   align-self: flex-start;
   margin: 0;
+  min-height: 1.2em;
   /* 크롬 좌측(0.75rem·safe-area) 대비 예전 라벨 단독 배치(0.85rem·safe-area)와 동일 선상 */
   margin-left: max(
     0px,

@@ -31,10 +31,11 @@ export default function TournamentsFilterBar({
   const selectValue = currentStatus === "all" ? "all" : currentStatus;
 
   return (
-    <div className={filterStyles.filterRow}>
+    <div className={`${filterStyles.filterRow} ${filterStyles.filterRowSingle}`}>
       <div className={filterStyles.filterField}>
         <span className={filterStyles.filterFieldLabel}>상태</span>
         <FilterDropdown
+          className={filterStyles.dropdownFlex}
           value={selectValue}
           aria-label="상태"
           onChange={(e) => {

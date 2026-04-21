@@ -436,7 +436,8 @@ export default async function SiteHomePage({
   const forcedMainSlideItems =
     liveSlideItems.length > 0 ? liveSlideItems : dummySlideItems.map((item) => ({ ...item }));
 
-  const showSiteNoticeBar = siteNotice.enabled === true && siteNotice.text.trim().length > 0;
+  /** 공지 문구가 있으면 슬라이드 상단 바 표시(enabled만 켤 때 빠지는 경우 복구) */
+  const showSiteNoticeBar = siteNotice.text.trim().length > 0;
 
   return (
     <SiteShellFrame

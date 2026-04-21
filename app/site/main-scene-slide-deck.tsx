@@ -372,14 +372,7 @@ export default function MainSceneSlideDeck({
     </div>
   );
 
-  if (trimmedNotice.length > 0) {
-    return (
-      <div className={styles.slideDeckShell}>
-        {deck}
-      </div>
-    );
-  }
-
-  return deck;
+  /* 공지 유무와 동일한 바깥 박스(테두리·흐름) 유지 — 레이아웃 출렁임 완화 */
+  return <div className={styles.slideDeckShell}>{deck}</div>;
 }
 

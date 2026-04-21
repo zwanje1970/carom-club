@@ -331,8 +331,9 @@ body {
   flex-direction: column;
 }
 
-/* 커뮤니티 게시판 탭 간 스와이프 (루트 스와이프와 동일한 3패널 트랙) */
+/* 커뮤니티 게시판 탭 간 스와이프: 3패널 트랙, 중앙만 본문(이웃은 빈 피크 — iframe 전체 페이지 중복 없음) */
 .community-board-swipe-viewport {
+  position: relative;
   overflow-x: hidden;
   overflow-y: visible;
   width: 100%;
@@ -343,15 +344,18 @@ body {
 .community-board-swipe-track {
   display: flex;
   flex-direction: row;
-  width: 300vw;
-  transform: translate3d(-100vw, 0, 0);
+  flex-wrap: nowrap;
+  align-items: stretch;
+  width: 300%;
+  box-sizing: border-box;
+  transform: translate3d(calc(-100% / 3), 0, 0);
   will-change: transform;
 }
 
 .community-board-swipe-panel {
-  flex: 0 0 100vw;
-  width: 100vw;
-  max-width: 100vw;
+  flex: 0 0 calc(100% / 3);
+  width: calc(100% / 3);
+  max-width: calc(100% / 3);
   box-sizing: border-box;
 }
 
@@ -360,26 +364,14 @@ body {
   background: var(--ui-bg-page);
 }
 
-.community-board-swipe-panel--neighbor {
-  min-height: 100dvh;
-  background: var(--ui-bg-page);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.community-board-swipe-embed {
-  flex: 1 1 auto;
-  width: 100%;
-  min-height: 100dvh;
-  border: none;
-  display: block;
-  pointer-events: none;
-  background: var(--ui-bg-page);
+/* 드래그 시 옆으로만 살짝 비치는 자리 — 별도 라우트/본문 렌더 없음 */
+.community-board-swipe-panel--peek {
+  min-height: 0;
+  background: var(--v3-surface-2, #eef0f3);
 }
 
 .community-board-swipe-panel--main {
-  min-height: 100dvh;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -957,7 +949,6 @@ body:has(.site-home-page) {
 
   .site-home-slide-stack--flush {
     margin-top: 0 !important;
-    padding-top: 0 !important;
   }
 }
 
@@ -1015,10 +1006,16 @@ body:has(.site-home-page) {
 /* 메인 홈: 슬라이드 ↔ 4메뉴 / 4메뉴 ↔ 대시보드 간격 분리 */
 .site-home-dark-main.site-home-dark-main--stack {
   gap: 0;
+  /* 로고(청 헤더) ↔ 슬라이드 블록 ↔ 4버튼 — 공통 간격 (공지는 슬라이드 내부라 바깥 블록 위치는 동일 규칙) */
+  --site-home-block-gap: 0.875rem;
+}
+
+.site-home-dark-main.site-home-dark-main--stack .site-home-slide-stack {
+  padding-top: var(--site-home-block-gap);
 }
 
 .site-home-dark-main.site-home-dark-main--stack #main-buttons.site-home-nav-grid {
-  margin-top: 1.35rem;
+  margin-top: var(--site-home-block-gap);
 }
 
 /* 대시보드 버튼 위 간격 = 4메뉴 그리드 gap(대회안내↔커뮤니티 등과 동일, .site-home-nav-grid gap 과 맞춤) */

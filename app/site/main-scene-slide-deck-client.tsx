@@ -40,14 +40,7 @@ export default function MainSceneSlideDeckClient(props: Props) {
         </div>
       </div>
     );
-    if (notice) {
-      return (
-        <div className={styles.slideDeckShell}>
-          {deck}
-        </div>
-      );
-    }
-    return deck;
+    return <div className={styles.slideDeckShell}>{deck}</div>;
   }
 
   return <MainSceneSlideDeck {...props} />;

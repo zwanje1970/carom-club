@@ -2,24 +2,50 @@
 
 .filterRow {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 0.4rem;
   flex-wrap: wrap;
 }
 
-.filterField {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.2rem;
+/* 대회안내: 상태 + 드롭다운 + 거리순 한 줄 우선 */
+.filterRowSingle {
+  flex-wrap: nowrap;
   min-width: 0;
 }
 
+.filterRowSingle .filterField {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.filterRowSingle .button {
+  flex-shrink: 0;
+}
+
+/* 한 줄: [라벨] [셀렉트] — 라벨은 위가 아니라 왼쪽 */
+.filterField {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .filterFieldLabel {
+  flex: 0 0 auto;
+  white-space: nowrap;
   font-size: 0.8125rem;
   line-height: 1.2;
   font-weight: 600;
   color: var(--v3-muted-foreground, #64748b);
+}
+
+.dropdownFlex {
+  flex: 1 1 7rem;
+  min-width: 6.5rem;
+  max-width: 14rem;
+  width: auto;
 }
 
 .dropdown {
@@ -80,16 +106,31 @@
   background: #dbeafe;
 }
 
-.filterGrid3 {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+/* 당구장: 유형 한 줄 + (요금제 + 거리순) 한 줄 */
+.filterVenuesAux {
+  display: flex;
+  flex-direction: column;
   gap: 0.36rem;
   width: 100%;
-  align-items: end;
+  align-items: stretch;
 }
 
-.filterGridCell {
+.filterVenuesRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
   min-width: 0;
+}
+
+.filterVenuesRow .filterField {
+  flex: 1 1 auto;
+}
+
+.filterVenuesDistance {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .filterSection {

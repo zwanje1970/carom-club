@@ -46,6 +46,8 @@ export default function BlankBracketPrintClient() {
   const [style,        setStyle]        = useState<BracketStyle>("TREE");
   const [treeLayout,   setTreeLayout]   = useState<TreeLayout>("VERTICAL");
   const [showStartPairNumbers, setShowStartPairNumbers] = useState(false);
+  /** 빈 칸 배경만 연한색 — 외곽선(stroke)은 CSS에서 검정 고정 */
+  const [warmEmptyBoxFill, setWarmEmptyBoxFill] = useState(false);
   const [pdfExporting, setPdfExporting] = useState(false);
   const pdfRootRef = useRef<HTMLDivElement>(null);
   const pdfBusyRef = useRef(false);
@@ -129,6 +131,16 @@ export default function BlankBracketPrintClient() {
     print-color-adjust: exact;
   }
   .hint { margin-top: 12px; font-size: 13px; color: #64748b; text-align: center; max-width: 40rem; }
+  .bbp-match-box {
+    fill: #ffffff;
+    stroke: #000000;
+    stroke-width: 0.2;
+  }
+  .bbp-match-box--fill {
+    fill: #fffbe6;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   @media print {
     html, body { background: #fff; }
     body { padding: 0; display: block; }
@@ -152,7 +164,7 @@ export default function BlankBracketPrintClient() {
       w.focus();
     };
     requestAnimationFrame(() => requestAnimationFrame(open));
-  }, [rounds.length, scene, showStartPairNumbers]);
+  }, [rounds.length, scene, showStartPairNumbers, warmEmptyBoxFill]);
 
   useEffect(() => {
     if (!mobilePreviewOpen) return;
@@ -204,7 +216,7 @@ export default function BlankBracketPrintClient() {
       pdfBusyRef.current = false;
       setPdfExporting(false);
     }
-  }, [startPlayers]);
+  }, [startPlayers, warmEmptyBoxFill]);
 
   return (
     <>
@@ -254,6 +266,17 @@ export default function BlankBracketPrintClient() {
             top: ${SERVICE_MARK_INSET_MM}mm;
             right: ${SERVICE_MARK_INSET_MM}mm;
           }
+        }
+        /* 빈 대진표 칸: 테두리는 항상 검정 — 배경만 .bbp-match-box--fill 에서 변경 */
+        .bbp-match-box {
+          fill: #ffffff;
+          stroke: #000000;
+          stroke-width: 0.2;
+        }
+        .bbp-match-box--fill {
+          fill: #fffbe6;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
       `}</style>
 
@@ -333,6 +356,14 @@ export default function BlankBracketPrintClient() {
                 />
                 <span style={{ fontWeight: 700, fontSize: "0.88rem" }}>조번호 표시</span>
               </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer", minHeight: "44px" }}>
+                <input
+                  type="checkbox"
+                  checked={warmEmptyBoxFill}
+                  onChange={(e) => setWarmEmptyBoxFill(e.target.checked)}
+                />
+                <span style={{ fontWeight: 700, fontSize: "0.88rem" }}>빈 칸 배경색</span>
+              </label>
             </div>
             <div style={{ padding: "1rem", borderTop: "1px solid #e5e7eb", background: "#f8fafc", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
               <button
@@ -364,6 +395,7 @@ export default function BlankBracketPrintClient() {
           scene={scene}
           matchType={matchType}
           startPairLabels={startPairLabels}
+          warmEmptyBoxFill={warmEmptyBoxFill}
           viewportWidth={mobileVw}
           viewportHeight={mobileVh}
           onBackdropClose={() => setMobilePreviewOpen(false)}
@@ -374,7 +406,12 @@ export default function BlankBracketPrintClient() {
       {scene && (
         <div ref={pdfRootRef} className="bbp-print-svg" id="bbp-print-svg-root">
           <div className="bbp-print-page-sheet">
-            <BracketSVG scene={scene} matchType={matchType} startPairLabels={startPairLabels} />
+            <BracketSVG
+              scene={scene}
+              matchType={matchType}
+              startPairLabels={startPairLabels}
+              warmEmptyBoxFill={warmEmptyBoxFill}
+            />
             <BracketPrintServiceMark />
           </div>
         </div>
@@ -393,6 +430,7 @@ type MobilePreviewLayerProps = {
   scene: Exclude<ReturnType<typeof buildBracketScene>, null>;
   matchType: MatchType;
   startPairLabels: StartPairLabel[];
+  warmEmptyBoxFill: boolean;
   viewportWidth: number;
   viewportHeight: number;
   onBackdropClose: () => void;
@@ -402,6 +440,7 @@ function MobilePrintPreviewLayer({
   scene,
   matchType,
   startPairLabels,
+  warmEmptyBoxFill,
   viewportWidth,
   viewportHeight,
   onBackdropClose,
@@ -446,7 +485,7 @@ function MobilePrintPreviewLayer({
       WebkitPrintColorAdjust: "exact",
       printColorAdjust: "exact",
     });
-  }, [vw, vh, scale, scene, matchType, startPairLabels]);
+  }, [vw, vh, scale, scene, matchType, startPairLabels, warmEmptyBoxFill]);
 
   return (
     <div
@@ -516,7 +555,12 @@ function MobilePrintPreviewLayer({
             }}
           >
             <div ref={bracketSceneRef} className="bbp-preview-bracket-scene" style={{ lineHeight: 0 }}>
-              <BracketSVG scene={scene} matchType={matchType} startPairLabels={startPairLabels} />
+              <BracketSVG
+                scene={scene}
+                matchType={matchType}
+                startPairLabels={startPairLabels}
+                warmEmptyBoxFill={warmEmptyBoxFill}
+              />
             </div>
           </div>
         </div>
@@ -548,6 +592,7 @@ function BracketSVG({
   scene,
   matchType,
   startPairLabels = [],
+  warmEmptyBoxFill = false,
 }: {
   scene: {
     boxes: { x: number; y: number; w: number; h: number }[];
@@ -555,6 +600,7 @@ function BracketSVG({
   };
   matchType: MatchType;
   startPairLabels?: StartPairLabel[];
+  warmEmptyBoxFill?: boolean;
 }) {
   return (
     <svg
@@ -591,9 +637,7 @@ function BracketSVG({
           <rect
             x={b.x} y={b.y}
             width={b.w} height={b.h}
-            fill="#ffffff"
-            stroke="#000000"
-            strokeWidth={0.2}
+            className={warmEmptyBoxFill ? "bbp-match-box bbp-match-box--fill" : "bbp-match-box"}
           />
           {matchType === "SCOTCH" && (
             <line
