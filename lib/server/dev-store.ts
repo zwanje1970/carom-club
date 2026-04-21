@@ -35,6 +35,34 @@ import {
   firestoreUpdatePassword,
   isFirestoreUsersBackendConfigured,
 } from "./firestore-users";
+import {
+  readPlatformOperationSettingsRawFromFirestoreKv,
+  resolvePlatformOperationSettingsReadStrategy,
+  resolvePlatformOperationSettingsWriteStrategy,
+  throwPlatformOperationSettingsWritePersistenceBlocked,
+  upsertPlatformOperationSettingsToFirestoreKv,
+} from "./platform-operation-settings";
+import {
+  readSiteCommunityConfigRawFromFirestoreKv,
+  resolveSiteCommunityConfigReadStrategy,
+  resolveSiteCommunityConfigWriteStrategy,
+  throwSiteCommunityConfigWritePersistenceBlocked,
+  upsertSiteCommunityConfigToFirestoreKv,
+} from "./platform-site-community-settings";
+import {
+  readSiteLayoutConfigRawFromFirestoreKv,
+  resolveSiteLayoutConfigReadStrategy,
+  resolveSiteLayoutConfigWriteStrategy,
+  throwSiteLayoutConfigWritePersistenceBlocked,
+  upsertSiteLayoutConfigToFirestoreKv,
+} from "./platform-site-layout-settings";
+import {
+  readSiteNoticeRawFromFirestoreKv,
+  resolveSiteNoticeReadStrategy,
+  resolveSiteNoticeWriteStrategy,
+  throwSiteNoticeWritePersistenceBlocked,
+  upsertSiteNoticeToFirestoreKv,
+} from "./platform-site-notice-settings";
 
 export type {
   TournamentDivisionMetricType,
@@ -768,6 +796,14 @@ const STORE_BACKUP_TIMESTAMP_PATH = path.join(STORE_DIR_PATH, "v3-dev-store.json
 /** 메인 파일이 깨졌을 때 우선 복구에 사용하는 마지막 정상 스냅샷(원자적 저장으로 갱신) */
 const STORE_LAST_GOOD_PATH = path.join(STORE_DIR_PATH, "v3-dev-store.json.last-good.json");
 
+/**
+ * 로컬 v3-dev-store.json 기반 영속 쓰기 허용 여부.
+ * 운영(NODE_ENV=production)에서는 읽기만 하고 파일·tmp·백업 쓰기는 하지 않는다.
+ */
+export function isDevStoreFilePersistenceEnabled(): boolean {
+  return process.env.NODE_ENV !== "production";
+}
+
 /** 운영(production) + Firebase 자격 증명이 있을 때만: 회원·로그인 사용자 레코드는 Firestore, dev-store JSON 사용자 테이블은 보조(시드 관리자 등) */
 function useFirestoreUsersInProduction(): boolean {
   return process.env.NODE_ENV === "production" && isFirestoreUsersBackendConfigured();
@@ -1436,6 +1472,10 @@ function ensureDefaultPlatformAdminInStore(store: DevStore): boolean {
 
 /** 임시 파일에 전체 문자열 기록 → 디스크 동기화 → rename으로 교체(본 파일에 이어쓰기 없음) */
 async function atomicWriteJsonFile(targetPath: string, jsonString: string): Promise<void> {
+  if (!isDevStoreFilePersistenceEnabled()) {
+    console.warn("[dev-store] skipped atomicWriteJsonFile (read-only in production):", targetPath);
+    return;
+  }
   const dir = path.dirname(targetPath);
   const base = path.basename(targetPath);
   const tmpPath = path.join(dir, `.${base}.tmp.${randomUUID()}`);
@@ -1481,6 +1521,7 @@ async function atomicWriteJsonFile(targetPath: string, jsonString: string): Prom
 
 /** 저장 직전: 파싱 가능한 메인 전체를 .backup + .last-good에 복사(직전 정상 스냅샷 보존) */
 async function snapshotValidMainToBackupAndLastGoodBeforeWrite(): Promise<void> {
+  if (!isDevStoreFilePersistenceEnabled()) return;
   let content: string;
   try {
     content = await readFile(STORE_FILE_PATH, "utf-8");
@@ -2382,6 +2423,7 @@ function buildDevStoreFromParsed(parsed: Partial<DevStore> & { mainCardTemplate?
 }
 
 async function ensureLastGoodMirrorIfMissing(store: DevStore): Promise<void> {
+  if (!isDevStoreFilePersistenceEnabled()) return;
   try {
     await readFile(STORE_LAST_GOOD_PATH, "utf-8");
   } catch {
@@ -2403,11 +2445,6 @@ async function tryRecoverFromLastGood(): Promise<DevStore | null> {
     reconcileDevStoreLoginIds(store);
     reconcileDevStoreUserIds(store);
     ensureCommunityPostsSeed(store);
-    try {
-      await writeStoreImpl(store);
-    } catch (persistErr) {
-      console.error("[dev-store] recovered from last-good but failed to persist to disk", persistErr);
-    }
     return store;
   } catch {
     return null;
@@ -2424,11 +2461,6 @@ async function tryRecoverFromBackup(): Promise<DevStore | null> {
     reconcileDevStoreLoginIds(store);
     reconcileDevStoreUserIds(store);
     ensureCommunityPostsSeed(store);
-    try {
-      await writeStoreImpl(store);
-    } catch (persistErr) {
-      console.error("[dev-store] recovered from .backup but failed to persist to disk", persistErr);
-    }
     console.warn("[dev-store] dev-store 복구됨 (.backup)");
     return store;
   } catch {
@@ -2462,11 +2494,6 @@ async function tryRecoverFromCorruptBackupsNewestFirst(): Promise<DevStore | nul
       reconcileDevStoreLoginIds(store);
       reconcileDevStoreUserIds(store);
       ensureCommunityPostsSeed(store);
-      try {
-        await writeStoreImpl(store);
-      } catch (persistErr) {
-        console.error("[dev-store] recovered from corrupt backup but failed to persist to disk", persistErr);
-      }
       return store;
     } catch {
       continue;
@@ -2476,6 +2503,7 @@ async function tryRecoverFromCorruptBackupsNewestFirst(): Promise<DevStore | nul
 }
 
 async function backupCorruptMainSnapshot(content: string): Promise<void> {
+  if (!isDevStoreFilePersistenceEnabled()) return;
   if (!content.length) return;
   try {
     await writeFile(`${STORE_FILE_PATH}.corrupt.${Date.now()}.json`, content, "utf-8");
@@ -2485,6 +2513,7 @@ async function backupCorruptMainSnapshot(content: string): Promise<void> {
 }
 
 async function ensureStoreFile(): Promise<void> {
+  if (!isDevStoreFilePersistenceEnabled()) return;
   await mkdir(STORE_DIR_PATH, { recursive: true });
   try {
     await readFile(STORE_FILE_PATH, "utf-8");
@@ -2526,7 +2555,9 @@ async function writeJsonWithRetry(targetPath: string, json: string): Promise<voi
 }
 
 async function readStoreImpl(): Promise<DevStore> {
-  await ensureStoreFile();
+  if (isDevStoreFilePersistenceEnabled()) {
+    await ensureStoreFile();
+  }
 
   let content = "";
   try {
@@ -2559,21 +2590,16 @@ async function readStoreImpl(): Promise<DevStore> {
       throw new Error("[dev-store] critical store fields invalid shape");
     }
     const store = buildDevStoreFromParsed(parsed);
-    const addedDefaultAdmin = ensureDefaultPlatformAdminInStore(store);
-    const reconciledLoginIds = reconcileDevStoreLoginIds(store);
-    const reconciledIds = reconcileDevStoreUserIds(store);
-    const seededCommunity = ensureCommunityPostsSeed(store);
-    if (addedDefaultAdmin || reconciledLoginIds || reconciledIds || seededCommunity) {
+    ensureDefaultPlatformAdminInStore(store);
+    reconcileDevStoreLoginIds(store);
+    reconcileDevStoreUserIds(store);
+    ensureCommunityPostsSeed(store);
+    if (isDevStoreFilePersistenceEnabled()) {
       try {
-        await writeStoreImpl(store);
-      } catch (persistErr) {
-        console.error("[dev-store] failed to persist store after reconciliation (keeping in-memory store)", persistErr);
+        await ensureLastGoodMirrorIfMissing(store);
+      } catch (mirrorErr) {
+        console.error("[dev-store] ensureLastGoodMirrorIfMissing failed after successful read", mirrorErr);
       }
-    }
-    try {
-      await ensureLastGoodMirrorIfMissing(store);
-    } catch (mirrorErr) {
-      console.error("[dev-store] ensureLastGoodMirrorIfMissing failed after successful read", mirrorErr);
     }
     return store;
   } catch (err) {
@@ -2627,21 +2653,17 @@ async function readStoreImpl(): Promise<DevStore> {
     ensureDefaultPlatformAdminInStore(fallbackStore);
     reconcileDevStoreLoginIds(fallbackStore);
     ensureCommunityPostsSeed(fallbackStore);
-    try {
-      await writeStoreImpl(fallbackStore);
-    } catch (persistErr) {
-      console.error("[dev-store] failed to persist fallback store; returning in-memory store only", persistErr);
+    if (!isDevStoreFilePersistenceEnabled()) {
+      console.warn("[dev-store] using in-memory fallback store (production read-only; disk persist skipped)");
     }
     return fallbackStore;
   }
 }
 
 async function writeStoreImpl(store: DevStore): Promise<void> {
-  if (process.env.NODE_ENV === "production") {
-    const msg =
-      "[dev-store] 운영 환경에서는 v3-dev-store.json 파일 쓰기(백업/tmp/atomic write)를 사용할 수 없습니다. 해당 기능은 영구 저장소로 이전해야 합니다.";
-    console.error(msg);
-    throw new Error(msg);
+  if (!isDevStoreFilePersistenceEnabled()) {
+    console.warn("[dev-store] skipped writeStoreImpl (read-only in production)");
+    return;
   }
   await snapshotValidMainToBackupAndLastGoodBeforeWrite();
   const baseline = await loadDevStoreFromFirstReadableDiskFile();
@@ -2656,7 +2678,7 @@ async function writeStoreImpl(store: DevStore): Promise<void> {
   }
 }
 
-/** 마이페이지 알림: 생성일 기준 보관 일수. 초과분은 readStore 시 제거·저장한다. */
+/** 마이페이지 알림: 생성일 기준 보관 일수. 초과분은 readStore 시 메모리에서만 제거한다(읽기 경로에서는 디스크에 반영하지 않음). */
 const USER_NOTIFICATION_RETENTION_DAYS = 30;
 
 function pruneExpiredNotifications(store: DevStore): number {
@@ -2675,12 +2697,8 @@ async function readStore(): Promise<DevStore> {
   return runStoreIoExclusive(async () => {
     const store = await readStoreImpl();
     const removed = pruneExpiredNotifications(store);
-    if (removed > 0) {
-      try {
-        await writeStoreImpl(store);
-      } catch (error) {
-        console.error("[dev-store] failed to persist after notification retention prune", error);
-      }
+    if (removed > 0 && !isDevStoreFilePersistenceEnabled()) {
+      console.warn("[dev-store] pruned expired notifications in memory only (read-only in production)", removed);
     }
     return store;
   });
@@ -3852,21 +3870,46 @@ export async function getClientStatusByUserId(userId: string): Promise<ClientApp
 }
 
 export async function getPlatformOperationSettings(): Promise<PlatformOperationSettings> {
-  const store = await readStore();
-  const normalized = normalizePlatformOperationSettings(store.platformOperationSettings);
-  store.platformOperationSettings = normalized;
-  try {
-    await writeStore(store);
-  } catch (error) {
-    console.error("[dev-store] failed to persist platformOperationSettings during read:", error);
+  const readStrategy = resolvePlatformOperationSettingsReadStrategy();
+  if (readStrategy === "firestore-kv") {
+    try {
+      const raw = await readPlatformOperationSettingsRawFromFirestoreKv();
+      if (raw != null) return normalizePlatformOperationSettings(raw);
+    } catch (e) {
+      console.warn("[dev-store] getPlatformOperationSettings Firestore read failed; using defaults", e);
+    }
+    return normalizePlatformOperationSettings(undefined);
   }
-  return normalized;
+  if (readStrategy === "production-defaults-only") {
+    return normalizePlatformOperationSettings(undefined);
+  }
+  const store = await readStore();
+  return normalizePlatformOperationSettings(store.platformOperationSettings);
 }
 
 export async function patchPlatformOperationSettings(params: {
   annualMembershipVisible?: boolean;
   annualMembershipEnforced?: boolean;
 }): Promise<PlatformOperationSettings> {
+  const writeStrategy = resolvePlatformOperationSettingsWriteStrategy();
+  if (writeStrategy === "firestore-kv") {
+    const raw = await readPlatformOperationSettingsRawFromFirestoreKv();
+    const current = normalizePlatformOperationSettings(raw ?? undefined);
+    const requestedVisible = params.annualMembershipVisible ?? current.annualMembershipVisible;
+    const requestedEnforced = params.annualMembershipEnforced ?? current.annualMembershipEnforced;
+    // 운영 정책 강제: enforced가 ON이면 visible은 자동으로 ON.
+    const normalizedVisible = requestedEnforced ? true : requestedVisible;
+    const next: PlatformOperationSettings = {
+      annualMembershipVisible: normalizedVisible,
+      annualMembershipEnforced: requestedEnforced,
+      updatedAt: new Date().toISOString(),
+    };
+    await upsertPlatformOperationSettingsToFirestoreKv(next);
+    return next;
+  }
+  if (writeStrategy === "blocked") {
+    throwPlatformOperationSettingsWritePersistenceBlocked();
+  }
   const store = await readStore();
   const current = normalizePlatformOperationSettings(store.platformOperationSettings);
   const requestedVisible = params.annualMembershipVisible ?? current.annualMembershipVisible;
@@ -3899,7 +3942,7 @@ export async function getClientDashboardPolicy(userId: string): Promise<{
   const store = await readStore();
   const canonical = resolveCanonicalUserId(store, userId.trim());
   const org = store.clientOrganizations.find((row) => row.clientUserId === canonical) ?? null;
-  const settings = normalizePlatformOperationSettings(store.platformOperationSettings);
+  const settings = await getPlatformOperationSettings();
   return {
     orgStatus: org?.status ?? null,
     membershipType: org?.membershipType === "ANNUAL" ? "ANNUAL" : "NONE",
@@ -7149,50 +7192,92 @@ export async function upsertMainCardTemplate(params: {
 }
 
 export async function getSiteLayoutConfig(): Promise<SiteLayoutConfig> {
-  const store = await readStore();
-  const normalized = normalizeSiteLayoutConfig(store.siteLayoutConfig);
-  store.siteLayoutConfig = normalized;
-  try {
-    await writeStore(store);
-  } catch (error) {
-    console.error("[dev-store] failed to persist siteLayoutConfig during read:", error);
+  const readStrategy = resolveSiteLayoutConfigReadStrategy();
+  if (readStrategy === "firestore-kv") {
+    try {
+      const raw = await readSiteLayoutConfigRawFromFirestoreKv();
+      if (raw != null) return normalizeSiteLayoutConfig(raw);
+    } catch (e) {
+      console.warn("[dev-store] getSiteLayoutConfig Firestore read failed; using defaults", e);
+    }
+    return normalizeSiteLayoutConfig(undefined);
   }
-  return normalized;
+  if (readStrategy === "production-defaults-only") {
+    return normalizeSiteLayoutConfig(undefined);
+  }
+  const store = await readStore();
+  return normalizeSiteLayoutConfig(store.siteLayoutConfig);
 }
 
 export async function patchSiteLayoutConfig(params: {
   header?: SiteLayoutConfig["header"];
   footer?: SiteLayoutConfig["footer"];
 }): Promise<SiteLayoutConfig> {
+  const writeStrategy = resolveSiteLayoutConfigWriteStrategy();
+  if (writeStrategy === "firestore-kv") {
+    const raw = await readSiteLayoutConfigRawFromFirestoreKv();
+    const current = normalizeSiteLayoutConfig(raw ?? undefined);
+    const next: SiteLayoutConfig = {
+      header: params.header
+        ? normalizeSiteLayoutConfig({ header: params.header, footer: current.footer }).header
+        : current.header,
+      footer: params.footer
+        ? normalizeSiteLayoutConfig({ header: current.header, footer: params.footer }).footer
+        : current.footer,
+    };
+    await upsertSiteLayoutConfigToFirestoreKv(next);
+    return next;
+  }
+  if (writeStrategy === "blocked") {
+    throwSiteLayoutConfigWritePersistenceBlocked();
+  }
   const store = await readStore();
   const current = normalizeSiteLayoutConfig(store.siteLayoutConfig);
-
   const next: SiteLayoutConfig = {
     header: params.header ? normalizeSiteLayoutConfig({ header: params.header, footer: current.footer }).header : current.header,
     footer: params.footer ? normalizeSiteLayoutConfig({ header: current.header, footer: params.footer }).footer : current.footer,
   };
-
   store.siteLayoutConfig = next;
   await writeStore(store);
   return next;
 }
 
 export async function getSiteNotice(): Promise<SiteNotice> {
-  const store = await readStore();
-  const normalized = normalizeSiteNotice(store.siteNotice);
-  store.siteNotice = normalized;
-  try {
-    await writeStore(store);
-  } catch (error) {
-    console.error("[dev-store] failed to persist siteNotice during read:", error);
+  const readStrategy = resolveSiteNoticeReadStrategy();
+  if (readStrategy === "firestore-kv") {
+    try {
+      const raw = await readSiteNoticeRawFromFirestoreKv();
+      if (raw != null) return normalizeSiteNotice(raw);
+    } catch (e) {
+      console.warn("[dev-store] getSiteNotice Firestore read failed; using defaults", e);
+    }
+    return normalizeSiteNotice(undefined);
   }
-  return normalized;
+  if (readStrategy === "production-defaults-only") {
+    return normalizeSiteNotice(undefined);
+  }
+  const store = await readStore();
+  return normalizeSiteNotice(store.siteNotice);
 }
 
 export async function patchSiteNotice(params: {
   enabled?: boolean;
   text?: string;
 }): Promise<SiteNotice> {
+  const writeStrategy = resolveSiteNoticeWriteStrategy();
+  if (writeStrategy === "firestore-kv") {
+    const raw = await readSiteNoticeRawFromFirestoreKv();
+    const current = normalizeSiteNotice(raw ?? undefined);
+    const next: SiteNotice = {
+      enabled: params.enabled ?? current.enabled,
+      text: params.text !== undefined ? params.text.trim() : current.text,
+    };
+    await upsertSiteNoticeToFirestoreKv(next);
+    return next;
+  }
+  if (writeStrategy === "blocked") {
+    throwSiteNoticeWritePersistenceBlocked();
+  }
   const store = await readStore();
   const current = normalizeSiteNotice(store.siteNotice);
   const next: SiteNotice = {
@@ -7205,15 +7290,21 @@ export async function patchSiteNotice(params: {
 }
 
 export async function getSiteCommunityConfig(): Promise<SiteCommunityConfig> {
-  const store = await readStore();
-  const normalized = normalizeSiteCommunityConfig(store.siteCommunityConfig);
-  store.siteCommunityConfig = normalized;
-  try {
-    await writeStore(store);
-  } catch (error) {
-    console.error("[dev-store] failed to persist siteCommunityConfig during read:", error);
+  const readStrategy = resolveSiteCommunityConfigReadStrategy();
+  if (readStrategy === "firestore-kv") {
+    try {
+      const raw = await readSiteCommunityConfigRawFromFirestoreKv();
+      if (raw != null) return normalizeSiteCommunityConfig(raw);
+    } catch (e) {
+      console.warn("[dev-store] getSiteCommunityConfig Firestore read failed; using defaults", e);
+    }
+    return normalizeSiteCommunityConfig(undefined);
   }
-  return normalized;
+  if (readStrategy === "production-defaults-only") {
+    return normalizeSiteCommunityConfig(undefined);
+  }
+  const store = await readStore();
+  return normalizeSiteCommunityConfig(store.siteCommunityConfig);
 }
 
 export async function patchSiteCommunityConfig(params: {
@@ -7223,9 +7314,25 @@ export async function patchSiteCommunityConfig(params: {
   extra1?: Partial<SiteCommunityBoardConfig>;
   extra2?: Partial<SiteCommunityBoardConfig>;
 }): Promise<SiteCommunityConfig> {
+  const writeStrategy = resolveSiteCommunityConfigWriteStrategy();
+  if (writeStrategy === "firestore-kv") {
+    const raw = await readSiteCommunityConfigRawFromFirestoreKv();
+    const current = normalizeSiteCommunityConfig(raw ?? undefined);
+    const next: SiteCommunityConfig = {
+      free: normalizeSiteCommunityBoardConfig(params.free ?? current.free, current.free),
+      qna: normalizeSiteCommunityBoardConfig(params.qna ?? current.qna, current.qna),
+      reviews: normalizeSiteCommunityBoardConfig(params.reviews ?? current.reviews, current.reviews),
+      extra1: normalizeSiteCommunityBoardConfig(params.extra1 ?? current.extra1, current.extra1),
+      extra2: normalizeSiteCommunityBoardConfig(params.extra2 ?? current.extra2, current.extra2),
+    };
+    await upsertSiteCommunityConfigToFirestoreKv(next);
+    return next;
+  }
+  if (writeStrategy === "blocked") {
+    throwSiteCommunityConfigWritePersistenceBlocked();
+  }
   const store = await readStore();
   const current = normalizeSiteCommunityConfig(store.siteCommunityConfig);
-
   const next: SiteCommunityConfig = {
     free: normalizeSiteCommunityBoardConfig(params.free ?? current.free, current.free),
     qna: normalizeSiteCommunityBoardConfig(params.qna ?? current.qna, current.qna),
@@ -7233,7 +7340,6 @@ export async function patchSiteCommunityConfig(params: {
     extra1: normalizeSiteCommunityBoardConfig(params.extra1 ?? current.extra1, current.extra1),
     extra2: normalizeSiteCommunityBoardConfig(params.extra2 ?? current.extra2, current.extra2),
   };
-
   store.siteCommunityConfig = next;
   await writeStore(store);
   return next;

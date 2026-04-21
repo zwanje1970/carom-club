@@ -48,14 +48,20 @@ export default async function SiteCommunityBoardListPage({ params, searchParams 
   const listBoardLabel = isPrimaryTabKey(boardType) ? COMMUNITY_PRIMARY_TAB_LABEL[boardType] : board.label;
 
   return (
-    <SiteShellFrame brandTitle="커뮤니티">
-      <section className="site-site-gray-main v3-stack ui-community-page ui-community-board-hub">
-        <CommunityBoardTabs tabs={tabItems} currentKey={boardType} />
-        <CommunityBoardSearchForm
-          actionPath={`/site/community/${boardType}`}
-          inputId={`community-q-${boardType}`}
-          defaultQuery={q}
-        />
+    <SiteShellFrame
+      brandTitle="커뮤니티"
+      auxiliary={
+        <>
+          <CommunityBoardTabs tabs={tabItems} currentKey={boardType} />
+          <CommunityBoardSearchForm
+            actionPath={`/site/community/${boardType}`}
+            inputId={`community-q-${boardType}`}
+            defaultQuery={q}
+          />
+        </>
+      }
+    >
+      <section className="site-site-gray-main v3-stack ui-community-page">
         <CommunityBoardPostList showRoomPrefix={false} items={items} />
         <Link href={writeHref} className="community-write-fab" aria-label={`${listBoardLabel} 글쓰기`}>
           <span aria-hidden>+</span>

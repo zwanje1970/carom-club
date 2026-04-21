@@ -167,7 +167,7 @@
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 0.28em;
+  gap: 0.1em;
   pointer-events: none;
   font-size: clamp(0.78rem, 2.8vw, 0.95rem);
   line-height: 1;

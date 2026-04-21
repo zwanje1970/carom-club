@@ -110,16 +110,17 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="v3-page v3-stack" style={{ maxWidth: "30rem", margin: "0 auto" }}>
-      <h1 className="v3-h1">로그인</h1>
+    <main className="v3-page v3-stack login-page-outer">
+      <div className="login-page-inner v3-stack">
+        <h1 className="v3-h1">로그인</h1>
 
-      {resetDone ? (
-        <p className="v3-box" style={{ background: "#f0fdf4", borderColor: "#86efac", marginBottom: 0 }}>
-          변경 완료
-        </p>
-      ) : null}
+        {resetDone ? (
+          <p className="v3-box" style={{ background: "#f0fdf4", borderColor: "#86efac", marginBottom: 0 }}>
+            변경 완료
+          </p>
+        ) : null}
 
-      <form className="v3-box v3-stack" onSubmit={handleLogin}>
+        <form className="v3-box v3-stack" onSubmit={handleLogin}>
         <label className="v3-stack">
           <span>아이디</span>
           <input
@@ -165,29 +166,30 @@ export default function LoginPage() {
         >
           로그아웃
         </button>
-      </form>
+        </form>
 
-      {message ? <p className="v3-muted">{message}</p> : null}
+        {message ? <p className="v3-muted">{message}</p> : null}
 
-      <p className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap" }}>
-        <Link className="v3-muted" href="/account/find-id" style={{ fontSize: "0.95rem" }}>
-          아이디 찾기
-        </Link>
-        <span className="v3-muted" style={{ opacity: 0.5 }}>
-          |
-        </span>
-        <Link className="v3-muted" href="/account/reset-password" style={{ fontSize: "0.95rem" }}>
-          비밀번호 찾기
-        </Link>
-      </p>
+        <p className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap" }}>
+          <Link className="v3-muted" href="/account/find-id" style={{ fontSize: "0.95rem" }}>
+            아이디 찾기
+          </Link>
+          <span className="v3-muted" style={{ opacity: 0.5 }}>
+            |
+          </span>
+          <Link className="v3-muted" href="/account/reset-password" style={{ fontSize: "0.95rem" }}>
+            비밀번호 찾기
+          </Link>
+        </p>
 
-      <div className="v3-row">
-        <Link className="v3-btn" href="/signup">
-          회원가입
-        </Link>
-        <Link className="v3-btn" href="/">
-          홈으로
-        </Link>
+        <div className="v3-row">
+          <Link className="v3-btn" href="/signup">
+            회원가입
+          </Link>
+          <Link className="v3-btn" href="/">
+            홈으로
+          </Link>
+        </div>
       </div>
     </main>
   );

@@ -7,6 +7,7 @@ import {
   patchSiteCommunityConfig,
   type SiteCommunityBoardConfig,
 } from "../../../../lib/server/dev-store";
+import { isSiteCommunityConfigWritePersistenceBlockedError } from "../../../../lib/server/platform-site-community-settings";
 
 export const runtime = "nodejs";
 
@@ -102,6 +103,18 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "No valid fields provided." }, { status: 400 });
   }
 
-  const config = await patchSiteCommunityConfig(nextPatch);
-  return NextResponse.json({ ok: true, config });
+  try {
+    const config = await patchSiteCommunityConfig(nextPatch);
+    return NextResponse.json({ ok: true, config });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to save site community config.";
+    console.error("[platform/site-community] PATCH persist failed", e);
+    if (isSiteCommunityConfigWritePersistenceBlockedError(e)) {
+      return NextResponse.json(
+        { error: message, code: "SITE_COMMUNITY_CONFIG_PERSISTENCE_UNAVAILABLE" },
+        { status: 503 }
+      );
+    }
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

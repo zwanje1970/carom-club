@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
-const mainStyle: CSSProperties = {
+const mainStyleHome: CSSProperties = {
   width: "100%",
   minHeight: "100dvh",
   display: "flex",
@@ -8,7 +8,18 @@ const mainStyle: CSSProperties = {
   boxSizing: "border-box",
 };
 
-const shellStyle: CSSProperties = {
+/** standard: 바깥 main을 가로 풀폭으로 — 자식 셸을 중앙에 모으지 않음(globals에서 셸도 풀폭 처리) */
+const mainStyleStandard: CSSProperties = {
+  width: "100%",
+  minHeight: "100dvh",
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "flex-start",
+  alignItems: "stretch",
+  boxSizing: "border-box",
+};
+
+const shellStyleHome: CSSProperties = {
   width: "100%",
   maxWidth: "430px",
   minHeight: "100dvh",
@@ -20,11 +31,28 @@ const shellStyle: CSSProperties = {
   position: "relative",
 };
 
+/** standard: 메인 제외 페이지 — 폭 제한·라운드 제거(globals .site-home-page--standard와 동일 목적) */
+const shellStyleStandard: CSSProperties = {
+  width: "100%",
+  maxWidth: "none",
+  minHeight: "100dvh",
+  borderRadius: 0,
+  paddingTop: "0",
+  paddingLeft: "0",
+  paddingRight: "0",
+  boxSizing: "border-box",
+  position: "relative",
+  boxShadow: "none",
+};
+
 export type SiteShellFrameProps = {
   brandTitle: ReactNode;
-  /** 공지 / 필터 등 상단 보조 영역. 생략 시 공지 슬롯 자체를 렌더하지 않음(대회상세 등) */
+  /**
+   * 헤더(청색 제목 바) 바로 아래 컨트롤 영역 — 필터·정렬·탭·검색 등.
+   * 본문(회색 영역) 위에 두어 제목만 헤더에 남긴다.
+   */
   auxiliary?: ReactNode;
-  /** true: 공지 박스 높이(2.75rem) 강제 없음 — 필터만 올 때(당구장안내) */
+  /** 컨트롤 바 세로 패딩을 약간 줄임(당구장 필터 등) */
   auxiliaryCompact?: boolean;
   /** 상단 흰 배경 아래 본문(다크 메인 또는 회색 본문) */
   children: ReactNode;
@@ -51,28 +79,29 @@ export default function SiteShellFrame({
   auxiliaryCompact,
   shellVariant = "standard",
 }: SiteShellFrameProps) {
-  const hasAuxiliarySlot = auxiliary !== undefined;
+  const hasControls = auxiliary !== undefined;
   const isHomeShell = shellVariant === "home";
+  /** `globals.css` 모바일 메인 레이아웃은 `.site-home-page--main` 기준 — `shellVariant` 값(home)과 DOM 클래스명을 맞춘다. */
+  const pageSurfaceClass = isHomeShell ? "site-home-page--main" : "site-home-page--standard";
   const topWhiteClass = [
     "site-home-top-white",
     isHomeShell ? "site-home-top-white--main" : "site-home-top-white--standard",
-    isHomeShell && !hasAuxiliarySlot ? "site-home-top-white--no-notice" : "",
+    isHomeShell && !hasControls ? "site-home-top-white--no-notice" : "",
   ]
     .filter(Boolean)
     .join(" ");
 
-  const auxiliarySectionClass = [
-    "v3-stack",
-    "site-home-notice-stack",
-    auxiliaryCompact ? "site-home-notice-stack--compact" : "",
-  ]
+  const controlsBarClass = ["site-shell-controls", auxiliaryCompact ? "site-shell-controls--compact" : ""]
     .filter(Boolean)
     .join(" ");
+
+  const mainStyle = isHomeShell ? mainStyleHome : mainStyleStandard;
+  const shellStyle = isHomeShell ? shellStyleHome : shellStyleStandard;
 
   return (
     <main
       id={mainId}
-      className={`v3-page site-home-page site-home-page--${shellVariant}`}
+      className={`v3-page site-home-page ${pageSurfaceClass}`}
       style={mainStyle}
     >
       {prependMain}
@@ -81,12 +110,12 @@ export default function SiteShellFrame({
           <div className="site-home-brand">
             <div className="site-mobile-page-title-block">{brandTitle}</div>
           </div>
-          {hasAuxiliarySlot ? (
-            <section className={auxiliarySectionClass}>
-              {auxiliary}
-            </section>
-          ) : null}
         </div>
+        {hasControls ? (
+          <div className={controlsBarClass}>
+            <div className="site-shell-controls-inner v3-stack">{auxiliary}</div>
+          </div>
+        ) : null}
         {children}
       </div>
     </main>

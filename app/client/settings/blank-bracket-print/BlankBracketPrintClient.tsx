@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
-import { buildBracketScene } from "./bracket-render-engine";
+import { buildBracketScene, buildStartPairLabels, type StartPairLabel } from "./bracket-render-engine";
 
 // @page 여백 = 10mm → 출력 영역 = 277 × 190 mm
 const MARGIN_MM = 10;
@@ -42,6 +42,7 @@ export default function BlankBracketPrintClient() {
   const [endPlayers,   setEndPlayers]   = useState(2);   /* 결승 */
   const [style,        setStyle]        = useState<BracketStyle>("TREE");
   const [treeLayout,   setTreeLayout]   = useState<TreeLayout>("VERTICAL");
+  const [showStartPairNumbers, setShowStartPairNumbers] = useState(false);
   const [pdfExporting, setPdfExporting] = useState(false);
   const pdfRootRef = useRef<HTMLDivElement>(null);
   const pdfBusyRef = useRef(false);
@@ -65,6 +66,11 @@ export default function BlankBracketPrintClient() {
     if (!rounds.length) return null;
     return buildBracketScene({ rounds, style, treeLayout });
   }, [rounds, style, treeLayout]);
+
+  const startPairLabels = useMemo((): StartPairLabel[] => {
+    if (!scene || !rounds.length || !showStartPairNumbers) return [];
+    return buildStartPairLabels(scene, { rounds, style, treeLayout });
+  }, [scene, rounds, style, treeLayout, showStartPairNumbers]);
 
   /** 새 창(데스크톱) 또는 인앱 전체 화면(모바일) 미리보기 */
   const handleOpenPreviewWindow = useCallback(() => {
@@ -99,12 +105,37 @@ export default function BlankBracketPrintClient() {
     min-height: 210mm;
     padding: 10mm;
   }
+  .bbp-print-page-sheet { position: relative; width: 100%; height: 100%; box-sizing: border-box; overflow: hidden; }
+  .bbp-print-service-mark {
+    position: absolute;
+    top: ${MARGIN_MM}mm;
+    right: ${MARGIN_MM}mm;
+    z-index: 10;
+    margin: 0;
+    padding: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 2.8mm;
+    font-weight: 300;
+    line-height: 1.2;
+    color: #888888;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   .hint { margin-top: 12px; font-size: 13px; color: #64748b; text-align: center; max-width: 40rem; }
   @media print {
     html, body { background: #fff; }
     body { padding: 0; display: block; }
     .sheet { box-shadow: none; width: auto; min-height: auto; padding: 0; }
     .hint { display: none; }
+    .bbp-print-service-mark {
+      position: absolute;
+      top: ${MARGIN_MM}mm;
+      right: ${MARGIN_MM}mm;
+    }
     @page { size: A4 landscape; margin: ${MARGIN_MM}mm; }
   }
 </style>
@@ -118,7 +149,7 @@ export default function BlankBracketPrintClient() {
       w.focus();
     };
     requestAnimationFrame(() => requestAnimationFrame(open));
-  }, [rounds.length, scene]);
+  }, [rounds.length, scene, showStartPairNumbers]);
 
   useEffect(() => {
     if (!mobilePreviewOpen) return;
@@ -186,6 +217,39 @@ export default function BlankBracketPrintClient() {
             overflow: hidden;
             z-index: -1;
             pointer-events: none;
+          }
+        }
+        .bbp-print-page-sheet {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          box-sizing: border-box;
+          overflow: hidden;
+        }
+        .bbp-print-service-mark {
+          position: absolute;
+          top: ${MARGIN_MM}mm;
+          right: ${MARGIN_MM}mm;
+          z-index: 10;
+          margin: 0;
+          padding: 0;
+          font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+          font-size: 2.8mm;
+          font-weight: 300;
+          line-height: 1.2;
+          color: #888888;
+          letter-spacing: 0.02em;
+          white-space: nowrap;
+          pointer-events: none;
+          user-select: none;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        @media print {
+          .bbp-print-service-mark {
+            position: absolute;
+            top: ${MARGIN_MM}mm;
+            right: ${MARGIN_MM}mm;
           }
         }
       `}</style>
@@ -259,6 +323,14 @@ export default function BlankBracketPrintClient() {
                   </div>
                 )}
               </div>
+              <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer", minHeight: "44px" }}>
+                <input
+                  type="checkbox"
+                  checked={showStartPairNumbers}
+                  onChange={(e) => setShowStartPairNumbers(e.target.checked)}
+                />
+                <span style={{ fontWeight: 700, fontSize: "0.88rem" }}>조번호 표시</span>
+              </label>
             </div>
             <div style={{ padding: "1rem", borderTop: "1px solid #e5e7eb", background: "#f8fafc", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
               <button
@@ -289,6 +361,7 @@ export default function BlankBracketPrintClient() {
         <MobilePrintPreviewLayer
           scene={scene}
           matchType={matchType}
+          startPairLabels={startPairLabels}
           viewportWidth={mobileVw}
           viewportHeight={mobileVh}
           onBackdropClose={() => setMobilePreviewOpen(false)}
@@ -298,7 +371,10 @@ export default function BlankBracketPrintClient() {
       {/* html2canvas·데스크톱 새창 미리보기 공용: 277×190mm SVG (화면 밖) */}
       {scene && (
         <div ref={pdfRootRef} className="bbp-print-svg" id="bbp-print-svg-root">
-          <BracketSVG scene={scene} matchType={matchType} />
+          <div className="bbp-print-page-sheet">
+            <BracketSVG scene={scene} matchType={matchType} startPairLabels={startPairLabels} />
+            <BracketPrintServiceMark />
+          </div>
         </div>
       )}
     </>
@@ -314,6 +390,7 @@ const A4_LANDSCAPE_H = 794;
 type MobilePreviewLayerProps = {
   scene: Exclude<ReturnType<typeof buildBracketScene>, null>;
   matchType: MatchType;
+  startPairLabels: StartPairLabel[];
   viewportWidth: number;
   viewportHeight: number;
   onBackdropClose: () => void;
@@ -322,6 +399,7 @@ type MobilePreviewLayerProps = {
 function MobilePrintPreviewLayer({
   scene,
   matchType,
+  startPairLabels,
   viewportWidth,
   viewportHeight,
   onBackdropClose,
@@ -336,6 +414,37 @@ function MobilePrintPreviewLayer({
     () => Math.min(Math.max(vw - 32, 1) / paperW, Math.max(vh - 32, 1) / paperH),
     [vw, vh, paperW, paperH],
   );
+
+  const paperRef = useRef<HTMLDivElement>(null);
+  const [serviceMarkOverlay, setServiceMarkOverlay] = useState<CSSProperties | null>(null);
+
+  useLayoutEffect(() => {
+    const paper = paperRef.current;
+    if (!paper) return;
+    const r = paper.getBoundingClientRect();
+    const mm10px = (MARGIN_MM / 25.4) * 96;
+    setServiceMarkOverlay({
+      position: "fixed",
+      top: r.top + mm10px,
+      right: Math.max(0, window.innerWidth - r.right + mm10px),
+      left: "auto",
+      bottom: "auto",
+      zIndex: 100000,
+      fontSize: "11px",
+      fontWeight: 300,
+      lineHeight: 1.2,
+      color: "#888888",
+      fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+      letterSpacing: "0.02em",
+      whiteSpace: "nowrap",
+      pointerEvents: "none",
+      userSelect: "none",
+      margin: 0,
+      padding: 0,
+      WebkitPrintColorAdjust: "exact",
+      printColorAdjust: "exact",
+    });
+  }, [vw, vh, scale, scene, matchType, startPairLabels]);
 
   return (
     <div
@@ -389,6 +498,7 @@ function MobilePrintPreviewLayer({
           }}
         >
           <div
+            ref={paperRef}
             className="bbp-preview-paper"
             style={{
               width: paperW,
@@ -405,11 +515,21 @@ function MobilePrintPreviewLayer({
             }}
           >
             <div className="bbp-preview-bracket-scene" style={{ lineHeight: 0 }}>
-              <BracketSVG scene={scene} matchType={matchType} />
+              <BracketSVG scene={scene} matchType={matchType} startPairLabels={startPairLabels} />
             </div>
           </div>
         </div>
       </div>
+      {serviceMarkOverlay ? <BracketPrintServiceMark overlayStyle={serviceMarkOverlay} /> : null}
+    </div>
+  );
+}
+
+/** 용지(277×190mm) 루트 기준 고정 — SVG·트리·scale 레이어와 분리 (overlayStyle: 모바일 미리보기 등 fixed 보정) */
+function BracketPrintServiceMark({ overlayStyle }: { overlayStyle?: CSSProperties }) {
+  return (
+    <div className="bbp-print-service-mark" style={overlayStyle} aria-hidden="true">
+      ⓒ CAROM.CLUB
     </div>
   );
 }
@@ -420,15 +540,19 @@ function MobilePrintPreviewLayer({
 // style 에 width/height/min-width/min-height 를 모두 인라인으로 강제해서
 // 프로젝트 전역 CSS (svg { max-width:100% } 등) 에 눌리지 않게 한다.
 // ─────────────────────────────────────────────────────────────────────────────
+const PAIR_LABEL_FONT_MM = 2.05;
+
 function BracketSVG({
   scene,
   matchType,
+  startPairLabels = [],
 }: {
   scene: {
     boxes: { x: number; y: number; w: number; h: number }[];
     lines: { x1: number; y1: number; x2: number; y2: number }[];
   };
   matchType: MatchType;
+  startPairLabels?: StartPairLabel[];
 }) {
   return (
     <svg
@@ -478,6 +602,27 @@ function BracketSVG({
           )}
         </g>
       ))}
+
+      {startPairLabels.length > 0 ? (
+        <g className="bbp-start-pair-labels" aria-hidden="true">
+          {startPairLabels.map((t, i) => (
+            <text
+              key={`sp-${i}`}
+              x={t.x}
+              y={t.y}
+              textAnchor={t.textAnchor}
+              dominantBaseline="middle"
+              fill="#8e8e8e"
+              fontSize={`${PAIR_LABEL_FONT_MM}mm`}
+              fontWeight={300}
+              fontFamily='system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+              style={{ paintOrder: "stroke fill", WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}
+            >
+              {t.text}
+            </text>
+          ))}
+        </g>
+      ) : null}
     </svg>
   );
 }

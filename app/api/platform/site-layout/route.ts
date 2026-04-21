@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
 import { getSiteLayoutConfig, getUserById, patchSiteLayoutConfig, type SiteLayoutConfig } from "../../../../lib/server/dev-store";
+import { isSiteLayoutConfigWritePersistenceBlockedError } from "../../../../lib/server/platform-site-layout-settings";
 
 export const runtime = "nodejs";
 
@@ -55,9 +56,21 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "header or footer is required." }, { status: 400 });
   }
 
-  const config = await patchSiteLayoutConfig({
-    header: parsed.header as PatchSiteLayoutRequest["header"] | undefined,
-    footer: parsed.footer as PatchSiteLayoutRequest["footer"] | undefined,
-  });
-  return NextResponse.json({ ok: true, config });
+  try {
+    const config = await patchSiteLayoutConfig({
+      header: parsed.header as PatchSiteLayoutRequest["header"] | undefined,
+      footer: parsed.footer as PatchSiteLayoutRequest["footer"] | undefined,
+    });
+    return NextResponse.json({ ok: true, config });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to save site layout config.";
+    console.error("[platform/site-layout] PATCH persist failed", e);
+    if (isSiteLayoutConfigWritePersistenceBlockedError(e)) {
+      return NextResponse.json(
+        { error: message, code: "SITE_LAYOUT_CONFIG_PERSISTENCE_UNAVAILABLE" },
+        { status: 503 }
+      );
+    }
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

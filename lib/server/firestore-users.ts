@@ -28,6 +28,11 @@ function ensureFirestore(): admin.firestore.Firestore {
   return admin.firestore();
 }
 
+/** 플랫폼 사용자·KV 등 공용 Firestore (자격 증명 없으면 throw) */
+export function getSharedFirestoreDb(): admin.firestore.Firestore {
+  return ensureFirestore();
+}
+
 export function isFirestoreUsersBackendConfigured(): boolean {
   const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim();

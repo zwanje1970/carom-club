@@ -277,7 +277,7 @@ body {
   display: flex;
   flex-direction: row;
   width: 300vw;
-  transform: translateX(-100vw);
+  transform: translate3d(-100vw, 0, 0);
   will-change: transform;
 }
 
@@ -326,15 +326,70 @@ body:has(.site-home-page) {
   background-color: #ffffff;
 }
 
+/* standard(메인 제외) 사이트 페이지: 바깥을 뷰포트 풀폭으로 — 전역 .v3-page 제한·셸 max-width·카드형 라운드 제거 */
+.site-home-page--standard.v3-page {
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box;
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+.site-home-page--standard .site-home-shell {
+  max-width: none !important;
+  width: 100% !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.site-home-page--standard .site-home-top-white {
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
+}
+
+.site-home-page--standard .site-site-gray-main {
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
+}
+
+/* 로그인: 페이지 바깥은 풀폭, 폼만 좁게(로그인 페이지 루트에 .login-page-outer) */
+.login-page-outer.v3-page {
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box;
+  padding-left: max(1rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1rem, env(safe-area-inset-right, 0px));
+}
+
+.login-page-inner {
+  width: 100%;
+  max-width: 30rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* 로고 + 공지: 셸 너비까지 흰 배경(세로 패딩은 --main / --standard 에서만) */
+/* 사이트 페이지 상단 타이틀/로고 바 — 짙은 청 배경 + 밝은 글자 */
 .site-home-top-white {
   margin-left: -0.85rem;
   margin-right: -0.85rem;
   padding-left: 0.85rem;
   padding-right: 0.85rem;
-  background: #ffffff;
+  background: #0f2744;
+  color: #ffffff;
   position: relative;
   z-index: 2;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 /* 메인(/) 전용: 기존 메인 상단 밀착 규칙 유지 */
@@ -412,6 +467,11 @@ body:has(.site-home-page) {
     display: flex;
     flex-direction: column;
     min-height: 100dvh;
+    width: 100%;
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+    box-sizing: border-box;
   }
 
   html:has(.site-home-page--main) .site-shell:has(.site-root-swipe-viewport) {
@@ -425,6 +485,19 @@ body:has(.site-home-page) {
     flex: 1 1 auto;
     min-height: 0;
     overflow: hidden;
+    width: 100%;
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+    box-sizing: border-box;
+  }
+
+  .site-home-page--main.v3-page {
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box;
   }
 
   .site-home-page--main {
@@ -531,8 +604,8 @@ body:has(.site-home-page) {
 }
 
 .site-home-brand {
-  color: #0f172a !important;
-  text-shadow: none;
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   text-align: center;
   font-size: 1rem;
   font-weight: 700;
@@ -547,10 +620,34 @@ body:has(.site-home-page) {
   padding-bottom: var(--site-shell-brand-padding-bottom);
 }
 
+/* 헤더(청) 아래: 필터·정렬·탭·검색 — 본문(회색)과 시각적으로 분리 */
+.site-shell-controls {
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
+  background: #eef2f7;
+  border-bottom: 1px solid #cbd5e1;
+  padding-top: 0.65rem;
+  padding-bottom: 0.75rem;
+  padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
+}
+
+.site-shell-controls--compact {
+  padding-top: 0.5rem;
+  padding-bottom: 0.55rem;
+}
+
+.site-shell-controls-inner {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 .site-home-notice-stack {
   gap: var(--site-shell-aux-gap);
   min-height: var(--site-shell-aux-min-height);
-  color: #0f172a;
+  color: #ffffff;
 }
 
 .site-home-notice-stack--compact {
@@ -573,6 +670,19 @@ body:has(.site-home-page) {
 
 .site-home-notice-stack a {
   color: inherit;
+}
+
+/* 상단 청색 헤더 안 필터·링크: 밝은 컨트롤 배경 + 짙은 글자 */
+.site-home-top-white .site-home-notice-stack select {
+  color: #0f172a;
+  background-color: #ffffff;
+  border-color: #cbd5e1;
+}
+
+.site-home-top-white .site-home-notice-stack a[href] {
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
 }
 
 @keyframes site-notice-marquee {
@@ -598,6 +708,11 @@ body:has(.site-home-page) {
   padding: 0.45rem 0.85rem;
 }
 
+.site-home-top-white .site-home-site-notice-marquee {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.2);
+}
+
 .site-home-site-notice-marquee__inner {
   display: inline-block;
   white-space: nowrap;
@@ -606,6 +721,10 @@ body:has(.site-home-page) {
   line-height: 1.35;
   animation: site-notice-marquee 14s linear infinite;
   will-change: transform;
+}
+
+.site-home-top-white .site-home-site-notice-marquee__inner {
+  color: #fef9c3;
 }
 
 /* 모바일 메인: 검은 배경·슬라이드와 빈틈 없이 연결 */
@@ -631,6 +750,12 @@ body:has(.site-home-page) {
   box-sizing: border-box;
 }
 
+.site-home-top-white .site-home-notice-slot-empty {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+}
+
 .site-home-brand .site-home-brand-ellipsis {
   display: block;
   max-width: 100%;
@@ -652,7 +777,7 @@ body:has(.site-home-page) {
     padding-bottom: 0.1rem;
     font-size: 1.02rem;
     font-weight: 700;
-    color: #0f172a;
+    color: #ffffff;
     line-height: 1.25;
     text-align: center;
   }
@@ -670,7 +795,7 @@ body:has(.site-home-page) {
 
   .site-main-logo-name {
     font-weight: 700;
-    color: #0f172a;
+    color: #ffffff;
   }
 
   /* 메인: 공지 ↔ 슬라이드 사이 빈틈 제거 */
@@ -743,19 +868,9 @@ body:has(.site-home-page) {
   margin-top: 1.35rem;
 }
 
-/*
- * 모바일 대시보드: 네비~대시보드 고정 간격 0.5rem (슬라이드는 aspect-ratio 고정).
- */
-@media (max-width: 767px) {
-  .site-home-dark-main.site-home-dark-main--stack .site-home-cta-primary {
-    margin-top: 0.5rem !important;
-  }
-}
-
-@media (min-width: 768px) {
-  .site-home-dark-main.site-home-dark-main--stack .site-home-cta-primary {
-    margin-top: 3rem !important;
-  }
+/* 대시보드 버튼 위 간격 = 4메뉴 그리드 gap(대회안내↔커뮤니티 등과 동일, .site-home-nav-grid gap 과 맞춤) */
+.site-home-dark-main.site-home-dark-main--stack .site-home-cta-primary {
+  margin-top: 14px !important;
 }
 
 /* 샘플 UI: 밝은 카드형 타일 · 파란 아이콘 · 짙은 글자 */
@@ -1465,8 +1580,9 @@ body:has(.site-home-page) {
 }
 
 .site-header {
-  border-bottom: 1px solid #ddd;
-  background: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  background: #0f2744;
+  color: #ffffff;
   position: sticky;
   top: 0;
   z-index: 10;
@@ -1502,8 +1618,8 @@ body:has(.site-home-page) {
 
 .site-nav a {
   text-decoration: none;
-  color: inherit;
-  border: 1px solid #ccc;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.28);
   padding: 0.5rem 0.75rem;
   font-size: 1rem;
   line-height: 1.35;
@@ -1528,12 +1644,12 @@ body:has(.site-home-page) {
 
 .site-nav-aux a {
   text-decoration: none;
-  color: #666;
-  border: 1px solid #ddd;
+  color: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   padding: 0.35rem 0.55rem;
   font-size: 0.9rem;
   line-height: 1.3;
-  background: #fafafa;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .site-nav-aux-mobile {

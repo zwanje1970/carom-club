@@ -37,10 +37,16 @@ export default async function SiteCommunityPage({
   const writeHref = firstVisible ? `/site/community/${firstVisible}/write` : "/site";
 
   return (
-    <SiteShellFrame brandTitle="커뮤니티">
-      <section className="site-site-gray-main v3-stack ui-community-page ui-community-board-hub">
-        <CommunityBoardTabs tabs={tabItems} currentKey="all" />
-        <CommunityBoardSearchForm actionPath="/site/community" inputId="community-q-all" defaultQuery={q} />
+    <SiteShellFrame
+      brandTitle="커뮤니티"
+      auxiliary={
+        <>
+          <CommunityBoardTabs tabs={tabItems} currentKey="all" />
+          <CommunityBoardSearchForm actionPath="/site/community" inputId="community-q-all" defaultQuery={q} />
+        </>
+      }
+    >
+      <section className="site-site-gray-main v3-stack ui-community-page">
         <CommunityBoardPostList showRoomPrefix items={items} />
         <Link href={writeHref} className="community-write-fab" aria-label="글쓰기">
           <span aria-hidden>+</span>

@@ -14,6 +14,16 @@ export type BracketScene = {
   lines: { x1: number; y1: number; x2: number; y2: number }[];
 };
 
+/** 시작 라운드 2슬롯=1조 보조 번호 (좌표만 — 박스·선 계산과 무관) */
+export type StartPairLabel = {
+  x: number;
+  y: number;
+  text: string;
+  textAnchor: "start" | "middle" | "end";
+};
+
+const PAIR_LABEL_OUT_MM = 2.3;
+
 export type BuildOpts = {
   rounds:     number[];
   style:      "TREE" | "CENTER";
@@ -46,6 +56,73 @@ export function buildBracketScene({ rounds, style, treeLayout }: BuildOpts): Bra
   if (style === "CENTER")      return buildCenter(rounds);
   if (treeLayout === "VERTICAL") return buildVertical(rounds);
   return buildHorizontal(rounds);
+}
+
+/**
+ * 시작 라운드에서 연속 2슬롯을 1조로 보고 1…N/2 번호만 계산한다.
+ * scene 의 박스 좌표는 변경하지 않는다.
+ */
+export function buildStartPairLabels(scene: BracketScene, opts: BuildOpts): StartPairLabel[] {
+  const { rounds, style, treeLayout } = opts;
+  if (!rounds.length) return [];
+  const N = rounds[0]!;
+  if (N < 2 || N % 2 !== 0) return [];
+  const { boxes } = scene;
+  if (boxes.length < N) return [];
+
+  const out: StartPairLabel[] = [];
+  let gn = 1;
+
+  if (style === "CENTER") {
+    const finalEnd = rounds[rounds.length - 1] === 1;
+    const baseRounds = finalEnd ? rounds.slice(0, -1) : rounds;
+    const sideRounds = baseRounds.map((n) => Math.max(1, Math.floor(n / 2)));
+    const L = sideRounds.length;
+    const s0 = sideRounds[0]!;
+    const pairsSide = s0 / 2;
+    let leftTotal = 0;
+    for (let r = 0; r < L; r++) leftTotal += sideRounds[r]!;
+
+    for (let k = 0; k < pairsSide; k++) {
+      const a = boxes[2 * k]!;
+      const b = boxes[2 * k + 1]!;
+      const midY = (a.y + a.h + b.y) * 0.5;
+      out.push({ x: a.x - PAIR_LABEL_OUT_MM, y: midY, text: String(gn++), textAnchor: "end" });
+    }
+    const rb = leftTotal;
+    for (let k = 0; k < pairsSide; k++) {
+      const a = boxes[rb + 2 * k]!;
+      const b = boxes[rb + 2 * k + 1]!;
+      const midY = (a.y + a.h + b.y) * 0.5;
+      out.push({ x: a.x + a.w + PAIR_LABEL_OUT_MM, y: midY, text: String(gn++), textAnchor: "start" });
+    }
+    return out;
+  }
+
+  if (treeLayout === "VERTICAL") {
+    const rowTop = boxes[0]!.y;
+    for (let k = 0; k < N / 2; k++) {
+      const a = boxes[2 * k]!;
+      const b = boxes[2 * k + 1]!;
+      const midX = (a.x + a.w + b.x) * 0.5;
+      out.push({
+        x: midX,
+        y: rowTop - PAIR_LABEL_OUT_MM,
+        text: String(gn++),
+        textAnchor: "middle",
+      });
+    }
+    return out;
+  }
+
+  /* TREE HORIZONTAL */
+  for (let k = 0; k < N / 2; k++) {
+    const a = boxes[2 * k]!;
+    const b = boxes[2 * k + 1]!;
+    const midY = (a.y + a.h + b.y) * 0.5;
+    out.push({ x: a.x - PAIR_LABEL_OUT_MM, y: midY, text: String(gn++), textAnchor: "end" });
+  }
+  return out;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

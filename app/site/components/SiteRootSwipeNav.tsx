@@ -102,15 +102,21 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
     if (!track) return;
     dragPxRef.current = dragPx;
     track.style.transition = withTransition ? `transform ${TRANSITION_MS}ms ${EASING}` : "none";
-    track.style.transform = `translateX(calc(-100vw + ${dragPx}px))`;
+    track.style.transform = `translate3d(calc(-100vw + ${dragPx}px), 0, 0)`;
+  }, []);
+
+  const releaseViewportTouchAxisLock = useCallback(() => {
+    const v = viewportRef.current;
+    if (v) v.style.removeProperty("touch-action");
   }, []);
 
   useLayoutEffect(() => {
     animatingRef.current = false;
     navAfterTransitionRef.current = null;
     dragPxRef.current = 0;
+    releaseViewportTouchAxisLock();
     if (trackRef.current) applyTransform(0, false);
-  }, [pathname, applyTransform]);
+  }, [pathname, applyTransform, releaseViewportTouchAxisLock]);
 
   useEffect(() => {
     if (children == null) return;
@@ -163,6 +169,8 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
           return;
         }
         start.horizontalLocked = true;
+        const vp = viewportRef.current;
+        if (vp) vp.style.setProperty("touch-action", "none");
       }
 
       e.preventDefault();
@@ -203,6 +211,7 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
           : [];
       startRef.current = null;
       samplesRef.current = [];
+      releaseViewportTouchAxisLock();
 
       if (!start || start.blocked || animatingRef.current) return;
       if (!isSiteRootSwipePath(pathname)) return;
@@ -278,24 +287,26 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
     const onTouchCancel = () => {
       startRef.current = null;
       samplesRef.current = [];
+      releaseViewportTouchAxisLock();
       if (dragPxRef.current !== 0 && !animatingRef.current) applyTransform(0, true);
     };
 
     const el = viewportRef.current;
     if (!el) return;
 
+    const touchMoveListenerOpts: AddEventListenerOptions = { passive: false, capture: true };
     el.addEventListener("touchstart", onTouchStart, { passive: true });
-    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchmove", onTouchMove, touchMoveListenerOpts);
     el.addEventListener("touchend", onTouchEnd, { passive: true });
     el.addEventListener("touchcancel", onTouchCancel, { passive: true });
 
     return () => {
       el.removeEventListener("touchstart", onTouchStart);
-      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchmove", onTouchMove, touchMoveListenerOpts);
       el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("touchcancel", onTouchCancel);
     };
-  }, [pathname, router, applyTransform]);
+  }, [pathname, router, applyTransform, releaseViewportTouchAxisLock]);
 
   if (children == null) return null;
 

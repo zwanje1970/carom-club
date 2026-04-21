@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
 import { getSiteNotice, getUserById, patchSiteNotice } from "../../../../lib/server/dev-store";
+import { isSiteNoticeWritePersistenceBlockedError } from "../../../../lib/server/platform-site-notice-settings";
 
 export const runtime = "nodejs";
 
@@ -49,9 +50,24 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "text must be a string." }, { status: 400 });
   }
 
-  const notice = await patchSiteNotice({
-    enabled: parsed.enabled as boolean | undefined,
-    text: parsed.text as string | undefined,
-  });
-  return NextResponse.json({ ok: true, notice });
+  try {
+    const notice = await patchSiteNotice({
+      enabled: parsed.enabled as boolean | undefined,
+      text: parsed.text as string | undefined,
+    });
+    return NextResponse.json({ ok: true, notice });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to save site notice.";
+    console.error("[platform/site-notice] PATCH persist failed", e);
+    if (isSiteNoticeWritePersistenceBlockedError(e)) {
+      return NextResponse.json(
+        {
+          error: message,
+          code: "SITE_NOTICE_PERSISTENCE_UNAVAILABLE",
+        },
+        { status: 503 }
+      );
+    }
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

@@ -6,6 +6,7 @@ import {
   getUserById,
   patchPlatformOperationSettings,
 } from "../../../../lib/server/dev-store";
+import { isPlatformOperationSettingsWritePersistenceBlockedError } from "../../../../lib/server/platform-operation-settings";
 
 export const runtime = "nodejs";
 
@@ -35,11 +36,23 @@ export async function PATCH(request: Request) {
   } catch {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
-  const settings = await patchPlatformOperationSettings({
-    annualMembershipVisible:
-      typeof body.annualMembershipVisible === "boolean" ? body.annualMembershipVisible : undefined,
-    annualMembershipEnforced:
-      typeof body.annualMembershipEnforced === "boolean" ? body.annualMembershipEnforced : undefined,
-  });
-  return NextResponse.json({ ok: true, settings });
+  try {
+    const settings = await patchPlatformOperationSettings({
+      annualMembershipVisible:
+        typeof body.annualMembershipVisible === "boolean" ? body.annualMembershipVisible : undefined,
+      annualMembershipEnforced:
+        typeof body.annualMembershipEnforced === "boolean" ? body.annualMembershipEnforced : undefined,
+    });
+    return NextResponse.json({ ok: true, settings });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to save platform operation settings.";
+    console.error("[platform/platform-settings] PATCH persist failed", e);
+    if (isPlatformOperationSettingsWritePersistenceBlockedError(e)) {
+      return NextResponse.json(
+        { error: message, code: "PLATFORM_OPERATION_SETTINGS_PERSISTENCE_UNAVAILABLE" },
+        { status: 503 }
+      );
+    }
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

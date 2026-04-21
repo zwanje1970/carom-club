@@ -15,7 +15,7 @@ const SITE_NAV_ITEMS = [
   { href: "/site/tournaments", label: "대회안내" },
   { href: "/site/venues", label: "당구장안내" },
   { href: "/site/community", label: "커뮤니티" },
-  { href: "/site/mypage", label: "MY" },
+  { href: "/site/mypage", label: "마이페이지" },
 ] as const;
 
 function navItemActive(pathname: string, href: string): boolean {
