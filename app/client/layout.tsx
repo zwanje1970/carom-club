@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import GlobalHomeButton from "../components/GlobalHomeButton";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../lib/auth/session";
 import { getClientStatusByUserId, getClientDashboardPolicy, getUserById } from "../../lib/server/dev-store";
+import SitePcDashboardChromeShell from "../site/components/SitePcDashboardChromeShell";
 
 export default async function ClientLayout({
   children,
@@ -45,7 +46,8 @@ export default async function ClientLayout({
     }
     return (
       <>
-        {children}
+        <SitePcDashboardChromeShell />
+        <div className="app-mobile-bottom-nav-scroll-pad">{children}</div>
         <GlobalHomeButton />
       </>
     );

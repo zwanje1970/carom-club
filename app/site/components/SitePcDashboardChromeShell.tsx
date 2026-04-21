@@ -1,0 +1,27 @@
+import { headers } from "next/headers";
+
+import { getSiteLayoutConfig } from "../../../lib/server/dev-store";
+import { getSiteUnreadNotificationCount } from "../../../lib/server/site-unread-notification-count";
+import SiteChromeHeader, { isPublicSiteMobileView } from "./SiteChromeHeader";
+import SiteVenuesGeolocationNav from "./SiteVenuesGeolocationNav";
+
+/** `/platform`·`/client` PC 대시보드 — 공개 사이트와 동일 `SiteChromeHeader` 재사용 (모바일 UA에서는 null) */
+export default async function SitePcDashboardChromeShell() {
+  const headerStore = await headers();
+  if (isPublicSiteMobileView(headerStore)) return null;
+
+  const siteConfig = await getSiteLayoutConfig();
+  const unreadNotificationCount = await getSiteUnreadNotificationCount();
+
+  return (
+    <div className="site-shell site-shell--pc-site-chrome site-shell--dashboard-chrome-header">
+      <div className="site-shell-pc-constrain">
+        <SiteVenuesGeolocationNav />
+        <SiteChromeHeader
+          menuItems={siteConfig.header.pc.menuItems}
+          unreadNotificationCount={unreadNotificationCount}
+        />
+      </div>
+    </div>
+  );
+}

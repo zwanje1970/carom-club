@@ -1,10 +1,9 @@
 import Link from "next/link";
+import { getSiteCommunityConfig, listCommunityPostsAllPrimary } from "../../../lib/server/dev-store";
 import {
-  COMMUNITY_PRIMARY_BOARD_KEYS,
-  getSiteCommunityConfig,
-  listCommunityPostsAllPrimary,
-} from "../../../lib/server/dev-store";
-import { COMMUNITY_PRIMARY_TAB_LABEL } from "./community-tab-config";
+  communityTabLabelForBoard,
+  visibleCommunityBoardKeysForTabs,
+} from "./community-tab-config";
 import CommunityBoardPostList from "./CommunityBoardPostList";
 import CommunityBoardSearchForm from "./CommunityBoardSearchForm";
 import CommunityBoardTabs from "./CommunityBoardTabs";
@@ -21,20 +20,20 @@ export default async function SiteCommunityPage({
   const qRaw = sp.q;
   const q = typeof qRaw === "string" ? qRaw.trim() : Array.isArray(qRaw) ? String(qRaw[0] ?? "").trim() : "";
 
-  const visibleKeys = COMMUNITY_PRIMARY_BOARD_KEYS.filter((k) => config[k].visible);
-  const items = await listCommunityPostsAllPrimary(visibleKeys, q ? { q } : undefined);
+  const visibleBoardKeys = visibleCommunityBoardKeysForTabs(config);
+  const items = await listCommunityPostsAllPrimary(visibleBoardKeys, q ? { q } : undefined);
 
   const qSuffix = q ? `?q=${encodeURIComponent(q)}` : "";
   const tabItems = [
     { key: "all" as const, label: "전체", href: `/site/community${qSuffix}` },
-    ...COMMUNITY_PRIMARY_BOARD_KEYS.filter((k) => config[k].visible).map((k) => ({
+    ...visibleBoardKeys.map((k) => ({
       key: k,
-      label: COMMUNITY_PRIMARY_TAB_LABEL[k as keyof typeof COMMUNITY_PRIMARY_TAB_LABEL],
+      label: communityTabLabelForBoard(k, config),
       href: `/site/community/${k}${qSuffix}`,
     })),
   ];
 
-  const firstVisible = COMMUNITY_PRIMARY_BOARD_KEYS.find((k) => config[k].visible);
+  const firstVisible = visibleBoardKeys[0];
   const writeHref = firstVisible ? `/site/community/${firstVisible}/write` : "/site";
 
   return (

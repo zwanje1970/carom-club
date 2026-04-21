@@ -1,5 +1,3 @@
-import { readFile } from "fs/promises";
-import path from "path";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
@@ -10,14 +8,9 @@ import {
   getTournamentById,
   getUserById,
 } from "../../../../lib/server/dev-store";
+import { mimeTypeFromProofExt, readProofImageVariantFile } from "../../../../lib/server/read-proof-image-variant";
 
 export const runtime = "nodejs";
-
-function getMimeTypeFromExt(ext: string): string {
-  if (ext === "png") return "image/png";
-  if (ext === "webp") return "image/webp";
-  return "image/jpeg";
-}
 
 export async function GET(
   request: NextRequest,
@@ -68,18 +61,15 @@ export async function GET(
     return NextResponse.json({ error: "접근 권한이 없습니다." }, { status: 403 });
   }
 
-  const ext = variant === "original" ? proofImage.originalExt : "jpg";
-  const absolutePath = path.join(process.cwd(), "data", "proof-images", variant, `${normalizedImageId}.${ext}`);
-  try {
-    const fileBuffer = await readFile(absolutePath);
-    return new NextResponse(fileBuffer, {
-      status: 200,
-      headers: {
-        "Content-Type": getMimeTypeFromExt(ext),
-        "Cache-Control": "private, no-store",
-      },
-    });
-  } catch {
+  const read = await readProofImageVariantFile(normalizedImageId, variant, proofImage.originalExt);
+  if (!read) {
     return NextResponse.json({ error: "존재하지 않는 데이터입니다." }, { status: 404 });
   }
+  return new NextResponse(new Uint8Array(read.buffer), {
+    status: 200,
+    headers: {
+      "Content-Type": mimeTypeFromProofExt(read.ext),
+      "Cache-Control": "private, no-store",
+    },
+  });
 }

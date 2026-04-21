@@ -1,13 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
-  COMMUNITY_PRIMARY_BOARD_KEYS,
   getSiteCommunityConfig,
   listCommunityPosts,
   parseCommunityBoardTypeParam,
   type SiteCommunityBoardKey,
 } from "../../../../lib/server/dev-store";
-import { COMMUNITY_PRIMARY_TAB_LABEL, isPrimaryTabKey } from "../community-tab-config";
+import { communityTabLabelForBoard, visibleCommunityBoardKeysForTabs } from "../community-tab-config";
 import CommunityBoardPostList from "../CommunityBoardPostList";
 import CommunityBoardSearchForm from "../CommunityBoardSearchForm";
 import CommunityBoardTabs from "../CommunityBoardTabs";
@@ -37,16 +36,17 @@ export default async function SiteCommunityBoardListPage({ params, searchParams 
   const writeHref = `/site/community/${boardType}/write`;
 
   const qSuffix = q ? `?q=${encodeURIComponent(q)}` : "";
+  const visibleBoardKeys = visibleCommunityBoardKeysForTabs(config);
   const tabItems = [
     { key: "all" as const, label: "전체", href: `/site/community${qSuffix}` },
-    ...COMMUNITY_PRIMARY_BOARD_KEYS.filter((k) => config[k].visible).map((k) => ({
+    ...visibleBoardKeys.map((k) => ({
       key: k,
-      label: COMMUNITY_PRIMARY_TAB_LABEL[k as keyof typeof COMMUNITY_PRIMARY_TAB_LABEL],
+      label: communityTabLabelForBoard(k, config),
       href: `/site/community/${k}${qSuffix}`,
     })),
   ];
 
-  const listBoardLabel = isPrimaryTabKey(boardType) ? COMMUNITY_PRIMARY_TAB_LABEL[boardType] : board.label;
+  const listBoardLabel = communityTabLabelForBoard(boardType, config);
 
   return (
     <SiteShellFrame

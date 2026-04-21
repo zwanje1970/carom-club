@@ -407,44 +407,6 @@ export default async function SiteHomePage({
       ? { imageOverlayOpacity: snapshot.tournamentImageOverlayOpacity }
       : {}),
   }));
-  const dummySlideItems = [
-    {
-      snapshotId: "dummy-slide-1",
-      title: "제2회 전국당구대회",
-      subtitle: "2026.05.18(토) · 캐롬클럽 빌리어즈",
-      statusBadge: "모집중",
-      cardExtraLine1: "전국 오픈 · 클럽 리그",
-      cardExtraLine2: "클럽 회원 및 게스트 참가 가능",
-      cardTemplate: "A" as const,
-      backgroundType: "image" as const,
-      themeType: "dark" as const,
-    },
-    {
-      snapshotId: "dummy-slide-2",
-      title: "2026 캐롬 스프링컵",
-      subtitle: "2026.06.01(일) · 강남구 K당구장",
-      statusBadge: "마감임박",
-      cardExtraLine1: "서울 지역 예선",
-      cardExtraLine2: "예선 마감 임박 · 선착순 마감",
-      cardTemplate: "B" as const,
-      backgroundType: "theme" as const,
-      themeType: "dark" as const,
-    },
-    {
-      snapshotId: "dummy-slide-3",
-      title: "클럽 내부 리그 3부",
-      subtitle: "2026.05.25(토) · 캐롬클럽 빌리어즈",
-      statusBadge: "대기자모집",
-      cardExtraLine1: "주말 리그",
-      cardExtraLine2: "대기 접수 중 · 취소 시 순번 연락",
-      cardTemplate: "A" as const,
-      backgroundType: "image" as const,
-      themeType: "natural" as const,
-    },
-  ];
-  const forcedMainSlideItems =
-    liveSlideItems.length > 0 ? liveSlideItems : dummySlideItems.map((item) => ({ ...item }));
-
   /** 공지 문구가 있으면 슬라이드 상단 바 표시(enabled만 켤 때 빠지는 경우 복구) */
   const showSiteNoticeBar = siteNotice.text.trim().length > 0;
 
@@ -534,75 +496,77 @@ export default async function SiteHomePage({
       }
       brandTitle={<SiteMainLogo />}
     >
-        <section id="main-content-group" className="v3-stack site-home-dark-main site-home-dark-main--stack">
-          <section className="v3-stack site-home-slide-stack site-home-slide-stack--flush" style={{ gap: 0 }}>
-            <section
-              className="site-home-slide-anchor"
-              data-section-id={tournamentSlideEntry?.sectionId ?? "section-tournament-forced"}
-              data-block-id={tournamentSlideEntry?.block.id ?? "block-tournament-forced"}
-              data-title-section-id={tournamentTitleEntry?.sectionId ?? tournamentSlideEntry?.sectionId}
-              data-title-block-id={tournamentTitleEntry?.block.id}
-            >
-              <MainSceneSlideDeckClient
-                items={forcedMainSlideItems}
-                sectionLabel={tournamentTitleEntry?.block.data.text?.trim() || "진행중 대회"}
-                siteNoticeText={showSiteNoticeBar ? siteNotice.text.trim() : undefined}
-              />
+        <section id="main-content-group" className="site-home-dark-main site-home-dark-main--stack">
+          <div className="site-home-main-content-box">
+            <section className="v3-stack site-home-slide-stack site-home-slide-stack--flush" style={{ gap: 0 }}>
+              <section
+                className="site-home-slide-anchor"
+                data-section-id={tournamentSlideEntry?.sectionId ?? "section-tournament-forced"}
+                data-block-id={tournamentSlideEntry?.block.id ?? "block-tournament-forced"}
+                data-title-section-id={tournamentTitleEntry?.sectionId ?? tournamentSlideEntry?.sectionId}
+                data-title-block-id={tournamentTitleEntry?.block.id}
+              >
+                <MainSceneSlideDeckClient
+                  items={liveSlideItems}
+                  sectionLabel={tournamentTitleEntry?.block.data.text?.trim() || "진행중 대회"}
+                  siteNoticeText={showSiteNoticeBar ? siteNotice.text.trim() : undefined}
+                />
+              </section>
             </section>
-          </section>
 
-          <section
-            id="main-buttons"
-            className="site-home-nav-grid"
-            style={{
-              width: "100%",
-              display: "grid",
-              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-            }}
-          >
-            {fixedMainButtons.map((row) => {
-              const tileStyle = {
-                textDecoration: "none" as const,
-                color: "inherit",
-                textAlign: "center" as const,
-                minHeight: "3.35rem",
-              };
-              const inner = (
-                <>
-                  <span className="site-home-nav-icon">
-                    <SiteMainNavIcon variant={mainNavVariants[row.label]} />
-                  </span>
-                  <span className="site-home-nav-label">{row.label}</span>
-                </>
-              );
-              return row.label === "주변당구장" ? (
-                <VenuesDistanceNavLink
-                  key={`fixed-main-nav-${row.label}`}
-                  href={row.href}
-                  className="site-home-nav-tile"
-                  style={tileStyle}
-                >
-                  {inner}
-                </VenuesDistanceNavLink>
-              ) : (
-                <Link key={`fixed-main-nav-${row.label}`} href={row.href} className="site-home-nav-tile" style={tileStyle}>
-                  {inner}
-                </Link>
-              );
-            })}
-          </section>
-          {dashboardHref ? (
-            <Link
-              href={dashboardHref}
-              className={
-                clientDashboardApproved
-                  ? "site-home-cta-primary site-home-cta-primary--client-ops"
-                  : "site-home-cta-primary"
-              }
+            <section
+              id="main-buttons"
+              className="site-home-nav-grid"
+              style={{
+                width: "100%",
+                display: "grid",
+                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              }}
             >
-              <span className="site-home-cta-primary__text">{dashboardLabel}</span>
-            </Link>
-          ) : null}
+              {fixedMainButtons.map((row) => {
+                const tileStyle = {
+                  textDecoration: "none" as const,
+                  color: "inherit",
+                  textAlign: "center" as const,
+                  minHeight: "3.35rem",
+                };
+                const inner = (
+                  <>
+                    <span className="site-home-nav-icon">
+                      <SiteMainNavIcon variant={mainNavVariants[row.label]} />
+                    </span>
+                    <span className="site-home-nav-label">{row.label}</span>
+                  </>
+                );
+                return row.label === "주변당구장" ? (
+                  <VenuesDistanceNavLink
+                    key={`fixed-main-nav-${row.label}`}
+                    href={row.href}
+                    className="site-home-nav-tile"
+                    style={tileStyle}
+                  >
+                    {inner}
+                  </VenuesDistanceNavLink>
+                ) : (
+                  <Link key={`fixed-main-nav-${row.label}`} href={row.href} className="site-home-nav-tile" style={tileStyle}>
+                    {inner}
+                  </Link>
+                );
+              })}
+            </section>
+            {dashboardHref ? (
+              <Link
+                href={dashboardHref}
+                className={
+                  clientDashboardApproved
+                    ? "site-home-cta-primary site-home-cta-primary--client-ops"
+                    : "site-home-cta-primary"
+                }
+              >
+                <span className="site-home-cta-primary__text">{dashboardLabel}</span>
+              </Link>
+            ) : null}
+          </div>
         </section>
 
     </SiteShellFrame>

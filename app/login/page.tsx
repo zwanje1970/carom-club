@@ -20,7 +20,7 @@ function safeNextPath(raw: string | null | undefined): string | null {
 function defaultPathAfterLogin(role: AuthRole): string {
   if (role === "PLATFORM") return "/platform";
   if (role === "CLIENT") return "/client";
-  return "/";
+  return "/site";
 }
 
 export default function LoginPage() {
@@ -83,6 +83,9 @@ export default function LoginPage() {
         dest = nextPath;
       } else {
         dest = defaultPathAfterLogin(role);
+      }
+      if (role === "USER" && (dest === "/" || dest === "/site/mypage" || dest.startsWith("/site/mypage/"))) {
+        dest = "/site";
       }
 
       router.push(dest);

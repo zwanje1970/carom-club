@@ -17,9 +17,28 @@ function pathOnly(href: string): string {
   return p.length > 1 && p.endsWith("/") ? p.slice(0, -1) : p;
 }
 
+/** 목록 허브만: `/site/community`, `/site/community/{board}` — 상세·쓰기 등은 null */
+function communityHubPathBoardSegment(pathname: string): string | null {
+  const norm = pathOnly(pathname);
+  if (norm === "/site/community" || norm === "/site/community/") return "all";
+  const prefix = "/site/community/";
+  if (!norm.startsWith(prefix)) return null;
+  const rest = norm.slice(prefix.length);
+  const parts = rest.split("/").filter(Boolean);
+  if (parts.length === 0) return "all";
+  if (parts.length >= 2) return null;
+  const seg = parts[0]!;
+  if (seg === "write") return null;
+  return seg;
+}
+
 function swipeIndexForPathname(pathname: string, tabs: Tab[]): number {
   const norm = pathOnly(pathname);
-  return tabs.findIndex((t) => pathOnly(t.href) === norm);
+  const exact = tabs.findIndex((t) => pathOnly(t.href) === norm);
+  if (exact >= 0) return exact;
+  const seg = communityHubPathBoardSegment(pathname);
+  if (seg == null) return -1;
+  return tabs.findIndex((t) => t.key === seg);
 }
 
 function touchBlocksCommunitySwipe(el: EventTarget | null): boolean {
@@ -138,6 +157,8 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
           start.verticalDominant = true;
           return;
         }
+        if (activeIdx === 0 && dx > 0) return;
+        if (activeIdx === n - 1 && dx < 0) return;
         start.horizontalLocked = true;
         const vp = viewportRef.current;
         if (vp) vp.style.setProperty("touch-action", "none");
@@ -152,8 +173,6 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
 
       const vw = window.innerWidth;
       let raw = dx * FOLLOW_RATIO;
-      if (activeIdx <= 0 && raw > 0) raw = 0;
-      if (activeIdx >= n - 1 && raw < 0) raw = 0;
       raw = Math.max(-vw, Math.min(vw, raw));
 
       setTrackTransform(raw, false);
@@ -263,8 +282,16 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
     return <>{children}</>;
   }
 
+  const swipeEdge: "first" | "last" | "middle" =
+    activeIdx <= 0 ? "first" : activeIdx >= n - 1 ? "last" : "middle";
+
   return (
-    <div ref={viewportRef} className="community-board-swipe-viewport" data-community-inner-swipe>
+    <div
+      ref={viewportRef}
+      className="community-board-swipe-viewport"
+      data-community-inner-swipe
+      data-community-swipe-edge={swipeEdge}
+    >
       <div ref={trackRef} className="community-board-swipe-track">
         {activeIdx > 0 ? (
           <div className="community-board-swipe-panel community-board-swipe-panel--peek" aria-hidden />

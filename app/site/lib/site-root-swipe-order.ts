@@ -59,6 +59,17 @@ export function isSiteRootSwipePath(pathname: string): boolean {
   return siteRootSwipeIndex(pathname) >= 0;
 }
 
+/** 커뮤니티 게시판 목록 허브만(전체·단일 게시판 탭). 상세·쓰기 등은 false */
+export function isCommunityBoardListHubPath(pathname: string): boolean {
+  const p = normalizeSiteRootPathname(pathname);
+  if (p === "/site/community") return true;
+  const m = /^\/site\/community\/([^/]+)$/.exec(p);
+  if (!m?.[1]) return false;
+  const seg = m[1];
+  if (seg === "write" || seg === "preview") return false;
+  return true;
+}
+
 export function siteRootSwipeHrefAt(index: number): string | null {
   if (index < 0 || index >= SITE_ROOT_SWIPE_NAV.length) return null;
   return SITE_ROOT_SWIPE_NAV[index]!.href;

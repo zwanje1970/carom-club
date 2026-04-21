@@ -206,6 +206,7 @@ export default function MainSceneSlideDeck({
   const axisRef = useRef<"undecided" | "vertical" | "horizontal">("undecided");
 
   useEffect(() => {
+    if (items.length === 0) return;
     let rafId = 0;
     const loop = () => {
       setFrameTime(Date.now());
@@ -216,10 +217,9 @@ export default function MainSceneSlideDeck({
       cancelAnimationFrame(rafId);
       if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
     };
-  }, []);
+  }, [items.length]);
 
   const n = items.length;
-  if (n === 0) return null;
 
   const pauseAuto = () => {
     if (pausedAtMsRef.current == null) {
@@ -326,51 +326,65 @@ export default function MainSceneSlideDeck({
       </div>
     ) : null;
 
-  const deck = (
-    <div
-      className={styles.slideDeck}
-      onWheel={onWheel}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
-    >
-      {items.map((item, i) => {
-        const role = sceneRoleForCard(i, n, sceneId);
-        const style = cardStyleForRole(
-          role,
-          tInScene,
-          role === "incoming"
-            ? Math.min(
-                1,
-                Math.max(0, (tInScene - INCOMING_DELAY_S) / INCOMING_RISE_DURATION_S),
-              )
-            : 0,
-        );
-        return (
-          <div key={item.snapshotId} className={styles.slideDeckLayer}>
-            <div className={styles.slideDeckCard} style={style}>
-              <SlideDeckCard item={item} />
-            </div>
-          </div>
-        );
-      })}
-      {/* 카드(transform)보다 위에 두기 위해 레이어 뒤·높은 z-index·flex로 창 안에 고정 */}
-      <div className={styles.slideDeckFrameOverlay}>
-        <div className={styles.slideDeckTopChrome}>
-          {noticeOverlay}
-          {sectionLabel.trim() ? (
-            <p className={styles.slideDeckLabel}>{sectionLabel.trim()}</p>
-          ) : null}
+  const overlayChrome = (
+    <div className={styles.slideDeckFrameOverlay}>
+      <div className={styles.slideDeckTopChrome}>
+        {noticeOverlay}
+        {sectionLabel.trim() ? (
+          <p className={styles.slideDeckLabel}>{sectionLabel.trim()}</p>
+        ) : null}
+      </div>
+      {n === 0 ? (
+        <div className={styles.slideDeckEmptyState}>
+          <p className={styles.slideDeckEmptyStateText}>노출 중인 대회 카드가 없습니다.</p>
         </div>
-        <div className={styles.slideDeckBottomDots} aria-hidden="true">
-          <span className={styles.slideDeckBottomDotY}>●</span>
-          <span className={styles.slideDeckBottomDotR}>●</span>
-          <span className={styles.slideDeckBottomDotW}>●</span>
-        </div>
+      ) : null}
+      <div className={styles.slideDeckBottomDots} aria-hidden="true">
+        <span className={styles.slideDeckBottomDotY}>●</span>
+        <span className={styles.slideDeckBottomDotR}>●</span>
+        <span className={styles.slideDeckBottomDotW}>●</span>
       </div>
     </div>
   );
+
+  const deck =
+    n === 0 ? (
+      <div className={styles.slideDeck} aria-label="진행 대회 슬라이드">
+        {overlayChrome}
+      </div>
+    ) : (
+      <div
+        className={styles.slideDeck}
+        onWheel={onWheel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+      >
+        {items.map((item, i) => {
+          const role = sceneRoleForCard(i, n, sceneId);
+          const style = cardStyleForRole(
+            role,
+            tInScene,
+            role === "incoming"
+              ? Math.min(
+                  1,
+                  Math.max(0, (tInScene - INCOMING_DELAY_S) / INCOMING_RISE_DURATION_S),
+                )
+              : 0,
+          );
+          return (
+            <div key={item.snapshotId} className={styles.slideDeckLayer}>
+              <div className={styles.slideDeckCard} style={style}>
+                <SlideDeckCard item={item} />
+              </div>
+            </div>
+          );
+        })}
+        {/* 카드(transform)보다 위에 두기 위해 레이어 뒤·높은 z-index·flex로 창 안에 고정 */}
+        {overlayChrome}
+      </div>
+    );
 
   /* 공지 유무와 동일한 바깥 박스(테두리·흐름) 유지 — 레이아웃 출렁임 완화 */
   return <div className={styles.slideDeckShell}>{deck}</div>;

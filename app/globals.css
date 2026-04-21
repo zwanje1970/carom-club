@@ -261,7 +261,17 @@ body {
   touch-action: manipulation;
 }
 
+/* /client·/platform PC: 헤더만 담은 .site-shell — min-height:100vh로 본문이 뷰포트 아래로 밀리지 않게 */
+.site-shell.site-shell--dashboard-chrome-header {
+  min-height: 0;
+}
+
 @media (max-width: 767px) {
+  /* 대시보드 전용: 좁은 뷰포트에서 공통 헤더 숨김(UA만으로는 빠지는 케이스 보완). 공개 /site 셸에는 미적용 */
+  .site-shell.site-shell--dashboard-chrome-header {
+    display: none !important;
+  }
+
   /* pan-y 루트 스와이프와 충돌 완화 — 세로 제스처는 기본 스크롤 우선 */
   .site-shell {
     touch-action: auto;
@@ -383,6 +393,14 @@ body {
   flex-direction: column;
 }
 
+.site-shell.site-shell--pc-site-chrome.site-shell--pc-sticky-footer > .site-shell-pc-constrain {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
 .site-shell--pc-sticky-footer .site-shell-main {
   flex: 1 1 auto;
   display: flex;
@@ -395,6 +413,27 @@ body {
   min-height: 0;
   width: 100%;
   align-self: stretch;
+}
+
+/* PC(768px~): 공통 크롬 안 홈 본문 — .v3-page 48rem 한계 제거 + standard와 동일 flex 자식(모바일 셸에는 pc-sticky-footer 없음) */
+@media (min-width: 768px) {
+  .site-shell--pc-sticky-footer .site-shell-main > .site-home-page--main {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    align-self: stretch;
+    min-width: 0;
+  }
+
+  .site-home-page--main.v3-page {
+    max-width: none !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    box-sizing: border-box;
+    padding-left: max(0.7rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.7rem, env(safe-area-inset-right, 0px));
+  }
 }
 
 /* —— Reference UI: 메인(폰 셸) —— */
@@ -413,6 +452,27 @@ body {
 html:has(.site-home-page),
 body:has(.site-home-page) {
   background-color: #ffffff;
+}
+
+/* PC 메인: 본문·푸터 사이 빈 여백까지 다크 톤 연속(스크롤 배경 포함) */
+@media (min-width: 768px) {
+  html:has(.site-home-page--main),
+  body:has(.site-home-page--main) {
+    background-color: #0a1421;
+  }
+
+  .site-shell.site-shell--pc-site-chrome > .site-shell-pc-constrain > .site-shell-main:has(> .site-home-page--main) {
+    background-color: #0a1421;
+  }
+
+  .site-home-page--main {
+    background-color: #0a1421;
+    background-image: linear-gradient(180deg, #141c2c 0%, #0e1626 52%, #0a1421 100%);
+  }
+
+  .site-home-page--main .site-home-shell {
+    min-height: 100% !important;
+  }
 }
 
 /* standard(메인 제외) 사이트 페이지: 바깥을 뷰포트 풀폭으로 — 전역 .v3-page 제한·셸 max-width·카드형 라운드 제거 */
@@ -567,6 +627,16 @@ body:has(.site-home-page) {
   z-index: 1;
 }
 
+/* 메인: 다크 배경 바깥은 풀폭 유지, 슬라이드·4버튼·CTA는 PC에서 .site-home-main-content-box 안에서만 폭 제한 */
+.site-home-main-content-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
 .site-home-shell {
   position: relative;
   z-index: 1;
@@ -701,6 +771,15 @@ body:has(.site-home-page) {
     padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px) + 4px);
   }
 
+  .site-home-dark-main.site-home-dark-main--stack > .site-home-main-content-box {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
   /* 슬라이드: 뷰포트 남는 높이를 먹지 않음 — .slideDeck aspect-ratio 로 크기 고정 */
   .site-home-slide-stack {
     flex: 0 0 auto;
@@ -798,12 +877,96 @@ body:has(.site-home-page) {
   filter: drop-shadow(0 14px 36px rgba(0, 0, 0, 0.42));
 }
 
+/* 홈: 래퍼는 1열 flex(모바일 규칙 유지). PC(768px~)는 대회안내 등 standard 페이지와 동일하게 풀폭 — 좁은 max-width·2열 그리드 없음 */
+.site-home-page--main .site-home-pc-layout {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.site-home-page--main .site-home-pc-layout__primary {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.site-home-pc-layout__aside {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .site-home-page--main .site-home-pc-layout {
+    max-width: none;
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    box-sizing: border-box;
+  }
+
+  .site-home-page--main .site-home-pc-layout__primary {
+    align-items: stretch;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .site-home-page--main .site-home-pc-layout .site-home-shell {
+    max-width: none;
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .site-home-pc-layout__aside {
+    display: none;
+  }
+}
+
+/* 모바일 UA /site 셸: 폰 뷰포트에서는 상단 공통 헤더 숨김 — 태블릿·PC 너비(768px~)에서만 표시 */
+.site-shell--ua-mobile-site .site-shell-pc-header {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .site-shell--ua-mobile-site .site-shell-pc-header {
+    display: block;
+  }
+}
+
 /* 데스크톱·넓은 화면: 다크 블록 좌우 패딩(0.85rem)까지 슬라이드 배경 풀폭 — 모바일은 위 미디어쿼리에서 뷰포트 풀폭 */
 @media (min-width: 768px) {
   .site-home-slide-anchor {
     margin-left: -0.85rem;
     margin-right: -0.85rem;
     width: calc(100% + 1.7rem);
+  }
+
+  .site-home-page--main .site-home-main-content-box {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .site-home-page--main .site-home-main-content-box .site-home-slide-anchor {
+    margin-left: 0;
+    margin-right: 0;
+    width: 100%;
+  }
+
+  .site-home-page--main .site-home-main-content-box .site-home-cta-primary {
+    width: 100% !important;
+    max-width: 100%;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    box-sizing: border-box;
+  }
+
+  /* PC 메인: 대회안내·당구장 등 4타일 메뉴는 헤더와 중복되므로 숨김 */
+  .site-home-page--main #main-buttons.site-home-nav-grid {
+    display: none !important;
   }
 }
 
@@ -1010,16 +1173,16 @@ body:has(.site-home-page) {
   --site-home-block-gap: 0.875rem;
 }
 
-.site-home-dark-main.site-home-dark-main--stack .site-home-slide-stack {
+.site-home-dark-main.site-home-dark-main--stack .site-home-main-content-box .site-home-slide-stack {
   padding-top: var(--site-home-block-gap);
 }
 
-.site-home-dark-main.site-home-dark-main--stack #main-buttons.site-home-nav-grid {
+.site-home-dark-main.site-home-dark-main--stack .site-home-main-content-box #main-buttons.site-home-nav-grid {
   margin-top: var(--site-home-block-gap);
 }
 
 /* 대시보드 버튼 위 간격 = 4메뉴 그리드 gap(대회안내↔커뮤니티 등과 동일, .site-home-nav-grid gap 과 맞춤) */
-.site-home-dark-main.site-home-dark-main--stack .site-home-cta-primary {
+.site-home-dark-main.site-home-dark-main--stack .site-home-main-content-box .site-home-cta-primary {
   margin-top: 14px !important;
 }
 
@@ -1211,6 +1374,13 @@ body:has(.site-home-page) {
 @media (min-width: 768px) {
   .site-mobile-bottom-nav {
     display: none !important;
+  }
+}
+
+/* /client·/platform: 모바일 하단 5탭(.site-home-fab-root)과 본문 겹침 방지 — 스크롤 끝까지 저장 버튼 등 노출 */
+@media (max-width: 767px) {
+  .app-mobile-bottom-nav-scroll-pad {
+    padding-bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -1830,6 +2000,57 @@ body:has(.site-home-page) {
   padding: 0;
 }
 
+/* 마이페이지 미읽음 알림 뱃지(헤더 레이아웃 유지: 뱃지는 absolute) */
+.site-header-nav-item-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.site-nav .site-header-mypage-nav-link {
+  display: inline-block;
+  text-decoration: none;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.site-nav-aux .site-header-mypage-nav-link {
+  display: inline-block;
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  padding: 0.35rem 0.55rem;
+  font-size: 0.9rem;
+  line-height: 1.3;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.site-header-unread-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform: translate(35%, -35%);
+  box-sizing: border-box;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding: 0 0.22rem;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.125rem;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
 .site-footer {
   border-top: 1px solid #ddd;
   margin-top: 2rem;
@@ -1847,12 +2068,74 @@ body:has(.site-home-page) {
   margin-top: 0.25rem;
 }
 
-/* Narrow viewport: same as server mobile branch (no layout header/footer).
-   Responsive mode in desktop browsers often keeps desktop UA, so SSR still sends PC chrome. */
+/* 좁은 창: 예전에는 공통 헤더까지 숨겼으나, 데스크톱 UA(/site)에서는 항상 노출(아래 .site-shell--pc-site-chrome 덮어씀). */
 @media (max-width: 48rem) {
   .site-shell > .site-header,
   .site-shell > .site-footer {
     display: none !important;
+  }
+}
+
+/* 데스크톱 UA 공개 /site 셸: 창 너비와 무관하게 상단·하단 공통 크롬 유지(로그인 여부와 무관) */
+.site-shell.site-shell--pc-site-chrome > .site-shell-pc-constrain .site-header,
+.site-shell.site-shell--pc-site-chrome > .site-shell-pc-constrain .site-footer {
+  display: block !important;
+}
+
+/* PC(1024px~): 사이트 전체 중앙 고정폭 — 헤더·본문·푸터 동일 컨테이너 */
+@media (min-width: 1024px) {
+  .site-shell.site-shell--pc-site-chrome.site-shell--pc-sticky-footer {
+    background-color: var(--ui-bg-page, #f1f5f9);
+  }
+
+  .site-shell.site-shell--pc-site-chrome > .site-shell-pc-constrain {
+    max-width: 1200px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
+  }
+
+  .site-shell.site-shell--pc-site-chrome > .site-shell-pc-constrain .site-header-top,
+  .site-shell.site-shell--pc-site-chrome > .site-shell-pc-constrain .site-nav,
+  .site-shell.site-shell--pc-site-chrome > .site-shell-pc-constrain .site-nav-aux,
+  .site-shell.site-shell--pc-site-chrome > .site-shell-pc-constrain .site-footer-desktop {
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+/* PC: 카테고리 메뉴 + 클라이언트/플랫폼 보조 메뉴를 한 줄(로고는 위 전체 폭) */
+@media (min-width: 768px) {
+  .site-shell.site-shell--pc-site-chrome > .site-shell-pc-constrain .site-header {
+    display: flex !important;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    column-gap: 0.5rem;
+  }
+
+  .site-shell.site-shell--pc-site-chrome > .site-shell-pc-constrain .site-header > .site-header-top {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  .site-shell.site-shell--pc-site-chrome > .site-shell-pc-constrain .site-header > .site-nav,
+  .site-shell.site-shell--pc-site-chrome > .site-shell-pc-constrain .site-header > .site-nav-aux {
+    max-width: none;
+    width: auto;
+    margin: 0;
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+  }
+
+  .site-shell.site-shell--pc-site-chrome > .site-shell-pc-constrain .site-header > .site-nav {
+    padding: 0 0 0.8rem 1rem;
+  }
+
+  .site-shell.site-shell--pc-site-chrome > .site-shell-pc-constrain .site-header > .site-nav-aux {
+    padding: 0 1rem 0.8rem 0;
   }
 }
 

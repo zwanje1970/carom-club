@@ -727,7 +727,7 @@ export type ProofImageAsset = {
   uploaderUserId: string;
   originalExt: "jpg" | "png" | "webp";
   createdAt: string;
-  /** 사이트 공개용(대회 포스터 등). true면 /api/site-images 로 제공 */
+  /** 사이트 공개용(대회 포스터 등). true면 `/site-images/{variant}/{id}` 로 제공 */
   sitePublic?: boolean;
 };
 
@@ -1203,246 +1203,10 @@ function normalizeCommunityBoardPostRow(row: unknown): CommunityBoardPost | null
   };
 }
 
-function ensureCommunityPostsSeed(store: DevStore): boolean {
+function ensureCommunityPostsArray(store: DevStore): void {
   if (!Array.isArray(store.communityPosts)) {
     store.communityPosts = [];
   }
-  if (store.communityPosts.length > 0) return false;
-  const author = store.users.find((u) => u.role === "PLATFORM") ?? store.users[0];
-  if (!author) return false;
-  const uid = author.id;
-  const nick = author.nickname;
-  const now = new Date().toISOString();
-  const seeds: CommunityBoardPost[] = [
-    {
-      id: "cm-f1",
-      boardType: "free",
-      title:
-        "초보자도 참여 가능한 대회 추천합니다 긴 제목 말줄임 테스트용으로 한 줄을 넘기는 경우를 확인합니다",
-      content: "동호회 규모에 맞는 대회를 찾을 때 확인하면 좋은 기준을 정리했습니다.\n\n안전한 참가를 위해 공지 사항을 꼭 읽어 주세요.",
-      authorUserId: uid,
-      authorNickname: nick,
-      createdAt: "2026-04-01T09:15:00.000Z",
-      updatedAt: now,
-      viewCount: 128,
-      commentCount: 0,
-      imageUrls: [],
-      imageSizeLevels: [],
-      isDeleted: false,
-    },
-    {
-      id: "cm-f2",
-      boardType: "free",
-      title: "연습할 때 집중하는 방법 공유",
-      content: "짧은 세션으로도 효과를 내려면 호흡과 루틴을 고정하는 것이 도움이 됩니다.",
-      authorUserId: uid,
-      authorNickname: nick,
-      createdAt: "2026-03-28T18:40:00.000Z",
-      updatedAt: now,
-      viewCount: 45,
-      commentCount: 0,
-      imageUrls: [],
-      imageSizeLevels: [],
-      isDeleted: false,
-    },
-    {
-      id: "cm-f3",
-      boardType: "free",
-      title: "주말 동호회 모집합니다",
-      content: "지역 및 연락처는 댓글 기능 오픈 후 안내 예정입니다.",
-      authorUserId: uid,
-      authorNickname: nick,
-      createdAt: "2026-03-20T11:05:00.000Z",
-      updatedAt: now,
-      viewCount: 201,
-      commentCount: 0,
-      imageUrls: [],
-      imageSizeLevels: [],
-      isDeleted: false,
-    },
-    {
-      id: "cm-q1",
-      boardType: "qna",
-      title: "참가신청 취소는 어디서 하나요?",
-      content: "마이페이지의 신청 내역에서 가능한 경우가 많습니다. 대회마다 규정이 다를 수 있습니다.",
-      authorUserId: uid,
-      authorNickname: nick,
-      createdAt: "2026-04-03T14:22:00.000Z",
-      updatedAt: now,
-      viewCount: 89,
-      commentCount: 0,
-      imageUrls: [],
-      imageSizeLevels: [],
-      isDeleted: false,
-    },
-    {
-      id: "cm-q2",
-      boardType: "qna",
-      title: "대회 참가비 환불 기준 문의",
-      content: "개최 전 취소와 당일 취소에 따라 다를 수 있으니 요강의 환불 조항을 확인해 주세요.",
-      authorUserId: uid,
-      authorNickname: nick,
-      createdAt: "2026-03-29T10:00:00.000Z",
-      updatedAt: now,
-      viewCount: 34,
-      commentCount: 0,
-      imageUrls: [],
-      imageSizeLevels: [],
-      isDeleted: false,
-    },
-    {
-      id: "cm-q3",
-      boardType: "qna",
-      title: "마이페이지 알림이 안 보일 때",
-      content: "브라우저 알림 권한과 푸시 수신 동의를 함께 확인해 주세요.",
-      authorUserId: uid,
-      authorNickname: nick,
-      createdAt: "2026-03-21T08:30:00.000Z",
-      updatedAt: now,
-      viewCount: 56,
-      commentCount: 0,
-      imageUrls: [],
-      imageSizeLevels: [],
-      isDeleted: false,
-    },
-    {
-      id: "cm-r1",
-      boardType: "reviews",
-      title: "봄 정기전 참가 후기",
-      content: "진행이 매끄러웠고 안내가 친절했습니다.",
-      authorUserId: uid,
-      authorNickname: nick,
-      createdAt: "2026-04-02T16:45:00.000Z",
-      updatedAt: now,
-      viewCount: 312,
-      commentCount: 0,
-      imageUrls: [],
-      imageSizeLevels: [],
-      isDeleted: false,
-    },
-    {
-      id: "cm-r2",
-      boardType: "reviews",
-      title: "현장 진행이 깔끔했던 대회 후기",
-      content: "대진표 확인과 경기 호출이 명확했습니다.",
-      authorUserId: uid,
-      authorNickname: nick,
-      createdAt: "2026-03-27T12:10:00.000Z",
-      updatedAt: now,
-      viewCount: 167,
-      commentCount: 0,
-      imageUrls: [],
-      imageSizeLevels: [],
-      isDeleted: false,
-    },
-    {
-      id: "cm-r3",
-      boardType: "reviews",
-      title: "첫 참가 경험 공유",
-      content: "긴장했지만 스태프 안내 덕분에 무사히 참가했습니다.",
-      authorUserId: uid,
-      authorNickname: nick,
-      createdAt: "2026-03-19T09:20:00.000Z",
-      updatedAt: now,
-      viewCount: 94,
-      commentCount: 0,
-      imageUrls: [],
-      imageSizeLevels: [],
-      isDeleted: false,
-    },
-    {
-      id: "cm-e1-1",
-      boardType: "extra1",
-      title: "예비게시판 1 샘플 글 1",
-      content: "예비 게시판 샘플 본문입니다.",
-      authorUserId: uid,
-      authorNickname: nick,
-      createdAt: "2026-04-01T13:00:00.000Z",
-      updatedAt: now,
-      viewCount: 8,
-      commentCount: 0,
-      imageUrls: [],
-      imageSizeLevels: [],
-      isDeleted: false,
-    },
-    {
-      id: "cm-e1-2",
-      boardType: "extra1",
-      title: "예비게시판 1 샘플 글 2",
-      content: "예비 게시판 샘플 본문입니다.",
-      authorUserId: uid,
-      authorNickname: nick,
-      createdAt: "2026-03-25T07:55:00.000Z",
-      updatedAt: now,
-      viewCount: 3,
-      commentCount: 0,
-      imageUrls: [],
-      imageSizeLevels: [],
-      isDeleted: false,
-    },
-    {
-      id: "cm-e1-3",
-      boardType: "extra1",
-      title: "예비게시판 1 샘플 글 3",
-      content: "예비 게시판 샘플 본문입니다.",
-      authorUserId: uid,
-      authorNickname: nick,
-      createdAt: "2026-03-18T20:15:00.000Z",
-      updatedAt: now,
-      viewCount: 1,
-      commentCount: 0,
-      imageUrls: [],
-      imageSizeLevels: [],
-      isDeleted: false,
-    },
-    {
-      id: "cm-e2-1",
-      boardType: "extra2",
-      title: "예비게시판 2 샘플 글 1",
-      content: "예비 게시판 샘플 본문입니다.",
-      authorUserId: uid,
-      authorNickname: nick,
-      createdAt: "2026-04-01T13:00:00.000Z",
-      updatedAt: now,
-      viewCount: 5,
-      commentCount: 0,
-      imageUrls: [],
-      imageSizeLevels: [],
-      isDeleted: false,
-    },
-    {
-      id: "cm-e2-2",
-      boardType: "extra2",
-      title: "예비게시판 2 샘플 글 2",
-      content: "예비 게시판 샘플 본문입니다.",
-      authorUserId: uid,
-      authorNickname: nick,
-      createdAt: "2026-03-25T07:55:00.000Z",
-      updatedAt: now,
-      viewCount: 2,
-      commentCount: 0,
-      imageUrls: [],
-      imageSizeLevels: [],
-      isDeleted: false,
-    },
-    {
-      id: "cm-e2-3",
-      boardType: "extra2",
-      title: "예비게시판 2 샘플 글 3",
-      content: "예비 게시판 샘플 본문입니다.",
-      authorUserId: uid,
-      authorNickname: nick,
-      createdAt: "2026-03-18T20:15:00.000Z",
-      updatedAt: now,
-      viewCount: 1,
-      commentCount: 0,
-      imageUrls: [],
-      imageSizeLevels: [],
-      isDeleted: false,
-    },
-  ];
-  store.communityPosts = seeds;
-  return true;
 }
 
 function ensureDefaultPlatformAdminInStore(store: DevStore): boolean {
@@ -2435,7 +2199,7 @@ async function tryRecoverFromLastGood(): Promise<DevStore | null> {
     ensureDefaultPlatformAdminInStore(store);
     reconcileDevStoreLoginIds(store);
     reconcileDevStoreUserIds(store);
-    ensureCommunityPostsSeed(store);
+    ensureCommunityPostsArray(store);
     return store;
   } catch {
     return null;
@@ -2451,7 +2215,7 @@ async function tryRecoverFromBackup(): Promise<DevStore | null> {
     ensureDefaultPlatformAdminInStore(store);
     reconcileDevStoreLoginIds(store);
     reconcileDevStoreUserIds(store);
-    ensureCommunityPostsSeed(store);
+    ensureCommunityPostsArray(store);
     console.warn("[dev-store] dev-store 복구됨 (.backup)");
     return store;
   } catch {
@@ -2484,7 +2248,7 @@ async function tryRecoverFromCorruptBackupsNewestFirst(): Promise<DevStore | nul
       ensureDefaultPlatformAdminInStore(store);
       reconcileDevStoreLoginIds(store);
       reconcileDevStoreUserIds(store);
-      ensureCommunityPostsSeed(store);
+      ensureCommunityPostsArray(store);
       return store;
     } catch {
       continue;
@@ -2584,7 +2348,7 @@ async function readStoreImpl(): Promise<DevStore> {
     ensureDefaultPlatformAdminInStore(store);
     reconcileDevStoreLoginIds(store);
     reconcileDevStoreUserIds(store);
-    ensureCommunityPostsSeed(store);
+    ensureCommunityPostsArray(store);
     if (isDevStoreFilePersistenceEnabled()) {
       try {
         await ensureLastGoodMirrorIfMissing(store);
@@ -2642,7 +2406,7 @@ async function readStoreImpl(): Promise<DevStore> {
     };
     ensureDefaultPlatformAdminInStore(fallbackStore);
     reconcileDevStoreLoginIds(fallbackStore);
-    ensureCommunityPostsSeed(fallbackStore);
+    ensureCommunityPostsArray(fallbackStore);
     if (!isDevStoreFilePersistenceEnabled()) {
       console.warn("[dev-store] using in-memory fallback store (production read-only; disk persist skipped)");
     }
@@ -5638,9 +5402,9 @@ export function buildProtectedProofImageUrl(imageId: string, variant: "original"
   return `/api/proof-images/${encodeURIComponent(imageId)}?variant=${variant}`;
 }
 
-/** 대회 포스터 등 사이트 공개 페이지용 이미지 URL (인증 불필요) */
+/** 대회 포스터 등 사이트 공개 페이지용 이미지 URL — `<img src>`용 바이너리 경로(쿼리 없음) */
 export function buildSitePublicImageUrl(imageId: string, variant: "original" | "w320" | "w640"): string {
-  return `/api/site-images/${encodeURIComponent(imageId)}?variant=${variant}`;
+  return `/site-images/${variant}/${encodeURIComponent(imageId.trim())}`;
 }
 
 /** 일정 표시: 연속이면 `시작 ~ 종료`, 아니면 쉼표 구분 */
@@ -5680,23 +5444,45 @@ export function formatTournamentScheduleLabel(tournament: Pick<Tournament, "date
   return sorted.map(appendKoreanWeekday).join(", ");
 }
 
-/** 저장값이 과거 `/api/proof-images/...`(보호)인 경우 사이트 공개 엔드포인트로 바꿔 img src에 사용 */
+/** 저장값이 과거 API 경로인 경우 `<img src>`용 `/site-images/{variant}/{id}` 로 정규화 */
 export function resolveSitePosterDisplayUrl(posterUrl: string | null | undefined): string | null {
   if (typeof posterUrl !== "string") return null;
   const trimmed = posterUrl.trim();
   if (!trimmed) return null;
-  if (trimmed.startsWith("/api/proof-images/")) {
-    return trimmed.replace("/api/proof-images/", "/api/site-images/");
+
+  if (trimmed.startsWith("/api/site-images/")) {
+    const hashless = trimmed.split("#")[0] ?? trimmed;
+    const q = hashless.indexOf("?");
+    const pathPart = q >= 0 ? hashless.slice(0, q) : hashless;
+    const idRaw = pathPart.replace(/^\/api\/site-images\//, "").trim();
+    if (idRaw) {
+      const id = decodeURIComponent(idRaw);
+      const sp = new URLSearchParams(q >= 0 ? hashless.slice(q + 1) : "");
+      const vr = sp.get("variant");
+      const v = vr === "original" || vr === "w320" || vr === "w640" ? vr : "w640";
+      return `/site-images/${v}/${encodeURIComponent(id)}`;
+    }
   }
+
+  if (trimmed.startsWith("/api/proof-images/")) {
+    const idMatch = trimmed.match(/^\/api\/proof-images\/([^/?#]+)/);
+    const vMatch = trimmed.match(/[?&]variant=(original|w320|w640)/);
+    const id = idMatch?.[1] ? decodeURIComponent(idMatch[1]) : "";
+    const v = (vMatch?.[1] as "original" | "w320" | "w640" | undefined) ?? "w640";
+    if (id) return `/site-images/${v}/${encodeURIComponent(id)}`;
+  }
+
   return trimmed;
 }
 
 export function extractProofImageIdFromPosterUrl(url: string): string | null {
   const trimmed = url.trim();
+  const fromFile = trimmed.match(/\/site-images\/(?:original|w320|w640)\/([^/?#]+)/);
+  if (fromFile?.[1]) return decodeURIComponent(fromFile[1]);
   const fromProof = trimmed.match(/\/api\/proof-images\/([^/?]+)/);
-  if (fromProof?.[1]) return fromProof[1];
+  if (fromProof?.[1]) return decodeURIComponent(fromProof[1]);
   const fromSite = trimmed.match(/\/api\/site-images\/([^/?]+)/);
-  if (fromSite?.[1]) return fromSite[1];
+  if (fromSite?.[1]) return decodeURIComponent(fromSite[1]);
   return null;
 }
 
@@ -6951,6 +6737,19 @@ export async function listNotificationsByUserId(userId: string, limit = 20): Pro
     .slice(0, safeLimit);
 }
 
+/** 마이페이지와 동일 `UserNotification` 저장소 기준 읽지 않은 건수(목록 미반환) */
+export async function countUnreadNotificationsByUserId(userId: string): Promise<number> {
+  const normalizedUserId = userId.trim();
+  if (!normalizedUserId) return 0;
+  const store = await readStore();
+  const canonicalUserId = resolveCanonicalUserId(store, normalizedUserId);
+  let unread = 0;
+  for (const n of store.notifications) {
+    if (n.userId === canonicalUserId && !n.isRead) unread++;
+  }
+  return unread;
+}
+
 export async function markNotificationAsRead(params: {
   userId: string;
   notificationId: string;
@@ -7285,12 +7084,8 @@ export async function listCommunityPostsAllPrimary(
 ): Promise<CommunityPostListItem[]> {
   const store = await readStore();
   const q = options?.q?.trim().toLowerCase() ?? "";
-  const primaryAllow = new Set(
-    COMMUNITY_PRIMARY_BOARD_KEYS.filter((k) => visibleBoardKeys.includes(k)),
-  );
-  let rows = store.communityPosts.filter(
-    (p) => primaryAllow.has(p.boardType) && p.isDeleted !== true,
-  );
+  const allow = new Set(visibleBoardKeys);
+  let rows = store.communityPosts.filter((p) => allow.has(p.boardType) && p.isDeleted !== true);
   if (q.length > 0) {
     rows = rows.filter((p) => p.title.toLowerCase().includes(q));
   }

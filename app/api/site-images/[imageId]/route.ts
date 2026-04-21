@@ -1,16 +1,8 @@
-import { readFile } from "fs/promises";
-import path from "path";
 import { NextRequest, NextResponse } from "next/server";
-import { getProofImageAssetById, isSiteImagePubliclyAccessible } from "../../../../lib/server/dev-store";
 
 export const runtime = "nodejs";
 
-function getMimeTypeFromExt(ext: string): string {
-  if (ext === "png") return "image/png";
-  if (ext === "webp") return "image/webp";
-  return "image/jpeg";
-}
-
+/** 레거시: `<img src>`는 `/site-images/{variant}/{id}` 사용. 이 경로는 바이너리 URL로 리다이렉트만 한다. */
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ imageId: string }> }
@@ -23,28 +15,8 @@ export async function GET(
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const proofImage = await getProofImageAssetById(normalizedImageId);
-  if (!proofImage) {
-    return NextResponse.json({ error: "존재하지 않는 데이터입니다." }, { status: 404 });
-  }
-
-  const accessible = await isSiteImagePubliclyAccessible(normalizedImageId);
-  if (!accessible) {
-    return NextResponse.json({ error: "접근 권한이 없습니다." }, { status: 403 });
-  }
-
-  const ext = variant === "original" ? proofImage.originalExt : "jpg";
-  const absolutePath = path.join(process.cwd(), "data", "proof-images", variant, `${normalizedImageId}.${ext}`);
-  try {
-    const fileBuffer = await readFile(absolutePath);
-    return new NextResponse(fileBuffer, {
-      status: 200,
-      headers: {
-        "Content-Type": getMimeTypeFromExt(ext),
-        "Cache-Control": "public, max-age=3600",
-      },
-    });
-  } catch {
-    return NextResponse.json({ error: "존재하지 않는 데이터입니다." }, { status: 404 });
-  }
+  const dest = new URL(request.url);
+  dest.pathname = `/site-images/${variant}/${encodeURIComponent(normalizedImageId)}`;
+  dest.search = "";
+  return NextResponse.redirect(dest, 307);
 }

@@ -275,3 +275,39 @@
   font-size: 0.8rem;
   color: #71717a;
 }
+
+/* PC(1024px+) 전용 2열 — 1023px 이하는 기존과 동일(아래 미디어 외 규칙 없음) */
+.pcPageShell {
+  width: 100%;
+}
+
+.pcPageMain {
+  width: 100%;
+  min-width: 0;
+}
+
+.pcPageAside {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .pcPageShell {
+    display: grid;
+    grid-template-columns: 70% 30%;
+    max-width: 72rem;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
+    column-gap: 1.5rem;
+    align-items: start;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  .pcPageAside {
+    display: block;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+}

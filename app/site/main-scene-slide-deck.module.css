@@ -213,3 +213,27 @@
   transform-origin: center center;
   will-change: transform, opacity;
 }
+
+/* 카드 0장: 슬라이드 창 높이·배경 동일 — 중앙 안내만 */
+.slideDeckEmptyState {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 0.75rem;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.slideDeckEmptyStateText {
+  margin: 0;
+  text-align: center;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  font-weight: 500;
+  color: rgba(226, 232, 240, 0.88);
+  text-shadow:
+    0 1px 8px rgba(0, 0, 0, 0.65),
+    0 0 1px rgba(0, 0, 0, 0.9);
+}

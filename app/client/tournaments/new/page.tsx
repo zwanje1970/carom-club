@@ -87,6 +87,46 @@ function prizeAmountDigitsOnly(raw: string): string {
   return raw.replace(/\D/g, "");
 }
 
+/** 클라이언트 안내용: 파일명 확장자만 (MIME 검사 없음) */
+function hasTournamentPosterImageExtension(fileName: string): boolean {
+  const n = fileName.trim().toLowerCase();
+  return n.endsWith(".jpg") || n.endsWith(".jpeg") || n.endsWith(".png") || n.endsWith(".webp");
+}
+
+const POSTER_IMAGE_MAX_BYTES = 25 * 1024 * 1024;
+
+/** 클라이언트 전용: `<img src>`에 레거시 `/api/site-images`·`/api/proof-images`가 오면 `/site-images/...`로만 바꿈 */
+function normalizePosterImageSrcForPreview(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+
+  if (trimmed.startsWith("/api/site-images/")) {
+    const hashless = trimmed.split("#")[0] ?? trimmed;
+    const q = hashless.indexOf("?");
+    const pathPart = q >= 0 ? hashless.slice(0, q) : hashless;
+    const idRaw = pathPart.replace(/^\/api\/site-images\//, "").trim();
+    if (idRaw) {
+      const id = decodeURIComponent(idRaw);
+      const sp = new URLSearchParams(q >= 0 ? hashless.slice(q + 1) : "");
+      const vr = sp.get("variant");
+      const v = vr === "original" || vr === "w320" || vr === "w640" ? vr : "w640";
+      return `/site-images/${v}/${encodeURIComponent(id)}`;
+    }
+  }
+
+  if (trimmed.startsWith("/api/proof-images/")) {
+    const idMatch = trimmed.match(/^\/api\/proof-images\/([^/?#]+)/);
+    const vMatch = trimmed.match(/[?&]variant=(original|w320|w640)/);
+    const id = idMatch?.[1] ? decodeURIComponent(idMatch[1]) : "";
+    const v = (vMatch?.[1] as "original" | "w320" | "w640" | undefined) ?? "w640";
+    if (id) return `/site-images/${v}/${encodeURIComponent(id)}`;
+  }
+
+  return trimmed;
+}
+
+const DEFAULT_VERIFICATION_GUIDE_TEXT = "에버리지 인증서, 또는 경기기록을 첨부하세요";
+
 const EQ_OPTIONS: { value: TournamentEntryQualificationType; label: string }[] = [
   { value: "NONE", label: "관계없음" },
   { value: "EVER", label: "에버기준" },
@@ -112,7 +152,7 @@ export default function ClientTournamentNewPage() {
   const [locLine1, setLocLine1] = useState("");
   const [locLine2, setLocLine2] = useState("");
   const [locLine3, setLocLine3] = useState("");
-  const [maxParticipants, setMaxParticipants] = useState("24");
+  const [maxParticipants, setMaxParticipants] = useState("64");
   const [entryFee, setEntryFee] = useState("30000");
   const [durationType, setDurationType] = useState<TournamentDurationType>("1_DAY");
   const [durationDays, setDurationDays] = useState(2);
@@ -142,8 +182,13 @@ export default function ClientTournamentNewPage() {
   const [teamScoreRule, setTeamScoreRule] = useState<TournamentTeamScoreRule>("LTE");
 
   const [posterImageUrl, setPosterImageUrl] = useState("");
+  /** 업로드 완료 전 임시 미리보기 (서버 URL과 분리) */
+  const [posterObjectPreviewUrl, setPosterObjectPreviewUrl] = useState("");
+  /** true면 미리보기 `<img>`에 서버 URL 사용(숨김 프리로드 onLoad 이후에만 true) */
+  const [posterVisibleUsesServerUrl, setPosterVisibleUsesServerUrl] = useState(true);
   const [posterUploading, setPosterUploading] = useState(false);
-  const [posterError, setPosterError] = useState("");
+  /** 차단용이 아닌 안내(용량·확장자 등). 업로드는 별도로 항상 시도 */
+  const [posterNotice, setPosterNotice] = useState("");
   const posterInputRef = useRef<HTMLInputElement>(null);
 
   const [tournamentIntro, setTournamentIntro] = useState("");
@@ -329,7 +374,7 @@ export default function ClientTournamentNewPage() {
         setVerificationRequested(r.verificationMode !== "NONE");
         setVerificationMode(r.verificationMode);
         setVerificationGuideText(r.verificationGuideText ?? "");
-        setDivisionEnabled(r.divisionEnabled);
+        setDivisionEnabled(false);
         setDivisionMetricType(r.divisionMetricType);
         if (r.divisionRulesJson?.length) {
           setDivisionRows(
@@ -358,7 +403,16 @@ export default function ClientTournamentNewPage() {
         setIsScotch(r.isScotch);
         setTeamScoreLimit(r.teamScoreLimit != null ? String(r.teamScoreLimit) : "");
         setTeamScoreRule(r.teamScoreRule);
-        setPosterImageUrl(t.posterImageUrl ?? "");
+        {
+          const raw = t.posterImageUrl?.trim() ?? "";
+          setPosterImageUrl(raw ? normalizePosterImageSrcForPreview(raw) : "");
+        }
+        setPosterObjectPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return "";
+        });
+        setPosterVisibleUsesServerUrl(true);
+        setPosterNotice("");
         setTournamentIntro(t.summary ?? "");
         const prizes = parsePrizeInfoToFields(t.prizeInfo);
         setPrize1(prizeAmountDigitsOnly(prizes.prize1));
@@ -428,6 +482,7 @@ export default function ClientTournamentNewPage() {
       teamScoreLimit,
       teamScoreRule,
       posterImageUrl,
+      posterObjectPreviewUrl: posterObjectPreviewUrl ? "1" : "",
       tournamentIntro,
       prize1,
       prize2,
@@ -453,11 +508,34 @@ export default function ClientTournamentNewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, editLoading]);
 
+  useEffect(() => {
+    return () => {
+      if (posterObjectPreviewUrl) URL.revokeObjectURL(posterObjectPreviewUrl);
+    };
+  }, [posterObjectPreviewUrl]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    if (!posterObjectPreviewUrl && !posterImageUrl) return;
+    const normalized =
+      posterImageUrl.trim() !== "" ? normalizePosterImageSrcForPreview(posterImageUrl) : "";
+    const src =
+      posterObjectPreviewUrl && !posterVisibleUsesServerUrl
+        ? posterObjectPreviewUrl
+        : normalized || posterObjectPreviewUrl || "";
+    // eslint-disable-next-line no-console -- 화면에 쓰는 최종 미리보기 src 점검용
+    console.log("[poster preview] display src", src, {
+      blob: Boolean(posterObjectPreviewUrl),
+      server: posterImageUrl || null,
+      visibleUsesServer: posterVisibleUsesServerUrl,
+    });
+  }, [posterObjectPreviewUrl, posterImageUrl, posterVisibleUsesServerUrl]);
+
   function isNewTournamentFormPristine(): boolean {
     if (title.trim() !== "") return false;
     if (date !== "") return false;
     if (buildLocationFromLines(locLine1, locLine2, locLine3).trim() !== "") return false;
-    if (maxParticipants !== "24") return false;
+    if (maxParticipants !== "64") return false;
     if (entryFee !== "30000") return false;
     if (durationType !== "1_DAY") return false;
     if (durationDays !== 2) return false;
@@ -468,7 +546,6 @@ export default function ClientTournamentNewPage() {
     if (verificationRequested) return false;
     if (verificationMode !== "NONE") return false;
     if (verificationGuideText.trim() !== "") return false;
-    if (divisionEnabled) return false;
     if (divisionMetricType !== "AVERAGE") return false;
     if (divisionRows.length !== 1) return false;
     const dr = divisionRows[0];
@@ -480,7 +557,7 @@ export default function ClientTournamentNewPage() {
     if (isScotch) return false;
     if (teamScoreLimit.trim() !== "") return false;
     if (teamScoreRule !== "LTE") return false;
-    if (posterImageUrl !== "") return false;
+    if (posterImageUrl !== "" || posterObjectPreviewUrl !== "") return false;
     if (tournamentIntro.trim() !== "") return false;
     if (
       prize1.trim() !== "" ||
@@ -540,51 +617,71 @@ export default function ClientTournamentNewPage() {
   async function handlePosterFileChange(fileList: FileList | null) {
     const file = fileList?.[0];
     if (!file) return;
-    setPosterError("");
+
+    setPosterNotice("");
+    setPosterImageUrl("");
+    setPosterVisibleUsesServerUrl(false);
+    setPosterObjectPreviewUrl(() => {
+      try {
+        return URL.createObjectURL(file);
+      } catch {
+        return "";
+      }
+    });
+
+    const hints: string[] = [];
+    if (!hasTournamentPosterImageExtension(file.name)) {
+      hints.push("jpg·jpeg·png·webp 파일을 권장합니다.");
+    }
+    if (file.size > POSTER_IMAGE_MAX_BYTES) {
+      hints.push("파일이 큽니다. 업로드에 시간이 걸릴 수 있습니다.");
+    }
+    setPosterNotice(hints.join(" "));
+
     setPosterUploading(true);
+
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("sitePublic", "1");
+
+    let res: Response | undefined;
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("sitePublic", "1");
-      const res = await fetch("/api/upload/image", {
+      res = await fetch("/api/upload/image", {
         method: "POST",
         body: fd,
         credentials: "include",
       });
-      let data: { error?: string; w640Url?: string };
-      try {
-        data = (await res.json()) as { error?: string; w640Url?: string };
-      } catch {
-        setPosterError(`서버 응답을 읽을 수 없습니다. (${res.status})`);
-        return;
-      }
-      if (!res.ok) {
-        setPosterError(data.error ?? "업로드에 실패했습니다.");
-        return;
-      }
-      if (typeof data.w640Url === "string" && data.w640Url) {
-        setPosterImageUrl(data.w640Url);
-      } else {
-        setPosterError("업로드는 되었으나 이미지 주소를 받지 못했습니다. 다시 시도해 주세요.");
-      }
     } catch {
-      setPosterError("업로드 중 오류가 발생했습니다.");
-    } finally {
-      setPosterUploading(false);
-      if (posterInputRef.current) posterInputRef.current.value = "";
+      // 네트워크 오류: 미리보기·폼은 유지, 재시도 가능
     }
-  }
 
-  function buildDivisionRulesJson(): unknown {
-    if (!divisionEnabled) return null;
-    const rows = divisionRows
-      .map((r) => ({
-        name: r.name.trim(),
-        min: r.min.trim() === "" ? null : Number(r.min.replace(",", ".")),
-        max: r.max.trim() === "" ? null : Number(r.max.replace(",", ".")),
-      }))
-      .filter((r) => r.name);
-    return rows.length ? rows : null;
+    if (posterInputRef.current) posterInputRef.current.value = "";
+    setPosterUploading(false);
+
+    if (!res) return;
+
+    let data: { error?: string; w640Url?: string; w320Url?: string; originalUrl?: string } = {};
+    try {
+      data = (await res.json()) as typeof data;
+    } catch {
+      // JSON 실패: 조용히 종료, 로컬 미리보기 유지
+    }
+
+    const w640 = typeof data.w640Url === "string" ? data.w640Url.trim() : "";
+    const original = typeof data.originalUrl === "string" ? data.originalUrl.trim() : "";
+    const w320 = typeof data.w320Url === "string" ? data.w320Url.trim() : "";
+    const nextUrl = w640 || original || w320;
+
+    if (process.env.NODE_ENV === "development") {
+      // eslint-disable-next-line no-console -- 포스터 미리보기 URL 점검용
+      console.log("[poster upload] urls", { w640, original, w320, chosen: nextUrl });
+    }
+
+    if (res.ok && nextUrl) {
+      setPosterImageUrl(normalizePosterImageSrcForPreview(nextUrl));
+      setPosterVisibleUsesServerUrl(false);
+      setPosterNotice("");
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -657,12 +754,12 @@ export default function ClientTournamentNewPage() {
         entryCondition: null,
         verificationMode: vm === "NONE" ? "NONE" : vm,
         verificationReviewRequired: true,
-        verificationGuideText: verificationGuideText.trim() || null,
+        verificationGuideText: vm === "NONE" ? null : verificationGuideText.trim() || null,
         eligibilityCompare,
         eligibilityValue: eligibilityNum,
-        divisionEnabled: vm === "AUTO" ? divisionEnabled : false,
+        divisionEnabled: false,
         divisionMetricType,
-        divisionRulesJson: buildDivisionRulesJson(),
+        divisionRulesJson: null,
         scope,
         region: null,
         accountNumber: accountNumber.trim() || null,
@@ -714,9 +811,14 @@ export default function ClientTournamentNewPage() {
     }
   }
 
-  const showDivision = verificationMode === "AUTO" && divisionEnabled;
-
   const showCreateDone = Boolean(createSuccessId && !editId);
+
+  const posterNormalizedForDisplay =
+    posterImageUrl.trim() !== "" ? normalizePosterImageSrcForPreview(posterImageUrl) : "";
+  const posterImgSrc =
+    posterObjectPreviewUrl && !posterVisibleUsesServerUrl
+      ? posterObjectPreviewUrl
+      : posterNormalizedForDisplay || posterObjectPreviewUrl || "";
 
   return (
     <main className="v3-page v3-stack" style={{ maxWidth: "40rem", margin: "0 auto" }}>
@@ -767,15 +869,44 @@ export default function ClientTournamentNewPage() {
           <input
             ref={posterInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
             className="hidden"
             onChange={(e) => void handlePosterFileChange(e.target.files)}
           />
-          {posterImageUrl ? (
-            <div className="v3-stack" style={{ gap: "0.5rem" }}>
+          {posterObjectPreviewUrl || posterImageUrl ? (
+            <div className="v3-stack" style={{ gap: "0.5rem", position: "relative" }}>
+              {posterImageUrl && posterObjectPreviewUrl && !posterVisibleUsesServerUrl ? (
+                <img
+                  key={posterImageUrl}
+                  src={posterNormalizedForDisplay || posterImageUrl}
+                  alt=""
+                  aria-hidden
+                  decoding="async"
+                  onLoad={() => {
+                    setPosterVisibleUsesServerUrl(true);
+                    setPosterObjectPreviewUrl("");
+                  }}
+                  onError={() => {
+                    if (process.env.NODE_ENV === "development") {
+                      // eslint-disable-next-line no-console -- 서버 이미지 로드 실패 점검
+                      console.warn("[poster] server image preload failed (blob 유지)", posterImageUrl);
+                    }
+                  }}
+                  style={{
+                    position: "absolute",
+                    left: "-9999px",
+                    width: "1px",
+                    height: "1px",
+                    opacity: 0,
+                    pointerEvents: "none",
+                    overflow: "hidden",
+                  }}
+                />
+              ) : null}
               <img
-                src={posterImageUrl}
+                src={posterImgSrc}
                 alt="대회 포스터 미리보기"
+                decoding="async"
                 style={{ maxWidth: "100%", maxHeight: "14rem", objectFit: "contain", borderRadius: "0.35rem" }}
               />
               <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
@@ -786,13 +917,21 @@ export default function ClientTournamentNewPage() {
                   onClick={() => posterInputRef.current?.click()}
                   disabled={posterUploading}
                 >
-                  {posterUploading ? "처리 중…" : "이미지 바꾸기"}
+                  {posterUploading ? "업로드 중…" : "이미지 바꾸기"}
                 </button>
                 <button
                   type="button"
                   className="v3-btn"
                   style={{ padding: "0.4rem 0.75rem" }}
-                  onClick={() => setPosterImageUrl("")}
+                  onClick={() => {
+                    setPosterObjectPreviewUrl((prev) => {
+                      if (prev) URL.revokeObjectURL(prev);
+                      return "";
+                    });
+                    setPosterImageUrl("");
+                    setPosterVisibleUsesServerUrl(true);
+                    setPosterNotice("");
+                  }}
                   disabled={posterUploading}
                 >
                   제거
@@ -816,10 +955,14 @@ export default function ClientTournamentNewPage() {
                 background: "transparent",
               }}
             >
-              {posterUploading ? "업로드 중…" : "클릭하여 포스터 이미지 선택 (jpg / png / webp, 선택 사항)"}
+              {posterUploading ? "업로드 중…" : "클릭하여 포스터 이미지 선택 (jpg / jpeg / png / webp, 선택 사항)"}
             </button>
           )}
-          {posterError ? <p className="v3-muted" style={{ color: "#b91c1c", fontSize: "0.9rem" }}>{posterError}</p> : null}
+          {posterNotice ? (
+            <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
+              {posterNotice}
+            </p>
+          ) : null}
         </section>
 
         {/* 2. 대회명 · 대회 설명 */}
@@ -874,9 +1017,11 @@ export default function ClientTournamentNewPage() {
               <span>스카치</span>
             </label>
           </div>
-          <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
-            스카치 팀 점수 제한은 아래 「참가 조건」에서 입력합니다.
-          </p>
+          {isScotch ? (
+            <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
+              스카치 시 합산 점수·에버는 「10. 참가 조건」에서 입력합니다.
+            </p>
+          ) : null}
         </section>
 
         {/* 4. 단일 / 전국 + 중복 참가 */}
@@ -975,47 +1120,67 @@ export default function ClientTournamentNewPage() {
           <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap" }}>
             <label className="v3-stack" style={{ flex: "1 1 8rem" }}>
               <span>1등</span>
-              <input
-                value={prize1}
-                onChange={(e) => setPrize1(prizeAmountDigitsOnly(e.target.value))}
-                placeholder="상금 (만원 단위, 숫자만 입력)"
-                inputMode="numeric"
-                autoComplete="off"
-                style={inputStyle}
-              />
+              <div className="v3-row" style={{ alignItems: "center", gap: "0.4rem", width: "100%" }}>
+                <input
+                  value={prize1}
+                  onChange={(e) => setPrize1(prizeAmountDigitsOnly(e.target.value))}
+                  placeholder="상금 (만원 단위, 숫자만 입력)"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  style={{ ...inputStyle, flex: "1 1 0", minWidth: 0 }}
+                />
+                <span className="v3-muted" style={{ flexShrink: 0, fontSize: "0.9rem" }}>
+                  만원
+                </span>
+              </div>
             </label>
             <label className="v3-stack" style={{ flex: "1 1 8rem" }}>
               <span>2등</span>
-              <input
-                value={prize2}
-                onChange={(e) => setPrize2(prizeAmountDigitsOnly(e.target.value))}
-                placeholder="상금 (만원 단위, 숫자만 입력)"
-                inputMode="numeric"
-                autoComplete="off"
-                style={inputStyle}
-              />
+              <div className="v3-row" style={{ alignItems: "center", gap: "0.4rem", width: "100%" }}>
+                <input
+                  value={prize2}
+                  onChange={(e) => setPrize2(prizeAmountDigitsOnly(e.target.value))}
+                  placeholder="상금 (만원 단위, 숫자만 입력)"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  style={{ ...inputStyle, flex: "1 1 0", minWidth: 0 }}
+                />
+                <span className="v3-muted" style={{ flexShrink: 0, fontSize: "0.9rem" }}>
+                  만원
+                </span>
+              </div>
             </label>
             <label className="v3-stack" style={{ flex: "1 1 8rem" }}>
               <span>3등</span>
-              <input
-                value={prize3a}
-                onChange={(e) => setPrize3a(prizeAmountDigitsOnly(e.target.value))}
-                placeholder="상금 (만원 단위, 숫자만 입력)"
-                inputMode="numeric"
-                autoComplete="off"
-                style={inputStyle}
-              />
+              <div className="v3-row" style={{ alignItems: "center", gap: "0.4rem", width: "100%" }}>
+                <input
+                  value={prize3a}
+                  onChange={(e) => setPrize3a(prizeAmountDigitsOnly(e.target.value))}
+                  placeholder="상금 (만원 단위, 숫자만 입력)"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  style={{ ...inputStyle, flex: "1 1 0", minWidth: 0 }}
+                />
+                <span className="v3-muted" style={{ flexShrink: 0, fontSize: "0.9rem" }}>
+                  만원
+                </span>
+              </div>
             </label>
             <label className="v3-stack" style={{ flex: "1 1 8rem" }}>
               <span>3등</span>
-              <input
-                value={prize3b}
-                onChange={(e) => setPrize3b(prizeAmountDigitsOnly(e.target.value))}
-                placeholder="상금 (만원 단위, 숫자만 입력)"
-                inputMode="numeric"
-                autoComplete="off"
-                style={inputStyle}
-              />
+              <div className="v3-row" style={{ alignItems: "center", gap: "0.4rem", width: "100%" }}>
+                <input
+                  value={prize3b}
+                  onChange={(e) => setPrize3b(prizeAmountDigitsOnly(e.target.value))}
+                  placeholder="상금 (만원 단위, 숫자만 입력)"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  style={{ ...inputStyle, flex: "1 1 0", minWidth: 0 }}
+                />
+                <span className="v3-muted" style={{ flexShrink: 0, fontSize: "0.9rem" }}>
+                  만원
+                </span>
+              </div>
             </label>
           </div>
           <label className="v3-stack">
@@ -1259,11 +1424,73 @@ export default function ClientTournamentNewPage() {
           ))}
         </section>
 
-        {/* 10. 자격 증빙 */}
-        <section className="v3-box v3-stack" aria-label="자격 증빙" style={{ gap: "0.65rem" }}>
+        {/* 10. 참가 조건 (자격 + 증빙) */}
+        <section className="v3-box v3-stack" aria-label="참가 조건" style={{ gap: "0.75rem" }}>
           <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0 }}>
-            10. 자격 증빙
+            10. 참가 조건
           </h2>
+          <div className="v3-stack" style={{ gap: "0.35rem" }}>
+            <span className="v3-muted" style={{ fontSize: "0.85rem" }}>
+              참가 자격
+            </span>
+            <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap" }}>
+              {EQ_OPTIONS.map((o) => (
+                <label key={o.value} className="v3-row" style={{ alignItems: "center", gap: "0.45rem" }}>
+                  <input
+                    type="radio"
+                    name="entryQualificationType"
+                    checked={entryQualificationType === o.value}
+                    onChange={() => setEntryQualificationType(o.value)}
+                  />
+                  <span>{o.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-end" }}>
+            <label className="v3-stack" style={{ flex: "1 1 14rem" }}>
+              <span>점수 또는 에버(스카치시 합산 입력)</span>
+              <input
+                inputMode="decimal"
+                disabled={entryQualificationType === "NONE"}
+                value={qualificationValue}
+                onChange={(e) => setQualificationValue(e.target.value)}
+                placeholder={
+                  entryQualificationType === "NONE" ? "—" : "0.80 of 27 형식으로 숫자만 입력하세요"
+                }
+                style={{
+                  ...inputStyle,
+                  opacity: entryQualificationType === "NONE" ? 0.5 : 1,
+                }}
+              />
+            </label>
+            <div className="v3-stack" style={{ gap: "0.35rem" }} role="group" aria-label="에버·점수 이하 또는 미만">
+              <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap" }}>
+                <label className="v3-row" style={{ alignItems: "center", gap: "0.45rem" }}>
+                  <input
+                    type="radio"
+                    name="eligibilityCompare"
+                    checked={eligibilityCompare === "LTE"}
+                    disabled={entryQualificationType === "NONE"}
+                    onChange={() => setEligibilityCompare("LTE")}
+                  />
+                  <span style={{ opacity: entryQualificationType === "NONE" ? 0.5 : 1 }}>이하</span>
+                </label>
+                <label className="v3-row" style={{ alignItems: "center", gap: "0.45rem" }}>
+                  <input
+                    type="radio"
+                    name="eligibilityCompare"
+                    checked={eligibilityCompare === "LT"}
+                    disabled={entryQualificationType === "NONE"}
+                    onChange={() => setEligibilityCompare("LT")}
+                  />
+                  <span style={{ opacity: entryQualificationType === "NONE" ? 0.5 : 1 }}>미만</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
           <label className="v3-row" style={{ alignItems: "center", gap: "0.5rem" }}>
             <input
               type="checkbox"
@@ -1271,202 +1498,47 @@ export default function ClientTournamentNewPage() {
               onChange={(e) => {
                 const on = e.target.checked;
                 setVerificationRequested(on);
-                if (!on) setVerificationMode("NONE");
-                else setVerificationMode((m) => (m === "NONE" ? "AUTO" : m));
+                if (!on) {
+                  setVerificationMode("NONE");
+                } else {
+                  setVerificationMode((m) => (m === "NONE" ? "AUTO" : m));
+                  setVerificationGuideText((t) =>
+                    t.trim() === "" ? DEFAULT_VERIFICATION_GUIDE_TEXT : t
+                  );
+                }
               }}
             />
             <span>증빙 요청</span>
           </label>
           {verificationRequested ? (
-            <label className="v3-stack" style={{ maxWidth: "14rem" }}>
-              <span>방식</span>
-              <select
-                value={verificationMode === "MANUAL" ? "MANUAL" : "AUTO"}
-                onChange={(e) => setVerificationMode(e.target.value as TournamentVerificationMode)}
-                style={inputStyle}
-              >
-                <option value="AUTO">자동(OCR)</option>
-                <option value="MANUAL">수동확인</option>
-              </select>
-            </label>
-          ) : null}
-          <label className="v3-stack">
-            <span>인증 안내 (선택)</span>
-            <textarea
-              rows={2}
-              value={verificationGuideText}
-              onChange={(e) => setVerificationGuideText(e.target.value)}
-              style={inputStyle}
-            />
-          </label>
-        </section>
-
-        {/* 11. 참가 조건 · 부 배정 · 스카치 */}
-        <section className="v3-box v3-stack" aria-label="참가 조건" style={{ gap: "0.75rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0 }}>
-            11. 참가 조건 · 부 배정 · 스카치
-          </h2>
-          <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-end" }}>
-            <label className="v3-stack" style={{ flex: "1 1 9rem" }}>
-              <span>기준</span>
-              <select
-                value={entryQualificationType}
-                onChange={(e) => setEntryQualificationType(e.target.value as TournamentEntryQualificationType)}
-                style={inputStyle}
-              >
-                {EQ_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="v3-stack" style={{ flex: "1 1 8rem" }}>
-              <span>점수 또는 에버</span>
-              <input
-                inputMode="decimal"
-                disabled={entryQualificationType === "NONE"}
-                value={qualificationValue}
-                onChange={(e) => setQualificationValue(e.target.value)}
-                placeholder={entryQualificationType === "NONE" ? "—" : "예: 0.55"}
-                style={{
-                  ...inputStyle,
-                  opacity: entryQualificationType === "NONE" ? 0.5 : 1,
-                }}
-              />
-            </label>
-            <label className="v3-stack" style={{ flex: "1 1 7rem" }}>
-              <span>비교</span>
-              <select
-                value={eligibilityCompare}
-                disabled={entryQualificationType === "NONE"}
-                onChange={(e) => setEligibilityCompare(e.target.value as TournamentTeamScoreRule)}
-                style={{
-                  ...inputStyle,
-                  opacity: entryQualificationType === "NONE" ? 0.5 : 1,
-                }}
-              >
-                <option value="LTE">이하</option>
-                <option value="LT">미만</option>
-              </select>
-            </label>
-          </div>
-
-          {verificationMode === "AUTO" ? (
-            <label className="v3-row" style={{ alignItems: "center", gap: "0.5rem" }}>
-              <input
-                type="checkbox"
-                checked={divisionEnabled}
-                onChange={(e) => setDivisionEnabled(e.target.checked)}
-              />
-              <span>부 자동 배정</span>
-            </label>
-          ) : null}
-
-          {showDivision ? (
-            <div className="v3-stack" style={{ gap: "0.5rem" }}>
-              <label className="v3-stack">
-                <span>부 기준</span>
+            <div className="v3-stack" style={{ gap: "0.65rem" }}>
+              <label className="v3-stack" style={{ maxWidth: "14rem" }}>
+                <span>방식</span>
                 <select
-                  value={divisionMetricType}
-                  onChange={(e) => setDivisionMetricType(e.target.value as TournamentDivisionMetricType)}
+                  value={verificationMode === "MANUAL" ? "MANUAL" : "AUTO"}
+                  onChange={(e) => setVerificationMode(e.target.value as TournamentVerificationMode)}
                   style={inputStyle}
                 >
-                  <option value="AVERAGE">에버</option>
-                  <option value="SCORE">점수</option>
+                  <option value="AUTO">자동(OCR)</option>
+                  <option value="MANUAL">수동확인</option>
                 </select>
               </label>
-              <span style={{ fontSize: "0.9rem" }}>부 규칙 (이름 · 하한 · 상한)</span>
-              {divisionRows.map((row, idx) => (
-                <div key={idx} className="v3-row" style={{ gap: "0.35rem", flexWrap: "wrap" }}>
-                  <input
-                    placeholder="부 이름"
-                    value={row.name}
-                    onChange={(e) => {
-                      const next = [...divisionRows];
-                      next[idx] = { ...next[idx]!, name: e.target.value };
-                      setDivisionRows(next);
-                    }}
-                    style={{ flex: "2 1 6rem", padding: "0.45rem", border: "1px solid #bbb", borderRadius: "0.35rem" }}
-                  />
-                  <input
-                    placeholder="min"
-                    inputMode="decimal"
-                    value={row.min}
-                    onChange={(e) => {
-                      const next = [...divisionRows];
-                      next[idx] = { ...next[idx]!, min: e.target.value };
-                      setDivisionRows(next);
-                    }}
-                    style={{ flex: "1 1 4rem", padding: "0.45rem", border: "1px solid #bbb", borderRadius: "0.35rem" }}
-                  />
-                  <input
-                    placeholder="max"
-                    inputMode="decimal"
-                    value={row.max}
-                    onChange={(e) => {
-                      const next = [...divisionRows];
-                      next[idx] = { ...next[idx]!, max: e.target.value };
-                      setDivisionRows(next);
-                    }}
-                    style={{ flex: "1 1 4rem", padding: "0.45rem", border: "1px solid #bbb", borderRadius: "0.35rem" }}
-                  />
-                  <button
-                    type="button"
-                    className="v3-btn"
-                    style={{ padding: "0.35rem 0.5rem" }}
-                    onClick={() => setDivisionRows((r) => r.filter((_, i) => i !== idx))}
-                  >
-                    삭제
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                className="v3-btn"
-                style={{ alignSelf: "flex-start", padding: "0.4rem 0.7rem" }}
-                onClick={() => setDivisionRows((r) => [...r, { name: "", min: "", max: "" }])}
-              >
-                행 추가
-              </button>
-            </div>
-          ) : null}
-
-          {isScotch ? (
-            <div className="v3-stack" style={{ gap: "0.5rem", borderTop: "1px solid #eee", paddingTop: "0.75rem" }}>
-              <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>스카치 팀 점수</span>
-              <div className="v3-row" style={{ gap: "1rem", flexWrap: "wrap", alignItems: "flex-end" }}>
-                <label className="v3-stack" style={{ flex: "1 1 8rem" }}>
-                  <span>팀 점수 제한</span>
-                  <input
-                    required
-                    type="number"
-                    min={0}
-                    value={teamScoreLimit}
-                    onChange={(e) => setTeamScoreLimit(e.target.value)}
-                    style={inputStyle}
-                  />
-                </label>
-                <label className="v3-stack" style={{ flex: "1 1 8rem" }}>
-                  <span>비교 (이하 / 미만)</span>
-                  <select
-                    value={teamScoreRule}
-                    onChange={(e) => setTeamScoreRule(e.target.value as TournamentTeamScoreRule)}
-                    style={inputStyle}
-                  >
-                    <option value="LTE">이하(≤)</option>
-                    <option value="LT">미만(&lt;)</option>
-                  </select>
-                </label>
-              </div>
+              <textarea
+                rows={3}
+                aria-label="증빙 안내 문구"
+                value={verificationGuideText}
+                onChange={(e) => setVerificationGuideText(e.target.value)}
+                placeholder={DEFAULT_VERIFICATION_GUIDE_TEXT}
+                style={inputStyle}
+              />
             </div>
           ) : null}
         </section>
 
-        {/* 12. 대회요강 / 대회장소 CTA */}
+        {/* 11. 대회요강 / 대회장소 CTA */}
         <section className="v3-box v3-stack" aria-label="대회요강 및 장소 안내" style={{ gap: "0.65rem" }}>
           <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0 }}>
-            12. 대회요강 · 대회 장소 안내
+            11. 대회요강 · 대회 장소 안내
           </h2>
           <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
             대회요강은 선택 사항입니다. 표시 방식을 바꿔도 직접 입력 내용은 유지됩니다.
@@ -1482,6 +1554,7 @@ export default function ClientTournamentNewPage() {
             outlinePdfUrl={outlinePdfUrl}
             onOutlinePdfUrlChange={setOutlinePdfUrl}
             compact={outlineEditorCompact}
+            imageUploadSitePublic
           />
           <div className="v3-stack" style={{ gap: "0.5rem", borderTop: "1px solid #e2e8f0", paddingTop: "0.75rem" }}>
             <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>대회 장소 안내 (당구장 페이지)</span>

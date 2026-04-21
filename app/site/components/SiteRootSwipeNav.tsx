@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import {
+  isCommunityBoardListHubPath,
   isSiteRootSwipePath,
   siteRootSwipeHrefAt,
   siteRootSwipeIndex,
@@ -23,10 +24,18 @@ const VELOCITY_COMPLETE = 0.42;
 const TRANSITION_MS = 300;
 const EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 
+function communitySwipeEdgeFromTarget(el: EventTarget | null): "first" | "last" | "middle" | null {
+  if (!el || !(el instanceof Element)) return null;
+  const host = el.closest("[data-community-inner-swipe]");
+  if (!host) return null;
+  const v = host.getAttribute("data-community-swipe-edge");
+  if (v === "first" || v === "last" || v === "middle") return v;
+  return "middle";
+}
+
 function touchTargetBlocksSwipe(el: EventTarget | null): boolean {
   if (!el || !(el instanceof Element)) return false;
   if (el.closest("[data-no-root-swipe]")) return true;
-  if (el.closest("[data-community-inner-swipe]")) return true;
   if (el.closest("input,textarea,select,button,iframe,video,audio,summary")) return true;
   if (el.closest('[contenteditable="true"]')) return true;
   if (el.closest('[role="button"],[role="tab"],[role="tablist"]')) return true;
@@ -150,6 +159,13 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
         if (ady >= adx) {
           start.verticalDominant = true;
           return;
+        }
+        const live = siteRootSwipePathnameNow(pathname);
+        if (isCommunityBoardListHubPath(live)) {
+          const edge = communitySwipeEdgeFromTarget(e.target) ?? "middle";
+          if (edge === "first" && dx < 0) return;
+          if (edge === "last" && dx > 0) return;
+          if (edge === "middle") return;
         }
         start.horizontalLocked = true;
         const vp = viewportRef.current;

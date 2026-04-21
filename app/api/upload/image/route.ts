@@ -85,23 +85,48 @@ export async function POST(request: Request) {
   const originalPath = path.join(originalDir, originalFileName);
   const w320Path = path.join(w320Dir, w320FileName);
   const w640Path = path.join(w640Dir, w640FileName);
+  const w320FallbackPath = path.join(w320Dir, originalFileName);
+  const w640FallbackPath = path.join(w640Dir, originalFileName);
 
   try {
     await writeFile(originalPath, buffer);
+  } catch (err) {
+    console.error("[api/upload/image] 원본 저장 실패:", err);
+    return NextResponse.json({ error: "이미지 파일을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요." }, { status: 500 });
+  }
+
+  /** sharp 실패 시에도 업로드 완료: 원본 바이트를 w320/w640에 그대로 복사(표시용 GET은 확장자 순회) */
+  let w320Ok = false;
+  let w640Ok = false;
+  try {
     await sharp(buffer)
       .resize({ width: 320, withoutEnlargement: true })
       .jpeg({ quality: 85 })
       .toFile(w320Path);
+    w320Ok = true;
+  } catch (err) {
+    console.warn("[api/upload/image] w320 sharp 생략(원본 복사):", err);
+  }
+  try {
     await sharp(buffer)
       .resize({ width: 640, withoutEnlargement: true })
       .jpeg({ quality: 88 })
       .toFile(w640Path);
+    w640Ok = true;
   } catch (err) {
-    console.error("[api/upload/image] 저장 또는 이미지 처리 실패:", err);
-    return NextResponse.json(
-      { error: "이미지를 처리하지 못했습니다. jpg/png/webp 파일인지 확인 후 다시 시도해 주세요." },
-      { status: 400 }
-    );
+    console.warn("[api/upload/image] w640 sharp 생략(원본 복사):", err);
+  }
+
+  try {
+    if (!w320Ok) {
+      await writeFile(w320FallbackPath, buffer);
+    }
+    if (!w640Ok) {
+      await writeFile(w640FallbackPath, buffer);
+    }
+  } catch (err) {
+    console.error("[api/upload/image] 파생 파일(원본 복사) 저장 실패:", err);
+    return NextResponse.json({ error: "이미지 파일을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요." }, { status: 500 });
   }
 
   const createAssetResult = await createProofImageAsset({

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { OutlineDisplayMode } from "../../../lib/outline-content-types";
 
 const OutlineRichEditor = dynamic(() => import("./OutlineRichEditor"), {
@@ -38,6 +38,8 @@ export type OutlineContentEditorProps = {
   compact?: boolean;
   imageUploadError?: string;
   pdfUploadError?: string;
+  /** true이면 공개 URL용 `sitePublic`을 FormData에 포함 (대회·당구장 소개 등) */
+  imageUploadSitePublic?: boolean;
 };
 
 export default function OutlineContentEditor({
@@ -53,40 +55,92 @@ export default function OutlineContentEditor({
   compact,
   imageUploadError: imageUploadErrorProp,
   pdfUploadError: pdfUploadErrorProp,
+  imageUploadSitePublic = false,
 }: OutlineContentEditorProps) {
   const fieldId = useId();
   const [imageBusy, setImageBusy] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
-  const [imageErr, setImageErr] = useState("");
   const [pdfErr, setPdfErr] = useState("");
+  const [imageObjectPreviewUrl, setImageObjectPreviewUrl] = useState("");
+  const [imageNotice, setImageNotice] = useState("");
   const imageInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
-  const imageUploadError = imageUploadErrorProp ?? imageErr;
+  const imageUploadError = imageUploadErrorProp ?? "";
   const pdfUploadError = pdfUploadErrorProp ?? pdfErr;
+
+  useEffect(() => {
+    return () => {
+      if (imageObjectPreviewUrl) URL.revokeObjectURL(imageObjectPreviewUrl);
+    };
+  }, [imageObjectPreviewUrl]);
 
   async function onOutlineImageFile(fileList: FileList | null) {
     const file = fileList?.[0];
     if (!file) return;
-    setImageErr("");
+    setImageNotice("");
+
+    setImageObjectPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      try {
+        return URL.createObjectURL(file);
+      } catch {
+        return "";
+      }
+    });
+
+    const hints: string[] = [];
+    const n = file.name.trim().toLowerCase();
+    if (!n.endsWith(".jpg") && !n.endsWith(".jpeg") && !n.endsWith(".png") && !n.endsWith(".webp")) {
+      hints.push("jpg·jpeg·png·webp 파일을 권장합니다.");
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      hints.push("파일이 큽니다. 업로드에 시간이 걸릴 수 있습니다.");
+    }
+    setImageNotice(hints.join(" "));
+
     setImageBusy(true);
+
+    const fd = new FormData();
+    fd.append("file", file);
+    if (imageUploadSitePublic) fd.append("sitePublic", "1");
+
+    let res: Response | undefined;
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/upload/image", { method: "POST", body: fd });
-      const data = (await res.json()) as { error?: string; w640Url?: string };
-      if (!res.ok) {
-        setImageErr(data.error ?? "이미지 업로드에 실패했습니다.");
-        return;
-      }
-      if (typeof data.w640Url === "string" && data.w640Url) {
-        onOutlineImageUrlChange(data.w640Url);
-      }
+      res = await fetch("/api/upload/image", {
+        method: "POST",
+        body: fd,
+        credentials: "include",
+      });
     } catch {
-      setImageErr("이미지 업로드 중 오류가 발생했습니다.");
-    } finally {
-      setImageBusy(false);
-      if (imageInputRef.current) imageInputRef.current.value = "";
+      // 네트워크 오류: 로컬 미리보기 유지
+    }
+
+    if (imageInputRef.current) imageInputRef.current.value = "";
+    setImageBusy(false);
+
+    if (!res) return;
+
+    let data: { error?: string; w640Url?: string; w320Url?: string; originalUrl?: string } = {};
+    try {
+      data = (await res.json()) as typeof data;
+    } catch {
+      // 응답 파싱 실패: 업로드 재시도 가능 상태 유지
+    }
+
+    const nextUrl =
+      (typeof data.w640Url === "string" && data.w640Url.trim()) ||
+      (typeof data.originalUrl === "string" && data.originalUrl.trim()) ||
+      (typeof data.w320Url === "string" && data.w320Url.trim()) ||
+      "";
+
+    if (res.ok && nextUrl) {
+      onOutlineImageUrlChange(nextUrl);
+      setImageObjectPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return "";
+      });
+      setImageNotice("");
     }
   }
 
@@ -160,7 +214,13 @@ export default function OutlineContentEditor({
       {displayMode === "IMAGE" ? (
         <div className="v3-stack" style={{ gap: "0.5rem" }}>
           <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
-            <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => onOutlineImageFile(e.target.files)} />
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+              hidden
+              onChange={(e) => void onOutlineImageFile(e.target.files)}
+            />
             <button
               type="button"
               className="v3-btn"
@@ -169,17 +229,37 @@ export default function OutlineContentEditor({
             >
               {imageBusy ? "업로드 중…" : "이미지 선택"}
             </button>
-            {outlineImageUrl ? (
-              <button type="button" className="v3-btn" onClick={() => onOutlineImageUrlChange("")}>
+            {outlineImageUrl || imageObjectPreviewUrl ? (
+              <button
+                type="button"
+                className="v3-btn"
+                onClick={() => {
+                  setImageObjectPreviewUrl((prev) => {
+                    if (prev) URL.revokeObjectURL(prev);
+                    return "";
+                  });
+                  onOutlineImageUrlChange("");
+                  setImageNotice("");
+                }}
+              >
                 이미지 제거
               </button>
             ) : null}
           </div>
           {imageUploadError ? <p className="v3-muted">{imageUploadError}</p> : null}
-          {outlineImageUrl ? (
+          {imageNotice && !imageUploadError ? (
+            <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
+              {imageNotice}
+            </p>
+          ) : null}
+          {outlineImageUrl || imageObjectPreviewUrl ? (
             <div style={{ border: "1px solid #e2e8f0", borderRadius: "0.4rem", padding: "0.5rem", background: "#fff" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={outlineImageUrl} alt="" style={{ maxWidth: "100%", height: "auto", display: "block" }} />
+              <img
+                src={imageObjectPreviewUrl || outlineImageUrl}
+                alt=""
+                style={{ maxWidth: "100%", height: "auto", display: "block" }}
+              />
             </div>
           ) : (
             <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>

@@ -381,11 +381,13 @@ export default function ClientTournamentCardPublishPage() {
 
   return (
     <main className="v3-page v3-stack" style={{ maxWidth: "none", margin: 0, width: "100%" }}>
-      <h1 className="v3-h1" style={{ paddingLeft: "0.75rem", paddingRight: "0.75rem" }}>
-        게시카드 작성
-      </h1>
+      <div className={editorStyles.pcPageShell}>
+        <div className={editorStyles.pcPageMain}>
+          <h1 className="v3-h1" style={{ paddingLeft: "0.75rem", paddingRight: "0.75rem" }}>
+            게시카드 작성
+          </h1>
 
-      <div className={editorStyles.pageWrap}>
+          <div className={editorStyles.pageWrap}>
         <div className={editorStyles.previewSticky}>
           <div className={editorStyles.previewInner}>
             <div className={editorStyles.previewCardWrap}>
@@ -592,13 +594,16 @@ export default function ClientTournamentCardPublishPage() {
             </button>
           </div>
         </form>
-      </div>
+          </div>
 
-      {message ? (
-        <p className="v3-muted" style={{ paddingLeft: "0.75rem" }}>
-          {message}
-        </p>
-      ) : null}
+          {message ? (
+            <p className="v3-muted" style={{ paddingLeft: "0.75rem" }}>
+              {message}
+            </p>
+          ) : null}
+        </div>
+        <aside className={editorStyles.pcPageAside} aria-hidden="true" />
+      </div>
     </main>
   );
 }

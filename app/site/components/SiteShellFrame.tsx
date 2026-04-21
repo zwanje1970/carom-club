@@ -21,7 +21,6 @@ const mainStyleStandard: CSSProperties = {
 
 const shellStyleHome: CSSProperties = {
   width: "100%",
-  maxWidth: "430px",
   minHeight: "100dvh",
   borderRadius: "1.2rem",
   paddingTop: "0",
@@ -113,6 +112,26 @@ export default function SiteShellFrame({
       </div>
     ) : null;
 
+  const homeShellInner = (
+    <div className="site-home-shell" style={shellStyle}>
+      {isHomeShell ? (
+        <>
+          {headerBlock}
+          {controlsBlock}
+          {children}
+        </>
+      ) : (
+        <>
+          <div className="site-shell-sticky-dock">
+            {headerBlock}
+            {controlsBlock}
+          </div>
+          <div className="site-shell-scroll-body">{children}</div>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <main
       id={mainId}
@@ -120,23 +139,14 @@ export default function SiteShellFrame({
       style={mainStyle}
     >
       {prependMain}
-      <div className="site-home-shell" style={shellStyle}>
-        {isHomeShell ? (
-          <>
-            {headerBlock}
-            {controlsBlock}
-            {children}
-          </>
-        ) : (
-          <>
-            <div className="site-shell-sticky-dock">
-              {headerBlock}
-              {controlsBlock}
-            </div>
-            <div className="site-shell-scroll-body">{children}</div>
-          </>
-        )}
-      </div>
+      {isHomeShell ? (
+        <div className="site-home-pc-layout">
+          <div className="site-home-pc-layout__primary">{homeShellInner}</div>
+          <div className="site-home-pc-layout__aside" aria-hidden="true" />
+        </div>
+      ) : (
+        homeShellInner
+      )}
     </main>
   );
 }
