@@ -11,6 +11,7 @@ import { COMMUNITY_PRIMARY_TAB_LABEL, isPrimaryTabKey } from "../community-tab-c
 import CommunityBoardPostList from "../CommunityBoardPostList";
 import CommunityBoardSearchForm from "../CommunityBoardSearchForm";
 import CommunityBoardTabs from "../CommunityBoardTabs";
+import CommunityBoardSwipeShell from "../CommunityBoardSwipeShell";
 import SiteShellFrame from "../../components/SiteShellFrame";
 
 type Props = {
@@ -61,12 +62,14 @@ export default async function SiteCommunityBoardListPage({ params, searchParams 
         </>
       }
     >
-      <section className="site-site-gray-main v3-stack ui-community-page">
-        <CommunityBoardPostList showRoomPrefix={false} items={items} />
-        <Link href={writeHref} className="community-write-fab" aria-label={`${listBoardLabel} 글쓰기`}>
-          <span aria-hidden>+</span>
-        </Link>
-      </section>
+      <CommunityBoardSwipeShell tabs={tabItems.map(({ key, href }) => ({ key, href }))}>
+        <section className="site-site-gray-main v3-stack ui-community-page">
+          <CommunityBoardPostList showRoomPrefix={false} items={items} />
+          <Link href={writeHref} className="community-write-fab" aria-label={`${listBoardLabel} 글쓰기`}>
+            <span aria-hidden>+</span>
+          </Link>
+        </section>
+      </CommunityBoardSwipeShell>
     </SiteShellFrame>
   );
 }

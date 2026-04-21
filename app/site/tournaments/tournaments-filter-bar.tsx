@@ -16,6 +16,7 @@ type Props = {
   currentStatus: TournamentStatusFilter;
   distanceSortHref: string;
   hasViewerCoordinate: boolean;
+  distanceSortActive: boolean;
 };
 
 export default function TournamentsFilterBar({
@@ -23,6 +24,7 @@ export default function TournamentsFilterBar({
   currentStatus,
   distanceSortHref,
   hasViewerCoordinate,
+  distanceSortActive,
 }: Props) {
   const router = useRouter();
 
@@ -30,24 +32,28 @@ export default function TournamentsFilterBar({
 
   return (
     <div className={filterStyles.filterRow}>
-      <FilterDropdown
-        value={selectValue}
-        aria-label="상태"
-        onChange={(e) => {
-          const v = e.target.value;
-          const status = v === "all" ? null : v;
-          const q = buildTournamentListHref(searchParams, { status });
-          router.push(q ? `/site/tournaments${q}` : "/site/tournaments");
-        }}
-      >
-        <option value="all">전체</option>
-        {TOURNAMENT_STATUS_FILTER_OPTIONS.map((s) => (
-          <option key={s} value={s}>
-            {s}
-          </option>
-        ))}
-      </FilterDropdown>
+      <div className={filterStyles.filterField}>
+        <span className={filterStyles.filterFieldLabel}>상태</span>
+        <FilterDropdown
+          value={selectValue}
+          aria-label="상태"
+          onChange={(e) => {
+            const v = e.target.value;
+            const status = v === "all" ? null : v;
+            const q = buildTournamentListHref(searchParams, { status });
+            router.push(q ? `/site/tournaments${q}` : "/site/tournaments");
+          }}
+        >
+          <option value="all">전체</option>
+          {TOURNAMENT_STATUS_FILTER_OPTIONS.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </FilterDropdown>
+      </div>
       <FilterButton
+        className={distanceSortActive ? filterStyles.buttonDistanceActive : undefined}
         href={`/site/tournaments${distanceSortHref}`}
         useNextLink={hasViewerCoordinate}
         onClick={

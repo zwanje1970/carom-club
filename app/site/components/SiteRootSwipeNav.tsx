@@ -50,6 +50,7 @@ const EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 function touchTargetBlocksSwipe(el: EventTarget | null): boolean {
   if (!el || !(el instanceof Element)) return false;
   if (el.closest("[data-no-root-swipe]")) return true;
+  if (el.closest("[data-community-inner-swipe]")) return true;
   if (el.closest("input,textarea,select,button,iframe,video,audio,summary")) return true;
   if (el.closest('[contenteditable="true"]')) return true;
   if (el.closest('[role="button"],[role="tab"],[role="tablist"]')) return true;
@@ -317,13 +318,12 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
   if (children == null) return null;
 
   const swipeIdx = rootSwipeIndex(pathname);
-  const onHome = normalizePathname(pathname) === "/site";
   const prevHref = swipeIdx > 0 ? SITE_ROOT_SWIPE_HREFS[swipeIdx - 1]! : null;
   const nextHref =
     swipeIdx >= 0 && swipeIdx < SITE_ROOT_SWIPE_HREFS.length - 1 ? SITE_ROOT_SWIPE_HREFS[swipeIdx + 1]! : null;
 
   const leftPanel =
-    swipeIdx <= 0 || onHome ? (
+    swipeIdx <= 0 ? (
       <div key="swipe-left-ph" className="site-root-swipe-panel site-root-swipe-panel--placeholder" aria-hidden />
     ) : allowNeighborIframePreview(prevHref) ? (
       <div key={`swipe-left-${prevHref}`} className="site-root-swipe-panel site-root-swipe-panel--neighbor">
@@ -334,7 +334,7 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
     );
 
   const rightPanel =
-    swipeIdx < 0 || swipeIdx >= SITE_ROOT_SWIPE_HREFS.length - 1 || onHome ? (
+    swipeIdx < 0 || swipeIdx >= SITE_ROOT_SWIPE_HREFS.length - 1 ? (
       <div key="swipe-right-ph" className="site-root-swipe-panel site-root-swipe-panel--placeholder" aria-hidden />
     ) : allowNeighborIframePreview(nextHref) ? (
       <div key={`swipe-right-${nextHref}`} className="site-root-swipe-panel site-root-swipe-panel--neighbor">

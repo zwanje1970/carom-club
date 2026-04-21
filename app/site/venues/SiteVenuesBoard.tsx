@@ -60,15 +60,15 @@ type VenueTypeFilter = "all" | "daedae_only" | "mixed";
 type FeeTypeFilter = "all" | "normal" | "flat";
 
 const VENUE_TYPE_OPTIONS: { value: VenueTypeFilter; label: string }[] = [
+  { value: "all", label: "전체" },
   { value: "daedae_only", label: "대대전용" },
   { value: "mixed", label: "복합구장" },
-  { value: "all", label: "전체" },
 ];
 
 const FEE_TYPE_OPTIONS: { value: FeeTypeFilter; label: string }[] = [
+  { value: "all", label: "전체" },
   { value: "normal", label: "일반요금" },
   { value: "flat", label: "정액제" },
-  { value: "all", label: "전체" },
 ];
 
 type Props = {
@@ -87,8 +87,8 @@ export default function SiteVenuesBoard({
   hasViewerCoordinate,
 }: Props) {
   const router = useRouter();
-  const [venueType, setVenueType] = useState<VenueTypeFilter>("daedae_only");
-  const [feeType, setFeeType] = useState<FeeTypeFilter>("normal");
+  const [venueType, setVenueType] = useState<VenueTypeFilter>("all");
+  const [feeType, setFeeType] = useState<FeeTypeFilter>("all");
 
   useEffect(() => {
     if (!distanceSort) return;
@@ -144,40 +144,53 @@ export default function SiteVenuesBoard({
     return list;
   }, [filtered, distanceSort]);
 
+  const distanceSortActive = distanceSort != null;
+
   const auxiliary = (
     <div className={filterStyles.filterGrid3}>
       <div className={filterStyles.filterGridCell}>
-        <FilterDropdown
-          id="site-venues-filter-venue-type"
-          value={venueType}
-          onChange={(e) => setVenueType(e.target.value as VenueTypeFilter)}
-          fullWidth
-          aria-label="구장유형"
-        >
-          {VENUE_TYPE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </FilterDropdown>
+        <div className={filterStyles.filterField}>
+          <span className={filterStyles.filterFieldLabel} id="site-venues-filter-venue-type-label">
+            유형
+          </span>
+          <FilterDropdown
+            id="site-venues-filter-venue-type"
+            value={venueType}
+            onChange={(e) => setVenueType(e.target.value as VenueTypeFilter)}
+            fullWidth
+            aria-labelledby="site-venues-filter-venue-type-label"
+          >
+            {VENUE_TYPE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </FilterDropdown>
+        </div>
       </div>
       <div className={filterStyles.filterGridCell}>
-        <FilterDropdown
-          id="site-venues-filter-fee-type"
-          value={feeType}
-          onChange={(e) => setFeeType(e.target.value as FeeTypeFilter)}
-          fullWidth
-          aria-label="요금유형"
-        >
-          {FEE_TYPE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </FilterDropdown>
+        <div className={filterStyles.filterField}>
+          <span className={filterStyles.filterFieldLabel} id="site-venues-filter-fee-type-label">
+            요금제
+          </span>
+          <FilterDropdown
+            id="site-venues-filter-fee-type"
+            value={feeType}
+            onChange={(e) => setFeeType(e.target.value as FeeTypeFilter)}
+            fullWidth
+            aria-labelledby="site-venues-filter-fee-type-label"
+          >
+            {FEE_TYPE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </FilterDropdown>
+        </div>
       </div>
       <div className={filterStyles.filterGridCell}>
         <FilterButton
+          className={distanceSortActive ? filterStyles.buttonDistanceActive : undefined}
           href={distanceButtonHref}
           useNextLink={hasViewerCoordinate}
           style={{ width: "100%", justifyContent: "center", boxSizing: "border-box" }}

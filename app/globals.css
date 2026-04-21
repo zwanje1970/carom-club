@@ -331,6 +331,60 @@ body {
   flex-direction: column;
 }
 
+/* 커뮤니티 게시판 탭 간 스와이프 (루트 스와이프와 동일한 3패널 트랙) */
+.community-board-swipe-viewport {
+  overflow-x: hidden;
+  overflow-y: visible;
+  width: 100%;
+  min-height: 0;
+  touch-action: pan-y;
+}
+
+.community-board-swipe-track {
+  display: flex;
+  flex-direction: row;
+  width: 300vw;
+  transform: translate3d(-100vw, 0, 0);
+  will-change: transform;
+}
+
+.community-board-swipe-panel {
+  flex: 0 0 100vw;
+  width: 100vw;
+  max-width: 100vw;
+  box-sizing: border-box;
+}
+
+.community-board-swipe-panel--edge {
+  min-height: 40vh;
+  background: var(--ui-bg-page);
+}
+
+.community-board-swipe-panel--neighbor {
+  min-height: 100dvh;
+  background: var(--ui-bg-page);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.community-board-swipe-embed {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 100dvh;
+  border: none;
+  display: block;
+  pointer-events: none;
+  background: var(--ui-bg-page);
+}
+
+.community-board-swipe-panel--main {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
 /* PC 사이트: 본문이 짧을 때 푸터를 뷰포트 하단에 맞춤 (sticky footer, flex 흐름) */
 .site-shell--pc-sticky-footer {
   display: flex;
