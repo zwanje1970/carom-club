@@ -27,7 +27,9 @@ export default async function SiteTournamentDetailPage({
 
   const cookieStore = await cookies();
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
-  const applyHref = session ? `/site/tournaments/${id}/apply` : `/login?next=/site/tournaments/${id}`;
+  const applyHref = session
+    ? `/site/tournaments/${id}/apply`
+    : `/login?next=${encodeURIComponent(`/site/tournaments/${id}/apply`)}`;
 
   return (
     <SiteShellFrame brandTitle={<span className="site-home-brand-ellipsis">대회상세</span>}>

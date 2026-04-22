@@ -41,7 +41,7 @@ export default function SiteTournamentApplyPage() {
       };
 
       if (!response.ok || !result.authenticated || !result.user) {
-        router.replace(`/login?next=/site/tournaments/${tournamentId}`);
+        router.replace(`/login?next=${encodeURIComponent(`/site/tournaments/${tournamentId}/apply`)}`);
         return;
       }
 

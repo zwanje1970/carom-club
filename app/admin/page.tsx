@@ -17,7 +17,7 @@ export default async function AdminLoginPage() {
   const cookieStore = await cookies();
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
   if (session?.role === "PLATFORM") {
-    redirect("/platform");
+    redirect("/");
   }
   if (session) {
     redirect("/unauthorized?from=/admin");

@@ -8,23 +8,23 @@ export type { SlideDeckItem };
 
 type SceneRole = "idle" | "incoming" | "center" | "outgoing";
 
-/** 다음 카드(incoming) 숨김(초). 이 동안 위치는 항상 최하단(바닥)에 고정 */
-const INCOMING_DELAY_S = 2;
-/** 보이기 시작한 뒤 바닥→중앙 상승 시간(초) */
-const INCOMING_RISE_DURATION_S = 4;
+/**
+ * 장면 8초: incoming·center 동일 / outgoing 퇴장 곡선은 1초 앞당겨 시작(끝은 clamp).
+ */
+const RISE_S = 10;
+const INCOMING_DELAY_S = 4;
+const COVER_TRIGGER = 0.8;
+const SCENE_S = RISE_S * COVER_TRIGGER;
+const RETREAT_S = SCENE_S;
+/** outgoing 퇴장(축소·이동) 곡선을 장면 기준 이 초만큼 앞당김 */
+const OUTGOING_RETREAT_START_OFFSET_S = 1;
+const CENTER_SETTLE_S = RISE_S * (1 - COVER_TRIGGER);
+const CENTER_FADE_DELAY_S = 4;
+const CENTER_OPACITY_TARGET = 0.6;
+const OUTGOING_SCALE_TARGET = 0.65;
+const OUTGOING_OPACITY_MIN = 0.5;
 const FX_STRENGTH = 1.15;
 const FX_EARLY_BIAS = 0.7;
-/** 중앙 도착 후 이 시간(초) 동안은 위치·크기·불투명도 유지, 이후 후퇴 시작 */
-const CENTER_HOLD_S = 4;
-/** 퇴장(위로·축소·페이드)에만 쓰이는 시간(초) */
-const RETREAT_DURATION_S = 6;
-/** 한 장면 길이 = 중앙 유지 + 퇴장 */
-const SCENE_S = CENTER_HOLD_S + RETREAT_DURATION_S;
-/** 후퇴 경로의 세로 이동(%) 배율 — 1보다 크면 같은 진행도에서 더 위로 */
-const RETREAT_TY_STRETCH = 1.4;
-/** 후퇴 종료 시 불투명도 (30%) */
-const RETREAT_OPACITY_END = 0.3;
-const OUTGOING_SCALE_TARGET = 0;
 const MANUAL_RESUME_DELAY_MS = 1800;
 const WHEEL_SCENE_STEP = 240;
 const DRAG_SCENE_STEP = 220;
@@ -53,6 +53,22 @@ const RETREAT_PTS: {
   { p: 0.9, ty: -82.8, sc: 0.694, op: 0.143 },
   { p: 1, ty: -92, sc: 0.66, op: 0 },
 ];
+
+/** incoming 상승 곡선 진행도가 이 값 미만이면 center(210) 아래 — 하단 일찍 비침 완화 */
+const INCOMING_LAYER_ABOVE_CENTER_AFTER_PROGRESS = 0.06;
+
+/** 형제 `.slideDeckLayer` 간 실제 쌓임 — 오버레이(250) 아래. 상승 중반부터 incoming이 center보다 앞 */
+function layerZIndexForRole(role: SceneRole, sceneT: number, incomingProgress: number): number {
+  if (role === "idle") return 10;
+  if (role === "outgoing") return 110;
+  if (role === "center") return 210;
+  if (role === "incoming") {
+    if (sceneT < INCOMING_DELAY_S) return 190;
+    if (incomingProgress < INCOMING_LAYER_ABOVE_CENTER_AFTER_PROGRESS) return 200;
+    return 220;
+  }
+  return 10;
+}
 
 function riseFactor(r: number): number {
   const t = Math.min(1, Math.max(0, r));
@@ -85,32 +101,17 @@ function retreatAt(progress: number) {
   };
 }
 
-/** 후퇴 진행도 0~1 → 위로 이동·축소·불투명도 100%→30% */
-function retreatVisuals(progress: number): { opacity: number; transform: string } {
-  const p = Math.min(1, Math.max(0, progress));
-  const move = retreatAt(p);
-  const fxProgress = Math.min(1, Math.max(0, p * FX_STRENGTH));
-  const fxProgressBiased = Math.pow(fxProgress, FX_EARLY_BIAS);
-  const outgoingScale = 1 + (OUTGOING_SCALE_TARGET - 1) * fxProgressBiased;
-  const opacity = 1 + (RETREAT_OPACITY_END - 1) * fxProgressBiased;
-  const tyPct = move.ty * RETREAT_TY_STRETCH;
-  return {
-    opacity,
-    transform: `translateY(${tyPct}%) scale(${outgoingScale})`,
-  };
-}
-
 /**
- * @param sceneT 장면 로컬 시간(초). t=0 은 중앙 카드 도착 직후(장면 시작). 퇴장·대기 길이와 별개로 모든 역할이 동일 시계 공유.
+ * @param sceneT 장면 로컬 시간(초), 0 ~ SCENE_S. 템플릿과 동일 시계.
+ * @param roleProgress incoming: delay~(장면 끝) 선형 0~1 / outgoing: 0~1.
  */
 function cardStyleForRole(role: SceneRole, sceneT: number, roleProgress: number): CSSProperties {
   if (role === "idle") {
     return {
       opacity: 0,
       visibility: "hidden",
-      transform: "translateY(calc(90cqh + 50%)) scale(1)",
+      transform: "translateY(calc(50cqh + 50%)) scale(1)",
       filter: "blur(0)",
-      zIndex: 1,
     };
   }
 
@@ -119,50 +120,46 @@ function cardStyleForRole(role: SceneRole, sceneT: number, roleProgress: number)
       return {
         opacity: 0,
         visibility: "hidden",
-        transform: `translateY(calc((90cqh + 50%) * ${riseFactor(0)})) scale(1)`,
+        transform: "translateY(calc(50cqh + 50%)) scale(1)",
         filter: "blur(0)",
-        zIndex: 1,
       };
     }
     const factor = riseFactor(roleProgress);
     return {
       opacity: 1,
       visibility: "visible",
-      transform: `translateY(calc((90cqh + 50%) * ${factor})) scale(1)`,
+      transform: `translateY(calc((50cqh + 50%) * ${factor})) scale(1)`,
       filter: "blur(0)",
-      zIndex: 120,
     };
   }
 
   if (role === "center") {
+    const centerFadeStart = CENTER_SETTLE_S + CENTER_FADE_DELAY_S;
+    const centerFadeProgress =
+      sceneT > centerFadeStart
+        ? Math.min(1, (sceneT - centerFadeStart) / Math.max(0.001, SCENE_S - centerFadeStart))
+        : 0;
+    const centerOpacity = 1 + (CENTER_OPACITY_TARGET - 1) * centerFadeProgress;
     const factor = riseFactor(1);
-    if (sceneT < CENTER_HOLD_S) {
-      return {
-        opacity: 1,
-        visibility: "visible",
-        transform: `translateY(calc((90cqh + 50%) * ${factor})) scale(1)`,
-        filter: "blur(0)",
-        zIndex: 100,
-      };
-    }
-    const retreatProgress = Math.min(1, (sceneT - CENTER_HOLD_S) / Math.max(0.001, RETREAT_DURATION_S));
-    const rv = retreatVisuals(retreatProgress);
     return {
-      opacity: rv.opacity,
+      opacity: centerOpacity,
       visibility: "visible",
-      transform: rv.transform,
+      transform: `translateY(calc((50cqh + 50%) * ${factor})) scale(1)`,
       filter: "blur(0)",
-      zIndex: 100,
     };
   }
 
-  const rv = retreatVisuals(1);
+  const move = retreatAt(roleProgress);
+  const fxProgress = Math.min(1, Math.max(0, roleProgress * FX_STRENGTH));
+  const fxProgressBiased = Math.pow(fxProgress, FX_EARLY_BIAS);
+  const outgoingOpacity =
+    CENTER_OPACITY_TARGET + (OUTGOING_OPACITY_MIN - CENTER_OPACITY_TARGET) * fxProgressBiased;
+  const outgoingScale = 1 + (OUTGOING_SCALE_TARGET - 1) * fxProgressBiased;
   return {
-    opacity: rv.opacity,
-    visibility: rv.opacity < 0.02 ? "hidden" : "visible",
-    transform: rv.transform,
+    opacity: outgoingOpacity,
+    visibility: outgoingOpacity < 0.02 ? "hidden" : "visible",
+    transform: `translateY(${move.ty}%) scale(${outgoingScale})`,
     filter: "blur(0)",
-    zIndex: 40,
   };
 }
 
@@ -412,18 +409,28 @@ export default function MainSceneSlideDeck({
       >
         {items.map((item, i) => {
           const role = sceneRoleForCard(i, n, sceneId);
+          const incomingProgress =
+            role === "incoming"
+              ? Math.min(
+                  1,
+                  Math.max(0, (tInScene - INCOMING_DELAY_S) / Math.max(0.001, SCENE_S - INCOMING_DELAY_S)),
+                )
+              : 0;
           const style = cardStyleForRole(
             role,
             tInScene,
             role === "incoming"
-              ? Math.min(
-                  1,
-                  Math.max(0, (tInScene - INCOMING_DELAY_S) / INCOMING_RISE_DURATION_S),
-                )
-              : 0,
+              ? incomingProgress
+              : role === "outgoing"
+                ? Math.min(1, (tInScene + OUTGOING_RETREAT_START_OFFSET_S) / RETREAT_S)
+                : 0,
           );
           return (
-            <div key={item.snapshotId} className={styles.slideDeckLayer}>
+            <div
+              key={item.snapshotId}
+              className={styles.slideDeckLayer}
+              style={{ zIndex: layerZIndexForRole(role, tInScene, incomingProgress) }}
+            >
               <div className={styles.slideDeckCard} data-slide-deck-card style={style}>
                 <SlideDeckCard item={item} />
               </div>

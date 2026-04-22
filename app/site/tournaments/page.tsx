@@ -59,10 +59,10 @@ function formatSingleDateWithWeekday(isoDate: string): string {
   if (!m) return isoDate;
   const d = new Date(`${m[1]}-${m[2]}-${m[3]}T12:00:00`);
   if (Number.isNaN(d.getTime())) return isoDate;
-  return `${m[1]}.${m[2]}.${m[3]}(${WEEKDAYS_KO[d.getDay()]})`;
+  return `${m[1]}.${m[2]}.${m[3]} (${WEEKDAYS_KO[d.getDay()]})`;
 }
 
-/** 목록 날짜 줄: 단일 일정은 YYYY.MM.DD(요일), 복수는 일정 라벨(날짜만 점 표기) */
+/** 목록 날짜 줄: 단일 일정은 YYYY.MM.DD (요일), 복수는 일정 라벨(날짜만 점 표기) */
 function tournamentListScheduleLine(t: Tournament): string {
   const dates =
     t.eventDates && t.eventDates.length > 0

@@ -2,13 +2,14 @@
 .slideDeckShell {
   width: 100%;
   display: block;
-  overflow: visible;
+  /* 카드·공지 box-shadow가 섹션 밖으로 비치지 않도록 슬라이드 블록 전체 클리핑 */
+  overflow: hidden;
   border-radius: 0;
   border-bottom: 1px solid #94a3b8;
   margin-top: 0;
 }
 
-/* 슬라이드 창 전체를 덮는 UI층 — 카드(transform)보다 위, 비네트(::after)보다 위 */
+/* 슬라이드 창 전체를 덮는 UI층 — 카드(transform)보다 위 */
 .slideDeckFrameOverlay {
   position: absolute;
   inset: 0;
@@ -17,7 +18,8 @@
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
-  padding: max(0.42rem, env(safe-area-inset-top, 0px)) max(0.75rem, env(safe-area-inset-right, 0px))
+  /* 공지는 슬라이드 창 상단 끝에 붙임(노치만 safe-area) */
+  padding: env(safe-area-inset-top, 0px) max(0.75rem, env(safe-area-inset-right, 0px))
     max(0.45rem, env(safe-area-inset-bottom, 0px)) max(0.75rem, env(safe-area-inset-left, 0px));
   box-sizing: border-box;
   pointer-events: none;
@@ -53,9 +55,8 @@
   border-radius: 0;
   background: #fff176;
   border: 1px solid #c9a227;
-  box-shadow:
-    0 2px 0 rgba(0, 0, 0, 0.06),
-    0 8px 18px rgba(0, 0, 0, 0.22);
+  /* 창 밖으로 번지지 않게 아래쪽만 약한 깊이 */
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
   overflow: hidden;
   white-space: nowrap;
   display: flex;
@@ -107,6 +108,8 @@
   border-radius: 0;
   border-bottom: 1px solid #94a3b8;
   overflow: hidden;
+  /* 자손 그림자·레이어 합성이 창 밖으로 새는 경우 완화 */
+  contain: paint;
   background-color: var(--slide-deck-mid);
   background-image: linear-gradient(
     180deg,
@@ -122,18 +125,6 @@
 /* 메인 홈: 슬라이드 상단을 다크 배경 상단과 맞춤 */
 :global(.site-home-page) .slideDeck {
   margin-top: 0;
-}
-
-/* 상·하단 안쪽 그림자(슬라이드 영역 가장자리 딥닝) — 카드·배경 위에 얹고 라벨 아래 */
-.slideDeck::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 150;
-  box-shadow:
-    inset 0 22px 32px rgba(0, 0, 0, 0.42),
-    inset 0 -22px 32px rgba(0, 0, 0, 0.42);
 }
 
 .slideDeckLabel {
@@ -198,7 +189,7 @@
 .slideDeckLayer {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  /* z-index: 역할별로 TS에서 .slideDeckLayer 인라인으로만 지정(오버레이 250 미만) */
   display: flex;
   align-items: center;
   justify-content: center;

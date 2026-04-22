@@ -15,6 +15,7 @@ import LogoutButton from "../../components/LogoutButton";
 import SiteShellFrame from "../components/SiteShellFrame";
 
 function getStatusLabel(status: TournamentApplicationStatus): string {
+  if (status === "APPLIED") return "신청 접수";
   if (status === "VERIFYING") return "검증 진행중";
   if (status === "WAITING_PAYMENT") return "입금 필요";
   if (status === "APPROVED") return "참가 확정";
@@ -58,11 +59,11 @@ export default async function SiteMypagePage() {
     })
   );
 
-  const visibleStatuses: TournamentApplicationStatus[] = ["VERIFYING", "WAITING_PAYMENT", "APPROVED"];
+  const visibleStatuses: TournamentApplicationStatus[] = ["APPLIED", "VERIFYING", "WAITING_PAYMENT", "APPROVED"];
   const visibleRows = applicationRows.filter((row) => {
     if (!row.tournament) return false;
     if (!visibleStatuses.includes(row.application.status)) return false;
-    if (row.application.status === "APPROVED") {
+    if (row.application.status === "APPROVED" || row.application.status === "APPLIED") {
       return isTournamentOngoing(row.tournament.date);
     }
     return true;

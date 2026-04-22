@@ -27,9 +27,8 @@ function pathOnly(href: string): string {
   return href.slice(0, end);
 }
 
-function defaultPathAfterLogin(role: AuthRole): string {
-  if (role === "PLATFORM") return "/platform";
-  if (role === "CLIENT") return "/client";
+/** 플랫폼·클라이언트 관리자도 일반 회원과 동일하게 로그인 직후 루트 메인(`/`)으로 통일 */
+function defaultPathAfterLogin(_role: AuthRole): string {
   return "/";
 }
 
@@ -50,6 +49,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [resetDone, setResetDone] = useState(false);
+  const [tournamentApplyContext, setTournamentApplyContext] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -57,6 +57,11 @@ export default function LoginPage() {
     if (p.get("reset") === "1") {
       setResetDone(true);
       window.history.replaceState({}, "", "/login");
+      return;
+    }
+    const nextPath = safeNextPath(p.get("next"));
+    if (nextPath && /^\/site\/tournaments\/[^/]+\/apply$/.test(pathOnly(nextPath))) {
+      setTournamentApplyContext(true);
     }
   }, []);
 
@@ -135,6 +140,12 @@ export default function LoginPage() {
     <main className="v3-page v3-stack login-page-outer">
       <div className="login-page-inner v3-stack">
         <h1 className="v3-h1">로그인</h1>
+
+        {tournamentApplyContext ? (
+          <p className="v3-muted" style={{ margin: "0 0 0.25rem", lineHeight: 1.45 }}>
+            대회 신청·내역 확인·증빙 제출을 위해 로그인이 필요합니다.
+          </p>
+        ) : null}
 
         {resetDone ? (
           <p className="v3-box" style={{ background: "#f0fdf4", borderColor: "#86efac", marginBottom: 0 }}>

@@ -49,9 +49,11 @@ export default async function SiteMypageHistoryPage() {
       if (!row.tournament) return false;
       const ongoingApproved =
         row.application.status === "APPROVED" && isTournamentOngoing(row.tournament.date);
+      const ongoingApplied =
+        row.application.status === "APPLIED" && isTournamentOngoing(row.tournament.date);
       const ongoingIncomplete =
         row.application.status === "VERIFYING" || row.application.status === "WAITING_PAYMENT";
-      const isActiveMypageItem = ongoingApproved || ongoingIncomplete;
+      const isActiveMypageItem = ongoingApproved || ongoingApplied || ongoingIncomplete;
       return !isActiveMypageItem;
     })
     .sort((a, b) => {

@@ -5410,15 +5410,17 @@ export function buildSitePublicImageUrl(imageId: string, variant: "original" | "
 }
 
 /** 일정 표시: 연속이면 `시작 ~ 종료`, 아니면 쉼표 구분 */
-const KO_WEEKDAY_LONG = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"] as const;
+const KO_WEEKDAY_SHORT = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
-/** `YYYY-MM-DD` 저장값 옆에 요일(일요일~토요일) — 파싱 실패 시 원문 유지 */
+/** `YYYY-MM-DD`… 앞부분만 사용해 `(월)` 형 요일 부착 — 파싱 실패 시 원문 유지 */
 function appendKoreanWeekday(dateStr: string): string {
   const trimmed = dateStr.trim();
   if (!trimmed) return trimmed;
-  const d = new Date(`${trimmed}T12:00:00`);
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(trimmed);
+  const core = m ? m[1]! : trimmed;
+  const d = new Date(`${core}T12:00:00`);
   if (Number.isNaN(d.getTime())) return trimmed;
-  return `${trimmed} ${KO_WEEKDAY_LONG[d.getDay()]}`;
+  return `${core} (${KO_WEEKDAY_SHORT[d.getDay()]})`;
 }
 
 export function formatTournamentScheduleLabel(tournament: Pick<Tournament, "date" | "eventDates">): string {

@@ -1,6 +1,17 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 
+const KO_WEEKDAY_SHORT = ["일", "월", "화", "수", "목", "금", "토"] as const;
+
+function formatSnapshotPublishedDateYmdWeekday(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const da = String(d.getDate()).padStart(2, "0");
+  return `${y}.${mo}.${da} (${KO_WEEKDAY_SHORT[d.getDay()]})`;
+}
+
 function SnapshotCardOuter({
   previewOnly,
   href,
@@ -395,7 +406,7 @@ export default function PublishedSnapshotCard({
               background: "#eef2ff",
             }}
           >
-            {new Date(item.publishedAt).toLocaleDateString("ko-KR")}
+            {formatSnapshotPublishedDateYmdWeekday(item.publishedAt)}
           </span>
         </div>
         <div style={{ flex: "0 0 36%" }}>
@@ -457,7 +468,7 @@ export default function PublishedSnapshotCard({
           background: "#eef2ff",
         }}
       >
-        {new Date(item.publishedAt).toLocaleDateString("ko-KR")}
+        {formatSnapshotPublishedDateYmdWeekday(item.publishedAt)}
       </span>
     </SnapshotCardOuter>
   );

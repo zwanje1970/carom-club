@@ -45,7 +45,7 @@ export default function AdminLoginForm() {
         return;
       }
 
-      router.push("/platform");
+      router.push("/");
       router.refresh();
     } catch {
       setMessage("로그인 요청 중 오류가 발생했습니다.");
