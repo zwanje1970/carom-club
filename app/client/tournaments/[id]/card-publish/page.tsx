@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   TournamentSnapshotCardView,
   type SlideDeckItem,
@@ -9,6 +9,82 @@ import {
 import editorStyles from "../card-publish-editor.module.css";
 
 const DESCRIPTION_MAX_LINES = 5;
+
+/** 백색 글자 대비용 고정 64색 (8×8 그리드) */
+const CARD_COLOR_PALETTE_64 = [
+  // Red
+  "#7F1D1D",
+  "#991B1B",
+  "#B91C1C",
+  "#DC2626",
+  "#7C2D12",
+  "#9A3412",
+  "#C2410C",
+  "#EA580C",
+  // Brown
+  "#78350F",
+  "#92400E",
+  "#B45309",
+  "#D97706",
+  "#7C3E0A",
+  "#9C4F0D",
+  "#C4660F",
+  "#E07A12",
+  // Green
+  "#064E3B",
+  "#065F46",
+  "#047857",
+  "#059669",
+  "#14532D",
+  "#166534",
+  "#15803D",
+  "#16A34A",
+  // Teal
+  "#134E4A",
+  "#115E59",
+  "#0F766E",
+  "#0D9488",
+  "#164E63",
+  "#155E75",
+  "#0E7490",
+  "#0891B2",
+  // Blue
+  "#1E3A8A",
+  "#1D4ED8",
+  "#2563EB",
+  "#1E40AF",
+  "#1E293B",
+  "#334155",
+  "#0F172A",
+  "#1F2937",
+  // Indigo / Purple
+  "#312E81",
+  "#3730A3",
+  "#4338CA",
+  "#4F46E5",
+  "#581C87",
+  "#6B21A8",
+  "#7E22CE",
+  "#9333EA",
+  // Pink / Rose (어두운 톤만)
+  "#881337",
+  "#9F1239",
+  "#BE123C",
+  "#E11D48",
+  "#831843",
+  "#9D174D",
+  "#BE185D",
+  "#DB2777",
+  // Gray (밝은 회색 제외)
+  "#111827",
+  "#1F2937",
+  "#374151",
+  "#4B5563",
+  "#030712",
+  "#020617",
+  "#111827",
+  "#0B1220",
+] as const;
 
 const KO_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
@@ -43,11 +119,13 @@ function formatCardDateForDisplay(raw: string): string {
   return `${y}-${mo}-${da} (${KO_WEEKDAYS[d.getDay()]})`;
 }
 
-/** 당구장명만: 첫 줄·쉼표 앞만(주소 꼬리 제거). 빈 값은 "" */
+/** 당구장명만: 첫 줄 → 한 줄이면 `상호 / 주소`에서 앞부분만 → 쉼표 앞만. 빈 값은 "" */
 function venueNameOnly(raw: string): string {
   let s = raw.trim();
   if (!s) return "";
   s = s.split(/\r?\n/)[0].trim();
+  const slashPart = s.split(/\s*\/\s*/)[0]?.trim() ?? "";
+  if (slashPart) s = slashPart;
   const comma = s.indexOf(",");
   if (comma > 0) {
     s = s.slice(0, comma).trim();
@@ -58,6 +136,35 @@ function venueNameOnly(raw: string): string {
 function clampDescriptionToMaxLines(value: string, maxLines: number): string {
   const lines = value.split(/\r?\n/);
   return lines.slice(0, maxLines).join("\n");
+}
+
+function firstNonEmptyLine(raw: string | null | undefined): string {
+  if (raw == null) return "";
+  for (const line of String(raw).split(/\r?\n/)) {
+    const t = line.trim();
+    if (t) return t;
+  }
+  return "";
+}
+
+function secondNonEmptyLine(raw: string | null | undefined): string {
+  if (raw == null) return "";
+  let seen = false;
+  for (const line of String(raw).split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t) continue;
+    if (!seen) {
+      seen = true;
+      continue;
+    }
+    return t;
+  }
+  return "";
+}
+
+function isUsableSnapshotTitle(raw: string | null | undefined): boolean {
+  const t = (raw ?? "").trim();
+  return t.length > 0 && t !== "(제목)";
 }
 
 type UploadedImage = {
@@ -74,6 +181,8 @@ type TournamentSummary = {
   date: string;
   location: string;
   statusBadge?: string;
+  summary?: string | null;
+  prizeInfo?: string | null;
 };
 
 type SnapshotPick = {
@@ -189,7 +298,10 @@ export default function ClientTournamentCardPublishPage() {
         tournament?: TournamentSummary;
         error?: string;
       };
-      if (!response.ok) return;
+      if (!response.ok) {
+        setMessage(result.error ?? "카드 정보를 불러오지 못했습니다.");
+        return;
+      }
 
       const t = result.tournament;
       if (!t) return;
@@ -198,18 +310,25 @@ export default function ClientTournamentCardPublishPage() {
         typeof t.statusBadge === "string" && t.statusBadge.trim() ? t.statusBadge.trim() : ""
       );
 
+      const summaryLine1 = firstNonEmptyLine(t.summary);
+      const summaryLine2 = secondNonEmptyLine(t.summary);
+      const prizeLine1 = firstNonEmptyLine(t.prizeInfo);
+
       const newest = result.snapshots?.[0];
       const active = result.activeSnapshot;
       const pick =
-        newest && (newest.title ?? "").trim()
+        newest && isUsableSnapshotTitle(newest.title)
           ? newest
-          : active && (active.title ?? "").trim()
+          : active && isUsableSnapshotTitle(active.title)
             ? active
             : null;
       if (pick) {
-        setTitle(pick.title || t.title);
-        setTextLine1(pick.cardExtraLine1 ?? "");
-        setTextLine2(pick.cardExtraLine2 ?? "");
+        const snapTitle = (pick.title ?? "").trim();
+        setTitle(snapTitle && snapTitle !== "(제목)" ? snapTitle : t.title);
+        const fromPick1 = (pick.cardExtraLine1 ?? "").trim();
+        const fromPick2 = (pick.cardExtraLine2 ?? "").trim();
+        setTextLine1(fromPick1 || summaryLine1);
+        setTextLine2(fromPick2 || prizeLine1 || summaryLine2);
         setCardTemplate(pick.tournamentCardTemplate === "B" ? "B" : "A");
         setThemeType(
           pick.tournamentTheme === "light" ? "light" : pick.tournamentTheme === "natural" ? "natural" : "dark"
@@ -238,24 +357,18 @@ export default function ClientTournamentCardPublishPage() {
           setImageOverlayBlend(false);
           setImageOverlayOpacity(1);
         }
-        const dRaw =
-          typeof pick.tournamentCardDisplayDate === "string"
-            ? pick.tournamentCardDisplayDate
-            : typeof t.date === "string"
-              ? t.date
-              : "";
-        const locRaw =
-          typeof pick.tournamentCardDisplayLocation === "string"
-            ? pick.tournamentCardDisplayLocation
-            : typeof t.location === "string"
-              ? t.location
-              : "";
+        const storedDate =
+          typeof pick.tournamentCardDisplayDate === "string" ? pick.tournamentCardDisplayDate.trim() : "";
+        const dRaw = storedDate || (typeof t.date === "string" ? t.date : "");
+        const storedLoc =
+          typeof pick.tournamentCardDisplayLocation === "string" ? pick.tournamentCardDisplayLocation.trim() : "";
+        const locRaw = storedLoc || (typeof t.location === "string" ? t.location : "");
         setCardDate(dRaw ? formatCardDateForDisplay(dRaw) : "");
         setCardPlace(locRaw ? venueNameOnly(locRaw) : "");
       } else {
         setTitle(t.title);
-        setTextLine1("");
-        setTextLine2("");
+        setTextLine1(summaryLine1);
+        setTextLine2(prizeLine1 || summaryLine2);
         setUploadedImage(null);
         setV2MediaMode("on");
         setMediaBackground("");
@@ -267,7 +380,7 @@ export default function ClientTournamentCardPublishPage() {
         setCardPlace(loc0 ? venueNameOnly(loc0) : "");
       }
     } catch {
-      /* noop */
+      setMessage("카드 정보를 불러오는 중 오류가 발생했습니다.");
     }
   }, [tournamentId]);
 
@@ -336,6 +449,8 @@ export default function ClientTournamentCardPublishPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      /** 메인 슬라이드 등 공개 페이지에서 `/site-images/...` 로 노출되도록 */
+      formData.append("sitePublic", "1");
       const response = await fetch("/api/upload/image", {
         method: "POST",
         body: formData,
@@ -368,15 +483,6 @@ export default function ClientTournamentCardPublishPage() {
   function clearBackgroundFileSelection() {
     if (bgFileInputRef.current) bgFileInputRef.current.value = "";
     if (uploadedImage) clearImage();
-  }
-
-  const colorPickerValue = /^#[0-9A-Fa-f]{6}$/.test(mediaBackground.trim())
-    ? mediaBackground.trim()
-    : "#1e293b";
-
-  function onColorPick(e: ChangeEvent<HTMLInputElement>) {
-    activateV2Media();
-    setMediaBackground(e.target.value);
   }
 
   return (
@@ -509,18 +615,49 @@ export default function ClientTournamentCardPublishPage() {
             </>
           ) : (
             <>
-              <label className={editorStyles.field}>
+              <div className={editorStyles.field}>
                 <span className={editorStyles.fieldLabel}>카드 배경색</span>
-                <div className={editorStyles.bgRow}>
-                  <input
-                    type="color"
-                    aria-label="카드 배경색"
-                    className={editorStyles.colorPick}
-                    value={colorPickerValue}
-                    onChange={onColorPick}
-                  />
+                <div
+                  className="card-publish-color-grid"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(8, 34px)",
+                    gap: "7px",
+                    justifyContent: "center",
+                    width: "100%",
+                    maxWidth: "max-content",
+                    margin: "0.35rem auto 0",
+                  }}
+                >
+                  {CARD_COLOR_PALETTE_64.map((hex, index) => {
+                    const selected = mediaBackground.trim().toLowerCase() === hex.toLowerCase();
+                    return (
+                      <button
+                        key={`card-color-${index}-${hex}`}
+                        type="button"
+                        aria-label={`배경색 ${hex}`}
+                        className="card-publish-color-swatch"
+                        style={{
+                          width: 34,
+                          height: 34,
+                          padding: 0,
+                          border: "none",
+                          borderRadius: 7,
+                          backgroundColor: hex,
+                          cursor: "pointer",
+                          boxSizing: "border-box",
+                          outline: selected ? "2px solid #ffffff" : "none",
+                          boxShadow: selected ? "0 0 0 2px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.25)" : "none",
+                        }}
+                        onClick={() => {
+                          activateV2Media();
+                          setMediaBackground(hex);
+                        }}
+                      />
+                    );
+                  })}
                 </div>
-              </label>
+              </div>
 
               <div className={editorStyles.field}>
                 <span className={editorStyles.fieldLabel}>배경 이미지</span>

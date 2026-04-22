@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "seed:test-tournament-cards": "node scripts/seed-test-tournament-cards.mjs"
+    "seed:test-tournament-cards": "node scripts/seed-test-tournament-cards.mjs",
+    "seed:virtual-clients": "node scripts/seed-virtual-clients.mjs",
+    "patch:virtual-client-venues": "node scripts/patch-virtual-client-venues.mjs",
+    "seed:virtual-client-tournaments": "node scripts/seed-virtual-client-tournaments.mjs",
+    "seed:virtual-players": "node scripts/seed-virtual-players.mjs"
   },
   "dependencies": {
     "@tiptap/extension-color": "^3.22.3",

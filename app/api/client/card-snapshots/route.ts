@@ -182,6 +182,8 @@ export async function GET(request: Request) {
       date: tournament.date,
       location: tournament.location,
       statusBadge: tournament.statusBadge,
+      summary: tournament.summary,
+      prizeInfo: tournament.prizeInfo,
     },
   });
 }

@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type PointerEventHandler,
-  type WheelEventHandler,
-} from "react";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEventHandler } from "react";
 import styles from "./main-scene-slide-deck.module.css";
 import { SlideDeckCard, type SlideDeckItem } from "./tournament-slide-card";
 
@@ -35,8 +28,10 @@ const OUTGOING_SCALE_TARGET = 0;
 const MANUAL_RESUME_DELAY_MS = 1800;
 const WHEEL_SCENE_STEP = 240;
 const DRAG_SCENE_STEP = 220;
-/** 루트 스와이프 `LOCK_MIN_PX` 와 동일 — 미확정 시 포인터 캡처·세로 드래그 금지 */
-const AXIS_LOCK_MIN_PX = 10;
+/** 루트 탭 스와이프보다 크게 — 미세한 대각선에서 덱이 먼저 잡히지 않게 */
+const DECK_AXIS_LOCK_MIN_PX = 26;
+/** 세로(페이지 스크롤)와 구분: 세로 성분이 이만큼 더 커야 덱 세로 조작으로 확정 */
+const DECK_VERTICAL_DOMINANCE = 1.38;
 
 const RETREAT_PTS: {
   p: number;
@@ -199,6 +194,7 @@ export default function MainSceneSlideDeck({
   const pausedAtMsRef = useRef<number | null>(null);
   const pausedAccumulatedMsRef = useRef(0);
   const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deckRef = useRef<HTMLDivElement | null>(null);
   const draggingRef = useRef(false);
   const dragStartYRef = useRef(0);
   const dragStartXRef = useRef(0);
@@ -221,6 +217,30 @@ export default function MainSceneSlideDeck({
 
   const n = items.length;
 
+  /** React 합성 wheel은 브라우저에 따라 passive로 등록되어 preventDefault 경고가 난다. 네이티브만 non-passive. */
+  useEffect(() => {
+    const el = deckRef.current;
+    if (!el || n === 0) return;
+    const onWheelNative = (e: WheelEvent) => {
+      e.preventDefault();
+      if (pausedAtMsRef.current == null) {
+        pausedAtMsRef.current = Date.now();
+      }
+      sceneOffsetRef.current -= e.deltaY / WHEEL_SCENE_STEP;
+      setFrameTime(Date.now());
+      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+      resumeTimerRef.current = setTimeout(() => {
+        if (!draggingRef.current) resumeAuto();
+        resumeTimerRef.current = null;
+      }, MANUAL_RESUME_DELAY_MS);
+    };
+    const wheelOpts: AddEventListenerOptions = { passive: false };
+    el.addEventListener("wheel", onWheelNative, wheelOpts);
+    return () => {
+      el.removeEventListener("wheel", onWheelNative, wheelOpts);
+    };
+  }, [n]);
+
   const pauseAuto = () => {
     if (pausedAtMsRef.current == null) {
       pausedAtMsRef.current = Date.now();
@@ -241,14 +261,6 @@ export default function MainSceneSlideDeck({
     }, MANUAL_RESUME_DELAY_MS);
   };
 
-  const onWheel: WheelEventHandler<HTMLDivElement> = (e) => {
-    e.preventDefault();
-    pauseAuto();
-    sceneOffsetRef.current -= e.deltaY / WHEEL_SCENE_STEP;
-    setFrameTime(Date.now());
-    scheduleAutoResume();
-  };
-
   const onPointerDown: PointerEventHandler<HTMLDivElement> = (e) => {
     if (e.button !== 0) return;
     draggingRef.current = true;
@@ -267,14 +279,15 @@ export default function MainSceneSlideDeck({
     const ady = Math.abs(dy);
 
     if (axisRef.current === "undecided") {
-      if (adx < AXIS_LOCK_MIN_PX && ady < AXIS_LOCK_MIN_PX) return;
-      if (ady >= adx) {
+      if (adx < DECK_AXIS_LOCK_MIN_PX && ady < DECK_AXIS_LOCK_MIN_PX) return;
+      if (ady >= adx * DECK_VERTICAL_DOMINANCE) {
         axisRef.current = "vertical";
         try {
           e.currentTarget.setPointerCapture(e.pointerId);
         } catch {
           /* noop */
         }
+        e.currentTarget.style.touchAction = "none";
       } else {
         axisRef.current = "horizontal";
         return;
@@ -292,6 +305,7 @@ export default function MainSceneSlideDeck({
     if (!draggingRef.current) return;
     draggingRef.current = false;
     axisRef.current = "undecided";
+    target.style.removeProperty("touch-action");
     try {
       target.releasePointerCapture(pointerId);
     } catch {
@@ -354,8 +368,8 @@ export default function MainSceneSlideDeck({
       </div>
     ) : (
       <div
+        ref={deckRef}
         className={styles.slideDeck}
-        onWheel={onWheel}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

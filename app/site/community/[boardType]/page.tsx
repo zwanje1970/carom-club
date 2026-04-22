@@ -62,14 +62,16 @@ export default async function SiteCommunityBoardListPage({ params, searchParams 
         </>
       }
     >
-      <CommunityBoardSwipeShell tabs={tabItems.map(({ key, href }) => ({ key, href }))}>
-        <section className="site-site-gray-main v3-stack ui-community-page">
-          <CommunityBoardPostList showRoomPrefix={false} items={items} />
-          <Link href={writeHref} className="community-write-fab" aria-label={`${listBoardLabel} 글쓰기`}>
-            <span aria-hidden>+</span>
-          </Link>
-        </section>
-      </CommunityBoardSwipeShell>
+      <>
+        <CommunityBoardSwipeShell tabs={tabItems.map(({ key, href }) => ({ key, href }))}>
+          <section className="site-site-gray-main v3-stack ui-community-page">
+            <CommunityBoardPostList showRoomPrefix={false} items={items} />
+          </section>
+        </CommunityBoardSwipeShell>
+        <Link href={writeHref} className="community-write-fab" aria-label={`${listBoardLabel} 글쓰기`}>
+          <span aria-hidden>+</span>
+        </Link>
+      </>
     </SiteShellFrame>
   );
 }

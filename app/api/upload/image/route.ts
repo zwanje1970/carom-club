@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import sharp from "sharp";
+import { getProofImagesBaseDir } from "../../../../lib/server/proof-images-base-dir";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
   const imageId = randomUUID();
   const buffer = Buffer.from(await imageFile.arrayBuffer());
 
-  const baseUploadDir = path.join(process.cwd(), "data", "proof-images");
+  const baseUploadDir = getProofImagesBaseDir();
   const originalDir = path.join(baseUploadDir, "original");
   const w320Dir = path.join(baseUploadDir, "w320");
   const w640Dir = path.join(baseUploadDir, "w640");

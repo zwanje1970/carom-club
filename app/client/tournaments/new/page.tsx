@@ -1450,7 +1450,7 @@ export default function ClientTournamentNewPage() {
 
           <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-end" }}>
             <label className="v3-stack" style={{ flex: "1 1 14rem" }}>
-              <span>점수 또는 에버(스카치시 합산 입력)</span>
+              <span>점수 또는 에버(스카치 접수시 합산점수 입력)</span>
               <input
                 inputMode="decimal"
                 disabled={entryQualificationType === "NONE"}

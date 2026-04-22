@@ -17,10 +17,29 @@ function safeNextPath(raw: string | null | undefined): string | null {
   }
 }
 
+/** `next`에 붙은 `?…`·`#…` 제거 — 미들웨어가 `pathname+search`로 넘기면 경로만 비교해야 함 */
+function pathOnly(href: string): string {
+  const q = href.indexOf("?");
+  const h = href.indexOf("#");
+  let end = href.length;
+  if (q >= 0) end = Math.min(end, q);
+  if (h >= 0) end = Math.min(end, h);
+  return href.slice(0, end);
+}
+
 function defaultPathAfterLogin(role: AuthRole): string {
   if (role === "PLATFORM") return "/platform";
   if (role === "CLIENT") return "/client";
-  return "/site";
+  return "/";
+}
+
+/** 일반 회원: 로그인 직후 마이페이지·공개 홈으로만 보내지 않고 루트 메인(`/`)으로 통일 */
+function resolveUserPostLoginDest(dest: string): string {
+  const p = pathOnly(dest);
+  if (p === "/" || p === "/site" || p.startsWith("/site/mypage")) {
+    return "/";
+  }
+  return dest;
 }
 
 export default function LoginPage() {
@@ -84,8 +103,8 @@ export default function LoginPage() {
       } else {
         dest = defaultPathAfterLogin(role);
       }
-      if (role === "USER" && (dest === "/" || dest === "/site/mypage" || dest.startsWith("/site/mypage/"))) {
-        dest = "/site";
+      if (role === "USER") {
+        dest = resolveUserPostLoginDest(dest);
       }
 
       router.push(dest);

@@ -5,6 +5,7 @@
  */
 import { readFile } from "fs/promises";
 import path from "path";
+import { getProofImagesBaseDir } from "./proof-images-base-dir";
 import {
   completeTournamentApplicationOcr,
   getProofImageAssetById,
@@ -25,7 +26,7 @@ export type OcrRecognitionResult = {
 };
 
 function resolveProofImageAbsolutePath(params: { imageId: string; originalExt: "jpg" | "png" | "webp" }): string {
-  return path.join(process.cwd(), "data", "proof-images", "original", `${params.imageId}.${params.originalExt}`);
+  return path.join(getProofImagesBaseDir(), "original", `${params.imageId}.${params.originalExt}`);
 }
 
 async function runMockOcr(application: TournamentApplication): Promise<OcrRecognitionResult> {

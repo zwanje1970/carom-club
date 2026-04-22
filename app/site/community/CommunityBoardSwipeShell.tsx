@@ -83,6 +83,8 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
   } | null>(null);
   const samplesRef = useRef<{ t: number; x: number }[]>([]);
   const navHrefRef = useRef<string | null>(null);
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
 
   const activeIdx = swipeIndexForPathname(pathname, tabs);
   const n = tabs.length;
@@ -215,7 +217,7 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
         return;
       }
 
-      const href = tabs[nextIdx]!.href;
+      const href = tabsRef.current[nextIdx]!.href;
       animatingRef.current = true;
       navHrefRef.current = href;
 
@@ -276,7 +278,7 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
       el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("touchcancel", onTouchCancel);
     };
-  }, [pathname, router, tabs, activeIdx, n, setTrackTransform]);
+  }, [pathname, router, activeIdx, n, setTrackTransform]);
 
   if (n < 2 || activeIdx < 0) {
     return <>{children}</>;

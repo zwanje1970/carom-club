@@ -22,7 +22,10 @@ export function normalizeSiteRootPathname(pathname: string): string {
   return pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
 }
 
-/** 터치 처리 시점의 실제 URL(클라이언트) — React pathname과 어긋나면 잘못된 prev/next가 나올 수 있음 */
+/**
+ * `window.location` 우선값 — RSC `children`과 `usePathname()`이 한 프레임 어긋날 수 있어
+ * 루트 스와이프 prev/next 계산에는 쓰지 않는 것이 안전하다.
+ */
 export function siteRootSwipePathnameNow(fallbackFromHook: string): string {
   if (typeof window !== "undefined" && typeof window.location?.pathname === "string") {
     return window.location.pathname;

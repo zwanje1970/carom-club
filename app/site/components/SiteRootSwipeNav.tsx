@@ -7,7 +7,6 @@ import {
   isSiteRootSwipePath,
   siteRootSwipeHrefAt,
   siteRootSwipeIndex,
-  siteRootSwipePathnameNow,
   SITE_ROOT_SWIPE_NAV,
 } from "../lib/site-root-swipe-order";
 
@@ -87,6 +86,8 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
   } | null>(null);
   const samplesRef = useRef<{ t: number; x: number }[]>([]);
   const navAfterTransitionRef = useRef<string | null>(null);
+  /** 수평 스와이프 확정 시점의 탭 인덱스 — 제스처 끝까지 `window.location` vs React pathname 불일치로 이웃 iframe이 한 칸 밀리지 않게 고정 */
+  const gestureAnchorIdxRef = useRef<number | null>(null);
 
   const applyTransform = useCallback((dragPx: number, withTransition: boolean) => {
     const track = trackRef.current;
@@ -104,6 +105,7 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
   useLayoutEffect(() => {
     animatingRef.current = false;
     navAfterTransitionRef.current = null;
+    gestureAnchorIdxRef.current = null;
     dragPxRef.current = 0;
     releaseViewportTouchAxisLock();
     if (trackRef.current) applyTransform(0, false);
@@ -120,6 +122,13 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       if (cooldownUntilRef.current > Date.now()) return;
       const t = e.touches[0];
       if (!t) return;
+      if (
+        isCommunityBoardListHubPath(pathname) &&
+        e.target instanceof Element &&
+        e.target.closest("[data-community-inner-swipe]")
+      ) {
+        return;
+      }
       const w = window.innerWidth;
       const x = t.clientX;
       const edgeSkip = x < EDGE_EXCLUDE_PX || x > w - EDGE_EXCLUDE_PX;
@@ -140,8 +149,7 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       if (!window.matchMedia("(max-width: 767px)").matches) return;
       const start = startRef.current;
       if (!start || start.blocked || animatingRef.current) return;
-      const live = siteRootSwipePathnameNow(pathname);
-      if (!isSiteRootSwipePath(live)) return;
+      if (!isSiteRootSwipePath(pathname)) return;
       const t = e.touches[0];
       if (!t) return;
 
@@ -160,14 +168,21 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
           start.verticalDominant = true;
           return;
         }
-        const live = siteRootSwipePathnameNow(pathname);
-        if (isCommunityBoardListHubPath(live)) {
+        if (
+          isCommunityBoardListHubPath(pathname) &&
+          e.target instanceof Element &&
+          e.target.closest("[data-community-inner-swipe]")
+        ) {
+          return;
+        }
+        if (isCommunityBoardListHubPath(pathname)) {
           const edge = communitySwipeEdgeFromTarget(e.target) ?? "middle";
           if (edge === "first" && dx < 0) return;
           if (edge === "last" && dx > 0) return;
           if (edge === "middle") return;
         }
         start.horizontalLocked = true;
+        gestureAnchorIdxRef.current = siteRootSwipeIndex(pathname);
         const vp = viewportRef.current;
         if (vp) vp.style.setProperty("touch-action", "none");
       }
@@ -179,7 +194,7 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       const tail = samplesRef.current;
       if (tail.length > 12) samplesRef.current = tail.slice(-12);
 
-      const idx = siteRootSwipeIndex(live);
+      const idx = gestureAnchorIdxRef.current ?? siteRootSwipeIndex(pathname);
       if (idx < 0) return;
 
       let raw = dx * FOLLOW_RATIO;
@@ -213,18 +228,28 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       samplesRef.current = [];
       releaseViewportTouchAxisLock();
 
-      if (!start || start.blocked || animatingRef.current) return;
-      const live = siteRootSwipePathnameNow(pathname);
-      if (!isSiteRootSwipePath(live)) return;
+      if (!start || start.blocked || animatingRef.current) {
+        gestureAnchorIdxRef.current = null;
+        return;
+      }
+      if (!isSiteRootSwipePath(pathname)) {
+        gestureAnchorIdxRef.current = null;
+        return;
+      }
 
-      if (!t) return;
+      if (!t) {
+        gestureAnchorIdxRef.current = null;
+        return;
+      }
 
       if (!start.horizontalLocked || start.verticalDominant) {
+        gestureAnchorIdxRef.current = null;
         if (dragPxRef.current !== 0) applyTransform(0, true);
         return;
       }
 
-      const idx = siteRootSwipeIndex(live);
+      const idx = gestureAnchorIdxRef.current ?? siteRootSwipeIndex(pathname);
+      gestureAnchorIdxRef.current = null;
       if (idx < 0) return;
 
       const vw = window.innerWidth;
@@ -293,6 +318,7 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
     const onTouchCancel = () => {
       startRef.current = null;
       samplesRef.current = [];
+      gestureAnchorIdxRef.current = null;
       releaseViewportTouchAxisLock();
       if (dragPxRef.current !== 0 && !animatingRef.current) applyTransform(0, true);
     };
@@ -316,8 +342,7 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
 
   if (children == null) return null;
 
-  const swipePath = siteRootSwipePathnameNow(pathname);
-  const swipeIdx = siteRootSwipeIndex(swipePath);
+  const swipeIdx = siteRootSwipeIndex(pathname);
   const prevHref = siteRootSwipeHrefAt(swipeIdx - 1);
   const nextHref = siteRootSwipeHrefAt(swipeIdx + 1);
 

@@ -115,7 +115,8 @@
     #141416 100%
   );
   box-shadow: none;
-  touch-action: none;
+  /* 세로 페이지 스크롤 허용 — 덱 세로 조작 확정 시에만 인라인으로 touch-action:none 전환 */
+  touch-action: pan-y;
 }
 
 /* 메인 홈: 슬라이드 상단을 다크 배경 상단과 맞춤 */

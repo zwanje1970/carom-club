@@ -1,5 +1,6 @@
 import { readFile } from "fs/promises";
 import path from "path";
+import { getProofImagesBaseDir } from "./proof-images-base-dir";
 
 export type ProofImageOriginalExt = "jpg" | "png" | "webp";
 
@@ -18,7 +19,7 @@ export async function readProofImageVariantFile(
   variant: "original" | "w320" | "w640",
   originalExt: ProofImageOriginalExt
 ): Promise<{ buffer: Buffer; ext: string } | null> {
-  const dir = path.join(process.cwd(), "data", "proof-images", variant);
+  const dir = path.join(getProofImagesBaseDir(), variant);
   if (variant === "original") {
     const p = path.join(dir, `${imageId}.${originalExt}`);
     try {

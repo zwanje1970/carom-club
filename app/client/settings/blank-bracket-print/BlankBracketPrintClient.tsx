@@ -130,6 +130,37 @@ export default function BlankBracketPrintClient() {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+  .preview-chrome {
+    position: sticky;
+    top: 0;
+    z-index: 9999;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    background: #0f172a;
+    color: #f8fafc;
+    font-family: system-ui, "Segoe UI", sans-serif;
+    border-bottom: 1px solid #334155;
+  }
+  .preview-chrome strong { font-size: 0.95rem; }
+  .preview-chrome button {
+    min-height: 44px;
+    padding: 0 18px;
+    font-size: 1rem;
+    font-weight: 700;
+    border: none;
+    border-radius: 10px;
+    background: #f59e0b;
+    color: #111827;
+    cursor: pointer;
+  }
+  .preview-chrome .preview-chrome-note { font-size: 12px; color: #94a3b8; width: 100%; margin: 0; line-height: 1.35; }
   .hint { margin-top: 12px; font-size: 13px; color: #64748b; text-align: center; max-width: 40rem; }
   .bbp-match-box {
     fill: #ffffff;
@@ -145,6 +176,7 @@ export default function BlankBracketPrintClient() {
     html, body { background: #fff; }
     body { padding: 0; display: block; }
     .sheet { box-shadow: none; width: auto; min-height: auto; padding: 0; }
+    .preview-chrome { display: none !important; }
     .hint { display: none; }
     .bbp-print-service-mark {
       position: absolute;
@@ -156,6 +188,11 @@ export default function BlankBracketPrintClient() {
 </style>
 </head>
 <body>
+  <div class="preview-chrome" role="region" aria-label="미리보기 도구">
+    <strong>빈 대진표 미리보기</strong>
+    <button type="button" onclick="window.close()">닫기</button>
+    <p class="preview-chrome-note">이 창은 새 탭으로 열렸습니다. 뒤로가기 대신 위 <b>닫기</b>를 눌러 주세요.</p>
+  </div>
   <div class="sheet">${inner}</div>
   <p class="hint">인쇄는 브라우저 메뉴의 인쇄(Ctrl+P)를 사용하세요.</p>
 </body>
@@ -451,10 +488,19 @@ function MobilePrintPreviewLayer({
   const paperW = A4_LANDSCAPE_W;
   const paperH = A4_LANDSCAPE_H;
 
-  const scale = useMemo(
-    () => Math.min(Math.max(vw - 32, 1) / paperW, Math.max(vh - 32, 1) / paperH),
-    [vw, vh, paperW, paperH],
-  );
+  /** 세로 홀드에서는 가로 용지가 과도하게 작아지지 않도록 최소 배율을 두고, 가로·세로 스크롤로 전체를 본다. */
+  const scale = useMemo(() => {
+    const padX = 16;
+    const toolbarReserve = 96;
+    const byW = Math.max(vw - padX * 2, 1) / paperW;
+    const byH = Math.max(vh - toolbarReserve, 1) / paperH;
+    const portrait = vw < vh;
+    if (!portrait) {
+      return Math.min(byW, byH, 1);
+    }
+    const floor = 0.42;
+    return Math.min(Math.max(byW, Math.min(floor, byH)), 1.15);
+  }, [vw, vh, paperW, paperH]);
 
   const bracketSceneRef = useRef<HTMLDivElement>(null);
   const [serviceMarkOverlay, setServiceMarkOverlay] = useState<CSSProperties | null>(null);
@@ -503,6 +549,8 @@ function MobilePrintPreviewLayer({
         overflow: "hidden",
         overscrollBehavior: "contain",
         touchAction: "none",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       <div
@@ -510,32 +558,63 @@ function MobilePrintPreviewLayer({
         style={{
           pointerEvents: "none",
           width: "100%",
-          height: "100%",
+          flex: 1,
+          minHeight: 0,
           display: "flex",
           flexDirection: "column",
-          alignItems: "center",
+          alignItems: "stretch",
           justifyContent: "flex-start",
-          padding: "16px",
+          padding: "12px 12px 16px",
           boxSizing: "border-box",
-          gap: "10px",
+          gap: "8px",
         }}
       >
         <div
           className="bbp-preview-toolbar"
           onClick={(e) => e.stopPropagation()}
-          style={{ pointerEvents: "auto", flexShrink: 0 }}
+          style={{
+            pointerEvents: "auto",
+            flexShrink: 0,
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "10px",
+          }}
         >
-          <p className="v3-muted" style={{ margin: 0, fontSize: "0.85rem", textAlign: "center" }}>
+          <p className="v3-muted" style={{ margin: 0, fontSize: "0.85rem", textAlign: "center", flex: "1 1 auto" }}>
             A4 가로 (인쇄·PDF와 동일)
           </p>
+          <button
+            type="button"
+            className="v3-btn"
+            onClick={onBackdropClose}
+            style={{ minHeight: "44px", padding: "0.5rem 1.1rem", fontWeight: 800 }}
+          >
+            닫기
+          </button>
         </div>
         <div
-          className="bbp-preview-paper-frame"
           onClick={(e) => e.stopPropagation()}
           style={{
             pointerEvents: "auto",
+            flex: 1,
+            minHeight: 0,
+            width: "100%",
+            overflow: "auto",
+            WebkitOverflowScrolling: "touch",
+            touchAction: "pan-x pan-y",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "flex-start",
+          }}
+        >
+        <div
+          className="bbp-preview-paper-frame"
+          style={{
             transform: `scale(${scale})`,
             transformOrigin: "top center",
+            flexShrink: 0,
           }}
         >
           <div
@@ -563,6 +642,7 @@ function MobilePrintPreviewLayer({
               />
             </div>
           </div>
+        </div>
         </div>
       </div>
       {serviceMarkOverlay ? <BracketPrintServiceMark overlayStyle={serviceMarkOverlay} /> : null}

@@ -324,6 +324,8 @@ export type Tournament = {
   outlinePdfUrl: string | null;
   /** 사이트 당구장안내 상세(`/site/venues/{id}`)로 연결할 당구장 ID. 없으면 null */
   venueGuideVenueId: string | null;
+  /** 로컬 dev-store 시드 출처(예: lib/dev-seed-source.ts 상수). 수동·운영 대회에는 두지 않음 */
+  devSeedSource?: string | null;
   /** 없는 구 데이터는 로드 시 기본값으로 채움 */
   rule: TournamentRuleSnapshot;
 };
@@ -794,10 +796,11 @@ const STORE_LAST_GOOD_PATH = path.join(STORE_DIR_PATH, "v3-dev-store.json.last-g
 
 /**
  * 로컬 v3-dev-store.json 기반 영속 쓰기 허용 여부.
- * 운영(NODE_ENV=production)에서는 읽기만 하고 파일·tmp·백업 쓰기는 하지 않는다.
+ * 운영 빌드 + Firestore 사용자 백엔드가 준비된 경우에만 JSON 파일 쓰기를 끈다.
+ * 운영 빌드이지만 Firestore 미설정(로컬 `next start` 등)일 때는 회원가입 등이 JSON에 반영되도록 쓰기를 허용한다.
  */
 export function isDevStoreFilePersistenceEnabled(): boolean {
-  return process.env.NODE_ENV !== "production";
+  return process.env.NODE_ENV !== "production" || !isFirestoreUsersBackendConfigured();
 }
 
 /** 운영(production) + Firebase 자격 증명이 있을 때만: 회원·로그인 사용자 레코드는 Firestore, dev-store JSON 사용자 테이블은 보조(시드 관리자 등) */
@@ -1768,6 +1771,10 @@ function buildTournamentFromParsedRow(raw: unknown, clientOrganizations: ClientO
   const eventDates = parseTournamentEventDates(t.eventDates);
   const extraVenues = parseTournamentExtraVenues(t.extraVenues);
 
+  const dsRaw = t.devSeedSource;
+  const devSeedSource =
+    typeof dsRaw === "string" && dsRaw.trim() !== "" ? dsRaw.trim() : null;
+
   return {
     id,
     title,
@@ -1788,6 +1795,7 @@ function buildTournamentFromParsedRow(raw: unknown, clientOrganizations: ClientO
     outlineImageUrl,
     outlinePdfUrl,
     venueGuideVenueId,
+    ...(devSeedSource ? { devSeedSource } : {}),
     rule,
   };
 }
@@ -3016,13 +3024,7 @@ export async function createUser(params: {
   if (!password) return { ok: false, error: "비밀번호를 입력해 주세요." };
   if (!nickResult.ok) return { ok: false, error: nickResult.error };
 
-  if (process.env.NODE_ENV === "production") {
-    if (!isFirestoreUsersBackendConfigured()) {
-      console.error(
-        "[dev-store] production 회원가입: Firestore 자격 증명(FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY)이 없습니다."
-      );
-      return { ok: false, error: "일시적으로 가입을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요." };
-    }
+  if (useFirestoreUsersInProduction()) {
     try {
       const duplicatedFs = await firestoreHasDuplicateIdentity({
         loginIdNorm: loginId,
@@ -7850,3 +7852,5 @@ export async function setCardSnapshotActive(params: {
     },
   };
 }
+
+export { DEV_SEED_SOURCE_VIRT_CLIENT_TOURNAMENT_V1 } from "../dev-seed-source";
