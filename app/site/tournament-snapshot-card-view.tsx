@@ -17,6 +17,8 @@ export type SlideDeckItem = {
   statusBadge?: string;
   cardExtraLine1?: string | null;
   cardExtraLine2?: string | null;
+  /** 템플릿 TournamentPostCard descriptionText2 에 대응 */
+  cardExtraLine3?: string | null;
   cardTemplate?: "A" | "B";
   backgroundType?: "image" | "theme";
   themeType?: "dark" | "light" | "natural";
@@ -32,6 +34,7 @@ type TournamentSlidePreviewItem = {
   statusBadge?: string;
   cardExtraLine1?: string | null;
   cardExtraLine2?: string | null;
+  cardExtraLine3?: string | null;
   image320Url?: string;
   mediaBackground?: string;
   imageOverlayBlend?: boolean;
@@ -48,6 +51,7 @@ function slideDeckItemToPreviewItem(item: SlideDeckItem): TournamentSlidePreview
     statusBadge: item.statusBadge,
     cardExtraLine1: item.cardExtraLine1,
     cardExtraLine2: item.cardExtraLine2,
+    cardExtraLine3: item.cardExtraLine3,
     image320Url: useBgImage ? item.image320Url!.trim() : undefined,
     mediaBackground: item.mediaBackground,
     imageOverlayBlend: item.imageOverlayBlend,
@@ -118,19 +122,29 @@ function TournamentSlideCardPreview({
   item,
   variant,
   slideDeck,
+  templateCardLayout,
 }: {
   item: TournamentSlidePreviewItem;
   variant: SlidePreviewVariant;
   /** 메인 슬라이드 창: 그림자를 창 안쪽으로만 두는 전용 스타일 */
   slideDeck?: boolean;
+  /** 템플릿 TournamentPostCard + SlideDeck 카드 규격(작성 미리보기·슬라이드 공통) */
+  templateCardLayout?: boolean;
 }) {
   const status = toStatus(item.statusBadge);
   const parsed = parseSubtitle(item.subtitle);
   const lead = (item.cardExtraLine1 ?? "").trim();
   const description = (item.cardExtraLine2 ?? "").trim();
+  const description2 = (item.cardExtraLine3 ?? "").trim();
   const statusBadge = <TournamentStatusBadge status={status} />;
 
-  const rootClass = [styles.cardRoot, slideDeck ? styles.cardRootSlideDeck : ""].filter(Boolean).join(" ");
+  const rootClass = [
+    styles.cardRoot,
+    slideDeck ? styles.cardRootSlideDeck : "",
+    templateCardLayout ? styles.cardRootTemplateLayout : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   if (variant === "classic") {
     return (
@@ -142,6 +156,7 @@ function TournamentSlideCardPreview({
                 {lead ? <p className={styles.classicLead}>{lead}</p> : null}
                 <h3 className={styles.classicTitle}>{item.title || "(제목)"}</h3>
                 {description ? <p className={styles.classicDesc}>{description}</p> : null}
+                {description2 ? <p className={styles.classicDescSecondary}>{description2}</p> : null}
               </div>
             </div>
           </div>
@@ -163,6 +178,7 @@ function TournamentSlideCardPreview({
               {lead ? <p className={styles.frameLead}>{lead}</p> : null}
               <h3 className={styles.frameTitle}>{item.title || "(제목)"}</h3>
               {description ? <p className={styles.frameDesc}>{description}</p> : null}
+              {description2 ? <p className={styles.frameDescSecondary}>{description2}</p> : null}
             </div>
           </div>
         </MediaStack>
@@ -178,11 +194,26 @@ function TournamentSlideCardPreview({
   return _exhaustive;
 }
 
-export function TournamentSnapshotCardView({ item, slideDeck = false }: { item: SlideDeckItem; slideDeck?: boolean }) {
+export function TournamentSnapshotCardView({
+  item,
+  slideDeck = false,
+  templateCardLayout = false,
+}: {
+  item: SlideDeckItem;
+  slideDeck?: boolean;
+  templateCardLayout?: boolean;
+}) {
   const previewItem = slideDeckItemToPreviewItem(item);
   const variant: SlidePreviewVariant = item.cardTemplate === "B" ? "frame" : "classic";
   const href = (item.targetDetailUrl ?? "").trim();
-  const inner = <TournamentSlideCardPreview item={previewItem} variant={variant} slideDeck={slideDeck} />;
+  const inner = (
+    <TournamentSlideCardPreview
+      item={previewItem}
+      variant={variant}
+      slideDeck={slideDeck}
+      templateCardLayout={templateCardLayout}
+    />
+  );
   if (!href) return inner;
   return (
     <Link
@@ -203,5 +234,5 @@ export function TournamentSnapshotCardView({ item, slideDeck = false }: { item: 
 }
 
 export function SlideDeckCard({ item }: { item: SlideDeckItem }) {
-  return <TournamentSnapshotCardView item={item} slideDeck />;
+  return <TournamentSnapshotCardView item={item} slideDeck templateCardLayout />;
 }

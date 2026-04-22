@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 
 import { getSiteLayoutConfig } from "../../../lib/server/dev-store";
 import { getSiteUnreadNotificationCount } from "../../../lib/server/site-unread-notification-count";
+import { filterPcHeaderAdminMenuItems, getPcSiteHeaderAdminFlags } from "../lib/site-pc-header-admin";
 import SiteChromeHeader, { isPublicSiteMobileView } from "./SiteChromeHeader";
 import SiteVenuesGeolocationNav from "./SiteVenuesGeolocationNav";
 
@@ -12,14 +13,17 @@ export default async function SitePcDashboardChromeShell() {
 
   const siteConfig = await getSiteLayoutConfig();
   const unreadNotificationCount = await getSiteUnreadNotificationCount();
+  const pcAdminEntry = await getPcSiteHeaderAdminFlags();
+  const pcHeaderMenuItems = filterPcHeaderAdminMenuItems(siteConfig.header.pc.menuItems);
 
   return (
     <div className="site-shell site-shell--pc-site-chrome site-shell--dashboard-chrome-header">
       <div className="site-shell-pc-constrain">
         <SiteVenuesGeolocationNav />
         <SiteChromeHeader
-          menuItems={siteConfig.header.pc.menuItems}
+          menuItems={pcHeaderMenuItems}
           unreadNotificationCount={unreadNotificationCount}
+          pcAdminEntry={pcAdminEntry}
         />
       </div>
     </div>

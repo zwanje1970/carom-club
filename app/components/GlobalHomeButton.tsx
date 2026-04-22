@@ -12,6 +12,7 @@ function isInquiryDetailWithComposer(pathname: string): boolean {
 }
 
 const SITE_NAV_ITEMS = SITE_ROOT_SWIPE_NAV.map((item) => ({
+  key: item.key,
   href: item.href,
   label: item.label,
 }));
@@ -41,7 +42,13 @@ export default function GlobalHomeButton() {
       <nav className="site-mobile-bottom-nav" aria-label="사이트 하단 메뉴">
         {SITE_NAV_ITEMS.map((item) => {
           const active = navItemActive(pathname, item.href);
-          const cls = `site-mobile-bottom-nav__link${active ? " site-mobile-bottom-nav__link--active" : ""}`;
+          const cls = [
+            "site-mobile-bottom-nav__link",
+            item.key === "home" ? "site-mobile-bottom-nav__link--home" : "",
+            active ? "site-mobile-bottom-nav__link--active" : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
           const inner = <span className="site-mobile-bottom-nav__label">{item.label}</span>;
           return item.href.startsWith("/site/venues") ? (
             <VenuesDistanceNavLink

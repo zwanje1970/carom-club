@@ -62,6 +62,7 @@ export async function POST(request: Request) {
     title?: unknown;
     textLine1?: unknown;
     textLine2?: unknown;
+    textLine3?: unknown;
     cardTemplate?: unknown;
     backgroundType?: unknown;
     themeType?: unknown;
@@ -96,6 +97,7 @@ export async function POST(request: Request) {
   const title = typeof body.title === "string" ? body.title : "";
   const t1 = typeof body.textLine1 === "string" ? body.textLine1 : null;
   const t2 = typeof body.textLine2 === "string" ? body.textLine2 : null;
+  const t3 = typeof body.textLine3 === "string" ? body.textLine3 : null;
   const imageId = typeof body.imageId === "string" ? body.imageId : "";
   const image320Url = typeof body.image320Url === "string" ? body.image320Url : "";
 
@@ -130,6 +132,7 @@ export async function POST(request: Request) {
     title,
     textLine1: t1,
     textLine2: t2,
+    textLine3: t3,
     templateType: parseCardTemplate(body.cardTemplate),
     backgroundType,
     themeType: parseTheme(body.themeType),

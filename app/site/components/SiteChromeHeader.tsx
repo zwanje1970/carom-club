@@ -1,6 +1,8 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import VenuesDistanceNavLink from "./VenuesDistanceNavLink";
 import type { SiteLayoutMenuItem } from "../../../lib/server/dev-store";
+import type { PcSiteHeaderAdminEntry } from "../lib/site-pc-header-admin";
 
 function isMobileUserAgent(userAgent: string): boolean {
   const ua = userAgent.toLowerCase();
@@ -38,29 +40,47 @@ function isMypageHeaderHref(href: string): boolean {
 export default function SiteChromeHeader({
   menuItems,
   unreadNotificationCount = 0,
+  pcAdminEntry,
 }: {
   menuItems: SiteLayoutMenuItem[];
   unreadNotificationCount?: number;
+  /** PC 전용: 전달 시에만 마이페이지 옆에 관리자 진입 노출(모바일 분기에서는 넘기지 않음) */
+  pcAdminEntry?: PcSiteHeaderAdminEntry;
 }) {
   const { main, auxiliary } = splitHeaderMenuItems(menuItems);
   const myBadge =
     unreadNotificationCount > 0 ? (unreadNotificationCount > 99 ? "99+" : String(unreadNotificationCount)) : null;
 
+  const adminAfterMypage =
+    pcAdminEntry && (pcAdminEntry.showClient || pcAdminEntry.showPlatform) ? (
+      <>
+        {pcAdminEntry.showClient ? (
+          <Link href="/client">
+            클라이언트관리자
+          </Link>
+        ) : null}
+        {pcAdminEntry.showPlatform ? (
+          <Link href="/platform">
+            플랫폼관리자
+          </Link>
+        ) : null}
+      </>
+    ) : null;
+
   const renderMainNav = (item: SiteLayoutMenuItem, index: number) => {
     const showBadge = myBadge != null && isMypageHeaderHref(item.href);
-    const inner =
-      item.href.startsWith("/site/venues") ? (
-        <VenuesDistanceNavLink key={`chrome-main-${index}-${item.href}`} href={item.href}>
-          {item.label}
-        </VenuesDistanceNavLink>
-      ) : (
-        <Link key={`chrome-main-${index}-${item.href}`} href={item.href}>
-          {item.label}
-        </Link>
-      );
+    const inner = item.href.startsWith("/site/venues") ? (
+      <VenuesDistanceNavLink href={item.href}>
+        {item.label}
+      </VenuesDistanceNavLink>
+    ) : (
+      <Link href={item.href}>
+        {item.label}
+      </Link>
+    );
     if (!showBadge) return inner;
     return (
-      <span key={`chrome-main-${index}-${item.href}`} className="site-header-nav-item-wrap">
+      <span className="site-header-nav-item-wrap">
         <Link href={item.href} className="site-header-mypage-nav-link">
           {item.label}
         </Link>
@@ -75,24 +95,31 @@ export default function SiteChromeHeader({
     <header className="site-header">
       <div className="site-header-top">
         <Link className="site-logo" href="/site">
+          <span className="site-header-logo-dots" aria-hidden="true">
+            <span className="site-header-logo-dot site-header-logo-dot--y">●</span>
+            <span className="site-header-logo-dot site-header-logo-dot--r">●</span>
+            <span className="site-header-logo-dot site-header-logo-dot--w">●</span>
+          </span>
           캐롬클럽
         </Link>
       </div>
       <nav className="site-nav site-nav-mobile" aria-label="사이트 메뉴">
-        {main.map((item, index) => renderMainNav(item, index))}
+        {main.map((item, index) => (
+          <Fragment key={`chrome-main-row-${index}-${item.href}`}>
+            {renderMainNav(item, index)}
+            {isMypageHeaderHref(item.href) ? adminAfterMypage : null}
+          </Fragment>
+        ))}
       </nav>
       <nav className="site-nav-aux site-nav-aux-mobile" aria-label="테스트 진입 메뉴">
         {auxiliary.map((item, index) => {
           const showBadge = myBadge != null && isMypageHeaderHref(item.href);
-          if (!showBadge) {
-            return (
-              <Link key={`chrome-aux-${index}-${item.href}`} href={item.href}>
-                {item.label}
-              </Link>
-            );
-          }
-          return (
-            <span key={`chrome-aux-${index}-${item.href}`} className="site-header-nav-item-wrap">
+          const inner = !showBadge ? (
+            <Link href={item.href}>
+              {item.label}
+            </Link>
+          ) : (
+            <span className="site-header-nav-item-wrap">
               <Link href={item.href} className="site-header-mypage-nav-link">
                 {item.label}
               </Link>
@@ -100,6 +127,12 @@ export default function SiteChromeHeader({
                 {myBadge}
               </span>
             </span>
+          );
+          return (
+            <Fragment key={`chrome-aux-row-${index}-${item.href}`}>
+              {inner}
+              {isMypageHeaderHref(item.href) ? adminAfterMypage : null}
+            </Fragment>
           );
         })}
       </nav>

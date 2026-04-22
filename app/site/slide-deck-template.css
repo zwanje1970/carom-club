@@ -1,0 +1,141 @@
+/* carom-postcard-template-test: SlideDeck.css + App.css .slide-deck-wrap — 메인 이식용 */
+
+.slide-deck {
+  box-sizing: border-box;
+  --slide-card-max-width: 420px;
+  --slide-window-reference-height: calc(var(--slide-card-max-width) / 2);
+  --slide-layer-padding-y: 48px;
+  --slide-window-height-scale: 1.5;
+  width: min(92vw, 448px);
+  height: calc(
+    (var(--slide-window-reference-height) * 1.2 + var(--slide-layer-padding-y)) * 1.3 *
+      var(--slide-window-height-scale) * 0.7
+  );
+  margin-top: 28px;
+  position: relative;
+  border-radius: 20px;
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 2px, #000 2px 3px), #174c36;
+  border: 1px solid rgba(200, 230, 210, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 10px 28px rgba(0, 0, 0, 0.22);
+  touch-action: none;
+}
+
+.slide-deck__layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 14px;
+  box-sizing: border-box;
+  pointer-events: none;
+  container-type: size;
+}
+
+.slide-deck__card {
+  width: 100%;
+  max-width: var(--slide-card-max-width);
+  transform-origin: center center;
+  will-change: transform, opacity;
+}
+
+.slide-deck__card .tournament-post-card {
+  width: 100%;
+}
+
+.slide-deck__card .tournament-post-card__media {
+  --status-badge-slot: calc(2.85rem * 1.1);
+}
+
+.slide-deck__card .tournament-post-card__inner {
+  padding: 11px 13px 12px;
+}
+
+.slide-deck__card .tournament-post-card__top {
+  gap: 6px;
+}
+
+.slide-deck__card .tournament-post-card__badge {
+  width: calc(2.85rem * 1.1);
+  height: calc(2.85rem * 1.1);
+  font-size: calc(0.62rem * 1.1);
+}
+
+.slide-deck__card .tournament-post-card__badge--recruiting {
+  font-size: calc(0.6rem * 1.1);
+}
+
+.slide-deck__card .tournament-post-card__badge--closing {
+  font-size: calc(0.52rem * 1.1 + 1pt);
+}
+
+.slide-deck__card .tournament-post-card__badge--full {
+  font-size: calc(0.64rem * 1.1 + 1pt);
+}
+
+.slide-deck__card .tournament-post-card__badge--ended {
+  font-size: calc(0.6rem * 1.1 + 1pt);
+}
+
+.slide-deck__card .tournament-post-card__main {
+  gap: 4px;
+}
+
+.slide-deck__card .tournament-post-card__lead {
+  font-size: clamp(0.86rem, 3.7vw, 1.02rem);
+  line-height: 1.22;
+}
+
+.slide-deck__card .tournament-post-card__title {
+  font-size: clamp(1rem, 4.8vw, 1.3rem);
+  line-height: 1.16;
+}
+
+.slide-deck__card .tournament-post-card__desc {
+  font-size: calc(0.72rem + 1pt);
+  line-height: 1.25;
+  max-height: calc(1.25em * 5);
+}
+
+.slide-deck__card .tournament-post-card__desc--secondary {
+  font-size: calc(0.72rem + 1pt + 3pt);
+  font-weight: 700;
+}
+
+.slide-deck__card .tournament-post-card__footer .tournament-post-card__place {
+  font-weight: 700;
+}
+
+.slide-deck__card .tournament-post-card__footer {
+  padding: 0 11px;
+  gap: 8px;
+}
+
+.slide-deck__card .tournament-post-card__footer .tournament-post-card__date,
+.slide-deck__card .tournament-post-card__footer .tournament-post-card__place {
+  font-size: calc(0.72rem + 1pt);
+  line-height: 1.22;
+}
+
+.slide-deck-wrap {
+  width: 100%;
+  max-width: min(100%, 480px);
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 8px 12px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.site-home-page .slide-deck-wrap .slide-deck,
+.site-home-page--main .slide-deck-wrap .slide-deck {
+  margin-top: 0;
+}

@@ -22,6 +22,58 @@
   flex-shrink: 0;
 }
 
+/* 대회·당구장: 드롭다운+거리순을 한 묶음(양끝 밀지 않음, flex 확장 없음) */
+.filterRowFilterPack.filterRow {
+  justify-content: flex-start;
+  gap: 0.26rem;
+}
+
+.filterRowFilterPack.filterRowSingle .filterField {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.filterRowFilterPack .filterField {
+  flex: 0 1 auto;
+}
+
+.filterRowFilterPack .dropdownFlex {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 11rem;
+}
+
+.filterRowFilterPack.filterRowSingleDouble .dropdownFlex {
+  max-width: 7.25rem;
+}
+
+.filterRowFilterPack .button {
+  flex-shrink: 0;
+  margin-left: 0;
+}
+
+/* 필드 2개 + 버튼(당구장: 유형·요금제·거리순) — 한 줄 유지, 셀렉트 최대 폭 축소 */
+.filterRowSingleDouble.filterRow {
+  gap: 0.32rem;
+}
+
+.filterRowSingleDouble .dropdownFlex {
+  flex: 1 1 2.75rem;
+  min-width: 0;
+  max-width: 8rem;
+}
+
+/* PC: 당구장 필터(유형·요금제·거리순) 한 묶음처럼 — 모바일은 위 gap 유지 */
+@media (min-width: 768px) {
+  .filterRowSingleDouble.filterRow {
+    gap: 0.12rem;
+  }
+
+  .filterRowSingleDouble .filterField {
+    gap: 0.22rem;
+  }
+}
+
 /* 한 줄: [라벨] [셀렉트] — 라벨은 위가 아니라 왼쪽 */
 .filterField {
   display: inline-flex;
@@ -106,7 +158,7 @@
   background: #dbeafe;
 }
 
-/* 당구장: 유형 한 줄 + (요금제 + 거리순) 한 줄 */
+/* (구) 당구장 2줄 레이아웃 — 현재는 filterRowSingleDouble 한 줄 사용 */
 .filterVenuesAux {
   display: flex;
   flex-direction: column;

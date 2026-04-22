@@ -189,6 +189,7 @@ type SnapshotPick = {
   title?: string;
   cardExtraLine1?: string | null;
   cardExtraLine2?: string | null;
+  cardExtraLine3?: string | null;
   tournamentCardTemplate?: "A" | "B";
   tournamentTheme?: "dark" | "light" | "natural";
   tournamentBackgroundType?: "image" | "theme";
@@ -222,6 +223,7 @@ export default function ClientTournamentCardPublishPage() {
   const [title, setTitle] = useState("");
   const [textLine1, setTextLine1] = useState("");
   const [textLine2, setTextLine2] = useState("");
+  const [textLine3, setTextLine3] = useState("");
   const [themeType, setThemeType] = useState<CardTheme>("dark");
   const [uploadedImage, setUploadedImage] = useState<UploadedImage | null>(null);
 
@@ -258,6 +260,7 @@ export default function ClientTournamentCardPublishPage() {
       statusBadge: tournamentStatusForPreview,
       cardExtraLine1: textLine1 || null,
       cardExtraLine2: textLine2 || null,
+      cardExtraLine3: textLine3 || null,
       image320Url: uploadedImage?.w320Url,
       cardTemplate,
       backgroundType,
@@ -274,6 +277,7 @@ export default function ClientTournamentCardPublishPage() {
     tournamentStatusForPreview,
     textLine1,
     textLine2,
+    textLine3,
     uploadedImage?.w320Url,
     cardTemplate,
     backgroundType,
@@ -327,8 +331,10 @@ export default function ClientTournamentCardPublishPage() {
         setTitle(snapTitle && snapTitle !== "(제목)" ? snapTitle : t.title);
         const fromPick1 = (pick.cardExtraLine1 ?? "").trim();
         const fromPick2 = (pick.cardExtraLine2 ?? "").trim();
+        const fromPick3 = (pick.cardExtraLine3 ?? "").trim();
         setTextLine1(fromPick1 || summaryLine1);
         setTextLine2(fromPick2 || prizeLine1 || summaryLine2);
+        setTextLine3(fromPick3);
         setCardTemplate(pick.tournamentCardTemplate === "B" ? "B" : "A");
         setThemeType(
           pick.tournamentTheme === "light" ? "light" : pick.tournamentTheme === "natural" ? "natural" : "dark"
@@ -369,6 +375,7 @@ export default function ClientTournamentCardPublishPage() {
         setTitle(t.title);
         setTextLine1(summaryLine1);
         setTextLine2(prizeLine1 || summaryLine2);
+        setTextLine3("");
         setUploadedImage(null);
         setV2MediaMode("on");
         setMediaBackground("");
@@ -409,6 +416,7 @@ export default function ClientTournamentCardPublishPage() {
         title: title.trim(),
         textLine1: textLine1.trim(),
         textLine2: textLine2.trim(),
+        textLine3: textLine3.trim(),
         cardTemplate,
         backgroundType,
         themeType,
@@ -497,7 +505,7 @@ export default function ClientTournamentCardPublishPage() {
         <div className={editorStyles.previewSticky}>
           <div className={editorStyles.previewInner}>
             <div className={editorStyles.previewCardWrap}>
-              <TournamentSnapshotCardView item={cardPublishSlidePreview} />
+              <TournamentSnapshotCardView item={cardPublishSlidePreview} templateCardLayout />
             </div>
             <div className={editorStyles.templateRadioRow} role="radiogroup" aria-label="슬라이드 템플릿">
               <label className={editorStyles.templateRadioLabel}>
@@ -583,6 +591,22 @@ export default function ClientTournamentCardPublishPage() {
                   value={textLine2}
                   onChange={(e) =>
                     setTextLine2(clampDescriptionToMaxLines(e.target.value, DESCRIPTION_MAX_LINES))
+                  }
+                  spellCheck={false}
+                  placeholder="비우면 카드에 표시하지 않음"
+                />
+              </label>
+
+              <label className={editorStyles.field}>
+                <span className={editorStyles.fieldLabel}>
+                  추가 설명 (최대 {DESCRIPTION_MAX_LINES}줄 · Enter 줄바꿈)
+                </span>
+                <textarea
+                  className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea}`}
+                  rows={4}
+                  value={textLine3}
+                  onChange={(e) =>
+                    setTextLine3(clampDescriptionToMaxLines(e.target.value, DESCRIPTION_MAX_LINES))
                   }
                   spellCheck={false}
                   placeholder="비우면 카드에 표시하지 않음"

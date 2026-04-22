@@ -20,6 +20,7 @@ type CardSnapshotRow = {
   subtitle: string;
   cardExtraLine1?: string | null;
   cardExtraLine2?: string | null;
+  cardExtraLine3?: string | null;
   imageId: string;
   image320Url: string;
   tournamentCardTemplate?: "A" | "B";
@@ -146,6 +147,7 @@ export default function TournamentBadgeCardManageRow({
           title: latest.title.trim(),
           textLine1: typeof latest.cardExtraLine1 === "string" ? latest.cardExtraLine1 : "",
           textLine2: typeof latest.cardExtraLine2 === "string" ? latest.cardExtraLine2 : "",
+          textLine3: typeof latest.cardExtraLine3 === "string" ? latest.cardExtraLine3 : "",
           cardTemplate: latest.tournamentCardTemplate ?? "A",
           backgroundType: latest.tournamentBackgroundType ?? "image",
           themeType: latest.tournamentTheme ?? "dark",

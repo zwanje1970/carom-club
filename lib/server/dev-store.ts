@@ -570,6 +570,7 @@ export type TournamentPublishedCard = {
   title: string;
   textLine1: string | null;
   textLine2: string | null;
+  textLine3: string | null;
   templateType: TournamentCardTemplate;
   backgroundType: TournamentCardBackground;
   themeType: TournamentCardTheme;
@@ -612,6 +613,7 @@ export type PublishedCardSnapshot = {
   /** 대회 카드: 제목과 날짜 사이 자유 문구(각 최대 1줄 권장) */
   cardExtraLine1?: string | null;
   cardExtraLine2?: string | null;
+  cardExtraLine3?: string | null;
   /** 미디어 영역 배경(CSS). 스냅샷에만 선택적으로 저장 */
   tournamentMediaBackground?: string | null;
   tournamentImageOverlayBlend?: boolean | null;
@@ -2029,8 +2031,10 @@ function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedC
   const title = typeof r.title === "string" ? r.title : "";
   const t1 = r.textLine1;
   const t2 = r.textLine2;
+  const t3 = r.textLine3;
   const textLine1 = typeof t1 === "string" && t1.trim() ? t1.trim() : null;
   const textLine2 = typeof t2 === "string" && t2.trim() ? t2.trim() : null;
+  const textLine3 = typeof t3 === "string" && t3.trim() ? t3.trim() : null;
   const image320Url = typeof r.image320Url === "string" ? r.image320Url : "";
   const imageId = typeof r.imageId === "string" ? r.imageId : "";
   const status = typeof r.status === "string" ? r.status : "";
@@ -2050,6 +2054,7 @@ function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedC
     title,
     textLine1,
     textLine2,
+    textLine3,
     templateType,
     backgroundType,
     themeType,
@@ -7389,6 +7394,7 @@ function tournamentPublishedCardToPublishedSnapshot(
 ): PublishedCardSnapshot {
   const line1 = t.textLine1?.trim() ?? "";
   const line2 = t.textLine2?.trim() ?? "";
+  const line3 = t.textLine3?.trim() ?? "";
   const storedDate = typeof t.cardDisplayDate === "string" ? t.cardDisplayDate.trim() : "";
   const storedLoc = typeof t.cardDisplayLocation === "string" ? t.cardDisplayLocation.trim() : "";
   const fbDate = (tournamentMeta?.date ?? "").trim();
@@ -7408,6 +7414,7 @@ function tournamentPublishedCardToPublishedSnapshot(
     statusBadge: normalizeTournamentStatusBadge(t.status),
     cardExtraLine1: line1 || null,
     cardExtraLine2: line2 || null,
+    cardExtraLine3: line3 || null,
     title: t.title.trim(),
     subtitle,
     imageId: t.imageId,
@@ -7448,6 +7455,7 @@ export async function upsertTournamentPublishedCard(params: {
   title: string;
   textLine1: string | null;
   textLine2: string | null;
+  textLine3: string | null;
   templateType: TournamentCardTemplate;
   backgroundType: TournamentCardBackground;
   themeType: TournamentCardTheme;
@@ -7508,6 +7516,7 @@ export async function upsertTournamentPublishedCard(params: {
     title,
     textLine1: params.textLine1?.trim() ? params.textLine1.trim() : null,
     textLine2: params.textLine2?.trim() ? params.textLine2.trim() : null,
+    textLine3: params.textLine3?.trim() ? params.textLine3.trim() : null,
     templateType: params.templateType,
     backgroundType: params.backgroundType,
     themeType: params.themeType,

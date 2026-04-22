@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Script from "next/script";
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import MainSceneSlideDeckClient from "./main-scene-slide-deck-client";
 import { SiteMainNavIcon } from "./main-nav-icon";
 import { getCommonPaletteColorHex, isCommonPaletteColor } from "../../lib/shared/common-color-palette";
@@ -15,6 +15,7 @@ import {
   listTournamentSnapshotsForMainSite,
 } from "../../lib/server/dev-store";
 import SiteShellFrame from "./components/SiteShellFrame";
+import { isPublicSiteMobileView } from "./components/SiteChromeHeader";
 import SiteMainLogo from "./components/SiteMainLogo";
 import VenuesDistanceNavLink from "./components/VenuesDistanceNavLink";
 
@@ -395,6 +396,7 @@ export default async function SiteHomePage({
     statusBadge: snapshot.statusBadge,
     cardExtraLine1: snapshot.cardExtraLine1,
     cardExtraLine2: snapshot.cardExtraLine2,
+    cardExtraLine3: snapshot.cardExtraLine3,
     cardTemplate: snapshot.tournamentCardTemplate ?? "A",
     backgroundType: snapshot.tournamentBackgroundType ?? (snapshot.image320Url?.trim() ? "image" : "theme"),
     themeType: snapshot.tournamentTheme ?? "dark",
@@ -410,6 +412,21 @@ export default async function SiteHomePage({
   }));
   /** 공지 문구가 있으면 슬라이드 상단 바 표시(enabled만 켤 때 빠지는 경우 복구) */
   const showSiteNoticeBar = siteNotice.text.trim().length > 0;
+  const headerStore = await headers();
+  const isMobileSiteUa = isPublicSiteMobileView(headerStore);
+  /** PC: 청 헤더 아래 흰/남색 줄은 CAROM 대신 공지 한 줄(모바일은 기존 로고 줄 유지). */
+  const homeBrandTitle =
+    isMobileSiteUa ? (
+      <SiteMainLogo />
+    ) : showSiteNoticeBar ? (
+      <div className="site-home-pc-notice-in-brand" aria-live="polite">
+        <div className="site-home-pc-notice-in-brand__bar">
+          <span className="site-home-pc-notice-in-brand__text">{siteNotice.text.trim()}</span>
+        </div>
+      </div>
+    ) : (
+      <span className="site-home-pc-brand-empty" aria-hidden="true" />
+    );
 
   return (
     <SiteShellFrame
@@ -495,7 +512,7 @@ export default async function SiteHomePage({
       ) : null}
         </>
       }
-      brandTitle={<SiteMainLogo />}
+      brandTitle={homeBrandTitle}
     >
         <section id="main-content-group" className="site-home-dark-main site-home-dark-main--stack">
           <div className="site-home-main-content-box">
@@ -509,15 +526,16 @@ export default async function SiteHomePage({
               >
                 <MainSceneSlideDeckClient
                   items={liveSlideItems}
-                  sectionLabel={tournamentTitleEntry?.block.data.text?.trim() || "진행중 대회"}
-                  siteNoticeText={showSiteNoticeBar ? siteNotice.text.trim() : undefined}
+                  sectionLabel={tournamentTitleEntry?.block.data.text?.trim() ?? ""}
+                  siteNoticeText={showSiteNoticeBar && isMobileSiteUa ? siteNotice.text.trim() : undefined}
                 />
               </section>
             </section>
 
+            {/* TEMP_PNG_MAIN_BUTTONS — 원복: (1) 아래 임시 <section> 블록 삭제 (2) #main-buttons 에서 site-home-nav-grid--tempPngHidden 제거 (3) globals.css 의 TEMP_PNG_MAIN_BUTTONS 블록 삭제 */}
             <section
               id="main-buttons"
-              className="site-home-nav-grid"
+              className="site-home-nav-grid site-home-nav-grid--tempPngHidden"
               style={{
                 width: "100%",
                 display: "grid",
@@ -555,14 +573,49 @@ export default async function SiteHomePage({
                 );
               })}
             </section>
+            <section
+              className="site-home-main-png-buttons-temp"
+              aria-label="메인 바로가기(임시 PNG)"
+            >
+              <div className="site-home-main-png-buttons-temp__cell">
+                <img
+                  className="site-home-main-png-buttons-temp__img"
+                  src="/images/buttons/btn-main-1.png"
+                  alt=""
+                  decoding="async"
+                />
+                <span className="site-home-main-png-buttons-temp__label">대회안내</span>
+              </div>
+              <div className="site-home-main-png-buttons-temp__cell">
+                <img
+                  className="site-home-main-png-buttons-temp__img"
+                  src="/images/buttons/btn-main-2.png"
+                  alt=""
+                  decoding="async"
+                />
+                <span className="site-home-main-png-buttons-temp__label">주변당구장</span>
+              </div>
+              <div className="site-home-main-png-buttons-temp__cell">
+                <img
+                  className="site-home-main-png-buttons-temp__img"
+                  src="/images/buttons/btn-main-3.png"
+                  alt=""
+                  decoding="async"
+                />
+                <span className="site-home-main-png-buttons-temp__label">커뮤니티</span>
+              </div>
+            </section>
             {dashboardHref ? (
               <Link
                 href={dashboardHref}
-                className={
+                className={[
                   clientDashboardApproved
                     ? "site-home-cta-primary site-home-cta-primary--client-ops"
-                    : "site-home-cta-primary"
-                }
+                    : "site-home-cta-primary",
+                  currentUser?.role === "PLATFORM" ? "site-home-main-dashboard--platform-only" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               >
                 <span className="site-home-cta-primary__text">{dashboardLabel}</span>
               </Link>

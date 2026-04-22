@@ -1,11 +1,11 @@
 /* carom-postcard-template-test: src/components/tournament-slide-card-previews.module.css (그대로) */
 
-/* 공통: 슬라이드형 게시 카드 미리보기 — 높이는 2:1 대비 +40% (aspect 10/7) */
+/* 공통: 게시 카드 미리보기 — 템플릿 TournamentPostCard 와 동일 aspect 20/20 */
 
 .cardRoot {
   position: relative;
   width: 100%;
-  aspect-ratio: 10 / 7;
+  aspect-ratio: 20 / 20;
   border-radius: 8px;
   overflow: hidden;
   border: none;
@@ -90,7 +90,7 @@
 .footerDate,
 .footerPlace {
   margin: 0;
-  font-size: calc(0.78rem + 1pt);
+  font-size: calc(0.78rem - 1pt);
   line-height: 1.3;
   letter-spacing: 0.02em;
   color: #18181b;
@@ -198,6 +198,24 @@
   overflow: hidden;
 }
 
+.classicDescSecondary,
+.frameDescSecondary {
+  margin: 0.35rem 0 0;
+  font-size: calc(0.78rem + 1pt + 3pt);
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  color: #fff;
+  text-shadow:
+    0 1px 12px rgba(0, 0, 0, 0.55),
+    0 0 1px rgba(0, 0, 0, 0.85);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+  max-height: calc(1.3em * 4);
+  overflow: hidden;
+}
+
 /* 상태 배지는 TournamentPostCardStatusBadges.css 의 tournament-post-card__badge 와 동일 */
 
 /* ---------- 프레임: 텍스트 상단 — 제목 세로 중심 ≈ 배지 중앙 ---------- */
@@ -240,4 +258,123 @@
   padding-top: calc(
     13px + (var(--frame-badge-size) / 2) - 0.68rem - 1.32em + 0.55rem
   );
+}
+
+/*
+ * 템플릿 TournamentPostCard.css + SlideDeck.css 의 슬라이드 내 수치
+ * (작성 미리보기 templateCardLayout · 메인 슬라이드 slideDeck+templateCardLayout)
+ */
+.cardRootTemplateLayout {
+  border: 10px solid #fff;
+  box-shadow:
+    0 -18px 26px rgba(0, 0, 0, 0.55),
+    0 -10px 16px rgba(0, 0, 0, 0.4),
+    0 -4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.cardRootTemplateLayout.cardRootSlideDeck {
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.38),
+    0 10px 28px rgba(0, 0, 0, 0.32);
+}
+
+.cardRootTemplateLayout .media {
+  flex: 43 1 0;
+  --status-badge-slot: calc(2.85rem * 1.1);
+}
+
+.cardRootTemplateLayout .cardFooter {
+  flex: 7 1 0;
+  gap: 12px;
+  padding: 0 14px;
+}
+
+.cardRootTemplateLayout .footerDate,
+.cardRootTemplateLayout .footerPlace {
+  font-size: calc(0.82rem * 1.05 + 1pt);
+  line-height: 1.3;
+}
+
+.cardRootTemplateLayout .footerPlace {
+  font-weight: 700;
+}
+
+.cardRootTemplateLayout .classicInner {
+  padding: 11px 13px 12px;
+}
+
+.cardRootTemplateLayout .classicMain {
+  padding-right: calc(var(--status-badge-slot) + 12px + 6px);
+}
+
+.cardRootTemplateLayout .classicLead {
+  font-size: clamp(0.86rem, 3.7vw, 1.02rem);
+  line-height: 1.22;
+}
+
+.cardRootTemplateLayout .classicTitle {
+  font-size: clamp(1rem, 4.8vw, 1.3rem);
+  line-height: 1.16;
+}
+
+.cardRootTemplateLayout .classicDesc,
+.cardRootTemplateLayout .frameDesc {
+  margin: 0.65rem 0 0;
+  font-size: calc(0.72rem + 1pt);
+  line-height: 1.25;
+  max-height: calc(1.25em * 5);
+}
+
+.cardRootTemplateLayout .classicDescSecondary,
+.cardRootTemplateLayout .frameDescSecondary {
+  margin: 0.4rem 0 0;
+  font-size: calc(0.72rem + 1pt + 3pt);
+  line-height: 1.25;
+  max-height: calc(1.25em * 4);
+}
+
+.cardRootTemplateLayout .classicDesc + .classicDescSecondary,
+.cardRootTemplateLayout .frameDesc + .frameDescSecondary {
+  margin-top: 0.4rem;
+}
+
+.cardRootTemplateLayout .frameInner {
+  --frame-badge-size: calc(2.85rem * 1.1);
+  padding: 8px 11px 6px;
+}
+
+.cardRootTemplateLayout .frameLead {
+  font-size: clamp(0.86rem, 3.7vw, 1.02rem);
+  line-height: 1.22;
+}
+
+.cardRootTemplateLayout .frameTitle {
+  font-size: clamp(1rem, 4.8vw, 1.3rem);
+  line-height: 1.16;
+}
+
+.cardRootTemplateLayout :global(.tournament-post-card__badge) {
+  width: calc(2.85rem * 1.1);
+  height: calc(2.85rem * 1.1);
+  font-size: calc(0.62rem * 1.1);
+}
+
+.cardRootTemplateLayout :global(.tournament-post-card__badge--recruiting) {
+  font-size: calc(0.6rem * 1.1);
+}
+
+.cardRootTemplateLayout :global(.tournament-post-card__badge--closing) {
+  font-size: calc(0.52rem * 1.1 + 1pt);
+}
+
+.cardRootTemplateLayout :global(.tournament-post-card__badge--full) {
+  font-size: calc(0.64rem * 1.1 + 1pt);
+}
+
+.cardRootTemplateLayout :global(.tournament-post-card__badge--ended) {
+  font-size: calc(0.6rem * 1.1 + 1pt);
+}
+
+.cardRootTemplateLayout :global(.tournament-post-card__badge--waitlist) {
+  font-size: calc(0.52rem * 1.1);
 }

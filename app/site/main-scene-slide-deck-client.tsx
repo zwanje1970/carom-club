@@ -3,6 +3,7 @@
 import { useEffect, useState, type ComponentProps } from "react";
 import MainSceneSlideDeck from "./main-scene-slide-deck";
 import styles from "./main-scene-slide-deck.module.css";
+import "./slide-deck-template.css";
 
 type Props = ComponentProps<typeof MainSceneSlideDeck>;
 
@@ -17,30 +18,39 @@ export default function MainSceneSlideDeckClient(props: Props) {
   }, []);
 
   if (!mounted) {
-    const label = props.sectionLabel?.trim() || "진행중 대회";
+    const label = props.sectionLabel?.trim() ?? "";
     const notice = props.siteNoticeText?.trim();
-    const deck = (
-      <div aria-hidden className={styles.slideDeck}>
-        <div className={styles.slideDeckFrameOverlay}>
-          <div className={styles.slideDeckTopChrome}>
-            {notice ? (
-              <div className={styles.slideDeckNoticeWrap}>
-                <div className={styles.slideDeckNotice}>
-                  <span className={styles.slideDeckNoticeMarquee}>{notice}</span>
-                </div>
-              </div>
-            ) : null}
-            <p className={styles.slideDeckLabel}>{label}</p>
+    const noticeAbove = notice ? (
+      <div className={styles.slideDeckNoticeAbove}>
+        <div className={styles.slideDeckNoticeWrap}>
+          <div className={styles.slideDeckNotice}>
+            <span className={styles.slideDeckNoticeMarquee}>{notice}</span>
           </div>
-          <div className={styles.slideDeckBottomDots} aria-hidden="true">
-            <span className={styles.slideDeckBottomDotY}>●</span>
-            <span className={styles.slideDeckBottomDotR}>●</span>
-            <span className={styles.slideDeckBottomDotW}>●</span>
+        </div>
+      </div>
+    ) : null;
+    const cardChrome = (
+      <div className={styles.slideDeckCardChrome}>
+        <div className={styles.slideDeckTopChrome}>
+          {label ? <p className={styles.slideDeckLabel}>{label}</p> : null}
+        </div>
+        <div className={styles.slideDeckBottomDots} aria-hidden="true">
+          <span className={styles.slideDeckBottomDotY}>●</span>
+          <span className={styles.slideDeckBottomDotR}>●</span>
+          <span className={styles.slideDeckBottomDotW}>●</span>
+        </div>
+      </div>
+    );
+    return (
+      <div className={styles.slideDeckShell}>
+        <div className={`slide-deck-wrap ${styles.slideDeckWrapWithNoticeGap}`}>
+          {noticeAbove}
+          <div aria-hidden className="slide-deck">
+            {cardChrome}
           </div>
         </div>
       </div>
     );
-    return <div className={styles.slideDeckShell}>{deck}</div>;
   }
 
   return <MainSceneSlideDeck {...props} />;

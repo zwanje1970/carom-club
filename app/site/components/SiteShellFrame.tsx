@@ -55,24 +55,30 @@ export type SiteShellFrameProps = {
   auxiliaryCompact?: boolean;
   /** 상단 흰 배경 아래 본문(다크 메인 또는 회색 본문) */
   children: ReactNode;
+  /**
+   * `shellVariant="home"` 전용: 청 헤더(로고 줄) 직후에만 렌더(옵션).
+   * PC 메인 공지 등 — 전달하지 않으면 기존과 동일.
+   */
+  homeBelowHeader?: ReactNode;
   /** 메인 최상단에 넣을 노드(스크립트 등) */
   prependMain?: ReactNode;
   mainId?: string;
   /**
-   * `home`: 메인(/) 전용 — 기존 메인 상단 밀착 규칙 유지.
+   * `home`: 메인(/) — 상단 고정 영역(dock) + 본문 스크롤(scroll-body) 구조는 `standard`와 동일.
    * `standard`(기본): 메인 제외 사이트 페이지 공통 여백(`globals.css` 변수).
    */
   shellVariant?: "home" | "standard";
 };
 
 /**
- * 메인(/site)과 동일한 상단 흰 바 + 보조 슬롯 + 셸 구조.
- * 대회안내·대회상세에서 동일 틀로 사용한다.
+ * 공개 사이트 공통: 상단 고정(dock) + 본문 스크롤(scroll-body).
+ * home·standard 모두 동일 DOM 패턴.
  */
 export default function SiteShellFrame({
   brandTitle,
   auxiliary,
   children,
+  homeBelowHeader,
   prependMain,
   mainId,
   auxiliaryCompact,
@@ -114,21 +120,12 @@ export default function SiteShellFrame({
 
   const homeShellInner = (
     <div className="site-home-shell" style={shellStyle}>
-      {isHomeShell ? (
-        <>
-          {headerBlock}
-          {controlsBlock}
-          {children}
-        </>
-      ) : (
-        <>
-          <div className="site-shell-sticky-dock">
-            {headerBlock}
-            {controlsBlock}
-          </div>
-          <div className="site-shell-scroll-body">{children}</div>
-        </>
-      )}
+      <div className="site-shell-sticky-dock">
+        {headerBlock}
+        {homeBelowHeader ?? null}
+        {controlsBlock}
+      </div>
+      <div className="site-shell-scroll-body">{children}</div>
     </div>
   );
 

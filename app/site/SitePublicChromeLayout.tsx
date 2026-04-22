@@ -5,6 +5,7 @@ import SiteRootSwipeNav from "./components/SiteRootSwipeNav";
 import SiteVenuesGeolocationNav from "./components/SiteVenuesGeolocationNav";
 import { getSiteLayoutConfig, getSiteNotice } from "../../lib/server/dev-store";
 import { getSiteUnreadNotificationCount } from "../../lib/server/site-unread-notification-count";
+import { filterPcHeaderAdminMenuItems, getPcSiteHeaderAdminFlags } from "./lib/site-pc-header-admin";
 
 function SiteFooterDesktop({ text }: { text: string }) {
   const lines = text.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
@@ -67,11 +68,18 @@ export default async function SitePublicChromeLayout({
     );
   }
 
+  const pcAdminEntry = await getPcSiteHeaderAdminFlags();
+  const pcHeaderMenuItems = filterPcHeaderAdminMenuItems(config.header.pc.menuItems);
+
   return (
     <div className="site-shell site-shell--pc-sticky-footer site-shell--pc-site-chrome">
       <div className="site-shell-pc-constrain">
         <SiteVenuesGeolocationNav />
-        <SiteChromeHeader menuItems={config.header.pc.menuItems} unreadNotificationCount={unreadNotificationCount} />
+        <SiteChromeHeader
+          menuItems={pcHeaderMenuItems}
+          unreadNotificationCount={unreadNotificationCount}
+          pcAdminEntry={pcAdminEntry}
+        />
         <div className="site-shell-main">{children}</div>
         <SiteFooterDesktop text={config.footer.pc.text} />
       </div>

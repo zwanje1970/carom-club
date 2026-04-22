@@ -147,69 +147,65 @@ export default function SiteVenuesBoard({
   const distanceSortActive = distanceSort != null;
 
   const auxiliary = (
-    <div className={filterStyles.filterVenuesAux}>
-      <div className={filterStyles.filterVenuesRow}>
-        <div className={filterStyles.filterField}>
-          <span className={filterStyles.filterFieldLabel} id="site-venues-filter-venue-type-label">
-            유형
-          </span>
-          <FilterDropdown
-            id="site-venues-filter-venue-type"
-            className={filterStyles.dropdownFlex}
-            value={venueType}
-            onChange={(e) => setVenueType(e.target.value as VenueTypeFilter)}
-            aria-labelledby="site-venues-filter-venue-type-label"
-          >
-            {VENUE_TYPE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </FilterDropdown>
-        </div>
-      </div>
-      <div className={filterStyles.filterVenuesRow}>
-        <div className={filterStyles.filterField}>
-          <span className={filterStyles.filterFieldLabel} id="site-venues-filter-fee-type-label">
-            요금제
-          </span>
-          <FilterDropdown
-            id="site-venues-filter-fee-type"
-            className={filterStyles.dropdownFlex}
-            value={feeType}
-            onChange={(e) => setFeeType(e.target.value as FeeTypeFilter)}
-            aria-labelledby="site-venues-filter-fee-type-label"
-          >
-            {FEE_TYPE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </FilterDropdown>
-        </div>
-        <FilterButton
-          className={[filterStyles.filterVenuesDistance, distanceSortActive ? filterStyles.buttonDistanceActive : ""]
-            .filter(Boolean)
-            .join(" ")}
-          href={distanceButtonHref}
-          useNextLink={hasViewerCoordinate}
-          onClick={
-            hasViewerCoordinate
-              ? undefined
-              : (e) => {
-                  e.preventDefault();
-                  performGeolocationThenNavigate(distanceButtonHref, (path) => router.push(path));
-                }
-          }
+    <div
+      className={`${filterStyles.filterRow} ${filterStyles.filterRowSingle} ${filterStyles.filterRowSingleDouble} ${filterStyles.filterRowFilterPack}`}
+    >
+      <div className={filterStyles.filterField}>
+        <span className={filterStyles.filterFieldLabel} id="site-venues-filter-venue-type-label">
+          유형
+        </span>
+        <FilterDropdown
+          id="site-venues-filter-venue-type"
+          className={filterStyles.dropdownFlex}
+          value={venueType}
+          onChange={(e) => setVenueType(e.target.value as VenueTypeFilter)}
+          aria-labelledby="site-venues-filter-venue-type-label"
         >
-          거리순
-        </FilterButton>
+          {VENUE_TYPE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </FilterDropdown>
       </div>
+      <div className={filterStyles.filterField}>
+        <span className={filterStyles.filterFieldLabel} id="site-venues-filter-fee-type-label">
+          요금제
+        </span>
+        <FilterDropdown
+          id="site-venues-filter-fee-type"
+          className={filterStyles.dropdownFlex}
+          value={feeType}
+          onChange={(e) => setFeeType(e.target.value as FeeTypeFilter)}
+          aria-labelledby="site-venues-filter-fee-type-label"
+        >
+          {FEE_TYPE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </FilterDropdown>
+      </div>
+      <FilterButton
+        className={distanceSortActive ? filterStyles.buttonDistanceActive : undefined}
+        href={distanceButtonHref}
+        useNextLink={hasViewerCoordinate}
+        onClick={
+          hasViewerCoordinate
+            ? undefined
+            : (e) => {
+                e.preventDefault();
+                performGeolocationThenNavigate(distanceButtonHref, (path) => router.push(path));
+              }
+        }
+      >
+        거리순
+      </FilterButton>
     </div>
   );
 
   return (
-    <SiteShellFrame brandTitle="당구장안내" auxiliary={auxiliary} auxiliaryCompact>
+    <SiteShellFrame brandTitle="당구장안내" auxiliary={auxiliary}>
       <section className="site-site-gray-main v3-stack">
         {locationDenied ? (
           <p

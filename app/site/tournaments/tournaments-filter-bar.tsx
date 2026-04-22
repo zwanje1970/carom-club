@@ -31,7 +31,7 @@ export default function TournamentsFilterBar({
   const selectValue = currentStatus === "all" ? "all" : currentStatus;
 
   return (
-    <div className={`${filterStyles.filterRow} ${filterStyles.filterRowSingle}`}>
+    <div className={`${filterStyles.filterRow} ${filterStyles.filterRowSingle} ${filterStyles.filterRowFilterPack}`}>
       <div className={filterStyles.filterField}>
         <span className={filterStyles.filterFieldLabel}>상태</span>
         <FilterDropdown
