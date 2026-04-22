@@ -19,11 +19,24 @@ import type {
 } from "../../../../lib/tournament-rule-types";
 
 type DivisionRow = { name: string; min: string; max: string };
+const KO_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
 function toDateInputValue(raw: string): string {
   const s = raw.trim();
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
   return s;
+}
+
+function withWeekdayLabel(raw: string): string {
+  const s = raw.trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return s;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const da = Number(m[3]);
+  const d = new Date(y, mo - 1, da);
+  if (d.getFullYear() !== y || d.getMonth() !== mo - 1 || d.getDate() !== da) return s;
+  return `${s} (${KO_WEEKDAYS[d.getDay()]})`;
 }
 
 function parseLocationToLines(loc: string): [string, string, string] {
@@ -1210,6 +1223,11 @@ export default function ClientTournamentNewPage() {
                 onChange={(e) => setDate(e.target.value)}
                 style={inputStyle}
               />
+              {date.trim() ? (
+                <p className="v3-muted" style={{ margin: "0.2rem 0 0", fontSize: "0.82rem" }}>
+                  {withWeekdayLabel(date)}
+                </p>
+              ) : null}
             </label>
             <label className="v3-stack" style={{ flex: "1 1 11rem" }}>
               <span>대회 기간</span>
@@ -1252,6 +1270,11 @@ export default function ClientTournamentNewPage() {
                     }}
                     style={inputStyle}
                   />
+                  {(extraDays[idx] ?? "").trim() ? (
+                    <p className="v3-muted" style={{ margin: "0.2rem 0 0", fontSize: "0.82rem" }}>
+                      {withWeekdayLabel(extraDays[idx] ?? "")}
+                    </p>
+                  ) : null}
                 </label>
               ))}
             </div>

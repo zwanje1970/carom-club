@@ -415,7 +415,7 @@ export default function ClientTournamentCardPublishPage() {
         imageId: uploadedImage?.imageId ?? "",
         image320Url: uploadedImage?.w320Url ?? "",
         draftOnly: true,
-        cardDisplayDate: cardDate.trim(),
+        cardDisplayDate: formatCardDateForDisplay(cardDate).trim(),
         cardDisplayLocation: cardPlace.trim(),
       };
       if (v2MediaMode === "on") {

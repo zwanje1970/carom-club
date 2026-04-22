@@ -32,6 +32,8 @@ const DRAG_SCENE_STEP = 220;
 const DECK_AXIS_LOCK_MIN_PX = 26;
 /** 세로(페이지 스크롤)와 구분: 세로 성분이 이만큼 더 커야 덱 세로 조작으로 확정 */
 const DECK_VERTICAL_DOMINANCE = 1.38;
+/** 카드 CTA 링크: 이보다 작은 이동은 탭(클릭), 초과 시 드래그로 보고 상세 이동 차단 */
+const SLIDE_LINK_TAP_MAX_PX = 12;
 
 const RETREAT_PTS: {
   p: number;
@@ -200,6 +202,9 @@ export default function MainSceneSlideDeck({
   const dragStartXRef = useRef(0);
   const dragStartSceneOffsetRef = useRef(0);
   const axisRef = useRef<"undecided" | "vertical" | "horizontal">("undecided");
+  const pointerStartedOnCardLinkRef = useRef(false);
+  const exceededTapSlopRef = useRef(false);
+  const verticalDeckDragConfirmedRef = useRef(false);
 
   useEffect(() => {
     if (items.length === 0) return;
@@ -263,6 +268,10 @@ export default function MainSceneSlideDeck({
 
   const onPointerDown: PointerEventHandler<HTMLDivElement> = (e) => {
     if (e.button !== 0) return;
+    exceededTapSlopRef.current = false;
+    verticalDeckDragConfirmedRef.current = false;
+    pointerStartedOnCardLinkRef.current =
+      e.target instanceof Element && Boolean(e.target.closest("[data-slide-deck-card] a[href]"));
     draggingRef.current = true;
     pauseAuto();
     axisRef.current = "undecided";
@@ -277,11 +286,15 @@ export default function MainSceneSlideDeck({
     const dy = e.clientY - dragStartYRef.current;
     const adx = Math.abs(dx);
     const ady = Math.abs(dy);
+    if (adx > SLIDE_LINK_TAP_MAX_PX || ady > SLIDE_LINK_TAP_MAX_PX) {
+      exceededTapSlopRef.current = true;
+    }
 
     if (axisRef.current === "undecided") {
       if (adx < DECK_AXIS_LOCK_MIN_PX && ady < DECK_AXIS_LOCK_MIN_PX) return;
       if (ady >= adx * DECK_VERTICAL_DOMINANCE) {
         axisRef.current = "vertical";
+        verticalDeckDragConfirmedRef.current = true;
         try {
           e.currentTarget.setPointerCapture(e.pointerId);
         } catch {
@@ -315,10 +328,32 @@ export default function MainSceneSlideDeck({
   };
 
   const onPointerUp: PointerEventHandler<HTMLDivElement> = (e) => {
-    endDragging(e.pointerId, e.currentTarget);
+    const deck = e.currentTarget;
+    const suppressCardNav =
+      pointerStartedOnCardLinkRef.current && verticalDeckDragConfirmedRef.current;
+    pointerStartedOnCardLinkRef.current = false;
+    exceededTapSlopRef.current = false;
+    verticalDeckDragConfirmedRef.current = false;
+    if (suppressCardNav) {
+      const killClick: EventListener = (ev) => {
+        deck.removeEventListener("click", killClick, true);
+        if (!(ev.target instanceof Element)) return;
+        if (!deck.contains(ev.target)) return;
+        const a = ev.target.closest("a[href]");
+        if (a && deck.contains(a) && a.closest("[data-slide-deck-card]")) {
+          ev.preventDefault();
+          ev.stopPropagation();
+        }
+      };
+      deck.addEventListener("click", killClick, true);
+    }
+    endDragging(e.pointerId, deck);
   };
 
   const onPointerCancel: PointerEventHandler<HTMLDivElement> = (e) => {
+    pointerStartedOnCardLinkRef.current = false;
+    exceededTapSlopRef.current = false;
+    verticalDeckDragConfirmedRef.current = false;
     endDragging(e.pointerId, e.currentTarget);
   };
 
@@ -389,7 +424,7 @@ export default function MainSceneSlideDeck({
           );
           return (
             <div key={item.snapshotId} className={styles.slideDeckLayer}>
-              <div className={styles.slideDeckCard} style={style}>
+              <div className={styles.slideDeckCard} data-slide-deck-card style={style}>
                 <SlideDeckCard item={item} />
               </div>
             </div>

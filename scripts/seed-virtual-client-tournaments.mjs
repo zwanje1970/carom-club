@@ -2,6 +2,7 @@
  * vclient01~10 각각 1개씩 대회(모집중·64명·OCR/자동검증 없음) + 64명 APPROVED 참가 +
  * 브래킷 1라운드 32경기(64강) + 대회 게시카드 10건.
  * 신청·스냅샷·브래킷의 userId 는 무작위 UUID가 아니라 store 의 vplayer01~vplayer64 실제 id 를 사용한다.
+ * 증빙은 공용 1개가 아니라 vplayer 로그인별 결정적 proofImage id + uploaderUserId=vplayer 로 64건을 준비한다.
  *
  *   node scripts/seed-virtual-client-tournaments.mjs
  *
@@ -10,7 +11,7 @@
  */
 
 import { createHash, randomUUID } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -37,6 +38,82 @@ function stableUuidFromSeed(seed) {
 /** vclient 슬롯별 고정 대회 id (재실행·제목 변경과 무관) */
 function deterministicTournamentIdForLogin(loginIdLower) {
   return stableUuidFromSeed(`v3-dev-seed-virt-client-tournament/v1:${loginIdLower}`);
+}
+
+/** vplayer 로그인당 고정 증빙 이미지 id (재시드 시에도 동일 참가자 = 동일 증빙) */
+function vplayerProofImageId(loginIdLower) {
+  return stableUuidFromSeed(`v3-dev-seed-vplayer-proof/v1:${loginIdLower}`);
+}
+
+/** lib/server/proof-images-base-dir.ts 와 동일 규칙(시드 스크립트는 TS 미임포트) */
+function getProofImagesBaseDir() {
+  const override = process.env.CAROM_PROOF_IMAGES_BASE?.trim();
+  if (override) return path.resolve(override);
+  if (process.env.VERCEL) return path.join("/tmp", "carom-proof-images");
+  return path.join(__dirname, "..", "data", "proof-images");
+}
+
+/**
+ * vplayer01~64 전용 proofImage store 행 + 디스크 파일(기존 증빙 1건을 바이트 복사).
+ * 신청의 proofImageId / uploaderUserId 가 참가자와 일치하도록 한다.
+ */
+function ensureVplayerProofImagePool(store, virtualPlayers, now) {
+  const baseDir = getProofImagesBaseDir();
+  const vplayerProofIds = new Set(
+    virtualPlayers.map((u) => vplayerProofImageId(String(u.loginId).toLowerCase()))
+  );
+
+  store.proofImages = (store.proofImages ?? []).filter((p) => !vplayerProofIds.has(p.id));
+
+  const candidates = store.proofImages ?? [];
+  const template =
+    candidates.find((p) => p && typeof p.id === "string" && p.id && (p.originalExt === "jpg" || p.originalExt === "png" || p.originalExt === "webp")) ??
+    null;
+  if (!template) {
+    console.error("증빙 템플릿으로 쓸 proofImages 항목이 없습니다.");
+    process.exit(1);
+  }
+
+  const tid = template.id;
+  const ext = template.originalExt;
+  const origSrc = path.join(baseDir, "original", `${tid}.${ext}`);
+  if (!existsSync(origSrc)) {
+    console.error(`증빙 원본 파일이 없습니다: ${origSrc}`);
+    process.exit(1);
+  }
+
+  const w320TemplateJpg = path.join(baseDir, "w320", `${tid}.jpg`);
+  const w320Src = existsSync(w320TemplateJpg) ? w320TemplateJpg : origSrc;
+  const w640TemplateJpg = path.join(baseDir, "w640", `${tid}.jpg`);
+  const w640Src = existsSync(w640TemplateJpg) ? w640TemplateJpg : origSrc;
+
+  for (const sub of ["original", "w320", "w640"]) {
+    mkdirSync(path.join(baseDir, sub), { recursive: true });
+  }
+
+  const proofIdByLogin = new Map();
+  for (const vUser of virtualPlayers) {
+    const loginLower = String(vUser.loginId).toLowerCase();
+    const newId = vplayerProofImageId(loginLower);
+    const uid = vUser.id;
+
+    store.proofImages.push({
+      id: newId,
+      uploaderUserId: uid,
+      originalExt: ext,
+      createdAt: now,
+    });
+
+    const origDst = path.join(baseDir, "original", `${newId}.${ext}`);
+    copyFileSync(origSrc, origDst);
+    copyFileSync(w320Src, path.join(baseDir, "w320", `${newId}.jpg`));
+    copyFileSync(w640Src, path.join(baseDir, "w640", `${newId}.jpg`));
+
+    proofIdByLogin.set(loginLower, newId);
+  }
+
+  console.log(`vplayer 전용 증빙 이미지 ${virtualPlayers.length}건(store+파일) 준비 완료.`);
+  return proofIdByLogin;
 }
 
 function collectVirtClientTournamentIdsToRemove(store) {
@@ -157,15 +234,6 @@ function main() {
     process.exit(1);
   }
 
-  const proofImages = store.proofImages ?? [];
-  const proof = proofImages[0];
-  if (!proof?.id) {
-    console.error("proofImages가 비어 있어 참가 신청 더미를 만들 수 없습니다.");
-    process.exit(1);
-  }
-  const proofId = proof.id;
-  const pUrls = proofUrls(proofId);
-
   const virtualUsers = (store.users ?? [])
     .filter((u) => /^vclient\d{2}$/i.test(String(u.loginId ?? "")))
     .sort((a, b) => String(a.loginId).localeCompare(String(b.loginId)));
@@ -192,6 +260,8 @@ function main() {
 
   const baseDate = ymdPlusDays(new Date().toISOString().slice(0, 10), 14);
   const now = new Date().toISOString();
+
+  const proofIdByVplayerLogin = ensureVplayerProofImagePool(store, virtualPlayers, now);
 
   for (let idx = 0; idx < virtualUsers.length; idx += 1) {
     const user = virtualUsers[idx];
@@ -234,6 +304,13 @@ function main() {
       const vUser = virtualPlayers[i];
       const uid = vUser.id;
       const vLogin = String(vUser.loginId);
+      const loginLower = vLogin.toLowerCase();
+      const proofId = proofIdByVplayerLogin.get(loginLower);
+      if (!proofId) {
+        console.error(`vplayer 증빙 id 매핑 누락: ${loginLower}`);
+        process.exit(1);
+      }
+      const pUrls = proofUrls(proofId);
       const applicantName =
         (typeof vUser.name === "string" && vUser.name.trim()) ||
         (typeof vUser.nickname === "string" && vUser.nickname.trim()) ||

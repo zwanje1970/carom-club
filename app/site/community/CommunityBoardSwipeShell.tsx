@@ -273,6 +273,10 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
     el.addEventListener("touchcancel", onTouchCancel, { passive: true });
 
     return () => {
+      startRef.current = null;
+      samplesRef.current = [];
+      const v = viewportRef.current;
+      if (v) v.style.removeProperty("touch-action");
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove, opts);
       el.removeEventListener("touchend", onTouchEnd);

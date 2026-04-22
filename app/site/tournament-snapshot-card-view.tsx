@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { TournamentStatusBadge, type TournamentPostStatus } from "./tournament-slide-card-status-badge";
 import styles from "./tournament-slide-card-previews.module.css";
@@ -10,6 +11,8 @@ export type SlideDeckItem = {
   snapshotId: string;
   title: string;
   subtitle: string;
+  /** 메인 슬라이드 등: 클릭 시 이동할 상세 경로(없으면 링크 없음·미리보기 전용) */
+  targetDetailUrl?: string;
   image320Url?: string;
   statusBadge?: string;
   cardExtraLine1?: string | null;
@@ -173,7 +176,25 @@ function TournamentSlideCardPreview({
 export function TournamentSnapshotCardView({ item }: { item: SlideDeckItem }) {
   const previewItem = slideDeckItemToPreviewItem(item);
   const variant: SlidePreviewVariant = item.cardTemplate === "B" ? "frame" : "classic";
-  return <TournamentSlideCardPreview item={previewItem} variant={variant} />;
+  const href = (item.targetDetailUrl ?? "").trim();
+  const inner = <TournamentSlideCardPreview item={previewItem} variant={variant} />;
+  if (!href) return inner;
+  return (
+    <Link
+      href={href}
+      aria-label={item.title?.trim() ? `${item.title.trim()} 상세 보기` : "대회 상세 보기"}
+      style={{
+        display: "block",
+        width: "100%",
+        maxWidth: "100%",
+        textDecoration: "none",
+        color: "inherit",
+        WebkitTapHighlightColor: "transparent",
+      }}
+    >
+      {inner}
+    </Link>
+  );
 }
 
 export function SlideDeckCard({ item }: { item: SlideDeckItem }) {

@@ -1390,7 +1390,8 @@ body:has(.site-home-page) {
   position: fixed;
   right: 16px;
   bottom: calc(62px + env(safe-area-inset-bottom, 0px));
-  z-index: 68;
+  /* 하단 5탭(.site-home-fab-root z-index:70) 위에 노출 */
+  z-index: 85;
   width: 56px;
   height: 56px;
   border-radius: 999px;

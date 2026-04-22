@@ -6953,8 +6953,19 @@ export async function patchSiteLayoutConfig(params: {
   return next;
 }
 
+let siteNoticeMemoryFallback: SiteNotice | null = null;
+
+function isReadonlyDevStoreWriteError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = "code" in error ? (error as { code?: unknown }).code : undefined;
+  return code === "EROFS" || code === "EACCES" || code === "EPERM";
+}
+
 export async function getSiteNotice(): Promise<SiteNotice> {
   const readStrategy = resolveSiteNoticeReadStrategy();
+  if (readStrategy !== "firestore-kv" && siteNoticeMemoryFallback) {
+    return siteNoticeMemoryFallback;
+  }
   if (readStrategy === "firestore-kv") {
     try {
       const raw = await readSiteNoticeRawFromFirestoreKv();
@@ -6984,6 +6995,7 @@ export async function patchSiteNotice(params: {
       text: params.text !== undefined ? params.text.trim() : current.text,
     };
     await upsertSiteNoticeToFirestoreKv(next);
+    siteNoticeMemoryFallback = null;
     return next;
   }
   if (writeStrategy === "blocked") {
@@ -6996,7 +7008,14 @@ export async function patchSiteNotice(params: {
     text: params.text !== undefined ? params.text.trim() : current.text,
   };
   store.siteNotice = next;
-  await writeStore(store);
+  siteNoticeMemoryFallback = next;
+  try {
+    await writeStore(store);
+  } catch (error) {
+    if (!isReadonlyDevStoreWriteError(error)) {
+      throw error;
+    }
+  }
   return next;
 }
 
@@ -7372,7 +7391,7 @@ function tournamentPublishedCardToPublishedSnapshot(
   const storedLoc = typeof t.cardDisplayLocation === "string" ? t.cardDisplayLocation.trim() : "";
   const fbDate = (tournamentMeta?.date ?? "").trim();
   const fbLoc = (tournamentMeta?.location ?? "").trim();
-  const datePart = storedDate || fbDate;
+  const datePart = appendKoreanWeekday(storedDate || fbDate);
   const locPart = storedLoc || fbLoc;
   const subtitle = [datePart, locPart].filter((x) => x.length > 0).join(" · ");
   const snap: PublishedCardSnapshot = {

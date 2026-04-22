@@ -213,6 +213,8 @@
   max-width: var(--slide-card-max-width);
   transform-origin: center center;
   will-change: transform, opacity;
+  /* 부모 .slideDeckLayer 가 pointer-events:none 이라 카드·링크가 클릭되도록 복구 */
+  pointer-events: auto;
 }
 
 /* 카드 0장: 슬라이드 창 높이·배경 동일 — 중앙 안내만 */

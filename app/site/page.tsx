@@ -390,6 +390,7 @@ export default async function SiteHomePage({
     snapshotId: snapshot.snapshotId,
     title: snapshot.title,
     subtitle: snapshot.subtitle,
+    targetDetailUrl: snapshot.targetDetailUrl,
     image320Url: snapshot.image320Url,
     statusBadge: snapshot.statusBadge,
     cardExtraLine1: snapshot.cardExtraLine1,

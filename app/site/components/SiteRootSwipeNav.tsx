@@ -122,13 +122,6 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       if (cooldownUntilRef.current > Date.now()) return;
       const t = e.touches[0];
       if (!t) return;
-      if (
-        isCommunityBoardListHubPath(pathname) &&
-        e.target instanceof Element &&
-        e.target.closest("[data-community-inner-swipe]")
-      ) {
-        return;
-      }
       const w = window.innerWidth;
       const x = t.clientX;
       const edgeSkip = x < EDGE_EXCLUDE_PX || x > w - EDGE_EXCLUDE_PX;
@@ -168,18 +161,20 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
           start.verticalDominant = true;
           return;
         }
-        if (
-          isCommunityBoardListHubPath(pathname) &&
-          e.target instanceof Element &&
-          e.target.closest("[data-community-inner-swipe]")
-        ) {
-          return;
-        }
-        if (isCommunityBoardListHubPath(pathname)) {
-          const edge = communitySwipeEdgeFromTarget(e.target) ?? "middle";
-          if (edge === "first" && dx < 0) return;
-          if (edge === "last" && dx > 0) return;
-          if (edge === "middle") return;
+        if (isCommunityBoardListHubPath(pathname) && e.target instanceof Element) {
+          const innerHost = e.target.closest("[data-community-inner-swipe]");
+          if (innerHost) {
+            const edge = innerHost.getAttribute("data-community-swipe-edge");
+            /** 첫 게시판 탭 + 오른쪽으로 밀기 → 이전 루트 탭 / 마지막 탭 + 왼쪽으로 밀기 → 다음 루트 탭. 그 외는 커뮤니티 내부 스와이프 전담 */
+            const passToRoot =
+              (edge === "first" && dx > 0) || (edge === "last" && dx < 0);
+            if (!passToRoot) return;
+          } else {
+            const edge = communitySwipeEdgeFromTarget(e.target) ?? "middle";
+            if (edge === "first" && dx < 0) return;
+            if (edge === "last" && dx > 0) return;
+            if (edge === "middle") return;
+          }
         }
         start.horizontalLocked = true;
         gestureAnchorIdxRef.current = siteRootSwipeIndex(pathname);
@@ -333,6 +328,10 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
     el.addEventListener("touchcancel", onTouchCancel, { passive: true });
 
     return () => {
+      startRef.current = null;
+      samplesRef.current = [];
+      gestureAnchorIdxRef.current = null;
+      releaseViewportTouchAxisLock();
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove, touchMoveListenerOpts);
       el.removeEventListener("touchend", onTouchEnd);
