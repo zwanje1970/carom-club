@@ -48,20 +48,20 @@ export default async function SiteCommunityPostEditPage({ params }: Props) {
 
   return (
     <SiteShellFrame brandTitle={`수정 · ${board.label}`}>
-      <section className="site-site-gray-main v3-stack">
-      <CommunityPostEditForm
-        boardType={boardType}
-        postId={postId}
-        initialTitle={post.title}
-        initialContent={post.content}
-        initialImageUrls={post.imageUrls}
-        initialImageSizeLevels={post.imageSizeLevels}
-      />
-      <div className="v3-row">
-        <Link className="v3-btn" href={`/site/community/${boardType}/${postId}`}>
-          취소
-        </Link>
-      </div>
+      <section className="site-site-gray-main v3-stack ui-community-post-detail-page">
+        <CommunityPostEditForm
+          boardType={boardType}
+          postId={postId}
+          initialTitle={post.title}
+          initialContent={post.content}
+          initialImageUrls={post.imageUrls}
+          initialImageSizeLevels={post.imageSizeLevels}
+        />
+        <div className="ui-community-post-detail-foot">
+          <Link className="secondary-button ui-community-post-detail-foot-secondary" href={`/site/community/${boardType}/${postId}`}>
+            취소
+          </Link>
+        </div>
       </section>
     </SiteShellFrame>
   );

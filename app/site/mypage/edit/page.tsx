@@ -20,22 +20,20 @@ export default async function SiteMypageEditPage() {
 
   return (
     <SiteShellFrame brandTitle="내 정보 수정">
-      <section className="site-site-gray-main v3-stack">
-      <section className="v3-box v3-stack">
-        <h2 className="v3-h2">수정용 화면</h2>
-        <ProfileEditForm
-          key={user.id}
-          initialName={user.name}
-          initialNickname={user.nickname}
-          initialEmail={user.email ?? ""}
-          initialPhone={user.phone != null ? String(user.phone) : ""}
-        />
-      </section>
-      <div className="v3-row">
-        <Link className="v3-btn" href="/site/mypage">
+      <section className="site-site-gray-main v3-stack site-mypage-shell">
+        <section className="card-clean site-detail-inner-stack">
+          <h2 className="site-mypage-card-title">수정용 화면</h2>
+          <ProfileEditForm
+            key={user.id}
+            initialName={user.name}
+            initialNickname={user.nickname}
+            initialEmail={user.email ?? ""}
+            initialPhone={user.phone != null ? String(user.phone) : ""}
+          />
+        </section>
+        <Link className="secondary-button" href="/site/mypage" style={{ alignSelf: "flex-start" }}>
           마이페이지로
         </Link>
-      </div>
       </section>
     </SiteShellFrame>
   );

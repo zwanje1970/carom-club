@@ -1,5 +1,6 @@
 import Link from "next/link";
 import LogoutButton from "../components/LogoutButton";
+import AdminCard, { AdminCardGrid, AdminSurface } from "../components/admin/AdminCard";
 import { cookies } from "next/headers";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../lib/auth/session";
 import { getClientDashboardPolicy } from "../../lib/server/dev-store";
@@ -16,7 +17,7 @@ export default async function ClientHomePage() {
         : "일반";
 
   return (
-    <main className="v3-page v3-stack ui-client-dashboard">
+    <main className="v3-page v3-stack ui-client-dashboard" style={{ gap: "1.15rem" }}>
       <div className="v3-row ui-client-dashboard-header" style={{ justifyContent: "space-between" }}>
         <h1 className="v3-h1" style={{ marginBottom: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
           대시보드
@@ -25,7 +26,7 @@ export default async function ClientHomePage() {
       </div>
 
       {policy?.annualMembershipVisible ? (
-        <section className="v3-box v3-stack">
+        <AdminSurface className="v3-stack" style={{ gap: "0.65rem" }}>
           <h2 className="v3-h2">연회원 상태</h2>
           <p>현재 상태: {membershipLabel}</p>
           {policy.annualMembershipEnforced ? (
@@ -62,60 +63,24 @@ export default async function ClientHomePage() {
               </div>
             </>
           )}
-        </section>
+        </AdminSurface>
       ) : null}
 
-      <section className="v3-stack" aria-label="메뉴" style={{ gap: "1rem" }}>
-        <div className="v3-row" style={{ flexWrap: "wrap", gap: "1rem" }}>
-          <Link
+      <section className="v3-stack" aria-label="메뉴" style={{ gap: "0.5rem" }}>
+        <AdminCardGrid>
+          <AdminCard
             href="/client/tournament"
-            className="v3-box v3-stack ui-client-tournament-card"
-            style={{ flex: "1 1 14rem", textDecoration: "none", color: "inherit", minHeight: "6rem" }}
-          >
-            <h2 className="v3-h2" style={{ marginBottom: "0.25rem" }}>
-              대회관리
-            </h2>
-            <p className="v3-muted" style={{ margin: 0, fontSize: "0.95rem" }}>
-              대회 생성 · 목록 · 참가자 · 대진표
-            </p>
-          </Link>
-          <Link
-            href="/client/settlement"
-            className="v3-box v3-stack ui-client-tournament-card"
-            style={{ flex: "1 1 14rem", textDecoration: "none", color: "inherit", minHeight: "6rem" }}
-          >
-            <h2 className="v3-h2" style={{ marginBottom: "0.25rem" }}>
-              정산관리
-            </h2>
-            <p className="v3-muted" style={{ margin: 0, fontSize: "0.95rem" }}>
-              전체정산 · 대회별 정산
-            </p>
-          </Link>
-          <Link
-            href="/client/member"
-            className="v3-box v3-stack ui-client-tournament-card"
-            style={{ flex: "1 1 14rem", textDecoration: "none", color: "inherit", minHeight: "6rem" }}
-          >
-            <h2 className="v3-h2" style={{ marginBottom: "0.25rem" }}>
-              회원관리
-            </h2>
-            <p className="v3-muted" style={{ margin: 0, fontSize: "0.95rem" }}>
-              회원 목록 · 푸시 발송
-            </p>
-          </Link>
-          <Link
+            title="대회관리"
+            description="대회 생성 · 목록 · 참가자 · 대진표"
+          />
+          <AdminCard href="/client/settlement" title="정산관리" description="전체정산 · 대회별 정산" />
+          <AdminCard href="/client/member" title="회원관리" description="회원 목록 · 푸시 발송" />
+          <AdminCard
             href="/client/settings"
-            className="v3-box v3-stack ui-client-tournament-card"
-            style={{ flex: "1 1 14rem", textDecoration: "none", color: "inherit", minHeight: "6rem" }}
-          >
-            <h2 className="v3-h2" style={{ marginBottom: "0.25rem" }}>
-              부가기능
-            </h2>
-            <p className="v3-muted" style={{ margin: 0, fontSize: "0.95rem" }}>
-              업체설정 · 당구장 소개 · 문의 내역 · 빈 대진표 출력
-            </p>
-          </Link>
-        </div>
+            title="부가기능"
+            description="업체설정 · 당구장 소개 · 문의 내역 · 빈 대진표 출력"
+          />
+        </AdminCardGrid>
       </section>
     </main>
   );

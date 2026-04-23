@@ -8,7 +8,7 @@
   margin-top: 0;
 }
 
-/* 공지는 슬라이드 창 위 흐름 배치 · 창과 가로 폭 정렬(min(92vw,448px)) */
+/* 공지는 슬라이드 창 위 흐름 배치 · 창과 가로 폭 정렬(slide-deck-template .slide-deck 폭과 동일) */
 .slideDeckWrapWithNoticeGap {
   gap: 0.5rem;
 }
@@ -17,11 +17,11 @@
   margin-top: 0;
 }
 
-/* slide-deck-template.css 의 .slide-deck 과 동일 폭(min(92vw, 448px)) — 좌우 패딩 없음 */
+/* slide-deck-template.css 의 .slide-deck 과 동일 폭 — 좌우 패딩 없음 */
 .slideDeckNoticeAbove {
   align-self: center;
-  width: min(92vw, 448px);
-  max-width: min(92vw, 448px);
+  width: min(94vw, 492px);
+  max-width: min(94vw, 492px);
   box-sizing: border-box;
   flex-shrink: 0;
   padding-top: env(safe-area-inset-top, 0px);
@@ -39,8 +39,8 @@
   bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(calc(100% - 28px), 420px);
-  max-width: 420px;
+  width: min(calc(100% - 20px), 440px);
+  max-width: 440px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -78,7 +78,6 @@
   border-radius: 0;
   background: #fff176;
   border: 1px solid #c9a227;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
   overflow: hidden;
   white-space: nowrap;
   display: flex;

@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import Link from "next/link";
 import { SITE_TOURNAMENT_LIST_EXCLUDED_BADGES } from "../../../lib/site-tournament-badges";
 import {
@@ -90,56 +89,14 @@ function tournamentLocationLine(t: Tournament): string {
   return typeof t.location === "string" ? t.location.trim() : "";
 }
 
-/** 대회목록 상태 뱃지 색 — 모집중·마감임박·마감·종료 */
-function tournamentListStatusBadgeStyle(statusBadge: string): CSSProperties {
+/** 대회목록 상태 뱃지 — 모집중만 success(.badge-status), 나머지는 약한 톤 */
+function tournamentStatusBadgeClassName(statusBadge: string): string {
   const s = statusBadge.trim();
-  const base: CSSProperties = {
-    display: "inline-block",
-    fontSize: "0.72rem",
-    fontWeight: 600,
-    lineHeight: 1.2,
-    padding: "0.2rem 0.45rem",
-    borderRadius: "999px",
-    whiteSpace: "nowrap",
-    marginBottom: "0.35rem",
-  };
-  switch (s) {
-    case "모집중":
-      return {
-        ...base,
-        background: "#dbeafe",
-        color: "#1d4ed8",
-        border: "1px solid #2563eb",
-      };
-    case "마감임박":
-      return {
-        ...base,
-        background: "#fee2e2",
-        color: "#b91c1c",
-        border: "1px solid #dc2626",
-      };
-    case "마감":
-      return {
-        ...base,
-        background: "#dcfce7",
-        color: "#15803d",
-        border: "1px solid #16a34a",
-      };
-    case "종료":
-      return {
-        ...base,
-        background: "#171717",
-        color: "#fafafa",
-        border: "1px solid #262626",
-      };
-    default:
-      return {
-        ...base,
-        background: "#f1f5f9",
-        color: "#334155",
-        border: "1px solid var(--v3-border, #e5e7eb)",
-      };
-  }
+  if (s === "모집중") return "badge-status";
+  if (s === "마감임박") return "site-board-status-badge site-board-status-badge--urgent";
+  if (s === "마감") return "site-board-status-badge site-board-status-badge--closed";
+  if (s === "종료") return "site-board-status-badge site-board-status-badge--ended";
+  return "site-board-status-badge site-board-status-badge--muted";
 }
 
 export default async function SiteTournamentsPage({
@@ -200,6 +157,7 @@ export default async function SiteTournamentsPage({
   return (
     <SiteShellFrame
       brandTitle="대회안내"
+      auxiliaryBarClassName="site-shell-controls--site-list"
       auxiliary={
         <TournamentsFilterBar
           searchParams={resolvedSearchParams}
@@ -239,98 +197,27 @@ export default async function SiteTournamentsPage({
             const locationLine = tournamentLocationLine(tournament);
             return (
             <li key={tournament.id} className="site-board-card">
-              <Link
-                href={`/site/tournaments/${tournament.id}`}
-                style={{
-                  textDecoration: "none",
-                  color: "inherit",
-                  display: "flex",
-                  alignItems: "flex-start",
-                  justifyContent: "space-between",
-                  gap: "0.75rem",
-                }}
-              >
-                <div style={{ minWidth: 0, flex: "1 1 auto" }}>
-                  <span style={tournamentListStatusBadgeStyle(tournament.statusBadge)}>
+              <Link href={`/site/tournaments/${tournament.id}`}>
+                <div className="site-tournament-card-main">
+                  <span className={tournamentStatusBadgeClassName(tournament.statusBadge)}>
                     {tournament.statusBadge}
                   </span>
-                  <strong
-                    style={{
-                      display: "block",
-                      fontSize: "1.05rem",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      marginBottom: "0.5rem",
-                    }}
-                  >
-                    {tournament.title}
-                    {bracketParen ? ` (${bracketParen})` : ""}
-                  </strong>
-                  {scheduleLine ? (
-                    <span
-                      style={{
-                        display: "block",
-                        marginTop: 0,
-                        fontSize: "0.92rem",
-                        color: "#334155",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {scheduleLine}
-                    </span>
-                  ) : null}
-                  {locationLine ? (
-                    <span
-                      className="v3-muted"
-                      style={{
-                        display: "block",
-                        marginTop: "0.25rem",
-                        fontSize: "0.875rem",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {locationLine}
-                    </span>
+                  <strong className="site-tournament-card-title">{tournament.title}</strong>
+                  {scheduleLine ? <span className="site-tournament-schedule">{scheduleLine}</span> : null}
+                  {locationLine ? <span className="site-tournament-location">{locationLine}</span> : null}
+                  {bracketParen ? (
+                    <div className="site-tournament-chips">
+                      <span className="site-list-chip">{bracketParen}</span>
+                    </div>
                   ) : null}
                 </div>
-                {posterSrc ? (
-                  <img
-                    src={posterSrc}
-                    alt={`${tournament.title} 포스터`}
-                    loading="lazy"
-                    style={{
-                      width: "96px",
-                      maxWidth: "96px",
-                      height: "auto",
-                      maxHeight: "128px",
-                      display: "block",
-                      marginLeft: "auto",
-                      flexShrink: 0,
-                    }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      width: "96px",
-                      height: "128px",
-                      background: "#e5e7eb",
-                      color: "#6b7280",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "0.8rem",
-                      marginLeft: "auto",
-                      flexShrink: 0,
-                    }}
-                  >
-                    이미지 없음
-                  </div>
-                )}
+                <div className="site-tournament-list-thumb">
+                  {posterSrc ? (
+                    <img src={posterSrc} alt={`${tournament.title} 포스터`} loading="lazy" />
+                  ) : (
+                    <div className="site-tournament-list-thumb-placeholder">이미지 없음</div>
+                  )}
+                </div>
               </Link>
             </li>
             );

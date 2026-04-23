@@ -39,16 +39,20 @@ export default async function SiteCommunityPage({
   return (
     <SiteShellFrame
       brandTitle="커뮤니티"
+      auxiliaryBarClassName="site-shell-controls--site-list"
       auxiliary={
-        <>
+        <div className="ui-community-shell-context v3-stack" data-community-board="all">
           <CommunityBoardTabs tabs={tabItems} currentKey="all" />
           <CommunityBoardSearchForm actionPath="/site/community" inputId="community-q-all" defaultQuery={q} />
-        </>
+        </div>
       }
     >
       <>
         <CommunityBoardSwipeShell tabs={tabItems.map(({ key, href }) => ({ key, href }))}>
-          <section className="site-site-gray-main v3-stack ui-community-page">
+          <section className="site-site-gray-main v3-stack ui-community-page" data-community-board="all">
+            <header className="ui-community-context-head">
+              <p className="ui-community-context-head-label">전체 게시판</p>
+            </header>
             <CommunityBoardPostList showRoomPrefix items={items} />
           </section>
         </CommunityBoardSwipeShell>

@@ -8,15 +8,18 @@ const mainStyleHome: CSSProperties = {
   boxSizing: "border-box",
 };
 
-/** standard: 바깥 main을 가로 풀폭으로 — 자식 셸을 중앙에 모으지 않음(globals에서 셸도 풀폭 처리) */
+/** standard: 부모(.site-shell-main) 높이에 맞춤 — min-height:100dvh 금지(문서 스크롤 방지) */
 const mainStyleStandard: CSSProperties = {
   width: "100%",
-  minHeight: "100dvh",
+  minHeight: 0,
+  height: "100%",
+  flex: "1 1 auto",
   display: "flex",
   flexDirection: "column",
   justifyContent: "flex-start",
   alignItems: "stretch",
   boxSizing: "border-box",
+  overflow: "hidden",
 };
 
 const shellStyleHome: CSSProperties = {
@@ -30,11 +33,15 @@ const shellStyleHome: CSSProperties = {
   position: "relative",
 };
 
-/** standard: 메인 제외 페이지 — 폭 제한·라운드 제거(globals .site-home-page--standard와 동일 목적) */
+/** standard: 셸이 main을 채우고 dock + scroll-body만 분배 — min-height:100dvh 금지 */
 const shellStyleStandard: CSSProperties = {
   width: "100%",
   maxWidth: "none",
-  minHeight: "100dvh",
+  minHeight: 0,
+  height: "100%",
+  flex: "1 1 auto",
+  display: "flex",
+  flexDirection: "column",
   borderRadius: 0,
   paddingTop: "0",
   paddingLeft: "0",
@@ -42,6 +49,7 @@ const shellStyleStandard: CSSProperties = {
   boxSizing: "border-box",
   position: "relative",
   boxShadow: "none",
+  overflow: "hidden",
 };
 
 export type SiteShellFrameProps = {
@@ -53,6 +61,11 @@ export type SiteShellFrameProps = {
   auxiliary?: ReactNode;
   /** 컨트롤 바 세로 패딩을 약간 줄임(당구장 필터 등) */
   auxiliaryCompact?: boolean;
+  /**
+   * 헤더 아래 필터 래퍼(`.site-shell-controls`)에 추가 클래스 — 목록 페이지만 톤 조정할 때 사용.
+   * 미지정 시 기존과 동일.
+   */
+  auxiliaryBarClassName?: string;
   /** 상단 흰 배경 아래 본문(다크 메인 또는 회색 본문) */
   children: ReactNode;
   /**
@@ -82,6 +95,7 @@ export default function SiteShellFrame({
   prependMain,
   mainId,
   auxiliaryCompact,
+  auxiliaryBarClassName,
   shellVariant = "standard",
 }: SiteShellFrameProps) {
   const hasControls = auxiliary !== undefined;
@@ -96,7 +110,11 @@ export default function SiteShellFrame({
     .filter(Boolean)
     .join(" ");
 
-  const controlsBarClass = ["site-shell-controls", auxiliaryCompact ? "site-shell-controls--compact" : ""]
+  const controlsBarClass = [
+    "site-shell-controls",
+    auxiliaryCompact ? "site-shell-controls--compact" : "",
+    auxiliaryBarClassName ?? "",
+  ]
     .filter(Boolean)
     .join(" ");
 

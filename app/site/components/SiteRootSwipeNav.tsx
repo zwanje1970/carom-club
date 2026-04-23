@@ -23,9 +23,7 @@ const VELOCITY_COMPLETE = 0.42;
 const TRANSITION_MS = 300;
 const EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 
-function communitySwipeEdgeFromTarget(el: EventTarget | null): "first" | "last" | "middle" | null {
-  if (!el || !(el instanceof Element)) return null;
-  const host = el.closest("[data-community-inner-swipe]");
+function communitySwipeEdgeFromHost(host: Element | null): "first" | "last" | "middle" | null {
   if (!host) return null;
   const v = host.getAttribute("data-community-swipe-edge");
   if (v === "first" || v === "last" || v === "middle") return v;
@@ -83,6 +81,13 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
     horizontalLocked: boolean;
     /** 세로 우선으로 확정되면 제스처 끝까지 스와이프 안 함 */
     verticalDominant: boolean;
+    /** touchstart 시점 기준: 커뮤니티 목록 허브 여부 */
+    startedOnCommunityHub: boolean;
+    /**
+     * touchstart 시점 기준: 커뮤니티 내부 스와이프 edge.
+     * null이면 커뮤니티 허브라도 내부 스와이프 영역 밖에서 시작.
+     */
+    startedCommunityEdge: "first" | "last" | "middle" | null;
   } | null>(null);
   const samplesRef = useRef<{ t: number; x: number }[]>([]);
   const navAfterTransitionRef = useRef<string | null>(null);
@@ -125,7 +130,13 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       const w = window.innerWidth;
       const x = t.clientX;
       const edgeSkip = x < EDGE_EXCLUDE_PX || x > w - EDGE_EXCLUDE_PX;
-      const blocked = touchTargetBlocksSwipe(e.target) || edgeSkip;
+      const startedOnCommunityHub = isCommunityBoardListHubPath(pathname);
+      const targetEl = e.target instanceof Element ? e.target : null;
+      const innerHost = startedOnCommunityHub ? targetEl?.closest("[data-community-inner-swipe]") : null;
+      const startedCommunityEdge = communitySwipeEdgeFromHost(innerHost ?? null);
+      /** 커뮤니티 허브에서 내부 스와이프 영역 밖으로 시작한 제스처는 루트가 가로 스와이프를 맡지 않는다. */
+      const blockedByCommunityPolicy = startedOnCommunityHub && !innerHost;
+      const blocked = touchTargetBlocksSwipe(e.target) || edgeSkip || blockedByCommunityPolicy;
       const startedOnLink = e.target instanceof Element && !!e.target.closest("a[href]");
       startRef.current = {
         x: t.clientX,
@@ -134,6 +145,8 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
         startedOnLink,
         horizontalLocked: false,
         verticalDominant: false,
+        startedOnCommunityHub,
+        startedCommunityEdge,
       };
       samplesRef.current = [{ t: Date.now(), x: t.clientX }];
     };
@@ -161,20 +174,12 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
           start.verticalDominant = true;
           return;
         }
-        if (isCommunityBoardListHubPath(pathname) && e.target instanceof Element) {
-          const innerHost = e.target.closest("[data-community-inner-swipe]");
-          if (innerHost) {
-            const edge = innerHost.getAttribute("data-community-swipe-edge");
-            /** 첫 게시판 탭 + 오른쪽으로 밀기 → 이전 루트 탭 / 마지막 탭 + 왼쪽으로 밀기 → 다음 루트 탭. 그 외는 커뮤니티 내부 스와이프 전담 */
-            const passToRoot =
-              (edge === "first" && dx > 0) || (edge === "last" && dx < 0);
-            if (!passToRoot) return;
-          } else {
-            const edge = communitySwipeEdgeFromTarget(e.target) ?? "middle";
-            if (edge === "first" && dx < 0) return;
-            if (edge === "last" && dx > 0) return;
-            if (edge === "middle") return;
-          }
+        if (start.startedOnCommunityHub) {
+          const edge = start.startedCommunityEdge;
+          if (!edge) return;
+          /** 첫 게시판 탭 + 오른쪽으로 밀기 → 이전 루트 탭 / 마지막 탭 + 왼쪽으로 밀기 → 다음 루트 탭. 그 외는 커뮤니티 내부 스와이프 전담 */
+          const passToRoot = (edge === "first" && dx > 0) || (edge === "last" && dx < 0);
+          if (!passToRoot) return;
         }
         start.horizontalLocked = true;
         gestureAnchorIdxRef.current = siteRootSwipeIndex(pathname);

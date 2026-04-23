@@ -80,6 +80,8 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
     startedOnLink: boolean;
     horizontalLocked: boolean;
     verticalDominant: boolean;
+    /** 제스처 시작 시점 기준의 탭 인덱스(엣지·완료 판정 고정) */
+    anchorIdx: number;
   } | null>(null);
   const samplesRef = useRef<{ t: number; x: number }[]>([]);
   const navHrefRef = useRef<string | null>(null);
@@ -135,6 +137,7 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
         startedOnLink,
         horizontalLocked: false,
         verticalDominant: false,
+        anchorIdx: activeIdx,
       };
       samplesRef.current = [{ t: Date.now(), x: t.clientX }];
     };
@@ -159,8 +162,8 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
           start.verticalDominant = true;
           return;
         }
-        if (activeIdx === 0 && dx > 0) return;
-        if (activeIdx === n - 1 && dx < 0) return;
+        if (start.anchorIdx === 0 && dx > 0) return;
+        if (start.anchorIdx === n - 1 && dx < 0) return;
         start.horizontalLocked = true;
         const vp = viewportRef.current;
         if (vp) vp.style.setProperty("touch-action", "none");
@@ -206,10 +209,11 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
       const vx = velocityFromSamples(velocitySamples);
 
       let nextIdx: number | null = null;
-      if (dragPx < 0 && activeIdx < n - 1) {
-        if (dragPx <= -threshold || vx < -VELOCITY_COMPLETE) nextIdx = activeIdx + 1;
-      } else if (dragPx > 0 && activeIdx > 0) {
-        if (dragPx >= threshold || vx > VELOCITY_COMPLETE) nextIdx = activeIdx - 1;
+      const idx = start.anchorIdx;
+      if (dragPx < 0 && idx < n - 1) {
+        if (dragPx <= -threshold || vx < -VELOCITY_COMPLETE) nextIdx = idx + 1;
+      } else if (dragPx > 0 && idx > 0) {
+        if (dragPx >= threshold || vx > VELOCITY_COMPLETE) nextIdx = idx - 1;
       }
 
       if (nextIdx == null) {
@@ -222,8 +226,7 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
       navHrefRef.current = href;
 
       const track = trackRef.current;
-      const endTransform =
-        nextIdx > activeIdx ? `translate3d(calc(-200% / 3), 0, 0)` : `translate3d(0px, 0, 0)`;
+      const endTransform = nextIdx > idx ? `translate3d(calc(-200% / 3), 0, 0)` : `translate3d(0px, 0, 0)`;
       if (track) {
         track.style.transition = `transform ${TRANSITION_MS}ms ${EASING}`;
         track.style.transform = endTransform;

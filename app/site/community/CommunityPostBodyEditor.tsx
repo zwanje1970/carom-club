@@ -823,27 +823,19 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
   }, []);
 
   return (
-    <div className="v3-stack" style={{ gap: "0.5rem", position: "relative", width: "100%" }}>
+    <div className="ui-community-post-editor-shell v3-stack">
       <div
         ref={bodySurfaceRef}
+        className="ui-community-post-editor-surface"
         onMouseDown={(e) => {
           if (e.target === e.currentTarget) {
             setSelectedImageBlockIndex(null);
           }
         }}
-        style={{
-          border: "1px solid #bbb",
-          borderRadius: "0.4rem",
-          padding: "0.65rem 0.75rem",
-          background: "#fff",
-          minHeight: "12rem",
-          position: "relative",
-          width: "100%",
-        }}
       >
         <div
           ref={editorRef}
-          className="community-post-body-editor-root"
+          className="community-post-body-editor-root ui-community-post-editor-editable"
           contentEditable={!disabled}
           suppressContentEditableWarning
           data-placeholder=""
@@ -1123,21 +1115,13 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
             const ed = editorRef.current;
             if (ed) scrollCaretOrSelectionIntoViewIfNeeded(ed);
           }}
-          style={{
-            minHeight: "10.5rem",
-            outline: "none",
-            fontSize: "0.95rem",
-            lineHeight: 1.65,
-            fontFamily: "inherit",
-            color: "inherit",
-            wordBreak: "break-word",
-          }}
         />
 
         {toolbarRect !== null && selectedImageBlockIndex !== null && blocks[selectedImageBlockIndex]?.type === "image" ? (
           <div
             role="toolbar"
             aria-label="이미지 편집"
+            className="ui-community-image-toolbar"
             onMouseDown={(e) => e.preventDefault()}
             style={{
               position: "fixed",
@@ -1145,67 +1129,40 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
               top: toolbarRect.top - 8,
               transform: "translate(-50%, -100%)",
               zIndex: 30,
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 6,
-              padding: "6px 8px",
-              borderRadius: "0.4rem",
-              border: "1px solid #ccc",
-              background: "#fff",
-              boxShadow: "0 2px 10px rgba(0,0,0,0.12)",
             }}
           >
             <button
               type="button"
+              className="ui-community-image-toolbar-btn"
               disabled={disabled || (blocks[selectedImageBlockIndex] as ImageBlock).sizeLevel >= COMMUNITY_POST_SIZE_LEVEL_MAX}
               onClick={() => updateImageLevel(selectedImageBlockIndex, 1)}
               style={{
                 width: coarsePointer ? 44 : 32,
                 height: coarsePointer ? 44 : 28,
-                border: "1px solid #ddd",
-                borderRadius: 6,
-                background: "#f8f8f8",
-                cursor: disabled ? "default" : "pointer",
-                fontSize: "1rem",
-                lineHeight: 1,
-                boxSizing: "border-box",
               }}
             >
               +
             </button>
             <button
               type="button"
+              className="ui-community-image-toolbar-btn"
               disabled={disabled || (blocks[selectedImageBlockIndex] as ImageBlock).sizeLevel <= COMMUNITY_POST_SIZE_LEVEL_MIN}
               onClick={() => updateImageLevel(selectedImageBlockIndex, -1)}
               style={{
                 width: coarsePointer ? 44 : 32,
                 height: coarsePointer ? 44 : 28,
-                border: "1px solid #ddd",
-                borderRadius: 6,
-                background: "#f8f8f8",
-                cursor: disabled ? "default" : "pointer",
-                fontSize: "1rem",
-                lineHeight: 1,
-                boxSizing: "border-box",
               }}
             >
               −
             </button>
             <button
               type="button"
+              className="ui-community-image-toolbar-remove"
               disabled={disabled}
               onClick={() => removeImageAt(selectedImageBlockIndex)}
               style={{
                 minHeight: coarsePointer ? 44 : 28,
                 padding: coarsePointer ? "0 12px" : "0 8px",
-                border: "1px solid #c99",
-                borderRadius: 6,
-                background: "#fff5f5",
-                cursor: disabled ? "default" : "pointer",
-                fontSize: "0.75rem",
-                lineHeight: 1,
-                boxSizing: "border-box",
               }}
             >
               삭제

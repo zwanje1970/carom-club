@@ -1,7 +1,7 @@
 /** 커뮤니티 게시판 목록 — 가벼운 게시판형 리스트 */
 
 import Link from "next/link";
-import type { CommunityPostListItem } from "../../../lib/server/dev-store";
+import type { CommunityPostListItem, SiteCommunityBoardKey } from "../../../lib/server/dev-store";
 import { COMMUNITY_ROOM_PREFIX_SHORT, isPrimaryTabKey } from "./community-tab-config";
 
 function formatListDateTime(iso: string): string {
@@ -16,15 +16,38 @@ function formatListDateTime(iso: string): string {
   return `${m}.${day} ${hh}:${min}`;
 }
 
+function boardPillClass(boardType: SiteCommunityBoardKey): string {
+  const base = "ui-community-board-pill";
+  if (boardType === "free") return `${base} ${base}--free`;
+  if (boardType === "qna") return `${base} ${base}--qna`;
+  if (boardType === "reviews") return `${base} ${base}--reviews`;
+  return `${base} ${base}--muted`;
+}
+
 type Props = {
   /** 전체 탭에서만 방 이름 접두어 */
   showRoomPrefix: boolean;
   items: CommunityPostListItem[];
+  /** 빈 목록 문구만 교체(표시용, API·데이터와 무관) */
+  emptyTitle?: string;
+  emptyDesc?: string;
 };
 
-export default function CommunityBoardPostList({ showRoomPrefix, items }: Props) {
+export default function CommunityBoardPostList({
+  showRoomPrefix,
+  items,
+  emptyTitle,
+  emptyDesc,
+}: Props) {
   if (items.length === 0) {
-    return <p className="v3-muted ui-community-board-empty">게시글이 없습니다.</p>;
+    return (
+      <div className="card-clean ui-community-board-empty" role="status">
+        <p className="ui-community-board-empty-title">{emptyTitle ?? "아직 게시글이 없습니다"}</p>
+        <p className="v3-muted ui-community-board-empty-desc">
+          {emptyDesc ?? "첫 글을 남겨 보시면 여기에 표시됩니다."}
+        </p>
+      </div>
+    );
   }
   return (
     <ul className="ui-community-board-rows">
@@ -37,18 +60,17 @@ export default function CommunityBoardPostList({ showRoomPrefix, items }: Props)
         return (
           <li key={post.id} className="ui-community-board-row">
             <div className="ui-community-board-row-main">
-              <Link href={href} className="ui-community-board-title-link">
+              <div className="ui-community-board-title-line">
                 {prefix ? (
-                  <>
-                    <span className="ui-community-board-prefix">[{prefix}]</span>
-                    <span className="ui-community-board-title">{post.title}</span>
-                  </>
-                ) : (
+                  <span className={boardPillClass(post.boardType)}>{prefix}</span>
+                ) : null}
+                <Link href={href} className="ui-community-board-title-link">
                   <span className="ui-community-board-title">{post.title}</span>
-                )}
-              </Link>
+                </Link>
+              </div>
               <p className="ui-community-board-meta">
-                {post.nickname} · {formatListDateTime(post.createdAt)} · 조회 {post.viewCount}
+                {post.nickname} · {formatListDateTime(post.createdAt)} · 조회 {post.viewCount} · 댓글{" "}
+                {post.commentCount}
               </p>
             </div>
             <div className="ui-community-board-row-aside">
@@ -58,13 +80,12 @@ export default function CommunityBoardPostList({ showRoomPrefix, items }: Props)
                   className="ui-community-board-thumb"
                   src={post.thumbnailUrl}
                   alt=""
-                  width={48}
-                  height={48}
+                  width={40}
+                  height={40}
                   loading="lazy"
                   decoding="async"
                 />
               ) : null}
-              <span className="ui-community-board-comments">댓글 {post.commentCount}</span>
             </div>
           </li>
         );

@@ -48,24 +48,46 @@ export default async function SiteCommunityBoardListPage({ params, searchParams 
 
   const listBoardLabel = communityTabLabelForBoard(boardType, config);
 
+  const boardEmptyCopy: Partial<
+    Record<SiteCommunityBoardKey, { emptyTitle: string; emptyDesc: string }>
+  > = {
+    free: {
+      emptyTitle: "아직 게시글이 없습니다",
+      emptyDesc: "가볍게 이야기나 정보를 남겨 보세요.",
+    },
+    qna: {
+      emptyTitle: "등록된 질문이 없습니다",
+      emptyDesc: "궁금한 점을 올리면 답변을 받을 수 있습니다.",
+    },
+    reviews: {
+      emptyTitle: "아직 후기가 없습니다",
+      emptyDesc: "대회나 연습 경험을 나눠 보세요.",
+    },
+  };
+  const emptyProps = boardEmptyCopy[boardType];
+
   return (
     <SiteShellFrame
       brandTitle="커뮤니티"
+      auxiliaryBarClassName="site-shell-controls--site-list"
       auxiliary={
-        <>
+        <div className="ui-community-shell-context v3-stack" data-community-board={boardType}>
           <CommunityBoardTabs tabs={tabItems} currentKey={boardType} />
           <CommunityBoardSearchForm
             actionPath={`/site/community/${boardType}`}
             inputId={`community-q-${boardType}`}
             defaultQuery={q}
           />
-        </>
+        </div>
       }
     >
       <>
         <CommunityBoardSwipeShell tabs={tabItems.map(({ key, href }) => ({ key, href }))}>
-          <section className="site-site-gray-main v3-stack ui-community-page">
-            <CommunityBoardPostList showRoomPrefix={false} items={items} />
+          <section className="site-site-gray-main v3-stack ui-community-page" data-community-board={boardType}>
+            <header className="ui-community-context-head">
+              <p className="ui-community-context-head-label">{listBoardLabel}</p>
+            </header>
+            <CommunityBoardPostList showRoomPrefix={false} items={items} {...emptyProps} />
           </section>
         </CommunityBoardSwipeShell>
         <Link href={writeHref} className="community-write-fab" aria-label={`${listBoardLabel} 글쓰기`}>

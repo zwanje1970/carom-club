@@ -71,79 +71,101 @@ export default async function SiteMypagePage() {
 
   return (
     <SiteShellFrame brandTitle="마이페이지">
-      <section className="site-site-gray-main v3-stack">
-      <section className="v3-box v3-stack">
-        <h2 className="v3-h2">내 정보 요약</h2>
-        <div className="v3-stack" style={{ gap: "0.4rem" }}>
-          <p>
-            <strong>닉네임:</strong> {user.nickname}
-          </p>
-          <p>
-            <strong>이름:</strong> {user.name}
-          </p>
-          <p>
-            <strong>이메일:</strong> {user.email ?? "-"}
-          </p>
-          <p>
-            <strong>전화번호:</strong> {user.phone ?? "-"}
-          </p>
-          {clientApproved ? (
-            <p style={{ margin: 0 }}>
-              <strong>회원 구분:</strong> 클라이언트 회원
+      <section className="site-site-gray-main v3-stack site-mypage-shell">
+        <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
+          내 정보 · 알림 · 신청 현황
+        </p>
+
+        <section className="card-clean site-detail-inner-stack">
+          <h2 className="site-mypage-card-title">내 정보 요약</h2>
+          <dl className="site-mypage-summary-dl">
+            <div className="site-mypage-summary-row">
+              <dt className="site-mypage-summary-dt">닉네임</dt>
+              <dd className="site-mypage-summary-dd">{user.nickname}</dd>
+            </div>
+            <div className="site-mypage-summary-row">
+              <dt className="site-mypage-summary-dt">이름</dt>
+              <dd className="site-mypage-summary-dd">{user.name}</dd>
+            </div>
+            <div className="site-mypage-summary-row">
+              <dt className="site-mypage-summary-dt">이메일</dt>
+              <dd className="site-mypage-summary-dd">{user.email ?? "-"}</dd>
+            </div>
+            <div className="site-mypage-summary-row">
+              <dt className="site-mypage-summary-dt">전화번호</dt>
+              <dd className="site-mypage-summary-dd">{user.phone ?? "-"}</dd>
+            </div>
+            {clientApproved ? (
+              <div className="site-mypage-summary-row">
+                <dt className="site-mypage-summary-dt">회원 구분</dt>
+                <dd className="site-mypage-summary-dd">클라이언트 회원</dd>
+              </div>
+            ) : null}
+          </dl>
+          <Link className="primary-button primary-button--block" href="/site/mypage/edit">
+            내 정보 수정
+          </Link>
+        </section>
+
+        <section className="card-clean site-detail-inner-stack">
+          <h2 className="site-mypage-card-title">최근 알림</h2>
+          <RecentNotifications initialItems={notifications} />
+        </section>
+
+        <section className="card-clean site-detail-inner-stack">
+          <h2 className="site-mypage-card-title">진행중 / 미완료 신청</h2>
+          {visibleRows.length === 0 ? (
+            <p className="v3-muted" style={{ margin: 0 }}>
+              현재 진행중 신청이 없습니다.
             </p>
-          ) : null}
+          ) : (
+            <ul className="site-mypage-link-list">
+              {visibleRows.map((row) => (
+                <li key={row.application.id}>
+                  <Link
+                    href={`/site/tournaments/${row.application.tournamentId}`}
+                    className="site-mypage-link-row"
+                  >
+                    <div className="site-mypage-link-main">
+                      <span className="site-mypage-link-title">{row.tournament?.title ?? "대회"}</span>
+                      <span className="site-mypage-link-sub">
+                        {getStatusLabel(row.application.status)} ·{" "}
+                        {row.tournament?.date || row.application.createdAt.slice(0, 10)}
+                      </span>
+                    </div>
+                    <span className="site-mypage-link-chevron" aria-hidden>
+                      ›
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <div className="site-mypage-footer-actions">
+          {clientApproved ? (
+            <Link className="secondary-button" href="/client">
+              클라이언트 대시보드
+            </Link>
+          ) : clientApplicationStatus === "PENDING" ? (
+            <Link className="secondary-button" href="/client-status/pending">
+              클라이언트 승인 대기
+            </Link>
+          ) : user.role === "PLATFORM" ? (
+            <Link className="secondary-button" href="/platform">
+              플랫폼 대시보드
+            </Link>
+          ) : (
+            <Link className="secondary-button" href="/client-apply">
+              클라이언트 신청
+            </Link>
+          )}
+          <Link className="secondary-button" href="/site/mypage/history">
+            지난 대회 보기
+          </Link>
+          <LogoutButton redirectTo="/" className="secondary-button site-mypage-logout" />
         </div>
-        <Link className="v3-btn" href="/site/mypage/edit">
-          내 정보 수정
-        </Link>
-      </section>
-
-      <section className="v3-box v3-stack">
-        <h2 className="v3-h2">최근 알림</h2>
-        <RecentNotifications initialItems={notifications} />
-      </section>
-
-      <section className="v3-box v3-stack">
-        <h2 className="v3-h2">진행중/미완료 신청</h2>
-        {visibleRows.length === 0 ? (
-          <p className="v3-muted">현재 진행중 신청이 없습니다.</p>
-        ) : (
-          <ul className="v3-list">
-            {visibleRows.map((row) => (
-              <li key={row.application.id}>
-                <Link href={`/site/tournaments/${row.application.tournamentId}`}>
-                  {row.tournament?.title ?? "대회"} · {getStatusLabel(row.application.status)} ·{" "}
-                  {row.tournament?.date || row.application.createdAt.slice(0, 10)}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <div className="v3-row">
-        {clientApproved ? (
-          <Link className="v3-btn" href="/client">
-            클라이언트 대시보드
-          </Link>
-        ) : clientApplicationStatus === "PENDING" ? (
-          <Link className="v3-btn" href="/client-status/pending">
-            클라이언트 승인 대기
-          </Link>
-        ) : user.role === "PLATFORM" ? (
-          <Link className="v3-btn" href="/platform">
-            플랫폼 대시보드
-          </Link>
-        ) : (
-          <Link className="v3-btn" href="/client-apply">
-            클라이언트 신청
-          </Link>
-        )}
-        <Link className="v3-btn" href="/site/mypage/history">
-          지난 대회 보기
-        </Link>
-        <LogoutButton redirectTo="/" />
-      </div>
       </section>
     </SiteShellFrame>
   );

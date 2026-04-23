@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import FilterButton from "../components/FilterButton";
 import FilterDropdown from "../components/FilterDropdown";
 import {
+  getStoredVenueCoords,
   performGeolocationThenNavigate,
   VENUES_GEO_STORAGE_LAT,
   VENUES_GEO_STORAGE_LNG,
@@ -92,6 +93,7 @@ export default function SiteVenuesBoard({
 
   useEffect(() => {
     if (!distanceSort) return;
+    if (!getStoredVenueCoords()) return;
     try {
       sessionStorage.setItem(VENUES_GEO_STORAGE_LAT, String(distanceSort.lat));
       sessionStorage.setItem(VENUES_GEO_STORAGE_LNG, String(distanceSort.lng));
@@ -205,7 +207,7 @@ export default function SiteVenuesBoard({
   );
 
   return (
-    <SiteShellFrame brandTitle="당구장안내" auxiliary={auxiliary}>
+    <SiteShellFrame brandTitle="당구장안내" auxiliaryBarClassName="site-shell-controls--site-list" auxiliary={auxiliary}>
       <section className="site-site-gray-main v3-stack">
         {locationDenied ? (
           <p
@@ -226,53 +228,25 @@ export default function SiteVenuesBoard({
         <ul className="site-board-card-list" style={{ margin: 0 }}>
           {ordered.map((row) => (
             <li key={row.venueId} className="site-board-card">
-              <Link
-                href={`/site/venues/${row.venueId}`}
-                style={{
-                  textDecoration: "none",
-                  color: "inherit",
-                  display: "flex",
-                  flexDirection: "row",
-                  alignItems: "flex-start",
-                  gap: "1rem",
-                  justifyContent: "space-between",
-                }}
-              >
-                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <span style={{ fontWeight: 700, fontSize: "1.05rem", display: "block", marginBottom: "0.4rem" }}>
-                    {row.name}
-                  </span>
+              <Link href={`/site/venues/${row.venueId}`}>
+                <div className="site-venue-card-main">
+                  <span className="site-venue-card-title">{row.name}</span>
                   {String(row.address ?? "").trim() ? (
-                    <span
-                      className="v3-muted"
-                      style={{ fontSize: "0.92rem", lineHeight: 1.5, display: "block", marginBottom: "0.25rem" }}
-                    >
-                      {String(row.address).trim()}
-                    </span>
+                    <span className="site-venue-address">{String(row.address).trim()}</span>
                   ) : null}
                   {(() => {
                     const cat = categoryLabel(row.venueCategory);
                     const fee = feeTypeLabel(row.pricingType);
-                    const parts = [cat, fee].filter(Boolean);
-                    if (parts.length === 0) return null;
+                    if (!cat && !fee) return null;
                     return (
-                      <span className="v3-muted" style={{ fontSize: "0.92rem", lineHeight: 1.5, display: "block" }}>
-                        {parts.join(" · ")}
-                      </span>
+                      <div className="site-venue-chips">
+                        {cat ? <span className="site-list-chip">{cat}</span> : null}
+                        {fee ? <span className="site-list-chip">{fee}</span> : null}
+                      </div>
                     );
                   })()}
                 </div>
-                <div
-                  style={{
-                    flex: "0 0 auto",
-                    width: "88px",
-                    height: "56px",
-                    borderRadius: "4px",
-                    overflow: "hidden",
-                    background: "var(--v3-surface-2, #eef0f3)",
-                    flexShrink: 0,
-                  }}
-                >
+                <div className="site-venue-list-thumb">
                   {row.thumbnailUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -282,24 +256,9 @@ export default function SiteVenuesBoard({
                       height={56}
                       loading="lazy"
                       decoding="async"
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                     />
                   ) : (
-                    <div
-                      className="v3-muted"
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "0.65rem",
-                        textAlign: "center",
-                        padding: "0.25rem",
-                      }}
-                    >
-                      이미지 없음
-                    </div>
+                    <div className="site-venue-list-thumb-placeholder">이미지 없음</div>
                   )}
                 </div>
               </Link>

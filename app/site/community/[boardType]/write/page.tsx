@@ -31,13 +31,13 @@ export default async function SiteCommunityWritePage({ params }: Props) {
 
   return (
     <SiteShellFrame brandTitle={`글쓰기 · ${board.label}`}>
-      <section className="site-site-gray-main v3-stack">
-      <CommunityPostWriteForm boardType={boardType} />
-      <div className="v3-row">
-        <Link className="v3-btn" href={`/site/community/${boardType}`}>
-          목록
-        </Link>
-      </div>
+      <section className="site-site-gray-main v3-stack ui-community-post-detail-page">
+        <CommunityPostWriteForm boardType={boardType} />
+        <div className="ui-community-post-detail-foot">
+          <Link className="secondary-button ui-community-post-detail-foot-secondary" href={`/site/community/${boardType}`}>
+            목록
+          </Link>
+        </div>
       </section>
     </SiteShellFrame>
   );

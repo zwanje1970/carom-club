@@ -96,34 +96,18 @@ export default function CommunityPostCommentsSection({ boardType, postId, isLogg
   }
 
   return (
-    <section className="v3-box v3-stack" style={{ marginTop: "1rem" }}>
-      <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0 }}>
-        댓글
-      </h2>
-      {loading ? <p className="v3-muted">불러오는 중...</p> : null}
+    <section className="card-clean ui-community-comments v3-stack">
+      <h2 className="ui-community-comments-heading">댓글</h2>
+      {loading ? <p className="v3-muted ui-community-comments-loading">불러오는 중...</p> : null}
       {!loading ? (
-        <ul className="v3-list" style={{ listStyle: "none", padding: 0, margin: 0 }}>
+        <ul className="ui-community-comment-list">
           {items.map((c) => (
-            <li
-              key={c.id}
-              style={{
-                padding: "0.65rem 0",
-                borderBottom: "1px solid var(--v3-border, #e8e8e8)",
-                fontSize: "0.9rem",
-              }}
-            >
-              <div style={{ fontWeight: 600 }}>{c.authorNickname}</div>
-              <div className="v3-muted" style={{ fontSize: "0.82rem" }}>
-                {formatCommentDate(c.createdAt)}
-              </div>
-              <div style={{ marginTop: "0.35rem", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{c.content}</div>
+            <li key={c.id} className="ui-community-comment-item">
+              <div className="ui-community-comment-author">{c.authorNickname}</div>
+              <div className="ui-community-comment-meta v3-muted">{formatCommentDate(c.createdAt)}</div>
+              <div className="ui-community-comment-body">{c.content}</div>
               {currentUserId && c.authorUserId === currentUserId ? (
-                <button
-                  type="button"
-                  className="v3-btn"
-                  onClick={() => handleDelete(c.id)}
-                  style={{ marginTop: "0.4rem", padding: "0.25rem 0.5rem", fontSize: "0.82rem" }}
-                >
+                <button type="button" className="secondary-button ui-community-post-action-tight" onClick={() => handleDelete(c.id)}>
                   삭제
                 </button>
               ) : null}
@@ -131,29 +115,27 @@ export default function CommunityPostCommentsSection({ boardType, postId, isLogg
           ))}
         </ul>
       ) : null}
-      {!loading && items.length === 0 ? <p className="v3-muted">댓글이 없습니다.</p> : null}
+      {!loading && items.length === 0 ? (
+        <p className="ui-community-comments-empty v3-muted" role="status">
+          댓글이 없습니다.
+        </p>
+      ) : null}
 
       {isLoggedIn ? (
-        <div className="v3-stack" style={{ marginTop: "0.75rem" }}>
+        <div className="ui-community-comment-compose v3-stack">
           <textarea
+            className="ui-community-form-textarea"
             value={content}
             onChange={(e) => setContent(e.target.value)}
             rows={4}
-            placeholder="댓글"
-            style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem", resize: "vertical" }}
+            placeholder="댓글을 입력하세요"
           />
-          <button
-            type="button"
-            className="v3-btn"
-            disabled={submitting}
-            onClick={handleSubmit}
-            style={{ padding: "0.55rem 1rem", alignSelf: "flex-start" }}
-          >
+          <button type="button" className="primary-button ui-community-post-action-submit" disabled={submitting} onClick={handleSubmit}>
             {submitting ? "등록 중..." : "등록"}
           </button>
         </div>
       ) : (
-        <p className="v3-muted" style={{ marginTop: "0.75rem" }}>
+        <p className="ui-community-comments-login-hint v3-muted">
           <Link href={`/login?next=${encodeURIComponent(loginNext)}`}>로그인</Link> 후 댓글을 남길 수 있습니다.
         </p>
       )}

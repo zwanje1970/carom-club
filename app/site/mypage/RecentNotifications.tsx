@@ -64,10 +64,10 @@ export default function RecentNotifications({ initialItems }: { initialItems: No
       <div className="v3-row" style={{ justifyContent: "flex-end", flexWrap: "wrap" }}>
         <button
           type="button"
-          className="v3-btn"
+          className="secondary-button"
           disabled={!hasUnread || markingAll}
           onClick={() => void handleMarkAllRead()}
-          style={{ fontSize: "0.88rem", padding: "0.4rem 0.75rem" }}
+          style={{ fontSize: "0.85rem", minHeight: "42px", padding: "0 0.85rem" }}
         >
           {markingAll ? "처리 중…" : "모두 읽음으로 표시"}
         </button>
@@ -96,7 +96,7 @@ export default function RecentNotifications({ initialItems }: { initialItems: No
                   </p>
                   {item.relatedTournamentId ? (
                     <p style={{ marginTop: "0.5rem" }}>
-                      <Link className="v3-btn" href={`/site/tournaments/${item.relatedTournamentId}`} style={{ fontSize: "0.86rem", padding: "0.35rem 0.65rem" }}>
+                      <Link className="secondary-button" href={`/site/tournaments/${item.relatedTournamentId}`} style={{ fontSize: "0.85rem", minHeight: "42px", padding: "0 0.85rem", display: "inline-flex" }}>
                         대회 상세 보기
                       </Link>
                     </p>

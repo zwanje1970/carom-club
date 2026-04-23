@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { buildBracketScene, buildStartPairLabels, type StartPairLabel } from "./bracket-render-engine";
@@ -33,10 +33,12 @@ type MatchType    = "NORMAL" | "SCOTCH";
 type BracketStyle = "TREE" | "CENTER";
 type TreeLayout   = "HORIZONTAL" | "VERTICAL";
 
-/** 모바일·좁은 화면: 팝업 대신 인앱 전체 화면 미리보기 */
-function isMobilePreviewViewport(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.matchMedia("(max-width: 768px)").matches;
+/** 미리보기용 A4 px (회전 없이 width/height만). TREE+세로 트리만 세로 용지, 그 외는 가로. */
+function previewPaperPx(style: BracketStyle, treeLayout: TreeLayout): { paperW: number; paperH: number } {
+  if (style === "TREE" && treeLayout === "VERTICAL") {
+    return { paperW: 794, paperH: 1123 };
+  }
+  return { paperW: 1123, paperH: 794 };
 }
 
 export default function BlankBracketPrintClient() {
@@ -51,7 +53,6 @@ export default function BlankBracketPrintClient() {
   const [pdfExporting, setPdfExporting] = useState(false);
   const pdfRootRef = useRef<HTMLDivElement>(null);
   const pdfBusyRef = useRef(false);
-  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
 
   const endOptions = useMemo(() => validEndOptions(startPlayers), [startPlayers]);
   const rounds = useMemo(() => {
@@ -77,13 +78,10 @@ export default function BlankBracketPrintClient() {
     return buildStartPairLabels(scene, { rounds, style, treeLayout });
   }, [scene, rounds, style, treeLayout, showStartPairNumbers]);
 
-  /** 새 창(데스크톱) 또는 인앱 전체 화면(모바일) 미리보기 */
+  /** 새 창 미리보기(모바일·데스크톱 공통): A4 한 장 전체 scale, 스크롤·스와이프 없음 */
   const handleOpenPreviewWindow = useCallback(() => {
     if (!rounds.length || !scene) return;
-    if (isMobilePreviewViewport()) {
-      setMobilePreviewOpen(true);
-      return;
-    }
+    const { paperW, paperH } = previewPaperPx(style, treeLayout);
     const open = () => {
       const root = pdfRootRef.current;
       if (!root) return;
@@ -97,18 +95,75 @@ export default function BlankBracketPrintClient() {
 <html lang="ko">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 <title>빈 대진표 미리보기</title>
 <style>
-  html, body { margin: 0; padding: 0; background: #e5e7eb; }
-  body { display: flex; flex-direction: column; align-items: center; padding: 16px; box-sizing: border-box; min-height: 100vh; font-family: system-ui, "Segoe UI", sans-serif; }
-  .sheet {
-    background: #fff;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; box-sizing: border-box; }
+  body { font-family: system-ui, "Segoe UI", sans-serif; }
+  .preview-root {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 100dvh;
+    max-height: 100dvh;
+    background: #e5e7eb;
+    overflow: hidden;
     box-sizing: border-box;
-    width: 297mm;
-    min-height: 210mm;
-    padding: 10mm;
+  }
+  .preview-topbar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 10px 16px;
+    box-sizing: border-box;
+    background: #e5e7eb;
+  }
+  .preview-topbar button {
+    min-height: 44px;
+    padding: 0 18px;
+    font-size: 1rem;
+    font-weight: 700;
+    border: none;
+    border-radius: 10px;
+    background: #f59e0b;
+    color: #111827;
+    cursor: pointer;
+  }
+  .preview-stage {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 0 16px 16px;
+    box-sizing: border-box;
+  }
+  .paper-frame {
+    transform-origin: top center;
+    will-change: transform;
+  }
+  .paper {
+    background: #ffffff;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.18);
+    box-sizing: border-box;
+    border-radius: 2px;
+    padding: ${MARGIN_MM}mm;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .bracket-scene { line-height: 0; }
+  .bbp-print-svg {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    width: auto !important;
+    height: auto !important;
+    z-index: auto !important;
+    pointer-events: none;
   }
   .bbp-print-page-sheet { position: relative; width: 100%; height: 100%; box-sizing: border-box; overflow: hidden; }
   .bbp-print-service-mark {
@@ -130,38 +185,6 @@ export default function BlankBracketPrintClient() {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .preview-chrome {
-    position: sticky;
-    top: 0;
-    z-index: 9999;
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-    padding: 10px 14px;
-    background: #0f172a;
-    color: #f8fafc;
-    font-family: system-ui, "Segoe UI", sans-serif;
-    border-bottom: 1px solid #334155;
-  }
-  .preview-chrome strong { font-size: 0.95rem; }
-  .preview-chrome button {
-    min-height: 44px;
-    padding: 0 18px;
-    font-size: 1rem;
-    font-weight: 700;
-    border: none;
-    border-radius: 10px;
-    background: #f59e0b;
-    color: #111827;
-    cursor: pointer;
-  }
-  .preview-chrome .preview-chrome-note { font-size: 12px; color: #94a3b8; width: 100%; margin: 0; line-height: 1.35; }
-  .hint { margin-top: 12px; font-size: 13px; color: #64748b; text-align: center; max-width: 40rem; }
   .bbp-match-box {
     fill: #ffffff;
     stroke: #000000;
@@ -173,11 +196,12 @@ export default function BlankBracketPrintClient() {
     print-color-adjust: exact;
   }
   @media print {
-    html, body { background: #fff; }
-    body { padding: 0; display: block; }
-    .sheet { box-shadow: none; width: auto; min-height: auto; padding: 0; }
-    .preview-chrome { display: none !important; }
-    .hint { display: none; }
+    html, body { height: auto; max-height: none; overflow: visible; background: #fff; }
+    .preview-root { min-height: 0; max-height: none; height: auto; background: #fff; overflow: visible; }
+    .preview-topbar { display: none !important; }
+    .preview-stage { overflow: visible; padding: 0; flex: none; }
+    .paper-frame { transform: none !important; }
+    .paper { box-shadow: none; border-radius: 0; padding: 0; width: auto !important; height: auto !important; overflow: visible; }
     .bbp-print-service-mark {
       position: absolute;
       top: ${SERVICE_MARK_INSET_MM}mm;
@@ -188,44 +212,47 @@ export default function BlankBracketPrintClient() {
 </style>
 </head>
 <body>
-  <div class="preview-chrome" role="region" aria-label="미리보기 도구">
-    <strong>빈 대진표 미리보기</strong>
-    <button type="button" onclick="window.close()">닫기</button>
-    <p class="preview-chrome-note">이 창은 새 탭으로 열렸습니다. 뒤로가기 대신 위 <b>닫기</b>를 눌러 주세요.</p>
+  <div class="preview-root" id="preview-root">
+    <div class="preview-topbar" data-preview-topbar>
+      <button type="button" onclick="window.close()">닫기</button>
+    </div>
+    <div class="preview-stage">
+      <div class="paper-frame" data-preview-paper-frame>
+        <div class="paper" data-preview-paper data-paper-w="${paperW}" data-paper-h="${paperH}" style="width:${paperW}px;height:${paperH}px;">
+          <div class="bracket-scene">${inner}</div>
+        </div>
+      </div>
+    </div>
   </div>
-  <div class="sheet">${inner}</div>
-  <p class="hint">인쇄는 브라우저 메뉴의 인쇄(Ctrl+P)를 사용하세요.</p>
+  <script>
+(function(){
+  function updateScale(){
+    var paper = document.querySelector("[data-preview-paper]");
+    var frame = document.querySelector("[data-preview-paper-frame]");
+    var topbar = document.querySelector("[data-preview-topbar]");
+    if(!paper||!frame)return;
+    var pw = parseFloat(paper.getAttribute("data-paper-w"),10)||1123;
+    var ph = parseFloat(paper.getAttribute("data-paper-h"),10)||794;
+    var th = topbar ? topbar.getBoundingClientRect().height : 48;
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
+    var s = Math.min((vw - 32) / pw, (vh - th - 32) / ph, 1);
+    if (!(s > 0) || !isFinite(s)) s = 0.1;
+    frame.style.transform = "scale(" + s + ")";
+  }
+  window.addEventListener("resize", updateScale);
+  window.addEventListener("orientationchange", function(){ setTimeout(updateScale, 150); });
+  if(window.visualViewport){ window.visualViewport.addEventListener("resize", updateScale); }
+  if(document.readyState==="loading"){ document.addEventListener("DOMContentLoaded", updateScale); } else { updateScale(); }
+})();
+  </script>
 </body>
 </html>`);
       w.document.close();
       w.focus();
     };
     requestAnimationFrame(() => requestAnimationFrame(open));
-  }, [rounds.length, scene, showStartPairNumbers, warmEmptyBoxFill]);
-
-  useEffect(() => {
-    if (!mobilePreviewOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMobilePreviewOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [mobilePreviewOpen]);
-
-  const [mobileVw, setMobileVw] = useState(0);
-  const [mobileVh, setMobileVh] = useState(0);
-  useEffect(() => {
-    if (!mobilePreviewOpen) return;
-    const update = () => {
-      setMobileVw(window.innerWidth);
-      setMobileVh(window.innerHeight);
-    };
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, [mobilePreviewOpen]);
+  }, [rounds.length, scene, style, treeLayout, showStartPairNumbers, warmEmptyBoxFill]);
 
   /** A4 가로 PDF — html2canvas 로 `.bbp-print-svg` 캡처 후 jsPDF 에 277×190mm 로 삽입 */
   const handleExportPDF = useCallback(async () => {
@@ -426,20 +453,7 @@ export default function BlankBracketPrintClient() {
         </main>
       </div>
 
-      {/* 모바일: A4 출력 미리보기 전용 레이어 (PDF/프린트 로직과 무관) */}
-      {mobilePreviewOpen && scene && (
-        <MobilePrintPreviewLayer
-          scene={scene}
-          matchType={matchType}
-          startPairLabels={startPairLabels}
-          warmEmptyBoxFill={warmEmptyBoxFill}
-          viewportWidth={mobileVw}
-          viewportHeight={mobileVh}
-          onBackdropClose={() => setMobilePreviewOpen(false)}
-        />
-      )}
-
-      {/* html2canvas·데스크톱 새창 미리보기 공용: 277×190mm SVG (화면 밖) */}
+      {/* html2canvas·새창 미리보기 공용: 277×190mm SVG (화면 밖) */}
       {scene && (
         <div ref={pdfRootRef} className="bbp-print-svg" id="bbp-print-svg-root">
           <div className="bbp-print-page-sheet">
@@ -457,203 +471,10 @@ export default function BlankBracketPrintClient() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 모바일 전용: A4 가로 px + scale (BracketSVG / PDF·인쇄와 동일 — 빈 대진표는 항상 가로 용지)
-// ─────────────────────────────────────────────────────────────────────────────
-const A4_LANDSCAPE_W = 1123;
-const A4_LANDSCAPE_H = 794;
-
-type MobilePreviewLayerProps = {
-  scene: Exclude<ReturnType<typeof buildBracketScene>, null>;
-  matchType: MatchType;
-  startPairLabels: StartPairLabel[];
-  warmEmptyBoxFill: boolean;
-  viewportWidth: number;
-  viewportHeight: number;
-  onBackdropClose: () => void;
-};
-
-function MobilePrintPreviewLayer({
-  scene,
-  matchType,
-  startPairLabels,
-  warmEmptyBoxFill,
-  viewportWidth,
-  viewportHeight,
-  onBackdropClose,
-}: MobilePreviewLayerProps) {
-  const vw = viewportWidth > 0 ? viewportWidth : 400;
-  const vh = viewportHeight > 0 ? viewportHeight : 700;
-
-  const paperW = A4_LANDSCAPE_W;
-  const paperH = A4_LANDSCAPE_H;
-
-  /** 세로 홀드에서는 가로 용지가 과도하게 작아지지 않도록 최소 배율을 두고, 가로·세로 스크롤로 전체를 본다. */
-  const scale = useMemo(() => {
-    const padX = 16;
-    const toolbarReserve = 96;
-    const byW = Math.max(vw - padX * 2, 1) / paperW;
-    const byH = Math.max(vh - toolbarReserve, 1) / paperH;
-    const portrait = vw < vh;
-    if (!portrait) {
-      return Math.min(byW, byH, 1);
-    }
-    const floor = 0.42;
-    return Math.min(Math.max(byW, Math.min(floor, byH)), 1.15);
-  }, [vw, vh, paperW, paperH]);
-
-  const bracketSceneRef = useRef<HTMLDivElement>(null);
-  const [serviceMarkOverlay, setServiceMarkOverlay] = useState<CSSProperties | null>(null);
-
-  useLayoutEffect(() => {
-    const scene = bracketSceneRef.current;
-    if (!scene) return;
-    const r = scene.getBoundingClientRect();
-    const insetPx = 2;
-    setServiceMarkOverlay({
-      position: "fixed",
-      top: r.top + insetPx,
-      right: Math.max(0, window.innerWidth - r.right + insetPx),
-      left: "auto",
-      bottom: "auto",
-      zIndex: 100000,
-      fontSize: "5.5px",
-      fontWeight: 300,
-      lineHeight: 1.2,
-      color: "#888888",
-      fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-      letterSpacing: "0.02em",
-      whiteSpace: "nowrap",
-      pointerEvents: "none",
-      userSelect: "none",
-      margin: 0,
-      padding: 0,
-      WebkitPrintColorAdjust: "exact",
-      printColorAdjust: "exact",
-    });
-  }, [vw, vh, scale, scene, matchType, startPairLabels, warmEmptyBoxFill]);
-
+/** 용지(277×190mm) 루트 기준 고정 — SVG·트리·scale 레이어와 분리 */
+function BracketPrintServiceMark() {
   return (
-    <div
-      className="bbp-preview-root"
-      role="dialog"
-      aria-modal="true"
-      aria-label="출력 미리보기"
-      onClick={onBackdropClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 99999,
-        background: "#e5e7eb",
-        boxSizing: "border-box",
-        overflow: "hidden",
-        overscrollBehavior: "contain",
-        touchAction: "none",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      <div
-        className="bbp-preview-center"
-        style={{
-          pointerEvents: "none",
-          width: "100%",
-          flex: 1,
-          minHeight: 0,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "stretch",
-          justifyContent: "flex-start",
-          padding: "12px 12px 16px",
-          boxSizing: "border-box",
-          gap: "8px",
-        }}
-      >
-        <div
-          className="bbp-preview-toolbar"
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            pointerEvents: "auto",
-            flexShrink: 0,
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "10px",
-          }}
-        >
-          <p className="v3-muted" style={{ margin: 0, fontSize: "0.85rem", textAlign: "center", flex: "1 1 auto" }}>
-            A4 가로 (인쇄·PDF와 동일)
-          </p>
-          <button
-            type="button"
-            className="v3-btn"
-            onClick={onBackdropClose}
-            style={{ minHeight: "44px", padding: "0.5rem 1.1rem", fontWeight: 800 }}
-          >
-            닫기
-          </button>
-        </div>
-        <div
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            pointerEvents: "auto",
-            flex: 1,
-            minHeight: 0,
-            width: "100%",
-            overflow: "auto",
-            WebkitOverflowScrolling: "touch",
-            touchAction: "pan-x pan-y",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "flex-start",
-          }}
-        >
-        <div
-          className="bbp-preview-paper-frame"
-          style={{
-            transform: `scale(${scale})`,
-            transformOrigin: "top center",
-            flexShrink: 0,
-          }}
-        >
-          <div
-            className="bbp-preview-paper"
-            style={{
-              width: paperW,
-              height: paperH,
-              background: "#ffffff",
-              boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
-              borderRadius: "4px",
-              boxSizing: "border-box",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: `${MARGIN_MM}mm`,
-              overflow: "hidden",
-            }}
-          >
-            <div ref={bracketSceneRef} className="bbp-preview-bracket-scene" style={{ lineHeight: 0 }}>
-              <BracketSVG
-                scene={scene}
-                matchType={matchType}
-                startPairLabels={startPairLabels}
-                warmEmptyBoxFill={warmEmptyBoxFill}
-              />
-            </div>
-          </div>
-        </div>
-        </div>
-      </div>
-      {serviceMarkOverlay ? <BracketPrintServiceMark overlayStyle={serviceMarkOverlay} /> : null}
-    </div>
-  );
-}
-
-/** 용지(277×190mm) 루트 기준 고정 — SVG·트리·scale 레이어와 분리 (overlayStyle: 모바일 미리보기 등 fixed 보정) */
-function BracketPrintServiceMark({ overlayStyle }: { overlayStyle?: CSSProperties }) {
-  return (
-    <div className="bbp-print-service-mark" style={overlayStyle} aria-hidden="true">
+    <div className="bbp-print-service-mark" aria-hidden="true">
       ⓒ CAROM.CLUB
     </div>
   );

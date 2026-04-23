@@ -3,7 +3,7 @@
 .filterRow {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.5rem;
   flex-wrap: wrap;
 }
 
@@ -25,7 +25,7 @@
 /* 대회·당구장: 드롭다운+거리순을 한 묶음(양끝 밀지 않음, flex 확장 없음) */
 .filterRowFilterPack.filterRow {
   justify-content: flex-start;
-  gap: 0.26rem;
+  gap: 0.45rem;
 }
 
 .filterRowFilterPack.filterRowSingle .filterField {
@@ -54,7 +54,7 @@
 
 /* 필드 2개 + 버튼(당구장: 유형·요금제·거리순) — 한 줄 유지, 셀렉트 최대 폭 축소 */
 .filterRowSingleDouble.filterRow {
-  gap: 0.32rem;
+  gap: 0.42rem;
 }
 
 .filterRowSingleDouble .dropdownFlex {
@@ -66,11 +66,11 @@
 /* PC: 당구장 필터(유형·요금제·거리순) 한 묶음처럼 — 모바일은 위 gap 유지 */
 @media (min-width: 768px) {
   .filterRowSingleDouble.filterRow {
-    gap: 0.12rem;
+    gap: 0.32rem;
   }
 
   .filterRowSingleDouble .filterField {
-    gap: 0.22rem;
+    gap: 0.4rem;
   }
 }
 
@@ -79,7 +79,7 @@
   display: inline-flex;
   flex-direction: row;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.45rem;
   min-width: 0;
   flex: 1 1 auto;
 }
@@ -90,7 +90,7 @@
   font-size: 0.8125rem;
   line-height: 1.2;
   font-weight: 600;
-  color: var(--v3-muted-foreground, #64748b);
+  color: var(--color-text-sub, #666666);
 }
 
 .dropdownFlex {
@@ -103,14 +103,14 @@
 .dropdown {
   box-sizing: border-box;
   font: inherit;
-  padding: 0.34rem 0.52rem;
-  border-radius: var(--ui-radius, 0.75rem);
-  border: 1px solid #e2e8f0;
+  padding: 0.38rem 0.55rem;
+  border-radius: 10px;
+  border: 1px solid var(--color-border, #e5e7eb);
   background: #fff;
-  min-height: max(2rem, 2.25rem * 0.82);
+  min-height: 44px;
   font-size: 0.9375rem;
   line-height: 1.25;
-  color: inherit;
+  color: var(--color-text-main, #111111);
   appearance: auto;
   -webkit-appearance: menulist;
 }
@@ -125,37 +125,37 @@
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  padding: 0.34rem 0.68rem;
-  min-height: max(2rem, 2.25rem * 0.82);
-  border: 1px solid #cbd5e1;
-  border-radius: 0.5rem;
-  background: #fff;
-  font-size: 0.9375rem;
-  line-height: 1.25;
+  padding: 0 0.85rem;
+  min-height: 44px;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 10px;
+  background: var(--color-bg-soft, #f9fafb);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.2;
   cursor: pointer;
   text-decoration: none;
-  color: inherit;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  color: var(--color-text-main, #111111);
+  box-shadow: none;
 }
 
 .button:hover {
-  background: #f8fafc;
+  background: #f3f4f6;
 }
 
 .button:active {
-  background: #f1f5f9;
-  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
+  background: #eceff2;
 }
 
 .buttonDistanceActive {
-  border-color: #2563eb;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border-color: var(--color-primary, #2563eb);
+  background: var(--color-primary, #2563eb);
+  color: #ffffff;
   font-weight: 600;
 }
 
 .buttonDistanceActive:hover {
-  background: #dbeafe;
+  filter: brightness(1.04);
 }
 
 /* (구) 당구장 2줄 레이아웃 — 현재는 filterRowSingleDouble 한 줄 사용 */

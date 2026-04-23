@@ -16,8 +16,21 @@ import {
   type SiteCommunityBoardKey,
 } from "../../../../../lib/server/dev-store";
 import SiteShellFrame from "../../../components/SiteShellFrame";
+import {
+  COMMUNITY_ROOM_PREFIX_SHORT,
+  communityTabLabelForBoard,
+  isPrimaryTabKey,
+} from "../../community-tab-config";
 import CommunityPostCommentsSection from "./CommunityPostCommentsSection";
 import CommunityPostDetailActions from "./CommunityPostDetailActions";
+
+function boardPillClass(boardType: SiteCommunityBoardKey): string {
+  const base = "ui-community-board-pill";
+  if (boardType === "free") return `${base} ${base}--free`;
+  if (boardType === "qna") return `${base} ${base}--qna`;
+  if (boardType === "reviews") return `${base} ${base}--reviews`;
+  return `${base} ${base}--muted`;
+}
 
 function formatDetailDateTime(iso: string): string {
   const d = new Date(iso);
@@ -72,45 +85,62 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
     post.imageSizeLevels
   );
 
+  const boardPillLabel = isPrimaryTabKey(boardType)
+    ? COMMUNITY_ROOM_PREFIX_SHORT[boardType]
+    : communityTabLabelForBoard(boardType, config).trim() || boardType;
+
   return (
     <SiteShellFrame brandTitle={<span className="site-home-brand-ellipsis">{post.title}</span>}>
-      <section className="site-site-gray-main v3-stack">
-      <CommunityPostDetailActions canManage={canManage} postId={postId} boardType={boardType} />
-      <article className="v3-box v3-stack">
-        <p className="v3-muted" style={{ fontSize: "0.88rem", margin: 0 }}>
-          {post.authorNickname} · {formatDetailDateTime(post.createdAt)} · 조회 {post.viewCount}
-        </p>
-        <div
-          style={{
-            marginTop: "1rem",
-            fontSize: "0.95rem",
-            lineHeight: 1.65,
-            wordBreak: "break-word",
-          }}
-        >
-          {segments.map((seg, i) =>
-            seg.kind === "text" ? (
-              <span key={i} style={{ whiteSpace: "pre-wrap" }}>
-                {seg.value}
-              </span>
-            ) : (
-              <span
-                key={i}
-                style={{
-                  display: "block",
-                  margin: "0.35em 0",
-                  lineHeight: 0,
-                }}
-              >
+      <section className="site-site-gray-main v3-stack ui-community-post-detail-page">
+        <article className="card-clean ui-community-post-detail-article v3-stack">
+          <h1 className="ui-community-post-detail-title">{post.title}</h1>
+          <p className="ui-community-post-detail-pill-row">
+            <span className={boardPillClass(boardType)}>{boardPillLabel}</span>
+          </p>
+          <p className="ui-community-post-detail-meta v3-muted">
+            {post.authorNickname} · {formatDetailDateTime(post.createdAt)} · 조회 {post.viewCount} · 댓글{" "}
+            {post.commentCount}
+          </p>
+          <div className="ui-community-post-body">
+            {segments.map((seg, i) =>
+              seg.kind === "text" ? (
+                <span key={i} className="ui-community-post-body-text">
+                  {seg.value}
+                </span>
+              ) : (
+                <span key={i} className="ui-community-post-body-figure">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    className="ui-community-post-inline-img"
+                    src={seg.url}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    style={{
+                      maxWidth: `min(100%, ${getCommunityPostLongEdgePx(seg.sizeLevel)}px)`,
+                      maxHeight: `min(70vh, ${getCommunityPostLongEdgePx(seg.sizeLevel)}px)`,
+                      width: "auto",
+                      height: "auto",
+                      objectFit: "contain",
+                      display: "block",
+                      margin: 0,
+                    }}
+                  />
+                </span>
+              )
+            )}
+            {tailImages.map((item, idx) => (
+              <span key={`tail-${idx}-${item.url}`} className="ui-community-post-body-figure">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={seg.url}
+                  className="ui-community-post-inline-img"
+                  src={item.url}
                   alt=""
                   loading="lazy"
                   decoding="async"
                   style={{
-                    maxWidth: getCommunityPostLongEdgePx(seg.sizeLevel),
-                    maxHeight: getCommunityPostLongEdgePx(seg.sizeLevel),
+                    maxWidth: `min(100%, ${getCommunityPostLongEdgePx(item.sizeLevel)}px)`,
+                    maxHeight: `min(70vh, ${getCommunityPostLongEdgePx(item.sizeLevel)}px)`,
                     width: "auto",
                     height: "auto",
                     objectFit: "contain",
@@ -119,48 +149,21 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
                   }}
                 />
               </span>
-            )
-          )}
-          {tailImages.map((item, idx) => (
-            <span
-              key={`tail-${idx}-${item.url}`}
-              style={{
-                display: "block",
-                margin: "0.35em 0",
-                lineHeight: 0,
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={item.url}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                style={{
-                  maxWidth: getCommunityPostLongEdgePx(item.sizeLevel),
-                  maxHeight: getCommunityPostLongEdgePx(item.sizeLevel),
-                  width: "auto",
-                  height: "auto",
-                  objectFit: "contain",
-                  display: "block",
-                  margin: 0,
-                }}
-              />
-            </span>
-          ))}
+            ))}
+          </div>
+        </article>
+        <CommunityPostDetailActions canManage={canManage} postId={postId} boardType={boardType} />
+        <CommunityPostCommentsSection
+          boardType={boardType}
+          postId={postId}
+          isLoggedIn={Boolean(session)}
+          currentUserId={currentUserId}
+        />
+        <div className="ui-community-post-detail-foot">
+          <Link className="primary-button ui-community-post-detail-foot-primary" href={`/site/community/${boardType}`}>
+            목록으로
+          </Link>
         </div>
-      </article>
-      <CommunityPostCommentsSection
-        boardType={boardType}
-        postId={postId}
-        isLoggedIn={Boolean(session)}
-        currentUserId={currentUserId}
-      />
-      <div className="v3-row">
-        <Link className="v3-btn" href={`/site/community/${boardType}`}>
-          목록으로
-        </Link>
-      </div>
       </section>
     </SiteShellFrame>
   );

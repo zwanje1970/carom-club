@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type CSSProperties, FormEvent, useEffect, useRef, useState } from "react";
 
+import adminUi from "../../../components/admin/admin-card.module.css";
 import OutlineContentEditor from "../../../../components/shared/outline/OutlineContentEditor";
 import { isEmptyOutlineHtml } from "../../../../lib/outline-content-helpers";
 import type { OutlineDisplayMode } from "../../../../lib/outline-content-types";
@@ -152,7 +153,7 @@ const inputStyle: CSSProperties = {
   borderRadius: "0.4rem",
 };
 
-const sectionGap: CSSProperties = { gap: "1.25rem" };
+const sectionGap: CSSProperties = { gap: "1.05rem" };
 
 export default function ClientTournamentNewPage() {
   const router = useRouter();
@@ -853,7 +854,7 @@ export default function ClientTournamentNewPage() {
       ) : null}
 
       {showCreateDone && createSuccessId ? (
-        <section className="v3-box v3-stack" style={{ gap: "0.85rem" }}>
+        <section className={`${adminUi.surface} v3-stack`} style={{ gap: "0.75rem" }}>
           <p style={{ margin: 0 }}>
             <strong>대회가 생성되었습니다.</strong> 메인 화면에 노출할 <strong>대회 카드</strong>를 발행하려면 아래에서 이동할 수
             있습니다.
@@ -875,8 +876,8 @@ export default function ClientTournamentNewPage() {
         <>
       <form className="v3-stack" style={sectionGap} onSubmit={handleSubmit}>
         {/* 1. 대회포스터 이미지 */}
-        <section className="v3-box v3-stack" aria-label="대회 포스터" style={{ gap: "0.65rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0 }}>
+        <section className={`${adminUi.surface} v3-stack`} aria-label="대회 포스터" style={{ gap: "0.7rem" }}>
+          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
             1. 대회 포스터 이미지
           </h2>
           <input
@@ -979,8 +980,8 @@ export default function ClientTournamentNewPage() {
         </section>
 
         {/* 2. 대회명 · 대회 설명 */}
-        <section className="v3-box v3-stack" aria-label="대회명과 설명" style={{ gap: "0.65rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0 }}>
+        <section className={`${adminUi.surface} v3-stack`} aria-label="대회명과 설명" style={{ gap: "0.7rem" }}>
+          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
             2. 대회명 · 대회 설명
           </h2>
           <label className="v3-stack">
@@ -1006,8 +1007,8 @@ export default function ClientTournamentNewPage() {
         </section>
 
         {/* 3. 대회 종류: 일반 / 스카치 */}
-        <section className="v3-box v3-stack" aria-label="대회 종류" style={{ gap: "0.65rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0 }}>
+        <section className={`${adminUi.surface} v3-stack`} aria-label="대회 종류" style={{ gap: "0.7rem" }}>
+          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
             3. 대회 종류
           </h2>
           <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap" }}>
@@ -1038,8 +1039,8 @@ export default function ClientTournamentNewPage() {
         </section>
 
         {/* 4. 단일 / 전국 + 중복 참가 */}
-        <section className="v3-box v3-stack" aria-label="대회 범위와 참가 운영" style={{ gap: "0.65rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0 }}>
+        <section className={`${adminUi.surface} v3-stack`} aria-label="대회 범위와 참가 운영" style={{ gap: "0.7rem" }}>
+          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
             4. 대회 범위 · 중복 참가
           </h2>
           <div className="v3-row" style={{ gap: "1rem", flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -1076,8 +1077,8 @@ export default function ClientTournamentNewPage() {
         </section>
 
         {/* 5. 모집 인원 */}
-        <section className="v3-box v3-stack" aria-label="모집 인원" style={{ gap: "0.65rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0 }}>
+        <section className={`${adminUi.surface} v3-stack`} aria-label="모집 인원" style={{ gap: "0.7rem" }}>
+          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
             5. 모집 인원
           </h2>
           <label className="v3-stack" style={{ maxWidth: "12rem" }}>
@@ -1094,8 +1095,8 @@ export default function ClientTournamentNewPage() {
         </section>
 
         {/* 6. 참가비 + 입금 계좌 */}
-        <section className="v3-box v3-stack" aria-label="참가비와 입금 계좌" style={{ gap: "0.65rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0 }}>
+        <section className={`${adminUi.surface} v3-stack`} aria-label="참가비와 입금 계좌" style={{ gap: "0.7rem" }}>
+          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
             6. 참가비 · 입금 계좌
           </h2>
           <div className="v3-row" style={{ gap: "1rem", flexWrap: "wrap" }}>
@@ -1123,8 +1124,8 @@ export default function ClientTournamentNewPage() {
         </section>
 
         {/* 7. 상금 (자리만) */}
-        <section className="v3-box v3-stack" aria-label="상금" style={{ gap: "0.65rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0 }}>
+        <section className={`${adminUi.surface} v3-stack`} aria-label="상금" style={{ gap: "0.7rem" }}>
+          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
             7. 상금
           </h2>
           <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
@@ -1209,8 +1210,8 @@ export default function ClientTournamentNewPage() {
         </section>
 
         {/* 8. 날짜 + 대회 기간 */}
-        <section className="v3-box v3-stack" aria-label="날짜와 대회 기간" style={{ gap: "0.65rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0 }}>
+        <section className={`${adminUi.surface} v3-stack`} aria-label="날짜와 대회 기간" style={{ gap: "0.7rem" }}>
+          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
             8. 날짜 · 대회 기간
           </h2>
           <div className="v3-row" style={{ gap: "1rem", flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -1282,8 +1283,8 @@ export default function ClientTournamentNewPage() {
         </section>
 
         {/* 9. 대회 장소 */}
-        <section className="v3-box v3-stack" aria-label="대회 장소" style={{ gap: "0.65rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0 }}>
+        <section className={`${adminUi.surface} v3-stack`} aria-label="대회 장소" style={{ gap: "0.7rem" }}>
+          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
             9. 대회 장소
           </h2>
           <p className="v3-muted" style={{ fontSize: "0.82rem", margin: 0 }}>
@@ -1448,8 +1449,8 @@ export default function ClientTournamentNewPage() {
         </section>
 
         {/* 10. 참가 조건 (자격 + 증빙) */}
-        <section className="v3-box v3-stack" aria-label="참가 조건" style={{ gap: "0.75rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0 }}>
+        <section className={`${adminUi.surface} v3-stack`} aria-label="참가 조건" style={{ gap: "0.7rem" }}>
+          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
             10. 참가 조건
           </h2>
           <div className="v3-stack" style={{ gap: "0.35rem" }}>
@@ -1534,7 +1535,7 @@ export default function ClientTournamentNewPage() {
             <span>증빙 요청</span>
           </label>
           {verificationRequested ? (
-            <div className="v3-stack" style={{ gap: "0.65rem" }}>
+            <div className="v3-stack" style={{ gap: "0.7rem" }}>
               <label className="v3-stack" style={{ maxWidth: "14rem" }}>
                 <span>방식</span>
                 <select
@@ -1559,8 +1560,8 @@ export default function ClientTournamentNewPage() {
         </section>
 
         {/* 11. 대회요강 / 대회장소 CTA */}
-        <section className="v3-box v3-stack" aria-label="대회요강 및 장소 안내" style={{ gap: "0.65rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0 }}>
+        <section className={`${adminUi.surface} v3-stack`} aria-label="대회요강 및 장소 안내" style={{ gap: "0.7rem" }}>
+          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
             11. 대회요강 · 대회 장소 안내
           </h2>
           <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
@@ -1671,7 +1672,7 @@ export default function ClientTournamentNewPage() {
             padding: "1rem",
           }}
         >
-          <div className="v3-box v3-stack" style={{ maxWidth: "22rem", width: "100%", gap: "1rem" }}>
+          <div className={`${adminUi.surface} v3-stack`} style={{ maxWidth: "22rem", width: "100%", gap: "1rem" }}>
             <p id="leave-confirm-title" style={{ margin: 0, lineHeight: 1.5 }}>
               작성 중인 내용이 삭제됩니다. 나가시겠습니까?
             </p>

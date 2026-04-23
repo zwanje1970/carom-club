@@ -78,26 +78,18 @@ export default function CommunityPostEditForm({
   }
 
   return (
-    <form className="v3-stack v3-box" onSubmit={handleSubmit}>
-      <label className="v3-stack">
-        <span>제목</span>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
-        />
+    <form className="card-clean ui-community-post-form v3-stack" onSubmit={handleSubmit}>
+      <label className="ui-community-form-field v3-stack">
+        <span className="ui-community-form-label">제목</span>
+        <input className="ui-community-form-input" value={title} onChange={(e) => setTitle(e.target.value)} />
       </label>
-      <div className="v3-stack">
-        <div
-          className="v3-row"
-          style={{ justifyContent: "space-between", alignItems: "center", gap: "0.5rem", width: "100%" }}
-        >
-          <span>내용</span>
+      <div className="ui-community-form-field v3-stack">
+        <div className="ui-community-form-toolbar">
+          <span className="ui-community-form-label">내용</span>
           <button
             type="button"
-            className="v3-btn"
+            className="secondary-button ui-community-post-action-tight"
             disabled={loading || attachUi.uploading || attachUi.remaining <= 0}
-            style={{ padding: "0.2rem 0.45rem", fontSize: "0.75rem", lineHeight: 1.25, flexShrink: 0 }}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => bodyEditorRef.current?.openImageAttach()}
           >
@@ -115,10 +107,10 @@ export default function CommunityPostEditForm({
           onAttachUiChange={onAttachUiChange}
         />
       </div>
-      <button type="submit" className="v3-btn" disabled={loading} style={{ padding: "0.7rem 1rem", alignSelf: "flex-start" }}>
+      <button type="submit" className="primary-button ui-community-post-action-submit" disabled={loading}>
         {loading ? "저장 중..." : "저장"}
       </button>
-      {message ? <p className="v3-muted">{message}</p> : null}
+      {message ? <p className="v3-muted ui-community-form-message">{message}</p> : null}
     </form>
   );
 }

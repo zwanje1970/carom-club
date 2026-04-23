@@ -39,6 +39,7 @@ export default async function SiteTournamentDetailPage({
           applyHref={applyHref}
           listBackHref="/site/tournaments"
           outlinePdfFileKind={outlinePdfFileKind}
+          detailLayout="site"
         />
       </section>
     </SiteShellFrame>

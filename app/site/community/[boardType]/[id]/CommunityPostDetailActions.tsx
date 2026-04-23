@@ -28,11 +28,11 @@ export default function CommunityPostDetailActions({ canManage, postId, boardTyp
   if (!canManage) return null;
 
   return (
-    <div className="v3-row" style={{ marginBottom: "0.75rem" }}>
-      <Link className="v3-btn" href={`/site/community/${boardType}/${postId}/edit`} style={{ padding: "0.45rem 0.8rem" }}>
+    <div className="ui-community-post-manage-actions">
+      <Link className="secondary-button ui-community-post-action-tight" href={`/site/community/${boardType}/${postId}/edit`}>
         수정
       </Link>
-      <button type="button" className="v3-btn" onClick={handleDelete} style={{ padding: "0.45rem 0.8rem" }}>
+      <button type="button" className="secondary-button ui-community-post-action-tight ui-community-post-action-danger" onClick={handleDelete}>
         삭제
       </button>
     </div>

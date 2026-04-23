@@ -25,7 +25,7 @@ export default function CommunityBoardSearchForm({
           autoComplete="off"
           enterKeyHint="search"
         />
-        <button type="submit" className="ui-community-search-btn v3-btn">
+        <button type="submit" className="secondary-button ui-community-search-submit">
           검색
         </button>
       </div>

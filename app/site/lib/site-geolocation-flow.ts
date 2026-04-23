@@ -43,7 +43,8 @@ export function eventTargetElement(ev: MouseEvent): Element | null {
 
 /**
  * 사용자 클릭 시에만 호출. `/site/venues`·`/site/tournaments` 이동 URL에 좌표를 붙인 뒤 navigate.
- * URL에 이미 distanceLat/Lng가 있으면 그대로 이동. 없으면 sessionStorage → geolocation 순.
+ * 세션에 좌표가 있으면 재사용하고, 없으면 현재 위치를 새로 조회한다.
+ * (URL의 distanceLat/Lng 유무와 무관하게 세션 우선 정책 적용)
  */
 export function performGeolocationThenNavigate(targetHref: string, navigate: (href: string) => void): void {
   if (typeof window === "undefined") return;
@@ -52,11 +53,6 @@ export function performGeolocationThenNavigate(targetHref: string, navigate: (hr
   const url = new URL(targetHref, base);
   const path = url.pathname;
   if (!path.startsWith("/site/venues") && !path.startsWith("/site/tournaments")) {
-    navigate(targetHref);
-    return;
-  }
-
-  if (url.searchParams.get(GEO_KEYS.lat) && url.searchParams.get(GEO_KEYS.lng)) {
     navigate(targetHref);
     return;
   }

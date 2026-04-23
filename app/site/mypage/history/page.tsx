@@ -64,27 +64,42 @@ export default async function SiteMypageHistoryPage() {
 
   return (
     <SiteShellFrame brandTitle="지난 대회">
-      <section className="site-site-gray-main v3-stack">
-      <p className="v3-muted">종료/지난 신청 기록</p>
+      <section className="site-site-gray-main v3-stack site-mypage-shell">
+        <section className="card-clean site-detail-inner-stack">
+          <h2 className="site-mypage-card-title">종료 / 지난 신청 기록</h2>
+          <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
+            진행 중 목록에 나오지 않는 기록입니다.
+          </p>
 
-      {historyRows.length === 0 ? (
-        <p className="v3-muted">지난 대회 기록이 없습니다.</p>
-      ) : (
-        <ul className="v3-list">
-          {historyRows.map((row) => (
-            <li key={row.application.id}>
-              <Link href={`/site/tournaments/${row.application.tournamentId}`}>
-                {row.tournament?.title ?? "대회"} · {getHistoryStatusLabel(row.application.status)} ·{" "}
-                {(row.application.statusChangedAt || row.application.updatedAt || row.application.createdAt).slice(0, 10)}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+          {historyRows.length === 0 ? (
+            <p className="v3-muted" style={{ margin: 0 }}>
+              지난 대회 기록이 없습니다.
+            </p>
+          ) : (
+            <ul className="site-mypage-link-list">
+              {historyRows.map((row) => (
+                <li key={row.application.id}>
+                  <Link href={`/site/tournaments/${row.application.tournamentId}`} className="site-mypage-link-row">
+                    <div className="site-mypage-link-main">
+                      <span className="site-mypage-link-title">{row.tournament?.title ?? "대회"}</span>
+                      <span className="site-mypage-link-sub">
+                        {getHistoryStatusLabel(row.application.status)} ·{" "}
+                        {(row.application.statusChangedAt || row.application.updatedAt || row.application.createdAt).slice(0, 10)}
+                      </span>
+                    </div>
+                    <span className="site-mypage-link-chevron" aria-hidden>
+                      ›
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-      <Link className="v3-btn" href="/site/mypage">
-        진행 중 신청으로
-      </Link>
+        <Link className="secondary-button" href="/site/mypage" style={{ alignSelf: "flex-start" }}>
+          진행 중 신청으로
+        </Link>
       </section>
     </SiteShellFrame>
   );

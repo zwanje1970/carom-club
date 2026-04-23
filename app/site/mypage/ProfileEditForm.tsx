@@ -99,21 +99,22 @@ export default function ProfileEditForm({
   }
 
   return (
-    <form className="v3-stack" onSubmit={handleSubmit}>
+    <form className="v3-stack site-profile-edit-form" onSubmit={handleSubmit}>
       <label className="v3-stack">
-        <span>이름</span>
+        <span className="site-profile-edit-label">이름</span>
         <input
+          className="site-profile-edit-input"
           value={name}
           onChange={(event) => setName(event.target.value)}
           placeholder="이름"
           autoComplete="name"
-          style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
         />
       </label>
 
       <label className="v3-stack">
-        <span>닉네임 (2~12자)</span>
+        <span className="site-profile-edit-label">닉네임 (2~12자)</span>
         <input
+          className="site-profile-edit-input"
           value={nickname}
           onChange={(event) => {
             setNickname(event.target.value);
@@ -140,24 +141,24 @@ export default function ProfileEditForm({
           }}
           placeholder="닉네임"
           autoComplete="nickname"
-          style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
         />
         {nicknameMessage ? <span className="v3-muted">{nicknameMessage}</span> : null}
       </label>
 
       <label className="v3-stack">
-        <span>이메일 (읽기 전용)</span>
+        <span className="site-profile-edit-label">이메일 (읽기 전용)</span>
         <input
+          className="site-profile-edit-input site-profile-edit-input--readonly"
           value={email}
           readOnly
           autoComplete="email"
-          style={{ padding: "0.55rem", border: "1px solid #ddd", borderRadius: "0.4rem", background: "#f7f7f7" }}
         />
       </label>
 
       <label className="v3-stack">
-        <span>전화번호</span>
+        <span className="site-profile-edit-label">전화번호</span>
         <input
+          className="site-profile-edit-input"
           type="tel"
           name="phone"
           value={formatPhoneDisplay(phoneDigits)}
@@ -165,35 +166,34 @@ export default function ProfileEditForm({
           placeholder="010-1234-5678"
           autoComplete="tel"
           inputMode="numeric"
-          style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
         />
       </label>
 
       <label className="v3-stack">
-        <span>새 비밀번호</span>
+        <span className="site-profile-edit-label">새 비밀번호</span>
         <input
+          className="site-profile-edit-input"
           type="password"
           value={newPassword}
           onChange={(event) => setNewPassword(event.target.value)}
           placeholder="변경 시에만 입력"
           autoComplete="new-password"
-          style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
         />
       </label>
 
       <label className="v3-stack">
-        <span>비밀번호 확인</span>
+        <span className="site-profile-edit-label">비밀번호 확인</span>
         <input
+          className="site-profile-edit-input"
           type="password"
           value={passwordConfirm}
           onChange={(event) => setPasswordConfirm(event.target.value)}
           placeholder="새 비밀번호 확인"
           autoComplete="new-password"
-          style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
         />
       </label>
 
-      <button type="submit" className="v3-btn" disabled={loading} style={{ padding: "0.7rem 1rem" }}>
+      <button type="submit" className="primary-button primary-button--block" disabled={loading}>
         {loading ? "저장 중..." : "저장"}
       </button>
 
