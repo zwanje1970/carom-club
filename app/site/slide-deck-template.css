@@ -2,11 +2,11 @@
 
 .slide-deck {
   box-sizing: border-box;
-  --slide-card-max-width: 420px;
+  --slide-card-max-width: 440px;
   --slide-window-reference-height: calc(var(--slide-card-max-width) / 2);
-  --slide-layer-padding-y: 48px;
-  --slide-window-height-scale: 1.5;
-  width: min(92vw, 448px);
+  --slide-layer-padding-y: 44px;
+  --slide-window-height-scale: 1.52;
+  width: min(94vw, 492px);
   height: calc(
     (var(--slide-window-reference-height) * 1.2 + var(--slide-layer-padding-y)) * 1.3 *
       var(--slide-window-height-scale) * 0.7
@@ -16,7 +16,7 @@
   border-radius: 20px;
   overflow: hidden;
   background:
-    repeating-linear-gradient(to bottom, transparent 0 2px, #000 2px 3px), #174c36;
+    repeating-linear-gradient(to bottom, transparent 0 2px, #000 2px 3px), #1f5a44;
   border: 1px solid rgba(200, 230, 210, 0.22);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
@@ -42,6 +42,18 @@
   width: 100%;
   max-width: var(--slide-card-max-width);
   transform-origin: center center;
+  will-change: transform, opacity;
+  pointer-events: auto;
+}
+
+.slide-deck__card > a[href] {
+  pointer-events: auto;
+}
+
+.slide-deck__card-interaction {
+  width: 100%;
+  max-width: 100%;
+  transition: transform 100ms ease, opacity 100ms ease;
   will-change: transform, opacity;
 }
 
@@ -125,10 +137,10 @@
 
 .slide-deck-wrap {
   width: 100%;
-  max-width: min(100%, 480px);
+  max-width: min(100%, 520px);
   margin-left: auto;
   margin-right: auto;
-  padding: 0 8px 12px;
+  padding: 0 4px 10px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;

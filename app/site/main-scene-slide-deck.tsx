@@ -5,9 +5,11 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type MouseEventHandler,
   type PointerEventHandler,
   type WheelEventHandler,
 } from "react";
+import { useRouter } from "next/navigation";
 import "./slide-deck-template.css";
 import styles from "./main-scene-slide-deck.module.css";
 import { SlideDeckCard, type SlideDeckItem } from "./tournament-slide-card";
@@ -39,6 +41,7 @@ const WHEEL_SCENE_STEP = 240 * TIMELINE_SCALE;
 const DRAG_SCENE_STEP = 220 * TIMELINE_SCALE;
 
 const SLIDE_LINK_DRAG_MIN_PX = 12;
+const CARD_SELECTION_NAV_DELAY_MS = 100;
 
 type SceneRole = "idle" | "incoming" | "center" | "outgoing";
 
@@ -187,6 +190,7 @@ export default function MainSceneSlideDeck({
   sectionLabel?: string;
   siteNoticeText?: string | null;
 }) {
+  const router = useRouter();
   const t0 = useRef(Date.now());
   const [frameTime, setFrameTime] = useState(() => Date.now());
   const sceneOffsetRef = useRef(0);
@@ -198,6 +202,9 @@ export default function MainSceneSlideDeck({
   const dragStartSceneOffsetRef = useRef(0);
   const pointerStartedOnCardLinkRef = useRef(false);
   const exceededLinkDragSlopRef = useRef(false);
+  const selectingRef = useRef(false);
+  const selectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   const n = items.length;
 
@@ -212,6 +219,7 @@ export default function MainSceneSlideDeck({
     return () => {
       cancelAnimationFrame(rafId);
       if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+      if (selectTimerRef.current) clearTimeout(selectTimerRef.current);
     };
   }, [n]);
 
@@ -236,6 +244,7 @@ export default function MainSceneSlideDeck({
   };
 
   const onWheel: WheelEventHandler<HTMLDivElement> = (e) => {
+    if (selectingRef.current) return;
     e.preventDefault();
     pauseAuto();
     sceneOffsetRef.current -= e.deltaY / WHEEL_SCENE_STEP;
@@ -244,6 +253,7 @@ export default function MainSceneSlideDeck({
   };
 
   const onPointerDown: PointerEventHandler<HTMLDivElement> = (e) => {
+    if (selectingRef.current) return;
     if (e.button !== 0) return;
     exceededLinkDragSlopRef.current = false;
     pointerStartedOnCardLinkRef.current =
@@ -256,6 +266,7 @@ export default function MainSceneSlideDeck({
   };
 
   const onPointerMove: PointerEventHandler<HTMLDivElement> = (e) => {
+    if (selectingRef.current) return;
     if (!draggingRef.current) return;
     const dy = e.clientY - dragStartYRef.current;
     if (pointerStartedOnCardLinkRef.current && Math.abs(dy) > SLIDE_LINK_DRAG_MIN_PX) {
@@ -277,6 +288,7 @@ export default function MainSceneSlideDeck({
   };
 
   const onPointerUp: PointerEventHandler<HTMLDivElement> = (e) => {
+    if (selectingRef.current) return;
     const deck = e.currentTarget;
     const suppress =
       pointerStartedOnCardLinkRef.current && exceededLinkDragSlopRef.current;
@@ -299,6 +311,7 @@ export default function MainSceneSlideDeck({
   };
 
   const onPointerCancel: PointerEventHandler<HTMLDivElement> = (e) => {
+    if (selectingRef.current) return;
     pointerStartedOnCardLinkRef.current = false;
     exceededLinkDragSlopRef.current = false;
     endDragging(e.pointerId, e.currentTarget);
@@ -314,6 +327,36 @@ export default function MainSceneSlideDeck({
 
   const centerIdx = n <= 1 ? 0 : (sceneId + 1) % n;
   const activeDot = n > 0 ? centerIdx % 3 : -1;
+
+  const onCardClickCapture: MouseEventHandler<HTMLDivElement> = (e) => {
+    if (e.defaultPrevented || selectingRef.current) return;
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (!(e.target instanceof Element)) return;
+    const anchor = e.target.closest("[data-slide-deck-card] a[href]");
+    if (!(anchor instanceof HTMLAnchorElement)) return;
+
+    const href = anchor.getAttribute("href");
+    if (!href) return;
+
+    const card = anchor.closest("[data-slide-card-index]");
+    const rawIndex = card?.getAttribute("data-slide-card-index");
+    const nextIndex =
+      rawIndex != null && rawIndex !== "" && Number.isFinite(Number(rawIndex))
+        ? Number(rawIndex)
+        : centerIdx;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    selectingRef.current = true;
+    pauseAuto();
+    setSelectedIndex(nextIndex);
+
+    if (selectTimerRef.current) clearTimeout(selectTimerRef.current);
+    selectTimerRef.current = setTimeout(() => {
+      router.push(href);
+    }, CARD_SELECTION_NAV_DELAY_MS);
+  };
 
   const trimmedNotice = siteNoticeText?.trim() ?? "";
   const noticeAboveDeck =
@@ -385,6 +428,7 @@ export default function MainSceneSlideDeck({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
+        onClickCapture={onCardClickCapture}
       >
         {items.map((item, i) => {
           const role = sceneRoleForCard(i, n, sceneId);
@@ -400,8 +444,24 @@ export default function MainSceneSlideDeck({
           );
           return (
             <div key={item.snapshotId} className="slide-deck__layer">
-              <div className="slide-deck__card" data-slide-deck-card style={style}>
-                <SlideDeckCard item={item} />
+              <div
+                className="slide-deck__card"
+                data-slide-deck-card
+                data-slide-card-index={i}
+                style={style}
+              >
+                <div
+                  className="slide-deck__card-interaction"
+                  style={
+                    selectedIndex == null
+                      ? undefined
+                      : i === selectedIndex
+                        ? { transform: "scale(1.04)", opacity: 1, pointerEvents: "auto" }
+                        : { opacity: 0.4, pointerEvents: "none" }
+                  }
+                >
+                  <SlideDeckCard item={item} />
+                </div>
               </div>
             </div>
           );
