@@ -42,6 +42,9 @@ const DRAG_SCENE_STEP = 220 * TIMELINE_SCALE;
 
 const SLIDE_LINK_DRAG_MIN_PX = 12;
 const CARD_SELECTION_NAV_DELAY_MS = 100;
+/** 자동 전환·장면 타임라인 시작 지연 — 첫 카드 정적 표시 후 Speed Index 부담 완화 */
+const SLIDE_TIMELINE_DEFER_IDLE_MAX_MS = 1200;
+const SLIDE_TIMELINE_DEFER_FALLBACK_MS = 1000;
 
 type SceneRole = "idle" | "incoming" | "center" | "outgoing";
 
@@ -191,7 +194,8 @@ export default function MainSceneSlideDeck({
   siteNoticeText?: string | null;
 }) {
   const router = useRouter();
-  const t0 = useRef(Date.now());
+  /** null이면 장면 시계 미시작(첫 카드·초기 장면 고정). 값 설정 후 경과 시간 기준으로 전환 */
+  const animationT0Ref = useRef<number | null>(null);
   const [frameTime, setFrameTime] = useState(() => Date.now());
   const sceneOffsetRef = useRef(0);
   const pausedAtMsRef = useRef<number | null>(null);
@@ -220,6 +224,32 @@ export default function MainSceneSlideDeck({
       cancelAnimationFrame(rafId);
       if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
       if (selectTimerRef.current) clearTimeout(selectTimerRef.current);
+    };
+  }, [n]);
+
+  useEffect(() => {
+    if (n === 0) {
+      animationT0Ref.current = null;
+      return;
+    }
+    animationT0Ref.current = null;
+    const kick = () => {
+      animationT0Ref.current = Date.now();
+      setFrameTime(Date.now());
+    };
+    let idleCbId: number | undefined;
+    /** DOM setTimeout id — Node 타입과 충돌하지 않게 number */
+    let timeoutId: number | undefined;
+    if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") {
+      idleCbId = window.requestIdleCallback(kick, { timeout: SLIDE_TIMELINE_DEFER_IDLE_MAX_MS });
+    } else {
+      timeoutId = window.setTimeout(kick, SLIDE_TIMELINE_DEFER_FALLBACK_MS);
+    }
+    return () => {
+      if (idleCbId != null && typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idleCbId);
+      }
+      if (timeoutId != null) window.clearTimeout(timeoutId);
     };
   }, [n]);
 
@@ -318,9 +348,11 @@ export default function MainSceneSlideDeck({
   };
 
   const autoNowMs = pausedAtMsRef.current ?? frameTime;
+  const animT0 = animationT0Ref.current;
   const elapsed =
-    (autoNowMs - t0.current - pausedAccumulatedMsRef.current) / 1000 +
-    sceneOffsetRef.current * SCENE_S;
+    animT0 == null
+      ? Math.max(0, sceneOffsetRef.current * SCENE_S)
+      : (autoNowMs - animT0 - pausedAccumulatedMsRef.current) / 1000 + sceneOffsetRef.current * SCENE_S;
   const clampedElapsed = Math.max(0, elapsed);
   const sceneId = Math.floor(clampedElapsed / SCENE_S);
   const tInScene = clampedElapsed % SCENE_S;

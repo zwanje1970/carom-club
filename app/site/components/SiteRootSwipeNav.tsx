@@ -18,6 +18,8 @@ const FOLLOW_RATIO = 0.78;
 const COMPLETE_FRACTION = 0.28;
 /** 방향 판정 전 최소 이동 (px) — 그 전에는 preventDefault 금지 (슬라이드 덱과 동일 값) */
 const LOCK_MIN_PX = 10;
+/** 가로 스와이프로 확정하려면 |dx|가 |dy|보다 이 이상 더 커야 함 (세로 스크롤·약한 대각선은 브라우저에 맡김) */
+const HORIZONTAL_LEAD_PX = 8;
 /** 빠른 스와이프 시 짧은 거리로도 완료 (px/ms) */
 const VELOCITY_COMPLETE = 0.42;
 const TRANSITION_MS = 300;
@@ -170,7 +172,13 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
         if (adx < LOCK_MIN_PX && ady < LOCK_MIN_PX) {
           return;
         }
+        /* 세로 우선: |dy| ≥ |dx| 이면 루트 스와이프 미개입·preventDefault 금지 */
         if (ady >= adx) {
+          start.verticalDominant = true;
+          return;
+        }
+        /* 가로가 세로보다 충분히 클 때만 가로 후보 — 약한 대각선은 세로 스크롤로 처리 */
+        if (adx - ady < HORIZONTAL_LEAD_PX) {
           start.verticalDominant = true;
           return;
         }

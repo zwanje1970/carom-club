@@ -1158,6 +1158,8 @@ body:has(.site-home-page) {
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    /* 슬라이드 높이 복원: 템플릿 기본식(0.7 미적용) + 하단 고정 탭 대역 — .slide-deck height calc와 동기 */
+    --site-home-mobile-bottom-nav-slide-extra: 76px;
     background-color: #0a1421;
     background-image:
       radial-gradient(ellipse 130% 52% at 50% -14%, rgba(255, 255, 255, 0.14) 0%, rgba(160, 190, 235, 0.06) 32%, transparent 60%),
@@ -1258,15 +1260,43 @@ body:has(.site-home-page) {
     margin-right: 0;
   }
 
+  /* 메인 모바일: 슬라이드 바깥 박스 제거(풀폭)·높이 원안 + 하단고정대역·슬라이드↔PNG 간격 축소 */
+  .site-home-page--main .site-home-slide-stack,
+  .site-home-page--main .site-home-slide-anchor {
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+
+  .site-home-page--main .slide-deck-wrap {
+    width: 100%;
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .site-home-page--main .slide-deck-wrap .slide-deck {
+    max-width: none;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    width: 100vw;
+    box-sizing: border-box;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    margin-top: 0;
+    height: calc(
+      (var(--slide-window-reference-height) * 1.2 + var(--slide-layer-padding-y)) * 1.3 *
+        var(--slide-window-height-scale) + var(--site-home-mobile-bottom-nav-slide-extra, 76px)
+    );
+  }
+
   .site-home-nav-grid {
     flex: 0 0 auto;
     padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
     padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
     box-sizing: border-box;
-  }
-
-  .site-home-dark-main.site-home-dark-main--stack .site-home-main-png-buttons-temp {
-    margin-top: calc(var(--site-home-block-gap) - 0.35rem);
   }
 
   .site-home-dark-main .site-home-cta-primary {
@@ -1643,6 +1673,21 @@ body:has(.site-home-page) {
   padding-top: var(--site-home-block-gap);
 }
 
+@media (max-width: 767px) {
+  /* 전역 .slide-stack padding-top(위)보다 뒤에 두어 메인 모바일에서만 덮어씀 */
+  .site-home-page--main .site-home-dark-main.site-home-dark-main--stack .site-home-main-content-box .site-home-slide-stack {
+    padding-top: 0.25rem;
+  }
+
+  .site-home-page--main .site-home-dark-main.site-home-dark-main--stack .site-home-main-png-buttons-temp {
+    margin-top: 0.35rem;
+  }
+
+  .site-home-page--main .site-home-dark-main .site-home-cta-primary {
+    margin-bottom: 0.65rem !important;
+  }
+}
+
 .site-home-dark-main.site-home-dark-main--stack .site-home-main-content-box #main-buttons.site-home-nav-grid {
   margin-top: var(--site-home-block-gap);
 }
@@ -1667,39 +1712,46 @@ body:has(.site-home-page) {
   align-items: flex-start;
   justify-content: center;
   gap: 0.5rem;
+  position: relative;
+  z-index: 1;
 }
 
-.site-home-main-png-buttons-temp__cell {
-  flex: 1 1 0;
-  min-width: 0;
+/* 메인 하단 PNG: <a class="main-button"> 한 덩어리 클릭(이미지+제목) */
+.main-button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
+  text-decoration: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+  color: inherit;
+  box-sizing: border-box;
 }
 
-/* 버튼 크기 조절: 높이·최대 너비 등 여기서만 손대면 됨 */
-.site-home-main-png-buttons-temp__img {
+.main-button img {
   display: block;
   width: 100%;
-  max-width: 100%;
   height: auto;
-  max-height: calc(3.75rem * 1.1 * 1.1);
-  object-fit: contain;
 }
 
-.site-home-main-png-buttons-temp__label {
-  margin-top: 0.3rem;
-  width: 100%;
-  text-align: center;
-  font-size: 0.62rem;
-  line-height: 1.2;
-  font-weight: 600;
-  color: #ffffff;
-  letter-spacing: -0.03em;
-  text-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.75),
-    0 0 1px rgba(0, 0, 0, 0.9);
+.main-button span {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #fff;
+}
+
+.site-home-main-png-buttons-temp > .main-button {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* 기존 PNG 슬롯과 동일한 최대 높이(이미지 비율 유지) */
+.site-home-main-png-buttons-temp .main-button img {
+  max-width: 100%;
+  max-height: calc(3.75rem * 1.1 * 1.1);
+  object-fit: contain;
 }
 
 /* 대시보드 버튼 위 간격(모바일은 @media 안에서 더 조밀하게 조정 가능) */
@@ -1910,8 +1962,9 @@ body:has(.site-home-page) {
   line-height: 1;
 }
 
+/* 홈 활성: 다른 탭의 활성 강조와 동일 토큰(var(--ui-primary)) — 비활성은 위 회색 원 유지 */
 .site-mobile-bottom-nav__link.site-mobile-bottom-nav__link--home.site-mobile-bottom-nav__link--active {
-  background: hsl(218, 8%, 26%);
+  background: var(--ui-primary);
   color: #ffffff !important;
 }
 

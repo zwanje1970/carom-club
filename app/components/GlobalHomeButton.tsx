@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import VenuesDistanceNavLink from "../site/components/VenuesDistanceNavLink";
-import { SITE_ROOT_SWIPE_NAV } from "../site/lib/site-root-swipe-order";
+import { normalizeSiteRootPathname, SITE_ROOT_SWIPE_NAV } from "../site/lib/site-root-swipe-order";
 
 function isInquiryDetailWithComposer(pathname: string): boolean {
   return (
@@ -18,10 +18,11 @@ const SITE_NAV_ITEMS = SITE_ROOT_SWIPE_NAV.map((item) => ({
 }));
 
 function navItemActive(pathname: string, href: string): boolean {
+  const p = normalizeSiteRootPathname(pathname);
   if (href === "/site") {
-    return pathname === "/site" || pathname === "/";
+    return p === "/site" || p === "/";
   }
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return p === href || p.startsWith(`${href}/`);
 }
 
 /** 모바일: 하단 5버튼 (데스크톱은 CSS로 숨김) */

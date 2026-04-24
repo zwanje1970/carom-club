@@ -577,33 +577,18 @@ export default async function SiteHomePage({
               className="site-home-main-png-buttons-temp"
               aria-label="메인 바로가기(임시 PNG)"
             >
-              <div className="site-home-main-png-buttons-temp__cell">
-                <img
-                  className="site-home-main-png-buttons-temp__img"
-                  src="/images/buttons/btn-main-1.png"
-                  alt=""
-                  decoding="async"
-                />
-                <span className="site-home-main-png-buttons-temp__label">대회안내</span>
-              </div>
-              <div className="site-home-main-png-buttons-temp__cell">
-                <img
-                  className="site-home-main-png-buttons-temp__img"
-                  src="/images/buttons/btn-main-2.png"
-                  alt=""
-                  decoding="async"
-                />
-                <span className="site-home-main-png-buttons-temp__label">주변당구장</span>
-              </div>
-              <div className="site-home-main-png-buttons-temp__cell">
-                <img
-                  className="site-home-main-png-buttons-temp__img"
-                  src="/images/buttons/btn-main-3.png"
-                  alt=""
-                  decoding="async"
-                />
-                <span className="site-home-main-png-buttons-temp__label">커뮤니티</span>
-              </div>
+              <a href="/site/tournaments" className="main-button" aria-label="대회안내">
+                <img src="/images/buttons/btn-main-1.png" alt="" decoding="async" />
+                <span>대회안내</span>
+              </a>
+              <VenuesDistanceNavLink href="/site/venues" className="main-button" aria-label="주변당구장">
+                <img src="/images/buttons/btn-main-2.png" alt="" decoding="async" />
+                <span>주변당구장</span>
+              </VenuesDistanceNavLink>
+              <a href="/site/community" className="main-button" aria-label="커뮤니티">
+                <img src="/images/buttons/btn-main-3.png" alt="" decoding="async" />
+                <span>커뮤니티</span>
+              </a>
             </section>
             {dashboardHref ? (
               <Link

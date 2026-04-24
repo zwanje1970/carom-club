@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { buildBracketScene, buildStartPairLabels, type StartPairLabel } from "./bracket-render-engine";
@@ -51,8 +52,11 @@ export default function BlankBracketPrintClient() {
   /** 빈 칸 배경만 연한색 — 외곽선(stroke)은 CSS에서 검정 고정 */
   const [warmEmptyBoxFill, setWarmEmptyBoxFill] = useState(false);
   const [pdfExporting, setPdfExporting] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewScale, setPreviewScale] = useState(1);
   const pdfRootRef = useRef<HTMLDivElement>(null);
   const pdfBusyRef = useRef(false);
+  const previewTopbarRef = useRef<HTMLDivElement>(null);
 
   const endOptions = useMemo(() => validEndOptions(startPlayers), [startPlayers]);
   const rounds = useMemo(() => {
@@ -78,181 +82,56 @@ export default function BlankBracketPrintClient() {
     return buildStartPairLabels(scene, { rounds, style, treeLayout });
   }, [scene, rounds, style, treeLayout, showStartPairNumbers]);
 
-  /** 새 창 미리보기(모바일·데스크톱 공통): A4 한 장 전체 scale, 스크롤·스와이프 없음 */
-  const handleOpenPreviewWindow = useCallback(() => {
-    if (!rounds.length || !scene) return;
-    const { paperW, paperH } = previewPaperPx(style, treeLayout);
-    const open = () => {
-      const root = pdfRootRef.current;
-      if (!root) return;
-      const inner = root.innerHTML;
-      const w = window.open("", "_blank", "noopener,noreferrer");
-      if (!w) {
-        alert("팝업이 차단되었습니다. 브라우저에서 이 사이트의 팝업을 허용한 뒤 다시 시도하세요.");
-        return;
-      }
-      w.document.write(`<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>빈 대진표 미리보기</title>
-<style>
-  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; box-sizing: border-box; }
-  body { font-family: system-ui, "Segoe UI", sans-serif; }
-  .preview-root {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-height: 100dvh;
-    max-height: 100dvh;
-    background: #e5e7eb;
-    overflow: hidden;
-    box-sizing: border-box;
-  }
-  .preview-topbar {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    padding: 10px 16px;
-    box-sizing: border-box;
-    background: #e5e7eb;
-  }
-  .preview-topbar button {
-    min-height: 44px;
-    padding: 0 18px;
-    font-size: 1rem;
-    font-weight: 700;
-    border: none;
-    border-radius: 10px;
-    background: #f59e0b;
-    color: #111827;
-    cursor: pointer;
-  }
-  .preview-stage {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: hidden;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding: 0 16px 16px;
-    box-sizing: border-box;
-  }
-  .paper-frame {
-    transform-origin: top center;
-    will-change: transform;
-  }
-  .paper {
-    background: #ffffff;
-    box-shadow: 0 10px 28px rgba(0,0,0,0.18);
-    box-sizing: border-box;
-    border-radius: 2px;
-    padding: ${MARGIN_MM}mm;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-  }
-  .bracket-scene { line-height: 0; }
-  .bbp-print-svg {
-    position: static !important;
-    left: auto !important;
-    top: auto !important;
-    width: auto !important;
-    height: auto !important;
-    z-index: auto !important;
-    pointer-events: none;
-  }
-  .bbp-print-page-sheet { position: relative; width: 100%; height: 100%; box-sizing: border-box; overflow: hidden; }
-  .bbp-print-service-mark {
-    position: absolute;
-    top: ${SERVICE_MARK_INSET_MM}mm;
-    right: ${SERVICE_MARK_INSET_MM}mm;
-    z-index: 10;
-    margin: 0;
-    padding: 0;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    font-size: ${SERVICE_MARK_FONT_MM}mm;
-    font-weight: 300;
-    line-height: 1.2;
-    color: #888888;
-    letter-spacing: 0.02em;
-    white-space: nowrap;
-    pointer-events: none;
-    user-select: none;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  .bbp-match-box {
-    fill: #ffffff;
-    stroke: #000000;
-    stroke-width: 0.2;
-  }
-  .bbp-match-box--fill {
-    fill: #fffbe6;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  @media print {
-    html, body { height: auto; max-height: none; overflow: visible; background: #fff; }
-    .preview-root { min-height: 0; max-height: none; height: auto; background: #fff; overflow: visible; }
-    .preview-topbar { display: none !important; }
-    .preview-stage { overflow: visible; padding: 0; flex: none; }
-    .paper-frame { transform: none !important; }
-    .paper { box-shadow: none; border-radius: 0; padding: 0; width: auto !important; height: auto !important; overflow: visible; }
-    .bbp-print-service-mark {
-      position: absolute;
-      top: ${SERVICE_MARK_INSET_MM}mm;
-      right: ${SERVICE_MARK_INSET_MM}mm;
-    }
-    @page { size: A4 landscape; margin: ${MARGIN_MM}mm; }
-  }
-</style>
-</head>
-<body>
-  <div class="preview-root" id="preview-root">
-    <div class="preview-topbar" data-preview-topbar>
-      <button type="button" onclick="window.close()">닫기</button>
-    </div>
-    <div class="preview-stage">
-      <div class="paper-frame" data-preview-paper-frame>
-        <div class="paper" data-preview-paper data-paper-w="${paperW}" data-paper-h="${paperH}" style="width:${paperW}px;height:${paperH}px;">
-          <div class="bracket-scene">${inner}</div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <script>
-(function(){
-  function updateScale(){
-    var paper = document.querySelector("[data-preview-paper]");
-    var frame = document.querySelector("[data-preview-paper-frame]");
-    var topbar = document.querySelector("[data-preview-topbar]");
-    if(!paper||!frame)return;
-    var pw = parseFloat(paper.getAttribute("data-paper-w"),10)||1123;
-    var ph = parseFloat(paper.getAttribute("data-paper-h"),10)||794;
-    var th = topbar ? topbar.getBoundingClientRect().height : 48;
-    var vw = window.innerWidth;
-    var vh = window.innerHeight;
-    var s = Math.min((vw - 32) / pw, (vh - th - 32) / ph, 1);
-    if (!(s > 0) || !isFinite(s)) s = 0.1;
-    frame.style.transform = "scale(" + s + ")";
-  }
-  window.addEventListener("resize", updateScale);
-  window.addEventListener("orientationchange", function(){ setTimeout(updateScale, 150); });
-  if(window.visualViewport){ window.visualViewport.addEventListener("resize", updateScale); }
-  if(document.readyState==="loading"){ document.addEventListener("DOMContentLoaded", updateScale); } else { updateScale(); }
-})();
-  </script>
-</body>
-</html>`);
-      w.document.close();
-      w.focus();
+  const previewPaper = useMemo(() => previewPaperPx(style, treeLayout), [style, treeLayout]);
+
+  const updatePreviewScale = useCallback(() => {
+    const { paperW, paperH } = previewPaper;
+    const th = previewTopbarRef.current?.getBoundingClientRect().height ?? 48;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let s = Math.min((vw - 32) / paperW, (vh - th - 32) / paperH, 1);
+    if (!(s > 0) || !Number.isFinite(s)) s = 0.1;
+    setPreviewScale(s);
+  }, [previewPaper]);
+
+  useEffect(() => {
+    if (!previewOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
     };
-    requestAnimationFrame(() => requestAnimationFrame(open));
-  }, [rounds.length, scene, style, treeLayout, showStartPairNumbers, warmEmptyBoxFill]);
+  }, [previewOpen]);
+
+  useLayoutEffect(() => {
+    if (!previewOpen) return;
+    updatePreviewScale();
+  }, [previewOpen, previewPaper, updatePreviewScale]);
+
+  useEffect(() => {
+    if (!previewOpen) return;
+    let orientTimer: ReturnType<typeof setTimeout> | undefined;
+    window.addEventListener("resize", updatePreviewScale);
+    const onOrientation = () => {
+      if (orientTimer) clearTimeout(orientTimer);
+      orientTimer = setTimeout(updatePreviewScale, 150);
+    };
+    window.addEventListener("orientationchange", onOrientation);
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", updatePreviewScale);
+    return () => {
+      if (orientTimer) clearTimeout(orientTimer);
+      window.removeEventListener("resize", updatePreviewScale);
+      window.removeEventListener("orientationchange", onOrientation);
+      vv?.removeEventListener("resize", updatePreviewScale);
+    };
+  }, [previewOpen, updatePreviewScale]);
+
+  /** 페이지 내부 전용 레이어 미리보기: A4 한 장 전체 scale, 스크롤·스와이프 없음 */
+  const handleOpenPreviewOverlay = useCallback(() => {
+    if (!rounds.length || !scene) return;
+    setPreviewOpen(true);
+  }, [rounds.length, scene]);
 
   /** A4 가로 PDF — html2canvas 로 `.bbp-print-svg` 캡처 후 jsPDF 에 277×190mm 로 삽입 */
   const handleExportPDF = useCallback(async () => {
@@ -341,6 +220,73 @@ export default function BlankBracketPrintClient() {
           fill: #fffbe6;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
+        }
+        .preview-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 2147483647;
+          box-sizing: border-box;
+          font-family: system-ui, "Segoe UI", sans-serif;
+          background: #e5e7eb;
+          overflow: hidden;
+        }
+        .preview-overlay .preview-root {
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          min-height: 100dvh;
+          max-height: 100dvh;
+          background: #e5e7eb;
+          overflow: hidden;
+          box-sizing: border-box;
+        }
+        .preview-overlay .preview-topbar {
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          padding: 10px 16px;
+          box-sizing: border-box;
+          background: #e5e7eb;
+        }
+        .preview-overlay .preview-close-button {
+          min-height: 44px;
+          padding: 0 18px;
+          font-size: 1rem;
+          font-weight: 700;
+          border: none;
+          border-radius: 10px;
+          background: #f59e0b;
+          color: #111827;
+          cursor: pointer;
+        }
+        .preview-overlay .preview-stage {
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow: hidden;
+          display: flex;
+          align-items: flex-start;
+          justify-content: center;
+          padding: 0 16px 16px;
+          box-sizing: border-box;
+        }
+        .preview-overlay .paper-frame {
+          transform-origin: top center;
+          will-change: transform;
+        }
+        .preview-overlay .paper {
+          background: #ffffff;
+          box-shadow: 0 10px 28px rgba(0,0,0,0.18);
+          box-sizing: border-box;
+          border-radius: 2px;
+          padding: ${MARGIN_MM}mm;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+        }
+        .preview-overlay .bracket-scene {
+          line-height: 0;
         }
       `}</style>
 
@@ -433,7 +379,7 @@ export default function BlankBracketPrintClient() {
               <button
                 type="button"
                 className="v3-btn"
-                onClick={handleOpenPreviewWindow}
+                onClick={handleOpenPreviewOverlay}
                 disabled={!rounds.length || !scene}
                 style={{ padding: "0.55rem 1rem", minHeight: "44px" }}
               >
@@ -467,6 +413,41 @@ export default function BlankBracketPrintClient() {
           </div>
         </div>
       )}
+
+      {previewOpen && scene && typeof document !== "undefined"
+        ? createPortal(
+            <div className="preview-overlay" role="dialog" aria-modal="true" aria-label="빈 대진표 미리보기">
+              <div className="preview-root">
+                <div className="preview-topbar" ref={previewTopbarRef}>
+                  <button type="button" className="preview-close-button" onClick={() => setPreviewOpen(false)}>
+                    닫기
+                  </button>
+                </div>
+                <div className="preview-stage">
+                  <div className="paper-frame" style={{ transform: `scale(${previewScale})` }}>
+                    <div
+                      className="paper"
+                      style={{ width: previewPaper.paperW, height: previewPaper.paperH }}
+                    >
+                      <div className="bracket-scene">
+                        <div className="bbp-print-page-sheet">
+                          <BracketSVG
+                            scene={scene}
+                            matchType={matchType}
+                            startPairLabels={startPairLabels}
+                            warmEmptyBoxFill={warmEmptyBoxFill}
+                          />
+                          <BracketPrintServiceMark />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }

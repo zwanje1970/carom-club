@@ -107,6 +107,19 @@
   margin-top: 0;
 }
 
+@media (max-width: 767px) {
+  :global(.site-home-page--main) .slideDeckNoticeAbove {
+    width: 100%;
+    max-width: none;
+    align-self: stretch;
+  }
+
+  :global(.site-home-page--main) .slideDeckCardChrome {
+    width: calc(100% - 20px);
+    max-width: none;
+  }
+}
+
 .slideDeckLabel {
   position: static;
   align-self: flex-start;
