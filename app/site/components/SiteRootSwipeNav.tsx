@@ -353,6 +353,8 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
   }, [pathname, router, applyTransform, releaseViewportTouchAxisLock]);
 
   if (children == null) return null;
+  /* 긴급 복구: 루트 스와이프 트랙(transform)으로 인한 공개 목록 스크롤/FAB 이슈가 있어 임시 보류 */
+  return <>{children}</>;
 
   const swipeIdx = siteRootSwipeIndex(pathname);
   const prevHref = siteRootSwipeHrefAt(swipeIdx - 1);
@@ -363,7 +365,7 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       <div key="swipe-left-ph" className="site-root-swipe-panel site-root-swipe-panel--placeholder" aria-hidden />
     ) : allowNeighborIframePreview(prevHref) ? (
       <div key={`swipe-left-${prevHref}`} className="site-root-swipe-panel site-root-swipe-panel--neighbor">
-        <iframe className="site-root-swipe-panel-embed" src={prevHref} title="이전 탭" loading="lazy" />
+        <iframe className="site-root-swipe-panel-embed" src={prevHref ?? undefined} title="이전 탭" loading="lazy" />
       </div>
     ) : (
       <div key="swipe-left-edge" className="site-root-swipe-panel site-root-swipe-panel--placeholder" aria-hidden />
@@ -374,7 +376,7 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       <div key="swipe-right-ph" className="site-root-swipe-panel site-root-swipe-panel--placeholder" aria-hidden />
     ) : allowNeighborIframePreview(nextHref) ? (
       <div key={`swipe-right-${nextHref}`} className="site-root-swipe-panel site-root-swipe-panel--neighbor">
-        <iframe className="site-root-swipe-panel-embed" src={nextHref} title="다음 탭" loading="lazy" />
+        <iframe className="site-root-swipe-panel-embed" src={nextHref ?? undefined} title="다음 탭" loading="lazy" />
       </div>
     ) : (
       <div key="swipe-right-edge" className="site-root-swipe-panel site-root-swipe-panel--placeholder" aria-hidden />

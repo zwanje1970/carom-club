@@ -6,10 +6,15 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { buildBracketScene, buildStartPairLabels, type StartPairLabel } from "./bracket-render-engine";
 
-// @page 여백 = 10mm → 출력 영역 = 277 × 190 mm
+/**
+ * 실제 인쇄 용지: A4 가로. @page(또는 PDF 삽입) 여백 10mm 기준으로 본문에 쓸 수 있는 직사각형이
+ * 277mm × 190mm — 이 크기가 대진 도면(SVG width/height, jsPDF addImage 폭·높이)과 일치한다.
+ */
 const MARGIN_MM = 10;
 /** 대진표(277×190mm) 도면 기준 우상단 — 용지 @page 여백과 별개 */
 const SERVICE_MARK_INSET_MM = 0.6;
+/** © 표기만 5mm 위로(대진표 좌표·박스 크기 불변, 양쪽→중앙형과 겹침 완화) */
+const SERVICE_MARK_TOP_MM = SERVICE_MARK_INSET_MM - 5;
 /** 기존 2.8mm 대비 50% */
 const SERVICE_MARK_FONT_MM = 1.4;
 
@@ -36,15 +41,12 @@ type TreeLayout   = "HORIZONTAL" | "VERTICAL";
 
 /**
  * 미리보기 용지 px — 모바일 화면 방향·viewport 비율과 무관.
- * 1) 인쇄(트리 세로형 = 세로 용지), 2) 그 외 가로 용지. (viewport는 scale 전용)
+ * 세로형(tree VERTICAL)은 대진 트리가 아래→위로 올라가는 형식일 뿐, 용지는 항상 가로(277×190mm 영역과 동일 비율).
  */
 function previewPaperFromPrintSettings(
-  style: BracketStyle,
-  treeLayout: TreeLayout,
+  _style: BracketStyle,
+  _treeLayout: TreeLayout,
 ): { paperW: number; paperH: number } {
-  if (style === "TREE" && treeLayout === "VERTICAL") {
-    return { paperW: 794, paperH: 1123 };
-  }
   return { paperW: 1123, paperH: 794 };
 }
 
@@ -60,6 +62,8 @@ export default function BlankBracketPrintClient() {
   const [pdfExporting, setPdfExporting] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewScale, setPreviewScale] = useState(1);
+  /** 모바일 가로: 용지+대진표를 90° 함께 회전 — 스케일은 회전 후 축정렬 박스 기준 */
+  const [previewMobileLandscape, setPreviewMobileLandscape] = useState(false);
   const pdfRootRef = useRef<HTMLDivElement>(null);
   const pdfBusyRef = useRef(false);
   const previewTopbarRef = useRef<HTMLDivElement>(null);
@@ -113,13 +117,21 @@ export default function BlankBracketPrintClient() {
       vw = window.innerWidth;
       vh = window.innerHeight;
     }
-    /* paper 방향은 이미 확정 — scale만. 스테이지=탑바 아래 영역이면 th 이중 차감 안 함 */
+    const mobileUa =
+      typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
+    const landscape = typeof window !== "undefined" && window.innerWidth > window.innerHeight;
+    const rotatePaper = mobileUa && landscape;
+    setPreviewMobileLandscape(rotatePaper);
+
+    /* paper 방향은 이미 확정 — scale만. 가로 모드 회전 시 화면에 맞는 축은 W↔H 교환 */
     const pad = 32;
+    const fitW = rotatePaper ? paperH : paperW;
+    const fitH = rotatePaper ? paperW : paperH;
     let s: number;
     if (stage) {
-      s = Math.min((vw - pad) / paperW, (vh - pad) / paperH, 1);
+      s = Math.min((vw - pad) / fitW, (vh - pad) / fitH, 1);
     } else {
-      s = Math.min((vw - pad) / paperW, (vh - th - pad) / paperH, 1);
+      s = Math.min((vw - pad) / fitW, (vh - th - pad) / fitH, 1);
     }
     if (!(s > 0) || !Number.isFinite(s)) s = 0.1;
     setPreviewScale(s);
@@ -220,7 +232,7 @@ export default function BlankBracketPrintClient() {
         }
         .bbp-print-service-mark {
           position: absolute;
-          top: ${SERVICE_MARK_INSET_MM}mm;
+          top: ${SERVICE_MARK_TOP_MM}mm;
           right: ${SERVICE_MARK_INSET_MM}mm;
           z-index: 10;
           margin: 0;
@@ -240,7 +252,7 @@ export default function BlankBracketPrintClient() {
         @media print {
           .bbp-print-service-mark {
             position: absolute;
-            top: ${SERVICE_MARK_INSET_MM}mm;
+            top: ${SERVICE_MARK_TOP_MM}mm;
             right: ${SERVICE_MARK_INSET_MM}mm;
           }
         }
@@ -469,8 +481,10 @@ export default function BlankBracketPrintClient() {
                   <div
                     className="paper-frame-slot"
                     style={{
-                      width: previewPaper.paperW * previewScale,
-                      height: previewPaper.paperH * previewScale,
+                      width:
+                        (previewMobileLandscape ? previewPaper.paperH : previewPaper.paperW) * previewScale,
+                      height:
+                        (previewMobileLandscape ? previewPaper.paperW : previewPaper.paperH) * previewScale,
                     }}
                   >
                     <div
@@ -478,7 +492,23 @@ export default function BlankBracketPrintClient() {
                       style={{
                         width: previewPaper.paperW,
                         height: previewPaper.paperH,
-                        transform: `scale(${previewScale})`,
+                        ...(previewMobileLandscape
+                          ? {
+                              left: "50%",
+                              top: "50%",
+                              marginLeft: -previewPaper.paperW / 2,
+                              marginTop: -previewPaper.paperH / 2,
+                              transform: `rotate(90deg) scale(${previewScale})`,
+                              transformOrigin: "center center",
+                            }
+                          : {
+                              left: 0,
+                              top: 0,
+                              marginLeft: 0,
+                              marginTop: 0,
+                              transform: `scale(${previewScale})`,
+                              transformOrigin: "top left",
+                            }),
                       }}
                     >
                     <div
@@ -520,12 +550,20 @@ function BracketPrintServiceMark() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BracketSVG
-// viewBox="0 0 277 190" → 좌표 단위 = mm
+// viewBox="0 0 277 190" → 좌표 단위 = mm. SVG 실물 크기는 여전히 277mm×190mm(A4 가로 인쇄영역).
 // style 에 width/height/min-width/min-height 를 모두 인라인으로 강제해서
 // 프로젝트 전역 CSS (svg { max-width:100% } 등) 에 눌리지 않게 한다.
 // ─────────────────────────────────────────────────────────────────────────────
 /** 조번호 SVG 텍스트 (기존 2.05mm 의 50%) */
 const PAIR_LABEL_FONT_MM = 1.025;
+
+/**
+ * 경계 클리핑 보조: stroke(0.2mm)가 viewBox 가장자리에서 잘리며 PDF에서 끝선만 얇게 보이는 현상 완화.
+ * SVG 캔버스(277×190mm)와 PDF 배치 폭·높이는 그대로 — 도면만 동일 뷰포트 안에서 미세 축소(수 sub-mm).
+ */
+const BRACKET_SVG_INSET_MM = 0.12;
+const BRACKET_SVG_W = 277;
+const BRACKET_SVG_H = 190;
 
 function BracketSVG({
   scene,
@@ -541,6 +579,12 @@ function BracketSVG({
   startPairLabels?: StartPairLabel[];
   warmEmptyBoxFill?: boolean;
 }) {
+  const cx = BRACKET_SVG_W / 2;
+  const cy = BRACKET_SVG_H / 2;
+  const sx = (BRACKET_SVG_W - 2 * BRACKET_SVG_INSET_MM) / BRACKET_SVG_W;
+  const sy = (BRACKET_SVG_H - 2 * BRACKET_SVG_INSET_MM) / BRACKET_SVG_H;
+  const bracketInsetTransform = `translate(${cx},${cy}) scale(${sx},${sy}) translate(${-cx},${-cy})`;
+
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -558,56 +602,58 @@ function BracketSVG({
         background: "#ffffff",
       }}
     >
-      {/* 경로선 (박스보다 먼저 그려 박스 테두리가 위로 올라옴) */}
-      {scene.lines.map((l, i) => (
-        <line
-          key={i}
-          x1={l.x1} y1={l.y1}
-          x2={l.x2} y2={l.y2}
-          stroke="#000000"
-          strokeWidth={0.2}
-          strokeLinecap="square"
-        />
-      ))}
-
-      {/* 박스 */}
-      {scene.boxes.map((b, i) => (
-        <g key={i}>
-          <rect
-            x={b.x} y={b.y}
-            width={b.w} height={b.h}
-            className={warmEmptyBoxFill ? "bbp-match-box bbp-match-box--fill" : "bbp-match-box"}
+      <g transform={bracketInsetTransform}>
+        {/* 경로선 (박스보다 먼저 그려 박스 테두리가 위로 올라옴) */}
+        {scene.lines.map((l, i) => (
+          <line
+            key={i}
+            x1={l.x1} y1={l.y1}
+            x2={l.x2} y2={l.y2}
+            stroke="#000000"
+            strokeWidth={0.2}
+            strokeLinecap="square"
           />
-          {matchType === "SCOTCH" && (
-            <line
-              x1={b.x + b.w / 2}  y1={b.y}
-              x2={b.x + b.w / 2}  y2={b.y + b.h}
-              stroke="#000000" strokeWidth={0.2}
-            />
-          )}
-        </g>
-      ))}
+        ))}
 
-      {startPairLabels.length > 0 ? (
-        <g className="bbp-start-pair-labels" aria-hidden="true">
-          {startPairLabels.map((t, i) => (
-            <text
-              key={`sp-${i}`}
-              x={t.x}
-              y={t.y}
-              textAnchor={t.textAnchor}
-              dominantBaseline="middle"
-              fill="#8e8e8e"
-              fontSize={`${PAIR_LABEL_FONT_MM}mm`}
-              fontWeight={300}
-              fontFamily='system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
-              style={{ paintOrder: "stroke fill", WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}
-            >
-              {t.text}
-            </text>
-          ))}
-        </g>
-      ) : null}
+        {/* 박스 */}
+        {scene.boxes.map((b, i) => (
+          <g key={i}>
+            <rect
+              x={b.x} y={b.y}
+              width={b.w} height={b.h}
+              className={warmEmptyBoxFill ? "bbp-match-box bbp-match-box--fill" : "bbp-match-box"}
+            />
+            {matchType === "SCOTCH" && (
+              <line
+                x1={b.x + b.w / 2}  y1={b.y}
+                x2={b.x + b.w / 2}  y2={b.y + b.h}
+                stroke="#000000" strokeWidth={0.2}
+              />
+            )}
+          </g>
+        ))}
+
+        {startPairLabels.length > 0 ? (
+          <g className="bbp-start-pair-labels" aria-hidden="true">
+            {startPairLabels.map((t, i) => (
+              <text
+                key={`sp-${i}`}
+                x={t.x}
+                y={t.y}
+                textAnchor={t.textAnchor}
+                dominantBaseline="middle"
+                fill="#8e8e8e"
+                fontSize={`${PAIR_LABEL_FONT_MM}mm`}
+                fontWeight={300}
+                fontFamily='system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+                style={{ paintOrder: "stroke fill", WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}
+              >
+                {t.text}
+              </text>
+            ))}
+          </g>
+        ) : null}
+      </g>
     </svg>
   );
 }
