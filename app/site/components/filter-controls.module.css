@@ -147,15 +147,30 @@
   background: #eceff2;
 }
 
-.buttonDistanceActive {
-  border-color: var(--color-primary, #2563eb);
-  background: var(--color-primary, #2563eb);
-  color: #ffffff;
+/* 거리순: 비활성(기본)=파랑, 활성=빨강 — 대회·클럽 동일 클래스 */
+.filterRowFilterPack .button.buttonDistance {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
   font-weight: 600;
 }
 
-.buttonDistanceActive:hover {
-  filter: brightness(1.04);
+.filterRowFilterPack .button.buttonDistance:hover {
+  background: #dbeafe;
+}
+
+.filterRowFilterPack .button.buttonDistance:active {
+  background: #bfdbfe;
+}
+
+.filterRowFilterPack .button.buttonDistance.buttonDistanceActive {
+  border-color: #dc2626;
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.filterRowFilterPack .button.buttonDistance.buttonDistanceActive:hover {
+  filter: brightness(1.05);
 }
 
 /* (구) 당구장 2줄 레이아웃 — 현재는 filterRowSingleDouble 한 줄 사용 */

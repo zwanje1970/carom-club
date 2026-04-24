@@ -1,5 +1,7 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
+
 /** 당구장 거리순·대회 거리순 공유 — sessionStorage 키 */
 export const VENUES_GEO_STORAGE_LAT = "carom_site_venues_lat";
 export const VENUES_GEO_STORAGE_LNG = "carom_site_venues_lng";
@@ -28,9 +30,54 @@ export function persistVenueCoords(lat: number, lng: number): void {
   try {
     sessionStorage.setItem(VENUES_GEO_STORAGE_LAT, String(lat));
     sessionStorage.setItem(VENUES_GEO_STORAGE_LNG, String(lng));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("carom-site-distance-geo"));
+    }
   } catch {
     /* ignore */
   }
+}
+
+/** 공개 사이트 이탈 시 호출 — 다음 방문 시 거리순·주변클럽 탭에서만 다시 위치 확인 */
+export function clearStoredVenueCoords(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(VENUES_GEO_STORAGE_LAT);
+    sessionStorage.removeItem(VENUES_GEO_STORAGE_LNG);
+    window.dispatchEvent(new Event("carom-site-distance-geo"));
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * 거리순 UI(빨강=활성): 현재 URL에 좌표가 있거나, 한쪽에서 저장한 세션 좌표가 있으면 대회·클럽 둘 다 활성으로 본다.
+ */
+export function useDistanceGearArmed(urlGeoPresent: boolean): boolean {
+  const compute = useCallback(
+    () => urlGeoPresent || (typeof window !== "undefined" && getStoredVenueCoords() != null),
+    [urlGeoPresent],
+  );
+
+  const [armed, setArmed] = useState(urlGeoPresent);
+
+  useEffect(() => {
+    setArmed(compute());
+  }, [compute]);
+
+  useEffect(() => {
+    const refresh = () => setArmed(compute());
+    window.addEventListener("focus", refresh);
+    window.addEventListener("storage", refresh);
+    window.addEventListener("carom-site-distance-geo", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("carom-site-distance-geo", refresh);
+    };
+  }, [compute]);
+
+  return armed;
 }
 
 /** Text 노드 등으로 target이 Element가 아닐 때 closest용 기준 요소 */
@@ -43,8 +90,8 @@ export function eventTargetElement(ev: MouseEvent): Element | null {
 
 /**
  * 사용자 클릭 시에만 호출. `/site/venues`·`/site/tournaments` 이동 URL에 좌표를 붙인 뒤 navigate.
- * 세션에 좌표가 있으면 재사용하고, 없으면 현재 위치를 새로 조회한다.
- * (URL의 distanceLat/Lng 유무와 무관하게 세션 우선 정책 적용)
+ * 세션에 좌표가 있으면 같은 공개 사이트 방문 동안 재사용(동의 재요청 없음). 없을 때만 geolocation 조회.
+ * 공개 사이트(`/`, `/site/*`)를 벗어나면 `clearStoredVenueCoords`로 세션이 비워진다.
  */
 export function performGeolocationThenNavigate(targetHref: string, navigate: (href: string) => void): void {
   if (typeof window === "undefined") return;

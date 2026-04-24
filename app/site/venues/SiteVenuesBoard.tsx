@@ -8,6 +8,7 @@ import FilterDropdown from "../components/FilterDropdown";
 import {
   getStoredVenueCoords,
   performGeolocationThenNavigate,
+  useDistanceGearArmed,
   VENUES_GEO_STORAGE_LAT,
   VENUES_GEO_STORAGE_LNG,
 } from "../lib/site-geolocation-flow";
@@ -88,6 +89,7 @@ export default function SiteVenuesBoard({
   hasViewerCoordinate,
 }: Props) {
   const router = useRouter();
+  const distanceArmed = useDistanceGearArmed(hasViewerCoordinate);
   const [venueType, setVenueType] = useState<VenueTypeFilter>("all");
   const [feeType, setFeeType] = useState<FeeTypeFilter>("all");
 
@@ -97,6 +99,7 @@ export default function SiteVenuesBoard({
     try {
       sessionStorage.setItem(VENUES_GEO_STORAGE_LAT, String(distanceSort.lat));
       sessionStorage.setItem(VENUES_GEO_STORAGE_LNG, String(distanceSort.lng));
+      window.dispatchEvent(new Event("carom-site-distance-geo"));
     } catch {
       /* ignore */
     }
@@ -146,8 +149,6 @@ export default function SiteVenuesBoard({
     return list;
   }, [filtered, distanceSort]);
 
-  const distanceSortActive = distanceSort != null;
-
   const auxiliary = (
     <div
       className={`${filterStyles.filterRow} ${filterStyles.filterRowSingle} ${filterStyles.filterRowSingleDouble} ${filterStyles.filterRowFilterPack}`}
@@ -189,7 +190,9 @@ export default function SiteVenuesBoard({
         </FilterDropdown>
       </div>
       <FilterButton
-        className={distanceSortActive ? filterStyles.buttonDistanceActive : undefined}
+        className={[filterStyles.buttonDistance, distanceArmed ? filterStyles.buttonDistanceActive : ""]
+          .filter(Boolean)
+          .join(" ")}
         href={distanceButtonHref}
         useNextLink={hasViewerCoordinate}
         onClick={
@@ -240,8 +243,16 @@ export default function SiteVenuesBoard({
                     if (!cat && !fee) return null;
                     return (
                       <div className="site-venue-chips">
-                        {cat ? <span className="site-list-chip">{cat}</span> : null}
-                        {fee ? <span className="site-list-chip">{fee}</span> : null}
+                        {cat ? (
+                          <span className={`site-list-chip site-venue-chip--cat-${row.venueCategory}`}>{cat}</span>
+                        ) : null}
+                        {fee ? (
+                          <span
+                            className={`site-list-chip site-venue-chip--fee-${row.pricingType === "FLAT" ? "flat" : row.pricingType === "MIXED" ? "mixed" : "general"}`}
+                          >
+                            {fee}
+                          </span>
+                        ) : null}
                       </div>
                     );
                   })()}

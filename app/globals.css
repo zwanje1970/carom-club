@@ -505,6 +505,32 @@ button.secondary-button.site-mypage-logout:hover,
   background: #f3f4f6;
 }
 
+/* 클럽안내 카드 칩만 — 대회 .site-list-chip 등과 분리 */
+.site-venue-chips .site-list-chip.site-venue-chip--cat-daeda_only {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+.site-venue-chips .site-list-chip.site-venue-chip--cat-mixed {
+  color: #c2410c;
+  background: #ffedd5;
+}
+
+.site-venue-chips .site-list-chip.site-venue-chip--fee-general {
+  color: #15803d;
+  background: #dcfce7;
+}
+
+.site-venue-chips .site-list-chip.site-venue-chip--fee-flat {
+  color: #7c3aed;
+  background: #ede9fe;
+}
+
+.site-venue-chips .site-list-chip.site-venue-chip--fee-mixed {
+  color: #475569;
+  background: #e2e8f0;
+}
+
 /* 대회 목록 상태 뱃지 — .badge-status(모집중) 외 변형만 정의 */
 .site-board-status-badge {
   display: inline-flex;

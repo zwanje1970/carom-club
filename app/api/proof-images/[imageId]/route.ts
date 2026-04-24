@@ -8,6 +8,7 @@ import {
   getTournamentById,
   getUserById,
 } from "../../../../lib/server/dev-store";
+import { getStoredProofImageVariantUrl } from "../../../../lib/server/proof-image-storage-url";
 import { mimeTypeFromProofExt, readProofImageVariantFile } from "../../../../lib/server/read-proof-image-variant";
 
 export const runtime = "nodejs";
@@ -59,6 +60,11 @@ export async function GET(
 
   if (!canView) {
     return NextResponse.json({ error: "접근 권한이 없습니다." }, { status: 403 });
+  }
+
+  const redirectUrl = getStoredProofImageVariantUrl(proofImage, variant);
+  if (redirectUrl) {
+    return NextResponse.redirect(redirectUrl, 307);
   }
 
   const read = await readProofImageVariantFile(normalizedImageId, variant, proofImage.originalExt);

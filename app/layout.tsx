@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import AdminDashboardFloatingFab from "./components/AdminDashboardFloatingFab";
+import FcmSessionRegisterClient from "./components/FcmSessionRegisterClient";
+import SiteGeoLifecycleGuard from "./components/SiteGeoLifecycleGuard";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,6 +24,8 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body>
+        <SiteGeoLifecycleGuard />
+        <FcmSessionRegisterClient />
         {children}
         <AdminDashboardFloatingFab />
       </body>

@@ -68,6 +68,18 @@ export async function POST(request: Request) {
     }
     const records = await listFcmDeviceTokensForUserIds(marketingTargets);
     const tokens = records.map((r) => r.token);
+    console.log(
+      "[api/push/send] platform audience",
+      JSON.stringify({
+        audience,
+        normalizedTargetCount: normalizedTargets.length,
+        marketingConsentCount: marketingTargets.length,
+        fcmTokenRecordCount: records.length,
+      })
+    );
+    if (tokens.length === 0) {
+      return NextResponse.json({ error: "푸시 토큰이 있는 사용자가 없습니다." }, { status: 400 });
+    }
     try {
       const result = await sendFcmToTokens({
         title,
@@ -140,6 +152,17 @@ export async function POST(request: Request) {
 
   const records = await listFcmDeviceTokensForUserIds(marketingTargets);
   const tokens = records.map((r) => r.token);
+  console.log(
+    "[api/push/send] scoped targetUserIds",
+    JSON.stringify({
+      normalizedTargetCount: normalizedTargets.length,
+      marketingConsentCount: marketingTargets.length,
+      fcmTokenRecordCount: records.length,
+    })
+  );
+  if (tokens.length === 0) {
+    return NextResponse.json({ error: "푸시 토큰이 있는 사용자가 없습니다." }, { status: 400 });
+  }
 
   try {
     const result = await sendFcmToTokens({

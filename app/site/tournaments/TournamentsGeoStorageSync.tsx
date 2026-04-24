@@ -19,6 +19,7 @@ export default function TournamentsGeoStorageSync({
     try {
       sessionStorage.setItem(VENUES_GEO_STORAGE_LAT, String(viewerCoordinate.lat));
       sessionStorage.setItem(VENUES_GEO_STORAGE_LNG, String(viewerCoordinate.lng));
+      window.dispatchEvent(new Event("carom-site-distance-geo"));
     } catch {
       /* ignore */
     }

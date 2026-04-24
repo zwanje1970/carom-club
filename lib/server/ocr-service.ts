@@ -6,11 +6,13 @@
 import { readFile } from "fs/promises";
 import path from "path";
 import { getProofImagesBaseDir } from "./proof-images-base-dir";
+import { getStoredProofImageVariantUrl } from "./proof-image-storage-url";
 import {
   completeTournamentApplicationOcr,
   getProofImageAssetById,
   getTournamentApplicationById,
   markTournamentApplicationOcrProcessing,
+  type ProofImageAsset,
   TournamentApplication,
 } from "./dev-store";
 
@@ -29,6 +31,20 @@ function resolveProofImageAbsolutePath(params: { imageId: string; originalExt: "
   return path.join(getProofImagesBaseDir(), "original", `${params.imageId}.${params.originalExt}`);
 }
 
+async function loadProofImageOriginalBuffer(proofImage: ProofImageAsset): Promise<Buffer> {
+  const url = getStoredProofImageVariantUrl(proofImage, "original");
+  if (url) {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error("proof image fetch failed");
+    }
+    return Buffer.from(await response.arrayBuffer());
+  }
+  return readFile(
+    resolveProofImageAbsolutePath({ imageId: proofImage.id, originalExt: proofImage.originalExt })
+  );
+}
+
 async function runMockOcr(application: TournamentApplication): Promise<OcrRecognitionResult> {
   return {
     rawText: `입금자명 추정: ${application.depositorName}\n전화번호 추정: ${application.phone}`,
@@ -40,13 +56,12 @@ async function runMockOcr(application: TournamentApplication): Promise<OcrRecogn
   };
 }
 
-async function runHttpOcr(absoluteImagePath: string): Promise<OcrRecognitionResult> {
+async function runHttpOcrFromBuffer(buffer: Buffer): Promise<OcrRecognitionResult> {
   const endpoint = process.env.OCR_HTTP_ENDPOINT?.trim() ?? "";
   if (!endpoint) {
     throw new Error("OCR endpoint is not configured");
   }
 
-  const buffer = await readFile(absoluteImagePath);
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
@@ -115,13 +130,10 @@ export async function runOcrForProofImage(params: {
     };
   }
 
-  const absoluteImagePath = resolveProofImageAbsolutePath({
-    imageId: proofImage.id,
-    originalExt: proofImage.originalExt,
-  });
   try {
     if ((process.env.OCR_PROVIDER ?? "mock").trim() === "http") {
-      return await runHttpOcr(absoluteImagePath);
+      const imageBuffer = await loadProofImageOriginalBuffer(proofImage);
+      return await runHttpOcrFromBuffer(imageBuffer);
     }
     return await runMockOcr(application);
   } catch {

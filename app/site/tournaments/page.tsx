@@ -164,7 +164,6 @@ export default async function SiteTournamentsPage({
           currentStatus={statusFilter}
           distanceSortHref={distanceSortHref}
           hasViewerCoordinate={viewerCoordinate != null}
-          distanceSortActive={sortType === "DISTANCE"}
         />
       }
     >

@@ -10,7 +10,8 @@ const INVALID_TOKEN_CODES = new Set([
 
 let initDone = false;
 
-function ensureFirebaseApp(): void {
+/** FCM·Storage 등 서버에서 Firebase Admin 공용 초기화 */
+export function ensureFirebaseApp(): void {
   if (initDone) return;
   const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim();
@@ -19,12 +20,15 @@ function ensureFirebaseApp(): void {
     throw new Error("FCM_CREDENTIALS_MISSING");
   }
   if (!admin.apps.length) {
+    const storageBucket =
+      process.env.FIREBASE_STORAGE_BUCKET?.trim() || `${projectId}.appspot.com`;
     admin.initializeApp({
       credential: admin.credential.cert({
         projectId,
         clientEmail,
         privateKey,
       }),
+      storageBucket,
     });
   }
   initDone = true;

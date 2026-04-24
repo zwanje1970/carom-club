@@ -203,3 +203,41 @@ export async function firestoreHasOtherUserWithPhoneDigits(
   }
   return false;
 }
+
+/** 플랫폼 푸시: Firestore `v3_platform_users` 기준 사용자 id(삭제 계정 제외). */
+export async function firestoreListUserIdsForPushAudience(audience: "all" | "client"): Promise<string[]> {
+  const db = ensureFirestore();
+  const col = db.collection(COLLECTION);
+  const snap = audience === "client" ? await col.where("role", "==", "CLIENT").get() : await col.get();
+  const out: string[] = [];
+  for (const doc of snap.docs) {
+    const u = docToUser(doc.data());
+    if (!u) continue;
+    if (u.status === "DELETED") continue;
+    out.push(doc.id);
+  }
+  return out;
+}
+
+/** 마케팅 푸시 동의: Firestore 사용자 문서의 pushMarketingAgreed 기준(명시적 false만 제외). */
+export async function firestoreFilterUserIdsWithMarketingPushConsent(userIds: string[]): Promise<string[]> {
+  const unique = [...new Set(userIds.map((x) => String(x).trim()).filter(Boolean))];
+  if (unique.length === 0) return [];
+  const db = ensureFirestore();
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (let i = 0; i < unique.length; i += 10) {
+    const chunk = unique.slice(i, i + 10);
+    const refs = chunk.map((id) => db.collection(COLLECTION).doc(id));
+    const snaps = await db.getAll(...refs);
+    for (const snap of snaps) {
+      if (!snap.exists) continue;
+      const u = docToUser(snap.data());
+      if (!u || seen.has(snap.id)) continue;
+      if (u.pushMarketingAgreed === false) continue;
+      seen.add(snap.id);
+      out.push(snap.id);
+    }
+  }
+  return out;
+}

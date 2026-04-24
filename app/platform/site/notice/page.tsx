@@ -19,7 +19,7 @@ export default function PlatformSiteNoticePage() {
       setLoading(true);
       setMessage("");
       try {
-        const response = await fetch("/api/platform/site-notice");
+        const response = await fetch("/api/platform/site-notice", { cache: "no-store" });
         const result = (await response.json()) as { notice?: SiteNotice; error?: string };
         if (!response.ok || !result.notice) {
           setMessage(result.error ?? "공지 설정을 불러오지 못했습니다.");
@@ -48,6 +48,7 @@ export default function PlatformSiteNoticePage() {
     try {
       const response = await fetch("/api/platform/site-notice", {
         method: "PATCH",
+        cache: "no-store",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           enabled: notice.enabled,

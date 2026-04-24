@@ -64,6 +64,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (!result.ok) {
     if (result.code === "NOT_FOUND") return NextResponse.json({ error: "게시글을 찾을 수 없습니다." }, { status: 404 });
     if (result.code === "FORBIDDEN") return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
+    if (result.code === "PERSIST_UNAVAILABLE") {
+      return NextResponse.json(
+        { error: "운영 저장소(Firestore)에 쓸 수 없습니다. Firebase 자격 증명을 확인해 주세요." },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({ error: "제목과 내용을 입력해 주세요." }, { status: 400 });
   }
   return NextResponse.json({ ok: true });
@@ -89,6 +95,12 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
   const result = await softDeleteCommunityPostById(postId, user.id);
   if (!result.ok) {
     if (result.code === "NOT_FOUND") return NextResponse.json({ error: "게시글을 찾을 수 없습니다." }, { status: 404 });
+    if (result.code === "PERSIST_UNAVAILABLE") {
+      return NextResponse.json(
+        { error: "운영 저장소(Firestore)에 쓸 수 없습니다. Firebase 자격 증명을 확인해 주세요." },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
   }
   return NextResponse.json({ ok: true });

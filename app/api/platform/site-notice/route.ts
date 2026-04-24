@@ -5,6 +5,7 @@ import { getSiteNotice, getUserById, patchSiteNotice } from "../../../../lib/ser
 import { isSiteNoticeWritePersistenceBlockedError } from "../../../../lib/server/platform-site-notice-settings";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 async function requirePlatformUser() {
   const cookieStore = await cookies();

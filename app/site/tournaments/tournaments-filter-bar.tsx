@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import FilterButton from "../components/FilterButton";
 import FilterDropdown from "../components/FilterDropdown";
 import filterStyles from "../components/filter-controls.module.css";
-import { performGeolocationThenNavigate } from "../lib/site-geolocation-flow";
+import { performGeolocationThenNavigate, useDistanceGearArmed } from "../lib/site-geolocation-flow";
 import {
   buildTournamentListHref,
   TOURNAMENT_STATUS_FILTER_OPTIONS,
@@ -16,7 +16,6 @@ type Props = {
   currentStatus: TournamentStatusFilter;
   distanceSortHref: string;
   hasViewerCoordinate: boolean;
-  distanceSortActive: boolean;
 };
 
 export default function TournamentsFilterBar({
@@ -24,9 +23,9 @@ export default function TournamentsFilterBar({
   currentStatus,
   distanceSortHref,
   hasViewerCoordinate,
-  distanceSortActive,
 }: Props) {
   const router = useRouter();
+  const distanceArmed = useDistanceGearArmed(hasViewerCoordinate);
 
   const selectValue = currentStatus === "all" ? "all" : currentStatus;
 
@@ -54,7 +53,12 @@ export default function TournamentsFilterBar({
         </FilterDropdown>
       </div>
       <FilterButton
-        className={distanceSortActive ? filterStyles.buttonDistanceActive : undefined}
+        className={[
+          filterStyles.buttonDistance,
+          distanceArmed ? filterStyles.buttonDistanceActive : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
         href={`/site/tournaments${distanceSortHref}`}
         useNextLink={hasViewerCoordinate}
         onClick={

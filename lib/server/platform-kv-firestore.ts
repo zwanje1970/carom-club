@@ -7,16 +7,25 @@ export type PlatformKvSettingKey =
   | "siteNotice"
   | "siteLayoutConfig"
   | "siteCommunityConfig"
-  | "platformOperationSettings";
+  | "platformOperationSettings"
+  | "siteCommunityFeed"
+  | "siteProofImageAssets";
 
 export const PLATFORM_KV_KEYS: Record<
-  "siteNotice" | "siteLayoutConfig" | "siteCommunityConfig" | "platformOperationSettings",
+  | "siteNotice"
+  | "siteLayoutConfig"
+  | "siteCommunityConfig"
+  | "platformOperationSettings"
+  | "siteCommunityFeed"
+  | "siteProofImageAssets",
   PlatformKvSettingKey
 > = {
   siteNotice: "siteNotice",
   siteLayoutConfig: "siteLayoutConfig",
   siteCommunityConfig: "siteCommunityConfig",
   platformOperationSettings: "platformOperationSettings",
+  siteCommunityFeed: "siteCommunityFeed",
+  siteProofImageAssets: "siteProofImageAssets",
 };
 
 /** 설정별 helper에서 동일 키 집합을 순회·매핑할 때 사용 */
@@ -25,6 +34,8 @@ export const ALL_PLATFORM_KV_SETTING_KEYS: readonly PlatformKvSettingKey[] = [
   PLATFORM_KV_KEYS.siteLayoutConfig,
   PLATFORM_KV_KEYS.siteCommunityConfig,
   PLATFORM_KV_KEYS.platformOperationSettings,
+  PLATFORM_KV_KEYS.siteCommunityFeed,
+  PLATFORM_KV_KEYS.siteProofImageAssets,
 ];
 
 export async function readPlatformKvJson(key: PlatformKvSettingKey): Promise<unknown | null> {

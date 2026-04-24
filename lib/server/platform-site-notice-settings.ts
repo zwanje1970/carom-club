@@ -10,15 +10,17 @@ export type SiteNoticeReadStrategy = "firestore-kv" | "dev-store-file" | "produc
 
 export type SiteNoticeWriteStrategy = "firestore-kv" | "dev-store-file" | "blocked";
 
-/** 운영에서 siteNotice를 Firestore KV로 읽을지 */
+/** 운영에서 siteNotice를 Firestore KV로 읽을지(레이아웃·커뮤니티 설정과 동일 분기) */
 export function resolveSiteNoticeReadStrategy(): SiteNoticeReadStrategy {
   if (IS_PRODUCTION && isFirestoreUsersBackendConfigured()) return "firestore-kv";
+  if (IS_PRODUCTION) return "production-defaults-only";
   return "dev-store-file";
 }
 
-/** 운영에서 siteNotice를 Firestore KV로 쓸지 (미설정이면 dev-store fallback) */
+/** 운영에서 siteNotice를 Firestore KV로 쓸지(운영+자격 없음이면 차단) */
 export function resolveSiteNoticeWriteStrategy(): SiteNoticeWriteStrategy {
   if (IS_PRODUCTION && isFirestoreUsersBackendConfigured()) return "firestore-kv";
+  if (IS_PRODUCTION) return "blocked";
   return "dev-store-file";
 }
 

@@ -24,6 +24,7 @@ import { normalizeCommunityPostImageSizeLevels } from "../community-post-content
 import { tournamentStatusEligibleForMainSlide } from "../site-tournament-badges";
 import {
   firestoreCreateUser,
+  firestoreFilterUserIdsWithMarketingPushConsent as firestoreFilterUserIdsWithMarketingPushConsentFs,
   firestoreFindByLoginIdAndPhoneDigits,
   firestoreFindByLoginIdNorm,
   firestoreFindByPhoneDigits,
@@ -31,10 +32,16 @@ import {
   firestoreHasDuplicateIdentity,
   firestoreHasOtherUserWithPhoneDigits,
   firestoreIsNicknameKeyTaken,
+  firestoreListUserIdsForPushAudience as firestoreListUserIdsForPushAudienceFs,
   firestoreReplaceUser,
   firestoreUpdatePassword,
   isFirestoreUsersBackendConfigured,
 } from "./firestore-users";
+import {
+  firestoreListFcmDeviceTokensForUserIds as firestoreListFcmDeviceTokensForUserIdsFs,
+  firestoreRemoveFcmDeviceTokensByTokenValues as firestoreRemoveFcmDeviceTokensByTokenValuesFs,
+  firestoreUpsertFcmDeviceTokenForUser as firestoreUpsertFcmDeviceTokenForUserFs,
+} from "./firestore-fcm-tokens";
 import {
   readPlatformOperationSettingsRawFromFirestoreKv,
   resolvePlatformOperationSettingsReadStrategy,
@@ -49,6 +56,18 @@ import {
   throwSiteCommunityConfigWritePersistenceBlocked,
   upsertSiteCommunityConfigToFirestoreKv,
 } from "./platform-site-community-settings";
+import {
+  readSiteCommunityFeedRawFromFirestoreKv,
+  resolveSiteCommunityFeedReadStrategy,
+  resolveSiteCommunityFeedWriteStrategy,
+  upsertSiteCommunityFeedToFirestoreKv,
+} from "./platform-site-community-feed-settings";
+import {
+  readSiteProofImageAssetsRawFromFirestoreKv,
+  resolveSiteProofImageAssetsReadStrategy,
+  resolveSiteProofImageAssetsWriteStrategy,
+  upsertSiteProofImageAssetsToFirestoreKv,
+} from "./platform-site-proof-image-assets-settings";
 import {
   readSiteLayoutConfigRawFromFirestoreKv,
   resolveSiteLayoutConfigReadStrategy,
@@ -733,6 +752,10 @@ export type ProofImageAsset = {
   createdAt: string;
   /** 사이트 공개용(대회 포스터 등). true면 `/site-images/{variant}/{id}` 로 제공 */
   sitePublic?: boolean;
+  /** 운영: Firebase Storage 등 외부 URL(있으면 GET은 디스크를 읽지 않고 리다이렉트) */
+  storageOriginalUrl?: string;
+  storageW320Url?: string;
+  storageW640Url?: string;
 };
 
 /** 클라이언트 업로드 경기요강·소개 문서 (data/outline-pdfs 파일과 대응) */
@@ -797,12 +820,12 @@ const STORE_BACKUP_TIMESTAMP_PATH = path.join(STORE_DIR_PATH, "v3-dev-store.json
 const STORE_LAST_GOOD_PATH = path.join(STORE_DIR_PATH, "v3-dev-store.json.last-good.json");
 
 /**
- * 로컬 v3-dev-store.json 기반 영속 쓰기 허용 여부.
- * 운영 빌드 + Firestore 사용자 백엔드가 준비된 경우에만 JSON 파일 쓰기를 끈다.
- * 운영 빌드이지만 Firestore 미설정(로컬 `next start` 등)일 때는 회원가입 등이 JSON에 반영되도록 쓰기를 허용한다.
+ * 로컬 v3-dev-store.json 읽기/쓰기/백업(copyfile 등) 허용 여부 — development 전용.
+ * 운영(production)에서는 디스크를 건드리지 않음(Lambda /var/task 등 EROFS 방지).
+ * 회원·설정 등 실데이터는 Firestore/KV 경로를 사용한다.
  */
 export function isDevStoreFilePersistenceEnabled(): boolean {
-  return process.env.NODE_ENV !== "production" || !isFirestoreUsersBackendConfigured();
+  return process.env.NODE_ENV === "development";
 }
 
 /** 운영(production) + Firebase 자격 증명이 있을 때만: 회원·로그인 사용자 레코드는 Firestore, dev-store JSON 사용자 테이블은 보조(시드 관리자 등) */
@@ -1237,7 +1260,7 @@ function ensureDefaultPlatformAdminInStore(store: DevStore): boolean {
 /** 임시 파일에 전체 문자열 기록 → 디스크 동기화 → rename으로 교체(본 파일에 이어쓰기 없음) */
 async function atomicWriteJsonFile(targetPath: string, jsonString: string): Promise<void> {
   if (!isDevStoreFilePersistenceEnabled()) {
-    console.warn("[dev-store] skipped atomicWriteJsonFile (read-only in production):", targetPath);
+    console.warn("[dev-store] skipped atomicWriteJsonFile (non-development):", targetPath);
     return;
   }
   const dir = path.dirname(targetPath);
@@ -1853,6 +1876,13 @@ function normalizeFcmDeviceTokenRow(row: unknown): FcmDeviceTokenRecord | null {
   return { id, userId, token, platform, createdAt, updatedAt };
 }
 
+function normalizeOptionalHttpsUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const s = value.trim();
+  if (!s.startsWith("https://")) return undefined;
+  return s;
+}
+
 function normalizeProofImageRow(row: unknown): ProofImageAsset | null {
   if (!row || typeof row !== "object") return null;
   const r = row as Record<string, unknown>;
@@ -1864,7 +1894,19 @@ function normalizeProofImageRow(row: unknown): ProofImageAsset | null {
   const createdAt = typeof r.createdAt === "string" ? r.createdAt : new Date().toISOString();
   if (!id || !uploaderUserId) return null;
   const sitePublic = r.sitePublic === true;
-  return { id, uploaderUserId, originalExt, createdAt, ...(sitePublic ? { sitePublic: true } : {}) };
+  const storageOriginalUrl = normalizeOptionalHttpsUrl(r.storageOriginalUrl);
+  const storageW320Url = normalizeOptionalHttpsUrl(r.storageW320Url);
+  const storageW640Url = normalizeOptionalHttpsUrl(r.storageW640Url);
+  return {
+    id,
+    uploaderUserId,
+    originalExt,
+    createdAt,
+    ...(sitePublic ? { sitePublic: true } : {}),
+    ...(storageOriginalUrl ? { storageOriginalUrl } : {}),
+    ...(storageW320Url ? { storageW320Url } : {}),
+    ...(storageW640Url ? { storageW640Url } : {}),
+  };
 }
 
 function normalizeClientApplicationRow(row: unknown): ClientApplication | null {
@@ -2322,10 +2364,52 @@ async function writeJsonWithRetry(targetPath: string, json: string): Promise<voi
   throw lastError;
 }
 
+/** 디스크 복구 실패 시 또는 비개발 환경용 — v3-dev-store.json 없이 동작할 기본 스토어 */
+function createEmptyFallbackDevStore(): DevStore {
+  const fallbackStore: DevStore = {
+    users: [],
+    legacyUserIdAliases: {},
+    clientApplications: [],
+    tournaments: [],
+    tournamentApplications: [],
+    bracketParticipantSnapshots: [],
+    brackets: [],
+    settlements: [],
+    notifications: [],
+    proofImages: [],
+    outlinePdfAssets: [],
+    auditLogs: [],
+    siteLayoutConfig: createDefaultSiteLayoutConfig(),
+    siteNotice: createDefaultSiteNotice(),
+    siteCommunityConfig: createDefaultSiteCommunityConfig(),
+    platformOperationSettings: createDefaultPlatformOperationSettings(),
+    publishedCardSnapshots: [],
+    tournamentPublishedCards: [],
+    sitePageBuilderDrafts: [],
+    sitePageBuilderPublishedPages: [],
+    webPushSubscriptions: [],
+    fcmDeviceTokens: [],
+    clientOrganizations: [],
+    clientVenueIntros: [],
+    communityPosts: [],
+    communityComments: [],
+    clientInquiries: [],
+    inquiryComments: [],
+  };
+  ensureDefaultPlatformAdminInStore(fallbackStore);
+  reconcileDevStoreLoginIds(fallbackStore);
+  reconcileDevStoreUserIds(fallbackStore);
+  ensureCommunityPostsArray(fallbackStore);
+  return fallbackStore;
+}
+
 async function readStoreImpl(): Promise<DevStore> {
-  if (isDevStoreFilePersistenceEnabled()) {
-    await ensureStoreFile();
+  if (!isDevStoreFilePersistenceEnabled()) {
+    console.warn("[dev-store] skipped readStoreImpl disk access (non-development; in-memory empty baseline)");
+    return createEmptyFallbackDevStore();
   }
+
+  await ensureStoreFile();
 
   let content = "";
   try {
@@ -2387,49 +2471,13 @@ async function readStoreImpl(): Promise<DevStore> {
       console.warn("[dev-store] recovered store from a non-empty corrupt backup file");
       return fromOldCorrupt;
     }
-    const fallbackStore: DevStore = {
-      users: [],
-      legacyUserIdAliases: {},
-      clientApplications: [],
-      tournaments: [],
-      tournamentApplications: [],
-      bracketParticipantSnapshots: [],
-      brackets: [],
-      settlements: [],
-      notifications: [],
-      proofImages: [],
-      outlinePdfAssets: [],
-      auditLogs: [],
-      siteLayoutConfig: createDefaultSiteLayoutConfig(),
-      siteNotice: createDefaultSiteNotice(),
-      siteCommunityConfig: createDefaultSiteCommunityConfig(),
-      platformOperationSettings: createDefaultPlatformOperationSettings(),
-      publishedCardSnapshots: [],
-      tournamentPublishedCards: [],
-      sitePageBuilderDrafts: [],
-      sitePageBuilderPublishedPages: [],
-      webPushSubscriptions: [],
-      fcmDeviceTokens: [],
-      clientOrganizations: [],
-      clientVenueIntros: [],
-      communityPosts: [],
-      communityComments: [],
-      clientInquiries: [],
-      inquiryComments: [],
-    };
-    ensureDefaultPlatformAdminInStore(fallbackStore);
-    reconcileDevStoreLoginIds(fallbackStore);
-    ensureCommunityPostsArray(fallbackStore);
-    if (!isDevStoreFilePersistenceEnabled()) {
-      console.warn("[dev-store] using in-memory fallback store (production read-only; disk persist skipped)");
-    }
-    return fallbackStore;
+    return createEmptyFallbackDevStore();
   }
 }
 
 async function writeStoreImpl(store: DevStore): Promise<void> {
   if (!isDevStoreFilePersistenceEnabled()) {
-    console.warn("[dev-store] skipped writeStoreImpl (read-only in production)");
+    console.warn("[dev-store] skipped writeStoreImpl (non-development)");
     return;
   }
   await snapshotValidMainToBackupAndLastGoodBeforeWrite();
@@ -2465,7 +2513,7 @@ async function readStore(): Promise<DevStore> {
     const store = await readStoreImpl();
     const removed = pruneExpiredNotifications(store);
     if (removed > 0 && !isDevStoreFilePersistenceEnabled()) {
-      console.warn("[dev-store] pruned expired notifications in memory only (read-only in production)", removed);
+      console.warn("[dev-store] pruned expired notifications in memory only (non-development)", removed);
     }
     return store;
   });
@@ -5492,6 +5540,19 @@ export function extractProofImageIdFromPosterUrl(url: string): string | null {
   if (fromProof?.[1]) return decodeURIComponent(fromProof[1]);
   const fromSite = trimmed.match(/\/api\/site-images\/([^/?]+)/);
   if (fromSite?.[1]) return decodeURIComponent(fromSite[1]);
+  try {
+    const u = new URL(trimmed);
+    if (u.hostname !== "firebasestorage.googleapis.com") return null;
+    const m = u.pathname.match(/\/o\/(.+)$/);
+    if (!m?.[1]) return null;
+    const decoded = decodeURIComponent(m[1]);
+    const parts = decoded.split("/");
+    if (parts[0] === "proof-images" && parts.length >= 3 && /^[0-9a-f-]{36}$/i.test(parts[1]!)) {
+      return parts[1]!.toLowerCase();
+    }
+  } catch {
+    return null;
+  }
   return null;
 }
 
@@ -5499,10 +5560,11 @@ export function extractProofImageIdFromPosterUrl(url: string): string | null {
 export async function isSiteImagePubliclyAccessible(imageId: string): Promise<boolean> {
   const normalized = imageId.trim();
   if (!normalized) return false;
-  const store = await readStore();
-  const asset = store.proofImages.find((item) => item.id === normalized);
+  const list = await loadProofImageAssetsList();
+  const asset = list.find((item) => item.id === normalized);
   if (!asset) return false;
   if (asset.sitePublic === true) return true;
+  const store = await readStore();
   return store.tournaments.some((t) => {
     const poster = t.posterImageUrl;
     if (typeof poster !== "string" || !poster.trim()) return false;
@@ -5515,6 +5577,9 @@ export async function createProofImageAsset(params: {
   uploaderUserId: string;
   originalExt: "jpg" | "png" | "webp";
   sitePublic?: boolean;
+  storageOriginalUrl?: string;
+  storageW320Url?: string;
+  storageW640Url?: string;
 }): Promise<{ ok: true; asset: ProofImageAsset } | { ok: false; error: string }> {
   const imageId = params.imageId.trim();
   const uploaderUserId = params.uploaderUserId.trim();
@@ -5522,16 +5587,47 @@ export async function createProofImageAsset(params: {
     return { ok: false, error: "잘못된 요청입니다." };
   }
 
-  const store = await readStore();
-  const user = findUserByRawId(store, uploaderUserId);
+  const user = await getUserById(uploaderUserId);
   if (!user) {
     return { ok: false, error: "사용자를 찾을 수 없습니다." };
   }
-  const duplicated = store.proofImages.find((item) => item.id === imageId);
+  const hasAnyStorageParam =
+    (typeof params.storageOriginalUrl === "string" && params.storageOriginalUrl.trim() !== "") ||
+    (typeof params.storageW320Url === "string" && params.storageW320Url.trim() !== "") ||
+    (typeof params.storageW640Url === "string" && params.storageW640Url.trim() !== "");
+
+  let storagePatch: {
+    storageOriginalUrl: string;
+    storageW320Url: string;
+    storageW640Url: string;
+  } | null = null;
+  if (hasAnyStorageParam) {
+    const storageOriginalUrl = normalizeOptionalHttpsUrl(params.storageOriginalUrl);
+    const storageW320Url = normalizeOptionalHttpsUrl(params.storageW320Url);
+    const storageW640Url = normalizeOptionalHttpsUrl(params.storageW640Url);
+    if (!storageOriginalUrl || !storageW320Url || !storageW640Url) {
+      return { ok: false, error: "증빙 이미지 Storage URL이 완전하지 않습니다." };
+    }
+    storagePatch = { storageOriginalUrl, storageW320Url, storageW640Url };
+  }
+
+  const list = await loadProofImageAssetsList();
+  const duplicated = list.find((item) => item.id === imageId);
   if (duplicated) {
+    let needsPersist = false;
     if (params.sitePublic && !duplicated.sitePublic) {
       duplicated.sitePublic = true;
-      await writeStore(store);
+      needsPersist = true;
+    }
+    if (storagePatch) {
+      Object.assign(duplicated, storagePatch);
+      needsPersist = true;
+    }
+    if (needsPersist && !(await persistProofImageAssetsList(list))) {
+      return {
+        ok: false,
+        error: "운영 환경에서 이미지 메타를 저장하려면 Firebase(Firestore) 자격 증명이 필요합니다.",
+      };
     }
     return { ok: true, asset: duplicated };
   }
@@ -5542,17 +5638,23 @@ export async function createProofImageAsset(params: {
     originalExt: params.originalExt,
     createdAt: new Date().toISOString(),
     ...(params.sitePublic ? { sitePublic: true } : {}),
+    ...(storagePatch ?? {}),
   };
-  store.proofImages.push(asset);
-  await writeStore(store);
+  list.push(asset);
+  if (!(await persistProofImageAssetsList(list))) {
+    return {
+      ok: false,
+      error: "운영 환경에서 이미지 메타를 저장하려면 Firebase(Firestore) 자격 증명이 필요합니다.",
+    };
+  }
   return { ok: true, asset };
 }
 
 export async function getProofImageAssetById(imageId: string): Promise<ProofImageAsset | null> {
   const normalized = imageId.trim();
   if (!normalized) return null;
-  const store = await readStore();
-  return store.proofImages.find((item) => item.id === normalized) ?? null;
+  const list = await loadProofImageAssetsList();
+  return list.find((item) => item.id === normalized) ?? null;
 }
 
 export function buildOutlinePdfPublicUrl(pdfId: string): string {
@@ -5723,7 +5825,7 @@ export async function createTournamentApplication(params: {
     return { ok: false, error: "이미 신청한 대회입니다." };
   }
 
-  const proofImage = store.proofImages.find((item) => item.id === proofImageId);
+  const proofImage = await getProofImageAssetById(proofImageId);
   if (!proofImage) {
     return { ok: false, error: "증빙 이미지를 다시 업로드해 주세요." };
   }
@@ -5894,6 +5996,9 @@ export function filterUserIdsWithMarketingPushConsentInStore(store: DevStore, us
 }
 
 export async function filterUserIdsWithMarketingPushConsent(userIds: string[]): Promise<string[]> {
+  if (useFirestoreUsersInProduction()) {
+    return firestoreFilterUserIdsWithMarketingPushConsentFs(userIds);
+  }
   const store = await readStore();
   return filterUserIdsWithMarketingPushConsentInStore(store, userIds);
 }
@@ -5916,6 +6021,36 @@ export async function createReannounceNotifications(params: {
   if (rawIds.length === 0) return { ok: false, error: "수신자를 선택해 주세요." };
 
   const store = await readStore();
+
+  if (useFirestoreUsersInProduction()) {
+    for (const id of rawIds) {
+      const u = await firestoreGetUserById(id);
+      if (!u) {
+        return { ok: false, error: "존재하지 않는 수신자가 포함되었습니다." };
+      }
+    }
+    const consentIds = await firestoreFilterUserIdsWithMarketingPushConsentFs(rawIds);
+    if (consentIds.length === 0) {
+      return { ok: false, error: "마케팅 푸시 수신에 동의한 수신자가 없습니다." };
+    }
+    const now = new Date().toISOString();
+    let count = 0;
+    for (const canonicalUserId of consentIds) {
+      store.notifications.push({
+        id: randomUUID(),
+        userId: canonicalUserId,
+        title,
+        message,
+        relatedTournamentId: null,
+        createdAt: now,
+        isRead: false,
+      });
+      count += 1;
+    }
+    await writeStore(store);
+    return { ok: true, count };
+  }
+
   const userIdSet = new Set(store.users.map((u) => u.id));
   for (const id of rawIds) {
     const canonicalUserId = resolveCanonicalUserId(store, id);
@@ -5993,6 +6128,20 @@ export async function upsertFcmDeviceTokenForUser(params: {
   token: string;
   platform?: string | null;
 }): Promise<FcmDeviceTokenRecord> {
+  if (useFirestoreUsersInProduction()) {
+    const platform =
+      params.platform === undefined || params.platform === null
+        ? null
+        : typeof params.platform === "string" && params.platform.trim()
+          ? params.platform.trim()
+          : null;
+    return firestoreUpsertFcmDeviceTokenForUserFs({
+      userId: params.userId.trim(),
+      token: params.token,
+      platform,
+    });
+  }
+
   const store = await readStore();
   const canonicalUserId = resolveCanonicalUserId(store, params.userId);
   const token = params.token.trim();
@@ -6036,6 +6185,9 @@ export async function listFcmDeviceTokensByUserId(userId: string): Promise<FcmDe
 
 /** 여러 userId에 등록된 FCM 토큰 전부(한 사용자·여러 기기). token 문자열 기준 중복 제거. */
 export async function listFcmDeviceTokensForUserIds(userIds: string[]): Promise<FcmDeviceTokenRecord[]> {
+  if (useFirestoreUsersInProduction()) {
+    return firestoreListFcmDeviceTokensForUserIdsFs(userIds);
+  }
   const store = await readStore();
   const idSet = new Set(
     userIds.map((id) => resolveCanonicalUserId(store, String(id).trim())).filter(Boolean)
@@ -6055,6 +6207,9 @@ export async function listFcmDeviceTokensForUserIds(userIds: string[]): Promise<
 export async function removeFcmDeviceTokensByTokenValues(tokens: string[]): Promise<number> {
   const raw = tokens.map((t) => String(t).trim()).filter(Boolean);
   if (raw.length === 0) return 0;
+  if (useFirestoreUsersInProduction()) {
+    return firestoreRemoveFcmDeviceTokensByTokenValuesFs(raw);
+  }
   const store = await readStore();
   const drop = new Set(raw);
   const before = store.fcmDeviceTokens.length;
@@ -6068,6 +6223,9 @@ export async function removeFcmDeviceTokensByTokenValues(tokens: string[]): Prom
 
 /** 플랫폼 푸시: 전체 회원 또는 CLIENT 역할만 */
 export async function listUserIdsForPlatformPushAudience(audience: "all" | "client"): Promise<string[]> {
+  if (useFirestoreUsersInProduction()) {
+    return firestoreListUserIdsForPushAudienceFs(audience);
+  }
   const store = await readStore();
   if (audience === "client") {
     return store.users.filter((u) => u.role === "CLIENT").map((u) => resolveCanonicalUserId(store, u.id));
@@ -6970,9 +7128,6 @@ function isReadonlyDevStoreWriteError(error: unknown): boolean {
 
 export async function getSiteNotice(): Promise<SiteNotice> {
   const readStrategy = resolveSiteNoticeReadStrategy();
-  if (readStrategy !== "firestore-kv" && siteNoticeMemoryFallback) {
-    return siteNoticeMemoryFallback;
-  }
   if (readStrategy === "firestore-kv") {
     try {
       const raw = await readSiteNoticeRawFromFirestoreKv();
@@ -6984,6 +7139,9 @@ export async function getSiteNotice(): Promise<SiteNotice> {
   }
   if (readStrategy === "production-defaults-only") {
     return normalizeSiteNotice(undefined);
+  }
+  if (readStrategy === "dev-store-file" && siteNoticeMemoryFallback) {
+    return siteNoticeMemoryFallback;
   }
   const store = await readStore();
   return normalizeSiteNotice(store.siteNotice);
@@ -7105,15 +7263,120 @@ function mapPostToListItem(p: CommunityBoardPost): CommunityPostListItem {
   };
 }
 
+function parseSiteCommunityFeedFromKvRaw(raw: unknown): {
+  communityPosts: CommunityBoardPost[];
+  communityComments: CommunityComment[];
+} {
+  if (!raw || typeof raw !== "object") {
+    return { communityPosts: [], communityComments: [] };
+  }
+  const o = raw as Record<string, unknown>;
+  const pr = o.communityPosts;
+  const cr = o.communityComments;
+  const communityPosts = Array.isArray(pr)
+    ? pr.map(normalizeCommunityBoardPostRow).filter((item): item is CommunityBoardPost => item !== null)
+    : [];
+  const communityComments = Array.isArray(cr)
+    ? cr.map(normalizeCommunityCommentRow).filter((item): item is CommunityComment => item !== null)
+    : [];
+  return { communityPosts, communityComments };
+}
+
+async function loadSiteCommunityFeed(): Promise<{
+  communityPosts: CommunityBoardPost[];
+  communityComments: CommunityComment[];
+}> {
+  const rs = resolveSiteCommunityFeedReadStrategy();
+  if (rs === "firestore-kv") {
+    try {
+      const raw = await readSiteCommunityFeedRawFromFirestoreKv();
+      const parsed = parseSiteCommunityFeedFromKvRaw(raw);
+      return {
+        communityPosts: [...parsed.communityPosts],
+        communityComments: [...parsed.communityComments],
+      };
+    } catch (e) {
+      console.warn("[dev-store] site community feed Firestore read failed; using empty feed", e);
+      return { communityPosts: [], communityComments: [] };
+    }
+  }
+  if (rs === "production-empty-only") {
+    return { communityPosts: [], communityComments: [] };
+  }
+  const store = await readStore();
+  ensureCommunityPostsArray(store);
+  if (!Array.isArray(store.communityComments)) store.communityComments = [];
+  return {
+    communityPosts: [...store.communityPosts],
+    communityComments: [...store.communityComments],
+  };
+}
+
+async function persistSiteCommunityFeed(feed: {
+  communityPosts: CommunityBoardPost[];
+  communityComments: CommunityComment[];
+}): Promise<boolean> {
+  const ws = resolveSiteCommunityFeedWriteStrategy();
+  if (ws === "firestore-kv") {
+    await upsertSiteCommunityFeedToFirestoreKv({
+      communityPosts: feed.communityPosts,
+      communityComments: feed.communityComments,
+    });
+    return true;
+  }
+  if (ws === "blocked") return false;
+  const store = await readStore();
+  store.communityPosts = feed.communityPosts;
+  store.communityComments = feed.communityComments;
+  await writeStore(store);
+  return true;
+}
+
+function parseProofImageAssetsFromKvRaw(raw: unknown): ProofImageAsset[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(normalizeProofImageRow).filter((item): item is ProofImageAsset => item !== null);
+}
+
+async function loadProofImageAssetsList(): Promise<ProofImageAsset[]> {
+  const rs = resolveSiteProofImageAssetsReadStrategy();
+  if (rs === "firestore-kv") {
+    try {
+      const raw = await readSiteProofImageAssetsRawFromFirestoreKv();
+      return [...parseProofImageAssetsFromKvRaw(raw)];
+    } catch (e) {
+      console.warn("[dev-store] site proof image assets Firestore read failed; using empty list", e);
+      return [];
+    }
+  }
+  if (rs === "production-empty-only") {
+    return [];
+  }
+  const store = await readStore();
+  return [...store.proofImages];
+}
+
+async function persistProofImageAssetsList(list: ProofImageAsset[]): Promise<boolean> {
+  const ws = resolveSiteProofImageAssetsWriteStrategy();
+  if (ws === "firestore-kv") {
+    await upsertSiteProofImageAssetsToFirestoreKv(list);
+    return true;
+  }
+  if (ws === "blocked") return false;
+  const store = await readStore();
+  store.proofImages = list;
+  await writeStore(store);
+  return true;
+}
+
 /** primary 4개 게시판만 한 번에 필터·정렬 — 프론트에서 게시판별 다중 요청 금지 */
 export async function listCommunityPostsAllPrimary(
   visibleBoardKeys: SiteCommunityBoardKey[],
   options?: { q?: string }
 ): Promise<CommunityPostListItem[]> {
-  const store = await readStore();
+  const feed = await loadSiteCommunityFeed();
   const q = options?.q?.trim().toLowerCase() ?? "";
   const allow = new Set(visibleBoardKeys);
-  let rows = store.communityPosts.filter((p) => allow.has(p.boardType) && p.isDeleted !== true);
+  let rows = feed.communityPosts.filter((p) => allow.has(p.boardType) && p.isDeleted !== true);
   if (q.length > 0) {
     rows = rows.filter((p) => p.title.toLowerCase().includes(q));
   }
@@ -7124,9 +7387,9 @@ export async function listCommunityPosts(
   boardType: SiteCommunityBoardKey,
   options?: { q?: string }
 ): Promise<CommunityPostListItem[]> {
-  const store = await readStore();
+  const feed = await loadSiteCommunityFeed();
   const q = options?.q?.trim().toLowerCase() ?? "";
-  let rows = store.communityPosts.filter((p) => p.boardType === boardType && p.isDeleted !== true);
+  let rows = feed.communityPosts.filter((p) => p.boardType === boardType && p.isDeleted !== true);
   if (q.length > 0) {
     rows = rows.filter((p) => p.title.toLowerCase().includes(q));
   }
@@ -7134,9 +7397,9 @@ export async function listCommunityPosts(
 }
 
 export async function getCommunityPostById(postId: string): Promise<CommunityPostDetail | null> {
-  const store = await readStore();
+  const feed = await loadSiteCommunityFeed();
   const id = postId.trim();
-  const p = store.communityPosts.find((x) => x.id === id);
+  const p = feed.communityPosts.find((x) => x.id === id);
   if (!p || p.isDeleted === true) return null;
   const imageUrls = normalizeCommunityPostImageUrls(p.imageUrls);
   const imageSizeLevels = normalizeCommunityPostImageSizeLevels(imageUrls.length, p.imageSizeLevels);
@@ -7157,13 +7420,13 @@ export async function getCommunityPostById(postId: string): Promise<CommunityPos
 }
 
 export async function incrementCommunityPostViewCount(postId: string): Promise<number | null> {
-  const store = await readStore();
+  const feed = await loadSiteCommunityFeed();
   const id = postId.trim();
-  const p = store.communityPosts.find((x) => x.id === id);
+  const p = feed.communityPosts.find((x) => x.id === id);
   if (!p || p.isDeleted === true) return null;
   p.viewCount = (p.viewCount ?? 0) + 1;
   p.updatedAt = new Date().toISOString();
-  await writeStore(store);
+  void persistSiteCommunityFeed(feed);
   return p.viewCount;
 }
 
@@ -7189,7 +7452,7 @@ export async function createCommunityPost(params: {
   const imageUrls = normalizeCommunityPostImageUrls(params.imageUrls);
   const imageSizeLevels = normalizeCommunityPostImageSizeLevels(imageUrls.length, params.imageSizeLevels);
 
-  const store = await readStore();
+  const feed = await loadSiteCommunityFeed();
   const now = new Date().toISOString();
   const post: CommunityBoardPost = {
     id: `cm-${randomUUID()}`,
@@ -7206,8 +7469,13 @@ export async function createCommunityPost(params: {
     commentCount: 0,
     isDeleted: false,
   };
-  store.communityPosts.push(post);
-  await writeStore(store);
+  feed.communityPosts.push(post);
+  if (!(await persistSiteCommunityFeed(feed))) {
+    return {
+      ok: false,
+      error: "운영 환경에서 게시글을 저장하려면 Firebase(Firestore) 자격 증명이 필요합니다.",
+    };
+  }
   return { ok: true, post };
 }
 
@@ -7220,7 +7488,9 @@ export async function updateCommunityPostById(
   postId: string,
   editorUserId: string,
   params: { title: string; content: string; imageUrls?: unknown; imageSizeLevels?: unknown }
-): Promise<{ ok: true } | { ok: false; code: "NOT_FOUND" | "FORBIDDEN" | "INVALID" }> {
+): Promise<
+  { ok: true } | { ok: false; code: "NOT_FOUND" | "FORBIDDEN" | "INVALID" | "PERSIST_UNAVAILABLE" }
+> {
   const title = params.title.trim();
   const content = params.content.trim();
   if (!title || !content) {
@@ -7228,9 +7498,10 @@ export async function updateCommunityPostById(
   }
   const imageUrls = normalizeCommunityPostImageUrls(params.imageUrls);
   const imageSizeLevels = normalizeCommunityPostImageSizeLevels(imageUrls.length, params.imageSizeLevels);
+  const feed = await loadSiteCommunityFeed();
   const store = await readStore();
   const id = postId.trim();
-  const p = store.communityPosts.find((x) => x.id === id);
+  const p = feed.communityPosts.find((x) => x.id === id);
   if (!p || p.isDeleted === true) {
     return { ok: false, code: "NOT_FOUND" };
   }
@@ -7242,17 +7513,20 @@ export async function updateCommunityPostById(
   p.imageUrls = imageUrls;
   p.imageSizeLevels = imageSizeLevels;
   p.updatedAt = new Date().toISOString();
-  await writeStore(store);
+  if (!(await persistSiteCommunityFeed(feed))) {
+    return { ok: false, code: "PERSIST_UNAVAILABLE" };
+  }
   return { ok: true };
 }
 
 export async function softDeleteCommunityPostById(
   postId: string,
   editorUserId: string
-): Promise<{ ok: true } | { ok: false; code: "NOT_FOUND" | "FORBIDDEN" }> {
+): Promise<{ ok: true } | { ok: false; code: "NOT_FOUND" | "FORBIDDEN" | "PERSIST_UNAVAILABLE" }> {
+  const feed = await loadSiteCommunityFeed();
   const store = await readStore();
   const id = postId.trim();
-  const p = store.communityPosts.find((x) => x.id === id);
+  const p = feed.communityPosts.find((x) => x.id === id);
   if (!p || p.isDeleted === true) {
     return { ok: false, code: "NOT_FOUND" };
   }
@@ -7261,13 +7535,15 @@ export async function softDeleteCommunityPostById(
   }
   p.isDeleted = true;
   p.updatedAt = new Date().toISOString();
-  await writeStore(store);
+  if (!(await persistSiteCommunityFeed(feed))) {
+    return { ok: false, code: "PERSIST_UNAVAILABLE" };
+  }
   return { ok: true };
 }
 
 export async function listCommentsByPostId(postId: string): Promise<CommunityCommentListItem[]> {
-  const store = await readStore();
-  const list = Array.isArray(store.communityComments) ? store.communityComments : [];
+  const feed = await loadSiteCommunityFeed();
+  const list = Array.isArray(feed.communityComments) ? feed.communityComments : [];
   const pid = postId.trim();
   return list
     .filter((c) => c.postId === pid && c.isDeleted !== true)
@@ -7283,21 +7559,21 @@ export async function listCommentsByPostId(postId: string): Promise<CommunityCom
 
 /** 게시글 commentCount만 조정 (댓글 생성/삭제는 createComment·softDeleteComment에서 일괄 처리) */
 export async function incrementPostCommentCount(postId: string): Promise<void> {
-  const store = await readStore();
-  const p = store.communityPosts.find((x) => x.id === postId.trim());
+  const feed = await loadSiteCommunityFeed();
+  const p = feed.communityPosts.find((x) => x.id === postId.trim());
   if (!p || p.isDeleted === true) return;
   p.commentCount = (p.commentCount ?? 0) + 1;
   p.updatedAt = new Date().toISOString();
-  await writeStore(store);
+  void persistSiteCommunityFeed(feed);
 }
 
 export async function decrementPostCommentCount(postId: string): Promise<void> {
-  const store = await readStore();
-  const p = store.communityPosts.find((x) => x.id === postId.trim());
+  const feed = await loadSiteCommunityFeed();
+  const p = feed.communityPosts.find((x) => x.id === postId.trim());
   if (!p || p.isDeleted === true) return;
   p.commentCount = Math.max(0, (p.commentCount ?? 0) - 1);
   p.updatedAt = new Date().toISOString();
-  await writeStore(store);
+  void persistSiteCommunityFeed(feed);
 }
 
 export async function createComment(
@@ -7308,10 +7584,10 @@ export async function createComment(
 ): Promise<{ ok: true; comment: CommunityComment } | { ok: false; error: string }> {
   const text = content.trim();
   if (!text) return { ok: false, error: "내용을 입력해 주세요." };
-  const store = await readStore();
-  if (!Array.isArray(store.communityComments)) store.communityComments = [];
+  const feed = await loadSiteCommunityFeed();
+  if (!Array.isArray(feed.communityComments)) feed.communityComments = [];
   const pid = postId.trim();
-  const post = store.communityPosts.find((x) => x.id === pid);
+  const post = feed.communityPosts.find((x) => x.id === pid);
   if (!post || post.isDeleted === true) return { ok: false, error: "게시글을 찾을 수 없습니다." };
   const now = new Date().toISOString();
   const comment: CommunityComment = {
@@ -7323,32 +7599,40 @@ export async function createComment(
     createdAt: now,
     isDeleted: false,
   };
-  store.communityComments.push(comment);
+  feed.communityComments.push(comment);
   post.commentCount = (post.commentCount ?? 0) + 1;
   post.updatedAt = now;
-  await writeStore(store);
+  if (!(await persistSiteCommunityFeed(feed))) {
+    return {
+      ok: false,
+      error: "운영 환경에서 댓글을 저장하려면 Firebase(Firestore) 자격 증명이 필요합니다.",
+    };
+  }
   return { ok: true, comment };
 }
 
 export async function softDeleteComment(
   commentId: string,
   editorUserId: string
-): Promise<{ ok: true } | { ok: false; code: "NOT_FOUND" | "FORBIDDEN" }> {
+): Promise<{ ok: true } | { ok: false; code: "NOT_FOUND" | "FORBIDDEN" | "PERSIST_UNAVAILABLE" }> {
+  const feed = await loadSiteCommunityFeed();
+  if (!Array.isArray(feed.communityComments)) feed.communityComments = [];
   const store = await readStore();
-  if (!Array.isArray(store.communityComments)) store.communityComments = [];
   const id = commentId.trim();
-  const c = store.communityComments.find((x) => x.id === id);
+  const c = feed.communityComments.find((x) => x.id === id);
   if (!c || c.isDeleted === true) return { ok: false, code: "NOT_FOUND" };
   if (resolveCanonicalUserId(store, c.authorUserId) !== resolveCanonicalUserId(store, editorUserId)) {
     return { ok: false, code: "FORBIDDEN" };
   }
   c.isDeleted = true;
-  const post = store.communityPosts.find((x) => x.id === c.postId);
+  const post = feed.communityPosts.find((x) => x.id === c.postId);
   if (post && post.isDeleted !== true) {
     post.commentCount = Math.max(0, (post.commentCount ?? 0) - 1);
     post.updatedAt = new Date().toISOString();
   }
-  await writeStore(store);
+  if (!(await persistSiteCommunityFeed(feed))) {
+    return { ok: false, code: "PERSIST_UNAVAILABLE" };
+  }
   return { ok: true };
 }
 
