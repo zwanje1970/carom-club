@@ -10,7 +10,7 @@ export type SiteRootSwipeNavItem = { key: SiteRootSwipeNavKey; href: string; lab
 export const SITE_ROOT_SWIPE_NAV = [
   { key: "home", href: "/site", label: "홈" },
   { key: "tournaments", href: "/site/tournaments", label: "대회안내" },
-  { key: "venues", href: "/site/venues", label: "당구장안내" },
+  { key: "venues", href: "/site/venues", label: "클럽안내" },
   { key: "community", href: "/site/community", label: "커뮤니티" },
   { key: "mypage", href: "/site/mypage", label: "마이페이지" },
 ] as const satisfies readonly SiteRootSwipeNavItem[];

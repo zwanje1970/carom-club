@@ -207,7 +207,7 @@ export default function SiteVenuesBoard({
   );
 
   return (
-    <SiteShellFrame brandTitle="당구장안내" auxiliaryBarClassName="site-shell-controls--site-list" auxiliary={auxiliary}>
+    <SiteShellFrame brandTitle="클럽안내" auxiliaryBarClassName="site-shell-controls--site-list" auxiliary={auxiliary}>
       <section className="site-site-gray-main v3-stack">
         {locationDenied ? (
           <p

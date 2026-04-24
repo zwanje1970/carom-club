@@ -17,6 +17,50 @@
   margin-top: 0;
 }
 
+/* 슬라이드 창 + 인디케이터: 카드 transform/scale과 분리 */
+.slideDeckFrame {
+  position: relative;
+  width: min(94vw, 492px);
+  max-width: min(94vw, 492px);
+  align-self: center;
+  box-sizing: border-box;
+}
+
+.slideDeckIndicatorOverlay {
+  position: absolute;
+  top: 5px;
+  left: 14px;
+  z-index: 600;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.slideDeckIndicatorDots {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.slideDeckIndicatorDots span {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  font-size: 9px;
+  line-height: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-sizing: border-box;
+  letter-spacing: 0;
+}
+
 /* slide-deck-template.css 의 .slide-deck 과 동일 폭 — 좌우 패딩 없음 */
 .slideDeckNoticeAbove {
   align-self: center;
@@ -92,6 +136,7 @@
   line-height: 1.25;
   animation: slideDeckNoticeMarquee 14s linear infinite;
   will-change: transform;
+  text-shadow: none;
 }
 
 @keyframes slideDeckNoticeMarquee {
@@ -114,9 +159,32 @@
     align-self: stretch;
   }
 
+  :global(.site-home-page--main) .slideDeckFrame {
+    width: 100%;
+    max-width: none;
+    align-self: stretch;
+  }
+
+  :global(.site-home-page--main) .slideDeckIndicatorOverlay {
+    top: 5px;
+    left: 16px;
+  }
+
   :global(.site-home-page--main) .slideDeckCardChrome {
     width: calc(100% - 20px);
     max-width: none;
+    /* 카드·크롬 영역을 위로 — dots top 4~6px 기준에 맞춤 */
+    top: 5px;
+  }
+
+  :global(.site-home-page--main) .slideDeckTopChrome {
+    padding-top: clamp(18px, 5vw, 22px);
+    box-sizing: border-box;
+  }
+
+  :global(.site-home-page--main) .slideDeckLabel {
+    padding-left: clamp(3.25rem, 22vw, 3.65rem);
+    box-sizing: border-box;
   }
 }
 
@@ -143,26 +211,6 @@
   pointer-events: none;
 }
 
-.slideDeckBottomDots {
-  position: relative;
-  z-index: 1;
-  margin-top: auto;
-  align-self: flex-start;
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.1em;
-  pointer-events: none;
-  font-size: clamp(0.78rem, 2.8vw, 0.95rem);
-  line-height: 1;
-  letter-spacing: 0;
-  opacity: 1;
-}
-
-.slideDeckBottomDots span {
-  opacity: 1;
-}
-
 .slideDeckBottomDotY {
   color: #f5c609;
   text-shadow:
@@ -186,7 +234,7 @@
 
 .slideDeckDotActive {
   opacity: 1;
-  transform: scale(1.12);
+  filter: brightness(1.12);
 }
 
 .slideDeckEmptyState {

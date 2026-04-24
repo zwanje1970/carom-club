@@ -7,7 +7,6 @@ import { SiteMainNavIcon } from "./main-nav-icon";
 import { getCommonPaletteColorHex, isCommonPaletteColor } from "../../lib/shared/common-color-palette";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../lib/auth/session";
 import {
-  getClientStatusByUserId,
   getSiteNotice,
   getSitePageBuilderDraftByPageId,
   getSitePageBuilderPublishedByPageId,
@@ -315,9 +314,6 @@ export default async function SiteHomePage({
   const rawSession = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   const session = parseSessionCookieValue(rawSession);
   const currentUser = session ? await getUserById(session.userId) : null;
-  const clientApplicationStatus =
-    session && currentUser?.role === "CLIENT" ? await getClientStatusByUserId(session.userId) : null;
-  const clientDashboardApproved = currentUser?.role === "CLIENT" && clientApplicationStatus === "APPROVED";
   const canUseDraftPreview = previewMode ? Boolean(currentUser && currentUser.role === "PLATFORM") : false;
 
   const [publishedPage, mainSlideSnapshots, siteNotice] = await Promise.all([
@@ -363,7 +359,7 @@ export default async function SiteHomePage({
   const tournamentTitleEntry = findTitleBefore(tournamentSlideEntry?.block.id);
   const fixedMainButtons = [
     { label: "대회안내", href: "/site/tournaments" },
-    { label: "주변당구장", href: "/site/venues" },
+    { label: "주변클럽", href: "/site/venues" },
     { label: "커뮤니티", href: "/site/community" },
     { label: "마이페이지", href: "/site/mypage" },
   ];
@@ -372,21 +368,10 @@ export default async function SiteHomePage({
     "tournament" | "venue" | "community" | "user"
   > = {
     대회안내: "tournament",
-    주변당구장: "venue",
+    주변클럽: "venue",
     커뮤니티: "community",
     마이페이지: "user",
   };
-  const dashboardHref =
-    currentUser?.role === "PLATFORM"
-      ? "/platform"
-      : clientDashboardApproved
-        ? "/client"
-        : null;
-  const dashboardLabel = dashboardHref
-    ? currentUser?.role === "PLATFORM"
-      ? "플랫폼관리자"
-      : "클라이언트 운영관리"
-    : null;
   const liveSlideItems = mainSlideSnapshots.map((snapshot) => ({
     snapshotId: snapshot.snapshotId,
     title: snapshot.title,
@@ -517,19 +502,38 @@ export default async function SiteHomePage({
         <section id="main-content-group" className="site-home-dark-main site-home-dark-main--stack">
           <div className="site-home-main-content-box">
             <section className="v3-stack site-home-slide-stack site-home-slide-stack--flush" style={{ gap: 0 }}>
-              <section
-                className="site-home-slide-anchor"
-                data-section-id={tournamentSlideEntry?.sectionId ?? "section-tournament-forced"}
-                data-block-id={tournamentSlideEntry?.block.id ?? "block-tournament-forced"}
-                data-title-section-id={tournamentTitleEntry?.sectionId ?? tournamentSlideEntry?.sectionId}
-                data-title-block-id={tournamentTitleEntry?.block.id}
-              >
-                <MainSceneSlideDeckClient
-                  items={liveSlideItems}
-                  sectionLabel={tournamentTitleEntry?.block.data.text?.trim() ?? ""}
-                  siteNoticeText={showSiteNoticeBar && isMobileSiteUa ? siteNotice.text.trim() : undefined}
-                />
-              </section>
+              <div className="site-home-main-slide-png-host">
+                <section
+                  className="site-home-slide-anchor"
+                  data-section-id={tournamentSlideEntry?.sectionId ?? "section-tournament-forced"}
+                  data-block-id={tournamentSlideEntry?.block.id ?? "block-tournament-forced"}
+                  data-title-section-id={tournamentTitleEntry?.sectionId ?? tournamentSlideEntry?.sectionId}
+                  data-title-block-id={tournamentTitleEntry?.block.id}
+                >
+                  <MainSceneSlideDeckClient
+                    items={liveSlideItems}
+                    sectionLabel={tournamentTitleEntry?.block.data.text?.trim() ?? ""}
+                    siteNoticeText={showSiteNoticeBar && isMobileSiteUa ? siteNotice.text.trim() : undefined}
+                  />
+                </section>
+                <section
+                  className="site-home-main-png-buttons-temp site-home-main-png-buttons-temp--slideOverlay"
+                  aria-label="메인 바로가기(임시 PNG)"
+                >
+                  <a href="/site/tournaments" className="main-button" aria-label="대회안내">
+                    <img src="/images/buttons/btn-main-1.png" alt="" decoding="async" />
+                    <span>대회안내</span>
+                  </a>
+                  <VenuesDistanceNavLink href="/site/venues" className="main-button" aria-label="주변클럽">
+                    <img src="/images/buttons/btn-main-2.png" alt="" decoding="async" />
+                    <span>주변클럽</span>
+                  </VenuesDistanceNavLink>
+                  <a href="/site/community" className="main-button" aria-label="커뮤니티">
+                    <img src="/images/buttons/btn-main-3.png" alt="" decoding="async" />
+                    <span>커뮤니티</span>
+                  </a>
+                </section>
+              </div>
             </section>
 
             {/* TEMP_PNG_MAIN_BUTTONS — 원복: (1) 아래 임시 <section> 블록 삭제 (2) #main-buttons 에서 site-home-nav-grid--tempPngHidden 제거 (3) globals.css 의 TEMP_PNG_MAIN_BUTTONS 블록 삭제 */}
@@ -557,7 +561,7 @@ export default async function SiteHomePage({
                     <span className="site-home-nav-label">{row.label}</span>
                   </>
                 );
-                return row.label === "주변당구장" ? (
+                return row.label === "주변클럽" ? (
                   <VenuesDistanceNavLink
                     key={`fixed-main-nav-${row.label}`}
                     href={row.href}
@@ -573,38 +577,6 @@ export default async function SiteHomePage({
                 );
               })}
             </section>
-            <section
-              className="site-home-main-png-buttons-temp"
-              aria-label="메인 바로가기(임시 PNG)"
-            >
-              <a href="/site/tournaments" className="main-button" aria-label="대회안내">
-                <img src="/images/buttons/btn-main-1.png" alt="" decoding="async" />
-                <span>대회안내</span>
-              </a>
-              <VenuesDistanceNavLink href="/site/venues" className="main-button" aria-label="주변당구장">
-                <img src="/images/buttons/btn-main-2.png" alt="" decoding="async" />
-                <span>주변당구장</span>
-              </VenuesDistanceNavLink>
-              <a href="/site/community" className="main-button" aria-label="커뮤니티">
-                <img src="/images/buttons/btn-main-3.png" alt="" decoding="async" />
-                <span>커뮤니티</span>
-              </a>
-            </section>
-            {dashboardHref ? (
-              <Link
-                href={dashboardHref}
-                className={[
-                  clientDashboardApproved
-                    ? "site-home-cta-primary site-home-cta-primary--client-ops"
-                    : "site-home-cta-primary",
-                  currentUser?.role === "PLATFORM" ? "site-home-main-dashboard--platform-only" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                <span className="site-home-cta-primary__text">{dashboardLabel}</span>
-              </Link>
-            ) : null}
           </div>
         </section>
 

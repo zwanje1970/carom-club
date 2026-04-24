@@ -84,11 +84,13 @@ function MediaStack({
   item,
   children,
   badge,
+  repImageHighPriority,
 }: {
   variant: SlidePreviewVariant;
   item: TournamentSlidePreviewItem;
   children: ReactNode;
   badge: ReactNode;
+  repImageHighPriority?: boolean;
 }) {
   const cssBg = item.mediaBackground?.trim();
   const imgUrl = item.image320Url?.trim();
@@ -107,8 +109,9 @@ function MediaStack({
           style={overlayBlend ? { opacity: overlayOpacity } : { opacity: 1 }}
           src={imgUrl}
           alt={item.title || "카드 배경"}
-          loading="lazy"
+          loading={repImageHighPriority ? "eager" : "lazy"}
           decoding="async"
+          {...(repImageHighPriority ? { fetchPriority: "high" as const } : {})}
         />
       ) : null}
       <div className={styles.statusBadgeWrap}>{badge}</div>
@@ -123,6 +126,7 @@ function TournamentSlideCardPreview({
   variant,
   slideDeck,
   templateCardLayout,
+  repImageHighPriority,
 }: {
   item: TournamentSlidePreviewItem;
   variant: SlidePreviewVariant;
@@ -130,6 +134,7 @@ function TournamentSlideCardPreview({
   slideDeck?: boolean;
   /** 템플릿 TournamentPostCard + SlideDeck 카드 규격(작성 미리보기·슬라이드 공통) */
   templateCardLayout?: boolean;
+  repImageHighPriority?: boolean;
 }) {
   const status = toStatus(item.statusBadge);
   const parsed = parseSubtitle(item.subtitle);
@@ -149,7 +154,7 @@ function TournamentSlideCardPreview({
   if (variant === "classic") {
     return (
       <article className={rootClass}>
-        <MediaStack variant="classic" item={item} badge={statusBadge}>
+        <MediaStack variant="classic" item={item} badge={statusBadge} repImageHighPriority={repImageHighPriority}>
           <div className={styles.classicInner}>
             <div className={styles.classicTop}>
               <div className={styles.classicMain}>
@@ -172,7 +177,7 @@ function TournamentSlideCardPreview({
   if (variant === "frame") {
     return (
       <article className={rootClass}>
-        <MediaStack variant="frame" item={item} badge={statusBadge}>
+        <MediaStack variant="frame" item={item} badge={statusBadge} repImageHighPriority={repImageHighPriority}>
           <div className={styles.frameInner}>
             <div className={styles.frameCenter}>
               {lead ? <p className={styles.frameLead}>{lead}</p> : null}
@@ -198,10 +203,12 @@ export function TournamentSnapshotCardView({
   item,
   slideDeck = false,
   templateCardLayout = false,
+  repImageHighPriority,
 }: {
   item: SlideDeckItem;
   slideDeck?: boolean;
   templateCardLayout?: boolean;
+  repImageHighPriority?: boolean;
 }) {
   const previewItem = slideDeckItemToPreviewItem(item);
   const variant: SlidePreviewVariant = item.cardTemplate === "B" ? "frame" : "classic";
@@ -212,6 +219,7 @@ export function TournamentSnapshotCardView({
       variant={variant}
       slideDeck={slideDeck}
       templateCardLayout={templateCardLayout}
+      repImageHighPriority={repImageHighPriority}
     />
   );
   if (!href) return inner;
@@ -233,6 +241,19 @@ export function TournamentSnapshotCardView({
   );
 }
 
-export function SlideDeckCard({ item }: { item: SlideDeckItem }) {
-  return <TournamentSnapshotCardView item={item} slideDeck templateCardLayout />;
+export function SlideDeckCard({
+  item,
+  repImageHighPriority,
+}: {
+  item: SlideDeckItem;
+  repImageHighPriority?: boolean;
+}) {
+  return (
+    <TournamentSnapshotCardView
+      item={item}
+      slideDeck
+      templateCardLayout
+      repImageHighPriority={repImageHighPriority}
+    />
+  );
 }

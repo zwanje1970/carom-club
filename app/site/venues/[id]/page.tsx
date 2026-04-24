@@ -437,7 +437,7 @@ export default async function SiteVenueDetailPage({
         ) : null}
 
         <Link className="secondary-button" href="/site/venues" style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>
-          당구장안내 목록으로
+          클럽안내 목록으로
         </Link>
       </section>
     </SiteShellFrame>

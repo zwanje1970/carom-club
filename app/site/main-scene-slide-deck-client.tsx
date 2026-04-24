@@ -34,7 +34,11 @@ export default function MainSceneSlideDeckClient(props: Props) {
         <div className={styles.slideDeckTopChrome}>
           {label ? <p className={styles.slideDeckLabel}>{label}</p> : null}
         </div>
-        <div className={styles.slideDeckBottomDots} aria-hidden="true">
+      </div>
+    );
+    const slideIndicatorOverlay = (
+      <div className={styles.slideDeckIndicatorOverlay} aria-hidden="true">
+        <div className={styles.slideDeckIndicatorDots}>
           <span className={styles.slideDeckBottomDotY}>●</span>
           <span className={styles.slideDeckBottomDotR}>●</span>
           <span className={styles.slideDeckBottomDotW}>●</span>
@@ -45,8 +49,11 @@ export default function MainSceneSlideDeckClient(props: Props) {
       <div className={styles.slideDeckShell}>
         <div className={`slide-deck-wrap ${styles.slideDeckWrapWithNoticeGap}`}>
           {noticeAbove}
-          <div aria-hidden className="slide-deck">
-            {cardChrome}
+          <div className={styles.slideDeckFrame}>
+            <div aria-hidden className="slide-deck">
+              {cardChrome}
+            </div>
+            {slideIndicatorOverlay}
           </div>
         </div>
       </div>

@@ -34,8 +34,14 @@ type MatchType    = "NORMAL" | "SCOTCH";
 type BracketStyle = "TREE" | "CENTER";
 type TreeLayout   = "HORIZONTAL" | "VERTICAL";
 
-/** 미리보기용 A4 px (회전 없이 width/height만). TREE+세로 트리만 세로 용지, 그 외는 가로. */
-function previewPaperPx(style: BracketStyle, treeLayout: TreeLayout): { paperW: number; paperH: number } {
+/**
+ * 미리보기 용지 px — 모바일 화면 방향·viewport 비율과 무관.
+ * 1) 인쇄(트리 세로형 = 세로 용지), 2) 그 외 가로 용지. (viewport는 scale 전용)
+ */
+function previewPaperFromPrintSettings(
+  style: BracketStyle,
+  treeLayout: TreeLayout,
+): { paperW: number; paperH: number } {
   if (style === "TREE" && treeLayout === "VERTICAL") {
     return { paperW: 794, paperH: 1123 };
   }
@@ -57,6 +63,7 @@ export default function BlankBracketPrintClient() {
   const pdfRootRef = useRef<HTMLDivElement>(null);
   const pdfBusyRef = useRef(false);
   const previewTopbarRef = useRef<HTMLDivElement>(null);
+  const previewStageRef = useRef<HTMLDivElement>(null);
 
   const endOptions = useMemo(() => validEndOptions(startPlayers), [startPlayers]);
   const rounds = useMemo(() => {
@@ -82,14 +89,38 @@ export default function BlankBracketPrintClient() {
     return buildStartPairLabels(scene, { rounds, style, treeLayout });
   }, [scene, rounds, style, treeLayout, showStartPairNumbers]);
 
-  const previewPaper = useMemo(() => previewPaperPx(style, treeLayout), [style, treeLayout]);
+  const previewPaper = useMemo(() => previewPaperFromPrintSettings(style, treeLayout), [style, treeLayout]);
 
   const updatePreviewScale = useCallback(() => {
     const { paperW, paperH } = previewPaper;
     const th = previewTopbarRef.current?.getBoundingClientRect().height ?? 48;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    let s = Math.min((vw - 32) / paperW, (vh - th - 32) / paperH, 1);
+    const stage = previewStageRef.current;
+    const vv = typeof window !== "undefined" ? window.visualViewport : undefined;
+    let vw: number;
+    let vh: number;
+    if (stage) {
+      const cs = getComputedStyle(stage);
+      const pl = Number.parseFloat(cs.paddingLeft) || 0;
+      const pr = Number.parseFloat(cs.paddingRight) || 0;
+      const pt = Number.parseFloat(cs.paddingTop) || 0;
+      const pb = Number.parseFloat(cs.paddingBottom) || 0;
+      vw = stage.clientWidth - pl - pr;
+      vh = stage.clientHeight - pt - pb;
+    } else if (vv) {
+      vw = vv.width;
+      vh = vv.height;
+    } else {
+      vw = window.innerWidth;
+      vh = window.innerHeight;
+    }
+    /* paper 방향은 이미 확정 — scale만. 스테이지=탑바 아래 영역이면 th 이중 차감 안 함 */
+    const pad = 32;
+    let s: number;
+    if (stage) {
+      s = Math.min((vw - pad) / paperW, (vh - pad) / paperH, 1);
+    } else {
+      s = Math.min((vw - pad) / paperW, (vh - th - pad) / paperH, 1);
+    }
     if (!(s > 0) || !Number.isFinite(s)) s = 0.1;
     setPreviewScale(s);
   }, [previewPaper]);
@@ -111,19 +142,22 @@ export default function BlankBracketPrintClient() {
   useEffect(() => {
     if (!previewOpen) return;
     let orientTimer: ReturnType<typeof setTimeout> | undefined;
-    window.addEventListener("resize", updatePreviewScale);
+    const run = () => {
+      requestAnimationFrame(() => updatePreviewScale());
+    };
+    window.addEventListener("resize", run);
     const onOrientation = () => {
       if (orientTimer) clearTimeout(orientTimer);
-      orientTimer = setTimeout(updatePreviewScale, 150);
+      orientTimer = setTimeout(run, 150);
     };
     window.addEventListener("orientationchange", onOrientation);
     const vv = window.visualViewport;
-    vv?.addEventListener("resize", updatePreviewScale);
+    vv?.addEventListener("resize", run);
     return () => {
       if (orientTimer) clearTimeout(orientTimer);
-      window.removeEventListener("resize", updatePreviewScale);
+      window.removeEventListener("resize", run);
       window.removeEventListener("orientationchange", onOrientation);
-      vv?.removeEventListener("resize", updatePreviewScale);
+      vv?.removeEventListener("resize", run);
     };
   }, [previewOpen, updatePreviewScale]);
 
@@ -265,13 +299,21 @@ export default function BlankBracketPrintClient() {
           min-height: 0;
           overflow: hidden;
           display: flex;
-          align-items: flex-start;
+          align-items: center;
           justify-content: center;
           padding: 0 16px 16px;
           box-sizing: border-box;
         }
+        .preview-overlay .paper-frame-slot {
+          flex-shrink: 0;
+          position: relative;
+          box-sizing: border-box;
+        }
         .preview-overlay .paper-frame {
-          transform-origin: top center;
+          position: absolute;
+          left: 0;
+          top: 0;
+          transform-origin: top left;
           will-change: transform;
         }
         .preview-overlay .paper {
@@ -423,8 +465,22 @@ export default function BlankBracketPrintClient() {
                     닫기
                   </button>
                 </div>
-                <div className="preview-stage">
-                  <div className="paper-frame" style={{ transform: `scale(${previewScale})` }}>
+                <div className="preview-stage" ref={previewStageRef}>
+                  <div
+                    className="paper-frame-slot"
+                    style={{
+                      width: previewPaper.paperW * previewScale,
+                      height: previewPaper.paperH * previewScale,
+                    }}
+                  >
+                    <div
+                      className="paper-frame"
+                      style={{
+                        width: previewPaper.paperW,
+                        height: previewPaper.paperH,
+                        transform: `scale(${previewScale})`,
+                      }}
+                    >
                     <div
                       className="paper"
                       style={{ width: previewPaper.paperW, height: previewPaper.paperH }}
@@ -440,6 +496,7 @@ export default function BlankBracketPrintClient() {
                           <BracketPrintServiceMark />
                         </div>
                       </div>
+                    </div>
                     </div>
                   </div>
                 </div>

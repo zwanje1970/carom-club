@@ -12,16 +12,20 @@ import {
 
 const EDGE_EXCLUDE_PX = 24;
 const NAV_COOLDOWN_MS = 480;
-/** 손가락 이동 대비 화면 이동 비율 (0.7~0.85) */
+/** 손가락 이동 대비 트랙 이동 비율 */
 const FOLLOW_RATIO = 0.78;
-/** 완료 판정: 뷰포트 너비 대비 (25~30%) */
-const COMPLETE_FRACTION = 0.28;
-/** 방향 판정 전 최소 이동 (px) — 그 전에는 preventDefault 금지 (슬라이드 덱과 동일 값) */
-const LOCK_MIN_PX = 10;
-/** 가로 스와이프로 확정하려면 |dx|가 |dy|보다 이 이상 더 커야 함 (세로 스크롤·약한 대각선은 브라우저에 맡김) */
+/** 방향 판정 전 최소 이동(px) — 미만이면 가로/세로 확정 안 함, preventDefault 금지 */
+const PROBE_MIN_PX = 10;
+/** 가로 lock: |dx| - |dy| >= 이 값 */
 const HORIZONTAL_LEAD_PX = 8;
-/** 빠른 스와이프 시 짧은 거리로도 완료 (px/ms) */
-const VELOCITY_COMPLETE = 0.42;
+/** 가로 lock: |dx| 최소 */
+const MIN_HORIZONTAL_LOCK_PX = 16;
+/** 완료: 손가락 이동 거리 ≥ 뷰포트 너비 × 이 비율 (0.5 = 50%) */
+const DISTANCE_COMPLETE_FRACTION = 0.5;
+/** 플릭: 최소 |dx|(px) + 속도 동시 만족 시 50% 미만이어도 전환 */
+const FLICK_MIN_ABS_DX_PX = 40;
+/** 플릭 속도 하한(px/ms) — 과민 방지 */
+const VELOCITY_FLICK_PX_PER_MS = 0.36;
 const TRANSITION_MS = 300;
 const EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 
@@ -64,8 +68,8 @@ function velocityFromSamples(samples: { t: number; x: number }[]): number {
 
 /**
  * 대표 카테고리 루트 5페이지에서만 좌우 스와이프로 인접 탭 이동.
- * 상세·하위 경로에서는 마운트만 되고 리스너는 등록하지 않음.
- * 모바일: `children`을 3패널 트랙으로 감싸 드래그 팔로우 후 완료 시 라우팅.
+ * 세로 스크롤 보호: 방향 확정 전 preventDefault·touch-action 변경 금지.
+ * 세로 우세(|dy|≥|dx|) 시 제스처 종료까지 루트 비개입.
  */
 export default function SiteRootSwipeNav({ children }: { children?: React.ReactNode }) {
   const pathname = usePathname() ?? "";
@@ -78,22 +82,17 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
   const startRef = useRef<{
     x: number;
     y: number;
+    t0: number;
     blocked: boolean;
     startedOnLink: boolean;
     horizontalLocked: boolean;
-    /** 세로 우선으로 확정되면 제스처 끝까지 스와이프 안 함 */
+    /** 세로 우선 확정 시 제스처 끝까지 루트 스와이프 포기 */
     verticalDominant: boolean;
-    /** touchstart 시점 기준: 커뮤니티 목록 허브 여부 */
     startedOnCommunityHub: boolean;
-    /**
-     * touchstart 시점 기준: 커뮤니티 내부 스와이프 edge.
-     * null이면 커뮤니티 허브라도 내부 스와이프 영역 밖에서 시작.
-     */
     startedCommunityEdge: "first" | "last" | "middle" | null;
   } | null>(null);
   const samplesRef = useRef<{ t: number; x: number }[]>([]);
   const navAfterTransitionRef = useRef<string | null>(null);
-  /** 수평 스와이프 확정 시점의 탭 인덱스 — 제스처 끝까지 `window.location` vs React pathname 불일치로 이웃 iframe이 한 칸 밀리지 않게 고정 */
   const gestureAnchorIdxRef = useRef<number | null>(null);
 
   const applyTransform = useCallback((dragPx: number, withTransition: boolean) => {
@@ -136,13 +135,13 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       const targetEl = e.target instanceof Element ? e.target : null;
       const innerHost = startedOnCommunityHub ? targetEl?.closest("[data-community-inner-swipe]") : null;
       const startedCommunityEdge = communitySwipeEdgeFromHost(innerHost ?? null);
-      /** 커뮤니티 허브에서 내부 스와이프 영역 밖으로 시작한 제스처는 루트가 가로 스와이프를 맡지 않는다. */
       const blockedByCommunityPolicy = startedOnCommunityHub && !innerHost;
       const blocked = touchTargetBlocksSwipe(e.target) || edgeSkip || blockedByCommunityPolicy;
       const startedOnLink = e.target instanceof Element && !!e.target.closest("a[href]");
       startRef.current = {
         x: t.clientX,
         y: t.clientY,
+        t0: Date.now(),
         blocked,
         startedOnLink,
         horizontalLocked: false,
@@ -169,26 +168,23 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       if (start.verticalDominant) return;
 
       if (!start.horizontalLocked) {
-        if (adx < LOCK_MIN_PX && ady < LOCK_MIN_PX) {
-          return;
-        }
-        /* 세로 우선: |dy| ≥ |dx| 이면 루트 스와이프 미개입·preventDefault 금지 */
+        if (adx < PROBE_MIN_PX && ady < PROBE_MIN_PX) return;
+
         if (ady >= adx) {
           start.verticalDominant = true;
           return;
         }
-        /* 가로가 세로보다 충분히 클 때만 가로 후보 — 약한 대각선은 세로 스크롤로 처리 */
-        if (adx - ady < HORIZONTAL_LEAD_PX) {
-          start.verticalDominant = true;
-          return;
-        }
+
+        if (adx < MIN_HORIZONTAL_LOCK_PX) return;
+        if (adx - ady < HORIZONTAL_LEAD_PX) return;
+
         if (start.startedOnCommunityHub) {
           const edge = start.startedCommunityEdge;
           if (!edge) return;
-          /** 첫 게시판 탭 + 오른쪽으로 밀기 → 이전 루트 탭 / 마지막 탭 + 왼쪽으로 밀기 → 다음 루트 탭. 그 외는 커뮤니티 내부 스와이프 전담 */
           const passToRoot = (edge === "first" && dx > 0) || (edge === "last" && dx < 0);
           if (!passToRoot) return;
         }
+
         start.horizontalLocked = true;
         gestureAnchorIdxRef.current = siteRootSwipeIndex(pathname);
         const vp = viewportRef.current;
@@ -229,9 +225,7 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       const start = startRef.current;
       const t = e.changedTouches[0];
       const velocitySamples =
-        start && t
-          ? [...samplesRef.current, { t: Date.now(), x: t.clientX }]
-          : [];
+        start && t ? [...samplesRef.current, { t: Date.now(), x: t.clientX }] : [];
       startRef.current = null;
       samplesRef.current = [];
       releaseViewportTouchAxisLock();
@@ -261,16 +255,22 @@ export default function SiteRootSwipeNav({ children }: { children?: React.ReactN
       if (idx < 0) return;
 
       const vw = window.innerWidth;
-      const threshold = vw * COMPLETE_FRACTION;
-      const dragPx = dragPxRef.current;
+      const distanceThreshold = vw * DISTANCE_COMPLETE_FRACTION;
+      const fingerDx = t.clientX - start.x;
+      const absFinger = Math.abs(fingerDx);
       const vx = velocityFromSamples(velocitySamples);
 
+      const flickNext =
+        fingerDx < 0 && absFinger >= FLICK_MIN_ABS_DX_PX && vx < -VELOCITY_FLICK_PX_PER_MS;
+      const flickPrev =
+        fingerDx > 0 && absFinger >= FLICK_MIN_ABS_DX_PX && vx > VELOCITY_FLICK_PX_PER_MS;
+
       let nextIdx: number | null = null;
-      if (dragPx < 0 && idx < SITE_ROOT_SWIPE_NAV.length - 1) {
-        const wantNext = dragPx <= -threshold || vx < -VELOCITY_COMPLETE;
+      if (fingerDx < 0 && idx < SITE_ROOT_SWIPE_NAV.length - 1) {
+        const wantNext = fingerDx <= -distanceThreshold || flickNext;
         if (wantNext) nextIdx = idx + 1;
-      } else if (dragPx > 0 && idx > 0) {
-        const wantPrev = dragPx >= threshold || vx > VELOCITY_COMPLETE;
+      } else if (fingerDx > 0 && idx > 0) {
+        const wantPrev = fingerDx >= distanceThreshold || flickPrev;
         if (wantPrev) nextIdx = idx - 1;
       }
 

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import AdminDashboardFloatingFab from "./components/AdminDashboardFloatingFab";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -20,7 +21,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body>
+        {children}
+        <AdminDashboardFloatingFab />
+      </body>
     </html>
   );
 }

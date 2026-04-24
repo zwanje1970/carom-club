@@ -211,6 +211,8 @@ export default function MainSceneSlideDeck({
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   const n = items.length;
+  /** sceneId===0 초기 장면과 동일 — 가운데 노출(visibility·opacity 유효) 카드. n>1 이면 items[0]은 숨김(outgoing/incoming)이라 LCP 후보는 이 인덱스 */
+  const initialVisibleSlideIndex = n <= 1 ? 0 : (1 % n);
 
   useEffect(() => {
     if (n === 0) return;
@@ -414,30 +416,29 @@ export default function MainSceneSlideDeck({
           <p className={styles.slideDeckEmptyStateText}>노출 중인 대회 카드가 없습니다.</p>
         </div>
       ) : null}
-      <div className={styles.slideDeckBottomDots} aria-hidden="true">
+    </div>
+  );
+
+  const slideIndicatorOverlay = (
+    <div className={styles.slideDeckIndicatorOverlay} aria-hidden="true">
+      <div className={styles.slideDeckIndicatorDots}>
         <span
           className={
-            activeDot === 0
-              ? `${styles.slideDeckBottomDotY} ${styles.slideDeckDotActive}`
-              : styles.slideDeckBottomDotY
+            activeDot === 0 ? `${styles.slideDeckBottomDotY} ${styles.slideDeckDotActive}` : styles.slideDeckBottomDotY
           }
         >
           ●
         </span>
         <span
           className={
-            activeDot === 1
-              ? `${styles.slideDeckBottomDotR} ${styles.slideDeckDotActive}`
-              : styles.slideDeckBottomDotR
+            activeDot === 1 ? `${styles.slideDeckBottomDotR} ${styles.slideDeckDotActive}` : styles.slideDeckBottomDotR
           }
         >
           ●
         </span>
         <span
           className={
-            activeDot === 2
-              ? `${styles.slideDeckBottomDotW} ${styles.slideDeckDotActive}`
-              : styles.slideDeckBottomDotW
+            activeDot === 2 ? `${styles.slideDeckBottomDotW} ${styles.slideDeckDotActive}` : styles.slideDeckBottomDotW
           }
         >
           ●
@@ -492,7 +493,7 @@ export default function MainSceneSlideDeck({
                         : { opacity: 0.4, pointerEvents: "none" }
                   }
                 >
-                  <SlideDeckCard item={item} />
+                  <SlideDeckCard item={item} repImageHighPriority={i === initialVisibleSlideIndex} />
                 </div>
               </div>
             </div>
@@ -506,7 +507,10 @@ export default function MainSceneSlideDeck({
     <div className={styles.slideDeckShell}>
       <div className={`slide-deck-wrap ${styles.slideDeckWrapWithNoticeGap}`}>
         {noticeAboveDeck}
-        {innerDeck}
+        <div className={styles.slideDeckFrame}>
+          {innerDeck}
+          {slideIndicatorOverlay}
+        </div>
       </div>
     </div>
   );
