@@ -5,6 +5,17 @@ import { useCallback, useEffect, useState } from "react";
 /** 당구장 거리순·대회 거리순 공유 — sessionStorage 키 */
 export const VENUES_GEO_STORAGE_LAT = "carom_site_venues_lat";
 export const VENUES_GEO_STORAGE_LNG = "carom_site_venues_lng";
+/** 사용자가 이번 방문에서 위치 동의(또는 재사용)로 거리 모드를 켠 경우에만 "1" */
+const VENUES_GEO_CONSENT_KEY = "carom_site_geo_consented";
+
+export function hasGeoConsentInSession(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return sessionStorage.getItem(VENUES_GEO_CONSENT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 const GEO_KEYS = { lat: "distanceLat", lng: "distanceLng", denied: "distanceDenied" } as const;
 
@@ -30,6 +41,7 @@ export function persistVenueCoords(lat: number, lng: number): void {
   try {
     sessionStorage.setItem(VENUES_GEO_STORAGE_LAT, String(lat));
     sessionStorage.setItem(VENUES_GEO_STORAGE_LNG, String(lng));
+    sessionStorage.setItem(VENUES_GEO_CONSENT_KEY, "1");
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("carom-site-distance-geo"));
     }
@@ -44,6 +56,7 @@ export function clearStoredVenueCoords(): void {
   try {
     sessionStorage.removeItem(VENUES_GEO_STORAGE_LAT);
     sessionStorage.removeItem(VENUES_GEO_STORAGE_LNG);
+    sessionStorage.removeItem(VENUES_GEO_CONSENT_KEY);
     window.dispatchEvent(new Event("carom-site-distance-geo"));
   } catch {
     /* ignore */
@@ -51,15 +64,12 @@ export function clearStoredVenueCoords(): void {
 }
 
 /**
- * 거리순 UI(빨강=활성): 현재 URL에 좌표가 있거나, 한쪽에서 저장한 세션 좌표가 있으면 대회·클럽 둘 다 활성으로 본다.
+ * 거리순 UI(빨강=활성): 이번 방문에서 위치 동의 후에만, URL에 거리 좌표가 있을 때.
  */
 export function useDistanceGearArmed(urlGeoPresent: boolean): boolean {
-  const compute = useCallback(
-    () => urlGeoPresent || (typeof window !== "undefined" && getStoredVenueCoords() != null),
-    [urlGeoPresent],
-  );
+  const compute = useCallback(() => urlGeoPresent && hasGeoConsentInSession(), [urlGeoPresent]);
 
-  const [armed, setArmed] = useState(urlGeoPresent);
+  const [armed, setArmed] = useState(false);
 
   useEffect(() => {
     setArmed(compute());
@@ -105,7 +115,7 @@ export function performGeolocationThenNavigate(targetHref: string, navigate: (hr
   }
 
   const stored = getStoredVenueCoords();
-  if (stored) {
+  if (stored && hasGeoConsentInSession()) {
     const u = new URL(targetHref, base);
     u.searchParams.set(GEO_KEYS.lat, String(stored.lat));
     u.searchParams.set(GEO_KEYS.lng, String(stored.lng));

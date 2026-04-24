@@ -82,6 +82,13 @@ import {
   throwSiteNoticeWritePersistenceBlocked,
   upsertSiteNoticeToFirestoreKv,
 } from "./platform-site-notice-settings";
+import {
+  readTournamentPublishedCardsRawFromFirestoreKv,
+  resolveTournamentPublishedCardsReadStrategy,
+  resolveTournamentPublishedCardsWriteStrategy,
+  throwTournamentPublishedCardsWritePersistenceBlocked,
+  upsertTournamentPublishedCardsToFirestoreKv,
+} from "./platform-tournament-published-cards-settings";
 
 export type {
   TournamentDivisionMetricType,
@@ -4738,10 +4745,9 @@ export async function getSettlementLedgerOverviewForClient(params: {
     params.role === "PLATFORM" ? await listAllTournaments() : await listTournamentsByCreator(params.userId);
 
   const store = await readStore();
+  const publishedCards = await loadTournamentPublishedCardsArray();
   const published = tournaments.filter((t) =>
-    store.tournamentPublishedCards.some(
-      (c) => c.tournamentId === t.id && c.isPublished === true && c.isActive === true
-    )
+    publishedCards.some((c) => c.tournamentId === t.id && c.isPublished === true && c.isActive === true)
   );
 
   published.sort((a, b) => {
@@ -4771,12 +4777,10 @@ export async function getSettlementLedgerOverviewForClient(params: {
 
 /** 메인·사이트에 게시 중인 대회 카드가 있을 때 true — 정산 허브·장부 노출 기준 */
 export async function tournamentHasActivePublishedCard(tournamentId: string): Promise<boolean> {
-  const store = await readStore();
   const id = tournamentId.trim();
   if (!id) return false;
-  return store.tournamentPublishedCards.some(
-    (c) => c.tournamentId === id && c.isPublished === true && c.isActive === true
-  );
+  const cards = await loadTournamentPublishedCardsArray();
+  return cards.some((c) => c.tournamentId === id && c.isPublished === true && c.isActive === true);
 }
 
 export async function getTournamentById(tournamentId: string): Promise<Tournament | null> {
@@ -4969,6 +4973,11 @@ export async function deleteTournament(params: {
   );
   store.tournamentPublishedCards = store.tournamentPublishedCards.filter((c) => c.tournamentId !== id);
   store.notifications = store.notifications.filter((n) => n.relatedTournamentId !== id);
+  const cardWs = resolveTournamentPublishedCardsWriteStrategy();
+  if (cardWs === "firestore-kv") {
+    const cur = await loadTournamentPublishedCardsArray();
+    await persistTournamentPublishedCardsRows(cur.filter((c) => c.tournamentId !== id));
+  }
   await writeStore(store);
   return { ok: true };
 }
@@ -5023,6 +5032,20 @@ export async function syncActiveTournamentCardSnapshotStatusBadge(tournamentId: 
   const badge = String(normalizeTournamentStatusBadge(tournament.statusBadge));
   const showOnMain = tournamentStatusEligibleForMainSlide(badge);
   const now = new Date().toISOString();
+  const cardWs = resolveTournamentPublishedCardsWriteStrategy();
+  if (cardWs === "firestore-kv") {
+    const cur = await loadTournamentPublishedCardsArray();
+    let changed = false;
+    const next = cur.map((c) => {
+      if (c.tournamentId === id && c.isActive) {
+        changed = true;
+        return { ...c, status: badge, showOnMainSlide: showOnMain, updatedAt: now };
+      }
+      return c;
+    });
+    if (changed) await persistTournamentPublishedCardsRows(next);
+    return;
+  }
   let changed = false;
   for (const c of store.tournamentPublishedCards) {
     if (c.tournamentId === id && c.isActive) {
@@ -7777,6 +7800,11 @@ export async function upsertTournamentPublishedCard(params: {
     return { ok: false, error: "대회를 찾을 수 없습니다." };
   }
 
+  const cardWs = resolveTournamentPublishedCardsWriteStrategy();
+  if (cardWs === "blocked") {
+    throwTournamentPublishedCardsWritePersistenceBlocked();
+  }
+
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
 
   const statusStr = String(normalizeTournamentStatusBadge(tournament.statusBadge));
@@ -7785,13 +7813,26 @@ export async function upsertTournamentPublishedCard(params: {
 
   const tid = params.tournamentId.trim();
   /** 초안 저장: 이전 초안(비활성)만 제거. 게시: 해당 대회 카드 전부 제거 후 새 게시 스냅샷 1건만 둔다. */
+  const cards =
+    cardWs === "dev-store-file" ? store.tournamentPublishedCards : [...(await loadTournamentPublishedCardsArray())];
   if (params.draftOnly) {
-    store.tournamentPublishedCards = store.tournamentPublishedCards.filter((c) => !(c.tournamentId === tid && !c.isActive));
-  } else {
+    if (cardWs === "dev-store-file") {
+      store.tournamentPublishedCards = store.tournamentPublishedCards.filter((c) => !(c.tournamentId === tid && !c.isActive));
+    } else {
+      const next = cards.filter((c) => !(c.tournamentId === tid && !c.isActive));
+      cards.length = 0;
+      cards.push(...next);
+    }
+  } else if (cardWs === "dev-store-file") {
     store.tournamentPublishedCards = store.tournamentPublishedCards.filter((c) => c.tournamentId !== tid);
+  } else {
+    const next = cards.filter((c) => c.tournamentId !== tid);
+    cards.length = 0;
+    cards.push(...next);
   }
 
-  const sameTournament = store.tournamentPublishedCards.filter((c) => c.tournamentId === tid);
+  const working = cardWs === "dev-store-file" ? store.tournamentPublishedCards : cards;
+  const sameTournament = working.filter((c) => c.tournamentId === tid);
   const nextVersion = sameTournament.reduce((max, c) => Math.max(max, c.version), 0) + 1;
 
   const row: TournamentPublishedCard = {
@@ -7833,8 +7874,12 @@ export async function upsertTournamentPublishedCard(params: {
     row.cardDisplayLocation = params.cardDisplayLocation;
   }
 
-  store.tournamentPublishedCards.push(row);
-  await writeStore(store);
+  working.push(row);
+  if (cardWs === "firestore-kv") {
+    await persistTournamentPublishedCardsRows(working);
+  } else {
+    await writeStore(store);
+  }
   return {
     ok: true,
     snapshot: tournamentPublishedCardToPublishedSnapshot(row, templateId, {
@@ -7917,7 +7962,8 @@ export async function publishVenueCardSnapshot(params: {
 export async function listPublishedCardSnapshots(): Promise<PublishedCardSnapshot[]> {
   const store = await readStore();
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
-  const fromTournament = store.tournamentPublishedCards
+  const publishedCards = await loadTournamentPublishedCardsArray();
+  const fromTournament = publishedCards
     .filter((c) => c.isPublished && c.isActive)
     .map((c) =>
       tournamentPublishedCardToPublishedSnapshot(c, templateId, tournamentDateLocationMeta(store, c.tournamentId))
@@ -7989,6 +8035,39 @@ export async function listPublishedCardSnapshots(): Promise<PublishedCardSnapsho
 /** 메인 홈 슬라이드에 넘길 토너먼트 게시 카드 최대 개수(슬라이드 예비 장면 포함) */
 const DEFAULT_MAIN_SITE_TOURNAMENT_SLIDE_LIMIT = 4;
 
+async function loadTournamentPublishedCardsArray(): Promise<TournamentPublishedCard[]> {
+  const rs = resolveTournamentPublishedCardsReadStrategy();
+  if (rs === "firestore-kv") {
+    try {
+      const raw = await readTournamentPublishedCardsRawFromFirestoreKv();
+      if (raw == null) return [];
+      if (!Array.isArray(raw)) return [];
+      return raw.map(normalizeTournamentPublishedCardRow).filter((x): x is TournamentPublishedCard => x !== null);
+    } catch {
+      return [];
+    }
+  }
+  if (rs === "production-defaults-only") {
+    return [];
+  }
+  const store = await readStore();
+  return store.tournamentPublishedCards;
+}
+
+async function persistTournamentPublishedCardsRows(next: TournamentPublishedCard[]): Promise<void> {
+  const ws = resolveTournamentPublishedCardsWriteStrategy();
+  if (ws === "firestore-kv") {
+    await upsertTournamentPublishedCardsToFirestoreKv(next);
+    return;
+  }
+  if (ws === "blocked") {
+    throwTournamentPublishedCardsWritePersistenceBlocked();
+  }
+  const store = await readStore();
+  store.tournamentPublishedCards = next;
+  await writeStore(store);
+}
+
 /**
  * 메인 홈 토너먼트 슬라이드 전용: `tournamentPublishedCards` 중 게시·활성·메인 노출 플래그가 켜진 카드만.
  * 레거시 `publishedCardSnapshots` 토너먼트 행은 사용하지 않는다(사이트에서 합성·재판단하지 않음).
@@ -8003,15 +8082,24 @@ export async function listTournamentSnapshotsForMainSite(options?: {
       ? Math.min(50, Math.floor(limitRaw))
       : DEFAULT_MAIN_SITE_TOURNAMENT_SLIDE_LIMIT;
 
-  const store = await readStore();
+  const publishedCardsReadStrategy = resolveTournamentPublishedCardsReadStrategy();
+  const store =
+    publishedCardsReadStrategy === "firestore-kv" ? null : await readStore();
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
-  const rows = store.tournamentPublishedCards
+  const cards = await loadTournamentPublishedCardsArray();
+  const rows = cards
     .filter((c) => c.isPublished && c.isActive && c.showOnMainSlide)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, limit);
 
   return rows.map((c) =>
-    tournamentPublishedCardToPublishedSnapshot(c, templateId, tournamentDateLocationMeta(store, c.tournamentId))
+    tournamentPublishedCardToPublishedSnapshot(
+      c,
+      templateId,
+      store === null
+        ? null
+        : tournamentDateLocationMeta(store, c.tournamentId)
+    )
   );
 }
 
@@ -8020,7 +8108,8 @@ export async function getLatestPublishedCardSnapshotByTournamentId(
 ): Promise<PublishedCardSnapshot | null> {
   const store = await readStore();
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
-  const active = store.tournamentPublishedCards
+  const publishedCards = await loadTournamentPublishedCardsArray();
+  const active = publishedCards
     .filter((c) => c.tournamentId === tournamentId.trim() && c.isPublished && c.isActive)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
   return active
@@ -8036,7 +8125,8 @@ export async function listCardSnapshotsByTournamentId(tournamentId: string): Pro
   const store = await readStore();
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
   const meta = tournamentDateLocationMeta(store, tournamentId);
-  return store.tournamentPublishedCards
+  const publishedCards = await loadTournamentPublishedCardsArray();
+  return publishedCards
     .filter((c) => c.tournamentId === tournamentId.trim())
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .map((c) => tournamentPublishedCardToPublishedSnapshot(c, templateId, meta));
@@ -8067,7 +8157,8 @@ export async function listCardSnapshotsByVenueId(venueId: string): Promise<Publi
 export async function getCardSnapshotById(snapshotId: string): Promise<PublishedCardSnapshot | null> {
   const store = await readStore();
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
-  const tc = store.tournamentPublishedCards.find((c) => c.snapshotId === snapshotId);
+  const publishedCards = await loadTournamentPublishedCardsArray();
+  const tc = publishedCards.find((c) => c.snapshotId === snapshotId);
   if (tc)
     return tournamentPublishedCardToPublishedSnapshot(
       tc,
@@ -8097,12 +8188,18 @@ export async function setCardSnapshotActive(params: {
 }): Promise<{ ok: true; snapshot: PublishedCardSnapshot } | { ok: false; error: string }> {
   const store = await readStore();
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
-  const tc = store.tournamentPublishedCards.find((c) => c.snapshotId === params.snapshotId);
+  const cardWs = resolveTournamentPublishedCardsWriteStrategy();
+  const publishedCards =
+    cardWs === "dev-store-file" ? store.tournamentPublishedCards : await loadTournamentPublishedCardsArray();
+  const tc = publishedCards.find((c) => c.snapshotId === params.snapshotId);
   const now = new Date().toISOString();
 
   if (tc) {
+    if (cardWs === "blocked") {
+      throwTournamentPublishedCardsWritePersistenceBlocked();
+    }
     if (params.isActive) {
-      for (const c of store.tournamentPublishedCards) {
+      for (const c of publishedCards) {
         if (c.tournamentId === tc.tournamentId && c.snapshotId !== tc.snapshotId && c.isActive) {
           c.isActive = false;
           c.updatedAt = now;
@@ -8118,7 +8215,11 @@ export async function setCardSnapshotActive(params: {
       tc.status = badge;
       tc.showOnMainSlide = tournamentStatusEligibleForMainSlide(badge);
     }
-    await writeStore(store);
+    if (cardWs === "firestore-kv") {
+      await persistTournamentPublishedCardsRows(publishedCards);
+    } else {
+      await writeStore(store);
+    }
     return {
       ok: true,
       snapshot: tournamentPublishedCardToPublishedSnapshot(tc, templateId, {

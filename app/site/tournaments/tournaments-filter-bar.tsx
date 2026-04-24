@@ -60,9 +60,9 @@ export default function TournamentsFilterBar({
           .filter(Boolean)
           .join(" ")}
         href={`/site/tournaments${distanceSortHref}`}
-        useNextLink={hasViewerCoordinate}
+        useNextLink={distanceArmed}
         onClick={
-          hasViewerCoordinate
+          distanceArmed
             ? undefined
             : (e) => {
                 e.preventDefault();

@@ -5,13 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import FilterButton from "../components/FilterButton";
 import FilterDropdown from "../components/FilterDropdown";
-import {
-  getStoredVenueCoords,
-  performGeolocationThenNavigate,
-  useDistanceGearArmed,
-  VENUES_GEO_STORAGE_LAT,
-  VENUES_GEO_STORAGE_LNG,
-} from "../lib/site-geolocation-flow";
+import { performGeolocationThenNavigate, useDistanceGearArmed } from "../lib/site-geolocation-flow";
 import SiteShellFrame from "../components/SiteShellFrame";
 import filterStyles from "../components/filter-controls.module.css";
 
@@ -92,18 +86,6 @@ export default function SiteVenuesBoard({
   const distanceArmed = useDistanceGearArmed(hasViewerCoordinate);
   const [venueType, setVenueType] = useState<VenueTypeFilter>("all");
   const [feeType, setFeeType] = useState<FeeTypeFilter>("all");
-
-  useEffect(() => {
-    if (!distanceSort) return;
-    if (!getStoredVenueCoords()) return;
-    try {
-      sessionStorage.setItem(VENUES_GEO_STORAGE_LAT, String(distanceSort.lat));
-      sessionStorage.setItem(VENUES_GEO_STORAGE_LNG, String(distanceSort.lng));
-      window.dispatchEvent(new Event("carom-site-distance-geo"));
-    } catch {
-      /* ignore */
-    }
-  }, [distanceSort]);
 
   const filtered = useMemo(() => {
     if (venueType === "all" && feeType === "all") {
@@ -194,9 +176,9 @@ export default function SiteVenuesBoard({
           .filter(Boolean)
           .join(" ")}
         href={distanceButtonHref}
-        useNextLink={hasViewerCoordinate}
+        useNextLink={distanceArmed}
         onClick={
-          hasViewerCoordinate
+          distanceArmed
             ? undefined
             : (e) => {
                 e.preventDefault();

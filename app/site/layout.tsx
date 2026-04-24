@@ -1,4 +1,6 @@
 import type { Viewport } from "next";
+import { Suspense } from "react";
+import SiteGeoConsentUrlSanitizer from "./components/SiteGeoConsentUrlSanitizer";
 import SitePublicChromeLayout from "./SitePublicChromeLayout";
 
 export const dynamic = "force-dynamic";
@@ -17,5 +19,12 @@ export default function SiteLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <SitePublicChromeLayout>{children}</SitePublicChromeLayout>;
+  return (
+    <SitePublicChromeLayout>
+      <Suspense fallback={null}>
+        <SiteGeoConsentUrlSanitizer />
+      </Suspense>
+      {children}
+    </SitePublicChromeLayout>
+  );
 }

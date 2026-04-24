@@ -13,6 +13,7 @@ import {
   type TournamentCardTemplate,
   type TournamentCardTheme,
 } from "../../../../lib/server/dev-store";
+import { isTournamentPublishedCardsWritePersistenceBlockedError } from "../../../../lib/server/platform-tournament-published-cards-settings";
 
 export const runtime = "nodejs";
 
@@ -127,26 +128,39 @@ export async function POST(request: Request) {
         ? body.cardDisplayLocation
         : undefined;
 
-  const result = await upsertTournamentPublishedCard({
-    tournamentId,
-    title,
-    textLine1: t1,
-    textLine2: t2,
-    textLine3: t3,
-    templateType: parseCardTemplate(body.cardTemplate),
-    backgroundType,
-    themeType: parseTheme(body.themeType),
-    image320Url,
-    imageId,
-    targetDetailUrl: `/site/tournaments/${tournamentId}`,
-    publishedBy: publisher.user.id,
-    draftOnly,
-    ...(mediaBackground !== undefined ? { mediaBackground } : {}),
-    ...(imageOverlayBlend !== undefined ? { imageOverlayBlend } : {}),
-    ...(imageOverlayOpacity !== undefined ? { imageOverlayOpacity } : {}),
-    ...(cardDisplayDate !== undefined ? { cardDisplayDate } : {}),
-    ...(cardDisplayLocation !== undefined ? { cardDisplayLocation } : {}),
-  });
+  let result: Awaited<ReturnType<typeof upsertTournamentPublishedCard>>;
+  try {
+    result = await upsertTournamentPublishedCard({
+      tournamentId,
+      title,
+      textLine1: t1,
+      textLine2: t2,
+      textLine3: t3,
+      templateType: parseCardTemplate(body.cardTemplate),
+      backgroundType,
+      themeType: parseTheme(body.themeType),
+      image320Url,
+      imageId,
+      targetDetailUrl: `/site/tournaments/${tournamentId}`,
+      publishedBy: publisher.user.id,
+      draftOnly,
+      ...(mediaBackground !== undefined ? { mediaBackground } : {}),
+      ...(imageOverlayBlend !== undefined ? { imageOverlayBlend } : {}),
+      ...(imageOverlayOpacity !== undefined ? { imageOverlayOpacity } : {}),
+      ...(cardDisplayDate !== undefined ? { cardDisplayDate } : {}),
+      ...(cardDisplayLocation !== undefined ? { cardDisplayLocation } : {}),
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to save tournament card.";
+    if (isTournamentPublishedCardsWritePersistenceBlockedError(e)) {
+      return NextResponse.json(
+        { error: message, code: "TOURNAMENT_PUBLISHED_CARDS_PERSISTENCE_UNAVAILABLE" },
+        { status: 503 }
+      );
+    }
+    console.error("[api/client/card-snapshots] POST persist failed", e);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
@@ -227,7 +241,20 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "You can update only your snapshots." }, { status: 403 });
   }
 
-  const result = await setCardSnapshotActive({ snapshotId, isActive });
+  let result: Awaited<ReturnType<typeof setCardSnapshotActive>>;
+  try {
+    result = await setCardSnapshotActive({ snapshotId, isActive });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to update snapshot.";
+    if (isTournamentPublishedCardsWritePersistenceBlockedError(e)) {
+      return NextResponse.json(
+        { error: message, code: "TOURNAMENT_PUBLISHED_CARDS_PERSISTENCE_UNAVAILABLE" },
+        { status: 503 }
+      );
+    }
+    console.error("[api/client/card-snapshots] PATCH persist failed", e);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }

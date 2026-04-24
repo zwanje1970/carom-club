@@ -8,7 +8,6 @@ import {
 } from "../../../lib/server/dev-store";
 import SiteShellFrame from "../components/SiteShellFrame";
 import TournamentsFilterBar from "./tournaments-filter-bar";
-import TournamentsGeoStorageSync from "./TournamentsGeoStorageSync";
 import { buildTournamentListHref, parseTournamentStatusFilter } from "./tournament-list-url";
 
 export const dynamic = "force-dynamic";
@@ -167,7 +166,6 @@ export default async function SiteTournamentsPage({
         />
       }
     >
-      <TournamentsGeoStorageSync viewerCoordinate={viewerCoordinate} />
       <section className="site-site-gray-main v3-stack">
         {sortType === "DISTANCE" && locationDenied ? (
           <p
