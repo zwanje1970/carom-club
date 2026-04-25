@@ -4902,13 +4902,27 @@ export async function patchTournamentStatusBadge(params: {
   });
   if (!gate.ok) return { ok: false, error: gate.error, httpStatus: gate.httpStatus };
 
+  const normalizedBadge = normalizeTournamentStatusBadge(params.statusBadge);
+  const tid = params.tournamentId.trim();
+
+  if (isFirestoreUsersBackendConfigured()) {
+    const { getSharedFirestoreDb } = await import("./firestore-users");
+    const { getTournamentByIdFirestore } = await import("./firestore-tournaments");
+    const db = getSharedFirestoreDb();
+    await db.collection("v3_tournaments").doc(tid).set({ statusBadge: normalizedBadge }, { merge: true });
+    await syncActiveTournamentCardSnapshotStatusBadge(tid);
+    const updated = await getTournamentByIdFirestore(tid);
+    if (!updated) return { ok: false, error: "대회를 찾을 수 없습니다.", httpStatus: 404 };
+    return { ok: true, tournament: updated };
+  }
+
   const store = await readLocalJsonAggregate();
-  const idx = store.tournaments.findIndex((t) => t.id === params.tournamentId.trim());
+  const idx = store.tournaments.findIndex((t) => t.id === tid);
   if (idx < 0) return { ok: false, error: "대회를 찾을 수 없습니다.", httpStatus: 404 };
 
-  store.tournaments[idx]!.statusBadge = normalizeTournamentStatusBadge(params.statusBadge);
+  store.tournaments[idx]!.statusBadge = normalizedBadge;
   await writeLocalJsonAggregate(store);
-  await syncActiveTournamentCardSnapshotStatusBadge(params.tournamentId.trim());
+  await syncActiveTournamentCardSnapshotStatusBadge(tid);
   return { ok: true, tournament: await normalizeTournament(store.tournaments[idx]!, store) };
 }
 

@@ -84,7 +84,17 @@ export async function POST(request: Request) {
   }
 
   const tournamentId = typeof body.tournamentId === "string" ? body.tournamentId : "";
-  const tournament = await getTournamentByIdFirestore(tournamentId);
+  let tournament: Awaited<ReturnType<typeof getTournamentByIdFirestore>>;
+  try {
+    tournament = await getTournamentByIdFirestore(tournamentId);
+  } catch (e) {
+    console.error("[api/client/card-snapshots] POST tournament lookup failed", {
+      step: "tournament-lookup",
+      tournamentId,
+      message: e instanceof Error ? e.message : String(e),
+    });
+    return NextResponse.json({ error: "Tournament lookup failed.", code: "TOURNAMENT_LOOKUP_FAILED" }, { status: 500 });
+  }
   if (!tournament) {
     return NextResponse.json({ error: "Tournament not found." }, { status: 404 });
   }
@@ -181,7 +191,17 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "tournamentId is required." }, { status: 400 });
   }
 
-  const tournament = await getTournamentByIdFirestore(tournamentId);
+  let tournament: Awaited<ReturnType<typeof getTournamentByIdFirestore>>;
+  try {
+    tournament = await getTournamentByIdFirestore(tournamentId);
+  } catch (e) {
+    console.error("[api/client/card-snapshots] GET tournament lookup failed", {
+      step: "tournament-lookup",
+      tournamentId,
+      message: e instanceof Error ? e.message : String(e),
+    });
+    return NextResponse.json({ error: "Tournament lookup failed.", code: "TOURNAMENT_LOOKUP_FAILED" }, { status: 500 });
+  }
   if (!tournament) {
     return NextResponse.json({ error: "Tournament not found." }, { status: 404 });
   }
@@ -233,7 +253,18 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Snapshot not found." }, { status: 404 });
   }
 
-  const tournament = await getTournamentByIdFirestore(snapshot.tournamentId);
+  let tournament: Awaited<ReturnType<typeof getTournamentByIdFirestore>>;
+  try {
+    tournament = await getTournamentByIdFirestore(snapshot.tournamentId);
+  } catch (e) {
+    console.error("[api/client/card-snapshots] PATCH tournament lookup failed", {
+      step: "tournament-lookup",
+      snapshotId,
+      tournamentId: snapshot.tournamentId,
+      message: e instanceof Error ? e.message : String(e),
+    });
+    return NextResponse.json({ error: "Tournament lookup failed.", code: "TOURNAMENT_LOOKUP_FAILED" }, { status: 500 });
+  }
   if (!tournament) {
     return NextResponse.json({ error: "Tournament not found." }, { status: 404 });
   }

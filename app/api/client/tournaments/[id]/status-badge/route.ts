@@ -58,12 +58,23 @@ export async function PATCH(
 
   const statusBadge = normalizeTournamentStatusBadge(body.statusBadge) as TournamentStatusBadge;
 
-  const result = await patchTournamentStatusBadge({
-    tournamentId: id,
-    actorUserId: auth.user.id,
-    actorRole: auth.user.role,
-    statusBadge,
-  });
+  let result: Awaited<ReturnType<typeof patchTournamentStatusBadge>>;
+  try {
+    result = await patchTournamentStatusBadge({
+      tournamentId: id,
+      actorUserId: auth.user.id,
+      actorRole: auth.user.role,
+      statusBadge,
+    });
+  } catch (e) {
+    console.error("[api/client/tournaments/[id]/status-badge] PATCH failed", {
+      step: "status-badge-persist",
+      tournamentId: id,
+      statusBadge,
+      message: e instanceof Error ? e.message : String(e),
+    });
+    return NextResponse.json({ error: "상태 배지 저장 중 오류가 발생했습니다." }, { status: 500 });
+  }
 
   if (!result.ok) {
     const status = result.httpStatus ?? 400;
