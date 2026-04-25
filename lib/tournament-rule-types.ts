@@ -1,4 +1,4 @@
-/** 클라이언트·API 공용 — dev-store 규칙 스냅샷과 동일한 문자열 유니온 (서버 구현과 맞출 것) */
+/** 클라이언트·API 공용 — 규칙 스냅샷 문자열 유니온 (서버 구현과 맞출 것) */
 
 export type TournamentEntryQualificationType = "NONE" | "SCORE" | "EVER" | "BOTH";
 export type TournamentVerificationMode = "NONE" | "AUTO" | "MANUAL";

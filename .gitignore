@@ -21,3 +21,4 @@ Thumbs.db
 tmp/
 tmp-*
 data/v3-dev-store.json.corrupt.*.json
+data/v3-local-platform-aggregate.json.corrupt.*.json

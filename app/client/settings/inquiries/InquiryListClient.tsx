@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Row = {
   id: string;
@@ -18,29 +18,43 @@ export default function InquiryListClient() {
   const [items, setItems] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const requestSeqRef = useRef(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (signal?: AbortSignal) => {
+    const requestSeq = ++requestSeqRef.current;
     setLoading(true);
     setErr("");
     try {
-      const res = await fetch("/api/client/inquiries", { credentials: "same-origin" });
+      const res = await fetch("/api/client/inquiries", { credentials: "same-origin", signal });
       const data = (await res.json()) as { error?: string; items?: Row[] };
+      if (signal?.aborted || requestSeq !== requestSeqRef.current) {
+        return;
+      }
       if (!res.ok) {
         setErr(data.error ?? "목록을 불러오지 못했습니다.");
         setItems([]);
         return;
       }
       setItems(Array.isArray(data.items) ? data.items : []);
-    } catch {
+      setErr("");
+    } catch (error) {
+      if (signal?.aborted) return;
+      if (error instanceof DOMException && error.name === "AbortError") return;
       setErr("목록 요청 중 오류가 발생했습니다.");
       setItems([]);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted && requestSeq === requestSeqRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    void load();
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => {
+      controller.abort();
+    };
   }, [load]);
 
   return (

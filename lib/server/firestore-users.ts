@@ -1,6 +1,6 @@
 import * as admin from "firebase-admin";
 import type { AuthRole } from "../auth/roles";
-import type { DevUser, PlatformUserStatus } from "./dev-store";
+import type { DevUser, PlatformUserStatus } from "./platform-backing-store";
 
 const COLLECTION = "v3_platform_users";
 

@@ -4,7 +4,7 @@ import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib
 import {
   getUserById,
   patchPlatformUserForPlatform,
-} from "../../../../../lib/server/dev-store";
+} from "../../../../../lib/platform-api";
 
 export const runtime = "nodejs";
 

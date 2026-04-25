@@ -1,4 +1,4 @@
-/** 정산 Firestore 모듈 전용 타입(dev-store 미참조). */
+/** 정산 Firestore 모듈 전용 타입. */
 
 export type SettlementExpenseItem = {
   id: string;

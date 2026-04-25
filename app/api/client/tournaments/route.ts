@@ -8,7 +8,7 @@ import {
   getUserById,
   resolveCanonicalUserIdForAuth,
   type TournamentRuleSnapshot,
-} from "../../../../lib/server/dev-store";
+} from "../../../../lib/platform-api";
 import {
   createTournamentFirestore,
   listAllTournamentsFirestore,

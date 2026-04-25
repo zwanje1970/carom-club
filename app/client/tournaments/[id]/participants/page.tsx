@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
 import { listTournamentApplicationsByTournamentIdFirestore } from "../../../../../lib/server/firestore-tournament-applications";
 import { getTournamentByIdFirestore } from "../../../../../lib/server/firestore-tournaments";
-import type { TournamentApplication } from "../../../../../lib/server/dev-store";
+import type { TournamentApplication } from "../../../../../lib/types/entities";
 import ParticipantListRow from "./ParticipantListRow";
 
 export const dynamic = "force-dynamic";

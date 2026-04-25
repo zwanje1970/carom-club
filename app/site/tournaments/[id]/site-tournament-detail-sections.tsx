@@ -1,12 +1,9 @@
 import Link from "next/link";
 import SiteOutlineDocumentCard from "../../components/SiteOutlineDocumentCard";
 import AccountNumberCopyInline from "./account-number-copy-inline";
-import {
-  formatTournamentScheduleLabel,
-  resolveSitePosterDisplayUrl,
-  type Tournament,
-  type TournamentDivisionRuleRow,
-} from "../../../../lib/server/dev-store";
+import { formatTournamentScheduleLabel } from "../../../../lib/tournament-schedule";
+import { resolveSitePosterDisplayUrl } from "../../../../lib/site-poster-urls";
+import type { Tournament, TournamentDivisionRuleRow } from "../../../../lib/types/entities";
 import { isEmptyOutlineHtml } from "../../../../lib/outline-content-helpers";
 import { buildSiteVenueDetailPath } from "../../../../lib/site-venues-catalog";
 import type { TournamentDivisionMetricType, TournamentEntryQualificationType } from "../../../../lib/tournament-rule-types";

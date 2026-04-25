@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import VenuesDistanceNavLink from "./VenuesDistanceNavLink";
-import type { SiteLayoutMenuItem } from "../../../lib/server/dev-store";
+import type { SiteLayoutMenuItem } from "../../../lib/types/entities";
 import type { PcSiteHeaderAdminEntry } from "../lib/site-pc-header-admin";
 
 function isMobileUserAgent(userAgent: string): boolean {

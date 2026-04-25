@@ -7,7 +7,7 @@ import {
   incrementCommunityPostViewCount,
   softDeleteCommunityPostById,
   updateCommunityPostById,
-} from "../../../../../../lib/server/dev-store";
+} from "../../../../../../lib/platform-api";
 
 export const runtime = "nodejs";
 

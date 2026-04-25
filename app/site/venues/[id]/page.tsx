@@ -2,12 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";
 import { isEmptyOutlineHtml } from "../../../../lib/outline-content-helpers";
-import {
-  getOutlinePdfAssetById,
-  getSiteVenueDetailById,
-  outlineFileKindFromAsset,
-  outlinePdfIdFromPublicUrl,
-} from "../../../../lib/server/dev-store";
+import { outlineFileKindFromAsset, outlinePdfIdFromPublicUrl } from "../../../../lib/outline-pdf-helpers";
+import { getOutlinePdfAssetById, getSiteVenueDetailById } from "../../../../lib/surface-read";
 import SiteOutlineDocumentCard from "../../components/SiteOutlineDocumentCard";
 import SiteShellFrame from "../../components/SiteShellFrame";
 

@@ -5,20 +5,20 @@ const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
 export const TOURNAMENT_PUBLISHED_CARDS_KV_KEY = PLATFORM_KV_KEYS.tournamentPublishedCards;
 
-export type TournamentPublishedCardsReadStrategy = "firestore-kv" | "dev-store-file" | "production-defaults-only";
+export type TournamentPublishedCardsReadStrategy = "firestore-kv" | "local-json-file" | "production-defaults-only";
 
-export type TournamentPublishedCardsWriteStrategy = "firestore-kv" | "dev-store-file" | "blocked";
+export type TournamentPublishedCardsWriteStrategy = "firestore-kv" | "local-json-file" | "blocked";
 
 export function resolveTournamentPublishedCardsReadStrategy(): TournamentPublishedCardsReadStrategy {
   if (IS_PRODUCTION && isFirestoreUsersBackendConfigured()) return "firestore-kv";
   if (IS_PRODUCTION) return "production-defaults-only";
-  return "dev-store-file";
+  return "local-json-file";
 }
 
 export function resolveTournamentPublishedCardsWriteStrategy(): TournamentPublishedCardsWriteStrategy {
   if (IS_PRODUCTION && isFirestoreUsersBackendConfigured()) return "firestore-kv";
   if (IS_PRODUCTION) return "blocked";
-  return "dev-store-file";
+  return "local-json-file";
 }
 
 const WRITE_BLOCKED_PREFIX = "TOURNAMENT_PUBLISHED_CARDS_PERSISTENCE_UNAVAILABLE";
@@ -31,7 +31,7 @@ export function throwTournamentPublishedCardsWritePersistenceBlocked(): never {
   throw new Error(
     `${WRITE_BLOCKED_PREFIX}: In production, tournament published cards can only be saved to Firestore. ` +
       "Configure FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY. " +
-      "File-based dev-store persistence is disabled in production."
+      "File-based local JSON persistence is disabled in production."
   );
 }
 
@@ -39,7 +39,7 @@ export async function readTournamentPublishedCardsRawFromFirestoreKv(): Promise<
   return readPlatformKvJson(TOURNAMENT_PUBLISHED_CARDS_KV_KEY);
 }
 
-/** 정산 ledger-overview 등: Firestore KV만 읽음(readStore·dev-store 파일 미사용). */
+/** 정산 ledger-overview 등: Firestore KV만 읽음(로컬 JSON 파일 미사용). */
 export async function listPublishedCardFlagsFromFirestoreKv(): Promise<
   Array<{ tournamentId: string; isPublished: boolean; isActive: boolean }>
 > {
@@ -67,7 +67,7 @@ export async function upsertTournamentPublishedCardsToFirestoreKv(value: unknown
   return upsertPlatformKvJson(TOURNAMENT_PUBLISHED_CARDS_KV_KEY, value);
 }
 
-/** 정산 장부 게이트: 게시·활성 카드가 KV에 있을 때만 true (dev-store 미사용). */
+/** 정산 장부 게이트: 게시·활성 카드가 KV에 있을 때만 true. */
 export async function tournamentHasActivePublishedCardInKv(tournamentId: string): Promise<boolean> {
   const id = tournamentId.trim();
   if (!id) return false;

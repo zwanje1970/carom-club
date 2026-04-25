@@ -1,4 +1,4 @@
-import type { SiteCommunityBoardKey, SiteCommunityConfig } from "../../../lib/server/dev-store";
+import type { SiteCommunityBoardKey, SiteCommunityConfig } from "../../../lib/types/entities";
 
 /** 탭·모바일 스와이프에 쓰는 물리 게시판 키(설정 `order`로 정렬) */
 export const COMMUNITY_SWIPE_BOARD_KEYS: SiteCommunityBoardKey[] = ["free", "qna", "reviews", "extra1", "extra2"];

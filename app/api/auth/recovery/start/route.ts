@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { findUserByLoginIdAndPhone } from "../../../../../lib/server/dev-store";
+import { findUserByLoginIdAndPhone } from "../../../../../lib/platform-api";
 import { issuePasswordResetToken } from "../../../../../lib/server/account-recovery-memory";
 import { checkRateLimit, getRequestClientKey } from "../../../../../lib/server/rate-limit-memory";
 

@@ -8,7 +8,7 @@ import {
   resolveClientInquiryPlatformDisplay,
   type ClientInquiryStatus,
   type ClientInquiryStored,
-} from "../../../../../../lib/server/dev-store";
+} from "../../../../../../lib/platform-api";
 
 export const runtime = "nodejs";
 

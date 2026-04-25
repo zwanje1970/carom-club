@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 
-import { getSiteLayoutConfig } from "../../../lib/server/dev-store";
+import { getSiteLayoutConfig } from "../../../lib/surface-read";
 import { getSiteUnreadNotificationCount } from "../../../lib/server/site-unread-notification-count";
 import { filterPcHeaderAdminMenuItems, getPcSiteHeaderAdminFlags } from "../lib/site-pc-header-admin";
 import SiteChromeHeader, { isPublicSiteMobileView } from "./SiteChromeHeader";

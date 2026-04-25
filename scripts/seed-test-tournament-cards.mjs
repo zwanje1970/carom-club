@@ -132,7 +132,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.warn("주의: 재실행 시 동일 규칙으로 대회·스냅샷이 추가됩니다. 필요하면 data/v3-dev-store.json 백업 후 실행하세요.\n");
+  console.warn("주의: 재실행 시 동일 규칙으로 대회·스냅샷이 추가됩니다. 필요하면 data/v3-local-platform-aggregate.json 백업 후 실행하세요.\n");
 
   const results = [];
 

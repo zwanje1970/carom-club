@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../lib/auth/session";
-import { getUserById, updateClientApplicationStatus } from "../../../../../../lib/server/dev-store";
+import { getUserById, updateClientApplicationStatus } from "../../../../../../lib/platform-api";
 import { ClientFirestoreUnavailableError } from "../../../../../../lib/server/firestore-client-applications";
 
 export const runtime = "nodejs";
@@ -74,7 +74,7 @@ export async function POST(
       {
         ok: false,
         error: `저장소에 반영하지 못했습니다: ${message}`,
-        step: "dev-store-write",
+        step: "application-status-write",
       },
       { status: 500 }
     );

@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "check:no-dev-store": "node scripts/check-no-dev-store-imports.mjs",
     "build": "next build",
     "start": "next start",
     "seed:test-tournament-cards": "node scripts/seed-test-tournament-cards.mjs",

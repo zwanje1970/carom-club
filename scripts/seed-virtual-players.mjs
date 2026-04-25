@@ -1,5 +1,5 @@
 /**
- * 로컬 dev-store(data/v3-dev-store.json)에 가상 참가자 일반 회원(USER) 64명을 넣는다.
+ * 로컬 aggregate JSON에 가상 참가자 일반 회원(USER) 64명을 넣는다.
  * 64강 브래킷·신청 연결 테스트용 풀 — 클라이언트(vclient*)와 분리된다.
  *
  *   node scripts/seed-virtual-players.mjs
@@ -14,7 +14,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STORE_PATH = path.join(__dirname, "..", "data", "v3-dev-store.json");
+const STORE_PATH = path.join(__dirname, "..", "data", "v3-local-platform-aggregate.json");
 
 const PLAYER_COUNT = 64;
 
@@ -82,7 +82,7 @@ function main() {
     return;
   }
 
-  console.log(`추가 완료: ${added.length}명 (USER · dev-store 가상 참가자 풀)`);
+  console.log(`추가 완료: ${added.length}명 (USER · 로컬 시드 풀)`);
   for (const row of added) {
     console.log(`  ${row.loginId} / ${row.password}`);
   }

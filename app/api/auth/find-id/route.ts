@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { findUserByPhone, maskLoginIdForDisplay } from "../../../../lib/server/dev-store";
+import { findUserByPhone, maskLoginIdForDisplay } from "../../../../lib/platform-api";
 import { checkRateLimit, getRequestClientKey } from "../../../../lib/server/rate-limit-memory";
 
 export const runtime = "nodejs";

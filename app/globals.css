@@ -2066,6 +2066,7 @@ body:has(.site-home-page) {
 /* /client·/platform: 모바일 하단 5탭(.site-home-fab-root)과 본문 겹침 방지 — 스크롤 끝까지 저장 버튼 등 노출 */
 @media (max-width: 767px) {
   .app-mobile-bottom-nav-scroll-pad {
+    padding-top: max(env(safe-area-inset-top, 0px), 12px);
     padding-bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
   }
 }

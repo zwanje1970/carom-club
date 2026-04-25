@@ -1,14 +1,14 @@
 import { randomUUID } from "crypto";
 import { assertClientFirestorePersistenceConfigured } from "./firestore-client-applications";
-import { getTournamentByIdFirestore } from "./firestore-tournaments";
-import { getSharedFirestoreDb } from "./firestore-users";
-import type { TournamentApplication, TournamentApplicationStatus } from "./dev-store";
+import { getTournamentByIdFirestore, listAllTournamentsFirestore, listTournamentsByCreatorFirestore } from "./firestore-tournaments";
+import { firestoreGetUserById, getSharedFirestoreDb } from "./firestore-users";
+import type { DeduplicatedApplicantRow, TournamentApplication, TournamentApplicationStatus } from "./platform-backing-store";
 import {
   buildProtectedProofImageUrl,
   getAllowedTournamentApplicationNextStatuses,
   getProofImageAssetById,
   resolveCanonicalUserIdForAuth,
-} from "./dev-store";
+} from "./platform-backing-store";
 
 const COLLECTION = "v3_tournament_applications";
 
@@ -308,4 +308,74 @@ export async function completeTournamentApplicationOcrFirestore(params: {
     { merge: true }
   );
   return getTournamentApplicationByIdFirestore(params.tournamentId, params.entryId);
+}
+
+async function listTournamentApplicationsByTournamentIdWithIndexFallback(tournamentId: string): Promise<TournamentApplication[]> {
+  assertClientFirestorePersistenceConfigured();
+  const id = tournamentId.trim();
+  if (!id) return [];
+  const db = getSharedFirestoreDb();
+  try {
+    const q = await db
+      .collection(COLLECTION)
+      .where("tournamentId", "==", id)
+      .orderBy("createdAt", "desc")
+      .get();
+    return q.docs.map((doc) => tournamentApplicationFromFirestore(doc.id, doc.data() as Record<string, unknown>));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error ?? "");
+    if (!message.includes("FAILED_PRECONDITION")) {
+      throw error;
+    }
+    const q = await db.collection(COLLECTION).where("tournamentId", "==", id).get();
+    const rows = q.docs.map((doc) => tournamentApplicationFromFirestore(doc.id, doc.data() as Record<string, unknown>));
+    return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+}
+
+/**
+ * production: `listDeduplicatedApplicantsForClientOwner` Firestore 이행.
+ * 본인이 생성한 대회(또는 플랫폼 scope 시 전체)에 대한 신청을 userId 기준으로 한 행씩.
+ */
+export async function listDeduplicatedApplicantsForClientOwnerFirestore(params: {
+  ownerUserId: string;
+  scope: "creator" | "platform";
+}): Promise<DeduplicatedApplicantRow[]> {
+  assertClientFirestorePersistenceConfigured();
+  const ownerUserId = await resolveCanonicalUserIdForAuth(params.ownerUserId.trim());
+  const tournaments =
+    params.scope === "platform" ? await listAllTournamentsFirestore() : await listTournamentsByCreatorFirestore(ownerUserId);
+  const bestByUser = new Map<string, TournamentApplication>();
+  for (const t of tournaments) {
+    const apps = await listTournamentApplicationsByTournamentIdWithIndexFallback(t.id);
+    for (const raw of apps) {
+      const uid = typeof raw.userId === "string" ? raw.userId.trim() : "";
+      if (!uid) continue;
+      const prev = bestByUser.get(uid);
+      const ca = raw.createdAt || "";
+      if (!prev) {
+        bestByUser.set(uid, raw);
+        continue;
+      }
+      const pb = prev.createdAt || "";
+      if (ca.localeCompare(pb) > 0) bestByUser.set(uid, raw);
+    }
+  }
+  const rows: DeduplicatedApplicantRow[] = [];
+  for (const app of bestByUser.values()) {
+    const name = typeof app.applicantName === "string" ? app.applicantName.trim() : "";
+    const phone = typeof app.phone === "string" ? app.phone.trim() : "";
+    const uidTrim = app.userId.trim();
+    const u = await firestoreGetUserById(uidTrim);
+    const pushMarketingAgreed = u ? u.pushMarketingAgreed !== false : true;
+    rows.push({
+      userId: uidTrim,
+      applicantName: name || "—",
+      phone: phone || "—",
+      lastAppliedAt: typeof app.createdAt === "string" ? app.createdAt : "",
+      pushMarketingAgreed,
+    });
+  }
+  rows.sort((a, b) => a.applicantName.localeCompare(b.applicantName, "ko"));
+  return rows;
 }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getApplicationSummaries } from "../../../../lib/server/dev-store";
+import { getApplicationSummaries } from "../../../../lib/surface-read";
 import { ClientFirestoreUnavailableError } from "../../../../lib/server/firestore-client-applications";
 import ClientApplicationsTableClient from "./ClientApplicationsTableClient";
 

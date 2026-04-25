@@ -1,9 +1,7 @@
 import { SITE_TOURNAMENT_LIST_EXCLUDED_BADGES } from "../../../lib/site-tournament-badges";
-import {
-  formatTournamentScheduleLabel,
-  resolveSitePosterDisplayUrl,
-  type Tournament,
-} from "../../../lib/server/dev-store";
+import { formatTournamentScheduleLabel } from "../../../lib/tournament-schedule";
+import { resolveSitePosterDisplayUrl } from "../../../lib/site-poster-urls";
+import type { Tournament } from "../../../lib/types/entities";
 import { listAllTournamentsFirestore } from "../../../lib/server/firestore-tournaments";
 import SiteTournamentsDistanceShell, { type SiteTournamentListRow } from "./SiteTournamentsDistanceShell";
 import { parseTournamentStatusFilter } from "./tournament-list-url";

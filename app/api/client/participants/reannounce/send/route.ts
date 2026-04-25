@@ -6,7 +6,7 @@ import {
   getClientStatusByUserId,
   getUserById,
   listDeduplicatedApplicantsForClientOwner,
-} from "../../../../../../lib/server/dev-store";
+} from "../../../../../../lib/platform-api";
 
 export const runtime = "nodejs";
 

@@ -3,7 +3,7 @@ import GlobalHomeButton from "../components/GlobalHomeButton";
 import SiteChromeHeader, { isPublicSiteMobileView } from "./components/SiteChromeHeader";
 import SiteRootSwipeNav from "./components/SiteRootSwipeNav";
 import SiteVenuesGeolocationNav from "./components/SiteVenuesGeolocationNav";
-import { getSiteLayoutConfig, getSiteNotice } from "../../lib/server/dev-store";
+import { getSiteLayoutConfig, getSiteNotice } from "../../lib/surface-read";
 import { getSiteUnreadNotificationCount } from "../../lib/server/site-unread-notification-count";
 import { filterPcHeaderAdminMenuItems, getPcSiteHeaderAdminFlags } from "./lib/site-pc-header-admin";
 

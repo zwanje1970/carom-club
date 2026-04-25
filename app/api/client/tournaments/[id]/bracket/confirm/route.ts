@@ -1,8 +1,8 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../../lib/auth/session";
-import type { BracketDraftMatchInput } from "../../../../../../../lib/server/dev-store";
-import { checkClientFeatureAccessByUserId, getUserById } from "../../../../../../../lib/server/dev-store";
+import type { BracketDraftMatchInput } from "../../../../../../../lib/platform-api";
+import { checkClientFeatureAccessByUserId, getUserById } from "../../../../../../../lib/platform-api";
 import {
   createBracketFromDraftFirestore,
   getLatestBracketParticipantSnapshotByTournamentIdFirestore,

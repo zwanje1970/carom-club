@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../lib/auth/session";
-import { getUserById } from "../../../lib/server/dev-store";
+import { getUserById } from "../../../lib/surface-read";
 import SiteShellFrame from "../components/SiteShellFrame";
 import SiteMypageClient from "./SiteMypageClient";
 

@@ -16,7 +16,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STORE_PATH = path.join(__dirname, "..", "data", "v3-dev-store.json");
+const STORE_PATH = path.join(__dirname, "..", "data", "v3-local-platform-aggregate.json");
 
 /** dev-seed 출처 문자열 — 반드시 lib/dev-seed-source.ts 와 동일 */
 const DEV_SEED_SOURCE_VIRT_CLIENT_TOURNAMENT_V1 = "dev-seed/virt-client-tournament/v1";
@@ -24,7 +24,7 @@ const DEV_SEED_SOURCE_VIRT_CLIENT_TOURNAMENT_V1 = "dev-seed/virt-client-tourname
 /** 구버전 시드만 제거(제목 접두어 + vclient 작성자 + 64인). 일반 대회와 겹치기 어렵게 3조건 동시 만족 */
 const LEGACY_TITLE_PREFIX = "[가상64강]";
 
-/** dev-store stableUserIdFromDevIdentity 와 동일한 UUID 형태 */
+/** platform-backing stableUserIdFromDevIdentity 와 동일한 UUID 형태 */
 function stableUuidFromSeed(seed) {
   const hash = createHash("sha256").update(seed).digest();
   const buf = Buffer.alloc(16);
@@ -192,7 +192,7 @@ function ymdPlusDays(base, days) {
   return `${y}-${m}-${day}`;
 }
 
-/** dev-store createDefaultTournamentRule + OCR 미사용 */
+/** createDefaultTournamentRule + OCR 미사용 */
 const DEFAULT_RULE = {
   entryCondition: null,
   entryQualificationType: "NONE",

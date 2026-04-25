@@ -7,7 +7,7 @@ import {
   listNotificationsByUserId,
   updateUserProfile,
   type TournamentApplicationStatus,
-} from "../../../../lib/server/dev-store";
+} from "../../../../lib/platform-api";
 import { listTournamentApplicationsByUserIdFirestore } from "../../../../lib/server/firestore-tournament-applications";
 import { getTournamentByIdFirestore } from "../../../../lib/server/firestore-tournaments";
 

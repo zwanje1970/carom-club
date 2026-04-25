@@ -10,7 +10,7 @@ import {
   getUserById,
   upsertClientOrganizationForUser,
   upsertClientVenueIntroForUser,
-} from "../../../../lib/server/dev-store";
+} from "../../../../lib/platform-api";
 import {
   isOrgType,
   normalizeRepresentativeImageUrls,

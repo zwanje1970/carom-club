@@ -12,12 +12,12 @@ import type {
   MutableBracket,
   MutableBracketMatch,
   MutableBracketRound,
-} from "./dev-store";
+} from "./platform-backing-store";
 import {
   applyBracketDefaultsInPlace,
   deriveRoundStatus,
   normalizeBracket,
-} from "./dev-store";
+} from "./platform-backing-store";
 
 const SNAPSHOTS = "v3_tournament_participant_snapshots";
 const BRACKETS = "v3_tournament_brackets";

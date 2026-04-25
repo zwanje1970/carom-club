@@ -5,20 +5,20 @@ const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
 export const SITE_LAYOUT_CONFIG_KV_KEY = PLATFORM_KV_KEYS.siteLayoutConfig;
 
-export type SiteLayoutConfigReadStrategy = "firestore-kv" | "dev-store-file" | "production-defaults-only";
+export type SiteLayoutConfigReadStrategy = "firestore-kv" | "local-json-file" | "production-defaults-only";
 
-export type SiteLayoutConfigWriteStrategy = "firestore-kv" | "dev-store-file" | "blocked";
+export type SiteLayoutConfigWriteStrategy = "firestore-kv" | "local-json-file" | "blocked";
 
 export function resolveSiteLayoutConfigReadStrategy(): SiteLayoutConfigReadStrategy {
   if (IS_PRODUCTION && isFirestoreUsersBackendConfigured()) return "firestore-kv";
   if (IS_PRODUCTION) return "production-defaults-only";
-  return "dev-store-file";
+  return "local-json-file";
 }
 
 export function resolveSiteLayoutConfigWriteStrategy(): SiteLayoutConfigWriteStrategy {
   if (IS_PRODUCTION && isFirestoreUsersBackendConfigured()) return "firestore-kv";
   if (IS_PRODUCTION) return "blocked";
-  return "dev-store-file";
+  return "local-json-file";
 }
 
 const WRITE_BLOCKED_PREFIX = "SITE_LAYOUT_CONFIG_PERSISTENCE_UNAVAILABLE";
@@ -31,7 +31,7 @@ export function throwSiteLayoutConfigWritePersistenceBlocked(): never {
   throw new Error(
     `${WRITE_BLOCKED_PREFIX}: In production, site layout config can only be saved to Firestore. ` +
       "Configure FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY. " +
-      "File-based dev-store persistence is disabled in production."
+      "File-based local JSON persistence is disabled in production."
   );
 }
 

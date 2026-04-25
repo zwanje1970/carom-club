@@ -1,4 +1,4 @@
-import { getSiteVenuesBoardRows } from "../../../lib/server/dev-store";
+import { getSiteVenuesBoardRows } from "../../../lib/surface-read";
 import SiteVenuesBoard from "./SiteVenuesBoard";
 
 export const dynamic = "force-dynamic";

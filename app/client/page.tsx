@@ -3,7 +3,7 @@ import LogoutButton from "../components/LogoutButton";
 import AdminCard, { AdminCardGrid, AdminSurface } from "../components/admin/AdminCard";
 import { cookies } from "next/headers";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../lib/auth/session";
-import { getClientDashboardPolicy } from "../../lib/server/dev-store";
+import { getClientDashboardPolicy } from "../../lib/surface-read";
 
 export default async function ClientHomePage() {
   const cookieStore = await cookies();
@@ -69,7 +69,7 @@ export default async function ClientHomePage() {
       <section className="v3-stack" aria-label="메뉴" style={{ gap: "0.5rem" }}>
         <AdminCardGrid>
           <AdminCard
-            href="/client/tournament"
+            href="/client/tournaments"
             title="대회관리"
             description="대회 생성 · 목록 · 참가자 · 대진표"
           />

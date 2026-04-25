@@ -1,7 +1,7 @@
 /** 커뮤니티 게시판 목록 — 가벼운 게시판형 리스트 */
 
 import Link from "next/link";
-import type { CommunityPostListItem, SiteCommunityBoardKey } from "../../../lib/server/dev-store";
+import type { CommunityPostListItem, SiteCommunityBoardKey } from "../../../lib/types/entities";
 import { COMMUNITY_ROOM_PREFIX_SHORT, isPrimaryTabKey } from "./community-tab-config";
 
 function formatListDateTime(iso: string): string {

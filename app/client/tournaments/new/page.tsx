@@ -9,7 +9,7 @@ import OutlineContentEditor from "../../../../components/shared/outline/OutlineC
 import { isEmptyOutlineHtml } from "../../../../lib/outline-content-helpers";
 import type { OutlineDisplayMode } from "../../../../lib/outline-content-types";
 import { buildSiteVenueDetailPath, getSiteVenueById } from "../../../../lib/site-venues-catalog";
-import type { Tournament } from "../../../../lib/server/dev-store";
+import type { Tournament } from "../../../../lib/types/entities";
 import type {
   TournamentDivisionMetricType,
   TournamentDurationType,

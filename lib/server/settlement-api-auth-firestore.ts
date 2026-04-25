@@ -1,5 +1,5 @@
 /**
- * 정산 API 라우트용: 사용자·클라이언트 게이트만 Firestore/KV 경로(dev-store 미import).
+ * 정산 API 라우트용: 사용자·클라이언트 게이트만 Firestore/KV 경로.
  */
 import type { AuthRole } from "../auth/roles";
 import {

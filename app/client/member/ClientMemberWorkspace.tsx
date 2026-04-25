@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type MemberRow = {
   userId: string;
@@ -22,6 +22,7 @@ export default function ClientMemberWorkspace() {
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const loadReqIdRef = useRef(0);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -40,12 +41,14 @@ export default function ClientMemberWorkspace() {
   const allSendableSelected =
     sendableIds.length > 0 && sendableIds.every((id) => selected.has(id));
 
-  const loadMembers = useCallback(async () => {
+  const loadMembers = useCallback(async (signal?: AbortSignal) => {
+    const reqId = ++loadReqIdRef.current;
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await fetch("/api/client/members", { credentials: "same-origin" });
+      const res = await fetch("/api/client/members", { credentials: "same-origin", signal });
       const data = (await res.json()) as { error?: string; members?: MemberRow[] };
+      if (signal?.aborted || reqId !== loadReqIdRef.current) return;
       if (!res.ok) {
         setLoadError(data.error ?? "목록을 불러오지 못했습니다.");
         setMembers([]);
@@ -53,16 +56,26 @@ export default function ClientMemberWorkspace() {
       }
       setMembers(Array.isArray(data.members) ? data.members : []);
       setSelected(new Set());
-    } catch {
+      setLoadError(null);
+    } catch (e) {
+      if (signal?.aborted) return;
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      if (reqId !== loadReqIdRef.current) return;
       setLoadError("목록 요청 중 오류가 발생했습니다.");
       setMembers([]);
     } finally {
-      setLoading(false);
+      if (reqId === loadReqIdRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    void loadMembers();
+    const ac = new AbortController();
+    void loadMembers(ac.signal);
+    return () => {
+      ac.abort();
+    };
   }, [loadMembers]);
 
   const toggleId = useCallback((userId: string, canSelect: boolean) => {

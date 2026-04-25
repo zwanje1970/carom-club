@@ -6,7 +6,7 @@ import {
   listApprovedClientOrganizations,
   type ClientOrganizationStatus,
   type ClientOrganizationType,
-} from "../../../../lib/server/dev-store";
+} from "../../../../lib/platform-api";
 
 export const runtime = "nodejs";
 

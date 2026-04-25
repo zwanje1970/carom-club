@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { listApprovedClientOrganizations } from "../../../../../lib/server/dev-store";
+import { listApprovedClientOrganizations } from "../../../../../lib/surface-read";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 

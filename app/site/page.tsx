@@ -12,7 +12,7 @@ import {
   getSitePageBuilderPublishedByPageId,
   getUserById,
   listTournamentSnapshotsForMainSite,
-} from "../../lib/server/dev-store";
+} from "../../lib/surface-read";
 import SiteShellFrame from "./components/SiteShellFrame";
 import { isPublicSiteMobileView } from "./components/SiteChromeHeader";
 import SiteMainLogo from "./components/SiteMainLogo";

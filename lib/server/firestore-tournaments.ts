@@ -9,7 +9,7 @@ import type {
   Tournament,
   TournamentRuleSnapshot,
   TournamentStatusBadge,
-} from "./dev-store";
+} from "./platform-backing-store";
 import {
   buildTournamentFromParsedRow,
   finalizeTournamentDates,
@@ -20,7 +20,7 @@ import {
   parseTournamentExtraVenues,
   resolveVenueGuideVenueIdFromOrgs,
   validateTournamentRuleForCreate,
-} from "./dev-store";
+} from "./platform-backing-store";
 
 const COLLECTION = "v3_tournaments";
 
@@ -80,16 +80,27 @@ export async function listTournamentsByCreatorFirestore(userId: string): Promise
   assertClientFirestorePersistenceConfigured();
   const db = getSharedFirestoreDb();
   const orgs = await loadResolutionOrgs();
-  const q = await db
-    .collection(COLLECTION)
-    .where("createdBy", "==", userId.trim())
-    .orderBy("createdAt", "desc")
-    .get();
+  let q;
+  try {
+    q = await db
+      .collection(COLLECTION)
+      .where("createdBy", "==", userId.trim())
+      .orderBy("createdAt", "desc")
+      .get();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error ?? "");
+    // Missing composite index(createdBy + createdAt) fallback: read by creator only and sort in memory.
+    if (!message.includes("FAILED_PRECONDITION")) {
+      throw error;
+    }
+    q = await db.collection(COLLECTION).where("createdBy", "==", userId.trim()).get();
+  }
   const out: Tournament[] = [];
   for (const doc of q.docs) {
     const t = buildTournamentFromParsedRow({ id: doc.id, ...doc.data() }, orgs);
     out.push(await normalizeTournament(t, undefined, orgs));
   }
+  out.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return out;
 }
 

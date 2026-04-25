@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../lib/auth/session";
-import { getClientStatusByUserId, getUserById, type SiteLayoutMenuItem } from "../../../lib/server/dev-store";
+import { getClientStatusByUserId, getUserById } from "../../../lib/surface-read";
+import type { SiteLayoutMenuItem } from "../../../lib/types/entities";
 
 function menuPathOnly(href: string): string {
   const p = href.split("?")[0] ?? "";

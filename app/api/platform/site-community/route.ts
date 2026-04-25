@@ -6,7 +6,7 @@ import {
   getUserById,
   patchSiteCommunityConfig,
   type SiteCommunityBoardConfig,
-} from "../../../../lib/server/dev-store";
+} from "../../../../lib/platform-api";
 import { isSiteCommunityConfigWritePersistenceBlockedError } from "../../../../lib/server/platform-site-community-settings";
 
 export const runtime = "nodejs";

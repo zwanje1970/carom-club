@@ -1,5 +1,5 @@
 /**
- * 로컬 dev-store(data/v3-dev-store.json)에 가상 클라이언트 10명을 넣고
+ * 로컬 aggregate JSON(data/v3-local-platform-aggregate.json)에 가상 클라이언트 10명을 넣고
  * 플랫폼 관리자가 승인한 것과 동일한 상태(APPROVED + 조직)로 맞춘다.
  *
  *   node scripts/seed-virtual-clients.mjs
@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import { getVirtualVenuePreset } from "./virtual-client-venue-presets.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STORE_PATH = path.join(__dirname, "..", "data", "v3-dev-store.json");
+const STORE_PATH = path.join(__dirname, "..", "data", "v3-local-platform-aggregate.json");
 
 function stableUserIdFromDevIdentity({ email, phone }) {
   const em = email?.trim() ? email.trim().toLowerCase() : null;

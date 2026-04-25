@@ -2,11 +2,9 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
-import {
-  getSiteCommunityConfig,
-  parseCommunityBoardTypeParam,
-  type SiteCommunityBoardKey,
-} from "../../../../../lib/server/dev-store";
+import { parseCommunityBoardTypeParam } from "../../../../../lib/community-board-params";
+import { getSiteCommunityConfig } from "../../../../../lib/surface-read";
+import type { SiteCommunityBoardKey } from "../../../../../lib/types/entities";
 import SiteShellFrame from "../../../components/SiteShellFrame";
 import CommunityPostWriteForm from "./CommunityPostWriteForm";
 

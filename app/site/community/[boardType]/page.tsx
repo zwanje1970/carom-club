@@ -1,11 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import {
-  getSiteCommunityConfig,
-  listCommunityPosts,
-  parseCommunityBoardTypeParam,
-  type SiteCommunityBoardKey,
-} from "../../../../lib/server/dev-store";
+import { parseCommunityBoardTypeParam } from "../../../../lib/community-board-params";
+import { getSiteCommunityConfig, listCommunityPosts } from "../../../../lib/surface-read";
+import type { SiteCommunityBoardKey } from "../../../../lib/types/entities";
 import { communityTabLabelForBoard, visibleCommunityBoardKeysForTabs } from "../community-tab-config";
 import CommunityBoardPostList from "../CommunityBoardPostList";
 import CommunityBoardSearchForm from "../CommunityBoardSearchForm";

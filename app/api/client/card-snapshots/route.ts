@@ -11,7 +11,7 @@ import {
   type TournamentCardBackground,
   type TournamentCardTemplate,
   type TournamentCardTheme,
-} from "../../../../lib/server/dev-store";
+} from "../../../../lib/platform-api";
 import { getTournamentByIdFirestore } from "../../../../lib/server/firestore-tournaments";
 import { isTournamentPublishedCardsWritePersistenceBlockedError } from "../../../../lib/server/platform-tournament-published-cards-settings";
 

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../lib/auth/session";
-import { formatTournamentScheduleLabel, resolveCanonicalUserIdForAuth } from "../../../lib/server/dev-store";
+import { resolveCanonicalUserIdForAuth } from "../../../lib/auth/resolve-canonical-user-id-for-auth";
 import { listTournamentsByCreatorFirestore } from "../../../lib/server/firestore-tournaments";
-import type { TournamentStatusBadge } from "../../../lib/server/dev-store";
+import { formatTournamentScheduleLabel } from "../../../lib/tournament-schedule";
+import type { TournamentStatusBadge } from "../../../lib/types/entities";
 import TournamentCardOverflowMenu from "../tournament/TournamentCardOverflowMenu";
 
 export const dynamic = "force-dynamic";

@@ -5,7 +5,7 @@ import {
   getPlatformOperationSettings,
   getUserById,
   patchPlatformOperationSettings,
-} from "../../../../lib/server/dev-store";
+} from "../../../../lib/platform-api";
 import { isPlatformOperationSettingsWritePersistenceBlockedError } from "../../../../lib/server/platform-operation-settings";
 
 export const runtime = "nodejs";

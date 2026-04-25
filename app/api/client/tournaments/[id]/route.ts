@@ -4,7 +4,7 @@ import type { AuthRole } from "../../../../../lib/auth/roles";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
 import { isEmptyOutlineHtml } from "../../../../../lib/outline-content-helpers";
 import type { OutlineDisplayMode } from "../../../../../lib/outline-content-types";
-import { getUserById, getClientStatusByUserId, resolveCanonicalUserIdForAuth, type TournamentRuleSnapshot } from "../../../../../lib/server/dev-store";
+import { getUserById, getClientStatusByUserId, resolveCanonicalUserIdForAuth, type TournamentRuleSnapshot } from "../../../../../lib/platform-api";
 import {
   assertClientCanManageTournamentFirestore,
   deleteTournamentFirestore,

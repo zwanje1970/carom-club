@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { takePasswordResetToken } from "../../../../../lib/server/account-recovery-memory";
-import { updateUserPasswordByUserId } from "../../../../../lib/server/dev-store";
+import { updateUserPasswordByUserId } from "../../../../../lib/platform-api";
 import { checkRateLimit, getRequestClientKey } from "../../../../../lib/server/rate-limit-memory";
 
 export const runtime = "nodejs";

@@ -6,7 +6,7 @@ import {
   serializeSessionCookieValue,
   SESSION_COOKIE_NAME,
 } from "../../../../lib/auth/session";
-import { findUserByIdentifier, getClientStatusByUserId, getUserById } from "../../../../lib/server/dev-store";
+import { findUserByIdentifier, getClientStatusByUserId, getUserById } from "../../../../lib/platform-api";
 
 export const runtime = "nodejs";
 

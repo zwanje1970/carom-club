@@ -55,10 +55,15 @@ type DaumPostcodeData = {
   apartment: string;
 };
 
+type DaumPostcodeInstance = {
+  open: () => void;
+  embed: (wrap: HTMLElement) => void;
+};
+
 declare global {
   interface Window {
     daum?: {
-      Postcode: new (options: { oncomplete: (data: DaumPostcodeData) => void }) => { open: () => void };
+      Postcode: new (options: { oncomplete: (data: DaumPostcodeData) => void }) => DaumPostcodeInstance;
     };
   }
 }
@@ -76,12 +81,26 @@ function loadDaumPostcodeScript(): Promise<void> {
   });
 }
 
+function shouldUseEmbeddedAddressSearch(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent.toLowerCase();
+  const isAndroid = ua.includes("android");
+  const isIos = /iphone|ipad|ipod/.test(ua);
+  const isMobile = isAndroid || isIos;
+  const isWebView = ua.includes("wv") || (isIos && !ua.includes("safari"));
+  return isMobile || isWebView;
+}
+
 export default function ClientSetupPage() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [saveFeedback, setSaveFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
+  const [addressSearchOpen, setAddressSearchOpen] = useState(false);
+  const [addressSearchLoading, setAddressSearchLoading] = useState(false);
+  const [addressSearchError, setAddressSearchError] = useState<string | null>(null);
+  const addressSearchWrapRef = useRef<HTMLDivElement | null>(null);
 
   const preservedOrgRef = useRef<PreservedOrgFields>({
     shortDescription: "",
@@ -162,6 +181,15 @@ export default function ClientSetupPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!addressSearchOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [addressSearchOpen]);
+
   function setTypeSpecific(update: Partial<TypeSpecific>) {
     setForm((f) => ({ ...f, typeSpecific: { ...f.typeSpecific, ...update } }));
   }
@@ -170,22 +198,55 @@ export default function ClientSetupPage() {
     setTypeSpecific({ curriculum: items });
   }
 
+  function applyAddressFromPostcode(data: DaumPostcodeData) {
+    const road = data.roadAddress || data.address || "";
+    setForm((f) => ({
+      ...f,
+      address: road,
+      addressJibun: data.jibunAddress || "",
+      zipCode: data.zonecode || "",
+    }));
+    setAddressSearchOpen(false);
+  }
+
+  function closeAddressSearchModal() {
+    setAddressSearchOpen(false);
+    setAddressSearchLoading(false);
+  }
+
   async function openAddressSearch() {
+    setAddressSearchError(null);
+    const useEmbedded = shouldUseEmbeddedAddressSearch();
+    if (useEmbedded) {
+      setAddressSearchOpen(true);
+      setAddressSearchLoading(true);
+    }
     try {
       await loadDaumPostcodeScript();
-      new window.daum!.Postcode({
-        oncomplete: (data: DaumPostcodeData) => {
-          const road = data.roadAddress || data.address || "";
-          setForm((f) => ({
-            ...f,
-            address: road,
-            addressJibun: data.jibunAddress || "",
-            zipCode: data.zonecode || "",
-          }));
-        },
-      }).open();
+      if (!window.daum?.Postcode) {
+        throw new Error("postcode-unavailable");
+      }
+      const postcode = new window.daum.Postcode({
+        oncomplete: (data: DaumPostcodeData) => applyAddressFromPostcode(data),
+      });
+      if (useEmbedded) {
+        const wrap = addressSearchWrapRef.current;
+        if (!wrap) {
+          throw new Error("postcode-wrap-missing");
+        }
+        wrap.innerHTML = "";
+        postcode.embed(wrap);
+        setAddressSearchLoading(false);
+      } else {
+        postcode.open();
+      }
     } catch {
-      // 스크립트 로드 실패 시 무시
+      if (useEmbedded) {
+        setAddressSearchLoading(false);
+        setAddressSearchError("주소 검색을 불러오지 못했습니다. 직접 입력해 주세요.");
+      } else {
+        setAddressSearchError("주소 검색을 불러오지 못했습니다. 직접 입력해 주세요.");
+      }
     }
   }
 
@@ -352,6 +413,11 @@ export default function ClientSetupPage() {
               주소 검색
             </button>
           </div>
+          {addressSearchError ? (
+            <p className="v3-muted" style={{ margin: 0, color: "#b91c1c", fontSize: "0.85rem" }}>
+              {addressSearchError}
+            </p>
+          ) : null}
           <label className="v3-muted" style={{ display: "block", fontSize: "0.9rem" }}>
             우편번호
             <input
@@ -698,6 +764,58 @@ export default function ClientSetupPage() {
           ) : null}
         </div>
       </form>
+      {addressSearchOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.48)",
+            zIndex: 60,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "0.9rem",
+          }}
+        >
+          <div
+            className="v3-box v3-stack"
+            style={{ width: "100%", maxWidth: "28rem", maxHeight: "90vh", gap: "0.65rem" }}
+          >
+            <div className="v3-row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+              <strong>주소 검색</strong>
+              <button type="button" className="v3-btn" onClick={closeAddressSearchModal}>
+                닫기
+              </button>
+            </div>
+            {addressSearchError ? (
+              <p className="v3-muted" style={{ margin: 0, color: "#b91c1c" }}>
+                {addressSearchError}
+              </p>
+            ) : null}
+            {addressSearchLoading ? (
+              <p className="v3-muted" style={{ margin: 0 }}>
+                주소 검색을 불러오는 중...
+              </p>
+            ) : null}
+            <div
+              ref={addressSearchWrapRef}
+              style={{
+                width: "100%",
+                minHeight: "20rem",
+                maxHeight: "70vh",
+                overflow: "auto",
+                border: "1px solid var(--v3-border, #ddd)",
+                borderRadius: "8px",
+              }}
+            />
+            <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
+              검색이 동작하지 않으면 아래 주소 입력란에 직접 입력해 주세요.
+            </p>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

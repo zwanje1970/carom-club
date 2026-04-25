@@ -7,7 +7,7 @@ import {
   getClientStatusByUserId,
   getUserById,
   listClientInquiryCommentViewsForInquiry,
-} from "../../../../../../lib/server/dev-store";
+} from "../../../../../../lib/platform-api";
 
 export const runtime = "nodejs";
 

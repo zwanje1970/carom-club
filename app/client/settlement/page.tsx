@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Row = { tournamentId: string; title: string; income: number; expense: number; net: number };
 
@@ -15,33 +15,94 @@ function formatWon(n: number) {
   return `${n.toLocaleString("ko-KR")}원`;
 }
 
+function parseLedgerOverviewPayload(v: unknown): LedgerOverviewOk | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  if (o.ok === false) return null;
+  if (!Array.isArray(o.rows)) return null;
+  if (!o.grand || typeof o.grand !== "object") return null;
+  const g = o.grand as Record<string, unknown>;
+  const income = g.income;
+  const expense = g.expense;
+  const net = g.net;
+  if (typeof income !== "number" || typeof expense !== "number" || typeof net !== "number") return null;
+  for (const r of o.rows) {
+    if (!r || typeof r !== "object") return null;
+    const row = r as Record<string, unknown>;
+    if (typeof row.tournamentId !== "string" || typeof row.title !== "string") return null;
+    if (typeof row.income !== "number" || typeof row.expense !== "number" || typeof row.net !== "number") return null;
+  }
+  /* ok: true 권장. ok 생략 시에도 rows+grand 형식이 맞으면 정상(빈 정산)으로 취급 */
+  if (o.ok !== true && o.ok !== undefined) return null;
+  return { ok: true, rows: o.rows as Row[], grand: { income, expense, net } };
+}
+
+function errorTextFromApiPayload(v: unknown): string | null {
+  if (!v || typeof v !== "object") return null;
+  const e = (v as { error?: unknown }).error;
+  return typeof e === "string" && e.trim() ? e.trim() : null;
+}
+
 export default function ClientSettlementHubPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [data, setData] = useState<LedgerOverviewOk | null>(null);
+  const loadReqIdRef = useRef(0);
 
-  const loadOverview = useCallback(async () => {
+  const loadOverview = useCallback(async (signal?: AbortSignal) => {
+    const reqId = ++loadReqIdRef.current;
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/client/settlements/ledger-overview", { credentials: "same-origin" });
-      const json = (await res.json()) as LedgerOverviewOk | { error?: string };
-      if (!res.ok || !("ok" in json) || json.ok !== true) {
-        setData(null);
-        setError((json as { error?: string }).error ?? "조회에 실패했습니다.");
+      const res = await fetch("/api/client/settlements/ledger-overview", { credentials: "same-origin", signal });
+      const text = await res.text();
+      let payload: unknown;
+      if (text.trim() === "") {
+        payload = {};
+      } else {
+        try {
+          payload = JSON.parse(text) as unknown;
+        } catch {
+          if (signal?.aborted || reqId !== loadReqIdRef.current) return;
+          setData(null);
+          setError("조회에 실패했습니다.");
+          return;
+        }
+      }
+      if (signal?.aborted || reqId !== loadReqIdRef.current) return;
+
+      const okBody = parseLedgerOverviewPayload(payload);
+      if (res.ok && okBody) {
+        setData(okBody);
+        setError("");
         return;
       }
-      setData(json);
-    } catch {
+      if (res.ok && !okBody) {
+        setData(null);
+        setError(errorTextFromApiPayload(payload) ?? "조회에 실패했습니다.");
+        return;
+      }
+      setData(null);
+      setError(errorTextFromApiPayload(payload) ?? "조회에 실패했습니다.");
+    } catch (e) {
+      if (signal?.aborted) return;
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      if (reqId !== loadReqIdRef.current) return;
       setData(null);
       setError("조회 중 오류가 발생했습니다.");
     } finally {
-      setLoading(false);
+      if (reqId === loadReqIdRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    void loadOverview();
+    const ac = new AbortController();
+    void loadOverview(ac.signal);
+    return () => {
+      ac.abort();
+    };
   }, [loadOverview]);
 
   return (

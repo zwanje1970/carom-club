@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getClientOrganizationByIdForPlatform } from "../../../../../lib/server/dev-store";
+import { getClientOrganizationByIdForPlatform } from "../../../../../lib/surface-read";
 import ClientOrganizationDetailForm from "./ClientOrganizationDetailForm";
 
 export default async function PlatformClientDetailPage({

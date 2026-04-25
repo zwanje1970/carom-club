@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
-import { getSiteLayoutConfig, getUserById, patchSiteLayoutConfig, type SiteLayoutConfig } from "../../../../lib/server/dev-store";
+import { getSiteLayoutConfig, getUserById, patchSiteLayoutConfig, type SiteLayoutConfig } from "../../../../lib/platform-api";
 import { isSiteLayoutConfigWritePersistenceBlockedError } from "../../../../lib/server/platform-site-layout-settings";
 
 export const runtime = "nodejs";

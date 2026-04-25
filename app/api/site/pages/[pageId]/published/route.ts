@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSitePageBuilderPublishedByPageId } from "../../../../../../lib/server/dev-store";
+import { getSitePageBuilderPublishedByPageId } from "../../../../../../lib/platform-api";
 
 export const runtime = "nodejs";
 

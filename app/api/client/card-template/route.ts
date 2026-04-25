@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
-import { getClientStatusByUserId, getUserById } from "../../../../lib/server/dev-store";
+import { getClientStatusByUserId, getUserById } from "../../../../lib/platform-api";
 
 export const runtime = "nodejs";
 

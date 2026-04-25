@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createUser } from "../../../../lib/server/dev-store";
+import { createUser } from "../../../../lib/platform-api";
 
 export const runtime = "nodejs";
 

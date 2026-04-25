@@ -6,15 +6,15 @@ import {
   getCommunityPostLongEdgePx,
   parseCommunityPostBodySegmentsWithSizes,
 } from "../../../../../lib/community-post-content-images";
+import { parseCommunityBoardTypeParam } from "../../../../../lib/community-board-params";
 import {
   getCommunityPostById,
   getSiteCommunityConfig,
   getUserById,
   incrementCommunityPostViewCount,
   isCommunityPostAuthor,
-  parseCommunityBoardTypeParam,
-  type SiteCommunityBoardKey,
-} from "../../../../../lib/server/dev-store";
+} from "../../../../../lib/surface-read";
+import type { SiteCommunityBoardKey } from "../../../../../lib/types/entities";
 import SiteShellFrame from "../../../components/SiteShellFrame";
 import {
   COMMUNITY_ROOM_PREFIX_SHORT,

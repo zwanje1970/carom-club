@@ -10,7 +10,7 @@ import type {
   ClientOrganizationType,
   ClientRequestedType,
   DevUser,
-} from "./dev-store";
+} from "./platform-backing-store";
 import {
   firestoreGetUserById,
   getSharedFirestoreDb,

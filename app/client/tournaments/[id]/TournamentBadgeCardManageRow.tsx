@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { TournamentStatusBadge } from "../../../../lib/server/dev-store";
+import type { TournamentStatusBadge } from "../../../../lib/types/entities";
 
 const OPTIONS: TournamentStatusBadge[] = [
   "모집중",

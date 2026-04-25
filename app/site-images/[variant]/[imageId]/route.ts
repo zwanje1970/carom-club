@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProofImageAssetById, isSiteImagePubliclyAccessible } from "../../../../lib/server/dev-store";
+import { getProofImageAssetById, isSiteImagePubliclyAccessible } from "../../../../lib/surface-read";
 import { getStoredProofImageVariantUrl } from "../../../../lib/server/proof-image-storage-url";
 import { mimeTypeFromProofExt, readProofImageVariantFile } from "../../../../lib/server/read-proof-image-variant";
 

@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../auth/session";
-import { countUnreadNotificationsByUserId, getUserById } from "./dev-store";
+import { countUnreadNotificationsByUserId, getUserById } from "./platform-backing-store";
 
 /** 읽지 않은 알림 개수만 반환(목록·내용 조회 없음). 헤더·GET /api/site/notifications/unread-count 공용 */
 export async function getSiteUnreadNotificationCount(): Promise<number> {

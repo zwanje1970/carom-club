@@ -7,7 +7,7 @@ import {
   getUserById,
   listClientInquiriesByClientUserIdWithAdminReplyFlag,
   type ClientInquiryType,
-} from "../../../../lib/server/dev-store";
+} from "../../../../lib/platform-api";
 
 export const runtime = "nodejs";
 

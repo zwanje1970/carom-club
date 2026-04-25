@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
-import { getOutlinePdfAssetById, outlineFileKindFromAsset, outlinePdfIdFromPublicUrl } from "../../../../lib/server/dev-store";
+import { outlineFileKindFromAsset, outlinePdfIdFromPublicUrl } from "../../../../lib/outline-pdf-helpers";
+import { getOutlinePdfAssetById } from "../../../../lib/surface-read";
 import { getTournamentByIdFirestore } from "../../../../lib/server/firestore-tournaments";
 import SiteTournamentDetailSections from "../../../site/tournaments/[id]/site-tournament-detail-sections";
 import TournamentBadgeCardManageRow from "./TournamentBadgeCardManageRow";
@@ -35,7 +36,7 @@ export default async function ClientTournamentManagePage({
 
       <SiteTournamentDetailSections
         tournament={tournament}
-        listBackHref="/client/tournament"
+        listBackHref="/client/tournaments"
         audience="client"
         outlinePdfFileKind={outlinePdfFileKind}
       />

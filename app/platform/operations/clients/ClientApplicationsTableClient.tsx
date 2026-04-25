@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import type { ClientApplication } from "../../../../lib/server/dev-store";
+import type { ClientApplication } from "../../../../lib/types/entities";
 import ApplicationStatusUpdateForm from "./ApplicationStatusUpdateForm";
 
 export type ClientApplicationSummaryPayload = {

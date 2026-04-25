@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../lib/auth/session";
-import { ensurePlatformAdminAccount } from "../../lib/server/dev-store";
+import { ensurePlatformAdminAccount } from "../../lib/surface-read";
 import AdminLoginForm from "./AdminLoginForm";
 
 export const runtime = "nodejs";

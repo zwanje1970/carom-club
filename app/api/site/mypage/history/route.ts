@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
-import { getUserById, type TournamentApplicationStatus } from "../../../../../lib/server/dev-store";
+import { getUserById, type TournamentApplicationStatus } from "../../../../../lib/platform-api";
 import { listTournamentApplicationsByUserIdFirestore } from "../../../../../lib/server/firestore-tournament-applications";
 import { getTournamentByIdFirestore } from "../../../../../lib/server/firestore-tournaments";
 

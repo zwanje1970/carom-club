@@ -8,7 +8,7 @@ import {
   listCardSnapshotsByVenueId,
   publishVenueCardSnapshot,
   setCardSnapshotActive,
-} from "../../../../lib/server/dev-store";
+} from "../../../../lib/platform-api";
 import { isSupportedVenueId } from "../../../../lib/venues/catalog";
 
 export const runtime = "nodejs";

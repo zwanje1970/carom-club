@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "crypto";
 import { getSharedFirestoreDb } from "./firestore-users";
 
-/** dev-store `FcmDeviceTokenRecord` 와 동일 필드(순환 import 방지). */
+/** `FcmDeviceTokenRecord` 와 동일 필드(순환 import 방지). */
 export type FirestoreFcmDeviceTokenRow = {
   id: string;
   userId: string;

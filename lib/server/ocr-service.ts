@@ -14,7 +14,7 @@ import {
   markTournamentApplicationOcrProcessing,
   type ProofImageAsset,
   type TournamentApplication,
-} from "./dev-store";
+} from "./platform-backing-store";
 import {
   completeTournamentApplicationOcrFirestore,
   getTournamentApplicationByIdFirestore,

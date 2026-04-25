@@ -62,8 +62,6 @@ export default function BlankBracketPrintClient() {
   const [pdfExporting, setPdfExporting] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewScale, setPreviewScale] = useState(1);
-  /** 모바일 가로: 용지+대진표를 90° 함께 회전 — 스케일은 회전 후 축정렬 박스 기준 */
-  const [previewMobileLandscape, setPreviewMobileLandscape] = useState(false);
   const pdfRootRef = useRef<HTMLDivElement>(null);
   const pdfBusyRef = useRef(false);
   const previewTopbarRef = useRef<HTMLDivElement>(null);
@@ -117,16 +115,10 @@ export default function BlankBracketPrintClient() {
       vw = window.innerWidth;
       vh = window.innerHeight;
     }
-    const mobileUa =
-      typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
-    const landscape = typeof window !== "undefined" && window.innerWidth > window.innerHeight;
-    const rotatePaper = mobileUa && landscape;
-    setPreviewMobileLandscape(rotatePaper);
-
-    /* paper 방향은 이미 확정 — scale만. 가로 모드 회전 시 화면에 맞는 축은 W↔H 교환 */
+    /* 용지는 항상 가로 고정. 화면 방향 변화에는 scale만 재계산한다. */
     const pad = 32;
-    const fitW = rotatePaper ? paperH : paperW;
-    const fitH = rotatePaper ? paperW : paperH;
+    const fitW = paperW;
+    const fitH = paperH;
     let s: number;
     if (stage) {
       s = Math.min((vw - pad) / fitW, (vh - pad) / fitH, 1);
@@ -309,12 +301,13 @@ export default function BlankBracketPrintClient() {
         .preview-overlay .preview-stage {
           flex: 1 1 auto;
           min-height: 0;
-          overflow: hidden;
+          overflow: auto;
           display: flex;
           align-items: center;
           justify-content: center;
           padding: 0 16px 16px;
           box-sizing: border-box;
+          touch-action: pinch-zoom;
         }
         .preview-overlay .paper-frame-slot {
           flex-shrink: 0;
@@ -481,10 +474,8 @@ export default function BlankBracketPrintClient() {
                   <div
                     className="paper-frame-slot"
                     style={{
-                      width:
-                        (previewMobileLandscape ? previewPaper.paperH : previewPaper.paperW) * previewScale,
-                      height:
-                        (previewMobileLandscape ? previewPaper.paperW : previewPaper.paperH) * previewScale,
+                      width: previewPaper.paperW * previewScale,
+                      height: previewPaper.paperH * previewScale,
                     }}
                   >
                     <div
@@ -492,23 +483,12 @@ export default function BlankBracketPrintClient() {
                       style={{
                         width: previewPaper.paperW,
                         height: previewPaper.paperH,
-                        ...(previewMobileLandscape
-                          ? {
-                              left: "50%",
-                              top: "50%",
-                              marginLeft: -previewPaper.paperW / 2,
-                              marginTop: -previewPaper.paperH / 2,
-                              transform: `rotate(90deg) scale(${previewScale})`,
-                              transformOrigin: "center center",
-                            }
-                          : {
-                              left: 0,
-                              top: 0,
-                              marginLeft: 0,
-                              marginTop: 0,
-                              transform: `scale(${previewScale})`,
-                              transformOrigin: "top left",
-                            }),
+                        left: 0,
+                        top: 0,
+                        marginLeft: 0,
+                        marginTop: 0,
+                        transform: `scale(${previewScale})`,
+                        transformOrigin: "top left",
                       }}
                     >
                     <div

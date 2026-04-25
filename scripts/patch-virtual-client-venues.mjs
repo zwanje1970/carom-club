@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import { getVirtualVenuePreset } from "./virtual-client-venue-presets.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STORE_PATH = path.join(__dirname, "..", "data", "v3-dev-store.json");
+const STORE_PATH = path.join(__dirname, "..", "data", "v3-local-platform-aggregate.json");
 
 function main() {
   const raw = readFileSync(STORE_PATH, "utf8");

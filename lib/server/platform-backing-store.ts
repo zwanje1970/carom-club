@@ -102,6 +102,10 @@ import {
   updateClientApplicationStatusFirestore,
   upsertClientOrganizationForUserFirestore,
 } from "./firestore-client-applications";
+import {
+  getClientVenueIntroByUserIdFirestore,
+  upsertClientVenueIntroForUserFirestore,
+} from "./firestore-client-venue-intros";
 
 export type {
   TournamentDivisionMetricType,
@@ -168,7 +172,7 @@ export type ClientApplication = {
   updatedAt: string;
 };
 
-/** 클라이언트 사업장 설정(v2 organization 대응, dev-store 영속) */
+/** 클라이언트 사업장 설정(v2 organization 대응, local-json 영속) */
 export type ClientOrganizationStored = {
   clientUserId: string;
   id: string;
@@ -363,7 +367,7 @@ export type Tournament = {
   outlinePdfUrl: string | null;
   /** 사이트 당구장안내 상세(`/site/venues/{id}`)로 연결할 당구장 ID. 없으면 null */
   venueGuideVenueId: string | null;
-  /** 로컬 dev-store 시드 출처(예: lib/dev-seed-source.ts 상수). 수동·운영 대회에는 두지 않음 */
+  /** 로컬 local-json 시드 출처(예: lib/dev-seed-source.ts 상수). 수동·운영 대회에는 두지 않음 */
   devSeedSource?: string | null;
   /** 없는 구 데이터는 로드 시 기본값으로 채움 */
   rule: TournamentRuleSnapshot;
@@ -832,15 +836,15 @@ type DevStore = {
 
 const DEV_STORE_MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const STORE_DIR_PATH = path.resolve(DEV_STORE_MODULE_DIR, "../../data");
-const STORE_FILE_PATH = path.join(STORE_DIR_PATH, "v3-dev-store.json");
+const STORE_FILE_PATH = path.join(STORE_DIR_PATH, "v3-local-platform-aggregate.json");
 /** 저장 직전 메인 파일 덮어쓰기용 단일 백업(파싱 성공한 내용만 복사) */
-const STORE_BACKUP_PATH = path.join(STORE_DIR_PATH, "v3-dev-store.json.backup");
-const STORE_BACKUP_TIMESTAMP_PATH = path.join(STORE_DIR_PATH, "v3-dev-store.json.backup.timestamp");
+const STORE_BACKUP_PATH = path.join(STORE_DIR_PATH, "v3-local-platform-aggregate.json.backup");
+const STORE_BACKUP_TIMESTAMP_PATH = path.join(STORE_DIR_PATH, "v3-local-platform-aggregate.json.backup.timestamp");
 /** 메인 파일이 깨졌을 때 우선 복구에 사용하는 마지막 정상 스냅샷(원자적 저장으로 갱신) */
-const STORE_LAST_GOOD_PATH = path.join(STORE_DIR_PATH, "v3-dev-store.json.last-good.json");
+const STORE_LAST_GOOD_PATH = path.join(STORE_DIR_PATH, "v3-local-platform-aggregate.json.last-good.json");
 
 /**
- * 로컬 v3-dev-store.json 읽기/쓰기/백업(copyfile 등) 허용 여부 — development 전용.
+ * 로컬 v3-local-platform-aggregate.json 읽기/쓰기/백업(copyfile 등) 허용 여부 — development 전용.
  * 운영(production)에서는 디스크를 건드리지 않음(Lambda /var/task 등 EROFS 방지).
  * 회원·설정 등 실데이터는 Firestore/KV 경로를 사용한다.
  */
@@ -848,12 +852,12 @@ export function isDevStoreFilePersistenceEnabled(): boolean {
   return process.env.NODE_ENV === "development";
 }
 
-/** 운영(production) + Firebase 자격 증명이 있을 때만: 회원·로그인 사용자 레코드는 Firestore, dev-store JSON 사용자 테이블은 보조(시드 관리자 등) */
+/** 운영(production) + Firebase 자격 증명이 있을 때만: 회원·로그인 사용자 레코드는 Firestore, local-json JSON 사용자 테이블은 보조(시드 관리자 등) */
 function useFirestoreUsersInProduction(): boolean {
   return process.env.NODE_ENV === "production" && isFirestoreUsersBackendConfigured();
 }
 
-/** dev-store JSON 파일 접근 직렬화(동시 rename/read·쓰기로 인한 Windows EBUSY 완화). 내부는 writeStoreImpl로 재진입 없이 처리. */
+/** local-json JSON 파일 접근 직렬화(동시 rename/read·쓰기로 인한 Windows EBUSY 완화). 내부는 writeLocalJsonAggregateImpl로 재진입 없이 처리. */
 let storeIoChain: Promise<void> = Promise.resolve();
 const STORE_IO_READ_RETRY_DELAYS_MS = [12, 28, 60];
 const STORE_IO_WRITE_RETRY_DELAYS_MS = [10, 24, 48];
@@ -1280,7 +1284,7 @@ function ensureDefaultPlatformAdminInStore(store: DevStore): boolean {
 /** 임시 파일에 전체 문자열 기록 → 디스크 동기화 → rename으로 교체(본 파일에 이어쓰기 없음) */
 async function atomicWriteJsonFile(targetPath: string, jsonString: string): Promise<void> {
   if (!isDevStoreFilePersistenceEnabled()) {
-    console.warn("[dev-store] skipped atomicWriteJsonFile (non-development):", targetPath);
+    console.warn("[local-json] skipped atomicWriteJsonFile (non-development):", targetPath);
     return;
   }
   const dir = path.dirname(targetPath);
@@ -1346,7 +1350,7 @@ async function snapshotValidMainToBackupAndLastGoodBeforeWrite(): Promise<void> 
     await writeFile(STORE_BACKUP_TIMESTAMP_PATH, `${new Date().toISOString()}\n`, "utf-8");
     await copyFile(STORE_FILE_PATH, STORE_LAST_GOOD_PATH);
   } catch (err) {
-    console.error("[dev-store] pre-write backup/last-good mirror snapshot failed", err);
+    console.error("[local-json] pre-write backup/last-good mirror snapshot failed", err);
   }
 }
 
@@ -1428,7 +1432,7 @@ function mergeUsersField(incoming: DevUser[] | undefined, disk: Partial<DevStore
       .map((u) => normalizeDevUserRecord(u))
       .filter((item): item is DevUser => item !== null);
     if (users.length > 0) {
-      console.warn("[dev-store] 저장 데이터에 users가 비어 있어 기존 파일에서 users를 유지했습니다.");
+      console.warn("[local-json] 저장 데이터에 users가 비어 있어 기존 파일에서 users를 유지했습니다.");
       return users;
     }
   }
@@ -1446,7 +1450,7 @@ function mergeStoreArrayField<T>(
   for (const part of disk) {
     const v = part[key];
     if (Array.isArray(v) && (v as unknown[]).length > 0) {
-      console.warn(`[dev-store] 저장 데이터에 ${label}가 비어 있어 기존 파일에서 유지했습니다.`);
+      console.warn(`[local-json] 저장 데이터에 ${label}가 비어 있어 기존 파일에서 유지했습니다.`);
       return v as T[];
     }
   }
@@ -2263,7 +2267,7 @@ async function ensureLastGoodMirrorIfMissing(store: DevStore): Promise<void> {
     try {
       await atomicWriteJsonFile(STORE_LAST_GOOD_PATH, JSON.stringify(store, null, 2));
     } catch (error) {
-      console.error("[dev-store] failed to create initial last-good mirror", error);
+      console.error("[local-json] failed to create initial last-good mirror", error);
     }
   }
 }
@@ -2294,7 +2298,7 @@ async function tryRecoverFromBackup(): Promise<DevStore | null> {
     reconcileDevStoreLoginIds(store);
     reconcileDevStoreUserIds(store);
     ensureCommunityPostsArray(store);
-    console.warn("[dev-store] dev-store 복구됨 (.backup)");
+    console.warn("[local-json] local-json 복구됨 (.backup)");
     return store;
   } catch {
     return null;
@@ -2308,7 +2312,7 @@ async function tryRecoverFromCorruptBackupsNewestFirst(): Promise<DevStore | nul
   } catch {
     return null;
   }
-  const corrupt = names.filter((n) => n.startsWith("v3-dev-store.json.corrupt.") && n.endsWith(".json"));
+  const corrupt = names.filter((n) => n.startsWith("v3-local-platform-aggregate.json.corrupt.") && n.endsWith(".json"));
   const withStat = await Promise.all(
     corrupt.map(async (name) => {
       const p = path.join(STORE_DIR_PATH, name);
@@ -2348,14 +2352,23 @@ async function backupCorruptMainSnapshot(content: string): Promise<void> {
 async function ensureStoreFile(): Promise<void> {
   if (!isDevStoreFilePersistenceEnabled()) return;
   await mkdir(STORE_DIR_PATH, { recursive: true });
+  const legacyPreRenamePath = path.join(STORE_DIR_PATH, "v3" + "-dev" + "-store.json");
   try {
     await readFile(STORE_FILE_PATH, "utf-8");
   } catch {
     try {
+      await stat(legacyPreRenamePath);
+      await copyFile(legacyPreRenamePath, STORE_FILE_PATH);
+      console.warn("[local-json] legacy aggregate JSON was copied to v3-local-platform-aggregate.json (one-time migration)");
+      return;
+    } catch {
+      // no legacy file
+    }
+    try {
       const bu = await readFile(STORE_BACKUP_PATH, "utf-8");
       JSON.parse(bu);
       await copyFile(STORE_BACKUP_PATH, STORE_FILE_PATH);
-      console.warn("[dev-store] dev-store 복구됨 (메인 파일 없음 → .backup 복원)");
+      console.warn("[local-json] local-json 복구됨 (메인 파일 없음 → .backup 복원)");
       return;
     } catch {
       // no backup or invalid
@@ -2365,7 +2378,7 @@ async function ensureStoreFile(): Promise<void> {
     try {
       await atomicWriteJsonFile(STORE_LAST_GOOD_PATH, empty);
     } catch (error) {
-      console.error("[dev-store] failed to seed last-good for new store file", error);
+      console.error("[local-json] failed to seed last-good for new store file", error);
     }
   }
 }
@@ -2387,7 +2400,7 @@ async function writeJsonWithRetry(targetPath: string, json: string): Promise<voi
   throw lastError;
 }
 
-/** 디스크 복구 실패 시 또는 비개발 환경용 — v3-dev-store.json 없이 동작할 기본 스토어 */
+/** 디스크 복구 실패 시 또는 비개발 환경용 — v3-local-platform-aggregate.json 없이 동작할 기본 스토어 */
 function createEmptyFallbackDevStore(): DevStore {
   const fallbackStore: DevStore = {
     users: [],
@@ -2426,9 +2439,9 @@ function createEmptyFallbackDevStore(): DevStore {
   return fallbackStore;
 }
 
-async function readStoreImpl(): Promise<DevStore> {
+async function readLocalJsonAggregateImpl(): Promise<DevStore> {
   if (!isDevStoreFilePersistenceEnabled()) {
-    console.warn("[dev-store] skipped readStoreImpl disk access (non-development; in-memory empty baseline)");
+    console.warn("[local-json] skipped readLocalJsonAggregateImpl disk access (non-development; in-memory empty baseline)");
     return createEmptyFallbackDevStore();
   }
 
@@ -2459,10 +2472,10 @@ async function readStoreImpl(): Promise<DevStore> {
       }
     }
     if (!parsed) {
-      throw new Error("[dev-store] failed to parse store JSON after retries");
+      throw new Error("[local-json] failed to parse store JSON after retries");
     }
     if (parsedCriticalStoreFieldsInvalid(parsed)) {
-      throw new Error("[dev-store] critical store fields invalid shape");
+      throw new Error("[local-json] critical store fields invalid shape");
     }
     const store = buildDevStoreFromParsed(parsed);
     ensureDefaultPlatformAdminInStore(store);
@@ -2473,16 +2486,16 @@ async function readStoreImpl(): Promise<DevStore> {
       try {
         await ensureLastGoodMirrorIfMissing(store);
       } catch (mirrorErr) {
-        console.error("[dev-store] ensureLastGoodMirrorIfMissing failed after successful read", mirrorErr);
+        console.error("[local-json] ensureLastGoodMirrorIfMissing failed after successful read", mirrorErr);
       }
     }
     return store;
   } catch (err) {
-    console.error("[dev-store] v3-dev-store.json read/parse failed; attempting recovery", err);
+    console.error("[local-json] v3-local-platform-aggregate.json read/parse failed; attempting recovery", err);
     await backupCorruptMainSnapshot(content);
     const fromLastGood = await tryRecoverFromLastGood();
     if (fromLastGood) {
-      console.warn("[dev-store] recovered store from last-good snapshot");
+      console.warn("[local-json] recovered store from last-good snapshot");
       return fromLastGood;
     }
     const fromBackup = await tryRecoverFromBackup();
@@ -2491,16 +2504,16 @@ async function readStoreImpl(): Promise<DevStore> {
     }
     const fromOldCorrupt = await tryRecoverFromCorruptBackupsNewestFirst();
     if (fromOldCorrupt) {
-      console.warn("[dev-store] recovered store from a non-empty corrupt backup file");
+      console.warn("[local-json] recovered store from a non-empty corrupt backup file");
       return fromOldCorrupt;
     }
     return createEmptyFallbackDevStore();
   }
 }
 
-async function writeStoreImpl(store: DevStore): Promise<void> {
+async function writeLocalJsonAggregateImpl(store: DevStore): Promise<void> {
   if (!isDevStoreFilePersistenceEnabled()) {
-    console.warn("[dev-store] skipped writeStoreImpl (non-development)");
+    console.warn("[local-json] skipped writeLocalJsonAggregateImpl (non-development)");
     return;
   }
   await snapshotValidMainToBackupAndLastGoodBeforeWrite();
@@ -2512,11 +2525,11 @@ async function writeStoreImpl(store: DevStore): Promise<void> {
   try {
     await writeJsonWithRetry(STORE_LAST_GOOD_PATH, json);
   } catch (error) {
-    console.error("[dev-store] failed to update last-good snapshot", error);
+    console.error("[local-json] failed to update last-good snapshot", error);
   }
 }
 
-/** 마이페이지 알림: 생성일 기준 보관 일수. 초과분은 readStore 시 메모리에서만 제거한다(읽기 경로에서는 디스크에 반영하지 않음). */
+/** 마이페이지 알림: 생성일 기준 보관 일수. 초과분은 로컬 JSON 집계 읽기 시 메모리에서만 제거한다(읽기 경로에서는 디스크에 반영하지 않음). */
 const USER_NOTIFICATION_RETENTION_DAYS = 30;
 
 function pruneExpiredNotifications(store: DevStore): number {
@@ -2531,25 +2544,25 @@ function pruneExpiredNotifications(store: DevStore): number {
   return before - store.notifications.length;
 }
 
-async function readStore(): Promise<DevStore> {
+async function readLocalJsonAggregate(): Promise<DevStore> {
   if (process.env.NODE_ENV === "production") {
-    throw new Error("dev-store is not allowed in production");
+    throw new Error("local-json is not allowed in production");
   }
   return runStoreIoExclusive(async () => {
-    const store = await readStoreImpl();
+    const store = await readLocalJsonAggregateImpl();
     const removed = pruneExpiredNotifications(store);
     if (removed > 0 && !isDevStoreFilePersistenceEnabled()) {
-      console.warn("[dev-store] pruned expired notifications in memory only (non-development)", removed);
+      console.warn("[local-json] pruned expired notifications in memory only (non-development)", removed);
     }
     return store;
   });
 }
 
-async function writeStore(store: DevStore): Promise<void> {
+async function writeLocalJsonAggregate(store: DevStore): Promise<void> {
   if (process.env.NODE_ENV === "production") {
-    throw new Error("dev-store is not allowed in production");
+    throw new Error("local-json is not allowed in production");
   }
-  return runStoreIoExclusive(() => writeStoreImpl(store));
+  return runStoreIoExclusive(() => writeLocalJsonAggregateImpl(store));
 }
 
 function appendAuditLogSafe(
@@ -2590,7 +2603,7 @@ function normalizePhone(value?: string): string | null {
   return digits.length > 0 ? digits : null;
 }
 
-/** dev-store: 동일 이메일/전화 식별자 → 항상 동일한 userId (스토어 재생성·HMR 후에도 불변) */
+/** local-json: 동일 이메일/전화 식별자 → 항상 동일한 userId (스토어 재생성·HMR 후에도 불변) */
 function stableUserIdFromDevIdentity(params: { email: string | null; phone: string | null }): string {
   const email = params.email?.trim() ? params.email.trim().toLowerCase() : null;
   const phone = params.phone?.trim() ? params.phone.trim() : null;
@@ -2671,14 +2684,14 @@ export async function checkNicknameAvailability(
       }
       return { ok: true, nickname: parsed.nickname };
     } catch (e) {
-      console.error("[dev-store] checkNicknameAvailability Firestore 실패", e);
+      console.error("[local-json] checkNicknameAvailability Firestore 실패", e);
       return { ok: false, error: "닉네임 확인 중 오류가 발생했습니다." };
     }
   }
   if (process.env.NODE_ENV === "production") {
     return { ok: false, error: "닉네임 확인 중 오류가 발생했습니다." };
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   if (isNicknameKeyTakenInStore(store, key, excludeUserId)) {
     return { ok: false, error: "이미 사용중" };
   }
@@ -2751,15 +2764,15 @@ function resolveCanonicalUserId(store: DevStore, rawUserId: string): string {
 
 /**
  * 세션/actors의 user id를 대회 권한·createdBy 비교용으로 정규화한다.
- * production·preview 등에서는 `readStore`를 쓰지 않고 session id를 그대로 쓴다.
- * `legacyUserIdAliases`는 development에서만 dev-store로 해석한다.
+ * production·preview 등에서는 legacy alias 해석을 생략하고 session id를 그대로 쓴다.
+ * `legacyUserIdAliases`는 development에서만 local-json로 해석한다.
  */
 export async function resolveCanonicalUserIdForAuth(rawUserId: string): Promise<string> {
   const trimmed = rawUserId.trim();
   if (process.env.NODE_ENV !== "development") {
     return trimmed;
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return resolveCanonicalUserId(store, trimmed);
 }
 
@@ -3168,12 +3181,12 @@ export async function createUser(params: {
       await firestoreCreateUser(newUser);
       return { ok: true, user: newUser };
     } catch (e) {
-      console.error("[dev-store] createUser Firestore 저장 실패", e);
+      console.error("[local-json] createUser Firestore 저장 실패", e);
       return { ok: false, error: "회원가입 처리 중 오류가 발생했습니다." };
     }
   }
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const duplicated = store.users.some((user) => {
     const uPhone = normalizePhone(user.phone ?? "");
     return (
@@ -3208,7 +3221,7 @@ export async function createUser(params: {
   };
 
   store.users.push(newUser);
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, user: newUser };
 }
 
@@ -3220,12 +3233,12 @@ export async function findUserByIdentifier(identifier: string): Promise<DevUser 
     try {
       return await firestoreFindByLoginIdNorm(loginId);
     } catch (e) {
-      console.error("[dev-store] findUserByIdentifier Firestore 조회 실패", e);
+      console.error("[local-json] findUserByIdentifier Firestore 조회 실패", e);
       throw new Error("User fetch failed in production");
     }
   }
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return store.users.find((item) => item.loginId.toLowerCase() === loginId) ?? null;
 }
 
@@ -3237,11 +3250,11 @@ export async function findUserByPhone(phone: string): Promise<DevUser | null> {
     try {
       return await firestoreFindByPhoneDigits(p);
     } catch (e) {
-      console.error("[dev-store] findUserByPhone Firestore 조회 실패", e);
+      console.error("[local-json] findUserByPhone Firestore 조회 실패", e);
       throw new Error("User fetch failed in production");
     }
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const matches = store.users.filter((u) => normalizePhone(u.phone ?? "") === p);
   if (matches.length === 0) return null;
   return matches[0] ?? null;
@@ -3257,11 +3270,11 @@ export async function findUserByLoginIdAndPhone(loginId: string, phone: string):
     try {
       return await firestoreFindByLoginIdAndPhoneDigits(raw, p);
     } catch (e) {
-      console.error("[dev-store] findUserByLoginIdAndPhone Firestore 조회 실패", e);
+      console.error("[local-json] findUserByLoginIdAndPhone Firestore 조회 실패", e);
       throw new Error("User fetch failed in production");
     }
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return (
     store.users.find((u) => {
       const uLogin = (u.loginId || "").trim().toLowerCase();
@@ -3286,15 +3299,15 @@ export async function updateUserPasswordByUserId(userId: string, newPassword: st
       const ok = await firestoreUpdatePassword(userId, pw);
       if (ok) return true;
     } catch (e) {
-      console.error("[dev-store] updateUserPasswordByUserId Firestore 실패", e);
+      console.error("[local-json] updateUserPasswordByUserId Firestore 실패", e);
     }
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const user = findUserByRawId(store, userId);
   if (!user) return false;
   user.password = pw;
   user.updatedAt = new Date().toISOString();
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return true;
 }
 
@@ -3303,24 +3316,24 @@ export async function getUserById(userId: string): Promise<DevUser | null> {
     try {
       return await firestoreGetUserById(userId);
     } catch (e) {
-      console.error("[dev-store] getUserById Firestore 조회 실패", e);
+      console.error("[local-json] getUserById Firestore 조회 실패", e);
       throw new Error("User fetch failed in production");
     }
   }
   if (process.env.NODE_ENV === "production") {
     return null;
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return findUserByRawId(store, userId);
 }
 
 export async function updateUserRole(userId: string, role: AuthRole): Promise<DevUser | null> {
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const user = findUserByRawId(store, userId);
   if (!user) return null;
   user.role = role;
   user.updatedAt = new Date().toISOString();
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return user;
 }
 
@@ -3329,7 +3342,7 @@ export async function listPlatformUsersForPlatform(params?: {
   role?: AuthRole | "all";
   status?: PlatformUserStatus | "all";
 }): Promise<PlatformUserListItem[]> {
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const search = (params?.search ?? "").trim().toLowerCase();
   const role = params?.role ?? "all";
   const status = params?.status ?? "all";
@@ -3374,7 +3387,7 @@ export async function patchPlatformUserForPlatform(
     orgApprovalStatus?: ClientOrganizationApprovalStatus;
   }
 ): Promise<PlatformUserListItem | null> {
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const targetUserId = userId.trim();
   const user = findUserByRawId(store, targetUserId);
   if (!user) return null;
@@ -3397,7 +3410,7 @@ export async function patchPlatformUserForPlatform(
     });
   }
 
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return {
     id: user.id,
     name: user.name,
@@ -3434,7 +3447,7 @@ export async function updateUserProfile(params: {
     try {
       const fsUser = await firestoreGetUserById(userId);
       if (fsUser) {
-        const store = await readStore();
+        const store = await readLocalJsonAggregate();
         const newKey = nicknameCompareKey(nickResult.nickname);
         const currentKey = nicknameCompareKey(fsUser.nickname);
         if (newKey !== currentKey) {
@@ -3470,12 +3483,12 @@ export async function updateUserProfile(params: {
         return { ok: true, user: fsUser };
       }
     } catch (e) {
-      console.error("[dev-store] updateUserProfile Firestore 실패", e);
+      console.error("[local-json] updateUserProfile Firestore 실패", e);
       return { ok: false, error: "프로필 저장 중 오류가 발생했습니다." };
     }
   }
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const user = findUserByRawId(store, userId);
   if (!user) {
     return { ok: false, error: "사용자를 찾을 수 없습니다." };
@@ -3505,7 +3518,7 @@ export async function updateUserProfile(params: {
   }
   user.updatedAt = new Date().toISOString();
 
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, user };
 }
 
@@ -3524,7 +3537,7 @@ export async function ensurePlatformAdminAccount(params: {
   const name = params.name?.trim() || "플랫폼 관리자";
   if (!loginId || !password) return null;
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const now = new Date().toISOString();
   const existing = store.users.find((user) => user.loginId.toLowerCase() === loginId);
   if (existing) {
@@ -3533,7 +3546,7 @@ export async function ensurePlatformAdminAccount(params: {
     if (existing.role !== "PLATFORM") {
       existing.role = "PLATFORM";
       existing.updatedAt = now;
-      await writeStore(store);
+      await writeLocalJsonAggregate(store);
     }
     return existing;
   }
@@ -3553,7 +3566,7 @@ export async function ensurePlatformAdminAccount(params: {
     pushMarketingAgreed: true,
   };
   store.users.push(created);
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return created;
 }
 
@@ -3597,14 +3610,14 @@ export async function getPlatformOperationSettings(): Promise<PlatformOperationS
       const raw = await readPlatformOperationSettingsRawFromFirestoreKv();
       if (raw != null) return normalizePlatformOperationSettings(raw);
     } catch (e) {
-      console.warn("[dev-store] getPlatformOperationSettings Firestore read failed; using defaults", e);
+      console.warn("[local-json] getPlatformOperationSettings Firestore read failed; using defaults", e);
     }
     return normalizePlatformOperationSettings(undefined);
   }
   if (readStrategy === "production-defaults-only") {
     return normalizePlatformOperationSettings(undefined);
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return normalizePlatformOperationSettings(store.platformOperationSettings);
 }
 
@@ -3631,7 +3644,7 @@ export async function patchPlatformOperationSettings(params: {
   if (writeStrategy === "blocked") {
     throwPlatformOperationSettingsWritePersistenceBlocked();
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const current = normalizePlatformOperationSettings(store.platformOperationSettings);
   const requestedVisible = params.annualMembershipVisible ?? current.annualMembershipVisible;
   const requestedEnforced = params.annualMembershipEnforced ?? current.annualMembershipEnforced;
@@ -3643,7 +3656,7 @@ export async function patchPlatformOperationSettings(params: {
     updatedAt: new Date().toISOString(),
   };
   store.platformOperationSettings = next;
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return next;
 }
 
@@ -3732,7 +3745,7 @@ export async function getClientOrganizationByUserId(userId: string): Promise<Cli
 }
 
 export async function getClientInquiryById(id: string): Promise<ClientInquiryStored | null> {
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const tid = id.trim();
   return store.clientInquiries.find((x) => x.id === tid) ?? null;
 }
@@ -3741,7 +3754,7 @@ export async function getClientInquiryByIdForClientUser(
   inquiryId: string,
   clientUserId: string
 ): Promise<ClientInquiryStored | null> {
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const tid = inquiryId.trim();
   const row = store.clientInquiries.find((x) => x.id === tid) ?? null;
   if (!row) return null;
@@ -3751,7 +3764,7 @@ export async function getClientInquiryByIdForClientUser(
 }
 
 export async function listClientInquiriesByClientUserId(userId: string): Promise<ClientInquiryStored[]> {
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const canonical = resolveCanonicalUserId(store, userId.trim());
   return store.clientInquiries
     .filter((x) => resolveCanonicalUserId(store, x.clientUserId) === canonical)
@@ -3763,7 +3776,7 @@ export async function listClientInquiriesByClientUserIdWithAdminReplyFlag(
   userId: string
 ): Promise<Array<{ inquiry: ClientInquiryStored; hasAdminReply: boolean }>> {
   const rows = await listClientInquiriesByClientUserId(userId);
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return rows.map((inquiry) => ({
     inquiry,
     hasAdminReply: store.inquiryComments.some(
@@ -3775,7 +3788,7 @@ export async function listClientInquiriesByClientUserIdWithAdminReplyFlag(
 export async function listClientInquiriesForPlatform(params?: {
   type?: ClientInquiryType;
 }): Promise<ClientInquiryStored[]> {
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   let rows = [...store.clientInquiries];
   if (params?.type === "ERROR" || params?.type === "FEATURE") {
     rows = rows.filter((x) => x.type === params.type);
@@ -3825,14 +3838,14 @@ async function resolveClientInquiryPlatformDisplayFromStoreAsync(
 export async function resolveClientInquiryPlatformDisplay(
   row: ClientInquiryStored
 ): Promise<ClientInquiryPlatformDisplayFields> {
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return resolveClientInquiryPlatformDisplayFromStoreAsync(store, row);
 }
 
 export async function resolveClientInquiryPlatformDisplayBatch(
   rows: ClientInquiryStored[]
 ): Promise<ClientInquiryPlatformDisplayFields[]> {
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return Promise.all(
     rows.map((row) => resolveClientInquiryPlatformDisplayFromStoreAsync(store, row))
   );
@@ -3852,7 +3865,7 @@ function authorLabelForInquiryComment(
 }
 
 export async function listClientInquiryCommentViewsForInquiry(inquiryId: string): Promise<ClientInquiryCommentView[]> {
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const tid = inquiryId.trim();
   const rows = store.inquiryComments
     .filter((c) => c.inquiryId === tid)
@@ -3877,7 +3890,7 @@ export async function appendClientInquiryCommentAsClient(params: {
   if (!body) return { ok: false, error: "내용을 입력해 주세요." };
   if (body.length > 10000) return { ok: false, error: "내용은 10000자 이하로 입력해 주세요." };
   const imageUrls = normalizeInquiryCommentImageUrls(params.imageUrls);
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const canonical = resolveCanonicalUserId(store, params.clientUserId.trim());
   const inv = store.clientInquiries.find((x) => x.id === params.inquiryId.trim()) ?? null;
   if (!inv) return { ok: false, error: "문의를 찾을 수 없습니다." };
@@ -3899,7 +3912,7 @@ export async function appendClientInquiryCommentAsClient(params: {
   if (invIdx >= 0) {
     store.clientInquiries[invIdx] = { ...store.clientInquiries[invIdx]!, updatedAt: now };
   }
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, comment };
 }
 
@@ -3916,7 +3929,7 @@ export async function appendClientInquiryCommentAsPlatform(params: {
   if (!body) return { ok: false, error: "내용을 입력해 주세요." };
   if (body.length > 10000) return { ok: false, error: "내용은 10000자 이하로 입력해 주세요." };
   const imageUrls = normalizeInquiryCommentImageUrls(params.imageUrls);
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const uid = resolveCanonicalUserId(store, params.platformUserId.trim());
   const u = store.users.find((x) => x.id === uid) ?? null;
   if (!u || u.role !== "PLATFORM") return { ok: false, error: "권한이 없습니다." };
@@ -3940,7 +3953,7 @@ export async function appendClientInquiryCommentAsPlatform(params: {
       ? { ...inv, status: st, updatedAt: now }
       : { ...inv, updatedAt: now };
   store.clientInquiries[idx] = nextInquiry;
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, comment, inquiry: nextInquiry };
 }
 
@@ -3961,7 +3974,7 @@ export async function createClientInquiry(params: {
   if (params.type === "ERROR" && imageUrls.length === 0) {
     return { ok: false, error: "오류 제보는 화면 캡처 등 이미지를 1장 이상 첨부해 주세요." };
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const canonical = resolveCanonicalUserId(store, params.clientUserId.trim());
   const org = await getClientOrganizationByUserId(canonical);
   const now = new Date().toISOString();
@@ -3978,7 +3991,7 @@ export async function createClientInquiry(params: {
     updatedAt: now,
   };
   store.clientInquiries.push(row);
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, inquiry: row };
 }
 
@@ -3989,7 +4002,7 @@ export async function updateClientInquiryByAuthor(params: {
   body?: string;
   imageUrls?: string[];
 }): Promise<{ ok: true; inquiry: ClientInquiryStored } | { ok: false; error: string }> {
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const canonical = resolveCanonicalUserId(store, params.authorUserId.trim());
   const idx = store.clientInquiries.findIndex((x) => x.id === params.inquiryId.trim());
   if (idx < 0) return { ok: false, error: "문의를 찾을 수 없습니다." };
@@ -4021,7 +4034,7 @@ export async function updateClientInquiryByAuthor(params: {
     updatedAt: new Date().toISOString(),
   };
   store.clientInquiries[idx] = next;
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, inquiry: next };
 }
 
@@ -4033,7 +4046,7 @@ export async function updateClientInquiryStatusByPlatform(params: {
   if (st !== "OPEN" && st !== "CHECKED" && st !== "DONE") {
     return { ok: false, error: "상태 값이 올바르지 않습니다." };
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const idx = store.clientInquiries.findIndex((x) => x.id === params.inquiryId.trim());
   if (idx < 0) return { ok: false, error: "문의를 찾을 수 없습니다." };
   const cur = store.clientInquiries[idx];
@@ -4043,7 +4056,7 @@ export async function updateClientInquiryStatusByPlatform(params: {
     updatedAt: new Date().toISOString(),
   };
   store.clientInquiries[idx] = next;
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, inquiry: next };
 }
 
@@ -4076,7 +4089,10 @@ export async function upsertClientOrganizationForUser(
 }
 
 export async function getClientVenueIntroByUserId(userId: string): Promise<ClientVenueIntroStored | null> {
-  const store = await readStore();
+  if (useFirestoreUsersInProduction()) {
+    return getClientVenueIntroByUserIdFirestore(userId);
+  }
+  const store = await readLocalJsonAggregate();
   const canonical = resolveCanonicalUserId(store, userId.trim());
   return store.clientVenueIntros.find((o) => o.clientUserId === canonical) ?? null;
 }
@@ -4090,7 +4106,10 @@ export async function upsertClientVenueIntroForUser(
     outlinePdfUrl: string | null;
   }
 ): Promise<ClientVenueIntroStored> {
-  const store = await readStore();
+  if (useFirestoreUsersInProduction()) {
+    return upsertClientVenueIntroForUserFirestore(userId, params);
+  }
+  const store = await readLocalJsonAggregate();
   const canonical = resolveCanonicalUserId(store, userId.trim());
   const now = new Date().toISOString();
   const idx = store.clientVenueIntros.findIndex((o) => o.clientUserId === canonical);
@@ -4104,7 +4123,7 @@ export async function upsertClientVenueIntroForUser(
   };
   if (idx >= 0) store.clientVenueIntros[idx] = next;
   else store.clientVenueIntros.push(next);
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return next;
 }
 
@@ -4252,7 +4271,7 @@ export type SiteVenueDetail = {
 };
 
 export async function getSiteVenueDetailById(venueIdRaw: string): Promise<SiteVenueDetail | null> {
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const venueId = venueIdRaw.trim();
   if (!venueId) return null;
   const orgs = await listApprovedClientOrganizationsFirestore({ status: "ACTIVE", clientType: "all" });
@@ -4468,7 +4487,7 @@ export async function createTournament(params: {
       ? String(params.outlinePdfUrl).trim()
       : null;
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const venueOrgs = await getVenueGuideResolutionOrgs(store);
   const venueGuideVenueId = resolveVenueGuideVenueIdFromOrgs(venueOrgs, params.venueGuideVenueId);
 
@@ -4495,12 +4514,12 @@ export async function createTournament(params: {
     rule,
   };
   store.tournaments.push(tournament);
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, tournament: await normalizeTournament(tournament, store, venueOrgs) };
 }
 
 export async function listTournamentsByCreator(userId: string): Promise<Tournament[]> {
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const canonicalUserId = resolveCanonicalUserId(store, userId.trim());
   const filtered = store.tournaments.filter((item) => item.createdBy === canonicalUserId);
   const venueOrgs = await getVenueGuideResolutionOrgs(store);
@@ -4509,7 +4528,7 @@ export async function listTournamentsByCreator(userId: string): Promise<Tourname
 }
 
 export async function listAllTournaments(): Promise<Tournament[]> {
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const venueOrgs = await getVenueGuideResolutionOrgs(store);
   const normalized = await Promise.all(
     store.tournaments.slice().map((item) => normalizeTournament(item, store, venueOrgs))
@@ -4553,7 +4572,7 @@ export async function getSettlementLedgerOverviewForClient(params: {
   const tournaments =
     params.role === "PLATFORM" ? await listAllTournaments() : await listTournamentsByCreator(params.userId);
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const publishedCards = await loadTournamentPublishedCardsArray();
   const published = tournaments.filter((t) =>
     publishedCards.some((c) => c.tournamentId === t.id && c.isPublished === true && c.isActive === true)
@@ -4593,7 +4612,7 @@ export async function tournamentHasActivePublishedCard(tournamentId: string): Pr
 }
 
 export async function getTournamentById(tournamentId: string): Promise<Tournament | null> {
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const tournament = store.tournaments.find((item) => item.id === tournamentId) ?? null;
   return tournament ? await normalizeTournament(tournament, store) : null;
 }
@@ -4632,7 +4651,7 @@ export async function assertClientCanManageTournament(params: {
   const tournament = await getTournamentById(tid);
   if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다.", httpStatus: 404 };
   if (params.actorRole === "PLATFORM") return { ok: true, tournament };
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const canonical = resolveCanonicalUserId(store, params.actorUserId.trim());
   if (tournament.createdBy !== canonical) {
     return { ok: false, error: "접근 권한이 없습니다.", httpStatus: 403 };
@@ -4727,7 +4746,7 @@ export async function updateTournament(params: {
       : "TEXT"
     : null;
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const venueOrgs = await getVenueGuideResolutionOrgs(store);
   const venueGuideVenueId = resolveVenueGuideVenueIdFromOrgs(venueOrgs, params.venueGuideVenueId);
 
@@ -4755,7 +4774,7 @@ export async function updateTournament(params: {
     rule,
   };
   store.tournaments[idx] = updated;
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, tournament: await normalizeTournament(updated, store, venueOrgs) };
 }
 
@@ -4772,7 +4791,7 @@ export async function deleteTournament(params: {
   if (!gate.ok) return { ok: false, error: gate.error, httpStatus: gate.httpStatus };
 
   const id = params.tournamentId.trim();
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   store.tournaments = store.tournaments.filter((t) => t.id !== id);
   store.tournamentApplications = store.tournamentApplications.filter((a) => a.tournamentId !== id);
   store.bracketParticipantSnapshots = store.bracketParticipantSnapshots.filter((s) => s.tournamentId !== id);
@@ -4788,7 +4807,7 @@ export async function deleteTournament(params: {
     const cur = await loadTournamentPublishedCardsArray();
     await persistTournamentPublishedCardsRows(cur.filter((c) => c.tournamentId !== id));
   }
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true };
 }
 
@@ -4807,7 +4826,7 @@ export async function duplicateTournament(params: {
   if (!gate.ok) return { ok: false, error: gate.error, httpStatus: gate.httpStatus };
 
   const source = gate.tournament;
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const titles = store.tournaments.filter((t) => t.createdBy === source.createdBy).map((t) => t.title);
   const newTitle = computeDuplicateTournamentTitle(source.title, titles);
 
@@ -4839,7 +4858,7 @@ export async function syncActiveTournamentCardSnapshotStatusBadge(tournamentId: 
   const cardWs = resolveTournamentPublishedCardsWriteStrategy();
   const tournament = isFirestoreUsersBackendConfigured()
     ? await (await import("./firestore-tournaments")).getTournamentByIdFirestore(id)
-    : (await readStore()).tournaments.find((t) => t.id === id);
+    : (await readLocalJsonAggregate()).tournaments.find((t) => t.id === id);
   if (!tournament) return;
   const badge = String(normalizeTournamentStatusBadge(tournament.statusBadge));
   const showOnMain = tournamentStatusEligibleForMainSlide(badge);
@@ -4857,7 +4876,7 @@ export async function syncActiveTournamentCardSnapshotStatusBadge(tournamentId: 
     if (changed) await persistTournamentPublishedCardsRows(next);
     return;
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   let changed = false;
   for (const c of store.tournamentPublishedCards) {
     if (c.tournamentId === id && c.isActive) {
@@ -4867,7 +4886,7 @@ export async function syncActiveTournamentCardSnapshotStatusBadge(tournamentId: 
       changed = true;
     }
   }
-  if (changed) await writeStore(store);
+  if (changed) await writeLocalJsonAggregate(store);
 }
 
 export async function patchTournamentStatusBadge(params: {
@@ -4883,12 +4902,12 @@ export async function patchTournamentStatusBadge(params: {
   });
   if (!gate.ok) return { ok: false, error: gate.error, httpStatus: gate.httpStatus };
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const idx = store.tournaments.findIndex((t) => t.id === params.tournamentId.trim());
   if (idx < 0) return { ok: false, error: "대회를 찾을 수 없습니다.", httpStatus: 404 };
 
   store.tournaments[idx]!.statusBadge = normalizeTournamentStatusBadge(params.statusBadge);
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   await syncActiveTournamentCardSnapshotStatusBadge(params.tournamentId.trim());
   return { ok: true, tournament: await normalizeTournament(store.tournaments[idx]!, store) };
 }
@@ -4992,9 +5011,9 @@ export async function getTournamentSettlementByTournamentId(
   if (!tournament) {
     return { ok: false, error: "대회를 찾을 수 없습니다." };
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const settlement = getOrCreateSettlement(store, tournamentId);
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, settlement };
 }
 
@@ -5010,9 +5029,9 @@ export async function getSettlementSummaryByTournamentId(
     return { ok: false, error: "대회를 찾을 수 없습니다." };
   }
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const settlement = getOrCreateSettlement(store, tournamentId);
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
 
   const approvedApplications = (await listTournamentApplicationsByTournamentId(tournamentId)).filter(
     (item) => item.status === "APPROVED"
@@ -5040,9 +5059,9 @@ export async function listSettlementEntriesByTournamentId(
   if (!tournament) {
     return { ok: false, error: "대회를 찾을 수 없습니다." };
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const settlement = getOrCreateSettlement(store, tournamentId);
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
 
   const approvedEntries = (await listTournamentApplicationsByTournamentId(tournamentId))
     .filter((item) => item.status === "APPROVED")
@@ -5090,7 +5109,7 @@ export async function upsertSettlementExpenseItem(params: {
   if (!title) return { ok: false, error: "지출 항목명을 입력해 주세요." };
   if (!Number.isFinite(amount) || amount < 0) return { ok: false, error: "지출 금액은 0 이상이어야 합니다." };
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const settlement = getOrCreateSettlement(store, tournamentId);
   const normalizedAmount = Math.floor(amount);
   const expenseItemId = params.expenseItemId?.trim() || null;
@@ -5135,7 +5154,7 @@ export async function upsertSettlementExpenseItem(params: {
       previousAmount: actionType === "EXPENSE_UPDATED" ? previousAmount : undefined,
     },
   });
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, settlement };
 }
 
@@ -5158,7 +5177,7 @@ export async function deleteSettlementExpenseItem(params: {
   const expenseItemId = params.expenseItemId.trim();
   if (!expenseItemId) return { ok: false, error: "잘못된 요청입니다." };
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const settlement = getOrCreateSettlement(store, tournamentId);
   const removed = settlement.expenseItems.find((item) => item.id === expenseItemId);
   const nextItems = settlement.expenseItems.filter((item) => item.id !== expenseItemId);
@@ -5179,7 +5198,7 @@ export async function deleteSettlementExpenseItem(params: {
       removedAmount: removed?.amount,
     },
   });
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, settlement };
 }
 
@@ -5206,7 +5225,7 @@ export async function setSettlementRefunded(params: {
     return { ok: false, error: "APPROVED 참가자만 환불 처리할 수 있습니다." };
   }
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const settlement = getOrCreateSettlement(store, params.tournamentId);
   if (params.refunded) {
     if (!settlement.refundedApplicationIds.includes(applicationId)) {
@@ -5216,7 +5235,7 @@ export async function setSettlementRefunded(params: {
     settlement.refundedApplicationIds = settlement.refundedApplicationIds.filter((id) => id !== applicationId);
   }
   settlement.updatedAt = new Date().toISOString();
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, settlement };
 }
 
@@ -5235,7 +5254,7 @@ export async function setTournamentSettlementStatus(params: {
   const tournament = await getTournamentById(tournamentId);
   if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다." };
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const settlement = getOrCreateSettlement(store, tournamentId);
   const previousIsSettled = settlement.isSettled;
   if (previousIsSettled === params.isSettled) {
@@ -5256,7 +5275,7 @@ export async function setTournamentSettlementStatus(params: {
       },
     });
   }
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, settlement };
 }
 
@@ -5272,7 +5291,7 @@ export async function getTournamentLedgerLinesForClient(
   }
   const tournament = await getTournamentById(tournamentId);
   if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다." };
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const s = store.settlements.find((item) => item.tournamentId === tournamentId);
   const lines = normalizeLedgerLinesArray(s?.ledgerLines).sort((a, b) => {
     const ad = a.entryDate ?? "";
@@ -5332,11 +5351,11 @@ export async function replaceSettlementLedgerLines(params: {
     });
   }
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const settlement = getOrCreateSettlement(store, tournamentId);
   settlement.ledgerLines = built;
   settlement.updatedAt = new Date().toISOString();
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true };
 }
 
@@ -5460,7 +5479,7 @@ export async function isSiteImagePubliclyAccessible(imageId: string): Promise<bo
       return extractProofImageIdFromPosterUrl(poster) === normalized;
     });
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return store.tournaments.some((t) => {
     const poster = t.posterImageUrl;
     if (typeof poster !== "string" || !poster.trim()) return false;
@@ -5586,7 +5605,7 @@ export async function createOutlinePdfAsset(params: {
     return { ok: false, error: "잘못된 요청입니다." };
   }
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const user = findUserByRawId(store, uploaderUserId);
   if (!user) {
     return { ok: false, error: "사용자를 찾을 수 없습니다." };
@@ -5603,14 +5622,14 @@ export async function createOutlinePdfAsset(params: {
     fileKind: params.fileKind,
   };
   store.outlinePdfAssets.push(asset);
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, asset };
 }
 
 export async function getOutlinePdfAssetById(pdfId: string): Promise<OutlinePdfAsset | null> {
   const normalized = pdfId.trim();
   if (!normalized) return null;
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return store.outlinePdfAssets.find((item) => item.id === normalized) ?? null;
 }
 
@@ -5621,7 +5640,7 @@ export async function canUserAccessOutlinePdfAsset(params: {
 }): Promise<boolean> {
   const id = params.pdfId.trim();
   if (!id) return false;
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const canonical = resolveCanonicalUserId(store, params.userId.trim());
   if (params.userRole === "PLATFORM") return true;
   const asset = store.outlinePdfAssets.find((a) => a.id === id);
@@ -5635,7 +5654,7 @@ export async function canUserAccessOutlinePdfAsset(params: {
 export async function isOutlinePdfLinkedToAnyTournament(pdfId: string): Promise<boolean> {
   const id = pdfId.trim();
   if (!id) return false;
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const url = buildOutlinePdfPublicUrl(id);
   return store.tournaments.some((t) => t.outlinePdfUrl === url);
 }
@@ -5645,7 +5664,7 @@ export async function isOutlinePdfLinkedForPublicSite(pdfId: string): Promise<bo
   const id = pdfId.trim();
   if (!id) return false;
   if (await isOutlinePdfLinkedToAnyTournament(id)) return true;
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const url = buildOutlinePdfPublicUrl(id);
   for (const intro of store.clientVenueIntros) {
     if (intro.outlinePdfUrl !== url) continue;
@@ -5666,7 +5685,7 @@ export async function isOutlinePdfLinkedForPublicSite(pdfId: string): Promise<bo
 export async function getTournamentApplicationByProofImageId(imageId: string): Promise<TournamentApplication | null> {
   const normalized = imageId.trim();
   if (!normalized) return null;
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const item = store.tournamentApplications.find((application) => application.proofImageId === normalized) ?? null;
   if (!item) return null;
   const createdAt = item.createdAt || new Date().toISOString();
@@ -5713,7 +5732,7 @@ export async function createTournamentApplication(params: {
     return { ok: false, error: "증빙 이미지를 업로드해 주세요." };
   }
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const canonicalUserId = resolveCanonicalUserId(store, params.userId.trim());
   const tournament = store.tournaments.find((item) => item.id === params.tournamentId);
   if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다." };
@@ -5757,7 +5776,7 @@ export async function createTournamentApplication(params: {
   };
 
   store.tournamentApplications.push(application);
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, application };
 }
 
@@ -5769,7 +5788,7 @@ export async function listTournamentApplicationsByTournamentId(
       tournamentId
     );
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return store.tournamentApplications
     .filter((item) => item.tournamentId === tournamentId)
     .map((item) => {
@@ -5799,7 +5818,7 @@ export async function listTournamentApplicationsByUserId(userId: string): Promis
   if (isFirestoreUsersBackendConfigured()) {
     return (await import("./firestore-tournament-applications")).listTournamentApplicationsByUserIdFirestore(userId);
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const canonicalUserId = resolveCanonicalUserId(store, normalizedUserId);
   return store.tournamentApplications
     .filter((item) => item.userId === canonicalUserId)
@@ -5843,7 +5862,11 @@ export async function listDeduplicatedApplicantsForClientOwner(params: {
   ownerUserId: string;
   scope: "creator" | "platform";
 }): Promise<DeduplicatedApplicantRow[]> {
-  const store = await readStore();
+  if (useFirestoreUsersInProduction()) {
+    const { listDeduplicatedApplicantsForClientOwnerFirestore } = await import("./firestore-tournament-applications");
+    return listDeduplicatedApplicantsForClientOwnerFirestore(params);
+  }
+  const store = await readLocalJsonAggregate();
   const ownerUserId = resolveCanonicalUserId(store, params.ownerUserId.trim());
   const tournamentIdSet = new Set<string>();
   for (const t of store.tournaments) {
@@ -5907,7 +5930,7 @@ export async function filterUserIdsWithMarketingPushConsent(userIds: string[]): 
   if (useFirestoreUsersInProduction()) {
     return firestoreFilterUserIdsWithMarketingPushConsentFs(userIds);
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return filterUserIdsWithMarketingPushConsentInStore(store, userIds);
 }
 
@@ -5928,7 +5951,7 @@ export async function createReannounceNotifications(params: {
   const rawIds = [...new Set(params.targetUserIds.map((id) => String(id).trim()).filter(Boolean))];
   if (rawIds.length === 0) return { ok: false, error: "수신자를 선택해 주세요." };
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
 
   if (useFirestoreUsersInProduction()) {
     for (const id of rawIds) {
@@ -5955,7 +5978,7 @@ export async function createReannounceNotifications(params: {
       });
       count += 1;
     }
-    await writeStore(store);
+    await writeLocalJsonAggregate(store);
     return { ok: true, count };
   }
 
@@ -5984,7 +6007,7 @@ export async function createReannounceNotifications(params: {
     });
     count += 1;
   }
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, count };
 }
 
@@ -5996,7 +6019,7 @@ export async function upsertWebPushSubscriptionForUser(params: {
     expirationTime?: number | null;
   };
 }): Promise<WebPushSubscriptionRecord> {
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const canonicalUserId = resolveCanonicalUserId(store, params.userId);
   const endpoint = params.subscription.endpoint.trim();
   const p256dh = params.subscription.keys.p256dh.trim();
@@ -6013,7 +6036,7 @@ export async function upsertWebPushSubscriptionForUser(params: {
     row.keys = { p256dh, auth };
     row.expirationTime = expirationTime;
     row.updatedAt = now;
-    await writeStore(store);
+    await writeLocalJsonAggregate(store);
     return row;
   }
 
@@ -6027,7 +6050,7 @@ export async function upsertWebPushSubscriptionForUser(params: {
     updatedAt: now,
   };
   store.webPushSubscriptions.push(row);
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return row;
 }
 
@@ -6050,7 +6073,7 @@ export async function upsertFcmDeviceTokenForUser(params: {
     });
   }
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const canonicalUserId = resolveCanonicalUserId(store, params.userId);
   const token = params.token.trim();
   if (!token) {
@@ -6069,7 +6092,7 @@ export async function upsertFcmDeviceTokenForUser(params: {
     row.userId = canonicalUserId;
     row.platform = platform;
     row.updatedAt = now;
-    await writeStore(store);
+    await writeLocalJsonAggregate(store);
     return row;
   }
   const row: FcmDeviceTokenRecord = {
@@ -6081,12 +6104,12 @@ export async function upsertFcmDeviceTokenForUser(params: {
     updatedAt: now,
   };
   store.fcmDeviceTokens.push(row);
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return row;
 }
 
 export async function listFcmDeviceTokensByUserId(userId: string): Promise<FcmDeviceTokenRecord[]> {
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const canonicalUserId = resolveCanonicalUserId(store, userId);
   return store.fcmDeviceTokens.filter((row) => row.userId === canonicalUserId);
 }
@@ -6096,7 +6119,7 @@ export async function listFcmDeviceTokensForUserIds(userIds: string[]): Promise<
   if (useFirestoreUsersInProduction()) {
     return firestoreListFcmDeviceTokensForUserIdsFs(userIds);
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const idSet = new Set(
     userIds.map((id) => resolveCanonicalUserId(store, String(id).trim())).filter(Boolean)
   );
@@ -6118,13 +6141,13 @@ export async function removeFcmDeviceTokensByTokenValues(tokens: string[]): Prom
   if (useFirestoreUsersInProduction()) {
     return firestoreRemoveFcmDeviceTokensByTokenValuesFs(raw);
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const drop = new Set(raw);
   const before = store.fcmDeviceTokens.length;
   store.fcmDeviceTokens = store.fcmDeviceTokens.filter((row) => !drop.has(row.token));
   const removed = before - store.fcmDeviceTokens.length;
   if (removed > 0) {
-    await writeStore(store);
+    await writeLocalJsonAggregate(store);
   }
   return removed;
 }
@@ -6134,7 +6157,7 @@ export async function listUserIdsForPlatformPushAudience(audience: "all" | "clie
   if (useFirestoreUsersInProduction()) {
     return firestoreListUserIdsForPushAudienceFs(audience);
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   if (audience === "client") {
     return store.users.filter((u) => u.role === "CLIENT").map((u) => resolveCanonicalUserId(store, u.id));
   }
@@ -6151,7 +6174,7 @@ export async function getTournamentApplicationById(
       entryId
     );
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const item =
     store.tournamentApplications.find((application) => application.tournamentId === tournamentId && application.id === entryId) ??
     null;
@@ -6197,7 +6220,7 @@ export async function createBracketParticipantSnapshot(params: {
     return { ok: false, error: "APPROVED 참가자가 없어 스냅샷을 생성할 수 없습니다." };
   }
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const existsTournament = store.tournaments.some((item) => item.id === params.tournamentId);
   if (!existsTournament) {
     return { ok: false, error: "대회를 찾을 수 없습니다." };
@@ -6215,7 +6238,7 @@ export async function createBracketParticipantSnapshot(params: {
   };
 
   store.bracketParticipantSnapshots.push(snapshot);
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, snapshot };
 }
 
@@ -6227,7 +6250,7 @@ export async function listBracketParticipantSnapshotsByTournamentId(
       tournamentId
     );
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return store.bracketParticipantSnapshots
     .filter((item) => item.tournamentId === tournamentId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -6251,7 +6274,7 @@ export async function createBracketFromSnapshot(
   if (isFirestoreUsersBackendConfigured()) {
     return (await import("./firestore-tournament-brackets")).createBracketFromSnapshotFirestore(snapshotId);
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const snapshot = store.bracketParticipantSnapshots.find((item) => item.id === snapshotId);
   if (!snapshot) {
     return { ok: false, error: "대상자 스냅샷을 찾을 수 없습니다." };
@@ -6291,7 +6314,7 @@ export async function createBracketFromSnapshot(
   };
 
   store.brackets.push(bracket);
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, bracket };
 }
 
@@ -6303,7 +6326,7 @@ export async function createBracketFromDraft(params: {
   if (isFirestoreUsersBackendConfigured()) {
     return (await import("./firestore-tournament-brackets")).createBracketFromDraftFirestore(params);
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const snapshot = store.bracketParticipantSnapshots.find(
     (item) => item.id === params.snapshotId && item.tournamentId === params.tournamentId
   );
@@ -6361,7 +6384,7 @@ export async function createBracketFromDraft(params: {
   };
 
   store.brackets.push(bracket);
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, bracket };
 }
 
@@ -6369,7 +6392,7 @@ export async function listBracketsByTournamentId(tournamentId: string): Promise<
   if (isFirestoreUsersBackendConfigured()) {
     return (await import("./firestore-tournament-brackets")).listBracketsByTournamentIdFirestore(tournamentId);
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return store.brackets
     .filter((item) => item.tournamentId === tournamentId)
     .map((item) => normalizeBracket(item))
@@ -6403,7 +6426,7 @@ export async function updateBracketMatchResult(params: {
     return { ok: false, error: "잘못된 요청입니다." };
   }
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const tournament = store.tournaments.find((item) => item.id === tournamentId);
   if (!tournament) {
     return { ok: false, error: "대회를 찾을 수 없습니다." };
@@ -6489,7 +6512,7 @@ export async function updateBracketMatchResult(params: {
     },
   });
 
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, bracket: normalizeBracket(latestBracket as Bracket) };
 }
 
@@ -6513,7 +6536,7 @@ export async function replaceBracketMatchPlayer(params: {
     return { ok: false, error: "잘못된 요청입니다." };
   }
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const tournament = store.tournaments.find((item) => item.id === tournamentId);
   if (!tournament) {
     return { ok: false, error: "대회를 찾을 수 없습니다." };
@@ -6597,7 +6620,7 @@ export async function replaceBracketMatchPlayer(params: {
     },
   });
 
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, bracket: normalizeBracket(latestBracket as Bracket) };
 }
 
@@ -6608,7 +6631,7 @@ export async function advanceBracketRound(
   if (isFirestoreUsersBackendConfigured()) {
     return (await import("./firestore-tournament-brackets")).advanceBracketRoundFirestore(bracketId, roundNumber);
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const bracket = store.brackets.find((item) => item.id === bracketId) as MutableBracket | undefined;
   if (!bracket) {
     return { ok: false, error: "브래킷을 찾을 수 없습니다." };
@@ -6663,7 +6686,7 @@ export async function advanceBracketRound(
     round.status = deriveRoundStatus(round.matches);
   }
 
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, bracket: normalizeBracket(bracket as Bracket) };
 }
 
@@ -6674,7 +6697,7 @@ export async function markTournamentApplicationOcrProcessing(params: {
   if (isFirestoreUsersBackendConfigured()) {
     return (await import("./firestore-tournament-applications")).markTournamentApplicationOcrProcessingFirestore(params);
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const target = store.tournamentApplications.find(
     (item) => item.tournamentId === params.tournamentId && item.id === params.entryId
   );
@@ -6684,7 +6707,7 @@ export async function markTournamentApplicationOcrProcessing(params: {
   target.ocrStatus = "PROCESSING";
   target.ocrRequestedAt = now;
   target.updatedAt = now;
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return target;
 }
 
@@ -6698,7 +6721,7 @@ export async function completeTournamentApplicationOcr(params: {
   if (isFirestoreUsersBackendConfigured()) {
     return (await import("./firestore-tournament-applications")).completeTournamentApplicationOcrFirestore(params);
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const target = store.tournamentApplications.find(
     (item) => item.tournamentId === params.tournamentId && item.id === params.entryId
   );
@@ -6710,7 +6733,7 @@ export async function completeTournamentApplicationOcr(params: {
   target.ocrRawResult = params.rawResult;
   target.ocrCompletedAt = now;
   target.updatedAt = now;
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return target;
 }
 
@@ -6746,7 +6769,7 @@ export async function updateTournamentApplicationStatus(params: {
     return { ok: false, error: "잘못된 요청입니다." };
   }
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const tournament = store.tournaments.find((item) => item.id === tournamentId);
   if (!tournament) {
     return { ok: false, error: "대회를 찾을 수 없습니다." };
@@ -6841,7 +6864,7 @@ export async function updateTournamentApplicationStatus(params: {
     });
   }
 
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
 
   return {
     ok: true,
@@ -6859,7 +6882,7 @@ export async function listNotificationsByUserId(userId: string, limit = 20): Pro
   if (process.env.NODE_ENV === "production") {
     return [];
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const canonicalUserId = resolveCanonicalUserId(store, normalizedUserId);
   const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
   return store.notifications
@@ -6876,7 +6899,7 @@ export async function countUnreadNotificationsByUserId(userId: string): Promise<
   if (process.env.NODE_ENV === "production") {
     return 0;
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const canonicalUserId = resolveCanonicalUserId(store, normalizedUserId);
   let unread = 0;
   for (const n of store.notifications) {
@@ -6904,14 +6927,14 @@ export async function markNotificationAsRead(params: {
       isRead: true,
     };
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const canonicalUserId = resolveCanonicalUserId(store, userId);
   const notification = store.notifications.find(
     (item) => item.id === notificationId && item.userId === canonicalUserId
   );
   if (!notification) return null;
   notification.isRead = true;
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return notification;
 }
 
@@ -6921,7 +6944,7 @@ export async function markAllNotificationsAsReadForUser(userId: string): Promise
   if (process.env.NODE_ENV === "production") {
     return { updated: 0 };
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const canonicalUserId = resolveCanonicalUserId(store, normalizedUserId);
   let updated = 0;
   for (const n of store.notifications) {
@@ -6931,7 +6954,7 @@ export async function markAllNotificationsAsReadForUser(userId: string): Promise
     }
   }
   if (updated > 0) {
-    await writeStore(store);
+    await writeLocalJsonAggregate(store);
   }
   return { updated };
 }
@@ -6942,7 +6965,7 @@ export async function getSitePageBuilderDraftByPageId(pageId: string): Promise<S
   if (process.env.NODE_ENV === "production") {
     return null;
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const draft = store.sitePageBuilderDrafts.find((item) => item.pageId === normalizedPageId);
   if (!draft) return null;
   return {
@@ -6977,7 +7000,7 @@ export async function upsertSitePageBuilderDraft(params: {
       order: index + 1,
     }));
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const now = new Date().toISOString();
   const nextDraft: SitePageBuilderDraft = {
     pageId,
@@ -6991,7 +7014,7 @@ export async function upsertSitePageBuilderDraft(params: {
   } else {
     store.sitePageBuilderDrafts.push(nextDraft);
   }
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, draft: nextDraft };
 }
 
@@ -7003,7 +7026,7 @@ export async function getSitePageBuilderPublishedByPageId(
   if (process.env.NODE_ENV === "production") {
     return null;
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const published = store.sitePageBuilderPublishedPages.find((item) => item.pageId === normalizedPageId);
   if (!published) return null;
   return {
@@ -7038,7 +7061,7 @@ export async function upsertSitePageBuilderPublishedPage(params: {
       order: index + 1,
     }));
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const now = new Date().toISOString();
   const nextPublished: SitePageBuilderPublishedPage = {
     pageId,
@@ -7052,7 +7075,7 @@ export async function upsertSitePageBuilderPublishedPage(params: {
   } else {
     store.sitePageBuilderPublishedPages.push(nextPublished);
   }
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, published: nextPublished };
 }
 
@@ -7063,14 +7086,14 @@ export async function getSiteLayoutConfig(): Promise<SiteLayoutConfig> {
       const raw = await readSiteLayoutConfigRawFromFirestoreKv();
       if (raw != null) return normalizeSiteLayoutConfig(raw);
     } catch (e) {
-      console.warn("[dev-store] getSiteLayoutConfig Firestore read failed; using defaults", e);
+      console.warn("[local-json] getSiteLayoutConfig Firestore read failed; using defaults", e);
     }
     return normalizeSiteLayoutConfig(undefined);
   }
   if (readStrategy === "production-defaults-only") {
     return normalizeSiteLayoutConfig(undefined);
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return normalizeSiteLayoutConfig(store.siteLayoutConfig);
 }
 
@@ -7096,14 +7119,14 @@ export async function patchSiteLayoutConfig(params: {
   if (writeStrategy === "blocked") {
     throwSiteLayoutConfigWritePersistenceBlocked();
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const current = normalizeSiteLayoutConfig(store.siteLayoutConfig);
   const next: SiteLayoutConfig = {
     header: params.header ? normalizeSiteLayoutConfig({ header: params.header, footer: current.footer }).header : current.header,
     footer: params.footer ? normalizeSiteLayoutConfig({ header: current.header, footer: params.footer }).footer : current.footer,
   };
   store.siteLayoutConfig = next;
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return next;
 }
 
@@ -7122,17 +7145,17 @@ export async function getSiteNotice(): Promise<SiteNotice> {
       const raw = await readSiteNoticeRawFromFirestoreKv();
       if (raw != null) return normalizeSiteNotice(raw);
     } catch (e) {
-      console.warn("[dev-store] getSiteNotice Firestore read failed; using defaults", e);
+      console.warn("[local-json] getSiteNotice Firestore read failed; using defaults", e);
     }
     return normalizeSiteNotice(undefined);
   }
   if (readStrategy === "production-defaults-only") {
     return normalizeSiteNotice(undefined);
   }
-  if (readStrategy === "dev-store-file" && siteNoticeMemoryFallback) {
+  if (readStrategy === "local-json-file" && siteNoticeMemoryFallback) {
     return siteNoticeMemoryFallback;
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return normalizeSiteNotice(store.siteNotice);
 }
 
@@ -7155,7 +7178,7 @@ export async function patchSiteNotice(params: {
   if (writeStrategy === "blocked") {
     throwSiteNoticeWritePersistenceBlocked();
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const current = normalizeSiteNotice(store.siteNotice);
   const next: SiteNotice = {
     enabled: params.enabled ?? current.enabled,
@@ -7164,7 +7187,7 @@ export async function patchSiteNotice(params: {
   store.siteNotice = next;
   siteNoticeMemoryFallback = next;
   try {
-    await writeStore(store);
+    await writeLocalJsonAggregate(store);
   } catch (error) {
     if (!isReadonlyDevStoreWriteError(error)) {
       throw error;
@@ -7180,14 +7203,14 @@ export async function getSiteCommunityConfig(): Promise<SiteCommunityConfig> {
       const raw = await readSiteCommunityConfigRawFromFirestoreKv();
       if (raw != null) return normalizeSiteCommunityConfig(raw);
     } catch (e) {
-      console.warn("[dev-store] getSiteCommunityConfig Firestore read failed; using defaults", e);
+      console.warn("[local-json] getSiteCommunityConfig Firestore read failed; using defaults", e);
     }
     return normalizeSiteCommunityConfig(undefined);
   }
   if (readStrategy === "production-defaults-only") {
     return normalizeSiteCommunityConfig(undefined);
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return normalizeSiteCommunityConfig(store.siteCommunityConfig);
 }
 
@@ -7215,7 +7238,7 @@ export async function patchSiteCommunityConfig(params: {
   if (writeStrategy === "blocked") {
     throwSiteCommunityConfigWritePersistenceBlocked();
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const current = normalizeSiteCommunityConfig(store.siteCommunityConfig);
   const next: SiteCommunityConfig = {
     free: normalizeSiteCommunityBoardConfig(params.free ?? current.free, current.free),
@@ -7225,7 +7248,7 @@ export async function patchSiteCommunityConfig(params: {
     extra2: normalizeSiteCommunityBoardConfig(params.extra2 ?? current.extra2, current.extra2),
   };
   store.siteCommunityConfig = next;
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return next;
 }
 
@@ -7285,14 +7308,14 @@ async function loadSiteCommunityFeed(): Promise<{
         communityComments: [...parsed.communityComments],
       };
     } catch (e) {
-      console.warn("[dev-store] site community feed Firestore read failed; using empty feed", e);
+      console.warn("[local-json] site community feed Firestore read failed; using empty feed", e);
       return { communityPosts: [], communityComments: [] };
     }
   }
   if (rs === "production-empty-only") {
     return { communityPosts: [], communityComments: [] };
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   ensureCommunityPostsArray(store);
   if (!Array.isArray(store.communityComments)) store.communityComments = [];
   return {
@@ -7314,10 +7337,10 @@ async function persistSiteCommunityFeed(feed: {
     return true;
   }
   if (ws === "blocked") return false;
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   store.communityPosts = feed.communityPosts;
   store.communityComments = feed.communityComments;
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return true;
 }
 
@@ -7333,14 +7356,14 @@ async function loadProofImageAssetsList(): Promise<ProofImageAsset[]> {
       const raw = await readSiteProofImageAssetsRawFromFirestoreKv();
       return [...parseProofImageAssetsFromKvRaw(raw)];
     } catch (e) {
-      console.warn("[dev-store] site proof image assets Firestore read failed; using empty list", e);
+      console.warn("[local-json] site proof image assets Firestore read failed; using empty list", e);
       return [];
     }
   }
   if (rs === "production-empty-only") {
     return [];
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return [...store.proofImages];
 }
 
@@ -7351,9 +7374,9 @@ async function persistProofImageAssetsList(list: ProofImageAsset[]): Promise<boo
     return true;
   }
   if (ws === "blocked") return false;
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   store.proofImages = list;
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return true;
 }
 
@@ -7469,7 +7492,7 @@ export async function createCommunityPost(params: {
 }
 
 export async function isCommunityPostAuthor(postAuthorUserId: string, editorUserId: string): Promise<boolean> {
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return resolveCanonicalUserId(store, postAuthorUserId) === resolveCanonicalUserId(store, editorUserId);
 }
 
@@ -7488,7 +7511,7 @@ export async function updateCommunityPostById(
   const imageUrls = normalizeCommunityPostImageUrls(params.imageUrls);
   const imageSizeLevels = normalizeCommunityPostImageSizeLevels(imageUrls.length, params.imageSizeLevels);
   const feed = await loadSiteCommunityFeed();
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const id = postId.trim();
   const p = feed.communityPosts.find((x) => x.id === id);
   if (!p || p.isDeleted === true) {
@@ -7513,7 +7536,7 @@ export async function softDeleteCommunityPostById(
   editorUserId: string
 ): Promise<{ ok: true } | { ok: false; code: "NOT_FOUND" | "FORBIDDEN" | "PERSIST_UNAVAILABLE" }> {
   const feed = await loadSiteCommunityFeed();
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const id = postId.trim();
   const p = feed.communityPosts.find((x) => x.id === id);
   if (!p || p.isDeleted === true) {
@@ -7606,7 +7629,7 @@ export async function softDeleteComment(
 ): Promise<{ ok: true } | { ok: false; code: "NOT_FOUND" | "FORBIDDEN" | "PERSIST_UNAVAILABLE" }> {
   const feed = await loadSiteCommunityFeed();
   if (!Array.isArray(feed.communityComments)) feed.communityComments = [];
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const id = commentId.trim();
   const c = feed.communityComments.find((x) => x.id === id);
   if (!c || c.isDeleted === true) return { ok: false, code: "NOT_FOUND" };
@@ -7675,7 +7698,7 @@ export async function getTournamentDateLocationMetaForPublishedCards(
   if (process.env.NODE_ENV === "production") {
     return { date: "", location: "" };
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return tournamentDateLocationMeta(store, tournamentId);
 }
 
@@ -7784,7 +7807,7 @@ export async function upsertTournamentPublishedCard(params: {
     throwTournamentPublishedCardsWritePersistenceBlocked();
   }
 
-  const localStore = cardWs === "dev-store-file" ? await readStore() : null;
+  const localStore = cardWs === "local-json-file" ? await readLocalJsonAggregate() : null;
   const tournament = isFirestoreUsersBackendConfigured()
     ? await (await import("./firestore-tournaments")).getTournamentByIdFirestore(params.tournamentId.trim())
     : localStore?.tournaments.find((item) => item.id === params.tournamentId.trim());
@@ -7801,11 +7824,11 @@ export async function upsertTournamentPublishedCard(params: {
   const tid = params.tournamentId.trim();
   /** 초안 저장: 이전 초안(비활성)만 제거. 게시: 해당 대회 카드 전부 제거 후 새 게시 스냅샷 1건만 둔다. */
   const cards =
-    cardWs === "dev-store-file" && localStore
+    cardWs === "local-json-file" && localStore
       ? localStore.tournamentPublishedCards
       : [...(await loadTournamentPublishedCardsArray())];
   if (params.draftOnly) {
-    if (cardWs === "dev-store-file" && localStore) {
+    if (cardWs === "local-json-file" && localStore) {
       localStore.tournamentPublishedCards = localStore.tournamentPublishedCards.filter(
         (c) => !(c.tournamentId === tid && !c.isActive)
       );
@@ -7814,7 +7837,7 @@ export async function upsertTournamentPublishedCard(params: {
       cards.length = 0;
       cards.push(...next);
     }
-  } else if (cardWs === "dev-store-file" && localStore) {
+  } else if (cardWs === "local-json-file" && localStore) {
     localStore.tournamentPublishedCards = localStore.tournamentPublishedCards.filter((c) => c.tournamentId !== tid);
   } else {
     const next = cards.filter((c) => c.tournamentId !== tid);
@@ -7822,7 +7845,7 @@ export async function upsertTournamentPublishedCard(params: {
     cards.push(...next);
   }
 
-  const working = cardWs === "dev-store-file" && localStore ? localStore.tournamentPublishedCards : cards;
+  const working = cardWs === "local-json-file" && localStore ? localStore.tournamentPublishedCards : cards;
   const sameTournament = working.filter((c) => c.tournamentId === tid);
   const nextVersion = sameTournament.reduce((max, c) => Math.max(max, c.version), 0) + 1;
 
@@ -7869,7 +7892,7 @@ export async function upsertTournamentPublishedCard(params: {
   if (cardWs === "firestore-kv") {
     await persistTournamentPublishedCardsRows(working);
   } else if (localStore) {
-    await writeStore(localStore);
+    await writeLocalJsonAggregate(localStore);
   }
   return {
     ok: true,
@@ -7907,7 +7930,7 @@ export async function publishVenueCardSnapshot(params: {
     return { ok: false, error: "이미지 업로드 후 발행할 수 있습니다." };
   }
 
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const sameVenueSnapshots = store.publishedCardSnapshots.filter(
     (item) => item.snapshotSourceType === "VENUE_SNAPSHOT" && item.tournamentId === venueId
   );
@@ -7946,7 +7969,7 @@ export async function publishVenueCardSnapshot(params: {
   };
 
   store.publishedCardSnapshots.push(snapshot);
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
   return { ok: true, snapshot };
 }
 
@@ -7962,7 +7985,7 @@ export async function listPublishedCardSnapshots(): Promise<PublishedCardSnapsho
       })
   );
 
-  const store = isFirestoreUsersBackendConfigured() ? null : await readStore();
+  const store = isFirestoreUsersBackendConfigured() ? null : await readLocalJsonAggregate();
   const normalized = (store ? store.publishedCardSnapshots : [])
     .map((item) => {
       const legacy = item as PublishedCardSnapshot & { cardImageUrl?: string; snapshotSourceType?: string };
@@ -8044,7 +8067,7 @@ export async function loadTournamentPublishedCardsArray(): Promise<TournamentPub
   if (rs === "production-defaults-only") {
     return [];
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return store.tournamentPublishedCards;
 }
 
@@ -8057,9 +8080,9 @@ async function persistTournamentPublishedCardsRows(next: TournamentPublishedCard
   if (ws === "blocked") {
     throwTournamentPublishedCardsWritePersistenceBlocked();
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   store.tournamentPublishedCards = next;
-  await writeStore(store);
+  await writeLocalJsonAggregate(store);
 }
 
 /**
@@ -8118,7 +8141,7 @@ export async function listCardSnapshotsByVenueId(venueId: string): Promise<Publi
   if (isFirestoreUsersBackendConfigured()) {
     return [];
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   return store.publishedCardSnapshots
     .filter((item) => normalizeSnapshotSourceType(item) === "VENUE_SNAPSHOT" && item.tournamentId === venueId)
     .map((item) => {
@@ -8150,7 +8173,7 @@ export async function getCardSnapshotById(snapshotId: string): Promise<Published
   if (isFirestoreUsersBackendConfigured()) {
     return null;
   }
-  const store = await readStore();
+  const store = await readLocalJsonAggregate();
   const snapshot = store.publishedCardSnapshots.find((item) => item.snapshotId === snapshotId);
   if (!snapshot) return null;
   const publishedAt = snapshot.publishedAt || new Date().toISOString();
@@ -8174,8 +8197,8 @@ export async function setCardSnapshotActive(params: {
 }): Promise<{ ok: true; snapshot: PublishedCardSnapshot } | { ok: false; error: string }> {
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
   const cardWs = resolveTournamentPublishedCardsWriteStrategy();
-  const needFileStore = cardWs === "dev-store-file";
-  const fileStore = needFileStore ? await readStore() : null;
+  const needFileStore = cardWs === "local-json-file";
+  const fileStore = needFileStore ? await readLocalJsonAggregate() : null;
   const publishedCards =
     needFileStore && fileStore
       ? fileStore.tournamentPublishedCards
@@ -8209,7 +8232,7 @@ export async function setCardSnapshotActive(params: {
     if (cardWs === "firestore-kv") {
       await persistTournamentPublishedCardsRows(publishedCards);
     } else if (fileStore) {
-      await writeStore(fileStore);
+      await writeLocalJsonAggregate(fileStore);
     }
     return {
       ok: true,
@@ -8246,7 +8269,7 @@ export async function setCardSnapshotActive(params: {
   snapshot.updatedAt = now;
   snapshot.isPublished = true;
 
-  await writeStore(fileStore);
+  await writeLocalJsonAggregate(fileStore);
 
   return {
     ok: true,

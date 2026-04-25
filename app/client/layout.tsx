@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import GlobalHomeButton from "../components/GlobalHomeButton";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../lib/auth/session";
-import { getClientStatusByUserId, getClientDashboardPolicy, getUserById } from "../../lib/server/dev-store";
+import { getClientDashboardPolicy, getClientStatusByUserId, getUserById } from "../../lib/surface-read";
 import SitePcDashboardChromeShell from "../site/components/SitePcDashboardChromeShell";
 
 export default async function ClientLayout({

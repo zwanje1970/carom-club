@@ -9,7 +9,7 @@ import {
   updateClientInquiryStatusByPlatform,
   type ClientInquiryStatus,
   type ClientInquiryStored,
-} from "../../../../../lib/server/dev-store";
+} from "../../../../../lib/platform-api";
 
 async function inquiryPayloadForPlatform(row: ClientInquiryStored) {
   const d = await resolveClientInquiryPlatformDisplay(row);

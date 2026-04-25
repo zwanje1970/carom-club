@@ -1,4 +1,4 @@
-import { getSiteCommunityConfig, listCommunityPostsAllPrimary } from "../../../lib/server/dev-store";
+import { getSiteCommunityConfig, listCommunityPostsAllPrimary } from "../../../lib/surface-read";
 import {
   communityTabLabelForBoard,
   visibleCommunityBoardKeysForTabs,

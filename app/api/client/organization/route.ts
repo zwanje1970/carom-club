@@ -7,7 +7,7 @@ import {
   getLatestClientApplicationByUserId,
   getUserById,
   upsertClientOrganizationForUser,
-} from "../../../../lib/server/dev-store";
+} from "../../../../lib/platform-api";
 
 export const runtime = "nodejs";
 

@@ -1,6 +1,6 @@
 /**
  * 구 v3 자동 정산 요약: 승인 인원×참가비 − 환불 − 지출 항목.
- * API 응답 호환을 위해 유지하며, dev-store에서만 호출한다.
+ * API 응답 호환을 위해 유지.
  */
 
 export function computeLegacyAutoSettlementSummary(params: {

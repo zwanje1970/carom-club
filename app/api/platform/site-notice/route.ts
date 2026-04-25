@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
-import { getSiteNotice, getUserById, patchSiteNotice } from "../../../../lib/server/dev-store";
+import { getSiteNotice, getUserById, patchSiteNotice } from "../../../../lib/platform-api";
 import { isSiteNoticeWritePersistenceBlockedError } from "../../../../lib/server/platform-site-notice-settings";
 
 export const runtime = "nodejs";

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 import { readdir, readFile } from "fs/promises";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
-import { getUserById } from "../../../../lib/server/dev-store";
+import { getUserById } from "../../../../lib/platform-api";
 
 export const runtime = "nodejs";
 
