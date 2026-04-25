@@ -66,6 +66,16 @@ export default function BlankBracketPrintClient() {
   const pdfBusyRef = useRef(false);
   const previewTopbarRef = useRef<HTMLDivElement>(null);
   const previewStageRef = useRef<HTMLDivElement>(null);
+  const previewDomStyleSnapshotRef = useRef<{
+    bodyOverflow: string;
+    bodyTransform: string;
+    bodyRotate: string;
+    bodyTouchAction: string;
+    htmlOverflow: string;
+    htmlTransform: string;
+    htmlRotate: string;
+    htmlTouchAction: string;
+  } | null>(null);
 
   const endOptions = useMemo(() => validEndOptions(startPlayers), [startPlayers]);
   const rounds = useMemo(() => {
@@ -135,12 +145,37 @@ export default function BlankBracketPrintClient() {
   }, [previewPaper]);
 
   useEffect(() => {
-    if (!previewOpen) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prevOverflow;
+    const restoreDomStyles = () => {
+      const snap = previewDomStyleSnapshotRef.current;
+      if (!snap) return;
+      document.body.style.overflow = snap.bodyOverflow;
+      document.body.style.transform = snap.bodyTransform;
+      document.body.style.rotate = snap.bodyRotate;
+      document.body.style.touchAction = snap.bodyTouchAction;
+      document.documentElement.style.overflow = snap.htmlOverflow;
+      document.documentElement.style.transform = snap.htmlTransform;
+      document.documentElement.style.rotate = snap.htmlRotate;
+      document.documentElement.style.touchAction = snap.htmlTouchAction;
+      previewDomStyleSnapshotRef.current = null;
     };
+
+    if (!previewOpen) {
+      restoreDomStyles();
+      return;
+    }
+    previewDomStyleSnapshotRef.current = {
+      bodyOverflow: document.body.style.overflow,
+      bodyTransform: document.body.style.transform,
+      bodyRotate: document.body.style.rotate,
+      bodyTouchAction: document.body.style.touchAction,
+      htmlOverflow: document.documentElement.style.overflow,
+      htmlTransform: document.documentElement.style.transform,
+      htmlRotate: document.documentElement.style.rotate,
+      htmlTouchAction: document.documentElement.style.touchAction,
+    };
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return restoreDomStyles;
   }, [previewOpen]);
 
   useLayoutEffect(() => {
@@ -185,6 +220,12 @@ export default function BlankBracketPrintClient() {
       stage.scrollLeft = 0;
       stage.scrollTop = 0;
     }
+    document.body.style.transform = "";
+    document.body.style.rotate = "";
+    document.body.style.touchAction = "";
+    document.documentElement.style.transform = "";
+    document.documentElement.style.rotate = "";
+    document.documentElement.style.touchAction = "";
   }, []);
 
   /** A4 가로 PDF — html2canvas 로 `.bbp-print-svg` 캡처 후 jsPDF 에 277×190mm 로 삽입 */
@@ -313,6 +354,14 @@ export default function BlankBracketPrintClient() {
           background: #f59e0b;
           color: #111827;
           cursor: pointer;
+        }
+        /* 모바일에서는 수동 회전 계열 조작 버튼을 표시하지 않는다(자동 방향 대응 우선) */
+        @media (max-width: 1024px) {
+          .preview-overlay .preview-rotate-button,
+          .preview-overlay [data-preview-rotate],
+          .preview-overlay [aria-label*="회전"] {
+            display: none !important;
+          }
         }
         .preview-overlay .preview-stage {
           flex: 1 1 auto;
