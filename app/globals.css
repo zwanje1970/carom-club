@@ -2071,6 +2071,22 @@ body:has(.site-home-page) {
   }
 }
 
+/* /client·/platform 대시보드: 페이지 상단 제목 영역을 본문과 분리 */
+.app-dashboard-shell .v3-page > .ui-client-dashboard-header,
+.app-dashboard-shell .v3-page > .v3-h1:first-child {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: #e2e6eb;
+  color: #111827;
+}
+
+.app-dashboard-shell .v3-page > .ui-client-dashboard-header .v3-h1,
+.app-dashboard-shell .v3-page > .v3-h1:first-child {
+  margin-bottom: 0;
+  color: #111827;
+}
+
 /* —— Reference UI: 커뮤니티(큰 카드 + 아이콘) —— */
 /* 게시판 목록: 글쓰기 FAB — 하단 홈 UI와 분리, site-home-fab 색·그림자와 통일 */
 .community-write-fab {

@@ -9,7 +9,7 @@ export default function PlatformLayout({
   return (
     <>
       <SitePcDashboardChromeShell />
-      <div className="app-mobile-bottom-nav-scroll-pad">{children}</div>
+      <div className="app-mobile-bottom-nav-scroll-pad app-dashboard-shell">{children}</div>
       <GlobalHomeButton />
     </>
   );

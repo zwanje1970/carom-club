@@ -373,7 +373,7 @@ export default function ClientSetupPage() {
         기본 사업장 정보를 입력합니다.
       </p>
 
-      <form className="v3-box v3-stack" onSubmit={handleSubmit} style={{ gap: "1rem" }}>
+      <form className="v3-box v3-stack setup-form-placeholder-ux" onSubmit={handleSubmit} style={{ gap: "1rem" }}>
         <div>
           <label className="v3-muted" style={{ display: "block", marginBottom: "0.35rem", fontSize: "0.9rem" }}>
             업체 종류
@@ -553,46 +553,55 @@ export default function ClientSetupPage() {
             </div>
             {venuePricingTypeUi === "GENERAL" || venuePricingTypeUi === "MIXED"
               ? (["daedae", "jungdae", "pocket"] as const).map((key) => (
-                  <div key={key} className="v3-stack" style={{ gap: "0.5rem", padding: "0.75rem", background: "var(--v3-surface-2, #f8f8f8)", borderRadius: "6px" }}>
+                  <div key={key} className="v3-stack venue-table-section" style={{ gap: "0.5rem" }}>
                     <h3 style={{ margin: 0, fontSize: "0.95rem" }}>{key === "daedae" ? "대대" : key === "jungdae" ? "중대" : "포켓"}</h3>
                     {key === "daedae" ? (
-                      <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
-                        <span style={{ flex: "1 1 6rem", fontSize: "0.75rem", color: "#94a3b8", fontWeight: 400 }}>종류(브랜드)</span>
-                        <span style={{ flex: "1 1 6rem", fontSize: "0.75rem", color: "#94a3b8", fontWeight: 400 }}>대수</span>
-                        <span style={{ flex: "1 1 6rem", fontSize: "0.75rem", color: "#94a3b8", fontWeight: 400 }}>가격(10분)</span>
+                      <div className="venue-table-header">
+                        <span>종류(브랜드)</span>
+                        <span>대수</span>
+                        <span>가격(10분)</span>
                       </div>
                     ) : null}
-                    <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
-                      <input
-                        className="v3-input"
-                        style={{ flex: "1 1 6rem", padding: "0.4rem 0.5rem", fontSize: "0.9rem" }}
-                        value={venue[key]?.kind ?? ""}
-                        onChange={(e) =>
-                          setTypeSpecific({
-                            [key]: { ...venue[key], kind: e.target.value },
-                          } as Partial<VenueSpecific>)
-                        }
-                      />
-                      <input
-                        className="v3-input"
-                        style={{ flex: "1 1 6rem", padding: "0.4rem 0.5rem", fontSize: "0.9rem" }}
-                        value={venue[key]?.count ?? ""}
-                        onChange={(e) =>
-                          setTypeSpecific({
-                            [key]: { ...venue[key], count: e.target.value },
-                          } as Partial<VenueSpecific>)
-                        }
-                      />
-                      <input
-                        className="v3-input"
-                        style={{ flex: "1 1 6rem", padding: "0.4rem 0.5rem", fontSize: "0.9rem" }}
-                        value={venue[key]?.fee ?? ""}
-                        onChange={(e) =>
-                          setTypeSpecific({
-                            [key]: { ...venue[key], fee: e.target.value },
-                          } as Partial<VenueSpecific>)
-                        }
-                      />
+                    <div className="venue-table-row">
+                      <label className="venue-table-field">
+                        <span>종류(브랜드)</span>
+                        <input
+                          className="v3-input"
+                          style={{ padding: "0.4rem 0.5rem", fontSize: "0.9rem" }}
+                          value={venue[key]?.kind ?? ""}
+                          onChange={(e) =>
+                            setTypeSpecific({
+                              [key]: { ...venue[key], kind: e.target.value },
+                            } as Partial<VenueSpecific>)
+                          }
+                        />
+                      </label>
+                      <label className="venue-table-field">
+                        <span>대수</span>
+                        <input
+                          className="v3-input"
+                          style={{ padding: "0.4rem 0.5rem", fontSize: "0.9rem" }}
+                          value={venue[key]?.count ?? ""}
+                          onChange={(e) =>
+                            setTypeSpecific({
+                              [key]: { ...venue[key], count: e.target.value },
+                            } as Partial<VenueSpecific>)
+                          }
+                        />
+                      </label>
+                      <label className="venue-table-field">
+                        <span>가격(10분)</span>
+                        <input
+                          className="v3-input"
+                          style={{ padding: "0.4rem 0.5rem", fontSize: "0.9rem" }}
+                          value={venue[key]?.fee ?? ""}
+                          onChange={(e) =>
+                            setTypeSpecific({
+                              [key]: { ...venue[key], fee: e.target.value },
+                            } as Partial<VenueSpecific>)
+                          }
+                        />
+                      </label>
                     </div>
                   </div>
                 ))
@@ -816,6 +825,62 @@ export default function ClientSetupPage() {
           </div>
         </div>
       ) : null}
+      <style jsx>{`
+        .setup-form-placeholder-ux :global(input) {
+          color: #111;
+        }
+        .setup-form-placeholder-ux :global(input::placeholder) {
+          color: #aaa;
+          opacity: 1;
+        }
+        .venue-table-section {
+          margin-top: 16px;
+          padding: 12px;
+          border-radius: 8px;
+          background: #f8f9fb;
+        }
+        .venue-table-header {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 8px;
+          color: #94a3b8;
+          font-size: 0.75rem;
+          font-weight: 400;
+        }
+        .venue-table-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 8px;
+        }
+        .venue-table-field {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          min-width: 0;
+        }
+        .venue-table-field > span {
+          display: none;
+        }
+        @media (max-width: 767px) {
+          .venue-table-header {
+            display: none;
+          }
+          .venue-table-row {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+          }
+          .venue-table-field > span {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #333;
+          }
+          .venue-table-field :global(input) {
+            height: 40px;
+          }
+        }
+      `}</style>
     </main>
   );
 }
