@@ -62,7 +62,6 @@ export default function BlankBracketPrintClient() {
   const [pdfExporting, setPdfExporting] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewScale, setPreviewScale] = useState(1);
-  const [previewViewport, setPreviewViewport] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const pdfRootRef = useRef<HTMLDivElement>(null);
   const pdfBusyRef = useRef(false);
   const previewTopbarRef = useRef<HTMLDivElement>(null);
@@ -125,25 +124,9 @@ export default function BlankBracketPrintClient() {
       vw = window.innerWidth;
       vh = window.innerHeight;
     }
-    /* 용지는 항상 가로 고정. 미리보기 내부에 가로 전용 viewport를 만든다. */
-    const stageRatio = Math.max(vw, vh) / Math.max(1, Math.min(vw, vh));
-    const landscapeRatio = Number.isFinite(stageRatio) && stageRatio > 1 ? stageRatio : 16 / 9;
-    const viewportWidth = Math.max(1, Math.min(vw, vh * landscapeRatio));
-    const viewportHeight = Math.max(1, Math.min(vh, viewportWidth / landscapeRatio));
-    setPreviewViewport({ width: viewportWidth, height: viewportHeight });
-    const fitScale = Math.min(viewportWidth / paperW, viewportHeight / paperH, 1);
-    const mqLandscape = typeof window !== "undefined" && window.matchMedia
-      ? window.matchMedia("(orientation: landscape)").matches
-      : window.innerWidth > window.innerHeight;
-    const innerLandscape = typeof window !== "undefined" ? window.innerWidth > window.innerHeight : false;
-    const isLandscape = mqLandscape || innerLandscape;
-
+    /* 용지는 항상 가로 고정. 세로/가로 모두 단순 fitScale로 복구한다. */
+    const fitScale = Math.min(vw / paperW, vh / paperH, 1);
     let s = fitScale;
-    if (isLandscape) {
-      const viewportShortSide = Math.min(viewportWidth, viewportHeight);
-      const targetMinScale = (viewportShortSide * 0.9) / paperH;
-      s = Math.max(fitScale, targetMinScale);
-    }
     if (!(s > 0) || !Number.isFinite(s)) s = 0.1;
     setPreviewScale(s);
   }, [previewPaper]);
@@ -213,14 +196,12 @@ export default function BlankBracketPrintClient() {
   const handleOpenPreviewOverlay = useCallback(() => {
     if (!rounds.length || !scene) return;
     setPreviewScale(1);
-    setPreviewViewport({ width: 0, height: 0 });
     setPreviewOpen(true);
   }, [rounds.length, scene]);
 
   const handleClosePreviewOverlay = useCallback(() => {
     setPreviewOpen(false);
     setPreviewScale(1);
-    setPreviewViewport({ width: 0, height: 0 });
     const stage = previewStageRef.current;
     if (stage) {
       stage.scrollLeft = 0;
@@ -376,18 +357,8 @@ export default function BlankBracketPrintClient() {
           display: block;
           padding: 0 max(16px, env(safe-area-inset-left, 0px)) calc(env(safe-area-inset-bottom, 0px) + 16px) max(16px, env(safe-area-inset-right, 0px));
           box-sizing: border-box;
-          touch-action: pan-x pan-y pinch-zoom;
+          touch-action: auto;
           -webkit-overflow-scrolling: touch;
-        }
-        .preview-overlay .preview-landscape-viewport {
-          width: max-content;
-          height: max-content;
-          min-width: 100%;
-          min-height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-sizing: border-box;
         }
         .preview-overlay .paper-frame-slot {
           width: max-content;
@@ -558,51 +529,43 @@ export default function BlankBracketPrintClient() {
                 </div>
                 <div className="preview-stage" ref={previewStageRef}>
                   <div
-                    className="preview-landscape-viewport"
+                    className="paper-frame-slot"
                     style={{
-                      width: previewViewport.width > 0 ? previewViewport.width : undefined,
-                      height: previewViewport.height > 0 ? previewViewport.height : undefined,
+                      width: previewPaper.paperW * previewScale,
+                      height: previewPaper.paperH * previewScale,
                     }}
                   >
                     <div
-                      className="paper-frame-slot"
+                      className="paper-frame"
                       style={{
-                        width: previewPaper.paperW * previewScale,
-                        height: previewPaper.paperH * previewScale,
+                        width: previewPaper.paperW,
+                        height: previewPaper.paperH,
+                        left: 0,
+                        top: 0,
+                        marginLeft: 0,
+                        marginTop: 0,
+                        transform: `scale(${previewScale})`,
+                        transformOrigin: "top left",
                       }}
                     >
-                      <div
-                        className="paper-frame"
-                        style={{
-                          width: previewPaper.paperW,
-                          height: previewPaper.paperH,
-                          left: 0,
-                          top: 0,
-                          marginLeft: 0,
-                          marginTop: 0,
-                          transform: `scale(${previewScale})`,
-                          transformOrigin: "top left",
-                        }}
-                      >
-                      <div
-                        className="paper"
-                        style={{ width: previewPaper.paperW, height: previewPaper.paperH }}
-                      >
-                        <div className="bracket-scene">
-                          <div className="bbp-print-page-sheet">
-                            <BracketSVG
-                              scene={scene}
-                              matchType={matchType}
-                              startPairLabels={startPairLabels}
-                              warmEmptyBoxFill={warmEmptyBoxFill}
-                            />
-                            <BracketPrintServiceMark />
-                          </div>
+                    <div
+                      className="paper"
+                      style={{ width: previewPaper.paperW, height: previewPaper.paperH }}
+                    >
+                      <div className="bracket-scene">
+                        <div className="bbp-print-page-sheet">
+                          <BracketSVG
+                            scene={scene}
+                            matchType={matchType}
+                            startPairLabels={startPairLabels}
+                            warmEmptyBoxFill={warmEmptyBoxFill}
+                          />
+                          <BracketPrintServiceMark />
                         </div>
-                      </div>
                       </div>
                     </div>
                   </div>
+                </div>
                 </div>
               </div>
             </div>,
