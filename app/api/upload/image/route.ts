@@ -83,61 +83,65 @@ export async function POST(request: Request) {
 
   if (useLocalProofImageDisk) {
     const baseUploadDir = getProofImagesBaseDir();
-    const originalDir = path.join(baseUploadDir, "original");
     const w320Dir = path.join(baseUploadDir, "w320");
     const w640Dir = path.join(baseUploadDir, "w640");
-    await mkdir(originalDir, { recursive: true });
     await mkdir(w320Dir, { recursive: true });
     await mkdir(w640Dir, { recursive: true });
 
-    const originalFileName = `${imageId}.${ext}`;
-    const w320FileName = `${imageId}.jpg`;
-    const w640FileName = `${imageId}.jpg`;
+    const w320Jpg = path.join(w320Dir, `${imageId}.jpg`);
+    const w640Jpg = path.join(w640Dir, `${imageId}.jpg`);
+    const w640Alt = path.join(w640Dir, `${imageId}.${ext}`);
 
-    const originalPath = path.join(originalDir, originalFileName);
-    const w320Path = path.join(w320Dir, w320FileName);
-    const w640Path = path.join(w640Dir, w640FileName);
-    const w320FallbackPath = path.join(w320Dir, originalFileName);
-    const w640FallbackPath = path.join(w640Dir, originalFileName);
-
+    let w640ForDownstream: Buffer;
     try {
-      await writeFile(originalPath, buffer);
+      w640ForDownstream = await sharp(buffer)
+        .resize({ width: 640, withoutEnlargement: true })
+        .jpeg({ quality: 88 })
+        .toBuffer();
+      await writeFile(w640Jpg, w640ForDownstream);
     } catch (err) {
-      console.error("[api/upload/image] 원본 저장 실패:", err);
-      return NextResponse.json({ error: "이미지 파일을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요." }, { status: 500 });
+      console.warn("[api/upload/image] w640 sharp 실패, 원본 바이트를 w640에 저장", err);
+      w640ForDownstream = buffer;
+      try {
+        await writeFile(w640Alt, buffer);
+      } catch (e2) {
+        console.error("[api/upload/image] w640 저장 실패", e2);
+        return NextResponse.json({ error: "이미지 파일을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요." }, { status: 500 });
+      }
     }
 
     let w320Ok = false;
-    let w640Ok = false;
     try {
-      await sharp(buffer)
+      const w320Buf = await sharp(buffer)
         .resize({ width: 320, withoutEnlargement: true })
         .jpeg({ quality: 85 })
-        .toFile(w320Path);
+        .toBuffer();
+      await writeFile(w320Jpg, w320Buf);
       w320Ok = true;
     } catch (err) {
-      console.warn("[api/upload/image] w320 sharp 생략(원본 복사):", err);
+      console.warn("[api/upload/image] w320 원본→320 sharp 실패, w640 기반 재시도", err);
     }
-    try {
-      await sharp(buffer)
-        .resize({ width: 640, withoutEnlargement: true })
-        .jpeg({ quality: 88 })
-        .toFile(w640Path);
-      w640Ok = true;
-    } catch (err) {
-      console.warn("[api/upload/image] w640 sharp 생략(원본 복사):", err);
+    if (!w320Ok) {
+      try {
+        const w320Buf = await sharp(w640ForDownstream)
+          .resize({ width: 320, withoutEnlargement: true })
+          .jpeg({ quality: 85 })
+          .toBuffer();
+        await writeFile(w320Jpg, w320Buf);
+        w320Ok = true;
+      } catch (err) {
+        console.warn("[api/upload/image] w320 w640기반 sharp 실패, 원본 복사", err);
+      }
     }
-
-    try {
-      if (!w320Ok) {
-        await writeFile(w320FallbackPath, buffer);
+    if (!w320Ok) {
+      const w320Alt = path.join(w320Dir, `${imageId}.${ext}`);
+      try {
+        await writeFile(w320Alt, buffer);
+        w320Ok = true;
+      } catch (err) {
+        console.error("[api/upload/image] w320 저장 실패", err);
+        return NextResponse.json({ error: "이미지 파일을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요." }, { status: 500 });
       }
-      if (!w640Ok) {
-        await writeFile(w640FallbackPath, buffer);
-      }
-    } catch (err) {
-      console.error("[api/upload/image] 파생 파일(원본 복사) 저장 실패:", err);
-      return NextResponse.json({ error: "이미지 파일을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요." }, { status: 500 });
     }
 
     const createAssetResult = await createProofImageAsset({
@@ -153,45 +157,62 @@ export async function POST(request: Request) {
     const buildUrl = sitePublic ? buildSitePublicImageUrl : buildProtectedProofImageUrl;
     return NextResponse.json({
       imageId,
-      originalUrl: buildUrl(imageId, "original"),
       w320Url: buildUrl(imageId, "w320"),
       w640Url: buildUrl(imageId, "w640"),
     });
   }
 
-  let w320Buffer: Buffer;
   let w640Buffer: Buffer;
-  try {
-    w320Buffer = await sharp(buffer)
-      .resize({ width: 320, withoutEnlargement: true })
-      .jpeg({ quality: 85 })
-      .toBuffer();
-  } catch (err) {
-    console.warn("[api/upload/image] w320 sharp 생략(원본 바이트 업로드):", err);
-    w320Buffer = buffer;
-  }
   try {
     w640Buffer = await sharp(buffer)
       .resize({ width: 640, withoutEnlargement: true })
       .jpeg({ quality: 88 })
       .toBuffer();
   } catch (err) {
-    console.warn("[api/upload/image] w640 sharp 생략(원본 바이트 업로드):", err);
+    console.warn("[api/upload/image] w640 sharp 실패(원본 바이트로 w640 업로드)", err);
     w640Buffer = buffer;
   }
 
-  let storageUrls: { storageOriginalUrl: string; storageW320Url: string; storageW640Url: string };
+  let w320Buffer: Buffer;
+  try {
+    w320Buffer = await sharp(buffer)
+      .resize({ width: 320, withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+  } catch (err) {
+    console.warn("[api/upload/image] w320 원본→320 sharp 실패, w640 기반 재시도", err);
+    try {
+      w320Buffer = await sharp(w640Buffer)
+        .resize({ width: 320, withoutEnlargement: true })
+        .jpeg({ quality: 85 })
+        .toBuffer();
+    } catch (err2) {
+      console.warn("[api/upload/image] w320 w640기반 sharp 실패, 원본 바이트 업로드", err2);
+      w320Buffer = buffer;
+    }
+  }
+
+  let storageUrls: { storageW320Url: string; storageW640Url: string };
   try {
     storageUrls = await uploadProofImageVariantsToFirebaseStorage({
       imageId,
-      originalExt: ext,
-      originalBuffer: buffer,
       w320Buffer,
       w640Buffer,
     });
   } catch (err) {
-    console.error("[api/upload/image] Firebase Storage 업로드 실패:", err);
-    return NextResponse.json({ error: "이미지를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요." }, { status: 500 });
+    console.error("[api/upload/image] Firebase Storage 업로드 실패", {
+      step: "storage-upload",
+      imageId,
+      fileType: ext,
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return NextResponse.json(
+      {
+        error: "이미지를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        code: "IMAGE_STORAGE_UPLOAD_FAILED",
+      },
+      { status: 500 }
+    );
   }
 
   const createAssetResult = await createProofImageAsset({
@@ -199,17 +220,23 @@ export async function POST(request: Request) {
     uploaderUserId: auth.user.id,
     originalExt: ext,
     sitePublic,
-    storageOriginalUrl: storageUrls.storageOriginalUrl,
+    storageOriginalUrl: storageUrls.storageW640Url,
     storageW320Url: storageUrls.storageW320Url,
     storageW640Url: storageUrls.storageW640Url,
   });
   if (!createAssetResult.ok) {
-    return NextResponse.json({ error: "이미지 메타 저장에 실패했습니다." }, { status: 500 });
+    console.error("[api/upload/image] 이미지 메타 저장 실패", {
+      step: "asset-meta-save",
+      imageId,
+      fileType: ext,
+      sitePublic,
+      storageW640Url: storageUrls.storageW640Url,
+    });
+    return NextResponse.json({ error: "이미지 메타 저장에 실패했습니다.", code: "IMAGE_META_SAVE_FAILED" }, { status: 500 });
   }
 
   return NextResponse.json({
     imageId,
-    originalUrl: storageUrls.storageOriginalUrl,
     w320Url: storageUrls.storageW320Url,
     w640Url: storageUrls.storageW640Url,
   });

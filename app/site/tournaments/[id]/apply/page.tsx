@@ -14,7 +14,6 @@ type SessionUser = {
 
 type UploadedProofImage = {
   imageId: string;
-  originalUrl: string;
   w320Url: string;
   w640Url: string;
 };
@@ -76,7 +75,7 @@ export default function SiteTournamentApplyPage() {
           proofImageId: uploadedProofImage.imageId,
           proofImage320Url: uploadedProofImage.w320Url,
           proofImage640Url: uploadedProofImage.w640Url,
-          proofOriginalUrl: uploadedProofImage.originalUrl,
+          proofOriginalUrl: uploadedProofImage.w640Url,
         }),
       });
       const result = (await response.json()) as { error?: string };
@@ -110,7 +109,6 @@ export default function SiteTournamentApplyPage() {
       }
       setUploadedProofImage({
         imageId: result.imageId,
-        originalUrl: result.originalUrl,
         w320Url: result.w320Url,
         w640Url: result.w640Url,
       });

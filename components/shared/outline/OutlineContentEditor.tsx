@@ -121,7 +121,7 @@ export default function OutlineContentEditor({
 
     if (!res) return;
 
-    let data: { error?: string; w640Url?: string; w320Url?: string; originalUrl?: string } = {};
+    let data: { error?: string; w640Url?: string; w320Url?: string } = {};
     try {
       data = (await res.json()) as typeof data;
     } catch {
@@ -130,7 +130,6 @@ export default function OutlineContentEditor({
 
     const nextUrl =
       (typeof data.w640Url === "string" && data.w640Url.trim()) ||
-      (typeof data.originalUrl === "string" && data.originalUrl.trim()) ||
       (typeof data.w320Url === "string" && data.w320Url.trim()) ||
       "";
 

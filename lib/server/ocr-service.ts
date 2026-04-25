@@ -3,10 +3,8 @@
  * 참가 자격 판정용 숫자 기준은 대회 규칙의 eligibilityValue(및 관련 필드)만 사용한다.
  * entryCondition(조건 설명 문장) 본문에서 숫자를 읽어 기준으로 삼지 않는다.
  */
-import { readFile } from "fs/promises";
-import path from "path";
-import { getProofImagesBaseDir } from "./proof-images-base-dir";
 import { getStoredProofImageVariantUrl } from "./proof-image-storage-url";
+import { readProofImageVariantFile } from "./read-proof-image-variant";
 import {
   completeTournamentApplicationOcr,
   getProofImageAssetById,
@@ -33,10 +31,6 @@ export type OcrRecognitionResult = {
   status: OcrResultStatus;
 };
 
-function resolveProofImageAbsolutePath(params: { imageId: string; originalExt: "jpg" | "png" | "webp" }): string {
-  return path.join(getProofImagesBaseDir(), "original", `${params.imageId}.${params.originalExt}`);
-}
-
 async function loadProofImageOriginalBuffer(proofImage: ProofImageAsset): Promise<Buffer> {
   const url = getStoredProofImageVariantUrl(proofImage, "original");
   if (url) {
@@ -46,9 +40,11 @@ async function loadProofImageOriginalBuffer(proofImage: ProofImageAsset): Promis
     }
     return Buffer.from(await response.arrayBuffer());
   }
-  return readFile(
-    resolveProofImageAbsolutePath({ imageId: proofImage.id, originalExt: proofImage.originalExt })
-  );
+  const fromDisk = await readProofImageVariantFile(proofImage.id, "original", proofImage.originalExt);
+  if (!fromDisk) {
+    throw new Error("proof image not found on disk");
+  }
+  return fromDisk.buffer;
 }
 
 async function runMockOcr(application: TournamentApplication): Promise<OcrRecognitionResult> {

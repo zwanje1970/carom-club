@@ -95,7 +95,6 @@ export default function BlankBracketPrintClient() {
 
   const updatePreviewScale = useCallback(() => {
     const { paperW, paperH } = previewPaper;
-    const th = previewTopbarRef.current?.getBoundingClientRect().height ?? 48;
     const stage = previewStageRef.current;
     const vv = typeof window !== "undefined" ? window.visualViewport : undefined;
     let vw: number;
@@ -115,15 +114,21 @@ export default function BlankBracketPrintClient() {
       vw = window.innerWidth;
       vh = window.innerHeight;
     }
-    /* 용지는 항상 가로 고정. 화면 방향 변화에는 scale만 재계산한다. */
-    const pad = 32;
+    /* 용지는 항상 가로 고정. 화면 방향 변화에는 scale/배치만 재계산한다. */
     const fitW = paperW;
     const fitH = paperH;
-    let s: number;
-    if (stage) {
-      s = Math.min((vw - pad) / fitW, (vh - pad) / fitH, 1);
-    } else {
-      s = Math.min((vw - pad) / fitW, (vh - th - pad) / fitH, 1);
+    const fitScale = Math.min(vw / fitW, vh / fitH, 1);
+    const mqLandscape = typeof window !== "undefined" && window.matchMedia
+      ? window.matchMedia("(orientation: landscape)").matches
+      : window.innerWidth > window.innerHeight;
+    const innerLandscape = typeof window !== "undefined" ? window.innerWidth > window.innerHeight : false;
+    const isLandscape = mqLandscape || innerLandscape;
+
+    let s = fitScale;
+    if (isLandscape) {
+      const viewportShortSide = Math.min(vw, vh);
+      const targetMinScale = (viewportShortSide * 0.9) / paperH;
+      s = Math.max(fitScale, targetMinScale);
     }
     if (!(s > 0) || !Number.isFinite(s)) s = 0.1;
     setPreviewScale(s);
@@ -168,8 +173,19 @@ export default function BlankBracketPrintClient() {
   /** 페이지 내부 전용 레이어 미리보기: A4 한 장 전체 scale, 스크롤·스와이프 없음 */
   const handleOpenPreviewOverlay = useCallback(() => {
     if (!rounds.length || !scene) return;
+    setPreviewScale(1);
     setPreviewOpen(true);
   }, [rounds.length, scene]);
+
+  const handleClosePreviewOverlay = useCallback(() => {
+    setPreviewOpen(false);
+    setPreviewScale(1);
+    const stage = previewStageRef.current;
+    if (stage) {
+      stage.scrollLeft = 0;
+      stage.scrollTop = 0;
+    }
+  }, []);
 
   /** A4 가로 PDF — html2canvas 로 `.bbp-print-svg` 캡처 후 jsPDF 에 277×190mm 로 삽입 */
   const handleExportPDF = useCallback(async () => {
@@ -283,7 +299,7 @@ export default function BlankBracketPrintClient() {
           display: flex;
           align-items: center;
           justify-content: flex-end;
-          padding: 10px 16px;
+          padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 10px;
           box-sizing: border-box;
           background: #e5e7eb;
         }
@@ -302,15 +318,20 @@ export default function BlankBracketPrintClient() {
           flex: 1 1 auto;
           min-height: 0;
           overflow: auto;
+          display: block;
+          padding: 0 max(16px, env(safe-area-inset-left, 0px)) calc(env(safe-area-inset-bottom, 0px) + 16px) max(16px, env(safe-area-inset-right, 0px));
+          box-sizing: border-box;
+          touch-action: pan-x pan-y pinch-zoom;
+          -webkit-overflow-scrolling: touch;
+        }
+        .preview-overlay .paper-frame-slot {
+          width: max-content;
+          height: max-content;
+          min-width: 100%;
+          min-height: 100%;
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 0 16px 16px;
-          box-sizing: border-box;
-          touch-action: pinch-zoom;
-        }
-        .preview-overlay .paper-frame-slot {
-          flex-shrink: 0;
           position: relative;
           box-sizing: border-box;
         }
@@ -466,7 +487,7 @@ export default function BlankBracketPrintClient() {
             <div className="preview-overlay" role="dialog" aria-modal="true" aria-label="빈 대진표 미리보기">
               <div className="preview-root">
                 <div className="preview-topbar" ref={previewTopbarRef}>
-                  <button type="button" className="preview-close-button" onClick={() => setPreviewOpen(false)}>
+                  <button type="button" className="preview-close-button" onClick={handleClosePreviewOverlay}>
                     닫기
                   </button>
                 </div>

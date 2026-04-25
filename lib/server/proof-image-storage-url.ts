@@ -12,7 +12,9 @@ export function getStoredProofImageVariantUrl(
 ): string | null {
   const raw =
     variant === "original"
-      ? asset.storageOriginalUrl
+      ? (typeof asset.storageOriginalUrl === "string" && asset.storageOriginalUrl.trim() !== ""
+          ? asset.storageOriginalUrl
+          : asset.storageW640Url)
       : variant === "w320"
         ? asset.storageW320Url
         : asset.storageW640Url;

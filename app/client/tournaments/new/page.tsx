@@ -674,7 +674,7 @@ export default function ClientTournamentNewPage() {
 
     if (!res) return;
 
-    let data: { error?: string; w640Url?: string; w320Url?: string; originalUrl?: string } = {};
+    let data: { error?: string; w640Url?: string; w320Url?: string } = {};
     try {
       data = (await res.json()) as typeof data;
     } catch {
@@ -682,13 +682,12 @@ export default function ClientTournamentNewPage() {
     }
 
     const w640 = typeof data.w640Url === "string" ? data.w640Url.trim() : "";
-    const original = typeof data.originalUrl === "string" ? data.originalUrl.trim() : "";
     const w320 = typeof data.w320Url === "string" ? data.w320Url.trim() : "";
-    const nextUrl = w640 || original || w320;
+    const nextUrl = w640 || w320;
 
     if (process.env.NODE_ENV === "development") {
       // eslint-disable-next-line no-console -- 포스터 미리보기 URL 점검용
-      console.log("[poster upload] urls", { w640, original, w320, chosen: nextUrl });
+      console.log("[poster upload] urls", { w640, w320, chosen: nextUrl });
     }
 
     if (res.ok && nextUrl) {
