@@ -62,6 +62,7 @@ export default function BlankBracketPrintClient() {
   const [pdfExporting, setPdfExporting] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewScale, setPreviewScale] = useState(1);
+  const [previewViewport, setPreviewViewport] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const pdfRootRef = useRef<HTMLDivElement>(null);
   const pdfBusyRef = useRef(false);
   const previewTopbarRef = useRef<HTMLDivElement>(null);
@@ -124,10 +125,13 @@ export default function BlankBracketPrintClient() {
       vw = window.innerWidth;
       vh = window.innerHeight;
     }
-    /* 용지는 항상 가로 고정. 화면 방향 변화에는 scale/배치만 재계산한다. */
-    const fitW = paperW;
-    const fitH = paperH;
-    const fitScale = Math.min(vw / fitW, vh / fitH, 1);
+    /* 용지는 항상 가로 고정. 미리보기 내부에 가로 전용 viewport를 만든다. */
+    const stageRatio = Math.max(vw, vh) / Math.max(1, Math.min(vw, vh));
+    const landscapeRatio = Number.isFinite(stageRatio) && stageRatio > 1 ? stageRatio : 16 / 9;
+    const viewportWidth = Math.max(1, Math.min(vw, vh * landscapeRatio));
+    const viewportHeight = Math.max(1, Math.min(vh, viewportWidth / landscapeRatio));
+    setPreviewViewport({ width: viewportWidth, height: viewportHeight });
+    const fitScale = Math.min(viewportWidth / paperW, viewportHeight / paperH, 1);
     const mqLandscape = typeof window !== "undefined" && window.matchMedia
       ? window.matchMedia("(orientation: landscape)").matches
       : window.innerWidth > window.innerHeight;
@@ -136,7 +140,7 @@ export default function BlankBracketPrintClient() {
 
     let s = fitScale;
     if (isLandscape) {
-      const viewportShortSide = Math.min(vw, vh);
+      const viewportShortSide = Math.min(viewportWidth, viewportHeight);
       const targetMinScale = (viewportShortSide * 0.9) / paperH;
       s = Math.max(fitScale, targetMinScale);
     }
@@ -209,12 +213,14 @@ export default function BlankBracketPrintClient() {
   const handleOpenPreviewOverlay = useCallback(() => {
     if (!rounds.length || !scene) return;
     setPreviewScale(1);
+    setPreviewViewport({ width: 0, height: 0 });
     setPreviewOpen(true);
   }, [rounds.length, scene]);
 
   const handleClosePreviewOverlay = useCallback(() => {
     setPreviewOpen(false);
     setPreviewScale(1);
+    setPreviewViewport({ width: 0, height: 0 });
     const stage = previewStageRef.current;
     if (stage) {
       stage.scrollLeft = 0;
@@ -372,6 +378,16 @@ export default function BlankBracketPrintClient() {
           box-sizing: border-box;
           touch-action: pan-x pan-y pinch-zoom;
           -webkit-overflow-scrolling: touch;
+        }
+        .preview-overlay .preview-landscape-viewport {
+          width: max-content;
+          height: max-content;
+          min-width: 100%;
+          min-height: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-sizing: border-box;
         }
         .preview-overlay .paper-frame-slot {
           width: max-content;
@@ -542,41 +558,49 @@ export default function BlankBracketPrintClient() {
                 </div>
                 <div className="preview-stage" ref={previewStageRef}>
                   <div
-                    className="paper-frame-slot"
+                    className="preview-landscape-viewport"
                     style={{
-                      width: previewPaper.paperW * previewScale,
-                      height: previewPaper.paperH * previewScale,
+                      width: previewViewport.width > 0 ? previewViewport.width : undefined,
+                      height: previewViewport.height > 0 ? previewViewport.height : undefined,
                     }}
                   >
                     <div
-                      className="paper-frame"
+                      className="paper-frame-slot"
                       style={{
-                        width: previewPaper.paperW,
-                        height: previewPaper.paperH,
-                        left: 0,
-                        top: 0,
-                        marginLeft: 0,
-                        marginTop: 0,
-                        transform: `scale(${previewScale})`,
-                        transformOrigin: "top left",
+                        width: previewPaper.paperW * previewScale,
+                        height: previewPaper.paperH * previewScale,
                       }}
                     >
-                    <div
-                      className="paper"
-                      style={{ width: previewPaper.paperW, height: previewPaper.paperH }}
-                    >
-                      <div className="bracket-scene">
-                        <div className="bbp-print-page-sheet">
-                          <BracketSVG
-                            scene={scene}
-                            matchType={matchType}
-                            startPairLabels={startPairLabels}
-                            warmEmptyBoxFill={warmEmptyBoxFill}
-                          />
-                          <BracketPrintServiceMark />
+                      <div
+                        className="paper-frame"
+                        style={{
+                          width: previewPaper.paperW,
+                          height: previewPaper.paperH,
+                          left: 0,
+                          top: 0,
+                          marginLeft: 0,
+                          marginTop: 0,
+                          transform: `scale(${previewScale})`,
+                          transformOrigin: "top left",
+                        }}
+                      >
+                      <div
+                        className="paper"
+                        style={{ width: previewPaper.paperW, height: previewPaper.paperH }}
+                      >
+                        <div className="bracket-scene">
+                          <div className="bbp-print-page-sheet">
+                            <BracketSVG
+                              scene={scene}
+                              matchType={matchType}
+                              startPairLabels={startPairLabels}
+                              warmEmptyBoxFill={warmEmptyBoxFill}
+                            />
+                            <BracketPrintServiceMark />
+                          </div>
                         </div>
                       </div>
-                    </div>
+                      </div>
                     </div>
                   </div>
                 </div>
