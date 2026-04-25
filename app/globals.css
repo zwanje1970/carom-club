@@ -1830,12 +1830,12 @@ body:has(.site-home-page) {
 }
 
 /* 기존 PNG 슬롯과 동일한 최대 높이(이미지 비율 유지) */
-.site-home-main-png-buttons-temp .main-button img {
+.site-home-main-png-buttons-temp.temp-png-button-tuning .main-button img {
   max-width: 100%;
-  max-height: calc(3.75rem * 1.1 * 1.1 * 1.2);
+  max-height: calc(3.75rem * 1.1 * 1.1 * 1.2 * 1.2);
   object-fit: contain;
-  /* 투명 PNG: 알파 따라가는 연한 그림자 */
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.12)) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.08));
+  /* 투명 PNG: 알파 따라가는 그림자(조금 더 진하게) */
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.28)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.24));
 }
 
 /* 대시보드 버튼 위 간격(모바일은 @media 안에서 더 조밀하게 조정 가능) */

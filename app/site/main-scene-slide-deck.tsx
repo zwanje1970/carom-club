@@ -35,7 +35,7 @@ const SCENE_S = CENTER_HOLD_S + RETREAT_S;
 const FX_STRENGTH = 1.15;
 const FX_EARLY_BIAS = 0.7;
 const OUTGOING_SCALE_TARGET = 0.65;
-const OUTGOING_OPACITY_MIN = 0.1;
+const OUTGOING_OPACITY_MIN = 0;
 const MANUAL_RESUME_DELAY_MS = Math.round(1800 * TIMELINE_SCALE);
 const WHEEL_SCENE_STEP = 240 * TIMELINE_SCALE;
 const DRAG_SCENE_STEP = 220 * TIMELINE_SCALE;
@@ -47,6 +47,13 @@ const SLIDE_TIMELINE_DEFER_IDLE_MAX_MS = 1200;
 const SLIDE_TIMELINE_DEFER_FALLBACK_MS = 1000;
 
 type SceneRole = "idle" | "incoming" | "center" | "outgoing";
+
+function layerZIndexForRole(role: SceneRole): number {
+  if (role === "incoming") return 300;
+  if (role === "center") return 200;
+  if (role === "outgoing") return 120;
+  return 1;
+}
 
 function riseFactor(r: number): number {
   const t = Math.min(1, Math.max(0, r));
@@ -358,8 +365,14 @@ export default function MainSceneSlideDeck({
   const clampedElapsed = Math.max(0, elapsed);
   const sceneId = Math.floor(clampedElapsed / SCENE_S);
   const tInScene = clampedElapsed % SCENE_S;
+  /**
+   * 공정성 보정: 한 바퀴(n개)가 끝날 때마다 시작 오프셋을 1씩 민다.
+   * 예) n=5일 때 1번 카드는 다음 사이클에서 6번째 순번처럼 뒤로 밀린다.
+   */
+  const cycleOffset = n > 0 ? Math.floor(sceneId / n) : 0;
+  const effectiveSceneId = sceneId + cycleOffset;
 
-  const centerIdx = n <= 1 ? 0 : (sceneId + 1) % n;
+  const centerIdx = n <= 1 ? 0 : (effectiveSceneId + 1) % n;
   const activeDot = n > 0 ? centerIdx % 3 : -1;
 
   const onCardClickCapture: MouseEventHandler<HTMLDivElement> = (e) => {
@@ -464,7 +477,7 @@ export default function MainSceneSlideDeck({
         onClickCapture={onCardClickCapture}
       >
         {items.map((item, i) => {
-          const role = sceneRoleForCard(i, n, sceneId);
+          const role = sceneRoleForCard(i, n, effectiveSceneId);
           const style = cardStyleForRole(
             role,
             tInScene,
@@ -476,7 +489,7 @@ export default function MainSceneSlideDeck({
               : 0,
           );
           return (
-            <div key={item.snapshotId} className="slide-deck__layer">
+            <div key={item.snapshotId} className="slide-deck__layer" style={{ zIndex: layerZIndexForRole(role) }}>
               <div
                 className="slide-deck__card"
                 data-slide-deck-card

@@ -517,7 +517,7 @@ export default async function SiteHomePage({
                   />
                 </section>
                 <section
-                  className="site-home-main-png-buttons-temp site-home-main-png-buttons-temp--slideOverlay"
+                  className="site-home-main-png-buttons-temp site-home-main-png-buttons-temp--slideOverlay temp-png-button-tuning"
                   aria-label="메인 바로가기(임시 PNG)"
                 >
                   <a href="/site/tournaments" className="main-button" aria-label="대회안내">

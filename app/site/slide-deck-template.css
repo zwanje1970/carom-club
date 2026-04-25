@@ -13,6 +13,8 @@
   );
   margin-top: 28px;
   position: relative;
+  z-index: 0;
+  isolation: isolate;
   border-radius: 20px;
   overflow: hidden;
   background:
