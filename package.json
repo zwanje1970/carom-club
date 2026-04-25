@@ -10,7 +10,11 @@
     "seed:virtual-clients": "node scripts/seed-virtual-clients.mjs",
     "patch:virtual-client-venues": "node scripts/patch-virtual-client-venues.mjs",
     "seed:virtual-client-tournaments": "node scripts/seed-virtual-client-tournaments.mjs",
-    "seed:virtual-players": "node scripts/seed-virtual-players.mjs"
+    "seed:virtual-players": "node scripts/seed-virtual-players.mjs",
+    "wipe:staging": "npx --yes tsx scripts/wipe-staging-firestore.mts",
+    "seed:tournament-participants": "npx --yes tsx scripts/seed-tournament-participants.mts",
+    "seed:platform-admin": "npx --yes tsx scripts/seed-platform-admin.mts",
+    "verify:client-approval": "npx --yes tsx scripts/verify-client-approval-flow.mts"
   },
   "dependencies": {
     "@tiptap/extension-color": "^3.22.3",

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getSiteCommunityConfig, listCommunityPostsAllPrimary } from "../../../lib/server/dev-store";
 import {
   communityTabLabelForBoard,
@@ -33,9 +32,6 @@ export default async function SiteCommunityPage({
     })),
   ];
 
-  const firstVisible = visibleBoardKeys[0];
-  const writeHref = firstVisible ? `/site/community/${firstVisible}/write` : "/site";
-
   return (
     <SiteShellFrame
       brandTitle="커뮤니티"
@@ -56,9 +52,6 @@ export default async function SiteCommunityPage({
             <CommunityBoardPostList showRoomPrefix items={items} />
           </section>
         </CommunityBoardSwipeShell>
-        <Link href={writeHref} className="community-write-fab" aria-label="글쓰기">
-          <span aria-hidden>+</span>
-        </Link>
       </>
     </SiteShellFrame>
   );

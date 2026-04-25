@@ -19,11 +19,13 @@ export function buildTournamentListHref(
   searchParams: Record<string, string | string[] | undefined>,
   patch: {
     status?: string | null;
-    sort?: TournamentSortType;
+    sort?: TournamentSortType | null;
   } = {}
 ): string {
   const next = new URLSearchParams();
   for (const [key, value] of Object.entries(searchParams)) {
+    if (key === "distanceLat" || key === "distanceLng" || key === "distanceDenied") continue;
+    if (key === "sort" && value === "DISTANCE") continue;
     if (Array.isArray(value)) {
       for (const item of value) next.append(key, item);
     } else if (typeof value === "string") {
@@ -39,13 +41,18 @@ export function buildTournamentListHref(
     }
   }
   if ("sort" in patch && patch.sort !== undefined) {
-    next.set("sort", patch.sort);
-    if (patch.sort !== "DISTANCE") {
-      next.delete("distanceLat");
-      next.delete("distanceLng");
-      next.delete("distanceDenied");
+    if (patch.sort === null || patch.sort === "DISTANCE") {
+      next.delete("sort");
+    } else {
+      next.set("sort", patch.sort);
     }
   }
+  if (next.get("sort") === "DISTANCE") {
+    next.delete("sort");
+  }
+  next.delete("distanceLat");
+  next.delete("distanceLng");
+  next.delete("distanceDenied");
   const q = next.toString();
   return q ? `?${q}` : "";
 }

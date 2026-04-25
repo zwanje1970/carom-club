@@ -1,12 +1,8 @@
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
-import {
-  getOutlinePdfAssetById,
-  getTournamentById,
-  outlineFileKindFromAsset,
-  outlinePdfIdFromPublicUrl,
-} from "../../../../../lib/server/dev-store";
+import { getOutlinePdfAssetById, outlineFileKindFromAsset, outlinePdfIdFromPublicUrl } from "../../../../../lib/server/dev-store";
+import { getTournamentByIdFirestore } from "../../../../../lib/server/firestore-tournaments";
 import { isEmptyOutlineHtml } from "../../../../../lib/outline-content-helpers";
 import SiteOutlineDocumentCard from "../../../../site/components/SiteOutlineDocumentCard";
 
@@ -18,7 +14,7 @@ export default async function ClientTournamentOutlinePage({
   const { id } = await params;
   const cookieStore = await cookies();
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
-  const t = await getTournamentById(id);
+  const t = await getTournamentByIdFirestore(id);
   if (!t) notFound();
   const canView = Boolean(session && t.createdBy === session.userId);
   if (!canView) {

@@ -4,7 +4,6 @@ import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/au
 import {
   getCardSnapshotById,
   getClientStatusByUserId,
-  getTournamentById,
   getUserById,
   listCardSnapshotsByTournamentId,
   setCardSnapshotActive,
@@ -13,6 +12,7 @@ import {
   type TournamentCardTemplate,
   type TournamentCardTheme,
 } from "../../../../lib/server/dev-store";
+import { getTournamentByIdFirestore } from "../../../../lib/server/firestore-tournaments";
 import { isTournamentPublishedCardsWritePersistenceBlockedError } from "../../../../lib/server/platform-tournament-published-cards-settings";
 
 export const runtime = "nodejs";
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
   }
 
   const tournamentId = typeof body.tournamentId === "string" ? body.tournamentId : "";
-  const tournament = await getTournamentById(tournamentId);
+  const tournament = await getTournamentByIdFirestore(tournamentId);
   if (!tournament) {
     return NextResponse.json({ error: "Tournament not found." }, { status: 404 });
   }
@@ -181,7 +181,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "tournamentId is required." }, { status: 400 });
   }
 
-  const tournament = await getTournamentById(tournamentId);
+  const tournament = await getTournamentByIdFirestore(tournamentId);
   if (!tournament) {
     return NextResponse.json({ error: "Tournament not found." }, { status: 404 });
   }
@@ -233,7 +233,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Snapshot not found." }, { status: 404 });
   }
 
-  const tournament = await getTournamentById(snapshot.tournamentId);
+  const tournament = await getTournamentByIdFirestore(snapshot.tournamentId);
   if (!tournament) {
     return NextResponse.json({ error: "Tournament not found." }, { status: 404 });
   }

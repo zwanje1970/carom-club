@@ -1,14 +1,12 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../../../lib/auth/session";
+import { getClientStatusByUserId, getUserById, type TournamentApplicationStatus } from "../../../../../../../../lib/server/dev-store";
 import {
-  getClientStatusByUserId,
-  getTournamentApplicationById,
-  getTournamentById,
-  getUserById,
-  TournamentApplicationStatus,
-  updateTournamentApplicationStatus,
-} from "../../../../../../../../lib/server/dev-store";
+  getTournamentApplicationByIdFirestore,
+  updateTournamentApplicationStatusFirestore,
+} from "../../../../../../../../lib/server/firestore-tournament-applications";
+import { getTournamentByIdFirestore } from "../../../../../../../../lib/server/firestore-tournaments";
 
 export const runtime = "nodejs";
 
@@ -43,12 +41,12 @@ export async function PATCH(
   if (!id.trim() || !entryId.trim()) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
-  const tournament = await getTournamentById(id);
+  const tournament = await getTournamentByIdFirestore(id);
   if (!tournament) {
     return NextResponse.json({ error: "대회를 찾을 수 없습니다." }, { status: 404 });
   }
 
-  const targetEntry = await getTournamentApplicationById(id, entryId);
+  const targetEntry = await getTournamentApplicationByIdFirestore(id, entryId);
   if (!targetEntry) {
     return NextResponse.json({ error: "참가신청을 찾을 수 없습니다." }, { status: 404 });
   }
@@ -77,7 +75,7 @@ export async function PATCH(
     return NextResponse.json({ error: "nextStatus 값이 올바르지 않습니다." }, { status: 400 });
   }
 
-  const result = await updateTournamentApplicationStatus({
+  const result = await updateTournamentApplicationStatusFirestore({
     tournamentId: id,
     entryId,
     nextStatus: body.nextStatus,

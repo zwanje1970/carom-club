@@ -2,13 +2,12 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../../lib/auth/session";
 import type { BracketDraftMatchInput } from "../../../../../../../lib/server/dev-store";
+import { checkClientFeatureAccessByUserId, getUserById } from "../../../../../../../lib/server/dev-store";
 import {
-  checkClientFeatureAccessByUserId,
-  createBracketFromDraft,
-  getLatestBracketParticipantSnapshotByTournamentId,
-  getTournamentById,
-  getUserById,
-} from "../../../../../../../lib/server/dev-store";
+  createBracketFromDraftFirestore,
+  getLatestBracketParticipantSnapshotByTournamentIdFirestore,
+} from "../../../../../../../lib/server/firestore-tournament-brackets";
+import { getTournamentByIdFirestore } from "../../../../../../../lib/server/firestore-tournaments";
 
 export const runtime = "nodejs";
 
@@ -20,7 +19,7 @@ async function requireBracketAccess(tournamentId: string) {
   const user = await getUserById(session.userId);
   if (!user) return { ok: false as const, status: 401, error: "사용자를 찾을 수 없습니다." };
 
-  const tournament = await getTournamentById(tournamentId);
+  const tournament = await getTournamentByIdFirestore(tournamentId);
   if (!tournament) return { ok: false as const, status: 404, error: "대회를 찾을 수 없습니다." };
 
   if (user.role === "PLATFORM") {
@@ -65,7 +64,7 @@ export async function POST(
     return NextResponse.json({ error: "snapshotId가 필요합니다." }, { status: 400 });
   }
 
-  const latestSnapshot = await getLatestBracketParticipantSnapshotByTournamentId(id);
+  const latestSnapshot = await getLatestBracketParticipantSnapshotByTournamentIdFirestore(id);
   if (!latestSnapshot) {
     return NextResponse.json({ error: "먼저 대진표 대상자 스냅샷을 생성해 주세요." }, { status: 400 });
   }
@@ -76,7 +75,7 @@ export async function POST(
     );
   }
 
-  const result = await createBracketFromDraft({
+  const result = await createBracketFromDraftFirestore({
     tournamentId: id,
     snapshotId,
     matches,

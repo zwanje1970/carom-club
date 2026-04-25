@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../lib/auth/session";
-import { formatTournamentScheduleLabel, listTournamentsByCreator } from "../../../lib/server/dev-store";
+import { formatTournamentScheduleLabel, resolveCanonicalUserIdForAuth } from "../../../lib/server/dev-store";
+import { listTournamentsByCreatorFirestore } from "../../../lib/server/firestore-tournaments";
 import type { TournamentStatusBadge } from "../../../lib/server/dev-store";
 import TournamentCardOverflowMenu from "./TournamentCardOverflowMenu";
 
@@ -20,7 +21,9 @@ function statusBadgeStyle(badge: TournamentStatusBadge): { background: string; c
 export default async function ClientTournamentOperationsPage() {
   const cookieStore = await cookies();
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
-  const tournaments = session ? await listTournamentsByCreator(session.userId) : [];
+  const tournaments = session
+    ? await listTournamentsByCreatorFirestore(await resolveCanonicalUserIdForAuth(session.userId))
+    : [];
 
   return (
     <main className="v3-page v3-stack ui-client-dashboard">

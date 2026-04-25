@@ -1,11 +1,9 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../lib/auth/session";
-import {
-  createTournamentApplication,
-  getTournamentById,
-  getUserById,
-} from "../../../../../../lib/server/dev-store";
+import { getUserById } from "../../../../../../lib/server/dev-store";
+import { createTournamentApplicationFirestore } from "../../../../../../lib/server/firestore-tournament-applications";
+import { getTournamentByIdFirestore } from "../../../../../../lib/server/firestore-tournaments";
 import { triggerOcrForTournamentApplication } from "../../../../../../lib/server/ocr-service";
 
 export const runtime = "nodejs";
@@ -29,7 +27,7 @@ export async function POST(
   if (!id.trim()) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
-  const tournament = await getTournamentById(id);
+  const tournament = await getTournamentByIdFirestore(id);
   if (!tournament) {
     return NextResponse.json({ error: "대회를 찾을 수 없습니다." }, { status: 404 });
   }
@@ -50,7 +48,7 @@ export async function POST(
     return NextResponse.json({ error: "요청 본문이 올바르지 않습니다." }, { status: 400 });
   }
 
-  const result = await createTournamentApplication({
+  const result = await createTournamentApplicationFirestore({
     tournamentId: id,
     userId: user.id,
     applicantName: typeof body.applicantName === "string" ? body.applicantName : "",

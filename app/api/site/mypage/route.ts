@@ -3,13 +3,13 @@ import { NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
 import {
   getClientStatusByUserId,
-  getTournamentById,
   getUserById,
   listNotificationsByUserId,
-  listTournamentApplicationsByUserId,
   updateUserProfile,
   type TournamentApplicationStatus,
 } from "../../../../lib/server/dev-store";
+import { listTournamentApplicationsByUserIdFirestore } from "../../../../lib/server/firestore-tournament-applications";
+import { getTournamentByIdFirestore } from "../../../../lib/server/firestore-tournaments";
 
 export const runtime = "nodejs";
 
@@ -24,10 +24,10 @@ function isTournamentOngoing(dateText: string): boolean {
 }
 
 async function getMypageApplicationRowsPayload(userId: string) {
-  const applications = await listTournamentApplicationsByUserId(userId);
+  const applications = await listTournamentApplicationsByUserIdFirestore(userId);
   const applicationRows = await Promise.all(
     applications.map(async (application) => {
-      const tournament = await getTournamentById(application.tournamentId);
+      const tournament = await getTournamentByIdFirestore(application.tournamentId);
       return { application, tournament };
     }),
   );

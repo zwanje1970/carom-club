@@ -1,10 +1,8 @@
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../lib/auth/session";
-import {
-  getTournamentApplicationById,
-  getTournamentById,
-} from "../../../../../../lib/server/dev-store";
+import { getTournamentApplicationByIdFirestore } from "../../../../../../lib/server/firestore-tournament-applications";
+import { getTournamentByIdFirestore } from "../../../../../../lib/server/firestore-tournaments";
 import StatusTransitionControls from "./StatusTransitionControls";
 
 const STATUS_LABELS = {
@@ -29,7 +27,7 @@ export default async function ClientTournamentParticipantDetailPage({
   params: Promise<{ id: string; entryId: string }>;
 }) {
   const { id, entryId } = await params;
-  const tournament = await getTournamentById(id);
+  const tournament = await getTournamentByIdFirestore(id);
   if (!tournament) notFound();
 
   const cookieStore = await cookies();
@@ -37,7 +35,7 @@ export default async function ClientTournamentParticipantDetailPage({
   const canView = Boolean(session && tournament.createdBy === session.userId);
   if (!canView) notFound();
 
-  const entry = await getTournamentApplicationById(id, entryId);
+  const entry = await getTournamentApplicationByIdFirestore(id, entryId);
   if (!entry) notFound();
 
   return (

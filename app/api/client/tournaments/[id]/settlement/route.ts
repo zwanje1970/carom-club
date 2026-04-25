@@ -2,16 +2,18 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../lib/auth/session";
 import {
-  checkClientFeatureAccessByUserId,
-  deleteSettlementExpenseItem,
-  getTournamentSettlementByTournamentId,
-  getSettlementSummaryByTournamentId,
-  getTournamentById,
-  getUserById,
-  setSettlementRefunded,
-  setTournamentSettlementStatus,
-  upsertSettlementExpenseItem,
-} from "../../../../../../lib/server/dev-store";
+  settlementApiCheckClientFeatureAccess,
+  settlementApiGetSessionUser,
+} from "../../../../../../lib/server/settlement-api-auth-firestore";
+import {
+  deleteSettlementExpenseItemFirestore,
+  getSettlementSummaryByTournamentIdFirestore,
+  getTournamentSettlementByTournamentIdFirestore,
+  setSettlementRefundedFirestore,
+  setTournamentSettlementStatusFirestore,
+  upsertSettlementExpenseItemFirestore,
+} from "../../../../../../lib/server/firestore-tournament-settlements";
+import { getTournamentByIdFirestore } from "../../../../../../lib/server/firestore-tournaments";
 
 export const runtime = "nodejs";
 
@@ -20,10 +22,10 @@ async function requireSettlementAccess(tournamentId: string) {
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
   if (!session) return { ok: false as const, status: 401, error: "로그인이 필요합니다." };
 
-  const user = await getUserById(session.userId);
+  const user = await settlementApiGetSessionUser(session.userId);
   if (!user) return { ok: false as const, status: 401, error: "사용자를 찾을 수 없습니다." };
 
-  const tournament = await getTournamentById(tournamentId);
+  const tournament = await getTournamentByIdFirestore(tournamentId);
   if (!tournament) return { ok: false as const, status: 404, error: "대회를 찾을 수 없습니다." };
 
   if (user.role === "PLATFORM") {
@@ -33,7 +35,7 @@ async function requireSettlementAccess(tournamentId: string) {
     return { ok: false as const, status: 403, error: "CLIENT + APPROVED 권한이 필요합니다." };
   }
 
-  const gate = await checkClientFeatureAccessByUserId({ userId: user.id, feature: "SETTLEMENT" });
+  const gate = await settlementApiCheckClientFeatureAccess({ userId: user.id, feature: "SETTLEMENT" });
   if (!gate.ok) {
     return { ok: false as const, status: 403, error: gate.error };
   }
@@ -56,11 +58,11 @@ export async function GET(
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const summaryResult = await getSettlementSummaryByTournamentId(id);
+  const summaryResult = await getSettlementSummaryByTournamentIdFirestore(id);
   if (!summaryResult.ok) {
     return NextResponse.json({ error: summaryResult.error }, { status: 400 });
   }
-  const settlementResult = await getTournamentSettlementByTournamentId(id);
+  const settlementResult = await getTournamentSettlementByTournamentIdFirestore(id);
   if (!settlementResult.ok) {
     return NextResponse.json({ error: settlementResult.error }, { status: 400 });
   }
@@ -104,14 +106,14 @@ export async function PATCH(
   let result: { ok: true; settlement: unknown } | { ok: false; error: string };
 
   if (action === "addExpense") {
-    result = await upsertSettlementExpenseItem({
+    result = await upsertSettlementExpenseItemFirestore({
       tournamentId: id,
       title: typeof body.title === "string" ? body.title : "",
       amount: typeof body.amount === "number" ? body.amount : Number(body.amount),
       actorUserId: auth.user.id,
     });
   } else if (action === "updateExpense") {
-    result = await upsertSettlementExpenseItem({
+    result = await upsertSettlementExpenseItemFirestore({
       tournamentId: id,
       expenseItemId: typeof body.expenseItemId === "string" ? body.expenseItemId : "",
       title: typeof body.title === "string" ? body.title : "",
@@ -119,22 +121,20 @@ export async function PATCH(
       actorUserId: auth.user.id,
     });
   } else if (action === "deleteExpense") {
-    result = await deleteSettlementExpenseItem({
+    result = await deleteSettlementExpenseItemFirestore({
       tournamentId: id,
       expenseItemId: typeof body.expenseItemId === "string" ? body.expenseItemId : "",
-      actorUserId: auth.user.id,
     });
   } else if (action === "toggleRefund") {
-    result = await setSettlementRefunded({
+    result = await setSettlementRefundedFirestore({
       tournamentId: id,
       applicationId: typeof body.applicationId === "string" ? body.applicationId : "",
       refunded: Boolean(body.refunded),
     });
   } else if (action === "setSettled") {
-    result = await setTournamentSettlementStatus({
+    result = await setTournamentSettlementStatusFirestore({
       tournamentId: id,
       isSettled: Boolean(body.isSettled),
-      actorUserId: auth.user.id,
     });
   } else {
     return NextResponse.json({ error: "지원하지 않는 action입니다." }, { status: 400 });
@@ -144,7 +144,7 @@ export async function PATCH(
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  const summaryResult = await getSettlementSummaryByTournamentId(id);
+  const summaryResult = await getSettlementSummaryByTournamentIdFirestore(id);
   if (!summaryResult.ok) {
     return NextResponse.json({ error: summaryResult.error }, { status: 400 });
   }

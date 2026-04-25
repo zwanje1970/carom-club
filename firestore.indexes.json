@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "v3_tournament_applications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "v3_tournament_brackets",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tournamentId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

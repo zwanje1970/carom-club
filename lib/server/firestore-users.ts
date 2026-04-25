@@ -44,9 +44,15 @@ function nicknameKey(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function docToUser(data: FirebaseFirestore.DocumentData | undefined): DevUser | null {
+function docToUser(
+  data: FirebaseFirestore.DocumentData | undefined,
+  firestoreDocumentId?: string
+): DevUser | null {
   if (!data || typeof data !== "object") return null;
-  const id = typeof data.id === "string" ? data.id.trim() : "";
+  const fromDoc = typeof firestoreDocumentId === "string" ? firestoreDocumentId.trim() : "";
+  const fromField = typeof data.id === "string" ? data.id.trim() : "";
+  /** 세션·getUserById는 컬렉션 문서 id(UUID) 기준 — 필드 `id`가 loginId 등과 달라도 doc id를 쓴다. */
+  const id = fromDoc || fromField;
   const loginId = typeof data.loginId === "string" ? data.loginId.trim() : "";
   const name = typeof data.name === "string" ? data.name.trim() : "";
   if (!id || !loginId || !name) return null;
@@ -101,7 +107,7 @@ export async function firestoreGetUserById(userId: string): Promise<DevUser | nu
   if (!id) return null;
   const db = ensureFirestore();
   const snap = await db.collection(COLLECTION).doc(id).get();
-  return docToUser(snap.data());
+  return docToUser(snap.data(), snap.id);
 }
 
 export async function firestoreFindByLoginIdNorm(loginIdNorm: string): Promise<DevUser | null> {
@@ -110,7 +116,7 @@ export async function firestoreFindByLoginIdNorm(loginIdNorm: string): Promise<D
   const db = ensureFirestore();
   const q = await db.collection(COLLECTION).where("loginIdNorm", "==", raw).limit(1).get();
   const d = q.docs[0];
-  return d ? docToUser(d.data()) : null;
+  return d ? docToUser(d.data(), d.id) : null;
 }
 
 export async function firestoreFindByPhoneDigits(phoneDigits: string): Promise<DevUser | null> {
@@ -118,7 +124,8 @@ export async function firestoreFindByPhoneDigits(phoneDigits: string): Promise<D
   if (!p) return null;
   const db = ensureFirestore();
   const q = await db.collection(COLLECTION).where("phoneDigits", "==", p).limit(2).get();
-  return q.docs[0] ? docToUser(q.docs[0].data()) : null;
+  const d0 = q.docs[0];
+  return d0 ? docToUser(d0.data(), d0.id) : null;
 }
 
 export async function firestoreFindByLoginIdAndPhoneDigits(
@@ -138,7 +145,7 @@ export async function firestoreIsNicknameKeyTaken(key: string, excludeUserId?: s
   const db = ensureFirestore();
   const q = await db.collection(COLLECTION).where("nicknameKey", "==", key).limit(8).get();
   for (const doc of q.docs) {
-    const u = docToUser(doc.data());
+    const u = docToUser(doc.data(), doc.id);
     if (u && (!excludeUserId || u.id !== excludeUserId)) return true;
   }
   return false;
@@ -211,7 +218,7 @@ export async function firestoreListUserIdsForPushAudience(audience: "all" | "cli
   const snap = audience === "client" ? await col.where("role", "==", "CLIENT").get() : await col.get();
   const out: string[] = [];
   for (const doc of snap.docs) {
-    const u = docToUser(doc.data());
+    const u = docToUser(doc.data(), doc.id);
     if (!u) continue;
     if (u.status === "DELETED") continue;
     out.push(doc.id);
@@ -232,7 +239,7 @@ export async function firestoreFilterUserIdsWithMarketingPushConsent(userIds: st
     const snaps = await db.getAll(...refs);
     for (const snap of snaps) {
       if (!snap.exists) continue;
-      const u = docToUser(snap.data());
+      const u = docToUser(snap.data(), snap.id);
       if (!u || seen.has(snap.id)) continue;
       if (u.pushMarketingAgreed === false) continue;
       seen.add(snap.id);

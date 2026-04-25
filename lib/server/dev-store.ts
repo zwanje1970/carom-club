@@ -89,6 +89,19 @@ import {
   throwTournamentPublishedCardsWritePersistenceBlocked,
   upsertTournamentPublishedCardsToFirestoreKv,
 } from "./platform-tournament-published-cards-settings";
+import {
+  createClientApplicationFirestore,
+  getApplicationSummariesFirestore,
+  getClientOrganizationByIdForPlatformFirestore,
+  getClientOrganizationByUserIdFirestore,
+  getClientStatusByUserIdFirestore,
+  getLatestClientApplicationByUserIdFirestore,
+  listApprovedClientOrganizationsFirestore,
+  listClientApplicationsFirestore,
+  patchClientOrganizationForPlatformFirestore,
+  updateClientApplicationStatusFirestore,
+  upsertClientOrganizationForUserFirestore,
+} from "./firestore-client-applications";
 
 export type {
   TournamentDivisionMetricType,
@@ -440,18 +453,18 @@ export type BracketDraftMatchInput = {
   player2: BracketPlayer;
 };
 
-type MutableBracketMatch = BracketMatch & {
+export type MutableBracketMatch = BracketMatch & {
   status?: BracketMatchStatus;
   winnerUserId?: string | null;
   winnerName?: string | null;
 };
 
-type MutableBracketRound = BracketRound & {
+export type MutableBracketRound = BracketRound & {
   status?: BracketRoundStatus;
   matches: MutableBracketMatch[];
 };
 
-type MutableBracket = Bracket & {
+export type MutableBracket = Bracket & {
   rounds: MutableBracketRound[];
 };
 
@@ -1567,7 +1580,7 @@ function parseDivisionRulesJson(raw: unknown): TournamentDivisionRuleRow[] | nul
   return out.length ? out : null;
 }
 
-function normalizeTournamentRule(partial: Partial<TournamentRuleSnapshot> | undefined | null): TournamentRuleSnapshot {
+export function normalizeTournamentRule(partial: Partial<TournamentRuleSnapshot> | undefined | null): TournamentRuleSnapshot {
   const base = createDefaultTournamentRule();
   if (partial == null || typeof partial !== "object") return base;
 
@@ -1707,7 +1720,7 @@ function normalizeTournamentRule(partial: Partial<TournamentRuleSnapshot> | unde
   return rule;
 }
 
-function parseTournamentEventDates(raw: unknown): string[] | null {
+export function parseTournamentEventDates(raw: unknown): string[] | null {
   if (raw == null) return null;
   if (!Array.isArray(raw)) return null;
   const out: string[] = [];
@@ -1719,7 +1732,7 @@ function parseTournamentEventDates(raw: unknown): string[] | null {
   return out.length ? out.sort() : null;
 }
 
-function parseTournamentExtraVenues(raw: unknown): TournamentExtraVenueRow[] | null {
+export function parseTournamentExtraVenues(raw: unknown): TournamentExtraVenueRow[] | null {
   if (raw == null) return null;
   if (!Array.isArray(raw)) return null;
   const out: TournamentExtraVenueRow[] = [];
@@ -1736,7 +1749,7 @@ function parseTournamentExtraVenues(raw: unknown): TournamentExtraVenueRow[] | n
 }
 
 /** 카탈로그 venue id 또는 게시된 등록 당구장(org slug/id) */
-function resolveVenueGuideVenueIdFromOrgs(
+export function resolveVenueGuideVenueIdFromOrgs(
   orgs: ClientOrganizationStored[],
   raw: unknown
 ): string | null {
@@ -1755,11 +1768,14 @@ function resolveVenueGuideVenueIdFromOrgs(
   return org ? (org.slug?.trim() || org.id) : null;
 }
 
-function resolveVenueGuideVenueIdFromStore(store: DevStore, raw: unknown): string | null {
-  return resolveVenueGuideVenueIdFromOrgs(store.clientOrganizations, raw);
+async function getVenueGuideResolutionOrgs(store: DevStore): Promise<ClientOrganizationStored[]> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return listApprovedClientOrganizationsFirestore({ status: "all", clientType: "all" });
+  }
+  return store.clientOrganizations;
 }
 
-function buildTournamentFromParsedRow(raw: unknown, clientOrganizations: ClientOrganizationStored[]): Tournament {
+export function buildTournamentFromParsedRow(raw: unknown, clientOrganizations: ClientOrganizationStored[]): Tournament {
   const t = raw as Record<string, unknown>;
   const id = typeof t.id === "string" ? t.id : "";
   const title = typeof t.title === "string" ? t.title : "";
@@ -2516,6 +2532,9 @@ function pruneExpiredNotifications(store: DevStore): number {
 }
 
 async function readStore(): Promise<DevStore> {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("dev-store is not allowed in production");
+  }
   return runStoreIoExclusive(async () => {
     const store = await readStoreImpl();
     const removed = pruneExpiredNotifications(store);
@@ -2527,6 +2546,9 @@ async function readStore(): Promise<DevStore> {
 }
 
 async function writeStore(store: DevStore): Promise<void> {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("dev-store is not allowed in production");
+  }
   return runStoreIoExclusive(() => writeStoreImpl(store));
 }
 
@@ -2647,10 +2669,14 @@ export async function checkNicknameAvailability(
       if (await firestoreIsNicknameKeyTaken(key, excludeUserId)) {
         return { ok: false, error: "이미 사용중" };
       }
+      return { ok: true, nickname: parsed.nickname };
     } catch (e) {
       console.error("[dev-store] checkNicknameAvailability Firestore 실패", e);
       return { ok: false, error: "닉네임 확인 중 오류가 발생했습니다." };
     }
+  }
+  if (process.env.NODE_ENV === "production") {
+    return { ok: false, error: "닉네임 확인 중 오류가 발생했습니다." };
   }
   const store = await readStore();
   if (isNicknameKeyTakenInStore(store, key, excludeUserId)) {
@@ -2721,6 +2747,20 @@ function resolveCanonicalUserId(store: DevStore, rawUserId: string): string {
     id = next;
   }
   return id;
+}
+
+/**
+ * 세션/actors의 user id를 대회 권한·createdBy 비교용으로 정규화한다.
+ * production·preview 등에서는 `readStore`를 쓰지 않고 session id를 그대로 쓴다.
+ * `legacyUserIdAliases`는 development에서만 dev-store로 해석한다.
+ */
+export async function resolveCanonicalUserIdForAuth(rawUserId: string): Promise<string> {
+  const trimmed = rawUserId.trim();
+  if (process.env.NODE_ENV !== "development") {
+    return trimmed;
+  }
+  const store = await readStore();
+  return resolveCanonicalUserId(store, trimmed);
 }
 
 function findUserByRawId(store: DevStore, rawUserId: string): DevUser | null {
@@ -2890,7 +2930,11 @@ function reconcileDevStoreLoginIds(store: DevStore): boolean {
   return changed;
 }
 
-function normalizeTournament(tournament: Tournament, store?: DevStore): Tournament {
+export async function normalizeTournament(
+  tournament: Tournament,
+  store?: DevStore,
+  venueGuideOrgs?: ClientOrganizationStored[]
+): Promise<Tournament> {
   const poster =
     typeof tournament.posterImageUrl === "string" && tournament.posterImageUrl.trim() !== ""
       ? tournament.posterImageUrl.trim()
@@ -2921,11 +2965,17 @@ function normalizeTournament(tournament: Tournament, store?: DevStore): Tourname
       : null;
 
   const vg = tournament.venueGuideVenueId;
-  const venueGuideVenueId = store
-    ? resolveVenueGuideVenueIdFromStore(store, vg)
-    : typeof vg === "string" && vg.trim() !== "" && isValidSiteVenueId(vg.trim())
-      ? vg.trim()
-      : null;
+  let venueGuideVenueId: string | null;
+  if (venueGuideOrgs) {
+    venueGuideVenueId = resolveVenueGuideVenueIdFromOrgs(venueGuideOrgs, vg);
+  } else if (store) {
+    const orgs = await getVenueGuideResolutionOrgs(store);
+    venueGuideVenueId = resolveVenueGuideVenueIdFromOrgs(orgs, vg);
+  } else if (typeof vg === "string" && vg.trim() !== "" && isValidSiteVenueId(vg.trim())) {
+    venueGuideVenueId = vg.trim();
+  } else {
+    venueGuideVenueId = null;
+  }
 
   const statusBadge = normalizeTournamentStatusBadge(
     (tournament as Tournament & { statusBadge?: unknown }).statusBadge
@@ -2955,7 +3005,7 @@ function normalizeTournament(tournament: Tournament, store?: DevStore): Tourname
   };
 }
 
-function validateTournamentRuleForCreate(rule: TournamentRuleSnapshot): { ok: true } | { ok: false; error: string } {
+export function validateTournamentRuleForCreate(rule: TournamentRuleSnapshot): { ok: true } | { ok: false; error: string } {
   const eq = rule.entryQualificationType;
   const needsMetric = eq === "SCORE" || eq === "EVER" || eq === "BOTH";
   if (needsMetric) {
@@ -3018,7 +3068,7 @@ function normalizeSitePageBuilderDraftSection(
   };
 }
 
-function deriveRoundStatus(matches: Array<Pick<BracketMatch, "status">>): BracketRoundStatus {
+export function deriveRoundStatus(matches: Array<Pick<BracketMatch, "status">>): BracketRoundStatus {
   if (matches.length === 0) return "PENDING";
   const completedCount = matches.filter((match) => match.status === "COMPLETED").length;
   if (completedCount === 0) return "PENDING";
@@ -3026,7 +3076,7 @@ function deriveRoundStatus(matches: Array<Pick<BracketMatch, "status">>): Bracke
   return "IN_PROGRESS";
 }
 
-function applyBracketDefaultsInPlace(bracket: MutableBracket): void {
+export function applyBracketDefaultsInPlace(bracket: MutableBracket): void {
   bracket.rounds = (bracket.rounds ?? []).map((round, roundIndex) => {
     const normalizedMatches = (round.matches ?? []).map((match) => {
       const winnerUserId = match.winnerUserId ?? null;
@@ -3050,7 +3100,7 @@ function applyBracketDefaultsInPlace(bracket: MutableBracket): void {
   });
 }
 
-function normalizeBracket(bracket: Bracket): Bracket {
+export function normalizeBracket(bracket: Bracket): Bracket {
   const mutable = {
     ...bracket,
     rounds: (bracket.rounds ?? []).map((round) => ({
@@ -3168,10 +3218,10 @@ export async function findUserByIdentifier(identifier: string): Promise<DevUser 
 
   if (useFirestoreUsersInProduction()) {
     try {
-      const u = await firestoreFindByLoginIdNorm(loginId);
-      if (u) return u;
+      return await firestoreFindByLoginIdNorm(loginId);
     } catch (e) {
       console.error("[dev-store] findUserByIdentifier Firestore 조회 실패", e);
+      throw new Error("User fetch failed in production");
     }
   }
 
@@ -3185,10 +3235,10 @@ export async function findUserByPhone(phone: string): Promise<DevUser | null> {
   if (!p) return null;
   if (useFirestoreUsersInProduction()) {
     try {
-      const u = await firestoreFindByPhoneDigits(p);
-      if (u) return u;
+      return await firestoreFindByPhoneDigits(p);
     } catch (e) {
       console.error("[dev-store] findUserByPhone Firestore 조회 실패", e);
+      throw new Error("User fetch failed in production");
     }
   }
   const store = await readStore();
@@ -3205,10 +3255,10 @@ export async function findUserByLoginIdAndPhone(loginId: string, phone: string):
   if (!raw) return null;
   if (useFirestoreUsersInProduction()) {
     try {
-      const u = await firestoreFindByLoginIdAndPhoneDigits(raw, p);
-      if (u) return u;
+      return await firestoreFindByLoginIdAndPhoneDigits(raw, p);
     } catch (e) {
       console.error("[dev-store] findUserByLoginIdAndPhone Firestore 조회 실패", e);
+      throw new Error("User fetch failed in production");
     }
   }
   const store = await readStore();
@@ -3251,11 +3301,14 @@ export async function updateUserPasswordByUserId(userId: string, newPassword: st
 export async function getUserById(userId: string): Promise<DevUser | null> {
   if (useFirestoreUsersInProduction()) {
     try {
-      const u = await firestoreGetUserById(userId);
-      if (u) return u;
+      return await firestoreGetUserById(userId);
     } catch (e) {
       console.error("[dev-store] getUserById Firestore 조회 실패", e);
+      throw new Error("User fetch failed in production");
     }
+  }
+  if (process.env.NODE_ENV === "production") {
+    return null;
   }
   const store = await readStore();
   return findUserByRawId(store, userId);
@@ -3281,25 +3334,27 @@ export async function listPlatformUsersForPlatform(params?: {
   const role = params?.role ?? "all";
   const status = params?.status ?? "all";
 
-  return store.users
-    .map((user) => {
-      const canonicalId = resolveCanonicalUserId(store, user.id);
-      const org = store.clientOrganizations.find((item) => item.clientUserId === canonicalId) ?? null;
-      const userStatus: PlatformUserStatus =
-        user.status === "SUSPENDED" || user.status === "DELETED" ? user.status : "ACTIVE";
-      return {
-        id: user.id,
-        name: user.name,
-        loginId: user.loginId,
-        email: user.email,
-        role: user.role,
-        status: userStatus,
-        orgClientType: org?.clientType ?? null,
-        orgApprovalStatus: org?.approvalStatus ?? null,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      };
-    })
+  const rows: PlatformUserListItem[] = [];
+  for (const user of store.users) {
+    const canonicalId = resolveCanonicalUserId(store, user.id);
+    const org = await getClientOrganizationByUserIdFirestore(canonicalId);
+    const userStatus: PlatformUserStatus =
+      user.status === "SUSPENDED" || user.status === "DELETED" ? user.status : "ACTIVE";
+    rows.push({
+      id: user.id,
+      name: user.name,
+      loginId: user.loginId,
+      email: user.email,
+      role: user.role,
+      status: userStatus,
+      orgClientType: org?.clientType ?? null,
+      orgApprovalStatus: org?.approvalStatus ?? null,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    });
+  }
+
+  return rows
     .filter((row) => (role === "all" ? true : row.role === role))
     .filter((row) => (status === "all" ? true : row.status === status))
     .filter((row) => {
@@ -3334,20 +3389,15 @@ export async function patchPlatformUserForPlatform(
   const now = new Date().toISOString();
   user.updatedAt = now;
   const canonicalId = resolveCanonicalUserId(store, user.id);
-  const orgIdx = store.clientOrganizations.findIndex((item) => item.clientUserId === canonicalId);
-  if (orgIdx >= 0) {
-    const currentOrg = store.clientOrganizations[orgIdx];
-    const nextOrg: ClientOrganizationStored = {
-      ...currentOrg,
-      clientType: params.orgClientType ?? currentOrg.clientType,
-      approvalStatus: params.orgApprovalStatus ?? currentOrg.approvalStatus,
-      updatedAt: now,
-    };
-    store.clientOrganizations[orgIdx] = nextOrg;
+  let org: ClientOrganizationStored | null = await getClientOrganizationByUserIdFirestore(canonicalId);
+  if (org && (params.orgClientType !== undefined || params.orgApprovalStatus !== undefined)) {
+    org = await patchClientOrganizationForPlatformFirestore(org.id, {
+      clientType: params.orgClientType ?? org.clientType,
+      approvalStatus: params.orgApprovalStatus ?? org.approvalStatus,
+    });
   }
 
   await writeStore(store);
-  const org = orgIdx >= 0 ? store.clientOrganizations[orgIdx] : null;
   return {
     id: user.id,
     name: user.name,
@@ -3465,6 +3515,9 @@ export async function ensurePlatformAdminAccount(params: {
   password: string;
   name?: string;
 }): Promise<DevUser | null> {
+  if (process.env.NODE_ENV === "production") {
+    return null;
+  }
   const loginId = normalizeLoginId(params.loginId);
   const email = params.email.trim().toLowerCase();
   const password = params.password.trim();
@@ -3505,12 +3558,7 @@ export async function ensurePlatformAdminAccount(params: {
 }
 
 export async function getLatestClientApplicationByUserId(userId: string): Promise<ClientApplication | null> {
-  const store = await readStore();
-  const canonical = resolveCanonicalUserId(store, userId.trim());
-  const target = store.clientApplications
-    .filter((item) => item.userId === canonical)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-  return target ?? null;
+  return getLatestClientApplicationByUserIdFirestore(userId);
 }
 
 export async function createClientApplication(params: {
@@ -3520,66 +3568,11 @@ export async function createClientApplication(params: {
   contactPhone: string;
   requestedClientType?: ClientRequestedType;
 }): Promise<{ ok: true; application: ClientApplication } | { ok: false; error: string }> {
-  const organizationName = params.organizationName.trim();
-  const contactName = params.contactName.trim();
-  const contactPhone = params.contactPhone.trim();
-
-  if (!organizationName) return { ok: false, error: "조직명을 입력해 주세요." };
-  if (!contactName) return { ok: false, error: "담당자명을 입력해 주세요." };
-  if (!contactPhone) return { ok: false, error: "담당자 연락처를 입력해 주세요." };
-
-  const store = await readStore();
-  const canonicalUserId = resolveCanonicalUserId(store, params.userId.trim());
-  const existing = store.clientApplications
-    .filter((item) => item.userId === canonicalUserId)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-
-  if (existing?.status === "PENDING") {
-    return { ok: false, error: "이미 승인 대기 중인 신청이 있습니다." };
-  }
-  if (existing?.status === "APPROVED") {
-    return { ok: false, error: "이미 승인 완료된 클라이언트 계정입니다." };
-  }
-
-  const now = new Date().toISOString();
-  const requestedClientType: ClientRequestedType =
-    params.requestedClientType === "REGISTERED" ? "REGISTERED" : "GENERAL";
-  const application: ClientApplication = {
-    id: randomUUID(),
-    userId: canonicalUserId,
-    organizationName,
-    contactName,
-    contactPhone,
-    requestedClientType,
-    status: "PENDING",
-    rejectedReason: null,
-    reviewedAt: null,
-    reviewedByUserId: null,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  store.clientApplications.push(application);
-  const user = findUserByRawId(store, params.userId);
-  if (user) {
-    user.role = "CLIENT";
-    user.updatedAt = now;
-  }
-  await writeStore(store);
-  return { ok: true, application };
+  return createClientApplicationFirestore(params);
 }
 
 export async function listClientApplications(): Promise<ClientApplication[]> {
-  const store = await readStore();
-  return [...store.clientApplications].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-}
-
-function mapApplicationStatusToOrgApprovalStatus(
-  status: ClientApplicationStatus
-): ClientOrganizationApprovalStatus {
-  if (status === "APPROVED") return "APPROVED";
-  if (status === "REJECTED") return "REJECTED";
-  return "PENDING";
+  return listClientApplicationsFirestore();
 }
 
 export async function updateClientApplicationStatus(
@@ -3590,99 +3583,11 @@ export async function updateClientApplicationStatus(
     rejectedReason?: string | null;
   }
 ): Promise<ClientApplication | null> {
-  const store = await readStore();
-  const application = store.clientApplications.find((item) => item.id === applicationId);
-  if (!application) return null;
-
-  const now = new Date().toISOString();
-  application.status = params.status;
-  application.reviewedAt = now;
-  application.reviewedByUserId = params.reviewedByUserId.trim() || null;
-  application.rejectedReason =
-    params.status === "REJECTED"
-      ? params.rejectedReason === undefined
-        ? application.rejectedReason
-        : params.rejectedReason != null && String(params.rejectedReason).trim() !== ""
-          ? String(params.rejectedReason).trim()
-          : null
-      : null;
-  application.updatedAt = now;
-
-  const user = findUserByRawId(store, application.userId);
-  if (user) {
-    user.role = "CLIENT";
-    user.updatedAt = now;
-  }
-
-  const canonicalUserId = resolveCanonicalUserId(store, application.userId);
-  const requestedType: ClientRequestedType =
-    application.requestedClientType === "REGISTERED" ? "REGISTERED" : "GENERAL";
-  const existingOrgIdx = store.clientOrganizations.findIndex((row) => row.clientUserId === canonicalUserId);
-  const mappedApproval = mapApplicationStatusToOrgApprovalStatus(params.status);
-
-  if (existingOrgIdx >= 0) {
-    const current = store.clientOrganizations[existingOrgIdx];
-    const next: ClientOrganizationStored = {
-      ...current,
-      name: current.name?.trim() ? current.name : application.organizationName,
-      slug: resolveClientOrgSlug(current, current.id),
-      phone: current.phone ?? application.contactPhone,
-      clientType: requestedType === "REGISTERED" ? "REGISTERED" : "GENERAL",
-      approvalStatus: mappedApproval,
-      membershipType: requestedType === "REGISTERED" ? "ANNUAL" : "NONE",
-      membershipExpireAt: requestedType === "REGISTERED" ? current.membershipExpireAt : null,
-      updatedAt: now,
-    };
-    if (params.status === "APPROVED" && next.status !== "SUSPENDED" && next.status !== "EXPELLED") {
-      next.status = "ACTIVE";
-    }
-    store.clientOrganizations[existingOrgIdx] = next;
-  } else {
-    const newOrgId = `client-org-${canonicalUserId}`;
-    const newOrg: ClientOrganizationStored = {
-      clientUserId: canonicalUserId,
-      id: newOrgId,
-      slug: `${newOrgId}_client`,
-      name: application.organizationName,
-      type: "VENUE",
-      shortDescription: null,
-      description: null,
-      fullDescription: null,
-      logoImageUrl: null,
-      coverImageUrl: null,
-      phone: application.contactPhone,
-      email: null,
-      website: null,
-      address: null,
-      addressDetail: null,
-      addressJibun: null,
-      zipCode: null,
-      latitude: null,
-      longitude: null,
-      addressNaverMapEnabled: false,
-      region: null,
-      typeSpecificJson: null,
-      clientType: requestedType === "REGISTERED" ? "REGISTERED" : "GENERAL",
-      approvalStatus: mappedApproval,
-      status: "ACTIVE",
-      adminRemarks: null,
-      membershipType: requestedType === "REGISTERED" ? "ANNUAL" : "NONE",
-      membershipExpireAt: null,
-      isPublished: false,
-      setupCompleted: false,
-      createdAt: now,
-      updatedAt: now,
-    };
-    store.clientOrganizations.push(newOrg);
-  }
-
-  await writeStore(store);
-  return application;
+  return updateClientApplicationStatusFirestore(applicationId, params);
 }
 
 export async function getClientStatusByUserId(userId: string): Promise<ClientApplicationStatus | null> {
-  const latest = await getLatestClientApplicationByUserId(userId);
-  return latest?.status ?? null;
+  return getClientStatusByUserIdFirestore(userId);
 }
 
 export async function getPlatformOperationSettings(): Promise<PlatformOperationSettings> {
@@ -3755,9 +3660,7 @@ export async function getClientDashboardPolicy(userId: string): Promise<{
   annualMembershipVisible: boolean;
   annualMembershipEnforced: boolean;
 }> {
-  const store = await readStore();
-  const canonical = resolveCanonicalUserId(store, userId.trim());
-  const org = store.clientOrganizations.find((row) => row.clientUserId === canonical) ?? null;
+  const org = await getClientOrganizationByUserIdFirestore(userId.trim());
   const settings = await getPlatformOperationSettings();
   return {
     orgStatus: org?.status ?? null,
@@ -3804,20 +3707,11 @@ export async function listApprovedClientOrganizations(params?: {
   status?: ClientOrganizationStatus | "all";
   clientType?: ClientOrganizationType | "all";
 }): Promise<ClientOrganizationStored[]> {
-  const store = await readStore();
-  const status = params?.status ?? "all";
-  const clientType = params?.clientType ?? "all";
-  return store.clientOrganizations
-    .filter((row) => row.approvalStatus === "APPROVED")
-    .filter((row) => (status === "all" ? true : row.status === status))
-    .filter((row) => (clientType === "all" ? true : row.clientType === clientType))
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return listApprovedClientOrganizationsFirestore(params);
 }
 
 export async function getClientOrganizationByIdForPlatform(orgId: string): Promise<ClientOrganizationStored | null> {
-  const store = await readStore();
-  const id = orgId.trim();
-  return store.clientOrganizations.find((row) => row.id === id) ?? null;
+  return getClientOrganizationByIdForPlatformFirestore(orgId);
 }
 
 export async function patchClientOrganizationForPlatform(
@@ -3830,41 +3724,11 @@ export async function patchClientOrganizationForPlatform(
     adminRemarks?: string | null;
   }
 ): Promise<ClientOrganizationStored | null> {
-  const store = await readStore();
-  const id = orgId.trim();
-  const idx = store.clientOrganizations.findIndex((row) => row.id === id);
-  if (idx < 0) return null;
-  const current = store.clientOrganizations[idx];
-  const nextMembershipType = params.membershipType ?? current.membershipType;
-  const nextMembershipExpireAt =
-    params.membershipExpireAt !== undefined
-      ? params.membershipExpireAt && params.membershipExpireAt.trim()
-        ? params.membershipExpireAt.trim()
-        : null
-      : current.membershipExpireAt;
-  const next: ClientOrganizationStored = {
-    ...current,
-    status: params.status ?? current.status,
-    clientType: params.clientType ?? current.clientType,
-    membershipType: nextMembershipType,
-    membershipExpireAt: nextMembershipType === "ANNUAL" ? nextMembershipExpireAt : null,
-    adminRemarks:
-      params.adminRemarks !== undefined
-        ? params.adminRemarks && params.adminRemarks.trim()
-          ? params.adminRemarks.trim()
-          : null
-        : current.adminRemarks,
-    updatedAt: new Date().toISOString(),
-  };
-  store.clientOrganizations[idx] = next;
-  await writeStore(store);
-  return next;
+  return patchClientOrganizationForPlatformFirestore(orgId, params);
 }
 
 export async function getClientOrganizationByUserId(userId: string): Promise<ClientOrganizationStored | null> {
-  const store = await readStore();
-  const canonical = resolveCanonicalUserId(store, userId.trim());
-  return store.clientOrganizations.find((o) => o.clientUserId === canonical) ?? null;
+  return getClientOrganizationByUserIdFirestore(userId);
 }
 
 export async function getClientInquiryById(id: string): Promise<ClientInquiryStored | null> {
@@ -3926,20 +3790,20 @@ export type ClientInquiryPlatformDisplayFields = {
   organizationDisplay: string;
 };
 
-function resolveClientInquiryPlatformDisplayFromStore(
+async function resolveClientInquiryPlatformDisplayFromStoreAsync(
   store: DevStore,
   row: ClientInquiryStored
-): ClientInquiryPlatformDisplayFields {
+): Promise<ClientInquiryPlatformDisplayFields> {
   const uid = resolveCanonicalUserId(store, row.clientUserId);
   const user = store.users.find((u) => u.id === uid) ?? null;
 
   let org: ClientOrganizationStored | null = null;
   if (row.clientOrganizationId) {
     const oid = row.clientOrganizationId.trim();
-    org = store.clientOrganizations.find((o) => o.id === oid) ?? null;
+    org = await getClientOrganizationByIdForPlatformFirestore(oid);
   }
   if (!org) {
-    org = store.clientOrganizations.find((o) => o.clientUserId === uid) ?? null;
+    org = await getClientOrganizationByUserIdFirestore(uid);
   }
 
   const nameFromUser = user?.name?.trim() ?? "";
@@ -3962,14 +3826,16 @@ export async function resolveClientInquiryPlatformDisplay(
   row: ClientInquiryStored
 ): Promise<ClientInquiryPlatformDisplayFields> {
   const store = await readStore();
-  return resolveClientInquiryPlatformDisplayFromStore(store, row);
+  return resolveClientInquiryPlatformDisplayFromStoreAsync(store, row);
 }
 
 export async function resolveClientInquiryPlatformDisplayBatch(
   rows: ClientInquiryStored[]
 ): Promise<ClientInquiryPlatformDisplayFields[]> {
   const store = await readStore();
-  return rows.map((row) => resolveClientInquiryPlatformDisplayFromStore(store, row));
+  return Promise.all(
+    rows.map((row) => resolveClientInquiryPlatformDisplayFromStoreAsync(store, row))
+  );
 }
 
 function authorLabelForInquiryComment(
@@ -4206,65 +4072,7 @@ export async function upsertClientOrganizationForUser(
     setupCompleted: boolean;
   }
 ): Promise<{ ok: true; org: ClientOrganizationStored } | { ok: false; error: string }> {
-  const store = await readStore();
-  const canonical = resolveCanonicalUserId(store, userId.trim());
-
-  const now = new Date().toISOString();
-  const idx = store.clientOrganizations.findIndex((o) => o.clientUserId === canonical);
-  const existing = idx >= 0 ? store.clientOrganizations[idx] : null;
-
-  const orgId = existing?.id ?? `client-org-${canonical}`;
-  const slugResolved = resolveClientOrgSlug(existing, orgId);
-
-  const dup = store.clientOrganizations.some(
-    (o) => o.clientUserId !== canonical && o.slug === slugResolved
-  );
-  if (dup) {
-    return { ok: false, error: "조직 식별자 충돌이 있습니다. 관리자에게 문의해 주세요." };
-  }
-
-  const nextType = existing?.type?.trim() ? existing.type.trim() : "VENUE";
-
-  const next: ClientOrganizationStored = {
-    clientUserId: canonical,
-    id: orgId,
-    slug: slugResolved,
-    name: params.name.trim(),
-    type: nextType,
-    shortDescription: params.shortDescription,
-    description: params.description,
-    fullDescription: params.fullDescription,
-    logoImageUrl: params.logoImageUrl,
-    coverImageUrl: params.coverImageUrl,
-    phone: params.phone,
-    email: params.email,
-    website: params.website,
-    address: params.address,
-    addressDetail: params.addressDetail,
-    addressJibun: params.addressJibun,
-    zipCode: params.zipCode,
-    latitude: params.latitude,
-    longitude: params.longitude,
-    addressNaverMapEnabled: params.addressNaverMapEnabled,
-    region: params.region,
-    typeSpecificJson: params.typeSpecificJson,
-    clientType: existing?.clientType === "REGISTERED" ? "REGISTERED" : "GENERAL",
-    approvalStatus: existing?.approvalStatus ?? "APPROVED",
-    status: existing?.status ?? "ACTIVE",
-    adminRemarks: existing?.adminRemarks ?? null,
-    membershipType: existing?.membershipType === "ANNUAL" ? "ANNUAL" : "NONE",
-    membershipExpireAt: existing?.membershipExpireAt ?? null,
-    isPublished: params.isPublished,
-    setupCompleted: params.setupCompleted,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  };
-
-  if (idx >= 0) store.clientOrganizations[idx] = next;
-  else store.clientOrganizations.push(next);
-
-  await writeStore(store);
-  return { ok: true, org: next };
+  return upsertClientOrganizationForUserFirestore(userId, params);
 }
 
 export async function getClientVenueIntroByUserId(userId: string): Promise<ClientVenueIntroStored | null> {
@@ -4321,8 +4129,8 @@ export type SiteVenueBoardRow = {
 };
 
 export async function getSiteVenuesBoardRows(): Promise<SiteVenueBoardRow[]> {
-  const store = await readStore();
-  const venueRows = store.clientOrganizations
+  const orgs = await listApprovedClientOrganizationsFirestore({ status: "ACTIVE", clientType: "all" });
+  const venueRows = orgs
     .filter((org) => org.type === "VENUE")
     .filter((org) => org.approvalStatus === "APPROVED")
     .filter((org) => org.status === "ACTIVE")
@@ -4383,10 +4191,10 @@ export async function getSiteVenuesBoardRows(): Promise<SiteVenueBoardRow[]> {
 export async function searchRegisteredVenuesForTournament(query: string): Promise<
   { venueId: string; name: string; addressLine: string; phone: string | null }[]
 > {
-  const store = await readStore();
   const q = query.trim().toLowerCase();
   if (!q) return [];
-  const rows = store.clientOrganizations
+  const orgs = await listApprovedClientOrganizationsFirestore({ status: "ACTIVE", clientType: "all" });
+  const rows = orgs
     .filter((org) => org.type === "VENUE")
     .filter((org) => org.approvalStatus === "APPROVED")
     .filter((org) => org.status === "ACTIVE")
@@ -4447,8 +4255,9 @@ export async function getSiteVenueDetailById(venueIdRaw: string): Promise<SiteVe
   const store = await readStore();
   const venueId = venueIdRaw.trim();
   if (!venueId) return null;
+  const orgs = await listApprovedClientOrganizationsFirestore({ status: "ACTIVE", clientType: "all" });
   const org =
-    store.clientOrganizations.find(
+    orgs.find(
       (x) =>
         x.type === "VENUE" &&
         x.approvalStatus === "APPROVED" &&
@@ -4553,17 +4362,10 @@ export async function getApplicationSummaries(): Promise<
     user: DevUser | null;
   }>
 > {
-  const store = await readStore();
-  return store.clientApplications
-    .slice()
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .map((application) => ({
-      application,
-      user: findUserByRawId(store, application.userId),
-    }));
+  return getApplicationSummariesFirestore();
 }
 
-function finalizeTournamentDates(
+export function finalizeTournamentDates(
   dateInput: string,
   eventDatesInput: string[] | null,
   rule: TournamentRuleSnapshot
@@ -4667,7 +4469,8 @@ export async function createTournament(params: {
       : null;
 
   const store = await readStore();
-  const venueGuideVenueId = resolveVenueGuideVenueIdFromStore(store, params.venueGuideVenueId);
+  const venueOrgs = await getVenueGuideResolutionOrgs(store);
+  const venueGuideVenueId = resolveVenueGuideVenueIdFromOrgs(venueOrgs, params.venueGuideVenueId);
 
   const tournament: Tournament = {
     id: randomUUID(),
@@ -4693,24 +4496,25 @@ export async function createTournament(params: {
   };
   store.tournaments.push(tournament);
   await writeStore(store);
-  return { ok: true, tournament: normalizeTournament(tournament, store) };
+  return { ok: true, tournament: await normalizeTournament(tournament, store, venueOrgs) };
 }
 
 export async function listTournamentsByCreator(userId: string): Promise<Tournament[]> {
   const store = await readStore();
   const canonicalUserId = resolveCanonicalUserId(store, userId.trim());
-  return store.tournaments
-    .filter((item) => item.createdBy === canonicalUserId)
-    .map((item) => normalizeTournament(item, store))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const filtered = store.tournaments.filter((item) => item.createdBy === canonicalUserId);
+  const venueOrgs = await getVenueGuideResolutionOrgs(store);
+  const normalized = await Promise.all(filtered.map((item) => normalizeTournament(item, store, venueOrgs)));
+  return normalized.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function listAllTournaments(): Promise<Tournament[]> {
   const store = await readStore();
-  return store.tournaments
-    .slice()
-    .map((item) => normalizeTournament(item, store))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const venueOrgs = await getVenueGuideResolutionOrgs(store);
+  const normalized = await Promise.all(
+    store.tournaments.slice().map((item) => normalizeTournament(item, store, venueOrgs))
+  );
+  return normalized.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 /** 대회 `date` 필드를 YYYY-MM-DD로 통일(기간 필터, v2 startAt 대응) */
@@ -4741,6 +4545,11 @@ export async function getSettlementLedgerOverviewForClient(params: {
     }
   | { ok: false; error: string }
 > {
+  if (isFirestoreUsersBackendConfigured()) {
+    const mod = await import("./firestore-tournament-settlements");
+    return mod.getSettlementLedgerOverviewForClientFirestore(params);
+  }
+
   const tournaments =
     params.role === "PLATFORM" ? await listAllTournaments() : await listTournamentsByCreator(params.userId);
 
@@ -4786,7 +4595,7 @@ export async function tournamentHasActivePublishedCard(tournamentId: string): Pr
 export async function getTournamentById(tournamentId: string): Promise<Tournament | null> {
   const store = await readStore();
   const tournament = store.tournaments.find((item) => item.id === tournamentId) ?? null;
-  return tournament ? normalizeTournament(tournament, store) : null;
+  return tournament ? await normalizeTournament(tournament, store) : null;
 }
 
 /** 동일 작성자 대회 제목 중 `이름 (n)` 패턴으로 다음 복제 제목 계산 */
@@ -4919,7 +4728,8 @@ export async function updateTournament(params: {
     : null;
 
   const store = await readStore();
-  const venueGuideVenueId = resolveVenueGuideVenueIdFromStore(store, params.venueGuideVenueId);
+  const venueOrgs = await getVenueGuideResolutionOrgs(store);
+  const venueGuideVenueId = resolveVenueGuideVenueIdFromOrgs(venueOrgs, params.venueGuideVenueId);
 
   const idx = store.tournaments.findIndex((item) => item.id === params.tournamentId.trim());
   if (idx < 0) return { ok: false, error: "대회를 찾을 수 없습니다.", httpStatus: 404 };
@@ -4946,7 +4756,7 @@ export async function updateTournament(params: {
   };
   store.tournaments[idx] = updated;
   await writeStore(store);
-  return { ok: true, tournament: normalizeTournament(updated, store) };
+  return { ok: true, tournament: await normalizeTournament(updated, store, venueOrgs) };
 }
 
 export async function deleteTournament(params: {
@@ -5026,13 +4836,14 @@ export async function duplicateTournament(params: {
 export async function syncActiveTournamentCardSnapshotStatusBadge(tournamentId: string): Promise<void> {
   const id = tournamentId.trim();
   if (!id) return;
-  const store = await readStore();
-  const tournament = store.tournaments.find((t) => t.id === id);
+  const cardWs = resolveTournamentPublishedCardsWriteStrategy();
+  const tournament = isFirestoreUsersBackendConfigured()
+    ? await (await import("./firestore-tournaments")).getTournamentByIdFirestore(id)
+    : (await readStore()).tournaments.find((t) => t.id === id);
   if (!tournament) return;
   const badge = String(normalizeTournamentStatusBadge(tournament.statusBadge));
   const showOnMain = tournamentStatusEligibleForMainSlide(badge);
   const now = new Date().toISOString();
-  const cardWs = resolveTournamentPublishedCardsWriteStrategy();
   if (cardWs === "firestore-kv") {
     const cur = await loadTournamentPublishedCardsArray();
     let changed = false;
@@ -5046,6 +4857,7 @@ export async function syncActiveTournamentCardSnapshotStatusBadge(tournamentId: 
     if (changed) await persistTournamentPublishedCardsRows(next);
     return;
   }
+  const store = await readStore();
   let changed = false;
   for (const c of store.tournamentPublishedCards) {
     if (c.tournamentId === id && c.isActive) {
@@ -5078,7 +4890,7 @@ export async function patchTournamentStatusBadge(params: {
   store.tournaments[idx]!.statusBadge = normalizeTournamentStatusBadge(params.statusBadge);
   await writeStore(store);
   await syncActiveTournamentCardSnapshotStatusBadge(params.tournamentId.trim());
-  return { ok: true, tournament: normalizeTournament(store.tournaments[idx]!, store) };
+  return { ok: true, tournament: await normalizeTournament(store.tournaments[idx]!, store) };
 }
 
 export type TournamentSettlementSummary = {
@@ -5172,6 +4984,10 @@ function getOrCreateSettlement(store: DevStore, tournamentId: string): Tournamen
 export async function getTournamentSettlementByTournamentId(
   tournamentId: string
 ): Promise<{ ok: true; settlement: TournamentSettlement } | { ok: false; error: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    const mod = await import("./firestore-tournament-settlements");
+    return mod.getTournamentSettlementByTournamentIdFirestore(tournamentId);
+  }
   const tournament = await getTournamentById(tournamentId);
   if (!tournament) {
     return { ok: false, error: "대회를 찾을 수 없습니다." };
@@ -5185,6 +5001,10 @@ export async function getTournamentSettlementByTournamentId(
 export async function getSettlementSummaryByTournamentId(
   tournamentId: string
 ): Promise<{ ok: true; summary: TournamentSettlementSummary } | { ok: false; error: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    const mod = await import("./firestore-tournament-settlements");
+    return mod.getSettlementSummaryByTournamentIdFirestore(tournamentId);
+  }
   const tournament = await getTournamentById(tournamentId);
   if (!tournament) {
     return { ok: false, error: "대회를 찾을 수 없습니다." };
@@ -5212,6 +5032,10 @@ export async function getSettlementSummaryByTournamentId(
 export async function listSettlementEntriesByTournamentId(
   tournamentId: string
 ): Promise<{ ok: true; entries: TournamentSettlementEntry[] } | { ok: false; error: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    const mod = await import("./firestore-tournament-settlements");
+    return mod.listSettlementEntriesByTournamentIdFirestore(tournamentId);
+  }
   const tournament = await getTournamentById(tournamentId);
   if (!tournament) {
     return { ok: false, error: "대회를 찾을 수 없습니다." };
@@ -5243,6 +5067,16 @@ export async function upsertSettlementExpenseItem(params: {
   amount: number;
   actorUserId?: string;
 }): Promise<{ ok: true; settlement: TournamentSettlement } | { ok: false; error: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    const mod = await import("./firestore-tournament-settlements");
+    return mod.upsertSettlementExpenseItemFirestore({
+      tournamentId: params.tournamentId,
+      expenseItemId: params.expenseItemId,
+      title: params.title,
+      amount: params.amount,
+      actorUserId: params.actorUserId,
+    });
+  }
   const tournamentId = params.tournamentId.trim();
   if (!tournamentId) return { ok: false, error: "잘못된 요청입니다." };
   const tournament = await getTournamentById(tournamentId);
@@ -5310,6 +5144,13 @@ export async function deleteSettlementExpenseItem(params: {
   expenseItemId: string;
   actorUserId?: string;
 }): Promise<{ ok: true; settlement: TournamentSettlement } | { ok: false; error: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    const mod = await import("./firestore-tournament-settlements");
+    return mod.deleteSettlementExpenseItemFirestore({
+      tournamentId: params.tournamentId,
+      expenseItemId: params.expenseItemId,
+    });
+  }
   const tournamentId = params.tournamentId.trim();
   if (!tournamentId) return { ok: false, error: "잘못된 요청입니다." };
   const tournament = await getTournamentById(tournamentId);
@@ -5347,6 +5188,14 @@ export async function setSettlementRefunded(params: {
   applicationId: string;
   refunded: boolean;
 }): Promise<{ ok: true; settlement: TournamentSettlement } | { ok: false; error: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    const mod = await import("./firestore-tournament-settlements");
+    return mod.setSettlementRefundedFirestore({
+      tournamentId: params.tournamentId,
+      applicationId: params.applicationId,
+      refunded: params.refunded,
+    });
+  }
   const applicationId = params.applicationId.trim();
   if (!applicationId) return { ok: false, error: "applicationId가 필요합니다." };
 
@@ -5376,6 +5225,10 @@ export async function setTournamentSettlementStatus(params: {
   isSettled: boolean;
   actorUserId?: string;
 }): Promise<{ ok: true; settlement: TournamentSettlement } | { ok: false; error: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    const mod = await import("./firestore-tournament-settlements");
+    return mod.setTournamentSettlementStatusFirestore({ tournamentId: params.tournamentId, isSettled: params.isSettled });
+  }
   const tournamentId = params.tournamentId.trim();
   if (!tournamentId) return { ok: false, error: "잘못된 요청입니다." };
   if (typeof params.isSettled !== "boolean") return { ok: false, error: "잘못된 요청입니다." };
@@ -5409,7 +5262,14 @@ export async function setTournamentSettlementStatus(params: {
 
 export async function getTournamentLedgerLinesForClient(
   tournamentId: string
-): Promise<{ ok: true; tournament: Tournament; lines: SettlementLedgerLineStored[] } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; tournament: Pick<Tournament, "id" | "title" | "date">; lines: SettlementLedgerLineStored[] }
+  | { ok: false; error: string }
+> {
+  if (isFirestoreUsersBackendConfigured()) {
+    const mod = await import("./firestore-tournament-settlements");
+    return mod.getTournamentLedgerLinesForClientFirestore(tournamentId);
+  }
   const tournament = await getTournamentById(tournamentId);
   if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다." };
   const store = await readStore();
@@ -5434,6 +5294,10 @@ export async function replaceSettlementLedgerLines(params: {
     entryDate?: string | null;
   }>;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    const mod = await import("./firestore-tournament-settlements");
+    return mod.replaceSettlementLedgerLinesFirestore({ tournamentId: params.tournamentId, lines: params.lines });
+  }
   const tournamentId = params.tournamentId.trim();
   if (!tournamentId) return { ok: false, error: "잘못된 요청입니다." };
   const tournament = await getTournamentById(tournamentId);
@@ -5587,6 +5451,15 @@ export async function isSiteImagePubliclyAccessible(imageId: string): Promise<bo
   const asset = list.find((item) => item.id === normalized);
   if (!asset) return false;
   if (asset.sitePublic === true) return true;
+  if (isFirestoreUsersBackendConfigured()) {
+    const { listAllTournamentsFirestore } = await import("./firestore-tournaments");
+    const all = await listAllTournamentsFirestore();
+    return all.some((t) => {
+      const poster = t.posterImageUrl;
+      if (typeof poster !== "string" || !poster.trim()) return false;
+      return extractProofImageIdFromPosterUrl(poster) === normalized;
+    });
+  }
   const store = await readStore();
   return store.tournaments.some((t) => {
     const poster = t.posterImageUrl;
@@ -5776,15 +5649,16 @@ export async function isOutlinePdfLinkedForPublicSite(pdfId: string): Promise<bo
   const url = buildOutlinePdfPublicUrl(id);
   for (const intro of store.clientVenueIntros) {
     if (intro.outlinePdfUrl !== url) continue;
-    const org = store.clientOrganizations.find(
-      (o) =>
-        o.clientUserId === intro.clientUserId &&
-        o.type === "VENUE" &&
-        o.approvalStatus === "APPROVED" &&
-        o.status === "ACTIVE" &&
-        o.isPublished === true
-    );
-    if (org) return true;
+    const org = await getClientOrganizationByUserIdFirestore(intro.clientUserId);
+    if (
+      org &&
+      org.type === "VENUE" &&
+      org.approvalStatus === "APPROVED" &&
+      org.status === "ACTIVE" &&
+      org.isPublished === true
+    ) {
+      return true;
+    }
   }
   return false;
 }
@@ -5824,6 +5698,9 @@ export async function createTournamentApplication(params: {
   proofImage640Url: string;
   proofOriginalUrl: string;
 }): Promise<{ ok: true; application: TournamentApplication } | { ok: false; error: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-applications")).createTournamentApplicationFirestore(params);
+  }
   const applicantName = params.applicantName.trim();
   const phone = params.phone.trim();
   const depositorName = params.depositorName.trim();
@@ -5887,6 +5764,11 @@ export async function createTournamentApplication(params: {
 export async function listTournamentApplicationsByTournamentId(
   tournamentId: string
 ): Promise<TournamentApplication[]> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-applications")).listTournamentApplicationsByTournamentIdFirestore(
+      tournamentId
+    );
+  }
   const store = await readStore();
   return store.tournamentApplications
     .filter((item) => item.tournamentId === tournamentId)
@@ -5914,6 +5796,9 @@ export async function listTournamentApplicationsByTournamentId(
 export async function listTournamentApplicationsByUserId(userId: string): Promise<TournamentApplication[]> {
   const normalizedUserId = userId.trim();
   if (!normalizedUserId) return [];
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-applications")).listTournamentApplicationsByUserIdFirestore(userId);
+  }
   const store = await readStore();
   const canonicalUserId = resolveCanonicalUserId(store, normalizedUserId);
   return store.tournamentApplications
@@ -6260,6 +6145,12 @@ export async function getTournamentApplicationById(
   tournamentId: string,
   entryId: string
 ): Promise<TournamentApplication | null> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-applications")).getTournamentApplicationByIdFirestore(
+      tournamentId,
+      entryId
+    );
+  }
   const store = await readStore();
   const item =
     store.tournamentApplications.find((application) => application.tournamentId === tournamentId && application.id === entryId) ??
@@ -6286,6 +6177,11 @@ export async function getTournamentApplicationById(
 export async function listApprovedParticipantsByTournamentId(
   tournamentId: string
 ): Promise<TournamentApplication[]> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-applications")).listApprovedParticipantsByTournamentIdFirestore(
+      tournamentId
+    );
+  }
   const applications = await listTournamentApplicationsByTournamentId(tournamentId);
   return applications.filter((item) => item.status === "APPROVED");
 }
@@ -6293,6 +6189,9 @@ export async function listApprovedParticipantsByTournamentId(
 export async function createBracketParticipantSnapshot(params: {
   tournamentId: string;
 }): Promise<{ ok: true; snapshot: BracketParticipantSnapshot } | { ok: false; error: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-brackets")).createBracketParticipantSnapshotFirestore(params);
+  }
   const approvedParticipants = await listApprovedParticipantsByTournamentId(params.tournamentId);
   if (approvedParticipants.length === 0) {
     return { ok: false, error: "APPROVED 참가자가 없어 스냅샷을 생성할 수 없습니다." };
@@ -6323,6 +6222,11 @@ export async function createBracketParticipantSnapshot(params: {
 export async function listBracketParticipantSnapshotsByTournamentId(
   tournamentId: string
 ): Promise<BracketParticipantSnapshot[]> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-brackets")).listBracketParticipantSnapshotsByTournamentIdFirestore(
+      tournamentId
+    );
+  }
   const store = await readStore();
   return store.bracketParticipantSnapshots
     .filter((item) => item.tournamentId === tournamentId)
@@ -6332,6 +6236,11 @@ export async function listBracketParticipantSnapshotsByTournamentId(
 export async function getLatestBracketParticipantSnapshotByTournamentId(
   tournamentId: string
 ): Promise<BracketParticipantSnapshot | null> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-brackets")).getLatestBracketParticipantSnapshotByTournamentIdFirestore(
+      tournamentId
+    );
+  }
   const snapshots = await listBracketParticipantSnapshotsByTournamentId(tournamentId);
   return snapshots[0] ?? null;
 }
@@ -6339,6 +6248,9 @@ export async function getLatestBracketParticipantSnapshotByTournamentId(
 export async function createBracketFromSnapshot(
   snapshotId: string
 ): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-brackets")).createBracketFromSnapshotFirestore(snapshotId);
+  }
   const store = await readStore();
   const snapshot = store.bracketParticipantSnapshots.find((item) => item.id === snapshotId);
   if (!snapshot) {
@@ -6388,6 +6300,9 @@ export async function createBracketFromDraft(params: {
   snapshotId: string;
   matches: BracketDraftMatchInput[];
 }): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-brackets")).createBracketFromDraftFirestore(params);
+  }
   const store = await readStore();
   const snapshot = store.bracketParticipantSnapshots.find(
     (item) => item.id === params.snapshotId && item.tournamentId === params.tournamentId
@@ -6451,6 +6366,9 @@ export async function createBracketFromDraft(params: {
 }
 
 export async function listBracketsByTournamentId(tournamentId: string): Promise<Bracket[]> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-brackets")).listBracketsByTournamentIdFirestore(tournamentId);
+  }
   const store = await readStore();
   return store.brackets
     .filter((item) => item.tournamentId === tournamentId)
@@ -6459,6 +6377,9 @@ export async function listBracketsByTournamentId(tournamentId: string): Promise<
 }
 
 export async function getLatestBracketByTournamentId(tournamentId: string): Promise<Bracket | null> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-brackets")).getLatestBracketByTournamentIdFirestore(tournamentId);
+  }
   const brackets = await listBracketsByTournamentId(tournamentId);
   return brackets[0] ?? null;
 }
@@ -6469,6 +6390,9 @@ export async function updateBracketMatchResult(params: {
   winnerUserId: string | null;
   actorUserId?: string;
 }): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-brackets")).updateBracketMatchResultFirestore(params);
+  }
   const tournamentId = params.tournamentId.trim();
   const matchId = params.matchId.trim();
   if (!tournamentId || !matchId) {
@@ -6576,6 +6500,9 @@ export async function replaceBracketMatchPlayer(params: {
   replacementUserId: string;
   actorUserId?: string;
 }): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-brackets")).replaceBracketMatchPlayerFirestore(params);
+  }
   const tournamentId = params.tournamentId.trim();
   const matchId = params.matchId.trim();
   const replacementUserId = params.replacementUserId.trim();
@@ -6678,6 +6605,9 @@ export async function advanceBracketRound(
   bracketId: string,
   roundNumber: number
 ): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-brackets")).advanceBracketRoundFirestore(bracketId, roundNumber);
+  }
   const store = await readStore();
   const bracket = store.brackets.find((item) => item.id === bracketId) as MutableBracket | undefined;
   if (!bracket) {
@@ -6741,6 +6671,9 @@ export async function markTournamentApplicationOcrProcessing(params: {
   tournamentId: string;
   entryId: string;
 }): Promise<TournamentApplication | null> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-applications")).markTournamentApplicationOcrProcessingFirestore(params);
+  }
   const store = await readStore();
   const target = store.tournamentApplications.find(
     (item) => item.tournamentId === params.tournamentId && item.id === params.entryId
@@ -6762,6 +6695,9 @@ export async function completeTournamentApplicationOcr(params: {
   rawResult: string;
   failed?: boolean;
 }): Promise<TournamentApplication | null> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-applications")).completeTournamentApplicationOcrFirestore(params);
+  }
   const store = await readStore();
   const target = store.tournamentApplications.find(
     (item) => item.tournamentId === params.tournamentId && item.id === params.entryId
@@ -6801,6 +6737,9 @@ export async function updateTournamentApplicationStatus(params: {
   nextStatus: TournamentApplicationStatus;
   actorUserId?: string;
 }): Promise<{ ok: true; application: TournamentApplication } | { ok: false; error: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-applications")).updateTournamentApplicationStatusFirestore(params);
+  }
   const tournamentId = params.tournamentId.trim();
   const entryId = params.entryId.trim();
   if (!tournamentId || !entryId) {
@@ -6917,6 +6856,9 @@ export async function updateTournamentApplicationStatus(params: {
 export async function listNotificationsByUserId(userId: string, limit = 20): Promise<UserNotification[]> {
   const normalizedUserId = userId.trim();
   if (!normalizedUserId) return [];
+  if (process.env.NODE_ENV === "production") {
+    return [];
+  }
   const store = await readStore();
   const canonicalUserId = resolveCanonicalUserId(store, normalizedUserId);
   const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
@@ -6931,6 +6873,9 @@ export async function listNotificationsByUserId(userId: string, limit = 20): Pro
 export async function countUnreadNotificationsByUserId(userId: string): Promise<number> {
   const normalizedUserId = userId.trim();
   if (!normalizedUserId) return 0;
+  if (process.env.NODE_ENV === "production") {
+    return 0;
+  }
   const store = await readStore();
   const canonicalUserId = resolveCanonicalUserId(store, normalizedUserId);
   let unread = 0;
@@ -6947,6 +6892,18 @@ export async function markNotificationAsRead(params: {
   const userId = params.userId.trim();
   const notificationId = params.notificationId.trim();
   if (!userId || !notificationId) return null;
+  if (process.env.NODE_ENV === "production") {
+    const now = new Date().toISOString();
+    return {
+      id: notificationId,
+      userId,
+      title: "",
+      message: "",
+      relatedTournamentId: null,
+      createdAt: now,
+      isRead: true,
+    };
+  }
   const store = await readStore();
   const canonicalUserId = resolveCanonicalUserId(store, userId);
   const notification = store.notifications.find(
@@ -6961,6 +6918,9 @@ export async function markNotificationAsRead(params: {
 export async function markAllNotificationsAsReadForUser(userId: string): Promise<{ updated: number }> {
   const normalizedUserId = userId.trim();
   if (!normalizedUserId) return { updated: 0 };
+  if (process.env.NODE_ENV === "production") {
+    return { updated: 0 };
+  }
   const store = await readStore();
   const canonicalUserId = resolveCanonicalUserId(store, normalizedUserId);
   let updated = 0;
@@ -6979,6 +6939,9 @@ export async function markAllNotificationsAsReadForUser(userId: string): Promise
 export async function getSitePageBuilderDraftByPageId(pageId: string): Promise<SitePageBuilderDraft | null> {
   const normalizedPageId = pageId.trim();
   if (!normalizedPageId) return null;
+  if (process.env.NODE_ENV === "production") {
+    return null;
+  }
   const store = await readStore();
   const draft = store.sitePageBuilderDrafts.find((item) => item.pageId === normalizedPageId);
   if (!draft) return null;
@@ -7037,6 +7000,9 @@ export async function getSitePageBuilderPublishedByPageId(
 ): Promise<SitePageBuilderPublishedPage | null> {
   const normalizedPageId = pageId.trim();
   if (!normalizedPageId) return null;
+  if (process.env.NODE_ENV === "production") {
+    return null;
+  }
   const store = await readStore();
   const published = store.sitePageBuilderPublishedPages.find((item) => item.pageId === normalizedPageId);
   if (!published) return null;
@@ -7694,6 +7660,25 @@ function tournamentDateLocationMeta(
   };
 }
 
+export async function getTournamentDateLocationMetaForPublishedCards(
+  tournamentId: string
+): Promise<{ date: string; location: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    const { getTournamentByIdFirestore } = await import("./firestore-tournaments");
+    const tour = await getTournamentByIdFirestore(tournamentId.trim());
+    if (!tour) return { date: "", location: "" };
+    return {
+      date: typeof tour.date === "string" ? tour.date : "",
+      location: typeof tour.location === "string" ? tour.location : "",
+    };
+  }
+  if (process.env.NODE_ENV === "production") {
+    return { date: "", location: "" };
+  }
+  const store = await readStore();
+  return tournamentDateLocationMeta(store, tournamentId);
+}
+
 function tournamentPublishedCardToPublishedSnapshot(
   t: TournamentPublishedCard,
   templateId: string,
@@ -7794,15 +7779,17 @@ export async function upsertTournamentPublishedCard(params: {
   const targetDetailUrl = params.targetDetailUrl.trim();
   if (!targetDetailUrl.startsWith("/")) return { ok: false, error: "상세 이동 경로가 올바르지 않습니다." };
 
-  const store = await readStore();
-  const tournament = store.tournaments.find((item) => item.id === params.tournamentId.trim());
-  if (!tournament) {
-    return { ok: false, error: "대회를 찾을 수 없습니다." };
-  }
-
   const cardWs = resolveTournamentPublishedCardsWriteStrategy();
   if (cardWs === "blocked") {
     throwTournamentPublishedCardsWritePersistenceBlocked();
+  }
+
+  const localStore = cardWs === "dev-store-file" ? await readStore() : null;
+  const tournament = isFirestoreUsersBackendConfigured()
+    ? await (await import("./firestore-tournaments")).getTournamentByIdFirestore(params.tournamentId.trim())
+    : localStore?.tournaments.find((item) => item.id === params.tournamentId.trim());
+  if (!tournament) {
+    return { ok: false, error: "대회를 찾을 수 없습니다." };
   }
 
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
@@ -7814,24 +7801,28 @@ export async function upsertTournamentPublishedCard(params: {
   const tid = params.tournamentId.trim();
   /** 초안 저장: 이전 초안(비활성)만 제거. 게시: 해당 대회 카드 전부 제거 후 새 게시 스냅샷 1건만 둔다. */
   const cards =
-    cardWs === "dev-store-file" ? store.tournamentPublishedCards : [...(await loadTournamentPublishedCardsArray())];
+    cardWs === "dev-store-file" && localStore
+      ? localStore.tournamentPublishedCards
+      : [...(await loadTournamentPublishedCardsArray())];
   if (params.draftOnly) {
-    if (cardWs === "dev-store-file") {
-      store.tournamentPublishedCards = store.tournamentPublishedCards.filter((c) => !(c.tournamentId === tid && !c.isActive));
+    if (cardWs === "dev-store-file" && localStore) {
+      localStore.tournamentPublishedCards = localStore.tournamentPublishedCards.filter(
+        (c) => !(c.tournamentId === tid && !c.isActive)
+      );
     } else {
       const next = cards.filter((c) => !(c.tournamentId === tid && !c.isActive));
       cards.length = 0;
       cards.push(...next);
     }
-  } else if (cardWs === "dev-store-file") {
-    store.tournamentPublishedCards = store.tournamentPublishedCards.filter((c) => c.tournamentId !== tid);
+  } else if (cardWs === "dev-store-file" && localStore) {
+    localStore.tournamentPublishedCards = localStore.tournamentPublishedCards.filter((c) => c.tournamentId !== tid);
   } else {
     const next = cards.filter((c) => c.tournamentId !== tid);
     cards.length = 0;
     cards.push(...next);
   }
 
-  const working = cardWs === "dev-store-file" ? store.tournamentPublishedCards : cards;
+  const working = cardWs === "dev-store-file" && localStore ? localStore.tournamentPublishedCards : cards;
   const sameTournament = working.filter((c) => c.tournamentId === tid);
   const nextVersion = sameTournament.reduce((max, c) => Math.max(max, c.version), 0) + 1;
 
@@ -7877,8 +7868,8 @@ export async function upsertTournamentPublishedCard(params: {
   working.push(row);
   if (cardWs === "firestore-kv") {
     await persistTournamentPublishedCardsRows(working);
-  } else {
-    await writeStore(store);
+  } else if (localStore) {
+    await writeStore(localStore);
   }
   return {
     ok: true,
@@ -7960,16 +7951,19 @@ export async function publishVenueCardSnapshot(params: {
 }
 
 export async function listPublishedCardSnapshots(): Promise<PublishedCardSnapshot[]> {
-  const store = await readStore();
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
   const publishedCards = await loadTournamentPublishedCardsArray();
-  const fromTournament = publishedCards
-    .filter((c) => c.isPublished && c.isActive)
-    .map((c) =>
-      tournamentPublishedCardToPublishedSnapshot(c, templateId, tournamentDateLocationMeta(store, c.tournamentId))
-    );
+  const fromTournament = await Promise.all(
+    publishedCards
+      .filter((c) => c.isPublished && c.isActive)
+      .map(async (c) => {
+        const meta = await getTournamentDateLocationMetaForPublishedCards(c.tournamentId);
+        return tournamentPublishedCardToPublishedSnapshot(c, templateId, meta);
+      })
+  );
 
-  const normalized = store.publishedCardSnapshots
+  const store = isFirestoreUsersBackendConfigured() ? null : await readStore();
+  const normalized = (store ? store.publishedCardSnapshots : [])
     .map((item) => {
       const legacy = item as PublishedCardSnapshot & { cardImageUrl?: string; snapshotSourceType?: string };
       const publishedAt = item.publishedAt || new Date().toISOString();
@@ -8035,7 +8029,7 @@ export async function listPublishedCardSnapshots(): Promise<PublishedCardSnapsho
 /** 메인 홈 슬라이드에 넘길 토너먼트 게시 카드 최대 개수(슬라이드 예비 장면 포함) */
 const DEFAULT_MAIN_SITE_TOURNAMENT_SLIDE_LIMIT = 4;
 
-async function loadTournamentPublishedCardsArray(): Promise<TournamentPublishedCard[]> {
+export async function loadTournamentPublishedCardsArray(): Promise<TournamentPublishedCard[]> {
   const rs = resolveTournamentPublishedCardsReadStrategy();
   if (rs === "firestore-kv") {
     try {
@@ -8082,9 +8076,6 @@ export async function listTournamentSnapshotsForMainSite(options?: {
       ? Math.min(50, Math.floor(limitRaw))
       : DEFAULT_MAIN_SITE_TOURNAMENT_SLIDE_LIMIT;
 
-  const publishedCardsReadStrategy = resolveTournamentPublishedCardsReadStrategy();
-  const store =
-    publishedCardsReadStrategy === "firestore-kv" ? null : await readStore();
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
   const cards = await loadTournamentPublishedCardsArray();
   const rows = cards
@@ -8092,39 +8083,30 @@ export async function listTournamentSnapshotsForMainSite(options?: {
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, limit);
 
-  return rows.map((c) =>
-    tournamentPublishedCardToPublishedSnapshot(
-      c,
-      templateId,
-      store === null
-        ? null
-        : tournamentDateLocationMeta(store, c.tournamentId)
-    )
+  return Promise.all(
+    rows.map(async (c) => {
+      const meta = await getTournamentDateLocationMetaForPublishedCards(c.tournamentId);
+      return tournamentPublishedCardToPublishedSnapshot(c, templateId, meta);
+    })
   );
 }
 
 export async function getLatestPublishedCardSnapshotByTournamentId(
   tournamentId: string
 ): Promise<PublishedCardSnapshot | null> {
-  const store = await readStore();
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
   const publishedCards = await loadTournamentPublishedCardsArray();
   const active = publishedCards
     .filter((c) => c.tournamentId === tournamentId.trim() && c.isPublished && c.isActive)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-  return active
-    ? tournamentPublishedCardToPublishedSnapshot(
-        active,
-        templateId,
-        tournamentDateLocationMeta(store, tournamentId)
-      )
-    : null;
+  if (!active) return null;
+  const meta = await getTournamentDateLocationMetaForPublishedCards(tournamentId);
+  return tournamentPublishedCardToPublishedSnapshot(active, templateId, meta);
 }
 
 export async function listCardSnapshotsByTournamentId(tournamentId: string): Promise<PublishedCardSnapshot[]> {
-  const store = await readStore();
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
-  const meta = tournamentDateLocationMeta(store, tournamentId);
+  const meta = await getTournamentDateLocationMetaForPublishedCards(tournamentId);
   const publishedCards = await loadTournamentPublishedCardsArray();
   return publishedCards
     .filter((c) => c.tournamentId === tournamentId.trim())
@@ -8133,6 +8115,9 @@ export async function listCardSnapshotsByTournamentId(tournamentId: string): Pro
 }
 
 export async function listCardSnapshotsByVenueId(venueId: string): Promise<PublishedCardSnapshot[]> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return [];
+  }
   const store = await readStore();
   return store.publishedCardSnapshots
     .filter((item) => normalizeSnapshotSourceType(item) === "VENUE_SNAPSHOT" && item.tournamentId === venueId)
@@ -8155,16 +8140,17 @@ export async function listCardSnapshotsByVenueId(venueId: string): Promise<Publi
 }
 
 export async function getCardSnapshotById(snapshotId: string): Promise<PublishedCardSnapshot | null> {
-  const store = await readStore();
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
   const publishedCards = await loadTournamentPublishedCardsArray();
   const tc = publishedCards.find((c) => c.snapshotId === snapshotId);
-  if (tc)
-    return tournamentPublishedCardToPublishedSnapshot(
-      tc,
-      templateId,
-      tournamentDateLocationMeta(store, tc.tournamentId)
-    );
+  if (tc) {
+    const meta = await getTournamentDateLocationMetaForPublishedCards(tc.tournamentId);
+    return tournamentPublishedCardToPublishedSnapshot(tc, templateId, meta);
+  }
+  if (isFirestoreUsersBackendConfigured()) {
+    return null;
+  }
+  const store = await readStore();
   const snapshot = store.publishedCardSnapshots.find((item) => item.snapshotId === snapshotId);
   if (!snapshot) return null;
   const publishedAt = snapshot.publishedAt || new Date().toISOString();
@@ -8186,11 +8172,14 @@ export async function setCardSnapshotActive(params: {
   snapshotId: string;
   isActive: boolean;
 }): Promise<{ ok: true; snapshot: PublishedCardSnapshot } | { ok: false; error: string }> {
-  const store = await readStore();
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
   const cardWs = resolveTournamentPublishedCardsWriteStrategy();
+  const needFileStore = cardWs === "dev-store-file";
+  const fileStore = needFileStore ? await readStore() : null;
   const publishedCards =
-    cardWs === "dev-store-file" ? store.tournamentPublishedCards : await loadTournamentPublishedCardsArray();
+    needFileStore && fileStore
+      ? fileStore.tournamentPublishedCards
+      : await loadTournamentPublishedCardsArray();
   const tc = publishedCards.find((c) => c.snapshotId === params.snapshotId);
   const now = new Date().toISOString();
 
@@ -8209,7 +8198,9 @@ export async function setCardSnapshotActive(params: {
     tc.isActive = params.isActive;
     tc.updatedAt = now;
     tc.isPublished = true;
-    const tour = store.tournaments.find((t) => t.id === tc.tournamentId);
+    const tour = isFirestoreUsersBackendConfigured()
+      ? await (await import("./firestore-tournaments")).getTournamentByIdFirestore(tc.tournamentId)
+      : fileStore?.tournaments.find((t) => t.id === tc.tournamentId) ?? null;
     if (tour) {
       const badge = String(normalizeTournamentStatusBadge(tour.statusBadge));
       tc.status = badge;
@@ -8217,8 +8208,8 @@ export async function setCardSnapshotActive(params: {
     }
     if (cardWs === "firestore-kv") {
       await persistTournamentPublishedCardsRows(publishedCards);
-    } else {
-      await writeStore(store);
+    } else if (fileStore) {
+      await writeStore(fileStore);
     }
     return {
       ok: true,
@@ -8229,13 +8220,16 @@ export async function setCardSnapshotActive(params: {
     };
   }
 
-  const snapshot = store.publishedCardSnapshots.find((item) => item.snapshotId === params.snapshotId);
+  if (!fileStore) {
+    return { ok: false, error: "스냅샷을 찾을 수 없습니다." };
+  }
+  const snapshot = fileStore.publishedCardSnapshots.find((item) => item.snapshotId === params.snapshotId);
   if (!snapshot) {
     return { ok: false, error: "스냅샷을 찾을 수 없습니다." };
   }
 
   if (params.isActive) {
-    for (const item of store.publishedCardSnapshots) {
+    for (const item of fileStore.publishedCardSnapshots) {
       if (
         normalizeSnapshotSourceType(item) === normalizeSnapshotSourceType(snapshot) &&
         item.tournamentId === snapshot.tournamentId &&
@@ -8252,7 +8246,7 @@ export async function setCardSnapshotActive(params: {
   snapshot.updatedAt = now;
   snapshot.isPublished = true;
 
-  await writeStore(store);
+  await writeStore(fileStore);
 
   return {
     ok: true,

@@ -12,16 +12,16 @@ if (localFile.exists()) {
     localFile.inputStream().use { localProps.load(it) }
 }
 val siteBaseUrl =
-    (localProps.getProperty("siteBaseUrl") ?: "http://10.0.2.2:3000").trim().trimEnd('/')
+    (localProps.getProperty("siteBaseUrl") ?: "https://carom.club").trim().trimEnd('/')
 
 android {
     namespace = "com.caromclub.webview"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.caromclub.webview"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
         buildConfigField("String", "SITE_BASE_URL", "\"$siteBaseUrl\"")

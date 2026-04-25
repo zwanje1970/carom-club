@@ -1,14 +1,16 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../../lib/auth/session";
+import { tournamentHasActivePublishedCardInKv } from "../../../../../../../lib/server/platform-tournament-published-cards-settings";
 import {
-  checkClientFeatureAccessByUserId,
-  getTournamentById,
-  getTournamentLedgerLinesForClient,
-  getUserById,
-  replaceSettlementLedgerLines,
-  tournamentHasActivePublishedCard,
-} from "../../../../../../../lib/server/dev-store";
+  settlementApiCheckClientFeatureAccess,
+  settlementApiGetSessionUser,
+} from "../../../../../../../lib/server/settlement-api-auth-firestore";
+import {
+  getTournamentLedgerLinesForClientFirestore,
+  replaceSettlementLedgerLinesFirestore,
+} from "../../../../../../../lib/server/firestore-tournament-settlements";
+import { getTournamentByIdFirestore } from "../../../../../../../lib/server/firestore-tournaments";
 
 export const runtime = "nodejs";
 
@@ -17,10 +19,10 @@ async function requireSettlementAccess(tournamentId: string) {
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
   if (!session) return { ok: false as const, status: 401, error: "로그인이 필요합니다." };
 
-  const user = await getUserById(session.userId);
+  const user = await settlementApiGetSessionUser(session.userId);
   if (!user) return { ok: false as const, status: 401, error: "사용자를 찾을 수 없습니다." };
 
-  const tournament = await getTournamentById(tournamentId);
+  const tournament = await getTournamentByIdFirestore(tournamentId);
   if (!tournament) return { ok: false as const, status: 404, error: "대회를 찾을 수 없습니다." };
 
   if (user.role === "PLATFORM") {
@@ -30,14 +32,14 @@ async function requireSettlementAccess(tournamentId: string) {
     return { ok: false as const, status: 403, error: "CLIENT + APPROVED 권한이 필요합니다." };
   }
 
-  const gate = await checkClientFeatureAccessByUserId({ userId: user.id, feature: "SETTLEMENT" });
+  const gate = await settlementApiCheckClientFeatureAccess({ userId: user.id, feature: "SETTLEMENT" });
   if (!gate.ok) {
     return { ok: false as const, status: 403, error: gate.error };
   }
   if (tournament.createdBy !== user.id) {
     return { ok: false as const, status: 403, error: "본인 대회만 접근할 수 있습니다." };
   }
-  const published = await tournamentHasActivePublishedCard(tournament.id);
+  const published = await tournamentHasActivePublishedCardInKv(tournament.id);
   if (!published) {
     return { ok: false as const, status: 403, error: "게시된 대회만 정산 장부를 사용할 수 있습니다." };
   }
@@ -53,7 +55,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
   if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
-  const result = await getTournamentLedgerLinesForClient(id);
+  const result = await getTournamentLedgerLinesForClientFirestore(id);
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
@@ -110,7 +112,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
     });
   }
 
-  const result = await replaceSettlementLedgerLines({ tournamentId: id, lines });
+  const result = await replaceSettlementLedgerLinesFirestore({ tournamentId: id, lines });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }

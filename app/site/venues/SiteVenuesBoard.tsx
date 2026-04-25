@@ -1,13 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import FilterButton from "../components/FilterButton";
 import FilterDropdown from "../components/FilterDropdown";
-import { performGeolocationThenNavigate, useDistanceGearArmed } from "../lib/site-geolocation-flow";
 import SiteShellFrame from "../components/SiteShellFrame";
 import filterStyles from "../components/filter-controls.module.css";
+import {
+  confirmSiteGeolocationPrecursor,
+  fetchViewerCoordinatesOnce,
+  SITE_GEO_DENIED_USER_MESSAGE,
+} from "../lib/site-geolocation-flow";
+import { buildVenuesListHref } from "./venues-list-url";
 
 export type SiteVenueBoardRow = {
   venueId: string;
@@ -69,23 +73,22 @@ const FEE_TYPE_OPTIONS: { value: FeeTypeFilter; label: string }[] = [
 
 type Props = {
   initialRows: SiteVenueBoardRow[];
-  distanceSort: { lat: number; lng: number } | null;
-  locationDenied?: boolean;
-  distanceButtonHref: string;
-  hasViewerCoordinate: boolean;
 };
 
-export default function SiteVenuesBoard({
-  initialRows,
-  distanceSort,
-  locationDenied,
-  distanceButtonHref,
-  hasViewerCoordinate,
-}: Props) {
-  const router = useRouter();
-  const distanceArmed = useDistanceGearArmed(hasViewerCoordinate);
+export default function SiteVenuesBoard({ initialRows }: Props) {
+  const [memoryCoords, setMemoryCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [showDeniedHint, setShowDeniedHint] = useState(false);
+  const [geoBusy, setGeoBusy] = useState(false);
   const [venueType, setVenueType] = useState<VenueTypeFilter>("all");
   const [feeType, setFeeType] = useState<FeeTypeFilter>("all");
+
+  useEffect(() => {
+    return () => {
+      setMemoryCoords(null);
+      setShowDeniedHint(false);
+      setGeoBusy(false);
+    };
+  }, []);
 
   const filtered = useMemo(() => {
     if (venueType === "all" && feeType === "all") {
@@ -110,11 +113,11 @@ export default function SiteVenuesBoard({
   const ordered = useMemo(() => {
     let list = [...filtered];
 
-    if (distanceSort) {
+    if (memoryCoords) {
       const withDistance = list.map((row, index) => {
         const d =
           row.lat != null && row.lng != null
-            ? distanceMeters(distanceSort, { lat: row.lat, lng: row.lng })
+            ? distanceMeters(memoryCoords, { lat: row.lat, lng: row.lng })
             : Number.POSITIVE_INFINITY;
         return { row, index, distance: d };
       });
@@ -129,7 +132,32 @@ export default function SiteVenuesBoard({
     }
 
     return list;
-  }, [filtered, distanceSort]);
+  }, [filtered, memoryCoords]);
+
+  const distanceHref = `/site/venues${buildVenuesListHref({})}`;
+
+  const onDistanceClick = useCallback(
+    async (e: React.MouseEvent<HTMLAnchorElement>) => {
+      e.preventDefault();
+      if (geoBusy) return;
+      const isRefresh = memoryCoords != null;
+      if (!isRefresh) {
+        if (!confirmSiteGeolocationPrecursor()) return;
+      }
+      setGeoBusy(true);
+      setShowDeniedHint(false);
+      const c = await fetchViewerCoordinatesOnce();
+      setGeoBusy(false);
+      if (c) {
+        setMemoryCoords(c);
+        setShowDeniedHint(false);
+      } else {
+        setMemoryCoords(null);
+        setShowDeniedHint(true);
+      }
+    },
+    [geoBusy, memoryCoords],
+  );
 
   const auxiliary = (
     <div
@@ -172,19 +200,17 @@ export default function SiteVenuesBoard({
         </FilterDropdown>
       </div>
       <FilterButton
-        className={[filterStyles.buttonDistance, distanceArmed ? filterStyles.buttonDistanceActive : ""]
+        className={[
+          filterStyles.buttonDistance,
+          memoryCoords != null ? filterStyles.buttonDistanceActive : "",
+        ]
           .filter(Boolean)
           .join(" ")}
-        href={distanceButtonHref}
-        useNextLink={distanceArmed}
-        onClick={
-          distanceArmed
-            ? undefined
-            : (e) => {
-                e.preventDefault();
-                performGeolocationThenNavigate(distanceButtonHref, (path) => router.push(path));
-              }
-        }
+        href={distanceHref}
+        useNextLink={false}
+        onClick={(e) => {
+          void onDistanceClick(e);
+        }}
       >
         거리순
       </FilterButton>
@@ -194,7 +220,7 @@ export default function SiteVenuesBoard({
   return (
     <SiteShellFrame brandTitle="클럽안내" auxiliaryBarClassName="site-shell-controls--site-list" auxiliary={auxiliary}>
       <section className="site-site-gray-main v3-stack">
-        {locationDenied ? (
+        {showDeniedHint ? (
           <p
             role="status"
             className="v3-muted"
@@ -207,7 +233,7 @@ export default function SiteVenuesBoard({
               lineHeight: 1.45,
             }}
           >
-            위치 권한을 허용해야 주변 당구장을 거리순으로 볼 수 있습니다. 브라우저 설정에서 위치를 허용한 뒤「거리순」을 다시 눌러 주세요.
+            {SITE_GEO_DENIED_USER_MESSAGE}
           </p>
         ) : null}
         <ul className="site-board-card-list" style={{ margin: 0 }}>

@@ -1,9 +1,8 @@
 /**
- * 당구장 목록 URL 쿼리 — 대회안내 `buildTournamentListHref`와 동일한 병합 방식(거리 파라미터만 도메인에 맞게).
+ * 당구장 목록 URL — 거리 좌표·거부 플래그는 URL에 넣지 않음(메모리 전용).
  */
-export function buildVenuesDistanceHref(
-  searchParams: Record<string, string | string[] | undefined>,
-  coords: { lat: number; lng: number } | null
+export function buildVenuesListHref(
+  searchParams: Record<string, string | string[] | undefined> = {}
 ): string {
   const next = new URLSearchParams();
   for (const [key, value] of Object.entries(searchParams)) {
@@ -14,11 +13,9 @@ export function buildVenuesDistanceHref(
       next.set(key, value);
     }
   }
-  if (coords) {
-    next.set("distanceLat", String(coords.lat));
-    next.set("distanceLng", String(coords.lng));
-    next.delete("distanceDenied");
-  }
+  next.delete("distanceLat");
+  next.delete("distanceLng");
+  next.delete("distanceDenied");
   const q = next.toString();
   return q ? `?${q}` : "";
 }

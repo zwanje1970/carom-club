@@ -13,8 +13,14 @@ import {
   getTournamentApplicationById,
   markTournamentApplicationOcrProcessing,
   type ProofImageAsset,
-  TournamentApplication,
+  type TournamentApplication,
 } from "./dev-store";
+import {
+  completeTournamentApplicationOcrFirestore,
+  getTournamentApplicationByIdFirestore,
+  markTournamentApplicationOcrProcessingFirestore,
+} from "./firestore-tournament-applications";
+import { isFirestoreUsersBackendConfigured } from "./firestore-users";
 
 export type OcrResultStatus = "success" | "failed";
 
@@ -106,7 +112,9 @@ export async function runOcrForProofImage(params: {
   tournamentId: string;
   entryId: string;
 }): Promise<OcrRecognitionResult> {
-  const application = await getTournamentApplicationById(params.tournamentId, params.entryId);
+  const application = isFirestoreUsersBackendConfigured()
+    ? await getTournamentApplicationByIdFirestore(params.tournamentId, params.entryId)
+    : await getTournamentApplicationById(params.tournamentId, params.entryId);
   if (!application) {
     return {
       rawText: "",
@@ -154,7 +162,9 @@ export function triggerOcrForTournamentApplication(params: { tournamentId: strin
   if (!tournamentId || !entryId) return;
 
   void (async () => {
-    const processing = await markTournamentApplicationOcrProcessing({ tournamentId, entryId });
+    const processing = isFirestoreUsersBackendConfigured()
+      ? await markTournamentApplicationOcrProcessingFirestore({ tournamentId, entryId })
+      : await markTournamentApplicationOcrProcessing({ tournamentId, entryId });
     if (!processing) return;
 
     const result = await runOcrForProofImage({ tournamentId, entryId });
@@ -171,12 +181,17 @@ export function triggerOcrForTournamentApplication(params: { tournamentId: strin
       2
     );
 
-    await completeTournamentApplicationOcr({
+    const ocrParams = {
       tournamentId,
       entryId,
       text: result.rawText.slice(0, 2000),
       rawResult: normalizedRawResult,
       failed: result.status !== "success",
-    });
+    };
+    if (isFirestoreUsersBackendConfigured()) {
+      await completeTournamentApplicationOcrFirestore(ocrParams);
+    } else {
+      await completeTournamentApplicationOcr(ocrParams);
+    }
   })();
 }

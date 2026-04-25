@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 type ApplicationStatus = "PENDING" | "APPROVED" | "REJECTED";
 type RequestedType = "GENERAL" | "REGISTERED";
 
 type ClientApplicationResponse = {
+  annualMembershipVisible: boolean;
   user: {
     id: string;
     name: string;
@@ -36,43 +37,80 @@ export default function ClientApplyPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [snapshot, setSnapshot] = useState<ClientApplicationResponse | null>(null);
+  const submittingRef = useRef(false);
 
-  async function loadSnapshot() {
+  const loadSnapshot = useCallback(async () => {
     try {
-      const response = await fetch("/api/client-application");
+      const response = await fetch("/api/client-application", { credentials: "include", cache: "no-store" });
       if (!response.ok) {
         return;
       }
       const data = (await response.json()) as ClientApplicationResponse;
       setSnapshot(data);
-    } catch {}
-  }
+      if (!data.annualMembershipVisible) {
+        setRequestedClientType("GENERAL");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     void loadSnapshot();
-  }, []);
+  }, [loadSnapshot]);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (loading) return;
+  const annualVisible = snapshot?.annualMembershipVisible === true;
 
+  const runSubmit = useCallback(async () => {
+    console.log("[client-apply] submit called", { inFlight: submittingRef.current, loading });
+    if (submittingRef.current) {
+      console.log("[client-apply] submit skipped: already in flight");
+      return;
+    }
+    submittingRef.current = true;
     setLoading(true);
     setMessage("");
     try {
+      const org = organizationName.trim();
+      const contact = contactName.trim();
+      const phone = contactPhone.trim();
+      if (!org || !contact || !phone) {
+        const msg = "조직명, 담당자명, 담당자 연락처를 모두 입력해 주세요.";
+        setMessage(msg);
+        alert(msg);
+        return;
+      }
+
+      console.log("[client-apply] POST /api/client-application");
       const response = await fetch("/api/client-application", {
         method: "POST",
+        credentials: "include",
+        cache: "no-store",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          organizationName,
-          contactName,
-          contactPhone,
+          organizationName: org,
+          contactName: contact,
+          contactPhone: phone,
           requestedClientType,
         }),
       });
 
-      const result = (await response.json()) as { error?: string };
+      const rawBody = await response.text();
+      let result: { error?: string } = {};
+      try {
+        result = rawBody ? (JSON.parse(rawBody) as { error?: string }) : {};
+      } catch (parseErr) {
+        console.error("[client-apply] response JSON parse failed", parseErr, rawBody);
+        const msg = "서버 응답을 해석하지 못했습니다.";
+        setMessage(msg);
+        alert(msg);
+        return;
+      }
+
       if (!response.ok) {
-        setMessage(result.error ?? "신청 저장에 실패했습니다.");
+        const msg = result.error ?? "신청 저장에 실패했습니다.";
+        setMessage(msg);
+        alert(msg);
         return;
       }
 
@@ -82,11 +120,20 @@ export default function ClientApplyPage() {
         router.push("/client-status/pending");
         router.refresh();
       }, 500);
-    } catch {
-      setMessage("신청 처리 중 오류가 발생했습니다.");
+    } catch (e) {
+      console.error("[client-apply] submit failed", e);
+      const msg = "신청 처리 중 오류가 발생했습니다.";
+      setMessage(msg);
+      alert(msg);
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
+  }, [contactName, contactPhone, loadSnapshot, organizationName, requestedClientType, router]);
+
+  function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void runSubmit();
   }
 
   return (
@@ -100,18 +147,22 @@ export default function ClientApplyPage() {
         <p>현재 신청 상태: {snapshot?.user.clientStatus ?? "신청 전"}</p>
       </section>
 
-      <form className="v3-box v3-stack" onSubmit={handleSubmit}>
-        <label className="v3-stack">
-          <span>신청 유형</span>
-          <select
-            value={requestedClientType}
-            onChange={(event) => setRequestedClientType(event.target.value === "REGISTERED" ? "REGISTERED" : "GENERAL")}
-            style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
-          >
-            <option value="GENERAL">일반</option>
-            <option value="REGISTERED">연회원 신청</option>
-          </select>
-        </label>
+      <form className="v3-box v3-stack" onSubmit={handleFormSubmit} noValidate>
+        {annualVisible ? (
+          <label className="v3-stack">
+            <span>신청 유형</span>
+            <select
+              value={requestedClientType}
+              onChange={(event) =>
+                setRequestedClientType(event.target.value === "REGISTERED" ? "REGISTERED" : "GENERAL")
+              }
+              style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
+            >
+              <option value="GENERAL">일반</option>
+              <option value="REGISTERED">연회원 신청</option>
+            </select>
+          </label>
+        ) : null}
         <label className="v3-stack">
           <span>조직명</span>
           <input
@@ -139,7 +190,13 @@ export default function ClientApplyPage() {
             style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
           />
         </label>
-        <button type="submit" className="v3-btn" disabled={loading} style={{ padding: "0.7rem 1rem" }}>
+        <button
+          type="button"
+          className="v3-btn"
+          disabled={loading}
+          style={{ padding: "0.7rem 1rem" }}
+          onClick={() => void runSubmit()}
+        >
           {loading ? "처리 중..." : "클라이언트 신청 제출"}
         </button>
       </form>

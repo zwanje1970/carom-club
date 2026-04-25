@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import FilterButton from "../components/FilterButton";
 import FilterDropdown from "../components/FilterDropdown";
 import filterStyles from "../components/filter-controls.module.css";
-import { performGeolocationThenNavigate, useDistanceGearArmed } from "../lib/site-geolocation-flow";
 import {
   buildTournamentListHref,
   TOURNAMENT_STATUS_FILTER_OPTIONS,
@@ -14,20 +13,19 @@ import {
 type Props = {
   searchParams: Record<string, string | string[] | undefined>;
   currentStatus: TournamentStatusFilter;
-  distanceSortHref: string;
-  hasViewerCoordinate: boolean;
+  distanceSortActive: boolean;
+  onDistanceClick: (ev: React.MouseEvent<HTMLAnchorElement>) => void | Promise<void>;
 };
 
 export default function TournamentsFilterBar({
   searchParams,
   currentStatus,
-  distanceSortHref,
-  hasViewerCoordinate,
+  distanceSortActive,
+  onDistanceClick,
 }: Props) {
   const router = useRouter();
-  const distanceArmed = useDistanceGearArmed(hasViewerCoordinate);
-
   const selectValue = currentStatus === "all" ? "all" : currentStatus;
+  const distanceHref = `/site/tournaments${buildTournamentListHref(searchParams, {})}`;
 
   return (
     <div className={`${filterStyles.filterRow} ${filterStyles.filterRowSingle} ${filterStyles.filterRowFilterPack}`}>
@@ -55,22 +53,16 @@ export default function TournamentsFilterBar({
       <FilterButton
         className={[
           filterStyles.buttonDistance,
-          distanceArmed ? filterStyles.buttonDistanceActive : "",
+          distanceSortActive ? filterStyles.buttonDistanceActive : "",
         ]
           .filter(Boolean)
           .join(" ")}
-        href={`/site/tournaments${distanceSortHref}`}
-        useNextLink={distanceArmed}
-        onClick={
-          distanceArmed
-            ? undefined
-            : (e) => {
-                e.preventDefault();
-                performGeolocationThenNavigate(`/site/tournaments${distanceSortHref}`, (path) =>
-                  router.push(path),
-                );
-              }
-        }
+        href={distanceHref}
+        useNextLink={false}
+        onClick={(e) => {
+          e.preventDefault();
+          void onDistanceClick(e);
+        }}
       >
         거리순
       </FilterButton>

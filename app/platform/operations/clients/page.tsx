@@ -1,11 +1,27 @@
 import Link from "next/link";
 import { getApplicationSummaries } from "../../../../lib/server/dev-store";
+import { ClientFirestoreUnavailableError } from "../../../../lib/server/firestore-client-applications";
 import ClientApplicationsTableClient from "./ClientApplicationsTableClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function PlatformOperationsClientsPage() {
-  const summaries = await getApplicationSummaries();
+  let summaries: Awaited<ReturnType<typeof getApplicationSummaries>>;
+  try {
+    summaries = await getApplicationSummaries();
+  } catch (e) {
+    if (e instanceof ClientFirestoreUnavailableError) {
+      return (
+        <main className="v3-page v3-stack">
+          <h1 className="v3-h1">클라이언트(업체)</h1>
+          <p className="v3-muted">
+            클라이언트 신청 저장소(Firestore)가 설정되지 않아 목록을 불러올 수 없습니다. 환경 변수를 확인한 뒤 다시 시도해 주세요.
+          </p>
+        </main>
+      );
+    }
+    throw e;
+  }
   const payload = summaries.map(({ application, user }) => ({
     application,
     userDisplayName: user?.name ?? null,

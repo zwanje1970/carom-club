@@ -1,16 +1,15 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import type { AuthRole } from "../../../../../lib/auth/roles";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
 import { isEmptyOutlineHtml } from "../../../../../lib/outline-content-helpers";
 import type { OutlineDisplayMode } from "../../../../../lib/outline-content-types";
+import { getUserById, getClientStatusByUserId, resolveCanonicalUserIdForAuth, type TournamentRuleSnapshot } from "../../../../../lib/server/dev-store";
 import {
-  assertClientCanManageTournament,
-  deleteTournament,
-  getUserById,
-  getClientStatusByUserId,
-  updateTournament,
-  type TournamentRuleSnapshot,
-} from "../../../../../lib/server/dev-store";
+  assertClientCanManageTournamentFirestore,
+  deleteTournamentFirestore,
+  updateTournamentFirestore,
+} from "../../../../../lib/server/firestore-tournaments";
 
 export const runtime = "nodejs";
 
@@ -37,6 +36,11 @@ async function getAuthorizedUser() {
   }
 
   return { user, allowed: true as const };
+}
+
+async function actorTournamentUserId(user: { id: string; role: AuthRole }): Promise<string> {
+  if (user.role === "PLATFORM") return user.id;
+  return resolveCanonicalUserIdForAuth(user.id);
 }
 
 function parseString(v: unknown): string | undefined {
@@ -144,8 +148,9 @@ export async function GET(
   }
 
   const { id } = await context.params;
-  const gate = await assertClientCanManageTournament({
-    actorUserId: auth.user.id,
+  const actorUserId = await actorTournamentUserId(auth.user);
+  const gate = await assertClientCanManageTournamentFirestore({
+    actorUserId,
     actorRole: auth.user.role,
     tournamentId: id,
   });
@@ -169,6 +174,7 @@ export async function PATCH(
   }
 
   const { id } = await context.params;
+  const actorUserId = await actorTournamentUserId(auth.user);
 
   let body: Record<string, unknown> = {};
   try {
@@ -222,9 +228,9 @@ export async function PATCH(
 
   const rule = parseRuleFromBody(body);
 
-  const result = await updateTournament({
+  const result = await updateTournamentFirestore({
     tournamentId: id,
-    actorUserId: auth.user.id,
+    actorUserId,
     actorRole: auth.user.role,
     title,
     date,
@@ -265,9 +271,10 @@ export async function DELETE(
   }
 
   const { id } = await context.params;
-  const result = await deleteTournament({
+  const actorUserId = await actorTournamentUserId(auth.user);
+  const result = await deleteTournamentFirestore({
     tournamentId: id,
-    actorUserId: auth.user.id,
+    actorUserId,
     actorRole: auth.user.role,
   });
 

@@ -2,11 +2,11 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../../lib/auth/session";
 import {
-  checkClientFeatureAccessByUserId,
-  getTournamentById,
-  getUserById,
-  listSettlementEntriesByTournamentId,
-} from "../../../../../../../lib/server/dev-store";
+  settlementApiCheckClientFeatureAccess,
+  settlementApiGetSessionUser,
+} from "../../../../../../../lib/server/settlement-api-auth-firestore";
+import { listSettlementEntriesByTournamentIdFirestore } from "../../../../../../../lib/server/firestore-tournament-settlements";
+import { getTournamentByIdFirestore } from "../../../../../../../lib/server/firestore-tournaments";
 
 export const runtime = "nodejs";
 
@@ -15,10 +15,10 @@ async function requireSettlementAccess(tournamentId: string) {
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
   if (!session) return { ok: false as const, status: 401, error: "로그인이 필요합니다." };
 
-  const user = await getUserById(session.userId);
+  const user = await settlementApiGetSessionUser(session.userId);
   if (!user) return { ok: false as const, status: 401, error: "사용자를 찾을 수 없습니다." };
 
-  const tournament = await getTournamentById(tournamentId);
+  const tournament = await getTournamentByIdFirestore(tournamentId);
   if (!tournament) return { ok: false as const, status: 404, error: "대회를 찾을 수 없습니다." };
 
   if (user.role === "PLATFORM") {
@@ -28,7 +28,7 @@ async function requireSettlementAccess(tournamentId: string) {
     return { ok: false as const, status: 403, error: "CLIENT + APPROVED 권한이 필요합니다." };
   }
 
-  const gate = await checkClientFeatureAccessByUserId({ userId: user.id, feature: "SETTLEMENT" });
+  const gate = await settlementApiCheckClientFeatureAccess({ userId: user.id, feature: "SETTLEMENT" });
   if (!gate.ok) {
     return { ok: false as const, status: 403, error: gate.error };
   }
@@ -52,7 +52,7 @@ export async function GET(
   const limitRaw = Number.parseInt(request.nextUrl.searchParams.get("limit") ?? "20", 10) || 20;
   const limit = Math.max(1, Math.min(50, limitRaw));
 
-  const entriesResult = await listSettlementEntriesByTournamentId(id);
+  const entriesResult = await listSettlementEntriesByTournamentIdFirestore(id);
   if (!entriesResult.ok) {
     return NextResponse.json({ error: entriesResult.error }, { status: 400 });
   }

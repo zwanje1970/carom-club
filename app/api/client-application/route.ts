@@ -6,10 +6,12 @@ import {
   serializeSessionCookieValue,
   SESSION_COOKIE_NAME,
 } from "../../../lib/auth/session";
+import { ClientFirestoreUnavailableError } from "../../../lib/server/firestore-client-applications";
 import {
   createClientApplication,
   getClientStatusByUserId,
   getLatestClientApplicationByUserId,
+  getPlatformOperationSettings,
   getUserById,
 } from "../../../lib/server/dev-store";
 
@@ -28,10 +30,25 @@ export async function GET() {
   const user = await getUserById(session.userId);
   if (!user) return getUnauthorizedResponse();
 
-  const latest = await getLatestClientApplicationByUserId(user.id);
-  const clientStatus = await getClientStatusByUserId(user.id);
+  let latest: Awaited<ReturnType<typeof getLatestClientApplicationByUserId>>;
+  let clientStatus: Awaited<ReturnType<typeof getClientStatusByUserId>>;
+  try {
+    latest = await getLatestClientApplicationByUserId(user.id);
+    clientStatus = await getClientStatusByUserId(user.id);
+  } catch (e) {
+    if (e instanceof ClientFirestoreUnavailableError) {
+      return NextResponse.json(
+        { error: "클라이언트 신청 저장소가 설정되지 않았습니다." },
+        { status: 503 }
+      );
+    }
+    throw e;
+  }
+
+  const platformSettings = await getPlatformOperationSettings();
 
   return NextResponse.json({
+    annualMembershipVisible: platformSettings.annualMembershipVisible,
     user: {
       id: user.id,
       name: user.name,
@@ -69,13 +86,30 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "요청 본문이 올바르지 않습니다." }, { status: 400 });
   }
 
-  const result = await createClientApplication({
-    userId: user.id,
-    organizationName: typeof body.organizationName === "string" ? body.organizationName : "",
-    contactName: typeof body.contactName === "string" ? body.contactName : "",
-    contactPhone: typeof body.contactPhone === "string" ? body.contactPhone : "",
-    requestedClientType: body.requestedClientType === "REGISTERED" ? "REGISTERED" : "GENERAL",
-  });
+  const platformSettings = await getPlatformOperationSettings();
+  const wantsRegistered = body.requestedClientType === "REGISTERED";
+  if (wantsRegistered && !platformSettings.annualMembershipVisible) {
+    return NextResponse.json({ error: "현재 선택할 수 없는 신청 유형입니다." }, { status: 400 });
+  }
+
+  let result: Awaited<ReturnType<typeof createClientApplication>>;
+  try {
+    result = await createClientApplication({
+      userId: user.id,
+      organizationName: typeof body.organizationName === "string" ? body.organizationName : "",
+      contactName: typeof body.contactName === "string" ? body.contactName : "",
+      contactPhone: typeof body.contactPhone === "string" ? body.contactPhone : "",
+      requestedClientType: wantsRegistered ? "REGISTERED" : "GENERAL",
+    });
+  } catch (e) {
+    if (e instanceof ClientFirestoreUnavailableError) {
+      return NextResponse.json(
+        { error: "클라이언트 신청 저장소가 설정되지 않았습니다." },
+        { status: 503 }
+      );
+    }
+    throw e;
+  }
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });

@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../lib/auth/session";
 import { getUserById, updateClientApplicationStatus } from "../../../../../../lib/server/dev-store";
+import { ClientFirestoreUnavailableError } from "../../../../../../lib/server/firestore-client-applications";
 
 export const runtime = "nodejs";
 
@@ -57,6 +58,16 @@ export async function POST(
     }
     return NextResponse.json({ ok: true });
   } catch (err) {
+    if (err instanceof ClientFirestoreUnavailableError) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "클라이언트 신청 저장소가 설정되지 않았습니다.",
+          step: "persistence-unavailable",
+        },
+        { status: 503 }
+      );
+    }
     console.error("[client-applications/status] 저장 실패", err);
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json(

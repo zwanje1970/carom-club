@@ -2,10 +2,8 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
-import {
-  getTournamentById,
-  listTournamentApplicationsByTournamentId,
-} from "../../../../../lib/server/dev-store";
+import { listTournamentApplicationsByTournamentIdFirestore } from "../../../../../lib/server/firestore-tournament-applications";
+import { getTournamentByIdFirestore } from "../../../../../lib/server/firestore-tournaments";
 import type { TournamentApplication } from "../../../../../lib/server/dev-store";
 import ParticipantListRow from "./ParticipantListRow";
 
@@ -44,7 +42,7 @@ export default async function ClientTournamentParticipantsPage({
 }) {
   const { id } = await params;
   const { f } = await searchParams;
-  const tournament = await getTournamentById(id);
+  const tournament = await getTournamentByIdFirestore(id);
   if (!tournament) notFound();
 
   const cookieStore = await cookies();
@@ -52,7 +50,7 @@ export default async function ClientTournamentParticipantsPage({
   const canView = Boolean(session && tournament.createdBy === session.userId);
   if (!canView) notFound();
 
-  const entries = await listTournamentApplicationsByTournamentId(id);
+  const entries = await listTournamentApplicationsByTournamentIdFirestore(id);
   const selected = parseFilter(f);
   const filteredEntries = filterEntries(entries, selected);
   const counts = countBy(entries);

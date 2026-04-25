@@ -4,13 +4,16 @@ import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/au
 import { isEmptyOutlineHtml } from "../../../../lib/outline-content-helpers";
 import type { OutlineDisplayMode } from "../../../../lib/outline-content-types";
 import {
-  createTournament,
   getClientStatusByUserId,
   getUserById,
-  listAllTournaments,
-  listTournamentsByCreator,
+  resolveCanonicalUserIdForAuth,
   type TournamentRuleSnapshot,
 } from "../../../../lib/server/dev-store";
+import {
+  createTournamentFirestore,
+  listAllTournamentsFirestore,
+  listTournamentsByCreatorFirestore,
+} from "../../../../lib/server/firestore-tournaments";
 
 export const runtime = "nodejs";
 
@@ -143,8 +146,8 @@ export async function GET() {
 
   const tournaments =
     auth.user.role === "PLATFORM"
-      ? await listAllTournaments()
-      : await listTournamentsByCreator(auth.user.id);
+      ? await listAllTournamentsFirestore()
+      : await listTournamentsByCreatorFirestore(await resolveCanonicalUserIdForAuth(auth.user.id));
 
   return NextResponse.json({ tournaments });
 }
@@ -211,13 +214,13 @@ export async function POST(request: Request) {
 
   const rule = parseRuleFromBody(body);
 
-  const result = await createTournament({
+  const result = await createTournamentFirestore({
     title,
     date,
     location,
     maxParticipants: maxParticipants ?? Number.NaN,
     entryFee: entryFee ?? Number.NaN,
-    createdBy: auth.user.id,
+    createdBy: await resolveCanonicalUserIdForAuth(auth.user.id),
     rule,
     posterImageUrl,
     summary,

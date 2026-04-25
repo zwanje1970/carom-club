@@ -1,13 +1,12 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../../lib/auth/session";
+import { checkClientFeatureAccessByUserId, getUserById } from "../../../../../../../lib/server/dev-store";
 import {
-  checkClientFeatureAccessByUserId,
-  createBracketParticipantSnapshot,
-  getLatestBracketParticipantSnapshotByTournamentId,
-  getTournamentById,
-  getUserById,
-} from "../../../../../../../lib/server/dev-store";
+  createBracketParticipantSnapshotFirestore,
+  getLatestBracketParticipantSnapshotByTournamentIdFirestore,
+} from "../../../../../../../lib/server/firestore-tournament-brackets";
+import { getTournamentByIdFirestore } from "../../../../../../../lib/server/firestore-tournaments";
 
 export const runtime = "nodejs";
 
@@ -27,7 +26,7 @@ async function requireApprovedClientOwner(tournamentId: string) {
     return { ok: false as const, status: 403, error: gate.error };
   }
 
-  const tournament = await getTournamentById(tournamentId);
+  const tournament = await getTournamentByIdFirestore(tournamentId);
   if (!tournament) {
     return { ok: false as const, status: 404, error: "대회를 찾을 수 없습니다." };
   }
@@ -48,7 +47,7 @@ export async function GET(
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const snapshot = await getLatestBracketParticipantSnapshotByTournamentId(id);
+  const snapshot = await getLatestBracketParticipantSnapshotByTournamentIdFirestore(id);
   return NextResponse.json({ snapshot: snapshot ?? null });
 }
 
@@ -62,7 +61,7 @@ export async function POST(
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const result = await createBracketParticipantSnapshot({ tournamentId: id });
+  const result = await createBracketParticipantSnapshotFirestore({ tournamentId: id });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }

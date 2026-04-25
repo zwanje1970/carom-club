@@ -2,7 +2,6 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
-import { hasGeoConsentInSession } from "../lib/site-geolocation-flow";
 
 const GEO_PARAM_KEYS = ["distanceLat", "distanceLng", "distanceDenied"] as const;
 
@@ -10,7 +9,7 @@ function isGeoListPath(pathname: string): boolean {
   return pathname === "/site/venues" || pathname === "/site/tournaments";
 }
 
-/** URL에만 좌표가 있고 세션 동의가 없으면(북마크·이전 탭 등) 거리 쿼리를 제거한다. */
+/** 북마크·이전 링크에 남은 거리 쿼리를 제거(좌표는 URL에 두지 않음) */
 export default function SiteGeoConsentUrlSanitizer() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -19,16 +18,21 @@ export default function SiteGeoConsentUrlSanitizer() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!isGeoListPath(pathname)) return;
-    const hasCoordsInUrl = searchParams.has("distanceLat") || searchParams.has("distanceLng");
-    if (!hasCoordsInUrl) return;
-    if (hasGeoConsentInSession()) return;
-
     const next = new URLSearchParams(searchParams.toString());
+    let changed = false;
     for (const k of GEO_PARAM_KEYS) {
-      next.delete(k);
+      if (next.has(k)) {
+        next.delete(k);
+        changed = true;
+      }
     }
+    if (pathname === "/site/tournaments" && next.get("sort") === "DISTANCE") {
+      next.delete("sort");
+      changed = true;
+    }
+    if (!changed) return;
     const qs = next.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname);
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }, [pathname, router, searchParams]);
 
   return null;

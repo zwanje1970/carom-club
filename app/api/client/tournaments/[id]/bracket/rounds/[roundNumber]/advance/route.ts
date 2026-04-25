@@ -1,13 +1,12 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../../../../lib/auth/session";
+import { checkClientFeatureAccessByUserId, getUserById } from "../../../../../../../../../lib/server/dev-store";
 import {
-  advanceBracketRound,
-  checkClientFeatureAccessByUserId,
-  getLatestBracketByTournamentId,
-  getTournamentById,
-  getUserById,
-} from "../../../../../../../../../lib/server/dev-store";
+  advanceBracketRoundFirestore,
+  getLatestBracketByTournamentIdFirestore,
+} from "../../../../../../../../../lib/server/firestore-tournament-brackets";
+import { getTournamentByIdFirestore } from "../../../../../../../../../lib/server/firestore-tournaments";
 
 export const runtime = "nodejs";
 
@@ -19,7 +18,7 @@ async function requireBracketAccess(tournamentId: string) {
   const user = await getUserById(session.userId);
   if (!user) return { ok: false as const, status: 401, error: "사용자를 찾을 수 없습니다." };
 
-  const tournament = await getTournamentById(tournamentId);
+  const tournament = await getTournamentByIdFirestore(tournamentId);
   if (!tournament) return { ok: false as const, status: 404, error: "대회를 찾을 수 없습니다." };
 
   if (user.role === "PLATFORM") {
@@ -56,12 +55,12 @@ export async function POST(
     return NextResponse.json({ error: "유효한 roundNumber가 필요합니다." }, { status: 400 });
   }
 
-  const latestBracket = await getLatestBracketByTournamentId(id);
+  const latestBracket = await getLatestBracketByTournamentIdFirestore(id);
   if (!latestBracket) {
     return NextResponse.json({ error: "확정 브래킷이 없습니다." }, { status: 400 });
   }
 
-  const result = await advanceBracketRound(latestBracket.id, parsedRoundNumber);
+  const result = await advanceBracketRoundFirestore(latestBracket.id, parsedRoundNumber);
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }

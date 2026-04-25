@@ -1,12 +1,9 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
-import {
-  getTournamentById,
-  getUserById,
-  listTournamentApplicationsByUserId,
-  type TournamentApplicationStatus,
-} from "../../../../../lib/server/dev-store";
+import { getUserById, type TournamentApplicationStatus } from "../../../../../lib/server/dev-store";
+import { listTournamentApplicationsByUserIdFirestore } from "../../../../../lib/server/firestore-tournament-applications";
+import { getTournamentByIdFirestore } from "../../../../../lib/server/firestore-tournaments";
 
 export const runtime = "nodejs";
 
@@ -29,11 +26,11 @@ export async function GET() {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  const applications = await listTournamentApplicationsByUserId(user.id);
+  const applications = await listTournamentApplicationsByUserIdFirestore(user.id);
   const rows = await Promise.all(
     applications.map(async (application) => ({
       application,
-      tournament: await getTournamentById(application.tournamentId),
+      tournament: await getTournamentByIdFirestore(application.tournamentId),
     })),
   );
 

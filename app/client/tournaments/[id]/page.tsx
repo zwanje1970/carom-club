@@ -1,12 +1,8 @@
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
-import {
-  getOutlinePdfAssetById,
-  getTournamentById,
-  outlineFileKindFromAsset,
-  outlinePdfIdFromPublicUrl,
-} from "../../../../lib/server/dev-store";
+import { getOutlinePdfAssetById, outlineFileKindFromAsset, outlinePdfIdFromPublicUrl } from "../../../../lib/server/dev-store";
+import { getTournamentByIdFirestore } from "../../../../lib/server/firestore-tournaments";
 import SiteTournamentDetailSections from "../../../site/tournaments/[id]/site-tournament-detail-sections";
 import TournamentBadgeCardManageRow from "./TournamentBadgeCardManageRow";
 
@@ -16,7 +12,7 @@ export default async function ClientTournamentManagePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const tournament = await getTournamentById(id);
+  const tournament = await getTournamentByIdFirestore(id);
   const cookieStore = await cookies();
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
 
