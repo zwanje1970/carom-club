@@ -110,13 +110,13 @@
 }
 
 .slide-deck__card .tournament-post-card__desc {
-  font-size: calc(0.72rem + 1pt);
+  font-size: calc(0.72rem + 1pt + 2pt);
   line-height: 1.25;
   max-height: calc(1.25em * 5);
 }
 
 .slide-deck__card .tournament-post-card__desc--secondary {
-  font-size: calc(0.72rem + 1pt + 3pt);
+  font-size: calc(0.72rem + 1pt + 2pt);
   font-weight: 700;
 }
 
@@ -131,7 +131,7 @@
 
 .slide-deck__card .tournament-post-card__footer .tournament-post-card__date,
 .slide-deck__card .tournament-post-card__footer .tournament-post-card__place {
-  font-size: calc(0.72rem + 1pt);
+  font-size: calc(0.72rem + 1pt + 2pt);
   line-height: 1.22;
 }
 
