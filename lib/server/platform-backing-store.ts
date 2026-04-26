@@ -7798,7 +7798,11 @@ export async function upsertTournamentPublishedCard(params: {
   imageOverlayOpacity?: number;
   cardDisplayDate?: string | null;
   cardDisplayLocation?: string | null;
-}): Promise<{ ok: true; snapshot: PublishedCardSnapshot } | { ok: false; error: string }> {
+}): Promise<
+  | { ok: true; snapshot: PublishedCardSnapshot }
+  | { ok: false; error: string }
+  | { ok: false; code: "ALREADY_PUBLISHED"; message: string }
+> {
   const title = params.title.trim();
   if (!title) return { ok: false, error: "카드 제목을 입력해 주세요." };
 
@@ -7841,6 +7845,20 @@ export async function upsertTournamentPublishedCard(params: {
     cardWs === "local-json-file" && localStore
       ? localStore.tournamentPublishedCards
       : [...(await loadTournamentPublishedCardsArray())];
+
+  if (!params.draftOnly) {
+    const alreadyOnMain = cards.some(
+      (c) =>
+        c.tournamentId === tid &&
+        c.isPublished === true &&
+        c.isActive === true &&
+        c.showOnMainSlide === true,
+    );
+    if (alreadyOnMain) {
+      return { ok: false, code: "ALREADY_PUBLISHED", message: "이미 게시중입니다." };
+    }
+  }
+
   if (params.draftOnly) {
     if (cardWs === "local-json-file" && localStore) {
       localStore.tournamentPublishedCards = localStore.tournamentPublishedCards.filter(
@@ -8115,10 +8133,21 @@ export async function listTournamentSnapshotsForMainSite(options?: {
 
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
   const cards = await loadTournamentPublishedCardsArray();
-  const rows = cards
-    .filter((c) => c.isPublished && c.isActive && c.showOnMainSlide)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, limit);
+  const filtered = cards.filter((c) => c.isPublished && c.isActive && c.showOnMainSlide);
+  const sortedForDedupe = [...filtered].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const seenTournament = new Set<string>();
+  const deduped: TournamentPublishedCard[] = [];
+  for (const c of sortedForDedupe) {
+    if (seenTournament.has(c.tournamentId)) continue;
+    seenTournament.add(c.tournamentId);
+    deduped.push(c);
+  }
+  if (filtered.length > deduped.length) {
+    console.warn("[listTournamentSnapshotsForMainSite] duplicate main-slide rows for same tournamentId; using latest per tournament only", {
+      duplicateRowsSkipped: filtered.length - deduped.length,
+    });
+  }
+  const rows = deduped.slice(0, limit);
 
   return Promise.all(
     rows.map(async (c) => {

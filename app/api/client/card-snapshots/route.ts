@@ -173,7 +173,16 @@ export async function POST(request: Request) {
   }
 
   if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: 400 });
+    if ("code" in result && result.code === "ALREADY_PUBLISHED") {
+      return NextResponse.json(
+        { ok: false, code: result.code, message: result.message },
+        { status: 200 },
+      );
+    }
+    return NextResponse.json(
+      { error: "error" in result ? result.error : "Request failed." },
+      { status: 400 },
+    );
   }
 
   return NextResponse.json({ ok: true, snapshot: result.snapshot });

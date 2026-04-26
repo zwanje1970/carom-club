@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   TournamentSnapshotCardView,
   type SlideDeckItem,
@@ -239,6 +239,8 @@ export default function ClientTournamentCardPublishPage() {
   const [uploading, setUploading] = useState(false);
 
   const bgFileInputRef = useRef<HTMLInputElement>(null);
+  /** 저장(게시) 중복 요청만 차단 — 첫 탭 직후 동기 setLoading으로 클릭이 취소되는 것을 피함 */
+  const isPublishingRef = useRef(false);
 
   const backgroundType = uploadedImage ? "image" : "theme";
 
@@ -405,49 +407,58 @@ export default function ClientTournamentCardPublishPage() {
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [loadSnapshots]);
 
-  async function handlePublish(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!tournamentId || loading) return;
-    setLoading(true);
-    setMessage("");
-    try {
-      const body: Record<string, unknown> = {
-        tournamentId,
-        title: title.trim(),
-        textLine1: textLine1.trim(),
-        textLine2: textLine2.trim(),
-        textLine3: textLine3.trim(),
-        cardTemplate,
-        backgroundType,
-        themeType,
-        imageId: uploadedImage?.imageId ?? "",
-        image320Url: uploadedImage?.w320Url ?? "",
-        draftOnly: true,
-        cardDisplayDate: formatCardDateForDisplay(cardDate).trim(),
-        cardDisplayLocation: cardPlace.trim(),
-      };
-      if (v2MediaMode === "on") {
-        body.mediaBackground = mediaBackground;
-        body.imageOverlayBlend = imageOverlayBlend;
-        body.imageOverlayOpacity = imageOverlayOpacity;
+  function requestPublish() {
+    if (!tournamentId) return;
+    if (isPublishingRef.current) return;
+    isPublishingRef.current = true;
+
+    void (async () => {
+      setLoading(true);
+      setMessage("");
+      try {
+        if (!title.trim()) {
+          setMessage("제목을 입력해 주세요.");
+          return;
+        }
+        const body: Record<string, unknown> = {
+          tournamentId,
+          title: title.trim(),
+          textLine1: textLine1.trim(),
+          textLine2: textLine2.trim(),
+          textLine3: textLine3.trim(),
+          cardTemplate,
+          backgroundType,
+          themeType,
+          imageId: uploadedImage?.imageId ?? "",
+          image320Url: uploadedImage?.w320Url ?? "",
+          draftOnly: true,
+          cardDisplayDate: formatCardDateForDisplay(cardDate).trim(),
+          cardDisplayLocation: cardPlace.trim(),
+        };
+        if (v2MediaMode === "on") {
+          body.mediaBackground = mediaBackground;
+          body.imageOverlayBlend = imageOverlayBlend;
+          body.imageOverlayOpacity = imageOverlayOpacity;
+        }
+        const response = await fetch("/api/client/card-snapshots", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const result = (await response.json()) as { error?: string };
+        if (!response.ok) {
+          setMessage(result.error ?? "저장에 실패했습니다.");
+          return;
+        }
+        setMessage("카드가 저장되었습니다. 대회 상세에서 카드게시를 눌러 게시하세요.");
+        router.refresh();
+      } catch {
+        setMessage("저장 요청 중 오류가 발생했습니다.");
+      } finally {
+        setLoading(false);
+        isPublishingRef.current = false;
       }
-      const response = await fetch("/api/client/card-snapshots", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const result = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        setMessage(result.error ?? "저장에 실패했습니다.");
-        return;
-      }
-      setMessage("카드가 저장되었습니다. 대회 상세에서 카드게시를 눌러 게시하세요.");
-      router.refresh();
-    } catch {
-      setMessage("저장 요청 중 오류가 발생했습니다.");
-    } finally {
-      setLoading(false);
-    }
+    })();
   }
 
   async function handleUploadImage(file: File) {
@@ -532,28 +543,38 @@ export default function ClientTournamentCardPublishPage() {
           </div>
         </div>
 
-        <form className={editorStyles.formPanel} onSubmit={handlePublish}>
-          <div className={editorStyles.stepTabs} role="tablist" aria-label="편집 단계">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={editorStep === 1}
-              className={`${editorStyles.stepTab} ${editorStep === 1 ? editorStyles.stepTabActive : ""}`}
-              onClick={() => setEditorStep(1)}
-            >
-              1. 내용 입력
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={editorStep === 2}
-              className={`${editorStyles.stepTab} ${editorStep === 2 ? editorStyles.stepTabActive : ""}`}
-              onClick={() => setEditorStep(2)}
-            >
-              2. 배경 설정
-            </button>
+        <form
+          className={editorStyles.formPanel}
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault();
+            requestPublish();
+          }}
+        >
+          <div className={editorStyles.stepTabsWrap}>
+            <div className={editorStyles.stepTabs} role="tablist" aria-label="편집 단계">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={editorStep === 1}
+                className={`${editorStyles.stepTab} ${editorStep === 1 ? editorStyles.stepTabActive : ""}`}
+                onClick={() => setEditorStep(1)}
+              >
+                1. 내용입력
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={editorStep === 2}
+                className={`${editorStyles.stepTab} ${editorStep === 2 ? editorStyles.stepTabActive : ""}`}
+                onClick={() => setEditorStep(2)}
+              >
+                2. 배경 설정
+              </button>
+            </div>
           </div>
 
+          <div className={editorStyles.stepScrollBody}>
           {editorStep === 1 ? (
             <>
               <label className={editorStyles.field}>
@@ -577,7 +598,6 @@ export default function ClientTournamentCardPublishPage() {
                   onChange={(e) => setTitle(e.target.value)}
                   autoComplete="off"
                   spellCheck={false}
-                  required
                 />
               </label>
 
@@ -748,9 +768,10 @@ export default function ClientTournamentCardPublishPage() {
               </div>
             </>
           )}
+          </div>
 
           <div className={editorStyles.actions}>
-            <button type="submit" className="v3-btn" disabled={loading}>
+            <button type="button" className="v3-btn" disabled={loading} onClick={() => requestPublish()}>
               {loading ? "처리 중…" : "저장"}
             </button>
           </div>

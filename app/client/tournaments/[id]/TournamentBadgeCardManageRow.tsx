@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { TournamentStatusBadge } from "../../../../lib/types/entities";
 
 const OPTIONS: TournamentStatusBadge[] = [
@@ -85,6 +85,7 @@ export default function TournamentBadgeCardManageRow({
   const [value, setValue] = useState(initialStatus);
   const [busy, setBusy] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
+  const publishRunningRef = useRef(false);
 
   useEffect(() => {
     setValue(initialStatus);
@@ -115,74 +116,89 @@ export default function TournamentBadgeCardManageRow({
     }
   }
 
-  async function handleCardPublish() {
+  function requestCardPublish() {
     const blocked = getDetailPublishBlockedMessage(value);
     if (blocked) {
       window.alert(blocked);
       return;
     }
-    if (publishBusy) return;
-    setPublishBusy(true);
-    try {
-      const res = await fetch(`/api/client/card-snapshots?tournamentId=${encodeURIComponent(tournamentId)}`);
-      const data = (await res.json()) as {
-        snapshots?: CardSnapshotRow[];
-        activeSnapshot?: CardSnapshotRow | null;
-        error?: string;
-      };
-      if (!res.ok) {
-        window.alert(data.error ?? "카드 정보를 불러오지 못했습니다.");
-        return;
+    if (publishRunningRef.current) return;
+    publishRunningRef.current = true;
+
+    void (async () => {
+      setPublishBusy(true);
+      try {
+        const res = await fetch(`/api/client/card-snapshots?tournamentId=${encodeURIComponent(tournamentId)}`);
+        const data = (await res.json()) as {
+          snapshots?: CardSnapshotRow[];
+          activeSnapshot?: CardSnapshotRow | null;
+          error?: string;
+        };
+        if (!res.ok) {
+          window.alert(data.error ?? "카드 정보를 불러오지 못했습니다.");
+          return;
+        }
+        const latest = pickCardForPublish(data);
+        if (!latest) {
+          window.alert("저장된 카드를 찾을 수 없습니다. 게시카드 작성에서 저장해 주세요.");
+          return;
+        }
+        const postRes = await fetch("/api/client/card-snapshots", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tournamentId,
+            title: latest.title.trim(),
+            textLine1: typeof latest.cardExtraLine1 === "string" ? latest.cardExtraLine1 : "",
+            textLine2: typeof latest.cardExtraLine2 === "string" ? latest.cardExtraLine2 : "",
+            textLine3: typeof latest.cardExtraLine3 === "string" ? latest.cardExtraLine3 : "",
+            cardTemplate: latest.tournamentCardTemplate ?? "A",
+            backgroundType: latest.tournamentBackgroundType ?? "image",
+            themeType: latest.tournamentTheme ?? "dark",
+            imageId: latest.imageId?.trim() ?? "",
+            image320Url: latest.image320Url?.trim() ?? "",
+            draftOnly: false,
+            ...(typeof latest.tournamentMediaBackground === "string"
+              ? { mediaBackground: latest.tournamentMediaBackground }
+              : {}),
+            ...(typeof latest.tournamentImageOverlayBlend === "boolean"
+              ? { imageOverlayBlend: latest.tournamentImageOverlayBlend }
+              : {}),
+            ...(typeof latest.tournamentImageOverlayOpacity === "number"
+              ? { imageOverlayOpacity: latest.tournamentImageOverlayOpacity }
+              : {}),
+            ...(typeof latest.tournamentCardDisplayDate === "string"
+              ? { cardDisplayDate: latest.tournamentCardDisplayDate }
+              : {}),
+            ...(typeof latest.tournamentCardDisplayLocation === "string"
+              ? { cardDisplayLocation: latest.tournamentCardDisplayLocation }
+              : {}),
+          }),
+        });
+        const postData = (await postRes.json()) as {
+          ok?: boolean;
+          code?: string;
+          message?: string;
+          error?: string;
+          snapshot?: { snapshotId?: string };
+        };
+        if (postData.ok === false && postData.code === "ALREADY_PUBLISHED") {
+          window.alert("이미 게시중입니다.");
+          return;
+        }
+        if (!postRes.ok) {
+          window.alert(postData.error ?? "게시에 실패했습니다.");
+          return;
+        }
+        window.alert("게시되었습니다. 사이트에 반영되었습니다.");
+        router.refresh();
+      } catch {
+        window.alert("처리 중 오류가 발생했습니다.");
+      } finally {
+        setPublishBusy(false);
+        publishRunningRef.current = false;
       }
-      const latest = pickCardForPublish(data);
-      if (!latest) {
-        window.alert("저장된 카드를 찾을 수 없습니다. 게시카드 작성에서 저장해 주세요.");
-        return;
-      }
-      const postRes = await fetch("/api/client/card-snapshots", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tournamentId,
-          title: latest.title.trim(),
-          textLine1: typeof latest.cardExtraLine1 === "string" ? latest.cardExtraLine1 : "",
-          textLine2: typeof latest.cardExtraLine2 === "string" ? latest.cardExtraLine2 : "",
-          textLine3: typeof latest.cardExtraLine3 === "string" ? latest.cardExtraLine3 : "",
-          cardTemplate: latest.tournamentCardTemplate ?? "A",
-          backgroundType: latest.tournamentBackgroundType ?? "image",
-          themeType: latest.tournamentTheme ?? "dark",
-          imageId: latest.imageId?.trim() ?? "",
-          image320Url: latest.image320Url?.trim() ?? "",
-          draftOnly: false,
-          ...(typeof latest.tournamentMediaBackground === "string"
-            ? { mediaBackground: latest.tournamentMediaBackground }
-            : {}),
-          ...(typeof latest.tournamentImageOverlayBlend === "boolean"
-            ? { imageOverlayBlend: latest.tournamentImageOverlayBlend }
-            : {}),
-          ...(typeof latest.tournamentImageOverlayOpacity === "number"
-            ? { imageOverlayOpacity: latest.tournamentImageOverlayOpacity }
-            : {}),
-          ...(typeof latest.tournamentCardDisplayDate === "string"
-            ? { cardDisplayDate: latest.tournamentCardDisplayDate }
-            : {}),
-          ...(typeof latest.tournamentCardDisplayLocation === "string"
-            ? { cardDisplayLocation: latest.tournamentCardDisplayLocation }
-            : {}),
-        }),
-      });
-      const postData = (await postRes.json()) as { error?: string; snapshot?: { snapshotId?: string } };
-      if (!postRes.ok) {
-        window.alert(postData.error ?? "게시에 실패했습니다.");
-        return;
-      }
-      window.alert("게시되었습니다. 사이트에 반영되었습니다.");
-      router.refresh();
-    } catch {
-      window.alert("처리 중 오류가 발생했습니다.");
-    } finally {
-      setPublishBusy(false);
-    }
+    })();
   }
 
   return (
@@ -226,7 +242,7 @@ export default function TournamentBadgeCardManageRow({
           type="button"
           className="v3-btn"
           disabled={busy || publishBusy}
-          onClick={() => void handleCardPublish()}
+          onClick={() => requestCardPublish()}
           style={{ alignSelf: "flex-end" }}
         >
           {publishBusy ? "게시 중…" : "카드게시"}

@@ -478,6 +478,14 @@ export default function MainSceneSlideDeck({
       >
         {items.map((item, i) => {
           const role = sceneRoleForCard(i, n, effectiveSceneId);
+          /** 같은 snapshot이라도 슬라이드가 한 바퀴 돌아 다시 incoming일 때 key가 바뀌어 진입 애니메이션이 다시 적용됨 */
+          let activeIndex = 0;
+          if (n > 1) {
+            const firstIncomingScene = ((i - 2) % n + n) % n;
+            if (effectiveSceneId >= firstIncomingScene) {
+              activeIndex = Math.floor((effectiveSceneId - firstIncomingScene) / n) + 1;
+            }
+          }
           const style = cardStyleForRole(
             role,
             tInScene,
@@ -489,7 +497,7 @@ export default function MainSceneSlideDeck({
               : 0,
           );
           return (
-            <div key={item.snapshotId} className="slide-deck__layer" style={{ zIndex: layerZIndexForRole(role) }}>
+            <div key={`${item.snapshotId}-${activeIndex}`} className="slide-deck__layer" style={{ zIndex: layerZIndexForRole(role) }}>
               <div
                 className="slide-deck__card"
                 data-slide-deck-card
