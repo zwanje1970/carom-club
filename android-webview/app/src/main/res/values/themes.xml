@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- 스플래시 종료 후 본 화면용 (창 배경만 단색) -->
     <style name="Theme.CaromWebView" parent="Theme.AppCompat.Light.NoActionBar">
-        <item name="android:windowBackground">@drawable/splash_screen</item>
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+
+    <!-- 런처 Activity 전용: SplashScreen API + 로고 -->
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_screen_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_centered</item>
+        <item name="postSplashScreenTheme">@style/Theme.CaromWebView</item>
     </style>
 </resources>

@@ -753,6 +753,19 @@ button.secondary-button.site-mypage-logout:hover,
   overflow: hidden;
 }
 
+/* 커뮤니티 게시판 탭 간 스와이프: 루트 = 스크롤 본문 전체(빈 배경 포함) 터치·data-community-inner-swipe */
+.community-board-swipe-root {
+  width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+  touch-action: pan-y;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  background: var(--ui-bg-page);
+}
+
 /* 커뮤니티 게시판 탭 간 스와이프: 3패널 트랙, 중앙만 본문(이웃은 빈 피크 — iframe 전체 페이지 중복 없음) */
 .community-board-swipe-viewport {
   position: relative;
@@ -760,7 +773,7 @@ button.secondary-button.site-mypage-logout:hover,
   overflow-y: visible;
   width: 100%;
   min-height: 0;
-  touch-action: pan-y;
+  flex: 1 1 auto;
   background: var(--ui-bg-page);
 }
 
@@ -2068,6 +2081,94 @@ body:has(.site-home-page) {
   .app-mobile-bottom-nav-scroll-pad {
     padding-top: max(env(safe-area-inset-top, 0px), 12px);
     padding-bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* 상단 공통 크롬이 safe-area를 담당 — 본문 패딩은 회색 본문과 동일 상단만 */
+  .app-dashboard-mobile-root .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
+    padding-top: var(--site-shell-gray-padding-top);
+  }
+
+  html:has(.app-dashboard-mobile-root),
+  body:has(.app-dashboard-mobile-root) {
+    background-color: #4d7db5;
+  }
+}
+
+/* 대시보드 모바일 공통 상단: 공개 사이트 standard 바와 동일 클래스 — 셸 밖 풀폭 */
+.app-dashboard-mobile-chrome {
+  display: none;
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+@media (max-width: 767px) {
+  .app-dashboard-mobile-chrome {
+    display: block;
+  }
+}
+
+.app-dashboard-mobile-chrome__inner {
+  display: grid;
+  grid-template-columns: minmax(2.75rem, 1fr) minmax(0, 3fr) minmax(2.75rem, 1fr);
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.app-dashboard-mobile-chrome__side {
+  display: flex;
+  align-items: center;
+  min-height: var(--site-shell-title-min-height);
+}
+
+.app-dashboard-mobile-chrome__side--start {
+  justify-content: flex-start;
+}
+
+.app-dashboard-mobile-chrome__side--end {
+  justify-content: flex-end;
+}
+
+.app-dashboard-mobile-chrome__side-spacer {
+  display: inline-block;
+  width: 2.75rem;
+  height: 1px;
+}
+
+.app-dashboard-mobile-chrome__back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 44px;
+  padding: 0 0.35rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #ffffff !important;
+  text-decoration: none !important;
+  border-radius: 0.45rem;
+  box-sizing: border-box;
+}
+
+.app-dashboard-mobile-chrome__title {
+  margin: 0 auto;
+  max-width: 100%;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+  box-sizing: border-box;
+}
+
+@media (max-width: 767px) {
+  .app-dashboard-shell--with-mobile-chrome > main.v3-page > .ui-client-dashboard-header,
+  .app-dashboard-shell--with-mobile-chrome main.v3-page > .ui-client-dashboard-header {
+    display: none !important;
+  }
+
+  .app-dashboard-shell--with-mobile-chrome > main.v3-page.platform-home > .v3-h1:first-child {
+    display: none !important;
   }
 }
 

@@ -25,7 +25,7 @@ function isLegacyClientPath(pathname: string): boolean {
   return pathname.startsWith("/client/bracket") || pathname.startsWith("/client/participants");
 }
 
-export function middleware(request: NextRequest): NextResponse {
+export function proxy(request: NextRequest): NextResponse {
   const pathname = request.nextUrl.pathname;
 
   // 페이지빌더 iframe 미리보기(/site/preview) — 레이아웃에서 헤더/푸터 분기용(하드코딩 경로 문자열 없이 경로만 사용)

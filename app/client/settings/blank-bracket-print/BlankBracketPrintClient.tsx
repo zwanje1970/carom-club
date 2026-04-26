@@ -70,6 +70,8 @@ function bracketPdfLayoutType(style: BracketStyle): "tree" | "center" {
   return style === "TREE" ? "tree" : "center";
 }
 
+type PdfDownloadStatus = "idle" | "ready" | "downloading" | "done" | "failed";
+
 export default function BlankBracketPrintClient() {
   const [matchType,    setMatchType]    = useState<MatchType>("NORMAL");
   const [startPlayers, setStartPlayers] = useState(32);
@@ -82,6 +84,7 @@ export default function BlankBracketPrintClient() {
   const [pdfExporting, setPdfExporting] = useState(false);
   const [pdfDownloadUrl, setPdfDownloadUrl] = useState<string | null>(null);
   const [pdfDownloadName, setPdfDownloadName] = useState("대진표.pdf");
+  const [pdfDownloadStatus, setPdfDownloadStatus] = useState<PdfDownloadStatus>("idle");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewScale, setPreviewScale] = useState(1);
   const [previewFitScale, setPreviewFitScale] = useState(1);
@@ -89,6 +92,7 @@ export default function BlankBracketPrintClient() {
   const pdfRootRef = useRef<HTMLDivElement>(null);
   const pdfBusyRef = useRef(false);
   const pdfDownloadUrlRef = useRef<string | null>(null);
+  const pdfDownloadDoneTimerRef = useRef<number | null>(null);
   const previewTopbarRef = useRef<HTMLDivElement>(null);
   const previewStageRef = useRef<HTMLDivElement>(null);
   const pinchActiveRef = useRef(false);
@@ -258,6 +262,10 @@ export default function BlankBracketPrintClient() {
 
   useEffect(() => {
     return () => {
+      if (pdfDownloadDoneTimerRef.current != null) {
+        window.clearTimeout(pdfDownloadDoneTimerRef.current);
+        pdfDownloadDoneTimerRef.current = null;
+      }
       if (pdfDownloadUrlRef.current) {
         URL.revokeObjectURL(pdfDownloadUrlRef.current);
         pdfDownloadUrlRef.current = null;
@@ -302,15 +310,51 @@ export default function BlankBracketPrintClient() {
       pdfDownloadUrlRef.current = nextUrl;
       setPdfDownloadUrl(nextUrl);
       setPdfDownloadName(nextName);
+      setPdfDownloadStatus("ready");
       console.info("[blank-bracket-print] PDF blob url ready");
     } catch (error) {
       console.error("[blank-bracket-print] PDF export failed", error);
+      setPdfDownloadStatus("failed");
       throw error;
     } finally {
       pdfBusyRef.current = false;
       setPdfExporting(false);
     }
   }, [startPlayers, style, warmEmptyBoxFill]);
+
+  const handlePdfDownload = useCallback(() => {
+    if (!pdfDownloadUrl) {
+      setPdfDownloadStatus("failed");
+      return;
+    }
+    try {
+      if (pdfDownloadDoneTimerRef.current != null) {
+        window.clearTimeout(pdfDownloadDoneTimerRef.current);
+        pdfDownloadDoneTimerRef.current = null;
+      }
+      setPdfDownloadStatus("downloading");
+      const a = document.createElement("a");
+      a.href = pdfDownloadUrl;
+      a.download = pdfDownloadName;
+      a.rel = "noopener";
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      pdfDownloadDoneTimerRef.current = window.setTimeout(() => {
+        setPdfDownloadStatus("done");
+        pdfDownloadDoneTimerRef.current = null;
+      }, 1200);
+    } catch (error) {
+      console.error("[blank-bracket-print] PDF download failed", error);
+      setPdfDownloadStatus("failed");
+    }
+  }, [pdfDownloadName, pdfDownloadUrl]);
+
+  const handlePdfOpen = useCallback(() => {
+    if (!pdfDownloadUrl) return;
+    window.open(pdfDownloadUrl, "_blank", "noopener,noreferrer");
+  }, [pdfDownloadUrl]);
 
   const handlePreviewTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
     if (e.touches.length !== 2) return;
@@ -337,6 +381,24 @@ export default function BlankBracketPrintClient() {
   }, []);
 
   const previewStageIsZoomed = previewScale > previewFitScale + 0.001;
+  const pdfDownloadButtonLabel =
+    pdfDownloadStatus === "downloading"
+      ? "다운로드 중..."
+      : pdfDownloadStatus === "done"
+        ? "다운로드 완료"
+        : pdfDownloadStatus === "failed"
+          ? "다운로드 실패 - PDF 열기 사용"
+          : "PDF 다운로드";
+  const pdfDownloadStatusText =
+    pdfDownloadStatus === "done"
+      ? "다운로드 완료 또는 파일 앱을 확인하세요."
+      : pdfDownloadStatus === "downloading"
+        ? "다운로드 중..."
+        : pdfDownloadStatus === "failed"
+          ? "다운로드가 막힌 경우 PDF 열기를 사용하세요."
+          : pdfDownloadStatus === "ready"
+            ? "PDF가 생성되었습니다. 다운로드 버튼을 눌러 저장하세요."
+            : "";
 
   return (
     <>
@@ -494,16 +556,36 @@ export default function BlankBracketPrintClient() {
         .preview-overlay .bracket-scene {
           line-height: 0;
         }
+        /* PDF 다운로드: 미리보기 오버레이·preview-stage 터치 영역과 분리된 고정 컨트롤 (포털) */
+        .bbp-pdf-download-dock {
+          position: fixed;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          z-index: 2147483647;
+          box-sizing: border-box;
+          padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+          background: #ffffff;
+          border-top: 1px solid #e5e7eb;
+          box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.08);
+          pointer-events: auto;
+          touch-action: manipulation;
+          isolation: isolate;
+        }
       `}</style>
 
       {/* ── 설정 패널 ── */}
       <div className="bbp-no-print"
         style={{ maxWidth: "min(100%,56rem)", margin: "0 auto", padding: "0 0.75rem 1.5rem" }}>
         <main className="v3-page v3-stack" style={{ gap: "1rem" }}>
-          <div className="v3-row"
-            style={{ justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+          <div
+            className="v3-row ui-client-dashboard-header"
+            style={{ justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}
+          >
             <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem" }}>
-              <h1 className="v3-h1" style={{ margin: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>빈 대진표 출력</h1>
+              <h1 className="v3-h1" style={{ margin: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
+                빈 대진표 출력
+              </h1>
             </div>
           </div>
 
@@ -601,19 +683,6 @@ export default function BlankBracketPrintClient() {
                 {pdfExporting ? "PDF 생성 중…" : "PDF 생성"}
               </button>
             </div>
-            {pdfDownloadUrl ? (
-              <div style={{ padding: "0 1rem 1rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                <p style={{ margin: 0, fontSize: "0.9rem", color: "#374151", fontWeight: 600 }}>PDF가 생성되었습니다.</p>
-                <a
-                  href={pdfDownloadUrl}
-                  download={pdfDownloadName}
-                  className="ui-btn-primary-solid"
-                  style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minHeight: "44px", padding: "0.55rem 1rem", textDecoration: "none" }}
-                >
-                  PDF 다운로드
-                </a>
-              </div>
-            ) : null}
           </section>
         </main>
       </div>
@@ -693,6 +762,40 @@ export default function BlankBracketPrintClient() {
                   </div>
                 </div>
                 </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+      {pdfDownloadUrl && typeof document !== "undefined"
+        ? createPortal(
+            <div className="bbp-pdf-download-dock" role="region" aria-label="PDF 다운로드">
+              {pdfDownloadStatusText ? (
+                <p style={{ margin: "0 0 0.5rem", fontSize: "0.9rem", color: "#374151", fontWeight: 600 }}>{pdfDownloadStatusText}</p>
+              ) : null}
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+                <button
+                  type="button"
+                  className="ui-btn-primary-solid"
+                  onClick={() => {
+                    console.info("download button clicked");
+                    handlePdfDownload();
+                  }}
+                  style={{ minHeight: "44px", padding: "0.55rem 1rem" }}
+                >
+                  {pdfDownloadButtonLabel}
+                </button>
+                <button
+                  type="button"
+                  className="v3-btn"
+                  onClick={() => {
+                    console.info("pdf open button clicked");
+                    handlePdfOpen();
+                  }}
+                  style={{ minHeight: "44px", padding: "0.55rem 1rem" }}
+                >
+                  PDF 열기
+                </button>
               </div>
             </div>,
             document.body,

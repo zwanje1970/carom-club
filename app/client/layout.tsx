@@ -1,9 +1,16 @@
+import type { Viewport } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import DashboardMobileChromeLayout from "../components/DashboardMobileChromeLayout";
 import GlobalHomeButton from "../components/GlobalHomeButton";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../lib/auth/session";
 import { getClientDashboardPolicy, getClientStatusByUserId, getUserById } from "../../lib/surface-read";
 import SitePcDashboardChromeShell from "../site/components/SitePcDashboardChromeShell";
+
+/** 모바일 브라우저·WebView 상단 영역 — 공개 사이트 standard 헤더(#4d7db5)와 동일 */
+export const viewport: Viewport = {
+  themeColor: "#4d7db5",
+};
 
 export default async function ClientLayout({
   children,
@@ -47,7 +54,11 @@ export default async function ClientLayout({
     return (
       <>
         <SitePcDashboardChromeShell />
-        <div className="app-mobile-bottom-nav-scroll-pad app-dashboard-shell">{children}</div>
+        <DashboardMobileChromeLayout area="client">
+          <div className="app-mobile-bottom-nav-scroll-pad app-dashboard-shell app-dashboard-shell--with-mobile-chrome">
+            {children}
+          </div>
+        </DashboardMobileChromeLayout>
         <GlobalHomeButton />
       </>
     );

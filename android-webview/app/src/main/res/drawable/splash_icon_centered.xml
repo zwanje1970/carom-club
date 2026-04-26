@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 전체 영역과 스플래시 배경색 동일 (검정) -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/splash_screen_background" />
+        </shape>
+    </item>
+    <!-- 정사각형 로고: 최대 200×200dp, 중앙 정렬 → 비율 유지 -->
+    <item
+        android:width="200dp"
+        android:height="200dp"
+        android:gravity="center">
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/splash_screen" />
+    </item>
+</layer-list>

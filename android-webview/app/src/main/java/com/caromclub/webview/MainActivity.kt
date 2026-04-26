@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import android.provider.MediaStore
 import android.webkit.CookieManager
 import android.webkit.GeolocationPermissions
@@ -20,6 +21,7 @@ import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.content.FileProvider
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
@@ -29,6 +31,7 @@ import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
@@ -36,6 +39,10 @@ class MainActivity : AppCompatActivity() {
     private var cameraImageUri: Uri? = null
     private var pendingGeoCallback: GeolocationPermissions.Callback? = null
     private var pendingGeoOrigin: String? = null
+
+    /** 스플래시 유지: 첫 페이지 로드 + 최소 2초 */
+    private val splashPageReady = AtomicBoolean(false)
+    private var splashMinEndElapsedRealtime: Long = 0L
 
     private val locationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
@@ -86,7 +93,14 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        splashPageReady.set(false)
+        splashMinEndElapsedRealtime = SystemClock.elapsedRealtime() + 2000L
+        splashScreen.setKeepOnScreenCondition {
+            val minElapsedOk = SystemClock.elapsedRealtime() >= splashMinEndElapsedRealtime
+            !(splashPageReady.get() && minElapsedOk)
+        }
         webView = WebView(this)
         setContentView(webView)
 
@@ -157,6 +171,7 @@ class MainActivity : AppCompatActivity() {
 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
+                    splashPageReady.set(true)
                     FcmRegister.postTokenToServer(this@MainActivity, BuildConfig.SITE_BASE_URL)
                 }
             }
