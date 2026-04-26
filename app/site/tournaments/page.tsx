@@ -2,9 +2,11 @@ import { SITE_TOURNAMENT_LIST_EXCLUDED_BADGES } from "../../../lib/site-tourname
 import { formatTournamentScheduleLabel } from "../../../lib/tournament-schedule";
 import { resolveSitePosterDisplayUrl } from "../../../lib/site-poster-urls";
 import type { Tournament } from "../../../lib/types/entities";
+import { Suspense } from "react";
 import { listAllTournamentsFirestore } from "../../../lib/server/firestore-tournaments";
 import SiteTournamentsDistanceShell, { type SiteTournamentListRow } from "./SiteTournamentsDistanceShell";
 import { parseTournamentStatusFilter } from "./tournament-list-url";
+import SiteListPageSkeleton from "../components/SiteListPageSkeleton";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +52,19 @@ function tournamentLocationLine(t: Tournament): string {
   return typeof t.location === "string" ? t.location.trim() : "";
 }
 
-export default async function SiteTournamentsPage({
+export default function SiteTournamentsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  return (
+    <Suspense fallback={<SiteListPageSkeleton brandTitle="대회안내" auxiliaryLabel="대회 목록을 불러오는 중입니다." listRows={4} />}>
+      <SiteTournamentsPageContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function SiteTournamentsPageContent({
   searchParams,
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;

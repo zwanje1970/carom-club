@@ -1,21 +1,57 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { parseCommunityBoardTypeParam } from "../../../../lib/community-board-params";
 import { getSiteCommunityConfig, listCommunityPosts } from "../../../../lib/surface-read";
 import type { SiteCommunityBoardKey } from "../../../../lib/types/entities";
-import { communityTabLabelForBoard, visibleCommunityBoardKeysForTabs } from "../community-tab-config";
+import { COMMUNITY_PRIMARY_TAB_LABEL, communityTabLabelForBoard, visibleCommunityBoardKeysForTabs } from "../community-tab-config";
 import CommunityBoardPostList from "../CommunityBoardPostList";
 import CommunityBoardSearchForm from "../CommunityBoardSearchForm";
 import CommunityBoardTabs from "../CommunityBoardTabs";
 import CommunityBoardSwipeShell from "../CommunityBoardSwipeShell";
 import SiteShellFrame from "../../components/SiteShellFrame";
+import SiteListPageSkeleton from "../../components/SiteListPageSkeleton";
+
+const DEFAULT_COMMUNITY_TAB_ITEMS = [
+  { key: "all" as const, label: "전체", href: "/site/community" },
+  { key: "free" as const, label: COMMUNITY_PRIMARY_TAB_LABEL.free, href: "/site/community/free" },
+  { key: "qna" as const, label: COMMUNITY_PRIMARY_TAB_LABEL.qna, href: "/site/community/qna" },
+  { key: "reviews" as const, label: COMMUNITY_PRIMARY_TAB_LABEL.reviews, href: "/site/community/reviews" },
+];
 
 type Props = {
   params: Promise<{ boardType: string }>;
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function SiteCommunityBoardListPage({ params, searchParams }: Props) {
+export default function SiteCommunityBoardListPage({ params, searchParams }: Props) {
+  return (
+    <SiteShellFrame
+      brandTitle="커뮤니티"
+      auxiliaryBarClassName="site-shell-controls--site-list"
+      auxiliary={
+        <div className="ui-community-shell-context v3-stack" data-community-board="all">
+          <CommunityBoardTabs tabs={DEFAULT_COMMUNITY_TAB_ITEMS} currentKey="all" />
+          <CommunityBoardSearchForm actionPath="/site/community" inputId="community-q-all" defaultQuery="" />
+        </div>
+      }
+    >
+      <>
+        <CommunityBoardSwipeShell tabs={DEFAULT_COMMUNITY_TAB_ITEMS.map(({ key, href }) => ({ key, href }))}>
+          <Suspense
+            fallback={
+              <SiteListPageSkeleton brandTitle="커뮤니티" auxiliaryLabel="게시글 목록을 불러오는 중입니다." listRows={5} />
+            }
+          >
+            <SiteCommunityBoardListContent params={params} searchParams={searchParams} />
+          </Suspense>
+        </CommunityBoardSwipeShell>
+      </>
+    </SiteShellFrame>
+  );
+}
+
+async function SiteCommunityBoardListContent({ params, searchParams }: Props) {
   const { boardType: raw } = await params;
   const boardType = parseCommunityBoardTypeParam(raw);
   if (!boardType) notFound();
@@ -31,17 +67,6 @@ export default async function SiteCommunityBoardListPage({ params, searchParams 
   const items = await listCommunityPosts(boardType, q ? { q } : undefined);
 
   const writeHref = `/site/community/${boardType}/write`;
-
-  const qSuffix = q ? `?q=${encodeURIComponent(q)}` : "";
-  const visibleBoardKeys = visibleCommunityBoardKeysForTabs(config);
-  const tabItems = [
-    { key: "all" as const, label: "전체", href: `/site/community${qSuffix}` },
-    ...visibleBoardKeys.map((k) => ({
-      key: k,
-      label: communityTabLabelForBoard(k, config),
-      href: `/site/community/${k}${qSuffix}`,
-    })),
-  ];
 
   const listBoardLabel = communityTabLabelForBoard(boardType, config);
 
@@ -64,33 +89,16 @@ export default async function SiteCommunityBoardListPage({ params, searchParams 
   const emptyProps = boardEmptyCopy[boardType];
 
   return (
-    <SiteShellFrame
-      brandTitle="커뮤니티"
-      auxiliaryBarClassName="site-shell-controls--site-list"
-      auxiliary={
-        <div className="ui-community-shell-context v3-stack" data-community-board={boardType}>
-          <CommunityBoardTabs tabs={tabItems} currentKey={boardType} />
-          <CommunityBoardSearchForm
-            actionPath={`/site/community/${boardType}`}
-            inputId={`community-q-${boardType}`}
-            defaultQuery={q}
-          />
-        </div>
-      }
-    >
-      <>
-        <CommunityBoardSwipeShell tabs={tabItems.map(({ key, href }) => ({ key, href }))}>
-          <section className="site-site-gray-main v3-stack ui-community-page" data-community-board={boardType}>
-            <header className="ui-community-context-head">
-              <p className="ui-community-context-head-label">{listBoardLabel}</p>
-            </header>
-            <CommunityBoardPostList showRoomPrefix={false} items={items} {...emptyProps} />
-          </section>
-        </CommunityBoardSwipeShell>
-        <Link href={writeHref} className="community-write-fab" aria-label={`${listBoardLabel} 글쓰기`}>
+    <>
+      <section className="site-site-gray-main v3-stack ui-community-page" data-community-board={boardType}>
+        <header className="ui-community-context-head">
+          <p className="ui-community-context-head-label">{listBoardLabel}</p>
+        </header>
+        <CommunityBoardPostList showRoomPrefix={false} items={items} {...emptyProps} />
+      </section>
+      <Link href={writeHref} className="community-write-fab" aria-label={`${listBoardLabel} 글쓰기`}>
           <span aria-hidden>+</span>
         </Link>
-      </>
-    </SiteShellFrame>
+    </>
   );
 }

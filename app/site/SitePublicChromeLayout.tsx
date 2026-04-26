@@ -3,8 +3,7 @@ import GlobalHomeButton from "../components/GlobalHomeButton";
 import SiteChromeHeader, { isPublicSiteMobileView } from "./components/SiteChromeHeader";
 import SiteRootSwipeNav from "./components/SiteRootSwipeNav";
 import SiteVenuesGeolocationNav from "./components/SiteVenuesGeolocationNav";
-import { getSiteLayoutConfig, getSiteNotice } from "../../lib/surface-read";
-import { getSiteUnreadNotificationCount } from "../../lib/server/site-unread-notification-count";
+import { getSiteLayoutConfig } from "../../lib/surface-read";
 import { filterPcHeaderAdminMenuItems, getPcSiteHeaderAdminFlags } from "./lib/site-pc-header-admin";
 
 function SiteFooterDesktop({ text }: { text: string }) {
@@ -30,7 +29,7 @@ export default async function SitePublicChromeLayout({
 }>) {
   const headerStore = await headers();
   const isMobile = isPublicSiteMobileView(headerStore);
-  const referer = headerStore.get("referer") ?? "";
+  const config = await getSiteLayoutConfig();
   const siteBuilderPreviewHeader = headerStore.get("x-site-builder-preview");
   const nextUrlHeader =
     headerStore.get("next-url") ??
@@ -41,26 +40,16 @@ export default async function SitePublicChromeLayout({
   const isPageBuilderPreviewRequest =
     siteBuilderPreviewHeader === "1" ||
     isPreviewPathRequest ||
-    referer.includes("/platform/site/pages") ||
-    referer.includes("/platform/site/page-builder") ||
-    referer.includes("/admin/site/page-builder");
-  const config = await getSiteLayoutConfig();
-  let siteNotice = { enabled: false, text: "" };
-  try {
-    siteNotice = await getSiteNotice();
-  } catch {
-    siteNotice = { enabled: false, text: "" };
-  }
-  void siteNotice;
-
-  const unreadNotificationCount = await getSiteUnreadNotificationCount();
+    (headerStore.get("referer") ?? "").includes("/platform/site/pages") ||
+    (headerStore.get("referer") ?? "").includes("/platform/site/page-builder") ||
+    (headerStore.get("referer") ?? "").includes("/admin/site/page-builder");
 
   if (isMobile || isPageBuilderPreviewRequest) {
     return (
       <div className="site-shell site-shell--ua-mobile-site">
         <SiteVenuesGeolocationNav />
         <div className="site-shell-pc-header">
-          <SiteChromeHeader menuItems={config.header.pc.menuItems} unreadNotificationCount={unreadNotificationCount} />
+          <SiteChromeHeader menuItems={config.header.mobile.menuItems} />
         </div>
         <SiteRootSwipeNav>{children}</SiteRootSwipeNav>
         <GlobalHomeButton />
@@ -77,7 +66,6 @@ export default async function SitePublicChromeLayout({
         <SiteVenuesGeolocationNav />
         <SiteChromeHeader
           menuItems={pcHeaderMenuItems}
-          unreadNotificationCount={unreadNotificationCount}
           pcAdminEntry={pcAdminEntry}
         />
         <div className="site-shell-main">{children}</div>

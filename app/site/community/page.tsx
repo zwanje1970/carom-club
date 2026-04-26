@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import { getSiteCommunityConfig, listCommunityPostsAllPrimary } from "../../../lib/surface-read";
 import {
+  COMMUNITY_PRIMARY_TAB_LABEL,
   communityTabLabelForBoard,
   visibleCommunityBoardKeysForTabs,
 } from "./community-tab-config";
@@ -8,8 +10,47 @@ import CommunityBoardSearchForm from "./CommunityBoardSearchForm";
 import CommunityBoardTabs from "./CommunityBoardTabs";
 import CommunityBoardSwipeShell from "./CommunityBoardSwipeShell";
 import SiteShellFrame from "../components/SiteShellFrame";
+import SiteListPageSkeleton from "../components/SiteListPageSkeleton";
 
-export default async function SiteCommunityPage({
+const DEFAULT_COMMUNITY_TAB_ITEMS = [
+  { key: "all" as const, label: "전체", href: "/site/community" },
+  { key: "free" as const, label: COMMUNITY_PRIMARY_TAB_LABEL.free, href: "/site/community/free" },
+  { key: "qna" as const, label: COMMUNITY_PRIMARY_TAB_LABEL.qna, href: "/site/community/qna" },
+  { key: "reviews" as const, label: COMMUNITY_PRIMARY_TAB_LABEL.reviews, href: "/site/community/reviews" },
+];
+
+export default function SiteCommunityPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  return (
+    <SiteShellFrame
+      brandTitle="커뮤니티"
+      auxiliaryBarClassName="site-shell-controls--site-list"
+      auxiliary={
+        <div className="ui-community-shell-context v3-stack" data-community-board="all">
+          <CommunityBoardTabs tabs={DEFAULT_COMMUNITY_TAB_ITEMS} currentKey="all" />
+          <CommunityBoardSearchForm actionPath="/site/community" inputId="community-q-all" defaultQuery="" />
+        </div>
+      }
+    >
+      <>
+        <CommunityBoardSwipeShell tabs={DEFAULT_COMMUNITY_TAB_ITEMS.map(({ key, href }) => ({ key, href }))}>
+          <Suspense
+            fallback={
+              <SiteListPageSkeleton brandTitle="커뮤니티" auxiliaryLabel="게시글 목록을 불러오는 중입니다." listRows={5} />
+            }
+          >
+            <SiteCommunityPageContent searchParams={searchParams} />
+          </Suspense>
+        </CommunityBoardSwipeShell>
+      </>
+    </SiteShellFrame>
+  );
+}
+
+async function SiteCommunityPageContent({
   searchParams,
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -33,26 +74,11 @@ export default async function SiteCommunityPage({
   ];
 
   return (
-    <SiteShellFrame
-      brandTitle="커뮤니티"
-      auxiliaryBarClassName="site-shell-controls--site-list"
-      auxiliary={
-        <div className="ui-community-shell-context v3-stack" data-community-board="all">
-          <CommunityBoardTabs tabs={tabItems} currentKey="all" />
-          <CommunityBoardSearchForm actionPath="/site/community" inputId="community-q-all" defaultQuery={q} />
-        </div>
-      }
-    >
-      <>
-        <CommunityBoardSwipeShell tabs={tabItems.map(({ key, href }) => ({ key, href }))}>
-          <section className="site-site-gray-main v3-stack ui-community-page" data-community-board="all">
-            <header className="ui-community-context-head">
-              <p className="ui-community-context-head-label">전체 게시판</p>
-            </header>
-            <CommunityBoardPostList showRoomPrefix items={items} />
-          </section>
-        </CommunityBoardSwipeShell>
-      </>
-    </SiteShellFrame>
+    <section className="site-site-gray-main v3-stack ui-community-page" data-community-board="all">
+      <header className="ui-community-context-head">
+        <p className="ui-community-context-head-label">전체 게시판</p>
+      </header>
+      <CommunityBoardPostList showRoomPrefix items={items} />
+    </section>
   );
 }

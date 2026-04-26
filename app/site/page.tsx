@@ -2,6 +2,7 @@ import Link from "next/link";
 import Script from "next/script";
 import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
+import { Suspense } from "react";
 import MainSceneSlideDeckClient from "./main-scene-slide-deck-client";
 import { SiteMainNavIcon } from "./main-nav-icon";
 import { getCommonPaletteColorHex, isCommonPaletteColor } from "../../lib/shared/common-color-palette";
@@ -17,6 +18,7 @@ import SiteShellFrame from "./components/SiteShellFrame";
 import { isPublicSiteMobileView } from "./components/SiteChromeHeader";
 import SiteMainLogo from "./components/SiteMainLogo";
 import VenuesDistanceNavLink from "./components/VenuesDistanceNavLink";
+import SitePublicLoadingShell from "./components/SitePublicLoadingShell";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -24,6 +26,18 @@ export const metadata: Metadata = {
     canonical: "/",
   },
 };
+
+export default function SiteHomePage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  return (
+    <Suspense fallback={<SitePublicLoadingShell />}>
+      <SiteHomePageContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
 
 const HOME_PAGE_ID = "home";
 
@@ -302,7 +316,7 @@ function normalizePublishedBlocks(input: unknown): HomeBlock[] {
   return mappedBlocks.filter((block): block is HomeBlock => block !== null);
 }
 
-export default async function SiteHomePage({
+async function SiteHomePageContent({
   searchParams,
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
