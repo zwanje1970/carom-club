@@ -62,6 +62,7 @@ export default function BlankBracketPrintClient() {
   const [pdfExporting, setPdfExporting] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewScale, setPreviewScale] = useState(1);
+  const [previewViewportScale, setPreviewViewportScale] = useState(1);
   const pdfRootRef = useRef<HTMLDivElement>(null);
   const pdfBusyRef = useRef(false);
   const previewTopbarRef = useRef<HTMLDivElement>(null);
@@ -71,7 +72,6 @@ export default function BlankBracketPrintClient() {
     bodyTransform: string;
     bodyRotate: string;
     bodyTouchAction: string;
-    htmlOverflow: string;
     htmlTransform: string;
     htmlRotate: string;
     htmlTouchAction: string;
@@ -131,15 +131,18 @@ export default function BlankBracketPrintClient() {
     setPreviewScale(s);
   }, [previewPaper]);
 
+  const syncPreviewViewportScale = useCallback(() => {
+    const vv = typeof window !== "undefined" ? window.visualViewport : undefined;
+    setPreviewViewportScale(vv?.scale ?? 1);
+  }, []);
+
   useEffect(() => {
     const restoreDomStyles = () => {
       const snap = previewDomStyleSnapshotRef.current;
       if (!snap) return;
-      document.body.style.overflow = snap.bodyOverflow;
       document.body.style.transform = snap.bodyTransform;
       document.body.style.rotate = snap.bodyRotate;
       document.body.style.touchAction = snap.bodyTouchAction;
-      document.documentElement.style.overflow = snap.htmlOverflow;
       document.documentElement.style.transform = snap.htmlTransform;
       document.documentElement.style.rotate = snap.htmlRotate;
       document.documentElement.style.touchAction = snap.htmlTouchAction;
@@ -155,26 +158,25 @@ export default function BlankBracketPrintClient() {
       bodyTransform: document.body.style.transform,
       bodyRotate: document.body.style.rotate,
       bodyTouchAction: document.body.style.touchAction,
-      htmlOverflow: document.documentElement.style.overflow,
       htmlTransform: document.documentElement.style.transform,
       htmlRotate: document.documentElement.style.rotate,
       htmlTouchAction: document.documentElement.style.touchAction,
     };
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
     return restoreDomStyles;
   }, [previewOpen]);
 
   useLayoutEffect(() => {
     if (!previewOpen) return;
     updatePreviewScale();
-  }, [previewOpen, previewPaper, updatePreviewScale]);
+    syncPreviewViewportScale();
+  }, [previewOpen, previewPaper, syncPreviewViewportScale, updatePreviewScale]);
 
   useEffect(() => {
     if (!previewOpen) return;
     let orientTimer: ReturnType<typeof setTimeout> | undefined;
     const run = () => {
       requestAnimationFrame(() => updatePreviewScale());
+      requestAnimationFrame(() => syncPreviewViewportScale());
     };
     window.addEventListener("resize", run);
     const onOrientation = () => {
@@ -184,13 +186,15 @@ export default function BlankBracketPrintClient() {
     window.addEventListener("orientationchange", onOrientation);
     const vv = window.visualViewport;
     vv?.addEventListener("resize", run);
+    vv?.addEventListener("scroll", run);
     return () => {
       if (orientTimer) clearTimeout(orientTimer);
       window.removeEventListener("resize", run);
       window.removeEventListener("orientationchange", onOrientation);
       vv?.removeEventListener("resize", run);
+      vv?.removeEventListener("scroll", run);
     };
-  }, [previewOpen, updatePreviewScale]);
+  }, [previewOpen, syncPreviewViewportScale, updatePreviewScale]);
 
   /** 페이지 내부 전용 레이어 미리보기: A4 한 장 전체 scale, 스크롤·스와이프 없음 */
   const handleOpenPreviewOverlay = useCallback(() => {
@@ -202,6 +206,7 @@ export default function BlankBracketPrintClient() {
   const handleClosePreviewOverlay = useCallback(() => {
     setPreviewOpen(false);
     setPreviewScale(1);
+    setPreviewViewportScale(1);
     const stage = previewStageRef.current;
     if (stage) {
       stage.scrollLeft = 0;
@@ -221,27 +226,41 @@ export default function BlankBracketPrintClient() {
     await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
 
     const root = pdfRootRef.current;
-    if (!root) return;
+    console.info("[blank-bracket-print] PDF export click");
+    if (!root) {
+      console.error("[blank-bracket-print] PDF export aborted: root is null");
+      return;
+    }
 
     pdfBusyRef.current = true;
     setPdfExporting(true);
     try {
+      console.info("[blank-bracket-print] html2canvas start");
       const canvas = await html2canvas(root, {
         scale: 3,
         backgroundColor: "#ffffff",
         useCORS: true,
         logging: false,
       });
+      console.info("[blank-bracket-print] html2canvas done", { width: canvas.width, height: canvas.height });
 
       const imgData = canvas.toDataURL("image/png");
+      console.info("[blank-bracket-print] jsPDF create");
       const pdf = new jsPDF({ orientation: "l", unit: "mm", format: "a4" });
       pdf.addImage(imgData, "PNG", MARGIN_MM, MARGIN_MM, 277, 190);
+      console.info("[blank-bracket-print] jsPDF save start");
       pdf.save(`bracket_${startPlayers}강.pdf`);
+      console.info("[blank-bracket-print] jsPDF save done");
+    } catch (error) {
+      console.error("[blank-bracket-print] PDF export failed", error);
+      throw error;
     } finally {
       pdfBusyRef.current = false;
       setPdfExporting(false);
     }
   }, [startPlayers, warmEmptyBoxFill]);
+
+  const previewStageIsZoomed = previewViewportScale > 1.02;
 
   return (
     <>
@@ -311,6 +330,8 @@ export default function BlankBracketPrintClient() {
           font-family: system-ui, "Segoe UI", sans-serif;
           background: #e5e7eb;
           overflow: hidden;
+          touch-action: auto;
+          overscroll-behavior: contain;
         }
         .preview-overlay .preview-root {
           display: flex;
@@ -321,6 +342,7 @@ export default function BlankBracketPrintClient() {
           background: #e5e7eb;
           overflow: hidden;
           box-sizing: border-box;
+          touch-action: auto;
         }
         .preview-overlay .preview-topbar {
           flex-shrink: 0;
@@ -359,6 +381,7 @@ export default function BlankBracketPrintClient() {
           box-sizing: border-box;
           touch-action: auto;
           -webkit-overflow-scrolling: touch;
+          overscroll-behavior: contain;
         }
         .preview-overlay .paper-frame-slot {
           width: max-content;
@@ -370,6 +393,7 @@ export default function BlankBracketPrintClient() {
           justify-content: center;
           position: relative;
           box-sizing: border-box;
+          touch-action: auto;
         }
         .preview-overlay .paper-frame {
           position: absolute;
@@ -377,6 +401,7 @@ export default function BlankBracketPrintClient() {
           top: 0;
           transform-origin: top left;
           will-change: transform;
+          touch-action: auto;
         }
         .preview-overlay .paper {
           background: #ffffff;
@@ -388,6 +413,7 @@ export default function BlankBracketPrintClient() {
           align-items: center;
           justify-content: center;
           overflow: hidden;
+          touch-action: auto;
         }
         .preview-overlay .bracket-scene {
           line-height: 0;
@@ -527,7 +553,14 @@ export default function BlankBracketPrintClient() {
                     닫기
                   </button>
                 </div>
-                <div className="preview-stage" ref={previewStageRef}>
+                <div
+                  className="preview-stage"
+                  ref={previewStageRef}
+                  style={{
+                    overflow: previewStageIsZoomed ? "auto" : "hidden",
+                    touchAction: previewStageIsZoomed ? "pan-x pan-y pinch-zoom" : "auto",
+                  }}
+                >
                   <div
                     className="paper-frame-slot"
                     style={{

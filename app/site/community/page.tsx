@@ -16,14 +16,19 @@ const DEFAULT_COMMUNITY_TAB_ITEMS = [
   { key: "all" as const, label: "전체", href: "/site/community" },
   { key: "free" as const, label: COMMUNITY_PRIMARY_TAB_LABEL.free, href: "/site/community/free" },
   { key: "qna" as const, label: COMMUNITY_PRIMARY_TAB_LABEL.qna, href: "/site/community/qna" },
-  { key: "reviews" as const, label: COMMUNITY_PRIMARY_TAB_LABEL.reviews, href: "/site/community/reviews" },
+  { key: "reviews" as const, label: COMMUNITY_PRIMARY_TAB_LABEL.reviews, href: "/site/community/review" },
+  { key: "extra1" as const, label: "구인구직", href: "/site/community/jobs" },
 ];
 
-export default function SiteCommunityPage({
+export default async function SiteCommunityPage({
   searchParams,
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const sp = searchParams ? await searchParams : {};
+  const qRaw = sp.q;
+  const q = typeof qRaw === "string" ? qRaw.trim() : Array.isArray(qRaw) ? String(qRaw[0] ?? "").trim() : "";
+
   return (
     <SiteShellFrame
       brandTitle="커뮤니티"
@@ -31,7 +36,7 @@ export default function SiteCommunityPage({
       auxiliary={
         <div className="ui-community-shell-context v3-stack" data-community-board="all">
           <CommunityBoardTabs tabs={DEFAULT_COMMUNITY_TAB_ITEMS} currentKey="all" />
-          <CommunityBoardSearchForm actionPath="/site/community" inputId="community-q-all" defaultQuery="" />
+          <CommunityBoardSearchForm actionPath="/site/community" inputId="community-q-all" defaultQuery={q} />
         </div>
       }
     >
@@ -62,16 +67,6 @@ async function SiteCommunityPageContent({
 
   const visibleBoardKeys = visibleCommunityBoardKeysForTabs(config);
   const items = await listCommunityPostsAllPrimary(visibleBoardKeys, q ? { q } : undefined);
-
-  const qSuffix = q ? `?q=${encodeURIComponent(q)}` : "";
-  const tabItems = [
-    { key: "all" as const, label: "전체", href: `/site/community${qSuffix}` },
-    ...visibleBoardKeys.map((k) => ({
-      key: k,
-      label: communityTabLabelForBoard(k, config),
-      href: `/site/community/${k}${qSuffix}`,
-    })),
-  ];
 
   return (
     <section className="site-site-gray-main v3-stack ui-community-page" data-community-board="all">

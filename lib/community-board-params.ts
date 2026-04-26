@@ -8,6 +8,8 @@ function isSiteCommunityBoardKey(value: unknown): value is SiteCommunityBoardKey
 
 export function parseCommunityBoardTypeParam(raw: string): SiteCommunityBoardKey | null {
   const t = raw.trim();
+  if (t === "review") return "reviews";
+  if (t === "jobs") return "extra1";
   return isSiteCommunityBoardKey(t) ? t : null;
 }
 

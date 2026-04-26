@@ -16,7 +16,8 @@ const DEFAULT_COMMUNITY_TAB_ITEMS = [
   { key: "all" as const, label: "전체", href: "/site/community" },
   { key: "free" as const, label: COMMUNITY_PRIMARY_TAB_LABEL.free, href: "/site/community/free" },
   { key: "qna" as const, label: COMMUNITY_PRIMARY_TAB_LABEL.qna, href: "/site/community/qna" },
-  { key: "reviews" as const, label: COMMUNITY_PRIMARY_TAB_LABEL.reviews, href: "/site/community/reviews" },
+  { key: "reviews" as const, label: COMMUNITY_PRIMARY_TAB_LABEL.reviews, href: "/site/community/review" },
+  { key: "extra1" as const, label: "구인구직", href: "/site/community/jobs" },
 ];
 
 type Props = {
@@ -24,15 +25,27 @@ type Props = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default function SiteCommunityBoardListPage({ params, searchParams }: Props) {
+export default async function SiteCommunityBoardListPage({ params, searchParams }: Props) {
+  const { boardType: raw } = await params;
+  const boardType = parseCommunityBoardTypeParam(raw);
+  if (!boardType) notFound();
+
+  const sp = searchParams ? await searchParams : {};
+  const qRaw = sp.q;
+  const q = typeof qRaw === "string" ? qRaw.trim() : Array.isArray(qRaw) ? String(qRaw[0] ?? "").trim() : "";
+
   return (
     <SiteShellFrame
       brandTitle="커뮤니티"
       auxiliaryBarClassName="site-shell-controls--site-list"
       auxiliary={
-        <div className="ui-community-shell-context v3-stack" data-community-board="all">
-          <CommunityBoardTabs tabs={DEFAULT_COMMUNITY_TAB_ITEMS} currentKey="all" />
-          <CommunityBoardSearchForm actionPath="/site/community" inputId="community-q-all" defaultQuery="" />
+        <div className="ui-community-shell-context v3-stack" data-community-board={boardType}>
+          <CommunityBoardTabs tabs={DEFAULT_COMMUNITY_TAB_ITEMS} currentKey={boardType} />
+          <CommunityBoardSearchForm
+            actionPath={`/site/community/${boardType === "reviews" ? "review" : boardType === "extra1" ? "jobs" : boardType}`}
+            inputId={`community-q-${boardType}`}
+            defaultQuery={q}
+          />
         </div>
       }
     >
@@ -43,19 +56,28 @@ export default function SiteCommunityBoardListPage({ params, searchParams }: Pro
               <SiteListPageSkeleton brandTitle="커뮤니티" auxiliaryLabel="게시글 목록을 불러오는 중입니다." listRows={5} />
             }
           >
-            <SiteCommunityBoardListContent params={params} searchParams={searchParams} />
+            <SiteCommunityBoardListContent boardType={boardType} searchParams={searchParams} />
           </Suspense>
         </CommunityBoardSwipeShell>
+        <Link
+          href={`/site/community/${boardType === "reviews" ? "review" : boardType === "extra1" ? "jobs" : boardType}/write`}
+          className="community-write-fab"
+          aria-label={`${boardType} 글쓰기`}
+        >
+          <span aria-hidden>+</span>
+        </Link>
       </>
     </SiteShellFrame>
   );
 }
 
-async function SiteCommunityBoardListContent({ params, searchParams }: Props) {
-  const { boardType: raw } = await params;
-  const boardType = parseCommunityBoardTypeParam(raw);
-  if (!boardType) notFound();
-
+async function SiteCommunityBoardListContent({
+  boardType,
+  searchParams,
+}: {
+  boardType: SiteCommunityBoardKey;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const config = await getSiteCommunityConfig();
   const board = config[boardType as SiteCommunityBoardKey];
   if (!board.visible) notFound();
@@ -65,8 +87,6 @@ async function SiteCommunityBoardListContent({ params, searchParams }: Props) {
   const q = typeof qRaw === "string" ? qRaw.trim() : Array.isArray(qRaw) ? String(qRaw[0] ?? "").trim() : "";
 
   const items = await listCommunityPosts(boardType, q ? { q } : undefined);
-
-  const writeHref = `/site/community/${boardType}/write`;
 
   const listBoardLabel = communityTabLabelForBoard(boardType, config);
 
@@ -89,16 +109,11 @@ async function SiteCommunityBoardListContent({ params, searchParams }: Props) {
   const emptyProps = boardEmptyCopy[boardType];
 
   return (
-    <>
-      <section className="site-site-gray-main v3-stack ui-community-page" data-community-board={boardType}>
-        <header className="ui-community-context-head">
-          <p className="ui-community-context-head-label">{listBoardLabel}</p>
-        </header>
-        <CommunityBoardPostList showRoomPrefix={false} items={items} {...emptyProps} />
-      </section>
-      <Link href={writeHref} className="community-write-fab" aria-label={`${listBoardLabel} 글쓰기`}>
-          <span aria-hidden>+</span>
-        </Link>
-    </>
+    <section className="site-site-gray-main v3-stack ui-community-page" data-community-board={boardType}>
+      <header className="ui-community-context-head">
+        <p className="ui-community-context-head-label">{listBoardLabel}</p>
+      </header>
+      <CommunityBoardPostList showRoomPrefix={false} items={items} {...emptyProps} />
+    </section>
   );
 }
