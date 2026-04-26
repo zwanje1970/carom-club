@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { createPortal } from "react-dom";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
@@ -50,6 +50,26 @@ function previewPaperFromPrintSettings(
   return { paperW: 1123, paperH: 794 };
 }
 
+function touchDistance(touches: { length: number; [index: number]: { clientX: number; clientY: number } | undefined }): number {
+  const t1 = touches[0];
+  const t2 = touches[1];
+  if (!t1 || !t2) return 0;
+  const dx = t1.clientX - t2.clientX;
+  const dy = t1.clientY - t2.clientY;
+  return Math.hypot(dx, dy);
+}
+
+function formatPdfDate(date: Date): string {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}${mm}${dd}`;
+}
+
+function bracketPdfLayoutType(style: BracketStyle): "tree" | "center" {
+  return style === "TREE" ? "tree" : "center";
+}
+
 export default function BlankBracketPrintClient() {
   const [matchType,    setMatchType]    = useState<MatchType>("NORMAL");
   const [startPlayers, setStartPlayers] = useState(32);
@@ -60,13 +80,20 @@ export default function BlankBracketPrintClient() {
   /** 빈 칸 배경만 연한색 — 외곽선(stroke)은 CSS에서 검정 고정 */
   const [warmEmptyBoxFill, setWarmEmptyBoxFill] = useState(false);
   const [pdfExporting, setPdfExporting] = useState(false);
+  const [pdfDownloadUrl, setPdfDownloadUrl] = useState<string | null>(null);
+  const [pdfDownloadName, setPdfDownloadName] = useState("대진표.pdf");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewScale, setPreviewScale] = useState(1);
+  const [previewFitScale, setPreviewFitScale] = useState(1);
   const [previewViewportScale, setPreviewViewportScale] = useState(1);
   const pdfRootRef = useRef<HTMLDivElement>(null);
   const pdfBusyRef = useRef(false);
+  const pdfDownloadUrlRef = useRef<string | null>(null);
   const previewTopbarRef = useRef<HTMLDivElement>(null);
   const previewStageRef = useRef<HTMLDivElement>(null);
+  const pinchActiveRef = useRef(false);
+  const pinchStartDistanceRef = useRef(0);
+  const pinchStartScaleRef = useRef(1);
   const previewDomStyleSnapshotRef = useRef<{
     bodyOverflow: string;
     bodyTransform: string;
@@ -128,7 +155,12 @@ export default function BlankBracketPrintClient() {
     const fitScale = Math.min(vw / paperW, vh / paperH, 1);
     let s = fitScale;
     if (!(s > 0) || !Number.isFinite(s)) s = 0.1;
-    setPreviewScale(s);
+    setPreviewFitScale(s);
+    setPreviewScale((prev) => {
+      const clampedPrev = Math.max(s, Math.min(prev, 2));
+      if (pinchActiveRef.current || clampedPrev > s + 0.001) return clampedPrev;
+      return s;
+    });
   }, [previewPaper]);
 
   const syncPreviewViewportScale = useCallback(() => {
@@ -206,7 +238,11 @@ export default function BlankBracketPrintClient() {
   const handleClosePreviewOverlay = useCallback(() => {
     setPreviewOpen(false);
     setPreviewScale(1);
+    setPreviewFitScale(1);
     setPreviewViewportScale(1);
+    pinchActiveRef.current = false;
+    pinchStartDistanceRef.current = 0;
+    pinchStartScaleRef.current = 1;
     const stage = previewStageRef.current;
     if (stage) {
       stage.scrollLeft = 0;
@@ -218,6 +254,15 @@ export default function BlankBracketPrintClient() {
     document.documentElement.style.transform = "";
     document.documentElement.style.rotate = "";
     document.documentElement.style.touchAction = "";
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (pdfDownloadUrlRef.current) {
+        URL.revokeObjectURL(pdfDownloadUrlRef.current);
+        pdfDownloadUrlRef.current = null;
+      }
+    };
   }, []);
 
   /** A4 가로 PDF — html2canvas 로 `.bbp-print-svg` 캡처 후 jsPDF 에 277×190mm 로 삽입 */
@@ -248,9 +293,16 @@ export default function BlankBracketPrintClient() {
       console.info("[blank-bracket-print] jsPDF create");
       const pdf = new jsPDF({ orientation: "l", unit: "mm", format: "a4" });
       pdf.addImage(imgData, "PNG", MARGIN_MM, MARGIN_MM, 277, 190);
-      console.info("[blank-bracket-print] jsPDF save start");
-      pdf.save(`bracket_${startPlayers}강.pdf`);
-      console.info("[blank-bracket-print] jsPDF save done");
+      const blob = pdf.output("blob");
+      const nextUrl = URL.createObjectURL(blob);
+      const nextName = `${startPlayers}${bracketPdfLayoutType(style)}bracket${formatPdfDate(new Date())}.pdf`;
+      if (pdfDownloadUrlRef.current) {
+        URL.revokeObjectURL(pdfDownloadUrlRef.current);
+      }
+      pdfDownloadUrlRef.current = nextUrl;
+      setPdfDownloadUrl(nextUrl);
+      setPdfDownloadName(nextName);
+      console.info("[blank-bracket-print] PDF blob url ready");
     } catch (error) {
       console.error("[blank-bracket-print] PDF export failed", error);
       throw error;
@@ -258,9 +310,33 @@ export default function BlankBracketPrintClient() {
       pdfBusyRef.current = false;
       setPdfExporting(false);
     }
-  }, [startPlayers, warmEmptyBoxFill]);
+  }, [startPlayers, style, warmEmptyBoxFill]);
 
-  const previewStageIsZoomed = previewViewportScale > 1.02;
+  const handlePreviewTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length !== 2) return;
+    const distance = touchDistance(e.touches);
+    if (!(distance > 0)) return;
+    pinchActiveRef.current = true;
+    pinchStartDistanceRef.current = distance;
+    pinchStartScaleRef.current = previewScale;
+  }, [previewScale]);
+
+  const handlePreviewTouchMove = useCallback((e: TouchEvent<HTMLDivElement>) => {
+    if (!pinchActiveRef.current || e.touches.length !== 2) return;
+    const distance = touchDistance(e.touches);
+    if (!(distance > 0) || !(pinchStartDistanceRef.current > 0)) return;
+    e.preventDefault();
+    const ratio = distance / pinchStartDistanceRef.current;
+    const nextScale = Math.max(previewFitScale, Math.min(pinchStartScaleRef.current * ratio, 2));
+    setPreviewScale(nextScale);
+  }, [previewFitScale]);
+
+  const handlePreviewTouchEnd = useCallback(() => {
+    pinchActiveRef.current = false;
+    pinchStartDistanceRef.current = 0;
+  }, []);
+
+  const previewStageIsZoomed = previewScale > previewFitScale + 0.001;
 
   return (
     <>
@@ -522,9 +598,22 @@ export default function BlankBracketPrintClient() {
                 onClick={() => void handleExportPDF()}
                 style={{ padding: "0.55rem 1rem", minHeight: "44px" }}
               >
-                {pdfExporting ? "PDF…" : "PDF"}
+                {pdfExporting ? "PDF 생성 중…" : "PDF 생성"}
               </button>
             </div>
+            {pdfDownloadUrl ? (
+              <div style={{ padding: "0 1rem 1rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <p style={{ margin: 0, fontSize: "0.9rem", color: "#374151", fontWeight: 600 }}>PDF가 생성되었습니다.</p>
+                <a
+                  href={pdfDownloadUrl}
+                  download={pdfDownloadName}
+                  className="ui-btn-primary-solid"
+                  style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minHeight: "44px", padding: "0.55rem 1rem", textDecoration: "none" }}
+                >
+                  PDF 다운로드
+                </a>
+              </div>
+            ) : null}
           </section>
         </main>
       </div>
@@ -556,9 +645,13 @@ export default function BlankBracketPrintClient() {
                 <div
                   className="preview-stage"
                   ref={previewStageRef}
+                  onTouchStart={handlePreviewTouchStart}
+                  onTouchMove={handlePreviewTouchMove}
+                  onTouchEnd={handlePreviewTouchEnd}
+                  onTouchCancel={handlePreviewTouchEnd}
                   style={{
                     overflow: previewStageIsZoomed ? "auto" : "hidden",
-                    touchAction: previewStageIsZoomed ? "pan-x pan-y pinch-zoom" : "auto",
+                    touchAction: previewStageIsZoomed ? "pan-x pan-y pinch-zoom" : "none",
                   }}
                 >
                   <div
