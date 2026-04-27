@@ -38,8 +38,34 @@
   --spacing-section-gap: 22px;
 
   /* 모바일 하단 고정 탭·PNG 버튼 간격 공통 (메인 등에서 참조) */
-  --mobile-bottom-nav-height: 76px;
+  --mobile-bottom-nav-height: 40px;
   --png-button-gap-above-nav: 24px;
+  /* 홈 메인 하단 “탭+safe” 예약 — 하위에서 --site-home-bottom-safe-effective만 덮으면 reserve가 따라감 */
+  --site-home-bottom-safe-effective: env(safe-area-inset-bottom, 0px);
+  --site-home-bottom-nav-reserve: calc(
+    var(--mobile-bottom-nav-height) + var(--site-home-bottom-safe-effective)
+  );
+
+  /* 메인 슬라이드 카드창(.slide-deck) 패널 배경 */
+  --site-home-main-slide-deck-surface: #2a3f66;
+  /* 메인 임시 PNG 구슬 최대 크기 — 하단 겹침 띠 높이 식과 동기(배율만 변경) */
+  --site-home-png-main-button-img-cap: calc(3.75rem * 1.1 * 1.1 * 1.2 * 0.7);
+  /*
+   * 하단 겹침 띠 높이(탭 위 간격 + 라벨 + 구슬 반지름 − undershoot).
+   * undershoot>0 이면 띠 윗선이 아래로(적도보다 낮게).
+   */
+  --site-home-png-shelf-undershoot: 0px;
+  --site-home-png-shelf-stack-height: calc(
+    var(--png-button-gap-above-nav) + 0.75rem * 1.2 + 6px + (3.75rem * 1.1 * 1.1 * 1.2 * 0.7 * 0.5) -
+      var(--site-home-png-shelf-undershoot)
+  );
+  /* 메인 슬라이드 덱 하단을 PNG 구슬 적도(이미지 수직 중앙)에 맞출 때 빼는 높이 — 하단 겹침 띠와 동일 */
+  --site-home-slide-deck-trim-to-button-equator: var(--site-home-png-shelf-stack-height);
+}
+
+/* PC 공개 /site 홈: 브라우저에선 safe-area가 0인 경우가 많아, 흔한 노치 폰 하단 대역과 레이아웃을 맞춤 */
+.site-shell.site-shell--pc-site-chrome:has(.site-home-page--main) {
+  --site-home-bottom-safe-effective: max(env(safe-area-inset-bottom, 0px), 34px);
 }
 
 * {
@@ -1131,6 +1157,164 @@ body:has(.site-home-page) {
   background: transparent !important;
 }
 
+@keyframes site-home-main-notice-marquee {
+  from {
+    transform: translateX(100%);
+  }
+
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+/*
+ * 메인 홈 슬라이드 덱(main-scene): 래퍼·CSS 변수·레이어·카드(배경·테두리·그림자 없음).
+ * @media(max-width:767px) 메인 규칙보다 앞에 두어 덮어쓰기 순서 유지.
+ */
+.site-home-slide-stack .slide-deck-wrap {
+  width: 100%;
+  max-width: min(100%, 520px);
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 4px 10px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.site-home-page .slide-deck-wrap .slide-deck {
+  margin-top: 0;
+}
+
+.site-home-slide-stack .slide-deck-wrap .slide-deck {
+  --slide-card-max-width: 440px;
+  --slide-window-reference-height: calc(var(--slide-card-max-width) / 2);
+  --slide-layer-padding-y: 44px;
+  --slide-window-height-scale: 1.52;
+  width: min(94vw, 492px);
+  margin-left: auto;
+  margin-right: auto;
+  height: calc(
+    (var(--slide-window-reference-height) * 1.2 + var(--slide-layer-padding-y)) * 1.3 *
+      var(--slide-window-height-scale) * 0.7
+  );
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.slide-deck__layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 14px;
+  box-sizing: border-box;
+  pointer-events: none;
+  container-type: size;
+}
+
+.slide-deck__card {
+  width: 100%;
+  max-width: var(--slide-card-max-width);
+  transform-origin: center center;
+  will-change: transform, opacity;
+  pointer-events: auto;
+}
+
+.slide-deck__card > a[href] {
+  pointer-events: auto;
+}
+
+.slide-deck__card-interaction {
+  width: 100%;
+  max-width: 100%;
+  transition: transform 100ms ease, opacity 100ms ease;
+  will-change: transform, opacity;
+}
+
+.slide-deck__card .tournament-post-card {
+  width: 100%;
+}
+
+.slide-deck__card .tournament-post-card__media {
+  --status-badge-slot: calc(2.85rem * 1.1);
+}
+
+.slide-deck__card .tournament-post-card__inner {
+  padding: 11px 13px 12px;
+}
+
+.slide-deck__card .tournament-post-card__top {
+  gap: 6px;
+}
+
+.slide-deck__card .tournament-post-card__badge {
+  width: calc(2.85rem * 1.1);
+  height: calc(2.85rem * 1.1);
+  font-size: calc(0.62rem * 1.1);
+}
+
+.slide-deck__card .tournament-post-card__badge--recruiting {
+  font-size: calc(0.6rem * 1.1);
+}
+
+.slide-deck__card .tournament-post-card__badge--closing {
+  font-size: calc(0.52rem * 1.1 + 1pt);
+}
+
+.slide-deck__card .tournament-post-card__badge--full {
+  font-size: calc(0.64rem * 1.1 + 1pt);
+}
+
+.slide-deck__card .tournament-post-card__badge--ended {
+  font-size: calc(0.6rem * 1.1 + 1pt);
+}
+
+.slide-deck__card .tournament-post-card__main {
+  gap: 4px;
+}
+
+.slide-deck__card .tournament-post-card__lead {
+  font-size: clamp(0.86rem, 3.7vw, 1.02rem);
+  line-height: 1.22;
+}
+
+.slide-deck__card .tournament-post-card__title {
+  font-size: clamp(1rem, 4.8vw, 1.3rem);
+  line-height: 1.16;
+}
+
+.slide-deck__card .tournament-post-card__desc {
+  font-size: calc(0.72rem + 1pt + 2pt);
+  line-height: 1.25;
+  max-height: calc(1.25em * 5);
+}
+
+.slide-deck__card .tournament-post-card__desc--secondary {
+  font-size: calc(0.72rem + 1pt + 2pt);
+  font-weight: 700;
+}
+
+.slide-deck__card .tournament-post-card__footer .tournament-post-card__place {
+  font-weight: 700;
+}
+
+.slide-deck__card .tournament-post-card__footer {
+  padding: 0 11px;
+  gap: 8px;
+}
+
+.slide-deck__card .tournament-post-card__footer .tournament-post-card__date,
+.slide-deck__card .tournament-post-card__footer .tournament-post-card__place {
+  font-size: calc(0.72rem + 1pt + 2pt);
+  line-height: 1.22;
+}
+
 /* 모바일 공개 /site(모바일 UA): 뷰포트 고정 — body 스크롤 금지, 세로는 .site-shell-scroll-body만 */
 @media (max-width: 767px) {
   html:has(.site-shell--ua-mobile-site),
@@ -1216,11 +1400,10 @@ body:has(.site-home-page) {
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    /* 슬라이드 높이 복원: 템플릿 기본식(0.7 미적용) + 하단 고정 탭 대역 — .slide-deck height calc와 동기 */
+    /* 슬라이드 높이: 기본 덱 높이(0.7 미적용) + 하단 고정 탭 대역 — .slide-deck height calc와 동기 */
     --site-home-mobile-bottom-nav-slide-extra: var(--mobile-bottom-nav-height);
-    /* 포스터 광고판: 블루 → 딥 블루 → 네이비/퍼플 */
-    background-color: #1a0f3c;
-    background-image: linear-gradient(to bottom, #1e5eff 0%, #1a3fa0 45%, #1a0f3c 100%);
+    background-color: var(--ui-bg-page);
+    background-image: none;
   }
 
   /* 모바일 메인: 상단 dock(로고 줄)은 흐름에서 빼고 본문을 풀높이 — 로고는 본문 위 오버레이 */
@@ -1308,7 +1491,7 @@ body:has(.site-home-page) {
 
   /* 모바일 메인: 공지 띠 — 화면 최상단(상태 표시줄 아래 가장자리)부터 기존 공지 줄까지 한 덩어리로 확장, 로고(z400)보다 아래 */
   .site-home-page--main .site-home-main-notice-strip {
-    --site-home-main-notice-content-h: clamp(28px, 8.2vw, 32px);
+    --site-home-main-notice-content-h: clamp(30px, 8.4vw, 34px);
     --site-home-main-notice-content-top: calc(
       env(safe-area-inset-top, 0px) + 12px + 0.72rem * 1.35 + 4px
     );
@@ -1319,7 +1502,7 @@ body:has(.site-home-page) {
     max-width: none;
     box-sizing: border-box;
     top: 0;
-    height: calc(var(--site-home-main-notice-content-top) + var(--site-home-main-notice-content-h));
+    height: calc(var(--site-home-main-notice-content-top) + var(--site-home-main-notice-content-h) + 8px);
     z-index: 380;
     pointer-events: none;
     overflow: hidden;
@@ -1338,8 +1521,8 @@ body:has(.site-home-page) {
     box-sizing: border-box;
     background: rgba(0, 0, 0, 0.38);
     overflow: hidden;
-    padding-top: 0;
-    padding-bottom: 0;
+    padding-top: 4px;
+    padding-bottom: 5px;
     padding-left: max(0.45rem, env(safe-area-inset-left, 0px));
     padding-right: max(0.45rem, env(safe-area-inset-right, 0px));
   }
@@ -1351,23 +1534,18 @@ body:has(.site-home-page) {
     max-width: none;
     white-space: nowrap;
     font-size: clamp(10px, 2.85vw, 12px);
-    line-height: 1.2;
+    line-height: 1.32;
+    padding-top: 1px;
+    padding-bottom: 1px;
+    /* 마퀴 transform과 겹치지 않게 세로만 margin */
+    margin-top: -3px;
+    margin-bottom: 0;
     font-weight: 600;
     letter-spacing: -0.01em;
     color: #ffd54f;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
     animation: site-home-main-notice-marquee 18s linear infinite;
     will-change: transform;
-  }
-
-  @keyframes site-home-main-notice-marquee {
-    from {
-      transform: translateX(100%);
-    }
-
-    to {
-      transform: translateX(-100%);
-    }
   }
 
   /* 모바일 메인만: 본문 스크롤 영역 세로 고정(슬라이드 덱 제스처는 하위 .slide-deck 유지) */
@@ -1437,19 +1615,21 @@ body:has(.site-home-page) {
     padding-right: 0;
     padding-top: 0;
     /* 모바일 고정형: 하단 홈/FAB에 가리지 않도록 홈 바 위 여유 확보(값 키우면 PNG·대시보드가 더 위로) */
-    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px) + 12px);
+    padding-bottom: calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 6px);
   }
 
-  /* 메인(/) 모바일: 본문 배경은 페이지 그라데이션만 쓰고 이중 그라데이션·노이즈 완화 */
+  /* 메인(/) 모바일: 다크 본문 포스터형 배경(기본 .site-home-dark-main 과 동일) */
   .site-home-page--main .site-home-dark-main {
-    background-color: transparent;
-    background-image: none;
-    /* 고정 하단 탭 높이(--mobile-bottom-nav-height) + safe-area — PNG·슬라이드와 동일 변수 */
-    padding-bottom: calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+    background-color: var(--site-home-bg-c);
+    background-image:
+      radial-gradient(ellipse 130% 52% at 50% -14%, rgba(255, 255, 255, 0.16) 0%, rgba(160, 190, 235, 0.07) 32%, transparent 60%),
+      linear-gradient(180deg, var(--site-home-bg-a) 0%, var(--site-home-bg-b) 52%, var(--site-home-bg-c) 100%);
+    /* 고정 하단 탭 + safe — PNG·슬라이드와 동일 토큰 */
+    padding-bottom: var(--site-home-bottom-nav-reserve);
   }
 
   .site-home-page--main .site-home-dark-main::before {
-    opacity: 0.06;
+    opacity: 0.16;
   }
 
   .site-home-dark-main.site-home-dark-main--stack > .site-home-main-content-box {
@@ -1484,7 +1664,8 @@ body:has(.site-home-page) {
     min-height: 0;
     display: flex;
     flex-direction: column;
-    justify-content: flex-start;
+    /* 슬라이드·검은 띠를 본문 하단(탭 예약 패딩 윗선)에 붙여 고정 PNG 버튼·띠와 한 덩어리로 */
+    justify-content: flex-end;
     width: 100%;
     overflow: visible;
   }
@@ -1506,6 +1687,13 @@ body:has(.site-home-page) {
     overflow-y: visible;
   }
 
+  .site-home-page--main .site-home-main-slide-deck-stack > .site-home-slide-anchor {
+    width: 100%;
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
   .site-home-page--main .slide-deck-wrap {
     width: 100%;
     max-width: none;
@@ -1517,32 +1705,35 @@ body:has(.site-home-page) {
   }
 
   .site-home-page--main .slide-deck-wrap .slide-deck {
+    width: 100%;
     max-width: none;
-    margin-left: calc(50% - 50vw);
-    margin-right: calc(50% - 50vw);
-    width: 100vw;
+    margin-left: 0;
+    margin-right: 0;
     box-sizing: border-box;
     border-radius: 0;
-    border-left: none;
-    border-right: none;
-    border-bottom: none;
     margin-top: 0;
+    /* 고정 띠(.site-home-main-png-shelf-instack) 높이는 .site-home-main-slide-deck-stack padding-bottom 으로만 확보 */
     height: calc(
       (var(--slide-window-reference-height) * 1.2 + var(--slide-layer-padding-y)) * 1.3 *
         var(--slide-window-height-scale) + var(--site-home-mobile-bottom-nav-slide-extra, var(--mobile-bottom-nav-height))
     );
-    /* 오버레이 PNG·카드 하단 CTA 최소 16px 이상 띄움(내부 여백만, height 식 유지) */
-    padding-bottom: calc(84px + 4.5rem + 16px);
-    /* 포스터 광고판: 녹색 필트 제거 — 배경 그라데이션이 비치도록 패널만 살짝 얹음 */
-    background-image: none;
-    background-color: rgba(7, 18, 36, 0.28);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 16px 48px rgba(0, 0, 0, 0.38);
+    padding-bottom: max(16px, calc(84px + 4.5rem + 16px));
+    /* 메인 카드창 기준색(: --site-home-main-slide-deck-surface)에 맞춘 청·네이비 — 본문 포스터 변수만 쓰면 화면에서 거의 검정으로 보임 */
+    background-color: var(--site-home-main-slide-deck-surface);
+    background-image:
+      radial-gradient(ellipse 125% 50% at 50% -12%, rgba(255, 255, 255, 0.2) 0%, rgba(140, 180, 235, 0.22) 34%, transparent 58%),
+      linear-gradient(
+        180deg,
+        #3d62a0 0%,
+        #325882 18%,
+        var(--site-home-main-slide-deck-surface) 52%,
+        #243652 100%
+      );
+    border: none;
+    box-shadow: none;
   }
 
-  /* 상단 로고·공지와 겹칠 때 카드 상단 가독성만 살짝 보강(포스터 전체는 그대로) */
+  /* 상단만 살짝 어둡게 — 배경 청색 그라데이션을 전면에서 가리지 않음 */
   .site-home-page--main .slide-deck-wrap .slide-deck::before {
     content: "";
     position: absolute;
@@ -1551,22 +1742,10 @@ body:has(.site-home-page) {
     pointer-events: none;
     background: linear-gradient(
       to bottom,
-      rgba(7, 18, 36, 0.42) 0%,
-      rgba(7, 18, 36, 0.12) 18%,
-      transparent 42%
+      rgba(10, 22, 40, 0.2) 0%,
+      rgba(10, 22, 40, 0.06) 20%,
+      transparent 44%
     );
-  }
-
-  /* 카드·상승 구간 전체를 살짝 위로 — 하단 PNG/탭과의 간격·시각 중심 보정 */
-  .site-home-page--main .slide-deck .slide-deck__layer {
-    transform: translateY(calc(-8% - 4%));
-  }
-
-  .site-home-nav-grid {
-    flex: 0 0 auto;
-    padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
-    padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
-    box-sizing: border-box;
   }
 
   .site-home-dark-main .site-home-cta-primary {
@@ -1581,6 +1760,346 @@ body:has(.site-home-page) {
     ) !important;
     max-width: none;
   }
+}
+
+/*
+ * 메인 홈(넓은 화면·PC): 슬라이드 + 짙은 띠 그리드 겹침, PNG는 DOM상 띠 안이나 position:fixed 로 기존과 동일 배치.
+ * 좁은 화면(≤767): 아래 @media 에서 띠만 bottom 고정·버튼은 띠 내부 static.
+ */
+.site-home-page--main .site-home-main-slide-deck-stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  position: relative;
+}
+
+.site-home-page--main .site-home-main-slide-deck-stack > .site-home-slide-anchor,
+.site-home-page--main .site-home-main-slide-deck-stack > .site-home-main-png-shelf-instack {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.site-home-page--main .site-home-main-slide-deck-stack > .site-home-slide-anchor {
+  align-self: start;
+  z-index: 0;
+  min-width: 0;
+}
+
+.site-home-page--main .site-home-main-slide-deck-stack > .site-home-main-png-shelf-instack {
+  align-self: end;
+  z-index: 5;
+  width: 100vw;
+  max-width: none;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  justify-self: center;
+  height: var(--site-home-png-shelf-stack-height);
+  pointer-events: none;
+  background-color: #050f1f;
+}
+
+/* 메인 PNG 3버튼(띠 내부 DOM) — 공통 타이포·flex; 좁은 화면은 static, 768px~ 는 기존처럼 fixed */
+.site-home-page--main .site-home-main-png-buttons-in-shelf {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding-left: max(0.5rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.5rem, env(safe-area-inset-right, 0px));
+  gap: calc(clamp(32px, 9vw, 40px) + 20px);
+}
+
+.site-home-page--main .site-home-main-png-buttons-in-shelf .main-button {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+}
+
+.site-home-page--main .site-home-main-png-buttons-in-shelf .main-button span {
+  line-height: 1.2;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.site-home-page--main .site-home-main-png-buttons-in-shelf > .main-button {
+  flex: 0 0 auto;
+}
+
+.site-home-page--main .site-home-main-png-buttons-in-shelf > .main-button img {
+  width: auto;
+  height: auto;
+  max-width: var(--site-home-png-main-button-img-cap);
+  max-height: var(--site-home-png-main-button-img-cap);
+  object-fit: contain;
+}
+
+@media (max-width: 767px) {
+  .site-home-page--main .site-home-main-slide-deck-stack {
+    display: block;
+    width: 100%;
+    position: relative;
+    padding-bottom: var(--site-home-png-shelf-stack-height);
+    box-sizing: border-box;
+  }
+
+  .site-home-page--main .site-home-main-slide-deck-stack > .site-home-main-png-shelf-instack {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: var(--site-home-bottom-nav-reserve);
+    width: 100vw;
+    max-width: none;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    height: var(--site-home-png-shelf-stack-height);
+    z-index: 5;
+    box-sizing: border-box;
+    pointer-events: auto;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    /* 슬라이드 덱 하단 톤과 맞춤 — 순단색, 위치·높이 불변 */
+    background-color: var(--site-home-main-slide-deck-surface);
+    grid-column: auto;
+    grid-row: auto;
+    align-self: stretch;
+    justify-self: stretch;
+  }
+
+  .site-home-page--main .site-home-main-png-buttons-in-shelf > .main-button img {
+    transform: scale(0.9);
+    transform-origin: center top;
+  }
+
+  .site-home-page--main .site-home-main-png-shelf-instack .site-home-main-png-buttons-in-shelf {
+    position: static;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    z-index: 1;
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    margin-top: calc(-0.5 * var(--site-home-png-main-button-img-cap));
+    pointer-events: auto;
+  }
+}
+
+@media (min-width: 768px) {
+  .site-home-page--main .site-home-main-png-buttons-in-shelf {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--site-home-bottom-nav-reserve) + 30px);
+    z-index: 68;
+    pointer-events: none;
+  }
+
+  .site-home-page--main .site-home-main-png-buttons-in-shelf .main-button {
+    pointer-events: auto;
+  }
+}
+
+/*
+ * 모바일 UA 셸(.site-shell--ua-mobile-site): 뷰포트가 768 초과여도 메인 전용 규칙 유지.
+ * (PC는 .site-shell--pc-site-chrome 전용 — 여기 비적용)
+ */
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-notice-strip {
+  --site-home-main-notice-content-h: clamp(30px, 8.4vw, 34px);
+  --site-home-main-notice-content-top: calc(
+    env(safe-area-inset-top, 0px) + 12px + 0.72rem * 1.35 + 4px
+  );
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+  top: 0;
+  height: calc(var(--site-home-main-notice-content-top) + var(--site-home-main-notice-content-h) + 8px);
+  z-index: 380;
+  pointer-events: none;
+  overflow: hidden;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-notice-strip__inner {
+  height: 100%;
+  min-height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.38);
+  overflow: hidden;
+  padding-top: 4px;
+  padding-bottom: 5px;
+  padding-left: max(0.45rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.45rem, env(safe-area-inset-right, 0px));
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-notice-strip__text {
+  display: inline-block;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  max-width: none;
+  white-space: nowrap;
+  font-size: clamp(10px, 2.85vw, 12px);
+  line-height: 1.32;
+  padding-top: 1px;
+  padding-bottom: 1px;
+  margin-top: -3px;
+  margin-bottom: 0;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #ffd54f;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  animation: site-home-main-notice-marquee 18s linear infinite;
+  will-change: transform;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-slide-stack,
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-slide-anchor {
+  overflow-x: clip;
+  overflow-y: visible;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-slide-deck-stack > .site-home-slide-anchor {
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .slide-deck-wrap {
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  padding: 0;
+  align-items: stretch;
+  position: relative;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .slide-deck-wrap .slide-deck {
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  box-sizing: border-box;
+  border-radius: 0;
+  margin-top: 0;
+  height: calc(
+    (var(--slide-window-reference-height) * 1.2 + var(--slide-layer-padding-y)) * 1.3 *
+      var(--slide-window-height-scale) + var(--site-home-mobile-bottom-nav-slide-extra, var(--mobile-bottom-nav-height))
+  );
+  padding-bottom: max(16px, calc(84px + 4.5rem + 16px));
+  background-color: var(--site-home-main-slide-deck-surface);
+  background-image:
+    radial-gradient(ellipse 125% 50% at 50% -12%, rgba(255, 255, 255, 0.2) 0%, rgba(140, 180, 235, 0.22) 34%, transparent 58%),
+    linear-gradient(
+      180deg,
+      #3d62a0 0%,
+      #325882 18%,
+      var(--site-home-main-slide-deck-surface) 52%,
+      #243652 100%
+    );
+  border: none;
+  box-shadow: none;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .slide-deck-wrap .slide-deck::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(10, 22, 40, 0.2) 0%,
+    rgba(10, 22, 40, 0.06) 20%,
+    transparent 44%
+  );
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-slide-stack .slide-deck-wrap .slide-deck {
+  filter: none;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-slide-deck-stack {
+  display: block;
+  width: 100%;
+  position: relative;
+  padding-bottom: var(--site-home-png-shelf-stack-height);
+  box-sizing: border-box;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-slide-deck-stack > .site-home-main-png-shelf-instack {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--site-home-bottom-nav-reserve);
+  width: 100vw;
+  max-width: none;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  height: var(--site-home-png-shelf-stack-height);
+  z-index: 5;
+  box-sizing: border-box;
+  pointer-events: auto;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  /* 슬라이드 덱 하단 톤과 맞춤 — 순단색, 위치·높이 불변 */
+  background-color: var(--site-home-main-slide-deck-surface);
+  grid-column: auto;
+  grid-row: auto;
+  align-self: stretch;
+  justify-self: stretch;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-png-buttons-in-shelf > .main-button img {
+  transform: scale(0.9);
+  transform-origin: center top;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-png-shelf-instack .site-home-main-png-buttons-in-shelf {
+  position: static;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  z-index: 1;
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  margin-top: calc(-0.5 * var(--site-home-png-main-button-img-cap));
+  pointer-events: auto;
+}
+
+/* 모바일 UA에서는 PC용(768+) 고정 PNG 행 무력화 — 띠 안 static 유지 */
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-png-buttons-in-shelf {
+  position: static;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  z-index: 1;
+  pointer-events: auto;
 }
 
 .site-home-brand {
@@ -1634,16 +2153,16 @@ body:has(.site-home-page) {
   min-height: unset;
 }
 
-/* 슬라이드 카드만 그림자 — 공지(슬라이드 위 형제)는 filter 대상에서 제외 */
-.site-home-slide-stack .slide-deck-wrap > .slide-deck {
+/* 슬라이드 카드만 그림자 — 공지(슬라이드 위 형제)는 filter 대상에서 제외 (.slideDeckFrame 아래 자손) */
+.site-home-slide-stack .slide-deck-wrap .slide-deck {
   filter:
     drop-shadow(0 10px 34px rgba(0, 0, 0, 0.4)) drop-shadow(0 -5px 22px rgba(0, 0, 0, 0.09));
 }
 
 @media (max-width: 767px) {
-  .site-home-page--main .site-home-slide-stack .slide-deck-wrap > .slide-deck {
-    filter:
-      drop-shadow(0 8px 30px rgba(0, 0, 0, 0.33)) drop-shadow(0 -4px 18px rgba(0, 0, 0, 0.07));
+  /* 메인 모바일: 풀폭 시 좌우에 띠처럼 보이지 않게 카드용 filter 제거 */
+  .site-home-page--main .site-home-slide-stack .slide-deck-wrap .slide-deck {
+    filter: none;
   }
 }
 
@@ -1734,13 +2253,8 @@ body:has(.site-home-page) {
     box-sizing: border-box;
   }
 
-  /* PC 메인: 대회안내·당구장 등 4타일 메뉴는 헤더와 중복되므로 숨김 */
-  .site-home-page--main #main-buttons.site-home-nav-grid {
-    display: none !important;
-  }
-
-  /* TEMP_PNG_MAIN_BUTTONS: PC에서도 기존과 동일하게 이 자리 UI 없음 */
-  .site-home-page--main .site-home-main-png-buttons-temp {
+  /* 인-flow 임시 PNG만 숨김 — 하단 고정 레이어 3버튼은 PC 메인에서도 표시 */
+  .site-home-page--main .site-home-main-png-buttons-temp:not(.site-home-main-png-buttons-in-shelf) {
     display: none !important;
   }
 }
@@ -1937,14 +2451,10 @@ body:has(.site-home-page) {
   }
 }
 
-.site-home-nav-grid {
-  gap: 14px !important;
-}
-
-/* 메인 홈: 슬라이드 ↔ 4메뉴 / 4메뉴 ↔ 대시보드 간격 분리 */
+/* 메인 홈: 다크 메인 스택 간격 */
 .site-home-dark-main.site-home-dark-main--stack {
   gap: 0;
-  /* 로고(청 헤더) ↔ 슬라이드 블록 ↔ 4버튼 — 공통 간격 (공지는 슬라이드 내부라 바깥 블록 위치는 동일 규칙) */
+  /* 로고(청 헤더) ↔ 슬라이드 블록 — 공통 간격 (공지는 슬라이드 내부) */
   --site-home-block-gap: 0.875rem;
 }
 
@@ -1961,18 +2471,6 @@ body:has(.site-home-page) {
   .site-home-page--main .site-home-dark-main .site-home-cta-primary {
     margin-bottom: 0.65rem !important;
   }
-}
-
-.site-home-dark-main.site-home-dark-main--stack .site-home-main-content-box #main-buttons.site-home-nav-grid {
-  margin-top: var(--site-home-block-gap);
-}
-
-/*
- * TEMP_PNG_MAIN_BUTTONS — 임시: 기존 4메뉴 그리드는 DOM 유지·숨김만, PNG 3개로 자리 대체.
- * 원복: 이 블록 전체 삭제 + page.tsx 의 TEMP 주석 안내대로 클래스/섹션 제거.
- */
-.site-home-nav-grid.site-home-nav-grid--tempPngHidden {
-  display: none !important;
 }
 
 .site-home-main-png-buttons-temp {
@@ -2025,7 +2523,7 @@ body:has(.site-home-page) {
 /* 기존 PNG 슬롯과 동일한 최대 높이(이미지 비율 유지) */
 .site-home-main-png-buttons-temp.temp-png-button-tuning .main-button img {
   max-width: 100%;
-  max-height: calc(3.75rem * 1.1 * 1.1 * 1.2 * 1.2);
+  max-height: var(--site-home-png-main-button-img-cap);
   object-fit: contain;
   /* 투명 PNG: 알파 따라가는 그림자(조금 더 진하게) */
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.28)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.24));
@@ -2034,64 +2532,6 @@ body:has(.site-home-page) {
 /* 대시보드 버튼 위 간격(모바일은 @media 안에서 더 조밀하게 조정 가능) */
 .site-home-dark-main.site-home-dark-main--stack .site-home-main-content-box .site-home-cta-primary {
   margin-top: 14px !important;
-}
-
-/* 샘플 UI: 밝은 카드형 타일 · 파란 아이콘 · 짙은 글자 */
-.site-home-nav-tile {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #e8ecf2 !important;
-  background: linear-gradient(180deg, #ffffff 0%, #f4f6f9 100%) !important;
-  color: #0f172a !important;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.9) inset,
-    0 4px 14px rgba(0, 0, 0, 0.1),
-    0 2px 6px rgba(0, 0, 0, 0.05) !important;
-  border-radius: 0.9rem !important;
-  font-weight: 600 !important;
-  padding: 0.92rem 0.5rem 0.82rem !important;
-  min-height: 3.35rem;
-  box-sizing: border-box;
-  transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-.site-home-nav-tile:active {
-  transform: scale(0.98);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.75) inset,
-    0 2px 8px rgba(0, 0, 0, 0.08) !important;
-}
-
-.site-home-nav-tile:focus-visible {
-  outline: 2px solid rgba(37, 99, 235, 0.55);
-  outline-offset: 2px;
-}
-
-.site-home-nav-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.87rem;
-  height: 1.87rem;
-  flex-shrink: 0;
-}
-
-.site-home-nav-icon svg {
-  display: block;
-  width: 24px;
-  height: 24px;
-}
-
-.site-home-nav-label {
-  font-size: 0.82rem;
-  line-height: 1.25;
-  letter-spacing: -0.03em;
-  font-weight: 600;
 }
 
 .site-home-slide-empty {
@@ -2181,14 +2621,23 @@ body:has(.site-home-page) {
   align-items: stretch;
   justify-content: space-between;
   gap: 0;
-  min-height: calc(48px + env(safe-area-inset-bottom, 0px));
-  padding-top: 6px;
+  min-height: calc(40px + env(safe-area-inset-bottom, 0px));
+  padding-top: 3px;
   padding-bottom: env(safe-area-inset-bottom, 0px);
   padding-left: max(0.15rem, env(safe-area-inset-left, 0px));
   padding-right: max(0.15rem, env(safe-area-inset-right, 0px));
   box-sizing: border-box;
   background: #fff;
   border-top: none;
+}
+
+/* 홈(/) 메인: 하단 탭 실제 높이 하한 — UA·뷰포트와 무관(PC 좁은 창에서도 48px 고정 아님) */
+.site-shell:has(.site-home-page--main) .site-home-fab-root .site-mobile-bottom-nav {
+  min-height: max(
+    var(--mobile-bottom-nav-height),
+    calc(40px + var(--site-home-bottom-safe-effective))
+  );
+  box-sizing: border-box;
 }
 
 .site-mobile-bottom-nav__link {
@@ -2198,8 +2647,8 @@ body:has(.site-home-page) {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px 2px 8px;
-  min-height: 44px;
+  padding: 3px 2px 4px;
+  min-height: 22px;
   text-decoration: none !important;
   color: #475569;
   font-size: 0.76rem;
@@ -2250,20 +2699,14 @@ body:has(.site-home-page) {
   text-overflow: clip;
 }
 
-/* 모바일 메인(/)일 때만: 하단 탭 min-height를 예약값과 맞추되, safe-area 포함 기존 하한은 유지 */
-@media (max-width: 767px) {
-  .site-shell--ua-mobile-site:has(.site-home-page--main) .site-home-fab-root .site-mobile-bottom-nav {
-    min-height: max(
-      var(--mobile-bottom-nav-height),
-      calc(48px + env(safe-area-inset-bottom, 0px))
-    );
-    box-sizing: border-box;
-  }
-}
-
 @media (min-width: 768px) {
   .site-mobile-bottom-nav {
     display: none !important;
+  }
+
+  /* PC 메인(/)만: 하단 5탭을 모바일과 동일 표시 — 공통 site-header·footer는 그대로 */
+  .site-shell.site-shell--pc-site-chrome:has(.site-home-page--main) .site-home-fab-root .site-mobile-bottom-nav {
+    display: flex !important;
   }
 }
 
@@ -2271,7 +2714,7 @@ body:has(.site-home-page) {
 @media (max-width: 767px) {
   .app-mobile-bottom-nav-scroll-pad {
     padding-top: max(env(safe-area-inset-top, 0px), 12px);
-    padding-bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(2.125rem + env(safe-area-inset-bottom, 0px));
   }
 
   /* 상단 공통 크롬이 safe-area를 담당 — 본문 패딩은 회색 본문과 동일 상단만 */
@@ -3696,13 +4139,414 @@ button.secondary-button.ui-community-post-action-danger:hover,
   display: none !important;
 }
 
-/* PC 메인: 공지 바로 아래부터·창 하단(작업 표시줄 직전, svh)까지 — 모바일 UA 셸에는 미적용 */
-.site-shell.site-shell--pc-site-chrome .site-home-page--main .slide-deck-wrap .slide-deck {
-  --site-home-pc-slide-top: 10.75rem;
-  --site-home-pc-slide-bottom-guard: max(0.2rem, env(safe-area-inset-bottom, 0px));
-  min-height: 18rem;
-  height: calc(100svh - var(--site-home-pc-slide-top) - var(--site-home-pc-slide-bottom-guard));
-  max-height: calc(100svh - var(--site-home-pc-slide-top) - var(--site-home-pc-slide-bottom-guard));
+/*
+ * PC 공개 /site 홈: 공통 site-header·footer는 유지, 본문(.site-home-page--main)만 모바일 @media (max-width:767px) 규칙과 동형.
+ * 접두: .site-shell.site-shell--pc-site-chrome > .site-shell-pc-constrain > .site-shell-main > .site-home-page--main
+ */
+@media (min-width: 768px) {
+  html:has(.site-shell.site-shell--pc-site-chrome .site-home-page--main),
+  body:has(.site-shell.site-shell--pc-site-chrome .site-home-page--main) {
+    background-color: var(--ui-bg-page);
+  }
+
+  .site-shell.site-shell--pc-site-chrome > .site-shell-pc-constrain > .site-shell-main > .site-home-page--main {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  .site-shell.site-shell--pc-site-chrome > .site-shell-pc-constrain > .site-shell-main > .site-home-page--main.v3-page {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  .site-shell.site-shell--pc-site-chrome > .site-shell-pc-constrain > .site-shell-main > .site-home-page--main {
+    flex: 1 1 auto;
+    min-height: 0 !important;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --site-home-mobile-bottom-nav-slide-extra: var(--mobile-bottom-nav-height);
+    background-color: var(--ui-bg-page);
+    background-image: none;
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-main-mobile-dock-brand-placeholder {
+    display: block;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-shell-sticky-dock {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 85;
+    flex: 0 0 auto;
+    width: 100%;
+    min-height: 0;
+    height: auto;
+    pointer-events: none;
+    background: transparent;
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-shell-sticky-dock
+    > * {
+    pointer-events: auto;
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-top-white {
+    margin-left: 0;
+    margin-right: 0;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    min-height: 0;
+    height: 0;
+    padding: 0;
+    overflow: hidden;
+    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-top-white.site-home-top-white--main
+    .site-home-brand {
+    min-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-mobile-page-title-block {
+    min-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 0;
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-main-slide-logo-overlay {
+    position: absolute;
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 400;
+    pointer-events: none;
+    text-align: center;
+    width: max-content;
+    max-width: calc(100vw - 1.5rem);
+    height: auto;
+    background: transparent;
+    overflow: visible;
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-main-slide-logo-overlay
+    .site-main-logo {
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    opacity: 0.96;
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-main-slide-logo-overlay
+    .site-main-logo-name {
+    color: rgba(255, 255, 255, 0.96);
+    text-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.5),
+      0 0 1px rgba(0, 0, 0, 0.85);
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-main-notice-strip {
+    --site-home-main-notice-content-h: clamp(28px, 8.2vw, 32px);
+    --site-home-main-notice-content-top: calc(
+      env(safe-area-inset-top, 0px) + 12px + 0.72rem * 1.35 + 4px
+    );
+    position: fixed;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+    top: 0;
+    height: calc(var(--site-home-main-notice-content-top) + var(--site-home-main-notice-content-h));
+    z-index: 380;
+    pointer-events: none;
+    overflow: hidden;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-main-notice-strip__inner {
+    height: 100%;
+    min-height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: stretch;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.38);
+    overflow: hidden;
+    padding-top: 0;
+    padding-bottom: 0;
+    padding-left: max(0.45rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.45rem, env(safe-area-inset-right, 0px));
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-main-notice-strip__text {
+    display: inline-block;
+    flex: 0 0 auto;
+    align-self: flex-start;
+    max-width: none;
+    white-space: nowrap;
+    font-size: clamp(10px, 2.85vw, 12px);
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: #ffd54f;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+    animation: site-home-main-notice-marquee 18s linear infinite;
+    will-change: transform;
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-shell-scroll-body {
+    overflow-y: hidden;
+    overscroll-behavior: none;
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-shell {
+    flex: 1 1 auto;
+    min-height: 0 !important;
+    height: auto;
+    max-height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 0;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+    border-radius: 0 !important;
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-dark-main {
+    background-color: var(--site-home-bg-c);
+    background-image:
+      radial-gradient(ellipse 130% 52% at 50% -14%, rgba(255, 255, 255, 0.16) 0%, rgba(160, 190, 235, 0.07) 32%, transparent 60%),
+      linear-gradient(180deg, var(--site-home-bg-a) 0%, var(--site-home-bg-b) 52%, var(--site-home-bg-c) 100%);
+    padding-bottom: var(--site-home-bottom-nav-reserve);
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-dark-main::before {
+    opacity: 0.16;
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-slide-stack {
+    flex: 1 1 auto;
+    justify-content: flex-start;
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-main-slide-png-host {
+    position: relative;
+    z-index: 2;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 100%;
+    overflow: visible;
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-slide-stack,
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-slide-anchor {
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .slide-deck-wrap {
+    width: 100%;
+    max-width: min(100%, 520px);
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0;
+    align-items: center;
+    position: relative;
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .slide-deck-wrap
+    .slide-deck {
+    width: min(94vw, 492px);
+    max-width: min(94vw, 492px);
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
+    border-radius: 20px;
+    margin-top: 0;
+    min-height: 0;
+    height: calc(
+      (var(--slide-window-reference-height) * 1.2 + var(--slide-layer-padding-y)) * 1.3 *
+        var(--slide-window-height-scale) + var(--site-home-mobile-bottom-nav-slide-extra, var(--mobile-bottom-nav-height)) -
+        var(--site-home-slide-deck-trim-to-button-equator)
+    );
+    max-height: none;
+    padding-bottom: max(
+      16px,
+      calc(84px + 4.5rem + 16px - var(--site-home-slide-deck-trim-to-button-equator))
+    );
+    background-image: none;
+    background-color: var(--site-home-main-slide-deck-surface);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 16px 48px rgba(0, 0, 0, 0.38);
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .slide-deck-wrap
+    .slide-deck::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      rgba(7, 18, 36, 0.42) 0%,
+      rgba(7, 18, 36, 0.12) 18%,
+      transparent 42%
+    );
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-slide-stack
+    .slide-deck-wrap
+    .slide-deck {
+    filter:
+      drop-shadow(0 8px 30px rgba(0, 0, 0, 0.33)) drop-shadow(0 -4px 18px rgba(0, 0, 0, 0.07));
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-dark-main.site-home-dark-main--stack
+    .site-home-main-content-box
+    .site-home-slide-stack {
+    padding-top: 0;
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-dark-main
+    .site-home-cta-primary {
+    margin-bottom: 0.65rem !important;
+  }
+
 }
 
 /* PC 메인: 기존 CAROM 줄(.site-home-brand) 자리에 공지 한 줄 — 모바일 UA는 이 DOM 없음 */
@@ -4134,4 +4978,25 @@ a.secondary-button.site-venue-website-btn {
 .site-venue-detail-meta--address-preview {
   font-size: 0.82rem;
   color: var(--color-text-sub, #666666);
+}
+
+/*
+ * 메인(/site) 전용: 배경 단축·다른 소스가 덮어써도 청색 그라데이션이 이기지 못하도록
+ * 배경만 !important — viewport·UA·로드 순서와 무관하게 고정.
+ */
+.site-home-page--main .slide-deck-wrap .slide-deck {
+  background-color: var(--site-home-main-slide-deck-surface) !important;
+  background-image:
+    radial-gradient(ellipse 125% 50% at 50% -12%, rgba(255, 255, 255, 0.2) 0%, rgba(140, 180, 235, 0.22) 34%, transparent 58%),
+    linear-gradient(
+      180deg,
+      #3d62a0 0%,
+      #325882 18%,
+      var(--site-home-main-slide-deck-surface) 52%,
+      #243652 100%
+    ) !important;
+  background-repeat: no-repeat !important;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
 }

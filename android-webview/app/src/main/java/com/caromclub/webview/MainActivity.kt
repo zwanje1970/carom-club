@@ -2,17 +2,23 @@ package com.caromclub.webview
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.DownloadManager
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.SystemClock
 import android.provider.MediaStore
+import android.util.Log
 import android.webkit.CookieManager
 import android.webkit.GeolocationPermissions
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
+import android.webkit.URLUtil
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -63,6 +69,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    private val storageWriteLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
+
     private val fileChooserLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             val callback = filePathCallback ?: return@registerForActivityResult
@@ -105,6 +114,13 @@ class MainActivity : AppCompatActivity() {
         setContentView(webView)
 
         setupWebView()
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                storageWriteLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            }
+        }
         onBackPressedDispatcher.addCallback(this) {
             if (this@MainActivity::webView.isInitialized && webView.canGoBack()) {
                 webView.goBack()
@@ -113,6 +129,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        Log.i("CaromWebView", "loadUrl next — CaromPdfDownload must already be registered on webView")
         webView.loadUrl(resolveOpenUrl(intent))
 
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
@@ -153,6 +170,31 @@ class MainActivity : AppCompatActivity() {
 
         if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
             WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, false)
+        }
+
+        webView.addJavascriptInterface(PdfDownloadBridge(this), "CaromPdfDownload")
+        webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, contentLength ->
+            if (url.isNullOrBlank()) return@setDownloadListener
+            Log.d(
+                "CaromWebView",
+                "DownloadListener url=${url.take(120)} mime=$mimeType contentDisposition=$contentDisposition len=$contentLength",
+            )
+            if (url.startsWith("blob:")) {
+                return@setDownloadListener
+            }
+            if (!url.startsWith("http://") && !url.startsWith("https://")) return@setDownloadListener
+            try {
+                val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                val request = DownloadManager.Request(Uri.parse(url))
+                request.setMimeType(mimeType ?: "application/octet-stream")
+                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                val name = URLUtil.guessFileName(url, contentDisposition, mimeType)
+                val subPath = "${PdfDownloadStorage.FOLDER_NAME}/$name"
+                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, subPath)
+                dm.enqueue(request)
+            } catch (e: Exception) {
+                Log.e("CaromWebView", "DownloadManager enqueue failed", e)
+            }
         }
 
         webView.webViewClient =
@@ -228,6 +270,12 @@ class MainActivity : AppCompatActivity() {
                     )
                 }
             }
+
+        Log.i(
+            "CaromWebView",
+            "setupWebView: javaScriptEnabled=${settings.javaScriptEnabled}, " +
+                "JavascriptInterface CaromPdfDownload registered on this WebView before loadUrl",
+        )
     }
 
     private fun resolveOpenUrl(intent: Intent?): String {

@@ -1,10 +1,8 @@
-import Link from "next/link";
 import Script from "next/script";
 import type { Metadata } from "next";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { Suspense } from "react";
 import MainSceneSlideDeckClient from "./main-scene-slide-deck-client";
-import { SiteMainNavIcon } from "./main-nav-icon";
 import { getCommonPaletteColorHex, isCommonPaletteColor } from "../../lib/shared/common-color-palette";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../lib/auth/session";
 import {
@@ -17,7 +15,6 @@ import {
 } from "../../lib/surface-read";
 import { mergeTournamentAndAdSlideDeckItems } from "../../lib/site/main-slide-stream";
 import SiteShellFrame from "./components/SiteShellFrame";
-import { isPublicSiteMobileView } from "./components/SiteChromeHeader";
 import SiteMainLogo from "./components/SiteMainLogo";
 import VenuesDistanceNavLink from "./components/VenuesDistanceNavLink";
 import SitePublicLoadingShell from "./components/SitePublicLoadingShell";
@@ -374,21 +371,6 @@ async function SiteHomePageContent({
     return null;
   };
   const tournamentTitleEntry = findTitleBefore(tournamentSlideEntry?.block.id);
-  const fixedMainButtons = [
-    { label: "대회안내", href: "/site/tournaments" },
-    { label: "주변클럽", href: "/site/venues" },
-    { label: "커뮤니티", href: "/site/community" },
-    { label: "마이페이지", href: "/site/mypage" },
-  ];
-  const mainNavVariants: Record<
-    (typeof fixedMainButtons)[number]["label"],
-    "tournament" | "venue" | "community" | "user"
-  > = {
-    대회안내: "tournament",
-    주변클럽: "venue",
-    커뮤니티: "community",
-    마이페이지: "user",
-  };
   const tournamentSlideDeckItems = mainSlideSnapshots.map((snapshot) => ({
     type: "tournament" as const,
     linkType: "internal" as const,
@@ -421,21 +403,8 @@ async function SiteHomePageContent({
   );
   /** 공지: 플랫폼에서 활성화 ON이고 문구가 있을 때만 메인(PC·모바일)에 표시 */
   const showSiteNoticeBar = Boolean(siteNotice.enabled) && siteNotice.text.trim().length > 0;
-  const headerStore = await headers();
-  const isMobileSiteUa = isPublicSiteMobileView(headerStore);
-  /** PC: 청 헤더 아래 흰/남색 줄은 CAROM 대신 공지 한 줄. 모바일 메인: 로고는 도크가 아니라 슬라이드창 오버레이(`.site-home-main-slide-logo-overlay`). */
-  const homeBrandTitle =
-    isMobileSiteUa ? (
-      <span className="site-home-main-mobile-dock-brand-placeholder" aria-hidden="true" />
-    ) : showSiteNoticeBar ? (
-      <div className="site-home-pc-notice-in-brand" aria-live="polite">
-        <div className="site-home-pc-notice-in-brand__bar">
-          <span className="site-home-pc-notice-in-brand__text">{siteNotice.text.trim()}</span>
-        </div>
-      </div>
-    ) : (
-      <span className="site-home-pc-brand-empty" aria-hidden="true" />
-    );
+  /** 메인: 모바일과 동일 — 셸 브랜드 줄은 비우고 공지는 상단 띠·로고는 슬라이드 오버레이(PC 포함). */
+  const homeBrandTitle = <span className="site-home-main-mobile-dock-brand-placeholder" aria-hidden="true" />;
 
   return (
     <SiteShellFrame
@@ -527,97 +496,56 @@ async function SiteHomePageContent({
           <div className="site-home-main-content-box">
             <section className="v3-stack site-home-slide-stack site-home-slide-stack--flush" style={{ gap: 0 }}>
               <div className="site-home-main-slide-png-host">
-                {isMobileSiteUa ? (
-                  <div className="site-home-main-slide-logo-overlay">
-                    <SiteMainLogo />
-                  </div>
-                ) : null}
-                {isMobileSiteUa ? (
-                  <div
-                    className="site-home-main-notice-strip"
-                    aria-live={showSiteNoticeBar ? "polite" : undefined}
-                    role={showSiteNoticeBar ? "status" : undefined}
-                    aria-hidden={showSiteNoticeBar ? undefined : "true"}
-                  >
-                    <div className="site-home-main-notice-strip__inner">
-                      {showSiteNoticeBar ? (
-                        <span className="site-home-main-notice-strip__text">{siteNotice.text.trim()}</span>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
-                <section
-                  className="site-home-slide-anchor"
-                  data-section-id={tournamentSlideEntry?.sectionId ?? "section-tournament-forced"}
-                  data-block-id={tournamentSlideEntry?.block.id ?? "block-tournament-forced"}
-                  data-title-section-id={tournamentTitleEntry?.sectionId ?? tournamentSlideEntry?.sectionId}
-                  data-title-block-id={tournamentTitleEntry?.block.id}
+                <div className="site-home-main-slide-logo-overlay">
+                  <SiteMainLogo />
+                </div>
+                <div
+                  className="site-home-main-notice-strip"
+                  aria-live={showSiteNoticeBar ? "polite" : undefined}
+                  role={showSiteNoticeBar ? "status" : undefined}
+                  aria-hidden={showSiteNoticeBar ? undefined : "true"}
                 >
-                  <MainSceneSlideDeckClient
-                    items={liveSlideItems}
-                    sectionLabel={tournamentTitleEntry?.block.data.text?.trim() ?? ""}
-                    incomingFromBottomUi={isMobileSiteUa}
-                    homeBottomOverlay={
-                      <>
-                        <a href="/site/tournaments" className="main-button" aria-label="대회안내">
-                          <img src="/images/buttons/btn-main-1.png" alt="" decoding="async" />
-                          <span>대회안내</span>
-                        </a>
-                        <VenuesDistanceNavLink href="/site/venues" className="main-button" aria-label="주변클럽">
-                          <img src="/images/buttons/btn-main-2.png" alt="" decoding="async" />
-                          <span>주변클럽</span>
-                        </VenuesDistanceNavLink>
-                        <a href="/site/community" className="main-button" aria-label="커뮤니티">
-                          <img src="/images/buttons/btn-main-3.png" alt="" decoding="async" />
-                          <span>커뮤니티</span>
-                        </a>
-                      </>
-                    }
-                  />
-                </section>
-              </div>
-            </section>
-
-            {/* TEMP_PNG_MAIN_BUTTONS — 원복: (1) 아래 임시 <section> 블록 삭제 (2) #main-buttons 에서 site-home-nav-grid--tempPngHidden 제거 (3) globals.css 의 TEMP_PNG_MAIN_BUTTONS 블록 삭제 */}
-            <section
-              id="main-buttons"
-              className="site-home-nav-grid site-home-nav-grid--tempPngHidden"
-              style={{
-                width: "100%",
-                display: "grid",
-                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-              }}
-            >
-              {fixedMainButtons.map((row) => {
-                const tileStyle = {
-                  textDecoration: "none" as const,
-                  color: "inherit",
-                  textAlign: "center" as const,
-                  minHeight: "3.35rem",
-                };
-                const inner = (
-                  <>
-                    <span className="site-home-nav-icon">
-                      <SiteMainNavIcon variant={mainNavVariants[row.label]} />
-                    </span>
-                    <span className="site-home-nav-label">{row.label}</span>
-                  </>
-                );
-                return row.label === "주변클럽" ? (
-                  <VenuesDistanceNavLink
-                    key={`fixed-main-nav-${row.label}`}
-                    href={row.href}
-                    className="site-home-nav-tile"
-                    style={tileStyle}
+                  <div className="site-home-main-notice-strip__inner">
+                    {showSiteNoticeBar ? (
+                      <span className="site-home-main-notice-strip__text">{siteNotice.text.trim()}</span>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="site-home-main-slide-deck-stack">
+                  <section
+                    className="site-home-slide-anchor"
+                    data-section-id={tournamentSlideEntry?.sectionId ?? "section-tournament-forced"}
+                    data-block-id={tournamentSlideEntry?.block.id ?? "block-tournament-forced"}
+                    data-title-section-id={tournamentTitleEntry?.sectionId ?? tournamentSlideEntry?.sectionId}
+                    data-title-block-id={tournamentTitleEntry?.block.id}
                   >
-                    {inner}
-                  </VenuesDistanceNavLink>
-                ) : (
-                  <Link key={`fixed-main-nav-${row.label}`} href={row.href} className="site-home-nav-tile" style={tileStyle}>
-                    {inner}
-                  </Link>
-                );
-              })}
+                    <MainSceneSlideDeckClient
+                      items={liveSlideItems}
+                      sectionLabel={tournamentTitleEntry?.block.data.text?.trim() ?? ""}
+                      incomingFromBottomUi
+                    />
+                  </section>
+                  <div className="site-home-main-png-shelf-instack">
+                    <section
+                      className="site-home-main-png-buttons-temp site-home-main-png-buttons-in-shelf temp-png-button-tuning"
+                      aria-label="메인 바로가기(임시 PNG)"
+                    >
+                      <a href="/site/tournaments" className="main-button" aria-label="대회안내">
+                        <img src="/images/buttons/btn-main-1.png" alt="" decoding="async" />
+                        <span>대회안내</span>
+                      </a>
+                      <VenuesDistanceNavLink href="/site/venues" className="main-button" aria-label="주변클럽">
+                        <img src="/images/buttons/btn-main-2.png" alt="" decoding="async" />
+                        <span>주변클럽</span>
+                      </VenuesDistanceNavLink>
+                      <a href="/site/community" className="main-button" aria-label="커뮤니티">
+                        <img src="/images/buttons/btn-main-3.png" alt="" decoding="async" />
+                        <span>커뮤니티</span>
+                      </a>
+                    </section>
+                  </div>
+                </div>
+              </div>
             </section>
           </div>
         </section>

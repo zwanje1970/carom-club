@@ -4,21 +4,17 @@ import Link from "next/link";
 import { parseCommunityBoardTypeParam } from "../../../../lib/community-board-params";
 import { getSiteCommunityConfig, listCommunityPosts } from "../../../../lib/surface-read";
 import type { SiteCommunityBoardKey } from "../../../../lib/types/entities";
-import { COMMUNITY_PRIMARY_TAB_LABEL, communityTabLabelForBoard } from "../community-tab-config";
+import {
+  communityBoardListHref,
+  communityNavTabsFromConfig,
+  communityTabLabelForBoard,
+} from "../community-tab-config";
 import CommunityBoardPostList from "../CommunityBoardPostList";
 import CommunityBoardSearchForm from "../CommunityBoardSearchForm";
 import CommunityBoardTabs from "../CommunityBoardTabs";
 import CommunityBoardSwipeShell from "../CommunityBoardSwipeShell";
 import SiteShellFrame from "../../components/SiteShellFrame";
 import SiteListPageSkeleton from "../../components/SiteListPageSkeleton";
-
-const DEFAULT_COMMUNITY_TAB_ITEMS = [
-  { key: "all" as const, label: "전체", href: "/site/community" },
-  { key: "free" as const, label: COMMUNITY_PRIMARY_TAB_LABEL.free, href: "/site/community/free" },
-  { key: "qna" as const, label: COMMUNITY_PRIMARY_TAB_LABEL.qna, href: "/site/community/qna" },
-  { key: "reviews" as const, label: COMMUNITY_PRIMARY_TAB_LABEL.reviews, href: "/site/community/review" },
-  { key: "extra1" as const, label: "구인구직", href: "/site/community/jobs" },
-];
 
 type Props = {
   params: Promise<{ boardType: string }>;
@@ -38,6 +34,7 @@ export default async function SiteCommunityBoardListPage({ params, searchParams 
   const board = config[boardType];
   if (!board.visible) notFound();
   const listBoardLabel = communityTabLabelForBoard(boardType, config);
+  const navTabs = communityNavTabsFromConfig(config);
 
   return (
     <SiteShellFrame
@@ -45,9 +42,9 @@ export default async function SiteCommunityBoardListPage({ params, searchParams 
       auxiliaryBarClassName="site-shell-controls--site-list"
       auxiliary={
         <div className="ui-community-shell-context v3-stack" data-community-board={boardType}>
-          <CommunityBoardTabs tabs={DEFAULT_COMMUNITY_TAB_ITEMS} currentKey={boardType} />
+          <CommunityBoardTabs tabs={navTabs} currentKey={boardType} />
           <CommunityBoardSearchForm
-            actionPath={`/site/community/${boardType === "reviews" ? "review" : boardType === "extra1" ? "jobs" : boardType}`}
+            actionPath={communityBoardListHref(boardType)}
             inputId={`community-q-${boardType}`}
             defaultQuery={q}
           />
@@ -58,7 +55,7 @@ export default async function SiteCommunityBoardListPage({ params, searchParams 
         <header className="ui-community-context-head">
           <p className="ui-community-context-head-label">{listBoardLabel}</p>
         </header>
-        <CommunityBoardSwipeShell tabs={DEFAULT_COMMUNITY_TAB_ITEMS.map(({ key, href }) => ({ key, href }))}>
+        <CommunityBoardSwipeShell tabs={navTabs.map(({ key, href }) => ({ key, href }))}>
           <Suspense
             fallback={
               <SiteListPageSkeleton brandTitle="커뮤니티" auxiliaryLabel="게시글 목록을 불러오는 중입니다." listRows={5} />
@@ -68,7 +65,7 @@ export default async function SiteCommunityBoardListPage({ params, searchParams 
           </Suspense>
         </CommunityBoardSwipeShell>
         <Link
-          href={`/site/community/${boardType === "reviews" ? "review" : boardType === "extra1" ? "jobs" : boardType}/write`}
+          href={`${communityBoardListHref(boardType)}/write`}
           className="community-write-fab"
           aria-label={`${boardType} 글쓰기`}
         >

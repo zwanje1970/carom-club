@@ -70,7 +70,58 @@ function bracketPdfLayoutType(style: BracketStyle): "tree" | "center" {
   return style === "TREE" ? "tree" : "center";
 }
 
-type PdfDownloadStatus = "idle" | "ready" | "downloading" | "done" | "failed";
+type PdfDownloadStatus = "idle" | "ready" | "downloading" | "started" | "failed";
+
+/** Android 앱 WebView: MainActivity 에서 주입하는 PDF 저장 브리지 */
+type CaromPdfDownloadBridge = {
+  savePdfBase64: (base64: string, fileName: string) => void;
+};
+
+type PdfDownloadChannel = "none" | "android" | "anchor";
+
+function logCaromPdfBridgeProbe(): void {
+  if (typeof window === "undefined") return;
+  const w = window as unknown as { CaromPdfDownload?: unknown };
+  const raw = w.CaromPdfDownload;
+  const saveFn =
+    raw != null && typeof raw === "object" && "savePdfBase64" in raw
+      ? (raw as { savePdfBase64?: unknown }).savePdfBase64
+      : undefined;
+  console.info("[blank-bracket-print] CaromPdfDownload probe", {
+    windowCaromPdfDownloadExists: raw !== undefined && raw !== null,
+    typeofCaromPdfDownload: typeof raw,
+    savePdfBase64Exists: typeof saveFn === "function",
+  });
+}
+
+function getCaromPdfDownloadBridge(): CaromPdfDownloadBridge | undefined {
+  if (typeof window === "undefined") return undefined;
+  const w = window as unknown as { CaromPdfDownload?: CaromPdfDownloadBridge };
+  const raw = w.CaromPdfDownload;
+  if (raw == null) return undefined;
+  if (typeof raw.savePdfBase64 !== "function") return undefined;
+  return raw;
+}
+
+function pdfBlobUrlToBase64(blobUrl: string): Promise<{ base64: string; blobSize: number }> {
+  return fetch(blobUrl)
+    .then((r) => r.blob())
+    .then(
+      (blob) =>
+        new Promise<{ base64: string; blobSize: number }>((resolve, reject) => {
+          const blobSize = blob.size;
+          const fr = new FileReader();
+          fr.onload = () => {
+            const dataUrl = fr.result as string;
+            const comma = dataUrl.indexOf(",");
+            const base64 = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
+            resolve({ base64, blobSize });
+          };
+          fr.onerror = () => reject(fr.error);
+          fr.readAsDataURL(blob);
+        }),
+    );
+}
 
 export default function BlankBracketPrintClient() {
   const [matchType,    setMatchType]    = useState<MatchType>("NORMAL");
@@ -85,6 +136,8 @@ export default function BlankBracketPrintClient() {
   const [pdfDownloadUrl, setPdfDownloadUrl] = useState<string | null>(null);
   const [pdfDownloadName, setPdfDownloadName] = useState("대진표.pdf");
   const [pdfDownloadStatus, setPdfDownloadStatus] = useState<PdfDownloadStatus>("idle");
+  const [pdfDownloadChannel, setPdfDownloadChannel] = useState<PdfDownloadChannel>("none");
+  const [pdfDownloadConfirmDone, setPdfDownloadConfirmDone] = useState(false);
   const [pdfDownloadModalOpen, setPdfDownloadModalOpen] = useState(false);
   const [downloadStartToast, setDownloadStartToast] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -320,6 +373,8 @@ export default function BlankBracketPrintClient() {
       pdfDownloadUrlRef.current = nextUrl;
       setPdfDownloadUrl(nextUrl);
       setPdfDownloadName(nextName);
+      setPdfDownloadChannel("none");
+      setPdfDownloadConfirmDone(false);
       setPdfDownloadStatus("ready");
       console.info("[blank-bracket-print] PDF blob url ready");
     } catch (error) {
@@ -334,8 +389,12 @@ export default function BlankBracketPrintClient() {
 
   const handlePdfDownload = useCallback(() => {
     if (!pdfDownloadUrl) {
+      console.warn("[blank-bracket-print] handlePdfDownload skipped: no pdfDownloadUrl");
       setPdfDownloadStatus("failed");
       return;
+    }
+    if (!pdfDownloadUrl.startsWith("blob:")) {
+      console.warn("[blank-bracket-print] handlePdfDownload: unexpected href (not blob:)", pdfDownloadUrl.slice(0, 48));
     }
     try {
       if (pdfDownloadDoneTimerRef.current != null) {
@@ -343,20 +402,62 @@ export default function BlankBracketPrintClient() {
         pdfDownloadDoneTimerRef.current = null;
       }
       setPdfDownloadStatus("downloading");
+      logCaromPdfBridgeProbe();
+
+      const bridge = getCaromPdfDownloadBridge();
+      if (bridge && pdfDownloadUrl.startsWith("blob:")) {
+        console.info("[blank-bracket-print] handlePdfDownload: using Android bridge savePdfBase64", {
+          fileName: pdfDownloadName,
+        });
+        void pdfBlobUrlToBase64(pdfDownloadUrl)
+          .then(({ base64, blobSize }) => {
+            console.info("[blank-bracket-print] before savePdfBase64", {
+              fileName: pdfDownloadName,
+              blobSize,
+              base64Length: base64.length,
+            });
+            bridge.savePdfBase64(base64, pdfDownloadName);
+            console.info("[blank-bracket-print] after savePdfBase64 (native returns void)", {
+              fileName: pdfDownloadName,
+              base64Length: base64.length,
+            });
+            setPdfDownloadChannel("android");
+            pdfDownloadDoneTimerRef.current = window.setTimeout(() => {
+              setPdfDownloadStatus("started");
+              pdfDownloadDoneTimerRef.current = null;
+            }, 800);
+          })
+          .catch((error) => {
+            console.error("[blank-bracket-print] PDF blob→base64 failed", error);
+            setPdfDownloadConfirmDone(false);
+            setPdfDownloadStatus("failed");
+          });
+        return;
+      }
+
+      console.info("[blank-bracket-print] handlePdfDownload: bridge absent or invalid — fallback <a download>", {
+        name: pdfDownloadName,
+        hrefPrefix: pdfDownloadUrl.slice(0, 24),
+      });
       const a = document.createElement("a");
       a.href = pdfDownloadUrl;
       a.download = pdfDownloadName;
+      a.setAttribute("download", pdfDownloadName);
       a.rel = "noopener";
       a.style.display = "none";
       document.body.appendChild(a);
       a.click();
-      a.remove();
+      window.setTimeout(() => {
+        if (a.parentNode) a.remove();
+      }, 250);
+      setPdfDownloadChannel("anchor");
       pdfDownloadDoneTimerRef.current = window.setTimeout(() => {
-        setPdfDownloadStatus("done");
+        setPdfDownloadStatus("started");
         pdfDownloadDoneTimerRef.current = null;
       }, 1200);
     } catch (error) {
       console.error("[blank-bracket-print] PDF download failed", error);
+      setPdfDownloadConfirmDone(false);
       setPdfDownloadStatus("failed");
     }
   }, [pdfDownloadName, pdfDownloadUrl]);
@@ -387,16 +488,18 @@ export default function BlankBracketPrintClient() {
 
   const previewStageIsZoomed = previewScale > previewFitScale + 0.001;
   const pdfDownloadButtonLabel =
-    pdfDownloadStatus === "downloading"
-      ? "다운로드 중..."
-      : pdfDownloadStatus === "done"
-        ? "다운로드 완료"
+    pdfDownloadConfirmDone
+      ? "닫기"
+      : pdfDownloadStatus === "downloading"
+        ? "다운로드 중..."
         : pdfDownloadStatus === "failed"
-          ? "다운로드 다시 시도"
-          : "PDF 다운로드";
+            ? "다운로드 다시 시도"
+            : "PDF 다운로드";
   const pdfDownloadStatusText =
-    pdfDownloadStatus === "done"
-      ? "다운로드 완료 또는 파일 앱을 확인하세요."
+    pdfDownloadStatus === "started"
+      ? pdfDownloadChannel === "anchor"
+        ? "다운로드를 요청했습니다. 파일 앱 또는 다운로드 목록을 확인하세요."
+        : "다운로드를 시작했습니다. 파일 앱 또는 다운로드 목록을 확인하세요."
       : pdfDownloadStatus === "downloading"
         ? "다운로드 중..."
         : pdfDownloadStatus === "failed"
@@ -784,6 +887,10 @@ export default function BlankBracketPrintClient() {
                   className="ui-btn-primary-solid"
                   disabled={pdfDownloadStatus === "downloading"}
                   onClick={() => {
+                    if (pdfDownloadConfirmDone) {
+                      setPdfDownloadModalOpen(false);
+                      return;
+                    }
                     console.info("download button clicked → open confirm modal");
                     setPdfDownloadModalOpen(true);
                   }}
@@ -852,6 +959,7 @@ export default function BlankBracketPrintClient() {
                     className="ui-btn-primary-solid"
                     onClick={() => {
                       setPdfDownloadModalOpen(false);
+                      setPdfDownloadConfirmDone(true);
                       handlePdfDownload();
                       setDownloadStartToast(true);
                       window.setTimeout(() => setDownloadStartToast(false), 2600);
@@ -889,7 +997,7 @@ export default function BlankBracketPrintClient() {
                 boxSizing: "border-box",
               }}
             >
-              다운로드가 시작되었습니다.
+              다운로드를 시작했습니다. 파일 앱 또는 다운로드 목록을 확인하세요.
             </div>,
             document.body,
           )
