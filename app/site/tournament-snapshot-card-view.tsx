@@ -8,6 +8,11 @@ import styles from "./tournament-slide-card-previews.module.css";
 export type { TournamentPostStatus };
 
 export type SlideDeckItem = {
+  /** 없거나 tournament면 대회 카드(기본) */
+  type?: "tournament" | "ad";
+  linkType?: "internal" | "external";
+  /** type === "ad"일 때 집계용 id */
+  mainSlideAdId?: string;
   snapshotId: string;
   title: string;
   subtitle: string;
@@ -85,24 +90,35 @@ function MediaStack({
   children,
   badge,
   repImageHighPriority,
+  slideDeckSolidBackdrop,
+  showAdBadge,
 }: {
   variant: SlidePreviewVariant;
   item: TournamentSlidePreviewItem;
   children: ReactNode;
   badge: ReactNode;
   repImageHighPriority?: boolean;
+  /** 메인 슬라이드: 링크 배경 이미지 대신 단색(구분용) */
+  slideDeckSolidBackdrop?: string;
+  /** type === "ad" 인 슬라이드 카드에만 AD 표시 */
+  showAdBadge?: boolean;
 }) {
+  const solid = slideDeckSolidBackdrop?.trim();
   const cssBg = item.mediaBackground?.trim();
-  const imgUrl = item.image320Url?.trim();
+  const imgUrl = solid ? undefined : item.image320Url?.trim();
   const overlayBlend = Boolean(imgUrl) && item.imageOverlayBlend !== false;
   const overlayOpacity = Math.min(1, Math.max(0.15, item.imageOverlayOpacity ?? 0.78));
-  const paintClass = [styles.mediaPaint, variant === "frame" && !cssBg ? styles.mediaPaintFrameDefault : ""]
+  const paintBg = solid ?? cssBg;
+  const paintClass = [
+    styles.mediaPaint,
+    variant === "frame" && !paintBg ? styles.mediaPaintFrameDefault : "",
+  ]
     .filter(Boolean)
     .join(" ");
 
   return (
     <div className={styles.media}>
-      <div className={paintClass} style={cssBg ? { background: cssBg } : undefined} aria-hidden />
+      <div className={paintClass} style={paintBg ? { background: paintBg } : undefined} aria-hidden />
       {imgUrl ? (
         <img
           className={styles.bg}
@@ -115,6 +131,11 @@ function MediaStack({
         />
       ) : null}
       <div className={styles.statusBadgeWrap}>{badge}</div>
+      {showAdBadge ? (
+        <span className={styles.mainSlideAdBadge} aria-hidden>
+          AD
+        </span>
+      ) : null}
       {children}
     </div>
   );
@@ -127,6 +148,8 @@ function TournamentSlideCardPreview({
   slideDeck,
   templateCardLayout,
   repImageHighPriority,
+  slideDeckSolidBackdrop,
+  showAdBadge,
 }: {
   item: TournamentSlidePreviewItem;
   variant: SlidePreviewVariant;
@@ -135,6 +158,9 @@ function TournamentSlideCardPreview({
   /** 템플릿 TournamentPostCard + SlideDeck 카드 규격(작성 미리보기·슬라이드 공통) */
   templateCardLayout?: boolean;
   repImageHighPriority?: boolean;
+  slideDeckSolidBackdrop?: string;
+  /** SlideDeckItem.type === "ad" 일 때만 true */
+  showAdBadge?: boolean;
 }) {
   const status = toStatus(item.statusBadge);
   const parsed = parseSubtitle(item.subtitle);
@@ -154,7 +180,14 @@ function TournamentSlideCardPreview({
   if (variant === "classic") {
     return (
       <article className={rootClass}>
-        <MediaStack variant="classic" item={item} badge={statusBadge} repImageHighPriority={repImageHighPriority}>
+        <MediaStack
+          variant="classic"
+          item={item}
+          badge={statusBadge}
+          repImageHighPriority={repImageHighPriority}
+          slideDeckSolidBackdrop={slideDeckSolidBackdrop}
+          showAdBadge={showAdBadge}
+        >
           <div className={styles.classicInner}>
             <div className={styles.classicTop}>
               <div className={styles.classicMain}>
@@ -177,7 +210,14 @@ function TournamentSlideCardPreview({
   if (variant === "frame") {
     return (
       <article className={rootClass}>
-        <MediaStack variant="frame" item={item} badge={statusBadge} repImageHighPriority={repImageHighPriority}>
+        <MediaStack
+          variant="frame"
+          item={item}
+          badge={statusBadge}
+          repImageHighPriority={repImageHighPriority}
+          slideDeckSolidBackdrop={slideDeckSolidBackdrop}
+          showAdBadge={showAdBadge}
+        >
           <div className={styles.frameInner}>
             <div className={styles.frameCenter}>
               {lead ? <p className={styles.frameLead}>{lead}</p> : null}
@@ -199,20 +239,32 @@ function TournamentSlideCardPreview({
   return _exhaustive;
 }
 
+export function reportMainSlideAdMetric(adId: string, metric: "impressions" | "clicks"): void {
+  void fetch("/api/site/main-slide-ad-metrics", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ adId, metric }),
+    keepalive: metric === "clicks",
+  }).catch(() => {});
+}
+
 export function TournamentSnapshotCardView({
   item,
   slideDeck = false,
   templateCardLayout = false,
   repImageHighPriority,
+  slideDeckSolidBackdrop,
 }: {
   item: SlideDeckItem;
   slideDeck?: boolean;
   templateCardLayout?: boolean;
   repImageHighPriority?: boolean;
+  slideDeckSolidBackdrop?: string;
 }) {
   const previewItem = slideDeckItemToPreviewItem(item);
   const variant: SlidePreviewVariant = item.cardTemplate === "B" ? "frame" : "classic";
   const href = (item.targetDetailUrl ?? "").trim();
+  const isExternal = item.type === "ad" || item.linkType === "external" || /^https?:\/\//i.test(href);
   const inner = (
     <TournamentSlideCardPreview
       item={previewItem}
@@ -220,9 +272,36 @@ export function TournamentSnapshotCardView({
       slideDeck={slideDeck}
       templateCardLayout={templateCardLayout}
       repImageHighPriority={repImageHighPriority}
+      slideDeckSolidBackdrop={slideDeckSolidBackdrop}
+      showAdBadge={item.type === "ad"}
     />
   );
   if (!href) return inner;
+  if (isExternal) {
+    const adId = item.mainSlideAdId?.trim() ?? "";
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-main-slide-external="1"
+        aria-label={item.title?.trim() ? `${item.title.trim()} 바로가기` : "광고 바로가기"}
+        onClick={() => {
+          if (adId) reportMainSlideAdMetric(adId, "clicks");
+        }}
+        style={{
+          display: "block",
+          width: "100%",
+          maxWidth: "100%",
+          textDecoration: "none",
+          color: "inherit",
+          WebkitTapHighlightColor: "transparent",
+        }}
+      >
+        {inner}
+      </a>
+    );
+  }
   return (
     <Link
       href={href}
@@ -241,12 +320,23 @@ export function TournamentSnapshotCardView({
   );
 }
 
+/** 메인 슬라이드 카드 구분용 배경(이미지 없음) — 색상만으로 5슬롯 구분 */
+export const SLIDE_DECK_SOLID_BACKDROPS = [
+  "#1a4d6e",
+  "#6b2d42",
+  "#0d5c45",
+  "#4a3482",
+  "#6b4a12",
+] as const;
+
 export function SlideDeckCard({
   item,
   repImageHighPriority,
+  slideDeckSolidBackdrop,
 }: {
   item: SlideDeckItem;
   repImageHighPriority?: boolean;
+  slideDeckSolidBackdrop?: string;
 }) {
   return (
     <TournamentSnapshotCardView
@@ -254,6 +344,7 @@ export function SlideDeckCard({
       slideDeck
       templateCardLayout
       repImageHighPriority={repImageHighPriority}
+      slideDeckSolidBackdrop={slideDeckSolidBackdrop}
     />
   );
 }

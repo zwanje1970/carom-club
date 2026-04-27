@@ -22,6 +22,9 @@ export default function PlatformSitePage() {
         <li>
           <Link href="/platform/site/community">커뮤니티 설정</Link>
         </li>
+        <li>
+          <Link href="/platform/main-slide-ads">메인 슬라이드 광고</Link>
+        </li>
       </ul>
     </main>
   );

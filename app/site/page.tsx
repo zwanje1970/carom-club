@@ -13,7 +13,9 @@ import {
   getSitePageBuilderPublishedByPageId,
   getUserById,
   listTournamentSnapshotsForMainSite,
+  getMainSlideAdSettingsForSite,
 } from "../../lib/surface-read";
+import { mergeTournamentAndAdSlideDeckItems } from "../../lib/site/main-slide-stream";
 import SiteShellFrame from "./components/SiteShellFrame";
 import { isPublicSiteMobileView } from "./components/SiteChromeHeader";
 import SiteMainLogo from "./components/SiteMainLogo";
@@ -330,12 +332,13 @@ async function SiteHomePageContent({
   const currentUser = session ? await getUserById(session.userId) : null;
   const canUseDraftPreview = previewMode ? Boolean(currentUser && currentUser.role === "PLATFORM") : false;
 
-  const [publishedPage, mainSlideSnapshots, siteNotice] = await Promise.all([
+  const [publishedPage, mainSlideSnapshots, siteNotice, mainSlideAdSettings] = await Promise.all([
     canUseDraftPreview
       ? getSitePageBuilderDraftByPageId(requestedPageId)
       : getSitePageBuilderPublishedByPageId(requestedPageId),
     listTournamentSnapshotsForMainSite(),
     getSiteNotice().catch(() => ({ enabled: false, text: "" })),
+    getMainSlideAdSettingsForSite(),
   ]);
 
   const sections = publishedPage
@@ -386,7 +389,9 @@ async function SiteHomePageContent({
     커뮤니티: "community",
     마이페이지: "user",
   };
-  const liveSlideItems = mainSlideSnapshots.map((snapshot) => ({
+  const tournamentSlideDeckItems = mainSlideSnapshots.map((snapshot) => ({
+    type: "tournament" as const,
+    linkType: "internal" as const,
     snapshotId: snapshot.snapshotId,
     title: snapshot.title,
     subtitle: snapshot.subtitle,
@@ -409,14 +414,19 @@ async function SiteHomePageContent({
       ? { imageOverlayOpacity: snapshot.tournamentImageOverlayOpacity }
       : {}),
   }));
+  const liveSlideItems = mergeTournamentAndAdSlideDeckItems(
+    tournamentSlideDeckItems,
+    mainSlideAdSettings.activeAds,
+    mainSlideAdSettings.config,
+  );
   /** 공지 문구가 있으면 슬라이드 상단 바 표시(enabled만 켤 때 빠지는 경우 복구) */
   const showSiteNoticeBar = siteNotice.text.trim().length > 0;
   const headerStore = await headers();
   const isMobileSiteUa = isPublicSiteMobileView(headerStore);
-  /** PC: 청 헤더 아래 흰/남색 줄은 CAROM 대신 공지 한 줄(모바일은 기존 로고 줄 유지). */
+  /** PC: 청 헤더 아래 흰/남색 줄은 CAROM 대신 공지 한 줄. 모바일 메인: 로고는 도크가 아니라 슬라이드창 오버레이(`.site-home-main-slide-logo-overlay`). */
   const homeBrandTitle =
     isMobileSiteUa ? (
-      <SiteMainLogo />
+      <span className="site-home-main-mobile-dock-brand-placeholder" aria-hidden="true" />
     ) : showSiteNoticeBar ? (
       <div className="site-home-pc-notice-in-brand" aria-live="polite">
         <div className="site-home-pc-notice-in-brand__bar">
@@ -517,6 +527,18 @@ async function SiteHomePageContent({
           <div className="site-home-main-content-box">
             <section className="v3-stack site-home-slide-stack site-home-slide-stack--flush" style={{ gap: 0 }}>
               <div className="site-home-main-slide-png-host">
+                {isMobileSiteUa ? (
+                  <div className="site-home-main-slide-logo-overlay">
+                    <SiteMainLogo />
+                  </div>
+                ) : null}
+                {isMobileSiteUa && showSiteNoticeBar ? (
+                  <div className="site-home-main-notice-strip" aria-live="polite" role="status">
+                    <div className="site-home-main-notice-strip__inner">
+                      <span className="site-home-main-notice-strip__text">{siteNotice.text.trim()}</span>
+                    </div>
+                  </div>
+                ) : null}
                 <section
                   className="site-home-slide-anchor"
                   data-section-id={tournamentSlideEntry?.sectionId ?? "section-tournament-forced"}
@@ -527,7 +549,7 @@ async function SiteHomePageContent({
                   <MainSceneSlideDeckClient
                     items={liveSlideItems}
                     sectionLabel={tournamentTitleEntry?.block.data.text?.trim() ?? ""}
-                    siteNoticeText={showSiteNoticeBar && isMobileSiteUa ? siteNotice.text.trim() : undefined}
+                    incomingFromBottomUi={isMobileSiteUa}
                   />
                 </section>
                 <section

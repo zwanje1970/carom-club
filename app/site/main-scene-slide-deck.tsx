@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -12,25 +13,35 @@ import {
 import { useRouter } from "next/navigation";
 import "./slide-deck-template.css";
 import styles from "./main-scene-slide-deck.module.css";
-import { SlideDeckCard, type SlideDeckItem } from "./tournament-slide-card";
+import {
+  SLIDE_DECK_SOLID_BACKDROPS,
+  SlideDeckCard,
+  reportMainSlideAdMetric,
+  type SlideDeckItem,
+} from "./tournament-slide-card";
 
 export type { SlideDeckItem };
 
 /**
- * 다음 카드가 올라오며 겹치기 시작할 때부터 이전(중앙) 카드 후퇴를 시작한다.
- * CENTER_HOLD_S < INCOMING_DELAY + INCOMING_RISE 이므로 상승이 끝나기 전에 후퇴가 시작됨.
- * TIMELINE_SCALE 로 상승·후퇴·대기 구간을 같은 비율로 늘린다.
- * (carom-postcard-template-test/src/components/SlideDeck.tsx 와 동일)
+ * 타이밍(초): 출발 대기 → 상승, 가운데 정지, 후퇴가 같은 장면 시계에서 겹쳐 진행.
+ * CENTER_HOLD_S < INCOMING_DELAY + INCOMING_RISE 이면 상승이 끝나기 전에 후퇴가 시작됨.
  */
 const TIMELINE_SCALE = 1.2;
 
-const INCOMING_RISE_S = 4 * TIMELINE_SCALE;
-const INCOMING_DELAY_S = 1 * TIMELINE_SCALE;
-const RETREAT_START_AFTER_INCOMING_BEGIN_S = 1.6 * TIMELINE_SCALE - 1;
-const CENTER_HOLD_S = INCOMING_DELAY_S + RETREAT_START_AFTER_INCOMING_BEGIN_S;
-const RETREAT_S = 7 * TIMELINE_SCALE;
+/** 출발 0 / 상승 8 / 정지 6 / 후퇴 4 (초) — 출발 0이면 첫 페인트에서 상승이 중간부터 보일 수 있음 */
+const INCOMING_DELAY_S = 0;
+/** 아래에서 중앙까지 상승에 걸리는 시간 */
+const INCOMING_RISE_S = 8;
+/** 장면 시작부터 중앙 카드가 후퇴를 시작하기까지(정지 구간) */
+const CENTER_HOLD_S = 6;
+/** 후퇴(이동·페이드)에 걸리는 시간 */
+const RETREAT_S = 4;
 const RETREAT_OPACITY_DELAY_S = 1 * TIMELINE_SCALE;
-const SCENE_S = CENTER_HOLD_S + RETREAT_S;
+/** 한 장면 = max(상승 끝+여유, 정지+후퇴) */
+const SCENE_S = Math.max(
+  INCOMING_DELAY_S + INCOMING_RISE_S + 0.2,
+  CENTER_HOLD_S + RETREAT_S,
+);
 
 const FX_STRENGTH = 1.15;
 const FX_EARLY_BIAS = 0.7;
@@ -42,9 +53,6 @@ const DRAG_SCENE_STEP = 220 * TIMELINE_SCALE;
 
 const SLIDE_LINK_DRAG_MIN_PX = 12;
 const CARD_SELECTION_NAV_DELAY_MS = 100;
-/** 자동 전환·장면 타임라인 시작 지연 — 첫 카드 정적 표시 후 Speed Index 부담 완화 */
-const SLIDE_TIMELINE_DEFER_IDLE_MAX_MS = 1200;
-const SLIDE_TIMELINE_DEFER_FALLBACK_MS = 1000;
 
 type SceneRole = "idle" | "incoming" | "center" | "outgoing";
 
@@ -67,6 +75,17 @@ function riseFactor(r: number): number {
   }
   const u = (t - 2 / 3) * 3;
   return 1 / 3 - u * (1 / 3);
+}
+
+/**
+ * incoming 시작 세로 오프셋(translateY 양수 = 아래에서 등장).
+ * 모바일 메인: max(50cqh+50%, 하단식) 에서 긴 슬라이드에 cqh 가 커져 하단식이 지는 문제 → cqh 제거, 하단식과 dvh 하한만 max.
+ */
+function incomingTranslateY(factor: number, fromBottomUi: boolean): string {
+  const base = fromBottomUi
+    ? "max(calc(100% + 120px + 9rem + var(--site-home-mobile-bottom-nav-slide-extra, 76px) + max(5.5rem, 16dvh) + env(safe-area-inset-bottom, 0px)), calc(34dvh + 50%))"
+    : "calc(52dvh + 58%)";
+  return `translateY(calc((${base}) * ${factor})) scale(1)`;
 }
 
 const RETREAT_PTS: {
@@ -105,32 +124,39 @@ function retreatAt(progress: number) {
   };
 }
 
-function cardStyleForRole(role: SceneRole, sceneT: number, roleProgress: number): CSSProperties {
+function cardStyleForRole(
+  role: SceneRole,
+  sceneT: number,
+  roleProgress: number,
+  incomingFromBottomUi: boolean,
+): CSSProperties {
   if (role === "idle") {
     return {
       opacity: 0,
       visibility: "hidden",
-      transform: "translateY(calc(50cqh + 50%)) scale(1)",
+      transform: incomingTranslateY(1, incomingFromBottomUi),
       filter: "blur(0)",
       zIndex: 1,
     };
   }
 
   if (role === "incoming") {
-    if (sceneT < INCOMING_DELAY_S) {
+    const riseElapsed = sceneT - INCOMING_DELAY_S;
+    const bottomTransform = incomingTranslateY(1, incomingFromBottomUi);
+    if (riseElapsed < 0) {
       return {
         opacity: 0,
         visibility: "hidden",
-        transform: "translateY(calc(50cqh + 50%)) scale(1)",
+        transform: bottomTransform,
         filter: "blur(0)",
-        zIndex: 1,
+        zIndex: 120,
       };
     }
     const factor = riseFactor(roleProgress);
     return {
       opacity: 1,
       visibility: "visible",
-      transform: `translateY(calc((50cqh + 50%) * ${factor})) scale(1)`,
+      transform: incomingTranslateY(factor, incomingFromBottomUi),
       filter: "blur(0)",
       zIndex: 120,
     };
@@ -141,7 +167,7 @@ function cardStyleForRole(role: SceneRole, sceneT: number, roleProgress: number)
       return {
         opacity: 1,
         visibility: "visible",
-        transform: "translateY(calc((50cqh + 50%) * 0)) scale(1)",
+        transform: "translateY(0) scale(1)",
         filter: "blur(0)",
         zIndex: 100,
       };
@@ -195,10 +221,13 @@ export default function MainSceneSlideDeck({
   items,
   sectionLabel = "",
   siteNoticeText,
+  incomingFromBottomUi = false,
 }: {
   items: SlideDeckItem[];
   sectionLabel?: string;
   siteNoticeText?: string | null;
+  /** 모바일 메인(UA)만: incoming 시작을 카드 높이+하단 고정 UI 아래로 — 짧은 슬라이드에서 중간 등장 완화 */
+  incomingFromBottomUi?: boolean;
 }) {
   const router = useRouter();
   /** null이면 장면 시계 미시작(첫 카드·초기 장면 고정). 값 설정 후 경과 시간 기준으로 전환 */
@@ -216,6 +245,7 @@ export default function MainSceneSlideDeck({
   const selectingRef = useRef(false);
   const selectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const mainSlideAdImpressionSentRef = useRef<Set<string>>(new Set());
 
   const n = items.length;
   /** sceneId===0 초기 장면과 동일 — 가운데 노출(visibility·opacity 유효) 카드. n>1 이면 items[0]은 숨김(outgoing/incoming)이라 LCP 후보는 이 인덱스 */
@@ -236,31 +266,41 @@ export default function MainSceneSlideDeck({
     };
   }, [n]);
 
-  useEffect(() => {
+  /** 첫 페인트 전에 t0 설정 — rAF/rIC 이후면 sceneT=0 이 한두 프레임 이상 고정되는 문제 방지 */
+  useLayoutEffect(() => {
     if (n === 0) {
       animationT0Ref.current = null;
       return;
     }
     animationT0Ref.current = null;
-    const kick = () => {
-      animationT0Ref.current = Date.now();
-      setFrameTime(Date.now());
-    };
-    let idleCbId: number | undefined;
-    /** DOM setTimeout id — Node 타입과 충돌하지 않게 number */
-    let timeoutId: number | undefined;
-    if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") {
-      idleCbId = window.requestIdleCallback(kick, { timeout: SLIDE_TIMELINE_DEFER_IDLE_MAX_MS });
-    } else {
-      timeoutId = window.setTimeout(kick, SLIDE_TIMELINE_DEFER_FALLBACK_MS);
-    }
+    const t0 = Date.now();
+    animationT0Ref.current = t0;
+    setFrameTime(t0);
     return () => {
-      if (idleCbId != null && typeof window.cancelIdleCallback === "function") {
-        window.cancelIdleCallback(idleCbId);
-      }
-      if (timeoutId != null) window.clearTimeout(timeoutId);
+      animationT0Ref.current = null;
     };
   }, [n]);
+
+  useLayoutEffect(() => {
+    if (n === 0) return;
+    const autoNowMs = pausedAtMsRef.current ?? frameTime;
+    const animT0 = animationT0Ref.current;
+    const elapsed =
+      animT0 == null
+        ? Math.max(0, sceneOffsetRef.current * SCENE_S)
+        : (autoNowMs - animT0 - pausedAccumulatedMsRef.current) / 1000 + sceneOffsetRef.current * SCENE_S;
+    const clampedElapsed = Math.max(0, elapsed);
+    const sceneId = Math.floor(clampedElapsed / SCENE_S);
+    const cycleOffset = n > 0 ? Math.floor(sceneId / n) : 0;
+    const effectiveSceneId = sceneId + cycleOffset;
+    const centerIdx = n <= 1 ? 0 : (effectiveSceneId + 1) % n;
+    const centerItem = items[centerIdx];
+    if (centerItem?.type !== "ad" || !centerItem.mainSlideAdId?.trim()) return;
+    const key = `${effectiveSceneId}-${centerItem.mainSlideAdId.trim()}`;
+    if (mainSlideAdImpressionSentRef.current.has(key)) return;
+    mainSlideAdImpressionSentRef.current.add(key);
+    reportMainSlideAdMetric(centerItem.mainSlideAdId.trim(), "impressions");
+  }, [n, frameTime, items]);
 
   const pauseAuto = () => {
     if (pausedAtMsRef.current == null) {
@@ -339,7 +379,12 @@ export default function MainSceneSlideDeck({
         if (!(ev.target instanceof Element)) return;
         if (!deck.contains(ev.target)) return;
         const a = ev.target.closest("a[href]");
-        if (a && deck.contains(a) && a.closest("[data-slide-deck-card]")) {
+        if (
+          a &&
+          deck.contains(a) &&
+          a.closest("[data-slide-deck-card]") &&
+          !(a instanceof HTMLAnchorElement && a.dataset.mainSlideExternal === "1")
+        ) {
           ev.preventDefault();
           ev.stopPropagation();
         }
@@ -373,7 +418,6 @@ export default function MainSceneSlideDeck({
   const effectiveSceneId = sceneId + cycleOffset;
 
   const centerIdx = n <= 1 ? 0 : (effectiveSceneId + 1) % n;
-  const activeDot = n > 0 ? centerIdx % 3 : -1;
 
   const onCardClickCapture: MouseEventHandler<HTMLDivElement> = (e) => {
     if (e.defaultPrevented || selectingRef.current) return;
@@ -384,6 +428,9 @@ export default function MainSceneSlideDeck({
 
     const href = anchor.getAttribute("href");
     if (!href) return;
+    if (anchor.dataset.mainSlideExternal === "1") {
+      return;
+    }
 
     const card = anchor.closest("[data-slide-card-index]");
     const rawIndex = card?.getAttribute("data-slide-card-index");
@@ -418,7 +465,9 @@ export default function MainSceneSlideDeck({
     ) : null;
 
   const cardChrome = (
-    <div className={styles.slideDeckCardChrome}>
+    <div
+      className={[styles.slideDeckCardChrome, n > 0 ? styles.slideDeckCardChromeDocked : ""].filter(Boolean).join(" ")}
+    >
       <div className={styles.slideDeckTopChrome}>
         {sectionLabel.trim() ? (
           <p className={styles.slideDeckLabel}>{sectionLabel.trim()}</p>
@@ -432,37 +481,10 @@ export default function MainSceneSlideDeck({
     </div>
   );
 
-  const slideIndicatorOverlay = (
-    <div className={styles.slideDeckIndicatorOverlay} aria-hidden="true">
-      <div className={styles.slideDeckIndicatorDots}>
-        <span
-          className={
-            activeDot === 0 ? `${styles.slideDeckBottomDotY} ${styles.slideDeckDotActive}` : styles.slideDeckBottomDotY
-          }
-        >
-          ●
-        </span>
-        <span
-          className={
-            activeDot === 1 ? `${styles.slideDeckBottomDotR} ${styles.slideDeckDotActive}` : styles.slideDeckBottomDotR
-          }
-        >
-          ●
-        </span>
-        <span
-          className={
-            activeDot === 2 ? `${styles.slideDeckBottomDotW} ${styles.slideDeckDotActive}` : styles.slideDeckBottomDotW
-          }
-        >
-          ●
-        </span>
-      </div>
-    </div>
-  );
-
   const innerDeck =
     n === 0 ? (
       <div className="slide-deck" aria-label="진행 대회 슬라이드">
+        {noticeAboveDeck}
         {cardChrome}
       </div>
     ) : (
@@ -495,6 +517,7 @@ export default function MainSceneSlideDeck({
                   Math.max(0, (tInScene - INCOMING_DELAY_S) / Math.max(0.001, INCOMING_RISE_S)),
                 )
               : 0,
+            incomingFromBottomUi,
           );
           return (
             <div key={`${item.snapshotId}-${activeIndex}`} className="slide-deck__layer" style={{ zIndex: layerZIndexForRole(role) }}>
@@ -514,12 +537,19 @@ export default function MainSceneSlideDeck({
                         : { opacity: 0.4, pointerEvents: "none" }
                   }
                 >
-                  <SlideDeckCard item={item} repImageHighPriority={i === initialVisibleSlideIndex} />
+                  <SlideDeckCard
+                    item={item}
+                    repImageHighPriority={i === initialVisibleSlideIndex}
+                    slideDeckSolidBackdrop={
+                      SLIDE_DECK_SOLID_BACKDROPS[i % SLIDE_DECK_SOLID_BACKDROPS.length]
+                    }
+                  />
                 </div>
               </div>
             </div>
           );
         })}
+        {noticeAboveDeck}
         {cardChrome}
       </div>
     );
@@ -527,10 +557,8 @@ export default function MainSceneSlideDeck({
   return (
     <div className={styles.slideDeckShell}>
       <div className={`slide-deck-wrap ${styles.slideDeckWrapWithNoticeGap}`}>
-        {noticeAboveDeck}
         <div className={styles.slideDeckFrame}>
           {innerDeck}
-          {slideIndicatorOverlay}
         </div>
       </div>
     </div>

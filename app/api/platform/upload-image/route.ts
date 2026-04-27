@@ -8,29 +8,30 @@ import {
   getImageExtFromMimeType,
   persistProofImageW320W640Variants,
 } from "../../../../lib/server/persist-proof-image-w320-w640-variants";
-import { getClientStatusByUserId, getUserById } from "../../../../lib/platform-api";
+import { getUserById } from "../../../../lib/platform-api";
 
 export const runtime = "nodejs";
 
 const useLocalProofImageDisk = process.env.NODE_ENV === "development";
 
-async function canUploadImage() {
+async function requirePlatformUser() {
   const cookieStore = await cookies();
-  const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
-  if (!session) return { allowed: false as const, user: null };
+  const raw = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  const session = parseSessionCookieValue(raw);
+  if (!session) return null;
   const user = await getUserById(session.userId);
-  if (!user) return { allowed: false as const, user: null };
-  if (user.role === "USER") return { allowed: true as const, user };
-  if (user.role === "PLATFORM") return { allowed: true as const, user };
-  if (user.role !== "CLIENT") return { allowed: false as const, user: null };
-  const status = await getClientStatusByUserId(user.id);
-  return { allowed: status === "APPROVED", user: status === "APPROVED" ? user : null };
+  if (!user || user.role !== "PLATFORM") return null;
+  return user;
 }
 
+/**
+ * 플랫폼 전용: 메인 슬라이드 광고 등 공개 노출용 이미지.
+ * 항상 sitePublic 메타로 저장하여 비로그인 방문자도 `/site-images/...` 로 조회 가능.
+ */
 export async function POST(request: Request) {
-  const auth = await canUploadImage();
-  if (!auth.allowed || !auth.user) {
-    return NextResponse.json({ error: "이미지 업로드 권한이 없습니다." }, { status: 403 });
+  const user = await requirePlatformUser();
+  if (!user) {
+    return NextResponse.json({ error: "Platform role is required." }, { status: 403 });
   }
   if (!useLocalProofImageDisk && !isFirestoreUsersBackendConfigured()) {
     return NextResponse.json(
@@ -40,8 +41,6 @@ export async function POST(request: Request) {
   }
 
   const formData = await request.formData();
-  const sitePublicRaw = formData.get("sitePublic");
-  const sitePublic = sitePublicRaw === "1" || sitePublicRaw === "true";
   const imageFile = formData.get("file");
   if (!(imageFile instanceof File)) {
     return NextResponse.json({ error: "업로드 파일이 필요합니다." }, { status: 400 });
@@ -62,20 +61,20 @@ export async function POST(request: Request) {
     imageId,
     buffer,
     ext,
-    uploaderUserId: auth.user.id,
-    sitePublic,
+    uploaderUserId: user.id,
+    sitePublic: true,
   });
 
   if (!result.ok) {
     return NextResponse.json(
-      { error: result.error, ...(result.code ? { code: result.code } : {}) },
+      { ok: false, error: result.error, ...(result.code ? { code: result.code } : {}) },
       { status: result.status }
     );
   }
 
   return NextResponse.json({
-    imageId: result.imageId,
-    w320Url: result.w320Url,
-    w640Url: result.w640Url,
+    ok: true,
+    image320Url: result.w320Url,
+    image640Url: result.w640Url,
   });
 }

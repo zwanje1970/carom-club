@@ -1,4 +1,4 @@
-/* 메인 슬라이드: 공지(위 흐름) + 셸 · 라벨·●●●·빈목록은 카드 영역(.slide-deck__layer 패딩·폭) 위에만 */
+/* 메인 슬라이드: 공지(위 흐름) + 셸 · 라벨·빈목록은 카드 영역(.slide-deck__layer 패딩·폭) 위에만 */
 
 .slideDeckShell {
   width: 100%;
@@ -17,48 +17,13 @@
   margin-top: 0;
 }
 
-/* 슬라이드 창 + 인디케이터: 카드 transform/scale과 분리 */
+/* 슬라이드 창: 카드 transform/scale과 분리 */
 .slideDeckFrame {
   position: relative;
   width: min(94vw, 492px);
   max-width: min(94vw, 492px);
   align-self: center;
   box-sizing: border-box;
-}
-
-.slideDeckIndicatorOverlay {
-  position: absolute;
-  top: 5px;
-  left: 14px;
-  z-index: 600;
-  pointer-events: none;
-  box-sizing: border-box;
-}
-
-.slideDeckIndicatorDots {
-  display: inline-flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 2px;
-  flex: 0 0 auto;
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-.slideDeckIndicatorDots span {
-  flex: 0 0 auto;
-  width: 14px;
-  height: 14px;
-  font-size: 14px;
-  line-height: 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  box-sizing: border-box;
-  letter-spacing: 0;
 }
 
 /* slide-deck-template.css 의 .slide-deck 과 동일 폭 — 좌우 패딩 없음 */
@@ -73,13 +38,26 @@
   padding-right: 0;
 }
 
+/* 공지 DOM이 `.slide-deck` 안에 있을 때: 흐름 높이 없음 · 카드 레이어(~300) 위 · 크롬(800) 아래 */
+.slide-deck > .slideDeckNoticeAbove {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 8px;
+  z-index: 320;
+  max-height: 3rem;
+  height: auto;
+  padding-top: 0;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
 .slideDeckCardChrome {
   position: absolute;
   /* 카드 레이어(z≤120)보다 위에 고정 */
   z-index: 800;
   /* .slide-deck__layer 과 동일: 카드가 그려지는 영역에만 맞춤 */
   top: 24px;
-  /* 하단을 덜 맞춰 점(●●●)을 카드 아래쪽·녹색 여백 쪽으로 조금 더 내림 */
   bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
@@ -91,6 +69,12 @@
   align-items: stretch;
   justify-content: flex-start;
   pointer-events: none;
+}
+
+/* 카드가 있을 때: 라벨·빈목 안내 영역만 덮고 나머지는 투과(전면 full-height 박스가 일부 환경에서 카드와 겹치는 이슈 방지) */
+.slideDeckCardChromeDocked {
+  bottom: auto;
+  height: auto;
 }
 
 .slideDeckTopChrome {
@@ -153,10 +137,39 @@
 }
 
 @media (max-width: 767px) {
-  :global(.site-home-page--main) .slideDeckNoticeAbove {
+  /* 로고·공지는 슬라이드창(.slide-deck) 위 오버레이 — 셸은 상단 패딩 없음 */
+  :global(.site-home-page--main) .slideDeckShell {
+    padding-top: 0;
+  }
+
+  :global(.site-home-page--main) .slideDeckWrapWithNoticeGap {
+    position: relative;
+    gap: 0;
+  }
+
+  :global(.site-home-page--main) .slide-deck > .slideDeckNoticeAbove {
+    top: calc(env(safe-area-inset-top, 0px) + 10px + 1.35rem);
+    max-height: 2.75rem;
     width: 100%;
     max-width: none;
-    align-self: stretch;
+  }
+
+  /* 노란 공지 박스 제거 — 얇은 흐름 텍스트만 */
+  :global(.site-home-page--main) .slideDeckNotice {
+    min-height: 0;
+    padding: 0.12rem 0;
+    background: transparent;
+    border: none;
+    overflow: hidden;
+  }
+
+  :global(.site-home-page--main) .slideDeckNoticeMarquee {
+    color: rgba(248, 250, 252, 0.88);
+    font-size: 0.68rem;
+    line-height: 1.2;
+    font-weight: 600;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+    animation-duration: 18s;
   }
 
   :global(.site-home-page--main) .slideDeckFrame {
@@ -165,20 +178,14 @@
     align-self: stretch;
   }
 
-  :global(.site-home-page--main) .slideDeckIndicatorOverlay {
-    top: 5px;
-    left: 16px;
-  }
-
   :global(.site-home-page--main) .slideDeckCardChrome {
     width: calc(100% - 20px);
     max-width: none;
-    /* 카드·크롬 영역을 위로 — dots top 4~6px 기준에 맞춤 */
     top: 5px;
   }
 
   :global(.site-home-page--main) .slideDeckTopChrome {
-    padding-top: clamp(18px, 5vw, 22px);
+    padding-top: 0.35rem;
     box-sizing: border-box;
   }
 
@@ -209,32 +216,6 @@
     0 1px 10px rgba(0, 0, 0, 0.75),
     0 0 1px rgba(0, 0, 0, 0.9);
   pointer-events: none;
-}
-
-.slideDeckBottomDotY {
-  color: #f5c609;
-  text-shadow:
-    0 0 2px rgba(0, 0, 0, 0.95),
-    0 1px 3px rgba(0, 0, 0, 0.75);
-}
-
-.slideDeckBottomDotR {
-  color: #ef4444;
-  text-shadow:
-    0 0 2px rgba(0, 0, 0, 0.95),
-    0 1px 3px rgba(0, 0, 0, 0.75);
-}
-
-.slideDeckBottomDotW {
-  color: #ffffff;
-  text-shadow:
-    0 0 2px rgba(0, 0, 0, 0.95),
-    0 1px 2px rgba(0, 0, 0, 0.8);
-}
-
-.slideDeckDotActive {
-  opacity: 1;
-  filter: brightness(1.12);
 }
 
 .slideDeckEmptyState {

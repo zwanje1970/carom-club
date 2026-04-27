@@ -10,7 +10,9 @@ export type PlatformKvSettingKey =
   | "platformOperationSettings"
   | "siteCommunityFeed"
   | "siteProofImageAssets"
-  | "tournamentPublishedCards";
+  | "tournamentPublishedCards"
+  | "main_slide_ads"
+  | "main_slide_ad_config";
 
 export const PLATFORM_KV_KEYS: Record<
   | "siteNotice"
@@ -19,7 +21,9 @@ export const PLATFORM_KV_KEYS: Record<
   | "platformOperationSettings"
   | "siteCommunityFeed"
   | "siteProofImageAssets"
-  | "tournamentPublishedCards",
+  | "tournamentPublishedCards"
+  | "mainSlideAds"
+  | "mainSlideAdConfig",
   PlatformKvSettingKey
 > = {
   siteNotice: "siteNotice",
@@ -29,6 +33,8 @@ export const PLATFORM_KV_KEYS: Record<
   siteCommunityFeed: "siteCommunityFeed",
   siteProofImageAssets: "siteProofImageAssets",
   tournamentPublishedCards: "tournamentPublishedCards",
+  mainSlideAds: "main_slide_ads",
+  mainSlideAdConfig: "main_slide_ad_config",
 };
 
 /** 설정별 helper에서 동일 키 집합을 순회·매핑할 때 사용 */
@@ -40,6 +46,8 @@ export const ALL_PLATFORM_KV_SETTING_KEYS: readonly PlatformKvSettingKey[] = [
   PLATFORM_KV_KEYS.siteCommunityFeed,
   PLATFORM_KV_KEYS.siteProofImageAssets,
   PLATFORM_KV_KEYS.tournamentPublishedCards,
+  PLATFORM_KV_KEYS.mainSlideAds,
+  PLATFORM_KV_KEYS.mainSlideAdConfig,
 ];
 
 export async function readPlatformKvJson(key: PlatformKvSettingKey): Promise<unknown | null> {

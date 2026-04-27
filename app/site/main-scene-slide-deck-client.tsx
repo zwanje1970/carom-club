@@ -12,9 +12,18 @@ type Props = ComponentProps<typeof MainSceneSlideDeck>;
  */
 export default function MainSceneSlideDeckClient(props: Props) {
   const [mounted, setMounted] = useState(false);
+  /** 데스크톱 UA + 좁은 창(반응형): 모바일과 동일 incoming 오프셋 — UA만으로는 뷰포트와 불일치 */
+  const [narrowViewport, setNarrowViewport] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches,
+  );
 
   useEffect(() => {
     setMounted(true);
+    const mq = window.matchMedia("(max-width: 767px)");
+    const syncNarrow = () => setNarrowViewport(mq.matches);
+    syncNarrow();
+    mq.addEventListener("change", syncNarrow);
+    return () => mq.removeEventListener("change", syncNarrow);
   }, []);
 
   if (!mounted) {
@@ -30,35 +39,34 @@ export default function MainSceneSlideDeckClient(props: Props) {
       </div>
     ) : null;
     const cardChrome = (
-      <div className={styles.slideDeckCardChrome}>
+      <div
+        className={[styles.slideDeckCardChrome, props.items.length > 0 ? styles.slideDeckCardChromeDocked : ""]
+          .filter(Boolean)
+          .join(" ")}
+      >
         <div className={styles.slideDeckTopChrome}>
           {label ? <p className={styles.slideDeckLabel}>{label}</p> : null}
-        </div>
-      </div>
-    );
-    const slideIndicatorOverlay = (
-      <div className={styles.slideDeckIndicatorOverlay} aria-hidden="true">
-        <div className={styles.slideDeckIndicatorDots}>
-          <span className={styles.slideDeckBottomDotY}>●</span>
-          <span className={styles.slideDeckBottomDotR}>●</span>
-          <span className={styles.slideDeckBottomDotW}>●</span>
         </div>
       </div>
     );
     return (
       <div className={styles.slideDeckShell}>
         <div className={`slide-deck-wrap ${styles.slideDeckWrapWithNoticeGap}`}>
-          {noticeAbove}
           <div className={styles.slideDeckFrame}>
             <div aria-hidden className="slide-deck">
+              {noticeAbove}
               {cardChrome}
             </div>
-            {slideIndicatorOverlay}
           </div>
         </div>
       </div>
     );
   }
 
-  return <MainSceneSlideDeck {...props} />;
+  return (
+    <MainSceneSlideDeck
+      {...props}
+      incomingFromBottomUi={props.incomingFromBottomUi || narrowViewport}
+    />
+  );
 }

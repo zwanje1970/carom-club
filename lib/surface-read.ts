@@ -27,6 +27,7 @@ import {
   getOutlinePdfAssetById,
   getProofImageAssetById,
   isSiteImagePubliclyAccessible,
+  getMainSlideAdSettingsForSite,
 } from "./server/platform-backing-store";
 
 export const getUserById = firestoreGetUserById;
@@ -54,4 +55,5 @@ export {
   getOutlinePdfAssetById,
   getProofImageAssetById,
   isSiteImagePubliclyAccessible,
+  getMainSlideAdSettingsForSite,
 };

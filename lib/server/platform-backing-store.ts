@@ -23,6 +23,14 @@ import { MAX_COMMUNITY_POST_IMAGE_COUNT } from "../community-post-images";
 import { normalizeCommunityPostImageSizeLevels } from "../community-post-content-images";
 import { tournamentStatusEligibleForMainSlide } from "../site-tournament-badges";
 import {
+  normalizeMainSlideAdConfig,
+  normalizeMainSiteSlideAdRow,
+  isMainSiteSlideAdActiveAt,
+  mergeMainSiteSlideAdsFromAdminPayload,
+  type MainSlideAdConfig,
+  type MainSiteSlideAd,
+} from "../site/main-slide-stream";
+import {
   firestoreCreateUser,
   firestoreFilterUserIdsWithMarketingPushConsent as firestoreFilterUserIdsWithMarketingPushConsentFs,
   firestoreFindByLoginIdAndPhoneDigits,
@@ -89,6 +97,16 @@ import {
   throwTournamentPublishedCardsWritePersistenceBlocked,
   upsertTournamentPublishedCardsToFirestoreKv,
 } from "./platform-tournament-published-cards-settings";
+import {
+  readMainSlideAdConfigRawFromFirestoreKv,
+  readMainSlideAdsRawFromFirestoreKv,
+  resolveMainSlideAdSettingsReadStrategy,
+  resolveMainSlideAdSettingsWriteStrategy,
+  isMainSlideAdSettingsWritePersistenceBlockedError,
+  throwMainSlideAdSettingsWritePersistenceBlocked,
+  upsertMainSlideAdsToFirestoreKv,
+  upsertMainSlideAdConfigToFirestoreKv,
+} from "./platform-main-slide-ad-settings";
 import {
   createClientApplicationFirestore,
   getApplicationSummariesFirestore,
@@ -832,6 +850,10 @@ type DevStore = {
   communityComments: CommunityComment[];
   clientInquiries: ClientInquiryStored[];
   inquiryComments: ClientInquiryCommentStored[];
+  /** 플랫폼 관리자 메인 슬라이드 광고 카드 */
+  mainSlideAds: MainSiteSlideAd[];
+  /** 메인 슬라이드 광고 삽입 규칙(플랫폼 관리자) */
+  mainSlideAdConfig: MainSlideAdConfig;
 };
 
 const DEV_STORE_MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -1089,6 +1111,8 @@ const EMPTY_STORE: DevStore = {
   communityComments: [],
   clientInquiries: [],
   inquiryComments: [],
+  mainSlideAds: [],
+  mainSlideAdConfig: normalizeMainSlideAdConfig(undefined),
 };
 
 function normalizeCommunityCommentRow(row: unknown): CommunityComment | null {
@@ -2113,7 +2137,13 @@ function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedC
   const publishedBy = typeof r.publishedBy === "string" ? r.publishedBy : "";
   const version = typeof r.version === "number" ? r.version : 1;
   const isPublished = typeof r.isPublished === "boolean" ? r.isPublished : true;
-  const isActive = typeof r.isActive === "boolean" ? r.isActive : false;
+  /** `isActive` 생략 시: `isPublished`를 명시한 행만 그 값을 따름(둘 다 생략이면 비활성 유지). 메인 슬라이드·수동 JSON에서 게시만 켠 경우 누락 푸트건 방지. */
+  const isActive =
+    typeof r.isActive === "boolean"
+      ? r.isActive
+      : typeof r.isPublished === "boolean"
+        ? r.isPublished
+        : false;
   const deadlineSortValue = typeof r.deadlineSortValue === "string" ? r.deadlineSortValue : undefined;
   const showOnMainSlide =
     typeof r.showOnMainSlide === "boolean" ? r.showOnMainSlide : tournamentStatusEligibleForMainSlide(status);
@@ -2256,6 +2286,12 @@ function buildDevStoreFromParsed(parsed: Partial<DevStore>): DevStore {
           .map((row) => normalizeClientInquiryCommentRow(row))
           .filter((item): item is ClientInquiryCommentStored => item !== null)
       : [],
+    mainSlideAds: Array.isArray((parsed as Partial<DevStore>).mainSlideAds)
+      ? ((parsed as Partial<DevStore>).mainSlideAds as unknown[])
+          .map((row) => normalizeMainSiteSlideAdRow(row))
+          .filter((item): item is MainSiteSlideAd => item !== null)
+      : [],
+    mainSlideAdConfig: normalizeMainSlideAdConfig((parsed as Partial<DevStore>).mainSlideAdConfig),
   };
 }
 
@@ -2431,6 +2467,8 @@ function createEmptyFallbackDevStore(): DevStore {
     communityComments: [],
     clientInquiries: [],
     inquiryComments: [],
+    mainSlideAds: [],
+    mainSlideAdConfig: normalizeMainSlideAdConfig(undefined),
   };
   ensureDefaultPlatformAdminInStore(fallbackStore);
   reconcileDevStoreLoginIds(fallbackStore);
@@ -8082,7 +8120,7 @@ export async function listPublishedCardSnapshots(): Promise<PublishedCardSnapsho
 }
 
 /** 메인 홈 슬라이드에 넘길 토너먼트 게시 카드 최대 개수(슬라이드 예비 장면 포함) */
-const DEFAULT_MAIN_SITE_TOURNAMENT_SLIDE_LIMIT = 4;
+const DEFAULT_MAIN_SITE_TOURNAMENT_SLIDE_LIMIT = 5;
 
 export async function loadTournamentPublishedCardsArray(): Promise<TournamentPublishedCard[]> {
   const rs = resolveTournamentPublishedCardsReadStrategy();
@@ -8155,6 +8193,141 @@ export async function listTournamentSnapshotsForMainSite(options?: {
       return tournamentPublishedCardToPublishedSnapshot(c, templateId, meta);
     })
   );
+}
+
+async function loadMainSlideAdsNormalizedForStorage(): Promise<MainSiteSlideAd[]> {
+  const rs = resolveMainSlideAdSettingsReadStrategy();
+  if (rs === "firestore-kv") {
+    const raw = await readMainSlideAdsRawFromFirestoreKv();
+    const adsRaw = Array.isArray(raw) ? (raw as unknown[]) : [];
+    return adsRaw
+      .map((row) => normalizeMainSiteSlideAdRow(row))
+      .filter((item): item is MainSiteSlideAd => item !== null);
+  }
+  if (rs === "production-defaults-only") {
+    return [];
+  }
+  const store = await readLocalJsonAggregate();
+  return store.mainSlideAds
+    .map((row) => normalizeMainSiteSlideAdRow(row))
+    .filter((item): item is MainSiteSlideAd => item !== null);
+}
+
+async function loadMainSlideAdConfigNormalizedForStorage(): Promise<MainSlideAdConfig> {
+  const rs = resolveMainSlideAdSettingsReadStrategy();
+  if (rs === "firestore-kv") {
+    const raw = await readMainSlideAdConfigRawFromFirestoreKv();
+    return normalizeMainSlideAdConfig(raw ?? undefined);
+  }
+  if (rs === "production-defaults-only") {
+    return normalizeMainSlideAdConfig(undefined);
+  }
+  const store = await readLocalJsonAggregate();
+  return normalizeMainSlideAdConfig(store.mainSlideAdConfig);
+}
+
+async function persistMainSlideAdsToStorageInternal(ads: MainSiteSlideAd[]): Promise<void> {
+  const ws = resolveMainSlideAdSettingsWriteStrategy();
+  if (ws === "blocked") {
+    throwMainSlideAdSettingsWritePersistenceBlocked();
+  }
+  if (ws === "firestore-kv") {
+    await upsertMainSlideAdsToFirestoreKv(ads);
+    return;
+  }
+  const store = await readLocalJsonAggregate();
+  store.mainSlideAds = ads;
+  await writeLocalJsonAggregate(store);
+}
+
+async function persistMainSlideAdConfigToStorageInternal(config: MainSlideAdConfig): Promise<void> {
+  const ws = resolveMainSlideAdSettingsWriteStrategy();
+  if (ws === "blocked") {
+    throwMainSlideAdSettingsWritePersistenceBlocked();
+  }
+  if (ws === "firestore-kv") {
+    await upsertMainSlideAdConfigToFirestoreKv(config);
+    return;
+  }
+  const store = await readLocalJsonAggregate();
+  store.mainSlideAdConfig = config;
+  await writeLocalJsonAggregate(store);
+}
+
+/**
+ * 메인 슬라이드 광고 + 삽입 설정.
+ * 개발: DevStore JSON. 운영(비개발 + Firebase 설정): Firestore KV `main_slide_ads` / `main_slide_ad_config`.
+ */
+export async function getMainSlideAdSettingsForSite(): Promise<{
+  config: MainSlideAdConfig;
+  activeAds: MainSiteSlideAd[];
+}> {
+  try {
+    const config = await loadMainSlideAdConfigNormalizedForStorage();
+    const ads = await loadMainSlideAdsNormalizedForStorage();
+    const now = Date.now();
+    const activeAds = ads.filter((a) => isMainSiteSlideAdActiveAt(a, now));
+    return { config, activeAds };
+  } catch {
+    return { config: normalizeMainSlideAdConfig(undefined), activeAds: [] };
+  }
+}
+
+export async function incrementMainSlideAdMetric(
+  adId: string,
+  metric: "impressions" | "clicks",
+): Promise<{ ok: boolean }> {
+  const id = adId.trim();
+  if (!id) return { ok: false };
+
+  const ws = resolveMainSlideAdSettingsWriteStrategy();
+  if (ws === "blocked") {
+    return { ok: true };
+  }
+
+  try {
+    const normalized = await loadMainSlideAdsNormalizedForStorage();
+    const ad = normalized.find((x) => x.id === id);
+    if (!ad) return { ok: false };
+    if (metric === "impressions") {
+      ad.impressions = (ad.impressions ?? 0) + 1;
+    } else {
+      ad.clicks = (ad.clicks ?? 0) + 1;
+    }
+    await persistMainSlideAdsToStorageInternal(normalized);
+    return { ok: true };
+  } catch {
+    return ws === "firestore-kv" ? { ok: true } : { ok: false };
+  }
+}
+
+export async function getMainSlideAdsForPlatformAdmin(): Promise<MainSiteSlideAd[]> {
+  try {
+    return await loadMainSlideAdsNormalizedForStorage();
+  } catch {
+    return [];
+  }
+}
+
+export async function getMainSlideAdConfigForPlatformAdmin(): Promise<MainSlideAdConfig> {
+  try {
+    return await loadMainSlideAdConfigNormalizedForStorage();
+  } catch {
+    return normalizeMainSlideAdConfig(undefined);
+  }
+}
+
+export async function patchMainSlideAdsForPlatformAdmin(incomingRows: unknown[]): Promise<MainSiteSlideAd[]> {
+  const previous = await loadMainSlideAdsNormalizedForStorage().catch(() => [] as MainSiteSlideAd[]);
+  const merged = mergeMainSiteSlideAdsFromAdminPayload(incomingRows, previous);
+  await persistMainSlideAdsToStorageInternal(merged);
+  return merged;
+}
+
+export async function patchMainSlideAdConfigForPlatformAdmin(raw: unknown): Promise<MainSlideAdConfig> {
+  const config = normalizeMainSlideAdConfig(raw);
+  await persistMainSlideAdConfigToStorageInternal(config);
+  return config;
 }
 
 export async function getLatestPublishedCardSnapshotByTournamentId(
