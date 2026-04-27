@@ -24,6 +24,24 @@ export type StartPairLabel = {
 
 const PAIR_LABEL_OUT_MM = 2.3;
 
+/** viewBox(0…W, 0…H) 안에 조번호가 잘리지 않도록 최소 보정 (박스·선 좌표는 변경하지 않음) */
+const LABEL_VIEW_MARGIN_MM = 1.0;
+/** textAnchor end/start 기준 대략적인 숫자 폭 여유(mm) */
+const LABEL_ANCHOR_PAD_MM = 2.0;
+
+function clampStartPairLabel(p: StartPairLabel): StartPairLabel {
+  const y = Math.min(Math.max(p.y, LABEL_VIEW_MARGIN_MM), H - LABEL_VIEW_MARGIN_MM);
+  let x = p.x;
+  if (p.textAnchor === "end") {
+    x = Math.max(p.x, LABEL_VIEW_MARGIN_MM + LABEL_ANCHOR_PAD_MM);
+  } else if (p.textAnchor === "start") {
+    x = Math.min(p.x, W - LABEL_VIEW_MARGIN_MM - LABEL_ANCHOR_PAD_MM);
+  } else {
+    x = Math.min(Math.max(p.x, LABEL_VIEW_MARGIN_MM), W - LABEL_VIEW_MARGIN_MM);
+  }
+  return { ...p, x, y };
+}
+
 export type BuildOpts = {
   rounds:     number[];
   style:      "TREE" | "CENTER";
@@ -96,7 +114,7 @@ export function buildStartPairLabels(scene: BracketScene, opts: BuildOpts): Star
       const midY = (a.y + a.h + b.y) * 0.5;
       out.push({ x: a.x + a.w + PAIR_LABEL_OUT_MM, y: midY, text: String(gn++), textAnchor: "start" });
     }
-    return out;
+    return out.map(clampStartPairLabel);
   }
 
   if (treeLayout === "VERTICAL") {
@@ -112,7 +130,7 @@ export function buildStartPairLabels(scene: BracketScene, opts: BuildOpts): Star
         textAnchor: "middle",
       });
     }
-    return out;
+    return out.map(clampStartPairLabel);
   }
 
   /* TREE HORIZONTAL */
@@ -122,7 +140,7 @@ export function buildStartPairLabels(scene: BracketScene, opts: BuildOpts): Star
     const midY = (a.y + a.h + b.y) * 0.5;
     out.push({ x: a.x - PAIR_LABEL_OUT_MM, y: midY, text: String(gn++), textAnchor: "end" });
   }
-  return out;
+  return out.map(clampStartPairLabel);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

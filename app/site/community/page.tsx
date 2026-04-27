@@ -41,6 +41,9 @@ export default async function SiteCommunityPage({
       }
     >
       <>
+        <header className="ui-community-context-head">
+          <p className="ui-community-context-head-label">전체 게시판</p>
+        </header>
         <CommunityBoardSwipeShell tabs={DEFAULT_COMMUNITY_TAB_ITEMS.map(({ key, href }) => ({ key, href }))}>
           <Suspense
             fallback={
@@ -70,9 +73,6 @@ async function SiteCommunityPageContent({
 
   return (
     <section className="site-site-gray-main v3-stack ui-community-page" data-community-board="all">
-      <header className="ui-community-context-head">
-        <p className="ui-community-context-head-label">전체 게시판</p>
-      </header>
       <CommunityBoardPostList showRoomPrefix items={items} />
     </section>
   );

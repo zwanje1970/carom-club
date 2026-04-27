@@ -419,8 +419,8 @@ async function SiteHomePageContent({
     mainSlideAdSettings.activeAds,
     mainSlideAdSettings.config,
   );
-  /** 공지 문구가 있으면 슬라이드 상단 바 표시(enabled만 켤 때 빠지는 경우 복구) */
-  const showSiteNoticeBar = siteNotice.text.trim().length > 0;
+  /** 공지: 플랫폼에서 활성화 ON이고 문구가 있을 때만 메인(PC·모바일)에 표시 */
+  const showSiteNoticeBar = Boolean(siteNotice.enabled) && siteNotice.text.trim().length > 0;
   const headerStore = await headers();
   const isMobileSiteUa = isPublicSiteMobileView(headerStore);
   /** PC: 청 헤더 아래 흰/남색 줄은 CAROM 대신 공지 한 줄. 모바일 메인: 로고는 도크가 아니라 슬라이드창 오버레이(`.site-home-main-slide-logo-overlay`). */
@@ -532,10 +532,17 @@ async function SiteHomePageContent({
                     <SiteMainLogo />
                   </div>
                 ) : null}
-                {isMobileSiteUa && showSiteNoticeBar ? (
-                  <div className="site-home-main-notice-strip" aria-live="polite" role="status">
+                {isMobileSiteUa ? (
+                  <div
+                    className="site-home-main-notice-strip"
+                    aria-live={showSiteNoticeBar ? "polite" : undefined}
+                    role={showSiteNoticeBar ? "status" : undefined}
+                    aria-hidden={showSiteNoticeBar ? undefined : "true"}
+                  >
                     <div className="site-home-main-notice-strip__inner">
-                      <span className="site-home-main-notice-strip__text">{siteNotice.text.trim()}</span>
+                      {showSiteNoticeBar ? (
+                        <span className="site-home-main-notice-strip__text">{siteNotice.text.trim()}</span>
+                      ) : null}
                     </div>
                   </div>
                 ) : null}
@@ -550,24 +557,23 @@ async function SiteHomePageContent({
                     items={liveSlideItems}
                     sectionLabel={tournamentTitleEntry?.block.data.text?.trim() ?? ""}
                     incomingFromBottomUi={isMobileSiteUa}
+                    homeBottomOverlay={
+                      <>
+                        <a href="/site/tournaments" className="main-button" aria-label="대회안내">
+                          <img src="/images/buttons/btn-main-1.png" alt="" decoding="async" />
+                          <span>대회안내</span>
+                        </a>
+                        <VenuesDistanceNavLink href="/site/venues" className="main-button" aria-label="주변클럽">
+                          <img src="/images/buttons/btn-main-2.png" alt="" decoding="async" />
+                          <span>주변클럽</span>
+                        </VenuesDistanceNavLink>
+                        <a href="/site/community" className="main-button" aria-label="커뮤니티">
+                          <img src="/images/buttons/btn-main-3.png" alt="" decoding="async" />
+                          <span>커뮤니티</span>
+                        </a>
+                      </>
+                    }
                   />
-                </section>
-                <section
-                  className="site-home-main-png-buttons-temp site-home-main-png-buttons-temp--slideOverlay temp-png-button-tuning"
-                  aria-label="메인 바로가기(임시 PNG)"
-                >
-                  <a href="/site/tournaments" className="main-button" aria-label="대회안내">
-                    <img src="/images/buttons/btn-main-1.png" alt="" decoding="async" />
-                    <span>대회안내</span>
-                  </a>
-                  <VenuesDistanceNavLink href="/site/venues" className="main-button" aria-label="주변클럽">
-                    <img src="/images/buttons/btn-main-2.png" alt="" decoding="async" />
-                    <span>주변클럽</span>
-                  </VenuesDistanceNavLink>
-                  <a href="/site/community" className="main-button" aria-label="커뮤니티">
-                    <img src="/images/buttons/btn-main-3.png" alt="" decoding="async" />
-                    <span>커뮤니티</span>
-                  </a>
                 </section>
               </div>
             </section>

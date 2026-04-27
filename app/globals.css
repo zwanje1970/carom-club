@@ -757,7 +757,7 @@ button.secondary-button.site-mypage-logout:hover,
   overflow: hidden;
 }
 
-/* 커뮤니티 게시판 탭 간 스와이프: 루트 = 스크롤 본문 전체(빈 배경 포함) 터치·data-community-inner-swipe */
+/* 커뮤니티 게시판 탭 간 스와이프: 루트는 레이아웃·data-community-inner-swipe, 터치는 .community-board-swipe-panel--main 에만 연결 */
 .community-board-swipe-root {
   width: 100%;
   min-height: 100%;
@@ -1306,37 +1306,48 @@ body:has(.site-home-page) {
       0 0 1px rgba(0, 0, 0, 0.85);
   }
 
-  /* 모바일 메인: 공지 띠 — 로고 바로 아래·슬라이드 위 오버레이(레이아웃 밀지 않음) */
+  /* 모바일 메인: 공지 띠 — 화면 최상단(상태 표시줄 아래 가장자리)부터 기존 공지 줄까지 한 덩어리로 확장, 로고(z400)보다 아래 */
   .site-home-page--main .site-home-main-notice-strip {
-    position: absolute;
+    --site-home-main-notice-content-h: clamp(28px, 8.2vw, 32px);
+    --site-home-main-notice-content-top: calc(
+      env(safe-area-inset-top, 0px) + 12px + 0.72rem * 1.35 + 4px
+    );
+    position: fixed;
     left: 0;
+    right: 0;
     width: 100%;
-    max-width: 100%;
+    max-width: none;
     box-sizing: border-box;
-    top: calc(env(safe-area-inset-top, 0px) + 12px + 0.72rem * 1.35 + 4px);
-    height: clamp(28px, 8.2vw, 32px);
-    z-index: 430;
+    top: 0;
+    height: calc(var(--site-home-main-notice-content-top) + var(--site-home-main-notice-content-h));
+    z-index: 380;
     pointer-events: none;
     overflow: hidden;
-    padding-left: env(safe-area-inset-left, 0px);
-    padding-right: env(safe-area-inset-right, 0px);
+    padding-left: 0;
+    padding-right: 0;
   }
 
   .site-home-page--main .site-home-main-notice-strip__inner {
     height: 100%;
+    min-height: 100%;
     width: 100%;
     display: flex;
-    align-items: center;
-    justify-content: flex-start;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: stretch;
     box-sizing: border-box;
-    background: rgba(0, 0, 0, 0.28);
+    background: rgba(0, 0, 0, 0.38);
     overflow: hidden;
-    padding: 0 0.45rem;
+    padding-top: 0;
+    padding-bottom: 0;
+    padding-left: max(0.45rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.45rem, env(safe-area-inset-right, 0px));
   }
 
   .site-home-page--main .site-home-main-notice-strip__text {
     display: inline-block;
     flex: 0 0 auto;
+    align-self: flex-start;
     max-width: none;
     white-space: nowrap;
     font-size: clamp(10px, 2.85vw, 12px);
@@ -1549,33 +1560,6 @@ body:has(.site-home-page) {
   /* 카드·상승 구간 전체를 살짝 위로 — 하단 PNG/탭과의 간격·시각 중심 보정 */
   .site-home-page--main .slide-deck .slide-deck__layer {
     transform: translateY(calc(-8% - 4%));
-  }
-
-  .site-home-page--main .site-home-main-png-buttons-temp--slideOverlay {
-    /* 뷰포트 기준: 탭 높이 + 버튼·탭 사이 간격 + safe-area (슬라이드 호스트 bottom과 이중 계산 방지) */
-    position: fixed;
-    left: 50%;
-    bottom: calc(
-      var(--mobile-bottom-nav-height) + var(--png-button-gap-above-nav) + env(safe-area-inset-bottom, 0px)
-    );
-    transform: translateX(-50%);
-    /* 하단 고정 탭(z-index:70)보다 낮게 — 겹칠 때 탭 클릭 유지 */
-    z-index: 55;
-    pointer-events: auto;
-    margin-top: 0;
-    width: auto;
-    max-width: calc(100% - 1.25rem);
-    padding-left: max(0.5rem, env(safe-area-inset-left, 0px));
-    padding-right: max(0.5rem, env(safe-area-inset-right, 0px));
-    /* 기존 clamp + 20px — 버튼 사이 더 벌림 */
-    gap: calc(clamp(32px, 9vw, 40px) + 20px);
-  }
-
-  .site-home-page--main .site-home-main-png-buttons-temp--slideOverlay .main-button span {
-    white-space: nowrap;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .site-home-nav-grid {

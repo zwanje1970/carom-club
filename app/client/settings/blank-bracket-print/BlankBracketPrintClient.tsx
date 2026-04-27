@@ -13,8 +13,8 @@ import { buildBracketScene, buildStartPairLabels, type StartPairLabel } from "./
 const MARGIN_MM = 10;
 /** 대진표(277×190mm) 도면 기준 우상단 — 용지 @page 여백과 별개 */
 const SERVICE_MARK_INSET_MM = 0.6;
-/** © 표기만 5mm 위로(대진표 좌표·박스 크기 불변, 양쪽→중앙형과 겹침 완화) */
-const SERVICE_MARK_TOP_MM = SERVICE_MARK_INSET_MM - 5;
+/** © 표기: 부모 overflow:hidden 클립 방지를 위해 용지 상단 안쪽(양수 mm)에 둔다. */
+const SERVICE_MARK_TOP_MM = 0.8;
 /** 기존 2.8mm 대비 50% */
 const SERVICE_MARK_FONT_MM = 1.4;
 
@@ -85,6 +85,8 @@ export default function BlankBracketPrintClient() {
   const [pdfDownloadUrl, setPdfDownloadUrl] = useState<string | null>(null);
   const [pdfDownloadName, setPdfDownloadName] = useState("대진표.pdf");
   const [pdfDownloadStatus, setPdfDownloadStatus] = useState<PdfDownloadStatus>("idle");
+  const [pdfDownloadModalOpen, setPdfDownloadModalOpen] = useState(false);
+  const [downloadStartToast, setDownloadStartToast] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewScale, setPreviewScale] = useState(1);
   const [previewFitScale, setPreviewFitScale] = useState(1);
@@ -232,6 +234,14 @@ export default function BlankBracketPrintClient() {
     };
   }, [previewOpen, syncPreviewViewportScale, updatePreviewScale]);
 
+  useEffect(() => {
+    if (pdfExporting) setPdfDownloadModalOpen(false);
+  }, [pdfExporting]);
+
+  useEffect(() => {
+    if (!pdfDownloadUrl) setPdfDownloadModalOpen(false);
+  }, [pdfDownloadUrl]);
+
   /** 페이지 내부 전용 레이어 미리보기: A4 한 장 전체 scale, 스크롤·스와이프 없음 */
   const handleOpenPreviewOverlay = useCallback(() => {
     if (!rounds.length || !scene) return;
@@ -351,11 +361,6 @@ export default function BlankBracketPrintClient() {
     }
   }, [pdfDownloadName, pdfDownloadUrl]);
 
-  const handlePdfOpen = useCallback(() => {
-    if (!pdfDownloadUrl) return;
-    window.open(pdfDownloadUrl, "_blank", "noopener,noreferrer");
-  }, [pdfDownloadUrl]);
-
   const handlePreviewTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
     if (e.touches.length !== 2) return;
     const distance = touchDistance(e.touches);
@@ -387,7 +392,7 @@ export default function BlankBracketPrintClient() {
       : pdfDownloadStatus === "done"
         ? "다운로드 완료"
         : pdfDownloadStatus === "failed"
-          ? "다운로드 실패 - PDF 열기 사용"
+          ? "다운로드 다시 시도"
           : "PDF 다운로드";
   const pdfDownloadStatusText =
     pdfDownloadStatus === "done"
@@ -395,7 +400,7 @@ export default function BlankBracketPrintClient() {
       : pdfDownloadStatus === "downloading"
         ? "다운로드 중..."
         : pdfDownloadStatus === "failed"
-          ? "다운로드가 막힌 경우 PDF 열기를 사용하세요."
+          ? "다운로드가 막힌 경우 브라우저 설정을 확인하거나 잠시 후 다시 시도해 주세요."
           : pdfDownloadStatus === "ready"
             ? "PDF가 생성되었습니다. 다운로드 버튼을 눌러 저장하세요."
             : "";
@@ -777,26 +782,114 @@ export default function BlankBracketPrintClient() {
                 <button
                   type="button"
                   className="ui-btn-primary-solid"
+                  disabled={pdfDownloadStatus === "downloading"}
                   onClick={() => {
-                    console.info("download button clicked");
-                    handlePdfDownload();
+                    console.info("download button clicked → open confirm modal");
+                    setPdfDownloadModalOpen(true);
                   }}
                   style={{ minHeight: "44px", padding: "0.55rem 1rem" }}
                 >
                   {pdfDownloadButtonLabel}
                 </button>
-                <button
-                  type="button"
-                  className="v3-btn"
-                  onClick={() => {
-                    console.info("pdf open button clicked");
-                    handlePdfOpen();
-                  }}
-                  style={{ minHeight: "44px", padding: "0.55rem 1rem" }}
-                >
-                  PDF 열기
-                </button>
               </div>
+            </div>,
+            document.body,
+          )
+        : null}
+      {pdfDownloadModalOpen && pdfDownloadUrl && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              role="presentation"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 2147483647,
+                background: "rgba(15, 23, 42, 0.55)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))",
+                boxSizing: "border-box",
+              }}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="bbp-pdf-download-modal-title"
+                style={{
+                  width: "100%",
+                  maxWidth: "22rem",
+                  background: "#fff",
+                  borderRadius: "12px",
+                  padding: "1.1rem 1.15rem",
+                  boxShadow: "0 16px 48px rgba(0,0,0,0.22)",
+                  boxSizing: "border-box",
+                }}
+              >
+                <h2 id="bbp-pdf-download-modal-title" style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 800 }}>
+                  PDF 다운로드
+                </h2>
+                <p style={{ margin: "0 0 0.5rem", fontSize: "0.9rem", lineHeight: 1.45, color: "#334155" }}>
+                  PDF는 기기의 <strong>다운로드</strong> 폴더(또는 브라우저가 안내하는 저장 위치)에 저장됩니다.
+                </p>
+                <p style={{ margin: "0 0 1rem", fontSize: "0.88rem", lineHeight: 1.45, color: "#475569" }}>
+                  파일명: <strong style={{ wordBreak: "break-all" }}>{pdfDownloadName}</strong>
+                </p>
+                <p style={{ margin: "0 0 1.1rem", fontSize: "0.85rem", color: "#64748b" }}>
+                  확인을 누르면 다운로드가 시작됩니다.
+                </p>
+                <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="v3-btn"
+                    onClick={() => setPdfDownloadModalOpen(false)}
+                    style={{ minHeight: "44px", padding: "0.55rem 1rem" }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    className="ui-btn-primary-solid"
+                    onClick={() => {
+                      setPdfDownloadModalOpen(false);
+                      handlePdfDownload();
+                      setDownloadStartToast(true);
+                      window.setTimeout(() => setDownloadStartToast(false), 2600);
+                    }}
+                    style={{ minHeight: "44px", padding: "0.55rem 1rem" }}
+                  >
+                    확인
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+      {downloadStartToast && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              role="status"
+              style={{
+                position: "fixed",
+                left: "50%",
+                bottom: "max(24px, env(safe-area-inset-bottom, 0px))",
+                transform: "translateX(-50%)",
+                zIndex: 2147483647,
+                maxWidth: "min(calc(100vw - 32px), 20rem)",
+                padding: "0.65rem 1rem",
+                background: "rgba(15, 23, 42, 0.92)",
+                color: "#f8fafc",
+                fontSize: "0.9rem",
+                fontWeight: 600,
+                borderRadius: "10px",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+                pointerEvents: "none",
+                textAlign: "center",
+                boxSizing: "border-box",
+              }}
+            >
+              다운로드가 시작되었습니다.
             </div>,
             document.body,
           )
@@ -820,8 +913,8 @@ function BracketPrintServiceMark() {
 // style 에 width/height/min-width/min-height 를 모두 인라인으로 강제해서
 // 프로젝트 전역 CSS (svg { max-width:100% } 등) 에 눌리지 않게 한다.
 // ─────────────────────────────────────────────────────────────────────────────
-/** 조번호 SVG 텍스트 (기존 2.05mm 의 50%) */
-const PAIR_LABEL_FONT_MM = 1.025;
+/** 조번호 SVG 텍스트 — PDF/캡처에서 식별되도록 소폭 키움 */
+const PAIR_LABEL_FONT_MM = 1.15;
 
 /**
  * 경계 클리핑 보조: stroke(0.2mm)가 viewBox 가장자리에서 잘리며 PDF에서 끝선만 얇게 보이는 현상 완화.
@@ -908,7 +1001,7 @@ function BracketSVG({
                 y={t.y}
                 textAnchor={t.textAnchor}
                 dominantBaseline="middle"
-                fill="#8e8e8e"
+                fill="#4b5563"
                 fontSize={`${PAIR_LABEL_FONT_MM}mm`}
                 fontWeight={300}
                 fontFamily='system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'

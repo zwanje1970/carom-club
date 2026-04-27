@@ -68,10 +68,18 @@ function velocityFromSamples(samples: { t: number; x: number }[]): number {
   return (last.x - first.x) / dt;
 }
 
+function clampDragPxForAnchor(anchorIdx: number, n: number, raw: number, vw: number): number {
+  let v = Math.max(-vw, Math.min(vw, raw));
+  if (anchorIdx <= 0) v = Math.min(0, v);
+  if (anchorIdx >= n - 1) v = Math.max(0, v);
+  return v;
+}
+
 export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab[]; children: ReactNode }) {
   const pathname = usePathname() ?? "";
   const router = useRouter();
-  const swipeRootRef = useRef<HTMLDivElement | null>(null);
+  /** 터치 제스처는 게시판 본문(중앙 패널)에서만 — 헤더·탭은 셸 쪽에 둠 */
+  const swipeTouchSurfaceRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const dragPxRef = useRef(0);
@@ -106,8 +114,8 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
   useLayoutEffect(() => {
     animatingRef.current = false;
     navHrefRef.current = null;
-    const root = swipeRootRef.current;
-    if (root) root.style.removeProperty("touch-action");
+    const touchEl = swipeTouchSurfaceRef.current;
+    if (touchEl) touchEl.style.removeProperty("touch-action");
     if (trackRef.current && n > 0 && activeIdx >= 0) {
       setTrackTransform(0, false);
     }
@@ -171,8 +179,8 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
         if (start.anchorIdx === 0 && dx > 0) return;
         if (start.anchorIdx === n - 1 && dx < 0) return;
         start.horizontalLocked = true;
-        const root = swipeRootRef.current;
-        if (root) root.style.setProperty("touch-action", "none");
+        const touchEl = swipeTouchSurfaceRef.current;
+        if (touchEl) touchEl.style.setProperty("touch-action", "none");
       }
 
       if (!start.horizontalLocked) return;
@@ -184,7 +192,7 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
 
       const vw = window.innerWidth;
       let raw = dx * FOLLOW_RATIO;
-      raw = Math.max(-vw, Math.min(vw, raw));
+      raw = clampDragPxForAnchor(start.anchorIdx, n, raw, vw);
 
       setTrackTransform(raw, false);
     };
@@ -198,8 +206,8 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
       const startedOnLink = start?.startedOnLink ?? false;
       startRef.current = null;
       samplesRef.current = [];
-      const root = swipeRootRef.current;
-      if (root) root.style.removeProperty("touch-action");
+      const touchEl = swipeTouchSurfaceRef.current;
+      if (touchEl) touchEl.style.removeProperty("touch-action");
 
       if (!start || start.blocked || animatingRef.current) return;
       if (!t) return;
@@ -222,7 +230,7 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
         if (dragPx >= threshold || vx > VELOCITY_COMPLETE) nextIdx = idx - 1;
       }
 
-      if (nextIdx == null) {
+      if (nextIdx == null || nextIdx < 0 || nextIdx >= n) {
         setTrackTransform(0, true);
         return;
       }
@@ -267,12 +275,12 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
     const onTouchCancel = () => {
       startRef.current = null;
       samplesRef.current = [];
-      const r = swipeRootRef.current;
-      if (r) r.style.removeProperty("touch-action");
+      const tch = swipeTouchSurfaceRef.current;
+      if (tch) tch.style.removeProperty("touch-action");
       if (dragPxRef.current !== 0 && !animatingRef.current) setTrackTransform(0, true);
     };
 
-    const el = swipeRootRef.current;
+    const el = swipeTouchSurfaceRef.current;
     if (!el) return;
 
     const opts: AddEventListenerOptions = { passive: false, capture: true };
@@ -284,8 +292,8 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
     return () => {
       startRef.current = null;
       samplesRef.current = [];
-      const r = swipeRootRef.current;
-      if (r) r.style.removeProperty("touch-action");
+      const tch = swipeTouchSurfaceRef.current;
+      if (tch) tch.style.removeProperty("touch-action");
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove, opts);
       el.removeEventListener("touchend", onTouchEnd);
@@ -302,7 +310,6 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
 
   return (
     <div
-      ref={swipeRootRef}
       className="community-board-swipe-root"
       data-community-inner-swipe
       data-community-swipe-edge={swipeEdge}
@@ -314,7 +321,9 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
         ) : (
           <div className="community-board-swipe-panel community-board-swipe-panel--edge" aria-hidden />
         )}
-        <div className="community-board-swipe-panel community-board-swipe-panel--main">{children}</div>
+        <div ref={swipeTouchSurfaceRef} className="community-board-swipe-panel community-board-swipe-panel--main">
+          {children}
+        </div>
         {activeIdx < n - 1 ? (
           <div className="community-board-swipe-panel community-board-swipe-panel--peek" aria-hidden />
         ) : (

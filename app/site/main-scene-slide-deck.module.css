@@ -240,3 +240,94 @@
     0 1px 8px rgba(0, 0, 0, 0.65),
     0 0 1px rgba(0, 0, 0, 0.9);
 }
+
+/* —— 메인 하단 PNG 오버레이: 뷰포트 fixed, 하단 고정 UI와의 간격은 기존 변수와 동일(PC/모바일 공통,미디어 분기 없음) —— */
+
+.slideDeckBottomOverlay {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(
+    var(--mobile-bottom-nav-height) + var(--png-button-gap-above-nav) + env(safe-area-inset-bottom, 0px)
+  );
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  box-sizing: border-box;
+  z-index: 55;
+  pointer-events: none;
+}
+
+.slideDeckBottomOverlayInner {
+  pointer-events: auto;
+  width: 100%;
+  max-width: calc(100% - 1.25rem);
+  display: flex;
+  justify-content: center;
+  padding-left: max(0.5rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.5rem, env(safe-area-inset-right, 0px));
+  box-sizing: border-box;
+}
+
+.slideDeckBottomOverlayBar {
+  position: relative;
+  z-index: 51;
+  width: min(100%, 492px);
+  box-sizing: border-box;
+  min-height: max(88px, calc(28px + 3.5rem));
+  padding-bottom: 16px;
+  padding-left: max(0.35rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.35rem, env(safe-area-inset-right, 0px));
+  border-radius: 16px 16px 0 0;
+  background: rgba(20, 30, 50, 0.85);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: none;
+  overflow: visible;
+}
+
+.slideDeckBottomOverlayRow {
+  position: absolute;
+  z-index: 52;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: calc(clamp(32px, 9vw, 40px) + 20px);
+  box-sizing: border-box;
+  transform: translateY(-35%);
+  pointer-events: auto;
+}
+
+.slideDeckBottomOverlayRow > :global(.main-button) {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.slideDeckBottomOverlayRow.temp-png-button-tuning :global(.main-button img) {
+  max-width: 100%;
+  max-height: calc(3.75rem * 1.1 * 1.1 * 1.2 * 1.2);
+  object-fit: contain;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.28)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.24));
+}
+
+.slideDeckBottomOverlayRow :global(.main-button span) {
+  margin-top: 8px;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 카드 하단(날짜/장소)이 오버레이에 가리지 않도록 — 기존 모바일 globals와 동일한 하단 패딩을 메인 전 구간에 적용 */
+:global(.site-home-page--main) .slideDeckWrapWithNoticeGap .slideDeckFrame :global(.slide-deck) {
+  box-sizing: border-box;
+  padding-bottom: calc(84px + 4.5rem + 16px);
+}

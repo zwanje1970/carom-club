@@ -8,6 +8,7 @@ import {
   type CSSProperties,
   type MouseEventHandler,
   type PointerEventHandler,
+  type ReactNode,
   type WheelEventHandler,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -222,12 +223,15 @@ export default function MainSceneSlideDeck({
   sectionLabel = "",
   siteNoticeText,
   incomingFromBottomUi = false,
+  homeBottomOverlay,
 }: {
   items: SlideDeckItem[];
   sectionLabel?: string;
   siteNoticeText?: string | null;
   /** 모바일 메인(UA)만: incoming 시작을 카드 높이+하단 고정 UI 아래로 — 짧은 슬라이드에서 중간 등장 완화 */
   incomingFromBottomUi?: boolean;
+  /** 메인 하단 PNG 3버튼 등 — 슬라이드 위 fixed 오버레이(하단 고정 UI와의 간격은 globals 변수와 동일) */
+  homeBottomOverlay?: ReactNode;
 }) {
   const router = useRouter();
   /** null이면 장면 시계 미시작(첫 카드·초기 장면 고정). 값 설정 후 경과 시간 기준으로 전환 */
@@ -554,12 +558,30 @@ export default function MainSceneSlideDeck({
       </div>
     );
 
+  const bottomOverlay =
+    homeBottomOverlay != null ? (
+      <div
+        className={styles.slideDeckBottomOverlay}
+        role="region"
+        aria-label="메인 바로가기(임시 PNG)"
+      >
+        <div className={styles.slideDeckBottomOverlayInner}>
+          <div className={styles.slideDeckBottomOverlayBar}>
+            <div className={`${styles.slideDeckBottomOverlayRow} temp-png-button-tuning`}>
+              {homeBottomOverlay}
+            </div>
+          </div>
+        </div>
+      </div>
+    ) : null;
+
   return (
     <div className={styles.slideDeckShell}>
       <div className={`slide-deck-wrap ${styles.slideDeckWrapWithNoticeGap}`}>
         <div className={styles.slideDeckFrame}>
           {innerDeck}
         </div>
+        {bottomOverlay}
       </div>
     </div>
   );

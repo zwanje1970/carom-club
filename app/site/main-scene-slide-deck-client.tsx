@@ -49,6 +49,22 @@ export default function MainSceneSlideDeckClient(props: Props) {
         </div>
       </div>
     );
+    const bottomOverlay =
+      props.homeBottomOverlay != null ? (
+        <div
+          className={styles.slideDeckBottomOverlay}
+          role="region"
+          aria-label="메인 바로가기(임시 PNG)"
+        >
+          <div className={styles.slideDeckBottomOverlayInner}>
+            <div className={styles.slideDeckBottomOverlayBar}>
+              <div className={`${styles.slideDeckBottomOverlayRow} temp-png-button-tuning`}>
+                {props.homeBottomOverlay}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null;
     return (
       <div className={styles.slideDeckShell}>
         <div className={`slide-deck-wrap ${styles.slideDeckWrapWithNoticeGap}`}>
@@ -58,6 +74,7 @@ export default function MainSceneSlideDeckClient(props: Props) {
               {cardChrome}
             </div>
           </div>
+          {bottomOverlay}
         </div>
       </div>
     );

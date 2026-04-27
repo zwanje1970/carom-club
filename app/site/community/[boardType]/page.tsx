@@ -4,7 +4,7 @@ import Link from "next/link";
 import { parseCommunityBoardTypeParam } from "../../../../lib/community-board-params";
 import { getSiteCommunityConfig, listCommunityPosts } from "../../../../lib/surface-read";
 import type { SiteCommunityBoardKey } from "../../../../lib/types/entities";
-import { COMMUNITY_PRIMARY_TAB_LABEL, communityTabLabelForBoard, visibleCommunityBoardKeysForTabs } from "../community-tab-config";
+import { COMMUNITY_PRIMARY_TAB_LABEL, communityTabLabelForBoard } from "../community-tab-config";
 import CommunityBoardPostList from "../CommunityBoardPostList";
 import CommunityBoardSearchForm from "../CommunityBoardSearchForm";
 import CommunityBoardTabs from "../CommunityBoardTabs";
@@ -34,6 +34,11 @@ export default async function SiteCommunityBoardListPage({ params, searchParams 
   const qRaw = sp.q;
   const q = typeof qRaw === "string" ? qRaw.trim() : Array.isArray(qRaw) ? String(qRaw[0] ?? "").trim() : "";
 
+  const config = await getSiteCommunityConfig();
+  const board = config[boardType];
+  if (!board.visible) notFound();
+  const listBoardLabel = communityTabLabelForBoard(boardType, config);
+
   return (
     <SiteShellFrame
       brandTitle="커뮤니티"
@@ -50,6 +55,9 @@ export default async function SiteCommunityBoardListPage({ params, searchParams 
       }
     >
       <>
+        <header className="ui-community-context-head">
+          <p className="ui-community-context-head-label">{listBoardLabel}</p>
+        </header>
         <CommunityBoardSwipeShell tabs={DEFAULT_COMMUNITY_TAB_ITEMS.map(({ key, href }) => ({ key, href }))}>
           <Suspense
             fallback={
@@ -78,17 +86,11 @@ async function SiteCommunityBoardListContent({
   boardType: SiteCommunityBoardKey;
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const config = await getSiteCommunityConfig();
-  const board = config[boardType as SiteCommunityBoardKey];
-  if (!board.visible) notFound();
-
   const sp = searchParams ? await searchParams : {};
   const qRaw = sp.q;
   const q = typeof qRaw === "string" ? qRaw.trim() : Array.isArray(qRaw) ? String(qRaw[0] ?? "").trim() : "";
 
   const items = await listCommunityPosts(boardType, q ? { q } : undefined);
-
-  const listBoardLabel = communityTabLabelForBoard(boardType, config);
 
   const boardEmptyCopy: Partial<
     Record<SiteCommunityBoardKey, { emptyTitle: string; emptyDesc: string }>
@@ -110,9 +112,6 @@ async function SiteCommunityBoardListContent({
 
   return (
     <section className="site-site-gray-main v3-stack ui-community-page" data-community-board={boardType}>
-      <header className="ui-community-context-head">
-        <p className="ui-community-context-head-label">{listBoardLabel}</p>
-      </header>
       <CommunityBoardPostList showRoomPrefix={false} items={items} {...emptyProps} />
     </section>
   );
