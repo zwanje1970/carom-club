@@ -172,7 +172,7 @@ class MainActivity : AppCompatActivity() {
             WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, false)
         }
 
-        webView.addJavascriptInterface(PdfDownloadBridge(this), "CaromPdfDownload")
+        webView.addJavascriptInterface(PdfDownloadBridge(this, webView), "CaromPdfDownload")
         webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, contentLength ->
             if (url.isNullOrBlank()) return@setDownloadListener
             Log.d(

@@ -1867,8 +1867,12 @@ body:has(.site-home-page) {
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
-    /* 슬라이드 덱 하단 톤과 맞춤 — 순단색, 위치·높이 불변 */
-    background-color: var(--site-home-main-slide-deck-surface);
+    /* 모바일 좁은 뷰: 띠 배경 없음 — 공·라벨만(위치·높이·bottom 예약 유지) */
+    background-color: transparent;
+    background-image: none;
+    box-shadow: none;
+    border: none;
+    outline: none;
     grid-column: auto;
     grid-row: auto;
     align-self: stretch;
@@ -1878,6 +1882,11 @@ body:has(.site-home-page) {
   .site-home-page--main .site-home-main-png-buttons-in-shelf > .main-button img {
     transform: scale(0.9);
     transform-origin: center top;
+  }
+
+  /* .temp-png-button-tuning img 필터(2524행)보다 구체적으로 — 좁은 뷰에서만 drop-shadow 제거 */
+  .site-home-page--main .site-home-main-png-buttons-in-shelf.temp-png-button-tuning > .main-button img {
+    filter: none;
   }
 
   .site-home-page--main .site-home-main-png-shelf-instack .site-home-main-png-buttons-in-shelf {
@@ -1892,6 +1901,12 @@ body:has(.site-home-page) {
     margin: 0;
     margin-top: calc(-0.5 * var(--site-home-png-main-button-img-cap));
     pointer-events: auto;
+    background: transparent;
+    background-color: transparent;
+    background-image: none;
+    box-shadow: none;
+    border: none;
+    outline: none;
   }
 }
 
@@ -2065,8 +2080,12 @@ body:has(.site-home-page) {
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
-  /* 슬라이드 덱 하단 톤과 맞춤 — 순단색, 위치·높이 불변 */
-  background-color: var(--site-home-main-slide-deck-surface);
+  /* 모바일 UA: 띠 배경 없음 — 공·라벨만(위치·높이·bottom 예약 유지) */
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+  border: none;
+  outline: none;
   grid-column: auto;
   grid-row: auto;
   align-self: stretch;
@@ -2076,6 +2095,15 @@ body:has(.site-home-page) {
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-png-buttons-in-shelf > .main-button img {
   transform: scale(0.9);
   transform-origin: center top;
+}
+
+/* 모바일 UA: 전역 .temp-png-button-tuning img drop-shadow(2524)보다 구체적 */
+.site-shell.site-shell--ua-mobile-site
+  .site-home-page--main
+  .site-home-main-png-buttons-in-shelf.temp-png-button-tuning
+  > .main-button
+  img {
+  filter: none;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-png-shelf-instack .site-home-main-png-buttons-in-shelf {
@@ -2100,6 +2128,12 @@ body:has(.site-home-page) {
   bottom: auto;
   z-index: 1;
   pointer-events: auto;
+  background: transparent;
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+  border: none;
+  outline: none;
 }
 
 .site-home-brand {

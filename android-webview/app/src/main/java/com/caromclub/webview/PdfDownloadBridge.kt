@@ -11,6 +11,7 @@ import android.media.MediaScannerConnection
 import android.util.Base64
 import android.util.Log
 import android.webkit.JavascriptInterface
+import android.webkit.WebView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import java.io.File
@@ -21,6 +22,7 @@ import java.util.concurrent.Executors
 @SuppressLint("JavascriptInterface")
 class PdfDownloadBridge(
     private val activity: AppCompatActivity,
+    private val webView: WebView,
 ) {
     private val executor = Executors.newSingleThreadExecutor()
 
@@ -41,6 +43,7 @@ class PdfDownloadBridge(
         if (name.isEmpty()) {
             activity.runOnUiThread {
                 Toast.makeText(activity, "다운로드 실패", Toast.LENGTH_SHORT).show()
+                notifyPdfSavedToWeb(false)
             }
             return
         }
@@ -64,8 +67,17 @@ class PdfDownloadBridge(
                     if (ok) "다운로드 완료" else "다운로드 실패",
                     Toast.LENGTH_SHORT,
                 ).show()
+                notifyPdfSavedToWeb(ok)
             }
         }
+    }
+
+    /** 저장(write) 결과만 웹에 전달 — 저장 경로·디코드 로직은 변경하지 않음. */
+    private fun notifyPdfSavedToWeb(ok: Boolean) {
+        val arg = if (ok) "true" else "false"
+        val js =
+            "(function(){try{if(window.__caromOnPdfSaved)window.__caromOnPdfSaved($arg);}catch(e){}})()"
+        webView.evaluateJavascript(js, null)
     }
 
     companion object {
