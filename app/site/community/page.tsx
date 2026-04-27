@@ -33,9 +33,6 @@ export default async function SiteCommunityPage({
       }
     >
       <>
-        <header className="ui-community-context-head">
-          <p className="ui-community-context-head-label">전체 게시판</p>
-        </header>
         <CommunityBoardSwipeShell tabs={navTabs.map(({ key, href }) => ({ key, href }))}>
           <Suspense
             fallback={

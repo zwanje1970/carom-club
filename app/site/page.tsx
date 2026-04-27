@@ -1,6 +1,6 @@
 import Script from "next/script";
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { Suspense } from "react";
 import MainSceneSlideDeckClient from "./main-scene-slide-deck-client";
 import { getCommonPaletteColorHex, isCommonPaletteColor } from "../../lib/shared/common-color-palette";
@@ -15,6 +15,7 @@ import {
 } from "../../lib/surface-read";
 import { mergeTournamentAndAdSlideDeckItems } from "../../lib/site/main-slide-stream";
 import SiteShellFrame from "./components/SiteShellFrame";
+import { isPublicSiteMobileView } from "./components/SiteChromeHeader";
 import SiteMainLogo from "./components/SiteMainLogo";
 import VenuesDistanceNavLink from "./components/VenuesDistanceNavLink";
 import SitePublicLoadingShell from "./components/SitePublicLoadingShell";
@@ -324,6 +325,21 @@ async function SiteHomePageContent({
   const requestedPageId = readSearchParam(resolvedSearchParams, "pageId")?.trim() || HOME_PAGE_ID;
   const previewMode = readSearchParam(resolvedSearchParams, "previewMode") === "draft";
   const cookieStore = await cookies();
+  const headerStore = await headers();
+  const siteBuilderPreviewHeader = headerStore.get("x-site-builder-preview");
+  const nextUrlHeader =
+    headerStore.get("next-url") ??
+    headerStore.get("x-invoke-path") ??
+    headerStore.get("x-matched-path") ??
+    "";
+  const isPreviewPathRequest = nextUrlHeader.startsWith("/site/preview");
+  const isPageBuilderPreviewRequest =
+    siteBuilderPreviewHeader === "1" ||
+    isPreviewPathRequest ||
+    (headerStore.get("referer") ?? "").includes("/platform/site/pages") ||
+    (headerStore.get("referer") ?? "").includes("/platform/site/page-builder") ||
+    (headerStore.get("referer") ?? "").includes("/admin/site/page-builder");
+  const publicMobileSiteChrome = isPublicSiteMobileView(headerStore) || isPageBuilderPreviewRequest;
   const rawSession = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   const session = parseSessionCookieValue(rawSession);
   const currentUser = session ? await getUserById(session.userId) : null;
@@ -495,7 +511,14 @@ async function SiteHomePageContent({
         <section id="main-content-group" className="site-home-dark-main site-home-dark-main--stack">
           <div className="site-home-main-content-box">
             <section className="v3-stack site-home-slide-stack site-home-slide-stack--flush" style={{ gap: 0 }}>
-              <div className="site-home-main-slide-png-host">
+              <div
+                className={[
+                  "site-home-main-slide-png-host",
+                  showSiteNoticeBar ? "site-home-main-slide-png-host--with-site-notice" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
                 <div className="site-home-main-slide-logo-overlay">
                   <SiteMainLogo />
                 </div>
@@ -511,7 +534,13 @@ async function SiteHomePageContent({
                     ) : null}
                   </div>
                 </div>
-                <div className="site-home-main-slide-deck-stack">
+                <div
+                  className={
+                    publicMobileSiteChrome
+                      ? "site-home-main-slide-deck-stack site-home-main-slide-deck-stack--public-mobile"
+                      : "site-home-main-slide-deck-stack"
+                  }
+                >
                   <section
                     className="site-home-slide-anchor"
                     data-section-id={tournamentSlideEntry?.sectionId ?? "section-tournament-forced"}
@@ -525,7 +554,7 @@ async function SiteHomePageContent({
                       incomingFromBottomUi
                     />
                   </section>
-                  <div className="site-home-main-png-shelf-instack">
+                  <div className="site-home-main-png-shelf-instack png-buttons-overlay">
                     <section
                       className="site-home-main-png-buttons-temp site-home-main-png-buttons-in-shelf temp-png-button-tuning"
                       aria-label="메인 바로가기(임시 PNG)"

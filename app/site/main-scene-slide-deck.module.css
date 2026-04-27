@@ -140,11 +140,32 @@
   /* 로고·공지는 슬라이드창(.slide-deck) 위 오버레이 — 셸은 상단 패딩 없음 */
   :global(.site-home-page--main) .slideDeckShell {
     padding-top: 0;
+    /* 앵커가 flex column일 때: block 이면 자식 .slide-deck-wrap 의 flex:1 이 높이를 못 받아
+       .slide-deck 이 패딩만큼(≈44px)으로 붕괴 → absolute 카드 레이어 표시 영역 0 */
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
   }
 
   :global(.site-home-page--main) .slideDeckWrapWithNoticeGap {
     position: relative;
     gap: 0;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :global(.site-home-page--main) .slideDeckFrame {
+    width: 100%;
+    max-width: none;
+    align-self: stretch;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
   }
 
   :global(.site-home-page--main) .slide-deck > .slideDeckNoticeAbove {
@@ -172,12 +193,6 @@
     animation-duration: 18s;
   }
 
-  :global(.site-home-page--main) .slideDeckFrame {
-    width: 100%;
-    max-width: none;
-    align-self: stretch;
-  }
-
   :global(.site-home-page--main) .slideDeckCardChrome {
     width: calc(100% - 20px);
     max-width: none;
@@ -198,11 +213,30 @@
 /* 모바일 UA 셸: 뷰포트 768 초과여도 @media(max-width:767px) 안과 동일 보정(슬라이드 내 공지·프레임) */
 :global(.site-shell.site-shell--ua-mobile-site) :global(.site-home-page--main) .slideDeckShell {
   padding-top: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
 }
 
 :global(.site-shell.site-shell--ua-mobile-site) :global(.site-home-page--main) .slideDeckWrapWithNoticeGap {
   position: relative;
   gap: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+:global(.site-shell.site-shell--ua-mobile-site) :global(.site-home-page--main) .slideDeckFrame {
+  width: 100%;
+  max-width: none;
+  align-self: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 :global(.site-shell.site-shell--ua-mobile-site) :global(.site-home-page--main) .slide-deck > .slideDeckNoticeAbove {
@@ -228,12 +262,6 @@
   margin-top: -2px;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
   animation-duration: 18s;
-}
-
-:global(.site-shell.site-shell--ua-mobile-site) :global(.site-home-page--main) .slideDeckFrame {
-  width: 100%;
-  max-width: none;
-  align-self: stretch;
 }
 
 :global(.site-shell.site-shell--ua-mobile-site) :global(.site-home-page--main) .slideDeckCardChrome {

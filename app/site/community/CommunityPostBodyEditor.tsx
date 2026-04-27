@@ -208,10 +208,13 @@ function renderEditorFromBlocks(editor: HTMLElement, blocks: Block[]) {
       wrap.dataset.bi = String(i);
       wrap.dataset.url = b.url;
       wrap.dataset.sizeLevel = String(b.sizeLevel);
-      wrap.style.display = "inline-block";
-      wrap.style.verticalAlign = "middle";
+      wrap.style.display = "block";
+      wrap.style.width = "100%";
+      wrap.style.boxSizing = "border-box";
+      wrap.style.verticalAlign = "baseline";
       wrap.style.position = "relative";
       wrap.style.maxWidth = "100%";
+      wrap.style.margin = "0.5rem 0";
       wrap.style.lineHeight = "0";
       const px = getCommunityPostLongEdgePx(b.sizeLevel);
       const img = document.createElement("img");
@@ -487,6 +490,8 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
   const editorRef = useRef<HTMLDivElement>(null);
   const lastCaretRef = useRef({ blockIndex: 0, start: 0, end: 0 });
   const fileRef = useRef<HTMLInputElement>(null);
+  /** 동시에 두 번 파일 선택 처리 방지(업로드 중에도 본문 편집은 유지) */
+  const imagePickBusyRef = useRef(false);
   const bodySurfaceRef = useRef<HTMLDivElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -674,7 +679,7 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
   }
 
   function openFileDialogOnly() {
-    if (disabled || uploading) return;
+    if (disabled) return;
     syncCaretRef();
     fileRef.current?.click();
   }
@@ -683,12 +688,12 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
     ref,
     () => ({
       openImageAttach: () => {
-        if (disabled || uploading) return;
+        if (disabled) return;
         syncCaretRef();
         fileRef.current?.click();
       },
     }),
-    [disabled, uploading]
+    [disabled]
   );
 
   async function handleFilePick(event: ChangeEvent<HTMLInputElement>) {
@@ -696,12 +701,12 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
     const fileArray = picked ? Array.from(picked) : [];
     event.target.value = "";
     if (!fileArray.length || disabled) return;
+    if (imagePickBusyRef.current) return;
     const ed0 = editorRef.current;
     if (!ed0) return;
 
-    // 1–3. editor DOM → parse → 최신 blocks 확정 (이후 삽입은 반드시 이 기준)
+    // DOM → 로컬 working만 갱신(저장과 분리). 초기 setBlocks 생략으로 업로드 중에도 입력 반응 유지
     let working = ensureTrailingTextBlock(parseDomToBlocks(ed0));
-    setBlocks(working);
     const caretNow = getCaretInEditor(ed0, working);
     if (caretNow) {
       lastCaretRef.current = { blockIndex: caretNow.blockIndex, start: caretNow.start, end: caretNow.end };
@@ -713,24 +718,30 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
       setError("이미지는 최대 " + MAX_COMMUNITY_POST_IMAGE_COUNT + "장까지입니다.");
       return;
     }
+
+    imagePickBusyRef.current = true;
     setError("");
-    setUploading(true);
     setSelectedImageBlockIndex(null);
     setToolbarRect(null);
 
     try {
       for (const file of fileArray) {
         if (countImages(working) >= MAX_COMMUNITY_POST_IMAGE_COUNT) break;
+        setUploading(true);
         const formData = new FormData();
         formData.append("file", file);
         formData.append("sitePublic", "1");
         const response = await fetch("/api/upload/image", { method: "POST", body: formData });
         if (!response.ok) {
           setError("이미지 업로드에 실패했습니다.");
+          setUploading(false);
           continue;
         }
         const data = (await response.json()) as { w640Url?: string };
-        if (typeof data.w640Url !== "string" || !data.w640Url.trim()) continue;
+        if (typeof data.w640Url !== "string" || !data.w640Url.trim()) {
+          setUploading(false);
+          continue;
+        }
         const url = data.w640Url.trim();
         if (insertAtBlock < 0 || insertAtBlock >= working.length || working[insertAtBlock].type !== "text") {
           let tidx = working.findIndex((b) => b.type === "text");
@@ -743,8 +754,11 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
           sel = { start: tb0.value.length, end: tb0.value.length };
         }
         const tb = working[insertAtBlock] as TextBlock;
-        const before = tb.value.slice(0, sel.start);
+        let before = tb.value.slice(0, sel.start);
         const after = tb.value.slice(sel.end);
+        if (before.length > 0 && !before.endsWith("\n")) {
+          before = `${before}\n`;
+        }
         const prevIsImage = insertAtBlock > 0 && working[insertAtBlock - 1]?.type === "image";
         if (prevIsImage && before === "") {
           const newBlocks: Block[] = [
@@ -758,6 +772,7 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
           lastCaretRef.current = { blockIndex: afterTextIndex, start: 0, end: 0 };
           insertAtBlock = afterTextIndex;
           sel = { start: 0, end: 0 };
+          setUploading(false);
           continue;
         }
         const newBlocks: Block[] = [
@@ -772,6 +787,7 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
         lastCaretRef.current = { blockIndex: afterTextIndex, start: 0, end: 0 };
         insertAtBlock = afterTextIndex;
         sel = { start: 0, end: 0 };
+        setUploading(false);
       }
       setBlocks(working);
       queueMicrotask(() => {
@@ -785,6 +801,7 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
       setError("이미지 업로드에 실패했습니다.");
     } finally {
       setUploading(false);
+      imagePickBusyRef.current = false;
     }
   }
 
@@ -1044,14 +1061,44 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
             }
 
             if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
               const c = getCaretInEditor(ed, blocksRef.current);
-              if (!c) return;
+              if (!c) {
+                setBlocks((prev) => {
+                  const next = [...prev];
+                  let textIdx = -1;
+                  for (let j = next.length - 1; j >= 0; j--) {
+                    if (next[j]?.type === "text") {
+                      textIdx = j;
+                      break;
+                    }
+                  }
+                  if (textIdx < 0) {
+                    next.push({ type: "text", value: "\n" });
+                    textIdx = next.length - 1;
+                  } else {
+                    const tbb = next[textIdx] as TextBlock;
+                    next[textIdx] = { type: "text", value: `${tbb.value}\n` };
+                  }
+                  const merged = ensureTrailingTextBlock(next);
+                  const fi = textIdx;
+                  const len = (merged[fi] as TextBlock).value.length;
+                  queueMicrotask(() => {
+                    const el = editorRef.current;
+                    if (!el) return;
+                    renderEditorFromBlocks(el, merged);
+                    lastCaretRef.current = { blockIndex: fi, start: len, end: len };
+                    setCaretInTextBlock(el, fi, len);
+                  });
+                  return merged;
+                });
+                return;
+              }
               const ti = c.blockIndex;
               const cur = blocksRef.current;
               const prevIsImage = ti > 0 && cur[ti - 1]?.type === "image";
               const nextIsImage = ti + 1 < cur.length && cur[ti + 1]?.type === "image";
               if (prevIsImage || nextIsImage) {
-                e.preventDefault();
                 const roots = getOrderedBlockRoots(ed);
                 const t = roots[ti] as HTMLElement | undefined;
                 if (!t?.classList.contains("cp-text")) return;
@@ -1075,7 +1122,6 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
                 });
                 return;
               }
-              e.preventDefault();
               const cursor = c.start;
               setBlocks((prev) => {
                 const merged = splitTextBlock(prev, ti, cursor);

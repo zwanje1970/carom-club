@@ -27,10 +27,12 @@ export type { SlideDeckItem };
  */
 const TIMELINE_SCALE = 1.2;
 
-/** 출발 0 / 상승 8 / 정지 6 / 후퇴 4 (초) — 출발 0이면 첫 페인트에서 상승이 중간부터 보일 수 있음 */
+/** 출발 0 / 상승 9 / 정지 6 / 후퇴 4 (초) — 출발 0이면 첫 페인트에서 상승이 중간부터 보일 수 있음 */
 const INCOMING_DELAY_S = 0;
-/** 아래에서 중앙까지 상승에 걸리는 시간 */
-const INCOMING_RISE_S = 8;
+/** 아래에서 정지 높이까지 상승에 걸리는 시간 */
+const INCOMING_RISE_S = 9;
+/** 정지 위치를 기하학적 가운데(factor 0)보다 위로 — 상승 총거리의 (이 값/INCOMING_RISE_S) 만큼(시간 비례) */
+const INCOMING_ABOVE_CENTER_SEC = 1;
 /** 장면 시작부터 중앙 카드가 후퇴를 시작하기까지(정지 구간) */
 const CENTER_HOLD_S = 6;
 /** 후퇴(이동·페이드)에 걸리는 시간 */
@@ -76,15 +78,35 @@ function riseFactor(r: number): number {
   return 1 / 3 - u * (1 / 3);
 }
 
+/** riseFactor 1→0 을 incoming translate factor 1→(-INCOMING_ABOVE_CENTER_SEC/INCOMING_RISE_S) 로 remap — 정지가 가운데보다 위 */
+function riseFactorToIncomingTransformFactor(riseF: number): number {
+  const a = INCOMING_ABOVE_CENTER_SEC / INCOMING_RISE_S;
+  return riseF * (1 + a) - a;
+}
+
+function incomingYBase(fromBottomUi: boolean): string {
+  return fromBottomUi
+    ? "max(calc(100% + 120px + 9rem + var(--site-bottom-reserve, var(--site-home-bottom-nav-reserve)) + max(5.5rem, 16dvh)), calc(34dvh + 50%))"
+    : "calc(52dvh + 58%)";
+}
+
 /**
  * incoming 시작 세로 오프셋(translateY 양수 = 아래에서 등장).
  * 모바일 메인: max(50cqh+50%, 하단식) 에서 긴 슬라이드에 cqh 가 커져 하단식이 지는 문제 → cqh 제거, 하단식과 dvh 하한만 max.
  */
 function incomingTranslateY(factor: number, fromBottomUi: boolean): string {
-  const base = fromBottomUi
-    ? "max(calc(100% + 120px + 9rem + var(--site-home-mobile-bottom-nav-slide-extra, 40px) + max(5.5rem, 16dvh) + env(safe-area-inset-bottom, 0px)), calc(34dvh + 50%))"
-    : "calc(52dvh + 58%)";
+  const base = incomingYBase(fromBottomUi);
   return `translateY(calc((${base}) * ${factor})) scale(1)`;
+}
+
+function centerRetreatTransform(
+  moveTyPercent: number,
+  outgoingScale: number,
+  fromBottomUi: boolean,
+): string {
+  const base = incomingYBase(fromBottomUi);
+  const rest = -INCOMING_ABOVE_CENTER_SEC / INCOMING_RISE_S;
+  return `translateY(calc((${base}) * ${rest})) translateY(${moveTyPercent}%) scale(${outgoingScale})`;
 }
 
 const RETREAT_PTS: {
@@ -151,7 +173,7 @@ function cardStyleForRole(
         zIndex: 120,
       };
     }
-    const factor = riseFactor(roleProgress);
+    const factor = riseFactorToIncomingTransformFactor(riseFactor(roleProgress));
     return {
       opacity: 1,
       visibility: "visible",
@@ -166,7 +188,7 @@ function cardStyleForRole(
       return {
         opacity: 1,
         visibility: "visible",
-        transform: "translateY(0) scale(1)",
+        transform: incomingTranslateY(-INCOMING_ABOVE_CENTER_SEC / INCOMING_RISE_S, incomingFromBottomUi),
         filter: "blur(0)",
         zIndex: 100,
       };
@@ -187,7 +209,7 @@ function cardStyleForRole(
     return {
       opacity,
       visibility: opacity < 0.02 ? "hidden" : "visible",
-      transform: `translateY(${move.ty}%) scale(${outgoingScale})`,
+      transform: centerRetreatTransform(move.ty, outgoingScale, incomingFromBottomUi),
       filter: "blur(0)",
       zIndex: 40,
     };

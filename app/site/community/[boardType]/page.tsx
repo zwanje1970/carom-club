@@ -4,11 +4,7 @@ import Link from "next/link";
 import { parseCommunityBoardTypeParam } from "../../../../lib/community-board-params";
 import { getSiteCommunityConfig, listCommunityPosts } from "../../../../lib/surface-read";
 import type { SiteCommunityBoardKey } from "../../../../lib/types/entities";
-import {
-  communityBoardListHref,
-  communityNavTabsFromConfig,
-  communityTabLabelForBoard,
-} from "../community-tab-config";
+import { communityBoardListHref, communityNavTabsFromConfig } from "../community-tab-config";
 import CommunityBoardPostList from "../CommunityBoardPostList";
 import CommunityBoardSearchForm from "../CommunityBoardSearchForm";
 import CommunityBoardTabs from "../CommunityBoardTabs";
@@ -33,7 +29,6 @@ export default async function SiteCommunityBoardListPage({ params, searchParams 
   const config = await getSiteCommunityConfig();
   const board = config[boardType];
   if (!board.visible) notFound();
-  const listBoardLabel = communityTabLabelForBoard(boardType, config);
   const navTabs = communityNavTabsFromConfig(config);
 
   return (
@@ -52,9 +47,6 @@ export default async function SiteCommunityBoardListPage({ params, searchParams 
       }
     >
       <>
-        <header className="ui-community-context-head">
-          <p className="ui-community-context-head-label">{listBoardLabel}</p>
-        </header>
         <CommunityBoardSwipeShell tabs={navTabs.map(({ key, href }) => ({ key, href }))}>
           <Suspense
             fallback={

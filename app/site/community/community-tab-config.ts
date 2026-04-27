@@ -16,6 +16,11 @@ export function communityBoardListHref(boardKey: SiteCommunityBoardKey): string 
   return `/site/community/${boardKey}`;
 }
 
+/** 게시글 상세·수정 등 `[boardType]/[id]` 경로 — 내부 키(reviews) → URL 세그먼트(review) */
+export function communityPostDetailHref(boardKey: SiteCommunityBoardKey, postId: string): string {
+  return `${communityBoardListHref(boardKey)}/${postId}`;
+}
+
 /** 상단 탭 라벨 (자유게시판 … 구인구직) */
 export const COMMUNITY_PRIMARY_TAB_LABEL = {
   free: "자유게시판",

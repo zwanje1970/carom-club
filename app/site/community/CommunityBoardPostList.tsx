@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { CommunityPostListItem, SiteCommunityBoardKey } from "../../../lib/types/entities";
-import { COMMUNITY_ROOM_PREFIX_SHORT, isPrimaryTabKey } from "./community-tab-config";
+import { COMMUNITY_ROOM_PREFIX_SHORT, communityPostDetailHref, isPrimaryTabKey } from "./community-tab-config";
 
 function formatListDateTime(iso: string): string {
   const d = new Date(iso);
@@ -52,7 +52,7 @@ export default function CommunityBoardPostList({
   return (
     <ul className="ui-community-board-rows">
       {items.map((post) => {
-        const href = `/site/community/${post.boardType}/${post.id}`;
+        const href = communityPostDetailHref(post.boardType, post.id);
         const prefix =
           showRoomPrefix && isPrimaryTabKey(post.boardType)
             ? COMMUNITY_ROOM_PREFIX_SHORT[post.boardType]

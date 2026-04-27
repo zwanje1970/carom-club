@@ -39,25 +39,45 @@
 
   /* 모바일 하단 고정 탭·PNG 버튼 간격 공통 (메인 등에서 참조) */
   --mobile-bottom-nav-height: 40px;
-  --png-button-gap-above-nav: 24px;
   /* 홈 메인 하단 “탭+safe” 예약 — 하위에서 --site-home-bottom-safe-effective만 덮으면 reserve가 따라감 */
   --site-home-bottom-safe-effective: env(safe-area-inset-bottom, 0px);
-  --site-home-bottom-nav-reserve: calc(
-    var(--mobile-bottom-nav-height) + var(--site-home-bottom-safe-effective)
-  );
+  /* 하단 점유(탭+safe) — 슬라이드·구슬·TS 오프셋 공통 진리값 */
+  --site-bottom-reserve: calc(var(--mobile-bottom-nav-height) + var(--site-home-bottom-safe-effective));
+  --site-home-bottom-nav-reserve: var(--site-bottom-reserve);
 
-  /* 메인 슬라이드 카드창(.slide-deck) 패널 배경 */
-  --site-home-main-slide-deck-surface: #2a3f66;
+  /*
+   * 메인 구슬·슬라이드 트림: 탭 상단 ↔ 구슬 이미지 중심 목표 간격(5~15px 띠 안).
+   */
+  --site-home-main-orbs-label-stack-height: calc(0.75rem * 1.2 + 6px);
+  --site-home-main-orb-gap-from-tab: clamp(5px, 10px, 15px);
+  --site-home-main-orbs-slide-trim-gap-above-nav: var(--site-home-main-orb-gap-from-tab);
+
+  /* 메인 슬라이드 카드창(.slide-deck) 패널 기준색 — 선형·방사 그라데이션과 맞춤 */
+  --site-home-main-slide-deck-surface: #2563eb;
+  /* 슬라이드 창 세로 그라데이션 막단(물리적 하단 100%) — 하단 비네트와 동일 토큰 */
+  --site-home-main-slide-deck-bottom-edge: #1e40af;
+  /* 슬라이드창과 동일 크기(::after, inset:0): 높이 6등분 — 1단계만 하단 모서리색, 2~6단계 투명 */
+  --site-home-slide-deck-bottom-vignette: linear-gradient(
+    to top,
+    var(--site-home-main-slide-deck-bottom-edge) 0%,
+    var(--site-home-main-slide-deck-bottom-edge) calc(100% * 1 / 6),
+    transparent calc(100% * 1 / 6),
+    transparent 100%
+  );
   /* 메인 임시 PNG 구슬 최대 크기 — 하단 겹침 띠 높이 식과 동기(배율만 변경) */
   --site-home-png-main-button-img-cap: calc(3.75rem * 1.1 * 1.1 * 1.2 * 0.7);
+  --site-home-png-main-button-half-cap: calc(var(--site-home-png-main-button-img-cap) * 0.5);
+  /* 투명 PNG 구슬 그림자 — 메인 in-shelf·temp 경로 포함(≤767에서도 동일 변수) */
+  --site-home-main-orb-img-drop-shadow: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.34))
+    drop-shadow(0 4px 10px rgba(0, 0, 0, 0.31));
   /*
    * 하단 겹침 띠 높이(탭 위 간격 + 라벨 + 구슬 반지름 − undershoot).
    * undershoot>0 이면 띠 윗선이 아래로(적도보다 낮게).
    */
   --site-home-png-shelf-undershoot: 0px;
   --site-home-png-shelf-stack-height: calc(
-    var(--png-button-gap-above-nav) + 0.75rem * 1.2 + 6px + (3.75rem * 1.1 * 1.1 * 1.2 * 0.7 * 0.5) -
-      var(--site-home-png-shelf-undershoot)
+    var(--site-home-main-orbs-slide-trim-gap-above-nav) + var(--site-home-main-orbs-label-stack-height) +
+      var(--site-home-png-main-button-half-cap) - var(--site-home-png-shelf-undershoot)
   );
   /* 메인 슬라이드 덱 하단을 PNG 구슬 적도(이미지 수직 중앙)에 맞출 때 빼는 높이 — 하단 겹침 띠와 동일 */
   --site-home-slide-deck-trim-to-button-equator: var(--site-home-png-shelf-stack-height);
@@ -1400,9 +1420,14 @@ body:has(.site-home-page) {
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    /* 공지 띠: viewport 상단(top:0) 기준 세로 길이 — 슬라이드 앵커는 top:0으로 띠와 세로 겹침 */
+    --site-home-main-notice-band-height: calc(
+      env(safe-area-inset-top, 0px) + 12px + 0.72rem * 1.35 + 4px + clamp(30px, 8.4vw, 34px) + 8px
+    );
     /* 슬라이드 높이: 기본 덱 높이(0.7 미적용) + 하단 고정 탭 대역 — .slide-deck height calc와 동기 */
     --site-home-mobile-bottom-nav-slide-extra: var(--mobile-bottom-nav-height);
-    background-color: var(--ui-bg-page);
+    /* 슬라이드창·뒤 레이어 톤만 보이게 — 짙은 남색/페이지 배경은 투명 */
+    background-color: transparent;
     background-image: none;
   }
 
@@ -1491,10 +1516,6 @@ body:has(.site-home-page) {
 
   /* 모바일 메인: 공지 띠 — 화면 최상단(상태 표시줄 아래 가장자리)부터 기존 공지 줄까지 한 덩어리로 확장, 로고(z400)보다 아래 */
   .site-home-page--main .site-home-main-notice-strip {
-    --site-home-main-notice-content-h: clamp(30px, 8.4vw, 34px);
-    --site-home-main-notice-content-top: calc(
-      env(safe-area-inset-top, 0px) + 12px + 0.72rem * 1.35 + 4px
-    );
     position: fixed;
     left: 0;
     right: 0;
@@ -1502,7 +1523,7 @@ body:has(.site-home-page) {
     max-width: none;
     box-sizing: border-box;
     top: 0;
-    height: calc(var(--site-home-main-notice-content-top) + var(--site-home-main-notice-content-h) + 8px);
+    height: var(--site-home-main-notice-band-height);
     z-index: 380;
     pointer-events: none;
     overflow: hidden;
@@ -1519,12 +1540,20 @@ body:has(.site-home-page) {
     justify-content: flex-end;
     align-items: stretch;
     box-sizing: border-box;
-    background: rgba(0, 0, 0, 0.38);
+    /* 진한 청색(#172554 계열) · 불투명도 50% — 공지 없을 때만 */
+    background: rgba(23, 37, 84, 0.5);
     overflow: hidden;
     padding-top: 4px;
     padding-bottom: 5px;
     padding-left: max(0.45rem, env(safe-area-inset-left, 0px));
     padding-right: max(0.45rem, env(safe-area-inset-right, 0px));
+  }
+
+  .site-home-page--main
+    .site-home-main-slide-png-host--with-site-notice
+    .site-home-main-notice-strip__inner {
+    /* 진한 군청(남청) · α0.6 — 공지 있을 때 띠 전용 */
+    background: rgba(23, 37, 84, 0.6);
   }
 
   .site-home-page--main .site-home-main-notice-strip__text {
@@ -1615,21 +1644,26 @@ body:has(.site-home-page) {
     padding-right: 0;
     padding-top: 0;
     /* 모바일 고정형: 하단 홈/FAB에 가리지 않도록 홈 바 위 여유 확보(값 키우면 PNG·대시보드가 더 위로) */
-    padding-bottom: calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 6px);
+    padding-bottom: calc(var(--site-home-bottom-nav-reserve) + 6px);
   }
 
-  /* 메인(/) 모바일: 다크 본문 포스터형 배경(기본 .site-home-dark-main 과 동일) */
+  /* 메인(/) 모바일: 본문 래퍼 배경 투명 — 다크 그라데이션·노이즈 없음 */
   .site-home-page--main .site-home-dark-main {
-    background-color: var(--site-home-bg-c);
-    background-image:
-      radial-gradient(ellipse 130% 52% at 50% -14%, rgba(255, 255, 255, 0.16) 0%, rgba(160, 190, 235, 0.07) 32%, transparent 60%),
-      linear-gradient(180deg, var(--site-home-bg-a) 0%, var(--site-home-bg-b) 52%, var(--site-home-bg-c) 100%);
+    background-color: transparent;
+    background-image: none;
     /* 고정 하단 탭 + safe — PNG·슬라이드와 동일 토큰 */
     padding-bottom: var(--site-home-bottom-nav-reserve);
   }
 
   .site-home-page--main .site-home-dark-main::before {
-    opacity: 0.16;
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  html:has(.site-home-page--main),
+  body:has(.site-home-page--main) {
+    background-color: transparent;
+    background-image: none;
   }
 
   .site-home-dark-main.site-home-dark-main--stack > .site-home-main-content-box {
@@ -1702,8 +1736,13 @@ body:has(.site-home-page) {
     padding: 0;
     align-items: stretch;
     position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
   }
 
+  /* 메인 슬라이드창(≤767px): 파란 패널 + 그라데이션 · 말미 !important 블록과 톤 동기 */
   .site-home-page--main .slide-deck-wrap .slide-deck {
     width: 100%;
     max-width: none;
@@ -1712,40 +1751,49 @@ body:has(.site-home-page) {
     box-sizing: border-box;
     border-radius: 0;
     margin-top: 0;
-    /* 고정 띠(.site-home-main-png-shelf-instack) 높이는 .site-home-main-slide-deck-stack padding-bottom 으로만 확보 */
-    height: calc(
-      (var(--slide-window-reference-height) * 1.2 + var(--slide-layer-padding-y)) * 1.3 *
-        var(--slide-window-height-scale) + var(--site-home-mobile-bottom-nav-slide-extra, var(--mobile-bottom-nav-height))
-    );
-    padding-bottom: max(16px, calc(84px + 4.5rem + 16px));
-    /* 메인 카드창 기준색(: --site-home-main-slide-deck-surface)에 맞춘 청·네이비 — 본문 포스터 변수만 쓰면 화면에서 거의 검정으로 보임 */
+    flex: 1 1 auto;
+    min-height: 100%;
+    height: auto;
+    max-height: none;
+    padding-bottom: max(16px, 2.75rem);
     background-color: var(--site-home-main-slide-deck-surface);
-    background-image:
-      radial-gradient(ellipse 125% 50% at 50% -12%, rgba(255, 255, 255, 0.2) 0%, rgba(140, 180, 235, 0.22) 34%, transparent 58%),
-      linear-gradient(
-        180deg,
-        #3d62a0 0%,
-        #325882 18%,
-        var(--site-home-main-slide-deck-surface) 52%,
-        #243652 100%
-      );
+    background-image: linear-gradient(
+      180deg,
+      #3b82f6 0%,
+      #3b82f6 22%,
+      var(--site-home-main-slide-deck-surface) 52%,
+      var(--site-home-main-slide-deck-bottom-edge) 100%
+    );
     border: none;
-    box-shadow: none;
+    box-shadow: inset 0 -26px 52px -22px rgba(15, 23, 42, 0.32);
+    /* 공지 띠(z380) 아래로 카드가 비치도록 — 기본 .slide-deck overflow:hidden 보다 구체적으로 덮음 */
+    overflow-x: clip;
+    overflow-y: visible;
   }
 
-  /* 상단만 살짝 어둡게 — 배경 청색 그라데이션을 전면에서 가리지 않음 */
+  /* 카드 레이어 최대 z≈300(incoming) — 딤·상단 흐림은 그 위(310)로 두어 카드가 그림자 밑으로 지나감. 공지 320·크롬 800 유지 */
   .site-home-page--main .slide-deck-wrap .slide-deck::before {
     content: "";
     position: absolute;
     inset: 0;
-    z-index: 4;
+    z-index: 310;
     pointer-events: none;
     background: linear-gradient(
       to bottom,
-      rgba(10, 22, 40, 0.2) 0%,
-      rgba(10, 22, 40, 0.06) 20%,
-      transparent 44%
+      rgba(15, 23, 42, 0.18) 0%,
+      rgba(30, 64, 175, 0.08) 22%,
+      transparent 46%
     );
+  }
+
+  /* 하단 비네트: 슬라이드창 높이에 종속(inset:0) · 카드 위(305) · 상단 딤(310) 아래 */
+  .site-home-page--main .slide-deck-wrap .slide-deck::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 305;
+    pointer-events: none;
+    background: var(--site-home-slide-deck-bottom-vignette);
   }
 
   .site-home-dark-main .site-home-cta-primary {
@@ -1773,32 +1821,150 @@ body:has(.site-home-page) {
   position: relative;
 }
 
-.site-home-page--main .site-home-main-slide-deck-stack > .site-home-slide-anchor,
-.site-home-page--main .site-home-main-slide-deck-stack > .site-home-main-png-shelf-instack {
+.site-home-page--main .site-home-main-slide-deck-stack > .site-home-slide-anchor {
   grid-column: 1;
   grid-row: 1;
-}
-
-.site-home-page--main .site-home-main-slide-deck-stack > .site-home-slide-anchor {
-  align-self: start;
+  align-self: stretch;
   z-index: 0;
   min-width: 0;
 }
 
-.site-home-page--main .site-home-main-slide-deck-stack > .site-home-main-png-shelf-instack {
+/* 메인 모바일(좁은 뷰포트): 슬라이드창 뷰포트 고정 — 하단 사이트 탭 뒤까지 배경, 오버레이는 z-index로 위 */
+@media (max-width: 767px) {
+  .site-home-page--main .site-home-main-slide-deck-stack {
+    min-height: 100dvh;
+  }
+
+  .site-home-page--main .site-home-main-slide-deck-stack > .site-home-slide-anchor {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: var(--site-bottom-reserve);
+    left: 0;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    grid-column: auto;
+    grid-row: auto;
+    align-self: auto;
+  }
+
+  .site-home-page--main .site-home-main-slide-deck-stack > .site-home-slide-anchor .slide-deck-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .site-home-page--main .site-home-main-slide-deck-stack > .site-home-slide-anchor .slide-deck-wrap .slide-deck {
+    flex: 1 1 auto;
+    min-height: 100%;
+  }
+}
+
+/* PNG 오버레이: 레이아웃 높이 0 — 구슬은 position:fixed 로만 그림 */
+.site-home-page--main .site-home-main-png-shelf-instack {
+  grid-column: 1;
+  grid-row: 1;
   align-self: end;
-  z-index: 5;
+  z-index: 1;
   width: 100vw;
   max-width: none;
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
   justify-self: center;
-  height: var(--site-home-png-shelf-stack-height);
+  height: 0;
+  overflow: visible;
   pointer-events: none;
-  background-color: #050f1f;
+  background: none;
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+  border: none;
+  outline: none;
+  position: relative;
 }
 
-/* 메인 PNG 3버튼(띠 내부 DOM) — 공통 타이포·flex; 좁은 화면은 static, 768px~ 는 기존처럼 fixed */
+/*
+ * 구슬 이미지 세로 중앙(표시 반높이) = 블록 top·적도 식. ≤767px 에서만 img scale(0.9) → 0.45×cap(기존과 동일).
+ */
+.site-home-page--main {
+  --site-home-png-img-visual-half: var(--site-home-png-main-button-half-cap);
+}
+
+@media (max-width: 767px) {
+  .site-home-page--main {
+    --site-home-png-img-visual-half: calc(var(--site-home-png-main-button-img-cap) * 0.45);
+  }
+}
+
+/* 공개 모바일 셸: 스택은 그리드 유지, PNG용 padding-bottom 없음(오버레이만) */
+.site-home-page--main .site-home-main-slide-deck-stack--public-mobile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  min-height: 100dvh;
+  position: relative;
+  box-sizing: border-box;
+  background: none;
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+  border: none;
+  outline: none;
+}
+
+.site-home-page--main .site-home-main-slide-deck-stack--public-mobile > .site-home-slide-anchor {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: var(--site-bottom-reserve);
+  left: 0;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 0;
+}
+
+.site-home-page--main .site-home-main-slide-deck-stack--public-mobile > .site-home-slide-anchor .slide-deck-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.site-home-page--main .site-home-main-slide-deck-stack--public-mobile > .site-home-slide-anchor .slide-deck-wrap .slide-deck {
+  flex: 1 1 auto;
+  min-height: 100%;
+  overflow-x: clip;
+  overflow-y: visible;
+}
+
+.png-buttons-overlay {
+  background: none;
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+  border: none;
+  outline: none;
+}
+
+.png-buttons-overlay .site-home-main-png-buttons-in-shelf {
+  background: none;
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+  border: none;
+  outline: none;
+}
+
+/* 메인 PNG 3버튼: viewport 고정 오버레이(슬라이드 레이아웃·높이 밀지 않음) */
 .site-home-page--main .site-home-main-png-buttons-in-shelf {
   display: flex;
   flex-direction: row;
@@ -1806,18 +1972,41 @@ body:has(.site-home-page) {
   align-items: flex-end;
   justify-content: center;
   box-sizing: border-box;
+  position: fixed;
+  left: 0;
+  right: 0;
   width: 100%;
   max-width: none;
   margin: 0;
+  margin-top: 0;
   padding-left: max(0.5rem, env(safe-area-inset-left, 0px));
   padding-right: max(0.5rem, env(safe-area-inset-right, 0px));
   gap: calc(clamp(32px, 9vw, 40px) + 20px);
+  /* 라벨 하단 = 탭 상단 + gap + 반높이 + 라벨열 → 이미지 중심이 탭 위 gap 에 오도록 */
+  bottom: calc(
+    var(--site-bottom-reserve) + var(--site-home-main-orb-gap-from-tab) +
+      var(--site-home-png-img-visual-half) + var(--site-home-main-orbs-label-stack-height)
+  );
+  z-index: 65;
+  pointer-events: none;
+  background: none;
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+  border: none;
+  outline: none;
 }
 
 .site-home-page--main .site-home-main-png-buttons-in-shelf .main-button {
   position: relative;
   z-index: 1;
   pointer-events: auto;
+  background: none;
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+  border: none;
+  outline: none;
 }
 
 .site-home-page--main .site-home-main-png-buttons-in-shelf .main-button span {
@@ -1841,87 +2030,14 @@ body:has(.site-home-page) {
 }
 
 @media (max-width: 767px) {
-  .site-home-page--main .site-home-main-slide-deck-stack {
-    display: block;
-    width: 100%;
-    position: relative;
-    padding-bottom: var(--site-home-png-shelf-stack-height);
-    box-sizing: border-box;
-  }
-
-  .site-home-page--main .site-home-main-slide-deck-stack > .site-home-main-png-shelf-instack {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: var(--site-home-bottom-nav-reserve);
-    width: 100vw;
-    max-width: none;
-    margin-left: calc(50% - 50vw);
-    margin-right: calc(50% - 50vw);
-    height: var(--site-home-png-shelf-stack-height);
-    z-index: 5;
-    box-sizing: border-box;
-    pointer-events: auto;
-    overflow: visible;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-start;
-    /* 모바일 좁은 뷰: 띠 배경 없음 — 공·라벨만(위치·높이·bottom 예약 유지) */
-    background-color: transparent;
-    background-image: none;
-    box-shadow: none;
-    border: none;
-    outline: none;
-    grid-column: auto;
-    grid-row: auto;
-    align-self: stretch;
-    justify-self: stretch;
-  }
-
   .site-home-page--main .site-home-main-png-buttons-in-shelf > .main-button img {
     transform: scale(0.9);
-    transform-origin: center top;
+    transform-origin: center center;
   }
 
-  /* .temp-png-button-tuning img 필터(2524행)보다 구체적으로 — 좁은 뷰에서만 drop-shadow 제거 */
+  /* in-shelf+tuning: 데스크톱과 동일 구슬 그림자(변수 한 곳) */
   .site-home-page--main .site-home-main-png-buttons-in-shelf.temp-png-button-tuning > .main-button img {
-    filter: none;
-  }
-
-  .site-home-page--main .site-home-main-png-shelf-instack .site-home-main-png-buttons-in-shelf {
-    position: static;
-    left: auto;
-    right: auto;
-    bottom: auto;
-    z-index: 1;
-    flex: 0 0 auto;
-    width: 100%;
-    max-width: none;
-    margin: 0;
-    margin-top: calc(-0.5 * var(--site-home-png-main-button-img-cap));
-    pointer-events: auto;
-    background: transparent;
-    background-color: transparent;
-    background-image: none;
-    box-shadow: none;
-    border: none;
-    outline: none;
-  }
-}
-
-@media (min-width: 768px) {
-  .site-home-page--main .site-home-main-png-buttons-in-shelf {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: calc(var(--site-home-bottom-nav-reserve) + 30px);
-    z-index: 68;
-    pointer-events: none;
-  }
-
-  .site-home-page--main .site-home-main-png-buttons-in-shelf .main-button {
-    pointer-events: auto;
+    filter: var(--site-home-main-orb-img-drop-shadow);
   }
 }
 
@@ -1930,10 +2046,6 @@ body:has(.site-home-page) {
  * (PC는 .site-shell--pc-site-chrome 전용 — 여기 비적용)
  */
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-notice-strip {
-  --site-home-main-notice-content-h: clamp(30px, 8.4vw, 34px);
-  --site-home-main-notice-content-top: calc(
-    env(safe-area-inset-top, 0px) + 12px + 0.72rem * 1.35 + 4px
-  );
   position: fixed;
   left: 0;
   right: 0;
@@ -1941,7 +2053,7 @@ body:has(.site-home-page) {
   max-width: none;
   box-sizing: border-box;
   top: 0;
-  height: calc(var(--site-home-main-notice-content-top) + var(--site-home-main-notice-content-h) + 8px);
+  height: var(--site-home-main-notice-band-height);
   z-index: 380;
   pointer-events: none;
   overflow: hidden;
@@ -1958,12 +2070,20 @@ body:has(.site-home-page) {
   justify-content: flex-end;
   align-items: stretch;
   box-sizing: border-box;
-  background: rgba(0, 0, 0, 0.38);
+  background: rgba(23, 37, 84, 0.5);
   overflow: hidden;
   padding-top: 4px;
   padding-bottom: 5px;
   padding-left: max(0.45rem, env(safe-area-inset-left, 0px));
   padding-right: max(0.45rem, env(safe-area-inset-right, 0px));
+}
+
+.site-shell.site-shell--ua-mobile-site
+  .site-home-page--main
+  .site-home-main-slide-png-host--with-site-notice
+  .site-home-main-notice-strip__inner {
+  /* 진한 군청(남청) · α0.6 — 공지 있을 때 띠 전용 */
+  background: rgba(23, 37, 84, 0.6);
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-notice-strip__text {
@@ -1992,11 +2112,47 @@ body:has(.site-home-page) {
   overflow-y: visible;
 }
 
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-slide-deck-stack {
+  min-height: 100dvh;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--main {
+  --site-home-main-notice-band-height: calc(
+    env(safe-area-inset-top, 0px) + 12px + 0.72rem * 1.35 + 4px + clamp(30px, 8.4vw, 34px) + 8px
+  );
+  background-color: transparent;
+  background-image: none;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-dark-main {
+  background-color: transparent;
+  background-image: none;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-dark-main::before {
+  opacity: 0;
+  visibility: hidden;
+}
+
+html:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main),
+body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
+  background-color: transparent;
+  background-image: none;
+}
+
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-slide-deck-stack > .site-home-slide-anchor {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: var(--site-bottom-reserve);
+  left: 0;
   width: 100%;
   max-width: none;
-  margin-left: 0;
-  margin-right: 0;
+  height: auto;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 0;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .slide-deck-wrap {
@@ -2007,8 +2163,13 @@ body:has(.site-home-page) {
   padding: 0;
   align-items: stretch;
   position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
+/* ua-mobile-site 메인 슬라이드창: ≤767과 동일 파란 패널 */
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .slide-deck-wrap .slide-deck {
   width: 100%;
   max-width: none;
@@ -2017,123 +2178,51 @@ body:has(.site-home-page) {
   box-sizing: border-box;
   border-radius: 0;
   margin-top: 0;
-  height: calc(
-    (var(--slide-window-reference-height) * 1.2 + var(--slide-layer-padding-y)) * 1.3 *
-      var(--slide-window-height-scale) + var(--site-home-mobile-bottom-nav-slide-extra, var(--mobile-bottom-nav-height))
-  );
-  padding-bottom: max(16px, calc(84px + 4.5rem + 16px));
+  flex: 1 1 auto;
+  min-height: 100%;
+  height: auto;
+  max-height: none;
+  padding-bottom: max(16px, 2.75rem);
   background-color: var(--site-home-main-slide-deck-surface);
-  background-image:
-    radial-gradient(ellipse 125% 50% at 50% -12%, rgba(255, 255, 255, 0.2) 0%, rgba(140, 180, 235, 0.22) 34%, transparent 58%),
-    linear-gradient(
-      180deg,
-      #3d62a0 0%,
-      #325882 18%,
-      var(--site-home-main-slide-deck-surface) 52%,
-      #243652 100%
-    );
+  background-image: linear-gradient(
+    180deg,
+    #3b82f6 0%,
+    #3b82f6 22%,
+    var(--site-home-main-slide-deck-surface) 52%,
+    var(--site-home-main-slide-deck-bottom-edge) 100%
+  );
   border: none;
-  box-shadow: none;
+  box-shadow: inset 0 -26px 52px -22px rgba(15, 23, 42, 0.32);
+  overflow-x: clip;
+  overflow-y: visible;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .slide-deck-wrap .slide-deck::before {
   content: "";
   position: absolute;
   inset: 0;
-  z-index: 4;
+  z-index: 310;
   pointer-events: none;
   background: linear-gradient(
     to bottom,
-    rgba(10, 22, 40, 0.2) 0%,
-    rgba(10, 22, 40, 0.06) 20%,
-    transparent 44%
+    rgba(15, 23, 42, 0.18) 0%,
+    rgba(30, 64, 175, 0.08) 22%,
+    transparent 46%
   );
 }
 
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .slide-deck-wrap .slide-deck::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 305;
+  pointer-events: none;
+  background: var(--site-home-slide-deck-bottom-vignette);
+}
+
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-slide-stack .slide-deck-wrap .slide-deck {
-  filter: none;
-}
-
-.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-slide-deck-stack {
-  display: block;
-  width: 100%;
-  position: relative;
-  padding-bottom: var(--site-home-png-shelf-stack-height);
-  box-sizing: border-box;
-}
-
-.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-slide-deck-stack > .site-home-main-png-shelf-instack {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: var(--site-home-bottom-nav-reserve);
-  width: 100vw;
-  max-width: none;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
-  height: var(--site-home-png-shelf-stack-height);
-  z-index: 5;
-  box-sizing: border-box;
-  pointer-events: auto;
-  overflow: visible;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
-  /* 모바일 UA: 띠 배경 없음 — 공·라벨만(위치·높이·bottom 예약 유지) */
-  background-color: transparent;
-  background-image: none;
-  box-shadow: none;
-  border: none;
-  outline: none;
-  grid-column: auto;
-  grid-row: auto;
-  align-self: stretch;
-  justify-self: stretch;
-}
-
-.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-png-buttons-in-shelf > .main-button img {
-  transform: scale(0.9);
-  transform-origin: center top;
-}
-
-/* 모바일 UA: 전역 .temp-png-button-tuning img drop-shadow(2524)보다 구체적 */
-.site-shell.site-shell--ua-mobile-site
-  .site-home-page--main
-  .site-home-main-png-buttons-in-shelf.temp-png-button-tuning
-  > .main-button
-  img {
-  filter: none;
-}
-
-.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-png-shelf-instack .site-home-main-png-buttons-in-shelf {
-  position: static;
-  left: auto;
-  right: auto;
-  bottom: auto;
-  z-index: 1;
-  flex: 0 0 auto;
-  width: 100%;
-  max-width: none;
-  margin: 0;
-  margin-top: calc(-0.5 * var(--site-home-png-main-button-img-cap));
-  pointer-events: auto;
-}
-
-/* 모바일 UA에서는 PC용(768+) 고정 PNG 행 무력화 — 띠 안 static 유지 */
-.site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-png-buttons-in-shelf {
-  position: static;
-  left: auto;
-  right: auto;
-  bottom: auto;
-  z-index: 1;
-  pointer-events: auto;
-  background: transparent;
-  background-color: transparent;
-  background-image: none;
-  box-shadow: none;
-  border: none;
-  outline: none;
+  filter:
+    drop-shadow(0 10px 34px rgba(0, 0, 0, 0.4)) drop-shadow(0 -5px 22px rgba(0, 0, 0, 0.09));
 }
 
 .site-home-brand {
@@ -2194,9 +2283,11 @@ body:has(.site-home-page) {
 }
 
 @media (max-width: 767px) {
-  /* 메인 모바일: 풀폭 시 좌우에 띠처럼 보이지 않게 카드용 filter 제거 */
   .site-home-page--main .site-home-slide-stack .slide-deck-wrap .slide-deck {
-    filter: none;
+    filter:
+      drop-shadow(0 10px 34px rgba(0, 0, 0, 0.4)) drop-shadow(0 -5px 22px rgba(0, 0, 0, 0.09));
+    overflow-x: clip;
+    overflow-y: visible;
   }
 }
 
@@ -2559,8 +2650,8 @@ body:has(.site-home-page) {
   max-width: 100%;
   max-height: var(--site-home-png-main-button-img-cap);
   object-fit: contain;
-  /* 투명 PNG: 알파 따라가는 그림자(조금 더 진하게) */
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.28)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.24));
+  /* 투명 PNG: 알파 따라가는 그림자 */
+  filter: var(--site-home-main-orb-img-drop-shadow);
 }
 
 /* 대시보드 버튼 위 간격(모바일은 @media 안에서 더 조밀하게 조정 가능) */
@@ -2911,7 +3002,7 @@ body:has(.site-home-page) {
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem 0.4rem;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.16);
 }
 
 .ui-community-tabs-link {
@@ -2957,7 +3048,7 @@ body:has(.site-home-page) {
   min-height: 2.25rem;
   font-size: 0.9rem;
   line-height: 1.25;
-  border: 1px solid var(--color-border, #e5e7eb);
+  border: 1px solid rgba(15, 23, 42, 0.18);
   border-radius: 10px;
   box-sizing: border-box;
   background: #fff;
@@ -2993,10 +3084,10 @@ button.secondary-button.ui-community-search-submit {
   justify-content: space-between;
   gap: 0.55rem;
   padding: 0.55rem 0.65rem;
-  border: none;
   border-radius: 12px;
   background: #fff;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(15, 23, 42, 0.1);
   min-width: 0;
 }
 
@@ -3105,35 +3196,8 @@ button.secondary-button.ui-community-search-submit {
 }
 
 /* ---------------------------------------------------------------------------
-   커뮤니티 2/3: 게시판 맥락(data-community-board)별 가벼운 톤 차이
+   커뮤니티: 게시판 맥락(data-community-board)별 톤 — 목록 헤더는 탭으로만 표시
    --------------------------------------------------------------------------- */
-
-.ui-community-context-head {
-  margin: 0 0 0.15rem;
-  padding: 0 0 0 0.45rem;
-  border-left: 2px solid rgba(15, 23, 42, 0.12);
-}
-
-.ui-community-context-head-label {
-  margin: 0;
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--color-text-muted, #64748b);
-  line-height: 1.35;
-}
-
-.ui-community-page[data-community-board="qna"] .ui-community-context-head {
-  border-left-color: rgba(37, 99, 235, 0.38);
-}
-
-.ui-community-page[data-community-board="reviews"] .ui-community-context-head {
-  border-left-color: rgba(34, 197, 94, 0.4);
-}
-
-.ui-community-page[data-community-board="free"] .ui-community-context-head {
-  border-left-color: rgba(15, 23, 42, 0.1);
-}
 
 /* 전체: 섞인 목록 — pill만 살짝 더 구분(제목보다 약하게 유지) */
 .ui-community-page[data-community-board="all"] .ui-community-board-pill {
@@ -3253,7 +3317,7 @@ button.secondary-button.ui-community-search-submit {
 .ui-community-post-body {
   margin-top: 0.85rem;
   padding-top: 0.85rem;
-  border-top: 1px solid rgba(15, 23, 42, 0.06);
+  border-top: 1px solid rgba(15, 23, 42, 0.14);
   font-size: 0.95rem;
   line-height: 1.75;
   word-break: break-word;
@@ -3346,7 +3410,7 @@ button.secondary-button.ui-community-post-action-danger:hover,
 
 .ui-community-comment-item {
   padding: 0.55rem 0;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.07);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.14);
   font-size: 0.9rem;
 }
 
@@ -3402,7 +3466,7 @@ button.secondary-button.ui-community-post-action-danger:hover,
   font: inherit;
   font-size: 0.9rem;
   line-height: 1.45;
-  border: 1px solid var(--color-border, #e5e7eb);
+  border: 1px solid rgba(15, 23, 42, 0.18);
   border-radius: 10px;
   background: #fff;
   color: var(--color-text-main, #0f172a);
@@ -3433,7 +3497,7 @@ button.secondary-button.ui-community-post-action-danger:hover,
   padding: 0.55rem 0.65rem;
   font: inherit;
   font-size: 0.95rem;
-  border: 1px solid var(--color-border, #e5e7eb);
+  border: 1px solid rgba(15, 23, 42, 0.18);
   border-radius: 10px;
   background: #fff;
   color: var(--color-text-main, #0f172a);
@@ -3467,7 +3531,7 @@ button.secondary-button.ui-community-post-action-danger:hover,
 }
 
 .ui-community-post-editor-surface {
-  border: 1px solid var(--color-border, #e5e7eb);
+  border: 1px solid rgba(15, 23, 42, 0.18);
   border-radius: 12px;
   padding: 0.65rem 0.75rem;
   background: #fff;
@@ -4366,12 +4430,22 @@ button.secondary-button.ui-community-post-action-danger:hover,
     justify-content: flex-end;
     align-items: stretch;
     box-sizing: border-box;
-    background: rgba(0, 0, 0, 0.38);
+    background: rgba(23, 37, 84, 0.5);
     overflow: hidden;
     padding-top: 0;
     padding-bottom: 0;
     padding-left: max(0.45rem, env(safe-area-inset-left, 0px));
     padding-right: max(0.45rem, env(safe-area-inset-right, 0px));
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .site-home-main-slide-png-host--with-site-notice
+    .site-home-main-notice-strip__inner {
+    /* 진한 군청(남청) · α0.6 — 공지 있을 때 띠 전용 */
+    background: rgba(23, 37, 84, 0.6);
   }
 
   .site-shell.site-shell--pc-site-chrome
@@ -4541,7 +4615,7 @@ button.secondary-button.ui-community-post-action-danger:hover,
     content: "";
     position: absolute;
     inset: 0;
-    z-index: 4;
+    z-index: 310;
     pointer-events: none;
     background: linear-gradient(
       to bottom,
@@ -4549,6 +4623,20 @@ button.secondary-button.ui-community-post-action-danger:hover,
       rgba(7, 18, 36, 0.12) 18%,
       transparent 42%
     );
+  }
+
+  .site-shell.site-shell--pc-site-chrome
+    > .site-shell-pc-constrain
+    > .site-shell-main
+    > .site-home-page--main
+    .slide-deck-wrap
+    .slide-deck::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 305;
+    pointer-events: none;
+    background: var(--site-home-slide-deck-bottom-vignette);
   }
 
   .site-shell.site-shell--pc-site-chrome
@@ -5015,22 +5103,90 @@ a.secondary-button.site-venue-website-btn {
 }
 
 /*
- * 메인(/site) 전용: 배경 단축·다른 소스가 덮어써도 청색 그라데이션이 이기지 못하도록
- * 배경만 !important — viewport·UA·로드 순서와 무관하게 고정.
+ * 메인(/site) 슬라이드창: 다른 소스보다 나중에 로드돼도 파란 패널이 유지되도록 배경·그림자만 !important
  */
-.site-home-page--main .slide-deck-wrap .slide-deck {
-  background-color: var(--site-home-main-slide-deck-surface) !important;
-  background-image:
-    radial-gradient(ellipse 125% 50% at 50% -12%, rgba(255, 255, 255, 0.2) 0%, rgba(140, 180, 235, 0.22) 34%, transparent 58%),
-    linear-gradient(
+@media (max-width: 767px) {
+  .site-home-page--main .slide-deck-wrap .slide-deck {
+    background-color: var(--site-home-main-slide-deck-surface) !important;
+    background-image: linear-gradient(
       180deg,
-      #3d62a0 0%,
-      #325882 18%,
+      #3b82f6 0%,
+      #3b82f6 22%,
       var(--site-home-main-slide-deck-surface) 52%,
-      #243652 100%
+      var(--site-home-main-slide-deck-bottom-edge) 100%
     ) !important;
+    background-repeat: no-repeat !important;
+    box-shadow: inset 0 -26px 52px -22px rgba(15, 23, 42, 0.32) !important;
+    filter:
+      drop-shadow(0 10px 34px rgba(0, 0, 0, 0.4)) drop-shadow(0 -5px 22px rgba(0, 0, 0, 0.09)) !important;
+    overflow-x: clip !important;
+    overflow-y: visible !important;
+  }
+
+  .site-home-page--main .slide-deck-wrap .slide-deck::before {
+    content: "" !important;
+    display: block !important;
+    position: absolute;
+    inset: 0;
+    z-index: 310 !important;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      rgba(15, 23, 42, 0.18) 0%,
+      rgba(30, 64, 175, 0.08) 22%,
+      transparent 46%
+    ) !important;
+  }
+
+  .site-home-page--main .slide-deck-wrap .slide-deck::after {
+    content: "" !important;
+    display: block !important;
+    position: absolute;
+    inset: 0;
+    z-index: 305 !important;
+    pointer-events: none;
+    background: var(--site-home-slide-deck-bottom-vignette) !important;
+  }
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .slide-deck-wrap .slide-deck {
+  background-color: var(--site-home-main-slide-deck-surface) !important;
+  background-image: linear-gradient(
+    180deg,
+    #3b82f6 0%,
+    #3b82f6 22%,
+    var(--site-home-main-slide-deck-surface) 52%,
+    var(--site-home-main-slide-deck-bottom-edge) 100%
+  ) !important;
   background-repeat: no-repeat !important;
-  border-radius: 0;
-  border: none;
-  box-shadow: none;
+  box-shadow: inset 0 -26px 52px -22px rgba(15, 23, 42, 0.32) !important;
+  filter:
+    drop-shadow(0 10px 34px rgba(0, 0, 0, 0.4)) drop-shadow(0 -5px 22px rgba(0, 0, 0, 0.09)) !important;
+  overflow-x: clip !important;
+  overflow-y: visible !important;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .slide-deck-wrap .slide-deck::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute;
+  inset: 0;
+  z-index: 310 !important;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(15, 23, 42, 0.18) 0%,
+    rgba(30, 64, 175, 0.08) 22%,
+    transparent 46%
+  ) !important;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--main .slide-deck-wrap .slide-deck::after {
+  content: "" !important;
+  display: block !important;
+  position: absolute;
+  inset: 0;
+  z-index: 305 !important;
+  pointer-events: none;
+  background: var(--site-home-slide-deck-bottom-vignette) !important;
 }

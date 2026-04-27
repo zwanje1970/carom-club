@@ -5,6 +5,7 @@ import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib
 import { parseCommunityBoardTypeParam } from "../../../../../lib/community-board-params";
 import { getSiteCommunityConfig } from "../../../../../lib/surface-read";
 import type { SiteCommunityBoardKey } from "../../../../../lib/types/entities";
+import { communityBoardListHref } from "../../community-tab-config";
 import SiteShellFrame from "../../../components/SiteShellFrame";
 import CommunityPostWriteForm from "./CommunityPostWriteForm";
 
@@ -32,7 +33,7 @@ export default async function SiteCommunityWritePage({ params }: Props) {
       <section className="site-site-gray-main v3-stack ui-community-post-detail-page">
         <CommunityPostWriteForm boardType={boardType} />
         <div className="ui-community-post-detail-foot">
-          <Link className="secondary-button ui-community-post-detail-foot-secondary" href={`/site/community/${boardType}`}>
+          <Link className="secondary-button ui-community-post-detail-foot-secondary" href={communityBoardListHref(boardType)}>
             목록
           </Link>
         </div>

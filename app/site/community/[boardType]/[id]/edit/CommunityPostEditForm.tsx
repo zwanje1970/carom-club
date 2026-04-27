@@ -6,6 +6,8 @@ import CommunityPostBodyEditor, {
   type CommunityPostBodyEditorHandle,
 } from "../../../CommunityPostBodyEditor";
 import { MAX_COMMUNITY_POST_IMAGE_COUNT } from "../../../../../../lib/community-post-images";
+import type { SiteCommunityBoardKey } from "../../../../../../lib/types/entities";
+import { communityPostDetailHref } from "../../../community-tab-config";
 
 type Props = {
   boardType: string;
@@ -69,7 +71,7 @@ export default function CommunityPostEditForm({
         setMessage("실패");
         return;
       }
-      router.push(`/site/community/${boardType}/${postId}`);
+      router.push(communityPostDetailHref(boardType as SiteCommunityBoardKey, postId));
     } catch {
       setMessage("실패");
     } finally {
@@ -81,7 +83,14 @@ export default function CommunityPostEditForm({
     <form className="card-clean ui-community-post-form v3-stack" onSubmit={handleSubmit}>
       <label className="ui-community-form-field v3-stack">
         <span className="ui-community-form-label">제목</span>
-        <input className="ui-community-form-input" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <input
+          className="ui-community-form-input"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.preventDefault();
+          }}
+        />
       </label>
       <div className="ui-community-form-field v3-stack">
         <div className="ui-community-form-toolbar">
@@ -89,7 +98,7 @@ export default function CommunityPostEditForm({
           <button
             type="button"
             className="secondary-button ui-community-post-action-tight"
-            disabled={loading || attachUi.uploading || attachUi.remaining <= 0}
+            disabled={loading || attachUi.remaining <= 0}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => bodyEditorRef.current?.openImageAttach()}
           >

@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 /** 방향 판정 전 미세 떨림 무시 — 가로 확정은 adx > 12 && adx > ady 에서만 */
 const PROBE_MICRO_PX = 8;
@@ -34,13 +34,20 @@ function communityHubPathBoardSegment(pathname: string): string | null {
   return seg;
 }
 
+function tabKeyFromUrlSegment(seg: string): string {
+  if (seg === "review") return "reviews";
+  if (seg === "jobs") return "extra1";
+  return seg;
+}
+
 function swipeIndexForPathname(pathname: string, tabs: Tab[]): number {
   const norm = pathOnly(pathname);
   const exact = tabs.findIndex((t) => pathOnly(t.href) === norm);
   if (exact >= 0) return exact;
   const seg = communityHubPathBoardSegment(pathname);
   if (seg == null) return -1;
-  return tabs.findIndex((t) => t.key === seg);
+  const tabKey = tabKeyFromUrlSegment(seg);
+  return tabs.findIndex((t) => t.key === tabKey);
 }
 
 function touchBlocksCommunitySwipe(el: EventTarget | null): boolean {
@@ -75,6 +82,12 @@ function clampDragPxForAnchor(anchorIdx: number, n: number, raw: number, vw: num
   return v;
 }
 
+function clampTabIndex(raw: number, tabCount: number): number {
+  if (tabCount < 1) return 0;
+  const x = Number.isFinite(raw) ? Math.floor(raw) : 0;
+  return Math.max(0, Math.min(tabCount - 1, x));
+}
+
 export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab[]; children: ReactNode }) {
   const pathname = usePathname() ?? "";
   const router = useRouter();
@@ -99,8 +112,21 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
 
-  const activeIdx = swipeIndexForPathname(pathname, tabs);
   const n = tabs.length;
+  const [activeIndex, setActiveIndex] = useState(() =>
+    clampTabIndex(swipeIndexForPathname(pathname, tabs), n),
+  );
+  const activeIndexRef = useRef(activeIndex);
+  activeIndexRef.current = activeIndex;
+
+  /** URL(탭 클릭·뒤로가기·router.push 완료)과만 동기 — 제스처 중 pathname 재계산 없음 */
+  useLayoutEffect(() => {
+    const list = tabsRef.current;
+    const nc = list.length;
+    if (nc < 1) return;
+    const raw = swipeIndexForPathname(pathname, list);
+    setActiveIndex(clampTabIndex(raw, nc));
+  }, [pathname]);
 
   const setTrackTransform = useCallback((dragPx: number, withTransition: boolean) => {
     const track = trackRef.current;
@@ -116,13 +142,13 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
     navHrefRef.current = null;
     const touchEl = swipeTouchSurfaceRef.current;
     if (touchEl) touchEl.style.removeProperty("touch-action");
-    if (trackRef.current && n > 0 && activeIdx >= 0) {
+    if (trackRef.current && n > 0) {
       setTrackTransform(0, false);
     }
-  }, [pathname, activeIdx, n, setTrackTransform]);
+  }, [pathname, activeIndex, n, setTrackTransform]);
 
   useEffect(() => {
-    if (n < 2 || activeIdx < 0) return;
+    if (n < 2) return;
 
     const killLinkClick = () => {
       const kill: EventListener = (ev) => {
@@ -141,6 +167,9 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
       if (!t) return;
       const blocked = touchBlocksCommunitySwipe(e.target);
       const startedOnLink = e.target instanceof Element && !!e.target.closest("a[href]");
+      const tabCount = tabsRef.current.length;
+      if (tabCount < 2) return;
+      const anchorIdxNow = clampTabIndex(activeIndexRef.current, tabCount);
       startRef.current = {
         x: t.clientX,
         y: t.clientY,
@@ -148,7 +177,7 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
         startedOnLink,
         horizontalLocked: false,
         verticalDominant: false,
-        anchorIdx: activeIdx,
+        anchorIdx: anchorIdxNow,
       };
       samplesRef.current = [{ t: Date.now(), x: t.clientX }];
     };
@@ -176,8 +205,9 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
         }
         /* 가로 후순위: |dx| > 12 이고 가로가 세로보다 클 때만 */
         if (!(adx > HORIZONTAL_MIN_DX_PX && adx > ady)) return;
+        const tn = tabsRef.current.length;
         if (start.anchorIdx === 0 && dx > 0) return;
-        if (start.anchorIdx === n - 1 && dx < 0) return;
+        if (start.anchorIdx >= tn - 1 && dx < 0) return;
         start.horizontalLocked = true;
         const touchEl = swipeTouchSurfaceRef.current;
         if (touchEl) touchEl.style.setProperty("touch-action", "none");
@@ -192,7 +222,7 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
 
       const vw = window.innerWidth;
       let raw = dx * FOLLOW_RATIO;
-      raw = clampDragPxForAnchor(start.anchorIdx, n, raw, vw);
+      raw = clampDragPxForAnchor(start.anchorIdx, tabsRef.current.length, raw, vw);
 
       setTrackTransform(raw, false);
     };
@@ -223,24 +253,26 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
       const vx = velocityFromSamples(velocitySamples);
 
       let nextIdx: number | null = null;
-      const idx = start.anchorIdx;
-      if (dragPx < 0 && idx < n - 1) {
+      const tn = tabsRef.current.length;
+      const idx = clampTabIndex(start.anchorIdx, tn);
+      if (dragPx < 0 && idx < tn - 1) {
         if (dragPx <= -threshold || vx < -VELOCITY_COMPLETE) nextIdx = idx + 1;
       } else if (dragPx > 0 && idx > 0) {
         if (dragPx >= threshold || vx > VELOCITY_COMPLETE) nextIdx = idx - 1;
       }
 
-      if (nextIdx == null || nextIdx < 0 || nextIdx >= n) {
+      if (nextIdx == null) {
         setTrackTransform(0, true);
         return;
       }
+      const safeNext = clampTabIndex(nextIdx, tn);
 
-      const href = tabsRef.current[nextIdx]!.href;
+      const href = tabsRef.current[safeNext]!.href;
       animatingRef.current = true;
       navHrefRef.current = href;
 
       const track = trackRef.current;
-      const endTransform = nextIdx > idx ? `translate3d(calc(-200% / 3), 0, 0)` : `translate3d(0px, 0, 0)`;
+      const endTransform = safeNext > idx ? `translate3d(calc(-200% / 3), 0, 0)` : `translate3d(0px, 0, 0)`;
       if (track) {
         track.style.transition = `transform ${TRANSITION_MS}ms ${EASING}`;
         track.style.transform = endTransform;
@@ -299,14 +331,14 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
       el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("touchcancel", onTouchCancel);
     };
-  }, [pathname, router, activeIdx, n, setTrackTransform]);
+  }, [router, setTrackTransform]);
 
-  if (n < 2 || activeIdx < 0) {
+  if (n < 2) {
     return <>{children}</>;
   }
 
   const swipeEdge: "first" | "last" | "middle" =
-    activeIdx <= 0 ? "first" : activeIdx >= n - 1 ? "last" : "middle";
+    activeIndex <= 0 ? "first" : activeIndex >= n - 1 ? "last" : "middle";
 
   return (
     <div
@@ -316,7 +348,7 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
     >
       <div ref={viewportRef} className="community-board-swipe-viewport">
       <div ref={trackRef} className="community-board-swipe-track">
-        {activeIdx > 0 ? (
+        {activeIndex > 0 ? (
           <div className="community-board-swipe-panel community-board-swipe-panel--peek" aria-hidden />
         ) : (
           <div className="community-board-swipe-panel community-board-swipe-panel--edge" aria-hidden />
@@ -324,7 +356,7 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
         <div ref={swipeTouchSurfaceRef} className="community-board-swipe-panel community-board-swipe-panel--main">
           {children}
         </div>
-        {activeIdx < n - 1 ? (
+        {activeIndex < n - 1 ? (
           <div className="community-board-swipe-panel community-board-swipe-panel--peek" aria-hidden />
         ) : (
           <div className="community-board-swipe-panel community-board-swipe-panel--edge" aria-hidden />
