@@ -1717,7 +1717,7 @@ body:has(.site-home-page) {
   /* 메인 모바일: 슬라이드 바깥 박스 제거(풀폭)·높이 원안 + 하단고정대역·슬라이드↔PNG 간격 축소 */
   .site-home-page--main .site-home-slide-stack,
   .site-home-page--main .site-home-slide-anchor {
-    overflow-x: clip;
+    overflow-x: hidden;
     overflow-y: visible;
   }
 
@@ -1767,7 +1767,7 @@ body:has(.site-home-page) {
     border: none;
     box-shadow: inset 0 -26px 52px -22px rgba(15, 23, 42, 0.32);
     /* 공지 띠(z380) 아래로 카드가 비치도록 — 기본 .slide-deck overflow:hidden 보다 구체적으로 덮음 */
-    overflow-x: clip;
+    overflow-x: hidden;
     overflow-y: visible;
   }
 
@@ -1942,7 +1942,7 @@ body:has(.site-home-page) {
 .site-home-page--main .site-home-main-slide-deck-stack--public-mobile > .site-home-slide-anchor .slide-deck-wrap .slide-deck {
   flex: 1 1 auto;
   min-height: 100%;
-  overflow-x: clip;
+  overflow-x: hidden;
   overflow-y: visible;
 }
 
@@ -2108,7 +2108,7 @@ body:has(.site-home-page) {
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-slide-stack,
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-slide-anchor {
-  overflow-x: clip;
+  overflow-x: hidden;
   overflow-y: visible;
 }
 
@@ -2193,7 +2193,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   );
   border: none;
   box-shadow: inset 0 -26px 52px -22px rgba(15, 23, 42, 0.32);
-  overflow-x: clip;
+  overflow-x: hidden;
   overflow-y: visible;
 }
 
@@ -2286,7 +2286,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   .site-home-page--main .site-home-slide-stack .slide-deck-wrap .slide-deck {
     filter:
       drop-shadow(0 10px 34px rgba(0, 0, 0, 0.4)) drop-shadow(0 -5px 22px rgba(0, 0, 0, 0.09));
-    overflow-x: clip;
+    overflow-x: hidden;
     overflow-y: visible;
   }
 }
@@ -4556,7 +4556,7 @@ button.secondary-button.ui-community-post-action-danger:hover,
     > .site-shell-main
     > .site-home-page--main
     .site-home-slide-anchor {
-    overflow-x: clip;
+    overflow-x: hidden;
     overflow-y: visible;
   }
 
@@ -5119,7 +5119,7 @@ a.secondary-button.site-venue-website-btn {
     box-shadow: inset 0 -26px 52px -22px rgba(15, 23, 42, 0.32) !important;
     filter:
       drop-shadow(0 10px 34px rgba(0, 0, 0, 0.4)) drop-shadow(0 -5px 22px rgba(0, 0, 0, 0.09)) !important;
-    overflow-x: clip !important;
+    overflow-x: hidden !important;
     overflow-y: visible !important;
   }
 
@@ -5162,7 +5162,7 @@ a.secondary-button.site-venue-website-btn {
   box-shadow: inset 0 -26px 52px -22px rgba(15, 23, 42, 0.32) !important;
   filter:
     drop-shadow(0 10px 34px rgba(0, 0, 0, 0.4)) drop-shadow(0 -5px 22px rgba(0, 0, 0, 0.09)) !important;
-  overflow-x: clip !important;
+  overflow-x: hidden !important;
   overflow-y: visible !important;
 }
 
