@@ -67,9 +67,17 @@
   /* 메인 임시 PNG 구슬 최대 크기 — 하단 겹침 띠 높이 식과 동기(배율만 변경) */
   --site-home-png-main-button-img-cap: calc(3.75rem * 1.1 * 1.1 * 1.2 * 0.7);
   --site-home-png-main-button-half-cap: calc(var(--site-home-png-main-button-img-cap) * 0.5);
-  /* 투명 PNG 구슬 그림자 — 메인 in-shelf·temp 경로 포함(≤767에서도 동일 변수) */
-  --site-home-main-orb-img-drop-shadow: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.34))
-    drop-shadow(0 4px 10px rgba(0, 0, 0, 0.31));
+  /* 투명 PNG 구슬 그림자 — 메인 in-shelf·temp 경로 포함(≤767에서도 동일 변수) — 이중 drop-shadow는 한 변수에 붙이면 번들 후 )drop-shadow 토큰 오류 방지 */
+  --site-home-main-orb-img-drop-shadow-a: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.34));
+  --site-home-main-orb-img-drop-shadow-b: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.31));
+  --site-home-main-orb-img-drop-shadow: var(--site-home-main-orb-img-drop-shadow-a)
+    var(--site-home-main-orb-img-drop-shadow-b);
+
+  /* 메인 슬라이드 덱 카드 그림자(이중 drop-shadow) — 번들러 병합 대비 분리 */
+  --site-slide-deck-drop-shadow-a: drop-shadow(0 10px 34px rgba(0, 0, 0, 0.4));
+  --site-slide-deck-drop-shadow-b: drop-shadow(0 -5px 22px rgba(0, 0, 0, 0.09));
+  --site-slide-deck-drop-shadow-pc-a: drop-shadow(0 8px 30px rgba(0, 0, 0, 0.33));
+  --site-slide-deck-drop-shadow-pc-b: drop-shadow(0 -4px 18px rgba(0, 0, 0, 0.07));
   /*
    * 하단 겹침 띠 높이(탭 위 간격 + 라벨 + 구슬 반지름 − undershoot).
    * undershoot>0 이면 띠 윗선이 아래로(적도보다 낮게).
@@ -738,7 +746,7 @@ button.secondary-button.site-mypage-logout:hover,
 /* 루트 5탭 스와이프: 가로만 숨김 — 세로는 문서/내부 스크롤에 맡김 (overflow: hidden 단축 금지) */
 .site-root-swipe-viewport {
   overflow-x: hidden;
-  overflow-y: visible;
+  overflow-y: visible !important;
   width: 100%;
   min-height: 0;
   touch-action: pan-y;
@@ -820,7 +828,7 @@ button.secondary-button.site-mypage-logout:hover,
 .community-board-swipe-viewport {
   position: relative;
   overflow-x: hidden;
-  overflow-y: visible;
+  overflow-y: visible !important;
   width: 100%;
   min-height: 0;
   flex: 1 1 auto;
@@ -1049,7 +1057,7 @@ body:has(.site-home-page) {
   min-height: 0;
   min-width: 0;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: auto !important;
   -webkit-overflow-scrolling: touch;
   background-color: var(--ui-bg-page);
   width: 100%;
@@ -1718,7 +1726,7 @@ body:has(.site-home-page) {
   .site-home-page--main .site-home-slide-stack,
   .site-home-page--main .site-home-slide-anchor {
     overflow-x: hidden;
-    overflow-y: visible;
+    overflow-y: visible !important;
   }
 
   .site-home-page--main .site-home-main-slide-deck-stack > .site-home-slide-anchor {
@@ -1768,7 +1776,7 @@ body:has(.site-home-page) {
     box-shadow: inset 0 -26px 52px -22px rgba(15, 23, 42, 0.32);
     /* 공지 띠(z380) 아래로 카드가 비치도록 — 기본 .slide-deck overflow:hidden 보다 구체적으로 덮음 */
     overflow-x: hidden;
-    overflow-y: visible;
+    overflow-y: visible !important;
   }
 
   /* 카드 레이어 최대 z≈300(incoming) — 딤·상단 흐림은 그 위(310)로 두어 카드가 그림자 밑으로 지나감. 공지 320·크롬 800 유지 */
@@ -1943,7 +1951,7 @@ body:has(.site-home-page) {
   flex: 1 1 auto;
   min-height: 100%;
   overflow-x: hidden;
-  overflow-y: visible;
+  overflow-y: visible !important;
 }
 
 .png-buttons-overlay {
@@ -2109,7 +2117,7 @@ body:has(.site-home-page) {
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-slide-stack,
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-slide-anchor {
   overflow-x: hidden;
-  overflow-y: visible;
+  overflow-y: visible !important;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-slide-deck-stack {
@@ -2194,7 +2202,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   border: none;
   box-shadow: inset 0 -26px 52px -22px rgba(15, 23, 42, 0.32);
   overflow-x: hidden;
-  overflow-y: visible;
+  overflow-y: visible !important;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .slide-deck-wrap .slide-deck::before {
@@ -2221,8 +2229,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-slide-stack .slide-deck-wrap .slide-deck {
-  filter:
-    drop-shadow(0 10px 34px rgba(0, 0, 0, 0.4)) drop-shadow(0 -5px 22px rgba(0, 0, 0, 0.09));
+  filter: var(--site-slide-deck-drop-shadow-a) var(--site-slide-deck-drop-shadow-b);
 }
 
 .site-home-brand {
@@ -2278,16 +2285,14 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
 
 /* 슬라이드 카드만 그림자 — 공지(슬라이드 위 형제)는 filter 대상에서 제외 (.slideDeckFrame 아래 자손) */
 .site-home-slide-stack .slide-deck-wrap .slide-deck {
-  filter:
-    drop-shadow(0 10px 34px rgba(0, 0, 0, 0.4)) drop-shadow(0 -5px 22px rgba(0, 0, 0, 0.09));
+  filter: var(--site-slide-deck-drop-shadow-a) var(--site-slide-deck-drop-shadow-b);
 }
 
 @media (max-width: 767px) {
   .site-home-page--main .site-home-slide-stack .slide-deck-wrap .slide-deck {
-    filter:
-      drop-shadow(0 10px 34px rgba(0, 0, 0, 0.4)) drop-shadow(0 -5px 22px rgba(0, 0, 0, 0.09));
+    filter: var(--site-slide-deck-drop-shadow-a) var(--site-slide-deck-drop-shadow-b);
     overflow-x: hidden;
-    overflow-y: visible;
+    overflow-y: visible !important;
   }
 }
 
@@ -4557,7 +4562,7 @@ button.secondary-button.ui-community-post-action-danger:hover,
     > .site-home-page--main
     .site-home-slide-anchor {
     overflow-x: hidden;
-    overflow-y: visible;
+    overflow-y: visible !important;
   }
 
   .site-shell.site-shell--pc-site-chrome
@@ -4646,8 +4651,7 @@ button.secondary-button.ui-community-post-action-danger:hover,
     .site-home-slide-stack
     .slide-deck-wrap
     .slide-deck {
-    filter:
-      drop-shadow(0 8px 30px rgba(0, 0, 0, 0.33)) drop-shadow(0 -4px 18px rgba(0, 0, 0, 0.07));
+    filter: var(--site-slide-deck-drop-shadow-pc-a) var(--site-slide-deck-drop-shadow-pc-b);
   }
 
   .site-shell.site-shell--pc-site-chrome
@@ -5117,10 +5121,8 @@ a.secondary-button.site-venue-website-btn {
     ) !important;
     background-repeat: no-repeat !important;
     box-shadow: inset 0 -26px 52px -22px rgba(15, 23, 42, 0.32) !important;
-    filter:
-      drop-shadow(0 10px 34px rgba(0, 0, 0, 0.4)) drop-shadow(0 -5px 22px rgba(0, 0, 0, 0.09)) !important;
+    filter: var(--site-slide-deck-drop-shadow-a) var(--site-slide-deck-drop-shadow-b) !important;
     overflow-x: hidden !important;
-    overflow-y: visible !important;
   }
 
   .site-home-page--main .slide-deck-wrap .slide-deck::before {
@@ -5149,6 +5151,15 @@ a.secondary-button.site-venue-website-btn {
   }
 }
 
+/* overflow-y만 분리: 동일 @media 안 인접 선택자는 번들러가 overflow 단축으로 합침 → @supports로 블록 분리 */
+@supports (overflow: visible) {
+  @media (max-width: 767px) {
+    .site-home-page--main .slide-deck-wrap .slide-deck {
+      overflow-y: visible !important;
+    }
+  }
+}
+
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .slide-deck-wrap .slide-deck {
   background-color: var(--site-home-main-slide-deck-surface) !important;
   background-image: linear-gradient(
@@ -5160,10 +5171,14 @@ a.secondary-button.site-venue-website-btn {
   ) !important;
   background-repeat: no-repeat !important;
   box-shadow: inset 0 -26px 52px -22px rgba(15, 23, 42, 0.32) !important;
-  filter:
-    drop-shadow(0 10px 34px rgba(0, 0, 0, 0.4)) drop-shadow(0 -5px 22px rgba(0, 0, 0, 0.09)) !important;
+  filter: var(--site-slide-deck-drop-shadow-a) var(--site-slide-deck-drop-shadow-b) !important;
   overflow-x: hidden !important;
-  overflow-y: visible !important;
+}
+
+@supports (overflow: visible) {
+  .site-shell.site-shell--ua-mobile-site .site-home-page--main .slide-deck-wrap .slide-deck {
+    overflow-y: visible !important;
+  }
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .slide-deck-wrap .slide-deck::before {
