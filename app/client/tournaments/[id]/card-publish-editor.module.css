@@ -42,9 +42,24 @@
   max-width: 28rem;
 }
 
-.previewCardWrap {
+/**
+ * 메인 슬라이드 실제 카드 영역과 동일 규격 (app/globals.css `.slide-deck__layer` + `.slide-deck__card`).
+ * --slide-card-max-width 는 홈 슬라이드 스택에서 정의되며, 없으면 440px.
+ */
+.previewSlideLayer {
+  box-sizing: border-box;
   width: 100%;
-  max-width: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 14px;
+}
+
+.previewCardWrap {
+  flex: 0 1 auto;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: min(100%, var(--slide-card-max-width, 440px));
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid #e4e4e7;
@@ -61,7 +76,7 @@
   margin-top: 4px;
   padding: 2px 0 0;
   width: 100%;
-  max-width: 420px;
+  max-width: min(100%, var(--slide-card-max-width, 440px));
   box-sizing: border-box;
 }
 
@@ -165,6 +180,43 @@
   gap: 6px;
   margin-bottom: 12px;
   text-align: left;
+}
+
+.fieldHead {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.fieldSwatches {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.fieldSwatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.fieldSwatchLight {
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.fieldSwatchSelected {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
 }
 
 .fieldLabel {

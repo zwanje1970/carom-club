@@ -1,5 +1,7 @@
 import { randomUUID } from "crypto";
 import { AuthRole } from "../auth/roles";
+import { cacheTagTournamentById } from "../cache-tags";
+import { revalidateSiteDataTag } from "../revalidate-site-data-tag";
 import { isEmptyOutlineHtml } from "../outline-content-helpers";
 import type { OutlineDisplayMode } from "../outline-content-types";
 import { assertClientFirestorePersistenceConfigured, listApprovedClientOrganizationsFirestore } from "./firestore-client-applications";
@@ -23,6 +25,12 @@ import {
 } from "./platform-backing-store";
 
 const COLLECTION = "v3_tournaments";
+
+function revalidatePublicTournamentCache(tournamentId: string): void {
+  const id = tournamentId.trim();
+  if (!id) return;
+  revalidateSiteDataTag(cacheTagTournamentById(id));
+}
 
 function tournamentToFirestorePlain(t: Tournament): Record<string, unknown> {
   const base: Record<string, unknown> = {
@@ -218,6 +226,7 @@ export async function createTournamentFirestore(params: {
 
   const db = getSharedFirestoreDb();
   await db.collection(COLLECTION).doc(id).set(tournamentToFirestorePlain(tournament));
+  revalidatePublicTournamentCache(id);
   return { ok: true, tournament: await normalizeTournament(tournament, undefined, venueOrgs) };
 }
 
@@ -336,6 +345,7 @@ export async function updateTournamentFirestore(params: {
   const db = getSharedFirestoreDb();
   const tid = params.tournamentId.trim();
   await db.collection(COLLECTION).doc(tid).set(tournamentToFirestorePlain(updated), { merge: true });
+  revalidatePublicTournamentCache(tid);
   return { ok: true, tournament: await normalizeTournament(updated, undefined, venueOrgs) };
 }
 
@@ -355,6 +365,7 @@ export async function deleteTournamentFirestore(params: {
   const id = params.tournamentId.trim();
   const db = getSharedFirestoreDb();
   await db.collection(COLLECTION).doc(id).delete();
+  revalidatePublicTournamentCache(id);
   return { ok: true };
 }
 

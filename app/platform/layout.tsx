@@ -1,4 +1,5 @@
 import type { Viewport } from "next";
+import AdminFabServerBridge from "../components/AdminFabServerBridge";
 import DashboardMobileChromeLayout from "../components/DashboardMobileChromeLayout";
 import GlobalHomeButton from "../components/GlobalHomeButton";
 import SitePcDashboardChromeShell from "../site/components/SitePcDashboardChromeShell";
@@ -21,6 +22,7 @@ export default function PlatformLayout({
         </div>
       </DashboardMobileChromeLayout>
       <GlobalHomeButton />
+      <AdminFabServerBridge />
     </>
   );
 }

@@ -70,11 +70,17 @@ function targetHrefFromSite(user: SessionUser): string {
   return "/client";
 }
 
-export default function AdminDashboardFloatingFab() {
+/** RSC(`getAdminFloatingFabSessionUser`)에서만 채움 — 클라이언트에서 `/api/auth/session` 반복 호출 없음 */
+export type AdminFabSessionUserProp = SessionUser | null;
+
+export default function AdminDashboardFloatingFab({
+  initialFabSessionUser,
+}: {
+  initialFabSessionUser: AdminFabSessionUserProp;
+}) {
   const router = useRouter();
   const pathname = usePathname() ?? "";
-  const [user, setUser] = useState<SessionUser | null>(null);
-  const [checked, setChecked] = useState(false);
+  const [user] = useState<SessionUser | null>(() => initialFabSessionUser);
   const [pos, setPos] = useState<Pos | null>(null);
   const dragRef = useRef<{
     pointerId: number;
@@ -84,32 +90,6 @@ export default function AdminDashboardFloatingFab() {
     origTop: number;
     dragged: boolean;
   } | null>(null);
-
-  const loadSession = useCallback(async () => {
-    try {
-      const res = await fetch("/api/auth/session", { credentials: "include", cache: "no-store" });
-      const data = (await res.json()) as {
-        authenticated?: boolean;
-        user?: { role?: string; clientStatus?: SessionUser["clientStatus"] };
-      };
-      if (data.authenticated && data.user?.role) {
-        setUser({
-          role: data.user.role,
-          clientStatus: data.user.clientStatus ?? null,
-        });
-      } else {
-        setUser(null);
-      }
-    } catch {
-      setUser(null);
-    } finally {
-      setChecked(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadSession();
-  }, [loadSession, pathname]);
 
   useLayoutEffect(() => {
     if (typeof window === "undefined") return;
@@ -186,7 +166,7 @@ export default function AdminDashboardFloatingFab() {
     [pathname, persistPos, router, user],
   );
 
-  if (!checked || !showFabForUser(user)) return null;
+  if (!showFabForUser(user)) return null;
   if (!pos) return null;
 
   const onDash = isDashboardPath(pathname);

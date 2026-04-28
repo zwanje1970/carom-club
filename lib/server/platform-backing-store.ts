@@ -3,6 +3,8 @@ import { copyFile, mkdir, open, readFile, readdir, rename, stat, unlink, writeFi
 import path from "path";
 import { fileURLToPath } from "url";
 import { AuthRole } from "../auth/roles";
+import { CACHE_TAG_SITE_COMMUNITY_CONFIG, CACHE_TAG_SITE_LAYOUT_CONFIG } from "../cache-tags";
+import { revalidateSiteDataTag } from "../revalidate-site-data-tag";
 import { normalizeRepresentativeImageUrls, parseTypeSpecific, resolveVenuePricingType } from "../client-organization-setup-parse";
 import type { VenuePricingType, VenueSpecific } from "../client-organization-setup-types";
 import { isEmptyOutlineHtml } from "../outline-content-helpers";
@@ -18,6 +20,7 @@ import type {
   TournamentTeamScoreRule,
   TournamentVerificationMode,
 } from "../tournament-rule-types";
+import { buildTournamentPublishedCardSubtitle } from "../tournament-slide-card-subtitle";
 import { computeLegacyAutoSettlementSummary } from "./settlement-legacy-summary";
 import { MAX_COMMUNITY_POST_IMAGE_COUNT } from "../community-post-images";
 import { normalizeCommunityPostImageSizeLevels } from "../community-post-content-images";
@@ -108,6 +111,7 @@ import {
   upsertMainSlideAdConfigToFirestoreKv,
 } from "./platform-main-slide-ad-settings";
 import {
+  ClientFirestoreUnavailableError,
   createClientApplicationFirestore,
   getApplicationSummariesFirestore,
   getClientOrganizationByIdForPlatformFirestore,
@@ -655,6 +659,10 @@ export type TournamentPublishedCard = {
   /** 카드 하단 날짜·장소 표시(대회 기본값에서 수정 가능) */
   cardDisplayDate?: string | null;
   cardDisplayLocation?: string | null;
+  /** 카드 본문 글자색(#rgb / #rrggbb). 비우면 테마 기본색 */
+  cardLeadTextColor?: string | null;
+  cardTitleTextColor?: string | null;
+  cardDescriptionTextColor?: string | null;
 };
 
 export type PublishedCardSnapshot = {
@@ -681,6 +689,9 @@ export type PublishedCardSnapshot = {
   tournamentImageOverlayOpacity?: number | null;
   tournamentCardDisplayDate?: string | null;
   tournamentCardDisplayLocation?: string | null;
+  cardLeadTextColor?: string | null;
+  cardTitleTextColor?: string | null;
+  cardDescriptionTextColor?: string | null;
   title: string;
   subtitle: string;
   imageId: string;
@@ -929,6 +940,7 @@ const DEFAULT_PLATFORM_ADMIN_NAME = "플랫폼 관리자";
 function createDefaultSiteLayoutConfig(): SiteLayoutConfig {
   const defaultMenuItems: SiteLayoutMenuItem[] = [
     { label: "메인", href: "/site" },
+    { label: "메인(구)", href: "/site/main-legacy" },
     { label: "대회안내", href: "/site/tournaments" },
     { label: "당구장안내", href: "/site/venues" },
     { label: "커뮤니티", href: "/site/community" },
@@ -2111,6 +2123,14 @@ function normalizeClientVenueIntroStoredRow(row: unknown): ClientVenueIntroStore
   };
 }
 
+function normalizeOptionalCardTextColor(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const s = value.trim();
+  if (!s) return null;
+  if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s)) return null;
+  return s;
+}
+
 function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedCard | null {
   if (!row || typeof row !== "object") return null;
   const r = row as Record<string, unknown>;
@@ -2186,6 +2206,15 @@ function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedC
   }
   if ("cardDisplayLocation" in r) {
     base.cardDisplayLocation = typeof r.cardDisplayLocation === "string" ? r.cardDisplayLocation : null;
+  }
+  if ("cardLeadTextColor" in r) {
+    base.cardLeadTextColor = normalizeOptionalCardTextColor(r.cardLeadTextColor);
+  }
+  if ("cardTitleTextColor" in r) {
+    base.cardTitleTextColor = normalizeOptionalCardTextColor(r.cardTitleTextColor);
+  }
+  if ("cardDescriptionTextColor" in r) {
+    base.cardDescriptionTextColor = normalizeOptionalCardTextColor(r.cardDescriptionTextColor);
   }
   return base;
 }
@@ -3638,7 +3667,23 @@ export async function updateClientApplicationStatus(
 }
 
 export async function getClientStatusByUserId(userId: string): Promise<ClientApplicationStatus | null> {
-  return getClientStatusByUserIdFirestore(userId);
+  const uid = userId.trim();
+  if (!uid) return null;
+  if (isFirestoreUsersBackendConfigured()) {
+    try {
+      const st = await getClientStatusByUserIdFirestore(uid);
+      if (st != null) return st;
+    } catch (e) {
+      console.warn("[getClientStatusByUserId] Firestore 조회 실패", e);
+      if (process.env.NODE_ENV === "production") return null;
+    }
+  }
+  if (process.env.NODE_ENV === "production") return null;
+  const store = await readLocalJsonAggregate();
+  const apps = store.clientApplications.filter((a) => a.userId === uid);
+  if (apps.length === 0) return null;
+  apps.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return apps[0]!.status;
 }
 
 export async function getPlatformOperationSettings(): Promise<PlatformOperationSettings> {
@@ -3704,6 +3749,44 @@ function membershipStateOfOrg(org: ClientOrganizationStored): "NONE" | "ACTIVE" 
   return new Date(org.membershipExpireAt).getTime() >= Date.now() ? "ACTIVE" : "EXPIRED";
 }
 
+/** 개발용 로컬 aggregate — Firestore 미설정·조회 실패 시 클라이언트 대시보드 정책만 보강 */
+async function getClientOrganizationByUserIdFromLocalStore(userId: string): Promise<ClientOrganizationStored | null> {
+  const uid = userId.trim();
+  if (!uid || process.env.NODE_ENV === "production") return null;
+  const store = await readLocalJsonAggregate();
+  const canonical = resolveCanonicalUserId(store, uid);
+  return (
+    store.clientOrganizations.find((o) => resolveCanonicalUserId(store, o.clientUserId) === canonical) ?? null
+  );
+}
+
+async function resolveClientOrganizationForDashboardPolicy(userId: string): Promise<ClientOrganizationStored | null> {
+  const uid = userId.trim();
+  if (!uid) return null;
+  if (isFirestoreUsersBackendConfigured()) {
+    try {
+      return await getClientOrganizationByUserIdFirestore(uid);
+    } catch (e) {
+      const isUnavailable =
+        e instanceof ClientFirestoreUnavailableError ||
+        (e instanceof Error && e.message === "CLIENT_FIRESTORE_UNAVAILABLE");
+      if (!isUnavailable) {
+        console.error("[getClientDashboardPolicy] Firestore 조직 조회 오류", e);
+      } else {
+        console.warn("[getClientDashboardPolicy] Firestore 미사용·조직 조회 생략, 로컬 JSON 폴백");
+      }
+      if (process.env.NODE_ENV !== "production") {
+        return getClientOrganizationByUserIdFromLocalStore(uid);
+      }
+      return null;
+    }
+  }
+  if (process.env.NODE_ENV !== "production") {
+    return getClientOrganizationByUserIdFromLocalStore(uid);
+  }
+  return null;
+}
+
 export async function getClientDashboardPolicy(userId: string): Promise<{
   orgStatus: ClientOrganizationStatus | null;
   membershipType: ClientMembershipType;
@@ -3711,7 +3794,7 @@ export async function getClientDashboardPolicy(userId: string): Promise<{
   annualMembershipVisible: boolean;
   annualMembershipEnforced: boolean;
 }> {
-  const org = await getClientOrganizationByUserIdFirestore(userId.trim());
+  const org = await resolveClientOrganizationForDashboardPolicy(userId.trim());
   const settings = await getPlatformOperationSettings();
   return {
     orgStatus: org?.status ?? null,
@@ -7149,6 +7232,14 @@ export async function getSiteLayoutConfig(): Promise<SiteLayoutConfig> {
   return normalizeSiteLayoutConfig(store.siteLayoutConfig);
 }
 
+function revalidatePublicSiteLayoutConfig(): void {
+  revalidateSiteDataTag(CACHE_TAG_SITE_LAYOUT_CONFIG);
+}
+
+function revalidatePublicSiteCommunityConfig(): void {
+  revalidateSiteDataTag(CACHE_TAG_SITE_COMMUNITY_CONFIG);
+}
+
 export async function patchSiteLayoutConfig(params: {
   header?: SiteLayoutConfig["header"];
   footer?: SiteLayoutConfig["footer"];
@@ -7166,6 +7257,7 @@ export async function patchSiteLayoutConfig(params: {
         : current.footer,
     };
     await upsertSiteLayoutConfigToFirestoreKv(next);
+    revalidatePublicSiteLayoutConfig();
     return next;
   }
   if (writeStrategy === "blocked") {
@@ -7179,6 +7271,7 @@ export async function patchSiteLayoutConfig(params: {
   };
   store.siteLayoutConfig = next;
   await writeLocalJsonAggregate(store);
+  revalidatePublicSiteLayoutConfig();
   return next;
 }
 
@@ -7285,6 +7378,7 @@ export async function patchSiteCommunityConfig(params: {
       extra2: normalizeSiteCommunityBoardConfig(params.extra2 ?? current.extra2, current.extra2),
     };
     await upsertSiteCommunityConfigToFirestoreKv(next);
+    revalidatePublicSiteCommunityConfig();
     return next;
   }
   if (writeStrategy === "blocked") {
@@ -7301,6 +7395,7 @@ export async function patchSiteCommunityConfig(params: {
   };
   store.siteCommunityConfig = next;
   await writeLocalJsonAggregate(store);
+  revalidatePublicSiteCommunityConfig();
   return next;
 }
 
@@ -7766,9 +7861,12 @@ function tournamentPublishedCardToPublishedSnapshot(
   const storedLoc = typeof t.cardDisplayLocation === "string" ? t.cardDisplayLocation.trim() : "";
   const fbDate = (tournamentMeta?.date ?? "").trim();
   const fbLoc = (tournamentMeta?.location ?? "").trim();
-  const datePart = appendKoreanWeekday(storedDate || fbDate);
-  const locPart = storedLoc || fbLoc;
-  const subtitle = [datePart, locPart].filter((x) => x.length > 0).join(" · ");
+  const subtitle = buildTournamentPublishedCardSubtitle({
+    cardDisplayDate: storedDate,
+    cardDisplayLocation: storedLoc,
+    tournamentDate: fbDate,
+    tournamentLocation: fbLoc,
+  });
   const snap: PublishedCardSnapshot = {
     snapshotId: t.snapshotId,
     tournamentId: t.tournamentId,
@@ -7813,6 +7911,12 @@ function tournamentPublishedCardToPublishedSnapshot(
   if (typeof t.cardDisplayLocation === "string") {
     snap.tournamentCardDisplayLocation = t.cardDisplayLocation;
   }
+  const leadColor = normalizeOptionalCardTextColor(t.cardLeadTextColor);
+  const titleColor = normalizeOptionalCardTextColor(t.cardTitleTextColor);
+  const descColor = normalizeOptionalCardTextColor(t.cardDescriptionTextColor);
+  if (leadColor) snap.cardLeadTextColor = leadColor;
+  if (titleColor) snap.cardTitleTextColor = titleColor;
+  if (descColor) snap.cardDescriptionTextColor = descColor;
   return snap;
 }
 
@@ -7836,6 +7940,9 @@ export async function upsertTournamentPublishedCard(params: {
   imageOverlayOpacity?: number;
   cardDisplayDate?: string | null;
   cardDisplayLocation?: string | null;
+  cardLeadTextColor?: string | null;
+  cardTitleTextColor?: string | null;
+  cardDescriptionTextColor?: string | null;
 }): Promise<
   | { ok: true; snapshot: PublishedCardSnapshot }
   | { ok: false; error: string }
@@ -7957,6 +8064,12 @@ export async function upsertTournamentPublishedCard(params: {
   if (params.cardDisplayLocation !== undefined) {
     row.cardDisplayLocation = params.cardDisplayLocation;
   }
+  const leadC = normalizeOptionalCardTextColor(params.cardLeadTextColor);
+  const titleC = normalizeOptionalCardTextColor(params.cardTitleTextColor);
+  const descC = normalizeOptionalCardTextColor(params.cardDescriptionTextColor);
+  if (leadC) row.cardLeadTextColor = leadC;
+  if (titleC) row.cardTitleTextColor = titleC;
+  if (descC) row.cardDescriptionTextColor = descC;
 
   working.push(row);
   if (cardWs === "firestore-kv") {

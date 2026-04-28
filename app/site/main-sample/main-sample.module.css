@@ -1,0 +1,260 @@
+/* 샘플 메인 전용: 단색 연파랑 50% 불투명 — 그라데이션 없음, 세로로 뷰포트까지 채움 */
+.sampleRoot {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  align-self: stretch;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* 레이아웃을 밀지 않고 슬라이드 위에만 얹는 상단 헤더 — blur/backdrop-filter 없음 */
+.sampleOverlayHeader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  margin: 0;
+  border: none;
+  box-sizing: border-box;
+  padding-top: calc(var(--site-shell-header-safe-top) + var(--site-shell-header-pad-y));
+  padding-bottom: var(--site-shell-header-pad-y);
+  padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
+  min-height: calc(
+    var(--site-shell-header-safe-top) + 2 * var(--site-shell-header-pad-y) + var(--site-shell-title-min-height)
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.58);
+  color: #ffffff;
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  pointer-events: auto;
+}
+
+.sampleRoot :global(main.site-home-page--standard) {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(191, 219, 254, 0.5);
+}
+
+.sampleRoot :global(.site-home-shell) {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 고정 탭·브랜드 제거 후 빈 dock 줄 없음 */
+.sampleRoot :global(.site-shell-sticky-dock) {
+  display: none;
+}
+
+/* 스크롤은 슬라이드 뷰포트만 — 바깥과 이중 스크롤 방지 */
+.sampleRoot :global(.site-shell-scroll-body) {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(191, 219, 254, 0.5);
+  overflow: hidden !important;
+}
+
+/* 전역은 flex:none + 콘텐츠 높이만 — 샘플에선 본문이 스크롤 영역을 꽉 채움 */
+.sampleRoot :global(.site-site-gray-main.v3-stack) {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-self: stretch;
+  width: 100%;
+  box-sizing: border-box;
+  background-color: rgba(191, 219, 254, 0.5);
+  gap: 0;
+  padding-top: 0;
+  /* 하단 고정 네비와 동일 토큰 — 슬라이드창 bottom = 네비 박스 상단선 */
+  padding-bottom: var(--site-fixed-bottom-nav-layout-height);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 연파랑 단색 — 자동 세로 이동(무한 루프) + 선택 시 정지 */
+.slideViewport {
+  --sample-block-ref: 5.75rem;
+  --sample-main-card-height: calc(var(--sample-block-ref) * 1.5);
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+  background-color: rgba(191, 219, 254, 0.5);
+  overflow: hidden;
+  position: relative;
+  pointer-events: auto;
+}
+
+.sampleMainMarqueeTrack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  pointer-events: auto;
+  animation-name: sampleMainMarqueeUp;
+  animation-duration: var(--main-sample-slide-duration, 10s);
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-fill-mode: none;
+}
+
+.sampleMainMarqueeSegment {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  pointer-events: auto;
+}
+
+@keyframes sampleMainMarqueeUp {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+/* 슬롯: 트랙과 함께 이동만( transform 없음 ) — z-index만 선택 시 상승 */
+.sampleMainCardSlot {
+  flex-shrink: 0;
+  align-self: stretch;
+  box-sizing: border-box;
+  width: auto;
+  min-width: 0;
+  margin: 15px;
+  padding: 0;
+  border: none;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+  z-index: 0;
+  pointer-events: auto;
+}
+
+.sampleMainCardSlotSelected {
+  z-index: 4;
+}
+
+/* 페이스: 시각·호버·선택 transform 전부( 트랙 marquee transform 과 요소 분리 ) */
+.sampleMainCardFace {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: var(--sample-main-card-height);
+  border-radius: 12px;
+  position: relative;
+  transform: translateY(-2px) scale(1);
+  box-shadow:
+    4px 10px 14px -6px rgba(15, 23, 42, 0.32),
+    2px 6px 10px -4px rgba(15, 23, 42, 0.18);
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.22s ease;
+}
+
+.sampleMainCardSlot:active .sampleMainCardFace:not(.sampleMainCardFaceSelected) {
+  transform: translateY(-6px) scale(1.03);
+  box-shadow:
+    5px 12px 18px -6px rgba(15, 23, 42, 0.36),
+    3px 8px 12px -4px rgba(15, 23, 42, 0.22);
+}
+
+.sampleMainCardFace.sampleMainCardFaceSelected {
+  transform: translateY(-16px) scale(1.11);
+  box-shadow:
+    6px 16px 24px -8px rgba(15, 23, 42, 0.42),
+    4px 10px 16px -5px rgba(15, 23, 42, 0.28);
+}
+
+.sampleMainCardSlot:active .sampleMainCardFace.sampleMainCardFaceSelected {
+  transform: translateY(-18px) scale(1.12);
+  box-shadow:
+    7px 18px 28px -8px rgba(15, 23, 42, 0.45),
+    4px 12px 18px -5px rgba(15, 23, 42, 0.3);
+}
+
+.sampleMainCardSlot:focus-visible .sampleMainCardFace {
+  outline: 2px solid rgba(37, 99, 235, 0.85);
+  outline-offset: 3px;
+}
+
+.sampleMainCardShortcut {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: none;
+  color: #fff;
+  background: rgba(15, 23, 42, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+
+.sampleMainCardFace.sampleMainCardFaceSelected .sampleMainCardShortcut {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sampleMainCardPoster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.sampleMainCardTitleOverlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 44px;
+  padding: 0.35rem 0.75rem;
+  box-sizing: border-box;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+  pointer-events: none;
+  max-height: 4.5em;
+  overflow: hidden;
+}
+
+.sampleMainEmpty {
+  margin: 0;
+  padding: 2rem 1rem;
+  text-align: center;
+  font-size: 0.88rem;
+  color: rgba(30, 41, 59, 0.75);
+  line-height: 1.45;
+}

@@ -1,4 +1,4 @@
-import SiteHomePage from "../page";
+import SiteMainLegacyHome from "../main-legacy/page";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,7 @@ export default async function SitePreviewPage({
   const pageId = typeof draftId === "string" && draftId.trim() ? draftId.trim() : "home";
 
   return (
-    <SiteHomePage
+    <SiteMainLegacyHome
       searchParams={Promise.resolve({
         ...resolvedSearchParams,
         pageId,

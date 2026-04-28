@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useLayoutEffect } from "react";
 import VenuesDistanceNavLink from "../site/components/VenuesDistanceNavLink";
+import { isSiteMainSamplePathname } from "../site/lib/site-main-sample";
 import { normalizeSiteRootPathname, SITE_ROOT_SWIPE_NAV } from "../site/lib/site-root-swipe-order";
 
 function isInquiryDetailWithComposer(pathname: string): boolean {
@@ -29,6 +31,14 @@ function navItemActive(pathname: string, href: string): boolean {
 export default function GlobalHomeButton() {
   const pathname = usePathname() ?? "";
   const overInquiryComposer = isInquiryDetailWithComposer(pathname);
+
+  /* 서버에서 `next-url`이 비면 샘플 셸 클래스가 빠져 하단 네비 실험 스타일이 적용되지 않음 — pathname으로 동기화 */
+  useLayoutEffect(() => {
+    const on = isSiteMainSamplePathname(pathname);
+    document.querySelectorAll<HTMLElement>(".site-shell").forEach((el) => {
+      el.classList.toggle("site-shell--site-main-sample", on);
+    });
+  }, [pathname]);
 
   return (
     <div

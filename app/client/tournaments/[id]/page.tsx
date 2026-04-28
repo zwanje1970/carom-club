@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
+import { resolveCanonicalUserIdForAuth } from "../../../../lib/auth/resolve-canonical-user-id-for-auth";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
 import { outlineFileKindFromAsset, outlinePdfIdFromPublicUrl } from "../../../../lib/outline-pdf-helpers";
 import { getOutlinePdfAssetById } from "../../../../lib/surface-read";
@@ -21,7 +22,8 @@ export default async function ClientTournamentManagePage({
     notFound();
   }
 
-  const canView = Boolean(session && tournament.createdBy === session.userId);
+  const viewerId = session ? await resolveCanonicalUserIdForAuth(session.userId) : "";
+  const canView = Boolean(session && tournament.createdBy === viewerId);
   if (!canView) {
     notFound();
   }

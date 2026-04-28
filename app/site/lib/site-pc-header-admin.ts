@@ -1,6 +1,5 @@
-import { cookies } from "next/headers";
-import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../lib/auth/session";
-import { getClientStatusByUserId, getUserById } from "../../../lib/surface-read";
+import { getClientStatusByUserId } from "../../../lib/surface-read";
+import { getRequestSessionUser } from "../../../lib/server/request-session-user";
 import type { SiteLayoutMenuItem } from "../../../lib/types/entities";
 
 function menuPathOnly(href: string): string {
@@ -20,11 +19,7 @@ export type PcSiteHeaderAdminEntry = { showClient: boolean; showPlatform: boolea
 
 /** 공개 /site·대시보드 PC 헤더: 로그인 + 역할·클라이언트 승인 기준 */
 export async function getPcSiteHeaderAdminFlags(): Promise<PcSiteHeaderAdminEntry> {
-  const cookieStore = await cookies();
-  const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
-  if (!session) return { showClient: false, showPlatform: false };
-
-  const user = await getUserById(session.userId);
+  const user = await getRequestSessionUser();
   if (!user) return { showClient: false, showPlatform: false };
 
   if (user.role === "PLATFORM") {

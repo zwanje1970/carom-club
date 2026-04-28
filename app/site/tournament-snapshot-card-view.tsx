@@ -30,6 +30,10 @@ export type SlideDeckItem = {
   mediaBackground?: string;
   imageOverlayBlend?: boolean;
   imageOverlayOpacity?: number;
+  /** 비우면 테마 기본 글자색 */
+  cardLeadTextColor?: string | null;
+  cardTitleTextColor?: string | null;
+  cardDescriptionTextColor?: string | null;
 };
 
 /** carom-postcard-template-test: TournamentSlideCardPreview.tsx TournamentSlidePreviewItem */
@@ -44,6 +48,9 @@ type TournamentSlidePreviewItem = {
   mediaBackground?: string;
   imageOverlayBlend?: boolean;
   imageOverlayOpacity?: number;
+  cardLeadTextColor?: string | null;
+  cardTitleTextColor?: string | null;
+  cardDescriptionTextColor?: string | null;
 };
 
 type SlidePreviewVariant = "classic" | "frame";
@@ -61,6 +68,9 @@ function slideDeckItemToPreviewItem(item: SlideDeckItem): TournamentSlidePreview
     mediaBackground: item.mediaBackground,
     imageOverlayBlend: item.imageOverlayBlend,
     imageOverlayOpacity: item.imageOverlayOpacity,
+    cardLeadTextColor: item.cardLeadTextColor,
+    cardTitleTextColor: item.cardTitleTextColor,
+    cardDescriptionTextColor: item.cardDescriptionTextColor,
   };
 }
 
@@ -103,12 +113,14 @@ function MediaStack({
   /** type === "ad" 인 슬라이드 카드에만 AD 표시 */
   showAdBadge?: boolean;
 }) {
-  const solid = slideDeckSolidBackdrop?.trim();
+  const solidBackdrop = slideDeckSolidBackdrop?.trim();
   const cssBg = item.mediaBackground?.trim();
-  const imgUrl = solid ? undefined : item.image320Url?.trim();
+  const rawImg = item.image320Url?.trim();
+  /** 슬라이드 단색은 '배경 이미지 없음'일 때만 이미지를 가린다 — 포스터 카드는 그대로 노출 */
+  const imgUrl = rawImg || undefined;
   const overlayBlend = Boolean(imgUrl) && item.imageOverlayBlend !== false;
   const overlayOpacity = Math.min(1, Math.max(0.15, item.imageOverlayOpacity ?? 0.78));
-  const paintBg = solid ?? cssBg;
+  const paintBg = imgUrl ? cssBg || undefined : cssBg || solidBackdrop;
   const paintClass = [
     styles.mediaPaint,
     variant === "frame" && !paintBg ? styles.mediaPaintFrameDefault : "",
@@ -167,6 +179,9 @@ function TournamentSlideCardPreview({
   const lead = (item.cardExtraLine1 ?? "").trim();
   const description = (item.cardExtraLine2 ?? "").trim();
   const description2 = (item.cardExtraLine3 ?? "").trim();
+  const leadColor = (item.cardLeadTextColor ?? "").trim();
+  const titleColor = (item.cardTitleTextColor ?? "").trim();
+  const descColor = (item.cardDescriptionTextColor ?? "").trim();
   const statusBadge = <TournamentStatusBadge status={status} />;
 
   const rootClass = [
@@ -191,10 +206,30 @@ function TournamentSlideCardPreview({
           <div className={styles.classicInner}>
             <div className={styles.classicTop}>
               <div className={styles.classicMain}>
-                {lead ? <p className={styles.classicLead}>{lead}</p> : null}
-                <h3 className={styles.classicTitle}>{item.title || "(제목)"}</h3>
-                {description ? <p className={styles.classicDesc}>{description}</p> : null}
-                {description2 ? <p className={styles.classicDescSecondary}>{description2}</p> : null}
+                {lead ? (
+                  <p className={styles.classicLead} style={leadColor ? { color: leadColor } : undefined}>
+                    {lead}
+                  </p>
+                ) : null}
+                <h3
+                  className={styles.classicTitle}
+                  style={titleColor ? { color: titleColor } : undefined}
+                >
+                  {item.title || "(제목)"}
+                </h3>
+                {description ? (
+                  <p className={styles.classicDesc} style={descColor ? { color: descColor } : undefined}>
+                    {description}
+                  </p>
+                ) : null}
+                {description2 ? (
+                  <p
+                    className={styles.classicDescSecondary}
+                    style={descColor ? { color: descColor } : undefined}
+                  >
+                    {description2}
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>
@@ -220,10 +255,27 @@ function TournamentSlideCardPreview({
         >
           <div className={styles.frameInner}>
             <div className={styles.frameCenter}>
-              {lead ? <p className={styles.frameLead}>{lead}</p> : null}
-              <h3 className={styles.frameTitle}>{item.title || "(제목)"}</h3>
-              {description ? <p className={styles.frameDesc}>{description}</p> : null}
-              {description2 ? <p className={styles.frameDescSecondary}>{description2}</p> : null}
+              {lead ? (
+                <p className={styles.frameLead} style={leadColor ? { color: leadColor } : undefined}>
+                  {lead}
+                </p>
+              ) : null}
+              <h3 className={styles.frameTitle} style={titleColor ? { color: titleColor } : undefined}>
+                {item.title || "(제목)"}
+              </h3>
+              {description ? (
+                <p className={styles.frameDesc} style={descColor ? { color: descColor } : undefined}>
+                  {description}
+                </p>
+              ) : null}
+              {description2 ? (
+                <p
+                  className={styles.frameDescSecondary}
+                  style={descColor ? { color: descColor } : undefined}
+                >
+                  {description2}
+                </p>
+              ) : null}
             </div>
           </div>
         </MediaStack>

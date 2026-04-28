@@ -6,6 +6,7 @@ import {
   getClientStatusByUserId,
   getUserById,
   listCardSnapshotsByTournamentId,
+  resolveCanonicalUserIdForAuth,
   setCardSnapshotActive,
   upsertTournamentPublishedCard,
   type TournamentCardBackground,
@@ -16,6 +17,11 @@ import { getTournamentByIdFirestore } from "../../../../lib/server/firestore-tou
 import { isTournamentPublishedCardsWritePersistenceBlockedError } from "../../../../lib/server/platform-tournament-published-cards-settings";
 
 export const runtime = "nodejs";
+
+async function publisherTournamentOwnerId(user: { id: string; role: string }): Promise<string> {
+  if (user.role === "PLATFORM") return user.id;
+  return resolveCanonicalUserIdForAuth(user.id);
+}
 
 async function getPublisher() {
   const cookieStore = await cookies();
@@ -75,6 +81,9 @@ export async function POST(request: Request) {
     imageOverlayOpacity?: unknown;
     cardDisplayDate?: unknown;
     cardDisplayLocation?: unknown;
+    cardLeadTextColor?: unknown;
+    cardTitleTextColor?: unknown;
+    cardDescriptionTextColor?: unknown;
   } = {};
 
   try {
@@ -99,7 +108,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Tournament not found." }, { status: 404 });
   }
 
-  if (publisher.user.role !== "PLATFORM" && tournament.createdBy !== publisher.user.id) {
+  const ownerId = await publisherTournamentOwnerId(publisher.user);
+  if (publisher.user.role !== "PLATFORM" && tournament.createdBy !== ownerId) {
     return NextResponse.json({ error: "You can publish only your tournaments." }, { status: 403 });
   }
 
@@ -138,6 +148,11 @@ export async function POST(request: Request) {
         ? body.cardDisplayLocation
         : undefined;
 
+  const cardLeadTextColor = typeof body.cardLeadTextColor === "string" ? body.cardLeadTextColor : undefined;
+  const cardTitleTextColor = typeof body.cardTitleTextColor === "string" ? body.cardTitleTextColor : undefined;
+  const cardDescriptionTextColor =
+    typeof body.cardDescriptionTextColor === "string" ? body.cardDescriptionTextColor : undefined;
+
   let result: Awaited<ReturnType<typeof upsertTournamentPublishedCard>>;
   try {
     result = await upsertTournamentPublishedCard({
@@ -159,6 +174,9 @@ export async function POST(request: Request) {
       ...(imageOverlayOpacity !== undefined ? { imageOverlayOpacity } : {}),
       ...(cardDisplayDate !== undefined ? { cardDisplayDate } : {}),
       ...(cardDisplayLocation !== undefined ? { cardDisplayLocation } : {}),
+      ...(cardLeadTextColor !== undefined ? { cardLeadTextColor } : {}),
+      ...(cardTitleTextColor !== undefined ? { cardTitleTextColor } : {}),
+      ...(cardDescriptionTextColor !== undefined ? { cardDescriptionTextColor } : {}),
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Failed to save tournament card.";
@@ -214,7 +232,8 @@ export async function GET(request: Request) {
   if (!tournament) {
     return NextResponse.json({ error: "Tournament not found." }, { status: 404 });
   }
-  if (publisher.user.role !== "PLATFORM" && tournament.createdBy !== publisher.user.id) {
+  const ownerIdGet = await publisherTournamentOwnerId(publisher.user);
+  if (publisher.user.role !== "PLATFORM" && tournament.createdBy !== ownerIdGet) {
     return NextResponse.json({ error: "You can read only your tournaments." }, { status: 403 });
   }
 
@@ -277,7 +296,8 @@ export async function PATCH(request: Request) {
   if (!tournament) {
     return NextResponse.json({ error: "Tournament not found." }, { status: 404 });
   }
-  if (publisher.user.role !== "PLATFORM" && tournament.createdBy !== publisher.user.id) {
+  const ownerIdPatch = await publisherTournamentOwnerId(publisher.user);
+  if (publisher.user.role !== "PLATFORM" && tournament.createdBy !== ownerIdPatch) {
     return NextResponse.json({ error: "You can update only your snapshots." }, { status: 403 });
   }
 

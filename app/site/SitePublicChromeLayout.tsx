@@ -5,6 +5,19 @@ import SiteRootSwipeNav from "./components/SiteRootSwipeNav";
 import SiteVenuesGeolocationNav from "./components/SiteVenuesGeolocationNav";
 import { getSiteLayoutConfig } from "../../lib/surface-read";
 import { filterPcHeaderAdminMenuItems, getPcSiteHeaderAdminFlags } from "./lib/site-pc-header-admin";
+import { isSiteMainSamplePathname } from "./lib/site-main-sample";
+
+/** 샘플 메인 — `next-url` 등 헤더 기준(클라이언트는 `GlobalHomeButton`에서 `usePathname`으로 보강) */
+function pathnameIndicatesSiteMainSample(nextUrlHeader: string): boolean {
+  const raw = nextUrlHeader.trim();
+  if (!raw) return false;
+  try {
+    const pathname = raw.startsWith("http") ? new URL(raw).pathname : raw.split("?")[0] ?? raw;
+    return isSiteMainSamplePathname(pathname);
+  } catch {
+    return isSiteMainSamplePathname(raw);
+  }
+}
 
 function SiteFooterDesktop({ text }: { text: string }) {
   const lines = text.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
@@ -44,13 +57,18 @@ export default async function SitePublicChromeLayout({
     (headerStore.get("referer") ?? "").includes("/platform/site/page-builder") ||
     (headerStore.get("referer") ?? "").includes("/admin/site/page-builder");
 
+  const isSiteMainSample = pathnameIndicatesSiteMainSample(nextUrlHeader);
+  const siteShellSampleClass = isSiteMainSample ? " site-shell--site-main-sample" : "";
+
   if (isMobile || isPageBuilderPreviewRequest) {
     return (
-      <div className="site-shell site-shell--ua-mobile-site">
+      <div className={`site-shell site-shell--ua-mobile-site${siteShellSampleClass}`}>
         <SiteVenuesGeolocationNav />
-        <div className="site-shell-pc-header">
-          <SiteChromeHeader menuItems={config.header.mobile.menuItems} />
-        </div>
+        {isSiteMainSample ? null : (
+          <div className="site-shell-pc-header">
+            <SiteChromeHeader menuItems={config.header.mobile.menuItems} />
+          </div>
+        )}
         <SiteRootSwipeNav>{children}</SiteRootSwipeNav>
         <GlobalHomeButton />
       </div>
@@ -61,13 +79,12 @@ export default async function SitePublicChromeLayout({
   const pcHeaderMenuItems = filterPcHeaderAdminMenuItems(config.header.pc.menuItems);
 
   return (
-    <div className="site-shell site-shell--pc-sticky-footer site-shell--pc-site-chrome">
+    <div className={`site-shell site-shell--pc-sticky-footer site-shell--pc-site-chrome${siteShellSampleClass}`}>
       <div className="site-shell-pc-constrain">
         <SiteVenuesGeolocationNav />
-        <SiteChromeHeader
-          menuItems={pcHeaderMenuItems}
-          pcAdminEntry={pcAdminEntry}
-        />
+        {isSiteMainSample ? null : (
+          <SiteChromeHeader menuItems={pcHeaderMenuItems} pcAdminEntry={pcAdminEntry} />
+        )}
         <div className="site-shell-main">{children}</div>
         <SiteFooterDesktop text={config.footer.pc.text} />
       </div>

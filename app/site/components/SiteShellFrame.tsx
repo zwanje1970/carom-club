@@ -81,6 +81,8 @@ export type SiteShellFrameProps = {
    * `standard`(기본): 메인 제외 사이트 페이지 공통 여백(`globals.css` 변수).
    */
   shellVariant?: "home" | "standard";
+  /** `true`이면 `.site-home-top-white`(로고·제목 줄)만 렌더하지 않음 — 샘플·특수 화면용 */
+  hideBrandHeader?: boolean;
 };
 
 /**
@@ -97,6 +99,7 @@ export default function SiteShellFrame({
   auxiliaryCompact,
   auxiliaryBarClassName,
   shellVariant = "standard",
+  hideBrandHeader = false,
 }: SiteShellFrameProps) {
   const hasControls = auxiliary !== undefined;
   const isHomeShell = shellVariant === "home";
@@ -139,7 +142,7 @@ export default function SiteShellFrame({
   const homeShellInner = (
     <div className="site-home-shell" style={shellStyle}>
       <div className="site-shell-sticky-dock">
-        {headerBlock}
+        {hideBrandHeader ? null : headerBlock}
         {homeBelowHeader ?? null}
         {controlsBlock}
       </div>

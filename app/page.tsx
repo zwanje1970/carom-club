@@ -1,4 +1,5 @@
 import type { Viewport } from "next";
+import AdminFabServerBridge from "./components/AdminFabServerBridge";
 import SitePublicChromeLayout from "./site/SitePublicChromeLayout";
 import SiteHomePage, { metadata } from "./site/page";
 
@@ -15,14 +16,13 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default async function HomePage({
-  searchParams,
-}: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}) {
+export default async function HomePage() {
   return (
-    <SitePublicChromeLayout>
-      <SiteHomePage searchParams={searchParams} />
-    </SitePublicChromeLayout>
+    <>
+      <SitePublicChromeLayout>
+        <SiteHomePage />
+      </SitePublicChromeLayout>
+      <AdminFabServerBridge />
+    </>
   );
 }

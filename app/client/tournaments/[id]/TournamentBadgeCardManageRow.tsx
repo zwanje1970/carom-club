@@ -250,10 +250,17 @@ export default function TournamentBadgeCardManageRow({
       </div>
       <Link
         className="v3-btn"
-        href={`/client/tournaments/${tournamentId}/card-publish`}
+        href={`/client/tournaments/${tournamentId}/card-publish-v2`}
         style={{ alignSelf: "flex-end", marginLeft: "auto", flexShrink: 0 }}
       >
         게시카드 작성
+      </Link>
+      <Link
+        className="v3-btn"
+        href={`/client/tournaments/${tournamentId}/card-publish`}
+        style={{ alignSelf: "flex-end", flexShrink: 0 }}
+      >
+        게시카드(구)
       </Link>
     </div>
   );

@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import AdminDashboardFloatingFab from "./components/AdminDashboardFloatingFab";
 import FcmSessionRegisterClient from "./components/FcmSessionRegisterClient";
 import SiteGeoLifecycleGuard from "./components/SiteGeoLifecycleGuard";
 import "./globals.css";
@@ -27,7 +26,6 @@ export default function RootLayout({
         <SiteGeoLifecycleGuard />
         <FcmSessionRegisterClient />
         {children}
-        <AdminDashboardFloatingFab />
       </body>
     </html>
   );

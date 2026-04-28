@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { outlineFileKindFromAsset, outlinePdfIdFromPublicUrl } from "../../../../../lib/outline-pdf-helpers";
-import { getOutlinePdfAssetById } from "../../../../../lib/surface-read";
-import { getTournamentByIdFirestore } from "../../../../../lib/server/firestore-tournaments";
+import { getOutlinePdfAssetById, getTournamentByIdForPublicSitePage } from "../../../../../lib/surface-read";
 import { isEmptyOutlineHtml } from "../../../../../lib/outline-content-helpers";
 import SiteOutlineDocumentCard from "../../../components/SiteOutlineDocumentCard";
 import SiteShellFrame from "../../../components/SiteShellFrame";
@@ -13,7 +12,7 @@ export default async function TournamentOutlineViewPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const t = await getTournamentByIdFirestore(id);
+  const t = await getTournamentByIdForPublicSitePage(id);
   if (!t) notFound();
 
   const pdf = t.outlinePdfUrl?.trim();

@@ -98,6 +98,8 @@ type MainSlideAdConfig = {
   adsPerInsert: number;
   rotationMode: "sequential" | "random";
   maxAdsPerCycle: number;
+  /** 카드 이동 시간(초) — 5~20, 기본 10 */
+  cardMoveDurationSec: number;
 };
 
 type AdRow = {
@@ -121,6 +123,7 @@ function defaultConfig(): MainSlideAdConfig {
     adsPerInsert: 1,
     rotationMode: "sequential",
     maxAdsPerCycle: 1,
+    cardMoveDurationSec: 10,
   };
 }
 
@@ -175,6 +178,10 @@ function configFromApi(raw: unknown): MainSlideAdConfig {
   if (Number.isFinite(mx)) base.maxAdsPerCycle = Math.max(0, Math.floor(mx));
   if (r.rotationMode === "random" || r.rotationMode === "sequential") {
     base.rotationMode = r.rotationMode;
+  }
+  const moveSec = Number(r.cardMoveDurationSec);
+  if (Number.isFinite(moveSec)) {
+    base.cardMoveDurationSec = Math.min(20, Math.max(5, Math.round(moveSec)));
   }
   return base;
 }
@@ -285,6 +292,7 @@ export default function PlatformMainSlideAdsPage() {
           adsPerInsert: config.adsPerInsert,
           rotationMode: config.rotationMode,
           maxAdsPerCycle: config.maxAdsPerCycle,
+          cardMoveDurationSec: config.cardMoveDurationSec,
         }),
       });
       const result = (await response.json()) as { ok?: boolean; config?: unknown; error?: string };
@@ -488,6 +496,26 @@ export default function PlatformMainSlideAdsPage() {
             onChange={(e) =>
               setConfig((c) => ({ ...c, maxAdsPerCycle: clampNonNegativeInt(e.target.value, c.maxAdsPerCycle) }))
             }
+            style={inputStyle}
+          />
+        </label>
+        <label className="v3-stack">
+          <span>카드 이동 시간(초) — 슬라이드 속도 (5~20, 기본 10)</span>
+          <input
+            type="number"
+            min={5}
+            max={20}
+            disabled={loading}
+            value={config.cardMoveDurationSec}
+            onChange={(e) => {
+              const n = Number.parseInt(e.target.value, 10);
+              setConfig((c) => ({
+                ...c,
+                cardMoveDurationSec: Number.isFinite(n)
+                  ? Math.min(20, Math.max(5, n))
+                  : c.cardMoveDurationSec,
+              }));
+            }}
             style={inputStyle}
           />
         </label>

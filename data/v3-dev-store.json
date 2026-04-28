@@ -31,6 +31,21 @@
       "pushMarketingAgreed": false
     },
     {
+      "id": "f0f0f0f0-f0f0-40f0-8f0f-f0f0f0f0aaaa",
+      "loginId": "aaaaaa",
+      "nickname": "aaaaaa",
+      "name": "임시 클라이언트",
+      "email": "aaaaaa@temp.local",
+      "phone": null,
+      "password": "aaaaaa",
+      "role": "CLIENT",
+      "status": "ACTIVE",
+      "createdAt": "2026-04-28T00:00:00.000Z",
+      "updatedAt": "2026-04-28T00:00:00.000Z",
+      "linkedVenueId": null,
+      "pushMarketingAgreed": false
+    },
+    {
       "id": "3466366b-fc7e-4381-b758-38a8c1fe57c0",
       "loginId": "zzzzzz",
       "nickname": "zzzzzz",
@@ -1214,21 +1229,6 @@
       "updatedAt": "2026-04-22T03:01:04.717Z",
       "linkedVenueId": null,
       "pushMarketingAgreed": true
-    },
-    {
-      "id": "bbaed5ee-ca12-438d-9f8e-aba41eda6fee",
-      "loginId": "aaaaaa",
-      "nickname": "aaaaaa",
-      "name": "aaaaaa",
-      "email": null,
-      "phone": null,
-      "password": "aaaaaa",
-      "role": "USER",
-      "status": "ACTIVE",
-      "createdAt": "2026-04-25T05:22:34.988Z",
-      "updatedAt": "2026-04-25T05:22:34.988Z",
-      "linkedVenueId": null,
-      "pushMarketingAgreed": true
     }
   ],
   "legacyUserIdAliases": {
@@ -1248,6 +1248,20 @@
       "reviewedByUserId": "c0b97eee-5271-4564-bdd5-7e29ea6a5f99",
       "createdAt": "2026-04-16T14:00:00.000Z",
       "updatedAt": "2026-04-16T15:01:20.869Z"
+    },
+    {
+      "id": "ca-aaaaaa-temp",
+      "userId": "f0f0f0f0-f0f0-40f0-8f0f-f0f0f0f0aaaa",
+      "organizationName": "임시 클라이언트 조직",
+      "contactName": "임시",
+      "contactPhone": "010-0000-0001",
+      "requestedClientType": "GENERAL",
+      "status": "APPROVED",
+      "rejectedReason": null,
+      "reviewedAt": "2026-04-28T00:00:00.000Z",
+      "reviewedByUserId": "c0b97eee-5271-4564-bdd5-7e29ea6a5f99",
+      "createdAt": "2026-04-28T00:00:00.000Z",
+      "updatedAt": "2026-04-28T00:00:00.000Z"
     },
     {
       "id": "2900c370-c6e8-4080-940b-3c56e693bad6",

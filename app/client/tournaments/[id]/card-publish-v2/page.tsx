@@ -7,9 +7,52 @@ import {
   TournamentSnapshotCardView,
   type SlideDeckItem,
 } from "../../../../site/tournament-snapshot-card-view";
+import {
+  POSTCARD_TEMPLATE_APP_DEFAULTS,
+  POSTCARD_TEMPLATE_TEXT_COLOR_SWATCHES,
+} from "../../../../../lib/postcard-template-reference";
 import editorStyles from "../card-publish-editor.module.css";
 
-const DESCRIPTION_MAX_LINES = 5;
+const DESCRIPTION_MAX_LINES = 2;
+
+/** 제목 위 / 제목 / 설명 글자색 — `carom-postcard-template-test/src/App.tsx` 와 동일 */
+const CARD_TEXT_COLOR_SWATCHES = POSTCARD_TEMPLATE_TEXT_COLOR_SWATCHES;
+
+function TextColorSwatches({
+  value,
+  onChange,
+  wrapClass,
+  swatchClass,
+  swatchLightClass,
+  swatchSelectedClass,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  wrapClass: string;
+  swatchClass: string;
+  swatchLightClass: string;
+  swatchSelectedClass: string;
+}) {
+  return (
+    <div className={wrapClass} role="group" aria-label="글자색">
+      {CARD_TEXT_COLOR_SWATCHES.map((hex) => {
+        const selected = value.trim().toLowerCase() === hex.toLowerCase();
+        const isLight = hex.toLowerCase() === "#ffffff";
+        return (
+          <button
+            key={hex}
+            type="button"
+            className={`${swatchClass} ${isLight ? swatchLightClass : ""} ${selected ? swatchSelectedClass : ""}`}
+            style={{ backgroundColor: hex }}
+            aria-label={`색 ${hex}`}
+            aria-pressed={selected}
+            onClick={() => onChange(selected ? "" : hex)}
+          />
+        );
+      })}
+    </div>
+  );
+}
 
 /** 백색 글자 대비용 고정 64색 (8×8 그리드) */
 const CARD_COLOR_PALETTE_64 = [
@@ -202,6 +245,9 @@ type SnapshotPick = {
   tournamentImageOverlayOpacity?: number | null;
   tournamentCardDisplayDate?: string | null;
   tournamentCardDisplayLocation?: string | null;
+  cardLeadTextColor?: string | null;
+  cardTitleTextColor?: string | null;
+  cardDescriptionTextColor?: string | null;
 };
 
 function hasStoredV2Media(pick: SnapshotPick): boolean {
@@ -212,7 +258,7 @@ function hasStoredV2Media(pick: SnapshotPick): boolean {
   );
 }
 
-export default function ClientTournamentCardPublishPage() {
+export default function ClientTournamentCardPublishV2Page() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const tournamentId = useMemo(() => (typeof params.id === "string" ? params.id : ""), [params.id]);
@@ -224,7 +270,9 @@ export default function ClientTournamentCardPublishPage() {
   const [title, setTitle] = useState("");
   const [textLine1, setTextLine1] = useState("");
   const [textLine2, setTextLine2] = useState("");
-  const [textLine3, setTextLine3] = useState("");
+  const [leadTextColor, setLeadTextColor] = useState("");
+  const [titleTextColor, setTitleTextColor] = useState("");
+  const [descriptionTextColor, setDescriptionTextColor] = useState("");
   const [themeType, setThemeType] = useState<CardTheme>("dark");
   const [uploadedImage, setUploadedImage] = useState<UploadedImage | null>(null);
 
@@ -263,7 +311,7 @@ export default function ClientTournamentCardPublishPage() {
       statusBadge: tournamentStatusForPreview,
       cardExtraLine1: textLine1 || null,
       cardExtraLine2: textLine2 || null,
-      cardExtraLine3: textLine3 || null,
+      cardExtraLine3: null,
       image320Url: uploadedImage?.w320Url,
       cardTemplate,
       backgroundType,
@@ -271,6 +319,9 @@ export default function ClientTournamentCardPublishPage() {
       mediaBackground: resolvedPreviewMediaBg,
       imageOverlayBlend: v2MediaMode === "on" ? imageOverlayBlend : true,
       imageOverlayOpacity: v2MediaMode === "on" ? imageOverlayOpacity : 1,
+      ...(leadTextColor.trim() ? { cardLeadTextColor: leadTextColor.trim() } : {}),
+      ...(titleTextColor.trim() ? { cardTitleTextColor: titleTextColor.trim() } : {}),
+      ...(descriptionTextColor.trim() ? { cardDescriptionTextColor: descriptionTextColor.trim() } : {}),
     };
     return base;
   }, [
@@ -280,7 +331,9 @@ export default function ClientTournamentCardPublishPage() {
     tournamentStatusForPreview,
     textLine1,
     textLine2,
-    textLine3,
+    leadTextColor,
+    titleTextColor,
+    descriptionTextColor,
     uploadedImage?.w320Url,
     cardTemplate,
     backgroundType,
@@ -334,10 +387,13 @@ export default function ClientTournamentCardPublishPage() {
         setTitle(snapTitle && snapTitle !== "(제목)" ? snapTitle : t.title);
         const fromPick1 = (pick.cardExtraLine1 ?? "").trim();
         const fromPick2 = (pick.cardExtraLine2 ?? "").trim();
-        const fromPick3 = (pick.cardExtraLine3 ?? "").trim();
         setTextLine1(fromPick1 || summaryLine1);
         setTextLine2(fromPick2 || prizeLine1 || summaryLine2);
-        setTextLine3(fromPick3);
+        setLeadTextColor(typeof pick.cardLeadTextColor === "string" ? pick.cardLeadTextColor.trim() : "");
+        setTitleTextColor(typeof pick.cardTitleTextColor === "string" ? pick.cardTitleTextColor.trim() : "");
+        setDescriptionTextColor(
+          typeof pick.cardDescriptionTextColor === "string" ? pick.cardDescriptionTextColor.trim() : ""
+        );
         setCardTemplate(pick.tournamentCardTemplate === "B" ? "B" : "A");
         setThemeType(
           pick.tournamentTheme === "light" ? "light" : pick.tournamentTheme === "natural" ? "natural" : "dark"
@@ -376,9 +432,13 @@ export default function ClientTournamentCardPublishPage() {
         setCardPlace(locRaw ? venueNameOnly(locRaw) : "");
       } else {
         setTitle(t.title);
-        setTextLine1(summaryLine1);
-        setTextLine2(prizeLine1 || summaryLine2);
-        setTextLine3("");
+        const sum1 = summaryLine1.trim();
+        const sum2 = (prizeLine1 || summaryLine2).trim();
+        setTextLine1(sum1 || POSTCARD_TEMPLATE_APP_DEFAULTS.leadText);
+        setTextLine2(sum2 || POSTCARD_TEMPLATE_APP_DEFAULTS.descriptionText);
+        setLeadTextColor("");
+        setTitleTextColor("");
+        setDescriptionTextColor("");
         setUploadedImage(null);
         setV2MediaMode("on");
         setMediaBackground("");
@@ -386,8 +446,8 @@ export default function ClientTournamentCardPublishPage() {
         setImageOverlayOpacity(0.78);
         const d0 = typeof t.date === "string" ? t.date : "";
         const loc0 = typeof t.location === "string" ? t.location : "";
-        setCardDate(d0 ? formatCardDateForDisplay(d0) : "");
-        setCardPlace(loc0 ? venueNameOnly(loc0) : "");
+        setCardDate(d0 ? formatCardDateForDisplay(d0) : POSTCARD_TEMPLATE_APP_DEFAULTS.dateText);
+        setCardPlace(loc0 ? venueNameOnly(loc0) : POSTCARD_TEMPLATE_APP_DEFAULTS.placeText);
       }
     } catch {
       setMessage("카드 정보를 불러오는 중 오류가 발생했습니다.");
@@ -426,7 +486,7 @@ export default function ClientTournamentCardPublishPage() {
           title: title.trim(),
           textLine1: textLine1.trim(),
           textLine2: textLine2.trim(),
-          textLine3: textLine3.trim(),
+          textLine3: "",
           cardTemplate,
           backgroundType,
           themeType,
@@ -436,6 +496,9 @@ export default function ClientTournamentCardPublishPage() {
           cardDisplayDate: formatCardDateForDisplay(cardDate).trim(),
           cardDisplayLocation: cardPlace.trim(),
         };
+        if (leadTextColor.trim()) body.cardLeadTextColor = leadTextColor.trim();
+        if (titleTextColor.trim()) body.cardTitleTextColor = titleTextColor.trim();
+        if (descriptionTextColor.trim()) body.cardDescriptionTextColor = descriptionTextColor.trim();
         if (v2MediaMode === "on") {
           body.mediaBackground = mediaBackground;
           body.imageOverlayBlend = imageOverlayBlend;
@@ -510,19 +573,21 @@ export default function ClientTournamentCardPublishPage() {
       <div className={editorStyles.pcPageShell}>
         <div className={editorStyles.pcPageMain}>
           <h1 className="v3-h1" style={{ paddingLeft: "0.75rem", paddingRight: "0.75rem" }}>
-            게시카드 작성
+            게시카드 작성 (신규)
           </h1>
 
           <div className={editorStyles.pageWrap}>
         <div className={editorStyles.previewSticky}>
           <div className={editorStyles.previewInner}>
-            <div className={editorStyles.previewCardWrap}>
-              <TournamentSnapshotCardView
-                item={cardPublishSlidePreview}
-                slideDeck
-                templateCardLayout
-                slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
-              />
+            <div className={editorStyles.previewSlideLayer}>
+              <div className={editorStyles.previewCardWrap}>
+                <TournamentSnapshotCardView
+                  item={cardPublishSlidePreview}
+                  slideDeck
+                  templateCardLayout
+                  slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
+                />
+              </div>
             </div>
             <div className={editorStyles.templateRadioRow} role="radiogroup" aria-label="슬라이드 템플릿">
               <label className={editorStyles.templateRadioLabel}>
@@ -583,8 +648,18 @@ export default function ClientTournamentCardPublishPage() {
           <div className={editorStyles.stepScrollBody}>
           {editorStep === 1 ? (
             <>
-              <label className={editorStyles.field}>
-                <span className={editorStyles.fieldLabel}>제목 위 한 줄</span>
+              <div className={editorStyles.field}>
+                <div className={editorStyles.fieldHead}>
+                  <span className={editorStyles.fieldLabel}>제목 위 한 줄</span>
+                  <TextColorSwatches
+                    value={leadTextColor}
+                    onChange={setLeadTextColor}
+                    wrapClass={editorStyles.fieldSwatches}
+                    swatchClass={editorStyles.fieldSwatch}
+                    swatchLightClass={editorStyles.fieldSwatchLight}
+                    swatchSelectedClass={editorStyles.fieldSwatchSelected}
+                  />
+                </div>
                 <input
                   className={editorStyles.fieldInput}
                   type="text"
@@ -593,10 +668,20 @@ export default function ClientTournamentCardPublishPage() {
                   autoComplete="off"
                   placeholder="비우면 표시 안 함"
                 />
-              </label>
+              </div>
 
-              <label className={editorStyles.field}>
-                <span className={editorStyles.fieldLabel}>제목 (1줄)</span>
+              <div className={editorStyles.field}>
+                <div className={editorStyles.fieldHead}>
+                  <span className={editorStyles.fieldLabel}>제목 (1줄)</span>
+                  <TextColorSwatches
+                    value={titleTextColor}
+                    onChange={setTitleTextColor}
+                    wrapClass={editorStyles.fieldSwatches}
+                    swatchClass={editorStyles.fieldSwatch}
+                    swatchLightClass={editorStyles.fieldSwatchLight}
+                    swatchSelectedClass={editorStyles.fieldSwatchSelected}
+                  />
+                </div>
                 <input
                   className={editorStyles.fieldInput}
                   type="text"
@@ -605,15 +690,25 @@ export default function ClientTournamentCardPublishPage() {
                   autoComplete="off"
                   spellCheck={false}
                 />
-              </label>
+              </div>
 
-              <label className={editorStyles.field}>
-                <span className={editorStyles.fieldLabel}>
-                  설명 (최대 {DESCRIPTION_MAX_LINES}줄 · Enter 줄바꿈)
-                </span>
+              <div className={editorStyles.field}>
+                <div className={editorStyles.fieldHead}>
+                  <span className={editorStyles.fieldLabel}>
+                    설명 (최대 {DESCRIPTION_MAX_LINES}줄 · Enter 줄바꿈)
+                  </span>
+                  <TextColorSwatches
+                    value={descriptionTextColor}
+                    onChange={setDescriptionTextColor}
+                    wrapClass={editorStyles.fieldSwatches}
+                    swatchClass={editorStyles.fieldSwatch}
+                    swatchLightClass={editorStyles.fieldSwatchLight}
+                    swatchSelectedClass={editorStyles.fieldSwatchSelected}
+                  />
+                </div>
                 <textarea
                   className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea}`}
-                  rows={5}
+                  rows={3}
                   value={textLine2}
                   onChange={(e) =>
                     setTextLine2(clampDescriptionToMaxLines(e.target.value, DESCRIPTION_MAX_LINES))
@@ -621,23 +716,7 @@ export default function ClientTournamentCardPublishPage() {
                   spellCheck={false}
                   placeholder="비우면 카드에 표시하지 않음"
                 />
-              </label>
-
-              <label className={editorStyles.field}>
-                <span className={editorStyles.fieldLabel}>
-                  추가 설명 (최대 {DESCRIPTION_MAX_LINES}줄 · Enter 줄바꿈)
-                </span>
-                <textarea
-                  className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea}`}
-                  rows={4}
-                  value={textLine3}
-                  onChange={(e) =>
-                    setTextLine3(clampDescriptionToMaxLines(e.target.value, DESCRIPTION_MAX_LINES))
-                  }
-                  spellCheck={false}
-                  placeholder="비우면 카드에 표시하지 않음"
-                />
-              </label>
+              </div>
 
               <label className={editorStyles.field}>
                 <span className={editorStyles.fieldLabel}>날짜</span>

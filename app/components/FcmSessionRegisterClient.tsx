@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
+import { fetchAuthSessionCached } from "../../lib/client/auth-session-fetch-cache";
 
 type CaromWindow = Window & {
   caromNativeGetFcmToken?: () => string | Promise<string>;
@@ -9,14 +10,8 @@ type CaromWindow = Window & {
 };
 
 async function isAuthenticated(): Promise<boolean> {
-  try {
-    const res = await fetch("/api/auth/session", { credentials: "same-origin" });
-    if (!res.ok) return false;
-    const data = (await res.json()) as { authenticated?: boolean };
-    return data.authenticated === true;
-  } catch {
-    return false;
-  }
+  const data = await fetchAuthSessionCached();
+  return data.authenticated === true;
 }
 
 async function postRegister(token: string, platform: string): Promise<void> {

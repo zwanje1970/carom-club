@@ -1,20 +1,25 @@
-/* carom-postcard-template-test: src/components/tournament-slide-card-previews.module.css (그대로) */
-
-/* 공통: 게시 카드 미리보기 — 템플릿 TournamentPostCard 와 동일 aspect 20/20 */
+/*
+ * 슬라이드형 게시 카드 — carom-postcard-template-test 의
+ * tournament-slide-card-previews.module.css 수식과 동기.
+ * @see C:/project/carom-postcard-template-test/src/components/tournament-slide-card-previews.module.css
+ */
 
 .cardRoot {
+  --slide-card-face-height: calc(5.75rem * 1.5);
   position: relative;
   width: 100%;
-  aspect-ratio: 20 / 20;
-  border-radius: 8px;
+  box-sizing: border-box;
+  height: calc(var(--slide-card-face-height) / 0.75 - 1rem);
+  min-height: 0;
+  border-radius: 12px;
   overflow: hidden;
   border: none;
   display: flex;
   flex-direction: column;
   box-shadow:
-    0 -30px 48px rgba(0, 0, 0, 0.58),
-    0 -16px 28px rgba(0, 0, 0, 0.42),
-    0 -6px 14px rgba(0, 0, 0, 0.32);
+    0 -18px 26px rgba(0, 0, 0, 0.55),
+    0 -10px 16px rgba(0, 0, 0, 0.4),
+    0 -4px 8px rgba(0, 0, 0, 0.3);
 }
 
 /* 메인 슬라이드 창: 위로 큰 번짐은 창 밖으로 보이므로 카드 주변에만 남김 */
@@ -26,14 +31,41 @@
 
 /* 상태 배지 위치 고정 — top/right는 .statusBadgeWrap 에서만 */
 .media {
-  --status-badge-slot: 3.35rem;
+  --status-badge-slot: calc(3.35rem * 1.1);
   position: relative;
-  flex: 4 1 0;
+  flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
 }
 
-/* 미디어 영역 기준 우상단 — 클래식·프레임·SlideDeck 카드 동일 */
+/* 페이스 기준 하단 가운데 — 템플릿 TournamentPostCard 와 동일 스펙 (마크업은 v3에서 선택적) */
+.detailCta {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.76rem;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.detailCta:hover {
+  background: rgba(0, 0, 0, 0.55);
+}
+
 .statusBadgeWrap {
   position: absolute;
   top: 13px;
@@ -66,7 +98,6 @@
   pointer-events: none;
 }
 
-/* 이미지 아래 깔리는 단색·그라데이션 (클래식·프레임 공통) */
 .mediaPaint {
   position: absolute;
   inset: 0;
@@ -74,7 +105,6 @@
   background: #2a2a30;
 }
 
-/* 프레임: mediaBackground 미지정 시 기본 녹색 */
 .mediaPaintFrameDefault {
   background: #15803d;
 }
@@ -90,11 +120,11 @@
   display: block;
 }
 
-/* 하단 20%: 백색 · 시합날짜(좌) · 장소(우) — TournamentPostCard 와 동일 비율 */
+/* 하단 백색 띠 — (면 기준 1/4 상당) − 1rem */
 .cardFooter {
   position: relative;
   z-index: 3;
-  flex: 1 1 0;
+  flex: 0 0 calc(var(--slide-card-face-height) / 3 - 1rem);
   min-height: 0;
   box-sizing: border-box;
   display: flex;
@@ -103,14 +133,13 @@
   justify-content: space-between;
   gap: 10px;
   padding: 0 12px;
-  background: #ffffff;
-  background-color: #ffffff;
+  background: #fff;
 }
 
 .footerDate,
 .footerPlace {
   margin: 0;
-  font-size: calc(0.78rem - 1pt);
+  font-size: calc(0.78rem + 2pt);
   line-height: 1.3;
   letter-spacing: 0.02em;
   color: #18181b;
@@ -124,7 +153,7 @@
 }
 
 .footerPlace {
-  font-weight: 500;
+  font-weight: 700;
   color: #3f3f46;
   flex: 1 1 auto;
   min-width: 0;
@@ -134,7 +163,7 @@
   white-space: nowrap;
 }
 
-/* ---------- 클래식 (메인 슬라이드와 동일 구조) ---------- */
+/* ---------- 클래식 ---------- */
 
 .classicInner {
   position: relative;
@@ -163,13 +192,10 @@
   gap: 6px;
 }
 
-/* 미디어 영역 공통 텍스트 — 클래식/프레임 동일(정렬·패딩만 템플릿별 상이) */
-.classicLead,
-.frameLead {
+.classicLead {
   margin: 0;
   width: 100%;
-  max-width: 100%;
-  font-size: clamp(0.95rem, 3.8vw, 1.12rem);
+  font-size: calc(clamp(0.95rem, 3.8vw, 1.12rem) - 1pt);
   font-weight: 600;
   line-height: 1.28;
   letter-spacing: -0.02em;
@@ -182,11 +208,9 @@
   text-overflow: ellipsis;
 }
 
-.classicTitle,
-.frameTitle {
+.classicTitle {
   margin: 0;
   width: 100%;
-  max-width: 100%;
   font-size: clamp(1.15rem, 4.8vw, 1.5rem);
   font-weight: 800;
   line-height: 1.22;
@@ -200,10 +224,9 @@
   text-overflow: ellipsis;
 }
 
-.classicDesc,
-.frameDesc {
+.classicDesc {
   margin: 0.65rem 0 0;
-  font-size: calc(0.78rem + 1pt + 2pt);
+  font-size: calc(0.78rem + 1pt);
   line-height: 1.35;
   letter-spacing: 0.02em;
   font-weight: 400;
@@ -214,12 +237,11 @@
   word-break: keep-all;
   overflow-wrap: anywhere;
   white-space: pre-line;
-  max-height: calc(1.35em * 5);
+  max-height: calc(1.35em * 2);
   overflow: hidden;
 }
 
-.classicDescSecondary,
-.frameDescSecondary {
+.classicDescSecondary {
   margin: 0.35rem 0 0;
   font-size: calc(0.78rem + 1pt + 3pt);
   line-height: 1.3;
@@ -236,12 +258,10 @@
   overflow: hidden;
 }
 
-/* 상태 배지는 TournamentPostCardStatusBadges.css 의 tournament-post-card__badge 와 동일 */
-
-/* ---------- 프레임: 텍스트 상단 — 제목 세로 중심 ≈ 배지 중앙 ---------- */
+/* ---------- 프레임 ---------- */
 
 .frameInner {
-  --frame-badge-size: 3.35rem;
+  --frame-badge-size: calc(3.35rem * 1.1);
   position: relative;
   z-index: 3;
   height: 100%;
@@ -259,30 +279,83 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  gap: 6px;
+  gap: 3px;
   min-height: 0;
-  /*
-   * 배지 중심: inset-top + badge/2
-   * 제목 한 줄 광학 중심 보정(~0.68rem) — +0.55rem 여백으로 전체를 살짝 아래로
-   */
-  padding-top: calc(
-    13px + (var(--frame-badge-size) / 2) - 0.68rem + 0.55rem
-  );
+  padding-top: calc(13px + (var(--frame-badge-size) / 2) - 0.68rem + 0.55rem);
   padding-left: 6px;
   padding-right: calc(6px + var(--frame-badge-size) + 6px);
   padding-bottom: 6px;
 }
 
-/* 리드 한 줄 있을 때 제목 위치 보정 */
 .frameCenter:has(.frameLead) {
-  padding-top: calc(
-    13px + (var(--frame-badge-size) / 2) - 0.68rem - 1.32em + 0.55rem
-  );
+  padding-top: calc(13px + (var(--frame-badge-size) / 2) - 0.68rem - 1.32em + 0.55rem);
+}
+
+.frameLead {
+  margin: 0;
+  font-size: calc(clamp(0.82rem, 3.2vw, 0.98rem) - 1pt);
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.65);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.frameTitle {
+  margin: 0;
+  font-size: clamp(1.05rem, 4.2vw, 1.38rem);
+  font-weight: 800;
+  line-height: 1.18;
+  color: #ffe566;
+  text-shadow:
+    0 2px 18px rgba(0, 0, 0, 0.75),
+    0 0 1px rgba(0, 0, 0, 1);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.frameDesc {
+  margin: 0.65rem 0 0;
+  font-size: calc(0.72rem + 1pt);
+  line-height: 1.4;
+  color: #fff;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+  max-height: calc(1.4em * 2);
+  overflow: hidden;
+}
+
+.frameDescSecondary {
+  margin: 0.35rem 0 0;
+  font-size: calc(0.78rem + 1pt + 3pt);
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  color: #fff;
+  text-shadow:
+    0 1px 12px rgba(0, 0, 0, 0.55),
+    0 0 1px rgba(0, 0, 0, 0.85);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+  max-height: calc(1.3em * 4);
+  overflow: hidden;
+}
+
+.classicDesc + .classicDescSecondary,
+.frameDesc + .frameDescSecondary {
+  margin-top: 0.4rem;
 }
 
 /*
- * 템플릿 TournamentPostCard.css + SlideDeck.css 의 슬라이드 내 수치
- * (작성 미리보기 templateCardLayout · 메인 슬라이드 slideDeck+templateCardLayout)
+ * 슬라이드·게시카드 작성: TournamentPostCard.css + SlideDeck.css 기준 타이포·배지 스케일
+ * (면/푸터 비율은 상단 .cardRoot / .media / .cardFooter 템플릿 수식 유지)
  */
 .cardRootTemplateLayout {
   border: none;
@@ -298,25 +371,10 @@
     0 10px 28px rgba(0, 0, 0, 0.32);
 }
 
-.cardRootTemplateLayout .media {
-  flex: 43 1 0;
-  --status-badge-slot: calc(2.85rem * 1.1);
-}
-
-.cardRootTemplateLayout .cardFooter {
-  flex: 7 1 0;
-  gap: 12px;
-  padding: 0 14px;
-}
-
 .cardRootTemplateLayout .footerDate,
 .cardRootTemplateLayout .footerPlace {
   font-size: calc(0.82rem * 1.05 + 1pt + 2pt);
   line-height: 1.3;
-}
-
-.cardRootTemplateLayout .footerPlace {
-  font-weight: 700;
 }
 
 .cardRootTemplateLayout .classicInner {

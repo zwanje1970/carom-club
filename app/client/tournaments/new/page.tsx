@@ -863,7 +863,7 @@ export default function ClientTournamentNewPage() {
             진행할 수 있습니다.
           </p>
           <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-            <Link className="v3-btn" href={`/client/tournaments/${createSuccessId}/card-publish`}>
+            <Link className="v3-btn" href={`/client/tournaments/${createSuccessId}/card-publish-v2`}>
               대회카드 발행 페이지로 이동
             </Link>
             <Link className="v3-btn" href={`/client/tournaments/${createSuccessId}`}>

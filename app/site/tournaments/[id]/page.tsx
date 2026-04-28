@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { outlineFileKindFromAsset, outlinePdfIdFromPublicUrl } from "../../../../lib/outline-pdf-helpers";
-import { getOutlinePdfAssetById } from "../../../../lib/surface-read";
-import { getTournamentByIdFirestore } from "../../../../lib/server/firestore-tournaments";
+import { getOutlinePdfAssetById, getTournamentByIdForPublicSitePage } from "../../../../lib/surface-read";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
 import SiteShellFrame from "../../components/SiteShellFrame";
 import SiteTournamentDetailSections from "./site-tournament-detail-sections";
@@ -13,7 +12,7 @@ export default async function SiteTournamentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const tournament = await getTournamentByIdFirestore(id);
+  const tournament = await getTournamentByIdForPublicSitePage(id);
   if (!tournament) {
     notFound();
   }

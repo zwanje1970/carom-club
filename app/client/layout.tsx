@@ -1,6 +1,7 @@
 import type { Viewport } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import AdminFabServerBridge from "../components/AdminFabServerBridge";
 import DashboardMobileChromeLayout from "../components/DashboardMobileChromeLayout";
 import GlobalHomeButton from "../components/GlobalHomeButton";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../lib/auth/session";
@@ -60,6 +61,7 @@ export default async function ClientLayout({
           </div>
         </DashboardMobileChromeLayout>
         <GlobalHomeButton />
+        <AdminFabServerBridge />
       </>
     );
   }

@@ -8,6 +8,8 @@ export type MainSlideAdConfig = {
   adsPerInsert: number;
   rotationMode: MainSlideAdRotationMode;
   maxAdsPerCycle: number;
+  /** 메인 슬라이드 카드 이동(자동) 한 사이클 기준 시간(초). 관리자 범위 5~20, 없음·비정상 시 10 */
+  cardMoveDurationSec: number;
 };
 
 export const DEFAULT_MAIN_SLIDE_AD_CONFIG: MainSlideAdConfig = {
@@ -16,6 +18,7 @@ export const DEFAULT_MAIN_SLIDE_AD_CONFIG: MainSlideAdConfig = {
   adsPerInsert: 1,
   rotationMode: "sequential",
   maxAdsPerCycle: 1,
+  cardMoveDurationSec: 10,
 };
 
 /** 플랫폼 관리자 등록 메인 슬라이드 광고 row (로컬 aggregate 등) */
@@ -61,6 +64,11 @@ export function normalizeMainSlideAdConfig(raw: unknown): MainSlideAdConfig {
   if (Number.isFinite(maxC)) {
     const f = Math.floor(maxC);
     base.maxAdsPerCycle = f < 0 ? def.maxAdsPerCycle : f;
+  }
+  const moveSec = Number(r.cardMoveDurationSec);
+  if (Number.isFinite(moveSec)) {
+    const rounded = Math.round(moveSec);
+    base.cardMoveDurationSec = Math.min(20, Math.max(5, rounded));
   }
   return base;
 }
