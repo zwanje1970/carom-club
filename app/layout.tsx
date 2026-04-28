@@ -5,8 +5,8 @@ import SiteGeoLifecycleGuard from "./components/SiteGeoLifecycleGuard";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "V3 Structure Skeleton",
-  description: "Site / client / platform structure only",
+  title: "캐롬클럽",
+  description: "당구 대회·클럽·커뮤니티",
 };
 
 /** iOS 등에서 env(safe-area-inset-*)가 동작하도록 */

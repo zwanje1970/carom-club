@@ -19,35 +19,43 @@ export default function SiteListPageSkeleton({
   brandTitle,
   auxiliaryLabel = "불러오는 중",
   listRows = 4,
+  /** 상위에 이미 `SiteShellFrame`(헤더·탭·검색)이 있을 때만 사용 — 중복 상단/헤더 방지 */
+  contentOnly = false,
 }: {
   brandTitle: ReactNode;
   auxiliaryLabel?: string;
   listRows?: number;
+  contentOnly?: boolean;
 }) {
+  const listSection = (
+    <section className={`site-site-gray-main v3-stack${contentOnly ? " ui-community-page" : ""}`} aria-hidden>
+      {Array.from({ length: listRows }, (_, i) => (
+        <div key={`site-skel-${i}`} className="card-clean v3-stack" style={{ gap: "0.75rem", background: "#fff" }}>
+          <SkeletonBlock width="5rem" height="1rem" background="#e5ebf1" />
+          <SkeletonBlock width="75%" height="1.2rem" background="#e5ebf1" />
+          <SkeletonBlock width="92%" height="0.9rem" background="#edf1f5" />
+          <SkeletonBlock width="62%" height="0.9rem" background="#edf1f5" />
+        </div>
+      ))}
+    </section>
+  );
+
+  if (contentOnly) {
+    return listSection;
+  }
+
   return (
     <SiteShellFrame
       brandTitle={brandTitle}
       auxiliaryBarClassName="site-shell-controls--site-list"
       auxiliary={
-        <div className="v3-stack" style={{ gap: "0.5rem" }}>
+        <div className="v3-stack" style={{ gap: "0.5rem" }} aria-label={auxiliaryLabel}>
           <SkeletonBlock width="6.25rem" height="1rem" background="#dbe3ea" />
           <SkeletonBlock width="100%" height="2.75rem" radius="0.75rem" background="#edf1f5" />
-          <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
-            {auxiliaryLabel}
-          </p>
         </div>
       }
     >
-      <section className="site-site-gray-main v3-stack" aria-hidden>
-        {Array.from({ length: listRows }, (_, i) => (
-          <div key={`site-skel-${i}`} className="card-clean v3-stack" style={{ gap: "0.75rem", background: "#fff" }}>
-            <SkeletonBlock width="5rem" height="1rem" background="#e5ebf1" />
-            <SkeletonBlock width="75%" height="1.2rem" background="#e5ebf1" />
-            <SkeletonBlock width="92%" height="0.9rem" background="#edf1f5" />
-            <SkeletonBlock width="62%" height="0.9rem" background="#edf1f5" />
-          </div>
-        ))}
-      </section>
+      {listSection}
     </SiteShellFrame>
   );
 }

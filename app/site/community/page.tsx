@@ -36,7 +36,12 @@ export default async function SiteCommunityPage({
         <CommunityBoardSwipeShell tabs={navTabs.map(({ key, href }) => ({ key, href }))}>
           <Suspense
             fallback={
-              <SiteListPageSkeleton brandTitle="커뮤니티" auxiliaryLabel="게시글 목록을 불러오는 중입니다." listRows={5} />
+              <SiteListPageSkeleton
+                contentOnly
+                brandTitle="커뮤니티"
+                auxiliaryLabel="게시글 목록을 불러오는 중입니다."
+                listRows={5}
+              />
             }
           >
             <SiteCommunityPageContent config={config} searchParams={searchParams} />
