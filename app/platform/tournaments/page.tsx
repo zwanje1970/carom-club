@@ -1,11 +1,27 @@
 import Link from "next/link";
-import { listAllTournaments } from "../../../lib/platform-api";
+import { isFirestoreUsersBackendConfigured } from "../../../lib/server/firestore-users";
 import { formatTournamentScheduleLabel } from "../../../lib/tournament-schedule";
+import type { Tournament } from "../../../lib/types/entities";
 
 export const dynamic = "force-dynamic";
 
+/** 로컬 JSON `listAllTournaments`는 프로덕션에서 금지(throw) — 상세 페이지와 같이 Firestore 목록을 쓴다. */
+async function loadTournamentsForPlatformList(): Promise<Tournament[]> {
+  try {
+    if (isFirestoreUsersBackendConfigured()) {
+      const { listAllTournamentsFirestore } = await import("../../../lib/server/firestore-tournaments");
+      return await listAllTournamentsFirestore();
+    }
+    const { listAllTournaments } = await import("../../../lib/platform-api");
+    return await listAllTournaments();
+  } catch (e) {
+    console.error("[platform/tournaments] tournament list load failed", e);
+    return [];
+  }
+}
+
 export default async function PlatformTournamentsListPage() {
-  const tournaments = await listAllTournaments();
+  const tournaments = await loadTournamentsForPlatformList();
 
   return (
     <main className="v3-page v3-stack">
