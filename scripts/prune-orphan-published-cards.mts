@@ -9,6 +9,7 @@ const { pruneOrphanTournamentPublishedCards } = await import("../lib/server/plat
 const r = await pruneOrphanTournamentPublishedCards();
 const allDeleted = [...r.deletedPublishedCardSnapshotIds, ...r.deletedLegacySnapshotIds];
 
+console.log("[prune-orphan-published-cards] reconcileChangedRowCount:", r.reconcileChangedRowCount);
 console.log("[prune-orphan-published-cards] tournamentCount:", r.tournamentCount);
 console.log("[prune-orphan-published-cards] deletedPublishedCardSnapshotIds count:", r.deletedPublishedCardSnapshotIds.length);
 console.log("[prune-orphan-published-cards] deletedLegacySnapshotIds count:", r.deletedLegacySnapshotIds.length);

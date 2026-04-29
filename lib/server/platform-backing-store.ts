@@ -15,7 +15,7 @@ import { normalizeRepresentativeImageUrls, parseTypeSpecific, resolveVenuePricin
 import type { VenuePricingType, VenueSpecific } from "../client-organization-setup-types";
 import { isEmptyOutlineHtml } from "../outline-content-helpers";
 import type { OutlineDisplayMode } from "../outline-content-types";
-import { isValidSiteVenueId, SITE_VENUES } from "../site-venues-catalog";
+import { isValidSiteVenueId } from "../site-venues-catalog";
 import { computeLedgerTotalsFromLines, isSettlementCategoryV2 } from "../settlement-ledger-v2";
 import type {
   TournamentDivisionMetricType,
@@ -694,6 +694,12 @@ export type TournamentPublishedCard = {
   deletedAt?: string | null;
   deletedBy?: string | null;
   deleteReason?: string | null;
+  /** 메인 슬라이드 제외(고아·삭제 대회·일정 경과). true면 메인 조회에서 제외 */
+  isExpired?: boolean;
+  /** 고아·삭제 대회 등으로 메인 비활성화된 시각 */
+  orphanedAt?: string | null;
+  /** 대회 일정 종료 다음날 이후 메인 비활성화된 시각 */
+  expiredAt?: string | null;
 };
 
 export type PublishedCardSnapshot = {
@@ -2303,6 +2309,17 @@ function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedC
   const lcDelBy = r.deletedBy;
   if (typeof lcDelBy === "string" && lcDelBy.trim() !== "") base.deletedBy = lcDelBy.trim();
   if (typeof r.deleteReason === "string" && r.deleteReason !== "") base.deleteReason = r.deleteReason;
+  if (typeof r.isExpired === "boolean") base.isExpired = r.isExpired;
+  if ("orphanedAt" in r) {
+    const o = r.orphanedAt;
+    base.orphanedAt =
+      typeof o === "string" && o.trim() !== "" ? o.trim() : o === null ? null : undefined;
+  }
+  if ("expiredAt" in r) {
+    const e = r.expiredAt;
+    base.expiredAt =
+      typeof e === "string" && e.trim() !== "" ? e.trim() : e === null ? null : undefined;
+  }
   return base;
 }
 
@@ -4395,23 +4412,7 @@ export async function getSiteVenuesBoardRows(): Promise<SiteVenueBoardRow[]> {
         lng: org.longitude,
       };
     });
-  if (venueRows.length > 0) return venueRows;
-  return SITE_VENUES.map((venue) => ({
-    venueId: venue.id,
-    name: venue.name,
-    region: venue.region,
-    catalogTypeLabel: venue.type,
-    venueCategory: "daedae_only" as const,
-    feeCategory: null,
-    pricingType: "GENERAL" as VenuePricingType,
-    introLine: null,
-    thumbnailUrl: null,
-    address: null,
-    phone: null,
-    website: null,
-    lat: venue.lat ?? null,
-    lng: venue.lng ?? null,
-  }));
+  return venueRows;
 }
 
 /** 대회 장소 폼: 게시·설정 완료된 등록 당구장만 상호 부분일치 검색 */
@@ -4493,38 +4494,7 @@ export async function getSiteVenueDetailById(venueIdRaw: string): Promise<SiteVe
         x.setupCompleted &&
         (x.slug === venueId || x.id === venueId)
     ) ?? null;
-  if (!org) {
-    const catalog = SITE_VENUES.find((x) => x.id === venueId) ?? null;
-    if (!catalog) return null;
-    return {
-      venueId: catalog.id,
-      name: catalog.name,
-      region: catalog.region?.trim() || null,
-      addressLine: null,
-      website: null,
-      phone: null,
-      daedaeTableCount: null,
-      jungdaeTableCount: null,
-      pocketTableCount: null,
-      daedaeKind: null,
-      jungdaeKind: null,
-      pocketKind: null,
-      daedaeFee: null,
-      jungdaeFee: null,
-      pocketFee: null,
-      scoreSystem: null,
-      galleryImageUrls: [],
-      shortDescription: null,
-      description: null,
-      introDisplayMode: null,
-      introHtml: null,
-      introPdfUrl: null,
-      naverMapUrl: null,
-      pricingType: "GENERAL",
-      flatRateInfo: null,
-      businessHours: null,
-    };
-  }
+  if (!org) return null;
   const intro = store.clientVenueIntros.find((x) => x.clientUserId === org.clientUserId) ?? null;
   const ts = parseTypeSpecific("VENUE", org.typeSpecificJson ?? null);
   const vs = ts as VenueSpecific;
@@ -5117,6 +5087,11 @@ export async function patchTournamentStatusBadge(params: {
     const db = getSharedFirestoreDb();
     await db.collection("v3_tournaments").doc(tid).set({ statusBadge: normalizedBadge }, { merge: true });
     await syncActiveTournamentCardSnapshotStatusBadge(tid);
+    try {
+      await reconcileTournamentPublishedCardsForTournamentId(tid);
+    } catch (e) {
+      console.warn("[patchTournamentStatusBadge] reconcile tournament published cards failed", e);
+    }
     const updated = await getTournamentByIdFirestore(tid);
     if (!updated) return { ok: false, error: "대회를 찾을 수 없습니다.", httpStatus: 404 };
     return { ok: true, tournament: updated };
@@ -5129,6 +5104,11 @@ export async function patchTournamentStatusBadge(params: {
   store.tournaments[idx]!.statusBadge = normalizedBadge;
   await writeLocalJsonAggregate(store);
   await syncActiveTournamentCardSnapshotStatusBadge(tid);
+  try {
+    await reconcileTournamentPublishedCardsForTournamentId(tid);
+  } catch (e) {
+    console.warn("[patchTournamentStatusBadge] reconcile tournament published cards failed", e);
+  }
   return { ok: true, tournament: await normalizeTournament(store.tournaments[idx]!, store) };
 }
 
@@ -8462,6 +8442,191 @@ async function loadTournamentPublishedCardsRowsIncludingDeleted(): Promise<Tourn
     .filter((x): x is TournamentPublishedCard => x !== null);
 }
 
+/** 메인 비활성화 판단용 달력일(Asia/Seoul, YYYY-MM-DD) */
+export function calendarTodayYyyyMmDdSeoul(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function yyyyMmDdPrefixFromScheduleField(s: string): string | null {
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec((s ?? "").trim());
+  return m ? m[1]! : null;
+}
+
+/**
+ * 대회 일정의 마지막 달력일(YYYY-MM-DD). `eventDates`가 있으면 그 중 최댓값, 없으면 `date`.
+ * (별도 endDate 필드 없음 — 요구사항상 endDate 없을 때 `date`가 종료일 역할)
+ */
+export function resolveTournamentLastScheduleDayYyyyMmDd(
+  t: Pick<Tournament, "date" | "eventDates">,
+): string | null {
+  const ev =
+    t.eventDates && t.eventDates.length > 0
+      ? [...t.eventDates].map((x) => x.trim()).filter(Boolean).sort()
+      : [];
+  if (ev.length > 0) return yyyyMmDdPrefixFromScheduleField(ev[ev.length - 1]!);
+  return yyyyMmDdPrefixFromScheduleField(typeof t.date === "string" ? t.date : "");
+}
+
+/** 종료일(달력일) 다음날부터 비활성: `todayYyyyMmDd > lastScheduleDay` */
+export function isTournamentPastScheduleEndForMainSlideCleanup(
+  t: Pick<Tournament, "date" | "eventDates">,
+  todayYyyyMmDd: string,
+): boolean {
+  const last = resolveTournamentLastScheduleDayYyyyMmDd(t);
+  if (!last) return false;
+  return todayYyyyMmDd > last;
+}
+
+async function loadTournamentByIdForPublishedCardReconcile(tournamentId: string): Promise<Tournament | null> {
+  const tid = tournamentId.trim();
+  if (!tid) return null;
+  if (isFirestoreUsersBackendConfigured()) {
+    const { getTournamentByIdFirestore } = await import("./firestore-tournaments");
+    return getTournamentByIdFirestore(tid);
+  }
+  const store = await readLocalJsonAggregate();
+  const row = store.tournaments.find((x) => x.id === tid);
+  if (!row) return null;
+  const venueOrgs = await getVenueGuideResolutionOrgs(store);
+  return normalizeTournament(row, store, venueOrgs);
+}
+
+/**
+ * 대회 1건 기준: 삭제·일정 경과·고아면 게시카드 메인 비활성화, 정상 복귀 시 isExpired 해제.
+ * 메인 페이지에서 호출 금지(쓰기·대회 로드).
+ */
+export async function reconcileTournamentPublishedCardsForTournamentId(
+  tournamentId: string,
+): Promise<{ ok: true; changedRowCount: number } | { ok: false; error: string }> {
+  const ws = resolveTournamentPublishedCardsWriteStrategy();
+  if (ws === "blocked") return { ok: false, error: "게시 카드 저장소에 쓸 수 없습니다." };
+  const tid = tournamentId.trim();
+  if (!tid) return { ok: false, error: "잘못된 요청입니다." };
+
+  const t = await loadTournamentByIdForPublishedCardReconcile(tid);
+  const today = calendarTodayYyyyMmDdSeoul();
+  const past = t ? isTournamentPastScheduleEndForMainSlideCleanup(t, today) : false;
+  const inactiveTournament = !t || t.status === "DELETED";
+
+  const allRows = await loadTournamentPublishedCardsRowsIncludingDeleted();
+  let changedRowCount = 0;
+  const now = new Date().toISOString();
+  const next = allRows.map((c) => {
+    if (c.tournamentId.trim() !== tid) return c;
+    if (!isEntityLifecycleVisibleForList(c.lifecycleStatus)) return c;
+
+    const shouldDeac = inactiveTournament || past;
+    if (shouldDeac) {
+      if (!c.isActive && !c.showOnMainSlide && c.isExpired === true) return c;
+      changedRowCount += 1;
+      return {
+        ...c,
+        isActive: false,
+        showOnMainSlide: false,
+        isExpired: true,
+        updatedAt: now,
+        ...(inactiveTournament ? { orphanedAt: c.orphanedAt ?? now } : {}),
+        ...(past ? { expiredAt: c.expiredAt ?? now } : {}),
+      };
+    }
+
+    if (c.isExpired === true) {
+      changedRowCount += 1;
+      return {
+        ...c,
+        isExpired: false,
+        orphanedAt: undefined,
+        expiredAt: undefined,
+        updatedAt: now,
+      };
+    }
+    return c;
+  });
+
+  if (changedRowCount > 0) await persistTournamentPublishedCardsRows(next);
+  return { ok: true, changedRowCount };
+}
+
+/**
+ * 전체 `tournamentPublishedCards` 점검(고아·삭제·일정 경과 및 정상 복귀 시 isExpired 해제).
+ * 관리자 버튼·배치 스크립트 전용. 메인 페이지에서 호출 금지.
+ */
+export async function reconcileAllTournamentPublishedCardsForMainSlide(): Promise<{
+  ok: true;
+  changedRowCount: number;
+  uniqueTournamentIds: number;
+}> {
+  const ws = resolveTournamentPublishedCardsWriteStrategy();
+  if (ws === "blocked") return { ok: true, changedRowCount: 0, uniqueTournamentIds: 0 };
+
+  const allRows = await loadTournamentPublishedCardsRowsIncludingDeleted();
+  const today = calendarTodayYyyyMmDdSeoul();
+  const activeRows = allRows.filter((c) => isEntityLifecycleVisibleForList(c.lifecycleStatus));
+  const uniqueTids = [...new Set(activeRows.map((c) => c.tournamentId.trim()).filter(Boolean))];
+
+  const tournamentById = new Map<string, Tournament | null>();
+  for (const ut of uniqueTids) {
+    tournamentById.set(ut, await loadTournamentByIdForPublishedCardReconcile(ut));
+  }
+
+  let changedRowCount = 0;
+  const now = new Date().toISOString();
+  const next = allRows.map((c) => {
+    if (!isEntityLifecycleVisibleForList(c.lifecycleStatus)) return c;
+    const rowTid = c.tournamentId.trim();
+    if (!rowTid) {
+      if (!c.isActive && !c.showOnMainSlide && c.isExpired === true) return c;
+      changedRowCount += 1;
+      return {
+        ...c,
+        isActive: false,
+        showOnMainSlide: false,
+        isExpired: true,
+        updatedAt: now,
+        orphanedAt: c.orphanedAt ?? now,
+      };
+    }
+
+    const tour = tournamentById.get(rowTid) ?? null;
+    const past = tour ? isTournamentPastScheduleEndForMainSlideCleanup(tour, today) : false;
+    const inactiveTournament = !tour || tour.status === "DELETED";
+
+    if (inactiveTournament || past) {
+      if (!c.isActive && !c.showOnMainSlide && c.isExpired === true) return c;
+      changedRowCount += 1;
+      return {
+        ...c,
+        isActive: false,
+        showOnMainSlide: false,
+        isExpired: true,
+        updatedAt: now,
+        ...(inactiveTournament ? { orphanedAt: c.orphanedAt ?? now } : {}),
+        ...(past ? { expiredAt: c.expiredAt ?? now } : {}),
+      };
+    }
+
+    if (c.isExpired === true) {
+      changedRowCount += 1;
+      return {
+        ...c,
+        isExpired: false,
+        orphanedAt: undefined,
+        expiredAt: undefined,
+        updatedAt: now,
+      };
+    }
+    return c;
+  });
+
+  if (changedRowCount > 0) await persistTournamentPublishedCardsRows(next);
+  return { ok: true, changedRowCount, uniqueTournamentIds: uniqueTids.length };
+}
+
 /** 대회 게시 카드 1건 소프트 삭제(플랫폼 관리자). */
 export async function softDeleteTournamentPublishedCardBySnapshotIdForPlatform(params: {
   tournamentId: string;
@@ -8510,24 +8675,23 @@ async function resolveExistingTournamentIdSet(): Promise<Set<string>> {
 }
 
 /**
- * `tournamentPublishedCards` 중 대회가 없거나([TEST] 등) 임시 표기인 행을 제거한다.
- * 대회가 0건이면 게시카드 전부 제거. 로컬 JSON 모드에서만 레거시 `publishedCardSnapshots`의 토너먼트 행도 동일 기준으로 정리한다.
+ * 먼저 전체 reconcile(고아·삭제·일정 경과 → 비활성화)을 수행한 뒤, [TEST] 등 임시 표기 행만 저장소에서 제거한다.
+ * 로컬 JSON 모드에서만 레거시 `publishedCardSnapshots`의 토너먼트 행도 동일 기준으로 정리한다.
  */
 export async function pruneOrphanTournamentPublishedCards(): Promise<{
   tournamentCount: number;
+  reconcileChangedRowCount: number;
   deletedPublishedCardSnapshotIds: string[];
   deletedLegacySnapshotIds: string[];
   remainingPublishedCardsCount: number;
 }> {
+  const reconcileSummary = await reconcileAllTournamentPublishedCardsForMainSlide();
   const tournamentIds = await resolveExistingTournamentIdSet();
-  const cards = await loadTournamentPublishedCardsArray();
+  const cards = await loadTournamentPublishedCardsRowsIncludingDeleted();
 
   const shouldRemovePublishedRow = (c: TournamentPublishedCard): boolean => {
-    if (isPublishedCardTitleTestLike(c.title)) return true;
-    if (tournamentIds.size === 0) return true;
-    const tid = (c.tournamentId ?? "").trim();
-    if (!tid) return true;
-    return !tournamentIds.has(tid);
+    if (!isEntityLifecycleVisibleForList(c.lifecycleStatus)) return false;
+    return isPublishedCardTitleTestLike(c.title);
   };
 
   const deletedPublishedCardSnapshotIds = cards.filter(shouldRemovePublishedRow).map((c) => c.snapshotId);
@@ -8564,6 +8728,7 @@ export async function pruneOrphanTournamentPublishedCards(): Promise<{
 
   return {
     tournamentCount: tournamentIds.size,
+    reconcileChangedRowCount: reconcileSummary.changedRowCount,
     deletedPublishedCardSnapshotIds,
     deletedLegacySnapshotIds,
     remainingPublishedCardsCount,
@@ -8591,7 +8756,8 @@ export async function listTournamentSnapshotsForMainSite(options?: {
       isEntityLifecycleVisibleForList(c.lifecycleStatus) &&
       c.isPublished &&
       c.isActive &&
-      c.showOnMainSlide,
+      c.showOnMainSlide &&
+      c.isExpired !== true,
   );
   const sortedForDedupe = [...filtered].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const seenTournament = new Set<string>();

@@ -26,17 +26,11 @@ type Snapshot = {
   publishedAt: string;
 };
 
-const VENUE_NAME_MAP: Record<string, string> = {
-  "venue-1": "카롬 강남점",
-  "venue-2": "카롬 서초점",
-  "venue-3": "카롬 수원점",
-};
-
 export default function ClientVenueCardPublishPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const venueId = useMemo(() => (typeof params.id === "string" ? params.id : ""), [params.id]);
-  const venueName = VENUE_NAME_MAP[venueId] ?? venueId;
+  const venueName = venueId;
   const [template, setTemplate] = useState<Template | null>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");

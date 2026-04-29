@@ -21,15 +21,14 @@ export function communityPostDetailHref(boardKey: SiteCommunityBoardKey, postId:
   return `${communityBoardListHref(boardKey)}/${postId}`;
 }
 
-/** 상단 탭 라벨 (자유게시판 … 구인구직) */
+/** 상단 탭 라벨 — extra1·extra2는 플랫폼 `SiteCommunityConfig`의 label을 쓴다(URL은 `/jobs` 등 기존 유지). */
 export const COMMUNITY_PRIMARY_TAB_LABEL = {
   free: "자유게시판",
   qna: "질문게시판",
   reviews: "대회후기",
-  extra1: "구인구직",
 } as const;
 
-/** 전체 탭 목록에서만 제목 앞 [방이름] — 짧은 표기 */
+/** 전체 탭 목록에서만 제목 앞 [방이름] — 짧은 표기(예비 게시판은 config 라벨 사용, 여기 없음) */
 export const COMMUNITY_ROOM_PREFIX_SHORT: Record<
   keyof typeof COMMUNITY_PRIMARY_TAB_LABEL,
   string
@@ -37,7 +36,6 @@ export const COMMUNITY_ROOM_PREFIX_SHORT: Record<
   free: "자유",
   qna: "질문",
   reviews: "대회후기",
-  extra1: "구인구직",
 };
 
 export type CommunityHubTabKey = "all" | SiteCommunityBoardKey;
@@ -51,10 +49,13 @@ export function isPrimaryTabKey(k: SiteCommunityBoardKey): k is keyof typeof COM
 export function communityTabLabelForBoard(boardKey: SiteCommunityBoardKey, config: SiteCommunityConfig): string {
   if (isPrimaryTabKey(boardKey)) return COMMUNITY_PRIMARY_TAB_LABEL[boardKey];
   const label = config[boardKey].label.trim();
-  return label.length > 0 ? label : boardKey;
+  if (label.length > 0) return label;
+  if (boardKey === "extra1") return "예비게시판 1";
+  if (boardKey === "extra2") return "예비게시판 2";
+  return boardKey;
 }
 
-/** 전체 탭 + 플랫폼에서 `visible` 인 게시판만 (비활성 예비·구인구직 등은 노출 안 함) */
+/** 전체 탭 + 플랫폼에서 `visible` 인 게시판만 (비활성 예비 게시판은 노출 안 함) */
 export function communityNavTabsFromConfig(config: SiteCommunityConfig): CommunityNavTabItem[] {
   const boards = visibleCommunityBoardKeysForTabs(config);
   return [

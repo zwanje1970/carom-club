@@ -1,8 +1,13 @@
 /** 커뮤니티 게시판 목록 — 가벼운 게시판형 리스트 */
 
 import Link from "next/link";
-import type { CommunityPostListItem, SiteCommunityBoardKey } from "../../../lib/types/entities";
-import { COMMUNITY_ROOM_PREFIX_SHORT, communityPostDetailHref, isPrimaryTabKey } from "./community-tab-config";
+import type { CommunityPostListItem, SiteCommunityBoardKey, SiteCommunityConfig } from "../../../lib/types/entities";
+import {
+  COMMUNITY_ROOM_PREFIX_SHORT,
+  communityPostDetailHref,
+  communityTabLabelForBoard,
+  isPrimaryTabKey,
+} from "./community-tab-config";
 
 function formatListDateTime(iso: string): string {
   const d = new Date(iso);
@@ -25,8 +30,10 @@ function boardPillClass(boardType: SiteCommunityBoardKey): string {
 }
 
 type Props = {
-  /** 전체 탭에서만 방 이름 접두어 */
+  /** 전체 탭에서만 방 이름 접두어 — 예비 게시판 라벨은 `config` 필요 */
   showRoomPrefix: boolean;
+  /** `showRoomPrefix`일 때 extra1·extra2 pill에 플랫폼 설정 표시명 반영 */
+  config?: SiteCommunityConfig;
   items: CommunityPostListItem[];
   /** 빈 목록 문구만 교체(표시용, API·데이터와 무관) */
   emptyTitle?: string;
@@ -35,6 +42,7 @@ type Props = {
 
 export default function CommunityBoardPostList({
   showRoomPrefix,
+  config,
   items,
   emptyTitle,
   emptyDesc,
@@ -53,10 +61,13 @@ export default function CommunityBoardPostList({
     <ul className="ui-community-board-rows">
       {items.map((post) => {
         const href = communityPostDetailHref(post.boardType, post.id);
-        const prefix =
-          showRoomPrefix && isPrimaryTabKey(post.boardType)
+        const prefix = showRoomPrefix
+          ? isPrimaryTabKey(post.boardType)
             ? COMMUNITY_ROOM_PREFIX_SHORT[post.boardType]
-            : null;
+            : config
+              ? communityTabLabelForBoard(post.boardType, config)
+              : null
+          : null;
         return (
           <li key={post.id} className="ui-community-board-row">
             <div className="ui-community-board-row-main">

@@ -22,21 +22,34 @@ async function requireApprovedClient() {
 }
 
 export async function GET() {
-  const user = await requireApprovedClient();
-  if (!user) {
-    return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
+  try {
+    const user = await requireApprovedClient();
+    if (!user?.id?.trim()) {
+      return NextResponse.json({ ok: true, items: [] });
+    }
+    const uid = user.id.trim();
+    const rows = await listClientInquiriesByClientUserIdWithAdminReplyFlag(uid);
+    const list = Array.isArray(rows) ? rows : [];
+    const items = list
+      .map((row) => {
+        const x = row?.inquiry;
+        if (!x || typeof x.id !== "string" || !x.id.trim()) return null;
+        const type = x.type === "FEATURE" ? "FEATURE" : "ERROR";
+        return {
+          id: x.id.trim(),
+          type,
+          title: typeof x.title === "string" ? x.title : "",
+          createdAt: typeof x.createdAt === "string" ? x.createdAt : "",
+          updatedAt: typeof x.updatedAt === "string" ? x.updatedAt : "",
+          hasAdminReply: Boolean(row?.hasAdminReply),
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null);
+    return NextResponse.json({ ok: true, items });
+  } catch (error) {
+    console.error("[api/client/inquiries GET]", error);
+    return NextResponse.json({ ok: true, items: [] });
   }
-  const items = await listClientInquiriesByClientUserIdWithAdminReplyFlag(user.id);
-  return NextResponse.json({
-    items: items.map(({ inquiry: x, hasAdminReply }) => ({
-      id: x.id,
-      type: x.type,
-      title: x.title,
-      createdAt: x.createdAt,
-      updatedAt: x.updatedAt,
-      hasAdminReply,
-    })),
-  });
 }
 
 export async function POST(request: Request) {

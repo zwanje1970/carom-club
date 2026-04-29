@@ -68,7 +68,7 @@ async function SiteCommunityPageContent({
 
   return (
     <section className="site-site-gray-main v3-stack ui-community-page" data-community-board="all">
-      <CommunityBoardPostList showRoomPrefix items={items} />
+      <CommunityBoardPostList showRoomPrefix config={config} items={items} />
     </section>
   );
 }

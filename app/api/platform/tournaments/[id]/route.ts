@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
 import { getUserById } from "../../../../../lib/platform-api";
 import { deleteTournamentFirestore } from "../../../../../lib/server/firestore-tournaments";
+import { reconcileTournamentPublishedCardsForTournamentId } from "../../../../../lib/server/platform-backing-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,6 +37,11 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.httpStatus ?? 400 });
+  }
+  try {
+    await reconcileTournamentPublishedCardsForTournamentId(tournamentId);
+  } catch (e) {
+    console.warn("[api/platform/tournaments/[id]] DELETE reconcile published cards failed", e);
   }
   return NextResponse.json({ ok: true });
 }

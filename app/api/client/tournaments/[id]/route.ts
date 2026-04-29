@@ -10,6 +10,7 @@ import {
   deleteTournamentFirestore,
   updateTournamentFirestore,
 } from "../../../../../lib/server/firestore-tournaments";
+import { reconcileTournamentPublishedCardsForTournamentId } from "../../../../../lib/server/platform-backing-store";
 
 export const runtime = "nodejs";
 
@@ -255,6 +256,12 @@ export async function PATCH(
     return NextResponse.json({ error: result.error }, { status });
   }
 
+  try {
+    await reconcileTournamentPublishedCardsForTournamentId(id);
+  } catch (e) {
+    console.warn("[api/client/tournaments/[id]] PATCH reconcile published cards failed", e);
+  }
+
   return NextResponse.json({ ok: true, tournament: result.tournament });
 }
 
@@ -281,6 +288,12 @@ export async function DELETE(
   if (!result.ok) {
     const status = result.httpStatus ?? 400;
     return NextResponse.json({ error: result.error }, { status });
+  }
+
+  try {
+    await reconcileTournamentPublishedCardsForTournamentId(id);
+  } catch (e) {
+    console.warn("[api/client/tournaments/[id]] DELETE reconcile published cards failed", e);
   }
 
   return NextResponse.json({ ok: true });

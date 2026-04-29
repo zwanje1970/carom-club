@@ -1,7 +1,4 @@
-/**
- * 사이트 당구장안내와 동일한 ID·이름 목록.
- * 대회 장소 CTA는 여기 등록된 venue id만 안전하게 연결한다.
- */
+/** 사이트 정적 클럽 카탈로그 타입(항목은 비어 있음 — 실데이터는 Firestore). */
 export type SiteVenueCatalogEntry = {
   id: string;
   name: string;
@@ -12,11 +9,8 @@ export type SiteVenueCatalogEntry = {
   lng?: number;
 };
 
-export const SITE_VENUES: SiteVenueCatalogEntry[] = [
-  { id: "venue-1", name: "카롬 강남점", region: "서울 강남", type: "클럽형", lat: 37.498, lng: 127.028 },
-  { id: "venue-2", name: "카롬 서초점", region: "서울 서초", type: "대회협력", lat: 37.483, lng: 127.032 },
-  { id: "venue-3", name: "카롬 수원점", region: "경기 수원", type: "일반형", lat: 37.264, lng: 127.029 },
-];
+/** 정적 샘플 제거 — 클럽 노출은 Firestore 승인·게시 사업장만 사용한다. */
+export const SITE_VENUES: SiteVenueCatalogEntry[] = [];
 
 export function isValidSiteVenueId(id: string): boolean {
   const t = id.trim();

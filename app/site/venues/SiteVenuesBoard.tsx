@@ -287,7 +287,7 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
 
         {ordered.length === 0 ? (
           <p className="v3-muted" style={{ margin: 0 }}>
-            조건에 맞는 당구장이 없습니다.
+            {initialRows.length === 0 ? "등록된 클럽이 없습니다." : "조건에 맞는 당구장이 없습니다."}
           </p>
         ) : null}
       </section>

@@ -131,8 +131,7 @@ export default function BlankBracketPrintClient() {
   const [pdfExporting, setPdfExporting] = useState(false);
   const [pdfDownloadUrl, setPdfDownloadUrl] = useState<string | null>(null);
   const [pdfDownloadName, setPdfDownloadName] = useState("대진표.pdf");
-  const [pdfDownloadStatus, setPdfDownloadStatus] = useState<PdfDownloadStatus>("idle");
-  const [pdfDownloadConfirmDone, setPdfDownloadConfirmDone] = useState(false);
+  const [, setPdfDownloadStatus] = useState<PdfDownloadStatus>("idle");
   const [pdfDownloadModalOpen, setPdfDownloadModalOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewScale, setPreviewScale] = useState(1);
@@ -371,8 +370,8 @@ export default function BlankBracketPrintClient() {
       pdfDownloadUrlRef.current = nextUrl;
       setPdfDownloadUrl(nextUrl);
       setPdfDownloadName(nextName);
-      setPdfDownloadConfirmDone(false);
       setPdfDownloadStatus("ready");
+      setPdfDownloadModalOpen(true);
       console.info("[blank-bracket-print] PDF blob url ready");
     } catch (error) {
       console.error("[blank-bracket-print] PDF export failed", error);
@@ -421,7 +420,6 @@ export default function BlankBracketPrintClient() {
           })
           .catch((error) => {
             console.error("[blank-bracket-print] PDF blob→base64 failed", error);
-            setPdfDownloadConfirmDone(false);
             setPdfDownloadStatus("failed");
           });
         return;
@@ -444,12 +442,10 @@ export default function BlankBracketPrintClient() {
       }, 250);
       pdfDownloadDoneTimerRef.current = window.setTimeout(() => {
         setPdfDownloadStatus("ready");
-        setPdfDownloadConfirmDone(true);
         pdfDownloadDoneTimerRef.current = null;
       }, 400);
     } catch (error) {
       console.error("[blank-bracket-print] PDF download failed", error);
-      setPdfDownloadConfirmDone(false);
       setPdfDownloadStatus("failed");
     }
   }, [pdfDownloadName, pdfDownloadUrl]);
@@ -488,14 +484,12 @@ export default function BlankBracketPrintClient() {
       }
       if (ok) {
         setPdfDownloadStatus("saved");
-        setPdfDownloadConfirmDone(false);
         pdfDownloadDoneTimerRef.current = window.setTimeout(() => {
           setPdfDownloadStatus("ready");
           pdfDownloadDoneTimerRef.current = null;
         }, 4000);
       } else {
         setPdfDownloadStatus("failed");
-        setPdfDownloadConfirmDone(false);
       }
     };
     return () => {
@@ -508,12 +502,6 @@ export default function BlankBracketPrintClient() {
   }, []);
 
   const previewStageIsZoomed = previewScale > previewFitScale + 0.001;
-  const pdfDownloadButtonLabel =
-    pdfDownloadStatus === "downloading"
-      ? "다운로드 중..."
-      : pdfDownloadStatus === "failed"
-          ? "다운로드 다시 시도"
-          : "PDF 다운로드";
 
   return (
     <>
@@ -670,22 +658,6 @@ export default function BlankBracketPrintClient() {
         }
         .preview-overlay .bracket-scene {
           line-height: 0;
-        }
-        /* PDF 다운로드: 미리보기 오버레이·preview-stage 터치 영역과 분리된 고정 컨트롤 (포털) */
-        .bbp-pdf-download-dock {
-          position: fixed;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          z-index: 2147483647;
-          box-sizing: border-box;
-          padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
-          background: #ffffff;
-          border-top: 1px solid #e5e7eb;
-          box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.08);
-          pointer-events: auto;
-          touch-action: manipulation;
-          isolation: isolate;
         }
       `}</style>
 
@@ -882,40 +854,6 @@ export default function BlankBracketPrintClient() {
             document.body,
           )
         : null}
-      {pdfDownloadUrl && typeof document !== "undefined"
-        ? createPortal(
-            <div className="bbp-pdf-download-dock" role="region" aria-label="PDF 다운로드">
-              {pdfDownloadStatus === "saved" || (pdfDownloadStatus === "ready" && pdfDownloadConfirmDone) ? (
-                <p style={{ margin: 0, fontSize: "0.9rem", color: "#374151", fontWeight: 600 }}>
-                  다운로드가 완료되었습니다. 파일 앱에서 확인하세요.
-                </p>
-              ) : (
-                <>
-                  {pdfDownloadStatus === "failed" ? (
-                    <p style={{ margin: "0 0 0.5rem", fontSize: "0.9rem", color: "#374151", fontWeight: 600 }}>
-                      다운로드가 막힌 경우 브라우저 설정을 확인하거나 잠시 후 다시 시도해 주세요.
-                    </p>
-                  ) : null}
-                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
-                    <button
-                      type="button"
-                      className="ui-btn-primary-solid"
-                      disabled={pdfDownloadStatus === "downloading"}
-                      onClick={() => {
-                        console.info("download button clicked → open confirm modal");
-                        setPdfDownloadModalOpen(true);
-                      }}
-                      style={{ minHeight: "44px", padding: "0.55rem 1rem" }}
-                    >
-                      {pdfDownloadButtonLabel}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>,
-            document.body,
-          )
-        : null}
       {pdfDownloadModalOpen && pdfDownloadUrl && typeof document !== "undefined"
         ? createPortal(
             <div
@@ -972,7 +910,6 @@ export default function BlankBracketPrintClient() {
                     className="ui-btn-primary-solid"
                     onClick={() => {
                       setPdfDownloadModalOpen(false);
-                      setPdfDownloadConfirmDone(true);
                       handlePdfDownload();
                     }}
                     style={{ minHeight: "44px", padding: "0.55rem 1rem" }}
