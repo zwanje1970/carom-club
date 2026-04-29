@@ -100,6 +100,23 @@
   pointer-events: auto;
 }
 
+/* /site 메인 MainSiteScrollCards 전용: 브라우저 세로 스크롤 허용(샘플 main-sample 경로는 .slideViewport 유지) */
+.slideViewportSiteMain {
+  --sample-block-ref: 5.75rem;
+  --sample-main-card-height: calc(var(--sample-block-ref) * 1.5);
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+  background-color: rgba(191, 219, 254, 0.5);
+  overflow-x: hidden;
+  overflow-y: auto;
+  position: relative;
+  pointer-events: auto;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
 .sampleMainMarqueeTrack {
   display: flex;
   flex-direction: column;

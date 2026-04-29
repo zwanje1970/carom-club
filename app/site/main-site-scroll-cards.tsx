@@ -51,7 +51,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
     <div
       className={`${styles.sampleMainCardSlot} ${selected ? styles.sampleMainCardSlotSelected : ""}`}
       {...{ [SITE_SCROLL_CARD]: "" }}
-      style={{ touchAction: "manipulation" }}
+      style={{ touchAction: "pan-y" }}
       role="button"
       tabIndex={0}
       aria-pressed={selected}
@@ -152,7 +152,7 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
 
   if (items.length === 0) {
     return (
-      <div className={styles.slideViewport} data-no-root-swipe>
+      <div className={styles.slideViewportSiteMain} data-no-root-swipe>
         <p className={styles.sampleMainEmpty}>등록된 메인 카드가 없습니다.</p>
       </div>
     );
@@ -176,7 +176,11 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
   );
 
   return (
-    <div className={styles.slideViewport} data-no-root-swipe onPointerDownCapture={onViewportPointerDownCapture}>
+    <div
+      className={styles.slideViewportSiteMain}
+      data-no-root-swipe
+      onPointerDownCapture={onViewportPointerDownCapture}
+    >
       <div
         className={styles.sampleMainMarqueeTrack}
         style={selectedRowKey !== null ? trackStylePaused : trackStyle}

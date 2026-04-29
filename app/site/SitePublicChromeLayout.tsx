@@ -7,7 +7,7 @@ import { getSiteLayoutConfig } from "../../lib/surface-read";
 import { filterPcHeaderAdminMenuItems, getPcSiteHeaderAdminFlags } from "./lib/site-pc-header-admin";
 import { isSiteMainSamplePathname } from "./lib/site-main-sample";
 
-/** 샘플 메인 — `next-url` 등 헤더 기준(클라이언트는 `GlobalHomeButton`에서 `usePathname`으로 보강) */
+/** `/site/main-sample` — `next-url` 등 헤더 기준(클라이언트는 `GlobalHomeButton`에서 `usePathname`으로 보강) */
 function pathnameIndicatesSiteMainSample(nextUrlHeader: string): boolean {
   const raw = nextUrlHeader.trim();
   if (!raw) return false;

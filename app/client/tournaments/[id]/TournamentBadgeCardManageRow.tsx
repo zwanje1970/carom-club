@@ -31,6 +31,13 @@ type CardSnapshotRow = {
   tournamentImageOverlayOpacity?: number | null;
   tournamentCardDisplayDate?: string | null;
   tournamentCardDisplayLocation?: string | null;
+  tournamentCardTextShadowEnabled?: boolean;
+  tournamentCardSurfaceLayout?: "split" | "full";
+  cardFooterDateTextColor?: string | null;
+  cardFooterPlaceTextColor?: string | null;
+  cardLeadTextColor?: string | null;
+  cardTitleTextColor?: string | null;
+  cardDescriptionTextColor?: string | null;
   /** false면 초안(게시카드 작성 저장분). 게시 시 최신 초안을 우선한다. */
   isActive?: boolean;
 };
@@ -148,7 +155,7 @@ export default function TournamentBadgeCardManageRow({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             tournamentId,
-            title: latest.title.trim(),
+            title: typeof latest.title === "string" ? latest.title : "",
             textLine1: typeof latest.cardExtraLine1 === "string" ? latest.cardExtraLine1 : "",
             textLine2: typeof latest.cardExtraLine2 === "string" ? latest.cardExtraLine2 : "",
             textLine3: typeof latest.cardExtraLine3 === "string" ? latest.cardExtraLine3 : "",
@@ -158,6 +165,23 @@ export default function TournamentBadgeCardManageRow({
             imageId: latest.imageId?.trim() ?? "",
             image320Url: latest.image320Url?.trim() ?? "",
             draftOnly: false,
+            cardTextShadowEnabled: latest.tournamentCardTextShadowEnabled === true,
+            cardSurfaceLayout: latest.tournamentCardSurfaceLayout === "full" ? "full" : "split",
+            ...(latest.tournamentCardSurfaceLayout === "full"
+              ? {
+                  cardFooterDateTextColor:
+                    typeof latest.cardFooterDateTextColor === "string" && latest.cardFooterDateTextColor.trim()
+                      ? latest.cardFooterDateTextColor.trim()
+                      : null,
+                  cardFooterPlaceTextColor:
+                    typeof latest.cardFooterPlaceTextColor === "string" && latest.cardFooterPlaceTextColor.trim()
+                      ? latest.cardFooterPlaceTextColor.trim()
+                      : null,
+                }
+              : {
+                  cardFooterDateTextColor: null,
+                  cardFooterPlaceTextColor: null,
+                }),
             ...(typeof latest.tournamentMediaBackground === "string"
               ? { mediaBackground: latest.tournamentMediaBackground }
               : {}),
@@ -173,6 +197,15 @@ export default function TournamentBadgeCardManageRow({
             ...(typeof latest.tournamentCardDisplayLocation === "string"
               ? { cardDisplayLocation: latest.tournamentCardDisplayLocation }
               : {}),
+            ...(typeof latest.cardLeadTextColor === "string" && latest.cardLeadTextColor.trim()
+              ? { cardLeadTextColor: latest.cardLeadTextColor.trim() }
+              : {}),
+            ...(typeof latest.cardTitleTextColor === "string" && latest.cardTitleTextColor.trim()
+              ? { cardTitleTextColor: latest.cardTitleTextColor.trim() }
+              : {}),
+            ...(typeof latest.cardDescriptionTextColor === "string" && latest.cardDescriptionTextColor.trim()
+              ? { cardDescriptionTextColor: latest.cardDescriptionTextColor.trim() }
+              : {}),
           }),
         });
         const postData = (await postRes.json()) as {
@@ -182,10 +215,6 @@ export default function TournamentBadgeCardManageRow({
           error?: string;
           snapshot?: { snapshotId?: string };
         };
-        if (postData.ok === false && postData.code === "ALREADY_PUBLISHED") {
-          window.alert("이미 게시중입니다.");
-          return;
-        }
         if (!postRes.ok) {
           window.alert(postData.error ?? "게시에 실패했습니다.");
           return;

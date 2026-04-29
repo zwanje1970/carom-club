@@ -516,13 +516,17 @@ export default function ClientTournamentCardPublishPage() {
           <div className={editorStyles.pageWrap}>
         <div className={editorStyles.previewSticky}>
           <div className={editorStyles.previewInner}>
-            <div className={editorStyles.previewCardWrap}>
-              <TournamentSnapshotCardView
-                item={cardPublishSlidePreview}
-                slideDeck
-                templateCardLayout
-                slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
-              />
+            <div className={editorStyles.previewCardScaleHost}>
+              <div className={editorStyles.previewCardScaleInner}>
+                <div className={editorStyles.previewCardWrap}>
+                  <TournamentSnapshotCardView
+                    item={cardPublishSlidePreview}
+                    slideDeck
+                    templateCardLayout
+                    slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
+                  />
+                </div>
+              </div>
             </div>
             <div className={editorStyles.templateRadioRow} role="radiogroup" aria-label="슬라이드 템플릿">
               <label className={editorStyles.templateRadioLabel}>

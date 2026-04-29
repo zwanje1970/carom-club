@@ -84,6 +84,10 @@ export async function POST(request: Request) {
     cardLeadTextColor?: unknown;
     cardTitleTextColor?: unknown;
     cardDescriptionTextColor?: unknown;
+    cardTextShadowEnabled?: unknown;
+    cardSurfaceLayout?: unknown;
+    cardFooterDateTextColor?: unknown;
+    cardFooterPlaceTextColor?: unknown;
   } = {};
 
   try {
@@ -152,6 +156,20 @@ export async function POST(request: Request) {
   const cardTitleTextColor = typeof body.cardTitleTextColor === "string" ? body.cardTitleTextColor : undefined;
   const cardDescriptionTextColor =
     typeof body.cardDescriptionTextColor === "string" ? body.cardDescriptionTextColor : undefined;
+  const cardTextShadowEnabled = body.cardTextShadowEnabled === true;
+  const cardSurfaceLayout = body.cardSurfaceLayout === "full" ? "full" : "split";
+  const cardFooterDateTextColor =
+    body.cardFooterDateTextColor === null
+      ? null
+      : typeof body.cardFooterDateTextColor === "string"
+        ? body.cardFooterDateTextColor
+        : undefined;
+  const cardFooterPlaceTextColor =
+    body.cardFooterPlaceTextColor === null
+      ? null
+      : typeof body.cardFooterPlaceTextColor === "string"
+        ? body.cardFooterPlaceTextColor
+        : undefined;
 
   let result: Awaited<ReturnType<typeof upsertTournamentPublishedCard>>;
   try {
@@ -177,6 +195,10 @@ export async function POST(request: Request) {
       ...(cardLeadTextColor !== undefined ? { cardLeadTextColor } : {}),
       ...(cardTitleTextColor !== undefined ? { cardTitleTextColor } : {}),
       ...(cardDescriptionTextColor !== undefined ? { cardDescriptionTextColor } : {}),
+      cardTextShadowEnabled,
+      cardSurfaceLayout,
+      ...(cardFooterDateTextColor !== undefined ? { cardFooterDateTextColor } : {}),
+      ...(cardFooterPlaceTextColor !== undefined ? { cardFooterPlaceTextColor } : {}),
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Failed to save tournament card.";
@@ -191,12 +213,6 @@ export async function POST(request: Request) {
   }
 
   if (!result.ok) {
-    if ("code" in result && result.code === "ALREADY_PUBLISHED") {
-      return NextResponse.json(
-        { ok: false, code: result.code, message: result.message },
-        { status: 200 },
-      );
-    }
     return NextResponse.json(
       { error: "error" in result ? result.error : "Request failed." },
       { status: 400 },

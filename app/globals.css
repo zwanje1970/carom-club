@@ -39,8 +39,8 @@
 
   /* 메인 슬라이드 대회 카드 폭 — 게시카드 작성 미리보기와 동일 기준 */
   --slide-card-max-width: 440px;
-  /* 카드 세로 — tournament-slide-card-previews .cardRoot height 와 동일 */
-  --slide-card-reference-height: calc(5.75rem * 2 - 1rem);
+  /* 카드 세로 — tournament-slide-card-previews .cardRoot height 와 동일(대회 게시카드 20% 확대 반영) */
+  --slide-card-reference-height: calc((5.75rem * 2 - 1rem) * 1.2);
   --slide-window-reference-height: var(--slide-card-reference-height);
 
   /* 모바일 하단 고정 탭·PNG 버튼 간격 공통 (메인 등에서 참조) */
@@ -1733,11 +1733,27 @@ body:has(.site-home-page) {
     margin-right: 0;
   }
 
+  /*
+   * /site 새 메인(MainSiteScrollCards): 앵커를 남은 높이에 맞춤 → 내부 .slideViewportSiteMain overflow-y 스크롤.
+   * 메인(구)는 이 modifier 없음.
+   */
+  .site-home-page--main .site-home-main-slide-deck-stack > .site-home-slide-anchor--marquee-scroll,
+  .site-home-page--main .site-home-main-slide-deck-stack--public-mobile > .site-home-slide-anchor--marquee-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: hidden;
+  }
+
   /* 메인 모바일: 슬라이드 바깥 박스 제거(풀폭)·높이 원안 + 하단고정대역·슬라이드↔PNG 간격 축소 */
   .site-home-page--main .site-home-slide-stack,
   .site-home-page--main .site-home-slide-anchor {
     overflow-x: hidden;
     overflow-y: visible !important;
+  }
+
+  .site-home-page--main .site-home-slide-anchor.site-home-slide-anchor--marquee-scroll {
+    overflow-y: hidden !important;
   }
 
   .site-home-page--main .site-home-main-slide-deck-stack > .site-home-slide-anchor {
@@ -2131,6 +2147,12 @@ body:has(.site-home-page) {
   overflow-y: visible !important;
 }
 
+.site-shell.site-shell--ua-mobile-site
+  .site-home-page--main
+  .site-home-slide-anchor.site-home-slide-anchor--marquee-scroll {
+  overflow-y: hidden !important;
+}
+
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-slide-deck-stack {
   min-height: 100dvh;
 }
@@ -2384,6 +2406,13 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
     margin-left: 0;
     margin-right: 0;
     width: 100%;
+  }
+
+  .site-home-page--main .site-home-main-content-box .site-home-slide-anchor.site-home-slide-anchor--marquee-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: hidden;
   }
 
   .site-home-page--main .site-home-main-content-box .site-home-cta-primary {
@@ -2773,7 +2802,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   border-top: none;
 }
 
-/* 정식 메인(`/`, `/site`)·구 샘플 URL: 하단 네비·본문 하단 예약을 동일 토큰의 4배로(컴팩트 탭 대비 UI) */
+/* `/site/main-sample` 전용: 하단 네비·본문 하단 예약 토큰 4배(실험 UI) — `/`·`/site` 정식 메인은 :root 기본값 */
 .site-shell.site-shell--site-main-sample {
   --site-fixed-bottom-nav-layout-height: calc(4 * (var(--mobile-bottom-nav-height) + var(--site-home-bottom-safe-effective)));
 }
@@ -2891,15 +2920,26 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
     padding-bottom: calc(2.125rem + env(safe-area-inset-bottom, 0px));
   }
 
-  /* 상단 공통 크롬이 safe-area를 담당 — 본문 패딩은 회색 본문과 동일 상단만 */
+  /* 상단 공통 크롬이 safe-area를 담당 — 본문 패딩은 메인과 동일 페이지 배경 상단만 */
   .app-dashboard-mobile-root .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
     padding-top: var(--site-shell-gray-padding-top);
   }
 
   html:has(.app-dashboard-mobile-root),
   body:has(.app-dashboard-mobile-root) {
-    background-color: #4d7db5;
+    background-color: var(--ui-bg-page);
   }
+}
+
+/* /client·/platform: 본문 루트 — 메인(스와이프 패널·body)과 동일 페이지 배경 */
+.app-dashboard-mobile-root {
+  background: var(--ui-bg-page);
+  min-height: 100dvh;
+  box-sizing: border-box;
+}
+
+.app-dashboard-shell.app-mobile-bottom-nav-scroll-pad {
+  background: var(--ui-bg-page);
 }
 
 /* 대시보드 모바일 공통 상단: 공개 사이트 standard 바와 동일 클래스 — 셸 밖 풀폭 */
@@ -2986,7 +3026,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   margin: 0 0 16px;
   padding: 14px 16px;
   border-radius: 8px;
-  background: #e2e6eb;
+  background: var(--ui-bg-card);
   color: #111827;
 }
 

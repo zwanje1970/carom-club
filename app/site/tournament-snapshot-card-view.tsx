@@ -7,6 +7,9 @@ import styles from "./tournament-slide-card-previews.module.css";
 
 export type { TournamentPostStatus };
 
+/** 분리형(하단 띠) / 전체형(배경 위 오버레이) — 미지정은 분리형 */
+export type TournamentCardSurfaceLayout = "split" | "full";
+
 export type SlideDeckItem = {
   /** 없거나 tournament면 대회 카드(기본) */
   type?: "tournament" | "ad";
@@ -34,6 +37,10 @@ export type SlideDeckItem = {
   cardLeadTextColor?: string | null;
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
+  cardTextShadowEnabled?: boolean;
+  cardSurfaceLayout?: TournamentCardSurfaceLayout;
+  cardFooterDateTextColor?: string | null;
+  cardFooterPlaceTextColor?: string | null;
 };
 
 /** carom-postcard-template-test: TournamentSlideCardPreview.tsx TournamentSlidePreviewItem */
@@ -51,12 +58,19 @@ type TournamentSlidePreviewItem = {
   cardLeadTextColor?: string | null;
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
+  cardTextShadowEnabled?: boolean;
+  cardSurfaceLayout?: TournamentCardSurfaceLayout;
+  cardFooterDateTextColor?: string | null;
+  cardFooterPlaceTextColor?: string | null;
 };
 
 type SlidePreviewVariant = "classic" | "frame";
 
 function slideDeckItemToPreviewItem(item: SlideDeckItem): TournamentSlidePreviewItem {
-  const useBgImage = item.backgroundType !== "theme" && Boolean(item.image320Url?.trim());
+  const isAd = item.type === "ad";
+  const useBgImage = isAd
+    ? Boolean(item.image320Url?.trim())
+    : item.backgroundType !== "theme" && Boolean(item.image320Url?.trim());
   return {
     title: item.title,
     subtitle: item.subtitle,
@@ -71,6 +85,10 @@ function slideDeckItemToPreviewItem(item: SlideDeckItem): TournamentSlidePreview
     cardLeadTextColor: item.cardLeadTextColor,
     cardTitleTextColor: item.cardTitleTextColor,
     cardDescriptionTextColor: item.cardDescriptionTextColor,
+    cardTextShadowEnabled: item.cardTextShadowEnabled,
+    cardSurfaceLayout: item.cardSurfaceLayout === "full" ? "full" : "split",
+    cardFooterDateTextColor: item.cardFooterDateTextColor,
+    cardFooterPlaceTextColor: item.cardFooterPlaceTextColor,
   };
 }
 
@@ -101,7 +119,7 @@ function MediaStack({
   badge,
   repImageHighPriority,
   slideDeckSolidBackdrop,
-  showAdBadge,
+  mainSlideAd,
 }: {
   variant: SlidePreviewVariant;
   item: TournamentSlidePreviewItem;
@@ -110,8 +128,8 @@ function MediaStack({
   repImageHighPriority?: boolean;
   /** 메인 슬라이드: 링크 배경 이미지 대신 단색(구분용) */
   slideDeckSolidBackdrop?: string;
-  /** type === "ad" 인 슬라이드 카드에만 AD 표시 */
-  showAdBadge?: boolean;
+  /** 메인 슬라이드 광고 카드 — 텍스트 없음·상태배지 대신 AD 문자만 */
+  mainSlideAd?: boolean;
 }) {
   const solidBackdrop = slideDeckSolidBackdrop?.trim();
   const cssBg = item.mediaBackground?.trim();
@@ -142,12 +160,15 @@ function MediaStack({
           {...(repImageHighPriority ? { fetchPriority: "high" as const } : {})}
         />
       ) : null}
-      <div className={styles.statusBadgeWrap}>{badge}</div>
-      {showAdBadge ? (
-        <span className={styles.mainSlideAdBadge} aria-hidden>
-          AD
-        </span>
-      ) : null}
+      <div className={styles.statusBadgeWrap}>
+        {mainSlideAd ? (
+          <span className={styles.adMark} aria-hidden>
+            AD
+          </span>
+        ) : (
+          badge
+        )}
+      </div>
       {children}
     </div>
   );
@@ -161,7 +182,8 @@ function TournamentSlideCardPreview({
   templateCardLayout,
   repImageHighPriority,
   slideDeckSolidBackdrop,
-  showAdBadge,
+  mainSlideAd,
+  tournamentPublishedHeightScale = true,
 }: {
   item: TournamentSlidePreviewItem;
   variant: SlidePreviewVariant;
@@ -171,26 +193,56 @@ function TournamentSlideCardPreview({
   templateCardLayout?: boolean;
   repImageHighPriority?: boolean;
   slideDeckSolidBackdrop?: string;
-  /** SlideDeckItem.type === "ad" 일 때만 true */
-  showAdBadge?: boolean;
+  /** 메인 슬라이드 광고 카드 */
+  mainSlideAd?: boolean;
+  /** 대회·광고 슬라이드 카드 동일 높이 스케일 */
+  tournamentPublishedHeightScale?: boolean;
 }) {
   const status = toStatus(item.statusBadge);
   const parsed = parseSubtitle(item.subtitle);
-  const lead = (item.cardExtraLine1 ?? "").trim();
-  const description = (item.cardExtraLine2 ?? "").trim();
-  const description2 = (item.cardExtraLine3 ?? "").trim();
+  const lead = item.cardExtraLine1 ?? "";
+  const description = item.cardExtraLine2 ?? "";
+  const description2 = item.cardExtraLine3 ?? "";
   const leadColor = (item.cardLeadTextColor ?? "").trim();
   const titleColor = (item.cardTitleTextColor ?? "").trim();
   const descColor = (item.cardDescriptionTextColor ?? "").trim();
   const statusBadge = <TournamentStatusBadge status={status} />;
+  const surfaceLayout: TournamentCardSurfaceLayout =
+    item.cardSurfaceLayout === "full" ? "full" : "split";
+  const footerDateColor = (item.cardFooterDateTextColor ?? "").trim();
+  const footerPlaceColor = (item.cardFooterPlaceTextColor ?? "").trim();
+  const fullFooterDateStyle = footerDateColor ? { color: footerDateColor } : undefined;
+  const fullFooterPlaceStyle = footerPlaceColor ? { color: footerPlaceColor } : undefined;
 
   const rootClass = [
     styles.cardRoot,
     slideDeck ? styles.cardRootSlideDeck : "",
     templateCardLayout ? styles.cardRootTemplateLayout : "",
+    tournamentPublishedHeightScale ? styles.cardRootTournamentPublishedScale : "",
+    item.cardTextShadowEnabled ? styles.cardTextShadowOn : "",
+    surfaceLayout === "full" ? styles.cardRootSurfaceFull : "",
+    mainSlideAd ? styles.cardRootMainSlideAd : "",
   ]
     .filter(Boolean)
     .join(" ");
+
+  const fullOverlayFooter = (
+    <div className={styles.fullSurfaceFooter}>
+      <p className={styles.fullSurfaceFooterDate} style={fullFooterDateStyle}>
+        {parsed.dateText}
+      </p>
+      <p className={styles.fullSurfaceFooterPlace} style={fullFooterPlaceStyle}>
+        {parsed.placeText}
+      </p>
+    </div>
+  );
+
+  const splitFooter = (
+    <footer className={styles.cardFooter}>
+      <p className={styles.footerDate}>{parsed.dateText}</p>
+      <p className={styles.footerPlace}>{parsed.placeText}</p>
+    </footer>
+  );
 
   if (variant === "classic") {
     return (
@@ -201,43 +253,45 @@ function TournamentSlideCardPreview({
           badge={statusBadge}
           repImageHighPriority={repImageHighPriority}
           slideDeckSolidBackdrop={slideDeckSolidBackdrop}
-          showAdBadge={showAdBadge}
+          mainSlideAd={mainSlideAd}
         >
-          <div className={styles.classicInner}>
-            <div className={styles.classicTop}>
-              <div className={styles.classicMain}>
-                {lead ? (
-                  <p className={styles.classicLead} style={leadColor ? { color: leadColor } : undefined}>
-                    {lead}
-                  </p>
-                ) : null}
-                <h3
-                  className={styles.classicTitle}
-                  style={titleColor ? { color: titleColor } : undefined}
-                >
-                  {item.title || "(제목)"}
-                </h3>
-                {description ? (
-                  <p className={styles.classicDesc} style={descColor ? { color: descColor } : undefined}>
-                    {description}
-                  </p>
-                ) : null}
-                {description2 ? (
-                  <p
-                    className={styles.classicDescSecondary}
-                    style={descColor ? { color: descColor } : undefined}
+          {mainSlideAd ? (
+            <div className={styles.adCardMediaFill} aria-hidden />
+          ) : (
+            <div className={styles.classicInner}>
+              <div className={styles.classicTop}>
+                <div className={styles.classicMain}>
+                  {lead.length > 0 ? (
+                    <p className={styles.classicLead} style={leadColor ? { color: leadColor } : undefined}>
+                      {lead}
+                    </p>
+                  ) : null}
+                  <h3
+                    className={styles.classicTitle}
+                    style={titleColor ? { color: titleColor } : undefined}
                   >
-                    {description2}
-                  </p>
-                ) : null}
+                    {item.title.length > 0 ? item.title : "(제목)"}
+                  </h3>
+                  {description.length > 0 ? (
+                    <p className={styles.classicDesc} style={descColor ? { color: descColor } : undefined}>
+                      {description}
+                    </p>
+                  ) : null}
+                  {description2.length > 0 ? (
+                    <p
+                      className={styles.classicDescSecondary}
+                      style={descColor ? { color: descColor } : undefined}
+                    >
+                      {description2}
+                    </p>
+                  ) : null}
+                </div>
               </div>
+              {surfaceLayout === "full" ? fullOverlayFooter : null}
             </div>
-          </div>
+          )}
         </MediaStack>
-        <footer className={styles.cardFooter}>
-          <p className={styles.footerDate}>{parsed.dateText}</p>
-          <p className={styles.footerPlace}>{parsed.placeText}</p>
-        </footer>
+        {mainSlideAd ? null : surfaceLayout === "split" ? splitFooter : null}
       </article>
     );
   }
@@ -251,38 +305,40 @@ function TournamentSlideCardPreview({
           badge={statusBadge}
           repImageHighPriority={repImageHighPriority}
           slideDeckSolidBackdrop={slideDeckSolidBackdrop}
-          showAdBadge={showAdBadge}
+          mainSlideAd={mainSlideAd}
         >
-          <div className={styles.frameInner}>
-            <div className={styles.frameCenter}>
-              {lead ? (
-                <p className={styles.frameLead} style={leadColor ? { color: leadColor } : undefined}>
-                  {lead}
-                </p>
-              ) : null}
-              <h3 className={styles.frameTitle} style={titleColor ? { color: titleColor } : undefined}>
-                {item.title || "(제목)"}
-              </h3>
-              {description ? (
-                <p className={styles.frameDesc} style={descColor ? { color: descColor } : undefined}>
-                  {description}
-                </p>
-              ) : null}
-              {description2 ? (
-                <p
-                  className={styles.frameDescSecondary}
-                  style={descColor ? { color: descColor } : undefined}
-                >
-                  {description2}
-                </p>
-              ) : null}
+          {mainSlideAd ? (
+            <div className={styles.adCardMediaFill} aria-hidden />
+          ) : (
+            <div className={styles.frameInner}>
+              <div className={styles.frameCenter}>
+                {lead.length > 0 ? (
+                  <p className={styles.frameLead} style={leadColor ? { color: leadColor } : undefined}>
+                    {lead}
+                  </p>
+                ) : null}
+                <h3 className={styles.frameTitle} style={titleColor ? { color: titleColor } : undefined}>
+                  {item.title.length > 0 ? item.title : "(제목)"}
+                </h3>
+                {description.length > 0 ? (
+                  <p className={styles.frameDesc} style={descColor ? { color: descColor } : undefined}>
+                    {description}
+                  </p>
+                ) : null}
+                {description2.length > 0 ? (
+                  <p
+                    className={styles.frameDescSecondary}
+                    style={descColor ? { color: descColor } : undefined}
+                  >
+                    {description2}
+                  </p>
+                ) : null}
+                {surfaceLayout === "full" ? fullOverlayFooter : null}
+              </div>
             </div>
-          </div>
+          )}
         </MediaStack>
-        <footer className={styles.cardFooter}>
-          <p className={styles.footerDate}>{parsed.dateText}</p>
-          <p className={styles.footerPlace}>{parsed.placeText}</p>
-        </footer>
+        {mainSlideAd ? null : surfaceLayout === "split" ? splitFooter : null}
       </article>
     );
   }
@@ -325,7 +381,8 @@ export function TournamentSnapshotCardView({
       templateCardLayout={templateCardLayout}
       repImageHighPriority={repImageHighPriority}
       slideDeckSolidBackdrop={slideDeckSolidBackdrop}
-      showAdBadge={item.type === "ad"}
+      mainSlideAd={item.type === "ad"}
+      tournamentPublishedHeightScale={true}
     />
   );
   if (!href) return inner;

@@ -8,6 +8,73 @@
   padding: 0 0.75rem 1.5rem;
 }
 
+.surfaceTemplateRow {
+  flex-shrink: 0;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+}
+
+.surfaceTemplateLabel {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #52525b;
+  margin-bottom: 8px;
+}
+
+.surfaceTemplateTabs {
+  display: flex;
+  gap: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #d4d4d8;
+  max-width: 40rem;
+  margin: 0 auto;
+}
+
+.surfaceTemplateTab {
+  flex: 1 1 50%;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: none;
+  background: #f4f4f5;
+  color: #52525b;
+  cursor: pointer;
+}
+
+.surfaceTemplateTab:hover {
+  background: #e4e4e7;
+}
+
+.surfaceTemplateTabActive {
+  background: #fff;
+  color: #18181b;
+  box-shadow: inset 0 -2px 0 #3b82f6;
+}
+
+/** 게시카드 작성 v2 전용 — 구 `card-publish` 페이지 미리보기는 기존 스타일 유지 */
+.pageWrapV2 .previewSticky {
+  padding: 8px 0 10px;
+  margin: 0;
+  background: transparent;
+  border-bottom: none;
+}
+
+.pageWrapV2 .previewSlideLayer {
+  padding: 8px 0;
+}
+
+.pageWrapV2 .previewCardWrap {
+  border: none;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.1),
+    0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
 .previewSticky {
   position: sticky;
   top: 0;
@@ -53,6 +120,29 @@
   align-items: center;
   justify-content: center;
   padding: 24px 14px;
+}
+
+/* 좁은 뷰포트: 카드·글자·배지·그림자를 한 번에 scale(레이아웃은 카드 실크기 기준) */
+.previewCardScaleHost {
+  width: 100%;
+  max-width: min(100%, var(--slide-card-max-width, 440px));
+  margin: 0 auto;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.previewCardScaleInner {
+  width: 100%;
+  max-width: min(100%, var(--slide-card-max-width, 440px));
+  transform-origin: top center;
+}
+
+@media (max-width: 480px) {
+  .previewCardScaleInner {
+    transform: scale(min(1, calc((100vw - 56px) / 440)));
+  }
 }
 
 .previewCardWrap {

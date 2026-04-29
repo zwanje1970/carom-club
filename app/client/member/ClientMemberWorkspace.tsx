@@ -31,7 +31,8 @@ export default function ClientMemberWorkspace() {
   const [linkUrl, setLinkUrl] = useState("");
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
-  const [pushOpen, setPushOpen] = useState(false);
+  /** 기본 열림: 접혀 있으면 목록만 보여 푸시·선택 UI가 없는 것처럼 보였음 */
+  const [pushOpen, setPushOpen] = useState(true);
 
   const sendableIds = useMemo(
     () => members.filter((m) => m.pushMarketingAgreed).map((m) => m.userId),
@@ -168,17 +169,17 @@ export default function ClientMemberWorkspace() {
           style={{ padding: "0.5rem 0.9rem", fontWeight: 600 }}
           aria-expanded={pushOpen}
         >
-          {pushOpen ? "앱 푸시 닫기" : "앱 푸시 발송"}
+          {pushOpen ? "웹 푸시 패널 닫기" : "웹 푸시 발송"}
         </button>
       </div>
 
       {pushOpen ? (
         <section className="v3-box v3-stack" style={{ gap: "0.75rem", maxWidth: "36rem" }} aria-label="푸시 발송">
           <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0 }}>
-            마케팅 푸시 발송
+            회원 대상 웹 푸시 발송
           </h2>
           <p className="v3-muted" style={{ margin: 0, fontSize: "0.88rem" }}>
-            아래 목록에서 수신 대상을 선택한 뒤 발송합니다. 수신 거부 회원은 선택할 수 없습니다.
+            아래 목록에서 수신 대상을 선택한 뒤 발송합니다. 마케팅 푸시 수신에 동의하지 않은 회원은 선택할 수 없습니다.
           </p>
 
           <label className="v3-stack" style={{ gap: "0.25rem" }}>
@@ -222,7 +223,7 @@ export default function ClientMemberWorkspace() {
             onClick={() => void handleSend()}
             style={{ alignSelf: "flex-start" }}
           >
-            {sending ? "발송 중…" : "푸시 발송"}
+            {sending ? "발송 중…" : "웹 푸시 발송"}
           </button>
 
           {notice ? (

@@ -837,7 +837,7 @@ export default function ClientSetupPage() {
           margin-top: 16px;
           padding: 12px;
           border-radius: 8px;
-          background: #f8f9fb;
+          background: var(--ui-bg-card);
         }
         .venue-table-header {
           display: grid;

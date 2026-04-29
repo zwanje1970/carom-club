@@ -6,6 +6,7 @@ import {
   SLIDE_DECK_SOLID_BACKDROPS,
   TournamentSnapshotCardView,
   type SlideDeckItem,
+  type TournamentCardSurfaceLayout,
 } from "../../../../site/tournament-snapshot-card-view";
 import {
   POSTCARD_TEMPLATE_APP_DEFAULTS,
@@ -13,7 +14,7 @@ import {
 } from "../../../../../lib/postcard-template-reference";
 import editorStyles from "../card-publish-editor.module.css";
 
-const DESCRIPTION_MAX_LINES = 2;
+const DESCRIPTION_MAX_LINES = 3;
 
 /** 제목 위 / 제목 / 설명 글자색 — `carom-postcard-template-test/src/App.tsx` 와 동일 */
 const CARD_TEXT_COLOR_SWATCHES = POSTCARD_TEMPLATE_TEXT_COLOR_SWATCHES;
@@ -248,6 +249,10 @@ type SnapshotPick = {
   cardLeadTextColor?: string | null;
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
+  tournamentCardTextShadowEnabled?: boolean;
+  tournamentCardSurfaceLayout?: TournamentCardSurfaceLayout;
+  cardFooterDateTextColor?: string | null;
+  cardFooterPlaceTextColor?: string | null;
 };
 
 function hasStoredV2Media(pick: SnapshotPick): boolean {
@@ -280,8 +285,12 @@ export default function ClientTournamentCardPublishV2Page() {
   const [imageOverlayBlend, setImageOverlayBlend] = useState(true);
   const [imageOverlayOpacity, setImageOverlayOpacity] = useState(0.78);
   const [v2MediaMode, setV2MediaMode] = useState<"inherit" | "on">("on");
+  const [cardTextShadowEnabled, setCardTextShadowEnabled] = useState(false);
+  const [cardSurfaceLayout, setCardSurfaceLayout] = useState<TournamentCardSurfaceLayout>("split");
+  const [footerDateTextColor, setFooterDateTextColor] = useState("");
+  const [footerPlaceTextColor, setFooterPlaceTextColor] = useState("");
 
-  const [editorStep, setEditorStep] = useState<1 | 2>(1);
+  const [editorTab, setEditorTab] = useState<"background" | "content">("background");
 
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -306,11 +315,11 @@ export default function ClientTournamentCardPublishV2Page() {
       noBgImage && noCssBg ? DEFAULT_PREVIEW_MEDIA_BG : mediaBackground.trim();
     const base: SlideDeckItem = {
       snapshotId: "card-publish-preview",
-      title: title.trim() || "(제목)",
+      title: title.length > 0 ? title : "(제목)",
       subtitle: subtitle.length ? subtitle : "·",
       statusBadge: tournamentStatusForPreview,
-      cardExtraLine1: textLine1 || null,
-      cardExtraLine2: textLine2 || null,
+      cardExtraLine1: textLine1.length > 0 ? textLine1 : null,
+      cardExtraLine2: textLine2.length > 0 ? textLine2 : null,
       cardExtraLine3: null,
       image320Url: uploadedImage?.w320Url,
       cardTemplate,
@@ -322,6 +331,14 @@ export default function ClientTournamentCardPublishV2Page() {
       ...(leadTextColor.trim() ? { cardLeadTextColor: leadTextColor.trim() } : {}),
       ...(titleTextColor.trim() ? { cardTitleTextColor: titleTextColor.trim() } : {}),
       ...(descriptionTextColor.trim() ? { cardDescriptionTextColor: descriptionTextColor.trim() } : {}),
+      ...(cardTextShadowEnabled ? { cardTextShadowEnabled: true } : {}),
+      ...(cardSurfaceLayout === "full" ? { cardSurfaceLayout: "full" as const } : {}),
+      ...(cardSurfaceLayout === "full" && footerDateTextColor.trim()
+        ? { cardFooterDateTextColor: footerDateTextColor.trim() }
+        : {}),
+      ...(cardSurfaceLayout === "full" && footerPlaceTextColor.trim()
+        ? { cardFooterPlaceTextColor: footerPlaceTextColor.trim() }
+        : {}),
     };
     return base;
   }, [
@@ -334,6 +351,10 @@ export default function ClientTournamentCardPublishV2Page() {
     leadTextColor,
     titleTextColor,
     descriptionTextColor,
+    cardTextShadowEnabled,
+    cardSurfaceLayout,
+    footerDateTextColor,
+    footerPlaceTextColor,
     uploadedImage?.w320Url,
     cardTemplate,
     backgroundType,
@@ -383,12 +404,20 @@ export default function ClientTournamentCardPublishV2Page() {
             ? active
             : null;
       if (pick) {
-        const snapTitle = (pick.title ?? "").trim();
-        setTitle(snapTitle && snapTitle !== "(제목)" ? snapTitle : t.title);
-        const fromPick1 = (pick.cardExtraLine1 ?? "").trim();
-        const fromPick2 = (pick.cardExtraLine2 ?? "").trim();
+        const snapRaw = pick.title ?? "";
+        setTitle(snapRaw.trim() && snapRaw.trim() !== "(제목)" ? snapRaw : t.title);
+        const fromPick1 = pick.cardExtraLine1 ?? "";
+        const fromPick2 = pick.cardExtraLine2 ?? "";
         setTextLine1(fromPick1 || summaryLine1);
         setTextLine2(fromPick2 || prizeLine1 || summaryLine2);
+        setCardTextShadowEnabled(pick.tournamentCardTextShadowEnabled === true);
+        setCardSurfaceLayout(pick.tournamentCardSurfaceLayout === "full" ? "full" : "split");
+        setFooterDateTextColor(
+          typeof pick.cardFooterDateTextColor === "string" ? pick.cardFooterDateTextColor.trim() : ""
+        );
+        setFooterPlaceTextColor(
+          typeof pick.cardFooterPlaceTextColor === "string" ? pick.cardFooterPlaceTextColor.trim() : ""
+        );
         setLeadTextColor(typeof pick.cardLeadTextColor === "string" ? pick.cardLeadTextColor.trim() : "");
         setTitleTextColor(typeof pick.cardTitleTextColor === "string" ? pick.cardTitleTextColor.trim() : "");
         setDescriptionTextColor(
@@ -448,6 +477,10 @@ export default function ClientTournamentCardPublishV2Page() {
         const loc0 = typeof t.location === "string" ? t.location : "";
         setCardDate(d0 ? formatCardDateForDisplay(d0) : POSTCARD_TEMPLATE_APP_DEFAULTS.dateText);
         setCardPlace(loc0 ? venueNameOnly(loc0) : POSTCARD_TEMPLATE_APP_DEFAULTS.placeText);
+        setCardTextShadowEnabled(false);
+        setCardSurfaceLayout("split");
+        setFooterDateTextColor("");
+        setFooterPlaceTextColor("");
       }
     } catch {
       setMessage("카드 정보를 불러오는 중 오류가 발생했습니다.");
@@ -483,9 +516,9 @@ export default function ClientTournamentCardPublishV2Page() {
         }
         const body: Record<string, unknown> = {
           tournamentId,
-          title: title.trim(),
-          textLine1: textLine1.trim(),
-          textLine2: textLine2.trim(),
+          title,
+          textLine1,
+          textLine2,
           textLine3: "",
           cardTemplate,
           backgroundType,
@@ -495,6 +528,17 @@ export default function ClientTournamentCardPublishV2Page() {
           draftOnly: true,
           cardDisplayDate: formatCardDateForDisplay(cardDate).trim(),
           cardDisplayLocation: cardPlace.trim(),
+          cardTextShadowEnabled,
+          cardSurfaceLayout,
+          ...(cardSurfaceLayout === "full"
+            ? {
+                cardFooterDateTextColor: footerDateTextColor.trim() || null,
+                cardFooterPlaceTextColor: footerPlaceTextColor.trim() || null,
+              }
+            : {
+                cardFooterDateTextColor: null,
+                cardFooterPlaceTextColor: null,
+              }),
         };
         if (leadTextColor.trim()) body.cardLeadTextColor = leadTextColor.trim();
         if (titleTextColor.trim()) body.cardTitleTextColor = titleTextColor.trim();
@@ -549,7 +593,7 @@ export default function ClientTournamentCardPublishV2Page() {
         w640Url: result.w640Url,
       });
       activateV2Media();
-      setEditorStep(2);
+      setEditorTab("background");
       setMessage("이미지가 적용되었습니다.");
     } catch {
       setMessage("이미지 업로드 중 오류가 발생했습니다.");
@@ -572,44 +616,44 @@ export default function ClientTournamentCardPublishV2Page() {
     <main className="v3-page v3-stack" style={{ maxWidth: "none", margin: 0, width: "100%" }}>
       <div className={editorStyles.pcPageShell}>
         <div className={editorStyles.pcPageMain}>
-          <h1 className="v3-h1" style={{ paddingLeft: "0.75rem", paddingRight: "0.75rem" }}>
-            게시카드 작성 (신규)
-          </h1>
+          <div className={`${editorStyles.pageWrap} ${editorStyles.pageWrapV2}`}>
+        <div className={editorStyles.surfaceTemplateRow}>
+          <span className={editorStyles.surfaceTemplateLabel}>카드 템플릿</span>
+          <div className={editorStyles.surfaceTemplateTabs} role="radiogroup" aria-label="카드 템플릿">
+            <button
+              type="button"
+              className={`${editorStyles.surfaceTemplateTab} ${cardSurfaceLayout === "split" ? editorStyles.surfaceTemplateTabActive : ""}`}
+              aria-pressed={cardSurfaceLayout === "split"}
+              onClick={() => setCardSurfaceLayout("split")}
+            >
+              분리형
+            </button>
+            <button
+              type="button"
+              className={`${editorStyles.surfaceTemplateTab} ${cardSurfaceLayout === "full" ? editorStyles.surfaceTemplateTabActive : ""}`}
+              aria-pressed={cardSurfaceLayout === "full"}
+              onClick={() => setCardSurfaceLayout("full")}
+            >
+              전체형
+            </button>
+          </div>
+        </div>
 
-          <div className={editorStyles.pageWrap}>
         <div className={editorStyles.previewSticky}>
           <div className={editorStyles.previewInner}>
             <div className={editorStyles.previewSlideLayer}>
-              <div className={editorStyles.previewCardWrap}>
-                <TournamentSnapshotCardView
-                  item={cardPublishSlidePreview}
-                  slideDeck
-                  templateCardLayout
-                  slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
-                />
+              <div className={editorStyles.previewCardScaleHost}>
+                <div className={editorStyles.previewCardScaleInner}>
+                  <div className={editorStyles.previewCardWrap}>
+                    <TournamentSnapshotCardView
+                      item={cardPublishSlidePreview}
+                      slideDeck
+                      templateCardLayout
+                      slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className={editorStyles.templateRadioRow} role="radiogroup" aria-label="슬라이드 템플릿">
-              <label className={editorStyles.templateRadioLabel}>
-                <input
-                  type="radio"
-                  name="cardPublishCardTemplate"
-                  value="A"
-                  checked={cardTemplate === "A"}
-                  onChange={() => setCardTemplate("A")}
-                />
-                좌측 정렬형
-              </label>
-              <label className={editorStyles.templateRadioLabel}>
-                <input
-                  type="radio"
-                  name="cardPublishCardTemplate"
-                  value="B"
-                  checked={cardTemplate === "B"}
-                  onChange={() => setCardTemplate("B")}
-                />
-                가운데 정렬형
-              </label>
             </div>
           </div>
         </div>
@@ -627,26 +671,26 @@ export default function ClientTournamentCardPublishV2Page() {
               <button
                 type="button"
                 role="tab"
-                aria-selected={editorStep === 1}
-                className={`${editorStyles.stepTab} ${editorStep === 1 ? editorStyles.stepTabActive : ""}`}
-                onClick={() => setEditorStep(1)}
+                aria-selected={editorTab === "background"}
+                className={`${editorStyles.stepTab} ${editorTab === "background" ? editorStyles.stepTabActive : ""}`}
+                onClick={() => setEditorTab("background")}
               >
-                1. 내용입력
+                배경설정
               </button>
               <button
                 type="button"
                 role="tab"
-                aria-selected={editorStep === 2}
-                className={`${editorStyles.stepTab} ${editorStep === 2 ? editorStyles.stepTabActive : ""}`}
-                onClick={() => setEditorStep(2)}
+                aria-selected={editorTab === "content"}
+                className={`${editorStyles.stepTab} ${editorTab === "content" ? editorStyles.stepTabActive : ""}`}
+                onClick={() => setEditorTab("content")}
               >
-                2. 배경 설정
+                내용입력
               </button>
             </div>
           </div>
 
           <div className={editorStyles.stepScrollBody}>
-          {editorStep === 1 ? (
+          {editorTab === "content" ? (
             <>
               <div className={editorStyles.field}>
                 <div className={editorStyles.fieldHead}>
@@ -718,6 +762,18 @@ export default function ClientTournamentCardPublishV2Page() {
                 />
               </div>
 
+              <div className={editorStyles.field}>
+                <span className={editorStyles.fieldLabel}>텍스트 효과</span>
+                <label className={editorStyles.fieldCheck}>
+                  <input
+                    type="checkbox"
+                    checked={cardTextShadowEnabled}
+                    onChange={(e) => setCardTextShadowEnabled(e.target.checked)}
+                  />
+                  <span>그림자 사용</span>
+                </label>
+              </div>
+
               <label className={editorStyles.field}>
                 <span className={editorStyles.fieldLabel}>날짜</span>
                 <input
@@ -741,6 +797,37 @@ export default function ClientTournamentCardPublishV2Page() {
                   placeholder="예: 캐롬클럽 빌리어즈"
                 />
               </label>
+
+              {cardSurfaceLayout === "full" ? (
+                <>
+                  <div className={editorStyles.field}>
+                    <div className={editorStyles.fieldHead}>
+                      <span className={editorStyles.fieldLabel}>날짜 글자색</span>
+                      <TextColorSwatches
+                        value={footerDateTextColor}
+                        onChange={setFooterDateTextColor}
+                        wrapClass={editorStyles.fieldSwatches}
+                        swatchClass={editorStyles.fieldSwatch}
+                        swatchLightClass={editorStyles.fieldSwatchLight}
+                        swatchSelectedClass={editorStyles.fieldSwatchSelected}
+                      />
+                    </div>
+                  </div>
+                  <div className={editorStyles.field}>
+                    <div className={editorStyles.fieldHead}>
+                      <span className={editorStyles.fieldLabel}>장소 글자색</span>
+                      <TextColorSwatches
+                        value={footerPlaceTextColor}
+                        onChange={setFooterPlaceTextColor}
+                        wrapClass={editorStyles.fieldSwatches}
+                        swatchClass={editorStyles.fieldSwatch}
+                        swatchLightClass={editorStyles.fieldSwatchLight}
+                        swatchSelectedClass={editorStyles.fieldSwatchSelected}
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : null}
             </>
           ) : (
             <>

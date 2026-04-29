@@ -50,6 +50,7 @@ export function dashboardMobileChromeMeta(
       }
       if (p.endsWith("/participants")) return { title: "참가자", backHref: tbase };
       if (p.includes("/outline")) return { title: "개요", backHref: tbase };
+      if (p.includes("/card-publish-v2")) return { title: "게시카드 작성", backHref: tbase };
       if (p.includes("/card-publish")) return { title: "카드 발행", backHref: tbase };
       if (p.includes("/settlement/details")) return { title: "정산 상세", backHref: `${tbase}/settlement` };
       if (p.endsWith("/settlement")) return { title: "대회 정산", backHref: "/client/settlement" };

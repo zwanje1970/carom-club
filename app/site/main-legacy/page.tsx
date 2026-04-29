@@ -422,6 +422,14 @@ async function SiteHomePageContent({
     ...(typeof snapshot.cardDescriptionTextColor === "string" && snapshot.cardDescriptionTextColor.trim()
       ? { cardDescriptionTextColor: snapshot.cardDescriptionTextColor.trim() }
       : {}),
+    ...(snapshot.tournamentCardTextShadowEnabled === true ? { cardTextShadowEnabled: true } : {}),
+    ...(snapshot.tournamentCardSurfaceLayout === "full" ? { cardSurfaceLayout: "full" as const } : {}),
+    ...(typeof snapshot.cardFooterDateTextColor === "string" && snapshot.cardFooterDateTextColor.trim()
+      ? { cardFooterDateTextColor: snapshot.cardFooterDateTextColor.trim() }
+      : {}),
+    ...(typeof snapshot.cardFooterPlaceTextColor === "string" && snapshot.cardFooterPlaceTextColor.trim()
+      ? { cardFooterPlaceTextColor: snapshot.cardFooterPlaceTextColor.trim() }
+      : {}),
   }));
   const liveSlideItems = mergeTournamentAndAdSlideDeckItems(
     tournamentSlideDeckItems,

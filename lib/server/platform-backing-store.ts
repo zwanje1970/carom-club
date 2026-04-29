@@ -628,6 +628,8 @@ export function normalizeSlideCardTemplate(v: unknown): SlideCardTemplateKey {
 export type TournamentCardTemplate = "A" | "B";
 export type TournamentCardBackground = "image" | "theme";
 export type TournamentCardTheme = "dark" | "light" | "natural";
+/** 분리형(하단 날짜·장소 띠) / 전체형(배경 위 오버레이) — 미저장·과거 데이터는 분리형 */
+export type TournamentCardSurfaceLayout = "split" | "full";
 
 export type TournamentPublishedCard = {
   snapshotId: string;
@@ -663,6 +665,13 @@ export type TournamentPublishedCard = {
   cardLeadTextColor?: string | null;
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
+  /** 제목·본문 텍스트 그림자(미설정·과거 데이터는 OFF) */
+  cardTextShadowEnabled?: boolean;
+  /** 카드 면 레이아웃(미설정·과거 데이터는 분리형) */
+  cardSurfaceLayout?: TournamentCardSurfaceLayout;
+  /** 전체형: 날짜·장소 글자색(미설정 시 CSS 기본) */
+  cardFooterDateTextColor?: string | null;
+  cardFooterPlaceTextColor?: string | null;
 };
 
 export type PublishedCardSnapshot = {
@@ -692,6 +701,10 @@ export type PublishedCardSnapshot = {
   cardLeadTextColor?: string | null;
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
+  tournamentCardTextShadowEnabled?: boolean;
+  tournamentCardSurfaceLayout?: TournamentCardSurfaceLayout;
+  cardFooterDateTextColor?: string | null;
+  cardFooterPlaceTextColor?: string | null;
   title: string;
   subtitle: string;
   imageId: string;
@@ -2145,9 +2158,9 @@ function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedC
   const t1 = r.textLine1;
   const t2 = r.textLine2;
   const t3 = r.textLine3;
-  const textLine1 = typeof t1 === "string" && t1.trim() ? t1.trim() : null;
-  const textLine2 = typeof t2 === "string" && t2.trim() ? t2.trim() : null;
-  const textLine3 = typeof t3 === "string" && t3.trim() ? t3.trim() : null;
+  const textLine1 = typeof t1 === "string" ? (t1.length > 0 ? t1 : null) : null;
+  const textLine2 = typeof t2 === "string" ? (t2.length > 0 ? t2 : null) : null;
+  const textLine3 = typeof t3 === "string" ? (t3.length > 0 ? t3 : null) : null;
   const image320Url = typeof r.image320Url === "string" ? r.image320Url : "";
   const imageId = typeof r.imageId === "string" ? r.imageId : "";
   const status = typeof r.status === "string" ? r.status : "";
@@ -2215,6 +2228,26 @@ function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedC
   }
   if ("cardDescriptionTextColor" in r) {
     base.cardDescriptionTextColor = normalizeOptionalCardTextColor(r.cardDescriptionTextColor);
+  }
+  if ("cardTextShadowEnabled" in r && typeof r.cardTextShadowEnabled === "boolean") {
+    base.cardTextShadowEnabled = r.cardTextShadowEnabled;
+  }
+  if (r.cardSurfaceLayout === "full") {
+    base.cardSurfaceLayout = "full";
+  }
+  if ("cardFooterDateTextColor" in r) {
+    if (r.cardFooterDateTextColor === null) base.cardFooterDateTextColor = null;
+    else {
+      const fc = normalizeOptionalCardTextColor(r.cardFooterDateTextColor);
+      base.cardFooterDateTextColor = fc;
+    }
+  }
+  if ("cardFooterPlaceTextColor" in r) {
+    if (r.cardFooterPlaceTextColor === null) base.cardFooterPlaceTextColor = null;
+    else {
+      const fp = normalizeOptionalCardTextColor(r.cardFooterPlaceTextColor);
+      base.cardFooterPlaceTextColor = fp;
+    }
   }
   return base;
 }
@@ -4982,7 +5015,6 @@ export async function syncActiveTournamentCardSnapshotStatusBadge(tournamentId: 
     : (await readLocalJsonAggregate()).tournaments.find((t) => t.id === id);
   if (!tournament) return;
   const badge = String(normalizeTournamentStatusBadge(tournament.statusBadge));
-  const showOnMain = tournamentStatusEligibleForMainSlide(badge);
   const now = new Date().toISOString();
   if (cardWs === "firestore-kv") {
     const cur = await loadTournamentPublishedCardsArray();
@@ -4990,7 +5022,7 @@ export async function syncActiveTournamentCardSnapshotStatusBadge(tournamentId: 
     const next = cur.map((c) => {
       if (c.tournamentId === id && c.isActive) {
         changed = true;
-        return { ...c, status: badge, showOnMainSlide: showOnMain, updatedAt: now };
+        return { ...c, status: badge, updatedAt: now };
       }
       return c;
     });
@@ -5002,7 +5034,6 @@ export async function syncActiveTournamentCardSnapshotStatusBadge(tournamentId: 
   for (const c of store.tournamentPublishedCards) {
     if (c.tournamentId === id && c.isActive) {
       c.status = badge;
-      c.showOnMainSlide = showOnMain;
       c.updatedAt = now;
       changed = true;
     }
@@ -7854,9 +7885,9 @@ function tournamentPublishedCardToPublishedSnapshot(
   templateId: string,
   tournamentMeta?: { date: string; location: string } | null
 ): PublishedCardSnapshot {
-  const line1 = t.textLine1?.trim() ?? "";
-  const line2 = t.textLine2?.trim() ?? "";
-  const line3 = t.textLine3?.trim() ?? "";
+  const line1 = t.textLine1 ?? "";
+  const line2 = t.textLine2 ?? "";
+  const line3 = t.textLine3 ?? "";
   const storedDate = typeof t.cardDisplayDate === "string" ? t.cardDisplayDate.trim() : "";
   const storedLoc = typeof t.cardDisplayLocation === "string" ? t.cardDisplayLocation.trim() : "";
   const fbDate = (tournamentMeta?.date ?? "").trim();
@@ -7877,10 +7908,10 @@ function tournamentPublishedCardToPublishedSnapshot(
     tournamentBackgroundType: t.backgroundType,
     tournamentTheme: t.themeType,
     statusBadge: normalizeTournamentStatusBadge(t.status),
-    cardExtraLine1: line1 || null,
-    cardExtraLine2: line2 || null,
-    cardExtraLine3: line3 || null,
-    title: t.title.trim(),
+    cardExtraLine1: line1.length > 0 ? line1 : null,
+    cardExtraLine2: line2.length > 0 ? line2 : null,
+    cardExtraLine3: line3.length > 0 ? line3 : null,
+    title: t.title,
     subtitle,
     imageId: t.imageId,
     image320Url: t.image320Url,
@@ -7895,6 +7926,7 @@ function tournamentPublishedCardToPublishedSnapshot(
     isActive: t.isActive,
     updatedAt: t.updatedAt,
     publishedBy: t.publishedBy,
+    tournamentCardSurfaceLayout: t.cardSurfaceLayout === "full" ? "full" : "split",
   };
   if (typeof t.mediaBackground === "string") {
     snap.tournamentMediaBackground = t.mediaBackground;
@@ -7917,6 +7949,13 @@ function tournamentPublishedCardToPublishedSnapshot(
   if (leadColor) snap.cardLeadTextColor = leadColor;
   if (titleColor) snap.cardTitleTextColor = titleColor;
   if (descColor) snap.cardDescriptionTextColor = descColor;
+  if (t.cardTextShadowEnabled === true) {
+    snap.tournamentCardTextShadowEnabled = true;
+  }
+  const footerDateC = normalizeOptionalCardTextColor(t.cardFooterDateTextColor);
+  const footerPlaceC = normalizeOptionalCardTextColor(t.cardFooterPlaceTextColor);
+  if (footerDateC) snap.cardFooterDateTextColor = footerDateC;
+  if (footerPlaceC) snap.cardFooterPlaceTextColor = footerPlaceC;
   return snap;
 }
 
@@ -7943,13 +7982,13 @@ export async function upsertTournamentPublishedCard(params: {
   cardLeadTextColor?: string | null;
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
-}): Promise<
-  | { ok: true; snapshot: PublishedCardSnapshot }
-  | { ok: false; error: string }
-  | { ok: false; code: "ALREADY_PUBLISHED"; message: string }
-> {
-  const title = params.title.trim();
-  if (!title) return { ok: false, error: "카드 제목을 입력해 주세요." };
+  cardTextShadowEnabled?: boolean;
+  cardSurfaceLayout?: TournamentCardSurfaceLayout;
+  cardFooterDateTextColor?: string | null;
+  cardFooterPlaceTextColor?: string | null;
+}): Promise<{ ok: true; snapshot: PublishedCardSnapshot } | { ok: false; error: string }> {
+  if (!params.title.trim()) return { ok: false, error: "카드 제목을 입력해 주세요." };
+  const title = params.title;
 
   let imageId = params.imageId.trim();
   let image320Url = params.image320Url.trim();
@@ -7981,28 +8020,21 @@ export async function upsertTournamentPublishedCard(params: {
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
 
   const statusStr = String(normalizeTournamentStatusBadge(tournament.statusBadge));
-  const showOnMainSlide = tournamentStatusEligibleForMainSlide(statusStr);
+  const defaultShowOnMainSlide = tournamentStatusEligibleForMainSlide(statusStr);
   const now = new Date().toISOString();
 
   const tid = params.tournamentId.trim();
-  /** 초안 저장: 이전 초안(비활성)만 제거. 게시: 해당 대회 카드 전부 제거 후 새 게시 스냅샷 1건만 둔다. */
+  /** 초안 저장: 이전 초안(비활성)만 제거. 게시: 대회당 카드 1행만 유지(동일 snapshotId·게시일·메인 노출 플래그 보존 후 덮어쓰기). */
   const cards =
     cardWs === "local-json-file" && localStore
       ? localStore.tournamentPublishedCards
       : [...(await loadTournamentPublishedCardsArray())];
 
-  if (!params.draftOnly) {
-    const alreadyOnMain = cards.some(
-      (c) =>
-        c.tournamentId === tid &&
-        c.isPublished === true &&
-        c.isActive === true &&
-        c.showOnMainSlide === true,
-    );
-    if (alreadyOnMain) {
-      return { ok: false, code: "ALREADY_PUBLISHED", message: "이미 게시중입니다." };
-    }
-  }
+  const originalForTid = cards.filter((c) => c.tournamentId === tid);
+  const canonicalPublished =
+    originalForTid.find((c) => c.isPublished && c.isActive) ??
+    [...originalForTid].sort((a, b) => (b.version ?? 0) - (a.version ?? 0))[0] ??
+    null;
 
   if (params.draftOnly) {
     if (cardWs === "local-json-file" && localStore) {
@@ -8024,15 +8056,40 @@ export async function upsertTournamentPublishedCard(params: {
 
   const working = cardWs === "local-json-file" && localStore ? localStore.tournamentPublishedCards : cards;
   const sameTournament = working.filter((c) => c.tournamentId === tid);
-  const nextVersion = sameTournament.reduce((max, c) => Math.max(max, c.version), 0) + 1;
+
+  let nextVersion: number;
+  let snapshotId: string;
+  let publishedAt: string;
+  let showOnMainSlide: boolean;
+  let publishedBy: string;
+  if (params.draftOnly) {
+    nextVersion =
+      sameTournament.reduce((max, c) => Math.max(max, typeof c.version === "number" ? c.version : 0), 0) + 1;
+    snapshotId = randomUUID();
+    publishedAt = now;
+    showOnMainSlide = defaultShowOnMainSlide;
+    publishedBy = params.publishedBy;
+  } else {
+    nextVersion = (canonicalPublished?.version ?? 0) + 1;
+    snapshotId = canonicalPublished?.snapshotId?.trim() || randomUUID();
+    publishedAt = canonicalPublished?.publishedAt?.trim() || now;
+    showOnMainSlide =
+      typeof canonicalPublished?.showOnMainSlide === "boolean"
+        ? canonicalPublished.showOnMainSlide
+        : defaultShowOnMainSlide;
+    publishedBy = canonicalPublished?.publishedBy?.trim() || params.publishedBy;
+  }
 
   const row: TournamentPublishedCard = {
-    snapshotId: randomUUID(),
+    snapshotId,
     tournamentId: params.tournamentId.trim(),
     title,
-    textLine1: params.textLine1?.trim() ? params.textLine1.trim() : null,
-    textLine2: params.textLine2?.trim() ? params.textLine2.trim() : null,
-    textLine3: params.textLine3?.trim() ? params.textLine3.trim() : null,
+    textLine1:
+      params.textLine1 != null && params.textLine1.length > 0 ? params.textLine1 : null,
+    textLine2:
+      params.textLine2 != null && params.textLine2.length > 0 ? params.textLine2 : null,
+    textLine3:
+      params.textLine3 != null && params.textLine3.length > 0 ? params.textLine3 : null,
     templateType: params.templateType,
     backgroundType: params.backgroundType,
     themeType: params.themeType,
@@ -8040,12 +8097,12 @@ export async function upsertTournamentPublishedCard(params: {
     imageId,
     status: statusStr,
     targetDetailUrl,
-    publishedAt: now,
+    publishedAt,
     updatedAt: now,
     isPublished: true,
     isActive: !params.draftOnly,
     version: nextVersion,
-    publishedBy: params.publishedBy,
+    publishedBy,
     showOnMainSlide,
     deadlineSortValue: typeof tournament.date === "string" && tournament.date.trim() ? tournament.date : "9999-12-31",
   };
@@ -8070,6 +8127,20 @@ export async function upsertTournamentPublishedCard(params: {
   if (leadC) row.cardLeadTextColor = leadC;
   if (titleC) row.cardTitleTextColor = titleC;
   if (descC) row.cardDescriptionTextColor = descC;
+  row.cardTextShadowEnabled = params.cardTextShadowEnabled === true;
+  row.cardSurfaceLayout = params.cardSurfaceLayout === "full" ? "full" : "split";
+  if (params.cardFooterDateTextColor !== undefined) {
+    row.cardFooterDateTextColor =
+      params.cardFooterDateTextColor === null
+        ? null
+        : normalizeOptionalCardTextColor(params.cardFooterDateTextColor);
+  }
+  if (params.cardFooterPlaceTextColor !== undefined) {
+    row.cardFooterPlaceTextColor =
+      params.cardFooterPlaceTextColor === null
+        ? null
+        : normalizeOptionalCardTextColor(params.cardFooterPlaceTextColor);
+  }
 
   working.push(row);
   if (cardWs === "firestore-kv") {

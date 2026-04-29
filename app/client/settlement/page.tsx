@@ -117,7 +117,7 @@ export default function ClientSettlementHubPage() {
           position: "sticky",
           top: 0,
           zIndex: 2,
-          background: "#f8fafc",
+          background: "var(--ui-bg-page)",
           paddingBottom: "0.5rem",
           marginBottom: "-0.25rem",
         }}
