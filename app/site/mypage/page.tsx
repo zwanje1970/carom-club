@@ -1,4 +1,5 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { isCaromClubMobileAppShell } from "../../../lib/is-carom-club-mobile-app-shell";
 import { redirect } from "next/navigation";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../lib/auth/session";
 import { getUserById } from "../../../lib/surface-read";
@@ -17,9 +18,13 @@ export default async function SiteMypagePage() {
     redirect("/login?next=/site/mypage");
   }
 
+  const headerList = await headers();
+  const hidePlatformDashboardLink = isCaromClubMobileAppShell(headerList);
+
   return (
     <SiteShellFrame brandTitle="마이페이지">
       <SiteMypageClient
+        hidePlatformDashboardLink={hidePlatformDashboardLink}
         user={{
           id: user.id,
           name: user.name,

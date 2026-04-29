@@ -369,7 +369,7 @@ export default function PlatformMainSlideAdsPage() {
     setAds((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
-  function removeAd(index: number) {
+  function removeAdFromState(index: number) {
     const id = ads[index]?.id;
     setAds((prev) => prev.filter((_, i) => i !== index));
     if (id) {
@@ -383,6 +383,30 @@ export default function PlatformMainSlideAdsPage() {
         delete next[id];
         return next;
       });
+    }
+  }
+
+  async function handleSoftDeleteAd(index: number) {
+    const row = ads[index];
+    if (!row?.id) return;
+    if (!confirm("삭제하면 백업함으로 이동하며 복구할 수 있습니다.")) return;
+    try {
+      const res = await fetch(`/api/platform/main-slide-ads/${encodeURIComponent(row.id)}`, {
+        method: "DELETE",
+        cache: "no-store",
+      });
+      if (res.status === 404) {
+        removeAdFromState(index);
+        return;
+      }
+      if (!res.ok) {
+        setMessage("광고 삭제에 실패했습니다.");
+        return;
+      }
+      removeAdFromState(index);
+      setMessage("광고를 백업함으로 옮겼습니다. 메인·목록에서 즉시 숨겨집니다.");
+    } catch {
+      setMessage("광고 삭제 중 오류가 발생했습니다.");
     }
   }
 
@@ -426,6 +450,8 @@ export default function PlatformMainSlideAdsPage() {
     <main className="v3-page v3-stack">
       <p className="v3-muted">
         <Link href="/platform/site">← 사이트 관리</Link>
+        {" · "}
+        <Link href="/platform/data/deleted">삭제된 항목 (백업함)</Link>
       </p>
       <h1 className="v3-h1">메인 슬라이드 광고</h1>
       <p className="v3-muted">메인 홈 슬라이드에 삽입되는 광고 카드와 삽입 규칙을 관리합니다.</p>
@@ -547,8 +573,8 @@ export default function PlatformMainSlideAdsPage() {
               <span className="v3-muted" style={{ fontSize: "0.85rem" }}>
                 id: {row.id}
               </span>
-              <button className="v3-btn" type="button" disabled={loading} onClick={() => removeAd(index)}>
-                삭제
+              <button className="v3-btn" type="button" disabled={loading} onClick={() => void handleSoftDeleteAd(index)}>
+                삭제(백업함 이동)
               </button>
             </div>
             <label className="v3-stack">

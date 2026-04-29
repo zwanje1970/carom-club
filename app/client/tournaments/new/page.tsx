@@ -855,16 +855,16 @@ export default function ClientTournamentNewPage() {
       {showCreateDone && createSuccessId ? (
         <section className={`${adminUi.surface} v3-stack`} style={{ gap: "0.75rem" }}>
           <p style={{ margin: 0 }}>
-            <strong>대회가 생성되었습니다.</strong> 메인 화면에 노출할 <strong>대회 카드</strong>를 발행하려면 아래에서 이동할 수
-            있습니다.
+            <strong>대회가 생성되었습니다.</strong> 메인에 올릴 <strong>게시카드</strong>를 만든 뒤 「메인에 게시하기」를 누르면
+            됩니다.
           </p>
           <p className="v3-muted" style={{ margin: 0, lineHeight: 1.5 }}>
-            지금 바로 가지 않아도 됩니다. 대회는 목록·상세에 그대로 남아 있으며, 원할 때 대회 상세의 「게시카드 작성」에서도
-            진행할 수 있습니다.
+            지금 바로 가지 않아도 됩니다. 대회는 목록·상세에 그대로 남으며, 대회 상세의 「게시카드 작성·수정」에서도 같은
+            흐름으로 진행할 수 있습니다. 이미 게시된 카드가 있으면 새로 만들지 않고 기존 카드에 반영됩니다.
           </p>
           <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
             <Link className="v3-btn" href={`/client/tournaments/${createSuccessId}/card-publish-v2`}>
-              대회카드 발행 페이지로 이동
+              게시카드 작성·수정으로 이동
             </Link>
             <Link className="v3-btn" href={`/client/tournaments/${createSuccessId}`}>
               상세 보기

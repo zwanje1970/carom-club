@@ -1,0 +1,42 @@
+/* /site 메인 MainSiteScrollCards 전용 — main-sample 경로는 미사용 */
+
+.viewportMarquee {
+  container-type: size;
+  container-name: site-main-marquee;
+}
+
+.segmentNoShrink {
+  flex-shrink: 0;
+}
+
+.segmentRelativeForDim {
+  position: relative;
+}
+
+.marqueeDimLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.marqueeDimLayerVisible {
+  opacity: 1;
+}
+
+.leadInSpacer {
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
+  pointer-events: none;
+  /* 뷰포트 높이 기준으로 카드가 아래쪽에서 올라오도록 상단 여백(양 세그먼트 동일 복제 → -50% 루프 유지) */
+  min-height: max(6rem, calc(100cqh - var(--sample-main-card-height) - 2.75rem));
+}
+
+.trackWillChange {
+  will-change: transform;
+}

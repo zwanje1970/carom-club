@@ -57,7 +57,7 @@ function isCompleteCard(s: CardSnapshotRow | null | undefined): s is CardSnapsho
 
 /**
  * 목록은 최신순(서버). 게시 시 본문은 마지막으로 저장한 초안(`isActive !== true`)을 우선하고,
- * 없으면 현재 게시 중인 카드로 재게시한다.
+ * 없으면 현재 메인에 올라간 카드 내용으로 다시 게시(갱신)한다.
  */
 function pickCardForPublish(data: {
   snapshots?: CardSnapshotRow[];
@@ -72,15 +72,6 @@ function pickCardForPublish(data: {
   return null;
 }
 
-/** 대회 상세에서만 사용 — 모집중일 때만 게시 허용 */
-function getDetailPublishBlockedMessage(status: string): string | null {
-  const s = status.trim();
-  if (s === "모집중") return null;
-  if (s === "초안") return "초안은 게시할 수 없습니다.";
-  if (s === "예정") return "예정은 게시할 수 없습니다.";
-  return "이 상태에서는 게시할 수 없습니다.";
-}
-
 export default function TournamentBadgeCardManageRow({
   tournamentId,
   initialStatus,
@@ -93,10 +84,30 @@ export default function TournamentBadgeCardManageRow({
   const [busy, setBusy] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
   const publishRunningRef = useRef(false);
+  /** 메인에 노출 중인 게시카드가 있는지(대회당 1개 유지·재게시 시 덮어쓰기) */
+  const [hasLivePublishedCard, setHasLivePublishedCard] = useState(false);
 
   useEffect(() => {
     setValue(initialStatus);
   }, [initialStatus]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/client/card-snapshots?tournamentId=${encodeURIComponent(tournamentId)}`);
+        const data = (await res.json()) as { activeSnapshot?: unknown; error?: string };
+        if (!cancelled && res.ok) {
+          setHasLivePublishedCard(Boolean(data.activeSnapshot));
+        }
+      } catch {
+        if (!cancelled) setHasLivePublishedCard(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tournamentId]);
 
   async function applyBadge(next: TournamentStatusBadge) {
     const prev = value;
@@ -124,11 +135,6 @@ export default function TournamentBadgeCardManageRow({
   }
 
   function requestCardPublish() {
-    const blocked = getDetailPublishBlockedMessage(value);
-    if (blocked) {
-      window.alert(blocked);
-      return;
-    }
     if (publishRunningRef.current) return;
     publishRunningRef.current = true;
 
@@ -145,6 +151,7 @@ export default function TournamentBadgeCardManageRow({
           window.alert(data.error ?? "카드 정보를 불러오지 못했습니다.");
           return;
         }
+        const hadPublishedBefore = Boolean(data.activeSnapshot);
         const latest = pickCardForPublish(data);
         if (!latest) {
           window.alert("저장된 카드를 찾을 수 없습니다. 게시카드 작성에서 저장해 주세요.");
@@ -219,7 +226,12 @@ export default function TournamentBadgeCardManageRow({
           window.alert(postData.error ?? "게시에 실패했습니다.");
           return;
         }
-        window.alert("게시되었습니다. 사이트에 반영되었습니다.");
+        setHasLivePublishedCard(true);
+        window.alert(
+          hadPublishedBefore
+            ? "게시카드가 갱신되어 메인에 반영되었습니다."
+            : "메인에 게시되었습니다. 사이트에 반영되었습니다.",
+        );
         router.refresh();
       } catch {
         window.alert("처리 중 오류가 발생했습니다.");
@@ -231,6 +243,7 @@ export default function TournamentBadgeCardManageRow({
   }
 
   return (
+    <>
     <div
       className="v3-row"
       style={{
@@ -274,7 +287,7 @@ export default function TournamentBadgeCardManageRow({
           onClick={() => requestCardPublish()}
           style={{ alignSelf: "flex-end" }}
         >
-          {publishBusy ? "게시 중…" : "카드게시"}
+          {publishBusy ? "처리 중…" : hasLivePublishedCard ? "게시카드 수정 반영" : "메인에 게시하기"}
         </button>
       </div>
       <Link
@@ -282,15 +295,12 @@ export default function TournamentBadgeCardManageRow({
         href={`/client/tournaments/${tournamentId}/card-publish-v2`}
         style={{ alignSelf: "flex-end", marginLeft: "auto", flexShrink: 0 }}
       >
-        게시카드 작성
-      </Link>
-      <Link
-        className="v3-btn"
-        href={`/client/tournaments/${tournamentId}/card-publish`}
-        style={{ alignSelf: "flex-end", flexShrink: 0 }}
-      >
-        게시카드(구)
+        게시카드 작성·수정
       </Link>
     </div>
+    <p className="v3-muted" style={{ margin: "0.35rem 0 0", fontSize: "0.85rem", maxWidth: "42rem" }}>
+      이미 게시된 카드가 있으면 새로 만들지 않고 기존 카드에 반영됩니다. 대회당 메인 게시카드는 1개입니다.
+    </p>
+    </>
   );
 }

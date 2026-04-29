@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { useCallback, useLayoutEffect, useRef } from "react";
 import { TournamentStatusBadge, type TournamentPostStatus } from "./tournament-slide-card-status-badge";
 import styles from "./tournament-slide-card-previews.module.css";
 
@@ -120,6 +121,7 @@ function MediaStack({
   repImageHighPriority,
   slideDeckSolidBackdrop,
   mainSlideAd,
+  onRepImageLoad,
 }: {
   variant: SlidePreviewVariant;
   item: TournamentSlidePreviewItem;
@@ -130,6 +132,7 @@ function MediaStack({
   slideDeckSolidBackdrop?: string;
   /** 메인 슬라이드 광고 카드 — 텍스트 없음·상태배지 대신 AD 문자만 */
   mainSlideAd?: boolean;
+  onRepImageLoad?: () => void;
 }) {
   const solidBackdrop = slideDeckSolidBackdrop?.trim();
   const cssBg = item.mediaBackground?.trim();
@@ -146,11 +149,31 @@ function MediaStack({
     .filter(Boolean)
     .join(" ");
 
+  const heroImgRef = useRef<HTMLImageElement | null>(null);
+  const repLoadFiredRef = useRef(false);
+  const fireRepImageLoad = useCallback(() => {
+    if (!onRepImageLoad || !repImageHighPriority) return;
+    if (repLoadFiredRef.current) return;
+    repLoadFiredRef.current = true;
+    onRepImageLoad();
+  }, [onRepImageLoad, repImageHighPriority]);
+
+  useLayoutEffect(() => {
+    repLoadFiredRef.current = false;
+    if (!repImageHighPriority || !imgUrl || !onRepImageLoad) return;
+    const id = requestAnimationFrame(() => {
+      const el = heroImgRef.current;
+      if (el?.complete) fireRepImageLoad();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [repImageHighPriority, imgUrl, onRepImageLoad, fireRepImageLoad]);
+
   return (
     <div className={styles.media}>
       <div className={paintClass} style={paintBg ? { background: paintBg } : undefined} aria-hidden />
       {imgUrl ? (
         <img
+          ref={repImageHighPriority ? heroImgRef : undefined}
           className={styles.bg}
           style={overlayBlend ? { opacity: overlayOpacity } : { opacity: 1 }}
           src={imgUrl}
@@ -158,6 +181,7 @@ function MediaStack({
           loading={repImageHighPriority ? "eager" : "lazy"}
           decoding="async"
           {...(repImageHighPriority ? { fetchPriority: "high" as const } : {})}
+          onLoad={repImageHighPriority && onRepImageLoad ? fireRepImageLoad : undefined}
         />
       ) : null}
       <div className={styles.statusBadgeWrap}>
@@ -184,6 +208,7 @@ function TournamentSlideCardPreview({
   slideDeckSolidBackdrop,
   mainSlideAd,
   tournamentPublishedHeightScale = true,
+  onRepImageLoad,
 }: {
   item: TournamentSlidePreviewItem;
   variant: SlidePreviewVariant;
@@ -197,6 +222,7 @@ function TournamentSlideCardPreview({
   mainSlideAd?: boolean;
   /** 대회·광고 슬라이드 카드 동일 높이 스케일 */
   tournamentPublishedHeightScale?: boolean;
+  onRepImageLoad?: () => void;
 }) {
   const status = toStatus(item.statusBadge);
   const parsed = parseSubtitle(item.subtitle);
@@ -254,6 +280,7 @@ function TournamentSlideCardPreview({
           repImageHighPriority={repImageHighPriority}
           slideDeckSolidBackdrop={slideDeckSolidBackdrop}
           mainSlideAd={mainSlideAd}
+          onRepImageLoad={onRepImageLoad}
         >
           {mainSlideAd ? (
             <div className={styles.adCardMediaFill} aria-hidden />
@@ -306,6 +333,7 @@ function TournamentSlideCardPreview({
           repImageHighPriority={repImageHighPriority}
           slideDeckSolidBackdrop={slideDeckSolidBackdrop}
           mainSlideAd={mainSlideAd}
+          onRepImageLoad={onRepImageLoad}
         >
           {mainSlideAd ? (
             <div className={styles.adCardMediaFill} aria-hidden />
@@ -362,12 +390,14 @@ export function TournamentSnapshotCardView({
   templateCardLayout = false,
   repImageHighPriority,
   slideDeckSolidBackdrop,
+  onRepImageLoad,
 }: {
   item: SlideDeckItem;
   slideDeck?: boolean;
   templateCardLayout?: boolean;
   repImageHighPriority?: boolean;
   slideDeckSolidBackdrop?: string;
+  onRepImageLoad?: () => void;
 }) {
   const previewItem = slideDeckItemToPreviewItem(item);
   const variant: SlidePreviewVariant = item.cardTemplate === "B" ? "frame" : "classic";
@@ -383,6 +413,7 @@ export function TournamentSnapshotCardView({
       slideDeckSolidBackdrop={slideDeckSolidBackdrop}
       mainSlideAd={item.type === "ad"}
       tournamentPublishedHeightScale={true}
+      onRepImageLoad={onRepImageLoad}
     />
   );
   if (!href) return inner;
@@ -442,10 +473,12 @@ export function SlideDeckCard({
   item,
   repImageHighPriority,
   slideDeckSolidBackdrop,
+  onRepImageLoad,
 }: {
   item: SlideDeckItem;
   repImageHighPriority?: boolean;
   slideDeckSolidBackdrop?: string;
+  onRepImageLoad?: () => void;
 }) {
   return (
     <TournamentSnapshotCardView
@@ -454,6 +487,7 @@ export function SlideDeckCard({
       templateCardLayout
       repImageHighPriority={repImageHighPriority}
       slideDeckSolidBackdrop={slideDeckSolidBackdrop}
+      onRepImageLoad={onRepImageLoad}
     />
   );
 }

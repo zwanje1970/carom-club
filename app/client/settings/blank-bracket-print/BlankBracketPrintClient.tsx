@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { createPortal } from "react-dom";
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
 import { buildBracketScene, buildStartPairLabels, type StartPairLabel } from "./bracket-render-engine";
 
 /**
@@ -347,6 +345,10 @@ export default function BlankBracketPrintClient() {
     pdfBusyRef.current = true;
     setPdfExporting(true);
     try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
       console.info("[blank-bracket-print] html2canvas start");
       const canvas = await html2canvas(root, {
         scale: 3,
@@ -507,13 +509,11 @@ export default function BlankBracketPrintClient() {
 
   const previewStageIsZoomed = previewScale > previewFitScale + 0.001;
   const pdfDownloadButtonLabel =
-    pdfDownloadConfirmDone
-      ? "닫기"
-      : pdfDownloadStatus === "downloading"
-        ? "다운로드 중..."
-        : pdfDownloadStatus === "failed"
-            ? "다운로드 다시 시도"
-            : "PDF 다운로드";
+    pdfDownloadStatus === "downloading"
+      ? "다운로드 중..."
+      : pdfDownloadStatus === "failed"
+          ? "다운로드 다시 시도"
+          : "PDF 다운로드";
 
   return (
     <>
@@ -885,7 +885,7 @@ export default function BlankBracketPrintClient() {
       {pdfDownloadUrl && typeof document !== "undefined"
         ? createPortal(
             <div className="bbp-pdf-download-dock" role="region" aria-label="PDF 다운로드">
-              {pdfDownloadStatus === "saved" ? (
+              {pdfDownloadStatus === "saved" || (pdfDownloadStatus === "ready" && pdfDownloadConfirmDone) ? (
                 <p style={{ margin: 0, fontSize: "0.9rem", color: "#374151", fontWeight: 600 }}>
                   다운로드가 완료되었습니다. 파일 앱에서 확인하세요.
                 </p>
@@ -902,10 +902,6 @@ export default function BlankBracketPrintClient() {
                       className="ui-btn-primary-solid"
                       disabled={pdfDownloadStatus === "downloading"}
                       onClick={() => {
-                        if (pdfDownloadConfirmDone) {
-                          setPdfDownloadModalOpen(false);
-                          return;
-                        }
                         console.info("download button clicked → open confirm modal");
                         setPdfDownloadModalOpen(true);
                       }}

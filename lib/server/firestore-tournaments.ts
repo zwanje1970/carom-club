@@ -1,3 +1,4 @@
+import * as admin from "firebase-admin";
 import { randomUUID } from "crypto";
 import { AuthRole } from "../auth/roles";
 import { cacheTagTournamentById } from "../cache-tags";
@@ -12,6 +13,7 @@ import type {
   TournamentRuleSnapshot,
   TournamentStatusBadge,
 } from "./platform-backing-store";
+import { isEntityLifecycleVisibleForList } from "./entity-lifecycle";
 import {
   buildTournamentFromParsedRow,
   finalizeTournamentDates,
@@ -56,6 +58,10 @@ function tournamentToFirestorePlain(t: Tournament): Record<string, unknown> {
     rule: t.rule,
   };
   if (t.devSeedSource != null) base.devSeedSource = t.devSeedSource;
+  if (t.status === "ACTIVE" || t.status === "DELETED") base.status = t.status;
+  if (typeof t.deletedAt === "string" && t.deletedAt.trim() !== "") base.deletedAt = t.deletedAt.trim();
+  if (typeof t.deletedBy === "string" && t.deletedBy.trim() !== "") base.deletedBy = t.deletedBy.trim();
+  if (typeof t.deleteReason === "string") base.deleteReason = t.deleteReason;
   return base;
 }
 
@@ -106,7 +112,8 @@ export async function listTournamentsByCreatorFirestore(userId: string): Promise
   const out: Tournament[] = [];
   for (const doc of q.docs) {
     const t = buildTournamentFromParsedRow({ id: doc.id, ...doc.data() }, orgs);
-    out.push(await normalizeTournament(t, undefined, orgs));
+    const n = await normalizeTournament(t, undefined, orgs);
+    if (isEntityLifecycleVisibleForList(n.status)) out.push(n);
   }
   out.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return out;
@@ -120,8 +127,10 @@ export async function listAllTournamentsFirestore(): Promise<Tournament[]> {
   const out: Tournament[] = [];
   for (const doc of q.docs) {
     const t = buildTournamentFromParsedRow({ id: doc.id, ...doc.data() }, orgs);
-    out.push(await normalizeTournament(t, undefined, orgs));
+    const n = await normalizeTournament(t, undefined, orgs);
+    if (isEntityLifecycleVisibleForList(n.status)) out.push(n);
   }
+  out.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return out;
 }
 
@@ -364,7 +373,16 @@ export async function deleteTournamentFirestore(params: {
 
   const id = params.tournamentId.trim();
   const db = getSharedFirestoreDb();
-  await db.collection(COLLECTION).doc(id).delete();
+  const now = new Date().toISOString();
+  await db.collection(COLLECTION).doc(id).set(
+    {
+      status: "DELETED",
+      deletedAt: now,
+      deletedBy: params.actorUserId.trim(),
+      deleteReason: "",
+    },
+    { merge: true },
+  );
   revalidatePublicTournamentCache(id);
   return { ok: true };
 }
@@ -386,4 +404,95 @@ export async function assertClientCanManageTournamentFirestore(params: {
     return { ok: false, error: "접근 권한이 없습니다.", httpStatus: 403 };
   }
   return { ok: true, tournament };
+}
+
+/** 소프트 삭제: 문서는 유지하고 status·삭제 메타만 기록한다. */
+export async function softDeleteTournamentDocumentFirestore(params: {
+  tournamentId: string;
+  deletedBy: string;
+  deleteReason?: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const id = params.tournamentId.trim();
+  if (!id) return { ok: false, error: "잘못된 요청입니다." };
+  const db = getSharedFirestoreDb();
+  const ref = db.collection(COLLECTION).doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) return { ok: false, error: "대회를 찾을 수 없습니다." };
+  const now = new Date().toISOString();
+  await ref.set(
+    {
+      status: "DELETED",
+      deletedAt: now,
+      deletedBy: params.deletedBy.trim(),
+      deleteReason: typeof params.deleteReason === "string" ? params.deleteReason : "",
+    },
+    { merge: true },
+  );
+  revalidatePublicTournamentCache(id);
+  return { ok: true };
+}
+
+/** 백업함: 소프트 삭제된 대회만 */
+export async function listDeletedTournamentsFirestore(): Promise<Tournament[]> {
+  assertClientFirestorePersistenceConfigured();
+  const db = getSharedFirestoreDb();
+  const orgs = await loadResolutionOrgs();
+  const q = await db.collection(COLLECTION).orderBy("createdAt", "desc").get();
+  const out: Tournament[] = [];
+  for (const doc of q.docs) {
+    const t = buildTournamentFromParsedRow({ id: doc.id, ...doc.data() }, orgs);
+    const n = await normalizeTournament(t, undefined, orgs);
+    if (n.status === "DELETED") out.push(n);
+  }
+  out.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return out;
+}
+
+export async function restoreTournamentDocumentFirestore(
+  tournamentId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const id = tournamentId.trim();
+  if (!id) return { ok: false, error: "잘못된 요청입니다." };
+  const db = getSharedFirestoreDb();
+  const ref = db.collection(COLLECTION).doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) return { ok: false, error: "대회를 찾을 수 없습니다." };
+  const raw = snap.data() as Record<string, unknown> | undefined;
+  if (raw?.status !== "DELETED") {
+    return { ok: false, error: "백업함에 있는 삭제된 대회만 복구할 수 있습니다." };
+  }
+  const FV = admin.firestore.FieldValue;
+  await ref.set(
+    {
+      status: "ACTIVE",
+      deletedAt: FV.delete(),
+      deletedBy: FV.delete(),
+      deleteReason: FV.delete(),
+    },
+    { merge: true },
+  );
+  revalidatePublicTournamentCache(id);
+  return { ok: true };
+}
+
+/** 백업함에서만: 문서 물리 삭제 */
+export async function permanentlyDeleteTournamentDocumentFirestore(
+  tournamentId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const id = tournamentId.trim();
+  if (!id) return { ok: false, error: "잘못된 요청입니다." };
+  const db = getSharedFirestoreDb();
+  const ref = db.collection(COLLECTION).doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) return { ok: false, error: "대회를 찾을 수 없습니다." };
+  const raw = snap.data() as Record<string, unknown> | undefined;
+  if (raw?.status !== "DELETED") {
+    return { ok: false, error: "백업함에 있는 삭제된 대회만 완전 삭제할 수 있습니다." };
+  }
+  await ref.delete();
+  revalidatePublicTournamentCache(id);
+  return { ok: true };
 }

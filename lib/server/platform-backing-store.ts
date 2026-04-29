@@ -3,7 +3,13 @@ import { copyFile, mkdir, open, readFile, readdir, rename, stat, unlink, writeFi
 import path from "path";
 import { fileURLToPath } from "url";
 import { AuthRole } from "../auth/roles";
-import { CACHE_TAG_SITE_COMMUNITY_CONFIG, CACHE_TAG_SITE_LAYOUT_CONFIG } from "../cache-tags";
+import {
+  CACHE_TAG_SITE_COMMUNITY_CONFIG,
+  CACHE_TAG_SITE_LAYOUT_CONFIG,
+  CACHE_TAG_SITE_NOTICE,
+  CACHE_TAG_MAIN_SLIDE_ADS,
+  CACHE_TAG_MAIN_SLIDE_SNAPSHOTS,
+} from "../cache-tags";
 import { revalidateSiteDataTag } from "../revalidate-site-data-tag";
 import { normalizeRepresentativeImageUrls, parseTypeSpecific, resolveVenuePricingType } from "../client-organization-setup-parse";
 import type { VenuePricingType, VenueSpecific } from "../client-organization-setup-types";
@@ -110,6 +116,7 @@ import {
   upsertMainSlideAdsToFirestoreKv,
   upsertMainSlideAdConfigToFirestoreKv,
 } from "./platform-main-slide-ad-settings";
+import { isEntityLifecycleVisibleForList, normalizeEntityLifecycleStatus } from "./entity-lifecycle";
 import {
   ClientFirestoreUnavailableError,
   createClientApplicationFirestore,
@@ -393,6 +400,11 @@ export type Tournament = {
   devSeedSource?: string | null;
   /** 없는 구 데이터는 로드 시 기본값으로 채움 */
   rule: TournamentRuleSnapshot;
+  /** 소프트 삭제 라이프사이클. 미설정은 ACTIVE로 간주(목록·공개 상세에서 DELETED 제외). */
+  status?: "ACTIVE" | "DELETED";
+  deletedAt?: string | null;
+  deletedBy?: string | null;
+  deleteReason?: string | null;
 };
 
 export type TournamentApplicationStatus =
@@ -563,6 +575,11 @@ export type CommunityBoardPost = {
   viewCount: number;
   commentCount: number;
   isDeleted?: boolean;
+  /** 소프트 삭제. 미설정은 ACTIVE */
+  status?: "ACTIVE" | "DELETED";
+  deletedAt?: string | null;
+  deletedBy?: string | null;
+  deleteReason?: string | null;
 };
 
 /** 목록 조회 전용(가벼운 필드) */
@@ -672,6 +689,11 @@ export type TournamentPublishedCard = {
   /** 전체형: 날짜·장소 글자색(미설정 시 CSS 기본) */
   cardFooterDateTextColor?: string | null;
   cardFooterPlaceTextColor?: string | null;
+  /** 소프트 삭제. `status` 필드(대회 표시 문자열)와 별개 */
+  lifecycleStatus?: "ACTIVE" | "DELETED";
+  deletedAt?: string | null;
+  deletedBy?: string | null;
+  deleteReason?: string | null;
 };
 
 export type PublishedCardSnapshot = {
@@ -953,7 +975,6 @@ const DEFAULT_PLATFORM_ADMIN_NAME = "플랫폼 관리자";
 function createDefaultSiteLayoutConfig(): SiteLayoutConfig {
   const defaultMenuItems: SiteLayoutMenuItem[] = [
     { label: "메인", href: "/site" },
-    { label: "메인(구)", href: "/site/main-legacy" },
     { label: "대회안내", href: "/site/tournaments" },
     { label: "당구장안내", href: "/site/venues" },
     { label: "커뮤니티", href: "/site/community" },
@@ -1287,6 +1308,12 @@ function normalizeCommunityBoardPostRow(row: unknown): CommunityBoardPost | null
   const isDeleted = r.isDeleted === true;
   const imageUrls = normalizeCommunityPostImageUrls(r.imageUrls);
   const imageSizeLevels = normalizeCommunityPostImageSizeLevels(imageUrls.length, r.imageSizeLevels);
+  const postLifecycle: "ACTIVE" | "DELETED" = r.status === "DELETED" ? "DELETED" : "ACTIVE";
+  const deletedAt =
+    typeof r.deletedAt === "string" && r.deletedAt.trim() !== "" ? r.deletedAt.trim() : undefined;
+  const deletedBy =
+    typeof r.deletedBy === "string" && r.deletedBy.trim() !== "" ? r.deletedBy.trim() : undefined;
+  const deleteReason = typeof r.deleteReason === "string" ? r.deleteReason : undefined;
   return {
     id,
     boardType: boardTypeRaw,
@@ -1301,7 +1328,15 @@ function normalizeCommunityBoardPostRow(row: unknown): CommunityBoardPost | null
     viewCount,
     commentCount,
     isDeleted,
+    status: postLifecycle,
+    ...(deletedAt ? { deletedAt } : {}),
+    ...(deletedBy ? { deletedBy } : {}),
+    ...(deleteReason !== undefined && deleteReason !== "" ? { deleteReason } : {}),
   };
+}
+
+function isCommunityBoardPostListed(p: CommunityBoardPost): boolean {
+  return isEntityLifecycleVisibleForList(p.status, { legacyIsDeleted: p.isDeleted === true });
 }
 
 function ensureCommunityPostsArray(store: DevStore): void {
@@ -1876,6 +1911,15 @@ export function buildTournamentFromParsedRow(raw: unknown, clientOrganizations: 
   const devSeedSource =
     typeof dsRaw === "string" && dsRaw.trim() !== "" ? dsRaw.trim() : null;
 
+  const docLifeRaw = t.status;
+  const docLifecycle: "ACTIVE" | "DELETED" =
+    docLifeRaw === "DELETED" || docLifeRaw === "ACTIVE" ? docLifeRaw : "ACTIVE";
+  const deletedAt =
+    typeof t.deletedAt === "string" && t.deletedAt.trim() !== "" ? t.deletedAt.trim() : undefined;
+  const deletedBy =
+    typeof t.deletedBy === "string" && t.deletedBy.trim() !== "" ? t.deletedBy.trim() : undefined;
+  const deleteReason = typeof t.deleteReason === "string" ? t.deleteReason : undefined;
+
   return {
     id,
     title,
@@ -1898,6 +1942,10 @@ export function buildTournamentFromParsedRow(raw: unknown, clientOrganizations: 
     venueGuideVenueId,
     ...(devSeedSource ? { devSeedSource } : {}),
     rule,
+    status: docLifecycle,
+    ...(deletedAt ? { deletedAt } : {}),
+    ...(deletedBy ? { deletedBy } : {}),
+    ...(deleteReason !== undefined && deleteReason !== "" ? { deleteReason } : {}),
   };
 }
 
@@ -2249,6 +2297,12 @@ function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedC
       base.cardFooterPlaceTextColor = fp;
     }
   }
+  base.lifecycleStatus = normalizeEntityLifecycleStatus(r.lifecycleStatus);
+  const lcDelAt = r.deletedAt;
+  if (typeof lcDelAt === "string" && lcDelAt.trim() !== "") base.deletedAt = lcDelAt.trim();
+  const lcDelBy = r.deletedBy;
+  if (typeof lcDelBy === "string" && lcDelBy.trim() !== "") base.deletedBy = lcDelBy.trim();
+  if (typeof r.deleteReason === "string" && r.deleteReason !== "") base.deleteReason = r.deleteReason;
   return base;
 }
 
@@ -4678,7 +4732,9 @@ export async function listTournamentsByCreator(userId: string): Promise<Tourname
   const filtered = store.tournaments.filter((item) => item.createdBy === canonicalUserId);
   const venueOrgs = await getVenueGuideResolutionOrgs(store);
   const normalized = await Promise.all(filtered.map((item) => normalizeTournament(item, store, venueOrgs)));
-  return normalized.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return normalized
+    .filter((t) => isEntityLifecycleVisibleForList(t.status))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function listAllTournaments(): Promise<Tournament[]> {
@@ -4687,7 +4743,9 @@ export async function listAllTournaments(): Promise<Tournament[]> {
   const normalized = await Promise.all(
     store.tournaments.slice().map((item) => normalizeTournament(item, store, venueOrgs))
   );
-  return normalized.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return normalized
+    .filter((t) => isEntityLifecycleVisibleForList(t.status))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 /** 대회 `date` 필드를 YYYY-MM-DD로 통일(기간 필터, v2 startAt 대응) */
@@ -4946,21 +5004,17 @@ export async function deleteTournament(params: {
 
   const id = params.tournamentId.trim();
   const store = await readLocalJsonAggregate();
-  store.tournaments = store.tournaments.filter((t) => t.id !== id);
-  store.tournamentApplications = store.tournamentApplications.filter((a) => a.tournamentId !== id);
-  store.bracketParticipantSnapshots = store.bracketParticipantSnapshots.filter((s) => s.tournamentId !== id);
-  store.brackets = store.brackets.filter((b) => b.tournamentId !== id);
-  store.settlements = store.settlements.filter((s) => s.tournamentId !== id);
-  store.publishedCardSnapshots = store.publishedCardSnapshots.filter(
-    (s) => !(s.tournamentId === id && s.snapshotSourceType === "TOURNAMENT_SNAPSHOT")
-  );
-  store.tournamentPublishedCards = store.tournamentPublishedCards.filter((c) => c.tournamentId !== id);
-  store.notifications = store.notifications.filter((n) => n.relatedTournamentId !== id);
-  const cardWs = resolveTournamentPublishedCardsWriteStrategy();
-  if (cardWs === "firestore-kv") {
-    const cur = await loadTournamentPublishedCardsArray();
-    await persistTournamentPublishedCardsRows(cur.filter((c) => c.tournamentId !== id));
-  }
+  const idx = store.tournaments.findIndex((t) => t.id === id);
+  if (idx < 0) return { ok: false, error: "대회를 찾을 수 없습니다.", httpStatus: 404 };
+  const now = new Date().toISOString();
+  const cur = store.tournaments[idx]!;
+  store.tournaments[idx] = {
+    ...cur,
+    status: "DELETED",
+    deletedAt: now,
+    deletedBy: params.actorUserId.trim(),
+    deleteReason: "",
+  };
   await writeLocalJsonAggregate(store);
   return { ok: true };
 }
@@ -7271,6 +7325,18 @@ function revalidatePublicSiteCommunityConfig(): void {
   revalidateSiteDataTag(CACHE_TAG_SITE_COMMUNITY_CONFIG);
 }
 
+function revalidateSiteNoticeCache(): void {
+  revalidateSiteDataTag(CACHE_TAG_SITE_NOTICE);
+}
+
+function revalidateMainSlideSnapshotsCache(): void {
+  revalidateSiteDataTag(CACHE_TAG_MAIN_SLIDE_SNAPSHOTS);
+}
+
+function revalidateMainSlideAdsCache(): void {
+  revalidateSiteDataTag(CACHE_TAG_MAIN_SLIDE_ADS);
+}
+
 export async function patchSiteLayoutConfig(params: {
   header?: SiteLayoutConfig["header"];
   footer?: SiteLayoutConfig["footer"];
@@ -7349,6 +7415,7 @@ export async function patchSiteNotice(params: {
     };
     await upsertSiteNoticeToFirestoreKv(next);
     siteNoticeMemoryFallback = null;
+    revalidateSiteNoticeCache();
     return next;
   }
   if (writeStrategy === "blocked") {
@@ -7369,6 +7436,7 @@ export async function patchSiteNotice(params: {
       throw error;
     }
   }
+  revalidateSiteNoticeCache();
   return next;
 }
 
@@ -7566,7 +7634,7 @@ export async function listCommunityPostsAllPrimary(
   const feed = await loadSiteCommunityFeed();
   const q = options?.q?.trim().toLowerCase() ?? "";
   const allow = new Set(visibleBoardKeys);
-  let rows = feed.communityPosts.filter((p) => allow.has(p.boardType) && p.isDeleted !== true);
+  let rows = feed.communityPosts.filter((p) => allow.has(p.boardType) && isCommunityBoardPostListed(p));
   if (q.length > 0) {
     rows = rows.filter((p) => p.title.toLowerCase().includes(q));
   }
@@ -7579,7 +7647,7 @@ export async function listCommunityPosts(
 ): Promise<CommunityPostListItem[]> {
   const feed = await loadSiteCommunityFeed();
   const q = options?.q?.trim().toLowerCase() ?? "";
-  let rows = feed.communityPosts.filter((p) => p.boardType === boardType && p.isDeleted !== true);
+  let rows = feed.communityPosts.filter((p) => p.boardType === boardType && isCommunityBoardPostListed(p));
   if (q.length > 0) {
     rows = rows.filter((p) => p.title.toLowerCase().includes(q));
   }
@@ -7590,7 +7658,7 @@ export async function getCommunityPostById(postId: string): Promise<CommunityPos
   const feed = await loadSiteCommunityFeed();
   const id = postId.trim();
   const p = feed.communityPosts.find((x) => x.id === id);
-  if (!p || p.isDeleted === true) return null;
+  if (!p || !isCommunityBoardPostListed(p)) return null;
   const imageUrls = normalizeCommunityPostImageUrls(p.imageUrls);
   const imageSizeLevels = normalizeCommunityPostImageSizeLevels(imageUrls.length, p.imageSizeLevels);
   return {
@@ -7613,7 +7681,7 @@ export async function incrementCommunityPostViewCount(postId: string): Promise<n
   const feed = await loadSiteCommunityFeed();
   const id = postId.trim();
   const p = feed.communityPosts.find((x) => x.id === id);
-  if (!p || p.isDeleted === true) return null;
+  if (!p || !isCommunityBoardPostListed(p)) return null;
   p.viewCount = (p.viewCount ?? 0) + 1;
   p.updatedAt = new Date().toISOString();
   void persistSiteCommunityFeed(feed);
@@ -7658,6 +7726,7 @@ export async function createCommunityPost(params: {
     viewCount: 0,
     commentCount: 0,
     isDeleted: false,
+    status: "ACTIVE",
   };
   feed.communityPosts.push(post);
   if (!(await persistSiteCommunityFeed(feed))) {
@@ -7692,7 +7761,7 @@ export async function updateCommunityPostById(
   const store = await readLocalJsonAggregate();
   const id = postId.trim();
   const p = feed.communityPosts.find((x) => x.id === id);
-  if (!p || p.isDeleted === true) {
+  if (!p || !isCommunityBoardPostListed(p)) {
     return { ok: false, code: "NOT_FOUND" };
   }
   if (resolveCanonicalUserId(store, p.authorUserId) !== resolveCanonicalUserId(store, editorUserId)) {
@@ -7717,14 +7786,43 @@ export async function softDeleteCommunityPostById(
   const store = await readLocalJsonAggregate();
   const id = postId.trim();
   const p = feed.communityPosts.find((x) => x.id === id);
-  if (!p || p.isDeleted === true) {
+  if (!p || !isCommunityBoardPostListed(p)) {
     return { ok: false, code: "NOT_FOUND" };
   }
   if (resolveCanonicalUserId(store, p.authorUserId) !== resolveCanonicalUserId(store, editorUserId)) {
     return { ok: false, code: "FORBIDDEN" };
   }
+  const now = new Date().toISOString();
   p.isDeleted = true;
-  p.updatedAt = new Date().toISOString();
+  p.status = "DELETED";
+  p.deletedAt = now;
+  p.deletedBy = editorUserId.trim();
+  p.deleteReason = "";
+  p.updatedAt = now;
+  if (!(await persistSiteCommunityFeed(feed))) {
+    return { ok: false, code: "PERSIST_UNAVAILABLE" };
+  }
+  return { ok: true };
+}
+
+/** 커뮤니티 게시글 소프트 삭제(작성자 확인 없이 플랫폼 관리자만). */
+export async function softDeleteCommunityPostByPlatformAdmin(
+  postId: string,
+  actorUserId: string
+): Promise<{ ok: true } | { ok: false; code: "NOT_FOUND" | "PERSIST_UNAVAILABLE" }> {
+  const feed = await loadSiteCommunityFeed();
+  const id = postId.trim();
+  const p = feed.communityPosts.find((x) => x.id === id);
+  if (!p || !isCommunityBoardPostListed(p)) {
+    return { ok: false, code: "NOT_FOUND" };
+  }
+  const now = new Date().toISOString();
+  p.isDeleted = true;
+  p.status = "DELETED";
+  p.deletedAt = now;
+  p.deletedBy = actorUserId.trim();
+  p.deleteReason = "";
+  p.updatedAt = now;
   if (!(await persistSiteCommunityFeed(feed))) {
     return { ok: false, code: "PERSIST_UNAVAILABLE" };
   }
@@ -7751,7 +7849,7 @@ export async function listCommentsByPostId(postId: string): Promise<CommunityCom
 export async function incrementPostCommentCount(postId: string): Promise<void> {
   const feed = await loadSiteCommunityFeed();
   const p = feed.communityPosts.find((x) => x.id === postId.trim());
-  if (!p || p.isDeleted === true) return;
+  if (!p || !isCommunityBoardPostListed(p)) return;
   p.commentCount = (p.commentCount ?? 0) + 1;
   p.updatedAt = new Date().toISOString();
   void persistSiteCommunityFeed(feed);
@@ -7760,7 +7858,7 @@ export async function incrementPostCommentCount(postId: string): Promise<void> {
 export async function decrementPostCommentCount(postId: string): Promise<void> {
   const feed = await loadSiteCommunityFeed();
   const p = feed.communityPosts.find((x) => x.id === postId.trim());
-  if (!p || p.isDeleted === true) return;
+  if (!p || !isCommunityBoardPostListed(p)) return;
   p.commentCount = Math.max(0, (p.commentCount ?? 0) - 1);
   p.updatedAt = new Date().toISOString();
   void persistSiteCommunityFeed(feed);
@@ -7778,7 +7876,7 @@ export async function createComment(
   if (!Array.isArray(feed.communityComments)) feed.communityComments = [];
   const pid = postId.trim();
   const post = feed.communityPosts.find((x) => x.id === pid);
-  if (!post || post.isDeleted === true) return { ok: false, error: "게시글을 찾을 수 없습니다." };
+  if (!post || !isCommunityBoardPostListed(post)) return { ok: false, error: "게시글을 찾을 수 없습니다." };
   const now = new Date().toISOString();
   const comment: CommunityComment = {
     id: `cc-${randomUUID()}`,
@@ -7816,7 +7914,7 @@ export async function softDeleteComment(
   }
   c.isDeleted = true;
   const post = feed.communityPosts.find((x) => x.id === c.postId);
-  if (post && post.isDeleted !== true) {
+  if (post && isCommunityBoardPostListed(post)) {
     post.commentCount = Math.max(0, (post.commentCount ?? 0) - 1);
     post.updatedAt = new Date().toISOString();
   }
@@ -8313,6 +8411,43 @@ export async function loadTournamentPublishedCardsArray(): Promise<TournamentPub
       const raw = await readTournamentPublishedCardsRawFromFirestoreKv();
       if (raw == null) return [];
       if (!Array.isArray(raw)) return [];
+      return raw
+        .map(normalizeTournamentPublishedCardRow)
+        .filter((x): x is TournamentPublishedCard => x !== null)
+        .filter((c) => isEntityLifecycleVisibleForList(c.lifecycleStatus));
+    } catch {
+      return [];
+    }
+  }
+  if (rs === "production-defaults-only") {
+    return [];
+  }
+  const store = await readLocalJsonAggregate();
+  return store.tournamentPublishedCards.filter((c) => isEntityLifecycleVisibleForList(c.lifecycleStatus));
+}
+
+async function persistTournamentPublishedCardsRows(next: TournamentPublishedCard[]): Promise<void> {
+  const ws = resolveTournamentPublishedCardsWriteStrategy();
+  if (ws === "firestore-kv") {
+    await upsertTournamentPublishedCardsToFirestoreKv(next);
+    revalidateMainSlideSnapshotsCache();
+    return;
+  }
+  if (ws === "blocked") {
+    throwTournamentPublishedCardsWritePersistenceBlocked();
+  }
+  const store = await readLocalJsonAggregate();
+  store.tournamentPublishedCards = next;
+  await writeLocalJsonAggregate(store);
+  revalidateMainSlideSnapshotsCache();
+}
+
+async function loadTournamentPublishedCardsRowsIncludingDeleted(): Promise<TournamentPublishedCard[]> {
+  const rs = resolveTournamentPublishedCardsReadStrategy();
+  if (rs === "firestore-kv") {
+    try {
+      const raw = await readTournamentPublishedCardsRawFromFirestoreKv();
+      if (raw == null || !Array.isArray(raw)) return [];
       return raw.map(normalizeTournamentPublishedCardRow).filter((x): x is TournamentPublishedCard => x !== null);
     } catch {
       return [];
@@ -8322,21 +8457,117 @@ export async function loadTournamentPublishedCardsArray(): Promise<TournamentPub
     return [];
   }
   const store = await readLocalJsonAggregate();
-  return store.tournamentPublishedCards;
+  return store.tournamentPublishedCards
+    .map((row) => normalizeTournamentPublishedCardRow(row))
+    .filter((x): x is TournamentPublishedCard => x !== null);
 }
 
-async function persistTournamentPublishedCardsRows(next: TournamentPublishedCard[]): Promise<void> {
+/** 대회 게시 카드 1건 소프트 삭제(플랫폼 관리자). */
+export async function softDeleteTournamentPublishedCardBySnapshotIdForPlatform(params: {
+  tournamentId: string;
+  snapshotId: string;
+  deletedBy: string;
+  deleteReason?: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const tournamentId = params.tournamentId.trim();
+  const snapshotId = params.snapshotId.trim();
+  if (!tournamentId || !snapshotId) return { ok: false, error: "잘못된 요청입니다." };
   const ws = resolveTournamentPublishedCardsWriteStrategy();
-  if (ws === "firestore-kv") {
-    await upsertTournamentPublishedCardsToFirestoreKv(next);
-    return;
-  }
-  if (ws === "blocked") {
-    throwTournamentPublishedCardsWritePersistenceBlocked();
+  if (ws === "blocked") return { ok: false, error: "게시 카드 저장소에 쓸 수 없습니다." };
+
+  const rows = (await loadTournamentPublishedCardsRowsIncludingDeleted()).map((c) => ({ ...c }));
+  const idx = rows.findIndex((c) => c.snapshotId === snapshotId && c.tournamentId === tournamentId);
+  if (idx < 0) return { ok: false, error: "게시 카드를 찾을 수 없습니다." };
+
+  const now = new Date().toISOString();
+  rows[idx] = {
+    ...rows[idx]!,
+    lifecycleStatus: "DELETED",
+    deletedAt: now,
+    deletedBy: params.deletedBy.trim(),
+    deleteReason: typeof params.deleteReason === "string" ? params.deleteReason : "",
+  };
+  await persistTournamentPublishedCardsRows(rows);
+  return { ok: true };
+}
+
+function isPublishedCardTitleTestLike(title: string | null | undefined): boolean {
+  const t = (title ?? "").trim();
+  if (!t) return false;
+  if (/\[TEST\]/i.test(t)) return true;
+  if (/임\s*시|샘\s*플|sample|dummy|더미|temp(?:orary)?/i.test(t)) return true;
+  return false;
+}
+
+async function resolveExistingTournamentIdSet(): Promise<Set<string>> {
+  if (isFirestoreUsersBackendConfigured()) {
+    const { listAllTournamentsFirestore } = await import("./firestore-tournaments");
+    const all = await listAllTournamentsFirestore();
+    return new Set(all.map((t) => String(t.id ?? "").trim()).filter(Boolean));
   }
   const store = await readLocalJsonAggregate();
-  store.tournamentPublishedCards = next;
-  await writeLocalJsonAggregate(store);
+  return new Set(store.tournaments.map((t) => String(t.id ?? "").trim()).filter(Boolean));
+}
+
+/**
+ * `tournamentPublishedCards` 중 대회가 없거나([TEST] 등) 임시 표기인 행을 제거한다.
+ * 대회가 0건이면 게시카드 전부 제거. 로컬 JSON 모드에서만 레거시 `publishedCardSnapshots`의 토너먼트 행도 동일 기준으로 정리한다.
+ */
+export async function pruneOrphanTournamentPublishedCards(): Promise<{
+  tournamentCount: number;
+  deletedPublishedCardSnapshotIds: string[];
+  deletedLegacySnapshotIds: string[];
+  remainingPublishedCardsCount: number;
+}> {
+  const tournamentIds = await resolveExistingTournamentIdSet();
+  const cards = await loadTournamentPublishedCardsArray();
+
+  const shouldRemovePublishedRow = (c: TournamentPublishedCard): boolean => {
+    if (isPublishedCardTitleTestLike(c.title)) return true;
+    if (tournamentIds.size === 0) return true;
+    const tid = (c.tournamentId ?? "").trim();
+    if (!tid) return true;
+    return !tournamentIds.has(tid);
+  };
+
+  const deletedPublishedCardSnapshotIds = cards.filter(shouldRemovePublishedRow).map((c) => c.snapshotId);
+  const keepPublished = cards.filter((c) => !shouldRemovePublishedRow(c));
+
+  if (keepPublished.length !== cards.length) {
+    await persistTournamentPublishedCardsRows(keepPublished);
+  }
+
+  const deletedLegacySnapshotIds: string[] = [];
+  if (!isFirestoreUsersBackendConfigured()) {
+    const store = await readLocalJsonAggregate();
+    const legacy = store.publishedCardSnapshots;
+    const nextLegacy = legacy.filter((s) => {
+      if (normalizeSnapshotSourceType(s) !== "TOURNAMENT_SNAPSHOT") return true;
+      if (isPublishedCardTitleTestLike(s.title)) return false;
+      if (tournamentIds.size === 0) return false;
+      const tid = (s.tournamentId ?? "").trim();
+      if (!tid) return false;
+      return tournamentIds.has(tid);
+    });
+    if (nextLegacy.length !== legacy.length) {
+      for (const s of legacy) {
+        if (!nextLegacy.some((x) => x.snapshotId === s.snapshotId)) {
+          deletedLegacySnapshotIds.push(s.snapshotId);
+        }
+      }
+      store.publishedCardSnapshots = nextLegacy;
+      await writeLocalJsonAggregate(store);
+    }
+  }
+
+  const remainingPublishedCardsCount = (await loadTournamentPublishedCardsArray()).length;
+
+  return {
+    tournamentCount: tournamentIds.size,
+    deletedPublishedCardSnapshotIds,
+    deletedLegacySnapshotIds,
+    remainingPublishedCardsCount,
+  };
 }
 
 /**
@@ -8355,7 +8586,13 @@ export async function listTournamentSnapshotsForMainSite(options?: {
 
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
   const cards = await loadTournamentPublishedCardsArray();
-  const filtered = cards.filter((c) => c.isPublished && c.isActive && c.showOnMainSlide);
+  const filtered = cards.filter(
+    (c) =>
+      isEntityLifecycleVisibleForList(c.lifecycleStatus) &&
+      c.isPublished &&
+      c.isActive &&
+      c.showOnMainSlide,
+  );
   const sortedForDedupe = [...filtered].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const seenTournament = new Set<string>();
   const deduped: TournamentPublishedCard[] = [];
@@ -8373,7 +8610,12 @@ export async function listTournamentSnapshotsForMainSite(options?: {
 
   return Promise.all(
     rows.map(async (c) => {
-      const meta = await getTournamentDateLocationMetaForPublishedCards(c.tournamentId);
+      const hasStoredDate = typeof c.cardDisplayDate === "string" && c.cardDisplayDate.trim() !== "";
+      const hasStoredLoc = typeof c.cardDisplayLocation === "string" && c.cardDisplayLocation.trim() !== "";
+      const meta =
+        hasStoredDate && hasStoredLoc
+          ? undefined
+          : await getTournamentDateLocationMetaForPublishedCards(c.tournamentId);
       return tournamentPublishedCardToPublishedSnapshot(c, templateId, meta);
     })
   );
@@ -8417,11 +8659,13 @@ async function persistMainSlideAdsToStorageInternal(ads: MainSiteSlideAd[]): Pro
   }
   if (ws === "firestore-kv") {
     await upsertMainSlideAdsToFirestoreKv(ads);
+    revalidateMainSlideAdsCache();
     return;
   }
   const store = await readLocalJsonAggregate();
   store.mainSlideAds = ads;
   await writeLocalJsonAggregate(store);
+  revalidateMainSlideAdsCache();
 }
 
 async function persistMainSlideAdConfigToStorageInternal(config: MainSlideAdConfig): Promise<void> {
@@ -8431,11 +8675,13 @@ async function persistMainSlideAdConfigToStorageInternal(config: MainSlideAdConf
   }
   if (ws === "firestore-kv") {
     await upsertMainSlideAdConfigToFirestoreKv(config);
+    revalidateMainSlideAdsCache();
     return;
   }
   const store = await readLocalJsonAggregate();
   store.mainSlideAdConfig = config;
   await writeLocalJsonAggregate(store);
+  revalidateMainSlideAdsCache();
 }
 
 /**
@@ -8487,9 +8733,43 @@ export async function incrementMainSlideAdMetric(
 
 export async function getMainSlideAdsForPlatformAdmin(): Promise<MainSiteSlideAd[]> {
   try {
-    return await loadMainSlideAdsNormalizedForStorage();
+    const all = await loadMainSlideAdsNormalizedForStorage();
+    return all.filter((a) => isEntityLifecycleVisibleForList(a.status));
   } catch {
     return [];
+  }
+}
+
+/** 메인 슬라이드 광고 1건 소프트 삭제(관리자). */
+export async function softDeleteMainSlideAdByIdForPlatform(params: {
+  adId: string;
+  deletedBy: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const id = params.adId.trim();
+  if (!id) return { ok: false, error: "잘못된 요청입니다." };
+  const ws = resolveMainSlideAdSettingsWriteStrategy();
+  if (ws === "blocked") return { ok: false, error: "광고 저장소에 쓸 수 없습니다." };
+  try {
+    const all = await loadMainSlideAdsNormalizedForStorage();
+    const idx = all.findIndex((a) => a.id === id);
+    if (idx < 0) return { ok: false, error: "광고를 찾을 수 없습니다." };
+    const now = new Date().toISOString();
+    const next = all.map((a, i) =>
+      i === idx
+        ? {
+            ...a,
+            status: "DELETED" as const,
+            deletedAt: now,
+            deletedBy: params.deletedBy.trim(),
+            deleteReason: "",
+            isActive: false,
+          }
+        : { ...a },
+    );
+    await persistMainSlideAdsToStorageInternal(next);
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "저장에 실패했습니다." };
   }
 }
 
@@ -8504,7 +8784,12 @@ export async function getMainSlideAdConfigForPlatformAdmin(): Promise<MainSlideA
 export async function patchMainSlideAdsForPlatformAdmin(incomingRows: unknown[]): Promise<MainSiteSlideAd[]> {
   const previous = await loadMainSlideAdsNormalizedForStorage().catch(() => [] as MainSiteSlideAd[]);
   const merged = mergeMainSiteSlideAdsFromAdminPayload(incomingRows, previous);
-  await persistMainSlideAdsToStorageInternal(merged);
+  const mergedIds = new Set(merged.map((a) => a.id));
+  const softDeletedPreserved = previous.filter(
+    (p) => normalizeEntityLifecycleStatus(p.status) === "DELETED" && !mergedIds.has(p.id),
+  );
+  const out = [...merged, ...softDeletedPreserved];
+  await persistMainSlideAdsToStorageInternal(out);
   return merged;
 }
 
@@ -8683,6 +8968,233 @@ export async function setCardSnapshotActive(params: {
       publishedAt: snapshot.publishedAt || now,
     },
   };
+}
+
+function assertPermanentDeleteConfirm(confirmToken: string): { ok: true } | { ok: false; error: string } {
+  if (confirmToken !== "DELETE") {
+    return { ok: false, error: "완전 삭제를 위해 대문자 DELETE를 정확히 입력해야 합니다." };
+  }
+  return { ok: true };
+}
+
+function isCommunityPostInBackup(p: CommunityBoardPost): boolean {
+  return !isCommunityBoardPostListed(p);
+}
+
+export async function resolvePlatformAdminUserDisplayLabel(userId: string): Promise<string> {
+  const id = userId.trim();
+  if (!id) return "";
+  const u = await getUserById(id);
+  if (!u) return id;
+  const nick = typeof u.nickname === "string" ? u.nickname.trim() : "";
+  const login = typeof u.loginId === "string" ? u.loginId.trim() : "";
+  return nick || login || u.id;
+}
+
+export async function listDeletedTournamentsForPlatformBackup(): Promise<Tournament[]> {
+  if (isFirestoreUsersBackendConfigured()) {
+    const { listDeletedTournamentsFirestore } = await import("./firestore-tournaments");
+    return listDeletedTournamentsFirestore();
+  }
+  const store = await readLocalJsonAggregate();
+  const venueOrgs = await getVenueGuideResolutionOrgs(store);
+  const out: Tournament[] = [];
+  for (const item of store.tournaments) {
+    const n = await normalizeTournament(item, store, venueOrgs);
+    if (n.status === "DELETED") out.push(n);
+  }
+  return out.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function restoreTournamentForPlatformBackup(
+  tournamentId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const id = tournamentId.trim();
+  if (!id) return { ok: false, error: "잘못된 요청입니다." };
+  if (isFirestoreUsersBackendConfigured()) {
+    const { restoreTournamentDocumentFirestore } = await import("./firestore-tournaments");
+    return restoreTournamentDocumentFirestore(id);
+  }
+  const store = await readLocalJsonAggregate();
+  const idx = store.tournaments.findIndex((t) => t.id === id);
+  if (idx < 0) return { ok: false, error: "대회를 찾을 수 없습니다." };
+  const cur = store.tournaments[idx]!;
+  if (cur.status !== "DELETED") return { ok: false, error: "백업함에 있는 삭제된 대회만 복구할 수 있습니다." };
+  const next: Tournament = { ...cur, status: "ACTIVE" };
+  delete (next as { deletedAt?: string | null }).deletedAt;
+  delete (next as { deletedBy?: string | null }).deletedBy;
+  delete (next as { deleteReason?: string | null }).deleteReason;
+  store.tournaments[idx] = next;
+  await writeLocalJsonAggregate(store);
+  return { ok: true };
+}
+
+export async function permanentlyDeleteTournamentForPlatformBackup(
+  tournamentId: string,
+  confirmToken: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const gate = assertPermanentDeleteConfirm(confirmToken);
+  if (!gate.ok) return gate;
+  const id = tournamentId.trim();
+  if (!id) return { ok: false, error: "잘못된 요청입니다." };
+  if (isFirestoreUsersBackendConfigured()) {
+    const { permanentlyDeleteTournamentDocumentFirestore } = await import("./firestore-tournaments");
+    return permanentlyDeleteTournamentDocumentFirestore(id);
+  }
+  const store = await readLocalJsonAggregate();
+  const t = store.tournaments.find((x) => x.id === id);
+  if (!t) return { ok: false, error: "대회를 찾을 수 없습니다." };
+  if (t.status !== "DELETED") return { ok: false, error: "백업함에 있는 삭제된 대회만 완전 삭제할 수 있습니다." };
+  store.tournaments = store.tournaments.filter((x) => x.id !== id);
+  await writeLocalJsonAggregate(store);
+  return { ok: true };
+}
+
+export async function listDeletedTournamentPublishedCardsForPlatformBackup(): Promise<TournamentPublishedCard[]> {
+  const all = await loadTournamentPublishedCardsRowsIncludingDeleted();
+  return all.filter((c) => normalizeEntityLifecycleStatus(c.lifecycleStatus) === "DELETED");
+}
+
+export async function restoreTournamentPublishedCardBySnapshotIdForPlatformBackup(
+  snapshotId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sid = snapshotId.trim();
+  if (!sid) return { ok: false, error: "잘못된 요청입니다." };
+  const ws = resolveTournamentPublishedCardsWriteStrategy();
+  if (ws === "blocked") return { ok: false, error: "게시 카드 저장소에 쓸 수 없습니다." };
+  const rows = (await loadTournamentPublishedCardsRowsIncludingDeleted()).map((c) => ({ ...c }));
+  const idx = rows.findIndex((c) => c.snapshotId === sid);
+  if (idx < 0) return { ok: false, error: "게시 카드를 찾을 수 없습니다." };
+  if (normalizeEntityLifecycleStatus(rows[idx]!.lifecycleStatus) !== "DELETED") {
+    return { ok: false, error: "백업함에 있는 삭제된 카드만 복구할 수 있습니다." };
+  }
+  const cur = rows[idx]!;
+  const restored: TournamentPublishedCard = { ...cur, lifecycleStatus: "ACTIVE" };
+  delete (restored as { deletedAt?: string | null }).deletedAt;
+  delete (restored as { deletedBy?: string | null }).deletedBy;
+  delete (restored as { deleteReason?: string | null }).deleteReason;
+  rows[idx] = restored;
+  await persistTournamentPublishedCardsRows(rows);
+  return { ok: true };
+}
+
+export async function permanentlyDeleteTournamentPublishedCardBySnapshotIdForPlatformBackup(
+  snapshotId: string,
+  confirmToken: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const gate = assertPermanentDeleteConfirm(confirmToken);
+  if (!gate.ok) return gate;
+  const sid = snapshotId.trim();
+  if (!sid) return { ok: false, error: "잘못된 요청입니다." };
+  const ws = resolveTournamentPublishedCardsWriteStrategy();
+  if (ws === "blocked") return { ok: false, error: "게시 카드 저장소에 쓸 수 없습니다." };
+  const rows = await loadTournamentPublishedCardsRowsIncludingDeleted();
+  const cur = rows.find((c) => c.snapshotId === sid);
+  if (!cur) return { ok: false, error: "게시 카드를 찾을 수 없습니다." };
+  if (normalizeEntityLifecycleStatus(cur.lifecycleStatus) !== "DELETED") {
+    return { ok: false, error: "백업함에 있는 삭제된 카드만 완전 삭제할 수 있습니다." };
+  }
+  const next = rows.filter((c) => c.snapshotId !== sid);
+  await persistTournamentPublishedCardsRows(next);
+  return { ok: true };
+}
+
+export async function listDeletedMainSlideAdsForPlatformBackup(): Promise<MainSiteSlideAd[]> {
+  const all = await loadMainSlideAdsNormalizedForStorage().catch(() => [] as MainSiteSlideAd[]);
+  return all.filter((a) => normalizeEntityLifecycleStatus(a.status) === "DELETED");
+}
+
+export async function restoreMainSlideAdByIdForPlatformBackup(
+  adId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const id = adId.trim();
+  if (!id) return { ok: false, error: "잘못된 요청입니다." };
+  const ws = resolveMainSlideAdSettingsWriteStrategy();
+  if (ws === "blocked") return { ok: false, error: "광고 저장소에 쓸 수 없습니다." };
+  const all = await loadMainSlideAdsNormalizedForStorage();
+  const idx = all.findIndex((a) => a.id === id);
+  if (idx < 0) return { ok: false, error: "광고를 찾을 수 없습니다." };
+  if (normalizeEntityLifecycleStatus(all[idx]!.status) !== "DELETED") {
+    return { ok: false, error: "백업함에 있는 삭제된 광고만 복구할 수 있습니다." };
+  }
+  const cur = all[idx]!;
+  const restored: MainSiteSlideAd = { ...cur, status: "ACTIVE", isActive: true };
+  delete (restored as { deletedAt?: string | null }).deletedAt;
+  delete (restored as { deletedBy?: string | null }).deletedBy;
+  delete (restored as { deleteReason?: string | null }).deleteReason;
+  const next = all.map((a, i) => (i === idx ? restored : a));
+  await persistMainSlideAdsToStorageInternal(next);
+  return { ok: true };
+}
+
+export async function permanentlyDeleteMainSlideAdByIdForPlatformBackup(
+  adId: string,
+  confirmToken: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const gate = assertPermanentDeleteConfirm(confirmToken);
+  if (!gate.ok) return gate;
+  const id = adId.trim();
+  if (!id) return { ok: false, error: "잘못된 요청입니다." };
+  const ws = resolveMainSlideAdSettingsWriteStrategy();
+  if (ws === "blocked") return { ok: false, error: "광고 저장소에 쓸 수 없습니다." };
+  const all = await loadMainSlideAdsNormalizedForStorage();
+  const cur = all.find((a) => a.id === id);
+  if (!cur) return { ok: false, error: "광고를 찾을 수 없습니다." };
+  if (normalizeEntityLifecycleStatus(cur.status) !== "DELETED") {
+    return { ok: false, error: "백업함에 있는 삭제된 광고만 완전 삭제할 수 있습니다." };
+  }
+  const next = all.filter((a) => a.id !== id);
+  await persistMainSlideAdsToStorageInternal(next);
+  return { ok: true };
+}
+
+export async function listDeletedCommunityPostsForPlatformBackup(): Promise<CommunityBoardPost[]> {
+  const feed = await loadSiteCommunityFeed();
+  return feed.communityPosts.filter((p) => isCommunityPostInBackup(p));
+}
+
+export async function restoreCommunityPostByIdForPlatformBackup(
+  postId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const id = postId.trim();
+  if (!id) return { ok: false, error: "잘못된 요청입니다." };
+  const feed = await loadSiteCommunityFeed();
+  const p = feed.communityPosts.find((x) => x.id === id);
+  if (!p) return { ok: false, error: "게시글을 찾을 수 없습니다." };
+  if (!isCommunityPostInBackup(p)) {
+    return { ok: false, error: "백업함에 있는 삭제된 글만 복구할 수 있습니다." };
+  }
+  p.isDeleted = false;
+  p.status = "ACTIVE";
+  delete (p as { deletedAt?: string }).deletedAt;
+  delete (p as { deletedBy?: string }).deletedBy;
+  delete (p as { deleteReason?: string }).deleteReason;
+  p.updatedAt = new Date().toISOString();
+  if (!(await persistSiteCommunityFeed(feed))) {
+    return { ok: false, error: "저장에 실패했습니다." };
+  }
+  return { ok: true };
+}
+
+export async function permanentlyDeleteCommunityPostByIdForPlatformBackup(
+  postId: string,
+  confirmToken: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const gate = assertPermanentDeleteConfirm(confirmToken);
+  if (!gate.ok) return gate;
+  const id = postId.trim();
+  if (!id) return { ok: false, error: "잘못된 요청입니다." };
+  const feed = await loadSiteCommunityFeed();
+  const p = feed.communityPosts.find((x) => x.id === id);
+  if (!p) return { ok: false, error: "게시글을 찾을 수 없습니다." };
+  if (!isCommunityPostInBackup(p)) {
+    return { ok: false, error: "백업함에 있는 삭제된 글만 완전 삭제할 수 있습니다." };
+  }
+  feed.communityPosts = feed.communityPosts.filter((x) => x.id !== id);
+  if (!(await persistSiteCommunityFeed(feed))) {
+    return { ok: false, error: "저장에 실패했습니다." };
+  }
+  return { ok: true };
 }
 
 export { DEV_SEED_SOURCE_VIRT_CLIENT_TOURNAMENT_V1 } from "../dev-seed-source";

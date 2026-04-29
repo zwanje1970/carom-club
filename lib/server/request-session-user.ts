@@ -1,6 +1,7 @@
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../auth/session";
+import { isCaromClubMobileAppShell } from "../is-carom-club-mobile-app-shell";
 import { getClientStatusByUserId, getUserById } from "./platform-backing-store";
 
 export type AdminFabSessionUser = {
@@ -20,6 +21,10 @@ export const getRequestSessionUser = cache(async () => {
 export async function getAdminFloatingFabSessionUser(): Promise<AdminFabSessionUser | null> {
   const user = await getRequestSessionUser();
   if (!user) return null;
+  const headerList = await headers();
+  if (user.role === "PLATFORM" && isCaromClubMobileAppShell(headerList)) {
+    return null;
+  }
   if (user.role === "PLATFORM") {
     return { role: "PLATFORM", clientStatus: null };
   }

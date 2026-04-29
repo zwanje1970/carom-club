@@ -15,7 +15,8 @@
     "wipe:staging": "npx --yes tsx scripts/wipe-staging-firestore.mts",
     "seed:tournament-participants": "npx --yes tsx scripts/seed-tournament-participants.mts",
     "seed:platform-admin": "npx --yes tsx scripts/seed-platform-admin.mts",
-    "verify:client-approval": "npx --yes tsx scripts/verify-client-approval-flow.mts"
+    "verify:client-approval": "npx --yes tsx scripts/verify-client-approval-flow.mts",
+    "prune:orphan-published-cards": "npx --yes tsx scripts/prune-orphan-published-cards.mts"
   },
   "dependencies": {
     "@tiptap/extension-color": "^3.22.3",

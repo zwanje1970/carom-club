@@ -1,4 +1,5 @@
 import type { SlideDeckItem } from "../../app/site/tournament-snapshot-card-view";
+import { normalizeEntityLifecycleStatus } from "../server/entity-lifecycle";
 
 export type MainSlideAdRotationMode = "sequential" | "random";
 
@@ -39,6 +40,11 @@ export type MainSiteSlideAd = {
   clicks?: number;
   createdAt?: string;
   updatedAt?: string;
+  /** 소프트 삭제. 미설정은 ACTIVE */
+  status?: "ACTIVE" | "DELETED";
+  deletedAt?: string | null;
+  deletedBy?: string | null;
+  deleteReason?: string | null;
 };
 
 export function normalizeMainSlideAdConfig(raw: unknown): MainSlideAdConfig {
@@ -83,6 +89,7 @@ function parseIsoMs(value: string | null | undefined): number | null {
 
 /** 활성 광고 판별: isActive, imageUrl, externalLink, 기간(startAt/endAt 선택 시만 구간 검사) */
 export function isMainSiteSlideAdActiveAt(ad: MainSiteSlideAd, nowMs: number): boolean {
+  if (normalizeEntityLifecycleStatus(ad.status) === "DELETED") return false;
   if (!ad.isActive) return false;
   const img = typeof ad.imageUrl === "string" ? ad.imageUrl.trim() : "";
   const link = typeof ad.externalLink === "string" ? ad.externalLink.trim() : "";
@@ -119,6 +126,12 @@ export function normalizeMainSiteSlideAdRow(row: unknown): MainSiteSlideAd | nul
   const createdAt = createdAtRaw ? createdAtRaw : undefined;
   const updatedAtRaw = typeof r.updatedAt === "string" ? r.updatedAt.trim() : "";
   const updatedAt = updatedAtRaw ? updatedAtRaw : undefined;
+  const status: "ACTIVE" | "DELETED" = r.status === "DELETED" ? "DELETED" : "ACTIVE";
+  const deletedAt =
+    typeof r.deletedAt === "string" && r.deletedAt.trim() !== "" ? r.deletedAt.trim() : undefined;
+  const deletedBy =
+    typeof r.deletedBy === "string" && r.deletedBy.trim() !== "" ? r.deletedBy.trim() : undefined;
+  const deleteReason = typeof r.deleteReason === "string" ? r.deleteReason : undefined;
   return {
     id,
     title,
@@ -129,6 +142,10 @@ export function normalizeMainSiteSlideAdRow(row: unknown): MainSiteSlideAd | nul
     isActive,
     startAt,
     endAt,
+    status,
+    ...(deletedAt ? { deletedAt } : {}),
+    ...(deletedBy ? { deletedBy } : {}),
+    ...(deleteReason !== undefined && deleteReason !== "" ? { deleteReason } : {}),
     ...(weight !== undefined ? { weight } : {}),
     impressions,
     clicks,
@@ -205,6 +222,25 @@ export function mergeMainSiteSlideAdsFromAdminPayload(
         ? r.createdAt.trim()
         : prev?.createdAt ?? nowIso;
 
+    const status: "ACTIVE" | "DELETED" =
+      "status" in r && r.status === "DELETED" ? "DELETED" : "status" in r && r.status === "ACTIVE" ? "ACTIVE" : normalizeEntityLifecycleStatus(prev?.status);
+    const deletedAt =
+      "deletedAt" in r
+        ? typeof r.deletedAt === "string" && r.deletedAt.trim() !== ""
+          ? r.deletedAt.trim()
+          : undefined
+        : prev?.deletedAt ?? undefined;
+    const deletedBy =
+      "deletedBy" in r
+        ? typeof r.deletedBy === "string" && r.deletedBy.trim() !== ""
+          ? r.deletedBy.trim()
+          : undefined
+        : prev?.deletedBy ?? undefined;
+    const deleteReason =
+      "deleteReason" in r && typeof r.deleteReason === "string"
+        ? r.deleteReason
+        : prev?.deleteReason ?? undefined;
+
     out.push({
       id,
       ...(title ? { title } : {}),
@@ -213,6 +249,10 @@ export function mergeMainSiteSlideAdsFromAdminPayload(
       imageUrl,
       externalLink,
       isActive,
+      status,
+      ...(deletedAt ? { deletedAt } : {}),
+      ...(deletedBy ? { deletedBy } : {}),
+      ...(deleteReason !== undefined && deleteReason !== "" ? { deleteReason } : {}),
       ...(startAt !== undefined ? { startAt } : {}),
       ...(endAt !== undefined ? { endAt } : {}),
       weight,

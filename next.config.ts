@@ -8,6 +8,9 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: projectRoot,
   },
+  outputFileTracingExcludes: {
+    "/*": ["./legacy-local-backup/**/*"],
+  },
 };
 
 export default nextConfig;

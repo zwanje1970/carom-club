@@ -31,8 +31,7 @@ export default function ClientMemberWorkspace() {
   const [linkUrl, setLinkUrl] = useState("");
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
-  /** 기본 열림: 접혀 있으면 목록만 보여 푸시·선택 UI가 없는 것처럼 보였음 */
-  const [pushOpen, setPushOpen] = useState(true);
+  const [pushOpen, setPushOpen] = useState(false);
 
   const sendableIds = useMemo(
     () => members.filter((m) => m.pushMarketingAgreed).map((m) => m.userId),
@@ -169,7 +168,7 @@ export default function ClientMemberWorkspace() {
           style={{ padding: "0.5rem 0.9rem", fontWeight: 600 }}
           aria-expanded={pushOpen}
         >
-          {pushOpen ? "웹 푸시 패널 닫기" : "웹 푸시 발송"}
+          {pushOpen ? "앱푸시 닫기" : "앱푸시 보내기"}
         </button>
       </div>
 

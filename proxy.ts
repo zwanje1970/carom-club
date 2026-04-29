@@ -5,6 +5,8 @@ import {
   parseSessionCookieValue,
   SESSION_COOKIE_NAME,
 } from "./lib/auth/session";
+import { isCaromClubMobileAppShell } from "./lib/is-carom-club-mobile-app-shell";
+import { logPlatformApiBlock } from "./lib/server/platform-api-block-log";
 
 function getLoginRedirect(request: NextRequest): NextResponse {
   const url = request.nextUrl.clone();
@@ -38,6 +40,34 @@ export function proxy(request: NextRequest): NextResponse {
   const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const session = parseSessionCookieValue(sessionCookie);
 
+  if (pathname.startsWith("/api/platform")) {
+    const method = request.method;
+    if (!session) {
+      logPlatformApiBlock("blocked_platform_api_unauthenticated", { path: pathname, method, userId: null });
+      return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+    }
+    if (isCaromClubMobileAppShell(request.headers)) {
+      logPlatformApiBlock("blocked_platform_api_from_app", {
+        path: pathname,
+        method,
+        userId: session.userId,
+      });
+      return NextResponse.json(
+        { error: "플랫폼 관리 기능은 웹 브라우저에서만 사용할 수 있습니다." },
+        { status: 403 },
+      );
+    }
+    if (!canAccessPlatform(session.role)) {
+      logPlatformApiBlock("blocked_platform_api_non_platform_role", {
+        path: pathname,
+        method,
+        userId: session.userId,
+      });
+      return NextResponse.json({ error: "플랫폼 관리자만 접근할 수 있습니다." }, { status: 403 });
+    }
+    return NextResponse.next();
+  }
+
   if (!session) {
     return getLoginRedirect(request);
   }
@@ -68,8 +98,18 @@ export function proxy(request: NextRequest): NextResponse {
     return NextResponse.next();
   }
 
-  if (pathname.startsWith("/platform") && !canAccessPlatform(session.role)) {
-    return getUnauthorizedRedirect(request);
+  if (pathname.startsWith("/platform")) {
+    if (isCaromClubMobileAppShell(request.headers)) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/unauthorized";
+      url.searchParams.set("from", pathname);
+      url.searchParams.set("reason", "app_platform_web_only");
+      return NextResponse.redirect(url);
+    }
+    if (!canAccessPlatform(session.role)) {
+      return getUnauthorizedRedirect(request);
+    }
+    return NextResponse.next();
   }
 
   if (isLegacyClientPath(pathname)) {
@@ -91,5 +131,7 @@ export const config = {
     "/site/preview/:path*",
     "/api/client",
     "/api/client/:path*",
+    "/api/platform",
+    "/api/platform/:path*",
   ],
 };

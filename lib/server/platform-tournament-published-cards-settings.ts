@@ -1,3 +1,4 @@
+import { isEntityLifecycleVisibleForList } from "./entity-lifecycle";
 import { isFirestoreUsersBackendConfigured } from "./firestore-users";
 import { PLATFORM_KV_KEYS, readPlatformKvJson, upsertPlatformKvJson } from "./platform-kv-firestore";
 
@@ -58,6 +59,7 @@ export async function listPublishedCardFlagsFromFirestoreKv(): Promise<
       const r = row as Record<string, unknown>;
       const tournamentId = typeof r.tournamentId === "string" ? r.tournamentId.trim() : "";
       if (!tournamentId) continue;
+      if (!isEntityLifecycleVisibleForList(r.lifecycleStatus)) continue;
       const isPublished = typeof r.isPublished === "boolean" ? r.isPublished : true;
       const isActive = typeof r.isActive === "boolean" ? r.isActive : false;
       out.push({ tournamentId, isPublished, isActive });

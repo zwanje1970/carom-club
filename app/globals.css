@@ -83,11 +83,9 @@
   --site-home-main-orb-img-drop-shadow: var(--site-home-main-orb-img-drop-shadow-a)
     var(--site-home-main-orb-img-drop-shadow-b);
 
-  /* 메인 슬라이드 덱 카드 그림자(이중 drop-shadow) — 번들러 병합 대비 분리 */
-  --site-slide-deck-drop-shadow-a: drop-shadow(0 10px 34px rgba(0, 0, 0, 0.4));
-  --site-slide-deck-drop-shadow-b: drop-shadow(0 -5px 22px rgba(0, 0, 0, 0.09));
-  --site-slide-deck-drop-shadow-pc-a: drop-shadow(0 8px 30px rgba(0, 0, 0, 0.33));
-  --site-slide-deck-drop-shadow-pc-b: drop-shadow(0 -4px 18px rgba(0, 0, 0, 0.07));
+  /* 메인 슬라이드 덱 카드 그림자 — box-shadow로 개별 카드에 적용 (filter:drop-shadow는 부모 GPU 레이어 생성 비용이 큼) */
+  --site-slide-deck-card-shadow: 0 10px 34px rgba(0, 0, 0, 0.4), 0 -5px 22px rgba(0, 0, 0, 0.09);
+  --site-slide-deck-card-shadow-pc: 0 8px 30px rgba(0, 0, 0, 0.33), 0 -4px 18px rgba(0, 0, 0, 0.07);
   /*
    * 하단 겹침 띠 높이(탭 위 간격 + 라벨 + 구슬 반지름 − undershoot).
    * undershoot>0 이면 띠 윗선이 아래로(적도보다 낮게).
@@ -1263,6 +1261,7 @@ body:has(.site-home-page) {
   transform-origin: center center;
   will-change: transform, opacity;
   pointer-events: auto;
+  box-shadow: var(--site-slide-deck-card-shadow);
 }
 
 .slide-deck__card > a[href] {
@@ -2262,7 +2261,6 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-slide-stack .slide-deck-wrap .slide-deck {
-  filter: var(--site-slide-deck-drop-shadow-a) var(--site-slide-deck-drop-shadow-b);
 }
 
 .site-home-brand {
@@ -2316,14 +2314,10 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   min-height: unset;
 }
 
-/* 슬라이드 카드만 그림자 — 공지(슬라이드 위 형제)는 filter 대상에서 제외 (.slideDeckFrame 아래 자손) */
-.site-home-slide-stack .slide-deck-wrap .slide-deck {
-  filter: var(--site-slide-deck-drop-shadow-a) var(--site-slide-deck-drop-shadow-b);
-}
+/* 슬라이드 카드 그림자는 .slide-deck__card의 box-shadow로 개별 적용 */
 
 @media (max-width: 767px) {
   .site-home-page--main .site-home-slide-stack .slide-deck-wrap .slide-deck {
-    filter: var(--site-slide-deck-drop-shadow-a) var(--site-slide-deck-drop-shadow-b);
     overflow-x: hidden;
     overflow-y: visible !important;
   }
@@ -4734,8 +4728,8 @@ button.secondary-button.ui-community-post-action-danger:hover,
     > .site-home-page--main
     .site-home-slide-stack
     .slide-deck-wrap
-    .slide-deck {
-    filter: var(--site-slide-deck-drop-shadow-pc-a) var(--site-slide-deck-drop-shadow-pc-b);
+    .slide-deck__card {
+    box-shadow: var(--site-slide-deck-card-shadow-pc);
   }
 
   .site-shell.site-shell--pc-site-chrome
@@ -5205,7 +5199,6 @@ a.secondary-button.site-venue-website-btn {
     ) !important;
     background-repeat: no-repeat !important;
     box-shadow: inset 0 -26px 52px -22px rgba(15, 23, 42, 0.32) !important;
-    filter: var(--site-slide-deck-drop-shadow-a) var(--site-slide-deck-drop-shadow-b) !important;
     overflow-x: hidden !important;
   }
 
@@ -5255,7 +5248,6 @@ a.secondary-button.site-venue-website-btn {
   ) !important;
   background-repeat: no-repeat !important;
   box-shadow: inset 0 -26px 52px -22px rgba(15, 23, 42, 0.32) !important;
-  filter: var(--site-slide-deck-drop-shadow-a) var(--site-slide-deck-drop-shadow-b) !important;
   overflow-x: hidden !important;
 }
 

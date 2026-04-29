@@ -295,6 +295,8 @@ export default function ClientTournamentCardPublishV2Page() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  /** 메인에 노출 중인 게시카드 존재 여부(대회당 1개·재게시 시 덮어쓰기) */
+  const [hasLivePublishedCard, setHasLivePublishedCard] = useState(false);
 
   const bgFileInputRef = useRef<HTMLInputElement>(null);
   /** 저장(게시) 중복 요청만 차단 — 첫 탭 직후 동기 setLoading으로 클릭이 취소되는 것을 피함 */
@@ -383,6 +385,8 @@ export default function ClientTournamentCardPublishV2Page() {
         setMessage(result.error ?? "카드 정보를 불러오지 못했습니다.");
         return;
       }
+
+      setHasLivePublishedCard(Boolean(result.activeSnapshot));
 
       const t = result.tournament;
       if (!t) return;
@@ -501,7 +505,47 @@ export default function ClientTournamentCardPublishV2Page() {
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [loadSnapshots]);
 
-  function requestPublish() {
+  function buildCardPayload(draftOnly: boolean): { ok: true; body: Record<string, unknown> } | { ok: false; error: string } {
+    if (!tournamentId.trim()) return { ok: false, error: "대회 정보가 없습니다." };
+    if (!title.trim()) return { ok: false, error: "제목을 입력해 주세요." };
+    const body: Record<string, unknown> = {
+      tournamentId,
+      title,
+      textLine1,
+      textLine2,
+      textLine3: "",
+      cardTemplate,
+      backgroundType,
+      themeType,
+      imageId: uploadedImage?.imageId ?? "",
+      image320Url: uploadedImage?.w320Url ?? "",
+      draftOnly,
+      cardDisplayDate: formatCardDateForDisplay(cardDate).trim(),
+      cardDisplayLocation: cardPlace.trim(),
+      cardTextShadowEnabled,
+      cardSurfaceLayout,
+      ...(cardSurfaceLayout === "full"
+        ? {
+            cardFooterDateTextColor: footerDateTextColor.trim() || null,
+            cardFooterPlaceTextColor: footerPlaceTextColor.trim() || null,
+          }
+        : {
+            cardFooterDateTextColor: null,
+            cardFooterPlaceTextColor: null,
+          }),
+    };
+    if (leadTextColor.trim()) body.cardLeadTextColor = leadTextColor.trim();
+    if (titleTextColor.trim()) body.cardTitleTextColor = titleTextColor.trim();
+    if (descriptionTextColor.trim()) body.cardDescriptionTextColor = descriptionTextColor.trim();
+    if (v2MediaMode === "on") {
+      body.mediaBackground = mediaBackground;
+      body.imageOverlayBlend = imageOverlayBlend;
+      body.imageOverlayOpacity = imageOverlayOpacity;
+    }
+    return { ok: true, body };
+  }
+
+  function postCardSnapshot(draftOnly: boolean, successMessage: string) {
     if (!tournamentId) return;
     if (isPublishingRef.current) return;
     isPublishingRef.current = true;
@@ -510,58 +554,28 @@ export default function ClientTournamentCardPublishV2Page() {
       setLoading(true);
       setMessage("");
       try {
-        if (!title.trim()) {
-          setMessage("제목을 입력해 주세요.");
+        const built = buildCardPayload(draftOnly);
+        if (!built.ok) {
+          setMessage(built.error);
           return;
-        }
-        const body: Record<string, unknown> = {
-          tournamentId,
-          title,
-          textLine1,
-          textLine2,
-          textLine3: "",
-          cardTemplate,
-          backgroundType,
-          themeType,
-          imageId: uploadedImage?.imageId ?? "",
-          image320Url: uploadedImage?.w320Url ?? "",
-          draftOnly: true,
-          cardDisplayDate: formatCardDateForDisplay(cardDate).trim(),
-          cardDisplayLocation: cardPlace.trim(),
-          cardTextShadowEnabled,
-          cardSurfaceLayout,
-          ...(cardSurfaceLayout === "full"
-            ? {
-                cardFooterDateTextColor: footerDateTextColor.trim() || null,
-                cardFooterPlaceTextColor: footerPlaceTextColor.trim() || null,
-              }
-            : {
-                cardFooterDateTextColor: null,
-                cardFooterPlaceTextColor: null,
-              }),
-        };
-        if (leadTextColor.trim()) body.cardLeadTextColor = leadTextColor.trim();
-        if (titleTextColor.trim()) body.cardTitleTextColor = titleTextColor.trim();
-        if (descriptionTextColor.trim()) body.cardDescriptionTextColor = descriptionTextColor.trim();
-        if (v2MediaMode === "on") {
-          body.mediaBackground = mediaBackground;
-          body.imageOverlayBlend = imageOverlayBlend;
-          body.imageOverlayOpacity = imageOverlayOpacity;
         }
         const response = await fetch("/api/client/card-snapshots", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify(built.body),
         });
         const result = (await response.json()) as { error?: string };
         if (!response.ok) {
-          setMessage(result.error ?? "저장에 실패했습니다.");
+          setMessage(result.error ?? (draftOnly ? "저장에 실패했습니다." : "메인 게시에 실패했습니다."));
           return;
         }
-        setMessage("카드가 저장되었습니다. 대회 상세에서 카드게시를 눌러 게시하세요.");
+        if (!draftOnly) {
+          setHasLivePublishedCard(true);
+        }
+        setMessage(successMessage);
         router.refresh();
       } catch {
-        setMessage("저장 요청 중 오류가 발생했습니다.");
+        setMessage(draftOnly ? "저장 요청 중 오류가 발생했습니다." : "메인 게시 요청 중 오류가 발생했습니다.");
       } finally {
         setLoading(false);
         isPublishingRef.current = false;
@@ -663,7 +677,10 @@ export default function ClientTournamentCardPublishV2Page() {
           noValidate
           onSubmit={(e) => {
             e.preventDefault();
-            requestPublish();
+            postCardSnapshot(
+              true,
+              "카드 초안이 저장되었습니다. 메인에 올리려면 「메인에 게시하기」 또는 대회 상세의 동일 버튼을 누르세요.",
+            );
           }}
         >
           <div className={editorStyles.stepTabsWrap}>
@@ -943,9 +960,29 @@ export default function ClientTournamentCardPublishV2Page() {
           </div>
 
           <div className={editorStyles.actions}>
-            <button type="button" className="v3-btn" disabled={loading} onClick={() => requestPublish()}>
-              {loading ? "처리 중…" : "저장"}
-            </button>
+            <p className="v3-muted" style={{ margin: "0 0 0.65rem", fontSize: "0.82rem", lineHeight: 1.45 }}>
+              이미 게시된 카드가 있으면 새로 만들지 않고 기존 카드에 반영됩니다.
+            </p>
+            <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
+              <button type="submit" className="v3-btn" disabled={loading}>
+                {loading ? "처리 중…" : "카드 저장 (초안)"}
+              </button>
+              <button
+                type="button"
+                className="v3-btn"
+                disabled={loading}
+                onClick={() =>
+                  postCardSnapshot(
+                    false,
+                    hasLivePublishedCard
+                      ? "게시카드가 갱신되어 메인에 반영되었습니다."
+                      : "메인에 게시되었습니다. 사이트에 반영되었습니다.",
+                  )
+                }
+              >
+                {loading ? "처리 중…" : hasLivePublishedCard ? "게시카드 수정 반영" : "메인에 게시하기"}
+              </button>
+            </div>
           </div>
         </form>
           </div>

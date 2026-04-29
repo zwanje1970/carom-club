@@ -39,7 +39,14 @@ export type SiteMypageUserSummary = {
   role: string;
 };
 
-export default function SiteMypageClient({ user }: { user: SiteMypageUserSummary }) {
+export default function SiteMypageClient({
+  user,
+  hidePlatformDashboardLink = false,
+}: {
+  user: SiteMypageUserSummary;
+  /** 앱(WebView) 등 — 플랫폼 대시보드 링크 비노출 */
+  hidePlatformDashboardLink?: boolean;
+}) {
   const [menuPayload, setMenuPayload] = useState<MypageClientMenuPayload | null>(null);
   const [summaryClientPayload, setSummaryClientPayload] = useState<MypageClientMenuPayload | null>(null);
   const [applicationsMount, setApplicationsMount] = useState(false);
@@ -139,9 +146,15 @@ export default function SiteMypageClient({ user }: { user: SiteMypageUserSummary
             클라이언트 승인 대기
           </Link>
         ) : user.role === "PLATFORM" ? (
-          <Link className="secondary-button" href="/platform">
-            플랫폼 대시보드
-          </Link>
+          hidePlatformDashboardLink ? (
+            <span className="v3-muted" style={{ fontSize: "0.85rem" }}>
+              플랫폼 관리는 PC 웹 브라우저에서 이용해 주세요.
+            </span>
+          ) : (
+            <Link className="secondary-button" href="/platform">
+              플랫폼 대시보드
+            </Link>
+          )
         ) : (
           <Link className="secondary-button" href="/client-apply">
             클라이언트 신청

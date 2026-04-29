@@ -6,6 +6,7 @@ import {
   getUserById,
   incrementCommunityPostViewCount,
   softDeleteCommunityPostById,
+  softDeleteCommunityPostByPlatformAdmin,
   updateCommunityPostById,
 } from "../../../../../../lib/platform-api";
 
@@ -92,7 +93,10 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const result = await softDeleteCommunityPostById(postId, user.id);
+  const result =
+    user.role === "PLATFORM"
+      ? await softDeleteCommunityPostByPlatformAdmin(postId, user.id)
+      : await softDeleteCommunityPostById(postId, user.id);
   if (!result.ok) {
     if (result.code === "NOT_FOUND") return NextResponse.json({ error: "게시글을 찾을 수 없습니다." }, { status: 404 });
     if (result.code === "PERSIST_UNAVAILABLE") {

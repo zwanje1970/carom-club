@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import type { CSSProperties, KeyboardEvent, PointerEvent } from "react";
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./main-sample/main-sample.module.css";
+import siteStyles from "./main-site-scroll-cards.module.css";
 
 const SITE_SCROLL_CARD = "data-site-scroll-card";
 const SITE_SCROLL_SHORTCUT = "data-site-scroll-shortcut";
@@ -22,7 +23,7 @@ type CardRowProps = {
   rowKey: string;
   item: MainSiteScrollCardItem;
   selected: boolean;
-  onCardPointerDown: (rowKey: string) => void;
+  onCardPointerDown: (itemId: string) => void;
 };
 
 const MainSiteCardRow = memo(function MainSiteCardRow({
@@ -35,9 +36,9 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
     (e: PointerEvent<HTMLDivElement>) => {
       const t = e.target as HTMLElement | null;
       if (t?.closest(`[${SITE_SCROLL_SHORTCUT}]`)) return;
-      onCardPointerDown(rowKey);
+      onCardPointerDown(item.id);
     },
-    [rowKey, onCardPointerDown],
+    [item.id, onCardPointerDown],
   );
 
   const faceStyle: CSSProperties = {};
@@ -60,7 +61,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
       onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
         if (e.key !== "Enter" && e.key !== " ") return;
         e.preventDefault();
-        onCardPointerDown(rowKey);
+        onCardPointerDown(item.id);
       }}
     >
       <div
@@ -111,8 +112,60 @@ export type MainSiteScrollCardsProps = {
   slideCardMoveDurationSec: number;
 };
 
+const MARQUEE_RESUME_AFTER_MS = 1000;
+
 export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSiteScrollCardsProps) {
-  const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [marqueePausedByUser, setMarqueePausedByUser] = useState(false);
+  const marqueeUserPauseRef = useRef(false);
+  const marqueeResumeTimerRef = useRef<number | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+
+  const bumpMarqueeUserPause = useCallback(() => {
+    if (!marqueeUserPauseRef.current) {
+      marqueeUserPauseRef.current = true;
+      setMarqueePausedByUser(true);
+    }
+    if (marqueeResumeTimerRef.current != null) {
+      window.clearTimeout(marqueeResumeTimerRef.current);
+    }
+    marqueeResumeTimerRef.current = window.setTimeout(() => {
+      marqueeUserPauseRef.current = false;
+      setMarqueePausedByUser(false);
+      marqueeResumeTimerRef.current = null;
+    }, MARQUEE_RESUME_AFTER_MS);
+  }, []);
+
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el || items.length === 0) return;
+
+    const onScroll = () => {
+      bumpMarqueeUserPause();
+    };
+    const onWheel = () => {
+      bumpMarqueeUserPause();
+    };
+    const onTouchMove = () => {
+      bumpMarqueeUserPause();
+    };
+
+    el.addEventListener("scroll", onScroll, { passive: true });
+    el.addEventListener("wheel", onWheel, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: true });
+
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("touchmove", onTouchMove);
+      if (marqueeResumeTimerRef.current != null) {
+        window.clearTimeout(marqueeResumeTimerRef.current);
+        marqueeResumeTimerRef.current = null;
+      }
+      marqueeUserPauseRef.current = false;
+      setMarqueePausedByUser(false);
+    };
+  }, [items.length, bumpMarqueeUserPause]);
 
   const trackStyle = useMemo(
     () =>
@@ -132,22 +185,22 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
     [slideCardMoveDurationSec],
   );
 
-  const onCardPointerDown = useCallback((rowKey: string) => {
-    setSelectedRowKey((prev) => {
-      if (prev === null) return rowKey;
-      if (prev === rowKey) return null;
+  const onCardPointerDown = useCallback((itemId: string) => {
+    setSelectedItemId((prev) => {
+      if (prev === null) return itemId;
+      if (prev === itemId) return null;
       return null;
     });
   }, []);
 
   const onViewportPointerDownCapture = useCallback(
     (e: PointerEvent<HTMLDivElement>) => {
-      if (selectedRowKey === null) return;
+      if (selectedItemId === null) return;
       const el = e.target as HTMLElement | null;
       if (!el || el.closest(`[${SITE_SCROLL_CARD}]`)) return;
-      setSelectedRowKey(null);
+      setSelectedItemId(null);
     },
-    [selectedRowKey],
+    [selectedItemId],
   );
 
   if (items.length === 0) {
@@ -159,7 +212,15 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
   }
 
   const renderSegment = (segmentKey: string) => (
-    <div className={styles.sampleMainMarqueeSegment} key={segmentKey}>
+    <div
+      className={`${styles.sampleMainMarqueeSegment} ${siteStyles.segmentNoShrink} ${siteStyles.segmentRelativeForDim}`}
+      key={segmentKey}
+    >
+      <div
+        className={`${siteStyles.marqueeDimLayer} ${selectedItemId ? siteStyles.marqueeDimLayerVisible : ""}`}
+        aria-hidden
+      />
+      <div className={siteStyles.leadInSpacer} aria-hidden />
       {items.map((item) => {
         const rowKey = `${segmentKey}-${item.id}`;
         return (
@@ -167,7 +228,7 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
             key={rowKey}
             rowKey={rowKey}
             item={item}
-            selected={selectedRowKey === rowKey}
+            selected={selectedItemId === item.id}
             onCardPointerDown={onCardPointerDown}
           />
         );
@@ -175,15 +236,18 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
     </div>
   );
 
+  const pauseMarquee = selectedItemId !== null || marqueePausedByUser;
+
   return (
     <div
-      className={styles.slideViewportSiteMain}
+      ref={viewportRef}
+      className={`${styles.slideViewportSiteMain} ${siteStyles.viewportMarquee}`}
       data-no-root-swipe
       onPointerDownCapture={onViewportPointerDownCapture}
     >
       <div
-        className={styles.sampleMainMarqueeTrack}
-        style={selectedRowKey !== null ? trackStylePaused : trackStyle}
+        className={`${styles.sampleMainMarqueeTrack} ${siteStyles.trackWillChange}`}
+        style={pauseMarquee ? trackStylePaused : trackStyle}
       >
         {renderSegment("a")}
         {renderSegment("b")}

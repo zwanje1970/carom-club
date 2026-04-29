@@ -1,3 +1,5 @@
+import { headers } from "next/headers";
+import { isCaromClubMobileAppShell } from "../../../lib/is-carom-club-mobile-app-shell";
 import { getClientStatusByUserId } from "../../../lib/surface-read";
 import { getRequestSessionUser } from "../../../lib/server/request-session-user";
 import type { SiteLayoutMenuItem } from "../../../lib/types/entities";
@@ -22,8 +24,11 @@ export async function getPcSiteHeaderAdminFlags(): Promise<PcSiteHeaderAdminEntr
   const user = await getRequestSessionUser();
   if (!user) return { showClient: false, showPlatform: false };
 
+  const headerList = await headers();
+  const appShell = isCaromClubMobileAppShell(headerList);
+
   if (user.role === "PLATFORM") {
-    return { showClient: false, showPlatform: true };
+    return { showClient: false, showPlatform: appShell ? false : true };
   }
 
   if (user.role === "CLIENT") {

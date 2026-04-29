@@ -1,4 +1,5 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { isCaromClubMobileAppShell } from "../../../../../lib/is-carom-club-mobile-app-shell";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
@@ -69,15 +70,19 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
 
   const cookieStore = await cookies();
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
-  let canManage = false;
+  let canManageAuthor = false;
+  let canPlatformDelete = false;
   let currentUserId: string | null = null;
   if (session) {
     const user = await getUserById(session.userId);
     if (user) {
       currentUserId = user.id;
-      canManage = await isCommunityPostAuthor(post.authorUserId, user.id);
+      canManageAuthor = await isCommunityPostAuthor(post.authorUserId, user.id);
+      const headerList = await headers();
+      canPlatformDelete = user.role === "PLATFORM" && !isCaromClubMobileAppShell(headerList);
     }
   }
+  const canDeletePost = canManageAuthor || canPlatformDelete;
 
   const { segments, tailImages } = parseCommunityPostBodySegmentsWithSizes(
     post.content,
@@ -152,7 +157,12 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
             ))}
           </div>
         </article>
-        <CommunityPostDetailActions canManage={canManage} postId={postId} boardType={boardType} />
+        <CommunityPostDetailActions
+          canManageAuthor={canManageAuthor}
+          canDeletePost={canDeletePost}
+          postId={postId}
+          boardType={boardType}
+        />
         <CommunityPostCommentsSection
           boardType={boardType}
           postId={postId}

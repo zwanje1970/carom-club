@@ -156,7 +156,6 @@ function cardStyleForRole(
       opacity: 0,
       visibility: "hidden",
       transform: incomingTranslateY(1, incomingFromBottomUi),
-      filter: "blur(0)",
       zIndex: 1,
     };
   }
@@ -169,7 +168,6 @@ function cardStyleForRole(
         opacity: 0,
         visibility: "hidden",
         transform: bottomTransform,
-        filter: "blur(0)",
         zIndex: 120,
       };
     }
@@ -178,7 +176,6 @@ function cardStyleForRole(
       opacity: 1,
       visibility: "visible",
       transform: incomingTranslateY(factor, incomingFromBottomUi),
-      filter: "blur(0)",
       zIndex: 120,
     };
   }
@@ -189,7 +186,6 @@ function cardStyleForRole(
         opacity: 1,
         visibility: "visible",
         transform: incomingTranslateY(-INCOMING_ABOVE_CENTER_SEC / INCOMING_RISE_S, incomingFromBottomUi),
-        filter: "blur(0)",
         zIndex: 100,
       };
     }
@@ -210,7 +206,6 @@ function cardStyleForRole(
       opacity,
       visibility: opacity < 0.02 ? "hidden" : "visible",
       transform: centerRetreatTransform(move.ty, outgoingScale, incomingFromBottomUi),
-      filter: "blur(0)",
       zIndex: 40,
     };
   }
@@ -220,7 +215,6 @@ function cardStyleForRole(
     opacity: 0,
     visibility: "hidden",
     transform: `translateY(${end.ty}%) scale(${end.sc})`,
-    filter: "blur(0)",
     zIndex: 40,
   };
 }
@@ -238,17 +232,41 @@ function sceneRoleForCard(cardIndex: number, n: number, sceneId: number): SceneR
   return "idle";
 }
 
+const INCOMING_PHASE_END = INCOMING_DELAY_S + INCOMING_RISE_S;
+
+/** 첫 상승 구간: 가운데 슬롯 카드도 하단 incoming과 동일 진행(첫 페인트에 center 고정 방지) */
+function coerceRoleForOpeningFirstRise(
+  role: SceneRole,
+  cardIndex: number,
+  n: number,
+  effectiveSceneId: number,
+  tInScene: number,
+): SceneRole {
+  if (tInScene >= INCOMING_PHASE_END) return role;
+  if (n <= 1 && cardIndex === 0) return "incoming";
+  if (n > 1 && effectiveSceneId === 0) {
+    const centerIdx = (effectiveSceneId + 1) % n;
+    if (cardIndex === centerIdx) return "incoming";
+  }
+  return role;
+}
+
 export default function MainSceneSlideDeck({
   items,
   sectionLabel = "",
   siteNoticeText,
   incomingFromBottomUi = false,
+  sceneClockReady = true,
+  onHeroBackgroundImageLoad,
 }: {
   items: SlideDeckItem[];
   sectionLabel?: string;
   siteNoticeText?: string | null;
   /** 모바일 메인(UA)만: incoming 시작을 카드 높이+하단 고정 UI 아래로 — 짧은 슬라이드에서 중간 등장 완화 */
   incomingFromBottomUi?: boolean;
+  /** false면 장면 시계 미시작(히어로 배경 이미지 decode 대기) */
+  sceneClockReady?: boolean;
+  onHeroBackgroundImageLoad?: () => void;
 }) {
   const router = useRouter();
   /** null이면 장면 시계 미시작(첫 카드·초기 장면 고정). 값 설정 후 경과 시간 기준으로 전환 */
@@ -287,29 +305,41 @@ export default function MainSceneSlideDeck({
     };
   }, [n]);
 
-  /** 첫 페인트 전에 t0 설정 — rAF/rIC 이후면 sceneT=0 이 한두 프레임 이상 고정되는 문제 방지 */
+  /** sceneClockReady 가 될 때까지 t0 미설정 → elapsed=0 고정; 이후 2프레임 뒤 시계 시작 */
   useLayoutEffect(() => {
     if (n === 0) {
       animationT0Ref.current = null;
       return;
     }
     animationT0Ref.current = null;
-    const t0 = Date.now();
-    animationT0Ref.current = t0;
-    setFrameTime(t0);
+    if (!sceneClockReady) {
+      return () => {
+        animationT0Ref.current = null;
+      };
+    }
+    let raf1 = 0;
+    let raf2 = 0;
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        const t0 = Date.now();
+        animationT0Ref.current = t0;
+        setFrameTime(t0);
+      });
+    });
     return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
       animationT0Ref.current = null;
     };
-  }, [n]);
+  }, [n, sceneClockReady]);
 
   useLayoutEffect(() => {
     if (n === 0) return;
-    const autoNowMs = pausedAtMsRef.current ?? frameTime;
     const animT0 = animationT0Ref.current;
+    if (animT0 == null) return;
+    const autoNowMs = pausedAtMsRef.current ?? frameTime;
     const elapsed =
-      animT0 == null
-        ? Math.max(0, sceneOffsetRef.current * SCENE_S)
-        : (autoNowMs - animT0 - pausedAccumulatedMsRef.current) / 1000 + sceneOffsetRef.current * SCENE_S;
+      (autoNowMs - animT0 - pausedAccumulatedMsRef.current) / 1000 + sceneOffsetRef.current * SCENE_S;
     const clampedElapsed = Math.max(0, elapsed);
     const sceneId = Math.floor(clampedElapsed / SCENE_S);
     const cycleOffset = n > 0 ? Math.floor(sceneId / n) : 0;
@@ -423,11 +453,11 @@ export default function MainSceneSlideDeck({
   };
 
   const autoNowMs = pausedAtMsRef.current ?? frameTime;
-  const animT0 = animationT0Ref.current;
+  const animT0Live = animationT0Ref.current;
   const elapsed =
-    animT0 == null
+    animT0Live == null
       ? Math.max(0, sceneOffsetRef.current * SCENE_S)
-      : (autoNowMs - animT0 - pausedAccumulatedMsRef.current) / 1000 + sceneOffsetRef.current * SCENE_S;
+      : (autoNowMs - animT0Live - pausedAccumulatedMsRef.current) / 1000 + sceneOffsetRef.current * SCENE_S;
   const clampedElapsed = Math.max(0, elapsed);
   const sceneId = Math.floor(clampedElapsed / SCENE_S);
   const tInScene = clampedElapsed % SCENE_S;
@@ -520,7 +550,8 @@ export default function MainSceneSlideDeck({
         onClickCapture={onCardClickCapture}
       >
         {items.map((item, i) => {
-          const role = sceneRoleForCard(i, n, effectiveSceneId);
+          const baseRole = sceneRoleForCard(i, n, effectiveSceneId);
+          const role = coerceRoleForOpeningFirstRise(baseRole, i, n, effectiveSceneId, tInScene);
           /** 같은 snapshot이라도 슬라이드가 한 바퀴 돌아 다시 incoming일 때 key가 바뀌어 진입 애니메이션이 다시 적용됨 */
           let activeIndex = 0;
           if (n > 1) {
@@ -529,15 +560,14 @@ export default function MainSceneSlideDeck({
               activeIndex = Math.floor((effectiveSceneId - firstIncomingScene) / n) + 1;
             }
           }
+          const incomingProgress = Math.min(
+            1,
+            Math.max(0, (tInScene - INCOMING_DELAY_S) / Math.max(0.001, INCOMING_RISE_S)),
+          );
           const style = cardStyleForRole(
             role,
             tInScene,
-            role === "incoming"
-              ? Math.min(
-                  1,
-                  Math.max(0, (tInScene - INCOMING_DELAY_S) / Math.max(0.001, INCOMING_RISE_S)),
-                )
-              : 0,
+            role === "incoming" ? incomingProgress : 0,
             incomingFromBottomUi,
           );
           return (
@@ -564,6 +594,7 @@ export default function MainSceneSlideDeck({
                     slideDeckSolidBackdrop={
                       SLIDE_DECK_SOLID_BACKDROPS[i % SLIDE_DECK_SOLID_BACKDROPS.length]
                     }
+                    onRepImageLoad={i === initialVisibleSlideIndex ? onHeroBackgroundImageLoad : undefined}
                   />
                 </div>
               </div>

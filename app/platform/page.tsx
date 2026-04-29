@@ -9,6 +9,34 @@ export default function PlatformPage() {
 
       <ul className="platform-home-menu-list">
         <li>
+          <Link href="/platform/data" className="platform-home-card">
+            <span className="platform-home-card-icon" aria-hidden>
+              🗄️
+            </span>
+            <span className="platform-home-card-body">
+              <span className="platform-home-card-title">데이터 관리</span>
+              <span className="platform-home-card-desc">삭제된 항목(백업함)·복구·완전 삭제</span>
+            </span>
+            <span className="platform-home-card-chevron" aria-hidden>
+              ›
+            </span>
+          </Link>
+        </li>
+        <li>
+          <Link href="/platform/tournaments" className="platform-home-card">
+            <span className="platform-home-card-icon" aria-hidden>
+              🏆
+            </span>
+            <span className="platform-home-card-body">
+              <span className="platform-home-card-title">대회 관리</span>
+              <span className="platform-home-card-desc">대회·게시 카드 삭제(백업함)</span>
+            </span>
+            <span className="platform-home-card-chevron" aria-hidden>
+              ›
+            </span>
+          </Link>
+        </li>
+        <li>
           <Link href="/platform/operations" className="platform-home-card">
             <span className="platform-home-card-icon" aria-hidden>
               ⚙️
