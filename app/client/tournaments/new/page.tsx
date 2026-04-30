@@ -834,10 +834,12 @@ export default function ClientTournamentNewPage() {
       : posterNormalizedForDisplay || posterObjectPreviewUrl || "";
 
   return (
-    <main className="v3-page v3-stack" style={{ maxWidth: "40rem", margin: "0 auto" }}>
-      <h1 className="v3-h1">
-        {showCreateDone ? "대회 생성 완료" : editId ? "대회 수정" : "새 대회 만들기"}
-      </h1>
+    <main className="v3-page v3-stack" style={{ maxWidth: "40rem", margin: "0 auto", paddingTop: "0.35rem" }}>
+      {editId || showCreateDone ? (
+        <h1 className="v3-h1">
+          {showCreateDone ? "대회 생성 완료" : "대회 수정"}
+        </h1>
+      ) : null}
       <p className="v3-muted">
         {showCreateDone
           ? "대회 정보는 이미 저장되었습니다. 다음 단계는 선택입니다."

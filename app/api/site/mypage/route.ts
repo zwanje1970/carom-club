@@ -24,37 +24,42 @@ function isTournamentOngoing(dateText: string): boolean {
 }
 
 async function getMypageApplicationRowsPayload(userId: string) {
-  const applications = await listTournamentApplicationsByUserIdFirestore(userId);
-  const applicationRows = await Promise.all(
-    applications.map(async (application) => {
-      const tournament = await getTournamentByIdFirestore(application.tournamentId);
-      return { application, tournament };
-    }),
-  );
+  try {
+    const applications = await listTournamentApplicationsByUserIdFirestore(userId);
+    const applicationRows = await Promise.all(
+      applications.map(async (application) => {
+        const tournament = await getTournamentByIdFirestore(application.tournamentId);
+        return { application, tournament };
+      }),
+    );
 
-  const visibleStatuses: TournamentApplicationStatus[] = [
-    "APPLIED",
-    "VERIFYING",
-    "WAITING_PAYMENT",
-    "APPROVED",
-  ];
-  const visibleRows = applicationRows.filter((row) => {
-    if (!row.tournament) return false;
-    if (!visibleStatuses.includes(row.application.status)) return false;
-    if (row.application.status === "APPROVED" || row.application.status === "APPLIED") {
-      return isTournamentOngoing(row.tournament.date);
-    }
-    return true;
-  });
+    const visibleStatuses: TournamentApplicationStatus[] = [
+      "APPLIED",
+      "VERIFYING",
+      "WAITING_PAYMENT",
+      "APPROVED",
+    ];
+    const visibleRows = applicationRows.filter((row) => {
+      if (!row.tournament) return false;
+      if (!visibleStatuses.includes(row.application.status)) return false;
+      if (row.application.status === "APPROVED" || row.application.status === "APPLIED") {
+        return isTournamentOngoing(row.tournament.date);
+      }
+      return true;
+    });
 
-  return visibleRows.map((row) => ({
-    applicationId: row.application.id,
-    tournamentId: row.application.tournamentId,
-    status: row.application.status,
-    createdAt: row.application.createdAt,
-    tournamentTitle: row.tournament?.title ?? "대회",
-    tournamentDate: row.tournament?.date || row.application.createdAt.slice(0, 10),
-  }));
+    return visibleRows.map((row) => ({
+      applicationId: row.application.id,
+      tournamentId: row.application.tournamentId,
+      status: row.application.status,
+      createdAt: row.application.createdAt,
+      tournamentTitle: row.tournament?.title ?? "대회",
+      tournamentDate: row.tournament?.date || row.application.createdAt.slice(0, 10),
+    }));
+  } catch (e) {
+    console.warn("[api/site/mypage] getMypageApplicationRowsPayload", e);
+    return [];
+  }
 }
 
 /** 마이페이지 클라이언트 지연 로드용 — RSC 초기 렌더와 분리 */
@@ -70,15 +75,28 @@ export async function GET(request: Request) {
   const part = new URL(request.url).searchParams.get("part");
 
   if (part === "footer") {
-    const clientApplicationStatus = await getClientStatusByUserId(user.id);
+    let clientApplicationStatus: Awaited<ReturnType<typeof getClientStatusByUserId>> = null;
+    try {
+      clientApplicationStatus = await getClientStatusByUserId(user.id);
+    } catch (e) {
+      console.warn("[api/site/mypage?part=footer] getClientStatusByUserId", e);
+    }
     return NextResponse.json({ clientApplicationStatus });
   }
 
   if (part === "notifications") {
-    const [notifications, clientApplicationStatus] = await Promise.all([
-      listNotificationsByUserId(user.id, 20),
-      getClientStatusByUserId(user.id),
-    ]);
+    let notifications: Awaited<ReturnType<typeof listNotificationsByUserId>> = [];
+    let clientApplicationStatus: Awaited<ReturnType<typeof getClientStatusByUserId>> = null;
+    try {
+      notifications = await listNotificationsByUserId(user.id, 20);
+    } catch (e) {
+      console.warn("[api/site/mypage?part=notifications] listNotificationsByUserId", e);
+    }
+    try {
+      clientApplicationStatus = await getClientStatusByUserId(user.id);
+    } catch (e) {
+      console.warn("[api/site/mypage?part=notifications] getClientStatusByUserId", e);
+    }
     return NextResponse.json({
       notifications: notifications.map((n) => ({
         id: n.id,
@@ -97,11 +115,24 @@ export async function GET(request: Request) {
     return NextResponse.json({ applicationRows });
   }
 
-  const [notifications, clientApplicationStatus, applicationRows] = await Promise.all([
-    listNotificationsByUserId(user.id, 20),
-    getClientStatusByUserId(user.id),
-    getMypageApplicationRowsPayload(user.id),
-  ]);
+  let notifications: Awaited<ReturnType<typeof listNotificationsByUserId>> = [];
+  let clientApplicationStatus: Awaited<ReturnType<typeof getClientStatusByUserId>> = null;
+  let applicationRows: Awaited<ReturnType<typeof getMypageApplicationRowsPayload>> = [];
+  try {
+    notifications = await listNotificationsByUserId(user.id, 20);
+  } catch (e) {
+    console.warn("[api/site/mypage] listNotificationsByUserId", e);
+  }
+  try {
+    clientApplicationStatus = await getClientStatusByUserId(user.id);
+  } catch (e) {
+    console.warn("[api/site/mypage] getClientStatusByUserId", e);
+  }
+  try {
+    applicationRows = await getMypageApplicationRowsPayload(user.id);
+  } catch (e) {
+    console.warn("[api/site/mypage] getMypageApplicationRowsPayload (full)", e);
+  }
 
   return NextResponse.json({
     notifications: notifications.map((n) => ({

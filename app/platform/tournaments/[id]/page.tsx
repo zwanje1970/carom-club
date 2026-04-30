@@ -23,16 +23,13 @@ export default async function PlatformTournamentDetailPage({
   const outlinePdfFileKind = outlineFileKindFromAsset(outlinePdfAsset);
 
   return (
-    <main className="v3-page v3-stack">
+    <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">
         <Link href="/platform/tournaments">← 대회 목록</Link>
         {" · "}
         <Link href="/platform/data/deleted">삭제된 항목 (백업함)</Link>
       </p>
       <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.75rem", alignItems: "center" }}>
-        <h1 className="v3-h1" style={{ margin: 0 }}>
-          대회 상세 (플랫폼)
-        </h1>
         <Link className="v3-btn" href={`/platform/tournaments/${id}/cards`}>
           게시 카드 관리
         </Link>

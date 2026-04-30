@@ -106,29 +106,7 @@ export default function ClientSettlementHubPage() {
   }, [loadOverview]);
 
   return (
-    <main className="v3-page v3-stack ui-client-dashboard" style={{ gap: "1rem" }}>
-      <header
-        className="v3-row ui-client-dashboard-header"
-        style={{
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: "0.75rem",
-          position: "sticky",
-          top: 0,
-          zIndex: 2,
-          background: "var(--ui-bg-page)",
-          paddingBottom: "0.5rem",
-          marginBottom: "-0.25rem",
-        }}
-      >
-        <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-          <h1 className="v3-h1" style={{ marginBottom: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
-            정산
-          </h1>
-        </div>
-      </header>
-
+    <main className="v3-page v3-stack ui-client-dashboard" style={{ gap: "1rem", paddingTop: "0.35rem" }}>
       <p className="v3-muted" style={{ margin: 0, fontSize: "0.88rem" }}>
         메인에 <strong>게시 중인 대회</strong>만 아래에 표시됩니다. 대회일과 관계없이 게시 후부터 장부를 사용할 수 있습니다.
       </p>

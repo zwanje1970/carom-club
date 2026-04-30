@@ -70,8 +70,7 @@ export default function PlatformSiteNoticePage() {
   }
 
   return (
-    <main className="v3-page v3-stack">
-      <h1 className="v3-h1">공지 관리</h1>
+    <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">사이트 전체에 사용할 1줄 공지입니다.</p>
 
       {loading ? <p className="v3-muted">불러오는 중...</p> : null}

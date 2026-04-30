@@ -103,13 +103,7 @@ export default function InquiryNewClient() {
   }
 
   return (
-    <main className="v3-page v3-stack ui-client-dashboard" style={{ gap: "0.85rem", maxWidth: "40rem" }}>
-      <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-        <h1 className="v3-h1" style={{ marginBottom: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
-          글 작성
-        </h1>
-      </div>
-
+    <main className="v3-page v3-stack ui-client-dashboard" style={{ gap: "0.85rem", maxWidth: "40rem", paddingTop: "0.35rem" }}>
       <p style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "#0f172a" }}>
         유형: {TYPE_LABEL[inquiryType]}
       </p>

@@ -191,8 +191,7 @@ export default function ClientVenueCardPublishPage() {
   }
 
   return (
-    <main className="v3-page v3-stack" style={{ maxWidth: "40rem", margin: "0 auto" }}>
-      <h1 className="v3-h1">게시카드 작성</h1>
+    <main className="v3-page v3-stack" style={{ maxWidth: "40rem", margin: "0 auto", paddingTop: "0.35rem" }}>
       <p className="v3-muted">템플릿 형식은 플랫폼에서 관리하고, 클라이언트는 당구장용 문구/이미지를 채워 발행합니다.</p>
       <p className="v3-muted">이 화면은 카드 내용 입력/발행 전용이며, 당구장 원본 데이터 전체를 수정하는 화면이 아닙니다.</p>
 

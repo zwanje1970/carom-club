@@ -664,18 +664,7 @@ export default function BlankBracketPrintClient() {
       {/* ── 설정 패널 ── */}
       <div className="bbp-no-print"
         style={{ maxWidth: "min(100%,56rem)", margin: "0 auto", padding: "0 0.75rem 1.5rem" }}>
-        <main className="v3-page v3-stack" style={{ gap: "1rem" }}>
-          <div
-            className="v3-row ui-client-dashboard-header"
-            style={{ justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}
-          >
-            <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem" }}>
-              <h1 className="v3-h1" style={{ margin: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
-                빈 대진표 출력
-              </h1>
-            </div>
-          </div>
-
+        <main className="v3-page v3-stack" style={{ gap: "1rem", paddingTop: "0.35rem" }}>
           <section className="v3-box v3-stack"
             style={{ gap: 0, border: "1px solid #d1d5db", borderRadius: "8px", padding: 0, overflow: "hidden" }}>
             <div style={{ padding: "1rem 1rem 0.75rem", borderBottom: "1px solid #e5e7eb", background: "#f8fafc" }}>

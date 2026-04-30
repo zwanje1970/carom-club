@@ -25,9 +25,7 @@ export default async function PlatformClientsListPage({
   });
 
   return (
-    <main className="v3-page v3-stack">
-      <h1 className="v3-h1">승인된 클라이언트 목록</h1>
-
+    <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <form className="v3-box v3-row" style={{ flexWrap: "wrap", gap: "0.75rem", alignItems: "flex-end" }}>
         <label className="v3-stack" style={{ gap: "0.3rem" }}>
           <span style={{ fontWeight: 600 }}>상태</span>

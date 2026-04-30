@@ -10,6 +10,19 @@ import { findUserByIdentifier, getClientStatusByUserId, getUserById } from "../.
 
 export const runtime = "nodejs";
 
+/** 로그인 POST·client-application 등과 동일한 name/path/httpOnly/sameSite/secure로 만료 Set-Cookie를 내려 보낸다. */
+function clearSessionCookieOnResponse(response: NextResponse): NextResponse {
+  const secure = process.env.NODE_ENV === "production";
+  response.cookies.set(SESSION_COOKIE_NAME, "", {
+    path: "/",
+    maxAge: 0,
+    httpOnly: true,
+    sameSite: "lax",
+    secure,
+  });
+  return response;
+}
+
 export async function GET() {
   const cookieStore = await cookies();
   const raw = cookieStore.get(SESSION_COOKIE_NAME)?.value;
@@ -21,8 +34,7 @@ export async function GET() {
 
   const user = await getUserById(session.userId);
   if (!user) {
-    cookieStore.delete(SESSION_COOKIE_NAME);
-    return NextResponse.json({ authenticated: false, session: null });
+    return clearSessionCookieOnResponse(NextResponse.json({ authenticated: false, session: null }));
   }
 
   const clientStatus = await getClientStatusByUserId(user.id);
@@ -96,7 +108,5 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE() {
-  const cookieStore = await cookies();
-  cookieStore.delete(SESSION_COOKIE_NAME);
-  return NextResponse.json({ authenticated: false, session: null });
+  return clearSessionCookieOnResponse(NextResponse.json({ authenticated: false, session: null }));
 }

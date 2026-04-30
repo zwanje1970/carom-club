@@ -3,8 +3,7 @@ import LogoutButton from "../components/LogoutButton";
 
 export default function PlatformPage() {
   return (
-    <main className="v3-page v3-stack platform-home">
-      <h1 className="v3-h1">플랫폼 홈</h1>
+    <main className="v3-page v3-stack platform-home" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">운영·사이트 관리로 이동합니다.</p>
 
       <ul className="platform-home-menu-list">

@@ -13,13 +13,12 @@ export default async function PlatformCommunityPostsAdminPage() {
   const posts = await listCommunityPostsAllPrimary(visible);
 
   return (
-    <main className="v3-page v3-stack">
+    <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">
         <Link href="/platform/site">← 사이트 관리</Link>
         {" · "}
         <Link href="/platform/data/deleted">삭제된 항목 (백업함)</Link>
       </p>
-      <h1 className="v3-h1">게시글 관리 (플랫폼)</h1>
       <p className="v3-muted">공개 게시판에 노출 중인 글만 나열합니다. 삭제 시 백업함(DELETED)으로 이동합니다.</p>
 
       {posts.length === 0 ? (

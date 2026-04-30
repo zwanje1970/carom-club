@@ -48,8 +48,7 @@ export default function PlatformSiteCopyPage() {
   }
 
   return (
-    <main className="v3-page v3-stack">
-      <h1 className="v3-h1">문구/카피</h1>
+    <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">사이트 문구를 검색하고 위치를 추적합니다.</p>
 
       <section className="v3-box v3-stack">

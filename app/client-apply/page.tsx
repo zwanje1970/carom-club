@@ -74,6 +74,7 @@ export default function ClientApplyPage() {
       const org = organizationName.trim();
       const contact = contactName.trim();
       const phone = contactPhone.trim();
+      const effectiveRequestedType: RequestedType = annualVisible ? requestedClientType : "GENERAL";
       if (!org || !contact || !phone) {
         const msg = "조직명, 담당자명, 담당자 연락처를 모두 입력해 주세요.";
         setMessage(msg);
@@ -91,7 +92,7 @@ export default function ClientApplyPage() {
           organizationName: org,
           contactName: contact,
           contactPhone: phone,
-          requestedClientType,
+          requestedClientType: effectiveRequestedType,
         }),
       });
 
@@ -129,7 +130,7 @@ export default function ClientApplyPage() {
       submittingRef.current = false;
       setLoading(false);
     }
-  }, [contactName, contactPhone, loadSnapshot, organizationName, requestedClientType, router]);
+  }, [annualVisible, contactName, contactPhone, loadSnapshot, organizationName, requestedClientType, router]);
 
   function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

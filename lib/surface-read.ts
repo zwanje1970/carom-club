@@ -2,7 +2,6 @@
  * App(non-api) 라우트용 읽기 진입. 구현은 `platform-backing-store` 및 Firestore 모듈.
  */
 import {
-  getApplicationSummariesFirestore,
   getClientOrganizationByIdForPlatformFirestore,
   listApprovedClientOrganizationsFirestore,
 } from "./server/firestore-client-applications";
@@ -29,12 +28,12 @@ import {
   getOutlinePdfAssetById,
   getProofImageAssetById,
   isSiteImagePubliclyAccessible,
+  getApplicationSummaries,
   getUserById,
   getClientStatusByUserId,
 } from "./server/platform-backing-store";
 
-export { getUserById, getClientStatusByUserId };
-export const getApplicationSummaries = getApplicationSummariesFirestore;
+export { getUserById, getClientStatusByUserId, getApplicationSummaries };
 export const listApprovedClientOrganizations = listApprovedClientOrganizationsFirestore;
 export const getClientOrganizationByIdForPlatform = getClientOrganizationByIdForPlatformFirestore;
 

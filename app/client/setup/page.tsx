@@ -361,14 +361,7 @@ export default function ClientSetupPage() {
   }
 
   return (
-    <main className="v3-page v3-stack ui-client-dashboard" style={{ maxWidth: "42rem" }}>
-      <div className="v3-row ui-client-dashboard-header" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
-        <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-          <h1 className="v3-h1" style={{ marginBottom: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
-            업체 설정
-          </h1>
-        </div>
-      </div>
+    <main className="v3-page v3-stack ui-client-dashboard" style={{ maxWidth: "42rem", paddingTop: "0.35rem" }}>
       <p className="v3-muted" style={{ margin: 0 }}>
         기본 사업장 정보를 입력합니다.
       </p>

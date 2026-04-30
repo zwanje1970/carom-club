@@ -56,7 +56,7 @@ export default function RecentNotifications({ initialItems }: { initialItems: No
   }
 
   if (items.length === 0) {
-    return <p className="v3-muted">새 알림이 없습니다.</p>;
+    return <p className="v3-muted">최근 알림이 없습니다.</p>;
   }
 
   return (

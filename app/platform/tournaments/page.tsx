@@ -24,11 +24,10 @@ export default async function PlatformTournamentsListPage() {
   const tournaments = await loadTournamentsForPlatformList();
 
   return (
-    <main className="v3-page v3-stack">
+    <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">
         <Link href="/platform">← 플랫폼 홈</Link>
       </p>
-      <h1 className="v3-h1">대회 관리 (플랫폼)</h1>
       <p className="v3-muted">목록에서 대회를 선택하면 상세·삭제·게시 카드 관리로 이동합니다.</p>
       <p className="v3-muted">
         <Link href="/platform/data/deleted">삭제된 항목 (백업함)</Link>

@@ -49,7 +49,6 @@ export default function SiteMypageClient({
 }) {
   const [menuPayload, setMenuPayload] = useState<MypageClientMenuPayload | null>(null);
   const [summaryClientPayload, setSummaryClientPayload] = useState<MypageClientMenuPayload | null>(null);
-  const [applicationsMount, setApplicationsMount] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,16 +62,12 @@ export default function SiteMypageClient({
         const json = (await res.json()) as MypageClientMenuPayload;
         if (!cancelled) setMenuPayload(json);
       } catch {
-        /* keep null — same as prior deferred failure (footer stayed loading) */
+        if (!cancelled) setMenuPayload({ clientApplicationStatus: null });
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  const onNotificationsFetchSettled = useCallback(() => {
-    setApplicationsMount(true);
   }, []);
 
   const onNotificationsMenuMeta = useCallback((p: MypageClientMenuPayload) => {
@@ -116,21 +111,9 @@ export default function SiteMypageClient({
         </Link>
       </section>
 
-      <MypageNotificationsDeferred
-        onFetchSettled={onNotificationsFetchSettled}
-        onNotificationsMenuMeta={onNotificationsMenuMeta}
-      />
+      <MypageNotificationsDeferred onNotificationsMenuMeta={onNotificationsMenuMeta} />
 
-      {applicationsMount ? (
-        <MypageApplicationsDeferred />
-      ) : (
-        <section className="card-clean site-detail-inner-stack">
-          <h2 className="site-mypage-card-title">진행중 / 미완료 신청</h2>
-          <p className="v3-muted" style={{ margin: 0 }}>
-            불러오는 중…
-          </p>
-        </section>
-      )}
+      <MypageApplicationsDeferred />
 
       <div className="site-mypage-footer-actions">
         {menuPayload === null ? (
@@ -144,6 +127,10 @@ export default function SiteMypageClient({
         ) : clientPending ? (
           <Link className="secondary-button" href="/client-status/pending">
             클라이언트 승인 대기
+          </Link>
+        ) : user.role === "CLIENT" ? (
+          <Link className="secondary-button" href="/client">
+            클라이언트 대시보드
           </Link>
         ) : user.role === "PLATFORM" ? (
           hidePlatformDashboardLink ? (
@@ -163,7 +150,7 @@ export default function SiteMypageClient({
         <Link className="secondary-button" href="/site/mypage/history" prefetch={false}>
           대회 이력 보기
         </Link>
-        <LogoutButton redirectTo="/" className="secondary-button site-mypage-logout" />
+        <LogoutButton redirectTo="/site" className="secondary-button site-mypage-logout" />
       </div>
     </section>
   );

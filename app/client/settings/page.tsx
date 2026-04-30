@@ -34,18 +34,7 @@ const ITEMS: {
 
 export default function ClientSettingsHubPage() {
   return (
-    <main className="v3-page v3-stack ui-client-dashboard" style={{ gap: "0.85rem" }}>
-      <div
-        className="v3-row ui-client-dashboard-header"
-        style={{ justifyContent: "space-between", flexWrap: "wrap", alignItems: "center", gap: "0.75rem" }}
-      >
-        <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-          <h1 className="v3-h1" style={{ marginBottom: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
-            부가기능
-          </h1>
-        </div>
-      </div>
-
+    <main className="v3-page v3-stack ui-client-dashboard" style={{ gap: "0.85rem", paddingTop: "0.35rem" }}>
       <ul className="v3-stack" style={{ gap: "0.65rem", listStyle: "none", margin: 0, padding: 0, maxWidth: "40rem" }}>
         {ITEMS.map((item) => (
           <li key={item.key}>

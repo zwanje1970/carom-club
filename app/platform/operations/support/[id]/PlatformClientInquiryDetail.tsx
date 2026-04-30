@@ -255,12 +255,6 @@ export default function PlatformClientInquiryDetail() {
         <InquiryComposerShell
           scroll={
             <div style={{ padding: "1rem", paddingBottom: "0.5rem" }}>
-              <div className="v3-row" style={{ alignItems: "center", gap: "0.65rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
-                <h1 className="v3-h1" style={{ marginBottom: 0 }}>
-                  문의
-                </h1>
-              </div>
-
               <section
                 className="v3-box v3-stack"
                 style={{

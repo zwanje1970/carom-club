@@ -12,8 +12,7 @@ export default async function PlatformClientDetailPage({
   if (!org) notFound();
 
   return (
-    <main className="v3-page v3-stack">
-      <h1 className="v3-h1">클라이언트 상세</h1>
+    <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <section className="v3-box v3-stack">
         <p>조직명: {org.name}</p>
         <p>슬러그: {org.slug || "-"}</p>

@@ -7,6 +7,7 @@ import {
   CACHE_TAG_SITE_COMMUNITY_CONFIG,
   CACHE_TAG_SITE_LAYOUT_CONFIG,
   CACHE_TAG_SITE_NOTICE,
+  CACHE_TAG_SITE_VENUES_BOARD_ROWS,
   CACHE_TAG_MAIN_SLIDE_ADS,
   CACHE_TAG_MAIN_SLIDE_SNAPSHOTS,
 } from "../cache-tags";
@@ -3741,8 +3742,93 @@ export async function ensurePlatformAdminAccount(params: {
   return created;
 }
 
+/**
+ * 클라이언트 신청 저장소: 운영(production)은 항상 Firestore.
+ * 로컬(dev)에서는 Firestore에 해당 사용자 문서가 있으면 Firestore를 우선해 JSON 신청과 이중 저장을 피한다.
+ */
+async function shouldPersistClientApplicationsToFirestore(userId: string): Promise<boolean> {
+  if (process.env.NODE_ENV === "production") return true;
+  if (!isFirestoreUsersBackendConfigured()) return false;
+  try {
+    const u = await firestoreGetUserById(userId.trim());
+    return u != null;
+  } catch {
+    return false;
+  }
+}
+
+async function createClientApplicationLocalDevStore(params: {
+  userId: string;
+  organizationName: string;
+  contactName: string;
+  contactPhone: string;
+  requestedClientType?: ClientRequestedType;
+}): Promise<{ ok: true; application: ClientApplication } | { ok: false; error: string }> {
+  const organizationName = params.organizationName.trim();
+  const contactName = params.contactName.trim();
+  const contactPhone = params.contactPhone.trim();
+
+  if (!organizationName) return { ok: false, error: "조직명을 입력해 주세요." };
+  if (!contactName) return { ok: false, error: "담당자명을 입력해 주세요." };
+  if (!contactPhone) return { ok: false, error: "담당자 연락처를 입력해 주세요." };
+
+  if (!isDevStoreFilePersistenceEnabled()) {
+    throw new ClientFirestoreUnavailableError();
+  }
+
+  const store = await readLocalJsonAggregate();
+  const user = findUserByRawId(store, params.userId.trim());
+  if (!user) return { ok: false, error: "사용자를 찾을 수 없습니다." };
+
+  const canonicalUserId = user.id;
+  const apps = store.clientApplications.filter((a) => a.userId === canonicalUserId);
+  apps.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const existing = apps[0];
+
+  if (existing?.status === "PENDING") {
+    return { ok: false, error: "이미 승인 대기 중인 신청이 있습니다." };
+  }
+  if (existing?.status === "APPROVED") {
+    return { ok: false, error: "이미 승인 완료된 클라이언트 계정입니다." };
+  }
+
+  const now = new Date().toISOString();
+  const requestedClientType: ClientRequestedType =
+    params.requestedClientType === "REGISTERED" ? "REGISTERED" : "GENERAL";
+  const id = randomUUID();
+  const nextApplication: ClientApplication = {
+    id,
+    userId: canonicalUserId,
+    organizationName,
+    contactName,
+    contactPhone,
+    requestedClientType,
+    status: "PENDING",
+    rejectedReason: null,
+    reviewedAt: null,
+    reviewedByUserId: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  store.clientApplications.push(nextApplication);
+  user.role = "CLIENT";
+  user.updatedAt = now;
+  await writeLocalJsonAggregate(store);
+  return { ok: true, application: nextApplication };
+}
+
 export async function getLatestClientApplicationByUserId(userId: string): Promise<ClientApplication | null> {
-  return getLatestClientApplicationByUserIdFirestore(userId);
+  if (await shouldPersistClientApplicationsToFirestore(userId)) {
+    return getLatestClientApplicationByUserIdFirestore(userId);
+  }
+  const uid = userId.trim();
+  if (!uid) return null;
+  const store = await readLocalJsonAggregate();
+  const apps = store.clientApplications.filter((a) => a.userId === uid);
+  if (apps.length === 0) return null;
+  apps.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return apps[0]!;
 }
 
 export async function createClientApplication(params: {
@@ -3752,11 +3838,145 @@ export async function createClientApplication(params: {
   contactPhone: string;
   requestedClientType?: ClientRequestedType;
 }): Promise<{ ok: true; application: ClientApplication } | { ok: false; error: string }> {
-  return createClientApplicationFirestore(params);
+  if (await shouldPersistClientApplicationsToFirestore(params.userId)) {
+    return createClientApplicationFirestore(params);
+  }
+  return createClientApplicationLocalDevStore(params);
 }
 
 export async function listClientApplications(): Promise<ClientApplication[]> {
   return listClientApplicationsFirestore();
+}
+
+function mapApplicationStatusToOrgApprovalStatusLocal(
+  status: ClientApplicationStatus
+): ClientOrganizationApprovalStatus {
+  if (status === "APPROVED") return "APPROVED";
+  if (status === "REJECTED") return "REJECTED";
+  return "PENDING";
+}
+
+async function updateClientApplicationStatusLocalDevStore(
+  applicationId: string,
+  params: {
+    status: ClientApplicationStatus;
+    reviewedByUserId: string;
+    rejectedReason?: string | null;
+  }
+): Promise<ClientApplication | null> {
+  if (!isDevStoreFilePersistenceEnabled()) {
+    throw new ClientFirestoreUnavailableError();
+  }
+  const aid = applicationId.trim();
+  if (!aid) return null;
+
+  const store = await readLocalJsonAggregate();
+  const idx = store.clientApplications.findIndex((a) => a.id === aid);
+  if (idx < 0) return null;
+
+  const prev = store.clientApplications[idx]!;
+  const now = new Date().toISOString();
+  const rejectedReason =
+    params.status === "REJECTED"
+      ? params.rejectedReason === undefined
+        ? prev.rejectedReason
+        : params.rejectedReason != null && String(params.rejectedReason).trim() !== ""
+          ? String(params.rejectedReason).trim()
+          : null
+      : null;
+
+  const updated: ClientApplication = {
+    ...prev,
+    status: params.status,
+    reviewedAt: now,
+    reviewedByUserId: params.reviewedByUserId.trim() || null,
+    rejectedReason,
+    updatedAt: now,
+  };
+
+  const canonicalUserId = prev.userId;
+  const requestedType: ClientRequestedType =
+    prev.requestedClientType === "REGISTERED" ? "REGISTERED" : "GENERAL";
+  const mappedApproval = mapApplicationStatusToOrgApprovalStatusLocal(params.status);
+  const orgId = `client-org-${canonicalUserId}`;
+  const canonical = resolveCanonicalUserId(store, canonicalUserId);
+  const orgIdx = store.clientOrganizations.findIndex(
+    (o) => o.id === orgId || resolveCanonicalUserId(store, o.clientUserId) === canonical
+  );
+  const existingOrg = orgIdx >= 0 ? store.clientOrganizations[orgIdx]! : null;
+
+  let nextOrg: ClientOrganizationStored;
+  if (existingOrg) {
+    const slug = existingOrg.slug?.trim() ? existingOrg.slug : `${orgId}_client`;
+    nextOrg = {
+      ...existingOrg,
+      name: existingOrg.name?.trim() ? existingOrg.name : prev.organizationName,
+      slug,
+      phone: existingOrg.phone ?? prev.contactPhone,
+      clientType: requestedType === "REGISTERED" ? "REGISTERED" : "GENERAL",
+      approvalStatus: mappedApproval,
+      membershipType: requestedType === "REGISTERED" ? "ANNUAL" : "NONE",
+      membershipExpireAt: requestedType === "REGISTERED" ? existingOrg.membershipExpireAt : null,
+      updatedAt: now,
+    };
+    if (params.status === "APPROVED" && nextOrg.status !== "SUSPENDED" && nextOrg.status !== "EXPELLED") {
+      nextOrg = { ...nextOrg, status: "ACTIVE" };
+    }
+  } else {
+    nextOrg = {
+      clientUserId: canonicalUserId,
+      id: orgId,
+      slug: `${orgId}_client`,
+      name: prev.organizationName,
+      type: "VENUE",
+      shortDescription: null,
+      description: null,
+      fullDescription: null,
+      logoImageUrl: null,
+      coverImageUrl: null,
+      phone: prev.contactPhone,
+      email: null,
+      website: null,
+      address: null,
+      addressDetail: null,
+      addressJibun: null,
+      zipCode: null,
+      latitude: null,
+      longitude: null,
+      addressNaverMapEnabled: false,
+      region: null,
+      typeSpecificJson: null,
+      clientType: requestedType === "REGISTERED" ? "REGISTERED" : "GENERAL",
+      approvalStatus: mappedApproval,
+      status: "ACTIVE",
+      adminRemarks: null,
+      membershipType: requestedType === "REGISTERED" ? "ANNUAL" : "NONE",
+      membershipExpireAt: null,
+      isPublished: false,
+      setupCompleted: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
+  store.clientApplications[idx] = updated;
+  if (orgIdx >= 0) {
+    store.clientOrganizations[orgIdx] = nextOrg;
+  } else {
+    store.clientOrganizations.push(nextOrg);
+  }
+
+  const user = findUserByRawId(store, canonicalUserId);
+  if (user) {
+    user.role = "CLIENT";
+    user.updatedAt = now;
+  }
+
+  await writeLocalJsonAggregate(store);
+  if (params.status === "APPROVED") {
+    revalidateSiteDataTag(CACHE_TAG_SITE_VENUES_BOARD_ROWS);
+  }
+  return updated;
 }
 
 export async function updateClientApplicationStatus(
@@ -3767,7 +3987,23 @@ export async function updateClientApplicationStatus(
     rejectedReason?: string | null;
   }
 ): Promise<ClientApplication | null> {
-  return updateClientApplicationStatusFirestore(applicationId, params);
+  if (process.env.NODE_ENV === "production") {
+    return updateClientApplicationStatusFirestore(applicationId, params);
+  }
+
+  if (isFirestoreUsersBackendConfigured()) {
+    try {
+      const fsResult = await updateClientApplicationStatusFirestore(applicationId, params);
+      if (fsResult != null) return fsResult;
+    } catch (e) {
+      if (e instanceof ClientFirestoreUnavailableError) {
+        return updateClientApplicationStatusLocalDevStore(applicationId, params);
+      }
+      throw e;
+    }
+  }
+
+  return updateClientApplicationStatusLocalDevStore(applicationId, params);
 }
 
 export async function getClientStatusByUserId(userId: string): Promise<ClientApplicationStatus | null> {
@@ -3864,7 +4100,7 @@ async function getClientOrganizationByUserIdFromLocalStore(userId: string): Prom
   );
 }
 
-async function resolveClientOrganizationForDashboardPolicy(userId: string): Promise<ClientOrganizationStored | null> {
+export async function resolveClientOrganizationForDashboardPolicy(userId: string): Promise<ClientOrganizationStored | null> {
   const uid = userId.trim();
   if (!uid) return null;
   if (isFirestoreUsersBackendConfigured()) {
@@ -4559,7 +4795,31 @@ export async function getApplicationSummaries(): Promise<
     user: DevUser | null;
   }>
 > {
-  return getApplicationSummariesFirestore();
+  if (process.env.NODE_ENV === "production") {
+    return getApplicationSummariesFirestore();
+  }
+
+  let fromFs: Array<{ application: ClientApplication; user: DevUser | null }> = [];
+  if (isFirestoreUsersBackendConfigured()) {
+    try {
+      fromFs = await getApplicationSummariesFirestore();
+    } catch {
+      fromFs = [];
+    }
+  }
+
+  const store = await readLocalJsonAggregate();
+  const seen = new Set(fromFs.map((x) => x.application.id));
+  const fromLocal: Array<{ application: ClientApplication; user: DevUser | null }> = [];
+  for (const application of store.clientApplications) {
+    if (seen.has(application.id)) continue;
+    seen.add(application.id);
+    fromLocal.push({ application, user: findUserByRawId(store, application.userId) });
+  }
+
+  const merged = [...fromFs, ...fromLocal];
+  merged.sort((a, b) => b.application.createdAt.localeCompare(a.application.createdAt));
+  return merged;
 }
 
 export function finalizeTournamentDates(

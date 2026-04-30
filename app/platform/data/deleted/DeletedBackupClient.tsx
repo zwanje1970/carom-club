@@ -106,11 +106,10 @@ export default function DeletedBackupClient() {
   }
 
   return (
-    <div className="v3-stack" style={{ gap: "1rem" }}>
+    <div className="v3-stack" style={{ gap: "1rem", paddingTop: "0.35rem" }}>
       <p className="v3-muted">
         <Link href="/platform/data">← 데이터 관리</Link>
       </p>
-      <h1 className="v3-h1">삭제된 항목 (백업함)</h1>
       <p className="v3-muted">
         완전 삭제는 되돌릴 수 없습니다. 완전 삭제 버튼을 누른 뒤 안내에 따라 입력란에 대문자 DELETE를 입력해야
         실행됩니다. 전체·일괄 삭제 기능은 없습니다.

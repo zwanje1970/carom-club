@@ -182,8 +182,7 @@ export default function PlatformSiteLayoutPage() {
   }
 
   return (
-    <main className="v3-page v3-stack">
-      <h1 className="v3-h1">헤더/푸터 관리</h1>
+    <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">사이트 공통 헤더/푸터 문구와 메뉴를 관리합니다.</p>
 
       <div className="v3-row">

@@ -2,8 +2,7 @@ import AdminCard, { AdminCardGrid } from "../../components/admin/AdminCard";
 
 export default function PlatformOperationsPage() {
   return (
-    <main className="v3-page v3-stack" style={{ gap: "1.15rem" }}>
-      <h1 className="v3-h1">운영 관리</h1>
+    <main className="v3-page v3-stack" style={{ gap: "1.15rem", paddingTop: "0.35rem" }}>
       <p className="v3-muted">관리 대상(클라이언트 · 회원 · 문의) 기준으로 묶었습니다.</p>
 
       <section className="v3-stack" style={{ gap: "0.5rem" }}>

@@ -2,8 +2,7 @@ import Link from "next/link";
 
 export default function PlatformSitePage() {
   return (
-    <main className="v3-page v3-stack">
-      <h1 className="v3-h1">사이트 관리</h1>
+    <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">이 화면은 사이트 운영 작업으로 이동하는 허브입니다.</p>
       <p className="v3-muted">페이지 구성 편집은 아래 &quot;페이지 빌더&quot;로 이동하세요.</p>
       <ul className="v3-list">

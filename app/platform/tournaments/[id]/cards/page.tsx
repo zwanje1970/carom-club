@@ -18,13 +18,12 @@ export default async function PlatformTournamentPublishedCardsPage({
   const cards = (await loadTournamentPublishedCardsArray()).filter((c) => c.tournamentId === id);
 
   return (
-    <main className="v3-page v3-stack">
+    <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">
         <Link href={`/platform/tournaments/${id}`}>← 대회 상세</Link>
         {" · "}
         <Link href="/platform/data/deleted">삭제된 항목 (백업함)</Link>
       </p>
-      <h1 className="v3-h1">게시 카드 관리</h1>
       <p className="v3-muted">{tournament.title}</p>
 
       {cards.length === 0 ? (

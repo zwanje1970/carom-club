@@ -58,15 +58,7 @@ export default function InquiryListClient() {
   }, [load]);
 
   return (
-    <main className="v3-page v3-stack ui-client-dashboard" style={{ gap: "0.85rem" }}>
-      <div className="v3-row ui-client-dashboard-header" style={{ flexWrap: "wrap", alignItems: "center", gap: "0.75rem" }}>
-        <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-          <h1 className="v3-h1" style={{ marginBottom: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
-            문의 내역
-          </h1>
-        </div>
-      </div>
-
+    <main className="v3-page v3-stack ui-client-dashboard" style={{ gap: "0.85rem", paddingTop: "0.35rem" }}>
       <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
         <Link className="v3-btn" href="/client/settings/inquiries/new?type=error" style={{ padding: "0.45rem 0.85rem" }}>
           오류 제보 작성

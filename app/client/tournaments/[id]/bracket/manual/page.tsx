@@ -121,11 +121,7 @@ export default function BracketManualAssignPage() {
   }
 
   return (
-    <main className="v3-page v3-stack">
-      <h1 className="v3-h1" style={{ marginBottom: 0 }}>
-        수동배정
-      </h1>
-
+    <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">최신 스냅샷 참가자를 운영자가 2명씩 직접 묶습니다. 이 단계에서는 저장하지 않습니다.</p>
       {message ? <p className="v3-muted">{message}</p> : null}
 

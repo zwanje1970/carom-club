@@ -6,6 +6,8 @@ import { getUserById } from "../../../lib/surface-read";
 import SiteShellFrame from "../components/SiteShellFrame";
 import SiteMypageClient from "./SiteMypageClient";
 
+export const dynamic = "force-dynamic";
+
 export default async function SiteMypagePage() {
   const cookieStore = await cookies();
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);

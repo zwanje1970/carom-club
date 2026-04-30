@@ -4,11 +4,13 @@ export default function ClientPendingPage() {
   return (
     <main className="v3-page v3-stack" style={{ maxWidth: "34rem", margin: "0 auto" }}>
       <h1 className="v3-h1">클라이언트 승인 대기</h1>
-      <p className="v3-muted">신청은 접수되었고, 플랫폼 관리자의 승인 전까지 client 기능은 잠금 상태입니다.</p>
 
       <section className="v3-box v3-stack">
-        <p>현재 상태: PENDING</p>
-        <p>승인 전에는 대회 생성/참가자/정산 등 client 실기능에 접근할 수 없습니다.</p>
+        <p>현재 상태: 승인 대기 중</p>
+        <p>신청이 정상적으로 접수되었습니다.</p>
+        <p>현재 관리자 승인 대기 중입니다.</p>
+        <p>승인이 완료되면 대회 생성, 참가자 관리 등의 기능을 이용하실 수 있습니다.</p>
+        <p>※ 승인까지 시간이 걸릴 수 있으니 잠시만 기다려 주세요.</p>
       </section>
 
       <div className="v3-row">

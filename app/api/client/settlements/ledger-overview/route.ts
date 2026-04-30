@@ -9,6 +9,12 @@ import { getSettlementLedgerOverviewForClientFirestore } from "../../../../../li
 
 export const runtime = "nodejs";
 
+const EMPTY_LEDGER_OK = {
+  ok: true as const,
+  rows: [] as { tournamentId: string; title: string; income: number; expense: number; net: number }[],
+  grand: { income: 0, expense: 0, net: 0 },
+};
+
 export async function GET() {
   const cookieStore = await cookies();
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
@@ -18,18 +24,22 @@ export async function GET() {
 
   const user = await settlementApiGetSessionUser(session.userId);
   if (!user) {
-    return NextResponse.json({ error: "사용자를 찾을 수 없습니다." }, { status: 401 });
+    return NextResponse.json(EMPTY_LEDGER_OK);
   }
 
   if (user.role === "PLATFORM") {
-    const result = await getSettlementLedgerOverviewForClientFirestore({
-      userId: user.id,
-      role: "PLATFORM",
-    });
-    if (!result.ok) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
+    try {
+      const result = await getSettlementLedgerOverviewForClientFirestore({
+        userId: user.id,
+        role: "PLATFORM",
+      });
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+      return NextResponse.json(result);
+    } catch {
+      return NextResponse.json(EMPTY_LEDGER_OK);
     }
-    return NextResponse.json(result);
   }
 
   if (user.role !== "CLIENT") {
@@ -41,12 +51,16 @@ export async function GET() {
     return NextResponse.json({ error: gate.error }, { status: 403 });
   }
 
-  const result = await getSettlementLedgerOverviewForClientFirestore({
-    userId: user.id,
-    role: "CLIENT",
-  });
-  if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: 400 });
+  try {
+    const result = await getSettlementLedgerOverviewForClientFirestore({
+      userId: user.id,
+      role: "CLIENT",
+    });
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+    return NextResponse.json(result);
+  } catch {
+    return NextResponse.json(EMPTY_LEDGER_OK);
   }
-  return NextResponse.json(result);
 }

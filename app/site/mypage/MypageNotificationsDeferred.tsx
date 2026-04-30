@@ -14,10 +14,8 @@ const RecentNotifications = dynamic(() => import("./RecentNotifications"), {
 });
 
 export default function MypageNotificationsDeferred({
-  onFetchSettled,
   onNotificationsMenuMeta,
 }: {
-  onFetchSettled?: () => void;
   onNotificationsMenuMeta?: (p: MypageClientMenuPayload) => void;
 }) {
   const [items, setItems] = useState<NotificationItem[] | null>(null);
@@ -41,14 +39,12 @@ export default function MypageNotificationsDeferred({
         onNotificationsMenuMeta?.({ clientApplicationStatus: json.clientApplicationStatus });
       } catch {
         if (!cancelled) setFailed(true);
-      } finally {
-        if (!cancelled) onFetchSettled?.();
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [onFetchSettled, onNotificationsMenuMeta]);
+  }, [onNotificationsMenuMeta]);
 
   if (failed) {
     return (

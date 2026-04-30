@@ -92,11 +92,7 @@ export default function BracketPreviewPage() {
   }
 
   return (
-    <main className="v3-page v3-stack">
-      <h1 className="v3-h1" style={{ marginBottom: 0 }}>
-        브래킷 미리보기
-      </h1>
-
+    <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">이 화면은 임시 배정 결과 확인 단계입니다. 확정 저장 전에는 실제 브래킷이 바뀌지 않습니다.</p>
       {message ? <p className="v3-muted">{message}</p> : null}
 

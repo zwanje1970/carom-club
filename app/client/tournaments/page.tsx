@@ -27,8 +27,7 @@ export default async function ClientTournamentsListPage() {
     : [];
 
   return (
-    <main className="v3-page v3-stack">
-      <h1 className="v3-h1">대회 목록</h1>
+    <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">로그인 사용자 기준으로 생성된 대회를 확인합니다.</p>
 
       <div className="v3-row">

@@ -24,7 +24,7 @@ export default function MypageApplicationsList({ rows }: { rows: MypageApplicati
   if (rows.length === 0) {
     return (
       <p className="v3-muted" style={{ margin: 0 }}>
-        현재 진행중 신청이 없습니다.
+        진행 중인 신청이 없습니다.
       </p>
     );
   }

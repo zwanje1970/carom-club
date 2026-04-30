@@ -12,8 +12,7 @@ export default async function PlatformOperationsClientsPage() {
   } catch (e) {
     if (e instanceof ClientFirestoreUnavailableError) {
       return (
-        <main className="v3-page v3-stack">
-          <h1 className="v3-h1">클라이언트(업체)</h1>
+        <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
           <p className="v3-muted">
             클라이언트 신청 저장소(Firestore)가 설정되지 않아 목록을 불러올 수 없습니다. 환경 변수를 확인한 뒤 다시 시도해 주세요.
           </p>
@@ -28,8 +27,7 @@ export default async function PlatformOperationsClientsPage() {
   }));
 
   return (
-    <main className="v3-page v3-stack">
-      <h1 className="v3-h1">클라이언트(업체)</h1>
+    <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">신청 상태를 미확인·승인·거절로 관리합니다. 행을 눌러 상세·처리합니다.</p>
 
       <section className="v3-box v3-stack ui-platform-clients-section">

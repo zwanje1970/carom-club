@@ -335,12 +335,6 @@ export default function InquiryDetailClient() {
         <InquiryComposerShell
           scroll={
             <div style={{ padding: "1rem", paddingBottom: "0.5rem" }}>
-              <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
-                <h1 className="v3-h1" style={{ marginBottom: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
-                  문의
-                </h1>
-              </div>
-
               <section className="v3-box v3-stack" style={{ gap: "0.5rem", padding: "1rem" }}>
                 <p style={{ margin: 0, fontSize: "0.9rem" }}>
                   <strong>유형</strong> {TYPE_LABEL[row.type] ?? row.type}

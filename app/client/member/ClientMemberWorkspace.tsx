@@ -154,13 +154,8 @@ export default function ClientMemberWorkspace() {
     sendableIds.some((id) => selected.has(id)) && title.trim().length > 0 && body.trim().length > 0 && !sending;
 
   return (
-    <main className="v3-page v3-stack ui-client-dashboard" style={{ gap: "1rem" }}>
-      <div className="v3-row ui-client-dashboard-header" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem" }}>
-        <div className="v3-row" style={{ alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-          <h1 className="v3-h1" style={{ marginBottom: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
-            회원
-          </h1>
-        </div>
+    <main className="v3-page v3-stack ui-client-dashboard" style={{ gap: "1rem", paddingTop: "0.35rem" }}>
+      <div className="v3-row" style={{ justifyContent: "flex-end", flexWrap: "wrap", gap: "0.75rem" }}>
         <button
           type="button"
           className="v3-btn"
