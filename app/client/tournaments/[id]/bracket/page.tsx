@@ -90,12 +90,12 @@ export default function TournamentBracketSnapshotPage() {
       const response = await fetch(`/api/client/tournaments/${tournamentId}/bracket`);
       const result = (await response.json()) as { bracket?: Bracket | null; error?: string };
       if (!response.ok) {
-        setMessage(result.error ?? "브래킷 조회에 실패했습니다.");
+        setMessage(result.error ?? "대진표 조회에 실패했습니다.");
         return;
       }
       setBracket(result.bracket ?? null);
     } catch {
-      setMessage("브래킷 조회 중 오류가 발생했습니다.");
+      setMessage("대진표 조회 중 오류가 발생했습니다.");
     }
   }
 
@@ -236,7 +236,7 @@ export default function TournamentBracketSnapshotPage() {
   return (
     <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">
-        자동배정/수동배정에서 임시 배정 후 미리보기에서 확인하고, 확정 저장 시점에만 실제 브래킷이 반영됩니다.
+        자동배정/수동배정에서 임시 배정 후 미리보기에서 확인하고, 확정 저장 시점에만 실제 대진표가 반영됩니다.
       </p>
 
       <section className="v3-box v3-stack">
@@ -271,20 +271,20 @@ export default function TournamentBracketSnapshotPage() {
           수동배정
         </Link>
         <a className="v3-btn" href="#confirmed-bracket">
-          현재 확정 브래킷 보기
+          현재 확정 대진표 보기
         </a>
       </div>
 
       {message ? <p className="v3-muted">{message}</p> : null}
 
       <section id="confirmed-bracket" className="v3-box v3-stack">
-        <h2 className="v3-h2">현재 확정 브래킷 (최신 1개)</h2>
+        <h2 className="v3-h2">현재 확정 대진표 (최신 1개)</h2>
         {!bracket ? (
-          <p className="v3-muted">아직 확정 저장된 브래킷이 없습니다.</p>
+          <p className="v3-muted">아직 확정 저장된 대진표가 없습니다.</p>
         ) : (
           <>
             <p>
-              <strong>브래킷 ID:</strong> {bracket.id}
+              <strong>대진표 ID:</strong> {bracket.id}
             </p>
             <p>
               <strong>입력 스냅샷:</strong> {bracket.snapshotId}

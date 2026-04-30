@@ -6742,7 +6742,7 @@ export async function createBracketFromSnapshot(
 
   const pairCount = Math.floor(snapshot.participants.length / 2);
   if (pairCount === 0) {
-    return { ok: false, error: "브래킷 생성을 위해 최소 2명의 참가자가 필요합니다." };
+    return { ok: false, error: "대진표 생성을 위해 최소 2명의 참가자가 필요합니다." };
   }
 
   const matches: BracketMatch[] = [];
@@ -6895,7 +6895,7 @@ export async function updateBracketMatchResult(params: {
     .filter((item) => item.tournamentId === tournamentId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] as MutableBracket | undefined;
   if (!latestBracket) {
-    return { ok: false, error: "확정 브래킷이 없습니다." };
+    return { ok: false, error: "확정 대진표가 없습니다." };
   }
 
   applyBracketDefaultsInPlace(latestBracket);
@@ -7005,7 +7005,7 @@ export async function replaceBracketMatchPlayer(params: {
     .filter((item) => item.tournamentId === tournamentId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] as MutableBracket | undefined;
   if (!latestBracket) {
-    return { ok: false, error: "확정 브래킷이 없습니다." };
+    return { ok: false, error: "확정 대진표가 없습니다." };
   }
 
   applyBracketDefaultsInPlace(latestBracket);
@@ -7036,7 +7036,7 @@ export async function replaceBracketMatchPlayer(params: {
   }
   const replacement = playerMap.get(replacementUserId);
   if (!replacement) {
-    return { ok: false, error: "같은 브래킷 참가자만 교체할 수 있습니다." };
+    return { ok: false, error: "같은 대진표 참가자만 교체할 수 있습니다." };
   }
 
   const currentPlayerUserId = params.slot === "player1" ? targetMatch.player1.userId : targetMatch.player2.userId;
@@ -7094,7 +7094,7 @@ export async function advanceBracketRound(
   const store = await readLocalJsonAggregate();
   const bracket = store.brackets.find((item) => item.id === bracketId) as MutableBracket | undefined;
   if (!bracket) {
-    return { ok: false, error: "브래킷을 찾을 수 없습니다." };
+    return { ok: false, error: "대진표를 찾을 수 없습니다." };
   }
 
   applyBracketDefaultsInPlace(bracket);

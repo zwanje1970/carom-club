@@ -93,7 +93,7 @@ export default function BracketPreviewPage() {
 
   return (
     <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
-      <p className="v3-muted">이 화면은 임시 배정 결과 확인 단계입니다. 확정 저장 전에는 실제 브래킷이 바뀌지 않습니다.</p>
+      <p className="v3-muted">이 화면은 임시 배정 결과 확인 단계입니다. 확정 저장 전에는 실제 대진표가 바뀌지 않습니다.</p>
       {message ? <p className="v3-muted">{message}</p> : null}
 
       <section className="v3-box v3-stack">

@@ -162,7 +162,7 @@ export async function createBracketFromSnapshotFirestore(
 
   const pairCount = Math.floor(snapshot.participants.length / 2);
   if (pairCount === 0) {
-    return { ok: false, error: "브래킷 생성을 위해 최소 2명의 참가자가 필요합니다." };
+    return { ok: false, error: "대진표 생성을 위해 최소 2명의 참가자가 필요합니다." };
   }
 
   const matches: BracketMatch[] = [];
@@ -329,13 +329,13 @@ export async function updateBracketMatchResultFirestore(params: {
         .limit(1);
       const qs = await tx.get(q);
       if (qs.empty) {
-        throw new BracketOpReject("확정 브래킷이 없습니다.");
+        throw new BracketOpReject("확정 대진표가 없습니다.");
       }
       const docSnap = qs.docs[0]!;
       const ref = docSnap.ref;
       const latestBracket = bracketFromDoc(docSnap.id, docSnap.data() as Record<string, unknown>) as MutableBracket;
       if (!latestBracket) {
-        throw new BracketOpReject("확정 브래킷이 없습니다.");
+        throw new BracketOpReject("확정 대진표가 없습니다.");
       }
 
       applyBracketDefaultsInPlace(latestBracket);
@@ -434,13 +434,13 @@ export async function replaceBracketMatchPlayerFirestore(params: {
         .limit(1);
       const qs = await tx.get(q);
       if (qs.empty) {
-        throw new BracketOpReject("확정 브래킷이 없습니다.");
+        throw new BracketOpReject("확정 대진표가 없습니다.");
       }
       const docSnap = qs.docs[0]!;
       const ref = docSnap.ref;
       const latestBracket = bracketFromDoc(docSnap.id, docSnap.data() as Record<string, unknown>) as MutableBracket;
       if (!latestBracket) {
-        throw new BracketOpReject("확정 브래킷이 없습니다.");
+        throw new BracketOpReject("확정 대진표가 없습니다.");
       }
 
       applyBracketDefaultsInPlace(latestBracket);
@@ -471,7 +471,7 @@ export async function replaceBracketMatchPlayerFirestore(params: {
       }
       const replacement = playerMap.get(replacementUserId);
       if (!replacement) {
-        throw new BracketOpReject("같은 브래킷 참가자만 교체할 수 있습니다.");
+        throw new BracketOpReject("같은 대진표 참가자만 교체할 수 있습니다.");
       }
 
       const currentPlayerUserId = params.slot === "player1" ? targetMatch.player1.userId : targetMatch.player2.userId;
@@ -521,11 +521,11 @@ export async function advanceBracketRoundFirestore(
       const ref = db.collection(BRACKETS).doc(bracketId.trim());
       const doc = await tx.get(ref);
       if (!doc.exists) {
-        throw new BracketOpReject("브래킷을 찾을 수 없습니다.");
+        throw new BracketOpReject("대진표를 찾을 수 없습니다.");
       }
       const bracketMut = bracketFromDoc(doc.id, doc.data() as Record<string, unknown>) as MutableBracket;
       if (!bracketMut) {
-        throw new BracketOpReject("브래킷을 찾을 수 없습니다.");
+        throw new BracketOpReject("대진표를 찾을 수 없습니다.");
       }
 
       applyBracketDefaultsInPlace(bracketMut);

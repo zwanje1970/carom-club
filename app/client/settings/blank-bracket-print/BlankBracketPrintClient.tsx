@@ -363,7 +363,7 @@ export default function BlankBracketPrintClient() {
       pdf.addImage(imgData, "PNG", MARGIN_MM, MARGIN_MM, 277, 190);
       const blob = pdf.output("blob");
       const nextUrl = URL.createObjectURL(blob);
-      const nextName = `${startPlayers}${bracketPdfLayoutType(style)}bracket${formatPdfDate(new Date())}.pdf`;
+      const nextName = `${startPlayers}${bracketPdfLayoutType(style)}daejinpyo${formatPdfDate(new Date())}.pdf`;
       if (pdfDownloadUrlRef.current) {
         URL.revokeObjectURL(pdfDownloadUrlRef.current);
       }

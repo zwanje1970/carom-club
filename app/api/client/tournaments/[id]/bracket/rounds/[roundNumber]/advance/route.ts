@@ -57,7 +57,7 @@ export async function POST(
 
   const latestBracket = await getLatestBracketByTournamentIdFirestore(id);
   if (!latestBracket) {
-    return NextResponse.json({ error: "확정 브래킷이 없습니다." }, { status: 400 });
+    return NextResponse.json({ error: "확정 대진표가 없습니다." }, { status: 400 });
   }
 
   const result = await advanceBracketRoundFirestore(latestBracket.id, parsedRoundNumber);
