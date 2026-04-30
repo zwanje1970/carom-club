@@ -15,13 +15,14 @@ async function readW320W640DirFiles(
   imageId: string,
   originalExt: ProofImageOriginalExt
 ): Promise<{ buffer: Buffer; ext: string } | null> {
-  const dir = path.join(getProofImagesBaseDir(), variant);
+  const dir = path.join(/* turbopackIgnore: true */ getProofImagesBaseDir(), variant);
+  const fileUnderDir = (name: string) => dir + path.sep + name;
   if (originalExt === "png") {
-    const pngPath = path.join(dir, `${imageId}.png`);
+    const pngPath = fileUnderDir(`${imageId}.png`);
     try {
       return { buffer: await readFile(pngPath), ext: "png" };
     } catch {
-      const jpgPath = path.join(dir, `${imageId}.jpg`);
+      const jpgPath = fileUnderDir(`${imageId}.jpg`);
       try {
         return { buffer: await readFile(jpgPath), ext: "jpg" };
       } catch {
@@ -29,11 +30,11 @@ async function readW320W640DirFiles(
       }
     }
   }
-  const jpgPath = path.join(dir, `${imageId}.jpg`);
+  const jpgPath = fileUnderDir(`${imageId}.jpg`);
   try {
     return { buffer: await readFile(jpgPath), ext: "jpg" };
   } catch {
-    const altPath = path.join(dir, `${imageId}.${originalExt}`);
+    const altPath = fileUnderDir(`${imageId}.${originalExt}`);
     try {
       return { buffer: await readFile(altPath), ext: originalExt };
     } catch {
@@ -54,7 +55,8 @@ export async function readProofImageVariantFile(
   if (variant === "original") {
     const fromW640 = await readW320W640DirFiles("w640", imageId, originalExt);
     if (fromW640) return fromW640;
-    const legacy = path.join(getProofImagesBaseDir(), "original", `${imageId}.${originalExt}`);
+    const base = getProofImagesBaseDir();
+    const legacy = base + path.sep + "original" + path.sep + imageId + "." + originalExt;
     try {
       return { buffer: await readFile(legacy), ext: originalExt };
     } catch {

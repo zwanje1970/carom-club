@@ -11,5 +11,5 @@ import path from "path";
 export function getProofImagesBaseDir(): string {
   const override = process.env.CAROM_PROOF_IMAGES_BASE?.trim();
   if (override) return path.resolve(override);
-  return path.join(process.cwd(), "data", "proof-images");
+  return path.join(/* turbopackIgnore: true */ process.cwd(), "data", "proof-images");
 }

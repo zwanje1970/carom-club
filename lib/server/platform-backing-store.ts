@@ -239,6 +239,8 @@ export type ClientOrganizationStored = {
   membershipExpireAt: string | null;
   isPublished: boolean;
   setupCompleted: boolean;
+  /** 참가자 자동 푸시(승인·전날) 통합. false만 OFF, 그 외는 ON. */
+  autoParticipantPushEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -408,6 +410,10 @@ export type Tournament = {
   deletedAt?: string | null;
   deletedBy?: string | null;
   deleteReason?: string | null;
+  /** 전날 알림 푸시에 사용(비어 있으면 cron에서 해당 대회는 발송 안 함). */
+  gatheringTime?: string | null;
+  /** 전날 알림 푸시 1회 발송 후 ISO 시각(cron 중복 방지). */
+  reminderSentAt?: string | null;
 };
 
 export type TournamentApplicationStatus =
@@ -932,13 +938,14 @@ type DevStore = {
 };
 
 const DEV_STORE_MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
+/** 로컬 JSON 저장 디렉터리 — Next 빌드 cwd와 무관하게 저장소 파일 기준 `../../data` */
 const STORE_DIR_PATH = path.resolve(DEV_STORE_MODULE_DIR, "../../data");
-const STORE_FILE_PATH = path.join(STORE_DIR_PATH, "v3-local-platform-aggregate.json");
+const STORE_FILE_PATH = STORE_DIR_PATH + path.sep + "v3-local-platform-aggregate.json";
 /** 저장 직전 메인 파일 덮어쓰기용 단일 백업(파싱 성공한 내용만 복사) */
-const STORE_BACKUP_PATH = path.join(STORE_DIR_PATH, "v3-local-platform-aggregate.json.backup");
-const STORE_BACKUP_TIMESTAMP_PATH = path.join(STORE_DIR_PATH, "v3-local-platform-aggregate.json.backup.timestamp");
+const STORE_BACKUP_PATH = STORE_DIR_PATH + path.sep + "v3-local-platform-aggregate.json.backup";
+const STORE_BACKUP_TIMESTAMP_PATH = STORE_DIR_PATH + path.sep + "v3-local-platform-aggregate.json.backup.timestamp";
 /** 메인 파일이 깨졌을 때 우선 복구에 사용하는 마지막 정상 스냅샷(원자적 저장으로 갱신) */
-const STORE_LAST_GOOD_PATH = path.join(STORE_DIR_PATH, "v3-local-platform-aggregate.json.last-good.json");
+const STORE_LAST_GOOD_PATH = STORE_DIR_PATH + path.sep + "v3-local-platform-aggregate.json.last-good.json";
 
 /**
  * 로컬 v3-local-platform-aggregate.json 읽기/쓰기/백업(copyfile 등) 허용 여부 — development 전용.
@@ -1403,7 +1410,7 @@ async function atomicWriteJsonFile(targetPath: string, jsonString: string): Prom
   }
   const dir = path.dirname(targetPath);
   const base = path.basename(targetPath);
-  const tmpPath = path.join(dir, `.${base}.tmp.${randomUUID()}`);
+  const tmpPath = dir + path.sep + `.${base}.tmp.${randomUUID()}`;
   try {
     const fh = await open(tmpPath, "w");
     try {
@@ -1956,6 +1963,13 @@ export function buildTournamentFromParsedRow(raw: unknown, clientOrganizations: 
     typeof t.deletedBy === "string" && t.deletedBy.trim() !== "" ? t.deletedBy.trim() : undefined;
   const deleteReason = typeof t.deleteReason === "string" ? t.deleteReason : undefined;
 
+  const gatheringTimeRaw = t.gatheringTime;
+  const gatheringTime =
+    typeof gatheringTimeRaw === "string" && gatheringTimeRaw.trim() !== "" ? gatheringTimeRaw.trim() : null;
+  const reminderSentAtRaw = t.reminderSentAt;
+  const reminderSentAt =
+    typeof reminderSentAtRaw === "string" && reminderSentAtRaw.trim() !== "" ? reminderSentAtRaw.trim() : null;
+
   return {
     id,
     title,
@@ -1982,6 +1996,8 @@ export function buildTournamentFromParsedRow(raw: unknown, clientOrganizations: 
     ...(deletedAt ? { deletedAt } : {}),
     ...(deletedBy ? { deletedBy } : {}),
     ...(deleteReason !== undefined && deleteReason !== "" ? { deleteReason } : {}),
+    ...(gatheringTime ? { gatheringTime } : {}),
+    ...(reminderSentAt ? { reminderSentAt } : {}),
   };
 }
 
@@ -2382,7 +2398,7 @@ async function deleteProofImageBinaryAndRegistryRow(
     for (const variant of ["w320", "w640"] as const) {
       for (const ext of extCandidates) {
         try {
-          await unlink(path.join(base, variant, `${norm}.${ext}`));
+          await unlink(base + path.sep + variant + path.sep + norm + "." + ext);
         } catch {
           /* ignore */
         }
@@ -2390,7 +2406,7 @@ async function deleteProofImageBinaryAndRegistryRow(
     }
     for (const ext of extCandidates) {
       try {
-        await unlink(path.join(base, "original", `${norm}.${ext}`));
+        await unlink(base + path.sep + "original" + path.sep + norm + "." + ext);
       } catch {
         /* ignore */
       }
@@ -2769,7 +2785,7 @@ async function tryRecoverFromCorruptBackupsNewestFirst(): Promise<DevStore | nul
   const corrupt = names.filter((n) => n.startsWith("v3-local-platform-aggregate.json.corrupt.") && n.endsWith(".json"));
   const withStat = await Promise.all(
     corrupt.map(async (name) => {
-      const p = path.join(STORE_DIR_PATH, name);
+      const p = STORE_DIR_PATH + path.sep + name;
       const s = await stat(p);
       return { path: p, mtime: s.mtimeMs, size: s.size };
     })
@@ -2806,7 +2822,7 @@ async function backupCorruptMainSnapshot(content: string): Promise<void> {
 async function ensureStoreFile(): Promise<void> {
   if (!isDevStoreFilePersistenceEnabled()) return;
   await mkdir(STORE_DIR_PATH, { recursive: true });
-  const legacyPreRenamePath = path.join(STORE_DIR_PATH, "v3" + "-dev" + "-store.json");
+  const legacyPreRenamePath = STORE_DIR_PATH + path.sep + "v3" + "-dev" + "-store.json";
   try {
     await readFile(STORE_FILE_PATH, "utf-8");
   } catch {
@@ -4202,6 +4218,7 @@ async function updateClientApplicationStatusLocalDevStore(
       approvalStatus: mappedApproval,
       membershipType: requestedType === "REGISTERED" ? "ANNUAL" : "NONE",
       membershipExpireAt: requestedType === "REGISTERED" ? existingOrg.membershipExpireAt : null,
+      autoParticipantPushEnabled: existingOrg.autoParticipantPushEnabled !== false,
       updatedAt: now,
     };
     if (params.status === "APPROVED" && nextOrg.status !== "SUSPENDED" && nextOrg.status !== "EXPELLED") {
@@ -4239,6 +4256,7 @@ async function updateClientApplicationStatusLocalDevStore(
       membershipExpireAt: null,
       isPublished: false,
       setupCompleted: false,
+      autoParticipantPushEnabled: true,
       createdAt: now,
       updatedAt: now,
     };
@@ -4488,6 +4506,18 @@ export async function patchClientOrganizationForPlatform(
 
 export async function getClientOrganizationByUserId(userId: string): Promise<ClientOrganizationStored | null> {
   return getClientOrganizationByUserIdFirestore(userId);
+}
+
+/** 조직 문서 없음·조회 실패 시 기본 ON(자동 알림 허용). */
+export async function isAutoParticipantPushEnabledForClientUserId(userId: string): Promise<boolean> {
+  try {
+    if (!isFirestoreUsersBackendConfigured()) return true;
+    const org = await getClientOrganizationByUserIdFirestore(userId.trim());
+    if (!org) return true;
+    return org.autoParticipantPushEnabled !== false;
+  } catch {
+    return true;
+  }
 }
 
 export async function getClientInquiryById(id: string): Promise<ClientInquiryStored | null> {
@@ -4829,6 +4859,7 @@ export async function upsertClientOrganizationForUser(
     typeSpecificJson: string | null;
     isPublished: boolean;
     setupCompleted: boolean;
+    autoParticipantPushEnabled: boolean;
   }
 ): Promise<{ ok: true; org: ClientOrganizationStored } | { ok: false; error: string }> {
   return upsertClientOrganizationForUserFirestore(userId, params);
