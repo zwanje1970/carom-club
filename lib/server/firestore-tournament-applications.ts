@@ -102,6 +102,19 @@ export async function listTournamentApplicationsByUserIdFirestore(userId: string
   return q.docs.map((doc) => tournamentApplicationFromFirestore(doc.id, doc.data() as Record<string, unknown>));
 }
 
+export async function getTournamentApplicationByProofImageIdFirestore(
+  imageId: string,
+): Promise<TournamentApplication | null> {
+  assertClientFirestorePersistenceConfigured();
+  const norm = imageId.trim();
+  if (!norm) return null;
+  const db = getSharedFirestoreDb();
+  const q = await db.collection(COLLECTION).where("proofImageId", "==", norm).limit(1).get();
+  if (q.empty) return null;
+  const doc = q.docs[0]!;
+  return tournamentApplicationFromFirestore(doc.id, doc.data() as Record<string, unknown>);
+}
+
 export async function listApprovedParticipantsByTournamentIdFirestore(
   tournamentId: string
 ): Promise<TournamentApplication[]> {
