@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createHash, randomUUID } from "crypto";
 import { copyFile, mkdir, open, readFile, readdir, rename, stat, unlink, writeFile } from "fs/promises";
 import path from "path";
@@ -4309,7 +4310,9 @@ export async function updateClientApplicationStatus(
   return updateClientApplicationStatusLocalDevStore(applicationId, params);
 }
 
-export async function getClientStatusByUserId(userId: string): Promise<ClientApplicationStatus | null> {
+export const getClientStatusByUserId = cache(async function getClientStatusByUserId(
+  userId: string,
+): Promise<ClientApplicationStatus | null> {
   const uid = userId.trim();
   if (!uid) return null;
   if (isFirestoreUsersBackendConfigured()) {
@@ -4327,7 +4330,7 @@ export async function getClientStatusByUserId(userId: string): Promise<ClientApp
   if (apps.length === 0) return null;
   apps.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return apps[0]!.status;
-}
+});
 
 export async function getPlatformOperationSettings(): Promise<PlatformOperationSettings> {
   const readStrategy = resolvePlatformOperationSettingsReadStrategy();
@@ -4403,7 +4406,9 @@ async function getClientOrganizationByUserIdFromLocalStore(userId: string): Prom
   );
 }
 
-export async function resolveClientOrganizationForDashboardPolicy(userId: string): Promise<ClientOrganizationStored | null> {
+export const resolveClientOrganizationForDashboardPolicy = cache(async function resolveClientOrganizationForDashboardPolicy(
+  userId: string,
+): Promise<ClientOrganizationStored | null> {
   const uid = userId.trim();
   if (!uid) return null;
   if (isFirestoreUsersBackendConfigured()) {
@@ -4428,24 +4433,39 @@ export async function resolveClientOrganizationForDashboardPolicy(userId: string
     return getClientOrganizationByUserIdFromLocalStore(uid);
   }
   return null;
-}
+});
 
-export async function getClientDashboardPolicy(userId: string): Promise<{
+export type ClientDashboardPolicy = {
   orgStatus: ClientOrganizationStatus | null;
   membershipType: ClientMembershipType;
   membershipState: "NONE" | "ACTIVE" | "EXPIRED";
   annualMembershipVisible: boolean;
   annualMembershipEnforced: boolean;
+};
+
+/** 조직 1회 조회로 정책 + org 스냅샷 — 대시보드 등에서 중복 resolve 방지 */
+export async function getClientDashboardPolicyAndOrganization(userId: string): Promise<{
+  policy: ClientDashboardPolicy;
+  org: ClientOrganizationStored | null;
 }> {
-  const org = await resolveClientOrganizationForDashboardPolicy(userId.trim());
-  const settings = await getPlatformOperationSettings();
-  return {
+  const uid = userId.trim();
+  const [org, settings] = await Promise.all([
+    resolveClientOrganizationForDashboardPolicy(uid),
+    getPlatformOperationSettings(),
+  ]);
+  const policy: ClientDashboardPolicy = {
     orgStatus: org?.status ?? null,
     membershipType: org?.membershipType === "ANNUAL" ? "ANNUAL" : "NONE",
     membershipState: org ? membershipStateOfOrg(org) : "NONE",
     annualMembershipVisible: settings.annualMembershipVisible,
     annualMembershipEnforced: settings.annualMembershipEnforced,
   };
+  return { policy, org };
+}
+
+export async function getClientDashboardPolicy(userId: string): Promise<ClientDashboardPolicy> {
+  const { policy } = await getClientDashboardPolicyAndOrganization(userId);
+  return policy;
 }
 
 export async function checkClientFeatureAccessByUserId(params: {
@@ -9006,6 +9026,40 @@ export async function listPublishedCardSnapshots(): Promise<PublishedCardSnapsho
 
 /** 메인 홈 슬라이드에 넘길 토너먼트 게시 카드 최대 개수(슬라이드 예비 장면 포함) */
 const DEFAULT_MAIN_SITE_TOURNAMENT_SLIDE_LIMIT = 5;
+
+/**
+ * 대시보드 등: 전체 `TournamentPublishedCard[]` 없이, 주어진 대회 ID 중
+ * 게시·활성 카드가 하나라도 있는지만 확인(첫 매칭에서 조기 종료).
+ */
+export async function someTournamentHasActivePublishedCard(tournamentIds: string[]): Promise<boolean> {
+  const idSet = new Set(tournamentIds.map((t) => t.trim()).filter(Boolean));
+  if (idSet.size === 0) return false;
+  const rs = resolveTournamentPublishedCardsReadStrategy();
+  if (rs === "firestore-kv") {
+    try {
+      const raw = await readTournamentPublishedCardsRawFromFirestoreKv();
+      if (raw == null || !Array.isArray(raw)) return false;
+      for (const row of raw) {
+        const c = normalizeTournamentPublishedCardRow(row);
+        if (!c || !isEntityLifecycleVisibleForList(c.lifecycleStatus)) continue;
+        if (idSet.has(c.tournamentId) && c.isPublished === true && c.isActive === true) return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+  if (rs === "production-defaults-only") {
+    return false;
+  }
+  const store = await readLocalJsonAggregate();
+  for (const row of store.tournamentPublishedCards) {
+    const c = normalizeTournamentPublishedCardRow(row);
+    if (!c || !isEntityLifecycleVisibleForList(c.lifecycleStatus)) continue;
+    if (idSet.has(c.tournamentId) && c.isPublished === true && c.isActive === true) return true;
+  }
+  return false;
+}
 
 export async function loadTournamentPublishedCardsArray(): Promise<TournamentPublishedCard[]> {
   const rs = resolveTournamentPublishedCardsReadStrategy();

@@ -16,6 +16,7 @@ import {
 } from "./server/public-data-cache";
 import {
   getClientDashboardPolicy,
+  getClientDashboardPolicyAndOrganization,
   ensurePlatformAdminAccount,
   getSitePageBuilderDraftByPageId,
   getSitePageBuilderPublishedByPageId,
@@ -39,6 +40,7 @@ export const getClientOrganizationByIdForPlatform = getClientOrganizationByIdFor
 
 export {
   getClientDashboardPolicy,
+  getClientDashboardPolicyAndOrganization,
   ensurePlatformAdminAccount,
   getSiteLayoutConfig,
   getSiteNotice,

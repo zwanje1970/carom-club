@@ -5,8 +5,9 @@ import { isCaromClubMobileAppShell } from "../../lib/is-carom-club-mobile-app-sh
 import AdminFabServerBridge from "../components/AdminFabServerBridge";
 import DashboardMobileChromeLayout from "../components/DashboardMobileChromeLayout";
 import GlobalHomeButton from "../components/GlobalHomeButton";
-import { getClientDashboardPolicy, getClientStatusByUserId } from "../../lib/surface-read";
+import { getClientStatusByUserId } from "../../lib/surface-read";
 import { getRequestSessionUser } from "../../lib/server/request-session-user";
+import { resolveClientOrganizationForDashboardPolicy } from "../../lib/server/platform-backing-store";
 import SitePcDashboardChromeShell from "../site/components/SitePcDashboardChromeShell";
 
 /** 모바일 브라우저·WebView 상단 영역 — 공개 사이트 standard 헤더(#4d7db5)와 동일 */
@@ -41,9 +42,9 @@ export default async function ClientLayout({
 
   const clientStatus = await getClientStatusByUserId(currentUser.id);
   if (clientStatus === "APPROVED") {
-    // 3) 조직 상태 차단
-    const policy = await getClientDashboardPolicy(currentUser.id);
-    if (policy.orgStatus === "SUSPENDED" || policy.orgStatus === "EXPELLED") {
+    // 3) 조직 상태 차단 — 대시보드 정책 전체(getClientDashboardPolicy)는 페이지 Suspense에서만 로드
+    const orgForGuard = await resolveClientOrganizationForDashboardPolicy(currentUser.id);
+    if (orgForGuard?.status === "SUSPENDED" || orgForGuard?.status === "EXPELLED") {
       redirect("/client-status/restricted");
     }
     return (
