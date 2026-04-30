@@ -117,6 +117,8 @@ import {
   upsertMainSlideAdsToFirestoreKv,
   upsertMainSlideAdConfigToFirestoreKv,
 } from "./platform-main-slide-ad-settings";
+import { readPlatformKvJson, upsertPlatformKvJson } from "./platform-kv-firestore";
+import { getProofImagesBaseDir } from "./proof-images-base-dir";
 import { isEntityLifecycleVisibleForList, normalizeEntityLifecycleStatus } from "./entity-lifecycle";
 import {
   ClientFirestoreUnavailableError,
@@ -701,6 +703,21 @@ export type TournamentPublishedCard = {
   orphanedAt?: string | null;
   /** 대회 일정 종료 다음날 이후 메인 비활성화된 시각 */
   expiredAt?: string | null;
+  /** 게시 시 생성한 카드 본문 PNG(640 변형 URL). 메인 스크롤 카드 우선 표시 */
+  publishedCardImageUrl?: string;
+  /** 동일 스냅샷의 320 변형(관리·목록용 선택) */
+  publishedCardImage320Url?: string;
+};
+
+/** 게시 카드 스냅샷 교체 시 이전 proof 이미지 id — `deleteAfter` 이후 삭제 시도 */
+export type PublishedCardImageDeleteQueueRow = {
+  id: string;
+  imageId: string;
+  /** ISO8601 — 이 시각 이후에만 삭제 실행 */
+  deleteAfter: string;
+  createdAt: string;
+  lastAttemptAt?: string;
+  lastError?: string;
 };
 
 export type PublishedCardSnapshot = {
@@ -749,6 +766,9 @@ export type PublishedCardSnapshot = {
   isActive: boolean;
   updatedAt: string;
   publishedBy: string;
+  /** 게시 시 카드 본문 640 스냅샷(메인 등에서 우선) */
+  publishedCardImageUrl?: string | null;
+  publishedCardImage320Url?: string | null;
 };
 
 export type SitePageBuilderDraftBlock = {
@@ -907,6 +927,8 @@ type DevStore = {
   mainSlideAds: MainSiteSlideAd[];
   /** 메인 슬라이드 광고 삽입 규칙(플랫폼 관리자) */
   mainSlideAdConfig: MainSlideAdConfig;
+  /** 로컬 개발: 게시 카드 스냅샷 이전 이미지 지연 삭제 큐(운영은 Firestore KV `publishedCardImageDeleteQueue`) */
+  scheduledPublishedCardImageDeletes: PublishedCardImageDeleteQueueRow[];
 };
 
 const DEV_STORE_MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -1166,6 +1188,7 @@ const EMPTY_STORE: DevStore = {
   inquiryComments: [],
   mainSlideAds: [],
   mainSlideAdConfig: normalizeMainSlideAdConfig(undefined),
+  scheduledPublishedCardImageDeletes: [],
 };
 
 function normalizeCommunityCommentRow(row: unknown): CommunityComment | null {
@@ -1565,6 +1588,12 @@ async function ensureCriticalStoreFieldsPreservedForWrite(store: DevStore): Prom
     disk,
     "tournamentPublishedCards",
     "tournamentPublishedCards"
+  );
+  merged.scheduledPublishedCardImageDeletes = mergeStoreArrayField(
+    store.scheduledPublishedCardImageDeletes ?? [],
+    disk,
+    "scheduledPublishedCardImageDeletes",
+    "scheduledPublishedCardImageDeletes"
   );
   merged.tournamentApplications = mergeStoreArrayField(
     store.tournamentApplications,
@@ -2199,6 +2228,250 @@ function normalizeOptionalCardTextColor(value: unknown): string | null {
   return s;
 }
 
+function normalizePublishedCardImageDeleteQueueRow(row: unknown): PublishedCardImageDeleteQueueRow | null {
+  if (!row || typeof row !== "object") return null;
+  const r = row as Record<string, unknown>;
+  const id = typeof r.id === "string" ? r.id.trim() : "";
+  const imageId = typeof r.imageId === "string" ? r.imageId.trim() : "";
+  const deleteAfter = typeof r.deleteAfter === "string" ? r.deleteAfter.trim() : "";
+  const createdAt = typeof r.createdAt === "string" ? r.createdAt.trim() : "";
+  if (!id || !imageId || !deleteAfter || !createdAt) return null;
+  const out: PublishedCardImageDeleteQueueRow = { id, imageId, deleteAfter, createdAt };
+  if (typeof r.lastAttemptAt === "string" && r.lastAttemptAt.trim()) out.lastAttemptAt = r.lastAttemptAt.trim();
+  if (typeof r.lastError === "string" && r.lastError.trim()) out.lastError = r.lastError.trim();
+  return out;
+}
+
+const PUBLISHED_CARD_SNAPSHOT_IMAGE_DELETE_DELAY_MS = 24 * 60 * 60 * 1000;
+
+function collectReplacedPublishedSnapshotImageIdsForDeletionSchedule(
+  prev: TournamentPublishedCard,
+  nextPublished640: string,
+  nextPublished320: string,
+  nextBackgroundImageId: string,
+): string[] {
+  const nextBg = nextBackgroundImageId.trim();
+  const nextId640 = nextPublished640 ? extractProofImageIdFromPosterUrl(nextPublished640) : null;
+  const nextId320 = nextPublished320 ? extractProofImageIdFromPosterUrl(nextPublished320) : null;
+  const out = new Set<string>();
+  for (const url of [prev.publishedCardImageUrl, prev.publishedCardImage320Url]) {
+    if (typeof url !== "string" || !url.trim()) continue;
+    const id = extractProofImageIdFromPosterUrl(url);
+    if (!id) continue;
+    if (nextBg && id === nextBg) continue;
+    if (nextId640 && id === nextId640) continue;
+    if (nextId320 && id === nextId320) continue;
+    out.add(id);
+  }
+  return [...out];
+}
+
+async function loadPublishedCardImageDeleteQueue(): Promise<PublishedCardImageDeleteQueueRow[]> {
+  const rs = resolveTournamentPublishedCardsReadStrategy();
+  if (rs === "firestore-kv") {
+    try {
+      const raw = await readPlatformKvJson("publishedCardImageDeleteQueue");
+      if (raw == null) return [];
+      if (!Array.isArray(raw)) return [];
+      return raw.map(normalizePublishedCardImageDeleteQueueRow).filter((x): x is PublishedCardImageDeleteQueueRow => x !== null);
+    } catch {
+      return [];
+    }
+  }
+  if (rs === "production-defaults-only") {
+    return [];
+  }
+  const store = await readLocalJsonAggregate();
+  return [...(store.scheduledPublishedCardImageDeletes ?? [])]
+    .map(normalizePublishedCardImageDeleteQueueRow)
+    .filter((x): x is PublishedCardImageDeleteQueueRow => x !== null);
+}
+
+async function persistPublishedCardImageDeleteQueue(rows: PublishedCardImageDeleteQueueRow[]): Promise<void> {
+  const ws = resolveTournamentPublishedCardsWriteStrategy();
+  if (ws === "firestore-kv") {
+    await upsertPlatformKvJson("publishedCardImageDeleteQueue", rows);
+    return;
+  }
+  if (ws === "blocked") {
+    return;
+  }
+  const store = await readLocalJsonAggregate();
+  store.scheduledPublishedCardImageDeletes = rows;
+  await writeLocalJsonAggregate(store);
+}
+
+async function appendPublishedCardImageDeleteQueueRows(rows: PublishedCardImageDeleteQueueRow[]): Promise<void> {
+  if (rows.length === 0) return;
+  const ws = resolveTournamentPublishedCardsWriteStrategy();
+  if (ws === "blocked") return;
+  const cur = await loadPublishedCardImageDeleteQueue();
+  await persistPublishedCardImageDeleteQueue([...cur, ...rows]);
+}
+
+async function isProofImageIdStillReferencedGlobally(imageId: string): Promise<boolean> {
+  const norm = imageId.trim();
+  if (!norm) return true;
+  const allCards = await loadTournamentPublishedCardsRowsIncludingDeleted();
+  for (const c of allCards) {
+    if ((c.imageId ?? "").trim() === norm) return true;
+    for (const u of [c.publishedCardImageUrl, c.publishedCardImage320Url, c.image320Url]) {
+      if (typeof u === "string" && extractProofImageIdFromPosterUrl(u) === norm) return true;
+    }
+  }
+  const appHit = await getTournamentApplicationByProofImageId(norm);
+  if (appHit) return true;
+  if (isFirestoreUsersBackendConfigured()) {
+    const { listAllTournamentsFirestore } = await import("./firestore-tournaments");
+    const tours = await listAllTournamentsFirestore();
+    if (tours.some((t) => extractProofImageIdFromPosterUrl(t.posterImageUrl ?? "") === norm)) return true;
+  } else {
+    const store = await readLocalJsonAggregate();
+    if (store.tournaments.some((t) => extractProofImageIdFromPosterUrl(t.posterImageUrl ?? "") === norm)) return true;
+  }
+  return false;
+}
+
+async function tryDeleteFirebaseProofImageStorageObjects(imageId: string): Promise<void> {
+  const norm = imageId.trim();
+  if (!norm || !isFirestoreUsersBackendConfigured()) return;
+  try {
+    const { ensureFirebaseApp } = await import("./fcm-send");
+    const admin = await import("firebase-admin");
+    ensureFirebaseApp();
+    const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
+    if (!projectId) return;
+    const bucketNames = [`${projectId}.firebasestorage.app`, `${projectId}.appspot.com`];
+    const paths = [
+      `proof-images/${norm}/w320.jpg`,
+      `proof-images/${norm}/w640.jpg`,
+      `proof-images/${norm}/w320.png`,
+      `proof-images/${norm}/w640.png`,
+    ];
+    for (const bucketName of bucketNames) {
+      const bucket = admin.storage().bucket(bucketName);
+      for (const p of paths) {
+        try {
+          await bucket.file(p).delete({ ignoreNotFound: true } as { ignoreNotFound: boolean });
+        } catch {
+          /* try next path/bucket */
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("[published-card-image-delete-queue] firebase storage delete skipped", {
+      imageId: norm,
+      message: e instanceof Error ? e.message : String(e),
+    });
+  }
+}
+
+async function deleteProofImageBinaryAndRegistryRow(
+  imageId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const norm = imageId.trim();
+  if (!norm) return { ok: false, error: "empty_image_id" };
+  try {
+    const asset = await getProofImageAssetById(norm);
+    await tryDeleteFirebaseProofImageStorageObjects(norm);
+    const base = getProofImagesBaseDir();
+    const extCandidates = new Set<"jpg" | "png" | "webp">(["jpg", "png", "webp"]);
+    if (asset?.originalExt === "jpg" || asset?.originalExt === "png" || asset?.originalExt === "webp") {
+      extCandidates.add(asset.originalExt);
+    }
+    for (const variant of ["w320", "w640"] as const) {
+      for (const ext of extCandidates) {
+        try {
+          await unlink(path.join(base, variant, `${norm}.${ext}`));
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    for (const ext of extCandidates) {
+      try {
+        await unlink(path.join(base, "original", `${norm}.${ext}`));
+      } catch {
+        /* ignore */
+      }
+    }
+    const list = await loadProofImageAssetsList();
+    const nextList = list.filter((x) => x.id !== norm);
+    if (nextList.length !== list.length) {
+      const persisted = await persistProofImageAssetsList(nextList);
+      if (!persisted) return { ok: false, error: "proof_image_registry_persist_failed" };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "delete_failed" };
+  }
+}
+
+/**
+ * 만기된 게시 카드 스냅샷 이미지 삭제 예약 처리. 실패한 행은 `lastError`를 남기고 큐에 유지되어 다음 실행에서 재시도.
+ */
+export async function processDuePublishedCardImageDeleteQueue(): Promise<{
+  processedDueIds: number;
+  deletedImageIds: number;
+  cancelledStillReferenced: number;
+}> {
+  const ws = resolveTournamentPublishedCardsWriteStrategy();
+  if (ws === "blocked") {
+    return { processedDueIds: 0, deletedImageIds: 0, cancelledStillReferenced: 0 };
+  }
+  const nowMs = Date.now();
+  const nowIso = new Date().toISOString();
+  const queue = await loadPublishedCardImageDeleteQueue();
+  const nonDue = queue.filter((r) => {
+    const t = Date.parse(r.deleteAfter);
+    return !Number.isFinite(t) || t > nowMs;
+  });
+  const dueRows = queue.filter((r) => {
+    const t = Date.parse(r.deleteAfter);
+    return Number.isFinite(t) && t <= nowMs;
+  });
+  const dueIds = [...new Set(dueRows.map((r) => r.imageId.trim()).filter(Boolean))];
+  let cancelledStillReferenced = 0;
+  const failedRows: PublishedCardImageDeleteQueueRow[] = [];
+  const deletedIdSet = new Set<string>();
+
+  for (const imageId of dueIds) {
+    if (await isProofImageIdStillReferencedGlobally(imageId)) {
+      cancelledStillReferenced += 1;
+      continue;
+    }
+    const res = await deleteProofImageBinaryAndRegistryRow(imageId);
+    if (res.ok) {
+      deletedIdSet.add(imageId);
+    } else {
+      const pick =
+        dueRows
+          .filter((r) => r.imageId.trim() === imageId)
+          .sort((a, b) => a.deleteAfter.localeCompare(b.deleteAfter))[0] ?? null;
+      if (pick) {
+        failedRows.push({
+          ...pick,
+          lastAttemptAt: nowIso,
+          lastError: res.error,
+        });
+      }
+    }
+  }
+
+  const nextQueue = [
+    ...nonDue.filter((r) => !deletedIdSet.has(r.imageId.trim())),
+    ...failedRows,
+  ];
+  if (dueRows.length > 0) {
+    await persistPublishedCardImageDeleteQueue(nextQueue);
+  }
+  return {
+    processedDueIds: dueIds.length,
+    deletedImageIds: deletedIdSet.size,
+    cancelledStillReferenced,
+  };
+}
+
 function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedCard | null {
   if (!row || typeof row !== "object") return null;
   const r = row as Record<string, unknown>;
@@ -2304,6 +2577,12 @@ function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedC
       base.cardFooterPlaceTextColor = fp;
     }
   }
+  if (typeof r.publishedCardImageUrl === "string" && r.publishedCardImageUrl.trim()) {
+    base.publishedCardImageUrl = r.publishedCardImageUrl.trim();
+  }
+  if (typeof r.publishedCardImage320Url === "string" && r.publishedCardImage320Url.trim()) {
+    base.publishedCardImage320Url = r.publishedCardImage320Url.trim();
+  }
   base.lifecycleStatus = normalizeEntityLifecycleStatus(r.lifecycleStatus);
   const lcDelAt = r.deletedAt;
   if (typeof lcDelAt === "string" && lcDelAt.trim() !== "") base.deletedAt = lcDelAt.trim();
@@ -2379,6 +2658,11 @@ function buildDevStoreFromParsed(parsed: Partial<DevStore>): DevStore {
       : [],
     tournamentPublishedCards: Array.isArray((parsed as Partial<DevStore>).tournamentPublishedCards)
       ? ((parsed as Partial<DevStore>).tournamentPublishedCards as unknown[]).map(normalizeTournamentPublishedCardRow).filter((x): x is TournamentPublishedCard => x !== null)
+      : [],
+    scheduledPublishedCardImageDeletes: Array.isArray((parsed as Partial<DevStore>).scheduledPublishedCardImageDeletes)
+      ? ((parsed as Partial<DevStore>).scheduledPublishedCardImageDeletes as unknown[])
+          .map(normalizePublishedCardImageDeleteQueueRow)
+          .filter((x): x is PublishedCardImageDeleteQueueRow => x !== null)
       : [],
     sitePageBuilderDrafts: Array.isArray(parsed.sitePageBuilderDrafts) ? parsed.sitePageBuilderDrafts : [],
     sitePageBuilderPublishedPages: Array.isArray(parsed.sitePageBuilderPublishedPages)
@@ -2603,6 +2887,7 @@ function createEmptyFallbackDevStore(): DevStore {
     inquiryComments: [],
     mainSlideAds: [],
     mainSlideAdConfig: normalizeMainSlideAdConfig(undefined),
+    scheduledPublishedCardImageDeletes: [],
   };
   ensureDefaultPlatformAdminInStore(fallbackStore);
   reconcileDevStoreLoginIds(fallbackStore);
@@ -8253,7 +8538,7 @@ function tournamentPublishedCardToPublishedSnapshot(
     subtitle,
     imageId: t.imageId,
     image320Url: t.image320Url,
-    image640Url: t.image320Url || t.image320Url,
+    image640Url: (t.publishedCardImageUrl?.trim() || t.image320Url || "").trim() || t.image320Url || "",
     textLayout: "v2",
     imageLayout: "v2",
     publishedAt: t.publishedAt,
@@ -8294,6 +8579,12 @@ function tournamentPublishedCardToPublishedSnapshot(
   const footerPlaceC = normalizeOptionalCardTextColor(t.cardFooterPlaceTextColor);
   if (footerDateC) snap.cardFooterDateTextColor = footerDateC;
   if (footerPlaceC) snap.cardFooterPlaceTextColor = footerPlaceC;
+  if (typeof t.publishedCardImageUrl === "string" && t.publishedCardImageUrl.trim()) {
+    snap.publishedCardImageUrl = t.publishedCardImageUrl.trim();
+  }
+  if (typeof t.publishedCardImage320Url === "string" && t.publishedCardImage320Url.trim()) {
+    snap.publishedCardImage320Url = t.publishedCardImage320Url.trim();
+  }
   return snap;
 }
 
@@ -8324,6 +8615,9 @@ export async function upsertTournamentPublishedCard(params: {
   cardSurfaceLayout?: TournamentCardSurfaceLayout;
   cardFooterDateTextColor?: string | null;
   cardFooterPlaceTextColor?: string | null;
+  /** 게시 시에만: 카드 본문 640 스냅샷 URL */
+  publishedCardImageUrl?: string | null;
+  publishedCardImage320Url?: string | null;
 }): Promise<{ ok: true; snapshot: PublishedCardSnapshot } | { ok: false; error: string }> {
   if (!params.title.trim()) return { ok: false, error: "카드 제목을 입력해 주세요." };
   const title = params.title;
@@ -8373,6 +8667,31 @@ export async function upsertTournamentPublishedCard(params: {
     originalForTid.find((c) => c.isPublished && c.isActive) ??
     [...originalForTid].sort((a, b) => (b.version ?? 0) - (a.version ?? 0))[0] ??
     null;
+
+  if (!params.draftOnly && canonicalPublished) {
+    const nextPub640 =
+      typeof params.publishedCardImageUrl === "string" ? params.publishedCardImageUrl.trim() : "";
+    const nextPub320 =
+      typeof params.publishedCardImage320Url === "string" ? params.publishedCardImage320Url.trim() : "";
+    const nextBgId = params.backgroundType === "image" ? params.imageId.trim() : "";
+    const idsToDeferDelete = collectReplacedPublishedSnapshotImageIdsForDeletionSchedule(
+      canonicalPublished,
+      nextPub640,
+      nextPub320,
+      nextBgId,
+    );
+    if (idsToDeferDelete.length > 0) {
+      const deleteAfter = new Date(Date.now() + PUBLISHED_CARD_SNAPSHOT_IMAGE_DELETE_DELAY_MS).toISOString();
+      await appendPublishedCardImageDeleteQueueRows(
+        idsToDeferDelete.map((imageId) => ({
+          id: randomUUID(),
+          imageId,
+          deleteAfter,
+          createdAt: now,
+        })),
+      );
+    }
+  }
 
   if (params.draftOnly) {
     if (cardWs === "local-json-file" && localStore) {
@@ -8479,12 +8798,25 @@ export async function upsertTournamentPublishedCard(params: {
         ? null
         : normalizeOptionalCardTextColor(params.cardFooterPlaceTextColor);
   }
+  if (!params.draftOnly) {
+    const pub640 =
+      typeof params.publishedCardImageUrl === "string" ? params.publishedCardImageUrl.trim() : "";
+    const pub320 =
+      typeof params.publishedCardImage320Url === "string" ? params.publishedCardImage320Url.trim() : "";
+    if (pub640) row.publishedCardImageUrl = pub640;
+    if (pub320) row.publishedCardImage320Url = pub320;
+  }
 
   working.push(row);
   if (cardWs === "firestore-kv") {
     await persistTournamentPublishedCardsRows(working);
   } else if (localStore) {
     await writeLocalJsonAggregate(localStore);
+  }
+  try {
+    await processDuePublishedCardImageDeleteQueue();
+  } catch (e) {
+    console.warn("[upsertTournamentPublishedCard] processDuePublishedCardImageDeleteQueue failed", e);
   }
   return {
     ok: true,
@@ -8884,6 +9216,11 @@ export async function reconcileAllTournamentPublishedCardsForMainSlide(): Promis
   });
 
   if (changedRowCount > 0) await persistTournamentPublishedCardsRows(next);
+  try {
+    await processDuePublishedCardImageDeleteQueue();
+  } catch (e) {
+    console.warn("[reconcileAllTournamentPublishedCardsForMainSlide] processDuePublishedCardImageDeleteQueue failed", e);
+  }
   return { ok: true, changedRowCount, uniqueTournamentIds: uniqueTids.length };
 }
 

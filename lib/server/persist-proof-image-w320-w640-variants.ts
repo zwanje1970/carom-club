@@ -33,6 +33,7 @@ export type PersistProofImageW320W640Result =
 
 /**
  * 증빙/사이트 이미지와 동일 파이프라인: sharp로 w640·w320 생성 후 디스크 또는 Firebase Storage + proof 메타.
+ * `preservePngTransparency`: 게시 카드 스냅샷만 — JPEG 변환 없이 PNG(알파)로 w320/w640 저장.
  */
 export async function persistProofImageW320W640Variants(params: {
   imageId: string;
@@ -40,8 +41,97 @@ export async function persistProofImageW320W640Variants(params: {
   ext: "jpg" | "png" | "webp";
   uploaderUserId: string;
   sitePublic: boolean;
+  preservePngTransparency?: boolean;
 }): Promise<PersistProofImageW320W640Result> {
   const { imageId, buffer, ext, uploaderUserId, sitePublic } = params;
+  const preservePngTransparency = params.preservePngTransparency === true;
+
+  if (preservePngTransparency) {
+    let w640Buf: Buffer;
+    let w320Buf: Buffer;
+    try {
+      w640Buf = await sharp(buffer).resize({ width: 640, withoutEnlargement: true }).png().toBuffer();
+      w320Buf = await sharp(buffer).resize({ width: 320, withoutEnlargement: true }).png().toBuffer();
+    } catch (err) {
+      console.error("[persist-proof-image-w320-w640] png variant sharp 실패", err);
+      return { ok: false, error: "이미지 파일을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.", status: 500 };
+    }
+
+    if (useLocalProofImageDisk) {
+      const baseUploadDir = getProofImagesBaseDir();
+      const w320Dir = path.join(baseUploadDir, "w320");
+      const w640Dir = path.join(baseUploadDir, "w640");
+      await mkdir(w320Dir, { recursive: true });
+      await mkdir(w640Dir, { recursive: true });
+      const w640Png = path.join(w640Dir, `${imageId}.png`);
+      const w320Png = path.join(w320Dir, `${imageId}.png`);
+      try {
+        await writeFile(w640Png, w640Buf);
+        await writeFile(w320Png, w320Buf);
+      } catch (e2) {
+        console.error("[persist-proof-image-w320-w640] png 디스크 저장 실패", e2);
+        return { ok: false, error: "이미지 파일을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.", status: 500 };
+      }
+      const createAssetResult = await createProofImageAsset({
+        imageId,
+        uploaderUserId,
+        originalExt: "png",
+        sitePublic,
+      });
+      if (!createAssetResult.ok) {
+        return { ok: false, error: "이미지 메타 저장에 실패했습니다.", status: 500 };
+      }
+      const buildUrl = sitePublic ? buildSitePublicImageUrl : buildProtectedProofImageUrl;
+      return {
+        ok: true,
+        imageId,
+        w320Url: buildUrl(imageId, "w320"),
+        w640Url: buildUrl(imageId, "w640"),
+      };
+    }
+
+    let storageUrls: { storageW320Url: string; storageW640Url: string };
+    try {
+      storageUrls = await uploadProofImageVariantsToFirebaseStorage({
+        imageId,
+        w320Buffer: w320Buf,
+        w640Buffer: w640Buf,
+        outputFormat: "png",
+      });
+    } catch (err) {
+      console.error("[persist-proof-image-w320-w640] png Firebase Storage 업로드 실패", {
+        step: "storage-upload",
+        imageId,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return {
+        ok: false,
+        error: "이미지를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        status: 500,
+        code: "IMAGE_STORAGE_UPLOAD_FAILED",
+      };
+    }
+
+    const createAssetResult = await createProofImageAsset({
+      imageId,
+      uploaderUserId,
+      originalExt: "png",
+      sitePublic,
+      storageOriginalUrl: storageUrls.storageW640Url,
+      storageW320Url: storageUrls.storageW320Url,
+      storageW640Url: storageUrls.storageW640Url,
+    });
+    if (!createAssetResult.ok) {
+      return { ok: false, error: "이미지 메타 저장에 실패했습니다.", status: 500, code: "IMAGE_META_SAVE_FAILED" };
+    }
+
+    return {
+      ok: true,
+      imageId,
+      w320Url: storageUrls.storageW320Url,
+      w640Url: storageUrls.storageW640Url,
+    };
+  }
 
   if (useLocalProofImageDisk) {
     const baseUploadDir = getProofImagesBaseDir();

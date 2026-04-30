@@ -16,6 +16,19 @@ async function readW320W640DirFiles(
   originalExt: ProofImageOriginalExt
 ): Promise<{ buffer: Buffer; ext: string } | null> {
   const dir = path.join(getProofImagesBaseDir(), variant);
+  if (originalExt === "png") {
+    const pngPath = path.join(dir, `${imageId}.png`);
+    try {
+      return { buffer: await readFile(pngPath), ext: "png" };
+    } catch {
+      const jpgPath = path.join(dir, `${imageId}.jpg`);
+      try {
+        return { buffer: await readFile(jpgPath), ext: "jpg" };
+      } catch {
+        return null;
+      }
+    }
+  }
   const jpgPath = path.join(dir, `${imageId}.jpg`);
   try {
     return { buffer: await readFile(jpgPath), ext: "jpg" };

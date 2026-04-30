@@ -75,6 +75,13 @@
     0 4px 14px rgba(0, 0, 0, 0.06);
 }
 
+/** html2canvas 게시 스냅샷 캡처 루트 — 카드 본문만 포함 */
+.cardPublishCaptureRoot {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
 .previewSticky {
   position: sticky;
   top: 0;
@@ -195,6 +202,11 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+/* 모바일에서만 실제 래퍼; 데스크톱은 display:contents 로 기존 formPanel 직계 자식 레이아웃 유지 */
+.formScrollPane {
+  display: contents;
 }
 
 /* 단계 탭(1·2 제목)은 고정, 아래 필드만 스크롤 */
@@ -486,5 +498,87 @@
     display: block;
     min-width: 0;
     box-sizing: border-box;
+  }
+}
+
+/* 게시카드 작성 v2: 모바일(≤767px) — 대시보드 상단 크롬 고정, 본문만 내부 스크롤 */
+@media (max-width: 767px) {
+  :global(main[data-card-publish-v2="1"]) {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: none !important;
+    margin: 0 !important;
+  }
+
+  :global(main[data-card-publish-v2="1"]) .pcPageShell {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  :global(main[data-card-publish-v2="1"]) .pcPageMain {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  :global(main[data-card-publish-v2="1"]) .pageWrapV2 {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  :global(main[data-card-publish-v2="1"]) .surfaceTemplateRow {
+    margin-bottom: 8px;
+  }
+
+  :global(main[data-card-publish-v2="1"]) .pageWrapV2 .previewSticky {
+    position: relative;
+    top: auto;
+    z-index: 1;
+    flex-shrink: 0;
+    padding-top: 4px;
+    padding-bottom: 8px;
+    margin: 0;
+    background: #fafafa;
+    border-bottom: 1px solid #e4e4e7;
+  }
+
+  :global(main[data-card-publish-v2="1"]) .formPanel {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding-top: 8px;
+    padding-bottom: 0;
+  }
+
+  :global(main[data-card-publish-v2="1"]) .formScrollPane {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  :global(main[data-card-publish-v2="1"]) .formScrollPane .stepScrollBody {
+    max-height: none !important;
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow: visible;
   }
 }

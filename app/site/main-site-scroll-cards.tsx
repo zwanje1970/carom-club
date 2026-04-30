@@ -17,6 +17,8 @@ export type MainSiteScrollCardItem = {
   /** 이미지 없을 때 카드 면 배경(CSS `background` 값) */
   faceCssBackground: string | null;
   external: boolean;
+  /** 게시 스냅샷으로 면 전체가 이미지일 때 제목 오버레이 숨김(중복 방지) */
+  faceIsFullPublishedSnapshot?: boolean;
 };
 
 type CardRowProps = {
@@ -76,7 +78,9 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
             decoding="async"
           />
         ) : null}
-        <div className={styles.sampleMainCardTitleOverlay}>{item.title}</div>
+        {!item.faceIsFullPublishedSnapshot ? (
+          <div className={styles.sampleMainCardTitleOverlay}>{item.title}</div>
+        ) : null}
         {item.external ? (
           <a
             href={item.href}

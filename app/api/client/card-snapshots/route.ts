@@ -88,6 +88,8 @@ export async function POST(request: Request) {
     cardSurfaceLayout?: unknown;
     cardFooterDateTextColor?: unknown;
     cardFooterPlaceTextColor?: unknown;
+    publishedCardImageUrl?: unknown;
+    publishedCardImage320Url?: unknown;
   } = {};
 
   try {
@@ -171,6 +173,11 @@ export async function POST(request: Request) {
         ? body.cardFooterPlaceTextColor
         : undefined;
 
+  const publishedCardImageUrl =
+    !draftOnly && typeof body.publishedCardImageUrl === "string" ? body.publishedCardImageUrl : undefined;
+  const publishedCardImage320Url =
+    !draftOnly && typeof body.publishedCardImage320Url === "string" ? body.publishedCardImage320Url : undefined;
+
   let result: Awaited<ReturnType<typeof upsertTournamentPublishedCard>>;
   try {
     result = await upsertTournamentPublishedCard({
@@ -199,6 +206,8 @@ export async function POST(request: Request) {
       cardSurfaceLayout,
       ...(cardFooterDateTextColor !== undefined ? { cardFooterDateTextColor } : {}),
       ...(cardFooterPlaceTextColor !== undefined ? { cardFooterPlaceTextColor } : {}),
+      ...(publishedCardImageUrl !== undefined ? { publishedCardImageUrl } : {}),
+      ...(publishedCardImage320Url !== undefined ? { publishedCardImage320Url } : {}),
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Failed to save tournament card.";

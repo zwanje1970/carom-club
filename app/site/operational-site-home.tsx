@@ -22,6 +22,18 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
   return items.map((item) => {
     const href = (item.targetDetailUrl ?? "").trim() || "/site/tournaments";
     const external = item.linkType === "external" || /^https?:\/\//i.test(href);
+    const published = (item.publishedCardImageUrl ?? "").trim();
+    if (published) {
+      return {
+        id: item.snapshotId,
+        href,
+        title: item.title,
+        imageUrl: published,
+        faceCssBackground: null,
+        external,
+        faceIsFullPublishedSnapshot: true,
+      };
+    }
     const useBgImage = item.backgroundType !== "theme" && Boolean(item.image320Url?.trim());
     const imageUrl = useBgImage ? item.image320Url!.trim() : null;
     const faceCssBackground =
@@ -91,6 +103,9 @@ export default async function SiteOperationalHome() {
       : {}),
     ...(typeof snapshot.cardFooterPlaceTextColor === "string" && snapshot.cardFooterPlaceTextColor.trim()
       ? { cardFooterPlaceTextColor: snapshot.cardFooterPlaceTextColor.trim() }
+      : {}),
+    ...(typeof snapshot.publishedCardImageUrl === "string" && snapshot.publishedCardImageUrl.trim()
+      ? { publishedCardImageUrl: snapshot.publishedCardImageUrl.trim() }
       : {}),
   }));
 

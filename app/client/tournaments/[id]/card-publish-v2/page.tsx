@@ -55,81 +55,28 @@ function TextColorSwatches({
   );
 }
 
-/** 백색 글자 대비용 고정 64색 (8×8 그리드) */
-const CARD_COLOR_PALETTE_64 = [
-  // Red
-  "#7F1D1D",
-  "#991B1B",
-  "#B91C1C",
+/** 카드 배경색 팔레트 (16색, 권장 톤 + 흰색) — 목록에 없는 저장값도 `mediaBackground` 그대로 미리보기·저장됨 */
+const CARD_COLOR_PALETTE_16 = [
+  "#FFFFFF",
+  "#171717",
+  "#6B7280",
   "#DC2626",
-  "#7C2D12",
-  "#9A3412",
-  "#C2410C",
   "#EA580C",
-  // Brown
-  "#78350F",
-  "#92400E",
-  "#B45309",
-  "#D97706",
-  "#7C3E0A",
-  "#9C4F0D",
-  "#C4660F",
-  "#E07A12",
-  // Green
-  "#064E3B",
-  "#065F46",
-  "#047857",
-  "#059669",
-  "#14532D",
-  "#166534",
-  "#15803D",
+  "#EAB308",
+  "#84CC16",
   "#16A34A",
-  // Teal
-  "#134E4A",
-  "#115E59",
-  "#0F766E",
-  "#0D9488",
-  "#164E63",
-  "#155E75",
-  "#0E7490",
-  "#0891B2",
-  // Blue
-  "#1E3A8A",
-  "#1D4ED8",
+  "#14B8A6",
+  "#38BDF8",
   "#2563EB",
-  "#1E40AF",
-  "#1E293B",
-  "#334155",
-  "#0F172A",
-  "#1F2937",
-  // Indigo / Purple
-  "#312E81",
-  "#3730A3",
-  "#4338CA",
-  "#4F46E5",
-  "#581C87",
-  "#6B21A8",
-  "#7E22CE",
+  "#1E3A8A",
   "#9333EA",
-  // Pink / Rose (어두운 톤만)
   "#881337",
-  "#9F1239",
-  "#BE123C",
-  "#E11D48",
-  "#831843",
-  "#9D174D",
-  "#BE185D",
-  "#DB2777",
-  // Gray (밝은 회색 제외)
-  "#111827",
-  "#1F2937",
-  "#374151",
-  "#4B5563",
-  "#030712",
-  "#020617",
-  "#111827",
-  "#0B1220",
+  "#EC4899",
+  "#92400E",
 ] as const;
+
+/** 신규 작성·저장 스냅샷 없을 때 미리보기·팔레트 기본(16색 중 하늘색) */
+const DEFAULT_CARD_MEDIA_BACKGROUND = "#38BDF8";
 
 const KO_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
@@ -253,6 +200,8 @@ type SnapshotPick = {
   tournamentCardSurfaceLayout?: TournamentCardSurfaceLayout;
   cardFooterDateTextColor?: string | null;
   cardFooterPlaceTextColor?: string | null;
+  publishedCardImageUrl?: string | null;
+  publishedCardImage320Url?: string | null;
 };
 
 function hasStoredV2Media(pick: SnapshotPick): boolean {
@@ -281,9 +230,9 @@ export default function ClientTournamentCardPublishV2Page() {
   const [themeType, setThemeType] = useState<CardTheme>("dark");
   const [uploadedImage, setUploadedImage] = useState<UploadedImage | null>(null);
 
-  const [mediaBackground, setMediaBackground] = useState("");
+  const [mediaBackground, setMediaBackground] = useState(DEFAULT_CARD_MEDIA_BACKGROUND);
   const [imageOverlayBlend, setImageOverlayBlend] = useState(true);
-  const [imageOverlayOpacity, setImageOverlayOpacity] = useState(0.78);
+  const [imageOverlayOpacity, setImageOverlayOpacity] = useState(1);
   const [v2MediaMode, setV2MediaMode] = useState<"inherit" | "on">("on");
   const [cardTextShadowEnabled, setCardTextShadowEnabled] = useState(false);
   const [cardSurfaceLayout, setCardSurfaceLayout] = useState<TournamentCardSurfaceLayout>("split");
@@ -299,6 +248,7 @@ export default function ClientTournamentCardPublishV2Page() {
   const [hasLivePublishedCard, setHasLivePublishedCard] = useState(false);
 
   const bgFileInputRef = useRef<HTMLInputElement>(null);
+  const cardPublishCaptureRef = useRef<HTMLDivElement>(null);
   /** 저장(게시) 중복 요청만 차단 — 첫 탭 직후 동기 setLoading으로 클릭이 취소되는 것을 피함 */
   const isPublishingRef = useRef(false);
 
@@ -447,7 +397,7 @@ export default function ClientTournamentCardPublishV2Page() {
             typeof pick.tournamentImageOverlayBlend === "boolean" ? pick.tournamentImageOverlayBlend : true
           );
           setImageOverlayOpacity(
-            typeof pick.tournamentImageOverlayOpacity === "number" ? pick.tournamentImageOverlayOpacity : 0.78
+            typeof pick.tournamentImageOverlayOpacity === "number" ? pick.tournamentImageOverlayOpacity : 1
           );
         } else {
           setV2MediaMode("inherit");
@@ -474,9 +424,9 @@ export default function ClientTournamentCardPublishV2Page() {
         setDescriptionTextColor("");
         setUploadedImage(null);
         setV2MediaMode("on");
-        setMediaBackground("");
+        setMediaBackground(DEFAULT_CARD_MEDIA_BACKGROUND);
         setImageOverlayBlend(true);
-        setImageOverlayOpacity(0.78);
+        setImageOverlayOpacity(1);
         const d0 = typeof t.date === "string" ? t.date : "";
         const loc0 = typeof t.location === "string" ? t.location : "";
         setCardDate(d0 ? formatCardDateForDisplay(d0) : POSTCARD_TEMPLATE_APP_DEFAULTS.dateText);
@@ -559,10 +509,54 @@ export default function ClientTournamentCardPublishV2Page() {
           setMessage(built.error);
           return;
         }
+        let body: Record<string, unknown> = built.body;
+        if (!draftOnly) {
+          try {
+            const el = cardPublishCaptureRef.current;
+            if (!el) {
+              setMessage("미리보기 카드 영역을 찾을 수 없어 게시 이미지를 만들 수 없습니다.");
+              return;
+            }
+            const { default: html2canvas } = await import("html2canvas");
+            const w = Math.max(1, Math.round(el.getBoundingClientRect().width));
+            const scale = 640 / w;
+            const canvas = await html2canvas(el, {
+              scale,
+              useCORS: true,
+              allowTaint: false,
+              backgroundColor: null,
+              logging: false,
+            });
+            const blob = await new Promise<Blob>((resolve, reject) => {
+              canvas.toBlob(
+                (b) => (b ? resolve(b) : reject(new Error("이미지 변환에 실패했습니다."))),
+                "image/png",
+              );
+            });
+            const formData = new FormData();
+            formData.append("file", blob, "published-card.png");
+            formData.append("sitePublic", "1");
+            formData.append("purpose", "published-card-snapshot");
+            const uploadRes = await fetch("/api/upload/image", { method: "POST", body: formData });
+            const uploadJson = (await uploadRes.json()) as UploadedImage & { error?: string };
+            if (!uploadRes.ok || !uploadJson.w640Url?.trim()) {
+              setMessage(uploadJson.error ?? "게시용 이미지 업로드에 실패했습니다.");
+              return;
+            }
+            body = {
+              ...body,
+              publishedCardImageUrl: uploadJson.w640Url,
+              ...(uploadJson.w320Url?.trim() ? { publishedCardImage320Url: uploadJson.w320Url } : {}),
+            };
+          } catch (e) {
+            setMessage(e instanceof Error ? e.message : "게시 이미지를 만들지 못했습니다.");
+            return;
+          }
+        }
         const response = await fetch("/api/client/card-snapshots", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(built.body),
+          body: JSON.stringify(body),
         });
         const result = (await response.json()) as { error?: string };
         if (!response.ok) {
@@ -627,12 +621,15 @@ export default function ClientTournamentCardPublishV2Page() {
   }
 
   return (
-    <main className="v3-page v3-stack" style={{ maxWidth: "none", margin: 0, width: "100%" }}>
+    <main
+      className="v3-page v3-stack"
+      data-card-publish-v2="1"
+      style={{ maxWidth: "none", margin: 0, width: "100%" }}
+    >
       <div className={editorStyles.pcPageShell}>
         <div className={editorStyles.pcPageMain}>
           <div className={`${editorStyles.pageWrap} ${editorStyles.pageWrapV2}`}>
         <div className={editorStyles.surfaceTemplateRow}>
-          <span className={editorStyles.surfaceTemplateLabel}>카드 템플릿</span>
           <div className={editorStyles.surfaceTemplateTabs} role="radiogroup" aria-label="카드 템플릿">
             <button
               type="button"
@@ -659,12 +656,14 @@ export default function ClientTournamentCardPublishV2Page() {
               <div className={editorStyles.previewCardScaleHost}>
                 <div className={editorStyles.previewCardScaleInner}>
                   <div className={editorStyles.previewCardWrap}>
-                    <TournamentSnapshotCardView
-                      item={cardPublishSlidePreview}
-                      slideDeck
-                      templateCardLayout
-                      slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
-                    />
+                    <div ref={cardPublishCaptureRef} className={editorStyles.cardPublishCaptureRoot}>
+                      <TournamentSnapshotCardView
+                        item={cardPublishSlidePreview}
+                        slideDeck
+                        templateCardLayout
+                        slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -706,6 +705,7 @@ export default function ClientTournamentCardPublishV2Page() {
             </div>
           </div>
 
+          <div className={editorStyles.formScrollPane}>
           <div className={editorStyles.stepScrollBody}>
           {editorTab === "content" ? (
             <>
@@ -780,14 +780,13 @@ export default function ClientTournamentCardPublishV2Page() {
               </div>
 
               <div className={editorStyles.field}>
-                <span className={editorStyles.fieldLabel}>텍스트 효과</span>
                 <label className={editorStyles.fieldCheck}>
                   <input
                     type="checkbox"
                     checked={cardTextShadowEnabled}
                     onChange={(e) => setCardTextShadowEnabled(e.target.checked)}
+                    aria-label="텍스트 그림자"
                   />
-                  <span>그림자 사용</span>
                 </label>
               </div>
 
@@ -854,7 +853,7 @@ export default function ClientTournamentCardPublishV2Page() {
                   className="card-publish-color-grid"
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(8, 34px)",
+                    gridTemplateColumns: "repeat(4, 34px)",
                     gap: "7px",
                     justifyContent: "center",
                     width: "100%",
@@ -862,7 +861,7 @@ export default function ClientTournamentCardPublishV2Page() {
                     margin: "0.35rem auto 0",
                   }}
                 >
-                  {CARD_COLOR_PALETTE_64.map((hex, index) => {
+                  {CARD_COLOR_PALETTE_16.map((hex, index) => {
                     const selected = mediaBackground.trim().toLowerCase() === hex.toLowerCase();
                     return (
                       <button
@@ -924,12 +923,12 @@ export default function ClientTournamentCardPublishV2Page() {
                     type="checkbox"
                     checked={imageOverlayBlend}
                     disabled={!uploadedImage}
+                    aria-label="이미지 오버레이"
                     onChange={(e) => {
                       activateV2Media();
                       setImageOverlayBlend(e.target.checked);
                     }}
                   />
-                  <span>이미지 오버레이 (배경색 위에 반투명으로 겹침 · 끄면 이미지 불투명)</span>
                 </label>
                 <div className={editorStyles.rangeBlock}>
                   <span className={`${editorStyles.fieldLabel} ${editorStyles.fieldLabelRow}`}>
@@ -950,9 +949,6 @@ export default function ClientTournamentCardPublishV2Page() {
                       setImageOverlayOpacity(Number(e.target.value) / 100);
                     }}
                   />
-                  <p className={editorStyles.microhint}>
-                    낮추면 배경이 더 보이고, 높이면 이미지가 진해집니다.
-                  </p>
                 </div>
               </div>
             </>
@@ -960,9 +956,6 @@ export default function ClientTournamentCardPublishV2Page() {
           </div>
 
           <div className={editorStyles.actions}>
-            <p className="v3-muted" style={{ margin: "0 0 0.65rem", fontSize: "0.82rem", lineHeight: 1.45 }}>
-              이미 게시된 카드가 있으면 새로 만들지 않고 기존 카드에 반영됩니다.
-            </p>
             <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
               <button type="submit" className="v3-btn" disabled={loading}>
                 {loading ? "처리 중…" : "카드 저장 (초안)"}
@@ -983,6 +976,7 @@ export default function ClientTournamentCardPublishV2Page() {
                 {loading ? "처리 중…" : hasLivePublishedCard ? "게시카드 수정 반영" : "메인에 게시하기"}
               </button>
             </div>
+          </div>
           </div>
         </form>
           </div>

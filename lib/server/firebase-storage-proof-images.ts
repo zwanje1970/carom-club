@@ -43,9 +43,14 @@ export async function uploadProofImageVariantsToFirebaseStorage(params: {
   imageId: string;
   w320Buffer: Buffer;
   w640Buffer: Buffer;
+  /** 기본 jpeg. `png` 는 게시 카드 스냅샷(알파 유지) 전용 */
+  outputFormat?: "jpeg" | "png";
 }): Promise<{ storageW320Url: string; storageW640Url: string }> {
   ensureFirebaseApp();
   const base = `proof-images/${params.imageId}`;
+  const fmt = params.outputFormat ?? "jpeg";
+  const ext = fmt === "png" ? "png" : "jpg";
+  const contentType = fmt === "png" ? "image/png" : "image/jpeg";
   const bucketCandidates = resolveStorageBucketCandidates();
   let lastError: unknown = null;
   for (const bucketName of bucketCandidates) {
@@ -54,15 +59,15 @@ export async function uploadProofImageVariantsToFirebaseStorage(params: {
       const [storageW320Url, storageW640Url] = await Promise.all([
         uploadOneObject({
           bucket,
-          objectPath: `${base}/w320.jpg`,
+          objectPath: `${base}/w320.${ext}`,
           buffer: params.w320Buffer,
-          contentType: "image/jpeg",
+          contentType,
         }),
         uploadOneObject({
           bucket,
-          objectPath: `${base}/w640.jpg`,
+          objectPath: `${base}/w640.${ext}`,
           buffer: params.w640Buffer,
-          contentType: "image/jpeg",
+          contentType,
         }),
       ]);
 

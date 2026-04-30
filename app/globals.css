@@ -2932,6 +2932,27 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   box-sizing: border-box;
 }
 
+/* 게시카드 작성 v2: 창 스크롤 대신 본문 패널만 스크롤 — 상단 대시보드 크롬은 고정 */
+@media (max-width: 767px) {
+  .app-dashboard-mobile-root:has([data-card-publish-v2="1"]) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .app-dashboard-mobile-root:has([data-card-publish-v2="1"])
+    > .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
 .app-dashboard-shell.app-mobile-bottom-nav-scroll-pad {
   background: var(--ui-bg-page);
 }

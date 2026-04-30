@@ -42,6 +42,13 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const sitePublicRaw = formData.get("sitePublic");
   const sitePublic = sitePublicRaw === "1" || sitePublicRaw === "true";
+  const purposeRaw = formData.get("purpose");
+  const purpose = typeof purposeRaw === "string" ? purposeRaw.trim() : "";
+  const preservePngFromPurpose = purpose === "published-card-snapshot";
+  const preservePngRaw = formData.get("preservePng");
+  const preservePngFlag =
+    preservePngRaw === "1" || preservePngRaw === "true" || preservePngRaw === "yes";
+  const preservePngTransparency = preservePngFromPurpose || preservePngFlag;
   const imageFile = formData.get("file");
   if (!(imageFile instanceof File)) {
     return NextResponse.json({ error: "업로드 파일이 필요합니다." }, { status: 400 });
@@ -55,6 +62,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "지원하지 않는 이미지 형식입니다. (jpg/png/webp)" }, { status: 400 });
   }
 
+  if (preservePngTransparency && ext !== "png") {
+    return NextResponse.json(
+      { error: "게시 카드 스냅샷(purpose=published-card-snapshot 또는 preservePng)은 PNG 파일만 업로드할 수 있습니다." },
+      { status: 400 },
+    );
+  }
+
   const imageId = randomUUID();
   const buffer = Buffer.from(await imageFile.arrayBuffer());
 
@@ -64,6 +78,7 @@ export async function POST(request: Request) {
     ext,
     uploaderUserId: auth.user.id,
     sitePublic,
+    ...(preservePngTransparency ? { preservePngTransparency: true } : {}),
   });
 
   if (!result.ok) {

@@ -42,6 +42,8 @@ export type SlideDeckItem = {
   cardSurfaceLayout?: TournamentCardSurfaceLayout;
   cardFooterDateTextColor?: string | null;
   cardFooterPlaceTextColor?: string | null;
+  /** 게시 시 생성한 카드 본문 640 스냅샷 URL — 메인 스크롤 카드에서 우선 표시 */
+  publishedCardImageUrl?: string;
 };
 
 /** carom-postcard-template-test: TournamentSlideCardPreview.tsx TournamentSlidePreviewItem */
