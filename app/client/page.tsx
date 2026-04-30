@@ -294,23 +294,43 @@ export default async function ClientHomePage() {
         </div>
       </section>
 
-      {/* 5. 부가기능 (접기/펼치기 자리) */}
+      {/* 5. 부가기능 */}
       <section aria-label="부가기능">
         <details className="client-dashboard-main__dsCard client-dashboard-main__extras">
-          <summary>부가기능 (접기/펼치기 자리)</summary>
+          <summary>부가기능</summary>
           <div className="client-dashboard-main__extrasList">
-            <div className="client-dashboard-main__extrasRow">
-              <span className="client-dashboard-main__extrasRowLabel">문의 (오류제보 / 기능건의) (자리)</span>
+            <Link href="/client/setup" prefetch={false} className="client-dashboard-main__extrasRow">
+              <span className="client-dashboard-main__extrasRowLabel">업체 설정</span>
               <span className="client-dashboard-main__extrasRowChevron" aria-hidden>
                 ›
               </span>
-            </div>
-            <div className="client-dashboard-main__extrasRow">
-              <span className="client-dashboard-main__extrasRowLabel">빈 대진표 (자리)</span>
+            </Link>
+            <Link href="/client/setup/venue-intro" prefetch={false} className="client-dashboard-main__extrasRow">
+              <span className="client-dashboard-main__extrasRowLabel">당구장 소개</span>
               <span className="client-dashboard-main__extrasRowChevron" aria-hidden>
                 ›
               </span>
-            </div>
+            </Link>
+            <Link
+              href="/client/settings/inquiries"
+              prefetch={false}
+              className="client-dashboard-main__extrasRow"
+            >
+              <span className="client-dashboard-main__extrasRowLabel">문의 (오류제보 / 기능건의)</span>
+              <span className="client-dashboard-main__extrasRowChevron" aria-hidden>
+                ›
+              </span>
+            </Link>
+            <Link
+              href="/client/settings/blank-bracket-print"
+              prefetch={false}
+              className="client-dashboard-main__extrasRow"
+            >
+              <span className="client-dashboard-main__extrasRowLabel">빈 대진표</span>
+              <span className="client-dashboard-main__extrasRowChevron" aria-hidden>
+                ›
+              </span>
+            </Link>
           </div>
         </details>
       </section>

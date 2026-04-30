@@ -432,6 +432,17 @@
   flex-wrap: wrap;
 }
 
+/* 배경색 32스와치 — 8열×4행 */
+.colorPaletteGrid {
+  display: grid;
+  grid-template-columns: repeat(8, 34px);
+  gap: 7px;
+  justify-content: center;
+  width: 100%;
+  max-width: max-content;
+  margin: 0.35rem auto 0;
+}
+
 .colorPick {
   width: 44px;
   height: 32px;

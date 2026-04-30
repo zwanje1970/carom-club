@@ -142,7 +142,7 @@ function MediaStack({
   /** 슬라이드 단색은 '배경 이미지 없음'일 때만 이미지를 가린다 — 포스터 카드는 그대로 노출 */
   const imgUrl = rawImg || undefined;
   const overlayBlend = Boolean(imgUrl) && item.imageOverlayBlend !== false;
-  const overlayOpacity = Math.min(1, Math.max(0.15, item.imageOverlayOpacity ?? 0.78));
+  const overlayOpacity = Math.min(1, Math.max(0.15, item.imageOverlayOpacity ?? 1));
   const paintBg = imgUrl ? cssBg || undefined : cssBg || solidBackdrop;
   const paintClass = [
     styles.mediaPaint,
@@ -210,6 +210,7 @@ function TournamentSlideCardPreview({
   slideDeckSolidBackdrop,
   mainSlideAd,
   tournamentPublishedHeightScale = true,
+  editorCompactCardHeight = false,
   onRepImageLoad,
 }: {
   item: TournamentSlidePreviewItem;
@@ -224,6 +225,8 @@ function TournamentSlideCardPreview({
   mainSlideAd?: boolean;
   /** 대회·광고 슬라이드 카드 동일 높이 스케일 */
   tournamentPublishedHeightScale?: boolean;
+  /** 게시카드 작성 미리보기·PNG 캡처: 카드 높이만 약 20% 축소(메인 live 미적용) */
+  editorCompactCardHeight?: boolean;
   onRepImageLoad?: () => void;
 }) {
   const status = toStatus(item.statusBadge);
@@ -247,6 +250,7 @@ function TournamentSlideCardPreview({
     slideDeck ? styles.cardRootSlideDeck : "",
     templateCardLayout ? styles.cardRootTemplateLayout : "",
     tournamentPublishedHeightScale ? styles.cardRootTournamentPublishedScale : "",
+    editorCompactCardHeight && tournamentPublishedHeightScale ? styles.cardRootEditorCompactHeight : "",
     item.cardTextShadowEnabled ? styles.cardTextShadowOn : "",
     surfaceLayout === "full" ? styles.cardRootSurfaceFull : "",
     mainSlideAd ? styles.cardRootMainSlideAd : "",
@@ -265,10 +269,17 @@ function TournamentSlideCardPreview({
     </div>
   );
 
+  const splitDateStyle = footerDateColor ? { color: footerDateColor } : undefined;
+  const splitPlaceStyle = footerPlaceColor ? { color: footerPlaceColor } : undefined;
+
   const splitFooter = (
     <footer className={styles.cardFooter}>
-      <p className={styles.footerDate}>{parsed.dateText}</p>
-      <p className={styles.footerPlace}>{parsed.placeText}</p>
+      <p className={styles.footerDate} style={splitDateStyle}>
+        {parsed.dateText}
+      </p>
+      <p className={styles.footerPlace} style={splitPlaceStyle}>
+        {parsed.placeText}
+      </p>
     </footer>
   );
 
@@ -390,6 +401,7 @@ export function TournamentSnapshotCardView({
   item,
   slideDeck = false,
   templateCardLayout = false,
+  editorCompactCardHeight = false,
   repImageHighPriority,
   slideDeckSolidBackdrop,
   onRepImageLoad,
@@ -397,6 +409,8 @@ export function TournamentSnapshotCardView({
   item: SlideDeckItem;
   slideDeck?: boolean;
   templateCardLayout?: boolean;
+  /** 작성 화면 미리보기·PNG 캡처만 — 메인 슬라이드(live)에서는 false 유지 */
+  editorCompactCardHeight?: boolean;
   repImageHighPriority?: boolean;
   slideDeckSolidBackdrop?: string;
   onRepImageLoad?: () => void;
@@ -415,6 +429,7 @@ export function TournamentSnapshotCardView({
       slideDeckSolidBackdrop={slideDeckSolidBackdrop}
       mainSlideAd={item.type === "ad"}
       tournamentPublishedHeightScale={true}
+      editorCompactCardHeight={editorCompactCardHeight}
       onRepImageLoad={onRepImageLoad}
     />
   );

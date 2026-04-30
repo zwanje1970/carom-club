@@ -55,7 +55,7 @@ function TextColorSwatches({
   );
 }
 
-/** 카드 배경색 팔레트 (32색, 4×8 · 흰색 포함) — 목록에 없는 저장값도 `mediaBackground` 그대로 미리보기·저장됨 */
+/** 카드 배경색 팔레트 (32색, 8×4 · 흰색 포함) — 목록에 없는 저장값도 `mediaBackground` 그대로 미리보기·저장됨 */
 const CARD_COLOR_PALETTE_32 = [
   "#FFFFFF",
   "#F3F4F6",
@@ -300,12 +300,8 @@ export default function ClientTournamentCardPublishV2Page() {
       ...(descriptionTextColor.trim() ? { cardDescriptionTextColor: descriptionTextColor.trim() } : {}),
       ...(cardTextShadowEnabled ? { cardTextShadowEnabled: true } : {}),
       ...(cardSurfaceLayout === "full" ? { cardSurfaceLayout: "full" as const } : {}),
-      ...(cardSurfaceLayout === "full" && footerDateTextColor.trim()
-        ? { cardFooterDateTextColor: footerDateTextColor.trim() }
-        : {}),
-      ...(cardSurfaceLayout === "full" && footerPlaceTextColor.trim()
-        ? { cardFooterPlaceTextColor: footerPlaceTextColor.trim() }
-        : {}),
+      ...(footerDateTextColor.trim() ? { cardFooterDateTextColor: footerDateTextColor.trim() } : {}),
+      ...(footerPlaceTextColor.trim() ? { cardFooterPlaceTextColor: footerPlaceTextColor.trim() } : {}),
     };
     return base;
   }, [
@@ -483,15 +479,8 @@ export default function ClientTournamentCardPublishV2Page() {
       cardDisplayLocation: cardPlace.trim(),
       cardTextShadowEnabled,
       cardSurfaceLayout,
-      ...(cardSurfaceLayout === "full"
-        ? {
-            cardFooterDateTextColor: footerDateTextColor.trim() || null,
-            cardFooterPlaceTextColor: footerPlaceTextColor.trim() || null,
-          }
-        : {
-            cardFooterDateTextColor: null,
-            cardFooterPlaceTextColor: null,
-          }),
+      cardFooterDateTextColor: footerDateTextColor.trim() || null,
+      cardFooterPlaceTextColor: footerPlaceTextColor.trim() || null,
     };
     if (leadTextColor.trim()) body.cardLeadTextColor = leadTextColor.trim();
     if (titleTextColor.trim()) body.cardTitleTextColor = titleTextColor.trim();
@@ -611,7 +600,6 @@ export default function ClientTournamentCardPublishV2Page() {
       });
       activateV2Media();
       setEditorTab("background");
-      setMessage("이미지가 적용되었습니다.");
     } catch {
       setMessage("이미지 업로드 중 오류가 발생했습니다.");
     } finally {
@@ -670,6 +658,7 @@ export default function ClientTournamentCardPublishV2Page() {
                         item={cardPublishSlidePreview}
                         slideDeck
                         templateCardLayout
+                        editorCompactCardHeight
                         slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
                       />
                     </div>
@@ -764,9 +753,7 @@ export default function ClientTournamentCardPublishV2Page() {
 
               <div className={editorStyles.field}>
                 <div className={editorStyles.fieldHead}>
-                  <span className={editorStyles.fieldLabel}>
-                    설명 (최대 {DESCRIPTION_MAX_LINES}줄 · Enter 줄바꿈)
-                  </span>
+                  <span className={editorStyles.fieldLabel}>설명 (최대 {DESCRIPTION_MAX_LINES}줄)</span>
                   <TextColorSwatches
                     value={descriptionTextColor}
                     onChange={setDescriptionTextColor}
@@ -788,8 +775,18 @@ export default function ClientTournamentCardPublishV2Page() {
                 />
               </div>
 
-              <label className={editorStyles.field}>
-                <span className={editorStyles.fieldLabel}>날짜</span>
+              <div className={editorStyles.field}>
+                <div className={editorStyles.fieldHead}>
+                  <span className={editorStyles.fieldLabel}>날짜</span>
+                  <TextColorSwatches
+                    value={footerDateTextColor}
+                    onChange={setFooterDateTextColor}
+                    wrapClass={editorStyles.fieldSwatches}
+                    swatchClass={editorStyles.fieldSwatch}
+                    swatchLightClass={editorStyles.fieldSwatchLight}
+                    swatchSelectedClass={editorStyles.fieldSwatchSelected}
+                  />
+                </div>
                 <input
                   className={editorStyles.fieldInput}
                   type="text"
@@ -798,10 +795,20 @@ export default function ClientTournamentCardPublishV2Page() {
                   autoComplete="off"
                   placeholder="예: 2026-05-09 (일)"
                 />
-              </label>
+              </div>
 
-              <label className={editorStyles.field}>
-                <span className={editorStyles.fieldLabel}>장소</span>
+              <div className={editorStyles.field}>
+                <div className={editorStyles.fieldHead}>
+                  <span className={editorStyles.fieldLabel}>장소</span>
+                  <TextColorSwatches
+                    value={footerPlaceTextColor}
+                    onChange={setFooterPlaceTextColor}
+                    wrapClass={editorStyles.fieldSwatches}
+                    swatchClass={editorStyles.fieldSwatch}
+                    swatchLightClass={editorStyles.fieldSwatchLight}
+                    swatchSelectedClass={editorStyles.fieldSwatchSelected}
+                  />
+                </div>
                 <input
                   className={editorStyles.fieldInput}
                   type="text"
@@ -810,55 +817,13 @@ export default function ClientTournamentCardPublishV2Page() {
                   autoComplete="off"
                   placeholder="예: 캐롬클럽 빌리어즈"
                 />
-              </label>
-
-              {cardSurfaceLayout === "full" ? (
-                <>
-                  <div className={editorStyles.field}>
-                    <div className={editorStyles.fieldHead}>
-                      <span className={editorStyles.fieldLabel}>날짜 글자색</span>
-                      <TextColorSwatches
-                        value={footerDateTextColor}
-                        onChange={setFooterDateTextColor}
-                        wrapClass={editorStyles.fieldSwatches}
-                        swatchClass={editorStyles.fieldSwatch}
-                        swatchLightClass={editorStyles.fieldSwatchLight}
-                        swatchSelectedClass={editorStyles.fieldSwatchSelected}
-                      />
-                    </div>
-                  </div>
-                  <div className={editorStyles.field}>
-                    <div className={editorStyles.fieldHead}>
-                      <span className={editorStyles.fieldLabel}>장소 글자색</span>
-                      <TextColorSwatches
-                        value={footerPlaceTextColor}
-                        onChange={setFooterPlaceTextColor}
-                        wrapClass={editorStyles.fieldSwatches}
-                        swatchClass={editorStyles.fieldSwatch}
-                        swatchLightClass={editorStyles.fieldSwatchLight}
-                        swatchSelectedClass={editorStyles.fieldSwatchSelected}
-                      />
-                    </div>
-                  </div>
-                </>
-              ) : null}
+              </div>
             </>
           ) : (
             <>
               <div className={editorStyles.field}>
                 <span className={editorStyles.fieldLabel}>카드 배경색</span>
-                <div
-                  className="card-publish-color-grid"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(4, 34px)",
-                    gap: "7px",
-                    justifyContent: "center",
-                    width: "100%",
-                    maxWidth: "max-content",
-                    margin: "0.35rem auto 0",
-                  }}
-                >
+                <div className={editorStyles.colorPaletteGrid}>
                   {CARD_COLOR_PALETTE_32.map((hex, index) => {
                     const selected = mediaBackground.trim().toLowerCase() === hex.toLowerCase();
                     return (
@@ -911,9 +876,9 @@ export default function ClientTournamentCardPublishV2Page() {
                     선택해제
                   </button>
                 </div>
-                {uploadedImage || uploading ? (
+                {uploading ? (
                   <p className="v3-muted" style={{ margin: 0, fontSize: "0.78rem" }}>
-                    {uploadedImage ? "이미지 적용됨" : "업로드 중…"}
+                    업로드 중…
                   </p>
                 ) : null}
                 <div className={editorStyles.rangeBlock}>

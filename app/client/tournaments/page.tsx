@@ -36,7 +36,7 @@ export default async function ClientTournamentsListPage() {
         </Link>
       </div>
 
-      <section className="v3-box v3-stack">
+      <section className="v3-stack">
         {tournaments.length === 0 ? (
           <p className="v3-muted">생성된 대회가 없습니다.</p>
         ) : (
@@ -48,14 +48,15 @@ export default async function ClientTournamentsListPage() {
               return (
                 <li key={t.id}>
                   <section
-                    className="v3-box"
                     style={{
                       border: "1px solid #e5e7eb",
-                      borderRadius: "0.5rem",
+                      borderRadius: "16px",
                       padding: "0.85rem 1rem",
                       display: "flex",
                       flexDirection: "column",
                       gap: "0.65rem",
+                      background: "#ffffff",
+                      boxShadow: "0 2px 10px rgba(0, 0, 0, 0.05)",
                     }}
                   >
                     <div
@@ -93,9 +94,11 @@ export default async function ClientTournamentsListPage() {
                         <h2 className="v3-h2" style={{ margin: "0.35rem 0 0", fontSize: "1.1rem" }}>
                           {t.title}
                         </h2>
-                        <p className="v3-muted" style={{ margin: "0.35rem 0 0", fontSize: "0.95rem" }}>
-                          {scheduleLine} · {t.location}
-                        </p>
+                        {scheduleLine ? (
+                          <p className="v3-muted" style={{ margin: "0.35rem 0 0", fontSize: "0.95rem" }}>
+                            {scheduleLine}
+                          </p>
+                        ) : null}
                       </Link>
                       <div style={{ flexShrink: 0, alignSelf: "flex-start" }}>
                         <TournamentCardOverflowMenu tournamentId={t.id} title={t.title} />

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
+import { resolveCanonicalUserIdForAuth } from "../../../../../lib/auth/resolve-canonical-user-id-for-auth";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
 import { listTournamentApplicationsByTournamentIdFirestore } from "../../../../../lib/server/firestore-tournament-applications";
 import { getTournamentByIdFirestore } from "../../../../../lib/server/firestore-tournaments";
@@ -47,7 +48,9 @@ export default async function ClientTournamentParticipantsPage({
 
   const cookieStore = await cookies();
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
-  const canView = Boolean(session && tournament.createdBy === session.userId);
+  if (!session) notFound();
+  const viewerId = await resolveCanonicalUserIdForAuth(session.userId);
+  const canView = String(tournament.createdBy ?? "").trim() === viewerId.trim();
   if (!canView) notFound();
 
   const entries = await listTournamentApplicationsByTournamentIdFirestore(id);

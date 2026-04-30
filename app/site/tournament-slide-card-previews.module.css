@@ -38,6 +38,11 @@
   --tournament-card-height-scale: 1.2;
 }
 
+/* 게시카드 작성 미리보기·html2canvas 캡처만 — 메인 슬라이드(live) 미적용. 높이 약 20% 축소(1.2×0.8) */
+.cardRoot.cardRootTournamentPublishedScale.cardRootEditorCompactHeight {
+  --tournament-card-height-scale: 0.96;
+}
+
 /* 템플릿 A/B 공통: 배지 실크기·슬롯(--status-badge-slot)과 맞춤 */
 .cardRootTournamentPublishedScale:not(.cardRootTemplateLayout) .statusBadgeWrap {
   transform: scale(var(--tournament-card-height-scale));
@@ -179,21 +184,21 @@
 .footerDate,
 .footerPlace {
   margin: 0;
-  font-size: calc(0.78rem + 2pt);
+  font-size: calc(0.78rem + 1pt);
   line-height: 1.3;
   letter-spacing: 0.02em;
   color: #18181b;
 }
 
 .footerDate {
-  font-weight: 700;
+  font-weight: 400;
   flex: 0 1 auto;
   min-width: 0;
   text-align: left;
 }
 
 .footerPlace {
-  font-weight: 700;
+  font-weight: 400;
   color: #3f3f46;
   flex: 1 1 auto;
   min-width: 0;
@@ -247,10 +252,10 @@
 .fullSurfaceFooterDate,
 .fullSurfaceFooterPlace {
   margin: 0;
-  font-size: calc(0.78rem + 2pt);
+  font-size: calc(0.78rem + 1pt);
   line-height: 1.3;
   letter-spacing: 0.02em;
-  font-weight: 700;
+  font-weight: 400;
 }
 
 .fullSurfaceFooterDate {
@@ -321,8 +326,8 @@
 .classicLead {
   margin: 0;
   width: 100%;
-  font-size: calc(clamp(0.95rem, 3.8vw, 1.12rem) - 1pt);
-  font-weight: 600;
+  font-size: calc(clamp(0.95rem, 3.8vw, 1.12rem) - 2pt);
+  font-weight: 400;
   line-height: 1.28;
   letter-spacing: -0.02em;
   color: #fff;
@@ -414,8 +419,8 @@
 
 .frameLead {
   margin: 0;
-  font-size: calc(clamp(0.82rem, 3.2vw, 0.98rem) - 1pt);
-  font-weight: 600;
+  font-size: calc(clamp(0.82rem, 3.2vw, 0.98rem) - 2pt);
+  font-weight: 400;
   color: #fff;
   text-shadow: none;
   max-width: 100%;
@@ -538,8 +543,9 @@
 
 .cardRootTemplateLayout .footerDate,
 .cardRootTemplateLayout .footerPlace {
-  font-size: calc(0.82rem * 1.05 + 1pt + 2pt);
-  line-height: 1.3;
+  font-size: calc(0.72rem + 1pt + 2pt);
+  line-height: 1.25;
+  font-weight: 400;
 }
 
 .cardRootTemplateLayout .classicInner {
@@ -551,8 +557,9 @@
 }
 
 .cardRootTemplateLayout .classicLead {
-  font-size: clamp(0.86rem, 3.7vw, 1.02rem);
+  font-size: calc(clamp(0.86rem, 3.7vw, 1.02rem) - 1pt);
   line-height: 1.22;
+  font-weight: 400;
 }
 
 .cardRootTemplateLayout .classicTitle {
@@ -587,8 +594,9 @@
 }
 
 .cardRootTemplateLayout .frameLead {
-  font-size: clamp(0.86rem, 3.7vw, 1.02rem);
+  font-size: calc(clamp(0.86rem, 3.7vw, 1.02rem) - 1pt);
   line-height: 1.22;
+  font-weight: 400;
 }
 
 .cardRootTemplateLayout .frameTitle {
@@ -603,8 +611,9 @@
 
 .cardRootTemplateLayout .fullSurfaceFooterDate,
 .cardRootTemplateLayout .fullSurfaceFooterPlace {
-  font-size: calc((0.82rem * 1.05 + 1pt + 2pt) * var(--tournament-card-height-scale));
-  line-height: 1.3;
+  font-size: calc((0.72rem + 1pt + 2pt) * var(--tournament-card-height-scale));
+  line-height: 1.25;
+  font-weight: 400;
 }
 
 .cardRootTemplateLayout :global(.tournament-post-card__badge) {

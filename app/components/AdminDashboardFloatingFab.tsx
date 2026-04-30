@@ -3,11 +3,13 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-const LS_KEY = "carom-admin-dashboard-fab-pos.v1";
-const FAB_SIZE = 72;
+const LS_KEY = "carom-admin-dashboard-fab-pos.v2";
+/** 목록·하단 탭과 겹침 완화 (~기존 72px 대비 축소) */
+const FAB_SIZE = 50;
 const DRAG_THRESHOLD_PX = 6;
-const DEFAULT_RIGHT = 16;
-const DEFAULT_BOTTOM = 96;
+const DEFAULT_RIGHT = 20;
+/** 하단 고정 네비(~40px) + safe-area 여유 + 카드와 간격 */
+const DEFAULT_BOTTOM = 124;
 const Z_INDEX = 80;
 
 type Pos = { left: number; top: number };
@@ -170,14 +172,16 @@ export default function AdminDashboardFloatingFab({
   if (!pos) return null;
 
   const onDash = isDashboardPath(pathname);
-  const line1 = onDash ? "메인" : "운영";
-  const line2 = onDash ? "으로" : "관리";
+  const titleHint = onDash ? "공개 사이트 메인으로" : "운영 대시보드로 이동";
+  const iconSize = 22;
+  const stroke = 1.85;
 
   return (
     <div
       role="button"
       tabIndex={0}
-      aria-label={onDash ? "공개 사이트 메인으로" : "운영 대시보드로 이동"}
+      title={titleHint}
+      aria-label={titleHint}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={finishDrag}
@@ -202,23 +206,50 @@ export default function AdminDashboardFloatingFab({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 1,
-        padding: "6px 4px",
-        background: "linear-gradient(160deg, #1e3a5f 0%, #0f172a 100%)",
-        color: "#fff",
-        fontSize: "11px",
-        fontWeight: 700,
-        lineHeight: 1.15,
-        textAlign: "center",
+        gap: 0,
+        padding: 0,
+        background: "linear-gradient(165deg, #2f6fbf 0%, #2563eb 42%, #1e3a78 100%)",
+        color: "#f8fafc",
         cursor: "grab",
         touchAction: "none",
         userSelect: "none",
-        boxShadow: "0 2px 10px rgba(0,0,0,0.22)",
-        border: "1px solid rgba(255,255,255,0.12)",
+        boxShadow: "0 1px 5px rgba(15, 23, 42, 0.16)",
+        border: "1px solid rgba(255,255,255,0.1)",
       }}
     >
-      <span style={{ whiteSpace: "nowrap" }}>{line1}</span>
-      <span style={{ whiteSpace: "nowrap" }}>{line2}</span>
+      {onDash ? (
+        <svg
+          width={iconSize}
+          height={iconSize}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <path d="M3 9.5 12 3l9 6.5V20a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 20V9.5z" />
+          <path d="M9 22.5V12h6v10.5" />
+        </svg>
+      ) : (
+        <svg
+          width={iconSize}
+          height={iconSize}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <rect x="3" y="3" width="7" height="9" rx="1.2" />
+          <rect x="14" y="3" width="7" height="5" rx="1.2" />
+          <rect x="14" y="11" width="7" height="10" rx="1.2" />
+          <rect x="3" y="15" width="7" height="6" rx="1.2" />
+        </svg>
+      )}
     </div>
   );
 }
