@@ -8050,6 +8050,9 @@ export async function getSiteCommunityConfig(): Promise<SiteCommunityConfig> {
   if (readStrategy === "production-defaults-only") {
     return normalizeSiteCommunityConfig(undefined);
   }
+  if (process.env.NODE_ENV !== "development") {
+    return normalizeSiteCommunityConfig(undefined);
+  }
   const store = await readLocalJsonAggregate();
   return normalizeSiteCommunityConfig(store.siteCommunityConfig);
 }
@@ -8155,6 +8158,9 @@ export async function loadSiteCommunityFeed(): Promise<{
     }
   }
   if (rs === "production-empty-only") {
+    return { communityPosts: [], communityComments: [] };
+  }
+  if (process.env.NODE_ENV !== "development") {
     return { communityPosts: [], communityComments: [] };
   }
   const store = await readLocalJsonAggregate();
@@ -8353,8 +8359,9 @@ export async function createCommunityPost(params: {
 }
 
 export async function isCommunityPostAuthor(postAuthorUserId: string, editorUserId: string): Promise<boolean> {
-  const store = await readLocalJsonAggregate();
-  return resolveCanonicalUserId(store, postAuthorUserId) === resolveCanonicalUserId(store, editorUserId);
+  const a = await resolveCanonicalUserIdForAuth(postAuthorUserId);
+  const b = await resolveCanonicalUserIdForAuth(editorUserId);
+  return a === b;
 }
 
 export async function updateCommunityPostById(
@@ -8372,13 +8379,12 @@ export async function updateCommunityPostById(
   const imageUrls = normalizeCommunityPostImageUrls(params.imageUrls);
   const imageSizeLevels = normalizeCommunityPostImageSizeLevels(imageUrls.length, params.imageSizeLevels);
   const feed = await loadSiteCommunityFeed();
-  const store = await readLocalJsonAggregate();
   const id = postId.trim();
   const p = feed.communityPosts.find((x) => x.id === id);
   if (!p || !isCommunityBoardPostListed(p)) {
     return { ok: false, code: "NOT_FOUND" };
   }
-  if (resolveCanonicalUserId(store, p.authorUserId) !== resolveCanonicalUserId(store, editorUserId)) {
+  if ((await resolveCanonicalUserIdForAuth(p.authorUserId)) !== (await resolveCanonicalUserIdForAuth(editorUserId))) {
     return { ok: false, code: "FORBIDDEN" };
   }
   p.title = title;
@@ -8397,13 +8403,12 @@ export async function softDeleteCommunityPostById(
   editorUserId: string
 ): Promise<{ ok: true } | { ok: false; code: "NOT_FOUND" | "FORBIDDEN" | "PERSIST_UNAVAILABLE" }> {
   const feed = await loadSiteCommunityFeed();
-  const store = await readLocalJsonAggregate();
   const id = postId.trim();
   const p = feed.communityPosts.find((x) => x.id === id);
   if (!p || !isCommunityBoardPostListed(p)) {
     return { ok: false, code: "NOT_FOUND" };
   }
-  if (resolveCanonicalUserId(store, p.authorUserId) !== resolveCanonicalUserId(store, editorUserId)) {
+  if ((await resolveCanonicalUserIdForAuth(p.authorUserId)) !== (await resolveCanonicalUserIdForAuth(editorUserId))) {
     return { ok: false, code: "FORBIDDEN" };
   }
   const now = new Date().toISOString();
@@ -8519,11 +8524,10 @@ export async function softDeleteComment(
 ): Promise<{ ok: true } | { ok: false; code: "NOT_FOUND" | "FORBIDDEN" | "PERSIST_UNAVAILABLE" }> {
   const feed = await loadSiteCommunityFeed();
   if (!Array.isArray(feed.communityComments)) feed.communityComments = [];
-  const store = await readLocalJsonAggregate();
   const id = commentId.trim();
   const c = feed.communityComments.find((x) => x.id === id);
   if (!c || c.isDeleted === true) return { ok: false, code: "NOT_FOUND" };
-  if (resolveCanonicalUserId(store, c.authorUserId) !== resolveCanonicalUserId(store, editorUserId)) {
+  if ((await resolveCanonicalUserIdForAuth(c.authorUserId)) !== (await resolveCanonicalUserIdForAuth(editorUserId))) {
     return { ok: false, code: "FORBIDDEN" };
   }
   c.isDeleted = true;
