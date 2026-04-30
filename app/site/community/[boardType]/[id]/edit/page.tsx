@@ -58,7 +58,11 @@ export default async function SiteCommunityPostEditPage({ params }: Props) {
           initialImageSizeLevels={post.imageSizeLevels}
         />
         <div className="ui-community-post-detail-foot">
-          <Link className="secondary-button ui-community-post-detail-foot-secondary" href={`/site/community/${boardType}/${postId}`}>
+          <Link
+            prefetch={false}
+            className="secondary-button ui-community-post-detail-foot-secondary"
+            href={`/site/community/${boardType}/${postId}`}
+          >
             취소
           </Link>
         </div>

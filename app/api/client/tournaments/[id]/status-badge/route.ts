@@ -2,8 +2,12 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../lib/auth/session";
 import { getClientStatusByUserId, getUserById, type TournamentStatusBadge } from "../../../../../../lib/platform-api";
+import { revalidatePublicTournamentCache } from "../../../../../../lib/server/firestore-tournaments";
 import { getSharedFirestoreDb } from "../../../../../../lib/server/firestore-users";
-import { reconcileTournamentPublishedCardsForTournamentId } from "../../../../../../lib/server/platform-backing-store";
+import {
+  reconcileTournamentPublishedCardsForTournamentId,
+  syncActiveTournamentCardSnapshotStatusBadge,
+} from "../../../../../../lib/server/platform-backing-store";
 
 export const runtime = "nodejs";
 const TOURNAMENT_COLLECTION = "v3_tournaments";
@@ -93,10 +97,24 @@ export async function PATCH(
 
     await ref.set({ statusBadge }, { merge: true });
     try {
+      await syncActiveTournamentCardSnapshotStatusBadge(tournamentId);
+    } catch (e) {
+      console.warn("[api/client/tournaments/[id]/status-badge] sync main card status failed", e);
+    }
+    try {
       await reconcileTournamentPublishedCardsForTournamentId(tournamentId);
     } catch (e) {
       console.warn("[api/client/tournaments/[id]/status-badge] reconcile published cards failed", e);
     }
+    try {
+      const { rebuildSitePublicTournamentListSnapshots } = await import(
+        "../../../../../../lib/server/site-public-list-snapshots-kv"
+      );
+      await rebuildSitePublicTournamentListSnapshots();
+    } catch (e) {
+      console.warn("[api/client/tournaments/[id]/status-badge] rebuild tournament list snapshots failed", e);
+    }
+    revalidatePublicTournamentCache(tournamentId);
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[api/client/tournaments/[id]/status-badge] PATCH failed", {

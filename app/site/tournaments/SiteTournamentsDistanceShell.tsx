@@ -1,13 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
 import SiteShellFrame from "../components/SiteShellFrame";
-import {
-  confirmSiteGeolocationPrecursor,
-  fetchViewerCoordinatesOnce,
-  SITE_GEO_DENIED_USER_MESSAGE,
-} from "../lib/site-geolocation-flow";
+import SiteListImage160 from "../components/SiteListImage160";
 import TournamentsFilterBar from "./tournaments-filter-bar";
 import type { TournamentStatusFilter } from "./tournament-list-url";
 
@@ -37,71 +32,13 @@ type Props = {
 };
 
 export default function SiteTournamentsDistanceShell({ rows, searchParams, currentStatus }: Props) {
-  const [memoryCoords, setMemoryCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [showDeniedHint, setShowDeniedHint] = useState(false);
-  const [geoBusy, setGeoBusy] = useState(false);
-
-  useEffect(() => {
-    return () => {
-      setMemoryCoords(null);
-      setShowDeniedHint(false);
-      setGeoBusy(false);
-    };
-  }, []);
-
-  const onDistanceClick = useCallback(
-    async (e: React.MouseEvent<HTMLAnchorElement>) => {
-      e.preventDefault();
-      if (geoBusy) return;
-      const isRefresh = memoryCoords != null;
-      if (!isRefresh) {
-        if (!confirmSiteGeolocationPrecursor()) return;
-      }
-      setGeoBusy(true);
-      setShowDeniedHint(false);
-      const c = await fetchViewerCoordinatesOnce();
-      setGeoBusy(false);
-      if (c) {
-        setMemoryCoords(c);
-        setShowDeniedHint(false);
-      } else {
-        setMemoryCoords(null);
-        setShowDeniedHint(true);
-      }
-    },
-    [geoBusy, memoryCoords],
-  );
-
   return (
     <SiteShellFrame
       brandTitle="대회안내"
       auxiliaryBarClassName="site-shell-controls--site-list"
-      auxiliary={
-        <TournamentsFilterBar
-          searchParams={searchParams}
-          currentStatus={currentStatus}
-          distanceSortActive={memoryCoords != null}
-          onDistanceClick={onDistanceClick}
-        />
-      }
+      auxiliary={<TournamentsFilterBar searchParams={searchParams} currentStatus={currentStatus} />}
     >
       <section className="site-site-gray-main v3-stack">
-        {showDeniedHint ? (
-          <p
-            role="status"
-            className="v3-muted"
-            style={{
-              margin: "0 0 1rem",
-              padding: "0.65rem 0.75rem",
-              borderRadius: "8px",
-              background: "var(--v3-surface-2, #eef0f3)",
-              fontSize: "0.9rem",
-              lineHeight: 1.45,
-            }}
-          >
-            {SITE_GEO_DENIED_USER_MESSAGE}
-          </p>
-        ) : null}
         {rows.length === 0 ? (
           <p className="v3-muted">등록된 대회가 없습니다.</p>
         ) : (
@@ -128,7 +65,11 @@ export default function SiteTournamentsDistanceShell({ rows, searchParams, curre
                   </div>
                   <div className="site-tournament-list-thumb">
                     {tournament.posterSrc ? (
-                      <img src={tournament.posterSrc} alt={`${tournament.title} 포스터`} loading="lazy" />
+                      <SiteListImage160
+                        src={tournament.posterSrc}
+                        alt={`${tournament.title} 포스터`}
+                        placeholderClassName="site-tournament-list-thumb-placeholder"
+                      />
                     ) : (
                       <div className="site-tournament-list-thumb-placeholder">이미지 없음</div>
                     )}

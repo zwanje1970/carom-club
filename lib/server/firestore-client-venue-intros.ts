@@ -1,4 +1,6 @@
 import type { OutlineDisplayMode } from "../outline-content-types";
+import { CACHE_TAG_SITE_VENUES_BOARD_ROWS } from "../cache-tags";
+import { revalidateSiteDataTag } from "../revalidate-site-data-tag";
 import type { ClientVenueIntroStored } from "./platform-backing-store";
 import { assertClientFirestorePersistenceConfigured } from "./firestore-client-applications";
 import { getSharedFirestoreDb } from "./firestore-users";
@@ -61,5 +63,6 @@ export async function upsertClientVenueIntroForUserFirestore(
   };
   const db = getSharedFirestoreDb();
   await db.collection(V3_CLIENT_VENUE_INTROS).doc(uid).set(next, { merge: true });
+  revalidateSiteDataTag(CACHE_TAG_SITE_VENUES_BOARD_ROWS);
   return next;
 }

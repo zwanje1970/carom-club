@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import GlobalHomeButton from "../components/GlobalHomeButton";
-import SiteChromeHeader, { isPublicSiteMobileView } from "./components/SiteChromeHeader";
+import SiteChromeHeader from "./components/SiteChromeHeader";
+import { isPublicSiteMobileView } from "./components/site-public-mobile-view";
 import SiteRootSwipeNav from "./components/SiteRootSwipeNav";
 import SiteVenuesGeolocationNav from "./components/SiteVenuesGeolocationNav";
 import { getSiteLayoutConfig } from "../../lib/surface-read";

@@ -13,7 +13,9 @@ export type PlatformKvSettingKey =
   | "tournamentPublishedCards"
   | "publishedCardImageDeleteQueue"
   | "main_slide_ads"
-  | "main_slide_ad_config";
+  | "main_slide_ad_config"
+  | "sitePublicTournamentListSnapshots"
+  | "sitePublicVenueListSnapshots";
 
 export const PLATFORM_KV_KEYS: Record<
   | "siteNotice"
@@ -25,7 +27,9 @@ export const PLATFORM_KV_KEYS: Record<
   | "tournamentPublishedCards"
   | "publishedCardImageDeleteQueue"
   | "mainSlideAds"
-  | "mainSlideAdConfig",
+  | "mainSlideAdConfig"
+  | "sitePublicTournamentListSnapshots"
+  | "sitePublicVenueListSnapshots",
   PlatformKvSettingKey
 > = {
   siteNotice: "siteNotice",
@@ -38,6 +42,8 @@ export const PLATFORM_KV_KEYS: Record<
   publishedCardImageDeleteQueue: "publishedCardImageDeleteQueue",
   mainSlideAds: "main_slide_ads",
   mainSlideAdConfig: "main_slide_ad_config",
+  sitePublicTournamentListSnapshots: "sitePublicTournamentListSnapshots",
+  sitePublicVenueListSnapshots: "sitePublicVenueListSnapshots",
 };
 
 /** 설정별 helper에서 동일 키 집합을 순회·매핑할 때 사용 */
@@ -52,6 +58,8 @@ export const ALL_PLATFORM_KV_SETTING_KEYS: readonly PlatformKvSettingKey[] = [
   PLATFORM_KV_KEYS.publishedCardImageDeleteQueue,
   PLATFORM_KV_KEYS.mainSlideAds,
   PLATFORM_KV_KEYS.mainSlideAdConfig,
+  PLATFORM_KV_KEYS.sitePublicTournamentListSnapshots,
+  PLATFORM_KV_KEYS.sitePublicVenueListSnapshots,
 ];
 
 export async function readPlatformKvJson(key: PlatformKvSettingKey): Promise<unknown | null> {

@@ -11,7 +11,7 @@ export function mimeTypeFromProofExt(ext: string): string {
 }
 
 async function readW320W640DirFiles(
-  variant: "w320" | "w640",
+  variant: "w160" | "w320" | "w640",
   imageId: string,
   originalExt: ProofImageOriginalExt
 ): Promise<{ buffer: Buffer; ext: string } | null> {
@@ -49,7 +49,7 @@ async function readW320W640DirFiles(
  */
 export async function readProofImageVariantFile(
   imageId: string,
-  variant: "original" | "w320" | "w640",
+  variant: "original" | "w160" | "w320" | "w640",
   originalExt: ProofImageOriginalExt
 ): Promise<{ buffer: Buffer; ext: string } | null> {
   if (variant === "original") {

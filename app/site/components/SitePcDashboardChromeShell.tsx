@@ -3,7 +3,8 @@ import { headers } from "next/headers";
 import { getSiteLayoutConfig } from "../../../lib/surface-read";
 import { getSiteUnreadNotificationCount } from "../../../lib/server/site-unread-notification-count";
 import { filterPcHeaderAdminMenuItems, getPcSiteHeaderAdminFlags } from "../lib/site-pc-header-admin";
-import SiteChromeHeader, { isPublicSiteMobileView } from "./SiteChromeHeader";
+import SiteChromeHeader from "./SiteChromeHeader";
+import { isPublicSiteMobileView } from "./site-public-mobile-view";
 import SiteVenuesGeolocationNav from "./SiteVenuesGeolocationNav";
 
 /** `/platform`·`/client` PC 대시보드 — 공개 사이트와 동일 `SiteChromeHeader` 재사용 (모바일 UA에서는 null) */

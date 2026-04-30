@@ -14,7 +14,9 @@ export async function GET(
   const normalizedImageId = decodeURIComponent(imageIdParam ?? "").trim();
   const variantRaw = (variantParam ?? "").trim().toLowerCase();
   const variant =
-    variantRaw === "original" || variantRaw === "w320" || variantRaw === "w640" ? variantRaw : null;
+    variantRaw === "original" || variantRaw === "w160" || variantRaw === "w320" || variantRaw === "w640"
+      ? variantRaw
+      : null;
 
   if (!normalizedImageId || !variant) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });

@@ -1,56 +1,11 @@
 import { SITE_TOURNAMENT_LIST_EXCLUDED_BADGES } from "../../../lib/site-tournament-badges";
-import { formatTournamentScheduleLabel } from "../../../lib/tournament-schedule";
-import { resolveSitePosterDisplayUrl } from "../../../lib/site-poster-urls";
-import type { Tournament } from "../../../lib/types/entities";
 import { Suspense } from "react";
-import { listAllTournamentsForPublicSiteList } from "../../../lib/surface-read";
+import { listSitePublicTournamentListSnapshotsForPublicSite } from "../../../lib/surface-read";
 import SiteTournamentsDistanceShell, { type SiteTournamentListRow } from "./SiteTournamentsDistanceShell";
 import { parseTournamentStatusFilter } from "./tournament-list-url";
 import SiteListPageSkeleton from "../components/SiteListPageSkeleton";
 
 export const dynamic = "force-dynamic";
-
-function tournamentDeadlineSortValue(t: Tournament): string {
-  const v = typeof t.date === "string" ? t.date.trim() : "";
-  return v || "9999-12-31";
-}
-
-const WEEKDAYS_KO = ["일", "월", "화", "수", "목", "금", "토"];
-
-function formatSingleDateWithWeekday(isoDate: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDate.trim());
-  if (!m) return isoDate;
-  const d = new Date(`${m[1]}-${m[2]}-${m[3]}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return isoDate;
-  return `${m[1]}.${m[2]}.${m[3]} (${WEEKDAYS_KO[d.getDay()]})`;
-}
-
-function tournamentListScheduleLine(t: Tournament): string {
-  const dates =
-    t.eventDates && t.eventDates.length > 0
-      ? [...t.eventDates]
-      : t.date
-        ? [t.date]
-        : [];
-  const sorted = dates.map((x) => x.trim()).filter(Boolean).sort();
-  if (sorted.length === 0) return "";
-  if (sorted.length === 1) return formatSingleDateWithWeekday(sorted[0]!);
-  const label = formatTournamentScheduleLabel(t);
-  return label.replace(/\d{4}-\d{2}-\d{2}/g, (seg) => {
-    const p = /^(\d{4})-(\d{2})-(\d{2})/.exec(seg);
-    return p ? `${p[1]}.${p[2]}.${p[3]}` : seg;
-  });
-}
-
-function tournamentBracketParen(t: Tournament): string | null {
-  const n = t.maxParticipants;
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return `${Math.floor(n)}강`;
-}
-
-function tournamentLocationLine(t: Tournament): string {
-  return typeof t.location === "string" ? t.location.trim() : "";
-}
 
 export default function SiteTournamentsPage({
   searchParams,
@@ -72,30 +27,24 @@ async function SiteTournamentsPageContent({
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const statusFilter = parseTournamentStatusFilter(resolvedSearchParams.status);
 
-  const tournaments = await listAllTournamentsForPublicSiteList();
+  const snapshots = await listSitePublicTournamentListSnapshotsForPublicSite();
 
-  let ordered = tournaments.filter((t) => !SITE_TOURNAMENT_LIST_EXCLUDED_BADGES.has(t.statusBadge));
+  let ordered = snapshots.filter((s) => !SITE_TOURNAMENT_LIST_EXCLUDED_BADGES.has(s.statusBadge));
   if (statusFilter !== "all") {
-    ordered = ordered.filter((t) => t.statusBadge === statusFilter);
+    ordered = ordered.filter((s) => s.statusBadge === statusFilter);
   }
 
-  ordered.sort((a, b) => tournamentDeadlineSortValue(a).localeCompare(tournamentDeadlineSortValue(b)));
+  ordered.sort((a, b) => a.sortDate.localeCompare(b.sortDate));
 
-  const rows: SiteTournamentListRow[] = ordered.map((tournament) => ({
-    id: tournament.id,
-    statusBadge: tournament.statusBadge,
-    title: tournament.title,
-    scheduleLine: tournamentListScheduleLine(tournament),
-    locationLine: tournamentLocationLine(tournament),
-    bracketParen: tournamentBracketParen(tournament),
-    posterSrc: resolveSitePosterDisplayUrl(tournament.posterImageUrl),
+  const rows: SiteTournamentListRow[] = ordered.map((s) => ({
+    id: s.tournamentId,
+    statusBadge: s.statusBadge,
+    title: s.title,
+    scheduleLine: s.dateLabel,
+    locationLine: s.regionLabel,
+    bracketParen: s.playScaleLabel.trim() ? s.playScaleLabel : null,
+    posterSrc: s.thumbnail160Url,
   }));
 
-  return (
-    <SiteTournamentsDistanceShell
-      rows={rows}
-      searchParams={resolvedSearchParams}
-      currentStatus={statusFilter}
-    />
-  );
+  return <SiteTournamentsDistanceShell rows={rows} searchParams={resolvedSearchParams} currentStatus={statusFilter} />;
 }

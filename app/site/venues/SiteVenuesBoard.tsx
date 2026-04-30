@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import FilterButton from "../components/FilterButton";
 import FilterDropdown from "../components/FilterDropdown";
 import SiteShellFrame from "../components/SiteShellFrame";
+import SiteListImage160 from "../components/SiteListImage160";
 import filterStyles from "../components/filter-controls.module.css";
 import {
   confirmSiteGeolocationPrecursor,
@@ -242,8 +243,8 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
               <Link href={`/site/venues/${row.venueId}`}>
                 <div className="site-venue-card-main">
                   <span className="site-venue-card-title">{row.name}</span>
-                  {String(row.address ?? "").trim() ? (
-                    <span className="site-venue-address">{String(row.address).trim()}</span>
+                  {String(row.region ?? "").trim() ? (
+                    <span className="site-venue-address">{String(row.region).trim()}</span>
                   ) : null}
                   {(() => {
                     const cat = categoryLabel(row.venueCategory);
@@ -267,14 +268,12 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
                 </div>
                 <div className="site-venue-list-thumb">
                   {row.thumbnailUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <SiteListImage160
                       src={row.thumbnailUrl}
                       alt=""
                       width={88}
                       height={56}
-                      loading="lazy"
-                      decoding="async"
+                      placeholderClassName="site-venue-list-thumb-placeholder"
                     />
                   ) : (
                     <div className="site-venue-list-thumb-placeholder">이미지 없음</div>

@@ -90,6 +90,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     imageId: result.imageId,
+    w160Url: result.w160Url,
     w320Url: result.w320Url,
     w640Url: result.w640Url,
   });

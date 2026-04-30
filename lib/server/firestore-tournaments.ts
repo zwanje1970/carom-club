@@ -1,7 +1,11 @@
 import * as admin from "firebase-admin";
 import { randomUUID } from "crypto";
 import { AuthRole } from "../auth/roles";
-import { cacheTagTournamentById } from "../cache-tags";
+import {
+  CACHE_TAG_MAIN_SLIDE_SNAPSHOTS,
+  CACHE_TAG_SITE_PUBLIC_TOURNAMENTS_LIST,
+  cacheTagTournamentById,
+} from "../cache-tags";
 import { revalidateSiteDataTag } from "../revalidate-site-data-tag";
 import { isEmptyOutlineHtml } from "../outline-content-helpers";
 import type { OutlineDisplayMode } from "../outline-content-types";
@@ -28,10 +32,22 @@ import {
 
 const COLLECTION = "v3_tournaments";
 
-function revalidatePublicTournamentCache(tournamentId: string): void {
+/** 대회 원본·게시카드 변경 후 공개 목록·메인 슬라이드·해당 대회 캐시 무효화 */
+export function revalidatePublicTournamentCache(tournamentId: string): void {
   const id = tournamentId.trim();
   if (!id) return;
   revalidateSiteDataTag(cacheTagTournamentById(id));
+  revalidateSiteDataTag(CACHE_TAG_SITE_PUBLIC_TOURNAMENTS_LIST);
+  revalidateSiteDataTag(CACHE_TAG_MAIN_SLIDE_SNAPSHOTS);
+}
+
+async function rebuildPublicTournamentListSnapshotsSafe(): Promise<void> {
+  try {
+    const { rebuildSitePublicTournamentListSnapshots } = await import("./site-public-list-snapshots-kv");
+    await rebuildSitePublicTournamentListSnapshots();
+  } catch (e) {
+    console.warn("[firestore-tournaments] rebuild tournament list snapshots failed", e);
+  }
 }
 
 function tournamentToFirestorePlain(t: Tournament): Record<string, unknown> {
@@ -274,6 +290,7 @@ export async function createTournamentFirestore(params: {
 
   const db = getSharedFirestoreDb();
   await db.collection(COLLECTION).doc(id).set(tournamentToFirestorePlain(tournament));
+  await rebuildPublicTournamentListSnapshotsSafe();
   revalidatePublicTournamentCache(id);
   return { ok: true, tournament: await normalizeTournament(tournament, undefined, venueOrgs) };
 }
@@ -393,6 +410,7 @@ export async function updateTournamentFirestore(params: {
   const db = getSharedFirestoreDb();
   const tid = params.tournamentId.trim();
   await db.collection(COLLECTION).doc(tid).set(tournamentToFirestorePlain(updated), { merge: true });
+  await rebuildPublicTournamentListSnapshotsSafe();
   revalidatePublicTournamentCache(tid);
   return { ok: true, tournament: await normalizeTournament(updated, undefined, venueOrgs) };
 }
@@ -422,6 +440,7 @@ export async function deleteTournamentFirestore(params: {
     },
     { merge: true },
   );
+  await rebuildPublicTournamentListSnapshotsSafe();
   revalidatePublicTournamentCache(id);
   return { ok: true };
 }
@@ -468,6 +487,7 @@ export async function softDeleteTournamentDocumentFirestore(params: {
     },
     { merge: true },
   );
+  await rebuildPublicTournamentListSnapshotsSafe();
   revalidatePublicTournamentCache(id);
   return { ok: true };
 }
@@ -512,6 +532,7 @@ export async function restoreTournamentDocumentFirestore(
     },
     { merge: true },
   );
+  await rebuildPublicTournamentListSnapshotsSafe();
   revalidatePublicTournamentCache(id);
   return { ok: true };
 }
@@ -532,6 +553,7 @@ export async function permanentlyDeleteTournamentDocumentFirestore(
     return { ok: false, error: "백업함에 있는 삭제된 대회만 완전 삭제할 수 있습니다." };
   }
   await ref.delete();
+  await rebuildPublicTournamentListSnapshotsSafe();
   revalidatePublicTournamentCache(id);
   return { ok: true };
 }

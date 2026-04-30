@@ -38,14 +38,15 @@ async function uploadOneObject(params: {
   return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${enc}?alt=media&token=${token}`;
 }
 
-/** w320 / w640 만 업로드 (w640 = 최대 해상도). `proof-images/{imageId}/original.*` 는 생성하지 않는다. */
+/** w160 / w320 / w640 업로드 (w640 = 최대 해상도). `proof-images/{imageId}/original.*` 는 생성하지 않는다. */
 export async function uploadProofImageVariantsToFirebaseStorage(params: {
   imageId: string;
+  w160Buffer: Buffer;
   w320Buffer: Buffer;
   w640Buffer: Buffer;
   /** 기본 jpeg. `png` 는 게시 카드 스냅샷(알파 유지) 전용 */
   outputFormat?: "jpeg" | "png";
-}): Promise<{ storageW320Url: string; storageW640Url: string }> {
+}): Promise<{ storageW160Url: string; storageW320Url: string; storageW640Url: string }> {
   ensureFirebaseApp();
   const base = `proof-images/${params.imageId}`;
   const fmt = params.outputFormat ?? "jpeg";
@@ -56,7 +57,13 @@ export async function uploadProofImageVariantsToFirebaseStorage(params: {
   for (const bucketName of bucketCandidates) {
     const bucket = admin.storage().bucket(bucketName);
     try {
-      const [storageW320Url, storageW640Url] = await Promise.all([
+      const [storageW160Url, storageW320Url, storageW640Url] = await Promise.all([
+        uploadOneObject({
+          bucket,
+          objectPath: `${base}/w160.${ext}`,
+          buffer: params.w160Buffer,
+          contentType,
+        }),
         uploadOneObject({
           bucket,
           objectPath: `${base}/w320.${ext}`,
@@ -71,7 +78,7 @@ export async function uploadProofImageVariantsToFirebaseStorage(params: {
         }),
       ]);
 
-      const urls = { storageW320Url, storageW640Url };
+      const urls = { storageW160Url, storageW320Url, storageW640Url };
       for (const v of Object.values(urls)) {
         if (typeof v !== "string" || !v.trim().startsWith("https://")) {
           throw new Error("incomplete proof image storage URLs");

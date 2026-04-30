@@ -13,7 +13,7 @@ import {
   listTournamentSnapshotsForMainSite,
   getMainSlideAdSettingsForSite,
   getTournamentByIdForPublicSitePage,
-  listAllTournamentsForPublicSiteList,
+  listSitePublicTournamentListSnapshotsForPublicSite,
   listCommunityPostsAllPrimaryForPublicSite,
   listCommunityPostsForPublicSite,
 } from "./server/public-data-cache";
@@ -63,7 +63,7 @@ export {
   isSiteImagePubliclyAccessible,
   getMainSlideAdSettingsForSite,
   getTournamentByIdForPublicSitePage,
-  listAllTournamentsForPublicSiteList,
+  listSitePublicTournamentListSnapshotsForPublicSite,
   listCommunityPostsAllPrimaryForPublicSite,
   listCommunityPostsForPublicSite,
 };

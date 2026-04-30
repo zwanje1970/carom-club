@@ -136,7 +136,10 @@ export default function CommunityPostCommentsSection({ boardType, postId, isLogg
         </div>
       ) : (
         <p className="ui-community-comments-login-hint v3-muted">
-          <Link href={`/login?next=${encodeURIComponent(loginNext)}`}>로그인</Link> 후 댓글을 남길 수 있습니다.
+          <Link prefetch={false} href={`/login?next=${encodeURIComponent(loginNext)}`}>
+            로그인
+          </Link>{" "}
+          후 댓글을 남길 수 있습니다.
         </p>
       )}
     </section>

@@ -14,6 +14,7 @@ import android.os.Environment
 import android.os.SystemClock
 import android.provider.MediaStore
 import android.util.Log
+import android.widget.Toast
 import android.webkit.CookieManager
 import android.webkit.GeolocationPermissions
 import android.webkit.ValueCallback
@@ -45,6 +46,9 @@ class MainActivity : AppCompatActivity() {
     private var cameraImageUri: Uri? = null
     private var pendingGeoCallback: GeolocationPermissions.Callback? = null
     private var pendingGeoOrigin: String? = null
+
+    /** 메인(홈)에서만: 2초 이내 두 번 뒤로가기 시 종료 */
+    private var lastBackPressedTime = 0L
 
     /** 스플래시 유지: 첫 페이지 로드 + 최소 2초 */
     private val splashPageReady = AtomicBoolean(false)
@@ -98,6 +102,9 @@ class MainActivity : AppCompatActivity() {
     companion object {
         /** FCM data 및 PendingIntent와 동일 키 */
         const val EXTRA_TARGET_URL = "url"
+
+        private const val EXIT_INTERVAL_MS = 2000L
+        private const val EXIT_TOAST_MESSAGE = "한 번 더 누르면 앱이 종료됩니다"
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -122,10 +129,24 @@ class MainActivity : AppCompatActivity() {
             }
         }
         onBackPressedDispatcher.addCallback(this) {
-            if (this@MainActivity::webView.isInitialized && webView.canGoBack()) {
-                webView.goBack()
-            } else {
+            if (!this@MainActivity::webView.isInitialized) {
                 finish()
+                return@addCallback
+            }
+            if (webView.canGoBack()) {
+                webView.goBack()
+                return@addCallback
+            }
+            if (!isMainHomeWebUrl(webView.url)) {
+                finish()
+                return@addCallback
+            }
+            val now = System.currentTimeMillis()
+            if (now - lastBackPressedTime < EXIT_INTERVAL_MS) {
+                finish()
+            } else {
+                Toast.makeText(this@MainActivity, EXIT_TOAST_MESSAGE, Toast.LENGTH_SHORT).show()
+                lastBackPressedTime = now
             }
         }
 
@@ -276,6 +297,29 @@ class MainActivity : AppCompatActivity() {
             "setupWebView: javaScriptEnabled=${settings.javaScriptEnabled}, " +
                 "JavascriptInterface CaromPdfDownload registered on this WebView before loadUrl",
         )
+    }
+
+    /**
+     * 공개 사이트 홈(`/`, `/site`)·클라이언트 홈(`/client`)만 메인으로 본다.
+     * 하위 경로(`/site/community` 등)는 메인이 아님.
+     */
+    private fun isMainHomeWebUrl(url: String?): Boolean {
+        if (url.isNullOrBlank()) return false
+        val uri =
+            try {
+                Uri.parse(url)
+            } catch (_: Exception) {
+                return false
+            }
+        if (uri.scheme != "http" && uri.scheme != "https") return false
+        val rawPath = uri.path
+        val path =
+            when {
+                rawPath.isNullOrEmpty() || rawPath == "/" -> "/"
+                rawPath.length > 1 && rawPath.endsWith("/") -> rawPath.dropLast(1)
+                else -> rawPath
+            }
+        return path == "/" || path == "/site" || path == "/client"
     }
 
     private fun resolveOpenUrl(intent: Intent?): String {

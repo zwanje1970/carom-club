@@ -62,6 +62,7 @@ export default async function SiteCommunityBoardListPage({ params, searchParams 
           </Suspense>
         </CommunityBoardSwipeShell>
         <Link
+          prefetch={false}
           href={`${communityBoardListHref(boardType)}/write`}
           className="community-write-fab"
           aria-label={`${boardType} 글쓰기`}

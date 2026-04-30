@@ -11,6 +11,7 @@ export default function CommunityBoardTabs({ tabs, currentKey }: { tabs: TabItem
         {tabs.map((t) => (
           <li key={t.key} className="ui-community-tabs-item">
             <Link
+              prefetch={false}
               href={t.href}
               className={`ui-community-tabs-link${t.key === currentKey ? " ui-community-tabs-link--active" : ""}`}
               aria-current={t.key === currentKey ? "page" : undefined}

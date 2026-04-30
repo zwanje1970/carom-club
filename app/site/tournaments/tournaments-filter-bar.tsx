@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import FilterButton from "../components/FilterButton";
 import FilterDropdown from "../components/FilterDropdown";
 import filterStyles from "../components/filter-controls.module.css";
 import {
@@ -13,19 +12,11 @@ import {
 type Props = {
   searchParams: Record<string, string | string[] | undefined>;
   currentStatus: TournamentStatusFilter;
-  distanceSortActive: boolean;
-  onDistanceClick: (ev: React.MouseEvent<HTMLAnchorElement>) => void | Promise<void>;
 };
 
-export default function TournamentsFilterBar({
-  searchParams,
-  currentStatus,
-  distanceSortActive,
-  onDistanceClick,
-}: Props) {
+export default function TournamentsFilterBar({ searchParams, currentStatus }: Props) {
   const router = useRouter();
   const selectValue = currentStatus === "all" ? "all" : currentStatus;
-  const distanceHref = `/site/tournaments${buildTournamentListHref(searchParams, {})}`;
 
   return (
     <div className={`${filterStyles.filterRow} ${filterStyles.filterRowSingle} ${filterStyles.filterRowFilterPack}`}>
@@ -50,22 +41,6 @@ export default function TournamentsFilterBar({
           ))}
         </FilterDropdown>
       </div>
-      <FilterButton
-        className={[
-          filterStyles.buttonDistance,
-          distanceSortActive ? filterStyles.buttonDistanceActive : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        href={distanceHref}
-        useNextLink={false}
-        onClick={(e) => {
-          e.preventDefault();
-          void onDistanceClick(e);
-        }}
-      >
-        거리순
-      </FilterButton>
     </div>
   );
 }

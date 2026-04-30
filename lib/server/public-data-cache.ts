@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { isEntityLifecycleVisibleForList } from "./entity-lifecycle";
-import { getTournamentByIdFirestore, listAllTournamentsFirestore } from "./firestore-tournaments";
+import { getTournamentByIdFirestore } from "./firestore-tournaments";
 import {
   getSiteCommunityConfig as getSiteCommunityConfigUncached,
   getSiteLayoutConfig as getSiteLayoutConfigUncached,
@@ -65,15 +65,18 @@ export const getMainSlideAdSettingsForSite = unstable_cache(
   { tags: [CACHE_TAG_MAIN_SLIDE_ADS] }
 );
 
-/** 공개 `/site/tournaments` — `listAllTournamentsFirestore` 전체 조회(짧은 ISR) */
-const _listAllTournamentsFirestoreForPublicSiteList = unstable_cache(
-  async () => listAllTournamentsFirestore(),
-  ["public-site-tournaments-list-v1"],
+/** 공개 `/site/tournaments` — KV 스냅샷(미배포 시 lazy rebuild, 짧은 ISR) */
+const _listSitePublicTournamentSnapshotsForPublicSite = unstable_cache(
+  async () => {
+    const { getSitePublicTournamentListSnapshotsWithLazyRebuild } = await import("./site-public-list-snapshots-kv");
+    return getSitePublicTournamentListSnapshotsWithLazyRebuild();
+  },
+  ["public-site-tournament-list-snapshots-v1"],
   { revalidate: 60, tags: [CACHE_TAG_SITE_PUBLIC_TOURNAMENTS_LIST] }
 );
 
-export async function listAllTournamentsForPublicSiteList() {
-  return _listAllTournamentsFirestoreForPublicSiteList();
+export async function listSitePublicTournamentListSnapshotsForPublicSite() {
+  return _listSitePublicTournamentSnapshotsForPublicSite();
 }
 
 /** 공개 사이트 커뮤니티 목록 — 피드 1회 로드 후 필터는 기존과 동일(짧은 ISR) */

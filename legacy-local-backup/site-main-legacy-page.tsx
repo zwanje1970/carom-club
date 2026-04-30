@@ -15,7 +15,7 @@ import {
 } from "../../../lib/surface-read";
 import { mergeTournamentAndAdSlideDeckItems } from "../../../lib/site/main-slide-stream";
 import SiteShellFrame from "../components/SiteShellFrame";
-import { isPublicSiteMobileView } from "../components/SiteChromeHeader";
+import { isPublicSiteMobileView } from "../app/site/components/site-public-mobile-view";
 import SiteMainLogo from "../components/SiteMainLogo";
 import VenuesDistanceNavLink from "../components/VenuesDistanceNavLink";
 import SitePublicLoadingShell from "../components/SitePublicLoadingShell";

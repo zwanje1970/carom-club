@@ -31,6 +31,8 @@ function navItemActive(pathname: string, href: string): boolean {
 export default function GlobalHomeButton() {
   const pathname = usePathname() ?? "";
   const overInquiryComposer = isInquiryDetailWithComposer(pathname);
+  /** 커뮤니티 목록·상세에서 하단 5탭이 인접 _rsc를 대량 prefetch 하지 않도록 */
+  const suppressBottomNavPrefetch = pathname.startsWith("/site/community");
 
   /* 서버에서 `next-url`이 비면 샘플 셸 클래스가 빠져 하단 네비 실험 스타일이 적용되지 않음 — pathname으로 동기화 */
   useLayoutEffect(() => {
@@ -67,11 +69,18 @@ export default function GlobalHomeButton() {
               href={item.href}
               className={cls}
               aria-current={active ? "page" : undefined}
+              prefetch={suppressBottomNavPrefetch ? false : undefined}
             >
               {inner}
             </VenuesDistanceNavLink>
           ) : (
-            <Link key={item.href} href={item.href} className={cls} aria-current={active ? "page" : undefined}>
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cls}
+              aria-current={active ? "page" : undefined}
+              prefetch={suppressBottomNavPrefetch ? false : undefined}
+            >
               {inner}
             </Link>
           );

@@ -16,8 +16,7 @@ import {
   getSharedFirestoreDb,
   isFirestoreUsersBackendConfigured,
 } from "./firestore-users";
-import { CACHE_TAG_SITE_VENUES_BOARD_ROWS } from "../cache-tags";
-import { revalidateSiteDataTag } from "../revalidate-site-data-tag";
+import { rebuildVenueListSnapshotsAndRevalidate } from "./revalidate-site-venues-board";
 
 export const V3_CLIENT_APPLICATIONS = "v3_client_applications";
 export const V3_CLIENT_ORGANIZATIONS = "v3_client_organizations";
@@ -412,9 +411,9 @@ export async function updateClientApplicationStatusFirestore(
     }
 
     return updated;
-  }).then((updated) => {
-    if (updated) {
-      revalidateSiteDataTag(CACHE_TAG_SITE_VENUES_BOARD_ROWS);
+  }).then(async (updated) => {
+    if (updated && params.status === "APPROVED") {
+      await rebuildVenueListSnapshotsAndRevalidate();
     }
     return updated;
   });
@@ -571,9 +570,9 @@ export async function upsertClientOrganizationForUserFirestore(
     tx.set(orgRefFinal, organizationToFirestore(next));
     return { ok: true as const, org: next };
   })
-    .then((res) => {
+    .then(async (res) => {
       if (res.ok === true && res.org.type === "VENUE") {
-        revalidateSiteDataTag(CACHE_TAG_SITE_VENUES_BOARD_ROWS);
+        await rebuildVenueListSnapshotsAndRevalidate();
       }
       return res;
     })
@@ -631,9 +630,9 @@ export async function patchClientOrganizationForPlatformFirestore(
     };
     tx.set(ref, organizationToFirestore(next));
     return next;
-  }).then((next) => {
-    if (next) {
-      revalidateSiteDataTag(CACHE_TAG_SITE_VENUES_BOARD_ROWS);
+  }).then(async (next) => {
+    if (next && next.type === "VENUE") {
+      await rebuildVenueListSnapshotsAndRevalidate();
     }
     return next;
   });

@@ -8,6 +8,7 @@ import {
   communityTabLabelForBoard,
   isPrimaryTabKey,
 } from "./community-tab-config";
+import SiteListImage160 from "../components/SiteListImage160";
 
 function formatListDateTime(iso: string): string {
   const d = new Date(iso);
@@ -70,34 +71,31 @@ export default function CommunityBoardPostList({
           : null;
         return (
           <li key={post.id} className="ui-community-board-row">
-            <div className="ui-community-board-row-main">
-              <div className="ui-community-board-title-line">
-                {prefix ? (
-                  <span className={boardPillClass(post.boardType)}>{prefix}</span>
-                ) : null}
-                <Link href={href} className="ui-community-board-title-link">
-                  <span className="ui-community-board-title">{post.title}</span>
-                </Link>
+            <Link prefetch={false} href={href} className="ui-community-board-row-link">
+              <div className="ui-community-board-thumb-wrap">
+                {post.thumbnailUrl ? (
+                  <SiteListImage160
+                    className="ui-community-board-thumb"
+                    src={post.thumbnailUrl}
+                    alt=""
+                    placeholderClassName="ui-community-board-thumb-placeholder"
+                  />
+                ) : (
+                  <div className="ui-community-board-thumb-placeholder" />
+                )}
               </div>
-              <p className="ui-community-board-meta">
-                {post.nickname} · {formatListDateTime(post.createdAt)} · 조회 {post.viewCount} · 댓글{" "}
-                {post.commentCount}
-              </p>
-            </div>
-            <div className="ui-community-board-row-aside">
-              {post.thumbnailUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  className="ui-community-board-thumb"
-                  src={post.thumbnailUrl}
-                  alt=""
-                  width={40}
-                  height={40}
-                  loading="lazy"
-                  decoding="async"
-                />
-              ) : null}
-            </div>
+              <div className="ui-community-board-row-body">
+                <div className="ui-community-board-line1">
+                  {prefix ? (
+                    <span className={boardPillClass(post.boardType)}>{prefix}</span>
+                  ) : null}
+                  <span className="ui-community-board-title">{post.title}</span>
+                </div>
+                <p className="ui-community-board-meta">
+                  {formatListDateTime(post.createdAt)} · 조회 {post.viewCount} · 댓글 {post.commentCount}
+                </p>
+              </div>
+            </Link>
           </li>
         );
       })}

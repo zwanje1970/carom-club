@@ -1,21 +1,11 @@
+"use client";
+
 import { Fragment } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import VenuesDistanceNavLink from "./VenuesDistanceNavLink";
 import type { SiteLayoutMenuItem } from "../../../lib/types/entities";
 import type { PcSiteHeaderAdminEntry } from "../lib/site-pc-header-admin";
-
-function isMobileUserAgent(userAgent: string): boolean {
-  const ua = userAgent.toLowerCase();
-  return ua.includes("iphone") || ua.includes("android") || ua.includes("ipad") || ua.includes("mobile");
-}
-
-/** 공개 사이트·클라이언트 PC 헤더 노출 분기와 동일 기준 */
-export function isPublicSiteMobileView(headerStore: { get: (name: string) => string | null }): boolean {
-  const ua = headerStore.get("user-agent") ?? "";
-  if (isMobileUserAgent(ua)) return true;
-  if (headerStore.get("sec-ch-ua-mobile") === "?1") return true;
-  return false;
-}
 
 function splitHeaderMenuItems(menuItems: SiteLayoutMenuItem[]): {
   main: SiteLayoutMenuItem[];
@@ -47,6 +37,10 @@ export default function SiteChromeHeader({
   /** PC 전용: 전달 시에만 마이페이지 옆에 관리자 진입 노출(모바일 분기에서는 넘기지 않음) */
   pcAdminEntry?: PcSiteHeaderAdminEntry;
 }) {
+  const pathname = usePathname() ?? "";
+  const suppressPrefetch = pathname.startsWith("/site/community");
+  const navPrefetch = suppressPrefetch ? false : undefined;
+
   const { main, auxiliary } = splitHeaderMenuItems(menuItems);
   const myBadge =
     unreadNotificationCount > 0 ? (unreadNotificationCount > 99 ? "99+" : String(unreadNotificationCount)) : null;
@@ -55,12 +49,12 @@ export default function SiteChromeHeader({
     pcAdminEntry && (pcAdminEntry.showClient || pcAdminEntry.showPlatform) ? (
       <>
         {pcAdminEntry.showClient ? (
-          <Link href="/client">
+          <Link prefetch={navPrefetch} href="/client">
             클라이언트관리자
           </Link>
         ) : null}
         {pcAdminEntry.showPlatform ? (
-          <Link href="/platform">
+          <Link prefetch={navPrefetch} href="/platform">
             플랫폼관리자
           </Link>
         ) : null}
@@ -70,18 +64,18 @@ export default function SiteChromeHeader({
   const renderMainNav = (item: SiteLayoutMenuItem, index: number) => {
     const showBadge = myBadge != null && isMypageHeaderHref(item.href);
     const inner = item.href.startsWith("/site/venues") ? (
-      <VenuesDistanceNavLink href={item.href}>
+      <VenuesDistanceNavLink prefetch={navPrefetch} href={item.href}>
         {item.label}
       </VenuesDistanceNavLink>
     ) : (
-      <Link href={item.href}>
+      <Link prefetch={navPrefetch} href={item.href}>
         {item.label}
       </Link>
     );
     if (!showBadge) return inner;
     return (
       <span className="site-header-nav-item-wrap">
-        <Link href={item.href} className="site-header-mypage-nav-link">
+        <Link prefetch={navPrefetch} href={item.href} className="site-header-mypage-nav-link">
           {item.label}
         </Link>
         <span className="site-header-unread-badge" aria-label={`읽지 않은 알림 ${unreadNotificationCount}건`}>
@@ -94,7 +88,7 @@ export default function SiteChromeHeader({
   return (
     <header className="site-header">
       <div className="site-header-top">
-        <Link className="site-logo" href="/site">
+        <Link prefetch={navPrefetch} className="site-logo" href="/site">
           <span className="site-header-logo-dots" aria-hidden="true">
             <span className="site-header-logo-dot site-header-logo-dot--y">●</span>
             <span className="site-header-logo-dot site-header-logo-dot--r">●</span>
@@ -115,12 +109,12 @@ export default function SiteChromeHeader({
         {auxiliary.map((item, index) => {
           const showBadge = myBadge != null && isMypageHeaderHref(item.href);
           const inner = !showBadge ? (
-            <Link href={item.href}>
+            <Link prefetch={navPrefetch} href={item.href}>
               {item.label}
             </Link>
           ) : (
             <span className="site-header-nav-item-wrap">
-              <Link href={item.href} className="site-header-mypage-nav-link">
+              <Link prefetch={navPrefetch} href={item.href} className="site-header-mypage-nav-link">
                 {item.label}
               </Link>
               <span className="site-header-unread-badge" aria-label={`읽지 않은 알림 ${unreadNotificationCount}건`}>

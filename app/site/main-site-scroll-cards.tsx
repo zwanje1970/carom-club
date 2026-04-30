@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties, KeyboardEvent, PointerEvent } from "react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import styles from "./main-sample/main-sample.module.css";
 import siteStyles from "./main-site-scroll-cards.module.css";
 
@@ -140,62 +140,10 @@ export type MainSiteScrollCardsProps = {
   slideCardMoveDurationSec: number;
 };
 
-const MARQUEE_RESUME_AFTER_MS = 1000;
-
 export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSiteScrollCardsProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const [marqueePausedByUser, setMarqueePausedByUser] = useState(false);
-  const marqueeUserPauseRef = useRef(false);
-  const marqueeResumeTimerRef = useRef<number | null>(null);
-  const viewportRef = useRef<HTMLDivElement | null>(null);
 
   const lcpHeroItemIndex = useMemo(() => items.findIndex((x) => Boolean(x.imageUrl?.trim())), [items]);
-
-  const bumpMarqueeUserPause = useCallback(() => {
-    if (!marqueeUserPauseRef.current) {
-      marqueeUserPauseRef.current = true;
-      setMarqueePausedByUser(true);
-    }
-    if (marqueeResumeTimerRef.current != null) {
-      window.clearTimeout(marqueeResumeTimerRef.current);
-    }
-    marqueeResumeTimerRef.current = window.setTimeout(() => {
-      marqueeUserPauseRef.current = false;
-      setMarqueePausedByUser(false);
-      marqueeResumeTimerRef.current = null;
-    }, MARQUEE_RESUME_AFTER_MS);
-  }, []);
-
-  useEffect(() => {
-    const el = viewportRef.current;
-    if (!el || items.length === 0) return;
-
-    const onScroll = () => {
-      bumpMarqueeUserPause();
-    };
-    const onWheel = () => {
-      bumpMarqueeUserPause();
-    };
-    const onTouchMove = () => {
-      bumpMarqueeUserPause();
-    };
-
-    el.addEventListener("scroll", onScroll, { passive: true });
-    el.addEventListener("wheel", onWheel, { passive: true });
-    el.addEventListener("touchmove", onTouchMove, { passive: true });
-
-    return () => {
-      el.removeEventListener("scroll", onScroll);
-      el.removeEventListener("wheel", onWheel);
-      el.removeEventListener("touchmove", onTouchMove);
-      if (marqueeResumeTimerRef.current != null) {
-        window.clearTimeout(marqueeResumeTimerRef.current);
-        marqueeResumeTimerRef.current = null;
-      }
-      marqueeUserPauseRef.current = false;
-      setMarqueePausedByUser(false);
-    };
-  }, [items.length, bumpMarqueeUserPause]);
 
   const trackStyle = useMemo(
     () =>
@@ -269,11 +217,10 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
     </div>
   );
 
-  const pauseMarquee = selectedItemId !== null || marqueePausedByUser;
+  const pauseMarquee = selectedItemId !== null;
 
   return (
     <div
-      ref={viewportRef}
       className={`${styles.slideViewportSiteMain} ${siteStyles.viewportMarquee}`}
       data-no-root-swipe
       onPointerDownCapture={onViewportPointerDownCapture}

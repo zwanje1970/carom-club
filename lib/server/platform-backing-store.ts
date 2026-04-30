@@ -11,6 +11,7 @@ import {
   CACHE_TAG_SITE_VENUES_BOARD_ROWS,
   CACHE_TAG_MAIN_SLIDE_ADS,
   CACHE_TAG_MAIN_SLIDE_SNAPSHOTS,
+  CACHE_TAG_SITE_PUBLIC_TOURNAMENTS_LIST,
 } from "../cache-tags";
 import { revalidateSiteDataTag } from "../revalidate-site-data-tag";
 import { normalizeRepresentativeImageUrls, parseTypeSpecific, resolveVenuePricingType } from "../client-organization-setup-parse";
@@ -4285,7 +4286,8 @@ async function updateClientApplicationStatusLocalDevStore(
 
   await writeLocalJsonAggregate(store);
   if (params.status === "APPROVED") {
-    revalidateSiteDataTag(CACHE_TAG_SITE_VENUES_BOARD_ROWS);
+    const { rebuildVenueListSnapshotsAndRevalidate } = await import("./revalidate-site-venues-board");
+    await rebuildVenueListSnapshotsAndRevalidate();
   }
   return updated;
 }
@@ -4934,10 +4936,11 @@ export async function upsertClientVenueIntroForUser(
   if (idx >= 0) store.clientVenueIntros[idx] = next;
   else store.clientVenueIntros.push(next);
   await writeLocalJsonAggregate(store);
+  revalidateSiteDataTag(CACHE_TAG_SITE_VENUES_BOARD_ROWS);
   return next;
 }
 
-/** 사이트 당구장안내 목록(게시판형) — 카탈로그 + 연결된 사업장설정 org */
+/** 사이트 당구장안내 목록(게시판형) — KV 스냅샷 기반(상세는 `getSiteVenueDetailById`) */
 export type SiteVenueBoardRow = {
   venueId: string;
   name: string;
@@ -4958,46 +4961,11 @@ export type SiteVenueBoardRow = {
 };
 
 export async function getSiteVenuesBoardRows(): Promise<SiteVenueBoardRow[]> {
-  const orgs = await listApprovedClientOrganizationsFirestore({ status: "ACTIVE", clientType: "all" });
-  const venueRows = orgs
-    .filter((org) => org.type === "VENUE")
-    .filter((org) => org.approvalStatus === "APPROVED")
-    .filter((org) => org.status === "ACTIVE")
-    .filter((org) => org.isPublished)
-    .filter((org) => org.setupCompleted)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .map((org) => {
-      const ts = parseTypeSpecific("VENUE", org.typeSpecificJson ?? null);
-      const vs = ts as VenueSpecific;
-      const reps = normalizeRepresentativeImageUrls(vs.representativeImageUrls);
-      const cover = org.coverImageUrl?.trim() ?? "";
-      const region = org.region?.trim() || "";
-      const introLine = org.shortDescription?.trim() || org.description?.trim() || null;
-      const venueCategory: "daedae_only" | "mixed" =
-        vs.venueCategory === "mixed" ? "mixed" : "daedae_only";
-      let feeCategory: "normal" | "flat" | null = null;
-      const pricingType = resolveVenuePricingType(vs);
-      if (pricingType === "GENERAL") feeCategory = "normal";
-      else if (pricingType === "FLAT") feeCategory = "flat";
-      else feeCategory = null;
-      return {
-        venueId: org.slug?.trim() || org.id,
-        name: org.name?.trim() || "이름 없음",
-        region,
-        catalogTypeLabel: "당구장",
-        venueCategory,
-        feeCategory,
-        pricingType,
-        introLine,
-        thumbnailUrl: resolveSiteImageListThumbnailUrl(reps[0] || cover || "") ?? null,
-        address: org.address?.trim() || null,
-        phone: org.phone?.trim() || null,
-        website: org.website?.trim() || null,
-        lat: org.latitude,
-        lng: org.longitude,
-      };
-    });
-  return venueRows;
+  const { getSitePublicVenueListSnapshotsWithLazyRebuild, venueSnapshotsToBoardRows } = await import(
+    "./site-public-list-snapshots-kv"
+  );
+  const snaps = await getSitePublicVenueListSnapshotsWithLazyRebuild();
+  return venueSnapshotsToBoardRows(snaps);
 }
 
 /** 대회 장소 폼: 게시·설정 완료된 등록 당구장만 상호 부분일치 검색 */
@@ -5693,7 +5661,7 @@ export async function patchTournamentStatusBadge(params: {
 
   if (isFirestoreUsersBackendConfigured()) {
     const { getSharedFirestoreDb } = await import("./firestore-users");
-    const { getTournamentByIdFirestore } = await import("./firestore-tournaments");
+    const { getTournamentByIdFirestore, revalidatePublicTournamentCache } = await import("./firestore-tournaments");
     const db = getSharedFirestoreDb();
     await db.collection("v3_tournaments").doc(tid).set({ statusBadge: normalizedBadge }, { merge: true });
     await syncActiveTournamentCardSnapshotStatusBadge(tid);
@@ -5704,6 +5672,13 @@ export async function patchTournamentStatusBadge(params: {
     }
     const updated = await getTournamentByIdFirestore(tid);
     if (!updated) return { ok: false, error: "대회를 찾을 수 없습니다.", httpStatus: 404 };
+    try {
+      const { rebuildSitePublicTournamentListSnapshots } = await import("./site-public-list-snapshots-kv");
+      await rebuildSitePublicTournamentListSnapshots();
+    } catch (e) {
+      console.warn("[patchTournamentStatusBadge] rebuild tournament list snapshots failed", e);
+    }
+    revalidatePublicTournamentCache(tid);
     return { ok: true, tournament: updated };
   }
 
@@ -5719,6 +5694,14 @@ export async function patchTournamentStatusBadge(params: {
   } catch (e) {
     console.warn("[patchTournamentStatusBadge] reconcile tournament published cards failed", e);
   }
+  const { revalidatePublicTournamentCache } = await import("./firestore-tournaments");
+  try {
+    const { rebuildSitePublicTournamentListSnapshots } = await import("./site-public-list-snapshots-kv");
+    await rebuildSitePublicTournamentListSnapshots();
+  } catch (e) {
+    console.warn("[patchTournamentStatusBadge] rebuild tournament list snapshots failed", e);
+  }
+  revalidatePublicTournamentCache(tid);
   return { ok: true, tournament: await normalizeTournament(store.tournaments[idx]!, store) };
 }
 
@@ -7927,6 +7910,7 @@ function revalidateSiteNoticeCache(): void {
 
 function revalidateMainSlideSnapshotsCache(): void {
   revalidateSiteDataTag(CACHE_TAG_MAIN_SLIDE_SNAPSHOTS);
+  revalidateSiteDataTag(CACHE_TAG_SITE_PUBLIC_TOURNAMENTS_LIST);
 }
 
 function revalidateMainSlideAdsCache(): void {

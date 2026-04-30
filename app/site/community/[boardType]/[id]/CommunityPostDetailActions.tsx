@@ -41,7 +41,11 @@ export default function CommunityPostDetailActions({
   return (
     <div className="ui-community-post-manage-actions">
       {canManageAuthor ? (
-        <Link className="secondary-button ui-community-post-action-tight" href={`/site/community/${boardType}/${postId}/edit`}>
+        <Link
+          prefetch={false}
+          className="secondary-button ui-community-post-action-tight"
+          href={`/site/community/${boardType}/${postId}/edit`}
+        >
           수정
         </Link>
       ) : null}

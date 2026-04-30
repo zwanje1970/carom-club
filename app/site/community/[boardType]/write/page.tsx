@@ -33,7 +33,11 @@ export default async function SiteCommunityWritePage({ params }: Props) {
       <section className="site-site-gray-main v3-stack ui-community-post-detail-page">
         <CommunityPostWriteForm boardType={boardType} />
         <div className="ui-community-post-detail-foot">
-          <Link className="secondary-button ui-community-post-detail-foot-secondary" href={communityBoardListHref(boardType)}>
+          <Link
+            prefetch={false}
+            className="secondary-button ui-community-post-detail-foot-secondary"
+            href={communityBoardListHref(boardType)}
+          >
             목록
           </Link>
         </div>

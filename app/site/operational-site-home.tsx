@@ -6,7 +6,7 @@ import {
 } from "../../lib/surface-read";
 import { mergeTournamentAndAdSlideDeckItems } from "../../lib/site/main-slide-stream";
 import SiteShellFrame from "./components/SiteShellFrame";
-import { isPublicSiteMobileView } from "./components/SiteChromeHeader";
+import { isPublicSiteMobileView } from "./components/site-public-mobile-view";
 import SiteMainLogo from "./components/SiteMainLogo";
 import { MainSiteScrollCards, type MainSiteScrollCardItem } from "./main-site-scroll-cards";
 import type { SlideDeckItem } from "./tournament-snapshot-card-view";

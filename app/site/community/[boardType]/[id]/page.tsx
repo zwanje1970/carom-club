@@ -170,7 +170,11 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
           currentUserId={currentUserId}
         />
         <div className="ui-community-post-detail-foot">
-          <Link className="primary-button ui-community-post-detail-foot-primary" href={`/site/community/${boardType}`}>
+          <Link
+            prefetch={false}
+            className="primary-button ui-community-post-detail-foot-primary"
+            href={`/site/community/${boardType}`}
+          >
             목록으로
           </Link>
         </div>

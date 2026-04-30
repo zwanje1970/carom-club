@@ -10,7 +10,10 @@ export async function GET(
   const { imageId } = await context.params;
   const normalizedImageId = imageId.trim();
   const variantRaw = request.nextUrl.searchParams.get("variant")?.trim() ?? "w640";
-  const variant = variantRaw === "original" || variantRaw === "w320" || variantRaw === "w640" ? variantRaw : null;
+  const variant =
+    variantRaw === "original" || variantRaw === "w160" || variantRaw === "w320" || variantRaw === "w640"
+      ? variantRaw
+      : null;
   if (!normalizedImageId || !variant) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
