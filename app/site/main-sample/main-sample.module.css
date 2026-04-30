@@ -250,6 +250,70 @@
   pointer-events: none;
 }
 
+/* 게시 PNG 전면 스냅샷: 샘플 고정 높이·--sample-main-card-height·cover와 분리 */
+.sampleMainCardFacePublishedSnapshot {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  border-radius: 12px;
+  position: relative;
+  overflow: visible;
+  transform: translateY(-2px) scale(1);
+  box-shadow:
+    4px 10px 14px -6px rgba(15, 23, 42, 0.32),
+    2px 6px 10px -4px rgba(15, 23, 42, 0.18);
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.22s ease;
+}
+
+.sampleMainCardSlot:active
+  .sampleMainCardFacePublishedSnapshot:not(.sampleMainCardFacePublishedSnapshotSelected) {
+  transform: translateY(-6px) scale(1.03);
+  box-shadow:
+    5px 12px 18px -6px rgba(15, 23, 42, 0.36),
+    3px 8px 12px -4px rgba(15, 23, 42, 0.22);
+}
+
+.sampleMainCardFacePublishedSnapshot.sampleMainCardFacePublishedSnapshotSelected {
+  transform: translateY(-16px) scale(1.11);
+  box-shadow:
+    6px 16px 24px -8px rgba(15, 23, 42, 0.42),
+    4px 10px 16px -5px rgba(15, 23, 42, 0.28);
+}
+
+.sampleMainCardSlot:active
+  .sampleMainCardFacePublishedSnapshot.sampleMainCardFacePublishedSnapshotSelected {
+  transform: translateY(-18px) scale(1.12);
+  box-shadow:
+    7px 18px 28px -8px rgba(15, 23, 42, 0.45),
+    4px 12px 18px -5px rgba(15, 23, 42, 0.3);
+}
+
+.sampleMainCardSlot:focus-visible .sampleMainCardFacePublishedSnapshot {
+  outline: 2px solid rgba(37, 99, 235, 0.85);
+  outline-offset: 3px;
+}
+
+.sampleMainCardFacePublishedSnapshot.sampleMainCardFacePublishedSnapshotSelected .sampleMainCardShortcut {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sampleMainCardPosterPublishedSnapshot {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  max-height: min(85dvh, 920px);
+  object-fit: contain;
+  border-radius: inherit;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
 .sampleMainCardTitleOverlay {
   position: absolute;
   left: 0;

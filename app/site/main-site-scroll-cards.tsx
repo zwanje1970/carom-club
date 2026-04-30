@@ -34,6 +34,8 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
   selected,
   onCardPointerDown,
 }: CardRowProps) {
+  const isPublishedSnapshotFace = Boolean(item.faceIsFullPublishedSnapshot && item.imageUrl?.trim());
+
   const onPointerDown = useCallback(
     (e: PointerEvent<HTMLDivElement>) => {
       const t = e.target as HTMLElement | null;
@@ -67,14 +69,22 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
       }}
     >
       <div
-        className={`${styles.sampleMainCardFace} ${selected ? styles.sampleMainCardFaceSelected : ""}`}
+        className={
+          isPublishedSnapshotFace
+            ? `${styles.sampleMainCardFacePublishedSnapshot} ${selected ? styles.sampleMainCardFacePublishedSnapshotSelected : ""}`
+            : `${styles.sampleMainCardFace} ${selected ? styles.sampleMainCardFaceSelected : ""}`
+        }
         style={faceStyle}
       >
         {item.imageUrl?.trim() ? (
           <img
             src={item.imageUrl.trim()}
             alt=""
-            className={styles.sampleMainCardPoster}
+            className={
+              isPublishedSnapshotFace
+                ? styles.sampleMainCardPosterPublishedSnapshot
+                : styles.sampleMainCardPoster
+            }
             decoding="async"
           />
         ) : null}

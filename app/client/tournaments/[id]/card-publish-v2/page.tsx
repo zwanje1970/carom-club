@@ -55,27 +55,43 @@ function TextColorSwatches({
   );
 }
 
-/** 카드 배경색 팔레트 (16색, 권장 톤 + 흰색) — 목록에 없는 저장값도 `mediaBackground` 그대로 미리보기·저장됨 */
-const CARD_COLOR_PALETTE_16 = [
+/** 카드 배경색 팔레트 (32색, 4×8 · 흰색 포함) — 목록에 없는 저장값도 `mediaBackground` 그대로 미리보기·저장됨 */
+const CARD_COLOR_PALETTE_32 = [
   "#FFFFFF",
-  "#171717",
+  "#F3F4F6",
+  "#9CA3AF",
   "#6B7280",
+  "#374151",
+  "#171717",
+  "#FECACA",
   "#DC2626",
+  "#FDBA74",
   "#EA580C",
+  "#FDE68A",
   "#EAB308",
+  "#CA8A04",
+  "#BBF7D0",
   "#84CC16",
+  "#4ADE80",
   "#16A34A",
+  "#6EE7B7",
   "#14B8A6",
+  "#22D3EE",
   "#38BDF8",
+  "#0EA5E9",
+  "#60A5FA",
   "#2563EB",
+  "#1E40AF",
   "#1E3A8A",
+  "#818CF8",
+  "#6366F1",
+  "#A78BFA",
   "#9333EA",
-  "#881337",
+  "#F0ABFC",
   "#EC4899",
-  "#92400E",
 ] as const;
 
-/** 신규 작성·저장 스냅샷 없을 때 미리보기·팔레트 기본(16색 중 하늘색) */
+/** 신규 작성·저장 스냅샷 없을 때 미리보기·팔레트 기본(32색 중 하늘색) */
 const DEFAULT_CARD_MEDIA_BACKGROUND = "#38BDF8";
 
 const KO_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
@@ -231,7 +247,6 @@ export default function ClientTournamentCardPublishV2Page() {
   const [uploadedImage, setUploadedImage] = useState<UploadedImage | null>(null);
 
   const [mediaBackground, setMediaBackground] = useState(DEFAULT_CARD_MEDIA_BACKGROUND);
-  const [imageOverlayBlend, setImageOverlayBlend] = useState(true);
   const [imageOverlayOpacity, setImageOverlayOpacity] = useState(1);
   const [v2MediaMode, setV2MediaMode] = useState<"inherit" | "on">("on");
   const [cardTextShadowEnabled, setCardTextShadowEnabled] = useState(false);
@@ -278,7 +293,7 @@ export default function ClientTournamentCardPublishV2Page() {
       backgroundType,
       themeType,
       mediaBackground: resolvedPreviewMediaBg,
-      imageOverlayBlend: v2MediaMode === "on" ? imageOverlayBlend : true,
+      imageOverlayBlend: true,
       imageOverlayOpacity: v2MediaMode === "on" ? imageOverlayOpacity : 1,
       ...(leadTextColor.trim() ? { cardLeadTextColor: leadTextColor.trim() } : {}),
       ...(titleTextColor.trim() ? { cardTitleTextColor: titleTextColor.trim() } : {}),
@@ -313,7 +328,6 @@ export default function ClientTournamentCardPublishV2Page() {
     themeType,
     v2MediaMode,
     mediaBackground,
-    imageOverlayBlend,
     imageOverlayOpacity,
   ]);
 
@@ -393,16 +407,12 @@ export default function ClientTournamentCardPublishV2Page() {
         if (hasStoredV2Media(pick)) {
           setV2MediaMode("on");
           setMediaBackground(typeof pick.tournamentMediaBackground === "string" ? pick.tournamentMediaBackground : "");
-          setImageOverlayBlend(
-            typeof pick.tournamentImageOverlayBlend === "boolean" ? pick.tournamentImageOverlayBlend : true
-          );
           setImageOverlayOpacity(
             typeof pick.tournamentImageOverlayOpacity === "number" ? pick.tournamentImageOverlayOpacity : 1
           );
         } else {
           setV2MediaMode("inherit");
           setMediaBackground("");
-          setImageOverlayBlend(false);
           setImageOverlayOpacity(1);
         }
         const storedDate =
@@ -425,7 +435,6 @@ export default function ClientTournamentCardPublishV2Page() {
         setUploadedImage(null);
         setV2MediaMode("on");
         setMediaBackground(DEFAULT_CARD_MEDIA_BACKGROUND);
-        setImageOverlayBlend(true);
         setImageOverlayOpacity(1);
         const d0 = typeof t.date === "string" ? t.date : "";
         const loc0 = typeof t.location === "string" ? t.location : "";
@@ -489,7 +498,7 @@ export default function ClientTournamentCardPublishV2Page() {
     if (descriptionTextColor.trim()) body.cardDescriptionTextColor = descriptionTextColor.trim();
     if (v2MediaMode === "on") {
       body.mediaBackground = mediaBackground;
-      body.imageOverlayBlend = imageOverlayBlend;
+      body.imageOverlayBlend = true;
       body.imageOverlayOpacity = imageOverlayOpacity;
     }
     return { ok: true, body };
@@ -779,17 +788,6 @@ export default function ClientTournamentCardPublishV2Page() {
                 />
               </div>
 
-              <div className={editorStyles.field}>
-                <label className={editorStyles.fieldCheck}>
-                  <input
-                    type="checkbox"
-                    checked={cardTextShadowEnabled}
-                    onChange={(e) => setCardTextShadowEnabled(e.target.checked)}
-                    aria-label="텍스트 그림자"
-                  />
-                </label>
-              </div>
-
               <label className={editorStyles.field}>
                 <span className={editorStyles.fieldLabel}>날짜</span>
                 <input
@@ -861,7 +859,7 @@ export default function ClientTournamentCardPublishV2Page() {
                     margin: "0.35rem auto 0",
                   }}
                 >
-                  {CARD_COLOR_PALETTE_16.map((hex, index) => {
+                  {CARD_COLOR_PALETTE_32.map((hex, index) => {
                     const selected = mediaBackground.trim().toLowerCase() === hex.toLowerCase();
                     return (
                       <button
@@ -918,18 +916,6 @@ export default function ClientTournamentCardPublishV2Page() {
                     {uploadedImage ? "이미지 적용됨" : "업로드 중…"}
                   </p>
                 ) : null}
-                <label className={editorStyles.fieldCheck}>
-                  <input
-                    type="checkbox"
-                    checked={imageOverlayBlend}
-                    disabled={!uploadedImage}
-                    aria-label="이미지 오버레이"
-                    onChange={(e) => {
-                      activateV2Media();
-                      setImageOverlayBlend(e.target.checked);
-                    }}
-                  />
-                </label>
                 <div className={editorStyles.rangeBlock}>
                   <span className={`${editorStyles.fieldLabel} ${editorStyles.fieldLabelRow}`}>
                     배경그림 투명도
@@ -942,7 +928,7 @@ export default function ClientTournamentCardPublishV2Page() {
                     max={100}
                     step={1}
                     value={Math.round(imageOverlayOpacity * 100)}
-                    disabled={!uploadedImage || !imageOverlayBlend}
+                    disabled={!uploadedImage}
                     aria-label="배경그림 투명도"
                     onChange={(e) => {
                       activateV2Media();
@@ -953,7 +939,6 @@ export default function ClientTournamentCardPublishV2Page() {
               </div>
             </>
           )}
-          </div>
 
           <div className={editorStyles.actions}>
             <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
@@ -976,6 +961,7 @@ export default function ClientTournamentCardPublishV2Page() {
                 {loading ? "처리 중…" : hasLivePublishedCard ? "게시카드 수정 반영" : "메인에 게시하기"}
               </button>
             </div>
+          </div>
           </div>
           </div>
         </form>

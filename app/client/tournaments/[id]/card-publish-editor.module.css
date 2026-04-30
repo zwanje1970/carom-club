@@ -452,11 +452,18 @@
   z-index: 1;
   margin-top: 12px;
   padding-top: 12px;
+  padding-bottom: 0.35rem;
   border-top: 1px solid #e4e4e7;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
+}
+
+@media (max-width: 767px) {
+  .pageWrapV2 .actions {
+    padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 .statusNote {
