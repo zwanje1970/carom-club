@@ -1,7 +1,9 @@
 import { isFirestoreUsersBackendConfigured } from "./firestore-users";
 import { PLATFORM_KV_KEYS, readPlatformKvJson, upsertPlatformKvJson } from "./platform-kv-firestore";
 
-const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const IS_DEVELOPMENT = process.env.NODE_ENV === "development";
+/** `platform-tournament-published-cards-settings`와 동일: 비개발 런타임은 Firestore KV 우선. */
+const IS_RUNTIME_DEPLOYMENT = !IS_DEVELOPMENT;
 
 export const PLATFORM_OPERATION_SETTINGS_KV_KEY = PLATFORM_KV_KEYS.platformOperationSettings;
 
@@ -10,14 +12,14 @@ export type PlatformOperationSettingsReadStrategy = "firestore-kv" | "local-json
 export type PlatformOperationSettingsWriteStrategy = "firestore-kv" | "local-json-file" | "blocked";
 
 export function resolvePlatformOperationSettingsReadStrategy(): PlatformOperationSettingsReadStrategy {
-  if (IS_PRODUCTION && isFirestoreUsersBackendConfigured()) return "firestore-kv";
-  if (IS_PRODUCTION) return "production-defaults-only";
+  if (IS_RUNTIME_DEPLOYMENT && isFirestoreUsersBackendConfigured()) return "firestore-kv";
+  if (IS_RUNTIME_DEPLOYMENT) return "production-defaults-only";
   return "local-json-file";
 }
 
 export function resolvePlatformOperationSettingsWriteStrategy(): PlatformOperationSettingsWriteStrategy {
-  if (IS_PRODUCTION && isFirestoreUsersBackendConfigured()) return "firestore-kv";
-  if (IS_PRODUCTION) return "blocked";
+  if (IS_RUNTIME_DEPLOYMENT && isFirestoreUsersBackendConfigured()) return "firestore-kv";
+  if (IS_RUNTIME_DEPLOYMENT) return "blocked";
   return "local-json-file";
 }
 
