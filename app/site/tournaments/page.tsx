@@ -3,7 +3,7 @@ import { formatTournamentScheduleLabel } from "../../../lib/tournament-schedule"
 import { resolveSitePosterDisplayUrl } from "../../../lib/site-poster-urls";
 import type { Tournament } from "../../../lib/types/entities";
 import { Suspense } from "react";
-import { listAllTournamentsFirestore } from "../../../lib/server/firestore-tournaments";
+import { listAllTournamentsForPublicSiteList } from "../../../lib/surface-read";
 import SiteTournamentsDistanceShell, { type SiteTournamentListRow } from "./SiteTournamentsDistanceShell";
 import { parseTournamentStatusFilter } from "./tournament-list-url";
 import SiteListPageSkeleton from "../components/SiteListPageSkeleton";
@@ -72,7 +72,7 @@ async function SiteTournamentsPageContent({
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const statusFilter = parseTournamentStatusFilter(resolvedSearchParams.status);
 
-  const tournaments = await listAllTournamentsFirestore();
+  const tournaments = await listAllTournamentsForPublicSiteList();
 
   let ordered = tournaments.filter((t) => !SITE_TOURNAMENT_LIST_EXCLUDED_BADGES.has(t.statusBadge));
   if (statusFilter !== "all") {

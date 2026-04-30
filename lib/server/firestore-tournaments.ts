@@ -92,6 +92,33 @@ export async function getTournamentByIdFirestore(tournamentId: string): Promise<
   return fetchAndNormalizeTournament(id, null);
 }
 
+/**
+ * 메인 슬라이드 등: 대회 문서의 `date`·`location`만 배치 조회(정규화·venue 해석 없음).
+ * `getTournamentByIdFirestore` 대비 라운드트립·CPU 부담을 줄인다.
+ */
+export async function getTournamentDateLocationFieldsByIdsFirestore(
+  tournamentIds: string[],
+): Promise<Map<string, { date: string; location: string }>> {
+  assertClientFirestorePersistenceConfigured();
+  const unique = [...new Set(tournamentIds.map((id) => String(id).trim()).filter(Boolean))];
+  const out = new Map<string, { date: string; location: string }>();
+  if (unique.length === 0) return out;
+  const db = getSharedFirestoreDb();
+  for (let i = 0; i < unique.length; i += 10) {
+    const chunk = unique.slice(i, i + 10);
+    const refs = chunk.map((id) => db.collection(COLLECTION).doc(id));
+    const snaps = await db.getAll(...refs);
+    for (const snap of snaps) {
+      if (!snap.exists) continue;
+      const data = snap.data() as Record<string, unknown> | undefined;
+      const date = typeof data?.date === "string" ? data.date : "";
+      const location = typeof data?.location === "string" ? data.location : "";
+      out.set(snap.id, { date, location });
+    }
+  }
+  return out;
+}
+
 export async function setTournamentReminderSentAtFirestore(tournamentId: string): Promise<void> {
   assertClientFirestorePersistenceConfigured();
   const tid = tournamentId.trim();

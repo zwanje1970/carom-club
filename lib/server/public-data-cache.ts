@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { isEntityLifecycleVisibleForList } from "./entity-lifecycle";
-import { getTournamentByIdFirestore } from "./firestore-tournaments";
+import { getTournamentByIdFirestore, listAllTournamentsFirestore } from "./firestore-tournaments";
 import {
   getSiteCommunityConfig as getSiteCommunityConfigUncached,
   getSiteLayoutConfig as getSiteLayoutConfigUncached,
@@ -8,7 +8,11 @@ import {
   getSiteNotice as getSiteNoticeUncached,
   listTournamentSnapshotsForMainSite as listTournamentSnapshotsUncached,
   getMainSlideAdSettingsForSite as getMainSlideAdSettingsUncached,
+  loadSiteCommunityFeed,
+  filterCommunityPostsAllPrimaryFromFeed,
+  filterCommunityPostsFromFeed,
 } from "./platform-backing-store";
+import type { CommunityPostListItem, SiteCommunityBoardKey } from "../types/entities";
 import {
   CACHE_TAG_SITE_COMMUNITY_CONFIG,
   CACHE_TAG_SITE_LAYOUT_CONFIG,
@@ -16,6 +20,8 @@ import {
   CACHE_TAG_SITE_NOTICE,
   CACHE_TAG_MAIN_SLIDE_ADS,
   CACHE_TAG_MAIN_SLIDE_SNAPSHOTS,
+  CACHE_TAG_SITE_PUBLIC_TOURNAMENTS_LIST,
+  CACHE_TAG_SITE_PUBLIC_COMMUNITY_FEED,
   cacheTagTournamentById,
 } from "../cache-tags";
 
@@ -58,6 +64,40 @@ export const getMainSlideAdSettingsForSite = unstable_cache(
   ["main-slide-ads"],
   { tags: [CACHE_TAG_MAIN_SLIDE_ADS] }
 );
+
+/** 공개 `/site/tournaments` — `listAllTournamentsFirestore` 전체 조회(짧은 ISR) */
+const _listAllTournamentsFirestoreForPublicSiteList = unstable_cache(
+  async () => listAllTournamentsFirestore(),
+  ["public-site-tournaments-list-v1"],
+  { revalidate: 60, tags: [CACHE_TAG_SITE_PUBLIC_TOURNAMENTS_LIST] }
+);
+
+export async function listAllTournamentsForPublicSiteList() {
+  return _listAllTournamentsFirestoreForPublicSiteList();
+}
+
+/** 공개 사이트 커뮤니티 목록 — 피드 1회 로드 후 필터는 기존과 동일(짧은 ISR) */
+const _loadSiteCommunityFeedForPublicList = unstable_cache(
+  async () => loadSiteCommunityFeed(),
+  ["public-site-community-feed-v1"],
+  { revalidate: 45, tags: [CACHE_TAG_SITE_PUBLIC_COMMUNITY_FEED] }
+);
+
+export async function listCommunityPostsAllPrimaryForPublicSite(
+  visibleBoardKeys: SiteCommunityBoardKey[],
+  options?: { q?: string }
+): Promise<CommunityPostListItem[]> {
+  const feed = await _loadSiteCommunityFeedForPublicList();
+  return filterCommunityPostsAllPrimaryFromFeed(feed, visibleBoardKeys, options);
+}
+
+export async function listCommunityPostsForPublicSite(
+  boardType: SiteCommunityBoardKey,
+  options?: { q?: string }
+): Promise<CommunityPostListItem[]> {
+  const feed = await _loadSiteCommunityFeedForPublicList();
+  return filterCommunityPostsFromFeed(feed, boardType, options);
+}
 
 /** 공개 사이트 RSC용 — 클라이언트 대회 수정 경로의 `getTournamentByIdFirestore`는 비캐시 유지 */
 export async function getTournamentByIdForPublicSitePage(tournamentId: string): Promise<

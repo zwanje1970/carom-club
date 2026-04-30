@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { getSiteCommunityConfig, listCommunityPostsAllPrimary } from "../../../lib/surface-read";
+import { getSiteCommunityConfig, listCommunityPostsAllPrimaryForPublicSite } from "../../../lib/surface-read";
 import { communityNavTabsFromConfig, visibleCommunityBoardKeysForTabs } from "./community-tab-config";
 import type { SiteCommunityConfig } from "../../../lib/types/entities";
 import CommunityBoardPostList from "./CommunityBoardPostList";
@@ -64,7 +64,7 @@ async function SiteCommunityPageContent({
   const q = typeof qRaw === "string" ? qRaw.trim() : Array.isArray(qRaw) ? String(qRaw[0] ?? "").trim() : "";
 
   const visibleBoardKeys = visibleCommunityBoardKeysForTabs(config);
-  const items = await listCommunityPostsAllPrimary(visibleBoardKeys, q ? { q } : undefined);
+  const items = await listCommunityPostsAllPrimaryForPublicSite(visibleBoardKeys, q ? { q } : undefined);
 
   return (
     <section className="site-site-gray-main v3-stack ui-community-page" data-community-board="all">

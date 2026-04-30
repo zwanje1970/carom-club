@@ -22,13 +22,15 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
   return items.map((item) => {
     const href = (item.targetDetailUrl ?? "").trim() || "/site/tournaments";
     const external = item.linkType === "external" || /^https?:\/\//i.test(href);
-    const published = (item.publishedCardImageUrl ?? "").trim();
-    if (published) {
+    const published640 = (item.publishedCardImageUrl ?? "").trim();
+    const published320 = (item.publishedCardImage320Url ?? "").trim();
+    const publishedScroll = published320 || published640;
+    if (publishedScroll) {
       return {
         id: item.snapshotId,
         href,
         title: item.title,
-        imageUrl: published,
+        imageUrl: publishedScroll,
         faceCssBackground: null,
         external,
         faceIsFullPublishedSnapshot: true,
@@ -107,6 +109,9 @@ export default async function SiteOperationalHome() {
       : {}),
     ...(typeof snapshot.publishedCardImageUrl === "string" && snapshot.publishedCardImageUrl.trim()
       ? { publishedCardImageUrl: snapshot.publishedCardImageUrl.trim() }
+      : {}),
+    ...(typeof snapshot.publishedCardImage320Url === "string" && snapshot.publishedCardImage320Url.trim()
+      ? { publishedCardImage320Url: snapshot.publishedCardImage320Url.trim() }
       : {}),
   }));
 

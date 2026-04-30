@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { parseCommunityBoardTypeParam } from "../../../../lib/community-board-params";
-import { getSiteCommunityConfig, listCommunityPosts } from "../../../../lib/surface-read";
+import { getSiteCommunityConfig, listCommunityPostsForPublicSite } from "../../../../lib/surface-read";
 import type { SiteCommunityBoardKey } from "../../../../lib/types/entities";
 import { communityBoardListHref, communityNavTabsFromConfig } from "../community-tab-config";
 import CommunityBoardPostList from "../CommunityBoardPostList";
@@ -84,7 +84,7 @@ async function SiteCommunityBoardListContent({
   const qRaw = sp.q;
   const q = typeof qRaw === "string" ? qRaw.trim() : Array.isArray(qRaw) ? String(qRaw[0] ?? "").trim() : "";
 
-  const items = await listCommunityPosts(boardType, q ? { q } : undefined);
+  const items = await listCommunityPostsForPublicSite(boardType, q ? { q } : undefined);
 
   const boardEmptyCopy: Partial<
     Record<SiteCommunityBoardKey, { emptyTitle: string; emptyDesc: string }>

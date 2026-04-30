@@ -8116,7 +8116,7 @@ function parseSiteCommunityFeedFromKvRaw(raw: unknown): {
   return { communityPosts, communityComments };
 }
 
-async function loadSiteCommunityFeed(): Promise<{
+export async function loadSiteCommunityFeed(): Promise<{
   communityPosts: CommunityBoardPost[];
   communityComments: CommunityComment[];
 }> {
@@ -8202,12 +8202,12 @@ async function persistProofImageAssetsList(list: ProofImageAsset[]): Promise<boo
   return true;
 }
 
-/** primary 4개 게시판만 한 번에 필터·정렬 — 프론트에서 게시판별 다중 요청 금지 */
-export async function listCommunityPostsAllPrimary(
+/** 이미 로드한 피드로 목록 생성 — 공개 사이트 캐시 레이어에서 재사용 */
+export function filterCommunityPostsAllPrimaryFromFeed(
+  feed: { communityPosts: CommunityBoardPost[]; communityComments: CommunityComment[] },
   visibleBoardKeys: SiteCommunityBoardKey[],
   options?: { q?: string }
-): Promise<CommunityPostListItem[]> {
-  const feed = await loadSiteCommunityFeed();
+): CommunityPostListItem[] {
   const q = options?.q?.trim().toLowerCase() ?? "";
   const allow = new Set(visibleBoardKeys);
   let rows = feed.communityPosts.filter((p) => allow.has(p.boardType) && isCommunityBoardPostListed(p));
@@ -8217,17 +8217,35 @@ export async function listCommunityPostsAllPrimary(
   return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(mapPostToListItem);
 }
 
-export async function listCommunityPosts(
+/** 이미 로드한 피드로 게시판별 목록 생성 — 공개 사이트 캐시 레이어에서 재사용 */
+export function filterCommunityPostsFromFeed(
+  feed: { communityPosts: CommunityBoardPost[]; communityComments: CommunityComment[] },
   boardType: SiteCommunityBoardKey,
   options?: { q?: string }
-): Promise<CommunityPostListItem[]> {
-  const feed = await loadSiteCommunityFeed();
+): CommunityPostListItem[] {
   const q = options?.q?.trim().toLowerCase() ?? "";
   let rows = feed.communityPosts.filter((p) => p.boardType === boardType && isCommunityBoardPostListed(p));
   if (q.length > 0) {
     rows = rows.filter((p) => p.title.toLowerCase().includes(q));
   }
   return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(mapPostToListItem);
+}
+
+/** primary 4개 게시판만 한 번에 필터·정렬 — 프론트에서 게시판별 다중 요청 금지 */
+export async function listCommunityPostsAllPrimary(
+  visibleBoardKeys: SiteCommunityBoardKey[],
+  options?: { q?: string }
+): Promise<CommunityPostListItem[]> {
+  const feed = await loadSiteCommunityFeed();
+  return filterCommunityPostsAllPrimaryFromFeed(feed, visibleBoardKeys, options);
+}
+
+export async function listCommunityPosts(
+  boardType: SiteCommunityBoardKey,
+  options?: { q?: string }
+): Promise<CommunityPostListItem[]> {
+  const feed = await loadSiteCommunityFeed();
+  return filterCommunityPostsFromFeed(feed, boardType, options);
 }
 
 export async function getCommunityPostById(postId: string): Promise<CommunityPostDetail | null> {
@@ -9456,17 +9474,35 @@ export async function listTournamentSnapshotsForMainSite(options?: {
   }
   const rows = deduped.slice(0, limit);
 
-  return Promise.all(
-    rows.map(async (c) => {
-      const hasStoredDate = typeof c.cardDisplayDate === "string" && c.cardDisplayDate.trim() !== "";
-      const hasStoredLoc = typeof c.cardDisplayLocation === "string" && c.cardDisplayLocation.trim() !== "";
-      const meta =
-        hasStoredDate && hasStoredLoc
-          ? undefined
-          : await getTournamentDateLocationMetaForPublishedCards(c.tournamentId);
-      return tournamentPublishedCardToPublishedSnapshot(c, templateId, meta);
-    })
-  );
+  const tournamentIdsNeedingMeta = new Set<string>();
+  for (const c of rows) {
+    const hasStoredDate = typeof c.cardDisplayDate === "string" && c.cardDisplayDate.trim() !== "";
+    const hasStoredLoc = typeof c.cardDisplayLocation === "string" && c.cardDisplayLocation.trim() !== "";
+    if (!(hasStoredDate && hasStoredLoc)) {
+      tournamentIdsNeedingMeta.add(c.tournamentId.trim());
+    }
+  }
+
+  let metaByTournamentId = new Map<string, { date: string; location: string }>();
+  if (tournamentIdsNeedingMeta.size > 0) {
+    if (isFirestoreUsersBackendConfigured()) {
+      const { getTournamentDateLocationFieldsByIdsFirestore } = await import("./firestore-tournaments");
+      metaByTournamentId = await getTournamentDateLocationFieldsByIdsFirestore([...tournamentIdsNeedingMeta]);
+    } else if (process.env.NODE_ENV !== "production") {
+      const store = await readLocalJsonAggregate();
+      for (const id of tournamentIdsNeedingMeta) {
+        metaByTournamentId.set(id, tournamentDateLocationMeta(store, id));
+      }
+    }
+  }
+
+  return rows.map((c) => {
+    const hasStoredDate = typeof c.cardDisplayDate === "string" && c.cardDisplayDate.trim() !== "";
+    const hasStoredLoc = typeof c.cardDisplayLocation === "string" && c.cardDisplayLocation.trim() !== "";
+    const meta =
+      hasStoredDate && hasStoredLoc ? undefined : metaByTournamentId.get(c.tournamentId.trim());
+    return tournamentPublishedCardToPublishedSnapshot(c, templateId, meta);
+  });
 }
 
 async function loadMainSlideAdsNormalizedForStorage(): Promise<MainSiteSlideAd[]> {

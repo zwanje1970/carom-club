@@ -31,6 +31,8 @@ type CardRowProps = {
   item: MainSiteScrollCardItem;
   selected: boolean;
   onCardPointerDown: (itemId: string) => void;
+  /** 문서 순서상 첫 번째 면 이미지(LCP 후보) — 링크 preload 없이 img 우선순위만 부여 */
+  lcpHeroImage?: boolean;
 };
 
 const MainSiteCardRow = memo(function MainSiteCardRow({
@@ -38,6 +40,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
   item,
   selected,
   onCardPointerDown,
+  lcpHeroImage = false,
 }: CardRowProps) {
   const hasFaceImage = Boolean(item.imageUrl?.trim());
   const usePublishedScrollLayout = Boolean(
@@ -95,6 +98,8 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
                 : styles.sampleMainCardPoster
             }
             decoding="async"
+            loading={lcpHeroImage ? "eager" : "lazy"}
+            {...(lcpHeroImage ? { fetchPriority: "high" as const } : {})}
           />
         ) : null}
         {!item.faceIsFullPublishedSnapshot ? (
@@ -143,6 +148,8 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
   const marqueeUserPauseRef = useRef(false);
   const marqueeResumeTimerRef = useRef<number | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
+
+  const lcpHeroItemIndex = useMemo(() => items.findIndex((x) => Boolean(x.imageUrl?.trim())), [items]);
 
   const bumpMarqueeUserPause = useCallback(() => {
     if (!marqueeUserPauseRef.current) {
@@ -244,8 +251,10 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
         aria-hidden
       />
       <div className={siteStyles.leadInSpacer} aria-hidden />
-      {items.map((item) => {
+      {items.map((item, itemIndex) => {
         const rowKey = `${segmentKey}-${item.id}`;
+        const lcpHeroImage =
+          segmentKey === "a" && itemIndex === lcpHeroItemIndex && lcpHeroItemIndex >= 0;
         return (
           <MainSiteCardRow
             key={rowKey}
@@ -253,6 +262,7 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
             item={item}
             selected={selectedItemId === item.id}
             onCardPointerDown={onCardPointerDown}
+            lcpHeroImage={lcpHeroImage}
           />
         );
       })}

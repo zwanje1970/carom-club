@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useLayoutEffect, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, type SyntheticEvent } from "react";
 import ClientAutoParticipantPushToggle from "./ClientAutoParticipantPushToggle";
 import { AdminSurface } from "../components/admin/AdminCard";
 import type { ClientDashboardSummaryJson } from "./dashboard-summary-types";
@@ -169,6 +169,14 @@ function DashboardSkeleton() {
 
 export default function ClientDashboardHomeClient() {
   const [state, setState] = useState<SummaryState>({ status: "loading" });
+  const extrasDetailsRef = useRef<HTMLDetailsElement>(null);
+
+  const onExtrasToggle = useCallback((e: SyntheticEvent<HTMLDetailsElement>) => {
+    if (!e.currentTarget.open) return;
+    requestAnimationFrame(() => {
+      extrasDetailsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
 
   const loadWithoutCache = useCallback(async () => {
     const r = await fetchDashboardSummary();
@@ -391,7 +399,11 @@ export default function ClientDashboardHomeClient() {
       </section>
 
       <section aria-label="부가기능">
-        <details className="client-dashboard-main__dsCard client-dashboard-main__extras">
+        <details
+          ref={extrasDetailsRef}
+          className="client-dashboard-main__dsCard client-dashboard-main__extras"
+          onToggle={onExtrasToggle}
+        >
           <summary>
             <span className="client-dashboard-main__extrasSummaryLeft">
               <span className="client-dashboard-main__extrasIconWrap">
