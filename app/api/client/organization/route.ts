@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
+import type { ClientOrganizationStored } from "../../../../lib/platform-api";
 import {
   getClientOrganizationByUserId,
   getClientStatusByUserId,
@@ -36,31 +37,7 @@ async function getAuthorizedClientUser() {
   return { user, allowed: true as const };
 }
 
-function organizationToJson(org: {
-  id: string;
-  slug: string;
-  name: string;
-  type: string;
-  shortDescription: string | null;
-  description: string | null;
-  fullDescription: string | null;
-  logoImageUrl: string | null;
-  coverImageUrl: string | null;
-  phone: string | null;
-  email: string | null;
-  website: string | null;
-  address: string | null;
-  addressDetail: string | null;
-  addressJibun: string | null;
-  zipCode: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  addressNaverMapEnabled: boolean | null;
-  region: string | null;
-  typeSpecificJson: string | null;
-  isPublished: boolean;
-  setupCompleted: boolean;
-}) {
+function organizationToJson(org: ClientOrganizationStored) {
   return {
     id: org.id,
     slug: org.slug,
@@ -85,6 +62,46 @@ function organizationToJson(org: {
     typeSpecificJson: org.typeSpecificJson,
     isPublished: org.isPublished,
     setupCompleted: org.setupCompleted,
+    autoParticipantPushEnabled: org.autoParticipantPushEnabled !== false,
+  };
+}
+
+function virtualOrgForGet(userId: string, defaultName: string): ClientOrganizationStored {
+  const now = new Date().toISOString();
+  return {
+    clientUserId: userId,
+    id: `client-org-${userId}`,
+    slug: "",
+    name: defaultName,
+    type: "VENUE",
+    shortDescription: null,
+    description: null,
+    fullDescription: null,
+    logoImageUrl: null,
+    coverImageUrl: null,
+    phone: null,
+    email: null,
+    website: null,
+    address: null,
+    addressDetail: null,
+    addressJibun: null,
+    zipCode: null,
+    latitude: null,
+    longitude: null,
+    addressNaverMapEnabled: false,
+    region: null,
+    typeSpecificJson: null,
+    clientType: "GENERAL",
+    approvalStatus: "APPROVED",
+    status: "ACTIVE",
+    adminRemarks: null,
+    membershipType: "NONE",
+    membershipExpireAt: null,
+    isPublished: false,
+    setupCompleted: false,
+    autoParticipantPushEnabled: true,
+    createdAt: now,
+    updatedAt: now,
   };
 }
 
@@ -111,33 +128,7 @@ export async function GET() {
   const app = await getLatestClientApplicationByUserId(user.id);
   const defaultName = app?.organizationName?.trim() ?? "";
 
-  return NextResponse.json(
-    organizationToJson({
-      id: `client-org-${user.id}`,
-      slug: "",
-      name: defaultName,
-      type: "VENUE",
-      shortDescription: null,
-      description: null,
-      fullDescription: null,
-      logoImageUrl: null,
-      coverImageUrl: null,
-      phone: null,
-      email: null,
-      website: null,
-      address: null,
-      addressDetail: null,
-      addressJibun: null,
-      zipCode: null,
-      latitude: null,
-      longitude: null,
-      addressNaverMapEnabled: false,
-      region: null,
-      typeSpecificJson: null,
-      isPublished: false,
-      setupCompleted: false,
-    })
-  );
+  return NextResponse.json(organizationToJson(virtualOrgForGet(user.id, defaultName)));
 }
 
 function trimOrNull(v: unknown): string | null {
@@ -155,6 +146,10 @@ function finiteNumberOrNull(v: unknown): number | null {
     return Number.isFinite(n) ? n : null;
   }
   return null;
+}
+
+function bodyHas(body: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(body, key);
 }
 
 /** PATCH: 사업장 설정 저장 (업체 종류 type 은 변경하지 않음) */
@@ -175,37 +170,73 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const name = typeof body.name === "string" ? body.name : "";
+  const stored = await getClientOrganizationByUserId(user.id);
+  const app = await getLatestClientApplicationByUserId(user.id);
+  const defaultNameFromApp = app?.organizationName?.trim() ?? "";
 
-  let typeSpecificJson: string | null = null;
-  if (body.typeSpecificJson === null || body.typeSpecificJson === undefined) {
+  const nameRaw = typeof body.name === "string" ? body.name.trim() : "";
+  const name = nameRaw !== "" ? nameRaw : (stored?.name?.trim() || defaultNameFromApp);
+  if (!name.trim()) {
+    return NextResponse.json({ error: "업체명을 입력해 주세요." }, { status: 400 });
+  }
+
+  let typeSpecificJson: string | null;
+  if (!bodyHas(body, "typeSpecificJson")) {
+    typeSpecificJson = stored?.typeSpecificJson ?? null;
+  } else if (body.typeSpecificJson === null || body.typeSpecificJson === undefined) {
     typeSpecificJson = null;
   } else if (typeof body.typeSpecificJson === "string") {
     const t = body.typeSpecificJson.trim();
     typeSpecificJson = t.length ? t : null;
+  } else {
+    typeSpecificJson = stored?.typeSpecificJson ?? null;
   }
+
+  const pickTrim = (key: keyof ClientOrganizationStored): string | null => {
+    if (bodyHas(body, key as string)) return trimOrNull(body[key as string]);
+    if (!stored) return null;
+    const v = stored[key];
+    return typeof v === "string" ? v : null;
+  };
+
+  const addressNaverMapEnabled = bodyHas(body, "addressNaverMapEnabled")
+    ? body.addressNaverMapEnabled === true
+    : stored?.addressNaverMapEnabled === true;
+
+  const isPublished = bodyHas(body, "isPublished") ? body.isPublished === true : (stored?.isPublished ?? false);
+
+  const setupCompleted = bodyHas(body, "setupCompleted")
+    ? body.setupCompleted === true
+    : (stored?.setupCompleted ?? false);
+
+  const autoParticipantPushEnabled = !bodyHas(body, "autoParticipantPushEnabled")
+    ? stored?.autoParticipantPushEnabled !== false
+    : typeof body.autoParticipantPushEnabled === "boolean"
+      ? body.autoParticipantPushEnabled
+      : stored?.autoParticipantPushEnabled !== false;
 
   const result = await upsertClientOrganizationForUser(user.id, {
     name,
-    shortDescription: trimOrNull(body.shortDescription),
-    description: trimOrNull(body.description),
-    fullDescription: trimOrNull(body.fullDescription),
-    logoImageUrl: trimOrNull(body.logoImageUrl),
-    coverImageUrl: trimOrNull(body.coverImageUrl),
-    phone: trimOrNull(body.phone),
-    email: trimOrNull(body.email),
-    website: trimOrNull(body.website),
-    address: trimOrNull(body.address),
-    addressDetail: trimOrNull(body.addressDetail),
-    addressJibun: trimOrNull(body.addressJibun),
-    zipCode: trimOrNull(body.zipCode),
-    latitude: finiteNumberOrNull(body.latitude),
-    longitude: finiteNumberOrNull(body.longitude),
-    addressNaverMapEnabled: body.addressNaverMapEnabled === true,
-    region: trimOrNull(body.region),
+    shortDescription: pickTrim("shortDescription"),
+    description: pickTrim("description"),
+    fullDescription: pickTrim("fullDescription"),
+    logoImageUrl: pickTrim("logoImageUrl"),
+    coverImageUrl: pickTrim("coverImageUrl"),
+    phone: pickTrim("phone"),
+    email: pickTrim("email"),
+    website: pickTrim("website"),
+    address: pickTrim("address"),
+    addressDetail: pickTrim("addressDetail"),
+    addressJibun: pickTrim("addressJibun"),
+    zipCode: pickTrim("zipCode"),
+    latitude: bodyHas(body, "latitude") ? finiteNumberOrNull(body.latitude) : (stored?.latitude ?? null),
+    longitude: bodyHas(body, "longitude") ? finiteNumberOrNull(body.longitude) : (stored?.longitude ?? null),
+    addressNaverMapEnabled,
+    region: pickTrim("region"),
     typeSpecificJson,
-    isPublished: body.isPublished === true,
-    setupCompleted: body.setupCompleted === true,
+    isPublished,
+    setupCompleted,
+    autoParticipantPushEnabled,
   });
 
   if (!result.ok) {

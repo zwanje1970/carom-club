@@ -104,6 +104,9 @@
 .slideViewportSiteMain {
   --sample-block-ref: 5.75rem;
   --sample-main-card-height: calc(var(--sample-block-ref) * 1.5);
+  /* 메인 스크롤: 게시 PNG·광고 업로드 면 공통 — 높이/반경 변경 시 한곳만 조정 */
+  --site-main-scroll-published-poster-max-height: min(85dvh, 920px);
+  --site-main-scroll-card-face-border-radius: 12px;
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
@@ -179,7 +182,7 @@
   width: 100%;
   min-width: 0;
   height: var(--sample-main-card-height);
-  border-radius: 12px;
+  border-radius: var(--site-main-scroll-card-face-border-radius, 12px);
   position: relative;
   transform: translateY(-2px) scale(1);
   box-shadow:
@@ -257,7 +260,7 @@
   width: 100%;
   min-width: 0;
   height: auto;
-  border-radius: 12px;
+  border-radius: var(--site-main-scroll-card-face-border-radius, 12px);
   position: relative;
   overflow: visible;
   transform: translateY(-2px) scale(1);
@@ -307,7 +310,7 @@
   width: 100%;
   max-width: 100%;
   height: auto;
-  max-height: min(85dvh, 920px);
+  max-height: var(--site-main-scroll-published-poster-max-height, min(85dvh, 920px));
   object-fit: contain;
   border-radius: inherit;
   pointer-events: none;

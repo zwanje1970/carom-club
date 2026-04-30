@@ -676,7 +676,7 @@ export default function ClientTournamentCardPublishV2Page() {
             e.preventDefault();
             postCardSnapshot(
               true,
-              "카드 초안이 저장되었습니다. 메인에 올리려면 「메인에 게시하기」 또는 대회 상세의 동일 버튼을 누르세요.",
+              "카드 초안이 저장되었습니다. 메인에 올리려면 「게시」 또는 대회 상세의 동일 버튼을 누르세요.",
             );
           }}
         >
@@ -764,7 +764,7 @@ export default function ClientTournamentCardPublishV2Page() {
                   />
                 </div>
                 <textarea
-                  className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea}`}
+                  className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight}`}
                   rows={3}
                   value={textLine2}
                   onChange={(e) =>
@@ -788,7 +788,7 @@ export default function ClientTournamentCardPublishV2Page() {
                   />
                 </div>
                 <input
-                  className={editorStyles.fieldInput}
+                  className={`${editorStyles.fieldInput} ${editorStyles.fieldInputContentTight}`}
                   type="text"
                   value={cardDate}
                   onChange={(e) => setCardDate(e.target.value)}
@@ -810,7 +810,7 @@ export default function ClientTournamentCardPublishV2Page() {
                   />
                 </div>
                 <input
-                  className={editorStyles.fieldInput}
+                  className={`${editorStyles.fieldInput} ${editorStyles.fieldInputContentTight}`}
                   type="text"
                   value={cardPlace}
                   onChange={(e) => setCardPlace(e.target.value)}
@@ -818,6 +818,15 @@ export default function ClientTournamentCardPublishV2Page() {
                   placeholder="예: 캐롬클럽 빌리어즈"
                 />
               </div>
+
+              <label className={editorStyles.fieldCheck}>
+                <input
+                  type="checkbox"
+                  checked={cardTextShadowEnabled}
+                  onChange={(e) => setCardTextShadowEnabled(e.target.checked)}
+                />
+                <span>전체 글자에 그림자 넣기</span>
+              </label>
             </>
           ) : (
             <>
@@ -908,7 +917,7 @@ export default function ClientTournamentCardPublishV2Page() {
           <div className={editorStyles.actions}>
             <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
               <button type="submit" className="v3-btn" disabled={loading}>
-                {loading ? "처리 중…" : "카드 저장 (초안)"}
+                {loading ? "처리 중…" : "저장"}
               </button>
               <button
                 type="button"
@@ -923,7 +932,7 @@ export default function ClientTournamentCardPublishV2Page() {
                   )
                 }
               >
-                {loading ? "처리 중…" : hasLivePublishedCard ? "게시카드 수정 반영" : "메인에 게시하기"}
+                {loading ? "처리 중…" : "게시"}
               </button>
             </div>
           </div>

@@ -157,6 +157,7 @@ function organizationFromDoc(id: string, data: Record<string, unknown> | undefin
       r.membershipExpireAt === null || typeof r.membershipExpireAt === "string" ? (r.membershipExpireAt as string | null) : null,
     isPublished: typeof r.isPublished === "boolean" ? r.isPublished : false,
     setupCompleted: typeof r.setupCompleted === "boolean" ? r.setupCompleted : false,
+    autoParticipantPushEnabled: r.autoParticipantPushEnabled !== false,
     createdAt: typeof r.createdAt === "string" ? r.createdAt : now,
     updatedAt: typeof r.updatedAt === "string" ? r.updatedAt : now,
   };
@@ -489,6 +490,7 @@ export async function upsertClientOrganizationForUserFirestore(
     typeSpecificJson: string | null;
     isPublished: boolean;
     setupCompleted: boolean;
+    autoParticipantPushEnabled: boolean;
   }
 ): Promise<{ ok: true; org: ClientOrganizationStored } | { ok: false; error: string }> {
   assertClientFirestorePersistenceConfigured();
@@ -561,6 +563,7 @@ export async function upsertClientOrganizationForUserFirestore(
       membershipExpireAt: existing?.membershipExpireAt ?? null,
       isPublished: params.isPublished,
       setupCompleted: params.setupCompleted,
+      autoParticipantPushEnabled: params.autoParticipantPushEnabled,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };

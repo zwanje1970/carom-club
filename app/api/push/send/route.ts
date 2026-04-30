@@ -15,21 +15,19 @@ import {
 
 export const runtime = "nodejs";
 
+type PushSendBody = {
+  title?: unknown;
+  body?: unknown;
+  targetUserIds?: unknown;
+  url?: unknown;
+  audience?: unknown;
+  internalCreatorUserId?: unknown;
+};
+
 export async function POST(request: Request) {
-  const cookieStore = await cookies();
-  const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
-  if (!session) {
-    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
-  }
-
-  const user = await getUserById(session.userId);
-  if (!user) {
-    return NextResponse.json({ error: "사용자를 찾을 수 없습니다." }, { status: 401 });
-  }
-
-  let body: { title?: unknown; body?: unknown; targetUserIds?: unknown; url?: unknown; audience?: unknown } = {};
+  let body: PushSendBody = {};
   try {
-    body = (await request.json()) as typeof body;
+    body = (await request.json()) as PushSendBody;
   } catch {
     return NextResponse.json({ error: "요청 본문이 올바르지 않습니다." }, { status: 400 });
   }
@@ -40,9 +38,54 @@ export async function POST(request: Request) {
   const urlOptional = typeof urlRaw === "string" && urlRaw.trim() ? urlRaw.trim() : null;
   const audienceRaw = body.audience;
   const hasAudience = audienceRaw === "all" || audienceRaw === "client";
+  const internalCreatorUserId =
+    typeof body.internalCreatorUserId === "string" ? body.internalCreatorUserId.trim() : "";
 
   if (!title.trim() || !messageBody.trim()) {
     return NextResponse.json({ error: "제목과 본문을 모두 입력해 주세요." }, { status: 400 });
+  }
+
+  const cronHeader = request.headers.get("x-carom-cron-secret");
+  const cronPush = process.env.CRON_PUSH_SECRET?.trim();
+  const cronVercel = process.env.CRON_SECRET?.trim();
+  const isCronInternal = Boolean(
+    cronHeader && ((cronPush && cronHeader === cronPush) || (cronVercel && cronHeader === cronVercel))
+  );
+
+  let user: Awaited<ReturnType<typeof getUserById>> = null;
+
+  if (isCronInternal) {
+    if (hasAudience) {
+      return NextResponse.json({ error: "내부 cron에서는 audience 발송을 사용할 수 없습니다." }, { status: 403 });
+    }
+    if (!internalCreatorUserId) {
+      return NextResponse.json({ error: "internalCreatorUserId가 필요합니다." }, { status: 400 });
+    }
+    user = await getUserById(internalCreatorUserId);
+    if (!user) {
+      return NextResponse.json({ error: "internalCreatorUserId 사용자를 찾을 수 없습니다." }, { status: 400 });
+    }
+    if (user.role !== "CLIENT") {
+      return NextResponse.json({ error: "internalCreatorUserId는 CLIENT여야 합니다." }, { status: 403 });
+    }
+    const clientStatus = await getClientStatusByUserId(user.id);
+    if (clientStatus !== "APPROVED") {
+      return NextResponse.json({ error: "승인 완료된 CLIENT만 발송할 수 있습니다." }, { status: 403 });
+    }
+  } else {
+    const cookieStore = await cookies();
+    const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
+    if (!session) {
+      return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+    }
+    user = await getUserById(session.userId);
+    if (!user) {
+      return NextResponse.json({ error: "사용자를 찾을 수 없습니다." }, { status: 401 });
+    }
+  }
+
+  if (!user) {
+    return NextResponse.json({ error: "사용자를 찾을 수 없습니다." }, { status: 401 });
   }
 
   if (hasAudience) {
@@ -158,6 +201,7 @@ export async function POST(request: Request) {
       normalizedTargetCount: normalizedTargets.length,
       marketingConsentCount: marketingTargets.length,
       fcmTokenRecordCount: records.length,
+      internalCron: isCronInternal,
     })
   );
   if (tokens.length === 0) {
@@ -178,6 +222,9 @@ export async function POST(request: Request) {
       ok: true,
       successCount: result.successCount,
       failureCount: result.failureCount,
+      targetParticipantCount: normalizedTargets.length,
+      eligibleUserCount: marketingTargets.length,
+      tokenCount: tokens.length,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";

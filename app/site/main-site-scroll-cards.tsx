@@ -19,6 +19,11 @@ export type MainSiteScrollCardItem = {
   external: boolean;
   /** 게시 스냅샷으로 면 전체가 이미지일 때 제목 오버레이 숨김(중복 방지) */
   faceIsFullPublishedSnapshot?: boolean;
+  /**
+   * 게시 PNG 분기(`faceIsFullPublishedSnapshot`)는 아니지만, 면·포스터 크기·비율은
+   * 게시 카드와 동일 CSS(공통 토큰) 사용 — 광고 업로드 이미지 전용.
+   */
+  faceMatchPublishedScrollMetrics?: boolean;
 };
 
 type CardRowProps = {
@@ -34,7 +39,11 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
   selected,
   onCardPointerDown,
 }: CardRowProps) {
-  const isPublishedSnapshotFace = Boolean(item.faceIsFullPublishedSnapshot && item.imageUrl?.trim());
+  const hasFaceImage = Boolean(item.imageUrl?.trim());
+  const usePublishedScrollLayout = Boolean(
+    (item.faceIsFullPublishedSnapshot && hasFaceImage) ||
+      (item.faceMatchPublishedScrollMetrics && hasFaceImage),
+  );
 
   const onPointerDown = useCallback(
     (e: PointerEvent<HTMLDivElement>) => {
@@ -70,7 +79,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
     >
       <div
         className={
-          isPublishedSnapshotFace
+          usePublishedScrollLayout
             ? `${styles.sampleMainCardFacePublishedSnapshot} ${selected ? styles.sampleMainCardFacePublishedSnapshotSelected : ""}`
             : `${styles.sampleMainCardFace} ${selected ? styles.sampleMainCardFaceSelected : ""}`
         }
@@ -81,7 +90,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
             src={item.imageUrl.trim()}
             alt=""
             className={
-              isPublishedSnapshotFace
+              usePublishedScrollLayout
                 ? styles.sampleMainCardPosterPublishedSnapshot
                 : styles.sampleMainCardPoster
             }

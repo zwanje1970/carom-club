@@ -413,7 +413,7 @@ button.secondary-button.site-mypage-logout:hover,
   padding: 0;
   background: #ffffff;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
   transition:
     box-shadow 0.15s ease,
     background-color 0.15s ease;
@@ -421,7 +421,7 @@ button.secondary-button.site-mypage-logout:hover,
 
 .site-board-card:hover {
   background: #ffffff;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.08);
 }
 
 .site-board-card > a {
@@ -673,7 +673,7 @@ button.secondary-button.site-mypage-logout:hover,
 /* 대회·당구장 목록: 필터 바 — 페이지 배경(#EEF2F7)과 동일 톤 */
 .site-shell-controls.site-shell-controls--site-list {
   background: #eef2f7;
-  border-bottom: 1px solid #d1d5db;
+  border-bottom: 1px solid #c5cad3;
   padding-top: 0.38rem;
   padding-bottom: 0.42rem;
 }
@@ -3107,7 +3107,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   display: flex;
   flex-wrap: wrap;
   gap: 0.2rem 0.3rem;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom: 1px solid #d1d5db;
 }
 
 .ui-community-tabs-link {
@@ -3193,7 +3193,7 @@ button.secondary-button.ui-community-search-submit {
   border-radius: 18px;
   background: #ffffff;
   border: 1px solid #d1d5db;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
   min-width: 0;
 }
 
@@ -4093,21 +4093,63 @@ main.client-dashboard-main details.client-dashboard-main__extras {
 main.client-dashboard-main details.client-dashboard-main__extras > summary {
   list-style: none;
   list-style-type: none;
-  cursor: default;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  margin: 0;
-  padding: 0 0 0.7rem;
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--ds-text-main);
+  margin: 0 0 0.15rem;
+  padding: 0 0 0.65rem;
   border: none;
   outline: none;
   box-shadow: none;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  border-bottom: 1px solid rgba(229, 231, 235, 0.65);
+}
+
+main.client-dashboard-main .client-dashboard-main__extrasSummaryLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+main.client-dashboard-main .client-dashboard-main__extrasIconWrap {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(47, 107, 255, 0.08);
+  color: #3d6fd8;
+}
+
+main.client-dashboard-main .client-dashboard-main__extrasIconWrap svg {
+  width: 18px;
+  height: 18px;
+}
+
+main.client-dashboard-main .client-dashboard-main__extrasSummaryTitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ds-text-main);
+}
+
+main.client-dashboard-main .client-dashboard-main__extrasSummaryChevron {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  line-height: 1;
+  color: #9ca3af;
+  opacity: 0.95;
+  transition: transform 0.15s ease;
+  user-select: none;
+}
+
+main.client-dashboard-main details.client-dashboard-main__extras[open] > summary .client-dashboard-main__extrasSummaryChevron {
+  transform: rotate(180deg);
 }
 
 main.client-dashboard-main details.client-dashboard-main__extras > summary::-webkit-details-marker {
@@ -4121,9 +4163,9 @@ main.client-dashboard-main details.client-dashboard-main__extras > summary:focus
 main.client-dashboard-main .client-dashboard-main__extrasList {
   display: flex;
   flex-direction: column;
-  margin: 0.55rem 0 0;
+  margin: 0.65rem 0 0;
   padding: 0;
-  gap: 0;
+  gap: 6px;
 }
 
 main.client-dashboard-main .client-dashboard-main__extrasRow {
@@ -4131,17 +4173,20 @@ main.client-dashboard-main .client-dashboard-main__extrasRow {
   align-items: center;
   justify-content: space-between;
   gap: 0.65rem;
-  padding: 0.62rem 0;
+  min-height: 48px;
+  box-sizing: border-box;
+  padding: 15px 4px;
   font-size: 0.88rem;
   line-height: 1.35;
   color: var(--ds-text-sub);
-  border-bottom: 1px solid rgba(15, 23, 42, 0.05);
+  border-bottom: none;
   text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: 10px;
 }
 
-main.client-dashboard-main .client-dashboard-main__extrasRow:last-child {
-  border-bottom: none;
-  padding-bottom: 0.15rem;
+main.client-dashboard-main .client-dashboard-main__extrasRow:active {
+  background: #f5f7fb;
 }
 
 main.client-dashboard-main .client-dashboard-main__extrasRowLabel {
@@ -4151,11 +4196,10 @@ main.client-dashboard-main .client-dashboard-main__extrasRowLabel {
 
 main.client-dashboard-main .client-dashboard-main__extrasRowChevron {
   flex-shrink: 0;
-  font-size: 1.15rem;
+  font-size: 0.72rem;
   font-weight: 500;
   line-height: 1;
-  color: var(--ds-text-sub);
-  opacity: 0.55;
+  color: #9ca3af;
 }
 
 main.client-dashboard-main .client-dashboard-main__tournamentEmpty {

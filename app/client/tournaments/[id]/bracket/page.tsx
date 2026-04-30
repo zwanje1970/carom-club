@@ -1,8 +1,14 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+
+const TournamentGroupRound1PrintClient = dynamic(
+  () => import("./TournamentGroupRound1PrintClient"),
+  { ssr: false, loading: () => <p className="v3-muted">조별 1차 대진표 인쇄 도구를 불러오는 중…</p> },
+);
 
 type BracketParticipant = {
   userId: string;
@@ -263,7 +269,7 @@ export default function TournamentBracketSnapshotPage() {
         </div>
       </section>
 
-      <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap" }}>
+      <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
         <Link className="v3-btn" href={`/client/tournaments/${tournamentId}/bracket/auto`}>
           자동배정
         </Link>
@@ -274,6 +280,11 @@ export default function TournamentBracketSnapshotPage() {
           현재 확정 대진표 보기
         </a>
       </div>
+
+      <section className="v3-box v3-stack" aria-label="조별 1차 대진표 인쇄">
+        <h2 className="v3-h2">조별 1차 대진표 인쇄</h2>
+        <TournamentGroupRound1PrintClient tournamentId={tournamentId} />
+      </section>
 
       {message ? <p className="v3-muted">{message}</p> : null}
 

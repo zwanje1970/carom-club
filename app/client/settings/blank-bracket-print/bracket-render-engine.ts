@@ -344,3 +344,29 @@ function buildCenter(rounds: number[]): BracketScene {
 
   return { boxes, lines };
 }
+
+/** 1라운드 참가자 슬롯 순서 → scene.boxes 인덱스 (CENTER 는 좌·우 리프 순) */
+function sideTreeBoxIndex(r: number, j: number, sideRounds: number[]): number {
+  let idx = 0;
+  for (let rr = 0; rr < r; rr++) idx += sideRounds[rr]!;
+  return idx + j;
+}
+
+export function buildFirstRoundSlotToBoxIndex(opts: BuildOpts): number[] {
+  const { rounds, style } = opts;
+  if (!rounds.length) return [];
+  const start = rounds[0]!;
+  if (style === "CENTER") {
+    const finalEnd = rounds[rounds.length - 1] === 1;
+    const baseRounds = finalEnd ? rounds.slice(0, -1) : rounds;
+    if (baseRounds.length === 0) return [];
+    const sideRounds = baseRounds.map((n) => Math.max(1, Math.floor(n / 2)));
+    const half = sideRounds[0]!;
+    const leftTreeBoxCount = sideRounds.reduce((acc, n) => acc + n, 0);
+    const out: number[] = [];
+    for (let j = 0; j < half; j++) out.push(sideTreeBoxIndex(0, j, sideRounds));
+    for (let j = 0; j < half; j++) out.push(leftTreeBoxCount + sideTreeBoxIndex(0, j, sideRounds));
+    return out;
+  }
+  return Array.from({ length: start }, (_, i) => i);
+}

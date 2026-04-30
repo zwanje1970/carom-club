@@ -1,5 +1,5 @@
 import Link from "next/link";
-import LogoutButton from "../components/LogoutButton";
+import ClientAutoParticipantPushToggle from "./ClientAutoParticipantPushToggle";
 import { AdminSurface } from "../components/admin/AdminCard";
 import { getRequestSessionUser } from "../../lib/server/request-session-user";
 import { getClientDashboardPolicy } from "../../lib/surface-read";
@@ -81,6 +81,23 @@ function IconChartLine() {
   );
 }
 
+/** 부가기능 헤더 — 설정(슬라이더)형, 18px 고정 */
+function IconExtrasToolbox() {
+  return (
+    <svg viewBox="0 0 24 24" width={18} height={18} fill="none" aria-hidden>
+      <path
+        d="M2 8h4M10 8h12M2 12h8M14 12h8M2 16h10M16 16h6"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+      <circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.75" fill="none" />
+      <circle cx="17" cy="12" r="2.5" stroke="currentColor" strokeWidth="1.75" fill="none" />
+      <circle cx="13" cy="16" r="2.5" stroke="currentColor" strokeWidth="1.75" fill="none" />
+    </svg>
+  );
+}
+
 function formatTournamentCardSubtitle(t: Pick<Tournament, "date" | "maxParticipants">): string {
   const date = (t.date ?? "").trim() || "—";
   const n = t.maxParticipants;
@@ -98,7 +115,6 @@ export default async function ClientHomePage() {
       : policy?.membershipState === "EXPIRED"
         ? "연회원 만료"
         : "일반";
-  const greetingName = (currentUser?.name ?? "").trim() || "○○";
 
   const org = userId ? await resolveClientOrganizationForDashboardPolicy(userId) : null;
   let tournaments: Tournament[] = [];
@@ -149,24 +165,7 @@ export default async function ClientHomePage() {
 
   return (
     <main className="v3-page v3-stack ui-client-dashboard client-dashboard-main" style={{ gap: "1.15rem" }}>
-      {/* 1. 상단 영역 */}
-      <header
-        className="v3-row ui-client-dashboard-header"
-        style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem" }}
-      >
-        <p style={{ margin: 0, fontWeight: 700 }}>안녕하세요, {greetingName}님</p>
-        <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
-          <button type="button" className="v3-btn" disabled aria-label="공지 (자리)">
-            공지
-          </button>
-          <span className="v3-muted" style={{ fontSize: "0.9rem" }}>
-            ❓ 안내 ON/OFF (자리)
-          </span>
-          <LogoutButton redirectTo="/" />
-        </div>
-      </header>
-
-      {/* 2. 현재 해야 할 일 — 상단 제목 / 중단 상태 문구 / 하단 버튼 1개 */}
+      {/* 현재 해야 할 일 — 상단 제목 / 중단 상태 문구 / 하단 버튼 1개 */}
       <section className="v3-stack client-dashboard-main__cta" aria-labelledby="client-main-action-heading">
         <h2 id="client-main-action-heading" className="v3-h2" style={{ margin: 0, fontSize: "1rem" }}>
           👉 지금 해야 할 일
@@ -297,18 +296,29 @@ export default async function ClientHomePage() {
       {/* 5. 부가기능 */}
       <section aria-label="부가기능">
         <details className="client-dashboard-main__dsCard client-dashboard-main__extras">
-          <summary>부가기능</summary>
+          <summary>
+            <span className="client-dashboard-main__extrasSummaryLeft">
+              <span className="client-dashboard-main__extrasIconWrap">
+                <IconExtrasToolbox />
+              </span>
+              <span className="client-dashboard-main__extrasSummaryTitle">부가기능</span>
+            </span>
+            <span className="client-dashboard-main__extrasSummaryChevron" aria-hidden>
+              ▼
+            </span>
+          </summary>
           <div className="client-dashboard-main__extrasList">
+            <ClientAutoParticipantPushToggle initialEnabled={org?.autoParticipantPushEnabled !== false} />
             <Link href="/client/setup" prefetch={false} className="client-dashboard-main__extrasRow">
               <span className="client-dashboard-main__extrasRowLabel">업체 설정</span>
               <span className="client-dashboard-main__extrasRowChevron" aria-hidden>
-                ›
+                &gt;
               </span>
             </Link>
             <Link href="/client/setup/venue-intro" prefetch={false} className="client-dashboard-main__extrasRow">
               <span className="client-dashboard-main__extrasRowLabel">당구장 소개</span>
               <span className="client-dashboard-main__extrasRowChevron" aria-hidden>
-                ›
+                &gt;
               </span>
             </Link>
             <Link
@@ -318,7 +328,7 @@ export default async function ClientHomePage() {
             >
               <span className="client-dashboard-main__extrasRowLabel">문의 (오류제보 / 기능건의)</span>
               <span className="client-dashboard-main__extrasRowChevron" aria-hidden>
-                ›
+                &gt;
               </span>
             </Link>
             <Link
@@ -328,7 +338,7 @@ export default async function ClientHomePage() {
             >
               <span className="client-dashboard-main__extrasRowLabel">빈 대진표</span>
               <span className="client-dashboard-main__extrasRowChevron" aria-hidden>
-                ›
+                &gt;
               </span>
             </Link>
           </div>

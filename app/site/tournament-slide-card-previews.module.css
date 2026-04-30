@@ -184,7 +184,7 @@
 .footerDate,
 .footerPlace {
   margin: 0;
-  font-size: calc(0.78rem + 1pt);
+  font-size: calc(0.78rem + 1pt - 1pt);
   line-height: 1.3;
   letter-spacing: 0.02em;
   color: #18181b;
@@ -252,7 +252,7 @@
 .fullSurfaceFooterDate,
 .fullSurfaceFooterPlace {
   margin: 0;
-  font-size: calc(0.78rem + 1pt);
+  font-size: calc(0.78rem + 1pt - 1pt);
   line-height: 1.3;
   letter-spacing: 0.02em;
   font-weight: 400;
@@ -278,11 +278,16 @@
 }
 
 .cardTextShadowOn .fullSurfaceFooterDate {
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 .cardTextShadowOn .fullSurfaceFooterPlace {
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.cardTextShadowOn .footerDate,
+.cardTextShadowOn .footerPlace {
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
 }
 
 .cardRootSurfaceFull .frameCenter {
@@ -355,7 +360,7 @@
 
 .classicDesc {
   margin: 0.65rem 0 0;
-  font-size: calc(0.78rem + 1pt);
+  font-size: calc(0.78rem + 1pt - 1pt);
   line-height: 1.35;
   letter-spacing: 0.02em;
   font-weight: 400;
@@ -370,7 +375,7 @@
 
 .classicDescSecondary {
   margin: 0.35rem 0 0;
-  font-size: calc(0.78rem + 1pt + 3pt);
+  font-size: calc(0.78rem + 1pt + 3pt - 1pt);
   line-height: 1.3;
   letter-spacing: 0.02em;
   font-weight: 700;
@@ -446,7 +451,7 @@
 
 .frameDesc {
   margin: 0.65rem 0 0;
-  font-size: calc(0.72rem + 1pt);
+  font-size: calc(0.72rem + 1pt - 1pt);
   line-height: 1.4;
   color: #fff;
   text-shadow: none;
@@ -459,7 +464,7 @@
 
 .frameDescSecondary {
   margin: 0.35rem 0 0;
-  font-size: calc(0.78rem + 1pt + 3pt);
+  font-size: calc(0.78rem + 1pt + 3pt - 1pt);
   line-height: 1.3;
   letter-spacing: 0.02em;
   font-weight: 700;
@@ -473,47 +478,35 @@
 }
 
 .cardTextShadowOn .classicLead {
-  text-shadow:
-    0 2px 14px rgba(0, 0, 0, 0.55),
-    0 1px 3px rgba(0, 0, 0, 0.85);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.42);
 }
 
 .cardTextShadowOn .classicTitle {
-  text-shadow:
-    0 2px 20px rgba(0, 0, 0, 0.6),
-    0 1px 4px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.48);
 }
 
 .cardTextShadowOn .classicDesc {
-  text-shadow:
-    0 1px 12px rgba(0, 0, 0, 0.55),
-    0 0 1px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .cardTextShadowOn .classicDescSecondary {
-  text-shadow:
-    0 1px 12px rgba(0, 0, 0, 0.55),
-    0 0 1px rgba(0, 0, 0, 0.85);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.42);
 }
 
 .cardTextShadowOn .frameLead {
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.65);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 
 .cardTextShadowOn .frameTitle {
-  text-shadow:
-    0 2px 18px rgba(0, 0, 0, 0.75),
-    0 0 1px rgba(0, 0, 0, 1);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .cardTextShadowOn .frameDesc {
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .cardTextShadowOn .frameDescSecondary {
-  text-shadow:
-    0 1px 12px rgba(0, 0, 0, 0.55),
-    0 0 1px rgba(0, 0, 0, 0.85);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.42);
 }
 
 .classicDesc + .classicDescSecondary,
@@ -543,7 +536,7 @@
 
 .cardRootTemplateLayout .footerDate,
 .cardRootTemplateLayout .footerPlace {
-  font-size: calc(0.72rem + 1pt + 2pt);
+  font-size: calc(0.72rem + 1pt + 2pt - 1pt);
   line-height: 1.25;
   font-weight: 400;
 }
@@ -570,7 +563,7 @@
 .cardRootTemplateLayout .classicDesc,
 .cardRootTemplateLayout .frameDesc {
   margin: 0.65rem 0 0;
-  font-size: calc(0.72rem + 1pt + 2pt);
+  font-size: calc(0.72rem + 1pt + 2pt - 1pt);
   line-height: 1.25;
   max-height: calc(1.25em * 3);
 }
@@ -578,7 +571,7 @@
 .cardRootTemplateLayout .classicDescSecondary,
 .cardRootTemplateLayout .frameDescSecondary {
   margin: 0.4rem 0 0;
-  font-size: calc(0.72rem + 1pt + 2pt);
+  font-size: calc(0.72rem + 1pt + 2pt - 1pt);
   line-height: 1.25;
   max-height: calc(1.25em * 4);
 }
@@ -611,7 +604,7 @@
 
 .cardRootTemplateLayout .fullSurfaceFooterDate,
 .cardRootTemplateLayout .fullSurfaceFooterPlace {
-  font-size: calc((0.72rem + 1pt + 2pt) * var(--tournament-card-height-scale));
+  font-size: calc((0.72rem + 1pt + 2pt - 1pt) * var(--tournament-card-height-scale));
   line-height: 1.25;
   font-weight: 400;
 }

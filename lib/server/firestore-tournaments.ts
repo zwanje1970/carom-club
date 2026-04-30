@@ -62,6 +62,8 @@ function tournamentToFirestorePlain(t: Tournament): Record<string, unknown> {
   if (typeof t.deletedAt === "string" && t.deletedAt.trim() !== "") base.deletedAt = t.deletedAt.trim();
   if (typeof t.deletedBy === "string" && t.deletedBy.trim() !== "") base.deletedBy = t.deletedBy.trim();
   if (typeof t.deleteReason === "string") base.deleteReason = t.deleteReason;
+  if (typeof t.gatheringTime === "string" && t.gatheringTime.trim() !== "") base.gatheringTime = t.gatheringTime.trim();
+  if (typeof t.reminderSentAt === "string" && t.reminderSentAt.trim() !== "") base.reminderSentAt = t.reminderSentAt.trim();
   return base;
 }
 
@@ -88,6 +90,16 @@ export async function getTournamentByIdFirestore(tournamentId: string): Promise<
   const id = tournamentId.trim();
   if (!id) return null;
   return fetchAndNormalizeTournament(id, null);
+}
+
+export async function setTournamentReminderSentAtFirestore(tournamentId: string): Promise<void> {
+  assertClientFirestorePersistenceConfigured();
+  const tid = tournamentId.trim();
+  if (!tid) return;
+  const db = getSharedFirestoreDb();
+  const now = new Date().toISOString();
+  await db.collection(COLLECTION).doc(tid).set({ reminderSentAt: now }, { merge: true });
+  revalidatePublicTournamentCache(tid);
 }
 
 export async function listTournamentsByCreatorFirestore(userId: string): Promise<Tournament[]> {

@@ -49,6 +49,7 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
       imageUrl,
       faceCssBackground,
       external,
+      ...(item.type === "ad" && imageUrl ? { faceMatchPublishedScrollMetrics: true as const } : {}),
     };
   });
 }

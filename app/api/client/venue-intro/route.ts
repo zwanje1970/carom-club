@@ -195,6 +195,7 @@ export async function PATCH(request: Request) {
         typeSpecificJson,
         isPublished: existing.isPublished,
         setupCompleted: existing.setupCompleted,
+        autoParticipantPushEnabled: existing.autoParticipantPushEnabled !== false,
       });
     }
   }

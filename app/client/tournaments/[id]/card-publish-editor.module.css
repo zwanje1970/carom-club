@@ -352,6 +352,15 @@
   font-size: 0.82rem;
 }
 
+/** 내용입력: 설명·날짜·장소만 1pt 축소 (제목/제목 위 필드는 기본 fieldInput 유지) */
+.fieldInputContentTight {
+  font-size: calc(0.9rem - 1pt);
+}
+
+.fieldTextareaContentTight {
+  font-size: calc(0.82rem - 1pt);
+}
+
 .fieldFile {
   font-size: 0.85rem;
 }
