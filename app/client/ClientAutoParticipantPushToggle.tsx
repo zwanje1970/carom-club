@@ -4,9 +4,11 @@ import { useCallback, useState } from "react";
 
 type Props = {
   initialEnabled: boolean;
+  /** 저장 성공 후 대시보드 summary 캐시 등과 동기화 */
+  onPersisted?: (enabled: boolean) => void;
 };
 
-export default function ClientAutoParticipantPushToggle({ initialEnabled }: Props) {
+export default function ClientAutoParticipantPushToggle({ initialEnabled, onPersisted }: Props) {
   const [enabled, setEnabled] = useState(initialEnabled);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -27,7 +29,9 @@ export default function ClientAutoParticipantPushToggle({ initialEnabled }: Prop
         setErr(typeof data.error === "string" ? data.error : "저장에 실패했습니다.");
         return;
       }
-      setEnabled(data.autoParticipantPushEnabled !== false);
+      const saved = data.autoParticipantPushEnabled !== false;
+      setEnabled(saved);
+      onPersisted?.(saved);
     } catch {
       setErr("요청 중 오류가 발생했습니다.");
     } finally {

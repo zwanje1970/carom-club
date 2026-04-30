@@ -1,16 +1,42 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useLayoutEffect, useState } from "react";
 import ClientAutoParticipantPushToggle from "./ClientAutoParticipantPushToggle";
 import { AdminSurface } from "../components/admin/AdminCard";
 import type { ClientDashboardSummaryJson } from "./dashboard-summary-types";
 import type { TournamentStatusBadge } from "../../lib/server/platform-backing-store";
+import {
+  mergeClientDashboardSummaryCache,
+  persistClientDashboardSummaryCache,
+  readClientDashboardSummaryCache,
+} from "./dashboard-summary-cache";
 
 type SummaryState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; data: ClientDashboardSummaryJson };
+  | { status: "ready"; data: ClientDashboardSummaryJson; refreshWarning?: string };
+
+type DashboardFetchResult =
+  | { ok: true; data: ClientDashboardSummaryJson }
+  | { ok: false; message: string };
+
+async function fetchDashboardSummary(): Promise<DashboardFetchResult> {
+  try {
+    const res = await fetch("/api/client/dashboard-summary", { credentials: "same-origin" });
+    const json = (await res.json()) as ClientDashboardSummaryJson | { ok: false; error?: string };
+    if (!res.ok || !("ok" in json) || json.ok !== true) {
+      const msg =
+        typeof (json as { error?: string }).error === "string"
+          ? (json as { error: string }).error
+          : "대시보드를 불러오지 못했습니다.";
+      return { ok: false, message: msg };
+    }
+    return { ok: true, data: json };
+  } catch {
+    return { ok: false, message: "네트워크 오류로 불러오지 못했습니다." };
+  }
+}
 
 function clientDashboardTournamentBadgeClass(badge: TournamentStatusBadge): string {
   switch (badge) {
@@ -144,28 +170,40 @@ function DashboardSkeleton() {
 export default function ClientDashboardHomeClient() {
   const [state, setState] = useState<SummaryState>({ status: "loading" });
 
-  const load = useCallback(async () => {
-    setState({ status: "loading" });
-    try {
-      const res = await fetch("/api/client/dashboard-summary", { credentials: "same-origin" });
-      const json = (await res.json()) as ClientDashboardSummaryJson | { ok: false; error?: string };
-      if (!res.ok || !("ok" in json) || json.ok !== true) {
-        const msg =
-          typeof (json as { error?: string }).error === "string"
-            ? (json as { error: string }).error
-            : "대시보드를 불러오지 못했습니다.";
-        setState({ status: "error", message: msg });
-        return;
-      }
-      setState({ status: "ready", data: json });
-    } catch {
-      setState({ status: "error", message: "네트워크 오류로 불러오지 못했습니다." });
+  const loadWithoutCache = useCallback(async () => {
+    const r = await fetchDashboardSummary();
+    if (r.ok) {
+      persistClientDashboardSummaryCache(r.data);
+      setState({ status: "ready", data: r.data });
+    } else {
+      setState({ status: "error", message: r.message });
     }
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const revalidateFromCache = useCallback(async () => {
+    const r = await fetchDashboardSummary();
+    if (r.ok) {
+      persistClientDashboardSummaryCache(r.data);
+      setState({ status: "ready", data: r.data });
+    } else {
+      setState((s) => (s.status === "ready" ? { ...s, refreshWarning: r.message } : s));
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    const cached = readClientDashboardSummaryCache();
+    if (cached) {
+      setState({ status: "ready", data: cached });
+      void revalidateFromCache();
+    } else {
+      void loadWithoutCache();
+    }
+  }, [loadWithoutCache, revalidateFromCache]);
+
+  const handleRetry = useCallback(() => {
+    setState({ status: "loading" });
+    void loadWithoutCache();
+  }, [loadWithoutCache]);
 
   if (state.status === "loading") {
     return <DashboardSkeleton />;
@@ -177,7 +215,7 @@ export default function ClientDashboardHomeClient() {
         <p className="v3-muted" style={{ margin: 0 }}>
           {state.message}
         </p>
-        <button type="button" className="v3-btn" onClick={() => void load()}>
+        <button type="button" className="v3-btn" onClick={() => void handleRetry()}>
           다시 시도
         </button>
       </div>
@@ -222,6 +260,11 @@ export default function ClientDashboardHomeClient() {
 
   return (
     <div className="v3-stack" style={{ gap: "1.15rem" }}>
+      {state.refreshWarning ? (
+        <p className="v3-muted" role="alert" style={{ margin: 0, fontSize: "0.85rem", color: "#b45309" }}>
+          {state.refreshWarning} (화면은 이전에 불러온 내용입니다.)
+        </p>
+      ) : null}
       <section className="v3-stack client-dashboard-main__cta" aria-labelledby="client-main-action-heading">
         <h2 id="client-main-action-heading" className="v3-h2" style={{ margin: 0, fontSize: "1rem" }}>
           👉 지금 해야 할 일
@@ -361,7 +404,17 @@ export default function ClientDashboardHomeClient() {
             </span>
           </summary>
           <div className="client-dashboard-main__extrasList">
-            <ClientAutoParticipantPushToggle initialEnabled={d.autoParticipantPushEnabled} />
+            <ClientAutoParticipantPushToggle
+              initialEnabled={d.autoParticipantPushEnabled}
+              onPersisted={(enabled) => {
+                mergeClientDashboardSummaryCache({ autoParticipantPushEnabled: enabled });
+                setState((s) =>
+                  s.status === "ready"
+                    ? { ...s, data: { ...s.data, autoParticipantPushEnabled: enabled } }
+                    : s,
+                );
+              }}
+            />
             <Link href="/client/setup" prefetch={false} className="client-dashboard-main__extrasRow">
               <span className="client-dashboard-main__extrasRowLabel">업체 설정</span>
               <span className="client-dashboard-main__extrasRowChevron" aria-hidden>

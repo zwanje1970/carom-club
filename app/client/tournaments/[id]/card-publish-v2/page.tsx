@@ -94,6 +94,9 @@ const CARD_COLOR_PALETTE_32 = [
 /** 신규 작성·저장 스냅샷 없을 때 미리보기·팔레트 기본(32색 중 하늘색) */
 const DEFAULT_CARD_MEDIA_BACKGROUND = "#38BDF8";
 
+/** 배경 이미지 `<img>` opacity — 슬라이더 100%에 대응(완전 불투명) */
+const DEFAULT_BG_IMAGE_OVERLAY_OPACITY = 1;
+
 const KO_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
 /** `2026-05-09 (일)` — 저장/미리보기 입력값과 동일 형식 */
@@ -247,7 +250,7 @@ export default function ClientTournamentCardPublishV2Page() {
   const [uploadedImage, setUploadedImage] = useState<UploadedImage | null>(null);
 
   const [mediaBackground, setMediaBackground] = useState(DEFAULT_CARD_MEDIA_BACKGROUND);
-  const [imageOverlayOpacity, setImageOverlayOpacity] = useState(1);
+  const [imageOverlayOpacity, setImageOverlayOpacity] = useState(DEFAULT_BG_IMAGE_OVERLAY_OPACITY);
   const [v2MediaMode, setV2MediaMode] = useState<"inherit" | "on">("on");
   const [cardTextShadowEnabled, setCardTextShadowEnabled] = useState(false);
   const [cardSurfaceLayout, setCardSurfaceLayout] = useState<TournamentCardSurfaceLayout>("split");
@@ -257,14 +260,15 @@ export default function ClientTournamentCardPublishV2Page() {
   const [editorTab, setEditorTab] = useState<"background" | "content">("background");
 
   const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [publishBusy, setPublishBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   /** 메인에 노출 중인 게시카드 존재 여부(대회당 1개·재게시 시 덮어쓰기) */
   const [hasLivePublishedCard, setHasLivePublishedCard] = useState(false);
 
   const bgFileInputRef = useRef<HTMLInputElement>(null);
   const cardPublishCaptureRef = useRef<HTMLDivElement>(null);
-  /** 저장(게시) 중복 요청만 차단 — 첫 탭 직후 동기 setLoading으로 클릭이 취소되는 것을 피함 */
+  /** 저장/게시 중복 요청 차단 — ref로 동기 가드 */
   const isPublishingRef = useRef(false);
 
   const backgroundType = uploadedImage ? "image" : "theme";
@@ -294,7 +298,7 @@ export default function ClientTournamentCardPublishV2Page() {
       themeType,
       mediaBackground: resolvedPreviewMediaBg,
       imageOverlayBlend: true,
-      imageOverlayOpacity: v2MediaMode === "on" ? imageOverlayOpacity : 1,
+      imageOverlayOpacity: v2MediaMode === "on" ? imageOverlayOpacity : DEFAULT_BG_IMAGE_OVERLAY_OPACITY,
       ...(leadTextColor.trim() ? { cardLeadTextColor: leadTextColor.trim() } : {}),
       ...(titleTextColor.trim() ? { cardTitleTextColor: titleTextColor.trim() } : {}),
       ...(descriptionTextColor.trim() ? { cardDescriptionTextColor: descriptionTextColor.trim() } : {}),
@@ -404,12 +408,14 @@ export default function ClientTournamentCardPublishV2Page() {
           setV2MediaMode("on");
           setMediaBackground(typeof pick.tournamentMediaBackground === "string" ? pick.tournamentMediaBackground : "");
           setImageOverlayOpacity(
-            typeof pick.tournamentImageOverlayOpacity === "number" ? pick.tournamentImageOverlayOpacity : 1
+            typeof pick.tournamentImageOverlayOpacity === "number"
+              ? pick.tournamentImageOverlayOpacity
+              : DEFAULT_BG_IMAGE_OVERLAY_OPACITY
           );
         } else {
           setV2MediaMode("inherit");
           setMediaBackground("");
-          setImageOverlayOpacity(1);
+          setImageOverlayOpacity(DEFAULT_BG_IMAGE_OVERLAY_OPACITY);
         }
         const storedDate =
           typeof pick.tournamentCardDisplayDate === "string" ? pick.tournamentCardDisplayDate.trim() : "";
@@ -431,7 +437,7 @@ export default function ClientTournamentCardPublishV2Page() {
         setUploadedImage(null);
         setV2MediaMode("on");
         setMediaBackground(DEFAULT_CARD_MEDIA_BACKGROUND);
-        setImageOverlayOpacity(1);
+        setImageOverlayOpacity(DEFAULT_BG_IMAGE_OVERLAY_OPACITY);
         const d0 = typeof t.date === "string" ? t.date : "";
         const loc0 = typeof t.location === "string" ? t.location : "";
         setCardDate(d0 ? formatCardDateForDisplay(d0) : POSTCARD_TEMPLATE_APP_DEFAULTS.dateText);
@@ -499,7 +505,8 @@ export default function ClientTournamentCardPublishV2Page() {
     isPublishingRef.current = true;
 
     void (async () => {
-      setLoading(true);
+      if (draftOnly) setSaveBusy(true);
+      else setPublishBusy(true);
       setMessage("");
       try {
         const built = buildCardPayload(draftOnly);
@@ -569,7 +576,8 @@ export default function ClientTournamentCardPublishV2Page() {
       } catch {
         setMessage(draftOnly ? "저장 요청 중 오류가 발생했습니다." : "메인 게시 요청 중 오류가 발생했습니다.");
       } finally {
-        setLoading(false);
+        if (draftOnly) setSaveBusy(false);
+        else setPublishBusy(false);
         isPublishingRef.current = false;
       }
     })();
@@ -598,6 +606,7 @@ export default function ClientTournamentCardPublishV2Page() {
         w320Url: result.w320Url,
         w640Url: result.w640Url,
       });
+      setImageOverlayOpacity(DEFAULT_BG_IMAGE_OVERLAY_OPACITY);
       activateV2Media();
       setEditorTab("background");
     } catch {
@@ -609,6 +618,7 @@ export default function ClientTournamentCardPublishV2Page() {
 
   function clearImage() {
     setUploadedImage(null);
+    setImageOverlayOpacity(DEFAULT_BG_IMAGE_OVERLAY_OPACITY);
     setMessage("이미지를 제거했습니다. 테마 배경으로 표시됩니다.");
   }
 
@@ -916,13 +926,13 @@ export default function ClientTournamentCardPublishV2Page() {
 
           <div className={editorStyles.actions}>
             <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-              <button type="submit" className="v3-btn" disabled={loading}>
-                {loading ? "처리 중…" : "저장"}
+              <button type="submit" className="v3-btn" disabled={saveBusy || publishBusy}>
+                {saveBusy ? "저장 중" : "저장"}
               </button>
               <button
                 type="button"
                 className="v3-btn"
-                disabled={loading}
+                disabled={saveBusy || publishBusy}
                 onClick={() =>
                   postCardSnapshot(
                     false,
@@ -932,7 +942,7 @@ export default function ClientTournamentCardPublishV2Page() {
                   )
                 }
               >
-                {loading ? "처리 중…" : "게시"}
+                {publishBusy ? "게시 중" : "게시"}
               </button>
             </div>
           </div>
