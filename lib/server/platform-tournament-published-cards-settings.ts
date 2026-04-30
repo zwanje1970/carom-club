@@ -2,13 +2,6 @@ import { isEntityLifecycleVisibleForList } from "./entity-lifecycle";
 import { isFirestoreUsersBackendConfigured } from "./firestore-users";
 import { PLATFORM_KV_KEYS, readPlatformKvJson, upsertPlatformKvJson } from "./platform-kv-firestore";
 
-const IS_DEVELOPMENT = process.env.NODE_ENV === "development";
-/**
- * 배포 환경에서 `NODE_ENV`가 비표준 문자열이어도 파일 저장(local-json-file)로 떨어지지 않게 한다.
- * development가 아니면 운영 런타임으로 간주하여 Firestore KV 우선/미설정 시 blocked 처리.
- */
-const IS_RUNTIME_DEPLOYMENT = !IS_DEVELOPMENT;
-
 export const TOURNAMENT_PUBLISHED_CARDS_KV_KEY = PLATFORM_KV_KEYS.tournamentPublishedCards;
 
 export type TournamentPublishedCardsReadStrategy = "firestore-kv" | "local-json-file" | "production-defaults-only";
@@ -16,14 +9,16 @@ export type TournamentPublishedCardsReadStrategy = "firestore-kv" | "local-json-
 export type TournamentPublishedCardsWriteStrategy = "firestore-kv" | "local-json-file" | "blocked";
 
 export function resolveTournamentPublishedCardsReadStrategy(): TournamentPublishedCardsReadStrategy {
-  if (IS_RUNTIME_DEPLOYMENT && isFirestoreUsersBackendConfigured()) return "firestore-kv";
-  if (IS_RUNTIME_DEPLOYMENT) return "production-defaults-only";
+  const isDeploymentRuntime = process.env.NODE_ENV !== "development";
+  if (isDeploymentRuntime && isFirestoreUsersBackendConfigured()) return "firestore-kv";
+  if (isDeploymentRuntime) return "production-defaults-only";
   return "local-json-file";
 }
 
 export function resolveTournamentPublishedCardsWriteStrategy(): TournamentPublishedCardsWriteStrategy {
-  if (IS_RUNTIME_DEPLOYMENT && isFirestoreUsersBackendConfigured()) return "firestore-kv";
-  if (IS_RUNTIME_DEPLOYMENT) return "blocked";
+  const isDeploymentRuntime = process.env.NODE_ENV !== "development";
+  if (isDeploymentRuntime && isFirestoreUsersBackendConfigured()) return "firestore-kv";
+  if (isDeploymentRuntime) return "blocked";
   return "local-json-file";
 }
 

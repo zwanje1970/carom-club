@@ -1,10 +1,6 @@
 import { isFirestoreUsersBackendConfigured } from "./firestore-users";
 import { PLATFORM_KV_KEYS, readPlatformKvJson, upsertPlatformKvJson } from "./platform-kv-firestore";
 
-const IS_DEVELOPMENT = process.env.NODE_ENV === "development";
-/** `platform-tournament-published-cards-settings`와 동일: 비개발 런타임은 Firestore KV 우선(local-json-file 미사용). */
-const IS_RUNTIME_DEPLOYMENT = !IS_DEVELOPMENT;
-
 export const SITE_LAYOUT_CONFIG_KV_KEY = PLATFORM_KV_KEYS.siteLayoutConfig;
 
 export type SiteLayoutConfigReadStrategy = "firestore-kv" | "local-json-file" | "production-defaults-only";
@@ -12,14 +8,17 @@ export type SiteLayoutConfigReadStrategy = "firestore-kv" | "local-json-file" | 
 export type SiteLayoutConfigWriteStrategy = "firestore-kv" | "local-json-file" | "blocked";
 
 export function resolveSiteLayoutConfigReadStrategy(): SiteLayoutConfigReadStrategy {
-  if (IS_RUNTIME_DEPLOYMENT && isFirestoreUsersBackendConfigured()) return "firestore-kv";
-  if (IS_RUNTIME_DEPLOYMENT) return "production-defaults-only";
+  /** 모듈 로드 시점 `NODE_ENV`에 묶이지 않도록 매 호출 평가(Next 빌드/워커 혼선 방지). */
+  const isDeploymentRuntime = process.env.NODE_ENV !== "development";
+  if (isDeploymentRuntime && isFirestoreUsersBackendConfigured()) return "firestore-kv";
+  if (isDeploymentRuntime) return "production-defaults-only";
   return "local-json-file";
 }
 
 export function resolveSiteLayoutConfigWriteStrategy(): SiteLayoutConfigWriteStrategy {
-  if (IS_RUNTIME_DEPLOYMENT && isFirestoreUsersBackendConfigured()) return "firestore-kv";
-  if (IS_RUNTIME_DEPLOYMENT) return "blocked";
+  const isDeploymentRuntime = process.env.NODE_ENV !== "development";
+  if (isDeploymentRuntime && isFirestoreUsersBackendConfigured()) return "firestore-kv";
+  if (isDeploymentRuntime) return "blocked";
   return "local-json-file";
 }
 

@@ -33,6 +33,10 @@ import { computeLegacyAutoSettlementSummary } from "./settlement-legacy-summary"
 import { MAX_COMMUNITY_POST_IMAGE_COUNT } from "../community-post-images";
 import { normalizeCommunityPostImageSizeLevels } from "../community-post-content-images";
 import { tournamentStatusEligibleForMainSlide } from "../site-tournament-badges";
+import { extractProofImageIdFromSiteImageUrl } from "../site-proof-image-id";
+import { resolveSiteImageListThumbnailUrl, resolveSitePosterDisplayUrl } from "../site-poster-urls";
+
+export { resolveSitePosterDisplayUrl };
 import {
   normalizeMainSlideAdConfig,
   normalizeMainSiteSlideAdRow,
@@ -876,6 +880,7 @@ export type ProofImageAsset = {
   sitePublic?: boolean;
   /** 운영: Firebase Storage 등 외부 URL(있으면 GET은 디스크를 읽지 않고 리다이렉트) */
   storageOriginalUrl?: string;
+  storageW160Url?: string;
   storageW320Url?: string;
   storageW640Url?: string;
 };
@@ -957,9 +962,9 @@ export function isDevStoreFilePersistenceEnabled(): boolean {
   return process.env.NODE_ENV === "development";
 }
 
-/** 운영(production) + Firebase 자격 증명이 있을 때만: 회원·로그인 사용자 레코드는 Firestore, local-json JSON 사용자 테이블은 보조(시드 관리자 등) */
+/** `next dev`가 아니고 Firebase 자격 증명이 있을 때: 회원·로그인 사용자 레코드는 Firestore. local-json 사용자 테이블은 development 전용 보조. */
 function useFirestoreUsersInProduction(): boolean {
-  return process.env.NODE_ENV === "production" && isFirestoreUsersBackendConfigured();
+  return process.env.NODE_ENV !== "development" && isFirestoreUsersBackendConfigured();
 }
 
 /** local-json JSON 파일 접근 직렬화(동시 rename/read·쓰기로 인한 Windows EBUSY 완화). 내부는 writeLocalJsonAggregateImpl로 재진입 없이 처리. */
@@ -2072,6 +2077,7 @@ function normalizeProofImageRow(row: unknown): ProofImageAsset | null {
   if (!id || !uploaderUserId) return null;
   const sitePublic = r.sitePublic === true;
   const storageOriginalUrl = normalizeOptionalHttpsUrl(r.storageOriginalUrl);
+  const storageW160Url = normalizeOptionalHttpsUrl(r.storageW160Url);
   const storageW320Url = normalizeOptionalHttpsUrl(r.storageW320Url);
   const storageW640Url = normalizeOptionalHttpsUrl(r.storageW640Url);
   return {
@@ -2081,6 +2087,7 @@ function normalizeProofImageRow(row: unknown): ProofImageAsset | null {
     createdAt,
     ...(sitePublic ? { sitePublic: true } : {}),
     ...(storageOriginalUrl ? { storageOriginalUrl } : {}),
+    ...(storageW160Url ? { storageW160Url } : {}),
     ...(storageW320Url ? { storageW320Url } : {}),
     ...(storageW640Url ? { storageW640Url } : {}),
   };
@@ -2342,7 +2349,7 @@ async function isProofImageIdStillReferencedGlobally(imageId: string): Promise<b
     const { listAllTournamentsFirestore } = await import("./firestore-tournaments");
     const tours = await listAllTournamentsFirestore();
     if (tours.some((t) => extractProofImageIdFromPosterUrl(t.posterImageUrl ?? "") === norm)) return true;
-  } else {
+  } else if (process.env.NODE_ENV === "development") {
     const store = await readLocalJsonAggregate();
     if (store.tournaments.some((t) => extractProofImageIdFromPosterUrl(t.posterImageUrl ?? "") === norm)) return true;
   }
@@ -3019,7 +3026,7 @@ function pruneExpiredNotifications(store: DevStore): number {
 }
 
 async function readLocalJsonAggregate(): Promise<DevStore> {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV !== "development") {
     throw new Error("local-json is not allowed in production");
   }
   return runStoreIoExclusive(async () => {
@@ -3033,7 +3040,7 @@ async function readLocalJsonAggregate(): Promise<DevStore> {
 }
 
 async function writeLocalJsonAggregate(store: DevStore): Promise<void> {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV !== "development") {
     throw new Error("local-json is not allowed in production");
   }
   return runStoreIoExclusive(() => writeLocalJsonAggregateImpl(store));
@@ -3162,7 +3169,7 @@ export async function checkNicknameAvailability(
       return { ok: false, error: "닉네임 확인 중 오류가 발생했습니다." };
     }
   }
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV !== "development") {
     return { ok: false, error: "닉네임 확인 중 오류가 발생했습니다." };
   }
   const store = await readLocalJsonAggregate();
@@ -3794,7 +3801,7 @@ export async function getUserById(userId: string): Promise<DevUser | null> {
       throw new Error("User fetch failed in production");
     }
   }
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV !== "development") {
     return null;
   }
   const store = await readLocalJsonAggregate();
@@ -4002,7 +4009,7 @@ export async function ensurePlatformAdminAccount(params: {
   password: string;
   name?: string;
 }): Promise<DevUser | null> {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV !== "development") {
     return null;
   }
   const loginId = normalizeLoginId(params.loginId);
@@ -4049,7 +4056,7 @@ export async function ensurePlatformAdminAccount(params: {
  * 로컬(dev)에서는 Firestore에 해당 사용자 문서가 있으면 Firestore를 우선해 JSON 신청과 이중 저장을 피한다.
  */
 async function shouldPersistClientApplicationsToFirestore(userId: string): Promise<boolean> {
-  if (process.env.NODE_ENV === "production") return true;
+  if (process.env.NODE_ENV !== "development") return true;
   if (!isFirestoreUsersBackendConfigured()) return false;
   try {
     const u = await firestoreGetUserById(userId.trim());
@@ -4291,7 +4298,7 @@ export async function updateClientApplicationStatus(
     rejectedReason?: string | null;
   }
 ): Promise<ClientApplication | null> {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV !== "development") {
     return updateClientApplicationStatusFirestore(applicationId, params);
   }
 
@@ -4321,10 +4328,10 @@ export const getClientStatusByUserId = cache(async function getClientStatusByUse
       if (st != null) return st;
     } catch (e) {
       console.warn("[getClientStatusByUserId] Firestore 조회 실패", e);
-      if (process.env.NODE_ENV === "production") return null;
+      if (process.env.NODE_ENV !== "development") return null;
     }
   }
-  if (process.env.NODE_ENV === "production") return null;
+  if (process.env.NODE_ENV !== "development") return null;
   const store = await readLocalJsonAggregate();
   const apps = store.clientApplications.filter((a) => a.userId === uid);
   if (apps.length === 0) return null;
@@ -4398,7 +4405,7 @@ function membershipStateOfOrg(org: ClientOrganizationStored): "NONE" | "ACTIVE" 
 /** 개발용 로컬 aggregate — Firestore 미설정·조회 실패 시 클라이언트 대시보드 정책만 보강 */
 async function getClientOrganizationByUserIdFromLocalStore(userId: string): Promise<ClientOrganizationStored | null> {
   const uid = userId.trim();
-  if (!uid || process.env.NODE_ENV === "production") return null;
+  if (!uid || process.env.NODE_ENV !== "development") return null;
   const store = await readLocalJsonAggregate();
   const canonical = resolveCanonicalUserId(store, uid);
   return (
@@ -4423,13 +4430,13 @@ export const resolveClientOrganizationForDashboardPolicy = cache(async function 
       } else {
         console.warn("[getClientDashboardPolicy] Firestore 미사용·조직 조회 생략, 로컬 JSON 폴백");
       }
-      if (process.env.NODE_ENV !== "production") {
+      if (process.env.NODE_ENV === "development") {
         return getClientOrganizationByUserIdFromLocalStore(uid);
       }
       return null;
     }
   }
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV === "development") {
     return getClientOrganizationByUserIdFromLocalStore(uid);
   }
   return null;
@@ -4889,6 +4896,9 @@ export async function getClientVenueIntroByUserId(userId: string): Promise<Clien
   if (useFirestoreUsersInProduction()) {
     return getClientVenueIntroByUserIdFirestore(userId);
   }
+  if (process.env.NODE_ENV !== "development") {
+    return null;
+  }
   const store = await readLocalJsonAggregate();
   const canonical = resolveCanonicalUserId(store, userId.trim());
   return store.clientVenueIntros.find((o) => o.clientUserId === canonical) ?? null;
@@ -4905,6 +4915,9 @@ export async function upsertClientVenueIntroForUser(
 ): Promise<ClientVenueIntroStored> {
   if (useFirestoreUsersInProduction()) {
     return upsertClientVenueIntroForUserFirestore(userId, params);
+  }
+  if (process.env.NODE_ENV !== "development") {
+    throw new Error("CLIENT_VENUE_INTRO_PERSISTENCE_REQUIRES_FIRESTORE");
   }
   const store = await readLocalJsonAggregate();
   const canonical = resolveCanonicalUserId(store, userId.trim());
@@ -4976,7 +4989,7 @@ export async function getSiteVenuesBoardRows(): Promise<SiteVenueBoardRow[]> {
         feeCategory,
         pricingType,
         introLine,
-        thumbnailUrl: reps[0] || cover || null,
+        thumbnailUrl: resolveSiteImageListThumbnailUrl(reps[0] || cover || "") ?? null,
         address: org.address?.trim() || null,
         phone: org.phone?.trim() || null,
         website: org.website?.trim() || null,
@@ -5052,7 +5065,6 @@ export type SiteVenueDetail = {
 };
 
 export async function getSiteVenueDetailById(venueIdRaw: string): Promise<SiteVenueDetail | null> {
-  const store = await readLocalJsonAggregate();
   const venueId = venueIdRaw.trim();
   if (!venueId) return null;
   const orgs = await listApprovedClientOrganizationsFirestore({ status: "ACTIVE", clientType: "all" });
@@ -5067,7 +5079,7 @@ export async function getSiteVenueDetailById(venueIdRaw: string): Promise<SiteVe
         (x.slug === venueId || x.id === venueId)
     ) ?? null;
   if (!org) return null;
-  const intro = store.clientVenueIntros.find((x) => x.clientUserId === org.clientUserId) ?? null;
+  const intro = await getClientVenueIntroByUserId(org.clientUserId);
   const ts = parseTypeSpecific("VENUE", org.typeSpecificJson ?? null);
   const vs = ts as VenueSpecific;
   const reps = normalizeRepresentativeImageUrls(vs.representativeImageUrls);
@@ -5131,7 +5143,7 @@ export async function getApplicationSummaries(): Promise<
     user: DevUser | null;
   }>
 > {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV !== "development") {
     return getApplicationSummariesFirestore();
   }
 
@@ -5632,7 +5644,9 @@ export async function syncActiveTournamentCardSnapshotStatusBadge(tournamentId: 
   const cardWs = resolveTournamentPublishedCardsWriteStrategy();
   const tournament = isFirestoreUsersBackendConfigured()
     ? await (await import("./firestore-tournaments")).getTournamentByIdFirestore(id)
-    : (await readLocalJsonAggregate()).tournaments.find((t) => t.id === id);
+    : process.env.NODE_ENV === "development"
+      ? (await readLocalJsonAggregate()).tournaments.find((t) => t.id === id)
+      : null;
   if (!tournament) return;
   const badge = String(normalizeTournamentStatusBadge(tournament.statusBadge));
   const now = new Date().toISOString();
@@ -6155,12 +6169,12 @@ export async function replaceSettlementLedgerLines(params: {
   return { ok: true };
 }
 
-export function buildProtectedProofImageUrl(imageId: string, variant: "original" | "w320" | "w640"): string {
+export function buildProtectedProofImageUrl(imageId: string, variant: "original" | "w160" | "w320" | "w640"): string {
   return `/api/proof-images/${encodeURIComponent(imageId)}?variant=${variant}`;
 }
 
 /** 대회 포스터 등 사이트 공개 페이지용 이미지 URL — `<img src>`용 바이너리 경로(쿼리 없음) */
-export function buildSitePublicImageUrl(imageId: string, variant: "original" | "w320" | "w640"): string {
+export function buildSitePublicImageUrl(imageId: string, variant: "original" | "w160" | "w320" | "w640"): string {
   return `/site-images/${variant}/${encodeURIComponent(imageId.trim())}`;
 }
 
@@ -6203,59 +6217,8 @@ export function formatTournamentScheduleLabel(tournament: Pick<Tournament, "date
   return sorted.map(appendKoreanWeekday).join(", ");
 }
 
-/** 저장값이 과거 API 경로인 경우 `<img src>`용 `/site-images/{variant}/{id}` 로 정규화 */
-export function resolveSitePosterDisplayUrl(posterUrl: string | null | undefined): string | null {
-  if (typeof posterUrl !== "string") return null;
-  const trimmed = posterUrl.trim();
-  if (!trimmed) return null;
-
-  if (trimmed.startsWith("/api/site-images/")) {
-    const hashless = trimmed.split("#")[0] ?? trimmed;
-    const q = hashless.indexOf("?");
-    const pathPart = q >= 0 ? hashless.slice(0, q) : hashless;
-    const idRaw = pathPart.replace(/^\/api\/site-images\//, "").trim();
-    if (idRaw) {
-      const id = decodeURIComponent(idRaw);
-      const sp = new URLSearchParams(q >= 0 ? hashless.slice(q + 1) : "");
-      const vr = sp.get("variant");
-      const v = vr === "original" || vr === "w320" || vr === "w640" ? vr : "w640";
-      return `/site-images/${v}/${encodeURIComponent(id)}`;
-    }
-  }
-
-  if (trimmed.startsWith("/api/proof-images/")) {
-    const idMatch = trimmed.match(/^\/api\/proof-images\/([^/?#]+)/);
-    const vMatch = trimmed.match(/[?&]variant=(original|w320|w640)/);
-    const id = idMatch?.[1] ? decodeURIComponent(idMatch[1]) : "";
-    const v = (vMatch?.[1] as "original" | "w320" | "w640" | undefined) ?? "w640";
-    if (id) return `/site-images/${v}/${encodeURIComponent(id)}`;
-  }
-
-  return trimmed;
-}
-
 export function extractProofImageIdFromPosterUrl(url: string): string | null {
-  const trimmed = url.trim();
-  const fromFile = trimmed.match(/\/site-images\/(?:original|w320|w640)\/([^/?#]+)/);
-  if (fromFile?.[1]) return decodeURIComponent(fromFile[1]);
-  const fromProof = trimmed.match(/\/api\/proof-images\/([^/?]+)/);
-  if (fromProof?.[1]) return decodeURIComponent(fromProof[1]);
-  const fromSite = trimmed.match(/\/api\/site-images\/([^/?]+)/);
-  if (fromSite?.[1]) return decodeURIComponent(fromSite[1]);
-  try {
-    const u = new URL(trimmed);
-    if (u.hostname !== "firebasestorage.googleapis.com") return null;
-    const m = u.pathname.match(/\/o\/(.+)$/);
-    if (!m?.[1]) return null;
-    const decoded = decodeURIComponent(m[1]);
-    const parts = decoded.split("/");
-    if (parts[0] === "proof-images" && parts.length >= 3 && /^[0-9a-f-]{36}$/i.test(parts[1]!)) {
-      return parts[1]!.toLowerCase();
-    }
-  } catch {
-    return null;
-  }
-  return null;
+  return extractProofImageIdFromSiteImageUrl(url);
 }
 
 /** 대회 포스터 등 사이트에서 비로그인으로 열람 가능한 이미지인지 (메타 또는 대회 posterImageUrl 기준) */
@@ -6275,6 +6238,9 @@ export async function isSiteImagePubliclyAccessible(imageId: string): Promise<bo
       return extractProofImageIdFromPosterUrl(poster) === normalized;
     });
   }
+  if (process.env.NODE_ENV !== "development") {
+    return false;
+  }
   const store = await readLocalJsonAggregate();
   return store.tournaments.some((t) => {
     const poster = t.posterImageUrl;
@@ -6289,6 +6255,7 @@ export async function createProofImageAsset(params: {
   originalExt: "jpg" | "png" | "webp";
   sitePublic?: boolean;
   storageOriginalUrl?: string;
+  storageW160Url?: string;
   storageW320Url?: string;
   storageW640Url?: string;
 }): Promise<{ ok: true; asset: ProofImageAsset } | { ok: false; error: string }> {
@@ -6304,22 +6271,25 @@ export async function createProofImageAsset(params: {
   }
   const hasAnyStorageParam =
     (typeof params.storageOriginalUrl === "string" && params.storageOriginalUrl.trim() !== "") ||
+    (typeof params.storageW160Url === "string" && params.storageW160Url.trim() !== "") ||
     (typeof params.storageW320Url === "string" && params.storageW320Url.trim() !== "") ||
     (typeof params.storageW640Url === "string" && params.storageW640Url.trim() !== "");
 
   let storagePatch: {
     storageOriginalUrl: string;
+    storageW160Url: string;
     storageW320Url: string;
     storageW640Url: string;
   } | null = null;
   if (hasAnyStorageParam) {
     const storageOriginalUrl = normalizeOptionalHttpsUrl(params.storageOriginalUrl);
+    const storageW160Url = normalizeOptionalHttpsUrl(params.storageW160Url);
     const storageW320Url = normalizeOptionalHttpsUrl(params.storageW320Url);
     const storageW640Url = normalizeOptionalHttpsUrl(params.storageW640Url);
-    if (!storageOriginalUrl || !storageW320Url || !storageW640Url) {
+    if (!storageOriginalUrl || !storageW160Url || !storageW320Url || !storageW640Url) {
       return { ok: false, error: "증빙 이미지 Storage URL이 완전하지 않습니다." };
     }
-    storagePatch = { storageOriginalUrl, storageW320Url, storageW640Url };
+    storagePatch = { storageOriginalUrl, storageW160Url, storageW320Url, storageW640Url };
   }
 
   const list = await loadProofImageAssetsList();
@@ -6425,6 +6395,9 @@ export async function createOutlinePdfAsset(params: {
 export async function getOutlinePdfAssetById(pdfId: string): Promise<OutlinePdfAsset | null> {
   const normalized = pdfId.trim();
   if (!normalized) return null;
+  if (process.env.NODE_ENV !== "development") {
+    return null;
+  }
   const store = await readLocalJsonAggregate();
   return store.outlinePdfAssets.find((item) => item.id === normalized) ?? null;
 }
@@ -6436,22 +6409,40 @@ export async function canUserAccessOutlinePdfAsset(params: {
 }): Promise<boolean> {
   const id = params.pdfId.trim();
   if (!id) return false;
-  const store = await readLocalJsonAggregate();
-  const canonical = resolveCanonicalUserId(store, params.userId.trim());
   if (params.userRole === "PLATFORM") return true;
+  const canonical = params.userId.trim();
+  if (process.env.NODE_ENV !== "development" && isFirestoreUsersBackendConfigured()) {
+    const url = buildOutlinePdfPublicUrl(id);
+    const { listAllTournamentsFirestore } = await import("./firestore-tournaments");
+    const all = await listAllTournamentsFirestore();
+    return all.some((t) => t.outlinePdfUrl === url && t.createdBy === canonical);
+  }
+  if (process.env.NODE_ENV !== "development") {
+    return false;
+  }
+  const store = await readLocalJsonAggregate();
+  const canonicalResolved = resolveCanonicalUserId(store, canonical);
   const asset = store.outlinePdfAssets.find((a) => a.id === id);
   if (!asset) return false;
-  if (asset.uploaderUserId === canonical) return true;
+  if (asset.uploaderUserId === canonicalResolved) return true;
   const url = buildOutlinePdfPublicUrl(asset.id);
-  return store.tournaments.some((t) => t.createdBy === canonical && t.outlinePdfUrl === url);
+  return store.tournaments.some((t) => t.createdBy === canonicalResolved && t.outlinePdfUrl === url);
 }
 
 /** 대회 데이터에 해당 PDF URL이 연결된 경우(사이트에서 요강 열람) */
 export async function isOutlinePdfLinkedToAnyTournament(pdfId: string): Promise<boolean> {
   const id = pdfId.trim();
   if (!id) return false;
-  const store = await readLocalJsonAggregate();
   const url = buildOutlinePdfPublicUrl(id);
+  if (isFirestoreUsersBackendConfigured()) {
+    const { listAllTournamentsFirestore } = await import("./firestore-tournaments");
+    const all = await listAllTournamentsFirestore();
+    return all.some((t) => t.outlinePdfUrl === url);
+  }
+  if (process.env.NODE_ENV !== "development") {
+    return false;
+  }
+  const store = await readLocalJsonAggregate();
   return store.tournaments.some((t) => t.outlinePdfUrl === url);
 }
 
@@ -6460,8 +6451,28 @@ export async function isOutlinePdfLinkedForPublicSite(pdfId: string): Promise<bo
   const id = pdfId.trim();
   if (!id) return false;
   if (await isOutlinePdfLinkedToAnyTournament(id)) return true;
-  const store = await readLocalJsonAggregate();
   const url = buildOutlinePdfPublicUrl(id);
+  if (process.env.NODE_ENV !== "development" && isFirestoreUsersBackendConfigured()) {
+    const orgs = await listApprovedClientOrganizationsFirestore({ status: "ACTIVE", clientType: "all" });
+    for (const org of orgs) {
+      if (
+        org.type !== "VENUE" ||
+        org.approvalStatus !== "APPROVED" ||
+        org.status !== "ACTIVE" ||
+        !org.isPublished ||
+        !org.setupCompleted
+      ) {
+        continue;
+      }
+      const intro = await getClientVenueIntroByUserIdFirestore(org.clientUserId);
+      if (intro?.outlinePdfUrl === url) return true;
+    }
+    return false;
+  }
+  if (process.env.NODE_ENV !== "development") {
+    return false;
+  }
+  const store = await readLocalJsonAggregate();
   for (const intro of store.clientVenueIntros) {
     if (intro.outlinePdfUrl !== url) continue;
     const org = await getClientOrganizationByUserIdFirestore(intro.clientUserId);
@@ -6481,6 +6492,14 @@ export async function isOutlinePdfLinkedForPublicSite(pdfId: string): Promise<bo
 export async function getTournamentApplicationByProofImageId(imageId: string): Promise<TournamentApplication | null> {
   const normalized = imageId.trim();
   if (!normalized) return null;
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-applications")).getTournamentApplicationByProofImageIdFirestore(
+      normalized,
+    );
+  }
+  if (process.env.NODE_ENV !== "development") {
+    return null;
+  }
   const store = await readLocalJsonAggregate();
   const item = store.tournamentApplications.find((application) => application.proofImageId === normalized) ?? null;
   if (!item) return null;
@@ -6584,6 +6603,9 @@ export async function listTournamentApplicationsByTournamentId(
       tournamentId
     );
   }
+  if (process.env.NODE_ENV !== "development") {
+    return [];
+  }
   const store = await readLocalJsonAggregate();
   return store.tournamentApplications
     .filter((item) => item.tournamentId === tournamentId)
@@ -6613,6 +6635,9 @@ export async function listTournamentApplicationsByUserId(userId: string): Promis
   if (!normalizedUserId) return [];
   if (isFirestoreUsersBackendConfigured()) {
     return (await import("./firestore-tournament-applications")).listTournamentApplicationsByUserIdFirestore(userId);
+  }
+  if (process.env.NODE_ENV !== "development") {
+    return [];
   }
   const store = await readLocalJsonAggregate();
   const canonicalUserId = resolveCanonicalUserId(store, normalizedUserId);
@@ -6661,6 +6686,9 @@ export async function listDeduplicatedApplicantsForClientOwner(params: {
   if (useFirestoreUsersInProduction()) {
     const { listDeduplicatedApplicantsForClientOwnerFirestore } = await import("./firestore-tournament-applications");
     return listDeduplicatedApplicantsForClientOwnerFirestore(params);
+  }
+  if (process.env.NODE_ENV !== "development") {
+    return [];
   }
   const store = await readLocalJsonAggregate();
   const ownerUserId = resolveCanonicalUserId(store, params.ownerUserId.trim());
@@ -6726,6 +6754,9 @@ export async function filterUserIdsWithMarketingPushConsent(userIds: string[]): 
   if (useFirestoreUsersInProduction()) {
     return firestoreFilterUserIdsWithMarketingPushConsentFs(userIds);
   }
+  if (process.env.NODE_ENV !== "development") {
+    return [];
+  }
   const store = await readLocalJsonAggregate();
   return filterUserIdsWithMarketingPushConsentInStore(store, userIds);
 }
@@ -6747,8 +6778,6 @@ export async function createReannounceNotifications(params: {
   const rawIds = [...new Set(params.targetUserIds.map((id) => String(id).trim()).filter(Boolean))];
   if (rawIds.length === 0) return { ok: false, error: "수신자를 선택해 주세요." };
 
-  const store = await readLocalJsonAggregate();
-
   if (useFirestoreUsersInProduction()) {
     for (const id of rawIds) {
       const u = await firestoreGetUserById(id);
@@ -6760,23 +6789,14 @@ export async function createReannounceNotifications(params: {
     if (consentIds.length === 0) {
       return { ok: false, error: "마케팅 푸시 수신에 동의한 수신자가 없습니다." };
     }
-    const now = new Date().toISOString();
-    let count = 0;
-    for (const canonicalUserId of consentIds) {
-      store.notifications.push({
-        id: randomUUID(),
-        userId: canonicalUserId,
-        title,
-        message,
-        relatedTournamentId: null,
-        createdAt: now,
-        isRead: false,
-      });
-      count += 1;
-    }
-    await writeLocalJsonAggregate(store);
-    return { ok: true, count };
+    return { ok: false, error: "재알림 저장은 로컬 개발 환경에서만 지원됩니다." };
   }
+
+  if (process.env.NODE_ENV !== "development") {
+    return { ok: false, error: "재알림 저장은 로컬 개발 환경에서만 지원됩니다." };
+  }
+
+  const store = await readLocalJsonAggregate();
 
   const userIdSet = new Set(store.users.map((u) => u.id));
   for (const id of rawIds) {
@@ -7675,7 +7695,7 @@ export async function updateTournamentApplicationStatus(params: {
 export async function listNotificationsByUserId(userId: string, limit = 20): Promise<UserNotification[]> {
   const normalizedUserId = userId.trim();
   if (!normalizedUserId) return [];
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV !== "development") {
     return [];
   }
   const store = await readLocalJsonAggregate();
@@ -7692,7 +7712,7 @@ export async function listNotificationsByUserId(userId: string, limit = 20): Pro
 export async function countUnreadNotificationsByUserId(userId: string): Promise<number> {
   const normalizedUserId = userId.trim();
   if (!normalizedUserId) return 0;
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV !== "development") {
     return 0;
   }
   const store = await readLocalJsonAggregate();
@@ -7711,7 +7731,7 @@ export async function markNotificationAsRead(params: {
   const userId = params.userId.trim();
   const notificationId = params.notificationId.trim();
   if (!userId || !notificationId) return null;
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV !== "development") {
     const now = new Date().toISOString();
     return {
       id: notificationId,
@@ -7737,7 +7757,7 @@ export async function markNotificationAsRead(params: {
 export async function markAllNotificationsAsReadForUser(userId: string): Promise<{ updated: number }> {
   const normalizedUserId = userId.trim();
   if (!normalizedUserId) return { updated: 0 };
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV !== "development") {
     return { updated: 0 };
   }
   const store = await readLocalJsonAggregate();
@@ -7758,7 +7778,7 @@ export async function markAllNotificationsAsReadForUser(userId: string): Promise
 export async function getSitePageBuilderDraftByPageId(pageId: string): Promise<SitePageBuilderDraft | null> {
   const normalizedPageId = pageId.trim();
   if (!normalizedPageId) return null;
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV !== "development") {
     return null;
   }
   const store = await readLocalJsonAggregate();
@@ -7819,7 +7839,7 @@ export async function getSitePageBuilderPublishedByPageId(
 ): Promise<SitePageBuilderPublishedPage | null> {
   const normalizedPageId = pageId.trim();
   if (!normalizedPageId) return null;
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV !== "development") {
     return null;
   }
   const store = await readLocalJsonAggregate();
@@ -8084,7 +8104,7 @@ export const COMMUNITY_PRIMARY_BOARD_KEYS: SiteCommunityBoardKey[] = ["free", "q
 
 function mapPostToListItem(p: CommunityBoardPost): CommunityPostListItem {
   const imageUrls = normalizeCommunityPostImageUrls(p.imageUrls);
-  const thumbnailUrl = imageUrls.length > 0 ? imageUrls[0]! : null;
+  const thumbnailUrl = imageUrls.length > 0 ? resolveSiteImageListThumbnailUrl(imageUrls[0]!) : null;
   return {
     id: p.id,
     boardType: p.boardType,
@@ -8565,7 +8585,7 @@ export async function getTournamentDateLocationMetaForPublishedCards(
       location: typeof tour.location === "string" ? tour.location : "",
     };
   }
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV !== "development") {
     return { date: "", location: "" };
   }
   const store = await readLocalJsonAggregate();
@@ -9488,7 +9508,7 @@ export async function listTournamentSnapshotsForMainSite(options?: {
     if (isFirestoreUsersBackendConfigured()) {
       const { getTournamentDateLocationFieldsByIdsFirestore } = await import("./firestore-tournaments");
       metaByTournamentId = await getTournamentDateLocationFieldsByIdsFirestore([...tournamentIdsNeedingMeta]);
-    } else if (process.env.NODE_ENV !== "production") {
+    } else if (process.env.NODE_ENV === "development") {
       const store = await readLocalJsonAggregate();
       for (const id of tournamentIdsNeedingMeta) {
         metaByTournamentId.set(id, tournamentDateLocationMeta(store, id));
