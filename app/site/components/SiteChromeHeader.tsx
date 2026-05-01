@@ -3,6 +3,11 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  isPublicSiteMainHomePathname,
+  isPublicSiteTournamentsHubPathname,
+  isPublicSiteVenuesHubPathname,
+} from "../lib/site-root-swipe-order";
 import VenuesDistanceNavLink from "./VenuesDistanceNavLink";
 import type { SiteLayoutMenuItem } from "../../../lib/types/entities";
 import type { PcSiteHeaderAdminEntry } from "../lib/site-pc-header-admin";
@@ -41,18 +46,14 @@ function isSiteMainHubNavHref(href: string): boolean {
   return SITE_MAIN_HUB_NAV_PATHS.has(p);
 }
 
-/** `/`·`/site` 공개 메인 — 관리자 헤더 링크는 노출하지 않음(진입은 URL 직접·FAB·마이페이지 등) */
-function isPublicSiteMainHomePathname(pathname: string): boolean {
-  const raw = pathname.split("?")[0] ?? "";
-  const p = raw.length > 1 && raw.endsWith("/") ? raw.slice(0, -1) : raw;
-  return p === "/" || p === "/site";
-}
-
 /**
- * 커뮤니티가 아닐 때: 기본 동작(Next 기본 prefetch).
- * 커뮤니티일 때: 주요 허브만 동일, 그 외(관리자 진입 등)는 prefetch 끔.
+ * 메인 홈·대회/클럽 허브 전역(목록·상세·신청 등): 타 허브 RSC 선로딩 금지.
+ * 그 외: 커뮤니티가 아닐 때 Next 기본 prefetch, 커뮤니티일 때는 주요 허브만 동일·그 외는 끔.
  */
 function prefetchPropForHeaderLink(pathname: string, linkHref: string): boolean | undefined {
+  if (isPublicSiteMainHomePathname(pathname)) return false;
+  if (isPublicSiteTournamentsHubPathname(pathname)) return false;
+  if (isPublicSiteVenuesHubPathname(pathname)) return false;
   if (!pathname.startsWith("/site/community")) return undefined;
   return isSiteMainHubNavHref(linkHref) ? undefined : false;
 }

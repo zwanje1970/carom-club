@@ -27,7 +27,7 @@ export default async function TournamentOutlineViewPage({
 
   const back = (
     <div className="v3-row" style={{ gap: "0.5rem" }}>
-      <Link className="v3-btn" href={`/site/tournaments/${id}`} style={{ padding: "0.5rem 0.9rem" }}>
+      <Link prefetch={false} className="v3-btn" href={`/site/tournaments/${id}`} style={{ padding: "0.5rem 0.9rem" }}>
         ← 대회 상세
       </Link>
     </div>

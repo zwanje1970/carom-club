@@ -45,7 +45,7 @@ export default function SiteTournamentsDistanceShell({ rows, searchParams, curre
           <ul className="site-board-card-list">
             {rows.map((tournament) => (
               <li key={tournament.id} className="site-board-card">
-                <Link href={`/site/tournaments/${tournament.id}`}>
+                <Link prefetch={false} href={`/site/tournaments/${tournament.id}`}>
                   <div className="site-tournament-card-main">
                     <span className={tournamentStatusBadgeClassName(tournament.statusBadge)}>
                       {tournament.statusBadge}

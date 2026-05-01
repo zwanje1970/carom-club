@@ -168,6 +168,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
             ) : (
               <Link
                 href={item.href}
+                prefetch={false}
                 className={styles.sampleMainCardShortcut}
                 {...{ [SITE_SCROLL_SHORTCUT]: "" }}
                 tabIndex={0}
@@ -292,6 +293,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
         ) : (
           <Link
             href={item.href}
+            prefetch={false}
             className={styles.sampleMainCardShortcut}
             {...{ [SITE_SCROLL_SHORTCUT]: "" }}
             tabIndex={selected ? 0 : -1}

@@ -186,10 +186,10 @@ export default function SiteTournamentApplyPage() {
       {message ? <p className="v3-muted">{message}</p> : null}
 
       <div className="v3-row">
-        <Link className="v3-btn" href={`/site/tournaments/${tournamentId}`}>
+        <Link prefetch={false} className="v3-btn" href={`/site/tournaments/${tournamentId}`}>
           상세로
         </Link>
-        <Link className="v3-btn" href="/site/tournaments">
+        <Link prefetch={false} className="v3-btn" href="/site/tournaments">
           목록으로
         </Link>
       </div>

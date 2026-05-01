@@ -247,7 +247,7 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
         <ul className="site-board-card-list" style={{ margin: 0 }}>
           {ordered.map((row) => (
             <li key={row.venueId} className="site-board-card site-board-card--venue">
-              <Link href={`/site/venues/${row.venueId}`}>
+              <Link prefetch={false} href={`/site/venues/${row.venueId}`}>
                 <div className="site-venue-card-main">
                   {(() => {
                     const cat = categoryLabel(row.venueCategory);

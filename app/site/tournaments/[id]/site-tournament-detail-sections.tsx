@@ -155,7 +155,7 @@ export default function SiteTournamentDetailSections({
           <span className={statusClass}>{tournament.statusBadge}</span>
           {tournament.summary?.trim() ? <p className="site-detail-hero-summary">{tournament.summary.trim()}</p> : null}
           {audience === "site" && applyHref ? (
-            <Link className="primary-button primary-button--block" href={applyHref}>
+            <Link prefetch={false} className="primary-button primary-button--block" href={applyHref}>
               참가신청
             </Link>
           ) : null}
@@ -241,13 +241,13 @@ export default function SiteTournamentDetailSections({
               outlinePdf ? (
                 <SiteOutlineDocumentCard url={outlinePdf} fileKind={outlinePdfFileKind} caption="요강 보기" />
               ) : (
-                <Link className="secondary-button" href={`${outlineBasePath}/outline`}>
+                <Link prefetch={false} className="secondary-button" href={`${outlineBasePath}/outline`}>
                   대회요강 보기
                 </Link>
               )
             ) : null}
             {venueHref && audience === "site" ? (
-              <Link className="secondary-button" href={venueHref}>
+              <Link prefetch={false} className="secondary-button" href={venueHref}>
                 시합장 보기
               </Link>
             ) : null}
@@ -255,7 +255,7 @@ export default function SiteTournamentDetailSections({
         </section>
 
         <div className="site-detail-actions-row">
-          <Link className="secondary-button" href={listBackHref} style={{ flex: "1 1 100%", maxWidth: "100%" }}>
+          <Link prefetch={false} className="secondary-button" href={listBackHref} style={{ flex: "1 1 100%", maxWidth: "100%" }}>
             목록으로
           </Link>
         </div>
@@ -289,7 +289,7 @@ export default function SiteTournamentDetailSections({
           <p style={{ whiteSpace: "pre-wrap", marginTop: "0.5rem" }}>{tournament.summary}</p>
         ) : null}
         {audience === "site" && applyHref ? (
-          <Link className="v3-btn" href={applyHref} style={{ padding: "0.5rem 0.9rem" }}>
+          <Link prefetch={false} className="v3-btn" href={applyHref} style={{ padding: "0.5rem 0.9rem" }}>
             참가신청
           </Link>
         ) : null}
@@ -385,6 +385,7 @@ export default function SiteTournamentDetailSections({
               <SiteOutlineDocumentCard url={outlinePdf} fileKind={outlinePdfFileKind} caption="요강 보기" />
             ) : (
               <Link
+                prefetch={false}
                 className="v3-btn"
                 href={`${outlineBasePath}/outline`}
                 style={{ padding: "0.55rem 1rem", fontWeight: 600, display: "inline-flex" }}
@@ -395,6 +396,7 @@ export default function SiteTournamentDetailSections({
           ) : null}
           {venueHref && audience === "site" ? (
             <Link
+              prefetch={false}
               className="v3-btn"
               href={venueHref}
               style={{ padding: "0.55rem 1rem", fontWeight: 600, display: "inline-flex" }}
@@ -406,7 +408,7 @@ export default function SiteTournamentDetailSections({
       </section>
 
       <div className="v3-row">
-        <Link className="v3-btn" href={listBackHref}>
+        <Link prefetch={false} className="v3-btn" href={listBackHref}>
           목록으로
         </Link>
       </div>

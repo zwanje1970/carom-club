@@ -22,6 +22,41 @@ export function normalizeSiteRootPathname(pathname: string): string {
   return pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
 }
 
+/** 공개 메인 홈(`/`, `/site`) — 이 경로에서는 타 허브 RSC prefetch 비활성화 등에 사용 */
+export function isPublicSiteMainHomePathname(pathname: string): boolean {
+  const raw = pathname.split("?")[0] ?? "";
+  const p = normalizeSiteRootPathname(raw);
+  return p === "/" || p === "/site";
+}
+
+/** 공개 대회 **목록** 허브(`/site/tournaments`만). 상세(`/site/tournaments/:id`)는 포함하지 않음 */
+export function isPublicSiteTournamentsListPathname(pathname: string): boolean {
+  const raw = pathname.split("?")[0] ?? "";
+  const p = normalizeSiteRootPathname(raw);
+  return p === "/site/tournaments";
+}
+
+/** 공개 클럽 **목록** 허브(`/site/venues`만). 상세(`/site/venues/:id`)는 포함하지 않음 */
+export function isPublicSiteVenuesListPathname(pathname: string): boolean {
+  const raw = pathname.split("?")[0] ?? "";
+  const p = normalizeSiteRootPathname(raw);
+  return p === "/site/venues";
+}
+
+/** 대회 허브: 목록·상세·신청·요강 등 `/site/tournaments` 전역 — 상·하단 허브 prefetch 끔 */
+export function isPublicSiteTournamentsHubPathname(pathname: string): boolean {
+  const raw = pathname.split("?")[0] ?? "";
+  const p = normalizeSiteRootPathname(raw);
+  return p === "/site/tournaments" || p.startsWith("/site/tournaments/");
+}
+
+/** 클럽 허브: 목록·상세 `/site/venues` 전역 — 상·하단 허브 prefetch 끔 */
+export function isPublicSiteVenuesHubPathname(pathname: string): boolean {
+  const raw = pathname.split("?")[0] ?? "";
+  const p = normalizeSiteRootPathname(raw);
+  return p === "/site/venues" || p.startsWith("/site/venues/");
+}
+
 /**
  * `window.location` 우선값 — RSC `children`과 `usePathname()`이 한 프레임 어긋날 수 있어
  * 루트 스와이프 prev/next 계산에는 쓰지 않는 것이 안전하다.

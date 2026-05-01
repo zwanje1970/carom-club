@@ -5,7 +5,13 @@ import { usePathname } from "next/navigation";
 import { useLayoutEffect } from "react";
 import VenuesDistanceNavLink from "../site/components/VenuesDistanceNavLink";
 import { isSiteMainSamplePathname } from "../site/lib/site-main-sample";
-import { normalizeSiteRootPathname, SITE_ROOT_SWIPE_NAV } from "../site/lib/site-root-swipe-order";
+import {
+  isPublicSiteMainHomePathname,
+  isPublicSiteTournamentsHubPathname,
+  isPublicSiteVenuesHubPathname,
+  normalizeSiteRootPathname,
+  SITE_ROOT_SWIPE_NAV,
+} from "../site/lib/site-root-swipe-order";
 
 function isInquiryDetailWithComposer(pathname: string): boolean {
   return (
@@ -40,6 +46,13 @@ export default function GlobalHomeButton() {
     });
   }, [pathname]);
 
+  const bottomNavPrefetch =
+    isPublicSiteMainHomePathname(pathname) ||
+    isPublicSiteTournamentsHubPathname(pathname) ||
+    isPublicSiteVenuesHubPathname(pathname)
+      ? false
+      : undefined;
+
   return (
     <div
       className="site-home-fab-root"
@@ -64,11 +77,17 @@ export default function GlobalHomeButton() {
             .join(" ");
           const inner = <span className="site-mobile-bottom-nav__label">{item.label}</span>;
           return item.href.startsWith("/site/venues") ? (
-            <VenuesDistanceNavLink key={item.href} href={item.href} className={cls} aria-current={active ? "page" : undefined}>
+            <VenuesDistanceNavLink
+              key={item.href}
+              href={item.href}
+              className={cls}
+              aria-current={active ? "page" : undefined}
+              prefetch={bottomNavPrefetch}
+            >
               {inner}
             </VenuesDistanceNavLink>
           ) : (
-            <Link key={item.href} href={item.href} className={cls} aria-current={active ? "page" : undefined}>
+            <Link key={item.href} href={item.href} className={cls} aria-current={active ? "page" : undefined} prefetch={bottomNavPrefetch}>
               {inner}
             </Link>
           );
