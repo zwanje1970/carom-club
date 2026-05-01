@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { Suspense } from "react";
 import AdminFabServerBridge from "../components/AdminFabServerBridge";
 import SiteGeoConsentUrlSanitizer from "./components/SiteGeoConsentUrlSanitizer";
+import SiteMypageLightChromeLayout from "./SiteMypageLightChromeLayout";
 import SitePublicChromeLayout from "./SitePublicChromeLayout";
 import { isPublicSiteMypageAreaPathname } from "./lib/site-root-swipe-order";
 
@@ -36,17 +37,28 @@ export default async function SiteLayout({
     headerList.get("x-invoke-path") ??
     headerList.get("x-matched-path") ??
     "";
-  const suppressAdminFab = isPublicSiteMypageAreaPathname(docPathnameFromNextLikeHeader(nextLike));
+  const isMypageArea = isPublicSiteMypageAreaPathname(docPathnameFromNextLikeHeader(nextLike));
 
   return (
     <>
-      <SitePublicChromeLayout>
-        <Suspense fallback={null}>
-          <SiteGeoConsentUrlSanitizer />
-        </Suspense>
-        {children}
-      </SitePublicChromeLayout>
-      {suppressAdminFab ? null : <AdminFabServerBridge />}
+      {isMypageArea ? (
+        <SiteMypageLightChromeLayout>
+          <Suspense fallback={null}>
+            <SiteGeoConsentUrlSanitizer />
+          </Suspense>
+          {children}
+        </SiteMypageLightChromeLayout>
+      ) : (
+        <>
+          <SitePublicChromeLayout>
+            <Suspense fallback={null}>
+              <SiteGeoConsentUrlSanitizer />
+            </Suspense>
+            {children}
+          </SitePublicChromeLayout>
+          <AdminFabServerBridge />
+        </>
+      )}
     </>
   );
 }
