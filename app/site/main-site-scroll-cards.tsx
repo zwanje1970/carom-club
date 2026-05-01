@@ -24,7 +24,53 @@ export type MainSiteScrollCardItem = {
    * 게시 카드와 동일 CSS(공통 토큰) 사용 — 광고 업로드 이미지 전용.
    */
   faceMatchPublishedScrollMetrics?: boolean;
+  /** 게시/광고 풀면레이아웃: HTML 텍스트(배지·제목·부가) — 이미지는 배경만 */
+  scrollFaceBadge?: string | null;
+  scrollFaceSubtitle?: string | null;
+  scrollFaceExtraLine1?: string | null;
+  scrollFaceExtraLine2?: string | null;
+  scrollFaceExtraLine3?: string | null;
+  scrollFaceTitleColor?: string | null;
+  scrollFaceMetaColor?: string | null;
+  scrollFaceStrongTextShadow?: boolean;
 };
+
+function publishedScrollBadgeClass(badge: string): string {
+  const b = badge.trim();
+  if (!b) return "site-board-status-badge site-board-status-badge--muted";
+  if (b === "광고") return "site-board-status-badge site-board-status-badge--muted";
+  if (b.includes("마감임박") || (b.includes("마감") && b.includes("임박")))
+    return "site-board-status-badge site-board-status-badge--urgent";
+  if (b.includes("마감")) return "site-board-status-badge site-board-status-badge--closed";
+  if (b.includes("종료")) return "site-board-status-badge site-board-status-badge--ended";
+  if (b.includes("모집") || b.includes("진행")) return "site-board-status-badge badge-status";
+  return "site-board-status-badge site-board-status-badge--muted";
+}
+
+function isDudMetaLine(s: string): boolean {
+  const t = s.trim();
+  if (!t) return true;
+  return /^[·\s.|\-–—]+$/u.test(t);
+}
+
+function publishedScrollMetaLines(
+  subtitle: string | null | undefined,
+  e1: string | null | undefined,
+  e2: string | null | undefined,
+  e3: string | null | undefined,
+): string[] {
+  const out: string[] = [];
+  const pushUnique = (s: string) => {
+    const t = s.trim();
+    if (!t || isDudMetaLine(t) || out.includes(t)) return;
+    out.push(t);
+  };
+  pushUnique(subtitle ?? "");
+  pushUnique(e1 ?? "");
+  pushUnique(e2 ?? "");
+  pushUnique(e3 ?? "");
+  return out.slice(0, 3);
+}
 
 type CardRowProps = {
   rowKey: string;
@@ -64,6 +110,18 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
     faceStyle.background = "linear-gradient(180deg, #1e293b 0%, #0f172a 100%)";
   }
 
+  const textShadowBase = item.scrollFaceStrongTextShadow
+    ? "0 1px 2px rgba(0,0,0,0.75), 0 2px 8px rgba(0,0,0,0.45)"
+    : "0 1px 2px rgba(0,0,0,0.65)";
+  const titleColor = item.scrollFaceTitleColor?.trim() || "#ffffff";
+  const metaColor = item.scrollFaceMetaColor?.trim() || "rgba(255,255,255,0.92)";
+  const metaLines = publishedScrollMetaLines(
+    item.scrollFaceSubtitle,
+    item.scrollFaceExtraLine1,
+    item.scrollFaceExtraLine2,
+    item.scrollFaceExtraLine3,
+  );
+
   return (
     <div
       className={`${styles.sampleMainCardSlot} ${selected ? styles.sampleMainCardSlotSelected : ""}`}
@@ -88,21 +146,50 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
         }
         style={faceStyle}
       >
-        {item.imageUrl?.trim() ? (
+        {usePublishedScrollLayout && item.imageUrl?.trim() ? (
+          <div className={styles.sampleMainCardPublishedInner}>
+            <img
+              src={item.imageUrl.trim()}
+              alt=""
+              className={styles.sampleMainCardPosterPublishedSnapshot}
+              decoding="async"
+              loading={lcpHeroImage ? "eager" : "lazy"}
+              {...(lcpHeroImage ? { fetchPriority: "high" as const } : {})}
+            />
+            <div className={styles.sampleMainCardPublishedOverlay} aria-hidden>
+              {item.scrollFaceBadge?.trim() ? (
+                <span className={publishedScrollBadgeClass(item.scrollFaceBadge.trim())}>
+                  {item.scrollFaceBadge.trim()}
+                </span>
+              ) : null}
+              <p
+                className={styles.sampleMainCardPublishedOverlayTitle}
+                style={{ color: titleColor, textShadow: textShadowBase }}
+              >
+                {item.title}
+              </p>
+              {metaLines.map((line, idx) => (
+                <p
+                  key={`${idx}-${line}`}
+                  className={styles.sampleMainCardPublishedOverlayMeta}
+                  style={{ color: metaColor, textShadow: textShadowBase }}
+                >
+                  {line}
+                </p>
+              ))}
+            </div>
+          </div>
+        ) : item.imageUrl?.trim() ? (
           <img
             src={item.imageUrl.trim()}
             alt=""
-            className={
-              usePublishedScrollLayout
-                ? styles.sampleMainCardPosterPublishedSnapshot
-                : styles.sampleMainCardPoster
-            }
+            className={styles.sampleMainCardPoster}
             decoding="async"
             loading={lcpHeroImage ? "eager" : "lazy"}
             {...(lcpHeroImage ? { fetchPriority: "high" as const } : {})}
           />
         ) : null}
-        {!item.faceIsFullPublishedSnapshot ? (
+        {!usePublishedScrollLayout ? (
           <div className={styles.sampleMainCardTitleOverlay}>{item.title}</div>
         ) : null}
         {item.external ? (

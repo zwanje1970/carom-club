@@ -87,27 +87,9 @@ async function SiteCommunityBoardListContent({
 
   const items = await listCommunityPostsForPublicSite(boardType, q ? { q } : undefined);
 
-  const boardEmptyCopy: Partial<
-    Record<SiteCommunityBoardKey, { emptyTitle: string; emptyDesc: string }>
-  > = {
-    free: {
-      emptyTitle: "아직 게시글이 없습니다",
-      emptyDesc: "가볍게 이야기나 정보를 남겨 보세요.",
-    },
-    qna: {
-      emptyTitle: "등록된 질문이 없습니다",
-      emptyDesc: "궁금한 점을 올리면 답변을 받을 수 있습니다.",
-    },
-    reviews: {
-      emptyTitle: "아직 후기가 없습니다",
-      emptyDesc: "대회나 연습 경험을 나눠 보세요.",
-    },
-  };
-  const emptyProps = boardEmptyCopy[boardType];
-
   return (
     <section className="site-site-gray-main v3-stack ui-community-page" data-community-board={boardType}>
-      <CommunityBoardPostList showRoomPrefix={false} items={items} {...emptyProps} />
+      <CommunityBoardPostList showRoomPrefix={false} items={items} />
     </section>
   );
 }

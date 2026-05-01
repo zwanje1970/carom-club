@@ -24,16 +24,31 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
     const external = item.linkType === "external" || /^https?:\/\//i.test(href);
     const published640 = (item.publishedCardImageUrl ?? "").trim();
     const published320 = (item.publishedCardImage320Url ?? "").trim();
-    const publishedScroll = published320 || published640;
-    if (publishedScroll) {
+    /** 메인 슬라이드: 640 우선(320은 목록 등 다른 경로 유지). 둘 다 없으면 게시 면 미사용 */
+    const publishedScrollBg = published640 || published320;
+    if (publishedScrollBg) {
+      const isAd = item.type === "ad";
+      const metaTint =
+        (item.cardFooterDateTextColor ?? "").trim() ||
+        (item.cardFooterPlaceTextColor ?? "").trim() ||
+        (item.cardDescriptionTextColor ?? "").trim() ||
+        null;
       return {
         id: item.snapshotId,
         href,
         title: item.title,
-        imageUrl: publishedScroll,
+        imageUrl: publishedScrollBg,
         faceCssBackground: null,
         external,
         faceIsFullPublishedSnapshot: true,
+        scrollFaceBadge: isAd ? "광고" : item.statusBadge?.trim() || null,
+        scrollFaceSubtitle: (item.subtitle ?? "").trim() || null,
+        scrollFaceExtraLine1: item.cardExtraLine1?.trim() || null,
+        scrollFaceExtraLine2: item.cardExtraLine2?.trim() || null,
+        scrollFaceExtraLine3: item.cardExtraLine3?.trim() || null,
+        scrollFaceTitleColor: item.cardTitleTextColor?.trim() || null,
+        scrollFaceMetaColor: metaTint,
+        scrollFaceStrongTextShadow: Boolean(item.cardTextShadowEnabled),
       };
     }
     const useBgImage = item.backgroundType !== "theme" && Boolean(item.image320Url?.trim());
@@ -51,7 +66,23 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
       imageUrl,
       faceCssBackground,
       external,
-      ...(item.type === "ad" && imageUrl ? { faceMatchPublishedScrollMetrics: true as const } : {}),
+      ...(item.type === "ad" && imageUrl
+        ? {
+            faceMatchPublishedScrollMetrics: true as const,
+            scrollFaceBadge: "광고" as const,
+            scrollFaceSubtitle: (item.subtitle ?? "").trim() || null,
+            scrollFaceExtraLine1: item.cardExtraLine1?.trim() || null,
+            scrollFaceExtraLine2: item.cardExtraLine2?.trim() || null,
+            scrollFaceExtraLine3: item.cardExtraLine3?.trim() || null,
+            scrollFaceTitleColor: item.cardTitleTextColor?.trim() || null,
+            scrollFaceMetaColor:
+              (item.cardFooterDateTextColor ?? "").trim() ||
+              (item.cardFooterPlaceTextColor ?? "").trim() ||
+              (item.cardDescriptionTextColor ?? "").trim() ||
+              null,
+            scrollFaceStrongTextShadow: Boolean(item.cardTextShadowEnabled),
+          }
+        : {}),
     };
   });
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useCallback, useLayoutEffect, useRef } from "react";
 import { TournamentStatusBadge, type TournamentPostStatus } from "./tournament-slide-card-status-badge";
 import styles from "./tournament-slide-card-previews.module.css";
@@ -126,6 +126,7 @@ function MediaStack({
   slideDeckSolidBackdrop,
   mainSlideAd,
   onRepImageLoad,
+  isImageCaptureMode,
 }: {
   variant: SlidePreviewVariant;
   item: TournamentSlidePreviewItem;
@@ -137,6 +138,8 @@ function MediaStack({
   /** 메인 슬라이드 광고 카드 — 텍스트 없음·상태배지 대신 AD 문자만 */
   mainSlideAd?: boolean;
   onRepImageLoad?: () => void;
+  /** 게시 PNG 캡처: AD 마크 등 글자만 숨김 */
+  isImageCaptureMode?: boolean;
 }) {
   const solidBackdrop = slideDeckSolidBackdrop?.trim();
   const cssBg = item.mediaBackground?.trim();
@@ -190,7 +193,11 @@ function MediaStack({
       ) : null}
       <div className={styles.statusBadgeWrap}>
         {mainSlideAd ? (
-          <span className={styles.adMark} aria-hidden>
+          <span
+            className={styles.adMark}
+            aria-hidden
+            style={isImageCaptureMode ? ({ visibility: "hidden" } satisfies CSSProperties) : undefined}
+          >
             AD
           </span>
         ) : (
@@ -214,6 +221,7 @@ function TournamentSlideCardPreview({
   tournamentPublishedHeightScale = true,
   editorCompactCardHeight = false,
   onRepImageLoad,
+  isImageCaptureMode = false,
 }: {
   item: TournamentSlidePreviewItem;
   variant: SlidePreviewVariant;
@@ -230,6 +238,8 @@ function TournamentSlideCardPreview({
   /** 게시카드 작성 미리보기·PNG 캡처: 카드 높이만 약 20% 축소(메인 live 미적용) */
   editorCompactCardHeight?: boolean;
   onRepImageLoad?: () => void;
+  /** true: 제목·부가·푸터·배지 글자만 숨김(레이아웃 유지) — html2canvas PNG용 */
+  isImageCaptureMode?: boolean;
 }) {
   const status = toStatus(item.statusBadge);
   const parsed = parseSubtitle(item.subtitle);
@@ -239,7 +249,12 @@ function TournamentSlideCardPreview({
   const leadColor = (item.cardLeadTextColor ?? "").trim();
   const titleColor = (item.cardTitleTextColor ?? "").trim();
   const descColor = (item.cardDescriptionTextColor ?? "").trim();
-  const statusBadge = <TournamentStatusBadge status={status} />;
+  const statusBadge = <TournamentStatusBadge status={status} hideLabel={isImageCaptureMode} />;
+  const capHide: CSSProperties | undefined = isImageCaptureMode ? { visibility: "hidden" } : undefined;
+  const mergeCap = (base?: CSSProperties): CSSProperties | undefined => {
+    if (!capHide) return base;
+    return base ? { ...base, ...capHide } : { ...capHide };
+  };
   const surfaceLayout: TournamentCardSurfaceLayout =
     item.cardSurfaceLayout === "full" ? "full" : "split";
   const footerDateColor = (item.cardFooterDateTextColor ?? "").trim();
@@ -261,7 +276,7 @@ function TournamentSlideCardPreview({
     .join(" ");
 
   const fullOverlayFooter = (
-    <div className={styles.fullSurfaceFooter}>
+    <div className={styles.fullSurfaceFooter} style={capHide}>
       <p className={styles.fullSurfaceFooterDate} style={fullFooterDateStyle}>
         {parsed.dateText}
       </p>
@@ -275,7 +290,7 @@ function TournamentSlideCardPreview({
   const splitPlaceStyle = footerPlaceColor ? { color: footerPlaceColor } : undefined;
 
   const splitFooter = (
-    <footer className={styles.cardFooter}>
+    <footer className={styles.cardFooter} style={capHide}>
       <p className={styles.footerDate} style={splitDateStyle}>
         {parsed.dateText}
       </p>
@@ -296,6 +311,7 @@ function TournamentSlideCardPreview({
           slideDeckSolidBackdrop={slideDeckSolidBackdrop}
           mainSlideAd={mainSlideAd}
           onRepImageLoad={onRepImageLoad}
+          isImageCaptureMode={isImageCaptureMode}
         >
           {mainSlideAd ? (
             <div className={styles.adCardMediaFill} aria-hidden />
@@ -304,25 +320,25 @@ function TournamentSlideCardPreview({
               <div className={styles.classicTop}>
                 <div className={styles.classicMain}>
                   {lead.length > 0 ? (
-                    <p className={styles.classicLead} style={leadColor ? { color: leadColor } : undefined}>
+                    <p className={styles.classicLead} style={mergeCap(leadColor ? { color: leadColor } : undefined)}>
                       {lead}
                     </p>
                   ) : null}
                   <h3
                     className={styles.classicTitle}
-                    style={titleColor ? { color: titleColor } : undefined}
+                    style={mergeCap(titleColor ? { color: titleColor } : undefined)}
                   >
                     {item.title.length > 0 ? item.title : "(제목)"}
                   </h3>
                   {description.length > 0 ? (
-                    <p className={styles.classicDesc} style={descColor ? { color: descColor } : undefined}>
+                    <p className={styles.classicDesc} style={mergeCap(descColor ? { color: descColor } : undefined)}>
                       {description}
                     </p>
                   ) : null}
                   {description2.length > 0 ? (
                     <p
                       className={styles.classicDescSecondary}
-                      style={descColor ? { color: descColor } : undefined}
+                      style={mergeCap(descColor ? { color: descColor } : undefined)}
                     >
                       {description2}
                     </p>
@@ -349,6 +365,7 @@ function TournamentSlideCardPreview({
           slideDeckSolidBackdrop={slideDeckSolidBackdrop}
           mainSlideAd={mainSlideAd}
           onRepImageLoad={onRepImageLoad}
+          isImageCaptureMode={isImageCaptureMode}
         >
           {mainSlideAd ? (
             <div className={styles.adCardMediaFill} aria-hidden />
@@ -356,22 +373,22 @@ function TournamentSlideCardPreview({
             <div className={styles.frameInner}>
               <div className={styles.frameCenter}>
                 {lead.length > 0 ? (
-                  <p className={styles.frameLead} style={leadColor ? { color: leadColor } : undefined}>
+                  <p className={styles.frameLead} style={mergeCap(leadColor ? { color: leadColor } : undefined)}>
                     {lead}
                   </p>
                 ) : null}
-                <h3 className={styles.frameTitle} style={titleColor ? { color: titleColor } : undefined}>
+                <h3 className={styles.frameTitle} style={mergeCap(titleColor ? { color: titleColor } : undefined)}>
                   {item.title.length > 0 ? item.title : "(제목)"}
                 </h3>
                 {description.length > 0 ? (
-                  <p className={styles.frameDesc} style={descColor ? { color: descColor } : undefined}>
+                  <p className={styles.frameDesc} style={mergeCap(descColor ? { color: descColor } : undefined)}>
                     {description}
                   </p>
                 ) : null}
                 {description2.length > 0 ? (
                   <p
                     className={styles.frameDescSecondary}
-                    style={descColor ? { color: descColor } : undefined}
+                    style={mergeCap(descColor ? { color: descColor } : undefined)}
                   >
                     {description2}
                   </p>
@@ -407,6 +424,7 @@ export function TournamentSnapshotCardView({
   repImageHighPriority,
   slideDeckSolidBackdrop,
   onRepImageLoad,
+  isImageCaptureMode = false,
 }: {
   item: SlideDeckItem;
   slideDeck?: boolean;
@@ -416,6 +434,8 @@ export function TournamentSnapshotCardView({
   repImageHighPriority?: boolean;
   slideDeckSolidBackdrop?: string;
   onRepImageLoad?: () => void;
+  /** true: 게시 PNG(html2canvas)용 — 글자만 숨김, 배경·레이아웃 유지 */
+  isImageCaptureMode?: boolean;
 }) {
   const previewItem = slideDeckItemToPreviewItem(item);
   const variant: SlidePreviewVariant = item.cardTemplate === "B" ? "frame" : "classic";
@@ -433,6 +453,7 @@ export function TournamentSnapshotCardView({
       tournamentPublishedHeightScale={true}
       editorCompactCardHeight={editorCompactCardHeight}
       onRepImageLoad={onRepImageLoad}
+      isImageCaptureMode={isImageCaptureMode}
     />
   );
   if (!href) return inner;

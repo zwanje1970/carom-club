@@ -239,8 +239,19 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
         ) : null}
         <ul className="site-board-card-list" style={{ margin: 0 }}>
           {ordered.map((row) => (
-            <li key={row.venueId} className="site-board-card">
+            <li key={row.venueId} className="site-board-card site-board-card--venue">
               <Link href={`/site/venues/${row.venueId}`}>
+                <div className="site-venue-list-thumb">
+                  {row.thumbnailUrl ? (
+                    <SiteListImage160
+                      src={row.thumbnailUrl}
+                      alt=""
+                      placeholderClassName="site-venue-list-thumb-placeholder"
+                    />
+                  ) : (
+                    <div className="site-venue-list-thumb-placeholder">이미지 없음</div>
+                  )}
+                </div>
                 <div className="site-venue-card-main">
                   <span className="site-venue-card-title">{row.name}</span>
                   {String(row.region ?? "").trim() ? (
@@ -265,19 +276,6 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
                       </div>
                     );
                   })()}
-                </div>
-                <div className="site-venue-list-thumb">
-                  {row.thumbnailUrl ? (
-                    <SiteListImage160
-                      src={row.thumbnailUrl}
-                      alt=""
-                      width={88}
-                      height={56}
-                      placeholderClassName="site-venue-list-thumb-placeholder"
-                    />
-                  ) : (
-                    <div className="site-venue-list-thumb-placeholder">이미지 없음</div>
-                  )}
                 </div>
               </Link>
             </li>

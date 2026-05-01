@@ -268,6 +268,7 @@ export default function ClientTournamentCardPublishV2Page() {
 
   const bgFileInputRef = useRef<HTMLInputElement>(null);
   const cardPublishCaptureRef = useRef<HTMLDivElement>(null);
+  const cardPublishCaptureForImageRef = useRef<HTMLDivElement>(null);
   /** 저장/게시 중복 요청 차단 — ref로 동기 가드 */
   const isPublishingRef = useRef(false);
 
@@ -517,9 +518,9 @@ export default function ClientTournamentCardPublishV2Page() {
         let body: Record<string, unknown> = built.body;
         if (!draftOnly) {
           try {
-            const el = cardPublishCaptureRef.current;
+            const el = cardPublishCaptureForImageRef.current;
             if (!el) {
-              setMessage("미리보기 카드 영역을 찾을 수 없어 게시 이미지를 만들 수 없습니다.");
+              setMessage("게시 이미지 캡처 영역을 찾을 수 없어 게시 이미지를 만들 수 없습니다.");
               return;
             }
             const { default: html2canvas } = await import("html2canvas");
@@ -671,6 +672,28 @@ export default function ClientTournamentCardPublishV2Page() {
                         editorCompactCardHeight
                         slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
                       />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className={editorStyles.cardPublishCaptureOffscreen} aria-hidden>
+            <div className={editorStyles.previewInner}>
+              <div className={editorStyles.previewSlideLayer}>
+                <div className={editorStyles.previewCardScaleHost}>
+                  <div className={editorStyles.previewCardScaleInner}>
+                    <div className={editorStyles.previewCardWrap}>
+                      <div ref={cardPublishCaptureForImageRef} className={editorStyles.cardPublishCaptureRoot}>
+                        <TournamentSnapshotCardView
+                          item={cardPublishSlidePreview}
+                          slideDeck
+                          templateCardLayout
+                          editorCompactCardHeight
+                          slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
+                          isImageCaptureMode
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

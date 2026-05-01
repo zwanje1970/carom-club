@@ -635,6 +635,7 @@ button.secondary-button.site-mypage-logout:hover,
   color: #64748b;
 }
 
+/* 클럽안내 기본(가로 썸네일) — 레거시·다른 경로 호환용 */
 .site-venue-list-thumb {
   width: 88px;
   min-width: 88px;
@@ -668,6 +669,58 @@ button.secondary-button.site-mypage-logout:hover,
   text-align: center;
   color: var(--color-icon-muted, #9ca3af);
   background: var(--color-bg-soft, #f9fafb);
+}
+
+/* 클럽안내 목록: 대회안내와 동일 3:4(96×128) 세로형 썸네일 — 상단 이미지·하단 텍스트 */
+.site-board-card.site-board-card--venue > a {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0.75rem;
+}
+
+.site-board-card.site-board-card--venue .site-venue-list-thumb {
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  aspect-ratio: 3 / 4;
+  margin-left: 0;
+  align-self: stretch;
+  flex-shrink: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-bg-soft, #f9fafb);
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.site-board-card.site-board-card--venue .site-venue-list-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.site-board-card.site-board-card--venue .site-venue-list-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem;
+  box-sizing: border-box;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  text-align: center;
+  color: var(--color-icon-muted, #9ca3af);
+  background: var(--color-bg-soft, #f9fafb);
+}
+
+.site-board-card.site-board-card--venue .site-venue-card-main {
+  flex: 0 0 auto;
+  width: 100%;
 }
 
 /* 대회·당구장 목록: 필터 바 — 페이지 배경(#EEF2F7)과 동일 톤 */
@@ -3202,8 +3255,17 @@ button.secondary-button.ui-community-search-submit {
   border-bottom: 1px solid #9ca3af;
 }
 
-.ui-community-board-row:last-child {
+.ui-community-board-row:last-child:not(.ui-community-board-row--empty) {
   border-bottom: none;
+}
+
+.ui-community-board-row--empty {
+  border-bottom: 1px solid #9ca3af;
+}
+
+.ui-community-board-empty-inner {
+  padding: 7px 0.5rem;
+  box-sizing: border-box;
 }
 
 .ui-community-board-row-link {
@@ -3211,8 +3273,13 @@ button.secondary-button.ui-community-search-submit {
   flex-direction: row;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.65rem 0.2rem;
+  padding-top: 7px;
+  padding-bottom: 7px;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  box-sizing: border-box;
   min-width: 0;
+  min-height: 68px;
   text-decoration: none;
   color: inherit;
   -webkit-tap-highlight-color: transparent;
@@ -3225,9 +3292,11 @@ button.secondary-button.ui-community-search-submit {
 .ui-community-board-row-body {
   flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 0.12rem;
+  justify-content: center;
 }
 
 .ui-community-board-line1 {
@@ -3278,6 +3347,10 @@ button.secondary-button.ui-community-search-submit {
   font-weight: 700;
   font-size: 1rem;
   line-height: 1.35;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .ui-community-board-meta {
@@ -3290,11 +3363,11 @@ button.secondary-button.ui-community-search-submit {
   word-break: keep-all;
 }
 
-/* 목록 썸네일: 160 변형 URL + 목록용 박스(비율 유지·cover) */
+/* 목록 썸네일: 160 변형 URL + 정사각 64px 박스(cover) — URL 없으면 DOM 미렌더 */
 .ui-community-board-thumb-wrap {
   flex-shrink: 0;
-  width: 56px;
-  height: 75px;
+  width: 64px;
+  height: 64px;
   overflow: hidden;
   background: var(--color-bg-soft, #f9fafb);
   display: flex;
@@ -3324,22 +3397,20 @@ button.secondary-button.ui-community-search-submit {
   padding: 0.15rem;
 }
 
-.ui-community-board-empty {
-  padding: 1.15rem 1rem;
-  text-align: center;
-}
-
 .ui-community-board-empty-title {
   margin: 0;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--color-text-main, #0f172a);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--color-text-main, #111111);
+  text-align: start;
 }
 
 .ui-community-board-empty-desc {
-  margin: 0.35rem 0 0;
-  font-size: 0.82rem;
-  line-height: 1.45;
+  margin: 0.12rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  text-align: start;
 }
 
 /* ---------------------------------------------------------------------------

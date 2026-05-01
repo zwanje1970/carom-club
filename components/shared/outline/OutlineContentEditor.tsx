@@ -216,8 +216,8 @@ export default function OutlineContentEditor({
             <input
               ref={imageInputRef}
               type="file"
-              accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-              hidden
+              accept="image/*"
+              style={{ display: "none" }}
               onChange={(e) => void onOutlineImageFile(e.target.files)}
             />
             <button
@@ -274,8 +274,8 @@ export default function OutlineContentEditor({
             <input
               ref={pdfInputRef}
               type="file"
-              accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.pdf,.docx"
-              hidden
+              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              style={{ display: "none" }}
               onChange={(e) => onOutlinePdfFile(e.target.files)}
             />
             <button type="button" className="v3-btn" disabled={pdfBusy} onClick={() => pdfInputRef.current?.click()}>

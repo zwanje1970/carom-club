@@ -44,6 +44,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private var cameraImageUri: Uri? = null
+    /** 카메라 권한 요청 직후 이미지 피커에서 다중 선택 허용 여부 */
+    private var pendingImagePickerAllowMultiple: Boolean = true
     private var pendingGeoCallback: GeolocationPermissions.Callback? = null
     private var pendingGeoOrigin: String? = null
 
@@ -67,9 +69,9 @@ class MainActivity : AppCompatActivity() {
     private val cameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) {
-                launchFilePicker(includeCamera = true)
+                launchImagePickerWithOptionalCamera(includeCamera = true, pendingImagePickerAllowMultiple)
             } else {
-                launchFilePicker(includeCamera = false)
+                launchImagePickerWithOptionalCamera(includeCamera = false, pendingImagePickerAllowMultiple)
             }
         }
 
@@ -249,13 +251,34 @@ class MainActivity : AppCompatActivity() {
                     if (filePathCallback == null) return false
                     this@MainActivity.filePathCallback?.onReceiveValue(null)
                     this@MainActivity.filePathCallback = filePathCallback
+
+                    val acceptTypes =
+                        fileChooserParams?.acceptTypes
+                            ?.map { it.trim() }
+                            ?.filter { it.isNotEmpty() }
+                            .orEmpty()
+                    val allowMultiple = fileChooserParams?.mode == FileChooserParams.MODE_OPEN_MULTIPLE
+
+                    val imageOnlyChooser =
+                        acceptTypes.isEmpty() ||
+                            acceptTypes.all { t ->
+                                val lower = t.lowercase(Locale.getDefault())
+                                lower == "image/*" || lower.startsWith("image/")
+                            }
+
+                    if (!imageOnlyChooser) {
+                        launchDocumentContentPicker(acceptTypes.toTypedArray(), allowMultiple)
+                        return true
+                    }
+
+                    pendingImagePickerAllowMultiple = allowMultiple
                     val hasCameraPermission =
                         ContextCompat.checkSelfPermission(
                             this@MainActivity,
                             Manifest.permission.CAMERA
                         ) == PackageManager.PERMISSION_GRANTED
                     if (hasCameraPermission) {
-                        launchFilePicker(includeCamera = true)
+                        launchImagePickerWithOptionalCamera(includeCamera = true, allowMultiple)
                     } else {
                         cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                     }
@@ -356,7 +379,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun launchFilePicker(includeCamera: Boolean) {
+    /** HTML `accept`가 이미지일 때만: 갤러리·(선택) 카메라. PDF/DOCX 등은 호출하지 않는다. */
+    private fun launchImagePickerWithOptionalCamera(
+        includeCamera: Boolean,
+        allowMultiple: Boolean,
+    ) {
         val intents = mutableListOf<Intent>()
         if (includeCamera) {
             createImageCaptureIntent()?.let { intents.add(it) }
@@ -366,7 +393,7 @@ class MainActivity : AppCompatActivity() {
             Intent(Intent.ACTION_GET_CONTENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
                 type = "image/*"
-                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, allowMultiple)
             }
 
         val chooser =
@@ -377,6 +404,23 @@ class MainActivity : AppCompatActivity() {
             }
 
         fileChooserLauncher.launch(chooser)
+    }
+
+    /** PDF·문서 전용 input — 카메라 인텐트 없이 문서/내 파일 쪽으로 연다. */
+    private fun launchDocumentContentPicker(
+        mimeTypes: Array<String>,
+        allowMultiple: Boolean,
+    ) {
+        val pickIntent =
+            Intent(Intent.ACTION_GET_CONTENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "*/*"
+                if (mimeTypes.isNotEmpty()) {
+                    putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes)
+                }
+                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, allowMultiple)
+            }
+        fileChooserLauncher.launch(Intent.createChooser(pickIntent, "파일 선택"))
     }
 
     private fun createImageCaptureIntent(): Intent? {

@@ -36,8 +36,9 @@ type Props = {
   /** `showRoomPrefix`일 때 extra1·extra2 pill에 플랫폼 설정 표시명 반영 */
   config?: SiteCommunityConfig;
   items: CommunityPostListItem[];
-  /** 빈 목록 문구만 교체(표시용, API·데이터와 무관) */
+  /** 빈 목록 1줄 문구(표시용) */
   emptyTitle?: string;
+  /** 빈 목록 2줄 문구(표시용) */
   emptyDesc?: string;
 };
 
@@ -48,57 +49,58 @@ export default function CommunityBoardPostList({
   emptyTitle,
   emptyDesc,
 }: Props) {
-  if (items.length === 0) {
-    return (
-      <div className="card-clean ui-community-board-empty" role="status">
-        <p className="ui-community-board-empty-title">{emptyTitle ?? "아직 게시글이 없습니다"}</p>
-        <p className="v3-muted ui-community-board-empty-desc">
-          {emptyDesc ?? "첫 글을 남겨 보시면 여기에 표시됩니다."}
-        </p>
-      </div>
-    );
-  }
+  const emptyTitleLine = emptyTitle ?? "게시글이 없습니다.";
+  const emptyDescLine = emptyDesc ?? "첫 글을 작성해보세요.";
+
   return (
     <ul className="ui-community-board-rows">
-      {items.map((post) => {
-        const href = communityPostDetailHref(post.boardType, post.id);
-        const prefix = showRoomPrefix
-          ? isPrimaryTabKey(post.boardType)
-            ? COMMUNITY_ROOM_PREFIX_SHORT[post.boardType]
-            : config
-              ? communityTabLabelForBoard(post.boardType, config)
-              : null
-          : null;
-        return (
-          <li key={post.id} className="ui-community-board-row">
-            <Link prefetch={false} href={href} className="ui-community-board-row-link">
-              <div className="ui-community-board-thumb-wrap">
-                {post.thumbnailUrl ? (
-                  <SiteListImage160
-                    className="ui-community-board-thumb"
-                    src={post.thumbnailUrl}
-                    alt=""
-                    placeholderClassName="ui-community-board-thumb-placeholder"
-                  />
-                ) : (
-                  <div className="ui-community-board-thumb-placeholder" />
-                )}
-              </div>
-              <div className="ui-community-board-row-body">
-                <div className="ui-community-board-line1">
-                  {prefix ? (
-                    <span className={boardPillClass(post.boardType)}>{prefix}</span>
-                  ) : null}
-                  <span className="ui-community-board-title">{post.title}</span>
+      {items.length === 0 ? (
+        <li className="ui-community-board-row ui-community-board-row--empty" role="status">
+          <div className="ui-community-board-empty-inner">
+            <p className="ui-community-board-empty-title">{emptyTitleLine}</p>
+            <p className="ui-community-board-empty-desc v3-muted">{emptyDescLine}</p>
+          </div>
+        </li>
+      ) : (
+        items.map((post) => {
+          const href = communityPostDetailHref(post.boardType, post.id);
+          const prefix = showRoomPrefix
+            ? isPrimaryTabKey(post.boardType)
+              ? COMMUNITY_ROOM_PREFIX_SHORT[post.boardType]
+              : config
+                ? communityTabLabelForBoard(post.boardType, config)
+                : null
+            : null;
+          const thumb = typeof post.thumbnailUrl === "string" ? post.thumbnailUrl.trim() : "";
+          return (
+            <li key={post.id} className="ui-community-board-row">
+              <Link prefetch={false} href={href} className="ui-community-board-row-link">
+                <div className="ui-community-board-row-body">
+                  <div className="ui-community-board-line1">
+                    {prefix ? (
+                      <span className={boardPillClass(post.boardType)}>{prefix}</span>
+                    ) : null}
+                    <span className="ui-community-board-title">{post.title}</span>
+                  </div>
+                  <p className="ui-community-board-meta">
+                    {formatListDateTime(post.createdAt)} · 조회 {post.viewCount} · 댓글 {post.commentCount}
+                  </p>
                 </div>
-                <p className="ui-community-board-meta">
-                  {formatListDateTime(post.createdAt)} · 조회 {post.viewCount} · 댓글 {post.commentCount}
-                </p>
-              </div>
-            </Link>
-          </li>
-        );
-      })}
+                {thumb ? (
+                  <div className="ui-community-board-thumb-wrap">
+                    <SiteListImage160
+                      className="ui-community-board-thumb"
+                      src={thumb}
+                      alt=""
+                      placeholderClassName="ui-community-board-thumb-placeholder"
+                    />
+                  </div>
+                ) : null}
+              </Link>
+            </li>
+          );
+        })
+      )}
     </ul>
   );
 }

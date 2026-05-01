@@ -26,6 +26,30 @@ function isMypageHeaderHref(href: string): boolean {
   return headerNavPathOnly(href) === "/site/mypage";
 }
 
+/** 상단 주요 허브만 — 커뮤니티 체류 시에도 prefetch 허용(냉 네비 완화). 게시판·게시글 URL은 여기 포함하지 않음 */
+const SITE_MAIN_HUB_NAV_PATHS = new Set([
+  "/",
+  "/site",
+  "/site/tournaments",
+  "/site/venues",
+  "/site/community",
+  "/site/mypage",
+]);
+
+function isSiteMainHubNavHref(href: string): boolean {
+  const p = headerNavPathOnly(href);
+  return SITE_MAIN_HUB_NAV_PATHS.has(p);
+}
+
+/**
+ * 커뮤니티가 아닐 때: 기본 동작(Next 기본 prefetch).
+ * 커뮤니티일 때: 주요 허브만 동일, 그 외(관리자 진입 등)는 prefetch 끔.
+ */
+function prefetchPropForHeaderLink(pathname: string, linkHref: string): boolean | undefined {
+  if (!pathname.startsWith("/site/community")) return undefined;
+  return isSiteMainHubNavHref(linkHref) ? undefined : false;
+}
+
 /** 공개 사이트와 동일 DOM·클래스(헤더만) — `/site`·`/`·클라이언트 PC 등에서 재사용 */
 export default function SiteChromeHeader({
   menuItems,
@@ -38,8 +62,6 @@ export default function SiteChromeHeader({
   pcAdminEntry?: PcSiteHeaderAdminEntry;
 }) {
   const pathname = usePathname() ?? "";
-  const suppressPrefetch = pathname.startsWith("/site/community");
-  const navPrefetch = suppressPrefetch ? false : undefined;
 
   const { main, auxiliary } = splitHeaderMenuItems(menuItems);
   const myBadge =
@@ -49,12 +71,12 @@ export default function SiteChromeHeader({
     pcAdminEntry && (pcAdminEntry.showClient || pcAdminEntry.showPlatform) ? (
       <>
         {pcAdminEntry.showClient ? (
-          <Link prefetch={navPrefetch} href="/client">
+          <Link prefetch={prefetchPropForHeaderLink(pathname, "/client")} href="/client">
             클라이언트관리자
           </Link>
         ) : null}
         {pcAdminEntry.showPlatform ? (
-          <Link prefetch={navPrefetch} href="/platform">
+          <Link prefetch={prefetchPropForHeaderLink(pathname, "/platform")} href="/platform">
             플랫폼관리자
           </Link>
         ) : null}
@@ -63,6 +85,7 @@ export default function SiteChromeHeader({
 
   const renderMainNav = (item: SiteLayoutMenuItem, index: number) => {
     const showBadge = myBadge != null && isMypageHeaderHref(item.href);
+    const navPrefetch = prefetchPropForHeaderLink(pathname, item.href);
     const inner = item.href.startsWith("/site/venues") ? (
       <VenuesDistanceNavLink prefetch={navPrefetch} href={item.href}>
         {item.label}
@@ -88,7 +111,7 @@ export default function SiteChromeHeader({
   return (
     <header className="site-header">
       <div className="site-header-top">
-        <Link prefetch={navPrefetch} className="site-logo" href="/site">
+        <Link prefetch={prefetchPropForHeaderLink(pathname, "/site")} className="site-logo" href="/site">
           <span className="site-header-logo-dots" aria-hidden="true">
             <span className="site-header-logo-dot site-header-logo-dot--y">●</span>
             <span className="site-header-logo-dot site-header-logo-dot--r">●</span>
@@ -108,13 +131,14 @@ export default function SiteChromeHeader({
       <nav className="site-nav-aux site-nav-aux-mobile" aria-label="테스트 진입 메뉴">
         {auxiliary.map((item, index) => {
           const showBadge = myBadge != null && isMypageHeaderHref(item.href);
+          const auxPrefetch = prefetchPropForHeaderLink(pathname, item.href);
           const inner = !showBadge ? (
-            <Link prefetch={navPrefetch} href={item.href}>
+            <Link prefetch={auxPrefetch} href={item.href}>
               {item.label}
             </Link>
           ) : (
             <span className="site-header-nav-item-wrap">
-              <Link prefetch={navPrefetch} href={item.href} className="site-header-mypage-nav-link">
+              <Link prefetch={auxPrefetch} href={item.href} className="site-header-mypage-nav-link">
                 {item.label}
               </Link>
               <span className="site-header-unread-badge" aria-label={`읽지 않은 알림 ${unreadNotificationCount}건`}>
