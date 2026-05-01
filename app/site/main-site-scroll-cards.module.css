@@ -34,7 +34,10 @@
   box-sizing: border-box;
   pointer-events: none;
   /* 뷰포트 높이 기준으로 카드가 아래쪽에서 올라오도록 상단 여백(양 세그먼트 동일 복제 → -50% 루프 유지) */
-  min-height: max(6rem, calc(100cqh - var(--sample-main-card-height) - 2.75rem));
+  min-height: max(
+    6rem,
+    calc(100cqh - var(--sample-main-scroll-layout-face-ref-height, var(--sample-main-card-height)) - 2.75rem)
+  );
 }
 
 .trackWillChange {

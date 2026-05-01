@@ -68,7 +68,8 @@
   padding: 8px 0;
 }
 
-.pageWrapV2 .previewCardWrap {
+/* 게시 v2 미리보기·메인 스크롤 대회 카드 공통 — `.pageWrapV2` 하위 선택자 대신 클래스로 동일 외곽 재사용 */
+.previewCardWrap.previewCardWrapV2Chrome {
   border: none;
   box-shadow:
     0 12px 40px rgba(0, 0, 0, 0.1),

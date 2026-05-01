@@ -64,7 +64,7 @@ function isDashboardPath(pathname: string): boolean {
 function isPublicSiteMainHomePathname(path: string): boolean {
   const raw = path.split("?")[0] ?? "";
   const p = raw.length > 1 && raw.endsWith("/") ? raw.slice(0, -1) : raw;
-  return p === "/" || p === "/site";
+  return p === "/" || p === "/site" || p === "/mobile-splash";
 }
 
 function showFabForUser(user: SessionUser | null): boolean {

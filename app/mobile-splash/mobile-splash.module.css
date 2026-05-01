@@ -1,0 +1,18 @@
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 1.5rem;
+  background: #000;
+}
+
+.logo {
+  width: min(72vw, 280px);
+  height: auto;
+  object-fit: contain;
+}

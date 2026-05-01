@@ -51,10 +51,17 @@ function categoryLabel(v: SiteVenueBoardRow["venueCategory"]): string {
   return "";
 }
 
-function feeTypeLabel(pt: SiteVenueBoardRow["pricingType"]): string {
-  if (pt === "MIXED") return "혼용요금";
-  if (pt === "FLAT") return "정액제";
-  return "일반요금";
+/** 스냅샷 `pricingType` 기준(시간·요일 없음). FLAT만 정액제, GENERAL·MIXED는 일반요금. */
+function feeChipKeyFromPricingType(pt: SiteVenueBoardRow["pricingType"]): "general" | "flat" {
+  return pt === "FLAT" ? "flat" : "general";
+}
+
+function feeLabelFromPricingType(pt: SiteVenueBoardRow["pricingType"]): string {
+  return pt === "FLAT" ? "정액제" : "일반요금";
+}
+
+function formatDistanceKmFromMeters(meters: number): string {
+  return `${(meters / 1000).toFixed(1)}km`;
 }
 
 type VenueTypeFilter = "all" | "daedae_only" | "mixed";
@@ -242,13 +249,10 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
             <li key={row.venueId} className="site-board-card site-board-card--venue">
               <Link href={`/site/venues/${row.venueId}`}>
                 <div className="site-venue-card-main">
-                  <span className="site-venue-card-title">{row.name}</span>
-                  {String(row.region ?? "").trim() ? (
-                    <span className="site-venue-address">{String(row.region).trim()}</span>
-                  ) : null}
                   {(() => {
                     const cat = categoryLabel(row.venueCategory);
-                    const fee = feeTypeLabel(row.pricingType);
+                    const fee = feeLabelFromPricingType(row.pricingType);
+                    const feeKey = feeChipKeyFromPricingType(row.pricingType);
                     if (!cat && !fee) return null;
                     return (
                       <div className="site-venue-chips">
@@ -256,13 +260,26 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
                           <span className={`site-list-chip site-venue-chip--cat-${row.venueCategory}`}>{cat}</span>
                         ) : null}
                         {fee ? (
-                          <span
-                            className={`site-list-chip site-venue-chip--fee-${row.pricingType === "FLAT" ? "flat" : row.pricingType === "MIXED" ? "mixed" : "general"}`}
-                          >
-                            {fee}
-                          </span>
+                          <span className={`site-list-chip site-venue-chip--fee-${feeKey}`}>{fee}</span>
                         ) : null}
                       </div>
+                    );
+                  })()}
+                  <span className="site-venue-card-title">{row.name}</span>
+                  {(() => {
+                    const region = String(row.region ?? "").trim();
+                    const dm =
+                      memoryCoords && row.lat != null && row.lng != null
+                        ? distanceMeters(memoryCoords, { lat: row.lat, lng: row.lng })
+                        : null;
+                    const distStr = dm != null && Number.isFinite(dm) ? formatDistanceKmFromMeters(dm) : null;
+                    if (!region && !distStr) return null;
+                    return (
+                      <span className="site-venue-address">
+                        {region ? <>{region}</> : null}
+                        {region && distStr ? <> · </> : null}
+                        {distStr ? <span className="site-venue-distance">{distStr}</span> : null}
+                      </span>
                     );
                   })()}
                 </div>

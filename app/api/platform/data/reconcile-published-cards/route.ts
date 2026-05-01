@@ -26,5 +26,6 @@ export async function POST() {
     ok: true,
     changedRowCount: summary.changedRowCount,
     uniqueTournamentIds: summary.uniqueTournamentIds,
+    snapshotFieldAlignmentChanged: summary.snapshotFieldAlignmentChanged,
   });
 }

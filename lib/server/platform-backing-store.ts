@@ -5620,10 +5620,11 @@ export async function syncActiveTournamentCardSnapshotStatusBadge(tournamentId: 
   if (cardWs === "firestore-kv") {
     const cur = await loadTournamentPublishedCardsArray();
     let changed = false;
+    const showOnMainSlide = tournamentStatusEligibleForMainSlide(badge);
     const next = cur.map((c) => {
       if (c.tournamentId === id && c.isActive) {
         changed = true;
-        return { ...c, status: badge, updatedAt: now };
+        return { ...c, status: badge, showOnMainSlide, updatedAt: now };
       }
       return c;
     });
@@ -5632,14 +5633,19 @@ export async function syncActiveTournamentCardSnapshotStatusBadge(tournamentId: 
   }
   const store = await readLocalJsonAggregate();
   let changed = false;
+  const showOnMainSlide = tournamentStatusEligibleForMainSlide(badge);
   for (const c of store.tournamentPublishedCards) {
     if (c.tournamentId === id && c.isActive) {
       c.status = badge;
+      c.showOnMainSlide = showOnMainSlide;
       c.updatedAt = now;
       changed = true;
     }
   }
-  if (changed) await writeLocalJsonAggregate(store);
+  if (changed) {
+    await writeLocalJsonAggregate(store);
+    revalidateMainSlideSnapshotsCache();
+  }
 }
 
 export async function patchTournamentStatusBadge(params: {
@@ -9269,12 +9275,16 @@ export async function reconcileTournamentPublishedCardsForTournamentId(
 
     if (c.isExpired === true) {
       changedRowCount += 1;
+      const badge = t ? String(normalizeTournamentStatusBadge(t.statusBadge)) : String(c.status ?? "");
+      const showOnMainSlide = tournamentStatusEligibleForMainSlide(badge);
       return {
         ...c,
         isExpired: false,
         orphanedAt: undefined,
         expiredAt: undefined,
         updatedAt: now,
+        showOnMainSlide,
+        ...(t ? { status: badge } : {}),
       };
     }
     return c;
@@ -9285,6 +9295,114 @@ export async function reconcileTournamentPublishedCardsForTournamentId(
 }
 
 /**
+ * `reconcileAllTournamentPublishedCardsForMainSlide` 1차 맵 이후 실행:
+ * 대회당 `isPublished && isActive` 게시카드 중복 제거(최신 `updatedAt` 1건만 유지),
+ * 활성 게시 행의 `status`·`showOnMainSlide`를 현재 대회 배지·`tournamentStatusEligibleForMainSlide`에 맞춤,
+ * 일정·삭제가 아닌데 `isExpired`만 잘못 켜진 경우(종료 배지 제외) 복구.
+ * 새 스냅샷을 만들지 않고 기존 행 필드만 정리한다.
+ */
+function alignTournamentPublishedCardSnapshotRowsWithTournamentState(
+  rows: TournamentPublishedCard[],
+  tournamentById: Map<string, Tournament | null>,
+  todayYyyyMmDd: string,
+): { next: TournamentPublishedCard[]; additionalChanged: number } {
+  const now = new Date().toISOString();
+  let additionalChanged = 0;
+  const out = rows.map((r) => ({ ...r }));
+  const visible = (c: TournamentPublishedCard) => isEntityLifecycleVisibleForList(c.lifecycleStatus);
+
+  const activePublishedSameTournament = (c: TournamentPublishedCard) =>
+    visible(c) && c.isPublished === true && c.isActive === true && c.tournamentId.trim() !== "";
+
+  const byTid = new Map<string, number[]>();
+  for (let i = 0; i < out.length; i++) {
+    if (!activePublishedSameTournament(out[i]!)) continue;
+    const tid = out[i]!.tournamentId.trim();
+    let arr = byTid.get(tid);
+    if (!arr) {
+      arr = [];
+      byTid.set(tid, arr);
+    }
+    arr.push(i);
+  }
+
+  for (const indices of byTid.values()) {
+    if (indices.length <= 1) continue;
+    indices.sort((ia, ib) => out[ib]!.updatedAt.localeCompare(out[ia]!.updatedAt));
+    for (let k = 1; k < indices.length; k++) {
+      const i = indices[k]!;
+      const c = out[i]!;
+      if (c.isActive === false && c.showOnMainSlide === false) continue;
+      out[i] = { ...c, isActive: false, showOnMainSlide: false, updatedAt: now };
+      additionalChanged += 1;
+    }
+  }
+
+  for (let i = 0; i < out.length; i++) {
+    const c0 = out[i]!;
+    if (!visible(c0)) continue;
+    const tid = c0.tournamentId.trim();
+    if (!tid) continue;
+    const tour = tournamentById.get(tid) ?? null;
+    const past = tour ? isTournamentPastScheduleEndForMainSlideCleanup(tour, todayYyyyMmDd) : false;
+    const inactiveTournament = !tour || tour.status === "DELETED";
+
+    if (
+      c0.isPublished === true &&
+      c0.isActive === true &&
+      c0.isExpired !== true &&
+      tour &&
+      !inactiveTournament &&
+      !past
+    ) {
+      const badge = String(normalizeTournamentStatusBadge(tour.statusBadge));
+      const showOnMainSlide = tournamentStatusEligibleForMainSlide(badge);
+      let nextRow = { ...c0 };
+      let rowTouch = false;
+      if (nextRow.status !== badge) {
+        nextRow.status = badge;
+        rowTouch = true;
+      }
+      if (nextRow.showOnMainSlide !== showOnMainSlide) {
+        nextRow.showOnMainSlide = showOnMainSlide;
+        rowTouch = true;
+      }
+      if (rowTouch) {
+        nextRow.updatedAt = now;
+        out[i] = nextRow;
+        additionalChanged += 1;
+      }
+    }
+
+    const c1 = out[i]!;
+    if (!visible(c1) || !c1.isPublished || !c1.isActive || c1.isExpired !== true) continue;
+    if (!tour || inactiveTournament || past) continue;
+
+    const badge = String(normalizeTournamentStatusBadge(tour.statusBadge));
+    if (badge === "종료") {
+      if (c1.showOnMainSlide) {
+        out[i] = { ...c1, showOnMainSlide: false, updatedAt: now };
+        additionalChanged += 1;
+      }
+      continue;
+    }
+
+    out[i] = {
+      ...c1,
+      isExpired: false,
+      orphanedAt: undefined,
+      expiredAt: undefined,
+      status: badge,
+      showOnMainSlide: tournamentStatusEligibleForMainSlide(badge),
+      updatedAt: now,
+    };
+    additionalChanged += 1;
+  }
+
+  return { next: out, additionalChanged };
+}
+
+/**
  * 전체 `tournamentPublishedCards` 점검(고아·삭제·일정 경과 및 정상 복귀 시 isExpired 해제).
  * 관리자 버튼·배치 스크립트 전용. 메인 페이지에서 호출 금지.
  */
@@ -9292,9 +9410,12 @@ export async function reconcileAllTournamentPublishedCardsForMainSlide(): Promis
   ok: true;
   changedRowCount: number;
   uniqueTournamentIds: number;
+  snapshotFieldAlignmentChanged: number;
 }> {
   const ws = resolveTournamentPublishedCardsWriteStrategy();
-  if (ws === "blocked") return { ok: true, changedRowCount: 0, uniqueTournamentIds: 0 };
+  if (ws === "blocked") {
+    return { ok: true, changedRowCount: 0, uniqueTournamentIds: 0, snapshotFieldAlignmentChanged: 0 };
+  }
 
   const allRows = await loadTournamentPublishedCardsRowsIncludingDeleted();
   const today = calendarTodayYyyyMmDdSeoul();
@@ -9308,7 +9429,7 @@ export async function reconcileAllTournamentPublishedCardsForMainSlide(): Promis
 
   let changedRowCount = 0;
   const now = new Date().toISOString();
-  const next = allRows.map((c) => {
+  let next = allRows.map((c) => {
     if (!isEntityLifecycleVisibleForList(c.lifecycleStatus)) return c;
     const rowTid = c.tournamentId.trim();
     if (!rowTid) {
@@ -9344,16 +9465,25 @@ export async function reconcileAllTournamentPublishedCardsForMainSlide(): Promis
 
     if (c.isExpired === true) {
       changedRowCount += 1;
+      const badge = tour ? String(normalizeTournamentStatusBadge(tour.statusBadge)) : String(c.status ?? "");
+      const showOnMainSlide = tournamentStatusEligibleForMainSlide(badge);
       return {
         ...c,
         isExpired: false,
         orphanedAt: undefined,
         expiredAt: undefined,
         updatedAt: now,
+        showOnMainSlide,
+        ...(tour ? { status: badge } : {}),
       };
     }
     return c;
   });
+
+  const aligned = alignTournamentPublishedCardSnapshotRowsWithTournamentState(next, tournamentById, today);
+  next = aligned.next;
+  const snapshotFieldAlignmentChanged = aligned.additionalChanged;
+  changedRowCount += snapshotFieldAlignmentChanged;
 
   if (changedRowCount > 0) await persistTournamentPublishedCardsRows(next);
   try {
@@ -9361,7 +9491,7 @@ export async function reconcileAllTournamentPublishedCardsForMainSlide(): Promis
   } catch (e) {
     console.warn("[reconcileAllTournamentPublishedCardsForMainSlide] processDuePublishedCardImageDeleteQueue failed", e);
   }
-  return { ok: true, changedRowCount, uniqueTournamentIds: uniqueTids.length };
+  return { ok: true, changedRowCount, uniqueTournamentIds: uniqueTids.length, snapshotFieldAlignmentChanged };
 }
 
 /** 대회 게시 카드 1건 소프트 삭제(플랫폼 관리자). */

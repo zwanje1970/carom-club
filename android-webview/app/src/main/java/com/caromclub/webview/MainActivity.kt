@@ -351,7 +351,8 @@ class MainActivity : AppCompatActivity() {
         val raw =
             intent?.getStringExtra(EXTRA_TARGET_URL)?.takeIf { it.isNotBlank() }
                 ?: intent?.extras?.getString(EXTRA_TARGET_URL)?.takeIf { it.isNotBlank() }
-        if (raw.isNullOrBlank()) return defaultUrl
+        // 앱 내부 스플래시에서 세션·권한 등 최소 준비 후 메인(/)으로 이동
+        if (raw.isNullOrBlank()) return "$defaultUrl/mobile-splash"
         val t = raw.trim()
         return when {
             t.startsWith("http://") || t.startsWith("https://") -> t

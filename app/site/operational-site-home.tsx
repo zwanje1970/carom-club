@@ -22,6 +22,20 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
   return items.map((item) => {
     const href = (item.targetDetailUrl ?? "").trim() || "/site/tournaments";
     const external = item.linkType === "external" || /^https?:\/\//i.test(href);
+
+    /** 대회 카드: 작성화면과 동일 `TournamentSnapshotCardView`(HTML 텍스트·배지) — 게시 PNG 평면 면은 쓰지 않음 */
+    if (item.type !== "ad") {
+      return {
+        id: item.snapshotId,
+        href,
+        title: item.title,
+        imageUrl: null,
+        faceCssBackground: null,
+        external,
+        slideDeckItem: item,
+      };
+    }
+
     const published640 = (item.publishedCardImageUrl ?? "").trim();
     const published320 = (item.publishedCardImage320Url ?? "").trim();
     /** 메인 슬라이드: 640 우선(320은 목록 등 다른 경로 유지). 둘 다 없으면 게시 면 미사용 */
@@ -54,11 +68,7 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
     const useBgImage = item.backgroundType !== "theme" && Boolean(item.image320Url?.trim());
     const imageUrl = useBgImage ? item.image320Url!.trim() : null;
     const faceCssBackground =
-      !imageUrl && item.mediaBackground?.trim()
-        ? item.mediaBackground.trim()
-        : !imageUrl
-          ? "linear-gradient(180deg, #1e293b 0%, #0f172a 100%)"
-          : null;
+      !imageUrl && item.mediaBackground?.trim() ? item.mediaBackground.trim() : !imageUrl ? "transparent" : null;
     return {
       id: item.snapshotId,
       href,

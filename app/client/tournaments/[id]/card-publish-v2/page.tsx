@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -13,8 +14,6 @@ import {
   POSTCARD_TEMPLATE_TEXT_COLOR_SWATCHES,
 } from "../../../../../lib/postcard-template-reference";
 import editorStyles from "../card-publish-editor.module.css";
-import { withPublishedCardMainReflectNotice } from "../../../../../lib/client-published-card-main-reflect-notice";
-
 const DESCRIPTION_MAX_LINES = 3;
 
 /** 제목 위 / 제목 / 설명 글자색 — `carom-postcard-template-test/src/App.tsx` 와 동일 */
@@ -262,16 +261,15 @@ export default function ClientTournamentCardPublishV2Page() {
 
   const [message, setMessage] = useState("");
   const [saveBusy, setSaveBusy] = useState(false);
-  const [publishBusy, setPublishBusy] = useState(false);
+  /** 저장 성공 후에만 노출: 대회 관리 상태설정 영역으로 이동 */
+  const [saveSucceeded, setSaveSucceeded] = useState(false);
   const [uploading, setUploading] = useState(false);
-  /** 메인에 노출 중인 게시카드 존재 여부(대회당 1개·재게시 시 덮어쓰기) */
-  const [hasLivePublishedCard, setHasLivePublishedCard] = useState(false);
 
   const bgFileInputRef = useRef<HTMLInputElement>(null);
   const cardPublishCaptureRef = useRef<HTMLDivElement>(null);
   const cardPublishCaptureForImageRef = useRef<HTMLDivElement>(null);
-  /** 저장/게시 중복 요청 차단 — ref로 동기 가드 */
-  const isPublishingRef = useRef(false);
+  /** 저장 중복 요청 차단 — ref로 동기 가드 */
+  const saveInFlightRef = useRef(false);
 
   const backgroundType = uploadedImage ? "image" : "theme";
 
@@ -351,8 +349,6 @@ export default function ClientTournamentCardPublishV2Page() {
         setMessage(result.error ?? "카드 정보를 불러오지 못했습니다.");
         return;
       }
-
-      setHasLivePublishedCard(Boolean(result.activeSnapshot));
 
       const t = result.tournament;
       if (!t) return;
@@ -459,6 +455,10 @@ export default function ClientTournamentCardPublishV2Page() {
   }, [loadSnapshots]);
 
   useEffect(() => {
+    setSaveSucceeded(false);
+  }, [tournamentId]);
+
+  useEffect(() => {
     function onVisibility() {
       if (document.visibilityState === "visible") {
         void loadSnapshots();
@@ -501,86 +501,39 @@ export default function ClientTournamentCardPublishV2Page() {
     return { ok: true, body };
   }
 
-  function postCardSnapshot(draftOnly: boolean, successMessage: string) {
+  /** 초안만 저장. 메인 게시는 이 화면에서 하지 않으며 대회 관리 페이지에서 진행한다. */
+  function saveCardDraft(successMessage: string) {
     if (!tournamentId) return;
-    if (isPublishingRef.current) return;
-    isPublishingRef.current = true;
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
 
     void (async () => {
-      if (draftOnly) setSaveBusy(true);
-      else setPublishBusy(true);
+      setSaveBusy(true);
       setMessage("");
       try {
-        const built = buildCardPayload(draftOnly);
+        const built = buildCardPayload(true);
         if (!built.ok) {
           setMessage(built.error);
           return;
         }
-        let body: Record<string, unknown> = built.body;
-        if (!draftOnly) {
-          try {
-            const el = cardPublishCaptureForImageRef.current;
-            if (!el) {
-              setMessage("게시 이미지 캡처 영역을 찾을 수 없어 게시 이미지를 만들 수 없습니다.");
-              return;
-            }
-            const { default: html2canvas } = await import("html2canvas");
-            const w = Math.max(1, Math.round(el.getBoundingClientRect().width));
-            const scale = 640 / w;
-            const canvas = await html2canvas(el, {
-              scale,
-              useCORS: true,
-              allowTaint: false,
-              backgroundColor: null,
-              logging: false,
-            });
-            const blob = await new Promise<Blob>((resolve, reject) => {
-              canvas.toBlob(
-                (b) => (b ? resolve(b) : reject(new Error("이미지 변환에 실패했습니다."))),
-                "image/png",
-              );
-            });
-            const formData = new FormData();
-            formData.append("file", blob, "published-card.png");
-            formData.append("sitePublic", "1");
-            formData.append("purpose", "published-card-snapshot");
-            const uploadRes = await fetch("/api/upload/image", { method: "POST", body: formData });
-            const uploadJson = (await uploadRes.json()) as UploadedImage & { error?: string };
-            if (!uploadRes.ok || !uploadJson.w640Url?.trim()) {
-              setMessage(uploadJson.error ?? "게시용 이미지 업로드에 실패했습니다.");
-              return;
-            }
-            body = {
-              ...body,
-              publishedCardImageUrl: uploadJson.w640Url,
-              ...(uploadJson.w320Url?.trim() ? { publishedCardImage320Url: uploadJson.w320Url } : {}),
-            };
-          } catch (e) {
-            setMessage(e instanceof Error ? e.message : "게시 이미지를 만들지 못했습니다.");
-            return;
-          }
-        }
         const response = await fetch("/api/client/card-snapshots", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify(built.body),
         });
         const result = (await response.json()) as { error?: string };
         if (!response.ok) {
-          setMessage(result.error ?? (draftOnly ? "저장에 실패했습니다." : "메인 게시에 실패했습니다."));
+          setMessage(result.error ?? "저장에 실패했습니다.");
           return;
         }
-        if (!draftOnly) {
-          setHasLivePublishedCard(true);
-        }
-        setMessage(!draftOnly ? withPublishedCardMainReflectNotice(successMessage) : successMessage);
+        setSaveSucceeded(true);
+        setMessage(successMessage);
         router.refresh();
       } catch {
-        setMessage(draftOnly ? "저장 요청 중 오류가 발생했습니다." : "메인 게시 요청 중 오류가 발생했습니다.");
+        setMessage("저장 요청 중 오류가 발생했습니다.");
       } finally {
-        if (draftOnly) setSaveBusy(false);
-        else setPublishBusy(false);
-        isPublishingRef.current = false;
+        setSaveBusy(false);
+        saveInFlightRef.current = false;
       }
     })();
   }
@@ -664,7 +617,9 @@ export default function ClientTournamentCardPublishV2Page() {
             <div className={editorStyles.previewSlideLayer}>
               <div className={editorStyles.previewCardScaleHost}>
                 <div className={editorStyles.previewCardScaleInner}>
-                  <div className={editorStyles.previewCardWrap}>
+                  <div
+                    className={`${editorStyles.previewCardWrap} ${editorStyles.previewCardWrapV2Chrome}`}
+                  >
                     <div ref={cardPublishCaptureRef} className={editorStyles.cardPublishCaptureRoot}>
                       <TournamentSnapshotCardView
                         item={cardPublishSlidePreview}
@@ -684,7 +639,9 @@ export default function ClientTournamentCardPublishV2Page() {
               <div className={editorStyles.previewSlideLayer}>
                 <div className={editorStyles.previewCardScaleHost}>
                   <div className={editorStyles.previewCardScaleInner}>
-                    <div className={editorStyles.previewCardWrap}>
+                    <div
+                      className={`${editorStyles.previewCardWrap} ${editorStyles.previewCardWrapV2Chrome}`}
+                    >
                       <div ref={cardPublishCaptureForImageRef} className={editorStyles.cardPublishCaptureRoot}>
                         <TournamentSnapshotCardView
                           item={cardPublishSlidePreview}
@@ -708,9 +665,8 @@ export default function ClientTournamentCardPublishV2Page() {
           noValidate
           onSubmit={(e) => {
             e.preventDefault();
-            postCardSnapshot(
-              true,
-              "카드 초안이 저장되었습니다. 메인에 올리려면 「게시」 또는 대회 상세의 동일 버튼을 누르세요.",
+            saveCardDraft(
+              "카드 초안이 저장되었습니다. 아래 「상태설정으로 이동」에서 대회 상태를 맞춘 뒤 「저장/게시」로 메인에 반영해 주세요.",
             );
           }}
         >
@@ -950,24 +906,17 @@ export default function ClientTournamentCardPublishV2Page() {
 
           <div className={editorStyles.actions}>
             <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-              <button type="submit" className="v3-btn" disabled={saveBusy || publishBusy}>
+              <button type="submit" className="v3-btn" disabled={saveBusy}>
                 {saveBusy ? "저장 중" : "저장"}
               </button>
-              <button
-                type="button"
-                className="v3-btn"
-                disabled={saveBusy || publishBusy}
-                onClick={() =>
-                  postCardSnapshot(
-                    false,
-                    hasLivePublishedCard
-                      ? "게시카드가 갱신되어 메인에 반영되었습니다."
-                      : "메인에 게시되었습니다. 사이트에 반영되었습니다.",
-                  )
-                }
-              >
-                {publishBusy ? "게시 중" : "게시"}
-              </button>
+              {saveSucceeded && tournamentId.trim() ? (
+                <Link
+                  className="v3-btn"
+                  href={`/client/tournaments/${encodeURIComponent(tournamentId)}#tournament-status-badge`}
+                >
+                  상태설정으로 이동
+                </Link>
+              ) : null}
             </div>
           </div>
           </div>

@@ -3,8 +3,14 @@
 import Link from "next/link";
 import type { CSSProperties, KeyboardEvent, PointerEvent } from "react";
 import { memo, useCallback, useMemo, useState } from "react";
+import editorCardStyles from "../client/tournaments/[id]/card-publish-editor.module.css";
 import styles from "./main-sample/main-sample.module.css";
 import siteStyles from "./main-site-scroll-cards.module.css";
+import {
+  SLIDE_DECK_SOLID_BACKDROPS,
+  TournamentSnapshotCardView,
+  type SlideDeckItem,
+} from "./tournament-snapshot-card-view";
 
 const SITE_SCROLL_CARD = "data-site-scroll-card";
 const SITE_SCROLL_SHORTCUT = "data-site-scroll-shortcut";
@@ -33,6 +39,8 @@ export type MainSiteScrollCardItem = {
   scrollFaceTitleColor?: string | null;
   scrollFaceMetaColor?: string | null;
   scrollFaceStrongTextShadow?: boolean;
+  /** 대회 카드: 작성화면과 동일 컴포넌트로 렌더(광고 등은 미사용) */
+  slideDeckItem?: SlideDeckItem;
 };
 
 function publishedScrollBadgeClass(badge: string): string {
@@ -88,26 +96,90 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
   onCardPointerDown,
   lcpHeroImage = false,
 }: CardRowProps) {
+  const onPointerDown = useCallback(
+    (e: PointerEvent<HTMLDivElement>) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest(`[${SITE_SCROLL_SHORTCUT}]`)) return;
+      if (t?.closest("a[href]")) return;
+      onCardPointerDown(item.id);
+    },
+    [item.id, onCardPointerDown],
+  );
+
+  if (item.slideDeckItem) {
+    const sd = item.slideDeckItem;
+    const linkBlockStyle = {
+      width: "100%",
+      maxWidth: "100%",
+      textDecoration: "none",
+      color: "inherit",
+      WebkitTapHighlightColor: "transparent",
+    } as const;
+    const deckInner = (
+      <TournamentSnapshotCardView
+        item={sd}
+        slideDeck
+        templateCardLayout
+        editorCompactCardHeight
+        suppressLink
+        repImageHighPriority={lcpHeroImage}
+        slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
+      />
+    );
+    return (
+      <div
+        className={`${styles.sampleMainCardSlot} ${selected ? styles.sampleMainCardSlotSelected : ""}`}
+        {...{ [SITE_SCROLL_CARD]: "" }}
+        style={{ touchAction: "pan-y" }}
+        role="group"
+        tabIndex={-1}
+        aria-label={item.title.trim() ? `${item.title.trim()} 상세 보기` : "대회 상세 보기"}
+        onPointerDown={onPointerDown}
+      >
+        <div
+          className={`${styles.sampleMainCardFace} ${styles.sampleMainCardFaceTournamentDeck} ${selected ? styles.sampleMainCardFaceSelected : ""}`}
+        >
+          <div className={styles.sampleMainCardDeckFit}>
+            {item.external ? (
+              <a href={item.href} target="_blank" rel="noopener noreferrer" style={linkBlockStyle}>
+                <div className={editorCardStyles.previewCardScaleHost}>
+                  <div className={editorCardStyles.previewCardScaleInner}>
+                    <div
+                      className={`${editorCardStyles.previewCardWrap} ${editorCardStyles.previewCardWrapV2Chrome}`}
+                    >
+                      <div className={editorCardStyles.cardPublishCaptureRoot}>{deckInner}</div>
+                    </div>
+                  </div>
+                </div>
+              </a>
+            ) : (
+              <Link href={item.href} style={linkBlockStyle}>
+                <div className={editorCardStyles.previewCardScaleHost}>
+                  <div className={editorCardStyles.previewCardScaleInner}>
+                    <div
+                      className={`${editorCardStyles.previewCardWrap} ${editorCardStyles.previewCardWrapV2Chrome}`}
+                    >
+                      <div className={editorCardStyles.cardPublishCaptureRoot}>{deckInner}</div>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const hasFaceImage = Boolean(item.imageUrl?.trim());
   const usePublishedScrollLayout = Boolean(
     (item.faceIsFullPublishedSnapshot && hasFaceImage) ||
       (item.faceMatchPublishedScrollMetrics && hasFaceImage),
   );
 
-  const onPointerDown = useCallback(
-    (e: PointerEvent<HTMLDivElement>) => {
-      const t = e.target as HTMLElement | null;
-      if (t?.closest(`[${SITE_SCROLL_SHORTCUT}]`)) return;
-      onCardPointerDown(item.id);
-    },
-    [item.id, onCardPointerDown],
-  );
-
   const faceStyle: CSSProperties = {};
   if (!item.imageUrl?.trim() && item.faceCssBackground?.trim()) {
     faceStyle.background = item.faceCssBackground.trim();
-  } else if (!item.imageUrl?.trim()) {
-    faceStyle.background = "linear-gradient(180deg, #1e293b 0%, #0f172a 100%)";
   }
 
   const textShadowBase = item.scrollFaceStrongTextShadow
@@ -121,6 +193,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
     item.scrollFaceExtraLine2,
     item.scrollFaceExtraLine3,
   );
+  const overlayTextShadow = item.scrollFaceStrongTextShadow ? textShadowBase : "none";
 
   return (
     <div
@@ -164,7 +237,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
               ) : null}
               <p
                 className={styles.sampleMainCardPublishedOverlayTitle}
-                style={{ color: titleColor, textShadow: textShadowBase }}
+                style={{ color: titleColor, textShadow: overlayTextShadow }}
               >
                 {item.title}
               </p>
@@ -172,7 +245,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
                 <p
                   key={`${idx}-${line}`}
                   className={styles.sampleMainCardPublishedOverlayMeta}
-                  style={{ color: metaColor, textShadow: textShadowBase }}
+                  style={{ color: metaColor, textShadow: overlayTextShadow }}
                 >
                   {line}
                 </p>
@@ -230,7 +303,19 @@ export type MainSiteScrollCardsProps = {
 export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSiteScrollCardsProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
-  const lcpHeroItemIndex = useMemo(() => items.findIndex((x) => Boolean(x.imageUrl?.trim())), [items]);
+  const lcpHeroItemIndex = useMemo(
+    () =>
+      items.findIndex(
+        (x) =>
+          Boolean(x.imageUrl?.trim()) ||
+          Boolean(
+            x.slideDeckItem &&
+              (x.slideDeckItem.image320Url?.trim() ||
+                (typeof x.slideDeckItem.mediaBackground === "string" && x.slideDeckItem.mediaBackground.trim())),
+          ),
+      ),
+    [items],
+  );
 
   const trackStyle = useMemo(
     () =>

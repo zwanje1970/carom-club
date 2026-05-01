@@ -16,14 +16,19 @@ export default function PlatformReconcilePublishedCardsButton() {
         ok?: boolean;
         changedRowCount?: number;
         uniqueTournamentIds?: number;
+        snapshotFieldAlignmentChanged?: number;
         error?: string;
       };
       if (!res.ok) {
         setMessage(data.error ?? `요청 실패 (${res.status})`);
         return;
       }
+      const align =
+        typeof data.snapshotFieldAlignmentChanged === "number" && data.snapshotFieldAlignmentChanged > 0
+          ? ` · 배지/메인노출 정렬 ${data.snapshotFieldAlignmentChanged}건`
+          : "";
       setMessage(
-        `완료: 변경 ${typeof data.changedRowCount === "number" ? data.changedRowCount : "?"}건 · 대회 ID ${typeof data.uniqueTournamentIds === "number" ? data.uniqueTournamentIds : "?"}개 기준`,
+        `완료: 변경 ${typeof data.changedRowCount === "number" ? data.changedRowCount : "?"}건 · 대회 ID ${typeof data.uniqueTournamentIds === "number" ? data.uniqueTournamentIds : "?"}개 기준${align}`,
       );
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "실행 중 오류");

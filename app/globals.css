@@ -533,11 +533,11 @@ button.secondary-button.site-mypage-logout:hover,
 
 .site-venue-card-title {
   margin: 0;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 1rem;
   line-height: 1.35;
   letter-spacing: -0.02em;
-  color: var(--color-text-main, #111111);
+  color: #1e3a8a;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -555,11 +555,18 @@ button.secondary-button.site-mypage-logout:hover,
   overflow: hidden;
 }
 
+.site-venue-distance {
+  color: #ef4444;
+  font-weight: 500;
+}
+
 .site-venue-chips {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.35rem;
-  margin-top: 0.05rem;
+  margin-top: 0;
+  margin-bottom: 0.05rem;
+  align-items: center;
 }
 
 .site-list-chip {
@@ -575,30 +582,30 @@ button.secondary-button.site-mypage-logout:hover,
   background: #f1f5f9;
 }
 
-/* 클럽안내 카드 칩만 — 대회 .site-list-chip 등과 분리 (연한 배경·진한 글자 톤 통일) */
+/* 클럽안내 카드 칩 — 연한 배경 + 진한 글자, 그림자·bold 강조 없음 */
+.site-venue-chips .site-list-chip {
+  font-weight: 500;
+  box-shadow: none;
+}
+
 .site-venue-chips .site-list-chip.site-venue-chip--cat-daeda_only {
-  color: #1e3a5f;
-  background: #e8eef7;
+  color: #1d4ed8;
+  background: #dbeafe;
 }
 
 .site-venue-chips .site-list-chip.site-venue-chip--cat-mixed {
-  color: #7c2d12;
-  background: #fff1e6;
+  color: #be185d;
+  background: #fce7f3;
 }
 
 .site-venue-chips .site-list-chip.site-venue-chip--fee-general {
-  color: #14532d;
-  background: #e8f5e9;
+  color: #15803d;
+  background: #dcfce7;
 }
 
 .site-venue-chips .site-list-chip.site-venue-chip--fee-flat {
-  color: #4c1d95;
-  background: #f0ebff;
-}
-
-.site-venue-chips .site-list-chip.site-venue-chip--fee-mixed {
-  color: #334155;
-  background: #eef2f6;
+  color: #c2410c;
+  background: #ffedd5;
 }
 
 /* 대회 목록 상태 뱃지 — .badge-status(모집중) 외 변형만 정의 */

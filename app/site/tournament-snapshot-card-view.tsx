@@ -145,15 +145,17 @@ function MediaStack({
   const rawImg = item.image320Url?.trim();
   /** 슬라이드 단색은 '배경 이미지 없음'일 때만 이미지를 가린다 — 포스터 카드는 그대로 노출 */
   const imgUrl = rawImg || undefined;
-  const overlayBlend = Boolean(imgUrl) && item.imageOverlayBlend !== false;
-  const overlayOpacity = Math.min(1, Math.max(0.15, item.imageOverlayOpacity ?? 1));
-  const paintBg = imgUrl ? cssBg || undefined : cssBg || solidBackdrop;
-  const paintClass = [
-    styles.mediaPaint,
-    variant === "frame" && !paintBg ? styles.mediaPaintFrameDefault : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  /** 배경 이미지 위 오버레이(투명도)는 사용자가 명시적으로 켠 경우에만 적용 */
+  const overlayBlend = Boolean(imgUrl) && item.imageOverlayBlend === true;
+  const overlayOpacity =
+    overlayBlend && typeof item.imageOverlayOpacity === "number" && Number.isFinite(item.imageOverlayOpacity)
+      ? Math.min(1, Math.max(0.15, item.imageOverlayOpacity))
+      : 1;
+  const paintBg = imgUrl ? (cssBg ? cssBg : undefined) : cssBg || solidBackdrop;
+  const paintBackground =
+    paintBg ?? (imgUrl ? "transparent" : solidBackdrop?.trim() ? solidBackdrop : "transparent");
+  const paintStyle = { background: paintBackground } satisfies CSSProperties;
+  const paintClass = styles.mediaPaint;
 
   const heroImgRef = useRef<HTMLImageElement | null>(null);
   const repLoadFiredRef = useRef(false);
@@ -176,7 +178,7 @@ function MediaStack({
 
   return (
     <div className={styles.media}>
-      <div className={paintClass} style={paintBg ? { background: paintBg } : undefined} aria-hidden />
+      <div className={paintClass} style={paintStyle} aria-hidden />
       {imgUrl ? (
         <img
           ref={repImageHighPriority ? heroImgRef : undefined}
@@ -424,6 +426,7 @@ export function TournamentSnapshotCardView({
   slideDeckSolidBackdrop,
   onRepImageLoad,
   isImageCaptureMode = false,
+  suppressLink = false,
 }: {
   item: SlideDeckItem;
   slideDeck?: boolean;
@@ -435,6 +438,8 @@ export function TournamentSnapshotCardView({
   onRepImageLoad?: () => void;
   /** true: 게시 PNG(html2canvas)용 — 글자만 숨김, 배경·레이아웃 유지 */
   isImageCaptureMode?: boolean;
+  /** true: 내부 미리보기만 렌더(바깥에서 Link/a로 감쌀 때) */
+  suppressLink?: boolean;
 }) {
   const previewItem = slideDeckItemToPreviewItem(item);
   const variant: SlidePreviewVariant = item.cardTemplate === "B" ? "frame" : "classic";
@@ -455,7 +460,7 @@ export function TournamentSnapshotCardView({
       isImageCaptureMode={isImageCaptureMode}
     />
   );
-  if (!href) return inner;
+  if (!href || suppressLink) return inner;
   if (isExternal) {
     const adId = item.mainSlideAdId?.trim() ?? "";
     return (
