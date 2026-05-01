@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
 import { getUserById } from "../../../../lib/surface-read";
 import SiteShellFrame from "../../components/SiteShellFrame";
+import MypageApplicationsDeferred from "../MypageApplicationsDeferred";
 import MypageHistoryDynamicMount from "./MypageHistoryDynamicMount";
 
 export default async function SiteMypageHistoryPage() {
@@ -20,17 +21,19 @@ export default async function SiteMypageHistoryPage() {
   return (
     <SiteShellFrame brandTitle="지난 대회">
       <section className="site-site-gray-main v3-stack site-mypage-shell">
+        <MypageApplicationsDeferred />
+
         <section className="card-clean site-detail-inner-stack">
           <h2 className="site-mypage-card-title">종료 / 지난 신청 기록</h2>
           <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
-            진행 중 목록에 나오지 않는 기록입니다.
+            대회가 종료되었거나 진행 중 신청 목록에서 사라진 기록입니다.
           </p>
 
           <MypageHistoryDynamicMount />
         </section>
 
         <Link className="secondary-button" href="/site/mypage" style={{ alignSelf: "flex-start" }}>
-          진행 중 신청으로
+          마이페이지로
         </Link>
       </section>
     </SiteShellFrame>

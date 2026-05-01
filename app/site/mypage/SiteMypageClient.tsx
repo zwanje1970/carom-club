@@ -1,34 +1,9 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import LogoutButton from "../../components/LogoutButton";
 import type { MypageClientMenuPayload } from "./mypage-client-types";
-
-const MypageNotificationsDeferred = dynamic(() => import("./MypageNotificationsDeferred"), {
-  ssr: false,
-  loading: () => (
-    <section className="card-clean site-detail-inner-stack">
-      <h2 className="site-mypage-card-title">최근 알림</h2>
-      <p className="v3-muted" style={{ margin: 0 }}>
-        불러오는 중…
-      </p>
-    </section>
-  ),
-});
-
-const MypageApplicationsDeferred = dynamic(() => import("./MypageApplicationsDeferred"), {
-  ssr: false,
-  loading: () => (
-    <section className="card-clean site-detail-inner-stack">
-      <h2 className="site-mypage-card-title">진행중 / 미완료 신청</h2>
-      <p className="v3-muted" style={{ margin: 0 }}>
-        불러오는 중…
-      </p>
-    </section>
-  ),
-});
 
 export type SiteMypageUserSummary = {
   id: string;
@@ -48,7 +23,6 @@ export default function SiteMypageClient({
   hidePlatformDashboardLink?: boolean;
 }) {
   const [menuPayload, setMenuPayload] = useState<MypageClientMenuPayload | null>(null);
-  const [summaryClientPayload, setSummaryClientPayload] = useState<MypageClientMenuPayload | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,11 +44,6 @@ export default function SiteMypageClient({
     };
   }, []);
 
-  const onNotificationsMenuMeta = useCallback((p: MypageClientMenuPayload) => {
-    setSummaryClientPayload(p);
-  }, []);
-
-  const summaryClientApproved = summaryClientPayload?.clientApplicationStatus === "APPROVED";
   const clientPending = menuPayload?.clientApplicationStatus === "PENDING";
   const clientApproved = menuPayload?.clientApplicationStatus === "APPROVED";
 
@@ -99,7 +68,7 @@ export default function SiteMypageClient({
             <dt className="site-mypage-summary-dt">전화번호</dt>
             <dd className="site-mypage-summary-dd">{user.phone ?? "-"}</dd>
           </div>
-          {summaryClientApproved ? (
+          {clientApproved ? (
             <div className="site-mypage-summary-row">
               <dt className="site-mypage-summary-dt">회원 구분</dt>
               <dd className="site-mypage-summary-dd">클라이언트 회원</dd>
@@ -110,10 +79,6 @@ export default function SiteMypageClient({
           내 정보 수정
         </Link>
       </section>
-
-      <MypageNotificationsDeferred onNotificationsMenuMeta={onNotificationsMenuMeta} />
-
-      <MypageApplicationsDeferred />
 
       <div className="site-mypage-footer-actions">
         {menuPayload === null ? (

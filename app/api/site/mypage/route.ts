@@ -4,7 +4,6 @@ import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/au
 import {
   getClientStatusByUserId,
   getUserById,
-  listNotificationsByUserId,
   updateUserProfile,
   type TournamentApplicationStatus,
 } from "../../../../lib/platform-api";
@@ -84,45 +83,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ clientApplicationStatus });
   }
 
-  if (part === "notifications") {
-    let notifications: Awaited<ReturnType<typeof listNotificationsByUserId>> = [];
-    let clientApplicationStatus: Awaited<ReturnType<typeof getClientStatusByUserId>> = null;
-    try {
-      notifications = await listNotificationsByUserId(user.id, 20);
-    } catch (e) {
-      console.warn("[api/site/mypage?part=notifications] listNotificationsByUserId", e);
-    }
-    try {
-      clientApplicationStatus = await getClientStatusByUserId(user.id);
-    } catch (e) {
-      console.warn("[api/site/mypage?part=notifications] getClientStatusByUserId", e);
-    }
-    return NextResponse.json({
-      notifications: notifications.map((n) => ({
-        id: n.id,
-        title: n.title,
-        message: n.message,
-        relatedTournamentId: n.relatedTournamentId,
-        createdAt: n.createdAt,
-        isRead: n.isRead,
-      })),
-      clientApplicationStatus,
-    });
-  }
-
   if (part === "applications") {
     const applicationRows = await getMypageApplicationRowsPayload(user.id);
     return NextResponse.json({ applicationRows });
   }
 
-  let notifications: Awaited<ReturnType<typeof listNotificationsByUserId>> = [];
   let clientApplicationStatus: Awaited<ReturnType<typeof getClientStatusByUserId>> = null;
   let applicationRows: Awaited<ReturnType<typeof getMypageApplicationRowsPayload>> = [];
-  try {
-    notifications = await listNotificationsByUserId(user.id, 20);
-  } catch (e) {
-    console.warn("[api/site/mypage] listNotificationsByUserId", e);
-  }
   try {
     clientApplicationStatus = await getClientStatusByUserId(user.id);
   } catch (e) {
@@ -135,14 +102,6 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({
-    notifications: notifications.map((n) => ({
-      id: n.id,
-      title: n.title,
-      message: n.message,
-      relatedTournamentId: n.relatedTournamentId,
-      createdAt: n.createdAt,
-      isRead: n.isRead,
-    })),
     clientApplicationStatus,
     applicationRows,
   });
