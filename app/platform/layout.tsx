@@ -1,4 +1,5 @@
 import type { Viewport } from "next";
+import "./platform-dashboard.css";
 import AdminFabServerBridge from "../components/AdminFabServerBridge";
 import DashboardMobileChromeLayout from "../components/DashboardMobileChromeLayout";
 import GlobalHomeButton from "../components/GlobalHomeButton";

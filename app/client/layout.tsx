@@ -1,4 +1,5 @@
 import type { Viewport } from "next";
+import "./client-dashboard.css";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { isCaromClubMobileAppShell } from "../../lib/is-carom-club-mobile-app-shell";

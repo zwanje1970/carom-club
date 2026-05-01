@@ -60,6 +60,13 @@ function isDashboardPath(pathname: string): boolean {
   return p.startsWith("/client") || p.startsWith("/platform");
 }
 
+/** 공개 메인 — 관리자 FAB 비노출(다른 공개 경로·대시보드는 기존과 동일) */
+function isPublicSiteMainHomePathname(path: string): boolean {
+  const raw = path.split("?")[0] ?? "";
+  const p = raw.length > 1 && raw.endsWith("/") ? raw.slice(0, -1) : raw;
+  return p === "/" || p === "/site";
+}
+
 function showFabForUser(user: SessionUser | null): boolean {
   if (!user) return false;
   if (user.role === "PLATFORM") return true;
@@ -169,6 +176,7 @@ export default function AdminDashboardFloatingFab({
   );
 
   if (!showFabForUser(user)) return null;
+  if (isPublicSiteMainHomePathname(pathname)) return null;
   if (!pos) return null;
 
   const onDash = isDashboardPath(pathname);

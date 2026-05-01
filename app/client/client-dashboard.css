@@ -1,0 +1,535 @@
+/* —— Reference UI: 클라이언트 대시보드(카드 + 상태 + 액션) —— */
+.ui-client-dashboard {
+  gap: 1.25rem !important;
+}
+
+.ui-client-dashboard-header {
+  align-items: flex-start !important;
+  flex-wrap: wrap;
+  gap: 0.75rem !important;
+}
+
+@media (min-width: 40rem) {
+  .ui-client-dashboard-header {
+    align-items: center !important;
+  }
+}
+
+/* --- /client 대시보드 홈: 디자인 시스템 (색상 고정값, 구조·로직 변경 없음) --- */
+.app-dashboard-mobile-root:has(main.client-dashboard-main),
+.app-dashboard-shell.app-mobile-bottom-nav-scroll-pad:has(main.client-dashboard-main) {
+  background: #f5f7fb;
+}
+
+main.client-dashboard-main {
+  --ds-primary: #2f6bff;
+  --ds-success: #22c55e;
+  --ds-warning: #f59e0b;
+  --ds-purple: #8b5cf6;
+  --ds-gray-bg: #f5f7fb;
+  --ds-card-bg: #ffffff;
+  --ds-text-main: #1a1a1a;
+  --ds-text-sub: #6b7280;
+  background: var(--ds-gray-bg);
+  color: var(--ds-text-main);
+}
+
+main.client-dashboard-main .ui-client-dashboard-header p {
+  color: var(--ds-text-main);
+}
+
+main.client-dashboard-main section:not(.client-dashboard-main__cta) > .v3-h2,
+main.client-dashboard-main .client-dashboard-main__dsCard .v3-h2 {
+  color: var(--ds-text-main);
+}
+
+main.client-dashboard-main .v3-muted {
+  color: var(--ds-text-sub) !important;
+}
+
+main.client-dashboard-main .client-dashboard-main__warn {
+  color: var(--ds-warning) !important;
+}
+
+/* “지금 해야 할 일” 강조 카드 */
+main.client-dashboard-main .client-dashboard-main__cta {
+  display: flex;
+  flex-direction: column;
+  padding: 1.15rem 1.3rem 1.25rem;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--ds-primary) 0%, var(--ds-purple) 100%);
+  box-shadow: 0 4px 20px rgba(47, 107, 255, 0.22);
+  border: none;
+  gap: 0.85rem !important;
+}
+
+main.client-dashboard-main .client-dashboard-main__cta .v3-h2 {
+  color: #ffffff;
+}
+
+main.client-dashboard-main .client-dashboard-main__cta > p {
+  color: rgba(255, 255, 255, 0.88);
+  flex: 0 0 auto;
+}
+
+main.client-dashboard-main .client-dashboard-main__ctaInner {
+  background: transparent;
+  border: none !important;
+  box-shadow: none;
+  padding: 0.35rem 0 0;
+  margin: 0;
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
+  flex: 1 1 auto;
+  min-height: 4.75rem;
+  gap: 0;
+}
+
+main.client-dashboard-main .client-dashboard-main__ctaInner a.v3-btn {
+  width: 100%;
+  max-width: 100%;
+  text-align: center;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  background: #ffffff !important;
+  color: #2f6bff !important;
+  border: none !important;
+  border-radius: 16px;
+  padding: 1.15rem 1.5rem;
+  font-weight: 700;
+  min-height: 3.25rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+main.client-dashboard-main .client-dashboard-main__ctaInner a.v3-btn:hover {
+  background: #ffffff !important;
+  color: #2f6bff !important;
+}
+
+main.client-dashboard-main .client-dashboard-main__ctaInner a.v3-btn:active {
+  transform: scale(0.97);
+}
+
+/* 공통 카드 (연회원·대회 행·주요 기능 그리드·부가기능) */
+main.client-dashboard-main .client-dashboard-main__dsCard {
+  background: var(--ds-card-bg);
+  border-radius: 16px;
+  padding: 1rem 1.2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: none !important;
+  box-sizing: border-box;
+}
+
+main.client-dashboard-main details.client-dashboard-main__dsCard summary {
+  color: var(--ds-text-main);
+}
+
+main.client-dashboard-main details.client-dashboard-main__dsCard .v3-stack li {
+  color: var(--ds-text-sub);
+}
+
+main.client-dashboard-main details.client-dashboard-main__extras {
+  background: #ffffff;
+  border: none !important;
+  outline: none;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  scroll-margin-top: 0.75rem;
+}
+
+main.client-dashboard-main details.client-dashboard-main__extras > summary {
+  list-style: none;
+  list-style-type: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0 0 0.15rem;
+  padding: 0 0 0.65rem;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.65);
+}
+
+main.client-dashboard-main .client-dashboard-main__extrasSummaryLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+main.client-dashboard-main .client-dashboard-main__extrasIconWrap {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(47, 107, 255, 0.08);
+  color: #3d6fd8;
+}
+
+main.client-dashboard-main .client-dashboard-main__extrasIconWrap svg {
+  width: 18px;
+  height: 18px;
+}
+
+main.client-dashboard-main .client-dashboard-main__extrasSummaryTitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ds-text-main);
+}
+
+main.client-dashboard-main .client-dashboard-main__extrasSummaryChevron {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  line-height: 1;
+  color: #9ca3af;
+  opacity: 0.95;
+  transition: transform 0.15s ease;
+  user-select: none;
+}
+
+main.client-dashboard-main details.client-dashboard-main__extras[open] > summary .client-dashboard-main__extrasSummaryChevron {
+  transform: rotate(180deg);
+}
+
+main.client-dashboard-main details.client-dashboard-main__extras > summary::-webkit-details-marker {
+  display: none;
+}
+
+main.client-dashboard-main details.client-dashboard-main__extras > summary:focus {
+  outline: none;
+}
+
+main.client-dashboard-main .client-dashboard-main__extrasList {
+  display: flex;
+  flex-direction: column;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  gap: 6px;
+}
+
+main.client-dashboard-main .client-dashboard-main__extrasRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  min-height: 48px;
+  box-sizing: border-box;
+  padding: 15px 4px;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  color: var(--ds-text-sub);
+  border-bottom: none;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: 10px;
+}
+
+main.client-dashboard-main .client-dashboard-main__extrasRow:active {
+  background: #f5f7fb;
+}
+
+main.client-dashboard-main .client-dashboard-main__extrasRowLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+main.client-dashboard-main .client-dashboard-main__extrasRowChevron {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1;
+  color: #9ca3af;
+}
+
+main.client-dashboard-main .client-dashboard-main__tournamentEmpty {
+  margin: 0;
+  padding: 0.65rem 0.15rem 0.35rem;
+  text-align: left;
+  font-size: 0.9rem;
+  color: var(--ds-text-sub);
+}
+
+/* 진행중 대회 — 업무 카드형 */
+main.client-dashboard-main .client-dashboard-main__tournamentList {
+  gap: 0.65rem !important;
+}
+
+main.client-dashboard-main li.client-dashboard-main__tournamentCard {
+  gap: 0.7rem !important;
+  padding: 1.1rem 1.25rem !important;
+}
+
+main.client-dashboard-main .client-dashboard-main__tournamentTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.45rem 0.75rem;
+}
+
+main.client-dashboard-main .client-dashboard-main__tournamentTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.35;
+  color: var(--ds-text-main);
+}
+
+main.client-dashboard-main .client-dashboard-main__tournamentBadge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.1rem 0.48rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+}
+
+main.client-dashboard-main .client-dashboard-main__tournamentBadge--success {
+  background: rgba(34, 197, 94, 0.14);
+  color: #22c55e;
+}
+
+main.client-dashboard-main .client-dashboard-main__tournamentBadge--warning {
+  background: rgba(245, 158, 11, 0.16);
+  color: #f59e0b;
+}
+
+main.client-dashboard-main .client-dashboard-main__tournamentBadge--purple {
+  background: rgba(139, 92, 246, 0.14);
+  color: #8b5cf6;
+}
+
+main.client-dashboard-main .client-dashboard-main__tournamentBadge--neutral {
+  background: rgba(107, 114, 128, 0.12);
+  color: #6b7280;
+}
+
+main.client-dashboard-main .client-dashboard-main__tournamentMeta {
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--ds-text-sub);
+}
+
+main.client-dashboard-main .client-dashboard-main__tournamentActions {
+  margin-top: 0.05rem;
+}
+
+main.client-dashboard-main a.client-dashboard-main__tournamentManage {
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  padding: 0.68rem 1rem;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  text-decoration: none;
+  background: var(--ds-primary);
+  color: #ffffff;
+  border: none;
+}
+
+/* 기본 버튼 (강조 카드 내부 링크는 위에서 별도 지정) */
+main.client-dashboard-main .v3-btn {
+  border-radius: 12px;
+  padding: 0.6rem 1.05rem;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  color: var(--ds-text-main);
+  background: #ffffff;
+}
+
+main.client-dashboard-main .v3-btn:hover:not(:disabled) {
+  background: #ffffff;
+}
+
+main.client-dashboard-main .v3-btn:disabled {
+  opacity: 0.65;
+}
+
+main.client-dashboard-main .client-dashboard-main__featureGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+/* 주요 기능 — 카드형 링크 (아이콘 영역만 톤 색) */
+main.client-dashboard-main a.client-dashboard-main__featureCard {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.85rem;
+  text-decoration: none;
+  color: inherit;
+  background: var(--ds-card-bg);
+  border-radius: 16px;
+  padding: 1rem 1.05rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: none;
+  box-sizing: border-box;
+  min-height: 4.25rem;
+  min-width: 0;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+main.client-dashboard-main a.client-dashboard-main__featureCard:active {
+  transform: scale(0.97);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+main.client-dashboard-main .client-dashboard-main__featureIconWrap {
+  width: 3.1rem;
+  height: 3.1rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+main.client-dashboard-main .client-dashboard-main__featureIconWrap svg {
+  width: 1.45rem;
+  height: 1.45rem;
+}
+
+main.client-dashboard-main .client-dashboard-main__featureCard--primary .client-dashboard-main__featureIconWrap {
+  background: rgba(47, 107, 255, 0.14);
+  color: #2f6bff;
+}
+
+main.client-dashboard-main .client-dashboard-main__featureCard--success .client-dashboard-main__featureIconWrap {
+  background: rgba(34, 197, 94, 0.14);
+  color: #22c55e;
+}
+
+main.client-dashboard-main .client-dashboard-main__featureCard--purple .client-dashboard-main__featureIconWrap {
+  background: rgba(139, 92, 246, 0.14);
+  color: #8b5cf6;
+}
+
+main.client-dashboard-main .client-dashboard-main__featureCard--warning .client-dashboard-main__featureIconWrap {
+  background: rgba(245, 158, 11, 0.14);
+  color: #f59e0b;
+}
+
+main.client-dashboard-main .client-dashboard-main__featureText {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+main.client-dashboard-main .client-dashboard-main__featureTitle {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--ds-text-main);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+main.client-dashboard-main .client-dashboard-main__featureDesc {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--ds-text-sub);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ui-client-stat {
+  font-size: 0.95rem;
+  color: #475569;
+  margin: 0;
+}
+
+.ui-client-filters {
+  gap: 0.45rem !important;
+  flex-wrap: wrap;
+}
+
+.ui-client-filter-pill {
+  display: inline-block;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  font-size: 0.85rem;
+  color: #64748b;
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.ui-client-tournament-card {
+  gap: 0.85rem !important;
+}
+
+.ui-client-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.ui-client-status-badge--ongoing {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.ui-client-status-badge--recruit {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.ui-client-card-actions {
+  gap: 0.45rem !important;
+  flex-wrap: wrap;
+}
+
+.ui-btn-primary-solid {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.95rem;
+  border-radius: 0.55rem;
+  border: none;
+  background: var(--ui-primary);
+  color: #fff !important;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.ui-btn-primary-solid:hover {
+  background: var(--ui-primary-dark);
+}

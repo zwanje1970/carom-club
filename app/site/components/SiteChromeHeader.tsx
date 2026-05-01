@@ -41,6 +41,13 @@ function isSiteMainHubNavHref(href: string): boolean {
   return SITE_MAIN_HUB_NAV_PATHS.has(p);
 }
 
+/** `/`·`/site` 공개 메인 — 관리자 헤더 링크는 노출하지 않음(진입은 URL 직접·FAB·마이페이지 등) */
+function isPublicSiteMainHomePathname(pathname: string): boolean {
+  const raw = pathname.split("?")[0] ?? "";
+  const p = raw.length > 1 && raw.endsWith("/") ? raw.slice(0, -1) : raw;
+  return p === "/" || p === "/site";
+}
+
 /**
  * 커뮤니티가 아닐 때: 기본 동작(Next 기본 prefetch).
  * 커뮤니티일 때: 주요 허브만 동일, 그 외(관리자 진입 등)는 prefetch 끔.
@@ -67,21 +74,25 @@ export default function SiteChromeHeader({
   const myBadge =
     unreadNotificationCount > 0 ? (unreadNotificationCount > 99 ? "99+" : String(unreadNotificationCount)) : null;
 
-  const adminAfterMypage =
-    pcAdminEntry && (pcAdminEntry.showClient || pcAdminEntry.showPlatform) ? (
-      <>
-        {pcAdminEntry.showClient ? (
-          <Link prefetch={prefetchPropForHeaderLink(pathname, "/client")} href="/client">
-            클라이언트관리자
-          </Link>
-        ) : null}
-        {pcAdminEntry.showPlatform ? (
-          <Link prefetch={prefetchPropForHeaderLink(pathname, "/platform")} href="/platform">
-            플랫폼관리자
-          </Link>
-        ) : null}
-      </>
-    ) : null;
+  const showHeaderAdminEntry =
+    pcAdminEntry &&
+    (pcAdminEntry.showClient || pcAdminEntry.showPlatform) &&
+    !isPublicSiteMainHomePathname(pathname);
+
+  const adminAfterMypage = showHeaderAdminEntry ? (
+    <>
+      {pcAdminEntry.showClient ? (
+        <Link prefetch={prefetchPropForHeaderLink(pathname, "/client")} href="/client">
+          클라이언트관리자
+        </Link>
+      ) : null}
+      {pcAdminEntry.showPlatform ? (
+        <Link prefetch={prefetchPropForHeaderLink(pathname, "/platform")} href="/platform">
+          플랫폼관리자
+        </Link>
+      ) : null}
+    </>
+  ) : null;
 
   const renderMainNav = (item: SiteLayoutMenuItem, index: number) => {
     const showBadge = myBadge != null && isMypageHeaderHref(item.href);
