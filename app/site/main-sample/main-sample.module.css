@@ -466,6 +466,13 @@
   z-index: 2;
 }
 
+/* 대회 카드(에디터 미리보기): 내부 레이어 z-index 위에 CTA가 보이도록 — 선택 시에만 DOM에 마운트 */
+.sampleMainCardFace.sampleMainCardFaceTournamentDeck .sampleMainCardShortcut {
+  z-index: 12;
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .sampleMainCardTitleOverlay {
   position: absolute;
   left: 0;

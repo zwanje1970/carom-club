@@ -55,4 +55,6 @@
   align-items: stretch;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
+  position: relative;
+  z-index: 0;
 }

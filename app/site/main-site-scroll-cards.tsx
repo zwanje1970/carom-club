@@ -152,31 +152,31 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
               </div>
             </div>
           </div>
-          {item.external ? (
-            <a
-              href={item.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.sampleMainCardShortcut}
-              {...{ [SITE_SCROLL_SHORTCUT]: "" }}
-              tabIndex={selected ? 0 : -1}
-              aria-hidden={!selected}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              자세히 보기 ▶
-            </a>
-          ) : (
-            <Link
-              href={item.href}
-              className={styles.sampleMainCardShortcut}
-              {...{ [SITE_SCROLL_SHORTCUT]: "" }}
-              tabIndex={selected ? 0 : -1}
-              aria-hidden={!selected}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              자세히 보기 ▶
-            </Link>
-          )}
+          {selected ? (
+            item.external ? (
+              <a
+                href={item.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.sampleMainCardShortcut}
+                {...{ [SITE_SCROLL_SHORTCUT]: "" }}
+                tabIndex={0}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                자세히 보기 ▶
+              </a>
+            ) : (
+              <Link
+                href={item.href}
+                className={styles.sampleMainCardShortcut}
+                {...{ [SITE_SCROLL_SHORTCUT]: "" }}
+                tabIndex={0}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                자세히 보기 ▶
+              </Link>
+            )
+          ) : null}
         </div>
       </div>
     );
