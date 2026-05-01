@@ -28,6 +28,25 @@ function tournamentApplicationFromFirestore(id: string, data: Record<string, unk
     st === "REJECTED"
       ? st
       : "APPLIED";
+  const regSrc = item.registrationSource;
+  const registrationSource = regSrc === "admin" ? ("admin" as const) : null;
+  const pa = item.participantAverage;
+  const participantAverage =
+    typeof pa === "number" && Number.isFinite(pa)
+      ? pa
+      : pa != null && typeof pa === "string" && pa.trim() !== "" && Number.isFinite(Number(pa))
+        ? Number(pa)
+        : null;
+  const adminNoteRaw = item.adminNote;
+  const adminNote =
+    adminNoteRaw === null || adminNoteRaw === undefined
+      ? null
+      : typeof adminNoteRaw === "string"
+        ? adminNoteRaw.trim() || null
+        : null;
+  const ac = item.attendanceChecked;
+  const attendanceChecked = ac === true ? true : ac === false ? false : null;
+
   return {
     id,
     tournamentId: typeof item.tournamentId === "string" ? item.tournamentId : "",
@@ -53,6 +72,10 @@ function tournamentApplicationFromFirestore(id: string, data: Record<string, unk
         : typeof item.updatedAt === "string" && item.updatedAt !== ""
           ? item.updatedAt
           : createdAt,
+    registrationSource,
+    participantAverage,
+    adminNote,
+    attendanceChecked,
   };
 }
 
@@ -391,4 +414,114 @@ export async function listDeduplicatedApplicantsForClientOwnerFirestore(params: 
   }
   rows.sort((a, b) => a.applicantName.localeCompare(b.applicantName, "ko"));
   return rows;
+}
+
+const MANUAL_PARTICIPANT_USER_ID_PREFIX = "manual-participant:";
+
+export function isManualParticipantUserId(userId: string): boolean {
+  return typeof userId === "string" && userId.startsWith(MANUAL_PARTICIPANT_USER_ID_PREFIX);
+}
+
+/** OCR·증빙 없이 관리자가 승인 상태로 등록(현장 입력) */
+export async function createAdminRegisteredParticipantFirestore(params: {
+  tournamentId: string;
+  applicantName: string;
+  participantAverage: number;
+  phone: string;
+  adminNote: string;
+}): Promise<{ ok: true; application: TournamentApplication } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const applicantName = params.applicantName.trim();
+  if (!applicantName) return { ok: false, error: "이름을 입력해 주세요." };
+  const avg = Number(params.participantAverage);
+  if (!Number.isFinite(avg)) return { ok: false, error: "에버를 입력해 주세요." };
+
+  const tournament = await getTournamentByIdFirestore(params.tournamentId);
+  if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다." };
+
+  const id = randomUUID();
+  const manualUserId = `${MANUAL_PARTICIPANT_USER_ID_PREFIX}${id}`;
+  const now = new Date().toISOString();
+  const application: TournamentApplication = {
+    id,
+    tournamentId: params.tournamentId.trim(),
+    userId: manualUserId,
+    applicantName,
+    phone: params.phone.trim(),
+    depositorName: "",
+    proofImageId: "",
+    proofImage320Url: "",
+    proofImage640Url: "",
+    proofOriginalUrl: "",
+    ocrStatus: "NOT_REQUESTED",
+    ocrText: "",
+    ocrRawResult: "",
+    ocrRequestedAt: null,
+    ocrCompletedAt: null,
+    status: "APPROVED",
+    createdAt: now,
+    updatedAt: now,
+    statusChangedAt: now,
+    registrationSource: "admin",
+    participantAverage: avg,
+    adminNote: params.adminNote.trim() ? params.adminNote.trim() : null,
+    attendanceChecked: false,
+  };
+
+  const plain: Record<string, unknown> = {
+    id: application.id,
+    tournamentId: application.tournamentId,
+    userId: application.userId,
+    applicantName: application.applicantName,
+    phone: application.phone,
+    depositorName: application.depositorName,
+    proofImageId: application.proofImageId,
+    proofImage320Url: application.proofImage320Url,
+    proofImage640Url: application.proofImage640Url,
+    proofOriginalUrl: application.proofOriginalUrl,
+    ocrStatus: application.ocrStatus,
+    ocrText: application.ocrText,
+    ocrRawResult: application.ocrRawResult,
+    ocrRequestedAt: application.ocrRequestedAt,
+    ocrCompletedAt: application.ocrCompletedAt,
+    status: application.status,
+    createdAt: application.createdAt,
+    updatedAt: application.updatedAt,
+    statusChangedAt: application.statusChangedAt,
+    registrationSource: "admin",
+    participantAverage: application.participantAverage,
+    adminNote: application.adminNote,
+    attendanceChecked: application.attendanceChecked,
+  };
+
+  const db = getSharedFirestoreDb();
+  await db.collection(COLLECTION).doc(id).set(plain);
+  return { ok: true, application };
+}
+
+export async function updateParticipantAttendanceCheckedFirestore(params: {
+  tournamentId: string;
+  entryId: string;
+  checked: boolean;
+}): Promise<{ ok: true; application: TournamentApplication } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const tournamentId = params.tournamentId.trim();
+  const entryId = params.entryId.trim();
+  if (!tournamentId || !entryId) return { ok: false, error: "잘못된 요청입니다." };
+
+  const application = await getTournamentApplicationByIdFirestore(tournamentId, entryId);
+  if (!application) return { ok: false, error: "참가신청을 찾을 수 없습니다." };
+
+  const now = new Date().toISOString();
+  const db = getSharedFirestoreDb();
+  await db.collection(COLLECTION).doc(entryId).set(
+    {
+      attendanceChecked: params.checked,
+      updatedAt: now,
+    },
+    { merge: true }
+  );
+  const after = await getTournamentApplicationByIdFirestore(tournamentId, entryId);
+  if (!after) return { ok: false, error: "참가신청을 찾을 수 없습니다." };
+  return { ok: true, application: after };
 }

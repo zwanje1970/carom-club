@@ -41,7 +41,7 @@ async function SiteTournamentsPageContent({
     statusBadge: s.statusBadge,
     title: s.title,
     scheduleLine: s.dateLabel,
-    locationLine: s.regionLabel,
+    locationLine: s.venueName,
     bracketParen: s.playScaleLabel.trim() ? s.playScaleLabel : null,
     posterSrc: s.thumbnail160Url,
   }));

@@ -50,6 +50,20 @@ function tournamentPlayScaleLabel(t: Pick<Tournament, "maxParticipants">): strin
   return `${Math.floor(n)}강`;
 }
 
+/** Tournament `location` 값에서 주최장소명만 — `app/client/tournaments/.../card-publish-v2`의 venueNameOnly와 동일 */
+function tournamentVenueDisplayNameFromLocation(raw: string | null | undefined): string {
+  let s = String(raw ?? "").trim();
+  if (!s) return "";
+  s = s.split(/\r?\n/)[0]?.trim() ?? "";
+  const slashPart = s.split(/\s*\/\s*/)[0]?.trim() ?? "";
+  if (slashPart) s = slashPart;
+  const comma = s.indexOf(",");
+  if (comma > 0) {
+    s = s.slice(0, comma).trim();
+  }
+  return s;
+}
+
 function buildTournamentSnapshot(t: Tournament, rebuiltAt: string): SiteTournamentListSnapshot {
   const regionSource = typeof t.location === "string" ? t.location.trim() : "";
   return {
@@ -59,6 +73,7 @@ function buildTournamentSnapshot(t: Tournament, rebuiltAt: string): SiteTourname
     playScaleLabel: tournamentPlayScaleLabel(t),
     dateLabel: tournamentDateLabelForList(t),
     regionLabel: buildRegionLabelForSiteListSnapshot(regionSource),
+    venueName: tournamentVenueDisplayNameFromLocation(regionSource),
     thumbnail160Url: resolveSiteImageListThumbnailUrl(t.posterImageUrl),
     detailUrl: `/site/tournaments/${t.id}`,
     sortDate: tournamentDeadlineSortValue(t),
@@ -99,6 +114,8 @@ function parseTournamentSnapshots(raw: unknown): SiteTournamentListSnapshot[] | 
     const playScaleLabel = typeof o.playScaleLabel === "string" ? o.playScaleLabel : "";
     const dateLabel = typeof o.dateLabel === "string" ? o.dateLabel : "";
     const regionLabel = typeof o.regionLabel === "string" ? o.regionLabel : "";
+    if (!("venueName" in o)) return null;
+    const venueName = typeof o.venueName === "string" ? o.venueName : "";
     const thumbnail160Url =
       o.thumbnail160Url === null || typeof o.thumbnail160Url === "string" ? o.thumbnail160Url : null;
     const detailUrl = typeof o.detailUrl === "string" ? o.detailUrl : "";
@@ -114,6 +131,7 @@ function parseTournamentSnapshots(raw: unknown): SiteTournamentListSnapshot[] | 
       playScaleLabel,
       dateLabel,
       regionLabel,
+      venueName,
       thumbnail160Url,
       detailUrl,
       sortDate,

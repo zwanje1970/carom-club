@@ -7,6 +7,7 @@ import { listTournamentApplicationsByTournamentIdFirestore } from "../../../../.
 import { getTournamentByIdFirestore } from "../../../../../lib/server/firestore-tournaments";
 import type { TournamentApplication } from "../../../../../lib/types/entities";
 import ParticipantListRow from "./ParticipantListRow";
+import ParticipantsToolbar from "./ParticipantsToolbar";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +83,7 @@ export default async function ClientTournamentParticipantsPage({
         <p className="v3-muted" style={{ margin: "0.35rem 0 0", fontSize: "0.88rem" }}>
           참가자 관리
         </p>
+        <ParticipantsToolbar tournamentId={id} />
       </header>
 
       <section className="v3-stack" style={{ gap: "0.5rem", marginBottom: "0.65rem" }}>
@@ -163,6 +165,9 @@ export default async function ClientTournamentParticipantsPage({
                 hour: "2-digit",
                 minute: "2-digit",
               })}
+              registrationSource={entry.registrationSource ?? null}
+              participantAverage={entry.participantAverage ?? null}
+              adminNote={entry.adminNote ?? null}
             />
           ))
         )}

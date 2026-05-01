@@ -454,6 +454,14 @@ export type TournamentApplication = {
   createdAt: string;
   updatedAt: string;
   statusChangedAt: string;
+  /** 관리자 현장 등록 등. 없으면 일반 신청 */
+  registrationSource?: "admin" | null;
+  /** 관리자 등록 시 에버(숫자). 일반 신청은 미사용 */
+  participantAverage?: number | null;
+  /** 관리자 등록 비고 */
+  adminNote?: string | null;
+  /** 출석(현장 운영·인쇄 목록 연동) */
+  attendanceChecked?: boolean | null;
 };
 
 export type BracketParticipantSnapshotParticipant = {
@@ -6581,6 +6589,91 @@ export async function createTournamentApplication(params: {
   store.tournamentApplications.push(application);
   await writeLocalJsonAggregate(store);
   return { ok: true, application };
+}
+
+export async function createAdminRegisteredParticipant(params: {
+  tournamentId: string;
+  applicantName: string;
+  participantAverage: number;
+  phone: string;
+  adminNote: string;
+}): Promise<{ ok: true; application: TournamentApplication } | { ok: false; error: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    const { createAdminRegisteredParticipantFirestore } = await import("./firestore-tournament-applications");
+    return createAdminRegisteredParticipantFirestore(params);
+  }
+  if (process.env.NODE_ENV !== "development") {
+    return { ok: false, error: "저장소가 설정되지 않았습니다." };
+  }
+  const applicantName = params.applicantName.trim();
+  if (!applicantName) return { ok: false, error: "이름을 입력해 주세요." };
+  const avg = Number(params.participantAverage);
+  if (!Number.isFinite(avg)) return { ok: false, error: "에버를 입력해 주세요." };
+  const store = await readLocalJsonAggregate();
+  const tournament = store.tournaments.find((t) => t.id === params.tournamentId.trim());
+  if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다." };
+  const id = randomUUID();
+  const manualUserId = `manual-participant:${id}`;
+  const now = new Date().toISOString();
+  const application: TournamentApplication = {
+    id,
+    tournamentId: params.tournamentId.trim(),
+    userId: manualUserId,
+    applicantName,
+    phone: params.phone.trim(),
+    depositorName: "",
+    proofImageId: "",
+    proofImage320Url: "",
+    proofImage640Url: "",
+    proofOriginalUrl: "",
+    ocrStatus: "NOT_REQUESTED",
+    ocrText: "",
+    ocrRawResult: "",
+    ocrRequestedAt: null,
+    ocrCompletedAt: null,
+    status: "APPROVED",
+    createdAt: now,
+    updatedAt: now,
+    statusChangedAt: now,
+    registrationSource: "admin",
+    participantAverage: avg,
+    adminNote: params.adminNote.trim() ? params.adminNote.trim() : null,
+    attendanceChecked: false,
+  };
+  store.tournamentApplications.push(application);
+  await writeLocalJsonAggregate(store);
+  return { ok: true, application };
+}
+
+export async function updateParticipantAttendanceChecked(params: {
+  tournamentId: string;
+  entryId: string;
+  checked: boolean;
+}): Promise<{ ok: true; application: TournamentApplication } | { ok: false; error: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    const { updateParticipantAttendanceCheckedFirestore } = await import("./firestore-tournament-applications");
+    return updateParticipantAttendanceCheckedFirestore(params);
+  }
+  if (process.env.NODE_ENV !== "development") {
+    return { ok: false, error: "저장소가 설정되지 않았습니다." };
+  }
+  const tournamentId = params.tournamentId.trim();
+  const entryId = params.entryId.trim();
+  if (!tournamentId || !entryId) return { ok: false, error: "잘못된 요청입니다." };
+  const store = await readLocalJsonAggregate();
+  const idx = store.tournamentApplications.findIndex(
+    (a) => a.id === entryId && a.tournamentId === tournamentId
+  );
+  if (idx < 0) return { ok: false, error: "참가신청을 찾을 수 없습니다." };
+  const now = new Date().toISOString();
+  const prev = store.tournamentApplications[idx]!;
+  store.tournamentApplications[idx] = {
+    ...prev,
+    attendanceChecked: params.checked,
+    updatedAt: now,
+  };
+  await writeLocalJsonAggregate(store);
+  return { ok: true, application: store.tournamentApplications[idx]! };
 }
 
 export async function listTournamentApplicationsByTournamentId(

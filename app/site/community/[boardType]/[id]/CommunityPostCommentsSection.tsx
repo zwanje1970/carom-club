@@ -119,7 +119,7 @@ export default function CommunityPostCommentsSection({ boardType, postId, isLogg
   }
 
   return (
-    <section className="card-clean ui-community-comments v3-stack">
+    <section className="ui-community-comments v3-stack">
       <h2 className="ui-community-comments-heading">댓글</h2>
       {loading ? <p className="v3-muted ui-community-comments-loading">불러오는 중...</p> : null}
       {!loading ? (

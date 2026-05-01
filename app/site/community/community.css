@@ -391,6 +391,40 @@ button.secondary-button.ui-community-search-submit {
   gap: 0.85rem !important;
 }
 
+/* 게시글 상세(읽기) 전용: 바깥 카드 없음, 모바일 좌우 12~16px급, 댓글·버튼 여백 축소 — 작성/수정 폼(:has 없음)에는 적용하지 않음 */
+@media (max-width: 767px) {
+  .site-site-gray-main.ui-community-post-detail-page:has(.ui-community-post-detail-article) {
+    margin-left: calc(-1 * max(0.85rem, env(safe-area-inset-left, 0px)));
+    margin-right: calc(-1 * max(0.85rem, env(safe-area-inset-right, 0px)));
+    padding-left: max(14px, env(safe-area-inset-left, 0px));
+    padding-right: max(14px, env(safe-area-inset-right, 0px));
+    gap: 0.65rem !important;
+  }
+}
+
+.site-site-gray-main.ui-community-post-detail-page:has(.ui-community-post-detail-article) .ui-community-post-manage-actions {
+  gap: 0.35rem;
+  margin-top: 0;
+}
+
+.site-site-gray-main.ui-community-post-detail-page:has(.ui-community-post-detail-article) .ui-community-post-detail-foot {
+  padding-top: 0.05rem;
+}
+
+.site-site-gray-main.ui-community-post-detail-page:has(.ui-community-post-detail-article) .ui-community-comments-heading {
+  margin-top: 0.2rem;
+}
+
+.site-site-gray-main.ui-community-post-detail-page:has(.ui-community-post-detail-article) .ui-community-comment-item:last-child {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.12);
+}
+
+.site-site-gray-main.ui-community-post-detail-page:has(.ui-community-post-detail-article) .ui-community-comment-compose.v3-stack {
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
 .ui-community-post-detail-article.v3-stack {
   gap: 0.45rem;
 }

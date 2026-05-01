@@ -12,6 +12,8 @@ export type SiteTournamentListSnapshot = {
   playScaleLabel: string;
   dateLabel: string;
   regionLabel: string;
+  /** Tournament `location`에서 카드·목록용 주최장소명만(주소 전체 아님). 없으면 "" */
+  venueName: string;
   thumbnail160Url: string | null;
   detailUrl: string;
   sortDate: string;

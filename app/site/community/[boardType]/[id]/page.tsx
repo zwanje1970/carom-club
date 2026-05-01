@@ -97,7 +97,7 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
   return (
     <SiteShellFrame brandTitle={<span className="site-home-brand-ellipsis">{post.title}</span>}>
       <section className="site-site-gray-main v3-stack ui-community-post-detail-page">
-        <article className="card-clean ui-community-post-detail-article v3-stack">
+        <article className="ui-community-post-detail-article v3-stack">
           <h1 className="ui-community-post-detail-title">{post.title}</h1>
           <p className="ui-community-post-detail-pill-row">
             <span className={boardPillClass(boardType)}>{boardPillLabel}</span>

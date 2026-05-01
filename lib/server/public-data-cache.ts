@@ -71,7 +71,7 @@ const _listSitePublicTournamentSnapshotsForPublicSite = unstable_cache(
     const { getSitePublicTournamentListSnapshotsWithLazyRebuild } = await import("./site-public-list-snapshots-kv");
     return getSitePublicTournamentListSnapshotsWithLazyRebuild();
   },
-  ["public-site-tournament-list-snapshots-v1"],
+  ["public-site-tournament-list-snapshots-v2"],
   { revalidate: 60, tags: [CACHE_TAG_SITE_PUBLIC_TOURNAMENTS_LIST] }
 );
 

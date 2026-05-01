@@ -47,6 +47,9 @@ export default function ParticipantListRow({
   initialStatus,
   phone,
   createdShort,
+  registrationSource,
+  participantAverage,
+  adminNote,
 }: {
   tournamentId: string;
   entryId: string;
@@ -54,6 +57,9 @@ export default function ParticipantListRow({
   initialStatus: TournamentApplicationStatus;
   phone: string;
   createdShort: string;
+  registrationSource?: "admin" | null;
+  participantAverage?: number | null;
+  adminNote?: string | null;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<TournamentApplicationStatus>(initialStatus);
@@ -120,7 +126,26 @@ export default function ParticipantListRow({
           textAlign: "left",
         }}
       >
-        <div style={{ fontWeight: 700, fontSize: "0.98rem", marginBottom: "0.3rem" }}>{applicantName}</div>
+        <div style={{ fontWeight: 700, fontSize: "0.98rem", marginBottom: "0.3rem" }}>
+          {applicantName}
+          {registrationSource === "admin" ? (
+            <span
+              style={{
+                marginLeft: "0.35rem",
+                fontSize: "0.72rem",
+                fontWeight: 700,
+                padding: "0.08rem 0.35rem",
+                borderRadius: "0.25rem",
+                background: "#eef2ff",
+                color: "#3730a3",
+                border: "1px solid #c7d2fe",
+                verticalAlign: "middle",
+              }}
+            >
+              관리자 등록
+            </span>
+          ) : null}
+        </div>
         <span
           style={{
             display: "inline-block",
@@ -134,8 +159,36 @@ export default function ParticipantListRow({
           {STATUS_LABELS[status]} · {status}
         </span>
         <div className="v3-muted" style={{ fontSize: "0.82rem", marginTop: "0.35rem", lineHeight: 1.35 }}>
-          {phone}
-          {createdShort ? ` · 신청 ${createdShort}` : null}
+          {registrationSource === "admin" ? (
+            <>
+              {participantAverage != null && Number.isFinite(participantAverage) ? (
+                <span>에버 {participantAverage}</span>
+              ) : null}
+              {phone.trim() ? (
+                <span>
+                  {participantAverage != null && Number.isFinite(participantAverage) ? " · " : null}
+                  {phone}
+                </span>
+              ) : null}
+              {adminNote?.trim() ? (
+                <>
+                  <br />
+                  <span>비고: {adminNote.trim()}</span>
+                </>
+              ) : null}
+              {createdShort ? (
+                <>
+                  <br />
+                  <span>등록 {createdShort}</span>
+                </>
+              ) : null}
+            </>
+          ) : (
+            <span>
+              {phone}
+              {createdShort ? ` · 신청 ${createdShort}` : null}
+            </span>
+          )}
         </div>
       </div>
 

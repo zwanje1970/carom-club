@@ -38,6 +38,8 @@ export default async function ClientTournamentParticipantDetailPage({
   const entry = await getTournamentApplicationByIdFirestore(id, entryId);
   if (!entry) notFound();
 
+  const isAdminEntry = entry.registrationSource === "admin";
+
   return (
     <main className="v3-page v3-stack">
       <h1 className="v3-h1" style={{ marginBottom: 0 }}>
@@ -52,10 +54,25 @@ export default async function ClientTournamentParticipantDetailPage({
           <strong>신청자명:</strong> {entry.applicantName}
         </p>
         <p>
-          <strong>전화번호:</strong> {entry.phone}
+          <strong>전화번호:</strong> {entry.phone || "—"}
         </p>
+        {isAdminEntry && entry.participantAverage != null && Number.isFinite(entry.participantAverage) ? (
+          <p>
+            <strong>에버:</strong> {entry.participantAverage}
+          </p>
+        ) : null}
+        {isAdminEntry && entry.adminNote?.trim() ? (
+          <p>
+            <strong>비고:</strong> {entry.adminNote.trim()}
+          </p>
+        ) : null}
+        {isAdminEntry ? (
+          <p>
+            <strong>등록방식:</strong> 관리자 등록
+          </p>
+        ) : null}
         <p>
-          <strong>입금자명:</strong> {entry.depositorName}
+          <strong>입금자명:</strong> {entry.depositorName || "—"}
         </p>
         <p>
           <strong>상태:</strong> {STATUS_LABELS[entry.status]} ({entry.status})
@@ -71,24 +88,33 @@ export default async function ClientTournamentParticipantDetailPage({
         </p>
       </section>
 
-      <section className="v3-box v3-stack">
-        <h2 className="v3-h2">증빙 이미지</h2>
-        {entry.proofImage640Url ? (
-          <img
-            src={entry.proofImage640Url}
-            alt="증빙 이미지"
-            style={{ width: "100%", maxHeight: "22rem", objectFit: "cover", borderRadius: "0.55rem" }}
-          />
-        ) : (
-          <p className="v3-muted">저장된 증빙 이미지가 없습니다.</p>
-        )}
-        {entry.proofOriginalUrl ? (
-          <a className="v3-btn" href={entry.proofOriginalUrl} target="_blank" rel="noreferrer">
-            원본 이미지 보기
-          </a>
-        ) : null}
-      </section>
+      {!isAdminEntry ? (
+        <section className="v3-box v3-stack">
+          <h2 className="v3-h2">증빙 이미지</h2>
+          {entry.proofImage640Url ? (
+            <img
+              src={entry.proofImage640Url}
+              alt="증빙 이미지"
+              style={{ width: "100%", maxHeight: "22rem", objectFit: "cover", borderRadius: "0.55rem" }}
+            />
+          ) : (
+            <p className="v3-muted">저장된 증빙 이미지가 없습니다.</p>
+          )}
+          {entry.proofOriginalUrl ? (
+            <a className="v3-btn" href={entry.proofOriginalUrl} target="_blank" rel="noreferrer">
+              원본 이미지 보기
+            </a>
+          ) : null}
+        </section>
+      ) : (
+        <section className="v3-box v3-stack">
+          <p className="v3-muted" style={{ margin: 0 }}>
+            관리자 등록 건은 증빙·OCR 절차가 없습니다.
+          </p>
+        </section>
+      )}
 
+      {!isAdminEntry ? (
       <section className="v3-box v3-stack">
         <h2 className="v3-h2">OCR 결과 (참고용)</h2>
         <p>
@@ -134,6 +160,7 @@ export default async function ClientTournamentParticipantDetailPage({
           </details>
         ) : null}
       </section>
+      ) : null}
 
       <StatusTransitionControls tournamentId={id} entryId={entryId} initialStatus={entry.status} />
     </main>

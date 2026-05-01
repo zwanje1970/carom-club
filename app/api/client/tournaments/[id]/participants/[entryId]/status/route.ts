@@ -9,6 +9,7 @@ import {
 } from "../../../../../../../../lib/platform-api";
 import {
   getTournamentApplicationByIdFirestore,
+  isManualParticipantUserId,
   updateTournamentApplicationStatusFirestore,
 } from "../../../../../../../../lib/server/firestore-tournament-applications";
 import { getTournamentByIdFirestore } from "../../../../../../../../lib/server/firestore-tournaments";
@@ -133,7 +134,12 @@ export async function PATCH(
   if (body.nextStatus === "APPROVED" && targetEntry.status !== "APPROVED") {
     const applicantUserId = String(result.application.userId ?? "").trim();
     const creatorId = String(tournament.createdBy ?? "").trim();
-    if (applicantUserId && creatorId && (await isAutoParticipantPushEnabledForClientUserId(creatorId))) {
+    if (
+      applicantUserId &&
+      !isManualParticipantUserId(applicantUserId) &&
+      creatorId &&
+      (await isAutoParticipantPushEnabledForClientUserId(creatorId))
+    ) {
       void fireAutoApprovePush(request, { applicantUserId, tournamentTitle: tournament.title });
     }
   }
