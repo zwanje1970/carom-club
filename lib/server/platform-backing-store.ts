@@ -35,7 +35,14 @@ import { MAX_COMMUNITY_POST_IMAGE_COUNT } from "../community-post-images";
 import { normalizeCommunityPostImageSizeLevels } from "../community-post-content-images";
 import { tournamentStatusEligibleForMainSlide } from "../site-tournament-badges";
 import { extractProofImageIdFromSiteImageUrl } from "../site-proof-image-id";
-import { resolveSiteImageListThumbnailUrl, resolveSitePosterDisplayUrl } from "../site-poster-urls";
+import { resolveSitePosterDisplayUrl } from "../site-poster-urls";
+import {
+  SITE_MAIN_SLIDE_CARD_IMAGE_VARIANT_PREF,
+  SITE_PUBLIC_DETAIL_IMAGE_VARIANT_PREF,
+  resolveSiteListThumbnailFromPosterWithAssetMap,
+  resolveSiteProofImageUrlWithVariantPreference,
+  type SiteListThumbnailProofFields,
+} from "../site-image-list-thumbnail";
 
 export { resolveSitePosterDisplayUrl };
 import {
@@ -8187,9 +8194,15 @@ export function parseCommunityBoardTypeParam(raw: string): SiteCommunityBoardKey
 /** 커뮤니티 허브 상단 탭(4칸): 자유·질문·대회후기·구인구직 매핑용 */
 export const COMMUNITY_PRIMARY_BOARD_KEYS: SiteCommunityBoardKey[] = ["free", "qna", "reviews", "extra1"];
 
-function mapPostToListItem(p: CommunityBoardPost): CommunityPostListItem {
+function mapPostToListItem(
+  p: CommunityBoardPost,
+  assetsById: ReadonlyMap<string, SiteListThumbnailProofFields>,
+): CommunityPostListItem {
   const imageUrls = normalizeCommunityPostImageUrls(p.imageUrls);
-  const thumbnailUrl = imageUrls.length > 0 ? resolveSiteImageListThumbnailUrl(imageUrls[0]!) : null;
+  const thumbnailUrl =
+    imageUrls.length > 0
+      ? resolveSiteListThumbnailFromPosterWithAssetMap(imageUrls[0]!, assetsById, buildSitePublicImageUrl)
+      : null;
   return {
     id: p.id,
     boardType: p.boardType,
@@ -8279,7 +8292,7 @@ function parseProofImageAssetsFromKvRaw(raw: unknown): ProofImageAsset[] {
   return raw.map(normalizeProofImageRow).filter((item): item is ProofImageAsset => item !== null);
 }
 
-async function loadProofImageAssetsList(): Promise<ProofImageAsset[]> {
+export async function loadProofImageAssetsList(): Promise<ProofImageAsset[]> {
   const rs = resolveSiteProofImageAssetsReadStrategy();
   if (rs === "firestore-kv") {
     try {
@@ -8311,32 +8324,36 @@ async function persistProofImageAssetsList(list: ProofImageAsset[]): Promise<boo
 }
 
 /** 이미 로드한 피드로 목록 생성 — 공개 사이트 캐시 레이어에서 재사용 */
-export function filterCommunityPostsAllPrimaryFromFeed(
+export async function filterCommunityPostsAllPrimaryFromFeed(
   feed: { communityPosts: CommunityBoardPost[]; communityComments: CommunityComment[] },
   visibleBoardKeys: SiteCommunityBoardKey[],
   options?: { q?: string }
-): CommunityPostListItem[] {
+): Promise<CommunityPostListItem[]> {
+  const proofAssets = await loadProofImageAssetsList();
+  const assetsById = new Map<string, SiteListThumbnailProofFields>(proofAssets.map((a) => [a.id, a]));
   const q = options?.q?.trim().toLowerCase() ?? "";
   const allow = new Set(visibleBoardKeys);
   let rows = feed.communityPosts.filter((p) => allow.has(p.boardType) && isCommunityBoardPostListed(p));
   if (q.length > 0) {
     rows = rows.filter((p) => p.title.toLowerCase().includes(q));
   }
-  return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(mapPostToListItem);
+  return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((p) => mapPostToListItem(p, assetsById));
 }
 
 /** 이미 로드한 피드로 게시판별 목록 생성 — 공개 사이트 캐시 레이어에서 재사용 */
-export function filterCommunityPostsFromFeed(
+export async function filterCommunityPostsFromFeed(
   feed: { communityPosts: CommunityBoardPost[]; communityComments: CommunityComment[] },
   boardType: SiteCommunityBoardKey,
   options?: { q?: string }
-): CommunityPostListItem[] {
+): Promise<CommunityPostListItem[]> {
+  const proofAssets = await loadProofImageAssetsList();
+  const assetsById = new Map<string, SiteListThumbnailProofFields>(proofAssets.map((a) => [a.id, a]));
   const q = options?.q?.trim().toLowerCase() ?? "";
   let rows = feed.communityPosts.filter((p) => p.boardType === boardType && isCommunityBoardPostListed(p));
   if (q.length > 0) {
     rows = rows.filter((p) => p.title.toLowerCase().includes(q));
   }
-  return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(mapPostToListItem);
+  return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((p) => mapPostToListItem(p, assetsById));
 }
 
 /** primary 4개 게시판만 한 번에 필터·정렬 — 프론트에서 게시판별 다중 요청 금지 */
@@ -8345,7 +8362,7 @@ export async function listCommunityPostsAllPrimary(
   options?: { q?: string }
 ): Promise<CommunityPostListItem[]> {
   const feed = await loadSiteCommunityFeed();
-  return filterCommunityPostsAllPrimaryFromFeed(feed, visibleBoardKeys, options);
+  return await filterCommunityPostsAllPrimaryFromFeed(feed, visibleBoardKeys, options);
 }
 
 export async function listCommunityPosts(
@@ -8353,7 +8370,7 @@ export async function listCommunityPosts(
   options?: { q?: string }
 ): Promise<CommunityPostListItem[]> {
   const feed = await loadSiteCommunityFeed();
-  return filterCommunityPostsFromFeed(feed, boardType, options);
+  return await filterCommunityPostsFromFeed(feed, boardType, options);
 }
 
 export async function getCommunityPostById(postId: string): Promise<CommunityPostDetail | null> {
@@ -9695,6 +9712,63 @@ export async function pruneOrphanTournamentPublishedCards(): Promise<{
   };
 }
 
+function posterSourceUrlFromPublishedCardSnapshot(s: PublishedCardSnapshot): string {
+  for (const u of [s.publishedCardImage320Url, s.image320Url, s.publishedCardImageUrl, s.image640Url]) {
+    const t = typeof u === "string" ? u.trim() : "";
+    if (t && extractProofImageIdFromSiteImageUrl(t)) return t;
+  }
+  return "";
+}
+
+function sanitizePublishedCardSnapshotForMainSiteSlide(
+  s: PublishedCardSnapshot,
+  byId: ReadonlyMap<string, SiteListThumbnailProofFields>,
+): PublishedCardSnapshot {
+  const source = posterSourceUrlFromPublishedCardSnapshot(s);
+  if (!source) return s;
+
+  const img320 = resolveSiteProofImageUrlWithVariantPreference(
+    source,
+    byId,
+    buildSitePublicImageUrl,
+    SITE_MAIN_SLIDE_CARD_IMAGE_VARIANT_PREF,
+  );
+  const img640 = resolveSiteProofImageUrlWithVariantPreference(
+    source,
+    byId,
+    buildSitePublicImageUrl,
+    SITE_PUBLIC_DETAIL_IMAGE_VARIANT_PREF,
+  );
+
+  if (img320 === null) {
+    const next: PublishedCardSnapshot = {
+      ...s,
+      image320Url: "",
+      image640Url: "",
+    };
+    if (next.publishedCardImageUrl && extractProofImageIdFromSiteImageUrl(next.publishedCardImageUrl)) {
+      next.publishedCardImageUrl = undefined;
+    }
+    if (next.publishedCardImage320Url && extractProofImageIdFromSiteImageUrl(next.publishedCardImage320Url)) {
+      next.publishedCardImage320Url = undefined;
+    }
+    return next;
+  }
+
+  const next: PublishedCardSnapshot = {
+    ...s,
+    image320Url: img320,
+    image640Url: img640 ?? img320,
+  };
+  if (next.publishedCardImage320Url && extractProofImageIdFromSiteImageUrl(next.publishedCardImage320Url)) {
+    next.publishedCardImage320Url = img320;
+  }
+  if (next.publishedCardImageUrl && extractProofImageIdFromSiteImageUrl(next.publishedCardImageUrl)) {
+    next.publishedCardImageUrl = img640 ?? img320;
+  }
+  return next;
+}
+
 /**
  * 메인 홈 토너먼트 슬라이드 전용: `tournamentPublishedCards` 중 게시·활성·메인 노출 플래그가 켜진 카드만.
  * 레거시 `publishedCardSnapshots` 토너먼트 행은 사용하지 않는다(사이트에서 합성·재판단하지 않음).
@@ -9756,13 +9830,16 @@ export async function listTournamentSnapshotsForMainSite(options?: {
     }
   }
 
-  return rows.map((c) => {
+  const rawSnapshots = rows.map((c) => {
     const hasStoredDate = typeof c.cardDisplayDate === "string" && c.cardDisplayDate.trim() !== "";
     const hasStoredLoc = typeof c.cardDisplayLocation === "string" && c.cardDisplayLocation.trim() !== "";
     const meta =
       hasStoredDate && hasStoredLoc ? undefined : metaByTournamentId.get(c.tournamentId.trim());
     return tournamentPublishedCardToPublishedSnapshot(c, templateId, meta);
   });
+  const proofAssets = await loadProofImageAssetsList();
+  const proofById = new Map<string, SiteListThumbnailProofFields>(proofAssets.map((a) => [a.id, a]));
+  return rawSnapshots.map((snap) => sanitizePublishedCardSnapshotForMainSiteSlide(snap, proofById));
 }
 
 async function loadMainSlideAdsNormalizedForStorage(): Promise<MainSiteSlideAd[]> {
@@ -9839,8 +9916,25 @@ export async function getMainSlideAdSettingsForSite(): Promise<{
   try {
     const config = await loadMainSlideAdConfigNormalizedForStorage();
     const ads = await loadMainSlideAdsNormalizedForStorage();
+    const proofAssets = await loadProofImageAssetsList();
+    const proofById = new Map<string, SiteListThumbnailProofFields>(proofAssets.map((a) => [a.id, a]));
     const now = Date.now();
-    const activeAds = ads.filter((a) => isMainSiteSlideAdActiveAt(a, now));
+    const activeAds = ads
+      .map((a) => {
+        const img = typeof a.imageUrl === "string" ? a.imageUrl.trim() : "";
+        if (!img) return a;
+        if (!extractProofImageIdFromSiteImageUrl(img)) return a;
+        const nextUrl = resolveSiteProofImageUrlWithVariantPreference(
+          img,
+          proofById,
+          buildSitePublicImageUrl,
+          SITE_MAIN_SLIDE_CARD_IMAGE_VARIANT_PREF,
+        );
+        if (nextUrl === null) return { ...a, imageUrl: "" };
+        if (nextUrl !== img) return { ...a, imageUrl: nextUrl };
+        return a;
+      })
+      .filter((a) => isMainSiteSlideAdActiveAt(a, now));
     return { config, activeAds };
   } catch {
     return { config: normalizeMainSlideAdConfig(undefined), activeAds: [] };

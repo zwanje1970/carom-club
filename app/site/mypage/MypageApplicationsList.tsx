@@ -32,7 +32,7 @@ export default function MypageApplicationsList({ rows }: { rows: MypageApplicati
     <ul className="site-mypage-link-list">
       {rows.map((row) => (
         <li key={row.applicationId}>
-          <Link href={`/site/tournaments/${row.tournamentId}`} className="site-mypage-link-row">
+          <Link href={`/site/tournaments/${row.tournamentId}`} prefetch={false} className="site-mypage-link-row">
             <div className="site-mypage-link-main">
               <span className="site-mypage-link-title">{row.tournamentTitle}</span>
               <span className="site-mypage-link-sub">

@@ -7,6 +7,7 @@ import VenuesDistanceNavLink from "../site/components/VenuesDistanceNavLink";
 import { isSiteMainSamplePathname } from "../site/lib/site-main-sample";
 import {
   isPublicSiteMainHomePathname,
+  isPublicSiteMypageAreaPathname,
   isPublicSiteTournamentsHubPathname,
   isPublicSiteVenuesHubPathname,
   normalizeSiteRootPathname,
@@ -49,7 +50,8 @@ export default function GlobalHomeButton() {
   const bottomNavPrefetch =
     isPublicSiteMainHomePathname(pathname) ||
     isPublicSiteTournamentsHubPathname(pathname) ||
-    isPublicSiteVenuesHubPathname(pathname)
+    isPublicSiteVenuesHubPathname(pathname) ||
+    isPublicSiteMypageAreaPathname(pathname)
       ? false
       : undefined;
 

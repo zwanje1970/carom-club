@@ -91,7 +91,7 @@ export async function listCommunityPostsAllPrimaryForPublicSite(
   options?: { q?: string }
 ): Promise<CommunityPostListItem[]> {
   const feed = await _loadSiteCommunityFeedForPublicList();
-  return filterCommunityPostsAllPrimaryFromFeed(feed, visibleBoardKeys, options);
+  return await filterCommunityPostsAllPrimaryFromFeed(feed, visibleBoardKeys, options);
 }
 
 export async function listCommunityPostsForPublicSite(
@@ -99,7 +99,7 @@ export async function listCommunityPostsForPublicSite(
   options?: { q?: string }
 ): Promise<CommunityPostListItem[]> {
   const feed = await _loadSiteCommunityFeedForPublicList();
-  return filterCommunityPostsFromFeed(feed, boardType, options);
+  return await filterCommunityPostsFromFeed(feed, boardType, options);
 }
 
 /** 공개 사이트 RSC용 — 클라이언트 대회 수정 경로의 `getTournamentByIdFirestore`는 비캐시 유지 */

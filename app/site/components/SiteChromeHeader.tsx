@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   isPublicSiteMainHomePathname,
+  isPublicSiteMypageAreaPathname,
   isPublicSiteTournamentsHubPathname,
   isPublicSiteVenuesHubPathname,
 } from "../lib/site-root-swipe-order";
@@ -51,6 +52,7 @@ function isSiteMainHubNavHref(href: string): boolean {
  * 그 외: 커뮤니티가 아닐 때 Next 기본 prefetch, 커뮤니티일 때는 주요 허브만 동일·그 외는 끔.
  */
 function prefetchPropForHeaderLink(pathname: string, linkHref: string): boolean | undefined {
+  if (isPublicSiteMypageAreaPathname(pathname)) return false;
   if (isPublicSiteMainHomePathname(pathname)) return false;
   if (isPublicSiteTournamentsHubPathname(pathname)) return false;
   if (isPublicSiteVenuesHubPathname(pathname)) return false;

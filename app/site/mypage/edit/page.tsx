@@ -31,7 +31,7 @@ export default async function SiteMypageEditPage() {
             initialPhone={user.phone != null ? String(user.phone) : ""}
           />
         </section>
-        <Link className="secondary-button" href="/site/mypage" style={{ alignSelf: "flex-start" }}>
+        <Link className="secondary-button" href="/site/mypage" prefetch={false} style={{ alignSelf: "flex-start" }}>
           마이페이지로
         </Link>
       </section>

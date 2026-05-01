@@ -57,6 +57,13 @@ export function isPublicSiteVenuesHubPathname(pathname: string): boolean {
   return p === "/site/venues" || p.startsWith("/site/venues/");
 }
 
+/** 마이페이지 트리(`/site/mypage`, 수정, 이력) — 초기 로딩 시 타 허브 RSC prefetch 비활성화 */
+export function isPublicSiteMypageAreaPathname(pathname: string): boolean {
+  const raw = pathname.split("?")[0] ?? "";
+  const p = normalizeSiteRootPathname(raw);
+  return p === "/site/mypage" || p.startsWith("/site/mypage/");
+}
+
 /**
  * `window.location` 우선값 — RSC `children`과 `usePathname()`이 한 프레임 어긋날 수 있어
  * 루트 스와이프 prev/next 계산에는 쓰지 않는 것이 안전하다.

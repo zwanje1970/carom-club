@@ -1,64 +1,13 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
-import {
-  getClientStatusByUserId,
-  getUserById,
-  updateUserProfile,
-  type TournamentApplicationStatus,
-} from "../../../../lib/platform-api";
-import { listTournamentApplicationsByUserIdFirestore } from "../../../../lib/server/firestore-tournament-applications";
-import { getTournamentByIdFirestore } from "../../../../lib/server/firestore-tournaments";
+import { getClientStatusByUserId, getUserById, updateUserProfile } from "../../../../lib/platform-api";
+import { buildMypageActiveApplicationRows } from "../../../../lib/server/site-mypage-applications-history-bundle";
 
 export const runtime = "nodejs";
 
 function getUnauthorizedResponse() {
   return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
-}
-
-function isTournamentOngoing(dateText: string): boolean {
-  const parsed = new Date(`${dateText}T23:59:59`);
-  if (Number.isNaN(parsed.getTime())) return true;
-  return parsed.getTime() >= Date.now();
-}
-
-async function getMypageApplicationRowsPayload(userId: string) {
-  try {
-    const applications = await listTournamentApplicationsByUserIdFirestore(userId);
-    const applicationRows = await Promise.all(
-      applications.map(async (application) => {
-        const tournament = await getTournamentByIdFirestore(application.tournamentId);
-        return { application, tournament };
-      }),
-    );
-
-    const visibleStatuses: TournamentApplicationStatus[] = [
-      "APPLIED",
-      "VERIFYING",
-      "WAITING_PAYMENT",
-      "APPROVED",
-    ];
-    const visibleRows = applicationRows.filter((row) => {
-      if (!row.tournament) return false;
-      if (!visibleStatuses.includes(row.application.status)) return false;
-      if (row.application.status === "APPROVED" || row.application.status === "APPLIED") {
-        return isTournamentOngoing(row.tournament.date);
-      }
-      return true;
-    });
-
-    return visibleRows.map((row) => ({
-      applicationId: row.application.id,
-      tournamentId: row.application.tournamentId,
-      status: row.application.status,
-      createdAt: row.application.createdAt,
-      tournamentTitle: row.tournament?.title ?? "대회",
-      tournamentDate: row.tournament?.date || row.application.createdAt.slice(0, 10),
-    }));
-  } catch (e) {
-    console.warn("[api/site/mypage] getMypageApplicationRowsPayload", e);
-    return [];
-  }
 }
 
 /** 마이페이지 클라이언트 지연 로드용 — RSC 초기 렌더와 분리 */
@@ -84,21 +33,21 @@ export async function GET(request: Request) {
   }
 
   if (part === "applications") {
-    const applicationRows = await getMypageApplicationRowsPayload(user.id);
+    const applicationRows = await buildMypageActiveApplicationRows(user.id);
     return NextResponse.json({ applicationRows });
   }
 
   let clientApplicationStatus: Awaited<ReturnType<typeof getClientStatusByUserId>> = null;
-  let applicationRows: Awaited<ReturnType<typeof getMypageApplicationRowsPayload>> = [];
+  let applicationRows: Awaited<ReturnType<typeof buildMypageActiveApplicationRows>> = [];
   try {
     clientApplicationStatus = await getClientStatusByUserId(user.id);
   } catch (e) {
     console.warn("[api/site/mypage] getClientStatusByUserId", e);
   }
   try {
-    applicationRows = await getMypageApplicationRowsPayload(user.id);
+    applicationRows = await buildMypageActiveApplicationRows(user.id);
   } catch (e) {
-    console.warn("[api/site/mypage] getMypageApplicationRowsPayload (full)", e);
+    console.warn("[api/site/mypage] buildMypageActiveApplicationRows (full)", e);
   }
 
   return NextResponse.json({

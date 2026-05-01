@@ -3,10 +3,8 @@ import { isCaromClubMobileAppShell } from "../../../../../lib/is-carom-club-mobi
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
-import {
-  getCommunityPostLongEdgePx,
-  parseCommunityPostBodySegmentsWithSizes,
-} from "../../../../../lib/community-post-content-images";
+import { getCommunityPostLongEdgePx } from "../../../../../lib/community-post-content-images";
+import { parseCommunityPostBodyForPublicSiteDetail } from "../../../../../lib/server/community-post-detail-site-images";
 import { parseCommunityBoardTypeParam } from "../../../../../lib/community-board-params";
 import {
   getCommunityPostById,
@@ -84,10 +82,10 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
   }
   const canDeletePost = canManageAuthor || canPlatformDelete;
 
-  const { segments, tailImages } = parseCommunityPostBodySegmentsWithSizes(
+  const { segments, tailImages } = await parseCommunityPostBodyForPublicSiteDetail(
     post.content,
     post.imageUrls,
-    post.imageSizeLevels
+    post.imageSizeLevels,
   );
 
   const boardPillLabel = isPrimaryTabKey(boardType)
@@ -112,7 +110,7 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
                 <span key={i} className="ui-community-post-body-text">
                   {seg.value}
                 </span>
-              ) : (
+              ) : seg.url ? (
                 <span key={i} className="ui-community-post-body-figure">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -132,29 +130,31 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
                     }}
                   />
                 </span>
-              )
+              ) : null
             )}
-            {tailImages.map((item, idx) => (
-              <span key={`tail-${idx}-${item.url}`} className="ui-community-post-body-figure">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  className="ui-community-post-inline-img"
-                  src={item.url}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  style={{
-                    maxWidth: `min(100%, ${getCommunityPostLongEdgePx(item.sizeLevel)}px)`,
-                    maxHeight: `min(70vh, ${getCommunityPostLongEdgePx(item.sizeLevel)}px)`,
-                    width: "auto",
-                    height: "auto",
-                    objectFit: "contain",
-                    display: "block",
-                    margin: 0,
-                  }}
-                />
-              </span>
-            ))}
+            {tailImages.map((item, idx) =>
+              item.url ? (
+                <span key={`tail-${idx}-${item.url}`} className="ui-community-post-body-figure">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    className="ui-community-post-inline-img"
+                    src={item.url}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    style={{
+                      maxWidth: `min(100%, ${getCommunityPostLongEdgePx(item.sizeLevel)}px)`,
+                      maxHeight: `min(70vh, ${getCommunityPostLongEdgePx(item.sizeLevel)}px)`,
+                      width: "auto",
+                      height: "auto",
+                      objectFit: "contain",
+                      display: "block",
+                      margin: 0,
+                    }}
+                  />
+                </span>
+              ) : null
+            )}
           </div>
         </article>
         <CommunityPostDetailActions

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-type HistoryRow = {
+export type MypageHistoryRow = {
   applicationId: string;
   tournamentId: string;
   status: string;
@@ -19,17 +19,23 @@ function getHistoryStatusLabel(status: string): string {
   return "신청 접수";
 }
 
-export default function MypageHistoryList() {
-  const [rows, setRows] = useState<HistoryRow[] | null>(null);
+export default function MypageHistoryList({
+  initialRows,
+}: {
+  /** 서버(RSC)에서 넘기면 `/api/site/mypage/history` 재호출 없음 */
+  initialRows?: MypageHistoryRow[];
+}) {
+  const [rows, setRows] = useState<MypageHistoryRow[] | null>(() => (initialRows !== undefined ? initialRows : null));
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    if (initialRows !== undefined) return;
     let cancelled = false;
     void (async () => {
       try {
         const res = await fetch("/api/site/mypage/history", { credentials: "include", cache: "no-store" });
         if (!res.ok) throw new Error("bad");
-        const data = (await res.json()) as { rows?: HistoryRow[] };
+        const data = (await res.json()) as { rows?: MypageHistoryRow[] };
         if (!cancelled) setRows(Array.isArray(data.rows) ? data.rows : []);
       } catch {
         if (!cancelled) {
@@ -41,7 +47,7 @@ export default function MypageHistoryList() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialRows]);
 
   if (rows === null) {
     return (
@@ -71,7 +77,7 @@ export default function MypageHistoryList() {
     <ul className="site-mypage-link-list">
       {rows.map((row) => (
         <li key={row.applicationId}>
-          <Link href={`/site/tournaments/${row.tournamentId}`} className="site-mypage-link-row">
+          <Link href={`/site/tournaments/${row.tournamentId}`} prefetch={false} className="site-mypage-link-row">
             <div className="site-mypage-link-main">
               <span className="site-mypage-link-title">{row.tournamentTitle}</span>
               <span className="site-mypage-link-sub">

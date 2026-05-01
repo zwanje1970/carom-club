@@ -13,11 +13,19 @@ const MypageApplicationsList = dynamic(() => import("./MypageApplicationsList"),
   ),
 });
 
-export default function MypageApplicationsDeferred() {
-  const [rows, setRows] = useState<MypageApplicationRowPayload[] | null>(null);
+export default function MypageApplicationsDeferred({
+  initialApplicationRows,
+}: {
+  /** 서버(RSC)에서 넘기면 클라이언트 재조회 없음 */
+  initialApplicationRows?: MypageApplicationRowPayload[];
+}) {
+  const [rows, setRows] = useState<MypageApplicationRowPayload[] | null>(() =>
+    initialApplicationRows !== undefined ? initialApplicationRows : null,
+  );
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    if (initialApplicationRows !== undefined) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -36,7 +44,7 @@ export default function MypageApplicationsDeferred() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialApplicationRows]);
 
   if (failed) {
     return (

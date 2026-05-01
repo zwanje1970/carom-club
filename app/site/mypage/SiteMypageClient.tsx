@@ -75,7 +75,7 @@ export default function SiteMypageClient({
             </div>
           ) : null}
         </dl>
-        <Link className="primary-button primary-button--block" href="/site/mypage/edit">
+        <Link className="primary-button primary-button--block" href="/site/mypage/edit" prefetch={false}>
           내 정보 수정
         </Link>
       </section>
@@ -86,15 +86,15 @@ export default function SiteMypageClient({
             메뉴 불러오는 중…
           </span>
         ) : clientApproved ? (
-          <Link className="secondary-button" href="/client">
+          <Link className="secondary-button" href="/client" prefetch={false}>
             클라이언트 대시보드
           </Link>
         ) : clientPending ? (
-          <Link className="secondary-button" href="/client-status/pending">
+          <Link className="secondary-button" href="/client-status/pending" prefetch={false}>
             클라이언트 승인 대기
           </Link>
         ) : user.role === "CLIENT" ? (
-          <Link className="secondary-button" href="/client">
+          <Link className="secondary-button" href="/client" prefetch={false}>
             클라이언트 대시보드
           </Link>
         ) : user.role === "PLATFORM" ? (
@@ -103,12 +103,12 @@ export default function SiteMypageClient({
               플랫폼 관리는 PC 웹 브라우저에서 이용해 주세요.
             </span>
           ) : (
-            <Link className="secondary-button" href="/platform">
+            <Link className="secondary-button" href="/platform" prefetch={false}>
               플랫폼 대시보드
             </Link>
           )
         ) : (
-          <Link className="secondary-button" href="/client-apply">
+          <Link className="secondary-button" href="/client-apply" prefetch={false}>
             클라이언트 신청
           </Link>
         )}

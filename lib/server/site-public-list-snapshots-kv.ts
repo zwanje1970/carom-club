@@ -9,16 +9,21 @@ import type { SiteTournamentListSnapshot, SiteVenueListSnapshot } from "../types
 import { buildRegionLabelForSiteListSnapshot } from "../site-list-region-label";
 import { formatTournamentScheduleLabel } from "../tournament-schedule";
 import type { Tournament } from "../types/entities";
-import type { SiteVenueBoardRow } from "./platform-backing-store";
+import {
+  buildSitePublicImageUrl,
+  loadProofImageAssetsList,
+  type ProofImageAsset,
+  type SiteVenueBoardRow,
+  type TournamentStatusBadge,
+} from "./platform-backing-store";
 import {
   normalizeRepresentativeImageUrls,
   parseTypeSpecific,
   resolveVenuePricingType,
 } from "../client-organization-setup-parse";
 import type { VenuePricingType, VenueSpecific } from "../client-organization-setup-types";
-import { resolveSiteImageListThumbnailUrl } from "../site-poster-urls";
+import { resolveSiteListThumbnailFromPosterWithAssetMap } from "../site-image-list-thumbnail";
 import { isEntityLifecycleVisibleForList } from "./entity-lifecycle";
-import type { TournamentStatusBadge } from "./platform-backing-store";
 
 const KV_TOURNAMENTS: PlatformKvSettingKey = PLATFORM_KV_KEYS.sitePublicTournamentListSnapshots;
 const KV_VENUES: PlatformKvSettingKey = PLATFORM_KV_KEYS.sitePublicVenueListSnapshots;
@@ -64,7 +69,11 @@ function tournamentVenueDisplayNameFromLocation(raw: string | null | undefined):
   return s;
 }
 
-function buildTournamentSnapshot(t: Tournament, rebuiltAt: string): SiteTournamentListSnapshot {
+function buildTournamentSnapshot(
+  t: Tournament,
+  rebuiltAt: string,
+  assetsById: ReadonlyMap<string, ProofImageAsset>,
+): SiteTournamentListSnapshot {
   const regionSource = typeof t.location === "string" ? t.location.trim() : "";
   return {
     tournamentId: t.id,
@@ -74,7 +83,7 @@ function buildTournamentSnapshot(t: Tournament, rebuiltAt: string): SiteTourname
     dateLabel: tournamentDateLabelForList(t),
     regionLabel: buildRegionLabelForSiteListSnapshot(regionSource),
     venueName: tournamentVenueDisplayNameFromLocation(regionSource),
-    thumbnail160Url: resolveSiteImageListThumbnailUrl(t.posterImageUrl),
+    thumbnail160Url: resolveSiteListThumbnailFromPosterWithAssetMap(t.posterImageUrl, assetsById, buildSitePublicImageUrl),
     detailUrl: `/site/tournaments/${t.id}`,
     sortDate: tournamentDeadlineSortValue(t),
     createdAt: t.createdAt,
@@ -187,19 +196,53 @@ function parseVenueSnapshots(raw: unknown): SiteVenueListSnapshot[] | null {
   return out;
 }
 
-export async function rebuildSitePublicTournamentListSnapshots(): Promise<void> {
+function mapSanitizeTournamentThumbnails(
+  snaps: SiteTournamentListSnapshot[],
+  byId: ReadonlyMap<string, ProofImageAsset>,
+): SiteTournamentListSnapshot[] {
+  return snaps.map((s) => ({
+    ...s,
+    thumbnail160Url:
+      s.thumbnail160Url == null
+        ? null
+        : resolveSiteListThumbnailFromPosterWithAssetMap(s.thumbnail160Url, byId, buildSitePublicImageUrl),
+  }));
+}
+
+function mapSanitizeVenueThumbnails(
+  snaps: SiteVenueListSnapshot[],
+  byId: ReadonlyMap<string, ProofImageAsset>,
+): SiteVenueListSnapshot[] {
+  return snaps.map((s) => ({
+    ...s,
+    thumbnail160Url:
+      s.thumbnail160Url == null
+        ? null
+        : resolveSiteListThumbnailFromPosterWithAssetMap(s.thumbnail160Url, byId, buildSitePublicImageUrl),
+  }));
+}
+
+export async function rebuildSitePublicTournamentListSnapshots(
+  preloadedAssetsById?: ReadonlyMap<string, ProofImageAsset>,
+): Promise<void> {
   if (!isFirestoreUsersBackendConfigured()) return;
+  const assetsById =
+    preloadedAssetsById ?? new Map((await loadProofImageAssetsList()).map((a) => [a.id, a]));
   const { listAllTournamentsFirestore } = await import("./firestore-tournaments");
   const list = await listAllTournamentsFirestore();
   const now = new Date().toISOString();
   const snapshots: SiteTournamentListSnapshot[] = list
-    .map((t) => buildTournamentSnapshot(t, now))
+    .map((t) => buildTournamentSnapshot(t, now, assetsById))
     .sort((a, b) => a.sortDate.localeCompare(b.sortDate));
   await upsertPlatformKvJson(KV_TOURNAMENTS, snapshots);
 }
 
-export async function rebuildSitePublicVenueListSnapshots(): Promise<void> {
+export async function rebuildSitePublicVenueListSnapshots(
+  preloadedAssetsById?: ReadonlyMap<string, ProofImageAsset>,
+): Promise<void> {
   if (!isFirestoreUsersBackendConfigured()) return;
+  const assetsById =
+    preloadedAssetsById ?? new Map((await loadProofImageAssetsList()).map((a) => [a.id, a]));
   const { listApprovedClientOrganizationsFirestore } = await import("./firestore-client-applications");
   const orgs = await listApprovedClientOrganizationsFirestore({ status: "ACTIVE", clientType: "all" });
   const now = new Date().toISOString();
@@ -222,7 +265,9 @@ export async function rebuildSitePublicVenueListSnapshots(): Promise<void> {
         venueId: org.slug?.trim() || org.id,
         name: org.name?.trim() || "이름 없음",
         regionLabel: buildRegionLabelForSiteListSnapshot(road),
-        thumbnail160Url: resolveSiteImageListThumbnailUrl(reps[0] || cover || "") ?? null,
+        thumbnail160Url:
+          resolveSiteListThumbnailFromPosterWithAssetMap(reps[0] || cover || "", assetsById, buildSitePublicImageUrl) ??
+          null,
         detailUrl: `/site/venues/${org.slug?.trim() || org.id}`,
         lat: org.latitude,
         lng: org.longitude,
@@ -240,30 +285,32 @@ export async function getSitePublicTournamentListSnapshotsWithLazyRebuild(): Pro
   if (!isFirestoreUsersBackendConfigured()) {
     return [];
   }
+  const assetsById = new Map((await loadProofImageAssetsList()).map((a) => [a.id, a]));
   const raw = await readPlatformKvJson(KV_TOURNAMENTS);
   if (raw != null) {
     const parsed = parseTournamentSnapshots(raw);
-    if (parsed !== null) return parsed;
+    if (parsed !== null) return mapSanitizeTournamentThumbnails(parsed, assetsById);
   }
-  await rebuildSitePublicTournamentListSnapshots();
+  await rebuildSitePublicTournamentListSnapshots(assetsById);
   const raw2 = await readPlatformKvJson(KV_TOURNAMENTS);
   const parsed2 = parseTournamentSnapshots(raw2);
-  return parsed2 ?? [];
+  return parsed2 !== null ? mapSanitizeTournamentThumbnails(parsed2, assetsById) : [];
 }
 
 export async function getSitePublicVenueListSnapshotsWithLazyRebuild(): Promise<SiteVenueListSnapshot[]> {
   if (!isFirestoreUsersBackendConfigured()) {
     return [];
   }
+  const assetsById = new Map((await loadProofImageAssetsList()).map((a) => [a.id, a]));
   const raw = await readPlatformKvJson(KV_VENUES);
   if (raw != null) {
     const parsed = parseVenueSnapshots(raw);
-    if (parsed !== null) return parsed;
+    if (parsed !== null) return mapSanitizeVenueThumbnails(parsed, assetsById);
   }
-  await rebuildSitePublicVenueListSnapshots();
+  await rebuildSitePublicVenueListSnapshots(assetsById);
   const raw2 = await readPlatformKvJson(KV_VENUES);
   const parsed2 = parseVenueSnapshots(raw2);
-  return parsed2 ?? [];
+  return parsed2 !== null ? mapSanitizeVenueThumbnails(parsed2, assetsById) : [];
 }
 
 export function venueSnapshotsToBoardRows(snaps: SiteVenueListSnapshot[]): SiteVenueBoardRow[] {

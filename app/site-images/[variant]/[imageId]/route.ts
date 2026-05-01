@@ -5,6 +5,22 @@ import { mimeTypeFromProofExt, readProofImageVariantFile } from "../../../../lib
 
 export const runtime = "nodejs";
 
+/** 삭제·누락 썸네일: JSON 404(51B) 대신 1×1 투명 PNG — `<img>`·목록 공통 노이즈 제거 */
+const MISSING_PUBLIC_IMAGE_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
+
+function missingPublicImagePngResponse(): NextResponse {
+  return new NextResponse(MISSING_PUBLIC_IMAGE_PNG, {
+    status: 200,
+    headers: {
+      "Content-Type": "image/png",
+      "Cache-Control": "public, max-age=300",
+    },
+  });
+}
+
 /** 공개 사이트 이미지 — 경로만으로 바이너리 제공(?variant 쿼리 없음). */
 export async function GET(
   _request: NextRequest,
@@ -24,7 +40,7 @@ export async function GET(
 
   const proofImage = await getProofImageAssetById(normalizedImageId);
   if (!proofImage) {
-    return NextResponse.json({ error: "존재하지 않는 데이터입니다." }, { status: 404 });
+    return missingPublicImagePngResponse();
   }
 
   const accessible = await isSiteImagePubliclyAccessible(normalizedImageId);
@@ -39,7 +55,7 @@ export async function GET(
 
   const read = await readProofImageVariantFile(normalizedImageId, variant, proofImage.originalExt);
   if (!read) {
-    return NextResponse.json({ error: "존재하지 않는 데이터입니다." }, { status: 404 });
+    return missingPublicImagePngResponse();
   }
 
   return new NextResponse(new Uint8Array(read.buffer), {
