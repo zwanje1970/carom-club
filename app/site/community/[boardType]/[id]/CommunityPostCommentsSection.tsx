@@ -38,6 +38,7 @@ export default function CommunityPostCommentsSection({ boardType, postId, isLogg
   const [loading, setLoading] = useState(true);
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const q = encodeURIComponent(postId);
@@ -61,20 +62,41 @@ export default function CommunityPostCommentsSection({ boardType, postId, isLogg
     };
   }, [load]);
 
+  function cancelEdit() {
+    setEditingCommentId(null);
+    setContent("");
+  }
+
+  function startEdit(c: CommentItem) {
+    setEditingCommentId(c.id);
+    setContent(c.content);
+  }
+
   async function handleSubmit() {
     if (!isLoggedIn || submitting) return;
     const text = content.trim();
     if (!text) return;
     setSubmitting(true);
     try {
-      const response = await fetch("/api/site/community/comments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postId, content: text }),
-      });
-      if (!response.ok) return;
-      setContent("");
-      await load();
+      if (editingCommentId) {
+        const response = await fetch(`/api/site/community/comments/${encodeURIComponent(editingCommentId)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: text }),
+        });
+        if (!response.ok) return;
+        cancelEdit();
+        await load();
+      } else {
+        const response = await fetch("/api/site/community/comments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ postId, content: text }),
+        });
+        if (!response.ok) return;
+        setContent("");
+        await load();
+      }
     } catch {
       // ignore
     } finally {
@@ -89,6 +111,7 @@ export default function CommunityPostCommentsSection({ boardType, postId, isLogg
         method: "DELETE",
       });
       if (!response.ok) return;
+      if (editingCommentId === commentId) cancelEdit();
       await load();
     } catch {
       // ignore
@@ -101,18 +124,33 @@ export default function CommunityPostCommentsSection({ boardType, postId, isLogg
       {loading ? <p className="v3-muted ui-community-comments-loading">불러오는 중...</p> : null}
       {!loading ? (
         <ul className="ui-community-comment-list">
-          {items.map((c) => (
-            <li key={c.id} className="ui-community-comment-item">
-              <div className="ui-community-comment-author">{c.authorNickname}</div>
-              <div className="ui-community-comment-meta v3-muted">{formatCommentDate(c.createdAt)}</div>
-              <div className="ui-community-comment-body">{c.content}</div>
-              {currentUserId && c.authorUserId === currentUserId ? (
-                <button type="button" className="secondary-button ui-community-post-action-tight" onClick={() => handleDelete(c.id)}>
-                  삭제
-                </button>
-              ) : null}
-            </li>
-          ))}
+          {items.map((c) => {
+            const canManage = Boolean(currentUserId && c.authorUserId === currentUserId);
+            return (
+              <li key={c.id} className="ui-community-comment-item">
+                <div className="ui-community-comment-head">
+                  <div className="ui-community-comment-head-main">
+                    <div className="ui-community-comment-author">{c.authorNickname}</div>
+                    <div className="ui-community-comment-meta v3-muted">{formatCommentDate(c.createdAt)}</div>
+                  </div>
+                  {canManage ? (
+                    <div className="ui-community-comment-actions">
+                      <button type="button" className="ui-community-comment-text-action" onClick={() => startEdit(c)}>
+                        수정
+                      </button>
+                      <span className="ui-community-comment-action-sep" aria-hidden>
+                        ·
+                      </span>
+                      <button type="button" className="ui-community-comment-text-action" onClick={() => handleDelete(c.id)}>
+                        삭제
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+                <div className="ui-community-comment-body">{c.content}</div>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
       {!loading && items.length === 0 ? (
@@ -130,9 +168,16 @@ export default function CommunityPostCommentsSection({ boardType, postId, isLogg
             rows={4}
             placeholder="댓글을 입력하세요"
           />
-          <button type="button" className="primary-button ui-community-post-action-submit" disabled={submitting} onClick={handleSubmit}>
-            {submitting ? "등록 중..." : "등록"}
-          </button>
+          <div className="ui-community-comment-compose-row">
+            {editingCommentId ? (
+              <button type="button" className="ui-community-comment-text-action ui-community-comment-compose-cancel" onClick={cancelEdit}>
+                취소
+              </button>
+            ) : null}
+            <button type="button" className="primary-button ui-community-post-action-submit" disabled={submitting} onClick={handleSubmit}>
+              {submitting ? (editingCommentId ? "수정 중..." : "등록 중...") : editingCommentId ? "수정완료" : "등록"}
+            </button>
+          </div>
         </div>
       ) : (
         <p className="ui-community-comments-login-hint v3-muted">

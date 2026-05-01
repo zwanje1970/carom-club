@@ -102,7 +102,6 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
     x: number;
     y: number;
     blocked: boolean;
-    startedOnLink: boolean;
     horizontalLocked: boolean;
     verticalDominant: boolean;
     /** 제스처 시작 시점 기준의 탭 인덱스(엣지·완료 판정 고정) */
@@ -151,23 +150,12 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
   useEffect(() => {
     if (n < 2) return;
 
-    const killLinkClick = () => {
-      const kill: EventListener = (ev) => {
-        ev.preventDefault();
-        ev.stopPropagation();
-        ev.stopImmediatePropagation();
-        document.removeEventListener("click", kill, true);
-      };
-      document.addEventListener("click", kill, true);
-    };
-
     const onTouchStart = (e: TouchEvent) => {
       if (!window.matchMedia("(max-width: 767px)").matches) return;
       if (animatingRef.current) return;
       const t = e.touches[0];
       if (!t) return;
       const blocked = touchBlocksCommunitySwipe(e.target);
-      const startedOnLink = e.target instanceof Element && !!e.target.closest("a[href]");
       const tabCount = tabsRef.current.length;
       if (tabCount < 2) return;
       const anchorIdxNow = clampTabIndex(activeIndexRef.current, tabCount);
@@ -175,7 +163,6 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
         x: t.clientX,
         y: t.clientY,
         blocked,
-        startedOnLink,
         horizontalLocked: false,
         verticalDominant: false,
         anchorIdx: anchorIdxNow,
@@ -234,7 +221,6 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
       const t = e.changedTouches[0];
       const velocitySamples =
         start && t ? [...samplesRef.current, { t: Date.now(), x: t.clientX }] : [];
-      const startedOnLink = start?.startedOnLink ?? false;
       startRef.current = null;
       samplesRef.current = [];
       const touchEl = swipeTouchSurfaceRef.current;
@@ -291,7 +277,6 @@ export default function CommunityBoardSwipeShell({ tabs, children }: { tabs: Tab
         navHrefRef.current = null;
         if (h) {
           router.push(h);
-          if (startedOnLink) killLinkClick();
         }
         animatingRef.current = false;
       };

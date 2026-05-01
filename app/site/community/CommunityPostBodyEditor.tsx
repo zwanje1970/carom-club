@@ -20,7 +20,8 @@ import {
 import { MAX_COMMUNITY_POST_IMAGE_COUNT } from "../../../lib/community-post-images";
 
 type TextBlock = { type: "text"; value: string };
-type ImageBlock = { type: "image"; url: string; sizeLevel: number };
+/** `previewUrl`: 업로드 전 로컬 미리보기(blob:). 저장 직렬화에는 `url`(서버 w640 등)만 포함 */
+type ImageBlock = { type: "image"; url: string; sizeLevel: number; previewUrl?: string };
 type Block = TextBlock | ImageBlock;
 
 function countImages(blocks: Block[]): number {
@@ -39,10 +40,19 @@ function serializeBlocks(blocks: Block[]): { content: string; imageUrls: string[
     if (b.type === "text") {
       content += b.value.replace(new RegExp(TEXT_CARET_ANCHOR, "g"), "");
     } else {
-      imageUrls.push(b.url);
+      if (b.previewUrl && !b.url.trim()) {
+        content += "\n";
+        continue;
+      }
+      const u = b.url.trim();
+      if (!u) {
+        content += "\n";
+        continue;
+      }
+      imageUrls.push(u);
       imageSizeLevels.push(b.sizeLevel);
       const needsNl = content.length > 0 && !content.endsWith("\n");
-      content += `${needsNl ? "\n" : ""}![](${b.url})\n`;
+      content += `${needsNl ? "\n" : ""}![](${u})\n`;
     }
   }
   return { content, imageUrls, imageSizeLevels };
@@ -207,6 +217,8 @@ function renderEditorFromBlocks(editor: HTMLElement, blocks: Block[]) {
       wrap.contentEditable = "false";
       wrap.dataset.bi = String(i);
       wrap.dataset.url = b.url;
+      if (b.previewUrl) wrap.dataset.previewUrl = b.previewUrl;
+      else delete wrap.dataset.previewUrl;
       wrap.dataset.sizeLevel = String(b.sizeLevel);
       wrap.style.display = "block";
       wrap.style.width = "100%";
@@ -218,10 +230,10 @@ function renderEditorFromBlocks(editor: HTMLElement, blocks: Block[]) {
       wrap.style.lineHeight = "0";
       const px = getCommunityPostLongEdgePx(b.sizeLevel);
       const img = document.createElement("img");
-      img.src = b.url;
+      img.src = b.previewUrl && !b.url.trim() ? b.previewUrl : b.url;
       img.alt = "";
       img.draggable = false;
-      img.loading = "lazy";
+      img.loading = b.previewUrl && !b.url.trim() ? "eager" : "lazy";
       img.decoding = "async";
       img.style.maxWidth = `${px}px`;
       img.style.maxHeight = `${px}px`;
@@ -262,10 +274,18 @@ function parseDomToBlocks(editor: HTMLElement): Block[] {
     if (el.classList.contains("cp-img-wrap")) {
       flushText();
       const url = el.dataset.url ?? "";
+      const previewUrl = typeof el.dataset.previewUrl === "string" ? el.dataset.previewUrl.trim() : "";
       const level = clampCommunityPostSizeLevel(
         parseInt(el.dataset.sizeLevel ?? "", 10) || COMMUNITY_POST_DEFAULT_SIZE_LEVEL
       );
-      if (url) blocks.push({ type: "image", url, sizeLevel: level });
+      if (url.trim() || previewUrl) {
+        blocks.push({
+          type: "image",
+          url: url.trim(),
+          sizeLevel: level,
+          ...(previewUrl ? { previewUrl } : {}),
+        });
+      }
       return;
     }
 
@@ -477,7 +497,7 @@ type Props = {
   initialImageSizeLevels: number[];
   onSerializedChange: (payload: { content: string; imageUrls: string[]; imageSizeLevels: number[] }) => void;
   /** 부모에서 라벨 줄에 붙이는 첨부 버튼용(업로드 중·잔여 슬롯) */
-  onAttachUiChange?: (state: { uploading: boolean; remaining: number }) => void;
+  onAttachUiChange?: (state: { uploading: boolean; remaining: number; pendingImages: boolean }) => void;
 };
 
 const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>(function CommunityPostBodyEditor(
@@ -516,9 +536,10 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
   }, [blocks, onSerializedChange]);
 
   const remaining = MAX_COMMUNITY_POST_IMAGE_COUNT - countImages(blocks);
+  const pendingImages = blocks.some((b) => b.type === "image" && !!(b as ImageBlock).previewUrl && !b.url.trim());
   useEffect(() => {
-    onAttachUiChange?.({ uploading, remaining });
-  }, [onAttachUiChange, uploading, remaining]);
+    onAttachUiChange?.({ uploading, remaining, pendingImages });
+  }, [onAttachUiChange, uploading, remaining, pendingImages]);
 
   useLayoutEffect(() => {
     const ed = editorRef.current;
@@ -608,6 +629,8 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
         e.preventDefault();
         setBlocks((prev) => {
           if (prev[idx]?.type !== "image") return prev;
+          const hit = prev[idx] as ImageBlock;
+          if (hit.previewUrl) URL.revokeObjectURL(hit.previewUrl);
           const next = deleteImageBlock(prev, idx);
           queueMicrotask(() => {
             const ed = editorRef.current;
@@ -665,6 +688,8 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
 
   function removeImageAt(i: number) {
     setBlocks((prev) => {
+      const cur = prev[i];
+      if (cur?.type === "image" && cur.previewUrl) URL.revokeObjectURL(cur.previewUrl);
       const next = deleteImageBlock(prev, i);
       queueMicrotask(() => {
         const ed = editorRef.current;
@@ -727,22 +752,7 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
     try {
       for (const file of fileArray) {
         if (countImages(working) >= MAX_COMMUNITY_POST_IMAGE_COUNT) break;
-        setUploading(true);
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("sitePublic", "1");
-        const response = await fetch("/api/upload/image", { method: "POST", body: formData });
-        if (!response.ok) {
-          setError("이미지 업로드에 실패했습니다.");
-          setUploading(false);
-          continue;
-        }
-        const data = (await response.json()) as { w640Url?: string };
-        if (typeof data.w640Url !== "string" || !data.w640Url.trim()) {
-          setUploading(false);
-          continue;
-        }
-        const url = data.w640Url.trim();
+
         if (insertAtBlock < 0 || insertAtBlock >= working.length || working[insertAtBlock].type !== "text") {
           let tidx = working.findIndex((b) => b.type === "text");
           if (tidx < 0) {
@@ -759,11 +769,20 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
         if (before.length > 0 && !before.endsWith("\n")) {
           before = `${before}\n`;
         }
+
+        const previewUrl = URL.createObjectURL(file);
+        const pendingBlock: ImageBlock = {
+          type: "image",
+          url: "",
+          sizeLevel: COMMUNITY_POST_DEFAULT_SIZE_LEVEL,
+          previewUrl,
+        };
+
         const prevIsImage = insertAtBlock > 0 && working[insertAtBlock - 1]?.type === "image";
         if (prevIsImage && before === "") {
           const newBlocks: Block[] = [
             ...working.slice(0, insertAtBlock),
-            { type: "image", url, sizeLevel: COMMUNITY_POST_DEFAULT_SIZE_LEVEL },
+            pendingBlock,
             { type: "text", value: after },
             ...working.slice(insertAtBlock + 1),
           ];
@@ -772,31 +791,90 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
           lastCaretRef.current = { blockIndex: afterTextIndex, start: 0, end: 0 };
           insertAtBlock = afterTextIndex;
           sel = { start: 0, end: 0 };
+        } else {
+          const newBlocks: Block[] = [
+            ...working.slice(0, insertAtBlock),
+            { type: "text", value: before },
+            pendingBlock,
+            { type: "text", value: after },
+            ...working.slice(insertAtBlock + 1),
+          ];
+          working = ensureTrailingTextBlock(newBlocks);
+          const afterTextIndex = insertAtBlock + 2;
+          lastCaretRef.current = { blockIndex: afterTextIndex, start: 0, end: 0 };
+          insertAtBlock = afterTextIndex;
+          sel = { start: 0, end: 0 };
+        }
+
+        setBlocks(working);
+        queueMicrotask(() => {
+          const ed = editorRef.current;
+          if (!ed) return;
+          renderEditorFromBlocks(ed, working);
+          setCaretInTextBlock(ed, lastCaretRef.current.blockIndex, lastCaretRef.current.start);
+          ed.focus();
+        });
+
+        setUploading(true);
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("sitePublic", "1");
+        const response = await fetch("/api/upload/image", { method: "POST", body: formData });
+        if (!response.ok) {
+          setError("이미지 업로드에 실패했습니다.");
           setUploading(false);
+          const revokeUrl = previewUrl;
+          setBlocks((prev) => {
+            const next = ensureTrailingTextBlock(
+              prev.filter((b) => !(b.type === "image" && (b as ImageBlock).previewUrl === revokeUrl))
+            );
+            working = next;
+            URL.revokeObjectURL(revokeUrl);
+            queueMicrotask(() => {
+              const ed = editorRef.current;
+              if (ed) renderEditorFromBlocks(ed, next);
+            });
+            return next;
+          });
           continue;
         }
-        const newBlocks: Block[] = [
-          ...working.slice(0, insertAtBlock),
-          { type: "text", value: before },
-          { type: "image", url, sizeLevel: COMMUNITY_POST_DEFAULT_SIZE_LEVEL },
-          { type: "text", value: after },
-          ...working.slice(insertAtBlock + 1),
-        ];
-        working = ensureTrailingTextBlock(newBlocks);
-        const afterTextIndex = insertAtBlock + 2;
-        lastCaretRef.current = { blockIndex: afterTextIndex, start: 0, end: 0 };
-        insertAtBlock = afterTextIndex;
-        sel = { start: 0, end: 0 };
+        const data = (await response.json()) as { w640Url?: string };
+        if (typeof data.w640Url !== "string" || !data.w640Url.trim()) {
+          setUploading(false);
+          const revokeUrl = previewUrl;
+          setBlocks((prev) => {
+            const next = ensureTrailingTextBlock(
+              prev.filter((b) => !(b.type === "image" && (b as ImageBlock).previewUrl === revokeUrl))
+            );
+            working = next;
+            URL.revokeObjectURL(revokeUrl);
+            queueMicrotask(() => {
+              const ed = editorRef.current;
+              if (ed) renderEditorFromBlocks(ed, next);
+            });
+            return next;
+          });
+          continue;
+        }
+        const url = data.w640Url.trim();
+        const matchPreview = previewUrl;
+        setBlocks((prev) => {
+          const next = prev.map((b) => {
+            if (b.type === "image" && (b as ImageBlock).previewUrl === matchPreview) {
+              URL.revokeObjectURL(matchPreview);
+              return { type: "image" as const, url, sizeLevel: b.sizeLevel };
+            }
+            return b;
+          });
+          working = next;
+          queueMicrotask(() => {
+            const ed = editorRef.current;
+            if (ed) renderEditorFromBlocks(ed, next);
+          });
+          return next;
+        });
         setUploading(false);
       }
-      setBlocks(working);
-      queueMicrotask(() => {
-        const ed = editorRef.current;
-        if (!ed) return;
-        renderEditorFromBlocks(ed, working);
-        setCaretInTextBlock(ed, lastCaretRef.current.blockIndex, lastCaretRef.current.start);
-        ed.focus();
-      });
     } catch {
       setError("이미지 업로드에 실패했습니다.");
     } finally {

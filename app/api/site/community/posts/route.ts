@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
+import { CACHE_TAG_SITE_PUBLIC_COMMUNITY_FEED } from "../../../../../lib/cache-tags";
+import { revalidateSiteDataTag } from "../../../../../lib/revalidate-site-data-tag";
 import {
   createCommunityPost,
   getUserById,
@@ -62,6 +64,8 @@ export async function POST(request: Request) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
+
+  revalidateSiteDataTag(CACHE_TAG_SITE_PUBLIC_COMMUNITY_FEED);
 
   return NextResponse.json({ ok: true, id: result.post.id });
 }

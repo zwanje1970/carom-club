@@ -8525,6 +8525,37 @@ export async function softDeleteComment(
   return { ok: true };
 }
 
+export async function updateComment(
+  commentId: string,
+  editorUserId: string,
+  content: string
+): Promise<
+  | { ok: true }
+  | { ok: false; code: "NOT_FOUND" | "FORBIDDEN" | "PERSIST_UNAVAILABLE" }
+  | { ok: false; error: string }
+> {
+  const text = content.trim();
+  if (!text) return { ok: false, error: "내용을 입력해 주세요." };
+  const feed = await loadSiteCommunityFeed();
+  if (!Array.isArray(feed.communityComments)) feed.communityComments = [];
+  const id = commentId.trim();
+  const c = feed.communityComments.find((x) => x.id === id);
+  if (!c || c.isDeleted === true) return { ok: false, code: "NOT_FOUND" };
+  if ((await resolveCanonicalUserIdForAuth(c.authorUserId)) !== (await resolveCanonicalUserIdForAuth(editorUserId))) {
+    return { ok: false, code: "FORBIDDEN" };
+  }
+  const now = new Date().toISOString();
+  c.content = text;
+  const post = feed.communityPosts.find((x) => x.id === c.postId);
+  if (post && isCommunityBoardPostListed(post)) {
+    post.updatedAt = now;
+  }
+  if (!(await persistSiteCommunityFeed(feed))) {
+    return { ok: false, code: "PERSIST_UNAVAILABLE" };
+  }
+  return { ok: true };
+}
+
 function normalizeSnapshotSourceType(
   item: PublishedCardSnapshot & { targetDetailUrl?: string; snapshotSourceType?: string }
 ): CardSnapshotSourceType {

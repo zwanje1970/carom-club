@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../lib/auth/session";
+import { CACHE_TAG_SITE_PUBLIC_COMMUNITY_FEED } from "../../../../../../lib/cache-tags";
+import { revalidateSiteDataTag } from "../../../../../../lib/revalidate-site-data-tag";
 import {
   getCommunityPostById,
   getUserById,
@@ -73,6 +75,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     }
     return NextResponse.json({ error: "제목과 내용을 입력해 주세요." }, { status: 400 });
   }
+  revalidateSiteDataTag(CACHE_TAG_SITE_PUBLIC_COMMUNITY_FEED);
   return NextResponse.json({ ok: true });
 }
 
@@ -107,5 +110,6 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
     }
     return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
   }
+  revalidateSiteDataTag(CACHE_TAG_SITE_PUBLIC_COMMUNITY_FEED);
   return NextResponse.json({ ok: true });
 }

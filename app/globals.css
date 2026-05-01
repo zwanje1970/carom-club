@@ -635,11 +635,11 @@ button.secondary-button.site-mypage-logout:hover,
   color: #64748b;
 }
 
-/* 클럽안내 기본(가로 썸네일) — 레거시·다른 경로 호환용 */
+/* 클럽안내 기본 — 가로 88px 고정, 정사각형(88×88) */
 .site-venue-list-thumb {
   width: 88px;
   min-width: 88px;
-  height: 56px;
+  height: 88px;
   flex-shrink: 0;
   border-radius: 12px;
   overflow: hidden;
@@ -671,7 +671,7 @@ button.secondary-button.site-mypage-logout:hover,
   background: var(--color-bg-soft, #f9fafb);
 }
 
-/* 클럽안내 목록: 가로 리스트 — 기본 .site-venue-list-thumb(88×56), 썸네일만 오른쪽 정렬 */
+/* 클럽안내 목록: 가로 리스트 — 기본 .site-venue-list-thumb(88×88), 썸네일만 오른쪽 정렬 */
 .site-board-card.site-board-card--venue .site-venue-list-thumb {
   margin-left: auto;
   align-self: flex-start;
@@ -838,6 +838,8 @@ button.secondary-button.site-mypage-logout:hover,
 
 /* 커뮤니티 게시판 탭 간 스와이프: 루트는 레이아웃·data-community-inner-swipe, 터치는 .community-board-swipe-panel--main 에만 연결 */
 .community-board-swipe-root {
+  position: relative;
+  z-index: 0;
   width: 100%;
   min-height: 100%;
   box-sizing: border-box;
@@ -3487,7 +3489,7 @@ button.secondary-button.ui-community-post-action-danger:hover,
 }
 
 .ui-community-comments.v3-stack {
-  gap: 0.55rem;
+  gap: 0.45rem;
 }
 
 .ui-community-comments-heading {
@@ -3509,9 +3511,55 @@ button.secondary-button.ui-community-post-action-danger:hover,
 }
 
 .ui-community-comment-item {
-  padding: 0.55rem 0;
+  padding: 0.4rem 0;
   border-bottom: 1px solid rgba(15, 23, 42, 0.14);
   font-size: 0.9rem;
+}
+
+.ui-community-comment-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.ui-community-comment-head-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.ui-community-comment-actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem;
+  font-size: 0.72rem;
+  line-height: 1.3;
+  padding-top: 0.05rem;
+}
+
+.ui-community-comment-text-action {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  color: rgba(15, 23, 42, 0.55);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.ui-community-comment-text-action:hover {
+  color: rgba(15, 23, 42, 0.85);
+}
+
+.ui-community-comment-action-sep {
+  color: rgba(15, 23, 42, 0.35);
+  user-select: none;
 }
 
 .ui-community-comment-item:last-child {
@@ -3525,20 +3573,16 @@ button.secondary-button.ui-community-post-action-danger:hover,
 }
 
 .ui-community-comment-meta {
-  margin: 0.12rem 0 0;
-  font-size: 0.75rem;
-  line-height: 1.35;
+  margin: 0.06rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.3;
 }
 
 .ui-community-comment-body {
-  margin-top: 0.35rem;
+  margin-top: 0.22rem;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  line-height: 1.55;
-}
-
-.ui-community-comment-item .ui-community-post-action-tight {
-  margin-top: 0.45rem;
+  line-height: 1.45;
 }
 
 .ui-community-comments-empty {
@@ -3548,8 +3592,47 @@ button.secondary-button.ui-community-post-action-danger:hover,
 }
 
 .ui-community-comment-compose.v3-stack {
-  gap: 0.45rem;
-  margin-top: 0.35rem;
+  gap: 0.4rem;
+  margin-top: 0.28rem;
+}
+
+.ui-community-comment-compose-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ui-community-comment-compose-cancel {
+  text-decoration: none;
+  color: rgba(15, 23, 42, 0.6);
+}
+
+.ui-community-comment-compose-cancel:hover {
+  color: rgba(15, 23, 42, 0.9);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  .ui-community-comments.v3-stack {
+    gap: 0.38rem;
+  }
+
+  .ui-community-comment-item {
+    padding: 0.28rem 0;
+    font-size: 0.88rem;
+  }
+
+  .ui-community-comment-body {
+    margin-top: 0.16rem;
+    line-height: 1.42;
+  }
+
+  .ui-community-comment-compose.v3-stack {
+    gap: 0.35rem;
+    margin-top: 0.22rem;
+  }
 }
 
 .ui-community-comments-login-hint {

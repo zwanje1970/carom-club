@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { withPublishedCardMainReflectNotice } from "../../../../lib/client-published-card-main-reflect-notice";
 import { useEffect, useRef, useState } from "react";
 import type { TournamentStatusBadge } from "../../../../lib/types/entities";
 
@@ -227,9 +228,11 @@ export default function TournamentBadgeCardManageRow({
         }
         setHasLivePublishedCard(true);
         window.alert(
-          hadPublishedBefore
-            ? "게시카드가 갱신되어 메인에 반영되었습니다."
-            : "메인에 게시되었습니다. 사이트에 반영되었습니다.",
+          withPublishedCardMainReflectNotice(
+            hadPublishedBefore
+              ? "게시카드가 갱신되어 메인에 반영되었습니다."
+              : "메인에 게시되었습니다. 사이트에 반영되었습니다.",
+          ),
         );
         router.refresh();
       } catch {

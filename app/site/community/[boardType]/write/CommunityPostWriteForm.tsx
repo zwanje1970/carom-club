@@ -23,8 +23,9 @@ export default function CommunityPostWriteForm({ boardType }: Props) {
   const [attachUi, setAttachUi] = useState({
     uploading: false,
     remaining: MAX_COMMUNITY_POST_IMAGE_COUNT,
+    pendingImages: false,
   });
-  const onAttachUiChange = useCallback((s: { uploading: boolean; remaining: number }) => {
+  const onAttachUiChange = useCallback((s: { uploading: boolean; remaining: number; pendingImages: boolean }) => {
     setAttachUi(s);
   }, []);
 
@@ -56,7 +57,9 @@ export default function CommunityPostWriteForm({ boardType }: Props) {
         setMessage("실패");
         return;
       }
-      router.push(communityBoardListHref(boardType as SiteCommunityBoardKey));
+      const href = communityBoardListHref(boardType as SiteCommunityBoardKey);
+      router.push(href);
+      router.refresh();
     } catch {
       setMessage("실패");
     } finally {
@@ -100,7 +103,11 @@ export default function CommunityPostWriteForm({ boardType }: Props) {
           onAttachUiChange={onAttachUiChange}
         />
       </div>
-      <button type="submit" className="primary-button ui-community-post-action-submit" disabled={loading}>
+      <button
+        type="submit"
+        className="primary-button ui-community-post-action-submit"
+        disabled={loading || attachUi.uploading || attachUi.pendingImages}
+      >
         {loading ? "저장 중..." : "저장"}
       </button>
       {message ? <p className="v3-muted ui-community-form-message">{message}</p> : null}

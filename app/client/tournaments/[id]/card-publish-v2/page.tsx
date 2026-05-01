@@ -13,6 +13,7 @@ import {
   POSTCARD_TEMPLATE_TEXT_COLOR_SWATCHES,
 } from "../../../../../lib/postcard-template-reference";
 import editorStyles from "../card-publish-editor.module.css";
+import { withPublishedCardMainReflectNotice } from "../../../../../lib/client-published-card-main-reflect-notice";
 
 const DESCRIPTION_MAX_LINES = 3;
 
@@ -572,7 +573,7 @@ export default function ClientTournamentCardPublishV2Page() {
         if (!draftOnly) {
           setHasLivePublishedCard(true);
         }
-        setMessage(successMessage);
+        setMessage(!draftOnly ? withPublishedCardMainReflectNotice(successMessage) : successMessage);
         router.refresh();
       } catch {
         setMessage(draftOnly ? "저장 요청 중 오류가 발생했습니다." : "메인 게시 요청 중 오류가 발생했습니다.");
@@ -975,7 +976,7 @@ export default function ClientTournamentCardPublishV2Page() {
           </div>
 
           {message ? (
-            <p className="v3-muted" style={{ paddingLeft: "0.75rem" }}>
+            <p className="v3-muted" role="status" style={{ paddingLeft: "0.75rem", whiteSpace: "pre-line" }}>
               {message}
             </p>
           ) : null}
