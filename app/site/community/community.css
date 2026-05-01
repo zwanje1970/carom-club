@@ -734,6 +734,11 @@ button.secondary-button.ui-community-post-action-danger:hover,
   word-break: break-word;
 }
 
+/* 본문: 텍스트(span)와 첨부 이미지(inline-block)가 한 줄 흐름에서 나란히 줄바꿈 — absolute/flex 겹침 없음 */
+.community-post-body-editor-root.ui-community-post-editor-editable {
+  white-space: normal;
+}
+
 .ui-community-post-editor-surface .cp-img-wrap img {
   border-radius: 8px;
 }

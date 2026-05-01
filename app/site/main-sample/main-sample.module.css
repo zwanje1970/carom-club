@@ -218,6 +218,20 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* 대회 카드: 링크 대신 블록 — 레이아웃은 기존 `> a`와 동일 */
+.sampleMainCardDeckFitInner {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-height: 0;
+  height: 100%;
+  align-items: stretch;
+  justify-content: center;
+  text-decoration: none;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .sampleMainCardDeckFit > a:focus-visible {
   outline: 2px solid rgba(37, 99, 235, 0.85);
   outline-offset: 2px;
@@ -235,17 +249,17 @@
 }
 
 .sampleMainCardSlot:active .sampleMainCardFace.sampleMainCardFaceTournamentDeck:not(.sampleMainCardFaceSelected) {
-  transform: none;
+  transform: translateY(-6px) scale(1.03);
   box-shadow: none;
 }
 
 .sampleMainCardFace.sampleMainCardFaceTournamentDeck.sampleMainCardFaceSelected {
-  transform: none;
+  transform: translateY(-14px) scale(1.06);
   box-shadow: none;
 }
 
 .sampleMainCardSlot:active .sampleMainCardFace.sampleMainCardFaceTournamentDeck.sampleMainCardFaceSelected {
-  transform: none;
+  transform: translateY(-16px) scale(1.07);
   box-shadow: none;
 }
 

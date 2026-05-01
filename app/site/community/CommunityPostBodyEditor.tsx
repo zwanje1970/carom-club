@@ -220,14 +220,12 @@ function renderEditorFromBlocks(editor: HTMLElement, blocks: Block[]) {
       if (b.previewUrl) wrap.dataset.previewUrl = b.previewUrl;
       else delete wrap.dataset.previewUrl;
       wrap.dataset.sizeLevel = String(b.sizeLevel);
-      wrap.style.display = "block";
-      wrap.style.width = "100%";
+      wrap.style.display = "inline-block";
       wrap.style.boxSizing = "border-box";
-      wrap.style.verticalAlign = "baseline";
-      wrap.style.position = "relative";
+      wrap.style.verticalAlign = "bottom";
       wrap.style.maxWidth = "100%";
-      wrap.style.margin = "0.5rem 0";
-      wrap.style.lineHeight = "0";
+      wrap.style.margin = "0.2rem 0.35rem 0.2rem 0";
+      wrap.style.lineHeight = "normal";
       const px = getCommunityPostLongEdgePx(b.sizeLevel);
       const img = document.createElement("img");
       img.src = b.previewUrl && !b.url.trim() ? b.previewUrl : b.url;
@@ -944,6 +942,41 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
             const ed = editorRef.current;
             if (!ed) return;
             syncCaretRef();
+
+            if (e.key === " ") {
+              const selImg = selectedImageBlockIndexRef.current;
+              if (selImg !== null) {
+                e.preventDefault();
+                setSelectedImageBlockIndex(null);
+                setToolbarRect(null);
+                setBlocks((prev) => {
+                  const next = [...prev];
+                  const afterIdx = selImg + 1;
+                  if (afterIdx < next.length && next[afterIdx]?.type === "text") {
+                    const t = next[afterIdx] as TextBlock;
+                    const v = t.value;
+                    next[afterIdx] = { type: "text", value: v.startsWith(" ") ? v : ` ${v}` };
+                  } else {
+                    next.splice(afterIdx, 0, { type: "text", value: " " });
+                  }
+                  const merged = ensureTrailingTextBlock(next);
+                  queueMicrotask(() => {
+                    const el = editorRef.current;
+                    if (!el) return;
+                    renderEditorFromBlocks(el, merged);
+                    const roots = getOrderedBlockRoots(el);
+                    const ri = roots.findIndex((r) => r.classList.contains("cp-text") && r.dataset.bi === String(afterIdx));
+                    const blockPos = ri >= 0 ? ri : afterIdx;
+                    const tb = merged[afterIdx] as TextBlock | undefined;
+                    const off = tb && tb.value.length > 0 ? 1 : 0;
+                    lastCaretRef.current = { blockIndex: blockPos, start: off, end: off };
+                    setCaretInTextBlock(el, blockPos, off);
+                  });
+                  return merged;
+                });
+                return;
+              }
+            }
 
             if (e.key === "Backspace") {
               const c = getCaretInEditor(ed, blocksRef.current);

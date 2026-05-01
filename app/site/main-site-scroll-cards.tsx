@@ -108,13 +108,6 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
 
   if (item.slideDeckItem) {
     const sd = item.slideDeckItem;
-    const linkBlockStyle = {
-      width: "100%",
-      maxWidth: "100%",
-      textDecoration: "none",
-      color: "inherit",
-      WebkitTapHighlightColor: "transparent",
-    } as const;
     const deckInner = (
       <TournamentSnapshotCardView
         item={sd}
@@ -131,17 +124,22 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
         className={`${styles.sampleMainCardSlot} ${selected ? styles.sampleMainCardSlotSelected : ""}`}
         {...{ [SITE_SCROLL_CARD]: "" }}
         style={{ touchAction: "pan-y" }}
-        role="group"
-        tabIndex={-1}
-        aria-label={item.title.trim() ? `${item.title.trim()} 상세 보기` : "대회 상세 보기"}
-        onPointerDown={onPointerDown}
+        role="button"
+        tabIndex={0}
+        aria-pressed={selected}
+        aria-label={`${item.title}${selected ? ", 선택됨" : ""}`}
+        onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          onCardPointerDown(item.id);
+        }}
       >
         <div
           className={`${styles.sampleMainCardFace} ${styles.sampleMainCardFaceTournamentDeck} ${selected ? styles.sampleMainCardFaceSelected : ""}`}
         >
-          <div className={styles.sampleMainCardDeckFit}>
-            {item.external ? (
-              <a href={item.href} target="_blank" rel="noopener noreferrer" style={linkBlockStyle}>
+          <div className={siteStyles.cardRowInteractionWrap} onPointerDown={onPointerDown}>
+            <div className={styles.sampleMainCardDeckFit}>
+              <div className={styles.sampleMainCardDeckFitInner}>
                 <div className={editorCardStyles.previewCardScaleHost}>
                   <div className={editorCardStyles.previewCardScaleInner}>
                     <div
@@ -151,21 +149,34 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
                     </div>
                   </div>
                 </div>
-              </a>
-            ) : (
-              <Link href={item.href} style={linkBlockStyle}>
-                <div className={editorCardStyles.previewCardScaleHost}>
-                  <div className={editorCardStyles.previewCardScaleInner}>
-                    <div
-                      className={`${editorCardStyles.previewCardWrap} ${editorCardStyles.previewCardWrapV2Chrome}`}
-                    >
-                      <div className={editorCardStyles.cardPublishCaptureRoot}>{deckInner}</div>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            )}
+              </div>
+            </div>
           </div>
+          {item.external ? (
+            <a
+              href={item.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.sampleMainCardShortcut}
+              {...{ [SITE_SCROLL_SHORTCUT]: "" }}
+              tabIndex={selected ? 0 : -1}
+              aria-hidden={!selected}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              자세히 보기 ▶
+            </a>
+          ) : (
+            <Link
+              href={item.href}
+              className={styles.sampleMainCardShortcut}
+              {...{ [SITE_SCROLL_SHORTCUT]: "" }}
+              tabIndex={selected ? 0 : -1}
+              aria-hidden={!selected}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              자세히 보기 ▶
+            </Link>
+          )}
         </div>
       </div>
     );
