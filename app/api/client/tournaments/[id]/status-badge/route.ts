@@ -15,7 +15,6 @@ const STATUS_BADGE_OPTIONS: readonly TournamentStatusBadge[] = [
   "모집중",
   "마감임박",
   "마감",
-  "대기자모집",
   "예정",
   "종료",
   "초안",
@@ -23,6 +22,7 @@ const STATUS_BADGE_OPTIONS: readonly TournamentStatusBadge[] = [
 
 function normalizeTournamentStatusBadgeInput(v: unknown): TournamentStatusBadge {
   const s = typeof v === "string" ? v.trim() : "";
+  if (s === "대기자모집") return "모집중";
   return STATUS_BADGE_OPTIONS.includes(s as TournamentStatusBadge) ? (s as TournamentStatusBadge) : "초안";
 }
 

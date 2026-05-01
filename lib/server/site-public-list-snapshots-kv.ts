@@ -73,7 +73,6 @@ function isTournamentStatusBadge(v: unknown): v is TournamentStatusBadge {
     v === "모집중" ||
     v === "마감임박" ||
     v === "마감" ||
-    v === "대기자모집" ||
     v === "예정" ||
     v === "종료" ||
     v === "초안"
@@ -89,7 +88,14 @@ function parseTournamentSnapshots(raw: unknown): SiteTournamentListSnapshot[] | 
     const tournamentId = typeof o.tournamentId === "string" ? o.tournamentId.trim() : "";
     const title = typeof o.title === "string" ? o.title : "";
     if (!tournamentId || !title) return null;
-    if (!isTournamentStatusBadge(o.statusBadge)) return null;
+    let statusBadge: TournamentStatusBadge;
+    if (o.statusBadge === "대기자모집") {
+      statusBadge = "모집중";
+    } else if (!isTournamentStatusBadge(o.statusBadge)) {
+      return null;
+    } else {
+      statusBadge = o.statusBadge;
+    }
     const playScaleLabel = typeof o.playScaleLabel === "string" ? o.playScaleLabel : "";
     const dateLabel = typeof o.dateLabel === "string" ? o.dateLabel : "";
     const regionLabel = typeof o.regionLabel === "string" ? o.regionLabel : "";
@@ -104,7 +110,7 @@ function parseTournamentSnapshots(raw: unknown): SiteTournamentListSnapshot[] | 
     out.push({
       tournamentId,
       title,
-      statusBadge: o.statusBadge,
+      statusBadge,
       playScaleLabel,
       dateLabel,
       regionLabel,

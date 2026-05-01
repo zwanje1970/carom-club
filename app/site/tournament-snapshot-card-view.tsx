@@ -110,7 +110,6 @@ function parseSubtitle(subtitle: string): { dateText: string; placeText: string 
 function toStatus(value: string | undefined): TournamentPostStatus {
   const badge = (value ?? "").trim();
   if (badge.includes("마감임박") || (badge.includes("마감") && badge.includes("임박"))) return "마감임박";
-  if (badge.includes("대기")) return "대기자모집";
   if (badge.includes("종료")) return "종료";
   if (badge.includes("마감")) return "마감";
   if (badge.includes("진행")) return "모집중";

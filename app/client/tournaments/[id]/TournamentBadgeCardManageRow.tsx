@@ -9,7 +9,6 @@ const OPTIONS: TournamentStatusBadge[] = [
   "모집중",
   "마감임박",
   "마감",
-  "대기자모집",
   "예정",
   "종료",
   "초안",

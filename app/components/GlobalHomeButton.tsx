@@ -31,8 +31,6 @@ function navItemActive(pathname: string, href: string): boolean {
 export default function GlobalHomeButton() {
   const pathname = usePathname() ?? "";
   const overInquiryComposer = isInquiryDetailWithComposer(pathname);
-  /** 커뮤니티 목록·상세에서 하단 5탭이 인접 _rsc를 대량 prefetch 하지 않도록 */
-  const suppressBottomNavPrefetch = pathname.startsWith("/site/community");
 
   /* 서버에서 `next-url`이 비면 샘플 셸 클래스가 빠져 하단 네비 실험 스타일이 적용되지 않음 — pathname으로 동기화 */
   useLayoutEffect(() => {
@@ -45,6 +43,8 @@ export default function GlobalHomeButton() {
   return (
     <div
       className="site-home-fab-root"
+      data-site-mobile-bottom-nav
+      data-no-community-board-swipe
       style={{
         bottom: overInquiryComposer
           ? "calc(3.875rem + env(safe-area-inset-bottom, 0px))"
@@ -64,23 +64,11 @@ export default function GlobalHomeButton() {
             .join(" ");
           const inner = <span className="site-mobile-bottom-nav__label">{item.label}</span>;
           return item.href.startsWith("/site/venues") ? (
-            <VenuesDistanceNavLink
-              key={item.href}
-              href={item.href}
-              className={cls}
-              aria-current={active ? "page" : undefined}
-              prefetch={suppressBottomNavPrefetch ? false : undefined}
-            >
+            <VenuesDistanceNavLink key={item.href} href={item.href} className={cls} aria-current={active ? "page" : undefined}>
               {inner}
             </VenuesDistanceNavLink>
           ) : (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cls}
-              aria-current={active ? "page" : undefined}
-              prefetch={suppressBottomNavPrefetch ? false : undefined}
-            >
+            <Link key={item.href} href={item.href} className={cls} aria-current={active ? "page" : undefined}>
               {inner}
             </Link>
           );

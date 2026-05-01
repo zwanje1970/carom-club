@@ -356,7 +356,6 @@ export type TournamentStatusBadge =
   | "모집중"
   | "마감임박"
   | "마감"
-  | "대기자모집"
   | "예정"
   | "종료"
   | "초안";
@@ -365,13 +364,13 @@ const TOURNAMENT_STATUS_BADGE_VALUES: TournamentStatusBadge[] = [
   "모집중",
   "마감임박",
   "마감",
-  "대기자모집",
   "예정",
   "종료",
   "초안",
 ];
 
 export function normalizeTournamentStatusBadge(raw: unknown): TournamentStatusBadge {
+  if (typeof raw === "string" && raw.trim() === "대기자모집") return "모집중";
   if (typeof raw === "string" && TOURNAMENT_STATUS_BADGE_VALUES.includes(raw as TournamentStatusBadge)) {
     return raw as TournamentStatusBadge;
   }
@@ -8807,10 +8806,8 @@ export async function upsertTournamentPublishedCard(params: {
     nextVersion = (canonicalPublished?.version ?? 0) + 1;
     snapshotId = canonicalPublished?.snapshotId?.trim() || randomUUID();
     publishedAt = canonicalPublished?.publishedAt?.trim() || now;
-    showOnMainSlide =
-      typeof canonicalPublished?.showOnMainSlide === "boolean"
-        ? canonicalPublished.showOnMainSlide
-        : defaultShowOnMainSlide;
+    /** 메인 노출은 게시 시점 대회 상태 기준(초안에 박힌 과거 플래그를 물려받지 않음 — `setCardSnapshotActive`와 동일) */
+    showOnMainSlide = defaultShowOnMainSlide;
     publishedBy = canonicalPublished?.publishedBy?.trim() || params.publishedBy;
   }
 
@@ -8889,6 +8886,7 @@ export async function upsertTournamentPublishedCard(params: {
     await persistTournamentPublishedCardsRows(working);
   } else if (localStore) {
     await writeLocalJsonAggregate(localStore);
+    revalidateMainSlideSnapshotsCache();
   }
   try {
     await processDuePublishedCardImageDeleteQueue();
@@ -9810,6 +9808,7 @@ export async function setCardSnapshotActive(params: {
       await persistTournamentPublishedCardsRows(publishedCards);
     } else if (fileStore) {
       await writeLocalJsonAggregate(fileStore);
+      revalidateMainSlideSnapshotsCache();
     }
     return {
       ok: true,
@@ -9847,6 +9846,7 @@ export async function setCardSnapshotActive(params: {
   snapshot.isPublished = true;
 
   await writeLocalJsonAggregate(fileStore);
+  revalidateMainSlideSnapshotsCache();
 
   return {
     ok: true,

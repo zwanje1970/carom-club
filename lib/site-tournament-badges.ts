@@ -4,7 +4,7 @@
  */
 
 /** 메인 홈 슬라이드(홍보): 참여 가능한 상태만 */
-export const MAIN_SLIDE_STATUS_BADGES = new Set<string>(["모집중", "마감임박", "대기자모집"]);
+export const MAIN_SLIDE_STATUS_BADGES = new Set<string>(["모집중", "마감임박"]);
 
 /** 대회 상태 문자열 기준으로 메인 슬라이드 게시 노출 여부(저장 시점에 카드에 반영) */
 export function tournamentStatusEligibleForMainSlide(status: string): boolean {
@@ -15,7 +15,7 @@ export function tournamentStatusEligibleForMainSlide(status: string): boolean {
 export const SITE_TOURNAMENT_LIST_EXCLUDED_BADGES = new Set<string>(["초안", "예정"]);
 
 /** 카드 게시(저장·게시 흐름) 허용 상태 */
-export const PUBLISH_ELIGIBLE_STATUS_BADGES = new Set<string>(["모집중", "마감임박", "대기자모집"]);
+export const PUBLISH_ELIGIBLE_STATUS_BADGES = new Set<string>(["모집중", "마감임박"]);
 
 export function resolveTournamentStatusBadgeForDisplay(
   snapshotBadge: string | undefined | null,

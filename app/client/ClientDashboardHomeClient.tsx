@@ -41,7 +41,6 @@ async function fetchDashboardSummary(): Promise<DashboardFetchResult> {
 function clientDashboardTournamentBadgeClass(badge: TournamentStatusBadge): string {
   switch (badge) {
     case "모집중":
-    case "대기자모집":
       return "client-dashboard-main__tournamentBadge client-dashboard-main__tournamentBadge--success";
     case "마감임박":
       return "client-dashboard-main__tournamentBadge client-dashboard-main__tournamentBadge--warning";

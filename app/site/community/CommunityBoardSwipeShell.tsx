@@ -53,6 +53,7 @@ function swipeIndexForPathname(pathname: string, tabs: Tab[]): number {
 function touchBlocksCommunitySwipe(el: EventTarget | null): boolean {
   if (!el || !(el instanceof Element)) return false;
   if (el.closest("[data-no-community-board-swipe]")) return true;
+  if (el.closest("[data-site-mobile-bottom-nav], .site-home-fab-root")) return true;
   if (el.closest("input,textarea,select,button,iframe,video,audio,summary")) return true;
   if (el.closest('[contenteditable="true"]')) return true;
   if (el.closest('[role="button"],[role="tab"],[role="tablist"]')) return true;
