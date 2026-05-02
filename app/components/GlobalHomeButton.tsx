@@ -48,6 +48,7 @@ export default function GlobalHomeButton() {
   }, [pathname]);
 
   const bottomNavPrefetch =
+    pathname.startsWith("/client") ||
     isPublicSiteMainHomePathname(pathname) ||
     isPublicSiteTournamentsHubPathname(pathname) ||
     isPublicSiteVenuesHubPathname(pathname) ||

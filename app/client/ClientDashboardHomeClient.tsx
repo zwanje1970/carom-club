@@ -144,7 +144,6 @@ function DashboardSkeleton() {
         <div className="skeleton-line" style={{ height: "1rem", width: "35%", borderRadius: 6, background: "#e5e7eb" }} />
         <div className="v3-stack" style={{ gap: "0.45rem" }}>
           <div className="client-dashboard-main__dsCard skeleton-line" style={{ height: "4.2rem", borderRadius: 12, background: "#eef2f7" }} />
-          <div className="client-dashboard-main__dsCard skeleton-line" style={{ height: "4.2rem", borderRadius: 12, background: "#eef2f7" }} />
         </div>
       </section>
       <section className="v3-stack" style={{ gap: "0.5rem" }} aria-hidden>
@@ -258,12 +257,15 @@ export default function ClientDashboardHomeClient() {
   } else {
     mainStatusText = "현재 대회가 운영 중입니다";
     mainButtonLabel = "대회 관리";
-    mainButtonHref = "/client/tournaments";
+    const detailId = (d.recentTournaments[0]?.id ?? d.firstTournamentId).trim();
+    mainButtonHref = detailId ? `/client/tournaments/${detailId}` : "/client/tournaments";
   }
 
   const cardPublishHref = d.firstTournamentId
     ? `/client/tournaments/${d.firstTournamentId}/card-publish-v2`
     : "/client/tournaments/new";
+
+  const ongoingTournamentsToRender = d.recentTournaments.slice(0, 1);
 
   return (
     <div className="v3-stack" style={{ gap: "1.15rem" }}>
@@ -331,7 +333,7 @@ export default function ClientDashboardHomeClient() {
           <p className="client-dashboard-main__tournamentEmpty">진행중 대회가 없습니다</p>
         ) : (
           <ul className="v3-stack client-dashboard-main__tournamentList" style={{ listStyle: "none", margin: 0, padding: 0 }}>
-            {d.recentTournaments.map((t) => (
+            {ongoingTournamentsToRender.map((t) => (
               <li key={t.id} className="v3-stack client-dashboard-main__dsCard client-dashboard-main__tournamentCard">
                 <div className="client-dashboard-main__tournamentTop">
                   <div className="client-dashboard-main__tournamentTitle">{t.title}</div>
@@ -347,6 +349,9 @@ export default function ClientDashboardHomeClient() {
             ))}
           </ul>
         )}
+        <Link href="/client/tournaments" prefetch={false} className="client-dashboard-main__tournamentSeeAll">
+          전체대회 보기
+        </Link>
       </section>
 
       <section className="v3-stack" aria-labelledby="client-main-features-heading" style={{ gap: "0.5rem" }}>

@@ -352,6 +352,25 @@ main.client-dashboard-main a.client-dashboard-main__tournamentManage {
   border: none;
 }
 
+main.client-dashboard-main a.client-dashboard-main__tournamentSeeAll {
+  display: inline-flex;
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 10px;
+  font-size: 0.87rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--ds-text-main);
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+main.client-dashboard-main a.client-dashboard-main__tournamentSeeAll:hover {
+  background: rgba(248, 250, 252, 0.95);
+}
+
 /* 기본 버튼 (강조 카드 내부 링크는 위에서 별도 지정) */
 main.client-dashboard-main .v3-btn {
   border-radius: 12px;

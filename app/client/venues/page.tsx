@@ -7,7 +7,9 @@ export default function ClientVenuesPage() {
       <section className="v3-box v3-stack">
         <p className="v3-muted" style={{ margin: 0 }}>
           등록된 클럽이 없습니다.{" "}
-          <Link href="/site/venues">클럽안내</Link>
+          <Link href="/site/venues" prefetch={false}>
+            클럽안내
+          </Link>
         </p>
       </section>
     </main>

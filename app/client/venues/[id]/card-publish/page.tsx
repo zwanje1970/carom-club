@@ -320,7 +320,7 @@ export default function ClientVenueCardPublishPage() {
       </section>
 
       <div className="v3-row">
-        <Link className="v3-btn" href={`/site/venues/${venueId}`}>
+        <Link className="v3-btn" href={`/site/venues/${venueId}`} prefetch={false}>
           사이트 상세 확인
         </Link>
       </div>
