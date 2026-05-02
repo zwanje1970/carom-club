@@ -228,7 +228,13 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
       <div
         className={
           usePublishedScrollLayout
-            ? `${styles.sampleMainCardFacePublishedSnapshot} ${selected ? styles.sampleMainCardFacePublishedSnapshotSelected : ""}`
+            ? [
+                styles.sampleMainCardFacePublishedSnapshot,
+                selected ? styles.sampleMainCardFacePublishedSnapshotSelected : "",
+                item.suppressPublishedScrollOverlay ? styles.sampleMainCardFacePublishedSnapshotImageOnly : "",
+              ]
+                .filter(Boolean)
+                .join(" ")
             : `${styles.sampleMainCardFace} ${selected ? styles.sampleMainCardFaceSelected : ""}`
         }
         style={faceStyle}

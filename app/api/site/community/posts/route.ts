@@ -35,8 +35,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  let body: { boardType?: unknown; title?: unknown; content?: unknown; imageUrls?: unknown; imageSizeLevels?: unknown } =
-    {};
+  let body: {
+    boardType?: unknown;
+    title?: unknown;
+    content?: unknown;
+    imageUrls?: unknown;
+    imageSizeLevels?: unknown;
+    imageLayout?: unknown;
+  } = {};
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -57,6 +63,7 @@ export async function POST(request: Request) {
     content,
     imageUrls: body.imageUrls,
     imageSizeLevels: body.imageSizeLevels,
+    imageLayout: body.imageLayout,
     authorUserId: user.id,
     authorNickname: user.nickname,
   });

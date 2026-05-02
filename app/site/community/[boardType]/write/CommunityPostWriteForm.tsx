@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import CommunityPostBodyEditor, {
   type CommunityPostBodyEditorHandle,
 } from "../../CommunityPostBodyEditor";
+import type { CommunityPostImageLayout } from "../../../../../lib/community-post-content-images";
 import { MAX_COMMUNITY_POST_IMAGE_COUNT } from "../../../../../lib/community-post-images";
 import type { SiteCommunityBoardKey } from "../../../../../lib/types/entities";
 import { communityBoardListHref } from "../../community-tab-config";
@@ -17,6 +18,7 @@ export default function CommunityPostWriteForm({ boardType }: Props) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState({ content: "", imageUrls: [] as string[], imageSizeLevels: [] as number[] });
+  const [imageLayout, setImageLayout] = useState<CommunityPostImageLayout>("full");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const bodyEditorRef = useRef<CommunityPostBodyEditorHandle>(null);
@@ -51,6 +53,7 @@ export default function CommunityPostWriteForm({ boardType }: Props) {
           content: body.content,
           imageUrls: body.imageUrls,
           imageSizeLevels: body.imageSizeLevels,
+          imageLayout,
         }),
       });
       if (!response.ok) {
@@ -102,6 +105,33 @@ export default function CommunityPostWriteForm({ boardType }: Props) {
           onSerializedChange={onBodyChange}
           onAttachUiChange={onAttachUiChange}
         />
+      </div>
+      <div className="ui-community-form-field v3-stack">
+        <span className="ui-community-form-label">첨부 이미지 표시</span>
+        <div className="ui-community-image-layout-options" role="group" aria-label="첨부 이미지 표시 방식">
+          <label className="ui-community-image-layout-option">
+            <input
+              type="radio"
+              name="imageLayout"
+              value="full"
+              checked={imageLayout === "full"}
+              onChange={() => setImageLayout("full")}
+              disabled={loading}
+            />
+            <span>풀폭 세로형</span>
+          </label>
+          <label className="ui-community-image-layout-option">
+            <input
+              type="radio"
+              name="imageLayout"
+              value="grid2"
+              checked={imageLayout === "grid2"}
+              onChange={() => setImageLayout("grid2")}
+              disabled={loading}
+            />
+            <span>2장 그리드형</span>
+          </label>
+        </div>
       </div>
       <button
         type="submit"

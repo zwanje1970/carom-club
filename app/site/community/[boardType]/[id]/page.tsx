@@ -1,9 +1,7 @@
 import { cookies, headers } from "next/headers";
 import { isCaromClubMobileAppShell } from "../../../../../lib/is-carom-club-mobile-app-shell";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
-import { getCommunityPostLongEdgePx } from "../../../../../lib/community-post-content-images";
 import { parseCommunityPostBodyForPublicSiteDetail } from "../../../../../lib/server/community-post-detail-site-images";
 import { parseCommunityBoardTypeParam } from "../../../../../lib/community-board-params";
 import {
@@ -21,6 +19,7 @@ import {
   isPrimaryTabKey,
 } from "../../community-tab-config";
 import CommunityPostCommentsSection from "./CommunityPostCommentsSection";
+import CommunityPostDetailBody from "./CommunityPostDetailBody";
 import CommunityPostDetailActions from "./CommunityPostDetailActions";
 
 function boardPillClass(boardType: SiteCommunityBoardKey): string {
@@ -96,7 +95,15 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
     <SiteShellFrame brandTitle={<span className="site-home-brand-ellipsis">{post.title}</span>}>
       <section className="site-site-gray-main v3-stack ui-community-post-detail-page">
         <article className="ui-community-post-detail-article v3-stack">
-          <h1 className="ui-community-post-detail-title">{post.title}</h1>
+          <div className="ui-community-post-detail-title-row">
+            <h1 className="ui-community-post-detail-title">{post.title}</h1>
+            <CommunityPostDetailActions
+              canManageAuthor={canManageAuthor}
+              canDeletePost={canDeletePost}
+              postId={postId}
+              boardType={boardType}
+            />
+          </div>
           <p className="ui-community-post-detail-pill-row">
             <span className={boardPillClass(boardType)}>{boardPillLabel}</span>
           </p>
@@ -104,80 +111,18 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
             {post.authorNickname} · {formatDetailDateTime(post.createdAt)} · 조회 {post.viewCount} · 댓글{" "}
             {post.commentCount}
           </p>
-          <div className="ui-community-post-body">
-            {segments.map((seg, i) =>
-              seg.kind === "text" ? (
-                <span key={i} className="ui-community-post-body-text">
-                  {seg.value}
-                </span>
-              ) : seg.url ? (
-                <span key={i} className="ui-community-post-body-figure">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    className="ui-community-post-inline-img"
-                    src={seg.url}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                    style={{
-                      maxWidth: `min(100%, ${getCommunityPostLongEdgePx(seg.sizeLevel)}px)`,
-                      maxHeight: `min(70vh, ${getCommunityPostLongEdgePx(seg.sizeLevel)}px)`,
-                      width: "auto",
-                      height: "auto",
-                      objectFit: "contain",
-                      display: "block",
-                      margin: 0,
-                    }}
-                  />
-                </span>
-              ) : null
-            )}
-            {tailImages.map((item, idx) =>
-              item.url ? (
-                <span key={`tail-${idx}-${item.url}`} className="ui-community-post-body-figure">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    className="ui-community-post-inline-img"
-                    src={item.url}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                    style={{
-                      maxWidth: `min(100%, ${getCommunityPostLongEdgePx(item.sizeLevel)}px)`,
-                      maxHeight: `min(70vh, ${getCommunityPostLongEdgePx(item.sizeLevel)}px)`,
-                      width: "auto",
-                      height: "auto",
-                      objectFit: "contain",
-                      display: "block",
-                      margin: 0,
-                    }}
-                  />
-                </span>
-              ) : null
-            )}
-          </div>
+          <CommunityPostDetailBody
+            segments={segments}
+            tailImages={tailImages}
+            imageLayout={post.imageLayout}
+          />
         </article>
-        <CommunityPostDetailActions
-          canManageAuthor={canManageAuthor}
-          canDeletePost={canDeletePost}
-          postId={postId}
-          boardType={boardType}
-        />
         <CommunityPostCommentsSection
           boardType={boardType}
           postId={postId}
           isLoggedIn={Boolean(session)}
           currentUserId={currentUserId}
         />
-        <div className="ui-community-post-detail-foot">
-          <Link
-            prefetch={false}
-            className="primary-button ui-community-post-detail-foot-primary"
-            href={`/site/community/${boardType}`}
-          >
-            목록으로
-          </Link>
-        </div>
       </section>
     </SiteShellFrame>
   );

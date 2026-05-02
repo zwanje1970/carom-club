@@ -429,6 +429,84 @@ button.secondary-button.ui-community-search-submit {
   gap: 0.45rem;
 }
 
+.ui-community-post-detail-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.ui-community-post-detail-title-row .ui-community-post-detail-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.ui-community-post-title-actions {
+  position: relative;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+
+.ui-community-post-more-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  margin: 0;
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 1.15rem;
+  line-height: 1;
+  color: rgba(15, 23, 42, 0.75);
+  cursor: pointer;
+}
+
+.ui-community-post-more-trigger:hover {
+  background: rgba(248, 250, 252, 0.95);
+  color: #0f172a;
+}
+
+.ui-community-post-more-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 9.5rem;
+  padding: 0.25rem 0;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+  z-index: 40;
+}
+
+.ui-community-post-more-item {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0.55rem 0.85rem;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  color: #0f172a;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ui-community-post-more-item:hover {
+  background: rgba(241, 245, 249, 0.9);
+}
+
+.ui-community-post-more-item--danger {
+  color: #b91c1c;
+}
+
 .ui-community-post-detail-title {
   margin: 0;
   font-size: 1.2rem;
@@ -473,6 +551,39 @@ button.secondary-button.ui-community-search-submit {
 .ui-community-post-inline-img {
   max-width: 100%;
   height: auto;
+}
+
+/* 연속 첨부 이미지 묶음: 본문 텍스트와 분리(전체 본문 grid 금지) */
+.ui-community-post-images {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ui-community-post-images--full {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.65rem 0;
+}
+
+.ui-community-post-images--full .ui-community-post-body-figure {
+  margin: 0;
+}
+
+.ui-community-post-images--grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  margin: 0.65rem 0;
+  align-items: start;
+}
+
+.ui-community-post-images--grid2.ui-community-post-images--grid2-single {
+  grid-template-columns: 1fr;
+}
+
+.ui-community-post-images--grid2 .ui-community-post-body-figure {
+  margin: 0;
 }
 
 .ui-community-post-manage-actions {
@@ -630,6 +741,57 @@ button.secondary-button.ui-community-post-action-danger:hover,
   margin-top: 0.28rem;
 }
 
+.ui-community-comment-compose-inline {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0.45rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.ui-community-comment-compose-cancel-inline {
+  flex: 0 0 auto;
+  align-self: center;
+  margin: 0;
+  padding: 0 0.35rem;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.8rem;
+  color: rgba(15, 23, 42, 0.6);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ui-community-comment-compose-cancel-inline:hover {
+  color: rgba(15, 23, 42, 0.9);
+}
+
+.ui-community-comment-textarea-inline {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 2.75rem !important;
+  max-height: 10rem;
+  resize: vertical;
+}
+
+.ui-community-comment-submit-inline {
+  flex: 0 0 auto;
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem !important;
+  min-width: 3.5rem !important;
+  padding: 0 0.85rem !important;
+  font-size: 0.86rem !important;
+  white-space: nowrap;
+}
+
 .ui-community-comment-compose-row {
   display: flex;
   flex-wrap: wrap;
@@ -718,6 +880,26 @@ button.secondary-button.ui-community-post-action-danger:hover,
   border-radius: 10px;
   background: #fff;
   color: var(--color-text-main, #0f172a);
+}
+
+.ui-community-image-layout-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.1rem;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.ui-community-image-layout-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  color: var(--color-text-main, #0f172a);
+}
+
+.ui-community-image-layout-option input {
+  margin: 0;
 }
 
 .ui-community-form-toolbar {

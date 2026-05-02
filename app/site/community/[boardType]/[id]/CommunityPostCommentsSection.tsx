@@ -161,20 +161,25 @@ export default function CommunityPostCommentsSection({ boardType, postId, isLogg
 
       {isLoggedIn ? (
         <div className="ui-community-comment-compose v3-stack">
-          <textarea
-            className="ui-community-form-textarea"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            rows={4}
-            placeholder="댓글을 입력하세요"
-          />
-          <div className="ui-community-comment-compose-row">
+          <div className="ui-community-comment-compose-inline">
             {editingCommentId ? (
-              <button type="button" className="ui-community-comment-text-action ui-community-comment-compose-cancel" onClick={cancelEdit}>
+              <button type="button" className="ui-community-comment-compose-cancel-inline" onClick={cancelEdit}>
                 취소
               </button>
             ) : null}
-            <button type="button" className="primary-button ui-community-post-action-submit" disabled={submitting} onClick={handleSubmit}>
+            <textarea
+              className="ui-community-form-textarea ui-community-comment-textarea-inline"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              rows={2}
+              placeholder="댓글을 입력하세요"
+            />
+            <button
+              type="button"
+              className="primary-button ui-community-comment-submit-inline"
+              disabled={submitting || !content.trim()}
+              onClick={handleSubmit}
+            >
               {submitting ? (editingCommentId ? "수정 중..." : "등록 중...") : editingCommentId ? "수정완료" : "등록"}
             </button>
           </div>

@@ -32,7 +32,10 @@ import type {
 import { buildTournamentPublishedCardSubtitle } from "../tournament-slide-card-subtitle";
 import { computeLegacyAutoSettlementSummary } from "./settlement-legacy-summary";
 import { MAX_COMMUNITY_POST_IMAGE_COUNT } from "../community-post-images";
-import { normalizeCommunityPostImageSizeLevels } from "../community-post-content-images";
+import {
+  normalizeCommunityPostImageLayoutParam,
+  normalizeCommunityPostImageSizeLevels,
+} from "../community-post-content-images";
 import { tournamentStatusEligibleForMainSlide } from "../site-tournament-badges";
 import { extractProofImageIdFromSiteImageUrl } from "../site-proof-image-id";
 import { resolveSitePosterDisplayUrl } from "../site-poster-urls";
@@ -597,6 +600,8 @@ export type CommunityBoardPost = {
   imageUrls: string[];
   /** imageUrls와 동일 순서·길이, 긴변 단계(0~4) */
   imageSizeLevels: number[];
+  /** 2열 그리드. 미설정·그 외는 풀폭 세로형과 동일 */
+  imageLayout?: "grid2";
   authorUserId: string;
   authorNickname: string;
   createdAt: string;
@@ -633,6 +638,8 @@ export type CommunityPostDetail = {
   content: string;
   imageUrls: string[];
   imageSizeLevels: number[];
+  /** 저장 `grid2` 여부를 항상 `full` | `grid2`로 정규화 */
+  imageLayout: "full" | "grid2";
   authorUserId: string;
   authorNickname: string;
   createdAt: string;
@@ -1372,6 +1379,7 @@ function normalizeCommunityBoardPostRow(row: unknown): CommunityBoardPost | null
   const deletedBy =
     typeof r.deletedBy === "string" && r.deletedBy.trim() !== "" ? r.deletedBy.trim() : undefined;
   const deleteReason = typeof r.deleteReason === "string" ? r.deleteReason : undefined;
+  const imageLayout = r.imageLayout === "grid2" ? ("grid2" as const) : undefined;
   return {
     id,
     boardType: boardTypeRaw,
@@ -1379,6 +1387,7 @@ function normalizeCommunityBoardPostRow(row: unknown): CommunityBoardPost | null
     content,
     imageUrls,
     imageSizeLevels,
+    ...(imageLayout ? { imageLayout } : {}),
     authorUserId,
     authorNickname,
     createdAt,
@@ -8393,6 +8402,7 @@ export async function getCommunityPostById(postId: string): Promise<CommunityPos
     updatedAt: p.updatedAt,
     viewCount: p.viewCount,
     commentCount: p.commentCount,
+    imageLayout: p.imageLayout === "grid2" ? "grid2" : "full",
   };
 }
 
@@ -8413,6 +8423,7 @@ export async function createCommunityPost(params: {
   content: string;
   imageUrls?: unknown;
   imageSizeLevels?: unknown;
+  imageLayout?: unknown;
   authorUserId: string;
   authorNickname: string;
 }): Promise<{ ok: true; post: CommunityBoardPost } | { ok: false; error: string }> {
@@ -8428,6 +8439,7 @@ export async function createCommunityPost(params: {
   }
   const imageUrls = normalizeCommunityPostImageUrls(params.imageUrls);
   const imageSizeLevels = normalizeCommunityPostImageSizeLevels(imageUrls.length, params.imageSizeLevels);
+  const layout = normalizeCommunityPostImageLayoutParam(params.imageLayout);
 
   const feed = await loadSiteCommunityFeed();
   const now = new Date().toISOString();
@@ -8438,6 +8450,7 @@ export async function createCommunityPost(params: {
     content,
     imageUrls,
     imageSizeLevels,
+    ...(layout === "grid2" ? { imageLayout: "grid2" as const } : {}),
     authorUserId,
     authorNickname,
     createdAt: now,
@@ -8466,7 +8479,13 @@ export async function isCommunityPostAuthor(postAuthorUserId: string, editorUser
 export async function updateCommunityPostById(
   postId: string,
   editorUserId: string,
-  params: { title: string; content: string; imageUrls?: unknown; imageSizeLevels?: unknown }
+  params: {
+    title: string;
+    content: string;
+    imageUrls?: unknown;
+    imageSizeLevels?: unknown;
+    imageLayout?: unknown;
+  }
 ): Promise<
   { ok: true } | { ok: false; code: "NOT_FOUND" | "FORBIDDEN" | "INVALID" | "PERSIST_UNAVAILABLE" }
 > {
@@ -8491,6 +8510,13 @@ export async function updateCommunityPostById(
   p.imageUrls = imageUrls;
   p.imageSizeLevels = imageSizeLevels;
   p.updatedAt = new Date().toISOString();
+  if (params.imageLayout !== undefined) {
+    if (normalizeCommunityPostImageLayoutParam(params.imageLayout) === "grid2") {
+      p.imageLayout = "grid2";
+    } else {
+      delete p.imageLayout;
+    }
+  }
   if (!(await persistSiteCommunityFeed(feed))) {
     return { ok: false, code: "PERSIST_UNAVAILABLE" };
   }

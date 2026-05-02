@@ -18,6 +18,13 @@ export function getCommunityPostLongEdgePx(level: number): number {
   return COMMUNITY_POST_LONG_EDGE_PX[clampCommunityPostSizeLevel(level)];
 }
 
+/** 게시글 첨부 이미지 표시 방식(상세·작성 UI). 저장소에는 `grid2`만 명시하고, 미설정은 풀폭과 동일 */
+export type CommunityPostImageLayout = "full" | "grid2";
+
+export function normalizeCommunityPostImageLayoutParam(raw: unknown): CommunityPostImageLayout {
+  return raw === "grid2" ? "grid2" : "full";
+}
+
 export function extractCommunityImageUrlsFromContent(content: string): string[] {
   const out: string[] = [];
   const re = new RegExp(IMG_LINE.source, "g");

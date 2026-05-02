@@ -49,7 +49,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  let body: { title?: unknown; content?: unknown; imageUrls?: unknown; imageSizeLevels?: unknown } = {};
+  let body: {
+    title?: unknown;
+    content?: unknown;
+    imageUrls?: unknown;
+    imageSizeLevels?: unknown;
+    imageLayout?: unknown;
+  } = {};
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -63,6 +69,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     content,
     imageUrls: body.imageUrls,
     imageSizeLevels: body.imageSizeLevels,
+    imageLayout: body.imageLayout,
   });
   if (!result.ok) {
     if (result.code === "NOT_FOUND") return NextResponse.json({ error: "게시글을 찾을 수 없습니다." }, { status: 404 });

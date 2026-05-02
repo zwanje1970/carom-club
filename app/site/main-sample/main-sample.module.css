@@ -397,6 +397,32 @@
   pointer-events: auto;
 }
 
+/*
+ * 메인 대회 게시 PNG만(suppressPublishedScrollOverlay): 상위 연파랑/그라데이션 면이 비치지 않게 하고
+ * img 하단 여백(baseline gap) 제거 — 광고(오버레이 유지)에는 이 modifier를 붙이지 않음.
+ */
+.sampleMainCardFacePublishedSnapshot.sampleMainCardFacePublishedSnapshotImageOnly {
+  background-color: #ffffff;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.sampleMainCardFacePublishedSnapshot.sampleMainCardFacePublishedSnapshotImageOnly .sampleMainCardPublishedInner {
+  line-height: 0;
+  background-color: #ffffff;
+}
+
+.sampleMainCardFacePublishedSnapshot.sampleMainCardFacePublishedSnapshotImageOnly .sampleMainCardPosterPublishedSnapshot {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  vertical-align: top;
+}
+
 .sampleMainCardPublishedInner {
   position: relative;
   display: block;

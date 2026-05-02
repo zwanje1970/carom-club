@@ -56,6 +56,7 @@ export default async function SiteCommunityPostEditPage({ params }: Props) {
           initialContent={post.content}
           initialImageUrls={post.imageUrls}
           initialImageSizeLevels={post.imageSizeLevels}
+          initialImageLayout={post.imageLayout}
         />
         <div className="ui-community-post-detail-foot">
           <Link
