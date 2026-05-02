@@ -9,6 +9,7 @@ import {
   resolveCanonicalUserIdForAuth,
   setCardSnapshotActive,
   upsertTournamentPublishedCard,
+  type PublishedCardSnapshot,
   type TournamentCardBackground,
   type TournamentCardTemplate,
   type TournamentCardTheme,
@@ -17,6 +18,47 @@ import { getTournamentByIdFirestore } from "../../../../lib/server/firestore-tou
 import { isTournamentPublishedCardsWritePersistenceBlockedError } from "../../../../lib/server/platform-tournament-published-cards-settings";
 
 export const runtime = "nodejs";
+
+const CARD_SNAPSHOTS_EDITOR_MODE_PARAM = "editor";
+/** `card-publish-v2` loadSnapshots — 최신순 상위 N건만(작성 화면은 [0]·active만 사용) */
+const CARD_SNAPSHOTS_EDITOR_LIST_LIMIT = 3;
+
+/** 게시카드 작성 화면 복원에 필요한 필드만 (`loadSnapshots` 기준) */
+function publishedCardSnapshotToEditorGetBody(s: PublishedCardSnapshot): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    title: s.title,
+    cardExtraLine1: s.cardExtraLine1 ?? null,
+    cardExtraLine2: s.cardExtraLine2 ?? null,
+    tournamentCardTemplate: s.tournamentCardTemplate,
+    tournamentTheme: s.tournamentTheme,
+    tournamentBackgroundType: s.tournamentBackgroundType,
+    image320Url: s.image320Url,
+    imageId: s.imageId,
+    tournamentCardDisplayDate: s.tournamentCardDisplayDate ?? null,
+    tournamentCardDisplayLocation: s.tournamentCardDisplayLocation ?? null,
+    cardLeadTextColor: s.cardLeadTextColor ?? null,
+    cardTitleTextColor: s.cardTitleTextColor ?? null,
+    cardDescriptionTextColor: s.cardDescriptionTextColor ?? null,
+    cardFooterDateTextColor: s.cardFooterDateTextColor ?? null,
+    cardFooterPlaceTextColor: s.cardFooterPlaceTextColor ?? null,
+  };
+  if (s.tournamentCardTextShadowEnabled === true) {
+    out.tournamentCardTextShadowEnabled = true;
+  }
+  if (s.tournamentCardSurfaceLayout === "full") {
+    out.tournamentCardSurfaceLayout = "full";
+  }
+  if (typeof s.tournamentMediaBackground === "string") {
+    out.tournamentMediaBackground = s.tournamentMediaBackground;
+  }
+  if (typeof s.tournamentImageOverlayBlend === "boolean") {
+    out.tournamentImageOverlayBlend = s.tournamentImageOverlayBlend;
+  }
+  if (typeof s.tournamentImageOverlayOpacity === "number") {
+    out.tournamentImageOverlayOpacity = s.tournamentImageOverlayOpacity;
+  }
+  return out;
+}
 
 async function publisherTournamentOwnerId(user: { id: string; role: string }): Promise<string> {
   if (user.role === "PLATFORM") return user.id;
@@ -264,17 +306,32 @@ export async function GET(request: Request) {
 
   const snapshots = await listCardSnapshotsByTournamentId(tournamentId);
   const activeSnapshot = snapshots.find((item) => item.isActive) ?? null;
+  const tournamentPayload = {
+    title: tournament.title,
+    date: tournament.date,
+    location: tournament.location,
+    statusBadge: tournament.statusBadge,
+    summary: tournament.summary,
+    prizeInfo: tournament.prizeInfo,
+  };
+
+  const mode = (url.searchParams.get("mode") ?? "").trim().toLowerCase();
+  if (mode === CARD_SNAPSHOTS_EDITOR_MODE_PARAM) {
+    const editorSnapshots = snapshots
+      .slice(0, CARD_SNAPSHOTS_EDITOR_LIST_LIMIT)
+      .map((s) => publishedCardSnapshotToEditorGetBody(s));
+    const editorActive = activeSnapshot ? publishedCardSnapshotToEditorGetBody(activeSnapshot) : null;
+    return NextResponse.json({
+      snapshots: editorSnapshots,
+      activeSnapshot: editorActive,
+      tournament: tournamentPayload,
+    });
+  }
+
   return NextResponse.json({
     snapshots,
     activeSnapshot,
-    tournament: {
-      title: tournament.title,
-      date: tournament.date,
-      location: tournament.location,
-      statusBadge: tournament.statusBadge,
-      summary: tournament.summary,
-      prizeInfo: tournament.prizeInfo,
-    },
+    tournament: tournamentPayload,
   });
 }
 

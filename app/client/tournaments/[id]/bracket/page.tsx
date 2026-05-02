@@ -270,10 +270,10 @@ export default function TournamentBracketSnapshotPage() {
       </section>
 
       <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
-        <Link className="v3-btn" href={`/client/tournaments/${tournamentId}/bracket/auto`}>
+        <Link prefetch={false} className="v3-btn" href={`/client/tournaments/${tournamentId}/bracket/auto`}>
           자동배정
         </Link>
-        <Link className="v3-btn" href={`/client/tournaments/${tournamentId}/bracket/manual`}>
+        <Link prefetch={false} className="v3-btn" href={`/client/tournaments/${tournamentId}/bracket/manual`}>
           수동배정
         </Link>
         <a className="v3-btn" href="#confirmed-bracket">

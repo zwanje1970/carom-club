@@ -474,6 +474,18 @@ export type TournamentApplication = {
   attendanceChecked?: boolean | null;
 };
 
+/** 클라이언트 참가자 목록 RSC — 증빙·OCR·입금자명 등 제외 */
+export type TournamentApplicationListItem = {
+  id: string;
+  applicantName: string;
+  phone: string;
+  status: TournamentApplicationStatus;
+  createdAt: string;
+  registrationSource?: "admin" | null;
+  participantAverage?: number | null;
+  adminNote?: string | null;
+};
+
 export type BracketParticipantSnapshotParticipant = {
   userId: string;
   applicantName: string;
@@ -5438,6 +5450,40 @@ export async function getTournamentById(tournamentId: string): Promise<Tournamen
   const store = await readLocalJsonAggregate();
   const tournament = store.tournaments.find((item) => item.id === tournamentId) ?? null;
   return tournament ? await normalizeTournament(tournament, store) : null;
+}
+
+/** 클라이언트 대회 상세(참가 안내·신청): Firestore는 필드 `select`, 로컬 JSON은 기존 `getTournamentById`와 동일 */
+export async function getClientTournamentDetailPreviewById(tournamentId: string): Promise<Tournament | null> {
+  if (isFirestoreUsersBackendConfigured()) {
+    const { getClientTournamentDetailPreviewByIdFirestore } = await import("./firestore-tournaments");
+    return getClientTournamentDetailPreviewByIdFirestore(tournamentId);
+  }
+  return getTournamentById(tournamentId);
+}
+
+export type TournamentOwnerAccessPreview = {
+  id: string;
+  createdBy: string;
+  status: "ACTIVE" | "DELETED";
+};
+
+/** 대진표 등 API 권한 검증 — 전체 `normalizeTournament` 없이 소유자 식별만 */
+export async function getTournamentOwnerAccessPreviewById(
+  tournamentId: string
+): Promise<TournamentOwnerAccessPreview | null> {
+  if (isFirestoreUsersBackendConfigured()) {
+    const { getTournamentOwnerAccessPreviewByIdFirestore } = await import("./firestore-tournaments");
+    return getTournamentOwnerAccessPreviewByIdFirestore(tournamentId);
+  }
+  const store = await readLocalJsonAggregate();
+  const t = store.tournaments.find((item) => item.id === tournamentId.trim()) ?? null;
+  if (!t) return null;
+  const status: "ACTIVE" | "DELETED" = t.status === "DELETED" ? "DELETED" : "ACTIVE";
+  return {
+    id: t.id,
+    createdBy: typeof t.createdBy === "string" ? t.createdBy : "",
+    status,
+  };
 }
 
 /** 동일 작성자 대회 제목 중 `이름 (n)` 패턴으로 다음 복제 제목 계산 */

@@ -2,7 +2,12 @@ import { randomUUID } from "crypto";
 import { assertClientFirestorePersistenceConfigured } from "./firestore-client-applications";
 import { getTournamentByIdFirestore, listAllTournamentsFirestore, listTournamentsByCreatorFirestore } from "./firestore-tournaments";
 import { firestoreGetUserById, getSharedFirestoreDb } from "./firestore-users";
-import type { DeduplicatedApplicantRow, TournamentApplication, TournamentApplicationStatus } from "./platform-backing-store";
+import type {
+  DeduplicatedApplicantRow,
+  TournamentApplication,
+  TournamentApplicationListItem,
+  TournamentApplicationStatus,
+} from "./platform-backing-store";
 import {
   buildProtectedProofImageUrl,
   getAllowedTournamentApplicationNextStatuses,
@@ -11,6 +16,61 @@ import {
 } from "./platform-backing-store";
 
 const COLLECTION = "v3_tournament_applications";
+
+const TOURNAMENT_APPLICATION_LIST_FIRESTORE_FIELDS = [
+  "createdAt",
+  "applicantName",
+  "phone",
+  "status",
+  "registrationSource",
+  "participantAverage",
+  "adminNote",
+] as const;
+
+/** `select` 결과만 — `tournamentApplicationFromFirestore`와 동일 규칙으로 목록 필드만 파싱 */
+function tournamentApplicationToListItem(
+  id: string,
+  data: Record<string, unknown> | undefined
+): TournamentApplicationListItem {
+  const item: Record<string, unknown> = data && typeof data === "object" ? { id, ...data } : { id };
+  const createdAt =
+    typeof item.createdAt === "string" && item.createdAt !== "" ? item.createdAt : new Date().toISOString();
+  const st = item.status;
+  const status: TournamentApplicationStatus =
+    st === "APPLIED" ||
+    st === "VERIFYING" ||
+    st === "WAITING_PAYMENT" ||
+    st === "APPROVED" ||
+    st === "REJECTED"
+      ? st
+      : "APPLIED";
+  const regSrc = item.registrationSource;
+  const registrationSource = regSrc === "admin" ? ("admin" as const) : null;
+  const pa = item.participantAverage;
+  const participantAverage =
+    typeof pa === "number" && Number.isFinite(pa)
+      ? pa
+      : pa != null && typeof pa === "string" && pa.trim() !== "" && Number.isFinite(Number(pa))
+        ? Number(pa)
+        : null;
+  const adminNoteRaw = item.adminNote;
+  const adminNote =
+    adminNoteRaw === null || adminNoteRaw === undefined
+      ? null
+      : typeof adminNoteRaw === "string"
+        ? adminNoteRaw.trim() || null
+        : null;
+  return {
+    id,
+    applicantName: typeof item.applicantName === "string" ? item.applicantName : "",
+    phone: typeof item.phone === "string" ? item.phone : "",
+    status,
+    createdAt,
+    registrationSource,
+    participantAverage,
+    adminNote,
+  };
+}
 
 function tournamentApplicationFromFirestore(id: string, data: Record<string, unknown> | undefined): TournamentApplication {
   const item: Record<string, unknown> = data && typeof data === "object" ? { id, ...data } : { id };
@@ -109,6 +169,23 @@ export async function listTournamentApplicationsByTournamentIdFirestore(
     .orderBy("createdAt", "desc")
     .get();
   return q.docs.map((doc) => tournamentApplicationFromFirestore(doc.id, doc.data() as Record<string, unknown>));
+}
+
+/** 참가자 목록 RSC 전용 — 증빙·OCR 등 대용량 필드 미조회 */
+export async function listTournamentApplicationsListItemsByTournamentIdFirestore(
+  tournamentId: string
+): Promise<TournamentApplicationListItem[]> {
+  assertClientFirestorePersistenceConfigured();
+  const id = tournamentId.trim();
+  if (!id) return [];
+  const db = getSharedFirestoreDb();
+  const q = await db
+    .collection(COLLECTION)
+    .where("tournamentId", "==", id)
+    .orderBy("createdAt", "desc")
+    .select(...TOURNAMENT_APPLICATION_LIST_FIRESTORE_FIELDS)
+    .get();
+  return q.docs.map((doc) => tournamentApplicationToListItem(doc.id, doc.data() as Record<string, unknown>));
 }
 
 export async function listTournamentApplicationsByUserIdFirestore(userId: string): Promise<TournamentApplication[]> {

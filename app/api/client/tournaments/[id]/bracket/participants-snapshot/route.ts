@@ -6,7 +6,7 @@ import {
   createBracketParticipantSnapshotFirestore,
   getLatestBracketParticipantSnapshotByTournamentIdFirestore,
 } from "../../../../../../../lib/server/firestore-tournament-brackets";
-import { getTournamentByIdFirestore } from "../../../../../../../lib/server/firestore-tournaments";
+import { getTournamentOwnerAccessPreviewById } from "../../../../../../../lib/server/platform-backing-store";
 
 export const runtime = "nodejs";
 
@@ -26,11 +26,11 @@ async function requireApprovedClientOwner(tournamentId: string) {
     return { ok: false as const, status: 403, error: gate.error };
   }
 
-  const tournament = await getTournamentByIdFirestore(tournamentId);
-  if (!tournament) {
+  const preview = await getTournamentOwnerAccessPreviewById(tournamentId);
+  if (!preview) {
     return { ok: false as const, status: 404, error: "대회를 찾을 수 없습니다." };
   }
-  if (tournament.createdBy !== user.id) {
+  if (preview.createdBy !== user.id) {
     return { ok: false as const, status: 403, error: "본인 대회만 접근할 수 있습니다." };
   }
 

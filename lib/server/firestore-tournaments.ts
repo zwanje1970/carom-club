@@ -35,7 +35,7 @@ import {
 const COLLECTION = "v3_tournaments";
 
 /** `buildTournamentFromParsedRow`가 읽는 필드만 — 문서에 다른 대용량 필드가 있어도 전송 제외 */
-const DASHBOARD_ROLLUP_TOURNAMENT_FS_FIELDS = [
+const TOURNAMENT_FIRESTORE_LEAN_BUILD_FIELDS = [
   "title",
   "date",
   "location",
@@ -140,6 +140,52 @@ export async function getTournamentByIdFirestore(tournamentId: string): Promise<
   return fetchAndNormalizeTournament(id, null);
 }
 
+/** `/client/tournaments/[id]` — 안내·신청 링크용 필드만 `select` 후 정규화(문서 내 기타 필드 미전송) */
+export async function getClientTournamentDetailPreviewByIdFirestore(tournamentId: string): Promise<Tournament | null> {
+  assertClientFirestorePersistenceConfigured();
+  const id = tournamentId.trim();
+  if (!id) return null;
+  const db = getSharedFirestoreDb();
+  const orgs = await loadResolutionOrgs();
+  const fsSelect = [...TOURNAMENT_FIRESTORE_LEAN_BUILD_FIELDS];
+  const qSnap = await db
+    .collection(COLLECTION)
+    .where(admin.firestore.FieldPath.documentId(), "==", id)
+    .limit(1)
+    .select(...fsSelect)
+    .get();
+  if (qSnap.empty) return null;
+  const doc = qSnap.docs[0]!;
+  const data = doc.data() as Record<string, unknown> | undefined;
+  const t = buildTournamentFromParsedRow({ id: doc.id, ...(data ?? {}) }, orgs);
+  return normalizeTournament(t, undefined, orgs);
+}
+
+/** 대진표 API 권한 검증 전용 — `createdBy`·문서 존재·삭제 여부만 */
+export async function getTournamentOwnerAccessPreviewByIdFirestore(tournamentId: string): Promise<{
+  id: string;
+  createdBy: string;
+  status: "ACTIVE" | "DELETED";
+} | null> {
+  assertClientFirestorePersistenceConfigured();
+  const id = tournamentId.trim();
+  if (!id) return null;
+  const db = getSharedFirestoreDb();
+  const qSnap = await db
+    .collection(COLLECTION)
+    .where(admin.firestore.FieldPath.documentId(), "==", id)
+    .limit(1)
+    .select("createdBy", "status")
+    .get();
+  if (qSnap.empty) return null;
+  const doc = qSnap.docs[0]!;
+  const data = doc.data() as Record<string, unknown> | undefined;
+  const createdBy = typeof data?.createdBy === "string" ? data.createdBy : "";
+  const st = data?.status;
+  const status: "ACTIVE" | "DELETED" = st === "DELETED" ? "DELETED" : "ACTIVE";
+  return { id: doc.id, createdBy, status };
+}
+
 /**
  * 메인 슬라이드 등: 대회 문서의 `date`·`location`만 배치 조회(정규화·venue 해석 없음).
  * `getTournamentByIdFirestore` 대비 라운드트립·CPU 부담을 줄인다.
@@ -215,7 +261,7 @@ export async function listClientDashboardTournamentRollupFirestore(userId: strin
   const db = getSharedFirestoreDb();
   const orgs = await loadResolutionOrgs();
   const uid = userId.trim();
-  const fsSelect = [...DASHBOARD_ROLLUP_TOURNAMENT_FS_FIELDS];
+  const fsSelect = [...TOURNAMENT_FIRESTORE_LEAN_BUILD_FIELDS];
   let q;
   try {
     q = await db

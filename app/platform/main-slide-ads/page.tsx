@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import NumericStepper from "../../components/NumericStepper";
 
 const previewBoxStyle: CSSProperties = {
   border: "1px solid #ccc",
@@ -470,28 +471,26 @@ export default function PlatformMainSlideAdsPage() {
         </label>
         <label className="v3-stack">
           <span>insertInterval (대회 카드 N개마다 삽입)</span>
-          <input
-            type="number"
-            min={0}
+          <NumericStepper
+            min={1}
+            max={50}
+            step={1}
+            unit="개마다"
             disabled={loading}
             value={config.insertInterval}
-            onChange={(e) =>
-              setConfig((c) => ({ ...c, insertInterval: clampNonNegativeInt(e.target.value, c.insertInterval) }))
-            }
-            style={inputStyle}
+            onChange={(next) => setConfig((c) => ({ ...c, insertInterval: next }))}
           />
         </label>
         <label className="v3-stack">
           <span>adsPerInsert (삽입 시 연속 광고 개수)</span>
-          <input
-            type="number"
-            min={0}
+          <NumericStepper
+            min={1}
+            max={10}
+            step={1}
+            unit="개"
             disabled={loading}
             value={config.adsPerInsert}
-            onChange={(e) =>
-              setConfig((c) => ({ ...c, adsPerInsert: clampNonNegativeInt(e.target.value, c.adsPerInsert) }))
-            }
-            style={inputStyle}
+            onChange={(next) => setConfig((c) => ({ ...c, adsPerInsert: next }))}
           />
         </label>
         <label className="v3-stack">
@@ -513,35 +512,26 @@ export default function PlatformMainSlideAdsPage() {
         </label>
         <label className="v3-stack">
           <span>maxAdsPerCycle (한 사이클 최대 광고 수)</span>
-          <input
-            type="number"
-            min={0}
+          <NumericStepper
+            min={1}
+            max={20}
+            step={1}
+            unit="개"
             disabled={loading}
             value={config.maxAdsPerCycle}
-            onChange={(e) =>
-              setConfig((c) => ({ ...c, maxAdsPerCycle: clampNonNegativeInt(e.target.value, c.maxAdsPerCycle) }))
-            }
-            style={inputStyle}
+            onChange={(next) => setConfig((c) => ({ ...c, maxAdsPerCycle: next }))}
           />
         </label>
         <label className="v3-stack">
           <span>카드 이동 시간(초) — 슬라이드 속도 (5~20, 기본 10)</span>
-          <input
-            type="number"
+          <NumericStepper
             min={5}
             max={20}
+            step={1}
+            unit="초"
             disabled={loading}
             value={config.cardMoveDurationSec}
-            onChange={(e) => {
-              const n = Number.parseInt(e.target.value, 10);
-              setConfig((c) => ({
-                ...c,
-                cardMoveDurationSec: Number.isFinite(n)
-                  ? Math.min(20, Math.max(5, n))
-                  : c.cardMoveDurationSec,
-              }));
-            }}
-            style={inputStyle}
+            onChange={(next) => setConfig((c) => ({ ...c, cardMoveDurationSec: next }))}
           />
         </label>
         <div className="v3-row">

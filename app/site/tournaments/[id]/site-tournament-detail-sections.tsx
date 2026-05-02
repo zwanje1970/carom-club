@@ -10,7 +10,7 @@ import type { TournamentDivisionMetricType, TournamentEntryQualificationType } f
 
 type Props = {
   tournament: Tournament;
-  /** 사이트 전용(참가신청). 클라이언트 대시보드 audience에서는 생략 */
+  /** 참가신청 링크(사이트·클라이언트 대회 상세 공통, 없으면 버튼 미표시) */
   applyHref?: string;
   listBackHref: string;
   /** client: 요강 보기는 /client 경로만 사용 (사이트 공개 URL로 이동하는 버튼 없음) */
@@ -154,7 +154,7 @@ export default function SiteTournamentDetailSections({
           {heroLine ? <p className="site-detail-hero-meta">{heroLine}</p> : null}
           <span className={statusClass}>{tournament.statusBadge}</span>
           {tournament.summary?.trim() ? <p className="site-detail-hero-summary">{tournament.summary.trim()}</p> : null}
-          {audience === "site" && applyHref ? (
+          {applyHref ? (
             <Link prefetch={false} className="primary-button primary-button--block" href={applyHref}>
               참가신청
             </Link>
@@ -288,7 +288,7 @@ export default function SiteTournamentDetailSections({
         {tournament.summary ? (
           <p style={{ whiteSpace: "pre-wrap", marginTop: "0.5rem" }}>{tournament.summary}</p>
         ) : null}
-        {audience === "site" && applyHref ? (
+        {applyHref ? (
           <Link prefetch={false} className="v3-btn" href={applyHref} style={{ padding: "0.5rem 0.9rem" }}>
             참가신청
           </Link>

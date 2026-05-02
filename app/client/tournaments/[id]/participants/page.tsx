@@ -3,9 +3,9 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { resolveCanonicalUserIdForAuth } from "../../../../../lib/auth/resolve-canonical-user-id-for-auth";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
-import { listTournamentApplicationsByTournamentIdFirestore } from "../../../../../lib/server/firestore-tournament-applications";
+import { listTournamentApplicationsListItemsByTournamentIdFirestore } from "../../../../../lib/server/firestore-tournament-applications";
 import { getTournamentByIdFirestore } from "../../../../../lib/server/firestore-tournaments";
-import type { TournamentApplication } from "../../../../../lib/types/entities";
+import type { TournamentApplicationListItem } from "../../../../../lib/types/entities";
 import ParticipantListRow from "./ParticipantListRow";
 import ParticipantsToolbar from "./ParticipantsToolbar";
 
@@ -19,14 +19,14 @@ function parseFilter(raw: string | undefined): FilterKey {
   return "all";
 }
 
-function filterEntries(entries: TournamentApplication[], key: FilterKey): TournamentApplication[] {
+function filterEntries(entries: TournamentApplicationListItem[], key: FilterKey): TournamentApplicationListItem[] {
   if (key === "approved") return entries.filter((e) => e.status === "APPROVED");
   if (key === "wait") return entries.filter((e) => e.status === "WAITING_PAYMENT");
   if (key === "reject") return entries.filter((e) => e.status === "REJECTED");
   return entries;
 }
 
-function countBy(entries: TournamentApplication[]) {
+function countBy(entries: TournamentApplicationListItem[]) {
   return {
     all: entries.length,
     approved: entries.filter((e) => e.status === "APPROVED").length,
@@ -54,7 +54,7 @@ export default async function ClientTournamentParticipantsPage({
   const canView = String(tournament.createdBy ?? "").trim() === viewerId.trim();
   if (!canView) notFound();
 
-  const entries = await listTournamentApplicationsByTournamentIdFirestore(id);
+  const entries = await listTournamentApplicationsListItemsByTournamentIdFirestore(id);
   const selected = parseFilter(f);
   const filteredEntries = filterEntries(entries, selected);
   const counts = countBy(entries);

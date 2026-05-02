@@ -4,7 +4,7 @@ import { resolveCanonicalUserIdForAuth } from "../../../../lib/auth/resolve-cano
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
 import { outlineFileKindFromAsset, outlinePdfIdFromPublicUrl } from "../../../../lib/outline-pdf-helpers";
 import { getOutlinePdfAssetById } from "../../../../lib/surface-read";
-import { getTournamentByIdFirestore } from "../../../../lib/server/firestore-tournaments";
+import { getClientTournamentDetailPreviewById } from "../../../../lib/platform-api";
 import SiteTournamentDetailSections from "../../../site/tournaments/[id]/site-tournament-detail-sections";
 import TournamentBadgeCardManageRow from "./TournamentBadgeCardManageRow";
 
@@ -14,9 +14,10 @@ export default async function ClientTournamentManagePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const tournament = await getTournamentByIdFirestore(id);
   const cookieStore = await cookies();
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
+
+  const tournament = await getClientTournamentDetailPreviewById(id);
 
   if (!tournament) {
     notFound();
@@ -28,6 +29,10 @@ export default async function ClientTournamentManagePage({
     notFound();
   }
 
+  const applyHref = session
+    ? `/site/tournaments/${id}/apply`
+    : `/login?next=${encodeURIComponent(`/site/tournaments/${id}/apply`)}`;
+
   const outlinePdfId = outlinePdfIdFromPublicUrl(tournament.outlinePdfUrl);
   const outlinePdfAsset = outlinePdfId ? await getOutlinePdfAssetById(outlinePdfId) : null;
   const outlinePdfFileKind = outlineFileKindFromAsset(outlinePdfAsset);
@@ -38,6 +43,7 @@ export default async function ClientTournamentManagePage({
 
       <SiteTournamentDetailSections
         tournament={tournament}
+        applyHref={applyHref}
         listBackHref="/client/tournaments"
         audience="client"
         outlinePdfFileKind={outlinePdfFileKind}

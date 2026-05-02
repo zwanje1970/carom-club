@@ -2,94 +2,12 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  SLIDE_DECK_SOLID_BACKDROPS,
-  TournamentSnapshotCardView,
-  type SlideDeckItem,
-  type TournamentCardSurfaceLayout,
-} from "../../../../site/tournament-snapshot-card-view";
-import {
-  POSTCARD_TEMPLATE_APP_DEFAULTS,
-  POSTCARD_TEMPLATE_TEXT_COLOR_SWATCHES,
-} from "../../../../../lib/postcard-template-reference";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import type { TournamentCardSurfaceLayout } from "../../../../site/tournament-snapshot-card-view";
+import { POSTCARD_TEMPLATE_APP_DEFAULTS } from "../../../../../lib/postcard-template-reference";
 import editorStyles from "../card-publish-editor.module.css";
-const DESCRIPTION_MAX_LINES = 3;
-
-/** 제목 위 / 제목 / 설명 글자색 — `carom-postcard-template-test/src/App.tsx` 와 동일 */
-const CARD_TEXT_COLOR_SWATCHES = POSTCARD_TEMPLATE_TEXT_COLOR_SWATCHES;
-
-function TextColorSwatches({
-  value,
-  onChange,
-  wrapClass,
-  swatchClass,
-  swatchLightClass,
-  swatchSelectedClass,
-}: {
-  value: string;
-  onChange: (next: string) => void;
-  wrapClass: string;
-  swatchClass: string;
-  swatchLightClass: string;
-  swatchSelectedClass: string;
-}) {
-  return (
-    <div className={wrapClass} role="group" aria-label="글자색">
-      {CARD_TEXT_COLOR_SWATCHES.map((hex) => {
-        const selected = value.trim().toLowerCase() === hex.toLowerCase();
-        const isLight = hex.toLowerCase() === "#ffffff";
-        return (
-          <button
-            key={hex}
-            type="button"
-            className={`${swatchClass} ${isLight ? swatchLightClass : ""} ${selected ? swatchSelectedClass : ""}`}
-            style={{ backgroundColor: hex }}
-            aria-label={`색 ${hex}`}
-            aria-pressed={selected}
-            onClick={() => onChange(selected ? "" : hex)}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
-/** 카드 배경색 팔레트 (32색, 8×4 · 흰색 포함) — 목록에 없는 저장값도 `mediaBackground` 그대로 미리보기·저장됨 */
-const CARD_COLOR_PALETTE_32 = [
-  "#FFFFFF",
-  "#F3F4F6",
-  "#9CA3AF",
-  "#6B7280",
-  "#374151",
-  "#171717",
-  "#FECACA",
-  "#DC2626",
-  "#FDBA74",
-  "#EA580C",
-  "#FDE68A",
-  "#EAB308",
-  "#CA8A04",
-  "#BBF7D0",
-  "#84CC16",
-  "#4ADE80",
-  "#16A34A",
-  "#6EE7B7",
-  "#14B8A6",
-  "#22D3EE",
-  "#38BDF8",
-  "#0EA5E9",
-  "#60A5FA",
-  "#2563EB",
-  "#1E40AF",
-  "#1E3A8A",
-  "#818CF8",
-  "#6366F1",
-  "#A78BFA",
-  "#9333EA",
-  "#F0ABFC",
-  "#EC4899",
-] as const;
+import { CardPublishBackgroundTab, CardPublishContentTab } from "./CardPublishEditorFormParts";
+import { CardPublishPreview, type CardPublishPreviewModel } from "./CardPublishPreview";
 
 /** 신규 작성·저장 스냅샷 없을 때 미리보기·팔레트 기본(32색 중 하늘색) */
 const DEFAULT_CARD_MEDIA_BACKGROUND = "#38BDF8";
@@ -142,11 +60,6 @@ function venueNameOnly(raw: string): string {
     s = s.slice(0, comma).trim();
   }
   return s;
-}
-
-function clampDescriptionToMaxLines(value: string, maxLines: number): string {
-  const lines = value.split(/\r?\n/);
-  return lines.slice(0, maxLines).join("\n");
 }
 
 function firstNonEmptyLine(raw: string | null | undefined): string {
@@ -264,6 +177,8 @@ export default function ClientTournamentCardPublishV2Page() {
   /** 저장 성공 후에만 노출: 대회 관리 상태설정 영역으로 이동 */
   const [saveSucceeded, setSaveSucceeded] = useState(false);
   const [uploading, setUploading] = useState(false);
+  /** 캡처용 오프스크린 카드 — 초기 타이핑 부담 완화 후 `requestIdleCallback`으로 마운트 */
+  const [renderOffscreenCaptureCard, setRenderOffscreenCaptureCard] = useState(false);
 
   const bgFileInputRef = useRef<HTMLInputElement>(null);
   const cardPublishCaptureRef = useRef<HTMLDivElement>(null);
@@ -276,7 +191,7 @@ export default function ClientTournamentCardPublishV2Page() {
   /** 배경색·배경 이미지 미설정 시 미리보기 기본(짙은 청색)만 — 저장 payload는 그대로 */
   const DEFAULT_PREVIEW_MEDIA_BG = "#0f2747";
 
-  const cardPublishSlidePreview: SlideDeckItem = useMemo(() => {
+  const previewModel: CardPublishPreviewModel = useMemo(() => {
     const datePart = formatCardDateForDisplay(cardDate) || cardDate.trim() || "-";
     const placePart = venueNameOnly(cardPlace) || "-";
     const subtitle = `${datePart} · ${placePart}`;
@@ -284,30 +199,32 @@ export default function ClientTournamentCardPublishV2Page() {
     const noCssBg = !(mediaBackground || "").trim();
     const resolvedPreviewMediaBg =
       noBgImage && noCssBg ? DEFAULT_PREVIEW_MEDIA_BG : mediaBackground.trim();
-    const base: SlideDeckItem = {
-      snapshotId: "card-publish-preview",
-      title: title.length > 0 ? title : "(제목)",
-      subtitle: subtitle.length ? subtitle : "·",
-      statusBadge: tournamentStatusForPreview,
-      cardExtraLine1: textLine1.length > 0 ? textLine1 : null,
-      cardExtraLine2: textLine2.length > 0 ? textLine2 : null,
-      cardExtraLine3: null,
-      image320Url: uploadedImage?.w320Url,
-      cardTemplate,
-      backgroundType,
-      themeType,
-      mediaBackground: resolvedPreviewMediaBg,
-      imageOverlayBlend: true,
-      imageOverlayOpacity: v2MediaMode === "on" ? imageOverlayOpacity : DEFAULT_BG_IMAGE_OVERLAY_OPACITY,
-      ...(leadTextColor.trim() ? { cardLeadTextColor: leadTextColor.trim() } : {}),
-      ...(titleTextColor.trim() ? { cardTitleTextColor: titleTextColor.trim() } : {}),
-      ...(descriptionTextColor.trim() ? { cardDescriptionTextColor: descriptionTextColor.trim() } : {}),
-      ...(cardTextShadowEnabled ? { cardTextShadowEnabled: true } : {}),
-      ...(cardSurfaceLayout === "full" ? { cardSurfaceLayout: "full" as const } : {}),
-      ...(footerDateTextColor.trim() ? { cardFooterDateTextColor: footerDateTextColor.trim() } : {}),
-      ...(footerPlaceTextColor.trim() ? { cardFooterPlaceTextColor: footerPlaceTextColor.trim() } : {}),
+    const lead = leadTextColor.trim();
+    const tc = titleTextColor.trim();
+    const dc = descriptionTextColor.trim();
+    const fdc = footerDateTextColor.trim();
+    const fpc = footerPlaceTextColor.trim();
+    return {
+      slideTitle: title.length > 0 ? title : "(제목)",
+      slideSubtitle: subtitle.length ? subtitle : "·",
+      slideStatusBadge: tournamentStatusForPreview,
+      slideExtra1: textLine1.length > 0 ? textLine1 : null,
+      slideExtra2: textLine2.length > 0 ? textLine2 : null,
+      slideImage320Url: uploadedImage?.w320Url,
+      slideCardTemplate: cardTemplate,
+      slideBackgroundType: backgroundType,
+      slideThemeType: themeType,
+      slideMediaBackground: resolvedPreviewMediaBg,
+      slideImageOverlayOpacity:
+        v2MediaMode === "on" ? imageOverlayOpacity : DEFAULT_BG_IMAGE_OVERLAY_OPACITY,
+      slideLeadTextColor: lead || undefined,
+      slideTitleTextColor: tc || undefined,
+      slideDescTextColor: dc || undefined,
+      slideTextShadowEnabled: cardTextShadowEnabled,
+      slideSurfaceFull: cardSurfaceLayout === "full",
+      slideFooterDateTextColor: fdc || undefined,
+      slideFooterPlaceTextColor: fpc || undefined,
     };
-    return base;
   }, [
     title,
     cardDate,
@@ -331,14 +248,31 @@ export default function ClientTournamentCardPublishV2Page() {
     imageOverlayOpacity,
   ]);
 
-  function activateV2Media() {
+  const activateV2Media = useCallback(() => {
     setV2MediaMode("on");
-  }
+  }, []);
+
+  useEffect(() => {
+    let idleHandle = 0;
+    let timeoutHandle = 0;
+    const enable = () => setRenderOffscreenCaptureCard(true);
+    if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") {
+      idleHandle = window.requestIdleCallback(enable, { timeout: 2000 });
+    } else if (typeof window !== "undefined") {
+      timeoutHandle = window.setTimeout(enable, 300);
+    }
+    return () => {
+      if (idleHandle) window.cancelIdleCallback(idleHandle);
+      if (timeoutHandle) window.clearTimeout(timeoutHandle);
+    };
+  }, []);
 
   const loadSnapshots = useCallback(async () => {
     if (!tournamentId) return;
     try {
-      const response = await fetch(`/api/client/card-snapshots?tournamentId=${encodeURIComponent(tournamentId)}`);
+      const response = await fetch(
+        `/api/client/card-snapshots?tournamentId=${encodeURIComponent(tournamentId)}&mode=editor`
+      );
       const result = (await response.json()) as {
         snapshots?: SnapshotPick[];
         activeSnapshot?: SnapshotPick | null;
@@ -538,49 +472,70 @@ export default function ClientTournamentCardPublishV2Page() {
     })();
   }
 
-  async function handleUploadImage(file: File) {
-    if (uploading) return;
-    setUploading(true);
-    setMessage("");
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      /** 메인 슬라이드 등 공개 페이지에서 `/site-images/...` 로 노출되도록 */
-      formData.append("sitePublic", "1");
-      const response = await fetch("/api/upload/image", {
-        method: "POST",
-        body: formData,
-      });
-      const result = (await response.json()) as UploadedImage & { error?: string };
-      if (!response.ok || !result.imageId) {
-        setMessage(result.error ?? "이미지 업로드에 실패했습니다.");
-        return;
+  const handleUploadImage = useCallback(
+    async (file: File) => {
+      if (uploading) return;
+      setUploading(true);
+      setMessage("");
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        /** 메인 슬라이드 등 공개 페이지에서 `/site-images/...` 로 노출되도록 */
+        formData.append("sitePublic", "1");
+        const response = await fetch("/api/upload/image", {
+          method: "POST",
+          body: formData,
+        });
+        const result = (await response.json()) as UploadedImage & { error?: string };
+        if (!response.ok || !result.imageId) {
+          setMessage(result.error ?? "이미지 업로드에 실패했습니다.");
+          return;
+        }
+        setUploadedImage({
+          imageId: result.imageId,
+          w320Url: result.w320Url,
+          w640Url: result.w640Url,
+        });
+        setImageOverlayOpacity(DEFAULT_BG_IMAGE_OVERLAY_OPACITY);
+        activateV2Media();
+        setEditorTab("background");
+      } catch {
+        setMessage("이미지 업로드 중 오류가 발생했습니다.");
+      } finally {
+        setUploading(false);
       }
-      setUploadedImage({
-        imageId: result.imageId,
-        w320Url: result.w320Url,
-        w640Url: result.w640Url,
-      });
-      setImageOverlayOpacity(DEFAULT_BG_IMAGE_OVERLAY_OPACITY);
-      activateV2Media();
-      setEditorTab("background");
-    } catch {
-      setMessage("이미지 업로드 중 오류가 발생했습니다.");
-    } finally {
-      setUploading(false);
-    }
-  }
+    },
+    [uploading, activateV2Media]
+  );
 
-  function clearImage() {
+  const clearImage = useCallback(() => {
     setUploadedImage(null);
     setImageOverlayOpacity(DEFAULT_BG_IMAGE_OVERLAY_OPACITY);
     setMessage("이미지를 제거했습니다. 테마 배경으로 표시됩니다.");
-  }
+  }, []);
 
-  function clearBackgroundFileSelection() {
+  const clearBackgroundFileSelection = useCallback(() => {
     if (bgFileInputRef.current) bgFileInputRef.current.value = "";
     if (uploadedImage) clearImage();
-  }
+  }, [uploadedImage, clearImage]);
+
+  const onPickPaletteColor = useCallback((hex: string) => {
+    setV2MediaMode("on");
+    setMediaBackground(hex);
+  }, []);
+
+  const onImageOverlayChange = useCallback((opacity: number) => {
+    setV2MediaMode("on");
+    setImageOverlayOpacity(opacity);
+  }, []);
+
+  const onBackgroundFileChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file) void handleUploadImage(file);
+    },
+    [handleUploadImage]
+  );
 
   return (
     <main
@@ -620,35 +575,24 @@ export default function ClientTournamentCardPublishV2Page() {
                   <div
                     className={`${editorStyles.previewCardWrap} ${editorStyles.previewCardWrapV2Chrome}`}
                   >
-                    <div ref={cardPublishCaptureRef} className={editorStyles.cardPublishCaptureRoot}>
-                      <TournamentSnapshotCardView
-                        item={cardPublishSlidePreview}
-                        slideDeck
-                        templateCardLayout
-                        editorCompactCardHeight
-                        slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
-                      />
-                    </div>
+                    <CardPublishPreview ref={cardPublishCaptureRef} model={previewModel} />
                   </div>
                 </div>
               </div>
             </div>
           </div>
           <div className={editorStyles.cardPublishCaptureOffscreen} aria-hidden>
-            <div className={editorStyles.previewInner}>
-              <div className={editorStyles.previewSlideLayer}>
-                <div className={editorStyles.previewCardScaleHost}>
-                  <div className={editorStyles.previewCardScaleInner}>
-                    <div
-                      className={`${editorStyles.previewCardWrap} ${editorStyles.previewCardWrapV2Chrome}`}
-                    >
-                      <div ref={cardPublishCaptureForImageRef} className={editorStyles.cardPublishCaptureRoot}>
-                        <TournamentSnapshotCardView
-                          item={cardPublishSlidePreview}
-                          slideDeck
-                          templateCardLayout
-                          editorCompactCardHeight
-                          slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
+            {renderOffscreenCaptureCard ? (
+              <div className={editorStyles.previewInner}>
+                <div className={editorStyles.previewSlideLayer}>
+                  <div className={editorStyles.previewCardScaleHost}>
+                    <div className={editorStyles.previewCardScaleInner}>
+                      <div
+                        className={`${editorStyles.previewCardWrap} ${editorStyles.previewCardWrapV2Chrome}`}
+                      >
+                        <CardPublishPreview
+                          ref={cardPublishCaptureForImageRef}
+                          model={previewModel}
                           isImageCaptureMode
                         />
                       </div>
@@ -656,7 +600,7 @@ export default function ClientTournamentCardPublishV2Page() {
                   </div>
                 </div>
               </div>
-            </div>
+            ) : null}
           </div>
         </div>
 
@@ -696,212 +640,42 @@ export default function ClientTournamentCardPublishV2Page() {
           <div className={editorStyles.formScrollPane}>
           <div className={editorStyles.stepScrollBody}>
           {editorTab === "content" ? (
-            <>
-              <div className={editorStyles.field}>
-                <div className={editorStyles.fieldHead}>
-                  <span className={editorStyles.fieldLabel}>제목 위 한 줄</span>
-                  <TextColorSwatches
-                    value={leadTextColor}
-                    onChange={setLeadTextColor}
-                    wrapClass={editorStyles.fieldSwatches}
-                    swatchClass={editorStyles.fieldSwatch}
-                    swatchLightClass={editorStyles.fieldSwatchLight}
-                    swatchSelectedClass={editorStyles.fieldSwatchSelected}
-                  />
-                </div>
-                <input
-                  className={editorStyles.fieldInput}
-                  type="text"
-                  value={textLine1}
-                  onChange={(e) => setTextLine1(e.target.value)}
-                  autoComplete="off"
-                  placeholder="비우면 표시 안 함"
-                />
-              </div>
-
-              <div className={editorStyles.field}>
-                <div className={editorStyles.fieldHead}>
-                  <span className={editorStyles.fieldLabel}>제목 (1줄)</span>
-                  <TextColorSwatches
-                    value={titleTextColor}
-                    onChange={setTitleTextColor}
-                    wrapClass={editorStyles.fieldSwatches}
-                    swatchClass={editorStyles.fieldSwatch}
-                    swatchLightClass={editorStyles.fieldSwatchLight}
-                    swatchSelectedClass={editorStyles.fieldSwatchSelected}
-                  />
-                </div>
-                <input
-                  className={editorStyles.fieldInput}
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-              </div>
-
-              <div className={editorStyles.field}>
-                <div className={editorStyles.fieldHead}>
-                  <span className={editorStyles.fieldLabel}>설명 (최대 {DESCRIPTION_MAX_LINES}줄)</span>
-                  <TextColorSwatches
-                    value={descriptionTextColor}
-                    onChange={setDescriptionTextColor}
-                    wrapClass={editorStyles.fieldSwatches}
-                    swatchClass={editorStyles.fieldSwatch}
-                    swatchLightClass={editorStyles.fieldSwatchLight}
-                    swatchSelectedClass={editorStyles.fieldSwatchSelected}
-                  />
-                </div>
-                <textarea
-                  className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight}`}
-                  rows={3}
-                  value={textLine2}
-                  onChange={(e) =>
-                    setTextLine2(clampDescriptionToMaxLines(e.target.value, DESCRIPTION_MAX_LINES))
-                  }
-                  spellCheck={false}
-                  placeholder="비우면 카드에 표시하지 않음"
-                />
-              </div>
-
-              <div className={editorStyles.field}>
-                <div className={editorStyles.fieldHead}>
-                  <span className={editorStyles.fieldLabel}>날짜</span>
-                  <TextColorSwatches
-                    value={footerDateTextColor}
-                    onChange={setFooterDateTextColor}
-                    wrapClass={editorStyles.fieldSwatches}
-                    swatchClass={editorStyles.fieldSwatch}
-                    swatchLightClass={editorStyles.fieldSwatchLight}
-                    swatchSelectedClass={editorStyles.fieldSwatchSelected}
-                  />
-                </div>
-                <input
-                  className={`${editorStyles.fieldInput} ${editorStyles.fieldInputContentTight}`}
-                  type="text"
-                  value={cardDate}
-                  onChange={(e) => setCardDate(e.target.value)}
-                  autoComplete="off"
-                  placeholder="예: 2026-05-09 (일)"
-                />
-              </div>
-
-              <div className={editorStyles.field}>
-                <div className={editorStyles.fieldHead}>
-                  <span className={editorStyles.fieldLabel}>장소</span>
-                  <TextColorSwatches
-                    value={footerPlaceTextColor}
-                    onChange={setFooterPlaceTextColor}
-                    wrapClass={editorStyles.fieldSwatches}
-                    swatchClass={editorStyles.fieldSwatch}
-                    swatchLightClass={editorStyles.fieldSwatchLight}
-                    swatchSelectedClass={editorStyles.fieldSwatchSelected}
-                  />
-                </div>
-                <input
-                  className={`${editorStyles.fieldInput} ${editorStyles.fieldInputContentTight}`}
-                  type="text"
-                  value={cardPlace}
-                  onChange={(e) => setCardPlace(e.target.value)}
-                  autoComplete="off"
-                  placeholder="예: 캐롬클럽 빌리어즈"
-                />
-              </div>
-
-              <label className={editorStyles.fieldCheck}>
-                <input
-                  type="checkbox"
-                  checked={cardTextShadowEnabled}
-                  onChange={(e) => setCardTextShadowEnabled(e.target.checked)}
-                />
-                <span>전체 글자에 그림자 넣기</span>
-              </label>
-            </>
+            <CardPublishContentTab
+              leadTextColor={leadTextColor}
+              setLeadTextColor={setLeadTextColor}
+              titleTextColor={titleTextColor}
+              setTitleTextColor={setTitleTextColor}
+              descriptionTextColor={descriptionTextColor}
+              setDescriptionTextColor={setDescriptionTextColor}
+              footerDateTextColor={footerDateTextColor}
+              setFooterDateTextColor={setFooterDateTextColor}
+              footerPlaceTextColor={footerPlaceTextColor}
+              setFooterPlaceTextColor={setFooterPlaceTextColor}
+              textLine1={textLine1}
+              setTextLine1={setTextLine1}
+              title={title}
+              setTitle={setTitle}
+              textLine2={textLine2}
+              setTextLine2={setTextLine2}
+              cardDate={cardDate}
+              setCardDate={setCardDate}
+              cardPlace={cardPlace}
+              setCardPlace={setCardPlace}
+              cardTextShadowEnabled={cardTextShadowEnabled}
+              setCardTextShadowEnabled={setCardTextShadowEnabled}
+            />
           ) : (
-            <>
-              <div className={editorStyles.field}>
-                <span className={editorStyles.fieldLabel}>카드 배경색</span>
-                <div className={editorStyles.colorPaletteGrid}>
-                  {CARD_COLOR_PALETTE_32.map((hex, index) => {
-                    const selected = mediaBackground.trim().toLowerCase() === hex.toLowerCase();
-                    return (
-                      <button
-                        key={`card-color-${index}-${hex}`}
-                        type="button"
-                        aria-label={`배경색 ${hex}`}
-                        className="card-publish-color-swatch"
-                        style={{
-                          width: 34,
-                          height: 34,
-                          padding: 0,
-                          border: "none",
-                          borderRadius: 7,
-                          backgroundColor: hex,
-                          cursor: "pointer",
-                          boxSizing: "border-box",
-                          outline: selected ? "2px solid #ffffff" : "none",
-                          boxShadow: selected ? "0 0 0 2px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.25)" : "none",
-                        }}
-                        onClick={() => {
-                          activateV2Media();
-                          setMediaBackground(hex);
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className={editorStyles.field}>
-                <span className={editorStyles.fieldLabel}>배경 이미지</span>
-                <div className={editorStyles.bgRow}>
-                  <input
-                    ref={bgFileInputRef}
-                    className={editorStyles.fieldFile}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (file) void handleUploadImage(file);
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className={editorStyles.clearBtn}
-                    style={{ marginTop: 0 }}
-                    onClick={clearBackgroundFileSelection}
-                  >
-                    선택해제
-                  </button>
-                </div>
-                {uploading ? (
-                  <p className="v3-muted" style={{ margin: 0, fontSize: "0.78rem" }}>
-                    업로드 중…
-                  </p>
-                ) : null}
-                <div className={editorStyles.rangeBlock}>
-                  <span className={`${editorStyles.fieldLabel} ${editorStyles.fieldLabelRow}`}>
-                    배경그림 투명도
-                    <output className={editorStyles.rangeOut}>{Math.round(imageOverlayOpacity * 100)}%</output>
-                  </span>
-                  <input
-                    className={editorStyles.range}
-                    type="range"
-                    min={15}
-                    max={100}
-                    step={1}
-                    value={Math.round(imageOverlayOpacity * 100)}
-                    disabled={!uploadedImage}
-                    aria-label="배경그림 투명도"
-                    onChange={(e) => {
-                      activateV2Media();
-                      setImageOverlayOpacity(Number(e.target.value) / 100);
-                    }}
-                  />
-                </div>
-              </div>
-            </>
+            <CardPublishBackgroundTab
+              mediaBackground={mediaBackground}
+              onPickPaletteColor={onPickPaletteColor}
+              bgFileInputRef={bgFileInputRef}
+              onBackgroundFileChange={onBackgroundFileChange}
+              onClearBackgroundFileSelection={clearBackgroundFileSelection}
+              uploading={uploading}
+              uploadedImage={uploadedImage}
+              imageOverlayOpacity={imageOverlayOpacity}
+              onImageOverlayChange={onImageOverlayChange}
+            />
           )}
 
           <div className={editorStyles.actions}>

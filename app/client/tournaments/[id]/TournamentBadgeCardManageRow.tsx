@@ -266,6 +266,7 @@ export default function TournamentBadgeCardManageRow({
       <Link
         className="v3-btn"
         href={`/client/tournaments/${tournamentId}/card-publish-v2`}
+        prefetch={false}
         style={{ alignSelf: "flex-end", marginLeft: "auto", flexShrink: 0 }}
       >
         게시카드 작성·수정

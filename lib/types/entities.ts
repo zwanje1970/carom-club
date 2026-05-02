@@ -11,6 +11,7 @@ export type {
   SiteLayoutMenuItem,
   Tournament,
   TournamentApplication,
+  TournamentApplicationListItem,
   TournamentDivisionRuleRow,
   TournamentStatusBadge,
 } from "../server/platform-backing-store";

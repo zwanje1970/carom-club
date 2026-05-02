@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../lib/auth/session";
 import { checkClientFeatureAccessByUserId, getUserById } from "../../../../../../lib/platform-api";
 import { getLatestBracketByTournamentIdFirestore } from "../../../../../../lib/server/firestore-tournament-brackets";
-import { getTournamentByIdFirestore } from "../../../../../../lib/server/firestore-tournaments";
+import { getTournamentOwnerAccessPreviewById } from "../../../../../../lib/server/platform-backing-store";
 
 export const runtime = "nodejs";
 
@@ -15,11 +15,11 @@ async function requireBracketAccess(tournamentId: string) {
   const user = await getUserById(session.userId);
   if (!user) return { ok: false as const, status: 401, error: "사용자를 찾을 수 없습니다." };
 
-  const tournament = await getTournamentByIdFirestore(tournamentId);
-  if (!tournament) return { ok: false as const, status: 404, error: "대회를 찾을 수 없습니다." };
+  const preview = await getTournamentOwnerAccessPreviewById(tournamentId);
+  if (!preview) return { ok: false as const, status: 404, error: "대회를 찾을 수 없습니다." };
 
   if (user.role === "PLATFORM") {
-    return { ok: true as const, user, tournament };
+    return { ok: true as const, user };
   }
 
   if (user.role !== "CLIENT") {
@@ -31,11 +31,11 @@ async function requireBracketAccess(tournamentId: string) {
     return { ok: false as const, status: 403, error: gate.error };
   }
 
-  if (tournament.createdBy !== user.id) {
+  if (preview.createdBy !== user.id) {
     return { ok: false as const, status: 403, error: "본인 대회만 접근할 수 있습니다." };
   }
 
-  return { ok: true as const, user, tournament };
+  return { ok: true as const, user };
 }
 
 export async function GET(
