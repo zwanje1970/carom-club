@@ -13,6 +13,9 @@ import {
   normalizeMainSlideAdConfig,
   type MainSiteSlideAd,
 } from "../../lib/site/main-slide-stream";
+import { headers } from "next/headers";
+import { isCaromClubMobileAppShell } from "../../lib/is-carom-club-mobile-app-shell";
+import CaromAppExitControl from "./components/CaromAppExitControl";
 import SiteShellFrame from "./components/SiteShellFrame";
 import SiteMainLogo from "./components/SiteMainLogo";
 import { MainSiteScrollCards, type MainSiteScrollCardItem } from "./main-site-scroll-cards";
@@ -212,6 +215,8 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
 }
 
 export default async function SiteOperationalHome() {
+  const headerList = await headers();
+  const appShell = isCaromClubMobileAppShell(headerList);
   /** headers() 제거: 요청별 값으로 동적 렌더·재요청 루프 방지. 모바일 크롬 분기는 임시 비활성(false). */
   const publicMobileSiteChrome = false;
 
@@ -281,7 +286,12 @@ export default async function SiteOperationalHome() {
   const homeBrandTitle = <span className="site-home-main-mobile-dock-brand-placeholder" aria-hidden="true" />;
 
   return (
-    <SiteShellFrame shellVariant="home" mainId="main-layout" brandTitle={homeBrandTitle}>
+    <SiteShellFrame
+      shellVariant="home"
+      mainId="main-layout"
+      brandTitle={homeBrandTitle}
+      prependMain={appShell ? <CaromAppExitControl /> : null}
+    >
       <section id="main-content-group" className="site-home-dark-main site-home-dark-main--stack">
         <div className="site-home-main-content-box">
           <section className="v3-stack site-home-slide-stack site-home-slide-stack--flush" style={{ gap: 0 }}>

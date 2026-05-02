@@ -29,8 +29,8 @@ export default async function SiteCommunityWritePage({ params }: Props) {
   }
 
   return (
-    <SiteShellFrame brandTitle={`글쓰기 · ${board.label}`}>
-      <section className="site-site-gray-main v3-stack ui-community-post-detail-page">
+    <SiteShellFrame brandTitle="커뮤니티">
+      <section className="site-site-gray-main v3-stack ui-community-post-detail-page ui-community-post-compose-page">
         <CommunityPostWriteForm boardType={boardType} />
         <div className="ui-community-post-detail-foot">
           <Link

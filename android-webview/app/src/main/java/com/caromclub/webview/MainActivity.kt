@@ -19,6 +19,7 @@ import android.webkit.CookieManager
 import android.webkit.GeolocationPermissions
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
+import android.webkit.JavascriptInterface
 import android.webkit.URLUtil
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -51,6 +52,7 @@ class MainActivity : AppCompatActivity() {
 
     /** 메인(홈)에서만: 2초 이내 두 번 뒤로가기 시 종료 */
     private var lastBackPressedTime = 0L
+    private lateinit var appBridge: CaromAppBridge
 
     /** 스플래시 유지: 첫 페이지 로드 + 최소 2초 */
     private val splashPageReady = AtomicBoolean(false)
@@ -195,6 +197,8 @@ class MainActivity : AppCompatActivity() {
             WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, false)
         }
 
+        appBridge = CaromAppBridge(this)
+        webView.addJavascriptInterface(appBridge, "CaromAppBridge")
         webView.addJavascriptInterface(PdfDownloadBridge(this, webView), "CaromPdfDownload")
         webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, contentLength ->
             if (url.isNullOrBlank()) return@setDownloadListener
@@ -450,5 +454,16 @@ class MainActivity : AppCompatActivity() {
             webView.destroy()
         }
         super.onDestroy()
+    }
+}
+
+class CaromAppBridge(
+    private val activity: AppCompatActivity,
+) {
+    @JavascriptInterface
+    fun exitApp() {
+        activity.runOnUiThread {
+            activity.finish()
+        }
     }
 }

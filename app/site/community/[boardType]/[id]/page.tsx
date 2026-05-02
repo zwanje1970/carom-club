@@ -3,12 +3,11 @@ import { isCaromClubMobileAppShell } from "../../../../../lib/is-carom-club-mobi
 import { notFound } from "next/navigation";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
 import { parseCommunityPostBodyForPublicSiteDetail } from "../../../../../lib/server/community-post-detail-site-images";
+import { getCommunityPostWithIncrementView } from "../../../../../lib/server/platform-backing-store";
 import { parseCommunityBoardTypeParam } from "../../../../../lib/community-board-params";
 import {
-  getCommunityPostById,
   getSiteCommunityConfig,
   getUserById,
-  incrementCommunityPostViewCount,
   isCommunityPostAuthor,
 } from "../../../../../lib/surface-read";
 import type { SiteCommunityBoardKey } from "../../../../../lib/types/entities";
@@ -58,11 +57,7 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
   const board = config[boardType as SiteCommunityBoardKey];
   if (!board.visible) notFound();
 
-  const existing = await getCommunityPostById(postId);
-  if (!existing || existing.boardType !== boardType) notFound();
-
-  await incrementCommunityPostViewCount(postId);
-  const post = await getCommunityPostById(postId);
+  const post = await getCommunityPostWithIncrementView(postId, { expectedBoardType: boardType });
   if (!post) notFound();
 
   const cookieStore = await cookies();
@@ -114,7 +109,6 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
           <CommunityPostDetailBody
             segments={segments}
             tailImages={tailImages}
-            imageLayout={post.imageLayout}
           />
         </article>
         <CommunityPostCommentsSection

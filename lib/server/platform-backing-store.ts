@@ -8293,13 +8293,25 @@ export const COMMUNITY_PRIMARY_BOARD_KEYS: SiteCommunityBoardKey[] = ["free", "q
 
 function mapPostToListItem(
   p: CommunityBoardPost,
-  assetsById: ReadonlyMap<string, SiteListThumbnailProofFields>,
+  options?: {
+    assetsById?: ReadonlyMap<string, SiteListThumbnailProofFields>;
+    useRawFirstImageWhenNoProof?: boolean;
+  },
 ): CommunityPostListItem {
   const imageUrls = normalizeCommunityPostImageUrls(p.imageUrls);
-  const thumbnailUrl =
-    imageUrls.length > 0
-      ? resolveSiteListThumbnailFromPosterWithAssetMap(imageUrls[0]!, assetsById, buildSitePublicImageUrl)
-      : null;
+  const firstImageUrl = imageUrls.length > 0 ? imageUrls[0]!.trim() : "";
+  let thumbnailUrl: string | null = null;
+  if (firstImageUrl) {
+    if (options?.assetsById) {
+      thumbnailUrl = resolveSiteListThumbnailFromPosterWithAssetMap(
+        firstImageUrl,
+        options.assetsById,
+        buildSitePublicImageUrl,
+      );
+    } else if (options?.useRawFirstImageWhenNoProof) {
+      thumbnailUrl = firstImageUrl;
+    }
+  }
   return {
     id: p.id,
     boardType: p.boardType,
@@ -8310,6 +8322,16 @@ function mapPostToListItem(
     commentCount: p.commentCount,
     thumbnailUrl,
   };
+}
+
+function hasProofImageIdInFirstImage(rows: CommunityBoardPost[]): boolean {
+  for (const p of rows) {
+    const imageUrls = normalizeCommunityPostImageUrls(p.imageUrls);
+    const firstImageUrl = imageUrls.length > 0 ? imageUrls[0]!.trim() : "";
+    if (!firstImageUrl) continue;
+    if (extractProofImageIdFromSiteImageUrl(firstImageUrl)) return true;
+  }
+  return false;
 }
 
 function parseSiteCommunityFeedFromKvRaw(raw: unknown): {
@@ -8329,6 +8351,24 @@ function parseSiteCommunityFeedFromKvRaw(raw: unknown): {
     ? cr.map(normalizeCommunityCommentRow).filter((item): item is CommunityComment => item !== null)
     : [];
   return { communityPosts, communityComments };
+}
+
+function parseSiteCommunityPostsOnlyFromKvRaw(raw: unknown): CommunityBoardPost[] {
+  if (!raw || typeof raw !== "object") return [];
+  const o = raw as Record<string, unknown>;
+  const pr = o.communityPosts;
+  return Array.isArray(pr)
+    ? pr.map(normalizeCommunityBoardPostRow).filter((item): item is CommunityBoardPost => item !== null)
+    : [];
+}
+
+function parseSiteCommunityCommentsOnlyFromKvRaw(raw: unknown): CommunityComment[] {
+  if (!raw || typeof raw !== "object") return [];
+  const o = raw as Record<string, unknown>;
+  const cr = o.communityComments;
+  return Array.isArray(cr)
+    ? cr.map(normalizeCommunityCommentRow).filter((item): item is CommunityComment => item !== null)
+    : [];
 }
 
 export async function loadSiteCommunityFeed(): Promise<{
@@ -8362,6 +8402,64 @@ export async function loadSiteCommunityFeed(): Promise<{
     communityPosts: [...store.communityPosts],
     communityComments: [...store.communityComments],
   };
+}
+
+/**
+ * 공개 목록 전용 경량 로더: 게시글만 파싱하고 댓글 파싱은 생략한다.
+ * 반환 타입은 기존 필터 함수 재사용을 위해 동일 shape를 유지한다.
+ */
+export async function loadSiteCommunityFeedForPublicList(): Promise<{
+  communityPosts: CommunityBoardPost[];
+  communityComments: CommunityComment[];
+}> {
+  const rs = resolveSiteCommunityFeedReadStrategy();
+  if (rs === "firestore-kv") {
+    try {
+      const raw = await readSiteCommunityFeedRawFromFirestoreKv();
+      return {
+        communityPosts: parseSiteCommunityPostsOnlyFromKvRaw(raw),
+        communityComments: [],
+      };
+    } catch (e) {
+      console.warn("[local-json] site community feed Firestore read failed; using empty feed", e);
+      return { communityPosts: [], communityComments: [] };
+    }
+  }
+  if (rs === "production-empty-only") {
+    return { communityPosts: [], communityComments: [] };
+  }
+  if (process.env.NODE_ENV !== "development") {
+    return { communityPosts: [], communityComments: [] };
+  }
+  const store = await readLocalJsonAggregate();
+  ensureCommunityPostsArray(store);
+  return {
+    communityPosts: [...store.communityPosts],
+    communityComments: [],
+  };
+}
+
+/** 댓글 목록 전용 경량 로더: 댓글만 파싱하고 게시글 파싱은 생략한다. */
+export async function loadSiteCommunityCommentsOnly(): Promise<CommunityComment[]> {
+  const rs = resolveSiteCommunityFeedReadStrategy();
+  if (rs === "firestore-kv") {
+    try {
+      const raw = await readSiteCommunityFeedRawFromFirestoreKv();
+      return parseSiteCommunityCommentsOnlyFromKvRaw(raw);
+    } catch (e) {
+      console.warn("[local-json] site community feed Firestore read failed; using empty comments", e);
+      return [];
+    }
+  }
+  if (rs === "production-empty-only") {
+    return [];
+  }
+  if (process.env.NODE_ENV !== "development") {
+    return [];
+  }
+  const store = await readLocalJsonAggregate();
+  if (!Array.isArray(store.communityComments)) return [];
+  return [...store.communityComments];
 }
 
 async function persistSiteCommunityFeed(feed: {
@@ -8426,15 +8524,19 @@ export async function filterCommunityPostsAllPrimaryFromFeed(
   visibleBoardKeys: SiteCommunityBoardKey[],
   options?: { q?: string }
 ): Promise<CommunityPostListItem[]> {
-  const proofAssets = await loadProofImageAssetsList();
-  const assetsById = new Map<string, SiteListThumbnailProofFields>(proofAssets.map((a) => [a.id, a]));
   const q = options?.q?.trim().toLowerCase() ?? "";
   const allow = new Set(visibleBoardKeys);
   let rows = feed.communityPosts.filter((p) => allow.has(p.boardType) && isCommunityBoardPostListed(p));
   if (q.length > 0) {
     rows = rows.filter((p) => p.title.toLowerCase().includes(q));
   }
-  return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((p) => mapPostToListItem(p, assetsById));
+  rows = rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  if (!hasProofImageIdInFirstImage(rows)) {
+    return rows.map((p) => mapPostToListItem(p, { useRawFirstImageWhenNoProof: true }));
+  }
+  const proofAssets = await loadProofImageAssetsList();
+  const assetsById = new Map<string, SiteListThumbnailProofFields>(proofAssets.map((a) => [a.id, a]));
+  return rows.map((p) => mapPostToListItem(p, { assetsById }));
 }
 
 /** 이미 로드한 피드로 게시판별 목록 생성 — 공개 사이트 캐시 레이어에서 재사용 */
@@ -8443,14 +8545,18 @@ export async function filterCommunityPostsFromFeed(
   boardType: SiteCommunityBoardKey,
   options?: { q?: string }
 ): Promise<CommunityPostListItem[]> {
-  const proofAssets = await loadProofImageAssetsList();
-  const assetsById = new Map<string, SiteListThumbnailProofFields>(proofAssets.map((a) => [a.id, a]));
   const q = options?.q?.trim().toLowerCase() ?? "";
   let rows = feed.communityPosts.filter((p) => p.boardType === boardType && isCommunityBoardPostListed(p));
   if (q.length > 0) {
     rows = rows.filter((p) => p.title.toLowerCase().includes(q));
   }
-  return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((p) => mapPostToListItem(p, assetsById));
+  rows = rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  if (!hasProofImageIdInFirstImage(rows)) {
+    return rows.map((p) => mapPostToListItem(p, { useRawFirstImageWhenNoProof: true }));
+  }
+  const proofAssets = await loadProofImageAssetsList();
+  const assetsById = new Map<string, SiteListThumbnailProofFields>(proofAssets.map((a) => [a.id, a]));
+  return rows.map((p) => mapPostToListItem(p, { assetsById }));
 }
 
 /** primary 4개 게시판만 한 번에 필터·정렬 — 프론트에서 게시판별 다중 요청 금지 */
@@ -8475,6 +8581,40 @@ export async function getCommunityPostById(postId: string): Promise<CommunityPos
   const id = postId.trim();
   const p = feed.communityPosts.find((x) => x.id === id);
   if (!p || !isCommunityBoardPostListed(p)) return null;
+  const imageUrls = normalizeCommunityPostImageUrls(p.imageUrls);
+  const imageSizeLevels = normalizeCommunityPostImageSizeLevels(imageUrls.length, p.imageSizeLevels);
+  return {
+    id: p.id,
+    boardType: p.boardType,
+    title: p.title,
+    content: p.content,
+    imageUrls,
+    imageSizeLevels,
+    authorUserId: p.authorUserId,
+    authorNickname: p.authorNickname,
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
+    viewCount: p.viewCount,
+    commentCount: p.commentCount,
+    imageLayout: p.imageLayout === "grid2" ? "grid2" : "full",
+  };
+}
+
+/** 상세 페이지 전용: 단일 feed 로드에서 조회수 증가 + 상세 반환 */
+export async function getCommunityPostWithIncrementView(
+  postId: string,
+  options?: { expectedBoardType?: SiteCommunityBoardKey },
+): Promise<CommunityPostDetail | null> {
+  const feed = await loadSiteCommunityFeed();
+  const id = postId.trim();
+  const p = feed.communityPosts.find((x) => x.id === id);
+  if (!p || !isCommunityBoardPostListed(p)) return null;
+  if (options?.expectedBoardType && p.boardType !== options.expectedBoardType) return null;
+
+  p.viewCount = (p.viewCount ?? 0) + 1;
+  p.updatedAt = new Date().toISOString();
+  void persistSiteCommunityFeed(feed);
+
   const imageUrls = normalizeCommunityPostImageUrls(p.imageUrls);
   const imageSizeLevels = normalizeCommunityPostImageSizeLevels(imageUrls.length, p.imageSizeLevels);
   return {
@@ -8662,8 +8802,7 @@ export async function softDeleteCommunityPostByPlatformAdmin(
 }
 
 export async function listCommentsByPostId(postId: string): Promise<CommunityCommentListItem[]> {
-  const feed = await loadSiteCommunityFeed();
-  const list = Array.isArray(feed.communityComments) ? feed.communityComments : [];
+  const list = await loadSiteCommunityCommentsOnly();
   const pid = postId.trim();
   return list
     .filter((c) => c.postId === pid && c.isDeleted !== true)

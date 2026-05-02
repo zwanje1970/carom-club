@@ -40,6 +40,10 @@ export default async function SiteCommunityPostEditPage({ params }: Props) {
 
   const post = await getCommunityPostById(postId);
   if (!post || post.boardType !== boardType) notFound();
+  const initialTitle = typeof post.title === "string" ? post.title : "";
+  const initialContent = typeof post.content === "string" ? post.content : "";
+  const initialImageUrls = Array.isArray(post.imageUrls) ? [...post.imageUrls] : [];
+  const initialImageSizeLevels = Array.isArray(post.imageSizeLevels) ? [...post.imageSizeLevels] : [];
 
   const allowed = await isCommunityPostAuthor(post.authorUserId, user.id);
   if (!allowed) {
@@ -47,16 +51,15 @@ export default async function SiteCommunityPostEditPage({ params }: Props) {
   }
 
   return (
-    <SiteShellFrame brandTitle={`수정 · ${board.label}`}>
-      <section className="site-site-gray-main v3-stack ui-community-post-detail-page">
+    <SiteShellFrame brandTitle="커뮤니티">
+      <section className="site-site-gray-main v3-stack ui-community-post-detail-page ui-community-post-compose-page">
         <CommunityPostEditForm
           boardType={boardType}
           postId={postId}
-          initialTitle={post.title}
-          initialContent={post.content}
-          initialImageUrls={post.imageUrls}
-          initialImageSizeLevels={post.imageSizeLevels}
-          initialImageLayout={post.imageLayout}
+          initialTitle={initialTitle}
+          initialContent={initialContent}
+          initialImageUrls={initialImageUrls}
+          initialImageSizeLevels={initialImageSizeLevels}
         />
         <div className="ui-community-post-detail-foot">
           <Link

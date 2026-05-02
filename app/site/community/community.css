@@ -443,68 +443,15 @@ button.secondary-button.ui-community-search-submit {
 }
 
 .ui-community-post-title-actions {
-  position: relative;
   flex-shrink: 0;
   margin-top: 0.05rem;
 }
 
-.ui-community-post-more-trigger {
+.ui-community-post-title-actions--inline {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  padding: 0;
-  margin: 0;
-  border: 1px solid rgba(15, 23, 42, 0.16);
-  border-radius: 10px;
-  background: #fff;
-  font-size: 1.15rem;
-  line-height: 1;
-  color: rgba(15, 23, 42, 0.75);
-  cursor: pointer;
-}
-
-.ui-community-post-more-trigger:hover {
-  background: rgba(248, 250, 252, 0.95);
-  color: #0f172a;
-}
-
-.ui-community-post-more-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  min-width: 9.5rem;
-  padding: 0.25rem 0;
-  border-radius: 10px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: #fff;
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
-  z-index: 40;
-}
-
-.ui-community-post-more-item {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0.55rem 0.85rem;
-  border: none;
-  background: none;
-  font: inherit;
-  font-size: 0.88rem;
-  text-align: left;
-  color: #0f172a;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.ui-community-post-more-item:hover {
-  background: rgba(241, 245, 249, 0.9);
-}
-
-.ui-community-post-more-item--danger {
-  color: #b91c1c;
+  gap: 0.18rem;
+  padding-top: 0.12rem;
 }
 
 .ui-community-post-detail-title {
@@ -539,18 +486,32 @@ button.secondary-button.ui-community-search-submit {
 }
 
 .ui-community-post-body-text {
+  display: block;
+  width: 90%;
+  max-width: 640px;
+  margin: 0;
   white-space: pre-wrap;
+}
+
+.ui-community-post-body-text p,
+.ui-community-post-body-text div {
+  margin-bottom: 0;
 }
 
 .ui-community-post-body-figure {
   display: block;
-  margin: 0.65rem 0;
+  width: 90%;
+  max-width: 640px;
+  margin: 0.2rem 0;
   line-height: 0;
+  box-sizing: border-box;
 }
 
 .ui-community-post-inline-img {
+  width: 100%;
   max-width: 100%;
   height: auto;
+  border-radius: 0 !important;
 }
 
 /* 연속 첨부 이미지 묶음: 본문 텍스트와 분리(전체 본문 grid 금지) */
@@ -559,43 +520,15 @@ button.secondary-button.ui-community-search-submit {
   box-sizing: border-box;
 }
 
-.ui-community-post-images--full {
+.ui-community-post-images--uniform {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin: 0.65rem 0;
+  gap: 0;
+  margin: 0.22rem 0 0.28rem;
 }
 
-.ui-community-post-images--full .ui-community-post-body-figure {
+.ui-community-post-images--uniform .ui-community-post-body-figure {
   margin: 0;
-}
-
-.ui-community-post-images--grid2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.45rem;
-  margin: 0.65rem 0;
-  align-items: start;
-}
-
-.ui-community-post-images--grid2.ui-community-post-images--grid2-single {
-  grid-template-columns: 1fr;
-}
-
-.ui-community-post-images--grid2 .ui-community-post-body-figure {
-  margin: 0;
-}
-
-/* 상세 본문: 이미지 묶음만 뷰포트 풀폭(텍스트·댓글 여백 유지). PC는 미적용 */
-@media (max-width: 767px) {
-  .site-site-gray-main.ui-community-post-detail-page:has(.ui-community-post-detail-article)
-    .ui-community-post-images.ui-community-post-images--full-bleed {
-    width: 100vw;
-    max-width: 100vw;
-    margin-left: calc(50% - 50vw);
-    margin-right: calc(50% - 50vw);
-    box-sizing: border-box;
-  }
 }
 
 .ui-community-post-manage-actions {
@@ -872,46 +805,66 @@ button.secondary-button.ui-community-post-action-danger:hover,
   gap: 0.75rem;
 }
 
+.ui-community-post-form--plain {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
 .ui-community-form-field.v3-stack {
   gap: 0.35rem;
 }
 
+.ui-community-compose-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 25;
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.3rem 0 0.5rem;
+  background: #f3f4f6;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.ui-community-compose-topbar-submit {
+  min-height: 2rem !important;
+  padding: 0 0.9rem !important;
+  font-size: 0.84rem !important;
+}
+
 .ui-community-form-label {
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 500;
   color: var(--color-text-muted, #64748b);
 }
 
 .ui-community-form-input {
   width: 100%;
   box-sizing: border-box;
-  padding: 0.55rem 0.65rem;
+  padding: 0.42rem 0;
   font: inherit;
-  font-size: 0.95rem;
-  border: 1px solid rgba(15, 23, 42, 0.18);
-  border-radius: 10px;
-  background: #fff;
+  font-size: 1rem;
+  border: none;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.16);
+  border-radius: 0;
+  background: transparent;
   color: var(--color-text-main, #0f172a);
+  outline: none;
 }
 
-.ui-community-image-layout-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem 1.1rem;
-  align-items: center;
-  font-size: 0.9rem;
+.ui-community-form-input::placeholder {
+  color: #9ca3af;
 }
 
-.ui-community-image-layout-option {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  cursor: pointer;
-  color: var(--color-text-main, #0f172a);
-}
-
-.ui-community-image-layout-option input {
-  margin: 0;
+.ui-community-form-input:focus {
+  border-bottom-color: rgba(15, 23, 42, 0.32);
 }
 
 .ui-community-form-toolbar {
@@ -921,6 +874,25 @@ button.secondary-button.ui-community-post-action-danger:hover,
   justify-content: space-between;
   gap: 0.45rem;
   width: 100%;
+}
+
+.ui-community-post-attach-button {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: rgba(15, 23, 42, 0.7);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.ui-community-post-attach-button:disabled {
+  color: rgba(15, 23, 42, 0.35);
+  cursor: default;
 }
 
 .ui-community-form-message {
@@ -935,40 +907,80 @@ button.secondary-button.ui-community-post-action-danger:hover,
   font-size: 0.9rem !important;
 }
 
+.ui-community-post-compose-page {
+  gap: 0.65rem !important;
+}
+
 .ui-community-post-editor-shell.v3-stack {
-  gap: 0.45rem;
-  position: relative;
+  gap: 0.6rem;
   width: 100%;
 }
 
-.ui-community-post-editor-surface {
-  border: 1px solid rgba(15, 23, 42, 0.18);
-  border-radius: 12px;
-  padding: 0.65rem 0.75rem;
-  background: #fff;
-  min-height: 12rem;
-  position: relative;
+.ui-community-post-editor-textarea {
   width: 100%;
   box-sizing: border-box;
-}
-
-.ui-community-post-editor-editable {
-  min-height: 10.5rem;
+  min-height: 12rem;
+  padding: 0.15rem 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  resize: none;
   outline: none;
-  font-size: 0.95rem;
-  line-height: 1.7;
+  font-size: 16px;
+  line-height: 1.5;
   font-family: inherit;
-  color: inherit;
+  color: var(--color-text-main, #0f172a);
   word-break: break-word;
 }
 
-/* 본문: 텍스트(span)와 첨부 이미지(inline-block)가 한 줄 흐름에서 나란히 줄바꿈 — absolute/flex 겹침 없음 */
-.community-post-body-editor-root.ui-community-post-editor-editable {
-  white-space: normal;
+.ui-community-post-editor-textarea::placeholder {
+  color: #9ca3af;
 }
 
-.ui-community-post-editor-surface .cp-img-wrap img {
-  border-radius: 8px;
+.ui-community-post-editor-file {
+  display: none;
+}
+
+.ui-community-post-editor-image-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  width: 90%;
+  max-width: 640px;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.ui-community-post-editor-image-item {
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.ui-community-post-editor-image {
+  display: block;
+  width: 90%;
+  max-width: 640px;
+  height: auto;
+  margin: 0.2rem 0 0.25rem;
+  border-radius: 0 !important;
+}
+
+.ui-community-post-compose-page .ui-community-post-detail-foot-secondary {
+  border: none !important;
+  background: transparent !important;
+  color: rgba(15, 23, 42, 0.55) !important;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0 !important;
+  min-height: auto !important;
+}
+
+.ui-community-post-compose-page .ui-community-post-detail-foot {
+  display: none;
 }
 
 .ui-community-image-toolbar {

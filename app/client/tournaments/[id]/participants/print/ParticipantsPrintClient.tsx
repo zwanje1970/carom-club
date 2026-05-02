@@ -133,7 +133,7 @@ export default function ParticipantsPrintClient({
         style={{ maxWidth: "56rem", margin: "0 auto", gap: "0.75rem", paddingBottom: "2rem" }}
       >
         <div className="participants-print-no-print v3-row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
-          <Link prefetch={false} href={`/client/tournaments/${tournamentId}/participants`} className="v3-btn" style={{ textDecoration: "none" }}>
+          <Link prefetch={false} href={`/client/tournaments/${tournamentId}`} className="v3-btn" style={{ textDecoration: "none" }}>
             목록으로
           </Link>
           <button type="button" className="v3-btn" onClick={() => window.print()} style={{ fontWeight: 800 }}>

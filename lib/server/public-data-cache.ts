@@ -8,7 +8,7 @@ import {
   getSiteNotice as getSiteNoticeUncached,
   listTournamentSnapshotsForMainSite as listTournamentSnapshotsUncached,
   getMainSlideAdSettingsForSite as getMainSlideAdSettingsUncached,
-  loadSiteCommunityFeed,
+  loadSiteCommunityFeedForPublicList,
   filterCommunityPostsAllPrimaryFromFeed,
   filterCommunityPostsFromFeed,
 } from "./platform-backing-store";
@@ -81,7 +81,7 @@ export async function listSitePublicTournamentListSnapshotsForPublicSite() {
 
 /** 공개 사이트 커뮤니티 목록 — 피드 1회 로드 후 필터는 기존과 동일(짧은 ISR) */
 const _loadSiteCommunityFeedForPublicList = unstable_cache(
-  async () => loadSiteCommunityFeed(),
+  async () => loadSiteCommunityFeedForPublicList(),
   ["public-site-community-feed-v1"],
   { revalidate: 45, tags: [CACHE_TAG_SITE_PUBLIC_COMMUNITY_FEED] }
 );

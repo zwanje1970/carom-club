@@ -1,14 +1,13 @@
 "use client";
 
-import { FormEvent, useCallback, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import CommunityPostBodyEditor, {
   type CommunityPostBodyEditorHandle,
 } from "../../../CommunityPostBodyEditor";
-import type { CommunityPostImageLayout } from "../../../../../../lib/community-post-content-images";
 import { MAX_COMMUNITY_POST_IMAGE_COUNT } from "../../../../../../lib/community-post-images";
 import type { SiteCommunityBoardKey } from "../../../../../../lib/types/entities";
-import { communityPostDetailHref } from "../../../community-tab-config";
+import { communityBoardListHref } from "../../../community-tab-config";
 
 type Props = {
   boardType: string;
@@ -17,7 +16,6 @@ type Props = {
   initialContent: string;
   initialImageUrls: string[];
   initialImageSizeLevels: number[];
-  initialImageLayout: CommunityPostImageLayout;
 };
 
 export default function CommunityPostEditForm({
@@ -27,7 +25,6 @@ export default function CommunityPostEditForm({
   initialContent,
   initialImageUrls,
   initialImageSizeLevels,
-  initialImageLayout,
 }: Props) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
@@ -36,7 +33,6 @@ export default function CommunityPostEditForm({
     imageUrls: initialImageUrls,
     imageSizeLevels: initialImageSizeLevels,
   });
-  const [imageLayout, setImageLayout] = useState<CommunityPostImageLayout>(initialImageLayout);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const bodyEditorRef = useRef<CommunityPostBodyEditorHandle>(null);
@@ -45,6 +41,32 @@ export default function CommunityPostEditForm({
     remaining: MAX_COMMUNITY_POST_IMAGE_COUNT,
     pendingImages: false,
   });
+  const [editorInit, setEditorInit] = useState({
+    content: initialContent,
+    imageUrls: initialImageUrls,
+    imageSizeLevels: initialImageSizeLevels,
+    resetToken: 0,
+  });
+
+  useEffect(() => {
+    setTitle(initialTitle);
+    setBody({
+      content: initialContent,
+      imageUrls: initialImageUrls,
+      imageSizeLevels: initialImageSizeLevels,
+    });
+    setEditorInit((prev) => ({
+      content: initialContent,
+      imageUrls: initialImageUrls,
+      imageSizeLevels: initialImageSizeLevels,
+      resetToken: prev.resetToken + 1,
+    }));
+    setMessage("");
+  }, [postId, initialTitle, initialContent, initialImageUrls, initialImageSizeLevels]);
+  const editorKey = useMemo(
+    () => `${postId}:${editorInit.resetToken}`,
+    [postId, editorInit.resetToken]
+  );
   const onAttachUiChange = useCallback((s: { uploading: boolean; remaining: number; pendingImages: boolean }) => {
     setAttachUi(s);
   }, []);
@@ -70,14 +92,14 @@ export default function CommunityPostEditForm({
           content: body.content,
           imageUrls: body.imageUrls,
           imageSizeLevels: body.imageSizeLevels,
-          imageLayout,
+          imageLayout: "full",
         }),
       });
       if (!response.ok) {
         setMessage("실패");
         return;
       }
-      router.push(communityPostDetailHref(boardType as SiteCommunityBoardKey, postId));
+      router.push(communityBoardListHref(boardType as SiteCommunityBoardKey));
       router.refresh();
     } catch {
       setMessage("실패");
@@ -87,76 +109,48 @@ export default function CommunityPostEditForm({
   }
 
   return (
-    <form className="card-clean ui-community-post-form v3-stack" onSubmit={handleSubmit}>
-      <label className="ui-community-form-field v3-stack">
-        <span className="ui-community-form-label">제목</span>
+    <form className="ui-community-post-form ui-community-post-form--plain v3-stack" onSubmit={handleSubmit}>
+      <div className="ui-community-compose-topbar">
+        <button
+          type="button"
+          className="ui-community-post-attach-button"
+          disabled={loading || attachUi.uploading || attachUi.pendingImages || attachUi.remaining <= 0}
+          onClick={() => bodyEditorRef.current?.openImageAttach()}
+        >
+          {attachUi.uploading ? "업로드…" : "이미지첨부"}
+        </button>
+        <button
+          type="submit"
+          className="primary-button ui-community-compose-topbar-submit"
+          disabled={loading || attachUi.uploading || attachUi.pendingImages}
+        >
+          {loading ? "저장 중..." : "저장"}
+        </button>
+      </div>
+      <div className="ui-community-form-field v3-stack">
         <input
           className="ui-community-form-input"
+          placeholder="제목"
+          aria-label="제목"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") e.preventDefault();
           }}
         />
-      </label>
+      </div>
       <div className="ui-community-form-field v3-stack">
-        <div className="ui-community-form-toolbar">
-          <span className="ui-community-form-label">내용</span>
-          <button
-            type="button"
-            className="secondary-button ui-community-post-action-tight"
-            disabled={loading || attachUi.uploading || attachUi.pendingImages || attachUi.remaining <= 0}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => bodyEditorRef.current?.openImageAttach()}
-          >
-            {attachUi.uploading ? "업로드…" : "이미지첨부"}
-          </button>
-        </div>
         <CommunityPostBodyEditor
           ref={bodyEditorRef}
-          key={postId}
+          key={editorKey}
           disabled={loading}
-          initialContent={initialContent}
-          initialImageUrls={initialImageUrls}
-          initialImageSizeLevels={initialImageSizeLevels}
+          initialContent={editorInit.content}
+          initialImageUrls={editorInit.imageUrls}
+          initialImageSizeLevels={editorInit.imageSizeLevels}
           onSerializedChange={onBodyChange}
           onAttachUiChange={onAttachUiChange}
         />
       </div>
-      <div className="ui-community-form-field v3-stack">
-        <span className="ui-community-form-label">첨부 이미지 표시</span>
-        <div className="ui-community-image-layout-options" role="group" aria-label="첨부 이미지 표시 방식">
-          <label className="ui-community-image-layout-option">
-            <input
-              type="radio"
-              name="imageLayout"
-              value="full"
-              checked={imageLayout === "full"}
-              onChange={() => setImageLayout("full")}
-              disabled={loading}
-            />
-            <span>풀폭 세로형</span>
-          </label>
-          <label className="ui-community-image-layout-option">
-            <input
-              type="radio"
-              name="imageLayout"
-              value="grid2"
-              checked={imageLayout === "grid2"}
-              onChange={() => setImageLayout("grid2")}
-              disabled={loading}
-            />
-            <span>2장 그리드형</span>
-          </label>
-        </div>
-      </div>
-      <button
-        type="submit"
-        className="primary-button ui-community-post-action-submit"
-        disabled={loading || attachUi.uploading || attachUi.pendingImages}
-      >
-        {loading ? "저장 중..." : "저장"}
-      </button>
       {message ? <p className="v3-muted ui-community-form-message">{message}</p> : null}
     </form>
   );
