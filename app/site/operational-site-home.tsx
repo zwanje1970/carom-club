@@ -1,12 +1,19 @@
-import { headers } from "next/headers";
 import {
   getMainSlideAdSettingsForSite,
   getSiteNotice,
   listTournamentSnapshotsForMainSite,
 } from "../../lib/surface-read";
-import { mergeTournamentAndAdSlideDeckItems } from "../../lib/site/main-slide-stream";
+import {
+  getMainSlideAdSettingsForSite as loadMainSlideAdSettingsDirect,
+  getSiteNotice as loadSiteNoticeDirect,
+  listTournamentSnapshotsForMainSite as loadMainTournamentSnapshotsDirect,
+} from "../../lib/server/platform-backing-store";
+import {
+  mergeTournamentAndAdSlideDeckItems,
+  normalizeMainSlideAdConfig,
+  type MainSiteSlideAd,
+} from "../../lib/site/main-slide-stream";
 import SiteShellFrame from "./components/SiteShellFrame";
-import { isPublicSiteMobileView } from "./components/site-public-mobile-view";
 import SiteMainLogo from "./components/SiteMainLogo";
 import { MainSiteScrollCards, type MainSiteScrollCardItem } from "./main-site-scroll-cards";
 import type { SlideDeckItem } from "./tournament-snapshot-card-view";
@@ -18,26 +25,178 @@ function isMainSitePosterTestSlideItem(item: SlideDeckItem): boolean {
   return /포스터\s*광고판\s*확인\s*(?:[1-5]|[１-５])\s*$/i.test(t);
 }
 
+const emptySiteNotice = (): { enabled: false; text: string } => ({ enabled: false, text: "" });
+
+const defaultMainSlideAdSettings = () => ({
+  config: normalizeMainSlideAdConfig(undefined),
+  activeAds: [] as MainSiteSlideAd[],
+});
+
+async function withTimeout<T>(promise: Promise<T>, ms = 2000): Promise<T | null> {
+  return Promise.race([
+    promise,
+    new Promise<T | null>((resolve) => {
+      setTimeout(() => resolve(null), ms);
+    }),
+  ]);
+}
+
+async function safeListMainSlideSnapshots() {
+  try {
+    if (process.env.NODE_ENV === "development") {
+      const rows = await loadMainTournamentSnapshotsDirect();
+      return Array.isArray(rows) ? rows : [];
+    }
+    const rows = await listTournamentSnapshotsForMainSite();
+    return Array.isArray(rows) ? rows : [];
+  } catch (e) {
+    console.error("[site home] main slide snapshots", e);
+    try {
+      const rows = await loadMainTournamentSnapshotsDirect();
+      return Array.isArray(rows) ? rows : [];
+    } catch (e2) {
+      console.error("[site home] main slide snapshots (direct fallback)", e2);
+      return [];
+    }
+  }
+}
+
+async function safeGetSiteNoticeForHome() {
+  try {
+    if (process.env.NODE_ENV === "development") {
+      return await loadSiteNoticeDirect();
+    }
+    return await getSiteNotice();
+  } catch (e) {
+    console.error("[site home] site notice", e);
+    try {
+      return await loadSiteNoticeDirect();
+    } catch (e2) {
+      console.error("[site home] site notice (direct fallback)", e2);
+      return emptySiteNotice();
+    }
+  }
+}
+
+async function safeGetMainSlideAdSettingsForHome() {
+  try {
+    if (process.env.NODE_ENV === "development") {
+      return await loadMainSlideAdSettingsDirect();
+    }
+    return await getMainSlideAdSettingsForSite();
+  } catch (e) {
+    console.error("[site home] main slide ad settings", e);
+    try {
+      return await loadMainSlideAdSettingsDirect();
+    } catch (e2) {
+      console.error("[site home] main slide ad settings (direct fallback)", e2);
+      return { config: normalizeMainSlideAdConfig(undefined), activeAds: [] };
+    }
+  }
+}
+
 function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCardItem[] {
   return items.map((item) => {
     const href = (item.targetDetailUrl ?? "").trim() || "/site/tournaments";
     const external = item.linkType === "external" || /^https?:\/\//i.test(href);
 
-    if (item.type !== "ad") {
-      const published640T = (item.publishedCardImageUrl ?? "").trim();
-      const published320T = (item.publishedCardImage320Url ?? "").trim();
-      const publishedScrollBgT = published640T || published320T;
-      /** 메인만: 게시 PNG가 있으면 슬라이드 면은 이미지 카드(오버레이 없음). 없을 때만 HTML 카드 */
-      if (publishedScrollBgT) {
+    try {
+      if (item.type !== "ad") {
+        const published640T = (item.publishedCardImageUrl ?? "").trim();
+        const published320T = (item.publishedCardImage320Url ?? "").trim();
+        const publishedScrollBgT = published640T || published320T;
+        /** 메인만: 게시 PNG URL이 있으면 플랫 이미지 카드(오버레이 없음). 없으면 HTML 카드 */
+        if (publishedScrollBgT) {
+          return {
+            id: item.snapshotId,
+            href,
+            title: item.title,
+            imageUrl: publishedScrollBgT,
+            faceCssBackground: null,
+            external,
+            faceIsFullPublishedSnapshot: true,
+            suppressPublishedScrollOverlay: true,
+          };
+        }
         return {
           id: item.snapshotId,
           href,
           title: item.title,
-          imageUrl: publishedScrollBgT,
+          imageUrl: null,
+          faceCssBackground: null,
+          external,
+          slideDeckItem: item,
+        };
+      }
+
+      const published640 = (item.publishedCardImageUrl ?? "").trim();
+      const published320 = (item.publishedCardImage320Url ?? "").trim();
+      /** 메인 슬라이드: 640 우선(320은 목록 등 다른 경로 유지). 둘 다 없으면 게시 면 미사용 */
+      const publishedScrollBg = published640 || published320;
+      if (publishedScrollBg) {
+        const isAd = item.type === "ad";
+        const metaTint =
+          (item.cardFooterDateTextColor ?? "").trim() ||
+          (item.cardFooterPlaceTextColor ?? "").trim() ||
+          (item.cardDescriptionTextColor ?? "").trim() ||
+          null;
+        return {
+          id: item.snapshotId,
+          href,
+          title: item.title,
+          imageUrl: publishedScrollBg,
           faceCssBackground: null,
           external,
           faceIsFullPublishedSnapshot: true,
-          suppressPublishedScrollOverlay: true,
+          scrollFaceBadge: isAd ? "광고" : item.statusBadge?.trim() || null,
+          scrollFaceSubtitle: (item.subtitle ?? "").trim() || null,
+          scrollFaceExtraLine1: item.cardExtraLine1?.trim() || null,
+          scrollFaceExtraLine2: item.cardExtraLine2?.trim() || null,
+          scrollFaceExtraLine3: item.cardExtraLine3?.trim() || null,
+          scrollFaceTitleColor: item.cardTitleTextColor?.trim() || null,
+          scrollFaceMetaColor: metaTint,
+          scrollFaceStrongTextShadow: Boolean(item.cardTextShadowEnabled),
+        };
+      }
+      const useBgImage = item.backgroundType !== "theme" && Boolean(item.image320Url?.trim());
+      const imageUrl = useBgImage ? item.image320Url!.trim() : null;
+      const faceCssBackground =
+        !imageUrl && item.mediaBackground?.trim() ? item.mediaBackground.trim() : !imageUrl ? "transparent" : null;
+      return {
+        id: item.snapshotId,
+        href,
+        title: item.title,
+        imageUrl,
+        faceCssBackground,
+        external,
+        ...(item.type === "ad" && imageUrl
+          ? {
+              faceMatchPublishedScrollMetrics: true as const,
+              scrollFaceBadge: "광고" as const,
+              scrollFaceSubtitle: (item.subtitle ?? "").trim() || null,
+              scrollFaceExtraLine1: item.cardExtraLine1?.trim() || null,
+              scrollFaceExtraLine2: item.cardExtraLine2?.trim() || null,
+              scrollFaceExtraLine3: item.cardExtraLine3?.trim() || null,
+              scrollFaceTitleColor: item.cardTitleTextColor?.trim() || null,
+              scrollFaceMetaColor:
+                (item.cardFooterDateTextColor ?? "").trim() ||
+                (item.cardFooterPlaceTextColor ?? "").trim() ||
+                (item.cardDescriptionTextColor ?? "").trim() ||
+                null,
+              scrollFaceStrongTextShadow: Boolean(item.cardTextShadowEnabled),
+            }
+          : {}),
+      };
+    } catch {
+      if (item.type !== "ad") {
+        return {
+          id: item.snapshotId,
+          href,
+          title: item.title,
+          imageUrl: null,
+          faceCssBackground: null,
+          external,
+          slideDeckItem: item,
         };
       }
       return {
@@ -45,82 +204,29 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
         href,
         title: item.title,
         imageUrl: null,
-        faceCssBackground: null,
+        faceCssBackground: item.mediaBackground?.trim() ? item.mediaBackground.trim() : "transparent",
         external,
-        slideDeckItem: item,
       };
     }
-
-    const published640 = (item.publishedCardImageUrl ?? "").trim();
-    const published320 = (item.publishedCardImage320Url ?? "").trim();
-    /** 메인 슬라이드: 640 우선(320은 목록 등 다른 경로 유지). 둘 다 없으면 게시 면 미사용 */
-    const publishedScrollBg = published640 || published320;
-    if (publishedScrollBg) {
-      const isAd = item.type === "ad";
-      const metaTint =
-        (item.cardFooterDateTextColor ?? "").trim() ||
-        (item.cardFooterPlaceTextColor ?? "").trim() ||
-        (item.cardDescriptionTextColor ?? "").trim() ||
-        null;
-      return {
-        id: item.snapshotId,
-        href,
-        title: item.title,
-        imageUrl: publishedScrollBg,
-        faceCssBackground: null,
-        external,
-        faceIsFullPublishedSnapshot: true,
-        scrollFaceBadge: isAd ? "광고" : item.statusBadge?.trim() || null,
-        scrollFaceSubtitle: (item.subtitle ?? "").trim() || null,
-        scrollFaceExtraLine1: item.cardExtraLine1?.trim() || null,
-        scrollFaceExtraLine2: item.cardExtraLine2?.trim() || null,
-        scrollFaceExtraLine3: item.cardExtraLine3?.trim() || null,
-        scrollFaceTitleColor: item.cardTitleTextColor?.trim() || null,
-        scrollFaceMetaColor: metaTint,
-        scrollFaceStrongTextShadow: Boolean(item.cardTextShadowEnabled),
-      };
-    }
-    const useBgImage = item.backgroundType !== "theme" && Boolean(item.image320Url?.trim());
-    const imageUrl = useBgImage ? item.image320Url!.trim() : null;
-    const faceCssBackground =
-      !imageUrl && item.mediaBackground?.trim() ? item.mediaBackground.trim() : !imageUrl ? "transparent" : null;
-    return {
-      id: item.snapshotId,
-      href,
-      title: item.title,
-      imageUrl,
-      faceCssBackground,
-      external,
-      ...(item.type === "ad" && imageUrl
-        ? {
-            faceMatchPublishedScrollMetrics: true as const,
-            scrollFaceBadge: "광고" as const,
-            scrollFaceSubtitle: (item.subtitle ?? "").trim() || null,
-            scrollFaceExtraLine1: item.cardExtraLine1?.trim() || null,
-            scrollFaceExtraLine2: item.cardExtraLine2?.trim() || null,
-            scrollFaceExtraLine3: item.cardExtraLine3?.trim() || null,
-            scrollFaceTitleColor: item.cardTitleTextColor?.trim() || null,
-            scrollFaceMetaColor:
-              (item.cardFooterDateTextColor ?? "").trim() ||
-              (item.cardFooterPlaceTextColor ?? "").trim() ||
-              (item.cardDescriptionTextColor ?? "").trim() ||
-              null,
-            scrollFaceStrongTextShadow: Boolean(item.cardTextShadowEnabled),
-          }
-        : {}),
-    };
   });
 }
 
 export default async function SiteOperationalHome() {
-  const headerStore = await headers();
-  const publicMobileSiteChrome = isPublicSiteMobileView(headerStore);
+  console.log("HOME: start");
+  /** headers() 제거: 요청별 값으로 동적 렌더·재요청 루프 방지. 모바일 크롬 분기는 임시 비활성(false). */
+  const publicMobileSiteChrome = false;
 
-  const [mainSlideSnapshots, siteNotice, mainSlideAdSettings] = await Promise.all([
-    listTournamentSnapshotsForMainSite(),
-    getSiteNotice().catch(() => ({ enabled: false as const, text: "" })),
-    getMainSlideAdSettingsForSite(),
-  ]);
+  console.log("HOME: before snapshots");
+  const mainSlideSnapshots = (await withTimeout(safeListMainSlideSnapshots())) ?? [];
+  console.log("HOME: after snapshots");
+
+  console.log("HOME: before notice");
+  const siteNotice = (await withTimeout(safeGetSiteNoticeForHome())) ?? emptySiteNotice();
+  console.log("HOME: after notice");
+
+  console.log("HOME: before ads");
+  const mainSlideAdSettings = (await withTimeout(safeGetMainSlideAdSettingsForHome())) ?? defaultMainSlideAdSettings();
+  console.log("HOME: after ads");
 
   const tournamentSlideDeckItems: SlideDeckItem[] = mainSlideSnapshots.map((snapshot) => ({
     type: "tournament" as const,
@@ -181,6 +287,7 @@ export default async function SiteOperationalHome() {
   const showSiteNoticeBar = Boolean(siteNotice.enabled) && siteNotice.text.trim().length > 0;
   const homeBrandTitle = <span className="site-home-main-mobile-dock-brand-placeholder" aria-hidden="true" />;
 
+  console.log("HOME: render ready");
   return (
     <SiteShellFrame shellVariant="home" mainId="main-layout" brandTitle={homeBrandTitle}>
       <section id="main-content-group" className="site-home-dark-main site-home-dark-main--stack">
