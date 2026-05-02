@@ -38,6 +38,21 @@ async function fetchDashboardSummary(): Promise<DashboardFetchResult> {
   }
 }
 
+/** 동시에 여러 번 호출돼도 진행 중인 요청 1개만 나가게 함(Strict Mode 이중 effect 등) */
+let dashboardSummaryInFlight: Promise<DashboardFetchResult> | null = null;
+
+function fetchDashboardSummaryCoalesced(): Promise<DashboardFetchResult> {
+  if (dashboardSummaryInFlight) return dashboardSummaryInFlight;
+  const p = fetchDashboardSummary();
+  dashboardSummaryInFlight = p;
+  void p.finally(() => {
+    queueMicrotask(() => {
+      if (dashboardSummaryInFlight === p) dashboardSummaryInFlight = null;
+    });
+  });
+  return dashboardSummaryInFlight;
+}
+
 function clientDashboardTournamentBadgeClass(badge: TournamentStatusBadge): string {
   switch (badge) {
     case "모집중":
@@ -176,40 +191,41 @@ export default function ClientDashboardHomeClient() {
     });
   }, []);
 
-  const loadWithoutCache = useCallback(async () => {
-    const r = await fetchDashboardSummary();
-    if (r.ok) {
-      persistClientDashboardSummaryCache(r.data);
-      setState({ status: "ready", data: r.data });
-    } else {
-      setState({ status: "error", message: r.message });
-    }
-  }, []);
-
-  const revalidateFromCache = useCallback(async () => {
-    const r = await fetchDashboardSummary();
-    if (r.ok) {
-      persistClientDashboardSummaryCache(r.data);
-      setState({ status: "ready", data: r.data });
-    } else {
-      setState((s) => (s.status === "ready" ? { ...s, refreshWarning: r.message } : s));
-    }
-  }, []);
-
   useLayoutEffect(() => {
-    const cached = readClientDashboardSummaryCache();
-    if (cached) {
-      setState({ status: "ready", data: cached });
-      void revalidateFromCache();
-    } else {
-      void loadWithoutCache();
+    const snapshot = readClientDashboardSummaryCache();
+    if (snapshot) {
+      setState({ status: "ready", data: snapshot });
     }
-  }, [loadWithoutCache, revalidateFromCache]);
+    void (async () => {
+      const r = await fetchDashboardSummaryCoalesced();
+      if (r.ok) {
+        persistClientDashboardSummaryCache(r.data);
+        setState({ status: "ready", data: r.data });
+      } else if (snapshot) {
+        setState({ status: "ready", data: snapshot, refreshWarning: r.message });
+      } else {
+        setState({ status: "error", message: r.message });
+      }
+    })();
+  }, []);
 
   const handleRetry = useCallback(() => {
     setState({ status: "loading" });
-    void loadWithoutCache();
-  }, [loadWithoutCache]);
+    void (async () => {
+      const r = await fetchDashboardSummaryCoalesced();
+      if (r.ok) {
+        persistClientDashboardSummaryCache(r.data);
+        setState({ status: "ready", data: r.data });
+      } else {
+        const snap = readClientDashboardSummaryCache();
+        if (snap) {
+          setState({ status: "ready", data: snap, refreshWarning: r.message });
+        } else {
+          setState({ status: "error", message: r.message });
+        }
+      }
+    })();
+  }, []);
 
   if (state.status === "loading") {
     return <DashboardSkeleton />;
