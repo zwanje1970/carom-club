@@ -27,10 +27,42 @@ import {
   parseTournamentEventDates,
   parseTournamentExtraVenues,
   resolveVenueGuideVenueIdFromOrgs,
+  tournamentToClientDashboardPreview,
+  type ClientDashboardTournamentPreviewRow,
   validateTournamentRuleForCreate,
 } from "./platform-backing-store";
 
 const COLLECTION = "v3_tournaments";
+
+/** `buildTournamentFromParsedRow`가 읽는 필드만 — 문서에 다른 대용량 필드가 있어도 전송 제외 */
+const DASHBOARD_ROLLUP_TOURNAMENT_FS_FIELDS = [
+  "title",
+  "date",
+  "location",
+  "maxParticipants",
+  "entryFee",
+  "createdBy",
+  "createdAt",
+  "rule",
+  "posterImageUrl",
+  "summary",
+  "prizeInfo",
+  "outlineDisplayMode",
+  "outlineHtml",
+  "outlineImageUrl",
+  "outlinePdfUrl",
+  "venueGuideVenueId",
+  "statusBadge",
+  "eventDates",
+  "extraVenues",
+  "devSeedSource",
+  "status",
+  "deletedAt",
+  "deletedBy",
+  "deleteReason",
+  "gatheringTime",
+  "reminderSentAt",
+] as const;
 
 /** 대회 원본·게시카드 변경 후 공개 목록·메인 슬라이드·해당 대회 캐시 무효화 */
 export function revalidatePublicTournamentCache(tournamentId: string): void {
@@ -174,27 +206,30 @@ export async function listTournamentsByCreatorFirestore(userId: string): Promise
   return out;
 }
 
-/** `/api/client/dashboard-summary` 전용: 목록 노출용으로는 최신 1건만 normalize, id 목록은 게시카드 여부 판별용 */
+/** `/api/client/dashboard-summary` 전용: `normalizeTournament` 없이 id·미리보기 최소 필드만 */
 export async function listClientDashboardTournamentRollupFirestore(userId: string): Promise<{
   visibleTournamentIds: string[];
-  recentTournamentsForSummary: Tournament[];
+  recentTournamentsForSummary: ClientDashboardTournamentPreviewRow[];
 }> {
   assertClientFirestorePersistenceConfigured();
   const db = getSharedFirestoreDb();
   const orgs = await loadResolutionOrgs();
+  const uid = userId.trim();
+  const fsSelect = [...DASHBOARD_ROLLUP_TOURNAMENT_FS_FIELDS];
   let q;
   try {
     q = await db
       .collection(COLLECTION)
-      .where("createdBy", "==", userId.trim())
+      .where("createdBy", "==", uid)
       .orderBy("createdAt", "desc")
+      .select(...fsSelect)
       .get();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error ?? "");
     if (!message.includes("FAILED_PRECONDITION")) {
       throw error;
     }
-    q = await db.collection(COLLECTION).where("createdBy", "==", userId.trim()).get();
+    q = await db.collection(COLLECTION).where("createdBy", "==", uid).select(...fsSelect).get();
   }
   const built: Tournament[] = [];
   for (const doc of q.docs) {
@@ -204,7 +239,7 @@ export async function listClientDashboardTournamentRollupFirestore(userId: strin
   built.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const visibleTournamentIds = built.map((t) => t.id);
   const recentTournamentsForSummary =
-    built.length === 0 ? [] : [await normalizeTournament(built[0]!, undefined, orgs)];
+    built.length === 0 ? [] : [tournamentToClientDashboardPreview(built[0]!)];
   return { visibleTournamentIds, recentTournamentsForSummary };
 }
 

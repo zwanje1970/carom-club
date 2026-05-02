@@ -8,7 +8,6 @@ import {
   loadClientDashboardTournamentRollupForUser,
   resolveClientOrganizationForDashboardPolicy,
   someTournamentHasActivePublishedCard,
-  type Tournament,
 } from "../../../../lib/platform-api";
 import type {
   ClientDashboardSummaryJson,
@@ -38,16 +37,6 @@ async function getAuthorizedClientUserId(): Promise<string | null> {
   return user.id.trim();
 }
 
-function tournamentToSummary(t: Tournament): ClientDashboardSummaryTournament {
-  return {
-    id: t.id,
-    title: t.title,
-    statusBadge: t.statusBadge,
-    date: t.date,
-    maxParticipants: t.maxParticipants,
-  };
-}
-
 export async function GET() {
   const userId = await getAuthorizedClientUserId();
   if (!userId) {
@@ -68,7 +57,7 @@ export async function GET() {
       hasAnyTournament: rollup.visibleTournamentIds.length > 0,
       hasPublishedActiveForSomeTournament,
       firstTournamentId: rollup.visibleTournamentIds[0] ?? "",
-      recentTournaments: rollup.recentTournamentsForSummary.map(tournamentToSummary),
+      recentTournaments: rollup.recentTournamentsForSummary as ClientDashboardSummaryTournament[],
       autoParticipantPushEnabled: org?.autoParticipantPushEnabled !== false,
       policy: {
         annualMembershipVisible: policy.annualMembershipVisible,
