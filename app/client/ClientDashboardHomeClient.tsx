@@ -280,7 +280,7 @@ export default function ClientDashboardHomeClient() {
         </h2>
         <p style={{ margin: 0, fontSize: "0.95rem" }}>{mainStatusText}</p>
         <div className="v3-stack client-dashboard-main__ctaInner">
-          <Link className="v3-btn" href={mainButtonHref}>
+          <Link className="v3-btn" href={mainButtonHref} prefetch={false}>
             {mainButtonLabel}
           </Link>
         </div>
@@ -300,10 +300,10 @@ export default function ClientDashboardHomeClient() {
                   연회원 가입 후 이용 가능합니다
                 </p>
                 <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
-                  <Link className="v3-btn" href="/client/settings">
+                  <Link className="v3-btn" href="/client/settings" prefetch={false}>
                     연회원 안내
                   </Link>
-                  <Link className="v3-btn" href="/client/settings">
+                  <Link className="v3-btn" href="/client/settings" prefetch={false}>
                     가입하기
                   </Link>
                 </div>
@@ -316,7 +316,7 @@ export default function ClientDashboardHomeClient() {
                 연회원 가입 시 이용 가능합니다
               </p>
               <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
-                <Link className="v3-btn" href="/client/settings">
+                <Link className="v3-btn" href="/client/settings" prefetch={false}>
                   연회원 안내 보기
                 </Link>
               </div>

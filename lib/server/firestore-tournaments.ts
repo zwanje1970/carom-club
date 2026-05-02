@@ -174,6 +174,40 @@ export async function listTournamentsByCreatorFirestore(userId: string): Promise
   return out;
 }
 
+/** `/api/client/dashboard-summary` 전용: 목록 노출용으로는 최신 1건만 normalize, id 목록은 게시카드 여부 판별용 */
+export async function listClientDashboardTournamentRollupFirestore(userId: string): Promise<{
+  visibleTournamentIds: string[];
+  recentTournamentsForSummary: Tournament[];
+}> {
+  assertClientFirestorePersistenceConfigured();
+  const db = getSharedFirestoreDb();
+  const orgs = await loadResolutionOrgs();
+  let q;
+  try {
+    q = await db
+      .collection(COLLECTION)
+      .where("createdBy", "==", userId.trim())
+      .orderBy("createdAt", "desc")
+      .get();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error ?? "");
+    if (!message.includes("FAILED_PRECONDITION")) {
+      throw error;
+    }
+    q = await db.collection(COLLECTION).where("createdBy", "==", userId.trim()).get();
+  }
+  const built: Tournament[] = [];
+  for (const doc of q.docs) {
+    const t = buildTournamentFromParsedRow({ id: doc.id, ...doc.data() }, orgs);
+    if (isEntityLifecycleVisibleForList(t.status)) built.push(t);
+  }
+  built.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const visibleTournamentIds = built.map((t) => t.id);
+  const recentTournamentsForSummary =
+    built.length === 0 ? [] : [await normalizeTournament(built[0]!, undefined, orgs)];
+  return { visibleTournamentIds, recentTournamentsForSummary };
+}
+
 export async function listAllTournamentsFirestore(): Promise<Tournament[]> {
   assertClientFirestorePersistenceConfigured();
   const db = getSharedFirestoreDb();

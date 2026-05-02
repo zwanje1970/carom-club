@@ -1,12 +1,11 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
-import { isFirestoreUsersBackendConfigured } from "../../../../lib/server/firestore-users";
 import {
   getClientDashboardPolicyAndOrganization,
   getClientStatusByUserId,
   getUserById,
-  listTournamentsByCreator,
+  loadClientDashboardTournamentRollupForUser,
   resolveClientOrganizationForDashboardPolicy,
   someTournamentHasActivePublishedCard,
   type Tournament,
@@ -56,27 +55,20 @@ export async function GET() {
   }
 
   try {
-    const [{ policy, org }, tournaments] = await Promise.all([
+    const [{ policy, org }, rollup] = await Promise.all([
       getClientDashboardPolicyAndOrganization(userId),
-      (async (): Promise<Tournament[]> => {
-        if (isFirestoreUsersBackendConfigured()) {
-          const { listTournamentsByCreatorFirestore } = await import("../../../../lib/server/firestore-tournaments");
-          return listTournamentsByCreatorFirestore(userId);
-        }
-        return listTournamentsByCreator(userId);
-      })(),
+      loadClientDashboardTournamentRollupForUser(userId),
     ]);
 
-    const myIds = tournaments.map((t) => t.id);
-    const hasPublishedActiveForSomeTournament = await someTournamentHasActivePublishedCard(myIds);
+    const hasPublishedActiveForSomeTournament = await someTournamentHasActivePublishedCard(rollup.visibleTournamentIds);
 
     const body: ClientDashboardSummaryJson = {
       ok: true,
       hasOrgSetup: Boolean(org?.setupCompleted),
-      hasAnyTournament: tournaments.length > 0,
+      hasAnyTournament: rollup.visibleTournamentIds.length > 0,
       hasPublishedActiveForSomeTournament,
-      firstTournamentId: tournaments[0]?.id ?? "",
-      recentTournaments: tournaments.slice(0, 3).map(tournamentToSummary),
+      firstTournamentId: rollup.visibleTournamentIds[0] ?? "",
+      recentTournaments: rollup.recentTournamentsForSummary.map(tournamentToSummary),
       autoParticipantPushEnabled: org?.autoParticipantPushEnabled !== false,
       policy: {
         annualMembershipVisible: policy.annualMembershipVisible,

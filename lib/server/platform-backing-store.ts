@@ -5306,6 +5306,28 @@ export async function listTournamentsByCreator(userId: string): Promise<Tourname
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+/** 클라이언트 대시보드 요약: 게시카드 매칭용 id 전체 + 카드 UI용 최신 1건만 normalize */
+export async function loadClientDashboardTournamentRollupForUser(userId: string): Promise<{
+  visibleTournamentIds: string[];
+  recentTournamentsForSummary: Tournament[];
+}> {
+  if (isFirestoreUsersBackendConfigured()) {
+    const mod = await import("./firestore-tournaments");
+    return mod.listClientDashboardTournamentRollupFirestore(userId);
+  }
+  const store = await readLocalJsonAggregate();
+  const canonicalUserId = resolveCanonicalUserId(store, userId.trim());
+  const filtered = store.tournaments.filter((item) => item.createdBy === canonicalUserId);
+  const venueOrgs = await getVenueGuideResolutionOrgs(store);
+  const visibleRaw = filtered
+    .filter((item) => isEntityLifecycleVisibleForList(item.status))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const visibleTournamentIds = visibleRaw.map((t) => t.id);
+  const recentTournamentsForSummary =
+    visibleRaw.length === 0 ? [] : [await normalizeTournament(visibleRaw[0]!, store, venueOrgs)];
+  return { visibleTournamentIds, recentTournamentsForSummary };
+}
+
 export async function listAllTournaments(): Promise<Tournament[]> {
   const store = await readLocalJsonAggregate();
   const venueOrgs = await getVenueGuideResolutionOrgs(store);
