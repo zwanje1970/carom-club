@@ -105,12 +105,6 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
         const published640T = (item.publishedCardImageUrl ?? "").trim();
         const published320T = (item.publishedCardImage320Url ?? "").trim();
         const publishedScrollBgT = published640T || published320T;
-        console.log("MAIN_CARD_IMAGE_DEBUG", {
-          title: item.title,
-          publishedCardImageUrl: item.publishedCardImageUrl,
-          publishedCardImage320Url: item.publishedCardImage320Url,
-          selectedImageUrl: publishedScrollBgT,
-        });
         /** 메인만: 게시 PNG URL이 있으면 플랫 이미지 카드(오버레이 없음). 없으면 HTML 카드 */
         if (publishedScrollBgT) {
           return {
@@ -218,21 +212,14 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
 }
 
 export default async function SiteOperationalHome() {
-  console.log("HOME: start");
   /** headers() 제거: 요청별 값으로 동적 렌더·재요청 루프 방지. 모바일 크롬 분기는 임시 비활성(false). */
   const publicMobileSiteChrome = false;
 
-  console.log("HOME: before snapshots");
   const mainSlideSnapshots = (await withTimeout(safeListMainSlideSnapshots())) ?? [];
-  console.log("HOME: after snapshots");
 
-  console.log("HOME: before notice");
   const siteNotice = (await withTimeout(safeGetSiteNoticeForHome())) ?? emptySiteNotice();
-  console.log("HOME: after notice");
 
-  console.log("HOME: before ads");
   const mainSlideAdSettings = (await withTimeout(safeGetMainSlideAdSettingsForHome())) ?? defaultMainSlideAdSettings();
-  console.log("HOME: after ads");
 
   const tournamentSlideDeckItems: SlideDeckItem[] = mainSlideSnapshots.map((snapshot) => ({
     type: "tournament" as const,
@@ -293,7 +280,6 @@ export default async function SiteOperationalHome() {
   const showSiteNoticeBar = Boolean(siteNotice.enabled) && siteNotice.text.trim().length > 0;
   const homeBrandTitle = <span className="site-home-main-mobile-dock-brand-placeholder" aria-hidden="true" />;
 
-  console.log("HOME: render ready");
   return (
     <SiteShellFrame shellVariant="home" mainId="main-layout" brandTitle={homeBrandTitle}>
       <section id="main-content-group" className="site-home-dark-main site-home-dark-main--stack">

@@ -9368,6 +9368,39 @@ export async function loadTournamentPublishedCardsArray(): Promise<TournamentPub
   return store.tournamentPublishedCards.filter((c) => isEntityLifecycleVisibleForList(c.lifecycleStatus));
 }
 
+/**
+ * 메인 슬라이드 전용 raw 선필터.
+ * normalize 전에도 "절대 후보가 될 수 없는" 행만 제외한다.
+ */
+function isMainSlideRawCandidateBeforeNormalize(row: unknown): boolean {
+  if (!row || typeof row !== "object") return false;
+  const r = row as Record<string, unknown>;
+  if (r.isPublished === false) return false;
+  if (r.isActive === false) return false;
+  if (r.showOnMainSlide === false) return false;
+  if (r.isExpired === true) return false;
+  if (!isEntityLifecycleVisibleForList(r.lifecycleStatus)) return false;
+  return true;
+}
+
+async function loadTournamentPublishedCardsArrayForMainSite(): Promise<TournamentPublishedCard[]> {
+  const rs = resolveTournamentPublishedCardsReadStrategy();
+  if (rs === "firestore-kv") {
+    try {
+      const raw = await readTournamentPublishedCardsRawFromFirestoreKv();
+      if (raw == null || !Array.isArray(raw)) return [];
+      return raw
+        .filter(isMainSlideRawCandidateBeforeNormalize)
+        .map(normalizeTournamentPublishedCardRow)
+        .filter((x): x is TournamentPublishedCard => x !== null)
+        .filter((c) => isEntityLifecycleVisibleForList(c.lifecycleStatus));
+    } catch {
+      return [];
+    }
+  }
+  return loadTournamentPublishedCardsArray();
+}
+
 async function persistTournamentPublishedCardsRows(next: TournamentPublishedCard[]): Promise<void> {
   const ws = resolveTournamentPublishedCardsWriteStrategy();
   if (ws === "firestore-kv") {
@@ -9834,6 +9867,11 @@ function posterSourceUrlFromPublishedCardSnapshot(s: PublishedCardSnapshot): str
   return "";
 }
 
+const loadProofImageAssetsByIdForMainSurface = cache(async () => {
+  const proofAssets = await loadProofImageAssetsList();
+  return new Map<string, SiteListThumbnailProofFields>(proofAssets.map((a) => [a.id, a]));
+});
+
 function sanitizePublishedCardSnapshotForMainSiteSlide(
   s: PublishedCardSnapshot,
   byId: ReadonlyMap<string, SiteListThumbnailProofFields>,
@@ -9898,7 +9936,7 @@ export async function listTournamentSnapshotsForMainSite(options?: {
       : DEFAULT_MAIN_SITE_TOURNAMENT_SLIDE_LIMIT;
 
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
-  const cards = await loadTournamentPublishedCardsArray();
+  const cards = await loadTournamentPublishedCardsArrayForMainSite();
   const filtered = cards.filter(
     (c) =>
       isEntityLifecycleVisibleForList(c.lifecycleStatus) &&
@@ -9951,8 +9989,10 @@ export async function listTournamentSnapshotsForMainSite(options?: {
       hasStoredDate && hasStoredLoc ? undefined : metaByTournamentId.get(c.tournamentId.trim());
     return tournamentPublishedCardToPublishedSnapshot(c, templateId, meta);
   });
-  const proofAssets = await loadProofImageAssetsList();
-  const proofById = new Map<string, SiteListThumbnailProofFields>(proofAssets.map((a) => [a.id, a]));
+  if (!rawSnapshots.some((snap) => posterSourceUrlFromPublishedCardSnapshot(snap))) {
+    return rawSnapshots;
+  }
+  const proofById = await loadProofImageAssetsByIdForMainSurface();
   return rawSnapshots.map((snap) => sanitizePublishedCardSnapshotForMainSiteSlide(snap, proofById));
 }
 
@@ -10030,14 +10070,18 @@ export async function getMainSlideAdSettingsForSite(): Promise<{
   try {
     const config = await loadMainSlideAdConfigNormalizedForStorage();
     const ads = await loadMainSlideAdsNormalizedForStorage();
-    const proofAssets = await loadProofImageAssetsList();
-    const proofById = new Map<string, SiteListThumbnailProofFields>(proofAssets.map((a) => [a.id, a]));
+    const hasProofBackedAdImage = ads.some((a) => {
+      const img = typeof a.imageUrl === "string" ? a.imageUrl.trim() : "";
+      return img.length > 0 && Boolean(extractProofImageIdFromSiteImageUrl(img));
+    });
+    const proofById = hasProofBackedAdImage ? await loadProofImageAssetsByIdForMainSurface() : null;
     const now = Date.now();
     const activeAds = ads
       .map((a) => {
         const img = typeof a.imageUrl === "string" ? a.imageUrl.trim() : "";
         if (!img) return a;
         if (!extractProofImageIdFromSiteImageUrl(img)) return a;
+        if (!proofById) return a;
         const nextUrl = resolveSiteProofImageUrlWithVariantPreference(
           img,
           proofById,
