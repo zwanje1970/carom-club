@@ -105,6 +105,12 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
         const published640T = (item.publishedCardImageUrl ?? "").trim();
         const published320T = (item.publishedCardImage320Url ?? "").trim();
         const publishedScrollBgT = published640T || published320T;
+        console.log("MAIN_CARD_IMAGE_DEBUG", {
+          title: item.title,
+          publishedCardImageUrl: item.publishedCardImageUrl,
+          publishedCardImage320Url: item.publishedCardImage320Url,
+          selectedImageUrl: publishedScrollBgT,
+        });
         /** 메인만: 게시 PNG URL이 있으면 플랫 이미지 카드(오버레이 없음). 없으면 HTML 카드 */
         if (publishedScrollBgT) {
           return {

@@ -6,6 +6,7 @@ import { memo, useCallback, useMemo, useState } from "react";
 import editorCardStyles from "../client/tournaments/[id]/card-publish-editor.module.css";
 import styles from "./main-sample/main-sample.module.css";
 import siteStyles from "./main-site-scroll-cards.module.css";
+import { PublishedSnapshotScrollCard } from "./published-snapshot-scroll-card";
 import {
   SLIDE_DECK_SOLID_BACKDROPS,
   TournamentSnapshotCardView,
@@ -186,6 +187,45 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
   }
 
   const hasFaceImage = Boolean(item.imageUrl?.trim());
+  const isPublishedSnapshotEnabled =
+    process.env.NEXT_PUBLIC_ENABLE_PUBLISHED_SNAPSHOT === "true";
+  /** 대회 게시 PNG 플랫 카드(메인 전용, 오버레이 없음) — 광고·HTML 덱과 분리 */
+  const isPublishedSnapshotImageOnlyCard =
+    isPublishedSnapshotEnabled &&
+    Boolean(item.faceIsFullPublishedSnapshot) &&
+    hasFaceImage &&
+    item.suppressPublishedScrollOverlay === true;
+
+  if (isPublishedSnapshotImageOnlyCard && item.imageUrl?.trim()) {
+    return (
+      <div
+        className={`${styles.sampleMainCardSlot} ${selected ? styles.sampleMainCardSlotSelected : ""}`}
+        {...{ [SITE_SCROLL_CARD]: "", "data-published-snapshot-card-slot": "" }}
+        style={{ touchAction: "pan-y" }}
+        role="button"
+        tabIndex={0}
+        aria-pressed={selected}
+        aria-label={`${item.title}${selected ? ", 선택됨" : ""}`}
+        onPointerDown={onPointerDown}
+        onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          onCardPointerDown(item.id);
+        }}
+      >
+        <PublishedSnapshotScrollCard
+          imageUrl={item.imageUrl.trim()}
+          href={item.href}
+          title={item.title}
+          alt={item.title}
+          external={item.external}
+          selected={selected}
+          lcpHeroImage={lcpHeroImage}
+        />
+      </div>
+    );
+  }
+
   const usePublishedScrollLayout = Boolean(
     (item.faceIsFullPublishedSnapshot && hasFaceImage) ||
       (item.faceMatchPublishedScrollMetrics && hasFaceImage),
@@ -249,30 +289,28 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
               loading={lcpHeroImage ? "eager" : "lazy"}
               {...(lcpHeroImage ? { fetchPriority: "high" as const } : {})}
             />
-            {item.suppressPublishedScrollOverlay ? null : (
-              <div className={styles.sampleMainCardPublishedOverlay} aria-hidden>
-                {item.scrollFaceBadge?.trim() ? (
-                  <span className={publishedScrollBadgeClass(item.scrollFaceBadge.trim())}>
-                    {item.scrollFaceBadge.trim()}
-                  </span>
-                ) : null}
+            <div className={styles.sampleMainCardPublishedOverlay} aria-hidden>
+              {item.scrollFaceBadge?.trim() ? (
+                <span className={publishedScrollBadgeClass(item.scrollFaceBadge.trim())}>
+                  {item.scrollFaceBadge.trim()}
+                </span>
+              ) : null}
+              <p
+                className={styles.sampleMainCardPublishedOverlayTitle}
+                style={{ color: titleColor, textShadow: overlayTextShadow }}
+              >
+                {item.title}
+              </p>
+              {metaLines.map((line, idx) => (
                 <p
-                  className={styles.sampleMainCardPublishedOverlayTitle}
-                  style={{ color: titleColor, textShadow: overlayTextShadow }}
+                  key={`${idx}-${line}`}
+                  className={styles.sampleMainCardPublishedOverlayMeta}
+                  style={{ color: metaColor, textShadow: overlayTextShadow }}
                 >
-                  {item.title}
+                  {line}
                 </p>
-                {metaLines.map((line, idx) => (
-                  <p
-                    key={`${idx}-${line}`}
-                    className={styles.sampleMainCardPublishedOverlayMeta}
-                    style={{ color: metaColor, textShadow: overlayTextShadow }}
-                  >
-                    {line}
-                  </p>
-                ))}
-              </div>
-            )}
+              ))}
+            </div>
           </div>
         ) : item.imageUrl?.trim() ? (
           <img

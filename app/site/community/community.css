@@ -586,6 +586,18 @@ button.secondary-button.ui-community-search-submit {
   margin: 0;
 }
 
+/* 상세 본문: 이미지 묶음만 뷰포트 풀폭(텍스트·댓글 여백 유지). PC는 미적용 */
+@media (max-width: 767px) {
+  .site-site-gray-main.ui-community-post-detail-page:has(.ui-community-post-detail-article)
+    .ui-community-post-images.ui-community-post-images--full-bleed {
+    width: 100vw;
+    max-width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    box-sizing: border-box;
+  }
+}
+
 .ui-community-post-manage-actions {
   display: flex;
   flex-wrap: wrap;

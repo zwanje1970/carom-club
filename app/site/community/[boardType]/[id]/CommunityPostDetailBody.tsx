@@ -107,7 +107,9 @@ function ImageCluster({
   };
 
   return (
-    <div className={`ui-community-post-images ${layoutClass} ${singleGrid}`.trim()}>
+    <div
+      className={`ui-community-post-images ui-community-post-images--full-bleed ${layoutClass} ${singleGrid}`.trim()}
+    >
       {images.map((img) => (
         <span key={img.key} className="ui-community-post-body-figure">
           {/* eslint-disable-next-line @next/next/no-img-element */}

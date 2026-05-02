@@ -1,0 +1,121 @@
+/**
+ * 메인 스크롤: 대회 게시 PNG 플랫 카드 전용 (PublishedSnapshotScrollCard).
+ * sampleMainCardSlot / main-sample 카드 클래스는 수정하지 않음.
+ */
+
+.face {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  align-self: stretch;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  touch-action: pan-y;
+  border-radius: var(--site-main-scroll-card-face-border-radius, 12px);
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background-color: #ffffff;
+  box-shadow:
+    4px 10px 14px -6px rgba(15, 23, 42, 0.32),
+    2px 6px 10px -4px rgba(15, 23, 42, 0.18);
+}
+
+.faceSelected {
+  outline: 2px solid rgba(37, 99, 235, 0.42);
+  outline-offset: 2px;
+  opacity: 0.98;
+}
+
+:global([data-published-snapshot-card-slot]:active) .face:not(.faceSelected) {
+  opacity: 0.96;
+}
+
+:global([data-published-snapshot-card-slot]:active) .face.faceSelected {
+  opacity: 0.96;
+}
+
+:global([data-published-snapshot-card-slot]:focus-visible) .face {
+  outline: 2px solid rgba(37, 99, 235, 0.85);
+  outline-offset: 3px;
+}
+
+.face.faceSelected .cta {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.inner {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  border-radius: inherit;
+  overflow: hidden;
+  box-sizing: border-box;
+  line-height: 0;
+  background-color: #ffffff;
+}
+
+.img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  border-radius: inherit;
+  pointer-events: none;
+  box-sizing: border-box;
+  vertical-align: top;
+}
+
+/* 선택 시 카드 면 전체 링크(투명) — 미선택 시 pointer-events none 으로 슬롯 선택 유지 */
+.fullHit {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  opacity: 0;
+  font-size: 0;
+  line-height: 0;
+  touch-action: pan-y;
+  text-decoration: none;
+  color: transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fullHitPassive {
+  pointer-events: none;
+}
+
+.fullHitActive {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.cta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: pan-y;
+  padding: 12px 0.75rem;
+  box-sizing: border-box;
+  min-height: 44px;
+  border-radius: 0 0 var(--site-main-scroll-card-face-border-radius, 12px) var(--site-main-scroll-card-face-border-radius, 12px);
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: none;
+  color: #fff;
+  background: rgba(15, 23, 42, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+  z-index: 2;
+}
