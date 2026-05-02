@@ -25,6 +25,8 @@ export type MainSiteScrollCardItem = {
   external: boolean;
   /** 게시 스냅샷으로 면 전체가 이미지일 때 제목 오버레이 숨김(중복 방지) */
   faceIsFullPublishedSnapshot?: boolean;
+  /** 게시 PNG 면에서 배지·제목·메타 오버레이 생략(메인 대회 카드 전용; 광고는 미설정) */
+  suppressPublishedScrollOverlay?: boolean;
   /**
    * 게시 PNG 분기(`faceIsFullPublishedSnapshot`)는 아니지만, 면·포스터 크기·비율은
    * 게시 카드와 동일 CSS(공통 토큰) 사용 — 광고 업로드 이미지 전용.
@@ -241,28 +243,30 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
               loading={lcpHeroImage ? "eager" : "lazy"}
               {...(lcpHeroImage ? { fetchPriority: "high" as const } : {})}
             />
-            <div className={styles.sampleMainCardPublishedOverlay} aria-hidden>
-              {item.scrollFaceBadge?.trim() ? (
-                <span className={publishedScrollBadgeClass(item.scrollFaceBadge.trim())}>
-                  {item.scrollFaceBadge.trim()}
-                </span>
-              ) : null}
-              <p
-                className={styles.sampleMainCardPublishedOverlayTitle}
-                style={{ color: titleColor, textShadow: overlayTextShadow }}
-              >
-                {item.title}
-              </p>
-              {metaLines.map((line, idx) => (
+            {item.suppressPublishedScrollOverlay ? null : (
+              <div className={styles.sampleMainCardPublishedOverlay} aria-hidden>
+                {item.scrollFaceBadge?.trim() ? (
+                  <span className={publishedScrollBadgeClass(item.scrollFaceBadge.trim())}>
+                    {item.scrollFaceBadge.trim()}
+                  </span>
+                ) : null}
                 <p
-                  key={`${idx}-${line}`}
-                  className={styles.sampleMainCardPublishedOverlayMeta}
-                  style={{ color: metaColor, textShadow: overlayTextShadow }}
+                  className={styles.sampleMainCardPublishedOverlayTitle}
+                  style={{ color: titleColor, textShadow: overlayTextShadow }}
                 >
-                  {line}
+                  {item.title}
                 </p>
-              ))}
-            </div>
+                {metaLines.map((line, idx) => (
+                  <p
+                    key={`${idx}-${line}`}
+                    className={styles.sampleMainCardPublishedOverlayMeta}
+                    style={{ color: metaColor, textShadow: overlayTextShadow }}
+                  >
+                    {line}
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
         ) : item.imageUrl?.trim() ? (
           <img

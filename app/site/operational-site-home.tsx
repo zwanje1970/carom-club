@@ -23,8 +23,23 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
     const href = (item.targetDetailUrl ?? "").trim() || "/site/tournaments";
     const external = item.linkType === "external" || /^https?:\/\//i.test(href);
 
-    /** 대회 카드: 작성화면과 동일 `TournamentSnapshotCardView`(HTML 텍스트·배지) — 게시 PNG 평면 면은 쓰지 않음 */
     if (item.type !== "ad") {
+      const published640T = (item.publishedCardImageUrl ?? "").trim();
+      const published320T = (item.publishedCardImage320Url ?? "").trim();
+      const publishedScrollBgT = published640T || published320T;
+      /** 메인만: 게시 PNG가 있으면 슬라이드 면은 이미지 카드(오버레이 없음). 없을 때만 HTML 카드 */
+      if (publishedScrollBgT) {
+        return {
+          id: item.snapshotId,
+          href,
+          title: item.title,
+          imageUrl: publishedScrollBgT,
+          faceCssBackground: null,
+          external,
+          faceIsFullPublishedSnapshot: true,
+          suppressPublishedScrollOverlay: true,
+        };
+      }
       return {
         id: item.snapshotId,
         href,
