@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useLayoutEffect, useRef, useState, type SyntheticEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type SyntheticEvent } from "react";
 import ClientAutoParticipantPushToggle from "./ClientAutoParticipantPushToggle";
 import { AdminSurface } from "../components/admin/AdminCard";
 import type { ClientDashboardSummaryJson } from "./dashboard-summary-types";
@@ -183,6 +183,8 @@ function DashboardSkeleton() {
 export default function ClientDashboardHomeClient() {
   const [state, setState] = useState<SummaryState>({ status: "loading" });
   const extrasDetailsRef = useRef<HTMLDetailsElement>(null);
+  /** 초기 로드 effect가 Strict Mode 등으로 두 번 들어와도 첫 실행만 진행 */
+  const didStartInitialLoadRef = useRef(false);
 
   const onExtrasToggle = useCallback((e: SyntheticEvent<HTMLDetailsElement>) => {
     if (!e.currentTarget.open) return;
@@ -191,7 +193,10 @@ export default function ClientDashboardHomeClient() {
     });
   }, []);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
+    if (didStartInitialLoadRef.current) return;
+    didStartInitialLoadRef.current = true;
+
     const snapshot = readClientDashboardSummaryCache();
     if (snapshot) {
       setState({ status: "ready", data: snapshot });
