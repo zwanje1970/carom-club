@@ -10216,6 +10216,9 @@ function normalizeMainSlideTournamentSnapshotsCompactRow(row: unknown): Publishe
   const imageId = typeof s.imageId === "string" ? s.imageId : "";
   const image320Url = typeof s.image320Url === "string" ? s.image320Url : "";
   const image640Url = typeof s.image640Url === "string" ? s.image640Url : "";
+  const isThemeCard =
+    imageId.trim() === "theme" ||
+    (typeof s.tournamentBackgroundType === "string" && s.tournamentBackgroundType === "theme");
   const textLayout = typeof s.textLayout === "string" ? s.textLayout : "";
   const imageLayout = typeof s.imageLayout === "string" ? s.imageLayout : "";
   const publishedAt = typeof s.publishedAt === "string" ? s.publishedAt : "";
@@ -10229,8 +10232,8 @@ function normalizeMainSlideTournamentSnapshotsCompactRow(row: unknown): Publishe
     !title ||
     !subtitle ||
     !imageId ||
-    !image320Url ||
-    !image640Url ||
+    (!isThemeCard && !image320Url) ||
+    (!isThemeCard && !image640Url) ||
     !textLayout ||
     !imageLayout ||
     !publishedAt ||

@@ -118,6 +118,31 @@ async function fetchDashboardPublishedCardStatus(
   }
 }
 
+let dashboardPublishedCardStatusInFlight: Promise<DashboardPublishedCardStatusResult> | null = null;
+let dashboardPublishedCardStatusInFlightKey = "";
+
+function fetchDashboardPublishedCardStatusCoalesced(
+  tournamentId: string,
+): Promise<DashboardPublishedCardStatusResult> {
+  const key = tournamentId.trim();
+  if (!key) return Promise.resolve({ ok: false });
+  if (dashboardPublishedCardStatusInFlight && dashboardPublishedCardStatusInFlightKey === key) {
+    return dashboardPublishedCardStatusInFlight;
+  }
+  dashboardPublishedCardStatusInFlightKey = key;
+  const p = fetchDashboardPublishedCardStatus(key);
+  dashboardPublishedCardStatusInFlight = p;
+  void p.finally(() => {
+    queueMicrotask(() => {
+      if (dashboardPublishedCardStatusInFlight === p) {
+        dashboardPublishedCardStatusInFlight = null;
+        dashboardPublishedCardStatusInFlightKey = "";
+      }
+    });
+  });
+  return dashboardPublishedCardStatusInFlight;
+}
+
 let dashboardSummaryInFlight: Promise<DashboardFetchResult> | null = null;
 let dashboardSummaryInFlightKey = "";
 
@@ -280,6 +305,7 @@ export default function ClientDashboardHomeClient({
   const extrasDetailsRef = useRef<HTMLDetailsElement>(null);
   const didStartInitialLoadRef = useRef(false);
   const publishedCardStatusInFlightForRef = useRef<string>("");
+  const publishedCardStatusCompletedTidRef = useRef<string>("");
 
   const onExtrasToggle = useCallback((e: SyntheticEvent<HTMLDetailsElement>) => {
     if (!e.currentTarget.open) return;
@@ -317,13 +343,21 @@ export default function ClientDashboardHomeClient({
     })();
   }, [bootstrap]);
 
+  const publishedCardSummaryReady = state.status === "ready";
+  const publishedCardHasAnyTournament = publishedCardSummaryReady && state.data.hasAnyTournament;
+  const publishedCardTid = publishedCardSummaryReady ? state.data.firstTournamentId.trim() : "";
+
   useEffect(() => {
-    if (state.status !== "ready") return;
-    const tid = state.data.firstTournamentId.trim();
-    if (!state.data.hasAnyTournament || !tid) {
+    if (!publishedCardSummaryReady) return;
+    const tid = publishedCardTid;
+    if (!publishedCardHasAnyTournament || !tid) {
+      publishedCardStatusCompletedTidRef.current = "";
       setPublishedCardStatus((prev) =>
         prev.state === "idle" && prev.tournamentId === "" ? prev : { tournamentId: "", state: "idle" },
       );
+      return;
+    }
+    if (publishedCardStatusCompletedTidRef.current === tid) {
       return;
     }
     setPublishedCardStatus((prev) => {
@@ -343,17 +377,19 @@ export default function ClientDashboardHomeClient({
     const run = () => {
       if (cancelled) return;
       void (async () => {
-        const r = await fetchDashboardPublishedCardStatus(tid);
+        const r = await fetchDashboardPublishedCardStatusCoalesced(tid);
         if (cancelled) return;
         if (publishedCardStatusInFlightForRef.current === tid) {
           publishedCardStatusInFlightForRef.current = "";
         }
         if (!r.ok) {
+          publishedCardStatusCompletedTidRef.current = tid;
           setPublishedCardStatus((prev) =>
             prev.tournamentId === tid ? { tournamentId: tid, state: "failed" } : prev,
           );
           return;
         }
+        publishedCardStatusCompletedTidRef.current = tid;
         mergeClientDashboardSummaryCache({
           hasPublishedActiveForSomeTournament: r.hasPublishedActiveForSomeTournament,
         });
@@ -397,9 +433,12 @@ export default function ClientDashboardHomeClient({
         publishedCardStatusInFlightForRef.current = "";
       }
     };
-  }, [state]);
+  }, [publishedCardSummaryReady, publishedCardHasAnyTournament, publishedCardTid]);
 
   const handleRetry = useCallback(() => {
+    publishedCardStatusCompletedTidRef.current = "";
+    publishedCardStatusInFlightForRef.current = "";
+    setPublishedCardStatus({ tournamentId: "", state: "idle" });
     setState({ status: "loading" });
     void (async () => {
       const r = await fetchDashboardSummaryCoalesced(bootstrap ?? null);
