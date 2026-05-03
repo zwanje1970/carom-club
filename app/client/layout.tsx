@@ -3,6 +3,7 @@ import "./client-dashboard.css";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { isCaromClubMobileAppShell } from "../../lib/is-carom-club-mobile-app-shell";
+import { ClientDashboardSummaryBootstrapProvider } from "./ClientDashboardHomeClient";
 import AdminFabServerBridge from "../components/AdminFabServerBridge";
 import DashboardMobileChromeLayout from "../components/DashboardMobileChromeLayout";
 import GlobalHomeButton from "../components/GlobalHomeButton";
@@ -48,8 +49,14 @@ export default async function ClientLayout({
     if (orgForGuard?.status === "SUSPENDED" || orgForGuard?.status === "EXPELLED") {
       redirect("/client-status/restricted");
     }
+    const dashboardSummaryBootstrap = {
+      userId: currentUser.id.trim(),
+      clientStatus,
+      orgId: orgForGuard?.id?.trim() ?? "",
+      orgStatus: orgForGuard?.status ?? null,
+    } as const;
     return (
-      <>
+      <ClientDashboardSummaryBootstrapProvider value={dashboardSummaryBootstrap}>
         <SitePcDashboardChromeShell />
         <DashboardMobileChromeLayout area="client">
           <div className="app-mobile-bottom-nav-scroll-pad app-dashboard-shell app-dashboard-shell--with-mobile-chrome">
@@ -58,7 +65,7 @@ export default async function ClientLayout({
         </DashboardMobileChromeLayout>
         <GlobalHomeButton />
         <AdminFabServerBridge />
-      </>
+      </ClientDashboardSummaryBootstrapProvider>
     );
   }
   if (clientStatus === "REJECTED") {

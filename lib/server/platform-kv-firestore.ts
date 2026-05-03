@@ -14,6 +14,7 @@ export type PlatformKvSettingKey =
   | "publishedCardImageDeleteQueue"
   | "main_slide_ads"
   | "main_slide_ad_config"
+  | "mainSlideTournamentSnapshots"
   | "sitePublicTournamentListSnapshots"
   | "sitePublicVenueListSnapshots";
 
@@ -28,6 +29,7 @@ export const PLATFORM_KV_KEYS: Record<
   | "publishedCardImageDeleteQueue"
   | "mainSlideAds"
   | "mainSlideAdConfig"
+  | "mainSlideTournamentSnapshots"
   | "sitePublicTournamentListSnapshots"
   | "sitePublicVenueListSnapshots",
   PlatformKvSettingKey
@@ -42,6 +44,7 @@ export const PLATFORM_KV_KEYS: Record<
   publishedCardImageDeleteQueue: "publishedCardImageDeleteQueue",
   mainSlideAds: "main_slide_ads",
   mainSlideAdConfig: "main_slide_ad_config",
+  mainSlideTournamentSnapshots: "mainSlideTournamentSnapshots",
   sitePublicTournamentListSnapshots: "sitePublicTournamentListSnapshots",
   sitePublicVenueListSnapshots: "sitePublicVenueListSnapshots",
 };
@@ -58,6 +61,7 @@ export const ALL_PLATFORM_KV_SETTING_KEYS: readonly PlatformKvSettingKey[] = [
   PLATFORM_KV_KEYS.publishedCardImageDeleteQueue,
   PLATFORM_KV_KEYS.mainSlideAds,
   PLATFORM_KV_KEYS.mainSlideAdConfig,
+  PLATFORM_KV_KEYS.mainSlideTournamentSnapshots,
   PLATFORM_KV_KEYS.sitePublicTournamentListSnapshots,
   PLATFORM_KV_KEYS.sitePublicVenueListSnapshots,
 ];

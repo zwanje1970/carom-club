@@ -82,12 +82,22 @@ function pickCardForPublish(data: {
   return null;
 }
 
+export type TournamentManageInfoCardFields = {
+  title: string;
+  scheduleLine: string | null;
+  divisionLabel: string;
+  maxParticipants: number;
+  applicationTotal: number;
+};
+
 export default function TournamentBadgeCardManageRow({
   tournamentId,
   initialStatus,
+  infoCard,
 }: {
   tournamentId: string;
   initialStatus: TournamentStatusBadge;
+  infoCard?: TournamentManageInfoCardFields;
 }) {
   const router = useRouter();
   const [value, setValue] = useState(initialStatus);
@@ -236,24 +246,108 @@ export default function TournamentBadgeCardManageRow({
     }
   }
 
+  const pill = (
+    <span
+      style={{
+        ...badgePillStyle,
+        fontSize: "0.78rem",
+        fontWeight: 800,
+        padding: "0.2rem 0.55rem",
+        borderRadius: "999px",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {value}
+    </span>
+  );
+
+  const expandedPanel = expanded ? (
+    <div
+      className="v3-stack client-tournament-manage__badgePanel"
+      style={{
+        width: "100%",
+        alignItems: "stretch",
+        gap: "0.4rem",
+        marginTop: "0.4rem",
+        padding: "0.55rem 0.6rem",
+        border: "1px solid #e5e7eb",
+        borderRadius: "12px",
+        background: "#f8fafc",
+        boxSizing: "border-box",
+      }}
+    >
+      <select
+        value={value}
+        disabled={publishBusy}
+        onChange={(e) => setValue(e.target.value as TournamentStatusBadge)}
+        style={{ padding: "0.45rem", border: "1px solid #bbb", borderRadius: "0.35rem", fontSize: "0.88rem" }}
+        aria-label="대회 상태 배지"
+      >
+        {OPTIONS.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
+      <p className="v3-muted" style={{ margin: 0, fontSize: "0.85rem", lineHeight: 1.45 }}>
+        이미 게시된 카드가 있으면 새로 만들지 않고 기존 카드에 반영됩니다. 대회당 메인 게시카드는 1개입니다.
+      </p>
+      <button type="button" className="v3-btn" disabled={publishBusy} onClick={() => void onSaveBadgeAndPublish()}>
+        {publishBusy ? "처리 중…" : "저장/게시"}
+      </button>
+      <Link
+        className="v3-btn"
+        href={`/client/tournaments/${tournamentId}/card-publish-v2`}
+        prefetch={false}
+        style={{ textAlign: "center", textDecoration: "none" }}
+      >
+        게시카드 작성·수정
+      </Link>
+    </div>
+  ) : null;
+
+  if (infoCard) {
+    return (
+      <div id="tournament-status-badge" className="client-tournament-manage__card client-tournament-manage__card--info" style={{ scrollMarginTop: "4.5rem" }}>
+        <div className="client-tournament-manage__infoHead">
+          <div className="client-tournament-manage__infoText">
+            <h1 className="client-tournament-manage__infoTitle">{infoCard.title}</h1>
+            <p className="client-tournament-manage__infoMeta">
+              {infoCard.scheduleLine ? (
+                <>대회일: {infoCard.scheduleLine}</>
+              ) : (
+                <span className="v3-muted">대회일: —</span>
+              )}
+              {" · "}
+              강수(부): <strong>{infoCard.divisionLabel}</strong>
+              {" · "}
+              모집인원: <strong>{infoCard.maxParticipants}명</strong>
+            </p>
+            <p className="client-tournament-manage__infoSub">
+              참가신청 <strong>{infoCard.applicationTotal}</strong>건 / 모집 {infoCard.maxParticipants}명
+            </p>
+          </div>
+        </div>
+        <div className="client-tournament-manage__infoBadgeActions">
+          <div className="client-tournament-manage__infoPill">{pill}</div>
+          <div className="client-tournament-manage__badgeToggleRow">
+            <button type="button" className="v3-btn" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
+              상태배지 변경
+            </button>
+          </div>
+        </div>
+        {expandedPanel}
+      </div>
+    );
+  }
+
   return (
     <div
       id="tournament-status-badge"
       className="v3-stack"
       style={{ scrollMarginTop: "4.5rem", alignItems: "flex-end", flex: "0 1 auto", minWidth: "min(100%, 22rem)", gap: "0.35rem" }}
     >
-      <span
-        style={{
-          ...badgePillStyle,
-          fontSize: "0.78rem",
-          fontWeight: 800,
-          padding: "0.2rem 0.55rem",
-          borderRadius: "999px",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {value}
-      </span>
+      {pill}
       <button
         type="button"
         className="v3-btn"
@@ -263,56 +357,7 @@ export default function TournamentBadgeCardManageRow({
       >
         상태배지 변경
       </button>
-      {expanded ? (
-        <div
-          className="v3-stack"
-          style={{
-            width: "100%",
-            maxWidth: "22rem",
-            alignItems: "stretch",
-            gap: "0.45rem",
-            padding: "0.5rem 0.55rem",
-            border: "1px solid #e5e7eb",
-            borderRadius: "0.4rem",
-            background: "#fff",
-            boxSizing: "border-box",
-          }}
-        >
-          <select
-            value={value}
-            disabled={publishBusy}
-            onChange={(e) => setValue(e.target.value as TournamentStatusBadge)}
-            style={{ padding: "0.45rem", border: "1px solid #bbb", borderRadius: "0.35rem", fontSize: "0.88rem" }}
-            aria-label="대회 상태 배지"
-          >
-            {OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
-          <p className="v3-muted" style={{ margin: 0, fontSize: "0.85rem", lineHeight: 1.45 }}>
-            이미 게시된 카드가 있으면 새로 만들지 않고 기존 카드에 반영됩니다. 대회당 메인 게시카드는 1개입니다.
-          </p>
-          <button
-            type="button"
-            className="v3-btn"
-            disabled={publishBusy}
-            onClick={() => void onSaveBadgeAndPublish()}
-            style={{ alignSelf: "flex-start" }}
-          >
-            {publishBusy ? "처리 중…" : "저장/게시"}
-          </button>
-          <Link
-            className="v3-btn"
-            href={`/client/tournaments/${tournamentId}/card-publish-v2`}
-            prefetch={false}
-            style={{ textAlign: "center", textDecoration: "none" }}
-          >
-            게시카드 작성·수정
-          </Link>
-        </div>
-      ) : null}
+      {expandedPanel}
     </div>
   );
 }

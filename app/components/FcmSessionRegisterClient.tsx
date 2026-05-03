@@ -9,6 +9,40 @@ type CaromWindow = Window & {
   __caromRegisterFcmToken?: (token: string, platform?: string) => Promise<void>;
 };
 
+const FCM_BOOT_DELAY_MS = 2500;
+const FCM_IDLE_TIMEOUT_MS = 1500;
+
+function scheduleDeferredRun(task: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  let cancelled = false;
+  let timeoutId: number | null = null;
+  let idleId: number | null = null;
+  const w = window as Window & {
+    requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
+    cancelIdleCallback?: (id: number) => void;
+  };
+  const runTask = () => {
+    if (cancelled) return;
+    task();
+  };
+
+  timeoutId = window.setTimeout(() => {
+    if (typeof w.requestIdleCallback === "function") {
+      idleId = w.requestIdleCallback(runTask, { timeout: FCM_IDLE_TIMEOUT_MS });
+      return;
+    }
+    runTask();
+  }, FCM_BOOT_DELAY_MS);
+
+  return () => {
+    cancelled = true;
+    if (timeoutId != null) window.clearTimeout(timeoutId);
+    if (idleId != null && typeof w.cancelIdleCallback === "function") {
+      w.cancelIdleCallback(idleId);
+    }
+  };
+}
+
 async function isAuthenticated(): Promise<boolean> {
   const data = await fetchAuthSessionCached();
   return data.authenticated === true;
@@ -86,6 +120,8 @@ async function resolveFirebaseWebToken(): Promise<{ token: string; platform: str
 /** 로그인 시 FCM 토큰을 `/api/site/fcm/register`로 전송. WebView: `caromNativeGetFcmToken` / `__caromRegisterFcmToken`. */
 export default function FcmSessionRegisterClient() {
   const busy = useRef(false);
+  const scheduledCancelRef = useRef<(() => void) | null>(null);
+  const externalTokenRef = useRef<{ token: string; platform: string } | null>(null);
   const pathname = usePathname();
 
   const run = useCallback(async () => {
@@ -93,6 +129,12 @@ export default function FcmSessionRegisterClient() {
     busy.current = true;
     try {
       if (!(await isAuthenticated())) return;
+      const queued = externalTokenRef.current;
+      if (queued) {
+        externalTokenRef.current = null;
+        await postRegister(queued.token, queued.platform);
+        return;
+      }
       const native = await resolveNativeToken();
       const web = native ? null : await resolveFirebaseWebToken();
       const pair = native ?? web;
@@ -103,15 +145,31 @@ export default function FcmSessionRegisterClient() {
     }
   }, []);
 
+  const scheduleRun = useCallback(() => {
+    if (scheduledCancelRef.current) {
+      scheduledCancelRef.current();
+      scheduledCancelRef.current = null;
+    }
+    scheduledCancelRef.current = scheduleDeferredRun(() => {
+      void run();
+    });
+  }, [run]);
+
   useEffect(() => {
-    void run();
-  }, [pathname, run]);
+    scheduleRun();
+    return () => {
+      if (scheduledCancelRef.current) {
+        scheduledCancelRef.current();
+        scheduledCancelRef.current = null;
+      }
+    };
+  }, [pathname, scheduleRun]);
 
   useEffect(() => {
     const onVis = () => {
-      if (document.visibilityState === "visible") void run();
+      if (document.visibilityState === "visible") scheduleRun();
     };
-    const onFocus = () => void run();
+    const onFocus = () => scheduleRun();
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("pageshow", onVis);
     window.addEventListener("focus", onFocus);
@@ -120,20 +178,23 @@ export default function FcmSessionRegisterClient() {
       window.removeEventListener("pageshow", onVis);
       window.removeEventListener("focus", onFocus);
     };
-  }, [run]);
+  }, [scheduleRun]);
 
   useEffect(() => {
     const w = window as CaromWindow;
     w.__caromRegisterFcmToken = async (token: string, platform = "android") => {
       const t = typeof token === "string" ? token.trim() : "";
       if (!t) return;
-      if (!(await isAuthenticated())) return;
-      await postRegister(t, typeof platform === "string" && platform.trim() ? platform.trim() : "android");
+      externalTokenRef.current = {
+        token: t,
+        platform: typeof platform === "string" && platform.trim() ? platform.trim() : "android",
+      };
+      scheduleRun();
     };
     return () => {
       delete w.__caromRegisterFcmToken;
     };
-  }, []);
+  }, [scheduleRun]);
 
   return null;
 }

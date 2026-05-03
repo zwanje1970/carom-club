@@ -19,7 +19,36 @@ export const runtime = "nodejs";
 
 export type { ClientDashboardSummaryJson, ClientDashboardSummaryTournament };
 
-async function getAuthorizedClientUserId(): Promise<string | null> {
+type DashboardSummaryBootstrapHint = {
+  userId?: unknown;
+  clientStatus?: unknown;
+  orgId?: unknown;
+  orgStatus?: unknown;
+};
+
+function normalizeBootstrapHint(raw: unknown): {
+  userId: string;
+  clientStatus: "APPROVED" | "PENDING" | "REJECTED" | "";
+  orgId: string;
+  orgStatus: "ACTIVE" | "SUSPENDED" | "EXPELLED" | "";
+} | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as DashboardSummaryBootstrapHint;
+  const userId = typeof obj.userId === "string" ? obj.userId.trim() : "";
+  if (!userId) return null;
+  const clientStatus =
+    obj.clientStatus === "APPROVED" || obj.clientStatus === "PENDING" || obj.clientStatus === "REJECTED"
+      ? obj.clientStatus
+      : "";
+  const orgStatus =
+    obj.orgStatus === "ACTIVE" || obj.orgStatus === "SUSPENDED" || obj.orgStatus === "EXPELLED"
+      ? obj.orgStatus
+      : "";
+  const orgId = typeof obj.orgId === "string" ? obj.orgId.trim() : "";
+  return { userId, clientStatus, orgId, orgStatus };
+}
+
+async function getAuthorizedClientUserId(hint: ReturnType<typeof normalizeBootstrapHint>): Promise<string | null> {
   const cookieStore = await cookies();
   const raw = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   const session = parseSessionCookieValue(raw);
@@ -28,18 +57,30 @@ async function getAuthorizedClientUserId(): Promise<string | null> {
   const user = await getUserById(session.userId);
   if (!user || user.role !== "CLIENT") return null;
   if (user.status === "SUSPENDED" || user.status === "DELETED") return null;
+  const uid = user.id.trim();
 
-  const clientStatus = await getClientStatusByUserId(user.id);
+  // layout에서 전달된 값이 세션 사용자와 일치하면 중복 guard 조회를 생략한다.
+  if (
+    hint &&
+    hint.userId === uid &&
+    hint.clientStatus === "APPROVED" &&
+    hint.orgStatus !== "SUSPENDED" &&
+    hint.orgStatus !== "EXPELLED"
+  ) {
+    return uid;
+  }
+
+  const clientStatus = await getClientStatusByUserId(uid);
   if (clientStatus !== "APPROVED") return null;
 
-  const orgGuard = await resolveClientOrganizationForDashboardPolicy(user.id);
+  const orgGuard = await resolveClientOrganizationForDashboardPolicy(uid);
   if (orgGuard?.status === "SUSPENDED" || orgGuard?.status === "EXPELLED") return null;
 
-  return user.id.trim();
+  return uid;
 }
 
-export async function GET() {
-  const userId = await getAuthorizedClientUserId();
+async function buildDashboardSummaryResponse(hint: ReturnType<typeof normalizeBootstrapHint>) {
+  const userId = await getAuthorizedClientUserId(hint);
   if (!userId) {
     return NextResponse.json({ ok: false as const, error: "인증이 필요합니다." }, { status: 401 });
   }
@@ -62,7 +103,7 @@ export async function GET() {
       /** 대표 대회 게시카드 활성 여부는 후속 경량 API에서 지연 확인 */
       hasPublishedActiveForSomeTournament: false,
       firstTournamentId,
-      recentTournaments: [] as ClientDashboardSummaryTournament[],
+      recentTournaments: rollupLight.recentTournamentsForSummary as ClientDashboardSummaryTournament[],
       autoParticipantPushEnabled: org?.autoParticipantPushEnabled !== false,
       policy: {
         annualMembershipVisible: policy.annualMembershipVisible,
@@ -79,4 +120,19 @@ export async function GET() {
       { status: 500 },
     );
   }
+}
+
+export async function GET() {
+  return buildDashboardSummaryResponse(null);
+}
+
+export async function POST(request: Request) {
+  let hint: ReturnType<typeof normalizeBootstrapHint> = null;
+  try {
+    const payload = (await request.json()) as unknown;
+    hint = normalizeBootstrapHint(payload);
+  } catch {
+    hint = null;
+  }
+  return buildDashboardSummaryResponse(hint);
 }

@@ -10,7 +10,7 @@ export default function ParticipantsToolbar({ tournamentId }: { tournamentId: st
       className="v3-row"
       style={{
         flexWrap: "wrap",
-        gap: "0.4rem",
+        gap: "0.3rem",
         alignItems: "center",
         marginTop: 0,
         touchAction: "manipulation",
@@ -22,8 +22,8 @@ export default function ParticipantsToolbar({ tournamentId }: { tournamentId: st
         href={printHref}
         className="v3-btn"
         style={{
-          padding: "0.45rem 0.75rem",
-          minHeight: 44,
+          padding: "0.32rem 0.6rem",
+          minHeight: 38,
           display: "inline-flex",
           alignItems: "center",
           fontWeight: 700,

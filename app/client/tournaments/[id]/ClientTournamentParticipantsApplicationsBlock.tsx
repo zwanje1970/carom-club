@@ -23,8 +23,8 @@ type Props = {
 };
 
 const participantApplicationsTableThBase: CSSProperties = {
-  padding: "0.25rem 0.3rem",
-  fontSize: "0.8rem",
+  padding: "0.18rem 0.28rem",
+  fontSize: "0.78rem",
   fontWeight: 800,
   whiteSpace: "nowrap",
   overflow: "hidden",
@@ -35,9 +35,13 @@ const participantApplicationsTableThBase: CSSProperties = {
 function filterLinkStyle(selected: ClientParticipantFilterKey, key: ClientParticipantFilterKey) {
   const on = selected === key;
   return {
-    padding: "0.45rem 0.65rem",
+    padding: "0.3rem 0.5rem",
+    minHeight: 38,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
     fontWeight: on ? 800 : 600,
-    fontSize: "0.88rem",
+    fontSize: "0.84rem",
     background: on ? "#dbeafe" : "#fff",
     borderColor: on ? "#2563eb" : "#d7d7d7",
     color: on ? "#1e3a8a" : "#374151",
@@ -161,23 +165,10 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   const base = filterBaseHref.replace(/\/$/, "");
 
   return (
-    <>
-      <div
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 25,
-          background: "#fff",
-          paddingBottom: "0.45rem",
-          marginBottom: "0.35rem",
-          borderBottom: "1px solid #e5e7eb",
-        }}
-      >
+    <div className="client-tournament-manage__participantsBlock">
+      <div className="client-tournament-manage__participantsSticky">
         <ParticipantsToolbar tournamentId={tournamentId} />
-        <div
-          className="v3-row"
-          style={{ flexWrap: "wrap", gap: "0.3rem", alignItems: "center", marginTop: "0.35rem" }}
-        >
+        <div className="client-tournament-manage__filterRow">
           <Link className="v3-btn" href={base} prefetch={false} style={filterLinkStyle(selected, "all")}>
             전체 ({counts.total})
           </Link>
@@ -193,26 +184,21 @@ export default function ClientTournamentParticipantsApplicationsBlock({
         </div>
       </div>
 
-      <section
-        style={{
-          border: "1px solid #e5e5e5",
-          borderRadius: "0.4rem",
-          overflow: "hidden",
-        }}
-      >
+      <section className="client-tournament-manage__participantTableShell">
         {sortedEntries.length === 0 ? (
-          <p className="v3-muted" style={{ margin: 0, padding: "1rem" }}>
+          <p className="v3-muted" style={{ margin: 0, padding: "0.65rem 0.75rem" }}>
             {participantCountSummary.total === 0 ? "저장된 참가신청이 없습니다." : "이 조건에 해당하는 참가자가 없습니다."}
           </p>
         ) : (
           <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
             <table
+              className="client-tournament-manage__participantTable"
               style={{
                 width: "100%",
                 minWidth: "34rem",
                 borderCollapse: "collapse",
                 tableLayout: "fixed",
-                fontSize: "0.86rem",
+                fontSize: "0.84rem",
               }}
             >
               <thead>
@@ -313,6 +299,6 @@ export default function ClientTournamentParticipantsApplicationsBlock({
           </p>
         ) : null}
       </section>
-    </>
+    </div>
   );
 }

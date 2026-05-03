@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { resolveCanonicalUserIdForAuth } from "../../../../lib/auth/resolve-canonical-user-id-for-auth";
@@ -12,6 +11,8 @@ import { formatTournamentScheduleLabel } from "../../../../lib/tournament-schedu
 import ClientTournamentParticipantsApplicationsBlock from "./ClientTournamentParticipantsApplicationsBlock";
 import { parseClientParticipantFilter } from "./client-participant-filter-shared";
 import TournamentBadgeCardManageRow from "./TournamentBadgeCardManageRow";
+import TournamentManageFeatureCards from "./TournamentManageFeatureCards";
+import "./tournament-manage-ui.css";
 
 export const dynamic = "force-dynamic";
 
@@ -56,104 +57,25 @@ export default async function ClientTournamentManagePage({
   const bracketEnabled = tournament.statusBadge === "마감";
 
   return (
-    <main className="v3-page v3-stack" style={{ gap: 0, paddingTop: 0 }}>
-      <header
-        style={{
-          paddingBottom: "0.55rem",
-          marginBottom: "0.45rem",
-          borderBottom: "1px solid #e5e5e5",
+    <main className="v3-page v3-stack client-tournament-manage">
+      <TournamentBadgeCardManageRow
+        tournamentId={id}
+        initialStatus={tournament.statusBadge}
+        infoCard={{
+          title: tournament.title,
+          scheduleLine: scheduleLine || null,
+          divisionLabel: divisionLineForSummary(tournament.rule),
+          maxParticipants: tournament.maxParticipants,
+          applicationTotal: participantCountSummary.total,
         }}
-      >
-        <div
-          className="v3-row"
-          style={{
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: "0.75rem",
-            flexWrap: "wrap",
-          }}
-        >
-          <div className="v3-stack" style={{ flex: "1 1 14rem", minWidth: 0, gap: 0 }}>
-            <h1
-              className="v3-h1"
-              style={{
-                margin: "0.5rem 0 0.25rem",
-                fontWeight: 800,
-                letterSpacing: "-0.02em",
-              }}
-            >
-              {tournament.title}
-            </h1>
-            <p style={{ margin: 0, fontSize: "0.92rem", color: "#374151" }}>
-              {scheduleLine ? <span>대회일: {scheduleLine}</span> : <span className="v3-muted">대회일: —</span>}
-            </p>
-            <p style={{ margin: "0.35rem 0 0", fontSize: "0.92rem", color: "#374151" }}>
-              강수(부): <strong>{divisionLineForSummary(tournament.rule)}</strong>
-              {" · "}
-              모집인원: <strong>{tournament.maxParticipants}명</strong>
-            </p>
-            <p className="v3-muted" style={{ margin: "0.35rem 0 0", fontSize: "0.88rem" }}>
-              참가신청 <strong>{participantCountSummary.total}</strong>건 / 모집 {tournament.maxParticipants}명
-            </p>
-          </div>
-          <TournamentBadgeCardManageRow tournamentId={id} initialStatus={tournament.statusBadge} />
-        </div>
-      </header>
+      />
 
-      <section style={{ marginBottom: "0.55rem" }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(10.5rem, 1fr))",
-            gap: "0.35rem",
-            alignItems: "stretch",
-          }}
-        >
-          <Link prefetch={false} className="v3-btn" href={`/client/tournaments/new?edit=${encodeURIComponent(id)}`} style={{ padding: "0.4rem 0.65rem", fontSize: "0.88rem" }}>
-            대회 정보 수정
-          </Link>
-          <Link prefetch={false} className="v3-btn" href={`/client/settlement/${encodeURIComponent(id)}`} style={{ padding: "0.4rem 0.65rem", fontSize: "0.88rem" }}>
-            정산 관리
-          </Link>
-          {bracketEnabled ? (
-            <Link
-              prefetch={false}
-              className="ui-btn-primary-solid"
-              href={`/client/tournaments/${id}/bracket`}
-              style={{
-                padding: "0.85rem 1.35rem",
-                fontSize: "1.05rem",
-                fontWeight: 700,
-                justifySelf: "start",
-                width: "fit-content",
-              }}
-            >
-              대진표 관리
-            </Link>
-          ) : (
-            <span
-              className="ui-btn-primary-solid"
-              aria-disabled
-              style={{
-                padding: "0.85rem 1.35rem",
-                fontSize: "1.05rem",
-                fontWeight: 700,
-                justifySelf: "start",
-                width: "fit-content",
-                opacity: 0.5,
-                cursor: "not-allowed",
-                pointerEvents: "none",
-                boxShadow: "none",
-              }}
-            >
-              대진표 관리
-            </span>
-          )}
-        </div>
+      <section className="client-tournament-manage__card">
+        <TournamentManageFeatureCards tournamentId={id} bracketEnabled={bracketEnabled} />
       </section>
 
-      <section className="v3-stack" style={{ gap: "0.5rem", marginBottom: "0.75rem" }}>
-        <h2 className="v3-h2" style={{ margin: 0, fontSize: "1.05rem", fontWeight: 800 }}>
+      <section className="client-tournament-manage__card client-tournament-manage__card--participants">
+        <h2 className="v3-h2 client-tournament-manage__participantsHeading">
           참가신청 현황
         </h2>
         <ClientTournamentParticipantsApplicationsBlock

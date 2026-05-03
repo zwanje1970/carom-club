@@ -65,7 +65,7 @@ export default function ParticipantAddSheet({ tournamentId }: { tournamentId: st
         type="button"
         className="v3-btn"
         onClick={() => setOpen(true)}
-        style={{ padding: "0.55rem 0.85rem", fontWeight: 700, fontSize: "0.92rem", WebkitTapHighlightColor: "transparent" }}
+        style={{ padding: "0.36rem 0.65rem", fontWeight: 700, fontSize: "0.86rem", WebkitTapHighlightColor: "transparent" }}
       >
         참가자 추가
       </button>

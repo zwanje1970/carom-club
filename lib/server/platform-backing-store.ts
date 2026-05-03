@@ -4960,6 +4960,7 @@ export function clientVenueIntroHasMeaningfulContent(intro: ClientVenueIntroStor
 export async function loadClientDashboardTournamentRollupLightForUser(userId: string): Promise<{
   hasAnyTournament: boolean;
   firstTournamentId: string;
+  recentTournamentsForSummary: ClientDashboardTournamentPreviewRow[];
 }> {
   if (isFirestoreUsersBackendConfigured()) {
     const mod = await import("./firestore-tournaments");
@@ -4971,8 +4972,12 @@ export async function loadClientDashboardTournamentRollupLightForUser(userId: st
     .filter((item) => item.createdBy === canonicalUserId)
     .filter((item) => isEntityLifecycleVisibleForList(item.status))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  if (filtered.length === 0) return { hasAnyTournament: false, firstTournamentId: "" };
-  return { hasAnyTournament: true, firstTournamentId: filtered[0]!.id };
+  if (filtered.length === 0) return { hasAnyTournament: false, firstTournamentId: "", recentTournamentsForSummary: [] };
+  return {
+    hasAnyTournament: true,
+    firstTournamentId: filtered[0]!.id,
+    recentTournamentsForSummary: [tournamentToClientDashboardPreview(filtered[0]!)],
+  };
 }
 
 export async function upsertClientVenueIntroForUser(
@@ -8230,6 +8235,7 @@ function revalidateSiteNoticeCache(): void {
 function revalidateMainSlideSnapshotsCache(): void {
   revalidateSiteDataTag(CACHE_TAG_MAIN_SLIDE_SNAPSHOTS);
   revalidateSiteDataTag(CACHE_TAG_SITE_PUBLIC_TOURNAMENTS_LIST);
+  scheduleMainSlideTournamentSnapshotsCompactRebuild();
 }
 
 function revalidateMainSlideAdsCache(): void {
@@ -9567,6 +9573,9 @@ export async function listPublishedCardSnapshots(): Promise<PublishedCardSnapsho
 
 /** 메인 홈 슬라이드에 넘길 토너먼트 게시 카드 최대 개수(슬라이드 예비 장면 포함) */
 const DEFAULT_MAIN_SITE_TOURNAMENT_SLIDE_LIMIT = 5;
+const MAIN_SLIDE_TOURNAMENT_SNAPSHOTS_COMPACT_KV_KEY = "mainSlideTournamentSnapshots" as const;
+
+let mainSlideTournamentSnapshotsCompactRebuildInFlight: Promise<void> | null = null;
 
 /**
  * 대시보드 등: 전체 `TournamentPublishedCard[]` 없이, 주어진 대회 ID 중
@@ -10177,12 +10186,119 @@ function sanitizePublishedCardSnapshotForMainSiteSlide(
   return next;
 }
 
+type MainSlideTournamentSnapshotsCompactReadStrategy = "firestore-kv" | "fallback-only";
+type MainSlideTournamentSnapshotsCompactWriteStrategy = "firestore-kv" | "fallback-only";
+
+function resolveMainSlideTournamentSnapshotsCompactReadStrategy(): MainSlideTournamentSnapshotsCompactReadStrategy {
+  const isDeploymentRuntime = process.env.NODE_ENV !== "development";
+  if (isDeploymentRuntime && isFirestoreUsersBackendConfigured()) return "firestore-kv";
+  return "fallback-only";
+}
+
+function resolveMainSlideTournamentSnapshotsCompactWriteStrategy(): MainSlideTournamentSnapshotsCompactWriteStrategy {
+  const isDeploymentRuntime = process.env.NODE_ENV !== "development";
+  if (isDeploymentRuntime && isFirestoreUsersBackendConfigured()) return "firestore-kv";
+  return "fallback-only";
+}
+
+function normalizeMainSlideTournamentSnapshotsCompactRow(row: unknown): PublishedCardSnapshot | null {
+  if (!row || typeof row !== "object") return null;
+  const s = row as Partial<PublishedCardSnapshot>;
+  const snapshotId = typeof s.snapshotId === "string" ? s.snapshotId.trim() : "";
+  const tournamentId = typeof s.tournamentId === "string" ? s.tournamentId.trim() : "";
+  const templateId = typeof s.templateId === "string" ? s.templateId : "";
+  const title = typeof s.title === "string" ? s.title : "";
+  const subtitle = typeof s.subtitle === "string" ? s.subtitle : "";
+  const imageId = typeof s.imageId === "string" ? s.imageId : "";
+  const image320Url = typeof s.image320Url === "string" ? s.image320Url : "";
+  const image640Url = typeof s.image640Url === "string" ? s.image640Url : "";
+  const textLayout = typeof s.textLayout === "string" ? s.textLayout : "";
+  const imageLayout = typeof s.imageLayout === "string" ? s.imageLayout : "";
+  const publishedAt = typeof s.publishedAt === "string" ? s.publishedAt : "";
+  const targetDetailUrl = typeof s.targetDetailUrl === "string" ? s.targetDetailUrl : "";
+  const publishedBy = typeof s.publishedBy === "string" ? s.publishedBy : "";
+  const updatedAt = typeof s.updatedAt === "string" ? s.updatedAt : "";
+  if (
+    !snapshotId ||
+    !tournamentId ||
+    !templateId ||
+    !title ||
+    !subtitle ||
+    !imageId ||
+    !image320Url ||
+    !image640Url ||
+    !textLayout ||
+    !imageLayout ||
+    !publishedAt ||
+    !targetDetailUrl ||
+    !publishedBy ||
+    !updatedAt
+  ) {
+    return null;
+  }
+  const sourceType = normalizeSnapshotSourceType({
+    ...(s as PublishedCardSnapshot),
+    snapshotId,
+    tournamentId,
+    templateId,
+    title,
+    subtitle,
+    imageId,
+    image320Url,
+    image640Url,
+    textLayout,
+    imageLayout,
+    publishedAt,
+    targetDetailUrl,
+  });
+  if (sourceType !== "TOURNAMENT_SNAPSHOT") return null;
+  return {
+    ...(s as PublishedCardSnapshot),
+    snapshotId,
+    tournamentId,
+    templateId,
+    title,
+    subtitle,
+    imageId,
+    image320Url,
+    image640Url,
+    textLayout,
+    imageLayout,
+    publishedAt,
+    targetDetailUrl,
+    publishedBy,
+    updatedAt,
+    snapshotSourceType: sourceType,
+  };
+}
+
+async function loadMainSlideTournamentSnapshotsCompactFromStorage(): Promise<PublishedCardSnapshot[] | null> {
+  const rs = resolveMainSlideTournamentSnapshotsCompactReadStrategy();
+  if (rs !== "firestore-kv") return null;
+  try {
+    const raw = await readPlatformKvJson(MAIN_SLIDE_TOURNAMENT_SNAPSHOTS_COMPACT_KV_KEY);
+    if (raw == null || !Array.isArray(raw)) return null;
+    const rows = raw
+      .map(normalizeMainSlideTournamentSnapshotsCompactRow)
+      .filter((x): x is PublishedCardSnapshot => x !== null);
+    return rows;
+  } catch {
+    return null;
+  }
+}
+
+async function saveMainSlideTournamentSnapshotsCompactToStorage(rows: PublishedCardSnapshot[]): Promise<void> {
+  const ws = resolveMainSlideTournamentSnapshotsCompactWriteStrategy();
+  if (ws !== "firestore-kv") return;
+  await upsertPlatformKvJson(MAIN_SLIDE_TOURNAMENT_SNAPSHOTS_COMPACT_KV_KEY, rows);
+}
+
 /**
  * 메인 홈 토너먼트 슬라이드 전용: `tournamentPublishedCards` 중 게시·활성·메인 노출 플래그가 켜진 카드만.
  * 레거시 `publishedCardSnapshots` 토너먼트 행은 사용하지 않는다(사이트에서 합성·재판단하지 않음).
  * 필터 → `updatedAt` 최신순 → 상위 limit건만 스냅샷으로 변환(전체 맵 후 자르기 없음).
  */
-export async function listTournamentSnapshotsForMainSite(options?: {
+async function buildTournamentSnapshotsForMainSiteFromSource(options?: {
   limit?: number;
 }): Promise<PublishedCardSnapshot[]> {
   const limitRaw = options?.limit;
@@ -10250,6 +10366,45 @@ export async function listTournamentSnapshotsForMainSite(options?: {
   }
   const proofById = await loadProofImageAssetsByIdForMainSurface();
   return rawSnapshots.map((snap) => sanitizePublishedCardSnapshotForMainSiteSlide(snap, proofById));
+}
+
+async function rebuildMainSlideTournamentSnapshotsCompactKvInternal(): Promise<void> {
+  const built = await buildTournamentSnapshotsForMainSiteFromSource({ limit: 50 });
+  await saveMainSlideTournamentSnapshotsCompactToStorage(built);
+}
+
+export function scheduleMainSlideTournamentSnapshotsCompactRebuild(): void {
+  if (mainSlideTournamentSnapshotsCompactRebuildInFlight) return;
+  mainSlideTournamentSnapshotsCompactRebuildInFlight = (async () => {
+    try {
+      await rebuildMainSlideTournamentSnapshotsCompactKvInternal();
+    } catch (e) {
+      console.warn("[main-slide-compact-kv] rebuild failed", e);
+    } finally {
+      mainSlideTournamentSnapshotsCompactRebuildInFlight = null;
+    }
+  })();
+}
+
+export async function listTournamentSnapshotsForMainSite(options?: {
+  limit?: number;
+}): Promise<PublishedCardSnapshot[]> {
+  const limitRaw = options?.limit;
+  const limit =
+    typeof limitRaw === "number" && Number.isFinite(limitRaw) && limitRaw > 0
+      ? Math.min(50, Math.floor(limitRaw))
+      : DEFAULT_MAIN_SITE_TOURNAMENT_SLIDE_LIMIT;
+
+  const compactRows = await loadMainSlideTournamentSnapshotsCompactFromStorage();
+  if (compactRows && compactRows.length > 0) {
+    return compactRows.slice(0, limit);
+  }
+
+  const fallbackRows = await buildTournamentSnapshotsForMainSiteFromSource({ limit });
+  if (!compactRows || compactRows.length === 0) {
+    scheduleMainSlideTournamentSnapshotsCompactRebuild();
+  }
+  return fallbackRows;
 }
 
 async function loadMainSlideAdsNormalizedForStorage(): Promise<MainSiteSlideAd[]> {

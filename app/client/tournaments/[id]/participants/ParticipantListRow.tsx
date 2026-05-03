@@ -44,8 +44,8 @@ const actionBtnBase: CSSProperties = {
 };
 
 const cellBase: CSSProperties = {
-  padding: "0.25rem 0.3rem",
-  fontSize: "0.86rem",
+  padding: "0.2rem 0.28rem",
+  fontSize: "0.84rem",
   verticalAlign: "middle",
   borderBottom: "1px solid #e8e8e8",
 };
@@ -175,7 +175,7 @@ export default function ParticipantListRow({
   function renderNameCellActions() {
     if (status === "WAITING_PAYMENT") {
       return (
-        <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "center", gap: "0.2rem", flexShrink: 0 }}>
+        <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "center", gap: "0.25rem", flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <button
             type="button"
             className="v3-btn"
@@ -254,51 +254,60 @@ export default function ParticipantListRow({
   const depositCell = formatDepositMd(status, statusChangedAt);
   const scoreCell = showEver ? String(participantAverage) : "—";
 
+  const detailBtnStyle: CSSProperties = {
+    padding: "0.2rem 0.45rem",
+    fontSize: "0.75rem",
+    fontWeight: 700,
+    textDecoration: "none",
+    flexShrink: 0,
+    touchAction: "manipulation",
+  };
+
   return (
     <tr style={{ background: "#fff" }}>
-      <td style={{ ...cellBase, whiteSpace: "nowrap", minWidth: 0 }}>
-        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "0.2rem", flexWrap: "nowrap", minWidth: 0 }}>
-          <span
-            style={{ fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}
-            title={metaLine || undefined}
-          >
-            {applicantName}
-          </span>
-          {registrationSource === "admin" ? (
-            <span
-              style={{
-                fontSize: "0.62rem",
-                fontWeight: 700,
-                padding: "0.04rem 0.25rem",
-                borderRadius: "0.2rem",
-                background: "#eef2ff",
-                color: "#3730a3",
-                border: "1px solid #c7d2fe",
-                flexShrink: 0,
-              }}
-            >
-              관리자 등록
-            </span>
-          ) : null}
-          <Link
-            prefetch={false}
-            href={detailHref}
-            className="v3-btn"
-            style={{
-              padding: "0.15rem 0.35rem",
-              fontSize: "0.68rem",
-              fontWeight: 700,
-              textDecoration: "none",
-              flexShrink: 0,
-              touchAction: "manipulation",
-            }}
-          >
-            상세
-          </Link>
-          {renderNameCellActions()}
+      <td data-participant-label="이름" style={{ ...cellBase, whiteSpace: "nowrap", minWidth: 0 }}>
+        <div className="client-tournament-manage__nameCell">
+          <div className="client-tournament-manage__nameRow1">
+            <div className="client-tournament-manage__nameLeft">
+              <span
+                style={{ fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}
+                title={metaLine || undefined}
+              >
+                {applicantName}
+              </span>
+              {registrationSource === "admin" ? (
+                <span
+                  style={{
+                    fontSize: "0.62rem",
+                    fontWeight: 700,
+                    padding: "0.04rem 0.25rem",
+                    borderRadius: "0.2rem",
+                    background: "#eef2ff",
+                    color: "#3730a3",
+                    border: "1px solid #c7d2fe",
+                    flexShrink: 0,
+                  }}
+                >
+                  관리자 등록
+                </span>
+              ) : null}
+            </div>
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "0.28rem", flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <div className="client-tournament-manage__nameStatus">{renderNameCellActions()}</div>
+              <Link prefetch={false} href={detailHref} className="v3-btn client-tournament-manage__detailDesktop" style={detailBtnStyle}>
+                상세
+              </Link>
+            </div>
+          </div>
+          <div className="client-tournament-manage__detailMobile">
+            <Link prefetch={false} href={detailHref} className="v3-btn" style={detailBtnStyle}>
+              상세
+            </Link>
+          </div>
         </div>
       </td>
       <td
+        data-participant-label="점수/에버"
         style={{
           ...cellBase,
           whiteSpace: "nowrap",
@@ -312,6 +321,7 @@ export default function ParticipantListRow({
         {scoreCell}
       </td>
       <td
+        data-participant-label="전화번호"
         style={{
           ...cellBase,
           whiteSpace: "nowrap",
@@ -324,6 +334,7 @@ export default function ParticipantListRow({
         {phone.trim() || "—"}
       </td>
       <td
+        data-participant-label="입금일"
         style={{
           ...cellBase,
           whiteSpace: "nowrap",
@@ -336,7 +347,7 @@ export default function ParticipantListRow({
       >
         {depositCell}
       </td>
-      <td style={{ ...cellBase, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", maxWidth: "2.85rem" }}>
+      <td data-participant-label="조" style={{ ...cellBase, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", maxWidth: "2.85rem" }}>
         <input
           type="number"
           min={1}
@@ -358,14 +369,14 @@ export default function ParticipantListRow({
           aria-label={`${applicantName} 조번호`}
         />
       </td>
-      <td style={{ ...cellBase, textAlign: "center", whiteSpace: "nowrap" }}>
+      <td data-participant-label="출석" style={{ ...cellBase, textAlign: "center", whiteSpace: "nowrap" }}>
         {status === "APPROVED" ? (
           <input
             type="checkbox"
             checked={attendanceChecked}
             disabled={attendancePending}
             onChange={(e) => void patchAttendance(e.target.checked)}
-            style={{ width: "1.05rem", height: "1.05rem", cursor: "pointer" }}
+            style={{ width: "1.15rem", height: "1.15rem", cursor: "pointer" }}
             aria-label={`${applicantName} 출석`}
           />
         ) : (

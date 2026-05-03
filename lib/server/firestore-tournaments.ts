@@ -71,6 +71,11 @@ export function revalidatePublicTournamentCache(tournamentId: string): void {
   revalidateSiteDataTag(cacheTagTournamentById(id));
   revalidateSiteDataTag(CACHE_TAG_SITE_PUBLIC_TOURNAMENTS_LIST);
   revalidateSiteDataTag(CACHE_TAG_MAIN_SLIDE_SNAPSHOTS);
+  void import("./platform-backing-store")
+    .then((mod) => {
+      mod.scheduleMainSlideTournamentSnapshotsCompactRebuild();
+    })
+    .catch(() => {});
 }
 
 async function rebuildPublicTournamentListSnapshotsSafe(): Promise<void> {
@@ -322,6 +327,10 @@ const DASHBOARD_TOURNAMENT_FIRST_VISIBLE_FIELDS = [
   "status",
   "isDeleted",
   "deletedAt",
+  "title",
+  "date",
+  "maxParticipants",
+  "statusBadge",
 ] as const;
 
 function parseDashboardTournamentCreatedAtMillis(value: unknown): number {
@@ -349,6 +358,7 @@ function parseDashboardTournamentCreatedAtMillis(value: unknown): number {
 export async function listClientDashboardTournamentFirstVisibleFirestore(userId: string): Promise<{
   hasAnyTournament: boolean;
   firstTournamentId: string;
+  recentTournamentsForSummary: ClientDashboardTournamentPreviewRow[];
 }> {
   assertClientFirestorePersistenceConfigured();
   const db = getSharedFirestoreDb();
@@ -366,7 +376,7 @@ export async function listClientDashboardTournamentFirstVisibleFirestore(userId:
         .select(...fsSelect);
       if (cursor) query = query.startAfter(cursor);
       const page = await query.get();
-      if (page.empty) return { hasAnyTournament: false, firstTournamentId: "" };
+      if (page.empty) return { hasAnyTournament: false, firstTournamentId: "", recentTournamentsForSummary: [] };
       for (const doc of page.docs) {
         const raw = doc.data() as Record<string, unknown> | undefined;
         if (
@@ -374,12 +384,25 @@ export async function listClientDashboardTournamentFirstVisibleFirestore(userId:
             legacyIsDeleted: raw?.isDeleted === true,
           })
         ) {
-          return { hasAnyTournament: true, firstTournamentId: doc.id };
+          const preview: ClientDashboardTournamentPreviewRow = {
+            id: doc.id,
+            title: typeof raw?.title === "string" ? raw.title : "",
+            statusBadge: normalizeTournamentStatusBadge(raw?.statusBadge),
+            date: typeof raw?.date === "string" ? raw.date : "",
+            maxParticipants: Number.isFinite(Number(raw?.maxParticipants))
+              ? Math.max(1, Math.floor(Number(raw?.maxParticipants)))
+              : 1,
+          };
+          return {
+            hasAnyTournament: true,
+            firstTournamentId: doc.id,
+            recentTournamentsForSummary: [preview],
+          };
         }
       }
       cursor = page.docs[page.docs.length - 1];
       if (!cursor || page.docs.length < DASHBOARD_TOURNAMENT_SCAN_LIMIT) {
-        return { hasAnyTournament: false, firstTournamentId: "" };
+        return { hasAnyTournament: false, firstTournamentId: "", recentTournamentsForSummary: [] };
       }
     }
   } catch (error) {
@@ -405,10 +428,23 @@ export async function listClientDashboardTournamentFirstVisibleFirestore(userId:
         legacyIsDeleted: raw?.isDeleted === true,
       })
     ) {
-      return { hasAnyTournament: true, firstTournamentId: doc.id };
+      const preview: ClientDashboardTournamentPreviewRow = {
+        id: doc.id,
+        title: typeof raw?.title === "string" ? raw.title : "",
+        statusBadge: normalizeTournamentStatusBadge(raw?.statusBadge),
+        date: typeof raw?.date === "string" ? raw.date : "",
+        maxParticipants: Number.isFinite(Number(raw?.maxParticipants))
+          ? Math.max(1, Math.floor(Number(raw?.maxParticipants)))
+          : 1,
+      };
+      return {
+        hasAnyTournament: true,
+        firstTournamentId: doc.id,
+        recentTournamentsForSummary: [preview],
+      };
     }
   }
-  return { hasAnyTournament: false, firstTournamentId: "" };
+  return { hasAnyTournament: false, firstTournamentId: "", recentTournamentsForSummary: [] };
 }
 
 export async function listAllTournamentsFirestore(): Promise<Tournament[]> {

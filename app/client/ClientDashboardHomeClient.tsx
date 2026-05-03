@@ -1,7 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, type SyntheticEvent } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type SyntheticEvent,
+} from "react";
 import ClientAutoParticipantPushToggle from "./ClientAutoParticipantPushToggle";
 import { AdminSurface } from "../components/admin/AdminCard";
 import type { ClientDashboardSummaryJson } from "./dashboard-summary-types";
@@ -21,13 +30,54 @@ type DashboardFetchResult =
   | { ok: true; data: ClientDashboardSummaryJson }
   | { ok: false; message: string };
 
+export type ClientDashboardSummaryBootstrap = {
+  userId: string;
+  clientStatus: "APPROVED" | "PENDING" | "REJECTED" | null;
+  orgId: string;
+  orgStatus: "ACTIVE" | "SUSPENDED" | "EXPELLED" | null;
+};
+
+const clientDashboardSummaryBootstrapContext = createContext<ClientDashboardSummaryBootstrap | null>(null);
+
+export function ClientDashboardSummaryBootstrapProvider({
+  value,
+  children,
+}: {
+  value: ClientDashboardSummaryBootstrap | null;
+  children: ReactNode;
+}) {
+  return (
+    <clientDashboardSummaryBootstrapContext.Provider value={value}>
+      {children}
+    </clientDashboardSummaryBootstrapContext.Provider>
+  );
+}
+
+export function useClientDashboardSummaryBootstrap(): ClientDashboardSummaryBootstrap | null {
+  return useContext(clientDashboardSummaryBootstrapContext);
+}
+
 type DashboardPublishedCardStatusResult =
   | { ok: true; hasPublishedActiveForSomeTournament: boolean }
   | { ok: false };
 
-async function fetchDashboardSummary(): Promise<DashboardFetchResult> {
+async function fetchDashboardSummary(
+  bootstrap: ClientDashboardSummaryBootstrap | null,
+): Promise<DashboardFetchResult> {
   try {
-    const res = await fetch("/api/client/dashboard-summary", { credentials: "same-origin" });
+    const res = await fetch("/api/client/dashboard-summary", {
+      method: bootstrap ? "POST" : "GET",
+      credentials: "same-origin",
+      headers: bootstrap ? { "Content-Type": "application/json" } : undefined,
+      body: bootstrap
+        ? JSON.stringify({
+            userId: bootstrap.userId,
+            clientStatus: bootstrap.clientStatus,
+            orgId: bootstrap.orgId,
+            orgStatus: bootstrap.orgStatus,
+          })
+        : undefined,
+    });
     const json = (await res.json()) as ClientDashboardSummaryJson | { ok: false; error?: string };
     if (!res.ok || !("ok" in json) || json.ok !== true) {
       const msg =
@@ -67,14 +117,22 @@ async function fetchDashboardPublishedCardStatus(
 }
 
 let dashboardSummaryInFlight: Promise<DashboardFetchResult> | null = null;
+let dashboardSummaryInFlightKey = "";
 
-function fetchDashboardSummaryCoalesced(): Promise<DashboardFetchResult> {
-  if (dashboardSummaryInFlight) return dashboardSummaryInFlight;
-  const p = fetchDashboardSummary();
+function fetchDashboardSummaryCoalesced(
+  bootstrap: ClientDashboardSummaryBootstrap | null,
+): Promise<DashboardFetchResult> {
+  const key = JSON.stringify(bootstrap ?? null);
+  if (dashboardSummaryInFlight && dashboardSummaryInFlightKey === key) return dashboardSummaryInFlight;
+  dashboardSummaryInFlightKey = key;
+  const p = fetchDashboardSummary(bootstrap);
   dashboardSummaryInFlight = p;
   void p.finally(() => {
     queueMicrotask(() => {
-      if (dashboardSummaryInFlight === p) dashboardSummaryInFlight = null;
+      if (dashboardSummaryInFlight === p) {
+        dashboardSummaryInFlight = null;
+        dashboardSummaryInFlightKey = "";
+      }
     });
   });
   return dashboardSummaryInFlight;
@@ -207,7 +265,11 @@ function DashboardSkeleton() {
   );
 }
 
-export default function ClientDashboardHomeClient() {
+export default function ClientDashboardHomeClient({
+  bootstrap,
+}: {
+  bootstrap?: ClientDashboardSummaryBootstrap | null;
+}) {
   const [state, setState] = useState<SummaryState>({ status: "loading" });
   const [publishedCardStatus, setPublishedCardStatus] = useState<{
     tournamentId: string;
@@ -233,7 +295,7 @@ export default function ClientDashboardHomeClient() {
       setState({ status: "ready", data: snapshot });
     }
     void (async () => {
-      const r = await fetchDashboardSummaryCoalesced();
+      const r = await fetchDashboardSummaryCoalesced(bootstrap ?? null);
       if (r.ok) {
         const cached = readClientDashboardSummaryCache();
         const merged =
@@ -251,7 +313,7 @@ export default function ClientDashboardHomeClient() {
         setState({ status: "error", message: r.message });
       }
     })();
-  }, []);
+  }, [bootstrap]);
 
   useEffect(() => {
     if (state.status !== "ready") return;
@@ -316,7 +378,7 @@ export default function ClientDashboardHomeClient() {
   const handleRetry = useCallback(() => {
     setState({ status: "loading" });
     void (async () => {
-      const r = await fetchDashboardSummaryCoalesced();
+      const r = await fetchDashboardSummaryCoalesced(bootstrap ?? null);
       if (r.ok) {
         const cached = readClientDashboardSummaryCache();
         const merged =
@@ -337,7 +399,7 @@ export default function ClientDashboardHomeClient() {
         }
       }
     })();
-  }, []);
+  }, [bootstrap]);
 
   if (state.status === "loading") {
     return <DashboardSkeleton />;
