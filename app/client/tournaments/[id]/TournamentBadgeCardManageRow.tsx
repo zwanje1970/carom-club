@@ -307,6 +307,8 @@ export default function TournamentBadgeCardManageRow({
   ) : null;
 
   if (infoCard) {
+    const doneHref = `/client/tournaments/new?done=${encodeURIComponent(tournamentId)}`;
+    const editHref = `/client/tournaments/new?edit=${encodeURIComponent(tournamentId)}`;
     return (
       <div id="tournament-status-badge" className="client-tournament-manage__card client-tournament-manage__card--info" style={{ scrollMarginTop: "4.5rem" }}>
         <div className="client-tournament-manage__infoHead">
@@ -330,6 +332,12 @@ export default function TournamentBadgeCardManageRow({
         </div>
         <div className="client-tournament-manage__infoBadgeActions">
           <div className="client-tournament-manage__infoPill">{pill}</div>
+          <Link prefetch={false} href={doneHref} className="v3-btn client-tournament-manage__topActionBtn">
+            확인
+          </Link>
+          <Link prefetch={false} href={editHref} className="v3-btn client-tournament-manage__topActionBtn">
+            수정하기
+          </Link>
           <div className="client-tournament-manage__badgeToggleRow">
             <button type="button" className="v3-btn" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
               상태배지 변경

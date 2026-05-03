@@ -2,13 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type CSSProperties, FormEvent, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type MouseEvent as ReactMouseEvent, FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import adminUi from "../../../components/admin/admin-card.module.css";
-import OutlineContentEditor from "../../../../components/shared/outline/OutlineContentEditor";
 import { isEmptyOutlineHtml } from "../../../../lib/outline-content-helpers";
 import type { OutlineDisplayMode } from "../../../../lib/outline-content-types";
-import { buildSiteVenueDetailPath, getSiteVenueById } from "../../../../lib/site-venues-catalog";
 import type { Tournament } from "../../../../lib/types/entities";
 import type {
   TournamentDivisionMetricType,
@@ -18,6 +16,9 @@ import type {
   TournamentTeamScoreRule,
   TournamentVerificationMode,
 } from "../../../../lib/tournament-rule-types";
+import SiteTournamentDetailSections from "../../../site/tournaments/[id]/site-tournament-detail-sections";
+
+import TournamentNewWizardForm from "./TournamentNewWizardForm";
 
 type DivisionRow = { name: string; min: string; max: string };
 const KO_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
@@ -139,14 +140,6 @@ function normalizePosterImageSrcForPreview(url: string): string {
   return trimmed;
 }
 
-const DEFAULT_VERIFICATION_GUIDE_TEXT = "에버리지 인증서, 또는 경기기록을 첨부하세요";
-
-const EQ_OPTIONS: { value: TournamentEntryQualificationType; label: string }[] = [
-  { value: "NONE", label: "관계없음" },
-  { value: "EVER", label: "에버기준" },
-  { value: "SCORE", label: "점수기준" },
-];
-
 const inputStyle: CSSProperties = {
   padding: "0.55rem",
   border: "1px solid #bbb",
@@ -237,14 +230,21 @@ export default function ClientTournamentNewPage() {
   const [message, setMessage] = useState("");
   /** 새 대회 생성 직후 안내(저장은 이미 완료된 상태) */
   const [createSuccessId, setCreateSuccessId] = useState<string | null>(null);
+  const [createDoneTournament, setCreateDoneTournament] = useState<Tournament | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  /** 대회 생성·수정 입력 단계(1~8). 저장 로직과 무관한 UI 상태 */
+  const [wizardStep, setWizardStep] = useState(1);
+  /** 신규 생성 시 증빙 정책(확인 함/안 함)을 한 번이라도 눌렀는지 — 제출 전 필수 */
+  const [step8PolicyAcknowledged, setStep8PolicyAcknowledged] = useState(false);
   /** 수정 모드: 불러온 직후 폼 스냅샷(JSON) — 변경 여부 비교용 */
   const editBaselineJsonRef = useRef<string | null>(null);
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const e = p.get("edit");
+    const d = p.get("done");
     setEditId(e && e.trim() ? e.trim() : null);
+    setCreateSuccessId(!e && d && d.trim() ? d.trim() : null);
   }, []);
 
   useEffect(() => {
@@ -282,6 +282,30 @@ export default function ClientTournamentNewPage() {
       cancelled = true;
     };
   }, [editId]);
+
+  useEffect(() => {
+    if (!createSuccessId) {
+      setCreateDoneTournament(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/client/tournaments/${encodeURIComponent(createSuccessId)}`, {
+          credentials: "same-origin",
+        });
+        const json = (await res.json()) as { tournament?: Tournament };
+        if (cancelled) return;
+        if (!res.ok || !json.tournament) return;
+        setCreateDoneTournament(json.tournament);
+      } catch {
+        /* noop */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [createSuccessId]);
 
   useEffect(() => {
     if (durationType !== "MULTI_DAY") return;
@@ -388,6 +412,7 @@ export default function ClientTournamentNewPage() {
         setVerificationRequested(r.verificationMode !== "NONE");
         setVerificationMode(r.verificationMode);
         setVerificationGuideText(r.verificationGuideText ?? "");
+        setStep8PolicyAcknowledged(true);
         setDivisionEnabled(false);
         setDivisionMetricType(r.divisionMetricType);
         if (r.divisionRulesJson?.length) {
@@ -464,6 +489,11 @@ export default function ClientTournamentNewPage() {
 
   useEffect(() => {
     editBaselineJsonRef.current = null;
+  }, [editId]);
+
+  useEffect(() => {
+    setWizardStep(1);
+    setStep8PolicyAcknowledged(false);
   }, [editId]);
 
   function serializeTournamentFormSnapshot(): string {
@@ -546,6 +576,7 @@ export default function ClientTournamentNewPage() {
   }, [posterObjectPreviewUrl, posterImageUrl, posterVisibleUsesServerUrl]);
 
   function isNewTournamentFormPristine(): boolean {
+    if (wizardStep !== 1) return false;
     if (title.trim() !== "") return false;
     if (date !== "") return false;
     if (buildLocationFromLines(locLine1, locLine2, locLine3).trim() !== "") return false;
@@ -593,6 +624,7 @@ export default function ClientTournamentNewPage() {
       return false;
     }
     if (extraVenues.length > 0) return false;
+    if (step8PolicyAcknowledged) return false;
     return true;
   }
 
@@ -626,6 +658,62 @@ export default function ClientTournamentNewPage() {
     if (prize3b.trim()) parts.push(`3위: ${prize3b.trim()}`);
     if (prizeExtra.trim()) parts.push(prizeExtra.trim());
     return parts.length ? parts.join("\n") : null;
+  }
+
+  type WizardValidateFail = { ok: false; step: number; message: string; focusId: string };
+  type WizardValidateOk = { ok: true };
+
+  function validateWizardBeforeSave(): WizardValidateOk | WizardValidateFail {
+    if (!title.trim()) {
+      return { ok: false, step: 1, message: "대회명을 입력해 주세요.", focusId: "wiz-title" };
+    }
+    const maxN = Number(maxParticipants);
+    if (!Number.isFinite(maxN) || maxN < 1) {
+      return { ok: false, step: 2, message: "모집 인원을 올바르게 입력해 주세요.", focusId: "wiz-max" };
+    }
+    if (entryQualificationType !== "NONE") {
+      const qParsed = Number.parseFloat(qualificationValue.replace(",", "."));
+      if (!Number.isFinite(qParsed)) {
+        return { ok: false, step: 3, message: "참가 자격에 맞는 점수 또는 에버를 입력해 주세요.", focusId: "wiz-qual" };
+      }
+    }
+    if (!date.trim()) {
+      return { ok: false, step: 4, message: "대회 날짜를 선택해 주세요.", focusId: "wiz-date" };
+    }
+    if (durationType === "MULTI_DAY") {
+      const first = date.trim();
+      const all = [first, ...extraDays.map((d) => d.trim())];
+      if (all.length !== durationDays || all.some((d) => !d)) {
+        const missingExtraIdx = all.slice(1).findIndex((d) => !d);
+        return {
+          ok: false,
+          step: 4,
+          message: `대회 일정을 ${durationDays}일 모두 선택해 주세요.`,
+          focusId: missingExtraIdx >= 0 ? "wiz-extra-day-0" : "wiz-date",
+        };
+      }
+    }
+    if (!locLine1.trim()) {
+      return { ok: false, step: 4, message: "장소 상호를 입력해 주세요.", focusId: "wiz-loc1" };
+    }
+    const prize = buildPrizeInfo();
+    if (!prize?.trim()) {
+      return { ok: false, step: 6, message: "상금 정보를 입력해 주세요.", focusId: "wiz-prize1" };
+    }
+    const fee = Number(entryFee);
+    if (!Number.isFinite(fee) || fee < 0) {
+      return { ok: false, step: 7, message: "참가비를 올바르게 입력해 주세요.", focusId: "wiz-fee" };
+    }
+    if (!accountNumber.trim()) {
+      return { ok: false, step: 7, message: "입금 계좌 안내를 입력해 주세요.", focusId: "wiz-account" };
+    }
+    if (!step8PolicyAcknowledged) {
+      return { ok: false, step: 8, message: "증빙 확인 정책을 선택해 주세요.", focusId: "wiz-verify-policy" };
+    }
+    if (verificationRequested && verificationMode !== "MANUAL" && verificationMode !== "AUTO") {
+      return { ok: false, step: 8, message: "증빙 확인 방식을 선택해 주세요.", focusId: "wiz-verify-mode" };
+    }
+    return { ok: true };
   }
 
   async function handlePosterFileChange(fileList: FileList | null) {
@@ -701,6 +789,19 @@ export default function ClientTournamentNewPage() {
     event.preventDefault();
     if (loading) return;
 
+    const wizardCheck = validateWizardBeforeSave();
+    if (!wizardCheck.ok) {
+      setWizardStep(wizardCheck.step);
+      setMessage(wizardCheck.message);
+      setSaveState("idle");
+      window.setTimeout(() => {
+        const el = document.getElementById(wizardCheck.focusId);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        (el as HTMLElement | null)?.focus?.();
+      }, 0);
+      return;
+    }
+
     setLoading(true);
     setSaveState("saving");
     setMessage("");
@@ -720,14 +821,7 @@ export default function ClientTournamentNewPage() {
       let eventDatesPayload: string[] | undefined;
       if (durationType === "MULTI_DAY") {
         const first = date.trim();
-        const all = [first, ...extraDays.map((d) => d.trim())];
-        if (all.length !== durationDays || all.some((d) => !d)) {
-          setMessage(`대회 일정을 ${durationDays}일 모두 선택해 주세요.`);
-          setSaveState("error");
-          setLoading(false);
-          return;
-        }
-        eventDatesPayload = all;
+        eventDatesPayload = [first, ...extraDays.map((d) => d.trim())];
       } else {
         eventDatesPayload = date.trim() ? [date.trim()] : undefined;
       }
@@ -826,6 +920,17 @@ export default function ClientTournamentNewPage() {
 
   const showCreateDone = Boolean(createSuccessId && !editId);
 
+  const onCreateDoneDetailClickCapture = useCallback(
+    (e: ReactMouseEvent<HTMLDivElement>) => {
+      const target = e.target as HTMLElement | null;
+      const anchor = target?.closest?.("a.primary-button--block");
+      if (!anchor) return;
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    [],
+  );
+
   const posterNormalizedForDisplay =
     posterImageUrl.trim() !== "" ? normalizePosterImageSrcForPreview(posterImageUrl) : "";
   const posterImgSrc =
@@ -840,12 +945,23 @@ export default function ClientTournamentNewPage() {
           {showCreateDone ? "대회 생성 완료" : "대회 수정"}
         </h1>
       ) : null}
+      {showCreateDone && createDoneTournament ? (
+        <div onClickCapture={onCreateDoneDetailClickCapture}>
+          <SiteTournamentDetailSections
+            tournament={createDoneTournament}
+            audience="site"
+            detailLayout="site"
+            applyHref={`/site/tournaments/${createDoneTournament.id}/apply`}
+            listBackHref="/site/tournaments"
+          />
+        </div>
+      ) : null}
       <p className="v3-muted">
         {showCreateDone
           ? "대회 정보는 이미 저장되었습니다. 다음 단계는 선택입니다."
           : editId
             ? "기존 대회 정보를 불러왔습니다. 수정 후 저장하면 동일 대회에 반영됩니다."
-            : "아래 순서대로 입력합니다. 대회 생성 시 포스터·안내말·상금이 함께 저장됩니다."}
+            : "대회 생성은 8단계 순서로 진행합니다. 한 번에 하나의 단계만 펼쳐지며, 저장은 마지막 단계에서만 할 수 있습니다. 필수 항목이 비어 있으면 저장되지 않고 해당 단계로 이동합니다."}
       </p>
 
       {editId && editLoading ? (
@@ -875,785 +991,107 @@ export default function ClientTournamentNewPage() {
         </section>
       ) : (
         <>
-      <form className="v3-stack" style={sectionGap} onSubmit={handleSubmit}>
-        {/* 1. 대회포스터 이미지 */}
-        <section className={`${adminUi.surface} v3-stack`} aria-label="대회 포스터" style={{ gap: "0.7rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
-            1. 대회 포스터 이미지
-          </h2>
-          <input
-            ref={posterInputRef}
-            type="file"
-            accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-            className="hidden"
-            onChange={(e) => void handlePosterFileChange(e.target.files)}
-          />
-          {posterObjectPreviewUrl || posterImageUrl ? (
-            <div className="v3-stack" style={{ gap: "0.5rem", position: "relative" }}>
-              {posterImageUrl && posterObjectPreviewUrl && !posterVisibleUsesServerUrl ? (
-                <img
-                  key={posterImageUrl}
-                  src={posterNormalizedForDisplay || posterImageUrl}
-                  alt=""
-                  aria-hidden
-                  decoding="async"
-                  onLoad={() => {
-                    setPosterVisibleUsesServerUrl(true);
-                    setPosterObjectPreviewUrl("");
-                  }}
-                  onError={() => {
-                    if (process.env.NODE_ENV === "development") {
-                      // eslint-disable-next-line no-console -- 서버 이미지 로드 실패 점검
-                      console.warn("[poster] server image preload failed (blob 유지)", posterImageUrl);
-                    }
-                  }}
-                  style={{
-                    position: "absolute",
-                    left: "-9999px",
-                    width: "1px",
-                    height: "1px",
-                    opacity: 0,
-                    pointerEvents: "none",
-                    overflow: "hidden",
-                  }}
-                />
-              ) : null}
-              <img
-                src={posterImgSrc}
-                alt="대회 포스터 미리보기"
-                decoding="async"
-                style={{ maxWidth: "100%", maxHeight: "14rem", objectFit: "contain", borderRadius: "0.35rem" }}
-              />
-              <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  className="v3-btn"
-                  style={{ padding: "0.4rem 0.75rem" }}
-                  onClick={() => posterInputRef.current?.click()}
-                  disabled={posterUploading}
-                >
-                  {posterUploading ? "업로드 중…" : "이미지 바꾸기"}
-                </button>
-                <button
-                  type="button"
-                  className="v3-btn"
-                  style={{ padding: "0.4rem 0.75rem" }}
-                  onClick={() => {
-                    setPosterObjectPreviewUrl((prev) => {
-                      if (prev) URL.revokeObjectURL(prev);
-                      return "";
-                    });
-                    setPosterImageUrl("");
-                    setPosterVisibleUsesServerUrl(true);
-                    setPosterNotice("");
-                  }}
-                  disabled={posterUploading}
-                >
-                  제거
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="v3-muted"
-              onClick={() => posterInputRef.current?.click()}
-              disabled={posterUploading}
-              style={{
-                border: "1px dashed #aaa",
-                borderRadius: "0.4rem",
-                padding: "1.25rem",
-                textAlign: "center",
-                fontSize: "0.9rem",
-                width: "100%",
-                cursor: posterUploading ? "wait" : "pointer",
-                background: "transparent",
-              }}
-            >
-              {posterUploading ? "업로드 중…" : "클릭하여 포스터 이미지 선택 (jpg / jpeg / png / webp, 선택 사항)"}
-            </button>
-          )}
-          {posterNotice ? (
-            <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
-              {posterNotice}
-            </p>
-          ) : null}
-        </section>
-
-        {/* 2. 대회명 · 대회 설명 */}
-        <section className={`${adminUi.surface} v3-stack`} aria-label="대회명과 설명" style={{ gap: "0.7rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
-            2. 대회명 · 대회 설명
-          </h2>
-          <label className="v3-stack">
-            <span>대회명</span>
-            <input
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="예: 봄 정기전"
-              style={inputStyle}
-            />
-          </label>
-          <label className="v3-stack">
-            <span>대회 설명</span>
-            <textarea
-              rows={3}
-              value={tournamentIntro}
-              onChange={(e) => setTournamentIntro(e.target.value)}
-              placeholder="선택"
-              style={inputStyle}
-            />
-          </label>
-        </section>
-
-        {/* 3. 대회 종류: 일반 / 스카치 */}
-        <section className={`${adminUi.surface} v3-stack`} aria-label="대회 종류" style={{ gap: "0.7rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
-            3. 대회 종류
-          </h2>
-          <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap" }}>
-            <label className="v3-row" style={{ alignItems: "center", gap: "0.45rem" }}>
-              <input
-                type="radio"
-                name="gameKind"
-                checked={!isScotch}
-                onChange={() => setIsScotch(false)}
-              />
-              <span>일반</span>
-            </label>
-            <label className="v3-row" style={{ alignItems: "center", gap: "0.45rem" }}>
-              <input
-                type="radio"
-                name="gameKind"
-                checked={isScotch}
-                onChange={() => setIsScotch(true)}
-              />
-              <span>스카치</span>
-            </label>
-          </div>
-          {isScotch ? (
-            <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
-              스카치 시 합산 점수·에버는 「10. 참가 조건」에서 입력합니다.
-            </p>
-          ) : null}
-        </section>
-
-        {/* 4. 단일 / 전국 + 중복 참가 */}
-        <section className={`${adminUi.surface} v3-stack`} aria-label="대회 범위와 참가 운영" style={{ gap: "0.7rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
-            4. 대회 범위 · 중복 참가
-          </h2>
-          <div className="v3-row" style={{ gap: "1rem", flexWrap: "wrap", alignItems: "flex-end" }}>
-            <label className="v3-stack" style={{ flex: "1 1 12rem" }}>
-              <span>대회 범위</span>
-              <select
-                value={scope}
-                onChange={(e) => setScope(e.target.value as TournamentScope)}
-                style={inputStyle}
-              >
-                <option value="REGIONAL">단일대회(당구장대회)</option>
-                <option value="NATIONAL">권역대회(합동·전국대회)</option>
-              </select>
-            </label>
-          </div>
-          <div className="v3-row" style={{ gap: "1.25rem", flexWrap: "wrap" }}>
-            <label className="v3-row" style={{ alignItems: "center", gap: "0.5rem" }}>
-              <input
-                type="checkbox"
-                checked={allowMultipleSlots}
-                onChange={(e) => setAllowMultipleSlots(e.target.checked)}
-              />
-              <span>중복 참가 허용</span>
-            </label>
-            <label className="v3-row" style={{ alignItems: "center", gap: "0.5rem" }}>
-              <input
-                type="checkbox"
-                checked={participantsListPublic}
-                onChange={(e) => setParticipantsListPublic(e.target.checked)}
-              />
-              <span>참가자 명단 공개</span>
-            </label>
-          </div>
-        </section>
-
-        {/* 5. 모집 인원 */}
-        <section className={`${adminUi.surface} v3-stack`} aria-label="모집 인원" style={{ gap: "0.7rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
-            5. 모집 인원
-          </h2>
-          <label className="v3-stack" style={{ maxWidth: "12rem" }}>
-            <span>모집 인원</span>
-            <input
-              required
-              type="number"
-              min={1}
-              value={maxParticipants}
-              onChange={(e) => setMaxParticipants(e.target.value)}
-              style={inputStyle}
-            />
-          </label>
-        </section>
-
-        {/* 6. 참가비 + 입금 계좌 */}
-        <section className={`${adminUi.surface} v3-stack`} aria-label="참가비와 입금 계좌" style={{ gap: "0.7rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
-            6. 참가비 · 입금 계좌
-          </h2>
-          <div className="v3-row" style={{ gap: "1rem", flexWrap: "wrap" }}>
-            <label className="v3-stack" style={{ flex: "1 1 10rem" }}>
-              <span>참가비(원)</span>
-              <input
-                required
-                type="number"
-                min={0}
-                value={entryFee}
-                onChange={(e) => setEntryFee(e.target.value)}
-                style={inputStyle}
-              />
-            </label>
-            <label className="v3-stack" style={{ flex: "2 1 14rem" }}>
-              <span>입금 계좌 안내</span>
-              <input
-                value={accountNumber}
-                onChange={(e) => setAccountNumber(e.target.value)}
-                placeholder="은행 · 계좌 · 예금주"
-                style={inputStyle}
-              />
-            </label>
-          </div>
-        </section>
-
-        {/* 7. 상금 (자리만) */}
-        <section className={`${adminUi.surface} v3-stack`} aria-label="상금" style={{ gap: "0.7rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
-            7. 상금
-          </h2>
-          <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
-            여러 줄로 합쳐 저장됩니다. (1등 / 2등 / 3등 / 3등 / 기타)
-          </p>
-          <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap" }}>
-            <label className="v3-stack" style={{ flex: "1 1 8rem" }}>
-              <span>1등</span>
-              <div className="v3-row" style={{ alignItems: "center", gap: "0.4rem", width: "100%" }}>
-                <input
-                  value={prize1}
-                  onChange={(e) => setPrize1(prizeAmountDigitsOnly(e.target.value))}
-                  placeholder="상금 (만원 단위, 숫자만 입력)"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  style={{ ...inputStyle, flex: "1 1 0", minWidth: 0 }}
-                />
-                <span className="v3-muted" style={{ flexShrink: 0, fontSize: "0.9rem" }}>
-                  만원
-                </span>
-              </div>
-            </label>
-            <label className="v3-stack" style={{ flex: "1 1 8rem" }}>
-              <span>2등</span>
-              <div className="v3-row" style={{ alignItems: "center", gap: "0.4rem", width: "100%" }}>
-                <input
-                  value={prize2}
-                  onChange={(e) => setPrize2(prizeAmountDigitsOnly(e.target.value))}
-                  placeholder="상금 (만원 단위, 숫자만 입력)"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  style={{ ...inputStyle, flex: "1 1 0", minWidth: 0 }}
-                />
-                <span className="v3-muted" style={{ flexShrink: 0, fontSize: "0.9rem" }}>
-                  만원
-                </span>
-              </div>
-            </label>
-            <label className="v3-stack" style={{ flex: "1 1 8rem" }}>
-              <span>3등</span>
-              <div className="v3-row" style={{ alignItems: "center", gap: "0.4rem", width: "100%" }}>
-                <input
-                  value={prize3a}
-                  onChange={(e) => setPrize3a(prizeAmountDigitsOnly(e.target.value))}
-                  placeholder="상금 (만원 단위, 숫자만 입력)"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  style={{ ...inputStyle, flex: "1 1 0", minWidth: 0 }}
-                />
-                <span className="v3-muted" style={{ flexShrink: 0, fontSize: "0.9rem" }}>
-                  만원
-                </span>
-              </div>
-            </label>
-            <label className="v3-stack" style={{ flex: "1 1 8rem" }}>
-              <span>3등</span>
-              <div className="v3-row" style={{ alignItems: "center", gap: "0.4rem", width: "100%" }}>
-                <input
-                  value={prize3b}
-                  onChange={(e) => setPrize3b(prizeAmountDigitsOnly(e.target.value))}
-                  placeholder="상금 (만원 단위, 숫자만 입력)"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  style={{ ...inputStyle, flex: "1 1 0", minWidth: 0 }}
-                />
-                <span className="v3-muted" style={{ flexShrink: 0, fontSize: "0.9rem" }}>
-                  만원
-                </span>
-              </div>
-            </label>
-          </div>
-          <label className="v3-stack">
-            <span>기타</span>
-            <textarea
-              rows={2}
-              value={prizeExtra}
-              onChange={(e) => setPrizeExtra(e.target.value)}
-              placeholder="4위 이하, 특별상 등"
-              style={inputStyle}
-            />
-          </label>
-        </section>
-
-        {/* 8. 날짜 + 대회 기간 */}
-        <section className={`${adminUi.surface} v3-stack`} aria-label="날짜와 대회 기간" style={{ gap: "0.7rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
-            8. 날짜 · 대회 기간
-          </h2>
-          <div className="v3-row" style={{ gap: "1rem", flexWrap: "wrap", alignItems: "flex-end" }}>
-            <label className="v3-stack" style={{ flex: "1 1 11rem" }}>
-              <span>{durationType === "MULTI_DAY" ? "시작일 (1일차)" : "대회 날짜"}</span>
-              <input
-                required
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                style={inputStyle}
-              />
-              {date.trim() ? (
-                <p className="v3-muted" style={{ margin: "0.2rem 0 0", fontSize: "0.82rem" }}>
-                  {withWeekdayLabel(date)}
-                </p>
-              ) : null}
-            </label>
-            <label className="v3-stack" style={{ flex: "1 1 11rem" }}>
-              <span>대회 기간</span>
-              <select
-                value={durationType === "MULTI_DAY" ? `M:${durationDays}` : "1_DAY"}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (v === "1_DAY") {
-                    setDurationType("1_DAY");
-                  } else {
-                    setDurationType("MULTI_DAY");
-                    const n = Number(v.slice(2));
-                    if (Number.isFinite(n) && n >= 2 && n <= 10) setDurationDays(n);
-                  }
-                }}
-                style={inputStyle}
-              >
-                <option value="1_DAY">1일</option>
-                {Array.from({ length: 9 }, (_, i) => i + 2).map((n) => (
-                  <option key={n} value={`M:${n}`}>
-                    {n}일
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          {durationType === "MULTI_DAY" && durationDays > 1 ? (
-            <div className="v3-stack" style={{ gap: "0.5rem" }}>
-              {Array.from({ length: durationDays - 1 }, (_, idx) => (
-                <label key={idx} className="v3-stack" style={{ maxWidth: "14rem" }}>
-                  <span>{idx + 2}일차</span>
-                  <input
-                    required
-                    type="date"
-                    value={extraDays[idx] ?? ""}
-                    onChange={(e) => {
-                      const next = [...extraDays];
-                      next[idx] = e.target.value;
-                      setExtraDays(next);
-                    }}
-                    style={inputStyle}
-                  />
-                  {(extraDays[idx] ?? "").trim() ? (
-                    <p className="v3-muted" style={{ margin: "0.2rem 0 0", fontSize: "0.82rem" }}>
-                      {withWeekdayLabel(extraDays[idx] ?? "")}
-                    </p>
-                  ) : null}
-                </label>
-              ))}
-            </div>
-          ) : null}
-        </section>
-
-        {/* 9. 대회 장소 */}
-        <section className={`${adminUi.surface} v3-stack`} aria-label="대회 장소" style={{ gap: "0.7rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
-            9. 대회 장소
-          </h2>
-          <p className="v3-muted" style={{ fontSize: "0.82rem", margin: 0 }}>
-            상호를 입력하면 등록된 당구장을 검색할 수 있습니다. 목록에서 선택하면 상호·주소·전화가 줄 단위로 채워집니다. 직접 수정할 수 있습니다.
-          </p>
-          <div ref={venueSearchWrapRef} className="v3-stack" style={{ gap: "0.35rem", position: "relative" }}>
-            <label className="v3-stack">
-              <span>상호</span>
-              <input
-                required
-                value={locLine1}
-                onChange={(e) => {
-                  setLocLine1(e.target.value);
-                  setPickedVenueGuideId(null);
-                  setVenueSearchOpen(true);
-                }}
-                onFocus={() => setVenueSearchOpen(true)}
-                placeholder="등록 당구장 검색 또는 직접 입력"
-                autoComplete="off"
-                style={inputStyle}
-              />
-            </label>
-            {venueSearchOpen && venueSearchResults.length > 0 ? (
-              <ul
-                role="listbox"
-                style={{
-                  position: "absolute",
-                  top: "100%",
-                  left: 0,
-                  right: 0,
-                  zIndex: 20,
-                  margin: "0.2rem 0 0",
-                  padding: "0.35rem 0",
-                  listStyle: "none",
-                  maxHeight: "12rem",
-                  overflow: "auto",
-                  background: "#fff",
-                  border: "1px solid #bbb",
-                  borderRadius: "0.4rem",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                }}
-              >
-                {venueSearchResults.map((v) => (
-                  <li key={v.venueId}>
-                    <button
-                      type="button"
-                      role="option"
-                      className="v3-btn"
-                      style={{
-                        width: "100%",
-                        textAlign: "left",
-                        padding: "0.45rem 0.65rem",
-                        background: "transparent",
-                        border: "none",
-                        borderRadius: 0,
-                        fontWeight: 500,
-                        cursor: "pointer",
-                      }}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        setLocLine1(v.name);
-                        setLocLine2(v.addressLine);
-                        setLocLine3(v.phone ?? "");
-                        setPickedVenueGuideId(v.venueId);
-                        setVenueSearchOpen(false);
-                      }}
-                    >
-                      {v.name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-          <label className="v3-stack">
-            <span>주소 (상세주소 포함)</span>
-            <input
-              value={locLine2}
-              onChange={(e) => {
-                setLocLine2(e.target.value);
-                setPickedVenueGuideId(null);
-              }}
-              placeholder="도로명 · 건물 동·층 등"
-              style={inputStyle}
-            />
-          </label>
-          <label className="v3-stack">
-            <span>전화번호</span>
-            <input
-              value={locLine3}
-              onChange={(e) => {
-                setLocLine3(e.target.value);
-                setPickedVenueGuideId(null);
-              }}
-              placeholder="전화번호"
-              style={inputStyle}
-            />
-          </label>
-          <button
-            type="button"
-            className="v3-btn"
-            style={{ alignSelf: "flex-start", padding: "0.4rem 0.75rem" }}
-            onClick={() =>
-              setExtraVenues((rows) => [...rows, { address: "", name: "", phone: "" }])
-            }
-          >
-            대회장 추가
-          </button>
-          {extraVenues.map((row, idx) => (
-            <div
-              key={idx}
-              className="v3-stack"
-              style={{ gap: "0.4rem", borderTop: "1px solid #e2e8f0", paddingTop: "0.65rem" }}
-            >
-              <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>추가 대회장 {idx + 1}</span>
-              <label className="v3-stack">
-                <span>주소</span>
-                <input
-                  value={row.address}
-                  onChange={(e) => {
-                    const next = [...extraVenues];
-                    next[idx] = { ...next[idx]!, address: e.target.value };
-                    setExtraVenues(next);
-                  }}
-                  style={inputStyle}
-                />
-              </label>
-              <label className="v3-stack">
-                <span>당구장명</span>
-                <input
-                  value={row.name}
-                  onChange={(e) => {
-                    const next = [...extraVenues];
-                    next[idx] = { ...next[idx]!, name: e.target.value };
-                    setExtraVenues(next);
-                  }}
-                  style={inputStyle}
-                />
-              </label>
-              <label className="v3-stack">
-                <span>전화번호</span>
-                <input
-                  value={row.phone}
-                  onChange={(e) => {
-                    const next = [...extraVenues];
-                    next[idx] = { ...next[idx]!, phone: e.target.value };
-                    setExtraVenues(next);
-                  }}
-                  style={inputStyle}
-                />
-              </label>
-              <button
-                type="button"
-                className="v3-btn"
-                style={{ alignSelf: "flex-start", padding: "0.35rem 0.6rem" }}
-                onClick={() => setExtraVenues((r) => r.filter((_, i) => i !== idx))}
-              >
-                삭제
-              </button>
-            </div>
-          ))}
-        </section>
-
-        {/* 10. 참가 조건 (자격 + 증빙) */}
-        <section className={`${adminUi.surface} v3-stack`} aria-label="참가 조건" style={{ gap: "0.7rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
-            10. 참가 조건
-          </h2>
-          <div className="v3-stack" style={{ gap: "0.35rem" }}>
-            <span className="v3-muted" style={{ fontSize: "0.85rem" }}>
-              참가 자격
-            </span>
-            <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap" }}>
-              {EQ_OPTIONS.map((o) => (
-                <label key={o.value} className="v3-row" style={{ alignItems: "center", gap: "0.45rem" }}>
-                  <input
-                    type="radio"
-                    name="entryQualificationType"
-                    checked={entryQualificationType === o.value}
-                    onChange={() => setEntryQualificationType(o.value)}
-                  />
-                  <span>{o.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-end" }}>
-            <label className="v3-stack" style={{ flex: "1 1 14rem" }}>
-              <span>점수 또는 에버(스카치 접수시 합산점수 입력)</span>
-              <input
-                inputMode="decimal"
-                disabled={entryQualificationType === "NONE"}
-                value={qualificationValue}
-                onChange={(e) => setQualificationValue(e.target.value)}
-                placeholder={
-                  entryQualificationType === "NONE" ? "—" : "0.80 of 27 형식으로 숫자만 입력하세요"
-                }
-                style={{
-                  ...inputStyle,
-                  opacity: entryQualificationType === "NONE" ? 0.5 : 1,
-                }}
-              />
-            </label>
-            <div className="v3-stack" style={{ gap: "0.35rem" }} role="group" aria-label="에버·점수 이하 또는 미만">
-              <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap" }}>
-                <label className="v3-row" style={{ alignItems: "center", gap: "0.45rem" }}>
-                  <input
-                    type="radio"
-                    name="eligibilityCompare"
-                    checked={eligibilityCompare === "LTE"}
-                    disabled={entryQualificationType === "NONE"}
-                    onChange={() => setEligibilityCompare("LTE")}
-                  />
-                  <span style={{ opacity: entryQualificationType === "NONE" ? 0.5 : 1 }}>이하</span>
-                </label>
-                <label className="v3-row" style={{ alignItems: "center", gap: "0.45rem" }}>
-                  <input
-                    type="radio"
-                    name="eligibilityCompare"
-                    checked={eligibilityCompare === "LT"}
-                    disabled={entryQualificationType === "NONE"}
-                    onChange={() => setEligibilityCompare("LT")}
-                  />
-                  <span style={{ opacity: entryQualificationType === "NONE" ? 0.5 : 1 }}>미만</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <label className="v3-row" style={{ alignItems: "center", gap: "0.5rem" }}>
-            <input
-              type="checkbox"
-              checked={verificationRequested}
-              onChange={(e) => {
-                const on = e.target.checked;
-                setVerificationRequested(on);
-                if (!on) {
-                  setVerificationMode("NONE");
-                } else {
-                  setVerificationMode((m) => (m === "NONE" ? "AUTO" : m));
-                  setVerificationGuideText((t) =>
-                    t.trim() === "" ? DEFAULT_VERIFICATION_GUIDE_TEXT : t
-                  );
-                }
-              }}
-            />
-            <span>증빙 요청</span>
-          </label>
-          {verificationRequested ? (
-            <div className="v3-stack" style={{ gap: "0.7rem" }}>
-              <label className="v3-stack" style={{ maxWidth: "14rem" }}>
-                <span>방식</span>
-                <select
-                  value={verificationMode === "MANUAL" ? "MANUAL" : "AUTO"}
-                  onChange={(e) => setVerificationMode(e.target.value as TournamentVerificationMode)}
-                  style={inputStyle}
-                >
-                  <option value="AUTO">자동(OCR)</option>
-                  <option value="MANUAL">수동확인</option>
-                </select>
-              </label>
-              <textarea
-                rows={3}
-                aria-label="증빙 안내 문구"
-                value={verificationGuideText}
-                onChange={(e) => setVerificationGuideText(e.target.value)}
-                placeholder={DEFAULT_VERIFICATION_GUIDE_TEXT}
-                style={inputStyle}
-              />
-            </div>
-          ) : null}
-        </section>
-
-        {/* 11. 대회요강 / 대회장소 CTA */}
-        <section className={`${adminUi.surface} v3-stack`} aria-label="대회요강 및 장소 안내" style={{ gap: "0.7rem" }}>
-          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
-            11. 대회요강 · 대회 장소 안내
-          </h2>
-          <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
-            대회요강은 선택 사항입니다. 표시 방식을 바꿔도 직접 입력 내용은 유지됩니다.
-          </p>
-          <OutlineContentEditor
-            heading="대회요강"
-            displayMode={outlineDisplayMode}
-            onDisplayModeChange={setOutlineDisplayMode}
-            outlineHtml={outlineHtml}
-            onOutlineHtmlChange={setOutlineHtml}
-            outlineImageUrl={outlineImageUrl}
-            onOutlineImageUrlChange={setOutlineImageUrl}
-            outlinePdfUrl={outlinePdfUrl}
-            onOutlinePdfUrlChange={setOutlinePdfUrl}
-            compact={outlineEditorCompact}
-            imageUploadSitePublic
-          />
-          <div className="v3-stack" style={{ gap: "0.5rem", borderTop: "1px solid #e2e8f0", paddingTop: "0.75rem" }}>
-            <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>대회 장소 안내 (당구장 페이지)</span>
-            <p className="v3-muted" style={{ fontSize: "0.82rem", margin: 0 }}>
-              위 <strong>장소</strong> 문구와 별도로, 계정에 등록된 소속 당구장 안내 페이지로만 연결할 수 있습니다.
-            </p>
-            {creatorVenueId ? (
-              <>
-                <label className="v3-stack" style={{ gap: "0.35rem", maxWidth: "28rem" }}>
-                  <span>CTA 연결</span>
-                  <select
-                    value={venueCtaMode}
-                    onChange={(e) => setVenueCtaMode(e.target.value as "creator" | "none")}
-                    style={inputStyle}
-                  >
-                    <option value="creator">
-                      내 당구장 ({getSiteVenueById(creatorVenueId)?.name ?? creatorVenueId})
-                    </option>
-                    <option value="none">선택 없음</option>
-                  </select>
-                </label>
-                {venueCtaMode === "creator" ? (
-                  <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
-                    <Link
-                      className="v3-btn"
-                      href={buildSiteVenueDetailPath(creatorVenueId)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ padding: "0.45rem 0.85rem" }}
-                    >
-                      당구장 안내 페이지 미리보기
-                    </Link>
-                    <span className="v3-muted" style={{ fontSize: "0.8rem" }}>
-                      {buildSiteVenueDetailPath(creatorVenueId)}
-                    </span>
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
-                계정에 등록된 소속 당구장이 없어 CTA를 연결할 수 없습니다. (선택 없음으로 저장됩니다.)
-              </p>
-            )}
-          </div>
-        </section>
-
-        <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "center", marginTop: "0.25rem" }}>
-          <button
-            type="submit"
-            className="v3-btn"
-            disabled={loading || (Boolean(editId) && editLoading)}
-            style={{ padding: "0.75rem 1rem" }}
-          >
-            {loading ? (editId ? "저장 중…" : "생성 중…") : editId ? "변경 저장" : "대회 생성"}
-          </button>
-          {saveState !== "idle" ? (
-            <span
-              className="v3-muted"
-              style={{ color: saveState === "success" ? "#15803d" : saveState === "error" ? "#b91c1c" : "#6b7280" }}
-            >
-              {saveState === "success" ? "저장성공" : saveState === "error" ? "저장실패" : "저장중"}
-            </span>
-          ) : null}
-          <button
-            type="button"
-            className="v3-btn"
-            disabled={loading || (Boolean(editId) && editLoading)}
-            style={{ padding: "0.75rem 1rem", background: "#fff", border: "1px solid #bbb" }}
-            onClick={handleCancelClick}
-          >
-            취소
-          </button>
-        </div>
-      </form>
+      <TournamentNewWizardForm
+        inputStyle={inputStyle}
+        sectionGap={sectionGap}
+        wizardStep={wizardStep}
+        setWizardStep={setWizardStep}
+        editId={editId}
+        editLoading={editLoading}
+        loading={loading}
+        saveState={saveState}
+        onSubmit={handleSubmit}
+        onCancelClick={handleCancelClick}
+        title={title}
+        setTitle={setTitle}
+        tournamentIntro={tournamentIntro}
+        setTournamentIntro={setTournamentIntro}
+        maxParticipants={maxParticipants}
+        setMaxParticipants={setMaxParticipants}
+        isScotch={isScotch}
+        setIsScotch={setIsScotch}
+        scope={scope}
+        setScope={setScope}
+        allowMultipleSlots={allowMultipleSlots}
+        setAllowMultipleSlots={setAllowMultipleSlots}
+        participantsListPublic={participantsListPublic}
+        setParticipantsListPublic={setParticipantsListPublic}
+        entryQualificationType={entryQualificationType}
+        setEntryQualificationType={setEntryQualificationType}
+        qualificationValue={qualificationValue}
+        setQualificationValue={setQualificationValue}
+        eligibilityCompare={eligibilityCompare}
+        setEligibilityCompare={setEligibilityCompare}
+        date={date}
+        setDate={setDate}
+        durationType={durationType}
+        setDurationType={setDurationType}
+        durationDays={durationDays}
+        setDurationDays={setDurationDays}
+        extraDays={extraDays}
+        setExtraDays={setExtraDays}
+        withWeekdayLabel={withWeekdayLabel}
+        locLine1={locLine1}
+        setLocLine1={setLocLine1}
+        locLine2={locLine2}
+        setLocLine2={setLocLine2}
+        locLine3={locLine3}
+        setLocLine3={setLocLine3}
+        venueSearchWrapRef={venueSearchWrapRef}
+        venueSearchOpen={venueSearchOpen}
+        setVenueSearchOpen={setVenueSearchOpen}
+        venueSearchResults={venueSearchResults}
+        setPickedVenueGuideId={setPickedVenueGuideId}
+        extraVenues={extraVenues}
+        setExtraVenues={setExtraVenues}
+        posterInputRef={posterInputRef}
+        posterObjectPreviewUrl={posterObjectPreviewUrl}
+        posterImageUrl={posterImageUrl}
+        posterVisibleUsesServerUrl={posterVisibleUsesServerUrl}
+        posterUploading={posterUploading}
+        posterNotice={posterNotice}
+        posterImgSrc={posterImgSrc}
+        posterNormalizedForDisplay={posterNormalizedForDisplay}
+        onPosterFileChange={handlePosterFileChange}
+        setPosterObjectPreviewUrl={setPosterObjectPreviewUrl}
+        setPosterImageUrl={setPosterImageUrl}
+        setPosterVisibleUsesServerUrl={setPosterVisibleUsesServerUrl}
+        setPosterNotice={setPosterNotice}
+        prize1={prize1}
+        setPrize1={setPrize1}
+        prize2={prize2}
+        setPrize2={setPrize2}
+        prize3a={prize3a}
+        setPrize3a={setPrize3a}
+        prize3b={prize3b}
+        setPrize3b={setPrize3b}
+        prizeExtra={prizeExtra}
+        setPrizeExtra={setPrizeExtra}
+        prizeAmountDigitsOnly={prizeAmountDigitsOnly}
+        entryFee={entryFee}
+        setEntryFee={setEntryFee}
+        accountNumber={accountNumber}
+        setAccountNumber={setAccountNumber}
+        verificationRequested={verificationRequested}
+        setVerificationRequested={setVerificationRequested}
+        verificationMode={verificationMode}
+        setVerificationMode={setVerificationMode}
+        verificationGuideText={verificationGuideText}
+        setVerificationGuideText={setVerificationGuideText}
+        outlineDisplayMode={outlineDisplayMode}
+        setOutlineDisplayMode={setOutlineDisplayMode}
+        outlineHtml={outlineHtml}
+        setOutlineHtml={setOutlineHtml}
+        outlineImageUrl={outlineImageUrl}
+        setOutlineImageUrl={setOutlineImageUrl}
+        outlinePdfUrl={outlinePdfUrl}
+        setOutlinePdfUrl={setOutlinePdfUrl}
+        outlineEditorCompact={outlineEditorCompact}
+        creatorVenueId={creatorVenueId}
+        venueCtaMode={venueCtaMode}
+        setVenueCtaMode={setVenueCtaMode}
+        onStep8PolicyInteract={() => setStep8PolicyAcknowledged(true)}
+      />
 
       {message ? <p className="v3-muted">{message}</p> : null}
 

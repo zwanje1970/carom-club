@@ -14,8 +14,9 @@ import {
   type TournamentCardTemplate,
   type TournamentCardTheme,
 } from "../../../../lib/platform-api";
-import { getTournamentByIdFirestore } from "../../../../lib/server/firestore-tournaments";
+import { getTournamentByIdFirestore, revalidatePublicTournamentCache } from "../../../../lib/server/firestore-tournaments";
 import { isTournamentPublishedCardsWritePersistenceBlockedError } from "../../../../lib/server/platform-tournament-published-cards-settings";
+import { reconcileTournamentPublishedCardsForTournamentId } from "../../../../lib/server/platform-backing-store";
 
 export const runtime = "nodejs";
 
@@ -268,6 +269,15 @@ export async function POST(request: Request) {
       { error: "error" in result ? result.error : "Request failed." },
       { status: 400 },
     );
+  }
+
+  if (!draftOnly) {
+    try {
+      await reconcileTournamentPublishedCardsForTournamentId(tournamentId);
+    } catch (e) {
+      console.warn("[api/client/card-snapshots] POST reconcile published cards failed", e);
+    }
+    revalidatePublicTournamentCache(tournamentId);
   }
 
   return NextResponse.json({ ok: true, snapshot: result.snapshot });

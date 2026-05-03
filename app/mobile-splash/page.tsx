@@ -1,15 +1,31 @@
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-import { isCaromClubMobileAppShell } from "../../lib/is-carom-club-mobile-app-shell";
-import MobileAppSplashClient from "./MobileAppSplashClient";
+"use client";
 
-export const dynamic = "force-dynamic";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-/** 앱 WebView 전용 내부 스플래시 — 일반 브라우저는 메인으로 보냄 */
-export default async function MobileSplashPage() {
-  const h = await headers();
-  if (!isCaromClubMobileAppShell(h)) {
-    redirect("/");
-  }
-  return <MobileAppSplashClient />;
+export default function MobileSplashPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      router.push("/site");
+    }, 3000);
+    return () => window.clearTimeout(t);
+  }, [router]);
+
+  return (
+    <div
+      style={{
+        width: "100%",
+        minHeight: "100vh",
+        backgroundColor: "#000",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        margin: 0,
+      }}
+    >
+      <img src="/splash.png" alt="splash" style={{ width: "45%" }} />
+    </div>
+  );
 }

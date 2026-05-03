@@ -86,6 +86,36 @@ function secondNonEmptyLine(raw: string | null | undefined): string {
   return "";
 }
 
+function formatPrizeValueWithManwon(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "";
+  if (/^\d+$/.test(t)) return `${t}만원`;
+  if (/만원$/.test(t)) return t;
+  return t;
+}
+
+function buildPrizeInfoSingleLine(raw: string | null | undefined): string {
+  if (!raw) return "";
+  const labels: Array<"우승" | "준우승" | "3위"> = ["우승", "준우승", "3위"];
+  const byLabel = new Map<string, string>();
+  for (const line of String(raw).split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const m = /^(우승|준우승|3위)\s*:\s*(.+)$/.exec(trimmed);
+    if (!m) continue;
+    const label = m[1] as "우승" | "준우승" | "3위";
+    const value = formatPrizeValueWithManwon(m[2] ?? "");
+    if (!value) continue;
+    if (!byLabel.has(label)) byLabel.set(label, value);
+  }
+  const out: string[] = [];
+  for (const label of labels) {
+    const value = byLabel.get(label);
+    if (value) out.push(`${label}: ${value}`);
+  }
+  return out.join(" ");
+}
+
 function isUsableSnapshotTitle(raw: string | null | undefined): boolean {
   const t = (raw ?? "").trim();
   return t.length > 0 && t !== "(제목)";
@@ -185,6 +215,13 @@ export default function ClientTournamentCardPublishV2Page() {
   const cardPublishCaptureForImageRef = useRef<HTMLDivElement>(null);
   /** 저장 중복 요청 차단 — ref로 동기 가드 */
   const saveInFlightRef = useRef(false);
+  const userEditedTextLine2Ref = useRef(false);
+  const prizeAutoSeededRef = useRef(false);
+
+  const handleTextLine2Change = useCallback((next: string) => {
+    userEditedTextLine2Ref.current = true;
+    setTextLine2(next);
+  }, []);
 
   const backgroundType = uploadedImage ? "image" : "theme";
 
@@ -294,6 +331,9 @@ export default function ClientTournamentCardPublishV2Page() {
       const summaryLine1 = firstNonEmptyLine(t.summary);
       const summaryLine2 = secondNonEmptyLine(t.summary);
       const prizeLine1 = firstNonEmptyLine(t.prizeInfo);
+      const prizeSingleLine = buildPrizeInfoSingleLine(t.prizeInfo);
+      const autoPrizeLine =
+        !prizeAutoSeededRef.current && !userEditedTextLine2Ref.current ? prizeSingleLine : "";
 
       const newest = result.snapshots?.[0];
       const active = result.activeSnapshot;
@@ -309,7 +349,13 @@ export default function ClientTournamentCardPublishV2Page() {
         const fromPick1 = pick.cardExtraLine1 ?? "";
         const fromPick2 = pick.cardExtraLine2 ?? "";
         setTextLine1(fromPick1 || summaryLine1);
-        setTextLine2(fromPick2 || prizeLine1 || summaryLine2);
+        if (!userEditedTextLine2Ref.current) {
+          const nextLine2 = fromPick2 || autoPrizeLine || prizeLine1 || summaryLine2;
+          setTextLine2(nextLine2);
+          if (!fromPick2 && autoPrizeLine) {
+            prizeAutoSeededRef.current = true;
+          }
+        }
         setCardTextShadowEnabled(pick.tournamentCardTextShadowEnabled === true);
         setCardSurfaceLayout(pick.tournamentCardSurfaceLayout === "full" ? "full" : "split");
         setFooterDateTextColor(
@@ -360,9 +406,14 @@ export default function ClientTournamentCardPublishV2Page() {
       } else {
         setTitle(t.title);
         const sum1 = summaryLine1.trim();
-        const sum2 = (prizeLine1 || summaryLine2).trim();
+        const sum2 = (autoPrizeLine || prizeLine1 || summaryLine2).trim();
         setTextLine1(sum1 || POSTCARD_TEMPLATE_APP_DEFAULTS.leadText);
-        setTextLine2(sum2 || POSTCARD_TEMPLATE_APP_DEFAULTS.descriptionText);
+        if (!userEditedTextLine2Ref.current) {
+          setTextLine2(sum2 || POSTCARD_TEMPLATE_APP_DEFAULTS.descriptionText);
+          if (autoPrizeLine) {
+            prizeAutoSeededRef.current = true;
+          }
+        }
         setLeadTextColor("");
         setTitleTextColor("");
         setDescriptionTextColor("");
@@ -390,6 +441,8 @@ export default function ClientTournamentCardPublishV2Page() {
 
   useEffect(() => {
     setSaveSucceeded(false);
+    userEditedTextLine2Ref.current = false;
+    prizeAutoSeededRef.current = false;
   }, [tournamentId]);
 
   useEffect(() => {
@@ -609,9 +662,7 @@ export default function ClientTournamentCardPublishV2Page() {
           noValidate
           onSubmit={(e) => {
             e.preventDefault();
-            saveCardDraft(
-              "카드 초안이 저장되었습니다. 아래 「상태설정으로 이동」에서 대회 상태를 맞춘 뒤 「저장/게시」로 메인에 반영해 주세요.",
-            );
+            saveCardDraft("카드 초안이 저장되었습니다.");
           }}
         >
           <div className={editorStyles.stepTabsWrap}>
@@ -656,7 +707,7 @@ export default function ClientTournamentCardPublishV2Page() {
               title={title}
               setTitle={setTitle}
               textLine2={textLine2}
-              setTextLine2={setTextLine2}
+              setTextLine2={handleTextLine2Change}
               cardDate={cardDate}
               setCardDate={setCardDate}
               cardPlace={cardPlace}
@@ -688,10 +739,15 @@ export default function ClientTournamentCardPublishV2Page() {
                   className="v3-btn"
                   href={`/client/tournaments/${encodeURIComponent(tournamentId)}#tournament-status-badge`}
                 >
-                  상태설정으로 이동
+                  상태배지 변경
                 </Link>
               ) : null}
             </div>
+            {saveSucceeded ? (
+              <p className="v3-muted" style={{ margin: 0 }}>
+                초안이 저장되었습니다. 게시하려면 모집중으로 변경하셔야 합니다.
+              </p>
+            ) : null}
           </div>
           </div>
           </div>

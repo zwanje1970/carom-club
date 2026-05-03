@@ -113,14 +113,9 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
-        val splashScreen = installSplashScreen()
+        installSplashScreen()
         super.onCreate(savedInstanceState)
-        splashPageReady.set(false)
-        splashMinEndElapsedRealtime = SystemClock.elapsedRealtime() + 2000L
-        splashScreen.setKeepOnScreenCondition {
-            val minElapsedOk = SystemClock.elapsedRealtime() >= splashMinEndElapsedRealtime
-            !(splashPageReady.get() && minElapsedOk)
-        }
+
         webView = WebView(this)
         setContentView(webView)
 
