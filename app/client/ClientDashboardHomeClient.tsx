@@ -209,9 +209,13 @@ function DashboardSkeleton() {
 
 export default function ClientDashboardHomeClient() {
   const [state, setState] = useState<SummaryState>({ status: "loading" });
+  const [publishedCardStatus, setPublishedCardStatus] = useState<{
+    tournamentId: string;
+    state: "idle" | "checking" | "resolved" | "failed";
+  }>({ tournamentId: "", state: "idle" });
   const extrasDetailsRef = useRef<HTMLDetailsElement>(null);
   const didStartInitialLoadRef = useRef(false);
-  const publishedCardStatusResolvedForRef = useRef<string>("");
+  const publishedCardStatusInFlightForRef = useRef<string>("");
 
   const onExtrasToggle = useCallback((e: SyntheticEvent<HTMLDetailsElement>) => {
     if (!e.currentTarget.open) return;
@@ -231,8 +235,16 @@ export default function ClientDashboardHomeClient() {
     void (async () => {
       const r = await fetchDashboardSummaryCoalesced();
       if (r.ok) {
-        persistClientDashboardSummaryCache(r.data);
-        setState({ status: "ready", data: r.data });
+        const cached = readClientDashboardSummaryCache();
+        const merged =
+          cached &&
+          cached.firstTournamentId.trim() === r.data.firstTournamentId.trim() &&
+          cached.hasPublishedActiveForSomeTournament === true &&
+          r.data.hasPublishedActiveForSomeTournament === false
+            ? { ...r.data, hasPublishedActiveForSomeTournament: true }
+            : r.data;
+        persistClientDashboardSummaryCache(merged);
+        setState({ status: "ready", data: merged });
       } else if (snapshot) {
         setState({ status: "ready", data: snapshot, refreshWarning: r.message });
       } else {
@@ -244,16 +256,36 @@ export default function ClientDashboardHomeClient() {
   useEffect(() => {
     if (state.status !== "ready") return;
     const tid = state.data.firstTournamentId.trim();
-    if (!state.data.hasAnyTournament || !tid) return;
-    if (publishedCardStatusResolvedForRef.current === tid) return;
-    publishedCardStatusResolvedForRef.current = tid;
+    if (!state.data.hasAnyTournament || !tid) {
+      setPublishedCardStatus((prev) =>
+        prev.state === "idle" && prev.tournamentId === "" ? prev : { tournamentId: "", state: "idle" },
+      );
+      return;
+    }
+    setPublishedCardStatus((prev) => {
+      if (prev.tournamentId !== tid) return { tournamentId: tid, state: "checking" };
+      if (prev.state === "idle" || prev.state === "failed") return { tournamentId: tid, state: "checking" };
+      return prev;
+    });
+    if (publishedCardStatusInFlightForRef.current === tid) return;
+    publishedCardStatusInFlightForRef.current = tid;
     let cancelled = false;
     void (async () => {
       const r = await fetchDashboardPublishedCardStatus(tid);
-      if (!r.ok || cancelled) return;
+      if (cancelled) return;
+      if (publishedCardStatusInFlightForRef.current === tid) {
+        publishedCardStatusInFlightForRef.current = "";
+      }
+      if (!r.ok) {
+        setPublishedCardStatus((prev) =>
+          prev.tournamentId === tid ? { tournamentId: tid, state: "failed" } : prev,
+        );
+        return;
+      }
       mergeClientDashboardSummaryCache({
         hasPublishedActiveForSomeTournament: r.hasPublishedActiveForSomeTournament,
       });
+      setPublishedCardStatus({ tournamentId: tid, state: "resolved" });
       setState((prev) => {
         if (prev.status !== "ready") return prev;
         if (prev.data.firstTournamentId.trim() !== tid) return prev;
@@ -275,6 +307,9 @@ export default function ClientDashboardHomeClient() {
     })();
     return () => {
       cancelled = true;
+      if (publishedCardStatusInFlightForRef.current === tid) {
+        publishedCardStatusInFlightForRef.current = "";
+      }
     };
   }, [state]);
 
@@ -283,8 +318,16 @@ export default function ClientDashboardHomeClient() {
     void (async () => {
       const r = await fetchDashboardSummaryCoalesced();
       if (r.ok) {
-        persistClientDashboardSummaryCache(r.data);
-        setState({ status: "ready", data: r.data });
+        const cached = readClientDashboardSummaryCache();
+        const merged =
+          cached &&
+          cached.firstTournamentId.trim() === r.data.firstTournamentId.trim() &&
+          cached.hasPublishedActiveForSomeTournament === true &&
+          r.data.hasPublishedActiveForSomeTournament === false
+            ? { ...r.data, hasPublishedActiveForSomeTournament: true }
+            : r.data;
+        persistClientDashboardSummaryCache(merged);
+        setState({ status: "ready", data: merged });
       } else {
         const snap = readClientDashboardSummaryCache();
         if (snap) {
@@ -314,6 +357,20 @@ export default function ClientDashboardHomeClient() {
   }
 
   const d = state.data;
+  const firstTournamentId = d.firstTournamentId.trim();
+  const isPublishedCardStatusPending =
+    d.hasAnyTournament &&
+    firstTournamentId !== "" &&
+    d.hasPublishedActiveForSomeTournament !== true &&
+    publishedCardStatus.tournamentId === firstTournamentId &&
+    publishedCardStatus.state === "checking";
+  const isPublishedCardStatusUnknown =
+    d.hasAnyTournament &&
+    firstTournamentId !== "" &&
+    d.hasPublishedActiveForSomeTournament !== true &&
+    (publishedCardStatus.tournamentId !== firstTournamentId ||
+      publishedCardStatus.state === "checking" ||
+      publishedCardStatus.state === "failed");
   const policy = d.policy;
   const membershipLabel =
     policy.membershipState === "ACTIVE"
@@ -337,6 +394,10 @@ export default function ClientDashboardHomeClient() {
     todayStatusText = "대회를 개최하세요";
     todayButtonLabel = "대회 만들기";
     todayButtonHref = "/client/tournaments/new";
+  } else if (isPublishedCardStatusPending || isPublishedCardStatusUnknown) {
+    todayStatusText = "게시카드 상태를 확인 중입니다";
+    todayButtonLabel = "대회 관리";
+    todayButtonHref = d.firstTournamentId ? `/client/tournaments/${d.firstTournamentId}` : "/client/tournaments";
   } else if (!d.hasPublishedActiveForSomeTournament) {
     todayStatusText = "메인에 대회 홍보용 카드를 게시하세요";
     todayButtonLabel = "게시카드 작성";

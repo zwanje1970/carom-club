@@ -321,7 +321,27 @@ const DASHBOARD_TOURNAMENT_FIRST_VISIBLE_FIELDS = [
   "createdAt",
   "status",
   "isDeleted",
+  "deletedAt",
 ] as const;
+
+function parseDashboardTournamentCreatedAtMillis(value: unknown): number {
+  if (typeof value === "string") {
+    const n = Date.parse(value);
+    return Number.isFinite(n) ? n : 0;
+  }
+  if (value instanceof Date) {
+    const n = value.getTime();
+    return Number.isFinite(n) ? n : 0;
+  }
+  if (value && typeof value === "object") {
+    const maybe = value as { toMillis?: () => number };
+    if (typeof maybe.toMillis === "function") {
+      const n = maybe.toMillis();
+      return Number.isFinite(n) ? n : 0;
+    }
+  }
+  return 0;
+}
 
 /**
  * 대시보드 요약 전용: 전체 대회 목록을 만들지 않고 최근 N건 중 첫 “표시 가능” 대회 1개만 탐색.
@@ -336,13 +356,32 @@ export async function listClientDashboardTournamentFirstVisibleFirestore(userId:
   const fsSelect = [...DASHBOARD_TOURNAMENT_FIRST_VISIBLE_FIELDS];
   let q;
   try {
-    q = await db
-      .collection(COLLECTION)
-      .where("createdBy", "==", uid)
-      .orderBy("createdAt", "desc")
-      .limit(DASHBOARD_TOURNAMENT_SCAN_LIMIT)
-      .select(...fsSelect)
-      .get();
+    let cursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
+    for (;;) {
+      let query = db
+        .collection(COLLECTION)
+        .where("createdBy", "==", uid)
+        .orderBy("createdAt", "desc")
+        .limit(DASHBOARD_TOURNAMENT_SCAN_LIMIT)
+        .select(...fsSelect);
+      if (cursor) query = query.startAfter(cursor);
+      const page = await query.get();
+      if (page.empty) return { hasAnyTournament: false, firstTournamentId: "" };
+      for (const doc of page.docs) {
+        const raw = doc.data() as Record<string, unknown> | undefined;
+        if (
+          isEntityLifecycleVisibleForList(raw?.status, {
+            legacyIsDeleted: raw?.isDeleted === true,
+          })
+        ) {
+          return { hasAnyTournament: true, firstTournamentId: doc.id };
+        }
+      }
+      cursor = page.docs[page.docs.length - 1];
+      if (!cursor || page.docs.length < DASHBOARD_TOURNAMENT_SCAN_LIMIT) {
+        return { hasAnyTournament: false, firstTournamentId: "" };
+      }
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error ?? "");
     if (!message.includes("FAILED_PRECONDITION")) {
@@ -351,14 +390,13 @@ export async function listClientDashboardTournamentFirstVisibleFirestore(userId:
     q = await db
       .collection(COLLECTION)
       .where("createdBy", "==", uid)
-      .limit(DASHBOARD_TOURNAMENT_SCAN_LIMIT)
       .select(...fsSelect)
       .get();
   }
   const docs = q.docs.slice().sort((a, b) => {
-    const ac = String(a.data()?.createdAt ?? "");
-    const bc = String(b.data()?.createdAt ?? "");
-    return bc.localeCompare(ac);
+    const ac = parseDashboardTournamentCreatedAtMillis(a.data()?.createdAt);
+    const bc = parseDashboardTournamentCreatedAtMillis(b.data()?.createdAt);
+    return bc - ac;
   });
   for (const doc of docs) {
     const raw = doc.data() as Record<string, unknown> | undefined;
