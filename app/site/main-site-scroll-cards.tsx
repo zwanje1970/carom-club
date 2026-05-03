@@ -433,12 +433,14 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
     };
 
     const scheduleResume = () => {
+      if (selectedItemId !== null) return;
       if (resumeTimerRef.current !== null) {
         window.clearTimeout(resumeTimerRef.current);
       }
       pausedByUserRef.current = true;
       stopAutoSlide();
       resumeTimerRef.current = window.setTimeout(() => {
+        if (selectedItemId !== null) return;
         pausedByUserRef.current = false;
         startAutoSlide();
       }, restartAfterUserInputMs);
@@ -468,7 +470,10 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
 
     const step = (frameTime: number) => {
       const node = viewportRef.current;
-      if (!node || pausedByUserRef.current) return;
+      if (!node || pausedByUserRef.current || selectedItemId !== null) {
+        stopAutoSlide();
+        return;
+      }
       const segmentHeight = readSegmentHeight();
       const maxScrollTop = node.scrollHeight - node.clientHeight;
       if (maxScrollTop <= 0) {
@@ -508,6 +513,7 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
 
     const startAutoSlide = () => {
       if (pausedByUserRef.current) return;
+      if (selectedItemId !== null) return;
       if (rafRef.current !== null) return;
       lastFrameTimeRef.current = null;
       rafRef.current = requestAnimationFrame(step);
@@ -528,8 +534,14 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
       resizeObserver.observe(viewport);
     }
 
-    if (readSegmentHeight() <= 0) scheduleMeasureRetry();
-    startAutoSlide();
+    if (selectedItemId !== null) {
+      pausedByUserRef.current = true;
+      stopAutoSlide();
+    } else {
+      pausedByUserRef.current = false;
+      if (readSegmentHeight() <= 0) scheduleMeasureRetry();
+      startAutoSlide();
+    }
 
     return () => {
       viewport.removeEventListener("touchstart", onUserInput);
@@ -546,7 +558,7 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
       pausedByUserRef.current = false;
       programmaticScrollUntilMsRef.current = 0;
     };
-  }, [items, slideCardMoveDurationSec]);
+  }, [items, slideCardMoveDurationSec, selectedItemId]);
 
   if (items.length === 0) {
     return (
