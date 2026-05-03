@@ -142,6 +142,7 @@ export async function POST(request: Request) {
   }
 
   const tournamentId = typeof body.tournamentId === "string" ? body.tournamentId : "";
+  console.log("[PUBLISH] start", tournamentId);
   let tournament: Awaited<ReturnType<typeof getTournamentByIdFirestore>>;
   try {
     tournament = await getTournamentByIdFirestore(tournamentId);
@@ -223,6 +224,7 @@ export async function POST(request: Request) {
 
   let result: Awaited<ReturnType<typeof upsertTournamentPublishedCard>>;
   try {
+    console.log("[PUBLISH] before upsert");
     result = await upsertTournamentPublishedCard({
       tournamentId,
       title,
@@ -252,6 +254,7 @@ export async function POST(request: Request) {
       ...(publishedCardImageUrl !== undefined ? { publishedCardImageUrl } : {}),
       ...(publishedCardImage320Url !== undefined ? { publishedCardImage320Url } : {}),
     });
+    console.log("[PUBLISH] after upsert");
   } catch (e) {
     const message = e instanceof Error ? e.message : "Failed to save tournament card.";
     if (isTournamentPublishedCardsWritePersistenceBlockedError(e)) {
@@ -273,13 +276,16 @@ export async function POST(request: Request) {
 
   if (!draftOnly) {
     try {
+      console.log("[PUBLISH] before reconcile");
       await reconcileTournamentPublishedCardsForTournamentId(tournamentId);
+      console.log("[PUBLISH] after reconcile");
     } catch (e) {
       console.warn("[api/client/card-snapshots] POST reconcile published cards failed", e);
     }
     revalidatePublicTournamentCache(tournamentId);
   }
 
+  console.log("[PUBLISH] response return");
   return NextResponse.json({ ok: true, snapshot: result.snapshot });
 }
 

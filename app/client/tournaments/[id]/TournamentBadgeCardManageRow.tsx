@@ -15,6 +15,9 @@ const OPTIONS: TournamentStatusBadge[] = [
   "초안",
 ];
 
+/** 동일 대회 publish 중복 실행 차단(컴포넌트 리마운트 간에도 유지). */
+const publishInFlightTournamentIds = new Set<string>();
+
 function statusBadgeStyle(badge: TournamentStatusBadge): { background: string; color: string } {
   if (badge === "모집중") {
     return { background: "#fef3c7", color: "#92400e" };
@@ -135,77 +138,114 @@ export default function TournamentBadgeCardManageRow({
    * `draftOnly: false` — 서버 검증·에러 문구는 변경하지 않음.
    */
   async function requestCardPublish(): Promise<void> {
-    const res = await fetch(`/api/client/card-snapshots?tournamentId=${encodeURIComponent(tournamentId)}`);
-    const data = (await res.json()) as {
+    let data: {
       snapshots?: CardSnapshotRow[];
       activeSnapshot?: CardSnapshotRow | null;
       error?: string;
+    } = {};
+    let hadPublishedBefore = false;
+    let latest: CardSnapshotRow | null = null;
+    let getOk = false;
+    let getStatus = 0;
+    try {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 2000);
+      try {
+        const res = await fetch(`/api/client/card-snapshots?tournamentId=${encodeURIComponent(tournamentId)}`, {
+          signal: controller.signal,
+        });
+        getOk = res.ok;
+        getStatus = res.status;
+        const json = (await res.json()) as {
+          snapshots?: CardSnapshotRow[];
+          activeSnapshot?: CardSnapshotRow | null;
+          error?: string;
+        };
+        data = json;
+        hadPublishedBefore = Boolean(json.activeSnapshot);
+        latest = pickCardForPublish(json);
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    } catch (e) {
+      console.warn("[PUBLISH] GET card-snapshots failed or timed out", e);
+    }
+
+    console.log("[PUBLISH] after GET card-snapshots", {
+      ok: getOk,
+      status: getStatus,
+      tournamentId,
+      snapshotCount: Array.isArray(data.snapshots) ? data.snapshots.length : 0,
+      hasLatest: Boolean(latest),
+    });
+
+    const publishSource: CardSnapshotRow = latest ?? {
+      title: "대회 카드",
+      subtitle: "",
+      imageId: "theme",
+      image320Url: "",
+      tournamentCardTemplate: "A",
+      tournamentBackgroundType: "theme",
+      tournamentTheme: "dark",
+      isActive: true,
     };
-    if (!res.ok) {
-      window.alert(data.error ?? "카드 정보를 불러오지 못했습니다.");
-      return;
-    }
-    const hadPublishedBefore = Boolean(data.activeSnapshot);
-    const latest = pickCardForPublish(data);
-    if (!latest) {
-      window.alert("저장된 카드를 찾을 수 없습니다. 게시카드 작성에서 저장해 주세요.");
-      return;
-    }
+
+    console.log("[PUBLISH] before POST");
     const postRes = await fetch("/api/client/card-snapshots", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         tournamentId,
-        title: typeof latest.title === "string" ? latest.title : "",
-        textLine1: typeof latest.cardExtraLine1 === "string" ? latest.cardExtraLine1 : "",
-        textLine2: typeof latest.cardExtraLine2 === "string" ? latest.cardExtraLine2 : "",
-        textLine3: typeof latest.cardExtraLine3 === "string" ? latest.cardExtraLine3 : "",
-        cardTemplate: latest.tournamentCardTemplate ?? "A",
-        backgroundType: latest.tournamentBackgroundType ?? "image",
-        themeType: latest.tournamentTheme ?? "dark",
-        imageId: latest.imageId?.trim() ?? "",
-        image320Url: latest.image320Url?.trim() ?? "",
+        title: typeof publishSource.title === "string" ? publishSource.title : "",
+        textLine1: typeof publishSource.cardExtraLine1 === "string" ? publishSource.cardExtraLine1 : "",
+        textLine2: typeof publishSource.cardExtraLine2 === "string" ? publishSource.cardExtraLine2 : "",
+        textLine3: typeof publishSource.cardExtraLine3 === "string" ? publishSource.cardExtraLine3 : "",
+        cardTemplate: publishSource.tournamentCardTemplate ?? "A",
+        backgroundType: publishSource.tournamentBackgroundType ?? "image",
+        themeType: publishSource.tournamentTheme ?? "dark",
+        imageId: publishSource.imageId?.trim() ?? "",
+        image320Url: publishSource.image320Url?.trim() ?? "",
         draftOnly: false,
-        cardTextShadowEnabled: latest.tournamentCardTextShadowEnabled === true,
-        cardSurfaceLayout: latest.tournamentCardSurfaceLayout === "full" ? "full" : "split",
-        ...(latest.tournamentCardSurfaceLayout === "full"
+        cardTextShadowEnabled: publishSource.tournamentCardTextShadowEnabled === true,
+        cardSurfaceLayout: publishSource.tournamentCardSurfaceLayout === "full" ? "full" : "split",
+        ...(publishSource.tournamentCardSurfaceLayout === "full"
           ? {
               cardFooterDateTextColor:
-                typeof latest.cardFooterDateTextColor === "string" && latest.cardFooterDateTextColor.trim()
-                  ? latest.cardFooterDateTextColor.trim()
+                typeof publishSource.cardFooterDateTextColor === "string" && publishSource.cardFooterDateTextColor.trim()
+                  ? publishSource.cardFooterDateTextColor.trim()
                   : null,
               cardFooterPlaceTextColor:
-                typeof latest.cardFooterPlaceTextColor === "string" && latest.cardFooterPlaceTextColor.trim()
-                  ? latest.cardFooterPlaceTextColor.trim()
+                typeof publishSource.cardFooterPlaceTextColor === "string" && publishSource.cardFooterPlaceTextColor.trim()
+                  ? publishSource.cardFooterPlaceTextColor.trim()
                   : null,
             }
           : {
               cardFooterDateTextColor: null,
               cardFooterPlaceTextColor: null,
             }),
-        ...(typeof latest.tournamentMediaBackground === "string"
-          ? { mediaBackground: latest.tournamentMediaBackground }
+        ...(typeof publishSource.tournamentMediaBackground === "string"
+          ? { mediaBackground: publishSource.tournamentMediaBackground }
           : {}),
-        ...(typeof latest.tournamentImageOverlayBlend === "boolean"
-          ? { imageOverlayBlend: latest.tournamentImageOverlayBlend }
+        ...(typeof publishSource.tournamentImageOverlayBlend === "boolean"
+          ? { imageOverlayBlend: publishSource.tournamentImageOverlayBlend }
           : {}),
-        ...(typeof latest.tournamentImageOverlayOpacity === "number"
-          ? { imageOverlayOpacity: latest.tournamentImageOverlayOpacity }
+        ...(typeof publishSource.tournamentImageOverlayOpacity === "number"
+          ? { imageOverlayOpacity: publishSource.tournamentImageOverlayOpacity }
           : {}),
-        ...(typeof latest.tournamentCardDisplayDate === "string"
-          ? { cardDisplayDate: latest.tournamentCardDisplayDate }
+        ...(typeof publishSource.tournamentCardDisplayDate === "string"
+          ? { cardDisplayDate: publishSource.tournamentCardDisplayDate }
           : {}),
-        ...(typeof latest.tournamentCardDisplayLocation === "string"
-          ? { cardDisplayLocation: latest.tournamentCardDisplayLocation }
+        ...(typeof publishSource.tournamentCardDisplayLocation === "string"
+          ? { cardDisplayLocation: publishSource.tournamentCardDisplayLocation }
           : {}),
-        ...(typeof latest.cardLeadTextColor === "string" && latest.cardLeadTextColor.trim()
-          ? { cardLeadTextColor: latest.cardLeadTextColor.trim() }
+        ...(typeof publishSource.cardLeadTextColor === "string" && publishSource.cardLeadTextColor.trim()
+          ? { cardLeadTextColor: publishSource.cardLeadTextColor.trim() }
           : {}),
-        ...(typeof latest.cardTitleTextColor === "string" && latest.cardTitleTextColor.trim()
-          ? { cardTitleTextColor: latest.cardTitleTextColor.trim() }
+        ...(typeof publishSource.cardTitleTextColor === "string" && publishSource.cardTitleTextColor.trim()
+          ? { cardTitleTextColor: publishSource.cardTitleTextColor.trim() }
           : {}),
-        ...(typeof latest.cardDescriptionTextColor === "string" && latest.cardDescriptionTextColor.trim()
-          ? { cardDescriptionTextColor: latest.cardDescriptionTextColor.trim() }
+        ...(typeof publishSource.cardDescriptionTextColor === "string" && publishSource.cardDescriptionTextColor.trim()
+          ? { cardDescriptionTextColor: publishSource.cardDescriptionTextColor.trim() }
           : {}),
       }),
     });
@@ -231,8 +271,12 @@ export default function TournamentBadgeCardManageRow({
   }
 
   async function onSaveBadgeAndPublish() {
+    const publishKey = tournamentId.trim();
+    if (!publishKey) return;
     if (publishRunningRef.current) return;
+    if (publishInFlightTournamentIds.has(publishKey)) return;
     publishRunningRef.current = true;
+    publishInFlightTournamentIds.add(publishKey);
     setPublishBusy(true);
     try {
       if (!(await persistCurrentBadgeToServer())) return;
@@ -243,6 +287,7 @@ export default function TournamentBadgeCardManageRow({
     } finally {
       setPublishBusy(false);
       publishRunningRef.current = false;
+      publishInFlightTournamentIds.delete(publishKey);
     }
   }
 

@@ -8233,6 +8233,7 @@ function revalidateSiteNoticeCache(): void {
 }
 
 function revalidateMainSlideSnapshotsCache(): void {
+  console.log("[CACHE] revalidateMainSlideSnapshotsCache");
   revalidateSiteDataTag(CACHE_TAG_MAIN_SLIDE_SNAPSHOTS);
   revalidateSiteDataTag(CACHE_TAG_SITE_PUBLIC_TOURNAMENTS_LIST);
 }
@@ -9665,9 +9666,11 @@ async function loadTournamentPublishedCardsArrayForMainSite(): Promise<Tournamen
 }
 
 async function persistTournamentPublishedCardsRows(next: TournamentPublishedCard[]): Promise<void> {
+  console.log("[PERSIST] start");
   const ws = resolveTournamentPublishedCardsWriteStrategy();
   if (ws === "firestore-kv") {
     await upsertTournamentPublishedCardsToFirestoreKv(next);
+    console.log("[PERSIST] saved KV");
     await rebuildMainSlideTournamentSnapshotsCompactKvNow();
     revalidateMainSlideSnapshotsCache();
     return;
@@ -9678,6 +9681,7 @@ async function persistTournamentPublishedCardsRows(next: TournamentPublishedCard
   const store = await readLocalJsonAggregate();
   store.tournamentPublishedCards = next;
   await writeLocalJsonAggregate(store);
+  console.log("[PERSIST] saved KV");
   await rebuildMainSlideTournamentSnapshotsCompactKvNow();
   revalidateMainSlideSnapshotsCache();
 }
@@ -10371,6 +10375,7 @@ async function buildTournamentSnapshotsForMainSiteFromSource(options?: {
 async function rebuildMainSlideTournamentSnapshotsCompactKvNow(): Promise<void> {
   const built = await buildTournamentSnapshotsForMainSiteFromSource({ limit: 50 });
   await saveMainSlideTournamentSnapshotsCompactToStorage(built);
+  console.log("[COMPACT] rebuilt");
 }
 
 export async function listTournamentSnapshotsForMainSite(options?: {
