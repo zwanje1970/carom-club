@@ -49,14 +49,8 @@ export const getSiteNotice = unstable_cache(
   { tags: [CACHE_TAG_SITE_NOTICE] }
 );
 
-const _listTournamentSnapshotsCache = unstable_cache(
-  async (limit: number | undefined) => listTournamentSnapshotsUncached({ limit }),
-  ["main-slide-snapshots"],
-  { tags: [CACHE_TAG_MAIN_SLIDE_SNAPSHOTS] }
-);
-
 export function listTournamentSnapshotsForMainSite(options?: { limit?: number }) {
-  return _listTournamentSnapshotsCache(options?.limit);
+  return listTournamentSnapshotsUncached({ limit: options?.limit });
 }
 
 export const getMainSlideAdSettingsForSite = unstable_cache(

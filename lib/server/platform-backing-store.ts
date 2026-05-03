@@ -10388,6 +10388,7 @@ export async function listTournamentSnapshotsForMainSite(options?: {
       : DEFAULT_MAIN_SITE_TOURNAMENT_SLIDE_LIMIT;
 
   const compactRows = await loadMainSlideTournamentSnapshotsCompactFromStorage();
+  console.log("[COMPACT] read length", Array.isArray(compactRows) ? compactRows.length : null);
   if (compactRows) {
     return compactRows.slice(0, limit);
   }
