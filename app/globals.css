@@ -1688,15 +1688,15 @@ body:has(.site-home-page) {
   }
 
   /*
-   * /site 새 메인(MainSiteScrollCards): 앵커를 남은 높이에 맞춤 → 내부 .slideViewportSiteMain overflow-y 스크롤.
-   * 메인(구)는 이 modifier 없음.
+   * /site 새 메인(MainSiteScrollCards): 앵커는 flex만 잡고 세로 스크롤은 하지 않음(중첩 스크롤 방지).
+   * 실제 스크롤은 내부 .slideViewportSiteMain(overflow-y: auto) 한 곳만.
    */
   .site-home-page--main .site-home-main-slide-deck-stack > .site-home-slide-anchor--marquee-scroll,
   .site-home-page--main .site-home-main-slide-deck-stack--public-mobile > .site-home-slide-anchor--marquee-scroll {
     flex: 1 1 auto;
     min-height: 0;
     overflow-x: hidden;
-    overflow-y: auto;
+    overflow-y: visible;
   }
 
   /* 메인 모바일: 슬라이드 바깥 박스 제거(풀폭)·높이 원안 + 하단고정대역·슬라이드↔PNG 간격 축소 */
@@ -1707,7 +1707,7 @@ body:has(.site-home-page) {
   }
 
   .site-home-page--main .site-home-slide-anchor.site-home-slide-anchor--marquee-scroll {
-    overflow-y: auto !important;
+    overflow-y: visible !important;
   }
 
   .site-home-page--main .site-home-main-slide-deck-stack > .site-home-slide-anchor {
@@ -2104,7 +2104,7 @@ body:has(.site-home-page) {
 .site-shell.site-shell--ua-mobile-site
   .site-home-page--main
   .site-home-slide-anchor.site-home-slide-anchor--marquee-scroll {
-  overflow-y: auto !important;
+  overflow-y: visible !important;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-slide-deck-stack {
@@ -2361,7 +2361,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
     flex: 1 1 auto;
     min-height: 0;
     overflow-x: hidden;
-    overflow-y: auto;
+    overflow-y: visible;
   }
 
   .site-home-page--main .site-home-main-content-box .site-home-cta-primary {

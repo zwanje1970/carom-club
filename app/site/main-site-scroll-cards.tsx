@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties, KeyboardEvent, PointerEvent } from "react";
-import { memo, useCallback, useMemo, useState } from "react";
+import type { CSSProperties, KeyboardEvent, PointerEvent, Ref } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import editorCardStyles from "../client/tournaments/[id]/card-publish-editor.module.css";
 import styles from "./main-sample/main-sample.module.css";
 import siteStyles from "./main-site-scroll-cards.module.css";
@@ -361,8 +361,15 @@ export type MainSiteScrollCardsProps = {
   slideCardMoveDurationSec: number;
 };
 
-export function MainSiteScrollCards({ items, slideCardMoveDurationSec: _slideCardMoveDurationSec }: MainSiteScrollCardsProps) {
+export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSiteScrollCardsProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const primarySegmentRef = useRef<HTMLDivElement | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const lastFrameTimeRef = useRef<number | null>(null);
+  const resumeTimerRef = useRef<number | null>(null);
+  const pausedByUserRef = useRef(false);
+  const suppressProgrammaticScrollRef = useRef(false);
 
   const lcpHeroItemIndex = useMemo(
     () =>
@@ -396,6 +403,108 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec: _slideCar
     [selectedItemId],
   );
 
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    if (items.length === 0) return;
+
+    const durationSec = Number.isFinite(slideCardMoveDurationSec)
+      ? Math.max(1, slideCardMoveDurationSec)
+      : 10;
+    const restartAfterUserInputMs = 2000;
+
+    const stopAutoSlide = () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      lastFrameTimeRef.current = null;
+    };
+
+    const scheduleResume = () => {
+      if (resumeTimerRef.current !== null) {
+        window.clearTimeout(resumeTimerRef.current);
+      }
+      pausedByUserRef.current = true;
+      stopAutoSlide();
+      resumeTimerRef.current = window.setTimeout(() => {
+        pausedByUserRef.current = false;
+        startAutoSlide();
+      }, restartAfterUserInputMs);
+    };
+
+    const onUserInput = () => {
+      scheduleResume();
+    };
+
+    const onScroll = () => {
+      if (suppressProgrammaticScrollRef.current) return;
+      scheduleResume();
+    };
+
+    const step = (frameTime: number) => {
+      const node = viewportRef.current;
+      if (!node || pausedByUserRef.current) return;
+      const segmentHeight = primarySegmentRef.current?.scrollHeight ?? 0;
+      if (segmentHeight <= 0) {
+        rafRef.current = requestAnimationFrame(step);
+        return;
+      }
+
+      const maxScrollTop = node.scrollHeight - node.clientHeight;
+      if (maxScrollTop <= 0) {
+        rafRef.current = requestAnimationFrame(step);
+        return;
+      }
+
+      const prevTime = lastFrameTimeRef.current ?? frameTime;
+      const dtSec = Math.max(0, (frameTime - prevTime) / 1000);
+      lastFrameTimeRef.current = frameTime;
+
+      const pxPerSec = segmentHeight / durationSec;
+      let nextScrollTop = node.scrollTop + pxPerSec * dtSec;
+      if (nextScrollTop >= segmentHeight) {
+        nextScrollTop -= segmentHeight;
+      }
+
+      suppressProgrammaticScrollRef.current = true;
+      node.scrollTop = Math.min(nextScrollTop, maxScrollTop);
+      suppressProgrammaticScrollRef.current = false;
+
+      rafRef.current = requestAnimationFrame(step);
+    };
+
+    const startAutoSlide = () => {
+      if (pausedByUserRef.current) return;
+      if (rafRef.current !== null) return;
+      lastFrameTimeRef.current = null;
+      rafRef.current = requestAnimationFrame(step);
+    };
+
+    viewport.addEventListener("touchstart", onUserInput, { passive: true });
+    viewport.addEventListener("touchmove", onUserInput, { passive: true });
+    viewport.addEventListener("wheel", onUserInput, { passive: true });
+    viewport.addEventListener("pointerdown", onUserInput, { passive: true });
+    viewport.addEventListener("scroll", onScroll, { passive: true });
+
+    startAutoSlide();
+
+    return () => {
+      viewport.removeEventListener("touchstart", onUserInput);
+      viewport.removeEventListener("touchmove", onUserInput);
+      viewport.removeEventListener("wheel", onUserInput);
+      viewport.removeEventListener("pointerdown", onUserInput);
+      viewport.removeEventListener("scroll", onScroll);
+      stopAutoSlide();
+      if (resumeTimerRef.current !== null) {
+        window.clearTimeout(resumeTimerRef.current);
+        resumeTimerRef.current = null;
+      }
+      pausedByUserRef.current = false;
+      suppressProgrammaticScrollRef.current = false;
+    };
+  }, [items, slideCardMoveDurationSec]);
+
   if (items.length === 0) {
     return (
       <div className={styles.slideViewportSiteMain} data-no-root-swipe>
@@ -404,10 +513,11 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec: _slideCar
     );
   }
 
-  const renderSegment = (segmentKey: string) => (
+  const renderSegment = (segmentKey: string, segmentRef?: Ref<HTMLDivElement>) => (
     <div
       className={`${styles.sampleMainMarqueeSegment} ${siteStyles.segmentNoShrink} ${siteStyles.segmentRelativeForDim}`}
       key={segmentKey}
+      ref={segmentRef}
     >
       <div
         className={`${siteStyles.marqueeDimLayer} ${selectedItemId ? siteStyles.marqueeDimLayerVisible : ""}`}
@@ -436,10 +546,12 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec: _slideCar
     <div
       className={`${styles.slideViewportSiteMain} ${siteStyles.viewportMarquee} ${siteStyles.viewportMarqueeLeadIn}`}
       data-no-root-swipe
+      ref={viewportRef}
       onPointerDownCapture={onViewportPointerDownCapture}
     >
       <div className={`${styles.sampleMainMarqueeTrack} ${siteStyles.trackScrollStatic}`}>
-        {renderSegment("a")}
+        {renderSegment("a", primarySegmentRef)}
+        {renderSegment("b")}
       </div>
     </div>
   );
