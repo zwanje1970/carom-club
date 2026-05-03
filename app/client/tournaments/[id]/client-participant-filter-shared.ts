@@ -8,12 +8,16 @@ export function parseClientParticipantFilter(raw: string | undefined): ClientPar
   return "all";
 }
 
+function isApplicantBucket(e: TournamentApplicationListItem): boolean {
+  return e.status === "APPLIED" || e.status === "VERIFYING" || e.status === "WAITING_PAYMENT";
+}
+
 export function filterParticipantEntries(
   entries: TournamentApplicationListItem[],
   key: ClientParticipantFilterKey
 ): TournamentApplicationListItem[] {
   if (key === "approved") return entries.filter((e) => e.status === "APPROVED");
-  if (key === "wait") return entries.filter((e) => e.status === "WAITING_PAYMENT");
+  if (key === "wait") return entries.filter(isApplicantBucket);
   if (key === "reject") return entries.filter((e) => e.status === "REJECTED");
   return entries;
 }
@@ -22,7 +26,7 @@ export function countParticipantApplications(entries: TournamentApplicationListI
   return {
     all: entries.length,
     approved: entries.filter((e) => e.status === "APPROVED").length,
-    wait: entries.filter((e) => e.status === "WAITING_PAYMENT").length,
+    wait: entries.filter(isApplicantBucket).length,
     reject: entries.filter((e) => e.status === "REJECTED").length,
   };
 }

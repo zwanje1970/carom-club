@@ -192,6 +192,7 @@ export default function ClientSettlementHubPage() {
               return (
                 <li key={r.tournamentId}>
                   <Link
+                    prefetch={false}
                     href={href}
                     style={{
                       textDecoration: "none",

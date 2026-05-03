@@ -25,6 +25,8 @@ const TOURNAMENT_APPLICATION_LIST_FIRESTORE_FIELDS = [
   "registrationSource",
   "participantAverage",
   "adminNote",
+  "statusChangedAt",
+  "attendanceChecked",
 ] as const;
 
 /** `select` 결과만 — `tournamentApplicationFromFirestore`와 동일 규칙으로 목록 필드만 파싱 */
@@ -60,6 +62,11 @@ function tournamentApplicationToListItem(
       : typeof adminNoteRaw === "string"
         ? adminNoteRaw.trim() || null
         : null;
+  const statusChangedAtRaw = item.statusChangedAt;
+  const statusChangedAt =
+    typeof statusChangedAtRaw === "string" && statusChangedAtRaw.trim() !== "" ? statusChangedAtRaw.trim() : undefined;
+  const ac = item.attendanceChecked;
+  const attendanceChecked = ac === true;
   return {
     id,
     applicantName: typeof item.applicantName === "string" ? item.applicantName : "",
@@ -69,6 +76,8 @@ function tournamentApplicationToListItem(
     registrationSource,
     participantAverage,
     adminNote,
+    ...(statusChangedAt ? { statusChangedAt } : {}),
+    attendanceChecked,
   };
 }
 
@@ -106,6 +115,9 @@ function tournamentApplicationFromFirestore(id: string, data: Record<string, unk
         : null;
   const ac = item.attendanceChecked;
   const attendanceChecked = ac === true ? true : ac === false ? false : null;
+  const approvedRaw = item.approvedNotifiedAt;
+  const approvedNotifiedAt =
+    typeof approvedRaw === "string" && approvedRaw.trim() ? approvedRaw.trim() : null;
 
   return {
     id,
@@ -136,7 +148,28 @@ function tournamentApplicationFromFirestore(id: string, data: Record<string, unk
     participantAverage,
     adminNote,
     attendanceChecked,
+    ...(approvedNotifiedAt ? { approvedNotifiedAt } : {}),
   };
+}
+
+/** APPROVED 상태에서 `approvedNotifiedAt` 미기록일 때만 1회 설정(알림 중복 방지). */
+export async function tryClaimApplicationApprovedNotifiedAtFirestore(entryId: string): Promise<boolean> {
+  assertClientFirestorePersistenceConfigured();
+  const eid = entryId.trim();
+  if (!eid) return false;
+  const db = getSharedFirestoreDb();
+  const ref = db.collection(COLLECTION).doc(eid);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return false;
+    const d = snap.data() as Record<string, unknown>;
+    if (d.status !== "APPROVED") return false;
+    const existing = d.approvedNotifiedAt;
+    if (typeof existing === "string" && existing.trim()) return false;
+    const now = new Date().toISOString();
+    tx.set(ref, { approvedNotifiedAt: now, updatedAt: now }, { merge: true });
+    return true;
+  });
 }
 
 export async function getTournamentApplicationByIdFirestore(
@@ -173,19 +206,54 @@ export async function listTournamentApplicationsByTournamentIdFirestore(
 
 /** 참가자 목록 RSC 전용 — 증빙·OCR 등 대용량 필드 미조회 */
 export async function listTournamentApplicationsListItemsByTournamentIdFirestore(
-  tournamentId: string
+  tournamentId: string,
+  options?: { limit?: number }
 ): Promise<TournamentApplicationListItem[]> {
   assertClientFirestorePersistenceConfigured();
   const id = tournamentId.trim();
   if (!id) return [];
   const db = getSharedFirestoreDb();
-  const q = await db
+  const base = db
     .collection(COLLECTION)
     .where("tournamentId", "==", id)
     .orderBy("createdAt", "desc")
-    .select(...TOURNAMENT_APPLICATION_LIST_FIRESTORE_FIELDS)
-    .get();
+    .select(...TOURNAMENT_APPLICATION_LIST_FIRESTORE_FIELDS);
+  const lim = options?.limit;
+  const q =
+    lim != null && Number.isFinite(lim)
+      ? await base.limit(Math.max(1, Math.min(500, Math.floor(lim)))).get()
+      : await base.get();
   return q.docs.map((doc) => tournamentApplicationToListItem(doc.id, doc.data() as Record<string, unknown>));
+}
+
+/** 필터 탭·헤더 건수용 — 문서 본문 없이 aggregate count만 */
+export async function getTournamentApplicationListCountsFirestore(tournamentId: string): Promise<{
+  total: number;
+  approved: number;
+  wait: number;
+  reject: number;
+}> {
+  assertClientFirestorePersistenceConfigured();
+  const id = tournamentId.trim();
+  if (!id) return { total: 0, approved: 0, wait: 0, reject: 0 };
+  const db = getSharedFirestoreDb();
+  const col = () => db.collection(COLLECTION).where("tournamentId", "==", id);
+  const [totalSnap, approvedSnap, rejectedSnap, appliedSnap, verifyingSnap, waitingPaySnap] = await Promise.all([
+    col().count().get(),
+    col().where("status", "==", "APPROVED").count().get(),
+    col().where("status", "==", "REJECTED").count().get(),
+    col().where("status", "==", "APPLIED").count().get(),
+    col().where("status", "==", "VERIFYING").count().get(),
+    col().where("status", "==", "WAITING_PAYMENT").count().get(),
+  ]);
+  const wait =
+    appliedSnap.data().count + verifyingSnap.data().count + waitingPaySnap.data().count;
+  return {
+    total: totalSnap.data().count,
+    approved: approvedSnap.data().count,
+    wait,
+    reject: rejectedSnap.data().count,
+  };
 }
 
 export async function listTournamentApplicationsByUserIdFirestore(userId: string): Promise<TournamentApplication[]> {

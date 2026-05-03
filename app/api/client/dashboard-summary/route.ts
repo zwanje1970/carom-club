@@ -2,12 +2,14 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
 import {
+  clientVenueIntroHasMeaningfulContent,
   getClientDashboardPolicyAndOrganization,
   getClientStatusByUserId,
+  getClientVenueIntroByUserId,
   getUserById,
-  loadClientDashboardTournamentRollupForUser,
+  loadClientDashboardTournamentRollupLightForUser,
   resolveClientOrganizationForDashboardPolicy,
-  someTournamentHasActivePublishedCard,
+  tournamentHasActivePublishedCard,
 } from "../../../../lib/platform-api";
 import type {
   ClientDashboardSummaryJson,
@@ -44,20 +46,25 @@ export async function GET() {
   }
 
   try {
-    const [{ policy, org }, rollup] = await Promise.all([
+    const [{ policy, org }, intro, rollupLight] = await Promise.all([
       getClientDashboardPolicyAndOrganization(userId),
-      loadClientDashboardTournamentRollupForUser(userId),
+      getClientVenueIntroByUserId(userId),
+      loadClientDashboardTournamentRollupLightForUser(userId),
     ]);
 
-    const hasPublishedActiveForSomeTournament = await someTournamentHasActivePublishedCard(rollup.visibleTournamentIds);
+    const hasVenueIntro = clientVenueIntroHasMeaningfulContent(intro);
+    const firstTournamentId = rollupLight.firstTournamentId.trim();
+    const hasPublishedActiveForSomeTournament =
+      firstTournamentId.length > 0 ? await tournamentHasActivePublishedCard(firstTournamentId) : false;
 
     const body: ClientDashboardSummaryJson = {
       ok: true,
       hasOrgSetup: Boolean(org?.setupCompleted),
-      hasAnyTournament: rollup.visibleTournamentIds.length > 0,
+      hasVenueIntro,
+      hasAnyTournament: rollupLight.hasAnyTournament,
       hasPublishedActiveForSomeTournament,
-      firstTournamentId: rollup.visibleTournamentIds[0] ?? "",
-      recentTournaments: rollup.recentTournamentsForSummary as ClientDashboardSummaryTournament[],
+      firstTournamentId,
+      recentTournaments: [] as ClientDashboardSummaryTournament[],
       autoParticipantPushEnabled: org?.autoParticipantPushEnabled !== false,
       policy: {
         annualMembershipVisible: policy.annualMembershipVisible,

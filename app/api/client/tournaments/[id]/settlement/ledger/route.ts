@@ -7,10 +7,10 @@ import {
   settlementApiGetSessionUser,
 } from "../../../../../../../lib/server/settlement-api-auth-firestore";
 import {
-  getTournamentLedgerLinesForClientFirestore,
+  getSettlementLedgerLinesOnlyFirestore,
   replaceSettlementLedgerLinesFirestore,
 } from "../../../../../../../lib/server/firestore-tournament-settlements";
-import { getTournamentByIdFirestore } from "../../../../../../../lib/server/firestore-tournaments";
+import { getTournamentSettlementAccessFieldsByIdFirestore } from "../../../../../../../lib/server/firestore-tournaments";
 
 export const runtime = "nodejs";
 
@@ -22,8 +22,10 @@ async function requireSettlementAccess(tournamentId: string) {
   const user = await settlementApiGetSessionUser(session.userId);
   if (!user) return { ok: false as const, status: 401, error: "사용자를 찾을 수 없습니다." };
 
-  const tournament = await getTournamentByIdFirestore(tournamentId);
-  if (!tournament) return { ok: false as const, status: 404, error: "대회를 찾을 수 없습니다." };
+  const tournament = await getTournamentSettlementAccessFieldsByIdFirestore(tournamentId);
+  if (!tournament || tournament.status === "DELETED") {
+    return { ok: false as const, status: 404, error: "대회를 찾을 수 없습니다." };
+  }
 
   if (user.role === "PLATFORM") {
     return { ok: true as const, tournament, user };
@@ -55,15 +57,14 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
   if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
-  const result = await getTournamentLedgerLinesForClientFirestore(id);
+  const result = await getSettlementLedgerLinesOnlyFirestore(id);
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
   return NextResponse.json({
     tournament: {
-      id: result.tournament.id,
-      title: result.tournament.title,
-      date: result.tournament.date,
+      id: auth.tournament.id,
+      title: auth.tournament.title,
     },
     lines: result.lines,
   });

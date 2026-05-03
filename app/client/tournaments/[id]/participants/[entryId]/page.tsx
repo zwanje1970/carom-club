@@ -9,7 +9,7 @@ const STATUS_LABELS = {
   APPLIED: "신청접수",
   VERIFYING: "검토중",
   WAITING_PAYMENT: "입금대기",
-  APPROVED: "승인완료",
+  APPROVED: "참가자",
   REJECTED: "거절",
 } as const;
 
@@ -17,7 +17,7 @@ const STATUS_DESCRIPTIONS = {
   APPLIED: "신청 접수됨",
   VERIFYING: "운영 검토중",
   WAITING_PAYMENT: "입금 확인 필요",
-  APPROVED: "참가 승인 완료",
+  APPROVED: "입금 확인 완료(참가자)",
   REJECTED: "참가 거절",
 } as const;
 

@@ -55,9 +55,8 @@ export type TournamentSettlementEntry = {
   isRefunded: boolean;
 };
 
-/** 장부 GET API 응답의 tournament 필드(기존 Tournament 부분집합). */
+/** 장부 GET API 응답의 tournament 필드 — 정산 화면용 최소값(id·대회명). */
 export type SettlementLedgerTournamentSummary = {
   id: string;
   title: string;
-  date: string;
 };

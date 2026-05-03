@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export type ParticipantsPrintRow = {
   id: string;
@@ -15,30 +15,42 @@ export type ParticipantsPrintRow = {
   attendanceChecked: boolean;
 };
 
-function maskPhoneForScreen(phone: string): string {
-  const d = phone.replace(/\D/g, "");
-  if (!d) return "-";
-  if (d.length >= 10) {
-    return `${d.slice(0, 3)}-****-${d.slice(-4)}`;
-  }
-  if (d.length >= 7) {
-    return `${d.slice(0, 2)}-****-${d.slice(-3)}`;
-  }
-  return "****";
+function groupDraftStorageKey(tournamentId: string): string {
+  return `v3-participant-group-draft:${tournamentId.trim()}`;
 }
 
-function depositLabel(row: ParticipantsPrintRow): string {
+function loadGroupDraftMap(tournamentId: string): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.sessionStorage.getItem(groupDraftStorageKey(tournamentId));
+    if (!raw) return {};
+    const o = JSON.parse(raw) as unknown;
+    if (!o || typeof o !== "object") return {};
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(o as Record<string, unknown>)) {
+      if (typeof v === "string") out[k] = v;
+      else if (typeof v === "number") out[k] = String(v);
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function formatDepositMd(row: ParticipantsPrintRow): string {
   if (row.registrationSource === "admin") return "";
   if (row.status !== "APPROVED") return "";
+  const raw = (row.statusChangedAt ?? "").trim();
+  if (!raw) return "";
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+  if (iso) return `${Number(iso[2])}/${Number(iso[3])}`;
   try {
-    return new Date(row.statusChangedAt).toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
+    const d = new Date(raw);
+    if (!Number.isNaN(d.getTime())) return `${d.getMonth() + 1}/${d.getDate()}`;
   } catch {
-    return "";
+    /* ignore */
   }
+  return "";
 }
 
 export default function ParticipantsPrintClient({
@@ -58,6 +70,11 @@ export default function ParticipantsPrintClient({
     }
     return o;
   });
+  const [groupById, setGroupById] = useState<Record<string, string>>({});
+  useEffect(() => {
+    setGroupById(loadGroupDraftMap(tournamentId));
+  }, [tournamentId]);
+
   const [pending, setPending] = useState<string | null>(null);
 
   const patchAttendance = useCallback(
@@ -107,16 +124,16 @@ export default function ParticipantsPrintClient({
           @media print {
             .participants-print-no-print { display: none !important; }
             .participants-print-wrap { padding: 0 !important; margin: 0 !important; }
-            .participants-print-table { font-size: 13pt !important; }
+            .participants-print-table { font-size: 12pt !important; }
             .participants-print-table th,
-            .participants-print-table td { padding: 10px 8px !important; }
+            .participants-print-table td { padding: 6px 5px !important; }
           }
           .participants-print-table { width: 100%; border-collapse: collapse; color: #0f172a; }
           .participants-print-table th, .participants-print-table td {
             border: 1px solid #334155;
-            padding: 0.55rem 0.45rem;
+            padding: 0.35rem 0.3rem;
             text-align: left;
-            font-size: 1rem;
+            font-size: 0.88rem;
             vertical-align: middle;
           }
           .participants-print-table th { background: #f1f5f9; font-weight: 800; }
@@ -146,7 +163,7 @@ export default function ParticipantsPrintClient({
           </h1>
           <p style={{ margin: "0.35rem 0 0", fontSize: "1.05rem", fontWeight: 800 }}>{tournamentTitle}</p>
           <p className="v3-muted participants-print-no-print" style={{ margin: "0.35rem 0 0", fontSize: "0.88rem" }}>
-            승인 참가자 · 이름순 · A4 세로 권장
+            참가자 · 이름순 · 조번호는 관리 화면 입력값(임시) 반영 · A4 세로 권장
           </p>
         </header>
 
@@ -154,35 +171,30 @@ export default function ParticipantsPrintClient({
           <table className="participants-print-table">
             <thead>
               <tr>
-                <th style={{ width: "3rem", textAlign: "center" }}>번호</th>
                 <th>이름</th>
-                <th style={{ width: "5rem" }}>에버</th>
+                <th style={{ width: "4.5rem", textAlign: "center" }}>점수/에버</th>
                 <th>전화번호</th>
-                <th style={{ width: "7rem" }}>입금일</th>
-                <th style={{ width: "4.5rem", textAlign: "center" }} className="participants-print-att-col">
+                <th style={{ width: "3.5rem", textAlign: "center" }}>입금일</th>
+                <th style={{ width: "2.75rem", textAlign: "center" }}>조</th>
+                <th style={{ width: "3.5rem", textAlign: "center" }} className="participants-print-att-col">
                   출석
                 </th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, idx) => {
-                const n = idx + 1;
+              {rows.map((row) => {
                 const checked = checkedById[row.id] ?? false;
-                const deposit = depositLabel(row);
+                const deposit = formatDepositMd(row);
                 const ever =
-                  row.participantAverage != null && Number.isFinite(row.participantAverage) ? String(row.participantAverage) : "-";
+                  row.participantAverage != null && Number.isFinite(row.participantAverage) ? String(row.participantAverage) : "—";
+                const groupVal = (groupById[row.id] ?? "").trim();
                 return (
                   <tr key={row.id}>
-                    <td style={{ textAlign: "center", fontWeight: 700 }}>{n}</td>
-                    <td style={{ fontWeight: 700 }}>{row.applicantName}</td>
-                    <td>{ever}</td>
-                    <td>
-                      <span className="participants-print-no-print">{maskPhoneForScreen(row.phone)}</span>
-                      <span className="participants-print-phone-full" style={{ display: "none" }}>
-                        {row.phone.trim() || "-"}
-                      </span>
-                    </td>
-                    <td>{deposit || "-"}</td>
+                    <td style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{row.applicantName}</td>
+                    <td style={{ textAlign: "center" }}>{ever}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>{row.phone.trim() || "-"}</td>
+                    <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>{deposit || "-"}</td>
+                    <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>{groupVal || "—"}</td>
                     <td style={{ textAlign: "center" }}>
                       <span className="participants-print-no-print">
                         <input
@@ -190,7 +202,7 @@ export default function ParticipantsPrintClient({
                           checked={checked}
                           disabled={pending === row.id}
                           onChange={(e) => void onToggleAttendance(row.id, e.target.checked)}
-                          style={{ width: "1.35rem", height: "1.35rem", cursor: "pointer" }}
+                          style={{ width: "1.2rem", height: "1.2rem", cursor: "pointer" }}
                           aria-label={`${row.applicantName} 출석`}
                         />
                       </span>
@@ -208,8 +220,7 @@ export default function ParticipantsPrintClient({
           dangerouslySetInnerHTML={{
             __html: `
             @media print {
-              .participants-print-phone-full { display: inline !important; }
-              .participants-print-cb-print { display: inline !important; font-size: 14pt; }
+              .participants-print-cb-print { display: inline !important; font-size: 12pt; }
             }
           `,
           }}

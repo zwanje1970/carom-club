@@ -105,7 +105,7 @@ export default function ParticipantAddSheet({ tournamentId }: { tournamentId: st
               </button>
             </div>
             <p className="v3-muted" style={{ margin: 0, fontSize: "0.85rem" }}>
-              현장 입력 · 즉시 승인 · 관리자 등록으로 저장됩니다.
+              현장 입력 · 즉시 참가자 등록 · 관리자 등록으로 저장됩니다.
             </p>
             <label className="v3-stack" style={{ gap: "0.25rem" }}>
               <span style={{ fontSize: "0.82rem", fontWeight: 600 }}>이름 (필수)</span>

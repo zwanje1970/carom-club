@@ -1,60 +1,16 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../../../lib/auth/session";
-import {
-  getClientStatusByUserId,
-  getUserById,
-  isAutoParticipantPushEnabledForClientUserId,
-  type TournamentApplicationStatus,
-} from "../../../../../../../../lib/platform-api";
+import { getClientStatusByUserId, getUserById, type TournamentApplicationStatus } from "../../../../../../../../lib/platform-api";
 import {
   getTournamentApplicationByIdFirestore,
   isManualParticipantUserId,
   updateTournamentApplicationStatusFirestore,
 } from "../../../../../../../../lib/server/firestore-tournament-applications";
 import { getTournamentByIdFirestore } from "../../../../../../../../lib/server/firestore-tournaments";
-import {
-  clampAutoPushBody,
-  truncateTournamentNameForAutoPush,
-} from "../../../../../../../../lib/server/tournament-auto-push-text";
+import { notifyParticipantApprovedAfterDepositConfirm } from "../../../../../../../../lib/server/participant-approved-notify";
 
 export const runtime = "nodejs";
-
-function internalOriginFromRequest(req: NextRequest): string {
-  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
-  const protoPart = (req.headers.get("x-forwarded-proto") ?? "http").split(",")[0];
-  const proto = (protoPart ?? "http").trim();
-  if (host) return `${proto}://${host.trim()}`;
-  const envBase = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
-  if (envBase) return envBase;
-  return "http://127.0.0.1:3000";
-}
-
-async function fireAutoApprovePush(req: NextRequest, params: { applicantUserId: string; tournamentTitle: string }) {
-  const uid = params.applicantUserId.trim();
-  if (!uid) return;
-  const display = truncateTournamentNameForAutoPush(params.tournamentTitle);
-  const bodyText = clampAutoPushBody(`${display} 참가가 확정되었습니다.`, 60);
-  const url = `${internalOriginFromRequest(req)}/api/push/send`;
-  const cookie = req.headers.get("cookie") ?? "";
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(cookie ? { cookie } : {}) },
-      body: JSON.stringify({
-        title: "참가 승인 완료",
-        body: bodyText,
-        targetUserIds: [uid],
-      }),
-    });
-    if (!res.ok) {
-      const j = (await res.json().catch(() => ({}))) as { error?: string };
-      console.error("[auto-push/approve] push/send failed", res.status, j.error ?? "");
-    }
-  } catch (e) {
-    console.error("[auto-push/approve]", e);
-  }
-}
 
 const ALLOWED_STATUSES: TournamentApplicationStatus[] = [
   "APPLIED",
@@ -133,14 +89,14 @@ export async function PATCH(
 
   if (body.nextStatus === "APPROVED" && targetEntry.status !== "APPROVED") {
     const applicantUserId = String(result.application.userId ?? "").trim();
-    const creatorId = String(tournament.createdBy ?? "").trim();
-    if (
-      applicantUserId &&
-      !isManualParticipantUserId(applicantUserId) &&
-      creatorId &&
-      (await isAutoParticipantPushEnabledForClientUserId(creatorId))
-    ) {
-      void fireAutoApprovePush(request, { applicantUserId, tournamentTitle: tournament.title });
+    if (applicantUserId && !isManualParticipantUserId(applicantUserId)) {
+      void notifyParticipantApprovedAfterDepositConfirm({
+        entryId,
+        applicantUserId,
+        tournamentId: id,
+        tournamentTitle: tournament.title,
+        tournamentDate: tournament.date,
+      });
     }
   }
 

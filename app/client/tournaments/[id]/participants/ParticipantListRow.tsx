@@ -12,10 +12,10 @@ type TournamentApplicationStatus =
   | "REJECTED";
 
 const STATUS_LABELS: Record<TournamentApplicationStatus, string> = {
-  APPLIED: "신청접수",
-  VERIFYING: "검토중",
-  WAITING_PAYMENT: "입금대기",
-  APPROVED: "승인완료",
+  APPLIED: "신청자",
+  VERIFYING: "신청자",
+  WAITING_PAYMENT: "신청자",
+  APPROVED: "참가자",
   REJECTED: "거절",
 };
 
@@ -33,15 +33,33 @@ function statusBadgeStyle(status: TournamentApplicationStatus): CSSProperties {
 }
 
 const actionBtnBase: CSSProperties = {
-  minHeight: 44,
-  minWidth: 44,
-  padding: "0 0.55rem",
-  fontSize: "0.82rem",
+  minHeight: 32,
+  minWidth: 32,
+  padding: "0 0.4rem",
+  fontSize: "0.72rem",
   fontWeight: 700,
-  borderRadius: "0.35rem",
+  borderRadius: "0.3rem",
   touchAction: "manipulation",
   flexShrink: 0,
 };
+
+const cellBase: CSSProperties = {
+  padding: "0.2rem 0.35rem",
+  fontSize: "0.875rem",
+  verticalAlign: "middle",
+  borderBottom: "1px solid #e8e8e8",
+};
+
+function formatDepositMd(status: TournamentApplicationStatus, statusChangedAt?: string): string {
+  if (status !== "APPROVED") return "—";
+  const raw = (statusChangedAt ?? "").trim();
+  if (!raw) return "—";
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+  if (iso) return `${Number(iso[2])}/${Number(iso[3])}`;
+  const d = new Date(raw);
+  if (!Number.isNaN(d.getTime())) return `${d.getMonth() + 1}/${d.getDate()}`;
+  return "—";
+}
 
 export default function ParticipantListRow({
   tournamentId,
@@ -53,6 +71,10 @@ export default function ParticipantListRow({
   registrationSource,
   participantAverage,
   adminNote,
+  statusChangedAt,
+  attendanceChecked: attendanceCheckedProp,
+  groupDraft,
+  onGroupDraftChange,
 }: {
   tournamentId: string;
   entryId: string;
@@ -63,14 +85,24 @@ export default function ParticipantListRow({
   registrationSource?: "admin" | null;
   participantAverage?: number | null;
   adminNote?: string | null;
+  statusChangedAt?: string;
+  attendanceChecked?: boolean | null;
+  groupDraft: string;
+  onGroupDraftChange: (entryId: string, value: string) => void;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<TournamentApplicationStatus>(initialStatus);
   const [loading, setLoading] = useState(false);
+  const [attendanceChecked, setAttendanceChecked] = useState(attendanceCheckedProp === true);
+  const [attendancePending, setAttendancePending] = useState(false);
 
   useEffect(() => {
     setStatus(initialStatus);
   }, [initialStatus]);
+
+  useEffect(() => {
+    setAttendanceChecked(attendanceCheckedProp === true);
+  }, [attendanceCheckedProp]);
 
   const detailHref = `/client/tournaments/${tournamentId}/participants/${entryId}`;
 
@@ -101,6 +133,35 @@ export default function ParticipantListRow({
     }
   }
 
+  async function patchAttendance(next: boolean) {
+    const prev = attendanceChecked;
+    if (prev && !next) {
+      if (!window.confirm("출석 체크를 해제할까요?")) return;
+    }
+    setAttendancePending(true);
+    try {
+      const response = await fetch(
+        `/api/client/tournaments/${encodeURIComponent(tournamentId)}/participants/${encodeURIComponent(entryId)}/attendance`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ checked: next }),
+        }
+      );
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        window.alert(result.error ?? "출석 저장에 실패했습니다.");
+        return;
+      }
+      setAttendanceChecked(next);
+      router.refresh();
+    } catch {
+      window.alert("출석 저장 중 오류가 발생했습니다.");
+    } finally {
+      setAttendancePending(false);
+    }
+  }
+
   const showEver = participantAverage != null && Number.isFinite(participantAverage);
   const metaBits: string[] = [];
   if (registrationSource === "admin" && adminNote?.trim()) {
@@ -111,14 +172,10 @@ export default function ParticipantListRow({
   }
   const metaLine = metaBits.join(" · ");
 
-  function renderRightColumn() {
+  function renderNameCellActions() {
     if (status === "WAITING_PAYMENT") {
       return (
-        <div
-          style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "0.25rem" }}
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
+        <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "center", gap: "0.2rem", flexShrink: 0 }}>
           <button
             type="button"
             className="v3-btn"
@@ -147,7 +204,7 @@ export default function ParticipantListRow({
           >
             거절
           </button>
-        </div>
+        </span>
       );
     }
     if (status === "APPROVED") {
@@ -156,31 +213,21 @@ export default function ParticipantListRow({
           style={{
             display: "inline-flex",
             alignItems: "center",
-            minHeight: 44,
-            padding: "0 0.45rem",
-            fontSize: "0.82rem",
+            minHeight: 28,
+            padding: "0 0.35rem",
+            fontSize: "0.7rem",
             fontWeight: 800,
             ...statusBadgeStyle(status),
-            borderRadius: "0.35rem",
+            borderRadius: "0.3rem",
           }}
         >
-          승인됨
+          참가자
         </span>
       );
     }
     if (status === "REJECTED") {
       return (
-        <span
-          className="v3-muted"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            minHeight: 44,
-            padding: "0 0.45rem",
-            fontSize: "0.8rem",
-            fontWeight: 700,
-          }}
-        >
+        <span className="v3-muted" style={{ fontSize: "0.68rem", fontWeight: 700 }}>
           거절됨
         </span>
       );
@@ -190,10 +237,10 @@ export default function ParticipantListRow({
         style={{
           display: "inline-flex",
           alignItems: "center",
-          minHeight: 44,
-          padding: "0.12rem 0.45rem",
-          borderRadius: "0.3rem",
-          fontSize: "0.78rem",
+          minHeight: 28,
+          padding: "0.08rem 0.35rem",
+          borderRadius: "0.25rem",
+          fontSize: "0.68rem",
           fontWeight: 700,
           whiteSpace: "nowrap",
           ...statusBadgeStyle(status),
@@ -204,99 +251,92 @@ export default function ParticipantListRow({
     );
   }
 
+  const depositCell = formatDepositMd(status, statusChangedAt);
+  const scoreCell = showEver ? String(participantAverage) : "—";
+
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        borderBottom: "1px solid #e8e8e8",
-        background: "#fff",
-        touchAction: "manipulation",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "0.45rem",
-          padding: "0.35rem 0.45rem 0.15rem",
-          minHeight: 44,
-        }}
-      >
-        <div
-          style={{
-            flex: 1,
-            minWidth: 0,
-            display: "flex",
-            flexDirection: "row",
-            alignItems: "baseline",
-            gap: "0.35rem",
-            flexWrap: "wrap",
-          }}
-        >
-          <span style={{ fontWeight: 800, fontSize: "0.95rem", lineHeight: 1.2 }}>{applicantName}</span>
+    <tr style={{ background: "#fff" }}>
+      <td style={{ ...cellBase, whiteSpace: "nowrap", maxWidth: "11rem" }}>
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "0.25rem", flexWrap: "nowrap", minWidth: 0 }}>
+          <span
+            style={{ fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}
+            title={metaLine || undefined}
+          >
+            {applicantName}
+          </span>
           {registrationSource === "admin" ? (
             <span
               style={{
-                fontSize: "0.68rem",
+                fontSize: "0.62rem",
                 fontWeight: 700,
-                padding: "0.06rem 0.3rem",
-                borderRadius: "0.25rem",
+                padding: "0.04rem 0.25rem",
+                borderRadius: "0.2rem",
                 background: "#eef2ff",
                 color: "#3730a3",
                 border: "1px solid #c7d2fe",
-                lineHeight: 1.2,
+                flexShrink: 0,
               }}
             >
               관리자 등록
             </span>
           ) : null}
-          {showEver ? (
-            <span className="v3-muted" style={{ fontSize: "0.8rem", fontWeight: 700 }}>
-              에버 {participantAverage}
-            </span>
-          ) : null}
+          <Link
+            prefetch={false}
+            href={detailHref}
+            className="v3-btn"
+            style={{
+              padding: "0.15rem 0.35rem",
+              fontSize: "0.68rem",
+              fontWeight: 700,
+              textDecoration: "none",
+              flexShrink: 0,
+              touchAction: "manipulation",
+            }}
+          >
+            상세
+          </Link>
+          {renderNameCellActions()}
         </div>
-        {renderRightColumn()}
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "0.5rem",
-          padding: "0 0.45rem 0.3rem",
-        }}
-      >
-        <span className="v3-muted" style={{ fontSize: "0.78rem", lineHeight: 1.35, wordBreak: "break-all" }}>
-          {phone.trim() || "—"}
-        </span>
-        <Link
-          prefetch={false}
-          href={detailHref}
-          className="v3-btn"
+      </td>
+      <td style={{ ...cellBase, whiteSpace: "nowrap", textAlign: "center" }}>{scoreCell}</td>
+      <td style={{ ...cellBase, whiteSpace: "nowrap" }}>{phone.trim() || "—"}</td>
+      <td style={{ ...cellBase, whiteSpace: "nowrap", textAlign: "center" }}>{depositCell}</td>
+      <td style={{ ...cellBase, textAlign: "center" }}>
+        <input
+          type="number"
+          min={1}
+          max={999}
+          inputMode="numeric"
+          placeholder=""
+          value={groupDraft}
+          onChange={(e) => onGroupDraftChange(entryId, e.target.value)}
           style={{
-            padding: "0.28rem 0.5rem",
-            fontSize: "0.76rem",
-            fontWeight: 700,
-            textDecoration: "none",
-            flexShrink: 0,
-            touchAction: "manipulation",
+            width: "3.25rem",
+            padding: "0.12rem 0.2rem",
+            fontSize: "0.8rem",
+            border: "1px solid #cbd5e1",
+            borderRadius: "0.25rem",
+            textAlign: "center",
           }}
-        >
-          상세
-        </Link>
-      </div>
-
-      {metaLine ? (
-        <div className="v3-muted" style={{ fontSize: "0.72rem", padding: "0 0.45rem 0.35rem", lineHeight: 1.3 }}>
-          {metaLine}
-        </div>
-      ) : null}
-    </div>
+          aria-label={`${applicantName} 조번호`}
+        />
+      </td>
+      <td style={{ ...cellBase, textAlign: "center" }}>
+        {status === "APPROVED" ? (
+          <input
+            type="checkbox"
+            checked={attendanceChecked}
+            disabled={attendancePending}
+            onChange={(e) => void patchAttendance(e.target.checked)}
+            style={{ width: "1.1rem", height: "1.1rem", cursor: "pointer" }}
+            aria-label={`${applicantName} 출석`}
+          />
+        ) : (
+          <span className="v3-muted" style={{ fontSize: "0.8rem" }}>
+            —
+          </span>
+        )}
+      </td>
+    </tr>
   );
 }

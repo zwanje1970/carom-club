@@ -13,9 +13,15 @@ const STATUS_LABELS: Record<TournamentApplicationStatus, string> = {
   APPLIED: "신청접수",
   VERIFYING: "검토중",
   WAITING_PAYMENT: "입금대기",
-  APPROVED: "승인완료",
+  APPROVED: "참가자",
   REJECTED: "거절",
 };
+
+function statusHeadline(s: TournamentApplicationStatus): string {
+  if (s === "APPROVED") return "참가자";
+  if (s === "REJECTED") return "거절";
+  return "신청자";
+}
 
 const NEXT_STATUS_MAP: Record<TournamentApplicationStatus, TournamentApplicationStatus[]> = {
   APPLIED: ["VERIFYING", "REJECTED"],
@@ -60,7 +66,7 @@ export default function StatusTransitionControls({
       }
       const updatedStatus = result.application?.status ?? nextStatus;
       setStatus(updatedStatus);
-      setMessage(`상태가 ${updatedStatus}(으)로 변경되었습니다.`);
+      setMessage(`상태가 ${statusHeadline(updatedStatus)}(으)로 변경되었습니다.`);
     } catch {
       setMessage("상태 변경 중 오류가 발생했습니다.");
     } finally {
@@ -72,7 +78,7 @@ export default function StatusTransitionControls({
     <section className="v3-box v3-stack">
       <h2 className="v3-h2">운영 상태 처리</h2>
       <p>
-        <strong>현재 상태:</strong> {STATUS_LABELS[status]} ({status})
+        <strong>현재 상태:</strong> {statusHeadline(status)} ({status})
       </p>
       {nextStatuses.length === 0 ? (
         <p className="v3-muted">이 상태에서는 추가 전이가 없습니다.</p>
@@ -91,7 +97,11 @@ export default function StatusTransitionControls({
                 borderColor: nextStatus === "APPROVED" ? "#7dcea0" : "#d7d7d7",
               }}
             >
-              {nextStatus === "APPROVED" ? "입금확인" : `${STATUS_LABELS[nextStatus]}로 변경`}
+              {nextStatus === "APPROVED"
+                ? "입금확인"
+                : nextStatus === "REJECTED"
+                  ? "거절"
+                  : `${STATUS_LABELS[nextStatus]}로 변경`}
             </button>
           ))}
         </div>

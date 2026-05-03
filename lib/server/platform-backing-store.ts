@@ -472,6 +472,8 @@ export type TournamentApplication = {
   adminNote?: string | null;
   /** 출석(현장 운영·인쇄 목록 연동) */
   attendanceChecked?: boolean | null;
+  /** 입금확정(APPROVED) 알림 1회 발송 시각(중복 방지) */
+  approvedNotifiedAt?: string | null;
 };
 
 /** 클라이언트 참가자 목록 RSC — 증빙·OCR·입금자명 등 제외 */
@@ -484,6 +486,9 @@ export type TournamentApplicationListItem = {
   registrationSource?: "admin" | null;
   participantAverage?: number | null;
   adminNote?: string | null;
+  /** 목록·출석 표시용(문서 필드, API 스키마 변경 아님) */
+  statusChangedAt?: string;
+  attendanceChecked?: boolean;
 };
 
 export type BracketParticipantSnapshotParticipant = {
@@ -4941,6 +4946,35 @@ export async function getClientVenueIntroByUserId(userId: string): Promise<Clien
   return store.clientVenueIntros.find((o) => o.clientUserId === canonical) ?? null;
 }
 
+/** 당구장 소개 문서가 있고, 표시 모드에 맞는 내용이 채워졌는지(대시보드 안내용) */
+export function clientVenueIntroHasMeaningfulContent(intro: ClientVenueIntroStored | null): boolean {
+  if (!intro) return false;
+  const mode = intro.outlineDisplayMode;
+  if (mode === "TEXT") return Boolean(intro.outlineHtml && intro.outlineHtml.trim());
+  if (mode === "IMAGE") return Boolean(intro.outlineImageUrl && intro.outlineImageUrl.trim());
+  if (mode === "PDF") return Boolean(intro.outlinePdfUrl && intro.outlinePdfUrl.trim());
+  return false;
+}
+
+/** 대시보드: 전체 대회 id 배열 없이 최근 쪽 1건만 탐색 */
+export async function loadClientDashboardTournamentRollupLightForUser(userId: string): Promise<{
+  hasAnyTournament: boolean;
+  firstTournamentId: string;
+}> {
+  if (isFirestoreUsersBackendConfigured()) {
+    const mod = await import("./firestore-tournaments");
+    return mod.listClientDashboardTournamentFirstVisibleFirestore(userId);
+  }
+  const store = await readLocalJsonAggregate();
+  const canonicalUserId = resolveCanonicalUserId(store, userId.trim());
+  const filtered = store.tournaments
+    .filter((item) => item.createdBy === canonicalUserId)
+    .filter((item) => isEntityLifecycleVisibleForList(item.status))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  if (filtered.length === 0) return { hasAnyTournament: false, firstTournamentId: "" };
+  return { hasAnyTournament: true, firstTournamentId: filtered[0]!.id };
+}
+
 export async function upsertClientVenueIntroForUser(
   userId: string,
   params: {
@@ -6192,7 +6226,7 @@ export async function setTournamentSettlementStatus(params: {
 export async function getTournamentLedgerLinesForClient(
   tournamentId: string
 ): Promise<
-  | { ok: true; tournament: Pick<Tournament, "id" | "title" | "date">; lines: SettlementLedgerLineStored[] }
+  | { ok: true; tournament: Pick<Tournament, "id" | "title">; lines: SettlementLedgerLineStored[] }
   | { ok: false; error: string }
 > {
   if (isFirestoreUsersBackendConfigured()) {
@@ -6209,7 +6243,7 @@ export async function getTournamentLedgerLinesForClient(
     if (ad !== bd) return bd.localeCompare(ad);
     return (b.sortOrder ?? 0) - (a.sortOrder ?? 0);
   });
-  return { ok: true, tournament, lines };
+  return { ok: true, tournament: { id: tournament.id, title: tournament.title }, lines };
 }
 
 export async function replaceSettlementLedgerLines(params: {
@@ -7803,9 +7837,6 @@ export async function updateTournamentApplicationStatus(params: {
   if (previousStatus === "VERIFYING" && params.nextStatus === "WAITING_PAYMENT") {
     notificationTitle = "검증 완료, 입금 필요";
     notificationMessage = `${tournamentTitle}: 검증이 완료되었습니다. 입금을 진행해 주세요.`;
-  } else if (previousStatus === "WAITING_PAYMENT" && params.nextStatus === "APPROVED") {
-    notificationTitle = "입금 확인, 참가 확정";
-    notificationMessage = `${tournamentTitle}: 입금 확인이 완료되어 참가가 확정되었습니다.`;
   } else if (params.nextStatus === "REJECTED") {
     notificationTitle = "참가 제한 안내";
     notificationMessage = `${tournamentTitle}: 참가가 제한되었습니다. 운영자 안내를 확인해 주세요.`;
@@ -7877,9 +7908,82 @@ export async function updateTournamentApplicationStatus(params: {
   };
 }
 
+function buildParticipantApprovedNotificationCopy(
+  tournamentDate: string,
+  tournamentTitle: string
+): { title: string; message: string } {
+  const title = "참가 신청 완료";
+  const raw = String(tournamentDate ?? "").trim();
+  let md = "";
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+  if (iso) {
+    md = `${Number(iso[2])}/${Number(iso[3])}`;
+  } else {
+    const d = new Date(raw);
+    if (!Number.isNaN(d.getTime())) {
+      md = `${d.getMonth() + 1}/${d.getDate()}`;
+    }
+  }
+  const name = (tournamentTitle || "대회").trim();
+  const message = md ? `${md} ${name} 참가신청이 완료되었습니다` : `${name} 참가신청이 완료되었습니다`;
+  return { title, message };
+}
+
+/** 로컬 JSON 저장소: 입금확정 알림·FCM 1회(approvedNotifiedAt 중복 방지). Firestore 경로에서는 호출하지 않는다. */
+export async function notifyParticipantApprovedOnLocalStoreIfNeeded(params: {
+  tournamentId: string;
+  entryId: string;
+  applicantUserId: string;
+  tournamentTitle: string;
+  tournamentDate: string;
+}): Promise<void> {
+  const applicantUserId = params.applicantUserId.trim();
+  if (!applicantUserId || applicantUserId.startsWith("manual-participant:")) return;
+  if (isFirestoreUsersBackendConfigured()) return;
+  if (!isDevStoreFilePersistenceEnabled()) return;
+
+  const store = await readLocalJsonAggregate();
+  const tid = params.tournamentId.trim();
+  const eid = params.entryId.trim();
+  const application = store.tournamentApplications.find((a) => a.tournamentId === tid && a.id === eid);
+  if (!application || application.status !== "APPROVED") return;
+  if (application.approvedNotifiedAt && String(application.approvedNotifiedAt).trim()) return;
+
+  const now = new Date().toISOString();
+  application.approvedNotifiedAt = now;
+  application.updatedAt = now;
+
+  const { title, message } = buildParticipantApprovedNotificationCopy(params.tournamentDate, params.tournamentTitle);
+  const canonicalUserId = resolveCanonicalUserId(store, applicantUserId);
+  store.notifications.push({
+    id: randomUUID(),
+    userId: canonicalUserId,
+    title,
+    message,
+    relatedTournamentId: tid,
+    createdAt: now,
+    isRead: false,
+  });
+  await writeLocalJsonAggregate(store);
+
+  try {
+    const rows = await listFcmDeviceTokensForUserIds([canonicalUserId]);
+    const tokens = rows.map((r) => r.token.trim()).filter(Boolean);
+    if (tokens.length === 0) return;
+    const { sendFcmToTokens } = await import("./fcm-send");
+    await sendFcmToTokens({ title, body: message, url: null, tokens });
+  } catch {
+    /* FCM 미설정·토큰 없음 등 무시 */
+  }
+}
+
 export async function listNotificationsByUserId(userId: string, limit = 20): Promise<UserNotification[]> {
   const normalizedUserId = userId.trim();
   if (!normalizedUserId) return [];
+  if (useFirestoreUsersInProduction()) {
+    const { listUserNotificationsFirestore } = await import("./firestore-user-notifications");
+    return (await listUserNotificationsFirestore(normalizedUserId, limit)) as UserNotification[];
+  }
   if (process.env.NODE_ENV !== "development") {
     return [];
   }
@@ -7897,6 +8001,10 @@ export async function listNotificationsByUserId(userId: string, limit = 20): Pro
 export async function countUnreadNotificationsByUserId(userId: string): Promise<number> {
   const normalizedUserId = userId.trim();
   if (!normalizedUserId) return 0;
+  if (useFirestoreUsersInProduction()) {
+    const { countUnreadUserNotificationsFirestore } = await import("./firestore-user-notifications");
+    return countUnreadUserNotificationsFirestore(normalizedUserId);
+  }
   if (process.env.NODE_ENV !== "development") {
     return 0;
   }
@@ -7916,6 +8024,10 @@ export async function markNotificationAsRead(params: {
   const userId = params.userId.trim();
   const notificationId = params.notificationId.trim();
   if (!userId || !notificationId) return null;
+  if (useFirestoreUsersInProduction()) {
+    const { markUserNotificationReadFirestore } = await import("./firestore-user-notifications");
+    return (await markUserNotificationReadFirestore({ userId, notificationId })) as UserNotification | null;
+  }
   if (process.env.NODE_ENV !== "development") {
     const now = new Date().toISOString();
     return {
@@ -7942,6 +8054,11 @@ export async function markNotificationAsRead(params: {
 export async function markAllNotificationsAsReadForUser(userId: string): Promise<{ updated: number }> {
   const normalizedUserId = userId.trim();
   if (!normalizedUserId) return { updated: 0 };
+  if (useFirestoreUsersInProduction()) {
+    const { markAllUserNotificationsReadFirestore } = await import("./firestore-user-notifications");
+    const updated = await markAllUserNotificationsReadFirestore(normalizedUserId);
+    return { updated };
+  }
   if (process.env.NODE_ENV !== "development") {
     return { updated: 0 };
   }

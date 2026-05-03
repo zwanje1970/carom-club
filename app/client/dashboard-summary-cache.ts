@@ -14,7 +14,9 @@ type SessionEnvelope = {
 let memorySummary: ClientDashboardSummaryJson | null = null;
 
 function isValidSummary(v: unknown): v is ClientDashboardSummaryJson {
-  return Boolean(v && typeof v === "object" && (v as ClientDashboardSummaryJson).ok === true);
+  if (!v || typeof v !== "object") return false;
+  const o = v as Partial<ClientDashboardSummaryJson>;
+  return o.ok === true && typeof o.hasVenueIntro === "boolean";
 }
 
 export function readClientDashboardSummaryMemory(): ClientDashboardSummaryJson | null {

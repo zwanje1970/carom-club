@@ -20,7 +20,7 @@ export function dashboardMobileChromeMeta(
   const root = area === "client" ? "/client" : "/platform";
 
   if (area === "client") {
-    if (p === "/client") return { title: "대시보드", backHref: null };
+    if (p === "/client") return { title: "클라이언트 운영관리", backHref: null };
     if (p === "/client/tournaments") return { title: "대회관리", backHref: "/client" };
     if (p === "/client/tournaments/new") return { title: "대회 만들기", backHref: "/client/tournaments" };
     if (p === "/client/settlement") return { title: "정산관리", backHref: "/client" };

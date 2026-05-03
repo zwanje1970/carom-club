@@ -3,7 +3,13 @@ import type { DocumentSnapshot } from "firebase-admin/firestore";
 import type { AuthRole } from "../auth/roles";
 import { assertClientFirestorePersistenceConfigured } from "./firestore-client-applications";
 import { listTournamentApplicationsByTournamentIdFirestore } from "./firestore-tournament-applications";
-import { getTournamentByIdFirestore, listAllTournamentsFirestore, listTournamentsByCreatorFirestore } from "./firestore-tournaments";
+import {
+  getTournamentByIdFirestore,
+  getTournamentOwnerAccessPreviewByIdFirestore,
+  getTournamentSettlementAccessFieldsByIdFirestore,
+  listAllTournamentsFirestore,
+  listTournamentsByCreatorFirestore,
+} from "./firestore-tournaments";
 import { getSharedFirestoreDb } from "./firestore-users";
 import { computeLegacyAutoSettlementSummary } from "./settlement-legacy-summary";
 import { computeLedgerTotalsFromLines, isSettlementCategoryV2 } from "../settlement-ledger-v2";
@@ -358,27 +364,40 @@ export async function setTournamentSettlementStatusFirestore(params: {
   );
 }
 
-export async function getTournamentLedgerLinesForClientFirestore(
+/** 장부 라인만 조회(대회 문서는 호출부에서 이미 검증한 경우). */
+export async function getSettlementLedgerLinesOnlyFirestore(
   tournamentId: string
-): Promise<
-  { ok: true; tournament: SettlementLedgerTournamentSummary; lines: SettlementLedgerLineStored[] } | { ok: false; error: string }
-> {
+): Promise<{ ok: true; lines: SettlementLedgerLineStored[] } | { ok: false; error: string }> {
   assertClientFirestorePersistenceConfigured();
-  const tournament = await getTournamentByIdFirestore(tournamentId);
-  if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다." };
-  const settlement = await getOrCreateSettlementFirestore(tournamentId);
+  const tid = tournamentId.trim();
+  if (!tid) return { ok: false, error: "잘못된 요청입니다." };
+  const settlement = await getOrCreateSettlementFirestore(tid);
   const lines = normalizeLedgerLinesArray(settlement.ledgerLines).sort((a, b) => {
     const ad = a.entryDate ?? "";
     const bd = b.entryDate ?? "";
     if (ad !== bd) return bd.localeCompare(ad);
     return (b.sortOrder ?? 0) - (a.sortOrder ?? 0);
   });
-  const summary: SettlementLedgerTournamentSummary = {
-    id: tournament.id,
-    title: tournament.title,
-    date: tournament.date,
+  return { ok: true, lines };
+}
+
+export async function getTournamentLedgerLinesForClientFirestore(
+  tournamentId: string
+): Promise<
+  { ok: true; tournament: SettlementLedgerTournamentSummary; lines: SettlementLedgerLineStored[] } | { ok: false; error: string }
+> {
+  assertClientFirestorePersistenceConfigured();
+  const t = await getTournamentSettlementAccessFieldsByIdFirestore(tournamentId);
+  if (!t || t.status === "DELETED") {
+    return { ok: false, error: "대회를 찾을 수 없습니다." };
+  }
+  const linesOnly = await getSettlementLedgerLinesOnlyFirestore(tournamentId);
+  if (!linesOnly.ok) return linesOnly;
+  return {
+    ok: true,
+    tournament: { id: t.id, title: t.title },
+    lines: linesOnly.lines,
   };
-  return { ok: true, tournament: summary, lines };
 }
 
 export async function replaceSettlementLedgerLinesFirestore(params: {
@@ -395,8 +414,10 @@ export async function replaceSettlementLedgerLinesFirestore(params: {
   assertClientFirestorePersistenceConfigured();
   const tournamentId = params.tournamentId.trim();
   if (!tournamentId) return { ok: false, error: "잘못된 요청입니다." };
-  const tournament = await getTournamentByIdFirestore(tournamentId);
-  if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다." };
+  const access = await getTournamentOwnerAccessPreviewByIdFirestore(tournamentId);
+  if (!access || access.status === "DELETED") {
+    return { ok: false, error: "대회를 찾을 수 없습니다." };
+  }
 
   const built: SettlementLedgerLineStored[] = [];
   for (let i = 0; i < params.lines.length; i++) {

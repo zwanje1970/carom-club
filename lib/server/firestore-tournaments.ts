@@ -186,6 +186,33 @@ export async function getTournamentOwnerAccessPreviewByIdFirestore(tournamentId:
   return { id: doc.id, createdBy, status };
 }
 
+/** 정산 장부 API 전용 — `title`·소유자·삭제 여부만 (전체 `normalizeTournament` 없음). */
+export async function getTournamentSettlementAccessFieldsByIdFirestore(tournamentId: string): Promise<{
+  id: string;
+  title: string;
+  createdBy: string;
+  status: "ACTIVE" | "DELETED";
+} | null> {
+  assertClientFirestorePersistenceConfigured();
+  const id = tournamentId.trim();
+  if (!id) return null;
+  const db = getSharedFirestoreDb();
+  const qSnap = await db
+    .collection(COLLECTION)
+    .where(admin.firestore.FieldPath.documentId(), "==", id)
+    .limit(1)
+    .select("title", "createdBy", "status")
+    .get();
+  if (qSnap.empty) return null;
+  const doc = qSnap.docs[0]!;
+  const data = doc.data() as Record<string, unknown> | undefined;
+  const title = typeof data?.title === "string" ? data.title : "";
+  const createdBy = typeof data?.createdBy === "string" ? data.createdBy : "";
+  const st = data?.status;
+  const status: "ACTIVE" | "DELETED" = st === "DELETED" ? "DELETED" : "ACTIVE";
+  return { id: doc.id, title, createdBy, status };
+}
+
 /**
  * 메인 슬라이드 등: 대회 문서의 `date`·`location`만 배치 조회(정규화·venue 해석 없음).
  * `getTournamentByIdFirestore` 대비 라운드트립·CPU 부담을 줄인다.
@@ -287,6 +314,55 @@ export async function listClientDashboardTournamentRollupFirestore(userId: strin
   const recentTournamentsForSummary =
     built.length === 0 ? [] : [tournamentToClientDashboardPreview(built[0]!)];
   return { visibleTournamentIds, recentTournamentsForSummary };
+}
+
+const DASHBOARD_TOURNAMENT_SCAN_LIMIT = 40;
+
+/**
+ * 대시보드 요약 전용: 전체 대회 목록을 만들지 않고 최근 N건 중 첫 “표시 가능” 대회 1개만 탐색.
+ */
+export async function listClientDashboardTournamentFirstVisibleFirestore(userId: string): Promise<{
+  hasAnyTournament: boolean;
+  firstTournamentId: string;
+}> {
+  assertClientFirestorePersistenceConfigured();
+  const db = getSharedFirestoreDb();
+  const orgs = await loadResolutionOrgs();
+  const uid = userId.trim();
+  const fsSelect = [...TOURNAMENT_FIRESTORE_LEAN_BUILD_FIELDS];
+  let q;
+  try {
+    q = await db
+      .collection(COLLECTION)
+      .where("createdBy", "==", uid)
+      .orderBy("createdAt", "desc")
+      .limit(DASHBOARD_TOURNAMENT_SCAN_LIMIT)
+      .select(...fsSelect)
+      .get();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error ?? "");
+    if (!message.includes("FAILED_PRECONDITION")) {
+      throw error;
+    }
+    q = await db
+      .collection(COLLECTION)
+      .where("createdBy", "==", uid)
+      .limit(DASHBOARD_TOURNAMENT_SCAN_LIMIT)
+      .select(...fsSelect)
+      .get();
+  }
+  const docs = q.docs.slice().sort((a, b) => {
+    const ac = String(a.data()?.createdAt ?? "");
+    const bc = String(b.data()?.createdAt ?? "");
+    return bc.localeCompare(ac);
+  });
+  for (const doc of docs) {
+    const t = buildTournamentFromParsedRow({ id: doc.id, ...doc.data() }, orgs);
+    if (isEntityLifecycleVisibleForList(t.status)) {
+      return { hasAnyTournament: true, firstTournamentId: doc.id };
+    }
+  }
+  return { hasAnyTournament: false, firstTournamentId: "" };
 }
 
 export async function listAllTournamentsFirestore(): Promise<Tournament[]> {
