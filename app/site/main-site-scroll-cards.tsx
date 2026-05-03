@@ -365,6 +365,7 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const primarySegmentRef = useRef<HTMLDivElement | null>(null);
+  const secondarySegmentRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number | null>(null);
   const resumeTimerRef = useRef<number | null>(null);
@@ -480,14 +481,22 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
       const dtSec = Math.max(0, (frameTime - prevTime) / 1000);
       lastFrameTimeRef.current = frameTime;
 
-      const cycleHeight = segmentHeight > 0 ? segmentHeight : Math.max(maxScrollTop, 1);
       let pxPerSec = segmentHeight > 0 ? segmentHeight / durationSec : fallbackPxPerSec;
       if (!Number.isFinite(pxPerSec) || pxPerSec <= 0) {
         pxPerSec = fallbackPxPerSec;
       }
+      const firstStart = primarySegmentRef.current?.offsetTop ?? 0;
+      const secondStart = secondarySegmentRef.current?.offsetTop ?? 0;
+      const hasOffsetLoopWindow = secondStart > firstStart;
+      const loopDistance = hasOffsetLoopWindow
+        ? secondStart - firstStart
+        : segmentHeight > 0
+          ? segmentHeight
+          : Math.max(maxScrollTop, 1);
+      const loopEnd = hasOffsetLoopWindow ? secondStart : loopDistance;
       let nextScrollTop = node.scrollTop + pxPerSec * dtSec;
-      if (nextScrollTop >= cycleHeight) {
-        nextScrollTop -= cycleHeight;
+      while (nextScrollTop >= loopEnd && loopDistance > 0) {
+        nextScrollTop -= loopDistance;
       }
 
       // programmatic scrollTop 변경 직후 발생하는 scroll 이벤트를 사용자 입력으로 오인하지 않도록 보호
@@ -585,7 +594,7 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
     >
       <div className={`${styles.sampleMainMarqueeTrack} ${siteStyles.trackScrollStatic}`}>
         {renderSegment("a", primarySegmentRef)}
-        {renderSegment("b")}
+        {renderSegment("b", secondarySegmentRef)}
       </div>
     </div>
   );
