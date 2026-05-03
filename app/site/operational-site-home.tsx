@@ -99,19 +99,21 @@ async function safeGetMainSlideAdSettingsForHome() {
 }
 
 function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCardItem[] {
-  return items.map((item) => {
+  return items.map((item, index) => {
     const href = (item.targetDetailUrl ?? "").trim() || "/site/tournaments";
     const external = item.linkType === "external" || /^https?:\/\//i.test(href);
+    /** 순환 병합 시 동일 snapshotId가 반복될 수 있어 리스트 인덱스로 키를 유일화 */
+    const rowId = `${item.snapshotId}__m${index}`;
 
     try {
       if (item.type !== "ad") {
         const published640T = (item.publishedCardImageUrl ?? "").trim();
         const published320T = (item.publishedCardImage320Url ?? "").trim();
-        const publishedScrollBgT = published640T || published320T;
+        const publishedScrollBgT = published320T || published640T;
         /** 메인만: 게시 PNG URL이 있으면 플랫 이미지 카드(오버레이 없음). 없으면 HTML 카드 */
         if (publishedScrollBgT) {
           return {
-            id: item.snapshotId,
+            id: rowId,
             href,
             title: item.title,
             imageUrl: publishedScrollBgT,
@@ -122,7 +124,7 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
           };
         }
         return {
-          id: item.snapshotId,
+          id: rowId,
           href,
           title: item.title,
           imageUrl: null,
@@ -134,8 +136,8 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
 
       const published640 = (item.publishedCardImageUrl ?? "").trim();
       const published320 = (item.publishedCardImage320Url ?? "").trim();
-      /** 메인 슬라이드: 640 우선(320은 목록 등 다른 경로 유지). 둘 다 없으면 게시 면 미사용 */
-      const publishedScrollBg = published640 || published320;
+      /** 메인 슬라이드: 320 기준(가벼운 CTA). */
+      const publishedScrollBg = published320 || published640;
       if (publishedScrollBg) {
         const isAd = item.type === "ad";
         const metaTint =
@@ -144,7 +146,7 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
           (item.cardDescriptionTextColor ?? "").trim() ||
           null;
         return {
-          id: item.snapshotId,
+          id: rowId,
           href,
           title: item.title,
           imageUrl: publishedScrollBg,
@@ -166,7 +168,7 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
       const faceCssBackground =
         !imageUrl && item.mediaBackground?.trim() ? item.mediaBackground.trim() : !imageUrl ? "transparent" : null;
       return {
-        id: item.snapshotId,
+        id: rowId,
         href,
         title: item.title,
         imageUrl,
@@ -193,7 +195,7 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
     } catch {
       if (item.type !== "ad") {
         return {
-          id: item.snapshotId,
+          id: rowId,
           href,
           title: item.title,
           imageUrl: null,
@@ -203,7 +205,7 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
         };
       }
       return {
-        id: item.snapshotId,
+        id: rowId,
         href,
         title: item.title,
         imageUrl: null,

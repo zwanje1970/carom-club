@@ -320,9 +320,76 @@ function pickWeightedRandomMainSlideAd(ads: MainSiteSlideAd[], rng: () => number
   return ads[ads.length - 1]!;
 }
 
+function gcdPositive(a: number, b: number): number {
+  let x = Math.abs(Math.floor(a));
+  let y = Math.abs(Math.floor(b));
+  if (x === 0) return y || 1;
+  if (y === 0) return x;
+  while (y !== 0) {
+    const t = y;
+    y = x % y;
+    x = t;
+  }
+  return x;
+}
+
+function lcmPositive(a: number, b: number): number {
+  if (a <= 0 || b <= 0) return 0;
+  return Math.floor((a * b) / gcdPositive(a, b));
+}
+
+/** 가상 대회 스트림 한 바퀴(캐러셀 a/b 복제) 길이 상한 — 과도한 배열 방지 */
+const MAX_VIRTUAL_TOURNAMENT_SLOTS = 600;
+
+/**
+ * 대회 카드가 `base.length`로 순환되는 무한 스트림에서 N마다 광고를 넣을 때,
+ * (대회 위상, 간격 위상)이 처음으로 되돌아오는 최소 가상 대회 슬롯 수.
+ * sequential 광고일 때는 광고 커서도 한 바퀴 돌아오도록 LCM으로 추가 배수를 붙인다.
+ */
+function computeVirtualTournamentCycleLength(
+  n: number,
+  insertInterval: number,
+  adsPickLength: number,
+  rotationMode: MainSlideAdRotationMode,
+): number {
+  if (n <= 0 || insertInterval <= 0) return 0;
+  const baseLcm = lcmPositive(n, insertInterval);
+  if (baseLcm === 0) return n;
+
+  let L = baseLcm;
+  if (rotationMode === "sequential" && adsPickLength > 0) {
+    const adsPerBase = baseLcm / insertInterval;
+    if (adsPerBase > 0) {
+      const k = adsPickLength / gcdPositive(adsPerBase, adsPickLength);
+      L = baseLcm * k;
+    }
+  }
+
+  if (L <= MAX_VIRTUAL_TOURNAMENT_SLOTS) return L;
+
+  const maxMult = Math.floor(MAX_VIRTUAL_TOURNAMENT_SLOTS / baseLcm);
+  if (maxMult < 1) {
+    /* 한 LCM 블록 자체가 상한 초과 — 정렬을 깨지 않기 위해 baseLcm만 사용(극히 드문 n·N 조합) */
+    return baseLcm;
+  }
+
+  let L2 = baseLcm * maxMult;
+  if (rotationMode === "sequential" && adsPickLength > 0) {
+    while (L2 >= baseLcm) {
+      const adsInL2 = L2 / insertInterval;
+      if (adsInL2 > 0 && adsInL2 % adsPickLength === 0) break;
+      L2 -= baseLcm;
+    }
+    if (L2 < baseLcm) L2 = baseLcm;
+  }
+  return L2;
+}
+
 /**
  * 대회 카드 스트림에 광고를 삽입한다.
  * enabled·간격·개수·max·활성 광고 없음이면 대회만(타입 메타만 보강) 반환.
+ * 광고가 켜진 경우: 대회는 `base[index % base.length]` 순환 스트림으로 간주하고,
+ * 한 캐러셀 주기(LCM·순차 광고 주기)만큼 가상 슬롯을 펼쳐 삽입한다.
  */
 export function mergeTournamentAndAdSlideDeckItems(
   tournamentItems: SlideDeckItem[],
@@ -349,6 +416,11 @@ export function mergeTournamentAndAdSlideDeckItems(
     return base;
   }
 
+  const n = base.length;
+  if (n === 0) {
+    return base;
+  }
+
   const adsForPick =
     rotationMode === "sequential"
       ? [...activeAdsInOrder].sort((a, b) => {
@@ -357,6 +429,13 @@ export function mergeTournamentAndAdSlideDeckItems(
           return 0;
         })
       : activeAdsInOrder;
+
+  const virtualLen = computeVirtualTournamentCycleLength(
+    n,
+    insertInterval,
+    adsForPick.length,
+    rotationMode,
+  );
 
   let seqCursor = 0;
   let adsInserted = 0;
@@ -373,8 +452,9 @@ export function mergeTournamentAndAdSlideDeckItems(
     return ad;
   };
 
-  for (const tItem of base) {
-    out.push(tItem);
+  for (let slot = 0; slot < virtualLen; slot += 1) {
+    const tSrc = base[slot % n]!;
+    out.push({ ...tSrc });
     sinceInsert += 1;
     if (adsInserted >= maxAdsPerCycle) continue;
     if (sinceInsert < insertInterval) continue;

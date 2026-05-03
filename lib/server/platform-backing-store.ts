@@ -36,7 +36,7 @@ import {
   normalizeCommunityPostImageLayoutParam,
   normalizeCommunityPostImageSizeLevels,
 } from "../community-post-content-images";
-import { tournamentStatusEligibleForMainSlide } from "../site-tournament-badges";
+import { MAIN_SLIDE_STATUS_BADGES, tournamentStatusEligibleForMainSlide } from "../site-tournament-badges";
 import { extractProofImageIdFromSiteImageUrl } from "../site-proof-image-id";
 import { resolveSitePosterDisplayUrl } from "../site-poster-urls";
 import {
@@ -5795,6 +5795,7 @@ export async function syncActiveTournamentCardSnapshotStatusBadge(tournamentId: 
   }
   if (changed) {
     await writeLocalJsonAggregate(store);
+    await rebuildMainSlideTournamentSnapshotsCompactKvNow();
     revalidateMainSlideSnapshotsCache();
   }
 }
@@ -9573,8 +9574,8 @@ export async function listPublishedCardSnapshots(): Promise<PublishedCardSnapsho
 }
 
 /** 메인 홈 슬라이드에 넘길 토너먼트 게시 카드 최대 개수(슬라이드 예비 장면 포함) */
-const DEFAULT_MAIN_SITE_TOURNAMENT_SLIDE_LIMIT = 5;
 const MAIN_SLIDE_TOURNAMENT_SNAPSHOTS_COMPACT_KV_KEY = "mainSlideTournamentSnapshots" as const;
+const MAIN_SLIDE_ARCHIVED_TOURNAMENT_SNAPSHOTS_COMPACT_KV_KEY = "mainSlideArchivedTournamentSnapshots" as const;
 
 /**
  * 대시보드 등: 전체 `TournamentPublishedCard[]` 없이, 주어진 대회 ID 중
@@ -10214,8 +10215,10 @@ function normalizeMainSlideTournamentSnapshotsCompactRow(row: unknown): Publishe
   const title = typeof s.title === "string" ? s.title : "";
   const subtitle = typeof s.subtitle === "string" ? s.subtitle : "";
   const imageId = typeof s.imageId === "string" ? s.imageId : "";
-  const image320Url = typeof s.image320Url === "string" ? s.image320Url : "";
-  const image640Url = typeof s.image640Url === "string" ? s.image640Url : "";
+  const image320Raw = typeof s.image320Url === "string" ? s.image320Url : "";
+  const image320Url = image320Raw.trim();
+  const image640Raw = typeof s.image640Url === "string" ? s.image640Url : "";
+  const image640Url = (image640Raw.trim() || image320Url).trim();
   const isThemeCard =
     imageId.trim() === "theme" ||
     (typeof s.tournamentBackgroundType === "string" && s.tournamentBackgroundType === "theme");
@@ -10233,7 +10236,6 @@ function normalizeMainSlideTournamentSnapshotsCompactRow(row: unknown): Publishe
     !subtitle ||
     !imageId ||
     (!isThemeCard && !image320Url) ||
-    (!isThemeCard && !image640Url) ||
     !textLayout ||
     !imageLayout ||
     !publishedAt ||
@@ -10288,7 +10290,7 @@ async function loadMainSlideTournamentSnapshotsCompactFromStorage(): Promise<Pub
     const rows = raw
       .map(normalizeMainSlideTournamentSnapshotsCompactRow)
       .filter((x): x is PublishedCardSnapshot => x !== null);
-    return rows;
+    return rows.length === 0 ? null : rows;
   } catch {
     return null;
   }
@@ -10300,102 +10302,131 @@ async function saveMainSlideTournamentSnapshotsCompactToStorage(rows: PublishedC
   await upsertPlatformKvJson(MAIN_SLIDE_TOURNAMENT_SNAPSHOTS_COMPACT_KV_KEY, rows);
 }
 
-/**
- * 메인 홈 토너먼트 슬라이드 전용: `tournamentPublishedCards` 중 게시·활성·메인 노출 플래그가 켜진 카드만.
- * 레거시 `publishedCardSnapshots` 토너먼트 행은 사용하지 않는다(사이트에서 합성·재판단하지 않음).
- * 필터 → `updatedAt` 최신순 → 상위 limit건만 스냅샷으로 변환(전체 맵 후 자르기 없음).
- */
-async function buildTournamentSnapshotsForMainSiteFromSource(options?: {
-  limit?: number;
-}): Promise<PublishedCardSnapshot[]> {
-  const limitRaw = options?.limit;
-  const limit =
-    typeof limitRaw === "number" && Number.isFinite(limitRaw) && limitRaw > 0
-      ? Math.min(50, Math.floor(limitRaw))
-      : DEFAULT_MAIN_SITE_TOURNAMENT_SLIDE_LIMIT;
+async function saveMainSlideArchivedTournamentSnapshotsToStorage(rows: PublishedCardSnapshot[]): Promise<void> {
+  const ws = resolveMainSlideTournamentSnapshotsCompactWriteStrategy();
+  if (ws !== "firestore-kv") return;
+  await upsertPlatformKvJson(MAIN_SLIDE_ARCHIVED_TOURNAMENT_SNAPSHOTS_COMPACT_KV_KEY, rows);
+}
 
+function mainSlidePublishedCardBadgeEligibleForKv(statusRaw: string | null | undefined): boolean {
+  return MAIN_SLIDE_STATUS_BADGES.has(String(normalizeTournamentStatusBadge(statusRaw)));
+}
+
+function alignMainSlideSnapshotFor320Only(s: PublishedCardSnapshot): PublishedCardSnapshot {
+  const pub320 = (s.publishedCardImage320Url ?? "").trim();
+  return {
+    ...s,
+    image640Url: s.image320Url || s.image640Url,
+    ...(pub320 ? { publishedCardImageUrl: pub320 } : {}),
+  };
+}
+
+type MainSlideKvRebuildResult = {
+  main: PublishedCardSnapshot[];
+  archived: PublishedCardSnapshot[];
+};
+
+/**
+ * 메인 전용 main-cards KV 재빌드: 게시카드 원본만 사용(대회 일괄 조회 없음).
+ * 모집중·마감임박만 main KV에 넣고, 그 외 게시 스냅샷은 archived KV에 둔다.
+ */
+async function buildMainSlideTournamentAndArchivedKvSnapshots(): Promise<MainSlideKvRebuildResult> {
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
   const cards = await loadTournamentPublishedCardsArrayForMainSite();
-  const filtered = cards.filter(
-    (c) =>
-      isEntityLifecycleVisibleForList(c.lifecycleStatus) &&
-      c.isPublished &&
-      c.isActive &&
-      c.showOnMainSlide &&
-      c.isExpired !== true,
+  const baseMainFilter = (c: TournamentPublishedCard) =>
+    isEntityLifecycleVisibleForList(c.lifecycleStatus) &&
+    c.isPublished &&
+    c.isActive &&
+    c.showOnMainSlide &&
+    c.isExpired !== true;
+
+  const filteredMain = cards.filter(
+    (c) => baseMainFilter(c) && mainSlidePublishedCardBadgeEligibleForKv(c.status),
   );
-  const sortedForDedupe = [...filtered].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const sortedForDedupe = [...filteredMain].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const seenTournament = new Set<string>();
-  const deduped: TournamentPublishedCard[] = [];
+  const mainDeduped: TournamentPublishedCard[] = [];
   for (const c of sortedForDedupe) {
     if (seenTournament.has(c.tournamentId)) continue;
     seenTournament.add(c.tournamentId);
-    deduped.push(c);
+    mainDeduped.push(c);
   }
-  if (filtered.length > deduped.length) {
-    console.warn("[listTournamentSnapshotsForMainSite] duplicate main-slide rows for same tournamentId; using latest per tournament only", {
-      duplicateRowsSkipped: filtered.length - deduped.length,
-    });
-  }
-  const rows = deduped.slice(0, limit);
-
-  const tournamentIdsNeedingMeta = new Set<string>();
-  for (const c of rows) {
-    const hasStoredDate = typeof c.cardDisplayDate === "string" && c.cardDisplayDate.trim() !== "";
-    const hasStoredLoc = typeof c.cardDisplayLocation === "string" && c.cardDisplayLocation.trim() !== "";
-    if (!(hasStoredDate && hasStoredLoc)) {
-      tournamentIdsNeedingMeta.add(c.tournamentId.trim());
-    }
+  if (filteredMain.length > mainDeduped.length) {
+    console.warn(
+      "[main-slide-kv] duplicate main-slide rows for same tournamentId; using latest per tournament only",
+      {
+        duplicateRowsSkipped: filteredMain.length - mainDeduped.length,
+      },
+    );
   }
 
-  let metaByTournamentId = new Map<string, { date: string; location: string }>();
-  if (tournamentIdsNeedingMeta.size > 0) {
-    if (isFirestoreUsersBackendConfigured()) {
-      const { getTournamentDateLocationFieldsByIdsFirestore } = await import("./firestore-tournaments");
-      metaByTournamentId = await getTournamentDateLocationFieldsByIdsFirestore([...tournamentIdsNeedingMeta]);
-    } else if (process.env.NODE_ENV === "development") {
-      const store = await readLocalJsonAggregate();
-      for (const id of tournamentIdsNeedingMeta) {
-        metaByTournamentId.set(id, tournamentDateLocationMeta(store, id));
-      }
-    }
+  const metaFromCardOnly = (c: TournamentPublishedCard): { date: string; location: string } => {
+    const d = typeof c.cardDisplayDate === "string" ? c.cardDisplayDate.trim() : "";
+    const loc = typeof c.cardDisplayLocation === "string" ? c.cardDisplayLocation.trim() : "";
+    return { date: d, location: loc };
+  };
+
+  const rawMainSnapshots = mainDeduped.map((c) =>
+    tournamentPublishedCardToPublishedSnapshot(c, templateId, metaFromCardOnly(c)),
+  );
+  let mainSnapshots = rawMainSnapshots;
+  if (rawMainSnapshots.some((snap) => posterSourceUrlFromPublishedCardSnapshot(snap))) {
+    const proofById = await loadProofImageAssetsByIdForMainSurface();
+    mainSnapshots = rawMainSnapshots.map((snap) => sanitizePublishedCardSnapshotForMainSiteSlide(snap, proofById));
+  }
+  mainSnapshots = mainSnapshots.map(alignMainSlideSnapshotFor320Only);
+
+  const allPublished = await loadTournamentPublishedCardsArray();
+  const archSource = allPublished.filter(
+    (c) => isEntityLifecycleVisibleForList(c.lifecycleStatus) && c.isPublished === true,
+  );
+  const sortedArch = [...archSource].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const seenArchTid = new Set<string>();
+  const mainTournamentIdSet = new Set(mainDeduped.map((c) => c.tournamentId.trim()));
+  const archDeduped: TournamentPublishedCard[] = [];
+  for (const c of sortedArch) {
+    const tid = c.tournamentId.trim();
+    if (seenArchTid.has(tid)) continue;
+    seenArchTid.add(tid);
+    if (mainTournamentIdSet.has(tid)) continue;
+    archDeduped.push(c);
   }
 
-  const rawSnapshots = rows.map((c) => {
-    const hasStoredDate = typeof c.cardDisplayDate === "string" && c.cardDisplayDate.trim() !== "";
-    const hasStoredLoc = typeof c.cardDisplayLocation === "string" && c.cardDisplayLocation.trim() !== "";
-    const meta =
-      hasStoredDate && hasStoredLoc ? undefined : metaByTournamentId.get(c.tournamentId.trim());
-    return tournamentPublishedCardToPublishedSnapshot(c, templateId, meta);
-  });
-  if (!rawSnapshots.some((snap) => posterSourceUrlFromPublishedCardSnapshot(snap))) {
-    return rawSnapshots;
+  const rawArchSnapshots = archDeduped.map((c) =>
+    tournamentPublishedCardToPublishedSnapshot(c, templateId, metaFromCardOnly(c)),
+  );
+  let archivedSnapshots = rawArchSnapshots;
+  if (rawArchSnapshots.some((snap) => posterSourceUrlFromPublishedCardSnapshot(snap))) {
+    const proofById = await loadProofImageAssetsByIdForMainSurface();
+    archivedSnapshots = rawArchSnapshots.map((snap) =>
+      sanitizePublishedCardSnapshotForMainSiteSlide(snap, proofById),
+    );
   }
-  const proofById = await loadProofImageAssetsByIdForMainSurface();
-  return rawSnapshots.map((snap) => sanitizePublishedCardSnapshotForMainSiteSlide(snap, proofById));
+  archivedSnapshots = archivedSnapshots.map(alignMainSlideSnapshotFor320Only);
+
+  return { main: mainSnapshots, archived: archivedSnapshots };
 }
 
-async function rebuildMainSlideTournamentSnapshotsCompactKvNow(): Promise<void> {
-  const built = await buildTournamentSnapshotsForMainSiteFromSource({ limit: 50 });
-  await saveMainSlideTournamentSnapshotsCompactToStorage(built);
-  console.log("[COMPACT] rebuilt");
+async function rebuildMainSlideTournamentSnapshotsCompactKvNow(): Promise<PublishedCardSnapshot[]> {
+  const { main, archived } = await buildMainSlideTournamentAndArchivedKvSnapshots();
+  await saveMainSlideTournamentSnapshotsCompactToStorage(main);
+  await saveMainSlideArchivedTournamentSnapshotsToStorage(archived);
+  console.log("[COMPACT] rebuilt main", main.length, "archived", archived.length);
+  return main;
 }
 
+/** 공개 메인 슬라이드: main-cards KV만 사용. 빈 KV면 재빌드 후 반환(메인 요청에서 대회원본 미조회). */
 export async function listTournamentSnapshotsForMainSite(options?: {
+  /** @deprecated 메인은 스냅샷 전체를 사용. 호환만 위해 남김(무시). */
   limit?: number;
 }): Promise<PublishedCardSnapshot[]> {
-  const limitRaw = options?.limit;
-  const limit =
-    typeof limitRaw === "number" && Number.isFinite(limitRaw) && limitRaw > 0
-      ? Math.min(50, Math.floor(limitRaw))
-      : DEFAULT_MAIN_SITE_TOURNAMENT_SLIDE_LIMIT;
-
+  void options?.limit;
   const compactRows = await loadMainSlideTournamentSnapshotsCompactFromStorage();
-  console.log("[COMPACT] read length", Array.isArray(compactRows) ? compactRows.length : null);
-  if (compactRows) {
-    return compactRows.slice(0, limit);
+  console.log("[COMPACT] read length", compactRows === null ? null : compactRows.length);
+  if (compactRows !== null && compactRows.length > 0) {
+    return compactRows;
   }
-  return buildTournamentSnapshotsForMainSiteFromSource({ limit });
+  return rebuildMainSlideTournamentSnapshotsCompactKvNow();
 }
 
 async function loadMainSlideAdsNormalizedForStorage(): Promise<MainSiteSlideAd[]> {
@@ -10716,6 +10747,7 @@ export async function setCardSnapshotActive(params: {
       await persistTournamentPublishedCardsRows(publishedCards);
     } else if (fileStore) {
       await writeLocalJsonAggregate(fileStore);
+      await rebuildMainSlideTournamentSnapshotsCompactKvNow();
       revalidateMainSlideSnapshotsCache();
     }
     return {
@@ -10754,6 +10786,7 @@ export async function setCardSnapshotActive(params: {
   snapshot.isPublished = true;
 
   await writeLocalJsonAggregate(fileStore);
+  await rebuildMainSlideTournamentSnapshotsCompactKvNow();
   revalidateMainSlideSnapshotsCache();
 
   return {

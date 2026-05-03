@@ -361,7 +361,7 @@ export type MainSiteScrollCardsProps = {
   slideCardMoveDurationSec: number;
 };
 
-export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSiteScrollCardsProps) {
+export function MainSiteScrollCards({ items, slideCardMoveDurationSec: _slideCardMoveDurationSec }: MainSiteScrollCardsProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
   const lcpHeroItemIndex = useMemo(
@@ -376,24 +376,6 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
           ),
       ),
     [items],
-  );
-
-  const trackStyle = useMemo(
-    () =>
-      ({
-        "--main-sample-slide-duration": `${slideCardMoveDurationSec}s`,
-        animationPlayState: "running" as const,
-      }) as CSSProperties,
-    [slideCardMoveDurationSec],
-  );
-
-  const trackStylePaused = useMemo(
-    () =>
-      ({
-        "--main-sample-slide-duration": `${slideCardMoveDurationSec}s`,
-        animationPlayState: "paused" as const,
-      }) as CSSProperties,
-    [slideCardMoveDurationSec],
   );
 
   const onCardPointerDown = useCallback((itemId: string) => {
@@ -431,39 +413,33 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
         className={`${siteStyles.marqueeDimLayer} ${selectedItemId ? siteStyles.marqueeDimLayerVisible : ""}`}
         aria-hidden
       />
-      <div className={siteStyles.leadInSpacer} aria-hidden />
       {items.map((item, itemIndex) => {
         const rowKey = `${segmentKey}-${item.id}`;
         const lcpHeroImage =
           segmentKey === "a" && itemIndex === lcpHeroItemIndex && lcpHeroItemIndex >= 0;
         return (
-          <MainSiteCardRow
-            key={rowKey}
-            rowKey={rowKey}
-            item={item}
-            selected={selectedItemId === item.id}
-            onCardPointerDown={onCardPointerDown}
-            lcpHeroImage={lcpHeroImage}
-          />
+          <div key={rowKey} className={siteStyles.marqueeCardSlotShell}>
+            <MainSiteCardRow
+              rowKey={rowKey}
+              item={item}
+              selected={selectedItemId === item.id}
+              onCardPointerDown={onCardPointerDown}
+              lcpHeroImage={lcpHeroImage}
+            />
+          </div>
         );
       })}
     </div>
   );
 
-  const pauseMarquee = selectedItemId !== null;
-
   return (
     <div
-      className={`${styles.slideViewportSiteMain} ${siteStyles.viewportMarquee}`}
+      className={`${styles.slideViewportSiteMain} ${siteStyles.viewportMarquee} ${siteStyles.viewportMarqueeLeadIn}`}
       data-no-root-swipe
       onPointerDownCapture={onViewportPointerDownCapture}
     >
-      <div
-        className={`${styles.sampleMainMarqueeTrack} ${siteStyles.trackWillChange}`}
-        style={pauseMarquee ? trackStylePaused : trackStyle}
-      >
+      <div className={`${styles.sampleMainMarqueeTrack} ${siteStyles.trackScrollStatic}`}>
         {renderSegment("a")}
-        {renderSegment("b")}
       </div>
     </div>
   );

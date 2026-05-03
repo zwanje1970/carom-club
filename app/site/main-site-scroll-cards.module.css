@@ -5,6 +5,14 @@
   container-name: site-main-marquee;
 }
 
+/* 리드인: 트랙 세그먼트마다 넣으면 루프 경계에 빈 구간이 생김 — 뷰포트 상단 패딩으로만 한 번 적용 */
+.viewportMarqueeLeadIn {
+  padding-top: max(
+    6rem,
+    calc(100cqh - var(--sample-main-scroll-layout-face-ref-height, var(--sample-main-card-height)) - 2.75rem)
+  );
+}
+
 .segmentNoShrink {
   flex-shrink: 0;
 }
@@ -28,20 +36,23 @@
   opacity: 1;
 }
 
-.leadInSpacer {
-  flex-shrink: 0;
-  width: 100%;
-  box-sizing: border-box;
-  pointer-events: none;
-  /* 뷰포트 높이 기준으로 카드가 아래쪽에서 올라오도록 상단 여백(양 세그먼트 동일 복제 → -50% 루프 유지) */
-  min-height: max(
-    6rem,
-    calc(100cqh - var(--sample-main-scroll-layout-face-ref-height, var(--sample-main-card-height)) - 2.75rem)
-  );
+.trackMarqueeIdle {
+  /* `.sampleMainMarqueeTrack`와 동일 특이도에서 애니메이션을 끄기 위해 */
+  animation: none !important;
+  transform: none !important;
 }
 
-.trackWillChange {
-  will-change: transform;
+/* 메인 전용: 세로 스크롤과 충돌하지 않도록 마키 transform 애니메이션 비활성(샘플 경로 `.sampleMainMarqueeTrack` 애니메이션 덮어씀) */
+.trackScrollStatic {
+  animation: none !important;
+  transform: none !important;
+  will-change: auto;
+}
+
+.marqueeCardSlotShell {
+  flex-shrink: 0;
+  align-self: stretch;
+  min-width: 0;
 }
 
 /* 대회 카드: 카드 컴포넌트 바깥 — 탭/클릭으로 선택만 처리(전체 면 링크 없음) */

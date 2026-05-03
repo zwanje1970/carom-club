@@ -1696,7 +1696,7 @@ body:has(.site-home-page) {
     flex: 1 1 auto;
     min-height: 0;
     overflow-x: hidden;
-    overflow-y: hidden;
+    overflow-y: auto;
   }
 
   /* 메인 모바일: 슬라이드 바깥 박스 제거(풀폭)·높이 원안 + 하단고정대역·슬라이드↔PNG 간격 축소 */
@@ -1707,7 +1707,7 @@ body:has(.site-home-page) {
   }
 
   .site-home-page--main .site-home-slide-anchor.site-home-slide-anchor--marquee-scroll {
-    overflow-y: hidden !important;
+    overflow-y: auto !important;
   }
 
   .site-home-page--main .site-home-main-slide-deck-stack > .site-home-slide-anchor {
@@ -2104,7 +2104,7 @@ body:has(.site-home-page) {
 .site-shell.site-shell--ua-mobile-site
   .site-home-page--main
   .site-home-slide-anchor.site-home-slide-anchor--marquee-scroll {
-  overflow-y: hidden !important;
+  overflow-y: auto !important;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--main .site-home-main-slide-deck-stack {
@@ -2361,7 +2361,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
     flex: 1 1 auto;
     min-height: 0;
     overflow-x: hidden;
-    overflow-y: hidden;
+    overflow-y: auto;
   }
 
   .site-home-page--main .site-home-main-content-box .site-home-cta-primary {
