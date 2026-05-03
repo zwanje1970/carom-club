@@ -15,6 +15,16 @@ const OPTIONS: TournamentStatusBadge[] = [
   "초안",
 ];
 
+function statusBadgeStyle(badge: TournamentStatusBadge): { background: string; color: string } {
+  if (badge === "모집중") {
+    return { background: "#fef3c7", color: "#92400e" };
+  }
+  if (badge === "마감" || badge === "종료") {
+    return { background: "#f3f4f6", color: "#4b5563" };
+  }
+  return { background: "#eff6ff", color: "#1e3a5f" };
+}
+
 type CardSnapshotRow = {
   title: string;
   subtitle: string;
@@ -81,8 +91,10 @@ export default function TournamentBadgeCardManageRow({
 }) {
   const router = useRouter();
   const [value, setValue] = useState(initialStatus);
+  const [expanded, setExpanded] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
   const publishRunningRef = useRef(false);
+  const badgePillStyle = statusBadgeStyle(value);
 
   useEffect(() => {
     setValue(initialStatus);
@@ -225,35 +237,53 @@ export default function TournamentBadgeCardManageRow({
   }
 
   return (
-    <div id="tournament-status-badge" style={{ scrollMarginTop: "4.5rem" }}>
     <div
-      className="v3-row"
-      style={{
-        flexWrap: "wrap",
-        alignItems: "flex-end",
-        gap: "0.65rem",
-        width: "100%",
-      }}
+      id="tournament-status-badge"
+      className="v3-stack"
+      style={{ scrollMarginTop: "4.5rem", alignItems: "flex-end", flex: "0 1 auto", minWidth: "min(100%, 22rem)", gap: "0.35rem" }}
     >
-      <div
-        className="v3-row"
+      <span
         style={{
-          flexWrap: "wrap",
-          alignItems: "flex-end",
-          gap: "0.65rem",
-          flex: "1 1 auto",
-          minWidth: 0,
+          ...badgePillStyle,
+          fontSize: "0.78rem",
+          fontWeight: 800,
+          padding: "0.2rem 0.55rem",
+          borderRadius: "999px",
+          whiteSpace: "nowrap",
         }}
       >
-        <label className="v3-stack" style={{ gap: "0.25rem", minWidth: "10rem" }}>
-          <span className="v3-muted" style={{ fontSize: "0.85rem" }}>
-            대회 상태 배지
-          </span>
+        {value}
+      </span>
+      <button
+        type="button"
+        className="v3-btn"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((v) => !v)}
+        style={{ padding: "0.35rem 0.6rem", fontSize: "0.82rem", fontWeight: 700, width: "100%", maxWidth: "14rem" }}
+      >
+        상태배지 변경
+      </button>
+      {expanded ? (
+        <div
+          className="v3-stack"
+          style={{
+            width: "100%",
+            maxWidth: "22rem",
+            alignItems: "stretch",
+            gap: "0.45rem",
+            padding: "0.5rem 0.55rem",
+            border: "1px solid #e5e7eb",
+            borderRadius: "0.4rem",
+            background: "#fff",
+            boxSizing: "border-box",
+          }}
+        >
           <select
             value={value}
             disabled={publishBusy}
             onChange={(e) => setValue(e.target.value as TournamentStatusBadge)}
-            style={{ padding: "0.45rem", border: "1px solid #bbb", borderRadius: "0.35rem" }}
+            style={{ padding: "0.45rem", border: "1px solid #bbb", borderRadius: "0.35rem", fontSize: "0.88rem" }}
+            aria-label="대회 상태 배지"
           >
             {OPTIONS.map((o) => (
               <option key={o} value={o}>
@@ -261,30 +291,28 @@ export default function TournamentBadgeCardManageRow({
               </option>
             ))}
           </select>
-        </label>
-      </div>
-      <Link
-        className="v3-btn"
-        href={`/client/tournaments/${tournamentId}/card-publish-v2`}
-        prefetch={false}
-        style={{ alignSelf: "flex-end", marginLeft: "auto", flexShrink: 0 }}
-      >
-        게시카드 작성·수정
-      </Link>
-    </div>
-    <p className="v3-muted" style={{ margin: "0.35rem 0 0", fontSize: "0.85rem", maxWidth: "42rem" }}>
-      이미 게시된 카드가 있으면 새로 만들지 않고 기존 카드에 반영됩니다. 대회당 메인 게시카드는 1개입니다.
-    </p>
-    <div className="v3-row" style={{ marginTop: "0.5rem", flexWrap: "wrap", gap: "0.5rem" }}>
-      <button
-        type="button"
-        className="v3-btn"
-        disabled={publishBusy}
-        onClick={() => void onSaveBadgeAndPublish()}
-      >
-        {publishBusy ? "처리 중…" : "저장/게시"}
-      </button>
-    </div>
+          <p className="v3-muted" style={{ margin: 0, fontSize: "0.85rem", lineHeight: 1.45 }}>
+            이미 게시된 카드가 있으면 새로 만들지 않고 기존 카드에 반영됩니다. 대회당 메인 게시카드는 1개입니다.
+          </p>
+          <button
+            type="button"
+            className="v3-btn"
+            disabled={publishBusy}
+            onClick={() => void onSaveBadgeAndPublish()}
+            style={{ alignSelf: "flex-start" }}
+          >
+            {publishBusy ? "처리 중…" : "저장/게시"}
+          </button>
+          <Link
+            className="v3-btn"
+            href={`/client/tournaments/${tournamentId}/card-publish-v2`}
+            prefetch={false}
+            style={{ textAlign: "center", textDecoration: "none" }}
+          >
+            게시카드 작성·수정
+          </Link>
+        </div>
+      ) : null}
     </div>
   );
 }

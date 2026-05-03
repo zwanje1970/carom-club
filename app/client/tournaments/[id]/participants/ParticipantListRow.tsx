@@ -44,8 +44,8 @@ const actionBtnBase: CSSProperties = {
 };
 
 const cellBase: CSSProperties = {
-  padding: "0.2rem 0.35rem",
-  fontSize: "0.875rem",
+  padding: "0.25rem 0.3rem",
+  fontSize: "0.86rem",
   verticalAlign: "middle",
   borderBottom: "1px solid #e8e8e8",
 };
@@ -256,8 +256,8 @@ export default function ParticipantListRow({
 
   return (
     <tr style={{ background: "#fff" }}>
-      <td style={{ ...cellBase, whiteSpace: "nowrap", maxWidth: "11rem" }}>
-        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "0.25rem", flexWrap: "nowrap", minWidth: 0 }}>
+      <td style={{ ...cellBase, whiteSpace: "nowrap", minWidth: 0 }}>
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "0.2rem", flexWrap: "nowrap", minWidth: 0 }}>
           <span
             style={{ fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}
             title={metaLine || undefined}
@@ -298,10 +298,45 @@ export default function ParticipantListRow({
           {renderNameCellActions()}
         </div>
       </td>
-      <td style={{ ...cellBase, whiteSpace: "nowrap", textAlign: "center" }}>{scoreCell}</td>
-      <td style={{ ...cellBase, whiteSpace: "nowrap" }}>{phone.trim() || "—"}</td>
-      <td style={{ ...cellBase, whiteSpace: "nowrap", textAlign: "center" }}>{depositCell}</td>
-      <td style={{ ...cellBase, textAlign: "center" }}>
+      <td
+        style={{
+          ...cellBase,
+          whiteSpace: "nowrap",
+          textAlign: "center",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          maxWidth: "4rem",
+        }}
+        title={showEver ? String(participantAverage) : undefined}
+      >
+        {scoreCell}
+      </td>
+      <td
+        style={{
+          ...cellBase,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          maxWidth: "6.75rem",
+        }}
+        title={phone.trim() || undefined}
+      >
+        {phone.trim() || "—"}
+      </td>
+      <td
+        style={{
+          ...cellBase,
+          whiteSpace: "nowrap",
+          textAlign: "center",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          maxWidth: "3rem",
+        }}
+        title={depositCell !== "—" ? depositCell : undefined}
+      >
+        {depositCell}
+      </td>
+      <td style={{ ...cellBase, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", maxWidth: "2.85rem" }}>
         <input
           type="number"
           min={1}
@@ -311,28 +346,30 @@ export default function ParticipantListRow({
           value={groupDraft}
           onChange={(e) => onGroupDraftChange(entryId, e.target.value)}
           style={{
-            width: "3.25rem",
-            padding: "0.12rem 0.2rem",
-            fontSize: "0.8rem",
+            width: "2.85rem",
+            maxWidth: "100%",
+            padding: "0.1rem 0.15rem",
+            fontSize: "0.78rem",
             border: "1px solid #cbd5e1",
             borderRadius: "0.25rem",
             textAlign: "center",
+            boxSizing: "border-box",
           }}
           aria-label={`${applicantName} 조번호`}
         />
       </td>
-      <td style={{ ...cellBase, textAlign: "center" }}>
+      <td style={{ ...cellBase, textAlign: "center", whiteSpace: "nowrap" }}>
         {status === "APPROVED" ? (
           <input
             type="checkbox"
             checked={attendanceChecked}
             disabled={attendancePending}
             onChange={(e) => void patchAttendance(e.target.checked)}
-            style={{ width: "1.1rem", height: "1.1rem", cursor: "pointer" }}
+            style={{ width: "1.05rem", height: "1.05rem", cursor: "pointer" }}
             aria-label={`${applicantName} 출석`}
           />
         ) : (
-          <span className="v3-muted" style={{ fontSize: "0.8rem" }}>
+          <span className="v3-muted" style={{ fontSize: "0.78rem", whiteSpace: "nowrap" }}>
             —
           </span>
         )}

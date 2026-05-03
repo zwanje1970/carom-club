@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { TournamentApplicationListItem } from "../../../../lib/types/entities";
 import { filterParticipantEntries, type ClientParticipantFilterKey } from "./client-participant-filter-shared";
 import ParticipantListRow from "./participants/ParticipantListRow";
@@ -20,6 +20,16 @@ type Props = {
   participantCountSummary: ParticipantCountSummary;
   selected: ClientParticipantFilterKey;
   filterBaseHref: string;
+};
+
+const participantApplicationsTableThBase: CSSProperties = {
+  padding: "0.25rem 0.3rem",
+  fontSize: "0.8rem",
+  fontWeight: 800,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  verticalAlign: "middle",
 };
 
 function filterLinkStyle(selected: ClientParticipantFilterKey, key: ClientParticipantFilterKey) {
@@ -199,80 +209,70 @@ export default function ClientTournamentParticipantsApplicationsBlock({
             <table
               style={{
                 width: "100%",
-                minWidth: "36rem",
+                minWidth: "34rem",
                 borderCollapse: "collapse",
-                fontSize: "0.875rem",
+                tableLayout: "fixed",
+                fontSize: "0.86rem",
               }}
             >
               <thead>
                 <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
                   <th
                     style={{
-                      padding: "0.25rem 0.35rem",
+                      ...participantApplicationsTableThBase,
                       textAlign: "left",
-                      fontSize: "0.82rem",
-                      fontWeight: 800,
-                      whiteSpace: "nowrap",
+                      minWidth: "7.5rem",
+                      width: "28%",
                     }}
                   >
                     이름
                   </th>
                   <th
                     style={{
-                      padding: "0.25rem 0.35rem",
+                      ...participantApplicationsTableThBase,
                       textAlign: "center",
-                      fontSize: "0.82rem",
-                      fontWeight: 800,
-                      whiteSpace: "nowrap",
-                      width: "4.5rem",
+                      width: "4rem",
+                      maxWidth: "4rem",
                     }}
                   >
                     점수/에버
                   </th>
                   <th
                     style={{
-                      padding: "0.25rem 0.35rem",
+                      ...participantApplicationsTableThBase,
                       textAlign: "left",
-                      fontSize: "0.82rem",
-                      fontWeight: 800,
-                      whiteSpace: "nowrap",
-                      width: "7.5rem",
+                      width: "6.75rem",
+                      maxWidth: "6.75rem",
                     }}
                   >
                     전화번호
                   </th>
                   <th
                     style={{
-                      padding: "0.25rem 0.35rem",
+                      ...participantApplicationsTableThBase,
                       textAlign: "center",
-                      fontSize: "0.82rem",
-                      fontWeight: 800,
-                      whiteSpace: "nowrap",
-                      width: "3.5rem",
+                      width: "3rem",
+                      maxWidth: "3rem",
                     }}
                   >
                     입금일
                   </th>
                   <th
                     style={{
-                      padding: "0.25rem 0.35rem",
+                      ...participantApplicationsTableThBase,
                       textAlign: "center",
-                      fontSize: "0.82rem",
-                      fontWeight: 800,
-                      whiteSpace: "nowrap",
-                      width: "3.75rem",
+                      width: "2.85rem",
+                      maxWidth: "2.85rem",
                     }}
                   >
                     조
                   </th>
                   <th
                     style={{
-                      padding: "0.25rem 0.35rem",
+                      ...participantApplicationsTableThBase,
                       textAlign: "center",
-                      fontSize: "0.82rem",
-                      fontWeight: 800,
-                      whiteSpace: "nowrap",
-                      width: "3rem",
+                      width: "2.5rem",
+                      maxWidth: "2.5rem",
                     }}
                   >
                     출석
