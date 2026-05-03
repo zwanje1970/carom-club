@@ -370,7 +370,7 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
   const resumeTimerRef = useRef<number | null>(null);
   const measureFrameRef = useRef<number | null>(null);
   const pausedByUserRef = useRef(false);
-  const suppressProgrammaticScrollRef = useRef(false);
+  const programmaticScrollUntilMsRef = useRef(0);
 
   const lcpHeroItemIndex = useMemo(
     () =>
@@ -448,7 +448,7 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
     };
 
     const onScroll = () => {
-      if (suppressProgrammaticScrollRef.current) return;
+      if (performance.now() <= programmaticScrollUntilMsRef.current) return;
       scheduleResume();
     };
 
@@ -490,9 +490,9 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
         nextScrollTop -= cycleHeight;
       }
 
-      suppressProgrammaticScrollRef.current = true;
+      // programmatic scrollTop 변경 직후 발생하는 scroll 이벤트를 사용자 입력으로 오인하지 않도록 보호
+      programmaticScrollUntilMsRef.current = performance.now() + 160;
       node.scrollTop = Math.min(nextScrollTop, maxScrollTop);
-      suppressProgrammaticScrollRef.current = false;
 
       rafRef.current = requestAnimationFrame(step);
     };
@@ -535,7 +535,7 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
         resumeTimerRef.current = null;
       }
       pausedByUserRef.current = false;
-      suppressProgrammaticScrollRef.current = false;
+      programmaticScrollUntilMsRef.current = 0;
     };
   }, [items, slideCardMoveDurationSec]);
 
