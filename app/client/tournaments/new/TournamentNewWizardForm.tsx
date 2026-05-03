@@ -105,10 +105,12 @@ export type TournamentNewWizardFormProps = {
   setPrize1: Dispatch<SetStateAction<string>>;
   prize2: string;
   setPrize2: Dispatch<SetStateAction<string>>;
-  prize3a: string;
-  setPrize3a: Dispatch<SetStateAction<string>>;
-  prize3b: string;
-  setPrize3b: Dispatch<SetStateAction<string>>;
+  prize3: string;
+  setPrize3: Dispatch<SetStateAction<string>>;
+  prize4: string;
+  setPrize4: Dispatch<SetStateAction<string>>;
+  prizeThirdShared: boolean;
+  setPrizeThirdShared: Dispatch<SetStateAction<boolean>>;
   prizeExtra: string;
   setPrizeExtra: Dispatch<SetStateAction<string>>;
   prizeAmountDigitsOnly: (raw: string) => string;
@@ -208,10 +210,12 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
     setPrize1,
     prize2,
     setPrize2,
-    prize3a,
-    setPrize3a,
-    prize3b,
-    setPrize3b,
+    prize3,
+    setPrize3,
+    prize4,
+    setPrize4,
+    prizeThirdShared,
+    setPrizeThirdShared,
     prizeExtra,
     setPrizeExtra,
     prizeAmountDigitsOnly,
@@ -747,7 +751,7 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
             6. 상금
           </h2>
           <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
-            여러 줄로 합쳐 저장됩니다. (1등 / 2등 / 3등 / 3등 / 기타)
+            여러 줄로 합쳐 저장됩니다. (1등 / 2등 / 공동 3등 또는 3등·4등 / 기타)
           </p>
           <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap" }}>
             <label className="v3-stack" style={{ flex: "1 1 8rem" }}>
@@ -787,8 +791,8 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
               <span>3등</span>
               <div className="v3-row" style={{ alignItems: "center", gap: "0.4rem", width: "100%" }}>
                 <input
-                  value={prize3a}
-                  onChange={(e) => setPrize3a(prizeAmountDigitsOnly(e.target.value))}
+                  value={prize3}
+                  onChange={(e) => setPrize3(prizeAmountDigitsOnly(e.target.value))}
                   placeholder="상금 (만원 단위, 숫자만 입력)"
                   inputMode="numeric"
                   autoComplete="off"
@@ -797,24 +801,36 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
                 <span className="v3-muted" style={{ flexShrink: 0, fontSize: "0.9rem" }}>
                   만원
                 </span>
+                <label className="v3-row" style={{ alignItems: "center", gap: "0.25rem", marginLeft: "0.3rem", flexShrink: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={prizeThirdShared}
+                    onChange={(e) => setPrizeThirdShared(e.target.checked)}
+                  />
+                  <span className="v3-muted" style={{ fontSize: "0.85rem" }}>
+                    공동
+                  </span>
+                </label>
               </div>
             </label>
-            <label className="v3-stack" style={{ flex: "1 1 8rem" }}>
-              <span>3등</span>
-              <div className="v3-row" style={{ alignItems: "center", gap: "0.4rem", width: "100%" }}>
-                <input
-                  value={prize3b}
-                  onChange={(e) => setPrize3b(prizeAmountDigitsOnly(e.target.value))}
-                  placeholder="상금 (만원 단위, 숫자만 입력)"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  style={{ ...inputStyle, flex: "1 1 0", minWidth: 0 }}
-                />
-                <span className="v3-muted" style={{ flexShrink: 0, fontSize: "0.9rem" }}>
-                  만원
-                </span>
-              </div>
-            </label>
+            {!prizeThirdShared ? (
+              <label className="v3-stack" style={{ flex: "1 1 8rem" }}>
+                <span>4등</span>
+                <div className="v3-row" style={{ alignItems: "center", gap: "0.4rem", width: "100%" }}>
+                  <input
+                    value={prize4}
+                    onChange={(e) => setPrize4(prizeAmountDigitsOnly(e.target.value))}
+                    placeholder="상금 (만원 단위, 숫자만 입력)"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    style={{ ...inputStyle, flex: "1 1 0", minWidth: 0 }}
+                  />
+                  <span className="v3-muted" style={{ flexShrink: 0, fontSize: "0.9rem" }}>
+                    만원
+                  </span>
+                </div>
+              </label>
+            ) : null}
           </div>
           <label className="v3-stack">
             <span>기타</span>

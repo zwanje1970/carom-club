@@ -71,11 +71,6 @@ export function revalidatePublicTournamentCache(tournamentId: string): void {
   revalidateSiteDataTag(cacheTagTournamentById(id));
   revalidateSiteDataTag(CACHE_TAG_SITE_PUBLIC_TOURNAMENTS_LIST);
   revalidateSiteDataTag(CACHE_TAG_MAIN_SLIDE_SNAPSHOTS);
-  void import("./platform-backing-store")
-    .then((mod) => {
-      mod.scheduleMainSlideTournamentSnapshotsCompactRebuild();
-    })
-    .catch(() => {});
 }
 
 async function rebuildPublicTournamentListSnapshotsSafe(): Promise<void> {

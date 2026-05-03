@@ -61,6 +61,8 @@ type DashboardPublishedCardStatusResult =
   | { ok: true; hasPublishedActiveForSomeTournament: boolean }
   | { ok: false };
 
+const DASHBOARD_PUBLISHED_CARD_STATUS_DELAY_MS = 2200;
+
 async function fetchDashboardSummary(
   bootstrap: ClientDashboardSummaryBootstrap | null,
 ): Promise<DashboardFetchResult> {
@@ -332,43 +334,65 @@ export default function ClientDashboardHomeClient({
     if (publishedCardStatusInFlightForRef.current === tid) return;
     publishedCardStatusInFlightForRef.current = tid;
     let cancelled = false;
-    void (async () => {
-      const r = await fetchDashboardPublishedCardStatus(tid);
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    let timerId: number | null = null;
+    let idleId: number | null = null;
+    const run = () => {
       if (cancelled) return;
-      if (publishedCardStatusInFlightForRef.current === tid) {
-        publishedCardStatusInFlightForRef.current = "";
-      }
-      if (!r.ok) {
-        setPublishedCardStatus((prev) =>
-          prev.tournamentId === tid ? { tournamentId: tid, state: "failed" } : prev,
-        );
-        return;
-      }
-      mergeClientDashboardSummaryCache({
-        hasPublishedActiveForSomeTournament: r.hasPublishedActiveForSomeTournament,
-      });
-      setPublishedCardStatus({ tournamentId: tid, state: "resolved" });
-      setState((prev) => {
-        if (prev.status !== "ready") return prev;
-        if (prev.data.firstTournamentId.trim() !== tid) return prev;
-        if (
-          prev.data.hasPublishedActiveForSomeTournament ===
-          r.hasPublishedActiveForSomeTournament
-        ) {
-          return prev;
+      void (async () => {
+        const r = await fetchDashboardPublishedCardStatus(tid);
+        if (cancelled) return;
+        if (publishedCardStatusInFlightForRef.current === tid) {
+          publishedCardStatusInFlightForRef.current = "";
         }
-        return {
-          ...prev,
-          data: {
-            ...prev.data,
-            hasPublishedActiveForSomeTournament:
-              r.hasPublishedActiveForSomeTournament,
-          },
-        };
-      });
+        if (!r.ok) {
+          setPublishedCardStatus((prev) =>
+            prev.tournamentId === tid ? { tournamentId: tid, state: "failed" } : prev,
+          );
+          return;
+        }
+        mergeClientDashboardSummaryCache({
+          hasPublishedActiveForSomeTournament: r.hasPublishedActiveForSomeTournament,
+        });
+        setPublishedCardStatus({ tournamentId: tid, state: "resolved" });
+        setState((prev) => {
+          if (prev.status !== "ready") return prev;
+          if (prev.data.firstTournamentId.trim() !== tid) return prev;
+          if (
+            prev.data.hasPublishedActiveForSomeTournament ===
+            r.hasPublishedActiveForSomeTournament
+          ) {
+            return prev;
+          }
+          return {
+            ...prev,
+            data: {
+              ...prev.data,
+              hasPublishedActiveForSomeTournament:
+                r.hasPublishedActiveForSomeTournament,
+            },
+          };
+        });
+      })();
+    };
+    void (async () => {
+      timerId = window.setTimeout(() => {
+        if (typeof w.requestIdleCallback === "function") {
+          idleId = w.requestIdleCallback(run, { timeout: 1500 });
+          return;
+        }
+        run();
+      }, DASHBOARD_PUBLISHED_CARD_STATUS_DELAY_MS);
     })();
     return () => {
       cancelled = true;
+      if (timerId != null) window.clearTimeout(timerId);
+      if (idleId != null && typeof w.cancelIdleCallback === "function") {
+        w.cancelIdleCallback(idleId);
+      }
       if (publishedCardStatusInFlightForRef.current === tid) {
         publishedCardStatusInFlightForRef.current = "";
       }
@@ -486,15 +510,23 @@ export default function ClientDashboardHomeClient({
         </p>
       ) : null}
 
-      <section className="client-dashboard-main__todayBar" aria-labelledby="client-today-heading">
+      <Link
+        href={todayButtonHref}
+        prefetch={false}
+        className="client-dashboard-main__todayBar client-dashboard-main__todayBarLink"
+        aria-labelledby="client-today-heading client-today-cta-label"
+        aria-describedby="client-today-status"
+      >
         <h2 id="client-today-heading" className="client-dashboard-main__todayBarHeading">
-          오늘 할 일
+          지금 할 일
         </h2>
-        <p className="client-dashboard-main__todayBarText">{todayStatusText}</p>
-        <Link href={todayButtonHref} prefetch={false} className="v3-btn client-dashboard-main__todayBarBtn">
+        <p id="client-today-status" className="client-dashboard-main__todayBarText">
+          {todayStatusText}
+        </p>
+        <span id="client-today-cta-label" className="client-dashboard-main__todayBarBtn" aria-hidden="true">
           {todayButtonLabel}
-        </Link>
-      </section>
+        </span>
+      </Link>
 
       {policy.annualMembershipVisible ? (
         <AdminSurface className="v3-stack client-dashboard-main__dsCard" style={{ gap: "0.65rem" }}>

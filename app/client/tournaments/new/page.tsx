@@ -66,15 +66,15 @@ function buildLocationFromLines(a: string, b: string, c: string): string {
 function parsePrizeInfoToFields(prizeInfo: string | null): {
   prize1: string;
   prize2: string;
-  prize3a: string;
-  prize3b: string;
+  prize3: string;
+  prize4: string;
+  prizeThirdShared: boolean;
   prizeExtra: string;
 } {
-  const out = { prize1: "", prize2: "", prize3a: "", prize3b: "", prizeExtra: "" };
+  const out = { prize1: "", prize2: "", prize3: "", prize4: "", prizeThirdShared: true, prizeExtra: "" };
   if (!prizeInfo?.trim()) return out;
   const lines = prizeInfo.split("\n").map((l) => l.trim()).filter(Boolean);
   const extra: string[] = [];
-  let thirdCount = 0;
   for (const line of lines) {
     if (line.startsWith("우승:")) {
       out.prize1 = line.slice(3).trim();
@@ -84,11 +84,27 @@ function parsePrizeInfoToFields(prizeInfo: string | null): {
       out.prize2 = line.slice(4).trim();
       continue;
     }
-    if (line.startsWith("3위:")) {
-      thirdCount += 1;
-      if (thirdCount === 1) out.prize3a = line.slice(3).trim();
-      else if (thirdCount === 2) out.prize3b = line.slice(3).trim();
-      else extra.push(line);
+    if (/^공동\s*3(?:위|등)\s*:/.test(line)) {
+      const value = line.slice(line.indexOf(":") + 1).trim();
+      if (value) out.prize3 = value;
+      out.prizeThirdShared = true;
+      continue;
+    }
+    if (/^3(?:위|등)\s*:/.test(line)) {
+      const value = line.slice(line.indexOf(":") + 1).trim();
+      if (!out.prize3) {
+        out.prize3 = value;
+      } else if (value && value !== out.prize3) {
+        extra.push(line);
+      }
+      continue;
+    }
+    if (/^4(?:위|등)\s*:/.test(line)) {
+      const value = line.slice(line.indexOf(":") + 1).trim();
+      if (value) {
+        out.prize4 = value;
+        out.prizeThirdShared = false;
+      }
       continue;
     }
     extra.push(line);
@@ -151,7 +167,12 @@ const sectionGap: CSSProperties = { gap: "1.05rem" };
 export default function ClientTournamentNewPage() {
   const router = useRouter();
 
-  const [editId, setEditId] = useState<string | null>(null);
+  const [editId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const p = new URLSearchParams(window.location.search);
+    const e = p.get("edit");
+    return e && e.trim() ? e.trim() : null;
+  });
   const [editLoading, setEditLoading] = useState(false);
 
   const [title, setTitle] = useState("");
@@ -201,8 +222,9 @@ export default function ClientTournamentNewPage() {
   const [tournamentIntro, setTournamentIntro] = useState("");
   const [prize1, setPrize1] = useState("");
   const [prize2, setPrize2] = useState("");
-  const [prize3a, setPrize3a] = useState("");
-  const [prize3b, setPrize3b] = useState("");
+  const [prize3, setPrize3] = useState("");
+  const [prize4, setPrize4] = useState("");
+  const [prizeThirdShared, setPrizeThirdShared] = useState(true);
   const [prizeExtra, setPrizeExtra] = useState("");
 
   const [outlineDisplayMode, setOutlineDisplayMode] = useState<OutlineDisplayMode>("TEXT");
@@ -229,7 +251,13 @@ export default function ClientTournamentNewPage() {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
   /** 새 대회 생성 직후 안내(저장은 이미 완료된 상태) */
-  const [createSuccessId, setCreateSuccessId] = useState<string | null>(null);
+  const [createSuccessId, setCreateSuccessId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const p = new URLSearchParams(window.location.search);
+    const e = p.get("edit");
+    const d = p.get("done");
+    return !e && d && d.trim() ? d.trim() : null;
+  });
   const [createDoneTournament, setCreateDoneTournament] = useState<Tournament | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   /** 대회 생성·수정 입력 단계(1~8). 저장 로직과 무관한 UI 상태 */
@@ -238,14 +266,6 @@ export default function ClientTournamentNewPage() {
   const [step8PolicyAcknowledged, setStep8PolicyAcknowledged] = useState(false);
   /** 수정 모드: 불러온 직후 폼 스냅샷(JSON) — 변경 여부 비교용 */
   const editBaselineJsonRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    const p = new URLSearchParams(window.location.search);
-    const e = p.get("edit");
-    const d = p.get("done");
-    setEditId(e && e.trim() ? e.trim() : null);
-    setCreateSuccessId(!e && d && d.trim() ? d.trim() : null);
-  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -456,8 +476,9 @@ export default function ClientTournamentNewPage() {
         const prizes = parsePrizeInfoToFields(t.prizeInfo);
         setPrize1(prizeAmountDigitsOnly(prizes.prize1));
         setPrize2(prizeAmountDigitsOnly(prizes.prize2));
-        setPrize3a(prizeAmountDigitsOnly(prizes.prize3a));
-        setPrize3b(prizeAmountDigitsOnly(prizes.prize3b));
+        setPrize3(prizeAmountDigitsOnly(prizes.prize3));
+        setPrize4(prizeAmountDigitsOnly(prizes.prize4));
+        setPrizeThirdShared(prizes.prizeThirdShared);
         setPrizeExtra(prizes.prizeExtra);
         setOutlineDisplayMode(t.outlineDisplayMode ?? "TEXT");
         setOutlineHtml(t.outlineHtml ?? "");
@@ -530,8 +551,9 @@ export default function ClientTournamentNewPage() {
       tournamentIntro,
       prize1,
       prize2,
-      prize3a,
-      prize3b,
+      prize3,
+      prize4,
+      prizeThirdShared,
       prizeExtra,
       outlineDisplayMode,
       outlineHtml,
@@ -607,8 +629,8 @@ export default function ClientTournamentNewPage() {
     if (
       prize1.trim() !== "" ||
       prize2.trim() !== "" ||
-      prize3a.trim() !== "" ||
-      prize3b.trim() !== "" ||
+      prize3.trim() !== "" ||
+      prize4.trim() !== "" ||
       prizeExtra.trim() !== ""
     ) {
       return false;
@@ -654,8 +676,10 @@ export default function ClientTournamentNewPage() {
     const parts: string[] = [];
     if (prize1.trim()) parts.push(`우승: ${prize1.trim()}`);
     if (prize2.trim()) parts.push(`준우승: ${prize2.trim()}`);
-    if (prize3a.trim()) parts.push(`3위: ${prize3a.trim()}`);
-    if (prize3b.trim()) parts.push(`3위: ${prize3b.trim()}`);
+    if (prize3.trim()) {
+      parts.push(`${prizeThirdShared ? "공동 3위" : "3위"}: ${prize3.trim()}`);
+    }
+    if (!prizeThirdShared && prize4.trim()) parts.push(`4위: ${prize4.trim()}`);
     if (prizeExtra.trim()) parts.push(prizeExtra.trim());
     return parts.length ? parts.join("\n") : null;
   }
@@ -907,8 +931,7 @@ export default function ClientTournamentNewPage() {
         router.refresh();
       } else {
         setSaveState("success");
-        setCreateSuccessId(savedId);
-        router.refresh();
+        router.replace(`/client/tournaments/new?done=${encodeURIComponent(savedId)}`);
       }
     } catch {
       setMessage(editId ? "저장 요청 중 오류가 발생했습니다." : "대회 생성 요청 중 오류가 발생했습니다.");
@@ -970,26 +993,7 @@ export default function ClientTournamentNewPage() {
         </p>
       ) : null}
 
-      {showCreateDone && createSuccessId ? (
-        <section className={`${adminUi.surface} v3-stack`} style={{ gap: "0.75rem" }}>
-          <p style={{ margin: 0 }}>
-            <strong>대회가 생성되었습니다.</strong> 메인에 올릴 <strong>게시카드</strong>를 만든 뒤 「메인에 게시하기」를 누르면
-            됩니다.
-          </p>
-          <p className="v3-muted" style={{ margin: 0, lineHeight: 1.5 }}>
-            지금 바로 가지 않아도 됩니다. 대회는 목록·상세에 그대로 남으며, 대회 상세의 「게시카드 작성·수정」에서도 같은
-            흐름으로 진행할 수 있습니다. 이미 게시된 카드가 있으면 새로 만들지 않고 기존 카드에 반영됩니다.
-          </p>
-          <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-            <Link className="v3-btn" href={`/client/tournaments/${createSuccessId}/card-publish-v2`}>
-              게시카드 작성·수정으로 이동
-            </Link>
-            <Link className="v3-btn" href={`/client/tournaments/${createSuccessId}`}>
-              상세 보기
-            </Link>
-          </div>
-        </section>
-      ) : (
+      {showCreateDone && createSuccessId ? null : (
         <>
       <TournamentNewWizardForm
         inputStyle={inputStyle}
@@ -1061,10 +1065,12 @@ export default function ClientTournamentNewPage() {
         setPrize1={setPrize1}
         prize2={prize2}
         setPrize2={setPrize2}
-        prize3a={prize3a}
-        setPrize3a={setPrize3a}
-        prize3b={prize3b}
-        setPrize3b={setPrize3b}
+        prize3={prize3}
+        setPrize3={setPrize3}
+        prize4={prize4}
+        setPrize4={setPrize4}
+        prizeThirdShared={prizeThirdShared}
+        setPrizeThirdShared={setPrizeThirdShared}
         prizeExtra={prizeExtra}
         setPrizeExtra={setPrizeExtra}
         prizeAmountDigitsOnly={prizeAmountDigitsOnly}

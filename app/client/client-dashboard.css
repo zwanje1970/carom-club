@@ -567,6 +567,18 @@ main.client-dashboard-main .client-dashboard-main__todayBar {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
+main.client-dashboard-main .client-dashboard-main__todayBarLink {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+main.client-dashboard-main .client-dashboard-main__todayBarLink:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
 main.client-dashboard-main .client-dashboard-main__todayBarHeading {
   margin: 0;
   font-size: 0.78rem;
@@ -587,11 +599,18 @@ main.client-dashboard-main .client-dashboard-main__todayBarText {
 }
 
 main.client-dashboard-main .client-dashboard-main__todayBarBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   padding: 0.35rem 0.75rem !important;
   font-size: 0.82rem !important;
   min-height: 0 !important;
   font-weight: 700;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
 }
 
 main.client-dashboard-main .client-dashboard-main__todayBar--skeleton {

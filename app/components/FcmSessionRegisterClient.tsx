@@ -9,8 +9,8 @@ type CaromWindow = Window & {
   __caromRegisterFcmToken?: (token: string, platform?: string) => Promise<void>;
 };
 
-const FCM_BOOT_DELAY_MS = 2500;
-const FCM_IDLE_TIMEOUT_MS = 1500;
+const FCM_BOOT_DELAY_MS = 5000;
+const FCM_IDLE_TIMEOUT_MS = 2000;
 
 function scheduleDeferredRun(task: () => void): () => void {
   if (typeof window === "undefined") return () => {};
@@ -41,6 +41,16 @@ function scheduleDeferredRun(task: () => void): () => void {
       w.cancelIdleCallback(idleId);
     }
   };
+}
+
+function isLikelyCaromMobileAppShellClient(): boolean {
+  if (typeof window === "undefined") return false;
+  const w = window as CaromWindow;
+  if (typeof w.caromNativeGetFcmToken === "function") return true;
+  const ua = (window.navigator?.userAgent ?? "").toLowerCase();
+  if (ua.includes("; wv)") || ua.includes("; wv ")) return true;
+  if (ua.includes("caromclubapp") || ua.includes("carom-club-app")) return true;
+  return false;
 }
 
 async function isAuthenticated(): Promise<boolean> {
@@ -146,6 +156,13 @@ export default function FcmSessionRegisterClient() {
   }, []);
 
   const scheduleRun = useCallback(() => {
+    if (pathname?.startsWith("/client") && !isLikelyCaromMobileAppShellClient()) {
+      if (scheduledCancelRef.current) {
+        scheduledCancelRef.current();
+        scheduledCancelRef.current = null;
+      }
+      return;
+    }
     if (scheduledCancelRef.current) {
       scheduledCancelRef.current();
       scheduledCancelRef.current = null;
@@ -153,7 +170,7 @@ export default function FcmSessionRegisterClient() {
     scheduledCancelRef.current = scheduleDeferredRun(() => {
       void run();
     });
-  }, [run]);
+  }, [pathname, run]);
 
   useEffect(() => {
     scheduleRun();

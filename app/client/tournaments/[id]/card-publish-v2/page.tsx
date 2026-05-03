@@ -96,14 +96,16 @@ function formatPrizeValueWithManwon(raw: string): string {
 
 function buildPrizeInfoSingleLine(raw: string | null | undefined): string {
   if (!raw) return "";
-  const labels: Array<"우승" | "준우승" | "3위"> = ["우승", "준우승", "3위"];
+  const labels: Array<"우승" | "준우승" | "공동 3위" | "3위" | "4위"> = ["우승", "준우승", "공동 3위", "3위", "4위"];
   const byLabel = new Map<string, string>();
   for (const line of String(raw).split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed) continue;
-    const m = /^(우승|준우승|3위)\s*:\s*(.+)$/.exec(trimmed);
+    const m = /^(우승|준우승|공동\s*3(?:위|등)|3(?:위|등)|4(?:위|등))\s*:\s*(.+)$/.exec(trimmed);
     if (!m) continue;
-    const label = m[1] as "우승" | "준우승" | "3위";
+    const rawLabel = m[1] ?? "";
+    const label =
+      /^공동/.test(rawLabel) ? "공동 3위" : /^3(?:위|등)$/.test(rawLabel) ? "3위" : /^4(?:위|등)$/.test(rawLabel) ? "4위" : (rawLabel as "우승" | "준우승");
     const value = formatPrizeValueWithManwon(m[2] ?? "");
     if (!value) continue;
     if (!byLabel.has(label)) byLabel.set(label, value);
