@@ -368,6 +368,7 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
   const rafRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number | null>(null);
   const resumeTimerRef = useRef<number | null>(null);
+  const measureFrameRef = useRef<number | null>(null);
   const pausedByUserRef = useRef(false);
   const suppressProgrammaticScrollRef = useRef(false);
 
@@ -411,12 +412,21 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
     const durationSec = Number.isFinite(slideCardMoveDurationSec)
       ? Math.max(1, slideCardMoveDurationSec)
       : 10;
+    const fallbackPxPerSec = 24;
     const restartAfterUserInputMs = 2000;
+    const readSegmentHeight = () => {
+      const raw = primarySegmentRef.current?.scrollHeight ?? 0;
+      return Number.isFinite(raw) && raw > 0 ? raw : 0;
+    };
 
     const stopAutoSlide = () => {
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
+      }
+      if (measureFrameRef.current !== null) {
+        cancelAnimationFrame(measureFrameRef.current);
+        measureFrameRef.current = null;
       }
       lastFrameTimeRef.current = null;
     };
@@ -442,17 +452,26 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
       scheduleResume();
     };
 
+    const scheduleMeasureRetry = () => {
+      if (measureFrameRef.current !== null) return;
+      let tries = 3;
+      const tick = () => {
+        measureFrameRef.current = null;
+        if (readSegmentHeight() > 0) return;
+        if (tries <= 0) return;
+        tries -= 1;
+        measureFrameRef.current = requestAnimationFrame(tick);
+      };
+      measureFrameRef.current = requestAnimationFrame(tick);
+    };
+
     const step = (frameTime: number) => {
       const node = viewportRef.current;
       if (!node || pausedByUserRef.current) return;
-      const segmentHeight = primarySegmentRef.current?.scrollHeight ?? 0;
-      if (segmentHeight <= 0) {
-        rafRef.current = requestAnimationFrame(step);
-        return;
-      }
-
+      const segmentHeight = readSegmentHeight();
       const maxScrollTop = node.scrollHeight - node.clientHeight;
       if (maxScrollTop <= 0) {
+        if (segmentHeight <= 0) scheduleMeasureRetry();
         rafRef.current = requestAnimationFrame(step);
         return;
       }
@@ -461,10 +480,14 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
       const dtSec = Math.max(0, (frameTime - prevTime) / 1000);
       lastFrameTimeRef.current = frameTime;
 
-      const pxPerSec = segmentHeight / durationSec;
+      const cycleHeight = segmentHeight > 0 ? segmentHeight : Math.max(maxScrollTop, 1);
+      let pxPerSec = segmentHeight > 0 ? segmentHeight / durationSec : fallbackPxPerSec;
+      if (!Number.isFinite(pxPerSec) || pxPerSec <= 0) {
+        pxPerSec = fallbackPxPerSec;
+      }
       let nextScrollTop = node.scrollTop + pxPerSec * dtSec;
-      if (nextScrollTop >= segmentHeight) {
-        nextScrollTop -= segmentHeight;
+      if (nextScrollTop >= cycleHeight) {
+        nextScrollTop -= cycleHeight;
       }
 
       suppressProgrammaticScrollRef.current = true;
@@ -487,6 +510,16 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
     viewport.addEventListener("pointerdown", onUserInput, { passive: true });
     viewport.addEventListener("scroll", onScroll, { passive: true });
 
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(() => {
+        if (readSegmentHeight() <= 0) scheduleMeasureRetry();
+      });
+      if (primarySegmentRef.current) resizeObserver.observe(primarySegmentRef.current);
+      resizeObserver.observe(viewport);
+    }
+
+    if (readSegmentHeight() <= 0) scheduleMeasureRetry();
     startAutoSlide();
 
     return () => {
@@ -495,6 +528,7 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
       viewport.removeEventListener("wheel", onUserInput);
       viewport.removeEventListener("pointerdown", onUserInput);
       viewport.removeEventListener("scroll", onScroll);
+      resizeObserver?.disconnect();
       stopAutoSlide();
       if (resumeTimerRef.current !== null) {
         window.clearTimeout(resumeTimerRef.current);
