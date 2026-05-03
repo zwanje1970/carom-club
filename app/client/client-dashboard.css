@@ -553,109 +553,49 @@ main.client-dashboard-main .client-dashboard-main__featureDesc {
   background: var(--ui-primary-dark);
 }
 
-/* —— /client 홈: 상단 제목 고정 + 본문만 스크롤(모바일) —— */
-main.client-dashboard-main.client-dashboard-home-root .client-dashboard-home-root__header {
-  position: sticky;
-  top: 0;
-  z-index: 6;
-  background: var(--ds-gray-bg, #f5f7fb);
-  padding: 0.5rem 0.75rem 0.45rem;
-  margin: 0 -0.25rem;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-main.client-dashboard-main.client-dashboard-home-root .client-dashboard-home-root__body {
-  padding: 0.5rem 0.5rem 1rem;
-}
-
-main.client-dashboard-main .client-dashboard-main__statusbar {
+/* —— 오늘 할 일: 기존 CTA 대비 한 줄 축소 —— */
+main.client-dashboard-main .client-dashboard-main__todayBar {
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.65rem;
+  gap: 0.5rem 0.75rem;
   padding: 0.45rem 0.65rem;
-  border-radius: 10px;
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
-main.client-dashboard-main .client-dashboard-main__statusbarText {
+main.client-dashboard-main .client-dashboard-main__todayBarHeading {
   margin: 0;
-  font-size: 0.84rem;
-  font-weight: 700;
-  color: #1e3a5f;
-  line-height: 1.35;
-  flex: 1 1 auto;
-  min-width: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
-main.client-dashboard-main .client-dashboard-main__statusbarBtn {
+main.client-dashboard-main .client-dashboard-main__todayBarText {
+  margin: 0;
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.35;
+}
+
+main.client-dashboard-main .client-dashboard-main__todayBarBtn {
   flex-shrink: 0;
-  padding: 0.38rem 0.75rem !important;
+  padding: 0.35rem 0.75rem !important;
   font-size: 0.82rem !important;
   min-height: 0 !important;
   font-weight: 700;
 }
 
-main.client-dashboard-main .client-dashboard-main__menuSection {
-  gap: 0.45rem !important;
-}
-
-main.client-dashboard-main .client-dashboard-main__menuList {
+main.client-dashboard-main .client-dashboard-main__todayBar--skeleton {
   display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-main.client-dashboard-main a.client-dashboard-main__menuLink {
-  display: block;
-  padding: 0.55rem 0.75rem;
-  border-radius: 10px;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  color: #111827 !important;
-  font-weight: 700;
-  font-size: 0.9rem;
-  text-decoration: none !important;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-
-main.client-dashboard-main a.client-dashboard-main__menuLink:active {
-  transform: scale(0.99);
-}
-
-@media (max-width: 767px) {
-  .app-dashboard-mobile-root:has([data-client-dashboard-home="1"]) {
-    display: flex;
-    flex-direction: column;
-    height: 100dvh;
-    max-height: 100dvh;
-    overflow: hidden;
-    box-sizing: border-box;
-  }
-
-  .app-dashboard-mobile-root:has([data-client-dashboard-home="1"])
-    > .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-  main.client-dashboard-main.client-dashboard-home-root[data-client-dashboard-home="1"] {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-  main.client-dashboard-main.client-dashboard-home-root[data-client-dashboard-home="1"] .client-dashboard-home-root__body {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
+  flex-direction: row;
+  align-items: center;
 }
