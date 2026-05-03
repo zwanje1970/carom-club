@@ -317,6 +317,11 @@ export async function listClientDashboardTournamentRollupFirestore(userId: strin
 }
 
 const DASHBOARD_TOURNAMENT_SCAN_LIMIT = 40;
+const DASHBOARD_TOURNAMENT_FIRST_VISIBLE_FIELDS = [
+  "createdAt",
+  "status",
+  "isDeleted",
+] as const;
 
 /**
  * 대시보드 요약 전용: 전체 대회 목록을 만들지 않고 최근 N건 중 첫 “표시 가능” 대회 1개만 탐색.
@@ -327,9 +332,8 @@ export async function listClientDashboardTournamentFirstVisibleFirestore(userId:
 }> {
   assertClientFirestorePersistenceConfigured();
   const db = getSharedFirestoreDb();
-  const orgs = await loadResolutionOrgs();
   const uid = userId.trim();
-  const fsSelect = [...TOURNAMENT_FIRESTORE_LEAN_BUILD_FIELDS];
+  const fsSelect = [...DASHBOARD_TOURNAMENT_FIRST_VISIBLE_FIELDS];
   let q;
   try {
     q = await db
@@ -357,8 +361,12 @@ export async function listClientDashboardTournamentFirstVisibleFirestore(userId:
     return bc.localeCompare(ac);
   });
   for (const doc of docs) {
-    const t = buildTournamentFromParsedRow({ id: doc.id, ...doc.data() }, orgs);
-    if (isEntityLifecycleVisibleForList(t.status)) {
+    const raw = doc.data() as Record<string, unknown> | undefined;
+    if (
+      isEntityLifecycleVisibleForList(raw?.status, {
+        legacyIsDeleted: raw?.isDeleted === true,
+      })
+    ) {
       return { hasAnyTournament: true, firstTournamentId: doc.id };
     }
   }

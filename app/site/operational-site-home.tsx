@@ -220,11 +220,13 @@ export default async function SiteOperationalHome() {
   /** headers() 제거: 요청별 값으로 동적 렌더·재요청 루프 방지. 모바일 크롬 분기는 임시 비활성(false). */
   const publicMobileSiteChrome = false;
 
-  const mainSlideSnapshots = (await withTimeout(safeListMainSlideSnapshots())) ?? [];
-
-  const siteNotice = (await withTimeout(safeGetSiteNoticeForHome())) ?? emptySiteNotice();
-
-  const mainSlideAdSettings = (await withTimeout(safeGetMainSlideAdSettingsForHome())) ?? defaultMainSlideAdSettings();
+  const [mainSlideSnapshots, siteNotice, mainSlideAdSettings] = await Promise.all([
+    withTimeout(safeListMainSlideSnapshots()).then((v) => v ?? []),
+    withTimeout(safeGetSiteNoticeForHome()).then((v) => v ?? emptySiteNotice()),
+    withTimeout(safeGetMainSlideAdSettingsForHome()).then(
+      (v) => v ?? defaultMainSlideAdSettings(),
+    ),
+  ]);
 
   const tournamentSlideDeckItems: SlideDeckItem[] = mainSlideSnapshots.map((snapshot) => ({
     type: "tournament" as const,

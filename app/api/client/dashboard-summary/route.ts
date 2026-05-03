@@ -9,7 +9,6 @@ import {
   getUserById,
   loadClientDashboardTournamentRollupLightForUser,
   resolveClientOrganizationForDashboardPolicy,
-  tournamentHasActivePublishedCard,
 } from "../../../../lib/platform-api";
 import type {
   ClientDashboardSummaryJson,
@@ -54,15 +53,14 @@ export async function GET() {
 
     const hasVenueIntro = clientVenueIntroHasMeaningfulContent(intro);
     const firstTournamentId = rollupLight.firstTournamentId.trim();
-    const hasPublishedActiveForSomeTournament =
-      firstTournamentId.length > 0 ? await tournamentHasActivePublishedCard(firstTournamentId) : false;
 
     const body: ClientDashboardSummaryJson = {
       ok: true,
       hasOrgSetup: Boolean(org?.setupCompleted),
       hasVenueIntro,
       hasAnyTournament: rollupLight.hasAnyTournament,
-      hasPublishedActiveForSomeTournament,
+      /** 대표 대회 게시카드 활성 여부는 후속 경량 API에서 지연 확인 */
+      hasPublishedActiveForSomeTournament: false,
       firstTournamentId,
       recentTournaments: [] as ClientDashboardSummaryTournament[],
       autoParticipantPushEnabled: org?.autoParticipantPushEnabled !== false,

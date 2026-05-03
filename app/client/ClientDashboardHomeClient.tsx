@@ -21,6 +21,10 @@ type DashboardFetchResult =
   | { ok: true; data: ClientDashboardSummaryJson }
   | { ok: false; message: string };
 
+type DashboardPublishedCardStatusResult =
+  | { ok: true; hasPublishedActiveForSomeTournament: boolean }
+  | { ok: false };
+
 async function fetchDashboardSummary(): Promise<DashboardFetchResult> {
   try {
     const res = await fetch("/api/client/dashboard-summary", { credentials: "same-origin" });
@@ -35,6 +39,30 @@ async function fetchDashboardSummary(): Promise<DashboardFetchResult> {
     return { ok: true, data: json };
   } catch {
     return { ok: false, message: "네트워크 오류로 불러오지 못했습니다." };
+  }
+}
+
+async function fetchDashboardPublishedCardStatus(
+  tournamentId: string,
+): Promise<DashboardPublishedCardStatusResult> {
+  const id = tournamentId.trim();
+  if (!id) return { ok: false };
+  try {
+    const res = await fetch(
+      `/api/client/dashboard-summary/published-card-status?tournamentId=${encodeURIComponent(id)}`,
+      { credentials: "same-origin" },
+    );
+    const json = (await res.json()) as
+      | { ok: true; hasPublishedActiveForSomeTournament: boolean }
+      | { ok: false; error?: string };
+    if (!res.ok || json.ok !== true) return { ok: false };
+    return {
+      ok: true,
+      hasPublishedActiveForSomeTournament:
+        json.hasPublishedActiveForSomeTournament === true,
+    };
+  } catch {
+    return { ok: false };
   }
 }
 
@@ -183,6 +211,7 @@ export default function ClientDashboardHomeClient() {
   const [state, setState] = useState<SummaryState>({ status: "loading" });
   const extrasDetailsRef = useRef<HTMLDetailsElement>(null);
   const didStartInitialLoadRef = useRef(false);
+  const publishedCardStatusResolvedForRef = useRef<string>("");
 
   const onExtrasToggle = useCallback((e: SyntheticEvent<HTMLDetailsElement>) => {
     if (!e.currentTarget.open) return;
@@ -211,6 +240,43 @@ export default function ClientDashboardHomeClient() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (state.status !== "ready") return;
+    const tid = state.data.firstTournamentId.trim();
+    if (!state.data.hasAnyTournament || !tid) return;
+    if (publishedCardStatusResolvedForRef.current === tid) return;
+    publishedCardStatusResolvedForRef.current = tid;
+    let cancelled = false;
+    void (async () => {
+      const r = await fetchDashboardPublishedCardStatus(tid);
+      if (!r.ok || cancelled) return;
+      mergeClientDashboardSummaryCache({
+        hasPublishedActiveForSomeTournament: r.hasPublishedActiveForSomeTournament,
+      });
+      setState((prev) => {
+        if (prev.status !== "ready") return prev;
+        if (prev.data.firstTournamentId.trim() !== tid) return prev;
+        if (
+          prev.data.hasPublishedActiveForSomeTournament ===
+          r.hasPublishedActiveForSomeTournament
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          data: {
+            ...prev.data,
+            hasPublishedActiveForSomeTournament:
+              r.hasPublishedActiveForSomeTournament,
+          },
+        };
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [state]);
 
   const handleRetry = useCallback(() => {
     setState({ status: "loading" });
