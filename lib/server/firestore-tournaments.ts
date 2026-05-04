@@ -317,6 +317,11 @@ export async function listClientDashboardTournamentRollupFirestore(userId: strin
 }
 
 const DASHBOARD_TOURNAMENT_SCAN_LIMIT = 40;
+const DASHBOARD_TOURNAMENT_GATE_FIELDS = [
+  "createdAt",
+  "status",
+  "isDeleted",
+] as const;
 const DASHBOARD_TOURNAMENT_FIRST_VISIBLE_FIELDS = [
   "createdAt",
   "status",
@@ -345,6 +350,45 @@ function parseDashboardTournamentCreatedAtMillis(value: unknown): number {
     }
   }
   return 0;
+}
+
+/**
+ * `/api/client/dashboard-gate` 전용: preview 생성 없이 표시 가능한 첫 대회 id만 찾는다.
+ */
+export async function findClientDashboardFirstTournamentIdFirestore(userId: string): Promise<{
+  hasAnyTournament: boolean;
+  firstTournamentId: string;
+}> {
+  assertClientFirestorePersistenceConfigured();
+  const db = getSharedFirestoreDb();
+  const uid = userId.trim();
+  const fsSelect = [...DASHBOARD_TOURNAMENT_GATE_FIELDS];
+  let cursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
+  for (;;) {
+    let query = db
+      .collection(COLLECTION)
+      .where("createdBy", "==", uid)
+      .orderBy("createdAt", "desc")
+      .limit(DASHBOARD_TOURNAMENT_SCAN_LIMIT)
+      .select(...fsSelect);
+    if (cursor) query = query.startAfter(cursor);
+    const page = await query.get();
+    if (page.empty) return { hasAnyTournament: false, firstTournamentId: "" };
+    for (const doc of page.docs) {
+      const raw = doc.data() as Record<string, unknown> | undefined;
+      if (
+        isEntityLifecycleVisibleForList(raw?.status, {
+          legacyIsDeleted: raw?.isDeleted === true,
+        })
+      ) {
+        return { hasAnyTournament: true, firstTournamentId: doc.id };
+      }
+    }
+    cursor = page.docs[page.docs.length - 1];
+    if (!cursor || page.docs.length < DASHBOARD_TOURNAMENT_SCAN_LIMIT) {
+      return { hasAnyTournament: false, firstTournamentId: "" };
+    }
+  }
 }
 
 /**

@@ -17,7 +17,28 @@ type Props = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function SiteCommunityBoardListPage({ params, searchParams }: Props) {
+function CommunityBoardListFallback() {
+  return (
+    <SiteShellFrame brandTitle="커뮤니티" auxiliaryBarClassName="site-shell-controls--site-list">
+      <SiteListPageSkeleton
+        contentOnly
+        brandTitle="커뮤니티"
+        auxiliaryLabel="게시글 목록을 불러오는 중입니다."
+        listRows={5}
+      />
+    </SiteShellFrame>
+  );
+}
+
+export default function SiteCommunityBoardListPage({ params, searchParams }: Props) {
+  return (
+    <Suspense fallback={<CommunityBoardListFallback />}>
+      <SiteCommunityBoardListPageResolved params={params} searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function SiteCommunityBoardListPageResolved({ params, searchParams }: Props) {
   const { boardType: raw } = await params;
   const boardType = parseCommunityBoardTypeParam(raw);
   if (!boardType) notFound();

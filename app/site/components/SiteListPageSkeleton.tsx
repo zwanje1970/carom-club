@@ -27,8 +27,40 @@ export default function SiteListPageSkeleton({
   listRows?: number;
   contentOnly?: boolean;
 }) {
+  /** 커뮤니티 목록 전용: `CommunityBoardPostList`와 동일 ul/row 클래스 — 카드형 스켈레톤 미사용 */
+  const communityListRowCount = Math.min(8, Math.max(5, listRows));
+  const communityListSection = (
+    <section className="site-site-gray-main v3-stack ui-community-page" aria-hidden>
+      <ul className="ui-community-board-rows">
+        {Array.from({ length: communityListRowCount }, (_, i) => (
+          <li key={`site-comm-skel-${i}`} className="ui-community-board-row">
+            <div className="ui-community-board-row-link" aria-hidden tabIndex={-1}>
+              <div className="ui-community-board-row-body">
+                <div className="ui-community-board-line1">
+                  <SkeletonBlock width="2.5rem" height="1.05rem" radius="999px" background="#e5ebf1" />
+                  <SkeletonBlock width="72%" height="1.05rem" radius="0.35rem" background="#e5ebf1" />
+                </div>
+                <SkeletonBlock width="58%" height="0.85rem" radius="0.25rem" background="#edf1f5" />
+              </div>
+              <div className="ui-community-board-thumb-wrap" aria-hidden>
+                <div
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    borderRadius: "4px",
+                    background: "#edf1f5",
+                  }}
+                />
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+
   const listSection = (
-    <section className={`site-site-gray-main v3-stack${contentOnly ? " ui-community-page" : ""}`} aria-hidden>
+    <section className="site-site-gray-main v3-stack" aria-hidden>
       {Array.from({ length: listRows }, (_, i) => (
         <div key={`site-skel-${i}`} className="card-clean v3-stack" style={{ gap: "0.75rem", background: "#fff" }}>
           <SkeletonBlock width="5rem" height="1rem" background="#e5ebf1" />
@@ -41,7 +73,7 @@ export default function SiteListPageSkeleton({
   );
 
   if (contentOnly) {
-    return listSection;
+    return communityListSection;
   }
 
   return (

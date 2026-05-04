@@ -4980,6 +4980,25 @@ export async function loadClientDashboardTournamentRollupLightForUser(userId: st
   };
 }
 
+/** 대시보드 게이트 전용: preview 생성 없이 대회 존재 여부와 첫 대회 id만 확인한다. */
+export async function findClientDashboardFirstTournamentIdForUser(userId: string): Promise<{
+  hasAnyTournament: boolean;
+  firstTournamentId: string;
+}> {
+  if (isFirestoreUsersBackendConfigured()) {
+    const mod = await import("./firestore-tournaments");
+    return mod.findClientDashboardFirstTournamentIdFirestore(userId);
+  }
+  const store = await readLocalJsonAggregate();
+  const canonicalUserId = resolveCanonicalUserId(store, userId.trim());
+  const filtered = store.tournaments
+    .filter((item) => item.createdBy === canonicalUserId)
+    .filter((item) => isEntityLifecycleVisibleForList(item.status))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  if (filtered.length === 0) return { hasAnyTournament: false, firstTournamentId: "" };
+  return { hasAnyTournament: true, firstTournamentId: filtered[0]!.id };
+}
+
 export async function upsertClientVenueIntroForUser(
   userId: string,
   params: {

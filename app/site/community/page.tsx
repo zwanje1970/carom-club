@@ -9,7 +9,32 @@ import CommunityBoardSwipeShell from "./CommunityBoardSwipeShell";
 import SiteShellFrame from "../components/SiteShellFrame";
 import SiteListPageSkeleton from "../components/SiteListPageSkeleton";
 
-export default async function SiteCommunityPage({
+function CommunityPageFallback() {
+  return (
+    <SiteShellFrame brandTitle="커뮤니티" auxiliaryBarClassName="site-shell-controls--site-list">
+      <SiteListPageSkeleton
+        contentOnly
+        brandTitle="커뮤니티"
+        auxiliaryLabel="게시글 목록을 불러오는 중입니다."
+        listRows={5}
+      />
+    </SiteShellFrame>
+  );
+}
+
+export default function SiteCommunityPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  return (
+    <Suspense fallback={<CommunityPageFallback />}>
+      <SiteCommunityPageResolved searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function SiteCommunityPageResolved({
   searchParams,
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
