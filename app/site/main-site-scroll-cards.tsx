@@ -381,6 +381,8 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
   const measureFrameRef = useRef<number | null>(null);
   const pausedByUserRef = useRef(false);
   const programmaticScrollUntilMsRef = useRef(0);
+  /** `pxPerSec * dt` 소수 누적 — `scrollTop`에는 정수 px만 반영해 미세 떨림 완화 */
+  const scrollPixelCarryRef = useRef(0);
 
   const lcpHeroItemIndex = useMemo(
     () =>
@@ -429,6 +431,33 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
       return Number.isFinite(raw) && raw > 0 ? raw : 0;
     };
 
+    /** primary 세그먼트 내 카드 슬롯(행) 높이 누적 — `cardMoveDurationSec`는 "행 1개 높이당 초"로만 사용 */
+    type CardLayoutMetrics = {
+      tops: number[];
+      heights: number[];
+      segmentHeight: number;
+    };
+    let cardLayoutMetrics: CardLayoutMetrics | null = null;
+    let layoutDirty = true;
+
+    const recomputeCardLayoutMetrics = (): CardLayoutMetrics | null => {
+      const seg = primarySegmentRef.current;
+      if (!seg) return null;
+      const tops: number[] = [];
+      const heights: number[] = [];
+      let acc = 0;
+      for (const child of seg.children) {
+        if (!(child instanceof HTMLElement)) continue;
+        if (child.classList.contains(siteStyles.marqueeDimLayer)) continue;
+        tops.push(acc);
+        const h = child.offsetHeight;
+        heights.push(h);
+        acc += h;
+      }
+      if (heights.length === 0) return null;
+      return { tops, heights, segmentHeight: acc };
+    };
+
     const stopAutoSlide = () => {
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current);
@@ -439,6 +468,7 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
         measureFrameRef.current = null;
       }
       lastFrameTimeRef.current = null;
+      scrollPixelCarryRef.current = 0;
     };
 
     const scheduleResume = () => {
@@ -469,7 +499,10 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
       let tries = 3;
       const tick = () => {
         measureFrameRef.current = null;
-        if (readSegmentHeight() > 0) return;
+        if (readSegmentHeight() > 0) {
+          layoutDirty = true;
+          return;
+        }
         if (tries <= 0) return;
         tries -= 1;
         measureFrameRef.current = requestAnimationFrame(tick);
@@ -495,11 +528,35 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
       const dtSec = Math.max(0, (frameTime - prevTime) / 1000);
       lastFrameTimeRef.current = frameTime;
 
-      let pxPerSec = segmentHeight > 0 ? segmentHeight / durationSec : fallbackPxPerSec;
+      if (layoutDirty || cardLayoutMetrics === null) {
+        cardLayoutMetrics = recomputeCardLayoutMetrics();
+        layoutDirty = false;
+      }
+
+      const firstStart = primarySegmentRef.current?.offsetTop ?? 0;
+      let pxPerSec = fallbackPxPerSec;
+      if (cardLayoutMetrics && cardLayoutMetrics.segmentHeight > 0) {
+        const localY = Math.min(
+          Math.max(0, node.scrollTop - firstStart),
+          Math.max(0, cardLayoutMetrics.segmentHeight - Number.EPSILON),
+        );
+        let idx = cardLayoutMetrics.heights.length - 1;
+        for (let i = 0; i < cardLayoutMetrics.heights.length; i += 1) {
+          const top = cardLayoutMetrics.tops[i]!;
+          const hi = cardLayoutMetrics.heights[i]!;
+          if (localY < top + hi) {
+            idx = i;
+            break;
+          }
+        }
+        const hCur = cardLayoutMetrics.heights[idx] ?? 0;
+        if (hCur > 0) {
+          pxPerSec = hCur / durationSec;
+        }
+      }
       if (!Number.isFinite(pxPerSec) || pxPerSec <= 0) {
         pxPerSec = fallbackPxPerSec;
       }
-      const firstStart = primarySegmentRef.current?.offsetTop ?? 0;
       const secondStart = secondarySegmentRef.current?.offsetTop ?? 0;
       const hasOffsetLoopWindow = secondStart > firstStart;
       const loopDistance = hasOffsetLoopWindow
@@ -508,14 +565,17 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
           ? segmentHeight
           : Math.max(maxScrollTop, 1);
       const loopEnd = hasOffsetLoopWindow ? secondStart : loopDistance;
-      let nextScrollTop = node.scrollTop + pxPerSec * dtSec;
+      const deltaTotal = pxPerSec * dtSec + scrollPixelCarryRef.current;
+      const deltaWhole = Math.floor(deltaTotal);
+      scrollPixelCarryRef.current = deltaTotal - deltaWhole;
+      let nextScrollTop = node.scrollTop + deltaWhole;
       while (nextScrollTop >= loopEnd && loopDistance > 0) {
         nextScrollTop -= loopDistance;
       }
 
       // programmatic scrollTop 변경 직후 발생하는 scroll 이벤트를 사용자 입력으로 오인하지 않도록 보호
       programmaticScrollUntilMsRef.current = performance.now() + 160;
-      node.scrollTop = Math.min(nextScrollTop, maxScrollTop);
+      node.scrollTop = Math.round(Math.min(nextScrollTop, maxScrollTop));
 
       rafRef.current = requestAnimationFrame(step);
     };
@@ -525,6 +585,7 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
       if (selectedItemId !== null) return;
       if (rafRef.current !== null) return;
       lastFrameTimeRef.current = null;
+      scrollPixelCarryRef.current = 0;
       rafRef.current = requestAnimationFrame(step);
     };
 
@@ -537,6 +598,7 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
     let resizeObserver: ResizeObserver | null = null;
     if (typeof ResizeObserver !== "undefined") {
       resizeObserver = new ResizeObserver(() => {
+        layoutDirty = true;
         if (readSegmentHeight() <= 0) scheduleMeasureRetry();
       });
       if (primarySegmentRef.current) resizeObserver.observe(primarySegmentRef.current);
@@ -566,6 +628,7 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
       }
       pausedByUserRef.current = false;
       programmaticScrollUntilMsRef.current = 0;
+      scrollPixelCarryRef.current = 0;
     };
   }, [items, slideCardMoveDurationSec, selectedItemId]);
 
