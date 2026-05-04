@@ -8,10 +8,10 @@ export default function PlatformPage() {
         <Link
           href="/site"
           prefetch={false}
-          className="v3-btn"
-          style={{ padding: "0.35rem 0.75rem", fontSize: "0.88rem" }}
+          className="secondary-button"
+          aria-label="공개 사이트 메인으로"
         >
-          메인으로 이동
+          공개 사이트로
         </Link>
       </div>
       <p className="v3-muted">운영·사이트 관리로 이동합니다.</p>

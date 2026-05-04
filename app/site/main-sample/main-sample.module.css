@@ -102,6 +102,8 @@
 
 /* /site 메인 MainSiteScrollCards 전용: 브라우저 세로 스크롤 허용(샘플 main-sample 경로는 .slideViewport 유지) */
 .slideViewportSiteMain {
+  /* 프로그램적 scrollTop과 브라우저 기본 스크롤 앵커링 경합 완화 */
+  overflow-anchor: none;
   --sample-block-ref: 5.75rem;
   --sample-main-card-height: calc(var(--sample-block-ref) * 1.5);
   /*
@@ -150,6 +152,7 @@
   flex-direction: column;
   align-items: stretch;
   pointer-events: auto;
+  overflow-anchor: none;
 }
 
 @keyframes sampleMainMarqueeUp {
@@ -430,6 +433,11 @@
   border-radius: inherit;
   overflow: hidden;
   box-sizing: border-box;
+  /* height:auto 이미지 로드 전·후 슬롯 높이 점프 완화(대회 덱 고정 높이 경로 미사용) */
+  min-height: max(
+    11rem,
+    min(calc(100cqw * 4 / 3), var(--site-main-scroll-published-poster-max-height, min(85dvh, 920px)))
+  );
 }
 
 .sampleMainCardPosterPublishedSnapshot {

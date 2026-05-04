@@ -9,8 +9,16 @@ export type MainSlideAdConfig = {
   adsPerInsert: number;
   rotationMode: MainSlideAdRotationMode;
   maxAdsPerCycle: number;
-  /** 메인 슬라이드 카드 이동(자동) 한 사이클 기준 시간(초). 관리자 범위 5~20, 없음·비정상 시 10 */
+  /**
+   * 저장소 JSON 키(레거시 이름). 의미: **1~10 카드 이동 속도 단계** (5=기본).
+   * 구버전은 초(5~20)로 저장됐을 수 있음 — `normalizeMainSlideAdConfig`에서 단계로 치환.
+   */
   cardMoveDurationSec: number;
+  /**
+   * true면 `cardMoveDurationSec`를 초가 아닌 단계(1~10)로 해석.
+   * 저장소에 없으면 구버전(초)으로 간주 후 마이그레이션; 신규 저장 시 true.
+   */
+  cardMoveSpeedIsLevels?: boolean;
 };
 
 export const DEFAULT_MAIN_SLIDE_AD_CONFIG: MainSlideAdConfig = {
@@ -19,8 +27,25 @@ export const DEFAULT_MAIN_SLIDE_AD_CONFIG: MainSlideAdConfig = {
   adsPerInsert: 1,
   rotationMode: "sequential",
   maxAdsPerCycle: 1,
-  cardMoveDurationSec: 10,
+  cardMoveDurationSec: 5,
+  cardMoveSpeedIsLevels: true,
 };
+
+/**
+ * 구 `cardMoveDurationSec`(초, 대략 5~20) 또는 1~4 단계 후보를 1~10 속도 단계로 치환.
+ * - 1~4: 예전에는 초로 저장 불가 → 단계로 본다.
+ * - 5~10: 초로 간주(5→1 … 10→5).
+ * - 11~20: 초로 간주(10→5 … 20→10 선형).
+ */
+export function migrateLegacyCardMoveFieldToLevel(n: number): number {
+  if (!Number.isFinite(n)) return 5;
+  const r = Math.round(n);
+  if (r >= 1 && r <= 4) return Math.min(10, Math.max(1, r));
+  if (r >= 5 && r <= 10) return Math.min(10, Math.max(1, Math.round(1 + ((r - 5) / 5) * 4)));
+  if (r > 10 && r <= 20) return Math.min(10, Math.max(1, Math.round(5 + ((r - 10) / 10) * 5)));
+  if (r > 20) return 10;
+  return 5;
+}
 
 /** 플랫폼 관리자 등록 메인 슬라이드 광고 row (로컬 aggregate 등) */
 export type MainSiteSlideAd = {
@@ -71,11 +96,15 @@ export function normalizeMainSlideAdConfig(raw: unknown): MainSlideAdConfig {
     const f = Math.floor(maxC);
     base.maxAdsPerCycle = f < 0 ? def.maxAdsPerCycle : f;
   }
-  const moveSec = Number(r.cardMoveDurationSec);
-  if (Number.isFinite(moveSec)) {
-    const rounded = Math.round(moveSec);
-    base.cardMoveDurationSec = Math.min(20, Math.max(5, rounded));
+  const moveRaw = Number(r.cardMoveDurationSec);
+  const levelSemantics = r.cardMoveSpeedIsLevels === true;
+  if (Number.isFinite(moveRaw)) {
+    const rounded = Math.round(moveRaw);
+    base.cardMoveDurationSec = levelSemantics
+      ? Math.min(10, Math.max(1, rounded))
+      : migrateLegacyCardMoveFieldToLevel(rounded);
   }
+  base.cardMoveSpeedIsLevels = true;
   return base;
 }
 

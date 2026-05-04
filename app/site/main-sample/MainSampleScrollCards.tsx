@@ -27,8 +27,8 @@ type CardRowProps = {
 };
 
 export type MainSampleScrollCardsProps = {
-  /** `MainSlideAdConfig.cardMoveDurationSec` — 서버에서 이미 5~20·기본 10 정규화 */
-  slideCardMoveDurationSec: number;
+  /** `MainSlideAdConfig.cardMoveDurationSec` — 1~10 속도 단계(레거시 JSON 키명) */
+  slideCardMoveSpeedLevel: number;
 };
 
 const MainSampleCardRow = memo(function MainSampleCardRow({
@@ -81,26 +81,32 @@ const MainSampleCardRow = memo(function MainSampleCardRow({
   );
 });
 
-export function MainSampleScrollCards({ slideCardMoveDurationSec }: MainSampleScrollCardsProps) {
+export function MainSampleScrollCards({ slideCardMoveSpeedLevel }: MainSampleScrollCardsProps) {
   /** 무한 트랙 구간(a|b) + 스냅샷 id — 동일 스냅샷 행이 두 세그먼트에 있어 행 단위로만 선택 */
   const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null);
+
+  const level = Number.isFinite(slideCardMoveSpeedLevel)
+    ? Math.min(10, Math.max(1, Math.round(slideCardMoveSpeedLevel)))
+    : 5;
+  /** 메인과 동일 기준: 5단계 ≈ 9초·뷰포트 높이 상당 이동에 맞춘 샘플 애니메이션 길이(초) */
+  const sampleAnimSec = (9 * 5) / level;
 
   const trackStyle = useMemo(
     () =>
       ({
-        "--main-sample-slide-duration": `${slideCardMoveDurationSec}s`,
+        "--main-sample-slide-duration": `${sampleAnimSec}s`,
         animationPlayState: "running" as const,
       }) as CSSProperties,
-    [slideCardMoveDurationSec],
+    [sampleAnimSec],
   );
 
   const trackStylePaused = useMemo(
     () =>
       ({
-        "--main-sample-slide-duration": `${slideCardMoveDurationSec}s`,
+        "--main-sample-slide-duration": `${sampleAnimSec}s`,
         animationPlayState: "paused" as const,
       }) as CSSProperties,
-    [slideCardMoveDurationSec],
+    [sampleAnimSec],
   );
 
   const onCardPointerDown = useCallback((rowKey: string) => {

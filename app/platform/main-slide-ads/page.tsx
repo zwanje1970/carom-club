@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import NumericStepper from "../../components/NumericStepper";
+import {
+  DEFAULT_MAIN_SLIDE_AD_CONFIG,
+  normalizeMainSlideAdConfig,
+  type MainSlideAdConfig,
+} from "../../../lib/site/main-slide-stream";
 
 const previewBoxStyle: CSSProperties = {
   border: "1px solid #ccc",
@@ -93,15 +98,9 @@ function AdminAdImagePreview({ imageUrl }: { imageUrl: string }) {
 
 const inputStyle: CSSProperties = { padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem", width: "100%" };
 
-type MainSlideAdConfig = {
-  enabled: boolean;
-  insertInterval: number;
-  adsPerInsert: number;
-  rotationMode: "sequential" | "random";
-  maxAdsPerCycle: number;
-  /** 카드 이동 시간(초) — 5~20, 기본 10 */
-  cardMoveDurationSec: number;
-};
+function defaultConfig(): MainSlideAdConfig {
+  return { ...DEFAULT_MAIN_SLIDE_AD_CONFIG };
+}
 
 type AdRow = {
   id: string;
@@ -116,17 +115,6 @@ type AdRow = {
   impressions: number;
   clicks: number;
 };
-
-function defaultConfig(): MainSlideAdConfig {
-  return {
-    enabled: false,
-    insertInterval: 10,
-    adsPerInsert: 1,
-    rotationMode: "sequential",
-    maxAdsPerCycle: 1,
-    cardMoveDurationSec: 10,
-  };
-}
 
 function createEmptyAdRow(): AdRow {
   return {
@@ -164,27 +152,6 @@ function adFromApi(row: unknown): AdRow {
     impressions: num(r.impressions, 0),
     clicks: num(r.clicks, 0),
   };
-}
-
-function configFromApi(raw: unknown): MainSlideAdConfig {
-  const base = defaultConfig();
-  if (!raw || typeof raw !== "object") return base;
-  const r = raw as Record<string, unknown>;
-  if (typeof r.enabled === "boolean") base.enabled = r.enabled;
-  const ins = Number(r.insertInterval);
-  if (Number.isFinite(ins)) base.insertInterval = Math.max(0, Math.floor(ins));
-  const ap = Number(r.adsPerInsert);
-  if (Number.isFinite(ap)) base.adsPerInsert = Math.max(0, Math.floor(ap));
-  const mx = Number(r.maxAdsPerCycle);
-  if (Number.isFinite(mx)) base.maxAdsPerCycle = Math.max(0, Math.floor(mx));
-  if (r.rotationMode === "random" || r.rotationMode === "sequential") {
-    base.rotationMode = r.rotationMode;
-  }
-  const moveSec = Number(r.cardMoveDurationSec);
-  if (Number.isFinite(moveSec)) {
-    base.cardMoveDurationSec = Math.min(20, Math.max(5, Math.round(moveSec)));
-  }
-  return base;
 }
 
 function formatCtr(impressions: number, clicks: number): string {
@@ -265,7 +232,7 @@ export default function PlatformMainSlideAdsPage() {
         setMessage(adsJson.error ?? "광고 목록을 불러오지 못했습니다.");
         return;
       }
-      setConfig(configFromApi(cfgJson.config));
+      setConfig(normalizeMainSlideAdConfig(cfgJson.config));
       setAds(adsJson.ads.map(adFromApi));
     } catch {
       setMessage("데이터 조회 중 오류가 발생했습니다.");
@@ -294,6 +261,7 @@ export default function PlatformMainSlideAdsPage() {
           rotationMode: config.rotationMode,
           maxAdsPerCycle: config.maxAdsPerCycle,
           cardMoveDurationSec: config.cardMoveDurationSec,
+          cardMoveSpeedIsLevels: true,
         }),
       });
       const result = (await response.json()) as { ok?: boolean; config?: unknown; error?: string };
@@ -301,7 +269,7 @@ export default function PlatformMainSlideAdsPage() {
         setMessage(result.error ?? "설정 저장에 실패했습니다.");
         return;
       }
-      setConfig(configFromApi(result.config));
+      setConfig(normalizeMainSlideAdConfig(result.config));
       setMessage("광고 삽입 설정이 저장되었습니다.");
     } catch {
       setMessage("설정 저장 중 오류가 발생했습니다.");
@@ -527,16 +495,19 @@ export default function PlatformMainSlideAdsPage() {
           />
         </label>
         <label className="v3-stack">
-          <span>카드 이동 시간(초) — 슬라이드 속도 (5~20, 기본 10)</span>
+          <span>카드 이동 속도</span>
           <NumericStepper
-            min={5}
-            max={20}
+            min={1}
+            max={10}
             step={1}
-            unit="초"
+            unit="단계"
             disabled={loading}
             value={config.cardMoveDurationSec}
             onChange={(next) => setConfig((c) => ({ ...c, cardMoveDurationSec: next }))}
           />
+          <span className="v3-muted" style={{ fontSize: "0.82rem", lineHeight: 1.45 }}>
+            5단계가 기본 속도입니다. 숫자가 클수록 빠르게 이동합니다.
+          </span>
         </label>
         <div className="v3-row">
           <button className="v3-btn" type="button" onClick={handleSaveConfig} disabled={loading || savingConfig}>

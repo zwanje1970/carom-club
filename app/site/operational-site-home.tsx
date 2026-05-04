@@ -335,7 +335,7 @@ export default async function SiteOperationalHome() {
                 >
                   <MainSiteScrollCards
                     items={scrollItems}
-                    slideCardMoveDurationSec={mainSlideAdSettings.config.cardMoveDurationSec}
+                    slideCardMoveSpeedLevel={mainSlideAdSettings.config.cardMoveDurationSec}
                   />
                 </section>
               </div>
