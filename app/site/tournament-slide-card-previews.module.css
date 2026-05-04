@@ -648,3 +648,23 @@
   height: var(--template-slide-badge-size);
   font-size: calc(0.62rem * 1.1 * var(--tournament-card-height-scale));
 }
+
+/*
+ * PC 웹 메인 세로 스크롤: 광고 덱 카드(.cardRootMainSlideAd)만
+ * .bg 의 min/max 폭이 슬롯을 넓히지 않게(UA 모바일 셸·다른 경로 비적용).
+ */
+:global(.site-shell.site-shell--pc-site-chrome)
+  :global([data-site-main-scroll-viewport="1"])
+  .cardRootMainSlideAd.cardRootSlideDeck
+  .media {
+  min-width: 0;
+  max-width: 100%;
+}
+
+:global(.site-shell.site-shell--pc-site-chrome)
+  :global([data-site-main-scroll-viewport="1"])
+  .cardRootMainSlideAd.cardRootSlideDeck
+  .bg {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}

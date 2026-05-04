@@ -9,6 +9,7 @@ import {
   completeTournamentApplicationOcr,
   getProofImageAssetById,
   getTournamentApplicationById,
+  getTournamentById,
   markTournamentApplicationOcrProcessing,
   type ProofImageAsset,
   type TournamentApplication,
@@ -20,6 +21,8 @@ import {
 } from "./firestore-tournament-applications";
 import { isFirestoreUsersBackendConfigured } from "./firestore-users";
 import { runGoogleOcrOnImageBuffer } from "./google-ocr";
+import { checkOcrEligibility, parseOcrEligibilityText } from "./ocr-eligibility-parser";
+import { getTournamentByIdFirestore } from "./firestore-tournaments";
 
 export type OcrResultStatus = "success" | "failed";
 
@@ -48,15 +51,72 @@ async function loadProofImageOriginalBuffer(proofImage: ProofImageAsset): Promis
   return fromDisk.buffer;
 }
 
-async function runMockOcr(application: TournamentApplication): Promise<OcrRecognitionResult> {
+async function runMockOcrFromSeed(seed: { depositorName: string; phone: string }): Promise<OcrRecognitionResult> {
   return {
-    rawText: `입금자명 추정: ${application.depositorName}\n전화번호 추정: ${application.phone}`,
-    extractedValue: application.depositorName || null,
+    rawText: `입금자명 추정: ${seed.depositorName}\n전화번호 추정: ${seed.phone}`,
+    extractedValue: seed.depositorName || null,
     confidence: 0.78,
     provider: "mock",
     processedAt: new Date().toISOString(),
     status: "success",
   };
+}
+
+async function runMockOcr(application: TournamentApplication): Promise<OcrRecognitionResult> {
+  return runMockOcrFromSeed({ depositorName: application.depositorName, phone: application.phone });
+}
+
+/**
+ * 신청서 없이 증빙 이미지 자산만으로 OCR을 실행한다(사이트 신청 전 게이트용).
+ * mock 프로바이더일 때는 `mockSeed`로 OCR 텍스트를 채운다.
+ */
+export async function runOcrForProofImageAsset(
+  proofImage: ProofImageAsset,
+  mockSeed?: { depositorName: string; phone: string }
+): Promise<OcrRecognitionResult> {
+  const providerEnv = (process.env.OCR_PROVIDER ?? "mock").trim() || "mock";
+  try {
+    if (providerEnv === "http") {
+      const imageBuffer = await loadProofImageOriginalBuffer(proofImage);
+      return await runHttpOcrFromBuffer(imageBuffer);
+    }
+    if (providerEnv === "google") {
+      const imageBuffer = await loadProofImageOriginalBuffer(proofImage);
+      const google = await runGoogleOcrOnImageBuffer(imageBuffer);
+      const processedAt = new Date().toISOString();
+      if (google.status !== "success") {
+        return {
+          rawText: "",
+          extractedValue: null,
+          confidence: null,
+          provider: "google",
+          processedAt,
+          status: "failed",
+        };
+      }
+      const rawText = google.text.slice(0, 2000);
+      return {
+        rawText,
+        extractedValue: null,
+        confidence: null,
+        provider: "google",
+        processedAt,
+        status: "success",
+      };
+    }
+    return await runMockOcrFromSeed(mockSeed ?? { depositorName: "", phone: "" });
+  } catch {
+    const providerLabel =
+      providerEnv === "http" ? "http" : providerEnv === "google" ? "google" : "mock";
+    return {
+      rawText: "",
+      extractedValue: null,
+      confidence: null,
+      provider: providerLabel,
+      processedAt: new Date().toISOString(),
+      status: "failed",
+    };
+  }
 }
 
 async function runHttpOcrFromBuffer(buffer: Buffer): Promise<OcrRecognitionResult> {
@@ -135,49 +195,10 @@ export async function runOcrForProofImage(params: {
     };
   }
 
-  const providerEnv = (process.env.OCR_PROVIDER ?? "mock").trim() || "mock";
-  try {
-    if (providerEnv === "http") {
-      const imageBuffer = await loadProofImageOriginalBuffer(proofImage);
-      return await runHttpOcrFromBuffer(imageBuffer);
-    }
-    if (providerEnv === "google") {
-      const imageBuffer = await loadProofImageOriginalBuffer(proofImage);
-      const google = await runGoogleOcrOnImageBuffer(imageBuffer);
-      const processedAt = new Date().toISOString();
-      if (google.status !== "success") {
-        return {
-          rawText: "",
-          extractedValue: null,
-          confidence: null,
-          provider: "google",
-          processedAt,
-          status: "failed",
-        };
-      }
-      const rawText = google.text.slice(0, 2000);
-      return {
-        rawText,
-        extractedValue: null,
-        confidence: null,
-        provider: "google",
-        processedAt,
-        status: "success",
-      };
-    }
-    return await runMockOcr(application);
-  } catch {
-    const providerLabel =
-      providerEnv === "http" ? "http" : providerEnv === "google" ? "google" : "mock";
-    return {
-      rawText: "",
-      extractedValue: null,
-      confidence: null,
-      provider: providerLabel,
-      processedAt: new Date().toISOString(),
-      status: "failed",
-    };
-  }
+  return runOcrForProofImageAsset(proofImage, {
+    depositorName: application.depositorName,
+    phone: application.phone,
+  });
 }
 
 export function triggerOcrForTournamentApplication(params: { tournamentId: string; entryId: string }): void {
@@ -192,6 +213,23 @@ export function triggerOcrForTournamentApplication(params: { tournamentId: strin
     if (!processing) return;
 
     const result = await runOcrForProofImage({ tournamentId, entryId });
+
+    let parsed: ReturnType<typeof parseOcrEligibilityText> | undefined;
+    let eligibilityCheck: ReturnType<typeof checkOcrEligibility> | undefined;
+    if (result.status === "success" && result.rawText.trim() !== "") {
+      try {
+        parsed = parseOcrEligibilityText(result.rawText);
+        const tournament = isFirestoreUsersBackendConfigured()
+          ? await getTournamentByIdFirestore(tournamentId)
+          : await getTournamentById(tournamentId);
+        if (tournament?.rule) {
+          eligibilityCheck = checkOcrEligibility(parsed, tournament.rule);
+        }
+      } catch (e) {
+        console.warn("[ocr-service] OCR eligibility parse/check failed", e);
+      }
+    }
+
     const normalizedRawResult = JSON.stringify(
       {
         status: result.status,
@@ -200,6 +238,8 @@ export function triggerOcrForTournamentApplication(params: { tournamentId: strin
         extractedValue: result.extractedValue,
         confidence: result.confidence,
         processedAt: result.processedAt,
+        ...(parsed ? { parsed } : {}),
+        ...(eligibilityCheck ? { eligibilityCheck } : {}),
       },
       null,
       2

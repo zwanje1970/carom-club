@@ -5,6 +5,8 @@ import { getUserById } from "../../../../../../lib/platform-api";
 import { createTournamentApplicationFirestore } from "../../../../../../lib/server/firestore-tournament-applications";
 import { getTournamentByIdFirestore } from "../../../../../../lib/server/firestore-tournaments";
 import { triggerOcrForTournamentApplication } from "../../../../../../lib/server/ocr-service";
+import { getProofImageAssetById, resolveCanonicalUserIdForAuth } from "../../../../../../lib/server/platform-backing-store";
+import { evaluateSiteApplyOcrGate } from "../../../../../../lib/server/site-apply-ocr-gate";
 
 export const runtime = "nodejs";
 
@@ -46,6 +48,29 @@ export async function POST(
     body = (await request.json()) as typeof body;
   } catch {
     return NextResponse.json({ error: "요청 본문이 올바르지 않습니다." }, { status: 400 });
+  }
+
+  const proofImageId = typeof body.proofImageId === "string" ? body.proofImageId.trim() : "";
+  if (proofImageId) {
+    const canonicalUserId = await resolveCanonicalUserIdForAuth(user.id);
+    const proofImage = await getProofImageAssetById(proofImageId);
+    if (!proofImage) {
+      return NextResponse.json({ error: "증빙 이미지를 다시 업로드해 주세요." }, { status: 400 });
+    }
+    if (proofImage.uploaderUserId !== canonicalUserId) {
+      return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+    }
+    const gate = await evaluateSiteApplyOcrGate({
+      proofImage,
+      rule: tournament.rule,
+      mockOcrSeed: {
+        depositorName: typeof body.depositorName === "string" ? body.depositorName : "",
+        phone: typeof body.phone === "string" ? body.phone : "",
+      },
+    });
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.userMessage }, { status: 400 });
+    }
   }
 
   const result = await createTournamentApplicationFirestore({

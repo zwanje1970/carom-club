@@ -8,6 +8,28 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import * as eligibilityParserModule from "../lib/server/ocr-eligibility-parser";
+
+const mod = eligibilityParserModule as unknown as {
+  parseOcrEligibilityText?: (rawText: string) => {
+    name: string | null;
+    phone: string | null;
+    score: number | null;
+    average: number | null;
+  };
+  default?: { parseOcrEligibilityText?: (rawText: string) => unknown };
+};
+
+const parseOcrEligibilityText =
+  typeof mod.parseOcrEligibilityText === "function"
+    ? mod.parseOcrEligibilityText
+    : typeof mod.default?.parseOcrEligibilityText === "function"
+      ? mod.default.parseOcrEligibilityText
+      : null;
+
+if (!parseOcrEligibilityText) {
+  throw new Error("parseOcrEligibilityText could not be resolved from ocr-eligibility-parser");
+}
 
 type GoogleOcrResult = {
   text: string;
@@ -76,6 +98,7 @@ function resolvePath(): string {
 const imagePath = resolvePath();
 const buf = readFileSync(imagePath);
 const result = await runGoogleOcrOnImageBuffer(buf);
+const parsed = result.status === "success" ? parseOcrEligibilityText(result.text) : null;
 console.log(
   JSON.stringify(
     {
@@ -83,6 +106,7 @@ console.log(
       status: result.status,
       textPreview: result.text.slice(0, 800),
       textLength: result.text.length,
+      parsed,
       meta: result.meta ?? null,
     },
     null,

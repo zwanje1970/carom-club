@@ -524,3 +524,29 @@
   color: rgba(30, 41, 59, 0.75);
   line-height: 1.45;
 }
+
+/*
+ * PC 웹(site-shell--pc-site-chrome) + 메인 세로 스크롤(data-site-main-scroll-viewport) + 광고 행만:
+ * 면 폭을 일반 카드와 동일 토큰으로 제한(UA 모바일 셸·가로 슬라이드 덱 비적용).
+ */
+:global(.site-shell.site-shell--pc-site-chrome)
+  :global([data-site-main-scroll-viewport="1"])
+  :global([data-site-main-scroll-ad="1"]).sampleMainCardSlot
+  > .sampleMainCardFacePublishedSnapshot {
+  max-width: min(100%, var(--slide-card-max-width, 440px));
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+:global(.site-shell.site-shell--pc-site-chrome)
+  :global([data-site-main-scroll-viewport="1"])
+  :global([data-site-main-scroll-ad="1"]).sampleMainCardSlot
+  > .sampleMainCardFace {
+  max-width: min(100%, var(--slide-card-max-width, 440px));
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  box-sizing: border-box;
+}

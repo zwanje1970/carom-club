@@ -46,6 +46,12 @@ export type MainSiteScrollCardItem = {
   slideDeckItem?: SlideDeckItem;
 };
 
+function isMainSiteScrollAdRow(item: MainSiteScrollCardItem): boolean {
+  if (item.slideDeckItem?.type === "ad") return true;
+  if (item.scrollFaceBadge?.trim() === "광고") return true;
+  return false;
+}
+
 function publishedScrollBadgeClass(badge: string): string {
   const b = badge.trim();
   if (!b) return "site-board-status-badge site-board-status-badge--muted";
@@ -126,6 +132,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
       <div
         className={`${styles.sampleMainCardSlot} ${selected ? styles.sampleMainCardSlotSelected : ""}`}
         {...{ [SITE_SCROLL_CARD]: "" }}
+        {...(isMainSiteScrollAdRow(item) ? { "data-site-main-scroll-ad": "1" } : {})}
         style={{ touchAction: "pan-y" }}
         role="button"
         tabIndex={0}
@@ -201,6 +208,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
       <div
         className={`${styles.sampleMainCardSlot} ${selected ? styles.sampleMainCardSlotSelected : ""}`}
         {...{ [SITE_SCROLL_CARD]: "", "data-published-snapshot-card-slot": "" }}
+        {...(isMainSiteScrollAdRow(item) ? { "data-site-main-scroll-ad": "1" } : {})}
         style={{ touchAction: "pan-y" }}
         role="button"
         tabIndex={0}
@@ -253,6 +261,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
     <div
       className={`${styles.sampleMainCardSlot} ${selected ? styles.sampleMainCardSlotSelected : ""}`}
       {...{ [SITE_SCROLL_CARD]: "" }}
+      {...(isMainSiteScrollAdRow(item) ? { "data-site-main-scroll-ad": "1" } : {})}
       style={{ touchAction: "pan-y" }}
       role="button"
       tabIndex={0}
@@ -562,7 +571,7 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
 
   if (items.length === 0) {
     return (
-      <div className={styles.slideViewportSiteMain} data-no-root-swipe>
+      <div className={styles.slideViewportSiteMain} data-no-root-swipe data-site-main-scroll-viewport="1">
         <p className={styles.sampleMainEmpty}>등록된 메인 카드가 없습니다.</p>
       </div>
     );
@@ -601,6 +610,7 @@ export function MainSiteScrollCards({ items, slideCardMoveDurationSec }: MainSit
     <div
       className={`${styles.slideViewportSiteMain} ${siteStyles.viewportMarquee} ${siteStyles.viewportMarqueeLeadIn}`}
       data-no-root-swipe
+      data-site-main-scroll-viewport="1"
       ref={viewportRef}
       onPointerDownCapture={onViewportPointerDownCapture}
     >

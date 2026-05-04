@@ -21,6 +21,58 @@ const STATUS_DESCRIPTIONS = {
   REJECTED: "참가 거절",
 } as const;
 
+type OcrAugmentParsed = {
+  name: string | null;
+  phone: string | null;
+  score: number | null;
+  average: number | null;
+};
+
+type OcrAugmentEligibility = {
+  target?: unknown;
+  extractedValue?: unknown;
+  limit?: unknown;
+  compare?: unknown;
+  passed?: unknown;
+  message?: unknown;
+};
+
+function readOcrAugmentFromRawResult(ocrRawResult: string | undefined): {
+  parsed: OcrAugmentParsed | null;
+  eligibilityCheck: OcrAugmentEligibility | null;
+} {
+  const raw = ocrRawResult?.trim() ?? "";
+  if (!raw) return { parsed: null, eligibilityCheck: null };
+  try {
+    const obj = JSON.parse(raw) as Record<string, unknown>;
+    const parsedRaw = obj.parsed;
+    const eligibilityRaw = obj.eligibilityCheck;
+    const parsed =
+      parsedRaw && typeof parsedRaw === "object" && !Array.isArray(parsedRaw)
+        ? (parsedRaw as OcrAugmentParsed)
+        : null;
+    const eligibilityCheck =
+      eligibilityRaw && typeof eligibilityRaw === "object" && !Array.isArray(eligibilityRaw)
+        ? (eligibilityRaw as OcrAugmentEligibility)
+        : null;
+    return { parsed, eligibilityCheck };
+  } catch {
+    return { parsed: null, eligibilityCheck: null };
+  }
+}
+
+function formatOcrAugmentField(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  const s = typeof value === "number" ? String(value) : value.trim();
+  return s ? s : "—";
+}
+
+function eligibilityPassedLabel(passed: unknown): string {
+  if (passed === true) return "충족(참고)";
+  if (passed === false) return "미충족 가능(참고)";
+  return "판정불가(참고)";
+}
+
 export default async function ClientTournamentParticipantDetailPage({
   params,
 }: {
@@ -39,6 +91,7 @@ export default async function ClientTournamentParticipantDetailPage({
   if (!entry) notFound();
 
   const isAdminEntry = entry.registrationSource === "admin";
+  const ocrAugment = readOcrAugmentFromRawResult(entry.ocrRawResult);
 
   return (
     <main className="v3-page v3-stack">
@@ -142,6 +195,69 @@ export default async function ClientTournamentParticipantDetailPage({
         >
           {entry.ocrText || "(아직 결과 없음)"}
         </pre>
+
+        <div
+          className="v3-stack"
+          style={{
+            marginTop: "0.75rem",
+            padding: "0.75rem",
+            borderRadius: "0.45rem",
+            border: "1px solid #dbeafe",
+            background: "#f8fbff",
+          }}
+        >
+          <p className="v3-h2" style={{ margin: 0, fontSize: "1.05rem" }}>
+            OCR 판정 참고
+          </p>
+          <p className="v3-muted" style={{ margin: 0, fontSize: "0.9rem" }}>
+            자동 승인·거절 근거가 아닙니다. 운영 참고용으로만 확인하세요.
+          </p>
+          {ocrAugment.parsed || ocrAugment.eligibilityCheck ? (
+            <>
+              <p style={{ margin: 0 }}>
+                <strong>이름(OCR):</strong> {formatOcrAugmentField(ocrAugment.parsed?.name)}
+              </p>
+              <p style={{ margin: 0 }}>
+                <strong>전화번호(OCR):</strong> {formatOcrAugmentField(ocrAugment.parsed?.phone)}
+              </p>
+              <p style={{ margin: 0 }}>
+                <strong>핸디(OCR):</strong>{" "}
+                {ocrAugment.parsed?.score != null && Number.isFinite(ocrAugment.parsed.score)
+                  ? `${ocrAugment.parsed.score}점`
+                  : "—"}
+              </p>
+              <p style={{ margin: 0 }}>
+                <strong>AVG(OCR):</strong>{" "}
+                {ocrAugment.parsed?.average != null && Number.isFinite(ocrAugment.parsed.average)
+                  ? String(ocrAugment.parsed.average)
+                  : "—"}
+              </p>
+              {ocrAugment.eligibilityCheck ? (
+                <>
+                  <p style={{ margin: 0 }}>
+                    <strong>판정:</strong> {eligibilityPassedLabel(ocrAugment.eligibilityCheck.passed)}
+                  </p>
+                  <p style={{ margin: 0 }}>
+                    <strong>판정 메시지:</strong>{" "}
+                    {typeof ocrAugment.eligibilityCheck.message === "string" &&
+                    ocrAugment.eligibilityCheck.message.trim()
+                      ? ocrAugment.eligibilityCheck.message.trim()
+                      : "—"}
+                  </p>
+                </>
+              ) : (
+                <p className="v3-muted" style={{ margin: 0, fontSize: "0.9rem" }}>
+                  대회 규칙과의 비교 결과가 아직 없습니다(OCR만 저장된 경우 등).
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="v3-muted" style={{ margin: 0 }}>
+              저장된 OCR 판정 참고 정보가 없습니다.
+            </p>
+          )}
+        </div>
+
         {entry.ocrRawResult ? (
           <details>
             <summary>OCR 원시 결과 보기</summary>
