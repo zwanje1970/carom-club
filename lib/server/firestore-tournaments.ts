@@ -31,6 +31,7 @@ import {
   type ClientDashboardTournamentPreviewRow,
   validateTournamentRuleForCreate,
 } from "./platform-backing-store";
+import { generateTvAccessToken } from "./tv-access";
 
 const COLLECTION = "v3_tournaments";
 
@@ -62,6 +63,7 @@ const TOURNAMENT_FIRESTORE_LEAN_BUILD_FIELDS = [
   "deleteReason",
   "gatheringTime",
   "reminderSentAt",
+  "zonesEnabled",
 ] as const;
 
 /** 대회 원본·게시카드 변경 후 공개 목록·메인 슬라이드·해당 대회 캐시 무효화 */
@@ -112,6 +114,7 @@ function tournamentToFirestorePlain(t: Tournament): Record<string, unknown> {
   if (typeof t.deleteReason === "string") base.deleteReason = t.deleteReason;
   if (typeof t.gatheringTime === "string" && t.gatheringTime.trim() !== "") base.gatheringTime = t.gatheringTime.trim();
   if (typeof t.reminderSentAt === "string" && t.reminderSentAt.trim() !== "") base.reminderSentAt = t.reminderSentAt.trim();
+  if (typeof t.zonesEnabled === "boolean") base.zonesEnabled = t.zonesEnabled;
   return base;
 }
 
@@ -520,6 +523,7 @@ export async function createTournamentFirestore(params: {
   venueGuideVenueId?: string | null;
   eventDates?: unknown;
   extraVenues?: unknown;
+  zonesEnabled?: boolean;
 }): Promise<{ ok: true; tournament: Tournament } | { ok: false; error: string }> {
   assertClientFirestorePersistenceConfigured();
   const title = params.title.trim();
@@ -598,6 +602,7 @@ export async function createTournamentFirestore(params: {
     outlinePdfUrl,
     venueGuideVenueId,
     rule,
+    ...(typeof params.zonesEnabled === "boolean" ? { zonesEnabled: params.zonesEnabled } : {}),
   };
 
   const db = getSharedFirestoreDb();
@@ -627,6 +632,7 @@ export async function updateTournamentFirestore(params: {
   venueGuideVenueId?: string | null;
   eventDates?: unknown;
   extraVenues?: unknown;
+  zonesEnabled?: boolean;
 }): Promise<
   { ok: true; tournament: Tournament } | { ok: false; error: string; httpStatus?: 403 | 404 }
 > {
@@ -717,6 +723,7 @@ export async function updateTournamentFirestore(params: {
     outlinePdfUrl,
     venueGuideVenueId,
     rule,
+    ...(typeof params.zonesEnabled === "boolean" ? { zonesEnabled: params.zonesEnabled } : {}),
   };
 
   const db = getSharedFirestoreDb();
@@ -868,4 +875,44 @@ export async function permanentlyDeleteTournamentDocumentFirestore(
   await rebuildPublicTournamentListSnapshotsSafe();
   revalidatePublicTournamentCache(id);
   return { ok: true };
+}
+
+/** `tvAccessToken`으로 삭제되지 않은 대회 문서 ID 조회(TV 공개용). */
+export async function findTournamentIdByTvAccessTokenFirestore(token: string): Promise<string | null> {
+  assertClientFirestorePersistenceConfigured();
+  const tok = token.trim();
+  if (!tok) return null;
+  const db = getSharedFirestoreDb();
+  const q = await db.collection(COLLECTION).where("tvAccessToken", "==", tok).limit(1).get();
+  if (q.empty) return null;
+  const id = q.docs[0]!.id;
+  const t = await getTournamentByIdFirestore(id);
+  if (!t || t.status === "DELETED") return null;
+  return id;
+}
+
+/**
+ * TV 토큰이 없으면 생성·저장하고, 있으면 기존 값을 유지한다.
+ */
+export async function ensureTournamentTvAccessTokenFirestore(
+  tournamentId: string,
+): Promise<{ ok: true; token: string } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const tid = tournamentId.trim();
+  if (!tid) return { ok: false, error: "잘못된 요청입니다." };
+  const existing = await getTournamentByIdFirestore(tid);
+  if (!existing) return { ok: false, error: "대회를 찾을 수 없습니다." };
+  const cur = existing.tvAccessToken?.trim();
+  if (cur) return { ok: true, token: cur };
+
+  const db = getSharedFirestoreDb();
+  const ref = db.collection(COLLECTION).doc(tid);
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const token = generateTvAccessToken();
+    const clash = await findTournamentIdByTvAccessTokenFirestore(token);
+    if (clash && clash !== tid) continue;
+    await ref.set({ tvAccessToken: token }, { merge: true });
+    return { ok: true, token };
+  }
+  return { ok: false, error: "TV 토큰을 생성하지 못했습니다." };
 }

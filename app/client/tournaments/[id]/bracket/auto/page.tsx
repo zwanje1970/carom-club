@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type BracketParticipant = {
@@ -43,7 +43,13 @@ function buildMatchesFromSnapshot(latestSnapshot: BracketParticipantSnapshot): D
 export default function BracketAutoAssignPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const tournamentId = useMemo(() => (typeof params.id === "string" ? params.id : ""), [params.id]);
+  const bracketZoneId = useMemo(() => searchParams.get("zoneId")?.trim() ?? "", [searchParams]);
+  const bracketZoneQuery = useMemo(
+    () => (bracketZoneId ? `?zoneId=${encodeURIComponent(bracketZoneId)}` : ""),
+    [bracketZoneId]
+  );
   const [snapshot, setSnapshot] = useState<BracketParticipantSnapshot | null>(null);
   const [proposedMatches, setProposedMatches] = useState<DraftMatch[]>([]);
   const [loading, setLoading] = useState(false);
@@ -56,7 +62,9 @@ export default function BracketAutoAssignPage() {
     setMessage("");
     setNoApprovedParticipants(false);
     try {
-      const response = await fetch(`/api/client/tournaments/${tournamentId}/bracket/participants-snapshot`);
+      const response = await fetch(`/api/client/tournaments/${tournamentId}/bracket/participants-snapshot${bracketZoneQuery}`, {
+        credentials: "same-origin",
+      });
       const result = (await response.json()) as {
         snapshot?: BracketParticipantSnapshot | null;
         error?: string;
@@ -77,7 +85,7 @@ export default function BracketAutoAssignPage() {
     } finally {
       setLoading(false);
     }
-  }, [tournamentId]);
+  }, [tournamentId, bracketZoneQuery]);
 
   useEffect(() => {
     void loadSnapshot();
@@ -90,6 +98,7 @@ export default function BracketAutoAssignPage() {
       snapshotId: snap.id,
       matches,
       createdAt: new Date().toISOString(),
+      ...(bracketZoneId ? { zoneId: bracketZoneId } : {}),
     };
     window.localStorage.setItem(getDraftStorageKey(tournamentId), JSON.stringify(draft));
     router.push(`/client/tournaments/${tournamentId}/bracket/preview`);
@@ -103,6 +112,8 @@ export default function BracketAutoAssignPage() {
     try {
       const response = await fetch(`/api/client/tournaments/${tournamentId}/bracket/participants-snapshot`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bracketZoneId ? { zoneId: bracketZoneId } : {}),
       });
       const result = (await response.json()) as {
         snapshot?: BracketParticipantSnapshot;
@@ -215,7 +226,10 @@ export default function BracketAutoAssignPage() {
       ) : null}
 
       <p className="v3-muted" style={{ margin: 0, fontSize: "0.85rem" }}>
-        <Link href={`/client/tournaments/${tournamentId}/bracket/manual`} style={{ color: "inherit", textDecoration: "underline" }}>
+        <Link
+          href={`/client/tournaments/${tournamentId}/bracket/manual${bracketZoneQuery}`}
+          style={{ color: "inherit", textDecoration: "underline" }}
+        >
           수동 배정
         </Link>
         은 여기서만 진입합니다.

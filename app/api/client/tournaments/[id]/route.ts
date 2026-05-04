@@ -228,6 +228,7 @@ export async function PATCH(
     typeof venueGuideRaw === "string" && venueGuideRaw.trim() !== "" ? venueGuideRaw.trim() : null;
 
   const rule = parseRuleFromBody(body);
+  const zonesEnabled = parseBooleanLoose(body.zonesEnabled);
 
   const result = await updateTournamentFirestore({
     tournamentId: id,
@@ -249,6 +250,7 @@ export async function PATCH(
     venueGuideVenueId,
     eventDates: body.eventDates,
     extraVenues: body.extraVenues,
+    ...(zonesEnabled !== undefined ? { zonesEnabled } : {}),
   });
 
   if (!result.ok) {

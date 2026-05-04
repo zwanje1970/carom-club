@@ -2,45 +2,20 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../../lib/auth/session";
 import type { BracketDraftMatchInput } from "../../../../../../../lib/platform-api";
-import { checkClientFeatureAccessByUserId, getUserById } from "../../../../../../../lib/platform-api";
+import { getUserById } from "../../../../../../../lib/platform-api";
 import {
   createBracketFromDraftFirestore,
+  getBracketParticipantSnapshotByIdFirestore,
   getLatestBracketParticipantSnapshotByTournamentIdFirestore,
+  type BracketParticipantSnapshotScope,
 } from "../../../../../../../lib/server/firestore-tournament-brackets";
-import { getTournamentByIdFirestore } from "../../../../../../../lib/server/firestore-tournaments";
+import {
+  authorizeClientTournamentBracketContext,
+  TOURNAMENT_ZONE_FORBIDDEN_ERROR,
+  zoneManagerMayAccessZoneId,
+} from "../../../../../../../lib/server/tournament-zone-access";
 
 export const runtime = "nodejs";
-
-async function requireBracketAccess(tournamentId: string) {
-  const cookieStore = await cookies();
-  const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
-  if (!session) return { ok: false as const, status: 401, error: "로그인이 필요합니다." };
-
-  const user = await getUserById(session.userId);
-  if (!user) return { ok: false as const, status: 401, error: "사용자를 찾을 수 없습니다." };
-
-  const tournament = await getTournamentByIdFirestore(tournamentId);
-  if (!tournament) return { ok: false as const, status: 404, error: "대회를 찾을 수 없습니다." };
-
-  if (user.role === "PLATFORM") {
-    return { ok: true as const, user, tournament };
-  }
-
-  if (user.role !== "CLIENT") {
-    return { ok: false as const, status: 403, error: "CLIENT + APPROVED 권한이 필요합니다." };
-  }
-
-  const gate = await checkClientFeatureAccessByUserId({ userId: user.id, feature: "BRACKET" });
-  if (!gate.ok) {
-    return { ok: false as const, status: 403, error: gate.error };
-  }
-
-  if (tournament.createdBy !== user.id) {
-    return { ok: false as const, status: 403, error: "본인 대회만 접근할 수 있습니다." };
-  }
-
-  return { ok: true as const, user, tournament };
-}
 
 type ConfirmBracketRequest = {
   snapshotId?: string;
@@ -52,9 +27,19 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   const { id } = await context.params;
-  const auth = await requireBracketAccess(id);
+  const cookieStore = await cookies();
+  const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
+  if (!session) {
+    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
+  const user = await getUserById(session.userId);
+  if (!user) {
+    return NextResponse.json({ error: "사용자를 찾을 수 없습니다." }, { status: 401 });
+  }
+
+  const auth = await authorizeClientTournamentBracketContext({ user, tournamentId: id });
   if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+    return NextResponse.json({ error: auth.error }, { status: auth.httpStatus });
   }
 
   const body = (await request.json().catch(() => null)) as ConfirmBracketRequest | null;
@@ -64,7 +49,26 @@ export async function POST(
     return NextResponse.json({ error: "snapshotId가 필요합니다." }, { status: 400 });
   }
 
-  const latestSnapshot = await getLatestBracketParticipantSnapshotByTournamentIdFirestore(id);
+  const submittedSnapshot = await getBracketParticipantSnapshotByIdFirestore(snapshotId);
+  if (!submittedSnapshot || submittedSnapshot.tournamentId !== id) {
+    return NextResponse.json({ error: "유효한 대진표 대상자 스냅샷을 찾을 수 없습니다." }, { status: 400 });
+  }
+
+  const scope: BracketParticipantSnapshotScope =
+    auth.tournament.zonesEnabled === true &&
+    typeof submittedSnapshot.zoneId === "string" &&
+    submittedSnapshot.zoneId.trim() !== ""
+      ? { zoneId: submittedSnapshot.zoneId.trim() }
+      : "legacy";
+
+  if (auth.access.kind === "zone_manager" && auth.tournament.zonesEnabled === true) {
+    const zid = typeof submittedSnapshot.zoneId === "string" ? submittedSnapshot.zoneId.trim() : "";
+    if (!zid || !zoneManagerMayAccessZoneId(auth.access, zid)) {
+      return NextResponse.json({ error: TOURNAMENT_ZONE_FORBIDDEN_ERROR }, { status: 403 });
+    }
+  }
+
+  const latestSnapshot = await getLatestBracketParticipantSnapshotByTournamentIdFirestore(id, scope);
   if (!latestSnapshot) {
     return NextResponse.json({ error: "먼저 대진표 대상자 스냅샷을 생성해 주세요." }, { status: 400 });
   }

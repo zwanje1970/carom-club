@@ -16,9 +16,12 @@
     "seed:tournament-participants": "npx --yes tsx scripts/seed-tournament-participants.mts",
     "seed:platform-admin": "npx --yes tsx scripts/seed-platform-admin.mts",
     "verify:client-approval": "npx --yes tsx scripts/verify-client-approval-flow.mts",
-    "prune:orphan-published-cards": "npx --yes tsx scripts/prune-orphan-published-cards.mts"
+    "prune:orphan-published-cards": "npx --yes tsx scripts/prune-orphan-published-cards.mts",
+    "test:ocr-receipt": "npx --yes tsx scripts/ocr-test-receipt-public-image.mts",
+    "test:ocr-google": "npx --yes tsx --env-file=.env.local scripts/ocr-test-google-vision-receipt.mts"
   },
   "dependencies": {
+    "@google-cloud/vision": "^4.3.3",
     "@tiptap/extension-color": "^3.22.3",
     "@tiptap/extension-link": "^3.22.3",
     "@tiptap/extension-placeholder": "^3.22.3",
@@ -35,6 +38,7 @@
     "next": "^16.2.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "server-only": "^0.0.1",
     "sharp": "^0.34.5"
   },
   "devDependencies": {

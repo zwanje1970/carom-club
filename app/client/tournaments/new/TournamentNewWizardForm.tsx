@@ -56,6 +56,8 @@ export type TournamentNewWizardFormProps = {
   setIsScotch: Dispatch<SetStateAction<boolean>>;
   scope: TournamentScope;
   setScope: Dispatch<SetStateAction<TournamentScope>>;
+  zonesEnabled: boolean;
+  setZonesEnabled: Dispatch<SetStateAction<boolean>>;
   allowMultipleSlots: boolean;
   setAllowMultipleSlots: Dispatch<SetStateAction<boolean>>;
   participantsListPublic: boolean;
@@ -161,6 +163,8 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
     setIsScotch,
     scope,
     setScope,
+    zonesEnabled,
+    setZonesEnabled,
     allowMultipleSlots,
     setAllowMultipleSlots,
     participantsListPublic,
@@ -358,6 +362,20 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
                 <option value="REGIONAL">단일대회(당구장대회)</option>
                 <option value="NATIONAL">권역대회(합동·전국대회)</option>
               </select>
+            </label>
+          </div>
+          <div
+            className="v3-stack"
+            style={{ gap: "0.35rem", marginTop: "0.45rem", paddingTop: "0.65rem", borderTop: "1px solid #e2e8f0" }}
+          >
+            <label className="v3-row" style={{ alignItems: "flex-start", gap: "0.55rem" }}>
+              <input type="checkbox" checked={zonesEnabled} onChange={(e) => setZonesEnabled(e.target.checked)} />
+              <span className="v3-stack" style={{ gap: "0.15rem" }}>
+                <span style={{ fontWeight: 700 }}>권역 운영 사용</span>
+                <span className="v3-muted" style={{ fontSize: "0.82rem", margin: 0 }}>
+                  권역별로 참가자와 대진표를 분리 운영합니다.
+                </span>
+              </span>
             </label>
           </div>
           <div className="v3-row" style={{ gap: "1.25rem", flexWrap: "wrap" }}>

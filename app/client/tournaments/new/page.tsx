@@ -201,6 +201,7 @@ export default function ClientTournamentNewPage() {
   const [divisionRows, setDivisionRows] = useState<DivisionRow[]>([{ name: "", min: "", max: "" }]);
 
   const [scope, setScope] = useState<TournamentScope>("REGIONAL");
+  const [zonesEnabled, setZonesEnabled] = useState(false);
   const [accountNumber, setAccountNumber] = useState("");
   const [allowMultipleSlots, setAllowMultipleSlots] = useState(false);
   const [participantsListPublic, setParticipantsListPublic] = useState(false);
@@ -447,6 +448,7 @@ export default function ClientTournamentNewPage() {
           setDivisionRows([{ name: "", min: "", max: "" }]);
         }
         setScope(r.scope);
+        setZonesEnabled(t.zonesEnabled === true);
         setAccountNumber(r.accountNumber ?? "");
         setAllowMultipleSlots(r.allowMultipleSlots);
         setParticipantsListPublic(r.participantsListPublic);
@@ -540,6 +542,7 @@ export default function ClientTournamentNewPage() {
       divisionMetricType,
       divisionRows,
       scope,
+      zonesEnabled,
       accountNumber,
       allowMultipleSlots,
       participantsListPublic,
@@ -618,6 +621,7 @@ export default function ClientTournamentNewPage() {
     const dr = divisionRows[0];
     if (!dr || dr.name.trim() !== "" || dr.min.trim() !== "" || dr.max.trim() !== "") return false;
     if (scope !== "REGIONAL") return false;
+    if (zonesEnabled) return false;
     if (accountNumber.trim() !== "") return false;
     if (allowMultipleSlots) return false;
     if (participantsListPublic) return false;
@@ -893,6 +897,7 @@ export default function ClientTournamentNewPage() {
         divisionRulesJson: null,
         scope,
         region: null,
+        zonesEnabled,
         accountNumber: accountNumber.trim() || null,
         allowMultipleSlots,
         participantsListPublic,
@@ -1016,6 +1021,8 @@ export default function ClientTournamentNewPage() {
         setIsScotch={setIsScotch}
         scope={scope}
         setScope={setScope}
+        zonesEnabled={zonesEnabled}
+        setZonesEnabled={setZonesEnabled}
         allowMultipleSlots={allowMultipleSlots}
         setAllowMultipleSlots={setAllowMultipleSlots}
         participantsListPublic={participantsListPublic}

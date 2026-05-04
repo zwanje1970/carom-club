@@ -40,29 +40,53 @@ function snapshotFromDoc(docId: string, data: Record<string, unknown> | undefine
     participants.push({ userId, applicantName, phone });
   }
   if (!tournamentId || participants.length === 0) return null;
-  return { id: docId, tournamentId, participants, createdAt };
+  const zr = data.zoneId;
+  const zoneId =
+    typeof zr === "string" && zr.trim() !== ""
+      ? zr.trim()
+      : zr === null
+        ? null
+        : undefined;
+  return {
+    id: docId,
+    tournamentId,
+    participants,
+    createdAt,
+    ...(zoneId !== undefined ? { zoneId } : {}),
+  };
 }
 
 function bracketFromDoc(docId: string, data: Record<string, unknown> | undefined): Bracket | null {
   if (!data || typeof data !== "object") return null;
+  const zr = data.zoneId;
+  const zoneId =
+    typeof zr === "string" && zr.trim() !== ""
+      ? zr.trim()
+      : zr === null
+        ? null
+        : undefined;
   const raw: Bracket = {
     id: docId,
     tournamentId: typeof data.tournamentId === "string" ? data.tournamentId : "",
     snapshotId: typeof data.snapshotId === "string" ? data.snapshotId : "",
     rounds: (Array.isArray(data.rounds) ? data.rounds : []) as Bracket["rounds"],
     createdAt: typeof data.createdAt === "string" ? data.createdAt : new Date().toISOString(),
+    ...(zoneId !== undefined ? { zoneId } : {}),
   };
   return normalizeBracket(raw);
 }
 
 function bracketToPlain(b: Bracket): Record<string, unknown> {
-  return {
+  const plain: Record<string, unknown> = {
     id: b.id,
     tournamentId: b.tournamentId,
     snapshotId: b.snapshotId,
     rounds: b.rounds,
     createdAt: b.createdAt,
   };
+  if (typeof b.zoneId === "string" && b.zoneId.trim() !== "") plain.zoneId = b.zoneId.trim();
+  else if (b.zoneId === null) plain.zoneId = null;
+  return plain;
 }
 
 export async function getBracketParticipantSnapshotByIdFirestore(
@@ -97,36 +121,85 @@ export async function listBracketParticipantSnapshotsByTournamentIdFirestore(
   return out;
 }
 
+export const UNASSIGNED_ZONE_BRACKET_ERROR =
+  "모든 참가자를 권역에 배정해야 대진표를 생성할 수 있습니다.";
+
+async function assertAllApprovedParticipantsHaveZoneIdFirestore(
+  tournamentId: string,
+  tournament: { zonesEnabled?: boolean }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (tournament.zonesEnabled !== true) return { ok: true };
+  const approved = await listApprovedParticipantsByTournamentIdFirestore(tournamentId);
+  for (const a of approved) {
+    const z = typeof a.zoneId === "string" ? a.zoneId.trim() : "";
+    if (!z) return { ok: false, error: UNASSIGNED_ZONE_BRACKET_ERROR };
+  }
+  return { ok: true };
+}
+
+export type BracketParticipantSnapshotScope = "legacy" | { zoneId: string };
+
 export async function getLatestBracketParticipantSnapshotByTournamentIdFirestore(
-  tournamentId: string
+  tournamentId: string,
+  scope?: BracketParticipantSnapshotScope
 ): Promise<BracketParticipantSnapshot | null> {
   assertClientFirestorePersistenceConfigured();
   const id = tournamentId.trim();
   if (!id) return null;
-  const db = getSharedFirestoreDb();
-  const q = await db
-    .collection(SNAPSHOTS)
-    .where("tournamentId", "==", id)
-    .orderBy("createdAt", "desc")
-    .limit(1)
-    .get();
-  if (q.empty) return null;
-  const doc = q.docs[0]!;
-  return snapshotFromDoc(doc.id, doc.data() as Record<string, unknown>);
+  if (scope === undefined) {
+    const db = getSharedFirestoreDb();
+    const q = await db
+      .collection(SNAPSHOTS)
+      .where("tournamentId", "==", id)
+      .orderBy("createdAt", "desc")
+      .limit(1)
+      .get();
+    if (q.empty) return null;
+    const doc = q.docs[0]!;
+    return snapshotFromDoc(doc.id, doc.data() as Record<string, unknown>);
+  }
+  const list = await listBracketParticipantSnapshotsByTournamentIdFirestore(id);
+  for (const s of list) {
+    const z = typeof s.zoneId === "string" ? s.zoneId.trim() : "";
+    if (scope === "legacy") {
+      if (!z) return s;
+    } else if (z === scope.zoneId.trim()) {
+      return s;
+    }
+  }
+  return null;
 }
 
 export async function createBracketParticipantSnapshotFirestore(params: {
   tournamentId: string;
+  zoneId?: string | null;
 }): Promise<{ ok: true; snapshot: BracketParticipantSnapshot } | { ok: false; error: string }> {
   assertClientFirestorePersistenceConfigured();
-  const approvedParticipants = await listApprovedParticipantsByTournamentIdFirestore(params.tournamentId);
-  if (approvedParticipants.length === 0) {
-    return { ok: false, error: "APPROVED 참가자가 없어 스냅샷을 생성할 수 없습니다." };
-  }
-
   const tournament = await getTournamentByIdFirestore(params.tournamentId);
   if (!tournament) {
     return { ok: false, error: "대회를 찾을 수 없습니다." };
+  }
+
+  if (tournament.zonesEnabled === true) {
+    const gate = await assertAllApprovedParticipantsHaveZoneIdFirestore(params.tournamentId, tournament);
+    if (!gate.ok) return gate;
+    const zid = typeof params.zoneId === "string" ? params.zoneId.trim() : "";
+    if (!zid) {
+      return { ok: false, error: "권역을 선택해 주세요." };
+    }
+  }
+
+  let approvedParticipants = await listApprovedParticipantsByTournamentIdFirestore(params.tournamentId);
+  if (tournament.zonesEnabled === true) {
+    const zid = String(params.zoneId ?? "").trim();
+    approvedParticipants = approvedParticipants.filter((item) => {
+      const z = typeof item.zoneId === "string" ? item.zoneId.trim() : "";
+      return z === zid;
+    });
+  }
+
+  if (approvedParticipants.length === 0) {
+    return { ok: false, error: "APPROVED 참가자가 없어 스냅샷을 생성할 수 없습니다." };
   }
 
   const snapshot: BracketParticipantSnapshot = {
@@ -138,6 +211,9 @@ export async function createBracketParticipantSnapshotFirestore(params: {
       phone: item.phone,
     })),
     createdAt: new Date().toISOString(),
+    ...(tournament.zonesEnabled === true && typeof params.zoneId === "string" && params.zoneId.trim() !== ""
+      ? { zoneId: params.zoneId.trim() }
+      : {}),
   };
 
   const db = getSharedFirestoreDb();
@@ -147,6 +223,11 @@ export async function createBracketParticipantSnapshotFirestore(params: {
     participants: snapshot.participants,
     createdAt: snapshot.createdAt,
   };
+  if (typeof snapshot.zoneId === "string" && snapshot.zoneId.trim() !== "") {
+    plain.zoneId = snapshot.zoneId.trim();
+  } else if (snapshot.zoneId === null) {
+    plain.zoneId = null;
+  }
   await db.collection(SNAPSHOTS).doc(snapshot.id).set(plain);
   return { ok: true, snapshot };
 }
@@ -191,6 +272,9 @@ export async function createBracketFromSnapshotFirestore(
       },
     ],
     createdAt: new Date().toISOString(),
+    ...(typeof snapshot.zoneId === "string" && snapshot.zoneId.trim() !== ""
+      ? { zoneId: snapshot.zoneId.trim() }
+      : {}),
   };
 
   const db = getSharedFirestoreDb();
@@ -204,6 +288,15 @@ export async function createBracketFromDraftFirestore(params: {
   matches: BracketDraftMatchInput[];
 }): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
   assertClientFirestorePersistenceConfigured();
+  const tournament = await getTournamentByIdFirestore(params.tournamentId);
+  if (!tournament) {
+    return { ok: false, error: "대회를 찾을 수 없습니다." };
+  }
+  if (tournament.zonesEnabled === true) {
+    const gate = await assertAllApprovedParticipantsHaveZoneIdFirestore(params.tournamentId, tournament);
+    if (!gate.ok) return gate;
+  }
+
   const snapshot = await getBracketParticipantSnapshotByIdFirestore(params.snapshotId.trim());
   if (!snapshot || snapshot.tournamentId !== params.tournamentId) {
     return { ok: false, error: "유효한 대진표 대상자 스냅샷을 찾을 수 없습니다." };
@@ -256,6 +349,9 @@ export async function createBracketFromDraftFirestore(params: {
       },
     ],
     createdAt: new Date().toISOString(),
+    ...(typeof snapshot.zoneId === "string" && snapshot.zoneId.trim() !== ""
+      ? { zoneId: snapshot.zoneId.trim() }
+      : {}),
   };
 
   const db = getSharedFirestoreDb();
@@ -297,11 +393,44 @@ export async function getLatestBracketByTournamentIdFirestore(tournamentId: stri
   return bracketFromDoc(doc.id, doc.data() as Record<string, unknown>);
 }
 
+export async function getLatestBracketByTournamentIdAndZoneIdFirestore(
+  tournamentId: string,
+  zoneId: string
+): Promise<Bracket | null> {
+  assertClientFirestorePersistenceConfigured();
+  const id = tournamentId.trim();
+  const zid = zoneId.trim();
+  if (!id || !zid) return null;
+  const list = await listBracketsByTournamentIdFirestore(id);
+  for (const b of list) {
+    const z = typeof b.zoneId === "string" ? b.zoneId.trim() : "";
+    if (z === zid) return b;
+  }
+  return null;
+}
+
+async function resolveLatestBracketForMutationFirestore(params: {
+  tournamentId: string;
+  tournament: { zonesEnabled?: boolean };
+  bracketZoneId?: string | null;
+}): Promise<Bracket | null> {
+  const tid = params.tournamentId.trim();
+  if (params.tournament.zonesEnabled === true) {
+    const qz = typeof params.bracketZoneId === "string" ? params.bracketZoneId.trim() : "";
+    if (!qz) {
+      return null;
+    }
+    return getLatestBracketByTournamentIdAndZoneIdFirestore(tid, qz);
+  }
+  return getLatestBracketByTournamentIdFirestore(tid);
+}
+
 export async function updateBracketMatchResultFirestore(params: {
   tournamentId: string;
   matchId: string;
   winnerUserId: string | null;
   actorUserId?: string;
+  bracketZoneId?: string | null;
 }): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
   assertClientFirestorePersistenceConfigured();
   const tournamentId = params.tournamentId.trim();
@@ -319,20 +448,29 @@ export async function updateBracketMatchResultFirestore(params: {
     return { ok: false, error: "대회를 찾을 수 없습니다." };
   }
 
+  const resolved = await resolveLatestBracketForMutationFirestore({
+    tournamentId,
+    tournament,
+    bracketZoneId: params.bracketZoneId,
+  });
+  if (!resolved) {
+    return {
+      ok: false,
+      error:
+        tournament.zonesEnabled === true
+          ? "권역(zoneId)를 지정하거나 해당 권역의 확정 대진표가 없습니다."
+          : "확정 대진표가 없습니다.",
+    };
+  }
+
   const db = getSharedFirestoreDb();
   try {
     const bracket = await db.runTransaction(async (tx) => {
-      const q = db
-        .collection(BRACKETS)
-        .where("tournamentId", "==", tournamentId)
-        .orderBy("createdAt", "desc")
-        .limit(1);
-      const qs = await tx.get(q);
-      if (qs.empty) {
+      const ref = db.collection(BRACKETS).doc(resolved.id);
+      const docSnap = await tx.get(ref);
+      if (!docSnap.exists) {
         throw new BracketOpReject("확정 대진표가 없습니다.");
       }
-      const docSnap = qs.docs[0]!;
-      const ref = docSnap.ref;
       const latestBracket = bracketFromDoc(docSnap.id, docSnap.data() as Record<string, unknown>) as MutableBracket;
       if (!latestBracket) {
         throw new BracketOpReject("확정 대진표가 없습니다.");
@@ -407,6 +545,7 @@ export async function replaceBracketMatchPlayerFirestore(params: {
   slot: "player1" | "player2";
   replacementUserId: string;
   actorUserId?: string;
+  bracketZoneId?: string | null;
 }): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
   assertClientFirestorePersistenceConfigured();
   const tournamentId = params.tournamentId.trim();
@@ -424,20 +563,29 @@ export async function replaceBracketMatchPlayerFirestore(params: {
     return { ok: false, error: "대회를 찾을 수 없습니다." };
   }
 
+  const resolved = await resolveLatestBracketForMutationFirestore({
+    tournamentId,
+    tournament,
+    bracketZoneId: params.bracketZoneId,
+  });
+  if (!resolved) {
+    return {
+      ok: false,
+      error:
+        tournament.zonesEnabled === true
+          ? "권역(zoneId)를 지정하거나 해당 권역의 확정 대진표가 없습니다."
+          : "확정 대진표가 없습니다.",
+    };
+  }
+
   const db = getSharedFirestoreDb();
   try {
     const bracket = await db.runTransaction(async (tx) => {
-      const q = db
-        .collection(BRACKETS)
-        .where("tournamentId", "==", tournamentId)
-        .orderBy("createdAt", "desc")
-        .limit(1);
-      const qs = await tx.get(q);
-      if (qs.empty) {
+      const ref = db.collection(BRACKETS).doc(resolved.id);
+      const docSnap = await tx.get(ref);
+      if (!docSnap.exists) {
         throw new BracketOpReject("확정 대진표가 없습니다.");
       }
-      const docSnap = qs.docs[0]!;
-      const ref = docSnap.ref;
       const latestBracket = bracketFromDoc(docSnap.id, docSnap.data() as Record<string, unknown>) as MutableBracket;
       if (!latestBracket) {
         throw new BracketOpReject("확정 대진표가 없습니다.");

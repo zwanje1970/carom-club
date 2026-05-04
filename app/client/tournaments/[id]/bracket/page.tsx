@@ -2,8 +2,8 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 const TournamentGroupRound1PrintClient = dynamic(
   () => import("./TournamentGroupRound1PrintClient"),
@@ -21,12 +21,14 @@ type BracketParticipantSnapshot = {
   tournamentId: string;
   participants: BracketParticipant[];
   createdAt: string;
+  zoneId?: string | null;
 };
 
 type Bracket = {
   id: string;
   tournamentId: string;
   snapshotId: string;
+  zoneId?: string | null;
   rounds: Array<{
     roundNumber: number;
     status: "PENDING" | "IN_PROGRESS" | "COMPLETED";
@@ -50,7 +52,9 @@ function getRoundStatusLabel(status: "PENDING" | "IN_PROGRESS" | "COMPLETED"): s
 
 export default function TournamentBracketSnapshotPage() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const tournamentId = useMemo(() => (typeof params.id === "string" ? params.id : ""), [params.id]);
+  const urlZoneId = useMemo(() => searchParams.get("zoneId")?.trim() ?? "", [searchParams]);
   const [snapshot, setSnapshot] = useState<BracketParticipantSnapshot | null>(null);
   const [bracket, setBracket] = useState<Bracket | null>(null);
   const [loadingSnapshot, setLoadingSnapshot] = useState(false);
@@ -59,6 +63,14 @@ export default function TournamentBracketSnapshotPage() {
     Record<string, { player1: string; player2: string }>
   >({});
   const [message, setMessage] = useState("");
+  const [zonesEnabled, setZonesEnabled] = useState(false);
+  const [zoneOptions, setZoneOptions] = useState<{ id: string; zoneName: string }[]>([]);
+  const [selectedZoneId, setSelectedZoneId] = useState("");
+
+  const bracketZoneQuery = useMemo(() => {
+    if (!zonesEnabled || !selectedZoneId) return "";
+    return `?zoneId=${encodeURIComponent(selectedZoneId)}`;
+  }, [zonesEnabled, selectedZoneId]);
 
   const bracketPlayers = useMemo(() => {
     if (!bracket) return [];
@@ -72,10 +84,17 @@ export default function TournamentBracketSnapshotPage() {
     return Array.from(map.values());
   }, [bracket]);
 
-  async function loadLatestSnapshot() {
+  const loadLatestSnapshot = useCallback(async () => {
     if (!tournamentId) return;
+    if (zonesEnabled && !selectedZoneId) {
+      setSnapshot(null);
+      return;
+    }
     try {
-      const response = await fetch(`/api/client/tournaments/${tournamentId}/bracket/participants-snapshot`);
+      const q = zonesEnabled && selectedZoneId ? `?zoneId=${encodeURIComponent(selectedZoneId)}` : "";
+      const response = await fetch(`/api/client/tournaments/${tournamentId}/bracket/participants-snapshot${q}`, {
+        credentials: "same-origin",
+      });
       const result = (await response.json()) as {
         snapshot?: BracketParticipantSnapshot | null;
         error?: string;
@@ -88,12 +107,19 @@ export default function TournamentBracketSnapshotPage() {
     } catch {
       setMessage("대진표 대상자 스냅샷 조회 중 오류가 발생했습니다.");
     }
-  }
+  }, [tournamentId, zonesEnabled, selectedZoneId]);
 
-  async function loadLatestBracket() {
+  const loadLatestBracket = useCallback(async () => {
     if (!tournamentId) return;
+    if (zonesEnabled && !selectedZoneId) {
+      setBracket(null);
+      return;
+    }
     try {
-      const response = await fetch(`/api/client/tournaments/${tournamentId}/bracket`);
+      const url = zonesEnabled
+        ? `/api/client/tournaments/${tournamentId}/bracket/zones/${encodeURIComponent(selectedZoneId)}`
+        : `/api/client/tournaments/${tournamentId}/bracket`;
+      const response = await fetch(url, { credentials: "same-origin" });
       const result = (await response.json()) as { bracket?: Bracket | null; error?: string };
       if (!response.ok) {
         setMessage(result.error ?? "대진표 조회에 실패했습니다.");
@@ -103,20 +129,78 @@ export default function TournamentBracketSnapshotPage() {
     } catch {
       setMessage("대진표 조회 중 오류가 발생했습니다.");
     }
-  }
+  }, [tournamentId, zonesEnabled, selectedZoneId]);
+
+  useEffect(() => {
+    if (!tournamentId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/client/tournaments/${tournamentId}`, { credentials: "same-origin" });
+        const json = (await res.json()) as { tournament?: { zonesEnabled?: boolean } };
+        if (!res.ok || cancelled || !json.tournament) return;
+        setZonesEnabled(json.tournament.zonesEnabled === true);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tournamentId]);
+
+  useEffect(() => {
+    if (!tournamentId || !zonesEnabled) {
+      setZoneOptions([]);
+      if (!zonesEnabled) setSelectedZoneId("");
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/client/tournaments/${tournamentId}/zones`, { credentials: "same-origin" });
+        const json = (await res.json()) as { zones?: Array<{ id?: string; zoneName?: string; status?: string }> };
+        if (!res.ok || cancelled || !Array.isArray(json.zones)) return;
+        const opts: { id: string; zoneName: string }[] = [];
+        for (const z of json.zones) {
+          if (!z || z.status !== "ACTIVE") continue;
+          const id = typeof z.id === "string" ? z.id.trim() : "";
+          const zoneName = typeof z.zoneName === "string" ? z.zoneName.trim() : "";
+          if (id && zoneName) opts.push({ id, zoneName });
+        }
+        setZoneOptions(opts);
+        setSelectedZoneId((prev) => {
+          if (urlZoneId && opts.some((o) => o.id === urlZoneId)) return urlZoneId;
+          if (prev && opts.some((o) => o.id === prev)) return prev;
+          return opts[0]?.id ?? "";
+        });
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tournamentId, zonesEnabled, urlZoneId]);
 
   useEffect(() => {
     void loadLatestSnapshot();
     void loadLatestBracket();
-  }, [tournamentId]);
+  }, [loadLatestSnapshot, loadLatestBracket]);
 
   async function handleCreateSnapshot() {
     if (!tournamentId || loadingSnapshot) return;
+    if (zonesEnabled && !selectedZoneId) {
+      setMessage("권역을 선택해 주세요.");
+      return;
+    }
     setLoadingSnapshot(true);
     setMessage("");
     try {
       const response = await fetch(`/api/client/tournaments/${tournamentId}/bracket/participants-snapshot`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(zonesEnabled && selectedZoneId ? { zoneId: selectedZoneId } : {}),
       });
       const result = (await response.json()) as {
         snapshot?: BracketParticipantSnapshot;
@@ -140,11 +224,14 @@ export default function TournamentBracketSnapshotPage() {
     setActionLoading(true);
     setMessage("");
     try {
-      const response = await fetch(`/api/client/tournaments/${tournamentId}/bracket/matches/${matchId}/result`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ winnerUserId }),
-      });
+      const response = await fetch(
+        `/api/client/tournaments/${tournamentId}/bracket/matches/${matchId}/result${bracketZoneQuery}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ winnerUserId }),
+        }
+      );
       const result = (await response.json()) as { bracket?: Bracket; error?: string };
       if (!response.ok || !result.bracket) {
         setMessage(result.error ?? "경기 결과 저장에 실패했습니다.");
@@ -164,11 +251,14 @@ export default function TournamentBracketSnapshotPage() {
     setActionLoading(true);
     setMessage("");
     try {
-      const response = await fetch(`/api/client/tournaments/${tournamentId}/bracket/matches/${matchId}/result`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ winnerUserId: null }),
-      });
+      const response = await fetch(
+        `/api/client/tournaments/${tournamentId}/bracket/matches/${matchId}/result${bracketZoneQuery}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ winnerUserId: null }),
+        }
+      );
       const result = (await response.json()) as { bracket?: Bracket; error?: string };
       if (!response.ok || !result.bracket) {
         setMessage(result.error ?? "결과 초기화에 실패했습니다.");
@@ -194,11 +284,14 @@ export default function TournamentBracketSnapshotPage() {
     setActionLoading(true);
     setMessage("");
     try {
-      const response = await fetch(`/api/client/tournaments/${tournamentId}/bracket/matches/${matchId}/players`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slot, replacementUserId }),
-      });
+      const response = await fetch(
+        `/api/client/tournaments/${tournamentId}/bracket/matches/${matchId}/players${bracketZoneQuery}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slot, replacementUserId }),
+        }
+      );
       const result = (await response.json()) as { bracket?: Bracket; error?: string };
       if (!response.ok || !result.bracket) {
         setMessage(result.error ?? "참가자 교체에 실패했습니다.");
@@ -222,9 +315,10 @@ export default function TournamentBracketSnapshotPage() {
     setActionLoading(true);
     setMessage("");
     try {
-      const response = await fetch(`/api/client/tournaments/${tournamentId}/bracket/rounds/${roundNumber}/advance`, {
-        method: "POST",
-      });
+      const response = await fetch(
+        `/api/client/tournaments/${tournamentId}/bracket/rounds/${roundNumber}/advance${bracketZoneQuery}`,
+        { method: "POST" }
+      );
       const result = (await response.json()) as { bracket?: Bracket; error?: string };
       if (!response.ok || !result.bracket) {
         setMessage(result.error ?? "다음 라운드 생성에 실패했습니다.");
@@ -245,6 +339,32 @@ export default function TournamentBracketSnapshotPage() {
         자동배정/수동배정에서 임시 배정 후 미리보기에서 확인하고, 확정 저장 시점에만 실제 대진표가 반영됩니다.
       </p>
 
+      {zonesEnabled ? (
+        <section className="v3-box v3-stack" style={{ padding: "0.65rem 0.75rem" }}>
+          <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontWeight: 800 }}>권역</span>
+            <select
+              className="v3-btn"
+              value={selectedZoneId}
+              onChange={(e) => setSelectedZoneId(e.target.value)}
+              disabled={zoneOptions.length === 0}
+              style={{ minHeight: 36, fontWeight: 600 }}
+            >
+              {zoneOptions.length === 0 ? <option value="">권역 없음</option> : null}
+              {zoneOptions.map((z) => (
+                <option key={z.id} value={z.id}>
+                  {z.zoneName}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="v3-muted" style={{ margin: "0.5rem 0 0", fontSize: "0.82rem" }}>
+            권역 운영 대회는 아래에서 권역을 선택한 뒤 스냅샷·대진표를 다룹니다. 기존{" "}
+            <code>/api/client/tournaments/…/bracket</code> 단일 조회는 이 화면에서 사용하지 않습니다.
+          </p>
+        </section>
+      ) : null}
+
       <section className="v3-box v3-stack">
         <h2 className="v3-h2">최신 대상자 스냅샷</h2>
         {!snapshot ? (
@@ -263,17 +383,34 @@ export default function TournamentBracketSnapshotPage() {
           </>
         )}
         <div className="v3-row">
-          <button type="button" className="v3-btn" onClick={handleCreateSnapshot} disabled={loadingSnapshot}>
+          <button
+            type="button"
+            className="v3-btn"
+            onClick={handleCreateSnapshot}
+            disabled={loadingSnapshot || (zonesEnabled && (!selectedZoneId || zoneOptions.length === 0))}
+          >
             {loadingSnapshot ? "생성 중..." : "대상자 스냅샷 생성"}
           </button>
         </div>
       </section>
 
       <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
-        <Link prefetch={false} className="v3-btn" href={`/client/tournaments/${tournamentId}/bracket/auto`}>
+        <Link
+          prefetch={false}
+          className="v3-btn"
+          href={`/client/tournaments/${tournamentId}/bracket/auto${bracketZoneQuery}`}
+          aria-disabled={zonesEnabled && !selectedZoneId}
+          style={zonesEnabled && !selectedZoneId ? { pointerEvents: "none", opacity: 0.45 } : undefined}
+        >
           자동배정
         </Link>
-        <Link prefetch={false} className="v3-btn" href={`/client/tournaments/${tournamentId}/bracket/manual`}>
+        <Link
+          prefetch={false}
+          className="v3-btn"
+          href={`/client/tournaments/${tournamentId}/bracket/manual${bracketZoneQuery}`}
+          aria-disabled={zonesEnabled && !selectedZoneId}
+          style={zonesEnabled && !selectedZoneId ? { pointerEvents: "none", opacity: 0.45 } : undefined}
+        >
           수동배정
         </Link>
         <a className="v3-btn" href="#confirmed-bracket">
@@ -297,6 +434,11 @@ export default function TournamentBracketSnapshotPage() {
             <p>
               <strong>대진표 ID:</strong> {bracket.id}
             </p>
+            {bracket.zoneId ? (
+              <p>
+                <strong>권역:</strong> {bracket.zoneId}
+              </p>
+            ) : null}
             <p>
               <strong>입력 스냅샷:</strong> {bracket.snapshotId}
             </p>

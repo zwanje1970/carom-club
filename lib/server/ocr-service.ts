@@ -19,6 +19,7 @@ import {
   markTournamentApplicationOcrProcessingFirestore,
 } from "./firestore-tournament-applications";
 import { isFirestoreUsersBackendConfigured } from "./firestore-users";
+import { runGoogleOcrOnImageBuffer } from "./google-ocr";
 
 export type OcrResultStatus = "success" | "failed";
 
@@ -134,18 +135,45 @@ export async function runOcrForProofImage(params: {
     };
   }
 
+  const providerEnv = (process.env.OCR_PROVIDER ?? "mock").trim() || "mock";
   try {
-    if ((process.env.OCR_PROVIDER ?? "mock").trim() === "http") {
+    if (providerEnv === "http") {
       const imageBuffer = await loadProofImageOriginalBuffer(proofImage);
       return await runHttpOcrFromBuffer(imageBuffer);
     }
+    if (providerEnv === "google") {
+      const imageBuffer = await loadProofImageOriginalBuffer(proofImage);
+      const google = await runGoogleOcrOnImageBuffer(imageBuffer);
+      const processedAt = new Date().toISOString();
+      if (google.status !== "success") {
+        return {
+          rawText: "",
+          extractedValue: null,
+          confidence: null,
+          provider: "google",
+          processedAt,
+          status: "failed",
+        };
+      }
+      const rawText = google.text.slice(0, 2000);
+      return {
+        rawText,
+        extractedValue: null,
+        confidence: null,
+        provider: "google",
+        processedAt,
+        status: "success",
+      };
+    }
     return await runMockOcr(application);
   } catch {
+    const providerLabel =
+      providerEnv === "http" ? "http" : providerEnv === "google" ? "google" : "mock";
     return {
       rawText: "",
       extractedValue: null,
       confidence: null,
-      provider: (process.env.OCR_PROVIDER ?? "mock").trim() || "mock",
+      provider: providerLabel,
       processedAt: new Date().toISOString(),
       status: "failed",
     };

@@ -18,39 +18,70 @@ type ClientDashboardGateJson = {
   hasPublishedCard: boolean;
 };
 
+const SAFE_DASHBOARD_GATE: ClientDashboardGateJson = {
+  hasOrgSetup: false,
+  hasAnyTournament: false,
+  firstTournamentId: "",
+  hasPublishedCard: false,
+};
+
 async function getAuthorizedClientContext(): Promise<{
   userId: string;
   org: Awaited<ReturnType<typeof resolveClientOrganizationForDashboardPolicy>>;
 } | null> {
-  const cookieStore = await cookies();
-  const raw = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  const session = parseSessionCookieValue(raw);
+  let session: ReturnType<typeof parseSessionCookieValue> | null = null;
+  try {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+    session = parseSessionCookieValue(raw);
+  } catch (e) {
+    console.error("[dashboard-gate]", e);
+    return null;
+  }
   if (!session) return null;
 
-  const user = await getUserById(session.userId);
+  let user: Awaited<ReturnType<typeof getUserById>> | null = null;
+  try {
+    user = await getUserById(session.userId);
+  } catch (e) {
+    console.error("[dashboard-gate]", e);
+    return null;
+  }
   if (!user || user.role !== "CLIENT") return null;
   if (user.status === "SUSPENDED" || user.status === "DELETED") return null;
 
-  const clientStatus = await getClientStatusByUserId(user.id);
+  let clientStatus: Awaited<ReturnType<typeof getClientStatusByUserId>> | null = null;
+  try {
+    clientStatus = await getClientStatusByUserId(user.id);
+  } catch (e) {
+    console.error("[dashboard-gate]", e);
+    return null;
+  }
   if (clientStatus !== "APPROVED") return null;
 
-  const org = await resolveClientOrganizationForDashboardPolicy(user.id);
+  let org: Awaited<ReturnType<typeof resolveClientOrganizationForDashboardPolicy>> = null;
+  try {
+    org = await resolveClientOrganizationForDashboardPolicy(user.id);
+  } catch (e) {
+    console.error("[dashboard-gate]", e);
+    org = null;
+  }
   if (org?.status === "SUSPENDED" || org?.status === "EXPELLED") return null;
 
   return { userId: user.id.trim(), org };
 }
 
 function gateJson(body: ClientDashboardGateJson) {
-  return NextResponse.json(body);
+  return NextResponse.json(body, { status: 200 });
 }
 
 export async function GET() {
-  const context = await getAuthorizedClientContext();
-  if (!context) {
-    return NextResponse.json({ ok: false as const, error: "인증이 필요합니다." }, { status: 401 });
-  }
-
   try {
+    const context = await getAuthorizedClientContext();
+    if (!context) {
+      return gateJson(SAFE_DASHBOARD_GATE);
+    }
+
     const hasOrgSetup = Boolean(context.org?.setupCompleted);
     if (!hasOrgSetup) {
       return gateJson({
@@ -61,7 +92,15 @@ export async function GET() {
       });
     }
 
-    const tournamentPresence = await findClientDashboardFirstTournamentIdForUser(context.userId);
+    let tournamentPresence: Awaited<ReturnType<typeof findClientDashboardFirstTournamentIdForUser>> = {
+      hasAnyTournament: false,
+      firstTournamentId: "",
+    };
+    try {
+      tournamentPresence = await findClientDashboardFirstTournamentIdForUser(context.userId);
+    } catch (e) {
+      console.error("[dashboard-gate]", e);
+    }
     const firstTournamentId = tournamentPresence.firstTournamentId.trim();
     if (!tournamentPresence.hasAnyTournament || !firstTournamentId) {
       return gateJson({
@@ -72,7 +111,12 @@ export async function GET() {
       });
     }
 
-    const hasPublishedCard = await someTournamentHasActivePublishedCard([firstTournamentId]);
+    let hasPublishedCard = false;
+    try {
+      hasPublishedCard = await someTournamentHasActivePublishedCard([firstTournamentId]);
+    } catch (e) {
+      console.error("[dashboard-gate]", e);
+    }
     return gateJson({
       hasOrgSetup: true,
       hasAnyTournament: true,
@@ -80,10 +124,7 @@ export async function GET() {
       hasPublishedCard,
     });
   } catch (e) {
-    console.error("[api/client/dashboard-gate]", e);
-    return NextResponse.json(
-      { ok: false as const, error: "대시보드 게이트 상태를 확인하지 못했습니다." },
-      { status: 500 },
-    );
+    console.error("[dashboard-gate]", e);
+    return gateJson(SAFE_DASHBOARD_GATE);
   }
 }

@@ -2,8 +2,8 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../../lib/auth/session";
 import { getClientStatusByUserId, getUserById } from "../../../../../../../lib/platform-api";
-import { assertClientCanManageTournamentFirestore } from "../../../../../../../lib/server/firestore-tournaments";
 import { listTournamentApplicationsListItemsByTournamentIdFirestore } from "../../../../../../../lib/server/firestore-tournament-applications";
+import { resolveTournamentZoneClientAccess } from "../../../../../../../lib/server/tournament-zone-access";
 
 export const runtime = "nodejs";
 
@@ -34,18 +34,22 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     return NextResponse.json({ ok: false as const, error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const gate = await assertClientCanManageTournamentFirestore({
-    actorUserId: user.id,
-    actorRole: user.role,
-    tournamentId,
-  });
-  if (!gate.ok) {
-    return NextResponse.json({ ok: false as const, error: gate.error }, { status: gate.httpStatus });
+  const access = await resolveTournamentZoneClientAccess({ user, tournamentId });
+  if (!access.ok) {
+    return NextResponse.json({ ok: false as const, error: access.error }, { status: access.httpStatus });
   }
 
   try {
     const entries = await listTournamentApplicationsListItemsByTournamentIdFirestore(tournamentId);
-    return NextResponse.json({ ok: true as const, entries });
+    if (access.access.kind === "full") {
+      return NextResponse.json({ ok: true as const, entries });
+    }
+    const managed = access.access.managedZoneIds;
+    const filtered = entries.filter((e) => {
+      const z = typeof e.zoneId === "string" ? e.zoneId.trim() : "";
+      return Boolean(z) && managed.includes(z);
+    });
+    return NextResponse.json({ ok: true as const, entries: filtered });
   } catch (e) {
     console.error("[api/client/tournaments/.../applications/list-items]", e);
     return NextResponse.json({ ok: false as const, error: "목록을 불러오지 못했습니다." }, { status: 500 });

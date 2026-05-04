@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 type BracketParticipant = {
@@ -28,7 +28,9 @@ function getDraftStorageKey(tournamentId: string): string {
 export default function BracketManualAssignPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const tournamentId = useMemo(() => (typeof params.id === "string" ? params.id : ""), [params.id]);
+  const bracketZoneId = useMemo(() => searchParams.get("zoneId")?.trim() ?? "", [searchParams]);
   const [snapshot, setSnapshot] = useState<BracketParticipantSnapshot | null>(null);
   const [selectedPlayer1, setSelectedPlayer1] = useState("");
   const [selectedPlayer2, setSelectedPlayer2] = useState("");
@@ -54,7 +56,10 @@ export default function BracketManualAssignPage() {
       if (!tournamentId) return;
       setMessage("");
       try {
-        const response = await fetch(`/api/client/tournaments/${tournamentId}/bracket/participants-snapshot`);
+        const q = bracketZoneId ? `?zoneId=${encodeURIComponent(bracketZoneId)}` : "";
+        const response = await fetch(`/api/client/tournaments/${tournamentId}/bracket/participants-snapshot${q}`, {
+          credentials: "same-origin",
+        });
         const result = (await response.json()) as {
           snapshot?: BracketParticipantSnapshot | null;
           error?: string;
@@ -73,7 +78,7 @@ export default function BracketManualAssignPage() {
       }
     }
     void loadSnapshot();
-  }, [tournamentId]);
+  }, [tournamentId, bracketZoneId]);
 
   function handleAddMatch() {
     if (!snapshot) return;
@@ -115,6 +120,7 @@ export default function BracketManualAssignPage() {
       snapshotId: snapshot.id,
       matches,
       createdAt: new Date().toISOString(),
+      ...(bracketZoneId ? { zoneId: bracketZoneId } : {}),
     };
     window.localStorage.setItem(getDraftStorageKey(tournamentId), JSON.stringify(draft));
     router.push(`/client/tournaments/${tournamentId}/bracket/preview`);

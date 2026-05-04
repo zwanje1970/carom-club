@@ -429,6 +429,10 @@ export type Tournament = {
   gatheringTime?: string | null;
   /** 전날 알림 푸시 1회 발송 후 ISO 시각(cron 중복 방지). */
   reminderSentAt?: string | null;
+  /** TV 공개 링크용 토큰. 미설정 대회는 없음 */
+  tvAccessToken?: string | null;
+  /** 권역(다중 대진) 운영 사용 여부. 없거나 false면 단일 대진표와 동일 */
+  zonesEnabled?: boolean;
 };
 
 export type TournamentApplicationStatus =
@@ -474,6 +478,8 @@ export type TournamentApplication = {
   attendanceChecked?: boolean | null;
   /** 입금확정(APPROVED) 알림 1회 발송 시각(중복 방지) */
   approvedNotifiedAt?: string | null;
+  /** 대회 권역 배정(v3_tournament_zones.id). 미설정이면 단일 대진표 흐름과 동일 */
+  zoneId?: string | null;
 };
 
 /** 클라이언트 참가자 목록 RSC — 증빙·OCR·입금자명 등 제외 */
@@ -489,6 +495,7 @@ export type TournamentApplicationListItem = {
   /** 목록·출석 표시용(문서 필드, API 스키마 변경 아님) */
   statusChangedAt?: string;
   attendanceChecked?: boolean;
+  zoneId?: string | null;
 };
 
 export type BracketParticipantSnapshotParticipant = {
@@ -502,6 +509,8 @@ export type BracketParticipantSnapshot = {
   tournamentId: string;
   participants: BracketParticipantSnapshotParticipant[];
   createdAt: string;
+  /** 권역별 스냅샷 구분용. 없으면 기존 단일 대진표 */
+  zoneId?: string | null;
 };
 
 export type BracketPlayer = {
@@ -533,6 +542,8 @@ export type Bracket = {
   snapshotId: string;
   rounds: BracketRound[];
   createdAt: string;
+  /** 권역별 대진표 구분용. 없으면 기존 단일 대진표 */
+  zoneId?: string | null;
 };
 
 export type BracketDraftMatchInput = {
@@ -2017,6 +2028,14 @@ export function buildTournamentFromParsedRow(raw: unknown, clientOrganizations: 
   const reminderSentAt =
     typeof reminderSentAtRaw === "string" && reminderSentAtRaw.trim() !== "" ? reminderSentAtRaw.trim() : null;
 
+  const tvTokRaw = t.tvAccessToken;
+  const tvAccessToken =
+    typeof tvTokRaw === "string" && tvTokRaw.trim() !== "" ? tvTokRaw.trim() : null;
+
+  const zonesEnabledRaw = t.zonesEnabled;
+  const zonesEnabled: boolean | undefined =
+    zonesEnabledRaw === true ? true : zonesEnabledRaw === false ? false : undefined;
+
   return {
     id,
     title,
@@ -2045,6 +2064,8 @@ export function buildTournamentFromParsedRow(raw: unknown, clientOrganizations: 
     ...(deleteReason !== undefined && deleteReason !== "" ? { deleteReason } : {}),
     ...(gatheringTime ? { gatheringTime } : {}),
     ...(reminderSentAt ? { reminderSentAt } : {}),
+    ...(tvAccessToken ? { tvAccessToken } : {}),
+    ...(typeof zonesEnabled === "boolean" ? { zonesEnabled } : {}),
   };
 }
 
@@ -7271,6 +7292,7 @@ export async function listApprovedParticipantsByTournamentId(
 
 export async function createBracketParticipantSnapshot(params: {
   tournamentId: string;
+  zoneId?: string | null;
 }): Promise<{ ok: true; snapshot: BracketParticipantSnapshot } | { ok: false; error: string }> {
   if (isFirestoreUsersBackendConfigured()) {
     return (await import("./firestore-tournament-brackets")).createBracketParticipantSnapshotFirestore(params);

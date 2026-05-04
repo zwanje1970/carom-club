@@ -1,9 +1,15 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../../../lib/auth/session";
-import { getClientStatusByUserId, getUserById } from "../../../../../../../../lib/platform-api";
+import { getClientStatusByUserId, getUserById, resolveCanonicalUserIdForAuth } from "../../../../../../../../lib/platform-api";
+import { getTournamentApplicationByIdFirestore } from "../../../../../../../../lib/server/firestore-tournament-applications";
+import { getTournamentByIdFirestore } from "../../../../../../../../lib/server/firestore-tournaments";
 import { updateParticipantAttendanceChecked } from "../../../../../../../../lib/server/platform-backing-store";
-import { assertClientCanManageTournamentFirestore } from "../../../../../../../../lib/server/firestore-tournaments";
+import {
+  resolveTournamentZoneClientAccess,
+  TOURNAMENT_ZONE_FORBIDDEN_ERROR,
+  zoneManagerMayAccessZoneId,
+} from "../../../../../../../../lib/server/tournament-zone-access";
 
 export const runtime = "nodejs";
 
@@ -35,13 +41,33 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const gate = await assertClientCanManageTournamentFirestore({
-    actorUserId: user.id,
-    actorRole: user.role,
-    tournamentId,
-  });
-  if (!gate.ok) {
-    return NextResponse.json({ error: gate.error }, { status: gate.httpStatus });
+  const tournament = await getTournamentByIdFirestore(tournamentId);
+  if (!tournament) {
+    return NextResponse.json({ error: "대회를 찾을 수 없습니다." }, { status: 404 });
+  }
+  const entry = await getTournamentApplicationByIdFirestore(tournamentId, eid);
+  if (!entry) {
+    return NextResponse.json({ error: "참가신청을 찾을 수 없습니다." }, { status: 404 });
+  }
+
+  let canManage = user.role === "PLATFORM";
+  if (!canManage && user.role === "CLIENT") {
+    const actorId = await resolveCanonicalUserIdForAuth(user.id);
+    if (tournament.createdBy === actorId || tournament.createdBy === user.id.trim()) {
+      canManage = true;
+    } else if (tournament.zonesEnabled === true) {
+      const access = await resolveTournamentZoneClientAccess({ user, tournamentId });
+      if (access.ok && access.access.kind === "zone_manager") {
+        if (!zoneManagerMayAccessZoneId(access.access, entry.zoneId ?? undefined)) {
+          return NextResponse.json({ error: TOURNAMENT_ZONE_FORBIDDEN_ERROR }, { status: 403 });
+        }
+        canManage = true;
+      }
+    }
+  }
+
+  if (!canManage) {
+    return NextResponse.json({ error: "접근 권한이 없습니다." }, { status: 403 });
   }
 
   let body: { checked?: unknown } = {};

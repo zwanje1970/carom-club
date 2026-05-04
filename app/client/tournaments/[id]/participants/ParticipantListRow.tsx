@@ -75,6 +75,10 @@ export default function ParticipantListRow({
   attendanceChecked: attendanceCheckedProp,
   groupDraft,
   onGroupDraftChange,
+  zonesEnabled = false,
+  zones = [],
+  initialZoneId = null,
+  onZoneIdUpdated,
 }: {
   tournamentId: string;
   entryId: string;
@@ -89,12 +93,18 @@ export default function ParticipantListRow({
   attendanceChecked?: boolean | null;
   groupDraft: string;
   onGroupDraftChange: (entryId: string, value: string) => void;
+  zonesEnabled?: boolean;
+  zones?: { id: string; zoneName: string }[];
+  initialZoneId?: string | null;
+  onZoneIdUpdated?: (entryId: string, zoneId: string | null) => void;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<TournamentApplicationStatus>(initialStatus);
   const [loading, setLoading] = useState(false);
   const [attendanceChecked, setAttendanceChecked] = useState(attendanceCheckedProp === true);
   const [attendancePending, setAttendancePending] = useState(false);
+  const [zoneSelect, setZoneSelect] = useState(() => (initialZoneId && String(initialZoneId).trim() !== "" ? String(initialZoneId).trim() : ""));
+  const [zonePending, setZonePending] = useState(false);
 
   useEffect(() => {
     setStatus(initialStatus);
@@ -104,7 +114,42 @@ export default function ParticipantListRow({
     setAttendanceChecked(attendanceCheckedProp === true);
   }, [attendanceCheckedProp]);
 
+  useEffect(() => {
+    const z = initialZoneId && String(initialZoneId).trim() !== "" ? String(initialZoneId).trim() : "";
+    setZoneSelect(z);
+  }, [initialZoneId]);
+
   const detailHref = `/client/tournaments/${tournamentId}/participants/${entryId}`;
+
+  async function patchZone(nextSelect: string) {
+    if (!zonesEnabled || !onZoneIdUpdated) return;
+    const nextZoneId = nextSelect.trim() === "" ? null : nextSelect.trim();
+    const prevSelect = zoneSelect;
+    setZoneSelect(nextSelect.trim() === "" ? "" : nextSelect.trim());
+    setZonePending(true);
+    try {
+      const response = await fetch(
+        `/api/client/tournaments/${encodeURIComponent(tournamentId)}/applications/${encodeURIComponent(entryId)}/zone`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ zoneId: nextZoneId }),
+        }
+      );
+      const result = (await response.json()) as { error?: string; ok?: boolean; zoneId?: string | null };
+      if (!response.ok) {
+        window.alert(result.error ?? "권역 저장에 실패했습니다.");
+        setZoneSelect(prevSelect);
+        return;
+      }
+      onZoneIdUpdated(entryId, result.zoneId !== undefined ? result.zoneId : nextZoneId);
+    } catch {
+      window.alert("권역 저장 중 오류가 발생했습니다.");
+      setZoneSelect(prevSelect);
+    } finally {
+      setZonePending(false);
+    }
+  }
 
   async function handleTransition(nextStatus: TournamentApplicationStatus) {
     if (loading) return;
@@ -347,6 +392,40 @@ export default function ParticipantListRow({
       >
         {depositCell}
       </td>
+      {zonesEnabled ? (
+        <td data-participant-label="권역" style={{ ...cellBase, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", maxWidth: "6.5rem" }}>
+          {zones.length === 0 ? (
+            <span className="v3-muted" style={{ fontSize: "0.72rem" }}>
+              —
+            </span>
+          ) : (
+            <select
+              value={zoneSelect}
+              disabled={zonePending}
+              onChange={(e) => void patchZone(e.target.value)}
+              aria-label={`${applicantName} 권역`}
+              style={{
+                width: "100%",
+                maxWidth: "6.25rem",
+                padding: "0.12rem 0.2rem",
+                fontSize: "0.72rem",
+                fontWeight: 600,
+                border: "1px solid #cbd5e1",
+                borderRadius: "0.25rem",
+                boxSizing: "border-box",
+                background: zonePending ? "#f1f5f9" : "#fff",
+              }}
+            >
+              <option value="">미배정</option>
+              {zones.map((z) => (
+                <option key={z.id} value={z.id}>
+                  {z.zoneName}
+                </option>
+              ))}
+            </select>
+          )}
+        </td>
+      ) : null}
       <td data-participant-label="조" style={{ ...cellBase, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", maxWidth: "2.85rem" }}>
         <input
           type="number"

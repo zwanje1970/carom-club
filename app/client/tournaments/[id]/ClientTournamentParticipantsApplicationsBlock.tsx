@@ -14,12 +14,19 @@ export type ParticipantCountSummary = {
   reject: number;
 };
 
+type TournamentZoneListEntry = {
+  id: string;
+  zoneName: string;
+  status: string;
+};
+
 type Props = {
   tournamentId: string;
   initialEntries: TournamentApplicationListItem[];
   participantCountSummary: ParticipantCountSummary;
   selected: ClientParticipantFilterKey;
   filterBaseHref: string;
+  zonesEnabled: boolean;
 };
 
 const participantApplicationsTableThBase: CSSProperties = {
@@ -90,6 +97,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   participantCountSummary,
   selected,
   filterBaseHref,
+  zonesEnabled,
 }: Props) {
   const [entries, setEntries] = useState<TournamentApplicationListItem[]>(initialEntries);
   const [moreLoading, setMoreLoading] = useState(() => participantCountSummary.total > initialEntries.length);
@@ -143,6 +151,56 @@ export default function ClientTournamentParticipantsApplicationsBlock({
     [filteredEntries]
   );
 
+  const [zones, setZones] = useState<TournamentZoneListEntry[]>([]);
+  const [zoneFilterZoneId, setZoneFilterZoneId] = useState<string>("all");
+
+  useEffect(() => {
+    if (!zonesEnabled) {
+      setZones([]);
+      setZoneFilterZoneId("all");
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/client/tournaments/${encodeURIComponent(tournamentId)}/zones`,
+          { credentials: "same-origin" }
+        );
+        const json = (await res.json()) as { zones?: unknown; error?: string };
+        if (!res.ok || cancelled || !json || !Array.isArray(json.zones)) {
+          return;
+        }
+        const parsed: TournamentZoneListEntry[] = [];
+        for (const z of json.zones) {
+          if (!z || typeof z !== "object") continue;
+          const o = z as Record<string, unknown>;
+          const id = typeof o.id === "string" ? o.id.trim() : "";
+          const zoneName = typeof o.zoneName === "string" ? o.zoneName.trim() : "";
+          const status = typeof o.status === "string" ? o.status.trim() : "";
+          if (id && zoneName) parsed.push({ id, zoneName, status });
+        }
+        setZones(parsed);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tournamentId, zonesEnabled]);
+
+  const activeZones = useMemo(() => zones.filter((z) => z.status === "ACTIVE"), [zones]);
+
+  const zoneFilteredEntries = useMemo(() => {
+    if (!zonesEnabled || zoneFilterZoneId === "all") return sortedEntries;
+    return sortedEntries.filter((e) => (e.zoneId ?? "").trim() === zoneFilterZoneId);
+  }, [sortedEntries, zonesEnabled, zoneFilterZoneId]);
+
+  const onZoneIdUpdated = useCallback((entryId: string, zoneId: string | null) => {
+    setEntries((prev) => prev.map((e) => (e.id === entryId ? { ...e, zoneId } : e)));
+  }, []);
+
   const [groupByEntryId, setGroupByEntryId] = useState<Record<string, string>>({});
   useEffect(() => {
     setGroupByEntryId(loadGroupDraftMap(tournamentId));
@@ -182,12 +240,47 @@ export default function ClientTournamentParticipantsApplicationsBlock({
             거절 ({counts.reject})
           </Link>
         </div>
+        {zonesEnabled ? (
+          <div className="client-tournament-manage__filterRow" style={{ marginTop: "0.35rem" }}>
+            <label className="v3-muted" style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", fontSize: "0.82rem", fontWeight: 700 }}>
+              권역
+              <select
+                className="v3-btn"
+                value={zoneFilterZoneId}
+                onChange={(e) => setZoneFilterZoneId(e.target.value)}
+                disabled={activeZones.length === 0}
+                style={{
+                  minHeight: 38,
+                  padding: "0.25rem 0.45rem",
+                  fontSize: "0.84rem",
+                  fontWeight: 600,
+                  borderRadius: "0.35rem",
+                  border: "1px solid #d7d7d7",
+                  background: activeZones.length === 0 ? "#f1f5f9" : "#fff",
+                  color: "#374151",
+                  maxWidth: "12rem",
+                }}
+              >
+                <option value="all">전체</option>
+                {activeZones.map((z) => (
+                  <option key={z.id} value={z.id}>
+                    {z.zoneName}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        ) : null}
       </div>
 
       <section className="client-tournament-manage__participantTableShell">
-        {sortedEntries.length === 0 ? (
+        {zoneFilteredEntries.length === 0 ? (
           <p className="v3-muted" style={{ margin: 0, padding: "0.65rem 0.75rem" }}>
-            {participantCountSummary.total === 0 ? "저장된 참가신청이 없습니다." : "이 조건에 해당하는 참가자가 없습니다."}
+            {participantCountSummary.total === 0
+              ? "저장된 참가신청이 없습니다."
+              : sortedEntries.length === 0
+                ? "이 조건에 해당하는 참가자가 없습니다."
+                : "선택한 권역에 배정된 참가자가 없습니다."}
           </p>
         ) : (
           <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
@@ -195,7 +288,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
               className="client-tournament-manage__participantTable"
               style={{
                 width: "100%",
-                minWidth: "34rem",
+                minWidth: zonesEnabled ? "39rem" : "34rem",
                 borderCollapse: "collapse",
                 tableLayout: "fixed",
                 fontSize: "0.84rem",
@@ -243,6 +336,18 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                   >
                     입금일
                   </th>
+                  {zonesEnabled ? (
+                    <th
+                      style={{
+                        ...participantApplicationsTableThBase,
+                        textAlign: "center",
+                        width: "5.5rem",
+                        maxWidth: "6.5rem",
+                      }}
+                    >
+                      권역
+                    </th>
+                  ) : null}
                   <th
                     style={{
                       ...participantApplicationsTableThBase,
@@ -266,7 +371,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                 </tr>
               </thead>
               <tbody>
-                {sortedEntries.map((entry) => (
+                {zoneFilteredEntries.map((entry) => (
                   <ParticipantListRow
                     key={entry.id}
                     tournamentId={tournamentId}
@@ -287,6 +392,10 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     attendanceChecked={entry.attendanceChecked}
                     groupDraft={groupByEntryId[entry.id] ?? ""}
                     onGroupDraftChange={onGroupDraftChange}
+                    zonesEnabled={zonesEnabled}
+                    zones={activeZones}
+                    initialZoneId={entry.zoneId ?? null}
+                    onZoneIdUpdated={onZoneIdUpdated}
                   />
                 ))}
               </tbody>

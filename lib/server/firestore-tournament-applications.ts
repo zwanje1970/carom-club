@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { assertClientFirestorePersistenceConfigured } from "./firestore-client-applications";
+import { getTournamentZoneById } from "./firestore-tournament-zones";
 import { getTournamentByIdFirestore, listAllTournamentsFirestore, listTournamentsByCreatorFirestore } from "./firestore-tournaments";
 import { firestoreGetUserById, getSharedFirestoreDb } from "./firestore-users";
 import type {
@@ -27,6 +28,7 @@ const TOURNAMENT_APPLICATION_LIST_FIRESTORE_FIELDS = [
   "adminNote",
   "statusChangedAt",
   "attendanceChecked",
+  "zoneId",
 ] as const;
 
 /** `select` 결과만 — `tournamentApplicationFromFirestore`와 동일 규칙으로 목록 필드만 파싱 */
@@ -67,6 +69,13 @@ function tournamentApplicationToListItem(
     typeof statusChangedAtRaw === "string" && statusChangedAtRaw.trim() !== "" ? statusChangedAtRaw.trim() : undefined;
   const ac = item.attendanceChecked;
   const attendanceChecked = ac === true;
+  const zr = item.zoneId;
+  const zoneId =
+    typeof zr === "string" && zr.trim() !== ""
+      ? zr.trim()
+      : zr === null
+        ? null
+        : undefined;
   return {
     id,
     applicantName: typeof item.applicantName === "string" ? item.applicantName : "",
@@ -78,6 +87,7 @@ function tournamentApplicationToListItem(
     adminNote,
     ...(statusChangedAt ? { statusChangedAt } : {}),
     attendanceChecked,
+    ...(zoneId !== undefined ? { zoneId } : {}),
   };
 }
 
@@ -119,6 +129,14 @@ function tournamentApplicationFromFirestore(id: string, data: Record<string, unk
   const approvedNotifiedAt =
     typeof approvedRaw === "string" && approvedRaw.trim() ? approvedRaw.trim() : null;
 
+  const zr = item.zoneId;
+  const zoneId =
+    typeof zr === "string" && zr.trim() !== ""
+      ? zr.trim()
+      : zr === null
+        ? null
+        : undefined;
+
   return {
     id,
     tournamentId: typeof item.tournamentId === "string" ? item.tournamentId : "",
@@ -149,6 +167,7 @@ function tournamentApplicationFromFirestore(id: string, data: Record<string, unk
     adminNote,
     attendanceChecked,
     ...(approvedNotifiedAt ? { approvedNotifiedAt } : {}),
+    ...(zoneId !== undefined ? { zoneId } : {}),
   };
 }
 
@@ -442,6 +461,48 @@ export async function updateTournamentApplicationStatusFirestore(params: {
     return { ok: false, error: "참가신청을 찾을 수 없습니다." };
   }
   return { ok: true, application: after };
+}
+
+export async function updateTournamentApplicationZoneIdFirestore(params: {
+  tournamentId: string;
+  entryId: string;
+  zoneId: string | null;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const tournamentId = params.tournamentId.trim();
+  const entryId = params.entryId.trim();
+  if (!tournamentId || !entryId) {
+    return { ok: false, error: "잘못된 요청입니다." };
+  }
+
+  const application = await getTournamentApplicationByIdFirestore(tournamentId, entryId);
+  if (!application || application.tournamentId.trim() !== tournamentId) {
+    return { ok: false, error: "참가신청을 찾을 수 없습니다." };
+  }
+
+  if (params.zoneId !== null) {
+    const zid = params.zoneId.trim();
+    if (!zid) {
+      return { ok: false, error: "잘못된 권역입니다." };
+    }
+    const zone = await getTournamentZoneById(tournamentId, zid);
+    if (!zone || zone.status !== "ACTIVE") {
+      return { ok: false, error: "권역을 찾을 수 없습니다." };
+    }
+  }
+
+  const now = new Date().toISOString();
+  const db = getSharedFirestoreDb();
+  const ref = db.collection(COLLECTION).doc(entryId);
+  await ref.set(
+    {
+      zoneId: params.zoneId === null ? null : params.zoneId.trim(),
+      updatedAt: now,
+    },
+    { merge: true }
+  );
+
+  return { ok: true };
 }
 
 export async function markTournamentApplicationOcrProcessingFirestore(params: {

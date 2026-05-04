@@ -1,13 +1,23 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../../../lib/auth/session";
-import { getClientStatusByUserId, getUserById, type TournamentApplicationStatus } from "../../../../../../../../lib/platform-api";
+import {
+  getClientStatusByUserId,
+  getUserById,
+  resolveCanonicalUserIdForAuth,
+  type TournamentApplicationStatus,
+} from "../../../../../../../../lib/platform-api";
 import {
   getTournamentApplicationByIdFirestore,
   isManualParticipantUserId,
   updateTournamentApplicationStatusFirestore,
 } from "../../../../../../../../lib/server/firestore-tournament-applications";
 import { getTournamentByIdFirestore } from "../../../../../../../../lib/server/firestore-tournaments";
+import {
+  resolveTournamentZoneClientAccess,
+  TOURNAMENT_ZONE_FORBIDDEN_ERROR,
+  zoneManagerMayAccessZoneId,
+} from "../../../../../../../../lib/server/tournament-zone-access";
 import { notifyParticipantApprovedAfterDepositConfirm } from "../../../../../../../../lib/server/participant-approved-notify";
 
 export const runtime = "nodejs";
@@ -54,12 +64,21 @@ export async function PATCH(
   }
 
   const isPlatform = user.role === "PLATFORM";
-  let canManage = false;
-  if (isPlatform) {
-    canManage = true;
-  } else if (user.role === "CLIENT" && tournament.createdBy === user.id) {
-    const clientStatus = await getClientStatusByUserId(user.id);
-    canManage = clientStatus === "APPROVED";
+  let canManage = isPlatform;
+  if (!canManage && user.role === "CLIENT") {
+    const actorId = await resolveCanonicalUserIdForAuth(user.id);
+    if (tournament.createdBy === actorId || tournament.createdBy === user.id.trim()) {
+      const clientStatus = await getClientStatusByUserId(user.id);
+      canManage = clientStatus === "APPROVED";
+    } else if (tournament.zonesEnabled === true) {
+      const access = await resolveTournamentZoneClientAccess({ user, tournamentId: id });
+      if (access.ok && access.access.kind === "zone_manager") {
+        if (!zoneManagerMayAccessZoneId(access.access, targetEntry.zoneId ?? undefined)) {
+          return NextResponse.json({ error: TOURNAMENT_ZONE_FORBIDDEN_ERROR }, { status: 403 });
+        }
+        canManage = true;
+      }
+    }
   }
 
   if (!canManage) {

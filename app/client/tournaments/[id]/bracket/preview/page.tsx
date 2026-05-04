@@ -13,6 +13,7 @@ type DraftPayload = {
   snapshotId: string;
   matches: DraftMatch[];
   createdAt: string;
+  zoneId?: string;
 };
 
 function getDraftStorageKey(tournamentId: string): string {
@@ -44,11 +45,13 @@ export default function BracketPreviewPage() {
         setMessage("임시 배정 데이터가 올바르지 않습니다.");
         return;
       }
+      const zoneId = typeof parsed.zoneId === "string" && parsed.zoneId.trim() !== "" ? parsed.zoneId.trim() : undefined;
       setDraft({
         source: parsed.source === "manual" ? "manual" : "auto",
         snapshotId: parsed.snapshotId,
         matches,
         createdAt: parsed.createdAt ?? new Date().toISOString(),
+        ...(zoneId ? { zoneId } : {}),
       });
       setMessage("");
     } catch {
@@ -69,6 +72,7 @@ export default function BracketPreviewPage() {
         body: JSON.stringify({
           snapshotId: draft.snapshotId,
           matches: draft.matches,
+          ...(draft.zoneId ? { zoneId: draft.zoneId } : {}),
         }),
       });
       const result = (await response.json()) as {
@@ -82,7 +86,8 @@ export default function BracketPreviewPage() {
       }
       setSaveState("success");
       window.localStorage.removeItem(getDraftStorageKey(tournamentId));
-      router.push(`/client/tournaments/${tournamentId}/bracket`);
+      const zq = draft.zoneId ? `?zoneId=${encodeURIComponent(draft.zoneId)}` : "";
+      router.push(`/client/tournaments/${tournamentId}/bracket${zq}`);
     } catch {
       setMessage("확정 저장 중 오류가 발생했습니다.");
       setSaveState("error");

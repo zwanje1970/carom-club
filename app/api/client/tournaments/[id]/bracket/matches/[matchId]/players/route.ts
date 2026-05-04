@@ -1,41 +1,15 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../../../../lib/auth/session";
-import { checkClientFeatureAccessByUserId, getUserById } from "../../../../../../../../../lib/platform-api";
+import { getUserById } from "../../../../../../../../../lib/platform-api";
 import { replaceBracketMatchPlayerFirestore } from "../../../../../../../../../lib/server/firestore-tournament-brackets";
-import { getTournamentByIdFirestore } from "../../../../../../../../../lib/server/firestore-tournaments";
+import {
+  authorizeClientTournamentBracketContext,
+  TOURNAMENT_ZONE_FORBIDDEN_ERROR,
+  zoneManagerMayAccessZoneId,
+} from "../../../../../../../../../lib/server/tournament-zone-access";
 
 export const runtime = "nodejs";
-
-async function requireBracketAccess(tournamentId: string) {
-  const cookieStore = await cookies();
-  const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
-  if (!session) return { ok: false as const, status: 401, error: "로그인이 필요합니다." };
-
-  const user = await getUserById(session.userId);
-  if (!user) return { ok: false as const, status: 401, error: "사용자를 찾을 수 없습니다." };
-
-  const tournament = await getTournamentByIdFirestore(tournamentId);
-  if (!tournament) return { ok: false as const, status: 404, error: "대회를 찾을 수 없습니다." };
-
-  if (user.role === "PLATFORM") {
-    return { ok: true as const, user, tournament };
-  }
-
-  if (user.role !== "CLIENT") {
-    return { ok: false as const, status: 403, error: "CLIENT + APPROVED 권한이 필요합니다." };
-  }
-
-  const gate = await checkClientFeatureAccessByUserId({ userId: user.id, feature: "BRACKET" });
-  if (!gate.ok) {
-    return { ok: false as const, status: 403, error: gate.error };
-  }
-  if (tournament.createdBy !== user.id) {
-    return { ok: false as const, status: 403, error: "본인 대회만 접근할 수 있습니다." };
-  }
-
-  return { ok: true as const, user, tournament };
-}
 
 type ReplacePlayerRequest = {
   slot?: "player1" | "player2";
@@ -50,9 +24,27 @@ export async function PATCH(
   if (!id.trim() || !matchId.trim()) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
-  const auth = await requireBracketAccess(id);
+
+  const cookieStore = await cookies();
+  const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
+  if (!session) {
+    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
+  const user = await getUserById(session.userId);
+  if (!user) {
+    return NextResponse.json({ error: "사용자를 찾을 수 없습니다." }, { status: 401 });
+  }
+
+  const auth = await authorizeClientTournamentBracketContext({ user, tournamentId: id });
   if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+    return NextResponse.json({ error: auth.error }, { status: auth.httpStatus });
+  }
+
+  const bracketZoneId = request.nextUrl.searchParams.get("zoneId")?.trim() ?? "";
+  if (auth.tournament.zonesEnabled === true && auth.access.kind === "zone_manager") {
+    if (!bracketZoneId || !zoneManagerMayAccessZoneId(auth.access, bracketZoneId)) {
+      return NextResponse.json({ error: TOURNAMENT_ZONE_FORBIDDEN_ERROR }, { status: 403 });
+    }
   }
 
   const body = (await request.json().catch(() => null)) as ReplacePlayerRequest | null;
@@ -70,7 +62,8 @@ export async function PATCH(
     matchId,
     slot,
     replacementUserId,
-    actorUserId: auth.user.id,
+    actorUserId: user.id,
+    ...(bracketZoneId ? { bracketZoneId } : {}),
   });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });

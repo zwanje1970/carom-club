@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { resolveCanonicalUserIdForAuth } from "../../../../lib/auth/resolve-canonical-user-id-for-auth";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
-import { getClientTournamentDetailPreviewById } from "../../../../lib/platform-api";
+import { getClientTournamentDetailPreviewById, getUserById } from "../../../../lib/platform-api";
 import {
   getTournamentApplicationListCountsFirestore,
   listTournamentApplicationsListItemsByTournamentIdFirestore,
@@ -12,6 +12,8 @@ import ClientTournamentParticipantsApplicationsBlock from "./ClientTournamentPar
 import { parseClientParticipantFilter } from "./client-participant-filter-shared";
 import TournamentBadgeCardManageRow from "./TournamentBadgeCardManageRow";
 import TournamentManageFeatureCards from "./TournamentManageFeatureCards";
+import TournamentTvLinkBlock from "./TournamentTvLinkBlock";
+import TournamentZonesManageBlock from "./TournamentZonesManageBlock";
 import "./tournament-manage-ui.css";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +49,8 @@ export default async function ClientTournamentManagePage({
     notFound();
   }
 
+  const sessionUser = session ? await getUserById(session.userId) : null;
+
   const [entries, participantCountSummary] = await Promise.all([
     listTournamentApplicationsListItemsByTournamentIdFirestore(id, { limit: 5 }),
     getTournamentApplicationListCountsFirestore(id),
@@ -74,6 +78,22 @@ export default async function ClientTournamentManagePage({
         <TournamentManageFeatureCards tournamentId={id} bracketEnabled={bracketEnabled} />
       </section>
 
+      <section className="client-tournament-manage__card">
+        <TournamentZonesManageBlock
+          tournamentId={id}
+          zonesEnabled={tournament.zonesEnabled === true}
+          tournamentEditHref={`/client/tournaments/new?edit=${encodeURIComponent(id)}`}
+          tournamentCreatedBy={tournament.createdBy ?? ""}
+          viewerRole={sessionUser?.role ?? null}
+          viewerCanonicalUserId={viewerId}
+          viewerSessionUserId={session?.userId?.trim() ?? ""}
+        />
+      </section>
+
+      <section className="client-tournament-manage__card">
+        <TournamentTvLinkBlock tournamentId={id} />
+      </section>
+
       <section className="client-tournament-manage__card client-tournament-manage__card--participants">
         <h2 className="v3-h2 client-tournament-manage__participantsHeading">
           참가신청 현황
@@ -84,6 +104,7 @@ export default async function ClientTournamentManagePage({
           participantCountSummary={participantCountSummary}
           selected={selected}
           filterBaseHref={filterBaseHref}
+          zonesEnabled={tournament.zonesEnabled === true}
         />
       </section>
     </main>

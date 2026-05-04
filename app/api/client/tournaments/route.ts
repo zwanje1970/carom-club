@@ -213,6 +213,7 @@ export async function POST(request: Request) {
     typeof venueGuideRaw === "string" && venueGuideRaw.trim() !== "" ? venueGuideRaw.trim() : null;
 
   const rule = parseRuleFromBody(body);
+  const zonesEnabled = parseBooleanLoose(body.zonesEnabled);
 
   const result = await createTournamentFirestore({
     title,
@@ -232,6 +233,7 @@ export async function POST(request: Request) {
     venueGuideVenueId,
     eventDates: body.eventDates,
     extraVenues: body.extraVenues,
+    ...(zonesEnabled !== undefined ? { zonesEnabled } : {}),
   });
 
   if (!result.ok) {
