@@ -50,7 +50,11 @@ export default function MobileSplashPage() {
         margin: 0,
       }}
     >
-      <img src="/splash.png" alt="splash" style={{ width: "45%" }} />
+      <img
+        src="/splash.png"
+        alt="splash"
+        style={{ width: "90%", maxWidth: "90vw", height: "auto" }}
+      />
     </div>
   );
 }
