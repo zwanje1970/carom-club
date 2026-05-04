@@ -156,6 +156,13 @@ export default function FcmSessionRegisterClient() {
   }, []);
 
   const scheduleRun = useCallback(() => {
+    if (pathname?.startsWith("/platform")) {
+      if (scheduledCancelRef.current) {
+        scheduledCancelRef.current();
+        scheduledCancelRef.current = null;
+      }
+      return;
+    }
     if (pathname?.startsWith("/client") && !isLikelyCaromMobileAppShellClient()) {
       if (scheduledCancelRef.current) {
         scheduledCancelRef.current();

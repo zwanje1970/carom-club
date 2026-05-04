@@ -44,7 +44,7 @@ export default function AdminCard({
   const badgeClass = badgeVariant === "emphasis" ? styles.badgeEmphasis : styles.badgeNeutral;
 
   return (
-    <Link href={href} className={styles.card}>
+    <Link href={href} className={styles.card} prefetch={false}>
       <div className={styles.top}>
         <span className={styles.iconWrap}>{icon ?? <DefaultIcon />}</span>
         <div className={styles.main}>

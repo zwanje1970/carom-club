@@ -26,13 +26,19 @@ export default async function PlatformTournamentsListPage() {
   return (
     <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">
-        <Link href="/platform">← 플랫폼 홈</Link>
+        <Link href="/platform" prefetch={false}>
+        ← 플랫폼 홈
+      </Link>
       </p>
       <p className="v3-muted">목록에서 대회를 선택하면 상세·삭제·게시 카드 관리로 이동합니다.</p>
       <p className="v3-muted">
-        <Link href="/platform/data/deleted">삭제된 항목 (백업함)</Link>
+        <Link href="/platform/data/deleted" prefetch={false}>
+          삭제된 항목 (백업함)
+        </Link>
         {" · "}
-        <Link href="/platform/data">데이터 관리</Link>
+        <Link href="/platform/data" prefetch={false}>
+          데이터 관리
+        </Link>
       </p>
 
       {tournaments.length === 0 ? (
@@ -41,7 +47,7 @@ export default async function PlatformTournamentsListPage() {
         <ul className="v3-stack" style={{ listStyle: "none", margin: 0, padding: 0, gap: "0.75rem" }}>
           {tournaments.map((t) => (
             <li key={t.id}>
-              <Link className="v3-box v3-stack" href={`/platform/tournaments/${t.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+              <Link className="v3-box v3-stack" href={`/platform/tournaments/${t.id}`} prefetch={false} style={{ textDecoration: "none", color: "inherit" }}>
                 <strong>{t.title}</strong>
                 <span className="v3-muted">{formatTournamentScheduleLabel(t)}</span>
                 <span className="v3-muted" style={{ fontSize: "0.85rem" }}>

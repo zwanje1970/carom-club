@@ -450,9 +450,13 @@ export default function PlatformMainSlideAdsPage() {
   return (
     <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">
-        <Link href="/platform/site">← 사이트 관리</Link>
+        <Link href="/platform/site" prefetch={false}>
+          ← 사이트 관리
+        </Link>
         {" · "}
-        <Link href="/platform/data/deleted">삭제된 항목 (백업함)</Link>
+        <Link href="/platform/data/deleted" prefetch={false}>
+          삭제된 항목 (백업함)
+        </Link>
       </p>
       <p className="v3-muted">메인 홈 슬라이드에 삽입되는 광고 카드와 삽입 규칙을 관리합니다.</p>
 

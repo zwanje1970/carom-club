@@ -5,12 +5,16 @@ export default function PlatformDataHubPage() {
   return (
     <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">
-        <Link href="/platform">← 플랫폼 홈</Link>
+        <Link href="/platform" prefetch={false}>
+        ← 플랫폼 홈
+      </Link>
       </p>
       <p className="v3-muted">삭제된 항목(백업함)에서 복구하거나 완전 삭제합니다.</p>
       <ul className="v3-list">
         <li>
-          <Link href="/platform/data/deleted">삭제된 항목 (백업함)</Link>
+          <Link href="/platform/data/deleted" prefetch={false}>
+            삭제된 항목 (백업함)
+          </Link>
         </li>
       </ul>
       <section className="v3-stack" aria-labelledby="reconcile-published-heading">

@@ -40,10 +40,10 @@ export default async function PlatformOperationsClientsPage() {
       </section>
 
       <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
-        <Link className="v3-btn" href="/platform/operations/clients/list">
+        <Link className="v3-btn" href="/platform/operations/clients/list" prefetch={false}>
           승인된 클라이언트 목록
         </Link>
-        <Link className="v3-btn" href="/platform/operations/membership">
+        <Link className="v3-btn" href="/platform/operations/membership" prefetch={false}>
           연회원 설정
         </Link>
       </div>

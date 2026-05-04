@@ -8,7 +8,7 @@ export default function PlatformPage() {
 
       <ul className="platform-home-menu-list">
         <li>
-          <Link href="/platform/data" className="platform-home-card">
+          <Link href="/platform/data" className="platform-home-card" prefetch={false}>
             <span className="platform-home-card-icon" aria-hidden>
               🗄️
             </span>
@@ -22,7 +22,7 @@ export default function PlatformPage() {
           </Link>
         </li>
         <li>
-          <Link href="/platform/tournaments" className="platform-home-card">
+          <Link href="/platform/tournaments" className="platform-home-card" prefetch={false}>
             <span className="platform-home-card-icon" aria-hidden>
               🏆
             </span>
@@ -36,7 +36,7 @@ export default function PlatformPage() {
           </Link>
         </li>
         <li>
-          <Link href="/platform/operations" className="platform-home-card">
+          <Link href="/platform/operations" className="platform-home-card" prefetch={false}>
             <span className="platform-home-card-icon" aria-hidden>
               ⚙️
             </span>
@@ -50,7 +50,7 @@ export default function PlatformPage() {
           </Link>
         </li>
         <li>
-          <Link href="/platform/site" className="platform-home-card">
+          <Link href="/platform/site" className="platform-home-card" prefetch={false}>
             <span className="platform-home-card-icon" aria-hidden>
               🌐
             </span>

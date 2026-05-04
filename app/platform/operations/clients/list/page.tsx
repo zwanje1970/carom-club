@@ -56,7 +56,7 @@ export default async function PlatformClientsListPage({
           <ul className="v3-list">
             {rows.map((row) => (
               <li key={row.id}>
-                <Link href={`/platform/operations/clients/${row.id}`}>
+                <Link href={`/platform/operations/clients/${row.id}`} prefetch={false}>
                   {row.name} / 상태:{" "}
                   {row.status === "ACTIVE" ? "정상" : row.status === "SUSPENDED" ? "정지" : "제명"} / 유형:{" "}
                   {row.clientType === "REGISTERED" ? "연회원" : "일반"}

@@ -15,9 +15,13 @@ export default async function PlatformCommunityPostsAdminPage() {
   return (
     <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">
-        <Link href="/platform/site">← 사이트 관리</Link>
+        <Link href="/platform/site" prefetch={false}>
+        ← 사이트 관리
+      </Link>
         {" · "}
-        <Link href="/platform/data/deleted">삭제된 항목 (백업함)</Link>
+        <Link href="/platform/data/deleted" prefetch={false}>
+          삭제된 항목 (백업함)
+        </Link>
       </p>
       <p className="v3-muted">공개 게시판에 노출 중인 글만 나열합니다. 삭제 시 백업함(DELETED)으로 이동합니다.</p>
 
@@ -29,7 +33,7 @@ export default async function PlatformCommunityPostsAdminPage() {
             <li key={p.id} className="v3-box v3-stack">
               <div className="v3-row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
                 <div className="v3-stack" style={{ gap: "0.25rem" }}>
-                  <Link href={`/site/community/${p.boardType}/${p.id}`} style={{ fontWeight: 600 }}>
+                  <Link href={`/site/community/${p.boardType}/${p.id}`} prefetch={false} style={{ fontWeight: 600 }}>
                     {p.title}
                   </Link>
                   <span className="v3-muted" style={{ fontSize: "0.85rem" }}>

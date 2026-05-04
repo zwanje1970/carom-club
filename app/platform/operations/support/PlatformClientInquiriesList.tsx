@@ -70,7 +70,7 @@ export default function PlatformClientInquiriesList() {
                 <tr key={r.id} style={{ borderBottom: "1px solid #e2e8f0", background: "#fff" }}>
                   <td style={{ padding: "0.5rem 0.65rem", verticalAlign: "top", color: "#0f172a" }}>{senderLine(r)}</td>
                   <td style={{ padding: "0.5rem 0.65rem", verticalAlign: "top" }}>
-                    <Link href={`/platform/operations/support/${r.id}`} style={{ color: "#1e40af", fontWeight: 600 }}>
+                    <Link href={`/platform/operations/support/${r.id}`} prefetch={false} style={{ color: "#1e40af", fontWeight: 600 }}>
                       {r.title}
                     </Link>
                   </td>

@@ -25,12 +25,16 @@ export default async function PlatformTournamentDetailPage({
   return (
     <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">
-        <Link href="/platform/tournaments">← 대회 목록</Link>
+        <Link href="/platform/tournaments" prefetch={false}>
+          ← 대회 목록
+        </Link>
         {" · "}
-        <Link href="/platform/data/deleted">삭제된 항목 (백업함)</Link>
+        <Link href="/platform/data/deleted" prefetch={false}>
+          삭제된 항목 (백업함)
+        </Link>
       </p>
       <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.75rem", alignItems: "center" }}>
-        <Link className="v3-btn" href={`/platform/tournaments/${id}/cards`}>
+        <Link className="v3-btn" href={`/platform/tournaments/${id}/cards`} prefetch={false}>
           게시 카드 관리
         </Link>
         <PlatformTournamentSoftDeleteButton tournamentId={id} disabled={isLifecycleDeleted} />
