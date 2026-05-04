@@ -21,21 +21,6 @@
   position: relative;
 }
 
-.marqueeDimLayer {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  box-sizing: border-box;
-  background: rgba(0, 0, 0, 0.45);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.25s ease;
-}
-
-.marqueeDimLayerVisible {
-  opacity: 1;
-}
-
 .trackMarqueeIdle {
   /* `.sampleMainMarqueeTrack`와 동일 특이도에서 애니메이션을 끄기 위해 */
   animation: none !important;
@@ -68,4 +53,19 @@
   -webkit-tap-highlight-color: transparent;
   position: relative;
   z-index: 0;
+}
+
+/* 메인 세로 스크롤 광고 카드(게시 PNG 면): 좌측 배지 대신 우측 상단 AD 텍스트만 */
+.publishedScrollAdMark {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  z-index: 5;
+  margin: 0;
+  padding: 0;
+  line-height: 1;
+  pointer-events: none;
 }

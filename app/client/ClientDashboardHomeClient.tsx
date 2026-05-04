@@ -255,38 +255,129 @@ function formatTournamentCardSubtitle(t: { date: string; maxParticipants: number
   return `${date} / ${g}`;
 }
 
-function DashboardSkeleton() {
+/** 요약 API 전까지 동일 레이아웃·고정 링크만 표시(전체 스켈레톤 없음) */
+function DashboardLoadingShell() {
+  const cardPublishHref = "/client/tournaments/new";
   return (
-    <div className="v3-stack" style={{ gap: "1.15rem" }} aria-busy="true" aria-label="대시보드 내용 불러오는 중">
-      <section className="client-dashboard-main__todayBar client-dashboard-main__todayBar--skeleton" aria-hidden>
-        <div className="skeleton-line" style={{ height: "0.85rem", width: "5rem", borderRadius: 6, background: "#e5e7eb" }} />
-        <div className="skeleton-line" style={{ height: "0.85rem", flex: 1, borderRadius: 6, background: "#e5e7eb" }} />
-        <div className="skeleton-line" style={{ height: "2rem", width: "6rem", borderRadius: 8, background: "#e5e7eb" }} />
+    <div className="v3-stack" style={{ gap: "1.15rem" }} aria-busy="true" aria-label="대시보드 불러오는 중">
+      <div
+        className="client-dashboard-main__todayBar"
+        role="status"
+        aria-live="polite"
+        aria-labelledby="client-today-heading"
+      >
+        <h2 id="client-today-heading" className="client-dashboard-main__todayBarHeading">
+          지금 할 일
+        </h2>
+        <p className="client-dashboard-main__todayBarText">불러오는 중…</p>
+        <span className="client-dashboard-main__todayBarBtn" aria-hidden>
+          …
+        </span>
+      </div>
+
+      <section className="v3-stack" aria-labelledby="client-ongoing-tournaments-heading" style={{ gap: "0.5rem" }}>
+        <h2 id="client-ongoing-tournaments-heading" className="v3-h2" style={{ margin: 0, fontSize: "1rem" }}>
+          진행중 대회
+        </h2>
+        <p className="v3-muted" style={{ margin: 0 }}>
+          불러오는 중…
+        </p>
+        <Link href="/client/tournaments" prefetch={false} className="client-dashboard-main__tournamentSeeAll">
+          전체대회 보기
+        </Link>
       </section>
-      <section className="v3-stack client-dashboard-main__dsCard" style={{ gap: "0.5rem" }} aria-hidden>
-        <div className="skeleton-line" style={{ height: "1rem", width: "40%", borderRadius: 6, background: "#e5e7eb" }} />
-        <div className="skeleton-line" style={{ height: "0.85rem", width: "70%", borderRadius: 6, background: "#e5e7eb" }} />
-      </section>
-      <section className="v3-stack" style={{ gap: "0.5rem" }} aria-hidden>
-        <div className="skeleton-line" style={{ height: "1rem", width: "35%", borderRadius: 6, background: "#e5e7eb" }} />
-        <div className="v3-stack" style={{ gap: "0.45rem" }}>
-          <div className="client-dashboard-main__dsCard skeleton-line" style={{ height: "4.2rem", borderRadius: 12, background: "#eef2f7" }} />
-        </div>
-      </section>
-      <section className="v3-stack" style={{ gap: "0.5rem" }} aria-hidden>
-        <div className="skeleton-line" style={{ height: "1rem", width: "30%", borderRadius: 6, background: "#e5e7eb" }} />
+
+      <section className="v3-stack" aria-labelledby="client-main-features-heading" style={{ gap: "0.5rem" }}>
+        <h2 id="client-main-features-heading" className="v3-h2" style={{ margin: 0, fontSize: "1rem" }}>
+          주요 기능
+        </h2>
         <div className="client-dashboard-main__featureGrid">
-          {[1, 2, 3, 4].map((k) => (
-            <div
-              key={k}
-              className="client-dashboard-main__featureCard skeleton-line"
-              style={{ minHeight: "4.5rem", borderRadius: 12, background: "#eef2f7" }}
-            />
-          ))}
+          <Link
+            href="/client/tournaments/new"
+            prefetch={false}
+            className="client-dashboard-main__featureCard client-dashboard-main__featureCard--primary"
+          >
+            <span className="client-dashboard-main__featureIconWrap">
+              <IconTournamentLine />
+            </span>
+            <span className="client-dashboard-main__featureText">
+              <span className="client-dashboard-main__featureTitle">대회 만들기</span>
+              <span className="client-dashboard-main__featureDesc">새 대회를 등록하고 일정을 관리합니다</span>
+            </span>
+          </Link>
+          <Link href={cardPublishHref} prefetch={false} className="client-dashboard-main__featureCard client-dashboard-main__featureCard--success">
+            <span className="client-dashboard-main__featureIconWrap">
+              <IconCardLine />
+            </span>
+            <span className="client-dashboard-main__featureText">
+              <span className="client-dashboard-main__featureTitle">게시카드 만들기</span>
+              <span className="client-dashboard-main__featureDesc">메인 노출용 대회 카드를 작성합니다</span>
+            </span>
+          </Link>
+          <Link href="/client/member" prefetch={false} className="client-dashboard-main__featureCard client-dashboard-main__featureCard--purple">
+            <span className="client-dashboard-main__featureIconWrap">
+              <IconUsersLine />
+            </span>
+            <span className="client-dashboard-main__featureText">
+              <span className="client-dashboard-main__featureTitle">회원 / 앱푸시</span>
+              <span className="client-dashboard-main__featureDesc">참가자·푸시 알림을 다룹니다</span>
+            </span>
+          </Link>
+          <Link href="/client/settlements" prefetch={false} className="client-dashboard-main__featureCard client-dashboard-main__featureCard--warning">
+            <span className="client-dashboard-main__featureIconWrap">
+              <IconChartLine />
+            </span>
+            <span className="client-dashboard-main__featureText">
+              <span className="client-dashboard-main__featureTitle">정산</span>
+              <span className="client-dashboard-main__featureDesc">대회별 정산을 확인합니다</span>
+            </span>
+          </Link>
         </div>
       </section>
-      <section aria-hidden>
-        <div className="client-dashboard-main__dsCard skeleton-line" style={{ height: "2.75rem", borderRadius: 12, background: "#eef2f7" }} />
+
+      <section aria-label="부가기능">
+        <details className="client-dashboard-main__dsCard client-dashboard-main__extras">
+          <summary>
+            <span className="client-dashboard-main__extrasSummaryLeft">
+              <span className="client-dashboard-main__extrasIconWrap">
+                <IconExtrasToolbox />
+              </span>
+              <span className="client-dashboard-main__extrasSummaryTitle">부가기능</span>
+            </span>
+            <span className="client-dashboard-main__extrasSummaryChevron" aria-hidden>
+              ▼
+            </span>
+          </summary>
+          <div className="client-dashboard-main__extrasList">
+            <p className="v3-muted" style={{ margin: 0, padding: "0.25rem 0" }}>
+              불러오는 중…
+            </p>
+            <Link href="/client/setup" prefetch={false} className="client-dashboard-main__extrasRow">
+              <span className="client-dashboard-main__extrasRowLabel">업체 설정</span>
+              <span className="client-dashboard-main__extrasRowChevron" aria-hidden>
+                &gt;
+              </span>
+            </Link>
+            <Link href="/client/setup/venue-intro" prefetch={false} className="client-dashboard-main__extrasRow">
+              <span className="client-dashboard-main__extrasRowLabel">당구장 소개</span>
+              <span className="client-dashboard-main__extrasRowChevron" aria-hidden>
+                &gt;
+              </span>
+            </Link>
+            <Link href="/client/settings/inquiries" prefetch={false} className="client-dashboard-main__extrasRow">
+              <span className="client-dashboard-main__extrasRowLabel">문의 (오류제보 / 기능건의)</span>
+              <span className="client-dashboard-main__extrasRowChevron" aria-hidden>
+                &gt;
+              </span>
+            </Link>
+            <Link href="/client/settings/blank-bracket-print" prefetch={false} className="client-dashboard-main__extrasRow">
+              <span className="client-dashboard-main__extrasRowLabel">빈 대진표</span>
+              <span className="client-dashboard-main__extrasRowChevron" aria-hidden>
+                &gt;
+              </span>
+            </Link>
+          </div>
+        </details>
       </section>
     </div>
   );
@@ -465,7 +556,7 @@ export default function ClientDashboardHomeClient({
   }, [bootstrap]);
 
   if (state.status === "loading") {
-    return <DashboardSkeleton />;
+    return <DashboardLoadingShell />;
   }
 
   if (state.status === "error") {

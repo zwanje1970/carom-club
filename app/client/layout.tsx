@@ -6,11 +6,9 @@ import { isCaromClubMobileAppShell } from "../../lib/is-carom-club-mobile-app-sh
 import { ClientDashboardSummaryBootstrapProvider } from "./ClientDashboardHomeClient";
 import AdminFabServerBridge from "../components/AdminFabServerBridge";
 import DashboardMobileChromeLayout from "../components/DashboardMobileChromeLayout";
-import GlobalHomeButton from "../components/GlobalHomeButton";
 import { getClientStatusByUserId } from "../../lib/surface-read";
 import { getRequestSessionUser } from "../../lib/server/request-session-user";
 import { resolveClientOrganizationForDashboardPolicy } from "../../lib/server/platform-backing-store";
-import SitePcDashboardChromeShell from "../site/components/SitePcDashboardChromeShell";
 
 /** 모바일 브라우저·WebView 상단 영역 — 공개 사이트 standard 헤더(#4d7db5)와 동일 */
 export const viewport: Viewport = {
@@ -57,13 +55,11 @@ export default async function ClientLayout({
     } as const;
     return (
       <ClientDashboardSummaryBootstrapProvider value={dashboardSummaryBootstrap}>
-        <SitePcDashboardChromeShell />
         <DashboardMobileChromeLayout area="client">
           <div className="app-mobile-bottom-nav-scroll-pad app-dashboard-shell app-dashboard-shell--with-mobile-chrome">
             {children}
           </div>
         </DashboardMobileChromeLayout>
-        <GlobalHomeButton />
         <AdminFabServerBridge />
       </ClientDashboardSummaryBootstrapProvider>
     );

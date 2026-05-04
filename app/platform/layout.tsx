@@ -1,4 +1,5 @@
 import type { Viewport } from "next";
+import PlatformDashboardBackLink from "./PlatformDashboardBackLink";
 import PlatformSessionOnceClient from "./PlatformSessionOnceClient";
 import "./platform-dashboard.css";
 
@@ -14,6 +15,7 @@ export default function PlatformLayout({
   return (
     <div>
       <PlatformSessionOnceClient />
+      <PlatformDashboardBackLink />
       {children}
     </div>
   );

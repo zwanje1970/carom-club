@@ -134,7 +134,7 @@ function MediaStack({
   repImageHighPriority?: boolean;
   /** 메인 슬라이드: 링크 배경 이미지 대신 단색(구분용) */
   slideDeckSolidBackdrop?: string;
-  /** 메인 슬라이드 광고 카드 — 텍스트 없음·상태배지 대신 AD 문자만 */
+  /** 메인 슬라이드 광고 카드 — 상태배지 슬롯에 우측 상단 AD 텍스트만 */
   mainSlideAd?: boolean;
   onRepImageLoad?: () => void;
   /** 게시 PNG 캡처: AD 마크 등 글자만 숨김 */

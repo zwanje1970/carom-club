@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { CSSProperties, KeyboardEvent, PointerEvent, Ref } from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import editorCardStyles from "../client/tournaments/[id]/card-publish-editor.module.css";
 import styles from "./main-sample/main-sample.module.css";
 import siteStyles from "./main-site-scroll-cards.module.css";
@@ -98,6 +99,10 @@ type CardRowProps = {
   lcpHeroImage?: boolean;
 };
 
+function cardSlotClassNames(base: string, selected: boolean, selectedMod?: string): string {
+  return [base, selected && selectedMod, selected && "card-selected"].filter(Boolean).join(" ");
+}
+
 const MainSiteCardRow = memo(function MainSiteCardRow({
   rowKey,
   item,
@@ -115,6 +120,8 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
     [item.id, onCardPointerDown],
   );
 
+  const isAdRow = isMainSiteScrollAdRow(item);
+
   if (item.slideDeckItem) {
     const sd = item.slideDeckItem;
     const deckInner = (
@@ -130,7 +137,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
     );
     return (
       <div
-        className={`${styles.sampleMainCardSlot} ${selected ? styles.sampleMainCardSlotSelected : ""}`}
+        className={cardSlotClassNames(styles.sampleMainCardSlot, selected, styles.sampleMainCardSlotSelected)}
         {...{ [SITE_SCROLL_CARD]: "" }}
         {...(isMainSiteScrollAdRow(item) ? { "data-site-main-scroll-ad": "1" } : {})}
         style={{ touchAction: "pan-y" }}
@@ -206,7 +213,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
   if (isPublishedSnapshotImageOnlyCard && item.imageUrl?.trim()) {
     return (
       <div
-        className={`${styles.sampleMainCardSlot} ${selected ? styles.sampleMainCardSlotSelected : ""}`}
+        className={cardSlotClassNames(styles.sampleMainCardSlot, selected, styles.sampleMainCardSlotSelected)}
         {...{ [SITE_SCROLL_CARD]: "", "data-published-snapshot-card-slot": "" }}
         {...(isMainSiteScrollAdRow(item) ? { "data-site-main-scroll-ad": "1" } : {})}
         style={{ touchAction: "pan-y" }}
@@ -259,7 +266,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
 
   return (
     <div
-      className={`${styles.sampleMainCardSlot} ${selected ? styles.sampleMainCardSlotSelected : ""}`}
+      className={cardSlotClassNames(styles.sampleMainCardSlot, selected, styles.sampleMainCardSlotSelected)}
       {...{ [SITE_SCROLL_CARD]: "" }}
       {...(isMainSiteScrollAdRow(item) ? { "data-site-main-scroll-ad": "1" } : {})}
       style={{ touchAction: "pan-y" }}
@@ -299,7 +306,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
               {...(lcpHeroImage ? { fetchPriority: "high" as const } : {})}
             />
             <div className={styles.sampleMainCardPublishedOverlay} aria-hidden>
-              {item.scrollFaceBadge?.trim() ? (
+              {!isAdRow && item.scrollFaceBadge?.trim() ? (
                 <span className={publishedScrollBadgeClass(item.scrollFaceBadge.trim())}>
                   {item.scrollFaceBadge.trim()}
                 </span>
@@ -320,6 +327,11 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
                 </p>
               ))}
             </div>
+            {isAdRow ? (
+              <span className={siteStyles.publishedScrollAdMark} aria-hidden>
+                AD
+              </span>
+            ) : null}
           </div>
         ) : item.imageUrl?.trim() ? (
           <img
@@ -407,15 +419,18 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     });
   }, []);
 
-  const onViewportPointerDownCapture = useCallback(
-    (e: PointerEvent<HTMLDivElement>) => {
-      if (selectedItemId === null) return;
+  useEffect(() => {
+    if (selectedItemId === null) return;
+    const onDocPointerDownCapture = (e: Event) => {
       const el = e.target as HTMLElement | null;
-      if (!el || el.closest(`[${SITE_SCROLL_CARD}]`)) return;
+      if (!el) return;
+      if (el.closest(`[${SITE_SCROLL_CARD}]`)) return;
+      if (el.closest(`[${SITE_SCROLL_SHORTCUT}]`)) return;
       setSelectedItemId(null);
-    },
-    [selectedItemId],
-  );
+    };
+    document.addEventListener("pointerdown", onDocPointerDownCapture, true);
+    return () => document.removeEventListener("pointerdown", onDocPointerDownCapture, true);
+  }, [selectedItemId]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -641,10 +656,6 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       key={segmentKey}
       ref={segmentRef}
     >
-      <div
-        className={`${siteStyles.marqueeDimLayer} ${selectedItemId ? siteStyles.marqueeDimLayerVisible : ""}`}
-        aria-hidden
-      />
       {items.map((item, itemIndex) => {
         const rowKey = `${segmentKey}-${item.id}`;
         const lcpHeroImage =
@@ -665,17 +676,21 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   );
 
   return (
-    <div
-      className={`${styles.slideViewportSiteMain} ${siteStyles.viewportMarquee} ${siteStyles.viewportMarqueeLeadIn}`}
-      data-no-root-swipe
-      data-site-main-scroll-viewport="1"
-      ref={viewportRef}
-      onPointerDownCapture={onViewportPointerDownCapture}
-    >
-      <div className={`${styles.sampleMainMarqueeTrack} ${siteStyles.trackScrollStatic}`}>
-        {renderSegment("a", primarySegmentRef)}
-        {renderSegment("b", secondarySegmentRef)}
+    <>
+      {typeof document !== "undefined" && selectedItemId !== null
+        ? createPortal(<div className="main-dim-overlay" aria-hidden />, document.body)
+        : null}
+      <div
+        className={`${styles.slideViewportSiteMain} ${siteStyles.viewportMarquee} ${siteStyles.viewportMarqueeLeadIn}`}
+        data-no-root-swipe
+        data-site-main-scroll-viewport="1"
+        ref={viewportRef}
+      >
+        <div className={`${styles.sampleMainMarqueeTrack} ${siteStyles.trackScrollStatic}`}>
+          {renderSegment("a", primarySegmentRef)}
+          {renderSegment("b", secondarySegmentRef)}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

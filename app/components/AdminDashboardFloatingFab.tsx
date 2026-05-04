@@ -177,6 +177,8 @@ export default function AdminDashboardFloatingFab({
 
   if (!showFabForUser(user)) return null;
   if (isPublicSiteMainHomePathname(pathname)) return null;
+  /** 클라이언트 대시보드: 사이트 왕복(FAB→`/site`) 제거 — 진입은 마이페이지 등 사이트 링크만 */
+  if (pathname.startsWith("/client")) return null;
   if (!pos) return null;
 
   const onDash = isDashboardPath(pathname);

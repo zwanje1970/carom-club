@@ -10,17 +10,19 @@
   align-items: stretch;
   align-self: stretch;
   width: 100%;
+  max-width: min(100%, var(--slide-card-max-width, 440px));
+  margin-left: auto;
+  margin-right: auto;
   min-width: 0;
   height: auto;
+  aspect-ratio: 3 / 4;
   touch-action: pan-y;
   border-radius: var(--site-main-scroll-card-face-border-radius, 12px);
   position: relative;
   overflow: hidden;
   isolation: isolate;
   background-color: #ffffff;
-  box-shadow:
-    4px 10px 14px -6px rgba(15, 23, 42, 0.32),
-    2px 6px 10px -4px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18);
 }
 
 .faceSelected {
@@ -53,16 +55,12 @@
   width: 100%;
   min-width: 0;
   flex: 1 1 auto;
+  min-height: 0;
   border-radius: inherit;
   overflow: hidden;
   box-sizing: border-box;
   line-height: 0;
   background-color: #ffffff;
-  /* 로드 전(placeholder)·후 공통: 컨테이너 폭 기준 예상 세로 + 상한으로 높이 점프 완화 */
-  min-height: max(
-    11rem,
-    min(calc(100cqw * 4 / 3), var(--site-main-scroll-published-poster-max-height, min(85dvh, 920px)))
-  );
 }
 
 .placeholder {

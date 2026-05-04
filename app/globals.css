@@ -4241,3 +4241,18 @@ a.secondary-button.site-venue-website-btn {
   pointer-events: none;
   background: var(--site-home-slide-deck-bottom-vignette) !important;
 }
+
+/* 메인 세로 스크롤(MainSiteScrollCards): 카드 선택 시 전역 dim — 포털로 document.body에 마운트 */
+.main-dim-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 10;
+  /* 스크롤·하위 클릭은 그대로 두고 시각만 어둡게 — 오버레이는 포인터 통과 */
+  pointer-events: none;
+}
+
+.card-selected {
+  position: relative;
+  z-index: 20;
+}
