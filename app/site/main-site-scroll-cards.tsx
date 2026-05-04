@@ -382,7 +382,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   const measureFrameRef = useRef<number | null>(null);
   const pausedByUserRef = useRef(false);
   const programmaticScrollUntilMsRef = useRef(0);
-  /** `pxPerSec * dt` 소수 누적 — `scrollTop`에는 정수 px만 반영해 미세 떨림 완화 */
+  /** `pxPerSec * dt` + carry; 매 프레임 `deltaTotal % 1`을 다음 carry로 유지 */
   const scrollPixelCarryRef = useRef(0);
 
   const lcpHeroItemIndex = useMemo(
@@ -529,15 +529,14 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       const loopEnd = hasOffsetLoopWindow ? secondStart : loopDistance;
       const carryBefore = scrollPixelCarryRef.current;
       const deltaTotal = pxPerSec * dtSec + carryBefore;
-      const deltaWhole = Math.floor(deltaTotal);
-      scrollPixelCarryRef.current = deltaTotal - deltaWhole;
-      let nextScrollTop = node.scrollTop + deltaWhole;
+      scrollPixelCarryRef.current = deltaTotal % 1;
+      let nextScrollTop = node.scrollTop + deltaTotal;
       while (nextScrollTop >= loopEnd && loopDistance > 0) {
         nextScrollTop -= loopDistance;
       }
 
       const scrollTopBefore = node.scrollTop;
-      const appliedScrollTop = Math.round(Math.min(nextScrollTop, maxScrollTop));
+      const appliedScrollTop = Math.min(nextScrollTop, maxScrollTop);
       // programmatic scrollTop 변경 직후 발생하는 scroll 이벤트를 사용자 입력으로 오인하지 않도록 보호
       programmaticScrollUntilMsRef.current = performance.now() + 160;
       node.scrollTop = appliedScrollTop;
@@ -562,7 +561,6 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
             usingFallback24: speedSource === "fallback",
             dtSec,
             deltaTotal,
-            deltaWhole,
             carryBefore,
             carryAfter: scrollPixelCarryRef.current,
             scrollTopBefore,
