@@ -215,6 +215,7 @@ function TournamentSlideCardPreview({
   item,
   variant,
   slideDeck,
+  slideDeckAspectFill,
   templateCardLayout,
   repImageHighPriority,
   slideDeckSolidBackdrop,
@@ -228,6 +229,8 @@ function TournamentSlideCardPreview({
   variant: SlidePreviewVariant;
   /** 메인 슬라이드 창: 그림자를 창 안쪽으로만 두는 전용 스타일 */
   slideDeck?: boolean;
+  /** /site 메인 세로 스크롤 덱: 면 aspect-ratio + flex 채움(가로 슬라이드는 미사용) */
+  slideDeckAspectFill?: boolean;
   /** 템플릿 TournamentPostCard + SlideDeck 카드 규격(작성 미리보기·슬라이드 공통) */
   templateCardLayout?: boolean;
   repImageHighPriority?: boolean;
@@ -266,6 +269,7 @@ function TournamentSlideCardPreview({
   const rootClass = [
     styles.cardRoot,
     slideDeck ? styles.cardRootSlideDeck : "",
+    slideDeck && slideDeckAspectFill ? styles.cardRootSlideDeckAspectFill : "",
     templateCardLayout ? styles.cardRootTemplateLayout : "",
     tournamentPublishedHeightScale ? styles.cardRootTournamentPublishedScale : "",
     editorCompactCardHeight && tournamentPublishedHeightScale ? styles.cardRootEditorCompactHeight : "",
@@ -420,6 +424,7 @@ export function reportMainSlideAdMetric(adId: string, metric: "impressions" | "c
 export function TournamentSnapshotCardView({
   item,
   slideDeck = false,
+  slideDeckAspectFill = false,
   templateCardLayout = false,
   editorCompactCardHeight = false,
   repImageHighPriority,
@@ -430,6 +435,8 @@ export function TournamentSnapshotCardView({
 }: {
   item: SlideDeckItem;
   slideDeck?: boolean;
+  /** 메인 세로 스크롤 덱 전용 — slideDeck 과 함께만 사용 */
+  slideDeckAspectFill?: boolean;
   templateCardLayout?: boolean;
   /** 작성 화면 미리보기·PNG 캡처만 — 메인 슬라이드(live)에서는 false 유지 */
   editorCompactCardHeight?: boolean;
@@ -450,6 +457,7 @@ export function TournamentSnapshotCardView({
       item={previewItem}
       variant={variant}
       slideDeck={slideDeck}
+      slideDeckAspectFill={slideDeckAspectFill}
       templateCardLayout={templateCardLayout}
       repImageHighPriority={repImageHighPriority}
       slideDeckSolidBackdrop={slideDeckSolidBackdrop}

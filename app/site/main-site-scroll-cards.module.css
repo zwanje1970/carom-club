@@ -44,14 +44,30 @@
 .cardRowInteractionWrap {
   box-sizing: border-box;
   width: 100%;
-  height: 100%;
+  flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
   display: flex;
+  flex-direction: column;
   align-items: stretch;
-  justify-content: center;
+  justify-content: flex-start;
   -webkit-tap-highlight-color: transparent;
   position: relative;
   z-index: 0;
+}
+
+/* 덱 카드: 면(aspect-ratio) 안에서 폭·세로 채움 — previewCardScaleHost / transform scale 미사용 */
+.mainScrollDeckCardShell {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: min(100%, var(--slide-card-max-width, 440px));
+  margin: 0 auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  align-self: stretch;
 }
 
 /* 메인 세로 스크롤 광고 카드(게시 PNG 면): 좌측 배지 대신 우측 상단 AD 텍스트만 */

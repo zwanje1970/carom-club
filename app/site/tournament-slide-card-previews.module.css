@@ -27,10 +27,48 @@
     0 -4px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* 메인 슬라이드 창: 타이트한 단일 그림자(blur 8px) — 면 높이는 부모(폭·aspect)에 맞춤 */
+/* 메인 슬라이드 창: 타이트한 단일 그림자(blur 8px) — 가로 슬라이드 등 부모 높이 % 전달 */
 .cardRoot.cardRootSlideDeck {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18);
   height: 100%;
+  min-height: 0;
+}
+
+/*
+ * 메인 세로 스크롤 덱: 면은 바깥 aspect-ratio, 카드는 flex 로 채움 — height:%·min-height 보정 불필요
+ */
+.cardRoot.cardRootSlideDeck.cardRootSlideDeckAspectFill {
+  height: auto;
+  flex: 1 1 auto;
+  align-self: stretch;
+  width: 100%;
+}
+
+.cardRootSlideDeckAspectFill .classicInner,
+.cardRootSlideDeckAspectFill .frameInner {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+
+.cardRootSlideDeckAspectFill.cardRootSurfaceFull .classicInner {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+
+.cardRootSlideDeckAspectFill.cardRootSurfaceFull .classicTop {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.cardRootSlideDeckAspectFill.cardRootSurfaceFull .classicMain {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.cardRootSlideDeckAspectFill.cardRootSurfaceFull .frameCenter {
+  flex: 1 1 auto;
   min-height: 0;
 }
 
@@ -53,7 +91,7 @@
 .media {
   --status-badge-slot: calc(3.35rem * 1.1 * var(--tournament-card-height-scale));
   position: relative;
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
   width: 100%;
@@ -155,9 +193,8 @@
  * rem 기반 min-height는 면 높이와 불일치해 하단 빈 영역이 생길 수 있어 사용하지 않음.
  */
 .cardRootMainSlideAd.cardRootSlideDeck .media {
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-height: 0;
-  height: 100%;
   align-self: stretch;
 }
 
@@ -207,12 +244,14 @@
 .cardFooter {
   position: relative;
   z-index: 3;
-  flex: 0 0 calc(
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  height: calc(
     var(--slide-card-face-height) / 3 * var(--tournament-card-height-scale)
       - 1rem * var(--tournament-card-height-scale)
   );
   min-height: 0;
-  box-sizing: border-box;
   display: flex;
   flex-direction: row;
   align-items: center;

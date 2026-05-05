@@ -7,6 +7,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -117,7 +118,9 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         webView = WebView(this)
+        webView.setBackgroundColor(Color.BLACK)
         setContentView(webView)
+        window.decorView.setBackgroundColor(Color.BLACK)
 
         setupWebView()
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {

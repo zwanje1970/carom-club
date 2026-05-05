@@ -195,7 +195,8 @@
 .sampleMainCardDeckFit {
   box-sizing: border-box;
   width: 100%;
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   align-items: stretch;
   justify-content: center;
@@ -207,7 +208,8 @@
   display: flex;
   width: 100%;
   max-width: 100%;
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   align-items: stretch;
   justify-content: center;
   text-decoration: none;
@@ -220,8 +222,8 @@
   display: flex;
   width: 100%;
   max-width: 100%;
+  flex: 1 1 auto;
   min-height: 0;
-  height: 100%;
   align-items: stretch;
   justify-content: center;
   text-decoration: none;
@@ -243,6 +245,9 @@
   margin-right: auto;
   height: auto;
   aspect-ratio: 440 / 161;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   border-radius: 0;
   box-shadow: none;
   transform: none;
@@ -620,7 +625,3 @@
   box-sizing: border-box;
 }
 
-/* 메인 전용: 좁은 뷰에서 에디터 미리보기 scale() 제거 — 면 비율은 aspect·폭 기반 높이만 사용 */
-.slideViewportSiteMain :global(.previewCardScaleInner) {
-  transform: none !important;
-}

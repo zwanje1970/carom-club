@@ -128,6 +128,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
       <TournamentSnapshotCardView
         item={sd}
         slideDeck
+        slideDeckAspectFill
         templateCardLayout
         editorCompactCardHeight
         suppressLink
@@ -157,12 +158,14 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
           <div className={siteStyles.cardRowInteractionWrap} onPointerDown={onPointerDown}>
             <div className={styles.sampleMainCardDeckFit}>
               <div className={styles.sampleMainCardDeckFitInner}>
-                <div className={editorCardStyles.previewCardScaleHost}>
-                  <div className={editorCardStyles.previewCardScaleInner}>
+                <div className={siteStyles.mainScrollDeckCardShell}>
+                  <div
+                    className={`${editorCardStyles.previewCardWrap} ${editorCardStyles.previewCardWrapV2Chrome} ${editorCardStyles.previewCardWrapMainScrollFlex}`}
+                  >
                     <div
-                      className={`${editorCardStyles.previewCardWrap} ${editorCardStyles.previewCardWrapV2Chrome}`}
+                      className={`${editorCardStyles.cardPublishCaptureRoot} ${editorCardStyles.cardPublishCaptureRootMainScrollFlex}`}
                     >
-                      <div className={editorCardStyles.cardPublishCaptureRoot}>{deckInner}</div>
+                      {deckInner}
                     </div>
                   </div>
                 </div>

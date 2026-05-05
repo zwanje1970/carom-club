@@ -83,6 +83,22 @@
   max-width: 100%;
 }
 
+/** 메인 세로 스크롤 덱 — 카드 article 이 면 높이를 flex 로 채움 */
+.cardPublishCaptureRootMainScrollFlex {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+
+.cardPublishCaptureRootMainScrollFlex > article {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  align-self: stretch;
+}
+
 /** 미리보기와 동일 규격으로만 DOM 유지 — 화면 밖(html2canvas 전용, 미리보기 레이아웃 불변) */
 .cardPublishCaptureOffscreen {
   position: fixed;
@@ -174,6 +190,16 @@
   overflow: hidden;
   border: 1px solid #e4e4e7;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/** /site 메인 세로 스크롤 덱만 — aspect-ratio 면 안에서 flex 로 카드 높이 채움 */
+.previewCardWrapMainScrollFlex {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  width: 100%;
 }
 
 .templateRadioRow {
