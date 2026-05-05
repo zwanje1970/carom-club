@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { resolveCanonicalUserIdForAuth } from "../../../../lib/auth/resolve-canonical-user-id-for-auth";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
 import { getClientTournamentDetailPreviewById, getUserById } from "../../../../lib/platform-api";
+import { getLatestBracketByTournamentIdFirestore } from "../../../../lib/server/firestore-tournament-brackets";
 import {
   getTournamentApplicationListCountsFirestore,
   listTournamentApplicationsListItemsByTournamentIdFirestore,
@@ -51,14 +52,16 @@ export default async function ClientTournamentManagePage({
 
   const sessionUser = session ? await getUserById(session.userId) : null;
 
-  const [entries, participantCountSummary] = await Promise.all([
+  const [entries, participantCountSummary, latestBracket] = await Promise.all([
     listTournamentApplicationsListItemsByTournamentIdFirestore(id, { limit: 5 }),
     getTournamentApplicationListCountsFirestore(id),
+    getLatestBracketByTournamentIdFirestore(id),
   ]);
   const selected = parseClientParticipantFilter(f);
   const scheduleLine = formatTournamentScheduleLabel(tournament);
   const filterBaseHref = `/client/tournaments/${id}`;
   const bracketEnabled = tournament.statusBadge === "마감";
+  const hasConfirmedBracket = latestBracket !== null;
 
   return (
     <main className="v3-page v3-stack client-tournament-manage">
@@ -75,7 +78,11 @@ export default async function ClientTournamentManagePage({
       />
 
       <section className="client-tournament-manage__card">
-        <TournamentManageFeatureCards tournamentId={id} bracketEnabled={bracketEnabled} />
+        <TournamentManageFeatureCards
+          tournamentId={id}
+          bracketEnabled={bracketEnabled}
+          hasConfirmedBracket={hasConfirmedBracket}
+        />
       </section>
 
       <section className="client-tournament-manage__card">
@@ -100,6 +107,8 @@ export default async function ClientTournamentManagePage({
         </h2>
         <ClientTournamentParticipantsApplicationsBlock
           tournamentId={id}
+          tournamentTitle={tournament.title}
+          maxParticipants={tournament.maxParticipants}
           initialEntries={entries}
           participantCountSummary={participantCountSummary}
           selected={selected}

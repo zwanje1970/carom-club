@@ -202,6 +202,11 @@
   width: 100%;
 }
 
+/** 메인 세로 스크롤: 카드 선택 시 scale/translate 가 부모 overflow 에 잘리지 않도록 */
+.previewCardWrap.previewCardWrapMainScrollFlex.previewCardWrapMainScrollSelection {
+  overflow: visible;
+}
+
 .templateRadioRow {
   display: flex;
   flex-direction: row;

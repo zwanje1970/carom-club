@@ -23,12 +23,19 @@
   isolation: isolate;
   background-color: #ffffff;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18);
+  transform: translateY(-2px) scale(1);
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.22s ease;
 }
 
 .faceSelected {
   outline: 2px solid rgba(37, 99, 235, 0.42);
   outline-offset: 2px;
-  opacity: 0.98;
+  opacity: 1;
+  overflow: visible;
+  transform: translateY(-16px) scale(1.11);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.24);
 }
 
 :global([data-published-snapshot-card-slot]:active) .face:not(.faceSelected) {
@@ -36,7 +43,7 @@
 }
 
 :global([data-published-snapshot-card-slot]:active) .face.faceSelected {
-  opacity: 0.96;
+  opacity: 1;
 }
 
 :global([data-published-snapshot-card-slot]:focus-visible) .face {

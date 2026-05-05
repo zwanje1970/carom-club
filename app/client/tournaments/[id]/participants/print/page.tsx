@@ -35,5 +35,12 @@ export default async function ClientTournamentParticipantsPrintPage({ params }: 
     attendanceChecked: e.attendanceChecked === true,
   }));
 
-  return <ParticipantsPrintClient tournamentId={id} tournamentTitle={tournament.title} rows={rows} />;
+  return (
+    <ParticipantsPrintClient
+      tournamentId={id}
+      tournamentTitle={tournament.title}
+      maxParticipants={tournament.maxParticipants}
+      rows={rows}
+    />
+  );
 }

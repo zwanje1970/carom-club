@@ -62,6 +62,7 @@ function formatDepositMd(status: TournamentApplicationStatus, statusChangedAt?: 
 }
 
 export default function ParticipantListRow({
+  rowNumber,
   tournamentId,
   entryId,
   applicantName,
@@ -80,6 +81,7 @@ export default function ParticipantListRow({
   initialZoneId = null,
   onZoneIdUpdated,
 }: {
+  rowNumber: number;
   tournamentId: string;
   entryId: string;
   applicantName: string;
@@ -310,6 +312,19 @@ export default function ParticipantListRow({
 
   return (
     <tr style={{ background: "#fff" }}>
+      <td
+        data-participant-label="번호"
+        style={{
+          ...cellBase,
+          textAlign: "center",
+          width: "2.35rem",
+          maxWidth: "2.5rem",
+          padding: "0.2rem 0.15rem",
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {rowNumber}
+      </td>
       <td data-participant-label="이름" style={{ ...cellBase, whiteSpace: "nowrap", minWidth: 0 }}>
         <div className="client-tournament-manage__nameCell">
           <div className="client-tournament-manage__nameRow1">

@@ -46,13 +46,16 @@ function IconGrid() {
 export default function TournamentManageFeatureCards({
   tournamentId,
   bracketEnabled,
+  hasConfirmedBracket,
 }: {
   tournamentId: string;
   bracketEnabled: boolean;
+  hasConfirmedBracket: boolean;
 }) {
   const editHref = `/client/tournaments/new?edit=${encodeURIComponent(tournamentId)}`;
   const settlementHref = `/client/settlement/${encodeURIComponent(tournamentId)}`;
-  const bracketHref = `/client/tournaments/${tournamentId}/bracket`;
+  const bracketManageHref = `/client/tournaments/${tournamentId}/bracket`;
+  const bracketCreateHref = `/client/tournaments/${tournamentId}/bracket/create`;
 
   return (
     <div className="client-tournament-manage__featureGrid">
@@ -73,18 +76,35 @@ export default function TournamentManageFeatureCards({
         <span className="client-tournament-manage__featureTitle">정산 관리</span>
       </Link>
       {bracketEnabled ? (
-        <Link prefetch={false} href={bracketHref} className="client-tournament-manage__featureCard client-tournament-manage__featureCard--accent">
-          <span className="client-tournament-manage__featureIconWrap" aria-hidden>
-            <IconGrid />
-          </span>
-          <span className="client-tournament-manage__featureTitle">대진표 관리</span>
-        </Link>
+        hasConfirmedBracket ? (
+          <Link
+            prefetch={false}
+            href={bracketManageHref}
+            className="client-tournament-manage__featureCard client-tournament-manage__featureCard--accent"
+          >
+            <span className="client-tournament-manage__featureIconWrap" aria-hidden>
+              <IconGrid />
+            </span>
+            <span className="client-tournament-manage__featureTitle">대진표 관리</span>
+          </Link>
+        ) : (
+          <Link
+            prefetch={false}
+            href={bracketCreateHref}
+            className="client-tournament-manage__featureCard client-tournament-manage__featureCard--accent"
+          >
+            <span className="client-tournament-manage__featureIconWrap" aria-hidden>
+              <IconGrid />
+            </span>
+            <span className="client-tournament-manage__featureTitle">대진표 생성</span>
+          </Link>
+        )
       ) : (
         <span className="client-tournament-manage__featureCard client-tournament-manage__featureCard--accent client-tournament-manage__featureCard--disabled">
           <span className="client-tournament-manage__featureIconWrap" aria-hidden>
             <IconGrid />
           </span>
-          <span className="client-tournament-manage__featureTitle">대진표 관리</span>
+          <span className="client-tournament-manage__featureTitle">대진표 생성</span>
         </span>
       )}
     </div>

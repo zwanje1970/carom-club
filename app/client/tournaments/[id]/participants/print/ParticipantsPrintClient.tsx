@@ -37,6 +37,12 @@ function loadGroupDraftMap(tournamentId: string): Record<string, string> {
   }
 }
 
+function capacityLabel(maxParticipants: number): string {
+  const n = Number(maxParticipants);
+  if (!Number.isFinite(n) || n <= 0) return "—";
+  return String(Math.floor(n));
+}
+
 function formatDepositMd(row: ParticipantsPrintRow): string {
   if (row.registrationSource === "admin") return "";
   if (row.status !== "APPROVED") return "";
@@ -56,10 +62,12 @@ function formatDepositMd(row: ParticipantsPrintRow): string {
 export default function ParticipantsPrintClient({
   tournamentId,
   tournamentTitle,
+  maxParticipants,
   rows,
 }: {
   tournamentId: string;
   tournamentTitle: string;
+  maxParticipants: number;
   rows: ParticipantsPrintRow[];
 }) {
   const router = useRouter();
@@ -171,6 +179,7 @@ export default function ParticipantsPrintClient({
           <table className="participants-print-table">
             <thead>
               <tr>
+                <th style={{ width: "2.5rem", maxWidth: "40px", textAlign: "center" }}>번호</th>
                 <th>이름</th>
                 <th style={{ width: "4.5rem", textAlign: "center" }}>점수/에버</th>
                 <th>전화번호</th>
@@ -182,7 +191,7 @@ export default function ParticipantsPrintClient({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => {
+              {rows.map((row, index) => {
                 const checked = checkedById[row.id] ?? false;
                 const deposit = formatDepositMd(row);
                 const ever =
@@ -190,6 +199,9 @@ export default function ParticipantsPrintClient({
                 const groupVal = (groupById[row.id] ?? "").trim();
                 return (
                   <tr key={row.id}>
+                    <td style={{ textAlign: "center", fontVariantNumeric: "tabular-nums", width: "2.5rem", maxWidth: "40px" }}>
+                      {index + 1}
+                    </td>
                     <td style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{row.applicantName}</td>
                     <td style={{ textAlign: "center" }}>{ever}</td>
                     <td style={{ whiteSpace: "nowrap" }}>{row.phone.trim() || "-"}</td>

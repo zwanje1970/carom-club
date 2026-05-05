@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties, KeyboardEvent, PointerEvent, Ref } from "react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import editorCardStyles from "../client/tournaments/[id]/card-publish-editor.module.css";
 import styles from "./main-sample/main-sample.module.css";
 import siteStyles from "./main-site-scroll-cards.module.css";
@@ -16,6 +15,19 @@ import {
 
 const SITE_SCROLL_CARD = "data-site-scroll-card";
 const SITE_SCROLL_SHORTCUT = "data-site-scroll-shortcut";
+
+/** 메인 이탈 후 복귀 시 세로 스크롤 위치 복원 — 새 세션·덱 변경 시 무시 */
+const MAIN_SITE_SCROLL_STORAGE_KEY = "site-main-marquee-scroll-v1";
+
+type MainSiteScrollStoredV1 = {
+  v: 1;
+  idsKey: string;
+  scrollTop: number;
+};
+
+function mainScrollIdsKey(items: MainSiteScrollCardItem[]): string {
+  return items.map((i) => i.id).join("\u001f");
+}
 
 export type MainSiteScrollCardItem = {
   id: string;
@@ -160,7 +172,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
               <div className={styles.sampleMainCardDeckFitInner}>
                 <div className={siteStyles.mainScrollDeckCardShell}>
                   <div
-                    className={`${editorCardStyles.previewCardWrap} ${editorCardStyles.previewCardWrapV2Chrome} ${editorCardStyles.previewCardWrapMainScrollFlex}`}
+                    className={`${editorCardStyles.previewCardWrap} ${editorCardStyles.previewCardWrapV2Chrome} ${editorCardStyles.previewCardWrapMainScrollFlex}${selected ? ` ${editorCardStyles.previewCardWrapMainScrollSelection}` : ""}`}
                   >
                     <div
                       className={`${editorCardStyles.cardPublishCaptureRoot} ${editorCardStyles.cardPublishCaptureRootMainScrollFlex}`}
@@ -389,6 +401,7 @@ export type MainSiteScrollCardsProps = {
 export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSiteScrollCardsProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const trackRef = useRef<HTMLDivElement | null>(null);
   const primarySegmentRef = useRef<HTMLDivElement | null>(null);
   const secondarySegmentRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -413,6 +426,39 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       ),
     [items],
   );
+
+  const itemsIdsKey = items.length > 0 ? mainScrollIdsKey(items) : "";
+
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    if (items.length === 0 || !itemsIdsKey) return;
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    let parsed: MainSiteScrollStoredV1 | null = null;
+    try {
+      const raw = sessionStorage.getItem(MAIN_SITE_SCROLL_STORAGE_KEY);
+      if (raw) {
+        const o = JSON.parse(raw) as Partial<MainSiteScrollStoredV1>;
+        if (o?.v === 1 && typeof o.idsKey === "string" && typeof o.scrollTop === "number") {
+          parsed = { v: 1, idsKey: o.idsKey, scrollTop: o.scrollTop };
+        }
+      }
+    } catch {
+      parsed = null;
+    }
+    if (!parsed || parsed.idsKey !== itemsIdsKey) return;
+
+    const target = parsed.scrollTop;
+    const apply = () => {
+      const maxScroll = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+      const nextTop = Math.min(Math.max(0, target), maxScroll);
+      viewport.scrollTop = nextTop;
+      programmaticScrollUntilMsRef.current = performance.now() + 250;
+    };
+    apply();
+    requestAnimationFrame(apply);
+  }, [items.length, itemsIdsKey]);
 
   const onCardPointerDown = useCallback((itemId: string) => {
     setSelectedItemId((prev) => {
@@ -448,8 +494,16 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     const fallbackPxPerSec = 24;
     const restartAfterUserInputMs = 2000;
     const readSegmentHeight = () => {
-      const raw = primarySegmentRef.current?.scrollHeight ?? 0;
-      return Number.isFinite(raw) && raw > 0 ? raw : 0;
+      const start = primarySegmentRef.current;
+      if (!start) return 0;
+      let total = 0;
+      let el: Element | null = start;
+      for (let i = 0; i < items.length && el; i++) {
+        if (!(el instanceof HTMLElement)) break;
+        total += el.offsetHeight;
+        el = el.nextElementSibling;
+      }
+      return Number.isFinite(total) && total > 0 ? total : 0;
     };
 
     const isMainScrollDevDiag = process.env.NODE_ENV === "development";
@@ -614,7 +668,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       resizeObserver = new ResizeObserver(() => {
         if (readSegmentHeight() <= 0) scheduleMeasureRetry();
       });
-      if (primarySegmentRef.current) resizeObserver.observe(primarySegmentRef.current);
+      if (trackRef.current) resizeObserver.observe(trackRef.current);
       resizeObserver.observe(viewport);
     }
 
@@ -628,6 +682,19 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     }
 
     return () => {
+      try {
+        const node = viewportRef.current;
+        if (node && items.length > 0) {
+          const payload: MainSiteScrollStoredV1 = {
+            v: 1,
+            idsKey: mainScrollIdsKey(items),
+            scrollTop: node.scrollTop,
+          };
+          sessionStorage.setItem(MAIN_SITE_SCROLL_STORAGE_KEY, JSON.stringify(payload));
+        }
+      } catch {
+        /* 저장 공간 부족 등 */
+      }
       viewport.removeEventListener("touchstart", onUserInput);
       viewport.removeEventListener("touchmove", onUserInput);
       viewport.removeEventListener("wheel", onUserInput);
@@ -653,18 +720,21 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     );
   }
 
-  const renderSegment = (segmentKey: string, segmentRef?: Ref<HTMLDivElement>) => (
+  const renderSegment = (segmentKey: string, segmentRootRef?: Ref<HTMLDivElement>) => (
     <div
-      className={`${styles.sampleMainMarqueeSegment} ${siteStyles.segmentNoShrink} ${siteStyles.segmentRelativeForDim}`}
+      className={`${styles.sampleMainMarqueeSegment} ${siteStyles.segmentMarqueeContents}`}
       key={segmentKey}
-      ref={segmentRef}
     >
       {items.map((item, itemIndex) => {
         const rowKey = `${segmentKey}-${item.id}`;
         const lcpHeroImage =
           segmentKey === "a" && itemIndex === lcpHeroItemIndex && lcpHeroItemIndex >= 0;
         return (
-          <div key={rowKey} className={siteStyles.marqueeCardSlotShell}>
+          <div
+            key={rowKey}
+            className={siteStyles.marqueeCardSlotShell}
+            ref={itemIndex === 0 ? segmentRootRef : undefined}
+          >
             <MainSiteCardRow
               rowKey={rowKey}
               item={item}
@@ -679,21 +749,22 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   );
 
   return (
-    <>
-      {typeof document !== "undefined" && selectedItemId !== null
-        ? createPortal(<div className="main-dim-overlay" aria-hidden />, document.body)
-        : null}
+    <div
+      className={`${styles.slideViewportSiteMain} ${siteStyles.viewportMarquee} ${siteStyles.viewportMarqueeLeadIn}`}
+      data-no-root-swipe
+      data-site-main-scroll-viewport="1"
+      ref={viewportRef}
+    >
       <div
-        className={`${styles.slideViewportSiteMain} ${siteStyles.viewportMarquee} ${siteStyles.viewportMarqueeLeadIn}`}
-        data-no-root-swipe
-        data-site-main-scroll-viewport="1"
-        ref={viewportRef}
+        ref={trackRef}
+        className={`${styles.sampleMainMarqueeTrack} ${siteStyles.trackScrollStatic}`}
       >
-        <div className={`${styles.sampleMainMarqueeTrack} ${siteStyles.trackScrollStatic}`}>
-          {renderSegment("a", primarySegmentRef)}
-          {renderSegment("b", secondarySegmentRef)}
-        </div>
+        {renderSegment("a", primarySegmentRef)}
+        {renderSegment("b", secondarySegmentRef)}
+        {selectedItemId !== null ? (
+          <div className={siteStyles.trackDimOverlay} aria-hidden />
+        ) : null}
       </div>
-    </>
+    </div>
   );
 }

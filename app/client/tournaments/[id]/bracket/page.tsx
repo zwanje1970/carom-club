@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import BracketProgressSummaryCard from "./BracketProgressSummaryCard";
+
 const TournamentGroupRound1PrintClient = dynamic(
   () => import("./TournamentGroupRound1PrintClient"),
   { ssr: false, loading: () => <p className="v3-muted">조별 1차 대진표 인쇄 도구를 불러오는 중…</p> },
@@ -57,7 +59,6 @@ export default function TournamentBracketSnapshotPage() {
   const urlZoneId = useMemo(() => searchParams.get("zoneId")?.trim() ?? "", [searchParams]);
   const [snapshot, setSnapshot] = useState<BracketParticipantSnapshot | null>(null);
   const [bracket, setBracket] = useState<Bracket | null>(null);
-  const [loadingSnapshot, setLoadingSnapshot] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [replacementSelections, setReplacementSelections] = useState<
     Record<string, { player1: string; player2: string }>
@@ -100,12 +101,12 @@ export default function TournamentBracketSnapshotPage() {
         error?: string;
       };
       if (!response.ok) {
-        setMessage(result.error ?? "대진표 대상자 스냅샷 조회에 실패했습니다.");
+        setMessage(result.error ?? "작성 기준 참가자 정보를 불러오지 못했습니다.");
         return;
       }
       setSnapshot(result.snapshot ?? null);
     } catch {
-      setMessage("대진표 대상자 스냅샷 조회 중 오류가 발생했습니다.");
+      setMessage("작성 기준 참가자 정보를 불러오는 중 오류가 발생했습니다.");
     }
   }, [tournamentId, zonesEnabled, selectedZoneId]);
 
@@ -187,37 +188,6 @@ export default function TournamentBracketSnapshotPage() {
     void loadLatestSnapshot();
     void loadLatestBracket();
   }, [loadLatestSnapshot, loadLatestBracket]);
-
-  async function handleCreateSnapshot() {
-    if (!tournamentId || loadingSnapshot) return;
-    if (zonesEnabled && !selectedZoneId) {
-      setMessage("권역을 선택해 주세요.");
-      return;
-    }
-    setLoadingSnapshot(true);
-    setMessage("");
-    try {
-      const response = await fetch(`/api/client/tournaments/${tournamentId}/bracket/participants-snapshot`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(zonesEnabled && selectedZoneId ? { zoneId: selectedZoneId } : {}),
-      });
-      const result = (await response.json()) as {
-        snapshot?: BracketParticipantSnapshot;
-        error?: string;
-      };
-      if (!response.ok || !result.snapshot) {
-        setMessage(result.error ?? "스냅샷 생성에 실패했습니다.");
-        return;
-      }
-      setSnapshot(result.snapshot);
-      setMessage("대진표 대상자 스냅샷이 생성되었습니다.");
-    } catch {
-      setMessage("스냅샷 생성 중 오류가 발생했습니다.");
-    } finally {
-      setLoadingSnapshot(false);
-    }
-  }
 
   async function handleSetWinner(matchId: string, winnerUserId: string) {
     if (!tournamentId || actionLoading) return;
@@ -359,42 +329,38 @@ export default function TournamentBracketSnapshotPage() {
             </select>
           </div>
           <p className="v3-muted" style={{ margin: "0.5rem 0 0", fontSize: "0.82rem" }}>
-            권역 운영 대회는 아래에서 권역을 선택한 뒤 스냅샷·대진표를 다룹니다. 기존{" "}
+            권역 운영 대회는 아래에서 권역을 선택한 뒤 대진표를 다룹니다. 기존{" "}
             <code>/api/client/tournaments/…/bracket</code> 단일 조회는 이 화면에서 사용하지 않습니다.
           </p>
         </section>
       ) : null}
 
       <section className="v3-box v3-stack">
-        <h2 className="v3-h2">최신 대상자 스냅샷</h2>
+        <h2 className="v3-h2">작성 기준 참가자</h2>
         {!snapshot ? (
-          <p className="v3-muted">생성된 스냅샷이 없습니다.</p>
+          <p className="v3-muted">아직 고정된 참가자 목록이 없습니다. 새 대진표가 필요하면 아래에서 생성하거나 자동·수동 배정 화면을 이용하세요.</p>
         ) : (
           <>
-            <p>
-              <strong>스냅샷 ID:</strong> {snapshot.id}
-            </p>
             <p>
               <strong>참가자 수:</strong> {snapshot.participants.length}명
             </p>
             <p>
-              <strong>생성 시각:</strong> {new Date(snapshot.createdAt).toLocaleString("ko-KR")}
+              <strong>고정 시각:</strong> {new Date(snapshot.createdAt).toLocaleString("ko-KR")}
             </p>
           </>
         )}
-        <div className="v3-row">
-          <button
-            type="button"
-            className="v3-btn"
-            onClick={handleCreateSnapshot}
-            disabled={loadingSnapshot || (zonesEnabled && (!selectedZoneId || zoneOptions.length === 0))}
-          >
-            {loadingSnapshot ? "생성 중..." : "대상자 스냅샷 생성"}
-          </button>
-        </div>
       </section>
 
       <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+        <Link
+          prefetch={false}
+          className="v3-btn"
+          href={`/client/tournaments/${tournamentId}/bracket/create${bracketZoneQuery}`}
+          aria-disabled={zonesEnabled && !selectedZoneId}
+          style={zonesEnabled && !selectedZoneId ? { pointerEvents: "none", opacity: 0.45 } : undefined}
+        >
+          대진표 생성
+        </Link>
         <Link
           prefetch={false}
           className="v3-btn"
@@ -431,6 +397,7 @@ export default function TournamentBracketSnapshotPage() {
           <p className="v3-muted">아직 확정 저장된 대진표가 없습니다.</p>
         ) : (
           <>
+            <BracketProgressSummaryCard bracket={bracket} />
             <p>
               <strong>대진표 ID:</strong> {bracket.id}
             </p>
@@ -439,9 +406,6 @@ export default function TournamentBracketSnapshotPage() {
                 <strong>권역:</strong> {bracket.zoneId}
               </p>
             ) : null}
-            <p>
-              <strong>입력 스냅샷:</strong> {bracket.snapshotId}
-            </p>
             <p>
               <strong>생성 시각:</strong> {new Date(bracket.createdAt).toLocaleString("ko-KR")}
             </p>
@@ -568,9 +532,9 @@ export default function TournamentBracketSnapshotPage() {
       </section>
 
       <section className="v3-box v3-stack">
-        <h2 className="v3-h2">최신 스냅샷 참가자</h2>
+        <h2 className="v3-h2">기준 참가자 명단</h2>
         {!snapshot ? (
-          <p className="v3-muted">스냅샷이 없어 참가자 목록을 표시할 수 없습니다.</p>
+          <p className="v3-muted">고정된 참가자 목록이 없어 표시할 수 없습니다.</p>
         ) : (
           <ul className="v3-list">
             {snapshot.participants.map((participant, index) => (

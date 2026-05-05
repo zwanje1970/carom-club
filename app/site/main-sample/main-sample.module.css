@@ -135,6 +135,7 @@
   align-items: stretch;
   width: 100%;
   pointer-events: auto;
+  position: relative;
   animation-name: sampleMainMarqueeUp;
   animation-duration: var(--main-sample-slide-duration, 10s);
   animation-timing-function: linear;
@@ -181,8 +182,14 @@
   pointer-events: auto;
 }
 
+/* 메인 세로 스크롤: 선택 카드는 트랙 내부 딤(.trackDimOverlay) 위 — 슬롯 z-index 상승 */
 .sampleMainCardSlotSelected {
-  z-index: 4;
+  z-index: 25;
+}
+
+.sampleMainCardSlotSelected .sampleMainCardDeckFit,
+.sampleMainCardSlotSelected .sampleMainCardDeckFitInner {
+  overflow: visible;
 }
 
 /* 페이스: 시각·호버·선택 transform 전부( 트랙 marquee transform 과 요소 분리 ) */
@@ -253,6 +260,9 @@
   transform: none;
   overflow: visible;
   background: transparent;
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.22s ease;
 }
 
 .sampleMainCardSlot:active .sampleMainCardFace.sampleMainCardFaceTournamentDeck:not(.sampleMainCardFaceSelected) {

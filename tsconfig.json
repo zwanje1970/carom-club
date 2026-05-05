@@ -33,6 +33,7 @@
   ],
   "exclude": [
     "node_modules",
-    "legacy-local-backup"
+    "legacy-local-backup",
+    "tmp"
   ]
 }

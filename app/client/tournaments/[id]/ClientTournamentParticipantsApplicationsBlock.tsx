@@ -22,6 +22,8 @@ type TournamentZoneListEntry = {
 
 type Props = {
   tournamentId: string;
+  tournamentTitle: string;
+  maxParticipants: number;
   initialEntries: TournamentApplicationListItem[];
   participantCountSummary: ParticipantCountSummary;
   selected: ClientParticipantFilterKey;
@@ -81,6 +83,12 @@ function loadGroupDraftMap(tournamentId: string): Record<string, string> {
   }
 }
 
+function capacityLabel(maxParticipants: number): string {
+  const n = Number(maxParticipants);
+  if (!Number.isFinite(n) || n <= 0) return "—";
+  return String(Math.floor(n));
+}
+
 function mergeByEntryId(
   a: TournamentApplicationListItem[],
   b: TournamentApplicationListItem[]
@@ -93,6 +101,8 @@ function mergeByEntryId(
 
 export default function ClientTournamentParticipantsApplicationsBlock({
   tournamentId,
+  tournamentTitle,
+  maxParticipants,
   initialEntries,
   participantCountSummary,
   selected,
@@ -273,6 +283,13 @@ export default function ClientTournamentParticipantsApplicationsBlock({
         ) : null}
       </div>
 
+      <p style={{ margin: "0.35rem 0 0", fontSize: "0.95rem", fontWeight: 700, lineHeight: 1.35 }}>
+        참가자 리스트
+      </p>
+      <p style={{ margin: "0.15rem 0 0.45rem", fontSize: "0.92rem", fontWeight: 700 }}>
+        {tournamentTitle.trim()} ({zoneFilteredEntries.length}/{capacityLabel(maxParticipants)})
+      </p>
+
       <section className="client-tournament-manage__participantTableShell">
         {zoneFilteredEntries.length === 0 ? (
           <p className="v3-muted" style={{ margin: 0, padding: "0.65rem 0.75rem" }}>
@@ -288,7 +305,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
               className="client-tournament-manage__participantTable"
               style={{
                 width: "100%",
-                minWidth: zonesEnabled ? "39rem" : "34rem",
+                minWidth: zonesEnabled ? "41rem" : "36rem",
                 borderCollapse: "collapse",
                 tableLayout: "fixed",
                 fontSize: "0.84rem",
@@ -299,9 +316,20 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                   <th
                     style={{
                       ...participantApplicationsTableThBase,
+                      textAlign: "center",
+                      width: "2.35rem",
+                      maxWidth: "2.5rem",
+                      minWidth: "2.35rem",
+                    }}
+                  >
+                    번호
+                  </th>
+                  <th
+                    style={{
+                      ...participantApplicationsTableThBase,
                       textAlign: "left",
                       minWidth: "7.5rem",
-                      width: "28%",
+                      width: "26%",
                     }}
                   >
                     이름
@@ -371,9 +399,10 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                 </tr>
               </thead>
               <tbody>
-                {zoneFilteredEntries.map((entry) => (
+                {zoneFilteredEntries.map((entry, rowIndex) => (
                   <ParticipantListRow
                     key={entry.id}
+                    rowNumber={rowIndex + 1}
                     tournamentId={tournamentId}
                     entryId={entry.id}
                     applicantName={entry.applicantName}
