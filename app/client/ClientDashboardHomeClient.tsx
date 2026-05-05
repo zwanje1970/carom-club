@@ -255,133 +255,9 @@ function formatTournamentCardSubtitle(t: { date: string; maxParticipants: number
   return `${date} / ${g}`;
 }
 
-/** 요약 API 전까지 동일 레이아웃·고정 링크만 표시(전체 스켈레톤 없음) */
-function DashboardLoadingShell() {
-  const cardPublishHref = "/client/tournaments/new";
-  return (
-    <div className="v3-stack" style={{ gap: "1.15rem" }} aria-busy="true" aria-label="대시보드 불러오는 중">
-      <div
-        className="client-dashboard-main__todayBar"
-        role="status"
-        aria-live="polite"
-        aria-labelledby="client-today-heading"
-      >
-        <h2 id="client-today-heading" className="client-dashboard-main__todayBarHeading">
-          지금 할 일
-        </h2>
-        <p className="client-dashboard-main__todayBarText">불러오는 중…</p>
-        <span className="client-dashboard-main__todayBarBtn" aria-hidden>
-          …
-        </span>
-      </div>
-
-      <section className="v3-stack" aria-labelledby="client-ongoing-tournaments-heading" style={{ gap: "0.5rem" }}>
-        <h2 id="client-ongoing-tournaments-heading" className="v3-h2" style={{ margin: 0, fontSize: "1rem" }}>
-          진행중 대회
-        </h2>
-        <p className="v3-muted" style={{ margin: 0 }}>
-          불러오는 중…
-        </p>
-        <Link href="/client/tournaments" prefetch={false} className="client-dashboard-main__tournamentSeeAll">
-          전체대회 보기
-        </Link>
-      </section>
-
-      <section className="v3-stack" aria-labelledby="client-main-features-heading" style={{ gap: "0.5rem" }}>
-        <h2 id="client-main-features-heading" className="v3-h2" style={{ margin: 0, fontSize: "1rem" }}>
-          주요 기능
-        </h2>
-        <div className="client-dashboard-main__featureGrid">
-          <Link
-            href="/client/tournaments/new"
-            prefetch={false}
-            className="client-dashboard-main__featureCard client-dashboard-main__featureCard--primary"
-          >
-            <span className="client-dashboard-main__featureIconWrap">
-              <IconTournamentLine />
-            </span>
-            <span className="client-dashboard-main__featureText">
-              <span className="client-dashboard-main__featureTitle">대회 만들기</span>
-              <span className="client-dashboard-main__featureDesc">새 대회를 등록하고 일정을 관리합니다</span>
-            </span>
-          </Link>
-          <Link href={cardPublishHref} prefetch={false} className="client-dashboard-main__featureCard client-dashboard-main__featureCard--success">
-            <span className="client-dashboard-main__featureIconWrap">
-              <IconCardLine />
-            </span>
-            <span className="client-dashboard-main__featureText">
-              <span className="client-dashboard-main__featureTitle">게시카드 만들기</span>
-              <span className="client-dashboard-main__featureDesc">메인 노출용 대회 카드를 작성합니다</span>
-            </span>
-          </Link>
-          <Link href="/client/member" prefetch={false} className="client-dashboard-main__featureCard client-dashboard-main__featureCard--purple">
-            <span className="client-dashboard-main__featureIconWrap">
-              <IconUsersLine />
-            </span>
-            <span className="client-dashboard-main__featureText">
-              <span className="client-dashboard-main__featureTitle">회원 / 앱푸시</span>
-              <span className="client-dashboard-main__featureDesc">참가자·푸시 알림을 다룹니다</span>
-            </span>
-          </Link>
-          <Link href="/client/settlements" prefetch={false} className="client-dashboard-main__featureCard client-dashboard-main__featureCard--warning">
-            <span className="client-dashboard-main__featureIconWrap">
-              <IconChartLine />
-            </span>
-            <span className="client-dashboard-main__featureText">
-              <span className="client-dashboard-main__featureTitle">정산</span>
-              <span className="client-dashboard-main__featureDesc">대회별 정산을 확인합니다</span>
-            </span>
-          </Link>
-        </div>
-      </section>
-
-      <section aria-label="부가기능">
-        <details className="client-dashboard-main__dsCard client-dashboard-main__extras">
-          <summary>
-            <span className="client-dashboard-main__extrasSummaryLeft">
-              <span className="client-dashboard-main__extrasIconWrap">
-                <IconExtrasToolbox />
-              </span>
-              <span className="client-dashboard-main__extrasSummaryTitle">부가기능</span>
-            </span>
-            <span className="client-dashboard-main__extrasSummaryChevron" aria-hidden>
-              ▼
-            </span>
-          </summary>
-          <div className="client-dashboard-main__extrasList">
-            <p className="v3-muted" style={{ margin: 0, padding: "0.25rem 0" }}>
-              불러오는 중…
-            </p>
-            <Link href="/client/setup" prefetch={false} className="client-dashboard-main__extrasRow">
-              <span className="client-dashboard-main__extrasRowLabel">업체 설정</span>
-              <span className="client-dashboard-main__extrasRowChevron" aria-hidden>
-                &gt;
-              </span>
-            </Link>
-            <Link href="/client/setup/venue-intro" prefetch={false} className="client-dashboard-main__extrasRow">
-              <span className="client-dashboard-main__extrasRowLabel">당구장 소개</span>
-              <span className="client-dashboard-main__extrasRowChevron" aria-hidden>
-                &gt;
-              </span>
-            </Link>
-            <Link href="/client/settings/inquiries" prefetch={false} className="client-dashboard-main__extrasRow">
-              <span className="client-dashboard-main__extrasRowLabel">문의 (오류제보 / 기능건의)</span>
-              <span className="client-dashboard-main__extrasRowChevron" aria-hidden>
-                &gt;
-              </span>
-            </Link>
-            <Link href="/client/settings/blank-bracket-print" prefetch={false} className="client-dashboard-main__extrasRow">
-              <span className="client-dashboard-main__extrasRowLabel">빈 대진표</span>
-              <span className="client-dashboard-main__extrasRowChevron" aria-hidden>
-                &gt;
-              </span>
-            </Link>
-          </div>
-        </details>
-      </section>
-    </div>
-  );
-}
+const MSG_TODAY_LOADING = "오늘 할 일을 불러오는 중";
+const MSG_TOURNAMENT_LOADING = "대회 정보를 불러오는 중";
+const MSG_ORG_LOADING = "업체 정보를 불러오는 중";
 
 export default function ClientDashboardHomeClient({
   bootstrap,
@@ -555,110 +431,78 @@ export default function ClientDashboardHomeClient({
     })();
   }, [bootstrap]);
 
-  if (state.status === "loading") {
-    return <DashboardLoadingShell />;
-  }
-
-  if (state.status === "error") {
-    return (
-      <div className="v3-stack client-dashboard-main__dsCard" style={{ gap: "0.65rem", padding: "1rem" }}>
-        <p className="v3-muted" style={{ margin: 0 }}>
-          {state.message}
-        </p>
-        <button type="button" className="v3-btn" onClick={() => void handleRetry()}>
-          다시 시도
-        </button>
-      </div>
-    );
-  }
-
-  const d = state.data;
-  const firstTournamentId = d.firstTournamentId.trim();
-  const isPublishedCardStatusPending =
-    d.hasAnyTournament &&
-    firstTournamentId !== "" &&
-    d.hasPublishedActiveForSomeTournament !== true &&
-    publishedCardStatus.tournamentId === firstTournamentId &&
-    publishedCardStatus.state === "checking";
-  const isPublishedCardStatusUnknown =
-    d.hasAnyTournament &&
-    firstTournamentId !== "" &&
-    d.hasPublishedActiveForSomeTournament !== true &&
-    (publishedCardStatus.tournamentId !== firstTournamentId ||
-      publishedCardStatus.state === "checking" ||
-      publishedCardStatus.state === "failed");
-  const policy = d.policy;
-  const membershipLabel =
-    policy.membershipState === "ACTIVE"
-      ? "연회원 이용 중"
-      : policy.membershipState === "EXPIRED"
-        ? "연회원 만료"
-        : "일반";
+  const isReady = state.status === "ready";
+  const isFetchError = state.status === "error";
+  const pendingAreaMessage = isFetchError ? state.message : "";
 
   let todayStatusText = "";
   let todayButtonLabel = "";
   let todayButtonHref = "/client/setup";
-  if (!d.hasOrgSetup) {
-    todayStatusText = "업체 설정을 먼저 완료하세요";
-    todayButtonLabel = "업체 설정";
-    todayButtonHref = "/client/setup";
-  } else if (!d.hasVenueIntro) {
-    todayStatusText = "당구장 소개를 작성하세요";
-    todayButtonLabel = "작성하기";
-    todayButtonHref = "/client/setup/venue-intro";
-  } else if (!d.hasAnyTournament) {
-    todayStatusText = "대회를 개최하세요";
-    todayButtonLabel = "대회 만들기";
-    todayButtonHref = "/client/tournaments/new";
-  } else if (isPublishedCardStatusPending || isPublishedCardStatusUnknown) {
-    todayStatusText = "게시카드 상태를 확인 중입니다";
-    todayButtonLabel = "대회 관리";
-    todayButtonHref = d.firstTournamentId ? `/client/tournaments/${d.firstTournamentId}` : "/client/tournaments";
-  } else if (!d.hasPublishedActiveForSomeTournament) {
-    todayStatusText = "메인에 대회 홍보용 카드를 게시하세요";
-    todayButtonLabel = "게시카드 작성";
-    todayButtonHref = d.firstTournamentId
+  let cardPublishHref = "/client/tournaments/new";
+  let ongoingTournamentsToRender: ClientDashboardSummaryJson["recentTournaments"] = [];
+  let membershipSection: ReactNode = null;
+  let tournamentListSection: ReactNode = null;
+
+  if (isReady) {
+    const d = state.data;
+    const firstTournamentId = d.firstTournamentId.trim();
+    const isPublishedCardStatusPending =
+      d.hasAnyTournament &&
+      firstTournamentId !== "" &&
+      d.hasPublishedActiveForSomeTournament !== true &&
+      publishedCardStatus.tournamentId === firstTournamentId &&
+      publishedCardStatus.state === "checking";
+    const isPublishedCardStatusUnknown =
+      d.hasAnyTournament &&
+      firstTournamentId !== "" &&
+      d.hasPublishedActiveForSomeTournament !== true &&
+      (publishedCardStatus.tournamentId !== firstTournamentId ||
+        publishedCardStatus.state === "checking" ||
+        publishedCardStatus.state === "failed");
+    const policy = d.policy;
+    const membershipLabel =
+      policy.membershipState === "ACTIVE"
+        ? "연회원 이용 중"
+        : policy.membershipState === "EXPIRED"
+          ? "연회원 만료"
+          : "일반";
+
+    if (!d.hasOrgSetup) {
+      todayStatusText = "업체 설정을 먼저 완료하세요";
+      todayButtonLabel = "업체 설정";
+      todayButtonHref = "/client/setup";
+    } else if (!d.hasVenueIntro) {
+      todayStatusText = "당구장 소개를 작성하세요";
+      todayButtonLabel = "작성하기";
+      todayButtonHref = "/client/setup/venue-intro";
+    } else if (!d.hasAnyTournament) {
+      todayStatusText = "대회를 개최하세요";
+      todayButtonLabel = "대회 만들기";
+      todayButtonHref = "/client/tournaments/new";
+    } else if (isPublishedCardStatusPending || isPublishedCardStatusUnknown) {
+      todayStatusText = "게시카드 상태를 확인 중입니다";
+      todayButtonLabel = "대회 관리";
+      todayButtonHref = d.firstTournamentId ? `/client/tournaments/${d.firstTournamentId}` : "/client/tournaments";
+    } else if (!d.hasPublishedActiveForSomeTournament) {
+      todayStatusText = "메인에 대회 홍보용 카드를 게시하세요";
+      todayButtonLabel = "게시카드 작성";
+      todayButtonHref = d.firstTournamentId
+        ? `/client/tournaments/${d.firstTournamentId}/card-publish-v2`
+        : "/client/tournaments/new";
+    } else {
+      todayStatusText = "진행중인 대회가 있습니다";
+      todayButtonLabel = "대회 관리";
+      todayButtonHref = d.firstTournamentId ? `/client/tournaments/${d.firstTournamentId}` : "/client/tournaments";
+    }
+
+    cardPublishHref = d.firstTournamentId
       ? `/client/tournaments/${d.firstTournamentId}/card-publish-v2`
       : "/client/tournaments/new";
-  } else {
-    todayStatusText = "진행중인 대회가 있습니다";
-    todayButtonLabel = "대회 관리";
-    todayButtonHref = d.firstTournamentId ? `/client/tournaments/${d.firstTournamentId}` : "/client/tournaments";
-  }
 
-  const cardPublishHref = d.firstTournamentId
-    ? `/client/tournaments/${d.firstTournamentId}/card-publish-v2`
-    : "/client/tournaments/new";
+    ongoingTournamentsToRender = d.recentTournaments.slice(0, 1);
 
-  const ongoingTournamentsToRender = d.recentTournaments.slice(0, 1);
-
-  return (
-    <div className="v3-stack" style={{ gap: "1.15rem" }}>
-      {state.refreshWarning ? (
-        <p className="v3-muted" role="alert" style={{ margin: 0, fontSize: "0.85rem", color: "#b45309" }}>
-          {state.refreshWarning} (화면은 이전에 불러온 내용입니다.)
-        </p>
-      ) : null}
-
-      <Link
-        href={todayButtonHref}
-        prefetch={false}
-        className="client-dashboard-main__todayBar client-dashboard-main__todayBarLink"
-        aria-labelledby="client-today-heading client-today-cta-label"
-        aria-describedby="client-today-status"
-      >
-        <h2 id="client-today-heading" className="client-dashboard-main__todayBarHeading">
-          지금 할 일
-        </h2>
-        <p id="client-today-status" className="client-dashboard-main__todayBarText">
-          {todayStatusText}
-        </p>
-        <span id="client-today-cta-label" className="client-dashboard-main__todayBarBtn" aria-hidden="true">
-          {todayButtonLabel}
-        </span>
-      </Link>
-
-      {policy.annualMembershipVisible ? (
+    membershipSection =
+      policy.annualMembershipVisible ? (
         <AdminSurface className="v3-stack client-dashboard-main__dsCard" style={{ gap: "0.65rem" }}>
           <h2 className="v3-h2">연회원 상태</h2>
           <p>현재 상태: {membershipLabel}</p>
@@ -695,31 +539,112 @@ export default function ClientDashboardHomeClient({
             </>
           )}
         </AdminSurface>
+      ) : null;
+
+    tournamentListSection =
+      d.recentTournaments.length === 0 ? (
+        <p className="client-dashboard-main__tournamentEmpty">진행중 대회가 없습니다</p>
+      ) : (
+        <ul className="v3-stack client-dashboard-main__tournamentList" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+          {ongoingTournamentsToRender.map((t) => (
+            <li key={t.id} className="v3-stack client-dashboard-main__dsCard client-dashboard-main__tournamentCard">
+              <div className="client-dashboard-main__tournamentTop">
+                <div className="client-dashboard-main__tournamentTitle">{t.title}</div>
+                <span className={clientDashboardTournamentBadgeClass(t.statusBadge)}>{t.statusBadge}</span>
+              </div>
+              <div className="client-dashboard-main__tournamentMeta">{formatTournamentCardSubtitle(t)}</div>
+              <div className="client-dashboard-main__tournamentActions">
+                <Link className="client-dashboard-main__tournamentManage" href={`/client/tournaments/${t.id}`} prefetch={false}>
+                  관리하기
+                </Link>
+              </div>
+            </li>
+          ))}
+        </ul>
+      );
+  }
+
+  const todayBar =
+    isReady ? (
+      <Link
+        href={todayButtonHref}
+        prefetch={false}
+        className="client-dashboard-main__todayBar client-dashboard-main__todayBarLink"
+        aria-labelledby="client-today-heading client-today-cta-label"
+        aria-describedby="client-today-status"
+      >
+        <h2 id="client-today-heading" className="client-dashboard-main__todayBarHeading">
+          지금 할 일
+        </h2>
+        <p id="client-today-status" className="client-dashboard-main__todayBarText">
+          {todayStatusText}
+        </p>
+        <span id="client-today-cta-label" className="client-dashboard-main__todayBarBtn" aria-hidden="true">
+          {todayButtonLabel}
+        </span>
+      </Link>
+    ) : isFetchError ? (
+      <div
+        className="client-dashboard-main__todayBar"
+        role="alert"
+        aria-labelledby="client-today-heading"
+      >
+        <h2 id="client-today-heading" className="client-dashboard-main__todayBarHeading">
+          지금 할 일
+        </h2>
+        <p id="client-today-status" className="client-dashboard-main__todayBarText">
+          {pendingAreaMessage}
+        </p>
+        <button
+          type="button"
+          className="client-dashboard-main__todayBarBtn"
+          style={{ border: "none", background: "transparent", font: "inherit", cursor: "pointer", color: "inherit" }}
+          onClick={() => void handleRetry()}
+        >
+          다시 시도
+        </button>
+      </div>
+    ) : (
+      <div
+        className="client-dashboard-main__todayBar"
+        aria-busy="true"
+        aria-live="polite"
+        aria-labelledby="client-today-heading"
+      >
+        <h2 id="client-today-heading" className="client-dashboard-main__todayBarHeading">
+          지금 할 일
+        </h2>
+        <p id="client-today-status" className="client-dashboard-main__todayBarText">
+          {MSG_TODAY_LOADING}
+        </p>
+        <span className="client-dashboard-main__todayBarBtn" aria-hidden>
+          …
+        </span>
+      </div>
+    );
+
+  return (
+    <div className="v3-stack" style={{ gap: "1.15rem" }}>
+      {isReady && state.refreshWarning ? (
+        <p className="v3-muted" role="alert" style={{ margin: 0, fontSize: "0.85rem", color: "#b45309" }}>
+          {state.refreshWarning} (화면은 이전에 불러온 내용입니다.)
+        </p>
       ) : null}
+
+      {todayBar}
+
+      {membershipSection}
 
       <section className="v3-stack" aria-labelledby="client-ongoing-tournaments-heading" style={{ gap: "0.5rem" }}>
         <h2 id="client-ongoing-tournaments-heading" className="v3-h2" style={{ margin: 0, fontSize: "1rem" }}>
           진행중 대회
         </h2>
-        {d.recentTournaments.length === 0 ? (
-          <p className="client-dashboard-main__tournamentEmpty">진행중 대회가 없습니다</p>
+        {isReady ? (
+          tournamentListSection
         ) : (
-          <ul className="v3-stack client-dashboard-main__tournamentList" style={{ listStyle: "none", margin: 0, padding: 0 }}>
-            {ongoingTournamentsToRender.map((t) => (
-              <li key={t.id} className="v3-stack client-dashboard-main__dsCard client-dashboard-main__tournamentCard">
-                <div className="client-dashboard-main__tournamentTop">
-                  <div className="client-dashboard-main__tournamentTitle">{t.title}</div>
-                  <span className={clientDashboardTournamentBadgeClass(t.statusBadge)}>{t.statusBadge}</span>
-                </div>
-                <div className="client-dashboard-main__tournamentMeta">{formatTournamentCardSubtitle(t)}</div>
-                <div className="client-dashboard-main__tournamentActions">
-                  <Link className="client-dashboard-main__tournamentManage" href={`/client/tournaments/${t.id}`} prefetch={false}>
-                    관리하기
-                  </Link>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <p className="v3-muted" style={{ margin: 0 }}>
+            {isFetchError ? pendingAreaMessage : MSG_TOURNAMENT_LOADING}
+          </p>
         )}
         <Link href="/client/tournaments" prefetch={false} className="client-dashboard-main__tournamentSeeAll">
           전체대회 보기
@@ -792,17 +717,24 @@ export default function ClientDashboardHomeClient({
             </span>
           </summary>
           <div className="client-dashboard-main__extrasList">
-            <ClientAutoParticipantPushToggle
-              initialEnabled={d.autoParticipantPushEnabled}
-              onPersisted={(enabled) => {
-                mergeClientDashboardSummaryCache({ autoParticipantPushEnabled: enabled });
-                setState((s) =>
-                  s.status === "ready"
-                    ? { ...s, data: { ...s.data, autoParticipantPushEnabled: enabled } }
-                    : s,
-                );
-              }}
-            />
+            {!isReady ? (
+              <p className="v3-muted" style={{ margin: 0, padding: "0.25rem 0" }}>
+                {isFetchError ? pendingAreaMessage : MSG_ORG_LOADING}
+              </p>
+            ) : null}
+            {isReady ? (
+              <ClientAutoParticipantPushToggle
+                initialEnabled={state.data.autoParticipantPushEnabled}
+                onPersisted={(enabled) => {
+                  mergeClientDashboardSummaryCache({ autoParticipantPushEnabled: enabled });
+                  setState((s) =>
+                    s.status === "ready"
+                      ? { ...s, data: { ...s.data, autoParticipantPushEnabled: enabled } }
+                      : s,
+                  );
+                }}
+              />
+            ) : null}
             <Link href="/client/setup" prefetch={false} className="client-dashboard-main__extrasRow">
               <span className="client-dashboard-main__extrasRowLabel">업체 설정</span>
               <span className="client-dashboard-main__extrasRowChevron" aria-hidden>

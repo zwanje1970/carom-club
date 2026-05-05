@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 const SPLASH_MIN_MS = 3000;
-const SPLASH_MAX_MS = 4500;
 
 export default function MobileSplashPage() {
   const router = useRouter();
@@ -12,12 +11,7 @@ export default function MobileSplashPage() {
   useEffect(() => {
     let cancelled = false;
 
-    const prefetchPromise = fetch("/api/site/app-home-shell-prefetch", {
-      method: "GET",
-      credentials: "same-origin",
-    })
-      .then(() => undefined)
-      .catch(() => undefined);
+    void router.prefetch("/site");
 
     const delay = (ms: number) =>
       new Promise<void>((resolve) => {
@@ -26,9 +20,6 @@ export default function MobileSplashPage() {
 
     void (async () => {
       await delay(SPLASH_MIN_MS);
-      if (cancelled) return;
-      const extraBudget = Math.max(0, SPLASH_MAX_MS - SPLASH_MIN_MS);
-      await Promise.race([prefetchPromise, delay(extraBudget)]);
       if (cancelled) return;
       router.push("/site");
     })();

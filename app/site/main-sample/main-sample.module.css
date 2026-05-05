@@ -207,7 +207,6 @@
   display: flex;
   width: 100%;
   max-width: 100%;
-  min-height: 0;
   height: 100%;
   align-items: stretch;
   justify-content: center;
@@ -417,6 +416,11 @@
   vertical-align: top;
 }
 
+/* 게시 PNG/광고 업로드 면(.sampleMainCardFacePublishedSnapshot)에서만 flex 수축 안정화 — 분할형 덱 면에는 미적용 */
+.sampleMainCardFacePublishedSnapshot .sampleMainCardPublishedInner {
+  min-height: 0;
+}
+
 .sampleMainCardPublishedInner {
   position: relative;
   display: block;
@@ -425,7 +429,6 @@
   border-radius: inherit;
   overflow: hidden;
   box-sizing: border-box;
-  min-height: 0;
 }
 
 .sampleMainCardPosterPublishedSnapshot {
