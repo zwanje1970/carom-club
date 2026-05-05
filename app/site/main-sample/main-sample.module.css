@@ -546,6 +546,77 @@
   box-sizing: border-box;
 }
 
+/* 메인 세로 스크롤 광고만: 대회 덱 면(440/161)과 동일 비율, 게시 PNG 이미지 전면 cover */
+.slideViewportSiteMain
+  :global([data-site-main-scroll-ad="1"]).sampleMainCardSlot
+  > .sampleMainCardFacePublishedSnapshot {
+  aspect-ratio: 440 / 161;
+  overflow: hidden;
+}
+
+.slideViewportSiteMain
+  :global([data-site-main-scroll-ad="1"]).sampleMainCardSlot
+  > .sampleMainCardFacePublishedSnapshot
+  .sampleMainCardPosterPublishedSnapshot {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: center center;
+}
+
+.slideViewportSiteMain
+  :global([data-site-main-scroll-ad="1"]).sampleMainCardSlot
+  > .sampleMainCardFacePublishedSnapshot.sampleMainCardFacePublishedSnapshotImageOnly
+  .sampleMainCardPosterPublishedSnapshot {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: center center;
+}
+
+/*
+ * 광고 + 게시 PNG 플랫(PublishedSnapshotScrollCard): 슬롯에 data-published-snapshot-card-slot —
+ * 하위 div/img는 해당 컴포넌트 고정 마크업(면 > inner > img).
+ */
+.slideViewportSiteMain
+  :global([data-site-main-scroll-ad="1"][data-published-snapshot-card-slot])
+  > :global(div) {
+  aspect-ratio: 440 / 161;
+}
+
+.slideViewportSiteMain
+  :global([data-site-main-scroll-ad="1"][data-published-snapshot-card-slot])
+  > :global(div)
+  > :global(div) {
+  flex: 1 1 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.slideViewportSiteMain
+  :global([data-site-main-scroll-ad="1"][data-published-snapshot-card-slot])
+  > :global(div)
+  > :global(div)
+  > :global(img) {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: center center;
+  border-radius: inherit;
+  box-sizing: border-box;
+}
+
 /* 메인 전용: 좁은 뷰에서 에디터 미리보기 scale() 제거 — 면 비율은 aspect·폭 기반 높이만 사용 */
 .slideViewportSiteMain :global(.previewCardScaleInner) {
   transform: none !important;

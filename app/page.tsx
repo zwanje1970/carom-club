@@ -1,5 +1,4 @@
 import type { Viewport } from "next";
-import AdminFabServerBridge from "./components/AdminFabServerBridge";
 import SitePublicChromeLayout from "./site/SitePublicChromeLayout";
 import SiteHomePage, { metadata } from "./site/page";
 
@@ -18,11 +17,8 @@ export const viewport: Viewport = {
 
 export default async function HomePage() {
   return (
-    <>
-      <SitePublicChromeLayout>
-        <SiteHomePage />
-      </SitePublicChromeLayout>
-      <AdminFabServerBridge />
-    </>
+    <SitePublicChromeLayout>
+      <SiteHomePage />
+    </SitePublicChromeLayout>
   );
 }

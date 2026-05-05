@@ -1,7 +1,6 @@
 import type { Viewport } from "next";
 import { headers } from "next/headers";
 import { Suspense } from "react";
-import AdminFabServerBridge from "../components/AdminFabServerBridge";
 import SiteGeoConsentUrlSanitizer from "./components/SiteGeoConsentUrlSanitizer";
 import SiteMypageLightChromeLayout from "./SiteMypageLightChromeLayout";
 import SitePublicChromeLayout from "./SitePublicChromeLayout";
@@ -49,15 +48,12 @@ export default async function SiteLayout({
           {children}
         </SiteMypageLightChromeLayout>
       ) : (
-        <>
-          <SitePublicChromeLayout>
-            <Suspense fallback={null}>
-              <SiteGeoConsentUrlSanitizer />
-            </Suspense>
-            {children}
-          </SitePublicChromeLayout>
-          <AdminFabServerBridge />
-        </>
+        <SitePublicChromeLayout>
+          <Suspense fallback={null}>
+            <SiteGeoConsentUrlSanitizer />
+          </Suspense>
+          {children}
+        </SitePublicChromeLayout>
       )}
     </>
   );
