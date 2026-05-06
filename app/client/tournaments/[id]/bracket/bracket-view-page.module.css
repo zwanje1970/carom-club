@@ -1,0 +1,20 @@
+/* 모바일: 대회 설명/뒤로 + 제목 띠만 숨김. 권역·멀티블록 탭은 유지(분할 대진 전환). */
+@media (max-width: 767px) {
+  .pageHeaderNavChrome {
+    display: none !important;
+  }
+
+  .pageHeader {
+    padding-bottom: 0.35rem !important;
+    gap: 0.35rem !important;
+  }
+
+  .pageHeaderMessage {
+    flex-basis: 100%;
+    font-size: 0.78rem;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

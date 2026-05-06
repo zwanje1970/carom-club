@@ -365,3 +365,58 @@
   stroke-linejoin: miter;
   vector-effect: non-scaling-stroke;
 }
+
+/* bracket/view + 모바일: 상단 오버레이 숨김·툴바 라벨·양쪽형·초기화·나가기 */
+.toolbarBtnLabelShort {
+  display: inline;
+}
+
+.toolbarBtnLabelLong {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .boardChromeBracketView .bracketFloatingToolbar {
+    top: max(env(safe-area-inset-top, 0px), 10px);
+  }
+
+  .boardChromeBracketView .tournamentOverlay {
+    display: none !important;
+  }
+
+  .toolbarBtnLabelShort {
+    display: none !important;
+  }
+
+  .toolbarBtnLabelLong {
+    display: inline !important;
+  }
+
+  .toolbarDualDesktopOnly {
+    display: none !important;
+  }
+
+  .toolbarResetDesktopOnly {
+    display: none !important;
+  }
+
+  .toolbarExitBracketView {
+    width: auto !important;
+    min-height: 36px;
+    padding: 0 8px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+  }
+
+  .boardChromeBracketView .toolbarOrientationWide {
+    width: auto !important;
+    min-width: 40px;
+    padding: 0 6px !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .toolbarExitBracketView {
+    display: none !important;
+  }
+}

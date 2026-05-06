@@ -565,6 +565,7 @@ export default function InteractiveBracketBoard({
   tournamentDate = "",
   tournamentLocation = "",
   onPickWinner,
+  onClearMatchWinner,
   onSwapPlayers,
   onRenamePlayer,
   onShuffleRound,
@@ -573,12 +574,20 @@ export default function InteractiveBracketBoard({
   canUndo = false,
   onUndo,
   saveStateText = "",
+  chromeMode = "default",
+  onExit,
 }: {
   bracket: BracketBoardInput;
   tournamentTitle?: string;
   tournamentDate?: string;
   tournamentLocation?: string;
+  /** bracket/view 전용: 모바일에서 헤더·양쪽형 등 간소화 */
+  chromeMode?: "default" | "bracketView";
+  /** 모바일 툴바 나가기 (이동은 부모 handleExit에서 처리) */
+  onExit?: () => void;
   onPickWinner?: (args: { matchId: string; winnerUserId: string; roundNumber: number }) => void | Promise<void>;
+  /** 제공 시 진출 취소(×) 시 서버에 승자 해제 반영 (부모에서 처리) */
+  onClearMatchWinner?: (args: { matchId: string }) => void | Promise<void>;
   onSwapPlayers?: (args: {
     roundNumber: number;
     first: { matchId: string; slot: "player1" | "player2" };
@@ -978,32 +987,46 @@ export default function InteractiveBracketBoard({
     [interactionDisabled, onPickWinner],
   );
 
-  const handleAdvanceCancel = useCallback((pairKey: string) => {
-    const selected = winnerByPair[pairKey];
-    if (selected !== 0 && selected !== 1) return;
-    if (!window.confirm("진출을 취소하시겠습니까?")) return;
-    const [roundRaw, pairRaw] = pairKey.split(":");
-    const baseRound = Number(roundRaw);
-    const basePair = Number(pairRaw);
-    if (!Number.isFinite(baseRound) || !Number.isFinite(basePair)) return;
-    setWinnerByPair((prev) => {
-      const next: Record<string, WinnerChoice> = { ...prev };
-      delete next[pairKey];
-      for (const key of Object.keys(next)) {
-        const [roundText, pairText] = key.split(":");
-        const round = Number(roundText);
-        const pair = Number(pairText);
-        if (!Number.isFinite(round) || !Number.isFinite(pair)) continue;
-        if (round <= baseRound) continue;
-        const shift = 2 ** (round - baseRound);
-        const affectedPair = Math.floor(basePair / shift);
-        if (pair === affectedPair) {
-          delete next[key];
-        }
+  const handleAdvanceCancel = useCallback(
+    async (pairKey: string) => {
+      const selected = winnerByPair[pairKey];
+      if (selected !== 0 && selected !== 1) return;
+      if (!window.confirm("진출을 취소하시겠습니까?")) return;
+
+      const [roundRaw, pairRaw] = pairKey.split(":");
+      const baseRound = Number(roundRaw);
+      const basePair = Number(pairRaw);
+      if (!Number.isFinite(baseRound) || !Number.isFinite(basePair)) return;
+
+      if (onClearMatchWinner) {
+        const item = activeLayout.positionedMatches.find(
+          (p) => p.roundIndex === baseRound && Math.floor(p.internalIndex / 2) === basePair,
+        );
+        if (!item) return;
+        await onClearMatchWinner({ matchId: item.match.id });
+        return;
       }
-      return next;
-    });
-  }, [winnerByPair]);
+
+      setWinnerByPair((prev) => {
+        const next: Record<string, WinnerChoice> = { ...prev };
+        delete next[pairKey];
+        for (const key of Object.keys(next)) {
+          const [roundText, pairText] = key.split(":");
+          const round = Number(roundText);
+          const pair = Number(pairText);
+          if (!Number.isFinite(round) || !Number.isFinite(pair)) continue;
+          if (round <= baseRound) continue;
+          const shift = 2 ** (round - baseRound);
+          const affectedPair = Math.floor(basePair / shift);
+          if (pair === affectedPair) {
+            delete next[key];
+          }
+        }
+        return next;
+      });
+    },
+    [activeLayout.positionedMatches, onClearMatchWinner, winnerByPair],
+  );
 
   const onBoxPointerDown = useCallback(
     (
@@ -1203,12 +1226,17 @@ export default function InteractiveBracketBoard({
     winnerByPair,
   ]);
 
+  const rootChrome =
+    chromeMode === "bracketView"
+      ? ` ${styles.boardChromeBracketView}`
+      : "";
+
   return (
     <section
       className={
-        viewMode === "vertical"
+        (viewMode === "vertical"
           ? `${styles.boardRoot} ${styles.boardRootVerticalMatch}`
-          : `${styles.boardRoot} ${styles.boardRootHorizontalSlot}`
+          : `${styles.boardRoot} ${styles.boardRootHorizontalSlot}`) + rootChrome
       }
       data-interactive-bracket-root="1"
     >
@@ -1285,27 +1313,46 @@ export default function InteractiveBracketBoard({
         onPointerUp={(e) => e.stopPropagation()}
       >
         <div className={styles.bracketFloatingToolbarInner}>
+          {chromeMode === "bracketView" && onExit ? (
+            <button
+              type="button"
+              className={`${styles.toolbarButton} ${styles.toolbarExitBracketView}`}
+              title="나가기"
+              aria-label="나가기"
+              onClick={() => onExit()}
+            >
+              나가기
+            </button>
+          ) : null}
           <button
             type="button"
-            className={`${styles.toolbarButton} ${viewMode === "vertical" ? styles.toolbarButtonActive : ""}`}
+            className={`${styles.toolbarButton} ${styles.toolbarOrientationWide} ${
+              viewMode === "vertical" ? styles.toolbarButtonActive : ""
+            }`}
             title="세로형 보기"
             aria-label="세로형 보기"
             onClick={() => setViewMode("vertical")}
           >
-            V
+            <span className={styles.toolbarBtnLabelShort}>V</span>
+            <span className={styles.toolbarBtnLabelLong}>세로</span>
           </button>
           <button
             type="button"
-            className={`${styles.toolbarButton} ${viewMode === "horizontal" ? styles.toolbarButtonActive : ""}`}
+            className={`${styles.toolbarButton} ${styles.toolbarOrientationWide} ${
+              viewMode === "horizontal" ? styles.toolbarButtonActive : ""
+            }`}
             title="가로형 보기"
             aria-label="가로형 보기"
             onClick={() => setViewMode("horizontal")}
           >
-            H
+            <span className={styles.toolbarBtnLabelShort}>H</span>
+            <span className={styles.toolbarBtnLabelLong}>가로</span>
           </button>
           <button
             type="button"
-            className={`${styles.toolbarButton} ${viewMode === "dual" ? styles.toolbarButtonActive : ""}`}
+            className={`${styles.toolbarButton} ${styles.toolbarDualDesktopOnly} ${
+              viewMode === "dual" ? styles.toolbarButtonActive : ""
+            }`}
             title="양쪽형 보기"
             aria-label="양쪽형 보기"
             onClick={() => setViewMode("dual")}
@@ -1342,7 +1389,7 @@ export default function InteractiveBracketBoard({
           </button>
           <button
             type="button"
-            className={styles.toolbarButton}
+            className={`${styles.toolbarButton} ${styles.toolbarResetDesktopOnly}`}
             title="초기화"
             aria-label="초기화"
             onClick={() => resetBracketView()}
@@ -1416,7 +1463,7 @@ export default function InteractiveBracketBoard({
                   style={{ left: `${btn.x}px`, top: `${btn.y}px` }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleAdvanceCancel(btn.pairKey);
+                    void handleAdvanceCancel(btn.pairKey);
                   }}
                   title="진출 취소"
                 >
