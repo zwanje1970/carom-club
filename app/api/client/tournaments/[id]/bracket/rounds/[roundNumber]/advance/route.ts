@@ -66,7 +66,10 @@ export async function POST(
     );
   }
 
-  const result = await advanceBracketRoundFirestore(latestBracket.id, parsedRoundNumber);
+  const body = (await request.json().catch(() => null)) as { sliceKey?: string } | null;
+  const sliceKey = typeof body?.sliceKey === "string" ? body.sliceKey.trim() : undefined;
+
+  const result = await advanceBracketRoundFirestore(latestBracket.id, parsedRoundNumber, sliceKey);
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }

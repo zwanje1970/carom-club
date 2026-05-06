@@ -12,6 +12,9 @@ export type BracketRoundForProgress = {
 
 export type BracketForProgress = {
   rounds: BracketRoundForProgress[];
+  bracketMode?: "single" | "multi_block";
+  blocks?: Array<{ rounds: BracketRoundForProgress[] }>;
+  finalBlock?: { rounds: BracketRoundForProgress[] };
 };
 
 /** 서버·deriveRoundStatus와 동일하게 status 우선, 보조로 winnerUserId */
@@ -36,6 +39,26 @@ export type BracketProgressComputed = {
 };
 
 export function computeBracketProgress(bracket: BracketForProgress): BracketProgressComputed {
+  if (bracket.bracketMode === "multi_block" && bracket.blocks?.length) {
+    let total = 0;
+    let completed = 0;
+    const accumulate = (rounds: BracketRoundForProgress[]) => {
+      const sub = computeBracketProgress({ rounds });
+      total += sub.total;
+      completed += sub.completed;
+    };
+    for (const b of bracket.blocks) accumulate(b.rounds);
+    if (bracket.finalBlock?.rounds?.length) accumulate(bracket.finalBlock.rounds);
+    const remaining = Math.max(0, total - completed);
+    return {
+      total,
+      completed,
+      remaining,
+      currentRoundLabel: "조별·결선 통합",
+      perRound: [],
+    };
+  }
+
   const sorted = [...bracket.rounds].sort((a, b) => a.roundNumber - b.roundNumber);
   let total = 0;
   let completed = 0;

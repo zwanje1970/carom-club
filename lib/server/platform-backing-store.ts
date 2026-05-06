@@ -536,6 +536,18 @@ export type BracketRound = {
   status: BracketRoundStatus;
 };
 
+/** 예선 조(블록)별 독립 단판 트리 */
+export type BracketBlockSlice = {
+  id: string;
+  label?: string;
+  rounds: BracketRound[];
+};
+
+/** 결선 트리 (블록 1위 진출 슬롯) */
+export type BracketFinalSlice = {
+  rounds: BracketRound[];
+};
+
 export type Bracket = {
   id: string;
   tournamentId: string;
@@ -544,6 +556,18 @@ export type Bracket = {
   createdAt: string;
   /** 권역별 대진표 구분용. 없으면 기존 단일 대진표 */
   zoneId?: string | null;
+  /** 미설정·single = 기존 단일 대진표 (`rounds`만 사용) */
+  bracketMode?: "single" | "multi_block";
+  blocks?: BracketBlockSlice[];
+  finalBlock?: BracketFinalSlice;
+  /** 결선 1라운드 슬롯 인덱스(블록 순번)별 수동 편집 시 자동 동기화 제외 */
+  finalBlockSlotManual?: Record<string, boolean>;
+  /** 분할 생성 시 메타 */
+  blockSplit?: {
+    mode: "blockSize" | "blockCount";
+    blockSize?: number;
+    blockCount?: number;
+  };
 };
 
 export type BracketDraftMatchInput = {
@@ -562,8 +586,18 @@ export type MutableBracketRound = BracketRound & {
   matches: MutableBracketMatch[];
 };
 
+export type MutableBracketBlockSlice = BracketBlockSlice & {
+  rounds: MutableBracketRound[];
+};
+
+export type MutableBracketFinalSlice = BracketFinalSlice & {
+  rounds: MutableBracketRound[];
+};
+
 export type MutableBracket = Bracket & {
   rounds: MutableBracketRound[];
+  blocks?: MutableBracketBlockSlice[];
+  finalBlock?: MutableBracketFinalSlice;
 };
 
 export type MainCardTemplateType = "tournament" | "venue";
@@ -3632,8 +3666,8 @@ export function deriveRoundStatus(matches: Array<Pick<BracketMatch, "status">>):
   return "IN_PROGRESS";
 }
 
-export function applyBracketDefaultsInPlace(bracket: MutableBracket): void {
-  bracket.rounds = (bracket.rounds ?? []).map((round, roundIndex) => {
+function normalizeMutableRoundsInPlace(rounds: MutableBracketRound[]): void {
+  const mapped = (rounds ?? []).map((round, roundIndex) => {
     const normalizedMatches = (round.matches ?? []).map((match) => {
       const winnerUserId = match.winnerUserId ?? null;
       const winnerName = match.winnerName ?? null;
@@ -3654,6 +3688,20 @@ export function applyBracketDefaultsInPlace(bracket: MutableBracket): void {
       status,
     };
   });
+  rounds.length = 0;
+  rounds.push(...mapped);
+}
+
+export function applyBracketDefaultsInPlace(bracket: MutableBracket): void {
+  normalizeMutableRoundsInPlace(bracket.rounds ?? []);
+  if (Array.isArray(bracket.blocks)) {
+    for (const block of bracket.blocks) {
+      normalizeMutableRoundsInPlace(block.rounds ?? []);
+    }
+  }
+  if (bracket.finalBlock?.rounds) {
+    normalizeMutableRoundsInPlace(bracket.finalBlock.rounds);
+  }
 }
 
 export function normalizeBracket(bracket: Bracket): Bracket {
@@ -3663,6 +3711,27 @@ export function normalizeBracket(bracket: Bracket): Bracket {
       ...round,
       matches: (round.matches ?? []).map((match) => ({ ...match })),
     })),
+    ...(Array.isArray(bracket.blocks)
+      ? {
+          blocks: bracket.blocks.map((block) => ({
+            ...block,
+            rounds: (block.rounds ?? []).map((round) => ({
+              ...round,
+              matches: (round.matches ?? []).map((match) => ({ ...match })),
+            })),
+          })),
+        }
+      : {}),
+    ...(bracket.finalBlock
+      ? {
+          finalBlock: {
+            rounds: (bracket.finalBlock.rounds ?? []).map((round) => ({
+              ...round,
+              matches: (round.matches ?? []).map((match) => ({ ...match })),
+            })),
+          },
+        }
+      : {}),
   } as MutableBracket;
   applyBracketDefaultsInPlace(mutable);
   return mutable as Bracket;

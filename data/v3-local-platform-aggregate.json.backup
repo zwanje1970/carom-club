@@ -23797,6 +23797,13 @@
       "originalExt": "jpg",
       "createdAt": "2026-05-02T15:57:43.615Z",
       "sitePublic": true
+    },
+    {
+      "id": "82c46125-b8cd-4d8c-8e36-a48e278dce7c",
+      "uploaderUserId": "bbaed5ee-ca12-438d-9f8e-aba41eda6fee",
+      "originalExt": "png",
+      "createdAt": "2026-05-05T10:34:24.701Z",
+      "sitePublic": true
     }
   ],
   "outlinePdfAssets": [
@@ -24008,7 +24015,40 @@
     "updatedAt": "2026-04-16T14:24:09.141Z"
   },
   "publishedCardSnapshots": [],
-  "tournamentPublishedCards": [],
+  "tournamentPublishedCards": [
+    {
+      "snapshotId": "6f5324b2-e4bb-4edf-95b3-94b82eb43210",
+      "tournamentId": "12c6ef0f-7870-4e90-8cd4-46fbe9fc40f4",
+      "title": "대진표테스트대회",
+      "textLine1": "대진표테스트용입니다.",
+      "textLine2": "우승: 100",
+      "textLine3": null,
+      "templateType": "A",
+      "backgroundType": "theme",
+      "themeType": "dark",
+      "image320Url": "",
+      "imageId": "theme",
+      "status": "마감",
+      "targetDetailUrl": "/site/tournaments/12c6ef0f-7870-4e90-8cd4-46fbe9fc40f4",
+      "publishedAt": "2026-05-05T10:44:08.506Z",
+      "updatedAt": "2026-05-05T10:48:17.017Z",
+      "isPublished": true,
+      "isActive": true,
+      "version": 2,
+      "publishedBy": "bbaed5ee-ca12-438d-9f8e-aba41eda6fee",
+      "showOnMainSlide": false,
+      "deadlineSortValue": "2026-05-31",
+      "mediaBackground": "#38BDF8",
+      "imageOverlayBlend": true,
+      "imageOverlayOpacity": 1,
+      "cardDisplayDate": "2026-05-31 (일)",
+      "cardDisplayLocation": "캐롬클럽_아산",
+      "cardTextShadowEnabled": false,
+      "cardFooterDateTextColor": null,
+      "cardFooterPlaceTextColor": null,
+      "lifecycleStatus": "ACTIVE"
+    }
+  ],
   "scheduledPublishedCardImageDeletes": [],
   "sitePageBuilderDrafts": [
     {
@@ -24582,7 +24622,16 @@
       "updatedAt": "2026-04-29T14:41:56.452Z"
     }
   ],
-  "clientVenueIntros": [],
+  "clientVenueIntros": [
+    {
+      "clientUserId": "bbaed5ee-ca12-438d-9f8e-aba41eda6fee",
+      "outlineDisplayMode": "TEXT",
+      "outlineHtml": "<p>ㄹㅇㅇㄴㄻㅇㅁㅇㄴㅇㄴㄻㅇㄴㅇㄴㄹㅇㄹㄴㅇㄴㄹㅇㄹㄴㅇㄴㅁㄹㄹㅇㅇㄹㅇㄹㅇㄹㅇㄹㄴㅇㄹㅇㄹㄴㄹㅇㄴㅁㅇㅁㄹㄴㅇㄴㄹㅇㄴㄹ</p>",
+      "outlineImageUrl": null,
+      "outlinePdfUrl": null,
+      "updatedAt": "2026-05-05T10:29:55.283Z"
+    }
+  ],
   "communityPosts": [
     {
       "id": "cm-92636868-dd96-44ed-94e8-44d0d9593da9",
@@ -24604,6 +24653,26 @@
       "createdAt": "2026-05-02T13:29:38.125Z",
       "updatedAt": "2026-05-02T15:28:15.553Z",
       "viewCount": 45,
+      "commentCount": 0,
+      "isDeleted": false,
+      "status": "ACTIVE"
+    },
+    {
+      "id": "cm-21c7c8c2-7708-49a4-bbb7-8e09dd690fd7",
+      "boardType": "free",
+      "title": "ㄱㄷㄱㅈㄷㄷㄱㅈㄱㄷㅈ",
+      "content": "ㄷㄱㅈㄷㅈㄱㄷㅈㄱㄷㅈㄱㄷㅈㄱ\n![](/site-images/w640/663ad9ef-e038-4e3b-8156-d6a1860c1c48)",
+      "imageUrls": [
+        "/site-images/w640/663ad9ef-e038-4e3b-8156-d6a1860c1c48"
+      ],
+      "imageSizeLevels": [
+        2
+      ],
+      "authorUserId": "bbaed5ee-ca12-438d-9f8e-aba41eda6fee",
+      "authorNickname": "aaaaaa",
+      "createdAt": "2026-05-02T16:08:14.602Z",
+      "updatedAt": "2026-05-02T16:08:14.602Z",
+      "viewCount": 0,
       "commentCount": 0,
       "isDeleted": false,
       "status": "ACTIVE"
@@ -24638,6 +24707,7 @@
     "adsPerInsert": 1,
     "rotationMode": "sequential",
     "maxAdsPerCycle": 1,
-    "cardMoveDurationSec": 10
+    "cardMoveDurationSec": 5,
+    "cardMoveSpeedIsLevels": true
   }
 }
