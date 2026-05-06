@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { AuthRole } from "../../../../lib/auth/roles";
 
@@ -51,7 +50,6 @@ function canShowZoneTvLinkButton(params: {
 export default function TournamentZonesManageBlock({
   tournamentId,
   zonesEnabled,
-  tournamentEditHref,
   tournamentCreatedBy,
   viewerRole,
   viewerCanonicalUserId,
@@ -59,7 +57,6 @@ export default function TournamentZonesManageBlock({
 }: {
   tournamentId: string;
   zonesEnabled: boolean;
-  tournamentEditHref: string;
   tournamentCreatedBy: string;
   viewerRole: AuthRole | null;
   viewerCanonicalUserId: string;
@@ -247,23 +244,7 @@ export default function TournamentZonesManageBlock({
     }
   };
 
-  if (!zonesEnabled) {
-    return (
-      <section className="v3-box v3-stack" style={{ gap: "0.65rem", padding: "1rem" }} aria-label="권역 관리">
-        <h2 className="v3-h2" style={{ margin: 0, fontSize: "1.05rem" }}>
-          권역 관리
-        </h2>
-        <p className="v3-muted" style={{ margin: 0, fontSize: "0.9rem" }}>
-          권역 운영을 사용하려면 대회 정보에서 권역 모드를 활성화하세요.
-        </p>
-        <div>
-          <Link prefetch={false} href={tournamentEditHref} className="v3-btn">
-            대회 정보 수정
-          </Link>
-        </div>
-      </section>
-    );
-  }
+  if (!zonesEnabled) return null;
 
   return (
     <section className="v3-box v3-stack" style={{ gap: "0.65rem", padding: "1rem" }} aria-label="권역 관리">

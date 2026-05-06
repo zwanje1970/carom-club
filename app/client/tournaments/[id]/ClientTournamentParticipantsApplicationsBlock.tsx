@@ -408,12 +408,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     applicantName={entry.applicantName}
                     initialStatus={entry.status}
                     phone={entry.phone}
-                    createdShort={new Date(entry.createdAt).toLocaleString("ko-KR", {
-                      month: "numeric",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    registrationCreatedAt={entry.createdAt}
                     registrationSource={entry.registrationSource ?? null}
                     participantAverage={entry.participantAverage ?? null}
                     adminNote={entry.adminNote ?? null}

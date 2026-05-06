@@ -52,7 +52,7 @@ export default function TournamentManageFeatureCards({
   bracketEnabled: boolean;
   hasConfirmedBracket: boolean;
 }) {
-  const editHref = `/client/tournaments/new?edit=${encodeURIComponent(tournamentId)}`;
+  const editHref = `/client/tournaments/${encodeURIComponent(tournamentId)}/edit`;
   const settlementHref = `/client/settlement/${encodeURIComponent(tournamentId)}`;
   const bracketManageHref = `/client/tournaments/${tournamentId}/bracket`;
   const bracketCreateHref = `/client/tournaments/${tournamentId}/bracket/create`;

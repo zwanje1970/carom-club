@@ -85,17 +85,18 @@ export default async function ClientTournamentManagePage({
         />
       </section>
 
-      <section className="client-tournament-manage__card">
-        <TournamentZonesManageBlock
-          tournamentId={id}
-          zonesEnabled={tournament.zonesEnabled === true}
-          tournamentEditHref={`/client/tournaments/new?edit=${encodeURIComponent(id)}`}
-          tournamentCreatedBy={tournament.createdBy ?? ""}
-          viewerRole={sessionUser?.role ?? null}
-          viewerCanonicalUserId={viewerId}
-          viewerSessionUserId={session?.userId?.trim() ?? ""}
-        />
-      </section>
+      {tournament.zonesEnabled === true ? (
+        <section className="client-tournament-manage__card">
+          <TournamentZonesManageBlock
+            tournamentId={id}
+            zonesEnabled
+            tournamentCreatedBy={tournament.createdBy ?? ""}
+            viewerRole={sessionUser?.role ?? null}
+            viewerCanonicalUserId={viewerId}
+            viewerSessionUserId={session?.userId?.trim() ?? ""}
+          />
+        </section>
+      ) : null}
 
       <section className="client-tournament-manage__card">
         <TournamentTvLinkBlock tournamentId={id} />

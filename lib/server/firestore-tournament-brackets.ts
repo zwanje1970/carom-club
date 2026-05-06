@@ -737,3 +737,435 @@ export async function advanceBracketRoundFirestore(
     throw e;
   }
 }
+
+function matchWinnerPlayerOrNull(match: MutableBracketMatch): BracketPlayer | null {
+  if (match.status !== "COMPLETED") return null;
+  const wid = typeof match.winnerUserId === "string" ? match.winnerUserId.trim() : "";
+  const wnm = typeof match.winnerName === "string" ? match.winnerName.trim() : "";
+  if (!wid || !wnm) return null;
+  return { userId: wid, name: wnm };
+}
+
+function tbdPlayer(nextRoundNumber: number, pairIndex: number, slot: "player1" | "player2"): BracketPlayer {
+  return {
+    userId: `__TBD__:${nextRoundNumber}:${pairIndex}:${slot}`,
+    name: "TBD",
+  };
+}
+
+function buildNextRoundMatchesFromRound(params: {
+  currentRound: MutableBracketRound;
+  nextRoundNumber: number;
+  allowPartial: boolean;
+}): MutableBracketMatch[] {
+  const { currentRound, nextRoundNumber, allowPartial } = params;
+  const pairCount = Math.floor(currentRound.matches.length / 2);
+  const nextMatches: MutableBracketMatch[] = [];
+  for (let i = 0; i < pairCount; i += 1) {
+    const m1 = currentRound.matches[i * 2]!;
+    const m2 = currentRound.matches[i * 2 + 1]!;
+    const w1 = matchWinnerPlayerOrNull(m1);
+    const w2 = matchWinnerPlayerOrNull(m2);
+    if (!allowPartial && (!w1 || !w2)) {
+      throw new BracketOpReject("해당 라운드에 승자가 확정되지 않은 매치가 있어 재생성할 수 없습니다.");
+    }
+    nextMatches.push({
+      id: randomUUID(),
+      player1: w1 ?? tbdPlayer(nextRoundNumber, i, "player1"),
+      player2: w2 ?? tbdPlayer(nextRoundNumber, i, "player2"),
+      winnerUserId: null,
+      winnerName: null,
+      status: "PENDING",
+    });
+  }
+  return nextMatches;
+}
+
+function normalizeRoundStatusesInPlace(bracket: MutableBracket): void {
+  for (const round of bracket.rounds) {
+    round.status = deriveRoundStatus(round.matches);
+  }
+}
+
+function truncateRoundsAfter(bracket: MutableBracket, roundNumber: number): void {
+  bracket.rounds = bracket.rounds.filter((round) => round.roundNumber <= roundNumber);
+}
+
+export async function resetBracketRoundsAfterFirestore(params: {
+  tournamentId: string;
+  roundNumber: number;
+  bracketZoneId?: string | null;
+}): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const tournamentId = params.tournamentId.trim();
+  const roundNumber = Math.floor(Number(params.roundNumber));
+  if (!tournamentId || !Number.isFinite(roundNumber) || roundNumber <= 0) {
+    return { ok: false, error: "잘못된 요청입니다." };
+  }
+  const tournament = await getTournamentByIdFirestore(tournamentId);
+  if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다." };
+  const resolved = await resolveLatestBracketForMutationFirestore({
+    tournamentId,
+    tournament,
+    bracketZoneId: params.bracketZoneId,
+  });
+  if (!resolved) {
+    return {
+      ok: false,
+      error:
+        tournament.zonesEnabled === true
+          ? "권역(zoneId)를 지정하거나 해당 권역의 확정 대진표가 없습니다."
+          : "확정 대진표가 없습니다.",
+    };
+  }
+  const db = getSharedFirestoreDb();
+  try {
+    const bracket = await db.runTransaction(async (tx) => {
+      const ref = db.collection(BRACKETS).doc(resolved.id);
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new BracketOpReject("확정 대진표가 없습니다.");
+      const mut = bracketFromDoc(snap.id, snap.data() as Record<string, unknown>) as MutableBracket;
+      if (!mut) throw new BracketOpReject("확정 대진표가 없습니다.");
+      applyBracketDefaultsInPlace(mut);
+      if (!mut.rounds.some((r) => r.roundNumber === roundNumber)) {
+        throw new BracketOpReject("대상 라운드를 찾을 수 없습니다.");
+      }
+      truncateRoundsAfter(mut, roundNumber);
+      normalizeRoundStatusesInPlace(mut);
+      const normalized = normalizeBracket(mut as Bracket);
+      tx.set(ref, bracketToPlain(normalized));
+      return normalized;
+    });
+    return { ok: true, bracket };
+  } catch (e) {
+    if (e instanceof BracketOpReject) return { ok: false, error: e.message };
+    throw e;
+  }
+}
+
+export async function rebuildBracketRoundFirestore(params: {
+  tournamentId: string;
+  roundNumber: number;
+  allowPartial?: boolean;
+  bracketZoneId?: string | null;
+}): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const tournamentId = params.tournamentId.trim();
+  const roundNumber = Math.floor(Number(params.roundNumber));
+  if (!tournamentId || !Number.isFinite(roundNumber) || roundNumber <= 0) {
+    return { ok: false, error: "잘못된 요청입니다." };
+  }
+  const tournament = await getTournamentByIdFirestore(tournamentId);
+  if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다." };
+  const resolved = await resolveLatestBracketForMutationFirestore({
+    tournamentId,
+    tournament,
+    bracketZoneId: params.bracketZoneId,
+  });
+  if (!resolved) {
+    return {
+      ok: false,
+      error:
+        tournament.zonesEnabled === true
+          ? "권역(zoneId)를 지정하거나 해당 권역의 확정 대진표가 없습니다."
+          : "확정 대진표가 없습니다.",
+    };
+  }
+  const allowPartial = params.allowPartial === true;
+  const db = getSharedFirestoreDb();
+  try {
+    const bracket = await db.runTransaction(async (tx) => {
+      const ref = db.collection(BRACKETS).doc(resolved.id);
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new BracketOpReject("확정 대진표가 없습니다.");
+      const mut = bracketFromDoc(snap.id, snap.data() as Record<string, unknown>) as MutableBracket;
+      if (!mut) throw new BracketOpReject("확정 대진표가 없습니다.");
+      applyBracketDefaultsInPlace(mut);
+      const currentRound = mut.rounds.find((r) => r.roundNumber === roundNumber);
+      if (!currentRound) throw new BracketOpReject("대상 라운드를 찾을 수 없습니다.");
+      if (!allowPartial && currentRound.status !== "COMPLETED") {
+        throw new BracketOpReject("현재 라운드가 완료되지 않아 재생성할 수 없습니다.");
+      }
+      truncateRoundsAfter(mut, roundNumber);
+      const nextRoundNumber = roundNumber + 1;
+      const nextMatches = buildNextRoundMatchesFromRound({
+        currentRound,
+        nextRoundNumber,
+        allowPartial,
+      });
+      if (nextMatches.length === 0) {
+        throw new BracketOpReject("다음 라운드를 만들 매치가 부족합니다.");
+      }
+      mut.rounds.push({
+        roundNumber: nextRoundNumber,
+        matches: nextMatches,
+        status: "PENDING",
+      });
+      normalizeRoundStatusesInPlace(mut);
+      const normalized = normalizeBracket(mut as Bracket);
+      tx.set(ref, bracketToPlain(normalized));
+      return normalized;
+    });
+    return { ok: true, bracket };
+  } catch (e) {
+    if (e instanceof BracketOpReject) return { ok: false, error: e.message };
+    throw e;
+  }
+}
+
+function rebuildChainFromRoundInPlace(params: {
+  bracket: MutableBracket;
+  startRoundNumber: number;
+  allowPartial: boolean;
+}): void {
+  const { bracket, startRoundNumber, allowPartial } = params;
+  truncateRoundsAfter(bracket, startRoundNumber);
+  let currentRoundNumber = startRoundNumber;
+  while (true) {
+    const currentRound = bracket.rounds.find((r) => r.roundNumber === currentRoundNumber);
+    if (!currentRound) break;
+    if (!allowPartial && currentRound.status !== "COMPLETED") break;
+    const nextRoundNumber = currentRoundNumber + 1;
+    const nextMatches = buildNextRoundMatchesFromRound({ currentRound, nextRoundNumber, allowPartial });
+    if (nextMatches.length === 0) break;
+    bracket.rounds.push({
+      roundNumber: nextRoundNumber,
+      matches: nextMatches,
+      status: "PENDING",
+    });
+    currentRoundNumber = nextRoundNumber;
+    if (nextMatches.length === 1) break;
+  }
+  normalizeRoundStatusesInPlace(bracket);
+}
+
+export async function rebuildBracketFromRoundFirestore(params: {
+  tournamentId: string;
+  roundNumber: number;
+  allowPartial?: boolean;
+  bracketZoneId?: string | null;
+}): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const tournamentId = params.tournamentId.trim();
+  const roundNumber = Math.floor(Number(params.roundNumber));
+  if (!tournamentId || !Number.isFinite(roundNumber) || roundNumber <= 0) {
+    return { ok: false, error: "잘못된 요청입니다." };
+  }
+  const tournament = await getTournamentByIdFirestore(tournamentId);
+  if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다." };
+  const resolved = await resolveLatestBracketForMutationFirestore({
+    tournamentId,
+    tournament,
+    bracketZoneId: params.bracketZoneId,
+  });
+  if (!resolved) {
+    return {
+      ok: false,
+      error:
+        tournament.zonesEnabled === true
+          ? "권역(zoneId)를 지정하거나 해당 권역의 확정 대진표가 없습니다."
+          : "확정 대진표가 없습니다.",
+    };
+  }
+  const allowPartial = params.allowPartial === true;
+  const db = getSharedFirestoreDb();
+  try {
+    const bracket = await db.runTransaction(async (tx) => {
+      const ref = db.collection(BRACKETS).doc(resolved.id);
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new BracketOpReject("확정 대진표가 없습니다.");
+      const mut = bracketFromDoc(snap.id, snap.data() as Record<string, unknown>) as MutableBracket;
+      if (!mut) throw new BracketOpReject("확정 대진표가 없습니다.");
+      applyBracketDefaultsInPlace(mut);
+      const startRound = mut.rounds.find((r) => r.roundNumber === roundNumber);
+      if (!startRound) {
+        throw new BracketOpReject("대상 라운드를 찾을 수 없습니다.");
+      }
+      if (!allowPartial && startRound.status !== "COMPLETED") {
+        throw new BracketOpReject("시작 라운드가 완료되지 않아 전체 재생성이 불가능합니다.");
+      }
+      rebuildChainFromRoundInPlace({ bracket: mut, startRoundNumber: roundNumber, allowPartial });
+      const normalized = normalizeBracket(mut as Bracket);
+      tx.set(ref, bracketToPlain(normalized));
+      return normalized;
+    });
+    return { ok: true, bracket };
+  } catch (e) {
+    if (e instanceof BracketOpReject) return { ok: false, error: e.message };
+    throw e;
+  }
+}
+
+type ReassignOperation =
+  | { type: "swap_within_match"; matchId: string }
+  | { type: "swap_between_matches"; matchAId: string; slotA: "player1" | "player2"; matchBId: string; slotB: "player1" | "player2" };
+
+export async function reassignBracketMatchesFirestore(params: {
+  tournamentId: string;
+  roundNumber: number;
+  operations: ReassignOperation[];
+  autoRebuildAfter?: boolean;
+  allowPartialRebuild?: boolean;
+  bracketZoneId?: string | null;
+}): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const tournamentId = params.tournamentId.trim();
+  const roundNumber = Math.floor(Number(params.roundNumber));
+  if (!tournamentId || !Number.isFinite(roundNumber) || roundNumber <= 0) {
+    return { ok: false, error: "잘못된 요청입니다." };
+  }
+  if (!Array.isArray(params.operations) || params.operations.length === 0) {
+    return { ok: false, error: "재배치 작업이 없습니다." };
+  }
+  const tournament = await getTournamentByIdFirestore(tournamentId);
+  if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다." };
+  const resolved = await resolveLatestBracketForMutationFirestore({
+    tournamentId,
+    tournament,
+    bracketZoneId: params.bracketZoneId,
+  });
+  if (!resolved) {
+    return {
+      ok: false,
+      error:
+        tournament.zonesEnabled === true
+          ? "권역(zoneId)를 지정하거나 해당 권역의 확정 대진표가 없습니다."
+          : "확정 대진표가 없습니다.",
+    };
+  }
+  const autoRebuildAfter = params.autoRebuildAfter !== false;
+  const allowPartialRebuild = params.allowPartialRebuild !== false;
+  const db = getSharedFirestoreDb();
+  try {
+    const bracket = await db.runTransaction(async (tx) => {
+      const ref = db.collection(BRACKETS).doc(resolved.id);
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new BracketOpReject("확정 대진표가 없습니다.");
+      const mut = bracketFromDoc(snap.id, snap.data() as Record<string, unknown>) as MutableBracket;
+      if (!mut) throw new BracketOpReject("확정 대진표가 없습니다.");
+      applyBracketDefaultsInPlace(mut);
+      const round = mut.rounds.find((r) => r.roundNumber === roundNumber);
+      if (!round) throw new BracketOpReject("대상 라운드를 찾을 수 없습니다.");
+      const matchMap = new Map<string, MutableBracketMatch>();
+      for (const m of round.matches) matchMap.set(m.id, m);
+
+      for (const op of params.operations) {
+        if (op.type === "swap_within_match") {
+          const m = matchMap.get(op.matchId.trim());
+          if (!m) throw new BracketOpReject("재배치 대상 매치를 찾을 수 없습니다.");
+          const p1 = m.player1;
+          m.player1 = m.player2;
+          m.player2 = p1;
+          m.winnerUserId = null;
+          m.winnerName = null;
+          m.status = "PENDING";
+          continue;
+        }
+        if (op.type === "swap_between_matches") {
+          const a = matchMap.get(op.matchAId.trim());
+          const b = matchMap.get(op.matchBId.trim());
+          if (!a || !b) throw new BracketOpReject("재배치 대상 매치를 찾을 수 없습니다.");
+          const pa = op.slotA === "player1" ? a.player1 : a.player2;
+          const pb = op.slotB === "player1" ? b.player1 : b.player2;
+          if (op.slotA === "player1") a.player1 = pb; else a.player2 = pb;
+          if (op.slotB === "player1") b.player1 = pa; else b.player2 = pa;
+          a.winnerUserId = null;
+          a.winnerName = null;
+          a.status = "PENDING";
+          b.winnerUserId = null;
+          b.winnerName = null;
+          b.status = "PENDING";
+          continue;
+        }
+      }
+
+      normalizeRoundStatusesInPlace(mut);
+      const hasDownstream = mut.rounds.some((r) => r.roundNumber > roundNumber);
+      if (hasDownstream) {
+        if (!autoRebuildAfter) {
+          throw new BracketOpReject("이후 라운드가 있어 재배치할 수 없습니다. reset-after/rebuild를 먼저 실행해 주세요.");
+        }
+        rebuildChainFromRoundInPlace({
+          bracket: mut,
+          startRoundNumber: roundNumber,
+          allowPartial: allowPartialRebuild,
+        });
+      }
+      const normalized = normalizeBracket(mut as Bracket);
+      tx.set(ref, bracketToPlain(normalized));
+      return normalized;
+    });
+    return { ok: true, bracket };
+  } catch (e) {
+    if (e instanceof BracketOpReject) return { ok: false, error: e.message };
+    throw e;
+  }
+}
+
+export async function updateBracketMatchPlayerNameFirestore(params: {
+  tournamentId: string;
+  matchId: string;
+  slot: "player1" | "player2";
+  displayName: string;
+  bracketZoneId?: string | null;
+}): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const tournamentId = params.tournamentId.trim();
+  const matchId = params.matchId.trim();
+  const displayName = params.displayName.trim();
+  if (!tournamentId || !matchId || !displayName) {
+    return { ok: false, error: "잘못된 요청입니다." };
+  }
+  if (params.slot !== "player1" && params.slot !== "player2") {
+    return { ok: false, error: "잘못된 슬롯입니다." };
+  }
+  const tournament = await getTournamentByIdFirestore(tournamentId);
+  if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다." };
+  const resolved = await resolveLatestBracketForMutationFirestore({
+    tournamentId,
+    tournament,
+    bracketZoneId: params.bracketZoneId,
+  });
+  if (!resolved) {
+    return {
+      ok: false,
+      error:
+        tournament.zonesEnabled === true
+          ? "권역(zoneId)를 지정하거나 해당 권역의 확정 대진표가 없습니다."
+          : "확정 대진표가 없습니다.",
+    };
+  }
+  const db = getSharedFirestoreDb();
+  try {
+    const bracket = await db.runTransaction(async (tx) => {
+      const ref = db.collection(BRACKETS).doc(resolved.id);
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new BracketOpReject("확정 대진표가 없습니다.");
+      const mut = bracketFromDoc(snap.id, snap.data() as Record<string, unknown>) as MutableBracket;
+      if (!mut) throw new BracketOpReject("확정 대진표가 없습니다.");
+      applyBracketDefaultsInPlace(mut);
+      let target: MutableBracketMatch | null = null;
+      for (const round of mut.rounds) {
+        const m = round.matches.find((x) => x.id === matchId);
+        if (m) {
+          target = m;
+          break;
+        }
+      }
+      if (!target) throw new BracketOpReject("대상 매치를 찾을 수 없습니다.");
+      const player = params.slot === "player1" ? target.player1 : target.player2;
+      player.name = displayName;
+      if (typeof target.winnerUserId === "string" && target.winnerUserId === player.userId) {
+        target.winnerName = displayName;
+      }
+      normalizeRoundStatusesInPlace(mut);
+      const normalized = normalizeBracket(mut as Bracket);
+      tx.set(ref, bracketToPlain(normalized));
+      return normalized;
+    });
+    return { ok: true, bracket };
+  } catch (e) {
+    if (e instanceof BracketOpReject) return { ok: false, error: e.message };
+    throw e;
+  }
+}

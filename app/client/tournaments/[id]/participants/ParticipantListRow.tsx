@@ -19,6 +19,22 @@ const STATUS_LABELS: Record<TournamentApplicationStatus, string> = {
   REJECTED: "거절",
 };
 
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : String(n);
+}
+
+/**
+ * locale·Intl 미사용, ISO 시각을 UTC 기준 YYYY.MM.DD HH:mm 로만 조합 (SSR·클라이언트 동일).
+ */
+function formatRegistrationInstantUtc(iso: string): string {
+  const raw = iso.trim();
+  if (!raw) return "";
+  const d = new Date(raw);
+  const t = d.getTime();
+  if (Number.isNaN(t)) return raw;
+  return `${d.getUTCFullYear()}.${pad2(d.getUTCMonth() + 1)}.${pad2(d.getUTCDate())} ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`;
+}
+
 function statusBadgeStyle(status: TournamentApplicationStatus): CSSProperties {
   if (status === "APPROVED") {
     return { background: "#dff5e6", color: "#0d5c2e", border: "1px solid #7dcea0" };
@@ -57,7 +73,7 @@ function formatDepositMd(status: TournamentApplicationStatus, statusChangedAt?: 
   const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
   if (iso) return `${Number(iso[2])}/${Number(iso[3])}`;
   const d = new Date(raw);
-  if (!Number.isNaN(d.getTime())) return `${d.getMonth() + 1}/${d.getDate()}`;
+  if (!Number.isNaN(d.getTime())) return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
   return "—";
 }
 
@@ -68,7 +84,7 @@ export default function ParticipantListRow({
   applicantName,
   initialStatus,
   phone,
-  createdShort,
+  registrationCreatedAt,
   registrationSource,
   participantAverage,
   adminNote,
@@ -87,7 +103,8 @@ export default function ParticipantListRow({
   applicantName: string;
   initialStatus: TournamentApplicationStatus;
   phone: string;
-  createdShort: string;
+  /** ISO 시각 문자열(서버 저장값 그대로). 표시는 컴포넌트 내 고정 포맷만 사용 */
+  registrationCreatedAt: string;
   registrationSource?: "admin" | null;
   participantAverage?: number | null;
   adminNote?: string | null;
@@ -210,12 +227,13 @@ export default function ParticipantListRow({
   }
 
   const showEver = participantAverage != null && Number.isFinite(participantAverage);
+  const registrationDisplay = formatRegistrationInstantUtc(registrationCreatedAt);
   const metaBits: string[] = [];
   if (registrationSource === "admin" && adminNote?.trim()) {
     metaBits.push(`비고: ${adminNote.trim()}`);
   }
-  if (createdShort) {
-    metaBits.push(registrationSource === "admin" ? `등록 ${createdShort}` : `신청 ${createdShort}`);
+  if (registrationDisplay) {
+    metaBits.push(registrationSource === "admin" ? `등록 ${registrationDisplay}` : `신청 ${registrationDisplay}`);
   }
   const metaLine = metaBits.join(" · ");
 
