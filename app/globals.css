@@ -2893,6 +2893,30 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
     display: flex;
     flex-direction: column;
   }
+
+  /* /client/.../bracket/view: 파란 모바일 크롬 숨김 + 본문 풀뷰포트 */
+  .app-dashboard-mobile-root:has([data-client-bracket-view-fullscreen="1"]) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .app-dashboard-mobile-root:has([data-client-bracket-view-fullscreen="1"]) > .app-dashboard-mobile-chrome {
+    display: none !important;
+  }
+
+  .app-dashboard-mobile-root:has([data-client-bracket-view-fullscreen="1"])
+    > .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding-top: 0;
+  }
 }
 
 .app-dashboard-shell.app-mobile-bottom-nav-scroll-pad {

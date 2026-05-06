@@ -1,20 +1,51 @@
-/* 모바일: 대회 설명/뒤로 + 제목 띠만 숨김. 권역·멀티블록 탭은 유지(분할 대진 전환). */
+/* 데스크톱: 기존 페이지 헤더 */
+.pageHeaderMessage {
+  flex-basis: 100%;
+  font-size: 0.78rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .bracketViewMobileTopChrome {
+    display: none !important;
+  }
+}
+
+/* 모바일: 앱·페이지 상단 헤더 숨김 — 권역·멀티블록·메시지는 상단 고정 바로만 표시 */
 @media (max-width: 767px) {
-  .pageHeaderNavChrome {
+  .pageHeader {
     display: none !important;
   }
 
-  .pageHeader {
-    padding-bottom: 0.35rem !important;
-    gap: 0.35rem !important;
+  .bracketViewMobileTopChrome {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 250;
+    padding: max(env(safe-area-inset-top, 0px), 6px) max(env(safe-area-inset-right, 0px), 10px) 8px
+      max(env(safe-area-inset-left, 0px), 10px);
+    background: rgba(248, 250, 252, 0.96);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+    pointer-events: auto;
+    box-sizing: border-box;
   }
 
-  .pageHeaderMessage {
-    flex-basis: 100%;
-    font-size: 0.78rem;
+  .bracketViewMain {
+    height: 100dvh;
+    min-height: 100dvh;
+    padding-top: 0;
+    top: 0;
+    width: 100%;
     max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    box-sizing: border-box;
   }
 }

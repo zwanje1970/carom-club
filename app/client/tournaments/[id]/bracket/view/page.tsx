@@ -494,16 +494,86 @@ export default function TournamentBracketBoardViewPage() {
   const saveStateText =
     saveState === "saving" ? "저장 중..." : saveState === "saved" ? "저장됨" : saveState === "error" ? "오류 발생" : "";
 
+  const showBracketViewMobileChrome =
+    zonesEnabled ||
+    Boolean(bracket?.bracketMode === "multi_block" && bracket.blocks?.length) ||
+    Boolean(message);
+
+  const bracketViewMobileTopOffset = showBracketViewMobileChrome ? "56px" : "0px";
+
+  const renderBracketContextControls = () => (
+    <>
+      {bracket?.bracketMode === "multi_block" && bracket.blocks?.length ? (
+        <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", alignItems: "center" }}>
+          {bracket.blocks.map((bl) => (
+            <button
+              key={bl.id}
+              type="button"
+              className="v3-btn"
+              style={{
+                minHeight: 32,
+                fontSize: "0.82rem",
+                padding: "0.25rem 0.55rem",
+                fontWeight: boardSliceKey === `block:${bl.id}` ? 700 : 600,
+                border: boardSliceKey === `block:${bl.id}` ? "2px solid #2563eb" : undefined,
+              }}
+              onClick={() => setBoardSliceKey(`block:${bl.id}`)}
+            >
+              조 {bl.label ?? bl.id}
+            </button>
+          ))}
+          {bracket.finalBlock?.rounds?.length ? (
+            <button
+              type="button"
+              className="v3-btn"
+              style={{
+                minHeight: 32,
+                fontSize: "0.82rem",
+                padding: "0.25rem 0.55rem",
+                fontWeight: boardSliceKey === "final" ? 700 : 600,
+                border: boardSliceKey === "final" ? "2px solid #2563eb" : undefined,
+              }}
+              onClick={() => setBoardSliceKey("final")}
+            >
+              결선
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {zonesEnabled ? (
+        <select
+          className="v3-btn"
+          value={selectedZoneId}
+          onChange={(e) => setSelectedZoneId(e.target.value)}
+          disabled={zoneOptions.length === 0}
+          style={{ minHeight: 34, fontWeight: 600 }}
+        >
+          {zoneOptions.length === 0 ? <option value="">권역 없음</option> : null}
+          {zoneOptions.map((z) => (
+            <option key={z.id} value={z.id}>
+              {z.zoneName}
+            </option>
+          ))}
+        </select>
+      ) : null}
+      {message ? <span className={`v3-muted ${viewStyles.pageHeaderMessage}`}>{message}</span> : null}
+    </>
+  );
+
   return (
     <main
+      className={viewStyles.bracketViewMain}
+      data-client-bracket-view-fullscreen="1"
       style={{
         position: "fixed",
         inset: 0,
         width: "100vw",
         height: "100dvh",
+        minHeight: "100dvh",
         overflow: "hidden",
         background: "#f8fafc",
         overscrollBehavior: "none",
+        ["--bracket-view-mobile-top-offset" as string]: bracketViewMobileTopOffset,
       }}
     >
       <header
@@ -537,63 +607,14 @@ export default function TournamentBracketBoardViewPage() {
           </button>
           <strong style={{ fontSize: "0.92rem" }}>대진표 보기</strong>
         </div>
-        {bracket?.bracketMode === "multi_block" && bracket.blocks?.length ? (
-          <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", alignItems: "center" }}>
-            {bracket.blocks.map((bl) => (
-              <button
-                key={bl.id}
-                type="button"
-                className="v3-btn"
-                style={{
-                  minHeight: 32,
-                  fontSize: "0.82rem",
-                  padding: "0.25rem 0.55rem",
-                  fontWeight: boardSliceKey === `block:${bl.id}` ? 700 : 600,
-                  border: boardSliceKey === `block:${bl.id}` ? "2px solid #2563eb" : undefined,
-                }}
-                onClick={() => setBoardSliceKey(`block:${bl.id}`)}
-              >
-                조 {bl.label ?? bl.id}
-              </button>
-            ))}
-            {bracket.finalBlock?.rounds?.length ? (
-              <button
-                type="button"
-                className="v3-btn"
-                style={{
-                  minHeight: 32,
-                  fontSize: "0.82rem",
-                  padding: "0.25rem 0.55rem",
-                  fontWeight: boardSliceKey === "final" ? 700 : 600,
-                  border: boardSliceKey === "final" ? "2px solid #2563eb" : undefined,
-                }}
-                onClick={() => setBoardSliceKey("final")}
-              >
-                결선
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-        {zonesEnabled ? (
-          <select
-            className="v3-btn"
-            value={selectedZoneId}
-            onChange={(e) => setSelectedZoneId(e.target.value)}
-            disabled={zoneOptions.length === 0}
-            style={{ minHeight: 34, fontWeight: 600 }}
-          >
-            {zoneOptions.length === 0 ? <option value="">권역 없음</option> : null}
-            {zoneOptions.map((z) => (
-              <option key={z.id} value={z.id}>
-                {z.zoneName}
-              </option>
-            ))}
-          </select>
-        ) : null}
-        {message ? (
-          <span className={`v3-muted ${viewStyles.pageHeaderMessage}`}>{message}</span>
-        ) : null}
+        {renderBracketContextControls()}
       </header>
+
+      {showBracketViewMobileChrome ? (
+        <div className={viewStyles.bracketViewMobileTopChrome} aria-label="대진표 보기 옵션">
+          {renderBracketContextControls()}
+        </div>
+      ) : null}
 
       <section
         style={{

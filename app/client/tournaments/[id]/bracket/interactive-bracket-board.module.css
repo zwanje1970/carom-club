@@ -1,6 +1,7 @@
 .boardRoot {
   position: fixed;
   inset: 0;
+  top: 0;
   width: 100vw;
   height: 100vh;
   min-height: 0;
@@ -376,12 +377,26 @@
 }
 
 @media (max-width: 767px) {
+  .boardChromeBracketView.boardRoot {
+    height: 100dvh;
+    min-height: 100dvh;
+    padding-top: 0;
+  }
+
   .boardChromeBracketView .bracketFloatingToolbar {
-    top: max(env(safe-area-inset-top, 0px), 10px);
+    top: calc(max(env(safe-area-inset-top, 0px), 10px) + var(--bracket-view-mobile-top-offset, 0px));
   }
 
   .boardChromeBracketView .tournamentOverlay {
-    display: none !important;
+    top: calc(max(env(safe-area-inset-top, 0px), 0px) + var(--bracket-view-mobile-top-offset, 0px) + 6px);
+    left: auto;
+    right: max(env(safe-area-inset-right, 0px), 10px);
+    text-align: right;
+    max-width: min(22rem, calc(100vw - 3.75rem));
+  }
+
+  .boardChromeBracketView .controlBar {
+    top: calc(max(env(safe-area-inset-top, 0px), 6px) + var(--bracket-view-mobile-top-offset, 0px));
   }
 
   .toolbarBtnLabelShort {
