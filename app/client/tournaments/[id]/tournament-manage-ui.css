@@ -742,6 +742,75 @@
   color: #1e3a8a;
 }
 
+.client-tournament-manage .client-tournament-manage__participantTable--applicationsCompact thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fafc;
+}
+
+.client-tournament-manage tbody tr.participant-row--rejected td {
+  background: #f3f4f6 !important;
+}
+
+.client-tournament-manage button.v3-appProcBtn {
+  box-shadow: none !important;
+  cursor: pointer;
+}
+
+.client-tournament-manage button.v3-appProcBtn:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.client-tournament-manage button.v3-appProcBtn--depositIdle {
+  background: #fff;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.client-tournament-manage button.v3-appProcBtn--depositDone {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+
+.client-tournament-manage button.v3-appProcBtn--approveIdleDisabled {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #86efac;
+}
+
+.client-tournament-manage button.v3-appProcBtn--approveReady {
+  background: #fff;
+  border-color: #4ade80;
+  color: #15803d;
+}
+
+.client-tournament-manage button.v3-appProcBtn--approveDone {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+
+.client-tournament-manage button.v3-appProcBtn--rejectIdle {
+  background: #fff;
+  border-color: #d1d5db;
+  color: #111827;
+}
+
+.client-tournament-manage button.v3-appProcBtn--rejectDone {
+  background: #374151;
+  border-color: #374151;
+  color: #fff;
+}
+
+.client-tournament-manage button.v3-appProcBtn--muted {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+  color: #9ca3af;
+}
+
 /* 모바일: 신청자 1명 = 한 줄(주요 열만), 카드형 적층 레이아웃 무시 */
 @media (max-width: 767px) {
   .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--singleLineMobile {
@@ -797,5 +866,37 @@
   .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--singleLineMobile tbody tr td.participant-col--actions {
     flex: 0 0 auto;
     margin-left: auto;
+  }
+
+  /* 신청 처리 표: 헤더 유지·카드형 적층 비활성화(한 화면 밀도 우선) */
+  .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--singleLineMobile {
+    table-layout: fixed !important;
+  }
+
+  .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--singleLineMobile thead {
+    display: table-header-group;
+  }
+
+  .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--singleLineMobile tbody tr {
+    display: table-row;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+    border: none;
+    background: transparent;
+    overflow: visible;
+  }
+
+  .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--singleLineMobile tbody tr td {
+    display: table-cell;
+    border-bottom: 1px solid #e8e8e8 !important;
+    flex-shrink: 1;
+    font-size: 0.68rem;
+  }
+
+  .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--singleLineMobile tbody tr td.participant-col--name {
+    flex: unset;
+    min-width: 0;
   }
 }

@@ -32,10 +32,21 @@ export default function TournamentParticipantsFinalizeBar({
     }
     setBusy(true);
     try {
+      const pr = await fetch(`/api/client/tournaments/${encodeURIComponent(tournamentId)}/participants/promote-confirmed`, {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      const pj = (await pr.json()) as { error?: string; promoted?: number };
+      if (!pr.ok) {
+        window.alert(pj.error ?? "참가자 반영에 실패했습니다.");
+        return;
+      }
+
       const res = await fetch(`/api/client/tournaments/${encodeURIComponent(tournamentId)}/status-badge`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ statusBadge: "마감" }),
+        credentials: "same-origin",
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
@@ -68,7 +79,7 @@ export default function TournamentParticipantsFinalizeBar({
         {busy ? "처리 중…" : "참가자 확정"}
       </button>
       <span className="v3-muted" style={{ margin: 0, fontSize: "0.82rem", flex: "1 1 12rem" }}>
-        승인된 참가확정자 {approvedCount}명 · 확정 시 신청 마감 및 대진표 단계로 진행합니다.
+        현재 참가 확정(APPROVED) {approvedCount}명 · 확정 시 신청 승인 처리된 인원을 참가자로 반영한 뒤 신청을 마감하고 대진표 단계로 진행합니다.
       </span>
       <Link prefetch={false} href={`/client/tournaments/${encodeURIComponent(tournamentId)}`} className="v3-btn" style={{ textDecoration: "none", fontWeight: 700 }}>
         대회 관리 홈

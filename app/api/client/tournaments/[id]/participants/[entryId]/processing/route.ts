@@ -1,15 +1,10 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../../../lib/auth/session";
-import {
-  getClientStatusByUserId,
-  getUserById,
-  resolveCanonicalUserIdForAuth,
-  type TournamentApplicationStatus,
-} from "../../../../../../../../lib/platform-api";
+import { getClientStatusByUserId, getUserById, resolveCanonicalUserIdForAuth } from "../../../../../../../../lib/platform-api";
 import {
   getTournamentApplicationByIdFirestore,
-  updateTournamentApplicationStatusFirestore,
+  patchTournamentApplicationProcessingFirestore,
 } from "../../../../../../../../lib/server/firestore-tournament-applications";
 import { getTournamentByIdFirestore } from "../../../../../../../../lib/server/firestore-tournaments";
 import {
@@ -17,19 +12,8 @@ import {
   TOURNAMENT_ZONE_FORBIDDEN_ERROR,
   zoneManagerMayAccessZoneId,
 } from "../../../../../../../../lib/server/tournament-zone-access";
+
 export const runtime = "nodejs";
-
-const ALLOWED_STATUSES: TournamentApplicationStatus[] = [
-  "APPLIED",
-  "VERIFYING",
-  "WAITING_PAYMENT",
-  "APPROVED",
-  "REJECTED",
-];
-
-function isTournamentApplicationStatus(value: unknown): value is TournamentApplicationStatus {
-  return typeof value === "string" && ALLOWED_STATUSES.includes(value as TournamentApplicationStatus);
-}
 
 export async function PATCH(
   request: NextRequest,
@@ -82,30 +66,31 @@ export async function PATCH(
     return NextResponse.json({ error: "상태 변경 권한이 없습니다." }, { status: 403 });
   }
 
-  let body: { nextStatus?: unknown; rejectReason?: unknown } = {};
+  let body: { depositConfirmed?: unknown; applicationApproved?: unknown } = {};
   try {
     body = (await request.json()) as typeof body;
   } catch {
     return NextResponse.json({ error: "요청 본문이 올바르지 않습니다." }, { status: 400 });
   }
 
-  if (!isTournamentApplicationStatus(body.nextStatus)) {
-    return NextResponse.json({ error: "nextStatus 값이 올바르지 않습니다." }, { status: 400 });
+  const dc = body.depositConfirmed;
+  const aa = body.applicationApproved;
+  const hasDc = typeof dc === "boolean";
+  const hasAa = typeof aa === "boolean";
+  if ((hasDc && hasAa) || (!hasDc && !hasAa)) {
+    return NextResponse.json({ error: "depositConfirmed 또는 applicationApproved 중 하나만 보내 주세요." }, { status: 400 });
   }
 
-  const rejectReason =
-    body.nextStatus === "REJECTED" && typeof body.rejectReason === "string" ? body.rejectReason : undefined;
-
-  const result = await updateTournamentApplicationStatusFirestore({
+  const result = await patchTournamentApplicationProcessingFirestore({
     tournamentId: id,
     entryId,
-    nextStatus: body.nextStatus,
-    actorUserId: user.id,
-    rejectReason,
+    ...(hasDc ? { depositConfirmed: dc } : {}),
+    ...(hasAa ? { applicationApproved: aa } : {}),
   });
+
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  return NextResponse.json({ ok: true, application: result.application });
+  return NextResponse.json({ ok: true as const, application: result.application });
 }

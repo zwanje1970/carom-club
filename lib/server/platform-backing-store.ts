@@ -486,6 +486,12 @@ export type TournamentApplication = {
   approvedNotifiedAt?: string | null;
   /** 대회 권역 배정(v3_tournament_zones.id). 미설정이면 단일 대진표 흐름과 동일 */
   zoneId?: string | null;
+  /** 신청자 소속(표시용, 선택) */
+  affiliation?: string | null;
+  /** 운영자 입금확인 시각(신청 처리 UI). 참가확정(APPROVED)과 별개 */
+  clientDepositConfirmedAt?: string | null;
+  /** 운영자 신청 승인 시각. 참가확정은 별도(참가자 확정 시 APPROVED) */
+  clientApplicationApprovedAt?: string | null;
 };
 
 /** 클라이언트 참가자 목록 RSC — 증빙·OCR 등 제외(입금자명은 목록 표시용으로 포함) */
@@ -503,6 +509,9 @@ export type TournamentApplicationListItem = {
   statusChangedAt?: string;
   attendanceChecked?: boolean;
   zoneId?: string | null;
+  affiliation?: string | null;
+  clientDepositConfirmedAt?: string | null;
+  clientApplicationApprovedAt?: string | null;
 };
 
 export type BracketParticipantSnapshotParticipant = {
@@ -7924,7 +7933,7 @@ const ALLOWED_TOURNAMENT_APPLICATION_TRANSITIONS: Record<
 > = {
   APPLIED: ["VERIFYING", "REJECTED"],
   VERIFYING: ["WAITING_PAYMENT", "REJECTED"],
-  WAITING_PAYMENT: ["APPROVED", "REJECTED"],
+  WAITING_PAYMENT: ["REJECTED"],
   APPROVED: [],
   REJECTED: [],
 };

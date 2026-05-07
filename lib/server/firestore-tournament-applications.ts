@@ -31,6 +31,9 @@ const TOURNAMENT_APPLICATION_LIST_FIRESTORE_FIELDS = [
   "statusChangedAt",
   "attendanceChecked",
   "zoneId",
+  "affiliation",
+  "clientDepositConfirmedAt",
+  "clientApplicationApprovedAt",
 ] as const;
 
 /** `select` 결과만 — `tournamentApplicationFromFirestore`와 동일 규칙으로 목록 필드만 파싱 */
@@ -82,6 +85,18 @@ function tournamentApplicationToListItem(
   const depositorName =
     typeof depositorNameRaw === "string" && depositorNameRaw.trim() !== "" ? depositorNameRaw.trim() : null;
 
+  const affRaw = item.affiliation;
+  const affiliation =
+    typeof affRaw === "string" && affRaw.trim() !== "" ? affRaw.trim() : affRaw === null ? null : undefined;
+
+  const cdc = item.clientDepositConfirmedAt;
+  const clientDepositConfirmedAt =
+    typeof cdc === "string" && cdc.trim() !== "" ? cdc.trim() : cdc === null ? null : undefined;
+
+  const caa = item.clientApplicationApprovedAt;
+  const clientApplicationApprovedAt =
+    typeof caa === "string" && caa.trim() !== "" ? caa.trim() : caa === null ? null : undefined;
+
   return {
     id,
     applicantName: typeof item.applicantName === "string" ? item.applicantName : "",
@@ -95,6 +110,9 @@ function tournamentApplicationToListItem(
     ...(statusChangedAt ? { statusChangedAt } : {}),
     attendanceChecked,
     ...(zoneId !== undefined ? { zoneId } : {}),
+    ...(affiliation !== undefined ? { affiliation } : {}),
+    ...(clientDepositConfirmedAt !== undefined ? { clientDepositConfirmedAt } : {}),
+    ...(clientApplicationApprovedAt !== undefined ? { clientApplicationApprovedAt } : {}),
   };
 }
 
@@ -144,6 +162,18 @@ function tournamentApplicationFromFirestore(id: string, data: Record<string, unk
         ? null
         : undefined;
 
+  const affRaw = item.affiliation;
+  const affiliation =
+    typeof affRaw === "string" && affRaw.trim() !== "" ? affRaw.trim() : affRaw === null ? null : undefined;
+
+  const cdc = item.clientDepositConfirmedAt;
+  const clientDepositConfirmedAt =
+    typeof cdc === "string" && cdc.trim() !== "" ? cdc.trim() : cdc === null ? null : undefined;
+
+  const caa = item.clientApplicationApprovedAt;
+  const clientApplicationApprovedAt =
+    typeof caa === "string" && caa.trim() !== "" ? caa.trim() : caa === null ? null : undefined;
+
   return {
     id,
     tournamentId: typeof item.tournamentId === "string" ? item.tournamentId : "",
@@ -175,6 +205,9 @@ function tournamentApplicationFromFirestore(id: string, data: Record<string, unk
     attendanceChecked,
     ...(approvedNotifiedAt ? { approvedNotifiedAt } : {}),
     ...(zoneId !== undefined ? { zoneId } : {}),
+    ...(affiliation !== undefined ? { affiliation } : {}),
+    ...(clientDepositConfirmedAt !== undefined ? { clientDepositConfirmedAt } : {}),
+    ...(clientApplicationApprovedAt !== undefined ? { clientApplicationApprovedAt } : {}),
   };
 }
 
@@ -478,6 +511,149 @@ export async function updateTournamentApplicationStatusFirestore(params: {
     return { ok: false, error: "참가신청을 찾을 수 없습니다." };
   }
   return { ok: true, application: after };
+}
+
+export async function patchTournamentApplicationProcessingFirestore(params: {
+  tournamentId: string;
+  entryId: string;
+  depositConfirmed?: boolean;
+  applicationApproved?: boolean;
+}): Promise<{ ok: true; application: TournamentApplication } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const tournamentId = params.tournamentId.trim();
+  const entryId = params.entryId.trim();
+  if (!tournamentId || !entryId) {
+    return { ok: false, error: "잘못된 요청입니다." };
+  }
+
+  const hasDeposit = typeof params.depositConfirmed === "boolean";
+  const hasApprove = typeof params.applicationApproved === "boolean";
+  if ((hasDeposit && hasApprove) || (!hasDeposit && !hasApprove)) {
+    return { ok: false, error: "요청 값이 올바르지 않습니다." };
+  }
+
+  const application = await getTournamentApplicationByIdFirestore(tournamentId, entryId);
+  if (!application) {
+    return { ok: false, error: "참가신청을 찾을 수 없습니다." };
+  }
+
+  const st = application.status;
+  if (st === "REJECTED") {
+    return { ok: false, error: "종료된 신청입니다." };
+  }
+  if (st === "APPROVED") {
+    return { ok: false, error: "참가 확정된 신청은 여기서 변경할 수 없습니다." };
+  }
+
+  const now = new Date().toISOString();
+  const db = getSharedFirestoreDb();
+  const ref = db.collection(COLLECTION).doc(entryId);
+  const patch: Record<string, unknown> = { updatedAt: now };
+
+  if (hasDeposit) {
+    if (params.depositConfirmed === true) {
+      patch.clientDepositConfirmedAt = now;
+    } else {
+      patch.clientDepositConfirmedAt = null;
+      patch.clientApplicationApprovedAt = null;
+    }
+  } else if (params.applicationApproved === true) {
+    const dep =
+      typeof application.clientDepositConfirmedAt === "string" && application.clientDepositConfirmedAt.trim() !== "";
+    if (!dep) {
+      return { ok: false, error: "입금확인 후 승인할 수 있습니다." };
+    }
+    patch.clientApplicationApprovedAt = now;
+  } else {
+    patch.clientApplicationApprovedAt = null;
+  }
+
+  await ref.set(patch, { merge: true });
+
+  const after = await getTournamentApplicationByIdFirestore(tournamentId, entryId);
+  if (!after) {
+    return { ok: false, error: "참가신청을 찾을 수 없습니다." };
+  }
+  return { ok: true, application: after };
+}
+
+/**
+ * 신청 승인(`clientApplicationApprovedAt`)된 건만 `APPROVED`(참가 확정)로 승격. 알림은 기존 입금확정 흐름 재사용.
+ * 권역 관리자는 `zoneIdsFilter`로 해당 권역 배정 건만 처리.
+ */
+export async function promoteOperatorApprovedApplicationsFirestore(params: {
+  tournamentId: string;
+  zoneIdsFilter?: string[] | null;
+}): Promise<{ ok: true; promoted: number } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const tournamentId = params.tournamentId.trim();
+  if (!tournamentId) {
+    return { ok: false, error: "잘못된 요청입니다." };
+  }
+
+  const tournament = await getTournamentByIdFirestore(tournamentId);
+  if (!tournament) {
+    return { ok: false, error: "대회를 찾을 수 없습니다." };
+  }
+
+  const all = await listTournamentApplicationsByTournamentIdFirestore(tournamentId);
+  const managed =
+    params.zoneIdsFilter != null
+      ? new Set(params.zoneIdsFilter.map((z) => z.trim()).filter(Boolean))
+      : null;
+
+  let targets = all.filter(
+    (a) =>
+      a.status !== "APPROVED" &&
+      a.status !== "REJECTED" &&
+      typeof a.clientApplicationApprovedAt === "string" &&
+      a.clientApplicationApprovedAt.trim() !== ""
+  );
+
+  if (managed && managed.size > 0) {
+    targets = targets.filter((a) => {
+      const zid = typeof a.zoneId === "string" ? a.zoneId.trim() : "";
+      return zid && managed.has(zid);
+    });
+  } else if (managed && managed.size === 0) {
+    targets = [];
+  }
+
+  if (targets.length === 0) {
+    return { ok: true, promoted: 0 };
+  }
+
+  const now = new Date().toISOString();
+  const db = getSharedFirestoreDb();
+  const chunkSize = 400;
+  for (let i = 0; i < targets.length; i += chunkSize) {
+    const slice = targets.slice(i, i + chunkSize);
+    const batch = db.batch();
+    for (const t of slice) {
+      batch.set(
+        db.collection(COLLECTION).doc(t.id),
+        { status: "APPROVED" as const, updatedAt: now, statusChangedAt: now },
+        { merge: true }
+      );
+    }
+    await batch.commit();
+  }
+
+  const { notifyParticipantApprovedAfterDepositConfirm } = await import("./participant-approved-notify");
+  for (const t of targets) {
+    const uid = String(t.userId ?? "").trim();
+    if (uid && !isManualParticipantUserId(uid)) {
+      void notifyParticipantApprovedAfterDepositConfirm({
+        entryId: t.id,
+        applicantUserId: uid,
+        tournamentId,
+        tournamentTitle: tournament.title,
+        tournamentDate: tournament.date,
+      });
+    }
+  }
+
+  return { ok: true, promoted: targets.length };
 }
 
 export async function updateTournamentApplicationZoneIdFirestore(params: {

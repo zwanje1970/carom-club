@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { TournamentApplicationListItem, TournamentStatusBadge } from "../../../../lib/types/entities";
 import { filterParticipantEntries, type ClientParticipantFilterKey } from "./client-participant-filter-shared";
 import ParticipantListRow from "./participants/ParticipantListRow";
@@ -34,8 +35,8 @@ type Props = {
 };
 
 const participantApplicationsTableThBase: CSSProperties = {
-  padding: "0.18rem 0.28rem",
-  fontSize: "0.78rem",
+  padding: "0.1rem 0.12rem",
+  fontSize: "0.66rem",
   fontWeight: 800,
   whiteSpace: "nowrap",
   overflow: "hidden",
@@ -63,28 +64,6 @@ function filterLinkStyle(selected: ClientParticipantFilterKey, key: ClientPartic
   };
 }
 
-function groupDraftStorageKey(tournamentId: string): string {
-  return `v3-participant-group-draft:${tournamentId.trim()}`;
-}
-
-function loadGroupDraftMap(tournamentId: string): Record<string, string> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.sessionStorage.getItem(groupDraftStorageKey(tournamentId));
-    if (!raw) return {};
-    const o = JSON.parse(raw) as unknown;
-    if (!o || typeof o !== "object") return {};
-    const out: Record<string, string> = {};
-    for (const [k, v] of Object.entries(o as Record<string, unknown>)) {
-      if (typeof v === "string") out[k] = v;
-      else if (typeof v === "number") out[k] = String(v);
-    }
-    return out;
-  } catch {
-    return {};
-  }
-}
-
 function capacityLabel(maxParticipants: number): string {
   const n = Number(maxParticipants);
   if (!Number.isFinite(n) || n <= 0) return "—";
@@ -101,6 +80,18 @@ function mergeByEntryId(
   return Array.from(map.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+function countApplicationApprovedChip(entries: TournamentApplicationListItem[]): number {
+  return entries.filter(
+    (e) =>
+      e.status === "APPROVED" ||
+      (typeof e.clientApplicationApprovedAt === "string" && e.clientApplicationApprovedAt.trim() !== "")
+  ).length;
+}
+
+function countCanceledRejectedChip(entries: TournamentApplicationListItem[]): number {
+  return entries.filter((e) => e.status === "REJECTED").length;
+}
+
 export default function ClientTournamentParticipantsApplicationsBlock({
   tournamentId,
   tournamentTitle,
@@ -112,6 +103,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   zonesEnabled,
   tournamentStatusBadge,
 }: Props) {
+  const router = useRouter();
   const [entries, setEntries] = useState<TournamentApplicationListItem[]>(initialEntries);
   const [moreLoading, setMoreLoading] = useState(() => participantCountSummary.total > initialEntries.length);
   const fullFetchDoneRef = useRef(false);
@@ -160,7 +152,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
 
   const filteredEntries = filterParticipantEntries(entries, selected);
   const sortedEntries = useMemo(
-    () => [...filteredEntries].sort((a, b) => a.applicantName.localeCompare(b.applicantName, "ko")),
+    () => [...filteredEntries].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [filteredEntries]
   );
 
@@ -210,27 +202,9 @@ export default function ClientTournamentParticipantsApplicationsBlock({
     return sortedEntries.filter((e) => (e.zoneId ?? "").trim() === zoneFilterZoneId);
   }, [sortedEntries, zonesEnabled, zoneFilterZoneId]);
 
-  const onZoneIdUpdated = useCallback((entryId: string, zoneId: string | null) => {
-    setEntries((prev) => prev.map((e) => (e.id === entryId ? { ...e, zoneId } : e)));
-  }, []);
-
-  const [groupByEntryId, setGroupByEntryId] = useState<Record<string, string>>({});
-  useEffect(() => {
-    setGroupByEntryId(loadGroupDraftMap(tournamentId));
-  }, [tournamentId]);
-
-  useEffect(() => {
-    try {
-      window.sessionStorage.setItem(groupDraftStorageKey(tournamentId), JSON.stringify(groupByEntryId));
-    } catch {
-      /* ignore quota */
-    }
-  }, [groupByEntryId, tournamentId]);
-
-  const onGroupDraftChange = useCallback((entryId: string, value: string) => {
-    const v = value.replace(/\D/g, "").slice(0, 3);
-    setGroupByEntryId((prev) => ({ ...prev, [entryId]: v }));
-  }, []);
+  const chipTotal = entries.length;
+  const chipApproved = countApplicationApprovedChip(entries);
+  const chipCancelReject = countCanceledRejectedChip(entries);
 
   const counts = participantCountSummary;
   const base = filterBaseHref.replace(/\/$/, "");
@@ -291,11 +265,69 @@ export default function ClientTournamentParticipantsApplicationsBlock({
         ) : null}
       </div>
 
-      <p style={{ margin: "0.35rem 0 0", fontSize: "0.95rem", fontWeight: 700, lineHeight: 1.35 }}>
-        신청자 관리
-      </p>
-      <p style={{ margin: "0.15rem 0 0.45rem", fontSize: "0.92rem", fontWeight: 700 }}>
-        {tournamentTitle.trim()} ({zoneFilteredEntries.length}/{capacityLabel(maxParticipants)})
+      <div
+        style={{
+          margin: "0.35rem 0 0",
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: "0.35rem 0.5rem",
+          justifyContent: "space-between",
+        }}
+      >
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.35rem", minWidth: 0 }}>
+          <span style={{ fontSize: "0.95rem", fontWeight: 800, lineHeight: 1.35 }}>신청자 관리</span>
+          <span
+            style={{
+              fontSize: "0.68rem",
+              fontWeight: 700,
+              padding: "0.12rem 0.38rem",
+              borderRadius: "0.35rem",
+              background: "#f1f5f9",
+              color: "#334155",
+              border: "1px solid #e2e8f0",
+            }}
+          >
+            총 신청 {chipTotal}명
+          </span>
+          <span
+            style={{
+              fontSize: "0.68rem",
+              fontWeight: 700,
+              padding: "0.12rem 0.38rem",
+              borderRadius: "0.35rem",
+              background: "#dcfce7",
+              color: "#14532d",
+              border: "1px solid #86efac",
+            }}
+          >
+            승인 {chipApproved}명
+          </span>
+          <span
+            style={{
+              fontSize: "0.68rem",
+              fontWeight: 700,
+              padding: "0.12rem 0.38rem",
+              borderRadius: "0.35rem",
+              background: "#f3f4f6",
+              color: "#4b5563",
+              border: "1px solid #d1d5db",
+            }}
+          >
+            취소/거절 {chipCancelReject}명
+          </span>
+        </div>
+        <button
+          type="button"
+          className="v3-btn"
+          onClick={() => router.refresh()}
+          style={{ fontSize: "0.78rem", fontWeight: 700, padding: "0.25rem 0.55rem", minHeight: 34 }}
+        >
+          새로고침
+        </button>
+      </div>
+      <p style={{ margin: "0.12rem 0 0.35rem", fontSize: "0.85rem", fontWeight: 700, color: "#475569" }}>
+        {tournamentTitle.trim()} · 표시 {zoneFilteredEntries.length}명 / 정원 {capacityLabel(maxParticipants)}
       </p>
 
       <section className="client-tournament-manage__participantTableShell">
@@ -310,131 +342,43 @@ export default function ClientTournamentParticipantsApplicationsBlock({
         ) : (
           <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
             <table
-              className="client-tournament-manage__participantTable client-tournament-manage__participantTable--singleLineMobile"
+              className="client-tournament-manage__participantTable client-tournament-manage__participantTable--singleLineMobile client-tournament-manage__participantTable--applicationsCompact"
               style={{
                 width: "100%",
-                minWidth: zonesEnabled ? "48rem" : "42rem",
+                minWidth: "28rem",
                 borderCollapse: "collapse",
                 tableLayout: "fixed",
-                fontSize: "0.84rem",
+                fontSize: "0.72rem",
               }}
             >
               <thead>
                 <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                  <th
-                    style={{
-                      ...participantApplicationsTableThBase,
-                      textAlign: "center",
-                      width: "2.35rem",
-                      maxWidth: "2.5rem",
-                      minWidth: "2.35rem",
-                    }}
-                  >
-                    번호
-                  </th>
-                  <th
-                    style={{
-                      ...participantApplicationsTableThBase,
-                      textAlign: "left",
-                      minWidth: "6rem",
-                      width: "18%",
-                    }}
-                  >
+                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "2.6rem" }}>신청일</th>
+                  <th style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "14%", minWidth: "3.2rem" }}>
                     이름
                   </th>
-                  <th
-                    style={{
-                      ...participantApplicationsTableThBase,
-                      textAlign: "center",
-                      width: "3.25rem",
-                      maxWidth: "4rem",
-                    }}
-                  >
-                    점수/에버
+                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "4.2rem" }}>점수/AVG</th>
+                  <th style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "12%", minWidth: "3rem" }}>
+                    입금자 이름
                   </th>
-                  <th
-                    style={{
-                      ...participantApplicationsTableThBase,
-                      textAlign: "left",
-                      width: "5rem",
-                      maxWidth: "6rem",
-                    }}
-                  >
-                    입금자
+                  <th style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "11%", minWidth: "2.8rem" }}>
+                    소속
                   </th>
-                  <th
-                    style={{
-                      ...participantApplicationsTableThBase,
-                      textAlign: "right",
-                      width: "auto",
-                      minWidth: "7rem",
-                    }}
-                  >
-                    작업
-                  </th>
-                  <th
-                    style={{
-                      ...participantApplicationsTableThBase,
-                      textAlign: "left",
-                      width: "6.75rem",
-                      maxWidth: "6.75rem",
-                    }}
-                  >
-                    전화번호
-                  </th>
-                  <th
-                    style={{
-                      ...participantApplicationsTableThBase,
-                      textAlign: "center",
-                      width: "3rem",
-                      maxWidth: "3rem",
-                    }}
-                  >
-                    입금일
-                  </th>
-                  {zonesEnabled ? (
-                    <th
-                      style={{
-                        ...participantApplicationsTableThBase,
-                        textAlign: "center",
-                        width: "5.5rem",
-                        maxWidth: "6.5rem",
-                      }}
-                    >
-                      권역
-                    </th>
-                  ) : null}
-                  <th
-                    style={{
-                      ...participantApplicationsTableThBase,
-                      textAlign: "center",
-                      width: "2.85rem",
-                      maxWidth: "2.85rem",
-                    }}
-                  >
-                    조
-                  </th>
-                  <th
-                    style={{
-                      ...participantApplicationsTableThBase,
-                      textAlign: "center",
-                      width: "2.5rem",
-                      maxWidth: "2.5rem",
-                    }}
-                  >
-                    출석
-                  </th>
+                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "4.25rem" }}>입금확인</th>
+                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "4rem" }}>승인</th>
+                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "2.5rem" }}>승인일</th>
+                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "4.25rem" }}>취소/거절</th>
                 </tr>
               </thead>
               <tbody>
-                {zoneFilteredEntries.map((entry, rowIndex) => (
+                {zoneFilteredEntries.map((entry) => (
                   <ParticipantListRow
                     key={entry.id}
-                    rowNumber={rowIndex + 1}
                     tournamentId={tournamentId}
                     entryId={entry.id}
                     applicantName={entry.applicantName}
                     depositorName={entry.depositorName ?? null}
+                    affiliation={entry.affiliation ?? null}
                     initialStatus={entry.status}
                     phone={entry.phone}
                     registrationCreatedAt={entry.createdAt}
@@ -443,12 +387,8 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     adminNote={entry.adminNote ?? null}
                     statusChangedAt={entry.statusChangedAt}
                     attendanceChecked={entry.attendanceChecked}
-                    groupDraft={groupByEntryId[entry.id] ?? ""}
-                    onGroupDraftChange={onGroupDraftChange}
-                    zonesEnabled={zonesEnabled}
-                    zones={activeZones}
-                    initialZoneId={entry.zoneId ?? null}
-                    onZoneIdUpdated={onZoneIdUpdated}
+                    initialClientDepositConfirmedAt={entry.clientDepositConfirmedAt ?? null}
+                    initialClientApplicationApprovedAt={entry.clientApplicationApprovedAt ?? null}
                   />
                 ))}
               </tbody>

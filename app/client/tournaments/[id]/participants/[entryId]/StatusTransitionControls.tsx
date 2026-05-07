@@ -26,7 +26,7 @@ function statusHeadline(s: TournamentApplicationStatus): string {
 const NEXT_STATUS_MAP: Record<TournamentApplicationStatus, TournamentApplicationStatus[]> = {
   APPLIED: ["VERIFYING", "REJECTED"],
   VERIFYING: ["WAITING_PAYMENT", "REJECTED"],
-  WAITING_PAYMENT: ["APPROVED", "REJECTED"],
+  WAITING_PAYMENT: ["REJECTED"],
   APPROVED: [],
   REJECTED: [],
 };
@@ -83,6 +83,11 @@ export default function StatusTransitionControls({
       <p>
         <strong>현재 상태:</strong> {statusHeadline(status)} ({status})
       </p>
+      {status === "WAITING_PAYMENT" ? (
+        <p className="v3-muted">
+          입금 대기 단계입니다. 참가 확정은 신청자 관리 목록에서 입금확인·신청 승인 후 &quot;참가자 확정&quot;을 실행할 때 반영됩니다.
+        </p>
+      ) : null}
       {nextStatuses.length === 0 ? (
         <p className="v3-muted">이 상태에서는 추가 전이가 없습니다.</p>
       ) : (
@@ -103,15 +108,13 @@ export default function StatusTransitionControls({
               }}
               style={{
                 padding: "0.55rem 0.9rem",
-                background: nextStatus === "APPROVED" ? "#dff5e6" : "#fff",
-                borderColor: nextStatus === "APPROVED" ? "#7dcea0" : "#d7d7d7",
+                background: "#fff",
+                borderColor: "#d7d7d7",
               }}
             >
-              {nextStatus === "APPROVED"
-                ? "입금확인"
-                : nextStatus === "REJECTED"
-                  ? "거절"
-                  : `${STATUS_LABELS[nextStatus]}로 변경`}
+              {nextStatus === "REJECTED"
+                ? "거절"
+                : `${STATUS_LABELS[nextStatus]}로 변경`}
             </button>
           ))}
         </div>
