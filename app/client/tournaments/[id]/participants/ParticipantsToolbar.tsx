@@ -32,7 +32,7 @@ export default function ParticipantsToolbar({ tournamentId }: { tournamentId: st
           touchAction: "manipulation",
         }}
       >
-        참가자 리스트 보기
+        참가확정자 리스트
       </Link>
     </div>
   );

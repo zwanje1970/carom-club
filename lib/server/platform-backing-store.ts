@@ -366,6 +366,7 @@ export type TournamentStatusBadge =
   | "모집중"
   | "마감임박"
   | "마감"
+  | "진행중"
   | "예정"
   | "종료"
   | "초안";
@@ -374,6 +375,7 @@ const TOURNAMENT_STATUS_BADGE_VALUES: TournamentStatusBadge[] = [
   "모집중",
   "마감임박",
   "마감",
+  "진행중",
   "예정",
   "종료",
   "초안",

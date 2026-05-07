@@ -137,7 +137,10 @@ export default function TournamentTvLinkBlock({
         <span className="client-tournament-manage__featureIconWrap" aria-hidden>
           <IconTv />
         </span>
-        <span className="client-tournament-manage__featureTitle">대진표 TV 연결</span>
+        <span className="client-tournament-manage__featureCardTextCol">
+          <span className="client-tournament-manage__featureTitle">TV 출력 (운영)</span>
+          <span className="client-tournament-manage__featureDesc">현장 전광 · QR 링크</span>
+        </span>
       </button>
 
       {open ? (

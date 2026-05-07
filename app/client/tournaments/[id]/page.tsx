@@ -6,8 +6,10 @@ import { getClientTournamentDetailPreviewById, getUserById } from "../../../../l
 import { getLatestBracketByTournamentIdFirestore } from "../../../../lib/server/firestore-tournament-brackets";
 import { getTournamentApplicationListCountsFirestore } from "../../../../lib/server/firestore-tournament-applications";
 import { formatTournamentScheduleLabel } from "../../../../lib/tournament-schedule";
+import Link from "next/link";
 import TournamentBadgeCardManageRow from "./TournamentBadgeCardManageRow";
 import TournamentManageFeatureCards from "./TournamentManageFeatureCards";
+import TournamentOperationalStartStrip from "./TournamentOperationalStartStrip";
 import TournamentZonesManageBlock from "./TournamentZonesManageBlock";
 import "./tournament-manage-ui.css";
 
@@ -44,8 +46,11 @@ export default async function ClientTournamentManagePage({ params }: { params: P
     getLatestBracketByTournamentIdFirestore(id),
   ]);
   const scheduleLine = formatTournamentScheduleLabel(tournament);
-  const bracketEnabled = tournament.statusBadge === "마감";
+  const bracketPlanEnabled =
+    tournament.statusBadge === "마감" || tournament.statusBadge === "진행중" || tournament.statusBadge === "종료";
+  const operationalUnlocked = tournament.statusBadge === "진행중" || tournament.statusBadge === "종료";
   const hasConfirmedBracket = latestBracket !== null;
+  const settlementHref = `/client/settlement/${encodeURIComponent(id)}`;
 
   return (
     <main className="v3-page v3-stack client-tournament-manage">
@@ -62,10 +67,17 @@ export default async function ClientTournamentManagePage({ params }: { params: P
       />
 
       <section className="client-tournament-manage__card client-tournament-manage__card--hub">
+        <TournamentOperationalStartStrip
+          tournamentId={id}
+          statusBadge={tournament.statusBadge}
+          hasConfirmedBracket={hasConfirmedBracket}
+        />
         <TournamentManageFeatureCards
           tournamentId={id}
-          bracketEnabled={bracketEnabled}
+          statusBadge={tournament.statusBadge}
+          bracketPlanEnabled={bracketPlanEnabled}
           hasConfirmedBracket={hasConfirmedBracket}
+          operationalUnlocked={operationalUnlocked}
         />
       </section>
 
@@ -81,6 +93,16 @@ export default async function ClientTournamentManagePage({ params }: { params: P
           />
         </section>
       ) : null}
+
+      <section className="client-tournament-manage__card client-tournament-manage__card--settlementFooter" aria-label="정산 관리">
+        <h2 className="client-tournament-manage__settlementFooterTitle">정산 관리</h2>
+        <p className="v3-muted" style={{ margin: "0 0 0.5rem", fontSize: "0.82rem", lineHeight: 1.45 }}>
+          대회 운영 흐름과 별도로 언제든 정산을 입력할 수 있습니다.
+        </p>
+        <Link prefetch={false} href={settlementHref} className="ui-btn-primary-solid" style={{ textDecoration: "none", display: "inline-flex", fontWeight: 700 }}>
+          정산 관리 열기
+        </Link>
+      </section>
     </main>
   );
 }

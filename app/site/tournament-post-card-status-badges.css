@@ -53,6 +53,12 @@
   font-size: 0.74rem;
 }
 
+/* 진행중 — 보라·파랑 · 1줄 */
+.tournament-post-card__badge--live {
+  background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+  font-size: 0.68rem;
+}
+
 /* 종료 — 검은색 · 1줄 */
 .tournament-post-card__badge--ended {
   background: linear-gradient(180deg, #171717 0%, #0a0a0a 100%);

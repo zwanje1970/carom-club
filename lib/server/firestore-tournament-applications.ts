@@ -13,6 +13,7 @@ import {
   buildProtectedProofImageUrl,
   getAllowedTournamentApplicationNextStatuses,
   getProofImageAssetById,
+  normalizeTournamentStatusBadge,
   resolveCanonicalUserIdForAuth,
 } from "./platform-backing-store";
 
@@ -346,6 +347,11 @@ export async function createTournamentApplicationFirestore(params: {
   const tournament = await getTournamentByIdFirestore(params.tournamentId);
   if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다." };
 
+  const recruitClosed = normalizeTournamentStatusBadge(tournament.statusBadge);
+  if (recruitClosed === "마감" || recruitClosed === "진행중" || recruitClosed === "종료") {
+    return { ok: false, error: "신청이 마감된 대회입니다." };
+  }
+
   const db = getSharedFirestoreDb();
   const dup = await db
     .collection(COLLECTION)
@@ -418,6 +424,8 @@ export async function updateTournamentApplicationStatusFirestore(params: {
   entryId: string;
   nextStatus: TournamentApplicationStatus;
   actorUserId?: string;
+  /** 거절 시 운영자 입력 사유 — adminNote에 병합 */
+  rejectReason?: string | null;
 }): Promise<{ ok: true; application: TournamentApplication } | { ok: false; error: string }> {
   assertClientFirestorePersistenceConfigured();
   const tournamentId = params.tournamentId.trim();
@@ -447,14 +455,17 @@ export async function updateTournamentApplicationStatusFirestore(params: {
   const now = new Date().toISOString();
   const db = getSharedFirestoreDb();
   const ref = db.collection(COLLECTION).doc(entryId);
-  await ref.set(
-    {
-      status: params.nextStatus,
-      updatedAt: now,
-      statusChangedAt: now,
-    },
-    { merge: true }
-  );
+  const reasonRaw = typeof params.rejectReason === "string" ? params.rejectReason.trim() : "";
+  const patch: Record<string, unknown> = {
+    status: params.nextStatus,
+    updatedAt: now,
+    statusChangedAt: now,
+  };
+  if (params.nextStatus === "REJECTED" && reasonRaw) {
+    const prev = (application.adminNote ?? "").trim();
+    patch.adminNote = prev ? `${prev}\n거절 사유: ${reasonRaw}` : `거절 사유: ${reasonRaw}`;
+  }
+  await ref.set(patch, { merge: true });
 
   const after = await getTournamentApplicationByIdFirestore(tournamentId, entryId);
   if (!after) {

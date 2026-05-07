@@ -1238,7 +1238,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           >
             ← 대진표 관리
           </button>
-          <span style={{ fontWeight: 800, fontSize: "1.02rem" }}>빠른 결과 입력</span>
+          <span style={{ fontWeight: 800, fontSize: "1.02rem" }}>운영용 리스트 입력</span>
           <button
             type="button"
             className="ui-btn-primary-solid"
@@ -1569,7 +1569,10 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                           return;
                         }
                         setBracket(json.bracket);
-                        setMessage("대진표를 분할했습니다.");
+                        const groups = projectedQualifierBlockCount(bracket, multiBlockSize);
+                        setMessage(
+                          `${multiBlockSize}명 조당 · ${groups}개의 예선 대진표가 생성되었습니다. 대회개시(진행중)와 운영 메뉴는 대회 관리 홈에서 이용하세요.`,
+                        );
                       } finally {
                         setMultiBlockBusy(false);
                       }
@@ -1590,7 +1593,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             ) : null}
             </div>
             <span className="v3-muted" style={{ fontSize: "0.82rem" }}>
-              다시 셔플은 빠른 결과 입력에서 실행할 수 있습니다.
+              다시 셔플은 진행중 단계의 「운영용 리스트 입력」에서 실행할 수 있습니다.
             </span>
           </div>
         </section>
@@ -1674,9 +1677,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                 운영판은 전체화면 대진표 보기 페이지에서 제공합니다.
               </p>
             </div>
-            <p>
-              <strong>대진표 ID:</strong> {bracket.id}
-            </p>
             {bracket.zoneId ? (
               <p>
                 <strong>권역:</strong> {bracket.zoneId}

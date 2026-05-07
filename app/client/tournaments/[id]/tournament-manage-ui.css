@@ -210,6 +210,43 @@
   line-height: 1.16;
 }
 
+.client-tournament-manage .client-tournament-manage__featureCardTextCol {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.client-tournament-manage .client-tournament-manage__featureDesc {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #64748b;
+  line-height: 1.28;
+}
+
+.client-tournament-manage .client-tournament-manage__hubStack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.client-tournament-manage .client-tournament-manage__operationalCard {
+  margin: 0;
+}
+
+.client-tournament-manage .client-tournament-manage__settlementFooterTitle {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.client-tournament-manage .client-tournament-manage__card--settlementFooter {
+  border: 1px dashed #cbd5e1;
+  background: #fafafa;
+}
+
 .client-tournament-manage .client-tournament-manage__participantsSticky {
   position: sticky;
   top: 0;
@@ -459,7 +496,7 @@
 .client-tournament-manage button.client-tournament-manage__hubTvTrigger {
   display: flex;
   flex-direction: row;
-  align-items: center;
+  align-items: flex-start;
   justify-content: flex-start;
   gap: 0.375rem;
   width: 100%;

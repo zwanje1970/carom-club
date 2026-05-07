@@ -67,7 +67,7 @@ export default function ParticipantAddSheet({ tournamentId }: { tournamentId: st
         onClick={() => setOpen(true)}
         style={{ padding: "0.36rem 0.65rem", fontWeight: 700, fontSize: "0.86rem", WebkitTapHighlightColor: "transparent" }}
       >
-        참가자 추가
+        수동 입력
       </button>
       {open ? (
         <div

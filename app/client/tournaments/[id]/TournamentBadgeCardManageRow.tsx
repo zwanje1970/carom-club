@@ -10,6 +10,7 @@ const OPTIONS: TournamentStatusBadge[] = [
   "모집중",
   "마감임박",
   "마감",
+  "진행중",
   "예정",
   "종료",
   "초안",
@@ -24,6 +25,9 @@ function statusBadgeStyle(badge: TournamentStatusBadge): { background: string; c
   }
   if (badge === "마감" || badge === "종료") {
     return { background: "#f3f4f6", color: "#4b5563" };
+  }
+  if (badge === "진행중") {
+    return { background: "#dbeafe", color: "#1e40af" };
   }
   return { background: "#eff6ff", color: "#1e3a5f" };
 }
@@ -321,6 +325,7 @@ export default function TournamentBadgeCardManageRow({
         boxSizing: "border-box",
       }}
     >
+      <p style={{ margin: 0, fontSize: "0.82rem", fontWeight: 800, color: "#334155" }}>게시카드 상태관리</p>
       <select
         value={value}
         disabled={publishBusy}
@@ -380,6 +385,14 @@ export default function TournamentBadgeCardManageRow({
               상태배지 변경
             </button>
           </div>
+          <Link
+            prefetch={false}
+            href={`/client/tournaments/${encodeURIComponent(tournamentId)}/edit`}
+            className="v3-btn client-tournament-manage__topActionBtn"
+            style={{ textDecoration: "none", flex: "1 1 auto", minWidth: "8rem" }}
+          >
+            대회정보 수정
+          </Link>
         </div>
         {expandedPanel}
       </div>

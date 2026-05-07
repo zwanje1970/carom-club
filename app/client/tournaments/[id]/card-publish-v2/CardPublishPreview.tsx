@@ -68,6 +68,7 @@ const CardPublishPreviewInner = forwardRef<
         slideDeck
         templateCardLayout
         editorCompactCardHeight
+        editorPreviewFixedLayout
         slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
         isImageCaptureMode={isImageCaptureMode}
       />

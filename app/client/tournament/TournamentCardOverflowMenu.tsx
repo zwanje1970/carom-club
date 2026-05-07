@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 export default function TournamentCardOverflowMenu({
   tournamentId,
@@ -14,17 +15,43 @@ export default function TournamentCardOverflowMenu({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [dupBusy, setDupBusy] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuPanelRef = useRef<HTMLDivElement>(null);
+  const [menuFixed, setMenuFixed] = useState<{ top: number; right: number } | null>(null);
+
+  const updateMenuPosition = () => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setMenuFixed({ top: rect.bottom + 4, right: typeof window !== "undefined" ? window.innerWidth - rect.right : 0 });
+  };
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuFixed(null);
+      return;
+    }
+    updateMenuPosition();
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
-    function onDocMouseDown(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+    function onDocPointerDown(e: PointerEvent) {
+      const t = e.target as Node | null;
+      if (!t) return;
+      if (triggerRef.current?.contains(t)) return;
+      if (menuPanelRef.current?.contains(t)) return;
+      setOpen(false);
     }
-    document.addEventListener("mousedown", onDocMouseDown);
-    return () => document.removeEventListener("mousedown", onDocMouseDown);
+    document.addEventListener("pointerdown", onDocPointerDown, true);
+    const onScrollOrResize = () => setOpen(false);
+    window.addEventListener("scroll", onScrollOrResize, true);
+    window.addEventListener("resize", onScrollOrResize);
+    return () => {
+      document.removeEventListener("pointerdown", onDocPointerDown, true);
+      window.removeEventListener("scroll", onScrollOrResize, true);
+      window.removeEventListener("resize", onScrollOrResize);
+    };
   }, [open]);
 
   async function onDuplicate() {
@@ -67,33 +94,24 @@ export default function TournamentCardOverflowMenu({
     })();
   }
 
-  return (
-    <div ref={rootRef} style={{ position: "relative", flexShrink: 0 }}>
-      <button
-        type="button"
-        className="v3-btn"
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-label="대회 메뉴"
-        onClick={() => setOpen((v) => !v)}
+  const menuPanel =
+    open && menuFixed && typeof document !== "undefined" ? (
+      <div
+        ref={menuPanelRef}
+        role="presentation"
         style={{
-          padding: "0.35rem 0.55rem",
-          minWidth: "2.25rem",
-          fontSize: "1.1rem",
-          lineHeight: 1,
+          position: "fixed",
+          top: menuFixed.top,
+          right: menuFixed.right,
+          zIndex: 10000,
+          margin: 0,
+          padding: 0,
         }}
       >
-        ⋮
-      </button>
-      {open ? (
         <ul
           role="menu"
           className="v3-stack"
           style={{
-            position: "absolute",
-            right: 0,
-            top: "calc(100% + 4px)",
-            zIndex: 20,
             margin: 0,
             padding: "0.35rem 0",
             listStyle: "none",
@@ -175,7 +193,29 @@ export default function TournamentCardOverflowMenu({
             </button>
           </li>
         </ul>
-      ) : null}
+      </div>
+    ) : null;
+
+  return (
+    <div style={{ flexShrink: 0 }}>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="v3-btn"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="대회 메뉴"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          padding: "0.35rem 0.55rem",
+          minWidth: "2.25rem",
+          fontSize: "1.1rem",
+          lineHeight: 1,
+        }}
+      >
+        ⋮
+      </button>
+      {menuPanel ? createPortal(menuPanel, document.body) : null}
     </div>
   );
 }

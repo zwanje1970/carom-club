@@ -10,6 +10,10 @@ import {
   type BracketParticipantSnapshotScope,
 } from "../../../../../../../lib/server/firestore-tournament-brackets";
 import {
+  CLIENT_BRACKET_CREATION_STATUS_ERROR,
+  tournamentStatusAllowsClientBracketCreation,
+} from "../../../../../../../lib/server/tournament-bracket-creation-gate";
+import {
   authorizeClientTournamentBracketContext,
   TOURNAMENT_ZONE_FORBIDDEN_ERROR,
   zoneManagerMayAccessZoneId,
@@ -40,6 +44,10 @@ export async function POST(
   const auth = await authorizeClientTournamentBracketContext({ user, tournamentId: id });
   if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.httpStatus });
+  }
+
+  if (!tournamentStatusAllowsClientBracketCreation(auth.tournament.statusBadge)) {
+    return NextResponse.json({ error: CLIENT_BRACKET_CREATION_STATUS_ERROR }, { status: 403 });
   }
 
   const body = (await request.json().catch(() => null)) as ConfirmBracketRequest | null;

@@ -50,6 +50,7 @@ export default async function ClientTournamentParticipantsPage({
         selected={selected}
         filterBaseHref={filterBaseHref}
         zonesEnabled={tournament.zonesEnabled === true}
+        tournamentStatusBadge={tournament.statusBadge}
       />
     </main>
   );

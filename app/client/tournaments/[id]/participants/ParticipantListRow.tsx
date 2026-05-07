@@ -171,14 +171,17 @@ export default function ParticipantListRow({
     }
   }
 
-  async function handleTransition(nextStatus: TournamentApplicationStatus) {
+  async function handleTransition(nextStatus: TournamentApplicationStatus, rejectReason?: string) {
     if (loading) return;
     setLoading(true);
     try {
       const response = await fetch(`/api/client/tournaments/${tournamentId}/participants/${entryId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nextStatus }),
+        body: JSON.stringify({
+          nextStatus,
+          ...(nextStatus === "REJECTED" && rejectReason ? { rejectReason } : {}),
+        }),
       });
       const result = (await response.json()) as {
         error?: string;
@@ -260,7 +263,10 @@ export default function ParticipantListRow({
             type="button"
             className="v3-btn"
             disabled={loading}
-            onClick={() => void handleTransition("REJECTED")}
+            onClick={() => {
+              const reason = window.prompt("거절 사유를 입력하세요. (선택, 신청 메모에 저장됩니다.)") ?? "";
+              void handleTransition("REJECTED", reason.trim() || undefined);
+            }}
             style={{
               ...actionBtnBase,
               background: "#fff",

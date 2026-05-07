@@ -636,6 +636,11 @@ button.secondary-button.site-mypage-logout:hover,
   color: #475569;
 }
 
+.site-board-status-badge--live {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
 .site-board-status-badge--ended {
   background: #eef2f6;
   color: #1e293b;

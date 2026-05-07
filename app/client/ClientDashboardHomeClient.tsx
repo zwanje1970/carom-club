@@ -171,6 +171,8 @@ function clientDashboardTournamentBadgeClass(badge: TournamentStatusBadge): stri
       return "client-dashboard-main__tournamentBadge client-dashboard-main__tournamentBadge--success";
     case "마감임박":
       return "client-dashboard-main__tournamentBadge client-dashboard-main__tournamentBadge--warning";
+    case "진행중":
+      return "client-dashboard-main__tournamentBadge client-dashboard-main__tournamentBadge--purple";
     case "마감":
     case "종료":
     case "초안":

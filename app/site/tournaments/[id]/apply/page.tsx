@@ -33,6 +33,7 @@ export default function SiteTournamentApplyPage() {
   const [ocrGateOk, setOcrGateOk] = useState<boolean | null>(null);
   const [ocrGateMessage, setOcrGateMessage] = useState("");
   const [ocrVerifying, setOcrVerifying] = useState(false);
+  const [applicationsClosed, setApplicationsClosed] = useState(false);
   const ocrGateCacheRef = useRef<{ seed: string; result: { ok: boolean; userMessage: string } } | null>(null);
   const proofAreaRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -113,9 +114,28 @@ export default function SiteTournamentApplyPage() {
     }
   }, [router, tournamentId]);
 
+  useEffect(() => {
+    if (!tournamentId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/site/tournaments/${encodeURIComponent(tournamentId)}/summary`, {
+          credentials: "same-origin",
+        });
+        const json = (await res.json()) as { applicationsClosed?: boolean };
+        if (!cancelled && res.ok) setApplicationsClosed(json.applicationsClosed === true);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tournamentId]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!tournamentId || loading) return;
+    if (!tournamentId || loading || applicationsClosed) return;
 
     const nameTrim = applicantName.trim();
     const phoneTrim = phone.trim();
@@ -250,12 +270,22 @@ export default function SiteTournamentApplyPage() {
         <p>증빙 이미지: {uploadedProofImage ? "업로드 완료" : uploading ? "업로드 중..." : "미업로드"}</p>
       </section>
 
-      <form className="v3-box v3-stack" onSubmit={handleSubmit}>
+      {applicationsClosed ? (
+        <section className="v3-box v3-stack" style={{ borderColor: "#e2e8f0", background: "#f8fafc" }}>
+          <p style={{ margin: 0, fontWeight: 800 }}>신청이 마감된 대회입니다.</p>
+          <p className="v3-muted" style={{ margin: "0.35rem 0 0" }}>
+            참가자 확정이 완료되어 새 신청을 받지 않습니다.
+          </p>
+        </section>
+      ) : null}
+
+      <form className="v3-box v3-stack" onSubmit={handleSubmit} style={{ opacity: applicationsClosed ? 0.5 : 1 }} aria-disabled={applicationsClosed}>
         <label className="v3-stack">
           <span>이름</span>
           <input
             value={applicantName}
             onChange={(event) => setApplicantName(event.target.value)}
+            disabled={applicationsClosed}
             style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
           />
         </label>
@@ -268,6 +298,7 @@ export default function SiteTournamentApplyPage() {
               ocrGateCacheRef.current = null;
               setOcrGateOk(null);
             }}
+            disabled={applicationsClosed}
             style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
           />
         </label>
@@ -280,6 +311,7 @@ export default function SiteTournamentApplyPage() {
               ocrGateCacheRef.current = null;
               setOcrGateOk(null);
             }}
+            disabled={applicationsClosed}
             style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
           />
         </label>
@@ -290,6 +322,7 @@ export default function SiteTournamentApplyPage() {
             ref={fileInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp"
+            disabled={applicationsClosed}
             onChange={(event) => {
               const file = event.target.files?.[0];
               if (file) {
@@ -308,7 +341,7 @@ export default function SiteTournamentApplyPage() {
         ) : null}
         {ocrVerifying ? <p className="v3-muted">OCR 검증 중...</p> : null}
         </div>
-        <button type="submit" className="v3-btn" disabled={loading || ocrVerifying}>
+        <button type="submit" className="v3-btn" disabled={loading || ocrVerifying || applicationsClosed}>
           {loading ? "저장 중..." : ocrVerifying ? "OCR 검증 중..." : "참가신청 저장"}
         </button>
       </form>

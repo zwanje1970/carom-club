@@ -3,12 +3,13 @@
 import type { CSSProperties } from "react";
 import "./tournament-post-card-status-badges.css";
 
-export type TournamentPostStatus = "모집중" | "마감임박" | "마감" | "종료";
+export type TournamentPostStatus = "모집중" | "마감임박" | "마감" | "진행중" | "종료";
 
 const STATUS_CLASS: Record<TournamentPostStatus, string> = {
   모집중: "tournament-post-card__badge--recruiting",
   마감임박: "tournament-post-card__badge--closing",
   마감: "tournament-post-card__badge--full",
+  진행중: "tournament-post-card__badge--live",
   종료: "tournament-post-card__badge--ended",
 };
 

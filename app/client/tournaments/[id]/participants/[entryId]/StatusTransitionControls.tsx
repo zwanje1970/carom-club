@@ -46,7 +46,7 @@ export default function StatusTransitionControls({
 
   const nextStatuses = NEXT_STATUS_MAP[status];
 
-  async function handleTransition(nextStatus: TournamentApplicationStatus) {
+  async function handleTransition(nextStatus: TournamentApplicationStatus, rejectReason?: string) {
     if (loading) return;
     setLoading(true);
     setMessage("");
@@ -54,7 +54,10 @@ export default function StatusTransitionControls({
       const response = await fetch(`/api/client/tournaments/${tournamentId}/participants/${entryId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nextStatus }),
+        body: JSON.stringify({
+          nextStatus,
+          ...(nextStatus === "REJECTED" && rejectReason ? { rejectReason } : {}),
+        }),
       });
       const result = (await response.json()) as {
         error?: string;
@@ -90,7 +93,14 @@ export default function StatusTransitionControls({
               type="button"
               className="v3-btn"
               disabled={loading}
-              onClick={() => void handleTransition(nextStatus)}
+              onClick={() => {
+                if (nextStatus === "REJECTED") {
+                  const reason = window.prompt("거절 사유를 입력하세요. (선택)") ?? "";
+                  void handleTransition(nextStatus, reason.trim() || undefined);
+                  return;
+                }
+                void handleTransition(nextStatus);
+              }}
               style={{
                 padding: "0.55rem 0.9rem",
                 background: nextStatus === "APPROVED" ? "#dff5e6" : "#fff",

@@ -16,6 +16,9 @@ function statusBadgeStyle(badge: TournamentStatusBadge): { background: string; c
   if (badge === "마감" || badge === "종료") {
     return { background: "#f3f4f6", color: "#4b5563" };
   }
+  if (badge === "진행중") {
+    return { background: "#dbeafe", color: "#1e40af" };
+  }
   return { background: "#eff6ff", color: "#1e3a5f" };
 }
 
@@ -29,12 +32,6 @@ export default async function ClientTournamentsListPage() {
   return (
     <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted">로그인 사용자 기준으로 생성된 대회를 확인합니다.</p>
-
-      <div className="v3-row">
-        <Link className="v3-btn" href="/client/tournaments/new">
-          대회 생성
-        </Link>
-      </div>
 
       <section className="v3-stack">
         {tournaments.length === 0 ? (
@@ -110,7 +107,7 @@ export default async function ClientTournamentsListPage() {
                         href={`/client/tournaments/${t.id}/participants`}
                         style={{ padding: "0.35rem 0.55rem", fontSize: "0.85rem" }}
                       >
-                        신청자
+                        신청자 관리
                       </Link>
                       <Link
                         className="v3-btn"

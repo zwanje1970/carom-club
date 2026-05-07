@@ -732,3 +732,72 @@
   min-width: 0 !important;
   max-width: 100% !important;
 }
+
+/*
+ * 게시카드 작성 화면 미리보기: slideDeck 의 height:100% 때문에 부모 높이에 맞춰
+ * 내용에 따라 카드가 줄었다 늘었다 하는 것을 막고, 메인과 동일한 절대 높이를 유지한다.
+ */
+article[data-editor-card-preview="1"].cardRoot.cardRootSlideDeck {
+  height: calc(
+    var(--slide-card-face-height) / 0.75 * var(--tournament-card-height-scale) -
+      1rem * var(--tournament-card-height-scale)
+  );
+  flex-shrink: 0;
+}
+
+article[data-editor-card-preview="1"] .classicMain,
+article[data-editor-card-preview="1"] .frameCenter {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+article[data-editor-card-preview="1"] .classicTitle,
+article[data-editor-card-preview="1"] .frameTitle {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  word-break: break-word;
+  white-space: normal;
+}
+
+article[data-editor-card-preview="1"] .classicLead,
+article[data-editor-card-preview="1"] .frameLead {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  word-break: break-word;
+  white-space: normal;
+}
+
+article[data-editor-card-preview="1"] .classicDesc,
+article[data-editor-card-preview="1"] .frameDesc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  white-space: normal;
+}
+
+article[data-editor-card-preview="1"] .classicDescSecondary,
+article[data-editor-card-preview="1"] .frameDescSecondary {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+}
+
+article[data-editor-card-preview="1"] .footerDate,
+article[data-editor-card-preview="1"] .footerPlace {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+article[data-editor-card-preview="1"] .fullSurfaceFooterDate,
+article[data-editor-card-preview="1"] .fullSurfaceFooterPlace {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

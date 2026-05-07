@@ -15,6 +15,7 @@ const STATUS_BADGE_OPTIONS: readonly TournamentStatusBadge[] = [
   "모집중",
   "마감임박",
   "마감",
+  "진행중",
   "예정",
   "종료",
   "초안",

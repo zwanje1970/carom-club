@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import type { TournamentApplicationListItem } from "../../../../lib/types/entities";
+import type { TournamentApplicationListItem, TournamentStatusBadge } from "../../../../lib/types/entities";
 import { filterParticipantEntries, type ClientParticipantFilterKey } from "./client-participant-filter-shared";
 import ParticipantListRow from "./participants/ParticipantListRow";
 import ParticipantsToolbar from "./participants/ParticipantsToolbar";
+import TournamentParticipantsFinalizeBar from "./TournamentParticipantsFinalizeBar";
 
 export type ParticipantCountSummary = {
   total: number;
@@ -29,6 +30,7 @@ type Props = {
   selected: ClientParticipantFilterKey;
   filterBaseHref: string;
   zonesEnabled: boolean;
+  tournamentStatusBadge: TournamentStatusBadge;
 };
 
 const participantApplicationsTableThBase: CSSProperties = {
@@ -108,6 +110,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   selected,
   filterBaseHref,
   zonesEnabled,
+  tournamentStatusBadge,
 }: Props) {
   const [entries, setEntries] = useState<TournamentApplicationListItem[]>(initialEntries);
   const [moreLoading, setMoreLoading] = useState(() => participantCountSummary.total > initialEntries.length);
@@ -234,6 +237,11 @@ export default function ClientTournamentParticipantsApplicationsBlock({
 
   return (
     <div className="client-tournament-manage__participantsBlock">
+      <TournamentParticipantsFinalizeBar
+        tournamentId={tournamentId}
+        tournamentStatusBadge={tournamentStatusBadge}
+        approvedCount={participantCountSummary.approved}
+      />
       <div className="client-tournament-manage__participantsSticky">
         <ParticipantsToolbar tournamentId={tournamentId} />
         <div className="client-tournament-manage__filterRow">
@@ -284,7 +292,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
       </div>
 
       <p style={{ margin: "0.35rem 0 0", fontSize: "0.95rem", fontWeight: 700, lineHeight: 1.35 }}>
-        참가자 리스트
+        신청자 관리
       </p>
       <p style={{ margin: "0.15rem 0 0.45rem", fontSize: "0.92rem", fontWeight: 700 }}>
         {tournamentTitle.trim()} ({zoneFilteredEntries.length}/{capacityLabel(maxParticipants)})

@@ -3,8 +3,8 @@
  * (스냅샷·대회 엔티티 구조는 바꾸지 않고, 표시·게시 조건만 맞춘다.)
  */
 
-/** 메인 홈 슬라이드(홍보): 참여 가능한 상태만 */
-export const MAIN_SLIDE_STATUS_BADGES = new Set<string>(["모집중", "마감임박"]);
+/** 메인 홈 슬라이드: 모집·마감·진행 노출(종료는 reconcile·만료 큐에서 별도 처리) */
+export const MAIN_SLIDE_STATUS_BADGES = new Set<string>(["모집중", "마감임박", "마감", "진행중"]);
 
 /** 대회 상태 문자열 기준으로 메인 슬라이드 게시 노출 여부(저장 시점에 카드에 반영) */
 export function tournamentStatusEligibleForMainSlide(status: string): boolean {
@@ -14,8 +14,8 @@ export function tournamentStatusEligibleForMainSlide(status: string): boolean {
 /** /site/tournaments 공개 목록에서 숨김 (생성자 전용 상태) */
 export const SITE_TOURNAMENT_LIST_EXCLUDED_BADGES = new Set<string>(["초안", "예정"]);
 
-/** 카드 게시(저장·게시 흐름) 허용 상태 */
-export const PUBLISH_ELIGIBLE_STATUS_BADGES = new Set<string>(["모집중", "마감임박"]);
+/** 카드 게시(저장·게시 흐름) 허용 상태 — 마감·진행 중에도 카드 갱신 가능 */
+export const PUBLISH_ELIGIBLE_STATUS_BADGES = new Set<string>(["모집중", "마감임박", "마감", "진행중"]);
 
 export function resolveTournamentStatusBadgeForDisplay(
   snapshotBadge: string | undefined | null,
@@ -39,8 +39,6 @@ export function getPublishBlockedUserMessage(status: string): string | null {
       return "초안은 게시할 수 없습니다.";
     case "예정":
       return "예정 상태는 게시할 수 없습니다.";
-    case "마감":
-      return "마감된 경기는 게시할 수 없습니다.";
     case "종료":
       return "종료된 경기는 게시할 수 없습니다.";
     default:

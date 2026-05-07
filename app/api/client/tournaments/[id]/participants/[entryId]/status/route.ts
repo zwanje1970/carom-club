@@ -85,7 +85,7 @@ export async function PATCH(
     return NextResponse.json({ error: "상태 변경 권한이 없습니다." }, { status: 403 });
   }
 
-  let body: { nextStatus?: unknown } = {};
+  let body: { nextStatus?: unknown; rejectReason?: unknown } = {};
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -96,11 +96,15 @@ export async function PATCH(
     return NextResponse.json({ error: "nextStatus 값이 올바르지 않습니다." }, { status: 400 });
   }
 
+  const rejectReason =
+    body.nextStatus === "REJECTED" && typeof body.rejectReason === "string" ? body.rejectReason : undefined;
+
   const result = await updateTournamentApplicationStatusFirestore({
     tournamentId: id,
     entryId,
     nextStatus: body.nextStatus,
     actorUserId: user.id,
+    rejectReason,
   });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });

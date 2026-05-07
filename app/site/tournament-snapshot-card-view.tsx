@@ -109,10 +109,10 @@ function parseSubtitle(subtitle: string): { dateText: string; placeText: string 
 
 function toStatus(value: string | undefined): TournamentPostStatus {
   const badge = (value ?? "").trim();
+  if (badge === "진행중") return "진행중";
   if (badge.includes("마감임박") || (badge.includes("마감") && badge.includes("임박"))) return "마감임박";
   if (badge.includes("종료")) return "종료";
   if (badge.includes("마감")) return "마감";
-  if (badge.includes("진행")) return "모집중";
   return "모집중";
 }
 
@@ -222,6 +222,7 @@ function TournamentSlideCardPreview({
   mainSlideAd,
   tournamentPublishedHeightScale = true,
   editorCompactCardHeight = false,
+  editorPreviewFixedLayout = false,
   onRepImageLoad,
   isImageCaptureMode = false,
 }: {
@@ -241,6 +242,8 @@ function TournamentSlideCardPreview({
   tournamentPublishedHeightScale?: boolean;
   /** 게시카드 작성 미리보기·PNG 캡처: 카드 높이만 약 20% 축소(메인 live 미적용) */
   editorCompactCardHeight?: boolean;
+  /** 게시카드 작성 미리보기만: 카드 박스·텍스트 슬롯 높이 고정(메인·다른 경로 false) */
+  editorPreviewFixedLayout?: boolean;
   onRepImageLoad?: () => void;
   /** true: 제목·부가·푸터·배지 글자만 숨김(레이아웃 유지) — html2canvas PNG용 */
   isImageCaptureMode?: boolean;
@@ -280,6 +283,16 @@ function TournamentSlideCardPreview({
     .filter(Boolean)
     .join(" ");
 
+  const leadText = lead.trim();
+  const descText = description.trim();
+  const desc2Text = description2.trim();
+  const showLeadBlock = editorPreviewFixedLayout || leadText.length > 0;
+  const showDescBlock = editorPreviewFixedLayout || descText.length > 0;
+  const showDesc2Block = editorPreviewFixedLayout || desc2Text.length > 0;
+  const leadDisplay = editorPreviewFixedLayout && !leadText ? "\u00a0" : lead;
+  const descDisplay = editorPreviewFixedLayout && !descText ? "\u00a0" : description;
+  const desc2Display = editorPreviewFixedLayout && !desc2Text ? "\u00a0" : description2;
+
   const fullOverlayFooter = (
     <div className={styles.fullSurfaceFooter} style={capHide}>
       <p className={styles.fullSurfaceFooterDate} style={fullFooterDateStyle}>
@@ -307,7 +320,10 @@ function TournamentSlideCardPreview({
 
   if (variant === "classic") {
     return (
-      <article className={rootClass}>
+      <article
+        className={rootClass}
+        data-editor-card-preview={editorPreviewFixedLayout ? "1" : undefined}
+      >
         <MediaStack
           variant="classic"
           item={item}
@@ -324,9 +340,9 @@ function TournamentSlideCardPreview({
             <div className={styles.classicInner}>
               <div className={styles.classicTop}>
                 <div className={styles.classicMain}>
-                  {lead.length > 0 ? (
+                  {showLeadBlock ? (
                     <p className={styles.classicLead} style={mergeCap(leadColor ? { color: leadColor } : undefined)}>
-                      {lead}
+                      {leadDisplay}
                     </p>
                   ) : null}
                   <h3
@@ -335,17 +351,17 @@ function TournamentSlideCardPreview({
                   >
                     {item.title.length > 0 ? item.title : "(제목)"}
                   </h3>
-                  {description.length > 0 ? (
+                  {showDescBlock ? (
                     <p className={styles.classicDesc} style={mergeCap(descColor ? { color: descColor } : undefined)}>
-                      {description}
+                      {descDisplay}
                     </p>
                   ) : null}
-                  {description2.length > 0 ? (
+                  {showDesc2Block ? (
                     <p
                       className={styles.classicDescSecondary}
                       style={mergeCap(descColor ? { color: descColor } : undefined)}
                     >
-                      {description2}
+                      {desc2Display}
                     </p>
                   ) : null}
                 </div>
@@ -361,7 +377,10 @@ function TournamentSlideCardPreview({
 
   if (variant === "frame") {
     return (
-      <article className={rootClass}>
+      <article
+        className={rootClass}
+        data-editor-card-preview={editorPreviewFixedLayout ? "1" : undefined}
+      >
         <MediaStack
           variant="frame"
           item={item}
@@ -377,25 +396,25 @@ function TournamentSlideCardPreview({
           ) : (
             <div className={styles.frameInner}>
               <div className={styles.frameCenter}>
-                {lead.length > 0 ? (
+                {showLeadBlock ? (
                   <p className={styles.frameLead} style={mergeCap(leadColor ? { color: leadColor } : undefined)}>
-                    {lead}
+                    {leadDisplay}
                   </p>
                 ) : null}
                 <h3 className={styles.frameTitle} style={mergeCap(titleColor ? { color: titleColor } : undefined)}>
                   {item.title.length > 0 ? item.title : "(제목)"}
                 </h3>
-                {description.length > 0 ? (
+                {showDescBlock ? (
                   <p className={styles.frameDesc} style={mergeCap(descColor ? { color: descColor } : undefined)}>
-                    {description}
+                    {descDisplay}
                   </p>
                 ) : null}
-                {description2.length > 0 ? (
+                {showDesc2Block ? (
                   <p
                     className={styles.frameDescSecondary}
                     style={mergeCap(descColor ? { color: descColor } : undefined)}
                   >
-                    {description2}
+                    {desc2Display}
                   </p>
                 ) : null}
                 {surfaceLayout === "full" ? fullOverlayFooter : null}
@@ -427,6 +446,7 @@ export function TournamentSnapshotCardView({
   slideDeckAspectFill = false,
   templateCardLayout = false,
   editorCompactCardHeight = false,
+  editorPreviewFixedLayout = false,
   repImageHighPriority,
   slideDeckSolidBackdrop,
   onRepImageLoad,
@@ -440,6 +460,8 @@ export function TournamentSnapshotCardView({
   templateCardLayout?: boolean;
   /** 작성 화면 미리보기·PNG 캡처만 — 메인 슬라이드(live)에서는 false 유지 */
   editorCompactCardHeight?: boolean;
+  /** 게시카드 작성 미리보기만 — 카드·텍스트 영역 크기 고정 */
+  editorPreviewFixedLayout?: boolean;
   repImageHighPriority?: boolean;
   slideDeckSolidBackdrop?: string;
   onRepImageLoad?: () => void;
@@ -464,6 +486,7 @@ export function TournamentSnapshotCardView({
       mainSlideAd={item.type === "ad"}
       tournamentPublishedHeightScale={true}
       editorCompactCardHeight={editorCompactCardHeight}
+      editorPreviewFixedLayout={editorPreviewFixedLayout}
       onRepImageLoad={onRepImageLoad}
       isImageCaptureMode={isImageCaptureMode}
     />

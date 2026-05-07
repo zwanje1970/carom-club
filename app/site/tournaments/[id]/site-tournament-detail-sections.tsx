@@ -7,6 +7,7 @@ import type { Tournament, TournamentDivisionRuleRow } from "../../../../lib/type
 import { isEmptyOutlineHtml } from "../../../../lib/outline-content-helpers";
 import { buildSiteVenueDetailPath } from "../../../../lib/site-venues-catalog";
 import type { TournamentDivisionMetricType, TournamentEntryQualificationType } from "../../../../lib/tournament-rule-types";
+import SiteTournamentBracketEmbedDynamic from "./site-tournament-bracket-embed-dynamic";
 
 type Props = {
   tournament: Tournament;
@@ -19,6 +20,8 @@ type Props = {
   outlinePdfFileKind?: "pdf" | "docx";
   /** `site`: 공개 대회 상세 전용 레이아웃 — 미지정·`legacy`면 기존 클라이언트와 동일 UI */
   detailLayout?: "legacy" | "site";
+  /** 마감·진행중일 때 공개 대진표 임베드(클라이언트 동적 로드) */
+  showLiveBracketEmbed?: boolean;
 };
 
 /** 일반 참가자격: [기준유형] [기준값] [이하/미만] — 부자동배정과 분리 */
@@ -70,6 +73,7 @@ function tournamentStatusBadgeClassName(statusBadge: string): string {
   if (s === "모집중") return "badge-status";
   if (s === "마감임박") return "site-board-status-badge site-board-status-badge--urgent";
   if (s === "마감") return "site-board-status-badge site-board-status-badge--closed";
+  if (s === "진행중") return "site-board-status-badge site-board-status-badge--live";
   if (s === "종료") return "site-board-status-badge site-board-status-badge--ended";
   return "site-board-status-badge site-board-status-badge--muted";
 }
@@ -93,6 +97,7 @@ export default function SiteTournamentDetailSections({
   audience = "site",
   outlinePdfFileKind = "pdf",
   detailLayout = "legacy",
+  showLiveBracketEmbed = false,
 }: Props) {
   const posterUrl = resolveSitePosterDisplayUrl(tournament.posterImageUrl ?? null);
   const scheduleLabel = formatTournamentScheduleLabel(tournament);
@@ -136,6 +141,8 @@ export default function SiteTournamentDetailSections({
     else if (firstExtraHead) heroLineParts.push(firstExtraHead);
     const heroLine = heroLineParts.join(" · ");
     const statusClass = tournamentStatusBadgeClassName(tournament.statusBadge);
+    const applicationsClosed =
+      tournament.statusBadge === "마감" || tournament.statusBadge === "진행중" || tournament.statusBadge === "종료";
 
     return (
       <div className="site-detail-page-stack">
@@ -154,10 +161,14 @@ export default function SiteTournamentDetailSections({
           {heroLine ? <p className="site-detail-hero-meta">{heroLine}</p> : null}
           <span className={statusClass}>{tournament.statusBadge}</span>
           {tournament.summary?.trim() ? <p className="site-detail-hero-summary">{tournament.summary.trim()}</p> : null}
-          {applyHref ? (
+          {applyHref && !applicationsClosed ? (
             <Link prefetch={false} className="primary-button primary-button--block" href={applyHref}>
               참가신청
             </Link>
+          ) : applyHref && applicationsClosed ? (
+            <p className="site-detail-body-text" style={{ margin: "0.65rem 0 0", color: "#64748b" }}>
+              신청이 마감된 대회입니다.
+            </p>
           ) : null}
         </section>
 
@@ -253,6 +264,13 @@ export default function SiteTournamentDetailSections({
             ) : null}
           </div>
         </section>
+
+        {showLiveBracketEmbed ? (
+          <SiteTournamentBracketEmbedDynamic
+            tournamentId={tournament.id}
+            fastPoll={tournament.statusBadge === "진행중"}
+          />
+        ) : null}
 
         <div className="site-detail-actions-row">
           <Link prefetch={false} className="secondary-button" href={listBackHref} style={{ flex: "1 1 100%", maxWidth: "100%" }}>

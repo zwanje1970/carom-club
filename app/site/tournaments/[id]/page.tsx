@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { outlineFileKindFromAsset, outlinePdfIdFromPublicUrl } from "../../../../lib/outline-pdf-helpers";
 import { getOutlinePdfAssetById, getTournamentByIdForPublicSitePage } from "../../../../lib/surface-read";
+import { getLatestBracketByTournamentIdFirestore } from "../../../../lib/server/firestore-tournament-brackets";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
 import SiteShellFrame from "../../components/SiteShellFrame";
 import SiteTournamentDetailSections from "./site-tournament-detail-sections";
@@ -16,6 +17,13 @@ export default async function SiteTournamentDetailPage({
   if (!tournament) {
     notFound();
   }
+
+  const latestBracket = await getLatestBracketByTournamentIdFirestore(id);
+  const showLiveBracketEmbed =
+    Boolean(latestBracket) &&
+    (tournament.statusBadge === "마감" ||
+      tournament.statusBadge === "진행중" ||
+      tournament.statusBadge === "종료");
 
   const outlinePdfId = outlinePdfIdFromPublicUrl(tournament.outlinePdfUrl);
   const outlinePdfAsset = outlinePdfId ? await getOutlinePdfAssetById(outlinePdfId) : null;
@@ -36,6 +44,7 @@ export default async function SiteTournamentDetailPage({
           listBackHref="/site/tournaments"
           outlinePdfFileKind={outlinePdfFileKind}
           detailLayout="site"
+          showLiveBracketEmbed={showLiveBracketEmbed}
         />
       </section>
     </SiteShellFrame>
