@@ -466,6 +466,65 @@
   gap: 0.5rem;
 }
 
+/* 모집중·마감임박: 신청자 관리 카드 강조, 대진표는 보조 */
+.client-tournament-manage .client-tournament-manage__hubGrid--recruitingApplicantsFirst {
+  grid-template-columns: 1fr;
+  gap: 0.45rem;
+}
+
+.client-tournament-manage a.client-tournament-manage__featureCard--participantsHero {
+  min-height: 5.35rem;
+  padding: 0.85rem 1rem;
+  border: 2px solid rgba(37, 99, 235, 0.38);
+  background: linear-gradient(145deg, #eff6ff 0%, #ffffff 52%);
+  box-shadow: 0 8px 26px rgba(37, 99, 235, 0.14);
+}
+
+.client-tournament-manage a.client-tournament-manage__featureCard--participantsHero .client-tournament-manage__featureIconWrap {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  border-radius: 11px;
+  background: rgba(37, 99, 235, 0.16);
+  color: #1d4ed8;
+}
+
+.client-tournament-manage a.client-tournament-manage__featureCard--participantsHero .client-tournament-manage__featureTitle {
+  font-size: 1.06rem;
+  font-weight: 800;
+  color: #1e3a8a;
+  letter-spacing: -0.02em;
+}
+
+.client-tournament-manage a.client-tournament-manage__featureCard--participantsHero .client-tournament-manage__featureDesc {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.client-tournament-manage .client-tournament-manage__featureCard--secondaryOps {
+  min-height: 3.35rem;
+  padding: 0.42rem 0.55rem;
+  opacity: 0.92;
+}
+
+.client-tournament-manage .client-tournament-manage__featureCard--secondaryOps .client-tournament-manage__featureTitle {
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.client-tournament-manage .client-tournament-manage__featureCard--secondaryOps .client-tournament-manage__featureDesc {
+  font-size: 0.66rem;
+}
+
+.client-tournament-manage .client-tournament-manage__featureCard--secondaryOps .client-tournament-manage__featureIconWrap {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+}
+
 .client-tournament-manage .client-tournament-manage__featureCard--span {
   grid-column: 1 / -1;
 }
@@ -656,4 +715,87 @@
   font-size: 0.75rem;
   font-weight: 700;
   touch-action: manipulation;
+}
+
+.client-tournament-manage .client-tournament-manage__participantNameBtn {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 800;
+  color: #1e40af;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.client-tournament-manage .client-tournament-manage__participantNameBtn:active {
+  color: #1e3a8a;
+}
+
+/* 모바일: 신청자 1명 = 한 줄(주요 열만), 카드형 적층 레이아웃 무시 */
+@media (max-width: 767px) {
+  .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--singleLineMobile {
+    border-collapse: collapse;
+    border-spacing: 0;
+    table-layout: auto !important;
+  }
+
+  .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--singleLineMobile thead {
+    display: none;
+  }
+
+  .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--singleLineMobile tbody tr {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.28rem;
+    margin: 0 0 0.38rem;
+    padding: 0.38rem 0.42rem;
+    background: #fff;
+    border-radius: 11px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 5px rgba(15, 23, 42, 0.05);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--singleLineMobile tbody tr td {
+    display: block;
+    border: none !important;
+    padding: 0.12rem 0.18rem !important;
+    width: auto !important;
+    max-width: none !important;
+    flex-shrink: 0;
+    font-size: 0.8rem;
+  }
+
+  .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--singleLineMobile tbody tr td::before {
+    display: none !important;
+  }
+
+  .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--singleLineMobile tbody tr td.participant-col--hideNarrow {
+    display: none !important;
+  }
+
+  .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--singleLineMobile tbody tr td.participant-col--name {
+    flex: 1 1 32%;
+    min-width: 0;
+    flex-shrink: 1;
+  }
+
+  .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--singleLineMobile tbody tr td.participant-col--actions {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
 }

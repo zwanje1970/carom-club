@@ -271,6 +271,7 @@ export default function TournamentBadgeCardManageRow({
           : "메인에 게시되었습니다. 사이트에 반영되었습니다.",
       ),
     );
+    setExpanded(false);
     router.refresh();
   }
 

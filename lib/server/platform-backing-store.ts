@@ -488,11 +488,12 @@ export type TournamentApplication = {
   zoneId?: string | null;
 };
 
-/** 클라이언트 참가자 목록 RSC — 증빙·OCR·입금자명 등 제외 */
+/** 클라이언트 참가자 목록 RSC — 증빙·OCR 등 제외(입금자명은 목록 표시용으로 포함) */
 export type TournamentApplicationListItem = {
   id: string;
   applicantName: string;
   phone: string;
+  depositorName?: string | null;
   status: TournamentApplicationStatus;
   createdAt: string;
   registrationSource?: "admin" | null;

@@ -310,10 +310,10 @@ export default function ClientTournamentParticipantsApplicationsBlock({
         ) : (
           <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
             <table
-              className="client-tournament-manage__participantTable"
+              className="client-tournament-manage__participantTable client-tournament-manage__participantTable--singleLineMobile"
               style={{
                 width: "100%",
-                minWidth: zonesEnabled ? "41rem" : "36rem",
+                minWidth: zonesEnabled ? "48rem" : "42rem",
                 borderCollapse: "collapse",
                 tableLayout: "fixed",
                 fontSize: "0.84rem",
@@ -336,8 +336,8 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     style={{
                       ...participantApplicationsTableThBase,
                       textAlign: "left",
-                      minWidth: "7.5rem",
-                      width: "26%",
+                      minWidth: "6rem",
+                      width: "18%",
                     }}
                   >
                     이름
@@ -346,11 +346,31 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     style={{
                       ...participantApplicationsTableThBase,
                       textAlign: "center",
-                      width: "4rem",
+                      width: "3.25rem",
                       maxWidth: "4rem",
                     }}
                   >
                     점수/에버
+                  </th>
+                  <th
+                    style={{
+                      ...participantApplicationsTableThBase,
+                      textAlign: "left",
+                      width: "5rem",
+                      maxWidth: "6rem",
+                    }}
+                  >
+                    입금자
+                  </th>
+                  <th
+                    style={{
+                      ...participantApplicationsTableThBase,
+                      textAlign: "right",
+                      width: "auto",
+                      minWidth: "7rem",
+                    }}
+                  >
+                    작업
                   </th>
                   <th
                     style={{
@@ -414,6 +434,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     tournamentId={tournamentId}
                     entryId={entry.id}
                     applicantName={entry.applicantName}
+                    depositorName={entry.depositorName ?? null}
                     initialStatus={entry.status}
                     phone={entry.phone}
                     registrationCreatedAt={entry.createdAt}

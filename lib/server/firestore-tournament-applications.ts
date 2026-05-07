@@ -23,6 +23,7 @@ const TOURNAMENT_APPLICATION_LIST_FIRESTORE_FIELDS = [
   "createdAt",
   "applicantName",
   "phone",
+  "depositorName",
   "status",
   "registrationSource",
   "participantAverage",
@@ -77,10 +78,15 @@ function tournamentApplicationToListItem(
       : zr === null
         ? null
         : undefined;
+  const depositorNameRaw = item.depositorName;
+  const depositorName =
+    typeof depositorNameRaw === "string" && depositorNameRaw.trim() !== "" ? depositorNameRaw.trim() : null;
+
   return {
     id,
     applicantName: typeof item.applicantName === "string" ? item.applicantName : "",
     phone: typeof item.phone === "string" ? item.phone : "",
+    ...(depositorName ? { depositorName } : {}),
     status,
     createdAt,
     registrationSource,

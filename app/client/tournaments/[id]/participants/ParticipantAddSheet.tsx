@@ -67,7 +67,7 @@ export default function ParticipantAddSheet({ tournamentId }: { tournamentId: st
         onClick={() => setOpen(true)}
         style={{ padding: "0.36rem 0.65rem", fontWeight: 700, fontSize: "0.86rem", WebkitTapHighlightColor: "transparent" }}
       >
-        수동 입력
+        운영자 참가자 수동 추가
       </button>
       {open ? (
         <div
@@ -99,13 +99,13 @@ export default function ParticipantAddSheet({ tournamentId }: { tournamentId: st
             }}
           >
             <div className="v3-row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-              <strong style={{ fontSize: "1.05rem" }}>참가자 추가</strong>
+              <strong style={{ fontSize: "1.05rem" }}>참가자 수동추가</strong>
               <button type="button" className="v3-btn" onClick={close} style={{ padding: "0.35rem 0.55rem" }}>
                 닫기
               </button>
             </div>
             <p className="v3-muted" style={{ margin: 0, fontSize: "0.85rem" }}>
-              현장 입력 · 즉시 참가자 등록 · 관리자 등록으로 저장됩니다.
+              사이트 밖에서 신청한 참가자를 운영자가 대신 등록합니다. 즉시 참가자(관리자 등록)로 저장됩니다.
             </p>
             <label className="v3-stack" style={{ gap: "0.25rem" }}>
               <span style={{ fontSize: "0.82rem", fontWeight: 600 }}>이름 (필수)</span>

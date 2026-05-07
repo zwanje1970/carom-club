@@ -58,6 +58,7 @@ export default function ParticipantApplicationDetailModal({
   tournamentId,
   entryId,
   applicantName,
+  depositorName,
   status,
   phone,
   registrationCreatedAt,
@@ -72,6 +73,7 @@ export default function ParticipantApplicationDetailModal({
   tournamentId: string;
   entryId: string;
   applicantName: string;
+  depositorName?: string;
   status: TournamentApplicationStatus;
   phone: string;
   registrationCreatedAt: string;
@@ -108,6 +110,9 @@ export default function ParticipantApplicationDetailModal({
 
           <span style={labelStyle}>전화번호</span>
           <span>{phone.trim() || "—"}</span>
+
+          <span style={labelStyle}>입금자</span>
+          <span>{typeof depositorName === "string" && depositorName.trim() ? depositorName.trim() : "—"}</span>
 
           <span style={labelStyle}>상태</span>
           <span>

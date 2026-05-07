@@ -75,13 +75,17 @@ export default function TournamentManageFeatureCards({
   const recruitingHighlight = statusBadge === "모집중" || statusBadge === "마감임박";
 
   const applicantsCard = (
-    <Link prefetch={false} href={participantsHref} className="client-tournament-manage__featureCard client-tournament-manage__featureCard--neutral">
+    <Link
+      prefetch={false}
+      href={participantsHref}
+      className={`client-tournament-manage__featureCard client-tournament-manage__featureCard--neutral${recruitingHighlight ? " client-tournament-manage__featureCard--participantsHero" : ""}`}
+    >
       <span className="client-tournament-manage__featureIconWrap" aria-hidden>
         <IconUsers />
       </span>
       <span className="client-tournament-manage__featureCardTextCol">
         <span className="client-tournament-manage__featureTitle">신청자 관리</span>
-        <span className="client-tournament-manage__featureDesc">신청·입금확인·승인·거절·수동 입력·참가자 확정</span>
+        <span className="client-tournament-manage__featureDesc">신청·입금확인·승인·거절·운영자 수동 추가·참가자 확정</span>
       </span>
     </Link>
   );
@@ -91,7 +95,7 @@ export default function TournamentManageFeatureCards({
       <Link
         prefetch={false}
         href={bracketManageHref}
-        className="client-tournament-manage__featureCard client-tournament-manage__featureCard--accent client-tournament-manage__featureCard--span"
+        className={`client-tournament-manage__featureCard client-tournament-manage__featureCard--accent client-tournament-manage__featureCard--span${recruitingHighlight ? " client-tournament-manage__featureCard--secondaryOps" : ""}`}
       >
         <span className="client-tournament-manage__featureIconWrap" aria-hidden>
           <IconGrid />
@@ -105,7 +109,7 @@ export default function TournamentManageFeatureCards({
       <Link
         prefetch={false}
         href={bracketWizardHref}
-        className="client-tournament-manage__featureCard client-tournament-manage__featureCard--accent client-tournament-manage__featureCard--span"
+        className={`client-tournament-manage__featureCard client-tournament-manage__featureCard--accent client-tournament-manage__featureCard--span${recruitingHighlight ? " client-tournament-manage__featureCard--secondaryOps" : ""}`}
       >
         <span className="client-tournament-manage__featureIconWrap" aria-hidden>
           <IconGrid />
@@ -116,7 +120,9 @@ export default function TournamentManageFeatureCards({
         </span>
       </Link>
     ) : (
-      <span className="client-tournament-manage__featureCard client-tournament-manage__featureCard--accent client-tournament-manage__featureCard--span client-tournament-manage__featureCard--disabled">
+      <span
+        className={`client-tournament-manage__featureCard client-tournament-manage__featureCard--accent client-tournament-manage__featureCard--span client-tournament-manage__featureCard--disabled${recruitingHighlight ? " client-tournament-manage__featureCard--secondaryOps" : ""}`}
+      >
         <span className="client-tournament-manage__featureIconWrap" aria-hidden>
           <IconGrid />
         </span>
@@ -129,7 +135,7 @@ export default function TournamentManageFeatureCards({
 
   return (
     <div className="client-tournament-manage__hubStack">
-      <div className="client-tournament-manage__hubGrid">
+      <div className={`client-tournament-manage__hubGrid${recruitingHighlight ? " client-tournament-manage__hubGrid--recruitingApplicantsFirst" : ""}`}>
         {recruitingHighlight ? (
           <>
             {applicantsCard}

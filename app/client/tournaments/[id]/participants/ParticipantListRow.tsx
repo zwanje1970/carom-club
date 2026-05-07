@@ -12,21 +12,10 @@ type TournamentApplicationStatus =
   | "APPROVED"
   | "REJECTED";
 
-const STATUS_LABELS: Record<TournamentApplicationStatus, string> = {
-  APPLIED: "신청자",
-  VERIFYING: "신청자",
-  WAITING_PAYMENT: "신청자",
-  APPROVED: "참가자",
-  REJECTED: "거절",
-};
-
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n);
 }
 
-/**
- * locale·Intl 미사용, ISO 시각을 UTC 기준 YYYY.MM.DD HH:mm 로만 조합 (SSR·클라이언트 동일).
- */
 function formatRegistrationInstantUtc(iso: string): string {
   const raw = iso.trim();
   if (!raw) return "";
@@ -49,20 +38,20 @@ function statusBadgeStyle(status: TournamentApplicationStatus): CSSProperties {
   return { background: "#eff6ff", color: "#1e3a5f", border: "1px solid #bfdbfe" };
 }
 
-const actionBtnBase: CSSProperties = {
-  minHeight: 32,
-  minWidth: 32,
-  padding: "0 0.4rem",
-  fontSize: "0.72rem",
-  fontWeight: 700,
-  borderRadius: "0.3rem",
+const actionBtn: CSSProperties = {
+  minHeight: 28,
+  padding: "0.12rem 0.38rem",
+  fontSize: "0.68rem",
+  fontWeight: 800,
+  borderRadius: "0.28rem",
   touchAction: "manipulation",
   flexShrink: 0,
+  whiteSpace: "nowrap",
 };
 
 const cellBase: CSSProperties = {
-  padding: "0.2rem 0.28rem",
-  fontSize: "0.84rem",
+  padding: "0.22rem 0.32rem",
+  fontSize: "0.82rem",
   verticalAlign: "middle",
   borderBottom: "1px solid #e8e8e8",
 };
@@ -83,6 +72,7 @@ export default function ParticipantListRow({
   tournamentId,
   entryId,
   applicantName,
+  depositorName,
   initialStatus,
   phone,
   registrationCreatedAt,
@@ -102,9 +92,9 @@ export default function ParticipantListRow({
   tournamentId: string;
   entryId: string;
   applicantName: string;
+  depositorName?: string | null;
   initialStatus: TournamentApplicationStatus;
   phone: string;
-  /** ISO 시각 문자열(서버 저장값 그대로). 표시는 컴포넌트 내 고정 포맷만 사용 */
   registrationCreatedAt: string;
   registrationSource?: "admin" | null;
   participantAverage?: number | null;
@@ -154,7 +144,7 @@ export default function ParticipantListRow({
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ zoneId: nextZoneId }),
-        }
+        },
       );
       const result = (await response.json()) as { error?: string; ok?: boolean; zoneId?: string | null };
       if (!response.ok) {
@@ -214,7 +204,7 @@ export default function ParticipantListRow({
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ checked: next }),
-        }
+        },
       );
       const result = (await response.json()) as { error?: string };
       if (!response.ok) {
@@ -230,6 +220,11 @@ export default function ParticipantListRow({
     }
   }
 
+  function promptReject() {
+    const reason = window.prompt("거절 사유를 입력하세요. (선택, 신청 메모에 저장됩니다.)") ?? "";
+    void handleTransition("REJECTED", reason.trim() || undefined);
+  }
+
   const showEver = participantAverage != null && Number.isFinite(participantAverage);
   const registrationDisplay = formatRegistrationInstantUtc(registrationCreatedAt);
   const metaBits: string[] = [];
@@ -240,45 +235,9 @@ export default function ParticipantListRow({
     metaBits.push(registrationSource === "admin" ? `등록 ${registrationDisplay}` : `신청 ${registrationDisplay}`);
   }
   const metaLine = metaBits.join(" · ");
+  const depositorDisplay = (typeof depositorName === "string" ? depositorName.trim() : "") || "—";
 
-  function renderNameCellActions() {
-    if (status === "WAITING_PAYMENT") {
-      return (
-        <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "center", gap: "0.25rem", flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <button
-            type="button"
-            className="v3-btn"
-            disabled={loading}
-            onClick={() => void handleTransition("APPROVED")}
-            style={{
-              ...actionBtnBase,
-              background: "#dff5e6",
-              borderColor: "#7dcea0",
-              color: "#0d5c2e",
-            }}
-          >
-            입금확인
-          </button>
-          <button
-            type="button"
-            className="v3-btn"
-            disabled={loading}
-            onClick={() => {
-              const reason = window.prompt("거절 사유를 입력하세요. (선택, 신청 메모에 저장됩니다.)") ?? "";
-              void handleTransition("REJECTED", reason.trim() || undefined);
-            }}
-            style={{
-              ...actionBtnBase,
-              background: "#fff",
-              borderColor: "#d7d7d7",
-              color: "#374151",
-            }}
-          >
-            거절
-          </button>
-        </span>
-      );
-    }
+  function renderActionButtons() {
     if (status === "APPROVED") {
       return (
         <span
@@ -286,11 +245,11 @@ export default function ParticipantListRow({
             display: "inline-flex",
             alignItems: "center",
             minHeight: 28,
-            padding: "0 0.35rem",
-            fontSize: "0.7rem",
+            padding: "0 0.3rem",
+            fontSize: "0.68rem",
             fontWeight: 800,
             ...statusBadgeStyle(status),
-            borderRadius: "0.3rem",
+            borderRadius: "0.28rem",
           }}
         >
           참가자
@@ -304,21 +263,85 @@ export default function ParticipantListRow({
         </span>
       );
     }
-    return (
-      <span
+
+    const rejectBtn = (
+      <button
+        type="button"
+        className="v3-btn"
+        disabled={loading}
+        onClick={() => promptReject()}
         style={{
-          display: "inline-flex",
-          alignItems: "center",
-          minHeight: 28,
-          padding: "0.08rem 0.35rem",
-          borderRadius: "0.25rem",
-          fontSize: "0.68rem",
-          fontWeight: 700,
-          whiteSpace: "nowrap",
-          ...statusBadgeStyle(status),
+          ...actionBtn,
+          background: "#fff",
+          border: "1px solid #d1d5db",
+          color: "#374151",
         }}
       >
-        {STATUS_LABELS[status]}
+        거절
+      </button>
+    );
+
+    if (status === "WAITING_PAYMENT") {
+      return (
+        <span style={{ display: "inline-flex", flexWrap: "nowrap", alignItems: "center", gap: "0.18rem" }}>
+          <button
+            type="button"
+            className="v3-btn"
+            disabled={loading}
+            onClick={() => void handleTransition("APPROVED")}
+            style={{
+              ...actionBtn,
+              background: "#dff5e6",
+              border: "1px solid #7dcea0",
+              color: "#0d5c2e",
+            }}
+          >
+            입금확인
+          </button>
+          {rejectBtn}
+        </span>
+      );
+    }
+
+    if (status === "VERIFYING") {
+      return (
+        <span style={{ display: "inline-flex", flexWrap: "nowrap", alignItems: "center", gap: "0.18rem" }}>
+          <button
+            type="button"
+            className="v3-btn"
+            disabled={loading}
+            onClick={() => void handleTransition("WAITING_PAYMENT")}
+            style={{
+              ...actionBtn,
+              background: "#dbeafe",
+              border: "1px solid #60a5fa",
+              color: "#1e40af",
+            }}
+          >
+            승인
+          </button>
+          {rejectBtn}
+        </span>
+      );
+    }
+
+    return (
+      <span style={{ display: "inline-flex", flexWrap: "nowrap", alignItems: "center", gap: "0.18rem" }}>
+        <button
+          type="button"
+          className="v3-btn"
+          disabled={loading}
+          onClick={() => void handleTransition("VERIFYING")}
+          style={{
+            ...actionBtn,
+            background: "#dbeafe",
+            border: "1px solid #60a5fa",
+            color: "#1e40af",
+          }}
+        >
+          승인
+        </button>
+        {rejectBtn}
       </span>
     );
   }
@@ -335,6 +358,7 @@ export default function ParticipantListRow({
             tournamentId={tournamentId}
             entryId={entryId}
             applicantName={applicantName}
+            depositorName={depositorDisplay !== "—" ? depositorDisplay : ""}
             status={status}
             phone={phone}
             registrationCreatedAt={registrationCreatedAt}
@@ -350,175 +374,187 @@ export default function ParticipantListRow({
 
   return (
     <>
-    <tr style={{ background: "#fff" }}>
-      <td
-        data-participant-label="번호"
-        style={{
-          ...cellBase,
-          textAlign: "center",
-          width: "2.35rem",
-          maxWidth: "2.5rem",
-          padding: "0.2rem 0.15rem",
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {rowNumber}
-      </td>
-      <td data-participant-label="이름" style={{ ...cellBase, whiteSpace: "nowrap", minWidth: 0 }}>
-        <div className="client-tournament-manage__nameCell">
-          <div className="client-tournament-manage__nameRow1">
-            <div className="client-tournament-manage__nameLeft">
+      <tr style={{ background: "#fff" }}>
+        <td
+          className="participant-col participant-col--hideNarrow"
+          data-participant-label="번호"
+          style={{
+            ...cellBase,
+            textAlign: "center",
+            width: "2.35rem",
+            maxWidth: "2.5rem",
+            padding: "0.2rem 0.15rem",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {rowNumber}
+        </td>
+        <td data-participant-label="이름" className="participant-col participant-col--name" style={{ ...cellBase, minWidth: 0 }}>
+          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "0.25rem", minWidth: 0 }}>
+            <button
+              type="button"
+              className="client-tournament-manage__participantNameBtn"
+              title={metaLine || undefined}
+              onClick={() => setDetailOpen(true)}
+            >
+              {applicantName}
+            </button>
+            {registrationSource === "admin" ? (
               <span
-                style={{ fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}
-                title={metaLine || undefined}
+                style={{
+                  fontSize: "0.58rem",
+                  fontWeight: 700,
+                  padding: "0.04rem 0.22rem",
+                  borderRadius: "0.2rem",
+                  background: "#eef2ff",
+                  color: "#3730a3",
+                  border: "1px solid #c7d2fe",
+                  flexShrink: 0,
+                }}
               >
-                {applicantName}
+                관리
               </span>
-              {registrationSource === "admin" ? (
-                <span
-                  style={{
-                    fontSize: "0.62rem",
-                    fontWeight: 700,
-                    padding: "0.04rem 0.25rem",
-                    borderRadius: "0.2rem",
-                    background: "#eef2ff",
-                    color: "#3730a3",
-                    border: "1px solid #c7d2fe",
-                    flexShrink: 0,
-                  }}
-                >
-                  관리자 등록
-                </span>
-              ) : null}
-            </div>
-            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "0.28rem", flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
-              <div className="client-tournament-manage__nameStatus">{renderNameCellActions()}</div>
-              <button
-                type="button"
-                className="v3-btn client-tournament-manage__detailTriggerBtn"
-                onClick={() => setDetailOpen(true)}
-              >
-                상세
-              </button>
-            </div>
+            ) : null}
           </div>
-        </div>
-      </td>
-      <td
-        data-participant-label="점수/에버"
-        style={{
-          ...cellBase,
-          whiteSpace: "nowrap",
-          textAlign: "center",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          maxWidth: "4rem",
-        }}
-        title={showEver ? String(participantAverage) : undefined}
-      >
-        {scoreCell}
-      </td>
-      <td
-        data-participant-label="전화번호"
-        style={{
-          ...cellBase,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          maxWidth: "6.75rem",
-        }}
-        title={phone.trim() || undefined}
-      >
-        {phone.trim() || "—"}
-      </td>
-      <td
-        data-participant-label="입금일"
-        style={{
-          ...cellBase,
-          whiteSpace: "nowrap",
-          textAlign: "center",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          maxWidth: "3rem",
-        }}
-        title={depositCell !== "—" ? depositCell : undefined}
-      >
-        {depositCell}
-      </td>
-      {zonesEnabled ? (
-        <td data-participant-label="권역" style={{ ...cellBase, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", maxWidth: "6.5rem" }}>
-          {zones.length === 0 ? (
-            <span className="v3-muted" style={{ fontSize: "0.72rem" }}>
+        </td>
+        <td
+          data-participant-label="점수/에버"
+          className="participant-col"
+          style={{
+            ...cellBase,
+            whiteSpace: "nowrap",
+            textAlign: "center",
+            width: "3.25rem",
+            maxWidth: "4rem",
+          }}
+        >
+          {scoreCell}
+        </td>
+        <td
+          data-participant-label="입금자"
+          className="participant-col"
+          style={{
+            ...cellBase,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            maxWidth: "5.5rem",
+          }}
+          title={depositorDisplay !== "—" ? depositorDisplay : undefined}
+        >
+          {depositorDisplay}
+        </td>
+        <td data-participant-label="작업" className="participant-col participant-col--actions" style={{ ...cellBase, textAlign: "right", whiteSpace: "nowrap" }}>
+          <div style={{ display: "inline-flex", justifyContent: "flex-end" }}>{renderActionButtons()}</div>
+        </td>
+        <td
+          className="participant-col participant-col--hideNarrow"
+          data-participant-label="전화번호"
+          style={{
+            ...cellBase,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            maxWidth: "6.75rem",
+          }}
+          title={phone.trim() || undefined}
+        >
+          {phone.trim() || "—"}
+        </td>
+        <td
+          className="participant-col participant-col--hideNarrow"
+          data-participant-label="입금일"
+          style={{
+            ...cellBase,
+            whiteSpace: "nowrap",
+            textAlign: "center",
+            maxWidth: "3rem",
+          }}
+        >
+          {depositCell}
+        </td>
+        {zonesEnabled ? (
+          <td
+            className="participant-col participant-col--hideNarrow"
+            data-participant-label="권역"
+            style={{ ...cellBase, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", maxWidth: "6.5rem" }}
+          >
+            {zones.length === 0 ? (
+              <span className="v3-muted" style={{ fontSize: "0.72rem" }}>
+                —
+              </span>
+            ) : (
+              <select
+                value={zoneSelect}
+                disabled={zonePending}
+                onChange={(e) => void patchZone(e.target.value)}
+                aria-label={`${applicantName} 권역`}
+                style={{
+                  width: "100%",
+                  maxWidth: "6.25rem",
+                  padding: "0.12rem 0.2rem",
+                  fontSize: "0.72rem",
+                  fontWeight: 600,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "0.25rem",
+                  boxSizing: "border-box",
+                  background: zonePending ? "#f1f5f9" : "#fff",
+                }}
+              >
+                <option value="">미배정</option>
+                {zones.map((z) => (
+                  <option key={z.id} value={z.id}>
+                    {z.zoneName}
+                  </option>
+                ))}
+              </select>
+            )}
+          </td>
+        ) : null}
+        <td
+          className="participant-col participant-col--hideNarrow"
+          data-participant-label="조"
+          style={{ ...cellBase, textAlign: "center", whiteSpace: "nowrap", maxWidth: "2.85rem" }}
+        >
+          <input
+            type="number"
+            min={1}
+            max={999}
+            inputMode="numeric"
+            placeholder=""
+            value={groupDraft}
+            onChange={(e) => onGroupDraftChange(entryId, e.target.value)}
+            style={{
+              width: "2.85rem",
+              maxWidth: "100%",
+              padding: "0.1rem 0.15rem",
+              fontSize: "0.78rem",
+              border: "1px solid #cbd5e1",
+              borderRadius: "0.25rem",
+              textAlign: "center",
+              boxSizing: "border-box",
+            }}
+            aria-label={`${applicantName} 조번호`}
+          />
+        </td>
+        <td className="participant-col participant-col--hideNarrow" data-participant-label="출석" style={{ ...cellBase, textAlign: "center", whiteSpace: "nowrap" }}>
+          {status === "APPROVED" ? (
+            <input
+              type="checkbox"
+              checked={attendanceChecked}
+              disabled={attendancePending}
+              onChange={(e) => void patchAttendance(e.target.checked)}
+              style={{ width: "1.15rem", height: "1.15rem", cursor: "pointer" }}
+              aria-label={`${applicantName} 출석`}
+            />
+          ) : (
+            <span className="v3-muted" style={{ fontSize: "0.78rem", whiteSpace: "nowrap" }}>
               —
             </span>
-          ) : (
-            <select
-              value={zoneSelect}
-              disabled={zonePending}
-              onChange={(e) => void patchZone(e.target.value)}
-              aria-label={`${applicantName} 권역`}
-              style={{
-                width: "100%",
-                maxWidth: "6.25rem",
-                padding: "0.12rem 0.2rem",
-                fontSize: "0.72rem",
-                fontWeight: 600,
-                border: "1px solid #cbd5e1",
-                borderRadius: "0.25rem",
-                boxSizing: "border-box",
-                background: zonePending ? "#f1f5f9" : "#fff",
-              }}
-            >
-              <option value="">미배정</option>
-              {zones.map((z) => (
-                <option key={z.id} value={z.id}>
-                  {z.zoneName}
-                </option>
-              ))}
-            </select>
           )}
         </td>
-      ) : null}
-      <td data-participant-label="조" style={{ ...cellBase, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", maxWidth: "2.85rem" }}>
-        <input
-          type="number"
-          min={1}
-          max={999}
-          inputMode="numeric"
-          placeholder=""
-          value={groupDraft}
-          onChange={(e) => onGroupDraftChange(entryId, e.target.value)}
-          style={{
-            width: "2.85rem",
-            maxWidth: "100%",
-            padding: "0.1rem 0.15rem",
-            fontSize: "0.78rem",
-            border: "1px solid #cbd5e1",
-            borderRadius: "0.25rem",
-            textAlign: "center",
-            boxSizing: "border-box",
-          }}
-          aria-label={`${applicantName} 조번호`}
-        />
-      </td>
-      <td data-participant-label="출석" style={{ ...cellBase, textAlign: "center", whiteSpace: "nowrap" }}>
-        {status === "APPROVED" ? (
-          <input
-            type="checkbox"
-            checked={attendanceChecked}
-            disabled={attendancePending}
-            onChange={(e) => void patchAttendance(e.target.checked)}
-            style={{ width: "1.15rem", height: "1.15rem", cursor: "pointer" }}
-            aria-label={`${applicantName} 출석`}
-          />
-        ) : (
-          <span className="v3-muted" style={{ fontSize: "0.78rem", whiteSpace: "nowrap" }}>
-            —
-          </span>
-        )}
-      </td>
-    </tr>
-    {modalEl}
+      </tr>
+      {modalEl}
     </>
   );
 }
