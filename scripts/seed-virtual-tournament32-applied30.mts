@@ -151,7 +151,7 @@ function buildApplicationDoc(tournamentId: string, index1: number, now: string):
 async function tryRebuildPublicTournamentSnapshots(): Promise<void> {
   try {
     const { rebuildSitePublicTournamentListSnapshots } = await import(
-      "../lib/server/site-public-list-snapshots-kv.ts"
+      "../lib/server/site-public-list-snapshots-kv"
     );
     await rebuildSitePublicTournamentListSnapshots();
     console.log("공개 대회 목록 스냅샷 rebuild 호출 완료.");
@@ -168,7 +168,10 @@ async function verify(db: Firestore, tournamentId: string): Promise<void> {
   console.log("   제목:", t?.title ?? "(없음)");
 
   const appsQ = await db.collection(APPLICATIONS).where("tournamentId", "==", tournamentId).get();
-  const apps = appsQ.docs.map((d) => ({ id: d.id, ...(d.data() as Record<string, unknown>) }));
+  const apps: Array<Record<string, unknown> & { id: string }> = appsQ.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Record<string, unknown>),
+  }));
   console.log("2. 신청 건수:", apps.length, apps.length === 30 ? "(성공)" : "(실패: 30명 아님)");
 
   const names = new Set(
