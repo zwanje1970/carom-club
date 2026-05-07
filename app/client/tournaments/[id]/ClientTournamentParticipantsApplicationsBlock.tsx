@@ -35,8 +35,8 @@ type Props = {
 };
 
 const participantApplicationsTableThBase: CSSProperties = {
-  padding: "0.1rem 0.12rem",
-  fontSize: "0.66rem",
+  padding: "0.08rem 0.1rem",
+  fontSize: "0.72rem",
   fontWeight: 800,
   whiteSpace: "nowrap",
   overflow: "hidden",
@@ -45,9 +45,9 @@ const participantApplicationsTableThBase: CSSProperties = {
 };
 
 const opsBtn: CSSProperties = {
-  minHeight: 30,
-  padding: "0.16rem 0.34rem",
-  fontSize: "0.7rem",
+  minHeight: 31,
+  padding: "0.18rem 0.28rem",
+  fontSize: "0.82rem",
   fontWeight: 700,
   borderRadius: "0.28rem",
   border: "1px solid #cbd5e1",
@@ -93,9 +93,9 @@ function participantMetricColumnTitle(eq: TournamentEntryQualificationType): str
 }
 
 const pillBase: CSSProperties = {
-  fontSize: "0.62rem",
+  fontSize: "0.78rem",
   fontWeight: 700,
-  padding: "0.08rem 0.28rem",
+  padding: "0.1rem 0.34rem",
   borderRadius: "999px",
   border: "1px solid #e2e8f0",
   whiteSpace: "nowrap",
@@ -259,10 +259,10 @@ export default function ClientTournamentParticipantsApplicationsBlock({
     <div className="client-tournament-manage__participantsBlock client-tournament-manage__applicationsCompactHeader">
       <p
         style={{
-          margin: "0 0 0.18rem",
-          fontSize: "0.88rem",
+          margin: "0 0 0.2rem",
+          fontSize: "1.02rem",
           fontWeight: 800,
-          lineHeight: 1.25,
+          lineHeight: 1.28,
           color: "#0f172a",
         }}
       >
@@ -303,7 +303,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
             margin: "0.14rem 0 0.2rem",
           }}
         >
-          <span className="v3-muted" style={{ fontSize: "0.7rem", fontWeight: 700 }}>
+          <span className="v3-muted" style={{ fontSize: "0.8rem", fontWeight: 700 }}>
             권역
           </span>
           <select
@@ -313,9 +313,9 @@ export default function ClientTournamentParticipantsApplicationsBlock({
             aria-label="권역 필터"
             style={{
               ...opsBtn,
-              minHeight: 28,
-              padding: "0.14rem 0.34rem",
-              fontSize: "0.68rem",
+              minHeight: 30,
+              padding: "0.16rem 0.36rem",
+              fontSize: "0.8rem",
               maxWidth: "11rem",
               cursor: activeZones.length === 0 ? "not-allowed" : "pointer",
               opacity: activeZones.length === 0 ? 0.65 : 1,
@@ -351,6 +351,19 @@ export default function ClientTournamentParticipantsApplicationsBlock({
         </span>
       </div>
 
+      <p
+        className="v3-muted"
+        style={{
+          margin: "0 0 0.28rem",
+          fontSize: "0.72rem",
+          lineHeight: 1.35,
+          fontWeight: 500,
+          color: "#64748b",
+        }}
+      >
+        승인완료시 신청자에게 신청완료 알림이 발송됩니다.
+      </p>
+
       <section className="client-tournament-manage__participantTableShell">
         {zoneFilteredEntries.length === 0 ? (
           <p className="v3-muted" style={{ margin: 0, padding: "0.65rem 0.75rem" }}>
@@ -366,26 +379,38 @@ export default function ClientTournamentParticipantsApplicationsBlock({
               className="client-tournament-manage__participantTable client-tournament-manage__participantTable--singleLineMobile client-tournament-manage__participantTable--applicationsCompact"
               style={{
                 width: "100%",
-                minWidth: "26rem",
+                minWidth: "100%",
                 borderCollapse: "collapse",
                 tableLayout: "fixed",
-                fontSize: "0.72rem",
+                fontSize: "0.74rem",
               }}
             >
               <thead>
                 <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "2.6rem" }}>신청일</th>
-                  <th style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "14%", minWidth: "3.2rem" }}>
+                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "5.5%", minWidth: "2rem" }}>
+                    신청
+                  </th>
+                  <th style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "26%", minWidth: "5.5rem" }}>
                     이름
                   </th>
-                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "3.6rem" }}>{metricColumnTitle}</th>
-                  <th style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "14%", minWidth: "3.2rem" }}>
+                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "7%", minWidth: "2.35rem" }}>
+                    {metricColumnTitle}
+                  </th>
+                  <th style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "22%", minWidth: "4.5rem" }}>
                     입금자 이름
                   </th>
-                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "4.25rem" }}>입금확인</th>
-                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "4rem" }}>승인</th>
-                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "2.5rem" }}>승인일</th>
-                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "4.25rem" }}>취소/거절</th>
+                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "11%", minWidth: "3.75rem" }}>
+                    입금확인
+                  </th>
+                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "11%", minWidth: "3.75rem" }}>
+                    처리
+                  </th>
+                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "6.5%", minWidth: "1.85rem" }}>
+                    승인
+                  </th>
+                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "11%", minWidth: "3.75rem" }}>
+                    취소/거절
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -403,6 +428,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     registrationSource={entry.registrationSource ?? null}
                     participantAverage={entry.participantAverage ?? null}
                     metricColumnTitle={metricColumnTitle}
+                    approveActionColumnLabel="처리"
                     adminNote={entry.adminNote ?? null}
                     statusChangedAt={entry.statusChangedAt}
                     attendanceChecked={entry.attendanceChecked}

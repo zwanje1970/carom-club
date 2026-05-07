@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import ParticipantApplicationDetailModal from "./ParticipantApplicationDetailModal";
 
@@ -23,9 +23,9 @@ function formatDateSlashMd(iso: string | null | undefined): string {
 
 const procBtnBase: CSSProperties = {
   minHeight: 28,
-  minWidth: "3.85rem",
-  padding: "0.06rem 0.26rem",
-  fontSize: "0.6rem",
+  minWidth: "3rem",
+  padding: "0.06rem 0.18rem",
+  fontSize: "0.58rem",
   fontWeight: 800,
   borderRadius: "0.2rem",
   touchAction: "manipulation",
@@ -56,6 +56,7 @@ export default function ParticipantListRow({
   registrationSource,
   participantAverage,
   metricColumnTitle,
+  approveActionColumnLabel = "처리",
   adminNote,
   statusChangedAt,
   initialClientDepositConfirmedAt,
@@ -73,6 +74,8 @@ export default function ParticipantListRow({
   registrationSource?: "admin" | null;
   participantAverage?: number | null;
   metricColumnTitle: string;
+  /** 신청 승인 버튼 열 헤더(표에서는 「승인일」열과 구분) */
+  approveActionColumnLabel?: string;
   adminNote?: string | null;
   statusChangedAt?: string;
   initialClientDepositConfirmedAt?: string | null;
@@ -88,6 +91,9 @@ export default function ParticipantListRow({
     initialClientApplicationApprovedAt ?? null,
   );
   const [loading, setLoading] = useState(false);
+  /** 입금확인(true) PATCH 진행 중 — 승인 버튼은 켜 두되, 입금해제는 막음 */
+  const [depositConfirmSaving, setDepositConfirmSaving] = useState(false);
+  const depositConfirmInflightRef = useRef<Promise<void> | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
   useEffect(() => {
@@ -192,10 +198,76 @@ export default function ParticipantListRow({
     }
   }
 
+  function runDepositConfirmOptimistic() {
+    if (depositConfirmInflightRef.current != null) return;
+    const prevAt = clientDepositConfirmedAt;
+    const optimisticAt = new Date().toISOString();
+    setClientDepositConfirmedAt(optimisticAt);
+
+    const p = (async () => {
+      try {
+        const response = await fetch(
+          `/api/client/tournaments/${encodeURIComponent(tournamentId)}/participants/${encodeURIComponent(entryId)}/processing`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ depositConfirmed: true }),
+            credentials: "same-origin",
+          },
+        );
+        const result = (await response.json()) as {
+          error?: string;
+          application?: {
+            status?: TournamentApplicationStatus;
+            clientDepositConfirmedAt?: string | null;
+            clientApplicationApprovedAt?: string | null;
+          };
+        };
+        if (!response.ok) {
+          setClientDepositConfirmedAt(prevAt);
+          window.alert(result.error ?? "저장에 실패했습니다.");
+          throw new Error("deposit-fail");
+        }
+        const app = result.application;
+        if (app?.status) setStatus(app.status);
+        if (app && "clientDepositConfirmedAt" in app) {
+          setClientDepositConfirmedAt(
+            typeof app.clientDepositConfirmedAt === "string" && app.clientDepositConfirmedAt.trim()
+              ? app.clientDepositConfirmedAt.trim()
+              : null,
+          );
+        }
+        if (app && "clientApplicationApprovedAt" in app) {
+          setClientApplicationApprovedAt(
+            typeof app.clientApplicationApprovedAt === "string" && app.clientApplicationApprovedAt.trim()
+              ? app.clientApplicationApprovedAt.trim()
+              : null,
+          );
+        }
+        router.refresh();
+      } catch (e) {
+        if (!(e instanceof Error && e.message === "deposit-fail")) {
+          setClientDepositConfirmedAt(prevAt);
+          window.alert("처리 중 오류가 발생했습니다.");
+        }
+        throw e;
+      }
+    })();
+
+    depositConfirmInflightRef.current = p;
+    setDepositConfirmSaving(true);
+    void p.finally(() => {
+      setDepositConfirmSaving(false);
+      if (depositConfirmInflightRef.current === p) {
+        depositConfirmInflightRef.current = null;
+      }
+    });
+  }
+
   function onDepositClick() {
     if (terminalRejected || terminalApproved) return;
     if (!depositDone) {
-      void patchProcessing({ depositConfirmed: true });
+      runDepositConfirmOptimistic();
       return;
     }
     if (!window.confirm("입금확인을 해제할까요? 신청 승인도 함께 해제됩니다.")) return;
@@ -206,7 +278,17 @@ export default function ParticipantListRow({
     if (terminalRejected || terminalApproved) return;
     if (!depositDone) return;
     if (!approveDone) {
-      void patchProcessing({ applicationApproved: true });
+      void (async () => {
+        const inflight = depositConfirmInflightRef.current;
+        if (inflight) {
+          try {
+            await inflight;
+          } catch {
+            return;
+          }
+        }
+        await patchProcessing({ applicationApproved: true });
+      })();
       return;
     }
     if (!window.confirm("신청 승인을 해제할까요?")) return;
@@ -252,7 +334,7 @@ export default function ParticipantListRow({
     return (
       <button
         type="button"
-        disabled={loading}
+        disabled={loading || depositConfirmSaving}
         className="v3-appProcBtn v3-appProcBtn--depositDone"
         style={procBtnBase}
         onClick={() => onDepositClick()}
@@ -380,15 +462,31 @@ export default function ParticipantListRow({
   return (
     <>
       <tr className={terminalRejected ? "participant-row--rejected" : undefined} style={{ background: rowBg }}>
-        <td data-participant-label="신청일" style={{ ...cellBase, fontVariantNumeric: "tabular-nums" }}>
+        <td data-participant-label="신청" style={{ ...cellBase, fontVariantNumeric: "tabular-nums" }}>
           {formatDateSlashMd(registrationCreatedAt)}
         </td>
         <td
           data-participant-label="이름"
           className="participant-col participant-col--name"
-          style={{ ...cellBase, textAlign: "left", minWidth: 0 }}
+          style={{
+            ...cellBase,
+            textAlign: "left",
+            verticalAlign: "top",
+            wordBreak: "keep-all",
+            whiteSpace: "normal",
+            overflow: "visible",
+          }}
         >
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "0.2rem", minWidth: 0 }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "flex-start",
+              gap: "0.2rem",
+              minWidth: 0,
+              flexWrap: "wrap",
+            }}
+          >
             <button
               type="button"
               className="client-tournament-manage__participantNameBtn"
@@ -422,25 +520,25 @@ export default function ParticipantListRow({
         </td>
         <td
           data-participant-label="입금자 이름"
+          className="participant-col participant-col--depositor"
           style={{
             ...cellBase,
             textAlign: "left",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            maxWidth: "5rem",
+            verticalAlign: "top",
+            wordBreak: "keep-all",
+            whiteSpace: "normal",
+            overflow: "visible",
           }}
-          title={depositorDisplay !== "—" ? depositorDisplay : undefined}
         >
           {depositorDisplay}
         </td>
         <td data-participant-label="입금확인" style={{ ...cellBase }}>
           <div style={{ display: "flex", justifyContent: "center" }}>{depositButton()}</div>
         </td>
-        <td data-participant-label="승인" style={{ ...cellBase }}>
+        <td data-participant-label={approveActionColumnLabel} style={{ ...cellBase }}>
           <div style={{ display: "flex", justifyContent: "center" }}>{approveButton()}</div>
         </td>
-        <td data-participant-label="승인일" style={{ ...cellBase, fontVariantNumeric: "tabular-nums" }}>
+        <td data-participant-label="승인" style={{ ...cellBase, fontVariantNumeric: "tabular-nums" }}>
           {approveMd}
         </td>
         <td data-participant-label="취소/거절" style={{ ...cellBase }}>

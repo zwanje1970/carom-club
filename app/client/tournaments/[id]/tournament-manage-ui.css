@@ -295,48 +295,38 @@
   padding-bottom: calc(0.35rem + env(safe-area-inset-bottom, 0px));
 }
 
-/* 신청자 관리: 상단 운영 버튼 한 줄 — 플랫·compact·줄바꿈 없음(좁으면 가로 스크롤) */
+/* 신청자 관리: 상단 운영 버튼 한 줄 — 화면 폭 균등 분할·compact */
 .client-tournament-manage .client-tournament-manage__applicationsOpsBar {
   display: flex;
   flex-wrap: nowrap;
-  gap: 0.22rem;
-  align-items: center;
-  margin: 0 0 0.1rem;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-
-.client-tournament-manage .client-tournament-manage__applicationsOpsBar::-webkit-scrollbar {
-  display: none;
+  gap: 0.12rem;
+  align-items: stretch;
+  margin: 0 0 0.12rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .client-tournament-manage .client-tournament-manage__applicationsOpsBar > button.v3-btn,
-.client-tournament-manage .client-tournament-manage__applicationsOpsBar > button.client-tournament-manage__finalizeParticipantsBtn {
-  flex-shrink: 0 !important;
-  min-height: 30px !important;
-  padding: 0.16rem 0.34rem !important;
-  font-size: 0.7rem !important;
+.client-tournament-manage .client-tournament-manage__applicationsOpsBar > button.client-tournament-manage__finalizeParticipantsBtn,
+.client-tournament-manage .client-tournament-manage__applicationsOpsBar > a {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  min-height: 31px !important;
+  padding: 0.18rem 0.28rem !important;
+  font-size: 0.82rem !important;
   font-weight: 700 !important;
   border-radius: 0.28rem !important;
   box-shadow: none !important;
+  white-space: nowrap !important;
 }
 
 .client-tournament-manage .client-tournament-manage__applicationsOpsBar > a {
-  flex-shrink: 0 !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  min-height: 30px !important;
-  padding: 0.16rem 0.34rem !important;
-  font-size: 0.7rem !important;
-  font-weight: 700 !important;
-  border-radius: 0.28rem !important;
   border: 1px solid #cbd5e1 !important;
   background: #fff !important;
   color: #334155 !important;
-  box-shadow: none !important;
-  white-space: nowrap !important;
 }
 
 .client-tournament-manage .client-tournament-manage__applicationsCompactHeader {
@@ -709,11 +699,11 @@
   min-height: 100%;
   box-sizing: border-box;
   /* 마지막 행·버튼이 모바일 하단 내비/홈 인디케이터에 가리지 않도록 */
-  padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px));
 }
 
 .client-tournament-manage.client-tournament-manage--participants-subpage .client-tournament-manage__participantTableShell {
-  padding-bottom: calc(0.35rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(1.35rem + env(safe-area-inset-bottom, 0px));
 }
 
 .client-tournament-manage__participantDetailBackdrop {
@@ -794,6 +784,22 @@
 
 .client-tournament-manage .client-tournament-manage__participantNameBtn:active {
   color: #1e3a8a;
+}
+
+/* 신청자 관리 표: 이름·입금자 전체 표시(ellipsis 금지), 줄바꿈 허용 */
+.client-tournament-manage .client-tournament-manage__participantTable--applicationsCompact .client-tournament-manage__participantNameBtn {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  word-break: keep-all !important;
+  line-height: 1.35 !important;
+  max-width: none !important;
+}
+
+.client-tournament-manage .client-tournament-manage__participantTable--applicationsCompact td.participant-col--name,
+.client-tournament-manage .client-tournament-manage__participantTable--applicationsCompact td.participant-col--depositor {
+  word-break: keep-all;
+  overflow: visible !important;
 }
 
 .client-tournament-manage .client-tournament-manage__participantTable--applicationsCompact thead th {
@@ -954,5 +960,14 @@
   .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--singleLineMobile tbody tr td.participant-col--name {
     flex: unset;
     min-width: 0;
+    overflow: visible !important;
+    white-space: normal !important;
+    word-break: keep-all;
+  }
+
+  .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--singleLineMobile tbody tr td.participant-col--depositor {
+    overflow: visible !important;
+    white-space: normal !important;
+    word-break: keep-all;
   }
 }
