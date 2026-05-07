@@ -292,7 +292,55 @@
   border-radius: 10px;
   overflow: hidden;
   background: #f8fafc;
-  padding-bottom: 5rem;
+  padding-bottom: calc(0.35rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* 신청자 관리: 상단 운영 버튼 한 줄 — 플랫·compact·줄바꿈 없음(좁으면 가로 스크롤) */
+.client-tournament-manage .client-tournament-manage__applicationsOpsBar {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.22rem;
+  align-items: center;
+  margin: 0 0 0.1rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.client-tournament-manage .client-tournament-manage__applicationsOpsBar::-webkit-scrollbar {
+  display: none;
+}
+
+.client-tournament-manage .client-tournament-manage__applicationsOpsBar > button.v3-btn,
+.client-tournament-manage .client-tournament-manage__applicationsOpsBar > button.client-tournament-manage__finalizeParticipantsBtn {
+  flex-shrink: 0 !important;
+  min-height: 30px !important;
+  padding: 0.16rem 0.34rem !important;
+  font-size: 0.7rem !important;
+  font-weight: 700 !important;
+  border-radius: 0.28rem !important;
+  box-shadow: none !important;
+}
+
+.client-tournament-manage .client-tournament-manage__applicationsOpsBar > a {
+  flex-shrink: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 30px !important;
+  padding: 0.16rem 0.34rem !important;
+  font-size: 0.7rem !important;
+  font-weight: 700 !important;
+  border-radius: 0.28rem !important;
+  border: 1px solid #cbd5e1 !important;
+  background: #fff !important;
+  color: #334155 !important;
+  box-shadow: none !important;
+  white-space: nowrap !important;
+}
+
+.client-tournament-manage .client-tournament-manage__applicationsCompactHeader {
+  margin-top: 0;
 }
 
 .client-tournament-manage .client-tournament-manage__participantTableShell .client-tournament-manage__participantTable {
@@ -660,6 +708,12 @@
 .client-tournament-manage.client-tournament-manage--participants-subpage {
   min-height: 100%;
   box-sizing: border-box;
+  /* 마지막 행·버튼이 모바일 하단 내비/홈 인디케이터에 가리지 않도록 */
+  padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+.client-tournament-manage.client-tournament-manage--participants-subpage .client-tournament-manage__participantTableShell {
+  padding-bottom: calc(0.35rem + env(safe-area-inset-bottom, 0px));
 }
 
 .client-tournament-manage__participantDetailBackdrop {
@@ -892,7 +946,9 @@
     display: table-cell;
     border-bottom: 1px solid #e8e8e8 !important;
     flex-shrink: 1;
-    font-size: 0.68rem;
+    font-size: 0.7rem;
+    padding-top: 0.22rem !important;
+    padding-bottom: 0.22rem !important;
   }
 
   .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--singleLineMobile tbody tr td.participant-col--name {

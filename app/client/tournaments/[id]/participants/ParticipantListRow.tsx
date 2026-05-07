@@ -12,28 +12,17 @@ type TournamentApplicationStatus =
   | "APPROVED"
   | "REJECTED";
 
-function pad2(n: number): string {
-  return n < 10 ? `0${n}` : String(n);
-}
-
-function formatApplyDateMd(iso: string): string {
-  const raw = iso.trim();
-  if (!raw) return "—";
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return "—";
-  return `${pad2(d.getUTCMonth() + 1)}.${pad2(d.getUTCDate())}`;
-}
-
-function formatMdFromIso(iso: string | null | undefined): string {
+/** 신청일·승인일 공통 — 월/일만, 앞자리 0 없음 (예: 12/25). 시간 없음. */
+function formatDateSlashMd(iso: string | null | undefined): string {
   const raw = (iso ?? "").trim();
   if (!raw) return "—";
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return "—";
-  return `${pad2(d.getUTCMonth() + 1)}.${pad2(d.getUTCDate())}`;
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
 }
 
 const procBtnBase: CSSProperties = {
-  minHeight: 26,
+  minHeight: 28,
   minWidth: "3.85rem",
   padding: "0.06rem 0.26rem",
   fontSize: "0.6rem",
@@ -48,8 +37,8 @@ const procBtnBase: CSSProperties = {
 };
 
 const cellBase: CSSProperties = {
-  padding: "0.1rem 0.14rem",
-  fontSize: "0.72rem",
+  padding: "0.2rem 0.14rem",
+  fontSize: "0.74rem",
   verticalAlign: "middle",
   borderBottom: "1px solid #e8e8e8",
   textAlign: "center",
@@ -66,6 +55,7 @@ export default function ParticipantListRow({
   registrationCreatedAt,
   registrationSource,
   participantAverage,
+  metricColumnTitle,
   adminNote,
   statusChangedAt,
   initialClientDepositConfirmedAt,
@@ -82,6 +72,7 @@ export default function ParticipantListRow({
   registrationCreatedAt: string;
   registrationSource?: "admin" | null;
   participantAverage?: number | null;
+  metricColumnTitle: string;
   adminNote?: string | null;
   statusChangedAt?: string;
   initialClientDepositConfirmedAt?: string | null;
@@ -349,16 +340,14 @@ export default function ParticipantListRow({
 
   const depositorDisplay = (typeof depositorName === "string" ? depositorName.trim() : "") || "—";
   const affiliationDisplay = (typeof affiliation === "string" ? affiliation.trim() : "") || "—";
-  const scoreAvg =
-    participantAverage != null && Number.isFinite(participantAverage)
-      ? `— / ${participantAverage}`
-      : "— / —";
+  const metricDisplay =
+    participantAverage != null && Number.isFinite(participantAverage) ? String(participantAverage) : "—";
 
   const approveMdIso =
     terminalApproved && !(clientApplicationApprovedAt ?? "").trim()
       ? statusChangedAt
       : clientApplicationApprovedAt;
-  const approveMd = formatMdFromIso(approveMdIso);
+  const approveMd = formatDateSlashMd(approveMdIso);
 
   const rowBg = terminalRejected ? "#f3f4f6" : "#fff";
 
@@ -392,7 +381,7 @@ export default function ParticipantListRow({
     <>
       <tr className={terminalRejected ? "participant-row--rejected" : undefined} style={{ background: rowBg }}>
         <td data-participant-label="신청일" style={{ ...cellBase, fontVariantNumeric: "tabular-nums" }}>
-          {formatApplyDateMd(registrationCreatedAt)}
+          {formatDateSlashMd(registrationCreatedAt)}
         </td>
         <td
           data-participant-label="이름"
@@ -425,36 +414,25 @@ export default function ParticipantListRow({
             ) : null}
           </div>
         </td>
-        <td data-participant-label="점수/AVG" style={{ ...cellBase, whiteSpace: "nowrap" }}>
-          {scoreAvg}
+        <td
+          data-participant-label={metricColumnTitle}
+          style={{ ...cellBase, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
+        >
+          {metricDisplay}
         </td>
         <td
-          data-participant-label="입금자"
+          data-participant-label="입금자 이름"
           style={{
             ...cellBase,
             textAlign: "left",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
-            maxWidth: "4.5rem",
+            maxWidth: "5rem",
           }}
           title={depositorDisplay !== "—" ? depositorDisplay : undefined}
         >
           {depositorDisplay}
-        </td>
-        <td
-          data-participant-label="소속"
-          style={{
-            ...cellBase,
-            textAlign: "left",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            maxWidth: "4rem",
-          }}
-          title={affiliationDisplay !== "—" ? affiliationDisplay : undefined}
-        >
-          {affiliationDisplay}
         </td>
         <td data-participant-label="입금확인" style={{ ...cellBase }}>
           <div style={{ display: "flex", justifyContent: "center" }}>{depositButton()}</div>

@@ -32,12 +32,13 @@ function formatRegistrationInstantUtc(iso: string): string {
   return `${d.getUTCFullYear()}.${pad2(d.getUTCMonth() + 1)}.${pad2(d.getUTCDate())} ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`;
 }
 
-function formatApplyDateOnlyUtc(iso: string): string {
+/** 표 신청일과 동일: 월/일만, 시간 없음 (예: 12/25). */
+function formatApplyDateSlashUtc(iso: string): string {
   const raw = iso.trim();
   if (!raw) return "—";
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return "—";
-  return `${d.getUTCFullYear()}.${pad2(d.getUTCMonth() + 1)}.${pad2(d.getUTCDate())}`;
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
 }
 
 function formatDepositMd(status: TournamentApplicationStatus, statusChangedAt?: string): string {
@@ -170,7 +171,7 @@ export default function ParticipantApplicationDetailModal({
           <span>{depositLine}</span>
 
           <span style={labelStyle}>신청일</span>
-          <span>{formatApplyDateOnlyUtc(registrationCreatedAt)}</span>
+          <span>{formatApplyDateSlashUtc(registrationCreatedAt)}</span>
 
           <span style={labelStyle}>운영 입금확인</span>
           <span>

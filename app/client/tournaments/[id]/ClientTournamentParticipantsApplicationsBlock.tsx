@@ -4,10 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { TournamentApplicationListItem, TournamentStatusBadge } from "../../../../lib/types/entities";
-import { filterParticipantEntries, type ClientParticipantFilterKey } from "./client-participant-filter-shared";
+import type { TournamentEntryQualificationType } from "../../../../lib/tournament-rule-types";
 import ParticipantListRow from "./participants/ParticipantListRow";
-import ParticipantsToolbar from "./participants/ParticipantsToolbar";
-import TournamentParticipantsFinalizeBar from "./TournamentParticipantsFinalizeBar";
+import ParticipantAddSheet from "./participants/ParticipantAddSheet";
 
 export type ParticipantCountSummary = {
   total: number;
@@ -22,14 +21,15 @@ type TournamentZoneListEntry = {
   status: string;
 };
 
+const CLOSED_BADGES: TournamentStatusBadge[] = ["마감", "진행중", "종료"];
+
 type Props = {
   tournamentId: string;
   tournamentTitle: string;
   maxParticipants: number;
+  entryQualificationType: TournamentEntryQualificationType;
   initialEntries: TournamentApplicationListItem[];
   participantCountSummary: ParticipantCountSummary;
-  selected: ClientParticipantFilterKey;
-  filterBaseHref: string;
   zonesEnabled: boolean;
   tournamentStatusBadge: TournamentStatusBadge;
 };
@@ -44,30 +44,27 @@ const participantApplicationsTableThBase: CSSProperties = {
   verticalAlign: "middle",
 };
 
-function filterLinkStyle(selected: ClientParticipantFilterKey, key: ClientParticipantFilterKey) {
-  const on = selected === key;
-  return {
-    padding: "0.3rem 0.5rem",
-    minHeight: 38,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: on ? 800 : 600,
-    fontSize: "0.84rem",
-    background: on ? "#dbeafe" : "#fff",
-    borderColor: on ? "#2563eb" : "#d7d7d7",
-    color: on ? "#1e3a8a" : "#374151",
-    boxShadow: on ? "0 0 0 1px #2563eb33" : "none",
-    textDecoration: "none" as const,
-    borderRadius: "0.35rem",
-    touchAction: "manipulation" as const,
-  };
-}
+const opsBtn: CSSProperties = {
+  minHeight: 30,
+  padding: "0.16rem 0.34rem",
+  fontSize: "0.7rem",
+  fontWeight: 700,
+  borderRadius: "0.28rem",
+  border: "1px solid #cbd5e1",
+  background: "#fff",
+  color: "#334155",
+  boxShadow: "none",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  touchAction: "manipulation",
+  whiteSpace: "nowrap",
+};
 
-function capacityLabel(maxParticipants: number): string {
-  const n = Number(maxParticipants);
-  if (!Number.isFinite(n) || n <= 0) return "—";
-  return String(Math.floor(n));
+function bracketScaleLabel(maxParticipants: number): string {
+  const k = Math.floor(Number(maxParticipants));
+  if (!Number.isFinite(k) || k <= 0) return "—";
+  return `${k}강`;
 }
 
 function mergeByEntryId(
@@ -88,23 +85,36 @@ function countApplicationApprovedChip(entries: TournamentApplicationListItem[]):
   ).length;
 }
 
-function countCanceledRejectedChip(entries: TournamentApplicationListItem[]): number {
-  return entries.filter((e) => e.status === "REJECTED").length;
+function participantMetricColumnTitle(eq: TournamentEntryQualificationType): string {
+  if (eq === "SCORE") return "점수";
+  if (eq === "EVER") return "AVG";
+  if (eq === "BOTH") return "점수·AVG";
+  return "AVG";
 }
+
+const pillBase: CSSProperties = {
+  fontSize: "0.62rem",
+  fontWeight: 700,
+  padding: "0.08rem 0.28rem",
+  borderRadius: "999px",
+  border: "1px solid #e2e8f0",
+  whiteSpace: "nowrap",
+};
 
 export default function ClientTournamentParticipantsApplicationsBlock({
   tournamentId,
   tournamentTitle,
   maxParticipants,
+  entryQualificationType,
   initialEntries,
   participantCountSummary,
-  selected,
-  filterBaseHref,
   zonesEnabled,
   tournamentStatusBadge,
 }: Props) {
   const router = useRouter();
+  const metricColumnTitle = participantMetricColumnTitle(entryQualificationType);
   const [entries, setEntries] = useState<TournamentApplicationListItem[]>(initialEntries);
+  const [finalizeBusy, setFinalizeBusy] = useState(false);
   const [moreLoading, setMoreLoading] = useState(() => participantCountSummary.total > initialEntries.length);
   const fullFetchDoneRef = useRef(false);
 
@@ -150,10 +160,9 @@ export default function ClientTournamentParticipantsApplicationsBlock({
     };
   }, [tournamentId, participantCountSummary.total, initialEntries.length]);
 
-  const filteredEntries = filterParticipantEntries(entries, selected);
   const sortedEntries = useMemo(
-    () => [...filteredEntries].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    [filteredEntries]
+    () => [...entries].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [entries]
   );
 
   const [zones, setZones] = useState<TournamentZoneListEntry[]>([]);
@@ -202,133 +211,145 @@ export default function ClientTournamentParticipantsApplicationsBlock({
     return sortedEntries.filter((e) => (e.zoneId ?? "").trim() === zoneFilterZoneId);
   }, [sortedEntries, zonesEnabled, zoneFilterZoneId]);
 
-  const chipTotal = entries.length;
   const chipApproved = countApplicationApprovedChip(entries);
-  const chipCancelReject = countCanceledRejectedChip(entries);
+  const printHref = `/client/tournaments/${encodeURIComponent(tournamentId)}/participants/print`;
+  const showFinalize = !CLOSED_BADGES.includes(tournamentStatusBadge);
 
-  const counts = participantCountSummary;
-  const base = filterBaseHref.replace(/\/$/, "");
+  async function onFinalizeParticipants() {
+    if (finalizeBusy) return;
+    if (
+      !window.confirm(
+        "참가자를 확정하시겠습니까?\n확정 후에는 신청이 마감되며 대진표 생성이 활성화됩니다."
+      )
+    ) {
+      return;
+    }
+    setFinalizeBusy(true);
+    try {
+      const pr = await fetch(`/api/client/tournaments/${encodeURIComponent(tournamentId)}/participants/promote-confirmed`, {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      const pj = (await pr.json()) as { error?: string };
+      if (!pr.ok) {
+        window.alert(pj.error ?? "참가자 반영에 실패했습니다.");
+        return;
+      }
+
+      const res = await fetch(`/api/client/tournaments/${encodeURIComponent(tournamentId)}/status-badge`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ statusBadge: "마감" }),
+        credentials: "same-origin",
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        window.alert(data.error ?? "저장에 실패했습니다.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      window.alert("처리 중 오류가 발생했습니다.");
+    } finally {
+      setFinalizeBusy(false);
+    }
+  }
 
   return (
-    <div className="client-tournament-manage__participantsBlock">
-      <TournamentParticipantsFinalizeBar
-        tournamentId={tournamentId}
-        tournamentStatusBadge={tournamentStatusBadge}
-        approvedCount={participantCountSummary.approved}
-      />
-      <div className="client-tournament-manage__participantsSticky">
-        <ParticipantsToolbar tournamentId={tournamentId} />
-        <div className="client-tournament-manage__filterRow">
-          <Link className="v3-btn" href={base} prefetch={false} style={filterLinkStyle(selected, "all")}>
-            전체 ({counts.total})
-          </Link>
-          <Link className="v3-btn" href={`${base}?f=approved`} prefetch={false} style={filterLinkStyle(selected, "approved")}>
-            참가자 ({counts.approved})
-          </Link>
-          <Link className="v3-btn" href={`${base}?f=wait`} prefetch={false} style={filterLinkStyle(selected, "wait")}>
-            신청자 ({counts.wait})
-          </Link>
-          <Link className="v3-btn" href={`${base}?f=reject`} prefetch={false} style={filterLinkStyle(selected, "reject")}>
-            거절 ({counts.reject})
-          </Link>
-        </div>
-        {zonesEnabled ? (
-          <div className="client-tournament-manage__filterRow" style={{ marginTop: "0.35rem" }}>
-            <label className="v3-muted" style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", fontSize: "0.82rem", fontWeight: 700 }}>
-              권역
-              <select
-                className="v3-btn"
-                value={zoneFilterZoneId}
-                onChange={(e) => setZoneFilterZoneId(e.target.value)}
-                disabled={activeZones.length === 0}
-                style={{
-                  minHeight: 38,
-                  padding: "0.25rem 0.45rem",
-                  fontSize: "0.84rem",
-                  fontWeight: 600,
-                  borderRadius: "0.35rem",
-                  border: "1px solid #d7d7d7",
-                  background: activeZones.length === 0 ? "#f1f5f9" : "#fff",
-                  color: "#374151",
-                  maxWidth: "12rem",
-                }}
-              >
-                <option value="all">전체</option>
-                {activeZones.map((z) => (
-                  <option key={z.id} value={z.id}>
-                    {z.zoneName}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+    <div className="client-tournament-manage__participantsBlock client-tournament-manage__applicationsCompactHeader">
+      <p
+        style={{
+          margin: "0 0 0.18rem",
+          fontSize: "0.88rem",
+          fontWeight: 800,
+          lineHeight: 1.25,
+          color: "#0f172a",
+        }}
+      >
+        {tournamentTitle.trim()} / {bracketScaleLabel(maxParticipants)}
+      </p>
+
+      <div className="client-tournament-manage__applicationsOpsBar">
+        <ParticipantAddSheet tournamentId={tournamentId} />
+        {showFinalize ? (
+          <button
+            type="button"
+            className="client-tournament-manage__finalizeParticipantsBtn"
+            disabled={finalizeBusy}
+            onClick={() => void onFinalizeParticipants()}
+            style={{
+              ...opsBtn,
+              borderColor: "#2563eb",
+              background: "#2563eb",
+              color: "#fff",
+              fontWeight: 800,
+            }}
+          >
+            {finalizeBusy ? "처리 중…" : "참가자 확정"}
+          </button>
         ) : null}
+        <Link prefetch={false} href={printHref} style={{ ...opsBtn, textDecoration: "none" }}>
+          확정리스트
+        </Link>
       </div>
+
+      {zonesEnabled ? (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: "0.35rem",
+            margin: "0.14rem 0 0.2rem",
+          }}
+        >
+          <span className="v3-muted" style={{ fontSize: "0.7rem", fontWeight: 700 }}>
+            권역
+          </span>
+          <select
+            value={zoneFilterZoneId}
+            onChange={(e) => setZoneFilterZoneId(e.target.value)}
+            disabled={activeZones.length === 0}
+            aria-label="권역 필터"
+            style={{
+              ...opsBtn,
+              minHeight: 28,
+              padding: "0.14rem 0.34rem",
+              fontSize: "0.68rem",
+              maxWidth: "11rem",
+              cursor: activeZones.length === 0 ? "not-allowed" : "pointer",
+              opacity: activeZones.length === 0 ? 0.65 : 1,
+            }}
+          >
+            <option value="all">전체</option>
+            {activeZones.map((z) => (
+              <option key={z.id} value={z.id}>
+                {z.zoneName}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
 
       <div
         style={{
-          margin: "0.35rem 0 0",
           display: "flex",
           flexWrap: "wrap",
           alignItems: "center",
-          gap: "0.35rem 0.5rem",
-          justifyContent: "space-between",
+          gap: "0.22rem",
+          margin: zonesEnabled ? "0 0 0.26rem" : "0.04rem 0 0.26rem",
         }}
       >
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.35rem", minWidth: 0 }}>
-          <span style={{ fontSize: "0.95rem", fontWeight: 800, lineHeight: 1.35 }}>신청자 관리</span>
-          <span
-            style={{
-              fontSize: "0.68rem",
-              fontWeight: 700,
-              padding: "0.12rem 0.38rem",
-              borderRadius: "0.35rem",
-              background: "#f1f5f9",
-              color: "#334155",
-              border: "1px solid #e2e8f0",
-            }}
-          >
-            총 신청 {chipTotal}명
-          </span>
-          <span
-            style={{
-              fontSize: "0.68rem",
-              fontWeight: 700,
-              padding: "0.12rem 0.38rem",
-              borderRadius: "0.35rem",
-              background: "#dcfce7",
-              color: "#14532d",
-              border: "1px solid #86efac",
-            }}
-          >
-            승인 {chipApproved}명
-          </span>
-          <span
-            style={{
-              fontSize: "0.68rem",
-              fontWeight: 700,
-              padding: "0.12rem 0.38rem",
-              borderRadius: "0.35rem",
-              background: "#f3f4f6",
-              color: "#4b5563",
-              border: "1px solid #d1d5db",
-            }}
-          >
-            취소/거절 {chipCancelReject}명
-          </span>
-        </div>
-        <button
-          type="button"
-          className="v3-btn"
-          onClick={() => router.refresh()}
-          style={{ fontSize: "0.78rem", fontWeight: 700, padding: "0.25rem 0.55rem", minHeight: 34 }}
-        >
-          새로고침
-        </button>
+        <span style={{ ...pillBase, background: "#f8fafc", color: "#475569", borderColor: "#e2e8f0" }}>
+          총신청 {participantCountSummary.total}명
+        </span>
+        <span style={{ ...pillBase, background: "#ecfdf5", color: "#166534", borderColor: "#86efac" }}>
+          승인 {chipApproved}명
+        </span>
+        <span style={{ ...pillBase, background: "#f9fafb", color: "#4b5563", borderColor: "#e5e7eb" }}>
+          취소/거절 {participantCountSummary.reject}명
+        </span>
       </div>
-      <p style={{ margin: "0.12rem 0 0.35rem", fontSize: "0.85rem", fontWeight: 700, color: "#475569" }}>
-        {tournamentTitle.trim()} · 표시 {zoneFilteredEntries.length}명 / 정원 {capacityLabel(maxParticipants)}
-      </p>
 
       <section className="client-tournament-manage__participantTableShell">
         {zoneFilteredEntries.length === 0 ? (
@@ -336,8 +357,8 @@ export default function ClientTournamentParticipantsApplicationsBlock({
             {participantCountSummary.total === 0
               ? "저장된 참가신청이 없습니다."
               : sortedEntries.length === 0
-                ? "이 조건에 해당하는 참가자가 없습니다."
-                : "선택한 권역에 배정된 참가자가 없습니다."}
+                ? "표시할 신청이 없습니다."
+                : "선택한 권역에 배정된 신청이 없습니다."}
           </p>
         ) : (
           <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
@@ -345,7 +366,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
               className="client-tournament-manage__participantTable client-tournament-manage__participantTable--singleLineMobile client-tournament-manage__participantTable--applicationsCompact"
               style={{
                 width: "100%",
-                minWidth: "28rem",
+                minWidth: "26rem",
                 borderCollapse: "collapse",
                 tableLayout: "fixed",
                 fontSize: "0.72rem",
@@ -357,12 +378,9 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                   <th style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "14%", minWidth: "3.2rem" }}>
                     이름
                   </th>
-                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "4.2rem" }}>점수/AVG</th>
-                  <th style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "12%", minWidth: "3rem" }}>
+                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "3.6rem" }}>{metricColumnTitle}</th>
+                  <th style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "14%", minWidth: "3.2rem" }}>
                     입금자 이름
-                  </th>
-                  <th style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "11%", minWidth: "2.8rem" }}>
-                    소속
                   </th>
                   <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "4.25rem" }}>입금확인</th>
                   <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "4rem" }}>승인</th>
@@ -384,6 +402,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     registrationCreatedAt={entry.createdAt}
                     registrationSource={entry.registrationSource ?? null}
                     participantAverage={entry.participantAverage ?? null}
+                    metricColumnTitle={metricColumnTitle}
                     adminNote={entry.adminNote ?? null}
                     statusChangedAt={entry.statusChangedAt}
                     attendanceChecked={entry.attendanceChecked}

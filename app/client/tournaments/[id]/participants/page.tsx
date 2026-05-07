@@ -8,20 +8,16 @@ import {
   listTournamentApplicationsListItemsByTournamentIdFirestore,
 } from "../../../../../lib/server/firestore-tournament-applications";
 import ClientTournamentParticipantsApplicationsBlock from "../ClientTournamentParticipantsApplicationsBlock";
-import { parseClientParticipantFilter } from "../client-participant-filter-shared";
 import "../tournament-manage-ui.css";
 
 export const dynamic = "force-dynamic";
 
 export default async function ClientTournamentParticipantsPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ f?: string }>;
 }) {
   const { id } = await params;
-  const { f } = await searchParams;
   const cookieStore = await cookies();
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
 
@@ -36,19 +32,15 @@ export default async function ClientTournamentParticipantsPage({
     listTournamentApplicationsListItemsByTournamentIdFirestore(id, { limit: 500 }),
     getTournamentApplicationListCountsFirestore(id),
   ]);
-  const selected = parseClientParticipantFilter(f);
-  const filterBaseHref = `/client/tournaments/${id}/participants`;
-
   return (
     <main className="v3-page v3-stack client-tournament-manage client-tournament-manage--participants-subpage">
       <ClientTournamentParticipantsApplicationsBlock
         tournamentId={id}
         tournamentTitle={tournament.title}
         maxParticipants={tournament.maxParticipants}
+        entryQualificationType={tournament.rule.entryQualificationType}
         initialEntries={entries}
         participantCountSummary={participantCountSummary}
-        selected={selected}
-        filterBaseHref={filterBaseHref}
         zonesEnabled={tournament.zonesEnabled === true}
         tournamentStatusBadge={tournament.statusBadge}
       />
