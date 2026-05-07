@@ -23,6 +23,10 @@
   --site-shell-aux-compact-gap: 0.45rem;
   --site-shell-gray-padding-top: 1rem;
   --site-shell-gray-inner-gap: 0.85rem;
+  /* 클라이언트 대시보드 모바일 상단 크롬(.site-home-top-white) — fixed 시 본문 상단 여백과 동일 기준 */
+  --app-dashboard-mobile-chrome-height: calc(
+    var(--site-shell-header-safe-top) + 2 * var(--site-shell-header-pad-y) + var(--site-shell-title-min-height)
+  );
 
   /* 공통 UI 색상·간격 (리스트/상세 공통 카드·버튼·뱃지 — 클래스로 조합 적용) */
   --color-primary: #2563eb;
@@ -2856,9 +2860,11 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
     padding-bottom: calc(2.125rem + env(safe-area-inset-bottom, 0px));
   }
 
-  /* 상단 공통 크롬이 safe-area를 담당 — 본문 패딩은 메인과 동일 페이지 배경 상단만 */
+  /* 상단 크롬 fixed — 본문은 크롬 높이 + 기존 회색 상단 간격만큼 패딩(대진표 전체화면은 아래 :has 규칙으로 제외) */
   .app-dashboard-mobile-root .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
-    padding-top: var(--site-shell-gray-padding-top);
+    padding-top: calc(var(--app-dashboard-mobile-chrome-height) + var(--site-shell-gray-padding-top));
+    /* 하단 고정 UI·sticky 툴바·홈 인디케이터와 겹침 완화 — 사이트 하단 네비와 동일 높이 토큰 */
+    padding-bottom: calc(var(--site-fixed-bottom-nav-layout-height) + 0.75rem);
   }
 
   html:has(.app-dashboard-mobile-root),
@@ -2916,6 +2922,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
     display: flex;
     flex-direction: column;
     padding-top: 0;
+    padding-bottom: 0;
   }
 }
 
@@ -2936,6 +2943,25 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
 @media (max-width: 767px) {
   .app-dashboard-mobile-chrome {
     display: block;
+  }
+
+  /*
+   * 클라이언트 대시보드 일반 페이지: 모바일 크롬 상단 고정.
+   * 제외: 대진표 보기 전체화면(data-client-bracket-view-fullscreen) — 기존 규칙에서 크롬 숨김·본문 풀뷰포트 유지.
+   */
+  .app-dashboard-mobile-root:not(:has([data-client-bracket-view-fullscreen="1"])) > .app-dashboard-mobile-chrome {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: none;
+    z-index: 60;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
+    box-sizing: border-box;
   }
 }
 

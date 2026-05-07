@@ -27,8 +27,8 @@ type BracketRoundView = {
   status: "PENDING" | "IN_PROGRESS" | "COMPLETED";
   matches: Array<{
     id: string;
-    player1: { userId: string; name: string };
-    player2: { userId: string; name: string };
+    player1: { userId: string; name: string; displayName?: string | null };
+    player2: { userId: string; name: string; displayName?: string | null };
     winnerUserId: string | null;
     winnerName: string | null;
     status: "PENDING" | "COMPLETED";

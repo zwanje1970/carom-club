@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
+import ParticipantApplicationDetailModal from "./ParticipantApplicationDetailModal";
 
 type TournamentApplicationStatus =
   | "APPLIED"
@@ -138,7 +139,7 @@ export default function ParticipantListRow({
     setZoneSelect(z);
   }, [initialZoneId]);
 
-  const detailHref = `/client/tournaments/${tournamentId}/participants/${entryId}`;
+  const [detailOpen, setDetailOpen] = useState(false);
 
   async function patchZone(nextSelect: string) {
     if (!zonesEnabled || !onZoneIdUpdated) return;
@@ -319,16 +320,30 @@ export default function ParticipantListRow({
   const depositCell = formatDepositMd(status, statusChangedAt);
   const scoreCell = showEver ? String(participantAverage) : "—";
 
-  const detailBtnStyle: CSSProperties = {
-    padding: "0.2rem 0.45rem",
-    fontSize: "0.75rem",
-    fontWeight: 700,
-    textDecoration: "none",
-    flexShrink: 0,
-    touchAction: "manipulation",
-  };
+  const modalEl =
+    detailOpen && typeof document !== "undefined"
+      ? createPortal(
+          <ParticipantApplicationDetailModal
+            open
+            onClose={() => setDetailOpen(false)}
+            tournamentId={tournamentId}
+            entryId={entryId}
+            applicantName={applicantName}
+            status={status}
+            phone={phone}
+            registrationCreatedAt={registrationCreatedAt}
+            registrationSource={registrationSource}
+            participantAverage={participantAverage}
+            adminNote={adminNote}
+            statusChangedAt={statusChangedAt}
+            attendanceChecked={attendanceChecked}
+          />,
+          document.body,
+        )
+      : null;
 
   return (
+    <>
     <tr style={{ background: "#fff" }}>
       <td
         data-participant-label="번호"
@@ -372,15 +387,14 @@ export default function ParticipantListRow({
             </div>
             <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "0.28rem", flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
               <div className="client-tournament-manage__nameStatus">{renderNameCellActions()}</div>
-              <Link prefetch={false} href={detailHref} className="v3-btn client-tournament-manage__detailDesktop" style={detailBtnStyle}>
+              <button
+                type="button"
+                className="v3-btn client-tournament-manage__detailTriggerBtn"
+                onClick={() => setDetailOpen(true)}
+              >
                 상세
-              </Link>
+              </button>
             </div>
-          </div>
-          <div className="client-tournament-manage__detailMobile">
-            <Link prefetch={false} href={detailHref} className="v3-btn" style={detailBtnStyle}>
-              상세
-            </Link>
           </div>
         </div>
       </td>
@@ -498,5 +512,7 @@ export default function ParticipantListRow({
         )}
       </td>
     </tr>
+    {modalEl}
+    </>
   );
 }

@@ -4,16 +4,10 @@ import { resolveCanonicalUserIdForAuth } from "../../../../lib/auth/resolve-cano
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
 import { getClientTournamentDetailPreviewById, getUserById } from "../../../../lib/platform-api";
 import { getLatestBracketByTournamentIdFirestore } from "../../../../lib/server/firestore-tournament-brackets";
-import {
-  getTournamentApplicationListCountsFirestore,
-  listTournamentApplicationsListItemsByTournamentIdFirestore,
-} from "../../../../lib/server/firestore-tournament-applications";
+import { getTournamentApplicationListCountsFirestore } from "../../../../lib/server/firestore-tournament-applications";
 import { formatTournamentScheduleLabel } from "../../../../lib/tournament-schedule";
-import ClientTournamentParticipantsApplicationsBlock from "./ClientTournamentParticipantsApplicationsBlock";
-import { parseClientParticipantFilter } from "./client-participant-filter-shared";
 import TournamentBadgeCardManageRow from "./TournamentBadgeCardManageRow";
 import TournamentManageFeatureCards from "./TournamentManageFeatureCards";
-import TournamentTvLinkBlock from "./TournamentTvLinkBlock";
 import TournamentZonesManageBlock from "./TournamentZonesManageBlock";
 import "./tournament-manage-ui.css";
 
@@ -26,15 +20,8 @@ function divisionLineForSummary(rule: { divisionEnabled: boolean; divisionRulesJ
   return "—";
 }
 
-export default async function ClientTournamentManagePage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ f?: string }>;
-}) {
+export default async function ClientTournamentManagePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { f } = await searchParams;
   const cookieStore = await cookies();
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
 
@@ -52,14 +39,11 @@ export default async function ClientTournamentManagePage({
 
   const sessionUser = session ? await getUserById(session.userId) : null;
 
-  const [entries, participantCountSummary, latestBracket] = await Promise.all([
-    listTournamentApplicationsListItemsByTournamentIdFirestore(id, { limit: 5 }),
+  const [participantCountSummary, latestBracket] = await Promise.all([
     getTournamentApplicationListCountsFirestore(id),
     getLatestBracketByTournamentIdFirestore(id),
   ]);
-  const selected = parseClientParticipantFilter(f);
   const scheduleLine = formatTournamentScheduleLabel(tournament);
-  const filterBaseHref = `/client/tournaments/${id}`;
   const bracketEnabled = tournament.statusBadge === "마감";
   const hasConfirmedBracket = latestBracket !== null;
 
@@ -77,7 +61,7 @@ export default async function ClientTournamentManagePage({
         }}
       />
 
-      <section className="client-tournament-manage__card">
+      <section className="client-tournament-manage__card client-tournament-manage__card--hub">
         <TournamentManageFeatureCards
           tournamentId={id}
           bracketEnabled={bracketEnabled}
@@ -97,26 +81,6 @@ export default async function ClientTournamentManagePage({
           />
         </section>
       ) : null}
-
-      <section className="client-tournament-manage__card">
-        <TournamentTvLinkBlock tournamentId={id} />
-      </section>
-
-      <section className="client-tournament-manage__card client-tournament-manage__card--participants">
-        <h2 className="v3-h2 client-tournament-manage__participantsHeading">
-          참가신청 현황
-        </h2>
-        <ClientTournamentParticipantsApplicationsBlock
-          tournamentId={id}
-          tournamentTitle={tournament.title}
-          maxParticipants={tournament.maxParticipants}
-          initialEntries={entries}
-          participantCountSummary={participantCountSummary}
-          selected={selected}
-          filterBaseHref={filterBaseHref}
-          zonesEnabled={tournament.zonesEnabled === true}
-        />
-      </section>
     </main>
   );
 }

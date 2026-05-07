@@ -1158,6 +1158,7 @@ export async function updateBracketMatchPlayerNameFirestore(params: {
   tournamentId: string;
   matchId: string;
   slot: "player1" | "player2";
+  /** 빈 문자열이면 표시 오버레이 제거(원래 이름으로 복귀) */
   displayName: string;
   bracketZoneId?: string | null;
 }): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
@@ -1165,7 +1166,7 @@ export async function updateBracketMatchPlayerNameFirestore(params: {
   const tournamentId = params.tournamentId.trim();
   const matchId = params.matchId.trim();
   const displayName = params.displayName.trim();
-  if (!tournamentId || !matchId || !displayName) {
+  if (!tournamentId || !matchId) {
     return { ok: false, error: "잘못된 요청입니다." };
   }
   if (params.slot !== "player1" && params.slot !== "player2") {
@@ -1200,9 +1201,17 @@ export async function updateBracketMatchPlayerNameFirestore(params: {
       const target = found?.match ?? null;
       if (!target) throw new BracketOpReject("대상 매치를 찾을 수 없습니다.");
       const player = params.slot === "player1" ? target.player1 : target.player2;
-      player.name = displayName;
+      if (!displayName) {
+        delete (player as { displayName?: string }).displayName;
+      } else {
+        player.displayName = displayName;
+      }
+      const labelAfter =
+        typeof player.displayName === "string" && player.displayName.trim() !== ""
+          ? player.displayName.trim()
+          : player.name;
       if (typeof target.winnerUserId === "string" && target.winnerUserId === player.userId) {
-        target.winnerName = displayName;
+        target.winnerName = labelAfter;
       }
       normalizeRoundStatusesEverywhere(mut);
       syncFinalBlockFromQualifiersInPlace(mut);

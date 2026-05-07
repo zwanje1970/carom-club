@@ -53,6 +53,11 @@
   backdrop-filter: blur(4px);
 }
 
+/* bracket/view: 세부 스타일은 미디어쿼리에서 .boardChromeBracketView 와 조합 */
+.bracketViewToolbarIcons {
+  align-items: stretch;
+}
+
 .toolbarDivider {
   align-self: stretch;
   height: 1px;
@@ -249,6 +254,7 @@
 
 .playerBox {
   box-sizing: border-box;
+  position: relative;
   border: 1px solid #ffffff;
   background: transparent;
   border-radius: 0;
@@ -263,6 +269,28 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.playerEditBadge {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  z-index: 3;
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 800;
+  color: #7dd3fc;
+  pointer-events: none;
+  text-shadow: 0 0 2px #000;
+}
+
+.bracketToolbarCollapsedWrap {
+  padding: 4px;
+}
+
+.toolbarMenuToggle {
+  font-size: 16px;
+  font-weight: 800;
 }
 
 .playerSelected {
@@ -315,6 +343,10 @@
   background: #9e9e9e;
   color: #111111;
   border-color: #ffffff;
+}
+
+.playerDisplayNameOverride {
+  color: #7dd3fc;
 }
 
 .linkSvg {
@@ -380,23 +412,39 @@
   .boardChromeBracketView.boardRoot {
     height: 100dvh;
     min-height: 100dvh;
+    min-height: 100svh;
     padding-top: 0;
   }
 
+  /* 좌측 세로 툴바 — 대회명 영역(상단 우측)과 겹치지 않게 아래로 */
   .boardChromeBracketView .bracketFloatingToolbar {
-    top: calc(max(env(safe-area-inset-top, 0px), 10px) + var(--bracket-view-mobile-top-offset, 0px));
+    left: max(8px, env(safe-area-inset-left, 0px));
+    top: calc(80px + env(safe-area-inset-top, 0px) + var(--bracket-view-mobile-top-offset, 0px));
+    z-index: 200;
   }
 
+  /* 대회명·일정·장소: 상단 우측, 툴바 오른쪽 열 */
   .boardChromeBracketView .tournamentOverlay {
-    top: calc(max(env(safe-area-inset-top, 0px), 0px) + var(--bracket-view-mobile-top-offset, 0px) + 6px);
-    left: auto;
-    right: max(env(safe-area-inset-right, 0px), 10px);
+    top: calc(8px + env(safe-area-inset-top, 0px) + var(--bracket-view-mobile-top-offset, 0px));
+    left: max(56px, calc(env(safe-area-inset-left, 0px) + 48px));
+    right: max(8px, env(safe-area-inset-right, 0px));
     text-align: right;
-    max-width: min(22rem, calc(100vw - 3.75rem));
+    max-width: calc(100vw - 72px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+    z-index: 190;
   }
 
+  .boardChromeBracketView .tournamentTitle {
+    font-size: clamp(0.88rem, 3.5vw, 1.05rem);
+    line-height: 1.2;
+  }
+
+  .boardChromeBracketView .tournamentMeta {
+    font-size: clamp(0.72rem, 2.8vw, 0.82rem);
+  }
+
+  /* 모바일 대진표 보기: 상단 한글 컨트롤바 숨김 — 좌측 플로팅 툴바만 사용 */
   .boardChromeBracketView .controlBar {
-    top: calc(max(env(safe-area-inset-top, 0px), 6px) + var(--bracket-view-mobile-top-offset, 0px));
+    display: none !important;
   }
 
   .toolbarBtnLabelShort {
@@ -407,6 +455,41 @@
     display: inline !important;
   }
 
+  .boardChromeBracketView .bracketViewToolbarIcons .toolbarBtnLabelShort {
+    display: inline !important;
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .boardChromeBracketView .bracketViewToolbarIcons .toolbarBtnLabelLong {
+    display: none !important;
+  }
+
+  .boardChromeBracketView .bracketViewToolbarIcons .toolbarDualDesktopOnly {
+    display: flex !important;
+  }
+
+  /* 대진표 보기 모바일: 초기화(↺) 포함 왼쪽 툴바 */
+  .boardChromeBracketView .toolbarResetDesktopOnly {
+    display: flex !important;
+  }
+
+  .boardChromeBracketView .toolbarExitBracketView {
+    width: 36px !important;
+    min-width: 36px !important;
+    height: 36px !important;
+    padding: 0 !important;
+    font-size: 18px !important;
+    font-weight: 700 !important;
+  }
+
+  .boardChromeBracketView .bracketViewToolbarIcons .toolbarOrientationWide {
+    width: 36px !important;
+    min-width: 36px !important;
+    padding: 0 !important;
+  }
+
   .toolbarDualDesktopOnly {
     display: none !important;
   }
@@ -414,24 +497,55 @@
   .toolbarResetDesktopOnly {
     display: none !important;
   }
+}
 
-  .toolbarExitBracketView {
-    width: auto !important;
-    min-height: 36px;
-    padding: 0 8px !important;
-    font-size: 11px !important;
-    font-weight: 700 !important;
+/* 모바일 가로: 툴바·타이틀 여백 재조정 (회전 강제 없음) */
+@media (max-width: 767px) and (orientation: landscape) {
+  .boardChromeBracketView .bracketFloatingToolbar {
+    top: calc(64px + env(safe-area-inset-top, 0px) + var(--bracket-view-mobile-top-offset, 0px));
   }
 
-  .boardChromeBracketView .toolbarOrientationWide {
-    width: auto !important;
-    min-width: 40px;
-    padding: 0 6px !important;
+  .boardChromeBracketView .tournamentOverlay {
+    top: calc(4px + env(safe-area-inset-top, 0px) + var(--bracket-view-mobile-top-offset, 0px));
+    max-width: calc(100vw - 68px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+  }
+
+  .boardChromeBracketView .tournamentTitle {
+    font-size: clamp(0.78rem, 2.8vw, 0.95rem);
   }
 }
 
 @media (min-width: 768px) {
   .toolbarExitBracketView {
     display: none !important;
+  }
+
+  .boardChromeBracketView .toolbarExitBracketView {
+    display: flex !important;
+    width: 36px !important;
+    min-width: 36px !important;
+    height: 36px !important;
+    padding: 0 !important;
+    font-size: 18px !important;
+  }
+
+  .boardChromeBracketView .bracketViewToolbarIcons .toolbarDualDesktopOnly {
+    display: flex !important;
+  }
+
+  .boardChromeBracketView .bracketViewToolbarIcons .toolbarBtnLabelLong {
+    display: none !important;
+  }
+
+  .boardChromeBracketView .bracketViewToolbarIcons .toolbarBtnLabelShort {
+    display: inline !important;
+    font-size: 15px;
+    font-weight: 800;
+  }
+
+  .boardChromeBracketView .bracketViewToolbarIcons .toolbarOrientationWide {
+    width: 36px !important;
+    min-width: 36px !important;
+    padding: 0 !important;
   }
 }

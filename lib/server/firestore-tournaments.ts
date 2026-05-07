@@ -916,3 +916,16 @@ export async function ensureTournamentTvAccessTokenFirestore(
   }
   return { ok: false, error: "TV 토큰을 생성하지 못했습니다." };
 }
+
+export async function clearTournamentTvAccessTokenFirestore(
+  tournamentId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const tid = tournamentId.trim();
+  if (!tid) return { ok: false, error: "잘못된 요청입니다." };
+  const existing = await getTournamentByIdFirestore(tid);
+  if (!existing) return { ok: false, error: "대회를 찾을 수 없습니다." };
+  const db = getSharedFirestoreDb();
+  await db.collection(COLLECTION).doc(tid).set({ tvAccessToken: null }, { merge: true });
+  return { ok: true };
+}

@@ -26,6 +26,63 @@ type BracketBoardInput = {
   rounds: BoardRound[];
 };
 
+type BoardPlayerSlot = {
+  userId: string;
+  name: string;
+  displayName?: string | null;
+};
+
+const RENAME_LONG_PRESS_MS = 1000;
+
+function bracketSlotLabel(p: { name: string; displayName?: string | null }): string {
+  const d = typeof p.displayName === "string" ? p.displayName.trim() : "";
+  return d || p.name;
+}
+
+function cloneBracketBoardForLayout(b: BracketBoardInput): BracketBoardInput {
+  return {
+    ...b,
+    rounds: b.rounds.map((r) => ({
+      ...r,
+      matches: r.matches.map((m) => ({
+        ...m,
+        player1: {
+          ...m.player1,
+          name: bracketSlotLabel(m.player1 as BoardPlayerSlot),
+        },
+        player2: {
+          ...m.player2,
+          name: bracketSlotLabel(m.player2 as BoardPlayerSlot),
+        },
+      })),
+    })),
+  };
+}
+
+function readRawSlotPlayer(
+  bracketInput: BracketBoardInput,
+  roundIndex: number,
+  internalIndex: number,
+): BoardPlayerSlot | null {
+  const round = bracketInput.rounds[roundIndex];
+  const match = round?.matches[Math.floor(internalIndex / 2)];
+  if (!match) return null;
+  return (internalIndex % 2 === 0 ? match.player1 : match.player2) as BoardPlayerSlot;
+}
+
+/** PATCH 본문 displayName: null은 저장 생략, ""는 오버레이 제거 */
+function resolveRenameDisplayPayload(
+  raw: BoardPlayerSlot | null,
+  resolvedSlotLabel: string,
+  nextTrimmed: string,
+): string | null {
+  if (nextTrimmed === "") return "";
+  if (nextTrimmed === resolvedSlotLabel) return null;
+  const original = raw?.name?.trim() ?? "";
+  if (original !== "" && nextTrimmed === original) return "";
+  return nextTrimmed;
+}
+
 type WinnerChoice = 0 | 1;
 
 function formatDateWithKoreanDow(raw: string): string {
@@ -626,6 +683,8 @@ export default function InteractiveBracketBoard({
   } | null>(null);
   const [renameEditing, setRenameEditing] = useState<{
     roundNumber: number;
+    roundIndex: number;
+    internalIndex: number;
     matchId: string;
     slot: "player1" | "player2";
     value: string;
@@ -635,6 +694,26 @@ export default function InteractiveBracketBoard({
   const [isPanning, setIsPanning] = useState(false);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const longPressTimerRef = useRef<number | null>(null);
+  /** 모바일 대진표 보기: 툴바 접기(기본 접힘) */
+  const [mobileToolbarExpanded, setMobileToolbarExpanded] = useState(false);
+  const [isMobileBracketViewLayout, setIsMobileBracketViewLayout] = useState(false);
+
+  useLayoutEffect(() => {
+    if (typeof window === "undefined" || chromeMode !== "bracketView") {
+      setIsMobileBracketViewLayout(false);
+      return;
+    }
+    const mq = window.matchMedia("(max-width: 767px)");
+    const sync = () => {
+      const narrow = mq.matches;
+      setIsMobileBracketViewLayout(narrow);
+      if (!narrow) setMobileToolbarExpanded(true);
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, [chromeMode]);
+
   useEffect(() => {
     scaleRef.current = scale;
   }, [scale]);
@@ -659,14 +738,17 @@ export default function InteractiveBracketBoard({
     },
     [],
   );
+
+  const bracketForLayout = useMemo(() => cloneBracketBoardForLayout(bracket), [bracket]);
+
   const metrics = useMemo<BracketBoardMetrics>(
-    () => computeBracketBoardMetrics(bracket as BoardBracket, "vertical"),
-    [bracket],
+    () => computeBracketBoardMetrics(bracketForLayout as BoardBracket, "vertical"),
+    [bracketForLayout],
   );
 
   const layoutVerticalBase = useMemo(
-    () => calculateLayout(bracket as BoardBracket, metrics, "vertical"),
-    [bracket, metrics],
+    () => calculateLayout(bracketForLayout as BoardBracket, metrics, "vertical"),
+    [bracketForLayout, metrics],
   );
 
   const layoutComputed = useMemo(() => {
@@ -1036,28 +1118,48 @@ export default function InteractiveBracketBoard({
         matchId: string;
         slot: "player1" | "player2";
         roundNumber: number;
+        roundIndex: number;
+        internalIndex: number;
         playerName: string;
       },
     ) => {
       e.stopPropagation();
       boxPointerStartRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY, ts: Date.now() });
       setSelectedBoxKey(args.boxKey);
-      if (interactionMode === "editSwap" && !interactionDisabled && !actionBusy) {
-        if (longPressTimerRef.current !== null) {
-          window.clearTimeout(longPressTimerRef.current);
-        }
-        longPressTimerRef.current = window.setTimeout(() => {
-          setRenameEditing({
-            roundNumber: args.roundNumber,
-            matchId: args.matchId,
-            slot: args.slot,
-            value: args.playerName,
-          });
-        }, 560);
+      const allowRenameLongPress =
+        Boolean(onRenamePlayer) &&
+        !interactionDisabled &&
+        !actionBusy &&
+        (interactionMode === "editSwap" || (chromeMode === "bracketView" && interactionMode === "winner"));
+      if (!allowRenameLongPress) return;
+      if (longPressTimerRef.current !== null) {
+        window.clearTimeout(longPressTimerRef.current);
       }
+      longPressTimerRef.current = window.setTimeout(() => {
+        longPressTimerRef.current = null;
+        setRenameEditing({
+          roundNumber: args.roundNumber,
+          roundIndex: args.roundIndex,
+          internalIndex: args.internalIndex,
+          matchId: args.matchId,
+          slot: args.slot,
+          value: args.playerName,
+        });
+      }, RENAME_LONG_PRESS_MS);
     },
-    [actionBusy, interactionDisabled, interactionMode],
+    [actionBusy, chromeMode, interactionDisabled, interactionMode, onRenamePlayer],
   );
+
+  const onBoxPointerMoveForLongPress = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    const s = boxPointerStartRef.current.get(e.pointerId);
+    if (!s) return;
+    if (Math.hypot(e.clientX - s.x, e.clientY - s.y) > 12) {
+      if (longPressTimerRef.current !== null) {
+        window.clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    }
+  }, []);
 
   const onBoxPointerUp = useCallback(
     (
@@ -1231,6 +1333,9 @@ export default function InteractiveBracketBoard({
       ? ` ${styles.boardChromeBracketView}`
       : "";
 
+  const collapseMobileToolbar =
+    chromeMode === "bracketView" && isMobileBracketViewLayout && !mobileToolbarExpanded;
+
   return (
     <section
       className={
@@ -1312,91 +1417,142 @@ export default function InteractiveBracketBoard({
         onPointerDown={(e) => e.stopPropagation()}
         onPointerUp={(e) => e.stopPropagation()}
       >
-        <div className={styles.bracketFloatingToolbarInner}>
-          {chromeMode === "bracketView" && onExit ? (
+        {collapseMobileToolbar ? (
+          <div
+            className={`${styles.bracketFloatingToolbarInner} ${styles.bracketViewToolbarIcons} ${styles.bracketToolbarCollapsedWrap}`}
+          >
             <button
               type="button"
-              className={`${styles.toolbarButton} ${styles.toolbarExitBracketView}`}
-              title="나가기"
-              aria-label="나가기"
-              onClick={() => onExit()}
+              className={`${styles.toolbarButton} ${styles.toolbarMenuToggle}`}
+              title="메뉴 펼치기"
+              aria-label="메뉴 펼치기"
+              aria-expanded={false}
+              onClick={() => setMobileToolbarExpanded(true)}
             >
-              나가기
+              ≡
             </button>
-          ) : null}
-          <button
-            type="button"
-            className={`${styles.toolbarButton} ${styles.toolbarOrientationWide} ${
-              viewMode === "vertical" ? styles.toolbarButtonActive : ""
-            }`}
-            title="세로형 보기"
-            aria-label="세로형 보기"
-            onClick={() => setViewMode("vertical")}
+          </div>
+        ) : (
+          <div
+            className={
+              chromeMode === "bracketView"
+                ? `${styles.bracketFloatingToolbarInner} ${styles.bracketViewToolbarIcons}`
+                : styles.bracketFloatingToolbarInner
+            }
           >
-            <span className={styles.toolbarBtnLabelShort}>V</span>
-            <span className={styles.toolbarBtnLabelLong}>세로</span>
-          </button>
-          <button
-            type="button"
-            className={`${styles.toolbarButton} ${styles.toolbarOrientationWide} ${
-              viewMode === "horizontal" ? styles.toolbarButtonActive : ""
-            }`}
-            title="가로형 보기"
-            aria-label="가로형 보기"
-            onClick={() => setViewMode("horizontal")}
-          >
-            <span className={styles.toolbarBtnLabelShort}>H</span>
-            <span className={styles.toolbarBtnLabelLong}>가로</span>
-          </button>
-          <button
-            type="button"
-            className={`${styles.toolbarButton} ${styles.toolbarDualDesktopOnly} ${
-              viewMode === "dual" ? styles.toolbarButtonActive : ""
-            }`}
-            title="양쪽형 보기"
-            aria-label="양쪽형 보기"
-            onClick={() => setViewMode("dual")}
-          >
-            ⇄
-          </button>
-          <hr className={styles.toolbarDivider} aria-hidden />
-          <button
-            type="button"
-            className={styles.toolbarButton}
-            title="확대"
-            aria-label="확대"
-            onClick={() => zoomFromViewportCenter(1.2)}
-          >
-            +
-          </button>
-          <button
-            type="button"
-            className={styles.toolbarButton}
-            title="축소"
-            aria-label="축소"
-            onClick={() => zoomFromViewportCenter(1 / 1.2)}
-          >
-            −
-          </button>
-          <button
-            type="button"
-            className={styles.toolbarButton}
-            title="전체보기"
-            aria-label="전체보기"
-            onClick={() => fitBracketToViewport()}
-          >
-            □
-          </button>
-          <button
-            type="button"
-            className={`${styles.toolbarButton} ${styles.toolbarResetDesktopOnly}`}
-            title="초기화"
-            aria-label="초기화"
-            onClick={() => resetBracketView()}
-          >
-            ↺
-          </button>
-        </div>
+            {chromeMode === "bracketView" && onExit ? (
+              <button
+                type="button"
+                className={`${styles.toolbarButton} ${styles.toolbarExitBracketView}`}
+                title="나가기"
+                aria-label="나가기"
+                onClick={() => onExit()}
+              >
+                ←
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className={`${styles.toolbarButton} ${styles.toolbarOrientationWide} ${
+                viewMode === "vertical" ? styles.toolbarButtonActive : ""
+              }`}
+              title="세로형 보기"
+              aria-label="세로형 보기"
+              onClick={() => setViewMode("vertical")}
+            >
+              {chromeMode === "bracketView" ? (
+                <span className={styles.toolbarBtnLabelShort}>┴</span>
+              ) : (
+                <>
+                  <span className={styles.toolbarBtnLabelShort}>V</span>
+                  <span className={styles.toolbarBtnLabelLong}>세로</span>
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              className={`${styles.toolbarButton} ${styles.toolbarOrientationWide} ${
+                viewMode === "horizontal" ? styles.toolbarButtonActive : ""
+              }`}
+              title="가로형 보기"
+              aria-label="가로형 보기"
+              onClick={() => setViewMode("horizontal")}
+            >
+              {chromeMode === "bracketView" ? (
+                <span className={styles.toolbarBtnLabelShort}>├</span>
+              ) : (
+                <>
+                  <span className={styles.toolbarBtnLabelShort}>H</span>
+                  <span className={styles.toolbarBtnLabelLong}>가로</span>
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              className={`${styles.toolbarButton} ${styles.toolbarDualDesktopOnly} ${
+                viewMode === "dual" ? styles.toolbarButtonActive : ""
+              }`}
+              title="양쪽형 보기"
+              aria-label="양쪽형 보기"
+              onClick={() => setViewMode("dual")}
+            >
+              {chromeMode === "bracketView" ? (
+                <span className={styles.toolbarBtnLabelShort}>H</span>
+              ) : (
+                "⇄"
+              )}
+            </button>
+            <hr className={styles.toolbarDivider} aria-hidden />
+            <button
+              type="button"
+              className={styles.toolbarButton}
+              title="확대"
+              aria-label="확대"
+              onClick={() => zoomFromViewportCenter(1.2)}
+            >
+              +
+            </button>
+            <button
+              type="button"
+              className={styles.toolbarButton}
+              title="축소"
+              aria-label="축소"
+              onClick={() => zoomFromViewportCenter(1 / 1.2)}
+            >
+              −
+            </button>
+            <button
+              type="button"
+              className={styles.toolbarButton}
+              title="전체보기"
+              aria-label="전체보기"
+              onClick={() => fitBracketToViewport()}
+            >
+              □
+            </button>
+            <button
+              type="button"
+              className={`${styles.toolbarButton} ${styles.toolbarResetDesktopOnly}`}
+              title="초기화"
+              aria-label="초기화"
+              onClick={() => resetBracketView()}
+            >
+              ↺
+            </button>
+            {chromeMode === "bracketView" && isMobileBracketViewLayout ? (
+              <button
+                type="button"
+                className={`${styles.toolbarButton} ${styles.toolbarMenuToggle}`}
+                title="메뉴 접기"
+                aria-label="메뉴 접기"
+                aria-expanded
+                onClick={() => setMobileToolbarExpanded(false)}
+              >
+                ≡
+              </button>
+            ) : null}
+          </div>
+        )}
       </div>
 
       <div
@@ -1478,6 +1634,16 @@ export default function InteractiveBracketBoard({
                 const slotLabel = derived.labelByItemKey.get(item.key) ?? "";
                 const slotHasName = slotLabel.trim() !== "";
                 const opponentHasName = derived.opponentHasNameByItemKey.get(item.key) === true;
+                const rawSlot = readRawSlotPlayer(bracket, item.roundIndex, item.internalIndex);
+                const playerSlot: "player1" | "player2" = item.internalIndex % 2 === 0 ? "player1" : "player2";
+                const origName = (rawSlot?.name ?? "").trim();
+                const dispName = (rawSlot?.displayName ?? "").trim();
+                const showRenameBadge = dispName.length > 0 && dispName !== origName;
+                const hasStoredDisplayName = dispName.length > 0;
+                const useDisplayNameStyle = showRenameBadge;
+                const editing = renameEditing;
+                const isRenamingThis =
+                  editing !== null && editing.matchId === item.match.id && editing.slot === playerSlot;
                 return (
                   <div
                     key={item.key}
@@ -1508,17 +1674,20 @@ export default function InteractiveBracketBoard({
                         onBoxPointerDown(e, {
                           boxKey,
                           matchId: item.match.id,
-                          slot: "player1",
+                          slot: playerSlot,
                           roundNumber: item.roundNumber,
+                          roundIndex: item.roundIndex,
+                          internalIndex: item.internalIndex,
                           playerName: slotLabel,
                         })
                       }
+                      onPointerMove={onBoxPointerMoveForLongPress}
                       onPointerUp={(e) =>
                         onBoxPointerUp(
                           e,
                           boxKey,
                           item.match.id,
-                          "player1",
+                          playerSlot,
                           item.match.player1.userId,
                           item.roundNumber,
                           item.roundIndex,
@@ -1541,52 +1710,106 @@ export default function InteractiveBracketBoard({
                             : undefined
                           : setRenameEditing({
                               roundNumber: item.roundNumber,
+                              roundIndex: item.roundIndex,
+                              internalIndex: item.internalIndex,
                               matchId: item.match.id,
-                              slot: "player1",
+                              slot: playerSlot,
                               value: slotLabel,
                             })
                       }
                     >
-                      {renameEditing &&
-                      renameEditing.matchId === item.match.id &&
-                      renameEditing.slot === "player1" ? (
-                        <input
-                          autoFocus
-                          value={renameEditing.value}
-                          className={styles.playerInlineInput}
-                          onChange={(ev) => setRenameEditing((prev) => (prev ? { ...prev, value: ev.target.value } : prev))}
-                          onBlur={() => {
-                            const payload = renameEditing;
-                            setRenameEditing(null);
-                            if (!payload) return;
-                            const next = payload.value.trim();
-                            if (!next || next === slotLabel) return;
-                            void onRenamePlayer?.({
-                              roundNumber: payload.roundNumber,
-                              matchId: payload.matchId,
-                              slot: payload.slot,
-                              displayName: next,
-                            });
+                      {showRenameBadge && !isRenamingThis ? (
+                        <span className={styles.playerEditBadge} aria-hidden>
+                          ✎
+                        </span>
+                      ) : null}
+                      {isRenamingThis && editing ? (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 4,
+                            justifyContent: "center",
+                            width: "100%",
+                            height: "100%",
+                            minHeight: 0,
                           }}
-                          onKeyDown={(ev) => {
-                            if (ev.key === "Escape") {
-                              setRenameEditing(null);
-                              return;
+                        >
+                          <input
+                            autoFocus
+                            value={editing.value}
+                            className={styles.playerInlineInput}
+                            onChange={(ev) =>
+                              setRenameEditing((prev) => (prev ? { ...prev, value: ev.target.value } : prev))
                             }
-                            if (ev.key !== "Enter") return;
-                            const payload = renameEditing;
-                            setRenameEditing(null);
-                            if (!payload) return;
-                            const next = payload.value.trim();
-                            if (!next || next === slotLabel) return;
-                            void onRenamePlayer?.({
-                              roundNumber: payload.roundNumber,
-                              matchId: payload.matchId,
-                              slot: payload.slot,
-                              displayName: next,
-                            });
-                          }}
-                        />
+                            onBlur={() => {
+                              const payload = editing;
+                              setRenameEditing(null);
+                              if (!payload) return;
+                              const rawPlayer = readRawSlotPlayer(bracket, payload.roundIndex, payload.internalIndex);
+                              const next = payload.value.trim();
+                              const resolved = resolveRenameDisplayPayload(rawPlayer, slotLabel, next);
+                              if (resolved === null) return;
+                              void onRenamePlayer?.({
+                                roundNumber: payload.roundNumber,
+                                matchId: payload.matchId,
+                                slot: payload.slot,
+                                displayName: resolved,
+                              });
+                            }}
+                            onKeyDown={(ev) => {
+                              if (ev.key === "Escape") {
+                                setRenameEditing(null);
+                                return;
+                              }
+                              if (ev.key !== "Enter") return;
+                              const payload = editing;
+                              setRenameEditing(null);
+                              if (!payload) return;
+                              const rawPlayer = readRawSlotPlayer(bracket, payload.roundIndex, payload.internalIndex);
+                              const next = payload.value.trim();
+                              const resolved = resolveRenameDisplayPayload(rawPlayer, slotLabel, next);
+                              if (resolved === null) return;
+                              void onRenamePlayer?.({
+                                roundNumber: payload.roundNumber,
+                                matchId: payload.matchId,
+                                slot: payload.slot,
+                                displayName: resolved,
+                              });
+                            }}
+                          />
+                          {hasStoredDisplayName ? (
+                            <button
+                              type="button"
+                              style={{
+                                fontSize: "0.62rem",
+                                fontWeight: 700,
+                                padding: "2px 4px",
+                                borderRadius: 4,
+                                border: "1px solid #cbd5e1",
+                                background: "#f8fafc",
+                                color: "#334155",
+                                cursor: "pointer",
+                                flexShrink: 0,
+                              }}
+                              onPointerDown={(ev) => ev.stopPropagation()}
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                setRenameEditing(null);
+                                void onRenamePlayer?.({
+                                  roundNumber: item.roundNumber,
+                                  matchId: item.match.id,
+                                  slot: playerSlot,
+                                  displayName: "",
+                                });
+                              }}
+                            >
+                              원래 이름으로 되돌리기
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : useDisplayNameStyle ? (
+                        <span className={styles.playerDisplayNameOverride}>{slotLabel}</span>
                       ) : (
                         slotLabel
                       )}

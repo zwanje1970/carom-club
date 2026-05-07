@@ -5,6 +5,7 @@ import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../
 import { getClientStatusByUserId, getUserById, resolveCanonicalUserIdForAuth } from "../../../../../../lib/platform-api";
 import {
   assertClientCanManageTournamentFirestore,
+  clearTournamentTvAccessTokenFirestore,
   ensureTournamentTvAccessTokenFirestore,
 } from "../../../../../../lib/server/firestore-tournaments";
 
@@ -109,4 +110,36 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     return NextResponse.json({ error: ensured.error }, { status: 500 });
   }
   return NextResponse.json({ token: ensured.token, url: buildTvShareUrl(request, ensured.token) });
+}
+
+export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const auth = await getAuthorizedUser();
+  if (!auth) {
+    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
+  if (!auth.allowed) {
+    return NextResponse.json({ error: "접근할 수 없습니다." }, { status: 403 });
+  }
+
+  const { id } = await context.params;
+  const tid = id.trim();
+  if (!tid) {
+    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+  }
+
+  const actorId = await actorTournamentUserId(auth.user);
+  const gate = await assertClientCanManageTournamentFirestore({
+    actorUserId: actorId,
+    actorRole: auth.user.role,
+    tournamentId: tid,
+  });
+  if (!gate.ok) {
+    return NextResponse.json({ error: gate.error }, { status: gate.httpStatus });
+  }
+
+  const cleared = await clearTournamentTvAccessTokenFirestore(tid);
+  if (!cleared.ok) {
+    return NextResponse.json({ error: cleared.error }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true, token: null as string | null, url: null as string | null });
 }

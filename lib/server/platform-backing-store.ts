@@ -515,7 +515,10 @@ export type BracketParticipantSnapshot = {
 
 export type BracketPlayer = {
   userId: string;
+  /** 참가자 스냅샷 기준 원본 표시명(대진표 저장 로직의 기준 이름) */
   name: string;
+  /** 대진표 보드 전용 표시 오버레이. 없으면 `name`만 표시 */
+  displayName?: string | null;
 };
 
 export type BracketMatchStatus = "PENDING" | "COMPLETED";

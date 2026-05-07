@@ -8,7 +8,25 @@ type TvTokenResponse = {
   error?: string;
 };
 
-export default function TournamentTvLinkBlock({ tournamentId }: { tournamentId: string }) {
+function IconTv() {
+  return (
+    <svg viewBox="0 0 24 24" width={22} height={22} fill="none" aria-hidden>
+      <rect x="3" y="5" width={18} height={12} rx={2} stroke="currentColor" strokeWidth="1.75" />
+      <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+const QR_DISPLAY_PX = 280;
+
+export default function TournamentTvLinkBlock({
+  tournamentId,
+  presentation = "hubModal",
+}: {
+  tournamentId: string;
+  presentation?: "hubModal";
+}) {
+  const [open, setOpen] = useState(false);
   const [state, setState] = useState<TvTokenResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -38,6 +56,11 @@ export default function TournamentTvLinkBlock({ tournamentId }: { tournamentId: 
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!open) return;
+    void load();
+  }, [open, load]);
+
   const onCreate = async () => {
     const id = tournamentId.trim();
     if (!id) return;
@@ -66,54 +89,121 @@ export default function TournamentTvLinkBlock({ tournamentId }: { tournamentId: 
     if (!url) return;
     try {
       await navigator.clipboard.writeText(url);
-      setMessage("TV 링크를 복사했습니다.");
+      setMessage("링크를 복사했습니다. TV 브라우저 주소창에 붙여넣을 수 있습니다.");
     } catch {
-      setMessage("복사에 실패했습니다. 링크를 직접 선택해 복사해 주세요.");
+      setMessage("복사에 실패했습니다.");
+    }
+  };
+
+  const onDisconnect = async () => {
+    const id = tournamentId.trim();
+    if (!id) return;
+    if (!window.confirm("TV 공개 링크 연결을 끊을까요? 기존 링크로는 더 이상 접속할 수 없습니다.")) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/client/tournaments/${encodeURIComponent(id)}/tv-access-token`, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setMessage(typeof json.error === "string" ? json.error : "연결 해제에 실패했습니다.");
+        return;
+      }
+      setState({ token: null, url: null });
+      setMessage("연결을 끊었습니다.");
+    } catch {
+      setMessage("네트워크 오류로 해제하지 못했습니다.");
+    } finally {
+      setBusy(false);
     }
   };
 
   const hasLink = Boolean(state?.url?.trim());
+  const hubUrl = state?.url?.trim() ?? "";
+
+  if (presentation !== "hubModal") {
+    return null;
+  }
 
   return (
-    <section className="v3-box v3-stack" style={{ gap: "0.65rem", padding: "1rem" }} aria-label="대진표 TV 링크">
-      <h2 className="v3-h2" style={{ margin: 0, fontSize: "1.05rem" }}>
-        대진표 TV
-      </h2>
-      <p className="v3-muted" style={{ margin: 0, fontSize: "0.9rem" }}>
-        TV·현장 모니터에 표시할 공개 링크입니다. 링크를 알면 누구나 볼 수 있으니 공유에 주의하세요.
-      </p>
-      {state && hasLink ? (
-        <div className="v3-stack" style={{ gap: "0.5rem" }}>
-          <code
-            style={{
-              display: "block",
-              wordBreak: "break-all",
-              fontSize: "0.85rem",
-              padding: "0.5rem 0.65rem",
-              borderRadius: "8px",
-              background: "var(--v3-site-gray-100, #f0f3f8)",
-            }}
-          >
-            {state.url}
-          </code>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-            <button type="button" className="v3-btn" disabled={busy} onClick={() => void onCopy()}>
-              TV 링크 복사
-            </button>
+    <>
+      <button
+        type="button"
+        className="client-tournament-manage__hubTvTrigger"
+        onClick={() => setOpen(true)}
+      >
+        <span className="client-tournament-manage__featureIconWrap" aria-hidden>
+          <IconTv />
+        </span>
+        <span className="client-tournament-manage__featureTitle">대진표 TV 연결</span>
+      </button>
+
+      {open ? (
+        <div
+          className="client-tournament-manage__tvModalBackdrop"
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setOpen(false);
+          }}
+        >
+          <div className="client-tournament-manage__tvModal" role="dialog" aria-modal="true" aria-label="대진표 TV 연결">
+            <div className="client-tournament-manage__tvModalHead">
+              <h2 className="client-tournament-manage__tvModalTitle">대진표 TV 연결</h2>
+              <button type="button" className="v3-btn" onClick={() => setOpen(false)}>
+                닫기
+              </button>
+            </div>
+            <p className="v3-muted" style={{ margin: "0 0 0.65rem", fontSize: "0.88rem" }}>
+              현장 TV는 아래 QR을 카메라로 스캔하거나, 링크 복사 후 TV 브라우저에 붙여넣으세요.
+            </p>
+            <p style={{ margin: "0 0 0.75rem", fontSize: "0.88rem", fontWeight: 700 }}>
+              상태:{" "}
+              <span style={{ color: hasLink ? "#166534" : "#64748b" }}>{hasLink ? "연결됨" : "연결 안 됨"}</span>
+            </p>
+
+            {hasLink && hubUrl ? (
+              <div className="client-tournament-manage__tvQrBlock">
+                <p style={{ margin: "0 0 0.5rem", fontSize: "0.9rem", fontWeight: 800, color: "#0f172a" }}>QR</p>
+                <p className="v3-muted" style={{ margin: "0 0 0.65rem", fontSize: "0.82rem", lineHeight: 1.45 }}>
+                  TV에서 QR 스캔: TV·셋톱박스 브라우저 또는 카메라 앱으로 코드를 비추면 접속할 수 있습니다.
+                </p>
+                <div className="client-tournament-manage__tvQrWrap">
+                  <img
+                    alt="TV 공개 링크 QR"
+                    width={QR_DISPLAY_PX}
+                    height={QR_DISPLAY_PX}
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=${QR_DISPLAY_PX}x${QR_DISPLAY_PX}&data=${encodeURIComponent(hubUrl)}`}
+                  />
+                </div>
+              </div>
+            ) : (
+              <p className="v3-muted" style={{ margin: "0 0 0.85rem", fontSize: "0.85rem" }}>
+                공개 링크를 만든 뒤 QR이 표시됩니다.
+              </p>
+            )}
+
+            <div className="client-tournament-manage__tvModalActions">
+              <button type="button" className="v3-btn" disabled={busy || !hasLink} onClick={() => void onCopy()}>
+                링크 복사
+              </button>
+              <button type="button" className="v3-btn" disabled={busy} onClick={() => void onCreate()}>
+                {busy ? "처리 중…" : hasLink ? "새 링크 발급" : "공개 링크 생성"}
+              </button>
+              <button type="button" className="v3-btn" disabled={busy || !hasLink} onClick={() => void onDisconnect()}>
+                연결 끊기
+              </button>
+            </div>
+
+            {message ? (
+              <p className="v3-muted" style={{ margin: "0.65rem 0 0", fontSize: "0.85rem" }}>
+                {message}
+              </p>
+            ) : null}
           </div>
         </div>
-      ) : (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-          <button type="button" className="v3-btn" disabled={busy} onClick={() => void onCreate()}>
-            {busy ? "처리 중…" : "TV 링크 생성"}
-          </button>
-        </div>
-      )}
-      {message ? (
-        <p className="v3-muted" style={{ margin: 0, fontSize: "0.85rem" }}>
-          {message}
-        </p>
       ) : null}
-    </section>
+    </>
   );
 }

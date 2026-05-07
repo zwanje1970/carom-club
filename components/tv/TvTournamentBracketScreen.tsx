@@ -6,8 +6,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 /** TV 폴링용 — API JSON 형태만 반영 (클라이언트에서 platform-backing-store 미참조) */
 type TvBracketMatchJson = {
   id: string;
-  player1: { userId: string; name: string };
-  player2: { userId: string; name: string };
+  player1: { userId: string; name: string; displayName?: string | null };
+  player2: { userId: string; name: string; displayName?: string | null };
   winnerUserId: string | null;
   winnerName: string | null;
   status: string;
@@ -33,7 +33,15 @@ type TvBracketApiPayload = {
   zoneName?: string;
 };
 
-const POLL_MS = 8000;
+/** TV 전용 폴링 — 메인 사이트와 분리된 경로에서만 호출 */
+const POLL_MS_ACTIVE = 3000;
+const POLL_MS_HIDDEN = 12000;
+
+function slotDisplayName(p: { name: string; displayName?: string | null }): string {
+  const d = typeof p.displayName === "string" ? p.displayName.trim() : "";
+  const n = (p.name ?? "").trim();
+  return d || n || "—";
+}
 
 function pickDisplayRound(rounds: TvBracketRoundJson[]): TvBracketRoundJson | null {
   if (!rounds.length) return null;
@@ -119,8 +127,23 @@ export function TvTournamentBracketScreen({
 
   useEffect(() => {
     void load();
-    const t = window.setInterval(() => void load(), POLL_MS);
-    return () => window.clearInterval(t);
+    let intervalMs = document.hidden ? POLL_MS_HIDDEN : POLL_MS_ACTIVE;
+    let t = window.setInterval(() => {
+      if (!document.hidden) void load();
+    }, intervalMs);
+    const onVisibility = () => {
+      window.clearInterval(t);
+      if (!document.hidden) void load();
+      intervalMs = document.hidden ? POLL_MS_HIDDEN : POLL_MS_ACTIVE;
+      t = window.setInterval(() => {
+        if (!document.hidden) void load();
+      }, intervalMs);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(t);
+    };
   }, [load]);
 
   const displayRound = useMemo(() => {
@@ -170,9 +193,9 @@ export function TvTournamentBracketScreen({
           {displayRound.matches.map((m) => (
             <li key={m.id} style={matchRowStyle}>
               <div style={nameColStyle}>
-                <span style={playerNameStyle}>{m.player1.name || "—"}</span>
+                <span style={playerNameStyle}>{slotDisplayName(m.player1)}</span>
                 <span style={vsStyle}>vs</span>
-                <span style={playerNameStyle}>{m.player2.name || "—"}</span>
+                <span style={playerNameStyle}>{slotDisplayName(m.player2)}</span>
               </div>
               <div style={metaColStyle}>
                 <span style={badgeStyle(m.status)}>{m.status === "COMPLETED" ? "종료" : "예정"}</span>

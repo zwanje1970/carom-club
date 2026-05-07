@@ -44,8 +44,8 @@ export async function PATCH(
   const body = (await request.json().catch(() => null)) as UpdatePlayerNameRequest | null;
   const slot = body?.slot;
   const displayName = typeof body?.displayName === "string" ? body.displayName.trim() : "";
-  if ((slot !== "player1" && slot !== "player2") || !displayName) {
-    return NextResponse.json({ error: "slot(player1|player2)과 displayName이 필요합니다." }, { status: 400 });
+  if (slot !== "player1" && slot !== "player2") {
+    return NextResponse.json({ error: "slot(player1|player2)이 필요합니다." }, { status: 400 });
   }
 
   const result = await updateBracketMatchPlayerNameFirestore({

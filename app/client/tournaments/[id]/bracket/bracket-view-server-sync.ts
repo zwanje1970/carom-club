@@ -283,7 +283,6 @@ export async function syncRenamePlayer(params: {
   hasDownstream: (b: BracketLike, roundNumber: number, sliceKey: string | null) => boolean;
 }): Promise<{ ok: true; bracket: BracketLike } | { ok: false; error: string }> {
   const nextName = params.displayName.trim();
-  if (!nextName) return { ok: false, error: "이름이 비었습니다." };
 
   const loc = findBracketMatchLocation(params.bracket, params.matchId);
   const renameSlice = loc?.sliceKey ?? null;
@@ -291,21 +290,7 @@ export async function syncRenamePlayer(params: {
     return { ok: false, error: "분할 대진표에서 매치 위치를 특정할 수 없습니다." };
   }
 
-  let next = params.bracket;
-  if (params.hasDownstream(next, params.roundNumber, renameSlice)) {
-    const reset = await params.mut.resetAfter(params.roundNumber, renameSlice);
-    if (!reset.ok) return { ok: false, error: reset.error };
-    next = reset.bracket;
-  }
-
   const renamed = await params.mut.renamePlayer(params.matchId, params.slot, nextName);
   if (!renamed.ok) return { ok: false, error: renamed.error };
-
-  next = renamed.bracket;
-  if (params.hasDownstream(params.bracket, params.roundNumber, renameSlice)) {
-    const rebuilt = await params.mut.rebuildFromRound(params.roundNumber, renameSlice);
-    if (!rebuilt.ok) return { ok: false, error: rebuilt.error };
-    next = rebuilt.bracket;
-  }
-  return { ok: true, bracket: next };
+  return { ok: true, bracket: renamed.bracket };
 }

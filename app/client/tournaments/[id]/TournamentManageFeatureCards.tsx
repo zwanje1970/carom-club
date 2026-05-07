@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import TournamentTvLinkBlock from "./TournamentTvLinkBlock";
 
 function IconPencil() {
   return (
@@ -43,6 +44,28 @@ function IconGrid() {
   );
 }
 
+function IconUsers() {
+  return (
+    <svg viewBox="0 0 24 24" width={22} height={22} fill="none" aria-hidden>
+      <path
+        d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconBolt() {
+  return (
+    <svg viewBox="0 0 24 24" width={22} height={22} fill="none" aria-hidden>
+      <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="1.75" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function TournamentManageFeatureCards({
   tournamentId,
   bracketEnabled,
@@ -56,9 +79,11 @@ export default function TournamentManageFeatureCards({
   const settlementHref = `/client/settlement/${encodeURIComponent(tournamentId)}`;
   const bracketManageHref = `/client/tournaments/${tournamentId}/bracket`;
   const bracketCreateHref = `/client/tournaments/${tournamentId}/bracket/create`;
+  const participantsHref = `/client/tournaments/${tournamentId}/participants`;
+  const quickResultsHref = `/client/tournaments/${tournamentId}/bracket/quick-results`;
 
   return (
-    <div className="client-tournament-manage__featureGrid">
+    <div className="client-tournament-manage__hubGrid">
       <Link
         prefetch={false}
         href={editHref}
@@ -75,12 +100,13 @@ export default function TournamentManageFeatureCards({
         </span>
         <span className="client-tournament-manage__featureTitle">정산 관리</span>
       </Link>
+
       {bracketEnabled ? (
         hasConfirmedBracket ? (
           <Link
             prefetch={false}
             href={bracketManageHref}
-            className="client-tournament-manage__featureCard client-tournament-manage__featureCard--accent"
+            className="client-tournament-manage__featureCard client-tournament-manage__featureCard--accent client-tournament-manage__featureCard--span"
           >
             <span className="client-tournament-manage__featureIconWrap" aria-hidden>
               <IconGrid />
@@ -91,7 +117,7 @@ export default function TournamentManageFeatureCards({
           <Link
             prefetch={false}
             href={bracketCreateHref}
-            className="client-tournament-manage__featureCard client-tournament-manage__featureCard--accent"
+            className="client-tournament-manage__featureCard client-tournament-manage__featureCard--accent client-tournament-manage__featureCard--span"
           >
             <span className="client-tournament-manage__featureIconWrap" aria-hidden>
               <IconGrid />
@@ -100,13 +126,40 @@ export default function TournamentManageFeatureCards({
           </Link>
         )
       ) : (
-        <span className="client-tournament-manage__featureCard client-tournament-manage__featureCard--accent client-tournament-manage__featureCard--disabled">
+        <span className="client-tournament-manage__featureCard client-tournament-manage__featureCard--accent client-tournament-manage__featureCard--span client-tournament-manage__featureCard--disabled">
           <span className="client-tournament-manage__featureIconWrap" aria-hidden>
             <IconGrid />
           </span>
           <span className="client-tournament-manage__featureTitle">대진표 생성</span>
         </span>
       )}
+
+      <Link prefetch={false} href={participantsHref} className="client-tournament-manage__featureCard client-tournament-manage__featureCard--neutral">
+        <span className="client-tournament-manage__featureIconWrap" aria-hidden>
+          <IconUsers />
+        </span>
+        <span className="client-tournament-manage__featureTitle">참가자 관리</span>
+      </Link>
+
+      {bracketEnabled && hasConfirmedBracket ? (
+        <Link prefetch={false} href={quickResultsHref} className="client-tournament-manage__featureCard client-tournament-manage__featureCard--neutral">
+          <span className="client-tournament-manage__featureIconWrap" aria-hidden>
+            <IconBolt />
+          </span>
+          <span className="client-tournament-manage__featureTitle">빠른 결과 입력</span>
+        </Link>
+      ) : (
+        <span className="client-tournament-manage__featureCard client-tournament-manage__featureCard--neutral client-tournament-manage__featureCard--disabled">
+          <span className="client-tournament-manage__featureIconWrap" aria-hidden>
+            <IconBolt />
+          </span>
+          <span className="client-tournament-manage__featureTitle">빠른 결과 입력</span>
+        </span>
+      )}
+
+      <div className="client-tournament-manage__featureCard client-tournament-manage__featureCard--neutral client-tournament-manage__featureCard--span client-tournament-manage__featureCard--tvSlot">
+        <TournamentTvLinkBlock tournamentId={tournamentId} presentation="hubModal" />
+      </div>
     </div>
   );
 }
