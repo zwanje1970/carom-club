@@ -70,6 +70,21 @@ function readRawSlotPlayer(
   return (internalIndex % 2 === 0 ? match.player1 : match.player2) as BoardPlayerSlot;
 }
 
+/** 승/패 색상용 — placeholder·부전승 더미 id 제외 */
+function slotUserIdForHighlight(raw: BoardPlayerSlot | null): string {
+  if (!raw) return "";
+  const id = typeof raw.userId === "string" ? raw.userId.trim() : "";
+  if (!id || id === "__none" || id.startsWith("__TBD__")) return "";
+  return id;
+}
+
+function opponentSlotLooksFilled(raw: BoardPlayerSlot | null): boolean {
+  if (!raw) return false;
+  if (slotUserIdForHighlight(raw)) return true;
+  const name = (raw.name ?? "").trim();
+  return name !== "" && name !== "대기";
+}
+
 /** PATCH 본문 displayName: null은 저장 생략, ""는 오버레이 제거 */
 function resolveRenameDisplayPayload(
   raw: BoardPlayerSlot | null,
@@ -1007,7 +1022,7 @@ export default function InteractiveBracketBoard({
     for (let r = 0; r <= maxRoundIndex; r += 1) {
       const row = roundMap.get(r) ?? [];
       const labels = labelsByRound[r] ?? [];
-      const parentLabels = labelsByRound[r + 1];
+      const parentRoundExists = r + 1 <= maxRoundIndex;
       for (let s = 0; s < row.length; s += 1) {
         const item = row[s];
         if (!item) continue;
@@ -1015,21 +1030,40 @@ export default function InteractiveBracketBoard({
         labelByItemKey.set(item.key, label);
         const pairIdx = Math.floor(s / 2);
         const pairBase = pairIdx * 2;
-        const selfInPair = s % 2;
+        const selfInPair = s - pairBase;
         const oppIdx = pairBase + (selfInPair === 0 ? 1 : 0);
-        const selfName = (labels[s] ?? "").trim();
-        const opponentName = (labels[oppIdx] ?? "").trim();
-        const nextRoundName = parentLabels ? (parentLabels[pairIdx] ?? "").trim() : "";
-        const isWinner = Boolean(selfName && nextRoundName && nextRoundName === selfName);
-        const isLoser = Boolean(selfName && opponentName && nextRoundName && nextRoundName === opponentName);
-        opponentHasNameByItemKey.set(item.key, opponentName !== "");
+
+        const selfRaw = readRawSlotPlayer(bracket, r, s);
+        const oppRaw = readRawSlotPlayer(bracket, r, oppIdx);
+        const parentRaw = parentRoundExists ? readRawSlotPlayer(bracket, r + 1, pairIdx) : null;
+
+        const selfId = slotUserIdForHighlight(selfRaw);
+        const oppId = slotUserIdForHighlight(oppRaw);
+        const parentId = slotUserIdForHighlight(parentRaw);
+
+        let isWinner = Boolean(selfId && parentId && selfId === parentId);
+        let isLoser = Boolean(selfId && oppId && parentId && parentId === oppId && selfId !== parentId);
+
+        const pairPickKey = `${r}:${pairIdx}`;
+        const picked = winnerByPair[pairPickKey];
+        if (!parentId && (picked === 0 || picked === 1) && selfId) {
+          if (picked === selfInPair) {
+            isWinner = true;
+            isLoser = false;
+          } else if (oppId) {
+            isLoser = true;
+            isWinner = false;
+          }
+        }
+
+        opponentHasNameByItemKey.set(item.key, opponentSlotLooksFilled(oppRaw));
         winnerByItemKey.set(item.key, isWinner);
         loserByItemKey.set(item.key, isLoser);
       }
     }
 
     return { labelByItemKey, winnerByItemKey, loserByItemKey, opponentHasNameByItemKey, activeConnectorKeys, chosenByPair };
-  }, [activeLayout.positionedMatches, winnerByPair]);
+  }, [activeLayout.positionedMatches, bracket, winnerByPair]);
 
   const handleWinnerPick = useCallback(
     (args: {

@@ -1,7 +1,11 @@
 import { randomUUID } from "crypto";
 import { assertClientFirestorePersistenceConfigured } from "./firestore-client-applications";
 import { listApprovedParticipantsByTournamentIdFirestore } from "./firestore-tournament-applications";
-import { getTournamentByIdFirestore } from "./firestore-tournaments";
+import {
+  getTournamentBracketPointerFieldsFirestore,
+  getTournamentByIdFirestore,
+  mergeTournamentActiveBracketPointerFirestore,
+} from "./firestore-tournaments";
 import { getSharedFirestoreDb } from "./firestore-users";
 import type {
   Bracket,
@@ -261,6 +265,126 @@ export async function createBracketParticipantSnapshotFirestore(params: {
   return { ok: true, snapshot };
 }
 
+export async function listBracketsByTournamentIdFirestore(tournamentId: string): Promise<Bracket[]> {
+  assertClientFirestorePersistenceConfigured();
+  const id = tournamentId.trim();
+  if (!id) return [];
+  const db = getSharedFirestoreDb();
+  const q = await db
+    .collection(BRACKETS)
+    .where("tournamentId", "==", id)
+    .orderBy("createdAt", "desc")
+    .get();
+  const out: Bracket[] = [];
+  for (const doc of q.docs) {
+    const b = bracketFromDoc(doc.id, doc.data() as Record<string, unknown>);
+    if (b) out.push(b);
+  }
+  return out;
+}
+
+export async function getBracketByIdFirestore(bracketId: string): Promise<Bracket | null> {
+  assertClientFirestorePersistenceConfigured();
+  const bid = bracketId.trim();
+  if (!bid) return null;
+  const db = getSharedFirestoreDb();
+  const snap = await db.collection(BRACKETS).doc(bid).get();
+  if (!snap.exists) return null;
+  return bracketFromDoc(snap.id, snap.data() as Record<string, unknown>);
+}
+
+function bracketBelongsToScope(
+  b: Bracket,
+  tournamentId: string,
+  zoneScope: string | null,
+  zonesEnabled: boolean,
+): boolean {
+  if (b.tournamentId.trim() !== tournamentId.trim()) return false;
+  if (!zonesEnabled) return true;
+  const bz = typeof b.zoneId === "string" ? b.zoneId.trim() : "";
+  if (zoneScope) return bz === zoneScope;
+  return bz === "";
+}
+
+/**
+ * 대회 문서의 활성 브래킷 포인터(ID)를 우선하고, 없거나 깨졌을 때만 createdAt 최신 문서로 후보를 고른 뒤 포인터를 보정한다.
+ * zonesEnabled이고 zoneScope가 없으면(TV 등) 후보만 고르고 포인터는 자동 보정하지 않는다.
+ */
+export async function resolveActiveBracketDocumentFirestore(
+  tournamentId: string,
+  zoneScope: string | null,
+): Promise<Bracket | null> {
+  const tid = tournamentId.trim();
+  if (!tid) return null;
+
+  const pointers = await getTournamentBracketPointerFieldsFirestore(tid);
+  const zonesEnabled = pointers?.zonesEnabled === true;
+
+  let pointerId: string | null = null;
+  if (pointers) {
+    if (zonesEnabled && zoneScope) {
+      pointerId = pointers.activeBracketByZoneId?.[zoneScope] ?? null;
+    } else if (!zonesEnabled) {
+      pointerId = pointers.activeBracketId ?? null;
+    } else {
+      pointerId = pointers.activeBracketId ?? null;
+    }
+  }
+
+  if (pointerId) {
+    const b = await getBracketByIdFirestore(pointerId);
+    if (b && bracketBelongsToScope(b, tid, zoneScope, zonesEnabled)) {
+      return b;
+    }
+  }
+
+  const list = await listBracketsByTournamentIdFirestore(tid);
+  let picked: Bracket | null = null;
+  if (zonesEnabled && zoneScope) {
+    for (const br of list) {
+      const bz = typeof br.zoneId === "string" ? br.zoneId.trim() : "";
+      if (bz === zoneScope) {
+        picked = br;
+        break;
+      }
+    }
+  } else {
+    picked = list[0] ?? null;
+  }
+
+  if (picked) {
+    if (!zonesEnabled) {
+      await mergeTournamentActiveBracketPointerFirestore({
+        tournamentId: tid,
+        bracketId: picked.id,
+        zonesEnabled: false,
+      });
+    } else if (zoneScope) {
+      await mergeTournamentActiveBracketPointerFirestore({
+        tournamentId: tid,
+        bracketId: picked.id,
+        zonesEnabled: true,
+        zoneId: zoneScope,
+      });
+    }
+  }
+
+  return picked;
+}
+
+export async function getLatestBracketByTournamentIdFirestore(tournamentId: string): Promise<Bracket | null> {
+  return resolveActiveBracketDocumentFirestore(tournamentId.trim(), null);
+}
+
+export async function getLatestBracketByTournamentIdAndZoneIdFirestore(
+  tournamentId: string,
+  zoneId: string,
+): Promise<Bracket | null> {
+  const zid = zoneId.trim();
+  if (!tournamentId.trim() || !zid) return null;
+  return resolveActiveBracketDocumentFirestore(tournamentId.trim(), zid);
+}
+
 export async function createBracketFromSnapshotFirestore(
   snapshotId: string
 ): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
@@ -268,6 +392,22 @@ export async function createBracketFromSnapshotFirestore(
   const snapshot = await getBracketParticipantSnapshotByIdFirestore(snapshotId);
   if (!snapshot) {
     return { ok: false, error: "대상자 스냅샷을 찾을 수 없습니다." };
+  }
+
+  const tournament = await getTournamentByIdFirestore(snapshot.tournamentId);
+  if (!tournament) {
+    return { ok: false, error: "대회를 찾을 수 없습니다." };
+  }
+  const zoneScopeSnap =
+    tournament.zonesEnabled === true && typeof snapshot.zoneId === "string" && snapshot.zoneId.trim() !== ""
+      ? snapshot.zoneId.trim()
+      : null;
+  const existingSnap = await resolveActiveBracketDocumentFirestore(snapshot.tournamentId, zoneScopeSnap);
+  if (
+    existingSnap &&
+    bracketBelongsToScope(existingSnap, snapshot.tournamentId, zoneScopeSnap, tournament.zonesEnabled === true)
+  ) {
+    return { ok: true, bracket: existingSnap };
   }
 
   const pairCount = Math.floor(snapshot.participants.length / 2);
@@ -308,7 +448,14 @@ export async function createBracketFromSnapshotFirestore(
 
   const db = getSharedFirestoreDb();
   await db.collection(BRACKETS).doc(bracket.id).set(bracketToPlain(normalizeBracket(bracket)));
-  return { ok: true, bracket: normalizeBracket(bracket) };
+  const normalizedSnap = normalizeBracket(bracket);
+  await mergeTournamentActiveBracketPointerFirestore({
+    tournamentId: snapshot.tournamentId,
+    bracketId: normalizedSnap.id,
+    zonesEnabled: tournament.zonesEnabled === true,
+    zoneId: zoneScopeSnap ?? undefined,
+  });
+  return { ok: true, bracket: normalizedSnap };
 }
 
 export async function createBracketFromDraftFirestore(params: {
@@ -332,6 +479,18 @@ export async function createBracketFromDraftFirestore(params: {
   }
   if (!Array.isArray(params.matches) || params.matches.length === 0) {
     return { ok: false, error: "확정 저장할 매치가 없습니다." };
+  }
+
+  const zoneScopeDraft =
+    tournament.zonesEnabled === true && typeof snapshot.zoneId === "string" && snapshot.zoneId.trim() !== ""
+      ? snapshot.zoneId.trim()
+      : null;
+  const existingDraft = await resolveActiveBracketDocumentFirestore(params.tournamentId, zoneScopeDraft);
+  if (
+    existingDraft &&
+    bracketBelongsToScope(existingDraft, params.tournamentId, zoneScopeDraft, tournament.zonesEnabled === true)
+  ) {
+    return { ok: true, bracket: existingDraft };
   }
 
   const snapshotParticipants = new Map(snapshot.participants.map((participant) => [participant.userId, participant]));
@@ -385,57 +544,14 @@ export async function createBracketFromDraftFirestore(params: {
 
   const db = getSharedFirestoreDb();
   await db.collection(BRACKETS).doc(bracket.id).set(bracketToPlain(normalizeBracket(bracket)));
-  return { ok: true, bracket: normalizeBracket(bracket) };
-}
-
-export async function listBracketsByTournamentIdFirestore(tournamentId: string): Promise<Bracket[]> {
-  assertClientFirestorePersistenceConfigured();
-  const id = tournamentId.trim();
-  if (!id) return [];
-  const db = getSharedFirestoreDb();
-  const q = await db
-    .collection(BRACKETS)
-    .where("tournamentId", "==", id)
-    .orderBy("createdAt", "desc")
-    .get();
-  const out: Bracket[] = [];
-  for (const doc of q.docs) {
-    const b = bracketFromDoc(doc.id, doc.data() as Record<string, unknown>);
-    if (b) out.push(b);
-  }
-  return out;
-}
-
-export async function getLatestBracketByTournamentIdFirestore(tournamentId: string): Promise<Bracket | null> {
-  assertClientFirestorePersistenceConfigured();
-  const id = tournamentId.trim();
-  if (!id) return null;
-  const db = getSharedFirestoreDb();
-  const q = await db
-    .collection(BRACKETS)
-    .where("tournamentId", "==", id)
-    .orderBy("createdAt", "desc")
-    .limit(1)
-    .get();
-  if (q.empty) return null;
-  const doc = q.docs[0]!;
-  return bracketFromDoc(doc.id, doc.data() as Record<string, unknown>);
-}
-
-export async function getLatestBracketByTournamentIdAndZoneIdFirestore(
-  tournamentId: string,
-  zoneId: string
-): Promise<Bracket | null> {
-  assertClientFirestorePersistenceConfigured();
-  const id = tournamentId.trim();
-  const zid = zoneId.trim();
-  if (!id || !zid) return null;
-  const list = await listBracketsByTournamentIdFirestore(id);
-  for (const b of list) {
-    const z = typeof b.zoneId === "string" ? b.zoneId.trim() : "";
-    if (z === zid) return b;
-  }
-  return null;
+  const normalizedDraft = normalizeBracket(bracket);
+  await mergeTournamentActiveBracketPointerFirestore({
+    tournamentId: params.tournamentId,
+    bracketId: normalizedDraft.id,
+    zonesEnabled: tournament.zonesEnabled === true,
+    zoneId: zoneScopeDraft ?? undefined,
+  });
+  return { ok: true, bracket: normalizedDraft };
 }
 
 async function resolveLatestBracketForMutationFirestore(params: {

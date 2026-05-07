@@ -929,3 +929,65 @@ export async function clearTournamentTvAccessTokenFirestore(
   await db.collection(COLLECTION).doc(tid).set({ tvAccessToken: null }, { merge: true });
   return { ok: true };
 }
+
+const BRACKET_POINTER_FIRESTORE_FIELDS = ["zonesEnabled", "activeBracketId", "activeBracketByZoneId"] as const;
+
+function parseBracketPointerZoneMap(raw: unknown): Record<string, string> | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const m: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const kk = k.trim();
+    if (!kk) continue;
+    if (typeof v === "string" && v.trim() !== "") m[kk] = v.trim();
+  }
+  return Object.keys(m).length > 0 ? m : null;
+}
+
+/** 대진표 조회 전용 — 활성 브래킷 포인터만 select (전체 대회 정규화 없음). */
+export async function getTournamentBracketPointerFieldsFirestore(tournamentId: string): Promise<{
+  zonesEnabled: boolean;
+  activeBracketId: string | null;
+  activeBracketByZoneId: Record<string, string> | null;
+} | null> {
+  assertClientFirestorePersistenceConfigured();
+  const tid = tournamentId.trim();
+  if (!tid) return null;
+  const db = getSharedFirestoreDb();
+  const qSnap = await db
+    .collection(COLLECTION)
+    .where(admin.firestore.FieldPath.documentId(), "==", tid)
+    .limit(1)
+    .select(...BRACKET_POINTER_FIRESTORE_FIELDS)
+    .get();
+  if (qSnap.empty) return null;
+  const snap = qSnap.docs[0]!;
+  const data = snap.data() as Record<string, unknown> | undefined;
+  const zonesEnabled = data?.zonesEnabled === true;
+  const abRaw = data?.activeBracketId;
+  const activeBracketId =
+    typeof abRaw === "string" && abRaw.trim() !== "" ? abRaw.trim() : null;
+  const activeBracketByZoneId = parseBracketPointerZoneMap(data?.activeBracketByZoneId);
+  return { zonesEnabled, activeBracketId, activeBracketByZoneId };
+}
+
+/** 활성 브래킷 문서 ID를 대회 문서에 고정(기존 다른 필드 유지). */
+export async function mergeTournamentActiveBracketPointerFirestore(params: {
+  tournamentId: string;
+  bracketId: string;
+  zonesEnabled: boolean;
+  zoneId?: string | null;
+}): Promise<void> {
+  assertClientFirestorePersistenceConfigured();
+  const tid = params.tournamentId.trim();
+  const bid = params.bracketId.trim();
+  if (!tid || !bid) return;
+  const db = getSharedFirestoreDb();
+  const ref = db.collection(COLLECTION).doc(tid);
+  if (params.zonesEnabled && typeof params.zoneId === "string" && params.zoneId.trim() !== "") {
+    const zid = params.zoneId.trim();
+    await ref.set({ activeBracketByZoneId: { [zid]: bid } }, { merge: true });
+  } else {
+    await ref.set({ activeBracketId: bid }, { merge: true });
+  }
+  revalidatePublicTournamentCache(tid);
+}

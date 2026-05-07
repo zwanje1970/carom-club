@@ -435,6 +435,10 @@ export type Tournament = {
   tvAccessToken?: string | null;
   /** 권역(다중 대진) 운영 사용 여부. 없거나 false면 단일 대진표와 동일 */
   zonesEnabled?: boolean;
+  /** 단일 대진(zonesEnabled 아님) 또는 TV 등 전역 조회용 활성 브래킷 문서 ID */
+  activeBracketId?: string | null;
+  /** 권역별 활성 브래킷 문서 ID (Firestore map과 동기) */
+  activeBracketByZoneId?: Record<string, string> | null;
 };
 
 export type TournamentApplicationStatus =
@@ -2075,6 +2079,24 @@ export function buildTournamentFromParsedRow(raw: unknown, clientOrganizations: 
   const zonesEnabled: boolean | undefined =
     zonesEnabledRaw === true ? true : zonesEnabledRaw === false ? false : undefined;
 
+  const activeBracketIdRaw = t.activeBracketId;
+  const activeBracketId =
+    typeof activeBracketIdRaw === "string" && activeBracketIdRaw.trim() !== ""
+      ? activeBracketIdRaw.trim()
+      : null;
+
+  let activeBracketByZoneId: Record<string, string> | null = null;
+  const abzRaw = t.activeBracketByZoneId;
+  if (abzRaw && typeof abzRaw === "object" && !Array.isArray(abzRaw)) {
+    const m: Record<string, string> = {};
+    for (const [k, v] of Object.entries(abzRaw as Record<string, unknown>)) {
+      const kk = k.trim();
+      if (!kk) continue;
+      if (typeof v === "string" && v.trim() !== "") m[kk] = v.trim();
+    }
+    if (Object.keys(m).length > 0) activeBracketByZoneId = m;
+  }
+
   return {
     id,
     title,
@@ -2105,6 +2127,8 @@ export function buildTournamentFromParsedRow(raw: unknown, clientOrganizations: 
     ...(reminderSentAt ? { reminderSentAt } : {}),
     ...(tvAccessToken ? { tvAccessToken } : {}),
     ...(typeof zonesEnabled === "boolean" ? { zonesEnabled } : {}),
+    ...(activeBracketId ? { activeBracketId } : {}),
+    ...(activeBracketByZoneId ? { activeBracketByZoneId } : {}),
   };
 }
 
