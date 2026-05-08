@@ -501,28 +501,6 @@ export default function TournamentBracketBoardViewPage() {
   const saveStateText =
     saveState === "saving" ? "저장 중..." : saveState === "saved" ? "저장됨" : saveState === "error" ? "오류 발생" : "";
 
-  const renderBracketContextControls = () => (
-    <>
-      {zonesEnabled ? (
-        <select
-          className="v3-btn"
-          value={selectedZoneId}
-          onChange={(e) => setSelectedZoneId(e.target.value)}
-          disabled={zoneOptions.length === 0}
-          style={{ minHeight: 34, fontWeight: 600 }}
-        >
-          {zoneOptions.length === 0 ? <option value="">권역 없음</option> : null}
-          {zoneOptions.map((z) => (
-            <option key={z.id} value={z.id}>
-              {z.zoneName}
-            </option>
-          ))}
-        </select>
-      ) : null}
-      {message ? <span className={`v3-muted ${viewStyles.pageHeaderMessage}`}>{message}</span> : null}
-    </>
-  );
-
   const bracketViewSlicePicker =
     bracket?.bracketMode === "multi_block" && bracket.blocks?.length
       ? {
@@ -553,44 +531,10 @@ export default function TournamentBracketBoardViewPage() {
         height: "100dvh",
         maxHeight: "100dvh",
         overflow: "hidden",
-        background: "#f8fafc",
+        background: "#000000",
         overscrollBehavior: "none",
       }}
     >
-      <header
-        className={viewStyles.pageHeader}
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 90,
-          background: "rgba(255, 255, 255, 0.92)",
-          backdropFilter: "blur(6px)",
-          borderBottom: "1px solid rgba(148,163,184,0.35)",
-          paddingTop: "0.45rem",
-          paddingRight: "0.55rem",
-          paddingBottom: "0.6rem",
-          paddingLeft: "0.55rem",
-          display: "flex",
-          alignItems: "center",
-          gap: "0.55rem",
-          flexWrap: "wrap",
-        }}
-      >
-        <div className={viewStyles.pageHeaderNavChrome} style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
-          <button
-            type="button"
-            className="v3-btn"
-            onClick={() => router.push(`/client/tournaments/${tournamentId}/bracket${bracketZoneQuery}`)}
-          >
-            ← 돌아가기
-          </button>
-          <strong style={{ fontSize: "0.92rem" }}>대진표 보기</strong>
-        </div>
-        {renderBracketContextControls()}
-      </header>
-
       <section
         style={{
           position: "absolute",

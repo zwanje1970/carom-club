@@ -1,26 +1,10 @@
-/* 데스크톱: 기존 페이지 헤더 */
-.pageHeaderMessage {
-  flex-basis: 100%;
-  font-size: 0.78rem;
+/* 대진표 보기(fullscreen): 본문 전역 레이아웃만 — 상단 페이지 헤더는 사용하지 않음 */
+
+.bracketViewMain {
+  height: 100%;
+  min-height: 100%;
+  max-height: 100%;
+  width: 100%;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 모바일: 상단 페이지 헤더 숨김 — 컨트롤은 대진표 보기 툴바·모달 */
-@media (max-width: 767px) {
-  .pageHeader {
-    display: none !important;
-  }
-
-  .bracketViewMain {
-    height: 100%;
-    min-height: 100%;
-    max-height: 100%;
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
+  box-sizing: border-box;
 }
