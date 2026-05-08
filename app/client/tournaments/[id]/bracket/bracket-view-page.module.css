@@ -8,46 +8,23 @@
   white-space: nowrap;
 }
 
-@media (min-width: 768px) {
-  .bracketViewMobileTopChrome {
-    display: none !important;
-  }
-}
-
-/* 모바일: 앱·페이지 상단 헤더 숨김 — 권역·멀티블록·메시지는 상단 고정 바로만 표시 */
+/* 모바일: 상단 페이지 헤더 숨김 — 컨트롤은 대진표 보기 툴바·모달 */
 @media (max-width: 767px) {
   .pageHeader {
     display: none !important;
   }
 
-  .bracketViewMobileTopChrome {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    align-items: center;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 250;
-    padding: max(env(safe-area-inset-top, 0px), 6px) max(env(safe-area-inset-right, 0px), 10px) 8px
-      max(env(safe-area-inset-left, 0px), 10px);
-    background: rgba(248, 250, 252, 0.96);
-    backdrop-filter: blur(8px);
-    border-bottom: 1px solid rgba(148, 163, 184, 0.35);
-    pointer-events: auto;
-    box-sizing: border-box;
-  }
-
   .bracketViewMain {
-    /* inline에서 height 100dvh + safe-area 패딩(box-sizing) — 여기서는 퍼센트 중복 방지 */
     height: 100%;
     min-height: 100%;
     max-height: 100%;
-    padding-top: 0;
-    top: 0;
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
+  }
+
+  /* 풀스크린: 상단 공통 ::after 제외 대신 내부에서 하단 제스처대와 구분 */
+  .bracketViewMain[data-client-bracket-view-fullscreen="1"] {
+    box-shadow: inset 0 -1px 0 rgba(15, 23, 42, 0.08);
   }
 }

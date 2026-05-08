@@ -2866,19 +2866,57 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
 
 /* /client·/platform: 모바일 하단 5탭(.site-home-fab-root)과 본문 겹침 방지 — 스크롤 끝까지 저장 버튼 등 노출 */
 @media (max-width: 767px) {
+  /*
+   * 클라이언트 대시보드(.app-dashboard-mobile-root)에서만 하단 토큰 보강:
+   * Android 등에서 env(safe-area-inset-bottom)=0 인 경우에도 최소 16px 여유.
+   * 공개 /site 는 이 루트가 없어 :root 기존 값 유지.
+   */
+  html:has(.app-dashboard-mobile-root) {
+    --app-dashboard-safe-bottom-effective: max(16px, env(safe-area-inset-bottom, 0px));
+    --site-home-bottom-safe-effective: var(--app-dashboard-safe-bottom-effective);
+    --site-fixed-bottom-nav-layout-height: calc(var(--mobile-bottom-nav-height) + var(--site-home-bottom-safe-effective));
+    --site-bottom-reserve: var(--site-fixed-bottom-nav-layout-height);
+    --site-home-bottom-nav-reserve: var(--site-fixed-bottom-nav-layout-height);
+  }
+
   .app-mobile-bottom-nav-scroll-pad {
     padding-top: max(env(safe-area-inset-top, 0px), 12px);
-    padding-bottom: calc(2.125rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(2.125rem + max(16px, env(safe-area-inset-bottom, 0px)));
   }
 
   /* 상단 크롬 fixed — 본문은 크롬 높이 + 기존 회색 상단 간격만큼 패딩(대진표 전체화면은 아래 :has 규칙으로 제외) */
   .app-dashboard-mobile-root .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
     padding-top: calc(var(--app-dashboard-mobile-chrome-height) + var(--site-shell-gray-padding-top));
-    /* 하단 고정 UI·sticky 툴바·홈 인디케이터와 겹침 완화 — 사이트 하단 네비와 동일 높이 토큰 */
-    padding-bottom: calc(var(--site-fixed-bottom-nav-layout-height) + 0.75rem);
-    /* 좌우 제스처·노치 옆 여백 — 콘텐츠가 시스템 영역으로 침범하지 않도록 */
-    padding-left: max(0.35rem, env(safe-area-inset-left, 0px));
-    padding-right: max(0.35rem, env(safe-area-inset-right, 0px));
+    /* 하단 예약 + 시각적 여유 12px 이상 — 토큰에 이미 최소 safe-bottom 포함 */
+    padding-bottom: calc(var(--site-fixed-bottom-nav-layout-height) + max(12px, 0.75rem));
+    /* 좌우 제스처·노치 — 최소 12px + env */
+    padding-left: max(12px, 0.35rem, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, 0.35rem, env(safe-area-inset-right, 0px));
+  }
+
+  /*
+   * 회색·카드형 본문과 하단 제스처 홈바(밝은 영역) 사이 시각 구분 — 고정 얇은선 + 틴트.
+   * 풀스크린 대진표·신청자 가로 표는 각 화면 내부에서 처리하므로 제외.
+   */
+  .app-dashboard-mobile-root:not(:has([data-client-bracket-view-fullscreen="1"])):not(
+      :has([data-client-applications-table-fullscreen="1"])
+    )::after {
+    content: "";
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 12px);
+    pointer-events: none;
+    z-index: 62;
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 -1px 0 rgba(15, 23, 42, 0.05);
+    background: linear-gradient(
+      to top,
+      rgba(255, 255, 255, 0.82) 0%,
+      rgba(255, 255, 255, 0.42) 45%,
+      rgba(255, 255, 255, 0) 100%
+    );
   }
 
   html:has(.app-dashboard-mobile-root),

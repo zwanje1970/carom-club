@@ -49,31 +49,6 @@ type Bracket = {
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
-const BRACKET_ORIENTATION_CTX = "bracket-view-fullscreen";
-
-function BracketViewOrientationButtons() {
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}>
-      <button
-        type="button"
-        className="v3-btn"
-        style={{ minHeight: 34, fontWeight: 700 }}
-        onClick={() => applyCaromOrientationMode("landscape", `${BRACKET_ORIENTATION_CTX}:button-landscape`)}
-      >
-        가로모드
-      </button>
-      <button
-        type="button"
-        className="v3-btn"
-        style={{ minHeight: 34, fontWeight: 700 }}
-        onClick={() => applyCaromOrientationMode("portrait", `${BRACKET_ORIENTATION_CTX}:button-portrait`)}
-      >
-        세로모드
-      </button>
-    </div>
-  );
-}
-
 export default function TournamentBracketBoardViewPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -488,7 +463,7 @@ export default function TournamentBracketBoardViewPage() {
 
   useEffect(() => {
     return () => {
-      applyCaromOrientationMode("portrait", `${BRACKET_ORIENTATION_CTX}:unmount`);
+      applyCaromOrientationMode("portrait", "bracket-view-fullscreen:unmount");
     };
   }, []);
 
@@ -526,48 +501,8 @@ export default function TournamentBracketBoardViewPage() {
   const saveStateText =
     saveState === "saving" ? "저장 중..." : saveState === "saved" ? "저장됨" : saveState === "error" ? "오류 발생" : "";
 
-  /** 모바일 대진표 보기 상단에 방향 버튼을 항상 두므로 보드 오버레이와 겹치지 않게 여백 유지 */
-  const bracketViewMobileTopOffset = "56px";
-
   const renderBracketContextControls = () => (
     <>
-      {bracket?.bracketMode === "multi_block" && bracket.blocks?.length ? (
-        <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", alignItems: "center" }}>
-          {bracket.blocks.map((bl) => (
-            <button
-              key={bl.id}
-              type="button"
-              className="v3-btn"
-              style={{
-                minHeight: 32,
-                fontSize: "0.82rem",
-                padding: "0.25rem 0.55rem",
-                fontWeight: boardSliceKey === `block:${bl.id}` ? 700 : 600,
-                border: boardSliceKey === `block:${bl.id}` ? "2px solid #2563eb" : undefined,
-              }}
-              onClick={() => setBoardSliceKey(`block:${bl.id}`)}
-            >
-              조 {bl.label ?? bl.id}
-            </button>
-          ))}
-          {bracket.finalBlock?.rounds?.length ? (
-            <button
-              type="button"
-              className="v3-btn"
-              style={{
-                minHeight: 32,
-                fontSize: "0.82rem",
-                padding: "0.25rem 0.55rem",
-                fontWeight: boardSliceKey === "final" ? 700 : 600,
-                border: boardSliceKey === "final" ? "2px solid #2563eb" : undefined,
-              }}
-              onClick={() => setBoardSliceKey("final")}
-            >
-              결선
-            </button>
-          ) : null}
-        </div>
-      ) : null}
       {zonesEnabled ? (
         <select
           className="v3-btn"
@@ -588,6 +523,24 @@ export default function TournamentBracketBoardViewPage() {
     </>
   );
 
+  const bracketViewSlicePicker =
+    bracket?.bracketMode === "multi_block" && bracket.blocks?.length
+      ? {
+          blocks: bracket.blocks.map((bl) => ({ id: bl.id, label: bl.label })),
+          hasFinal: Boolean(bracket.finalBlock?.rounds?.length),
+          boardSliceKey,
+          onSliceChange: setBoardSliceKey,
+        }
+      : null;
+
+  const bracketViewZones = zonesEnabled
+    ? {
+        options: zoneOptions,
+        selectedId: selectedZoneId,
+        onChange: setSelectedZoneId,
+      }
+    : null;
+
   return (
     <main
       className={viewStyles.bracketViewMain}
@@ -599,14 +552,17 @@ export default function TournamentBracketBoardViewPage() {
         width: "100%",
         height: "100dvh",
         maxHeight: "100dvh",
-        paddingTop: "env(safe-area-inset-top, 0px)",
-        paddingRight: "env(safe-area-inset-right, 0px)",
-        paddingBottom: "env(safe-area-inset-bottom, 0px)",
-        paddingLeft: "env(safe-area-inset-left, 0px)",
+        ["--bv-safe-top" as string]: "calc(env(safe-area-inset-top, 0px) + 12px)",
+        ["--bv-safe-bottom" as string]: "calc(max(16px, env(safe-area-inset-bottom, 0px)) + 16px)",
+        ["--bv-safe-left" as string]: "calc(env(safe-area-inset-left, 0px) + 12px)",
+        ["--bv-safe-right" as string]: "calc(env(safe-area-inset-right, 0px) + 12px)",
+        paddingTop: "var(--bv-safe-top)",
+        paddingBottom: "var(--bv-safe-bottom)",
+        paddingLeft: "var(--bv-safe-left)",
+        paddingRight: "var(--bv-safe-right)",
         overflow: "hidden",
         background: "#f8fafc",
         overscrollBehavior: "none",
-        ["--bracket-view-mobile-top-offset" as string]: bracketViewMobileTopOffset,
       }}
     >
       <header
@@ -630,17 +586,6 @@ export default function TournamentBracketBoardViewPage() {
           flexWrap: "wrap",
         }}
       >
-        <div
-          style={{
-            flexBasis: "100%",
-            width: "100%",
-            paddingBottom: "0.4rem",
-            marginBottom: "0.15rem",
-            borderBottom: "1px solid rgba(148,163,184,0.28)",
-          }}
-        >
-          <BracketViewOrientationButtons />
-        </div>
         <div className={viewStyles.pageHeaderNavChrome} style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
           <button
             type="button"
@@ -653,11 +598,6 @@ export default function TournamentBracketBoardViewPage() {
         </div>
         {renderBracketContextControls()}
       </header>
-
-      <div className={viewStyles.bracketViewMobileTopChrome} aria-label="대진표 보기 옵션">
-        <BracketViewOrientationButtons />
-        {renderBracketContextControls()}
-      </div>
 
       <section
         style={{
@@ -706,6 +646,9 @@ export default function TournamentBracketBoardViewPage() {
             canUndo={false}
             saveStateText={saveStateText}
             chromeMode="bracketView"
+            bracketViewSlicePicker={bracketViewSlicePicker}
+            bracketViewZones={bracketViewZones}
+            bracketViewNotice={message}
             onExit={handleExit}
             onPickWinner={handlePickWinner}
             onClearMatchWinner={handleClearMatchWinner}

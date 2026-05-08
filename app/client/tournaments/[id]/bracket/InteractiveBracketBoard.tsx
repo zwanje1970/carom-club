@@ -2,6 +2,7 @@
 
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { applyCaromOrientationMode } from "../../../native-fullscreen-orientation-lock";
 import styles from "./interactive-bracket-board.module.css";
 import {
   calculateLayout,
@@ -647,6 +648,9 @@ export default function InteractiveBracketBoard({
   onUndo,
   saveStateText = "",
   chromeMode = "default",
+  bracketViewSlicePicker = null,
+  bracketViewZones = null,
+  bracketViewNotice = "",
   onExit,
 }: {
   bracket: BracketBoardInput;
@@ -655,6 +659,21 @@ export default function InteractiveBracketBoard({
   tournamentLocation?: string;
   /** bracket/view 전용: 모바일에서 헤더·양쪽형 등 간소화 */
   chromeMode?: "default" | "bracketView";
+  /** 분할 대진표: 조·결선 선택 — 상단 노출 대신 툴바 모달 */
+  bracketViewSlicePicker?: {
+    blocks: Array<{ id: string; label?: string | null }>;
+    hasFinal: boolean;
+    boardSliceKey: string | null;
+    onSliceChange: (sliceKey: string | null) => void;
+  } | null;
+  /** 권역 대회: 툴바에서 권역 선택 모달 */
+  bracketViewZones?: {
+    options: Array<{ id: string; zoneName: string }>;
+    selectedId: string;
+    onChange: (zoneId: string) => void;
+  } | null;
+  /** 모바일 등 헤더 없을 때 상태 메시지 */
+  bracketViewNotice?: string;
   /** 모바일 툴바 나가기 (이동은 부모 handleExit에서 처리) */
   onExit?: () => void;
   onPickWinner?: (args: { matchId: string; winnerUserId: string; roundNumber: number }) => void | Promise<void>;
@@ -712,6 +731,7 @@ export default function InteractiveBracketBoard({
   /** 모바일 대진표 보기: 툴바 접기(기본 접힘) */
   const [mobileToolbarExpanded, setMobileToolbarExpanded] = useState(false);
   const [isMobileBracketViewLayout, setIsMobileBracketViewLayout] = useState(false);
+  const [bracketViewModal, setBracketViewModal] = useState<null | "slice" | "zone">(null);
 
   useLayoutEffect(() => {
     if (typeof window === "undefined" || chromeMode !== "bracketView") {
@@ -1474,6 +1494,33 @@ export default function InteractiveBracketBoard({
                 : styles.bracketFloatingToolbarInner
             }
           >
+            {chromeMode === "bracketView" ? (
+              <>
+                <button
+                  type="button"
+                  className={`${styles.toolbarButton} ${styles.toolbarBracketViewWideBtn}`}
+                  title="기기 가로모드"
+                  aria-label="기기 가로모드"
+                  onClick={() =>
+                    applyCaromOrientationMode("landscape", "bracket-view-fullscreen:toolbar-landscape")
+                  }
+                >
+                  가로모드
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.toolbarButton} ${styles.toolbarBracketViewWideBtn}`}
+                  title="기기 세로모드"
+                  aria-label="기기 세로모드"
+                  onClick={() =>
+                    applyCaromOrientationMode("portrait", "bracket-view-fullscreen:toolbar-portrait")
+                  }
+                >
+                  세로모드
+                </button>
+                <hr className={styles.toolbarDivider} aria-hidden />
+              </>
+            ) : null}
             {chromeMode === "bracketView" && onExit ? (
               <button
                 type="button"
@@ -1484,6 +1531,31 @@ export default function InteractiveBracketBoard({
               >
                 ←
               </button>
+            ) : null}
+            {chromeMode === "bracketView" && bracketViewSlicePicker ? (
+              <button
+                type="button"
+                className={`${styles.toolbarButton} ${styles.toolbarBracketViewWideBtn}`}
+                title="조 선택"
+                aria-label="조 선택"
+                onClick={() => setBracketViewModal("slice")}
+              >
+                조 선택
+              </button>
+            ) : null}
+            {chromeMode === "bracketView" && bracketViewZones ? (
+              <button
+                type="button"
+                className={`${styles.toolbarButton} ${styles.toolbarBracketViewWideBtn}`}
+                title="권역 선택"
+                aria-label="권역 선택"
+                onClick={() => setBracketViewModal("zone")}
+              >
+                권역
+              </button>
+            ) : null}
+            {chromeMode === "bracketView" && (bracketViewSlicePicker || bracketViewZones) ? (
+              <hr className={styles.toolbarDivider} aria-hidden />
             ) : null}
             <button
               type="button"
@@ -1588,6 +1660,115 @@ export default function InteractiveBracketBoard({
           </div>
         )}
       </div>
+
+      {chromeMode === "bracketView" && bracketViewNotice.trim() ? (
+        <div className={styles.bracketViewNoticeBar} role="status">
+          {bracketViewNotice}
+        </div>
+      ) : null}
+
+      {chromeMode === "bracketView" && bracketViewModal === "slice" && bracketViewSlicePicker ? (
+        <div
+          className={styles.bracketViewModalBackdrop}
+          role="presentation"
+          onClick={() => setBracketViewModal(null)}
+        >
+          <div
+            className={styles.bracketViewModalPanel}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bracket-view-slice-modal-title"
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <p id="bracket-view-slice-modal-title" className={styles.bracketViewModalTitle}>
+              조 선택
+            </p>
+            <div className={styles.bracketViewModalActions}>
+              {bracketViewSlicePicker.blocks.map((bl) => {
+                const key = `block:${bl.id}`;
+                const active = bracketViewSlicePicker.boardSliceKey === key;
+                return (
+                  <button
+                    key={bl.id}
+                    type="button"
+                    className={`${styles.bracketViewModalBtn} ${active ? styles.bracketViewModalBtnActive : ""}`}
+                    onClick={() => {
+                      bracketViewSlicePicker.onSliceChange(key);
+                      setBracketViewModal(null);
+                    }}
+                  >
+                    조 {bl.label ?? bl.id}
+                  </button>
+                );
+              })}
+              {bracketViewSlicePicker.hasFinal ? (
+                <button
+                  type="button"
+                  className={`${styles.bracketViewModalBtn} ${
+                    bracketViewSlicePicker.boardSliceKey === "final" ? styles.bracketViewModalBtnActive : ""
+                  }`}
+                  onClick={() => {
+                    bracketViewSlicePicker.onSliceChange("final");
+                    setBracketViewModal(null);
+                  }}
+                >
+                  결선
+                </button>
+              ) : null}
+            </div>
+            <button type="button" className={styles.bracketViewModalDismiss} onClick={() => setBracketViewModal(null)}>
+              닫기
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {chromeMode === "bracketView" && bracketViewModal === "zone" && bracketViewZones ? (
+        <div
+          className={styles.bracketViewModalBackdrop}
+          role="presentation"
+          onClick={() => setBracketViewModal(null)}
+        >
+          <div
+            className={styles.bracketViewModalPanel}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bracket-view-zone-modal-title"
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <p id="bracket-view-zone-modal-title" className={styles.bracketViewModalTitle}>
+              권역 선택
+            </p>
+            <div className={styles.bracketViewModalActions}>
+              {bracketViewZones.options.length === 0 ? (
+                <p className={styles.bracketViewModalEmpty}>등록된 권역이 없습니다.</p>
+              ) : (
+                bracketViewZones.options.map((z) => {
+                  const active = bracketViewZones.selectedId === z.id;
+                  return (
+                    <button
+                      key={z.id}
+                      type="button"
+                      className={`${styles.bracketViewModalBtn} ${active ? styles.bracketViewModalBtnActive : ""}`}
+                      onClick={() => {
+                        bracketViewZones.onChange(z.id);
+                        setBracketViewModal(null);
+                      }}
+                    >
+                      {z.zoneName}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+            <button type="button" className={styles.bracketViewModalDismiss} onClick={() => setBracketViewModal(null)}>
+              닫기
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div
         ref={viewportRef}
