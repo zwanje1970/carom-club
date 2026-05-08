@@ -6,6 +6,7 @@ import android.app.DownloadManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
@@ -463,5 +464,27 @@ class CaromAppBridge(
         activity.runOnUiThread {
             activity.finish()
         }
+    }
+
+    @JavascriptInterface
+    fun requestOrientation(mode: String) {
+        activity.runOnUiThread {
+            activity.requestedOrientation =
+                if (mode == "landscape") {
+                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                } else {
+                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                }
+        }
+    }
+
+    @JavascriptInterface
+    fun requestLandscape() {
+        requestOrientation("landscape")
+    }
+
+    @JavascriptInterface
+    fun requestPortrait() {
+        requestOrientation("portrait")
     }
 }

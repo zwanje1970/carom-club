@@ -7,6 +7,7 @@ import type { TournamentApplicationListItem, TournamentStatusBadge } from "../..
 import type { TournamentEntryQualificationType } from "../../../../lib/tournament-rule-types";
 import ParticipantListRow from "./participants/ParticipantListRow";
 import ParticipantAddSheet from "./participants/ParticipantAddSheet";
+import ApplicationsTableOrientationLock from "./participants/ApplicationsTableOrientationLock";
 
 export type ParticipantCountSummary = {
   total: number;
@@ -330,6 +331,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
           : "client-tournament-manage__participantsBlock client-tournament-manage__applicationsCompactHeader client-tournament-manage__applicationsRoot"
       }
     >
+      {fullscreenTable ? <ApplicationsTableOrientationLock /> : null}
       <div className="client-tournament-manage__applicationsHeaderZone">
         {fullscreenTable ? (
           <div className="client-tournament-manage__fullscreenTableHead">

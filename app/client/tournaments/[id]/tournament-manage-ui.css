@@ -823,7 +823,8 @@
 /* 컬럼 경계: 매우 연한 세로선(헤더·본문·버튼 열 동일) — 마지막 열 제외 */
 .client-tournament-manage .client-tournament-manage__participantTable--applicationsCompact thead th:not(:last-child),
 .client-tournament-manage .client-tournament-manage__participantTable--applicationsCompact tbody td:not(:last-child) {
-  border-right: 1px solid #eceff4;
+  border-right: 1px solid #d8dee8;
+  box-shadow: inset -1px 0 0 #d8dee8;
 }
 
 .client-tournament-manage .client-tournament-manage__participantTable--applicationsCompact thead th {
@@ -1089,11 +1090,11 @@
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
 }
 
-/* 가로보기 전용 표: 뷰포트 폭에 맞춤(억지 min-width 제거), 앞쪽 열 최소 폭 */
+/* 가로보기 전용 표: landscape 기준 폭을 확보해 10열을 세로폭에 억지 압축하지 않음 */
 .client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide {
-  width: 100% !important;
-  min-width: 100% !important;
-  max-width: 100% !important;
+  width: max(100%, 820px) !important;
+  min-width: 820px !important;
+  max-width: none !important;
 }
 
 .client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide .participant-th--name,

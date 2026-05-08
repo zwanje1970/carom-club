@@ -509,6 +509,13 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     const isMainScrollDevDiag = process.env.NODE_ENV === "development";
     let devDiagLastLogMs = 0;
     let devDiagLastPxPerSec = -1;
+    const readViewportLeadInPaddingTop = () => {
+      if (!isMainScrollDevDiag) return 0;
+      const v = viewportRef.current;
+      if (!v) return 0;
+      const pt = Number.parseFloat(window.getComputedStyle(v).paddingTop || "0");
+      return Number.isFinite(pt) && pt > 0 ? pt : 0;
+    };
 
     const stopAutoSlide = () => {
       if (rafRef.current !== null) {
@@ -579,7 +586,9 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       const dtSec = Math.max(0, (frameTime - prevTime) / 1000);
       lastFrameTimeRef.current = frameTime;
 
-      const firstStart = primarySegmentRef.current?.offsetTop ?? 0;
+      const trackStart = trackRef.current?.offsetTop ?? 0;
+      const primaryOffset = primarySegmentRef.current?.offsetTop ?? 0;
+      const firstStart = trackStart + primaryOffset;
       const clientH = node.clientHeight;
       let pxPerSec = fallbackPxPerSec;
       let speedSource: "viewport" | "fallback" = "fallback";
@@ -591,20 +600,31 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
         pxPerSec = fallbackPxPerSec;
         speedSource = "fallback";
       }
-      const secondStart = secondarySegmentRef.current?.offsetTop ?? 0;
+      const secondaryOffset = secondarySegmentRef.current?.offsetTop ?? 0;
+      const secondStart = trackStart + secondaryOffset;
       const hasOffsetLoopWindow = secondStart > firstStart;
       const loopDistance = hasOffsetLoopWindow
         ? secondStart - firstStart
         : segmentHeight > 0
           ? segmentHeight
           : Math.max(maxScrollTop, 1);
-      const loopEnd = hasOffsetLoopWindow ? secondStart : loopDistance;
+      const loopEnd = hasOffsetLoopWindow ? secondStart : firstStart + loopDistance;
       const carryBefore = scrollPixelCarryRef.current;
       const deltaTotal = pxPerSec * dtSec + carryBefore;
       scrollPixelCarryRef.current = deltaTotal % 1;
       let nextScrollTop = node.scrollTop + deltaTotal;
+      const nextScrollTopBeforeWrap = nextScrollTop;
+      let wrappedCount = 0;
       while (nextScrollTop >= loopEnd && loopDistance > 0) {
         nextScrollTop -= loopDistance;
+        wrappedCount += 1;
+      }
+      /**
+       * 루프 보정 후 좌표가 상단 리드인(spacer)으로 떨어지지 않도록
+       * 카드 세그먼트 시작점 이상으로 고정.
+       */
+      if (loopDistance > 0 && nextScrollTop < firstStart) {
+        nextScrollTop = firstStart + ((nextScrollTop - firstStart) % loopDistance + loopDistance) % loopDistance;
       }
 
       const scrollTopBefore = node.scrollTop;
@@ -628,6 +648,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
             speedLevel,
             baseTravelSec,
             clientH,
+            viewportPaddingTop: readViewportLeadInPaddingTop(),
             pxPerSec,
             speedSource,
             usingFallback24: speedSource === "fallback",
@@ -636,10 +657,21 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
             carryBefore,
             carryAfter: scrollPixelCarryRef.current,
             scrollTopBefore,
+            nextScrollTopBeforeWrap,
+            nextScrollTop,
             appliedScrollTop,
             scrollTopReadBack,
             scrollMismatch,
+            wrappedCount,
+            loopDistance,
+            loopEnd,
+            primarySegmentOffsetTop: primaryOffset,
+            secondarySegmentOffsetTop: secondaryOffset,
+            trackOffsetTop: trackStart,
+            firstStart,
+            secondStart,
             segmentHeight,
+            scrollHeight: node.scrollHeight,
             maxScrollTop,
           });
         }
