@@ -40,6 +40,24 @@ function bracketSlotLabel(p: { name: string; displayName?: string | null }): str
   return d || p.name;
 }
 
+/** 대진표 보기 툴바: 가로 전환 안내(폰이 가로로 누운 형태) */
+function BracketToolbarPhoneLandscapeGlyph(props: { className?: string }) {
+  return (
+    <svg width={18} height={18} viewBox="0 0 24 24" aria-hidden {...props}>
+      <rect x="2" y="8" width="20" height="8" rx="1.75" fill="none" stroke="currentColor" strokeWidth="1.75" />
+    </svg>
+  );
+}
+
+/** 대진표 보기 툴바: 세로 전환 안내(폰이 세로로 선 형태) */
+function BracketToolbarPhonePortraitGlyph(props: { className?: string }) {
+  return (
+    <svg width={18} height={18} viewBox="0 0 24 24" aria-hidden {...props}>
+      <rect x="8" y="2" width="8" height="20" rx="1.75" fill="none" stroke="currentColor" strokeWidth="1.75" />
+    </svg>
+  );
+}
+
 function cloneBracketBoardForLayout(b: BracketBoardInput): BracketBoardInput {
   return {
     ...b,
@@ -732,6 +750,22 @@ export default function InteractiveBracketBoard({
   const [mobileToolbarExpanded, setMobileToolbarExpanded] = useState(false);
   const [isMobileBracketViewLayout, setIsMobileBracketViewLayout] = useState(false);
   const [bracketViewModal, setBracketViewModal] = useState<null | "slice" | "zone">(null);
+  const [toolbarLayoutIsLandscape, setToolbarLayoutIsLandscape] = useState(false);
+
+  useLayoutEffect(() => {
+    if (typeof window === "undefined" || chromeMode !== "bracketView") {
+      return;
+    }
+    const sync = () => setToolbarLayoutIsLandscape(window.matchMedia("(orientation: landscape)").matches);
+    sync();
+    const mq = window.matchMedia("(orientation: landscape)");
+    mq.addEventListener("change", sync);
+    window.addEventListener("resize", sync);
+    return () => {
+      mq.removeEventListener("change", sync);
+      window.removeEventListener("resize", sync);
+    };
+  }, [chromeMode]);
 
   useLayoutEffect(() => {
     if (typeof window === "undefined" || chromeMode !== "bracketView") {
@@ -1498,25 +1532,20 @@ export default function InteractiveBracketBoard({
               <>
                 <button
                   type="button"
-                  className={`${styles.toolbarButton} ${styles.toolbarBracketViewWideBtn}`}
-                  title="기기 가로모드"
-                  aria-label="기기 가로모드"
+                  className={`${styles.toolbarButton} ${styles.toolbarBracketViewWideBtn} ${styles.toolbarBracketViewGlyphBtn}`}
+                  title={toolbarLayoutIsLandscape ? "기기 세로모드" : "기기 가로모드"}
+                  aria-label={toolbarLayoutIsLandscape ? "기기 세로모드" : "기기 가로모드"}
                   onClick={() =>
-                    applyCaromOrientationMode("landscape", "bracket-view-fullscreen:toolbar-landscape")
+                    toolbarLayoutIsLandscape
+                      ? applyCaromOrientationMode("portrait", "bracket-view-fullscreen:toolbar-portrait")
+                      : applyCaromOrientationMode("landscape", "bracket-view-fullscreen:toolbar-landscape")
                   }
                 >
-                  가로모드
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.toolbarButton} ${styles.toolbarBracketViewWideBtn}`}
-                  title="기기 세로모드"
-                  aria-label="기기 세로모드"
-                  onClick={() =>
-                    applyCaromOrientationMode("portrait", "bracket-view-fullscreen:toolbar-portrait")
-                  }
-                >
-                  세로모드
+                  {toolbarLayoutIsLandscape ? (
+                    <BracketToolbarPhonePortraitGlyph className={styles.bracketToolbarPhoneSvg} />
+                  ) : (
+                    <BracketToolbarPhoneLandscapeGlyph className={styles.bracketToolbarPhoneSvg} />
+                  )}
                 </button>
                 <hr className={styles.toolbarDivider} aria-hidden />
               </>
@@ -1535,12 +1564,12 @@ export default function InteractiveBracketBoard({
             {chromeMode === "bracketView" && bracketViewSlicePicker ? (
               <button
                 type="button"
-                className={`${styles.toolbarButton} ${styles.toolbarBracketViewWideBtn}`}
+                className={`${styles.toolbarButton} ${styles.toolbarBracketViewWideBtn} ${styles.toolbarBracketViewGlyphBtn}`}
                 title="조 선택"
                 aria-label="조 선택"
                 onClick={() => setBracketViewModal("slice")}
               >
-                조 선택
+                ▦
               </button>
             ) : null}
             {chromeMode === "bracketView" && bracketViewZones ? (

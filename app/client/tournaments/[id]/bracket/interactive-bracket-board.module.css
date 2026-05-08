@@ -79,6 +79,21 @@
   white-space: normal;
 }
 
+/* bracket/view: 가로·세로·조선택 아이콘 버튼 정렬 */
+.toolbarBracketViewGlyphBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  line-height: 1;
+  font-size: 15px !important;
+}
+
+.bracketToolbarPhoneSvg {
+  display: block;
+  flex-shrink: 0;
+}
+
 .bracketViewNoticeBar {
   position: absolute;
   left: 8px;
