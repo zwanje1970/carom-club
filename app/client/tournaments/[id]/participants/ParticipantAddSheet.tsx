@@ -91,7 +91,8 @@ export default function ParticipantAddSheet({ tournamentId }: { tournamentId: st
               background: "#fff",
               borderTopLeftRadius: "0.75rem",
               borderTopRightRadius: "0.75rem",
-              padding: "1rem max(1rem, env(safe-area-inset-right)) calc(1rem + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left))",
+              padding:
+                "1rem max(1rem, env(safe-area-inset-right, 0px)) max(1rem, var(--client-bottom-space, calc(24px + env(safe-area-inset-bottom, 0px)))) max(1rem, env(safe-area-inset-left, 0px))",
               gap: "0.65rem",
               maxHeight: "88vh",
               overflowY: "auto",

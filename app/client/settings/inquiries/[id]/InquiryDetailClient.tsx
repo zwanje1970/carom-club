@@ -333,6 +333,7 @@ export default function InquiryDetailClient() {
         </div>
       ) : row ? (
         <InquiryComposerShell
+          clientDashboardComposerSafeArea
           scroll={
             <div style={{ padding: "1rem", paddingBottom: "0.5rem" }}>
               <section className="v3-box v3-stack" style={{ gap: "0.5rem", padding: "1rem" }}>

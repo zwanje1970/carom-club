@@ -10,7 +10,8 @@
   padding-top: max(0.5rem, env(safe-area-inset-top));
   padding-left: max(0.75rem, env(safe-area-inset-left));
   padding-right: max(0.75rem, env(safe-area-inset-right));
-  padding-bottom: max(6.75rem, calc(6.75rem + env(safe-area-inset-bottom)));
+  /* 하단 제스처 여유는 `.app-mobile-bottom-nav-scroll-pad` 공통 스크롤 패딩으로만 처리 */
+  padding-bottom: var(--tm-gap);
   background: var(--tm-page-bg);
   min-height: 100%;
 }
@@ -292,7 +293,7 @@
   border-radius: 10px;
   overflow: hidden;
   background: #f8fafc;
-  padding-bottom: calc(0.35rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: var(--client-bottom-space, calc(0.35rem + env(safe-area-inset-bottom, 0px)));
 }
 
 /* 신청자 관리: 상단 운영 버튼 — 줄바꿈 허용(가로보기 추가 등) */
@@ -698,12 +699,11 @@
 .client-tournament-manage.client-tournament-manage--participants-subpage {
   min-height: 100%;
   box-sizing: border-box;
-  /* 마지막 행·버튼이 모바일 하단 내비/홈 인디케이터에 가리지 않도록 */
-  padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: var(--tm-gap);
 }
 
 .client-tournament-manage.client-tournament-manage--participants-subpage .client-tournament-manage__participantTableShell {
-  padding-bottom: calc(1.35rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: var(--client-bottom-space, calc(1.35rem + env(safe-area-inset-bottom, 0px)));
 }
 
 /* 신청자 관리: 상단 고정 + 표 영역만 세로 스크롤 */
@@ -712,13 +712,12 @@
   flex-direction: column;
   min-height: 100dvh;
   min-height: 100svh;
-  /* 본문·스크롤이 화면 하단까지 이어지도록 — 하단 safe-area는 표 스크롤 안쪽만 사용 */
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: 0;
 }
 
 /* 일반 신청자 관리: 서브페이지 공통 하단 여백(내비) 덮어써서 스크롤 영역이 끊기지 않게 */
 .client-tournament-manage.client-tournament-manage--participants-subpage.client-tournament-manage--participants-subpage--appsLayout {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: 0;
 }
 
 .client-tournament-manage.client-tournament-manage--participants-subpage.client-tournament-manage--participants-subpage--appsLayout
@@ -820,8 +819,8 @@
   min-height: 0;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
-  /* 마지막 행이 홈 제스처에 가리지 않도록 — 스크롤 콘텐츠 하단에만 safe-area */
-  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  padding-bottom: var(--client-bottom-space, max(0.5rem, env(safe-area-inset-bottom, 0px)));
+  scroll-padding-bottom: var(--client-bottom-space, max(0.5rem, env(safe-area-inset-bottom, 0px)));
 }
 
 .client-tournament-manage .client-tournament-manage__participantTable--applicationsCompact {
@@ -1103,12 +1102,20 @@
 }
 
 .client-tournament-manage .client-tournament-manage__participantTableShell--fullscreenScroll .client-tournament-manage__applicationsTableInner {
-  padding-bottom: max(0.5rem, max(16px, env(safe-area-inset-bottom, 0px)));
+  padding-bottom: var(--client-bottom-space, max(0.5rem, max(16px, env(safe-area-inset-bottom, 0px))));
+  scroll-padding-bottom: var(--client-bottom-space, max(0.5rem, max(16px, env(safe-area-inset-bottom, 0px))));
 }
 
 @media (orientation: landscape) {
   .client-tournament-manage .client-tournament-manage__participantTableShell--fullscreenScroll .client-tournament-manage__applicationsTableInner {
-    padding-bottom: max(0.75rem, calc(max(16px, env(safe-area-inset-bottom, 0px)) + 0.75rem));
+    padding-bottom: var(
+      --client-bottom-space,
+      max(0.75rem, calc(max(16px, env(safe-area-inset-bottom, 0px)) + 0.75rem))
+    );
+    scroll-padding-bottom: var(
+      --client-bottom-space,
+      max(0.75rem, calc(max(16px, env(safe-area-inset-bottom, 0px)) + 0.75rem))
+    );
   }
 }
 

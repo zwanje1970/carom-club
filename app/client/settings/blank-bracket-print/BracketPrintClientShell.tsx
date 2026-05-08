@@ -810,7 +810,8 @@ export function BracketPrintClientShell({
           min-height: 0;
           overflow: auto;
           display: block;
-          padding: 0 max(16px, env(safe-area-inset-left, 0px)) calc(env(safe-area-inset-bottom, 0px) + 16px) max(16px, env(safe-area-inset-right, 0px));
+          padding: 0 max(16px, env(safe-area-inset-left, 0px)) max(16px, var(--client-bottom-space, calc(env(safe-area-inset-bottom, 0px) + 16px))) max(16px, env(safe-area-inset-right, 0px));
+          scroll-padding-bottom: max(16px, var(--client-bottom-space, calc(env(safe-area-inset-bottom, 0px) + 16px)));
           box-sizing: border-box;
           touch-action: auto;
           -webkit-overflow-scrolling: touch;
@@ -1086,7 +1087,8 @@ export function BracketPrintClientShell({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                padding: "max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))",
+                padding:
+                  "max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, var(--client-bottom-space, calc(16px + env(safe-area-inset-bottom, 0px)))) max(16px, env(safe-area-inset-left, 0px))",
                 boxSizing: "border-box",
               }}
             >

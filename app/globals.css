@@ -2864,44 +2864,54 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   }
 }
 
-/* /client·/platform: 모바일 하단 5탭(.site-home-fab-root)과 본문 겹침 방지 — 스크롤 끝까지 저장 버튼 등 노출 */
+/* /client 모바일: 하단 제스처 영역 — 공통 토큰만 사용(공개 /site·번들 분리: .app-dashboard-mobile-root 없음) */
 @media (max-width: 767px) {
   /*
-   * 클라이언트 대시보드: 화면 전체를 쓰되, 스크롤 끝에서 마지막 콘텐츠를 제스처 위로 끌어올릴 수 있게
-   * 하단에 safe-area + FAB 예약 + 여백을 padding으로만 둔다(콘텐츠 클리핑 없음). 공개 /site 에는 .app-dashboard-mobile-root 없음.
+   * 클라이언트 대시보드(/client): 본문 스크롤 끝에서 마지막 콘텐츠를 제스처 위로 끌어올릴 하단 여유.
+   * --client-safe-bottom: 하단 고정 UI의 bottom 오프셋 / --client-bottom-space: 스크롤 패딩·내부 스크롤러 하단
    */
-  html:has(.app-dashboard-mobile-root) {
-    --app-dashboard-scroll-pad-bottom: calc(
-      max(16px, env(safe-area-inset-bottom, 0px)) + var(--mobile-bottom-nav-height) + 16px
-    );
+  html:has(.app-dashboard-mobile-root[data-dashboard-mobile-area="client"]) {
+    --client-safe-bottom: max(24px, env(safe-area-inset-bottom, 0px));
+    --client-bottom-space: calc(24px + env(safe-area-inset-bottom, 0px));
+    scroll-padding-bottom: var(--client-bottom-space);
   }
 
-  .app-mobile-bottom-nav-scroll-pad {
-    padding-top: max(env(safe-area-inset-top, 0px), 12px);
-    padding-bottom: var(
-      --app-dashboard-scroll-pad-bottom,
-      calc(max(16px, env(safe-area-inset-bottom, 0px)) + var(--mobile-bottom-nav-height) + 16px)
-    );
-  }
-
-  /* 상단 크롬 fixed — 본문은 크롬 높이 + 회색 간격만큼 패딩 */
-  .app-dashboard-mobile-root .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
+  /* 상단 크롬 fixed — 본문은 크롬 높이 + 회색 간격 + 하단 공통 스크롤 여유 */
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]
+    .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
     padding-top: calc(var(--app-dashboard-mobile-chrome-height) + var(--site-shell-gray-padding-top));
-    padding-bottom: var(
-      --app-dashboard-scroll-pad-bottom,
-      calc(max(16px, env(safe-area-inset-bottom, 0px)) + var(--mobile-bottom-nav-height) + 16px)
-    );
+    padding-bottom: var(--client-bottom-space);
+    scroll-padding-bottom: var(--client-bottom-space);
     padding-left: max(12px, env(safe-area-inset-left, 0px));
     padding-right: max(12px, env(safe-area-inset-right, 0px));
   }
 
-  html:has(.app-dashboard-mobile-root),
-  body:has(.app-dashboard-mobile-root) {
+  html:has(.app-dashboard-mobile-root[data-dashboard-mobile-area="client"]),
+  body:has(.app-dashboard-mobile-root[data-dashboard-mobile-area="client"]) {
     background-color: var(--ui-bg-page);
+  }
+
+  /* 모바일 클라이언트: 하단 sticky/고정 바를 제스처 위로(PC는 아래 기본 bottom:0 유지) */
+  html:has(.app-dashboard-mobile-root[data-dashboard-mobile-area="client"]) .client-dashboard-fixed-bottom {
+    bottom: var(--client-safe-bottom) !important;
+  }
+
+  /* 문의 상세: 스크롤 끝·하단 입력줄 — InquiryComposerShell(clientDashboardComposerSafeArea) */
+  html:has(.app-dashboard-mobile-root[data-dashboard-mobile-area="client"]) .client-dashboard-inquiry-composer-scroll {
+    scroll-padding-bottom: var(--client-bottom-space);
+  }
+
+  html:has(.app-dashboard-mobile-root[data-dashboard-mobile-area="client"]) .client-dashboard-inquiry-composer-footer {
+    padding-bottom: max(0.65rem, var(--client-bottom-space)) !important;
   }
 }
 
-/* /client·/platform: 본문 루트 — 메인(스와이프 패널·body)과 동일 페이지 배경 */
+/* 정산 등 sticky 하단 앵커 — 데스크톱 기본값(PC 레이아웃 유지) */
+.client-dashboard-fixed-bottom {
+  bottom: 0;
+}
+
+/* /client 본문 루트 — 메인(스와이프 패널·body)과 동일 페이지 배경 */
 .app-dashboard-mobile-root {
   background: var(--ui-bg-page);
   min-height: 100dvh;

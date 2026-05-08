@@ -56,6 +56,7 @@ export default async function ClientLayout({
     return (
       <ClientDashboardSummaryBootstrapProvider value={dashboardSummaryBootstrap}>
         <DashboardMobileChromeLayout area="client">
+          {/* 모바일 하단 제스처 여유: globals.css `--client-bottom-space` / `.app-mobile-bottom-nav-scroll-pad` */}
           <div className="app-mobile-bottom-nav-scroll-pad app-dashboard-shell app-dashboard-shell--with-mobile-chrome">
             {children}
           </div>

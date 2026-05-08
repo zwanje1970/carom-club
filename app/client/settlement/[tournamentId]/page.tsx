@@ -358,7 +358,7 @@ export default function ClientSettlementLedgerEditPage() {
       style={{
         display: "flex",
         flexDirection: "column",
-        minHeight: "100vh",
+        minHeight: "100dvh",
         paddingBottom: 0,
         gap: 0,
       }}
@@ -449,14 +449,14 @@ export default function ClientSettlementLedgerEditPage() {
 
       {!loading ? (
         <div
+          className="client-dashboard-fixed-bottom"
           style={{
             position: "sticky",
-            bottom: 0,
             zIndex: 4,
             flexShrink: 0,
             marginTop: "auto",
             paddingTop: "0.6rem",
-            paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
+            paddingBottom: "0.5rem",
             background: "linear-gradient(to top, #f8fafc 92%, transparent)",
           }}
         >
