@@ -39,7 +39,7 @@ function formatDateSlashMd(iso: string | null | undefined): string {
 }
 
 const cellBase: CSSProperties = {
-  padding: "0.24rem 0.2rem",
+  padding: "0.16rem 0.18rem",
   fontSize: "0.72rem",
   verticalAlign: "middle",
   borderBottom: "1px solid #e8e8e8",
@@ -309,28 +309,34 @@ export default function ParticipantListRow({
     const idleCls = done ? "participant-op-btn participant-op-btn--won participant-op-btn--won-done" : "participant-op-btn participant-op-btn--won participant-op-btn--won-idle";
     if (terminalApproved) {
       return (
-        <button type="button" disabled className={`${idleCls} participant-op-btn--disabled`} aria-label="입금확인(완료)">
-          ₩
-        </button>
+        <span className="participant-op-hit">
+          <button type="button" disabled className={`${idleCls} participant-op-btn--disabled`} aria-label="입금확인(완료)">
+            ₩
+          </button>
+        </span>
       );
     }
     if (terminalRejected) {
       return (
-        <button type="button" disabled className="participant-op-btn participant-op-btn--won participant-op-btn--won-muted" aria-label="입금확인(불가)">
-          ₩
-        </button>
+        <span className="participant-op-hit">
+          <button type="button" disabled className="participant-op-btn participant-op-btn--won participant-op-btn--won-muted" aria-label="입금확인(불가)">
+            ₩
+          </button>
+        </span>
       );
     }
     return (
-      <button
-        type="button"
-        disabled={loading || depositConfirmSaving}
-        className={idleCls}
-        aria-label={done ? "입금확인(완료)" : "입금확인"}
-        onClick={() => onDepositClick()}
-      >
-        ₩
-      </button>
+      <span className="participant-op-hit">
+        <button
+          type="button"
+          disabled={loading || depositConfirmSaving}
+          className={idleCls}
+          aria-label={done ? "입금확인(완료)" : "입금확인"}
+          onClick={() => onDepositClick()}
+        >
+          ₩
+        </button>
+      </span>
     );
   }
 
@@ -338,31 +344,39 @@ export default function ParticipantListRow({
   function renderCheckBtn() {
     if (terminalApproved) {
       return (
-        <button type="button" disabled className="participant-op-btn participant-op-btn--check participant-op-btn--check-done participant-op-btn--disabled" aria-label="승인(완료)">
-          ✓
-        </button>
+        <span className="participant-op-hit">
+          <button type="button" disabled className="participant-op-btn participant-op-btn--check participant-op-btn--check-done participant-op-btn--disabled" aria-label="승인(완료)">
+            ✓
+          </button>
+        </span>
       );
     }
     if (terminalRejected) {
       return (
-        <button type="button" disabled className="participant-op-btn participant-op-btn--check participant-op-btn--check-muted" aria-label="승인(불가)">
-          ✓
-        </button>
+        <span className="participant-op-hit">
+          <button type="button" disabled className="participant-op-btn participant-op-btn--check participant-op-btn--check-muted" aria-label="승인(불가)">
+            ✓
+          </button>
+        </span>
       );
     }
     if (!depositDone) {
       return (
-        <button type="button" disabled className="participant-op-btn participant-op-btn--check participant-op-btn--check-wait" aria-label="승인(입금확인 필요)">
-          ✓
-        </button>
+        <span className="participant-op-hit">
+          <button type="button" disabled className="participant-op-btn participant-op-btn--check participant-op-btn--check-wait" aria-label="승인(입금확인 필요)">
+            ✓
+          </button>
+        </span>
       );
     }
     const done = approveDone;
     const cls = done ? "participant-op-btn participant-op-btn--check participant-op-btn--check-done" : "participant-op-btn participant-op-btn--check participant-op-btn--check-idle";
     return (
-      <button type="button" disabled={loading} className={cls} aria-label={done ? "승인(완료)" : "승인"} onClick={() => onApproveClick()}>
-        ✓
-      </button>
+      <span className="participant-op-hit">
+        <button type="button" disabled={loading} className={cls} aria-label={done ? "승인(완료)" : "승인"} onClick={() => onApproveClick()}>
+          ✓
+        </button>
+      </span>
     );
   }
 
@@ -370,22 +384,34 @@ export default function ParticipantListRow({
   function renderCrossBtn() {
     if (terminalApproved) {
       return (
-        <button type="button" disabled className="participant-op-btn participant-op-btn--cross participant-op-btn--cross-muted participant-op-btn--disabled" aria-label="취소/거절(불가)">
-          ✕
-        </button>
+        <span className="participant-op-hit">
+          <button type="button" disabled className="participant-op-btn participant-op-btn--cross participant-op-btn--cross-muted participant-op-btn--disabled" aria-label="취소/거절(불가)">
+            <span className="participant-op-cross-glyph" aria-hidden="true">
+              ✕
+            </span>
+          </button>
+        </span>
       );
     }
     if (terminalRejected) {
       return (
-        <button type="button" disabled className="participant-op-btn participant-op-btn--cross participant-op-btn--cross-done participant-op-btn--disabled" aria-label="취소/거절(완료)">
-          ✕
-        </button>
+        <span className="participant-op-hit">
+          <button type="button" disabled className="participant-op-btn participant-op-btn--cross participant-op-btn--cross-done participant-op-btn--disabled" aria-label="취소/거절(완료)">
+            <span className="participant-op-cross-glyph" aria-hidden="true">
+              ✕
+            </span>
+          </button>
+        </span>
       );
     }
     return (
-      <button type="button" disabled={loading} className="participant-op-btn participant-op-btn--cross participant-op-btn--cross-idle" aria-label="취소/거절" onClick={() => onCancelRejectClick()}>
-        ✕
-      </button>
+      <span className="participant-op-hit">
+        <button type="button" disabled={loading} className="participant-op-btn participant-op-btn--cross participant-op-btn--cross-idle" aria-label="취소/거절" onClick={() => onCancelRejectClick()}>
+          <span className="participant-op-cross-glyph" aria-hidden="true">
+            ✕
+          </span>
+        </button>
+      </span>
     );
   }
 
@@ -507,7 +533,11 @@ export default function ParticipantListRow({
             {phoneDisplay}
           </td>
         ) : null}
-        <td data-participant-label={metricColumnTitle} style={{ ...cellBase, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+        <td
+          data-participant-label={metricColumnTitle}
+          className="participant-col participant-col--metric"
+          style={{ ...cellBase, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
+        >
           {metricDisplay}
         </td>
         {rowLayout === "fullscreen"

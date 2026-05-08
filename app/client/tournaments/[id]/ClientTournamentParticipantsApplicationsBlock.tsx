@@ -5,10 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { TournamentApplicationListItem, TournamentStatusBadge } from "../../../../lib/types/entities";
 import type { TournamentEntryQualificationType } from "../../../../lib/tournament-rule-types";
-import { useApplicationsTableMobileLayout } from "../../../../lib/client/use-applications-table-mobile-layout";
 import ParticipantListRow from "./participants/ParticipantListRow";
 import ParticipantAddSheet from "./participants/ParticipantAddSheet";
-import ApplicationsTableOrientationLock from "./participants/ApplicationsTableOrientationLock";
 
 export type ParticipantCountSummary = {
   total: number;
@@ -124,7 +122,6 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   variant = "standard",
 }: Props) {
   const router = useRouter();
-  const isApplicationsMobileLayout = useApplicationsTableMobileLayout();
   const metricColumnTitle = participantMetricColumnTitle(entryQualificationType);
   const [entries, setEntries] = useState<TournamentApplicationListItem[]>(initialEntries);
   const [finalizeBusy, setFinalizeBusy] = useState(false);
@@ -333,7 +330,6 @@ export default function ClientTournamentParticipantsApplicationsBlock({
           : "client-tournament-manage__participantsBlock client-tournament-manage__applicationsCompactHeader client-tournament-manage__applicationsRoot"
       }
     >
-      {fullscreenTable && isApplicationsMobileLayout ? <ApplicationsTableOrientationLock /> : null}
       <div className="client-tournament-manage__applicationsHeaderZone">
         {fullscreenTable ? (
           <div className="client-tournament-manage__fullscreenTableHead">
@@ -566,7 +562,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                         className="participant-th participant-th--deposit"
                         style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "7%", minWidth: "2.5rem" }}
                       >
-                        입금확인
+                        입금
                       </th>
                       <th
                         className="participant-th participant-th--approveBtn"
@@ -617,19 +613,19 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                         className="participant-th participant-th--deposit"
                         style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "9%", minWidth: "2.4rem" }}
                       >
-                        ₩
+                        입금
                       </th>
                       <th
                         className="participant-th participant-th--approveBtn"
                         style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "9%", minWidth: "2.4rem" }}
                       >
-                        ✓
+                        승인
                       </th>
                       <th
                         className="participant-th participant-th--reject"
                         style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "9%", minWidth: "2.4rem" }}
                       >
-                        ✕
+                        취소
                       </th>
                     </>
                   )}
