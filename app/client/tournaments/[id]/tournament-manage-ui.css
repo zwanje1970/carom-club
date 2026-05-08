@@ -293,7 +293,7 @@
   border-radius: 10px;
   overflow: hidden;
   background: #f8fafc;
-  padding-bottom: var(--client-bottom-space, 48px);
+  padding-bottom: var(--client-bottom-space, 80px);
 }
 
 /* 신청자 관리: 상단 운영 버튼 — 줄바꿈 허용(가로보기 추가 등) */
@@ -703,7 +703,7 @@
 }
 
 .client-tournament-manage.client-tournament-manage--participants-subpage .client-tournament-manage__participantTableShell {
-  padding-bottom: var(--client-bottom-space, 48px);
+  padding-bottom: var(--client-bottom-space, 80px);
 }
 
 /* 신청자 관리: 상단 고정 + 표 영역만 세로 스크롤 */

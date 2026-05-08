@@ -536,7 +536,7 @@
 
 @media (max-width: 767px) {
   .pageWrapV2 .actions {
-    padding-bottom: var(--client-bottom-space, 48px);
+    padding-bottom: var(--client-bottom-space, 80px);
   }
 }
 

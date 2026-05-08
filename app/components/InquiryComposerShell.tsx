@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 type Props = {
   scroll: ReactNode;
   composer: ReactNode;
-  /** 클라이언트 대시보드(/client): globals `--client-bottom-space` 로 하단 제스처 여유 통일 */
+  /** 클라이언트 대시보드(/client): globals `--client-bottom-space`(= reserved-space) 로 하단 예약 통일 */
   clientDashboardComposerSafeArea?: boolean;
 };
 

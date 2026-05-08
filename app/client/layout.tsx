@@ -6,6 +6,7 @@ import { isCaromClubMobileAppShell } from "../../lib/is-carom-club-mobile-app-sh
 import { ClientDashboardSummaryBootstrapProvider } from "./ClientDashboardHomeClient";
 import AdminFabServerBridge from "../components/AdminFabServerBridge";
 import DashboardMobileChromeLayout from "../components/DashboardMobileChromeLayout";
+import ClientMobileBottomNav from "./ClientMobileBottomNav";
 import { getClientStatusByUserId } from "../../lib/surface-read";
 import { getRequestSessionUser } from "../../lib/server/request-session-user";
 import { resolveClientOrganizationForDashboardPolicy } from "../../lib/server/platform-backing-store";
@@ -56,10 +57,13 @@ export default async function ClientLayout({
     return (
       <ClientDashboardSummaryBootstrapProvider value={dashboardSummaryBootstrap}>
         <DashboardMobileChromeLayout area="client">
-          {/* 모바일 하단 여유: `.app-dashboard-mobile-root` CSS 변수 + `.app-mobile-bottom-nav-scroll-pad`(fallback 48px) */}
-          <div className="app-mobile-bottom-nav-scroll-pad app-dashboard-shell app-dashboard-shell--with-mobile-chrome">
-            {children}
-          </div>
+          <>
+            {/* 모바일 하단 예약: `--client-bottom-reserved-space` + 공통 하단바(`ClientMobileBottomNav`) */}
+            <div className="app-mobile-bottom-nav-scroll-pad app-dashboard-shell app-dashboard-shell--with-mobile-chrome">
+              {children}
+            </div>
+            <ClientMobileBottomNav />
+          </>
         </DashboardMobileChromeLayout>
         <AdminFabServerBridge />
       </ClientDashboardSummaryBootstrapProvider>

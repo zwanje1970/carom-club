@@ -2864,41 +2864,129 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   }
 }
 
-/* /client 모바일: 하단 제스처 영역 — :has(html) 미사용(WebView 호환). 변수는 루트에만 정의. */
+/* 클라이언트 전용 하단바 — PC·미디어 외 구간에서는 비표시 */
+.client-mobile-bottom-nav {
+  display: none;
+}
+
+/* /client 모바일: 공통 하단 고정 UI 기준 예약(`--client-bottom-reserved-space`) — :has(html) 미사용(WebView 호환). */
 @media (max-width: 767px) {
   /*
-   * env(bottom)=0 인 Android에서도 최소 48px 여유. 모든 var() 사용처는 fallback(48px) 필수.
-   * --client-safe-bottom: 하단 고정 UI의 bottom / --client-bottom-space: 스크롤·패딩 하단
+   * --client-bottom-nav-height: 하단바 본문 높이(고정)
+   * --client-safe-bottom: max(16px, env(bottom)) — 제스처·최소 여백
+   * --client-bottom-reserved-space: 하단바 + safe (스크롤 패딩 단일 진리)
+   * --client-bottom-space: 하위 CSS 모듈 호환 별칭 (= reserved-space)
    */
   .app-dashboard-mobile-root[data-dashboard-mobile-area="client"] {
-    --client-safe-bottom: max(48px, env(safe-area-inset-bottom, 0px));
-    --client-bottom-space: calc(48px + env(safe-area-inset-bottom, 0px));
+    --client-bottom-nav-height: 64px;
+    --client-safe-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+    --client-bottom-reserved-space: calc(var(--client-bottom-nav-height) + var(--client-safe-bottom));
+    --client-bottom-space: var(--client-bottom-reserved-space);
+  }
+
+  /* 대진표 전체화면 · 신청자 가로 전체화면: 하단바 숨김 — 제스처 구역만 예약 */
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-bracket-view-fullscreen="1"]),
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-applications-table-fullscreen="1"]) {
+    --client-bottom-nav-height: 0px;
+  }
+
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-bracket-view-fullscreen="1"]) .client-mobile-bottom-nav,
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-applications-table-fullscreen="1"]) .client-mobile-bottom-nav {
+    display: none !important;
+  }
+
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"] .client-mobile-bottom-nav {
+    display: flex;
+    box-sizing: border-box;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: env(safe-area-inset-bottom, 0px);
+    z-index: 56;
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 0;
+    height: var(--client-bottom-nav-height);
+    min-height: var(--client-bottom-nav-height);
+    padding-left: max(0px, env(safe-area-inset-left, 0px));
+    padding-right: max(0px, env(safe-area-inset-right, 0px));
+    margin: 0;
+    background: #ffffff;
+    border-top: 1px solid #e2e8f0;
+    pointer-events: auto;
+  }
+
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"] .client-mobile-bottom-nav__btn {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    min-height: 44px;
+    padding: 6px 4px;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: #475569;
+    font: inherit;
+    text-decoration: none !important;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
+  }
+
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"] .client-mobile-bottom-nav__btn--primary {
+    color: var(--ui-primary, #4d7db5);
+    font-weight: 700;
+  }
+
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"] .client-mobile-bottom-nav__label {
+    font-size: 0.74rem;
+    font-weight: 700;
+    line-height: 1.15;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"] .client-mobile-bottom-nav__hint {
+    font-size: 0.62rem;
+    font-weight: 500;
+    line-height: 1.15;
+    opacity: 0.82;
+    text-align: center;
   }
 
   /* 내부 overflow:auto 스크롤러 공통 — 게시카드·신청자 표·문의 스크롤 영역 등 */
   .app-dashboard-mobile-root[data-dashboard-mobile-area="client"] .client-dashboard-scroll-safe-area {
-    padding-bottom: var(--client-bottom-space, 48px);
-    scroll-padding-bottom: var(--client-bottom-space, 48px);
+    padding-bottom: var(--client-bottom-space, 80px);
+    scroll-padding-bottom: var(--client-bottom-space, 80px);
   }
 
-  /* 상단 크롬 fixed — 본문은 크롬 높이 + 회색 간격 + 하단 공통 스크롤 여유 */
+  /* 상단 크롬 fixed — 본문은 크롬 높이 + 회색 간격 + 하단 예약 공간 */
   .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]
     .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
     padding-top: calc(var(--app-dashboard-mobile-chrome-height) + var(--site-shell-gray-padding-top));
-    padding-bottom: var(--client-bottom-space, 48px);
-    scroll-padding-bottom: var(--client-bottom-space, 48px);
+    padding-bottom: var(--client-bottom-space, 80px);
+    scroll-padding-bottom: var(--client-bottom-space, 80px);
     padding-left: max(12px, env(safe-area-inset-left, 0px));
     padding-right: max(12px, env(safe-area-inset-right, 0px));
   }
 
-  /* 모바일 클라이언트: 하단 sticky/고정 바를 제스처 위로(PC는 아래 기본 bottom:0 유지) */
+  /* 모바일 클라이언트: 페이지 하단 sticky/고정 앵커 — 하단바 꼭대기 위에 붙임(PC는 아래 기본 bottom:0 유지) */
   .app-dashboard-mobile-root[data-dashboard-mobile-area="client"] .client-dashboard-fixed-bottom {
-    bottom: var(--client-safe-bottom, 48px) !important;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + var(--client-bottom-nav-height)) !important;
   }
 
   /* 문의 상세 하단 입력줄 — InquiryComposerShell(clientDashboardComposerSafeArea) */
   .app-dashboard-mobile-root[data-dashboard-mobile-area="client"] .client-dashboard-inquiry-composer-footer {
-    padding-bottom: max(0.65rem, var(--client-bottom-space, 48px)) !important;
+    padding-bottom: max(0.65rem, var(--client-bottom-space, 80px)) !important;
   }
 }
 
