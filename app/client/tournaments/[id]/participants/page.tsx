@@ -33,7 +33,10 @@ export default async function ClientTournamentParticipantsPage({
     getTournamentApplicationListCountsFirestore(id),
   ]);
   return (
-    <main className="v3-page v3-stack client-tournament-manage client-tournament-manage--participants-subpage client-tournament-manage--participants-subpage--appsLayout">
+    <main
+      data-client-applications-vertical-focus="1"
+      className="v3-page v3-stack client-tournament-manage client-tournament-manage--participants-subpage client-tournament-manage--participants-subpage--appsLayout"
+    >
       <ClientTournamentParticipantsApplicationsBlock
         tournamentId={id}
         tournamentTitle={tournament.title}

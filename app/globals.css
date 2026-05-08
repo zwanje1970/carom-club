@@ -2929,6 +2929,83 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
     padding-top: 0;
     padding-bottom: 0;
   }
+
+  /* 신청자 관리(세로): 뷰포트 고정 — 상단 운영바·표 헤더 아래 행 목록만 스크롤 */
+  .app-dashboard-mobile-root:has([data-client-applications-vertical-focus="1"]) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .app-dashboard-mobile-root:has([data-client-applications-vertical-focus="1"])
+    > .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .app-dashboard-mobile-root:has([data-client-applications-vertical-focus="1"])
+    main[data-client-applications-vertical-focus="1"].v3-page {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding-top: 0.35rem;
+    padding-bottom: 0;
+    padding-left: max(0.45rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.45rem, env(safe-area-inset-right, 0px));
+    max-width: none;
+    margin: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* 신청자 가로보기 전체화면: 크롬 숨김 + safe-area는 표 셸에서 처리 */
+  .app-dashboard-mobile-root:has([data-client-applications-table-fullscreen="1"]) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .app-dashboard-mobile-root:has([data-client-applications-table-fullscreen="1"]) > .app-dashboard-mobile-chrome {
+    display: none !important;
+  }
+
+  .app-dashboard-mobile-root:has([data-client-applications-table-fullscreen="1"])
+    > .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .app-dashboard-mobile-root:has([data-client-applications-table-fullscreen="1"])
+    main[data-client-applications-table-fullscreen="1"] {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    width: 100%;
+    box-sizing: border-box;
+  }
 }
 
 .app-dashboard-shell.app-mobile-bottom-nav-scroll-pad {
@@ -2952,9 +3029,12 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
 
   /*
    * 클라이언트 대시보드 일반 페이지: 모바일 크롬 상단 고정.
-   * 제외: 대진표 보기 전체화면(data-client-bracket-view-fullscreen) — 기존 규칙에서 크롬 숨김·본문 풀뷰포트 유지.
+   * 제외: 대진표 전체화면 · 신청자 가로보기 전체화면.
    */
-  .app-dashboard-mobile-root:not(:has([data-client-bracket-view-fullscreen="1"])) > .app-dashboard-mobile-chrome {
+  .app-dashboard-mobile-root:not(:has([data-client-bracket-view-fullscreen="1"])):not(
+      :has([data-client-applications-table-fullscreen="1"])
+    )
+    > .app-dashboard-mobile-chrome {
     position: fixed;
     top: 0;
     left: 0;

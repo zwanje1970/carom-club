@@ -766,13 +766,14 @@
   min-height: 0;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  /* 신청자 행만 스크롤 — 마지막 행 버튼이 홈 제스처와 겹치지 않도록 표 영역 하단 여유 */
+  padding-bottom: calc(128px + env(safe-area-inset-bottom, 0px));
 }
 
 .client-tournament-manage .client-tournament-manage__participantTable--applicationsCompact thead th {
   position: sticky;
   top: 0;
-  z-index: 5;
+  z-index: 6;
   background: #f8fafc;
   box-shadow: 0 1px 0 #e2e8f0;
 }
@@ -816,6 +817,9 @@
   gap: 0.35rem;
   min-height: 0;
   flex: 1 1 auto;
+  padding-left: max(0.2rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.2rem, env(safe-area-inset-right, 0px));
+  box-sizing: border-box;
 }
 
 .client-tournament-manage .client-tournament-manage__fullscreenTableHead {
@@ -824,6 +828,15 @@
   align-items: center;
   gap: 0.45rem;
   flex-wrap: wrap;
+  padding-top: max(0.35rem, env(safe-area-inset-top, 0px));
+}
+
+.client-tournament-manage .client-tournament-manage__fullscreenTableBulkRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  margin: 0 0 0.15rem;
 }
 
 .client-tournament-manage .client-tournament-manage__fullscreenTableTitle {
@@ -855,7 +868,7 @@
 }
 
 .client-tournament-manage .client-tournament-manage__participantTableShell--fullscreenScroll .client-tournament-manage__applicationsTableInner {
-  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px));
 }
 
 .client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide thead th,

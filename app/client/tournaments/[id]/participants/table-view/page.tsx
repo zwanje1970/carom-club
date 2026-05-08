@@ -34,7 +34,10 @@ export default async function ClientTournamentParticipantsTableViewPage({
   ]);
 
   return (
-    <main className="v3-page v3-stack client-tournament-manage client-tournament-manage--participants-table-view-page">
+    <main
+      data-client-applications-table-fullscreen="1"
+      className="v3-page v3-stack client-tournament-manage client-tournament-manage--participants-table-view-page"
+    >
       <ClientTournamentParticipantsApplicationsBlock
         tournamentId={id}
         tournamentTitle={tournament.title}

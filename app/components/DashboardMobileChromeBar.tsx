@@ -11,6 +11,11 @@ export default function DashboardMobileChromeBar({ area }: { area: DashboardArea
   const pathname = usePathname() ?? "";
   const { title, backHref } = dashboardMobileChromeMeta(pathname, area);
 
+  /* 신청자 가로보기: 전체화면 표 전용 — 상단 바 숨김(globals와 동일 경로) */
+  if (pathname.includes("/participants/table-view")) {
+    return null;
+  }
+
   return (
     <header
       className="site-home-top-white site-home-top-white--standard app-dashboard-mobile-chrome"

@@ -48,6 +48,7 @@ export function dashboardMobileChromeMeta(
       if (p.includes("/bracket/preview")) return { title: "대진표 미리보기", backHref: tbase };
       if (p.endsWith("/bracket/view")) return { title: "대진표 보기", backHref: `${tbase}/bracket` };
       if (p.includes("/bracket")) return { title: "대진표", backHref: tbase };
+      if (p.endsWith("/participants/table-view")) return { title: "신청자 표", backHref: `${tbase}/participants` };
       if (p.includes("/participants/") && p !== `${tbase}/participants`) {
         return { title: "참가자", backHref: `${tbase}/participants` };
       }

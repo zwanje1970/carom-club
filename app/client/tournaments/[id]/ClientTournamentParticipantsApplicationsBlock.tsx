@@ -8,6 +8,7 @@ import type { TournamentEntryQualificationType } from "../../../../lib/tournamen
 import { useApplicationsTableMobileLayout } from "../../../../lib/client/use-applications-table-mobile-layout";
 import ParticipantListRow from "./participants/ParticipantListRow";
 import ParticipantAddSheet from "./participants/ParticipantAddSheet";
+import ApplicationsTableOrientationLock from "./participants/ApplicationsTableOrientationLock";
 
 export type ParticipantCountSummary = {
   total: number;
@@ -86,6 +87,15 @@ function countApplicationApprovedChip(entries: TournamentApplicationListItem[]):
   ).length;
 }
 
+/** 입금확인만 된 상태 · 신청 승인(clientApplicationApprovedAt) 전 · 취소·참가확정 제외 */
+function listItemEligibleBulkDepositApprove(e: TournamentApplicationListItem): boolean {
+  if (e.status === "REJECTED" || e.status === "APPROVED") return false;
+  const hasDep = typeof e.clientDepositConfirmedAt === "string" && e.clientDepositConfirmedAt.trim() !== "";
+  if (!hasDep) return false;
+  const hasAppr = typeof e.clientApplicationApprovedAt === "string" && e.clientApplicationApprovedAt.trim() !== "";
+  return !hasAppr;
+}
+
 function participantMetricColumnTitle(eq: TournamentEntryQualificationType): string {
   if (eq === "SCORE") return "점수";
   if (eq === "EVER") return "AVG";
@@ -114,10 +124,12 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   variant = "standard",
 }: Props) {
   const router = useRouter();
-  const applicationsMobileMerged = variant === "standard" && useApplicationsTableMobileLayout();
+  const isApplicationsMobileLayout = useApplicationsTableMobileLayout();
+  const applicationsMobileMerged = variant === "standard" && isApplicationsMobileLayout;
   const metricColumnTitle = participantMetricColumnTitle(entryQualificationType);
   const [entries, setEntries] = useState<TournamentApplicationListItem[]>(initialEntries);
   const [finalizeBusy, setFinalizeBusy] = useState(false);
+  const [bulkApproveBusy, setBulkApproveBusy] = useState(false);
   const [moreLoading, setMoreLoading] = useState(() => participantCountSummary.total > initialEntries.length);
   const fullFetchDoneRef = useRef(false);
 
@@ -219,11 +231,58 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   const tableViewHref = `/client/tournaments/${encodeURIComponent(tournamentId)}/participants/table-view`;
   const showFinalize = !CLOSED_BADGES.includes(tournamentStatusBadge);
   const fullscreenTable = variant === "fullscreenTable";
+  const rowLayout = fullscreenTable ? "fullscreen" : applicationsMobileMerged ? "mobile" : "desktop";
 
-  /*
-   * 향후 확장(미구현): 입금확인 ON · 신청 승인 OFF · 취소/거절 아님 인원만 일괄 승인.
-   * 이미 승인된 신청은 제외·푸시 재발송 없음 — Firestore 필드(clientDepositConfirmedAt / clientApplicationApprovedAt / status) 조합으로 필터링 가능.
-   */
+  async function onBulkApproveDepositConfirmed() {
+    if (bulkApproveBusy) return;
+    const targets = zoneFilteredEntries.filter(listItemEligibleBulkDepositApprove);
+    if (targets.length === 0) {
+      window.alert("입금확인만 되어 있고 아직 신청 승인 전인 건이 없습니다.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `입금확인된 ${targets.length}건을 일괄 신청 승인할까요?\n(이미 승인·참가확정·거절 건은 제외됩니다. 개별 승인과 동일 API를 사용합니다.)`
+      )
+    ) {
+      return;
+    }
+    setBulkApproveBusy(true);
+    try {
+      for (const t of targets) {
+        const res = await fetch(
+          `/api/client/tournaments/${encodeURIComponent(tournamentId)}/participants/${encodeURIComponent(t.id)}/processing`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ applicationApproved: true }),
+            credentials: "same-origin",
+          }
+        );
+        const json = (await res.json()) as {
+          error?: string;
+          application?: { clientApplicationApprovedAt?: string | null };
+        };
+        if (!res.ok) {
+          window.alert(json.error ?? "일괄 승인 중 저장에 실패했습니다.");
+          router.refresh();
+          return;
+        }
+        const at = json.application?.clientApplicationApprovedAt;
+        if (typeof at === "string" && at.trim()) {
+          setEntries((prev) =>
+            prev.map((e) => (e.id === t.id ? { ...e, clientApplicationApprovedAt: at.trim() } : e))
+          );
+        }
+      }
+      router.refresh();
+    } catch {
+      window.alert("일괄 승인 처리 중 오류가 발생했습니다.");
+      router.refresh();
+    } finally {
+      setBulkApproveBusy(false);
+    }
+  }
 
   async function onFinalizeParticipants() {
     if (finalizeBusy) return;
@@ -275,6 +334,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
           : "client-tournament-manage__participantsBlock client-tournament-manage__applicationsCompactHeader client-tournament-manage__applicationsRoot"
       }
     >
+      {fullscreenTable && isApplicationsMobileLayout ? <ApplicationsTableOrientationLock /> : null}
       <div className="client-tournament-manage__applicationsHeaderZone">
         {fullscreenTable ? (
           <div className="client-tournament-manage__fullscreenTableHead">
@@ -318,6 +378,20 @@ export default function ClientTournamentParticipantsApplicationsBlock({
             <Link prefetch={false} href={tableViewHref} style={{ ...opsBtn, textDecoration: "none" }}>
               가로보기
             </Link>
+            <button
+              type="button"
+              disabled={bulkApproveBusy}
+              onClick={() => void onBulkApproveDepositConfirmed()}
+              style={{
+                ...opsBtn,
+                borderColor: "#15803d",
+                background: "#fff",
+                color: "#15803d",
+                fontWeight: 800,
+              }}
+            >
+              {bulkApproveBusy ? "처리 중…" : "입금확인 전체승인"}
+            </button>
           </div>
         ) : null}
 
@@ -380,9 +454,28 @@ export default function ClientTournamentParticipantsApplicationsBlock({
             </span>
           </div>
         ) : (
-          <p className="v3-muted client-tournament-manage__fullscreenTableMeta">
-            총 {participantCountSummary.total}명 · 승인 {chipApproved}명 · 취소/거절 {participantCountSummary.reject}명
-          </p>
+          <>
+            <p className="v3-muted client-tournament-manage__fullscreenTableMeta">
+              총 {participantCountSummary.total}명 · 승인 {chipApproved}명 · 취소/거절 {participantCountSummary.reject}명
+            </p>
+            <div className="client-tournament-manage__fullscreenTableBulkRow">
+              <button
+                type="button"
+                disabled={bulkApproveBusy}
+                onClick={() => void onBulkApproveDepositConfirmed()}
+                style={{
+                  ...opsBtn,
+                  borderColor: "#15803d",
+                  background: "#fff",
+                  color: "#15803d",
+                  fontWeight: 800,
+                  flex: "0 0 auto",
+                }}
+              >
+                {bulkApproveBusy ? "처리 중…" : "입금확인 전체승인"}
+              </button>
+            </div>
+          </>
         )}
 
         {!fullscreenTable ? (
@@ -413,7 +506,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
               className={`client-tournament-manage__participantTable client-tournament-manage__participantTable--singleLineMobile client-tournament-manage__participantTable--applicationsCompact ${fullscreenTable ? "client-tournament-manage__participantTable--fullscreenWide" : ""}`}
               style={{
                 width: "100%",
-                minWidth: fullscreenTable ? "720px" : "100%",
+                minWidth: fullscreenTable ? "1040px" : "100%",
                 borderCollapse: "collapse",
                 tableLayout: "fixed",
                 fontSize: fullscreenTable ? "0.82rem" : applicationsMobileMerged ? "0.78rem" : "0.74rem",
@@ -421,78 +514,150 @@ export default function ClientTournamentParticipantsApplicationsBlock({
             >
               <thead>
                 <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                  <th
-                    className="participant-th participant-th--apply"
-                    style={{ ...participantApplicationsTableThBase, textAlign: "center", width: applicationsMobileMerged ? "9%" : "5.5%", minWidth: "2.75rem" }}
-                  >
-                    신청
-                  </th>
-                  <th
-                    className="participant-th participant-th--name"
-                    style={{
-                      ...participantApplicationsTableThBase,
-                      textAlign: "left",
-                      width: applicationsMobileMerged ? "30%" : "26%",
-                      minWidth: applicationsMobileMerged ? "7rem" : "5.5rem",
-                    }}
-                  >
-                    이름
-                  </th>
-                  <th
-                    className="participant-th participant-th--metric"
-                    style={{
-                      ...participantApplicationsTableThBase,
-                      textAlign: "center",
-                      width: applicationsMobileMerged ? "8%" : "7%",
-                      minWidth: "2.35rem",
-                    }}
-                  >
-                    {metricColumnTitle}
-                  </th>
-                  <th
-                    className="participant-th participant-th--depositor"
-                    style={{
-                      ...participantApplicationsTableThBase,
-                      textAlign: "left",
-                      width: applicationsMobileMerged ? "auto" : "22%",
-                      minWidth: applicationsMobileMerged ? "5rem" : "4.5rem",
-                    }}
-                  >
-                    입금자 이름
-                  </th>
-                  {applicationsMobileMerged ? (
-                    <th
-                      className="participant-th participant-th--processing"
-                      style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "22%", minWidth: "9.5rem" }}
-                    >
-                      처리
-                    </th>
-                  ) : (
+                  {fullscreenTable ? (
                     <>
                       <th
+                        className="participant-th participant-th--apply"
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "7%", minWidth: "3.25rem" }}
+                      >
+                        신청
+                      </th>
+                      <th
+                        className="participant-th participant-th--name"
+                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "11%", minWidth: "4.5rem" }}
+                      >
+                        이름
+                      </th>
+                      <th
+                        className="participant-th participant-th--phoneFs"
+                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "13%", minWidth: "5.5rem" }}
+                      >
+                        전화
+                      </th>
+                      <th
+                        className="participant-th participant-th--metric"
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "7%", minWidth: "2.5rem" }}
+                      >
+                        {metricColumnTitle}
+                      </th>
+                      <th
+                        className="participant-th participant-th--depositor"
+                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "10%", minWidth: "4rem" }}
+                      >
+                        입금자
+                      </th>
+                      <th
+                        className="participant-th participant-th--affiliationFs"
+                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "11%", minWidth: "4rem" }}
+                      >
+                        소속
+                      </th>
+                      <th
                         className="participant-th participant-th--deposit"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "11%", minWidth: "3.75rem" }}
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "8%", minWidth: "3.5rem" }}
                       >
                         입금확인
                       </th>
                       <th
                         className="participant-th participant-th--approveBtn"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "11%", minWidth: "3.75rem" }}
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "8%", minWidth: "3.5rem" }}
                       >
                         처리
                       </th>
                       <th
-                        className="participant-th participant-th--approveDate"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "6.5%", minWidth: "1.85rem" }}
+                        className="participant-th participant-th--approveDateFs"
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "7%", minWidth: "2.75rem" }}
                       >
-                        승인
+                        승인일
+                      </th>
+                      <th
+                        className="participant-th participant-th--statusFs"
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "8%", minWidth: "3rem" }}
+                      >
+                        상태
                       </th>
                       <th
                         className="participant-th participant-th--reject"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "11%", minWidth: "3.75rem" }}
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "10%", minWidth: "3.75rem" }}
                       >
                         취소/거절
                       </th>
+                    </>
+                  ) : (
+                    <>
+                      <th
+                        className="participant-th participant-th--apply"
+                        style={{
+                          ...participantApplicationsTableThBase,
+                          textAlign: "center",
+                          width: applicationsMobileMerged ? "11%" : "12%",
+                          minWidth: "3.1rem",
+                        }}
+                      >
+                        신청
+                      </th>
+                      <th
+                        className="participant-th participant-th--name"
+                        style={{
+                          ...participantApplicationsTableThBase,
+                          textAlign: "left",
+                          width: applicationsMobileMerged ? "28%" : "24%",
+                          minWidth: applicationsMobileMerged ? "6.5rem" : "5.5rem",
+                        }}
+                      >
+                        이름
+                      </th>
+                      <th
+                        className="participant-th participant-th--metric"
+                        style={{
+                          ...participantApplicationsTableThBase,
+                          textAlign: "center",
+                          width: applicationsMobileMerged ? "9%" : "8%",
+                          minWidth: "2.35rem",
+                        }}
+                      >
+                        {metricColumnTitle}
+                      </th>
+                      <th
+                        className="participant-th participant-th--depositor"
+                        style={{
+                          ...participantApplicationsTableThBase,
+                          textAlign: "left",
+                          width: applicationsMobileMerged ? "auto" : "20%",
+                          minWidth: applicationsMobileMerged ? "5.25rem" : "4.75rem",
+                        }}
+                      >
+                        입금자
+                      </th>
+                      {applicationsMobileMerged ? (
+                        <th
+                          className="participant-th participant-th--processing"
+                          style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "22%", minWidth: "9.5rem" }}
+                        >
+                          처리
+                        </th>
+                      ) : (
+                        <>
+                          <th
+                            className="participant-th participant-th--deposit"
+                            style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "12%", minWidth: "3.75rem" }}
+                          >
+                            입금확인
+                          </th>
+                          <th
+                            className="participant-th participant-th--approveBtn"
+                            style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "12%", minWidth: "3.75rem" }}
+                          >
+                            처리
+                          </th>
+                          <th
+                            className="participant-th participant-th--reject"
+                            style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "12%", minWidth: "3.75rem" }}
+                          >
+                            취소/거절
+                          </th>
+                        </>
+                      )}
                     </>
                   )}
                 </tr>
@@ -518,7 +683,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     attendanceChecked={entry.attendanceChecked}
                     initialClientDepositConfirmedAt={entry.clientDepositConfirmedAt ?? null}
                     initialClientApplicationApprovedAt={entry.clientApplicationApprovedAt ?? null}
-                    applicationsMobileMerged={applicationsMobileMerged}
+                    rowLayout={rowLayout}
                   />
                 ))}
               </tbody>
