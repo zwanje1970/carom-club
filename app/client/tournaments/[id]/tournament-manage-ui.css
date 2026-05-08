@@ -749,6 +749,28 @@
   color: #475569;
 }
 
+/* 신청자 표: ₩ ✓ ✕ 범례(목록 상단 1회) */
+.client-tournament-manage .client-tournament-manage__applicationsSymbolLegend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  margin: 0 0 0.42rem;
+  padding: 0 0.1rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #475569;
+}
+
+.client-tournament-manage .client-tournament-manage__applicationsSymbolLegendItem {
+  white-space: nowrap;
+}
+
+.client-tournament-manage .client-tournament-manage__participantTableShell--fullscreenScroll .client-tournament-manage__applicationsSymbolLegend {
+  margin-top: 0.1rem;
+}
+
 .client-tournament-manage .client-tournament-manage__participantTableShell--applicationsScroll {
   flex: 1 1 auto;
   min-height: 0;
@@ -794,6 +816,122 @@
   font-weight: 600;
   line-height: 1.35;
   text-align: center;
+}
+
+/* 신청자 행: ₩ ✓ ✕ 원형 기호 버튼 (텍스트 기호만) */
+.client-tournament-manage .participant-op-inline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.client-tournament-manage .participant-op-btn {
+  box-sizing: border-box;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  margin: 0;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  font-family: inherit;
+}
+
+.client-tournament-manage .participant-op-btn:disabled {
+  cursor: default;
+}
+
+.client-tournament-manage .participant-op-btn--disabled {
+  opacity: 0.88;
+}
+
+/* ₩ 입금확인 — 빨강 */
+.client-tournament-manage .participant-op-btn--won-idle {
+  border: 1.5px solid rgba(220, 38, 38, 0.42);
+  background: #fff;
+  color: rgba(185, 28, 28, 0.55);
+}
+
+.client-tournament-manage .participant-op-btn--won-done {
+  border: 1.5px solid #b91c1c;
+  background: #dc2626;
+  color: #fff;
+}
+
+.client-tournament-manage .participant-op-btn--won-muted {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+/* ✓ 승인 — 초록 */
+.client-tournament-manage .participant-op-btn--check-idle {
+  border: 1.5px solid rgba(22, 163, 74, 0.45);
+  background: #fff;
+  color: rgba(21, 128, 61, 0.55);
+}
+
+.client-tournament-manage .participant-op-btn--check-done {
+  border: 1.5px solid #15803d;
+  background: #16a34a;
+  color: #fff;
+}
+
+.client-tournament-manage .participant-op-btn--check-wait {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: rgba(21, 128, 61, 0.35);
+}
+
+.client-tournament-manage .participant-op-btn--check-muted {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+/* ✕ 취소/거절 — 회색 */
+.client-tournament-manage .participant-op-btn--cross-idle {
+  border: 1.5px solid rgba(71, 85, 105, 0.38);
+  background: #fff;
+  color: rgba(71, 85, 105, 0.55);
+}
+
+.client-tournament-manage .participant-op-btn--cross-done {
+  border: 1.5px solid #475569;
+  background: #64748b;
+  color: #fff;
+}
+
+.client-tournament-manage .participant-op-btn--cross-muted {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.client-tournament-manage .participant-name-cell-1l {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.client-tournament-manage .participant-name-btn-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
+  text-align: left;
 }
 
 /* 가로보기(표 전용) */
@@ -881,7 +1019,7 @@
 
 @media (min-width: 900px) {
   .client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide {
-    min-width: 960px !important;
+    min-width: 100% !important;
   }
 }
 
@@ -1133,21 +1271,34 @@
     .client-tournament-manage__participantTable.client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--singleLineMobile
     tbody
     tr
-    td.participant-col--mobileProcMerged {
+    td.participant-col--ops {
     vertical-align: middle;
   }
 
   .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--singleLineMobile tbody tr td.participant-col--name {
     flex: unset;
     min-width: 0;
-    overflow: visible !important;
-    white-space: normal !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    text-overflow: ellipsis;
     word-break: keep-all;
   }
 
   .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--singleLineMobile tbody tr td.participant-col--depositor {
-    overflow: visible !important;
-    white-space: normal !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    text-overflow: ellipsis;
     word-break: keep-all;
+  }
+
+  .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--singleLineMobile tbody tr td.participant-col--affiliationFs {
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    text-overflow: ellipsis;
+  }
+
+  .client-tournament-manage .client-tournament-manage__participantTable.client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--singleLineMobile tbody tr td.participant-col--phoneFs {
+    white-space: nowrap !important;
+    overflow: visible !important;
   }
 }

@@ -29,7 +29,7 @@ function applicationStatusShortKo(status: TournamentApplicationStatus): string {
   }
 }
 
-/** 신청일·승인일 공통 — 월/일만, 앞자리 0 없음 (예: 12/25). 시간 없음. */
+/** 신청일·승인일 — 월/일만 (예: 12/25) */
 function formatDateSlashMd(iso: string | null | undefined): string {
   const raw = (iso ?? "").trim();
   if (!raw) return "—";
@@ -38,51 +38,12 @@ function formatDateSlashMd(iso: string | null | undefined): string {
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
 }
 
-const procBtnBase: CSSProperties = {
-  minHeight: 28,
-  minWidth: "3rem",
-  padding: "0.06rem 0.18rem",
-  fontSize: "0.58rem",
-  fontWeight: 800,
-  borderRadius: "0.2rem",
-  touchAction: "manipulation",
-  flexShrink: 0,
-  whiteSpace: "nowrap",
-  borderWidth: 1,
-  borderStyle: "solid",
-  boxShadow: "none",
-};
-
-/** 모바일 「처리」열: 한 줄에 한 버튼, pill·플랫·터치 여유 */
-const procBtnMobilePill: CSSProperties = {
-  ...procBtnBase,
-  display: "inline-flex",
-  alignItems: "center",
-  minHeight: 31,
-  minWidth: "4.6rem",
-  width: "100%",
-  maxWidth: "11rem",
-  padding: "0.28rem 0.55rem",
-  fontSize: "0.68rem",
-  fontWeight: 700,
-  borderRadius: "999px",
-  justifyContent: "center",
-};
-
 const cellBase: CSSProperties = {
-  padding: "0.2rem 0.14rem",
-  fontSize: "0.74rem",
+  padding: "0.24rem 0.2rem",
+  fontSize: "0.72rem",
   verticalAlign: "middle",
   borderBottom: "1px solid #e8e8e8",
   textAlign: "center",
-};
-
-const cellBaseMobileMerged: CSSProperties = {
-  ...cellBase,
-  paddingTop: "0.42rem",
-  paddingBottom: "0.42rem",
-  paddingLeft: "0.28rem",
-  paddingRight: "0.28rem",
 };
 
 export default function ParticipantListRow({
@@ -97,13 +58,12 @@ export default function ParticipantListRow({
   registrationSource,
   participantAverage,
   metricColumnTitle,
-  approveActionColumnLabel = "처리",
   adminNote,
   statusChangedAt,
   initialClientDepositConfirmedAt,
   initialClientApplicationApprovedAt,
   attendanceChecked,
-  rowLayout = "desktop",
+  rowLayout = "standard",
 }: {
   tournamentId: string;
   entryId: string;
@@ -116,15 +76,12 @@ export default function ParticipantListRow({
   registrationSource?: "admin" | null;
   participantAverage?: number | null;
   metricColumnTitle: string;
-  /** 신청 승인 버튼 열 헤더(표에서는 「승인일」열과 구분) */
-  approveActionColumnLabel?: string;
   adminNote?: string | null;
   statusChangedAt?: string;
   initialClientDepositConfirmedAt?: string | null;
   initialClientApplicationApprovedAt?: string | null;
   attendanceChecked?: boolean | null;
-  /** 세로(모바일 병합 | 데스크톱 분리) · 가로 전체화면 표 */
-  rowLayout?: "mobile" | "desktop" | "fullscreen";
+  rowLayout?: "standard" | "fullscreen";
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<TournamentApplicationStatus>(initialStatus);
@@ -135,7 +92,6 @@ export default function ParticipantListRow({
     initialClientApplicationApprovedAt ?? null,
   );
   const [loading, setLoading] = useState(false);
-  /** 입금확인(true) PATCH 진행 중 — 승인 버튼은 켜 두되, 입금해제는 막음 */
   const [depositConfirmSaving, setDepositConfirmSaving] = useState(false);
   const depositConfirmInflightRef = useRef<Promise<void> | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -151,8 +107,6 @@ export default function ParticipantListRow({
   useEffect(() => {
     setClientApplicationApprovedAt(initialClientApplicationApprovedAt ?? null);
   }, [initialClientApplicationApprovedAt]);
-
-  const procStyle = rowLayout === "mobile" ? procBtnMobilePill : procBtnBase;
 
   const terminalRejected = status === "REJECTED";
   const terminalApproved = status === "APPROVED";
@@ -349,31 +303,21 @@ export default function ParticipantListRow({
     void handleTransition("REJECTED", rejectReason);
   }
 
-  function depositButton() {
+  /** ₩ 입금확인 — 빨강 계열, 미완 ○ / 완료 ● */
+  function renderWonBtn() {
+    const done = terminalApproved || depositDone;
+    const idleCls = done ? "participant-op-btn participant-op-btn--won participant-op-btn--won-done" : "participant-op-btn participant-op-btn--won participant-op-btn--won-idle";
     if (terminalApproved) {
       return (
-        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--depositDone" style={procStyle}>
-          입금완료
+        <button type="button" disabled className={`${idleCls} participant-op-btn--disabled`} aria-label="입금확인(완료)">
+          ₩
         </button>
       );
     }
     if (terminalRejected) {
       return (
-        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--muted" style={procStyle}>
-          입금확인
-        </button>
-      );
-    }
-    if (!depositDone) {
-      return (
-        <button
-          type="button"
-          disabled={loading}
-          className="v3-appProcBtn v3-appProcBtn--depositIdle"
-          style={procStyle}
-          onClick={() => onDepositClick()}
-        >
-          입금확인
+        <button type="button" disabled className="participant-op-btn participant-op-btn--won participant-op-btn--won-muted" aria-label="입금확인(불가)">
+          ₩
         </button>
       );
     }
@@ -381,87 +325,66 @@ export default function ParticipantListRow({
       <button
         type="button"
         disabled={loading || depositConfirmSaving}
-        className="v3-appProcBtn v3-appProcBtn--depositDone"
-        style={procStyle}
+        className={idleCls}
+        aria-label={done ? "입금확인(완료)" : "입금확인"}
         onClick={() => onDepositClick()}
       >
-        입금완료
+        ₩
       </button>
     );
   }
 
-  function approveButton() {
+  /** ✓ 승인 — 초록 계열 */
+  function renderCheckBtn() {
     if (terminalApproved) {
       return (
-        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--approveDone" style={procStyle}>
-          승인완료
+        <button type="button" disabled className="participant-op-btn participant-op-btn--check participant-op-btn--check-done participant-op-btn--disabled" aria-label="승인(완료)">
+          ✓
         </button>
       );
     }
     if (terminalRejected) {
       return (
-        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--muted" style={procStyle}>
-          승인
+        <button type="button" disabled className="participant-op-btn participant-op-btn--check participant-op-btn--check-muted" aria-label="승인(불가)">
+          ✓
         </button>
       );
     }
     if (!depositDone) {
       return (
-        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--approveIdleDisabled" style={procStyle}>
-          승인
+        <button type="button" disabled className="participant-op-btn participant-op-btn--check participant-op-btn--check-wait" aria-label="승인(입금확인 필요)">
+          ✓
         </button>
       );
     }
-    if (!approveDone) {
-      return (
-        <button
-          type="button"
-          disabled={loading}
-          className="v3-appProcBtn v3-appProcBtn--approveReady"
-          style={procStyle}
-          onClick={() => onApproveClick()}
-        >
-          승인
-        </button>
-      );
-    }
+    const done = approveDone;
+    const cls = done ? "participant-op-btn participant-op-btn--check participant-op-btn--check-done" : "participant-op-btn participant-op-btn--check participant-op-btn--check-idle";
     return (
-      <button
-        type="button"
-        disabled={loading}
-        className="v3-appProcBtn v3-appProcBtn--approveDone"
-        style={procStyle}
-        onClick={() => onApproveClick()}
-      >
-        승인완료
+      <button type="button" disabled={loading} className={cls} aria-label={done ? "승인(완료)" : "승인"} onClick={() => onApproveClick()}>
+        ✓
       </button>
     );
   }
 
-  function cancelRejectButton() {
+  /** ✕ 취소/거절 — 회색 계열 */
+  function renderCrossBtn() {
     if (terminalApproved) {
       return (
-        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--muted" style={procStyle}>
-          취소/거절
+        <button type="button" disabled className="participant-op-btn participant-op-btn--cross participant-op-btn--cross-muted participant-op-btn--disabled" aria-label="취소/거절(불가)">
+          ✕
         </button>
       );
     }
     if (terminalRejected) {
       return (
-        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--rejectDone" style={procStyle}>
-          취소/거절
+        <button type="button" disabled className="participant-op-btn participant-op-btn--cross participant-op-btn--cross-done participant-op-btn--disabled" aria-label="취소/거절(완료)">
+          ✕
         </button>
       );
     }
     return (
-      <button
-        type="button"
-        disabled={loading}
-        className="v3-appProcBtn v3-appProcBtn--rejectIdle"
-        style={procStyle}
-        onClick={() => onCancelRejectClick()}
-      >
-        취소/거절
+      <button type="button" disabled={loading} className="participant-op-btn participant-op-btn--cross participant-op-btn--cross-idle" aria-label="취소/거절" onClick={() => onCancelRejectClick()}>
+        ✕
       </button>
     );
   }
@@ -478,7 +401,11 @@ export default function ParticipantListRow({
   const approveMd = formatDateSlashMd(approveMdIso);
 
   const rowBg = terminalRejected ? "#f3f4f6" : "#fff";
-  const cellPad = rowLayout === "mobile" ? cellBaseMobileMerged : cellBase;
+
+  const approveInfoCell =
+    terminalRejected ? "—" : approveDone ? approveMd : applicationStatusShortKo(status);
+
+  const phoneDisplay = (phone ?? "").trim() || "—";
 
   const modalEl =
     detailOpen && typeof document !== "undefined"
@@ -506,88 +433,50 @@ export default function ParticipantListRow({
         )
       : null;
 
-  const mergedProcessingCell = (
-    <td
-      data-participant-label="처리"
-      className="participant-col participant-col--mobileProcMerged"
-      style={{
-        ...cellPad,
-        textAlign: "center",
-        verticalAlign: "middle",
-      }}
-    >
-      <div className="participant-mobileProcStack">
-        {depositButton()}
-        {approveButton()}
-        {cancelRejectButton()}
-      </div>
+  const opsCell = (
+    <td className="participant-col participant-col--ops" style={{ ...cellBase, textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap" }}>
+      <div className="participant-op-inline">{renderWonBtn()}</div>
+    </td>
+  );
+  const opsCellCheck = (
+    <td className="participant-col participant-col--ops" style={{ ...cellBase, textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap" }}>
+      <div className="participant-op-inline">{renderCheckBtn()}</div>
+    </td>
+  );
+  const opsCellCross = (
+    <td className="participant-col participant-col--ops" style={{ ...cellBase, textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap" }}>
+      <div className="participant-op-inline">{renderCrossBtn()}</div>
     </td>
   );
 
-  const applyCellInner =
-    rowLayout === "fullscreen" ? (
-      <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>{formatDateSlashMd(registrationCreatedAt)}</span>
-    ) : (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "0.06rem",
-          lineHeight: 1.28,
-          fontSize: rowLayout === "mobile" ? "0.7rem" : "0.72rem",
-          textAlign: "center",
-        }}
-      >
-        <span style={{ color: "#64748b", fontWeight: 700, fontSize: "0.58rem", letterSpacing: "-0.02em" }}>신청일</span>
-        <span style={{ fontVariantNumeric: "tabular-nums", color: "#0f172a", fontWeight: 600 }}>
-          {formatDateSlashMd(registrationCreatedAt)}
-        </span>
-        {approveDone ? (
-          <>
-            <span style={{ color: "#dc2626", fontWeight: 800, fontSize: "0.58rem", marginTop: "0.04rem" }}>승인</span>
-            <span style={{ color: "#dc2626", fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{approveMd}</span>
-          </>
-        ) : null}
-      </div>
-    );
-
-  const phoneDisplay = (phone ?? "").trim() || "—";
+  const ellipsisTd = (label: string, content: string, align: "left" | "center" = "left", extraClass = "") => (
+    <td
+      data-participant-label={label}
+      className={`participant-col participant-col--ellipsis ${extraClass}`.trim()}
+      style={{
+        ...cellBase,
+        textAlign: align,
+        maxWidth: 0,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+        fontVariantNumeric: "tabular-nums",
+      }}
+      title={content}
+    >
+      {content}
+    </td>
+  );
 
   return (
     <>
       <tr className={terminalRejected ? "participant-row--rejected" : undefined} style={{ background: rowBg }}>
-        <td data-participant-label="신청" style={{ ...cellPad, verticalAlign: "middle" }}>
-          {applyCellInner}
+        <td data-participant-label="신청" style={{ ...cellBase, fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
+          {formatDateSlashMd(registrationCreatedAt)}
         </td>
-        <td
-          data-participant-label="이름"
-          className="participant-col participant-col--name"
-          style={{
-            ...cellPad,
-            textAlign: "left",
-            verticalAlign: "top",
-            wordBreak: "keep-all",
-            whiteSpace: "normal",
-            overflow: "visible",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "flex-start",
-              gap: "0.2rem",
-              minWidth: 0,
-              flexWrap: "wrap",
-            }}
-          >
-            <button
-              type="button"
-              className="client-tournament-manage__participantNameBtn"
-              onClick={() => setDetailOpen(true)}
-            >
+        <td data-participant-label="이름" className="participant-col participant-col--name" style={{ ...cellBase, textAlign: "left", maxWidth: 0 }}>
+          <div className="participant-name-cell-1l">
+            <button type="button" className="client-tournament-manage__participantNameBtn participant-name-btn-ellipsis" onClick={() => setDetailOpen(true)}>
               {applicantName}
             </button>
             {registrationSource === "admin" ? (
@@ -610,88 +499,40 @@ export default function ParticipantListRow({
         </td>
         {rowLayout === "fullscreen" ? (
           <td
-            data-participant-label="전화"
+            data-participant-label="전화번호"
             className="participant-col participant-col--phoneFs"
-            style={{ ...cellPad, textAlign: "left", fontVariantNumeric: "tabular-nums", color: "#334155" }}
+            style={{ ...cellBase, textAlign: "left", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: "#334155" }}
+            title={phoneDisplay}
           >
             {phoneDisplay}
           </td>
         ) : null}
-        <td
-          data-participant-label={metricColumnTitle}
-          className="participant-col participant-col--metricNarrow"
-          style={{ ...cellPad, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
-        >
+        <td data-participant-label={metricColumnTitle} style={{ ...cellBase, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
           {metricDisplay}
         </td>
+        {rowLayout === "fullscreen"
+          ? ellipsisTd("소속", affiliationDisplay, "left", "participant-col--affiliationFs")
+          : null}
+        {ellipsisTd("입금자", depositorDisplay, "left", "participant-col--depositor")}
         <td
-          data-participant-label="입금자"
-          className="participant-col participant-col--depositor"
+          data-participant-label="승인"
           style={{
-            ...cellPad,
-            textAlign: "left",
-            verticalAlign: "top",
-            wordBreak: "keep-all",
-            whiteSpace: "normal",
-            overflow: "visible",
+            ...cellBase,
+            maxWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            fontVariantNumeric: "tabular-nums",
+            fontWeight: 600,
+            color: "#334155",
           }}
+          title={approveInfoCell}
         >
-          {depositorDisplay}
+          {approveInfoCell}
         </td>
-        {rowLayout === "fullscreen" ? (
-          <td
-            data-participant-label="소속"
-            className="participant-col participant-col--affiliationFs"
-            style={{ ...cellPad, textAlign: "left", wordBreak: "keep-all", whiteSpace: "normal" }}
-          >
-            {affiliationDisplay}
-          </td>
-        ) : null}
-        {rowLayout === "mobile" ? (
-          mergedProcessingCell
-        ) : rowLayout === "desktop" ? (
-          <>
-            <td className="participant-col participant-col--desktopProcSplit" data-participant-label="입금확인" style={{ ...cellPad }}>
-              <div style={{ display: "flex", justifyContent: "center" }}>{depositButton()}</div>
-            </td>
-            <td
-              className="participant-col participant-col--desktopProcSplit"
-              data-participant-label={approveActionColumnLabel}
-              style={{ ...cellPad }}
-            >
-              <div style={{ display: "flex", justifyContent: "center" }}>{approveButton()}</div>
-            </td>
-            <td className="participant-col participant-col--desktopProcSplit" data-participant-label="취소/거절" style={{ ...cellPad }}>
-              <div style={{ display: "flex", justifyContent: "center" }}>{cancelRejectButton()}</div>
-            </td>
-          </>
-        ) : (
-          <>
-            <td className="participant-col participant-col--desktopProcSplit" data-participant-label="입금확인" style={{ ...cellPad }}>
-              <div style={{ display: "flex", justifyContent: "center" }}>{depositButton()}</div>
-            </td>
-            <td
-              className="participant-col participant-col--desktopProcSplit"
-              data-participant-label={approveActionColumnLabel}
-              style={{ ...cellPad }}
-            >
-              <div style={{ display: "flex", justifyContent: "center" }}>{approveButton()}</div>
-            </td>
-            <td
-              className="participant-col participant-col--desktopProcSplit"
-              data-participant-label="승인일"
-              style={{ ...cellPad, fontVariantNumeric: "tabular-nums", color: approveMd !== "—" ? "#dc2626" : "#64748b", fontWeight: 600 }}
-            >
-              {approveMd}
-            </td>
-            <td className="participant-col participant-col--desktopProcSplit" data-participant-label="상태" style={{ ...cellPad, fontWeight: 700 }}>
-              {applicationStatusShortKo(status)}
-            </td>
-            <td className="participant-col participant-col--desktopProcSplit" data-participant-label="취소/거절" style={{ ...cellPad }}>
-              <div style={{ display: "flex", justifyContent: "center" }}>{cancelRejectButton()}</div>
-            </td>
-          </>
-        )}
+        {opsCell}
+        {opsCellCheck}
+        {opsCellCross}
       </tr>
       {modalEl}
     </>

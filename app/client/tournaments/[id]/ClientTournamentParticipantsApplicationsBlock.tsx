@@ -125,7 +125,6 @@ export default function ClientTournamentParticipantsApplicationsBlock({
 }: Props) {
   const router = useRouter();
   const isApplicationsMobileLayout = useApplicationsTableMobileLayout();
-  const applicationsMobileMerged = variant === "standard" && isApplicationsMobileLayout;
   const metricColumnTitle = participantMetricColumnTitle(entryQualificationType);
   const [entries, setEntries] = useState<TournamentApplicationListItem[]>(initialEntries);
   const [finalizeBusy, setFinalizeBusy] = useState(false);
@@ -231,7 +230,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   const tableViewHref = `/client/tournaments/${encodeURIComponent(tournamentId)}/participants/table-view`;
   const showFinalize = !CLOSED_BADGES.includes(tournamentStatusBadge);
   const fullscreenTable = variant === "fullscreenTable";
-  const rowLayout = fullscreenTable ? "fullscreen" : applicationsMobileMerged ? "mobile" : "desktop";
+  const rowLayout = fullscreenTable ? "fullscreen" : "standard";
 
   async function onBulkApproveDepositConfirmed() {
     if (bulkApproveBusy) return;
@@ -492,6 +491,11 @@ export default function ClientTournamentParticipantsApplicationsBlock({
             : "client-tournament-manage__participantTableShell client-tournament-manage__participantTableShell--applicationsScroll"
         }
       >
+        <p className="client-tournament-manage__applicationsSymbolLegend">
+          <span className="client-tournament-manage__applicationsSymbolLegendItem">₩ = 입금확인</span>
+          <span className="client-tournament-manage__applicationsSymbolLegendItem">✓ = 승인</span>
+          <span className="client-tournament-manage__applicationsSymbolLegendItem">✕ = 취소/거절</span>
+        </p>
         {zoneFilteredEntries.length === 0 ? (
           <p className="v3-muted" style={{ margin: 0, padding: "0.65rem 0.75rem" }}>
             {participantCountSummary.total === 0
@@ -506,10 +510,10 @@ export default function ClientTournamentParticipantsApplicationsBlock({
               className={`client-tournament-manage__participantTable client-tournament-manage__participantTable--singleLineMobile client-tournament-manage__participantTable--applicationsCompact ${fullscreenTable ? "client-tournament-manage__participantTable--fullscreenWide" : ""}`}
               style={{
                 width: "100%",
-                minWidth: fullscreenTable ? "1040px" : "100%",
+                minWidth: fullscreenTable ? "720px" : "100%",
                 borderCollapse: "collapse",
                 tableLayout: "fixed",
-                fontSize: fullscreenTable ? "0.82rem" : applicationsMobileMerged ? "0.78rem" : "0.74rem",
+                fontSize: fullscreenTable ? "0.8rem" : "0.74rem",
               }}
             >
               <thead>
@@ -518,146 +522,115 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     <>
                       <th
                         className="participant-th participant-th--apply"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "7%", minWidth: "3.25rem" }}
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "6%", minWidth: "2.75rem" }}
                       >
                         신청
                       </th>
                       <th
                         className="participant-th participant-th--name"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "11%", minWidth: "4.5rem" }}
+                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "10%", minWidth: "3.5rem" }}
                       >
                         이름
                       </th>
                       <th
                         className="participant-th participant-th--phoneFs"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "13%", minWidth: "5.5rem" }}
+                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "16%", minWidth: "7.25rem" }}
                       >
-                        전화
+                        전화번호
                       </th>
                       <th
                         className="participant-th participant-th--metric"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "7%", minWidth: "2.5rem" }}
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "6%", minWidth: "2.25rem" }}
                       >
                         {metricColumnTitle}
                       </th>
                       <th
-                        className="participant-th participant-th--depositor"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "10%", minWidth: "4rem" }}
-                      >
-                        입금자
-                      </th>
-                      <th
                         className="participant-th participant-th--affiliationFs"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "11%", minWidth: "4rem" }}
+                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "10%", minWidth: "3rem" }}
                       >
                         소속
                       </th>
                       <th
+                        className="participant-th participant-th--depositor"
+                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "10%", minWidth: "3rem" }}
+                      >
+                        입금자
+                      </th>
+                      <th
+                        className="participant-th participant-th--approveInfoFs"
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "9%", minWidth: "2.75rem" }}
+                      >
+                        승인
+                      </th>
+                      <th
                         className="participant-th participant-th--deposit"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "8%", minWidth: "3.5rem" }}
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "7%", minWidth: "2.5rem" }}
                       >
                         입금확인
                       </th>
                       <th
                         className="participant-th participant-th--approveBtn"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "8%", minWidth: "3.5rem" }}
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "7%", minWidth: "2.5rem" }}
                       >
-                        처리
-                      </th>
-                      <th
-                        className="participant-th participant-th--approveDateFs"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "7%", minWidth: "2.75rem" }}
-                      >
-                        승인일
-                      </th>
-                      <th
-                        className="participant-th participant-th--statusFs"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "8%", minWidth: "3rem" }}
-                      >
-                        상태
+                        승인
                       </th>
                       <th
                         className="participant-th participant-th--reject"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "10%", minWidth: "3.75rem" }}
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "7%", minWidth: "2.5rem" }}
                       >
-                        취소/거절
+                        취소
                       </th>
                     </>
                   ) : (
                     <>
                       <th
                         className="participant-th participant-th--apply"
-                        style={{
-                          ...participantApplicationsTableThBase,
-                          textAlign: "center",
-                          width: applicationsMobileMerged ? "11%" : "12%",
-                          minWidth: "3.1rem",
-                        }}
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "10%", minWidth: "2.85rem" }}
                       >
                         신청
                       </th>
                       <th
                         className="participant-th participant-th--name"
-                        style={{
-                          ...participantApplicationsTableThBase,
-                          textAlign: "left",
-                          width: applicationsMobileMerged ? "28%" : "24%",
-                          minWidth: applicationsMobileMerged ? "6.5rem" : "5.5rem",
-                        }}
+                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "22%", minWidth: "4.5rem" }}
                       >
                         이름
                       </th>
                       <th
                         className="participant-th participant-th--metric"
-                        style={{
-                          ...participantApplicationsTableThBase,
-                          textAlign: "center",
-                          width: applicationsMobileMerged ? "9%" : "8%",
-                          minWidth: "2.35rem",
-                        }}
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "9%", minWidth: "2.2rem" }}
                       >
                         {metricColumnTitle}
                       </th>
                       <th
                         className="participant-th participant-th--depositor"
-                        style={{
-                          ...participantApplicationsTableThBase,
-                          textAlign: "left",
-                          width: applicationsMobileMerged ? "auto" : "20%",
-                          minWidth: applicationsMobileMerged ? "5.25rem" : "4.75rem",
-                        }}
+                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "18%", minWidth: "3.5rem" }}
                       >
                         입금자
                       </th>
-                      {applicationsMobileMerged ? (
-                        <th
-                          className="participant-th participant-th--processing"
-                          style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "22%", minWidth: "9.5rem" }}
-                        >
-                          처리
-                        </th>
-                      ) : (
-                        <>
-                          <th
-                            className="participant-th participant-th--deposit"
-                            style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "12%", minWidth: "3.75rem" }}
-                          >
-                            입금확인
-                          </th>
-                          <th
-                            className="participant-th participant-th--approveBtn"
-                            style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "12%", minWidth: "3.75rem" }}
-                          >
-                            처리
-                          </th>
-                          <th
-                            className="participant-th participant-th--reject"
-                            style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "12%", minWidth: "3.75rem" }}
-                          >
-                            취소/거절
-                          </th>
-                        </>
-                      )}
+                      <th
+                        className="participant-th participant-th--approveInfo"
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "14%", minWidth: "3rem" }}
+                      >
+                        승인
+                      </th>
+                      <th
+                        className="participant-th participant-th--deposit"
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "9%", minWidth: "2.4rem" }}
+                      >
+                        ₩
+                      </th>
+                      <th
+                        className="participant-th participant-th--approveBtn"
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "9%", minWidth: "2.4rem" }}
+                      >
+                        ✓
+                      </th>
+                      <th
+                        className="participant-th participant-th--reject"
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "9%", minWidth: "2.4rem" }}
+                      >
+                        ✕
+                      </th>
                     </>
                   )}
                 </tr>
@@ -677,7 +650,6 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     registrationSource={entry.registrationSource ?? null}
                     participantAverage={entry.participantAverage ?? null}
                     metricColumnTitle={metricColumnTitle}
-                    approveActionColumnLabel="처리"
                     adminNote={entry.adminNote ?? null}
                     statusChangedAt={entry.statusChangedAt}
                     attendanceChecked={entry.attendanceChecked}
