@@ -39,10 +39,9 @@ function formatDateSlashMd(iso: string | null | undefined): string {
 }
 
 const cellBase: CSSProperties = {
-  padding: "0.16rem 0.18rem",
+  padding: "0.22rem 0.36rem",
   fontSize: "0.72rem",
   verticalAlign: "middle",
-  borderBottom: "1px solid #e8e8e8",
   textAlign: "center",
 };
 

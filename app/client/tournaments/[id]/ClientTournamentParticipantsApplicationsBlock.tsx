@@ -506,125 +506,96 @@ export default function ClientTournamentParticipantsApplicationsBlock({
               className={`client-tournament-manage__participantTable client-tournament-manage__participantTable--singleLineMobile client-tournament-manage__participantTable--applicationsCompact ${fullscreenTable ? "client-tournament-manage__participantTable--fullscreenWide" : ""}`}
               style={{
                 width: "100%",
-                minWidth: fullscreenTable ? "720px" : "100%",
+                minWidth: "100%",
                 borderCollapse: "collapse",
                 tableLayout: "fixed",
-                fontSize: fullscreenTable ? "0.8rem" : "0.74rem",
+                fontSize: fullscreenTable ? "0.78rem" : "0.74rem",
               }}
             >
+              {fullscreenTable ? (
+                <colgroup>
+                  <col style={{ width: "6%" }} />
+                  <col style={{ width: "11%" }} />
+                  <col style={{ width: "19%" }} />
+                  <col style={{ width: "6%" }} />
+                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "9%" }} />
+                </colgroup>
+              ) : (
+                <colgroup>
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "23%" }} />
+                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "17%" }} />
+                  <col style={{ width: "16%" }} />
+                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "9%" }} />
+                </colgroup>
+              )}
               <thead>
-                <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                <tr style={{ background: "#f8fafc" }}>
                   {fullscreenTable ? (
                     <>
-                      <th
-                        className="participant-th participant-th--apply"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "6%", minWidth: "2.75rem" }}
-                      >
+                      <th className="participant-th participant-th--apply" style={{ ...participantApplicationsTableThBase, textAlign: "center" }}>
                         신청
                       </th>
-                      <th
-                        className="participant-th participant-th--name"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "10%", minWidth: "3.5rem" }}
-                      >
+                      <th className="participant-th participant-th--name" style={{ ...participantApplicationsTableThBase, textAlign: "left" }}>
                         이름
                       </th>
-                      <th
-                        className="participant-th participant-th--phoneFs"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "16%", minWidth: "7.25rem" }}
-                      >
+                      <th className="participant-th participant-th--phoneFs" style={{ ...participantApplicationsTableThBase, textAlign: "left" }}>
                         전화번호
                       </th>
-                      <th
-                        className="participant-th participant-th--metric"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "6%", minWidth: "2.25rem" }}
-                      >
+                      <th className="participant-th participant-th--metric" style={{ ...participantApplicationsTableThBase, textAlign: "center" }}>
                         {metricColumnTitle}
                       </th>
-                      <th
-                        className="participant-th participant-th--affiliationFs"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "10%", minWidth: "3rem" }}
-                      >
+                      <th className="participant-th participant-th--affiliationFs" style={{ ...participantApplicationsTableThBase, textAlign: "left" }}>
                         소속
                       </th>
-                      <th
-                        className="participant-th participant-th--depositor"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "10%", minWidth: "3rem" }}
-                      >
+                      <th className="participant-th participant-th--depositor" style={{ ...participantApplicationsTableThBase, textAlign: "left" }}>
                         입금자
                       </th>
-                      <th
-                        className="participant-th participant-th--approveInfoFs"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "9%", minWidth: "2.75rem" }}
-                      >
+                      <th className="participant-th participant-th--approveInfoFs" style={{ ...participantApplicationsTableThBase, textAlign: "center" }}>
                         승인
                       </th>
-                      <th
-                        className="participant-th participant-th--deposit"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "7%", minWidth: "2.5rem" }}
-                      >
+                      <th className="participant-th participant-th--deposit" style={{ ...participantApplicationsTableThBase, textAlign: "center" }}>
                         입금
                       </th>
-                      <th
-                        className="participant-th participant-th--approveBtn"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "7%", minWidth: "2.5rem" }}
-                      >
+                      <th className="participant-th participant-th--approveBtn" style={{ ...participantApplicationsTableThBase, textAlign: "center" }}>
                         승인
                       </th>
-                      <th
-                        className="participant-th participant-th--reject"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "7%", minWidth: "2.5rem" }}
-                      >
+                      <th className="participant-th participant-th--reject" style={{ ...participantApplicationsTableThBase, textAlign: "center" }}>
                         취소
                       </th>
                     </>
                   ) : (
                     <>
-                      <th
-                        className="participant-th participant-th--apply"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "10%", minWidth: "2.85rem" }}
-                      >
+                      <th className="participant-th participant-th--apply" style={{ ...participantApplicationsTableThBase, textAlign: "center" }}>
                         신청
                       </th>
-                      <th
-                        className="participant-th participant-th--name"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "22%", minWidth: "4.5rem" }}
-                      >
+                      <th className="participant-th participant-th--name" style={{ ...participantApplicationsTableThBase, textAlign: "left" }}>
                         이름
                       </th>
-                      <th
-                        className="participant-th participant-th--metric"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "9%", minWidth: "2.2rem" }}
-                      >
+                      <th className="participant-th participant-th--metric" style={{ ...participantApplicationsTableThBase, textAlign: "center" }}>
                         {metricColumnTitle}
                       </th>
-                      <th
-                        className="participant-th participant-th--depositor"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "18%", minWidth: "3.5rem" }}
-                      >
+                      <th className="participant-th participant-th--depositor" style={{ ...participantApplicationsTableThBase, textAlign: "left" }}>
                         입금자
                       </th>
-                      <th
-                        className="participant-th participant-th--approveInfo"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "14%", minWidth: "3rem" }}
-                      >
+                      <th className="participant-th participant-th--approveInfo" style={{ ...participantApplicationsTableThBase, textAlign: "center" }}>
                         승인
                       </th>
-                      <th
-                        className="participant-th participant-th--deposit"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "9%", minWidth: "2.4rem" }}
-                      >
+                      <th className="participant-th participant-th--deposit" style={{ ...participantApplicationsTableThBase, textAlign: "center" }}>
                         입금
                       </th>
-                      <th
-                        className="participant-th participant-th--approveBtn"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "9%", minWidth: "2.4rem" }}
-                      >
+                      <th className="participant-th participant-th--approveBtn" style={{ ...participantApplicationsTableThBase, textAlign: "center" }}>
                         승인
                       </th>
-                      <th
-                        className="participant-th participant-th--reject"
-                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "9%", minWidth: "2.4rem" }}
-                      >
+                      <th className="participant-th participant-th--reject" style={{ ...participantApplicationsTableThBase, textAlign: "center" }}>
                         취소
                       </th>
                     </>

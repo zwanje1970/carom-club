@@ -2999,7 +2999,8 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
     display: flex;
     flex-direction: column;
     padding-top: max(var(--app-safe-top), 0px);
-    padding-bottom: max(var(--app-safe-bottom), 0px);
+    /* 하단은 표 스크롤 영역이 뷰포트까지 이어지도록 — safe-area는 표 내부 padding에서만 처리 */
+    padding-bottom: 0;
     padding-left: max(var(--app-safe-left), 0px);
     padding-right: max(var(--app-safe-right), 0px);
   }
