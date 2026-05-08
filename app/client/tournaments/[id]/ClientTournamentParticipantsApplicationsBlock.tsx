@@ -337,6 +337,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
           <div className="client-tournament-manage__fullscreenTableHead">
             <Link
               prefetch={false}
+              replace
               href={`/client/tournaments/${encodeURIComponent(tournamentId)}/participants`}
               className="client-tournament-manage__fullscreenTableClose"
               style={{ ...opsBtn, flex: "0 0 auto", textDecoration: "none", fontWeight: 700 }}
@@ -372,7 +373,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
             <Link prefetch={false} href={printHref} style={{ ...opsBtn, textDecoration: "none" }}>
               확정리스트
             </Link>
-            <Link prefetch={false} href={tableViewHref} style={{ ...opsBtn, textDecoration: "none" }}>
+            <Link prefetch={false} replace href={tableViewHref} style={{ ...opsBtn, textDecoration: "none" }}>
               가로보기
             </Link>
             <button
