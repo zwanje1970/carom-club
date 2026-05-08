@@ -28,6 +28,12 @@
     var(--site-shell-header-safe-top) + 2 * var(--site-shell-header-pad-y) + var(--site-shell-title-min-height)
   );
 
+  /* 모바일 시스템 영역(노치·홈 인디케이터·제스처) — 전체화면·fixed 뷰에서 공통 참조 */
+  --app-safe-top: env(safe-area-inset-top, 0px);
+  --app-safe-right: env(safe-area-inset-right, 0px);
+  --app-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --app-safe-left: env(safe-area-inset-left, 0px);
+
   /* 공통 UI 색상·간격 (리스트/상세 공통 카드·버튼·뱃지 — 클래스로 조합 적용) */
   --color-primary: #2563eb;
   --color-primary-soft: #eff6ff;
@@ -2870,6 +2876,9 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
     padding-top: calc(var(--app-dashboard-mobile-chrome-height) + var(--site-shell-gray-padding-top));
     /* 하단 고정 UI·sticky 툴바·홈 인디케이터와 겹침 완화 — 사이트 하단 네비와 동일 높이 토큰 */
     padding-bottom: calc(var(--site-fixed-bottom-nav-layout-height) + 0.75rem);
+    /* 좌우 제스처·노치 옆 여백 — 콘텐츠가 시스템 영역으로 침범하지 않도록 */
+    padding-left: max(0.35rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.35rem, env(safe-area-inset-right, 0px));
   }
 
   html:has(.app-dashboard-mobile-root),
@@ -2926,6 +2935,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    /* fixed 자식(main)은 뷰포트 기준이므로 패딩 무효 — safe-area는 bracket view main에서 처리 */
     padding-top: 0;
     padding-bottom: 0;
   }
@@ -2988,8 +2998,10 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    padding-top: 0;
-    padding-bottom: 0;
+    padding-top: max(var(--app-safe-top), 0px);
+    padding-bottom: max(var(--app-safe-bottom), 0px);
+    padding-left: max(var(--app-safe-left), 0px);
+    padding-right: max(var(--app-safe-right), 0px);
   }
 
   .app-dashboard-mobile-root:has([data-client-applications-table-fullscreen="1"])
@@ -3006,6 +3018,17 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
     width: 100%;
     box-sizing: border-box;
   }
+}
+
+/* TV 공유·대진표 TV: 루트에 시스템 영역 이격 */
+.tv-root-shell {
+  box-sizing: border-box;
+  min-height: 100dvh;
+  min-height: 100svh;
+  padding-top: max(0px, var(--app-safe-top));
+  padding-right: max(0px, var(--app-safe-right));
+  padding-bottom: max(0px, var(--app-safe-bottom));
+  padding-left: max(0px, var(--app-safe-left));
 }
 
 .app-dashboard-shell.app-mobile-bottom-nav-scroll-pad {
