@@ -8,8 +8,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Color
 import android.net.Uri
+import android.view.ViewGroup
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -42,6 +44,45 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
+
+private const val ORIENTATION_BRIDGE_TAG = "CaromAppBridge"
+
+/**
+ * 로컬 단말 검증 전용: `true`이면 앱 시작 직후 landscape 고정(전체 앱이 가로가 됨).
+ * OS/Manifest가 회전을 허용하는지 확인한 뒤 **반드시 false로 되돌릴 것**. 배포 금지.
+ */
+private const val DIAGNOSTIC_FORCE_LANDSCAPE_ON_LAUNCH = false
+
+private fun configurationOrientationLabel(orientation: Int): String =
+    when (orientation) {
+        Configuration.ORIENTATION_LANDSCAPE -> "LANDSCAPE"
+        Configuration.ORIENTATION_PORTRAIT -> "PORTRAIT"
+        Configuration.ORIENTATION_UNDEFINED -> "UNDEFINED"
+        else -> "OTHER($orientation)"
+    }
+
+@Suppress("DEPRECATION")
+private fun displayRotationForProbe(activity: AppCompatActivity): Int =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        activity.display?.rotation ?: -1
+    } else {
+        activity.windowManager.defaultDisplay.rotation
+    }
+
+/** 회전 디버그: requestedOrientation / configuration / Display.rotation 한 줄로 */
+private fun logOrientationProbe(tag: String, activity: AppCompatActivity) {
+    val confRaw = activity.resources.configuration.orientation
+    val req = activity.requestedOrientation
+    val rot = displayRotationForProbe(activity)
+    Log.d(
+        ORIENTATION_BRIDGE_TAG,
+        "probe[$tag] activity=${activity.javaClass.name} hash=${System.identityHashCode(activity)} " +
+            "taskId=${activity.taskId} isFinishing=${activity.isFinishing} " +
+            "requestedOrientation=$req " +
+            "configuration.orientation=${configurationOrientationLabel(confRaw)} raw=$confRaw " +
+            "displayRotation=$rot (0=up 1=90° 2=180 3=270)",
+    )
+}
 
 class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
@@ -120,8 +161,26 @@ class MainActivity : AppCompatActivity() {
 
         webView = WebView(this)
         webView.setBackgroundColor(Color.BLACK)
+        webView.layoutParams =
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
         setContentView(webView)
         window.decorView.setBackgroundColor(Color.BLACK)
+
+        Log.d(ORIENTATION_BRIDGE_TAG, "onCreate MainActivity — verifying launcher Activity instance")
+        logOrientationProbe("onCreate.initial", this)
+        if (DIAGNOSTIC_FORCE_LANDSCAPE_ON_LAUNCH) {
+            Log.w(
+                ORIENTATION_BRIDGE_TAG,
+                "DIAGNOSTIC_FORCE_LANDSCAPE_ON_LAUNCH=true — forcing SCREEN_ORIENTATION_LANDSCAPE (remove after test)",
+            )
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            logOrientationProbe("onCreate.afterDiagnosticForce", this)
+            window.decorView.postDelayed({ logOrientationProbe("onCreate.diagnostic300ms", this) }, 300L)
+            window.decorView.postDelayed({ logOrientationProbe("onCreate.diagnostic1000ms", this) }, 1000L)
+        }
 
         setupWebView()
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
@@ -172,6 +231,16 @@ class MainActivity : AppCompatActivity() {
                 webView.loadUrl(resolveOpenUrl(intent))
             }
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        Log.d(
+            ORIENTATION_BRIDGE_TAG,
+            "MainActivity.onConfigurationChanged orientation=${configurationOrientationLabel(newConfig.orientation)} " +
+                "screenWidthDp=${newConfig.screenWidthDp} screenHeightDp=${newConfig.screenHeightDp} " +
+                "requestedOrientation=$requestedOrientation",
+        )
     }
 
     private fun setupWebView() {
@@ -468,13 +537,44 @@ class CaromAppBridge(
 
     @JavascriptInterface
     fun requestOrientation(mode: String) {
+        Log.d(
+            ORIENTATION_BRIDGE_TAG,
+            "JS->Native requestOrientation(mode=$mode) thread=${Thread.currentThread().name} " +
+                "activity=${activity.javaClass.name} hash=${System.identityHashCode(activity)} " +
+                "isFinishing=${activity.isFinishing}",
+        )
         activity.runOnUiThread {
-            activity.requestedOrientation =
-                if (mode == "landscape") {
-                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            logOrientationProbe("bridge.beforeSet", activity)
+            /* 고정 방향: 시스템 자동 회전과 무관하게 요청 (sensor* 대신 고정값) */
+            val target =
+                if (mode.equals("landscape", ignoreCase = true)) {
+                    ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                 } else {
-                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                    ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                 }
+            activity.requestedOrientation = target
+            Log.d(ORIENTATION_BRIDGE_TAG, "bridge set requestedOrientation targetConstant=$target")
+            val applied = activity.requestedOrientation
+            val matchesLandscape =
+                mode.equals("landscape", ignoreCase = true) &&
+                    applied == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            val matchesPortrait =
+                !mode.equals("landscape", ignoreCase = true) &&
+                    applied == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            Log.d(
+                ORIENTATION_BRIDGE_TAG,
+                "verify requestedOrientation matches fixed constant: landscapeOk=$matchesLandscape portraitOk=$matchesPortrait applied=$applied",
+            )
+            logOrientationProbe("bridge.afterSetImmediate", activity)
+            activity.window.decorView.post {
+                logOrientationProbe("bridge.afterDecorViewPost", activity)
+            }
+            activity.window.decorView.postDelayed({
+                logOrientationProbe("bridge.after300ms", activity)
+            }, 300L)
+            activity.window.decorView.postDelayed({
+                logOrientationProbe("bridge.after1000ms", activity)
+            }, 1000L)
         }
     }
 

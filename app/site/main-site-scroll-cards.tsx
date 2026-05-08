@@ -784,6 +784,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       className={`${styles.slideViewportSiteMain} ${siteStyles.viewportMarquee} ${siteStyles.viewportMarqueeLeadIn}`}
       data-no-root-swipe
       data-site-main-scroll-viewport="1"
+      data-site-main-scroll-deck="1"
       ref={viewportRef}
     >
       <div

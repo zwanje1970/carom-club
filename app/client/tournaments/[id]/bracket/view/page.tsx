@@ -16,6 +16,7 @@ import {
   type MutationFns,
 } from "../bracket-view-server-sync";
 import viewStyles from "../bracket-view-page.module.css";
+import { applyCaromOrientationMode } from "../../../../native-fullscreen-orientation-lock";
 
 const InteractiveBracketBoard = dynamic(
   () => import("../InteractiveBracketBoard"),
@@ -47,6 +48,31 @@ type Bracket = {
 };
 
 type SaveState = "idle" | "saving" | "saved" | "error";
+
+const BRACKET_ORIENTATION_CTX = "bracket-view-fullscreen";
+
+function BracketViewOrientationButtons() {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}>
+      <button
+        type="button"
+        className="v3-btn"
+        style={{ minHeight: 34, fontWeight: 700 }}
+        onClick={() => applyCaromOrientationMode("landscape", `${BRACKET_ORIENTATION_CTX}:button-landscape`)}
+      >
+        가로모드
+      </button>
+      <button
+        type="button"
+        className="v3-btn"
+        style={{ minHeight: 34, fontWeight: 700 }}
+        onClick={() => applyCaromOrientationMode("portrait", `${BRACKET_ORIENTATION_CTX}:button-portrait`)}
+      >
+        세로모드
+      </button>
+    </div>
+  );
+}
 
 export default function TournamentBracketBoardViewPage() {
   const params = useParams<{ id: string }>();
@@ -461,6 +487,12 @@ export default function TournamentBracketBoardViewPage() {
   }, [loadBracket]);
 
   useEffect(() => {
+    return () => {
+      applyCaromOrientationMode("portrait", `${BRACKET_ORIENTATION_CTX}:unmount`);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!bracket) {
       setBoardSliceKey(null);
       return;
@@ -494,12 +526,8 @@ export default function TournamentBracketBoardViewPage() {
   const saveStateText =
     saveState === "saving" ? "저장 중..." : saveState === "saved" ? "저장됨" : saveState === "error" ? "오류 발생" : "";
 
-  const showBracketViewMobileChrome =
-    zonesEnabled ||
-    Boolean(bracket?.bracketMode === "multi_block" && bracket.blocks?.length) ||
-    Boolean(message);
-
-  const bracketViewMobileTopOffset = showBracketViewMobileChrome ? "56px" : "0px";
+  /** 모바일 대진표 보기 상단에 방향 버튼을 항상 두므로 보드 오버레이와 겹치지 않게 여백 유지 */
+  const bracketViewMobileTopOffset = "56px";
 
   const renderBracketContextControls = () => (
     <>
@@ -602,6 +630,17 @@ export default function TournamentBracketBoardViewPage() {
           flexWrap: "wrap",
         }}
       >
+        <div
+          style={{
+            flexBasis: "100%",
+            width: "100%",
+            paddingBottom: "0.4rem",
+            marginBottom: "0.15rem",
+            borderBottom: "1px solid rgba(148,163,184,0.28)",
+          }}
+        >
+          <BracketViewOrientationButtons />
+        </div>
         <div className={viewStyles.pageHeaderNavChrome} style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
           <button
             type="button"
@@ -615,11 +654,10 @@ export default function TournamentBracketBoardViewPage() {
         {renderBracketContextControls()}
       </header>
 
-      {showBracketViewMobileChrome ? (
-        <div className={viewStyles.bracketViewMobileTopChrome} aria-label="대진표 보기 옵션">
-          {renderBracketContextControls()}
-        </div>
-      ) : null}
+      <div className={viewStyles.bracketViewMobileTopChrome} aria-label="대진표 보기 옵션">
+        <BracketViewOrientationButtons />
+        {renderBracketContextControls()}
+      </div>
 
       <section
         style={{

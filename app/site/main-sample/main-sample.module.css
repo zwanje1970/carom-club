@@ -254,7 +254,8 @@
   aspect-ratio: 440 / 161;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  /* 뷰포트 토큰과 동일한 바닥 — flex min-height:0 체인으로 면이 깎이지 않게 */
+  min-height: var(--sample-main-card-height);
   border-radius: 0;
   box-shadow: none;
   transform: none;
@@ -263,6 +264,12 @@
   transition:
     transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.22s ease;
+}
+
+/* 메인 세로 스크롤 덱: 면 높이 확정 후 내부 flex 열이 실제 카드 영역을 꽉 채움 */
+:global([data-site-main-scroll-deck="1"]) .sampleMainCardDeckFit,
+:global([data-site-main-scroll-deck="1"]) .sampleMainCardDeckFitInner {
+  min-height: 100%;
 }
 
 .sampleMainCardSlot:active .sampleMainCardFace.sampleMainCardFaceTournamentDeck:not(.sampleMainCardFaceSelected) {

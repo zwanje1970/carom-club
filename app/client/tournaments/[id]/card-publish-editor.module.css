@@ -207,6 +207,16 @@
   overflow: visible;
 }
 
+/* 메인 세로 스크롤 덱: 바깥 면(aspect-ratio·토큰 min-height)에 맞춰 카드 article 이 축소되지 않게 */
+:global([data-site-main-scroll-deck="1"]) .previewCardWrapMainScrollFlex,
+:global([data-site-main-scroll-deck="1"]) .cardPublishCaptureRootMainScrollFlex {
+  min-height: 100%;
+}
+
+:global([data-site-main-scroll-deck="1"]) .cardPublishCaptureRootMainScrollFlex > :global(article) {
+  min-height: 100%;
+}
+
 .templateRadioRow {
   display: flex;
   flex-direction: row;

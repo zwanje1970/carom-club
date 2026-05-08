@@ -92,6 +92,11 @@
   align-self: stretch;
 }
 
+:global([data-site-main-scroll-deck="1"]) .mainScrollDeckCardShell,
+:global([data-site-main-scroll-deck="1"]) .cardRowInteractionWrap {
+  min-height: 100%;
+}
+
 /* 메인 세로 스크롤 광고 카드(게시 PNG 면): 좌측 배지 대신 우측 상단 AD 텍스트만 */
 .publishedScrollAdMark {
   position: absolute;
