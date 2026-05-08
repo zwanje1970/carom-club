@@ -36,12 +36,36 @@ const procBtnBase: CSSProperties = {
   boxShadow: "none",
 };
 
+/** 모바일 「처리」열: 한 줄에 한 버튼, pill·플랫·터치 여유 */
+const procBtnMobilePill: CSSProperties = {
+  ...procBtnBase,
+  display: "inline-flex",
+  alignItems: "center",
+  minHeight: 31,
+  minWidth: "4.6rem",
+  width: "100%",
+  maxWidth: "11rem",
+  padding: "0.28rem 0.55rem",
+  fontSize: "0.68rem",
+  fontWeight: 700,
+  borderRadius: "999px",
+  justifyContent: "center",
+};
+
 const cellBase: CSSProperties = {
   padding: "0.2rem 0.14rem",
   fontSize: "0.74rem",
   verticalAlign: "middle",
   borderBottom: "1px solid #e8e8e8",
   textAlign: "center",
+};
+
+const cellBaseMobileMerged: CSSProperties = {
+  ...cellBase,
+  paddingTop: "0.42rem",
+  paddingBottom: "0.42rem",
+  paddingLeft: "0.28rem",
+  paddingRight: "0.28rem",
 };
 
 export default function ParticipantListRow({
@@ -62,6 +86,7 @@ export default function ParticipantListRow({
   initialClientDepositConfirmedAt,
   initialClientApplicationApprovedAt,
   attendanceChecked,
+  applicationsMobileMerged = false,
 }: {
   tournamentId: string;
   entryId: string;
@@ -81,6 +106,8 @@ export default function ParticipantListRow({
   initialClientDepositConfirmedAt?: string | null;
   initialClientApplicationApprovedAt?: string | null;
   attendanceChecked?: boolean | null;
+  /** 모바일 신청자 표: 입금·승인·취소를 「처리」 한 열에 묶음 */
+  applicationsMobileMerged?: boolean;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<TournamentApplicationStatus>(initialStatus);
@@ -107,6 +134,8 @@ export default function ParticipantListRow({
   useEffect(() => {
     setClientApplicationApprovedAt(initialClientApplicationApprovedAt ?? null);
   }, [initialClientApplicationApprovedAt]);
+
+  const procStyle = applicationsMobileMerged ? procBtnMobilePill : procBtnBase;
 
   const terminalRejected = status === "REJECTED";
   const terminalApproved = status === "APPROVED";
@@ -306,14 +335,14 @@ export default function ParticipantListRow({
   function depositButton() {
     if (terminalApproved) {
       return (
-        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--depositDone" style={procBtnBase}>
+        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--depositDone" style={procStyle}>
           입금완료
         </button>
       );
     }
     if (terminalRejected) {
       return (
-        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--muted" style={procBtnBase}>
+        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--muted" style={procStyle}>
           입금확인
         </button>
       );
@@ -324,7 +353,7 @@ export default function ParticipantListRow({
           type="button"
           disabled={loading}
           className="v3-appProcBtn v3-appProcBtn--depositIdle"
-          style={procBtnBase}
+          style={procStyle}
           onClick={() => onDepositClick()}
         >
           입금확인
@@ -336,7 +365,7 @@ export default function ParticipantListRow({
         type="button"
         disabled={loading || depositConfirmSaving}
         className="v3-appProcBtn v3-appProcBtn--depositDone"
-        style={procBtnBase}
+        style={procStyle}
         onClick={() => onDepositClick()}
       >
         입금완료
@@ -347,21 +376,21 @@ export default function ParticipantListRow({
   function approveButton() {
     if (terminalApproved) {
       return (
-        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--approveDone" style={procBtnBase}>
+        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--approveDone" style={procStyle}>
           승인완료
         </button>
       );
     }
     if (terminalRejected) {
       return (
-        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--muted" style={procBtnBase}>
+        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--muted" style={procStyle}>
           승인
         </button>
       );
     }
     if (!depositDone) {
       return (
-        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--approveIdleDisabled" style={procBtnBase}>
+        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--approveIdleDisabled" style={procStyle}>
           승인
         </button>
       );
@@ -372,7 +401,7 @@ export default function ParticipantListRow({
           type="button"
           disabled={loading}
           className="v3-appProcBtn v3-appProcBtn--approveReady"
-          style={procBtnBase}
+          style={procStyle}
           onClick={() => onApproveClick()}
         >
           승인
@@ -384,7 +413,7 @@ export default function ParticipantListRow({
         type="button"
         disabled={loading}
         className="v3-appProcBtn v3-appProcBtn--approveDone"
-        style={procBtnBase}
+        style={procStyle}
         onClick={() => onApproveClick()}
       >
         승인완료
@@ -395,14 +424,14 @@ export default function ParticipantListRow({
   function cancelRejectButton() {
     if (terminalApproved) {
       return (
-        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--muted" style={procBtnBase}>
+        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--muted" style={procStyle}>
           취소/거절
         </button>
       );
     }
     if (terminalRejected) {
       return (
-        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--rejectDone" style={procBtnBase}>
+        <button type="button" disabled className="v3-appProcBtn v3-appProcBtn--rejectDone" style={procStyle}>
           취소/거절
         </button>
       );
@@ -412,7 +441,7 @@ export default function ParticipantListRow({
         type="button"
         disabled={loading}
         className="v3-appProcBtn v3-appProcBtn--rejectIdle"
-        style={procBtnBase}
+        style={procStyle}
         onClick={() => onCancelRejectClick()}
       >
         취소/거절
@@ -432,6 +461,7 @@ export default function ParticipantListRow({
   const approveMd = formatDateSlashMd(approveMdIso);
 
   const rowBg = terminalRejected ? "#f3f4f6" : "#fff";
+  const cellPad = applicationsMobileMerged ? cellBaseMobileMerged : cellBase;
 
   const modalEl =
     detailOpen && typeof document !== "undefined"
@@ -459,17 +489,38 @@ export default function ParticipantListRow({
         )
       : null;
 
+  const mergedProcessingCell = (
+    <td
+      data-participant-label="처리"
+      className="participant-col participant-col--mobileProcMerged"
+      style={{
+        ...cellPad,
+        textAlign: "center",
+        verticalAlign: "middle",
+      }}
+    >
+      <div className="participant-mobileProcStack">
+        {depositButton()}
+        {approveButton()}
+        {cancelRejectButton()}
+        {approveMd !== "—" ? (
+          <span className="participant-mobileProcApproveHint">승인일 {approveMd}</span>
+        ) : null}
+      </div>
+    </td>
+  );
+
   return (
     <>
       <tr className={terminalRejected ? "participant-row--rejected" : undefined} style={{ background: rowBg }}>
-        <td data-participant-label="신청" style={{ ...cellBase, fontVariantNumeric: "tabular-nums" }}>
+        <td data-participant-label="신청" style={{ ...cellPad, fontVariantNumeric: "tabular-nums" }}>
           {formatDateSlashMd(registrationCreatedAt)}
         </td>
         <td
           data-participant-label="이름"
           className="participant-col participant-col--name"
           style={{
-            ...cellBase,
+            ...cellPad,
             textAlign: "left",
             verticalAlign: "top",
             wordBreak: "keep-all",
@@ -514,7 +565,8 @@ export default function ParticipantListRow({
         </td>
         <td
           data-participant-label={metricColumnTitle}
-          style={{ ...cellBase, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
+          className="participant-col participant-col--metricNarrow"
+          style={{ ...cellPad, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
         >
           {metricDisplay}
         </td>
@@ -522,7 +574,7 @@ export default function ParticipantListRow({
           data-participant-label="입금자 이름"
           className="participant-col participant-col--depositor"
           style={{
-            ...cellBase,
+            ...cellPad,
             textAlign: "left",
             verticalAlign: "top",
             wordBreak: "keep-all",
@@ -532,18 +584,32 @@ export default function ParticipantListRow({
         >
           {depositorDisplay}
         </td>
-        <td data-participant-label="입금확인" style={{ ...cellBase }}>
-          <div style={{ display: "flex", justifyContent: "center" }}>{depositButton()}</div>
-        </td>
-        <td data-participant-label={approveActionColumnLabel} style={{ ...cellBase }}>
-          <div style={{ display: "flex", justifyContent: "center" }}>{approveButton()}</div>
-        </td>
-        <td data-participant-label="승인" style={{ ...cellBase, fontVariantNumeric: "tabular-nums" }}>
-          {approveMd}
-        </td>
-        <td data-participant-label="취소/거절" style={{ ...cellBase }}>
-          <div style={{ display: "flex", justifyContent: "center" }}>{cancelRejectButton()}</div>
-        </td>
+        {applicationsMobileMerged ? (
+          mergedProcessingCell
+        ) : (
+          <>
+            <td className="participant-col participant-col--desktopProcSplit" data-participant-label="입금확인" style={{ ...cellPad }}>
+              <div style={{ display: "flex", justifyContent: "center" }}>{depositButton()}</div>
+            </td>
+            <td
+              className="participant-col participant-col--desktopProcSplit"
+              data-participant-label={approveActionColumnLabel}
+              style={{ ...cellPad }}
+            >
+              <div style={{ display: "flex", justifyContent: "center" }}>{approveButton()}</div>
+            </td>
+            <td
+              className="participant-col participant-col--desktopProcSplit"
+              data-participant-label="승인"
+              style={{ ...cellPad, fontVariantNumeric: "tabular-nums" }}
+            >
+              {approveMd}
+            </td>
+            <td className="participant-col participant-col--desktopProcSplit" data-participant-label="취소/거절" style={{ ...cellPad }}>
+              <div style={{ display: "flex", justifyContent: "center" }}>{cancelRejectButton()}</div>
+            </td>
+          </>
+        )}
       </tr>
       {modalEl}
     </>

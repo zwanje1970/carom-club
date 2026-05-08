@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { type CSSProperties, type MouseEvent as ReactMouseEvent, FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type CSSProperties, FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import adminUi from "../../../../components/admin/admin-card.module.css";
 import { isEmptyOutlineHtml } from "../../../../../lib/outline-content-helpers";
@@ -16,8 +16,6 @@ import type {
   TournamentTeamScoreRule,
   TournamentVerificationMode,
 } from "../../../../../lib/tournament-rule-types";
-import SiteTournamentDetailSections from "../../../../site/tournaments/[id]/site-tournament-detail-sections";
-
 import TournamentNewWizardForm from "../../new/TournamentNewWizardForm";
 
 type DivisionRow = { name: string; min: string; max: string };
@@ -247,15 +245,6 @@ export default function ClientTournamentEditPage() {
   const [loading, setLoading] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
-  /** 새 대회 생성 직후 안내(저장은 이미 완료된 상태) */
-  const [createSuccessId, setCreateSuccessId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    const p = new URLSearchParams(window.location.search);
-    const e = p.get("edit");
-    const d = p.get("done");
-    return !e && d && d.trim() ? d.trim() : null;
-  });
-  const [createDoneTournament, setCreateDoneTournament] = useState<Tournament | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   /** 대회 생성·수정 입력 단계(1~8). 저장 로직과 무관한 UI 상태 */
   const [wizardStep, setWizardStep] = useState(1);
@@ -263,6 +252,29 @@ export default function ClientTournamentEditPage() {
   const [step8PolicyAcknowledged, setStep8PolicyAcknowledged] = useState(false);
   /** 수정 모드: 불러온 직후 폼 스냅샷(JSON) — 변경 여부 비교용 */
   const editBaselineJsonRef = useRef<string | null>(null);
+  /** 이탈 확인 후 이동할 내부 경로(모바일 ← 등). 없으면 router.back() */
+  const pendingLeaveHrefRef = useRef<string | null>(null);
+  const hasUnsavedDraftRef = useRef(false);
+  /** 뒤로가기(popstate)로 연 확인창인지 — 나가기 시 history 한 번에 두 단계 복귀 */
+  const leaveViaHistoryBackRef = useRef(false);
+  /** 저장 전 이탈 방지용 히스토리 중복 항목이 활성인지 */
+  const trapActiveRef = useRef(false);
+  /** 프로그램적 history 조작 시 popstate 무시(남은 횟수) */
+  const ignorePopstateCountRef = useRef(0);
+
+  function historyStateHasEditTrap(): boolean {
+    const s = window.history.state as { ccEditTrap?: unknown } | null;
+    return s != null && typeof s === "object" && s.ccEditTrap === 1;
+  }
+
+  function pushEditHistoryTrap() {
+    const prev = window.history.state;
+    const next =
+      prev != null && typeof prev === "object" && !Array.isArray(prev)
+        ? { ...prev, ccEditTrap: 1 as const }
+        : { ccEditTrap: 1 as const };
+    window.history.pushState(next, "", window.location.href);
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -299,30 +311,6 @@ export default function ClientTournamentEditPage() {
       cancelled = true;
     };
   }, [editId]);
-
-  useEffect(() => {
-    if (!createSuccessId) {
-      setCreateDoneTournament(null);
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch(`/api/client/tournaments/${encodeURIComponent(createSuccessId)}`, {
-          credentials: "same-origin",
-        });
-        const json = (await res.json()) as { tournament?: Tournament };
-        if (cancelled) return;
-        if (!res.ok || !json.tournament) return;
-        setCreateDoneTournament(json.tournament);
-      } catch {
-        /* noop */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [createSuccessId]);
 
   useEffect(() => {
     if (durationType !== "MULTI_DAY") return;
@@ -596,70 +584,14 @@ export default function ClientTournamentEditPage() {
     });
   }, [posterObjectPreviewUrl, posterImageUrl, posterVisibleUsesServerUrl]);
 
-  function isNewTournamentFormPristine(): boolean {
-    if (wizardStep !== 1) return false;
-    if (title.trim() !== "") return false;
-    if (date !== "") return false;
-    if (buildLocationFromLines(locLine1, locLine2, locLine3).trim() !== "") return false;
-    if (maxParticipants !== "64") return false;
-    if (entryFee !== "30000") return false;
-    if (durationType !== "1_DAY") return false;
-    if (durationDays !== 2) return false;
-    if (extraDays.length > 0) return false;
-    if (entryQualificationType !== "NONE") return false;
-    if (qualificationValue.trim() !== "") return false;
-    if (eligibilityCompare !== "LTE") return false;
-    if (verificationRequested) return false;
-    if (verificationMode !== "NONE") return false;
-    if (verificationGuideText.trim() !== "") return false;
-    if (divisionMetricType !== "AVERAGE") return false;
-    if (divisionRows.length !== 1) return false;
-    const dr = divisionRows[0];
-    if (!dr || dr.name.trim() !== "" || dr.min.trim() !== "" || dr.max.trim() !== "") return false;
-    if (scope !== "REGIONAL") return false;
-    if (zonesEnabled) return false;
-    if (accountNumber.trim() !== "") return false;
-    if (allowMultipleSlots) return false;
-    if (participantsListPublic) return false;
-    if (isScotch) return false;
-    if (teamScoreLimit.trim() !== "") return false;
-    if (teamScoreRule !== "LTE") return false;
-    if (posterImageUrl !== "" || posterObjectPreviewUrl !== "") return false;
-    if (tournamentIntro.trim() !== "") return false;
-    if (
-      prize1.trim() !== "" ||
-      prize2.trim() !== "" ||
-      prize3.trim() !== "" ||
-      prize4.trim() !== "" ||
-      prizeExtra.trim() !== ""
-    ) {
-      return false;
-    }
-    if (outlineDisplayMode !== "TEXT") return false;
-    if (!isEmptyOutlineHtml(outlineHtml)) return false;
-    if (outlineImageUrl.trim() !== "") return false;
-    if (outlinePdfUrl.trim() !== "") return false;
-    if (pickedVenueGuideId !== null) return false;
-    if (!creatorVenueId) {
-      if (venueCtaMode !== "none") return false;
-    } else if (venueCtaMode !== "creator") {
-      return false;
-    }
-    if (extraVenues.length > 0) return false;
-    if (step8PolicyAcknowledged) return false;
-    return true;
-  }
-
   function hasUnsavedDraft(): boolean {
-    if (createSuccessId && !editId) return false;
-    if (editId) {
-      if (editLoading || editBaselineJsonRef.current === null) return false;
-      return serializeTournamentFormSnapshot() !== editBaselineJsonRef.current;
-    }
-    return !isNewTournamentFormPristine();
+    if (!editId) return false;
+    if (editLoading || editBaselineJsonRef.current === null) return false;
+    return serializeTournamentFormSnapshot() !== editBaselineJsonRef.current;
   }
 
   function handleCancelClick() {
+    pendingLeaveHrefRef.current = null;
     if (!hasUnsavedDraft()) {
       router.back();
       return;
@@ -667,8 +599,31 @@ export default function ClientTournamentEditPage() {
     setLeaveConfirmOpen(true);
   }
 
+  function handleDismissLeaveModal() {
+    setLeaveConfirmOpen(false);
+    pendingLeaveHrefRef.current = null;
+    leaveViaHistoryBackRef.current = false;
+  }
+
   function handleConfirmLeave() {
     setLeaveConfirmOpen(false);
+    const href = pendingLeaveHrefRef.current;
+    pendingLeaveHrefRef.current = null;
+    const viaHistoryBack = leaveViaHistoryBackRef.current;
+    leaveViaHistoryBackRef.current = false;
+
+    if (href) {
+      router.push(href);
+      return;
+    }
+
+    if (trapActiveRef.current || viaHistoryBack) {
+      trapActiveRef.current = false;
+      ignorePopstateCountRef.current = 2;
+      window.history.go(-2);
+      return;
+    }
+
     router.back();
   }
 
@@ -811,7 +766,7 @@ export default function ClientTournamentEditPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (loading) return;
+    if (loading || !editId) return;
 
     const wizardCheck = validateWizardBeforeSave();
     if (!wizardCheck.ok) {
@@ -902,58 +857,131 @@ export default function ClientTournamentEditPage() {
         teamScoreRule: isScotch ? teamScoreRule : "LTE",
       };
 
-      const url = editId
-        ? `/api/client/tournaments/${encodeURIComponent(editId)}`
-        : "/api/client/tournaments";
-      const method = editId ? "PATCH" : "POST";
-
-      const response = await fetch(url, {
-        method,
+      const response = await fetch(`/api/client/tournaments/${encodeURIComponent(editId)}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       const result = (await response.json()) as { error?: string; tournament?: { id: string } };
       if (!response.ok) {
-        setMessage(result.error ?? (editId ? "저장에 실패했습니다." : "대회 생성에 실패했습니다."));
+        setMessage(result.error ?? "저장에 실패했습니다.");
         setSaveState("error");
         return;
       }
 
       const savedId = result.tournament?.id;
       if (!savedId) {
-        setMessage(editId ? "저장 결과를 확인할 수 없습니다." : "대회 생성 결과를 확인할 수 없습니다.");
+        setMessage("저장 결과를 확인할 수 없습니다.");
         setSaveState("error");
         return;
       }
 
-      if (editId) {
-        setSaveState("success");
-        router.push(`/client/tournaments/${savedId}`);
-        router.refresh();
-      } else {
-        setSaveState("success");
-        router.replace(`/client/tournaments/new?done=${encodeURIComponent(savedId)}`);
-      }
+      setSaveState("success");
+      setMessage("저장되었습니다.");
+      editBaselineJsonRef.current = serializeTournamentFormSnapshot();
     } catch {
-      setMessage(editId ? "저장 요청 중 오류가 발생했습니다." : "대회 생성 요청 중 오류가 발생했습니다.");
+      setMessage("저장 요청 중 오류가 발생했습니다.");
       setSaveState("error");
     } finally {
       setLoading(false);
     }
   }
 
-  const showCreateDone = Boolean(createSuccessId && !editId);
+  hasUnsavedDraftRef.current = hasUnsavedDraft();
 
-  const onCreateDoneDetailClickCapture = useCallback(
-    (e: ReactMouseEvent<HTMLDivElement>) => {
-      const target = e.target as HTMLElement | null;
-      const anchor = target?.closest?.("a.primary-button--block");
-      if (!anchor) return;
+  /* 저장 전에만 히스토리 트랩 삽입·해제 — 매 렌더마다 더티 여부와 동기화 */
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 폼 변경마다 더티·히스토리 일치
+  useLayoutEffect(() => {
+    if (!editId || editLoading || editBaselineJsonRef.current === null) return;
+
+    const dirty = hasUnsavedDraftRef.current;
+
+    if (dirty) {
+      if (!trapActiveRef.current) {
+        if (!historyStateHasEditTrap()) {
+          pushEditHistoryTrap();
+        }
+        trapActiveRef.current = true;
+      }
+    } else if (trapActiveRef.current) {
+      if (historyStateHasEditTrap()) {
+        ignorePopstateCountRef.current = 1;
+        window.history.back();
+      }
+      trapActiveRef.current = false;
+    }
+  });
+
+  useEffect(() => {
+    if (!editId) return;
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (!hasUnsavedDraftRef.current) return;
       e.preventDefault();
-      e.stopPropagation();
-    },
-    [],
-  );
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [editId]);
+
+  useEffect(() => {
+    if (typeof editId !== "string" || editId.trim() === "") return;
+    const tournamentIdForEditPath = editId.trim();
+    function onDocumentClickCapture(ev: MouseEvent) {
+      if (!hasUnsavedDraftRef.current) return;
+      const t = ev.target;
+      if (!(t instanceof Element)) return;
+      const anchor = t.closest("a[href]");
+      if (!(anchor instanceof HTMLAnchorElement)) return;
+      if (anchor.target === "_blank") return;
+      const hrefAttr = anchor.getAttribute("href");
+      if (!hrefAttr || hrefAttr.startsWith("#") || hrefAttr.startsWith("javascript:")) return;
+      let url: URL;
+      try {
+        url = new URL(hrefAttr, window.location.origin);
+      } catch {
+        return;
+      }
+      if (url.origin !== window.location.origin) return;
+      const cur = new URL(window.location.href);
+      if (url.pathname === cur.pathname && url.search === cur.search) return;
+      const editPath = `/client/tournaments/${encodeURIComponent(tournamentIdForEditPath)}/edit`;
+      if (url.pathname === editPath) return;
+
+      ev.preventDefault();
+      ev.stopPropagation();
+      pendingLeaveHrefRef.current = `${url.pathname}${url.search}${url.hash}`;
+      setLeaveConfirmOpen(true);
+    }
+    document.addEventListener("click", onDocumentClickCapture, true);
+    return () => document.removeEventListener("click", onDocumentClickCapture, true);
+  }, [editId]);
+
+  useEffect(() => {
+    if (!editId) return;
+
+    function onPopState() {
+      if (ignorePopstateCountRef.current > 0) {
+        ignorePopstateCountRef.current -= 1;
+        return;
+      }
+
+      if (!hasUnsavedDraftRef.current) {
+        trapActiveRef.current = false;
+        return;
+      }
+
+      if (!historyStateHasEditTrap()) {
+        pushEditHistoryTrap();
+      }
+      trapActiveRef.current = true;
+      leaveViaHistoryBackRef.current = true;
+      pendingLeaveHrefRef.current = null;
+      setLeaveConfirmOpen(true);
+    }
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [editId]);
 
   const posterNormalizedForDisplay =
     posterImageUrl.trim() !== "" ? normalizePosterImageSrcForPreview(posterImageUrl) : "";
@@ -962,40 +990,28 @@ export default function ClientTournamentEditPage() {
       ? posterObjectPreviewUrl
       : posterNormalizedForDisplay || posterObjectPreviewUrl || "";
 
+  if (!editId) {
+    return (
+      <main className="v3-page v3-stack" style={{ maxWidth: "40rem", margin: "0 auto", paddingTop: "0.35rem" }}>
+        <p className="v3-muted">대회 정보를 불러올 수 없습니다.</p>
+      </main>
+    );
+  }
+
   return (
     <main className="v3-page v3-stack" style={{ maxWidth: "40rem", margin: "0 auto", paddingTop: "0.35rem" }}>
-      {editId || showCreateDone ? (
-        <h1 className="v3-h1">
-          {showCreateDone ? "대회 생성 완료" : "대회 수정"}
-        </h1>
-      ) : null}
-      {showCreateDone && createDoneTournament ? (
-        <div onClickCapture={onCreateDoneDetailClickCapture}>
-          <SiteTournamentDetailSections
-            tournament={createDoneTournament}
-            audience="site"
-            detailLayout="site"
-            applyHref={`/site/tournaments/${createDoneTournament.id}/apply`}
-            listBackHref="/site/tournaments"
-          />
-        </div>
-      ) : null}
+      <h1 className="v3-h1">대회 수정</h1>
       <p className="v3-muted">
-        {showCreateDone
-          ? "대회 정보는 이미 저장되었습니다. 다음 단계는 선택입니다."
-          : editId
-            ? "기존 대회 정보를 불러왔습니다. 수정 후 저장하면 동일 대회에 반영됩니다."
-            : "대회 생성은 8단계 순서로 진행합니다. 한 번에 하나의 단계만 펼쳐지며, 저장은 마지막 단계에서만 할 수 있습니다. 필수 항목이 비어 있으면 저장되지 않고 해당 단계로 이동합니다."}
+        아래에서 전체 항목을 한 화면에서 확인·수정할 수 있습니다. 상단 버튼은 해당 항목 위치로 스크롤 이동합니다. 저장하면 동일 대회에 반영됩니다.
       </p>
 
-      {editId && editLoading ? (
+      {editLoading ? (
         <p className="v3-muted" role="status">
           대회 정보를 불러오는 중…
         </p>
       ) : null}
 
-      {showCreateDone && createSuccessId ? null : (
-        <>
+      <>
       <TournamentNewWizardForm
         inputStyle={inputStyle}
         sectionGap={sectionGap}
@@ -1100,7 +1116,16 @@ export default function ClientTournamentEditPage() {
         venueCtaMode={venueCtaMode}
         setVenueCtaMode={setVenueCtaMode}
         onStep8PolicyInteract={() => setStep8PolicyAcknowledged(true)}
+        wizardNavigationMode="toc"
       />
+
+      {saveState === "success" ? (
+        <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+          <Link className="v3-btn" href={`/client/tournaments/${encodeURIComponent(editId)}`} prefetch={false}>
+            대회 화면으로 이동
+          </Link>
+        </div>
+      ) : null}
 
       {message ? <p className="v3-muted">{message}</p> : null}
 
@@ -1122,22 +1147,21 @@ export default function ClientTournamentEditPage() {
         >
           <div className={`${adminUi.surface} v3-stack`} style={{ maxWidth: "22rem", width: "100%", gap: "1rem" }}>
             <p id="leave-confirm-title" style={{ margin: 0, lineHeight: 1.5 }}>
-              작성 중인 내용이 삭제됩니다. 나가시겠습니까?
+              저장하지 않은 변경사항이 있습니다. 나가시겠습니까?
             </p>
             <div className="v3-row" style={{ gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
-              <button type="button" className="v3-btn" style={{ background: "#fff", border: "1px solid #bbb" }} onClick={() => setLeaveConfirmOpen(false)}>
-                취소
+              <button type="button" className="v3-btn" style={{ background: "#fff", border: "1px solid #bbb" }} onClick={handleDismissLeaveModal}>
+                계속 수정
               </button>
               <button type="button" className="v3-btn" onClick={handleConfirmLeave}>
-                확인
+                나가기
               </button>
             </div>
           </div>
         </div>
       ) : null}
 
-        </>
-      )}
+      </>
     </main>
   );
 }

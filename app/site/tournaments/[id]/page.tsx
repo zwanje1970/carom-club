@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { outlineFileKindFromAsset, outlinePdfIdFromPublicUrl } from "../../../../lib/outline-pdf-helpers";
 import { getOutlinePdfAssetById, getTournamentByIdForPublicSitePage } from "../../../../lib/surface-read";
+import { countApprovedApplicationsByTournamentIdFirestore } from "../../../../lib/server/firestore-tournament-applications";
 import { getLatestBracketByTournamentIdFirestore } from "../../../../lib/server/firestore-tournament-brackets";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
 import SiteShellFrame from "../../components/SiteShellFrame";
@@ -17,6 +18,8 @@ export default async function SiteTournamentDetailPage({
   if (!tournament) {
     notFound();
   }
+
+  const confirmedParticipantCount = await countApprovedApplicationsByTournamentIdFirestore(id);
 
   const latestBracket = await getLatestBracketByTournamentIdFirestore(id);
   const showLiveBracketEmbed =
@@ -45,6 +48,7 @@ export default async function SiteTournamentDetailPage({
           outlinePdfFileKind={outlinePdfFileKind}
           detailLayout="site"
           showLiveBracketEmbed={showLiveBracketEmbed}
+          confirmedParticipantCount={confirmedParticipantCount}
         />
       </section>
     </SiteShellFrame>

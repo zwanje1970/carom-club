@@ -23,14 +23,15 @@ const EQ_OPTIONS: { value: TournamentEntryQualificationType; label: string }[] =
 ];
 
 export const TOURNAMENT_CREATE_WIZARD_LABELS = [
-  "대회명 · 설명",
+  "기본정보",
   "모집 인원",
-  "대회 종류 · 범위 · 참가 자격",
-  "날짜 · 장소",
+  "종목 · 범위 · 참가 자격",
+  "일정 · 장소",
   "대회 포스터",
   "상금",
   "참가비 · 입금",
-  "증빙 · 대회요강 · 안내",
+  "증빙 확인",
+  "대회요강 · 장소 안내",
 ] as const;
 
 export const TOURNAMENT_CREATE_WIZARD_COUNT = TOURNAMENT_CREATE_WIZARD_LABELS.length;
@@ -139,6 +140,8 @@ export type TournamentNewWizardFormProps = {
   venueCtaMode: "creator" | "none";
   setVenueCtaMode: Dispatch<SetStateAction<"creator" | "none">>;
   onStep8PolicyInteract: () => void;
+  /** 수정 화면: 전체 문서형 — 모든 섹션 표시, 상단 버튼은 목차(스크롤 이동) */
+  wizardNavigationMode?: "stepper" | "toc";
 };
 
 export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps) {
@@ -246,34 +249,48 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
     venueCtaMode,
     setVenueCtaMode,
     onStep8PolicyInteract,
+    wizardNavigationMode = "stepper",
   } = p;
 
   const step = wizardStep;
+  const tocMode = wizardNavigationMode === "toc";
+  const sectionVisible = (n: number) => tocMode || step === n;
+  const sectionScrollPad = tocMode ? ({ scrollMarginTop: "0.85rem" } as const) : {};
   const canPrev = step > 1;
   const canNext = step < TOURNAMENT_CREATE_WIZARD_COUNT;
 
   return (
     <form className="v3-stack" style={sectionGap} onSubmit={onSubmit} noValidate>
-      <nav aria-label="대회 입력 단계" className={`${adminUi.surface} v3-stack`} style={{ gap: "0.45rem", padding: "0.65rem 0.75rem" }}>
+      <nav
+        aria-label={tocMode ? "대회 수정 목차" : "대회 입력 단계"}
+        className={`${adminUi.surface} v3-stack`}
+        style={{ gap: "0.45rem", padding: "0.65rem 0.75rem" }}
+      >
         <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}>
           {TOURNAMENT_CREATE_WIZARD_LABELS.map((label, idx) => {
             const n = idx + 1;
-            const done = step > n;
-            const active = step === n;
+            const done = !tocMode && step > n;
+            const active = !tocMode && step === n;
             return (
               <button
                 key={label}
                 type="button"
-                onClick={() => setWizardStep(n)}
+                onClick={() => {
+                  if (tocMode) {
+                    document.getElementById(`wizard-step-${n}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  } else {
+                    setWizardStep(n);
+                  }
+                }}
                 className="v3-btn"
                 aria-current={active ? "step" : undefined}
                 style={{
                   padding: "0.28rem 0.5rem",
                   fontSize: "0.78rem",
-                  fontWeight: active ? 800 : done ? 600 : 500,
-                  background: active ? "#dbeafe" : done ? "#f1f5f9" : "#fff",
-                  borderColor: active ? "#2563eb" : "#d1d5db",
-                  color: active ? "#1e3a8a" : "#374151",
+                  fontWeight: tocMode ? 600 : active ? 800 : done ? 600 : 500,
+                  background: tocMode ? "#f8fafc" : active ? "#dbeafe" : done ? "#f1f5f9" : "#fff",
+                  borderColor: tocMode ? "#e2e8f0" : active ? "#2563eb" : "#d1d5db",
+                  color: tocMode ? "#334155" : active ? "#1e3a8a" : "#374151",
                   borderRadius: "999px",
                 }}
               >
@@ -284,14 +301,27 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
           })}
         </div>
         <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
-          현재: <strong>{step}</strong>단계 — {TOURNAMENT_CREATE_WIZARD_LABELS[step - 1]}
+          {tocMode ? (
+            <>
+              상단 항목을 누르면 해당 위치로 스크롤됩니다. 아래 전체 내용을 한 화면에서 수정할 수 있습니다.
+            </>
+          ) : (
+            <>
+              현재: <strong>{step}</strong>단계 — {TOURNAMENT_CREATE_WIZARD_LABELS[step - 1]}
+            </>
+          )}
         </p>
       </nav>
 
-      {step === 1 ? (
-        <section id="wizard-step-1" className={`${adminUi.surface} v3-stack`} aria-label="대회명과 설명" style={{ gap: "0.7rem" }}>
+      {sectionVisible(1) ? (
+        <section
+          id="wizard-step-1"
+          className={`${adminUi.surface} v3-stack`}
+          aria-label="대회명과 설명"
+          style={{ gap: "0.7rem", ...sectionScrollPad }}
+        >
           <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
-            1. 대회명 · 대회 설명
+            1. 기본정보
           </h2>
           <label className="v3-stack">
             <span>대회명</span>
@@ -316,8 +346,13 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
         </section>
       ) : null}
 
-      {step === 2 ? (
-        <section id="wizard-step-2" className={`${adminUi.surface} v3-stack`} aria-label="모집 인원" style={{ gap: "0.7rem" }}>
+      {sectionVisible(2) ? (
+        <section
+          id="wizard-step-2"
+          className={`${adminUi.surface} v3-stack`}
+          aria-label="모집 인원"
+          style={{ gap: "0.7rem", ...sectionScrollPad }}
+        >
           <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
             2. 모집 인원
           </h2>
@@ -335,10 +370,15 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
         </section>
       ) : null}
 
-      {step === 3 ? (
-        <section id="wizard-step-3" className={`${adminUi.surface} v3-stack`} aria-label="대회 종류 범위 참가 자격" style={{ gap: "0.7rem" }}>
+      {sectionVisible(3) ? (
+        <section
+          id="wizard-step-3"
+          className={`${adminUi.surface} v3-stack`}
+          aria-label="대회 종류 범위 참가 자격"
+          style={{ gap: "0.7rem", ...sectionScrollPad }}
+        >
           <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
-            3. 대회 종류 · 범위 · 참가 자격
+            3. 종목 · 범위 · 참가 자격
           </h2>
           <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap" }}>
             <label className="v3-row" style={{ alignItems: "center", gap: "0.45rem" }}>
@@ -450,10 +490,15 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
         </section>
       ) : null}
 
-      {step === 4 ? (
-        <section id="wizard-step-4" className={`${adminUi.surface} v3-stack`} aria-label="날짜와 장소" style={{ gap: "0.7rem" }}>
+      {sectionVisible(4) ? (
+        <section
+          id="wizard-step-4"
+          className={`${adminUi.surface} v3-stack`}
+          aria-label="날짜와 장소"
+          style={{ gap: "0.7rem", ...sectionScrollPad }}
+        >
           <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
-            4. 날짜 · 장소
+            4. 일정 · 장소
           </h2>
           <div className="v3-row" style={{ gap: "1rem", flexWrap: "wrap", alignItems: "flex-end" }}>
             <label className="v3-stack" style={{ flex: "1 1 11rem" }}>
@@ -666,8 +711,13 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
         </section>
       ) : null}
 
-      {step === 5 ? (
-        <section id="wizard-step-5" className={`${adminUi.surface} v3-stack`} aria-label="대회 포스터" style={{ gap: "0.7rem" }}>
+      {sectionVisible(5) ? (
+        <section
+          id="wizard-step-5"
+          className={`${adminUi.surface} v3-stack`}
+          aria-label="대회 포스터"
+          style={{ gap: "0.7rem", ...sectionScrollPad }}
+        >
           <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
             5. 대회 포스터 (선택)
           </h2>
@@ -763,8 +813,8 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
         </section>
       ) : null}
 
-      {step === 6 ? (
-        <section id="wizard-step-6" className={`${adminUi.surface} v3-stack`} aria-label="상금" style={{ gap: "0.7rem" }}>
+      {sectionVisible(6) ? (
+        <section id="wizard-step-6" className={`${adminUi.surface} v3-stack`} aria-label="상금" style={{ gap: "0.7rem", ...sectionScrollPad }}>
           <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
             6. 상금
           </h2>
@@ -857,8 +907,13 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
         </section>
       ) : null}
 
-      {step === 7 ? (
-        <section id="wizard-step-7" className={`${adminUi.surface} v3-stack`} aria-label="참가비와 입금" style={{ gap: "0.7rem" }}>
+      {sectionVisible(7) ? (
+        <section
+          id="wizard-step-7"
+          className={`${adminUi.surface} v3-stack`}
+          aria-label="참가비와 입금"
+          style={{ gap: "0.7rem", ...sectionScrollPad }}
+        >
           <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
             7. 참가비 · 입금 계좌
           </h2>
@@ -875,10 +930,15 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
         </section>
       ) : null}
 
-      {step === 8 ? (
-        <section id="wizard-step-8" className={`${adminUi.surface} v3-stack`} aria-label="증빙과 대회요강" style={{ gap: "0.7rem" }}>
+      {sectionVisible(8) ? (
+        <section
+          id="wizard-step-8"
+          className={`${adminUi.surface} v3-stack`}
+          aria-label="증빙 확인"
+          style={{ gap: "0.7rem", ...sectionScrollPad }}
+        >
           <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
-            8. 증빙 확인 · 대회요강 · 장소 안내
+            8. 증빙 확인
           </h2>
           <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
             증빙은 참가 신청 시 <strong>이미지 첨부</strong>로 받습니다. 증빙을 쓰지 않으면 아래에서 「확인 안 함」만 선택하면 됩니다.
@@ -940,7 +1000,20 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
               />
             </div>
           ) : null}
-          <div className="v3-stack" style={{ gap: "0.5rem", borderTop: "1px solid #e2e8f0", paddingTop: "0.75rem" }}>
+        </section>
+      ) : null}
+
+      {sectionVisible(9) ? (
+        <section
+          id="wizard-step-9"
+          className={`${adminUi.surface} v3-stack`}
+          aria-label="대회요강과 장소 안내"
+          style={{ gap: "0.7rem", ...sectionScrollPad }}
+        >
+          <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
+            9. 대회요강 · 장소 안내
+          </h2>
+          <div className="v3-stack" style={{ gap: "0.5rem" }}>
             <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
               대회요강은 선택 사항입니다.
             </p>
@@ -993,10 +1066,22 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
       ) : null}
 
       <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "center", marginTop: "0.25rem" }}>
-        <button type="button" className="v3-btn" disabled={!canPrev || loading || editLoading} style={{ padding: "0.75rem 1rem", background: "#fff", border: "1px solid #bbb" }} onClick={() => setWizardStep((s) => Math.max(1, s - 1))}>
-          이전 단계
-        </button>
-        {canNext ? (
+        {tocMode ? null : (
+          <button
+            type="button"
+            className="v3-btn"
+            disabled={!canPrev || loading || editLoading}
+            style={{ padding: "0.75rem 1rem", background: "#fff", border: "1px solid #bbb" }}
+            onClick={() => setWizardStep((s) => Math.max(1, s - 1))}
+          >
+            이전 단계
+          </button>
+        )}
+        {tocMode ? (
+          <button type="submit" className="v3-btn" disabled={loading || editLoading} style={{ padding: "0.75rem 1rem" }}>
+            {loading ? "저장 중…" : "변경 저장"}
+          </button>
+        ) : canNext ? (
           <button
             type="button"
             className="v3-btn"

@@ -34,6 +34,11 @@ export default function SiteTournamentApplyPage() {
   const [ocrGateMessage, setOcrGateMessage] = useState("");
   const [ocrVerifying, setOcrVerifying] = useState(false);
   const [applicationsClosed, setApplicationsClosed] = useState(false);
+  const [applySummaryMeta, setApplySummaryMeta] = useState<{
+    maxParticipants: number;
+    entryFee: number;
+    confirmedParticipantCount: number;
+  } | null>(null);
   const ocrGateCacheRef = useRef<{ seed: string; result: { ok: boolean; userMessage: string } } | null>(null);
   const proofAreaRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -122,8 +127,32 @@ export default function SiteTournamentApplyPage() {
         const res = await fetch(`/api/site/tournaments/${encodeURIComponent(tournamentId)}/summary`, {
           credentials: "same-origin",
         });
-        const json = (await res.json()) as { applicationsClosed?: boolean };
-        if (!cancelled && res.ok) setApplicationsClosed(json.applicationsClosed === true);
+        const json = (await res.json()) as {
+          applicationsClosed?: boolean;
+          maxParticipants?: number;
+          entryFee?: number;
+          confirmedParticipantCount?: number;
+        };
+        if (!cancelled && res.ok) {
+          setApplicationsClosed(json.applicationsClosed === true);
+          const maxP = json.maxParticipants;
+          const fee = json.entryFee;
+          const confirmed = json.confirmedParticipantCount;
+          if (
+            typeof maxP === "number" &&
+            Number.isFinite(maxP) &&
+            typeof fee === "number" &&
+            Number.isFinite(fee) &&
+            typeof confirmed === "number" &&
+            Number.isFinite(confirmed)
+          ) {
+            setApplySummaryMeta({
+              maxParticipants: maxP,
+              entryFee: fee,
+              confirmedParticipantCount: confirmed,
+            });
+          }
+        }
       } catch {
         /* ignore */
       }
@@ -269,6 +298,28 @@ export default function SiteTournamentApplyPage() {
         <p>연락처(기본값): {user?.phone ?? "-"}</p>
         <p>증빙 이미지: {uploadedProofImage ? "업로드 완료" : uploading ? "업로드 중..." : "미업로드"}</p>
       </section>
+
+      {applySummaryMeta ? (
+        <section
+          className="v3-box v3-stack"
+          style={{
+            gap: "0.35rem",
+            fontVariantNumeric: "tabular-nums",
+            wordBreak: "keep-all",
+          }}
+          aria-label="대회 모집·확정·참가비"
+        >
+          <p style={{ margin: 0, lineHeight: 1.45 }}>
+            <span style={{ fontWeight: 700 }}>모집인원</span> {applySummaryMeta.maxParticipants}명
+          </p>
+          <p style={{ margin: 0, lineHeight: 1.45 }}>
+            <span style={{ fontWeight: 700 }}>확정인원</span> {applySummaryMeta.confirmedParticipantCount}명
+          </p>
+          <p style={{ margin: 0, lineHeight: 1.45 }}>
+            <span style={{ fontWeight: 700 }}>참가비</span> {applySummaryMeta.entryFee.toLocaleString("ko-KR")}원
+          </p>
+        </section>
+      ) : null}
 
       {applicationsClosed ? (
         <section className="v3-box v3-stack" style={{ borderColor: "#e2e8f0", background: "#f8fafc" }}>

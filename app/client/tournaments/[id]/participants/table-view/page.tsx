@@ -1,18 +1,18 @@
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
-import { resolveCanonicalUserIdForAuth } from "../../../../../lib/auth/resolve-canonical-user-id-for-auth";
-import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
-import { getClientTournamentDetailPreviewById } from "../../../../../lib/platform-api";
+import { resolveCanonicalUserIdForAuth } from "../../../../../../lib/auth/resolve-canonical-user-id-for-auth";
+import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../lib/auth/session";
+import { getClientTournamentDetailPreviewById } from "../../../../../../lib/platform-api";
 import {
   getTournamentApplicationListCountsFirestore,
   listTournamentApplicationsListItemsByTournamentIdFirestore,
-} from "../../../../../lib/server/firestore-tournament-applications";
-import ClientTournamentParticipantsApplicationsBlock from "../ClientTournamentParticipantsApplicationsBlock";
-import "../tournament-manage-ui.css";
+} from "../../../../../../lib/server/firestore-tournament-applications";
+import ClientTournamentParticipantsApplicationsBlock from "../../ClientTournamentParticipantsApplicationsBlock";
+import "../../tournament-manage-ui.css";
 
 export const dynamic = "force-dynamic";
 
-export default async function ClientTournamentParticipantsPage({
+export default async function ClientTournamentParticipantsTableViewPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -32,8 +32,9 @@ export default async function ClientTournamentParticipantsPage({
     listTournamentApplicationsListItemsByTournamentIdFirestore(id, { limit: 500 }),
     getTournamentApplicationListCountsFirestore(id),
   ]);
+
   return (
-    <main className="v3-page v3-stack client-tournament-manage client-tournament-manage--participants-subpage client-tournament-manage--participants-subpage--appsLayout">
+    <main className="v3-page v3-stack client-tournament-manage client-tournament-manage--participants-table-view-page">
       <ClientTournamentParticipantsApplicationsBlock
         tournamentId={id}
         tournamentTitle={tournament.title}
@@ -43,6 +44,7 @@ export default async function ClientTournamentParticipantsPage({
         participantCountSummary={participantCountSummary}
         zonesEnabled={tournament.zonesEnabled === true}
         tournamentStatusBadge={tournament.statusBadge}
+        variant="fullscreenTable"
       />
     </main>
   );

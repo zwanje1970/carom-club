@@ -22,6 +22,8 @@ type Props = {
   detailLayout?: "legacy" | "site";
   /** 마감·진행중일 때 공개 대진표 임베드(클라이언트 동적 로드) */
   showLiveBracketEmbed?: boolean;
+  /** 관리자 승인 확정(APPROVED) 인원 — 공개 상세 페이지 등에서만 전달 (목록·메인에서는 조회하지 않음) */
+  confirmedParticipantCount?: number;
 };
 
 /** 일반 참가자격: [기준유형] [기준값] [이하/미만] — 부자동배정과 분리 */
@@ -98,6 +100,7 @@ export default function SiteTournamentDetailSections({
   outlinePdfFileKind = "pdf",
   detailLayout = "legacy",
   showLiveBracketEmbed = false,
+  confirmedParticipantCount,
 }: Props) {
   const posterUrl = resolveSitePosterDisplayUrl(tournament.posterImageUrl ?? null);
   const scheduleLabel = formatTournamentScheduleLabel(tournament);
@@ -209,9 +212,21 @@ export default function SiteTournamentDetailSections({
               </>
             ) : null}
             <p className="site-detail-label">모집인원</p>
-            <p className="site-detail-value">{tournament.maxParticipants ?? 24}명</p>
+            <p className="site-detail-value" style={{ fontVariantNumeric: "tabular-nums" }}>
+              {tournament.maxParticipants ?? 24}명
+            </p>
+            {typeof confirmedParticipantCount === "number" ? (
+              <>
+                <p className="site-detail-label">확정인원</p>
+                <p className="site-detail-value" style={{ fontVariantNumeric: "tabular-nums" }}>
+                  {confirmedParticipantCount}명
+                </p>
+              </>
+            ) : null}
             <p className="site-detail-label">참가비</p>
-            <p className="site-detail-value">{`${tournament.entryFee.toLocaleString("ko-KR")}원`}</p>
+            <p className="site-detail-value" style={{ fontVariantNumeric: "tabular-nums" }}>
+              {`${tournament.entryFee.toLocaleString("ko-KR")}원`}
+            </p>
           </div>
           {tournament.prizeInfo ? (
             <div className="site-detail-inner-stack" style={{ gap: "0.35rem", marginTop: "0.35rem" }}>
@@ -351,9 +366,14 @@ export default function SiteTournamentDetailSections({
           </>
         ) : null}
         {scheduleLabel || hasLocationBlock || eligibilityLine ? <BasicInfoDivider /> : null}
-        <p style={{ margin: 0 }}>
+        <p style={{ margin: 0, fontVariantNumeric: "tabular-nums", wordBreak: "keep-all" }}>
           <span style={{ fontWeight: 600 }}>모집인원</span> {tournament.maxParticipants ?? 24}명
         </p>
+        {typeof confirmedParticipantCount === "number" ? (
+          <p style={{ margin: "0.35rem 0 0", fontVariantNumeric: "tabular-nums", wordBreak: "keep-all" }}>
+            <span style={{ fontWeight: 600 }}>확정인원</span> {confirmedParticipantCount}명
+          </p>
+        ) : null}
         {tournament.prizeInfo ? (
           <>
             <BasicInfoDivider />

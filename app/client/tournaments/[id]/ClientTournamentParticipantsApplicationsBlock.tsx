@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { TournamentApplicationListItem, TournamentStatusBadge } from "../../../../lib/types/entities";
 import type { TournamentEntryQualificationType } from "../../../../lib/tournament-rule-types";
+import { useApplicationsTableMobileLayout } from "../../../../lib/client/use-applications-table-mobile-layout";
 import ParticipantListRow from "./participants/ParticipantListRow";
 import ParticipantAddSheet from "./participants/ParticipantAddSheet";
 
@@ -32,15 +33,15 @@ type Props = {
   participantCountSummary: ParticipantCountSummary;
   zonesEnabled: boolean;
   tournamentStatusBadge: TournamentStatusBadge;
+  /** 표 전용 전체화면(가로보기) — 항상 넓은 열 구성 */
+  variant?: "standard" | "fullscreenTable";
 };
 
 const participantApplicationsTableThBase: CSSProperties = {
-  padding: "0.08rem 0.1rem",
-  fontSize: "0.72rem",
+  padding: "0.42rem 0.28rem",
+  fontSize: "0.76rem",
   fontWeight: 800,
   whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
   verticalAlign: "middle",
 };
 
@@ -110,8 +111,10 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   participantCountSummary,
   zonesEnabled,
   tournamentStatusBadge,
+  variant = "standard",
 }: Props) {
   const router = useRouter();
+  const applicationsMobileMerged = variant === "standard" && useApplicationsTableMobileLayout();
   const metricColumnTitle = participantMetricColumnTitle(entryQualificationType);
   const [entries, setEntries] = useState<TournamentApplicationListItem[]>(initialEntries);
   const [finalizeBusy, setFinalizeBusy] = useState(false);
@@ -213,7 +216,14 @@ export default function ClientTournamentParticipantsApplicationsBlock({
 
   const chipApproved = countApplicationApprovedChip(entries);
   const printHref = `/client/tournaments/${encodeURIComponent(tournamentId)}/participants/print`;
+  const tableViewHref = `/client/tournaments/${encodeURIComponent(tournamentId)}/participants/table-view`;
   const showFinalize = !CLOSED_BADGES.includes(tournamentStatusBadge);
+  const fullscreenTable = variant === "fullscreenTable";
+
+  /*
+   * 향후 확장(미구현): 입금확인 ON · 신청 승인 OFF · 취소/거절 아님 인원만 일괄 승인.
+   * 이미 승인된 신청은 제외·푸시 재발송 없음 — Firestore 필드(clientDepositConfirmedAt / clientApplicationApprovedAt / status) 조합으로 필터링 가능.
+   */
 
   async function onFinalizeParticipants() {
     if (finalizeBusy) return;
@@ -255,116 +265,140 @@ export default function ClientTournamentParticipantsApplicationsBlock({
     }
   }
 
+  const titleLine = `${tournamentTitle.trim()} / ${bracketScaleLabel(maxParticipants)}`;
+
   return (
-    <div className="client-tournament-manage__participantsBlock client-tournament-manage__applicationsCompactHeader">
-      <p
-        style={{
-          margin: "0 0 0.2rem",
-          fontSize: "1.02rem",
-          fontWeight: 800,
-          lineHeight: 1.28,
-          color: "#0f172a",
-        }}
-      >
-        {tournamentTitle.trim()} / {bracketScaleLabel(maxParticipants)}
-      </p>
+    <div
+      className={
+        fullscreenTable
+          ? "client-tournament-manage__participantsBlock client-tournament-manage__participantsBlock--fullscreenTable"
+          : "client-tournament-manage__participantsBlock client-tournament-manage__applicationsCompactHeader client-tournament-manage__applicationsRoot"
+      }
+    >
+      <div className="client-tournament-manage__applicationsHeaderZone">
+        {fullscreenTable ? (
+          <div className="client-tournament-manage__fullscreenTableHead">
+            <Link
+              prefetch={false}
+              href={`/client/tournaments/${encodeURIComponent(tournamentId)}/participants`}
+              className="client-tournament-manage__fullscreenTableClose"
+              style={{ ...opsBtn, flex: "0 0 auto", textDecoration: "none", fontWeight: 700 }}
+            >
+              ← 닫기
+            </Link>
+            <p className="client-tournament-manage__fullscreenTableTitle">{titleLine}</p>
+          </div>
+        ) : (
+          <p className="client-tournament-manage__applicationsTitle">{titleLine}</p>
+        )}
 
-      <div className="client-tournament-manage__applicationsOpsBar">
-        <ParticipantAddSheet tournamentId={tournamentId} />
-        {showFinalize ? (
-          <button
-            type="button"
-            className="client-tournament-manage__finalizeParticipantsBtn"
-            disabled={finalizeBusy}
-            onClick={() => void onFinalizeParticipants()}
-            style={{
-              ...opsBtn,
-              borderColor: "#2563eb",
-              background: "#2563eb",
-              color: "#fff",
-              fontWeight: 800,
-            }}
-          >
-            {finalizeBusy ? "처리 중…" : "참가자 확정"}
-          </button>
+        {!fullscreenTable ? (
+          <div className="client-tournament-manage__applicationsOpsBar">
+            <ParticipantAddSheet tournamentId={tournamentId} />
+            {showFinalize ? (
+              <button
+                type="button"
+                className="client-tournament-manage__finalizeParticipantsBtn"
+                disabled={finalizeBusy}
+                onClick={() => void onFinalizeParticipants()}
+                style={{
+                  ...opsBtn,
+                  borderColor: "#2563eb",
+                  background: "#2563eb",
+                  color: "#fff",
+                  fontWeight: 800,
+                }}
+              >
+                {finalizeBusy ? "처리 중…" : "참가자 확정"}
+              </button>
+            ) : null}
+            <Link prefetch={false} href={printHref} style={{ ...opsBtn, textDecoration: "none" }}>
+              확정리스트
+            </Link>
+            <Link prefetch={false} href={tableViewHref} style={{ ...opsBtn, textDecoration: "none" }}>
+              가로보기
+            </Link>
+          </div>
         ) : null}
-        <Link prefetch={false} href={printHref} style={{ ...opsBtn, textDecoration: "none" }}>
-          확정리스트
-        </Link>
-      </div>
 
-      {zonesEnabled ? (
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: "0.35rem",
-            margin: "0.14rem 0 0.2rem",
-          }}
-        >
-          <span className="v3-muted" style={{ fontSize: "0.8rem", fontWeight: 700 }}>
-            권역
-          </span>
-          <select
-            value={zoneFilterZoneId}
-            onChange={(e) => setZoneFilterZoneId(e.target.value)}
-            disabled={activeZones.length === 0}
-            aria-label="권역 필터"
+        {zonesEnabled ? (
+          <div
             style={{
-              ...opsBtn,
-              minHeight: 30,
-              padding: "0.16rem 0.36rem",
-              fontSize: "0.8rem",
-              maxWidth: "11rem",
-              cursor: activeZones.length === 0 ? "not-allowed" : "pointer",
-              opacity: activeZones.length === 0 ? 0.65 : 1,
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "0.35rem",
+              margin: fullscreenTable ? "0.2rem 0 0.15rem" : "0.14rem 0 0.2rem",
             }}
           >
-            <option value="all">전체</option>
-            {activeZones.map((z) => (
-              <option key={z.id} value={z.id}>
-                {z.zoneName}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : null}
+            <span className="v3-muted" style={{ fontSize: "0.8rem", fontWeight: 700 }}>
+              권역
+            </span>
+            <select
+              value={zoneFilterZoneId}
+              onChange={(e) => setZoneFilterZoneId(e.target.value)}
+              disabled={activeZones.length === 0}
+              aria-label="권역 필터"
+              style={{
+                ...opsBtn,
+                minHeight: 30,
+                padding: "0.16rem 0.36rem",
+                fontSize: "0.8rem",
+                maxWidth: "11rem",
+                cursor: activeZones.length === 0 ? "not-allowed" : "pointer",
+                opacity: activeZones.length === 0 ? 0.65 : 1,
+              }}
+            >
+              <option value="all">전체</option>
+              {activeZones.map((z) => (
+                <option key={z.id} value={z.id}>
+                  {z.zoneName}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
 
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: "0.22rem",
-          margin: zonesEnabled ? "0 0 0.26rem" : "0.04rem 0 0.26rem",
-        }}
-      >
-        <span style={{ ...pillBase, background: "#f8fafc", color: "#475569", borderColor: "#e2e8f0" }}>
-          총신청 {participantCountSummary.total}명
-        </span>
-        <span style={{ ...pillBase, background: "#ecfdf5", color: "#166534", borderColor: "#86efac" }}>
-          승인 {chipApproved}명
-        </span>
-        <span style={{ ...pillBase, background: "#f9fafb", color: "#4b5563", borderColor: "#e5e7eb" }}>
-          취소/거절 {participantCountSummary.reject}명
-        </span>
+        {!fullscreenTable ? (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "0.22rem",
+              margin: zonesEnabled ? "0 0 0.26rem" : "0.04rem 0 0.26rem",
+            }}
+          >
+            <span style={{ ...pillBase, background: "#f8fafc", color: "#475569", borderColor: "#e2e8f0" }}>
+              총신청 {participantCountSummary.total}명
+            </span>
+            <span style={{ ...pillBase, background: "#ecfdf5", color: "#166534", borderColor: "#86efac" }}>
+              승인 {chipApproved}명
+            </span>
+            <span style={{ ...pillBase, background: "#f9fafb", color: "#4b5563", borderColor: "#e5e7eb" }}>
+              취소/거절 {participantCountSummary.reject}명
+            </span>
+          </div>
+        ) : (
+          <p className="v3-muted client-tournament-manage__fullscreenTableMeta">
+            총 {participantCountSummary.total}명 · 승인 {chipApproved}명 · 취소/거절 {participantCountSummary.reject}명
+          </p>
+        )}
+
+        {!fullscreenTable ? (
+          <p className="client-tournament-manage__applicationsNotify">
+            승인완료시 신청자에게 신청완료 알림이 발송됩니다.
+          </p>
+        ) : null}
       </div>
 
-      <p
-        className="v3-muted"
-        style={{
-          margin: "0 0 0.28rem",
-          fontSize: "0.72rem",
-          lineHeight: 1.35,
-          fontWeight: 500,
-          color: "#64748b",
-        }}
+      <section
+        className={
+          fullscreenTable
+            ? "client-tournament-manage__participantTableShell client-tournament-manage__participantTableShell--fullscreenScroll"
+            : "client-tournament-manage__participantTableShell client-tournament-manage__participantTableShell--applicationsScroll"
+        }
       >
-        승인완료시 신청자에게 신청완료 알림이 발송됩니다.
-      </p>
-
-      <section className="client-tournament-manage__participantTableShell">
         {zoneFilteredEntries.length === 0 ? (
           <p className="v3-muted" style={{ margin: 0, padding: "0.65rem 0.75rem" }}>
             {participantCountSummary.total === 0
@@ -374,43 +408,93 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                 : "선택한 권역에 배정된 신청이 없습니다."}
           </p>
         ) : (
-          <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+          <div className="client-tournament-manage__applicationsTableInner">
             <table
-              className="client-tournament-manage__participantTable client-tournament-manage__participantTable--singleLineMobile client-tournament-manage__participantTable--applicationsCompact"
+              className={`client-tournament-manage__participantTable client-tournament-manage__participantTable--singleLineMobile client-tournament-manage__participantTable--applicationsCompact ${fullscreenTable ? "client-tournament-manage__participantTable--fullscreenWide" : ""}`}
               style={{
                 width: "100%",
-                minWidth: "100%",
+                minWidth: fullscreenTable ? "720px" : "100%",
                 borderCollapse: "collapse",
                 tableLayout: "fixed",
-                fontSize: "0.74rem",
+                fontSize: fullscreenTable ? "0.82rem" : applicationsMobileMerged ? "0.78rem" : "0.74rem",
               }}
             >
               <thead>
                 <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "5.5%", minWidth: "2rem" }}>
+                  <th
+                    className="participant-th participant-th--apply"
+                    style={{ ...participantApplicationsTableThBase, textAlign: "center", width: applicationsMobileMerged ? "9%" : "5.5%", minWidth: "2.75rem" }}
+                  >
                     신청
                   </th>
-                  <th style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "26%", minWidth: "5.5rem" }}>
+                  <th
+                    className="participant-th participant-th--name"
+                    style={{
+                      ...participantApplicationsTableThBase,
+                      textAlign: "left",
+                      width: applicationsMobileMerged ? "30%" : "26%",
+                      minWidth: applicationsMobileMerged ? "7rem" : "5.5rem",
+                    }}
+                  >
                     이름
                   </th>
-                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "7%", minWidth: "2.35rem" }}>
+                  <th
+                    className="participant-th participant-th--metric"
+                    style={{
+                      ...participantApplicationsTableThBase,
+                      textAlign: "center",
+                      width: applicationsMobileMerged ? "8%" : "7%",
+                      minWidth: "2.35rem",
+                    }}
+                  >
                     {metricColumnTitle}
                   </th>
-                  <th style={{ ...participantApplicationsTableThBase, textAlign: "left", width: "22%", minWidth: "4.5rem" }}>
+                  <th
+                    className="participant-th participant-th--depositor"
+                    style={{
+                      ...participantApplicationsTableThBase,
+                      textAlign: "left",
+                      width: applicationsMobileMerged ? "auto" : "22%",
+                      minWidth: applicationsMobileMerged ? "5rem" : "4.5rem",
+                    }}
+                  >
                     입금자 이름
                   </th>
-                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "11%", minWidth: "3.75rem" }}>
-                    입금확인
-                  </th>
-                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "11%", minWidth: "3.75rem" }}>
-                    처리
-                  </th>
-                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "6.5%", minWidth: "1.85rem" }}>
-                    승인
-                  </th>
-                  <th style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "11%", minWidth: "3.75rem" }}>
-                    취소/거절
-                  </th>
+                  {applicationsMobileMerged ? (
+                    <th
+                      className="participant-th participant-th--processing"
+                      style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "22%", minWidth: "9.5rem" }}
+                    >
+                      처리
+                    </th>
+                  ) : (
+                    <>
+                      <th
+                        className="participant-th participant-th--deposit"
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "11%", minWidth: "3.75rem" }}
+                      >
+                        입금확인
+                      </th>
+                      <th
+                        className="participant-th participant-th--approveBtn"
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "11%", minWidth: "3.75rem" }}
+                      >
+                        처리
+                      </th>
+                      <th
+                        className="participant-th participant-th--approveDate"
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "6.5%", minWidth: "1.85rem" }}
+                      >
+                        승인
+                      </th>
+                      <th
+                        className="participant-th participant-th--reject"
+                        style={{ ...participantApplicationsTableThBase, textAlign: "center", width: "11%", minWidth: "3.75rem" }}
+                      >
+                        취소/거절
+                      </th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -434,6 +518,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     attendanceChecked={entry.attendanceChecked}
                     initialClientDepositConfirmedAt={entry.clientDepositConfirmedAt ?? null}
                     initialClientApplicationApprovedAt={entry.clientApplicationApprovedAt ?? null}
+                    applicationsMobileMerged={applicationsMobileMerged}
                   />
                 ))}
               </tbody>

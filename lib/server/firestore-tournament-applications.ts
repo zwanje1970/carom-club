@@ -315,6 +315,21 @@ export async function getTournamentApplicationListCountsFirestore(tournamentId: 
   };
 }
 
+/** 공개 상세·신청 화면 전용 — 승인(APPROVED) 건수만 aggregate (목록 스냅샷에는 포함하지 않음) */
+export async function countApprovedApplicationsByTournamentIdFirestore(tournamentId: string): Promise<number> {
+  assertClientFirestorePersistenceConfigured();
+  const id = tournamentId.trim();
+  if (!id) return 0;
+  const db = getSharedFirestoreDb();
+  const snap = await db
+    .collection(COLLECTION)
+    .where("tournamentId", "==", id)
+    .where("status", "==", "APPROVED")
+    .count()
+    .get();
+  return snap.data().count;
+}
+
 export async function listTournamentApplicationsByUserIdFirestore(userId: string): Promise<TournamentApplication[]> {
   assertClientFirestorePersistenceConfigured();
   const uid = userId.trim();

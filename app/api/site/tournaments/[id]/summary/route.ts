@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { countApprovedApplicationsByTournamentIdFirestore } from "../../../../../../lib/server/firestore-tournament-applications";
 import { getTournamentByIdFirestore } from "../../../../../../lib/server/firestore-tournaments";
 import { normalizeTournamentStatusBadge } from "../../../../../../lib/server/platform-backing-store";
 
@@ -16,9 +17,14 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const badge = normalizeTournamentStatusBadge(tournament.statusBadge);
   const applicationsClosed = badge === "마감" || badge === "진행중" || badge === "종료";
 
+  const confirmedParticipantCount = await countApprovedApplicationsByTournamentIdFirestore(tid);
+
   return NextResponse.json({
     statusBadge: badge,
     applicationsClosed,
     title: tournament.title ?? "",
+    maxParticipants: tournament.maxParticipants ?? 24,
+    entryFee: tournament.entryFee,
+    confirmedParticipantCount,
   });
 }
