@@ -778,6 +778,22 @@
   white-space: nowrap;
 }
 
+.client-tournament-manage .client-tournament-manage__applicationsSymbolLegendGlyph {
+  font-weight: 800;
+}
+
+.client-tournament-manage .client-tournament-manage__applicationsSymbolLegendGlyph--won {
+  color: #dc2626;
+}
+
+.client-tournament-manage .client-tournament-manage__applicationsSymbolLegendGlyph--check {
+  color: #15803d;
+}
+
+.client-tournament-manage .client-tournament-manage__applicationsSymbolLegendGlyph--cross {
+  color: #475569;
+}
+
 .client-tournament-manage .client-tournament-manage__participantTableShell--fullscreenScroll .client-tournament-manage__applicationsSymbolLegend {
   margin-top: 0.1rem;
 }
@@ -1090,26 +1106,55 @@
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
 }
 
-/* 가로보기 전용 표: landscape 기준 폭을 확보해 10열을 세로폭에 억지 압축하지 않음 */
+@media (orientation: landscape) {
+  .client-tournament-manage .client-tournament-manage__participantTableShell--fullscreenScroll .client-tournament-manage__applicationsTableInner {
+    padding-bottom: max(0.75rem, calc(env(safe-area-inset-bottom, 0px) + 0.75rem));
+  }
+}
+
+/* 가로보기 전용 표: 10열 전체를 landscape viewport 안에 맞춤 */
 .client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide {
-  width: max(100%, 820px) !important;
-  min-width: 820px !important;
-  max-width: none !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide thead th,
+.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide tbody td {
+  padding-left: 0.18rem !important;
+  padding-right: 0.18rem !important;
+}
+
+.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide .participant-th--apply,
+.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide .participant-th--approveInfoFs,
+.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide td.participant-col--apply,
+.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide td.participant-col--approveInfoFs {
+  text-align: center !important;
+  font-variant-numeric: tabular-nums;
 }
 
 .client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide .participant-th--name,
-.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide td.participant-col--name {
-  min-width: 4.5rem;
+.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide .participant-th--depositor,
+.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide td.participant-col--name,
+.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide td.participant-col--depositor {
+  text-align: left !important;
+  min-width: 0;
+}
+
+.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide .participant-th--metric,
+.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide td.participant-col--metric {
+  min-width: 3.75rem;
+  text-align: center !important;
 }
 
 .client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide .participant-th--phoneFs,
 .client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide td.participant-col--phoneFs {
-  min-width: 7.25rem;
+  white-space: nowrap !important;
 }
 
-.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide .participant-th--affiliationFs,
-.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide td.participant-col--affiliationFs {
-  min-width: 3.25rem;
+.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide .participant-op-hit {
+  min-width: 32px;
+  min-height: 32px;
 }
 
 .client-tournament-manage__participantDetailBackdrop {
@@ -1389,4 +1434,25 @@
     white-space: nowrap !important;
     overflow: visible !important;
   }
+}
+
+.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide thead th,
+.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide tbody td {
+  padding-left: 0.18rem !important;
+  padding-right: 0.18rem !important;
+}
+
+.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide .client-tournament-manage__participantNameBtn {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
+}
+
+.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide td.participant-col--name,
+.client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide td.participant-col--depositor {
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis;
+  word-break: keep-all;
 }

@@ -490,9 +490,24 @@ export default function ClientTournamentParticipantsApplicationsBlock({
         }
       >
         <p className="client-tournament-manage__applicationsSymbolLegend">
-          <span className="client-tournament-manage__applicationsSymbolLegendItem">₩ = 입금확인</span>
-          <span className="client-tournament-manage__applicationsSymbolLegendItem">✓ = 승인</span>
-          <span className="client-tournament-manage__applicationsSymbolLegendItem">✕ = 취소/거절</span>
+          <span className="client-tournament-manage__applicationsSymbolLegendItem">
+            <span className="client-tournament-manage__applicationsSymbolLegendGlyph client-tournament-manage__applicationsSymbolLegendGlyph--won">
+              ₩
+            </span>{" "}
+            = 입금확인
+          </span>
+          <span className="client-tournament-manage__applicationsSymbolLegendItem">
+            <span className="client-tournament-manage__applicationsSymbolLegendGlyph client-tournament-manage__applicationsSymbolLegendGlyph--check">
+              ✓
+            </span>{" "}
+            = 승인
+          </span>
+          <span className="client-tournament-manage__applicationsSymbolLegendItem">
+            <span className="client-tournament-manage__applicationsSymbolLegendGlyph client-tournament-manage__applicationsSymbolLegendGlyph--cross">
+              ✕
+            </span>{" "}
+            = 취소/거절
+          </span>
         </p>
         {zoneFilteredEntries.length === 0 ? (
           <p className="v3-muted" style={{ margin: 0, padding: "0.65rem 0.75rem" }}>
@@ -516,16 +531,16 @@ export default function ClientTournamentParticipantsApplicationsBlock({
             >
               {fullscreenTable ? (
                 <colgroup>
-                  <col style={{ width: "6%" }} />
-                  <col style={{ width: "11%" }} />
-                  <col style={{ width: "19%" }} />
-                  <col style={{ width: "6%" }} />
-                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "6.25%" }} />
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: "20%" }} />
+                  <col style={{ width: "9.5%" }} />
                   <col style={{ width: "10%" }} />
                   <col style={{ width: "12%" }} />
-                  <col style={{ width: "9%" }} />
-                  <col style={{ width: "9%" }} />
-                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "6.25%" }} />
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "8%" }} />
                 </colgroup>
               ) : (
                 <colgroup>

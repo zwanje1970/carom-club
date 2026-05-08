@@ -142,7 +142,6 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
         slideDeck
         slideDeckAspectFill
         templateCardLayout
-        editorCompactCardHeight
         suppressLink
         repImageHighPriority={lcpHeroImage}
         slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}

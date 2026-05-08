@@ -496,7 +496,11 @@ export default function ParticipantListRow({
   return (
     <>
       <tr className={terminalRejected ? "participant-row--rejected" : undefined} style={{ background: rowBg }}>
-        <td data-participant-label="신청" style={{ ...cellBase, fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
+        <td
+          data-participant-label="신청"
+          className="participant-col participant-col--apply"
+          style={{ ...cellBase, fontVariantNumeric: "tabular-nums", fontWeight: 600 }}
+        >
           {formatDateSlashMd(registrationCreatedAt)}
         </td>
         <td data-participant-label="이름" className="participant-col participant-col--name" style={{ ...cellBase, textAlign: "left", maxWidth: 0 }}>
@@ -545,6 +549,7 @@ export default function ParticipantListRow({
         {ellipsisTd("입금자", depositorDisplay, "left", "participant-col--depositor")}
         <td
           data-participant-label="승인"
+          className="participant-col participant-col--approveInfoFs"
           style={{
             ...cellBase,
             maxWidth: 0,
