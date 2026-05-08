@@ -10556,26 +10556,53 @@ async function buildMainSlideTournamentAndArchivedKvSnapshots(): Promise<MainSli
   return { main: mainSnapshots, archived: archivedSnapshots };
 }
 
-async function rebuildMainSlideTournamentSnapshotsCompactKvNow(): Promise<PublishedCardSnapshot[]> {
-  const { main, archived } = await buildMainSlideTournamentAndArchivedKvSnapshots();
-  await saveMainSlideTournamentSnapshotsCompactToStorage(main);
-  await saveMainSlideArchivedTournamentSnapshotsToStorage(archived);
-  console.log("[COMPACT] rebuilt main", main.length, "archived", archived.length);
-  return main;
+let rebuildMainSlideCompactKvEpipeWarned = false;
+
+function isBrokenPipeWriteError(e: unknown): boolean {
+  if (!e || typeof e !== "object") return false;
+  const err = e as NodeJS.ErrnoException & { code?: unknown };
+  const msg = typeof err.message === "string" ? err.message : "";
+  return err.code === "EPIPE" || msg.includes("EPIPE") || /broken\s+pipe/i.test(msg);
 }
 
-/** 공개 메인 슬라이드: main-cards KV만 사용. 빈 KV면 재빌드 후 반환(메인 요청에서 대회원본 미조회). */
+async function rebuildMainSlideTournamentSnapshotsCompactKvNow(): Promise<PublishedCardSnapshot[]> {
+  try {
+    const { main, archived } = await buildMainSlideTournamentAndArchivedKvSnapshots();
+    await saveMainSlideTournamentSnapshotsCompactToStorage(main);
+    await saveMainSlideArchivedTournamentSnapshotsToStorage(archived);
+    try {
+      console.log("[COMPACT] rebuilt main", main.length, "archived", archived.length);
+    } catch (logErr) {
+      if (!isBrokenPipeWriteError(logErr)) throw logErr;
+      if (!rebuildMainSlideCompactKvEpipeWarned) {
+        rebuildMainSlideCompactKvEpipeWarned = true;
+        console.warn("[main-slide-kv] compact rebuild log skipped (EPIPE), ignoring further EPIPE noise");
+      }
+    }
+    return main;
+  } catch (e) {
+    if (isBrokenPipeWriteError(e)) {
+      if (!rebuildMainSlideCompactKvEpipeWarned) {
+        rebuildMainSlideCompactKvEpipeWarned = true;
+        console.warn("[main-slide-kv] compact rebuild aborted (EPIPE), ignoring further EPIPE noise");
+      }
+      return [];
+    }
+    throw e;
+  }
+}
+
+/** 공개 메인 슬라이드: 저장된 compact KV만 읽음. 빈 값이면 [] — 재빌드는 관리 저장·카드 갱신·전용 API에서만 수행. */
 export async function listTournamentSnapshotsForMainSite(options?: {
   /** @deprecated 메인은 스냅샷 전체를 사용. 호환만 위해 남김(무시). */
   limit?: number;
 }): Promise<PublishedCardSnapshot[]> {
   void options?.limit;
   const compactRows = await loadMainSlideTournamentSnapshotsCompactFromStorage();
-  console.log("[COMPACT] read length", compactRows === null ? null : compactRows.length);
   if (compactRows !== null && compactRows.length > 0) {
     return compactRows;
   }
-  return rebuildMainSlideTournamentSnapshotsCompactKvNow();
+  return [];
 }
 
 async function loadMainSlideAdsNormalizedForStorage(): Promise<MainSiteSlideAd[]> {

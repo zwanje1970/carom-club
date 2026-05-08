@@ -24,7 +24,6 @@ export function dashboardMobileChromeMeta(
     if (p === "/client/tournaments") return { title: "대회관리", backHref: "/client" };
     if (p === "/client/tournaments/new") return { title: "대회 만들기", backHref: "/client/tournaments" };
     if (p === "/client/settlement") return { title: "정산관리", backHref: "/client" };
-    if (p === "/client/settlements") return { title: "전체정산 (구)", backHref: "/client" };
     if (p === "/client/member") return { title: "회원관리", backHref: "/client" };
     if (p === "/client/settings") return { title: "설정", backHref: "/client" };
     if (p === "/client/settings/blank-bracket-print") return { title: "빈 대진표 출력", backHref: "/client/settings" };

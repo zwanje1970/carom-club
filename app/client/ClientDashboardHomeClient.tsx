@@ -689,7 +689,7 @@ export default function ClientDashboardHomeClient({
               <span className="client-dashboard-main__featureDesc">참가자·푸시 알림을 다룹니다</span>
             </span>
           </Link>
-          <Link href="/client/settlements" prefetch={false} className="client-dashboard-main__featureCard client-dashboard-main__featureCard--warning">
+          <Link href="/client/settlement" prefetch={false} className="client-dashboard-main__featureCard client-dashboard-main__featureCard--warning">
             <span className="client-dashboard-main__featureIconWrap">
               <IconChartLine />
             </span>
