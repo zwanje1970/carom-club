@@ -518,7 +518,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                 : "선택한 권역에 배정된 신청이 없습니다."}
           </p>
         ) : (
-          <div className="client-tournament-manage__applicationsTableInner">
+          <div className="client-tournament-manage__applicationsTableInner client-dashboard-scroll-safe-area">
             <table
               className={`client-tournament-manage__participantTable client-tournament-manage__participantTable--singleLineMobile client-tournament-manage__participantTable--applicationsCompact ${fullscreenTable ? "client-tournament-manage__participantTable--fullscreenWide" : ""}`}
               style={{

@@ -13,7 +13,7 @@ type Props = {
  * 문의 상세(플랫폼/클라이언트) 공통: 스크롤 영역 + 하단 입력(문서 흐름, 뷰포트 하단 고정)
  */
 export default function InquiryComposerShell({ scroll, composer, clientDashboardComposerSafeArea }: Props) {
-  const scrollCls = clientDashboardComposerSafeArea ? "client-dashboard-inquiry-composer-scroll" : undefined;
+  const scrollCls = clientDashboardComposerSafeArea ? "client-dashboard-scroll-safe-area" : undefined;
   const footerCls = clientDashboardComposerSafeArea ? "client-dashboard-inquiry-composer-footer" : undefined;
   return (
     <div

@@ -2864,45 +2864,41 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   }
 }
 
-/* /client 모바일: 하단 제스처 영역 — 공통 토큰만 사용(공개 /site·번들 분리: .app-dashboard-mobile-root 없음) */
+/* /client 모바일: 하단 제스처 영역 — :has(html) 미사용(WebView 호환). 변수는 루트에만 정의. */
 @media (max-width: 767px) {
   /*
-   * 클라이언트 대시보드(/client): 본문 스크롤 끝에서 마지막 콘텐츠를 제스처 위로 끌어올릴 하단 여유.
-   * --client-safe-bottom: 하단 고정 UI의 bottom 오프셋 / --client-bottom-space: 스크롤 패딩·내부 스크롤러 하단
+   * env(bottom)=0 인 Android에서도 최소 48px 여유. 모든 var() 사용처는 fallback(48px) 필수.
+   * --client-safe-bottom: 하단 고정 UI의 bottom / --client-bottom-space: 스크롤·패딩 하단
    */
-  html:has(.app-dashboard-mobile-root[data-dashboard-mobile-area="client"]) {
-    --client-safe-bottom: max(24px, env(safe-area-inset-bottom, 0px));
-    --client-bottom-space: calc(24px + env(safe-area-inset-bottom, 0px));
-    scroll-padding-bottom: var(--client-bottom-space);
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"] {
+    --client-safe-bottom: max(48px, env(safe-area-inset-bottom, 0px));
+    --client-bottom-space: calc(48px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* 내부 overflow:auto 스크롤러 공통 — 게시카드·신청자 표·문의 스크롤 영역 등 */
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"] .client-dashboard-scroll-safe-area {
+    padding-bottom: var(--client-bottom-space, 48px);
+    scroll-padding-bottom: var(--client-bottom-space, 48px);
   }
 
   /* 상단 크롬 fixed — 본문은 크롬 높이 + 회색 간격 + 하단 공통 스크롤 여유 */
   .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]
     .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
     padding-top: calc(var(--app-dashboard-mobile-chrome-height) + var(--site-shell-gray-padding-top));
-    padding-bottom: var(--client-bottom-space);
-    scroll-padding-bottom: var(--client-bottom-space);
+    padding-bottom: var(--client-bottom-space, 48px);
+    scroll-padding-bottom: var(--client-bottom-space, 48px);
     padding-left: max(12px, env(safe-area-inset-left, 0px));
     padding-right: max(12px, env(safe-area-inset-right, 0px));
   }
 
-  html:has(.app-dashboard-mobile-root[data-dashboard-mobile-area="client"]),
-  body:has(.app-dashboard-mobile-root[data-dashboard-mobile-area="client"]) {
-    background-color: var(--ui-bg-page);
-  }
-
   /* 모바일 클라이언트: 하단 sticky/고정 바를 제스처 위로(PC는 아래 기본 bottom:0 유지) */
-  html:has(.app-dashboard-mobile-root[data-dashboard-mobile-area="client"]) .client-dashboard-fixed-bottom {
-    bottom: var(--client-safe-bottom) !important;
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"] .client-dashboard-fixed-bottom {
+    bottom: var(--client-safe-bottom, 48px) !important;
   }
 
-  /* 문의 상세: 스크롤 끝·하단 입력줄 — InquiryComposerShell(clientDashboardComposerSafeArea) */
-  html:has(.app-dashboard-mobile-root[data-dashboard-mobile-area="client"]) .client-dashboard-inquiry-composer-scroll {
-    scroll-padding-bottom: var(--client-bottom-space);
-  }
-
-  html:has(.app-dashboard-mobile-root[data-dashboard-mobile-area="client"]) .client-dashboard-inquiry-composer-footer {
-    padding-bottom: max(0.65rem, var(--client-bottom-space)) !important;
+  /* 문의 상세 하단 입력줄 — InquiryComposerShell(clientDashboardComposerSafeArea) */
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"] .client-dashboard-inquiry-composer-footer {
+    padding-bottom: max(0.65rem, var(--client-bottom-space, 48px)) !important;
   }
 }
 

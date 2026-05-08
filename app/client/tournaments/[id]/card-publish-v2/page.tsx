@@ -690,7 +690,7 @@ export default function ClientTournamentCardPublishV2Page() {
             </div>
           </div>
 
-          <div className={editorStyles.formScrollPane}>
+          <div className={`${editorStyles.formScrollPane} client-dashboard-scroll-safe-area`}>
           <div className={editorStyles.stepScrollBody}>
           {editorTab === "content" ? (
             <CardPublishContentTab

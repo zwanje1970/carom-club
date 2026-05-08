@@ -293,7 +293,7 @@
   border-radius: 10px;
   overflow: hidden;
   background: #f8fafc;
-  padding-bottom: var(--client-bottom-space, calc(0.35rem + env(safe-area-inset-bottom, 0px)));
+  padding-bottom: var(--client-bottom-space, 48px);
 }
 
 /* 신청자 관리: 상단 운영 버튼 — 줄바꿈 허용(가로보기 추가 등) */
@@ -703,7 +703,7 @@
 }
 
 .client-tournament-manage.client-tournament-manage--participants-subpage .client-tournament-manage__participantTableShell {
-  padding-bottom: var(--client-bottom-space, calc(1.35rem + env(safe-area-inset-bottom, 0px)));
+  padding-bottom: var(--client-bottom-space, 48px);
 }
 
 /* 신청자 관리: 상단 고정 + 표 영역만 세로 스크롤 */
@@ -819,8 +819,7 @@
   min-height: 0;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: var(--client-bottom-space, max(0.5rem, env(safe-area-inset-bottom, 0px)));
-  scroll-padding-bottom: var(--client-bottom-space, max(0.5rem, env(safe-area-inset-bottom, 0px)));
+  /* 하단 여유: globals `.client-dashboard-scroll-safe-area`(표 inner에 클래스 부착) */
 }
 
 .client-tournament-manage .client-tournament-manage__participantTable--applicationsCompact {
@@ -1101,23 +1100,7 @@
   background: #f1f5f9;
 }
 
-.client-tournament-manage .client-tournament-manage__participantTableShell--fullscreenScroll .client-tournament-manage__applicationsTableInner {
-  padding-bottom: var(--client-bottom-space, max(0.5rem, max(16px, env(safe-area-inset-bottom, 0px))));
-  scroll-padding-bottom: var(--client-bottom-space, max(0.5rem, max(16px, env(safe-area-inset-bottom, 0px))));
-}
-
-@media (orientation: landscape) {
-  .client-tournament-manage .client-tournament-manage__participantTableShell--fullscreenScroll .client-tournament-manage__applicationsTableInner {
-    padding-bottom: var(
-      --client-bottom-space,
-      max(0.75rem, calc(max(16px, env(safe-area-inset-bottom, 0px)) + 0.75rem))
-    );
-    scroll-padding-bottom: var(
-      --client-bottom-space,
-      max(0.75rem, calc(max(16px, env(safe-area-inset-bottom, 0px)) + 0.75rem))
-    );
-  }
-}
+/* 풀스크린 표 inner: `.client-dashboard-scroll-safe-area` 로 하단 여유 */
 
 /* 가로보기 전용 표: 10열 전체를 landscape viewport 안에 맞춤 */
 .client-tournament-manage .client-tournament-manage__participantTable--fullscreenWide {

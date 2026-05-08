@@ -84,15 +84,16 @@ export default function ParticipantAddSheet({ tournamentId }: { tournamentId: st
           onClick={close}
         >
           <form
-            className="v3-stack"
+            className="v3-stack client-dashboard-scroll-safe-area"
             onSubmit={handleSubmit}
             onClick={(ev) => ev.stopPropagation()}
             style={{
               background: "#fff",
               borderTopLeftRadius: "0.75rem",
               borderTopRightRadius: "0.75rem",
-              padding:
-                "1rem max(1rem, env(safe-area-inset-right, 0px)) max(1rem, var(--client-bottom-space, calc(24px + env(safe-area-inset-bottom, 0px)))) max(1rem, env(safe-area-inset-left, 0px))",
+              paddingTop: "1rem",
+              paddingLeft: "max(1rem, env(safe-area-inset-left, 0px))",
+              paddingRight: "max(1rem, env(safe-area-inset-right, 0px))",
               gap: "0.65rem",
               maxHeight: "88vh",
               overflowY: "auto",
