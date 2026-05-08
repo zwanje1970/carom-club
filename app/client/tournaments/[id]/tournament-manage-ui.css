@@ -1103,12 +1103,12 @@
 }
 
 .client-tournament-manage .client-tournament-manage__participantTableShell--fullscreenScroll .client-tournament-manage__applicationsTableInner {
-  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  padding-bottom: max(0.5rem, max(16px, env(safe-area-inset-bottom, 0px)));
 }
 
 @media (orientation: landscape) {
   .client-tournament-manage .client-tournament-manage__participantTableShell--fullscreenScroll .client-tournament-manage__applicationsTableInner {
-    padding-bottom: max(0.75rem, calc(env(safe-area-inset-bottom, 0px) + 0.75rem));
+    padding-bottom: max(0.75rem, calc(max(16px, env(safe-area-inset-bottom, 0px)) + 0.75rem));
   }
 }
 

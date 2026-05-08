@@ -10,7 +10,7 @@
   z-index: 30;
 }
 
-/* 대진표 보기: 부모(main)가 safe-area 패딩을 두었으므로 뷰포트 fixed 대신 영역에 맞춤 */
+/* 대진표 보기: 부모(main) 전체화면 안에서 absolute로 채움 — 하단 제스처 여유는 .viewport 패딩으로 */
 .boardChromeBracketView.boardRoot {
   position: absolute;
   inset: 0;
@@ -35,6 +35,14 @@
   box-sizing: border-box;
   padding: 0;
   user-select: none;
+}
+
+/* 대진표 보기 모바일: 스크롤 끝에서 보드가 제스처 뒤에 붙지 않도록 하단 스크롤 여유 */
+@media (max-width: 767px) {
+  .boardChromeBracketView .viewport {
+    padding-bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 16px);
+    scroll-padding-bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 16px);
+  }
 }
 
 .viewportGrab {
@@ -75,7 +83,7 @@
   position: absolute;
   left: 8px;
   right: 8px;
-  bottom: 12px;
+  bottom: calc(12px + max(16px, env(safe-area-inset-bottom, 0px)));
   z-index: 195;
   pointer-events: none;
   box-sizing: border-box;
