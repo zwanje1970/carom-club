@@ -59,7 +59,7 @@ export default async function ClientLayout({
         <DashboardMobileChromeLayout area="client">
           <>
             {/* 모바일 하단 예약: `--client-bottom-reserved-space` + 공통 하단바(`ClientMobileBottomNav`) */}
-            <div className="app-mobile-bottom-nav-scroll-pad app-dashboard-shell app-dashboard-shell--with-mobile-chrome">
+            <div className="app-mobile-bottom-nav-scroll-pad app-dashboard-shell app-dashboard-shell--with-mobile-chrome app-client-mobile-main-scroll">
               {children}
             </div>
             <ClientMobileBottomNav />

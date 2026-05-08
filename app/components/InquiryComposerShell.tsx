@@ -17,6 +17,7 @@ export default function InquiryComposerShell({ scroll, composer, clientDashboard
   const footerCls = clientDashboardComposerSafeArea ? "client-dashboard-inquiry-composer-footer" : undefined;
   return (
     <div
+      className={clientDashboardComposerSafeArea ? "client-dashboard-inquiry-composer-root" : undefined}
       style={{
         display: "flex",
         flexDirection: "column",
