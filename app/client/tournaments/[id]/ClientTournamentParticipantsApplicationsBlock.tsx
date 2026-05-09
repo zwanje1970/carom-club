@@ -84,6 +84,30 @@ function mergeByEntryId(
   return Array.from(map.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+/** 목록 항목의 입금/신청승인 시각 — 문자열 외 직렬화 형태 보정(전체승인 대상 판정만, 타입 정의는 유지) */
+function coerceClientProcessingIsoAt(raw: unknown): string | null {
+  if (typeof raw === "string" && raw.trim() !== "") return raw.trim();
+  if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    if (typeof o.toDate === "function") {
+      try {
+        const d = (o.toDate as () => Date)();
+        if (d instanceof Date && !Number.isNaN(d.getTime())) return d.toISOString();
+      } catch {
+        /* ignore */
+      }
+    }
+    const sec = o._seconds;
+    const nano = o._nanoseconds;
+    if (typeof sec === "number" && Number.isFinite(sec)) {
+      const ms = typeof nano === "number" && Number.isFinite(nano) ? sec * 1000 + Math.floor(nano / 1e6) : sec * 1000;
+      const d = new Date(ms);
+      if (!Number.isNaN(d.getTime())) return d.toISOString();
+    }
+  }
+  return null;
+}
+
 function countApplicationApprovedChip(entries: TournamentApplicationListItem[]): number {
   return entries.filter(
     (e) =>
@@ -92,13 +116,17 @@ function countApplicationApprovedChip(entries: TournamentApplicationListItem[]):
   ).length;
 }
 
-/** 입금확인 완료 · 운영 신청 승인 전 · 거절·참가확정·대기자 제외(API processing과 동일) */
+/**
+ * 입금확인 전체승인 대상: 입금확인 시각 있음 · 신청 승인 시각 없음 · 거절(REJECTED)·참가확정(APPROVED)·대기자(WAITING) 제외.
+ * (patchTournamentApplicationProcessingFirestore: WAITING·REJECTED·APPROVED 는 신청 승인 불가)
+ */
 function listItemEligibleBulkDepositApprove(e: TournamentApplicationListItem): boolean {
   if (e.status === "REJECTED" || e.status === "APPROVED" || e.status === "WAITING") return false;
-  const hasDep = typeof e.clientDepositConfirmedAt === "string" && e.clientDepositConfirmedAt.trim() !== "";
-  if (!hasDep) return false;
-  const hasAppr = typeof e.clientApplicationApprovedAt === "string" && e.clientApplicationApprovedAt.trim() !== "";
-  return !hasAppr;
+  const depAt = coerceClientProcessingIsoAt(e.clientDepositConfirmedAt as unknown);
+  if (!depAt) return false;
+  const apprAt = coerceClientProcessingIsoAt(e.clientApplicationApprovedAt as unknown);
+  if (apprAt) return false;
+  return true;
 }
 
 function participantMetricColumnTitle(eq: TournamentEntryQualificationType): string {
@@ -135,6 +163,8 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   const [finalizeBusy, setFinalizeBusy] = useState(false);
   const [finalizeUnapprovedModalCount, setFinalizeUnapprovedModalCount] = useState<number | null>(null);
   const [bulkApproveBusy, setBulkApproveBusy] = useState(false);
+  const [bulkDepositApproveModalOpen, setBulkDepositApproveModalOpen] = useState(false);
+  const [bulkDepositApproveTargetIds, setBulkDepositApproveTargetIds] = useState<string[]>([]);
   const [moreLoading, setMoreLoading] = useState(() => participantCountSummary.total > initialEntries.length);
   const fullFetchDoneRef = useRef(false);
 
@@ -241,23 +271,32 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   const capacityOccupied = useMemo(() => countCapacityOccupiedFromListItems(entries), [entries]);
   const waitingListTotal = participantCountSummary.waitingList ?? 0;
 
-  async function onBulkApproveDepositConfirmed() {
+  function requestBulkDepositApprove() {
     if (bulkApproveBusy) return;
     const targets = zoneFilteredEntries.filter(listItemEligibleBulkDepositApprove);
     if (targets.length === 0) {
-      window.alert("입금확인만 되어 있고 아직 신청 승인 전인 건이 없습니다.");
+      window.alert("입금확인 된 미승인자가 없습니다.");
       return;
     }
-    if (
-      !window.confirm(
-        `입금확인된 ${targets.length}건을 일괄 신청 승인할까요?\n(이미 승인·참가확정·거절 건은 제외됩니다. 개별 승인과 동일 API를 사용합니다.)`
-      )
-    ) {
+    setBulkDepositApproveTargetIds(targets.map((t) => t.id));
+    setBulkDepositApproveModalOpen(true);
+  }
+
+  async function executeBulkDepositApproveAfterConfirm() {
+    if (bulkApproveBusy) return;
+    const ids = [...bulkDepositApproveTargetIds];
+    if (ids.length === 0) {
+      setBulkDepositApproveModalOpen(false);
+      setBulkDepositApproveTargetIds([]);
       return;
     }
+    setBulkDepositApproveModalOpen(false);
+    setBulkDepositApproveTargetIds([]);
     setBulkApproveBusy(true);
     try {
-      for (const t of targets) {
+      for (const id of ids) {
+        const t = entries.find((e) => e.id === id);
+        if (!t || !listItemEligibleBulkDepositApprove(t)) continue;
         const res = await fetch(
           `/api/client/tournaments/${encodeURIComponent(tournamentId)}/participants/${encodeURIComponent(t.id)}/processing`,
           {
@@ -290,6 +329,11 @@ export default function ClientTournamentParticipantsApplicationsBlock({
     } finally {
       setBulkApproveBusy(false);
     }
+  }
+
+  function cancelBulkDepositApproveModal() {
+    setBulkDepositApproveModalOpen(false);
+    setBulkDepositApproveTargetIds([]);
   }
 
   async function runFinalizeParticipantsCore() {
@@ -473,7 +517,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     type="button"
                     className="client-tournament-manage__opsBarEqualBtn"
                     disabled={bulkApproveBusy}
-                    onClick={() => void onBulkApproveDepositConfirmed()}
+                    onClick={() => requestBulkDepositApprove()}
                     style={{
                       ...opsBtn,
                       width: "100%",
@@ -575,7 +619,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
             <button
               type="button"
               disabled={bulkApproveBusy}
-              onClick={() => void onBulkApproveDepositConfirmed()}
+              onClick={() => requestBulkDepositApprove()}
               style={{
                 ...opsBtn,
                 borderColor: "#15803d",
@@ -790,6 +834,51 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     })();
                   }}
                 >
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {bulkDepositApproveModalOpen ? (
+          <div
+            role="presentation"
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 241,
+              background: "rgba(15,23,42,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px)) max(1rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px))",
+              boxSizing: "border-box",
+            }}
+            onMouseDown={(ev) => {
+              if (ev.target === ev.currentTarget) cancelBulkDepositApproveModal();
+            }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="입금확인 전체 승인 확인"
+              className="v3-box v3-stack"
+              style={{
+                maxWidth: "22rem",
+                width: "100%",
+                background: "#fff",
+                borderRadius: "0.65rem",
+                padding: "1rem",
+                gap: "0.65rem",
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <p style={{ margin: 0, fontWeight: 800, lineHeight: 1.45 }}>입금확인 된 미승인자를 전체 승인합니다.</p>
+              <div className="v3-row" style={{ justifyContent: "flex-end", gap: "0.45rem" }}>
+                <button type="button" className="v3-btn" onClick={() => cancelBulkDepositApproveModal()}>
+                  취소
+                </button>
+                <button type="button" className="v3-btn" style={{ fontWeight: 800 }} onClick={() => void executeBulkDepositApproveAfterConfirm()}>
                   확인
                 </button>
               </div>
