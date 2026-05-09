@@ -1848,7 +1848,9 @@ main[data-client-applications-table-fullscreen="1"].client-tournament-manage
 }
 
 /*
- * 가로모드(landscape)만: 운영용 fullscreen 표 — 상단 모바일 UI 제거, safe-area는 env만·한 겹,
+ * 가로모드(landscape)만: 운영용 fullscreen 표 — 상단 모바일 UI 제거.
+ * Android WebView 등에서 env(safe-area-inset-*)가 0일 때를 대비해 스크롤 패드에 한 겹 fallback 패딩만 적용한다.
+ * (globals가 main에 padding:0을 두므로 safe-area는 패드에서 처리 — 이중 여백 없음)
  * 가로 스크롤 금지, 표 영역만 세로 스크롤.
  */
 @media (orientation: landscape) {
@@ -1858,23 +1860,26 @@ main[data-client-applications-table-fullscreen="1"].client-tournament-manage
       [data-client-applications-table-fullscreen="1"]
     )
     > .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
-    padding-top: 0 !important;
-    padding-left: 0 !important;
-    padding-right: 0 !important;
+    /* max(env, px): WebView에서 env 미전달 시에도 최소 안전영역 — 신청자 가로 fullscreen 전용 */
+    padding-top: max(env(safe-area-inset-top, 0px), 10px) !important;
+    padding-left: max(env(safe-area-inset-left, 0px), 6px) !important;
+    padding-right: max(env(safe-area-inset-right, 0px), 20px) !important;
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 6px) !important;
+    box-sizing: border-box !important;
   }
 
-  main[data-client-applications-table-fullscreen="1"].client-tournament-manage--participants-table-view-page.v3-page {
+  /* 부모 패딩 안에서만 표가 채워지도록 — 100dvw 뷰포트 침범 방지 */
+  .app-dashboard-mobile-root:has([data-client-applications-table-fullscreen="1"])
+    main[data-client-applications-table-fullscreen="1"].client-tournament-manage--participants-table-view-page.v3-page,
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:has(
+      [data-client-applications-table-fullscreen="1"]
+    )
+    main[data-client-applications-table-fullscreen="1"].client-tournament-manage--participants-table-view-page.v3-page {
     max-width: none !important;
-    width: 100dvw !important;
+    width: 100% !important;
     margin: 0 !important;
     min-width: 0 !important;
-    overflow-x: hidden !important;
     box-sizing: border-box !important;
-    /* 루트 한 겹: 노치·상태바·제스처 바 회피 + 최소 breathing space (중복 패딩 없음) */
-    padding-top: calc(env(safe-area-inset-top, 0px) + 2px) !important;
-    padding-left: calc(env(safe-area-inset-left, 0px) + 2px) !important;
-    padding-right: calc(env(safe-area-inset-right, 0px) + 2px) !important;
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2px) !important;
     gap: 0 !important;
   }
 

@@ -144,14 +144,24 @@ export default function NativeFullscreenOrientationLock({ contextLabel }: Native
       window.clearTimeout(t);
       requestNativeOrientation("portrait", `${ctx}:unmount`);
       requestBrowserOrientation("portrait", `${ctx}:unmount`);
-      if (!hasCaromNativeOrientationBridge()) {
+      /* 브라우저/WebView: 네이티브 portrait 요청만으로 복구가 늦거나 무시되는 경우 대비 — unlock은 브릿지 유무와 무관 시도 */
+      try {
+        screen.orientation?.unlock();
+      } catch {
+        /* ignore */
+      }
+      logViewport(`${ctx}:after-unmount-request`);
+      /* Activity 반영 지연 대비 재요청 — 뒤로가기 직후 세로·모바일 셸 레이아웃 안정화 */
+      window.setTimeout(() => {
+        requestNativeOrientation("portrait", `${ctx}:unmount-retry`);
+        requestBrowserOrientation("portrait", `${ctx}:unmount-retry`);
         try {
           screen.orientation?.unlock();
         } catch {
           /* ignore */
         }
-      }
-      logViewport(`${ctx}:after-unmount-request`);
+        logViewport(`${ctx}:after-unmount-retry`);
+      }, 160);
     };
   }, [contextLabel]);
 
