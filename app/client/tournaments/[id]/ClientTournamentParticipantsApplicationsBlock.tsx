@@ -402,73 +402,94 @@ export default function ClientTournamentParticipantsApplicationsBlock({
             <p className="client-tournament-manage__fullscreenTableTitle">{titleLine}</p>
           </div>
         ) : (
-          <p className="client-tournament-manage__applicationsTitle">{titleLine}</p>
+          <>
+            <div className="client-tournament-manage__applicationsTitleRow">
+              <p className="client-tournament-manage__applicationsTitle client-tournament-manage__applicationsTitle--inline">
+                {titleLine}
+              </p>
+              <Link prefetch={false} replace href={tableViewHref} className="client-tournament-manage__applicationsTableViewLink">
+                가로보기
+              </Link>
+            </div>
+            <div className="client-tournament-manage__applicationsOpsRows">
+              <div className="client-tournament-manage__applicationsOpsRow">
+                <div className="client-tournament-manage__opsBarCell">
+                  <Link prefetch={false} href={printHref} className="client-tournament-manage__opsBarEqualBtn" style={{ ...opsBtn, textDecoration: "none" }}>
+                    확정리스트
+                  </Link>
+                </div>
+                <div className="client-tournament-manage__opsBarCell">
+                  {showCancelFinalize ? (
+                    <button
+                      type="button"
+                      className="client-tournament-manage__finalizeParticipantsBtn client-tournament-manage__opsBarEqualBtn"
+                      disabled={finalizeBusy}
+                      onClick={() => void onCancelFinalizeParticipants()}
+                      style={{
+                        ...opsBtn,
+                        width: "100%",
+                        borderColor: "#b45309",
+                        background: "#fff7ed",
+                        color: "#9a3412",
+                        fontWeight: 800,
+                      }}
+                    >
+                      {finalizeBusy ? "처리 중…" : "참가확정 취소"}
+                    </button>
+                  ) : showFinalize ? (
+                    <button
+                      type="button"
+                      className="client-tournament-manage__finalizeParticipantsBtn client-tournament-manage__opsBarEqualBtn"
+                      disabled={finalizeBusy}
+                      onClick={() => void onFinalizeParticipants()}
+                      style={{
+                        ...opsBtn,
+                        width: "100%",
+                        borderColor: "#2563eb",
+                        background: "#2563eb",
+                        color: "#fff",
+                        fontWeight: 800,
+                      }}
+                    >
+                      {finalizeBusy ? "처리 중…" : "참가자 확정"}
+                    </button>
+                  ) : (
+                    <span className="client-tournament-manage__opsBarPlaceholder" aria-hidden />
+                  )}
+                </div>
+              </div>
+              <div className="client-tournament-manage__applicationsOpsRow">
+                <div className="client-tournament-manage__opsBarCell client-tournament-manage__opsBarCell--addSheet">
+                  <ParticipantAddSheet
+                    tournamentId={tournamentId}
+                    maxParticipants={maxParticipants}
+                    capacityOccupied={capacityOccupied}
+                    participantsFinalized={tournamentStatusBadge === "마감"}
+                    hasActiveBracket={hasActiveBracket}
+                  />
+                </div>
+                <div className="client-tournament-manage__opsBarCell">
+                  <button
+                    type="button"
+                    className="client-tournament-manage__opsBarEqualBtn"
+                    disabled={bulkApproveBusy}
+                    onClick={() => void onBulkApproveDepositConfirmed()}
+                    style={{
+                      ...opsBtn,
+                      width: "100%",
+                      borderColor: "#15803d",
+                      background: "#fff",
+                      color: "#15803d",
+                      fontWeight: 800,
+                    }}
+                  >
+                    {bulkApproveBusy ? "처리 중…" : "입금확인 전체승인"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
         )}
-
-        {!fullscreenTable ? (
-          <div className="client-tournament-manage__applicationsOpsBar">
-            <ParticipantAddSheet
-              tournamentId={tournamentId}
-              maxParticipants={maxParticipants}
-              capacityOccupied={capacityOccupied}
-              participantsFinalized={tournamentStatusBadge === "마감"}
-              hasActiveBracket={hasActiveBracket}
-            />
-            {showCancelFinalize ? (
-              <button
-                type="button"
-                className="client-tournament-manage__finalizeParticipantsBtn"
-                disabled={finalizeBusy}
-                onClick={() => void onCancelFinalizeParticipants()}
-                style={{
-                  ...opsBtn,
-                  borderColor: "#b45309",
-                  background: "#fff7ed",
-                  color: "#9a3412",
-                  fontWeight: 800,
-                }}
-              >
-                {finalizeBusy ? "처리 중…" : "참가확정 취소"}
-              </button>
-            ) : showFinalize ? (
-              <button
-                type="button"
-                className="client-tournament-manage__finalizeParticipantsBtn"
-                disabled={finalizeBusy}
-                onClick={() => void onFinalizeParticipants()}
-                style={{
-                  ...opsBtn,
-                  borderColor: "#2563eb",
-                  background: "#2563eb",
-                  color: "#fff",
-                  fontWeight: 800,
-                }}
-              >
-                {finalizeBusy ? "처리 중…" : "참가자 확정"}
-              </button>
-            ) : null}
-            <Link prefetch={false} href={printHref} style={{ ...opsBtn, textDecoration: "none" }}>
-              확정리스트
-            </Link>
-            <Link prefetch={false} replace href={tableViewHref} style={{ ...opsBtn, textDecoration: "none" }}>
-              가로보기
-            </Link>
-            <button
-              type="button"
-              disabled={bulkApproveBusy}
-              onClick={() => void onBulkApproveDepositConfirmed()}
-              style={{
-                ...opsBtn,
-                borderColor: "#15803d",
-                background: "#fff",
-                color: "#15803d",
-                fontWeight: 800,
-              }}
-            >
-              {bulkApproveBusy ? "처리 중…" : "입금확인 전체승인"}
-            </button>
-          </div>
-        ) : null}
 
         {zonesEnabled ? (
           <div
@@ -508,58 +529,75 @@ export default function ClientTournamentParticipantsApplicationsBlock({
           </div>
         ) : null}
 
-        {!fullscreenTable ? (
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: "0.22rem",
-              margin: zonesEnabled ? "0 0 0.26rem" : "0.04rem 0 0.26rem",
-            }}
-          >
-            <span style={{ ...pillBase, background: "#f8fafc", color: "#475569", borderColor: "#e2e8f0" }}>
-              총신청 {participantCountSummary.total}명
-            </span>
-            <span style={{ ...pillBase, background: "#ecfdf5", color: "#166534", borderColor: "#86efac" }}>
-              승인 {chipApproved}명
-            </span>
-            <span style={{ ...pillBase, background: "#f9fafb", color: "#4b5563", borderColor: "#e5e7eb" }}>
-              취소/거절 {participantCountSummary.reject}명
-            </span>
-            {waitingListTotal > 0 ? (
-              <span style={{ ...pillBase, background: "#fffbeb", color: "#92400e", borderColor: "#fcd34d" }}>
-                대기자 {waitingListTotal}명
-              </span>
-            ) : null}
+        {fullscreenTable ? (
+          <div className="client-tournament-manage__fullscreenTableBulkRow">
+            <button
+              type="button"
+              disabled={bulkApproveBusy}
+              onClick={() => void onBulkApproveDepositConfirmed()}
+              style={{
+                ...opsBtn,
+                borderColor: "#15803d",
+                background: "#fff",
+                color: "#15803d",
+                fontWeight: 800,
+                flex: "0 0 auto",
+              }}
+            >
+              {bulkApproveBusy ? "처리 중…" : "입금확인 전체승인"}
+            </button>
           </div>
         ) : (
           <>
-            <div className="client-tournament-manage__fullscreenTableBulkRow">
-              <button
-                type="button"
-                disabled={bulkApproveBusy}
-                onClick={() => void onBulkApproveDepositConfirmed()}
+            <p className="client-tournament-manage__applicationsNotify">승인완료시 신청자에게 신청완료 알림이 발송됩니다.</p>
+            <div className="client-tournament-manage__applicationsStatusLegendRow">
+              <div
+                className="client-tournament-manage__applicationsStatusChips"
                 style={{
-                  ...opsBtn,
-                  borderColor: "#15803d",
-                  background: "#fff",
-                  color: "#15803d",
-                  fontWeight: 800,
-                  flex: "0 0 auto",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  gap: "0.22rem",
                 }}
               >
-                {bulkApproveBusy ? "처리 중…" : "입금확인 전체승인"}
-              </button>
+                <span style={{ ...pillBase, background: "#f8fafc", color: "#475569", borderColor: "#e2e8f0" }}>
+                  신청 {participantCountSummary.total}명
+                </span>
+                <span style={{ ...pillBase, background: "#ecfdf5", color: "#166534", borderColor: "#86efac" }}>
+                  승인 {chipApproved}명
+                </span>
+                <span style={{ ...pillBase, background: "#f9fafb", color: "#4b5563", borderColor: "#e5e7eb" }}>
+                  취소/거절 {participantCountSummary.reject}명
+                </span>
+                {waitingListTotal > 0 ? (
+                  <span style={{ ...pillBase, background: "#fffbeb", color: "#92400e", borderColor: "#fcd34d" }}>
+                    대기자 {waitingListTotal}명
+                  </span>
+                ) : null}
+              </div>
+              <div className="client-tournament-manage__applicationsOpLegend" aria-label="표 버튼 기호 안내">
+                <span className="client-tournament-manage__opLegendItem">
+                  <span className="client-tournament-manage__opLegendDisk client-tournament-manage__opLegendDisk--won" aria-hidden>
+                    ₩
+                  </span>
+                  <span className="client-tournament-manage__opLegendCaption">입금확인</span>
+                </span>
+                <span className="client-tournament-manage__opLegendItem">
+                  <span className="client-tournament-manage__opLegendDisk client-tournament-manage__opLegendDisk--check" aria-hidden>
+                    ✓
+                  </span>
+                  <span className="client-tournament-manage__opLegendCaption">승인</span>
+                </span>
+                <span className="client-tournament-manage__opLegendItem">
+                  <span className="client-tournament-manage__opLegendDisk client-tournament-manage__opLegendDisk--cross" aria-hidden>
+                    ✕
+                  </span>
+                  <span className="client-tournament-manage__opLegendCaption">취소/거절</span>
+                </span>
+              </div>
             </div>
           </>
         )}
-
-        {!fullscreenTable ? (
-          <p className="client-tournament-manage__applicationsNotify">
-            승인완료시 신청자에게 신청완료 알림이 발송됩니다.
-          </p>
-        ) : null}
       </div>
 
       <section
@@ -569,28 +607,6 @@ export default function ClientTournamentParticipantsApplicationsBlock({
             : "client-tournament-manage__participantTableShell client-tournament-manage__participantTableShell--applicationsScroll"
         }
       >
-        {!fullscreenTable ? (
-          <p className="client-tournament-manage__applicationsSymbolLegend">
-            <span className="client-tournament-manage__applicationsSymbolLegendItem">
-              <span className="client-tournament-manage__applicationsSymbolLegendGlyph client-tournament-manage__applicationsSymbolLegendGlyph--won">
-                ₩
-              </span>{" "}
-              = 입금확인
-            </span>
-            <span className="client-tournament-manage__applicationsSymbolLegendItem">
-              <span className="client-tournament-manage__applicationsSymbolLegendGlyph client-tournament-manage__applicationsSymbolLegendGlyph--check">
-                ✓
-              </span>{" "}
-              = 승인
-            </span>
-            <span className="client-tournament-manage__applicationsSymbolLegendItem">
-              <span className="client-tournament-manage__applicationsSymbolLegendGlyph client-tournament-manage__applicationsSymbolLegendGlyph--cross">
-                ✕
-              </span>{" "}
-              = 취소/거절
-            </span>
-          </p>
-        ) : null}
         {zoneFilteredEntries.length === 0 ? (
           <p className="v3-muted" style={{ margin: 0, padding: "0.65rem 0.75rem" }}>
             {participantCountSummary.total === 0
@@ -625,15 +641,15 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                   <col className="participant-col-w-fs participant-col-w-fs--reject" />
                 </colgroup>
               ) : (
-                <colgroup>
-                  <col style={{ width: "8%" }} />
-                  <col style={{ width: "23%" }} />
-                  <col style={{ width: "9%" }} />
-                  <col style={{ width: "17%" }} />
-                  <col style={{ width: "16%" }} />
-                  <col style={{ width: "9%" }} />
-                  <col style={{ width: "9%" }} />
-                  <col style={{ width: "9%" }} />
+                <colgroup className="client-tournament-manage__participantTableColgroup--appsStandard">
+                  <col className="participant-col-w-std participant-col-w-std--apply" />
+                  <col className="participant-col-w-std participant-col-w-std--name" />
+                  <col className="participant-col-w-std participant-col-w-std--metric" />
+                  <col className="participant-col-w-std participant-col-w-std--depositor" />
+                  <col className="participant-col-w-std participant-col-w-std--approveInfo" />
+                  <col className="participant-col-w-std participant-col-w-std--deposit" />
+                  <col className="participant-col-w-std participant-col-w-std--approveBtn" />
+                  <col className="participant-col-w-std participant-col-w-std--reject" />
                 </colgroup>
               )}
               <thead>

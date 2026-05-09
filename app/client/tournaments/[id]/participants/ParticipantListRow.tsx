@@ -331,14 +331,14 @@ export default function ParticipantListRow({
     if (opButtonPresentation === "text") {
       if (terminalWaiting || terminalRejected) {
         return (
-          <button type="button" disabled style={{ ...textOpBtnBase, opacity: 0.55 }}>
+          <button type="button" disabled className="participant-op-textBtn" style={{ ...textOpBtnBase, opacity: 0.55 }}>
             입금확인
           </button>
         );
       }
       if (terminalApproved) {
         return (
-          <button type="button" disabled style={{ ...textOpBtnBase, opacity: 0.55 }}>
+          <button type="button" disabled className="participant-op-textBtn" style={{ ...textOpBtnBase, opacity: 0.55 }}>
             입금확인
           </button>
         );
@@ -347,6 +347,7 @@ export default function ParticipantListRow({
       return (
         <button
           type="button"
+          className="participant-op-textBtn"
           disabled={loading || depositConfirmSaving}
           style={{
             ...textOpBtnBase,
@@ -409,21 +410,21 @@ export default function ParticipantListRow({
     if (opButtonPresentation === "text") {
       if (terminalWaiting || terminalRejected) {
         return (
-          <button type="button" disabled style={{ ...textOpBtnBase, opacity: 0.55 }}>
+          <button type="button" disabled className="participant-op-textBtn" style={{ ...textOpBtnBase, opacity: 0.55 }}>
             승인
           </button>
         );
       }
       if (terminalApproved) {
         return (
-          <button type="button" disabled style={{ ...textOpBtnBase, opacity: 0.55 }}>
+          <button type="button" disabled className="participant-op-textBtn" style={{ ...textOpBtnBase, opacity: 0.55 }}>
             승인
           </button>
         );
       }
       if (!depositDone) {
         return (
-          <button type="button" disabled style={{ ...textOpBtnBase, opacity: 0.55 }}>
+          <button type="button" disabled className="participant-op-textBtn" style={{ ...textOpBtnBase, opacity: 0.55 }}>
             승인
           </button>
         );
@@ -432,6 +433,7 @@ export default function ParticipantListRow({
       return (
         <button
           type="button"
+          className="participant-op-textBtn"
           disabled={loading}
           style={{
             ...textOpBtnBase,
@@ -497,14 +499,14 @@ export default function ParticipantListRow({
     if (opButtonPresentation === "text") {
       if (terminalApproved) {
         return (
-          <button type="button" disabled style={{ ...textOpBtnBase, opacity: 0.55 }}>
+          <button type="button" disabled className="participant-op-textBtn" style={{ ...textOpBtnBase, opacity: 0.55 }}>
             취소
           </button>
         );
       }
       if (terminalRejected) {
         return (
-          <button type="button" disabled style={{ ...textOpBtnBase, opacity: 0.55 }}>
+          <button type="button" disabled className="participant-op-textBtn" style={{ ...textOpBtnBase, opacity: 0.55 }}>
             취소
           </button>
         );
@@ -512,6 +514,7 @@ export default function ParticipantListRow({
       return (
         <button
           type="button"
+          className="participant-op-textBtn"
           disabled={loading}
           style={{
             ...textOpBtnBase,
