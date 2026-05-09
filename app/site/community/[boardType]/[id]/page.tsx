@@ -90,22 +90,23 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
     <SiteShellFrame brandTitle={<span className="site-home-brand-ellipsis">{post.title}</span>}>
       <section className="site-site-gray-main v3-stack ui-community-post-detail-page">
         <article className="ui-community-post-detail-article v3-stack">
-          <div className="ui-community-post-detail-title-row">
-            <h1 className="ui-community-post-detail-title">{post.title}</h1>
-            <CommunityPostDetailActions
-              canManageAuthor={canManageAuthor}
-              canDeletePost={canDeletePost}
-              postId={postId}
-              boardType={boardType}
-            />
-          </div>
+          <h1 className="ui-community-post-detail-title">{post.title}</h1>
           <p className="ui-community-post-detail-pill-row">
             <span className={boardPillClass(boardType)}>{boardPillLabel}</span>
           </p>
-          <p className="ui-community-post-detail-meta v3-muted">
-            {post.authorNickname} · {formatDetailDateTime(post.createdAt)} · 조회 {post.viewCount} · 댓글{" "}
-            {post.commentCount}
+          <p className="ui-community-post-detail-meta">
+            <span className="ui-community-post-detail-author">{post.authorNickname}</span>
+            <span className="ui-community-post-detail-meta-plain">
+              {" "}
+              · {formatDetailDateTime(post.createdAt)} · 조회 {post.viewCount} · 댓글 {post.commentCount}
+            </span>
           </p>
+          <CommunityPostDetailActions
+            canManageAuthor={canManageAuthor}
+            canDeletePost={canDeletePost}
+            postId={postId}
+            boardType={boardType}
+          />
           <CommunityPostDetailBody
             segments={segments}
             tailImages={tailImages}

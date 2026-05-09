@@ -40,17 +40,19 @@ export default function SiteTournamentsDistanceShell({ rows, searchParams, curre
     >
       <section className="site-site-gray-main v3-stack">
         {rows.length === 0 ? (
-          <p className="v3-muted">등록된 대회가 없습니다.</p>
+          <p className="v3-muted site-list-empty-hint">등록된 대회가 없습니다.</p>
         ) : (
           <ul className="site-board-card-list">
             {rows.map((tournament) => (
               <li key={tournament.id} className="site-board-card">
                 <Link prefetch={false} href={`/site/tournaments/${tournament.id}`}>
                   <div className="site-tournament-card-main">
-                    <span className={tournamentStatusBadgeClassName(tournament.statusBadge)}>
-                      {tournament.statusBadge}
-                    </span>
-                    <strong className="site-tournament-card-title">{tournament.title}</strong>
+                    <div className="site-tournament-card-head">
+                      <span className={tournamentStatusBadgeClassName(tournament.statusBadge)}>
+                        {tournament.statusBadge}
+                      </span>
+                      <strong className="site-tournament-card-title">{tournament.title}</strong>
+                    </div>
                     {tournament.scheduleLine ? (
                       <span className="site-tournament-schedule">{tournament.scheduleLine}</span>
                     ) : null}
@@ -63,17 +65,15 @@ export default function SiteTournamentsDistanceShell({ rows, searchParams, curre
                       </div>
                     ) : null}
                   </div>
-                  <div className="site-tournament-list-thumb">
-                    {tournament.posterSrc ? (
+                  {tournament.posterSrc ? (
+                    <div className="site-tournament-list-thumb">
                       <SiteListImage160
                         src={tournament.posterSrc}
                         alt={`${tournament.title} 포스터`}
                         placeholderClassName="site-tournament-list-thumb-placeholder"
                       />
-                    ) : (
-                      <div className="site-tournament-list-thumb-placeholder">이미지 없음</div>
-                    )}
-                  </div>
+                    </div>
+                  ) : null}
                 </Link>
               </li>
             ))}

@@ -3,10 +3,9 @@
 import Link from "next/link";
 import type { CSSProperties, KeyboardEvent, PointerEvent, Ref } from "react";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import editorCardStyles from "../client/tournaments/[id]/card-publish-editor.module.css";
 import styles from "./main-sample/main-sample.module.css";
 import siteStyles from "./main-site-scroll-cards.module.css";
-import { PublishedSnapshotScrollCard } from "./published-snapshot-scroll-card";
+import deckShellStyles from "./main-site-scroll-tournament-deck-shell.module.css";
 import {
   SLIDE_DECK_SOLID_BACKDROPS,
   TournamentSnapshotCardView,
@@ -39,8 +38,6 @@ export type MainSiteScrollCardItem = {
   external: boolean;
   /** 게시 스냅샷으로 면 전체가 이미지일 때 제목 오버레이 숨김(중복 방지) */
   faceIsFullPublishedSnapshot?: boolean;
-  /** 게시 PNG 면에서 배지·제목·메타 오버레이 생략(메인 대회 카드 전용; 광고는 미설정) */
-  suppressPublishedScrollOverlay?: boolean;
   /**
    * 게시 PNG 분기(`faceIsFullPublishedSnapshot`)는 아니지만, 면·포스터 크기·비율은
    * 게시 카드와 동일 CSS(공통 토큰) 사용 — 광고 업로드 이미지 전용.
@@ -171,10 +168,10 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
               <div className={styles.sampleMainCardDeckFitInner}>
                 <div className={siteStyles.mainScrollDeckCardShell}>
                   <div
-                    className={`${editorCardStyles.previewCardWrap} ${editorCardStyles.previewCardWrapV2Chrome} ${editorCardStyles.previewCardWrapMainScrollFlex}${selected ? ` ${editorCardStyles.previewCardWrapMainScrollSelection}` : ""}`}
+                    className={`${deckShellStyles.mainScrollDeckCardOuter} ${deckShellStyles.mainScrollDeckCardOuterFlex}${selected ? ` ${deckShellStyles.mainScrollDeckCardOuterSelected}` : ""}`}
                   >
                     <div
-                      className={`${editorCardStyles.cardPublishCaptureRoot} ${editorCardStyles.cardPublishCaptureRootMainScrollFlex}`}
+                      className={`${deckShellStyles.mainScrollDeckCardInner} ${deckShellStyles.mainScrollDeckCardInnerFlex}`}
                     >
                       {deckInner}
                     </div>
@@ -215,45 +212,6 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
   }
 
   const hasFaceImage = Boolean(item.imageUrl?.trim());
-  const isPublishedSnapshotEnabled =
-    process.env.NEXT_PUBLIC_ENABLE_PUBLISHED_SNAPSHOT === "true";
-  /** 대회 게시 PNG 플랫 카드(메인 전용, 오버레이 없음) — 광고·HTML 덱과 분리 */
-  const isPublishedSnapshotImageOnlyCard =
-    isPublishedSnapshotEnabled &&
-    Boolean(item.faceIsFullPublishedSnapshot) &&
-    hasFaceImage &&
-    item.suppressPublishedScrollOverlay === true;
-
-  if (isPublishedSnapshotImageOnlyCard && item.imageUrl?.trim()) {
-    return (
-      <div
-        className={cardSlotClassNames(styles.sampleMainCardSlot, selected, styles.sampleMainCardSlotSelected)}
-        {...{ [SITE_SCROLL_CARD]: "", "data-published-snapshot-card-slot": "" }}
-        {...(isMainSiteScrollAdRow(item) ? { "data-site-main-scroll-ad": "1" } : {})}
-        style={{ touchAction: "pan-y" }}
-        role="button"
-        tabIndex={0}
-        aria-pressed={selected}
-        aria-label={`${item.title}${selected ? ", 선택됨" : ""}`}
-        onPointerDown={onPointerDown}
-        onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
-          if (e.key !== "Enter" && e.key !== " ") return;
-          e.preventDefault();
-          onCardPointerDown(item.id);
-        }}
-      >
-        <PublishedSnapshotScrollCard
-          imageUrl={item.imageUrl.trim()}
-          href={item.href}
-          title={item.title}
-          alt={item.title}
-          external={item.external}
-          selected={selected}
-          lcpHeroImage={lcpHeroImage}
-        />
-      </div>
-    );
-  }
 
   const usePublishedScrollLayout = Boolean(
     (item.faceIsFullPublishedSnapshot && hasFaceImage) ||
@@ -301,7 +259,6 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
             ? [
                 styles.sampleMainCardFacePublishedSnapshot,
                 selected ? styles.sampleMainCardFacePublishedSnapshotSelected : "",
-                item.suppressPublishedScrollOverlay ? styles.sampleMainCardFacePublishedSnapshotImageOnly : "",
               ]
                 .filter(Boolean)
                 .join(" ")

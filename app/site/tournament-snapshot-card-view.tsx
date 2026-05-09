@@ -6,6 +6,8 @@ import { useCallback, useLayoutEffect, useRef } from "react";
 import { TournamentStatusBadge, type TournamentPostStatus } from "./tournament-slide-card-status-badge";
 import styles from "./tournament-slide-card-previews.module.css";
 
+/* 편집기 미리보기·메인 메인덱 대회 면 공통 HTML 렌더; 디자인 좌표 440×161 (`slideDeckAspectFill`). */
+
 export type { TournamentPostStatus };
 
 /** 분리형(하단 띠) / 전체형(배경 위 오버레이) — 미지정은 분리형 */
@@ -221,7 +223,6 @@ function TournamentSlideCardPreview({
   slideDeckSolidBackdrop,
   mainSlideAd,
   tournamentPublishedHeightScale = true,
-  editorCompactCardHeight = false,
   editorPreviewFixedLayout = false,
   onRepImageLoad,
   isImageCaptureMode = false,
@@ -240,8 +241,6 @@ function TournamentSlideCardPreview({
   mainSlideAd?: boolean;
   /** 대회·광고 슬라이드 카드 동일 높이 스케일 */
   tournamentPublishedHeightScale?: boolean;
-  /** 게시카드 작성 미리보기·PNG 캡처: 카드 높이만 약 20% 축소(메인 live 미적용) */
-  editorCompactCardHeight?: boolean;
   /** 게시카드 작성 미리보기만: 카드 박스·텍스트 슬롯 높이 고정(메인·다른 경로 false) */
   editorPreviewFixedLayout?: boolean;
   onRepImageLoad?: () => void;
@@ -275,7 +274,6 @@ function TournamentSlideCardPreview({
     slideDeck && slideDeckAspectFill ? styles.cardRootSlideDeckAspectFill : "",
     templateCardLayout ? styles.cardRootTemplateLayout : "",
     tournamentPublishedHeightScale ? styles.cardRootTournamentPublishedScale : "",
-    editorCompactCardHeight && tournamentPublishedHeightScale ? styles.cardRootEditorCompactHeight : "",
     item.cardTextShadowEnabled ? styles.cardTextShadowOn : "",
     surfaceLayout === "full" ? styles.cardRootSurfaceFull : "",
     mainSlideAd ? styles.cardRootMainSlideAd : "",
@@ -445,7 +443,6 @@ export function TournamentSnapshotCardView({
   slideDeck = false,
   slideDeckAspectFill = false,
   templateCardLayout = false,
-  editorCompactCardHeight = false,
   editorPreviewFixedLayout = false,
   repImageHighPriority,
   slideDeckSolidBackdrop,
@@ -458,8 +455,6 @@ export function TournamentSnapshotCardView({
   /** 메인 세로 스크롤 덱 전용 — slideDeck 과 함께만 사용 */
   slideDeckAspectFill?: boolean;
   templateCardLayout?: boolean;
-  /** 작성 화면 미리보기·PNG 캡처만 — 메인 슬라이드(live)에서는 false 유지 */
-  editorCompactCardHeight?: boolean;
   /** 게시카드 작성 미리보기만 — 카드·텍스트 영역 크기 고정 */
   editorPreviewFixedLayout?: boolean;
   repImageHighPriority?: boolean;
@@ -485,7 +480,6 @@ export function TournamentSnapshotCardView({
       slideDeckSolidBackdrop={slideDeckSolidBackdrop}
       mainSlideAd={item.type === "ad"}
       tournamentPublishedHeightScale={true}
-      editorCompactCardHeight={editorCompactCardHeight}
       editorPreviewFixedLayout={editorPreviewFixedLayout}
       onRepImageLoad={onRepImageLoad}
       isImageCaptureMode={isImageCaptureMode}

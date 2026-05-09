@@ -76,11 +76,6 @@
   --tournament-card-height-scale: 1.2;
 }
 
-/* 게시카드 작성 미리보기·html2canvas 캡처만 — 메인 슬라이드(live) 미적용. 높이 약 20% 축소(1.2×0.8) */
-.cardRoot.cardRootTournamentPublishedScale.cardRootEditorCompactHeight {
-  --tournament-card-height-scale: 0.96;
-}
-
 /* 템플릿 A/B 공통: 배지 실크기·슬롯(--status-badge-slot)과 맞춤 */
 .cardRootTournamentPublishedScale:not(.cardRootTemplateLayout) .statusBadgeWrap {
   transform: scale(var(--tournament-card-height-scale));

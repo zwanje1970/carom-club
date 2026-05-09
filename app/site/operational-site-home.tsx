@@ -107,22 +107,10 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
 
     try {
       if (item.type !== "ad") {
-        const published640T = (item.publishedCardImageUrl ?? "").trim();
-        const published320T = (item.publishedCardImage320Url ?? "").trim();
-        const publishedScrollBgT = published320T || published640T;
-        /** 메인만: 게시 PNG URL이 있으면 플랫 이미지 카드(오버레이 없음). 없으면 HTML 카드 */
-        if (publishedScrollBgT) {
-          return {
-            id: rowId,
-            href,
-            title: item.title,
-            imageUrl: publishedScrollBgT,
-            faceCssBackground: null,
-            external,
-            faceIsFullPublishedSnapshot: true,
-            suppressPublishedScrollOverlay: true,
-          };
-        }
+        /**
+         * WYSIWYG: 메인 대회 면은 스냅샷 `slideDeckItem` → `TournamentSnapshotCardView`만 사용.
+         * `publishedCardImageUrl`/`publishedCardImage320Url`은 공유·스토리지용으로 유지(메인에서 플랫 PNG 분기 없음).
+         */
         return {
           id: rowId,
           href,

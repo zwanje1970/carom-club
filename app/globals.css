@@ -381,16 +381,142 @@ body {
   gap: 0.5rem;
 }
 
+.site-mypage-footer-actions--menu {
+  gap: 0;
+}
+
+.site-mypage-menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  box-sizing: border-box;
+  text-decoration: none;
+  color: inherit;
+  min-height: 3rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.site-mypage-menu-row:hover {
+  background: #f3f4f6;
+}
+
+.site-mypage-menu-row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+}
+
+.site-mypage-menu-row-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text-main, #111111);
+}
+
+.site-mypage-menu-row-sub {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: #64748b;
+}
+
+.site-mypage-menu-row-chevron {
+  flex-shrink: 0;
+  font-size: 1.05rem;
+  line-height: 1;
+  color: var(--color-icon-muted, #9ca3af);
+}
+
+.site-mypage-menu-pill {
+  display: inline-block;
+  margin-right: 0.35rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.25;
+  background: #eff6ff;
+  color: #1d4ed8;
+  vertical-align: middle;
+}
+
+.site-mypage-menu-pill--platform {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.site-mypage-profile-heading {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.site-mypage-profile-head {
+  margin: 0 0 0.35rem;
+}
+
+.site-mypage-profile-nickname {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text-main, #111111);
+}
+
+.site-mypage-profile-name {
+  margin: 0.18rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: #64748b;
+}
+
+.site-mypage-summary-dl--meta {
+  margin-top: 0.15rem;
+}
+
+.site-mypage-menu-loading {
+  margin: 0;
+  padding: 0.5rem 0;
+  font-size: 0.85rem;
+}
+
+.site-mypage-menu-note {
+  margin: 0;
+  padding: 0.45rem 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.site-mypage-menu-actions-footer {
+  margin-top: 0.15rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.site-mypage-menu-logout-btn {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 @media (min-width: 480px) {
-  .site-mypage-footer-actions {
+  .site-mypage-footer-actions:not(.site-mypage-footer-actions--menu) {
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
   }
 
-  .site-mypage-footer-actions > .secondary-button,
-  .site-mypage-footer-actions > .primary-button,
-  .site-mypage-footer-actions > button {
+  .site-mypage-footer-actions:not(.site-mypage-footer-actions--menu) > .secondary-button,
+  .site-mypage-footer-actions:not(.site-mypage-footer-actions--menu) > .primary-button,
+  .site-mypage-footer-actions:not(.site-mypage-footer-actions--menu) > button {
     flex: 1 1 10rem;
   }
 }
@@ -452,6 +578,23 @@ button.secondary-button.site-mypage-logout:hover,
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+}
+
+.site-tournament-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.35rem 0.5rem;
+}
+
+.site-tournament-card-head .site-tournament-card-title {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
+.site-tournament-card-head .badge-status,
+.site-tournament-card-head .site-board-status-badge {
+  margin-bottom: 0;
 }
 
 .site-tournament-card-title {
@@ -2585,6 +2728,394 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   }
 }
 
+/* 목록 로딩 스켈레톤 — PC·기본: 카드형; 모바일 UA 표준 페이지에서는 아래 블록에서 디바이더형으로 덮음 */
+.site-list-page-skeleton-rows {
+  gap: var(--spacing-card-gap, 14px);
+}
+
+.site-list-page-skeleton-row {
+  gap: 0.75rem;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.site-list-page-skeleton-row.site-list-page-skeleton-row--board {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.site-list-page-skeleton-row-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.site-list-page-skeleton-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.45rem;
+}
+
+/* =============================================================================
+   모바일 공개 사이트 앱형 본문 v1 — UA 모바일 셸 + 목록형(.site-home-page--standard)만.
+   메인 홈(.site-home-page--main) 슬라이드·강조 영역은 변경하지 않음.
+   ============================================================================= */
+
+.site-shell.site-shell--ua-mobile-site:has(main.site-home-page--standard) {
+  background-color: #ffffff;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-site-gray-main {
+  background-color: #ffffff;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-shell-controls.site-shell-controls--site-list {
+  background: #ffffff;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+/* 대회·클럽 목록: 화이트 카드·그림자 대신 디바이더 리스트 */
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-board-card-list {
+  gap: 0;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-board-card {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.07);
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-board-card:last-child {
+  border-bottom: none;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-board-card:hover {
+  box-shadow: none;
+  background-color: rgba(248, 249, 251, 0.92);
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-board-card > a {
+  padding: 0.52rem 0;
+  align-items: center;
+  gap: 0.62rem;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-card-main {
+  gap: 0.26rem;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-card-head {
+  gap: 0.28rem 0.45rem;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-card-head .badge-status,
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-card-head .site-board-status-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  line-height: 1.25;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-card-title {
+  font-size: clamp(1rem, 3.1vw, 1.0625rem);
+  font-weight: 600;
+  line-height: 1.38;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-schedule,
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-location {
+  font-size: 0.8125rem;
+  line-height: 1.42;
+  color: #64748b;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-chips {
+  margin-top: 0.06rem;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-venue-card-main {
+  gap: 0.26rem;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-venue-card-title {
+  font-size: clamp(1rem, 3.1vw, 1.0625rem);
+  font-weight: 600;
+  line-height: 1.38;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-venue-address {
+  font-size: 0.8125rem;
+  line-height: 1.42;
+  color: #64748b;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-venue-chips {
+  margin-top: 0;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-list-chip {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 8px;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-list-thumb {
+  width: 52px;
+  min-width: 52px;
+  height: 52px;
+  border-radius: 8px;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-venue-list-thumb {
+  width: 52px;
+  min-width: 52px;
+  height: 52px;
+  border-radius: 8px;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-shell-controls-inner .site-list-filter-bar select {
+  box-sizing: border-box;
+  min-height: 40px;
+  max-height: 44px;
+  padding: 0.3rem 0.65rem 0.3rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #f8f9fb;
+  font-size: 0.8125rem;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-list-filter-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-list-filter-bar a.site-list-filter-distance-btn {
+  box-sizing: border-box;
+  min-height: 40px;
+  max-height: 44px;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-list-empty-hint {
+  margin: 0;
+  padding: 1.1rem 0.25rem;
+  text-align: center;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-list-geo-hint {
+  margin: 0 0 0.65rem;
+  padding: 0.45rem 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: #64748b;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-list-page-skeleton-row--board {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.62rem;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-list-page-skeleton-row--board .site-list-page-skeleton-row-text {
+  gap: 0.32rem;
+}
+
+/* 마이페이지: 카드형 최소화 — 구분선 위주 */
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-mypage-shell .card-clean {
+  box-shadow: none;
+  border-radius: 0;
+  background: transparent;
+  padding-left: 0;
+  padding-right: 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-mypage-shell.v3-stack {
+  gap: 0.65rem;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-mypage-summary-dl--meta .site-mypage-summary-dd {
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-mypage-summary-dl--meta .site-mypage-summary-dt {
+  font-size: 0.75rem;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-mypage-footer-actions--menu {
+  gap: 0;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-mypage-footer-actions--menu .site-mypage-menu-row {
+  min-height: 52px;
+  padding: 0.62rem 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-mypage-footer-actions--menu .site-mypage-menu-row:hover {
+  background: rgba(248, 249, 251, 0.85);
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-mypage-footer-actions--menu .site-mypage-menu-row:last-of-type {
+  border-bottom: none;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-mypage-footer-actions--menu .site-mypage-menu-loading,
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-mypage-footer-actions--menu .site-mypage-menu-note {
+  padding: 0.55rem 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-mypage-menu-row.site-mypage-menu-row--in-summary {
+  margin-top: 0.35rem;
+  padding-top: 0.62rem;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom: none;
+  min-height: 52px;
+  padding-left: 0;
+  padding-right: 0;
+  border-radius: 0;
+  background: transparent;
+  border-left: none;
+  border-right: none;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-mypage-menu-row.site-mypage-menu-row--in-summary:hover {
+  background: rgba(248, 249, 251, 0.85);
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-mypage-menu-actions-footer {
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+  border-top: none;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard button.secondary-button.site-mypage-menu-logout-btn,
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .secondary-button.site-mypage-menu-logout-btn {
+  min-height: 48px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #ffffff;
+  color: #64748b;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard button.secondary-button.site-mypage-menu-logout-btn:hover,
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .secondary-button.site-mypage-menu-logout-btn:hover {
+  background: #f8f9fb;
+  color: #475569;
+}
+
+/* 커뮤니티: 배경·행 간격·구분선 */
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .community-board-swipe-root,
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .community-board-swipe-viewport,
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .community-board-swipe-track,
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .community-board-swipe-panel,
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .community-board-swipe-panel--edge,
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .community-board-swipe-panel--peek,
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .community-board-swipe-panel--main {
+  background: #ffffff;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-site-gray-main.ui-community-page,
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-site-gray-main.ui-community-post-detail-page {
+  background-color: #ffffff;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-shell-controls.site-shell-controls--site-list:has(.ui-community-shell-context) {
+  background: #ffffff;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-page {
+  gap: 0.55rem !important;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-board-row,
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-board-row--empty {
+  border-bottom-color: rgba(15, 23, 42, 0.08);
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-board-row-link:active {
+  background: #f8f9fb;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-board-row-link {
+  min-height: 0;
+  padding-top: 0.48rem;
+  padding-bottom: 0.48rem;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-board-title {
+  font-weight: 600;
+  font-size: 1.0625rem;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-board-pill {
+  font-size: 0.8125rem;
+}
+
+@media (max-width: 767px) {
+  .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-mobile-page-title-block {
+    font-size: clamp(1.375rem, 4vw, 1.5rem);
+    font-weight: 700;
+  }
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-list-page-skeleton-rows {
+  gap: 0;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-list-page-skeleton-row {
+  gap: 0.4rem;
+  padding: 0.62rem 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-list-page-skeleton-row:last-child {
+  border-bottom: none;
+}
+
 /* 메인 홈: 다크 메인 스택 간격 */
 .site-home-dark-main.site-home-dark-main--stack {
   gap: 0;
@@ -4369,6 +4900,118 @@ a.secondary-button {
   height: auto;
   display: block;
   border-radius: 10px;
+}
+
+/* 대회 상세 히어로(detailLayout=site) — 공통 마크업 보조 */
+.site-tournament-detail-hero-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.site-tournament-detail-hero-meta-line {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.site-tournament-detail-hero-recruitment {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  font-weight: 600;
+  color: #475569;
+}
+
+.site-tournament-detail-hero-badge {
+  align-self: flex-start;
+}
+
+.site-tournament-detail-hero-poster-wrap {
+  width: 100%;
+  max-width: 320px;
+}
+
+.site-tournament-detail-apply-closed-note {
+  margin: 0.35rem 0 0;
+  color: #64748b;
+}
+
+/* 모바일 UA + 표준 페이지: 대회 상단 히어로 v1 — 카드 완화·divider·포스터 보조 */
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-detail-hero.card-clean {
+  box-shadow: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 0 0.85rem;
+  margin: 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  gap: 0.42rem;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-detail-hero .site-detail-hero-title {
+  font-size: clamp(1.3125rem, 4vw, 1.4375rem);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  -webkit-line-clamp: 4;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-detail-hero .site-detail-hero-summary {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-detail-hero-badge.badge-status,
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-detail-hero-badge.site-board-status-badge {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25;
+  padding: 3px 10px;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-detail-hero-badge.site-board-status-badge--urgent {
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-detail-hero-badge.site-board-status-badge--closed {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-detail-hero-badge.site-board-status-badge--live {
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-detail-hero-badge.site-board-status-badge--ended {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-detail-hero-badge.site-board-status-badge--muted {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-detail-hero-poster-wrap {
+  max-width: min(220px, 48vw);
+  margin-top: 0.15rem;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-detail-hero-poster {
+  width: 100%;
+  max-width: none;
+  border-radius: 8px;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .primary-button.site-tournament-detail-apply-cta {
+  margin-top: 0.35rem;
+  box-shadow: none;
+  min-height: 48px;
+  border-radius: 12px;
 }
 
 .site-venue-detail-title {

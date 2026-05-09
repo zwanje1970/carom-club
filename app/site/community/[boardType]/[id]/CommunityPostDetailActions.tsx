@@ -39,25 +39,20 @@ export default function CommunityPostDetailActions({
   if (!canManageAuthor && !canDeletePost) return null;
 
   return (
-    <div className="ui-community-post-title-actions ui-community-post-title-actions--inline">
+    <div className="ui-community-post-detail-actions" role="group" aria-label="게시글 관리">
       {canManageAuthor ? (
         <Link
           prefetch={false}
-          className="ui-community-comment-text-action"
+          className="ui-community-post-detail-action-btn ui-community-post-detail-action-btn--edit"
           href={`/site/community/${boardType}/${postId}/edit`}
         >
           수정
         </Link>
       ) : null}
-      {canManageAuthor && canDeletePost ? (
-        <span className="ui-community-comment-action-sep" aria-hidden>
-          ·
-        </span>
-      ) : null}
       {canDeletePost ? (
         <button
           type="button"
-          className="ui-community-comment-text-action"
+          className="ui-community-post-detail-action-btn ui-community-post-detail-action-btn--delete"
           onClick={() => {
             void handleDelete();
           }}

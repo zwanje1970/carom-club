@@ -412,32 +412,6 @@
   pointer-events: auto;
 }
 
-/*
- * 메인 대회 게시 PNG만(suppressPublishedScrollOverlay): 상위 연파랑/그라데이션 면이 비치지 않게 하고
- * img 하단 여백(baseline gap) 제거 — 광고(오버레이 유지)에는 이 modifier를 붙이지 않음.
- */
-.sampleMainCardFacePublishedSnapshot.sampleMainCardFacePublishedSnapshotImageOnly {
-  background-color: #ffffff;
-  overflow: hidden;
-  isolation: isolate;
-}
-
-.sampleMainCardFacePublishedSnapshot.sampleMainCardFacePublishedSnapshotImageOnly .sampleMainCardPublishedInner {
-  line-height: 0;
-  background-color: #ffffff;
-}
-
-.sampleMainCardFacePublishedSnapshot.sampleMainCardFacePublishedSnapshotImageOnly .sampleMainCardPosterPublishedSnapshot {
-  position: relative;
-  z-index: 1;
-  display: block;
-  width: 100%;
-  max-width: 100%;
-  height: auto;
-  object-fit: contain;
-  vertical-align: top;
-}
-
 /* 게시 PNG/광고 업로드 면(.sampleMainCardFacePublishedSnapshot)에서만 flex 수축 안정화 — 분할형 덱 면에는 미적용 */
 .sampleMainCardFacePublishedSnapshot .sampleMainCardPublishedInner {
   min-height: 0;
@@ -591,54 +565,3 @@
   object-fit: cover;
   object-position: center center;
 }
-
-.slideViewportSiteMain
-  :global([data-site-main-scroll-ad="1"]).sampleMainCardSlot
-  > .sampleMainCardFacePublishedSnapshot.sampleMainCardFacePublishedSnapshotImageOnly
-  .sampleMainCardPosterPublishedSnapshot {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  object-fit: cover;
-  object-position: center center;
-}
-
-/*
- * 광고 + 게시 PNG 플랫(PublishedSnapshotScrollCard): 슬롯에 data-published-snapshot-card-slot —
- * 하위 div/img는 해당 컴포넌트 고정 마크업(면 > inner > img).
- */
-.slideViewportSiteMain
-  :global([data-site-main-scroll-ad="1"][data-published-snapshot-card-slot])
-  > :global(div) {
-  aspect-ratio: 440 / 161;
-}
-
-.slideViewportSiteMain
-  :global([data-site-main-scroll-ad="1"][data-published-snapshot-card-slot])
-  > :global(div)
-  > :global(div) {
-  flex: 1 1 0;
-  min-height: 0;
-  height: 100%;
-}
-
-.slideViewportSiteMain
-  :global([data-site-main-scroll-ad="1"][data-published-snapshot-card-slot])
-  > :global(div)
-  > :global(div)
-  > :global(img) {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  display: block;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  object-fit: cover;
-  object-position: center center;
-  border-radius: inherit;
-  box-sizing: border-box;
-}
-

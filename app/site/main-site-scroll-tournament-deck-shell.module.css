@@ -1,0 +1,60 @@
+/**
+ * /site 메인 세로 스크롤 — 대회 HTML 덱 카드 외곽·내부 래퍼.
+ * (기존 card-publish-editor.module.css 의 메인 전용 클래스만 분리; 디자인 토큰 동일 유지)
+ */
+
+.mainScrollDeckCardOuter {
+  flex: 0 1 auto;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: min(100%, var(--slide-card-max-width, 440px));
+  border-radius: 12px;
+  overflow: hidden;
+  border: none;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.1),
+    0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+.mainScrollDeckCardOuterFlex {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  width: 100%;
+}
+
+.mainScrollDeckCardOuterFlex.mainScrollDeckCardOuterSelected {
+  overflow: visible;
+}
+
+.mainScrollDeckCardInner {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
+.mainScrollDeckCardInnerFlex {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+
+.mainScrollDeckCardInnerFlex > :global(article) {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  align-self: stretch;
+}
+
+:global([data-site-main-scroll-deck="1"]) .mainScrollDeckCardOuterFlex,
+:global([data-site-main-scroll-deck="1"]) .mainScrollDeckCardInnerFlex {
+  min-height: 100%;
+}
+
+:global([data-site-main-scroll-deck="1"]) .mainScrollDeckCardInnerFlex > :global(article) {
+  min-height: 100%;
+}

@@ -415,10 +415,6 @@ button.secondary-button.ui-community-search-submit {
   margin-top: 0.2rem;
 }
 
-.site-site-gray-main.ui-community-post-detail-page:has(.ui-community-post-detail-article) .ui-community-comment-item:last-child {
-  border-bottom: 1px solid rgba(15, 23, 42, 0.12);
-}
-
 .site-site-gray-main.ui-community-post-detail-page:has(.ui-community-post-detail-article) .ui-community-comment-compose.v3-stack {
   margin-top: 0.35rem;
   padding-top: 0.35rem;
@@ -427,31 +423,6 @@ button.secondary-button.ui-community-search-submit {
 
 .ui-community-post-detail-article.v3-stack {
   gap: 0.45rem;
-}
-
-.ui-community-post-detail-title-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.5rem;
-  width: 100%;
-}
-
-.ui-community-post-detail-title-row .ui-community-post-detail-title {
-  flex: 1;
-  min-width: 0;
-}
-
-.ui-community-post-title-actions {
-  flex-shrink: 0;
-  margin-top: 0.05rem;
-}
-
-.ui-community-post-title-actions--inline {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.18rem;
-  padding-top: 0.12rem;
 }
 
 .ui-community-post-detail-title {
@@ -473,6 +444,56 @@ button.secondary-button.ui-community-search-submit {
   margin: 0.35rem 0 0;
   font-size: 0.8rem;
   line-height: 1.45;
+  color: #64748b;
+}
+
+.ui-community-post-detail-author {
+  font-weight: 600;
+  color: #334155;
+}
+
+.ui-community-post-detail-meta-plain {
+  font-weight: 400;
+  color: #94a3b8;
+}
+
+.ui-community-post-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.15rem;
+}
+
+.ui-community-post-detail-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0.26rem 0.62rem;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #f8fafc;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #334155;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ui-community-post-detail-action-btn--delete {
+  color: #b91c1c;
+  border-color: rgba(185, 28, 28, 0.22);
+  background: #fff5f5;
+}
+
+button.ui-community-post-detail-action-btn {
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
 }
 
 .ui-community-post-body {
@@ -1073,4 +1094,184 @@ button.secondary-button.ui-community-post-action-danger:hover,
   color: #94a3b8;
   font-size: 1.25rem;
   font-weight: 300;
+}
+
+/* ---------------------------------------------------------------------------
+   커뮤니티 상세·댓글 v1 — 모바일 UA 공개 셸 + 표준 페이지만 (메인 슬라이드 비적용)
+   --------------------------------------------------------------------------- */
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-site-gray-main.ui-community-post-detail-page:has(.ui-community-post-detail-article) {
+  gap: 0.5rem !important;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-post-detail-article.v3-stack {
+  gap: 0.28rem;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-post-detail-title {
+  font-size: clamp(1.25rem, 3.8vw, 1.375rem);
+  font-weight: 600;
+  line-height: 1.32;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-post-detail-pill-row {
+  margin: 0.05rem 0 0;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-post-detail-meta {
+  margin: 0.12rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-post-detail-actions {
+  margin-top: 0.28rem;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-post-body {
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-post-body-text {
+  width: 100%;
+  max-width: none;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-post-body-figure {
+  width: 100%;
+  max-width: none;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-comments.v3-stack {
+  gap: 0.35rem;
+  margin-top: 0.15rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-comments-heading {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-comment-item {
+  padding: 0.42rem 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  background: transparent;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-comment-item:last-child {
+  border-bottom: none;
+}
+
+.site-shell.site-shell--ua-mobile-site
+  .site-home-page--standard
+  .site-site-gray-main.ui-community-post-detail-page:has(.ui-community-post-detail-article)
+  .ui-community-comment-item:last-child {
+  border-bottom: none;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-comment-author {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-comment-meta {
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-comment-body {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-comment-actions .ui-community-comment-text-action {
+  text-decoration: none;
+  padding: 0.18rem 0.48rem;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #f8fafc;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-comment-actions .ui-community-comment-text-action:hover {
+  color: #0f172a;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-comment-action-sep {
+  display: none;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-comment-actions {
+  gap: 0.28rem;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-comment-compose.v3-stack {
+  margin-top: 0.35rem;
+  padding-top: 0.45rem;
+  padding-bottom: max(0.35rem, env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  gap: 0.35rem;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-comment-compose-inline {
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.38rem;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-comment-textarea-inline {
+  flex: 1 1 100%;
+  min-height: 2.45rem !important;
+  padding: 0.48rem 0.75rem !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(15, 23, 42, 0.1) !important;
+  background: #f8f9fb !important;
+  font-size: 0.9375rem !important;
+  line-height: 1.45 !important;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-comment-compose-cancel-inline {
+  text-decoration: none;
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .primary-button.ui-community-comment-submit-inline {
+  align-self: flex-end;
+  min-height: 2rem !important;
+  min-width: auto !important;
+  padding: 0.35rem 0.85rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  border-radius: 999px !important;
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border: 1px solid rgba(37, 99, 235, 0.28) !important;
+  box-shadow: none !important;
+  filter: none;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .primary-button.ui-community-comment-submit-inline:disabled {
+  opacity: 0.45;
+}
+
+.site-shell.site-shell--ua-mobile-site
+  .site-home-page--standard
+  .site-site-gray-main.ui-community-post-detail-page:has(.ui-community-post-detail-article)
+  .ui-community-comment-compose.v3-stack {
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
 }

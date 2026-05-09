@@ -42,16 +42,6 @@ export default function SiteListPageSkeleton({
                 </div>
                 <SkeletonBlock width="58%" height="0.85rem" radius="0.25rem" background="#edf1f5" />
               </div>
-              <div className="ui-community-board-thumb-wrap" aria-hidden>
-                <div
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    borderRadius: "4px",
-                    background: "#edf1f5",
-                  }}
-                />
-              </div>
             </div>
           </li>
         ))}
@@ -60,13 +50,21 @@ export default function SiteListPageSkeleton({
   );
 
   const listSection = (
-    <section className="site-site-gray-main v3-stack" aria-hidden>
+    <section className="site-site-gray-main v3-stack site-list-page-skeleton-rows" aria-hidden>
       {Array.from({ length: listRows }, (_, i) => (
-        <div key={`site-skel-${i}`} className="card-clean v3-stack" style={{ gap: "0.75rem", background: "#fff" }}>
-          <SkeletonBlock width="5rem" height="1rem" background="#e5ebf1" />
-          <SkeletonBlock width="75%" height="1.2rem" background="#e5ebf1" />
-          <SkeletonBlock width="92%" height="0.9rem" background="#edf1f5" />
-          <SkeletonBlock width="62%" height="0.9rem" background="#edf1f5" />
+        <div
+          key={`site-skel-${i}`}
+          className="site-list-page-skeleton-row site-list-page-skeleton-row--board"
+        >
+          <div className="site-list-page-skeleton-row-text">
+            <div className="site-list-page-skeleton-row-head">
+              <SkeletonBlock width="2.75rem" height="0.95rem" radius="999px" background="#e5ebf1" />
+              <SkeletonBlock width="min(72%, 14rem)" height="1rem" radius="0.35rem" background="#e5ebf1" />
+            </div>
+            <SkeletonBlock width="88%" height="0.82rem" radius="0.25rem" background="#edf1f5" />
+            <SkeletonBlock width="55%" height="0.82rem" radius="0.25rem" background="#edf1f5" />
+          </div>
+          <SkeletonBlock width="52px" height="52px" radius="8px" background="#e5ebf1" />
         </div>
       ))}
     </section>

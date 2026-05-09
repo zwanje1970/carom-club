@@ -62,12 +62,15 @@ const CardPublishPreviewInner = forwardRef<
 >(function CardPublishPreviewInner({ model, isImageCaptureMode = false }, ref) {
   const item = useMemo(() => slideItemFromModel(model), [model]);
   return (
-    <div ref={ref} className={editorStyles.cardPublishCaptureRoot}>
+    <div
+      ref={ref}
+      className={`${editorStyles.cardPublishCaptureRoot} ${editorStyles.cardPublishCaptureRootFlexFill}`}
+    >
       <TournamentSnapshotCardView
         item={item}
         slideDeck
+        slideDeckAspectFill
         templateCardLayout
-        editorCompactCardHeight
         editorPreviewFixedLayout
         slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
         isImageCaptureMode={isImageCaptureMode}

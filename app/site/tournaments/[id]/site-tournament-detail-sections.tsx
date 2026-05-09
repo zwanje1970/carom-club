@@ -136,40 +136,53 @@ export default function SiteTournamentDetailSections({
               "",
           ).trim() || null
         : null;
-    const heroLineParts: string[] = [];
-    if (scheduleLabel.trim()) {
-      heroLineParts.push(scheduleLabel.replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim());
-    }
-    if (mainLocationLines[0]) heroLineParts.push(mainLocationLines[0]);
-    else if (firstExtraHead) heroLineParts.push(firstExtraHead);
-    const heroLine = heroLineParts.join(" · ");
+    const scheduleMetaLine = scheduleLabel.trim()
+      ? scheduleLabel.replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim()
+      : "";
+    const venueHeroLine = mainLocationLines[0]?.trim() || firstExtraHead?.trim() || "";
     const statusClass = tournamentStatusBadgeClassName(tournament.statusBadge);
     const applicationsClosed =
       tournament.statusBadge === "마감" || tournament.statusBadge === "진행중" || tournament.statusBadge === "종료";
+    const recruitmentParts: string[] = [`정원 ${tournament.maxParticipants ?? 24}명`];
+    if (typeof confirmedParticipantCount === "number") {
+      recruitmentParts.push(`확정 ${confirmedParticipantCount}명`);
+    }
 
     return (
       <div className="site-detail-page-stack">
-        <section className="card-clean site-detail-inner-stack">
+        <section className="card-clean site-detail-inner-stack site-tournament-detail-hero">
+          <span className={`site-tournament-detail-hero-badge ${statusClass}`}>{tournament.statusBadge}</span>
+          <h1 className="site-detail-hero-title">{tournament.title ?? "대회"}</h1>
+          {scheduleMetaLine || venueHeroLine ? (
+            <div className="site-tournament-detail-hero-meta">
+              {scheduleMetaLine ? (
+                <p className="site-tournament-detail-hero-meta-line">{scheduleMetaLine}</p>
+              ) : null}
+              {venueHeroLine ? <p className="site-tournament-detail-hero-meta-line">{venueHeroLine}</p> : null}
+            </div>
+          ) : null}
+          <p className="site-tournament-detail-hero-recruitment">{recruitmentParts.join(" · ")}</p>
+          {tournament.summary?.trim() ? <p className="site-detail-hero-summary">{tournament.summary.trim()}</p> : null}
           {posterUrl ? (
-            <div>
+            <div className="site-tournament-detail-hero-poster-wrap">
               <img
-                className="site-detail-poster"
+                className="site-detail-poster site-tournament-detail-hero-poster"
                 src={posterUrl}
                 alt={`${tournament.title ?? "대회"} 포스터`}
                 loading="lazy"
               />
             </div>
           ) : null}
-          <h1 className="site-detail-hero-title">{tournament.title ?? "대회"}</h1>
-          {heroLine ? <p className="site-detail-hero-meta">{heroLine}</p> : null}
-          <span className={statusClass}>{tournament.statusBadge}</span>
-          {tournament.summary?.trim() ? <p className="site-detail-hero-summary">{tournament.summary.trim()}</p> : null}
           {applyHref && !applicationsClosed ? (
-            <Link prefetch={false} className="primary-button primary-button--block" href={applyHref}>
+            <Link
+              prefetch={false}
+              className="primary-button primary-button--block site-tournament-detail-apply-cta"
+              href={applyHref}
+            >
               참가신청
             </Link>
           ) : applyHref && applicationsClosed ? (
-            <p className="site-detail-body-text" style={{ margin: "0.65rem 0 0", color: "#64748b" }}>
+            <p className="site-detail-body-text site-tournament-detail-apply-closed-note">
               신청이 마감된 대회입니다.
             </p>
           ) : null}

@@ -626,7 +626,7 @@ export default function ClientTournamentCardPublishV2Page() {
           <div className={editorStyles.previewInner}>
             <div className={editorStyles.previewSlideLayer}>
               <div className={editorStyles.previewCardScaleHost}>
-                <div className={editorStyles.previewCardScaleInner}>
+                <div className={editorStyles.previewCardAspectFace}>
                   <div
                     className={`${editorStyles.previewCardWrap} ${editorStyles.previewCardWrapV2Chrome}`}
                   >
@@ -641,7 +641,7 @@ export default function ClientTournamentCardPublishV2Page() {
               <div className={editorStyles.previewInner}>
                 <div className={editorStyles.previewSlideLayer}>
                   <div className={editorStyles.previewCardScaleHost}>
-                    <div className={editorStyles.previewCardScaleInner}>
+                    <div className={editorStyles.previewCardAspectFace}>
                       <div
                         className={`${editorStyles.previewCardWrap} ${editorStyles.previewCardWrapV2Chrome}`}
                       >

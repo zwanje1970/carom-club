@@ -169,10 +169,13 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
 
   const auxiliary = (
     <div
-      className={`${filterStyles.filterRow} ${filterStyles.filterRowSingle} ${filterStyles.filterRowSingleDouble} ${filterStyles.filterRowFilterPack}`}
+      className={`site-list-filter-bar ${filterStyles.filterRow} ${filterStyles.filterRowSingle} ${filterStyles.filterRowSingleDouble} ${filterStyles.filterRowFilterPack}`}
     >
       <div className={filterStyles.filterField}>
-        <span className={filterStyles.filterFieldLabel} id="site-venues-filter-venue-type-label">
+        <span
+          className={`${filterStyles.filterFieldLabel} site-list-filter-label`}
+          id="site-venues-filter-venue-type-label"
+        >
           유형
         </span>
         <FilterDropdown
@@ -190,7 +193,10 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
         </FilterDropdown>
       </div>
       <div className={filterStyles.filterField}>
-        <span className={filterStyles.filterFieldLabel} id="site-venues-filter-fee-type-label">
+        <span
+          className={`${filterStyles.filterFieldLabel} site-list-filter-label`}
+          id="site-venues-filter-fee-type-label"
+        >
           요금제
         </span>
         <FilterDropdown
@@ -211,6 +217,7 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
         className={[
           filterStyles.buttonDistance,
           memoryCoords != null ? filterStyles.buttonDistanceActive : "",
+          "site-list-filter-distance-btn",
         ]
           .filter(Boolean)
           .join(" ")}
@@ -229,18 +236,7 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
     <SiteShellFrame brandTitle="클럽안내" auxiliaryBarClassName="site-shell-controls--site-list" auxiliary={auxiliary}>
       <section className="site-site-gray-main v3-stack">
         {showDeniedHint ? (
-          <p
-            role="status"
-            className="v3-muted"
-            style={{
-              margin: "0 0 1rem",
-              padding: "0.65rem 0.75rem",
-              borderRadius: "8px",
-              background: "var(--v3-surface-2, #eef0f3)",
-              fontSize: "0.9rem",
-              lineHeight: 1.45,
-            }}
-          >
+          <p role="status" className="v3-muted site-list-geo-hint">
             {SITE_GEO_DENIED_USER_MESSAGE}
           </p>
         ) : null}
@@ -249,6 +245,7 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
             <li key={row.venueId} className="site-board-card site-board-card--venue">
               <Link prefetch={false} href={`/site/venues/${row.venueId}`}>
                 <div className="site-venue-card-main">
+                  <span className="site-venue-card-title">{row.name}</span>
                   {(() => {
                     const cat = categoryLabel(row.venueCategory);
                     const fee = feeLabelFromPricingType(row.pricingType);
@@ -265,7 +262,6 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
                       </div>
                     );
                   })()}
-                  <span className="site-venue-card-title">{row.name}</span>
                   {(() => {
                     const region = String(row.region ?? "").trim();
                     const dm =
@@ -283,24 +279,22 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
                     );
                   })()}
                 </div>
-                <div className="site-venue-list-thumb">
-                  {row.thumbnailUrl ? (
+                {row.thumbnailUrl ? (
+                  <div className="site-venue-list-thumb">
                     <SiteListImage160
                       src={row.thumbnailUrl}
                       alt=""
                       placeholderClassName="site-venue-list-thumb-placeholder"
                     />
-                  ) : (
-                    <div className="site-venue-list-thumb-placeholder">이미지 없음</div>
-                  )}
-                </div>
+                  </div>
+                ) : null}
               </Link>
             </li>
           ))}
         </ul>
 
         {ordered.length === 0 ? (
-          <p className="v3-muted" style={{ margin: 0 }}>
+          <p className="v3-muted site-list-empty-hint">
             {initialRows.length === 0 ? "등록된 클럽이 없습니다." : "조건에 맞는 당구장이 없습니다."}
           </p>
         ) : null}
