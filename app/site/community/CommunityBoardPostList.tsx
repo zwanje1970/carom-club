@@ -72,6 +72,7 @@ export default function CommunityBoardPostList({
                 : null
             : null;
           const thumb = typeof post.thumbnailUrl === "string" ? post.thumbnailUrl.trim() : "";
+          const authorLabel = (post.nickname ?? "").trim() || "—";
           return (
             <li key={post.id} className="ui-community-board-row">
               <Link prefetch={false} href={href} className="ui-community-board-row-link">
@@ -83,19 +84,24 @@ export default function CommunityBoardPostList({
                     <span className="ui-community-board-title">{post.title}</span>
                   </div>
                   <p className="ui-community-board-meta">
-                    {formatListDateTime(post.createdAt)} · 조회 {post.viewCount} · 댓글 {post.commentCount}
+                    {authorLabel} · {formatListDateTime(post.createdAt)} · 조회 {post.viewCount} · 댓글{" "}
+                    {post.commentCount}
                   </p>
                 </div>
-                {thumb ? (
-                  <div className="ui-community-board-thumb-wrap">
+                <div
+                  className={`ui-community-board-row-media${thumb ? " ui-community-board-row-media--has-thumb" : ""}`}
+                  aria-hidden
+                >
+                  {thumb ? (
                     <SiteListImage160
                       className="ui-community-board-thumb"
                       src={thumb}
                       alt=""
                       placeholderClassName="ui-community-board-thumb-placeholder"
+                      placeholderLabel=""
                     />
-                  </div>
-                ) : null}
+                  ) : null}
+                </div>
               </Link>
             </li>
           );

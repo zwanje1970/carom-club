@@ -3228,46 +3228,64 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-board-row-link:active {
-  background: #f8f9fb;
+  background: rgba(15, 23, 42, 0.03);
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-board-row-link {
   min-height: 0;
-  padding-top: 0.52rem;
-  padding-bottom: 0.52rem;
+  padding-top: 0.62rem;
+  padding-bottom: 0.62rem;
+  padding-left: 0;
+  padding-right: 0;
+  gap: 0.62rem;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-board-title {
-  font-weight: 600;
-  font-size: clamp(0.9375rem, 2.8vw, 1rem);
+  font-weight: 700;
+  font-size: clamp(0.90625rem, 2.75vw, 0.9375rem);
   line-height: 1.38;
 }
 
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-board-meta {
+  font-size: 0.665rem;
+  color: #64748b;
+}
+
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-board-pill {
-  font-size: 0.6875rem;
+  font-size: 0.6rem;
   font-weight: 600;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-tabs-link {
-  font-size: 0.8125rem;
+  font-size: 0.765rem;
   line-height: 1.28;
-  padding: 0.24rem 0.48rem;
+  padding: 0.16rem 0.38rem;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-search-input {
-  border-radius: 6px;
-  min-height: 42px;
-  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  min-height: 2.125rem;
+  padding: 0.26rem 0.55rem;
   font-size: 0.8125rem;
-  border: 1px solid rgba(15, 23, 42, 0.1);
+  border: 1px solid rgba(15, 23, 42, 0.14);
   background: #ffffff;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard button.secondary-button.ui-community-search-submit {
-  border-radius: 6px;
-  min-height: 42px;
+  border-radius: 8px;
+  min-height: 2.125rem;
   font-size: 0.8125rem;
-  padding: 0 0.65rem;
+  font-weight: 500;
+  padding: 0 0.52rem;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: #ffffff;
+  color: #475569;
+  box-shadow: none;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard button.secondary-button.ui-community-search-submit:hover {
+  background: rgba(15, 23, 42, 0.04);
+  color: #0f172a;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-community-detail-brand-row {
