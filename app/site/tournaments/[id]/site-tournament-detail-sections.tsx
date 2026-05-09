@@ -149,7 +149,7 @@ export default function SiteTournamentDetailSections({
     }
 
     return (
-      <div className="site-detail-page-stack">
+      <div className="site-detail-page-stack site-tournament-detail-site">
         <section className="card-clean site-detail-inner-stack site-tournament-detail-hero">
           <span className={`site-tournament-detail-hero-badge ${statusClass}`}>{tournament.statusBadge}</span>
           <h1 className="site-detail-hero-title">{tournament.title ?? "대회"}</h1>

@@ -269,15 +269,26 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
                         ? distanceMeters(memoryCoords, { lat: row.lat, lng: row.lng })
                         : null;
                     const distStr = dm != null && Number.isFinite(dm) ? formatDistanceKmFromMeters(dm) : null;
-                    if (!region && !distStr) return null;
+                    const distPart =
+                      memoryCoords && row.lat != null && row.lng != null
+                        ? distStr
+                        : memoryCoords
+                          ? "—"
+                          : null;
+                    if (!region && !distPart) return null;
                     return (
                       <span className="site-venue-address">
                         {region ? <>{region}</> : null}
-                        {region && distStr ? <> · </> : null}
-                        {distStr ? <span className="site-venue-distance">{distStr}</span> : null}
+                        {region && distPart ? <> · </> : null}
+                        {distPart ? <span className="site-venue-distance">{distPart}</span> : null}
                       </span>
                     );
                   })()}
+                  {row.phone?.trim() ? (
+                    <a className="site-venue-phone" href={`tel:${row.phone.trim().replace(/\s+/g, "")}`}>
+                      {row.phone.trim()}
+                    </a>
+                  ) : null}
                 </div>
                 {row.thumbnailUrl ? (
                   <div className="site-venue-list-thumb">

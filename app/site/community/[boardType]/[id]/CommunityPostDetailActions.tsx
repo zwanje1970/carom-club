@@ -13,6 +13,8 @@ type Props = {
   canDeletePost: boolean;
   postId: string;
   boardType: string;
+  /** 상단 헤더(게시판명 옆) 등 레이아웃용 클래스 */
+  className?: string;
 };
 
 export default function CommunityPostDetailActions({
@@ -20,6 +22,7 @@ export default function CommunityPostDetailActions({
   canDeletePost,
   postId,
   boardType,
+  className,
 }: Props) {
   const router = useRouter();
 
@@ -39,7 +42,11 @@ export default function CommunityPostDetailActions({
   if (!canManageAuthor && !canDeletePost) return null;
 
   return (
-    <div className="ui-community-post-detail-actions" role="group" aria-label="게시글 관리">
+    <div
+      className={["ui-community-post-detail-actions", className].filter(Boolean).join(" ")}
+      role="group"
+      aria-label="게시글 관리"
+    >
       {canManageAuthor ? (
         <Link
           prefetch={false}

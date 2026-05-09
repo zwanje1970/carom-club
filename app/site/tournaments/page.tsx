@@ -31,7 +31,11 @@ async function SiteTournamentsPageContent({
 
   let ordered = snapshots.filter((s) => !SITE_TOURNAMENT_LIST_EXCLUDED_BADGES.has(s.statusBadge));
   if (statusFilter !== "all") {
-    ordered = ordered.filter((s) => s.statusBadge === statusFilter);
+    if (statusFilter === "모집중") {
+      ordered = ordered.filter((s) => s.statusBadge === "모집중" || s.statusBadge === "마감임박");
+    } else {
+      ordered = ordered.filter((s) => s.statusBadge === statusFilter);
+    }
   }
 
   ordered.sort((a, b) => a.sortDate.localeCompare(b.sortDate));

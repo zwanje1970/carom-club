@@ -13,6 +13,8 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
+  /** iOS 등: 가상 키보드 시 레이아웃 뷰포트 조정으로 하단 고정 입력과의 겹침 완화(CSS 위주 보조) */
+  interactiveWidget: "resizes-content",
 };
 
 function docPathnameFromNextLikeHeader(nextUrlHeader: string): string {

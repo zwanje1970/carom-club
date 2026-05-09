@@ -64,7 +64,7 @@ export default function SiteListPageSkeleton({
             <SkeletonBlock width="88%" height="0.82rem" radius="0.25rem" background="#edf1f5" />
             <SkeletonBlock width="55%" height="0.82rem" radius="0.25rem" background="#edf1f5" />
           </div>
-          <SkeletonBlock width="52px" height="52px" radius="8px" background="#e5ebf1" />
+          <SkeletonBlock width="72px" height="72px" radius="8px" background="#e5ebf1" />
         </div>
       ))}
     </section>

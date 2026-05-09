@@ -11,7 +11,7 @@ export default function CommunityBoardSearchForm({
 }) {
   return (
     <form className="ui-community-search" method="get" action={actionPath} role="search">
-      <label className="ui-community-search-label v3-muted" htmlFor={inputId}>
+      <label className="ui-community-search-sr-only" htmlFor={inputId}>
         제목 검색
       </label>
       <div className="ui-community-search-row">
@@ -21,7 +21,7 @@ export default function CommunityBoardSearchForm({
           type="search"
           name="q"
           defaultValue={defaultQuery}
-          placeholder="검색어"
+          placeholder="제목으로 검색…"
           autoComplete="off"
           enterKeyHint="search"
         />

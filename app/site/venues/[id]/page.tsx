@@ -212,6 +212,8 @@ export default async function SiteVenueDetailPage({
   const introPdfFileKind = outlineFileKindFromAsset(introPdfAsset);
 
   const images = venue.galleryImageUrls;
+  const heroCoverUrl = images.length > 0 ? images[0] : null;
+  const galleryRest = images.length > 1 ? images.slice(1) : [];
   const pt = venue.pricingType;
   const showGeneralFees = pt === "GENERAL" || pt === "MIXED";
   const combinedLines = showGeneralFees
@@ -243,8 +245,7 @@ export default async function SiteVenueDetailPage({
   const showWebsiteBtn = websiteUrl.length > 0;
   const linkParts = venue.website ? classifyExternalLink(venue.website) : null;
 
-  const showIntroSection =
-    images.length > 0 || introTextBlocks.length > 0 || showPdf;
+  const showIntroSection = galleryRest.length > 0 || introTextBlocks.length > 0 || showPdf;
 
   const regionTrim = venue.region?.trim() ?? "";
   const addressTrim = venue.addressLine?.trim() ?? "";
@@ -260,8 +261,14 @@ export default async function SiteVenueDetailPage({
 
   return (
     <SiteShellFrame brandTitle={<span className="site-home-brand-ellipsis">{venue.name}</span>}>
-      <section className="site-site-gray-main v3-stack site-detail-page-stack">
-        <section className="card-clean site-detail-inner-stack">
+      <section className="site-site-gray-main v3-stack site-detail-page-stack site-venue-detail-site">
+        <section className="card-clean site-detail-inner-stack site-venue-detail-hero-block">
+          {heroCoverUrl ? (
+            <div className="site-venue-detail-hero-cover">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="site-venue-detail-hero-cover-img" src={heroCoverUrl} alt="" width={1200} height={675} />
+            </div>
+          ) : null}
           <h1 className="site-venue-detail-title">{venue.name}</h1>
           {heroMetaLine ? (
             <p
@@ -269,6 +276,11 @@ export default async function SiteVenueDetailPage({
             >
               {heroMetaLine}
             </p>
+          ) : null}
+          {venue.phone && telHref ? (
+            <a className="site-venue-detail-hero-phone" href={telHref}>
+              {venue.phone}
+            </a>
           ) : null}
           <div className="site-detail-actions-row">
             {venue.phone && telHref ? (
@@ -373,7 +385,7 @@ export default async function SiteVenueDetailPage({
         {showIntroSection ? (
           <section className="card-clean site-detail-inner-stack">
             <h2 className="site-detail-section-title">소개</h2>
-            {images.length > 0 ? (
+            {galleryRest.length > 0 ? (
               <div
                 style={{
                   display: "grid",
@@ -383,7 +395,7 @@ export default async function SiteVenueDetailPage({
                   maxWidth: "40rem",
                 }}
               >
-                {images.map((url) => (
+                {galleryRest.map((url) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={url}

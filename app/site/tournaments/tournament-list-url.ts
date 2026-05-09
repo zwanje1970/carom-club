@@ -1,16 +1,19 @@
 export type TournamentSortType = "DEADLINE" | "DISTANCE";
 
-export const TOURNAMENT_STATUS_FILTER_OPTIONS = ["모집중", "마감임박", "마감", "종료"] as const;
-export type TournamentStatusFilterOption = (typeof TOURNAMENT_STATUS_FILTER_OPTIONS)[number];
-export type TournamentStatusFilter = "all" | TournamentStatusFilterOption;
+/** 목록 상단 탭 4개(전체 + 아래 3) — UI·필터 공통 */
+export const TOURNAMENT_STATUS_TAB_VALUES = ["모집중", "마감", "종료"] as const;
+export type TournamentStatusTabValue = (typeof TOURNAMENT_STATUS_TAB_VALUES)[number];
+export type TournamentStatusFilter = "all" | TournamentStatusTabValue;
 
 export function parseTournamentStatusFilter(
   raw: string | string[] | undefined
 ): TournamentStatusFilter {
   const s = typeof raw === "string" ? raw.trim() : "";
   if (!s || s === "all") return "all";
-  if ((TOURNAMENT_STATUS_FILTER_OPTIONS as readonly string[]).includes(s)) {
-    return s as TournamentStatusFilterOption;
+  /** 예전 `?status=마감임박` 링크는 모집중 탭 필터와 동일하게 동작 */
+  if (s === "마감임박") return "모집중";
+  if ((TOURNAMENT_STATUS_TAB_VALUES as readonly string[]).includes(s)) {
+    return s as TournamentStatusTabValue;
   }
   return "all";
 }

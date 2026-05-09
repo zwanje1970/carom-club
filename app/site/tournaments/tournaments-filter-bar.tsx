@@ -1,13 +1,16 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import FilterDropdown from "../components/FilterDropdown";
-import filterStyles from "../components/filter-controls.module.css";
+import Link from "next/link";
 import {
   buildTournamentListHref,
-  TOURNAMENT_STATUS_FILTER_OPTIONS,
+  TOURNAMENT_STATUS_TAB_VALUES,
   type TournamentStatusFilter,
 } from "./tournament-list-url";
+
+const STATUS_SEGMENTS: { value: TournamentStatusFilter; label: string }[] = [
+  { value: "all", label: "전체" },
+  ...TOURNAMENT_STATUS_TAB_VALUES.map((s) => ({ value: s, label: s })),
+];
 
 type Props = {
   searchParams: Record<string, string | string[] | undefined>;
@@ -15,34 +18,28 @@ type Props = {
 };
 
 export default function TournamentsFilterBar({ searchParams, currentStatus }: Props) {
-  const router = useRouter();
-  const selectValue = currentStatus === "all" ? "all" : currentStatus;
-
   return (
-    <div
-      className={`site-list-filter-bar ${filterStyles.filterRow} ${filterStyles.filterRowSingle} ${filterStyles.filterRowFilterPack}`}
-    >
-      <div className={filterStyles.filterField}>
-        <span className={`${filterStyles.filterFieldLabel} site-list-filter-label`}>상태</span>
-        <FilterDropdown
-          className={filterStyles.dropdownFlex}
-          value={selectValue}
-          aria-label="상태"
-          onChange={(e) => {
-            const v = e.target.value;
-            const status = v === "all" ? null : v;
-            const q = buildTournamentListHref(searchParams, { status });
-            router.push(q ? `/site/tournaments${q}` : "/site/tournaments");
-          }}
-        >
-          <option value="all">전체</option>
-          {TOURNAMENT_STATUS_FILTER_OPTIONS.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </FilterDropdown>
-      </div>
+    <div className="site-list-filter-bar site-tournament-status-filter">
+      <nav className="site-tournament-status-filter__track" aria-label="대회 상태">
+        {STATUS_SEGMENTS.map(({ value, label }) => {
+          const q = buildTournamentListHref(searchParams, {
+            status: value === "all" ? null : value,
+          });
+          const href = q ? `/site/tournaments${q}` : "/site/tournaments";
+          const active = currentStatus === value;
+          return (
+            <Link
+              key={value}
+              prefetch={false}
+              href={href}
+              className={`site-tournament-status-filter__tab${active ? " site-tournament-status-filter__tab--active" : ""}`}
+              aria-current={active ? "page" : undefined}
+            >
+              {label}
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }

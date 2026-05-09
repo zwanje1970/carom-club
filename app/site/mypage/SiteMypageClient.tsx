@@ -161,7 +161,6 @@ export default function SiteMypageClient({
       </section>
 
       <nav className="site-mypage-footer-actions site-mypage-footer-actions--menu" aria-label="마이페이지 메뉴">
-        {workspaceMenu}
         <Link prefetch={false} href="/site/mypage/history" className="site-mypage-menu-row">
           <div className="site-mypage-menu-row-main">
             <span className="site-mypage-menu-row-title">대회 이력</span>
@@ -172,6 +171,10 @@ export default function SiteMypageClient({
           </span>
         </Link>
       </nav>
+
+      <div className="site-mypage-workspace-cta" aria-label="운영·대시보드">
+        {workspaceMenu}
+      </div>
 
       <div className="site-mypage-menu-actions-footer">
         <LogoutButton redirectTo="/site" className="site-mypage-menu-logout-btn secondary-button site-mypage-logout" />

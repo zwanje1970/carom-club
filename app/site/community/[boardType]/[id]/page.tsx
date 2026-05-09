@@ -21,14 +21,6 @@ import CommunityPostCommentsSection from "./CommunityPostCommentsSection";
 import CommunityPostDetailBody from "./CommunityPostDetailBody";
 import CommunityPostDetailActions from "./CommunityPostDetailActions";
 
-function boardPillClass(boardType: SiteCommunityBoardKey): string {
-  const base = "ui-community-board-pill";
-  if (boardType === "free") return `${base} ${base}--free`;
-  if (boardType === "qna") return `${base} ${base}--qna`;
-  if (boardType === "reviews") return `${base} ${base}--reviews`;
-  return `${base} ${base}--muted`;
-}
-
 function formatDetailDateTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
@@ -87,13 +79,23 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
     : communityTabLabelForBoard(boardType, config).trim() || boardType;
 
   return (
-    <SiteShellFrame brandTitle={<span className="site-home-brand-ellipsis">{post.title}</span>}>
+    <SiteShellFrame
+      brandTitle={
+        <div className="site-community-detail-brand-row">
+          <span className="site-community-detail-brand-name site-home-brand-ellipsis">{boardPillLabel}</span>
+          <CommunityPostDetailActions
+            canManageAuthor={canManageAuthor}
+            canDeletePost={canDeletePost}
+            postId={postId}
+            boardType={boardType}
+            className="site-community-detail-header-actions"
+          />
+        </div>
+      }
+    >
       <section className="site-site-gray-main v3-stack ui-community-post-detail-page">
         <article className="ui-community-post-detail-article v3-stack">
           <h1 className="ui-community-post-detail-title">{post.title}</h1>
-          <p className="ui-community-post-detail-pill-row">
-            <span className={boardPillClass(boardType)}>{boardPillLabel}</span>
-          </p>
           <p className="ui-community-post-detail-meta">
             <span className="ui-community-post-detail-author">{post.authorNickname}</span>
             <span className="ui-community-post-detail-meta-plain">
@@ -101,12 +103,6 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
               · {formatDetailDateTime(post.createdAt)} · 조회 {post.viewCount} · 댓글 {post.commentCount}
             </span>
           </p>
-          <CommunityPostDetailActions
-            canManageAuthor={canManageAuthor}
-            canDeletePost={canDeletePost}
-            postId={postId}
-            boardType={boardType}
-          />
           <CommunityPostDetailBody
             segments={segments}
             tailImages={tailImages}
