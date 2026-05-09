@@ -57,7 +57,7 @@ function logViewport(context: string) {
   }
 }
 
-function requestNativeOrientation(mode: CaromOrientationRequestMode, context: string) {
+export function requestNativeOrientation(mode: CaromOrientationRequestMode, context: string) {
   const bridge = (window as OrientationBridgeWindow).CaromAppBridge;
   const hasReq = typeof bridge?.requestOrientation === "function";
   const hasLegacyL = typeof bridge?.requestLandscape === "function";
@@ -93,6 +93,19 @@ function requestNativeOrientation(mode: CaromOrientationRequestMode, context: st
   }
 }
 
+/** 네이티브 `requestOrientation`와 별도로 `requestLandscape()`만 추가 호출(일부 WebView에서 primary 매핑 실패 시). */
+export function requestNativeLandscapeLegacyExtra(context: string): void {
+  try {
+    const bridge = (window as OrientationBridgeWindow).CaromAppBridge;
+    if (typeof bridge?.requestLandscape === "function") {
+      bridge.requestLandscape();
+      console.info(LOG_TAG, context, "called CaromAppBridge.requestLandscape (extra legacy)");
+    }
+  } catch (e) {
+    console.warn(LOG_TAG, context, "requestLandscape extra threw", e);
+  }
+}
+
 /** screen.orientation.lock 에 넘길 Orientation Lock Type */
 function browserLockOrientationType(mode: CaromOrientationRequestMode): string {
   if (mode === "landscape-primary" || mode === "landscape-secondary" || mode === "portrait") {
@@ -101,11 +114,16 @@ function browserLockOrientationType(mode: CaromOrientationRequestMode): string {
   return "landscape";
 }
 
-function requestBrowserOrientation(mode: CaromOrientationRequestMode, context: string) {
+export function requestBrowserOrientation(mode: CaromOrientationRequestMode, context: string) {
   if (hasCaromNativeOrientationBridge()) {
     console.info(LOG_TAG, context, "skip screen.orientation.lock — CaromAppBridge handles orientation");
     return;
   }
+  requestBrowserOrientationIgnoringBridge(mode, context);
+}
+
+/** 브릿지 유무와 관계없이 `screen.orientation.lock` 시도 — 네이티브 primary 실패 후 fallback 전용 */
+export function requestBrowserOrientationIgnoringBridge(mode: CaromOrientationRequestMode, context: string): void {
   const orientation = typeof screen !== "undefined" ? screen.orientation : null;
   const lockable = orientation as (ScreenOrientation & { lock?: (mode: string) => Promise<void> }) | null;
   if (!lockable || typeof lockable.lock !== "function") {
@@ -117,6 +135,48 @@ function requestBrowserOrientation(mode: CaromOrientationRequestMode, context: s
     () => console.info(LOG_TAG, context, "screen.orientation.lock resolved", lockTarget),
     () => console.info(LOG_TAG, context, "screen.orientation.lock rejected", lockTarget),
   );
+}
+
+/** 실제 가로 화면 여부 — 요청 성공 여부와 무관 */
+export function isCaromViewportLandscape(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    if (w > 1 && h > 1 && w > h) return true;
+  } catch {
+    /* ignore */
+  }
+  try {
+    const t = typeof screen !== "undefined" ? screen.orientation?.type : undefined;
+    if (typeof t === "string" && t.includes("landscape")) return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+/** 전체화면 이탈 시 세로 복구 + 160ms 재시도 (기존 NativeFullscreenOrientationLock 동작과 동일) */
+export function restoreCaromFullscreenPortrait(contextLabel: string): void {
+  const ctx = contextLabel.trim() || "fullscreen";
+  requestNativeOrientation("portrait", `${ctx}:unmount`);
+  requestBrowserOrientation("portrait", `${ctx}:unmount`);
+  try {
+    screen.orientation?.unlock();
+  } catch {
+    /* ignore */
+  }
+  logViewport(`${ctx}:after-unmount-request`);
+  window.setTimeout(() => {
+    requestNativeOrientation("portrait", `${ctx}:unmount-retry`);
+    requestBrowserOrientation("portrait", `${ctx}:unmount-retry`);
+    try {
+      screen.orientation?.unlock();
+    } catch {
+      /* ignore */
+    }
+    logViewport(`${ctx}:after-unmount-retry`);
+  }, 160);
 }
 
 /** 대진표 등 툴바에서 사용 — 기존 시그니처 유지 */
@@ -170,26 +230,7 @@ export default function NativeFullscreenOrientationLock({
     return () => {
       window.removeEventListener("orientationchange", onOrient);
       window.clearTimeout(t);
-      requestNativeOrientation("portrait", `${ctx}:unmount`);
-      requestBrowserOrientation("portrait", `${ctx}:unmount`);
-      /* 브라우저/WebView: 네이티브 portrait 요청만으로 복구가 늦거나 무시되는 경우 대비 — unlock은 브릿지 유무와 무관 시도 */
-      try {
-        screen.orientation?.unlock();
-      } catch {
-        /* ignore */
-      }
-      logViewport(`${ctx}:after-unmount-request`);
-      /* Activity 반영 지연 대비 재요청 — 뒤로가기 직후 세로·모바일 셸 레이아웃 안정화 */
-      window.setTimeout(() => {
-        requestNativeOrientation("portrait", `${ctx}:unmount-retry`);
-        requestBrowserOrientation("portrait", `${ctx}:unmount-retry`);
-        try {
-          screen.orientation?.unlock();
-        } catch {
-          /* ignore */
-        }
-        logViewport(`${ctx}:after-unmount-retry`);
-      }, 160);
+      restoreCaromFullscreenPortrait(ctx);
     };
   }, [contextLabel, landscapeLockMode]);
 

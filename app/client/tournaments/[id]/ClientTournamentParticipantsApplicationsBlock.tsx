@@ -11,7 +11,9 @@ import {
 } from "./client-participant-filter-shared";
 import ParticipantListRow from "./participants/ParticipantListRow";
 import ParticipantAddSheet from "./participants/ParticipantAddSheet";
-import ApplicationsTableOrientationLock from "./participants/ApplicationsTableOrientationLock";
+import ApplicationsTableOrientationLock, {
+  type ApplicationsTableLandscapePhase,
+} from "./participants/ApplicationsTableOrientationLock";
 
 export type ParticipantCountSummary = {
   total: number;
@@ -267,6 +269,9 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   const showFinalize = !CLOSED_BADGES.includes(tournamentStatusBadge);
   const showCancelFinalize = tournamentStatusBadge === "마감";
   const fullscreenTable = variant === "fullscreenTable";
+  const [tableLandscapePhase, setTableLandscapePhase] = useState<ApplicationsTableLandscapePhase>(() =>
+    fullscreenTable ? "pending" : "ready",
+  );
   const rowLayout = fullscreenTable ? "fullscreen" : "standard";
   const capacityOccupied = useMemo(() => countCapacityOccupiedFromListItems(entries), [entries]);
   const waitingListTotal = participantCountSummary.waitingList ?? 0;
@@ -430,7 +435,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
           : "client-tournament-manage__participantsBlock client-tournament-manage__applicationsCompactHeader client-tournament-manage__applicationsRoot"
       }
     >
-      {fullscreenTable ? <ApplicationsTableOrientationLock /> : null}
+      {fullscreenTable ? <ApplicationsTableOrientationLock onPhaseChange={setTableLandscapePhase} /> : null}
       <div className="client-tournament-manage__applicationsHeaderZone">
         {fullscreenTable ? (
           <div className="client-tournament-manage__fullscreenTableHead">
@@ -576,7 +581,13 @@ export default function ClientTournamentParticipantsApplicationsBlock({
           </>
         )}
 
-        {zonesEnabled ? (
+        {fullscreenTable && tableLandscapePhase !== "ready" ? (
+          <p className="v3-muted" style={{ margin: 0, padding: "1rem 0.75rem", textAlign: "center", fontSize: "0.9rem", fontWeight: 700 }}>
+            {tableLandscapePhase === "pending" ? "가로보기로 전환 중입니다." : "기기를 가로로 돌려주세요."}
+          </p>
+        ) : null}
+
+        {zonesEnabled && (!fullscreenTable || tableLandscapePhase === "ready") ? (
           <div
             style={{
               display: "flex",
@@ -614,7 +625,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
           </div>
         ) : null}
 
-        {fullscreenTable ? (
+        {fullscreenTable && tableLandscapePhase === "ready" ? (
           <div className="client-tournament-manage__fullscreenTableBulkRow">
             <button
               type="button"
@@ -635,6 +646,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
         ) : null}
       </div>
 
+      {!fullscreenTable || tableLandscapePhase === "ready" ? (
       <section
         className={
           fullscreenTable
@@ -891,6 +903,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
           </p>
         ) : null}
       </section>
+      ) : null}
     </div>
   );
 }
