@@ -92,9 +92,9 @@ function countApplicationApprovedChip(entries: TournamentApplicationListItem[]):
   ).length;
 }
 
-/** 입금확인만 된 상태 · 신청 승인(clientApplicationApprovedAt) 전 · 취소·참가확정 제외 */
+/** 입금확인 완료 · 운영 신청 승인 전 · 거절·참가확정·대기자 제외(API processing과 동일) */
 function listItemEligibleBulkDepositApprove(e: TournamentApplicationListItem): boolean {
-  if (e.status === "REJECTED" || e.status === "APPROVED") return false;
+  if (e.status === "REJECTED" || e.status === "APPROVED" || e.status === "WAITING") return false;
   const hasDep = typeof e.clientDepositConfirmedAt === "string" && e.clientDepositConfirmedAt.trim() !== "";
   if (!hasDep) return false;
   const hasAppr = typeof e.clientApplicationApprovedAt === "string" && e.clientApplicationApprovedAt.trim() !== "";
@@ -492,38 +492,42 @@ export default function ClientTournamentParticipantsApplicationsBlock({
               승인완료시 신청자에게 신청완료 알림이 자동발신 됩니다.
             </p>
             <div className="client-tournament-manage__applicationsStatusLegendSingleLine" aria-label="신청 현황 및 표 버튼 안내">
-              <span className="client-tournament-manage__statusChipCompact" style={{ ...pillBase, background: "#f8fafc", color: "#475569", borderColor: "#e2e8f0" }}>
-                신청 {participantCountSummary.total}명
-              </span>
-              <span className="client-tournament-manage__statusChipCompact" style={{ ...pillBase, background: "#ecfdf5", color: "#166534", borderColor: "#86efac" }}>
-                승인 {chipApproved}명
-              </span>
-              <span className="client-tournament-manage__statusChipCompact" style={{ ...pillBase, background: "#f9fafb", color: "#4b5563", borderColor: "#e5e7eb" }}>
-                취소 {participantCountSummary.reject}명
-              </span>
-              {waitingListTotal > 0 ? (
-                <span className="client-tournament-manage__statusChipCompact" style={{ ...pillBase, background: "#fffbeb", color: "#92400e", borderColor: "#fcd34d" }}>
-                  대기자 {waitingListTotal}명
+              <div className="client-tournament-manage__applicationsStatusLegendSingleLine-chips">
+                <span className="client-tournament-manage__statusChipCompact" style={{ ...pillBase, background: "#f8fafc", color: "#475569", borderColor: "#e2e8f0" }}>
+                  신청 {participantCountSummary.total}명
                 </span>
-              ) : null}
-              <span className="client-tournament-manage__opLegendItem client-tournament-manage__opLegendItem--singleLine">
-                <span className="client-tournament-manage__opLegendDisk client-tournament-manage__opLegendDisk--won client-tournament-manage__opLegendDisk--singleLine" aria-hidden>
-                  ₩
+                <span className="client-tournament-manage__statusChipCompact" style={{ ...pillBase, background: "#ecfdf5", color: "#166534", borderColor: "#86efac" }}>
+                  승인 {chipApproved}명
                 </span>
-                <span className="client-tournament-manage__opLegendCaption client-tournament-manage__opLegendCaption--singleLine">입금확인</span>
-              </span>
-              <span className="client-tournament-manage__opLegendItem client-tournament-manage__opLegendItem--singleLine">
-                <span className="client-tournament-manage__opLegendDisk client-tournament-manage__opLegendDisk--check client-tournament-manage__opLegendDisk--singleLine" aria-hidden>
-                  ✓
+                <span className="client-tournament-manage__statusChipCompact" style={{ ...pillBase, background: "#f9fafb", color: "#4b5563", borderColor: "#e5e7eb" }}>
+                  취소 {participantCountSummary.reject}명
                 </span>
-                <span className="client-tournament-manage__opLegendCaption client-tournament-manage__opLegendCaption--singleLine">승인</span>
-              </span>
-              <span className="client-tournament-manage__opLegendItem client-tournament-manage__opLegendItem--singleLine">
-                <span className="client-tournament-manage__opLegendDisk client-tournament-manage__opLegendDisk--cross client-tournament-manage__opLegendDisk--singleLine" aria-hidden>
-                  ✕
+                {waitingListTotal > 0 ? (
+                  <span className="client-tournament-manage__statusChipCompact" style={{ ...pillBase, background: "#fffbeb", color: "#92400e", borderColor: "#fcd34d" }}>
+                    대기자 {waitingListTotal}명
+                  </span>
+                ) : null}
+              </div>
+              <div className="client-tournament-manage__applicationsStatusLegendSingleLine-legend">
+                <span className="client-tournament-manage__opLegendItem client-tournament-manage__opLegendItem--singleLine">
+                  <span className="client-tournament-manage__opLegendDisk client-tournament-manage__opLegendDisk--won client-tournament-manage__opLegendDisk--singleLine" aria-hidden>
+                    ₩
+                  </span>
+                  <span className="client-tournament-manage__opLegendCaption client-tournament-manage__opLegendCaption--singleLine">입금확인</span>
                 </span>
-                <span className="client-tournament-manage__opLegendCaption client-tournament-manage__opLegendCaption--singleLine">취소</span>
-              </span>
+                <span className="client-tournament-manage__opLegendItem client-tournament-manage__opLegendItem--singleLine">
+                  <span className="client-tournament-manage__opLegendDisk client-tournament-manage__opLegendDisk--check client-tournament-manage__opLegendDisk--singleLine" aria-hidden>
+                    ✓
+                  </span>
+                  <span className="client-tournament-manage__opLegendCaption client-tournament-manage__opLegendCaption--singleLine">승인</span>
+                </span>
+                <span className="client-tournament-manage__opLegendItem client-tournament-manage__opLegendItem--singleLine">
+                  <span className="client-tournament-manage__opLegendDisk client-tournament-manage__opLegendDisk--cross client-tournament-manage__opLegendDisk--singleLine" aria-hidden>
+                    ✕
+                  </span>
+                  <span className="client-tournament-manage__opLegendCaption client-tournament-manage__opLegendCaption--singleLine">취소</span>
+                </span>
+              </div>
             </div>
           </>
         )}
@@ -605,7 +609,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
         ) : (
           <div className="client-tournament-manage__applicationsTableInner client-dashboard-scroll-safe-area">
             <table
-              className={`client-tournament-manage__participantTable client-tournament-manage__participantTable--singleLineMobile client-tournament-manage__participantTable--applicationsCompact ${fullscreenTable ? "client-tournament-manage__participantTable--fullscreenWide" : ""}`}
+              className={`client-tournament-manage__participantTable client-tournament-manage__participantTable--singleLineMobile client-tournament-manage__participantTable--applicationsCompact ${fullscreenTable ? "client-tournament-manage__participantTable--fullscreenWide" : "client-tournament-manage__participantTable--appsStandardPortrait"}`}
               style={{
                 width: "100%",
                 minWidth: "100%",
@@ -631,7 +635,6 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                 <colgroup className="client-tournament-manage__participantTableColgroup--appsStandard">
                   <col className="participant-col-w-std participant-col-w-std--apply" />
                   <col className="participant-col-w-std participant-col-w-std--name" />
-                  <col className="participant-col-w-std participant-col-w-std--metric" />
                   <col className="participant-col-w-std participant-col-w-std--depositor" />
                   <col className="participant-col-w-std participant-col-w-std--approveInfo" />
                   <col className="participant-col-w-std participant-col-w-std--deposit" />
@@ -681,9 +684,6 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                       </th>
                       <th className="participant-th participant-th--name" style={{ ...participantApplicationsTableThBase, textAlign: "left" }}>
                         이름
-                      </th>
-                      <th className="participant-th participant-th--metric" style={{ ...participantApplicationsTableThBase, textAlign: "center" }}>
-                        {metricColumnTitle}
                       </th>
                       <th className="participant-th participant-th--depositor" style={{ ...participantApplicationsTableThBase, textAlign: "left" }}>
                         입금자

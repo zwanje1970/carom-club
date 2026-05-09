@@ -642,20 +642,24 @@ export default function ParticipantListRow({
             {phoneDisplay}
           </td>
         ) : null}
-        <td
-          data-participant-label={metricColumnTitle}
-          className="participant-col participant-col--metric"
-          style={{ ...cellBase, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
-        >
-          {metricDisplay}
-        </td>
+        {rowLayout === "fullscreen" ? (
+          <td
+            data-participant-label={metricColumnTitle}
+            className="participant-col participant-col--metric"
+            style={{ ...cellBase, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
+          >
+            {metricDisplay}
+          </td>
+        ) : null}
         {rowLayout === "fullscreen"
           ? ellipsisTd("소속", affiliationDisplay, "left", "participant-col--affiliationFs")
           : null}
         {ellipsisTd("입금자", depositorDisplay, "left", "participant-col--depositor")}
         <td
           data-participant-label="승인"
-          className="participant-col participant-col--approveInfoFs"
+          className={
+            rowLayout === "fullscreen" ? "participant-col participant-col--approveInfoFs" : "participant-col participant-col--approveInfo"
+          }
           style={{
             ...cellBase,
             maxWidth: 0,

@@ -928,12 +928,36 @@
   flex-direction: row;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 0.28rem;
+  justify-content: space-between;
+  gap: 0.55rem;
   margin: 0 0 0.32rem;
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
   overflow: hidden;
+}
+
+.client-tournament-manage .client-tournament-manage__applicationsStatusLegendSingleLine-chips {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.28rem;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.client-tournament-manage .client-tournament-manage__applicationsStatusLegendSingleLine-legend {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.34rem;
+  flex-shrink: 1;
+  min-width: 0;
+  margin-left: auto;
+  padding-left: 0.4rem;
 }
 
 .client-tournament-manage .client-tournament-manage__statusChipCompact {
@@ -945,7 +969,7 @@
 
 .client-tournament-manage .client-tournament-manage__opLegendItem--singleLine {
   flex-shrink: 1;
-  gap: 0.15rem;
+  gap: 0.12rem;
   min-width: 0;
 }
 
@@ -957,11 +981,23 @@
   font-size: 0.5rem;
 }
 
+.client-tournament-manage .client-tournament-manage__applicationsStatusLegendSingleLine-legend .client-tournament-manage__opLegendDisk--singleLine {
+  width: 0.8rem;
+  height: 0.8rem;
+  min-width: 0.8rem;
+  min-height: 0.8rem;
+  font-size: 0.48rem;
+}
+
 .client-tournament-manage .client-tournament-manage__opLegendCaption--singleLine {
   font-size: 0.66rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.client-tournament-manage .client-tournament-manage__applicationsStatusLegendSingleLine-legend .client-tournament-manage__opLegendCaption--singleLine {
+  font-size: 0.62rem;
 }
 
 /* 신청자 표: ₩ ✓ ✕ 범례(목록 상단 1회) */
@@ -998,21 +1034,18 @@
   color: #475569;
 }
 
-/* 세로 신청자 표(8열): 신청=승인(정보) 동일폭, 이름=입금자 동일폭, 입금/승인/취소 동일폭 */
+/* 세로 신청자 표(7열, AVG 없음): 신청=승인(일) 동일폭, 이름=입금자 동일폭, 입금/승인/취소 버튼 동일폭 */
 .client-tournament-manage .client-tournament-manage__participantTableColgroup--appsStandard col.participant-col-w-std--apply {
-  width: 8%;
+  width: 12.5%;
 }
 .client-tournament-manage .client-tournament-manage__participantTableColgroup--appsStandard col.participant-col-w-std--name {
-  width: 14%;
-}
-.client-tournament-manage .client-tournament-manage__participantTableColgroup--appsStandard col.participant-col-w-std--metric {
-  width: 11%;
+  width: 18%;
 }
 .client-tournament-manage .client-tournament-manage__participantTableColgroup--appsStandard col.participant-col-w-std--depositor {
-  width: 14%;
+  width: 18%;
 }
 .client-tournament-manage .client-tournament-manage__participantTableColgroup--appsStandard col.participant-col-w-std--approveInfo {
-  width: 14%;
+  width: 12.5%;
 }
 .client-tournament-manage .client-tournament-manage__participantTableColgroup--appsStandard col.participant-col-w-std--deposit {
   width: 13%;
@@ -1022,6 +1055,51 @@
 }
 .client-tournament-manage .client-tournament-manage__participantTableColgroup--appsStandard col.participant-col-w-std--reject {
   width: 13%;
+}
+
+/* 세로 표: 텍스트 열 사이 세로선 제거 — 승인일 우측만 얇은 구분선, 버튼 3열 구분 유지 */
+.client-tournament-manage
+  .client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--appsStandardPortrait
+  thead
+  th:nth-child(-n + 3),
+.client-tournament-manage
+  .client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--appsStandardPortrait
+  tbody
+  td:nth-child(-n + 3) {
+  border-right: none !important;
+  box-shadow: none !important;
+}
+
+.client-tournament-manage
+  .client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--appsStandardPortrait
+  thead
+  th:nth-child(4),
+.client-tournament-manage
+  .client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--appsStandardPortrait
+  tbody
+  td:nth-child(4) {
+  border-right: 1px solid rgba(203, 213, 225, 0.55) !important;
+  box-shadow: none !important;
+}
+
+.client-tournament-manage
+  .client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--appsStandardPortrait
+  thead
+  th:nth-child(5),
+.client-tournament-manage
+  .client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--appsStandardPortrait
+  tbody
+  td:nth-child(5),
+.client-tournament-manage
+  .client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--appsStandardPortrait
+  thead
+  th:nth-child(6),
+.client-tournament-manage
+  .client-tournament-manage__participantTable--applicationsCompact.client-tournament-manage__participantTable--appsStandardPortrait
+  tbody
+  td:nth-child(6) {
+  border-right: 1px solid rgba(216, 222, 232, 0.65) !important;
+  box-shadow: none !important;
 }
 
 .client-tournament-manage .client-tournament-manage__participantTableShell--fullscreenScroll .client-tournament-manage__applicationsSymbolLegend {
@@ -1707,12 +1785,12 @@ main[data-client-applications-table-fullscreen="1"]
 main[data-client-applications-table-fullscreen="1"]
   .client-tournament-manage__participantTableColgroup--fullscreen
   col.participant-col-w-fs--phone {
-  width: 10%;
+  width: 10.5%;
 }
 main[data-client-applications-table-fullscreen="1"]
   .client-tournament-manage__participantTableColgroup--fullscreen
   col.participant-col-w-fs--metric {
-  width: 9.5%;
+  width: 9%;
 }
 main[data-client-applications-table-fullscreen="1"]
   .client-tournament-manage__participantTableColgroup--fullscreen
@@ -1787,18 +1865,29 @@ main[data-client-applications-table-fullscreen="1"].client-tournament-manage
 
   main[data-client-applications-table-fullscreen="1"].client-tournament-manage--participants-table-view-page.v3-page {
     max-width: none !important;
-    width: 100% !important;
+    width: 100dvw !important;
     margin: 0 !important;
-    padding-top: env(safe-area-inset-top, 0px) !important;
-    padding-left: calc(env(safe-area-inset-left, 0px) + 4px) !important;
-    padding-right: calc(env(safe-area-inset-right, 0px) + 4px) !important;
-    padding-bottom: 0 !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+    /* 루트 한 겹: 노치·상태바·제스처 바 회피 + 최소 breathing space (중복 패딩 없음) */
+    padding-top: calc(env(safe-area-inset-top, 0px) + 2px) !important;
+    padding-left: calc(env(safe-area-inset-left, 0px) + 2px) !important;
+    padding-right: calc(env(safe-area-inset-right, 0px) + 2px) !important;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2px) !important;
     gap: 0 !important;
-    box-sizing: border-box;
   }
 
   main[data-client-applications-table-fullscreen="1"] .client-tournament-manage__applicationsHeaderZone {
     display: none !important;
+  }
+
+  /* 가로보기: 컬럼 제목 행만 연한 배경(데이터 행과 구분, 높이는 기존 패딩 유지) */
+  main[data-client-applications-table-fullscreen="1"]
+    .client-tournament-manage__participantTable--fullscreenWide
+    thead
+    th {
+    background-color: #eef2f7;
   }
 
   main[data-client-applications-table-fullscreen="1"] .client-tournament-manage__participantsBlock--fullscreenTable {
@@ -1829,7 +1918,8 @@ main[data-client-applications-table-fullscreen="1"].client-tournament-manage
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
-    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+    /* 하단 safe-area는 landscape 루트(main)에서만 적용 — 이중 여백 방지 */
+    padding-bottom: 0 !important;
     box-sizing: border-box;
   }
 
