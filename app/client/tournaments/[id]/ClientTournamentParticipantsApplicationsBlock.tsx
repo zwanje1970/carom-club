@@ -488,6 +488,43 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                 </div>
               </div>
             </div>
+            <p className="client-tournament-manage__applicationsNotify client-tournament-manage__applicationsNotify--alert">
+              승인완료시 신청자에게 신청완료 알림이 자동발신 됩니다.
+            </p>
+            <div className="client-tournament-manage__applicationsStatusLegendSingleLine" aria-label="신청 현황 및 표 버튼 안내">
+              <span className="client-tournament-manage__statusChipCompact" style={{ ...pillBase, background: "#f8fafc", color: "#475569", borderColor: "#e2e8f0" }}>
+                신청 {participantCountSummary.total}명
+              </span>
+              <span className="client-tournament-manage__statusChipCompact" style={{ ...pillBase, background: "#ecfdf5", color: "#166534", borderColor: "#86efac" }}>
+                승인 {chipApproved}명
+              </span>
+              <span className="client-tournament-manage__statusChipCompact" style={{ ...pillBase, background: "#f9fafb", color: "#4b5563", borderColor: "#e5e7eb" }}>
+                취소 {participantCountSummary.reject}명
+              </span>
+              {waitingListTotal > 0 ? (
+                <span className="client-tournament-manage__statusChipCompact" style={{ ...pillBase, background: "#fffbeb", color: "#92400e", borderColor: "#fcd34d" }}>
+                  대기자 {waitingListTotal}명
+                </span>
+              ) : null}
+              <span className="client-tournament-manage__opLegendItem client-tournament-manage__opLegendItem--singleLine">
+                <span className="client-tournament-manage__opLegendDisk client-tournament-manage__opLegendDisk--won client-tournament-manage__opLegendDisk--singleLine" aria-hidden>
+                  ₩
+                </span>
+                <span className="client-tournament-manage__opLegendCaption client-tournament-manage__opLegendCaption--singleLine">입금확인</span>
+              </span>
+              <span className="client-tournament-manage__opLegendItem client-tournament-manage__opLegendItem--singleLine">
+                <span className="client-tournament-manage__opLegendDisk client-tournament-manage__opLegendDisk--check client-tournament-manage__opLegendDisk--singleLine" aria-hidden>
+                  ✓
+                </span>
+                <span className="client-tournament-manage__opLegendCaption client-tournament-manage__opLegendCaption--singleLine">승인</span>
+              </span>
+              <span className="client-tournament-manage__opLegendItem client-tournament-manage__opLegendItem--singleLine">
+                <span className="client-tournament-manage__opLegendDisk client-tournament-manage__opLegendDisk--cross client-tournament-manage__opLegendDisk--singleLine" aria-hidden>
+                  ✕
+                </span>
+                <span className="client-tournament-manage__opLegendCaption client-tournament-manage__opLegendCaption--singleLine">취소</span>
+              </span>
+            </div>
           </>
         )}
 
@@ -547,57 +584,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
               {bulkApproveBusy ? "처리 중…" : "입금확인 전체승인"}
             </button>
           </div>
-        ) : (
-          <>
-            <p className="client-tournament-manage__applicationsNotify">승인완료시 신청자에게 신청완료 알림이 발송됩니다.</p>
-            <div className="client-tournament-manage__applicationsStatusLegendRow">
-              <div
-                className="client-tournament-manage__applicationsStatusChips"
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                  gap: "0.22rem",
-                }}
-              >
-                <span style={{ ...pillBase, background: "#f8fafc", color: "#475569", borderColor: "#e2e8f0" }}>
-                  신청 {participantCountSummary.total}명
-                </span>
-                <span style={{ ...pillBase, background: "#ecfdf5", color: "#166534", borderColor: "#86efac" }}>
-                  승인 {chipApproved}명
-                </span>
-                <span style={{ ...pillBase, background: "#f9fafb", color: "#4b5563", borderColor: "#e5e7eb" }}>
-                  취소/거절 {participantCountSummary.reject}명
-                </span>
-                {waitingListTotal > 0 ? (
-                  <span style={{ ...pillBase, background: "#fffbeb", color: "#92400e", borderColor: "#fcd34d" }}>
-                    대기자 {waitingListTotal}명
-                  </span>
-                ) : null}
-              </div>
-              <div className="client-tournament-manage__applicationsOpLegend" aria-label="표 버튼 기호 안내">
-                <span className="client-tournament-manage__opLegendItem">
-                  <span className="client-tournament-manage__opLegendDisk client-tournament-manage__opLegendDisk--won" aria-hidden>
-                    ₩
-                  </span>
-                  <span className="client-tournament-manage__opLegendCaption">입금확인</span>
-                </span>
-                <span className="client-tournament-manage__opLegendItem">
-                  <span className="client-tournament-manage__opLegendDisk client-tournament-manage__opLegendDisk--check" aria-hidden>
-                    ✓
-                  </span>
-                  <span className="client-tournament-manage__opLegendCaption">승인</span>
-                </span>
-                <span className="client-tournament-manage__opLegendItem">
-                  <span className="client-tournament-manage__opLegendDisk client-tournament-manage__opLegendDisk--cross" aria-hidden>
-                    ✕
-                  </span>
-                  <span className="client-tournament-manage__opLegendCaption">취소/거절</span>
-                </span>
-              </div>
-            </div>
-          </>
-        )}
+        ) : null}
       </div>
 
       <section

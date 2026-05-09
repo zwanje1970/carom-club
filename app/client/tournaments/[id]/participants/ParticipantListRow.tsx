@@ -13,25 +13,6 @@ type TournamentApplicationStatus =
   | "APPROVED"
   | "REJECTED";
 
-function applicationStatusShortKo(status: TournamentApplicationStatus): string {
-  switch (status) {
-    case "APPLIED":
-      return "신청";
-    case "VERIFYING":
-      return "확인중";
-    case "WAITING_PAYMENT":
-      return "입금대기";
-    case "WAITING":
-      return "대기자";
-    case "APPROVED":
-      return "확정";
-    case "REJECTED":
-      return "거절";
-    default:
-      return status;
-  }
-}
-
 /** 신청일·승인일 — 월/일만 (예: 12/25) */
 function formatDateSlashMd(iso: string | null | undefined): string {
   const raw = (iso ?? "").trim();
@@ -531,7 +512,7 @@ export default function ParticipantListRow({
     if (terminalApproved) {
       return (
         <span className="participant-op-hit">
-          <button type="button" disabled className="participant-op-btn participant-op-btn--cross participant-op-btn--cross-muted participant-op-btn--disabled" aria-label="취소/거절(불가)">
+          <button type="button" disabled className="participant-op-btn participant-op-btn--cross participant-op-btn--cross-muted participant-op-btn--disabled" aria-label="취소(불가)">
             <span className="participant-op-cross-glyph" aria-hidden="true">
               ✕
             </span>
@@ -542,7 +523,7 @@ export default function ParticipantListRow({
     if (terminalRejected) {
       return (
         <span className="participant-op-hit">
-          <button type="button" disabled className="participant-op-btn participant-op-btn--cross participant-op-btn--cross-done participant-op-btn--disabled" aria-label="취소/거절(완료)">
+          <button type="button" disabled className="participant-op-btn participant-op-btn--cross participant-op-btn--cross-done participant-op-btn--disabled" aria-label="취소(완료)">
             <span className="participant-op-cross-glyph" aria-hidden="true">
               ✕
             </span>
@@ -552,7 +533,7 @@ export default function ParticipantListRow({
     }
     return (
       <span className="participant-op-hit">
-        <button type="button" disabled={loading} className="participant-op-btn participant-op-btn--cross participant-op-btn--cross-idle" aria-label="취소/거절" onClick={() => onCancelRejectClick()}>
+        <button type="button" disabled={loading} className="participant-op-btn participant-op-btn--cross participant-op-btn--cross-idle" aria-label="취소" onClick={() => onCancelRejectClick()}>
           <span className="participant-op-cross-glyph" aria-hidden="true">
             ✕
           </span>
@@ -566,21 +547,10 @@ export default function ParticipantListRow({
   const metricDisplay =
     participantAverage != null && Number.isFinite(participantAverage) ? String(participantAverage) : "—";
 
-  const approveMdIso =
-    terminalApproved && !(clientApplicationApprovedAt ?? "").trim()
-      ? statusChangedAt
-      : clientApplicationApprovedAt;
-  const approveMd = formatDateSlashMd(approveMdIso);
-
   const rowBg = terminalRejected ? "#f3f4f6" : terminalWaiting ? "#fffbeb" : "#fff";
 
-  const approveInfoCell = terminalRejected
-    ? "—"
-    : terminalWaiting
-      ? "대기자"
-      : approveDone
-        ? approveMd
-        : applicationStatusShortKo(status);
+  const approveAtRaw = (clientApplicationApprovedAt ?? "").trim();
+  const approveInfoCell = terminalRejected ? "—" : approveAtRaw ? formatDateSlashMd(approveAtRaw) : "-";
 
   const phoneDisplay = (phone ?? "").trim() || "—";
 
@@ -660,22 +630,6 @@ export default function ParticipantListRow({
             <button type="button" className="client-tournament-manage__participantNameBtn participant-name-btn-ellipsis" onClick={() => setDetailOpen(true)}>
               {applicantName}
             </button>
-            {registrationSource === "admin" ? (
-              <span
-                style={{
-                  fontSize: "0.52rem",
-                  fontWeight: 700,
-                  padding: "0.02rem 0.18rem",
-                  borderRadius: "0.18rem",
-                  background: "#eef2ff",
-                  color: "#3730a3",
-                  border: "1px solid #c7d2fe",
-                  flexShrink: 0,
-                }}
-              >
-                관리
-              </span>
-            ) : null}
           </div>
         </td>
         {rowLayout === "fullscreen" ? (
