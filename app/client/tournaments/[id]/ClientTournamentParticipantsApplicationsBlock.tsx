@@ -568,14 +568,6 @@ export default function ClientTournamentParticipantsApplicationsBlock({
             ? "client-tournament-manage__participantTableShell client-tournament-manage__participantTableShell--fullscreenScroll"
             : "client-tournament-manage__participantTableShell client-tournament-manage__participantTableShell--applicationsScroll"
         }
-        style={
-          fullscreenTable
-            ? {
-                paddingLeft: "max(0px, env(safe-area-inset-left, 0px))",
-                paddingRight: "max(0px, env(safe-area-inset-right, 0px))",
-              }
-            : undefined
-        }
       >
         {!fullscreenTable ? (
           <p className="client-tournament-manage__applicationsSymbolLegend">
@@ -620,17 +612,17 @@ export default function ClientTournamentParticipantsApplicationsBlock({
               }}
             >
               {fullscreenTable ? (
-                <colgroup>
-                  <col style={{ width: "6.25%" }} />
-                  <col style={{ width: "12%" }} />
-                  <col style={{ width: "20%" }} />
-                  <col style={{ width: "9.5%" }} />
-                  <col style={{ width: "10%" }} />
-                  <col style={{ width: "12%" }} />
-                  <col style={{ width: "6.25%" }} />
-                  <col style={{ width: "8%" }} />
-                  <col style={{ width: "8%" }} />
-                  <col style={{ width: "8%" }} />
+                <colgroup className="client-tournament-manage__participantTableColgroup--fullscreen">
+                  <col className="participant-col-w-fs participant-col-w-fs--apply" />
+                  <col className="participant-col-w-fs participant-col-w-fs--name" />
+                  <col className="participant-col-w-fs participant-col-w-fs--phone" />
+                  <col className="participant-col-w-fs participant-col-w-fs--metric" />
+                  <col className="participant-col-w-fs participant-col-w-fs--affiliation" />
+                  <col className="participant-col-w-fs participant-col-w-fs--depositor" />
+                  <col className="participant-col-w-fs participant-col-w-fs--approveInfo" />
+                  <col className="participant-col-w-fs participant-col-w-fs--deposit" />
+                  <col className="participant-col-w-fs participant-col-w-fs--approveBtn" />
+                  <col className="participant-col-w-fs participant-col-w-fs--reject" />
                 </colgroup>
               ) : (
                 <colgroup>

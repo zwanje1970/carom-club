@@ -1105,6 +1105,9 @@ main[data-client-applications-table-fullscreen="1"].client-tournament-manage--pa
   flex-direction: column;
   overflow: hidden;
   padding-bottom: 0;
+  /* 세로 가로보기: 좌우는 env 한 번만(landscape에서는 main으로 이전) */
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   background: #f1f5f9;
@@ -1455,4 +1458,219 @@ main[data-client-applications-table-fullscreen="1"].client-tournament-manage--pa
   white-space: nowrap !important;
   text-overflow: ellipsis;
   word-break: keep-all;
+}
+
+/*
+ * 신청자 표 fullscreen(table-view): col 폭 — 기존 인라인 col width와 동일(세로·portrait 가로보기).
+ */
+main[data-client-applications-table-fullscreen="1"]
+  .client-tournament-manage__participantTableColgroup--fullscreen
+  col.participant-col-w-fs--apply {
+  width: 6.25%;
+}
+main[data-client-applications-table-fullscreen="1"]
+  .client-tournament-manage__participantTableColgroup--fullscreen
+  col.participant-col-w-fs--name {
+  width: 12%;
+}
+main[data-client-applications-table-fullscreen="1"]
+  .client-tournament-manage__participantTableColgroup--fullscreen
+  col.participant-col-w-fs--phone {
+  width: 20%;
+}
+main[data-client-applications-table-fullscreen="1"]
+  .client-tournament-manage__participantTableColgroup--fullscreen
+  col.participant-col-w-fs--metric {
+  width: 9.5%;
+}
+main[data-client-applications-table-fullscreen="1"]
+  .client-tournament-manage__participantTableColgroup--fullscreen
+  col.participant-col-w-fs--affiliation {
+  width: 10%;
+}
+main[data-client-applications-table-fullscreen="1"]
+  .client-tournament-manage__participantTableColgroup--fullscreen
+  col.participant-col-w-fs--depositor {
+  width: 12%;
+}
+main[data-client-applications-table-fullscreen="1"]
+  .client-tournament-manage__participantTableColgroup--fullscreen
+  col.participant-col-w-fs--approveInfo {
+  width: 6.25%;
+}
+main[data-client-applications-table-fullscreen="1"]
+  .client-tournament-manage__participantTableColgroup--fullscreen
+  col.participant-col-w-fs--deposit {
+  width: 8%;
+}
+main[data-client-applications-table-fullscreen="1"]
+  .client-tournament-manage__participantTableColgroup--fullscreen
+  col.participant-col-w-fs--approveBtn {
+  width: 8%;
+}
+main[data-client-applications-table-fullscreen="1"]
+  .client-tournament-manage__participantTableColgroup--fullscreen
+  col.participant-col-w-fs--reject {
+  width: 8%;
+}
+
+/*
+ * 가로모드(landscape)만: 운영용 fullscreen 표 — 상단 모바일 UI 제거, safe-area는 env만·한 겹,
+ * 가로 스크롤 금지, 표 영역만 세로 스크롤.
+ */
+@media (orientation: landscape) {
+  .app-dashboard-mobile-root:has([data-client-applications-table-fullscreen="1"])
+    > .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome,
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:has(
+      [data-client-applications-table-fullscreen="1"]
+    )
+    > .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
+    padding-top: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  main[data-client-applications-table-fullscreen="1"].client-tournament-manage--participants-table-view-page.v3-page {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding-top: env(safe-area-inset-top, 0px) !important;
+    padding-left: env(safe-area-inset-left, 0px) !important;
+    padding-right: env(safe-area-inset-right, 0px) !important;
+    padding-bottom: 0 !important;
+    gap: 0 !important;
+    box-sizing: border-box;
+  }
+
+  main[data-client-applications-table-fullscreen="1"] .client-tournament-manage__applicationsHeaderZone {
+    display: none !important;
+  }
+
+  main[data-client-applications-table-fullscreen="1"] .client-tournament-manage__participantsBlock--fullscreenTable {
+    gap: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  main[data-client-applications-table-fullscreen="1"] .client-tournament-manage__participantTableShell--fullscreenScroll {
+    border: none !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  main[data-client-applications-table-fullscreen="1"] .client-tournament-manage__applicationsTableInner {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden !important;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+    box-sizing: border-box;
+  }
+
+  main[data-client-applications-table-fullscreen="1"] .client-dashboard-scroll-safe-area {
+    padding-bottom: 0 !important;
+    scroll-padding-bottom: 0;
+  }
+
+  main[data-client-applications-table-fullscreen="1"]
+    .client-tournament-manage__participantTable--fullscreenWide.client-tournament-manage__participantTable--applicationsCompact {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed !important;
+  }
+
+  main[data-client-applications-table-fullscreen="1"]
+    .client-tournament-manage__participantTableColgroup--fullscreen
+    col.participant-col-w-fs--apply {
+    width: 4.5%;
+  }
+  main[data-client-applications-table-fullscreen="1"]
+    .client-tournament-manage__participantTableColgroup--fullscreen
+    col.participant-col-w-fs--name {
+    width: 20%;
+  }
+  main[data-client-applications-table-fullscreen="1"]
+    .client-tournament-manage__participantTableColgroup--fullscreen
+    col.participant-col-w-fs--phone {
+    width: 12%;
+  }
+  main[data-client-applications-table-fullscreen="1"]
+    .client-tournament-manage__participantTableColgroup--fullscreen
+    col.participant-col-w-fs--metric {
+    width: 6%;
+  }
+  main[data-client-applications-table-fullscreen="1"]
+    .client-tournament-manage__participantTableColgroup--fullscreen
+    col.participant-col-w-fs--affiliation {
+    width: 9%;
+  }
+  main[data-client-applications-table-fullscreen="1"]
+    .client-tournament-manage__participantTableColgroup--fullscreen
+    col.participant-col-w-fs--depositor {
+    width: 9%;
+  }
+  main[data-client-applications-table-fullscreen="1"]
+    .client-tournament-manage__participantTableColgroup--fullscreen
+    col.participant-col-w-fs--approveInfo {
+    width: 6%;
+  }
+  main[data-client-applications-table-fullscreen="1"]
+    .client-tournament-manage__participantTableColgroup--fullscreen
+    col.participant-col-w-fs--deposit {
+    width: 7%;
+  }
+  main[data-client-applications-table-fullscreen="1"]
+    .client-tournament-manage__participantTableColgroup--fullscreen
+    col.participant-col-w-fs--approveBtn {
+    width: 13%;
+  }
+  main[data-client-applications-table-fullscreen="1"]
+    .client-tournament-manage__participantTableColgroup--fullscreen
+    col.participant-col-w-fs--reject {
+    width: 13.5%;
+  }
+
+  main[data-client-applications-table-fullscreen="1"]
+    .client-tournament-manage__participantTable--fullscreenWide
+    .participant-th--metric,
+  main[data-client-applications-table-fullscreen="1"]
+    .client-tournament-manage__participantTable--fullscreenWide
+    td.participant-col--metric {
+    min-width: 0 !important;
+  }
+
+  main[data-client-applications-table-fullscreen="1"]
+    .client-tournament-manage__participantTable--fullscreenWide
+    thead
+    th {
+    font-size: 0.72rem !important;
+    padding-top: 0.22rem !important;
+    padding-bottom: 0.22rem !important;
+  }
+
+  main[data-client-applications-table-fullscreen="1"]
+    .client-tournament-manage__participantTable--fullscreenWide
+    tbody
+    td {
+    font-size: 0.74rem !important;
+  }
+
+  main[data-client-applications-table-fullscreen="1"]
+    .client-tournament-manage__participantTable--fullscreenWide
+    .participant-op-hit {
+    min-width: 34px;
+    min-height: 34px;
+  }
 }
