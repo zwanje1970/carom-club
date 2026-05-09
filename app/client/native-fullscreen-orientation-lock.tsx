@@ -2,10 +2,15 @@
 
 import { useEffect } from "react";
 
-type OrientationMode = "landscape" | "portrait";
+/** 브라우저 lock·네이티브 브릿지 공통 요청 모드 */
+export type CaromOrientationRequestMode =
+  | "portrait"
+  | "landscape"
+  | "landscape-primary"
+  | "landscape-secondary";
 
 type CaromOrientationBridge = {
-  requestOrientation?: (mode: OrientationMode) => void;
+  requestOrientation?: (mode: CaromOrientationRequestMode) => void;
   requestLandscape?: () => void;
   requestPortrait?: () => void;
 };
@@ -52,7 +57,7 @@ function logViewport(context: string) {
   }
 }
 
-function requestNativeOrientation(mode: OrientationMode, context: string) {
+function requestNativeOrientation(mode: CaromOrientationRequestMode, context: string) {
   const bridge = (window as OrientationBridgeWindow).CaromAppBridge;
   const hasReq = typeof bridge?.requestOrientation === "function";
   const hasLegacyL = typeof bridge?.requestLandscape === "function";
@@ -70,9 +75,11 @@ function requestNativeOrientation(mode: OrientationMode, context: string) {
       console.info(LOG_TAG, context, "called CaromAppBridge.requestOrientation", mode);
       return;
     }
-    if (mode === "landscape" && hasLegacyL) {
+    const wantsLandscape =
+      mode === "landscape" || mode === "landscape-primary" || mode === "landscape-secondary";
+    if (wantsLandscape && hasLegacyL) {
       bridge!.requestLandscape!();
-      console.info(LOG_TAG, context, "called CaromAppBridge.requestLandscape");
+      console.info(LOG_TAG, context, "called CaromAppBridge.requestLandscape (legacy — 방향 미구분)");
       return;
     }
     if (mode === "portrait" && hasLegacyP) {
@@ -86,9 +93,17 @@ function requestNativeOrientation(mode: OrientationMode, context: string) {
   }
 }
 
-function requestBrowserOrientation(mode: OrientationMode, context: string) {
+/** screen.orientation.lock 에 넘길 Orientation Lock Type */
+function browserLockOrientationType(mode: CaromOrientationRequestMode): string {
+  if (mode === "landscape-primary" || mode === "landscape-secondary" || mode === "portrait") {
+    return mode;
+  }
+  return "landscape";
+}
+
+function requestBrowserOrientation(mode: CaromOrientationRequestMode, context: string) {
   if (hasCaromNativeOrientationBridge()) {
-    console.info(LOG_TAG, context, "skip screen.orientation.lock — CaromAppBridge handles orientation (fixed LANDSCAPE/PORTRAIT)");
+    console.info(LOG_TAG, context, "skip screen.orientation.lock — CaromAppBridge handles orientation");
     return;
   }
   const orientation = typeof screen !== "undefined" ? screen.orientation : null;
@@ -97,17 +112,21 @@ function requestBrowserOrientation(mode: OrientationMode, context: string) {
     console.info(LOG_TAG, context, "screen.orientation.lock unavailable");
     return;
   }
-  void lockable.lock(mode).then(
-    () => console.info(LOG_TAG, context, "screen.orientation.lock resolved", mode),
-    () => console.info(LOG_TAG, context, "screen.orientation.lock rejected", mode),
+  const lockTarget = browserLockOrientationType(mode);
+  void lockable.lock(lockTarget).then(
+    () => console.info(LOG_TAG, context, "screen.orientation.lock resolved", lockTarget),
+    () => console.info(LOG_TAG, context, "screen.orientation.lock rejected", lockTarget),
   );
 }
+
+/** 대진표 등 툴바에서 사용 — 기존 시그니처 유지 */
+export type CaromToolbarOrientationMode = "landscape" | "portrait";
 
 /**
  * `CaromAppBridge.requestOrientation` + 브라우저 lock 시도 — 마운트형 NativeFullscreenOrientationLock과 동일한 경로.
  * 대진표 보기 등에서 버튼으로 가로/세로 전환할 때 사용합니다.
  */
-export function applyCaromOrientationMode(mode: OrientationMode, context: string): void {
+export function applyCaromOrientationMode(mode: CaromToolbarOrientationMode, context: string): void {
   requestNativeOrientation(mode, context);
   requestBrowserOrientation(mode, context);
   if (mode === "portrait" && !hasCaromNativeOrientationBridge()) {
@@ -122,18 +141,27 @@ export function applyCaromOrientationMode(mode: OrientationMode, context: string
 export type NativeFullscreenOrientationLockProps = {
   /** Log prefix — e.g. applications-table-view / bracket-view */
   contextLabel: string;
+  /**
+   * 신청자 가로보기: 노치·펀치홀을 물리적으로 왼쪽에 두는 방향(제스처 바는 오른쪽)으로 고정하려면 landscape-primary.
+   * 기기·OEM에 따라 반대면 landscape-secondary 로 앱에서 바꿀 수 있음. CSS 회전 금지 — 브릿지/lock API만 사용.
+   */
+  landscapeLockMode?: "landscape-primary" | "landscape-secondary";
 };
 
 /**
  * 앱 WebView `CaromAppBridge.requestOrientation` + 브라우저 lock 시도.
  * 클라이언트 대시보드 전체화면(신청자 가로보기·대진표 보기 등)에서만 사용 — 사이트 공개 메인 번들과 무관.
  */
-export default function NativeFullscreenOrientationLock({ contextLabel }: NativeFullscreenOrientationLockProps) {
+export default function NativeFullscreenOrientationLock({
+  contextLabel,
+  landscapeLockMode = "landscape-primary",
+}: NativeFullscreenOrientationLockProps) {
   useEffect(() => {
     const ctx = contextLabel.trim() || "fullscreen";
+    const landscapeMode: CaromOrientationRequestMode = landscapeLockMode;
 
-    requestNativeOrientation("landscape", `${ctx}:mount`);
-    requestBrowserOrientation("landscape", `${ctx}:mount`);
+    requestNativeOrientation(landscapeMode, `${ctx}:mount`);
+    requestBrowserOrientation(landscapeMode, `${ctx}:mount`);
 
     const onOrient = () => logViewport(`${ctx}:orientationchange`);
     window.addEventListener("orientationchange", onOrient);
@@ -163,7 +191,7 @@ export default function NativeFullscreenOrientationLock({ contextLabel }: Native
         logViewport(`${ctx}:after-unmount-retry`);
       }, 160);
     };
-  }, [contextLabel]);
+  }, [contextLabel, landscapeLockMode]);
 
   return null;
 }
