@@ -7,6 +7,7 @@ import {
   getTournamentApplicationListCountsFirestore,
   listTournamentApplicationsListItemsByTournamentIdFirestore,
 } from "../../../../../../lib/server/firestore-tournament-applications";
+import { getTournamentBracketPointerFieldsFirestore } from "../../../../../../lib/server/firestore-tournaments";
 import ClientTournamentParticipantsApplicationsBlock from "../../ClientTournamentParticipantsApplicationsBlock";
 import "../../tournament-manage-ui.css";
 
@@ -28,10 +29,14 @@ export default async function ClientTournamentParticipantsTableViewPage({
   const canView = Boolean(session && tournament.createdBy === viewerId);
   if (!canView) notFound();
 
-  const [entries, participantCountSummary] = await Promise.all([
+  const [entries, participantCountSummary, bracketPtr] = await Promise.all([
     listTournamentApplicationsListItemsByTournamentIdFirestore(id, { limit: 500 }),
     getTournamentApplicationListCountsFirestore(id),
+    getTournamentBracketPointerFieldsFirestore(id),
   ]);
+  const hasActiveBracket =
+    Boolean(bracketPtr?.activeBracketId?.trim()) ||
+    Boolean(bracketPtr?.activeBracketByZoneId && Object.keys(bracketPtr.activeBracketByZoneId).length > 0);
 
   return (
     <main
@@ -47,6 +52,7 @@ export default async function ClientTournamentParticipantsTableViewPage({
         participantCountSummary={participantCountSummary}
         zonesEnabled={tournament.zonesEnabled === true}
         tournamentStatusBadge={tournament.statusBadge}
+        hasActiveBracket={hasActiveBracket}
         variant="fullscreenTable"
       />
     </main>

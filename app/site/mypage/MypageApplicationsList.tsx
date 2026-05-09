@@ -15,6 +15,7 @@ function getStatusLabel(status: string): string {
   if (status === "APPLIED") return "신청 접수";
   if (status === "VERIFYING") return "검증 진행중";
   if (status === "WAITING_PAYMENT") return "입금 필요";
+  if (status === "WAITING") return "대기자";
   if (status === "APPROVED") return "참가 확정";
   if (status === "REJECTED") return "참가 불가";
   return "진행중";

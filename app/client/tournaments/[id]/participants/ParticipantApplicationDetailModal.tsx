@@ -8,6 +8,7 @@ type TournamentApplicationStatus =
   | "APPLIED"
   | "VERIFYING"
   | "WAITING_PAYMENT"
+  | "WAITING"
   | "APPROVED"
   | "REJECTED";
 
@@ -15,6 +16,7 @@ const STATUS_LABELS: Record<TournamentApplicationStatus, string> = {
   APPLIED: "신청자",
   VERIFYING: "신청자",
   WAITING_PAYMENT: "입금대기",
+  WAITING: "대기자",
   APPROVED: "참가자",
   REJECTED: "거절",
 };
@@ -211,6 +213,27 @@ export default function ParticipantApplicationDetailModal({
           <span style={labelStyle}>메모</span>
           <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{adminNote?.trim() || "—"}</span>
         </div>
+
+        {status === "WAITING" ? (
+          <div style={{ marginTop: "0.85rem" }}>
+            <span style={{ ...labelStyle, display: "block", marginBottom: "0.35rem" }}>대기자 처리</span>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
+              <button
+                type="button"
+                className="v3-btn"
+                disabled={pipelineLoading}
+                onClick={() => void pipelineTransition("APPLIED")}
+              >
+                정식 신청 전환
+              </button>
+            </div>
+            {pipelineMsg ? (
+              <p className="v3-muted" style={{ margin: "0.45rem 0 0", fontSize: "0.82rem" }}>
+                {pipelineMsg}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         {status === "APPLIED" || status === "VERIFYING" ? (
           <div style={{ marginTop: "0.85rem" }}>

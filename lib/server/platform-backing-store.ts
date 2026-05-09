@@ -445,6 +445,8 @@ export type TournamentApplicationStatus =
   | "APPLIED"
   | "VERIFYING"
   | "WAITING_PAYMENT"
+  /** 정원 초과 시 사이트 신청 대기자(모집 정원 카운트 제외) */
+  | "WAITING"
   | "APPROVED"
   | "REJECTED";
 
@@ -7934,6 +7936,7 @@ const ALLOWED_TOURNAMENT_APPLICATION_TRANSITIONS: Record<
   APPLIED: ["VERIFYING", "REJECTED"],
   VERIFYING: ["WAITING_PAYMENT", "REJECTED"],
   WAITING_PAYMENT: ["REJECTED"],
+  WAITING: ["APPLIED", "REJECTED"],
   APPROVED: [],
   REJECTED: [],
 };

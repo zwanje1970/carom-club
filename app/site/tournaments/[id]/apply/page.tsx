@@ -38,7 +38,9 @@ export default function SiteTournamentApplyPage() {
     maxParticipants: number;
     entryFee: number;
     confirmedParticipantCount: number;
+    capacityFilledCount: number;
   } | null>(null);
+  const [capacityFullModalOpen, setCapacityFullModalOpen] = useState(false);
   const ocrGateCacheRef = useRef<{ seed: string; result: { ok: boolean; userMessage: string } } | null>(null);
   const proofAreaRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -132,24 +134,29 @@ export default function SiteTournamentApplyPage() {
           maxParticipants?: number;
           entryFee?: number;
           confirmedParticipantCount?: number;
+          capacityFilledCount?: number;
         };
         if (!cancelled && res.ok) {
           setApplicationsClosed(json.applicationsClosed === true);
           const maxP = json.maxParticipants;
           const fee = json.entryFee;
           const confirmed = json.confirmedParticipantCount;
+          const capFilled = json.capacityFilledCount;
           if (
             typeof maxP === "number" &&
             Number.isFinite(maxP) &&
             typeof fee === "number" &&
             Number.isFinite(fee) &&
             typeof confirmed === "number" &&
-            Number.isFinite(confirmed)
+            Number.isFinite(confirmed) &&
+            typeof capFilled === "number" &&
+            Number.isFinite(capFilled)
           ) {
             setApplySummaryMeta({
               maxParticipants: maxP,
               entryFee: fee,
               confirmedParticipantCount: confirmed,
+              capacityFilledCount: capFilled,
             });
           }
         }
@@ -162,8 +169,7 @@ export default function SiteTournamentApplyPage() {
     };
   }, [tournamentId]);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submitApplication(waitlist: boolean) {
     if (!tournamentId || loading || applicationsClosed) return;
 
     const nameTrim = applicantName.trim();
@@ -221,12 +227,18 @@ export default function SiteTournamentApplyPage() {
           proofImage320Url: uploadedProofImage.w320Url,
           proofImage640Url: uploadedProofImage.w640Url,
           proofOriginalUrl: uploadedProofImage.w640Url,
+          waitlist,
         }),
       });
       const result = (await response.json()) as { error?: string };
       if (!response.ok) {
-        setMessage(result.error ?? "신청 저장에 실패했습니다.");
         const err = (result.error ?? "").trim();
+        if (err.includes("참가정원이 되어 신청이 안됩니다")) {
+          setCapacityFullModalOpen(true);
+          setMessage("");
+          return;
+        }
+        setMessage(result.error ?? "신청 저장에 실패했습니다.");
         if (
           err.includes("판독불가") ||
           err.includes("기준 부적합") ||
@@ -239,12 +251,30 @@ export default function SiteTournamentApplyPage() {
         }
         return;
       }
-      setMessage("참가신청이 저장되었습니다.");
+      setCapacityFullModalOpen(false);
+      setMessage(waitlist ? "대기자 신청이 저장되었습니다." : "참가신청이 저장되었습니다.");
     } catch {
       setMessage("참가신청 처리 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!tournamentId || loading || applicationsClosed) return;
+
+    const meta = applySummaryMeta;
+    if (
+      meta &&
+      meta.maxParticipants > 0 &&
+      meta.capacityFilledCount >= meta.maxParticipants
+    ) {
+      setCapacityFullModalOpen(true);
+      return;
+    }
+
+    await submitApplication(false);
   }
 
   async function handleUploadProofImage(file: File) {
@@ -314,6 +344,10 @@ export default function SiteTournamentApplyPage() {
           </p>
           <p style={{ margin: 0, lineHeight: 1.45 }}>
             <span style={{ fontWeight: 700 }}>확정인원</span> {applySummaryMeta.confirmedParticipantCount}명
+          </p>
+          <p style={{ margin: 0, lineHeight: 1.45 }}>
+            <span style={{ fontWeight: 700 }}>모집 배정</span> {applySummaryMeta.capacityFilledCount}명 /{" "}
+            {applySummaryMeta.maxParticipants}명
           </p>
           <p style={{ margin: 0, lineHeight: 1.45 }}>
             <span style={{ fontWeight: 700 }}>참가비</span> {applySummaryMeta.entryFee.toLocaleString("ko-KR")}원
@@ -398,6 +432,61 @@ export default function SiteTournamentApplyPage() {
       </form>
 
       {message ? <p className="v3-muted">{message}</p> : null}
+
+      {capacityFullModalOpen ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 300,
+            background: "rgba(15,23,42,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding:
+              "max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px)) max(1rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px))",
+            boxSizing: "border-box",
+          }}
+          onMouseDown={(ev) => {
+            if (ev.target === ev.currentTarget) setCapacityFullModalOpen(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="참가 정원 안내"
+            className="v3-box v3-stack"
+            style={{
+              maxWidth: "22rem",
+              width: "100%",
+              background: "#fff",
+              borderRadius: "0.65rem",
+              padding: "1rem",
+              gap: "0.65rem",
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <p style={{ margin: 0, fontWeight: 800, lineHeight: 1.45 }}>참가정원이 되어 신청이 안됩니다.</p>
+            <div className="v3-row" style={{ justifyContent: "flex-end", gap: "0.45rem", flexWrap: "wrap" }}>
+              <button type="button" className="v3-btn" onClick={() => setCapacityFullModalOpen(false)}>
+                신청취소
+              </button>
+              <button
+                type="button"
+                className="v3-btn"
+                style={{ fontWeight: 800 }}
+                onClick={() => {
+                  setCapacityFullModalOpen(false);
+                  void submitApplication(true);
+                }}
+              >
+                대기자 신청
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="v3-row">
         <Link prefetch={false} className="v3-btn" href={`/site/tournaments/${tournamentId}`}>

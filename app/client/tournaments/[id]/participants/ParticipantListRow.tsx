@@ -9,6 +9,7 @@ type TournamentApplicationStatus =
   | "APPLIED"
   | "VERIFYING"
   | "WAITING_PAYMENT"
+  | "WAITING"
   | "APPROVED"
   | "REJECTED";
 
@@ -20,6 +21,8 @@ function applicationStatusShortKo(status: TournamentApplicationStatus): string {
       return "확인중";
     case "WAITING_PAYMENT":
       return "입금대기";
+    case "WAITING":
+      return "대기자";
     case "APPROVED":
       return "확정";
     case "REJECTED":
@@ -63,6 +66,7 @@ export default function ParticipantListRow({
   initialClientApplicationApprovedAt,
   attendanceChecked,
   rowLayout = "standard",
+  opButtonPresentation = "icon",
 }: {
   tournamentId: string;
   entryId: string;
@@ -81,6 +85,7 @@ export default function ParticipantListRow({
   initialClientApplicationApprovedAt?: string | null;
   attendanceChecked?: boolean | null;
   rowLayout?: "standard" | "fullscreen";
+  opButtonPresentation?: "icon" | "text";
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<TournamentApplicationStatus>(initialStatus);
@@ -109,6 +114,7 @@ export default function ParticipantListRow({
 
   const terminalRejected = status === "REJECTED";
   const terminalApproved = status === "APPROVED";
+  const terminalWaiting = status === "WAITING";
 
   const depositDone =
     terminalApproved ||
@@ -264,7 +270,7 @@ export default function ParticipantListRow({
   }
 
   function onDepositClick() {
-    if (terminalRejected || terminalApproved) return;
+    if (terminalRejected || terminalApproved || terminalWaiting) return;
     if (!depositDone) {
       runDepositConfirmOptimistic();
       return;
@@ -274,7 +280,7 @@ export default function ParticipantListRow({
   }
 
   function onApproveClick() {
-    if (terminalRejected || terminalApproved) return;
+    if (terminalRejected || terminalApproved || terminalWaiting) return;
     if (!depositDone) return;
     if (!approveDone) {
       void (async () => {
@@ -302,8 +308,58 @@ export default function ParticipantListRow({
     void handleTransition("REJECTED", rejectReason);
   }
 
+  const textOpBtnBase: CSSProperties = {
+    minHeight: 31,
+    minWidth: "3.2rem",
+    padding: "0.14rem 0.28rem",
+    fontSize: "0.68rem",
+    fontWeight: 700,
+    borderRadius: "0.22rem",
+    border: "1px solid #cbd5e1",
+    background: "#fff",
+    color: "#334155",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    touchAction: "manipulation",
+    whiteSpace: "nowrap",
+    boxSizing: "border-box",
+  };
+
   /** ₩ 입금확인 — 빨강 계열, 미완 ○ / 완료 ● */
   function renderWonBtn() {
+    if (opButtonPresentation === "text") {
+      if (terminalWaiting || terminalRejected) {
+        return (
+          <button type="button" disabled style={{ ...textOpBtnBase, opacity: 0.55 }}>
+            입금확인
+          </button>
+        );
+      }
+      if (terminalApproved) {
+        return (
+          <button type="button" disabled style={{ ...textOpBtnBase, opacity: 0.55 }}>
+            입금확인
+          </button>
+        );
+      }
+      const done = depositDone;
+      return (
+        <button
+          type="button"
+          disabled={loading || depositConfirmSaving}
+          style={{
+            ...textOpBtnBase,
+            borderColor: done ? "#dc2626" : "#f87171",
+            color: done ? "#fff" : "#b91c1c",
+            background: done ? "#dc2626" : "#fff",
+          }}
+          onClick={() => onDepositClick()}
+        >
+          입금확인
+        </button>
+      );
+    }
     const done = terminalApproved || depositDone;
     const idleCls = done ? "participant-op-btn participant-op-btn--won participant-op-btn--won-done" : "participant-op-btn participant-op-btn--won participant-op-btn--won-idle";
     if (terminalApproved) {
@@ -319,6 +375,15 @@ export default function ParticipantListRow({
       return (
         <span className="participant-op-hit">
           <button type="button" disabled className="participant-op-btn participant-op-btn--won participant-op-btn--won-muted" aria-label="입금확인(불가)">
+            ₩
+          </button>
+        </span>
+      );
+    }
+    if (terminalWaiting) {
+      return (
+        <span className="participant-op-hit">
+          <button type="button" disabled className="participant-op-btn participant-op-btn--won participant-op-btn--won-muted" aria-label="입금확인(대기자)">
             ₩
           </button>
         </span>
@@ -341,6 +406,45 @@ export default function ParticipantListRow({
 
   /** ✓ 승인 — 초록 계열 */
   function renderCheckBtn() {
+    if (opButtonPresentation === "text") {
+      if (terminalWaiting || terminalRejected) {
+        return (
+          <button type="button" disabled style={{ ...textOpBtnBase, opacity: 0.55 }}>
+            승인
+          </button>
+        );
+      }
+      if (terminalApproved) {
+        return (
+          <button type="button" disabled style={{ ...textOpBtnBase, opacity: 0.55 }}>
+            승인
+          </button>
+        );
+      }
+      if (!depositDone) {
+        return (
+          <button type="button" disabled style={{ ...textOpBtnBase, opacity: 0.55 }}>
+            승인
+          </button>
+        );
+      }
+      const done = approveDone;
+      return (
+        <button
+          type="button"
+          disabled={loading}
+          style={{
+            ...textOpBtnBase,
+            borderColor: done ? "#15803d" : "#86efac",
+            color: done ? "#fff" : "#166534",
+            background: done ? "#15803d" : "#fff",
+          }}
+          onClick={() => onApproveClick()}
+        >
+          승인
+        </button>
+      );
+    }
     if (terminalApproved) {
       return (
         <span className="participant-op-hit">
@@ -354,6 +458,15 @@ export default function ParticipantListRow({
       return (
         <span className="participant-op-hit">
           <button type="button" disabled className="participant-op-btn participant-op-btn--check participant-op-btn--check-muted" aria-label="승인(불가)">
+            ✓
+          </button>
+        </span>
+      );
+    }
+    if (terminalWaiting) {
+      return (
+        <span className="participant-op-hit">
+          <button type="button" disabled className="participant-op-btn participant-op-btn--check participant-op-btn--check-muted" aria-label="승인(대기자)">
             ✓
           </button>
         </span>
@@ -381,6 +494,37 @@ export default function ParticipantListRow({
 
   /** ✕ 취소/거절 — 회색 계열 */
   function renderCrossBtn() {
+    if (opButtonPresentation === "text") {
+      if (terminalApproved) {
+        return (
+          <button type="button" disabled style={{ ...textOpBtnBase, opacity: 0.55 }}>
+            취소
+          </button>
+        );
+      }
+      if (terminalRejected) {
+        return (
+          <button type="button" disabled style={{ ...textOpBtnBase, opacity: 0.55 }}>
+            취소
+          </button>
+        );
+      }
+      return (
+        <button
+          type="button"
+          disabled={loading}
+          style={{
+            ...textOpBtnBase,
+            borderColor: "#64748b",
+            color: "#334155",
+            background: "#fff",
+          }}
+          onClick={() => onCancelRejectClick()}
+        >
+          취소
+        </button>
+      );
+    }
     if (terminalApproved) {
       return (
         <span className="participant-op-hit">
@@ -425,10 +569,15 @@ export default function ParticipantListRow({
       : clientApplicationApprovedAt;
   const approveMd = formatDateSlashMd(approveMdIso);
 
-  const rowBg = terminalRejected ? "#f3f4f6" : "#fff";
+  const rowBg = terminalRejected ? "#f3f4f6" : terminalWaiting ? "#fffbeb" : "#fff";
 
-  const approveInfoCell =
-    terminalRejected ? "—" : approveDone ? approveMd : applicationStatusShortKo(status);
+  const approveInfoCell = terminalRejected
+    ? "—"
+    : terminalWaiting
+      ? "대기자"
+      : approveDone
+        ? approveMd
+        : applicationStatusShortKo(status);
 
   const phoneDisplay = (phone ?? "").trim() || "—";
 

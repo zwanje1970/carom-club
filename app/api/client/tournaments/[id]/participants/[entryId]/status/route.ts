@@ -23,6 +23,7 @@ const ALLOWED_STATUSES: TournamentApplicationStatus[] = [
   "APPLIED",
   "VERIFYING",
   "WAITING_PAYMENT",
+  "WAITING",
   "APPROVED",
   "REJECTED",
 ];

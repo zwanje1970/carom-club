@@ -1,9 +1,28 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
-export default function ParticipantAddSheet({ tournamentId }: { tournamentId: string }) {
+type PendingRegister = {
+  applicantName: string;
+  participantAverage: number;
+  phone: string;
+  adminNote: string;
+};
+
+export default function ParticipantAddSheet({
+  tournamentId,
+  maxParticipants,
+  capacityOccupied,
+  participantsFinalized,
+  hasActiveBracket,
+}: {
+  tournamentId: string;
+  maxParticipants: number;
+  capacityOccupied: number;
+  participantsFinalized: boolean;
+  hasActiveBracket: boolean;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [applicantName, setApplicantName] = useState("");
@@ -11,6 +30,8 @@ export default function ParticipantAddSheet({ tournamentId }: { tournamentId: st
   const [phone, setPhone] = useState("");
   const [adminNote, setAdminNote] = useState("");
   const [loading, setLoading] = useState(false);
+  const [finalizeWarnOpen, setFinalizeWarnOpen] = useState(false);
+  const pendingAfterFinalizeRef = useRef<PendingRegister | null>(null);
 
   function close() {
     setOpen(false);
@@ -18,6 +39,35 @@ export default function ParticipantAddSheet({ tournamentId }: { tournamentId: st
     setParticipantAverage("");
     setPhone("");
     setAdminNote("");
+    setFinalizeWarnOpen(false);
+    pendingAfterFinalizeRef.current = null;
+  }
+
+  async function performRegister(payload: PendingRegister) {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/client/tournaments/${encodeURIComponent(tournamentId)}/participants/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicantName: payload.applicantName,
+          participantAverage: payload.participantAverage,
+          phone: payload.phone,
+          adminNote: payload.adminNote,
+        }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        window.alert(result.error ?? "등록에 실패했습니다.");
+        return;
+      }
+      close();
+      router.refresh();
+    } catch {
+      window.alert("등록 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -33,30 +83,43 @@ export default function ParticipantAddSheet({ tournamentId }: { tournamentId: st
       window.alert("에버를 숫자로 입력해 주세요.");
       return;
     }
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/client/tournaments/${encodeURIComponent(tournamentId)}/participants/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          applicantName: name,
-          participantAverage: avg,
-          phone: phone.trim(),
-          adminNote: adminNote.trim(),
-        }),
-      });
-      const result = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        window.alert(result.error ?? "등록에 실패했습니다.");
-        return;
-      }
-      close();
-      router.refresh();
-    } catch {
-      window.alert("등록 중 오류가 발생했습니다.");
-    } finally {
-      setLoading(false);
+
+    const maxP = Math.floor(Number(maxParticipants));
+    const capOk =
+      !Number.isFinite(maxP) ||
+      maxP <= 0 ||
+      capacityOccupied < maxP ||
+      window.confirm(`모집정원(${maxP}명)을 초과합니다. 그래도 추가하시겠습니까?`);
+
+    if (!capOk) return;
+
+    const payload: PendingRegister = {
+      applicantName: name,
+      participantAverage: avg,
+      phone: phone.trim(),
+      adminNote: adminNote.trim(),
+    };
+
+    if (participantsFinalized) {
+      pendingAfterFinalizeRef.current = payload;
+      setFinalizeWarnOpen(true);
+      return;
     }
+
+    await performRegister(payload);
+  }
+
+  function onFinalizeWarnCancel() {
+    setFinalizeWarnOpen(false);
+    pendingAfterFinalizeRef.current = null;
+  }
+
+  function onFinalizeWarnConfirm() {
+    const p = pendingAfterFinalizeRef.current;
+    setFinalizeWarnOpen(false);
+    pendingAfterFinalizeRef.current = null;
+    if (!p) return;
+    void performRegister(p);
   }
 
   return (
@@ -94,6 +157,7 @@ export default function ParticipantAddSheet({ tournamentId }: { tournamentId: st
               paddingTop: "1rem",
               paddingLeft: "max(1rem, env(safe-area-inset-left, 0px))",
               paddingRight: "max(1rem, env(safe-area-inset-right, 0px))",
+              paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))",
               gap: "0.65rem",
               maxHeight: "88vh",
               overflowY: "auto",
@@ -198,6 +262,65 @@ export default function ParticipantAddSheet({ tournamentId }: { tournamentId: st
               {loading ? "저장 중…" : "저장"}
             </button>
           </form>
+        </div>
+      ) : null}
+
+      {finalizeWarnOpen ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 230,
+            background: "rgba(15,23,42,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding:
+              "max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px)) max(1rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px))",
+            boxSizing: "border-box",
+          }}
+          onMouseDown={(ev) => {
+            if (ev.target === ev.currentTarget) onFinalizeWarnCancel();
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="참가 확정 후 추가 확인"
+            className="v3-box v3-stack"
+            style={{
+              maxWidth: "22rem",
+              width: "100%",
+              background: "#fff",
+              borderRadius: "0.65rem",
+              padding: "1rem",
+              gap: "0.55rem",
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <p style={{ margin: 0, fontWeight: 800, lineHeight: 1.45 }}>
+              이미 참가자가 확정된 상태입니다. 추가하시겠습니까?
+            </p>
+            {hasActiveBracket ? (
+              <>
+                <p className="v3-muted" style={{ margin: 0, fontSize: "0.88rem", lineHeight: 1.45, fontWeight: 600 }}>
+                  대진표를 다시 셔플해야 할 수 있습니다.
+                </p>
+                <p className="v3-muted" style={{ margin: 0, fontSize: "0.88rem", lineHeight: 1.45 }}>
+                  필요 시 대진표를 다시 셔플하세요.
+                </p>
+              </>
+            ) : null}
+            <div className="v3-row" style={{ justifyContent: "flex-end", gap: "0.45rem", flexWrap: "wrap", marginTop: "0.25rem" }}>
+              <button type="button" className="v3-btn" disabled={loading} onClick={() => onFinalizeWarnCancel()}>
+                취소
+              </button>
+              <button type="button" className="v3-btn" disabled={loading} style={{ fontWeight: 800 }} onClick={() => onFinalizeWarnConfirm()}>
+                추가
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
     </>

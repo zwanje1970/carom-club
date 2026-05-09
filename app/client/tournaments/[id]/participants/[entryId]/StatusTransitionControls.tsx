@@ -6,6 +6,7 @@ type TournamentApplicationStatus =
   | "APPLIED"
   | "VERIFYING"
   | "WAITING_PAYMENT"
+  | "WAITING"
   | "APPROVED"
   | "REJECTED";
 
@@ -13,6 +14,7 @@ const STATUS_LABELS: Record<TournamentApplicationStatus, string> = {
   APPLIED: "신청접수",
   VERIFYING: "검토중",
   WAITING_PAYMENT: "입금대기",
+  WAITING: "대기자",
   APPROVED: "참가자",
   REJECTED: "거절",
 };
@@ -27,6 +29,7 @@ const NEXT_STATUS_MAP: Record<TournamentApplicationStatus, TournamentApplication
   APPLIED: ["VERIFYING", "REJECTED"],
   VERIFYING: ["WAITING_PAYMENT", "REJECTED"],
   WAITING_PAYMENT: ["REJECTED"],
+  WAITING: ["APPLIED", "REJECTED"],
   APPROVED: [],
   REJECTED: [],
 };
@@ -88,6 +91,11 @@ export default function StatusTransitionControls({
           입금 대기 단계입니다. 참가 확정은 신청자 관리 목록에서 입금확인·신청 승인 후 &quot;참가자 확정&quot;을 실행할 때 반영됩니다.
         </p>
       ) : null}
+      {status === "WAITING" ? (
+        <p className="v3-muted">
+          정원 초과 대기자입니다. 「정식 신청 전환」 후 목록에서 입금확인·승인을 진행할 수 있습니다.
+        </p>
+      ) : null}
       {nextStatuses.length === 0 ? (
         <p className="v3-muted">이 상태에서는 추가 전이가 없습니다.</p>
       ) : (
@@ -114,7 +122,9 @@ export default function StatusTransitionControls({
             >
               {nextStatus === "REJECTED"
                 ? "거절"
-                : `${STATUS_LABELS[nextStatus]}로 변경`}
+                : status === "WAITING" && nextStatus === "APPLIED"
+                  ? "정식 신청 전환"
+                  : `${STATUS_LABELS[nextStatus]}로 변경`}
             </button>
           ))}
         </div>

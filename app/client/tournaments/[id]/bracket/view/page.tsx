@@ -2,9 +2,10 @@
 
 import dynamic from "next/dynamic";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  findBracketMatchLocation,
   getSliceRoundsFromBracket,
   hasDownstreamRoundsInSlice,
   shuffleScopeForSlice,
@@ -15,6 +16,21 @@ import {
   type BracketLike,
   type MutationFns,
 } from "../bracket-view-server-sync";
+import {
+  appendOfflinePending,
+  applyLocalClearWinner,
+  applyLocalRenamePlayer,
+  applyLocalSwapPlayers,
+  applyLocalWinnerPick,
+  bracketOfflineSegment,
+  readLastGoodBracket,
+  readOfflineDirty,
+  readOfflinePending,
+  replayShuffleRoundFetch,
+  setOfflineDirty,
+  writeLastGoodBracket,
+  writeOfflinePending,
+} from "../bracket-offline-cache";
 import viewStyles from "../bracket-view-page.module.css";
 import { applyCaromOrientationMode } from "../../../../native-fullscreen-orientation-lock";
 
@@ -68,19 +84,41 @@ export default function TournamentBracketBoardViewPage() {
   const [boardSliceKey, setBoardSliceKey] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [boardRemountKey, setBoardRemountKey] = useState(0);
+  const sliceMetaRef = useRef<{ bracketId: string; blockSig: string }>({ bracketId: "", blockSig: "" });
+  const bracketRef = useRef<Bracket | null>(null);
+  const replayRunningRef = useRef(false);
+  const [navigatorOnline, setNavigatorOnline] = useState(
+    typeof navigator !== "undefined" ? navigator.onLine : true,
+  );
+  const [bracketSyncBusy, setBracketSyncBusy] = useState(false);
 
   const bracketZoneQuery = useMemo(() => {
     if (!zonesEnabled || !selectedZoneId) return "";
     return `?zoneId=${encodeURIComponent(selectedZoneId)}`;
   }, [zonesEnabled, selectedZoneId]);
 
-  const loadBracket = useCallback(async () => {
-    if (!tournamentId) return;
-    if (zonesEnabled && !selectedZoneId) {
-      setBracket(null);
-      return;
-    }
+  const storageSeg = useMemo(() => bracketOfflineSegment(zonesEnabled, selectedZoneId), [zonesEnabled, selectedZoneId]);
+
+  useEffect(() => {
+    bracketRef.current = bracket;
+  }, [bracket]);
+
+  useEffect(() => {
+    const up = () => setNavigatorOnline(true);
+    const down = () => setNavigatorOnline(false);
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
+    return () => {
+      window.removeEventListener("online", up);
+      window.removeEventListener("offline", down);
+    };
+  }, []);
+
+  const pullBracketSnapshot = useCallback(async (): Promise<
+    { ok: true; bracket: Bracket | null } | { ok: false; error?: string }
+  > => {
+    if (!tournamentId) return { ok: false, error: "" };
+    if (zonesEnabled && !selectedZoneId) return { ok: false, error: "" };
     try {
       const url = zonesEnabled
         ? `/api/client/tournaments/${tournamentId}/bracket/zones/${encodeURIComponent(selectedZoneId)}`
@@ -88,15 +126,39 @@ export default function TournamentBracketBoardViewPage() {
       const response = await fetch(url, { credentials: "same-origin" });
       const result = (await response.json()) as { bracket?: Bracket | null; error?: string };
       if (!response.ok) {
-        setMessage(result.error ?? "대진표 조회에 실패했습니다.");
-        return;
+        return { ok: false, error: result.error ?? "대진표 조회에 실패했습니다." };
       }
-      setBracket(result.bracket ?? null);
-      setMessage("");
+      return { ok: true, bracket: result.bracket ?? null };
     } catch {
-      setMessage("대진표 조회 중 오류가 발생했습니다.");
+      return { ok: false, error: "대진표 조회 중 오류가 발생했습니다." };
     }
   }, [selectedZoneId, tournamentId, zonesEnabled]);
+
+  const loadBracket = useCallback(async () => {
+    if (!tournamentId) return;
+    if (zonesEnabled && !selectedZoneId) {
+      setBracket(null);
+      return;
+    }
+    const seg = storageSeg;
+    const pulled = await pullBracketSnapshot();
+    if (!pulled.ok) {
+      if (!readOfflineDirty(tournamentId, seg)) {
+        const cached = readLastGoodBracket<Bracket>(tournamentId, seg);
+        setBracket((prev) => (prev == null && cached ? cached : prev));
+      }
+      setMessage("");
+      return;
+    }
+    if (readOfflineDirty(tournamentId, seg)) {
+      setMessage("");
+      return;
+    }
+    setBracket(pulled.bracket);
+    if (pulled.bracket) writeLastGoodBracket(tournamentId, seg, pulled.bracket);
+    else writeLastGoodBracket(tournamentId, seg, null);
+    setMessage("");
+  }, [pullBracketSnapshot, storageSeg, tournamentId, zonesEnabled, selectedZoneId]);
 
   const mutationFns = useMemo<MutationFns>(() => {
     return {
@@ -210,6 +272,151 @@ export default function TournamentBracketBoardViewPage() {
     return hasDownstreamRoundsInSlice(getSliceRoundsFromBracket(b, sliceKey), roundNumber);
   }, []);
 
+  const replayOfflinePending = useCallback(async () => {
+    if (!tournamentId) return;
+    if (zonesEnabled && !selectedZoneId) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+    if (replayRunningRef.current) return;
+    const seg = storageSeg;
+    const ops = readOfflinePending(tournamentId, seg);
+    if (!ops.length) return;
+    try {
+      replayRunningRef.current = true;
+      setBracketSyncBusy(true);
+      let work = bracketRef.current as BracketLike | null;
+      if (!work) return;
+      for (let i = 0; i < ops.length; i += 1) {
+        const op = ops[i]!;
+        if (op.type === "winner_pick") {
+          const rs = await syncWinnerPick({
+            bracket: work,
+            matchId: op.matchId,
+            winnerUserId: op.winnerUserId,
+            roundNumber: op.roundNumber,
+            mut: mutationFns,
+            hasDownstream,
+          });
+          if (!rs.ok) {
+            writeOfflinePending(tournamentId, seg, ops.slice(i));
+            setMessage(rs.error);
+            return;
+          }
+          work = rs.bracket;
+          setBracket(rs.bracket as Bracket);
+        } else if (op.type === "clear_winner") {
+          const rs = await syncClearMatchWinner({
+            bracket: work,
+            matchId: op.matchId,
+            mut: mutationFns,
+            hasDownstream,
+          });
+          if (!rs.ok) {
+            writeOfflinePending(tournamentId, seg, ops.slice(i));
+            setMessage(rs.error);
+            return;
+          }
+          work = rs.bracket;
+          setBracket(rs.bracket as Bracket);
+        } else if (op.type === "rename") {
+          const rs = await syncRenamePlayer({
+            bracket: work,
+            roundNumber: op.roundNumber,
+            matchId: op.matchId,
+            slot: op.slot,
+            displayName: op.displayName,
+            mut: mutationFns,
+            hasDownstream,
+          });
+          if (!rs.ok) {
+            writeOfflinePending(tournamentId, seg, ops.slice(i));
+            setMessage(rs.error);
+            return;
+          }
+          work = rs.bracket;
+          setBracket(rs.bracket as Bracket);
+        } else if (op.type === "swap") {
+          const rs = await syncSwapPlayers({
+            bracket: work,
+            roundNumber: op.roundNumber,
+            first: op.first,
+            second: op.second,
+            mut: mutationFns,
+            hasDownstream,
+          });
+          if (!rs.ok) {
+            writeOfflinePending(tournamentId, seg, ops.slice(i));
+            setMessage(rs.error);
+            return;
+          }
+          work = rs.bracket;
+          setBracket(rs.bracket as Bracket);
+        } else if (op.type === "shuffle_round") {
+          const rs = await replayShuffleRoundFetch({
+            tournamentId,
+            bracketZoneQuery,
+            roundNumber: op.roundNumber,
+            scope: op.scope,
+          });
+          if (!rs.ok) {
+            writeOfflinePending(tournamentId, seg, ops.slice(i));
+            setMessage(rs.error);
+            return;
+          }
+          work = rs.bracket;
+          setBracket(rs.bracket as Bracket);
+        }
+      }
+      writeOfflinePending(tournamentId, seg, []);
+      setOfflineDirty(tournamentId, seg, false);
+      if (work) writeLastGoodBracket(tournamentId, seg, work as Bracket);
+      const pulled = await pullBracketSnapshot();
+      if (pulled.ok && !readOfflineDirty(tournamentId, seg)) {
+        setBracket(pulled.bracket);
+        if (pulled.bracket) writeLastGoodBracket(tournamentId, seg, pulled.bracket);
+      }
+      setMessage("");
+    } finally {
+      setBracketSyncBusy(false);
+      replayRunningRef.current = false;
+    }
+  }, [
+    bracketZoneQuery,
+    hasDownstream,
+    mutationFns,
+    pullBracketSnapshot,
+    selectedZoneId,
+    storageSeg,
+    tournamentId,
+    zonesEnabled,
+  ]);
+
+  useEffect(() => {
+    const run = () => {
+      void replayOfflinePending();
+    };
+    window.addEventListener("online", run);
+    return () => window.removeEventListener("online", run);
+  }, [replayOfflinePending]);
+
+  useEffect(() => {
+    if (!tournamentId) return;
+    if (zonesEnabled && !selectedZoneId) return;
+    const seg = storageSeg;
+    const cached = readLastGoodBracket<Bracket>(tournamentId, seg);
+    if (cached) setBracket((prev) => prev ?? cached);
+  }, [tournamentId, zonesEnabled, selectedZoneId, storageSeg]);
+
+  useEffect(() => {
+    if (!tournamentId) return;
+    if (zonesEnabled && !selectedZoneId) return;
+    const seg = storageSeg;
+    if (!readOfflinePending(tournamentId, seg).length) return;
+    const t = window.setTimeout(() => {
+      void replayOfflinePending();
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [replayOfflinePending, selectedZoneId, storageSeg, tournamentId, zonesEnabled]);
+
   const handleExit = useCallback(() => {
     if (!tournamentId) return;
     router.replace(`/client/tournaments/${tournamentId}`);
@@ -218,10 +425,43 @@ export default function TournamentBracketBoardViewPage() {
   const handlePickWinner = useCallback(
     async (args: { matchId: string; winnerUserId: string; roundNumber: number }) => {
       if (!bracket || !tournamentId || isTournamentClosed || actionBusy) return;
+      const seg = storageSeg;
+      const loc = findBracketMatchLocation(bracket as BracketLike, args.matchId);
+      if (!loc) return;
+      const currentMatch = loc.match;
+      const changingWinner =
+        typeof currentMatch.winnerUserId === "string" &&
+        currentMatch.winnerUserId.trim() !== "" &&
+        currentMatch.winnerUserId !== args.winnerUserId;
+
       setActionBusy(true);
       setSaveState("saving");
       setMessage("");
       try {
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          if (changingWinner) {
+            setSaveState("error");
+            setMessage("승자 변경은 네트워크 연결 후 진행해 주세요.");
+            return;
+          }
+          const next = applyLocalWinnerPick(bracket as BracketLike, args.matchId, args.winnerUserId);
+          if (!next) {
+            setSaveState("error");
+            setMessage("경기 결과를 반영할 수 없습니다.");
+            return;
+          }
+          setBracket(next as Bracket);
+          writeLastGoodBracket(tournamentId, seg, next as Bracket);
+          appendOfflinePending(tournamentId, seg, {
+            type: "winner_pick",
+            matchId: args.matchId,
+            winnerUserId: args.winnerUserId,
+            roundNumber: args.roundNumber,
+          });
+          setOfflineDirty(tournamentId, seg, true);
+          setSaveState("idle");
+          return;
+        }
         const rs = await syncWinnerPick({
           bracket: bracket as BracketLike,
           matchId: args.matchId,
@@ -236,17 +476,38 @@ export default function TournamentBracketBoardViewPage() {
           return;
         }
         setBracket(rs.bracket as Bracket);
-        setBoardRemountKey((k) => k + 1);
-        setSaveState("saved");
-        setMessage(rs.message);
+        writeLastGoodBracket(tournamentId, seg, rs.bracket as Bracket);
+        setOfflineDirty(tournamentId, seg, false);
+        setSaveState("idle");
+        setMessage("");
       } catch {
-        setSaveState("error");
-        setMessage("경기 결과 저장 중 오류가 발생했습니다.");
+        if (changingWinner) {
+          setSaveState("error");
+          setMessage("네트워크 오류 · 승자 변경은 연결 후 다시 시도해 주세요.");
+          return;
+        }
+        const next = applyLocalWinnerPick(bracket as BracketLike, args.matchId, args.winnerUserId);
+        if (next) {
+          setBracket(next as Bracket);
+          writeLastGoodBracket(tournamentId, seg, next as Bracket);
+          appendOfflinePending(tournamentId, seg, {
+            type: "winner_pick",
+            matchId: args.matchId,
+            winnerUserId: args.winnerUserId,
+            roundNumber: args.roundNumber,
+          });
+          setOfflineDirty(tournamentId, seg, true);
+          setSaveState("idle");
+          setMessage("");
+        } else {
+          setSaveState("error");
+          setMessage("경기 결과 저장 중 오류가 발생했습니다.");
+        }
       } finally {
         setActionBusy(false);
       }
     },
-    [actionBusy, bracket, hasDownstream, isTournamentClosed, mutationFns, tournamentId],
+    [actionBusy, bracket, hasDownstream, isTournamentClosed, mutationFns, storageSeg, tournamentId],
   );
 
   const handleSwapPlayers = useCallback(
@@ -256,10 +517,25 @@ export default function TournamentBracketBoardViewPage() {
       second: { matchId: string; slot: "player1" | "player2" };
     }) => {
       if (!bracket || actionBusy || isTournamentClosed) return;
+      const seg = storageSeg;
       setActionBusy(true);
       setSaveState("saving");
       setMessage("");
       try {
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          const next = applyLocalSwapPlayers(bracket as BracketLike, args.roundNumber, args.first, args.second);
+          if (!next) {
+            setSaveState("error");
+            setMessage("선수 위치를 교체할 수 없습니다.");
+            return;
+          }
+          setBracket(next as Bracket);
+          writeLastGoodBracket(tournamentId, seg, next as Bracket);
+          appendOfflinePending(tournamentId, seg, { type: "swap", roundNumber: args.roundNumber, first: args.first, second: args.second });
+          setOfflineDirty(tournamentId, seg, true);
+          setSaveState("idle");
+          return;
+        }
         const rs = await syncSwapPlayers({
           bracket: bracket as BracketLike,
           roundNumber: args.roundNumber,
@@ -274,26 +550,58 @@ export default function TournamentBracketBoardViewPage() {
           return;
         }
         setBracket(rs.bracket as Bracket);
-        setBoardRemountKey((k) => k + 1);
-        setSaveState("saved");
-        setMessage("선수 위치가 교체되었습니다.");
+        writeLastGoodBracket(tournamentId, seg, rs.bracket as Bracket);
+        setOfflineDirty(tournamentId, seg, false);
+        setSaveState("idle");
+        setMessage("");
       } catch {
-        setSaveState("error");
-        setMessage("선수 위치 교체 중 오류가 발생했습니다.");
+        const next = applyLocalSwapPlayers(bracket as BracketLike, args.roundNumber, args.first, args.second);
+        if (next) {
+          setBracket(next as Bracket);
+          writeLastGoodBracket(tournamentId, seg, next as Bracket);
+          appendOfflinePending(tournamentId, seg, { type: "swap", roundNumber: args.roundNumber, first: args.first, second: args.second });
+          setOfflineDirty(tournamentId, seg, true);
+          setSaveState("idle");
+          setMessage("");
+        } else {
+          setSaveState("error");
+          setMessage("선수 위치 교체 중 오류가 발생했습니다.");
+        }
       } finally {
         setActionBusy(false);
       }
     },
-    [actionBusy, bracket, hasDownstream, isTournamentClosed, mutationFns],
+    [actionBusy, bracket, hasDownstream, isTournamentClosed, mutationFns, storageSeg, tournamentId],
   );
 
   const handleRenamePlayer = useCallback(
     async (args: { roundNumber: number; matchId: string; slot: "player1" | "player2"; displayName: string }) => {
       if (!bracket || actionBusy || isTournamentClosed) return;
+      const seg = storageSeg;
       setActionBusy(true);
       setSaveState("saving");
       setMessage("");
       try {
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          const next = applyLocalRenamePlayer(bracket as BracketLike, args.matchId, args.slot, args.displayName);
+          if (!next) {
+            setSaveState("error");
+            setMessage("이름을 수정할 수 없습니다.");
+            return;
+          }
+          setBracket(next as Bracket);
+          writeLastGoodBracket(tournamentId, seg, next as Bracket);
+          appendOfflinePending(tournamentId, seg, {
+            type: "rename",
+            roundNumber: args.roundNumber,
+            matchId: args.matchId,
+            slot: args.slot,
+            displayName: args.displayName,
+          });
+          setOfflineDirty(tournamentId, seg, true);
+          setSaveState("idle");
+          return;
+        }
         const rs = await syncRenamePlayer({
           bracket: bracket as BracketLike,
           roundNumber: args.roundNumber,
@@ -309,26 +617,58 @@ export default function TournamentBracketBoardViewPage() {
           return;
         }
         setBracket(rs.bracket as Bracket);
-        setBoardRemountKey((k) => k + 1);
-        setSaveState("saved");
-        setMessage("선수 이름이 수정되었습니다.");
+        writeLastGoodBracket(tournamentId, seg, rs.bracket as Bracket);
+        setOfflineDirty(tournamentId, seg, false);
+        setSaveState("idle");
+        setMessage("");
       } catch {
-        setSaveState("error");
-        setMessage("선수 이름 수정 중 오류가 발생했습니다.");
+        const next = applyLocalRenamePlayer(bracket as BracketLike, args.matchId, args.slot, args.displayName);
+        if (next) {
+          setBracket(next as Bracket);
+          writeLastGoodBracket(tournamentId, seg, next as Bracket);
+          appendOfflinePending(tournamentId, seg, {
+            type: "rename",
+            roundNumber: args.roundNumber,
+            matchId: args.matchId,
+            slot: args.slot,
+            displayName: args.displayName,
+          });
+          setOfflineDirty(tournamentId, seg, true);
+          setSaveState("idle");
+          setMessage("");
+        } else {
+          setSaveState("error");
+          setMessage("선수 이름 수정 중 오류가 발생했습니다.");
+        }
       } finally {
         setActionBusy(false);
       }
     },
-    [actionBusy, bracket, hasDownstream, isTournamentClosed, mutationFns],
+    [actionBusy, bracket, hasDownstream, isTournamentClosed, mutationFns, storageSeg, tournamentId],
   );
 
   const handleClearMatchWinner = useCallback(
     async (args: { matchId: string }) => {
       if (!bracket || !tournamentId || isTournamentClosed || actionBusy) return;
+      const seg = storageSeg;
       setActionBusy(true);
       setSaveState("saving");
       setMessage("");
       try {
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          const next = applyLocalClearWinner(bracket as BracketLike, args.matchId);
+          if (!next) {
+            setSaveState("error");
+            setMessage("진출을 취소할 수 없습니다.");
+            return;
+          }
+          setBracket(next as Bracket);
+          writeLastGoodBracket(tournamentId, seg, next as Bracket);
+          appendOfflinePending(tournamentId, seg, { type: "clear_winner", matchId: args.matchId });
+          setOfflineDirty(tournamentId, seg, true);
+          setSaveState("idle");
+          return;
+        }
         const rs = await syncClearMatchWinner({
           bracket: bracket as BracketLike,
           matchId: args.matchId,
@@ -341,26 +681,45 @@ export default function TournamentBracketBoardViewPage() {
           return;
         }
         setBracket(rs.bracket as Bracket);
-        setBoardRemountKey((k) => k + 1);
-        setSaveState("saved");
-        setMessage(rs.message);
+        writeLastGoodBracket(tournamentId, seg, rs.bracket as Bracket);
+        setOfflineDirty(tournamentId, seg, false);
+        setSaveState("idle");
+        setMessage("");
       } catch {
-        setSaveState("error");
-        setMessage("진출 취소 중 오류가 발생했습니다.");
+        const next = applyLocalClearWinner(bracket as BracketLike, args.matchId);
+        if (next) {
+          setBracket(next as Bracket);
+          writeLastGoodBracket(tournamentId, seg, next as Bracket);
+          appendOfflinePending(tournamentId, seg, { type: "clear_winner", matchId: args.matchId });
+          setOfflineDirty(tournamentId, seg, true);
+          setSaveState("idle");
+          setMessage("");
+        } else {
+          setSaveState("error");
+          setMessage("진출 취소 중 오류가 발생했습니다.");
+        }
       } finally {
         setActionBusy(false);
       }
     },
-    [actionBusy, bracket, hasDownstream, isTournamentClosed, mutationFns, tournamentId],
+    [actionBusy, bracket, hasDownstream, isTournamentClosed, mutationFns, storageSeg, tournamentId],
   );
 
   const handleShuffleRound = useCallback(
     async (roundNumber: number) => {
       if (!bracket || actionBusy || isTournamentClosed || !tournamentId) return;
+      const seg = storageSeg;
+      const scope = shuffleScopeForSlice(bracket as BracketLike, boardSliceKey);
       setActionBusy(true);
       setSaveState("saving");
       setMessage("");
       try {
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          appendOfflinePending(tournamentId, seg, { type: "shuffle_round", roundNumber, scope });
+          setOfflineDirty(tournamentId, seg, true);
+          setSaveState("idle");
+          return;
+        }
         const res = await fetch(
           `/api/client/tournaments/${tournamentId}/bracket/shuffle-round-one${bracketZoneQuery}`,
           {
@@ -368,7 +727,7 @@ export default function TournamentBracketBoardViewPage() {
             headers: { "Content-Type": "application/json" },
             credentials: "same-origin",
             body: JSON.stringify({
-              scope: shuffleScopeForSlice(bracket as BracketLike, boardSliceKey),
+              scope,
               roundNumber,
             }),
           },
@@ -380,17 +739,20 @@ export default function TournamentBracketBoardViewPage() {
           return;
         }
         setBracket(json.bracket);
-        setBoardRemountKey((k) => k + 1);
-        setSaveState("saved");
-        setMessage(`Round ${roundNumber}이(가) 재배치되었습니다.`);
+        writeLastGoodBracket(tournamentId, seg, json.bracket);
+        setOfflineDirty(tournamentId, seg, false);
+        setSaveState("idle");
+        setMessage("");
       } catch {
-        setSaveState("error");
-        setMessage("현재 라운드 재배치 중 오류가 발생했습니다.");
+        appendOfflinePending(tournamentId, seg, { type: "shuffle_round", roundNumber, scope });
+        setOfflineDirty(tournamentId, seg, true);
+        setSaveState("idle");
+        setMessage("");
       } finally {
         setActionBusy(false);
       }
     },
-    [actionBusy, boardSliceKey, bracket, bracketZoneQuery, isTournamentClosed, tournamentId],
+    [actionBusy, boardSliceKey, bracket, bracketZoneQuery, isTournamentClosed, storageSeg, tournamentId],
   );
 
   useEffect(() => {
@@ -467,17 +829,80 @@ export default function TournamentBracketBoardViewPage() {
     };
   }, []);
 
+  const sliceStorageKey = useMemo(() => {
+    if (!tournamentId || !bracket?.id) return null;
+    const z = zonesEnabled ? selectedZoneId : "-";
+    return `v3:bracketViewSlice:${tournamentId}:${z}:${bracket.id}`;
+  }, [tournamentId, bracket?.id, zonesEnabled, selectedZoneId]);
+
+  const handleBoardSliceChange = useCallback(
+    (next: string | null) => {
+      setBoardSliceKey(next);
+      if (sliceStorageKey && typeof window !== "undefined" && next) {
+        try {
+          sessionStorage.setItem(sliceStorageKey, next);
+        } catch {
+          /* ignore */
+        }
+      }
+    },
+    [sliceStorageKey],
+  );
+
   useEffect(() => {
     if (!bracket) {
       setBoardSliceKey(null);
+      sliceMetaRef.current = { bracketId: "", blockSig: "" };
       return;
     }
-    if (bracket.bracketMode === "multi_block" && bracket.blocks?.[0]) {
-      setBoardSliceKey(`block:${bracket.blocks[0].id}`);
-    } else {
+    if (bracket.bracketMode !== "multi_block" || !bracket.blocks?.[0]) {
       setBoardSliceKey(null);
+      sliceMetaRef.current = { bracketId: bracket.id, blockSig: "" };
+      return;
     }
-  }, [bracket?.id, bracket?.bracketMode, bracket?.blocks]);
+    const blockSig = bracket.blocks.map((b) => b.id).join("|");
+    const { bracketId: prevBracketId, blockSig: prevSig } = sliceMetaRef.current;
+    const structuralChange = prevBracketId !== bracket.id || prevSig !== blockSig;
+    sliceMetaRef.current = { bracketId: bracket.id, blockSig };
+
+    const readStoredSlice = (): string | null => {
+      if (!sliceStorageKey || typeof window === "undefined") return null;
+      try {
+        const raw = sessionStorage.getItem(sliceStorageKey);
+        if (raw === "final" && bracket.finalBlock?.rounds?.length) return "final";
+        if (raw?.startsWith("block:")) {
+          const bid = raw.slice("block:".length);
+          if (bracket.blocks!.some((b) => b.id === bid)) return raw;
+        }
+      } catch {
+        /* ignore */
+      }
+      return null;
+    };
+
+    setBoardSliceKey((prevKey) => {
+      const ids = new Set(bracket.blocks!.map((b) => b.id));
+      const hasFinal = Boolean(bracket.finalBlock?.rounds?.length);
+
+      if (structuralChange) {
+        const stored = readStoredSlice();
+        if (stored) return stored;
+        if (prevKey === "final" && hasFinal) return "final";
+        if (typeof prevKey === "string" && prevKey.startsWith("block:")) {
+          const bid = prevKey.slice("block:".length);
+          if (ids.has(bid)) return prevKey;
+        }
+        return `block:${bracket.blocks![0].id}`;
+      }
+
+      if (prevKey === "final" && hasFinal) return prevKey;
+      if (typeof prevKey === "string" && prevKey.startsWith("block:")) {
+        const bid = prevKey.slice("block:".length);
+        if (ids.has(bid)) return prevKey;
+      }
+      return `block:${bracket.blocks![0].id}`;
+    });
+  }, [bracket, sliceStorageKey]);
 
   const boardBracket = useMemo(() => {
     if (!bracket) return null;
@@ -498,8 +923,15 @@ export default function TournamentBracketBoardViewPage() {
     return { id: `${bracket.id}:${suffix}`, rounds };
   }, [bracket, boardSliceKey]);
 
-  const saveStateText =
-    saveState === "saving" ? "저장 중..." : saveState === "saved" ? "저장됨" : saveState === "error" ? "오류 발생" : "";
+  const viewStateStorageKey = useMemo(() => {
+    if (!tournamentId || !boardBracket) return undefined;
+    const z = zonesEnabled ? selectedZoneId : "-";
+    return `v3:bracketViewUI:${tournamentId}:${z}:${boardBracket.id}`;
+  }, [boardBracket, tournamentId, zonesEnabled, selectedZoneId]);
+
+  const saveStateText = saveState === "saving" ? "저장 중..." : saveState === "error" ? "오류 발생" : "";
+
+  const connectivityHint = !navigatorOnline ? "오프라인" : bracketSyncBusy ? "연결 복구 중" : "";
 
   const bracketViewSlicePicker =
     bracket?.bracketMode === "multi_block" && bracket.blocks?.length
@@ -507,7 +939,7 @@ export default function TournamentBracketBoardViewPage() {
           blocks: bracket.blocks.map((bl) => ({ id: bl.id, label: bl.label })),
           hasFinal: Boolean(bracket.finalBlock?.rounds?.length),
           boardSliceKey,
-          onSliceChange: setBoardSliceKey,
+          onSliceChange: handleBoardSliceChange,
         }
       : null;
 
@@ -572,7 +1004,7 @@ export default function TournamentBracketBoardViewPage() {
           </div>
         ) : boardBracket ? (
           <InteractiveBracketBoard
-            key={`${boardBracket.id}-${boardRemountKey}`}
+            key={boardBracket.id}
             bracket={boardBracket}
             tournamentTitle={tournamentTitle}
             tournamentDate={tournamentDate}
@@ -585,6 +1017,8 @@ export default function TournamentBracketBoardViewPage() {
             bracketViewSlicePicker={bracketViewSlicePicker}
             bracketViewZones={bracketViewZones}
             bracketViewNotice={message}
+            viewStateStorageKey={viewStateStorageKey}
+            connectivityHint={connectivityHint}
             onExit={handleExit}
             onPickWinner={handlePickWinner}
             onClearMatchWinner={handleClearMatchWinner}

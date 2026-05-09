@@ -669,6 +669,8 @@ export default function InteractiveBracketBoard({
   bracketViewSlicePicker = null,
   bracketViewZones = null,
   bracketViewNotice = "",
+  viewStateStorageKey,
+  connectivityHint = "",
   onExit,
 }: {
   bracket: BracketBoardInput;
@@ -692,6 +694,10 @@ export default function InteractiveBracketBoard({
   } | null;
   /** 모바일 등 헤더 없을 때 상태 메시지 */
   bracketViewNotice?: string;
+  /** bracketView: 가로/세로·확대·스크롤 sessionStorage 키(부모에서 고정 문자열) */
+  viewStateStorageKey?: string;
+  /** bracketView: 오프라인·재동기화 등 짧은 연결 상태 문구 */
+  connectivityHint?: string;
   /** 모바일 툴바 나가기 (이동은 부모 handleExit에서 처리) */
   onExit?: () => void;
   onPickWinner?: (args: { matchId: string; winnerUserId: string; roundNumber: number }) => void | Promise<void>;
@@ -751,6 +757,9 @@ export default function InteractiveBracketBoard({
   const [isMobileBracketViewLayout, setIsMobileBracketViewLayout] = useState(false);
   const [bracketViewModal, setBracketViewModal] = useState<null | "slice" | "zone">(null);
   const [toolbarLayoutIsLandscape, setToolbarLayoutIsLandscape] = useState(false);
+
+  const scrollResetSigRef = useRef("");
+  const viewStateHydratedForKeyRef = useRef<string | null>(null);
 
   useLayoutEffect(() => {
     if (typeof window === "undefined" || chromeMode !== "bracketView") {
@@ -1017,8 +1026,86 @@ export default function InteractiveBracketBoard({
   }, []);
 
   useLayoutEffect(() => {
-    scrollViewportToDefault();
-  }, [scrollViewportToDefault, canvasWidth, canvasHeight, bracket, viewMode]);
+    const bracketId = bracket?.id ?? "";
+    const key = viewStateStorageKey;
+
+    if (key && chromeMode === "bracketView" && viewStateHydratedForKeyRef.current !== key) {
+      viewStateHydratedForKeyRef.current = key;
+      try {
+        const raw = sessionStorage.getItem(key);
+        if (raw) {
+          const o = JSON.parse(raw) as {
+            viewMode?: unknown;
+            scale?: unknown;
+            scrollLeft?: unknown;
+            scrollTop?: unknown;
+          };
+          let vmForSig: BoardViewMode = viewMode;
+          const vm = o.viewMode;
+          if (vm === "vertical" || vm === "horizontal" || vm === "dual") {
+            setViewMode(vm);
+            vmForSig = vm;
+          }
+          if (typeof o.scale === "number" && Number.isFinite(o.scale)) {
+            const c = clampScale(o.scale);
+            setScale(c);
+            scaleRef.current = c;
+          }
+          scrollResetSigRef.current = `${bracketId}|${vmForSig}`;
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              const vp = viewportRef.current;
+              if (!vp) return;
+              if (typeof o.scrollLeft === "number" && Number.isFinite(o.scrollLeft)) {
+                vp.scrollLeft = o.scrollLeft;
+              }
+              if (typeof o.scrollTop === "number" && Number.isFinite(o.scrollTop)) {
+                vp.scrollTop = o.scrollTop;
+              }
+            });
+          });
+          return;
+        }
+      } catch {
+        /* ignore corrupt storage */
+      }
+    }
+
+    const sig = `${bracketId}|${viewMode}`;
+    if (scrollResetSigRef.current !== sig) {
+      scrollResetSigRef.current = sig;
+      scrollViewportToDefault();
+    }
+  }, [bracket?.id, chromeMode, clampScale, scrollViewportToDefault, viewMode, viewStateStorageKey]);
+
+  useEffect(() => {
+    if (!viewStateStorageKey || chromeMode !== "bracketView") return;
+    if (typeof window === "undefined") return;
+    const persist = () => {
+      try {
+        const vp = viewportRef.current;
+        if (!vp) return;
+        sessionStorage.setItem(
+          viewStateStorageKey,
+          JSON.stringify({
+            viewMode,
+            scale,
+            scrollLeft: vp.scrollLeft,
+            scrollTop: vp.scrollTop,
+          }),
+        );
+      } catch {
+        /* ignore quota / private mode */
+      }
+    };
+    const id = window.setInterval(persist, 1600);
+    window.addEventListener("pagehide", persist);
+    return () => {
+      window.removeEventListener("pagehide", persist);
+      window.clearInterval(id);
+      persist();
+    };
+  }, [chromeMode, scale, viewMode, viewStateStorageKey]);
 
   const activeLayout = layoutComputed;
 
@@ -1487,6 +1574,9 @@ export default function InteractiveBracketBoard({
           </button>
         ) : null}
         <span className={styles.scaleLabel}>
+          {chromeMode === "bracketView" && connectivityHint.trim()
+            ? `${connectivityHint.trim()} · `
+            : ""}
           {saveStateText ? `${saveStateText} · ` : ""}
           {canvasWidth}×{canvasHeight} · {(scale * 100).toFixed(0)}%
         </span>

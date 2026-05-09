@@ -1039,6 +1039,16 @@
   box-sizing: border-box;
 }
 
+/* 가로보기: 공통 .v3-page max-width(48rem) 제거 — 표 폭 확보, 좌우 safe-area만 유지 */
+main[data-client-applications-table-fullscreen="1"].client-tournament-manage--participants-table-view-page.v3-page {
+  max-width: none;
+  width: 100%;
+  margin: 0 auto;
+  padding-left: max(0.35rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.35rem, env(safe-area-inset-right, 0px));
+  box-sizing: border-box;
+}
+
 .client-tournament-manage.client-tournament-manage--participants-table-view-page > .client-tournament-manage__participantsBlock {
   flex: 1 1 auto;
   min-height: 0;

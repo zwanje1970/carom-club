@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { TournamentApplicationListItem, TournamentStatusBadge } from "../../../../lib/types/entities";
 import type { TournamentEntryQualificationType } from "../../../../lib/tournament-rule-types";
+import {
+  countCapacityOccupiedFromListItems,
+  countPendingOperatorApplicationApproval,
+} from "./client-participant-filter-shared";
 import ParticipantListRow from "./participants/ParticipantListRow";
 import ParticipantAddSheet from "./participants/ParticipantAddSheet";
 import ApplicationsTableOrientationLock from "./participants/ApplicationsTableOrientationLock";
@@ -14,6 +18,7 @@ export type ParticipantCountSummary = {
   approved: number;
   wait: number;
   reject: number;
+  waitingList?: number;
 };
 
 type TournamentZoneListEntry = {
@@ -33,6 +38,7 @@ type Props = {
   participantCountSummary: ParticipantCountSummary;
   zonesEnabled: boolean;
   tournamentStatusBadge: TournamentStatusBadge;
+  hasActiveBracket?: boolean;
   /** 표 전용 전체화면(가로보기) — 항상 넓은 열 구성 */
   variant?: "standard" | "fullscreenTable";
 };
@@ -120,12 +126,14 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   participantCountSummary,
   zonesEnabled,
   tournamentStatusBadge,
+  hasActiveBracket = false,
   variant = "standard",
 }: Props) {
   const router = useRouter();
   const metricColumnTitle = participantMetricColumnTitle(entryQualificationType);
   const [entries, setEntries] = useState<TournamentApplicationListItem[]>(initialEntries);
   const [finalizeBusy, setFinalizeBusy] = useState(false);
+  const [finalizeUnapprovedModalCount, setFinalizeUnapprovedModalCount] = useState<number | null>(null);
   const [bulkApproveBusy, setBulkApproveBusy] = useState(false);
   const [moreLoading, setMoreLoading] = useState(() => participantCountSummary.total > initialEntries.length);
   const fullFetchDoneRef = useRef(false);
@@ -227,8 +235,11 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   const printHref = `/client/tournaments/${encodeURIComponent(tournamentId)}/participants/print`;
   const tableViewHref = `/client/tournaments/${encodeURIComponent(tournamentId)}/participants/table-view`;
   const showFinalize = !CLOSED_BADGES.includes(tournamentStatusBadge);
+  const showCancelFinalize = tournamentStatusBadge === "마감";
   const fullscreenTable = variant === "fullscreenTable";
   const rowLayout = fullscreenTable ? "fullscreen" : "standard";
+  const capacityOccupied = useMemo(() => countCapacityOccupiedFromListItems(entries), [entries]);
+  const waitingListTotal = participantCountSummary.waitingList ?? 0;
 
   async function onBulkApproveDepositConfirmed() {
     if (bulkApproveBusy) return;
@@ -281,8 +292,38 @@ export default function ClientTournamentParticipantsApplicationsBlock({
     }
   }
 
+  async function runFinalizeParticipantsCore() {
+    const pr = await fetch(`/api/client/tournaments/${encodeURIComponent(tournamentId)}/participants/promote-confirmed`, {
+      method: "POST",
+      credentials: "same-origin",
+    });
+    const pj = (await pr.json()) as { error?: string };
+    if (!pr.ok) {
+      window.alert(pj.error ?? "참가자 반영에 실패했습니다.");
+      return;
+    }
+
+    const res = await fetch(`/api/client/tournaments/${encodeURIComponent(tournamentId)}/status-badge`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ statusBadge: "마감" }),
+      credentials: "same-origin",
+    });
+    const data = (await res.json()) as { error?: string };
+    if (!res.ok) {
+      window.alert(data.error ?? "저장에 실패했습니다.");
+      return;
+    }
+    router.refresh();
+  }
+
   async function onFinalizeParticipants() {
     if (finalizeBusy) return;
+    const pendingApproval = countPendingOperatorApplicationApproval(zoneFilteredEntries);
+    if (pendingApproval > 0) {
+      setFinalizeUnapprovedModalCount(pendingApproval);
+      return;
+    }
     if (
       !window.confirm(
         "참가자를 확정하시겠습니까?\n확정 후에는 신청이 마감되며 대진표 생성이 활성화됩니다."
@@ -292,20 +333,34 @@ export default function ClientTournamentParticipantsApplicationsBlock({
     }
     setFinalizeBusy(true);
     try {
-      const pr = await fetch(`/api/client/tournaments/${encodeURIComponent(tournamentId)}/participants/promote-confirmed`, {
+      await runFinalizeParticipantsCore();
+    } catch {
+      window.alert("처리 중 오류가 발생했습니다.");
+    } finally {
+      setFinalizeBusy(false);
+    }
+  }
+
+  async function onCancelFinalizeParticipants() {
+    if (finalizeBusy) return;
+    if (!window.confirm("참가 확정을 취소하고 대회를 「모집중」으로 되돌릴까요?\n참가 확정(APPROVED) 상태였던 신청은 확정 전 단계로 되돌아갑니다.")) {
+      return;
+    }
+    setFinalizeBusy(true);
+    try {
+      const dr = await fetch(`/api/client/tournaments/${encodeURIComponent(tournamentId)}/participants/demote-confirmed`, {
         method: "POST",
         credentials: "same-origin",
       });
-      const pj = (await pr.json()) as { error?: string };
-      if (!pr.ok) {
-        window.alert(pj.error ?? "참가자 반영에 실패했습니다.");
+      const dj = (await dr.json()) as { error?: string };
+      if (!dr.ok) {
+        window.alert(dj.error ?? "취소 처리에 실패했습니다.");
         return;
       }
-
       const res = await fetch(`/api/client/tournaments/${encodeURIComponent(tournamentId)}/status-badge`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ statusBadge: "마감" }),
+        body: JSON.stringify({ statusBadge: "모집중" }),
         credentials: "same-origin",
       });
       const data = (await res.json()) as { error?: string };
@@ -352,8 +407,30 @@ export default function ClientTournamentParticipantsApplicationsBlock({
 
         {!fullscreenTable ? (
           <div className="client-tournament-manage__applicationsOpsBar">
-            <ParticipantAddSheet tournamentId={tournamentId} />
-            {showFinalize ? (
+            <ParticipantAddSheet
+              tournamentId={tournamentId}
+              maxParticipants={maxParticipants}
+              capacityOccupied={capacityOccupied}
+              participantsFinalized={tournamentStatusBadge === "마감"}
+              hasActiveBracket={hasActiveBracket}
+            />
+            {showCancelFinalize ? (
+              <button
+                type="button"
+                className="client-tournament-manage__finalizeParticipantsBtn"
+                disabled={finalizeBusy}
+                onClick={() => void onCancelFinalizeParticipants()}
+                style={{
+                  ...opsBtn,
+                  borderColor: "#b45309",
+                  background: "#fff7ed",
+                  color: "#9a3412",
+                  fontWeight: 800,
+                }}
+              >
+                {finalizeBusy ? "처리 중…" : "참가확정 취소"}
+              </button>
+            ) : showFinalize ? (
               <button
                 type="button"
                 className="client-tournament-manage__finalizeParticipantsBtn"
@@ -450,12 +527,14 @@ export default function ClientTournamentParticipantsApplicationsBlock({
             <span style={{ ...pillBase, background: "#f9fafb", color: "#4b5563", borderColor: "#e5e7eb" }}>
               취소/거절 {participantCountSummary.reject}명
             </span>
+            {waitingListTotal > 0 ? (
+              <span style={{ ...pillBase, background: "#fffbeb", color: "#92400e", borderColor: "#fcd34d" }}>
+                대기자 {waitingListTotal}명
+              </span>
+            ) : null}
           </div>
         ) : (
           <>
-            <p className="v3-muted client-tournament-manage__fullscreenTableMeta">
-              총 {participantCountSummary.total}명 · 승인 {chipApproved}명 · 취소/거절 {participantCountSummary.reject}명
-            </p>
             <div className="client-tournament-manage__fullscreenTableBulkRow">
               <button
                 type="button"
@@ -489,27 +568,37 @@ export default function ClientTournamentParticipantsApplicationsBlock({
             ? "client-tournament-manage__participantTableShell client-tournament-manage__participantTableShell--fullscreenScroll"
             : "client-tournament-manage__participantTableShell client-tournament-manage__participantTableShell--applicationsScroll"
         }
+        style={
+          fullscreenTable
+            ? {
+                paddingLeft: "max(0px, env(safe-area-inset-left, 0px))",
+                paddingRight: "max(0px, env(safe-area-inset-right, 0px))",
+              }
+            : undefined
+        }
       >
-        <p className="client-tournament-manage__applicationsSymbolLegend">
-          <span className="client-tournament-manage__applicationsSymbolLegendItem">
-            <span className="client-tournament-manage__applicationsSymbolLegendGlyph client-tournament-manage__applicationsSymbolLegendGlyph--won">
-              ₩
-            </span>{" "}
-            = 입금확인
-          </span>
-          <span className="client-tournament-manage__applicationsSymbolLegendItem">
-            <span className="client-tournament-manage__applicationsSymbolLegendGlyph client-tournament-manage__applicationsSymbolLegendGlyph--check">
-              ✓
-            </span>{" "}
-            = 승인
-          </span>
-          <span className="client-tournament-manage__applicationsSymbolLegendItem">
-            <span className="client-tournament-manage__applicationsSymbolLegendGlyph client-tournament-manage__applicationsSymbolLegendGlyph--cross">
-              ✕
-            </span>{" "}
-            = 취소/거절
-          </span>
-        </p>
+        {!fullscreenTable ? (
+          <p className="client-tournament-manage__applicationsSymbolLegend">
+            <span className="client-tournament-manage__applicationsSymbolLegendItem">
+              <span className="client-tournament-manage__applicationsSymbolLegendGlyph client-tournament-manage__applicationsSymbolLegendGlyph--won">
+                ₩
+              </span>{" "}
+              = 입금확인
+            </span>
+            <span className="client-tournament-manage__applicationsSymbolLegendItem">
+              <span className="client-tournament-manage__applicationsSymbolLegendGlyph client-tournament-manage__applicationsSymbolLegendGlyph--check">
+                ✓
+              </span>{" "}
+              = 승인
+            </span>
+            <span className="client-tournament-manage__applicationsSymbolLegendItem">
+              <span className="client-tournament-manage__applicationsSymbolLegendGlyph client-tournament-manage__applicationsSymbolLegendGlyph--cross">
+                ✕
+              </span>{" "}
+              = 취소/거절
+            </span>
+          </p>
+        ) : null}
         {zoneFilteredEntries.length === 0 ? (
           <p className="v3-muted" style={{ margin: 0, padding: "0.65rem 0.75rem" }}>
             {participantCountSummary.total === 0
@@ -641,12 +730,77 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     initialClientDepositConfirmedAt={entry.clientDepositConfirmedAt ?? null}
                     initialClientApplicationApprovedAt={entry.clientApplicationApprovedAt ?? null}
                     rowLayout={rowLayout}
+                    opButtonPresentation={fullscreenTable ? "text" : "icon"}
                   />
                 ))}
               </tbody>
             </table>
           </div>
         )}
+        {finalizeUnapprovedModalCount !== null ? (
+          <div
+            role="presentation"
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 240,
+              background: "rgba(15,23,42,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px)) max(1rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px))",
+              boxSizing: "border-box",
+            }}
+            onMouseDown={(ev) => {
+              if (ev.target === ev.currentTarget) setFinalizeUnapprovedModalCount(null);
+            }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="참가 확정 확인"
+              className="v3-box v3-stack"
+              style={{
+                maxWidth: "22rem",
+                width: "100%",
+                background: "#fff",
+                borderRadius: "0.65rem",
+                padding: "1rem",
+                gap: "0.65rem",
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <p style={{ margin: 0, fontWeight: 800, lineHeight: 1.45 }}>
+                미승인자가 {finalizeUnapprovedModalCount}명 있습니다. 그래도 참가자를 확정하시겠습니까?
+              </p>
+              <div className="v3-row" style={{ justifyContent: "flex-end", gap: "0.45rem" }}>
+                <button type="button" className="v3-btn" onClick={() => setFinalizeUnapprovedModalCount(null)}>
+                  취소
+                </button>
+                <button
+                  type="button"
+                  className="v3-btn"
+                  style={{ fontWeight: 800 }}
+                  onClick={() => {
+                    setFinalizeUnapprovedModalCount(null);
+                    setFinalizeBusy(true);
+                    void (async () => {
+                      try {
+                        await runFinalizeParticipantsCore();
+                      } catch {
+                        window.alert("처리 중 오류가 발생했습니다.");
+                      } finally {
+                        setFinalizeBusy(false);
+                      }
+                    })();
+                  }}
+                >
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
         {moreLoading ? (
           <p className="v3-muted" style={{ margin: 0, padding: "0.45rem 0.5rem", fontSize: "0.8rem", textAlign: "center" }}>
             불러오는 중…

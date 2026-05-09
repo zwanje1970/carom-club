@@ -42,6 +42,7 @@ export async function POST(
     proofImage320Url?: unknown;
     proofImage640Url?: unknown;
     proofOriginalUrl?: unknown;
+    waitlist?: unknown;
   } = {};
 
   try {
@@ -83,6 +84,7 @@ export async function POST(
     proofImage320Url: typeof body.proofImage320Url === "string" ? body.proofImage320Url : "",
     proofImage640Url: typeof body.proofImage640Url === "string" ? body.proofImage640Url : "",
     proofOriginalUrl: typeof body.proofOriginalUrl === "string" ? body.proofOriginalUrl : "",
+    waitlist: body.waitlist === true,
   });
 
   if (!result.ok) {

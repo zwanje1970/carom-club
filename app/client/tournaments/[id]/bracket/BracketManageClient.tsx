@@ -10,7 +10,29 @@ import {
   type ShuffleGuardRound,
 } from "../../../../../lib/bracket-shuffle-guards";
 
-import { syncClearMatchWinner, type BracketLike, type MutationFns } from "./bracket-view-server-sync";
+import {
+  syncClearMatchWinner,
+  syncRenamePlayer,
+  syncSwapPlayers,
+  syncWinnerPick,
+  type BracketLike,
+  type MutationFns,
+} from "./bracket-view-server-sync";
+import {
+  appendOfflinePending,
+  applyLocalClearWinner,
+  applyLocalRenamePlayer,
+  applyLocalSwapPlayers,
+  applyLocalWinnerPick,
+  bracketOfflineSegment,
+  readLastGoodBracket,
+  readOfflineDirty,
+  readOfflinePending,
+  replayShuffleRoundFetch,
+  setOfflineDirty,
+  writeLastGoodBracket,
+  writeOfflinePending,
+} from "./bracket-offline-cache";
 import BracketProgressSummaryCard from "./BracketProgressSummaryCard";
 import { roundLabelFromMatchCount } from "./bracket-progress-utils";
 
@@ -224,10 +246,58 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   }, [zonesEnabled, selectedZoneId]);
   const actionQueueRef = useRef<Promise<void>>(Promise.resolve());
   const pendingActionKeysRef = useRef<Set<string>>(new Set());
+  const bracketRef = useRef<Bracket | null>(null);
+  const replayRunningRef = useRef(false);
+  const sliceMetaRefManage = useRef<{ bracketId: string; blockSig: string }>({ bracketId: "", blockSig: "" });
+  const [navigatorOnline, setNavigatorOnline] = useState(
+    typeof navigator !== "undefined" ? navigator.onLine : true,
+  );
+  const [bracketSyncBusy, setBracketSyncBusy] = useState(false);
+  const storageSeg = useMemo(() => bracketOfflineSegment(zonesEnabled, selectedZoneId), [zonesEnabled, selectedZoneId]);
 
   useEffect(() => {
-    setBoardSliceKey(defaultBoardSliceKey(bracket));
-  }, [bracket?.id, bracket?.bracketMode, bracket?.blocks]);
+    bracketRef.current = bracket;
+  }, [bracket]);
+
+  useEffect(() => {
+    const up = () => setNavigatorOnline(true);
+    const down = () => setNavigatorOnline(false);
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
+    return () => {
+      window.removeEventListener("online", up);
+      window.removeEventListener("offline", down);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!bracket) {
+      setBoardSliceKey(null);
+      sliceMetaRefManage.current = { bracketId: "", blockSig: "" };
+      return;
+    }
+    if (bracket.bracketMode !== "multi_block" || !bracket.blocks?.[0]) {
+      setBoardSliceKey(null);
+      sliceMetaRefManage.current = { bracketId: bracket.id, blockSig: "" };
+      return;
+    }
+    const blockSig = bracket.blocks.map((b) => b.id).join("|");
+    const prevM = sliceMetaRefManage.current;
+    const structuralChange = prevM.bracketId !== bracket.id || prevM.blockSig !== blockSig;
+    sliceMetaRefManage.current = { bracketId: bracket.id, blockSig };
+    const ids = new Set(bracket.blocks.map((b) => b.id));
+    setBoardSliceKey((prevKey) => {
+      if (!structuralChange) {
+        if (prevKey === "final" && bracket.finalBlock?.rounds?.length) return prevKey;
+        if (typeof prevKey === "string" && prevKey.startsWith("block:")) {
+          const bid = prevKey.slice("block:".length);
+          if (ids.has(bid)) return prevKey;
+        }
+        return prevKey;
+      }
+      return defaultBoardSliceKey(bracket);
+    });
+  }, [bracket]);
 
   const displayRounds = useMemo(() => {
     if (!bracket) return [];
@@ -288,12 +358,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     }
   }, [tournamentId, zonesEnabled, selectedZoneId]);
 
-  const loadLatestBracket = useCallback(async () => {
-    if (!tournamentId) return;
-    if (zonesEnabled && !selectedZoneId) {
-      setBracket(null);
-      return;
-    }
+  const pullManageBracket = useCallback(async (): Promise<
+    { ok: true; bracket: Bracket | null } | { ok: false; error?: string }
+  > => {
+    if (!tournamentId) return { ok: false, error: "" };
+    if (zonesEnabled && !selectedZoneId) return { ok: false, error: "" };
     try {
       const url = zonesEnabled
         ? `/api/client/tournaments/${tournamentId}/bracket/zones/${encodeURIComponent(selectedZoneId)}`
@@ -301,14 +370,39 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       const response = await fetch(url, { credentials: "same-origin" });
       const result = (await response.json()) as { bracket?: Bracket | null; error?: string };
       if (!response.ok) {
-        setMessage(result.error ?? "대진표 조회에 실패했습니다.");
-        return;
+        return { ok: false, error: result.error ?? "대진표 조회에 실패했습니다." };
       }
-      setBracket(result.bracket ?? null);
+      return { ok: true, bracket: result.bracket ?? null };
     } catch {
-      setMessage("대진표 조회 중 오류가 발생했습니다.");
+      return { ok: false, error: "대진표 조회 중 오류가 발생했습니다." };
     }
-  }, [tournamentId, zonesEnabled, selectedZoneId]);
+  }, [selectedZoneId, tournamentId, zonesEnabled]);
+
+  const loadLatestBracket = useCallback(async () => {
+    if (!tournamentId) return;
+    if (zonesEnabled && !selectedZoneId) {
+      setBracket(null);
+      return;
+    }
+    const seg = storageSeg;
+    const pulled = await pullManageBracket();
+    if (!pulled.ok) {
+      if (!readOfflineDirty(tournamentId, seg)) {
+        const cached = readLastGoodBracket<Bracket>(tournamentId, seg);
+        setBracket((prev) => (prev == null && cached ? cached : prev));
+      }
+      setMessage("");
+      return;
+    }
+    if (readOfflineDirty(tournamentId, seg)) {
+      setMessage("");
+      return;
+    }
+    setBracket(pulled.bracket);
+    if (pulled.bracket) writeLastGoodBracket(tournamentId, seg, pulled.bracket);
+    else writeLastGoodBracket(tournamentId, seg, null);
+    setMessage("");
+  }, [pullManageBracket, storageSeg, tournamentId, zonesEnabled, selectedZoneId]);
 
   useEffect(() => {
     if (!tournamentId) return;
@@ -466,8 +560,8 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
 
   const interactionLocked = isTournamentClosed || zoneFinalizedLocked;
   const canUndo = !interactionLocked && undoStack.length > 0 && !actionLoading;
-  const saveStateText =
-    saveState === "saving" ? "저장 중..." : saveState === "saved" ? "저장됨" : saveState === "error" ? "오류 발생" : "";
+  const saveStateText = saveState === "saving" ? "저장 중..." : saveState === "error" ? "오류 발생" : "";
+  const connectivityHint = !navigatorOnline ? "오프라인" : bracketSyncBusy ? "연결 복구 중" : "";
 
   const enqueueMutation = useCallback(
     (actionKey: string, runner: () => Promise<void>) => {
@@ -612,6 +706,157 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     ],
   );
 
+  const hasDownstreamForSync = useCallback(
+    (b: BracketLike, roundNumber: number, sliceKey: string | null) =>
+      hasDownstreamRounds(b as Bracket, roundNumber, sliceKey),
+    [hasDownstreamRounds],
+  );
+
+  const replayOfflinePendingManage = useCallback(async () => {
+    if (!tournamentId) return;
+    if (zonesEnabled && !selectedZoneId) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+    if (replayRunningRef.current) return;
+    const seg = storageSeg;
+    const ops = readOfflinePending(tournamentId, seg);
+    if (!ops.length) return;
+    try {
+      replayRunningRef.current = true;
+      setBracketSyncBusy(true);
+      let work = bracketRef.current as BracketLike | null;
+      if (!work) return;
+      for (let i = 0; i < ops.length; i += 1) {
+        const op = ops[i]!;
+        if (op.type === "winner_pick") {
+          const rs = await syncWinnerPick({
+            bracket: work,
+            matchId: op.matchId,
+            winnerUserId: op.winnerUserId,
+            roundNumber: op.roundNumber,
+            mut: mutationFnsQuick,
+            hasDownstream: hasDownstreamForSync,
+          });
+          if (!rs.ok) {
+            writeOfflinePending(tournamentId, seg, ops.slice(i));
+            setMessage(rs.error);
+            return;
+          }
+          work = rs.bracket;
+          setBracket(rs.bracket as Bracket);
+        } else if (op.type === "clear_winner") {
+          const rs = await syncClearMatchWinner({
+            bracket: work,
+            matchId: op.matchId,
+            mut: mutationFnsQuick,
+            hasDownstream: hasDownstreamForSync,
+          });
+          if (!rs.ok) {
+            writeOfflinePending(tournamentId, seg, ops.slice(i));
+            setMessage(rs.error);
+            return;
+          }
+          work = rs.bracket;
+          setBracket(rs.bracket as Bracket);
+        } else if (op.type === "rename") {
+          const rs = await syncRenamePlayer({
+            bracket: work,
+            roundNumber: op.roundNumber,
+            matchId: op.matchId,
+            slot: op.slot,
+            displayName: op.displayName,
+            mut: mutationFnsQuick,
+            hasDownstream: hasDownstreamForSync,
+          });
+          if (!rs.ok) {
+            writeOfflinePending(tournamentId, seg, ops.slice(i));
+            setMessage(rs.error);
+            return;
+          }
+          work = rs.bracket;
+          setBracket(rs.bracket as Bracket);
+        } else if (op.type === "swap") {
+          const rs = await syncSwapPlayers({
+            bracket: work,
+            roundNumber: op.roundNumber,
+            first: op.first,
+            second: op.second,
+            mut: mutationFnsQuick,
+            hasDownstream: hasDownstreamForSync,
+          });
+          if (!rs.ok) {
+            writeOfflinePending(tournamentId, seg, ops.slice(i));
+            setMessage(rs.error);
+            return;
+          }
+          work = rs.bracket;
+          setBracket(rs.bracket as Bracket);
+        } else if (op.type === "shuffle_round") {
+          const rs = await replayShuffleRoundFetch({
+            tournamentId,
+            bracketZoneQuery,
+            roundNumber: op.roundNumber,
+            scope: op.scope,
+          });
+          if (!rs.ok) {
+            writeOfflinePending(tournamentId, seg, ops.slice(i));
+            setMessage(rs.error);
+            return;
+          }
+          work = rs.bracket;
+          setBracket(rs.bracket as Bracket);
+        }
+      }
+      writeOfflinePending(tournamentId, seg, []);
+      setOfflineDirty(tournamentId, seg, false);
+      if (work) writeLastGoodBracket(tournamentId, seg, work as Bracket);
+      const pulled = await pullManageBracket();
+      if (pulled.ok && !readOfflineDirty(tournamentId, seg)) {
+        setBracket(pulled.bracket);
+        if (pulled.bracket) writeLastGoodBracket(tournamentId, seg, pulled.bracket);
+      }
+      setMessage("");
+    } finally {
+      setBracketSyncBusy(false);
+      replayRunningRef.current = false;
+    }
+  }, [
+    bracketZoneQuery,
+    hasDownstreamForSync,
+    mutationFnsQuick,
+    pullManageBracket,
+    selectedZoneId,
+    storageSeg,
+    tournamentId,
+    zonesEnabled,
+  ]);
+
+  useEffect(() => {
+    const run = () => {
+      void replayOfflinePendingManage();
+    };
+    window.addEventListener("online", run);
+    return () => window.removeEventListener("online", run);
+  }, [replayOfflinePendingManage]);
+
+  useEffect(() => {
+    if (!tournamentId) return;
+    if (zonesEnabled && !selectedZoneId) return;
+    const seg = storageSeg;
+    const cached = readLastGoodBracket<Bracket>(tournamentId, seg);
+    if (cached) setBracket((prev) => prev ?? cached);
+  }, [tournamentId, zonesEnabled, selectedZoneId, storageSeg]);
+
+  useEffect(() => {
+    if (!tournamentId) return;
+    if (zonesEnabled && !selectedZoneId) return;
+    const seg = storageSeg;
+    if (!readOfflinePending(tournamentId, seg).length) return;
+    const t = window.setTimeout(() => {
+      void replayOfflinePendingManage();
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [replayOfflinePendingManage, selectedZoneId, storageSeg, tournamentId, zonesEnabled]);
+
   const runSetTournamentClosedMutation = useCallback(async () => {
     const response = await fetch(`/api/client/tournaments/${tournamentId}/status-badge`, {
       method: "PATCH",
@@ -670,7 +915,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
         window.localStorage.setItem(zoneKey, "1");
         setZoneFinalizedLocked(true);
         setMessage("권역 결승이 종료되어 읽기 전용으로 잠금되었습니다.");
-        setSaveState("saved");
+        setSaveState("idle");
         return true;
       }
 
@@ -682,7 +927,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       }
       setIsTournamentClosed(true);
       setMessage("결승 종료로 대회가 자동 종료되었습니다.");
-      setSaveState("saved");
+      setSaveState("idle");
       return true;
     },
     [captureBracketImageSnapshot, runSetTournamentClosedMutation, selectedZoneId, tournamentId, zonesEnabled],
@@ -716,8 +961,8 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             return;
           }
           setBracket(rs.bracket as Bracket);
-          setSaveState("saved");
-          setMessage(rs.message);
+          setSaveState("idle");
+          setMessage("");
         } catch {
           rollbackLastUndoSnapshot();
           setSaveState("error");
@@ -773,6 +1018,30 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       pushUndoSnapshot(current);
       setMessage("");
       try {
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          if (changingWinner) {
+            rollbackLastUndoSnapshot();
+            setMessage("승자 변경은 네트워크 연결 후 진행해 주세요.");
+            return;
+          }
+          const next = applyLocalWinnerPick(current as unknown as BracketLike, matchId, winnerUserId);
+          if (!next) {
+            rollbackLastUndoSnapshot();
+            setMessage("경기 결과를 반영할 수 없습니다.");
+            return;
+          }
+          setBracket(next as Bracket);
+          writeLastGoodBracket(tournamentId, storageSeg, next as Bracket);
+          appendOfflinePending(tournamentId, storageSeg, {
+            type: "winner_pick",
+            matchId,
+            winnerUserId,
+            roundNumber: typeof roundNumber === "number" ? roundNumber : currentRound.roundNumber,
+          });
+          setOfflineDirty(tournamentId, storageSeg, true);
+          setSaveState("idle");
+          return;
+        }
         let workingBracket = current;
         if (changingWinner && hasDownstreamRounds(workingBracket, currentRound.roundNumber, winSliceKey)) {
           const resetResult = await runResetAfterMutation(currentRound.roundNumber, winSliceKey);
@@ -804,7 +1073,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           }
           nextBracket = rebuildResult.bracket;
         }
-        let nextMessage = "경기 결과가 반영되었습니다.";
         const sliceAfter = getSliceRoundsFromBracket(nextBracket, winSliceKey);
         const rr =
           typeof roundNumber === "number" ? sliceAfter.find((r) => r.roundNumber === roundNumber) ?? null : null;
@@ -816,21 +1084,49 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           const advResult = await runAdvanceRoundMutation(rr!.roundNumber, winSliceKey);
           if (advResult.ok) {
             nextBracket = advResult.bracket;
-            nextMessage = `경기 결과가 반영되었고 Round ${rr!.roundNumber + 1}이 생성되었습니다.`;
           } else {
-            nextMessage = `경기 결과 반영 완료 · ${advResult.error}`;
+            setBracket(nextBracket);
+            const finalProcessedEarly = await processFinalCompletion(nextBracket);
+            if (!finalProcessedEarly) {
+              setSaveState("error");
+              setMessage(advResult.error);
+            }
+            return;
           }
         }
         setBracket(nextBracket);
+        writeLastGoodBracket(tournamentId, storageSeg, nextBracket);
+        setOfflineDirty(tournamentId, storageSeg, false);
         const finalProcessed = await processFinalCompletion(nextBracket);
         if (!finalProcessed) {
-          setSaveState("saved");
-          setMessage(nextMessage);
+          setSaveState("idle");
+          setMessage("");
         }
       } catch {
-        rollbackLastUndoSnapshot();
-        setSaveState("error");
-        setMessage("경기 결과 저장 중 오류가 발생했습니다.");
+        if (changingWinner) {
+          rollbackLastUndoSnapshot();
+          setSaveState("error");
+          setMessage("네트워크 오류 · 승자 변경은 연결 후 다시 시도해 주세요.");
+          return;
+        }
+        const next = applyLocalWinnerPick(current as unknown as BracketLike, matchId, winnerUserId);
+        if (next) {
+          setBracket(next as Bracket);
+          writeLastGoodBracket(tournamentId, storageSeg, next as Bracket);
+          appendOfflinePending(tournamentId, storageSeg, {
+            type: "winner_pick",
+            matchId,
+            winnerUserId,
+            roundNumber: typeof roundNumber === "number" ? roundNumber : currentRound.roundNumber,
+          });
+          setOfflineDirty(tournamentId, storageSeg, true);
+          setSaveState("idle");
+          setMessage("");
+        } else {
+          rollbackLastUndoSnapshot();
+          setSaveState("error");
+          setMessage("경기 결과 저장 중 오류가 발생했습니다.");
+        }
       }
     });
   }
@@ -855,8 +1151,8 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
         return;
       }
       setBracket(result.bracket);
-      setSaveState("saved");
-      setMessage(`Round ${roundNumber + 1}이 생성되었습니다.`);
+      setSaveState("idle");
+      setMessage("");
     } catch {
       rollbackLastUndoSnapshot();
       setSaveState("error");
@@ -889,7 +1185,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
         return;
       }
       setBracket(json.bracket);
-      setMessage(`Round ${roundNumber}이(가) 재배치되었습니다.`);
+      setMessage("");
     } finally {
       setMultiBlockBusy(false);
     }
@@ -978,7 +1274,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
 
     if (winnerDiffs.length === 0) {
       setUndoStack((prev) => prev.slice(0, -1));
-      setMessage("되돌릴 변경이 없어 스택만 정리했습니다.");
+      setMessage("");
       return;
     }
 
@@ -998,8 +1294,8 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       }
       setBracket(latest);
       setUndoStack((prev) => prev.slice(0, -1));
-      setSaveState("saved");
-      setMessage("되돌리기가 완료되었습니다.");
+      setSaveState("idle");
+      setMessage("");
     } catch {
       setSaveState("error");
       setMessage("되돌리기 처리 중 오류가 발생했습니다.");
@@ -1069,8 +1365,8 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
         next = rebuilt.bracket;
       }
       setBracket(next);
-      setSaveState("saved");
-      setMessage("선수 위치가 교체되었습니다.");
+      setSaveState("idle");
+      setMessage("");
     } catch {
       rollbackLastUndoSnapshot();
       setSaveState("error");
@@ -1107,8 +1403,8 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
         return;
       }
       setBracket(renamed.bracket);
-      setSaveState("saved");
-      setMessage(nextName ? "표시 이름이 반영되었습니다." : "원래 이름으로 되돌렸습니다.");
+      setSaveState("idle");
+      setMessage("");
     } catch {
       rollbackLastUndoSnapshot();
       setSaveState("error");
@@ -1160,7 +1456,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       });
     }
     if (operations.length === 0) {
-      setSaveState("saved");
+      setSaveState("idle");
       setMessage("재배치할 매치가 충분하지 않습니다.");
       return;
     }
@@ -1200,8 +1496,8 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
         next = rebuilt.bracket;
       }
       setBracket(next);
-      setSaveState("saved");
-      setMessage("현재 라운드 재배치가 완료되었습니다.");
+      setSaveState("idle");
+      setMessage("");
     } catch {
       rollbackLastUndoSnapshot();
       setSaveState("error");
@@ -1461,8 +1757,10 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                 </div>
               </section>
             ) : null}
-            {saveStateText || message ? (
+            {connectivityHint || saveStateText || message ? (
               <p className="v3-muted">
+                {connectivityHint}
+                {connectivityHint && (saveStateText || message) ? " · " : ""}
                 {saveStateText}
                 {saveStateText && message ? " · " : ""}
                 {message}
@@ -1689,8 +1987,10 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
         )}
       </section>
 
-      {saveStateText || message ? (
+      {connectivityHint || saveStateText || message ? (
         <p className="v3-muted">
+          {connectivityHint}
+          {connectivityHint && (saveStateText || message) ? " · " : ""}
           {saveStateText}
           {saveStateText && message ? " · " : ""}
           {message}

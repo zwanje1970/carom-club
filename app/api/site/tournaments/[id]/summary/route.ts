@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { countApprovedApplicationsByTournamentIdFirestore } from "../../../../../../lib/server/firestore-tournament-applications";
+import {
+  countApprovedApplicationsByTournamentIdFirestore,
+  countCapacityOccupiedApplicationsForTournamentFirestore,
+} from "../../../../../../lib/server/firestore-tournament-applications";
 import { getTournamentByIdFirestore } from "../../../../../../lib/server/firestore-tournaments";
 import { normalizeTournamentStatusBadge } from "../../../../../../lib/server/platform-backing-store";
 
@@ -17,7 +20,10 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const badge = normalizeTournamentStatusBadge(tournament.statusBadge);
   const applicationsClosed = badge === "마감" || badge === "진행중" || badge === "종료";
 
-  const confirmedParticipantCount = await countApprovedApplicationsByTournamentIdFirestore(tid);
+  const [confirmedParticipantCount, capacityFilledCount] = await Promise.all([
+    countApprovedApplicationsByTournamentIdFirestore(tid),
+    countCapacityOccupiedApplicationsForTournamentFirestore(tid),
+  ]);
 
   return NextResponse.json({
     statusBadge: badge,
@@ -26,5 +32,6 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     maxParticipants: tournament.maxParticipants ?? 24,
     entryFee: tournament.entryFee,
     confirmedParticipantCount,
+    capacityFilledCount,
   });
 }

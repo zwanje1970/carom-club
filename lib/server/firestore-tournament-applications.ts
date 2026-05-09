@@ -49,6 +49,7 @@ function tournamentApplicationToListItem(
     st === "APPLIED" ||
     st === "VERIFYING" ||
     st === "WAITING_PAYMENT" ||
+    st === "WAITING" ||
     st === "APPROVED" ||
     st === "REJECTED"
       ? st
@@ -128,6 +129,7 @@ function tournamentApplicationFromFirestore(id: string, data: Record<string, unk
     st === "APPLIED" ||
     st === "VERIFYING" ||
     st === "WAITING_PAYMENT" ||
+    st === "WAITING" ||
     st === "APPROVED" ||
     st === "REJECTED"
       ? st
@@ -291,20 +293,23 @@ export async function getTournamentApplicationListCountsFirestore(tournamentId: 
   approved: number;
   wait: number;
   reject: number;
+  waitingList: number;
 }> {
   assertClientFirestorePersistenceConfigured();
   const id = tournamentId.trim();
-  if (!id) return { total: 0, approved: 0, wait: 0, reject: 0 };
+  if (!id) return { total: 0, approved: 0, wait: 0, reject: 0, waitingList: 0 };
   const db = getSharedFirestoreDb();
   const col = () => db.collection(COLLECTION).where("tournamentId", "==", id);
-  const [totalSnap, approvedSnap, rejectedSnap, appliedSnap, verifyingSnap, waitingPaySnap] = await Promise.all([
-    col().count().get(),
-    col().where("status", "==", "APPROVED").count().get(),
-    col().where("status", "==", "REJECTED").count().get(),
-    col().where("status", "==", "APPLIED").count().get(),
-    col().where("status", "==", "VERIFYING").count().get(),
-    col().where("status", "==", "WAITING_PAYMENT").count().get(),
-  ]);
+  const [totalSnap, approvedSnap, rejectedSnap, appliedSnap, verifyingSnap, waitingPaySnap, waitingListSnap] =
+    await Promise.all([
+      col().count().get(),
+      col().where("status", "==", "APPROVED").count().get(),
+      col().where("status", "==", "REJECTED").count().get(),
+      col().where("status", "==", "APPLIED").count().get(),
+      col().where("status", "==", "VERIFYING").count().get(),
+      col().where("status", "==", "WAITING_PAYMENT").count().get(),
+      col().where("status", "==", "WAITING").count().get(),
+    ]);
   const wait =
     appliedSnap.data().count + verifyingSnap.data().count + waitingPaySnap.data().count;
   return {
@@ -312,7 +317,34 @@ export async function getTournamentApplicationListCountsFirestore(tournamentId: 
     approved: approvedSnap.data().count,
     wait,
     reject: rejectedSnap.data().count,
+    waitingList: waitingListSnap.data().count,
   };
+}
+
+/** 모집 정원 충족 판단용 — `WAITING`(대기자)·`REJECTED` 제외, 승인 처리된 건·참가 확정 건 포함 */
+export async function countCapacityOccupiedApplicationsForTournamentFirestore(tournamentId: string): Promise<number> {
+  assertClientFirestorePersistenceConfigured();
+  const id = tournamentId.trim();
+  if (!id) return 0;
+  const db = getSharedFirestoreDb();
+  const q = await db
+    .collection(COLLECTION)
+    .where("tournamentId", "==", id)
+    .select("status", "clientApplicationApprovedAt")
+    .get();
+  let n = 0;
+  for (const doc of q.docs) {
+    const d = doc.data() as Record<string, unknown>;
+    const st = d.status;
+    if (st === "REJECTED" || st === "WAITING") continue;
+    if (st === "APPROVED") {
+      n++;
+      continue;
+    }
+    const caa = d.clientApplicationApprovedAt;
+    if (typeof caa === "string" && caa.trim() !== "") n++;
+  }
+  return n;
 }
 
 /** 공개 상세·신청 화면 전용 — 승인(APPROVED) 건수만 aggregate (목록 스냅샷에는 포함하지 않음) */
@@ -383,12 +415,15 @@ export async function createTournamentApplicationFirestore(params: {
   proofImage320Url: string;
   proofImage640Url: string;
   proofOriginalUrl: string;
+  /** 정원 초과 시 대기자 행으로 저장. 일반 신청과 동일 증빙·중복 규칙 */
+  waitlist?: boolean;
 }): Promise<{ ok: true; application: TournamentApplication } | { ok: false; error: string }> {
   assertClientFirestorePersistenceConfigured();
   const applicantName = params.applicantName.trim();
   const phone = params.phone.trim();
   const depositorName = params.depositorName.trim();
   const proofImageId = params.proofImageId.trim();
+  const waitlist = params.waitlist === true;
 
   if (!applicantName) return { ok: false, error: "이름을 입력해 주세요." };
   if (!phone) return { ok: false, error: "전화번호를 입력해 주세요." };
@@ -404,6 +439,14 @@ export async function createTournamentApplicationFirestore(params: {
   const recruitClosed = normalizeTournamentStatusBadge(tournament.statusBadge);
   if (recruitClosed === "마감" || recruitClosed === "진행중" || recruitClosed === "종료") {
     return { ok: false, error: "신청이 마감된 대회입니다." };
+  }
+
+  const maxParticipants = Number(tournament.maxParticipants);
+  if (!waitlist && Number.isFinite(maxParticipants) && maxParticipants > 0) {
+    const occupied = await countCapacityOccupiedApplicationsForTournamentFirestore(params.tournamentId);
+    if (occupied >= maxParticipants) {
+      return { ok: false, error: "참가정원이 되어 신청이 안됩니다." };
+    }
   }
 
   const db = getSharedFirestoreDb();
@@ -426,6 +469,7 @@ export async function createTournamentApplicationFirestore(params: {
   }
 
   const now = new Date().toISOString();
+  const initialStatus: TournamentApplicationStatus = waitlist ? "WAITING" : "APPLIED";
   const application: TournamentApplication = {
     id: randomUUID(),
     tournamentId: params.tournamentId,
@@ -442,7 +486,7 @@ export async function createTournamentApplicationFirestore(params: {
     ocrRawResult: "",
     ocrRequestedAt: null,
     ocrCompletedAt: null,
-    status: "APPLIED",
+    status: initialStatus,
     createdAt: now,
     updatedAt: now,
     statusChangedAt: now,
@@ -559,6 +603,12 @@ export async function patchTournamentApplicationProcessingFirestore(params: {
   if (st === "APPROVED") {
     return { ok: false, error: "참가 확정된 신청은 여기서 변경할 수 없습니다." };
   }
+  if (st === "WAITING") {
+    return {
+      ok: false,
+      error: "대기자 신청은 상세에서 「정식 신청 전환」 후 입금·승인할 수 있습니다.",
+    };
+  }
 
   const now = new Date().toISOString();
   const db = getSharedFirestoreDb();
@@ -621,6 +671,7 @@ export async function promoteOperatorApprovedApplicationsFirestore(params: {
     (a) =>
       a.status !== "APPROVED" &&
       a.status !== "REJECTED" &&
+      a.status !== "WAITING" &&
       typeof a.clientApplicationApprovedAt === "string" &&
       a.clientApplicationApprovedAt.trim() !== ""
   );
@@ -669,6 +720,68 @@ export async function promoteOperatorApprovedApplicationsFirestore(params: {
   }
 
   return { ok: true, promoted: targets.length };
+}
+
+function demoteApprovedApplicationStatus(app: TournamentApplication): TournamentApplicationStatus {
+  const dep =
+    typeof app.clientDepositConfirmedAt === "string" && app.clientDepositConfirmedAt.trim() !== "";
+  return dep ? "WAITING_PAYMENT" : "VERIFYING";
+}
+
+/** 참가 확정(마감) 취소 — `APPROVED` 참가자를 확정 전 상태로 되돌림. 알림 재발송 없음. */
+export async function demoteParticipantConfirmationFirestore(params: {
+  tournamentId: string;
+  zoneIdsFilter?: string[] | null;
+}): Promise<{ ok: true; demoted: number } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const tournamentId = params.tournamentId.trim();
+  if (!tournamentId) {
+    return { ok: false, error: "잘못된 요청입니다." };
+  }
+
+  const tournament = await getTournamentByIdFirestore(tournamentId);
+  if (!tournament) {
+    return { ok: false, error: "대회를 찾을 수 없습니다." };
+  }
+
+  const all = await listTournamentApplicationsByTournamentIdFirestore(tournamentId);
+  const managed =
+    params.zoneIdsFilter != null
+      ? new Set(params.zoneIdsFilter.map((z) => z.trim()).filter(Boolean))
+      : null;
+
+  let targets = all.filter((a) => a.status === "APPROVED");
+  if (managed && managed.size > 0) {
+    targets = targets.filter((a) => {
+      const zid = typeof a.zoneId === "string" ? a.zoneId.trim() : "";
+      return zid && managed.has(zid);
+    });
+  } else if (managed && managed.size === 0) {
+    targets = [];
+  }
+
+  if (targets.length === 0) {
+    return { ok: true, demoted: 0 };
+  }
+
+  const now = new Date().toISOString();
+  const db = getSharedFirestoreDb();
+  const chunkSize = 400;
+  for (let i = 0; i < targets.length; i += chunkSize) {
+    const slice = targets.slice(i, i + chunkSize);
+    const batch = db.batch();
+    for (const t of slice) {
+      const nextSt = demoteApprovedApplicationStatus(t);
+      batch.set(
+        db.collection(COLLECTION).doc(t.id),
+        { status: nextSt, updatedAt: now, statusChangedAt: now },
+        { merge: true },
+      );
+    }
+    await batch.commit();
+  }
+
+  return { ok: true, demoted: targets.length };
 }
 
 export async function updateTournamentApplicationZoneIdFirestore(params: {

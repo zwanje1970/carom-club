@@ -158,7 +158,6 @@ export async function syncWinnerPick(params: {
     nextBracket = rebuildResult.bracket;
   }
 
-  let nextMessage = "경기 결과가 반영되었습니다.";
   const sliceAfter = getSliceRoundsFromBracket(nextBracket, winSliceKey);
   const rr = sliceAfter.find((r) => r.roundNumber === params.roundNumber) ?? null;
   const shouldAdvance =
@@ -170,13 +169,12 @@ export async function syncWinnerPick(params: {
     const advResult = await params.mut.advanceRound(rr.roundNumber, winSliceKey);
     if (advResult.ok) {
       nextBracket = advResult.bracket;
-      nextMessage = `경기 결과가 반영되었고 Round ${rr.roundNumber + 1}이 생성되었습니다.`;
     } else {
-      nextMessage = `경기 결과 반영 완료 · ${advResult.error}`;
+      return { ok: true, bracket: nextBracket, message: advResult.error };
     }
   }
 
-  return { ok: true, bracket: nextBracket, message: nextMessage };
+  return { ok: true, bracket: nextBracket, message: "" };
 }
 
 /** 진출 취소(승자 해제): PATCH winnerUserId null + 필요 시 reset/rebuild */
@@ -194,7 +192,7 @@ export async function syncClearMatchWinner(params: {
     typeof currentMatch.winnerUserId === "string" && currentMatch.winnerUserId.trim() !== "";
 
   if (!hadWinner) {
-    return { ok: true, bracket: params.bracket, message: "이미 승자가 없습니다." };
+    return { ok: true, bracket: params.bracket, message: "" };
   }
 
   let workingBracket = params.bracket;
@@ -214,7 +212,7 @@ export async function syncClearMatchWinner(params: {
     nextBracket = rebuildResult.bracket;
   }
 
-  return { ok: true, bracket: nextBracket, message: "진출이 취소되었습니다." };
+  return { ok: true, bracket: nextBracket, message: "" };
 }
 
 export function shuffleScopeForSlice(

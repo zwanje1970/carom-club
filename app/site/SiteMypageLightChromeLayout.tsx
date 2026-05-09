@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import GlobalHomeButton from "../components/GlobalHomeButton";
-import { isPublicSiteMobileView } from "./components/site-public-mobile-view";
+import { isPublicSiteMobileShell } from "./components/site-public-mobile-view";
 import SiteRootSwipeNav from "./components/SiteRootSwipeNav";
 import SiteVenuesGeolocationNav from "./components/SiteVenuesGeolocationNav";
 import { isSiteMainSamplePathname } from "./lib/site-main-sample";
@@ -27,7 +27,7 @@ export default async function SiteMypageLightChromeLayout({
   children: React.ReactNode;
 }>) {
   const headerStore = await headers();
-  const isMobile = isPublicSiteMobileView(headerStore);
+  const useMobileShell = isPublicSiteMobileShell(headerStore);
   const siteBuilderPreviewHeader = headerStore.get("x-site-builder-preview");
   const nextUrlHeader =
     headerStore.get("next-url") ??
@@ -63,7 +63,7 @@ export default async function SiteMypageLightChromeLayout({
   const mobileTopChrome =
     minimalHeaderInner != null ? <div className="site-shell-pc-header">{minimalHeaderInner}</div> : null;
 
-  if (isMobile || isPageBuilderPreviewRequest) {
+  if (useMobileShell || isPageBuilderPreviewRequest) {
     return (
       <div className={`site-shell site-shell--ua-mobile-site${siteShellSampleClass}`}>
         <SiteVenuesGeolocationNav />

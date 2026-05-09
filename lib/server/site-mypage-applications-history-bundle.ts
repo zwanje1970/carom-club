@@ -44,6 +44,7 @@ export async function buildMypageActiveApplicationRows(userId: string): Promise<
       "APPLIED",
       "VERIFYING",
       "WAITING_PAYMENT",
+      "WAITING",
       "APPROVED",
     ];
     const visibleRows = applicationRows.filter((row) => {
@@ -81,7 +82,9 @@ export async function buildMypageHistoryRows(userId: string): Promise<MypageHist
         const ongoingApplied =
           row.application.status === "APPLIED" && isTournamentOngoing(row.tournament.date);
         const ongoingIncomplete =
-          row.application.status === "VERIFYING" || row.application.status === "WAITING_PAYMENT";
+          row.application.status === "VERIFYING" ||
+          row.application.status === "WAITING_PAYMENT" ||
+          row.application.status === "WAITING";
         const isActiveMypageItem = ongoingApproved || ongoingApplied || ongoingIncomplete;
         return !isActiveMypageItem;
       })
@@ -118,6 +121,7 @@ export async function loadMypageApplicationsHistoryBundleForUserId(userId: strin
       "APPLIED",
       "VERIFYING",
       "WAITING_PAYMENT",
+      "WAITING",
       "APPROVED",
     ];
     const activeRows = joined.filter((row) => {
@@ -146,7 +150,9 @@ export async function loadMypageApplicationsHistoryBundleForUserId(userId: strin
         const ongoingApplied =
           row.application.status === "APPLIED" && isTournamentOngoing(row.tournament.date);
         const ongoingIncomplete =
-          row.application.status === "VERIFYING" || row.application.status === "WAITING_PAYMENT";
+          row.application.status === "VERIFYING" ||
+          row.application.status === "WAITING_PAYMENT" ||
+          row.application.status === "WAITING";
         const isActiveMypageItem = ongoingApproved || ongoingApplied || ongoingIncomplete;
         return !isActiveMypageItem;
       })
