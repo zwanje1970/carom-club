@@ -274,7 +274,7 @@ function TournamentSlideCardPreview({
   const rootClass = [
     styles.cardRoot,
     slideDeck ? styles.cardRootSlideDeck : "",
-    slideDeck && slideDeckAspectFill && !artboardPx ? styles.cardRootSlideDeckAspectFill : "",
+    slideDeck && slideDeckAspectFill ? styles.cardRootSlideDeckAspectFill : "",
     templateCardLayout ? styles.cardRootTemplateLayout : "",
     tournamentPublishedHeightScale ? styles.cardRootTournamentPublishedScale : "",
     item.cardTextShadowEnabled ? styles.cardTextShadowOn : "",
