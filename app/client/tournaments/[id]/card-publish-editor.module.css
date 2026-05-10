@@ -216,6 +216,66 @@
   flex-direction: column;
 }
 
+/*
+ * 보이는 미리보기만: 좁은 폭에서 .previewCardAspectFace 높이(폭×180/440) < 고정 180px 아트보드라
+ * 하단 분리형 흰 띠가 .previewCardWrap overflow 로 잘림 — 캡처용 offscreen(.cardPublishCaptureOffscreen)은 제외.
+ */
+.previewSticky > .previewInner .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"] {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  max-width: 100%;
+  align-self: stretch;
+}
+
+.previewSticky > .previewInner .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"] > :global(article) {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  min-width: 0;
+  max-width: 440px;
+  height: auto;
+  max-height: none;
+  aspect-ratio: 440 / 180;
+  align-self: center;
+}
+
+/* 분리형: media 140 + footer 40 → flex 7 : 2 */
+.previewSticky
+  > .previewInner
+  .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"]
+  > :global(article):has(> footer)
+  > div:first-of-type {
+  flex: 7 0 0;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+}
+
+.previewSticky
+  > .previewInner
+  .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"]
+  > :global(article):has(> footer)
+  > footer {
+  flex: 2 0 0;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+}
+
+/* 전체형: 단일 .media 면만 */
+.previewSticky
+  > .previewInner
+  .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"]
+  > :global(article):not(:has(> footer))
+  > div:first-of-type {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+}
+
 .previewCardWrap {
   flex: 0 1 auto;
   box-sizing: border-box;
