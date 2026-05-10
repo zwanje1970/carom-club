@@ -41,7 +41,7 @@ async function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 }
 
 /**
- * 440×161 고정 아트보드로 카드를 렌더한 뒤 PNG 업로드 → w640/w320 공개 URL.
+ * 440×180 고정 아트보드로 카드를 렌더한 뒤 PNG 업로드 → w640/w320 공개 URL.
  * 메인에서는 호출하지 않는다.
  */
 export async function captureAndUploadTournamentCardSnapshots(item: SlideDeckItem): Promise<{

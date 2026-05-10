@@ -184,7 +184,7 @@
 }
 
 /*
- * 메인 세로 스크롤 광고 덱만: 부모 면(aspect 440/161) 높이에 맞춰 .media가 카드 전체를 채움.
+ * 메인 세로 스크롤 광고 덱만: 부모 면(aspect 440/180) 높이에 맞춰 .media가 카드 전체를 채움.
  * rem 기반 min-height는 면 높이와 불일치해 하단 빈 영역이 생길 수 있어 사용하지 않음.
  */
 .cardRootMainSlideAd.cardRootSlideDeck .media {
@@ -798,29 +798,55 @@ article[data-editor-card-preview="1"] .fullSurfaceFooterPlace {
 }
 
 /*
- * 440×161px 고정 아트보드 — 게시 html2canvas·편집 미리보기 전용.
+ * 440×180px 고정 아트보드 — 게시 html2canvas·편집 미리보기 전용.
+ * 분리형: 상단 배경(.media) 140px + 하단 흰 띠(.cardFooter) 40px.
+ * 전체형: 배경(.media) 180px, footer.cardFooter 없음.
  * 뷰포트 vw 에 의존하지 않도록 템플릿 타이포를 px 로 고정한다.
  */
 .cardRootArtboardPx {
   width: 440px;
-  height: 161px;
+  height: 180px;
   min-width: 440px;
   max-width: 440px;
-  min-height: 161px;
-  max-height: 161px;
+  min-height: 180px;
+  max-height: 180px;
   flex-shrink: 0;
   box-sizing: border-box;
 }
 
 .cardRootArtboardPx.cardRootSlideDeck {
-  height: 161px;
-  min-height: 161px;
+  height: 180px;
+  min-height: 180px;
 }
 
 .cardRootArtboardPx.cardRootSlideDeck.cardRootSlideDeckAspectFill {
-  height: 161px;
+  height: 180px;
   flex: 0 0 auto;
   align-self: flex-start;
+}
+
+/* 아트보드 분리형: media 140px + 흰 띠 40px (날짜·장소 한 줄 · 좌/우 정렬은 기존 .cardFooter flex 유지) */
+.cardRootArtboardPx:not(.cardRootSurfaceFull) > .media {
+  flex: 0 0 140px;
+  height: 140px;
+  min-height: 140px;
+  max-height: 140px;
+}
+
+.cardRootArtboardPx:not(.cardRootSurfaceFull) > .cardFooter {
+  flex: 0 0 40px;
+  height: 40px;
+  min-height: 40px;
+  max-height: 40px;
+  box-sizing: border-box;
+}
+
+/* 아트보드 전체형: 배경 면 전체 180px */
+.cardRootArtboardPx.cardRootSurfaceFull > .media {
+  flex: 1 1 auto;
+  height: 180px;
+  min-height: 180px;
+  max-height: 180px;
 }
 
 .cardRootArtboardPx.cardRootTemplateLayout .classicLead,

@@ -99,6 +99,26 @@
   align-self: stretch;
 }
 
+/*
+ * 440×180 아트보드: 부모(.previewCardAspectFace 체인)의 flex-shrink·min-height:0 때문에 카드가 눌리고
+ * 하단 흰 띠(분리형 footer)가 overflow:hidden 에 잘리는 경우 방지 — 메인 슬라이드 미사용 경로만.
+ */
+.cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"] {
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  min-height: 180px;
+  width: min(100%, 440px);
+  max-width: 100%;
+  align-self: center;
+}
+
+.cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"] > :global(article) {
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  align-self: center;
+  min-width: 0;
+}
+
 /** 미리보기와 동일 규격으로만 DOM 유지 — 화면 밖(html2canvas 전용, 미리보기 레이아웃 불변) */
 .cardPublishCaptureOffscreen {
   position: fixed;
@@ -158,7 +178,7 @@
   padding: 24px 14px;
 }
 
-/* 미리보기 카드 폭 정렬 — 메인과 동일 440:161 면은 .previewCardAspectFace */
+/* 미리보기 카드 폭 정렬 — 메인과 동일 440:180 면은 .previewCardAspectFace */
 .previewCardScaleHost {
   width: 100%;
   max-width: min(100%, var(--slide-card-max-width, 440px));
@@ -170,7 +190,7 @@
 }
 
 /**
- * /site 메인 `.sampleMainCardFaceTournamentDeck` 과 동일 비율(440:161).
+ * /site 메인 `.sampleMainCardFaceTournamentDeck` 과 동일 비율(440:180).
  * 좁은 화면에서 transform scale 대신 폭에 따른 자연 높이로 메인 HTML 카드와 정책 통일.
  */
 .previewCardAspectFace {
@@ -179,9 +199,9 @@
   max-width: min(100%, var(--slide-card-max-width, 440px));
   margin-left: auto;
   margin-right: auto;
-  aspect-ratio: 440 / 161;
+  aspect-ratio: 440 / 180;
   /* 메인 `.sampleMainCardFaceTournamentDeck` 의 min-height 토큰과 동일 식(폭 상한 440px) */
-  min-height: calc(min(100%, var(--slide-card-max-width, 440px)) * 161 / 440);
+  min-height: calc(min(100%, var(--slide-card-max-width, 440px)) * 180 / 440);
   display: flex;
   flex-direction: column;
   align-items: stretch;

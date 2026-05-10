@@ -106,11 +106,10 @@
   overflow-anchor: none;
   --sample-block-ref: 5.75rem;
   /*
-   * 메인 세로 스크롤 카드 면 높이: 폭(컨테이너 cqw, 상한 440px)에 비례 — 좁은 화면에서 rem 고정 높이로 인한 비율 깨짐 방지.
-   * 440:161 ≈ 기존 slideDeck+editorCompact 카드(약 10.08rem 높이 @440px 폭) 비율.
+   * 메인 세로 스크롤 카드 면 높이: 폭(컨테이너 cqw, 상한 440px)에 비례 — 게시 PNG·광고 공통 440:180 슬롯.
    */
   --sample-main-scroll-card-width: min(100%, var(--slide-card-max-width, 440px));
-  --sample-main-card-height: calc(var(--sample-main-scroll-card-width) * 161 / 440);
+  --sample-main-card-height: calc(var(--sample-main-scroll-card-width) * 180 / 440);
   --site-main-tournament-deck-card-height: var(--sample-main-card-height);
   --sample-main-scroll-layout-face-ref-height: var(--sample-main-card-height);
   /* 메인 스크롤: 게시 PNG·광고 업로드 면 공통 — 높이/반경 변경 시 한곳만 조정 */
@@ -251,7 +250,7 @@
   margin-left: auto;
   margin-right: auto;
   height: auto;
-  aspect-ratio: 440 / 161;
+  aspect-ratio: 440 / 180;
   display: flex;
   flex-direction: column;
   /* 뷰포트 토큰과 동일한 바닥 — flex min-height:0 체인으로 면이 깎이지 않게 */

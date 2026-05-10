@@ -3,4 +3,4 @@
  * 메인(`/site`) 면은 이 DOM을 쓰지 않고 저장된 PNG만 표시한다.
  */
 export const TOURNAMENT_CARD_ARTBOARD_WIDTH_PX = 440;
-export const TOURNAMENT_CARD_ARTBOARD_HEIGHT_PX = 161;
+export const TOURNAMENT_CARD_ARTBOARD_HEIGHT_PX = 180;

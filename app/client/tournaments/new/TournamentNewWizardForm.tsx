@@ -560,10 +560,7 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
               ))}
             </div>
           ) : null}
-          <p className="v3-muted" style={{ fontSize: "0.82rem", margin: 0, borderTop: "1px solid #e2e8f0", paddingTop: "0.65rem" }}>
-            상호를 입력하면 등록된 당구장을 검색할 수 있습니다. 목록에서 선택하면 상호·주소·전화가 줄 단위로 채워집니다.
-          </p>
-          <div ref={venueSearchWrapRef} className="v3-stack" style={{ gap: "0.35rem", position: "relative" }}>
+          <div ref={venueSearchWrapRef} className="v3-stack" style={{ gap: "0.35rem", position: "relative", borderTop: "1px solid #e2e8f0", paddingTop: "0.55rem" }}>
             <label className="v3-stack">
               <span>상호</span>
               <input
@@ -721,9 +718,6 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
           <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
             5. 대회 포스터 (선택)
           </h2>
-          <p className="v3-muted" style={{ margin: 0, fontSize: "0.85rem" }}>
-            포스터를 올리면 대회 안내에 함께 표시됩니다. 건너뛰어도 나중에 대회 상세에서 추가할 수 있습니다.
-          </p>
           <input
             ref={posterInputRef}
             type="file"
@@ -818,9 +812,6 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
           <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
             6. 상금
           </h2>
-          <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
-            여러 줄로 합쳐 저장됩니다. (1등 / 2등 / 공동 3등 또는 3등·4등 / 기타)
-          </p>
           <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap" }}>
             <label className="v3-stack" style={{ flex: "1 1 8rem" }}>
               <span>1등</span>
@@ -940,9 +931,6 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
           <h2 className="v3-h2" style={{ fontSize: "1.05rem", margin: 0, marginBottom: "0.55rem" }}>
             8. 증빙 확인
           </h2>
-          <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
-            증빙은 참가 신청 시 <strong>이미지 첨부</strong>로 받습니다. 증빙을 쓰지 않으면 아래에서 「확인 안 함」만 선택하면 됩니다.
-          </p>
           <div
             id="wiz-verify-policy"
             tabIndex={-1}
@@ -1031,11 +1019,8 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
               imageUploadSitePublic
             />
           </div>
-          <div className="v3-stack" style={{ gap: "0.5rem", borderTop: "1px solid #e2e8f0", paddingTop: "0.75rem" }}>
+          <div className="v3-stack" style={{ gap: "0.5rem", borderTop: "1px solid #e2e8f0", paddingTop: "0.65rem" }}>
             <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>대회 장소 안내 (당구장 페이지)</span>
-            <p className="v3-muted" style={{ fontSize: "0.82rem", margin: 0 }}>
-              위 <strong>장소</strong> 문구와 별도로, 계정에 등록된 소속 당구장 안내 페이지로만 연결할 수 있습니다.
-            </p>
             {creatorVenueId ? (
               <>
                 <label className="v3-stack" style={{ gap: "0.35rem", maxWidth: "28rem" }}>
@@ -1056,11 +1041,7 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
                   </div>
                 ) : null}
               </>
-            ) : (
-              <p className="v3-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
-                계정에 등록된 소속 당구장이 없어 CTA를 연결할 수 없습니다. (선택 없음으로 저장됩니다.)
-              </p>
-            )}
+            ) : null}
           </div>
         </section>
       ) : null}

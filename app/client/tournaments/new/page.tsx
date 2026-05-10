@@ -984,13 +984,13 @@ export default function ClientTournamentNewPage() {
           />
         </div>
       ) : null}
-      <p className="v3-muted">
-        {showCreateDone
-          ? "대회 정보는 이미 저장되었습니다. 다음 단계는 선택입니다."
-          : editId
-            ? "기존 대회 정보를 불러왔습니다. 수정 후 저장하면 동일 대회에 반영됩니다."
-            : "대회 생성은 9단계 순서로 진행합니다. 한 번에 하나의 단계만 펼쳐지며, 저장은 마지막 단계에서만 할 수 있습니다. 필수 항목이 비어 있으면 저장되지 않고 해당 단계로 이동합니다."}
-      </p>
+      {showCreateDone || editId ? (
+        <p className="v3-muted">
+          {showCreateDone
+            ? "대회 정보는 이미 저장되었습니다. 다음 단계는 선택입니다."
+            : "기존 대회 정보를 불러왔습니다. 수정 후 저장하면 동일 대회에 반영됩니다."}
+        </p>
+      ) : null}
 
       {editId && editLoading ? (
         <p className="v3-muted" role="status">

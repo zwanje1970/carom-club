@@ -64,6 +64,7 @@ const CardPublishPreviewInner = forwardRef<
   return (
     <div
       ref={ref}
+      data-card-publish-artboard="1"
       className={`${editorStyles.cardPublishCaptureRoot} ${editorStyles.cardPublishCaptureRootFlexFill}`}
     >
       <TournamentSnapshotCardView
