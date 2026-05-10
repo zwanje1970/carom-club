@@ -303,6 +303,7 @@ export default function TournamentBadgeCardManageRow({
           : {}),
         publishedCardImageUrl,
         publishedCardImage320Url,
+        publishedCardImageBackgroundOnly: true,
       }),
     });
     const postData = (await postRes.json()) as {

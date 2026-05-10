@@ -16,6 +16,20 @@ export function appendKoreanWeekdayToDateDisplay(dateStr: string): string {
   return `${core} (${KO_WEEKDAY_SHORT[d.getDay()]})`;
 }
 
+/** `tournament-snapshot-card-view` 의 부제 파싱과 동일(중점 `·` 기준) — 메인 HTML 오버레이용 */
+export function parseTournamentSlideCardSubtitleParts(subtitle: string): {
+  dateText: string;
+  placeText: string;
+} {
+  const parts = subtitle
+    .split("·")
+    .map((v) => v.trim())
+    .filter((v) => v.length > 0);
+  if (parts.length === 0) return { dateText: "-", placeText: "-" };
+  if (parts.length === 1) return { dateText: parts[0] ?? "-", placeText: "-" };
+  return { dateText: parts[0] ?? "-", placeText: parts.slice(1).join(" · ") };
+}
+
 export function buildTournamentPublishedCardSubtitle(params: {
   cardDisplayDate: string;
   cardDisplayLocation: string;

@@ -823,6 +823,8 @@ export type TournamentPublishedCard = {
   publishedCardImageUrl?: string;
   /** 동일 스냅샷의 320 변형(관리·목록용 선택) */
   publishedCardImage320Url?: string;
+  /** true: 게시 PNG가 배경만(글자 제외) — 메인에서 HTML 텍스트 오버레이 */
+  publishedCardImageBackgroundOnly?: boolean;
 };
 
 /** 게시 카드 스냅샷 교체 시 이전 proof 이미지 id — `deleteAfter` 이후 삭제 시도 */
@@ -885,6 +887,8 @@ export type PublishedCardSnapshot = {
   /** 게시 시 카드 본문 640 스냅샷(메인 등에서 우선) */
   publishedCardImageUrl?: string | null;
   publishedCardImage320Url?: string | null;
+  /** 메인: 배경 PNG + HTML 글자 모드 */
+  publishedCardImageBackgroundOnly?: boolean;
 };
 
 export type SitePageBuilderDraftBlock = {
@@ -9337,6 +9341,9 @@ function tournamentPublishedCardToPublishedSnapshot(
   if (typeof t.publishedCardImage320Url === "string" && t.publishedCardImage320Url.trim()) {
     snap.publishedCardImage320Url = t.publishedCardImage320Url.trim();
   }
+  if (t.publishedCardImageBackgroundOnly === true) {
+    snap.publishedCardImageBackgroundOnly = true;
+  }
   return snap;
 }
 
@@ -9370,6 +9377,8 @@ export async function upsertTournamentPublishedCard(params: {
   /** 게시 시에만: 카드 본문 640 스냅샷 URL */
   publishedCardImageUrl?: string | null;
   publishedCardImage320Url?: string | null;
+  /** 게시 PNG가 배경만(텍스트 제외)인 경우 true */
+  publishedCardImageBackgroundOnly?: boolean;
 }): Promise<{ ok: true; snapshot: PublishedCardSnapshot } | { ok: false; error: string }> {
   if (!params.title.trim()) return { ok: false, error: "카드 제목을 입력해 주세요." };
   const title = params.title;
@@ -9555,6 +9564,9 @@ export async function upsertTournamentPublishedCard(params: {
       typeof params.publishedCardImage320Url === "string" ? params.publishedCardImage320Url.trim() : "";
     if (pub640) row.publishedCardImageUrl = pub640;
     if (pub320) row.publishedCardImage320Url = pub320;
+    if (params.publishedCardImageBackgroundOnly === true) {
+      row.publishedCardImageBackgroundOnly = true;
+    }
   }
 
   working.push(row);

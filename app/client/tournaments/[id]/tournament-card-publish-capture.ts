@@ -74,6 +74,8 @@ export async function captureAndUploadTournamentCardSnapshots(item: SlideDeckIte
       suppressLink: true,
       artboardPx: true,
       slideDeckSolidBackdrop: SLIDE_DECK_SOLID_BACKDROPS[0],
+      /** 배경·띠·배지틀만 PNG — 글자는 메인 HTML */
+      isImageCaptureMode: true,
     }),
   );
 

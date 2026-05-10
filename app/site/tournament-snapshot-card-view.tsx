@@ -48,6 +48,8 @@ export type SlideDeckItem = {
   publishedCardImageUrl?: string;
   /** 게시 시 생성한 카드 본문 320 스냅샷 URL — 메인 스크롤 등 목록 표시용 */
   publishedCardImage320Url?: string;
+  /** true: PNG에 글자 미포함(배경만) — 메인에서 HTML 오버레이 */
+  publishedCardImageBackgroundOnly?: boolean;
 };
 
 /** carom-postcard-template-test: TournamentSlideCardPreview.tsx TournamentSlidePreviewItem */
@@ -297,11 +299,11 @@ function TournamentSlideCardPreview({
   const desc2Display = layoutStableSlots && !desc2Text ? "\u00a0" : description2;
 
   const fullOverlayFooter = (
-    <div className={styles.fullSurfaceFooter} style={capHide}>
-      <p className={styles.fullSurfaceFooterDate} style={fullFooterDateStyle}>
+    <div className={styles.fullSurfaceFooter}>
+      <p className={styles.fullSurfaceFooterDate} style={mergeCap(fullFooterDateStyle)}>
         {parsed.dateText}
       </p>
-      <p className={styles.fullSurfaceFooterPlace} style={fullFooterPlaceStyle}>
+      <p className={styles.fullSurfaceFooterPlace} style={mergeCap(fullFooterPlaceStyle)}>
         {parsed.placeText}
       </p>
     </div>
@@ -311,11 +313,11 @@ function TournamentSlideCardPreview({
   const splitPlaceStyle = footerPlaceColor ? { color: footerPlaceColor } : undefined;
 
   const splitFooter = (
-    <footer className={styles.cardFooter} style={capHide}>
-      <p className={styles.footerDate} style={splitDateStyle}>
+    <footer className={styles.cardFooter}>
+      <p className={styles.footerDate} style={mergeCap(splitDateStyle)}>
         {parsed.dateText}
       </p>
-      <p className={styles.footerPlace} style={splitPlaceStyle}>
+      <p className={styles.footerPlace} style={mergeCap(splitPlaceStyle)}>
         {parsed.placeText}
       </p>
     </footer>

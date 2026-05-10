@@ -58,6 +58,9 @@ function publishedCardSnapshotToEditorGetBody(s: PublishedCardSnapshot): Record<
   if (typeof s.tournamentImageOverlayOpacity === "number") {
     out.tournamentImageOverlayOpacity = s.tournamentImageOverlayOpacity;
   }
+  if (s.publishedCardImageBackgroundOnly === true) {
+    out.publishedCardImageBackgroundOnly = true;
+  }
   return out;
 }
 
@@ -133,6 +136,7 @@ export async function POST(request: Request) {
     cardFooterPlaceTextColor?: unknown;
     publishedCardImageUrl?: unknown;
     publishedCardImage320Url?: unknown;
+    publishedCardImageBackgroundOnly?: unknown;
   } = {};
 
   try {
@@ -221,6 +225,7 @@ export async function POST(request: Request) {
     !draftOnly && typeof body.publishedCardImageUrl === "string" ? body.publishedCardImageUrl : undefined;
   const publishedCardImage320Url =
     !draftOnly && typeof body.publishedCardImage320Url === "string" ? body.publishedCardImage320Url : undefined;
+  const publishedCardImageBackgroundOnly = body.publishedCardImageBackgroundOnly === true;
 
   let result: Awaited<ReturnType<typeof upsertTournamentPublishedCard>>;
   try {
@@ -253,6 +258,7 @@ export async function POST(request: Request) {
       ...(cardFooterPlaceTextColor !== undefined ? { cardFooterPlaceTextColor } : {}),
       ...(publishedCardImageUrl !== undefined ? { publishedCardImageUrl } : {}),
       ...(publishedCardImage320Url !== undefined ? { publishedCardImage320Url } : {}),
+      ...(publishedCardImageBackgroundOnly ? { publishedCardImageBackgroundOnly: true as const } : {}),
     });
     console.log("[PUBLISH] after upsert");
   } catch (e) {

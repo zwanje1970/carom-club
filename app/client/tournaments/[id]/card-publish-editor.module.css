@@ -191,7 +191,7 @@
 
 /**
  * /site 메인 `.sampleMainCardFaceTournamentDeck` 과 동일 비율(440:180).
- * 좁은 화면에서 transform scale 대신 폭에 따른 자연 높이로 메인 HTML 카드와 정책 통일.
+ * 오프스크린 캡처·구버전 미리보기: 면 박스만 비율 고정.
  */
 .previewCardAspectFace {
   box-sizing: border-box;
@@ -207,6 +207,60 @@
   align-items: stretch;
 }
 
+/*
+ * 화면 미리보기(card-publish-v2): 내부는 항상 440×180 고정 DOM — 좁은 폭에서는 통째로 scale.
+ * 줄바꿈·ellipsis·분리형 footer는 캡처 PNG와 동일해야 함.
+ */
+.previewCardAspectFace.previewCardAspectFaceScaledPreview {
+  container-type: inline-size;
+  container-name: card-publish-v2-preview;
+  aspect-ratio: unset;
+  min-height: unset;
+  height: auto;
+  display: block;
+}
+
+.previewCardScaleClip {
+  width: min(100cqw, 440px);
+  height: calc(min(100cqw, 440px) * 180 / 440);
+  overflow: hidden;
+  margin-inline: auto;
+  box-sizing: border-box;
+}
+
+.previewCardScaleInner {
+  width: 440px;
+  height: 180px;
+  transform-origin: top left;
+  transform: scale(calc(min(100cqw, 440px) / 440px));
+  box-sizing: border-box;
+}
+
+.previewCardScaleInner .previewCardWrap.previewCardWrapV2Chrome {
+  width: 440px;
+  height: 180px;
+  max-width: none;
+  flex: none;
+  min-height: 0;
+}
+
+.previewCardScaleInner .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"] {
+  width: 440px;
+  max-width: 440px;
+  min-height: 180px;
+  height: 180px;
+  flex: 0 0 auto;
+  align-self: flex-start;
+}
+
+.previewCardScaleInner .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"] > :global(article) {
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  align-self: flex-start;
+  min-width: 440px;
+  width: 440px;
+}
+
 .previewCardAspectFace > .previewCardWrap {
   flex: 1 1 auto;
   min-height: 0;
@@ -216,64 +270,10 @@
   flex-direction: column;
 }
 
-/*
- * 보이는 미리보기만: 좁은 폭에서 .previewCardAspectFace 높이(폭×180/440) < 고정 180px 아트보드라
- * 하단 분리형 흰 띠가 .previewCardWrap overflow 로 잘림 — 캡처용 offscreen(.cardPublishCaptureOffscreen)은 제외.
- */
-.previewSticky > .previewInner .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"] {
+.previewCardAspectFace > .previewCardWrap.previewCardWrapV2Chrome {
   flex: 1 1 auto;
-  min-height: 0;
-  height: 100%;
-  width: 100%;
-  max-width: 100%;
-  align-self: stretch;
-}
-
-.previewSticky > .previewInner .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"] > :global(article) {
-  flex: 1 1 auto;
-  min-height: 0;
-  width: 100%;
-  min-width: 0;
-  max-width: 440px;
-  height: auto;
-  max-height: none;
-  aspect-ratio: 440 / 180;
-  align-self: center;
-}
-
-/* 분리형: media 140 + footer 40 → flex 7 : 2 */
-.previewSticky
-  > .previewInner
-  .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"]
-  > :global(article):has(> footer)
-  > div:first-of-type {
-  flex: 7 0 0;
-  height: auto;
-  min-height: 0;
-  max-height: none;
-}
-
-.previewSticky
-  > .previewInner
-  .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"]
-  > :global(article):has(> footer)
-  > footer {
-  flex: 2 0 0;
-  height: auto;
-  min-height: 0;
-  max-height: none;
-}
-
-/* 전체형: 단일 .media 면만 */
-.previewSticky
-  > .previewInner
-  .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"]
-  > :global(article):not(:has(> footer))
-  > div:first-of-type {
-  flex: 1 1 auto;
-  height: auto;
-  min-height: 0;
-  max-height: none;
+  flex-shrink: 0;
+  min-height: 100%;
 }
 
 .previewCardWrap {
@@ -691,6 +691,20 @@
 
   :global(main[data-card-publish-v2="1"]) .surfaceTemplateRow {
     margin-bottom: 8px;
+  }
+
+  /*
+   * 미리보기 카드 폭 = min(440, 본문 폭). 모바일에서 v3-page·pageWrap 좌우 패딩 합이 크면
+   * 실제 면이 과소해져 440:180 대비 높이도 작아 보임 — 게시 v2만 패딩 완화.
+   */
+  :global(main[data-card-publish-v2="1"]).v3-page {
+    padding-left: max(0.35rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.35rem, env(safe-area-inset-right, 0px));
+  }
+
+  .pageWrap.pageWrapV2 {
+    padding-left: 0.35rem;
+    padding-right: 0.35rem;
   }
 
   :global(main[data-card-publish-v2="1"]) .pageWrapV2 .previewSticky {

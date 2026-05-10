@@ -1,0 +1,28 @@
+/**
+ * 메인 스크롤 대회 카드: 배경 PNG 위 HTML 텍스트.
+ * 좌표계는 440×100cqw 스케일 — 아트보드 타이포는 tournament-slide-card-previews.module.css 재사용.
+ */
+.overlayHost {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  container-type: inline-size;
+  container-name: main-tournament-card-overlay;
+}
+
+.overlayScaleWrap {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  box-sizing: border-box;
+}
+
+.overlayArtboard {
+  width: 440px;
+  flex-shrink: 0;
+  transform-origin: top center;
+  transform: scale(calc(100cqw / 440px));
+}

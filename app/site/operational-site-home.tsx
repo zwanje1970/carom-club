@@ -20,6 +20,7 @@ import SiteShellFrame from "./components/SiteShellFrame";
 import SiteMainLogo from "./components/SiteMainLogo";
 import { MainSiteScrollCards, type MainSiteScrollCardItem } from "./main-site-scroll-cards";
 import type { SlideDeckItem } from "./tournament-snapshot-card-view";
+import type { MainSiteTournamentCardTextOverlayPayload } from "./main-site-tournament-card-text-overlay";
 
 /** `/site` 표시만 제외 — 병합·저장 API는 그대로 두고 테스트용 메인 슬라이드 광고 제목만 숨김 */
 function isMainSitePosterTestSlideItem(item: SlideDeckItem): boolean {
@@ -111,6 +112,24 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
         const published640 = (item.publishedCardImageUrl ?? "").trim();
         const published320 = (item.publishedCardImage320Url ?? "").trim();
         const scrollImg = published320 || published640;
+        const tournamentCardTextOverlay: MainSiteTournamentCardTextOverlayPayload | undefined =
+          item.publishedCardImageBackgroundOnly === true && scrollImg
+            ? {
+                cardTemplate: item.cardTemplate ?? "A",
+                surfaceLayout: item.cardSurfaceLayout === "full" ? "full" : "split",
+                title: item.title,
+                subtitle: item.subtitle,
+                cardExtraLine1: item.cardExtraLine1 ?? null,
+                cardExtraLine2: item.cardExtraLine2 ?? null,
+                cardExtraLine3: item.cardExtraLine3 ?? null,
+                cardLeadTextColor: item.cardLeadTextColor ?? null,
+                cardTitleTextColor: item.cardTitleTextColor ?? null,
+                cardDescriptionTextColor: item.cardDescriptionTextColor ?? null,
+                cardTextShadowEnabled: item.cardTextShadowEnabled === true,
+                cardFooterDateTextColor: item.cardFooterDateTextColor ?? null,
+                cardFooterPlaceTextColor: item.cardFooterPlaceTextColor ?? null,
+              }
+            : undefined;
         return {
           id: rowId,
           href,
@@ -121,6 +140,7 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
           slideDeckPngFace: Boolean(scrollImg),
           slideDeckPngPlaceholder: !scrollImg,
           slideDeckPngAdMark: false,
+          ...(tournamentCardTextOverlay ? { tournamentCardTextOverlay } : {}),
         };
       }
 
@@ -160,6 +180,24 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
         const published640 = (item.publishedCardImageUrl ?? "").trim();
         const published320 = (item.publishedCardImage320Url ?? "").trim();
         const scrollImg = published320 || published640;
+        const tournamentCardTextOverlay: MainSiteTournamentCardTextOverlayPayload | undefined =
+          item.publishedCardImageBackgroundOnly === true && scrollImg
+            ? {
+                cardTemplate: item.cardTemplate ?? "A",
+                surfaceLayout: item.cardSurfaceLayout === "full" ? "full" : "split",
+                title: item.title,
+                subtitle: item.subtitle,
+                cardExtraLine1: item.cardExtraLine1 ?? null,
+                cardExtraLine2: item.cardExtraLine2 ?? null,
+                cardExtraLine3: item.cardExtraLine3 ?? null,
+                cardLeadTextColor: item.cardLeadTextColor ?? null,
+                cardTitleTextColor: item.cardTitleTextColor ?? null,
+                cardDescriptionTextColor: item.cardDescriptionTextColor ?? null,
+                cardTextShadowEnabled: item.cardTextShadowEnabled === true,
+                cardFooterDateTextColor: item.cardFooterDateTextColor ?? null,
+                cardFooterPlaceTextColor: item.cardFooterPlaceTextColor ?? null,
+              }
+            : undefined;
         return {
           id: rowId,
           href,
@@ -170,6 +208,7 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
           slideDeckPngFace: Boolean(scrollImg),
           slideDeckPngPlaceholder: !scrollImg,
           slideDeckPngAdMark: false,
+          ...(tournamentCardTextOverlay ? { tournamentCardTextOverlay } : {}),
         };
       }
       return {
@@ -248,6 +287,7 @@ export default async function SiteOperationalHome() {
     ...(typeof snapshot.publishedCardImage320Url === "string" && snapshot.publishedCardImage320Url.trim()
       ? { publishedCardImage320Url: snapshot.publishedCardImage320Url.trim() }
       : {}),
+    ...(snapshot.publishedCardImageBackgroundOnly === true ? { publishedCardImageBackgroundOnly: true as const } : {}),
   }));
 
   const liveSlideItems = mergeTournamentAndAdSlideDeckItems(
