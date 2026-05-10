@@ -1200,10 +1200,10 @@ export default function InteractiveBracketBoard({
         const choice = selected;
         const srcMatch = bracket.rounds[r - 1]?.matches[j];
         if (!srcMatch) continue;
-        const w = typeof srcMatch.winnerUserId === "string" ? srcMatch.winnerUserId.trim() : "";
         const chosenPlayer = choice === 0 ? srcMatch.player1 : srcMatch.player2;
         const chosenRealId = typeof chosenPlayer.userId === "string" ? chosenPlayer.userId.trim() : "";
-        if (!isEligibleBracketWinnerUserId(chosenRealId) || w !== chosenRealId) continue;
+        /* 표시 전파: 서버 winnerUserId 반영 전에도 로컬 픽(winnerByPair)으로 상위 라벨 표시. 저장 가능 id/라벨만. */
+        if (!isEligibleBracketWinnerUserId(chosenRealId)) continue;
         const chosenLabel = choice === 0 ? a : b;
         if (!isPropagatableBracketWinnerLabel(chosenLabel)) continue;
         parentLabels[j] = chosenLabel;
@@ -1249,16 +1249,14 @@ export default function InteractiveBracketBoard({
         const picked = winnerByPair[pairPickKey];
         const srcMatchForPick = bracket.rounds[r]?.matches[pairIdx];
         if (!parentId && srcMatchForPick && (picked === 0 || picked === 1) && selfId) {
-          const wPick =
-            typeof srcMatchForPick.winnerUserId === "string" ? srcMatchForPick.winnerUserId.trim() : "";
           const chosenPlayer = picked === 0 ? srcMatchForPick.player1 : srcMatchForPick.player2;
           const chosenRealId =
             typeof chosenPlayer.userId === "string" ? chosenPlayer.userId.trim() : "";
-          if (isEligibleBracketWinnerUserId(chosenRealId) && wPick === chosenRealId) {
-            if (picked === selfInPair && selfId === wPick) {
+          if (isEligibleBracketWinnerUserId(chosenRealId)) {
+            if (picked === selfInPair && selfId === chosenRealId) {
               isWinner = true;
               isLoser = false;
-            } else if (oppId && wPick === oppId && selfId !== wPick) {
+            } else if (oppId) {
               isLoser = true;
               isWinner = false;
             }
@@ -2019,14 +2017,7 @@ export default function InteractiveBracketBoard({
                   key={btn.key}
                   type="button"
                   className={styles.advanceCancelButton}
-                  style={{
-                    left: `${btn.x}px`,
-                    top: `${btn.y}px`,
-                    width: 44,
-                    height: 44,
-                    marginLeft: -22,
-                    marginTop: -22,
-                  }}
+                  style={{ left: `${btn.x}px`, top: `${btn.y}px` }}
                   onPointerDown={(e) => {
                     e.stopPropagation();
                   }}

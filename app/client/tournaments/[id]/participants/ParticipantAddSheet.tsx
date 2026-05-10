@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
@@ -16,12 +17,18 @@ export default function ParticipantAddSheet({
   capacityOccupied,
   participantsFinalized,
   hasActiveBracket,
+  triggerClassName,
+  triggerLabel,
 }: {
   tournamentId: string;
   maxParticipants: number;
   capacityOccupied: number;
   participantsFinalized: boolean;
   hasActiveBracket: boolean;
+  /** 기본 `v3-btn` 대신 상위 레이아웃용 클래스(모바일 액션 그리드 등) */
+  triggerClassName?: string;
+  /** 트리거 버튼 내용 — 미지정 시 「수동 추가」 한 줄 */
+  triggerLabel?: ReactNode;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -126,11 +133,11 @@ export default function ParticipantAddSheet({
     <>
       <button
         type="button"
-        className="v3-btn"
+        className={triggerClassName ?? "v3-btn"}
         onClick={() => setOpen(true)}
         style={{ WebkitTapHighlightColor: "transparent" }}
       >
-        수동 추가
+        {triggerLabel ?? "수동 추가"}
       </button>
       {open ? (
         <div

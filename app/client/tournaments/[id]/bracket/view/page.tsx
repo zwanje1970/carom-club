@@ -41,7 +41,7 @@ import {
 
 const InteractiveBracketBoard = dynamic(
   () => import("../InteractiveBracketBoard"),
-  { ssr: false, loading: () => <p className="v3-muted">인터랙티브 대진표 보드를 불러오는 중…</p> },
+  { ssr: false, loading: () => <p className="v3-muted">대진표를 불러오는 중입니다.</p> },
 );
 
 type BracketRoundView = {
@@ -85,6 +85,7 @@ export default function TournamentBracketBoardViewPage() {
   const [tournamentDate, setTournamentDate] = useState("");
   const [tournamentLocation, setTournamentLocation] = useState("");
   const [bracket, setBracket] = useState<Bracket | null>(null);
+  const [bracketDataLoading, setBracketDataLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [boardSliceKey, setBoardSliceKey] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
@@ -140,29 +141,38 @@ export default function TournamentBracketBoardViewPage() {
   }, [selectedZoneId, tournamentId, zonesEnabled]);
 
   const loadBracket = useCallback(async () => {
-    if (!tournamentId) return;
+    if (!tournamentId) {
+      setBracketDataLoading(false);
+      return;
+    }
     if (zonesEnabled && !selectedZoneId) {
       setBracket(null);
+      setBracketDataLoading(false);
       return;
     }
+    setBracketDataLoading(true);
     const seg = storageSeg;
-    const pulled = await pullBracketSnapshot();
-    if (!pulled.ok) {
-      if (!readOfflineDirty(tournamentId, seg)) {
-        const cached = readLastGoodBracket<Bracket>(tournamentId, seg);
-        setBracket((prev) => (prev == null && cached ? cached : prev));
+    try {
+      const pulled = await pullBracketSnapshot();
+      if (!pulled.ok) {
+        if (!readOfflineDirty(tournamentId, seg)) {
+          const cached = readLastGoodBracket<Bracket>(tournamentId, seg);
+          setBracket((prev) => (prev == null && cached ? cached : prev));
+        }
+        setMessage("");
+        return;
       }
+      if (readOfflineDirty(tournamentId, seg)) {
+        setMessage("");
+        return;
+      }
+      setBracket(pulled.bracket);
+      if (pulled.bracket) writeLastGoodBracket(tournamentId, seg, pulled.bracket);
+      else writeLastGoodBracket(tournamentId, seg, null);
       setMessage("");
-      return;
+    } finally {
+      setBracketDataLoading(false);
     }
-    if (readOfflineDirty(tournamentId, seg)) {
-      setMessage("");
-      return;
-    }
-    setBracket(pulled.bracket);
-    if (pulled.bracket) writeLastGoodBracket(tournamentId, seg, pulled.bracket);
-    else writeLastGoodBracket(tournamentId, seg, null);
-    setMessage("");
   }, [pullBracketSnapshot, storageSeg, tournamentId, zonesEnabled, selectedZoneId]);
 
   const mutationFns = useMemo<MutationFns>(() => {
@@ -997,6 +1007,22 @@ export default function TournamentBracketBoardViewPage() {
           >
             <p>권역을 선택해야 대진표를 볼 수 있습니다.</p>
           </div>
+        ) : bracketDataLoading ? (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "grid",
+              placeItems: "center",
+              color: "#e2e8f0",
+              padding: "1rem",
+              textAlign: "center",
+            }}
+            role="status"
+            aria-live="polite"
+          >
+            <p style={{ margin: 0, fontSize: "0.95rem", fontWeight: 500 }}>대진표를 불러오는 중입니다.</p>
+          </div>
         ) : !bracket ? (
           <div
             style={{
@@ -1012,31 +1038,63 @@ export default function TournamentBracketBoardViewPage() {
             <p>아직 확정된 대진표가 없습니다.</p>
           </div>
         ) : boardBracket ? (
-          <InteractiveBracketBoard
-            key={boardBracket.id}
-            bracket={boardBracket}
-            tournamentTitle={tournamentTitle}
-            tournamentDate={tournamentDate}
-            tournamentLocation={tournamentLocation}
-            interactionDisabled={isTournamentClosed}
-            actionBusy={actionBusy}
-            canUndo={false}
-            saveStateText={saveStateText}
-            chromeMode="bracketView"
-            bracketViewSlicePicker={bracketViewSlicePicker}
-            bracketViewZones={bracketViewZones}
-            bracketViewNotice={message}
-            viewStateStorageKey={viewStateStorageKey}
-            connectivityHint={connectivityHint}
-            onExit={handleExit}
-            onPickWinner={handlePickWinner}
-            onClearMatchWinner={handleClearMatchWinner}
-            onSwapPlayers={handleSwapPlayers}
-            onRenamePlayer={handleRenamePlayer}
-            onShuffleRound={(roundNumber) => {
-              void handleShuffleRound(roundNumber);
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              flexDirection: "column",
+              flex: 1,
+              minHeight: 0,
+              minWidth: 0,
+              height: "100%",
             }}
-          />
+          >
+            {actionBusy && saveState === "saving" ? (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 50,
+                  display: "grid",
+                  placeItems: "center",
+                  background: "rgba(0, 0, 0, 0.4)",
+                  pointerEvents: "auto",
+                }}
+                role="status"
+                aria-live="polite"
+              >
+                <p style={{ margin: 0, fontSize: "0.95rem", fontWeight: 500, color: "#e2e8f0", textAlign: "center", padding: "1rem" }}>
+                  대진표를 불러오는 중입니다.
+                </p>
+              </div>
+            ) : null}
+            <InteractiveBracketBoard
+              key={boardBracket.id}
+              bracket={boardBracket}
+              tournamentTitle={tournamentTitle}
+              tournamentDate={tournamentDate}
+              tournamentLocation={tournamentLocation}
+              interactionDisabled={isTournamentClosed}
+              actionBusy={actionBusy}
+              canUndo={false}
+              saveStateText={saveStateText}
+              chromeMode="bracketView"
+              bracketViewSlicePicker={bracketViewSlicePicker}
+              bracketViewZones={bracketViewZones}
+              bracketViewNotice={message}
+              viewStateStorageKey={viewStateStorageKey}
+              connectivityHint={connectivityHint}
+              onExit={handleExit}
+              onPickWinner={handlePickWinner}
+              onClearMatchWinner={handleClearMatchWinner}
+              onSwapPlayers={handleSwapPlayers}
+              onRenamePlayer={handleRenamePlayer}
+              onShuffleRound={(roundNumber) => {
+                void handleShuffleRound(roundNumber);
+              }}
+            />
+          </div>
         ) : null}
       </section>
     </main>

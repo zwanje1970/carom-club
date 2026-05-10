@@ -48,7 +48,7 @@ type Props = {
 const participantApplicationsTableThBase: CSSProperties = {
   padding: "0.42rem 0.28rem",
   fontSize: "0.76rem",
-  fontWeight: 800,
+  fontWeight: 500,
   whiteSpace: "nowrap",
   verticalAlign: "middle",
 };
@@ -57,7 +57,7 @@ const opsBtn: CSSProperties = {
   minHeight: 31,
   padding: "0.18rem 0.28rem",
   fontSize: "0.82rem",
-  fontWeight: 700,
+  fontWeight: 500,
   borderRadius: "0.28rem",
   border: "1px solid #cbd5e1",
   background: "#fff",
@@ -140,7 +140,7 @@ function participantMetricColumnTitle(eq: TournamentEntryQualificationType): str
 
 const pillBase: CSSProperties = {
   fontSize: "0.78rem",
-  fontWeight: 700,
+  fontWeight: 500,
   padding: "0.1rem 0.34rem",
   borderRadius: "999px",
   border: "1px solid #e2e8f0",
@@ -427,6 +427,13 @@ export default function ClientTournamentParticipantsApplicationsBlock({
 
   const titleLine = `${tournamentTitle.trim()} / ${bracketScaleLabel(maxParticipants)}`;
 
+  const appActionTwoLines = (line1: string, line2: string) => (
+    <>
+      <span className="client-tournament-manage__appActionLine">{line1}</span>
+      <span className="client-tournament-manage__appActionLine">{line2}</span>
+    </>
+  );
+
   return (
     <div
       className={
@@ -444,7 +451,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
               replace
               href={`/client/tournaments/${encodeURIComponent(tournamentId)}/participants`}
               className="client-tournament-manage__fullscreenTableClose"
-              style={{ ...opsBtn, flex: "0 0 auto", textDecoration: "none", fontWeight: 700 }}
+              style={{ ...opsBtn, flex: "0 0 auto", textDecoration: "none", fontWeight: 500 }}
             >
               ← 닫기
             </Link>
@@ -460,80 +467,147 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                 가로보기
               </Link>
             </div>
-            <div className="client-tournament-manage__applicationsOpsRows">
-              <div className="client-tournament-manage__applicationsOpsRow">
-                <div className="client-tournament-manage__opsBarCell">
-                  <Link prefetch={false} href={printHref} className="client-tournament-manage__opsBarEqualBtn" style={{ ...opsBtn, textDecoration: "none" }}>
-                    확정리스트
-                  </Link>
-                </div>
-                <div className="client-tournament-manage__opsBarCell">
+            <div className="client-tournament-manage__applicationsOpsMobileOnly">
+              <div className="client-tournament-manage__applicationsOpsGrid4">
+                <div className="client-tournament-manage__applicationsOpsGrid4Cell">
                   {showCancelFinalize ? (
                     <button
                       type="button"
-                      className="client-tournament-manage__finalizeParticipantsBtn client-tournament-manage__opsBarEqualBtn"
+                      className="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--warn"
                       disabled={finalizeBusy}
                       onClick={() => void onCancelFinalizeParticipants()}
-                      style={{
-                        ...opsBtn,
-                        width: "100%",
-                        borderColor: "#b45309",
-                        background: "#fff7ed",
-                        color: "#9a3412",
-                        fontWeight: 800,
-                      }}
                     >
-                      {finalizeBusy ? "처리 중…" : "참가확정 취소"}
+                      {finalizeBusy ? (
+                        <span className="client-tournament-manage__appActionLine">처리 중…</span>
+                      ) : (
+                        appActionTwoLines("참가", "확정 취소")
+                      )}
                     </button>
                   ) : showFinalize ? (
                     <button
                       type="button"
-                      className="client-tournament-manage__finalizeParticipantsBtn client-tournament-manage__opsBarEqualBtn"
+                      className="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--primary"
                       disabled={finalizeBusy}
                       onClick={() => void onFinalizeParticipants()}
-                      style={{
-                        ...opsBtn,
-                        width: "100%",
-                        borderColor: "#2563eb",
-                        background: "#2563eb",
-                        color: "#fff",
-                        fontWeight: 800,
-                      }}
                     >
-                      {finalizeBusy ? "처리 중…" : "참가자 확정"}
+                      {finalizeBusy ? (
+                        <span className="client-tournament-manage__appActionLine">처리 중…</span>
+                      ) : (
+                        appActionTwoLines("참가자", "확정")
+                      )}
                     </button>
                   ) : (
-                    <span className="client-tournament-manage__opsBarPlaceholder" aria-hidden />
+                    <div className="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--empty" aria-hidden />
                   )}
                 </div>
-              </div>
-              <div className="client-tournament-manage__applicationsOpsRow">
-                <div className="client-tournament-manage__opsBarCell client-tournament-manage__opsBarCell--addSheet">
+                <div className="client-tournament-manage__applicationsOpsGrid4Cell">
+                  <Link prefetch={false} href={printHref} className="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--neutral">
+                    {appActionTwoLines("확정", "리스트")}
+                  </Link>
+                </div>
+                <div className="client-tournament-manage__applicationsOpsGrid4Cell">
+                  <button
+                    type="button"
+                    className="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--success"
+                    disabled={bulkApproveBusy}
+                    onClick={() => requestBulkDepositApprove()}
+                  >
+                    {bulkApproveBusy ? (
+                      <span className="client-tournament-manage__appActionLine">처리 중…</span>
+                    ) : (
+                      appActionTwoLines("입금확인", "전체승인")
+                    )}
+                  </button>
+                </div>
+                <div className="client-tournament-manage__applicationsOpsGrid4Cell">
                   <ParticipantAddSheet
                     tournamentId={tournamentId}
                     maxParticipants={maxParticipants}
                     capacityOccupied={capacityOccupied}
                     participantsFinalized={tournamentStatusBadge === "마감"}
                     hasActiveBracket={hasActiveBracket}
+                    triggerClassName="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--neutral"
+                    triggerLabel={appActionTwoLines("수동", "추가")}
                   />
                 </div>
-                <div className="client-tournament-manage__opsBarCell">
-                  <button
-                    type="button"
-                    className="client-tournament-manage__opsBarEqualBtn"
-                    disabled={bulkApproveBusy}
-                    onClick={() => requestBulkDepositApprove()}
-                    style={{
-                      ...opsBtn,
-                      width: "100%",
-                      borderColor: "#15803d",
-                      background: "#fff",
-                      color: "#15803d",
-                      fontWeight: 800,
-                    }}
-                  >
-                    {bulkApproveBusy ? "처리 중…" : "입금확인 전체승인"}
-                  </button>
+              </div>
+            </div>
+            <div className="client-tournament-manage__applicationsOpsDesktopOnly">
+              <div className="client-tournament-manage__applicationsOpsRows">
+                <div className="client-tournament-manage__applicationsOpsRow">
+                  <div className="client-tournament-manage__opsBarCell">
+                    <Link prefetch={false} href={printHref} className="client-tournament-manage__opsBarEqualBtn" style={{ ...opsBtn, textDecoration: "none" }}>
+                      확정리스트
+                    </Link>
+                  </div>
+                  <div className="client-tournament-manage__opsBarCell">
+                    {showCancelFinalize ? (
+                      <button
+                        type="button"
+                        className="client-tournament-manage__finalizeParticipantsBtn client-tournament-manage__opsBarEqualBtn"
+                        disabled={finalizeBusy}
+                        onClick={() => void onCancelFinalizeParticipants()}
+                        style={{
+                          ...opsBtn,
+                          width: "100%",
+                          borderColor: "#b45309",
+                          background: "#fff7ed",
+                          color: "#9a3412",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {finalizeBusy ? "처리 중…" : "참가확정 취소"}
+                      </button>
+                    ) : showFinalize ? (
+                      <button
+                        type="button"
+                        className="client-tournament-manage__finalizeParticipantsBtn client-tournament-manage__opsBarEqualBtn"
+                        disabled={finalizeBusy}
+                        onClick={() => void onFinalizeParticipants()}
+                        style={{
+                          ...opsBtn,
+                          width: "100%",
+                          borderColor: "#2563eb",
+                          background: "#2563eb",
+                          color: "#fff",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {finalizeBusy ? "처리 중…" : "참가자 확정"}
+                      </button>
+                    ) : (
+                      <span className="client-tournament-manage__opsBarPlaceholder" aria-hidden />
+                    )}
+                  </div>
+                </div>
+                <div className="client-tournament-manage__applicationsOpsRow">
+                  <div className="client-tournament-manage__opsBarCell client-tournament-manage__opsBarCell--addSheet">
+                    <ParticipantAddSheet
+                      tournamentId={tournamentId}
+                      maxParticipants={maxParticipants}
+                      capacityOccupied={capacityOccupied}
+                      participantsFinalized={tournamentStatusBadge === "마감"}
+                      hasActiveBracket={hasActiveBracket}
+                    />
+                  </div>
+                  <div className="client-tournament-manage__opsBarCell">
+                    <button
+                      type="button"
+                      className="client-tournament-manage__opsBarEqualBtn"
+                      disabled={bulkApproveBusy}
+                      onClick={() => requestBulkDepositApprove()}
+                      style={{
+                        ...opsBtn,
+                        width: "100%",
+                        borderColor: "#15803d",
+                        background: "#fff",
+                        color: "#15803d",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {bulkApproveBusy ? "처리 중…" : "입금확인 전체승인"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -582,7 +656,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
         )}
 
         {fullscreenTable && tableLandscapePhase !== "ready" ? (
-          <p className="v3-muted" style={{ margin: 0, padding: "1rem 0.75rem", textAlign: "center", fontSize: "0.9rem", fontWeight: 700 }}>
+          <p className="v3-muted" style={{ margin: 0, padding: "1rem 0.75rem", textAlign: "center", fontSize: "0.82rem", fontWeight: 500 }}>
             {tableLandscapePhase === "pending" ? "가로보기로 전환 중입니다." : "기기를 가로로 돌려주세요."}
           </p>
         ) : null}
@@ -597,7 +671,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
               margin: fullscreenTable ? "0.2rem 0 0.15rem" : "0.14rem 0 0.2rem",
             }}
           >
-            <span className="v3-muted" style={{ fontSize: "0.8rem", fontWeight: 700 }}>
+            <span className="v3-muted" style={{ fontSize: "0.8rem", fontWeight: 500 }}>
               권역
             </span>
             <select
@@ -636,7 +710,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                 borderColor: "#15803d",
                 background: "#fff",
                 color: "#15803d",
-                fontWeight: 800,
+                fontWeight: 600,
                 flex: "0 0 auto",
               }}
             >
@@ -649,11 +723,17 @@ export default function ClientTournamentParticipantsApplicationsBlock({
       {!fullscreenTable || tableLandscapePhase === "ready" ? (
       <section
         className={
-          fullscreenTable
+          (fullscreenTable
             ? "client-tournament-manage__participantTableShell client-tournament-manage__participantTableShell--fullscreenScroll"
-            : "client-tournament-manage__participantTableShell client-tournament-manage__participantTableShell--applicationsScroll"
+            : "client-tournament-manage__participantTableShell client-tournament-manage__participantTableShell--applicationsScroll") +
+          (moreLoading && !fullscreenTable ? " client-tournament-manage__participantTableShell--applicationsLoading" : "")
         }
       >
+        {moreLoading && !fullscreenTable ? (
+          <div className="client-tournament-manage__applicationsDataLoadingMask" role="status" aria-live="polite">
+            <p className="client-tournament-manage__applicationsDataLoadingText">신청자를 불러오는 중입니다.</p>
+          </div>
+        ) : null}
         {zoneFilteredEntries.length === 0 ? (
           <p className="v3-muted" style={{ margin: 0, padding: "0.65rem 0.75rem" }}>
             {participantCountSummary.total === 0

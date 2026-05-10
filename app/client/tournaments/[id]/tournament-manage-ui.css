@@ -745,7 +745,7 @@
 .client-tournament-manage .client-tournament-manage__applicationsTitle {
   margin: 0 0 0.35rem;
   font-size: clamp(1.14rem, 4.4vw, 1.34rem);
-  font-weight: 800;
+  font-weight: 500;
   line-height: 1.28;
   letter-spacing: -0.02em;
   color: #0f172a;
@@ -770,13 +770,19 @@
 
 .client-tournament-manage .client-tournament-manage__applicationsTableViewLink {
   flex: 0 0 auto;
-  font-size: 0.8rem;
-  font-weight: 700;
+  font-size: 0.72rem;
+  font-weight: 500;
   color: #2563eb;
   text-decoration: underline;
   text-underline-offset: 2px;
-  padding: 0.25rem 0.15rem;
+  padding: 0.35rem 0.45rem;
   white-space: nowrap;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 .client-tournament-manage .client-tournament-manage__applicationsOpsRows {
@@ -812,7 +818,7 @@
   min-height: 31px;
   padding: 0.18rem 0.28rem !important;
   font-size: 0.82rem !important;
-  font-weight: 700 !important;
+  font-weight: 500 !important;
   border-radius: 0.28rem !important;
   border: 1px solid #cbd5e1 !important;
   background: #fff !important;
@@ -879,7 +885,7 @@
   min-height: 1.05rem;
   border-radius: 999px;
   font-size: 0.58rem;
-  font-weight: 800;
+  font-weight: 500;
   line-height: 1;
   box-sizing: border-box;
   flex-shrink: 0;
@@ -905,7 +911,7 @@
 
 .client-tournament-manage .client-tournament-manage__opLegendCaption {
   font-size: 0.76rem;
-  font-weight: 600;
+  font-weight: 500;
   color: #475569;
 }
 
@@ -1009,7 +1015,7 @@
   margin: 0 0 0.42rem;
   padding: 0 0.1rem;
   font-size: 0.78rem;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.45;
   color: #475569;
 }
@@ -1019,7 +1025,7 @@
 }
 
 .client-tournament-manage .client-tournament-manage__applicationsSymbolLegendGlyph {
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .client-tournament-manage .client-tournament-manage__applicationsSymbolLegendGlyph--won {
@@ -1158,6 +1164,7 @@
   box-shadow: none;
   padding-top: 0.28rem !important;
   padding-bottom: 0.28rem !important;
+  font-weight: 500;
   /* 헤더 하단: 본문 행선보다 약간 진하게 */
   border-bottom: 1px solid #cbd5e1;
 }
@@ -1205,7 +1212,7 @@
 .client-tournament-manage .participant-mobileProcApproveHint {
   font-size: 0.62rem;
   color: #64748b;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.35;
   text-align: center;
 }
@@ -1238,7 +1245,7 @@
   margin: 0;
   border-radius: 999px;
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1;
   display: inline-flex;
   align-items: center;
@@ -1259,7 +1266,7 @@
 /* ✕ 가독성: 체크와 구분되도록 굵게·약간 확대 */
 .client-tournament-manage .participant-op-cross-glyph {
   display: inline-block;
-  font-weight: 900;
+  font-weight: 600;
   font-size: 0.78rem;
   line-height: 1;
 }
@@ -1986,4 +1993,149 @@ main[data-client-applications-table-fullscreen="1"].client-tournament-manage
     min-width: 34px;
     min-height: 34px;
   }
+}
+
+/* 참가자 관리(모바일): 상단 4칸 정사각형 액션 — 세로 목록(<768px) 전용 */
+.client-tournament-manage .client-tournament-manage__applicationsOpsDesktopOnly {
+  display: none;
+}
+
+.client-tournament-manage .client-tournament-manage__applicationsOpsMobileOnly {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 0.28rem;
+}
+
+.client-tournament-manage .client-tournament-manage__applicationsOpsGrid4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.client-tournament-manage .client-tournament-manage__applicationsOpsGrid4Cell {
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.client-tournament-manage .client-tournament-manage__applicationsOpsGrid4Cell > button,
+.client-tournament-manage .client-tournament-manage__applicationsOpsGrid4Cell > a {
+  width: 100%;
+  min-width: 0;
+}
+
+.client-tournament-manage .client-tournament-manage__appActionSquare {
+  flex: 1 1 auto;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.06rem;
+  margin: 0;
+  padding: 0.1rem 0.06rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.28rem;
+  background: #fff;
+  color: #334155;
+  font-family: inherit;
+  font-size: clamp(0.56rem, 2.65vw, 0.66rem);
+  font-weight: 500;
+  line-height: 1.16;
+  text-align: center;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.client-tournament-manage a.client-tournament-manage__appActionSquare {
+  color: #334155;
+}
+
+.client-tournament-manage button.client-tournament-manage__appActionSquare:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.client-tournament-manage .client-tournament-manage__appActionSquare--primary {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
+}
+
+.client-tournament-manage .client-tournament-manage__appActionSquare--warn {
+  border-color: #b45309;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.client-tournament-manage .client-tournament-manage__appActionSquare--success {
+  border-color: #15803d;
+  background: #fff;
+  color: #15803d;
+}
+
+.client-tournament-manage .client-tournament-manage__appActionSquare--neutral {
+  border-color: #cbd5e1;
+  background: #fff;
+  color: #334155;
+}
+
+.client-tournament-manage .client-tournament-manage__appActionSquare--empty {
+  visibility: hidden;
+  pointer-events: none;
+  border-color: transparent;
+  background: transparent;
+  cursor: default;
+}
+
+.client-tournament-manage .client-tournament-manage__appActionLine {
+  display: block;
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .client-tournament-manage .client-tournament-manage__applicationsOpsMobileOnly {
+    display: none;
+  }
+
+  .client-tournament-manage .client-tournament-manage__applicationsOpsDesktopOnly {
+    display: block;
+  }
+}
+
+/* 신청자 추가 fetch 중: 표 영역 중앙 텍스트 안내 */
+.client-tournament-manage .client-tournament-manage__participantTableShell--applicationsLoading {
+  position: relative;
+  min-height: 10.5rem;
+}
+
+.client-tournament-manage .client-tournament-manage__applicationsDataLoadingMask {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 1rem;
+  background: rgba(248, 250, 252, 0.93);
+  pointer-events: none;
+}
+
+.client-tournament-manage .client-tournament-manage__applicationsDataLoadingText {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: #64748b;
+  text-align: center;
 }
