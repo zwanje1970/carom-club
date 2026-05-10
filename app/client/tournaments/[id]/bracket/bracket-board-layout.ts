@@ -1006,7 +1006,7 @@ export function layoutDualFromVerticalBase(
   const SLOT_GAP = 18;
   const slotPitch = SLOT_H + SLOT_GAP;
   const STEP = 265;
-  const FINAL_GAP = 340;
+  const FINAL_GAP = 210;
 
   const byRound = new Map<number, PositionedBoardMatch[]>();
   for (const p of base.positionedMatches) {
@@ -1067,7 +1067,8 @@ export function layoutDualFromVerticalBase(
       const side = dualSideForTreeLayout(lo, hi, half);
       let cy = centerY[r]![item.internalIndex]!;
       if (r === finalRi && side === "center" && semiRowLen >= 2) {
-        cy = (centerY[semiRi]![0]! + centerY[semiRi]![1]!) / 2;
+        const semiCenterY = (centerY[semiRi]![0]! + centerY[semiRi]![1]!) / 2;
+        cy = semiCenterY - slotPitch * 1.25;
       }
       let x: number;
       if (side === "left") {
@@ -1149,22 +1150,23 @@ export function layoutDualFromVerticalBase(
       const s1 = dualSideForTreeLayout(leafSpanForTreeLayout(r, 2 * j + 1).lo, leafSpanForTreeLayout(r, 2 * j + 1).hi, half);
 
       if (pSide === "center" && s0 === "left" && s1 === "right") {
-        const py = p.y + p.height / 2;
-        const plx = p.x;
-        const prx = p.x + p.width;
         const Lrx = c0.x + c0.width;
         const Ly = c0.y + c0.height / 2;
         const Rlx = c1.x;
         const Ry = c1.y + c1.height / 2;
-        const stubL = Math.min(STEP, Math.max(52, (plx - Lrx) * 0.52));
-        const stubR = Math.min(STEP, Math.max(52, (Rlx - prx) * 0.52));
-        const mxL = Math.max(Lrx + 48, Math.min(plx - 48, Lrx + stubL));
-        const mxR = Math.min(Rlx - 48, Math.max(prx + 48, Rlx - stubR));
+
+        const joinX = canvasW / 2;
+        const joinY = (Ly + Ry) / 2;
+
+        const championBottomX = p.x + p.width / 2;
+        const championBottomY = p.y + p.height;
+
         connectors.push({
           key: `${r + 1}:${2 * j}+${r + 1}:${2 * j + 1}->${r + 2}:${j}`,
           basePaths: [
-            `M ${Lrx} ${Ly} L ${mxL} ${Ly} L ${mxL} ${py} L ${plx} ${py}`,
-            `M ${Rlx} ${Ry} L ${mxR} ${Ry} L ${mxR} ${py} L ${prx} ${py}`,
+            `M ${Lrx} ${Ly} L ${joinX} ${Ly} L ${joinX} ${joinY}`,
+            `M ${Rlx} ${Ry} L ${joinX} ${Ry} L ${joinX} ${joinY}`,
+            `M ${joinX} ${joinY} L ${championBottomX} ${championBottomY}`,
           ],
           winnerPath: null,
         });
