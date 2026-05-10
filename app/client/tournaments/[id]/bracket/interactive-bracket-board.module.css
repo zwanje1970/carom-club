@@ -19,6 +19,272 @@
   max-height: 100%;
   min-height: 0;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.boardChromeBracketView .controlBar {
+  display: none !important;
+}
+
+.bracketViewChromeBody {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.bracketViewCenterStack {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.boardChromeBracketView .bracketViewCenterStack .viewport {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+
+.bracketViewRightSafeStrip {
+  flex-shrink: 0;
+  width: calc(14px + env(safe-area-inset-right, 0px));
+  min-width: 14px;
+  box-sizing: border-box;
+  background: linear-gradient(90deg, rgba(22, 27, 34, 0.94), rgba(8, 10, 14, 0.98));
+  border-left: 1px solid rgba(148, 163, 184, 0.38);
+  box-shadow: inset 2px 0 0 rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+  z-index: 55;
+}
+
+/* 좌측 슬라이딩 운영 패널 (viewport·줌과 분리, fixed) */
+.bracketViewOpsDock {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 260;
+  pointer-events: none;
+}
+
+.bracketViewOpsTrack {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  height: 100%;
+  transition: transform 0.24s ease;
+  transform: translateX(calc(-100% + 18px));
+  will-change: transform;
+}
+
+.bracketViewOpsTrackOpen {
+  transform: translateX(0);
+}
+
+.bracketViewOpsSheet {
+  width: min(252px, calc(100vw - 56px));
+  max-height: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: rgba(17, 24, 39, 0.92);
+  backdrop-filter: blur(12px);
+  border-right: 1px solid rgba(148, 163, 184, 0.38);
+  box-shadow: 8px 0 28px rgba(0, 0, 0, 0.45);
+  padding: max(10px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px)) 14px;
+}
+
+.bracketViewOpsSheetInner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bracketViewOpsHeading {
+  margin: 0 0 4px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.bracketViewOpsHandle {
+  flex-shrink: 0;
+  width: 18px;
+  align-self: stretch;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-right: 1px solid rgba(100, 116, 139, 0.45);
+  background: rgba(30, 41, 59, 0.94);
+  color: #e2e8f0;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  letter-spacing: 3px;
+}
+
+.bracketViewOpsHandle:active {
+  background: rgba(51, 65, 85, 0.95);
+}
+
+.bracketViewOpsRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 11px;
+  border-radius: 9px;
+  border: 1px solid rgba(71, 85, 105, 0.65);
+  background: rgba(15, 23, 42, 0.66);
+  color: #f8fafc;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bracketViewOpsRow:active {
+  background: rgba(30, 41, 59, 0.88);
+}
+
+.bracketViewOpsRowActive {
+  border-color: #eab308;
+  background: rgba(66, 32, 6, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(234, 179, 8, 0.35);
+}
+
+.bracketViewOpsRowGlyph {
+  flex-shrink: 0;
+  width: 1.5rem;
+  text-align: center;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.bracketViewOpsRowGlyphSvg {
+  flex-shrink: 0;
+  width: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #e2e8f0;
+}
+
+.bracketViewOpsRowText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bracketViewOpsRowTitle {
+  font-weight: 800;
+  font-size: 0.86rem;
+}
+
+.bracketViewOpsRowHint {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: rgba(226, 232, 240, 0.72);
+  line-height: 1.25;
+}
+
+.bracketViewOpsModeToggle {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+}
+
+.bracketViewOpsChip {
+  flex: 1;
+  min-height: 38px;
+  border-radius: 8px;
+  border: 1px solid rgba(71, 85, 105, 0.75);
+  background: rgba(15, 23, 42, 0.55);
+  color: #e2e8f0;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.bracketViewOpsChipActive {
+  border-color: #38bdf8;
+  background: rgba(14, 116, 144, 0.35);
+  color: #f0f9ff;
+}
+
+.bracketViewOpsDivider {
+  border: 0;
+  height: 1px;
+  margin: 4px 0;
+  background: rgba(71, 85, 105, 0.65);
+}
+
+.bracketViewOpsZoomRow {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  justify-content: stretch;
+}
+
+.bracketViewOpsIconBtn {
+  flex: 1;
+  min-height: 40px;
+  border-radius: 8px;
+  border: 1px solid rgba(71, 85, 105, 0.75);
+  background: rgba(24, 31, 49, 0.88);
+  color: #f8fafc;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.bracketViewOpsExitBtn {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 4px;
+  border-radius: 9px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(51, 65, 85, 0.55);
+  color: #f1f5f9;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.bracketViewOpsFooter {
+  margin: 8px 0 0;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: rgba(148, 163, 184, 0.95);
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.bracketViewSlotPassThrough {
+  pointer-events: none !important;
+}
+
+.bracketViewAdvanceCancelBlocked {
+  pointer-events: none !important;
+  opacity: 0.35;
 }
 
 .viewport {
@@ -37,11 +303,11 @@
   user-select: none;
 }
 
-/* 대진표 보기 모바일: 스크롤 끝에서 보드가 제스처 뒤에 붙지 않도록 하단 스크롤 여유 */
+/* 대진표 보기 모바일: 하단은 safe-area 중심(전체화면 main에서 --client-bottom-space 축소) */
 @media (max-width: 767px) {
   .boardChromeBracketView .viewport {
-    padding-bottom: var(--client-bottom-space, 80px);
-    scroll-padding-bottom: var(--client-bottom-space, 80px);
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+    scroll-padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -59,12 +325,6 @@
   left: 12px;
   z-index: 200;
   pointer-events: none;
-}
-
-/* 대진표 전체화면: 부모(main)가 --bv-safe-* 만큼 패딩 — 툴바는 콘텐츠 좌상단 기준 */
-.boardChromeBracketView .bracketFloatingToolbar {
-  left: 0;
-  top: 80px;
 }
 
 .toolbarBracketViewWideBtn {
@@ -573,20 +833,13 @@
     max-height: 100%;
   }
 
-  /* 좌측 세로 툴바 — main 패딩으로 물리 safe area 확보됨, 제스처 여유는 좌 0 + 패딩 */
-  .boardChromeBracketView .bracketFloatingToolbar {
-    left: 0;
-    top: 10px;
-    z-index: 200;
-  }
-
-  /* 대회명·일정·장소: 우측 정렬, 좌측은 툴바 폭 제외 */
+  /* 대회명·일정·장소: 우측 정렬 — 좌측은 얇은 패널 핸들만 고려 */
   .boardChromeBracketView .tournamentOverlay {
     top: 10px;
-    left: 52px;
+    left: 28px;
     right: 0;
     text-align: right;
-    max-width: calc(100% - 52px);
+    max-width: calc(100% - 36px);
     z-index: 190;
   }
 
@@ -597,11 +850,6 @@
 
   .boardChromeBracketView .tournamentMeta {
     font-size: clamp(0.72rem, 2.8vw, 0.82rem);
-  }
-
-  /* 모바일 대진표 보기: 상단 한글 컨트롤바 숨김 — 좌측 플로팅 툴바만 사용 */
-  .boardChromeBracketView .controlBar {
-    display: none !important;
   }
 
   .toolbarBtnLabelShort {
@@ -658,13 +906,9 @@
 
 /* 모바일 가로: 좌우 제스처·노치 여유는 main --bv-safe-* 패딩으로 처리 */
 @media (max-width: 767px) and (orientation: landscape) {
-  .boardChromeBracketView .bracketFloatingToolbar {
-    top: 8px;
-  }
-
   .boardChromeBracketView .tournamentOverlay {
     top: 8px;
-    max-width: calc(100% - 56px);
+    max-width: calc(100% - 40px);
   }
 
   .boardChromeBracketView .tournamentTitle {

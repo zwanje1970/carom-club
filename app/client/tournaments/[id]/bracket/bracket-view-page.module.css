@@ -7,4 +7,7 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  /* 전체화면 전용: 공통 하단 네비 예약 대신 safe-area만 — 빈 여백·아래로 숨김 완화 */
+  --client-bottom-space: max(10px, env(safe-area-inset-bottom, 0px));
+  --client-bottom-reserved-space: max(10px, env(safe-area-inset-bottom, 0px));
 }

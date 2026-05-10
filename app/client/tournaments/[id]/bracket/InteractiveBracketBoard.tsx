@@ -424,9 +424,10 @@ export default function InteractiveBracketBoard({
   const [isPanning, setIsPanning] = useState(false);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const longPressTimerRef = useRef<number | null>(null);
-  /** 모바일 대진표 보기: 툴바 접기(기본 접힘) */
-  const [mobileToolbarExpanded, setMobileToolbarExpanded] = useState(false);
-  const [isMobileBracketViewLayout, setIsMobileBracketViewLayout] = useState(false);
+  /** bracket/view: 좌측 슬라이딩 운영 패널 */
+  const [bracketViewOpsPanelOpen, setBracketViewOpsPanelOpen] = useState(false);
+  /** bracket/view: OFF면 패닝·줌만, 슬롯 입력·키보드 없음 */
+  const [bracketViewParticipantInputActive, setBracketViewParticipantInputActive] = useState(false);
   const [bracketViewModal, setBracketViewModal] = useState<null | "slice" | "zone">(null);
   const [toolbarLayoutIsLandscape, setToolbarLayoutIsLandscape] = useState(false);
 
@@ -448,21 +449,12 @@ export default function InteractiveBracketBoard({
     };
   }, [chromeMode]);
 
-  useLayoutEffect(() => {
-    if (typeof window === "undefined" || chromeMode !== "bracketView") {
-      setIsMobileBracketViewLayout(false);
-      return;
-    }
-    const mq = window.matchMedia("(max-width: 767px)");
-    const sync = () => {
-      const narrow = mq.matches;
-      setIsMobileBracketViewLayout(narrow);
-      if (!narrow) setMobileToolbarExpanded(true);
-    };
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, [chromeMode]);
+  useEffect(() => {
+    if (chromeMode !== "bracketView" || bracketViewParticipantInputActive) return;
+    setRenameEditing(null);
+    setSwapCandidate(null);
+    setSelectedBoxKey("");
+  }, [bracketViewParticipantInputActive, chromeMode]);
 
   useEffect(() => {
     scaleRef.current = scale;
@@ -615,7 +607,7 @@ export default function InteractiveBracketBoard({
 
   const onViewportPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     const elTarget = e.target as HTMLElement | null;
-    if (elTarget?.closest("[data-bracket-toolbar]")) return;
+    if (elTarget?.closest("[data-bracket-toolbar], [data-bracket-ops-panel]")) return;
 
     if (e.pointerType === "touch") {
       pinchPointsRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -973,6 +965,7 @@ export default function InteractiveBracketBoard({
         playerName: string;
       },
     ) => {
+      if (chromeMode === "bracketView" && !bracketViewParticipantInputActive) return;
       e.stopPropagation();
       boxPointerStartRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY, ts: Date.now() });
       setSelectedBoxKey(args.boxKey);
@@ -997,7 +990,7 @@ export default function InteractiveBracketBoard({
         });
       }, RENAME_LONG_PRESS_MS);
     },
-    [actionBusy, chromeMode, interactionDisabled, interactionMode, onRenamePlayer],
+    [actionBusy, bracketViewParticipantInputActive, chromeMode, interactionDisabled, interactionMode, onRenamePlayer],
   );
 
   const onBoxPointerMoveForLongPress = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
@@ -1024,6 +1017,7 @@ export default function InteractiveBracketBoard({
       slotLabel: string,
       opponentHasName: boolean,
     ) => {
+      if (chromeMode === "bracketView" && !bracketViewParticipantInputActive) return;
       e.stopPropagation();
       const s = boxPointerStartRef.current.get(e.pointerId);
       boxPointerStartRef.current.delete(e.pointerId);
@@ -1079,7 +1073,15 @@ export default function InteractiveBracketBoard({
         });
       }
     },
-    [actionBusy, handleWinnerPick, interactionDisabled, interactionMode, onSwapPlayers],
+    [
+      actionBusy,
+      bracketViewParticipantInputActive,
+      chromeMode,
+      handleWinnerPick,
+      interactionDisabled,
+      interactionMode,
+      onSwapPlayers,
+    ],
   );
 
   const currentRoundNumber = useMemo(() => {
@@ -1191,18 +1193,28 @@ export default function InteractiveBracketBoard({
       ? ` ${styles.boardChromeBracketView}`
       : "";
 
-  const collapseMobileToolbar =
-    chromeMode === "bracketView" && isMobileBracketViewLayout && !mobileToolbarExpanded;
+  const bracketViewSlotInteractionLocked =
+    chromeMode === "bracketView" && !bracketViewParticipantInputActive;
 
-  return (
-    <section
-      className={
-        (viewMode === "vertical"
-          ? `${styles.boardRoot} ${styles.boardRootVerticalMatch}`
-          : `${styles.boardRoot} ${styles.boardRootHorizontalSlot}`) + rootChrome
-      }
-      data-interactive-bracket-root="1"
-    >
+  const bracketViewNextViewMode = useCallback(() => {
+    setViewMode((vm) => {
+      if (vm === "vertical") return "horizontal";
+      if (vm === "horizontal") return "dual";
+      return "vertical";
+    });
+  }, []);
+
+  const bracketViewViewToggleGlyph =
+    viewMode === "vertical" ? "├" : viewMode === "horizontal" ? "⇄" : "┴";
+  const bracketViewViewToggleTitle =
+    viewMode === "vertical"
+      ? "가로형 보기로 전환"
+      : viewMode === "horizontal"
+        ? "양쪽형 보기로 전환"
+        : "세로형 보기로 전환";
+
+  const boardMainChrome = (
+    <>
       <div className={styles.controlBar}>
         {!interactionDisabled ? (
           <button
@@ -1272,42 +1284,107 @@ export default function InteractiveBracketBoard({
         </aside>
       ) : null}
 
-      <div
-        className={styles.bracketFloatingToolbar}
-        data-bracket-toolbar="1"
-        onPointerDown={(e) => e.stopPropagation()}
-        onPointerUp={(e) => e.stopPropagation()}
-      >
-        {collapseMobileToolbar ? (
+      {chromeMode === "bracketView" ? (
+        <div
+          className={styles.bracketViewOpsDock}
+          data-bracket-ops-panel="1"
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+        >
           <div
-            className={`${styles.bracketFloatingToolbarInner} ${styles.bracketViewToolbarIcons} ${styles.bracketToolbarCollapsedWrap}`}
+            className={`${styles.bracketViewOpsTrack} ${bracketViewOpsPanelOpen ? styles.bracketViewOpsTrackOpen : ""}`}
           >
-            <button
-              type="button"
-              className={`${styles.toolbarButton} ${styles.toolbarMenuToggle}`}
-              title="메뉴 펼치기"
-              aria-label="메뉴 펼치기"
-              aria-expanded={false}
-              onClick={() => setMobileToolbarExpanded(true)}
-            >
-              ≡
-            </button>
-          </div>
-        ) : (
-          <div
-            className={
-              chromeMode === "bracketView"
-                ? `${styles.bracketFloatingToolbarInner} ${styles.bracketViewToolbarIcons}`
-                : styles.bracketFloatingToolbarInner
-            }
-          >
-            {chromeMode === "bracketView" ? (
-              <>
+            <div className={styles.bracketViewOpsSheet}>
+              <div className={styles.bracketViewOpsSheetInner}>
+                <p className={styles.bracketViewOpsHeading}>운영 패널</p>
                 <button
                   type="button"
-                  className={`${styles.toolbarButton} ${styles.toolbarBracketViewWideBtn} ${styles.toolbarBracketViewGlyphBtn}`}
+                  className={styles.bracketViewOpsRow}
+                  title={bracketViewViewToggleTitle}
+                  onClick={() => bracketViewNextViewMode()}
+                >
+                  <span className={styles.bracketViewOpsRowGlyph} aria-hidden>
+                    {bracketViewViewToggleGlyph}
+                  </span>
+                  <span className={styles.bracketViewOpsRowText}>
+                    <span className={styles.bracketViewOpsRowTitle}>보기 전환</span>
+                    <span className={styles.bracketViewOpsRowHint}>{bracketViewViewToggleTitle}</span>
+                  </span>
+                </button>
+                {bracketViewSlicePicker ? (
+                  <button
+                    type="button"
+                    className={styles.bracketViewOpsRow}
+                    title="조 선택"
+                    onClick={() => setBracketViewModal("slice")}
+                  >
+                    <span className={styles.bracketViewOpsRowGlyph} aria-hidden>
+                      ▦
+                    </span>
+                    <span className={styles.bracketViewOpsRowText}>
+                      <span className={styles.bracketViewOpsRowTitle}>조 선택</span>
+                    </span>
+                  </button>
+                ) : null}
+                {bracketViewZones ? (
+                  <button
+                    type="button"
+                    className={styles.bracketViewOpsRow}
+                    title="권역 선택"
+                    onClick={() => setBracketViewModal("zone")}
+                  >
+                    <span className={styles.bracketViewOpsRowGlyph} aria-hidden>
+                      ⌗
+                    </span>
+                    <span className={styles.bracketViewOpsRowText}>
+                      <span className={styles.bracketViewOpsRowTitle}>권역 선택</span>
+                    </span>
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className={`${styles.bracketViewOpsRow} ${bracketViewParticipantInputActive ? styles.bracketViewOpsRowActive : ""}`}
+                  title={bracketViewParticipantInputActive ? "참가자 입력 끄기" : "참가자 입력 켜기"}
+                  onClick={() => setBracketViewParticipantInputActive((v) => !v)}
+                >
+                  <span className={styles.bracketViewOpsRowGlyph} aria-hidden>
+                    👤
+                  </span>
+                  <span className={styles.bracketViewOpsRowText}>
+                    <span className={styles.bracketViewOpsRowTitle}>참가자 입력</span>
+                    <span className={styles.bracketViewOpsRowHint}>
+                      {bracketViewParticipantInputActive ? "켜짐 · 슬롯 탭 가능" : "꺼짐 · 이동·줌만"}
+                    </span>
+                  </span>
+                </button>
+                {bracketViewParticipantInputActive ? (
+                  <div className={styles.bracketViewOpsModeToggle}>
+                    <button
+                      type="button"
+                      className={`${styles.bracketViewOpsChip} ${interactionMode === "winner" ? styles.bracketViewOpsChipActive : ""}`}
+                      onClick={() => {
+                        setInteractionMode("winner");
+                        setSwapCandidate(null);
+                        setRenameEditing(null);
+                      }}
+                    >
+                      승자
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.bracketViewOpsChip} ${interactionMode === "editSwap" ? styles.bracketViewOpsChipActive : ""}`}
+                      disabled={actionBusy}
+                      onClick={() => setInteractionMode("editSwap")}
+                    >
+                      편집·스왑
+                    </button>
+                  </div>
+                ) : null}
+                <hr className={styles.bracketViewOpsDivider} aria-hidden />
+                <button
+                  type="button"
+                  className={styles.bracketViewOpsRow}
                   title={toolbarLayoutIsLandscape ? "기기 세로모드" : "기기 가로모드"}
-                  aria-label={toolbarLayoutIsLandscape ? "기기 세로모드" : "기기 가로모드"}
                   onClick={() =>
                     toolbarLayoutIsLandscape
                       ? (unregisterCaromExplicitNativeLandscapeSession(CAROM_BRACKET_NATIVE_LANDSCAPE_SESSION_ID),
@@ -1316,51 +1393,89 @@ export default function InteractiveBracketBoard({
                         applyCaromOrientationMode("landscape", "bracket-view-fullscreen:toolbar-landscape"))
                   }
                 >
-                  {toolbarLayoutIsLandscape ? (
-                    <BracketToolbarPhonePortraitGlyph className={styles.bracketToolbarPhoneSvg} />
-                  ) : (
-                    <BracketToolbarPhoneLandscapeGlyph className={styles.bracketToolbarPhoneSvg} />
-                  )}
+                  <span className={styles.bracketViewOpsRowGlyphSvg} aria-hidden>
+                    {toolbarLayoutIsLandscape ? (
+                      <BracketToolbarPhonePortraitGlyph className={styles.bracketToolbarPhoneSvg} />
+                    ) : (
+                      <BracketToolbarPhoneLandscapeGlyph className={styles.bracketToolbarPhoneSvg} />
+                    )}
+                  </span>
+                  <span className={styles.bracketViewOpsRowText}>
+                    <span className={styles.bracketViewOpsRowTitle}>화면 방향</span>
+                    <span className={styles.bracketViewOpsRowHint}>
+                      {toolbarLayoutIsLandscape ? "세로로 전환" : "가로로 전환"}
+                    </span>
+                  </span>
                 </button>
-                <hr className={styles.toolbarDivider} aria-hidden />
-              </>
-            ) : null}
-            {chromeMode === "bracketView" && onExit ? (
-              <button
-                type="button"
-                className={`${styles.toolbarButton} ${styles.toolbarExitBracketView}`}
-                title="나가기"
-                aria-label="나가기"
-                onClick={() => onExit()}
-              >
-                ←
-              </button>
-            ) : null}
-            {chromeMode === "bracketView" && bracketViewSlicePicker ? (
-              <button
-                type="button"
-                className={`${styles.toolbarButton} ${styles.toolbarBracketViewWideBtn} ${styles.toolbarBracketViewGlyphBtn}`}
-                title="조 선택"
-                aria-label="조 선택"
-                onClick={() => setBracketViewModal("slice")}
-              >
-                ▦
-              </button>
-            ) : null}
-            {chromeMode === "bracketView" && bracketViewZones ? (
-              <button
-                type="button"
-                className={`${styles.toolbarButton} ${styles.toolbarBracketViewWideBtn}`}
-                title="권역 선택"
-                aria-label="권역 선택"
-                onClick={() => setBracketViewModal("zone")}
-              >
-                권역
-              </button>
-            ) : null}
-            {chromeMode === "bracketView" && (bracketViewSlicePicker || bracketViewZones) ? (
-              <hr className={styles.toolbarDivider} aria-hidden />
-            ) : null}
+                <div className={styles.bracketViewOpsZoomRow}>
+                  <button
+                    type="button"
+                    className={styles.bracketViewOpsIconBtn}
+                    title="확대"
+                    aria-label="확대"
+                    onClick={() => zoomFromViewportCenter(1.2)}
+                  >
+                    +
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.bracketViewOpsIconBtn}
+                    title="축소"
+                    aria-label="축소"
+                    onClick={() => zoomFromViewportCenter(1 / 1.2)}
+                  >
+                    −
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.bracketViewOpsIconBtn}
+                    title="전체보기"
+                    aria-label="전체보기"
+                    onClick={() => fitBracketToViewport()}
+                  >
+                    □
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.bracketViewOpsIconBtn}
+                    title="초기화"
+                    aria-label="초기화"
+                    onClick={() => resetBracketView()}
+                  >
+                    ↺
+                  </button>
+                </div>
+                {onExit ? (
+                  <button type="button" className={styles.bracketViewOpsExitBtn} onClick={() => onExit()}>
+                    나가기
+                  </button>
+                ) : null}
+                <p className={styles.bracketViewOpsFooter}>
+                  {connectivityHint.trim() ? `${connectivityHint.trim()} · ` : ""}
+                  {saveStateText ? `${saveStateText} · ` : ""}
+                  {canvasWidth}×{canvasHeight} · {(scale * 100).toFixed(0)}%
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              className={styles.bracketViewOpsHandle}
+              aria-expanded={bracketViewOpsPanelOpen}
+              aria-label={bracketViewOpsPanelOpen ? "운영 패널 닫기" : "운영 패널 열기"}
+              onClick={() => setBracketViewOpsPanelOpen((o) => !o)}
+            >
+              {bracketViewOpsPanelOpen ? "‹" : "›"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          className={styles.bracketFloatingToolbar}
+          data-bracket-toolbar="1"
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+        >
+          <div className={styles.bracketFloatingToolbarInner}>
             <button
               type="button"
               className={`${styles.toolbarButton} ${styles.toolbarOrientationWide} ${
@@ -1370,14 +1485,10 @@ export default function InteractiveBracketBoard({
               aria-label="세로형 보기"
               onClick={() => setViewMode("vertical")}
             >
-              {chromeMode === "bracketView" ? (
-                <span className={styles.toolbarBtnLabelShort}>┴</span>
-              ) : (
-                <>
-                  <span className={styles.toolbarBtnLabelShort}>V</span>
-                  <span className={styles.toolbarBtnLabelLong}>세로</span>
-                </>
-              )}
+              <>
+                <span className={styles.toolbarBtnLabelShort}>V</span>
+                <span className={styles.toolbarBtnLabelLong}>세로</span>
+              </>
             </button>
             <button
               type="button"
@@ -1388,14 +1499,10 @@ export default function InteractiveBracketBoard({
               aria-label="가로형 보기"
               onClick={() => setViewMode("horizontal")}
             >
-              {chromeMode === "bracketView" ? (
-                <span className={styles.toolbarBtnLabelShort}>├</span>
-              ) : (
-                <>
-                  <span className={styles.toolbarBtnLabelShort}>H</span>
-                  <span className={styles.toolbarBtnLabelLong}>가로</span>
-                </>
-              )}
+              <>
+                <span className={styles.toolbarBtnLabelShort}>H</span>
+                <span className={styles.toolbarBtnLabelLong}>가로</span>
+              </>
             </button>
             <button
               type="button"
@@ -1406,11 +1513,7 @@ export default function InteractiveBracketBoard({
               aria-label="양쪽형 보기"
               onClick={() => setViewMode("dual")}
             >
-              {chromeMode === "bracketView" ? (
-                <span className={styles.toolbarBtnLabelShort}>H</span>
-              ) : (
-                "⇄"
-              )}
+              ⇄
             </button>
             <hr className={styles.toolbarDivider} aria-hidden />
             <button
@@ -1449,21 +1552,9 @@ export default function InteractiveBracketBoard({
             >
               ↺
             </button>
-            {chromeMode === "bracketView" && isMobileBracketViewLayout ? (
-              <button
-                type="button"
-                className={`${styles.toolbarButton} ${styles.toolbarMenuToggle}`}
-                title="메뉴 접기"
-                aria-label="메뉴 접기"
-                aria-expanded
-                onClick={() => setMobileToolbarExpanded(false)}
-              >
-                ≡
-              </button>
-            ) : null}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {chromeMode === "bracketView" && bracketViewNotice.trim() ? (
         <div className={styles.bracketViewNoticeBar} role="status">
@@ -1634,7 +1725,11 @@ export default function InteractiveBracketBoard({
                 <button
                   key={btn.key}
                   type="button"
-                  className={styles.advanceCancelButton}
+                  className={
+                    bracketViewSlotInteractionLocked
+                      ? `${styles.advanceCancelButton} ${styles.bracketViewAdvanceCancelBlocked}`
+                      : styles.advanceCancelButton
+                  }
                   style={{ left: `${btn.x}px`, top: `${btn.y}px` }}
                   onPointerDown={(e) => {
                     e.stopPropagation();
@@ -1684,6 +1779,7 @@ export default function InteractiveBracketBoard({
                     <div
                       className={[
                         styles.playerBox,
+                        bracketViewSlotInteractionLocked ? styles.bracketViewSlotPassThrough : "",
                         selectedBoxKey === boxKey ? styles.playerSelected : "",
                         swapCandidate?.key === boxKey ? styles.playerSwapCandidate : "",
                         slotHasName && !slotLoser ? styles.playerHasName : "",
@@ -1723,7 +1819,8 @@ export default function InteractiveBracketBoard({
                           opponentHasName,
                         )
                       }
-                      onDoubleClick={() =>
+                      onDoubleClick={() => {
+                        if (bracketViewSlotInteractionLocked) return;
                         interactionMode === "winner"
                           ? slotHasName && pickUserIdForApi
                             ? handleWinnerPick({
@@ -1742,8 +1839,8 @@ export default function InteractiveBracketBoard({
                               matchId: item.match.id,
                               slot: playerSlot,
                               value: slotLabel,
-                            })
-                      }
+                            });
+                      }}
                     >
                       {showRenameBadge && !isRenamingThis ? (
                         <span className={styles.playerEditBadge} aria-hidden>
@@ -1849,6 +1946,26 @@ export default function InteractiveBracketBoard({
           </div>
         </div>
       </div>
+    </>
+  );
+
+  return (
+    <section
+      className={
+        (viewMode === "vertical"
+          ? `${styles.boardRoot} ${styles.boardRootVerticalMatch}`
+          : `${styles.boardRoot} ${styles.boardRootHorizontalSlot}`) + rootChrome
+      }
+      data-interactive-bracket-root="1"
+    >
+      {chromeMode === "bracketView" ? (
+        <div className={styles.bracketViewChromeBody}>
+          <div className={styles.bracketViewCenterStack}>{boardMainChrome}</div>
+          <div className={styles.bracketViewRightSafeStrip} aria-hidden />
+        </div>
+      ) : (
+        boardMainChrome
+      )}
     </section>
   );
 }
