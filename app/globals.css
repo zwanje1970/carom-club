@@ -3241,19 +3241,20 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-board-title {
-  font-weight: 700;
+  font-weight: 500;
   font-size: clamp(0.90625rem, 2.75vw, 0.9375rem);
-  line-height: 1.38;
+  line-height: 1.42;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-board-meta {
   font-size: 0.665rem;
-  color: #64748b;
+  font-weight: 400;
+  color: #5b6578;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-board-pill {
   font-size: 0.6rem;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-tabs-link {
@@ -3267,6 +3268,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   min-height: 2.125rem;
   padding: 0.26rem 0.55rem;
   font-size: 0.8125rem;
+  font-weight: 400;
   border: 1px solid rgba(15, 23, 42, 0.14);
   background: #ffffff;
 }
@@ -3301,7 +3303,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   flex: 1 1 auto;
   min-width: 0;
   font-size: clamp(1rem, 3.2vw, 1.125rem);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-community-detail-header-actions {
