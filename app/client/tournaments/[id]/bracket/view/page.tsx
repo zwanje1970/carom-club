@@ -726,6 +726,11 @@ export default function TournamentBracketBoardViewPage() {
   const handleShuffleRound = useCallback(
     async (roundNumber: number) => {
       if (!bracket || actionBusy || isTournamentClosed || !tournamentId) return;
+      if (bracket.bracketMode === "multi_block") {
+        setSaveState("error");
+        setMessage("조분할 상태에서는 다시 섞기를 사용할 수 없습니다. 전체 초기화 후 이용해 주세요.");
+        return;
+      }
       const seg = storageSeg;
       const scope = shuffleScopeForSlice(bracket as BracketLike, boardSliceKey);
       setActionBusy(true);
@@ -1075,6 +1080,7 @@ export default function TournamentBracketBoardViewPage() {
               tournamentTitle={tournamentTitle}
               tournamentDate={tournamentDate}
               tournamentLocation={tournamentLocation}
+              shuffleRoundHidden={bracket?.bracketMode === "multi_block"}
               interactionDisabled={isTournamentClosed}
               actionBusy={actionBusy}
               canUndo={false}

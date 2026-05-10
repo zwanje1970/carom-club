@@ -714,6 +714,8 @@ export default function InteractiveBracketBoard({
   onSwapPlayers,
   onRenamePlayer,
   onShuffleRound,
+  /** true면 「현재 라운드 재배치」(랜덤 재배치) 숨김 — 조분할 등 */
+  shuffleRoundHidden = false,
   interactionDisabled = false,
   actionBusy = false,
   canUndo = false,
@@ -769,6 +771,7 @@ export default function InteractiveBracketBoard({
     displayName: string;
   }) => void | Promise<void>;
   onShuffleRound?: (roundNumber: number) => void | Promise<void>;
+  shuffleRoundHidden?: boolean;
   interactionDisabled?: boolean;
   actionBusy?: boolean;
   canUndo?: boolean;
@@ -1624,7 +1627,7 @@ export default function InteractiveBracketBoard({
             편집/스왑
           </button>
         ) : null}
-        {!interactionDisabled ? (
+        {!interactionDisabled && !shuffleRoundHidden ? (
           <button
             data-board-control
             type="button"
@@ -1635,7 +1638,7 @@ export default function InteractiveBracketBoard({
               void onShuffleRound?.(currentRoundNumber);
             }}
           >
-            현재 라운드 재배치
+            다시 섞기
           </button>
         ) : null}
         <span className={styles.scaleLabel}>

@@ -27,6 +27,7 @@ import {
   findMutableMatchById,
   hasDownstreamRoundInSlice,
   normalizeRoundStatusesEverywhere,
+  normalizeRoundStatusesInSlice,
   rebuildChainFromRoundInSlice,
   resolveRoundsForSliceKey,
   shuffleRoundSlotValuesInSlice,
@@ -1537,6 +1538,172 @@ export async function convertLatestBracketToMultiBlockFirestore(params: {
   }
 }
 
+/** 예선 조 1개: 1라운드 대진 유지·승패·진행만 제거, 결선은 1라운드만 남기고 동기화 */
+function resetQualifierBlockResultsInPlace(mut: MutableBracket, blockId: string): void {
+  if (mut.bracketMode !== "multi_block" || !mut.blocks?.length) {
+    throw new BracketOpReject("분할된 예선 조가 아닙니다.");
+  }
+  const bid = blockId.trim();
+  const block = mut.blocks.find((b) => b.id === bid);
+  if (!block) throw new BracketOpReject("대상 조를 찾을 수 없습니다.");
+
+  const rounds = block.rounds;
+  truncateRoundsAfterInSlice(rounds, 1);
+  const r1 = rounds.find((r) => r.roundNumber === 1);
+  if (!r1?.matches.length) throw new BracketOpReject("1라운드가 없습니다.");
+  for (const m of r1.matches) {
+    m.winnerUserId = null;
+    m.winnerName = null;
+    m.status = "PENDING";
+  }
+  normalizeRoundStatusesInSlice(rounds);
+
+  if (mut.finalBlock?.rounds?.length) {
+    truncateRoundsAfterInSlice(mut.finalBlock.rounds, 1);
+    const fr1 = mut.finalBlock.rounds.find((r) => r.roundNumber === 1);
+    if (fr1) {
+      for (const m of fr1.matches) {
+        m.winnerUserId = null;
+        m.winnerName = null;
+        m.status = "PENDING";
+      }
+    }
+  }
+  syncFinalBlockFromQualifiersInPlace(mut);
+  normalizeRoundStatusesEverywhere(mut);
+}
+
+/** 조분할 해제: 각 조 1라운드 슬롯을 순서대로 병합해 단일 예선 1라운드로 복귀(배치·상대 유지, 결과 없음) */
+function revertMultiBlockBracketToSingleInPlace(mut: MutableBracket): void {
+  if (mut.bracketMode !== "multi_block" || !mut.blocks?.length) {
+    throw new BracketOpReject("조분할된 대진표가 아닙니다.");
+  }
+  const slots: BracketPlayer[] = [];
+  for (const block of mut.blocks) {
+    const r1 = block.rounds.find((r) => r.roundNumber === 1);
+    if (!r1?.matches.length) {
+      throw new BracketOpReject("병합할 1라운드 데이터가 없습니다.");
+    }
+    for (const m of r1.matches) {
+      slots.push({ ...m.player1 }, { ...m.player2 });
+    }
+  }
+  if (slots.length < 2 || slots.length % 2 !== 0) {
+    throw new BracketOpReject("병합할 1라운드 슬롯이 올바르지 않습니다.");
+  }
+  const matches = buildRoundOneMatchesFromCopiedSlots(slots);
+  mut.rounds = [
+    {
+      roundNumber: 1,
+      matches,
+      status: "PENDING",
+    },
+  ];
+  delete (mut as { bracketMode?: string }).bracketMode;
+  mut.blocks = undefined;
+  mut.finalBlock = undefined;
+  mut.finalBlockSlotManual = undefined;
+  mut.blockSplit = undefined;
+  applyBracketDefaultsInPlace(mut);
+  normalizeRoundStatusesEverywhere(mut);
+}
+
+export async function resetQualifierBlockResultsFirestore(params: {
+  tournamentId: string;
+  bracketZoneId?: string | null;
+  blockId: string;
+}): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const tournamentId = params.tournamentId.trim();
+  const blockId = params.blockId.trim();
+  if (!tournamentId || !blockId) return { ok: false, error: "잘못된 요청입니다." };
+
+  const tournament = await getTournamentByIdFirestore(tournamentId);
+  if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다." };
+
+  const resolved = await resolveLatestBracketForMutationFirestore({
+    tournamentId,
+    tournament,
+    bracketZoneId: params.bracketZoneId,
+  });
+  if (!resolved) {
+    return {
+      ok: false,
+      error:
+        tournament.zonesEnabled === true
+          ? "권역(zoneId)를 지정하거나 해당 권역의 확정 대진표가 없습니다."
+          : "확정 대진표가 없습니다.",
+    };
+  }
+
+  const db = getSharedFirestoreDb();
+  try {
+    const bracket = await db.runTransaction(async (tx) => {
+      const ref = db.collection(BRACKETS).doc(resolved.id);
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new BracketOpReject("확정 대진표가 없습니다.");
+      const mut = bracketFromDoc(snap.id, snap.data() as Record<string, unknown>) as MutableBracket;
+      if (!mut) throw new BracketOpReject("확정 대진표가 없습니다.");
+      applyBracketDefaultsInPlace(mut);
+      resetQualifierBlockResultsInPlace(mut, blockId);
+      const normalized = normalizeBracket(mut as Bracket);
+      tx.set(ref, bracketToPlain(normalized));
+      return normalized;
+    });
+    return { ok: true, bracket };
+  } catch (e) {
+    if (e instanceof BracketOpReject) return { ok: false, error: e.message };
+    throw e;
+  }
+}
+
+export async function revertMultiBlockBracketToSingleFirestore(params: {
+  tournamentId: string;
+  bracketZoneId?: string | null;
+}): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const tournamentId = params.tournamentId.trim();
+  if (!tournamentId) return { ok: false, error: "잘못된 요청입니다." };
+
+  const tournament = await getTournamentByIdFirestore(tournamentId);
+  if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다." };
+
+  const resolved = await resolveLatestBracketForMutationFirestore({
+    tournamentId,
+    tournament,
+    bracketZoneId: params.bracketZoneId,
+  });
+  if (!resolved) {
+    return {
+      ok: false,
+      error:
+        tournament.zonesEnabled === true
+          ? "권역(zoneId)를 지정하거나 해당 권역의 확정 대진표가 없습니다."
+          : "확정 대진표가 없습니다.",
+    };
+  }
+
+  const db = getSharedFirestoreDb();
+  try {
+    const bracket = await db.runTransaction(async (tx) => {
+      const ref = db.collection(BRACKETS).doc(resolved.id);
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new BracketOpReject("확정 대진표가 없습니다.");
+      const mut = bracketFromDoc(snap.id, snap.data() as Record<string, unknown>) as MutableBracket;
+      if (!mut) throw new BracketOpReject("확정 대진표가 없습니다.");
+      applyBracketDefaultsInPlace(mut);
+      revertMultiBlockBracketToSingleInPlace(mut);
+      const normalized = normalizeBracket(mut as Bracket);
+      tx.set(ref, bracketToPlain(normalized));
+      return normalized;
+    });
+    return { ok: true, bracket };
+  } catch (e) {
+    if (e instanceof BracketOpReject) return { ok: false, error: e.message };
+    throw e;
+  }
+}
+
 export async function shuffleBracketRoundFirestore(params: {
   tournamentId: string;
   bracketZoneId?: string | null;
@@ -1589,35 +1756,13 @@ export async function shuffleBracketRoundFirestore(params: {
       if (!mut) throw new BracketOpReject("확정 대진표가 없습니다.");
       applyBracketDefaultsInPlace(mut);
 
-      const isMulti = mut.bracketMode === "multi_block" && mut.blocks?.length;
-
-      if (!isMulti) {
-        runShuffle(mut.rounds);
-      } else if (params.scope === "final_only") {
-        const fr = mut.finalBlock?.rounds;
-        if (!fr?.length) throw new BracketOpReject("결선 대진표가 없습니다.");
-        runShuffle(fr);
-      } else {
-        const blocks = mut.blocks;
-        if (!blocks?.length) throw new BracketOpReject("분할 대진표 블록이 없습니다.");
-        const scope = params.scope;
-        if (scope === "all_blocks") {
-          for (const block of blocks) {
-            runShuffle(block.rounds);
-          }
-        } else if (scope === "qualifiers_only") {
-          for (const block of blocks) {
-            runShuffle(block.rounds);
-          }
-        } else if (typeof scope === "object" && typeof scope.blockId === "string") {
-          const bid = scope.blockId.trim();
-          const block = blocks.find((b) => b.id === bid);
-          if (!block) throw new BracketOpReject("대상 블록을 찾을 수 없습니다.");
-          runShuffle(block.rounds);
-        } else {
-          throw new BracketOpReject("유효하지 않은 재배치 범위입니다.");
-        }
+      if (mut.bracketMode === "multi_block") {
+        throw new BracketOpReject(
+          "조분할 상태에서는 다시 섞기를 사용할 수 없습니다. 전체 초기화 후 이용해 주세요.",
+        );
       }
+
+      runShuffle(mut.rounds);
 
       normalizeRoundStatusesEverywhere(mut);
       syncFinalBlockFromQualifiersInPlace(mut);

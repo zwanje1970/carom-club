@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type TouchEvent } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import {
   buildBracketScene,
   buildFirstRoundSlotToBoxIndex,
@@ -133,11 +133,14 @@ export function BracketPrintClientShell({
   variant,
   tournamentId,
   embedded = false,
+  printStartPlayersHint = null,
 }: {
   variant: "blank" | "tournament";
   tournamentId?: string;
   /** 대회 상세 등 이미 main 안에 넣을 때 true — 중첩 main 방지 */
   embedded?: boolean;
+  /** tournament: 확정 대진표 기준 시작 강수 자동 반영(사용자 수동 변경 후 조·대진 변경 시에도 덮어씀) */
+  printStartPlayersHint?: number | null;
 }) {
   const [matchType,    setMatchType]    = useState<MatchType>("NORMAL");
   const [startPlayers, setStartPlayers] = useState(32);
@@ -153,6 +156,9 @@ export function BracketPrintClientShell({
   const [, setPdfDownloadStatus] = useState<PdfDownloadStatus>("idle");
   const [pdfDownloadModalOpen, setPdfDownloadModalOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const previewOpeningRef = useRef(false);
+  const [previewPortraitVertical, setPreviewPortraitVertical] = useState(false);
   const [previewScale, setPreviewScale] = useState(1);
   const [previewFitScale, setPreviewFitScale] = useState(1);
   const [previewViewportScale, setPreviewViewportScale] = useState(1);
@@ -256,8 +262,17 @@ export function BracketPrintClientShell({
       vw = window.innerWidth;
       vh = window.innerHeight;
     }
-    /* 용지는 항상 가로 고정. 세로/가로 모두 단순 fitScale로 복구한다. */
-    const fitScale = Math.min(vw / paperW, vh / paperH, 1);
+    const portraitLike = vw <= 600 && vh >= vw * 0.96;
+    let fitScale = Math.min(vw / paperW, vh / paperH);
+    if (!(fitScale > 0) || !Number.isFinite(fitScale)) fitScale = 0.1;
+    /* 세로 트리 + 모바일 세로: 가독성 하한으로 과소 축소 방지(스크롤로 보완) */
+    if (treeLayout === "VERTICAL" && portraitLike) {
+      const narrowFit = vw / paperW;
+      const readabilityFloor = Math.min(0.78, Math.max(narrowFit * 1.4, 0.4));
+      fitScale = Math.min(1.28, Math.max(fitScale, readabilityFloor));
+    } else {
+      fitScale = Math.min(fitScale, 1);
+    }
     let s = fitScale;
     if (!(s > 0) || !Number.isFinite(s)) s = 0.1;
     setPreviewFitScale(s);
@@ -266,7 +281,7 @@ export function BracketPrintClientShell({
       if (pinchActiveRef.current || clampedPrev > s + 0.001) return clampedPrev;
       return s;
     });
-  }, [previewPaper]);
+  }, [previewPaper, treeLayout]);
 
   const syncPreviewViewportScale = useCallback(() => {
     const vv = typeof window !== "undefined" ? window.visualViewport : undefined;
@@ -309,6 +324,39 @@ export function BracketPrintClientShell({
   }, [previewOpen, previewPaper, syncPreviewViewportScale, updatePreviewScale]);
 
   useEffect(() => {
+    if (!previewOpen) {
+      setPreviewPortraitVertical(false);
+      return;
+    }
+    const read = () => {
+      if (typeof window === "undefined") return;
+      const vw = window.visualViewport?.width ?? window.innerWidth;
+      const vh = window.visualViewport?.height ?? window.innerHeight;
+      setPreviewPortraitVertical(vw <= 600 && vh >= vw * 0.96);
+    };
+    read();
+    window.addEventListener("resize", read);
+    window.addEventListener("orientationchange", read);
+    window.visualViewport?.addEventListener("resize", read);
+    return () => {
+      window.removeEventListener("resize", read);
+      window.removeEventListener("orientationchange", read);
+      window.visualViewport?.removeEventListener("resize", read);
+    };
+  }, [previewOpen]);
+
+  useEffect(() => {
+    if (variant !== "tournament" || printStartPlayersHint == null) return;
+    const h = printStartPlayersHint;
+    if (!(START_SIZES as readonly number[]).includes(h)) return;
+    setStartPlayers(h);
+    setEndPlayers((prev) => {
+      const opts = validEndOptions(h);
+      return opts.includes(prev) ? prev : (opts[opts.length - 1] ?? 2);
+    });
+  }, [variant, printStartPlayersHint]);
+
+  useEffect(() => {
     if (!previewOpen) return;
     let orientTimer: ReturnType<typeof setTimeout> | undefined;
     const run = () => {
@@ -343,21 +391,30 @@ export function BracketPrintClientShell({
 
   /** 페이지 내부 전용 레이어 미리보기: A4 한 장 전체 scale, 스크롤·스와이프 없음 */
   const handleOpenPreviewOverlay = useCallback(async () => {
-    if (!rounds.length || !scene) return;
-    if (variant === "tournament") {
-      try {
+    if (!rounds.length || !scene || previewOpeningRef.current) return;
+    previewOpeningRef.current = true;
+    flushSync(() => {
+      setPreviewBusy(true);
+    });
+    try {
+      if (variant === "tournament") {
         const names = await fetchTournamentApplicants();
         setTournamentApplicants(names);
-      } catch {
-        return;
       }
+      setPreviewScale(1);
+      setPreviewOpen(true);
+    } catch {
+      window.alert("미리보기 준비 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setPreviewBusy(false);
+      previewOpeningRef.current = false;
     }
-    setPreviewScale(1);
-    setPreviewOpen(true);
   }, [rounds.length, scene, variant, fetchTournamentApplicants]);
 
   const handleClosePreviewOverlay = useCallback(() => {
     setPreviewOpen(false);
+    setPreviewBusy(false);
+    previewOpeningRef.current = false;
     setPreviewScale(1);
     setPreviewFitScale(1);
     setPreviewViewportScale(1);
@@ -657,11 +714,16 @@ export function BracketPrintClientShell({
   }, []);
 
   const previewStageIsZoomed = previewScale > previewFitScale + 0.001;
+  const previewStageScrollable = previewStageIsZoomed || (treeLayout === "VERTICAL" && previewPortraitVertical);
+  const previewDenseSlotNames = treeLayout === "VERTICAL" && previewPortraitVertical;
 
   return (
     <>
       {/* html2canvas 캡처용 오프스크린 SVG — 본 페이지에서는 인쇄하지 않음 */}
       <style>{`
+        @keyframes bbp-preview-spin {
+          to { transform: rotate(360deg); }
+        }
         @media screen {
           .bbp-print-svg {
             position: fixed;
@@ -938,15 +1000,16 @@ export function BracketPrintClientShell({
                 <span style={{ fontWeight: 700, fontSize: "0.88rem" }}>빈 칸 배경색</span>
               </label>
             </div>
-            <div style={{ padding: "1rem", borderTop: "1px solid #e5e7eb", background: "#f8fafc", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <div style={{ padding: "1rem", borderTop: "1px solid #e5e7eb", background: "#f8fafc" }}>
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
               <button
                 type="button"
                 className="v3-btn"
                 onClick={() => void handleOpenPreviewOverlay()}
-                disabled={!rounds.length || !scene}
+                disabled={!rounds.length || !scene || previewBusy || pdfExporting}
                 style={{ padding: "0.55rem 1rem", minHeight: "44px" }}
               >
-                미리보기
+                {previewBusy ? "준비 중…" : "미리보기"}
               </button>
               {variant === "blank" ? (
                 <button
@@ -969,6 +1032,36 @@ export function BracketPrintClientShell({
                   {pdfExporting ? "PDF 생성 중…" : "조별 1차 대진표 인쇄"}
                 </button>
               )}
+              </div>
+              {previewBusy ? (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  style={{
+                    marginTop: "0.65rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    fontSize: "0.88rem",
+                    color: "#475569",
+                  }}
+                >
+                  <span
+                    aria-hidden
+                    style={{
+                      display: "inline-block",
+                      width: "1.1rem",
+                      height: "1.1rem",
+                      border: "2px solid #cbd5e1",
+                      borderTopColor: "#2563eb",
+                      borderRadius: "50%",
+                      animation: "bbp-preview-spin 0.7s linear infinite",
+                      flexShrink: 0,
+                    }}
+                  />
+                  미리보기 계산중입니다
+                </div>
+              ) : null}
             </div>
           </section>
         </div>
@@ -1025,8 +1118,8 @@ export function BracketPrintClientShell({
                   onTouchEnd={handlePreviewTouchEnd}
                   onTouchCancel={handlePreviewTouchEnd}
                   style={{
-                    overflow: previewStageIsZoomed ? "auto" : "hidden",
-                    touchAction: previewStageIsZoomed ? "pan-x pan-y pinch-zoom" : "none",
+                    overflow: previewStageScrollable ? "auto" : "hidden",
+                    touchAction: previewStageScrollable ? "pan-x pan-y pinch-zoom" : "none",
                   }}
                 >
                   <div
@@ -1062,6 +1155,7 @@ export function BracketPrintClientShell({
                             warmEmptyBoxFill={warmEmptyBoxFill}
                             firstRoundNameSlots={variant === "tournament" ? previewTournamentFirstRoundSlots : null}
                             firstRoundSlotToBoxIndex={variant === "tournament" ? firstRoundSlotToBoxIndex : null}
+                            denseSlotNames={previewDenseSlotNames}
                           />
                           <BracketPrintServiceMark />
                         </div>

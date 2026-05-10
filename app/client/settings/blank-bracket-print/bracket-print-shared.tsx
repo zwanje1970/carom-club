@@ -40,6 +40,8 @@ export function BracketSVG({
   warmEmptyBoxFill = false,
   firstRoundNameSlots = null,
   firstRoundSlotToBoxIndex = null,
+  /** 모바일 세로·세로 트리 미리보기: 박스 대비 글자 자동 축소 강화 */
+  denseSlotNames = false,
 }: {
   scene: BracketSceneLike;
   matchType: MatchType;
@@ -49,6 +51,7 @@ export function BracketSVG({
   firstRoundNameSlots?: readonly (string | null | undefined)[] | null;
   /** 슬롯 i → scene.boxes 인덱스 (CENTER 등). 없으면 i 그대로 */
   firstRoundSlotToBoxIndex?: readonly number[] | null;
+  denseSlotNames?: boolean;
 }) {
   const cx = BRACKET_SVG_W / 2;
   const cy = BRACKET_SVG_H / 2;
@@ -67,10 +70,11 @@ export function BracketSVG({
           if (!b) return [];
           const label = typeof raw === "string" ? raw.trim() : "";
           if (!label) return [];
-          const fs = Math.max(
-            SLOT_NAME_FONT_MIN_MM,
-            Math.min(SLOT_NAME_FONT_MAX_MM, b.h * 0.34),
-          );
+          const minMm = denseSlotNames ? 0.82 : SLOT_NAME_FONT_MIN_MM;
+          const maxMm = denseSlotNames ? 1.95 : SLOT_NAME_FONT_MAX_MM;
+          const base = b.h * (denseSlotNames ? 0.36 : 0.34);
+          const lenPenalty = Math.min(label.length, 22) * (denseSlotNames ? 0.052 : 0);
+          const fs = Math.max(minMm, Math.min(maxMm, base - lenPenalty));
           const cxText = b.x + b.w / 2;
           const cyText = b.y + b.h / 2;
           return [
@@ -86,7 +90,7 @@ export function BracketSVG({
               fontFamily='system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
               style={{ paintOrder: "stroke fill", WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}
             >
-              {label.length > 18 ? `${label.slice(0, 17)}…` : label}
+              {label.length > (denseSlotNames ? 22 : 18) ? `${label.slice(0, denseSlotNames ? 21 : 17)}…` : label}
             </text>,
           ];
         })

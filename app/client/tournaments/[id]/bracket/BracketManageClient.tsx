@@ -41,20 +41,6 @@ const TournamentGroupRound1PrintClient = dynamic(
   { ssr: false, loading: () => <p className="v3-muted">조별 1차 대진표 인쇄 도구를 불러오는 중…</p> },
 );
 
-type BracketParticipant = {
-  userId: string;
-  applicantName: string;
-  phone: string;
-};
-
-type BracketParticipantSnapshot = {
-  id: string;
-  tournamentId: string;
-  participants: BracketParticipant[];
-  createdAt: string;
-  zoneId?: string | null;
-};
-
 type BracketRoundDoc = {
   roundNumber: number;
   status: "PENDING" | "IN_PROGRESS" | "COMPLETED";
@@ -149,6 +135,52 @@ function rootRoundOneSlotCount(b: Bracket): number {
   return r1.matches.length * 2;
 }
 
+const PRINT_START_SIZES = [16, 32, 64, 128] as const;
+
+function toAllowedPrintStartSize(n: number): number {
+  if (!Number.isFinite(n) || n <= 0) return 32;
+  for (const a of PRINT_START_SIZES) {
+    if (a >= n) return a;
+  }
+  return 128;
+}
+
+function countSliceFilledSlotsRoundOne(sliceRounds: BracketRoundDoc[]): number {
+  const r1 = sliceRounds.find((r) => r.roundNumber === 1);
+  if (!r1) return 0;
+  let c = 0;
+  for (const m of r1.matches) {
+    const filled = (p: { userId?: string; name?: string; displayName?: string | null }) => {
+      const uid = (p?.userId ?? "").trim();
+      if (uid.startsWith("__")) return false;
+      const nm = (p?.displayName ?? p?.name ?? "").trim();
+      return uid !== "" || nm !== "";
+    };
+    if (filled(m.player1)) c++;
+    if (filled(m.player2)) c++;
+  }
+  return c;
+}
+
+/** 인쇄용 시작 강수: 단일 대진표는 저장 슬롯 수, 조·결선은 해당 슬라이스 1라운드 실제·구조 기준 */
+function printStartPlayersHintFromBracket(b: Bracket | null, sliceKey: string | null): number | null {
+  if (!b) return null;
+  const sliceRounds = getSliceRoundsFromBracket(b, sliceKey);
+  if (!sliceRounds.length) return null;
+  const r1 = sliceRounds.find((r) => r.roundNumber === 1);
+  const structural = (r1?.matches.length ?? 0) * 2;
+  const counted = countSliceFilledSlotsRoundOne(sliceRounds);
+
+  if (b.bracketMode === "multi_block" && (sliceKey?.startsWith("block:") || sliceKey === "final")) {
+    const basis = Math.max(counted, structural);
+    return toAllowedPrintStartSize(basis > 0 ? basis : 32);
+  }
+
+  const slots = rootRoundOneSlotCount(b);
+  if (slots <= 0) return null;
+  return toAllowedPrintStartSize(slots);
+}
+
 function projectedQualifierBlockCount(b: Bracket, blockSize: number): number {
   const n = rootRoundOneSlotCount(b);
   const bs = Math.max(1, Math.floor(blockSize));
@@ -219,7 +251,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   const searchParams = useSearchParams();
   const tournamentId = useMemo(() => (typeof params.id === "string" ? params.id : ""), [params.id]);
   const urlZoneId = useMemo(() => searchParams.get("zoneId")?.trim() ?? "", [searchParams]);
-  const [snapshot, setSnapshot] = useState<BracketParticipantSnapshot | null>(null);
   const [bracket, setBracket] = useState<Bracket | null>(null);
   const [undoStack, setUndoStack] = useState<Bracket[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
@@ -233,6 +264,12 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   const [zoneOptions, setZoneOptions] = useState<{ id: string; zoneName: string }[]>([]);
   const [selectedZoneId, setSelectedZoneId] = useState("");
   const [printToolsOpen, setPrintToolsOpen] = useState(false);
+  const [zoneResetModalOpen, setZoneResetModalOpen] = useState(false);
+  const [fullResetWarnOpen, setFullResetWarnOpen] = useState(false);
+  const [fullResetPasswordOpen, setFullResetPasswordOpen] = useState(false);
+  const [fullResetPasswordInput, setFullResetPasswordInput] = useState("");
+  const [fullResetPasswordError, setFullResetPasswordError] = useState("");
+  const [dangerBusy, setDangerBusy] = useState(false);
   const [boardSliceKey, setBoardSliceKey] = useState<string | null>(null);
   const [multiBlockSize, setMultiBlockSize] = useState(16);
   const [multiBlockBusy, setMultiBlockBusy] = useState(false);
@@ -309,6 +346,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     return getSliceRoundsFromBracket(bracket, boardSliceKey) as ShuffleGuardRound[];
   }, [bracket, boardSliceKey]);
 
+  const selectedQualifierBlockId = useMemo(() => {
+    if (!boardSliceKey?.startsWith("block:")) return null;
+    return boardSliceKey.slice("block:".length);
+  }, [boardSliceKey]);
+
   const splitPreviewLine = useMemo(() => {
     if (!bracket || !canSplitBracket(bracket)) return null;
     const total = rootRoundOneSlotCount(bracket);
@@ -332,31 +374,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       return displayRoundsSorted[0]!.roundNumber;
     });
   }, [displayRoundsSorted]);
-
-  const loadLatestSnapshot = useCallback(async () => {
-    if (!tournamentId) return;
-    if (zonesEnabled && !selectedZoneId) {
-      setSnapshot(null);
-      return;
-    }
-    try {
-      const q = zonesEnabled && selectedZoneId ? `?zoneId=${encodeURIComponent(selectedZoneId)}` : "";
-      const response = await fetch(`/api/client/tournaments/${tournamentId}/bracket/participants-snapshot${q}`, {
-        credentials: "same-origin",
-      });
-      const result = (await response.json()) as {
-        snapshot?: BracketParticipantSnapshot | null;
-        error?: string;
-      };
-      if (!response.ok) {
-        setMessage(result.error ?? "작성 기준 참가자 정보를 불러오지 못했습니다.");
-        return;
-      }
-      setSnapshot(result.snapshot ?? null);
-    } catch {
-      setMessage("작성 기준 참가자 정보를 불러오는 중 오류가 발생했습니다.");
-    }
-  }, [tournamentId, zonesEnabled, selectedZoneId]);
 
   const pullManageBracket = useCallback(async (): Promise<
     { ok: true; bracket: Bracket | null } | { ok: false; error?: string }
@@ -458,9 +475,8 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   }, [tournamentId, zonesEnabled, urlZoneId]);
 
   useEffect(() => {
-    void loadLatestSnapshot();
     void loadLatestBracket();
-  }, [loadLatestSnapshot, loadLatestBracket]);
+  }, [loadLatestBracket]);
 
   useEffect(() => {
     didInitialBoardFocusRef.current = false;
@@ -1164,6 +1180,10 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
 
   async function executeRoundShuffle(roundNumber: number) {
     if (!tournamentId || !bracket) return;
+    if (bracket.bracketMode === "multi_block") {
+      setMessage("조분할 상태에서는 다시 섞기를 사용할 수 없습니다. 전체 초기화 후 이용해 주세요.");
+      return;
+    }
     setMultiBlockBusy(true);
     setMessage("");
     try {
@@ -1416,6 +1436,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
 
   async function handleShuffleCurrentRound(roundNumber: number) {
     if (!bracket || actionLoading || interactionLocked) return;
+    if (bracket.bracketMode === "multi_block") {
+      setSaveState("error");
+      setMessage("조분할 상태에서는 다시 섞기를 사용할 수 없습니다. 전체 초기화 후 이용해 주세요.");
+      return;
+    }
     const sliceRounds = getSliceRoundsFromBracket(bracket, boardSliceKey);
     const targetRound = sliceRounds.find((r) => r.roundNumber === roundNumber) ?? null;
     if (!targetRound || targetRound.matches.length === 0) {
@@ -1507,13 +1532,88 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     }
   }
 
+  async function submitQualifierBlockReset() {
+    if (!tournamentId || !selectedQualifierBlockId || dangerBusy) return;
+    setDangerBusy(true);
+    try {
+      const res = await fetch(
+        `/api/client/tournaments/${encodeURIComponent(tournamentId)}/bracket/reset-qualifier-block${bracketZoneQuery}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ blockId: selectedQualifierBlockId }),
+        },
+      );
+      const json = (await res.json()) as { bracket?: Bracket; error?: string };
+      if (!res.ok || !json.bracket) {
+        window.alert(json.error ?? "초기화에 실패했습니다.");
+        return;
+      }
+      setBracket(json.bracket);
+      setZoneResetModalOpen(false);
+      router.refresh();
+    } finally {
+      setDangerBusy(false);
+    }
+  }
+
+  async function submitFullRevertAfterPassword() {
+    if (!tournamentId || dangerBusy) return;
+    const pw = fullResetPasswordInput.trim();
+    if (!pw) {
+      setFullResetPasswordError("비밀번호를 입력해 주세요.");
+      return;
+    }
+    setDangerBusy(true);
+    setFullResetPasswordError("");
+    try {
+      const v = await fetch("/api/client/auth/verify-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ password: pw }),
+      });
+      const vj = (await v.json()) as { ok?: boolean; error?: string };
+      if (!v.ok || !vj.ok) {
+        setFullResetPasswordError(vj.error ?? "비밀번호가 일치하지 않습니다.");
+        return;
+      }
+      const res = await fetch(
+        `/api/client/tournaments/${encodeURIComponent(tournamentId)}/bracket/revert-multi-block${bracketZoneQuery}`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+        },
+      );
+      const json = (await res.json()) as { bracket?: Bracket; error?: string };
+      if (!res.ok || !json.bracket) {
+        window.alert(json.error ?? "전체 초기화에 실패했습니다.");
+        return;
+      }
+      setBracket(json.bracket);
+      setFullResetPasswordOpen(false);
+      setFullResetWarnOpen(false);
+      setFullResetPasswordInput("");
+      setFullResetPasswordError("");
+      router.refresh();
+    } finally {
+      setDangerBusy(false);
+    }
+  }
+
   if (variant === "quickResults") {
     const activeQuickRound =
       displayRoundsSorted.find((r) => r.roundNumber === selectedQuickRoundNumber) ?? displayRoundsSorted[0] ?? null;
-    const shuffleBlockedQuick =
-      activeQuickRound != null
-        ? getShuffleRoundBlockedReason(sliceRoundsForShuffleGuard, activeQuickRound.roundNumber)
+    const shuffleBlockedMultiSplit =
+      bracket?.bracketMode === "multi_block"
+        ? "조분할 상태에서는 다시 섞기를 사용할 수 없습니다. 전체 초기화 후 이용해 주세요."
         : null;
+    const shuffleBlockedQuick =
+      shuffleBlockedMultiSplit ??
+      (activeQuickRound != null
+        ? getShuffleRoundBlockedReason(sliceRoundsForShuffleGuard, activeQuickRound.roundNumber)
+        : null);
 
     return (
       <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
@@ -1642,7 +1742,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                       void executeRoundShuffle(activeQuickRound.roundNumber);
                     }}
                   >
-                    다시 셔플
+                    다시 섞기
                   </button>
                 </div>
                 <div style={{ marginTop: "0.5rem", overflowX: "auto" }}>
@@ -1772,12 +1872,13 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     );
   }
 
+  const printStartPlayersHint = useMemo(
+    () => printStartPlayersHintFromBracket(bracket, boardSliceKey),
+    [bracket, boardSliceKey],
+  );
+
   return (
     <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
-      <p className="v3-muted">
-        자동배정/수동배정에서 임시 배정 후 미리보기에서 확인하고, 확정 저장 시점에만 실제 대진표가 반영됩니다.
-      </p>
-
       {zonesEnabled ? (
         <section className="v3-box v3-stack" style={{ padding: "0.65rem 0.75rem" }}>
           <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
@@ -1890,9 +1991,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               </>
             ) : null}
             </div>
-            <span className="v3-muted" style={{ fontSize: "0.82rem" }}>
-              다시 셔플은 진행중 단계의 「운영용 리스트 입력」에서 실행할 수 있습니다.
-            </span>
           </div>
         </section>
       ) : null}
@@ -2009,7 +2107,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           </button>
         </div>
         {printToolsOpen ? (
-          <TournamentGroupRound1PrintClient tournamentId={tournamentId} />
+          <TournamentGroupRound1PrintClient tournamentId={tournamentId} printStartPlayersHint={printStartPlayersHint} />
         ) : (
           <p className="v3-muted" style={{ margin: 0 }}>
             운영판과 분리된 인쇄 전용 화면입니다. 필요할 때 열어 사용하세요.
@@ -2017,21 +2115,306 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
         )}
       </section>
 
-      <section className="v3-box v3-stack">
-        <h2 className="v3-h2">작성 기준 참가자</h2>
-        {!snapshot ? (
-          <p className="v3-muted">아직 고정된 참가자 목록이 없습니다. 새 대진표가 필요하면 아래에서 생성하거나 자동·수동 배정 화면을 이용하세요.</p>
-        ) : (
-          <>
-            <p>
-              <strong>참가자 수:</strong> {snapshot.participants.length}명
+      {bracket?.bracketMode === "multi_block" ? (
+        <section
+          className="v3-box v3-stack"
+          aria-label="위험 작업"
+          style={{
+            border: "2px solid #dc2626",
+            borderRadius: "10px",
+            background: "#fff7ed",
+            padding: "0.85rem 1rem",
+            gap: "0.65rem",
+          }}
+        >
+          <h2 className="v3-h2" style={{ margin: 0, fontSize: "1rem", color: "#991b1b" }}>
+            위험 작업
+          </h2>
+          <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem", color: "#7f1d1d" }}>
+            초기화는 참가자 순서를 바꾸지 않습니다. 참가자를 무작위로 다시 배치하려면 「다시 섞기」를 사용합니다.
+          </p>
+          <div className="v3-stack" style={{ gap: "0.5rem" }}>
+            <button
+              type="button"
+              disabled={!selectedQualifierBlockId || dangerBusy || (zonesEnabled && !selectedZoneId)}
+              onClick={() => setZoneResetModalOpen(true)}
+              style={{
+                minHeight: "44px",
+                padding: "0.5rem 0.85rem",
+                borderRadius: "8px",
+                border: "1px solid #b91c1c",
+                background: "#fef2f2",
+                color: "#991b1b",
+                fontWeight: 600,
+                cursor: !selectedQualifierBlockId ? "not-allowed" : "pointer",
+                opacity: !selectedQualifierBlockId ? 0.55 : 1,
+              }}
+            >
+              현재 조 결과 초기화
+            </button>
+            {!selectedQualifierBlockId ? (
+              <span className="v3-muted" style={{ fontSize: "0.78rem" }}>
+                예선 조(A/B/…)를 선택한 뒤 사용할 수 있습니다. 결선 화면에서는 이 초기화를 쓸 수 없습니다.
+              </span>
+            ) : null}
+            <button
+              type="button"
+              disabled={dangerBusy || (zonesEnabled && !selectedZoneId)}
+              onClick={() => {
+                setFullResetWarnOpen(true);
+              }}
+              style={{
+                minHeight: "44px",
+                padding: "0.5rem 0.85rem",
+                borderRadius: "8px",
+                border: "1px solid #7f1d1d",
+                background: "#991b1b",
+                color: "#fff",
+                fontWeight: 600,
+              }}
+            >
+              전체 초기화
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {zoneResetModalOpen ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 400,
+            background: "rgba(15,23,42,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, var(--client-bottom-space, 80px)) max(16px, env(safe-area-inset-left))",
+            boxSizing: "border-box",
+          }}
+          onClick={() => (!dangerBusy ? setZoneResetModalOpen(false) : null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="zone-reset-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: "22rem",
+              background: "#fff",
+              borderRadius: "12px",
+              padding: "1.15rem",
+              boxShadow: "0 16px 48px rgba(0,0,0,0.2)",
+              boxSizing: "border-box",
+            }}
+          >
+            <h2 id="zone-reset-title" style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}>
+              현재 조 결과 초기화
+            </h2>
+            <ul style={{ margin: "0 0 0.85rem", paddingLeft: "1.15rem", fontSize: "0.88rem", lineHeight: 1.5, color: "#334155" }}>
+              <li>선택한 예선 조의 경기 결과·승패·진출 상태가 삭제됩니다.</li>
+              <li>참가자 위치·대진 구조는 유지됩니다.</li>
+              <li>되돌릴 수 없습니다.</li>
+            </ul>
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+              <button type="button" className="v3-btn" disabled={dangerBusy} onClick={() => setZoneResetModalOpen(false)} style={{ minHeight: 44 }}>
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={dangerBusy}
+                onClick={() => void submitQualifierBlockReset()}
+                style={{
+                  minHeight: 44,
+                  padding: "0.5rem 1rem",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: "#dc2626",
+                  color: "#fff",
+                  fontWeight: 700,
+                }}
+              >
+                {dangerBusy ? "처리 중…" : "초기화 진행"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {fullResetWarnOpen ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 400,
+            background: "rgba(15,23,42,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, var(--client-bottom-space, 80px)) max(16px, env(safe-area-inset-left))",
+            boxSizing: "border-box",
+          }}
+          onClick={() => (!dangerBusy ? setFullResetWarnOpen(false) : null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="full-reset-warn-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: "22rem",
+              background: "#fff",
+              borderRadius: "12px",
+              padding: "1.15rem",
+              boxShadow: "0 16px 48px rgba(0,0,0,0.2)",
+              boxSizing: "border-box",
+            }}
+          >
+            <h2 id="full-reset-warn-title" style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}>
+              전체 초기화 (1단계)
+            </h2>
+            <ul style={{ margin: "0 0 0.85rem", paddingLeft: "1.15rem", fontSize: "0.88rem", lineHeight: 1.5, color: "#334155" }}>
+              <li>조분할(A/B/C…)이 해제됩니다.</li>
+              <li>조별 결과·진출자·결선이 제거됩니다.</li>
+              <li>조분할 전 단일 예선 1라운드 상태로 돌아갑니다.</li>
+              <li>참가자 배치·경기 상대는 유지됩니다(다시 섞기 아님).</li>
+              <li>되돌릴 수 없습니다.</li>
+            </ul>
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+              <button type="button" className="v3-btn" disabled={dangerBusy} onClick={() => setFullResetWarnOpen(false)} style={{ minHeight: 44 }}>
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={dangerBusy}
+                onClick={() => {
+                  setFullResetWarnOpen(false);
+                  setFullResetPasswordOpen(true);
+                  setFullResetPasswordInput("");
+                  setFullResetPasswordError("");
+                }}
+                style={{
+                  minHeight: 44,
+                  padding: "0.5rem 1rem",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: "#991b1b",
+                  color: "#fff",
+                  fontWeight: 700,
+                }}
+              >
+                계속 진행
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {fullResetPasswordOpen ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 401,
+            background: "rgba(15,23,42,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, var(--client-bottom-space, 80px)) max(16px, env(safe-area-inset-left))",
+            boxSizing: "border-box",
+          }}
+          onClick={() => {
+            if (dangerBusy) return;
+            setFullResetPasswordOpen(false);
+            setFullResetPasswordInput("");
+            setFullResetPasswordError("");
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="full-reset-pw-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: "22rem",
+              background: "#fff",
+              borderRadius: "12px",
+              padding: "1.15rem",
+              boxShadow: "0 16px 48px rgba(0,0,0,0.2)",
+              boxSizing: "border-box",
+            }}
+          >
+            <h2 id="full-reset-pw-title" style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}>
+              전체 초기화 (2단계)
+            </h2>
+            <p style={{ margin: "0 0 0.5rem", fontSize: "0.88rem", color: "#475569" }}>
+              로그인에 사용 중인 관리자 비밀번호를 입력해 주세요.
             </p>
-            <p>
-              <strong>고정 시각:</strong> {new Date(snapshot.createdAt).toLocaleString("ko-KR")}
-            </p>
-          </>
-        )}
-      </section>
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={fullResetPasswordInput}
+              onChange={(e) => {
+                setFullResetPasswordInput(e.target.value);
+                setFullResetPasswordError("");
+              }}
+              disabled={dangerBusy}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                minHeight: "44px",
+                padding: "0.5rem 0.65rem",
+                fontSize: "1rem",
+                borderRadius: "8px",
+                border: "1px solid #cbd5e1",
+                marginBottom: "0.35rem",
+              }}
+            />
+            {fullResetPasswordError ? (
+              <p style={{ margin: "0 0 0.65rem", fontSize: "0.85rem", color: "#b91c1c" }}>{fullResetPasswordError}</p>
+            ) : (
+              <div style={{ marginBottom: "0.65rem" }} />
+            )}
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="v3-btn"
+                disabled={dangerBusy}
+                onClick={() => {
+                  setFullResetPasswordOpen(false);
+                  setFullResetPasswordInput("");
+                  setFullResetPasswordError("");
+                }}
+                style={{ minHeight: 44 }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={dangerBusy}
+                onClick={() => void submitFullRevertAfterPassword()}
+                style={{
+                  minHeight: 44,
+                  padding: "0.5rem 1rem",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: "#991b1b",
+                  color: "#fff",
+                  fontWeight: 700,
+                }}
+              >
+                {dangerBusy ? "처리 중…" : "비밀번호 확인 후 초기화"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {!bracket ? (
         <>
@@ -2066,21 +2449,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           </div>
         </>
       ) : null}
-
-      <section className="v3-box v3-stack">
-        <h2 className="v3-h2">기준 참가자 명단</h2>
-        {!snapshot ? (
-          <p className="v3-muted">고정된 참가자 목록이 없어 표시할 수 없습니다.</p>
-        ) : (
-          <ul className="v3-list">
-            {snapshot.participants.map((participant, index) => (
-              <li key={`${snapshot.id}-${participant.userId}-${index}`}>
-                {participant.applicantName} / {participant.phone}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </main>
   );
 }
