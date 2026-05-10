@@ -5,6 +5,7 @@ import {
   parseSessionCookieValue,
   SESSION_COOKIE_NAME,
 } from "./lib/auth/session";
+import { CAROM_CLIENT_MOBILE_APP_SHELL_HEADER } from "./lib/carom-client-mobile-shell-boot";
 import { isCaromClubMobileAppShell } from "./lib/is-carom-club-mobile-app-shell";
 import { logPlatformApiBlock } from "./lib/server/platform-api-block-log";
 
@@ -95,7 +96,11 @@ export function proxy(request: NextRequest): NextResponse {
       url.pathname = "/client-apply";
       return NextResponse.redirect(url);
     }
-    return NextResponse.next();
+    const requestHeaders = new Headers(request.headers);
+    if (isCaromClubMobileAppShell(request.headers)) {
+      requestHeaders.set(CAROM_CLIENT_MOBILE_APP_SHELL_HEADER, "1");
+    }
+    return NextResponse.next({ request: { headers: requestHeaders } });
   }
 
   if (pathname.startsWith("/platform")) {

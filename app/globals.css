@@ -3886,40 +3886,64 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
 }
 
 /*
- * /client 앱(WebView) 전용: `isCaromClubMobileAppShell`일 때 서버가 붙이는
- * `[data-carom-app-client-force-mobile-shell="1"]`에서만, 뷰포트가 768px 이상이어도
- * 위 `@media (max-width: 767px)` /client 모바일 셸 규칙과 동일하게 적용한다.
+ * /client 모바일 셸 — 뷰포트>767에서도 적용:
+ * - `[data-carom-app-client-force-mobile-shell="1"]` (서버·WebView UA 등)
+ * - `html[data-mobile-app-shell="1"]` (proxy SSR 헤더 + beforeInteractive 스크립트: PWA·브릿지 등)
+ * `@media (max-width: 767px)` 규칙은 유지 — 일반 브라우저 좁은 창용.
  */
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"] {
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"],
+  html[data-mobile-app-shell="1"] .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]
+) {
   --client-bottom-nav-height: 64px;
   --client-safe-bottom: max(16px, env(safe-area-inset-bottom, 0px));
   --client-bottom-reserved-space: calc(var(--client-bottom-nav-height) + var(--client-safe-bottom));
   --client-bottom-space: var(--client-bottom-reserved-space);
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:has(
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:has(
     [data-client-bracket-view-fullscreen="1"]
   ),
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:has(
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-bracket-view-fullscreen="1"])
+),
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:has(
     [data-client-applications-table-fullscreen="1"]
-  ) {
+  ),
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-applications-table-fullscreen="1"])
+) {
   --client-bottom-nav-height: 0px;
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:has(
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:has(
     [data-client-bracket-view-fullscreen="1"]
-  )
+  ),
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-bracket-view-fullscreen="1"])
+)
   .client-mobile-bottom-nav,
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:has(
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:has(
     [data-client-applications-table-fullscreen="1"]
-  )
+  ),
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-applications-table-fullscreen="1"])
+)
   .client-mobile-bottom-nav {
   display: none !important;
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:not(
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:not(
     :has([data-client-bracket-view-fullscreen="1"])
-  ) {
+  ),
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:not(:has([data-client-bracket-view-fullscreen="1"]))
+) {
   display: flex;
   flex-direction: column;
   height: 100dvh;
@@ -3929,9 +3953,13 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   box-sizing: border-box;
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:not(
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:not(
     :has([data-client-bracket-view-fullscreen="1"])
-  )
+  ),
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:not(:has([data-client-bracket-view-fullscreen="1"]))
+)
   > .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
   flex: 1 1 auto;
   min-height: 0;
@@ -3946,7 +3974,10 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   padding-right: max(12px, env(safe-area-inset-right, 0px));
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"],
+  html[data-mobile-app-shell="1"] .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]
+)
   .client-mobile-bottom-nav {
   display: flex;
   box-sizing: border-box;
@@ -3963,9 +3994,13 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   z-index: 56;
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:not(
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:not(
     :has([data-client-bracket-view-fullscreen="1"])
-  )
+  ),
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:not(:has([data-client-bracket-view-fullscreen="1"]))
+)
   .client-mobile-bottom-nav {
   position: relative;
   flex-shrink: 0;
@@ -3976,7 +4011,10 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"],
+  html[data-mobile-app-shell="1"] .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]
+)
   .client-mobile-bottom-nav__btn {
   flex: 1 1 0;
   min-width: 0;
@@ -3999,13 +4037,19 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   box-sizing: border-box;
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"],
+  html[data-mobile-app-shell="1"] .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]
+)
   .client-mobile-bottom-nav__btn--primary {
   color: var(--ui-primary, #4d7db5);
   font-weight: 700;
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"],
+  html[data-mobile-app-shell="1"] .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]
+)
   .client-mobile-bottom-nav__label {
   font-size: 0.76rem;
   font-weight: 600;
@@ -4017,33 +4061,50 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   max-width: 100%;
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"],
+  html[data-mobile-app-shell="1"] .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]
+)
   .client-mobile-bottom-nav__btn--primary
   .client-mobile-bottom-nav__label {
   font-weight: 700;
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:not(
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:not(
     :has([data-client-bracket-view-fullscreen="1"])
-  )
+  ),
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:not(:has([data-client-bracket-view-fullscreen="1"]))
+)
   .client-dashboard-scroll-safe-area {
   padding-bottom: 0.75rem;
   scroll-padding-bottom: 0.75rem;
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"],
+  html[data-mobile-app-shell="1"] .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]
+)
   .client-dashboard-fixed-bottom {
   bottom: calc(env(safe-area-inset-bottom, 0px) + var(--client-bottom-nav-height)) !important;
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"],
+  html[data-mobile-app-shell="1"] .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]
+)
   .client-dashboard-inquiry-composer-footer {
   padding-bottom: max(0.65rem, env(safe-area-inset-bottom, 0px)) !important;
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:not(
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:not(
     :has([data-client-bracket-view-fullscreen="1"])
-  )
+  ),
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:not(:has([data-client-bracket-view-fullscreen="1"]))
+)
   .client-dashboard-inquiry-composer-root {
   height: 100% !important;
   max-height: 100% !important;
@@ -4188,6 +4249,140 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   }
 }
 
+/*
+ * html[data-mobile-app-shell]: 가로 등으로 뷰포트 너비>767일 때 — 위 @media(max-width:767px) 블록과 동일(/client 만).
+ */
+html[data-mobile-app-shell="1"] .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-card-publish-v2="1"]) {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+html[data-mobile-app-shell="1"]
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-card-publish-v2="1"])
+  > .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+html[data-mobile-app-shell="1"] .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-bracket-view-fullscreen="1"]) {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+html[data-mobile-app-shell="1"]
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-bracket-view-fullscreen="1"])
+  > .app-dashboard-mobile-chrome {
+  display: none !important;
+}
+
+html[data-mobile-app-shell="1"]
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-bracket-view-fullscreen="1"])
+  > .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+html[data-mobile-app-shell="1"]
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-applications-vertical-focus="1"]) {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+html[data-mobile-app-shell="1"]
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-applications-vertical-focus="1"])
+  > .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+html[data-mobile-app-shell="1"]
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-applications-vertical-focus="1"])
+  main[data-client-applications-vertical-focus="1"].v3-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding-top: 0.35rem;
+  padding-bottom: 0;
+  padding-left: max(0.45rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.45rem, env(safe-area-inset-right, 0px));
+  max-width: none;
+  margin: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+html[data-mobile-app-shell="1"]
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-applications-table-fullscreen="1"]) {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+html[data-mobile-app-shell="1"]
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-applications-table-fullscreen="1"])
+  > .app-dashboard-mobile-chrome {
+  display: none !important;
+}
+
+html[data-mobile-app-shell="1"]
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-applications-table-fullscreen="1"])
+  > .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding-top: max(var(--app-safe-top), 0px);
+  padding-bottom: 0;
+  padding-left: max(var(--app-safe-left), 0px);
+  padding-right: max(var(--app-safe-right), 0px);
+}
+
+html[data-mobile-app-shell="1"]
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-applications-table-fullscreen="1"])
+  main[data-client-applications-table-fullscreen="1"] {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0 !important;
+  margin: 0 !important;
+  max-width: none !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 @media (orientation: landscape) {
   .app-dashboard-mobile-root:has([data-client-applications-table-fullscreen="1"]) {
     display: flex;
@@ -4216,6 +4411,52 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   }
 
   .app-dashboard-mobile-root:has([data-client-applications-table-fullscreen="1"])
+    main[data-client-applications-table-fullscreen="1"] {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-applications-table-fullscreen="1"]) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-applications-table-fullscreen="1"])
+    > .app-dashboard-mobile-chrome {
+    display: none !important;
+  }
+
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-applications-table-fullscreen="1"])
+    > .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding-top: max(var(--app-safe-top), 0px);
+    padding-bottom: 0;
+    padding-left: max(var(--app-safe-left), 0px);
+    padding-right: max(var(--app-safe-right), 0px);
+  }
+
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-applications-table-fullscreen="1"])
     main[data-client-applications-table-fullscreen="1"] {
     flex: 1 1 auto;
     min-height: 0;
@@ -4284,26 +4525,43 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   }
 }
 
-/* /client 앱: 뷰포트 >767 — 상단 크롬 표시, 풀스크린 시 위 미디어 블록과 동일하게 숨김·레이아웃 */
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]
+/* /client 앱: 뷰포트 >767 — 상단 크롬·풀스크린 예외 (`html[data-mobile-app-shell]` 동일) */
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"],
+  html[data-mobile-app-shell="1"] .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]
+)
   > .app-dashboard-mobile-chrome {
   display: block;
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:has(
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:has(
     [data-client-bracket-view-fullscreen="1"]
-  )
+  ),
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-bracket-view-fullscreen="1"])
+)
   > .app-dashboard-mobile-chrome,
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:has(
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:has(
     [data-client-applications-table-fullscreen="1"]
-  )
+  ),
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-applications-table-fullscreen="1"])
+)
   > .app-dashboard-mobile-chrome {
   display: none !important;
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:not(
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:not(
     :has([data-client-bracket-view-fullscreen="1"])
-  ):not(:has([data-client-applications-table-fullscreen="1"]))
+  ):not(:has([data-client-applications-table-fullscreen="1"])),
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:not(:has([data-client-bracket-view-fullscreen="1"])):not(
+      :has([data-client-applications-table-fullscreen="1"])
+    )
+)
   > .app-dashboard-mobile-chrome {
   position: fixed;
   top: 0;
@@ -4319,9 +4577,13 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   box-sizing: border-box;
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:has(
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:has(
     [data-client-bracket-view-fullscreen="1"]
-  ) {
+  ),
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-bracket-view-fullscreen="1"])
+) {
   display: flex;
   flex-direction: column;
   height: 100dvh;
@@ -4330,9 +4592,13 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   box-sizing: border-box;
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:has(
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:has(
     [data-client-bracket-view-fullscreen="1"]
-  )
+  ),
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:has([data-client-bracket-view-fullscreen="1"])
+)
   > .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
   flex: 1 1 auto;
   min-height: 0;
@@ -4343,9 +4609,15 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   padding-bottom: 0;
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:not(
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:not(
     :has([data-client-bracket-view-fullscreen="1"])
-  ):has([data-client-applications-table-fullscreen="1"]) {
+  ):has([data-client-applications-table-fullscreen="1"]),
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:not(:has([data-client-bracket-view-fullscreen="1"])):has(
+      [data-client-applications-table-fullscreen="1"]
+    )
+) {
   display: flex;
   flex-direction: column;
   height: 100dvh;
@@ -4354,9 +4626,15 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   box-sizing: border-box;
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:not(
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:not(
     :has([data-client-bracket-view-fullscreen="1"])
-  ):has([data-client-applications-table-fullscreen="1"])
+  ):has([data-client-applications-table-fullscreen="1"]),
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:not(:has([data-client-bracket-view-fullscreen="1"])):has(
+      [data-client-applications-table-fullscreen="1"]
+    )
+)
   > .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
   flex: 1 1 auto;
   min-height: 0;
@@ -4369,9 +4647,15 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   padding-right: max(var(--app-safe-right), 0px);
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:not(
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]:not(
     :has([data-client-bracket-view-fullscreen="1"])
-  ):has([data-client-applications-table-fullscreen="1"])
+  ):has([data-client-applications-table-fullscreen="1"]),
+  html[data-mobile-app-shell="1"]
+    .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]:not(:has([data-client-bracket-view-fullscreen="1"])):has(
+      [data-client-applications-table-fullscreen="1"]
+    )
+)
   main[data-client-applications-table-fullscreen="1"] {
   flex: 1 1 auto;
   min-height: 0;
@@ -4448,18 +4732,27 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   }
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"],
+  html[data-mobile-app-shell="1"] .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]
+)
   .app-dashboard-shell--with-mobile-chrome
   > main.v3-page
   > .ui-client-dashboard-header,
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"],
+  html[data-mobile-app-shell="1"] .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]
+)
   .app-dashboard-shell--with-mobile-chrome
   main.v3-page
   > .ui-client-dashboard-header {
   display: none !important;
 }
 
-.app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"]
+:is(
+  .app-dashboard-mobile-root[data-dashboard-mobile-area="client"][data-carom-app-client-force-mobile-shell="1"],
+  html[data-mobile-app-shell="1"] .app-dashboard-mobile-root[data-dashboard-mobile-area="client"]
+)
   .app-dashboard-shell--with-mobile-chrome
   > main.v3-page.platform-home
   > .v3-h1:first-child {

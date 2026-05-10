@@ -51,23 +51,23 @@
   height: auto;
 }
 
-.cardRootSlideDeckAspectFill.cardRootSurfaceFull .classicInner {
+.cardRootSlideDeckAspectFill.cardRootSurfaceFull:not(.cardRootArtboardPx) .classicInner {
   flex: 1 1 auto;
   min-height: 0;
   height: auto;
 }
 
-.cardRootSlideDeckAspectFill.cardRootSurfaceFull .classicTop {
+.cardRootSlideDeckAspectFill.cardRootSurfaceFull:not(.cardRootArtboardPx) .classicTop {
   flex: 1 1 auto;
   min-height: 0;
 }
 
-.cardRootSlideDeckAspectFill.cardRootSurfaceFull .classicMain {
+.cardRootSlideDeckAspectFill.cardRootSurfaceFull:not(.cardRootArtboardPx) .classicMain {
   flex: 1 1 auto;
   min-height: 0;
 }
 
-.cardRootSlideDeckAspectFill.cardRootSurfaceFull .frameCenter {
+.cardRootSlideDeckAspectFill.cardRootSurfaceFull:not(.cardRootArtboardPx) .frameCenter {
   flex: 1 1 auto;
   min-height: 0;
 }
@@ -284,25 +284,25 @@
 }
 
 /* 전체형: 하단 흰 띠 없이 면 전체 배경 + 하단 오버레이(카드 높이·반지름·그림자는 분리형과 동일) */
-.cardRootSurfaceFull .media {
+.cardRootSurfaceFull:not(.cardRootArtboardPx) .media {
   flex: 1 1 auto;
 }
 
-.cardRootSurfaceFull .classicInner {
+.cardRootSurfaceFull:not(.cardRootArtboardPx) .classicInner {
   display: flex;
   flex-direction: column;
   min-height: 100%;
   height: 100%;
 }
 
-.cardRootSurfaceFull .classicTop {
+.cardRootSurfaceFull:not(.cardRootArtboardPx) .classicTop {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
-.cardRootSurfaceFull .classicMain {
+.cardRootSurfaceFull:not(.cardRootArtboardPx) .classicMain {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
@@ -365,7 +365,7 @@
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
 }
 
-.cardRootSurfaceFull .frameCenter {
+.cardRootSurfaceFull:not(.cardRootArtboardPx) .frameCenter {
   flex: 1 1 auto;
   min-height: 100%;
   align-self: stretch;
@@ -821,6 +821,93 @@ article[data-editor-card-preview="1"] .fullSurfaceFooterPlace {
   height: 161px;
   flex: 0 0 auto;
   align-self: flex-start;
+}
+
+/*
+ * 440×161 아트보드 + 템플릿: 분리형은 .media 높이가 면−하단 띠, 전체형은 .media=전체 높이였으나
+ * .classicTop/.classicMain flex 성장으로 텍스트 박스가 달라짐 → 동일 inset 절대 배치로 통일.
+ */
+.cardRootArtboardPx.cardRootTemplateLayout {
+  --artboard-footer-strip-height: calc(
+    var(--slide-card-face-height) / 3 * var(--tournament-card-height-scale) -
+      1rem * var(--tournament-card-height-scale)
+  );
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout .classicInner {
+  position: relative;
+  display: block;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 0;
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout:not(.cardRootSurfaceFull) .classicTop {
+  position: absolute;
+  top: 11px;
+  right: 13px;
+  left: 13px;
+  bottom: 12px;
+  width: auto;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout.cardRootSurfaceFull .classicTop {
+  position: absolute;
+  top: 11px;
+  right: 13px;
+  left: 13px;
+  bottom: calc(12px + var(--artboard-footer-strip-height));
+  width: auto;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout .classicMain {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout.cardRootSurfaceFull .fullSurfaceFooter {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin-top: 0;
+  z-index: 5;
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout .frameInner {
+  position: relative;
+  display: block;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 0;
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout:not(.cardRootSurfaceFull) .frameCenter {
+  position: absolute;
+  top: 8px;
+  right: 11px;
+  left: 11px;
+  bottom: 6px;
+  width: auto;
+  flex: none;
+  min-height: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout.cardRootSurfaceFull .frameCenter {
+  bottom: calc(6px + var(--artboard-footer-strip-height));
 }
 
 .cardRootArtboardPx.cardRootTemplateLayout .classicLead,
