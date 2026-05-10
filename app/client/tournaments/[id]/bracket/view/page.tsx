@@ -8,6 +8,7 @@ import {
   findBracketMatchLocation,
   getSliceRoundsFromBracket,
   hasDownstreamRoundsInSlice,
+  isEligibleBracketWinnerUserId,
   shuffleScopeForSlice,
   syncClearMatchWinner,
   syncRenamePlayer,
@@ -32,7 +33,11 @@ import {
   writeOfflinePending,
 } from "../bracket-offline-cache";
 import viewStyles from "../bracket-view-page.module.css";
-import { applyCaromOrientationMode } from "../../../../native-fullscreen-orientation-lock";
+import {
+  applyCaromOrientationMode,
+  CAROM_BRACKET_NATIVE_LANDSCAPE_SESSION_ID,
+  unregisterCaromExplicitNativeLandscapeSession,
+} from "../../../../native-fullscreen-orientation-lock";
 
 const InteractiveBracketBoard = dynamic(
   () => import("../InteractiveBracketBoard"),
@@ -425,6 +430,7 @@ export default function TournamentBracketBoardViewPage() {
   const handlePickWinner = useCallback(
     async (args: { matchId: string; winnerUserId: string; roundNumber: number }) => {
       if (!bracket || !tournamentId || isTournamentClosed || actionBusy) return;
+      if (!isEligibleBracketWinnerUserId(args.winnerUserId)) return;
       const seg = storageSeg;
       const loc = findBracketMatchLocation(bracket as BracketLike, args.matchId);
       if (!loc) return;
@@ -648,8 +654,8 @@ export default function TournamentBracketBoardViewPage() {
   );
 
   const handleClearMatchWinner = useCallback(
-    async (args: { matchId: string }) => {
-      if (!bracket || !tournamentId || isTournamentClosed || actionBusy) return;
+    async (args: { matchId: string }): Promise<boolean> => {
+      if (!bracket || !tournamentId || isTournamentClosed || actionBusy) return false;
       const seg = storageSeg;
       setActionBusy(true);
       setSaveState("saving");
@@ -660,14 +666,14 @@ export default function TournamentBracketBoardViewPage() {
           if (!next) {
             setSaveState("error");
             setMessage("진출을 취소할 수 없습니다.");
-            return;
+            return false;
           }
           setBracket(next as Bracket);
           writeLastGoodBracket(tournamentId, seg, next as Bracket);
           appendOfflinePending(tournamentId, seg, { type: "clear_winner", matchId: args.matchId });
           setOfflineDirty(tournamentId, seg, true);
           setSaveState("idle");
-          return;
+          return true;
         }
         const rs = await syncClearMatchWinner({
           bracket: bracket as BracketLike,
@@ -678,13 +684,14 @@ export default function TournamentBracketBoardViewPage() {
         if (!rs.ok) {
           setSaveState("error");
           setMessage(rs.error);
-          return;
+          return false;
         }
         setBracket(rs.bracket as Bracket);
         writeLastGoodBracket(tournamentId, seg, rs.bracket as Bracket);
         setOfflineDirty(tournamentId, seg, false);
         setSaveState("idle");
         setMessage("");
+        return true;
       } catch {
         const next = applyLocalClearWinner(bracket as BracketLike, args.matchId);
         if (next) {
@@ -694,10 +701,11 @@ export default function TournamentBracketBoardViewPage() {
           setOfflineDirty(tournamentId, seg, true);
           setSaveState("idle");
           setMessage("");
-        } else {
-          setSaveState("error");
-          setMessage("진출 취소 중 오류가 발생했습니다.");
+          return true;
         }
+        setSaveState("error");
+        setMessage("진출 취소 중 오류가 발생했습니다.");
+        return false;
       } finally {
         setActionBusy(false);
       }
@@ -825,6 +833,7 @@ export default function TournamentBracketBoardViewPage() {
 
   useEffect(() => {
     return () => {
+      unregisterCaromExplicitNativeLandscapeSession(CAROM_BRACKET_NATIVE_LANDSCAPE_SESSION_ID);
       applyCaromOrientationMode("portrait", "bracket-view-fullscreen:unmount");
     };
   }, []);

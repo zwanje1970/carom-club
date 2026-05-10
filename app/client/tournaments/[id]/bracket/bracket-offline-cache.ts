@@ -3,7 +3,12 @@
  * (서버/Firestore 구조 변경 없음)
  */
 
-import { findBracketMatchLocation, shuffleScopeForSlice, type BracketLike } from "./bracket-view-server-sync";
+import {
+  findBracketMatchLocation,
+  isEligibleBracketWinnerUserId,
+  shuffleScopeForSlice,
+  type BracketLike,
+} from "./bracket-view-server-sync";
 
 export type BracketOfflineSegment = string;
 
@@ -149,6 +154,7 @@ export function applyLocalWinnerPick(bracket: BracketLike, matchId: string, winn
   if (!loc) return null;
   const m = loc.match;
   const w = winnerUserId.trim();
+  if (!isEligibleBracketWinnerUserId(w)) return null;
   const p1 = m.player1.userId.trim() === w;
   const p2 = m.player2.userId.trim() === w;
   if (!p1 && !p2) return null;

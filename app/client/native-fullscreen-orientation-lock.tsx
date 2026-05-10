@@ -156,6 +156,64 @@ export function isCaromViewportLandscape(): boolean {
   return false;
 }
 
+/** 대진표 툴바에서 네이티브 가로를 켠 동안 lifecycle 가드가 세로로 덮어쓰지 않게 표시 */
+export const CAROM_BRACKET_NATIVE_LANDSCAPE_SESSION_ID = "bracket-view-native-landscape";
+
+const explicitNativeLandscapeSessions = new Set<string>();
+
+export function registerCaromExplicitNativeLandscapeSession(sessionId: string): void {
+  const id = sessionId.trim();
+  if (!id) return;
+  explicitNativeLandscapeSessions.add(id);
+}
+
+export function unregisterCaromExplicitNativeLandscapeSession(sessionId: string): void {
+  explicitNativeLandscapeSessions.delete(sessionId.trim());
+}
+
+export function unregisterAllCaromExplicitNativeLandscapeSessions(): void {
+  explicitNativeLandscapeSessions.clear();
+}
+
+export function hasCaromExplicitNativeLandscapeSession(): boolean {
+  return explicitNativeLandscapeSessions.size > 0;
+}
+
+/**
+ * 앱 WebView 복구용: 전체화면 해제 시도 + 세로 고정 + 짧은 재시도(100ms·300ms).
+ * 일반 브라우저에서는 호출 전제를 두지 않지만, 호출부에서 앱 여부를 필터한다.
+ */
+export function scheduleCaromAppPortraitRecovery(contextLabel: string): void {
+  const ctx = contextLabel.trim() || "app-portrait-recover";
+  try {
+    const fs = typeof document !== "undefined" ? document.fullscreenElement : null;
+    if (fs && typeof document.exitFullscreen === "function") {
+      void document.exitFullscreen();
+    }
+  } catch {
+    /* ignore */
+  }
+  restoreCaromFullscreenPortrait(ctx);
+  window.setTimeout(() => {
+    requestNativeOrientation("portrait", `${ctx}:recover-100`);
+    requestBrowserOrientation("portrait", `${ctx}:recover-100`);
+    try {
+      screen.orientation?.unlock();
+    } catch {
+      /* ignore */
+    }
+  }, 100);
+  window.setTimeout(() => {
+    requestNativeOrientation("portrait", `${ctx}:recover-300`);
+    requestBrowserOrientation("portrait", `${ctx}:recover-300`);
+    try {
+      screen.orientation?.unlock();
+    } catch {
+      /* ignore */
+    }
+  }, 300);
+}
+
 /** 전체화면 이탈 시 세로 복구 + 160ms 재시도 (기존 NativeFullscreenOrientationLock 동작과 동일) */
 export function restoreCaromFullscreenPortrait(contextLabel: string): void {
   const ctx = contextLabel.trim() || "fullscreen";
@@ -219,6 +277,9 @@ export default function NativeFullscreenOrientationLock({
   useEffect(() => {
     const ctx = contextLabel.trim() || "fullscreen";
     const landscapeMode: CaromOrientationRequestMode = landscapeLockMode;
+    const sessionKey = `native-fullscreen-lock:${ctx}`;
+
+    registerCaromExplicitNativeLandscapeSession(sessionKey);
 
     requestNativeOrientation(landscapeMode, `${ctx}:mount`);
     requestBrowserOrientation(landscapeMode, `${ctx}:mount`);
@@ -230,6 +291,7 @@ export default function NativeFullscreenOrientationLock({
     return () => {
       window.removeEventListener("orientationchange", onOrient);
       window.clearTimeout(t);
+      unregisterCaromExplicitNativeLandscapeSession(sessionKey);
       restoreCaromFullscreenPortrait(ctx);
     };
   }, [contextLabel, landscapeLockMode]);

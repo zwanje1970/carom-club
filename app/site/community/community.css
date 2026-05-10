@@ -256,9 +256,9 @@ button.secondary-button.ui-community-search-submit:hover {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 0.62rem;
-  padding-top: 0.62rem;
-  padding-bottom: 0.62rem;
+  gap: 0.72rem;
+  padding-top: 0.72rem;
+  padding-bottom: 0.72rem;
   padding-left: 0.75rem;
   padding-right: 0.75rem;
   box-sizing: border-box;
@@ -351,10 +351,10 @@ button.secondary-button.ui-community-search-submit:hover {
 /* 고정 폭 미디어 슬롯: 이미지 글이 없어도 리듬 유지, 첨부 시에만 작은 썸네일 */
 .ui-community-board-row-media {
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 48px;
+  height: 48px;
   box-sizing: border-box;
-  border-radius: 6px;
+  border-radius: 7px;
   overflow: hidden;
   display: flex;
   align-items: center;

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import GlobalHomeButton from "../components/GlobalHomeButton";
 import { isPublicSiteMobileShell } from "./components/site-public-mobile-view";
+import SiteCaromAppWebViewGuards from "./components/SiteCaromAppWebViewGuards";
+import { isCaromClubMobileAppShell } from "../../lib/is-carom-club-mobile-app-shell";
 import SiteRootSwipeNav from "./components/SiteRootSwipeNav";
 import SiteVenuesGeolocationNav from "./components/SiteVenuesGeolocationNav";
 import { isSiteMainSamplePathname } from "./lib/site-main-sample";
@@ -28,6 +30,7 @@ export default async function SiteMypageLightChromeLayout({
 }>) {
   const headerStore = await headers();
   const useMobileShell = isPublicSiteMobileShell(headerStore);
+  const caromAppShellRequest = isCaromClubMobileAppShell(headerStore);
   const siteBuilderPreviewHeader = headerStore.get("x-site-builder-preview");
   const nextUrlHeader =
     headerStore.get("next-url") ??
@@ -65,7 +68,11 @@ export default async function SiteMypageLightChromeLayout({
 
   if (useMobileShell || isPageBuilderPreviewRequest) {
     return (
-      <div className={`site-shell site-shell--ua-mobile-site${siteShellSampleClass}`}>
+      <div
+        className={`site-shell site-shell--ua-mobile-site${siteShellSampleClass}`}
+        data-carom-club-app-shell={caromAppShellRequest ? "1" : undefined}
+      >
+        <SiteCaromAppWebViewGuards appShell={caromAppShellRequest} />
         <SiteVenuesGeolocationNav />
         {mobileTopChrome}
         <SiteRootSwipeNav>{children}</SiteRootSwipeNav>

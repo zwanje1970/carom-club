@@ -577,7 +577,7 @@ button.secondary-button.site-mypage-logout:hover,
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.38rem;
 }
 
 .site-tournament-card-head {
@@ -623,7 +623,7 @@ button.secondary-button.site-mypage-logout:hover,
   text-decoration: none;
   color: #64748b;
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.25;
   padding: 0.36rem 0.2rem 0.32rem;
   margin-bottom: -1px;
@@ -636,7 +636,7 @@ button.secondary-button.site-mypage-logout:hover,
 
 .site-tournament-status-filter__tab--active {
   color: #0f172a;
-  font-weight: 600;
+  font-weight: 500;
   border-bottom-color: #2563eb;
   background: rgba(37, 99, 235, 0.07);
   text-decoration: none;
@@ -649,8 +649,8 @@ button.secondary-button.site-mypage-logout:hover,
   overflow: hidden;
   margin: 0;
   font-size: 1rem;
-  font-weight: 700;
-  line-height: 1.35;
+  font-weight: 500;
+  line-height: 1.4;
   letter-spacing: -0.02em;
   color: var(--color-text-main, #111111);
 }
@@ -658,8 +658,9 @@ button.secondary-button.site-mypage-logout:hover,
 .site-tournament-schedule {
   margin: 0;
   font-size: 0.875rem;
-  line-height: 1.45;
-  color: #6b7280;
+  font-weight: 400;
+  line-height: 1.48;
+  color: #64748b;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -669,8 +670,9 @@ button.secondary-button.site-mypage-logout:hover,
 .site-tournament-location {
   margin: 0;
   font-size: 0.875rem;
-  line-height: 1.45;
-  color: #6b7280;
+  font-weight: 400;
+  line-height: 1.48;
+  color: #64748b;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -726,14 +728,14 @@ button.secondary-button.site-mypage-logout:hover,
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.34rem;
 }
 
 .site-venue-card-title {
   margin: 0;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 1rem;
-  line-height: 1.35;
+  line-height: 1.4;
   letter-spacing: -0.02em;
   color: #1e3a8a;
   display: -webkit-box;
@@ -745,8 +747,9 @@ button.secondary-button.site-mypage-logout:hover,
 .site-venue-address {
   margin: 0;
   font-size: 0.875rem;
-  line-height: 1.45;
-  color: #6b7280;
+  font-weight: 400;
+  line-height: 1.48;
+  color: #64748b;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -755,7 +758,7 @@ button.secondary-button.site-mypage-logout:hover,
 
 .site-venue-distance {
   color: #ef4444;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .site-venue-chips {
@@ -774,7 +777,7 @@ button.secondary-button.site-mypage-logout:hover,
   padding: 3px 9px;
   border-radius: 999px;
   font-size: 0.7rem;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.25;
   color: #374151;
   background: #f1f5f9;
@@ -816,7 +819,7 @@ button.secondary-button.site-mypage-logout:hover,
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.25;
 }
 
@@ -2541,6 +2544,82 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   }
 }
 
+/* 캐롬클럽 앱 WebView(/site): 넓은 뷰포트·가로여도 모바일 UA 셸 단일열 유지 — 상단 PC 헤더 미노출 */
+.site-shell.site-shell--ua-mobile-site[data-carom-club-app-shell="1"] .site-shell-pc-header {
+  display: none !important;
+}
+
+@media (min-width: 768px) {
+  html:has(.site-shell.site-shell--ua-mobile-site[data-carom-club-app-shell="1"]),
+  body:has(.site-shell.site-shell--ua-mobile-site[data-carom-club-app-shell="1"]) {
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+    margin: 0;
+  }
+
+  .site-shell.site-shell--ua-mobile-site[data-carom-club-app-shell="1"]:not(:has(.site-root-swipe-viewport)) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    width: 100%;
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+    box-sizing: border-box;
+  }
+
+  .site-shell.site-shell--ua-mobile-site[data-carom-club-app-shell="1"]:has(.site-root-swipe-viewport) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    width: 100%;
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+    box-sizing: border-box;
+  }
+
+  .site-shell.site-shell--ua-mobile-site[data-carom-club-app-shell="1"]:has(.site-root-swipe-viewport)
+    .site-root-swipe-viewport {
+    flex: 1 1 auto;
+    min-height: 0 !important;
+    overflow-x: hidden;
+    overflow-y: hidden;
+    width: 100%;
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+    box-sizing: border-box;
+    touch-action: pan-y;
+  }
+
+  .site-shell.site-shell--ua-mobile-site[data-carom-club-app-shell="1"]:has(.site-root-swipe-viewport)
+    .site-root-swipe-panel--main {
+    min-height: 0 !important;
+    flex: 1 1 auto;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+  }
+
+  .site-shell.site-shell--ua-mobile-site[data-carom-club-app-shell="1"] .site-home-slide-anchor {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+  }
+}
+
 /* 데스크톱·넓은 화면: 다크 블록 좌우 패딩(0.85rem)까지 슬라이드 배경 풀폭 — 모바일은 위 미디어쿼리에서 뷰포트 풀폭 */
 @media (min-width: 768px) {
   .site-home-slide-anchor {
@@ -2848,6 +2927,13 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   gap: 0.5rem;
 }
 
+/* 공개 모바일 셸(표준 홈): secondary CTA도 커뮤니티와 동일 톤 — 커뮤니티 검색 등은 전용 클래스로 이미 덮음 */
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .secondary-button,
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard button.secondary-button,
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard a.secondary-button {
+  font-weight: 500;
+}
+
 @media (max-width: 767px) {
   .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-home-top-white--standard .site-mobile-page-title-block {
     padding-top: 0.18rem;
@@ -2888,18 +2974,18 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-board-card > a {
-  padding: 0.62rem 0;
+  padding: 0.68rem 0;
   align-items: center;
-  gap: 0.72rem;
+  gap: 0.75rem;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-board-card--venue > a {
-  padding: 0.72rem 0;
+  padding: 0.78rem 0;
   align-items: flex-start;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-card-main {
-  gap: 0.34rem;
+  gap: 0.38rem;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-card-head {
@@ -2909,14 +2995,14 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-card-head .badge-status,
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-card-head .site-board-status-badge {
   font-size: 0.6875rem;
-  font-weight: 600;
+  font-weight: 500;
   padding: 2px 7px;
   line-height: 1.25;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-card-title {
   font-size: clamp(0.95rem, 2.95vw, 1.02rem);
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.42;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -2927,6 +3013,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-schedule,
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-location {
   font-size: 0.75rem;
+  font-weight: 400;
   line-height: 1.48;
   color: #94a3b8;
 }
@@ -2941,7 +3028,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-venue-card-title {
   font-size: clamp(0.95rem, 2.95vw, 1.02rem);
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.44;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -2951,6 +3038,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-venue-address {
   font-size: 0.75rem;
+  font-weight: 400;
   line-height: 1.48;
   color: #94a3b8;
   display: -webkit-box;
@@ -2965,7 +3053,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   line-height: 1.48;
   color: #64748b;
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-venue-phone:active {
@@ -2978,7 +3066,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-list-chip {
   font-size: 0.6875rem;
-  font-weight: 600;
+  font-weight: 500;
   padding: 2px 7px;
 }
 
@@ -3005,11 +3093,12 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   border: 1px solid rgba(15, 23, 42, 0.08);
   background: #f8f9fb;
   font-size: 0.75rem;
+  font-weight: 400;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-list-filter-label {
   font-size: 0.6875rem;
-  font-weight: 600;
+  font-weight: 500;
   color: #94a3b8;
 }
 
@@ -3020,7 +3109,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   padding: 0 0.75rem;
   border-radius: 999px;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 500;
   box-shadow: none;
 }
 
@@ -3233,11 +3322,11 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-board-row-link {
   min-height: 0;
-  padding-top: 0.62rem;
-  padding-bottom: 0.62rem;
+  padding-top: 0.72rem;
+  padding-bottom: 0.72rem;
   padding-left: 0;
   padding-right: 0;
-  gap: 0.62rem;
+  gap: 0.72rem;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-board-title {
@@ -5205,7 +5294,7 @@ a.primary-button {
   border-radius: 12px;
   background: var(--color-primary);
   color: #ffffff;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 0.95rem;
   line-height: 1.2;
   text-decoration: none;
@@ -5271,7 +5360,7 @@ a.secondary-button {
   border-radius: 999px;
   padding: 4px 10px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.25;
 }
 
@@ -5347,21 +5436,22 @@ a.secondary-button {
 
 .site-tournament-detail-site .site-detail-hero-title {
   font-size: clamp(1.35rem, 3.6vw, 1.7rem);
-  font-weight: 800;
-  line-height: 1.22;
+  font-weight: 500;
+  line-height: 1.28;
   letter-spacing: -0.03em;
   -webkit-line-clamp: 3;
 }
 
 .site-tournament-detail-site .site-tournament-detail-hero-meta-line {
   font-size: 0.875rem;
+  font-weight: 400;
   line-height: 1.45;
   color: #475569;
 }
 
 .site-tournament-detail-site .site-tournament-detail-hero-recruitment {
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 400;
   color: #334155;
 }
 
@@ -5377,7 +5467,7 @@ a.secondary-button {
 
 .site-tournament-detail-site .primary-button.site-tournament-detail-apply-cta {
   min-height: 50px;
-  font-weight: 700;
+  font-weight: 500;
   font-size: 1rem;
   border-radius: 12px;
   box-shadow: none;
@@ -5422,7 +5512,7 @@ a.secondary-button {
   display: inline-flex;
   align-items: center;
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: #0f172a;
   text-decoration: none;
@@ -5439,7 +5529,7 @@ a.secondary-button {
 
 .site-venue-detail-site .site-venue-detail-title {
   font-size: clamp(1.35rem, 3.6vw, 1.65rem);
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .site-detail-inner-stack {
@@ -5451,8 +5541,8 @@ a.secondary-button {
 .site-detail-hero-title {
   margin: 0;
   font-size: 1.35rem;
-  font-weight: 800;
-  line-height: 1.25;
+  font-weight: 500;
+  line-height: 1.28;
   letter-spacing: -0.03em;
   color: var(--color-text-main, #111111);
   display: -webkit-box;
@@ -5464,7 +5554,8 @@ a.secondary-button {
 .site-detail-hero-meta {
   margin: 0;
   font-size: 0.9rem;
-  line-height: 1.35;
+  font-weight: 400;
+  line-height: 1.4;
   color: var(--color-text-sub, #666666);
   white-space: nowrap;
   overflow: hidden;
@@ -5474,6 +5565,7 @@ a.secondary-button {
 .site-detail-hero-summary {
   margin: 0;
   font-size: 0.88rem;
+  font-weight: 400;
   line-height: 1.55;
   color: var(--color-text-sub, #666666);
   display: -webkit-box;
@@ -5491,7 +5583,7 @@ a.secondary-button {
 .site-detail-section-title {
   margin: 0 0 0.35rem;
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--color-text-main, #111111);
 }
 
@@ -5505,7 +5597,7 @@ a.secondary-button {
 .site-detail-label {
   margin: 0;
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--color-text-sub, #666666);
   padding-top: 0.12rem;
 }
@@ -5513,6 +5605,7 @@ a.secondary-button {
 .site-detail-value {
   margin: 0;
   font-size: 0.92rem;
+  font-weight: 400;
   line-height: 1.6;
   color: var(--color-text-main, #111111);
   white-space: pre-wrap;
@@ -5540,6 +5633,7 @@ a.secondary-button {
   white-space: pre-wrap;
   line-height: 1.65;
   font-size: 0.92rem;
+  font-weight: 400;
   color: var(--color-text-main, #111111);
 }
 
@@ -5561,6 +5655,7 @@ a.secondary-button {
 .site-tournament-detail-hero-meta-line {
   margin: 0;
   font-size: 0.8125rem;
+  font-weight: 400;
   line-height: 1.45;
   color: #64748b;
 }
@@ -5569,7 +5664,7 @@ a.secondary-button {
   margin: 0;
   font-size: 0.8125rem;
   line-height: 1.4;
-  font-weight: 600;
+  font-weight: 400;
   color: #475569;
 }
 
@@ -5606,7 +5701,7 @@ a.secondary-button {
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-detail-hero-badge.badge-status,
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-detail-hero-badge.site-board-status-badge {
   font-size: 0.8125rem;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.25;
   padding: 3px 10px;
 }
@@ -5662,8 +5757,8 @@ a.secondary-button {
 .site-venue-detail-title {
   margin: 0;
   font-size: 1.3rem;
-  font-weight: 800;
-  line-height: 1.25;
+  font-weight: 500;
+  line-height: 1.28;
   letter-spacing: -0.03em;
   color: var(--color-text-main, #111111);
   display: -webkit-box;
@@ -5675,6 +5770,7 @@ a.secondary-button {
 .site-venue-detail-meta {
   margin: 0;
   font-size: 0.9rem;
+  font-weight: 400;
   color: var(--color-text-sub, #666666);
   line-height: 1.4;
   white-space: nowrap;
@@ -5704,7 +5800,7 @@ a.secondary-button {
 .site-venue-kv__label {
   margin: 0;
   font-size: 0.72rem;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--color-text-sub, #666666);
   letter-spacing: 0.02em;
 }
@@ -5712,6 +5808,7 @@ a.secondary-button {
 .site-venue-kv__value {
   margin: 0.12rem 0 0;
   font-size: 0.9rem;
+  font-weight: 400;
   line-height: 1.55;
   color: var(--color-text-main, #111111);
   white-space: pre-wrap;

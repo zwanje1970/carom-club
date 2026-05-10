@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { DashboardArea } from "../../lib/dashboard-mobile-route-meta";
+import CaromAppWebViewLifecycleGuards from "./CaromAppWebViewLifecycleGuards";
 import DashboardMobileChromeBar from "./DashboardMobileChromeBar";
 
 /**
@@ -28,6 +29,9 @@ export default function DashboardMobileChromeLayout({
         forceClientAppMobileLayout && area === "client" ? "1" : undefined
       }
     >
+      {area === "client" ? (
+        <CaromAppWebViewLifecycleGuards enabled={Boolean(forceClientAppMobileLayout)} />
+      ) : null}
       <DashboardMobileChromeBar area={area} />
       {children}
     </div>

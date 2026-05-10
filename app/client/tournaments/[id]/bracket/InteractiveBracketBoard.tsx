@@ -2,7 +2,12 @@
 
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { applyCaromOrientationMode } from "../../../native-fullscreen-orientation-lock";
+import {
+  applyCaromOrientationMode,
+  CAROM_BRACKET_NATIVE_LANDSCAPE_SESSION_ID,
+  registerCaromExplicitNativeLandscapeSession,
+  unregisterCaromExplicitNativeLandscapeSession,
+} from "../../../native-fullscreen-orientation-lock";
 import styles from "./interactive-bracket-board.module.css";
 import {
   calculateLayout,
@@ -15,6 +20,10 @@ import {
   type MatchFrame,
   type PositionedBoardMatch,
 } from "./bracket-board-layout";
+import {
+  isEligibleBracketWinnerUserId,
+  isPropagatableBracketWinnerLabel,
+} from "./bracket-view-server-sync";
 
 type BoardRound = {
   roundNumber: number;
@@ -102,6 +111,51 @@ function opponentSlotLooksFilled(raw: BoardPlayerSlot | null): boolean {
   if (slotUserIdForHighlight(raw)) return true;
   const name = (raw.name ?? "").trim();
   return name !== "" && name !== "대기";
+}
+
+function cascadeClearWinnerByPairState(
+  prev: Record<string, WinnerChoice>,
+  pairKey: string,
+  baseRound: number,
+  basePair: number,
+): Record<string, WinnerChoice> {
+  const next: Record<string, WinnerChoice> = { ...prev };
+  delete next[pairKey];
+  for (const key of Object.keys(next)) {
+    const [roundText, pairText] = key.split(":");
+    const round = Number(roundText);
+    const pair = Number(pairText);
+    if (!Number.isFinite(round) || !Number.isFinite(pair)) continue;
+    if (round <= baseRound) continue;
+    const shift = 2 ** (round - baseRound);
+    const affectedPair = Math.floor(basePair / shift);
+    if (pair === affectedPair) {
+      delete next[key];
+    }
+  }
+  return next;
+}
+
+function matchPairHasClearableServerWinner(
+  bracketInput: BracketBoardInput,
+  roundIndex: number,
+  pairIndex: number,
+): boolean {
+  const m = bracketInput.rounds[roundIndex]?.matches[pairIndex];
+  if (!m) return false;
+  const w = typeof m.winnerUserId === "string" ? m.winnerUserId.trim() : "";
+  if (!w) return false;
+  const p1 = m.player1.userId.trim();
+  const p2 = m.player2.userId.trim();
+  if (w === p1 && isEligibleBracketWinnerUserId(p1)) return true;
+  if (w === p2 && isEligibleBracketWinnerUserId(p2)) return true;
+  return false;
+}
+
+function isReservedWinnerPickDisplay(raw: BoardPlayerSlot | null): boolean {
+  if (!raw) return true;
+  const label = bracketSlotLabel(raw);
+  return !isPropagatableBracketWinnerLabel(label);
 }
 
 /** PATCH 본문 displayName: null은 저장 생략, ""는 오버레이 제거 */
@@ -702,7 +756,7 @@ export default function InteractiveBracketBoard({
   onExit?: () => void;
   onPickWinner?: (args: { matchId: string; winnerUserId: string; roundNumber: number }) => void | Promise<void>;
   /** 제공 시 진출 취소(×) 시 서버에 승자 해제 반영 (부모에서 처리) */
-  onClearMatchWinner?: (args: { matchId: string }) => void | Promise<void>;
+  onClearMatchWinner?: (args: { matchId: string }) => boolean | Promise<boolean>;
   onSwapPlayers?: (args: {
     roundNumber: number;
     first: { matchId: string; slot: "player1" | "player2" };
@@ -1144,8 +1198,14 @@ export default function InteractiveBracketBoard({
         const selected = winnerByPair[pairKey];
         if (selected !== 0 && selected !== 1) continue;
         const choice = selected;
+        const srcMatch = bracket.rounds[r - 1]?.matches[j];
+        if (!srcMatch) continue;
+        const w = typeof srcMatch.winnerUserId === "string" ? srcMatch.winnerUserId.trim() : "";
+        const chosenPlayer = choice === 0 ? srcMatch.player1 : srcMatch.player2;
+        const chosenRealId = typeof chosenPlayer.userId === "string" ? chosenPlayer.userId.trim() : "";
+        if (!isEligibleBracketWinnerUserId(chosenRealId) || w !== chosenRealId) continue;
         const chosenLabel = choice === 0 ? a : b;
-        if (!chosenLabel.trim()) continue;
+        if (!isPropagatableBracketWinnerLabel(chosenLabel)) continue;
         parentLabels[j] = chosenLabel;
         chosenByPair.set(pairKey, choice);
         const childRoundNo = r;
@@ -1187,13 +1247,21 @@ export default function InteractiveBracketBoard({
 
         const pairPickKey = `${r}:${pairIdx}`;
         const picked = winnerByPair[pairPickKey];
-        if (!parentId && (picked === 0 || picked === 1) && selfId) {
-          if (picked === selfInPair) {
-            isWinner = true;
-            isLoser = false;
-          } else if (oppId) {
-            isLoser = true;
-            isWinner = false;
+        const srcMatchForPick = bracket.rounds[r]?.matches[pairIdx];
+        if (!parentId && srcMatchForPick && (picked === 0 || picked === 1) && selfId) {
+          const wPick =
+            typeof srcMatchForPick.winnerUserId === "string" ? srcMatchForPick.winnerUserId.trim() : "";
+          const chosenPlayer = picked === 0 ? srcMatchForPick.player1 : srcMatchForPick.player2;
+          const chosenRealId =
+            typeof chosenPlayer.userId === "string" ? chosenPlayer.userId.trim() : "";
+          if (isEligibleBracketWinnerUserId(chosenRealId) && wPick === chosenRealId) {
+            if (picked === selfInPair && selfId === wPick) {
+              isWinner = true;
+              isLoser = false;
+            } else if (oppId && wPick === oppId && selfId !== wPick) {
+              isLoser = true;
+              isWinner = false;
+            }
           }
         }
 
@@ -1216,6 +1284,11 @@ export default function InteractiveBracketBoard({
       opponentHasName: boolean;
     }) => {
       if (interactionDisabled) return;
+      const rawPick = readRawSlotPlayer(bracket, args.roundIndex, args.internalIndex);
+      const pickedUid = typeof rawPick?.userId === "string" ? rawPick.userId.trim() : "";
+      if (!isEligibleBracketWinnerUserId(pickedUid)) return;
+      if (isReservedWinnerPickDisplay(rawPick)) return;
+      if (pickedUid !== args.winnerUserId.trim()) return;
       if (!args.opponentHasName) {
         if (!window.confirm("부전승 진출")) return;
       }
@@ -1239,50 +1312,36 @@ export default function InteractiveBracketBoard({
         return next;
       });
       setSelectedBoxKey(`${args.matchId}:${args.winnerUserId}`);
-      void onPickWinner?.({ matchId: args.matchId, winnerUserId: args.winnerUserId, roundNumber: args.roundNumber });
+      void onPickWinner?.({ matchId: args.matchId, winnerUserId: pickedUid, roundNumber: args.roundNumber });
     },
-    [interactionDisabled, onPickWinner],
+    [bracket, interactionDisabled, onPickWinner],
   );
 
   const handleAdvanceCancel = useCallback(
     async (pairKey: string) => {
-      const selected = winnerByPair[pairKey];
-      if (selected !== 0 && selected !== 1) return;
-      if (!window.confirm("진출을 취소하시겠습니까?")) return;
-
       const [roundRaw, pairRaw] = pairKey.split(":");
       const baseRound = Number(roundRaw);
       const basePair = Number(pairRaw);
       if (!Number.isFinite(baseRound) || !Number.isFinite(basePair)) return;
 
-      if (onClearMatchWinner) {
-        const item = activeLayout.positionedMatches.find(
-          (p) => p.roundIndex === baseRound && Math.floor(p.internalIndex / 2) === basePair,
-        );
-        if (!item) return;
-        await onClearMatchWinner({ matchId: item.match.id });
-        return;
+      const selected = winnerByPair[pairKey];
+      const hasServerWinner = matchPairHasClearableServerWinner(bracket, baseRound, basePair);
+      if (selected !== 0 && selected !== 1 && !hasServerWinner) return;
+      if (!window.confirm("진출을 취소하시겠습니까?")) return;
+
+      const item = activeLayout.positionedMatches.find(
+        (p) => p.roundIndex === baseRound && Math.floor(p.internalIndex / 2) === basePair,
+      );
+      if (!item) return;
+
+      if (onClearMatchWinner && hasServerWinner) {
+        const ok = await onClearMatchWinner({ matchId: item.match.id });
+        if (ok === false) return;
       }
 
-      setWinnerByPair((prev) => {
-        const next: Record<string, WinnerChoice> = { ...prev };
-        delete next[pairKey];
-        for (const key of Object.keys(next)) {
-          const [roundText, pairText] = key.split(":");
-          const round = Number(roundText);
-          const pair = Number(pairText);
-          if (!Number.isFinite(round) || !Number.isFinite(pair)) continue;
-          if (round <= baseRound) continue;
-          const shift = 2 ** (round - baseRound);
-          const affectedPair = Math.floor(basePair / shift);
-          if (pair === affectedPair) {
-            delete next[key];
-          }
-        }
-        return next;
-      });
+      setWinnerByPair((prev) => cascadeClearWinnerByPairState(prev, pairKey, baseRound, basePair));
     },
-    [activeLayout.positionedMatches, onClearMatchWinner, winnerByPair],
+    [activeLayout.positionedMatches, bracket, onClearMatchWinner, winnerByPair],
   );
 
   const onBoxPointerDown = useCallback(
@@ -1368,6 +1427,7 @@ export default function InteractiveBracketBoard({
       lastTapRef.current = { key: boxKey, ts: now };
       if (interactionMode === "winner" && isDoubleTap) {
         if (!slotLabel.trim()) return;
+        if (!isEligibleBracketWinnerUserId(winnerUserId)) return;
         handleWinnerPick({
           matchId,
           winnerUserId,
@@ -1465,7 +1525,13 @@ export default function InteractiveBracketBoard({
     for (const connector of activeLayout.connectors) {
       const pairKey = pairKeyFromConnector(connector.key);
       if (!pairKey) continue;
-      if (!(pairKey in winnerByPair)) continue;
+      const [pkR, pkP] = pairKey.split(":");
+      const ri = Number(pkR);
+      const pi = Number(pkP);
+      const showCancel =
+        pairKey in winnerByPair ||
+        (Number.isFinite(ri) && Number.isFinite(pi) && matchPairHasClearableServerWinner(bracket, ri, pi));
+      if (!showCancel) continue;
       const [leftPart, rightRaw] = connector.key.split("+");
       if (!rightRaw) continue;
       const [, parentPart] = rightRaw.split("->");
@@ -1498,6 +1564,7 @@ export default function InteractiveBracketBoard({
   }, [
     activeLayout.connectors,
     activeLayout.positionedMatches,
+    bracket,
     pairKeyFromConnector,
     viewMode,
     winnerByPair,
@@ -1627,8 +1694,10 @@ export default function InteractiveBracketBoard({
                   aria-label={toolbarLayoutIsLandscape ? "기기 세로모드" : "기기 가로모드"}
                   onClick={() =>
                     toolbarLayoutIsLandscape
-                      ? applyCaromOrientationMode("portrait", "bracket-view-fullscreen:toolbar-portrait")
-                      : applyCaromOrientationMode("landscape", "bracket-view-fullscreen:toolbar-landscape")
+                      ? (unregisterCaromExplicitNativeLandscapeSession(CAROM_BRACKET_NATIVE_LANDSCAPE_SESSION_ID),
+                        applyCaromOrientationMode("portrait", "bracket-view-fullscreen:toolbar-portrait"))
+                      : (registerCaromExplicitNativeLandscapeSession(CAROM_BRACKET_NATIVE_LANDSCAPE_SESSION_ID),
+                        applyCaromOrientationMode("landscape", "bracket-view-fullscreen:toolbar-landscape"))
                   }
                 >
                   {toolbarLayoutIsLandscape ? (
@@ -1950,7 +2019,20 @@ export default function InteractiveBracketBoard({
                   key={btn.key}
                   type="button"
                   className={styles.advanceCancelButton}
-                  style={{ left: `${btn.x}px`, top: `${btn.y}px` }}
+                  style={{
+                    left: `${btn.x}px`,
+                    top: `${btn.y}px`,
+                    width: 44,
+                    height: 44,
+                    marginLeft: -22,
+                    marginTop: -22,
+                  }}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                  }}
+                  onPointerUp={(e) => {
+                    e.stopPropagation();
+                  }}
                   onClick={(e) => {
                     e.stopPropagation();
                     void handleAdvanceCancel(btn.pairKey);
@@ -1964,11 +2046,13 @@ export default function InteractiveBracketBoard({
               {activeLayout.positionedMatches.map((item) => {
                 const slotWinner = derived.winnerByItemKey.get(item.key) === true;
                 const slotLoser = derived.loserByItemKey.get(item.key) === true;
-                const boxKey = `${item.match.id}:${item.match.player1.userId}`;
+                const rawSlot = readRawSlotPlayer(bracket, item.roundIndex, item.internalIndex);
+                const highlightUid = slotUserIdForHighlight(rawSlot);
+                const pickUserIdForApi = highlightUid && rawSlot ? rawSlot.userId.trim() : "";
+                const boxKey = `${item.match.id}:${item.internalIndex}`;
                 const slotLabel = derived.labelByItemKey.get(item.key) ?? "";
                 const slotHasName = slotLabel.trim() !== "";
                 const opponentHasName = derived.opponentHasNameByItemKey.get(item.key) === true;
-                const rawSlot = readRawSlotPlayer(bracket, item.roundIndex, item.internalIndex);
                 const playerSlot: "player1" | "player2" = item.internalIndex % 2 === 0 ? "player1" : "player2";
                 const origName = (rawSlot?.name ?? "").trim();
                 const dispName = (rawSlot?.displayName ?? "").trim();
@@ -2022,7 +2106,7 @@ export default function InteractiveBracketBoard({
                           boxKey,
                           item.match.id,
                           playerSlot,
-                          item.match.player1.userId,
+                          pickUserIdForApi,
                           item.roundNumber,
                           item.roundIndex,
                           item.internalIndex,
@@ -2032,10 +2116,10 @@ export default function InteractiveBracketBoard({
                       }
                       onDoubleClick={() =>
                         interactionMode === "winner"
-                          ? slotHasName
+                          ? slotHasName && pickUserIdForApi
                             ? handleWinnerPick({
                                 matchId: item.match.id,
-                                winnerUserId: item.match.player1.userId,
+                                winnerUserId: pickUserIdForApi,
                                 roundNumber: item.roundNumber,
                                 roundIndex: item.roundIndex,
                                 internalIndex: item.internalIndex,

@@ -3,16 +3,19 @@
 import { useEffect, useRef } from "react";
 import {
   isCaromViewportLandscape,
+  registerCaromExplicitNativeLandscapeSession,
   requestBrowserOrientation,
   requestBrowserOrientationIgnoringBridge,
   requestNativeLandscapeLegacyExtra,
   requestNativeOrientation,
   restoreCaromFullscreenPortrait,
+  unregisterCaromExplicitNativeLandscapeSession,
 } from "../../../native-fullscreen-orientation-lock";
 
 export type ApplicationsTableLandscapePhase = "pending" | "ready" | "manual";
 
 const CTX = "applications-table-view";
+const APP_TABLE_LANDSCAPE_SESSION = `${CTX}:native-landscape`;
 /** primary 반영 대기 후 generic landscape·레거시 브릿지·브라우저 lock 시도 */
 const PRIMARY_WAIT_MS = 420;
 /** 그래도 가로가 아니면 안내 문구만 (전체 대기 상한) */
@@ -50,12 +53,15 @@ export default function ApplicationsTableOrientationLock({
     };
 
     if (considerLandscape()) {
+      registerCaromExplicitNativeLandscapeSession(APP_TABLE_LANDSCAPE_SESSION);
       return () => {
         cancelled = true;
+        unregisterCaromExplicitNativeLandscapeSession(APP_TABLE_LANDSCAPE_SESSION);
         restoreCaromFullscreenPortrait(CTX);
       };
     }
 
+    registerCaromExplicitNativeLandscapeSession(APP_TABLE_LANDSCAPE_SESSION);
     requestNativeOrientation("landscape-primary", `${CTX}:mount-primary`);
     requestBrowserOrientation("landscape-primary", `${CTX}:mount-primary`);
 
@@ -86,6 +92,7 @@ export default function ApplicationsTableOrientationLock({
       if (manualTimer !== undefined) window.clearTimeout(manualTimer);
       window.removeEventListener("orientationchange", bump);
       window.removeEventListener("resize", bump);
+      unregisterCaromExplicitNativeLandscapeSession(APP_TABLE_LANDSCAPE_SESSION);
       restoreCaromFullscreenPortrait(CTX);
     };
   }, []);

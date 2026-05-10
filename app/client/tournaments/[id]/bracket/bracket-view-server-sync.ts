@@ -24,6 +24,23 @@ export type BracketLike = {
   finalBlock?: { rounds: BracketRoundLike[] };
 };
 
+/** 클라이언트·서버 공통: 승자로 저장·전파 가능한 실참가자 userId */
+export function isEligibleBracketWinnerUserId(userId: string): boolean {
+  const w = typeof userId === "string" ? userId.trim() : "";
+  if (!w || w === "__none" || w.startsWith("__TBD__")) return false;
+  return true;
+}
+
+/** 상위 라운드 표시 라벨 전파 허용(표시용 예약 문자열 제외) */
+export function isPropagatableBracketWinnerLabel(label: string): boolean {
+  const t = typeof label === "string" ? label.trim() : "";
+  if (!t) return false;
+  if (t.toUpperCase() === "TBD") return false;
+  if (t === "대상참가자") return false;
+  if (t === "대기") return false;
+  return true;
+}
+
 export function getSliceRoundsFromBracket(b: BracketLike, sliceKey: string | null): BracketRoundLike[] {
   if (b.bracketMode === "multi_block" && sliceKey) {
     if (sliceKey === "final") return b.finalBlock?.rounds ?? [];
@@ -122,6 +139,10 @@ export async function syncWinnerPick(params: {
 }): Promise<{ ok: true; bracket: BracketLike; message: string } | { ok: false; error: string }> {
   const loc = findBracketMatchLocation(params.bracket, params.matchId);
   if (!loc) return { ok: false, error: "대상 매치를 찾을 수 없습니다." };
+
+  if (!isEligibleBracketWinnerUserId(params.winnerUserId)) {
+    return { ok: false, error: "승자로 저장할 수 없는 참가자입니다." };
+  }
 
   const { round: currentRound, match: currentMatch, sliceKey: winSliceKey, sliceRounds } = loc;
   const changingWinner =

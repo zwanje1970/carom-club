@@ -2,6 +2,8 @@ import { headers } from "next/headers";
 import GlobalHomeButton from "../components/GlobalHomeButton";
 import SiteChromeHeader from "./components/SiteChromeHeader";
 import { isPublicSiteMobileShell } from "./components/site-public-mobile-view";
+import SiteCaromAppWebViewGuards from "./components/SiteCaromAppWebViewGuards";
+import { isCaromClubMobileAppShell } from "../../lib/is-carom-club-mobile-app-shell";
 import SiteRootSwipeNav from "./components/SiteRootSwipeNav";
 import SiteVenuesGeolocationNav from "./components/SiteVenuesGeolocationNav";
 import { getSiteLayoutConfig } from "../../lib/surface-read";
@@ -43,6 +45,7 @@ export default async function SitePublicChromeLayout({
 }>) {
   const headerStore = await headers();
   const useMobileShell = isPublicSiteMobileShell(headerStore);
+  const caromAppShellRequest = isCaromClubMobileAppShell(headerStore);
   const config = await getSiteLayoutConfig();
   const siteBuilderPreviewHeader = headerStore.get("x-site-builder-preview");
   const nextUrlHeader =
@@ -63,7 +66,11 @@ export default async function SitePublicChromeLayout({
 
   if (useMobileShell || isPageBuilderPreviewRequest) {
     return (
-      <div className={`site-shell site-shell--ua-mobile-site${siteShellSampleClass}`}>
+      <div
+        className={`site-shell site-shell--ua-mobile-site${siteShellSampleClass}`}
+        data-carom-club-app-shell={caromAppShellRequest ? "1" : undefined}
+      >
+        <SiteCaromAppWebViewGuards appShell={caromAppShellRequest} />
         <SiteVenuesGeolocationNav />
         {isSiteMainSample ? null : (
           <div className="site-shell-pc-header">
