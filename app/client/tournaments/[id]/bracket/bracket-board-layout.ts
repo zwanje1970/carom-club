@@ -1006,7 +1006,8 @@ export function layoutDualFromVerticalBase(
   const SLOT_GAP = 18;
   const slotPitch = SLOT_H + SLOT_GAP;
   const STEP = 265;
-  const FINAL_GAP = 210;
+  /** 좌·우 준결승 슬롯 사이 가로 간격 (Lrx → Rlx) */
+  const SEMIFINAL_CONNECTOR_GAP_PX = 200;
 
   const byRound = new Map<number, PositionedBoardMatch[]>();
   for (const p of base.positionedMatches) {
@@ -1023,13 +1024,12 @@ export function layoutDualFromVerticalBase(
   if (nLeaf === 0) return base;
 
   const half = nLeaf / 2;
-  const innerSteps = Math.max(0, slotRounds - 2);
   const semiRi = slotRounds - 2;
   const finalRi = slotRounds - 1;
 
-  const leftInnerRight = ORIGIN_LEFT + innerSteps * STEP + SLOT_W;
-  const minHalfCenterX = leftInnerRight + FINAL_GAP + SLOT_W / 2;
-  const canvasW = 2 * minHalfCenterX;
+  const semiIdxForGap = Math.max(0, semiRi);
+  const canvasW =
+    SEMIFINAL_CONNECTOR_GAP_PX + ORIGIN_LEFT + ORIGIN_RIGHT + 2 * SLOT_W + 2 * semiIdxForGap * STEP;
 
   const xLeftForRound = (r: number): number => ORIGIN_LEFT + r * STEP;
   const xRightForRound = (r: number): number => canvasW - ORIGIN_RIGHT - SLOT_W - r * STEP;
@@ -1068,7 +1068,7 @@ export function layoutDualFromVerticalBase(
       let cy = centerY[r]![item.internalIndex]!;
       if (r === finalRi && side === "center" && semiRowLen >= 2) {
         const semiCenterY = (centerY[semiRi]![0]! + centerY[semiRi]![1]!) / 2;
-        cy = semiCenterY - slotPitch * 1.25;
+        cy = semiCenterY - slotPitch * 5;
       }
       let x: number;
       if (side === "left") {
@@ -1087,16 +1087,20 @@ export function layoutDualFromVerticalBase(
     }
   }
 
-  const CENTER_SLOT_SCALE = 2;
+  const CHAMPION_SLOT_W = 240;
+  const CHAMPION_SLOT_H = 54;
   for (const item of positionedMatches) {
     const { lo, hi } = leafSpanForTreeLayout(item.roundIndex, item.internalIndex);
     if (dualSideForTreeLayout(lo, hi, half) !== "center") continue;
     const f = item.frame;
     const midX = f.x + f.width / 2;
     const midY = f.y + f.height / 2;
-    const nw = f.width * CENTER_SLOT_SCALE;
-    const nh = f.height * CENTER_SLOT_SCALE;
-    item.frame = { x: midX - nw / 2, y: midY - nh / 2, width: nw, height: nh };
+    item.frame = {
+      x: midX - CHAMPION_SLOT_W / 2,
+      y: midY - CHAMPION_SLOT_H / 2,
+      width: CHAMPION_SLOT_W,
+      height: CHAMPION_SLOT_H,
+    };
   }
 
   const frameAt = (roundIdx: number, internalIndex: number): MatchFrame | null => {
