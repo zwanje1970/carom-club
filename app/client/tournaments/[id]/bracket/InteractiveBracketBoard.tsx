@@ -12,6 +12,8 @@ import styles from "./interactive-bracket-board.module.css";
 import {
   calculateLayout,
   computeBracketBoardMetrics,
+  layoutDualFromVerticalBase,
+  layoutHorizontalFromVerticalBase,
   type BoardBracket,
   type BoardMatch,
   type BracketBoardMetrics,
@@ -20,6 +22,7 @@ import {
   type MatchFrame,
   type PositionedBoardMatch,
 } from "./bracket-board-layout";
+import type { BracketBoardPdfSnapshot } from "./bracket-pdf-client-export";
 import {
   isEligibleBracketWinnerUserId,
   isPropagatableBracketWinnerLabel,
@@ -301,409 +304,6 @@ function normalizeLayoutToCanvas(
   };
 }
 
-/** 좌표 이동 없이 최소 캔버스 크기와 실제 bbox를 맞춘다 */
-function layoutBoundsWithMinimum(
-  positionedMatches: PositionedBoardMatch[],
-  connectors: ConnectorGeometry[],
-  minCanvasW: number,
-  minCanvasH: number,
-): BracketLayoutCalculation {
-  let maxX = 0;
-  let maxY = 0;
-  const growBox = (x: number, y: number, w: number, h: number) => {
-    maxX = Math.max(maxX, x + w);
-    maxY = Math.max(maxY, y + h);
-  };
-  const growPt = (x: number, y: number) => {
-    maxX = Math.max(maxX, x);
-    maxY = Math.max(maxY, y);
-  };
-  for (const p of positionedMatches) {
-    growBox(p.frame.x, p.frame.y, p.frame.width, p.frame.height);
-  }
-  for (const c of connectors) {
-    for (const path of c.basePaths) {
-      growSvgPathPoints(path, growPt);
-    }
-  }
-  const pad = LAYOUT_VIEW_PAD;
-  return {
-    positionedMatches,
-    connectors,
-    roundTitles: [],
-    canvasBounds: {
-      width: Math.max(minCanvasW, Math.ceil(maxX + pad)),
-      height: Math.max(minCanvasH, Math.ceil(maxY + pad)),
-    },
-  };
-}
-
-function leafSpan(roundIdx: number, internalIndex: number): { lo: number; hi: number } {
-  const span = 2 ** roundIdx;
-  return { lo: internalIndex * span, hi: internalIndex * span + span - 1 };
-}
-
-function dualSide(lo: number, hi: number, half: number): "left" | "right" | "center" {
-  if (hi < half) return "left";
-  if (lo >= half) return "right";
-  return "center";
-}
-
-/** 슬롯 키·connector 키는 세로형과 동일. 가로형 전용 좌표·캔버스(세로형 metrics 미사용) */
-function layoutHorizontalFromVerticalBase(
-  base: BracketLayoutCalculation,
-  _metrics: BracketBoardMetrics,
-): BracketLayoutCalculation {
-  const LEFT_PAD = 120;
-  const RIGHT_PAD = 120;
-  const TOP_PAD = 100;
-  const SLOT_W = 160;
-  const SLOT_H = 36;
-  const ROUND_GAP = 265;
-  const SLOT_GAP = 18;
-  const slotPitch = SLOT_H + SLOT_GAP;
-
-  const byRound = new Map<number, PositionedBoardMatch[]>();
-  for (const p of base.positionedMatches) {
-    const arr = byRound.get(p.roundIndex) ?? [];
-    arr.push(p);
-    byRound.set(p.roundIndex, arr);
-  }
-  const maxRi = Math.max(0, ...byRound.keys());
-  const slotRounds = maxRi + 1;
-  for (const arr of byRound.values()) arr.sort((a, b) => a.internalIndex - b.internalIndex);
-
-  const firstRow = byRound.get(0) ?? [];
-  const nLeaf = firstRow.length;
-  if (nLeaf === 0) return base;
-
-  const FINAL_WINNER_SLOT_SCALE = 2;
-  const roundCount = slotRounds;
-  const canvasW =
-    LEFT_PAD + Math.max(0, roundCount - 1) * ROUND_GAP + SLOT_W * FINAL_WINNER_SLOT_SCALE + RIGHT_PAD;
-  const canvasH = TOP_PAD * 2 + nLeaf * slotPitch;
-
-  const centerY: number[][] = [];
-  const row0: number[] = [];
-  for (let i = 0; i < nLeaf; i += 1) {
-    row0.push(TOP_PAD + i * slotPitch + SLOT_H / 2);
-  }
-  centerY.push(row0);
-  for (let r = 1; r < slotRounds; r += 1) {
-    const prev = centerY[r - 1]!;
-    const next: number[] = [];
-    for (let j = 0; j < prev.length / 2; j += 1) {
-      next.push((prev[2 * j]! + prev[2 * j + 1]!) / 2);
-    }
-    centerY.push(next);
-  }
-
-  const oldByKey = new Map(base.positionedMatches.map((p) => [p.key, p]));
-  const positionedMatches: PositionedBoardMatch[] = [];
-
-  for (let r = 0; r < slotRounds; r += 1) {
-    const row = byRound.get(r) ?? [];
-    for (const item of row) {
-      const cy = centerY[r]![item.internalIndex]!;
-      const x = LEFT_PAD + r * ROUND_GAP;
-      const orig = oldByKey.get(item.key)!;
-      positionedMatches.push({
-        ...orig,
-        frame: { x, y: cy - SLOT_H / 2, width: SLOT_W, height: SLOT_H },
-      });
-    }
-  }
-
-  const finalRi = slotRounds - 1;
-  for (const item of positionedMatches) {
-    if (item.roundIndex !== finalRi) continue;
-    const f = item.frame;
-    const midY = f.y + f.height / 2;
-    const nw = f.width * FINAL_WINNER_SLOT_SCALE;
-    const nh = f.height * FINAL_WINNER_SLOT_SCALE;
-    item.frame = { x: f.x, y: midY - nh / 2, width: nw, height: nh };
-  }
-
-  const frameAt = (roundIdx: number, internalIndex: number): MatchFrame | null => {
-    const it = positionedMatches.find((p) => p.roundIndex === roundIdx && p.internalIndex === internalIndex);
-    return it?.frame ?? null;
-  };
-
-  const connectors: ConnectorGeometry[] = [];
-  for (let r = 0; r < slotRounds - 1; r += 1) {
-    const childCount = byRound.get(r)?.length ?? 0;
-    const parentCount = byRound.get(r + 1)?.length ?? 0;
-    for (let j = 0; j < parentCount; j += 1) {
-      const c0 = frameAt(r, 2 * j);
-      const c1 = frameAt(r, 2 * j + 1);
-      const p = frameAt(r + 1, j);
-      if (!c0 || !p) continue;
-
-      const px = p.x;
-      const py = p.y + p.height / 2;
-
-      if (!c1 || 2 * j + 1 >= childCount) {
-        const c0rx = c0.x + c0.width;
-        const c0cy = c0.y + c0.height / 2;
-        const midX = c0rx + Math.max(40, (px - c0rx) * 0.55);
-        connectors.push({
-          key: `${r + 1}:${2 * j}->${r + 2}:${j}`,
-          basePaths: [`M ${c0rx} ${c0cy} L ${midX} ${c0cy} L ${midX} ${py} L ${px} ${py}`],
-          winnerPath: null,
-        });
-        continue;
-      }
-
-      const c0rx = c0.x + c0.width;
-      const c0cy = c0.y + c0.height / 2;
-      const c1rx = c1.x + c1.width;
-      const c1cy = c1.y + c1.height / 2;
-      const mergeY = (c0cy + c1cy) / 2;
-      const mergeX = Math.max(c0rx, c1rx) + Math.max(48, (px - Math.max(c0rx, c1rx)) * 0.55);
-
-      connectors.push({
-        key: `${r + 1}:${2 * j}+${r + 1}:${2 * j + 1}->${r + 2}:${j}`,
-        basePaths: [
-          `M ${c0rx} ${c0cy} L ${mergeX} ${c0cy} L ${mergeX} ${mergeY}`,
-          `M ${c1rx} ${c1cy} L ${mergeX} ${c1cy} L ${mergeX} ${mergeY}`,
-          `M ${mergeX} ${mergeY} L ${px} ${mergeY} L ${px} ${py}`,
-        ],
-        winnerPath: null,
-      });
-    }
-  }
-
-  return layoutBoundsWithMinimum(positionedMatches, connectors, canvasW, canvasH);
-}
-
-function layoutDualFromVerticalBase(
-  base: BracketLayoutCalculation,
-  _metrics: BracketBoardMetrics,
-): BracketLayoutCalculation {
-  const ORIGIN_LEFT = 120;
-  const ORIGIN_RIGHT = 120;
-  const TOP_PAD = 100;
-  const SLOT_W = 160;
-  const SLOT_H = 36;
-  const SLOT_GAP = 18;
-  const slotPitch = SLOT_H + SLOT_GAP;
-  /** 라운드 간 수평 간격(경로선 길이) */
-  const STEP = 265;
-  /** [좌 트리] — finalGap — [마지막 라운드 1슬롯, 캔버스 중앙] — finalGap — [우 트리] */
-  const FINAL_GAP = 340;
-
-  const byRound = new Map<number, PositionedBoardMatch[]>();
-  for (const p of base.positionedMatches) {
-    const arr = byRound.get(p.roundIndex) ?? [];
-    arr.push(p);
-    byRound.set(p.roundIndex, arr);
-  }
-  const maxRi = Math.max(0, ...byRound.keys());
-  const slotRounds = maxRi + 1;
-  for (const arr of byRound.values()) arr.sort((a, b) => a.internalIndex - b.internalIndex);
-
-  const firstRow = byRound.get(0) ?? [];
-  const nLeaf = firstRow.length;
-  if (nLeaf === 0) return base;
-
-  const half = nLeaf / 2;
-  const innerSteps = Math.max(0, slotRounds - 2);
-  const semiRi = slotRounds - 2;
-  const finalRi = slotRounds - 1;
-
-  const leftInnerRight = ORIGIN_LEFT + innerSteps * STEP + SLOT_W;
-  /** 마지막 라운드 슬롯 중심 = canvasW/2, 좌·우 트리 끝과 FINAL_GAP 이상 */
-  const minHalfCenterX = leftInnerRight + FINAL_GAP + SLOT_W / 2;
-  const canvasW = 2 * minHalfCenterX;
-
-  const xLeftForRound = (r: number): number => ORIGIN_LEFT + r * STEP;
-  const xRightForRound = (r: number): number => canvasW - ORIGIN_RIGHT - SLOT_W - r * STEP;
-
-  const centerY: number[][] = [];
-  const row0: number[] = [];
-  for (let i = 0; i < nLeaf; i += 1) {
-    if (i < half) {
-      row0.push(TOP_PAD + i * slotPitch + SLOT_H / 2);
-    } else {
-      row0.push(TOP_PAD + (i - half) * slotPitch + SLOT_H / 2);
-    }
-  }
-  centerY.push(row0);
-  for (let r = 1; r < slotRounds; r += 1) {
-    const prev = centerY[r - 1]!;
-    const next: number[] = [];
-    for (let j = 0; j < prev.length / 2; j += 1) {
-      next.push((prev[2 * j]! + prev[2 * j + 1]!) / 2);
-    }
-    centerY.push(next);
-  }
-
-  const canvasH = TOP_PAD * 2 + half * slotPitch;
-
-  const oldByKey = new Map(base.positionedMatches.map((p) => [p.key, p]));
-  const positionedMatches: PositionedBoardMatch[] = [];
-
-  const semiRowLen = byRound.get(semiRi)?.length ?? 0;
-
-  for (let r = 0; r < slotRounds; r += 1) {
-    const row = byRound.get(r) ?? [];
-    for (const item of row) {
-      const { lo, hi } = leafSpan(r, item.internalIndex);
-      const side = dualSide(lo, hi, half);
-      let cy = centerY[r]![item.internalIndex]!;
-      if (r === finalRi && side === "center" && semiRowLen >= 2) {
-        cy = (centerY[semiRi]![0]! + centerY[semiRi]![1]!) / 2;
-      }
-      let x: number;
-      if (side === "left") {
-        x = xLeftForRound(r);
-      } else if (side === "right") {
-        x = xRightForRound(r);
-      } else {
-        x = canvasW / 2 - SLOT_W / 2;
-      }
-
-      const orig = oldByKey.get(item.key)!;
-      positionedMatches.push({
-        ...orig,
-        frame: { x, y: cy - SLOT_H / 2, width: SLOT_W, height: SLOT_H },
-      });
-    }
-  }
-
-  const CENTER_SLOT_SCALE = 2;
-  for (const item of positionedMatches) {
-    const { lo, hi } = leafSpan(item.roundIndex, item.internalIndex);
-    if (dualSide(lo, hi, half) !== "center") continue;
-    const f = item.frame;
-    const midX = f.x + f.width / 2;
-    const midY = f.y + f.height / 2;
-    const nw = f.width * CENTER_SLOT_SCALE;
-    const nh = f.height * CENTER_SLOT_SCALE;
-    item.frame = { x: midX - nw / 2, y: midY - nh / 2, width: nw, height: nh };
-  }
-
-  const frameAt = (roundIdx: number, internalIndex: number): MatchFrame | null => {
-    const it = positionedMatches.find((p) => p.roundIndex === roundIdx && p.internalIndex === internalIndex);
-    return it?.frame ?? null;
-  };
-
-  const orthLR = (c: MatchFrame, p: MatchFrame): string => {
-    const cx = c.x + c.width;
-    const cy = c.y + c.height / 2;
-    const px = p.x;
-    const py = p.y + p.height / 2;
-    const mx = cx + Math.max(52, (px - cx) * 0.52);
-    return `M ${cx} ${cy} L ${mx} ${cy} L ${mx} ${py} L ${px} ${py}`;
-  };
-
-  const orthRL = (c: MatchFrame, p: MatchFrame): string => {
-    const cx = c.x;
-    const cy = c.y + c.height / 2;
-    const px = p.x + p.width;
-    const py = p.y + p.height / 2;
-    const mx = cx - Math.max(52, (cx - px) * 0.52);
-    return `M ${cx} ${cy} L ${mx} ${cy} L ${mx} ${py} L ${px} ${py}`;
-  };
-
-  const connectors: ConnectorGeometry[] = [];
-
-  for (let r = 0; r < slotRounds - 1; r += 1) {
-    const childCount = byRound.get(r)?.length ?? 0;
-    const parentCount = byRound.get(r + 1)?.length ?? 0;
-    for (let j = 0; j < parentCount; j += 1) {
-      const c0 = frameAt(r, 2 * j);
-      const c1 = frameAt(r, 2 * j + 1);
-      const p = frameAt(r + 1, j);
-      if (!c0 || !p) continue;
-
-      const pSide = dualSide(leafSpan(r + 1, j).lo, leafSpan(r + 1, j).hi, half);
-
-      if (!c1 || 2 * j + 1 >= childCount) {
-        const s0 = dualSide(leafSpan(r, 2 * j).lo, leafSpan(r, 2 * j).hi, half);
-        const path =
-          s0 === "right" || pSide === "center"
-            ? orthRL(c0, p)
-            : orthLR(c0, p);
-        connectors.push({
-          key: `${r + 1}:${2 * j}->${r + 2}:${j}`,
-          basePaths: [path],
-          winnerPath: null,
-        });
-        continue;
-      }
-
-      const s0 = dualSide(leafSpan(r, 2 * j).lo, leafSpan(r, 2 * j).hi, half);
-      const s1 = dualSide(leafSpan(r, 2 * j + 1).lo, leafSpan(r, 2 * j + 1).hi, half);
-
-      if (pSide === "center" && s0 === "left" && s1 === "right") {
-        const py = p.y + p.height / 2;
-        const plx = p.x;
-        const prx = p.x + p.width;
-        const Lrx = c0.x + c0.width;
-        const Ly = c0.y + c0.height / 2;
-        const Rlx = c1.x;
-        const Ry = c1.y + c1.height / 2;
-        const stubL = Math.min(STEP, Math.max(52, (plx - Lrx) * 0.52));
-        const stubR = Math.min(STEP, Math.max(52, (Rlx - prx) * 0.52));
-        const mxL = Math.max(Lrx + 48, Math.min(plx - 48, Lrx + stubL));
-        const mxR = Math.min(Rlx - 48, Math.max(prx + 48, Rlx - stubR));
-        connectors.push({
-          key: `${r + 1}:${2 * j}+${r + 1}:${2 * j + 1}->${r + 2}:${j}`,
-          basePaths: [
-            `M ${Lrx} ${Ly} L ${mxL} ${Ly} L ${mxL} ${py} L ${plx} ${py}`,
-            `M ${Rlx} ${Ry} L ${mxR} ${Ry} L ${mxR} ${py} L ${prx} ${py}`,
-          ],
-          winnerPath: null,
-        });
-        continue;
-      }
-
-      if (s0 === "right" && s1 === "right") {
-        const c0lx = c0.x;
-        const c0cy = c0.y + c0.height / 2;
-        const c1lx = c1.x;
-        const c1cy = c1.y + c1.height / 2;
-        const prx = p.x + p.width;
-        const py = p.y + p.height / 2;
-        const mergeY = (c0cy + c1cy) / 2;
-        const loEdge = Math.min(c0lx, c1lx);
-        const mergeX = Math.max(prx + 48, loEdge - Math.max(52, (loEdge - prx) * 0.52));
-        connectors.push({
-          key: `${r + 1}:${2 * j}+${r + 1}:${2 * j + 1}->${r + 2}:${j}`,
-          basePaths: [
-            `M ${c0lx} ${c0cy} L ${mergeX} ${c0cy} L ${mergeX} ${mergeY}`,
-            `M ${c1lx} ${c1cy} L ${mergeX} ${c1cy} L ${mergeX} ${mergeY}`,
-            `M ${mergeX} ${mergeY} L ${prx} ${mergeY} L ${prx} ${py}`,
-          ],
-          winnerPath: null,
-        });
-        continue;
-      }
-
-      const c0rx = c0.x + c0.width;
-      const c0cy = c0.y + c0.height / 2;
-      const c1rx = c1.x + c1.width;
-      const c1cy = c1.y + c1.height / 2;
-      const plx = p.x;
-      const py = p.y + p.height / 2;
-      const mergeY = (c0cy + c1cy) / 2;
-      const mergeX = Math.max(c0rx, c1rx) + Math.max(52, (plx - Math.max(c0rx, c1rx)) * 0.52);
-      connectors.push({
-        key: `${r + 1}:${2 * j}+${r + 1}:${2 * j + 1}->${r + 2}:${j}`,
-        basePaths: [
-          `M ${c0rx} ${c0cy} L ${mergeX} ${c0cy} L ${mergeX} ${mergeY}`,
-          `M ${c1rx} ${c1cy} L ${mergeX} ${c1cy} L ${mergeX} ${mergeY}`,
-          `M ${mergeX} ${mergeY} L ${plx} ${mergeY} L ${plx} ${py}`,
-        ],
-        winnerPath: null,
-      });
-    }
-  }
-
-  return layoutBoundsWithMinimum(positionedMatches, connectors, canvasW, canvasH);
-}
-
 export default function InteractiveBracketBoard({
   bracket,
   tournamentTitle = "",
@@ -728,6 +328,7 @@ export default function InteractiveBracketBoard({
   viewStateStorageKey,
   connectivityHint = "",
   onExit,
+  bracketPdfSnapshotRef,
 }: {
   bracket: BracketBoardInput;
   tournamentTitle?: string;
@@ -777,6 +378,8 @@ export default function InteractiveBracketBoard({
   canUndo?: boolean;
   onUndo?: () => void | Promise<void>;
   saveStateText?: string;
+  /** 현재 화면 bracket·viewMode·로컬 승자 선택 스냅샷 — PDF 출력 등 */
+  bracketPdfSnapshotRef?: React.MutableRefObject<(() => BracketBoardPdfSnapshot) | null>;
 }) {
   const MIN_SCALE = 0.3;
   const MAX_SCALE = 2.5;
@@ -805,6 +408,18 @@ export default function InteractiveBracketBoard({
     value: string;
   } | null>(null);
   const [winnerByPair, setWinnerByPair] = useState<Record<string, WinnerChoice>>({});
+
+  useLayoutEffect(() => {
+    if (!bracketPdfSnapshotRef) return;
+    bracketPdfSnapshotRef.current = () => ({
+      bracket,
+      boardViewMode: viewMode === "dual" ? "dual" : viewMode === "horizontal" ? "horizontal" : "vertical",
+      winnerByPairSnapshot: { ...winnerByPair },
+    });
+    return () => {
+      bracketPdfSnapshotRef.current = null;
+    };
+  }, [bracket, bracketPdfSnapshotRef, viewMode, winnerByPair]);
   const [scale, setScale] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });

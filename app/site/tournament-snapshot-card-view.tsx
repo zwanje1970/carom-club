@@ -6,7 +6,7 @@ import { useCallback, useLayoutEffect, useRef } from "react";
 import { TournamentStatusBadge, type TournamentPostStatus } from "./tournament-slide-card-status-badge";
 import styles from "./tournament-slide-card-previews.module.css";
 
-/* 편집기 미리보기·메인 메인덱 대회 면 공통 HTML 렌더; 디자인 좌표 440×161 (`slideDeckAspectFill`). */
+/* 편집기 미리보기·게시 PNG(html2canvas) 입력용 HTML 렌더 — /site 메인 슬라이드는 PNG(`MainSiteScrollCards`)만 사용. 디자인 좌표 440×161 (`slideDeckAspectFill`). */
 
 export type { TournamentPostStatus };
 
@@ -224,6 +224,7 @@ function TournamentSlideCardPreview({
   mainSlideAd,
   tournamentPublishedHeightScale = true,
   editorPreviewFixedLayout = false,
+  artboardPx = false,
   onRepImageLoad,
   isImageCaptureMode = false,
 }: {
@@ -243,6 +244,8 @@ function TournamentSlideCardPreview({
   tournamentPublishedHeightScale?: boolean;
   /** 게시카드 작성 미리보기만: 카드 박스·텍스트 슬롯 높이 고정(메인·다른 경로 false) */
   editorPreviewFixedLayout?: boolean;
+  /** 440×161 고정 아트보드 — 게시 스냅샷·편집 미리보기(메인 면에서는 미사용) */
+  artboardPx?: boolean;
   onRepImageLoad?: () => void;
   /** true: 제목·부가·푸터·배지 글자만 숨김(레이아웃 유지) — html2canvas PNG용 */
   isImageCaptureMode?: boolean;
@@ -271,25 +274,27 @@ function TournamentSlideCardPreview({
   const rootClass = [
     styles.cardRoot,
     slideDeck ? styles.cardRootSlideDeck : "",
-    slideDeck && slideDeckAspectFill ? styles.cardRootSlideDeckAspectFill : "",
+    slideDeck && slideDeckAspectFill && !artboardPx ? styles.cardRootSlideDeckAspectFill : "",
     templateCardLayout ? styles.cardRootTemplateLayout : "",
     tournamentPublishedHeightScale ? styles.cardRootTournamentPublishedScale : "",
     item.cardTextShadowEnabled ? styles.cardTextShadowOn : "",
     surfaceLayout === "full" ? styles.cardRootSurfaceFull : "",
     mainSlideAd ? styles.cardRootMainSlideAd : "",
+    artboardPx ? styles.cardRootArtboardPx : "",
   ]
     .filter(Boolean)
     .join(" ");
 
+  const layoutStableSlots = editorPreviewFixedLayout || artboardPx;
   const leadText = lead.trim();
   const descText = description.trim();
   const desc2Text = description2.trim();
-  const showLeadBlock = editorPreviewFixedLayout || leadText.length > 0;
-  const showDescBlock = editorPreviewFixedLayout || descText.length > 0;
-  const showDesc2Block = editorPreviewFixedLayout || desc2Text.length > 0;
-  const leadDisplay = editorPreviewFixedLayout && !leadText ? "\u00a0" : lead;
-  const descDisplay = editorPreviewFixedLayout && !descText ? "\u00a0" : description;
-  const desc2Display = editorPreviewFixedLayout && !desc2Text ? "\u00a0" : description2;
+  const showLeadBlock = layoutStableSlots || leadText.length > 0;
+  const showDescBlock = layoutStableSlots || descText.length > 0;
+  const showDesc2Block = layoutStableSlots || desc2Text.length > 0;
+  const leadDisplay = layoutStableSlots && !leadText ? "\u00a0" : lead;
+  const descDisplay = layoutStableSlots && !descText ? "\u00a0" : description;
+  const desc2Display = layoutStableSlots && !desc2Text ? "\u00a0" : description2;
 
   const fullOverlayFooter = (
     <div className={styles.fullSurfaceFooter} style={capHide}>
@@ -320,7 +325,7 @@ function TournamentSlideCardPreview({
     return (
       <article
         className={rootClass}
-        data-editor-card-preview={editorPreviewFixedLayout ? "1" : undefined}
+        data-editor-card-preview={editorPreviewFixedLayout && !artboardPx ? "1" : undefined}
       >
         <MediaStack
           variant="classic"
@@ -377,7 +382,7 @@ function TournamentSlideCardPreview({
     return (
       <article
         className={rootClass}
-        data-editor-card-preview={editorPreviewFixedLayout ? "1" : undefined}
+        data-editor-card-preview={editorPreviewFixedLayout && !artboardPx ? "1" : undefined}
       >
         <MediaStack
           variant="frame"
@@ -444,6 +449,7 @@ export function TournamentSnapshotCardView({
   slideDeckAspectFill = false,
   templateCardLayout = false,
   editorPreviewFixedLayout = false,
+  artboardPx = false,
   repImageHighPriority,
   slideDeckSolidBackdrop,
   onRepImageLoad,
@@ -457,6 +463,8 @@ export function TournamentSnapshotCardView({
   templateCardLayout?: boolean;
   /** 게시카드 작성 미리보기만 — 카드·텍스트 영역 크기 고정 */
   editorPreviewFixedLayout?: boolean;
+  /** 440×161 고정 픽셀 아트보드 — 게시 캡처·편집 미리보기(메인 면 미사용) */
+  artboardPx?: boolean;
   repImageHighPriority?: boolean;
   slideDeckSolidBackdrop?: string;
   onRepImageLoad?: () => void;
@@ -481,6 +489,7 @@ export function TournamentSnapshotCardView({
       mainSlideAd={item.type === "ad"}
       tournamentPublishedHeightScale={true}
       editorPreviewFixedLayout={editorPreviewFixedLayout}
+      artboardPx={artboardPx}
       onRepImageLoad={onRepImageLoad}
       isImageCaptureMode={isImageCaptureMode}
     />

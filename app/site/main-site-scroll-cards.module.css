@@ -1,4 +1,4 @@
-/* /site 메인 MainSiteScrollCards 전용 — main-sample 경로는 미사용 */
+/* /site 메인 `MainSiteScrollCards` 전용 — 카드 면 CSS는 `main-sample.module.css` 덱 면 클래스와 함께 사용 */
 
 .viewportMarquee {
   container-type: size;
@@ -97,8 +97,8 @@
   min-height: 100%;
 }
 
-/* 메인 세로 스크롤 광고 카드(게시 PNG 면): 좌측 배지 대신 우측 상단 AD 텍스트만 */
-.publishedScrollAdMark {
+/* 슬라이드 덱 PNG 행(대회·광고 공통): 레이아웃 비참여 우측 상단 AD 표시 */
+.slideDeckPngAdMark {
   position: absolute;
   top: 6px;
   right: 8px;

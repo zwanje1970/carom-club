@@ -1,16 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties, KeyboardEvent, PointerEvent, Ref } from "react";
+import type { KeyboardEvent, PointerEvent, Ref } from "react";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import styles from "./main-sample/main-sample.module.css";
 import siteStyles from "./main-site-scroll-cards.module.css";
 import deckShellStyles from "./main-site-scroll-tournament-deck-shell.module.css";
-import {
-  SLIDE_DECK_SOLID_BACKDROPS,
-  TournamentSnapshotCardView,
-  type SlideDeckItem,
-} from "./tournament-snapshot-card-view";
 
 const SITE_SCROLL_CARD = "data-site-scroll-card";
 const SITE_SCROLL_SHORTCUT = "data-site-scroll-shortcut";
@@ -36,68 +31,13 @@ export type MainSiteScrollCardItem = {
   /** 이미지 없을 때 카드 면 배경(CSS `background` 값) */
   faceCssBackground: string | null;
   external: boolean;
-  /** 게시 스냅샷으로 면 전체가 이미지일 때 제목 오버레이 숨김(중복 방지) */
-  faceIsFullPublishedSnapshot?: boolean;
-  /**
-   * 게시 PNG 분기(`faceIsFullPublishedSnapshot`)는 아니지만, 면·포스터 크기·비율은
-   * 게시 카드와 동일 CSS(공통 토큰) 사용 — 광고 업로드 이미지 전용.
-   */
-  faceMatchPublishedScrollMetrics?: boolean;
-  /** 게시/광고 풀면레이아웃: HTML 텍스트(배지·제목·부가) — 이미지는 배경만 */
-  scrollFaceBadge?: string | null;
-  scrollFaceSubtitle?: string | null;
-  scrollFaceExtraLine1?: string | null;
-  scrollFaceExtraLine2?: string | null;
-  scrollFaceExtraLine3?: string | null;
-  scrollFaceTitleColor?: string | null;
-  scrollFaceMetaColor?: string | null;
-  scrollFaceStrongTextShadow?: boolean;
-  /** 대회 카드: 작성화면과 동일 컴포넌트로 렌더(광고 등은 미사용) */
-  slideDeckItem?: SlideDeckItem;
+  /** 슬라이드 덱 PNG 행: 이미지 면(대회·광고 동일 래퍼) */
+  slideDeckPngFace?: boolean;
+  /** PNG 없음 — 플레이스홀더 면만 */
+  slideDeckPngPlaceholder?: boolean;
+  /** 광고만 우측 상단 AD 표시(포인터 비참여) */
+  slideDeckPngAdMark?: boolean;
 };
-
-function isMainSiteScrollAdRow(item: MainSiteScrollCardItem): boolean {
-  if (item.slideDeckItem?.type === "ad") return true;
-  if (item.scrollFaceBadge?.trim() === "광고") return true;
-  return false;
-}
-
-function publishedScrollBadgeClass(badge: string): string {
-  const b = badge.trim();
-  if (!b) return "site-board-status-badge site-board-status-badge--muted";
-  if (b === "광고") return "site-board-status-badge site-board-status-badge--muted";
-  if (b.includes("마감임박") || (b.includes("마감") && b.includes("임박")))
-    return "site-board-status-badge site-board-status-badge--urgent";
-  if (b.includes("마감")) return "site-board-status-badge site-board-status-badge--closed";
-  if (b.includes("종료")) return "site-board-status-badge site-board-status-badge--ended";
-  if (b.includes("모집") || b.includes("진행")) return "site-board-status-badge badge-status";
-  return "site-board-status-badge site-board-status-badge--muted";
-}
-
-function isDudMetaLine(s: string): boolean {
-  const t = s.trim();
-  if (!t) return true;
-  return /^[·\s.|\-–—]+$/u.test(t);
-}
-
-function publishedScrollMetaLines(
-  subtitle: string | null | undefined,
-  e1: string | null | undefined,
-  e2: string | null | undefined,
-  e3: string | null | undefined,
-): string[] {
-  const out: string[] = [];
-  const pushUnique = (s: string) => {
-    const t = s.trim();
-    if (!t || isDudMetaLine(t) || out.includes(t)) return;
-    out.push(t);
-  };
-  pushUnique(subtitle ?? "");
-  pushUnique(e1 ?? "");
-  pushUnique(e2 ?? "");
-  pushUnique(e3 ?? "");
-  return out.slice(0, 3);
-}
 
 type CardRowProps = {
   rowKey: string;
@@ -113,7 +53,7 @@ function cardSlotClassNames(base: string, selected: boolean, selectedMod?: strin
 }
 
 const MainSiteCardRow = memo(function MainSiteCardRow({
-  rowKey,
+  rowKey: _rowKey,
   item,
   selected,
   onCardPointerDown,
@@ -129,37 +69,55 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
     [item.id, onCardPointerDown],
   );
 
-  const isAdRow = isMainSiteScrollAdRow(item);
+  const deckImgUrl = item.imageUrl?.trim() ?? "";
+  /** PNG 면: URL 있고 플레이스홀더 행이 아님 — 대회·광고 동일 */
+  const showPngDeck = Boolean(deckImgUrl) && !item.slideDeckPngPlaceholder;
 
-  if (item.slideDeckItem) {
-    const sd = item.slideDeckItem;
-    const deckInner = (
-      <TournamentSnapshotCardView
-        item={sd}
-        slideDeck
-        slideDeckAspectFill
-        templateCardLayout
-        suppressLink
-        repImageHighPriority={lcpHeroImage}
-        slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
-      />
-    );
-    return (
-      <div
-        className={cardSlotClassNames(styles.sampleMainCardSlot, selected, styles.sampleMainCardSlotSelected)}
-        {...{ [SITE_SCROLL_CARD]: "" }}
-        {...(isMainSiteScrollAdRow(item) ? { "data-site-main-scroll-ad": "1" } : {})}
-        style={{ touchAction: "pan-y" }}
-        role="button"
+  const slotShellProps = {
+    className: cardSlotClassNames(styles.sampleMainCardSlot, selected, styles.sampleMainCardSlotSelected),
+    ...{ [SITE_SCROLL_CARD]: "" },
+    style: { touchAction: "pan-y" as const },
+    role: "button" as const,
+    tabIndex: 0,
+    "aria-pressed": selected,
+    "aria-label": `${item.title}${selected ? ", 선택됨" : ""}`,
+    onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      onCardPointerDown(item.id);
+    },
+  };
+
+  const shortcutSelected =
+    selected &&
+    (item.external ? (
+      <a
+        href={item.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={styles.sampleMainCardShortcut}
+        {...{ [SITE_SCROLL_SHORTCUT]: "" }}
         tabIndex={0}
-        aria-pressed={selected}
-        aria-label={`${item.title}${selected ? ", 선택됨" : ""}`}
-        onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
-          if (e.key !== "Enter" && e.key !== " ") return;
-          e.preventDefault();
-          onCardPointerDown(item.id);
-        }}
+        onPointerDown={(e) => e.stopPropagation()}
       >
+        자세히 보기 ▶
+      </a>
+    ) : (
+      <Link
+        href={item.href}
+        prefetch={false}
+        className={styles.sampleMainCardShortcut}
+        {...{ [SITE_SCROLL_SHORTCUT]: "" }}
+        tabIndex={0}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        자세히 보기 ▶
+      </Link>
+    ));
+
+  if (showPngDeck) {
+    return (
+      <div {...slotShellProps}>
         <div
           className={`${styles.sampleMainCardFace} ${styles.sampleMainCardFaceTournamentDeck} ${selected ? styles.sampleMainCardFaceSelected : ""}`}
         >
@@ -173,176 +131,63 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
                     <div
                       className={`${deckShellStyles.mainScrollDeckCardInner} ${deckShellStyles.mainScrollDeckCardInnerFlex}`}
                     >
-                      {deckInner}
+                      <div className={styles.sampleMainCardPublishedInner}>
+                        <img
+                          src={deckImgUrl}
+                          alt=""
+                          className={styles.sampleMainCardPosterPublishedSnapshot}
+                          decoding="async"
+                          loading={lcpHeroImage ? "eager" : "lazy"}
+                          {...(lcpHeroImage ? { fetchPriority: "high" as const } : {})}
+                        />
+                        {item.slideDeckPngAdMark ? (
+                          <span className={siteStyles.slideDeckPngAdMark} aria-hidden>
+                            AD
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-          {selected ? (
-            item.external ? (
-              <a
-                href={item.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.sampleMainCardShortcut}
-                {...{ [SITE_SCROLL_SHORTCUT]: "" }}
-                tabIndex={0}
-                onPointerDown={(e) => e.stopPropagation()}
-              >
-                자세히 보기 ▶
-              </a>
-            ) : (
-              <Link
-                href={item.href}
-                prefetch={false}
-                className={styles.sampleMainCardShortcut}
-                {...{ [SITE_SCROLL_SHORTCUT]: "" }}
-                tabIndex={0}
-                onPointerDown={(e) => e.stopPropagation()}
-              >
-                자세히 보기 ▶
-              </Link>
-            )
-          ) : null}
+          {shortcutSelected}
         </div>
       </div>
     );
   }
 
-  const hasFaceImage = Boolean(item.imageUrl?.trim());
-
-  const usePublishedScrollLayout = Boolean(
-    (item.faceIsFullPublishedSnapshot && hasFaceImage) ||
-      (item.faceMatchPublishedScrollMetrics && hasFaceImage),
-  );
-
-  const faceStyle: CSSProperties = {};
-  if (!item.imageUrl?.trim() && item.faceCssBackground?.trim()) {
-    faceStyle.background = item.faceCssBackground.trim();
-  }
-
-  const textShadowBase = item.scrollFaceStrongTextShadow
-    ? "0 1px 2px rgba(0,0,0,0.75), 0 2px 8px rgba(0,0,0,0.45)"
-    : "0 1px 2px rgba(0,0,0,0.65)";
-  const titleColor = item.scrollFaceTitleColor?.trim() || "#ffffff";
-  const metaColor = item.scrollFaceMetaColor?.trim() || "rgba(255,255,255,0.92)";
-  const metaLines = publishedScrollMetaLines(
-    item.scrollFaceSubtitle,
-    item.scrollFaceExtraLine1,
-    item.scrollFaceExtraLine2,
-    item.scrollFaceExtraLine3,
-  );
-  const overlayTextShadow = item.scrollFaceStrongTextShadow ? textShadowBase : "none";
-
+  const phBg = item.faceCssBackground?.trim() || "#0f172a";
   return (
-    <div
-      className={cardSlotClassNames(styles.sampleMainCardSlot, selected, styles.sampleMainCardSlotSelected)}
-      {...{ [SITE_SCROLL_CARD]: "" }}
-      {...(isMainSiteScrollAdRow(item) ? { "data-site-main-scroll-ad": "1" } : {})}
-      style={{ touchAction: "pan-y" }}
-      role="button"
-      tabIndex={0}
-      aria-pressed={selected}
-      aria-label={`${item.title}${selected ? ", 선택됨" : ""}`}
-      onPointerDown={onPointerDown}
-      onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
-        if (e.key !== "Enter" && e.key !== " ") return;
-        e.preventDefault();
-        onCardPointerDown(item.id);
-      }}
-    >
+    <div {...slotShellProps}>
       <div
-        className={
-          usePublishedScrollLayout
-            ? [
-                styles.sampleMainCardFacePublishedSnapshot,
-                selected ? styles.sampleMainCardFacePublishedSnapshotSelected : "",
-              ]
-                .filter(Boolean)
-                .join(" ")
-            : `${styles.sampleMainCardFace} ${selected ? styles.sampleMainCardFaceSelected : ""}`
-        }
-        style={faceStyle}
+        className={`${styles.sampleMainCardFace} ${styles.sampleMainCardFaceTournamentDeck} ${selected ? styles.sampleMainCardFaceSelected : ""}`}
       >
-        {usePublishedScrollLayout && item.imageUrl?.trim() ? (
-          <div className={styles.sampleMainCardPublishedInner}>
-            <img
-              src={item.imageUrl.trim()}
-              alt=""
-              className={styles.sampleMainCardPosterPublishedSnapshot}
-              decoding="async"
-              loading={lcpHeroImage ? "eager" : "lazy"}
-              {...(lcpHeroImage ? { fetchPriority: "high" as const } : {})}
-            />
-            <div className={styles.sampleMainCardPublishedOverlay} aria-hidden>
-              {!isAdRow && item.scrollFaceBadge?.trim() ? (
-                <span className={publishedScrollBadgeClass(item.scrollFaceBadge.trim())}>
-                  {item.scrollFaceBadge.trim()}
-                </span>
-              ) : null}
-              <p
-                className={styles.sampleMainCardPublishedOverlayTitle}
-                style={{ color: titleColor, textShadow: overlayTextShadow }}
-              >
-                {item.title}
-              </p>
-              {metaLines.map((line, idx) => (
-                <p
-                  key={`${idx}-${line}`}
-                  className={styles.sampleMainCardPublishedOverlayMeta}
-                  style={{ color: metaColor, textShadow: overlayTextShadow }}
+        <div className={siteStyles.cardRowInteractionWrap} onPointerDown={onPointerDown}>
+          <div className={styles.sampleMainCardDeckFit}>
+            <div className={styles.sampleMainCardDeckFitInner}>
+              <div className={siteStyles.mainScrollDeckCardShell}>
+                <div
+                  className={`${deckShellStyles.mainScrollDeckCardOuter} ${deckShellStyles.mainScrollDeckCardOuterFlex}${selected ? ` ${deckShellStyles.mainScrollDeckCardOuterSelected}` : ""}`}
                 >
-                  {line}
-                </p>
-              ))}
+                  <div
+                    className={`${deckShellStyles.mainScrollDeckCardInner} ${deckShellStyles.mainScrollDeckCardInnerFlex}`}
+                  >
+                    <div className={styles.sampleMainCardPublishedInner} style={{ background: phBg }} aria-hidden>
+                      {item.slideDeckPngAdMark ? (
+                        <span className={siteStyles.slideDeckPngAdMark} aria-hidden>
+                          AD
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            {isAdRow ? (
-              <span className={siteStyles.publishedScrollAdMark} aria-hidden>
-                AD
-              </span>
-            ) : null}
           </div>
-        ) : item.imageUrl?.trim() ? (
-          <img
-            src={item.imageUrl.trim()}
-            alt=""
-            className={styles.sampleMainCardPoster}
-            decoding="async"
-            loading={lcpHeroImage ? "eager" : "lazy"}
-            {...(lcpHeroImage ? { fetchPriority: "high" as const } : {})}
-          />
-        ) : null}
-        {!usePublishedScrollLayout ? (
-          <div className={styles.sampleMainCardTitleOverlay}>{item.title}</div>
-        ) : null}
-        {item.external ? (
-          <a
-            href={item.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.sampleMainCardShortcut}
-            {...{ [SITE_SCROLL_SHORTCUT]: "" }}
-            tabIndex={selected ? 0 : -1}
-            aria-hidden={!selected}
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            자세히 보기 ▶
-          </a>
-        ) : (
-          <Link
-            href={item.href}
-            prefetch={false}
-            className={styles.sampleMainCardShortcut}
-            {...{ [SITE_SCROLL_SHORTCUT]: "" }}
-            tabIndex={selected ? 0 : -1}
-            aria-hidden={!selected}
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            자세히 보기 ▶
-          </Link>
-        )}
+        </div>
+        {shortcutSelected}
       </div>
     </div>
   );
@@ -370,16 +215,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   const scrollPixelCarryRef = useRef(0);
 
   const lcpHeroItemIndex = useMemo(
-    () =>
-      items.findIndex(
-        (x) =>
-          Boolean(x.imageUrl?.trim()) ||
-          Boolean(
-            x.slideDeckItem &&
-              (x.slideDeckItem.image320Url?.trim() ||
-                (typeof x.slideDeckItem.mediaBackground === "string" && x.slideDeckItem.mediaBackground.trim())),
-          ),
-      ),
+    () => items.findIndex((x) => Boolean(x.imageUrl?.trim()) && !x.slideDeckPngPlaceholder),
     [items],
   );
 

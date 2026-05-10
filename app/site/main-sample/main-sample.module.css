@@ -364,59 +364,7 @@
   pointer-events: none;
 }
 
-/* 게시 PNG 전면 스냅샷: 샘플 고정 높이·--sample-main-card-height·cover와 분리 */
-.sampleMainCardFacePublishedSnapshot {
-  box-sizing: border-box;
-  display: block;
-  width: 100%;
-  max-width: min(100%, var(--slide-card-max-width, 440px));
-  margin-left: auto;
-  margin-right: auto;
-  min-width: 0;
-  height: auto;
-  aspect-ratio: 3 / 4;
-  border-radius: var(--site-main-scroll-card-face-border-radius, 12px);
-  position: relative;
-  overflow: visible;
-  transform: translateY(-2px) scale(1);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18);
-  transition:
-    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.22s ease;
-}
-
-.sampleMainCardSlot:active
-  .sampleMainCardFacePublishedSnapshot:not(.sampleMainCardFacePublishedSnapshotSelected) {
-  transform: translateY(-6px) scale(1.03);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.22);
-}
-
-.sampleMainCardFacePublishedSnapshot.sampleMainCardFacePublishedSnapshotSelected {
-  transform: translateY(-16px) scale(1.11);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.24);
-}
-
-.sampleMainCardSlot:active
-  .sampleMainCardFacePublishedSnapshot.sampleMainCardFacePublishedSnapshotSelected {
-  transform: translateY(-18px) scale(1.12);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.26);
-}
-
-.sampleMainCardSlot:focus-visible .sampleMainCardFacePublishedSnapshot {
-  outline: 2px solid rgba(37, 99, 235, 0.85);
-  outline-offset: 3px;
-}
-
-.sampleMainCardFacePublishedSnapshot.sampleMainCardFacePublishedSnapshotSelected .sampleMainCardShortcut {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* 게시 PNG/광고 업로드 면(.sampleMainCardFacePublishedSnapshot)에서만 flex 수축 안정화 — 분할형 덱 면에는 미적용 */
-.sampleMainCardFacePublishedSnapshot .sampleMainCardPublishedInner {
-  min-height: 0;
-}
-
+/* 메인 세로 스크롤 PNG 면: `MainSiteScrollCards` — 덱 면 + `.sampleMainCardPublishedInner` + `.sampleMainCardPosterPublishedSnapshot` */
 .sampleMainCardPublishedInner {
   position: relative;
   display: block;
@@ -439,75 +387,11 @@
   vertical-align: top;
 }
 
-.sampleMainCardPublishedOverlay {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.28rem;
-  padding: 0.65rem 0.75rem 3.25rem;
-  justify-content: flex-start;
-  pointer-events: none;
-  /* 사용자 미설정 시 임의 그라데이션·음영 없음 — 텍스트/색은 인라인 스타일만 */
-  background: transparent;
-}
-
-.sampleMainCardPublishedOverlayTitle {
-  margin: 0;
-  width: 100%;
-  min-width: 0;
-  font-size: clamp(0.82rem, 2.9vw, 0.95rem);
-  font-weight: 700;
-  line-height: 1.28;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  word-break: keep-all;
-  overflow-wrap: anywhere;
-}
-
-.sampleMainCardPublishedOverlayMeta {
-  margin: 0;
-  width: 100%;
-  min-width: 0;
-  font-size: clamp(0.72rem, 2.5vw, 0.82rem);
-  font-weight: 500;
-  line-height: 1.3;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sampleMainCardFacePublishedSnapshot .sampleMainCardShortcut {
-  z-index: 2;
-}
-
-/* 대회 카드(에디터 미리보기): 내부 레이어 z-index 위에 CTA가 보이도록 — 선택 시에만 DOM에 마운트 */
+/* 대회·광고 PNG 덱 면: CTA z-index */
 .sampleMainCardFace.sampleMainCardFaceTournamentDeck .sampleMainCardShortcut {
   z-index: 12;
   opacity: 1;
   pointer-events: auto;
-}
-
-.sampleMainCardTitleOverlay {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 44px;
-  padding: 0.35rem 0.75rem;
-  box-sizing: border-box;
-  font-size: 0.78rem;
-  font-weight: 700;
-  line-height: 1.25;
-  color: #fff;
-  text-shadow: none;
-  pointer-events: none;
-  max-height: 4.5em;
-  overflow: hidden;
 }
 
 .sampleMainEmpty {
@@ -517,51 +401,4 @@
   font-size: 0.88rem;
   color: rgba(30, 41, 59, 0.75);
   line-height: 1.45;
-}
-
-/*
- * PC 웹(site-shell--pc-site-chrome) + 메인 세로 스크롤(data-site-main-scroll-viewport) + 광고 행만:
- * 면 폭을 일반 카드와 동일 토큰으로 제한(UA 모바일 셸·가로 슬라이드 덱 비적용).
- */
-:global(.site-shell.site-shell--pc-site-chrome)
-  :global([data-site-main-scroll-viewport="1"])
-  :global([data-site-main-scroll-ad="1"]).sampleMainCardSlot
-  > .sampleMainCardFacePublishedSnapshot {
-  max-width: min(100%, var(--slide-card-max-width, 440px));
-  margin-left: auto;
-  margin-right: auto;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-:global(.site-shell.site-shell--pc-site-chrome)
-  :global([data-site-main-scroll-viewport="1"])
-  :global([data-site-main-scroll-ad="1"]).sampleMainCardSlot
-  > .sampleMainCardFace {
-  max-width: min(100%, var(--slide-card-max-width, 440px));
-  margin-left: auto;
-  margin-right: auto;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-/* 메인 세로 스크롤 광고만: 대회 덱 면(440/161)과 동일 비율, 게시 PNG 이미지 전면 cover */
-.slideViewportSiteMain
-  :global([data-site-main-scroll-ad="1"]).sampleMainCardSlot
-  > .sampleMainCardFacePublishedSnapshot {
-  aspect-ratio: 440 / 161;
-  overflow: hidden;
-}
-
-.slideViewportSiteMain
-  :global([data-site-main-scroll-ad="1"]).sampleMainCardSlot
-  > .sampleMainCardFacePublishedSnapshot
-  .sampleMainCardPosterPublishedSnapshot {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  object-fit: cover;
-  object-position: center center;
 }

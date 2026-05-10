@@ -6,11 +6,6 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  getShuffleRoundBlockedReason,
-  type ShuffleGuardRound,
-} from "../../../../../lib/bracket-shuffle-guards";
-
-import {
   syncClearMatchWinner,
   syncRenamePlayer,
   syncSwapPlayers,
@@ -33,6 +28,7 @@ import {
   writeLastGoodBracket,
   writeOfflinePending,
 } from "./bracket-offline-cache";
+import { exportCurrentBracketToPdf } from "./bracket-pdf-client-export";
 import BracketProgressSummaryCard from "./BracketProgressSummaryCard";
 import { roundLabelFromMatchCount } from "./bracket-progress-utils";
 
@@ -274,6 +270,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   const [multiBlockSize, setMultiBlockSize] = useState(16);
   const [multiBlockBusy, setMultiBlockBusy] = useState(false);
   const [selectedQuickRoundNumber, setSelectedQuickRoundNumber] = useState<number | null>(null);
+  const [manageBracketPdfBusy, setManageBracketPdfBusy] = useState(false);
   const confirmedSectionRef = useRef<HTMLElement | null>(null);
   const didInitialBoardFocusRef = useRef(false);
 
@@ -341,11 +338,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     return getSliceRoundsFromBracket(bracket, boardSliceKey);
   }, [bracket, boardSliceKey]);
 
-  const sliceRoundsForShuffleGuard = useMemo((): ShuffleGuardRound[] => {
-    if (!bracket) return [];
-    return getSliceRoundsFromBracket(bracket, boardSliceKey) as ShuffleGuardRound[];
-  }, [bracket, boardSliceKey]);
-
   const selectedQualifierBlockId = useMemo(() => {
     if (!boardSliceKey?.startsWith("block:")) return null;
     return boardSliceKey.slice("block:".length);
@@ -374,6 +366,34 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       return displayRoundsSorted[0]!.roundNumber;
     });
   }, [displayRoundsSorted]);
+
+  const handleExportManageBracketPdf = useCallback(async () => {
+    if (!bracket) return;
+    if (zonesEnabled && !selectedZoneId) {
+      setMessage("권역을 선택한 뒤 PDF를 출력할 수 있습니다.");
+      return;
+    }
+    const rounds = getSliceRoundsFromBracket(bracket, boardSliceKey);
+    if (!rounds.length) {
+      setMessage("선택한 조·결선에 출력할 라운드가 없습니다.");
+      return;
+    }
+    const suffix = boardSliceKey ?? "root";
+    setManageBracketPdfBusy(true);
+    setMessage("");
+    try {
+      await exportCurrentBracketToPdf({
+        bracket: { id: `${bracket.id}:${suffix}`, rounds },
+        boardViewMode: "vertical",
+        winnerByPairSnapshot: {},
+        fileNameBase: `bracket_manage_${tournamentId}_${suffix.replace(/:/g, "_")}`,
+      });
+    } catch {
+      setMessage("PDF 저장에 실패했습니다.");
+    } finally {
+      setManageBracketPdfBusy(false);
+    }
+  }, [boardSliceKey, bracket, selectedZoneId, tournamentId, zonesEnabled]);
 
   const pullManageBracket = useCallback(async (): Promise<
     { ok: true; bracket: Bracket | null } | { ok: false; error?: string }
@@ -1605,40 +1625,26 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   if (variant === "quickResults") {
     const activeQuickRound =
       displayRoundsSorted.find((r) => r.roundNumber === selectedQuickRoundNumber) ?? displayRoundsSorted[0] ?? null;
-    const shuffleBlockedMultiSplit =
-      bracket?.bracketMode === "multi_block"
-        ? "조분할 상태에서는 다시 섞기를 사용할 수 없습니다. 전체 초기화 후 이용해 주세요."
-        : null;
-    const shuffleBlockedQuick =
-      shuffleBlockedMultiSplit ??
-      (activeQuickRound != null
-        ? getShuffleRoundBlockedReason(sliceRoundsForShuffleGuard, activeQuickRound.roundNumber)
-        : null);
 
     return (
-      <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
+      <main className="v3-page v3-stack" style={{ paddingTop: "0.25rem" }}>
         <div
           className="v3-row"
           style={{
             alignItems: "center",
             justifyContent: "space-between",
             flexWrap: "wrap",
-            gap: "0.5rem",
-            marginBottom: "0.35rem",
+            gap: "0.4rem",
+            marginBottom: "0.28rem",
           }}
         >
-          <button
-            type="button"
-            className="v3-btn"
-            onClick={() => router.push(`/client/tournaments/${tournamentId}/bracket${bracketZoneQuery}`)}
-          >
-            ← 대진표 관리
-          </button>
-          <span style={{ fontWeight: 800, fontSize: "1.02rem" }}>운영용 리스트 입력</span>
+          <h1 className="v3-h2" style={{ margin: 0, fontSize: "clamp(1rem, 4vw, 1.15rem)", fontWeight: 700 }}>
+            간편입력
+          </h1>
           <button
             type="button"
             className="ui-btn-primary-solid"
-            style={{ padding: "0.45rem 0.75rem", fontWeight: 700 }}
+            style={{ padding: "0.4rem 0.65rem", fontWeight: 600, fontSize: "0.88rem", minHeight: "40px" }}
             onClick={() => router.push(`/client/tournaments/${tournamentId}/bracket/view${bracketZoneQuery}`)}
           >
             대진표 보기
@@ -1673,11 +1679,10 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           <p className="v3-muted">아직 확정된 대진표가 없습니다.</p>
         ) : (
           <>
-            <BracketProgressSummaryCard bracket={bracket} />
             {bracket.bracketMode === "multi_block" && bracket.blocks?.length ? (
               <div
                 className="v3-row"
-                style={{ gap: "0.35rem", flexWrap: "wrap", alignItems: "center", marginBottom: "0.5rem" }}
+                style={{ gap: "0.35rem", flexWrap: "wrap", alignItems: "center", marginBottom: "0.4rem" }}
               >
                 {bracket.blocks.map((bl) => (
                   <button
@@ -1701,7 +1706,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               </div>
             ) : null}
 
-            <div className="v3-row" style={{ gap: "0.35rem", flexWrap: "wrap", alignItems: "center", marginBottom: "0.65rem" }}>
+            <div className="v3-row" style={{ gap: "0.35rem", flexWrap: "wrap", alignItems: "center", marginBottom: "0.45rem" }}>
               {displayRoundsSorted.map((round) => (
                 <button
                   key={`qr-tab-${bracket.id}-${boardSliceKey ?? "root"}-${round.roundNumber}`}
@@ -1715,37 +1720,8 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             </div>
 
             {activeQuickRound ? (
-              <section className="v3-box v3-stack" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-                <div className="v3-row" style={{ gap: "0.45rem", flexWrap: "wrap", alignItems: "center" }}>
-                  <span style={{ fontWeight: 700 }}>
-                    Round {activeQuickRound.roundNumber} · {roundLabelFromMatchCount(activeQuickRound.matches.length)}
-                  </span>
-                  <button
-                    type="button"
-                    className="v3-btn"
-                    disabled={
-                      !!shuffleBlockedQuick ||
-                      actionLoading ||
-                      interactionLocked ||
-                      multiBlockBusy ||
-                      activeQuickRound.matches.length === 0
-                    }
-                    title={shuffleBlockedQuick ?? undefined}
-                    onClick={() => {
-                      if (
-                        !window.confirm(
-                          `「${roundLabelFromMatchCount(activeQuickRound.matches.length)}」라운드를 다시 셔플합니다. 계속하시겠습니까?`,
-                        )
-                      ) {
-                        return;
-                      }
-                      void executeRoundShuffle(activeQuickRound.roundNumber);
-                    }}
-                  >
-                    다시 섞기
-                  </button>
-                </div>
-                <div style={{ marginTop: "0.5rem", overflowX: "auto" }}>
+              <section className="v3-box v3-stack" style={{ background: "#f8fafc", border: "1px solid #e2e8f0", padding: "0.5rem 0.55rem", gap: "0.35rem" }}>
+                <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.88rem" }}>
                     <tbody>
                       {activeQuickRound.matches.map((match, idx) => {
@@ -1778,7 +1754,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                         return (
                           <tr key={match.id} style={{ borderTop: "1px solid #e2e8f0" }}>
                             <td style={{ padding: "0.35rem 0.45rem", whiteSpace: "nowrap", fontWeight: 700 }}>
-                              {idx + 1}조
+                              {idx + 1}번
                             </td>
                             <td style={{ padding: "0.35rem 0.45rem" }}>{p1Label}</td>
                             <td style={{ padding: "0.35rem 0.25rem", whiteSpace: "nowrap" }}>
@@ -1821,14 +1797,29 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                                       </button>
                                     )}
                             </td>
-                            <td style={{ padding: "0.35rem 0.25rem", whiteSpace: "nowrap" }}>
+                            <td style={{ padding: "0.35rem 0.25rem", whiteSpace: "nowrap", width: "3rem" }}>
                               <button
                                 type="button"
                                 className="v3-btn"
+                                aria-label="이 경기 되돌리기"
+                                title="이 경기 되돌리기"
                                 disabled={!done || actionLoading || interactionLocked}
                                 onClick={() => void handleQuickRevertMatch(match.id)}
+                                style={{
+                                  minWidth: 44,
+                                  minHeight: 44,
+                                  width: 44,
+                                  height: 44,
+                                  padding: 0,
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: "1.25rem",
+                                  lineHeight: 1,
+                                  borderRadius: "0.35rem",
+                                }}
                               >
-                                되돌리기
+                                ↶
                               </button>
                             </td>
                           </tr>
@@ -1850,11 +1841,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                     </button>
                   </div>
                 ) : null}
-                <div className="v3-row" style={{ marginTop: "0.5rem", gap: "0.45rem", flexWrap: "wrap" }}>
-                  <button type="button" className="v3-btn" onClick={() => void handleUndo()} disabled={!canUndo}>
-                    되돌리기 (전체)
-                  </button>
-                </div>
               </section>
             ) : null}
             {connectivityHint || saveStateText || message ? (
@@ -2044,7 +2030,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                   alignItems: "center",
                 }}
               >
-                빠른 결과 입력
+                간편입력
               </Link>
               <span className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
                 라운드별 승패 입력은 별도 화면에서 진행합니다.
@@ -2059,6 +2045,15 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                 style={{ padding: "0.6rem 1rem", fontWeight: 700 }}
               >
                 대진표 보기
+              </button>
+              <button
+                type="button"
+                className="v3-btn"
+                disabled={manageBracketPdfBusy || !bracket}
+                onClick={() => void handleExportManageBracketPdf()}
+                style={{ padding: "0.6rem 1rem", fontWeight: 700 }}
+              >
+                {manageBracketPdfBusy ? "PDF 준비…" : "현재 대진표 PDF 출력"}
               </button>
               <button
                 type="button"

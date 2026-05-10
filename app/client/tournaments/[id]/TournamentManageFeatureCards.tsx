@@ -160,8 +160,8 @@ export default function TournamentManageFeatureCards({
                 <IconBolt />
               </span>
               <span className="client-tournament-manage__featureCardTextCol">
-                <span className="client-tournament-manage__featureTitle">운영용 리스트 입력</span>
-                <span className="client-tournament-manage__featureDesc">빠른 결과 입력 (동일 데이터)</span>
+                <span className="client-tournament-manage__featureTitle">간편입력</span>
+                <span className="client-tournament-manage__featureDesc">동일 대진표 데이터</span>
               </span>
             </Link>
             <Link prefetch={false} href={bracketViewHref} className="client-tournament-manage__featureCard client-tournament-manage__featureCard--neutral">

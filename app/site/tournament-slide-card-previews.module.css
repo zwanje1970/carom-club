@@ -796,3 +796,123 @@ article[data-editor-card-preview="1"] .fullSurfaceFooterPlace {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/*
+ * 440×161px 고정 아트보드 — 게시 html2canvas·편집 미리보기 전용.
+ * 뷰포트 vw 에 의존하지 않도록 템플릿 타이포를 px 로 고정한다.
+ */
+.cardRootArtboardPx {
+  width: 440px;
+  height: 161px;
+  min-width: 440px;
+  max-width: 440px;
+  min-height: 161px;
+  max-height: 161px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.cardRootArtboardPx.cardRootSlideDeck {
+  height: 161px;
+  min-height: 161px;
+}
+
+.cardRootArtboardPx.cardRootSlideDeck.cardRootSlideDeckAspectFill {
+  height: 161px;
+  flex: 0 0 auto;
+  align-self: flex-start;
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout .classicLead,
+.cardRootArtboardPx.cardRootTemplateLayout .frameLead {
+  font-size: 14px;
+  line-height: 1.22;
+  font-weight: 400;
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout .classicTitle,
+.cardRootArtboardPx.cardRootTemplateLayout .frameTitle {
+  font-size: 20px;
+  line-height: 1.16;
+  font-weight: 800;
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout .classicDesc,
+.cardRootArtboardPx.cardRootTemplateLayout .frameDesc {
+  font-size: 13px;
+  line-height: 1.25;
+  max-height: calc(1.25em * 3);
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout .classicDescSecondary,
+.cardRootArtboardPx.cardRootTemplateLayout .frameDescSecondary {
+  font-size: 13px;
+  line-height: 1.25;
+  max-height: calc(1.25em * 4);
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout .footerDate,
+.cardRootArtboardPx.cardRootTemplateLayout .footerPlace {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout .fullSurfaceFooterDate,
+.cardRootArtboardPx.cardRootTemplateLayout .fullSurfaceFooterPlace {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout :global(.tournament-post-card__badge) {
+  font-size: 11px;
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout :global(.tournament-post-card__badge--recruiting) {
+  font-size: 10px;
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout :global(.tournament-post-card__badge--closing) {
+  font-size: 9px;
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout :global(.tournament-post-card__badge--full) {
+  font-size: 10px;
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout :global(.tournament-post-card__badge--ended) {
+  font-size: 10px;
+}
+
+.cardRootArtboardPx.cardRootTemplateLayout :global(.tournament-post-card__badge--waitlist) {
+  font-size: 9px;
+}
+
+/* 템플릿 플래그 없이 아트보드만 켠 경우(비권장) vw 대체 */
+.cardRootArtboardPx:not(.cardRootTemplateLayout) .classicLead {
+  font-size: 15px;
+  line-height: 1.28;
+}
+
+.cardRootArtboardPx:not(.cardRootTemplateLayout) .classicTitle {
+  font-size: 21px;
+  line-height: 1.22;
+}
+
+.cardRootArtboardPx:not(.cardRootTemplateLayout) .frameLead {
+  font-size: 13px;
+}
+
+.cardRootArtboardPx:not(.cardRootTemplateLayout) .frameTitle {
+  font-size: 19px;
+  line-height: 1.18;
+}
+
+.cardRootArtboardPx:not(.cardRootTemplateLayout) .classicDesc,
+.cardRootArtboardPx:not(.cardRootTemplateLayout) .frameDesc {
+  font-size: 13px;
+}
+
+.cardRootArtboardPx:not(.cardRootTemplateLayout) .classicDescSecondary,
+.cardRootArtboardPx:not(.cardRootTemplateLayout) .frameDescSecondary {
+  font-size: 13px;
+}

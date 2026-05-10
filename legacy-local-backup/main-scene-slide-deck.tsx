@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * 레거시 가로 슬라이드 덱(HTML `SlideDeckCard`). 운영 `/site` 메인은 `MainSiteScrollCards`(PNG)만 사용.
+ * 이 파일은 `legacy-local-backup/site-main-legacy-page.tsx` 참고용으로만 유지합니다.
+ */
+
 import {
   useEffect,
   useLayoutEffect,
@@ -17,7 +22,7 @@ import {
   SlideDeckCard,
   reportMainSlideAdMetric,
   type SlideDeckItem,
-} from "./tournament-slide-card";
+} from "../app/site/tournament-slide-card";
 
 export type { SlideDeckItem };
 

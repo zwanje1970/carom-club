@@ -107,32 +107,27 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
 
     try {
       if (item.type !== "ad") {
-        /**
-         * WYSIWYG: 메인 대회 면은 스냅샷 `slideDeckItem` → `TournamentSnapshotCardView`만 사용.
-         * `publishedCardImageUrl`/`publishedCardImage320Url`은 공유·스토리지용으로 유지(메인에서 플랫 PNG 분기 없음).
-         */
+        /** 메인 대회 면: 게시 PNG 만 — 대회·광고와 동일 슬라이드 덱 행(slideDeckPng*). */
+        const published640 = (item.publishedCardImageUrl ?? "").trim();
+        const published320 = (item.publishedCardImage320Url ?? "").trim();
+        const scrollImg = published320 || published640;
         return {
           id: rowId,
           href,
           title: item.title,
-          imageUrl: null,
-          faceCssBackground: null,
+          imageUrl: scrollImg || null,
+          faceCssBackground: scrollImg ? null : "#0f172a",
           external,
-          slideDeckItem: item,
+          slideDeckPngFace: Boolean(scrollImg),
+          slideDeckPngPlaceholder: !scrollImg,
+          slideDeckPngAdMark: false,
         };
       }
 
       const published640 = (item.publishedCardImageUrl ?? "").trim();
       const published320 = (item.publishedCardImage320Url ?? "").trim();
-      /** 메인 슬라이드: 320 기준(가벼운 CTA). */
       const publishedScrollBg = published320 || published640;
       if (publishedScrollBg) {
-        const isAd = item.type === "ad";
-        const metaTint =
-          (item.cardFooterDateTextColor ?? "").trim() ||
-          (item.cardFooterPlaceTextColor ?? "").trim() ||
-          (item.cardDescriptionTextColor ?? "").trim() ||
-          null;
         return {
           id: rowId,
           href,
@@ -140,15 +135,9 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
           imageUrl: publishedScrollBg,
           faceCssBackground: null,
           external,
-          faceIsFullPublishedSnapshot: true,
-          scrollFaceBadge: isAd ? "광고" : item.statusBadge?.trim() || null,
-          scrollFaceSubtitle: (item.subtitle ?? "").trim() || null,
-          scrollFaceExtraLine1: item.cardExtraLine1?.trim() || null,
-          scrollFaceExtraLine2: item.cardExtraLine2?.trim() || null,
-          scrollFaceExtraLine3: item.cardExtraLine3?.trim() || null,
-          scrollFaceTitleColor: item.cardTitleTextColor?.trim() || null,
-          scrollFaceMetaColor: metaTint,
-          scrollFaceStrongTextShadow: Boolean(item.cardTextShadowEnabled),
+          slideDeckPngFace: true,
+          slideDeckPngPlaceholder: false,
+          slideDeckPngAdMark: true,
         };
       }
       const useBgImage = item.backgroundType !== "theme" && Boolean(item.image320Url?.trim());
@@ -162,34 +151,25 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
         imageUrl,
         faceCssBackground,
         external,
-        ...(item.type === "ad" && imageUrl
-          ? {
-              faceMatchPublishedScrollMetrics: true as const,
-              scrollFaceBadge: "광고" as const,
-              scrollFaceSubtitle: (item.subtitle ?? "").trim() || null,
-              scrollFaceExtraLine1: item.cardExtraLine1?.trim() || null,
-              scrollFaceExtraLine2: item.cardExtraLine2?.trim() || null,
-              scrollFaceExtraLine3: item.cardExtraLine3?.trim() || null,
-              scrollFaceTitleColor: item.cardTitleTextColor?.trim() || null,
-              scrollFaceMetaColor:
-                (item.cardFooterDateTextColor ?? "").trim() ||
-                (item.cardFooterPlaceTextColor ?? "").trim() ||
-                (item.cardDescriptionTextColor ?? "").trim() ||
-                null,
-              scrollFaceStrongTextShadow: Boolean(item.cardTextShadowEnabled),
-            }
-          : {}),
+        slideDeckPngFace: Boolean(imageUrl),
+        slideDeckPngPlaceholder: !imageUrl,
+        slideDeckPngAdMark: true,
       };
     } catch {
       if (item.type !== "ad") {
+        const published640 = (item.publishedCardImageUrl ?? "").trim();
+        const published320 = (item.publishedCardImage320Url ?? "").trim();
+        const scrollImg = published320 || published640;
         return {
           id: rowId,
           href,
           title: item.title,
-          imageUrl: null,
-          faceCssBackground: null,
+          imageUrl: scrollImg || null,
+          faceCssBackground: scrollImg ? null : "#0f172a",
           external,
-          slideDeckItem: item,
+          slideDeckPngFace: Boolean(scrollImg),
+          slideDeckPngPlaceholder: !scrollImg,
+          slideDeckPngAdMark: false,
         };
       }
       return {
@@ -199,6 +179,9 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
         imageUrl: null,
         faceCssBackground: item.mediaBackground?.trim() ? item.mediaBackground.trim() : "transparent",
         external,
+        slideDeckPngFace: false,
+        slideDeckPngPlaceholder: true,
+        slideDeckPngAdMark: true,
       };
     }
   });

@@ -71,7 +71,7 @@ const CardPublishPreviewInner = forwardRef<
         slideDeck
         slideDeckAspectFill
         templateCardLayout
-        editorPreviewFixedLayout
+        artboardPx
         slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
         isImageCaptureMode={isImageCaptureMode}
       />

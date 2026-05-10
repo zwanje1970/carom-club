@@ -34,6 +34,10 @@ import {
 } from "../bracket-offline-cache";
 import viewStyles from "../bracket-view-page.module.css";
 import {
+  exportCurrentBracketToPdf,
+  type BracketBoardPdfSnapshot,
+} from "../bracket-pdf-client-export";
+import {
   applyCaromOrientationMode,
   CAROM_BRACKET_NATIVE_LANDSCAPE_SESSION_ID,
   unregisterCaromExplicitNativeLandscapeSession,
@@ -91,12 +95,14 @@ export default function TournamentBracketBoardViewPage() {
   const [actionBusy, setActionBusy] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const sliceMetaRef = useRef<{ bracketId: string; blockSig: string }>({ bracketId: "", blockSig: "" });
+  const bracketPdfSnapshotRef = useRef<(() => BracketBoardPdfSnapshot) | null>(null);
   const bracketRef = useRef<Bracket | null>(null);
   const replayRunningRef = useRef(false);
   const [navigatorOnline, setNavigatorOnline] = useState(
     typeof navigator !== "undefined" ? navigator.onLine : true,
   );
   const [bracketSyncBusy, setBracketSyncBusy] = useState(false);
+  const [bracketPdfExportBusy, setBracketPdfExportBusy] = useState(false);
 
   const bracketZoneQuery = useMemo(() => {
     if (!zonesEnabled || !selectedZoneId) return "";
@@ -947,6 +953,27 @@ export default function TournamentBracketBoardViewPage() {
     return { id: `${bracket.id}:${suffix}`, rounds };
   }, [bracket, boardSliceKey]);
 
+  const handleExportBracketViewPdf = useCallback(async () => {
+    const snapFn = bracketPdfSnapshotRef.current;
+    if (!snapFn) {
+      setMessage("PDF를 만들 수 없습니다. 대진표가 표시된 뒤 다시 시도해 주세요.");
+      return;
+    }
+    const snap = snapFn();
+    setBracketPdfExportBusy(true);
+    setMessage("");
+    try {
+      await exportCurrentBracketToPdf({
+        ...snap,
+        fileNameBase: `bracket_${tournamentId}_${boardBracket?.id.replace(/:/g, "_") ?? "board"}`,
+      });
+    } catch {
+      setMessage("PDF 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setBracketPdfExportBusy(false);
+    }
+  }, [boardBracket?.id, tournamentId]);
+
   const viewStateStorageKey = useMemo(() => {
     if (!tournamentId || !boardBracket) return undefined;
     const z = zonesEnabled ? selectedZoneId : "-";
@@ -1074,9 +1101,38 @@ export default function TournamentBracketBoardViewPage() {
                 </p>
               </div>
             ) : null}
+            <button
+              type="button"
+              disabled={
+                bracketPdfExportBusy ||
+                actionBusy ||
+                isTournamentClosed ||
+                (zonesEnabled && !selectedZoneId)
+              }
+              onClick={() => void handleExportBracketViewPdf()}
+              style={{
+                position: "absolute",
+                top: "max(10px, env(safe-area-inset-top))",
+                right: "max(10px, env(safe-area-inset-right))",
+                zIndex: 220,
+                minHeight: 40,
+                padding: "0 11px",
+                fontWeight: 700,
+                fontSize: "0.78rem",
+                borderRadius: 9,
+                border: "1px solid #cbd5e1",
+                background: "#f8fafc",
+                color: "#0f172a",
+                cursor: bracketPdfExportBusy ? "wait" : "pointer",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+              }}
+            >
+              {bracketPdfExportBusy ? "PDF 준비…" : "현재 대진표 PDF"}
+            </button>
             <InteractiveBracketBoard
               key={boardBracket.id}
               bracket={boardBracket}
+              bracketPdfSnapshotRef={bracketPdfSnapshotRef}
               tournamentTitle={tournamentTitle}
               tournamentDate={tournamentDate}
               tournamentLocation={tournamentLocation}

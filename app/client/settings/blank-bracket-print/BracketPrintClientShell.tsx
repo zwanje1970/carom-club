@@ -2,13 +2,9 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { createPortal, flushSync } from "react-dom";
-import {
-  buildBracketScene,
-  buildFirstRoundSlotToBoxIndex,
-  buildStartPairLabels,
-  type StartPairLabel,
-} from "./bracket-render-engine";
-import { BracketPrintServiceMark, BracketSVG, type MatchType } from "./bracket-print-shared";
+import BracketBoardPdfCanvas from "../../tournaments/[id]/bracket/BracketBoardPdfCanvas";
+import { buildPrintSyntheticBracket } from "../../tournaments/[id]/bracket/bracket-print-synthetic-bracket";
+import { BracketPrintServiceMark, type MatchType } from "./bracket-print-shared";
 
 /**
  * 실제 인쇄 용지: A4 가로. @page(또는 PDF 삽입) 여백 10mm 기준으로 본문에 쓸 수 있는 직사각형이
@@ -28,16 +24,6 @@ const ROUND_LABEL: Record<number, string> = {
 };
 const roundLabel = (n: number) => ROUND_LABEL[n] ?? `${n}강`;
 const START_SIZES = [16, 32, 64, 128] as const;
-
-function validEndOptions(start: number): number[] {
-  return [128, 64, 32, 16, 8, 4, 2].filter(e => e < start);
-}
-function segmentRounds(start: number, end: number): number[] {
-  const out: number[] = [];
-  for (let n = start; n >= end; n = n / 2) out.push(n);
-  if (end === 2 && out[out.length - 1] === 2) out.push(1);
-  return out;
-}
 
 type BracketStyle = "TREE" | "CENTER";
 type TreeLayout   = "HORIZONTAL" | "VERTICAL";
@@ -144,7 +130,6 @@ export function BracketPrintClientShell({
 }) {
   const [matchType,    setMatchType]    = useState<MatchType>("NORMAL");
   const [startPlayers, setStartPlayers] = useState(32);
-  const [endPlayers,   setEndPlayers]   = useState(2);   /* 결승 */
   const [style,        setStyle]        = useState<BracketStyle>("TREE");
   const [treeLayout,   setTreeLayout]   = useState<TreeLayout>("VERTICAL");
   const [showStartPairNumbers, setShowStartPairNumbers] = useState(false);
@@ -210,34 +195,19 @@ export function BracketPrintClientShell({
     });
   }, [variant, tournamentApplicants, startPlayers]);
 
-  const endOptions = useMemo(() => validEndOptions(startPlayers), [startPlayers]);
-  const rounds = useMemo(() => {
-    if (!endOptions.includes(endPlayers)) return [];
-    return segmentRounds(startPlayers, endPlayers);
-  }, [startPlayers, endPlayers, endOptions]);
+  const boardViewMode = useMemo(
+    () => (style === "CENTER" ? "dual" : treeLayout === "VERTICAL" ? "vertical" : "horizontal"),
+    [style, treeLayout],
+  );
+
+  const bracketForBlankPrint = useMemo(
+    () => buildPrintSyntheticBracket(startPlayers, "blank"),
+    [startPlayers],
+  );
 
   const onStartChange = useCallback((n: number) => {
     setStartPlayers(n);
-    setEndPlayers(prev => {
-      const opts = validEndOptions(n);
-      return opts.includes(prev) ? prev : (opts[opts.length - 1] ?? 2);
-    });
   }, []);
-
-  const scene = useMemo(() => {
-    if (!rounds.length) return null;
-    return buildBracketScene({ rounds, style, treeLayout });
-  }, [rounds, style, treeLayout]);
-
-  const startPairLabels = useMemo((): StartPairLabel[] => {
-    if (!scene || !rounds.length || !showStartPairNumbers) return [];
-    return buildStartPairLabels(scene, { rounds, style, treeLayout });
-  }, [scene, rounds, style, treeLayout, showStartPairNumbers]);
-
-  const firstRoundSlotToBoxIndex = useMemo(() => {
-    if (!rounds.length) return null;
-    return buildFirstRoundSlotToBoxIndex({ rounds, style, treeLayout });
-  }, [rounds, style, treeLayout]);
 
   const previewPaper = useMemo(() => previewPaperFromPrintSettings(style, treeLayout), [style, treeLayout]);
 
@@ -350,10 +320,6 @@ export function BracketPrintClientShell({
     const h = printStartPlayersHint;
     if (!(START_SIZES as readonly number[]).includes(h)) return;
     setStartPlayers(h);
-    setEndPlayers((prev) => {
-      const opts = validEndOptions(h);
-      return opts.includes(prev) ? prev : (opts[opts.length - 1] ?? 2);
-    });
   }, [variant, printStartPlayersHint]);
 
   useEffect(() => {
@@ -391,7 +357,7 @@ export function BracketPrintClientShell({
 
   /** 페이지 내부 전용 레이어 미리보기: A4 한 장 전체 scale, 스크롤·스와이프 없음 */
   const handleOpenPreviewOverlay = useCallback(async () => {
-    if (!rounds.length || !scene || previewOpeningRef.current) return;
+    if (!startPlayers || previewOpeningRef.current) return;
     previewOpeningRef.current = true;
     flushSync(() => {
       setPreviewBusy(true);
@@ -409,7 +375,7 @@ export function BracketPrintClientShell({
       setPreviewBusy(false);
       previewOpeningRef.current = false;
     }
-  }, [rounds.length, scene, variant, fetchTournamentApplicants]);
+  }, [startPlayers, variant, fetchTournamentApplicants]);
 
   const handleClosePreviewOverlay = useCallback(() => {
     setPreviewOpen(false);
@@ -500,11 +466,11 @@ export function BracketPrintClientShell({
       pdfBusyRef.current = false;
       setPdfExporting(false);
     }
-  }, [variant, startPlayers, style, warmEmptyBoxFill]);
+  }, [variant, startPlayers, style, treeLayout, matchType, warmEmptyBoxFill, showStartPairNumbers, boardViewMode]);
 
   const runTournamentMultiPagePdf = useCallback(
     async (pageElements: HTMLElement[]) => {
-      if (variant !== "tournament" || pdfBusyRef.current || !scene) return;
+      if (variant !== "tournament" || pdfBusyRef.current) return;
       pdfBusyRef.current = true;
       try {
         const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
@@ -543,16 +509,11 @@ export function BracketPrintClientShell({
         setTournamentPdfPages(null);
       }
     },
-    [variant, scene, tournamentId],
+    [variant, tournamentId],
   );
 
   useLayoutEffect(() => {
     if (variant !== "tournament" || !tournamentPdfPages?.length) return;
-    if (!scene) {
-      setTournamentPdfPages(null);
-      setPdfExporting(false);
-      return;
-    }
     const root = offscreenTournamentRef.current;
     if (!root) {
       setTournamentPdfPages(null);
@@ -566,10 +527,10 @@ export function BracketPrintClientShell({
       return;
     }
     void runTournamentMultiPagePdf(els);
-  }, [variant, tournamentPdfPages, scene, runTournamentMultiPagePdf]);
+  }, [variant, tournamentPdfPages, runTournamentMultiPagePdf]);
 
   const handleTournamentGroupPdf = useCallback(async () => {
-    if (variant !== "tournament" || pdfBusyRef.current || !scene || !rounds.length) return;
+    if (variant !== "tournament" || pdfBusyRef.current || !startPlayers) return;
     const tid = (tournamentId ?? "").trim();
     if (!tid) return;
     await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
@@ -593,7 +554,7 @@ export function BracketPrintClientShell({
       console.error("[tournament-group-bracket-print] prepare failed", error);
       setPdfExporting(false);
     }
-  }, [variant, tournamentId, scene, rounds.length, startPlayers, fetchTournamentApplicants]);
+  }, [variant, tournamentId, startPlayers, fetchTournamentApplicants]);
 
   const handlePdfDownload = useCallback(() => {
     if (!pdfDownloadUrl) {
@@ -715,11 +676,19 @@ export function BracketPrintClientShell({
 
   const previewStageIsZoomed = previewScale > previewFitScale + 0.001;
   const previewStageScrollable = previewStageIsZoomed || (treeLayout === "VERTICAL" && previewPortraitVertical);
-  const previewDenseSlotNames = treeLayout === "VERTICAL" && previewPortraitVertical;
+  const previewBracket = useMemo(() => {
+    if (variant === "tournament") {
+      const slots =
+        previewTournamentFirstRoundSlots ??
+        Array.from({ length: startPlayers }, () => null as string | null);
+      return buildPrintSyntheticBracket(startPlayers, { names: slots });
+    }
+    return buildPrintSyntheticBracket(startPlayers, "blank");
+  }, [variant, previewTournamentFirstRoundSlots, startPlayers]);
 
   return (
     <>
-      {/* html2canvas 캡처용 오프스크린 SVG — 본 페이지에서는 인쇄하지 않음 */}
+      {/* html2canvas 캡처용 오프스크린 레이어 — 본 페이지에서는 인쇄하지 않음 */}
       <style>{`
         @keyframes bbp-preview-spin {
           to { transform: rotate(360deg); }
@@ -805,17 +774,6 @@ export function BracketPrintClientShell({
             top: ${SERVICE_MARK_TOP_MM}mm;
             right: ${SERVICE_MARK_INSET_MM}mm;
           }
-        }
-        /* 빈 대진표 칸: 테두리는 항상 검정 — 배경만 .bbp-match-box--fill 에서 변경 */
-        .bbp-match-box {
-          fill: #ffffff;
-          stroke: #000000;
-          stroke-width: 0.2;
-        }
-        .bbp-match-box--fill {
-          fill: #fffbe6;
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
         }
         .preview-overlay {
           position: fixed;
@@ -947,23 +905,16 @@ export function BracketPrintClientShell({
               {/* 강수 */}
               <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "flex-end" }}>
                 <label style={{ display: "flex", flexDirection: "column", gap: "0.35rem", flex: "1 1 10rem" }}>
-                  <span style={{ fontWeight: 700, fontSize: "0.88rem" }}>2. 시작 강수</span>
+                  <span style={{ fontWeight: 700, fontSize: "0.88rem" }}>2. 시작 강수 (결승까지 전체 트리)</span>
                   <select value={startPlayers} onChange={e => onStartChange(Number(e.target.value))}
                     style={{ padding: "0.5rem", fontSize: "1rem", borderRadius: "6px", border: "1px solid #cbd5e1" }}>
                     {START_SIZES.map(s => <option key={s} value={s}>{roundLabel(s)}</option>)}
                   </select>
                 </label>
-                <label style={{ display: "flex", flexDirection: "column", gap: "0.35rem", flex: "1 1 10rem" }}>
-                  <span style={{ fontWeight: 700, fontSize: "0.88rem" }}>3. 종료 강수</span>
-                  <select value={endPlayers} onChange={e => setEndPlayers(Number(e.target.value))}
-                    style={{ padding: "0.5rem", fontSize: "1rem", borderRadius: "6px", border: "1px solid #cbd5e1" }}>
-                    {endOptions.map(e => <option key={e} value={e}>{roundLabel(e)}</option>)}
-                  </select>
-                </label>
               </div>
               {/* 스타일 */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-                <span style={{ fontWeight: 700, fontSize: "0.88rem" }}>4. 스타일</span>
+                <span style={{ fontWeight: 700, fontSize: "0.88rem" }}>3. 스타일</span>
                 <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap" }}>
                   {(["TREE", "CENTER"] as BracketStyle[]).map(s => (
                     <label key={s} style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer", minHeight: "44px" }}>
@@ -1006,7 +957,7 @@ export function BracketPrintClientShell({
                 type="button"
                 className="v3-btn"
                 onClick={() => void handleOpenPreviewOverlay()}
-                disabled={!rounds.length || !scene || previewBusy || pdfExporting}
+                disabled={!startPlayers || previewBusy || pdfExporting}
                 style={{ padding: "0.55rem 1rem", minHeight: "44px" }}
               >
                 {previewBusy ? "준비 중…" : "미리보기"}
@@ -1015,7 +966,7 @@ export function BracketPrintClientShell({
                 <button
                   type="button"
                   className="ui-btn-primary-solid"
-                  disabled={!rounds.length || !scene || pdfExporting}
+                  disabled={!startPlayers || pdfExporting}
                   onClick={() => void handleExportPDF()}
                   style={{ padding: "0.55rem 1rem", minHeight: "44px" }}
                 >
@@ -1025,7 +976,7 @@ export function BracketPrintClientShell({
                 <button
                   type="button"
                   className="ui-btn-primary-solid"
-                  disabled={!rounds.length || !scene || pdfExporting}
+                  disabled={!startPlayers || pdfExporting}
                   onClick={() => void handleTournamentGroupPdf()}
                   style={{ padding: "0.55rem 1rem", minHeight: "44px" }}
                 >
@@ -1067,41 +1018,54 @@ export function BracketPrintClientShell({
         </div>
       </div>
 
-      {/* html2canvas·새창 미리보기 공용: 277×190mm SVG (화면 밖) — 빈 대진표 단일 페이지만 */}
-      {scene && variant === "blank" ? (
+      {/* html2canvas 캡처용 오프스크린 — 실제 대진표 레이아웃 엔진 DOM */}
+      {variant === "blank" ? (
         <div ref={pdfRootRef} className="bbp-print-svg" id="bbp-print-svg-root">
-          <div className="bbp-print-page-sheet">
-            <BracketSVG
-              scene={scene}
+          <div
+            className="bbp-print-page-sheet"
+            style={{ width: "277mm", height: "190mm", boxSizing: "border-box", position: "relative" }}
+          >
+            <BracketBoardPdfCanvas
+              pdfFitSheet
+              bracket={bracketForBlankPrint}
+              boardViewMode={boardViewMode}
               matchType={matchType}
-              startPairLabels={startPairLabels}
               warmEmptyBoxFill={warmEmptyBoxFill}
+              showStartPairNumbers={showStartPairNumbers}
+              blankAllNames
             />
             <BracketPrintServiceMark />
           </div>
         </div>
       ) : null}
 
-      {variant === "tournament" && tournamentPdfPages && scene ? (
+      {variant === "tournament" && tournamentPdfPages ? (
         <div ref={offscreenTournamentRef} className="tg-pdf-offscreen" aria-hidden>
           {tournamentPdfPages.map((page, idx) => (
-            <div key={`${page.label}-${idx}`} className="tg-pdf-page" data-tg-pdf-page={String(idx)}>
+            <div
+              key={`${page.label}-${idx}`}
+              className="tg-pdf-page"
+              data-tg-pdf-page={String(idx)}
+              style={{ position: "relative", width: "277mm", height: "190mm", boxSizing: "border-box" }}
+            >
               <p className="tg-pdf-group-title">{page.label}</p>
-              <BracketSVG
-                scene={scene}
-                matchType={matchType}
-                startPairLabels={startPairLabels}
-                warmEmptyBoxFill={warmEmptyBoxFill}
-                firstRoundNameSlots={page.slots}
-                firstRoundSlotToBoxIndex={firstRoundSlotToBoxIndex}
-              />
+              <div style={{ position: "absolute", left: 0, right: 0, top: "7mm", bottom: 0 }}>
+                <BracketBoardPdfCanvas
+                  pdfFitSheet
+                  bracket={buildPrintSyntheticBracket(startPlayers, { names: page.slots })}
+                  boardViewMode={boardViewMode}
+                  matchType={matchType}
+                  warmEmptyBoxFill={warmEmptyBoxFill}
+                  showStartPairNumbers={showStartPairNumbers}
+                />
+              </div>
               <BracketPrintServiceMark />
             </div>
           ))}
         </div>
       ) : null}
 
-      {previewOpen && scene && typeof document !== "undefined"
+      {previewOpen && typeof document !== "undefined"
         ? createPortal(
             <div className="preview-overlay" role="dialog" aria-modal="true" aria-label="빈 대진표 미리보기">
               <div className="preview-root">
@@ -1147,15 +1111,18 @@ export function BracketPrintClientShell({
                       style={{ width: previewPaper.paperW, height: previewPaper.paperH }}
                     >
                       <div className="bracket-scene">
-                        <div className="bbp-print-page-sheet">
-                          <BracketSVG
-                            scene={scene}
+                        <div
+                          className="bbp-print-page-sheet"
+                          style={{ width: "277mm", height: "190mm", margin: "0 auto", position: "relative" }}
+                        >
+                          <BracketBoardPdfCanvas
+                            pdfFitSheet
+                            bracket={previewBracket}
+                            boardViewMode={boardViewMode}
                             matchType={matchType}
-                            startPairLabels={startPairLabels}
                             warmEmptyBoxFill={warmEmptyBoxFill}
-                            firstRoundNameSlots={variant === "tournament" ? previewTournamentFirstRoundSlots : null}
-                            firstRoundSlotToBoxIndex={variant === "tournament" ? firstRoundSlotToBoxIndex : null}
-                            denseSlotNames={previewDenseSlotNames}
+                            showStartPairNumbers={showStartPairNumbers}
+                            blankAllNames={variant === "blank"}
                           />
                           <BracketPrintServiceMark />
                         </div>

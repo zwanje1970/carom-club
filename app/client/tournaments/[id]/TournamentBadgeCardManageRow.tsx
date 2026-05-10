@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { withPublishedCardMainReflectNotice } from "../../../../lib/client-published-card-main-reflect-notice";
 import { useEffect, useRef, useState } from "react";
 import type { TournamentStatusBadge } from "../../../../lib/types/entities";
+import { buildSlideDeckItemForTournamentCapture } from "./tournament-card-build-slide-deck-item";
+import { captureAndUploadTournamentCardSnapshots } from "./tournament-card-publish-capture";
 
 const OPTIONS: TournamentStatusBadge[] = [
   "모집중",
@@ -33,6 +35,7 @@ function statusBadgeStyle(badge: TournamentStatusBadge): { background: string; c
 }
 
 type CardSnapshotRow = {
+  snapshotId?: string;
   title: string;
   subtitle: string;
   cardExtraLine1?: string | null;
@@ -145,12 +148,15 @@ export default function TournamentBadgeCardManageRow({
     let data: {
       snapshots?: CardSnapshotRow[];
       activeSnapshot?: CardSnapshotRow | null;
+      tournament?: { date?: string; location?: string };
       error?: string;
     } = {};
     let hadPublishedBefore = false;
     let latest: CardSnapshotRow | null = null;
     let getOk = false;
     let getStatus = 0;
+    let tournamentDate = "";
+    let tournamentLocation = "";
     try {
       const controller = new AbortController();
       const timeoutId = window.setTimeout(() => controller.abort(), 2000);
@@ -163,11 +169,14 @@ export default function TournamentBadgeCardManageRow({
         const json = (await res.json()) as {
           snapshots?: CardSnapshotRow[];
           activeSnapshot?: CardSnapshotRow | null;
+          tournament?: { date?: string; location?: string };
           error?: string;
         };
         data = json;
         hadPublishedBefore = Boolean(json.activeSnapshot);
         latest = pickCardForPublish(json);
+        tournamentDate = typeof json.tournament?.date === "string" ? json.tournament.date : "";
+        tournamentLocation = typeof json.tournament?.location === "string" ? json.tournament.location : "";
       } finally {
         window.clearTimeout(timeoutId);
       }
@@ -193,6 +202,47 @@ export default function TournamentBadgeCardManageRow({
       tournamentTheme: "dark",
       isActive: true,
     };
+
+    let publishedCardImageUrl = "";
+    let publishedCardImage320Url = "";
+    try {
+      const slideDeckItem = buildSlideDeckItemForTournamentCapture({
+        tournamentId,
+        source: {
+          snapshotId: publishSource.snapshotId,
+          title: publishSource.title,
+          subtitle: publishSource.subtitle,
+          cardExtraLine1: publishSource.cardExtraLine1,
+          cardExtraLine2: publishSource.cardExtraLine2,
+          cardExtraLine3: publishSource.cardExtraLine3,
+          image320Url: publishSource.image320Url,
+          tournamentCardTemplate: publishSource.tournamentCardTemplate,
+          tournamentBackgroundType: publishSource.tournamentBackgroundType,
+          tournamentTheme: publishSource.tournamentTheme,
+          tournamentMediaBackground: publishSource.tournamentMediaBackground,
+          tournamentImageOverlayBlend: publishSource.tournamentImageOverlayBlend,
+          tournamentImageOverlayOpacity: publishSource.tournamentImageOverlayOpacity,
+          tournamentCardDisplayDate: publishSource.tournamentCardDisplayDate,
+          tournamentCardDisplayLocation: publishSource.tournamentCardDisplayLocation,
+          cardLeadTextColor: publishSource.cardLeadTextColor,
+          cardTitleTextColor: publishSource.cardTitleTextColor,
+          cardDescriptionTextColor: publishSource.cardDescriptionTextColor,
+          tournamentCardTextShadowEnabled: publishSource.tournamentCardTextShadowEnabled,
+          tournamentCardSurfaceLayout: publishSource.tournamentCardSurfaceLayout,
+          cardFooterDateTextColor: publishSource.cardFooterDateTextColor,
+          cardFooterPlaceTextColor: publishSource.cardFooterPlaceTextColor,
+        },
+        statusBadge: value,
+        tournamentFallbackDate: tournamentDate,
+        tournamentFallbackLocation: tournamentLocation,
+      });
+      const urls = await captureAndUploadTournamentCardSnapshots(slideDeckItem);
+      publishedCardImageUrl = urls.publishedCardImageUrl;
+      publishedCardImage320Url = urls.publishedCardImage320Url;
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "카드 이미지 생성에 실패했습니다.");
+      return;
+    }
 
     console.log("[PUBLISH] before POST");
     const postRes = await fetch("/api/client/card-snapshots", {
@@ -251,6 +301,8 @@ export default function TournamentBadgeCardManageRow({
         ...(typeof publishSource.cardDescriptionTextColor === "string" && publishSource.cardDescriptionTextColor.trim()
           ? { cardDescriptionTextColor: publishSource.cardDescriptionTextColor.trim() }
           : {}),
+        publishedCardImageUrl,
+        publishedCardImage320Url,
       }),
     });
     const postData = (await postRes.json()) as {

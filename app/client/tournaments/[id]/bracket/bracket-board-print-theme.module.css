@@ -1,0 +1,93 @@
+/* 인쇄/PDF 전용: 화면용 다크 테마와 분리 — 흰 배경·검정 선·검정 글자, 그림자·글로우 없음 */
+
+.sheetRoot {
+  position: relative;
+  background: #ffffff;
+  color: #000000;
+  box-sizing: border-box;
+}
+
+.canvasRoot {
+  position: relative;
+  background: #ffffff;
+  overflow: visible;
+}
+
+.linkSvg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pathBase {
+  fill: none;
+  stroke: #000000;
+  stroke-width: 1.15;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+}
+
+.pathActive {
+  stroke-width: 1.85;
+}
+
+.matchGroup {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  box-sizing: border-box;
+}
+
+.playerBox {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2px 4px;
+  border: 1px solid #000000;
+  background: #ffffff;
+  color: #000000;
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 1.15;
+  overflow: hidden;
+  word-break: break-word;
+  pointer-events: none;
+  user-select: none;
+}
+
+.playerBoxWarmEmpty {
+  background: #fffbe6;
+}
+
+.playerWinner {
+  font-weight: 800;
+}
+
+.playerLoser {
+  color: #374151;
+  font-weight: 500;
+}
+
+.scotchDivider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  border-left: 1px solid #000000;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.startPairLabel {
+  position: absolute;
+  font-size: 10px;
+  font-weight: 600;
+  color: #000000;
+  pointer-events: none;
+  user-select: none;
+  line-height: 1;
+}

@@ -2,7 +2,7 @@ import Script from "next/script";
 import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import { Suspense } from "react";
-import MainSceneSlideDeckClient from "../main-scene-slide-deck-client";
+import MainSceneSlideDeckClient from "./main-scene-slide-deck-client";
 import { getCommonPaletteColorHex, isCommonPaletteColor } from "../../../lib/shared/common-color-palette";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../lib/auth/session";
 import {

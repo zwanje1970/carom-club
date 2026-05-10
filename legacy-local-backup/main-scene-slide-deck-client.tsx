@@ -1,9 +1,11 @@
 "use client";
 
+/** @see `./main-scene-slide-deck.tsx` — 운영 `/site` 메인은 `app/site/main-site-scroll-cards.tsx`(PNG)만 사용. */
+
 import { useCallback, useEffect, useLayoutEffect, useState, type ComponentProps } from "react";
 import MainSceneSlideDeck from "./main-scene-slide-deck";
 import styles from "./main-scene-slide-deck.module.css";
-import type { SlideDeckItem } from "./tournament-snapshot-card-view";
+import type { SlideDeckItem } from "../app/site/tournament-snapshot-card-view";
 
 type Props = ComponentProps<typeof MainSceneSlideDeck>;
 
