@@ -6,6 +6,7 @@ import { publishTournamentCardFromEditorClient } from "../tournament-card-client
 import type { TournamentCardSurfaceLayout } from "../../../../site/tournament-snapshot-card-view";
 import { POSTCARD_TEMPLATE_APP_DEFAULTS } from "../../../../../lib/postcard-template-reference";
 import editorStyles from "../card-publish-editor.module.css";
+import { useClientTournamentFormKeyboardScroll } from "../../client-tournament-form-keyboard-scroll";
 import { CardPublishBackgroundTab, CardPublishContentTab } from "./CardPublishEditorFormParts";
 import { normalizeCardEditorBackgroundUpload } from "./normalize-card-editor-background-upload";
 import { CardPublishPreview, type CardPublishPreviewModel } from "./CardPublishPreview";
@@ -181,6 +182,9 @@ export default function ClientTournamentCardPublishV2Page() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const tournamentId = useMemo(() => (typeof params.id === "string" ? params.id : ""), [params.id]);
+
+  const tournamentFormKeyboardRootRef = useRef<HTMLElement | null>(null);
+  useClientTournamentFormKeyboardScroll(tournamentFormKeyboardRootRef);
 
   /** 게시 화면 전용 미리보기 배지(모집중 공개 vs 임시저장) */
   const [publishIntent, setPublishIntent] = useState<"recruiting" | "draft">("recruiting");
@@ -632,6 +636,7 @@ export default function ClientTournamentCardPublishV2Page() {
 
   return (
     <main
+      ref={tournamentFormKeyboardRootRef}
       className="v3-page v3-stack"
       data-card-publish-v2="1"
       style={{ maxWidth: "none", margin: 0, width: "100%" }}

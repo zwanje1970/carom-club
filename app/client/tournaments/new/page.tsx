@@ -18,6 +18,7 @@ import type {
 } from "../../../../lib/tournament-rule-types";
 import SiteTournamentDetailSections from "../../../site/tournaments/[id]/site-tournament-detail-sections";
 
+import { useClientTournamentFormKeyboardScroll } from "../client-tournament-form-keyboard-scroll";
 import TournamentNewWizardForm from "./TournamentNewWizardForm";
 
 type DivisionRow = { name: string; min: string; max: string };
@@ -167,6 +168,9 @@ const sectionGap: CSSProperties = { gap: "1.05rem" };
 export default function ClientTournamentNewPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const tournamentFormKeyboardRootRef = useRef<HTMLElement | null>(null);
+  useClientTournamentFormKeyboardScroll(tournamentFormKeyboardRootRef);
 
   /** 동일 타이밍 이중 submit(연타·중복 이벤트) 차단 — loading 갱신 전에도 1회만 실행 */
   const tournamentCreateSubmitInFlightRef = useRef(false);
@@ -985,7 +989,11 @@ export default function ClientTournamentNewPage() {
       : posterNormalizedForDisplay || posterObjectPreviewUrl || "";
 
   return (
-    <main className="v3-page v3-stack" style={{ maxWidth: "40rem", margin: "0 auto", paddingTop: "0.35rem" }}>
+    <main
+      ref={tournamentFormKeyboardRootRef}
+      className="v3-page v3-stack"
+      style={{ maxWidth: "40rem", margin: "0 auto", paddingTop: "0.35rem" }}
+    >
       {editId || showCreateDone ? (
         <h1 className="v3-h1">
           {showCreateDone ? "대회 생성 완료" : "대회 수정"}

@@ -82,7 +82,7 @@
   padding: 0;
   border: 0;
   border-radius: 0;
-  background: rgba(0, 0, 0, 0.32);
+  background: rgba(0, 0, 0, 0.22);
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
   cursor: pointer;
@@ -122,6 +122,10 @@
   transform: translateX(0);
 }
 
+.bracketViewOpsTrack.bracketViewOpsTrackDragging {
+  transition: none;
+}
+
 .bracketViewOpsSheet {
   width: min(280px, calc(100vw - 56px));
   max-height: 100%;
@@ -130,7 +134,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: rgba(5, 10, 20, 0.72);
+  background: rgba(5, 10, 20, 0.7);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-right: 1px solid rgba(148, 163, 184, 0.38);
@@ -160,6 +164,9 @@
   min-width: 0;
   overflow-x: hidden;
   overflow-y: auto;
+  /* .bracketFloatingToolbarInner 기본 배경보다 구체성 높음 — 시트 반투명이 비치도록 */
+  background: transparent;
+  backdrop-filter: none;
 }
 
 .bracketViewOpsSheetInner {
@@ -221,8 +228,9 @@
   margin: 0;
   padding: 0;
   border: 0;
+  touch-action: none;
   border-right: 1px solid rgba(100, 116, 139, 0.45);
-  background: rgba(30, 41, 59, 0.94);
+  background: rgba(30, 41, 59, 0.72);
   color: #e2e8f0;
   font-size: 15px;
   font-weight: 800;
@@ -377,6 +385,11 @@
 
 .bracketViewSlotPassThrough {
   pointer-events: none !important;
+}
+
+/* 뷰어 모드: 표시용 이름 외 편집 배지 숨김 */
+.boardChromeBracketView .playerEditBadge {
+  display: none;
 }
 
 .bracketViewAdvanceCancelBlocked {

@@ -861,7 +861,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     initialClientDepositConfirmedAt={entry.clientDepositConfirmedAt ?? null}
                     initialClientApplicationApprovedAt={entry.clientApplicationApprovedAt ?? null}
                     rowLayout={rowLayout}
-                    opButtonPresentation={fullscreenTable ? "text" : "icon"}
+                    opButtonPresentation="icon"
                   />
                 ))}
               </tbody>

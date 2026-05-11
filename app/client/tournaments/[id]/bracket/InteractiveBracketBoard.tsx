@@ -48,6 +48,14 @@ type BoardPlayerSlot = {
 
 const RENAME_LONG_PRESS_MS = 1000;
 
+/** bracket/view 좌측 운영 패널 드래그 (픽셀 스냅·속도 스냅) */
+const OPS_DRAWER_PEEK_PX = 14;
+const OPS_DRAWER_TAP_MAX_PX = 12;
+const OPS_DRAWER_VELOCITY_SNAP_PX_PER_MS = 0.42;
+const OPS_DRAWER_OPEN_PROGRESS = 0.33;
+
+type OpsDrawerDragKind = "strip" | "sheetEdge" | "handle";
+
 function bracketSlotLabel(p: { name: string; displayName?: string | null }): string {
   const d = typeof p.displayName === "string" ? p.displayName.trim() : "";
   return d || p.name;
@@ -570,6 +578,9 @@ export default function InteractiveBracketBoard({
   /** 현재 화면 bracket·viewMode·로컬 승자 선택 스냅샷 — PDF 출력 등 */
   bracketPdfSnapshotRef?: React.MutableRefObject<(() => BracketBoardPdfSnapshot) | null>;
 }) {
+  void bracketViewNotice;
+  void connectivityHint;
+
   const MIN_SCALE = 0.3;
   const MAX_SCALE = 2.5;
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -615,14 +626,21 @@ export default function InteractiveBracketBoard({
   const longPressTimerRef = useRef<number | null>(null);
   /** bracket/view: 좌측 슬라이딩 운영 패널 */
   const [bracketViewOpsPanelOpen, setBracketViewOpsPanelOpen] = useState(false);
-  /** 드로어 열기/닫기 스와이프(얇은 제스처 영역·시트 좌측·핸들) */
-  const opsDrawerSwipeRef = useRef<{
+  /** 드래그 중에는 픽셀 transform, null이면 CSS 클래스 스냅 */
+  const [opsDrawerTranslatePx, setOpsDrawerTranslatePx] = useState<number | null>(null);
+  const opsDrawerTrackRef = useRef<HTMLDivElement | null>(null);
+  const opsDrawerDragRef = useRef<{
     pointerId: number;
-    startX: number;
-    kind: "strip" | "sheetEdge" | "handle";
+    kind: OpsDrawerDragKind;
+    startClientX: number;
+    startTranslatePx: number;
+    closedPx: number;
+    lastClientX: number;
+    lastTs: number;
+    velocityX: number;
+    pointerDownTs: number;
+    wasOpenAtDown: boolean;
   } | null>(null);
-  /** bracket/view: OFF면 패닝·줌만, 슬롯 입력·키보드 없음 */
-  const [bracketViewParticipantInputActive, setBracketViewParticipantInputActive] = useState(false);
   const [bracketViewModal, setBracketViewModal] = useState<null | "slice" | "zone">(null);
   const [toolbarLayoutIsLandscape, setToolbarLayoutIsLandscape] = useState(false);
 
@@ -645,11 +663,11 @@ export default function InteractiveBracketBoard({
   }, [chromeMode]);
 
   useEffect(() => {
-    if (chromeMode !== "bracketView" || bracketViewParticipantInputActive) return;
+    if (chromeMode !== "bracketView") return;
     setRenameEditing(null);
     setSwapCandidate(null);
     setSelectedBoxKey("");
-  }, [bracketViewParticipantInputActive, chromeMode]);
+  }, [chromeMode]);
 
   useEffect(() => {
     scaleRef.current = scale;
@@ -896,6 +914,102 @@ export default function InteractiveBracketBoard({
     }
   }, []);
 
+  const getOpsDrawerClosedTranslatePx = useCallback(() => {
+    const el = opsDrawerTrackRef.current;
+    const w = el?.offsetWidth ?? 0;
+    if (w <= OPS_DRAWER_PEEK_PX) return -280;
+    return -(w - OPS_DRAWER_PEEK_PX);
+  }, []);
+
+  const beginOpsDrawerDrag = useCallback(
+    (e: ReactPointerEvent, kind: OpsDrawerDragKind, captureEl: HTMLElement, sheetEdgeOnlyWhenOpen?: boolean) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      if (sheetEdgeOnlyWhenOpen && !bracketViewOpsPanelOpen) return;
+
+      const closedPx = getOpsDrawerClosedTranslatePx();
+      const wasOpen = bracketViewOpsPanelOpen;
+      const startTranslatePx = wasOpen ? 0 : closedPx;
+
+      opsDrawerDragRef.current = {
+        pointerId: e.pointerId,
+        kind,
+        startClientX: e.clientX,
+        startTranslatePx,
+        closedPx,
+        lastClientX: e.clientX,
+        lastTs: e.timeStamp,
+        velocityX: 0,
+        pointerDownTs: e.timeStamp,
+        wasOpenAtDown: wasOpen,
+      };
+      setOpsDrawerTranslatePx(startTranslatePx);
+      e.stopPropagation();
+      try {
+        captureEl.setPointerCapture(e.pointerId);
+      } catch {
+        /* noop */
+      }
+    },
+    [bracketViewOpsPanelOpen, getOpsDrawerClosedTranslatePx],
+  );
+
+  const moveOpsDrawerDrag = useCallback((e: ReactPointerEvent) => {
+    const sess = opsDrawerDragRef.current;
+    if (!sess || sess.pointerId !== e.pointerId) return;
+    const dx = e.clientX - sess.startClientX;
+    const next = Math.min(0, Math.max(sess.closedPx, sess.startTranslatePx + dx));
+    const dt = e.timeStamp - sess.lastTs;
+    if (dt > 0) {
+      sess.velocityX = (e.clientX - sess.lastClientX) / dt;
+    }
+    sess.lastClientX = e.clientX;
+    sess.lastTs = e.timeStamp;
+    setOpsDrawerTranslatePx(next);
+  }, []);
+
+  const endOpsDrawerDrag = useCallback((e: ReactPointerEvent) => {
+    const sess = opsDrawerDragRef.current;
+    if (!sess || sess.pointerId !== e.pointerId) return;
+    opsDrawerDragRef.current = null;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* noop */
+    }
+
+    const dxTotal = e.clientX - sess.startClientX;
+    const translate = Math.min(0, Math.max(sess.closedPx, sess.startTranslatePx + dxTotal));
+    const elapsed = e.timeStamp - sess.pointerDownTs;
+
+    let nextOpen: boolean;
+    if (sess.kind === "handle" && Math.abs(dxTotal) < OPS_DRAWER_TAP_MAX_PX && elapsed < 320) {
+      nextOpen = !sess.wasOpenAtDown;
+    } else if (sess.velocityX > OPS_DRAWER_VELOCITY_SNAP_PX_PER_MS) {
+      nextOpen = true;
+    } else if (sess.velocityX < -OPS_DRAWER_VELOCITY_SNAP_PX_PER_MS) {
+      nextOpen = false;
+    } else {
+      const span = -sess.closedPx;
+      const progress = span > 0 ? (translate - sess.closedPx) / span : sess.wasOpenAtDown ? 1 : 0;
+      nextOpen = progress >= OPS_DRAWER_OPEN_PROGRESS;
+    }
+
+    setBracketViewOpsPanelOpen(nextOpen);
+    setOpsDrawerTranslatePx(null);
+  }, []);
+
+  const cancelOpsDrawerDrag = useCallback((e: ReactPointerEvent) => {
+    const sess = opsDrawerDragRef.current;
+    if (!sess || sess.pointerId !== e.pointerId) return;
+    opsDrawerDragRef.current = null;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* noop */
+    }
+    setOpsDrawerTranslatePx(null);
+  }, []);
+
   useLayoutEffect(() => {
     const bracketId = bracket?.id ?? "";
     const key = viewStateStorageKey;
@@ -1114,7 +1228,7 @@ export default function InteractiveBracketBoard({
         playerName: string;
       },
     ) => {
-      if (chromeMode === "bracketView" && !bracketViewParticipantInputActive) return;
+      if (chromeMode === "bracketView") return;
       e.stopPropagation();
       boxPointerStartRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY, ts: Date.now() });
       setSelectedBoxKey(args.boxKey);
@@ -1122,7 +1236,7 @@ export default function InteractiveBracketBoard({
         Boolean(onRenamePlayer) &&
         !interactionDisabled &&
         !actionBusy &&
-        (interactionMode === "editSwap" || (chromeMode === "bracketView" && interactionMode === "winner"));
+        interactionMode === "editSwap";
       if (!allowRenameLongPress) return;
       if (longPressTimerRef.current !== null) {
         window.clearTimeout(longPressTimerRef.current);
@@ -1139,7 +1253,7 @@ export default function InteractiveBracketBoard({
         });
       }, RENAME_LONG_PRESS_MS);
     },
-    [actionBusy, bracketViewParticipantInputActive, chromeMode, interactionDisabled, interactionMode, onRenamePlayer],
+    [actionBusy, chromeMode, interactionDisabled, interactionMode, onRenamePlayer],
   );
 
   const onBoxPointerMoveForLongPress = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
@@ -1166,7 +1280,7 @@ export default function InteractiveBracketBoard({
       slotLabel: string,
       opponentHasName: boolean,
     ) => {
-      if (chromeMode === "bracketView" && !bracketViewParticipantInputActive) return;
+      if (chromeMode === "bracketView") return;
       e.stopPropagation();
       const s = boxPointerStartRef.current.get(e.pointerId);
       boxPointerStartRef.current.delete(e.pointerId);
@@ -1224,7 +1338,6 @@ export default function InteractiveBracketBoard({
     },
     [
       actionBusy,
-      bracketViewParticipantInputActive,
       chromeMode,
       handleWinnerPick,
       interactionDisabled,
@@ -1349,72 +1462,71 @@ export default function InteractiveBracketBoard({
       ? ` ${styles.boardChromeBracketView}`
       : "";
 
-  const bracketViewSlotInteractionLocked =
-    chromeMode === "bracketView" && !bracketViewParticipantInputActive;
+  /** 대진표 보기(bracketView): 승패·편집·진출취소 등 운영 입력 없음(뷰어 전용) */
+  const bracketViewSlotInteractionLocked = chromeMode === "bracketView";
 
   const boardMainChrome = (
     <>
-      <div className={styles.controlBar}>
-        {!interactionDisabled ? (
-          <button
-            data-board-control
-            type="button"
-            className={styles.controlBtn}
-            disabled={!canUndo || actionBusy}
-            onClick={() => {
-              void onUndo?.();
-            }}
-          >
-            되돌리기
-          </button>
-        ) : null}
-        {!interactionDisabled ? (
-          <button
-            data-board-control
-            type="button"
-            className={`${styles.controlBtn} ${interactionMode === "winner" ? styles.controlBtnActive : ""}`}
-            onClick={() => {
-              setInteractionMode("winner");
-              setSwapCandidate(null);
-              setRenameEditing(null);
-            }}
-          >
-            승자 선택
-          </button>
-        ) : null}
-        {!interactionDisabled ? (
-          <button
-            data-board-control
-            type="button"
-            className={`${styles.controlBtn} ${interactionMode === "editSwap" ? styles.controlBtnActive : ""}`}
-            onClick={() => setInteractionMode("editSwap")}
-            disabled={actionBusy}
-          >
-            편집/스왑
-          </button>
-        ) : null}
-        {!interactionDisabled && !shuffleRoundHidden ? (
-          <button
-            data-board-control
-            type="button"
-            className={styles.controlBtn}
-            disabled={actionBusy || interactionMode !== "editSwap" || currentRoundNumber === null}
-            onClick={() => {
-              if (currentRoundNumber === null) return;
-              void onShuffleRound?.(currentRoundNumber);
-            }}
-          >
-            다시 섞기
-          </button>
-        ) : null}
-        <span className={styles.scaleLabel}>
-          {chromeMode === "bracketView" && connectivityHint.trim()
-            ? `${connectivityHint.trim()} · `
-            : ""}
-          {saveStateText ? `${saveStateText} · ` : ""}
-          {canvasWidth}×{canvasHeight} · {(scale * 100).toFixed(0)}%
-        </span>
-      </div>
+      {chromeMode !== "bracketView" ? (
+        <div className={styles.controlBar}>
+          {!interactionDisabled ? (
+            <button
+              data-board-control
+              type="button"
+              className={styles.controlBtn}
+              disabled={!canUndo || actionBusy}
+              onClick={() => {
+                void onUndo?.();
+              }}
+            >
+              되돌리기
+            </button>
+          ) : null}
+          {!interactionDisabled ? (
+            <button
+              data-board-control
+              type="button"
+              className={`${styles.controlBtn} ${interactionMode === "winner" ? styles.controlBtnActive : ""}`}
+              onClick={() => {
+                setInteractionMode("winner");
+                setSwapCandidate(null);
+                setRenameEditing(null);
+              }}
+            >
+              승자 선택
+            </button>
+          ) : null}
+          {!interactionDisabled ? (
+            <button
+              data-board-control
+              type="button"
+              className={`${styles.controlBtn} ${interactionMode === "editSwap" ? styles.controlBtnActive : ""}`}
+              onClick={() => setInteractionMode("editSwap")}
+              disabled={actionBusy}
+            >
+              편집/스왑
+            </button>
+          ) : null}
+          {!interactionDisabled && !shuffleRoundHidden ? (
+            <button
+              data-board-control
+              type="button"
+              className={styles.controlBtn}
+              disabled={actionBusy || interactionMode !== "editSwap" || currentRoundNumber === null}
+              onClick={() => {
+                if (currentRoundNumber === null) return;
+                void onShuffleRound?.(currentRoundNumber);
+              }}
+            >
+              다시 섞기
+            </button>
+          ) : null}
+          <span className={styles.scaleLabel}>
+            {saveStateText ? `${saveStateText} · ` : ""}
+            {canvasWidth}×{canvasHeight} · {(scale * 100).toFixed(0)}%
+          </span>
+        </div>
+      ) : null}
 
       {tournamentInfoLine1 || tournamentInfoLine2 ? (
         <aside className={styles.tournamentOverlay} aria-label="대회 정보">
@@ -1434,7 +1546,7 @@ export default function InteractiveBracketBoard({
             <button
               type="button"
               className={styles.bracketViewOpsBackdrop}
-              aria-label="운영 패널 닫기"
+              aria-label="메뉴 닫기"
               onClick={() => setBracketViewOpsPanelOpen(false)}
             />
           ) : null}
@@ -1442,67 +1554,35 @@ export default function InteractiveBracketBoard({
             <div
               className={styles.bracketViewOpsGestureStrip}
               aria-hidden
-              onPointerDown={(e) => {
-                if (e.pointerType === "mouse" && e.button !== 0) return;
-                opsDrawerSwipeRef.current = {
-                  pointerId: e.pointerId,
-                  startX: e.clientX,
-                  kind: "strip",
-                };
-                e.currentTarget.setPointerCapture(e.pointerId);
-              }}
-              onPointerUp={(e) => {
-                const s = opsDrawerSwipeRef.current;
-                if (!s || s.pointerId !== e.pointerId || s.kind !== "strip") return;
-                opsDrawerSwipeRef.current = null;
-                try {
-                  e.currentTarget.releasePointerCapture(e.pointerId);
-                } catch {
-                  /* noop */
-                }
-                const dx = e.clientX - s.startX;
-                if (!bracketViewOpsPanelOpen && dx > 42) setBracketViewOpsPanelOpen(true);
-                else if (bracketViewOpsPanelOpen && dx < -42) setBracketViewOpsPanelOpen(false);
-              }}
-              onPointerCancel={(e) => {
-                const s = opsDrawerSwipeRef.current;
-                if (s?.pointerId === e.pointerId && s.kind === "strip") opsDrawerSwipeRef.current = null;
-              }}
+              onPointerDown={(e) => beginOpsDrawerDrag(e, "strip", e.currentTarget)}
+              onPointerMove={moveOpsDrawerDrag}
+              onPointerUp={endOpsDrawerDrag}
+              onPointerCancel={cancelOpsDrawerDrag}
+              onLostPointerCapture={cancelOpsDrawerDrag}
             />
             <div
-              className={`${styles.bracketViewOpsTrack} ${bracketViewOpsPanelOpen ? styles.bracketViewOpsTrackOpen : ""}`}
+              ref={opsDrawerTrackRef}
+              className={`${styles.bracketViewOpsTrack} ${
+                opsDrawerTranslatePx === null && bracketViewOpsPanelOpen ? styles.bracketViewOpsTrackOpen : ""
+              } ${opsDrawerTranslatePx !== null ? styles.bracketViewOpsTrackDragging : ""}`}
+              style={
+                opsDrawerTranslatePx !== null
+                  ? { transform: `translate3d(${opsDrawerTranslatePx}px, 0, 0)` }
+                  : undefined
+              }
             >
               <div className={styles.bracketViewOpsSheet}>
                 <div className={styles.bracketViewOpsSheetBody}>
                   <div
                     className={styles.bracketViewOpsSheetSwipeEdge}
                     aria-hidden
-                    onPointerDown={(e) => {
-                      if (!bracketViewOpsPanelOpen) return;
-                      if (e.pointerType === "mouse" && e.button !== 0) return;
-                      opsDrawerSwipeRef.current = {
-                        pointerId: e.pointerId,
-                        startX: e.clientX,
-                        kind: "sheetEdge",
-                      };
-                      e.currentTarget.setPointerCapture(e.pointerId);
-                    }}
-                    onPointerUp={(e) => {
-                      const s = opsDrawerSwipeRef.current;
-                      if (!s || s.pointerId !== e.pointerId || s.kind !== "sheetEdge") return;
-                      opsDrawerSwipeRef.current = null;
-                      try {
-                        e.currentTarget.releasePointerCapture(e.pointerId);
-                      } catch {
-                        /* noop */
-                      }
-                      const dx = e.clientX - s.startX;
-                      if (bracketViewOpsPanelOpen && dx < -42) setBracketViewOpsPanelOpen(false);
-                    }}
-                    onPointerCancel={(e) => {
-                      const s = opsDrawerSwipeRef.current;
-                      if (s?.pointerId === e.pointerId && s.kind === "sheetEdge") opsDrawerSwipeRef.current = null;
-                    }}
+                    onPointerDown={(e) =>
+                      beginOpsDrawerDrag(e, "sheetEdge", e.currentTarget, true)
+                    }
+                    onPointerMove={moveOpsDrawerDrag}
+                    onPointerUp={endOpsDrawerDrag}
+                    onPointerCancel={cancelOpsDrawerDrag}
+                    onLostPointerCapture={cancelOpsDrawerDrag}
                   />
                   <div
                     className={`${styles.bracketFloatingToolbarInner} ${styles.bracketViewToolbarIcons} ${styles.bracketViewOpsToolbarInner}`}
@@ -1626,19 +1706,6 @@ export default function InteractiveBracketBoard({
                 <div className={styles.bracketViewOpsLabeledRow}>
                   <button
                     type="button"
-                    className={`${styles.toolbarButton} ${bracketViewParticipantInputActive ? styles.toolbarButtonActive : ""}`}
-                    title={bracketViewParticipantInputActive ? "참가자 입력 끄기" : "참가자 입력 켜기"}
-                    aria-label={bracketViewParticipantInputActive ? "참가자 입력 끄기" : "참가자 입력 켜기"}
-                    onClick={() => setBracketViewParticipantInputActive((v) => !v)}
-                  >
-                    👤
-                  </button>
-                  <span className={styles.bracketViewOpsItemLabel}>참가자 입력</span>
-                </div>
-                <hr className={styles.toolbarDivider} aria-hidden />
-                <div className={styles.bracketViewOpsLabeledRow}>
-                  <button
-                    type="button"
                     className={styles.toolbarButton}
                     title="확대"
                     aria-label="확대"
@@ -1672,18 +1739,6 @@ export default function InteractiveBracketBoard({
                   </button>
                   <span className={styles.bracketViewOpsItemLabel}>화면맞춤</span>
                 </div>
-                <div className={styles.bracketViewOpsLabeledRow}>
-                  <button
-                    type="button"
-                    className={`${styles.toolbarButton} ${styles.toolbarResetDesktopOnly}`}
-                    title="초기화"
-                    aria-label="초기화"
-                    onClick={() => resetBracketView()}
-                  >
-                    ↺
-                  </button>
-                  <span className={styles.bracketViewOpsItemLabel}>초기화</span>
-                </div>
                   </div>
                 </div>
               </div>
@@ -1691,40 +1746,12 @@ export default function InteractiveBracketBoard({
               type="button"
               className={styles.bracketViewOpsHandle}
               aria-expanded={bracketViewOpsPanelOpen}
-              aria-label={bracketViewOpsPanelOpen ? "운영 패널 닫기" : "운영 패널 열기"}
-              onPointerDown={(e) => {
-                if (e.pointerType === "mouse" && e.button !== 0) return;
-                opsDrawerSwipeRef.current = {
-                  pointerId: e.pointerId,
-                  startX: e.clientX,
-                  kind: "handle",
-                };
-                e.currentTarget.setPointerCapture(e.pointerId);
-              }}
-              onPointerUp={(e) => {
-                const s = opsDrawerSwipeRef.current;
-                if (!s || s.pointerId !== e.pointerId || s.kind !== "handle") return;
-                opsDrawerSwipeRef.current = null;
-                try {
-                  e.currentTarget.releasePointerCapture(e.pointerId);
-                } catch {
-                  /* noop */
-                }
-                const dx = e.clientX - s.startX;
-                if (dx > 48 && !bracketViewOpsPanelOpen) {
-                  setBracketViewOpsPanelOpen(true);
-                  return;
-                }
-                if (dx < -48 && bracketViewOpsPanelOpen) {
-                  setBracketViewOpsPanelOpen(false);
-                  return;
-                }
-                if (Math.abs(dx) < 14) setBracketViewOpsPanelOpen((o) => !o);
-              }}
-              onPointerCancel={(e) => {
-                const s = opsDrawerSwipeRef.current;
-                if (s?.pointerId === e.pointerId && s.kind === "handle") opsDrawerSwipeRef.current = null;
-              }}
+              aria-label={bracketViewOpsPanelOpen ? "보기 메뉴 닫기" : "보기 메뉴 열기"}
+              onPointerDown={(e) => beginOpsDrawerDrag(e, "handle", e.currentTarget)}
+              onPointerMove={moveOpsDrawerDrag}
+              onPointerUp={endOpsDrawerDrag}
+              onPointerCancel={cancelOpsDrawerDrag}
+              onLostPointerCapture={cancelOpsDrawerDrag}
             >
               {bracketViewOpsPanelOpen ? "‹" : "›"}
             </button>
@@ -1818,12 +1845,6 @@ export default function InteractiveBracketBoard({
           </div>
         </div>
       )}
-
-      {chromeMode === "bracketView" && bracketViewNotice.trim() ? (
-        <div className={styles.bracketViewNoticeBar} role="status">
-          {bracketViewNotice}
-        </div>
-      ) : null}
 
       {chromeMode === "bracketView" && bracketViewModal === "slice" && bracketViewSlicePicker ? (
         <div
@@ -2022,31 +2043,29 @@ export default function InteractiveBracketBoard({
                   </g>
                 ))}
               </svg>
-              {advanceCancelButtons.map((btn) => (
-                <button
-                  key={btn.key}
-                  type="button"
-                  className={
-                    bracketViewSlotInteractionLocked
-                      ? `${styles.advanceCancelButton} ${styles.bracketViewAdvanceCancelBlocked}`
-                      : styles.advanceCancelButton
-                  }
-                  style={{ left: `${btn.x}px`, top: `${btn.y}px` }}
-                  onPointerDown={(e) => {
-                    e.stopPropagation();
-                  }}
-                  onPointerUp={(e) => {
-                    e.stopPropagation();
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void handleAdvanceCancel(btn.pairKey);
-                  }}
-                  title="진출 취소"
-                >
-                  ×
-                </button>
-              ))}
+              {chromeMode !== "bracketView"
+                ? advanceCancelButtons.map((btn) => (
+                    <button
+                      key={btn.key}
+                      type="button"
+                      className={styles.advanceCancelButton}
+                      style={{ left: `${btn.x}px`, top: `${btn.y}px` }}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                      }}
+                      onPointerUp={(e) => {
+                        e.stopPropagation();
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleAdvanceCancel(btn.pairKey);
+                      }}
+                      title="진출 취소"
+                    >
+                      ×
+                    </button>
+                  ))
+                : null}
 
               {activeLayout.positionedMatches.map((item) => {
                 const slotWinner = derived.winnerByItemKey.get(item.key) === true;

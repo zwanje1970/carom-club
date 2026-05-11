@@ -16,6 +16,7 @@ import type {
   TournamentTeamScoreRule,
   TournamentVerificationMode,
 } from "../../../../../lib/tournament-rule-types";
+import { useClientTournamentFormKeyboardScroll } from "../../client-tournament-form-keyboard-scroll";
 import TournamentNewWizardForm from "../../new/TournamentNewWizardForm";
 
 type DivisionRow = { name: string; min: string; max: string };
@@ -167,6 +168,10 @@ export default function ClientTournamentEditPage() {
   const params = useParams();
   const editId =
     typeof params?.id === "string" && params.id.trim() !== "" ? params.id.trim() : null;
+
+  const tournamentFormKeyboardRootRef = useRef<HTMLElement | null>(null);
+  useClientTournamentFormKeyboardScroll(tournamentFormKeyboardRootRef);
+
   const [editLoading, setEditLoading] = useState(false);
 
   const [title, setTitle] = useState("");
@@ -992,14 +997,24 @@ export default function ClientTournamentEditPage() {
 
   if (!editId) {
     return (
-      <main className="v3-page v3-stack" style={{ maxWidth: "40rem", margin: "0 auto", paddingTop: "0.35rem" }}>
+      <main
+        key="__edit-none__"
+        ref={tournamentFormKeyboardRootRef}
+        className="v3-page v3-stack"
+        style={{ maxWidth: "40rem", margin: "0 auto", paddingTop: "0.35rem" }}
+      >
         <p className="v3-muted">대회 정보를 불러올 수 없습니다.</p>
       </main>
     );
   }
 
   return (
-    <main className="v3-page v3-stack" style={{ maxWidth: "40rem", margin: "0 auto", paddingTop: "0.35rem" }}>
+    <main
+      key={editId}
+      ref={tournamentFormKeyboardRootRef}
+      className="v3-page v3-stack"
+      style={{ maxWidth: "40rem", margin: "0 auto", paddingTop: "0.35rem" }}
+    >
       <h1 className="v3-h1">대회 수정</h1>
       <p className="v3-muted">
         아래에서 전체 항목을 한 화면에서 확인·수정할 수 있습니다. 상단 버튼은 해당 항목 위치로 스크롤 이동합니다. 저장하면 동일 대회에 반영됩니다.
