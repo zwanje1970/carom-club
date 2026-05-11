@@ -19,6 +19,7 @@ import {
 import {
   appendOfflinePending,
   applyLocalClearWinner,
+  applyLocalClearWinnerCascadeInSlice,
   applyLocalRenamePlayer,
   applyLocalSwapPlayers,
   applyLocalWinnerPick,
@@ -891,8 +892,20 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           work = rs.bracket;
           setBracket(rs.bracket as Bracket);
         } else if (op.type === "clear_winner") {
+          /** 동기화 시점의 서버 스냅샷으로 reset/PATCH 순서만 계산(UI는 pull 결과로 덮지 않음) */
+          const pulled = await pullManageBracket();
+          if (!pulled.ok) {
+            writeOfflinePending(tournamentId, seg, ops.slice(i));
+            setMessage(pulled.error ?? "대진표를 불러 동기화하지 못했습니다.");
+            return;
+          }
+          if (!pulled.bracket) {
+            writeOfflinePending(tournamentId, seg, ops.slice(i));
+            setMessage("확정 대진표가 없습니다.");
+            return;
+          }
           const rs = await syncClearMatchWinner({
-            bracket: work,
+            bracket: pulled.bracket as BracketLike,
             matchId: op.matchId,
             mut: mutationFnsQuick,
             hasDownstream: hasDownstreamForSync,
@@ -902,8 +915,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             setMessage(rs.error);
             return;
           }
-          work = rs.bracket;
-          setBracket(rs.bracket as Bracket);
+          /** 로컬 정본 우선: 서버 응답 bracket으로 화면을 덮어쓰지 않음 */
+          work =
+            (bracketRef.current as BracketLike | null) ??
+            applyLocalClearWinnerCascadeInSlice(work as BracketLike, op.matchId) ??
+            (rs.bracket as BracketLike);
         } else if (op.type === "rename") {
           const rs = await syncRenamePlayer({
             bracket: work,
@@ -1085,142 +1101,67 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     void captureBracketImageSnapshot(bracket);
   }, [bracket, captureBracketImageSnapshot, interactionLocked, snapshotCaptureFailed, snapshotImageUrl]);
 
-  /** 빠른결과: 해당 경기 승패 결과 취소(히스토리 Undo 아님). 온라인은 서버 최신 브래킷 기준. */
+  /** 빠른결과: 승패 결과 취소 — 로컬 브래킷 정본 즉시 반영 후 clear_winner 큐로 서버 동기화(응답으로 로컬 덮어쓰지 않음). */
   const handleQuickClearMatchResult = useCallback(
-    async (
+    (
       matchId: string,
       rowCtx?: { roundNumber: number; boardSliceKey: string | null; rowIndex1Based: number },
     ) => {
       const trimmedId = matchId.trim();
       if (!tournamentId || interactionLocked || !trimmedId) return;
-      enqueueMutation(`clearResult:${trimmedId}`, async () => {
-        const seg = storageSeg;
-        setMessage("");
-        try {
-          if (typeof navigator !== "undefined" && !navigator.onLine) {
-            const snap = bracketRef.current as BracketLike | null;
-            if (!snap) {
-              console.warn("[quick-results clear-match-result] bracketRef null (offline)", {
-                matchId: trimmedId,
-                rowCtx,
-              });
-              setSaveState("error");
-              setMessage("대진표 데이터가 없습니다.");
-              return;
-            }
-            const locOff = findBracketMatchLocationForSync(snap, trimmedId);
-            if (!locOff) {
-              console.warn("[quick-results clear-match-result] match not found (offline)", {
-                matchId: trimmedId,
-                rowCtx,
-                bracketId: snap.id,
-              });
-              setSaveState("error");
-              setMessage("대상 매치를 찾을 수 없습니다.");
-              return;
-            }
-            const next = applyLocalClearWinner(snap, trimmedId);
-            if (!next) {
-              setSaveState("error");
-              setMessage("진출을 취소할 수 없습니다.");
-              return;
-            }
-            setBracket(next as Bracket);
-            writeLastGoodBracket(tournamentId, seg, next as Bracket);
-            appendOfflinePending(tournamentId, seg, { type: "clear_winner", matchId: trimmedId });
-            setOfflineDirty(tournamentId, seg, true);
-            setSaveState("idle");
-            setMessage("");
-            return;
-          }
-
-          const pulled = await pullManageBracket();
-          if (!pulled.ok) {
-            setSaveState("error");
-            setMessage(pulled.error ?? "대진표를 불러오지 못했습니다.");
-            return;
-          }
-          const serverBracket = pulled.bracket;
-          if (!serverBracket) {
-            setSaveState("error");
-            setMessage("확정 대진표가 없습니다.");
-            return;
-          }
-
-          const loc = findBracketMatchLocationForSync(serverBracket as BracketLike, trimmedId);
-          if (!loc) {
-            console.warn("[quick-results clear-match-result] match not found on server bracket", {
-              matchId: trimmedId,
-              rowCtx,
-              bracketId: serverBracket.id,
-            });
-            setSaveState("error");
-            setMessage("대상 매치를 찾을 수 없습니다.");
-            return;
-          }
-          if (rowCtx) {
-            if (loc.round.roundNumber !== rowCtx.roundNumber) {
-              console.warn("[quick-results clear-match-result] roundNumber mismatch (row vs server)", {
-                matchId: trimmedId,
-                rowCtx,
-                serverRoundNumber: loc.round.roundNumber,
-              });
-            }
-            if ((loc.sliceKey ?? null) !== (rowCtx.boardSliceKey ?? null)) {
-              console.warn("[quick-results clear-match-result] sliceKey mismatch (tab vs server)", {
-                matchId: trimmedId,
-                rowCtx,
-                serverSliceKey: loc.sliceKey,
-              });
-            }
-          }
-
-          const hadWinner =
-            typeof loc.match.winnerUserId === "string" && loc.match.winnerUserId.trim() !== "";
-          if (!hadWinner) {
-            setBracket(serverBracket);
-            writeLastGoodBracket(tournamentId, seg, serverBracket);
-            setOfflineDirty(tournamentId, seg, false);
-            setSaveState("idle");
-            setMessage("");
-            return;
-          }
-
-          const rs = await syncClearMatchWinner({
-            bracket: serverBracket as BracketLike,
+      const seg = storageSeg;
+      const snap = bracketRef.current as BracketLike | null;
+      if (!snap) {
+        console.warn("[quick-results clear-match-result] bracketRef null", { matchId: trimmedId, rowCtx });
+        setSaveState("error");
+        setMessage("대진표 데이터가 없습니다.");
+        return;
+      }
+      const locPre = findBracketMatchLocationForSync(snap, trimmedId);
+      if (!locPre) {
+        console.warn("[quick-results clear-match-result] match not found (local)", {
+          matchId: trimmedId,
+          rowCtx,
+          bracketId: snap.id,
+        });
+        setSaveState("error");
+        setMessage("대상 매치를 찾을 수 없습니다.");
+        return;
+      }
+      if (rowCtx) {
+        if (locPre.round.roundNumber !== rowCtx.roundNumber) {
+          console.warn("[quick-results clear-match-result] roundNumber mismatch (row vs local bracket)", {
             matchId: trimmedId,
-            mut: mutationFnsQuick,
-            hasDownstream: (b, roundNumber, sliceKey) =>
-              hasDownstreamRoundsInSliceForWinnerSync(getSliceRoundsForWinnerSync(b, sliceKey), roundNumber),
+            rowCtx,
+            bracketRoundNumber: locPre.round.roundNumber,
           });
-          if (!rs.ok) {
-            setSaveState("error");
-            setMessage(rs.error);
-            return;
-          }
-          setBracket(rs.bracket as Bracket);
-          writeLastGoodBracket(tournamentId, seg, rs.bracket as Bracket);
-          setOfflineDirty(tournamentId, seg, false);
-          setSaveState("idle");
-          setMessage("");
-        } catch {
-          const fallback = bracketRef.current as BracketLike | null;
-          const next = fallback ? applyLocalClearWinner(fallback, trimmedId) : null;
-          if (next) {
-            setBracket(next as Bracket);
-            writeLastGoodBracket(tournamentId, seg, next as Bracket);
-            appendOfflinePending(tournamentId, seg, { type: "clear_winner", matchId: trimmedId });
-            setOfflineDirty(tournamentId, seg, true);
-            setSaveState("idle");
-            setMessage("");
-            return;
-          }
-          setSaveState("error");
-          setMessage("승패 결과 취소 중 오류가 발생했습니다.");
         }
+        if ((locPre.sliceKey ?? null) !== (rowCtx.boardSliceKey ?? null)) {
+          console.warn("[quick-results clear-match-result] sliceKey mismatch (tab vs local bracket)", {
+            matchId: trimmedId,
+            rowCtx,
+            bracketSliceKey: locPre.sliceKey,
+          });
+        }
+      }
+      const next = applyLocalClearWinnerCascadeInSlice(snap, trimmedId);
+      if (!next) {
+        setSaveState("error");
+        setMessage("승패 결과를 취소할 수 없습니다.");
+        return;
+      }
+      bumpBracketLocalAuthorityRev(tournamentId, seg);
+      setBracket(next as Bracket);
+      writeLastGoodBracket(tournamentId, seg, next as Bracket);
+      appendOfflinePending(tournamentId, seg, { type: "clear_winner", matchId: trimmedId });
+      setOfflineDirty(tournamentId, seg, true);
+      setSaveState("idle");
+      setMessage("");
+      queueMicrotask(() => {
+        void replayOfflinePendingManage();
       });
     },
-    [enqueueMutation, interactionLocked, mutationFnsQuick, pullManageBracket, storageSeg, tournamentId],
+    [interactionLocked, replayOfflinePendingManage, storageSeg, tournamentId],
   );
 
   async function handleSetWinner(matchId: string, winnerUserId: string, roundNumber?: number) {

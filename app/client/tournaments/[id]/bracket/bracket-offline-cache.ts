@@ -5,6 +5,7 @@
 
 import {
   findBracketMatchLocation,
+  getSliceRoundsFromBracket,
   isEligibleBracketWinnerUserId,
   shuffleScopeForSlice,
   type BracketLike,
@@ -193,6 +194,19 @@ export function applyLocalWinnerPick(bracket: BracketLike, matchId: string, winn
   return b;
 }
 
+function refreshRoundStatusFromMatches(round: {
+  status: "PENDING" | "IN_PROGRESS" | "COMPLETED";
+  matches: Array<{ status: "PENDING" | "COMPLETED" }>;
+}): void {
+  const allCompleted =
+    round.matches.length > 0 && round.matches.every((m) => m.status === "COMPLETED");
+  const allPending = round.matches.every((m) => m.status === "PENDING");
+  if (allCompleted) round.status = "COMPLETED";
+  else if (allPending) round.status = "PENDING";
+  else round.status = "IN_PROGRESS";
+}
+
+/** 단일 매치 승자만 제거 */
 export function applyLocalClearWinner(bracket: BracketLike, matchId: string): BracketLike | null {
   const b = cloneBracket(bracket);
   const loc = findBracketMatchLocation(b, matchId);
@@ -200,6 +214,29 @@ export function applyLocalClearWinner(bracket: BracketLike, matchId: string): Br
   loc.match.winnerUserId = null;
   loc.match.winnerName = null;
   loc.match.status = "PENDING";
+  return b;
+}
+
+/** 해당 매치 승패 제거 + 같은 슬라이스에서 더 높은 라운드 번호의 매치 결과를 로컬에서 초기화(reset-after에 대응) */
+export function applyLocalClearWinnerCascadeInSlice(bracket: BracketLike, matchId: string): BracketLike | null {
+  const b = cloneBracket(bracket);
+  const loc = findBracketMatchLocation(b, matchId);
+  if (!loc) return null;
+  const sliceRounds = getSliceRoundsFromBracket(b, loc.sliceKey);
+  const cutRn = loc.round.roundNumber;
+  for (const r of sliceRounds) {
+    if (r.roundNumber <= cutRn) continue;
+    for (const m of r.matches) {
+      m.winnerUserId = null;
+      m.winnerName = null;
+      m.status = "PENDING";
+    }
+    refreshRoundStatusFromMatches(r);
+  }
+  loc.match.winnerUserId = null;
+  loc.match.winnerName = null;
+  loc.match.status = "PENDING";
+  refreshRoundStatusFromMatches(loc.round);
   return b;
 }
 
