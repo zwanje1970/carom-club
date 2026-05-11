@@ -1196,23 +1196,6 @@ export default function InteractiveBracketBoard({
   const bracketViewSlotInteractionLocked =
     chromeMode === "bracketView" && !bracketViewParticipantInputActive;
 
-  const bracketViewNextViewMode = useCallback(() => {
-    setViewMode((vm) => {
-      if (vm === "vertical") return "horizontal";
-      if (vm === "horizontal") return "dual";
-      return "vertical";
-    });
-  }, []);
-
-  const bracketViewViewToggleGlyph =
-    viewMode === "vertical" ? "├" : viewMode === "horizontal" ? "⇄" : "┴";
-  const bracketViewViewToggleTitle =
-    viewMode === "vertical"
-      ? "가로형 보기로 전환"
-      : viewMode === "horizontal"
-        ? "양쪽형 보기로 전환"
-        : "세로형 보기로 전환";
-
   const boardMainChrome = (
     <>
       <div className={styles.controlBar}>
@@ -1295,166 +1278,183 @@ export default function InteractiveBracketBoard({
             className={`${styles.bracketViewOpsTrack} ${bracketViewOpsPanelOpen ? styles.bracketViewOpsTrackOpen : ""}`}
           >
             <div className={styles.bracketViewOpsSheet}>
-              <div className={styles.bracketViewOpsSheetInner}>
-                <p className={styles.bracketViewOpsHeading}>운영 패널</p>
-                <button
-                  type="button"
-                  className={styles.bracketViewOpsRow}
-                  title={bracketViewViewToggleTitle}
-                  onClick={() => bracketViewNextViewMode()}
-                >
-                  <span className={styles.bracketViewOpsRowGlyph} aria-hidden>
-                    {bracketViewViewToggleGlyph}
-                  </span>
-                  <span className={styles.bracketViewOpsRowText}>
-                    <span className={styles.bracketViewOpsRowTitle}>보기 전환</span>
-                    <span className={styles.bracketViewOpsRowHint}>{bracketViewViewToggleTitle}</span>
-                  </span>
-                </button>
-                {bracketViewSlicePicker ? (
+              <div
+                className={`${styles.bracketFloatingToolbarInner} ${styles.bracketViewToolbarIcons} ${styles.bracketViewOpsToolbarInner}`}
+              >
+                <div className={styles.bracketViewOpsLabeledRow}>
                   <button
                     type="button"
-                    className={styles.bracketViewOpsRow}
-                    title="조 선택"
-                    onClick={() => setBracketViewModal("slice")}
+                    className={`${styles.toolbarButton} ${styles.toolbarBracketViewWideBtn} ${styles.toolbarBracketViewGlyphBtn}`}
+                    title={toolbarLayoutIsLandscape ? "기기 세로모드" : "기기 가로모드"}
+                    aria-label={toolbarLayoutIsLandscape ? "기기 세로모드" : "기기 가로모드"}
+                    onClick={() =>
+                      toolbarLayoutIsLandscape
+                        ? (unregisterCaromExplicitNativeLandscapeSession(CAROM_BRACKET_NATIVE_LANDSCAPE_SESSION_ID),
+                          applyCaromOrientationMode("portrait", "bracket-view-fullscreen:toolbar-portrait"))
+                        : (registerCaromExplicitNativeLandscapeSession(CAROM_BRACKET_NATIVE_LANDSCAPE_SESSION_ID),
+                          applyCaromOrientationMode("landscape", "bracket-view-fullscreen:toolbar-landscape"))
+                    }
                   >
-                    <span className={styles.bracketViewOpsRowGlyph} aria-hidden>
-                      ▦
-                    </span>
-                    <span className={styles.bracketViewOpsRowText}>
-                      <span className={styles.bracketViewOpsRowTitle}>조 선택</span>
-                    </span>
-                  </button>
-                ) : null}
-                {bracketViewZones ? (
-                  <button
-                    type="button"
-                    className={styles.bracketViewOpsRow}
-                    title="권역 선택"
-                    onClick={() => setBracketViewModal("zone")}
-                  >
-                    <span className={styles.bracketViewOpsRowGlyph} aria-hidden>
-                      ⌗
-                    </span>
-                    <span className={styles.bracketViewOpsRowText}>
-                      <span className={styles.bracketViewOpsRowTitle}>권역 선택</span>
-                    </span>
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  className={`${styles.bracketViewOpsRow} ${bracketViewParticipantInputActive ? styles.bracketViewOpsRowActive : ""}`}
-                  title={bracketViewParticipantInputActive ? "참가자 입력 끄기" : "참가자 입력 켜기"}
-                  onClick={() => setBracketViewParticipantInputActive((v) => !v)}
-                >
-                  <span className={styles.bracketViewOpsRowGlyph} aria-hidden>
-                    👤
-                  </span>
-                  <span className={styles.bracketViewOpsRowText}>
-                    <span className={styles.bracketViewOpsRowTitle}>참가자 입력</span>
-                    <span className={styles.bracketViewOpsRowHint}>
-                      {bracketViewParticipantInputActive ? "켜짐 · 슬롯 탭 가능" : "꺼짐 · 이동·줌만"}
-                    </span>
-                  </span>
-                </button>
-                {bracketViewParticipantInputActive ? (
-                  <div className={styles.bracketViewOpsModeToggle}>
-                    <button
-                      type="button"
-                      className={`${styles.bracketViewOpsChip} ${interactionMode === "winner" ? styles.bracketViewOpsChipActive : ""}`}
-                      onClick={() => {
-                        setInteractionMode("winner");
-                        setSwapCandidate(null);
-                        setRenameEditing(null);
-                      }}
-                    >
-                      승자
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.bracketViewOpsChip} ${interactionMode === "editSwap" ? styles.bracketViewOpsChipActive : ""}`}
-                      disabled={actionBusy}
-                      onClick={() => setInteractionMode("editSwap")}
-                    >
-                      편집·스왑
-                    </button>
-                  </div>
-                ) : null}
-                <hr className={styles.bracketViewOpsDivider} aria-hidden />
-                <button
-                  type="button"
-                  className={styles.bracketViewOpsRow}
-                  title={toolbarLayoutIsLandscape ? "기기 세로모드" : "기기 가로모드"}
-                  onClick={() =>
-                    toolbarLayoutIsLandscape
-                      ? (unregisterCaromExplicitNativeLandscapeSession(CAROM_BRACKET_NATIVE_LANDSCAPE_SESSION_ID),
-                        applyCaromOrientationMode("portrait", "bracket-view-fullscreen:toolbar-portrait"))
-                      : (registerCaromExplicitNativeLandscapeSession(CAROM_BRACKET_NATIVE_LANDSCAPE_SESSION_ID),
-                        applyCaromOrientationMode("landscape", "bracket-view-fullscreen:toolbar-landscape"))
-                  }
-                >
-                  <span className={styles.bracketViewOpsRowGlyphSvg} aria-hidden>
                     {toolbarLayoutIsLandscape ? (
                       <BracketToolbarPhonePortraitGlyph className={styles.bracketToolbarPhoneSvg} />
                     ) : (
                       <BracketToolbarPhoneLandscapeGlyph className={styles.bracketToolbarPhoneSvg} />
                     )}
+                  </button>
+                  <span className={styles.bracketViewOpsItemLabel}>
+                    {toolbarLayoutIsLandscape ? "세로 화면" : "가로 화면"}
                   </span>
-                  <span className={styles.bracketViewOpsRowText}>
-                    <span className={styles.bracketViewOpsRowTitle}>화면 방향</span>
-                    <span className={styles.bracketViewOpsRowHint}>
-                      {toolbarLayoutIsLandscape ? "세로로 전환" : "가로로 전환"}
-                    </span>
-                  </span>
-                </button>
-                <div className={styles.bracketViewOpsZoomRow}>
+                </div>
+                <hr className={styles.toolbarDivider} aria-hidden />
+                {onExit ? (
+                  <div className={styles.bracketViewOpsLabeledRow}>
+                    <button
+                      type="button"
+                      className={`${styles.toolbarButton} ${styles.toolbarExitBracketView}`}
+                      title="나가기"
+                      aria-label="나가기"
+                      onClick={() => onExit()}
+                    >
+                      ←
+                    </button>
+                    <span className={styles.bracketViewOpsItemLabel}>나가기</span>
+                  </div>
+                ) : null}
+                {bracketViewSlicePicker ? (
+                  <div className={styles.bracketViewOpsLabeledRow}>
+                    <button
+                      type="button"
+                      className={`${styles.toolbarButton} ${styles.toolbarBracketViewWideBtn} ${styles.toolbarBracketViewGlyphBtn}`}
+                      title="조 선택"
+                      aria-label="조 선택"
+                      onClick={() => setBracketViewModal("slice")}
+                    >
+                      ▦
+                    </button>
+                    <span className={styles.bracketViewOpsItemLabel}>조 선택</span>
+                  </div>
+                ) : null}
+                {bracketViewZones ? (
+                  <div className={styles.bracketViewOpsLabeledRow}>
+                    <button
+                      type="button"
+                      className={`${styles.toolbarButton} ${styles.toolbarBracketViewWideBtn}`}
+                      title="권역 선택"
+                      aria-label="권역 선택"
+                      onClick={() => setBracketViewModal("zone")}
+                    >
+                      권역
+                    </button>
+                    <span className={styles.bracketViewOpsItemLabel}>권역 선택</span>
+                  </div>
+                ) : null}
+                {bracketViewSlicePicker || bracketViewZones ? (
+                  <hr className={styles.toolbarDivider} aria-hidden />
+                ) : null}
+                <div className={styles.bracketViewOpsLabeledRow}>
                   <button
                     type="button"
-                    className={styles.bracketViewOpsIconBtn}
+                    className={`${styles.toolbarButton} ${styles.toolbarOrientationWide} ${
+                      viewMode === "vertical" ? styles.toolbarButtonActive : ""
+                    }`}
+                    title="세로형 보기"
+                    aria-label="세로형 보기"
+                    onClick={() => setViewMode("vertical")}
+                  >
+                    <span className={styles.toolbarBtnLabelShort}>├</span>
+                  </button>
+                  <span className={styles.bracketViewOpsItemLabel}>세로형</span>
+                </div>
+                <div className={styles.bracketViewOpsLabeledRow}>
+                  <button
+                    type="button"
+                    className={`${styles.toolbarButton} ${styles.toolbarDualDesktopOnly} ${
+                      viewMode === "dual" ? styles.toolbarButtonActive : ""
+                    }`}
+                    title="양쪽형 보기"
+                    aria-label="양쪽형 보기"
+                    onClick={() => setViewMode("dual")}
+                  >
+                    <span className={styles.toolbarBtnLabelShort}>┴</span>
+                  </button>
+                  <span className={styles.bracketViewOpsItemLabel}>양쪽형</span>
+                </div>
+                <div className={styles.bracketViewOpsLabeledRow}>
+                  <button
+                    type="button"
+                    className={`${styles.toolbarButton} ${styles.toolbarOrientationWide} ${
+                      viewMode === "horizontal" ? styles.toolbarButtonActive : ""
+                    }`}
+                    title="가로형 보기"
+                    aria-label="가로형 보기"
+                    onClick={() => setViewMode("horizontal")}
+                  >
+                    <span className={styles.toolbarBtnLabelShort}>⇄</span>
+                  </button>
+                  <span className={styles.bracketViewOpsItemLabel}>가로형</span>
+                </div>
+                <hr className={styles.toolbarDivider} aria-hidden />
+                <div className={styles.bracketViewOpsLabeledRow}>
+                  <button
+                    type="button"
+                    className={`${styles.toolbarButton} ${bracketViewParticipantInputActive ? styles.toolbarButtonActive : ""}`}
+                    title={bracketViewParticipantInputActive ? "참가자 입력 끄기" : "참가자 입력 켜기"}
+                    aria-label={bracketViewParticipantInputActive ? "참가자 입력 끄기" : "참가자 입력 켜기"}
+                    onClick={() => setBracketViewParticipantInputActive((v) => !v)}
+                  >
+                    👤
+                  </button>
+                  <span className={styles.bracketViewOpsItemLabel}>참가자 입력</span>
+                </div>
+                <hr className={styles.toolbarDivider} aria-hidden />
+                <div className={styles.bracketViewOpsLabeledRow}>
+                  <button
+                    type="button"
+                    className={styles.toolbarButton}
                     title="확대"
                     aria-label="확대"
                     onClick={() => zoomFromViewportCenter(1.2)}
                   >
                     +
                   </button>
+                  <span className={styles.bracketViewOpsItemLabel}>확대</span>
+                </div>
+                <div className={styles.bracketViewOpsLabeledRow}>
                   <button
                     type="button"
-                    className={styles.bracketViewOpsIconBtn}
+                    className={styles.toolbarButton}
                     title="축소"
                     aria-label="축소"
                     onClick={() => zoomFromViewportCenter(1 / 1.2)}
                   >
                     −
                   </button>
+                  <span className={styles.bracketViewOpsItemLabel}>축소</span>
+                </div>
+                <div className={styles.bracketViewOpsLabeledRow}>
                   <button
                     type="button"
-                    className={styles.bracketViewOpsIconBtn}
+                    className={styles.toolbarButton}
                     title="전체보기"
                     aria-label="전체보기"
                     onClick={() => fitBracketToViewport()}
                   >
                     □
                   </button>
+                  <span className={styles.bracketViewOpsItemLabel}>화면맞춤</span>
+                </div>
+                <div className={styles.bracketViewOpsLabeledRow}>
                   <button
                     type="button"
-                    className={styles.bracketViewOpsIconBtn}
+                    className={`${styles.toolbarButton} ${styles.toolbarResetDesktopOnly}`}
                     title="초기화"
                     aria-label="초기화"
                     onClick={() => resetBracketView()}
                   >
                     ↺
                   </button>
+                  <span className={styles.bracketViewOpsItemLabel}>초기화</span>
                 </div>
-                {onExit ? (
-                  <button type="button" className={styles.bracketViewOpsExitBtn} onClick={() => onExit()}>
-                    나가기
-                  </button>
-                ) : null}
-                <p className={styles.bracketViewOpsFooter}>
-                  {connectivityHint.trim() ? `${connectivityHint.trim()} · ` : ""}
-                  {saveStateText ? `${saveStateText} · ` : ""}
-                  {canvasWidth}×{canvasHeight} · {(scale * 100).toFixed(0)}%
-                </p>
               </div>
             </div>
             <button

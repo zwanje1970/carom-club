@@ -1,6 +1,5 @@
 "use client";
 
-import type { CSSProperties } from "react";
 import "./tournament-post-card-status-badges.css";
 
 export type TournamentPostStatus = "모집중" | "마감임박" | "마감" | "진행중" | "종료";
@@ -22,10 +21,12 @@ export function TournamentStatusBadge({
   /** true: 글자만 숨김(배지 박스·배경 유지) — PNG 캡처용 */
   hideLabel?: boolean;
 }) {
-  const labelWrapStyle = hideLabel ? ({ visibility: "hidden" as const } satisfies CSSProperties) : undefined;
   return (
     <span className={`tournament-post-card__badge ${STATUS_CLASS[status]}`}>
-      <span style={labelWrapStyle} aria-hidden={hideLabel ? true : undefined}>
+      <span
+        className={hideLabel ? "tournament-post-card__badge-label--image-capture-hidden" : undefined}
+        aria-hidden={hideLabel ? true : undefined}
+      >
         {status === "마감임박" ? (
           <>
             <span className="tournament-post-card__badge-line">마감</span>

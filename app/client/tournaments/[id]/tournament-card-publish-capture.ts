@@ -86,12 +86,22 @@ export async function captureAndUploadTournamentCardSnapshots(item: SlideDeckIte
     await waitForImages(host);
     await doubleRaf();
 
+    const articleEl = host.querySelector("article");
+    const captureRoot = articleEl instanceof HTMLElement ? articleEl : host;
+    for (const img of host.querySelectorAll("img")) {
+      img.crossOrigin = "anonymous";
+    }
+    await waitForImages(host);
+    await doubleRaf();
+
     const [{ default: html2canvas }] = await Promise.all([import("html2canvas")]);
-    const canvas = await html2canvas(host, {
+    const canvas = await html2canvas(captureRoot, {
       scale: 2,
       backgroundColor: null,
       useCORS: true,
       logging: false,
+      width: TOURNAMENT_CARD_ARTBOARD_WIDTH_PX,
+      height: TOURNAMENT_CARD_ARTBOARD_HEIGHT_PX,
     });
 
     const blob = await canvasToBlob(canvas);

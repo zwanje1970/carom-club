@@ -30,6 +30,34 @@ export function offlinePendingKey(tournamentId: string, seg: BracketOfflineSegme
   return `v3:bracketOfflinePending:${tournamentId}:${seg}`;
 }
 
+/** 같은 기기·세그먼트에서 로컬 우선 적용 세대(서버 늦은 응답으로 되돌리지 않기 위한 비교용) */
+function localAuthorityRevKey(tournamentId: string, seg: BracketOfflineSegment): string {
+  return `v3:bracketLocalAuthorityRev:${tournamentId}:${seg}`;
+}
+
+export function readBracketLocalAuthorityRev(tournamentId: string, seg: BracketOfflineSegment): number {
+  if (typeof window === "undefined" || !tournamentId) return 0;
+  try {
+    const raw = window.localStorage.getItem(localAuthorityRevKey(tournamentId, seg));
+    const n = raw ? parseInt(raw, 10) : 0;
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** 로컬 대진표를 갱신할 때마다 호출. 이후 서버 응답은 동일 세대일 때만 bracket state를 덮어쓴다. */
+export function bumpBracketLocalAuthorityRev(tournamentId: string, seg: BracketOfflineSegment): number {
+  if (typeof window === "undefined" || !tournamentId) return 0;
+  try {
+    const next = readBracketLocalAuthorityRev(tournamentId, seg) + 1;
+    window.localStorage.setItem(localAuthorityRevKey(tournamentId, seg), String(next));
+    return next;
+  } catch {
+    return readBracketLocalAuthorityRev(tournamentId, seg);
+  }
+}
+
 function safeParseJson<T>(raw: string | null): T | null {
   if (!raw || typeof raw !== "string") return null;
   try {
@@ -55,6 +83,7 @@ export function writeLastGoodBracket<T>(tournamentId: string, seg: BracketOfflin
       window.localStorage.removeItem(lastGoodBracketKey(tournamentId, seg));
       return;
     }
+    /* 즉시 직렬화 저장 — 강제 종료 직전에도 가능한 한 디스크에 남김 */
     window.localStorage.setItem(lastGoodBracketKey(tournamentId, seg), JSON.stringify(bracket));
   } catch (e) {
     if (typeof console !== "undefined" && console.warn) {

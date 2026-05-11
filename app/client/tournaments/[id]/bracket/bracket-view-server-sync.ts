@@ -129,6 +129,7 @@ export type MutationFns = {
   ) => Promise<{ ok: true; bracket: BracketLike } | { ok: false; error: string }>;
 };
 
+/** `bracket`은 승자 변경 판별용 스냅샷이다. UI에 이미 낙관 적용했다면 `changingWinner` 검출을 위해 PATCH 이전 상태를 넘긴다. */
 export async function syncWinnerPick(params: {
   bracket: BracketLike;
   matchId: string;

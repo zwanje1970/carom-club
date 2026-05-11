@@ -942,3 +942,8 @@ article[data-editor-card-preview="1"] .fullSurfaceFooterPlace {
 .cardRootArtboardPx:not(.cardRootTemplateLayout) .frameDescSecondary {
   font-size: 13px;
 }
+
+/* 게시 PNG(html2canvas): 글자 glyph만 숨김 — 배경·띠·배지 원·레이아웃 wrapper에는 적용하지 않음 */
+.imageCaptureHideGlyph {
+  visibility: hidden;
+}

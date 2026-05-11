@@ -28,6 +28,11 @@
   display: block;
 }
 
+/* 게시 PNG: 배지 라벨 glyph만 숨김(원·그라데이션·테두리는 유지) */
+.tournament-post-card__badge-label--image-capture-hidden {
+  visibility: hidden;
+}
+
 /* 모집중 — 파란색 · 1줄 */
 .tournament-post-card__badge--recruiting {
   background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);

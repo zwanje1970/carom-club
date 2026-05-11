@@ -20,6 +20,8 @@ import {
   applyLocalSwapPlayers,
   applyLocalWinnerPick,
   bracketOfflineSegment,
+  bumpBracketLocalAuthorityRev,
+  readBracketLocalAuthorityRev,
   readLastGoodBracket,
   readOfflineDirty,
   readOfflinePending,
@@ -28,8 +30,9 @@ import {
   writeLastGoodBracket,
   writeOfflinePending,
 } from "./bracket-offline-cache";
-import { exportCurrentBracketToPdf } from "./bracket-pdf-client-export";
 import BracketProgressSummaryCard from "./BracketProgressSummaryCard";
+import TournamentTvLinkBlock from "../TournamentTvLinkBlock";
+import "../tournament-manage-ui.css";
 import { roundLabelFromMatchCount } from "./bracket-progress-utils";
 
 const TournamentGroupRound1PrintClient = dynamic(
@@ -270,7 +273,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   const [multiBlockSize, setMultiBlockSize] = useState(16);
   const [multiBlockBusy, setMultiBlockBusy] = useState(false);
   const [selectedQuickRoundNumber, setSelectedQuickRoundNumber] = useState<number | null>(null);
-  const [manageBracketPdfBusy, setManageBracketPdfBusy] = useState(false);
   const confirmedSectionRef = useRef<HTMLElement | null>(null);
   const didInitialBoardFocusRef = useRef(false);
 
@@ -367,34 +369,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     });
   }, [displayRoundsSorted]);
 
-  const handleExportManageBracketPdf = useCallback(async () => {
-    if (!bracket) return;
-    if (zonesEnabled && !selectedZoneId) {
-      setMessage("권역을 선택한 뒤 PDF를 출력할 수 있습니다.");
-      return;
-    }
-    const rounds = getSliceRoundsFromBracket(bracket, boardSliceKey);
-    if (!rounds.length) {
-      setMessage("선택한 조·결선에 출력할 라운드가 없습니다.");
-      return;
-    }
-    const suffix = boardSliceKey ?? "root";
-    setManageBracketPdfBusy(true);
-    setMessage("");
-    try {
-      await exportCurrentBracketToPdf({
-        bracket: { id: `${bracket.id}:${suffix}`, rounds },
-        boardViewMode: "vertical",
-        winnerByPairSnapshot: {},
-        fileNameBase: `bracket_manage_${tournamentId}_${suffix.replace(/:/g, "_")}`,
-      });
-    } catch {
-      setMessage("PDF 저장에 실패했습니다.");
-    } finally {
-      setManageBracketPdfBusy(false);
-    }
-  }, [boardSliceKey, bracket, selectedZoneId, tournamentId, zonesEnabled]);
-
   const pullManageBracket = useCallback(async (): Promise<
     { ok: true; bracket: Bracket | null } | { ok: false; error?: string }
   > => {
@@ -422,11 +396,15 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       return;
     }
     const seg = storageSeg;
+    const cached = readLastGoodBracket<Bracket>(tournamentId, seg);
+    if (cached) {
+      setBracket(cached);
+    }
     const pulled = await pullManageBracket();
     if (!pulled.ok) {
-      if (!readOfflineDirty(tournamentId, seg)) {
-        const cached = readLastGoodBracket<Bracket>(tournamentId, seg);
-        setBracket((prev) => (prev == null && cached ? cached : prev));
+      if (!readOfflineDirty(tournamentId, seg) && !cached) {
+        const fallback = readLastGoodBracket<Bracket>(tournamentId, seg);
+        setBracket((prev) => (prev == null && fallback ? fallback : prev));
       }
       setMessage("");
       return;
@@ -435,9 +413,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       setMessage("");
       return;
     }
-    setBracket(pulled.bracket);
-    if (pulled.bracket) writeLastGoodBracket(tournamentId, seg, pulled.bracket);
-    else writeLastGoodBracket(tournamentId, seg, null);
+    if (!cached) {
+      setBracket(pulled.bracket);
+      if (pulled.bracket) writeLastGoodBracket(tournamentId, seg, pulled.bracket);
+      else writeLastGoodBracket(tournamentId, seg, null);
+    }
     setMessage("");
   }, [pullManageBracket, storageSeg, tournamentId, zonesEnabled, selectedZoneId]);
 
@@ -600,19 +580,24 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   const connectivityHint = !navigatorOnline ? "오프라인" : bracketSyncBusy ? "연결 복구 중" : "";
 
   const enqueueMutation = useCallback(
-    (actionKey: string, runner: () => Promise<void>) => {
+    (actionKey: string, runner: () => Promise<void>, options?: { quiet?: boolean }) => {
       if (pendingActionKeysRef.current.has(actionKey)) return;
       pendingActionKeysRef.current.add(actionKey);
+      const quiet = options?.quiet === true;
       actionQueueRef.current = actionQueueRef.current
         .catch(() => undefined)
         .then(async () => {
-          setActionLoading(true);
-          setSaveState("saving");
+          if (!quiet) {
+            setActionLoading(true);
+            setSaveState("saving");
+          }
           try {
             await runner();
           } finally {
             pendingActionKeysRef.current.delete(actionKey);
-            setActionLoading(false);
+            if (!quiet) {
+              setActionLoading(false);
+            }
           }
         });
     },
@@ -844,11 +829,9 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       }
       writeOfflinePending(tournamentId, seg, []);
       setOfflineDirty(tournamentId, seg, false);
-      if (work) writeLastGoodBracket(tournamentId, seg, work as Bracket);
-      const pulled = await pullManageBracket();
-      if (pulled.ok && !readOfflineDirty(tournamentId, seg)) {
-        setBracket(pulled.bracket);
-        if (pulled.bracket) writeLastGoodBracket(tournamentId, seg, pulled.bracket);
+      if (work) {
+        writeLastGoodBracket(tournamentId, seg, work as Bracket);
+        setBracket(work as Bracket);
       }
       setMessage("");
     } finally {
@@ -1050,36 +1033,43 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
         return;
       }
     }
-    enqueueMutation(`winner:${matchId}`, async () => {
-      pushUndoSnapshot(current);
+
+    const seg = storageSeg;
+    const roundNoForPending = typeof roundNumber === "number" ? roundNumber : currentRound.roundNumber;
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      if (changingWinner) {
+        setMessage("승자 변경은 네트워크 연결 후 진행해 주세요.");
+        return;
+      }
+      const next = applyLocalWinnerPick(current as unknown as BracketLike, matchId, winnerUserId);
+      if (!next) {
+        setMessage("경기 결과를 반영할 수 없습니다.");
+        return;
+      }
+      bumpBracketLocalAuthorityRev(tournamentId, seg);
+      setBracket(next as Bracket);
+      writeLastGoodBracket(tournamentId, seg, next as Bracket);
+      appendOfflinePending(tournamentId, seg, {
+        type: "winner_pick",
+        matchId,
+        winnerUserId,
+        roundNumber: roundNoForPending,
+      });
+      setOfflineDirty(tournamentId, seg, true);
+      setSaveState("idle");
       setMessage("");
-      try {
-        if (typeof navigator !== "undefined" && !navigator.onLine) {
-          if (changingWinner) {
-            rollbackLastUndoSnapshot();
-            setMessage("승자 변경은 네트워크 연결 후 진행해 주세요.");
-            return;
-          }
-          const next = applyLocalWinnerPick(current as unknown as BracketLike, matchId, winnerUserId);
-          if (!next) {
-            rollbackLastUndoSnapshot();
-            setMessage("경기 결과를 반영할 수 없습니다.");
-            return;
-          }
-          setBracket(next as Bracket);
-          writeLastGoodBracket(tournamentId, storageSeg, next as Bracket);
-          appendOfflinePending(tournamentId, storageSeg, {
-            type: "winner_pick",
-            matchId,
-            winnerUserId,
-            roundNumber: typeof roundNumber === "number" ? roundNumber : currentRound.roundNumber,
-          });
-          setOfflineDirty(tournamentId, storageSeg, true);
-          setSaveState("idle");
-          return;
-        }
-        let workingBracket = current;
-        if (changingWinner && hasDownstreamRounds(workingBracket, currentRound.roundNumber, winSliceKey)) {
+      return;
+    }
+
+    const mustResetDownstreamOnline =
+      changingWinner && hasDownstreamRounds(current, currentRound.roundNumber, winSliceKey);
+
+    if (mustResetDownstreamOnline) {
+      enqueueMutation(`winner:${matchId}`, async () => {
+        pushUndoSnapshot(current);
+        setMessage("");
+        try {
           const resetResult = await runResetAfterMutation(currentRound.roundNumber, winSliceKey);
           if (!resetResult.ok) {
             rollbackLastUndoSnapshot();
@@ -1087,19 +1077,16 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             setMessage(resetResult.error);
             return;
           }
-          workingBracket = resetResult.bracket;
-          setBracket(workingBracket);
-        }
+          setBracket(resetResult.bracket);
 
-        const result = await runMatchResultMutation(matchId, winnerUserId);
-        if (!result.ok) {
-          rollbackLastUndoSnapshot();
-          setSaveState("error");
-          setMessage(result.error);
-          return;
-        }
-        let nextBracket = result.bracket;
-        if (changingWinner) {
+          const result = await runMatchResultMutation(matchId, winnerUserId);
+          if (!result.ok) {
+            rollbackLastUndoSnapshot();
+            setSaveState("error");
+            setMessage(result.error);
+            return;
+          }
+          let nextBracket = result.bracket;
           const rebuildResult = await runRebuildFromRoundMutation(currentRound.roundNumber, winSliceKey);
           if (!rebuildResult.ok) {
             rollbackLastUndoSnapshot();
@@ -1108,63 +1095,141 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             return;
           }
           nextBracket = rebuildResult.bracket;
-        }
-        const sliceAfter = getSliceRoundsFromBracket(nextBracket, winSliceKey);
-        const rr =
-          typeof roundNumber === "number" ? sliceAfter.find((r) => r.roundNumber === roundNumber) ?? null : null;
-        const shouldAdvance =
-          rr !== null &&
-          rr.status === "COMPLETED" &&
-          !sliceAfter.some((r) => r.roundNumber === rr.roundNumber + 1);
-        if (shouldAdvance) {
-          const advResult = await runAdvanceRoundMutation(rr!.roundNumber, winSliceKey);
-          if (advResult.ok) {
-            nextBracket = advResult.bracket;
-          } else {
-            setBracket(nextBracket);
-            const finalProcessedEarly = await processFinalCompletion(nextBracket);
-            if (!finalProcessedEarly) {
-              setSaveState("error");
-              setMessage(advResult.error);
+          const sliceAfter = getSliceRoundsFromBracket(nextBracket, winSliceKey);
+          const rr =
+            typeof roundNumber === "number" ? sliceAfter.find((r) => r.roundNumber === roundNumber) ?? null : null;
+          const shouldAdvance =
+            rr !== null &&
+            rr.status === "COMPLETED" &&
+            !sliceAfter.some((r) => r.roundNumber === rr.roundNumber + 1);
+          if (shouldAdvance) {
+            const advResult = await runAdvanceRoundMutation(rr!.roundNumber, winSliceKey);
+            if (advResult.ok) {
+              nextBracket = advResult.bracket;
+            } else {
+              bumpBracketLocalAuthorityRev(tournamentId, seg);
+              setBracket(nextBracket);
+              writeLastGoodBracket(tournamentId, seg, nextBracket);
+              const finalProcessedEarly = await processFinalCompletion(nextBracket);
+              if (!finalProcessedEarly) {
+                setSaveState("error");
+                setMessage(advResult.error);
+              }
+              return;
             }
-            return;
           }
-        }
-        setBracket(nextBracket);
-        writeLastGoodBracket(tournamentId, storageSeg, nextBracket);
-        setOfflineDirty(tournamentId, storageSeg, false);
-        const finalProcessed = await processFinalCompletion(nextBracket);
-        if (!finalProcessed) {
-          setSaveState("idle");
-          setMessage("");
-        }
-      } catch {
-        if (changingWinner) {
+          bumpBracketLocalAuthorityRev(tournamentId, seg);
+          setBracket(nextBracket);
+          writeLastGoodBracket(tournamentId, seg, nextBracket);
+          setOfflineDirty(tournamentId, seg, false);
+          const finalProcessed = await processFinalCompletion(nextBracket);
+          if (!finalProcessed) {
+            setSaveState("idle");
+            setMessage("");
+          }
+        } catch {
           rollbackLastUndoSnapshot();
           setSaveState("error");
           setMessage("네트워크 오류 · 승자 변경은 연결 후 다시 시도해 주세요.");
-          return;
         }
-        const next = applyLocalWinnerPick(current as unknown as BracketLike, matchId, winnerUserId);
-        if (next) {
-          setBracket(next as Bracket);
-          writeLastGoodBracket(tournamentId, storageSeg, next as Bracket);
-          appendOfflinePending(tournamentId, storageSeg, {
+      });
+      return;
+    }
+
+    const before = current;
+    const optimistic = applyLocalWinnerPick(before as unknown as BracketLike, matchId, winnerUserId);
+    if (!optimistic) {
+      setMessage("경기 결과를 반영할 수 없습니다.");
+      return;
+    }
+    const localRev = bumpBracketLocalAuthorityRev(tournamentId, seg);
+    setBracket(optimistic as Bracket);
+    writeLastGoodBracket(tournamentId, seg, optimistic as Bracket);
+    setOfflineDirty(tournamentId, seg, true);
+    setSaveState("idle");
+    setMessage("");
+
+    enqueueMutation(
+      `winner:${matchId}`,
+      async () => {
+        try {
+          const result = await runMatchResultMutation(matchId, winnerUserId);
+          if (!result.ok) {
+            appendOfflinePending(tournamentId, seg, {
+              type: "winner_pick",
+              matchId,
+              winnerUserId,
+              roundNumber: roundNoForPending,
+            });
+            setSaveState("error");
+            setMessage(result.error);
+            return;
+          }
+          let nextBracket = result.bracket;
+          if (changingWinner) {
+            const rebuildResult = await runRebuildFromRoundMutation(currentRound.roundNumber, winSliceKey);
+            if (!rebuildResult.ok) {
+              appendOfflinePending(tournamentId, seg, {
+                type: "winner_pick",
+                matchId,
+                winnerUserId,
+                roundNumber: roundNoForPending,
+              });
+              setSaveState("error");
+              setMessage(rebuildResult.error);
+              return;
+            }
+            nextBracket = rebuildResult.bracket;
+          }
+          const sliceAfter = getSliceRoundsFromBracket(nextBracket, winSliceKey);
+          const rr =
+            typeof roundNumber === "number" ? sliceAfter.find((r) => r.roundNumber === roundNumber) ?? null : null;
+          const shouldAdvance =
+            rr !== null &&
+            rr.status === "COMPLETED" &&
+            !sliceAfter.some((r) => r.roundNumber === rr.roundNumber + 1);
+          if (shouldAdvance) {
+            const advResult = await runAdvanceRoundMutation(rr!.roundNumber, winSliceKey);
+            if (advResult.ok) {
+              nextBracket = advResult.bracket;
+            } else {
+              if (readBracketLocalAuthorityRev(tournamentId, seg) === localRev) {
+                setBracket(nextBracket);
+                writeLastGoodBracket(tournamentId, seg, nextBracket);
+              }
+              const finalProcessedEarly = await processFinalCompletion(nextBracket);
+              if (!finalProcessedEarly) {
+                setSaveState("error");
+                setMessage(advResult.error);
+              }
+              return;
+            }
+          }
+          if (readBracketLocalAuthorityRev(tournamentId, seg) !== localRev) {
+            return;
+          }
+          setBracket(nextBracket);
+          writeLastGoodBracket(tournamentId, seg, nextBracket);
+          setOfflineDirty(tournamentId, seg, false);
+          const finalProcessed = await processFinalCompletion(nextBracket);
+          if (!finalProcessed) {
+            setSaveState("idle");
+            setMessage("");
+          }
+        } catch {
+          appendOfflinePending(tournamentId, seg, {
             type: "winner_pick",
             matchId,
             winnerUserId,
-            roundNumber: typeof roundNumber === "number" ? roundNumber : currentRound.roundNumber,
+            roundNumber: roundNoForPending,
           });
-          setOfflineDirty(tournamentId, storageSeg, true);
+          setOfflineDirty(tournamentId, seg, true);
           setSaveState("idle");
           setMessage("");
-        } else {
-          rollbackLastUndoSnapshot();
-          setSaveState("error");
-          setMessage("경기 결과 저장 중 오류가 발생했습니다.");
         }
-      }
-    });
+      },
+      { quiet: true },
+    );
   }
 
   async function handleAdvanceRound(roundNumber: number) {
@@ -1639,12 +1704,18 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           }}
         >
           <h1 className="v3-h2" style={{ margin: 0, fontSize: "clamp(1rem, 4vw, 1.15rem)", fontWeight: 700 }}>
-            간편입력
+            빠른 결과 입력
           </h1>
           <button
             type="button"
             className="ui-btn-primary-solid"
-            style={{ padding: "0.4rem 0.65rem", fontWeight: 600, fontSize: "0.88rem", minHeight: "40px" }}
+            style={{
+              padding: "0.4rem 0.65rem",
+              fontWeight: 600,
+              fontSize: "0.88rem",
+              minHeight: "40px",
+              boxShadow: "none",
+            }}
             onClick={() => router.push(`/client/tournaments/${tournamentId}/bracket/view${bracketZoneQuery}`)}
           >
             대진표 보기
@@ -1891,14 +1962,137 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
         </section>
       ) : null}
 
-      {bracket && (!zonesEnabled || selectedZoneId) ? (
-        <section className="v3-box v3-stack" style={{ padding: "0.55rem 0.75rem" }} aria-label="대진표 편집 도구">
-          <div className="v3-stack" style={{ gap: "0.45rem" }}>
-            <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+      <section
+        aria-label="대진표 생성"
+        className="v3-stack"
+        style={{
+          gap: "0.65rem",
+          padding: "0.85rem 1rem",
+          borderRadius: "10px",
+          border: "1px solid #cbd5e1",
+          background: "#f8fafc",
+          boxShadow: "none",
+        }}
+      >
+        <div>
+          <h2 className="v3-h2" style={{ margin: "0 0 0.15rem", fontSize: "1.05rem" }}>
+            1. 대진표 생성
+          </h2>
+          <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
+            대진을 만드는 단계입니다. 확정 후에는 배치를 다시 섞거나 조 분할을 진행할 수 있습니다.
+          </p>
+        </div>
+
+        {zonesEnabled && !selectedZoneId ? (
+          <p className="v3-muted" style={{ margin: 0 }}>
+            권역을 선택한 뒤 대진표 생성·분할을 이용할 수 있습니다.
+          </p>
+        ) : !bracket ? (
+          <div className="v3-stack" style={{ gap: "0.5rem", width: "100%" }}>
+            <Link
+              prefetch={false}
+              href={`/client/tournaments/${tournamentId}/bracket/create${bracketZoneQuery}`}
+              style={{
+                width: "100%",
+                minHeight: "52px",
+                borderRadius: "8px",
+                border: "1px solid #047857",
+                background: "#059669",
+                color: "#fff",
+                fontWeight: 800,
+                fontSize: "1rem",
+                textDecoration: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "none",
+              }}
+            >
+              전체 대진표 만들기
+            </Link>
+            <Link
+              prefetch={false}
+              href={`/client/tournaments/${tournamentId}/bracket/auto${bracketZoneQuery}`}
+              style={{
+                width: "100%",
+                minHeight: "48px",
+                borderRadius: "8px",
+                border: "1px solid #64748b",
+                background: "#fff",
+                color: "#334155",
+                fontWeight: 700,
+                fontSize: "0.95rem",
+                textDecoration: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "none",
+              }}
+            >
+              자동 배정으로 만들기
+            </Link>
+            <Link
+              prefetch={false}
+              href={`/client/tournaments/${tournamentId}/bracket/manual${bracketZoneQuery}`}
+              style={{
+                width: "100%",
+                minHeight: "48px",
+                borderRadius: "8px",
+                border: "1px solid #64748b",
+                background: "#fff",
+                color: "#334155",
+                fontWeight: 700,
+                fontSize: "0.95rem",
+                textDecoration: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "none",
+              }}
+            >
+              수동 배정으로 만들기
+            </Link>
+          </div>
+        ) : (
+          <div className="v3-stack" style={{ gap: "0.65rem", width: "100%" }}>
+            {bracket.bracketMode !== "multi_block" && displayRoundsSorted.length > 0 ? (
+              <button
+                type="button"
+                disabled={actionLoading || interactionLocked || multiBlockBusy}
+                onClick={() => void executeRoundShuffle(displayRoundsSorted[0]!.roundNumber)}
+                style={{
+                  width: "100%",
+                  minHeight: "48px",
+                  borderRadius: "8px",
+                  border: "1px solid #d97706",
+                  background: "#fffbeb",
+                  color: "#9a3412",
+                  fontWeight: 700,
+                  fontSize: "0.95rem",
+                  boxShadow: "none",
+                  cursor: actionLoading || interactionLocked || multiBlockBusy ? "not-allowed" : "pointer",
+                }}
+              >
+                {multiBlockBusy ? "처리 중…" : `${displayRoundsSorted[0]!.roundNumber}라운드 배치 다시 섞기`}
+              </button>
+            ) : bracket.bracketMode === "multi_block" ? (
+              <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem", lineHeight: 1.45 }}>
+                조 분할 상태에서는 「다시 섞기」로 1라운드를 재배치할 수 없습니다. 전체 초기화 후 단일 대진표로 되돌린 뒤 이용하세요.
+              </p>
+            ) : null}
+
             {canSplitBracket(bracket) ? (
-              <>
-                <label className="v3-stack" style={{ gap: "0.2rem", minWidth: "12rem" }}>
-                  <span style={{ fontWeight: 700 }}>대진표 분할 인원</span>
+              <div
+                className="v3-stack"
+                style={{
+                  gap: "0.5rem",
+                  paddingTop: "0.55rem",
+                  borderTop: "1px solid #e2e8f0",
+                }}
+              >
+                <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "#0f172a" }}>조 분할</span>
+                <label className="v3-stack" style={{ gap: "0.2rem" }}>
+                  <span style={{ fontWeight: 700 }}>조당 인원</span>
                   <span className="v3-muted" style={{ fontSize: "0.8rem", fontWeight: 500 }}>
                     한 조에 들어갈 참가자 수를 입력하세요
                   </span>
@@ -1907,7 +2101,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                     min={2}
                     step={2}
                     className="v3-btn"
-                    style={{ width: "5rem", minHeight: 34 }}
+                    style={{ width: "5rem", minHeight: 34, boxShadow: "none" }}
                     value={multiBlockSize}
                     onChange={(e) => setMultiBlockSize(Math.max(2, Math.floor(Number(e.target.value)) || 16))}
                     disabled={interactionLocked}
@@ -1963,8 +2157,9 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                       }
                     })();
                   }}
+                  style={{ alignSelf: "flex-start", boxShadow: "none", fontWeight: 700 }}
                 >
-                  대진표 분할
+                  대진표 분할 실행
                 </button>
                 {projectedQualifierBlockCount(bracket, multiBlockSize) < 4 ? (
                   <span className="v3-muted" style={{ fontSize: "0.82rem" }}>
@@ -1974,42 +2169,81 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                 {splitPreviewLine ? (
                   <span style={{ fontSize: "0.88rem", fontWeight: 600, color: "#0f172a" }}>{splitPreviewLine}</span>
                 ) : null}
-              </>
+              </div>
             ) : null}
-            </div>
           </div>
-        </section>
-      ) : null}
+        )}
+      </section>
 
-      <section id="confirmed-bracket" ref={confirmedSectionRef} className="v3-box v3-stack">
-        <h2 className="v3-h2">현재 확정 대진표 (최신 1개)</h2>
+      <section
+        id="confirmed-bracket"
+        ref={confirmedSectionRef}
+        className="v3-stack"
+        style={{
+          gap: "0.65rem",
+          padding: "0.85rem 1rem",
+          borderRadius: "10px",
+          border: "1px solid #cbd5e1",
+          background: "#fff",
+          boxShadow: "none",
+        }}
+      >
+        <div>
+          <h2 className="v3-h2" style={{ margin: "0 0 0.15rem", fontSize: "1.05rem" }}>
+            2. 대진표 운영
+          </h2>
+          <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
+            현장 결과 입력·전체 화면 표시입니다.
+          </p>
+        </div>
         {zonesEnabled && !selectedZoneId ? (
           <p className="v3-muted">권역을 선택해야 대진표를 볼 수 있습니다.</p>
         ) : !bracket ? (
-          <p className="v3-muted">아직 확정된 대진표가 없습니다.</p>
+          <p className="v3-muted">아직 확정된 대진표가 없습니다. 「1. 대진표 생성」에서 먼저 만들어 주세요.</p>
         ) : (
           <>
             <BracketProgressSummaryCard bracket={bracket} />
             {bracket.bracketMode === "multi_block" && bracket.blocks?.length ? (
               <div
                 className="v3-row"
-                style={{ gap: "0.35rem", flexWrap: "wrap", alignItems: "center", marginBottom: "0.5rem" }}
+                style={{ gap: "0.35rem", flexWrap: "wrap", alignItems: "center", marginBottom: "0.35rem" }}
               >
-                {bracket.blocks.map((bl) => (
-                  <button
-                    key={bl.id}
-                    type="button"
-                    className={boardSliceKey === `block:${bl.id}` ? "ui-btn-primary-solid" : "v3-btn"}
-                    onClick={() => setBoardSliceKey(`block:${bl.id}`)}
-                  >
-                    조 {bl.label ?? bl.id}
-                  </button>
-                ))}
+                {bracket.blocks.map((bl) => {
+                  const active = boardSliceKey === `block:${bl.id}`;
+                  return (
+                    <button
+                      key={bl.id}
+                      type="button"
+                      onClick={() => setBoardSliceKey(`block:${bl.id}`)}
+                      style={{
+                        minHeight: 40,
+                        padding: "0.35rem 0.65rem",
+                        borderRadius: 8,
+                        border: active ? "1px solid #1d4ed8" : "1px solid #cbd5e1",
+                        background: active ? "#2563eb" : "#fff",
+                        color: active ? "#fff" : "#0f172a",
+                        fontWeight: 700,
+                        boxShadow: "none",
+                      }}
+                    >
+                      조 {bl.label ?? bl.id}
+                    </button>
+                  );
+                })}
                 {bracket.finalBlock?.rounds?.length ? (
                   <button
                     type="button"
-                    className={boardSliceKey === "final" ? "ui-btn-primary-solid" : "v3-btn"}
                     onClick={() => setBoardSliceKey("final")}
+                    style={{
+                      minHeight: 40,
+                      padding: "0.35rem 0.65rem",
+                      borderRadius: 8,
+                      border: boardSliceKey === "final" ? "1px solid #1d4ed8" : "1px solid #cbd5e1",
+                      background: boardSliceKey === "final" ? "#2563eb" : "#fff",
+                      color: boardSliceKey === "final" ? "#fff" : "#0f172a",
+                      fontWeight: 700,
+                      boxShadow: "none",
+                    }}
                   >
                     결선
                   </button>
@@ -2017,63 +2251,79 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               </div>
             ) : null}
 
-            <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "center", marginBottom: "0.35rem" }}>
+            <div className="v3-stack" style={{ gap: "0.5rem", width: "100%" }}>
               <Link
                 prefetch={false}
                 href={`/client/tournaments/${tournamentId}/bracket/quick-results${bracketZoneQuery}`}
-                className="ui-btn-primary-solid"
                 style={{
-                  padding: "0.55rem 0.85rem",
-                  fontWeight: 700,
+                  width: "100%",
+                  minHeight: "52px",
+                  borderRadius: "8px",
+                  border: "1px solid #0f766e",
+                  background: "#14b8a6",
+                  color: "#fff",
+                  fontWeight: 800,
+                  fontSize: "1rem",
                   textDecoration: "none",
-                  display: "inline-flex",
+                  display: "flex",
                   alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "none",
                 }}
               >
-                간편입력
+                빠른 결과 입력
               </Link>
-              <span className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
-                라운드별 승패 입력은 별도 화면에서 진행합니다.
-              </span>
+              <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
+                라운드별 승패는 위 화면에서 빠르게 입력합니다.
+              </p>
+              <button
+                type="button"
+                onClick={() => router.push(`/client/tournaments/${tournamentId}/bracket/view${bracketZoneQuery}`)}
+                style={{
+                  width: "100%",
+                  minHeight: "52px",
+                  borderRadius: "8px",
+                  border: "1px solid #1d4ed8",
+                  background: "#2563eb",
+                  color: "#fff",
+                  fontWeight: 800,
+                  fontSize: "1rem",
+                  boxShadow: "none",
+                }}
+              >
+                대진표 보기 (전체 화면)
+              </button>
             </div>
 
-            <div className="v3-row" style={{ gap: "0.6rem", flexWrap: "wrap", alignItems: "center" }}>
-              <button
-                type="button"
-                className="ui-btn-primary-solid"
-                onClick={() => router.push(`/client/tournaments/${tournamentId}/bracket/view${bracketZoneQuery}`)}
-                style={{ padding: "0.6rem 1rem", fontWeight: 700 }}
-              >
-                대진표 보기
-              </button>
-              <button
-                type="button"
-                className="v3-btn"
-                disabled={manageBracketPdfBusy || !bracket}
-                onClick={() => void handleExportManageBracketPdf()}
-                style={{ padding: "0.6rem 1rem", fontWeight: 700 }}
-              >
-                {manageBracketPdfBusy ? "PDF 준비…" : "현재 대진표 PDF 출력"}
-              </button>
-              <button
-                type="button"
-                className="v3-btn"
-                onClick={() => void handleUndo()}
-                disabled={!canUndo}
-                title={!undoStack.length ? "되돌릴 변경이 없습니다." : undefined}
-              >
-                되돌리기
-              </button>
-              <p className="v3-muted" style={{ margin: 0 }}>
-                운영판은 전체화면 대진표 보기 페이지에서 제공합니다.
-              </p>
-            </div>
+            <button
+              type="button"
+              className="v3-btn"
+              onClick={() => void handleUndo()}
+              disabled={!canUndo}
+              title={!undoStack.length ? "되돌릴 변경이 없습니다." : undefined}
+              style={{
+                width: "100%",
+                minHeight: "44px",
+                marginTop: "0.25rem",
+                borderRadius: "8px",
+                border: "1px solid #cbd5e1",
+                background: "#f1f5f9",
+                color: "#334155",
+                fontWeight: 700,
+                boxShadow: "none",
+              }}
+            >
+              되돌리기 (마지막 작업 취소)
+            </button>
+            <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
+              운영판 UI는 전체 화면 「대진표 보기」에서 제공합니다.
+            </p>
             {bracket.zoneId ? (
-              <p>
+              <p style={{ margin: 0 }}>
                 <strong>권역:</strong> {bracket.zoneId}
               </p>
             ) : null}
-            <p>
+            <p style={{ margin: 0 }}>
               <strong>생성 시각:</strong> {new Date(bracket.createdAt).toLocaleString("ko-KR")}
             </p>
           </>
@@ -2090,24 +2340,58 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
         </p>
       ) : null}
 
-      <section className="v3-box v3-stack" aria-label="인쇄용 대진표">
-        <div className="v3-row" style={{ justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
-          <h2 className="v3-h2" style={{ margin: 0 }}>인쇄용 대진표</h2>
-          <button
-            type="button"
-            className="v3-btn"
-            onClick={() => setPrintToolsOpen((prev) => !prev)}
-          >
-            {printToolsOpen ? "닫기" : "열기"}
-          </button>
-        </div>
-        {printToolsOpen ? (
-          <TournamentGroupRound1PrintClient tournamentId={tournamentId} printStartPlayersHint={printStartPlayersHint} />
-        ) : (
-          <p className="v3-muted" style={{ margin: 0 }}>
-            운영판과 분리된 인쇄 전용 화면입니다. 필요할 때 열어 사용하세요.
+      <section
+        aria-label="부가기능"
+        className="v3-stack"
+        style={{
+          gap: "0.65rem",
+          padding: "0.85rem 1rem",
+          borderRadius: "10px",
+          border: "1px solid #cbd5e1",
+          background: "#f8fafc",
+          boxShadow: "none",
+        }}
+      >
+        <div>
+          <h2 className="v3-h2" style={{ margin: "0 0 0.15rem", fontSize: "1.05rem" }}>
+            3. 부가기능
+          </h2>
+          <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
+            인쇄·TV 등 보조 도구입니다.
           </p>
-        )}
+        </div>
+
+        <section
+          className="v3-box v3-stack"
+          aria-label="인쇄용 대진표"
+          style={{ boxShadow: "none", border: "1px solid #e2e8f0", background: "#fff", padding: "0.65rem 0.75rem" }}
+        >
+          <div className="v3-row" style={{ justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
+            <h2 className="v3-h2" style={{ margin: 0 }}>인쇄용 대진표</h2>
+            <button
+              type="button"
+              className="v3-btn"
+              onClick={() => setPrintToolsOpen((prev) => !prev)}
+              style={{ boxShadow: "none" }}
+            >
+              {printToolsOpen ? "닫기" : "열기"}
+            </button>
+          </div>
+          {printToolsOpen ? (
+            <TournamentGroupRound1PrintClient tournamentId={tournamentId} printStartPlayersHint={printStartPlayersHint} />
+          ) : (
+            <p className="v3-muted" style={{ margin: 0 }}>
+              운영판과 분리된 인쇄 전용 화면입니다. 필요할 때 열어 사용하세요.
+            </p>
+          )}
+        </section>
+
+        <div>
+          <p style={{ margin: "0 0 0.45rem", fontWeight: 800, fontSize: "0.9rem", color: "#0f172a" }}>TV 연결</p>
+          <div className="client-tournament-manage" style={{ width: "100%", maxWidth: "100%" }}>
+            <TournamentTvLinkBlock tournamentId={tournamentId} />
+          </div>
+        </div>
       </section>
 
       {bracket?.bracketMode === "multi_block" ? (
@@ -2120,6 +2404,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             background: "#fff7ed",
             padding: "0.85rem 1rem",
             gap: "0.65rem",
+            boxShadow: "none",
           }}
         >
           <h2 className="v3-h2" style={{ margin: 0, fontSize: "1rem", color: "#991b1b" }}>
@@ -2201,7 +2486,8 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               background: "#fff",
               borderRadius: "12px",
               padding: "1.15rem",
-              boxShadow: "0 16px 48px rgba(0,0,0,0.2)",
+              border: "1px solid #cbd5e1",
+              boxShadow: "none",
               boxSizing: "border-box",
             }}
           >
@@ -2265,7 +2551,8 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               background: "#fff",
               borderRadius: "12px",
               padding: "1.15rem",
-              boxShadow: "0 16px 48px rgba(0,0,0,0.2)",
+              border: "1px solid #cbd5e1",
+              boxShadow: "none",
               boxSizing: "border-box",
             }}
           >
@@ -2341,7 +2628,8 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               background: "#fff",
               borderRadius: "12px",
               padding: "1.15rem",
-              boxShadow: "0 16px 48px rgba(0,0,0,0.2)",
+              border: "1px solid #cbd5e1",
+              boxShadow: "none",
               boxSizing: "border-box",
             }}
           >
@@ -2409,40 +2697,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             </div>
           </div>
         </div>
-      ) : null}
-
-      {!bracket ? (
-        <>
-          <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
-            <Link
-              prefetch={false}
-              className="v3-btn"
-              href={`/client/tournaments/${tournamentId}/bracket/create${bracketZoneQuery}`}
-              aria-disabled={zonesEnabled && !selectedZoneId}
-              style={zonesEnabled && !selectedZoneId ? { pointerEvents: "none", opacity: 0.45 } : undefined}
-            >
-              대진표 생성
-            </Link>
-            <Link
-              prefetch={false}
-              className="v3-btn"
-              href={`/client/tournaments/${tournamentId}/bracket/auto${bracketZoneQuery}`}
-              aria-disabled={zonesEnabled && !selectedZoneId}
-              style={zonesEnabled && !selectedZoneId ? { pointerEvents: "none", opacity: 0.45 } : undefined}
-            >
-              자동배정
-            </Link>
-            <Link
-              prefetch={false}
-              className="v3-btn"
-              href={`/client/tournaments/${tournamentId}/bracket/manual${bracketZoneQuery}`}
-              aria-disabled={zonesEnabled && !selectedZoneId}
-              style={zonesEnabled && !selectedZoneId ? { pointerEvents: "none", opacity: 0.45 } : undefined}
-            >
-              수동배정
-            </Link>
-          </div>
-        </>
       ) : null}
     </main>
   );

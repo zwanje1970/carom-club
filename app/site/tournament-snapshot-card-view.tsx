@@ -192,6 +192,7 @@ function MediaStack({
           alt={item.title || "카드 배경"}
           loading={repImageHighPriority ? "eager" : "lazy"}
           decoding="async"
+          {...(isImageCaptureMode ? { crossOrigin: "anonymous" as const } : {})}
           {...(repImageHighPriority ? { fetchPriority: "high" as const } : {})}
           onLoad={repImageHighPriority && onRepImageLoad ? fireRepImageLoad : undefined}
         />
@@ -199,9 +200,8 @@ function MediaStack({
       <div className={styles.statusBadgeWrap}>
         {mainSlideAd ? (
           <span
-            className={styles.adMark}
+            className={`${styles.adMark} ${isImageCaptureMode ? styles.imageCaptureHideGlyph : ""}`.trim()}
             aria-hidden
-            style={isImageCaptureMode ? ({ visibility: "hidden" } satisfies CSSProperties) : undefined}
           >
             AD
           </span>
@@ -261,11 +261,7 @@ function TournamentSlideCardPreview({
   const titleColor = (item.cardTitleTextColor ?? "").trim();
   const descColor = (item.cardDescriptionTextColor ?? "").trim();
   const statusBadge = <TournamentStatusBadge status={status} hideLabel={isImageCaptureMode} />;
-  const capHide: CSSProperties | undefined = isImageCaptureMode ? { visibility: "hidden" } : undefined;
-  const mergeCap = (base?: CSSProperties): CSSProperties | undefined => {
-    if (!capHide) return base;
-    return base ? { ...base, ...capHide } : { ...capHide };
-  };
+  const captureHideGlyphClass = isImageCaptureMode ? styles.imageCaptureHideGlyph : "";
   const surfaceLayout: TournamentCardSurfaceLayout =
     item.cardSurfaceLayout === "full" ? "full" : "split";
   const footerDateColor = (item.cardFooterDateTextColor ?? "").trim();
@@ -300,10 +296,10 @@ function TournamentSlideCardPreview({
 
   const fullOverlayFooter = (
     <div className={styles.fullSurfaceFooter}>
-      <p className={styles.fullSurfaceFooterDate} style={mergeCap(fullFooterDateStyle)}>
+      <p className={`${styles.fullSurfaceFooterDate} ${captureHideGlyphClass}`.trim()} style={fullFooterDateStyle}>
         {parsed.dateText}
       </p>
-      <p className={styles.fullSurfaceFooterPlace} style={mergeCap(fullFooterPlaceStyle)}>
+      <p className={`${styles.fullSurfaceFooterPlace} ${captureHideGlyphClass}`.trim()} style={fullFooterPlaceStyle}>
         {parsed.placeText}
       </p>
     </div>
@@ -314,10 +310,10 @@ function TournamentSlideCardPreview({
 
   const splitFooter = (
     <footer className={styles.cardFooter}>
-      <p className={styles.footerDate} style={mergeCap(splitDateStyle)}>
+      <p className={`${styles.footerDate} ${captureHideGlyphClass}`.trim()} style={splitDateStyle}>
         {parsed.dateText}
       </p>
-      <p className={styles.footerPlace} style={mergeCap(splitPlaceStyle)}>
+      <p className={`${styles.footerPlace} ${captureHideGlyphClass}`.trim()} style={splitPlaceStyle}>
         {parsed.placeText}
       </p>
     </footer>
@@ -346,25 +342,31 @@ function TournamentSlideCardPreview({
               <div className={styles.classicTop}>
                 <div className={styles.classicMain}>
                   {showLeadBlock ? (
-                    <p className={styles.classicLead} style={mergeCap(leadColor ? { color: leadColor } : undefined)}>
+                    <p
+                      className={`${styles.classicLead} ${captureHideGlyphClass}`.trim()}
+                      style={leadColor ? { color: leadColor } : undefined}
+                    >
                       {leadDisplay}
                     </p>
                   ) : null}
                   <h3
-                    className={styles.classicTitle}
-                    style={mergeCap(titleColor ? { color: titleColor } : undefined)}
+                    className={`${styles.classicTitle} ${captureHideGlyphClass}`.trim()}
+                    style={titleColor ? { color: titleColor } : undefined}
                   >
                     {item.title.length > 0 ? item.title : "(제목)"}
                   </h3>
                   {showDescBlock ? (
-                    <p className={styles.classicDesc} style={mergeCap(descColor ? { color: descColor } : undefined)}>
+                    <p
+                      className={`${styles.classicDesc} ${captureHideGlyphClass}`.trim()}
+                      style={descColor ? { color: descColor } : undefined}
+                    >
                       {descDisplay}
                     </p>
                   ) : null}
                   {showDesc2Block ? (
                     <p
-                      className={styles.classicDescSecondary}
-                      style={mergeCap(descColor ? { color: descColor } : undefined)}
+                      className={`${styles.classicDescSecondary} ${captureHideGlyphClass}`.trim()}
+                      style={descColor ? { color: descColor } : undefined}
                     >
                       {desc2Display}
                     </p>
@@ -402,22 +404,31 @@ function TournamentSlideCardPreview({
             <div className={styles.frameInner}>
               <div className={styles.frameCenter}>
                 {showLeadBlock ? (
-                  <p className={styles.frameLead} style={mergeCap(leadColor ? { color: leadColor } : undefined)}>
+                  <p
+                    className={`${styles.frameLead} ${captureHideGlyphClass}`.trim()}
+                    style={leadColor ? { color: leadColor } : undefined}
+                  >
                     {leadDisplay}
                   </p>
                 ) : null}
-                <h3 className={styles.frameTitle} style={mergeCap(titleColor ? { color: titleColor } : undefined)}>
+                <h3
+                  className={`${styles.frameTitle} ${captureHideGlyphClass}`.trim()}
+                  style={titleColor ? { color: titleColor } : undefined}
+                >
                   {item.title.length > 0 ? item.title : "(제목)"}
                 </h3>
                 {showDescBlock ? (
-                  <p className={styles.frameDesc} style={mergeCap(descColor ? { color: descColor } : undefined)}>
+                  <p
+                    className={`${styles.frameDesc} ${captureHideGlyphClass}`.trim()}
+                    style={descColor ? { color: descColor } : undefined}
+                  >
                     {descDisplay}
                   </p>
                 ) : null}
                 {showDesc2Block ? (
                   <p
-                    className={styles.frameDescSecondary}
-                    style={mergeCap(descColor ? { color: descColor } : undefined)}
+                    className={`${styles.frameDescSecondary} ${captureHideGlyphClass}`.trim()}
+                    style={descColor ? { color: descColor } : undefined}
                   >
                     {desc2Display}
                   </p>

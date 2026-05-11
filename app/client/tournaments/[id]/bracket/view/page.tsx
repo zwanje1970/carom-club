@@ -24,6 +24,8 @@ import {
   applyLocalSwapPlayers,
   applyLocalWinnerPick,
   bracketOfflineSegment,
+  bumpBracketLocalAuthorityRev,
+  readBracketLocalAuthorityRev,
   readLastGoodBracket,
   readOfflineDirty,
   readOfflinePending,
@@ -152,14 +154,20 @@ export default function TournamentBracketBoardViewPage() {
       setBracketDataLoading(false);
       return;
     }
-    setBracketDataLoading(true);
     const seg = storageSeg;
+    const cached = readLastGoodBracket<Bracket>(tournamentId, seg);
+    if (cached) {
+      setBracket(cached);
+      setBracketDataLoading(false);
+    } else {
+      setBracketDataLoading(true);
+    }
     try {
       const pulled = await pullBracketSnapshot();
       if (!pulled.ok) {
-        if (!readOfflineDirty(tournamentId, seg)) {
-          const cached = readLastGoodBracket<Bracket>(tournamentId, seg);
-          setBracket((prev) => (prev == null && cached ? cached : prev));
+        if (!readOfflineDirty(tournamentId, seg) && !cached) {
+          const fallback = readLastGoodBracket<Bracket>(tournamentId, seg);
+          setBracket((prev) => (prev == null && fallback ? fallback : prev));
         }
         setMessage("");
         return;
@@ -168,12 +176,16 @@ export default function TournamentBracketBoardViewPage() {
         setMessage("");
         return;
       }
-      setBracket(pulled.bracket);
-      if (pulled.bracket) writeLastGoodBracket(tournamentId, seg, pulled.bracket);
-      else writeLastGoodBracket(tournamentId, seg, null);
+      if (!cached) {
+        setBracket(pulled.bracket);
+        if (pulled.bracket) writeLastGoodBracket(tournamentId, seg, pulled.bracket);
+        else writeLastGoodBracket(tournamentId, seg, null);
+      }
       setMessage("");
     } finally {
-      setBracketDataLoading(false);
+      if (!cached) {
+        setBracketDataLoading(false);
+      }
     }
   }, [pullBracketSnapshot, storageSeg, tournamentId, zonesEnabled, selectedZoneId]);
 
@@ -385,11 +397,9 @@ export default function TournamentBracketBoardViewPage() {
       }
       writeOfflinePending(tournamentId, seg, []);
       setOfflineDirty(tournamentId, seg, false);
-      if (work) writeLastGoodBracket(tournamentId, seg, work as Bracket);
-      const pulled = await pullBracketSnapshot();
-      if (pulled.ok && !readOfflineDirty(tournamentId, seg)) {
-        setBracket(pulled.bracket);
-        if (pulled.bracket) writeLastGoodBracket(tournamentId, seg, pulled.bracket);
+      if (work) {
+        writeLastGoodBracket(tournamentId, seg, work as Bracket);
+        setBracket(work as Bracket);
       }
       setMessage("");
     } finally {
@@ -451,63 +461,109 @@ export default function TournamentBracketBoardViewPage() {
         typeof currentMatch.winnerUserId === "string" &&
         currentMatch.winnerUserId.trim() !== "" &&
         currentMatch.winnerUserId !== args.winnerUserId;
+      const winSliceKey = loc.sliceKey;
+      const hasDownNow = hasDownstream(bracket as BracketLike, loc.round.roundNumber, winSliceKey);
 
-      setActionBusy(true);
-      setSaveState("saving");
       setMessage("");
-      try {
-        if (typeof navigator !== "undefined" && !navigator.onLine) {
-          if (changingWinner) {
-            setSaveState("error");
-            setMessage("승자 변경은 네트워크 연결 후 진행해 주세요.");
-            return;
-          }
-          const next = applyLocalWinnerPick(bracket as BracketLike, args.matchId, args.winnerUserId);
-          if (!next) {
-            setSaveState("error");
-            setMessage("경기 결과를 반영할 수 없습니다.");
-            return;
-          }
-          setBracket(next as Bracket);
-          writeLastGoodBracket(tournamentId, seg, next as Bracket);
-          appendOfflinePending(tournamentId, seg, {
-            type: "winner_pick",
-            matchId: args.matchId,
-            winnerUserId: args.winnerUserId,
-            roundNumber: args.roundNumber,
-          });
-          setOfflineDirty(tournamentId, seg, true);
-          setSaveState("idle");
-          return;
-        }
-        const rs = await syncWinnerPick({
-          bracket: bracket as BracketLike,
-          matchId: args.matchId,
-          winnerUserId: args.winnerUserId,
-          roundNumber: args.roundNumber,
-          mut: mutationFns,
-          hasDownstream,
-        });
-        if (!rs.ok) {
-          setSaveState("error");
-          setMessage(rs.error);
-          return;
-        }
-        setBracket(rs.bracket as Bracket);
-        writeLastGoodBracket(tournamentId, seg, rs.bracket as Bracket);
-        setOfflineDirty(tournamentId, seg, false);
-        setSaveState("idle");
-        setMessage("");
-      } catch {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
         if (changingWinner) {
           setSaveState("error");
-          setMessage("네트워크 오류 · 승자 변경은 연결 후 다시 시도해 주세요.");
+          setMessage("승자 변경은 네트워크 연결 후 진행해 주세요.");
           return;
         }
         const next = applyLocalWinnerPick(bracket as BracketLike, args.matchId, args.winnerUserId);
-        if (next) {
-          setBracket(next as Bracket);
-          writeLastGoodBracket(tournamentId, seg, next as Bracket);
+        if (!next) {
+          setSaveState("error");
+          setMessage("경기 결과를 반영할 수 없습니다.");
+          return;
+        }
+        bumpBracketLocalAuthorityRev(tournamentId, seg);
+        setBracket(next as Bracket);
+        writeLastGoodBracket(tournamentId, seg, next as Bracket);
+        appendOfflinePending(tournamentId, seg, {
+          type: "winner_pick",
+          matchId: args.matchId,
+          winnerUserId: args.winnerUserId,
+          roundNumber: args.roundNumber,
+        });
+        setOfflineDirty(tournamentId, seg, true);
+        setSaveState("idle");
+        return;
+      }
+
+      if (changingWinner && hasDownNow) {
+        setActionBusy(true);
+        setSaveState("saving");
+        try {
+          const rs = await syncWinnerPick({
+            bracket: bracket as BracketLike,
+            matchId: args.matchId,
+            winnerUserId: args.winnerUserId,
+            roundNumber: args.roundNumber,
+            mut: mutationFns,
+            hasDownstream,
+          });
+          if (!rs.ok) {
+            setSaveState("error");
+            setMessage(rs.error);
+            return;
+          }
+          bumpBracketLocalAuthorityRev(tournamentId, seg);
+          setBracket(rs.bracket as Bracket);
+          writeLastGoodBracket(tournamentId, seg, rs.bracket as Bracket);
+          setOfflineDirty(tournamentId, seg, false);
+          setSaveState("idle");
+        } catch {
+          setSaveState("error");
+          setMessage("네트워크 오류 · 승자 변경은 연결 후 다시 시도해 주세요.");
+        } finally {
+          setActionBusy(false);
+        }
+        return;
+      }
+
+      const before = bracket;
+      const optimistic = applyLocalWinnerPick(before as BracketLike, args.matchId, args.winnerUserId);
+      if (!optimistic) {
+        setSaveState("error");
+        setMessage("경기 결과를 반영할 수 없습니다.");
+        return;
+      }
+      const localRev = bumpBracketLocalAuthorityRev(tournamentId, seg);
+      setBracket(optimistic as Bracket);
+      writeLastGoodBracket(tournamentId, seg, optimistic as Bracket);
+      setOfflineDirty(tournamentId, seg, true);
+      setSaveState("idle");
+
+      void (async () => {
+        try {
+          const rs = await syncWinnerPick({
+            bracket: before as BracketLike,
+            matchId: args.matchId,
+            winnerUserId: args.winnerUserId,
+            roundNumber: args.roundNumber,
+            mut: mutationFns,
+            hasDownstream,
+          });
+          if (!rs.ok) {
+            appendOfflinePending(tournamentId, seg, {
+              type: "winner_pick",
+              matchId: args.matchId,
+              winnerUserId: args.winnerUserId,
+              roundNumber: args.roundNumber,
+            });
+            setSaveState("error");
+            setMessage(rs.error);
+            return;
+          }
+          if (readBracketLocalAuthorityRev(tournamentId, seg) !== localRev) {
+            return;
+          }
+          setBracket(rs.bracket as Bracket);
+          writeLastGoodBracket(tournamentId, seg, rs.bracket as Bracket);
+          setOfflineDirty(tournamentId, seg, false);
+          setMessage("");
+        } catch {
           appendOfflinePending(tournamentId, seg, {
             type: "winner_pick",
             matchId: args.matchId,
@@ -517,13 +573,8 @@ export default function TournamentBracketBoardViewPage() {
           setOfflineDirty(tournamentId, seg, true);
           setSaveState("idle");
           setMessage("");
-        } else {
-          setSaveState("error");
-          setMessage("경기 결과 저장 중 오류가 발생했습니다.");
         }
-      } finally {
-        setActionBusy(false);
-      }
+      })();
     },
     [actionBusy, bracket, hasDownstream, isTournamentClosed, mutationFns, storageSeg, tournamentId],
   );
