@@ -389,10 +389,78 @@ main.client-dashboard-main .v3-btn:disabled {
   opacity: 0.65;
 }
 
-main.client-dashboard-main .client-dashboard-main__featureGrid {
+/** 주요 기능: 상단 대회 만들기(넓게) + 하단 회원·정산 2열 */
+main.client-dashboard-main .client-dashboard-main__featureStack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+main.client-dashboard-main .client-dashboard-main__featureRowSplit {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.65rem;
+  min-width: 0;
+}
+
+main.client-dashboard-main .client-dashboard-main__featureRowSplit > a.client-dashboard-main__featureCard {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.55rem;
+  padding: 0.85rem 0.75rem;
+  min-height: 6.5rem;
+}
+
+main.client-dashboard-main .client-dashboard-main__featureRowSplit .client-dashboard-main__featureTitle {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.2;
+}
+
+main.client-dashboard-main .client-dashboard-main__featureRowSplit .client-dashboard-main__featureDesc {
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.25;
+}
+
+main.client-dashboard-main a.client-dashboard-main__featureCard--hero {
+  width: 100%;
+  min-height: 5.6rem;
+  padding: 1.2rem 1.15rem;
+  gap: 1rem;
+}
+
+main.client-dashboard-main .client-dashboard-main__featureCard--hero .client-dashboard-main__featureIconWrap {
+  width: 3.75rem;
+  height: 3.75rem;
+  border-radius: 14px;
+}
+
+main.client-dashboard-main .client-dashboard-main__featureCard--hero .client-dashboard-main__featureIconWrap svg {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+main.client-dashboard-main .client-dashboard-main__featureCard--hero .client-dashboard-main__featureTitle {
+  font-size: 1.08rem;
+  font-weight: 700;
+}
+
+main.client-dashboard-main .client-dashboard-main__featureCard--hero .client-dashboard-main__featureDesc {
+  font-size: 0.84rem;
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 /* 주요 기능 — 카드형 링크 (아이콘 영역만 톤 색) */

@@ -127,6 +127,8 @@ export type TournamentNewWizardFormProps = {
   setVerificationMode: Dispatch<SetStateAction<TournamentVerificationMode>>;
   verificationGuideText: string;
   setVerificationGuideText: Dispatch<SetStateAction<string>>;
+  /** 증빙 정책 버튼 중 하나를 사용자가 눌렀을 때만 true — 미선택 시 둘 다 비강조 */
+  step8PolicyAcknowledged: boolean;
   outlineDisplayMode: OutlineDisplayMode;
   setOutlineDisplayMode: Dispatch<SetStateAction<OutlineDisplayMode>>;
   outlineHtml: string;
@@ -236,6 +238,7 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
     setVerificationMode,
     verificationGuideText,
     setVerificationGuideText,
+    step8PolicyAcknowledged,
     outlineDisplayMode,
     setOutlineDisplayMode,
     outlineHtml,
@@ -940,7 +943,13 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
             <button
               type="button"
               className="v3-btn"
-              style={{ padding: "0.45rem 0.75rem", background: !verificationRequested ? "#dbeafe" : "#fff" }}
+              aria-pressed={step8PolicyAcknowledged && !verificationRequested}
+              style={{
+                padding: "0.45rem 0.75rem",
+                ...(step8PolicyAcknowledged && !verificationRequested
+                  ? { background: "#dbeafe", border: "1px solid #93c5fd", color: "#1e3a8a" }
+                  : { background: "#fff", border: "1px solid #cbd5e1", color: "#334155" }),
+              }}
               onClick={() => {
                 onStep8PolicyInteract();
                 setVerificationRequested(false);
@@ -952,7 +961,13 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
             <button
               type="button"
               className="v3-btn"
-              style={{ padding: "0.45rem 0.75rem", background: verificationRequested ? "#dbeafe" : "#fff" }}
+              aria-pressed={step8PolicyAcknowledged && verificationRequested}
+              style={{
+                padding: "0.45rem 0.75rem",
+                ...(step8PolicyAcknowledged && verificationRequested
+                  ? { background: "#dbeafe", border: "1px solid #93c5fd", color: "#1e3a8a" }
+                  : { background: "#fff", border: "1px solid #cbd5e1", color: "#334155" }),
+              }}
               onClick={() => {
                 onStep8PolicyInteract();
                 setVerificationRequested(true);

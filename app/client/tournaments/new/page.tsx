@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { type CSSProperties, type MouseEvent as ReactMouseEvent, FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import adminUi from "../../../components/admin/admin-card.module.css";
@@ -166,6 +166,10 @@ const sectionGap: CSSProperties = { gap: "1.05rem" };
 
 export default function ClientTournamentNewPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  /** 동일 타이밍 이중 submit(연타·중복 이벤트) 차단 — loading 갱신 전에도 1회만 실행 */
+  const tournamentCreateSubmitInFlightRef = useRef(false);
 
   const [editId] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
@@ -327,6 +331,13 @@ export default function ClientTournamentNewPage() {
       cancelled = true;
     };
   }, [createSuccessId]);
+
+  /** replace 후에도 searchParams와 createSuccessId 동기화(리마운트·타이밍 차이 대비) */
+  useEffect(() => {
+    if (editId) return;
+    const done = searchParams.get("done")?.trim();
+    if (done) setCreateSuccessId(done);
+  }, [searchParams, editId]);
 
   useEffect(() => {
     if (durationType !== "MULTI_DAY") return;
@@ -815,25 +826,28 @@ export default function ClientTournamentNewPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (loading) return;
+    event.stopPropagation();
 
-    const wizardCheck = validateWizardBeforeSave();
-    if (!wizardCheck.ok) {
-      setWizardStep(wizardCheck.step);
-      setMessage(wizardCheck.message);
-      setSaveState("idle");
-      window.setTimeout(() => {
-        const el = document.getElementById(wizardCheck.focusId);
-        el?.scrollIntoView({ behavior: "smooth", block: "center" });
-        (el as HTMLElement | null)?.focus?.();
-      }, 0);
-      return;
-    }
-
+    if (tournamentCreateSubmitInFlightRef.current || loading) return;
+    tournamentCreateSubmitInFlightRef.current = true;
     setLoading(true);
-    setSaveState("saving");
-    setMessage("");
+
     try {
+      const wizardCheck = validateWizardBeforeSave();
+      if (!wizardCheck.ok) {
+        setWizardStep(wizardCheck.step);
+        setMessage(wizardCheck.message);
+        setSaveState("idle");
+        window.setTimeout(() => {
+          const el = document.getElementById(wizardCheck.focusId);
+          el?.scrollIntoView({ behavior: "smooth", block: "center" });
+          (el as HTMLElement | null)?.focus?.();
+        }, 0);
+        return;
+      }
+
+      setSaveState("saving");
+      setMessage("");
       const outlineHtmlPayload =
         outlineHtml.trim() !== "" && !isEmptyOutlineHtml(outlineHtml) ? outlineHtml : null;
       const outlineImagePayload = outlineImageUrl.trim() !== "" ? outlineImageUrl.trim() : null;
@@ -936,12 +950,16 @@ export default function ClientTournamentNewPage() {
         router.refresh();
       } else {
         setSaveState("success");
-        router.replace(`/client/tournaments/new?done=${encodeURIComponent(savedId)}`);
+        const createdId = savedId.trim();
+        /** URL과 동일 소스로 상태 반영 — replace만 하면 같은 페이지가 리마운트되지 않아 createSuccessId가 비어 완료 안내가 안 뜰 수 있음 */
+        setCreateSuccessId(createdId);
+        router.replace(`/client/tournaments/new?done=${encodeURIComponent(createdId)}`);
       }
     } catch {
       setMessage(editId ? "저장 요청 중 오류가 발생했습니다." : "대회 생성 요청 중 오류가 발생했습니다.");
       setSaveState("error");
     } finally {
+      tournamentCreateSubmitInFlightRef.current = false;
       setLoading(false);
     }
   }
@@ -1122,6 +1140,7 @@ export default function ClientTournamentNewPage() {
         setVerificationMode={setVerificationMode}
         verificationGuideText={verificationGuideText}
         setVerificationGuideText={setVerificationGuideText}
+        step8PolicyAcknowledged={step8PolicyAcknowledged}
         outlineDisplayMode={outlineDisplayMode}
         setOutlineDisplayMode={setOutlineDisplayMode}
         outlineHtml={outlineHtml}

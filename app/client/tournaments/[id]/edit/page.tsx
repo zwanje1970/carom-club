@@ -1103,6 +1103,7 @@ export default function ClientTournamentEditPage() {
         setVerificationMode={setVerificationMode}
         verificationGuideText={verificationGuideText}
         setVerificationGuideText={setVerificationGuideText}
+        step8PolicyAcknowledged={step8PolicyAcknowledged}
         outlineDisplayMode={outlineDisplayMode}
         setOutlineDisplayMode={setOutlineDisplayMode}
         outlineHtml={outlineHtml}

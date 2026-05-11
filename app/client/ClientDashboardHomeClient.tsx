@@ -637,11 +637,11 @@ export default function ClientDashboardHomeClient({
         <h2 id="client-main-features-heading" className="v3-h2" style={{ margin: 0, fontSize: "1rem" }}>
           주요 기능
         </h2>
-        <div className="client-dashboard-main__featureGrid">
+        <div className="client-dashboard-main__featureStack">
           <Link
             href="/client/tournaments/new"
             prefetch={false}
-            className="client-dashboard-main__featureCard client-dashboard-main__featureCard--primary"
+            className="client-dashboard-main__featureCard client-dashboard-main__featureCard--primary client-dashboard-main__featureCard--hero"
           >
             <span className="client-dashboard-main__featureIconWrap">
               <IconTournamentLine />
@@ -651,24 +651,26 @@ export default function ClientDashboardHomeClient({
               <span className="client-dashboard-main__featureDesc">새 대회를 등록하고 일정을 관리합니다</span>
             </span>
           </Link>
-          <Link href="/client/member" prefetch={false} className="client-dashboard-main__featureCard client-dashboard-main__featureCard--purple">
-            <span className="client-dashboard-main__featureIconWrap">
-              <IconUsersLine />
-            </span>
-            <span className="client-dashboard-main__featureText">
-              <span className="client-dashboard-main__featureTitle">회원 / 앱푸시</span>
-              <span className="client-dashboard-main__featureDesc">참가자·푸시 알림을 다룹니다</span>
-            </span>
-          </Link>
-          <Link href="/client/settlement" prefetch={false} className="client-dashboard-main__featureCard client-dashboard-main__featureCard--warning">
-            <span className="client-dashboard-main__featureIconWrap">
-              <IconChartLine />
-            </span>
-            <span className="client-dashboard-main__featureText">
-              <span className="client-dashboard-main__featureTitle">정산</span>
-              <span className="client-dashboard-main__featureDesc">대회별 정산을 확인합니다</span>
-            </span>
-          </Link>
+          <div className="client-dashboard-main__featureRowSplit">
+            <Link href="/client/member" prefetch={false} className="client-dashboard-main__featureCard client-dashboard-main__featureCard--purple">
+              <span className="client-dashboard-main__featureIconWrap">
+                <IconUsersLine />
+              </span>
+              <span className="client-dashboard-main__featureText">
+                <span className="client-dashboard-main__featureTitle">회원 / 앱푸시</span>
+                <span className="client-dashboard-main__featureDesc">참가자·푸시 알림을 다룹니다</span>
+              </span>
+            </Link>
+            <Link href="/client/settlement" prefetch={false} className="client-dashboard-main__featureCard client-dashboard-main__featureCard--warning">
+              <span className="client-dashboard-main__featureIconWrap">
+                <IconChartLine />
+              </span>
+              <span className="client-dashboard-main__featureText">
+                <span className="client-dashboard-main__featureTitle">정산</span>
+                <span className="client-dashboard-main__featureDesc">대회별 정산을 확인합니다</span>
+              </span>
+            </Link>
+          </div>
         </div>
       </section>
 
