@@ -102,7 +102,7 @@ export default function TournamentManageFeatureCards({
         </span>
         <span className="client-tournament-manage__featureCardTextCol">
           <span className="client-tournament-manage__featureTitle">대진표 관리</span>
-          <span className="client-tournament-manage__featureDesc">분할·되돌리기·인쇄</span>
+          <span className="client-tournament-manage__featureDesc">분할·결과·인쇄</span>
         </span>
       </Link>
     ) : bracketPlanEnabled ? (
