@@ -3,9 +3,10 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import {
+  findBracketMatchLocation as findBracketMatchLocationForSync,
   getSliceRoundsFromBracket as getSliceRoundsForWinnerSync,
   hasDownstreamRoundsInSlice as hasDownstreamRoundsInSliceForWinnerSync,
   syncClearMatchWinner,
@@ -375,7 +376,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   const [bracketSyncBusy, setBracketSyncBusy] = useState(false);
   const storageSeg = useMemo(() => bracketOfflineSegment(zonesEnabled, selectedZoneId), [zonesEnabled, selectedZoneId]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     bracketRef.current = bracket;
   }, [bracket]);
 
@@ -1084,17 +1085,41 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     void captureBracketImageSnapshot(bracket);
   }, [bracket, captureBracketImageSnapshot, interactionLocked, snapshotCaptureFailed, snapshotImageUrl]);
 
-  const handleQuickRevertMatch = useCallback(
-    async (matchId: string) => {
-      if (!tournamentId || interactionLocked || !bracketRef.current) return;
-      enqueueMutation(`clear:${matchId}`, async () => {
+  /** 빠른결과: 해당 경기 승패 결과 취소(히스토리 Undo 아님). 온라인은 서버 최신 브래킷 기준. */
+  const handleQuickClearMatchResult = useCallback(
+    async (
+      matchId: string,
+      rowCtx?: { roundNumber: number; boardSliceKey: string | null; rowIndex1Based: number },
+    ) => {
+      const trimmedId = matchId.trim();
+      if (!tournamentId || interactionLocked || !trimmedId) return;
+      enqueueMutation(`clearResult:${trimmedId}`, async () => {
         const seg = storageSeg;
-        const current = bracketRef.current as BracketLike | null;
-        if (!current) return;
         setMessage("");
         try {
           if (typeof navigator !== "undefined" && !navigator.onLine) {
-            const next = applyLocalClearWinner(current, matchId);
+            const snap = bracketRef.current as BracketLike | null;
+            if (!snap) {
+              console.warn("[quick-results clear-match-result] bracketRef null (offline)", {
+                matchId: trimmedId,
+                rowCtx,
+              });
+              setSaveState("error");
+              setMessage("대진표 데이터가 없습니다.");
+              return;
+            }
+            const locOff = findBracketMatchLocationForSync(snap, trimmedId);
+            if (!locOff) {
+              console.warn("[quick-results clear-match-result] match not found (offline)", {
+                matchId: trimmedId,
+                rowCtx,
+                bracketId: snap.id,
+              });
+              setSaveState("error");
+              setMessage("대상 매치를 찾을 수 없습니다.");
+              return;
+            }
+            const next = applyLocalClearWinner(snap, trimmedId);
             if (!next) {
               setSaveState("error");
               setMessage("진출을 취소할 수 없습니다.");
@@ -1102,15 +1127,68 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             }
             setBracket(next as Bracket);
             writeLastGoodBracket(tournamentId, seg, next as Bracket);
-            appendOfflinePending(tournamentId, seg, { type: "clear_winner", matchId });
+            appendOfflinePending(tournamentId, seg, { type: "clear_winner", matchId: trimmedId });
             setOfflineDirty(tournamentId, seg, true);
             setSaveState("idle");
             setMessage("");
             return;
           }
+
+          const pulled = await pullManageBracket();
+          if (!pulled.ok) {
+            setSaveState("error");
+            setMessage(pulled.error ?? "대진표를 불러오지 못했습니다.");
+            return;
+          }
+          const serverBracket = pulled.bracket;
+          if (!serverBracket) {
+            setSaveState("error");
+            setMessage("확정 대진표가 없습니다.");
+            return;
+          }
+
+          const loc = findBracketMatchLocationForSync(serverBracket as BracketLike, trimmedId);
+          if (!loc) {
+            console.warn("[quick-results clear-match-result] match not found on server bracket", {
+              matchId: trimmedId,
+              rowCtx,
+              bracketId: serverBracket.id,
+            });
+            setSaveState("error");
+            setMessage("대상 매치를 찾을 수 없습니다.");
+            return;
+          }
+          if (rowCtx) {
+            if (loc.round.roundNumber !== rowCtx.roundNumber) {
+              console.warn("[quick-results clear-match-result] roundNumber mismatch (row vs server)", {
+                matchId: trimmedId,
+                rowCtx,
+                serverRoundNumber: loc.round.roundNumber,
+              });
+            }
+            if ((loc.sliceKey ?? null) !== (rowCtx.boardSliceKey ?? null)) {
+              console.warn("[quick-results clear-match-result] sliceKey mismatch (tab vs server)", {
+                matchId: trimmedId,
+                rowCtx,
+                serverSliceKey: loc.sliceKey,
+              });
+            }
+          }
+
+          const hadWinner =
+            typeof loc.match.winnerUserId === "string" && loc.match.winnerUserId.trim() !== "";
+          if (!hadWinner) {
+            setBracket(serverBracket);
+            writeLastGoodBracket(tournamentId, seg, serverBracket);
+            setOfflineDirty(tournamentId, seg, false);
+            setSaveState("idle");
+            setMessage("");
+            return;
+          }
+
           const rs = await syncClearMatchWinner({
-            bracket: current,
-            matchId,
+            bracket: serverBracket as BracketLike,
+            matchId: trimmedId,
             mut: mutationFnsQuick,
             hasDownstream: (b, roundNumber, sliceKey) =>
               hasDownstreamRoundsInSliceForWinnerSync(getSliceRoundsForWinnerSync(b, sliceKey), roundNumber),
@@ -1126,22 +1204,23 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           setSaveState("idle");
           setMessage("");
         } catch {
-          const next = applyLocalClearWinner(current, matchId);
+          const fallback = bracketRef.current as BracketLike | null;
+          const next = fallback ? applyLocalClearWinner(fallback, trimmedId) : null;
           if (next) {
             setBracket(next as Bracket);
             writeLastGoodBracket(tournamentId, seg, next as Bracket);
-            appendOfflinePending(tournamentId, seg, { type: "clear_winner", matchId });
+            appendOfflinePending(tournamentId, seg, { type: "clear_winner", matchId: trimmedId });
             setOfflineDirty(tournamentId, seg, true);
             setSaveState("idle");
             setMessage("");
             return;
           }
           setSaveState("error");
-          setMessage("되돌리기 처리 중 오류가 발생했습니다.");
+          setMessage("승패 결과 취소 중 오류가 발생했습니다.");
         }
       });
     },
-    [enqueueMutation, interactionLocked, mutationFnsQuick, storageSeg, tournamentId],
+    [enqueueMutation, interactionLocked, mutationFnsQuick, pullManageBracket, storageSeg, tournamentId],
   );
 
   async function handleSetWinner(matchId: string, winnerUserId: string, roundNumber?: number) {
@@ -1887,10 +1966,16 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                               <button
                                 type="button"
                                 className="v3-btn"
-                                aria-label="이 경기 되돌리기"
-                                title="이 경기 되돌리기"
+                                aria-label="이 경기 승패 결과 취소"
+                                title="이 경기 승패 결과 취소"
                                 disabled={!done || actionLoading || interactionLocked}
-                                onClick={() => void handleQuickRevertMatch(match.id)}
+                                onClick={() =>
+                                  void handleQuickClearMatchResult(match.id, {
+                                    roundNumber: activeQuickRound.roundNumber,
+                                    boardSliceKey,
+                                    rowIndex1Based: idx + 1,
+                                  })
+                                }
                                 style={{
                                   minWidth: 44,
                                   minHeight: 44,
