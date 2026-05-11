@@ -6,6 +6,8 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import {
+  getSliceRoundsFromBracket as getSliceRoundsForWinnerSync,
+  hasDownstreamRoundsInSlice as hasDownstreamRoundsInSliceForWinnerSync,
   syncClearMatchWinner,
   syncRenamePlayer,
   syncSwapPlayers,
@@ -1084,16 +1086,34 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
 
   const handleQuickRevertMatch = useCallback(
     async (matchId: string) => {
-      if (!bracket || interactionLocked || actionLoading) return;
+      if (!tournamentId || interactionLocked || !bracketRef.current) return;
       enqueueMutation(`clear:${matchId}`, async () => {
+        const seg = storageSeg;
+        const current = bracketRef.current as BracketLike | null;
+        if (!current) return;
         setMessage("");
         try {
+          if (typeof navigator !== "undefined" && !navigator.onLine) {
+            const next = applyLocalClearWinner(current, matchId);
+            if (!next) {
+              setSaveState("error");
+              setMessage("진출을 취소할 수 없습니다.");
+              return;
+            }
+            setBracket(next as Bracket);
+            writeLastGoodBracket(tournamentId, seg, next as Bracket);
+            appendOfflinePending(tournamentId, seg, { type: "clear_winner", matchId });
+            setOfflineDirty(tournamentId, seg, true);
+            setSaveState("idle");
+            setMessage("");
+            return;
+          }
           const rs = await syncClearMatchWinner({
-            bracket: bracket as BracketLike,
+            bracket: current,
             matchId,
             mut: mutationFnsQuick,
             hasDownstream: (b, roundNumber, sliceKey) =>
-              hasDownstreamRoundsInSlice(getSliceRoundsFromBracket(b as Bracket, sliceKey), roundNumber),
+              hasDownstreamRoundsInSliceForWinnerSync(getSliceRoundsForWinnerSync(b, sliceKey), roundNumber),
           });
           if (!rs.ok) {
             setSaveState("error");
@@ -1101,15 +1121,27 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             return;
           }
           setBracket(rs.bracket as Bracket);
+          writeLastGoodBracket(tournamentId, seg, rs.bracket as Bracket);
+          setOfflineDirty(tournamentId, seg, false);
           setSaveState("idle");
           setMessage("");
         } catch {
+          const next = applyLocalClearWinner(current, matchId);
+          if (next) {
+            setBracket(next as Bracket);
+            writeLastGoodBracket(tournamentId, seg, next as Bracket);
+            appendOfflinePending(tournamentId, seg, { type: "clear_winner", matchId });
+            setOfflineDirty(tournamentId, seg, true);
+            setSaveState("idle");
+            setMessage("");
+            return;
+          }
           setSaveState("error");
           setMessage("되돌리기 처리 중 오류가 발생했습니다.");
         }
       });
     },
-    [actionLoading, bracket, enqueueMutation, interactionLocked, mutationFnsQuick],
+    [enqueueMutation, interactionLocked, mutationFnsQuick, storageSeg, tournamentId],
   );
 
   async function handleSetWinner(matchId: string, winnerUserId: string, roundNumber?: number) {
@@ -1801,7 +1833,12 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                           </span>
                         );
                         return (
-                          <tr key={match.id} style={{ borderTop: "1px solid #e2e8f0" }}>
+                          <tr
+                            key={match.id}
+                            style={{
+                              borderBottom: "1px solid rgba(15, 23, 42, 0.15)",
+                            }}
+                          >
                             <td style={{ padding: "0.35rem 0.45rem", whiteSpace: "nowrap", fontWeight: 700 }}>
                               {idx + 1}번
                             </td>
