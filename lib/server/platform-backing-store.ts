@@ -10492,7 +10492,7 @@ type MainSlideKvRebuildResult = {
 
 /**
  * 메인 전용 main-cards KV 재빌드: 게시카드 원본만 사용(대회 일괄 조회 없음).
- * 모집중·마감임박만 main KV에 넣고, 그 외 게시 스냅샷은 archived KV에 둔다.
+ * 모집중·마감만 main KV에 넣고, 그 외 게시 스냅샷은 archived KV에 둔다.
  */
 async function buildMainSlideTournamentAndArchivedKvSnapshots(): Promise<MainSlideKvRebuildResult> {
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;

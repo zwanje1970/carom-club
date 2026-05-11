@@ -2411,6 +2411,58 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           expanded={isAccordionOpen("field")}
           onToggle={() => toggleAccordion("field")}
         >
+        <div className="v3-stack" style={{ gap: "0.5rem", width: "100%" }}>
+          <button
+            type="button"
+            onClick={() => router.push(`/client/tournaments/${tournamentId}/bracket/view${bracketZoneQuery}`)}
+            style={{
+              width: "100%",
+              minHeight: "52px",
+              borderRadius: "8px",
+              border: "1px solid #1d4ed8",
+              background: "#2563eb",
+              color: "#fff",
+              fontWeight: 800,
+              fontSize: "1rem",
+              boxShadow: "none",
+              cursor: "pointer",
+            }}
+          >
+            대진표 보기
+          </button>
+          {bracket?.bracketMode === "multi_block" ? (
+            <button
+              type="button"
+              onClick={() =>
+                router.push(
+                  `/client/tournaments/${tournamentId}/bracket/view${
+                    bracketZoneQuery ? `${bracketZoneQuery}&viewMode=merged` : "?viewMode=merged"
+                  }`,
+                )
+              }
+              style={{
+                width: "100%",
+                minHeight: "52px",
+                borderRadius: "8px",
+                border: "1px solid #0f766e",
+                background: "#0d9488",
+                color: "#fff",
+                fontWeight: 800,
+                fontSize: "1rem",
+                boxShadow: "none",
+                cursor: "pointer",
+              }}
+            >
+              통합 대진표 보기
+            </button>
+          ) : null}
+          {bracket?.bracketMode === "multi_block" ? (
+            <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem", lineHeight: 1.45 }}>
+              조별 대진표와 결선 대진표를 한 화면에서 함께 확인합니다.
+            </p>
+          ) : null}
+        </div>
+
         <section
           className="v3-box v3-stack"
           aria-label="인쇄용 대진표"

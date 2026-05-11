@@ -64,6 +64,8 @@ export type PositionedBoardMatch = {
   internalIndex: number;
   match: BoardMatch;
   frame: MatchFrame;
+  /** multi_block 통합 보기: 조·결선 구간 인덱스 (단일 보드에서는 미설정) */
+  mergeSectionIndex?: number;
 };
 
 export type ConnectorGeometry = {

@@ -196,21 +196,6 @@ function IconTournamentLine() {
   );
 }
 
-function IconCardLine() {
-  return (
-    <svg viewBox="0 0 24 24" width={22} height={22} fill="none" aria-hidden>
-      <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.75" />
-      <path
-        d="M3 15l4.5-4.5 3 3L15 9l6 6"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function IconUsersLine() {
   return (
     <svg viewBox="0 0 24 24" width={22} height={22} fill="none" aria-hidden>
@@ -440,7 +425,6 @@ export default function ClientDashboardHomeClient({
   let todayStatusText = "";
   let todayButtonLabel = "";
   let todayButtonHref = "/client/setup";
-  let cardPublishHref = "/client/tournaments/new";
   let ongoingTournamentsToRender: ClientDashboardSummaryJson["recentTournaments"] = [];
   let membershipSection: ReactNode = null;
   let tournamentListSection: ReactNode = null;
@@ -496,10 +480,6 @@ export default function ClientDashboardHomeClient({
       todayButtonLabel = "대회 관리";
       todayButtonHref = d.firstTournamentId ? `/client/tournaments/${d.firstTournamentId}` : "/client/tournaments";
     }
-
-    cardPublishHref = d.firstTournamentId
-      ? `/client/tournaments/${d.firstTournamentId}/card-publish-v2`
-      : "/client/tournaments/new";
 
     ongoingTournamentsToRender = d.recentTournaments.slice(0, 1);
 
@@ -669,15 +649,6 @@ export default function ClientDashboardHomeClient({
             <span className="client-dashboard-main__featureText">
               <span className="client-dashboard-main__featureTitle">대회 만들기</span>
               <span className="client-dashboard-main__featureDesc">새 대회를 등록하고 일정을 관리합니다</span>
-            </span>
-          </Link>
-          <Link href={cardPublishHref} prefetch={false} className="client-dashboard-main__featureCard client-dashboard-main__featureCard--success">
-            <span className="client-dashboard-main__featureIconWrap">
-              <IconCardLine />
-            </span>
-            <span className="client-dashboard-main__featureText">
-              <span className="client-dashboard-main__featureTitle">게시카드 만들기</span>
-              <span className="client-dashboard-main__featureDesc">메인 노출용 대회 카드를 작성합니다</span>
             </span>
           </Link>
           <Link href="/client/member" prefetch={false} className="client-dashboard-main__featureCard client-dashboard-main__featureCard--purple">

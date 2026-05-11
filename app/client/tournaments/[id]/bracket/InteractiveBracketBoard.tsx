@@ -21,6 +21,7 @@ import {
   type ConnectorGeometry,
   type MatchFrame,
   type PositionedBoardMatch,
+  type RoundTitleAnchor,
 } from "./bracket-board-layout";
 import type { BracketBoardPdfSnapshot } from "./bracket-pdf-client-export";
 import {
@@ -304,6 +305,205 @@ function normalizeLayoutToCanvas(
   };
 }
 
+const MERGED_SECTION_TITLE_BAND_PX = 36;
+const MERGED_SECTION_GAP_PX = 28;
+
+/** 통합 보기 connector / derived 키에서 `m{인덱스}|` 접두 제거 */
+function stripMergeLayoutKeyPrefix(key: string): string {
+  return key.replace(/^m\d+\|/, "");
+}
+
+function mergeSectionPrefixFromKey(key: string): string {
+  const m = /^m(\d+)\|/.exec(key);
+  return m ? `m${m[1]}|` : "";
+}
+
+function combineMultiBlockViewLayouts(
+  sections: Array<{ sectionTitle: string; bracket: BracketBoardInput }>,
+): { layout: BracketLayoutCalculation; sectionTitleBands: Array<{ topPx: number; title: string }> } {
+  let yCursor = 0;
+  let maxW = 400;
+  const allMatches: PositionedBoardMatch[] = [];
+  const allConnectors: ConnectorGeometry[] = [];
+  const allRoundTitles: RoundTitleAnchor[] = [];
+  const sectionTitleBands: Array<{ topPx: number; title: string }> = [];
+
+  for (let si = 0; si < sections.length; si += 1) {
+    const sec = sections[si];
+    if (!sec) continue;
+    sectionTitleBands.push({ topPx: yCursor + 6, title: sec.sectionTitle });
+    yCursor += MERGED_SECTION_TITLE_BAND_PX;
+
+    const cloned = cloneBracketBoardForLayout(sec.bracket);
+    const metrics = computeBracketBoardMetrics(cloned as BoardBracket, "vertical");
+    const lay = calculateLayout(cloned as BoardBracket, metrics, "vertical");
+    const prefix = `m${si}|`;
+
+    for (const item of lay.positionedMatches) {
+      item.key = `${prefix}${item.key}`;
+      item.mergeSectionIndex = si;
+      item.frame.y += yCursor;
+    }
+    for (const t of lay.roundTitles) {
+      t.key = `${prefix}${t.key}`;
+      if (t.y != null) t.y += yCursor;
+    }
+    for (const c of lay.connectors) {
+      c.key = `${prefix}${c.key}`;
+      c.basePaths = c.basePaths.map((p) => offsetSvgPathD(p, 0, yCursor));
+      if (c.winnerPath) c.winnerPath = offsetSvgPathD(c.winnerPath, 0, yCursor);
+    }
+
+    const h = lay.canvasBounds?.height ?? 300;
+    const w = lay.canvasBounds?.width ?? 400;
+    maxW = Math.max(maxW, w);
+
+    allMatches.push(...lay.positionedMatches);
+    allConnectors.push(...lay.connectors);
+    allRoundTitles.push(...lay.roundTitles);
+
+    yCursor += h + MERGED_SECTION_GAP_PX;
+  }
+
+  yCursor -= MERGED_SECTION_GAP_PX;
+
+  return {
+    layout: {
+      positionedMatches: allMatches,
+      connectors: allConnectors,
+      roundTitles: allRoundTitles,
+      canvasBounds: { width: maxW, height: Math.max(320, yCursor) },
+    },
+    sectionTitleBands,
+  };
+}
+
+type DerivedVisualPack = {
+  labelByItemKey: Map<string, string>;
+  winnerByItemKey: Map<string, boolean>;
+  loserByItemKey: Map<string, boolean>;
+  opponentHasNameByItemKey: Map<string, boolean>;
+  activeConnectorKeys: Set<string>;
+  chosenByPair: Map<string, WinnerChoice>;
+};
+
+function computeDerivedVisualState(params: {
+  positionedMatches: PositionedBoardMatch[];
+  bracketSource: BracketBoardInput;
+  winnerByPair: Record<string, WinnerChoice>;
+  connectorKeyPrefix: string;
+}): DerivedVisualPack {
+  const { positionedMatches, bracketSource, winnerByPair, connectorKeyPrefix } = params;
+  const activeLayoutMatches = positionedMatches;
+
+  const roundMap = new Map<number, typeof activeLayoutMatches>();
+  for (const item of activeLayoutMatches) {
+    const arr = roundMap.get(item.roundIndex) ?? [];
+    arr.push(item);
+    roundMap.set(item.roundIndex, arr);
+  }
+  for (const arr of roundMap.values()) {
+    arr.sort((a, b) => a.internalIndex - b.internalIndex);
+  }
+  const maxRoundIndex = roundMap.size > 0 ? Math.max(...roundMap.keys()) : -1;
+  const labelsByRound: string[][] = [];
+  const chosenByPair = new Map<string, WinnerChoice>();
+  const activeConnectorKeys = new Set<string>();
+
+  for (let r = 0; r <= maxRoundIndex; r += 1) {
+    const row = roundMap.get(r) ?? [];
+    const rowLabels = Array.from({ length: row.length }, (_, idx) => {
+      const raw = row[idx]?.match.player1.name?.trim() ?? "";
+      return raw === "대기" ? "" : raw;
+    });
+    labelsByRound[r] = rowLabels;
+  }
+
+  for (let r = 1; r <= maxRoundIndex; r += 1) {
+    const parentRow = roundMap.get(r) ?? [];
+    const childLabels = labelsByRound[r - 1] ?? [];
+    const parentLabels = [...(labelsByRound[r] ?? Array.from({ length: parentRow.length }, () => ""))];
+    for (let j = 0; j < parentRow.length; j += 1) {
+      const a = childLabels[2 * j] ?? "";
+      const b = childLabels[2 * j + 1] ?? "";
+      const pairKey = `${r - 1}:${j}`;
+      const selected = winnerByPair[pairKey];
+      if (selected !== 0 && selected !== 1) continue;
+      const choice = selected;
+      const srcMatch = bracketSource.rounds[r - 1]?.matches[j];
+      if (!srcMatch) continue;
+      const chosenPlayer = choice === 0 ? srcMatch.player1 : srcMatch.player2;
+      const chosenRealId = typeof chosenPlayer.userId === "string" ? chosenPlayer.userId.trim() : "";
+      if (!isEligibleBracketWinnerUserId(chosenRealId)) continue;
+      const chosenLabel = choice === 0 ? a : b;
+      if (!isPropagatableBracketWinnerLabel(chosenLabel)) continue;
+      parentLabels[j] = chosenLabel;
+      chosenByPair.set(pairKey, choice);
+      const childRoundNo = r;
+      const parentRoundNo = r + 1;
+      activeConnectorKeys.add(`${connectorKeyPrefix}pair:${childRoundNo}:${2 * j + choice}`);
+      activeConnectorKeys.add(
+        `${connectorKeyPrefix}${childRoundNo}:${2 * j}+${childRoundNo}:${2 * j + 1}->${parentRoundNo}:${j}`,
+      );
+    }
+    labelsByRound[r] = parentLabels;
+  }
+
+  const labelByItemKey = new Map<string, string>();
+  const winnerByItemKey = new Map<string, boolean>();
+  const loserByItemKey = new Map<string, boolean>();
+  const opponentHasNameByItemKey = new Map<string, boolean>();
+  for (let r = 0; r <= maxRoundIndex; r += 1) {
+    const row = roundMap.get(r) ?? [];
+    const labels = labelsByRound[r] ?? [];
+    const parentRoundExists = r + 1 <= maxRoundIndex;
+    for (let s = 0; s < row.length; s += 1) {
+      const item = row[s];
+      if (!item) continue;
+      const label = labels[s] ?? "";
+      labelByItemKey.set(item.key, label);
+      const pairIdx = Math.floor(s / 2);
+      const pairBase = pairIdx * 2;
+      const selfInPair = s - pairBase;
+      const oppIdx = pairBase + (selfInPair === 0 ? 1 : 0);
+
+      const selfRaw = readRawSlotPlayer(bracketSource, r, s);
+      const oppRaw = readRawSlotPlayer(bracketSource, r, oppIdx);
+      const parentRaw = parentRoundExists ? readRawSlotPlayer(bracketSource, r + 1, pairIdx) : null;
+
+      const selfId = slotUserIdForHighlight(selfRaw);
+      const oppId = slotUserIdForHighlight(oppRaw);
+      const parentId = slotUserIdForHighlight(parentRaw);
+
+      let isWinner = Boolean(selfId && parentId && selfId === parentId);
+      let isLoser = Boolean(selfId && oppId && parentId && parentId === oppId && selfId !== oppId);
+
+      const pairPickKey = `${r}:${pairIdx}`;
+      const picked = winnerByPair[pairPickKey];
+      const srcMatchForPick = bracketSource.rounds[r]?.matches[pairIdx];
+      if (!parentId && srcMatchForPick && (picked === 0 || picked === 1) && selfId) {
+        const chosenPlayer = picked === 0 ? srcMatchForPick.player1 : srcMatchForPick.player2;
+        const chosenRealId = typeof chosenPlayer.userId === "string" ? chosenPlayer.userId.trim() : "";
+        if (isEligibleBracketWinnerUserId(chosenRealId)) {
+          if (picked === selfInPair && selfId === chosenRealId) {
+            isWinner = true;
+            isLoser = false;
+          } else if (oppId) {
+            isLoser = true;
+            isWinner = false;
+          }
+        }
+      }
+
+      opponentHasNameByItemKey.set(item.key, opponentSlotLooksFilled(oppRaw));
+      winnerByItemKey.set(item.key, isWinner);
+      loserByItemKey.set(item.key, isLoser);
+    }
+  }
+
+  return { labelByItemKey, winnerByItemKey, loserByItemKey, opponentHasNameByItemKey, activeConnectorKeys, chosenByPair };
+}
+
 export default function InteractiveBracketBoard({
   bracket,
   tournamentTitle = "",
@@ -323,6 +523,8 @@ export default function InteractiveBracketBoard({
   saveStateText = "",
   chromeMode = "default",
   bracketViewSlicePicker = null,
+  /** multi_block 통합 보기: 표시만 (데이터 병합 없음) */
+  bracketViewMergedStacks = null,
   bracketViewZones = null,
   bracketViewNotice = "",
   viewStateStorageKey,
@@ -340,9 +542,11 @@ export default function InteractiveBracketBoard({
   bracketViewSlicePicker?: {
     blocks: Array<{ id: string; label?: string | null }>;
     hasFinal: boolean;
+    hasMerged?: boolean;
     boardSliceKey: string | null;
     onSliceChange: (sliceKey: string | null) => void;
   } | null;
+  bracketViewMergedStacks?: Array<{ sectionTitle: string; bracket: BracketBoardInput }> | null;
   /** 권역 대회: 툴바에서 권역 선택 모달 */
   bracketViewZones?: {
     options: Array<{ id: string; zoneName: string }>;
@@ -481,6 +685,11 @@ export default function InteractiveBracketBoard({
     [],
   );
 
+  const mergedLayoutBundle = useMemo(() => {
+    if (!bracketViewMergedStacks?.length) return null;
+    return combineMultiBlockViewLayouts(bracketViewMergedStacks);
+  }, [bracketViewMergedStacks]);
+
   const bracketForLayout = useMemo(() => cloneBracketBoardForLayout(bracket), [bracket]);
 
   const metrics = useMemo<BracketBoardMetrics>(
@@ -488,16 +697,23 @@ export default function InteractiveBracketBoard({
     [bracketForLayout],
   );
 
-  const layoutVerticalBase = useMemo(
-    () => calculateLayout(bracketForLayout as BoardBracket, metrics, "vertical"),
-    [bracketForLayout, metrics],
-  );
+  const layoutVerticalBase = useMemo(() => {
+    if (mergedLayoutBundle) return mergedLayoutBundle.layout;
+    return calculateLayout(bracketForLayout as BoardBracket, metrics, "vertical");
+  }, [mergedLayoutBundle, bracketForLayout, metrics]);
 
   const layoutComputed = useMemo(() => {
+    if (mergedLayoutBundle) return mergedLayoutBundle.layout;
     if (viewMode === "vertical") return layoutVerticalBase;
     if (viewMode === "horizontal") return layoutHorizontalFromVerticalBase(layoutVerticalBase, metrics);
     return layoutDualFromVerticalBase(layoutVerticalBase, metrics);
-  }, [layoutVerticalBase, metrics, viewMode]);
+  }, [mergedLayoutBundle, layoutVerticalBase, metrics, viewMode]);
+
+  const mergedSectionTitleBands = mergedLayoutBundle?.sectionTitleBands ?? null;
+
+  useEffect(() => {
+    if (bracketViewMergedStacks?.length) setViewMode("vertical");
+  }, [bracketViewMergedStacks]);
 
   const canvasWidth = layoutComputed.canvasBounds?.width ?? metrics.canvasWidth;
   const canvasHeight = layoutComputed.canvasBounds?.height ?? metrics.canvasHeight;
@@ -774,113 +990,55 @@ export default function InteractiveBracketBoard({
   const activeLayout = layoutComputed;
 
   const derived = useMemo(() => {
-    const roundMap = new Map<number, typeof activeLayout.positionedMatches>();
-    for (const item of activeLayout.positionedMatches) {
-      const arr = roundMap.get(item.roundIndex) ?? [];
-      arr.push(item);
-      roundMap.set(item.roundIndex, arr);
-    }
-    for (const arr of roundMap.values()) {
-      arr.sort((a, b) => a.internalIndex - b.internalIndex);
-    }
-    const maxRoundIndex = roundMap.size > 0 ? Math.max(...roundMap.keys()) : -1;
-    const labelsByRound: string[][] = [];
-    const chosenByPair = new Map<string, WinnerChoice>();
-    const activeConnectorKeys = new Set<string>();
-
-    for (let r = 0; r <= maxRoundIndex; r += 1) {
-      const row = roundMap.get(r) ?? [];
-      const rowLabels = Array.from({ length: row.length }, (_, idx) => {
-        const raw = row[idx]?.match.player1.name?.trim() ?? "";
-        return raw === "대기" ? "" : raw;
+    const items = activeLayout.positionedMatches;
+    const hasMerge = items.some((it) => typeof it.mergeSectionIndex === "number");
+    if (!hasMerge) {
+      return computeDerivedVisualState({
+        positionedMatches: items,
+        bracketSource: bracket,
+        winnerByPair,
+        connectorKeyPrefix: "",
       });
-      labelsByRound[r] = rowLabels;
     }
-
-    for (let r = 1; r <= maxRoundIndex; r += 1) {
-      const parentRow = roundMap.get(r) ?? [];
-      const childLabels = labelsByRound[r - 1] ?? [];
-      const parentLabels = [...(labelsByRound[r] ?? Array.from({ length: parentRow.length }, () => ""))];
-      for (let j = 0; j < parentRow.length; j += 1) {
-        const a = childLabels[2 * j] ?? "";
-        const b = childLabels[2 * j + 1] ?? "";
-        const pairKey = `${r - 1}:${j}`;
-        const selected = winnerByPair[pairKey];
-        if (selected !== 0 && selected !== 1) continue;
-        const choice = selected;
-        const srcMatch = bracket.rounds[r - 1]?.matches[j];
-        if (!srcMatch) continue;
-        const chosenPlayer = choice === 0 ? srcMatch.player1 : srcMatch.player2;
-        const chosenRealId = typeof chosenPlayer.userId === "string" ? chosenPlayer.userId.trim() : "";
-        /* 표시 전파: 서버 winnerUserId 반영 전에도 로컬 픽(winnerByPair)으로 상위 라벨 표시. 저장 가능 id/라벨만. */
-        if (!isEligibleBracketWinnerUserId(chosenRealId)) continue;
-        const chosenLabel = choice === 0 ? a : b;
-        if (!isPropagatableBracketWinnerLabel(chosenLabel)) continue;
-        parentLabels[j] = chosenLabel;
-        chosenByPair.set(pairKey, choice);
-        const childRoundNo = r;
-        const parentRoundNo = r + 1;
-        activeConnectorKeys.add(`pair:${childRoundNo}:${2 * j + choice}`);
-        activeConnectorKeys.add(`${childRoundNo}:${2 * j}+${childRoundNo}:${2 * j + 1}->${parentRoundNo}:${j}`);
-      }
-      labelsByRound[r] = parentLabels;
+    const sources = bracketViewMergedStacks?.map((s) => s.bracket) ?? [];
+    const bySec = new Map<number, PositionedBoardMatch[]>();
+    for (const it of items) {
+      const si = it.mergeSectionIndex ?? 0;
+      const arr = bySec.get(si) ?? [];
+      arr.push(it);
+      bySec.set(si, arr);
     }
-
-    const labelByItemKey = new Map<string, string>();
-    const winnerByItemKey = new Map<string, boolean>();
-    const loserByItemKey = new Map<string, boolean>();
-    const opponentHasNameByItemKey = new Map<string, boolean>();
-    for (let r = 0; r <= maxRoundIndex; r += 1) {
-      const row = roundMap.get(r) ?? [];
-      const labels = labelsByRound[r] ?? [];
-      const parentRoundExists = r + 1 <= maxRoundIndex;
-      for (let s = 0; s < row.length; s += 1) {
-        const item = row[s];
-        if (!item) continue;
-        const label = labels[s] ?? "";
-        labelByItemKey.set(item.key, label);
-        const pairIdx = Math.floor(s / 2);
-        const pairBase = pairIdx * 2;
-        const selfInPair = s - pairBase;
-        const oppIdx = pairBase + (selfInPair === 0 ? 1 : 0);
-
-        const selfRaw = readRawSlotPlayer(bracket, r, s);
-        const oppRaw = readRawSlotPlayer(bracket, r, oppIdx);
-        const parentRaw = parentRoundExists ? readRawSlotPlayer(bracket, r + 1, pairIdx) : null;
-
-        const selfId = slotUserIdForHighlight(selfRaw);
-        const oppId = slotUserIdForHighlight(oppRaw);
-        const parentId = slotUserIdForHighlight(parentRaw);
-
-        let isWinner = Boolean(selfId && parentId && selfId === parentId);
-        let isLoser = Boolean(selfId && oppId && parentId && parentId === oppId && selfId !== parentId);
-
-        const pairPickKey = `${r}:${pairIdx}`;
-        const picked = winnerByPair[pairPickKey];
-        const srcMatchForPick = bracket.rounds[r]?.matches[pairIdx];
-        if (!parentId && srcMatchForPick && (picked === 0 || picked === 1) && selfId) {
-          const chosenPlayer = picked === 0 ? srcMatchForPick.player1 : srcMatchForPick.player2;
-          const chosenRealId =
-            typeof chosenPlayer.userId === "string" ? chosenPlayer.userId.trim() : "";
-          if (isEligibleBracketWinnerUserId(chosenRealId)) {
-            if (picked === selfInPair && selfId === chosenRealId) {
-              isWinner = true;
-              isLoser = false;
-            } else if (oppId) {
-              isLoser = true;
-              isWinner = false;
-            }
-          }
-        }
-
-        opponentHasNameByItemKey.set(item.key, opponentSlotLooksFilled(oppRaw));
-        winnerByItemKey.set(item.key, isWinner);
-        loserByItemKey.set(item.key, isLoser);
-      }
+    const mergedLabel = new Map<string, string>();
+    const mergedWinner = new Map<string, boolean>();
+    const mergedLoser = new Map<string, boolean>();
+    const mergedOpp = new Map<string, boolean>();
+    const mergedActive = new Set<string>();
+    const mergedChosen = new Map<string, WinnerChoice>();
+    for (const [si, subset] of bySec) {
+      const src = sources[si];
+      if (!src) continue;
+      const d = computeDerivedVisualState({
+        positionedMatches: subset,
+        bracketSource: src,
+        winnerByPair,
+        connectorKeyPrefix: `m${si}|`,
+      });
+      for (const [k, v] of d.labelByItemKey) mergedLabel.set(k, v);
+      for (const [k, v] of d.winnerByItemKey) mergedWinner.set(k, v);
+      for (const [k, v] of d.loserByItemKey) mergedLoser.set(k, v);
+      for (const [k, v] of d.opponentHasNameByItemKey) mergedOpp.set(k, v);
+      for (const k of d.activeConnectorKeys) mergedActive.add(k);
+      for (const [k, v] of d.chosenByPair) mergedChosen.set(k, v);
     }
-
-    return { labelByItemKey, winnerByItemKey, loserByItemKey, opponentHasNameByItemKey, activeConnectorKeys, chosenByPair };
-  }, [activeLayout.positionedMatches, bracket, winnerByPair]);
+    return {
+      labelByItemKey: mergedLabel,
+      winnerByItemKey: mergedWinner,
+      loserByItemKey: mergedLoser,
+      opponentHasNameByItemKey: mergedOpp,
+      activeConnectorKeys: mergedActive,
+      chosenByPair: mergedChosen,
+    };
+  }, [activeLayout.positionedMatches, bracket, winnerByPair, bracketViewMergedStacks]);
 
   const handleWinnerPick = useCallback(
     (args: {
@@ -1095,38 +1253,42 @@ export default function InteractiveBracketBoard({
   }, [activeLayout.positionedMatches, selectedBoxKey, swapCandidate]);
 
   const roundStrengthLabel = useMemo(() => {
+    if (bracketViewMergedStacks?.length) return "";
     const firstRoundMatches = bracket.rounds[0]?.matches.length ?? 0;
     const slots = firstRoundMatches > 0 ? firstRoundMatches * 2 : 0;
     return slots > 0 ? `${slots}강전` : "";
-  }, [bracket.rounds]);
+  }, [bracket.rounds, bracketViewMergedStacks]);
   const tournamentInfoLine1 = `${(tournamentTitle || "").trim()}${roundStrengthLabel ? ` ${roundStrengthLabel}` : ""}`.trim();
   const tournamentInfoLine2 = `${formatDateWithKoreanDow(tournamentDate)} ${stripVenueAddress(tournamentLocation)}`.trim();
 
   const isConnectorSegmentActive = useCallback(
     (connectorKey: string, segmentIndex: number): boolean => {
-      if (!connectorKey.includes("+")) {
-        return derived.activeConnectorKeys.has(connectorKey);
+      const secPref = mergeSectionPrefixFromKey(connectorKey);
+      const inner = stripMergeLayoutKeyPrefix(connectorKey);
+      if (!inner.includes("+")) {
+        return derived.activeConnectorKeys.has(secPref ? `${secPref}${inner}` : connectorKey);
       }
-      const [leftPart, rightPart] = connectorKey.split("+");
+      const [leftPart, rightPart] = inner.split("+");
       const [rightSlotPart, parentPart] = (rightPart ?? "").split("->");
       if (!leftPart || !rightSlotPart || !parentPart) return false;
-      if (segmentIndex === 0) return derived.activeConnectorKeys.has(`pair:${leftPart}`);
-      if (segmentIndex === 1) return derived.activeConnectorKeys.has(`pair:${rightSlotPart}`);
-      return derived.activeConnectorKeys.has(`${leftPart}+${rightSlotPart}->${parentPart}`);
+      if (segmentIndex === 0) return derived.activeConnectorKeys.has(`${secPref}pair:${leftPart}`);
+      if (segmentIndex === 1) return derived.activeConnectorKeys.has(`${secPref}pair:${rightSlotPart}`);
+      return derived.activeConnectorKeys.has(`${secPref}${leftPart}+${rightSlotPart}->${parentPart}`);
     },
     [derived.activeConnectorKeys],
   );
 
   const pairKeyFromConnector = useCallback((connectorKey: string): string | null => {
-    if (connectorKey.includes("+")) {
-      const [leftPart] = connectorKey.split("+");
+    const inner = stripMergeLayoutKeyPrefix(connectorKey);
+    if (inner.includes("+")) {
+      const [leftPart] = inner.split("+");
       const [roundRaw, slotRaw] = (leftPart ?? "").split(":");
       const roundNo = Number(roundRaw);
       const slot = Number(slotRaw);
       if (!Number.isFinite(roundNo) || !Number.isFinite(slot)) return null;
       return `${roundNo - 1}:${Math.floor(slot / 2)}`;
     }
-    const [leftPart] = connectorKey.split("->");
+    const [leftPart] = inner.split("->");
     const [roundRaw, slotRaw] = (leftPart ?? "").split(":");
     const roundNo = Number(roundRaw);
     const slot = Number(slotRaw);
@@ -1135,6 +1297,7 @@ export default function InteractiveBracketBoard({
   }, []);
 
   const advanceCancelButtons = useMemo(() => {
+    if (bracketViewMergedStacks?.length) return [];
     const byKey = new Map<string, (typeof activeLayout.positionedMatches)[number]>();
     for (const item of activeLayout.positionedMatches) {
       byKey.set(`${item.roundIndex + 1}:${item.internalIndex}`, item);
@@ -1146,11 +1309,18 @@ export default function InteractiveBracketBoard({
       const [pkR, pkP] = pairKey.split(":");
       const ri = Number(pkR);
       const pi = Number(pkP);
+      const siMatch = /^m(\d+)\|/.exec(connector.key);
+      const si = siMatch ? Number(siMatch[1]) : NaN;
+      const srcBracket =
+        Number.isFinite(si) && bracketViewMergedStacks?.[si]
+          ? bracketViewMergedStacks[si]!.bracket
+          : bracket;
       const showCancel =
         pairKey in winnerByPair ||
-        (Number.isFinite(ri) && Number.isFinite(pi) && matchPairHasClearableServerWinner(bracket, ri, pi));
+        (Number.isFinite(ri) && Number.isFinite(pi) && matchPairHasClearableServerWinner(srcBracket, ri, pi));
       if (!showCancel) continue;
-      const [leftPart, rightRaw] = connector.key.split("+");
+      const innerConn = stripMergeLayoutKeyPrefix(connector.key);
+      const [leftPart, rightRaw] = innerConn.split("+");
       if (!rightRaw) continue;
       const [, parentPart] = rightRaw.split("->");
       if (!leftPart || !parentPart) continue;
@@ -1183,6 +1353,7 @@ export default function InteractiveBracketBoard({
     activeLayout.connectors,
     activeLayout.positionedMatches,
     bracket,
+    bracketViewMergedStacks,
     pairKeyFromConnector,
     viewMode,
     winnerByPair,
@@ -1325,13 +1496,13 @@ export default function InteractiveBracketBoard({
                     <button
                       type="button"
                       className={`${styles.toolbarButton} ${styles.toolbarBracketViewWideBtn} ${styles.toolbarBracketViewGlyphBtn}`}
-                      title="조 선택"
-                      aria-label="조 선택"
+                      title="대진표 구간"
+                      aria-label="대진표 구간"
                       onClick={() => setBracketViewModal("slice")}
                     >
                       ▦
                     </button>
-                    <span className={styles.bracketViewOpsItemLabel}>조 선택</span>
+                    <span className={styles.bracketViewOpsItemLabel}>구간</span>
                   </div>
                 ) : null}
                 {bracketViewZones ? (
@@ -1359,6 +1530,7 @@ export default function InteractiveBracketBoard({
                     }`}
                     title="세로형 보기"
                     aria-label="세로형 보기"
+                    disabled={Boolean(bracketViewMergedStacks?.length)}
                     onClick={() => setViewMode("vertical")}
                   >
                     <span className={styles.toolbarBtnLabelShort}>├</span>
@@ -1373,6 +1545,7 @@ export default function InteractiveBracketBoard({
                     }`}
                     title="양쪽형 보기"
                     aria-label="양쪽형 보기"
+                    disabled={Boolean(bracketViewMergedStacks?.length)}
                     onClick={() => setViewMode("dual")}
                   >
                     <span className={styles.toolbarBtnLabelShort}>┴</span>
@@ -1387,6 +1560,7 @@ export default function InteractiveBracketBoard({
                     }`}
                     title="가로형 보기"
                     aria-label="가로형 보기"
+                    disabled={Boolean(bracketViewMergedStacks?.length)}
                     onClick={() => setViewMode("horizontal")}
                   >
                     <span className={styles.toolbarBtnLabelShort}>⇄</span>
@@ -1577,8 +1751,13 @@ export default function InteractiveBracketBoard({
             onPointerDown={(e) => e.stopPropagation()}
           >
             <p id="bracket-view-slice-modal-title" className={styles.bracketViewModalTitle}>
-              조 선택
+              대진표 구간
             </p>
+            {bracketViewSlicePicker.hasMerged ? (
+              <p className="v3-muted" style={{ margin: "0 0 0.65rem", fontSize: "0.82rem", lineHeight: 1.45 }}>
+                조별 대진표와 결선 대진표를 한 화면에서 함께 확인합니다.
+              </p>
+            ) : null}
             <div className={styles.bracketViewModalActions}>
               {bracketViewSlicePicker.blocks.map((bl) => {
                 const key = `block:${bl.id}`;
@@ -1609,6 +1788,20 @@ export default function InteractiveBracketBoard({
                   }}
                 >
                   결선
+                </button>
+              ) : null}
+              {bracketViewSlicePicker.hasMerged ? (
+                <button
+                  type="button"
+                  className={`${styles.bracketViewModalBtn} ${
+                    bracketViewSlicePicker.boardSliceKey === "merged" ? styles.bracketViewModalBtnActive : ""
+                  }`}
+                  onClick={() => {
+                    bracketViewSlicePicker.onSliceChange("merged");
+                    setBracketViewModal(null);
+                  }}
+                >
+                  통합 대진표 보기
                 </button>
               ) : null}
             </div>
@@ -1704,6 +1897,25 @@ export default function InteractiveBracketBoard({
               }}
             >
               <div className={styles.content}>
+              {mergedSectionTitleBands?.map((band, idx) => (
+                <div
+                  key={`merged-sec-${idx}-${band.title}`}
+                  style={{
+                    position: "absolute",
+                    left: 16,
+                    top: band.topPx,
+                    right: 16,
+                    fontSize: 15,
+                    fontWeight: 800,
+                    color: "#e2e8f0",
+                    letterSpacing: "0.02em",
+                    pointerEvents: "none",
+                    textShadow: "0 1px 2px rgba(0,0,0,0.85)",
+                  }}
+                >
+                  {band.title}
+                </div>
+              ))}
               <svg className={styles.linkSvg} width={canvasWidth} height={canvasHeight}>
                 {activeLayout.connectors.map((connector) => (
                   <g key={connector.key}>

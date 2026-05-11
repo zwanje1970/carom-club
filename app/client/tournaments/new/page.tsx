@@ -973,6 +973,41 @@ export default function ClientTournamentNewPage() {
           {showCreateDone ? "대회 생성 완료" : "대회 수정"}
         </h1>
       ) : null}
+      {showCreateDone && createSuccessId ? (
+        <section
+          className="v3-stack"
+          style={{
+            gap: "0.65rem",
+            padding: "1rem 1rem",
+            borderRadius: "12px",
+            border: "1px solid #e2e8f0",
+            background: "#f8fafc",
+            marginBottom: "0.75rem",
+          }}
+          aria-labelledby="create-done-heading"
+        >
+          <h2 id="create-done-heading" className="v3-h2" style={{ margin: 0, fontSize: "1.05rem" }}>
+            대회가 생성되었습니다.
+          </h2>
+          <p style={{ margin: 0, fontSize: "0.92rem", lineHeight: 1.55, color: "#334155" }}>
+            생성된 대회는 대회안내에서 확인할 수 있습니다.
+            <br />
+            대회를 홍보하려면 대회카드를 게시하세요.
+          </p>
+          <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
+            <Link
+              className="v3-btn"
+              prefetch={false}
+              href={`/client/tournaments/${encodeURIComponent(createSuccessId)}/card-publish-v2`}
+            >
+              대회카드 작성
+            </Link>
+            <Link className="v3-btn" prefetch={false} href="/client">
+              다음에 하기
+            </Link>
+          </div>
+        </section>
+      ) : null}
       {showCreateDone && createDoneTournament ? (
         <div onClickCapture={onCreateDoneDetailClickCapture}>
           <SiteTournamentDetailSections
@@ -984,12 +1019,8 @@ export default function ClientTournamentNewPage() {
           />
         </div>
       ) : null}
-      {showCreateDone || editId ? (
-        <p className="v3-muted">
-          {showCreateDone
-            ? "대회 정보는 이미 저장되었습니다. 다음 단계는 선택입니다."
-            : "기존 대회 정보를 불러왔습니다. 수정 후 저장하면 동일 대회에 반영됩니다."}
-        </p>
+      {editId ? (
+        <p className="v3-muted">기존 대회 정보를 불러왔습니다. 수정 후 저장하면 동일 대회에 반영됩니다.</p>
       ) : null}
 
       {editId && editLoading ? (

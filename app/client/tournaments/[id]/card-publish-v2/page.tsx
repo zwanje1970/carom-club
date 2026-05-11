@@ -1,12 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { publishTournamentCardFromEditorClient } from "../tournament-card-client-publish";
 import type { TournamentCardSurfaceLayout } from "../../../../site/tournament-snapshot-card-view";
 import { POSTCARD_TEMPLATE_APP_DEFAULTS } from "../../../../../lib/postcard-template-reference";
 import editorStyles from "../card-publish-editor.module.css";
 import { CardPublishBackgroundTab, CardPublishContentTab } from "./CardPublishEditorFormParts";
+import { normalizeCardEditorBackgroundUpload } from "./normalize-card-editor-background-upload";
 import { CardPublishPreview, type CardPublishPreviewModel } from "./CardPublishPreview";
 
 /** 신규 작성·저장 스냅샷 없을 때 미리보기·팔레트 기본(32색 중 하늘색) */
@@ -181,7 +182,8 @@ export default function ClientTournamentCardPublishV2Page() {
   const router = useRouter();
   const tournamentId = useMemo(() => (typeof params.id === "string" ? params.id : ""), [params.id]);
 
-  const [tournamentStatusForPreview, setTournamentStatusForPreview] = useState("");
+  /** 게시 화면 전용 미리보기 배지(모집중 공개 vs 임시저장) */
+  const [publishIntent, setPublishIntent] = useState<"recruiting" | "draft">("recruiting");
   const [cardDate, setCardDate] = useState("");
   const [cardPlace, setCardPlace] = useState("");
   const [cardTemplate, setCardTemplate] = useState<CardTemplate>("A");
@@ -205,9 +207,7 @@ export default function ClientTournamentCardPublishV2Page() {
   const [editorTab, setEditorTab] = useState<"background" | "content">("background");
 
   const [message, setMessage] = useState("");
-  const [saveBusy, setSaveBusy] = useState(false);
-  /** 저장 성공 후에만 노출: 대회 관리 상태설정 영역으로 이동 */
-  const [saveSucceeded, setSaveSucceeded] = useState(false);
+  const [publishBusy, setPublishBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   /** 캡처용 오프스크린 카드 — 초기 타이핑 부담 완화 후 `requestIdleCallback`으로 마운트 */
   const [renderOffscreenCaptureCard, setRenderOffscreenCaptureCard] = useState(false);
@@ -246,7 +246,7 @@ export default function ClientTournamentCardPublishV2Page() {
     return {
       slideTitle: title.length > 0 ? title : "(제목)",
       slideSubtitle: subtitle.length ? subtitle : "·",
-      slideStatusBadge: tournamentStatusForPreview,
+      slideStatusBadge: publishIntent === "recruiting" ? "모집중" : "임시저장",
       slideExtra1: textLine1.length > 0 ? textLine1 : null,
       slideExtra2: textLine2.length > 0 ? textLine2 : null,
       slideImage320Url: uploadedImage?.w320Url,
@@ -268,7 +268,7 @@ export default function ClientTournamentCardPublishV2Page() {
     title,
     cardDate,
     cardPlace,
-    tournamentStatusForPreview,
+    publishIntent,
     textLine1,
     textLine2,
     leadTextColor,
@@ -325,10 +325,6 @@ export default function ClientTournamentCardPublishV2Page() {
 
       const t = result.tournament;
       if (!t) return;
-
-      setTournamentStatusForPreview(
-        typeof t.statusBadge === "string" && t.statusBadge.trim() ? t.statusBadge.trim() : ""
-      );
 
       const summaryLine1 = firstNonEmptyLine(t.summary);
       const summaryLine2 = secondNonEmptyLine(t.summary);
@@ -442,9 +438,9 @@ export default function ClientTournamentCardPublishV2Page() {
   }, [loadSnapshots]);
 
   useEffect(() => {
-    setSaveSucceeded(false);
     userEditedTextLine2Ref.current = false;
     prizeAutoSeededRef.current = false;
+    setPublishIntent("recruiting");
   }, [tournamentId]);
 
   useEffect(() => {
@@ -490,41 +486,72 @@ export default function ClientTournamentCardPublishV2Page() {
     return { ok: true, body };
   }
 
-  /** 초안만 저장. 메인 게시는 이 화면에서 하지 않으며 대회 관리 페이지에서 진행한다. */
-  function saveCardDraft(successMessage: string) {
-    if (!tournamentId) return;
+  /** 스냅샷 임시저장만 (`draftOnly: true`). 공개본은 덮어쓰지 않음. */
+  async function persistCardDraftSnapshot(): Promise<boolean> {
+    if (!tournamentId) return false;
+    const built = buildCardPayload(true);
+    if (!built.ok) {
+      setMessage(built.error);
+      return false;
+    }
+    const response = await fetch("/api/client/card-snapshots", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(built.body),
+    });
+    const result = (await response.json()) as { error?: string };
+    if (!response.ok) {
+      setMessage(result.error ?? "저장에 실패했습니다.");
+      return false;
+    }
+    return true;
+  }
+
+  async function handlePublish(): Promise<void> {
+    if (!tournamentId.trim() || publishBusy) return;
     if (saveInFlightRef.current) return;
     saveInFlightRef.current = true;
-
-    void (async () => {
-      setSaveBusy(true);
-      setMessage("");
-      try {
-        const built = buildCardPayload(true);
-        if (!built.ok) {
-          setMessage(built.error);
-          return;
-        }
-        const response = await fetch("/api/client/card-snapshots", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(built.body),
-        });
-        const result = (await response.json()) as { error?: string };
-        if (!response.ok) {
-          setMessage(result.error ?? "저장에 실패했습니다.");
-          return;
-        }
-        setSaveSucceeded(true);
-        setMessage(successMessage);
-        router.refresh();
-      } catch {
-        setMessage("저장 요청 중 오류가 발생했습니다.");
-      } finally {
-        setSaveBusy(false);
-        saveInFlightRef.current = false;
+    setPublishBusy(true);
+    setMessage("");
+    try {
+      if (!(await persistCardDraftSnapshot())) {
+        return;
       }
-    })();
+
+      if (publishIntent === "draft") {
+        window.alert("대회카드가 임시저장되었습니다.");
+        void router.refresh();
+        return;
+      }
+
+      const patchRes = await fetch(`/api/client/tournaments/${encodeURIComponent(tournamentId)}/status-badge`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ statusBadge: "모집중" }),
+      });
+      if (!patchRes.ok) {
+        const data = (await patchRes.json()) as { error?: string };
+        window.alert(data.error ?? "대회 상태를 모집중으로 바꾸지 못했습니다.");
+        return;
+      }
+
+      const pub = await publishTournamentCardFromEditorClient({
+        tournamentId,
+        slideStatusBadge: "모집중",
+      });
+      if (!pub.ok) {
+        window.alert(pub.error);
+        return;
+      }
+
+      window.alert("대회카드가 게시되었습니다.");
+      void router.refresh();
+    } catch {
+      window.alert("처리 중 오류가 발생했습니다.");
+    } finally {
+      setPublishBusy(false);
+      saveInFlightRef.current = false;
+    }
   }
 
   const handleUploadImage = useCallback(
@@ -533,8 +560,19 @@ export default function ClientTournamentCardPublishV2Page() {
       setUploading(true);
       setMessage("");
       try {
+        let uploadFile: File;
+        try {
+          uploadFile = await normalizeCardEditorBackgroundUpload(file);
+        } catch {
+          setMessage(
+            "이미지 변환에 실패했습니다. 다른 사진을 선택하거나 캡처 이미지로 다시 시도해 주세요."
+          );
+          if (bgFileInputRef.current) bgFileInputRef.current.value = "";
+          return;
+        }
+
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("file", uploadFile);
         /** 메인 슬라이드 등 공개 페이지에서 `/site-images/...` 로 노출되도록 */
         formData.append("sitePublic", "1");
         const response = await fetch("/api/upload/image", {
@@ -665,14 +703,7 @@ export default function ClientTournamentCardPublishV2Page() {
           </div>
         </div>
 
-        <form
-          className={editorStyles.formPanel}
-          noValidate
-          onSubmit={(e) => {
-            e.preventDefault();
-            saveCardDraft("카드 초안이 저장되었습니다.");
-          }}
-        >
+        <div className={editorStyles.formPanel}>
           <div className={editorStyles.stepTabsWrap}>
             <div className={editorStyles.stepTabs} role="tablist" aria-label="편집 단계">
               <button
@@ -738,28 +769,62 @@ export default function ClientTournamentCardPublishV2Page() {
           )}
 
           <div className={editorStyles.actions}>
-            <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-              <button type="submit" className="v3-btn" disabled={saveBusy}>
-                {saveBusy ? "저장 중" : "저장"}
-              </button>
-              {saveSucceeded && tournamentId.trim() ? (
-                <Link
-                  className="v3-btn"
-                  href={`/client/tournaments/${encodeURIComponent(tournamentId)}#tournament-status-badge`}
+            <div className="v3-stack" style={{ gap: "0.35rem", alignItems: "stretch" }}>
+              <p style={{ margin: 0, fontSize: "0.82rem", fontWeight: 800, color: "#334155" }}>게시 상태</p>
+              <div
+                className="v3-row"
+                role="radiogroup"
+                aria-label="게시 상태"
+                style={{ flexWrap: "wrap", gap: "0.65rem", alignItems: "center" }}
+              >
+                <label
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
+                    fontSize: "0.9rem",
+                    cursor: publishBusy ? "default" : "pointer",
+                  }}
                 >
-                  상태배지 변경
-                </Link>
-              ) : null}
-            </div>
-            {saveSucceeded ? (
-              <p className="v3-muted" style={{ margin: 0 }}>
-                초안이 저장되었습니다. 게시하려면 모집중으로 변경하셔야 합니다.
+                  <input
+                    type="radio"
+                    name="publish-intent"
+                    checked={publishIntent === "recruiting"}
+                    disabled={publishBusy}
+                    onChange={() => setPublishIntent("recruiting")}
+                  />
+                  모집중
+                </label>
+                <label
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
+                    fontSize: "0.9rem",
+                    cursor: publishBusy ? "default" : "pointer",
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="publish-intent"
+                    checked={publishIntent === "draft"}
+                    disabled={publishBusy}
+                    onChange={() => setPublishIntent("draft")}
+                  />
+                  임시저장
+                </label>
+              </div>
+              <p className="v3-muted" style={{ margin: 0, fontSize: "0.8rem", lineHeight: 1.45 }}>
+                모집중으로 게시하면 메인에 홍보됩니다. 임시저장은 공개 카드를 바꾸지 않습니다.
               </p>
-            ) : null}
+              <button type="button" className="v3-btn" disabled={publishBusy} onClick={() => void handlePublish()}>
+                {publishBusy ? "처리 중…" : "게시"}
+              </button>
+            </div>
           </div>
           </div>
           </div>
-        </form>
+        </div>
           </div>
 
           {message ? (

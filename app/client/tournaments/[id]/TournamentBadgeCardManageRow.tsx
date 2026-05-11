@@ -2,24 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { withPublishedCardMainReflectNotice } from "../../../../lib/client-published-card-main-reflect-notice";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { TournamentStatusBadge } from "../../../../lib/types/entities";
-import { buildSlideDeckItemForTournamentCapture } from "./tournament-card-build-slide-deck-item";
-import { captureAndUploadTournamentCardSnapshots } from "./tournament-card-publish-capture";
 
-const OPTIONS: TournamentStatusBadge[] = [
-  "모집중",
-  "마감임박",
-  "마감",
-  "진행중",
-  "예정",
-  "종료",
-  "초안",
-];
-
-/** 동일 대회 publish 중복 실행 차단(컴포넌트 리마운트 간에도 유지). */
-const publishInFlightTournamentIds = new Set<string>();
+/** API `/status-badge` 와 동일 옵션(대회 운영 상태) */
+const OPTIONS: TournamentStatusBadge[] = ["모집중", "마감임박", "마감", "진행중", "예정", "종료", "초안"];
 
 function statusBadgeStyle(badge: TournamentStatusBadge): { background: string; color: string } {
   if (badge === "모집중") {
@@ -34,64 +21,6 @@ function statusBadgeStyle(badge: TournamentStatusBadge): { background: string; c
   return { background: "#eff6ff", color: "#1e3a5f" };
 }
 
-type CardSnapshotRow = {
-  snapshotId?: string;
-  title: string;
-  subtitle: string;
-  cardExtraLine1?: string | null;
-  cardExtraLine2?: string | null;
-  cardExtraLine3?: string | null;
-  imageId: string;
-  image320Url: string;
-  tournamentCardTemplate?: "A" | "B";
-  tournamentBackgroundType?: "image" | "theme";
-  tournamentTheme?: "dark" | "light" | "natural";
-  tournamentMediaBackground?: string | null;
-  tournamentImageOverlayBlend?: boolean | null;
-  tournamentImageOverlayOpacity?: number | null;
-  tournamentCardDisplayDate?: string | null;
-  tournamentCardDisplayLocation?: string | null;
-  tournamentCardTextShadowEnabled?: boolean;
-  tournamentCardSurfaceLayout?: "split" | "full";
-  cardFooterDateTextColor?: string | null;
-  cardFooterPlaceTextColor?: string | null;
-  cardLeadTextColor?: string | null;
-  cardTitleTextColor?: string | null;
-  cardDescriptionTextColor?: string | null;
-  /** false면 초안(게시카드 작성 저장분). 게시 시 최신 초안을 우선한다. */
-  isActive?: boolean;
-};
-
-function isCompleteCard(s: CardSnapshotRow | null | undefined): s is CardSnapshotRow {
-  if (!s) return false;
-  const title = typeof s.title === "string" ? s.title.trim() : "";
-  if (!title) return false;
-  const bg = s.tournamentBackgroundType === "theme" ? "theme" : "image";
-  if (bg === "image") {
-    const imageId = typeof s.imageId === "string" ? s.imageId.trim() : "";
-    const image320Url = typeof s.image320Url === "string" ? s.image320Url.trim() : "";
-    return Boolean(imageId && image320Url);
-  }
-  return true;
-}
-
-/**
- * 목록은 최신순(서버). 게시 시 본문은 마지막으로 저장한 초안(`isActive !== true`)을 우선하고,
- * 없으면 현재 메인에 올라간 카드 내용으로 다시 게시(갱신)한다.
- */
-function pickCardForPublish(data: {
-  snapshots?: CardSnapshotRow[];
-  activeSnapshot?: CardSnapshotRow | null;
-}): CardSnapshotRow | null {
-  const list = data.snapshots ?? [];
-  const draft = list.find((row) => row.isActive === false && isCompleteCard(row));
-  if (draft) return draft;
-  const fromList = list.find((row) => isCompleteCard(row));
-  if (fromList) return fromList;
-  if (isCompleteCard(data.activeSnapshot)) return data.activeSnapshot;
-  return null;
-}
-
 export type TournamentManageInfoCardFields = {
   title: string;
   scheduleLine: string | null;
@@ -104,24 +33,25 @@ export default function TournamentBadgeCardManageRow({
   tournamentId,
   initialStatus,
   infoCard,
+  hasDraftCardSnapshot,
 }: {
   tournamentId: string;
   initialStatus: TournamentStatusBadge;
   infoCard?: TournamentManageInfoCardFields;
+  /** 게시카드 임시저장 스냅샷 존재(공개본과 별도) */
+  hasDraftCardSnapshot?: boolean;
 }) {
   const router = useRouter();
   const [value, setValue] = useState(initialStatus);
-  const [expanded, setExpanded] = useState(false);
-  const [publishBusy, setPublishBusy] = useState(false);
-  const publishRunningRef = useRef(false);
-  const badgePillStyle = statusBadgeStyle(value);
+  const [applyBusy, setApplyBusy] = useState(false);
 
   useEffect(() => {
     setValue(initialStatus);
   }, [initialStatus]);
 
-  /** 기존 PATCH `/status-badge` 요청과 동일한 본문·응답 처리(호출 위치만 「저장/게시」로 이동). */
-  async function persistCurrentBadgeToServer(): Promise<boolean> {
+  async function onApplyStatus(): Promise<void> {
+    if (!tournamentId.trim() || applyBusy) return;
+    setApplyBusy(true);
     try {
       const res = await fetch(`/api/client/tournaments/${encodeURIComponent(tournamentId)}/status-badge`, {
         method: "PATCH",
@@ -131,228 +61,20 @@ export default function TournamentBadgeCardManageRow({
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
         window.alert(data.error ?? "저장에 실패했습니다.");
-        return false;
+        return;
       }
-      return true;
+      void router.refresh();
     } catch {
       window.alert("저장 중 오류가 발생했습니다.");
-      return false;
-    }
-  }
-
-  /**
-   * 작성화면(card-publish-v2)에서 쓰던 게시 POST와 동일한 페이로드·검증·안내(함수 위치만 대회 관리로 이동).
-   * `draftOnly: false` — 서버 검증·에러 문구는 변경하지 않음.
-   */
-  async function requestCardPublish(): Promise<void> {
-    let data: {
-      snapshots?: CardSnapshotRow[];
-      activeSnapshot?: CardSnapshotRow | null;
-      tournament?: { date?: string; location?: string };
-      error?: string;
-    } = {};
-    let hadPublishedBefore = false;
-    let latest: CardSnapshotRow | null = null;
-    let getOk = false;
-    let getStatus = 0;
-    let tournamentDate = "";
-    let tournamentLocation = "";
-    try {
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), 2000);
-      try {
-        const res = await fetch(`/api/client/card-snapshots?tournamentId=${encodeURIComponent(tournamentId)}`, {
-          signal: controller.signal,
-        });
-        getOk = res.ok;
-        getStatus = res.status;
-        const json = (await res.json()) as {
-          snapshots?: CardSnapshotRow[];
-          activeSnapshot?: CardSnapshotRow | null;
-          tournament?: { date?: string; location?: string };
-          error?: string;
-        };
-        data = json;
-        hadPublishedBefore = Boolean(json.activeSnapshot);
-        latest = pickCardForPublish(json);
-        tournamentDate = typeof json.tournament?.date === "string" ? json.tournament.date : "";
-        tournamentLocation = typeof json.tournament?.location === "string" ? json.tournament.location : "";
-      } finally {
-        window.clearTimeout(timeoutId);
-      }
-    } catch (e) {
-      console.warn("[PUBLISH] GET card-snapshots failed or timed out", e);
-    }
-
-    console.log("[PUBLISH] after GET card-snapshots", {
-      ok: getOk,
-      status: getStatus,
-      tournamentId,
-      snapshotCount: Array.isArray(data.snapshots) ? data.snapshots.length : 0,
-      hasLatest: Boolean(latest),
-    });
-
-    const publishSource: CardSnapshotRow = latest ?? {
-      title: "대회 카드",
-      subtitle: "",
-      imageId: "theme",
-      image320Url: "",
-      tournamentCardTemplate: "A",
-      tournamentBackgroundType: "theme",
-      tournamentTheme: "dark",
-      isActive: true,
-    };
-
-    let publishedCardImageUrl = "";
-    let publishedCardImage320Url = "";
-    try {
-      const slideDeckItem = buildSlideDeckItemForTournamentCapture({
-        tournamentId,
-        source: {
-          snapshotId: publishSource.snapshotId,
-          title: publishSource.title,
-          subtitle: publishSource.subtitle,
-          cardExtraLine1: publishSource.cardExtraLine1,
-          cardExtraLine2: publishSource.cardExtraLine2,
-          cardExtraLine3: publishSource.cardExtraLine3,
-          image320Url: publishSource.image320Url,
-          tournamentCardTemplate: publishSource.tournamentCardTemplate,
-          tournamentBackgroundType: publishSource.tournamentBackgroundType,
-          tournamentTheme: publishSource.tournamentTheme,
-          tournamentMediaBackground: publishSource.tournamentMediaBackground,
-          tournamentImageOverlayBlend: publishSource.tournamentImageOverlayBlend,
-          tournamentImageOverlayOpacity: publishSource.tournamentImageOverlayOpacity,
-          tournamentCardDisplayDate: publishSource.tournamentCardDisplayDate,
-          tournamentCardDisplayLocation: publishSource.tournamentCardDisplayLocation,
-          cardLeadTextColor: publishSource.cardLeadTextColor,
-          cardTitleTextColor: publishSource.cardTitleTextColor,
-          cardDescriptionTextColor: publishSource.cardDescriptionTextColor,
-          tournamentCardTextShadowEnabled: publishSource.tournamentCardTextShadowEnabled,
-          tournamentCardSurfaceLayout: publishSource.tournamentCardSurfaceLayout,
-          cardFooterDateTextColor: publishSource.cardFooterDateTextColor,
-          cardFooterPlaceTextColor: publishSource.cardFooterPlaceTextColor,
-        },
-        statusBadge: value,
-        tournamentFallbackDate: tournamentDate,
-        tournamentFallbackLocation: tournamentLocation,
-      });
-      const urls = await captureAndUploadTournamentCardSnapshots(slideDeckItem);
-      publishedCardImageUrl = urls.publishedCardImageUrl;
-      publishedCardImage320Url = urls.publishedCardImage320Url;
-    } catch (e) {
-      window.alert(e instanceof Error ? e.message : "카드 이미지 생성에 실패했습니다.");
-      return;
-    }
-
-    console.log("[PUBLISH] before POST");
-    const postRes = await fetch("/api/client/card-snapshots", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tournamentId,
-        title: typeof publishSource.title === "string" ? publishSource.title : "",
-        textLine1: typeof publishSource.cardExtraLine1 === "string" ? publishSource.cardExtraLine1 : "",
-        textLine2: typeof publishSource.cardExtraLine2 === "string" ? publishSource.cardExtraLine2 : "",
-        textLine3: typeof publishSource.cardExtraLine3 === "string" ? publishSource.cardExtraLine3 : "",
-        cardTemplate: publishSource.tournamentCardTemplate ?? "A",
-        backgroundType: publishSource.tournamentBackgroundType ?? "image",
-        themeType: publishSource.tournamentTheme ?? "dark",
-        imageId: publishSource.imageId?.trim() ?? "",
-        image320Url: publishSource.image320Url?.trim() ?? "",
-        draftOnly: false,
-        cardTextShadowEnabled: publishSource.tournamentCardTextShadowEnabled === true,
-        cardSurfaceLayout: publishSource.tournamentCardSurfaceLayout === "full" ? "full" : "split",
-        ...(publishSource.tournamentCardSurfaceLayout === "full"
-          ? {
-              cardFooterDateTextColor:
-                typeof publishSource.cardFooterDateTextColor === "string" && publishSource.cardFooterDateTextColor.trim()
-                  ? publishSource.cardFooterDateTextColor.trim()
-                  : null,
-              cardFooterPlaceTextColor:
-                typeof publishSource.cardFooterPlaceTextColor === "string" && publishSource.cardFooterPlaceTextColor.trim()
-                  ? publishSource.cardFooterPlaceTextColor.trim()
-                  : null,
-            }
-          : {
-              cardFooterDateTextColor: null,
-              cardFooterPlaceTextColor: null,
-            }),
-        ...(typeof publishSource.tournamentMediaBackground === "string"
-          ? { mediaBackground: publishSource.tournamentMediaBackground }
-          : {}),
-        ...(typeof publishSource.tournamentImageOverlayBlend === "boolean"
-          ? { imageOverlayBlend: publishSource.tournamentImageOverlayBlend }
-          : {}),
-        ...(typeof publishSource.tournamentImageOverlayOpacity === "number"
-          ? { imageOverlayOpacity: publishSource.tournamentImageOverlayOpacity }
-          : {}),
-        ...(typeof publishSource.tournamentCardDisplayDate === "string"
-          ? { cardDisplayDate: publishSource.tournamentCardDisplayDate }
-          : {}),
-        ...(typeof publishSource.tournamentCardDisplayLocation === "string"
-          ? { cardDisplayLocation: publishSource.tournamentCardDisplayLocation }
-          : {}),
-        ...(typeof publishSource.cardLeadTextColor === "string" && publishSource.cardLeadTextColor.trim()
-          ? { cardLeadTextColor: publishSource.cardLeadTextColor.trim() }
-          : {}),
-        ...(typeof publishSource.cardTitleTextColor === "string" && publishSource.cardTitleTextColor.trim()
-          ? { cardTitleTextColor: publishSource.cardTitleTextColor.trim() }
-          : {}),
-        ...(typeof publishSource.cardDescriptionTextColor === "string" && publishSource.cardDescriptionTextColor.trim()
-          ? { cardDescriptionTextColor: publishSource.cardDescriptionTextColor.trim() }
-          : {}),
-        publishedCardImageUrl,
-        publishedCardImage320Url,
-        publishedCardImageBackgroundOnly: true,
-      }),
-    });
-    const postData = (await postRes.json()) as {
-      ok?: boolean;
-      code?: string;
-      message?: string;
-      error?: string;
-      snapshot?: { snapshotId?: string };
-    };
-    if (!postRes.ok) {
-      window.alert(postData.error ?? "게시에 실패했습니다.");
-      return;
-    }
-    window.alert(
-      withPublishedCardMainReflectNotice(
-        hadPublishedBefore
-          ? "게시카드가 갱신되어 메인에 반영되었습니다."
-          : "메인에 게시되었습니다. 사이트에 반영되었습니다.",
-      ),
-    );
-    setExpanded(false);
-    router.refresh();
-  }
-
-  async function onSaveBadgeAndPublish() {
-    const publishKey = tournamentId.trim();
-    if (!publishKey) return;
-    if (publishRunningRef.current) return;
-    if (publishInFlightTournamentIds.has(publishKey)) return;
-    publishRunningRef.current = true;
-    publishInFlightTournamentIds.add(publishKey);
-    setPublishBusy(true);
-    try {
-      if (!(await persistCurrentBadgeToServer())) return;
-      await router.refresh();
-      await requestCardPublish();
-    } catch {
-      window.alert("처리 중 오류가 발생했습니다.");
     } finally {
-      setPublishBusy(false);
-      publishRunningRef.current = false;
-      publishInFlightTournamentIds.delete(publishKey);
+      setApplyBusy(false);
     }
   }
 
   const pill = (
     <span
       style={{
-        ...badgePillStyle,
+        ...statusBadgeStyle(value),
         fontSize: "0.78rem",
         fontWeight: 800,
         padding: "0.2rem 0.55rem",
@@ -364,28 +86,50 @@ export default function TournamentBadgeCardManageRow({
     </span>
   );
 
-  const expandedPanel = expanded ? (
+  const draftPill =
+    hasDraftCardSnapshot === true ? (
+      <span
+        style={{
+          background: "#e0e7ff",
+          color: "#3730a3",
+          fontSize: "0.72rem",
+          fontWeight: 800,
+          padding: "0.2rem 0.5rem",
+          borderRadius: "999px",
+          whiteSpace: "nowrap",
+        }}
+      >
+        게시카드 임시저장
+      </span>
+    ) : null;
+
+  const cardPublishHref = `/client/tournaments/${encodeURIComponent(tournamentId)}/card-publish-v2`;
+  const editHref = `/client/tournaments/${encodeURIComponent(tournamentId)}/edit`;
+
+  const statusRow = (
     <div
-      className="v3-stack client-tournament-manage__badgePanel"
+      className="client-tournament-manage__badgeSimpleRow"
       style={{
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "center",
+        gap: "0.45rem",
         width: "100%",
-        alignItems: "stretch",
-        gap: "0.4rem",
-        marginTop: "0.4rem",
-        padding: "0.55rem 0.6rem",
-        border: "1px solid #e5e7eb",
-        borderRadius: "12px",
-        background: "#f8fafc",
-        boxSizing: "border-box",
       }}
     >
-      <p style={{ margin: 0, fontSize: "0.82rem", fontWeight: 800, color: "#334155" }}>게시카드 상태관리</p>
       <select
         value={value}
-        disabled={publishBusy}
+        disabled={applyBusy}
         onChange={(e) => setValue(e.target.value as TournamentStatusBadge)}
-        style={{ padding: "0.45rem", border: "1px solid #bbb", borderRadius: "0.35rem", fontSize: "0.88rem" }}
-        aria-label="대회 상태 배지"
+        style={{
+          flex: "1 1 10rem",
+          minWidth: "min(100%, 11rem)",
+          padding: "0.45rem",
+          border: "1px solid #bbb",
+          borderRadius: "0.35rem",
+          fontSize: "0.88rem",
+        }}
+        aria-label="대회 상태"
       >
         {OPTIONS.map((o) => (
           <option key={o} value={o}>
@@ -393,22 +137,32 @@ export default function TournamentBadgeCardManageRow({
           </option>
         ))}
       </select>
-      <p className="v3-muted" style={{ margin: 0, fontSize: "0.85rem", lineHeight: 1.45 }}>
-        이미 게시된 카드가 있으면 새로 만들지 않고 기존 카드에 반영됩니다. 대회당 메인 게시카드는 1개입니다.
-      </p>
-      <button type="button" className="v3-btn" disabled={publishBusy} onClick={() => void onSaveBadgeAndPublish()}>
-        {publishBusy ? "처리 중…" : "저장/게시"}
+      <button type="button" className="v3-btn" disabled={applyBusy} onClick={() => void onApplyStatus()}>
+        {applyBusy ? "적용 중…" : "상태 적용"}
       </button>
+    </div>
+  );
+
+  const linksRow = (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem", width: "100%" }}>
       <Link
-        className="v3-btn"
-        href={`/client/tournaments/${tournamentId}/card-publish-v2`}
         prefetch={false}
-        style={{ textAlign: "center", textDecoration: "none" }}
+        href={cardPublishHref}
+        className="v3-btn"
+        style={{ flex: "1 1 auto", minWidth: "min(100%, 10rem)", textAlign: "center", textDecoration: "none" }}
       >
-        게시카드 작성·수정
+        게시카드 수정
+      </Link>
+      <Link
+        prefetch={false}
+        href={editHref}
+        className="v3-btn"
+        style={{ flex: "1 1 auto", minWidth: "min(100%, 10rem)", textAlign: "center", textDecoration: "none" }}
+      >
+        대회정보 수정
       </Link>
     </div>
-  ) : null;
+  );
 
   if (infoCard) {
     return (
@@ -432,23 +186,14 @@ export default function TournamentBadgeCardManageRow({
             </p>
           </div>
         </div>
-        <div className="client-tournament-manage__infoBadgeActions">
-          <div className="client-tournament-manage__infoPill">{pill}</div>
-          <div className="client-tournament-manage__badgeToggleRow">
-            <button type="button" className="v3-btn" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
-              상태배지 변경
-            </button>
+        <div className="client-tournament-manage__infoBadgeActions v3-stack" style={{ gap: "0.45rem", alignItems: "stretch" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.35rem" }}>
+            <span className="client-tournament-manage__infoPill">{pill}</span>
+            {draftPill}
           </div>
-          <Link
-            prefetch={false}
-            href={`/client/tournaments/${encodeURIComponent(tournamentId)}/edit`}
-            className="v3-btn client-tournament-manage__topActionBtn"
-            style={{ textDecoration: "none", flex: "1 1 auto", minWidth: "8rem" }}
-          >
-            대회정보 수정
-          </Link>
+          {statusRow}
+          {linksRow}
         </div>
-        {expandedPanel}
       </div>
     );
   }
@@ -459,17 +204,12 @@ export default function TournamentBadgeCardManageRow({
       className="v3-stack"
       style={{ scrollMarginTop: "4.5rem", alignItems: "flex-end", flex: "0 1 auto", minWidth: "min(100%, 22rem)", gap: "0.35rem" }}
     >
-      {pill}
-      <button
-        type="button"
-        className="v3-btn"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((v) => !v)}
-        style={{ padding: "0.35rem 0.6rem", fontSize: "0.82rem", fontWeight: 700, width: "100%", maxWidth: "14rem" }}
-      >
-        상태배지 변경
-      </button>
-      {expandedPanel}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}>
+        {pill}
+        {draftPill}
+      </div>
+      {statusRow}
+      {linksRow}
     </div>
   );
 }

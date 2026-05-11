@@ -94,6 +94,8 @@ export default function TournamentBracketBoardViewPage() {
   const [actionBusy, setActionBusy] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const sliceMetaRef = useRef<{ bracketId: string; blockSig: string }>({ bracketId: "", blockSig: "" });
+  /** `viewMode=merged` 는 최초 진입 시 한 번만 적용(사용자가 조·결선 전환 시 덮어쓰지 않음) */
+  const appliedMergedFromUrlRef = useRef(false);
   const bracketPdfSnapshotRef = useRef<(() => BracketBoardPdfSnapshot) | null>(null);
   const bracketRef = useRef<Bracket | null>(null);
   const replayRunningRef = useRef(false);
@@ -112,6 +114,18 @@ export default function TournamentBracketBoardViewPage() {
   useEffect(() => {
     bracketRef.current = bracket;
   }, [bracket]);
+
+  useEffect(() => {
+    appliedMergedFromUrlRef.current = false;
+  }, [tournamentId]);
+
+  useEffect(() => {
+    if (appliedMergedFromUrlRef.current) return;
+    if (!bracket?.id || bracket.bracketMode !== "multi_block") return;
+    if (searchParams.get("viewMode")?.trim() !== "merged") return;
+    appliedMergedFromUrlRef.current = true;
+    setBoardSliceKey("merged");
+  }, [bracket?.id, bracket?.bracketMode, searchParams]);
 
   useEffect(() => {
     const up = () => setNavigatorOnline(true);
@@ -946,6 +960,7 @@ export default function TournamentBracketBoardViewPage() {
       if (!sliceStorageKey || typeof window === "undefined") return null;
       try {
         const raw = sessionStorage.getItem(sliceStorageKey);
+        if (raw === "merged") return "merged";
         if (raw === "final" && bracket.finalBlock?.rounds?.length) return "final";
         if (raw?.startsWith("block:")) {
           const bid = raw.slice("block:".length);
@@ -964,6 +979,7 @@ export default function TournamentBracketBoardViewPage() {
       if (structuralChange) {
         const stored = readStoredSlice();
         if (stored) return stored;
+        if (prevKey === "merged") return "merged";
         if (prevKey === "final" && hasFinal) return "final";
         if (typeof prevKey === "string" && prevKey.startsWith("block:")) {
           const bid = prevKey.slice("block:".length);
@@ -972,6 +988,7 @@ export default function TournamentBracketBoardViewPage() {
         return `block:${bracket.blocks![0].id}`;
       }
 
+      if (prevKey === "merged") return "merged";
       if (prevKey === "final" && hasFinal) return prevKey;
       if (typeof prevKey === "string" && prevKey.startsWith("block:")) {
         const bid = prevKey.slice("block:".length);
@@ -981,11 +998,30 @@ export default function TournamentBracketBoardViewPage() {
     });
   }, [bracket, sliceStorageKey]);
 
+  const bracketViewMergedStacks = useMemo(() => {
+    if (!bracket || bracket.bracketMode !== "multi_block" || boardSliceKey !== "merged" || !bracket.blocks?.length) {
+      return null;
+    }
+    const stacks = bracket.blocks.map((bl) => ({
+      sectionTitle: `조 ${bl.label ?? bl.id}`,
+      bracket: { id: `${bracket.id}:merged:block:${bl.id}`, rounds: bl.rounds },
+    }));
+    if (bracket.finalBlock?.rounds?.length) {
+      stacks.push({
+        sectionTitle: "결선",
+        bracket: { id: `${bracket.id}:merged:final`, rounds: bracket.finalBlock.rounds },
+      });
+    }
+    return stacks;
+  }, [bracket, boardSliceKey]);
+
   const boardBracket = useMemo(() => {
     if (!bracket) return null;
     let rounds: BracketRoundView[];
     if (bracket.bracketMode === "multi_block" && boardSliceKey) {
-      if (boardSliceKey === "final") {
+      if (boardSliceKey === "merged" && bracketViewMergedStacks?.length) {
+        rounds = bracketViewMergedStacks[0]!.bracket.rounds;
+      } else if (boardSliceKey === "final") {
         rounds = bracket.finalBlock?.rounds ?? [];
       } else if (boardSliceKey.startsWith("block:")) {
         const bid = boardSliceKey.slice("block:".length);
@@ -998,7 +1034,7 @@ export default function TournamentBracketBoardViewPage() {
     }
     const suffix = boardSliceKey ?? "root";
     return { id: `${bracket.id}:${suffix}`, rounds };
-  }, [bracket, boardSliceKey]);
+  }, [bracket, boardSliceKey, bracketViewMergedStacks]);
 
   const viewStateStorageKey = useMemo(() => {
     if (!tournamentId || !boardBracket) return undefined;
@@ -1015,6 +1051,7 @@ export default function TournamentBracketBoardViewPage() {
       ? {
           blocks: bracket.blocks.map((bl) => ({ id: bl.id, label: bl.label })),
           hasFinal: Boolean(bracket.finalBlock?.rounds?.length),
+          hasMerged: true,
           boardSliceKey,
           onSliceChange: handleBoardSliceChange,
         }
@@ -1135,12 +1172,13 @@ export default function TournamentBracketBoardViewPage() {
               tournamentDate={tournamentDate}
               tournamentLocation={tournamentLocation}
               shuffleRoundHidden={bracket?.bracketMode === "multi_block"}
-              interactionDisabled={isTournamentClosed}
+              interactionDisabled={isTournamentClosed || boardSliceKey === "merged"}
               actionBusy={actionBusy}
               canUndo={false}
               saveStateText={saveStateText}
               chromeMode="bracketView"
               bracketViewSlicePicker={bracketViewSlicePicker}
+              bracketViewMergedStacks={bracketViewMergedStacks}
               bracketViewZones={bracketViewZones}
               bracketViewNotice={message}
               viewStateStorageKey={viewStateStorageKey}

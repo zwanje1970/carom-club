@@ -5,6 +5,7 @@ import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/au
 import { getClientTournamentDetailPreviewById, getUserById } from "../../../../lib/platform-api";
 import { getLatestBracketByTournamentIdFirestore } from "../../../../lib/server/firestore-tournament-brackets";
 import { getTournamentApplicationListCountsFirestore } from "../../../../lib/server/firestore-tournament-applications";
+import { listCardSnapshotsByTournamentId } from "../../../../lib/server/platform-backing-store";
 import { formatTournamentScheduleLabel } from "../../../../lib/tournament-schedule";
 import Link from "next/link";
 import TournamentBadgeCardManageRow from "./TournamentBadgeCardManageRow";
@@ -41,10 +42,12 @@ export default async function ClientTournamentManagePage({ params }: { params: P
 
   const sessionUser = session ? await getUserById(session.userId) : null;
 
-  const [participantCountSummary, latestBracket] = await Promise.all([
+  const [participantCountSummary, latestBracket, cardSnapshots] = await Promise.all([
     getTournamentApplicationListCountsFirestore(id),
     getLatestBracketByTournamentIdFirestore(id),
+    listCardSnapshotsByTournamentId(id),
   ]);
+  const hasDraftCardSnapshot = cardSnapshots.some((s) => s.isPublished === true && s.isActive === false);
   const scheduleLine = formatTournamentScheduleLabel(tournament);
   const bracketPlanEnabled =
     tournament.statusBadge === "마감" || tournament.statusBadge === "진행중" || tournament.statusBadge === "종료";
@@ -57,6 +60,7 @@ export default async function ClientTournamentManagePage({ params }: { params: P
       <TournamentBadgeCardManageRow
         tournamentId={id}
         initialStatus={tournament.statusBadge}
+        hasDraftCardSnapshot={hasDraftCardSnapshot}
         infoCard={{
           title: tournament.title,
           scheduleLine: scheduleLine || null,
