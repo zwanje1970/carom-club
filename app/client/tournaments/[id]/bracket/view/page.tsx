@@ -96,6 +96,8 @@ export default function TournamentBracketBoardViewPage() {
   const sliceMetaRef = useRef<{ bracketId: string; blockSig: string }>({ bracketId: "", blockSig: "" });
   /** `viewMode=merged` 는 최초 진입 시 한 번만 적용(사용자가 조·결선 전환 시 덮어쓰지 않음) */
   const appliedMergedFromUrlRef = useRef(false);
+  /** 허브 등에서 `sliceKey` 쿼리로 들어올 때 브라켓 구조가 같아도 URL 변경을 감지한다 */
+  const prevViewSliceKeyParamRef = useRef("");
   const bracketPdfSnapshotRef = useRef<(() => BracketBoardPdfSnapshot) | null>(null);
   const bracketRef = useRef<Bracket | null>(null);
   const replayRunningRef = useRef(false);
@@ -117,6 +119,7 @@ export default function TournamentBracketBoardViewPage() {
 
   useEffect(() => {
     appliedMergedFromUrlRef.current = false;
+    prevViewSliceKeyParamRef.current = "";
   }, [tournamentId]);
 
   useEffect(() => {
@@ -944,13 +947,19 @@ export default function TournamentBracketBoardViewPage() {
     if (!bracket) {
       setBoardSliceKey(null);
       sliceMetaRef.current = { bracketId: "", blockSig: "" };
+      prevViewSliceKeyParamRef.current = "";
       return;
     }
     if (bracket.bracketMode !== "multi_block" || !bracket.blocks?.[0]) {
       setBoardSliceKey(null);
       sliceMetaRef.current = { bracketId: bracket.id, blockSig: "" };
+      prevViewSliceKeyParamRef.current = "";
       return;
     }
+    const sliceKeyParam = searchParams.get("sliceKey")?.trim() ?? "";
+    const sliceKeyParamChanged = prevViewSliceKeyParamRef.current !== sliceKeyParam;
+    prevViewSliceKeyParamRef.current = sliceKeyParam;
+
     const blockSig = bracket.blocks.map((b) => b.id).join("|");
     const { bracketId: prevBracketId, blockSig: prevSig } = sliceMetaRef.current;
     const structuralChange = prevBracketId !== bracket.id || prevSig !== blockSig;
@@ -972,9 +981,25 @@ export default function TournamentBracketBoardViewPage() {
       return null;
     };
 
+    const resolveSliceFromUrl = (raw: string): string | null => {
+      const ids = new Set(bracket.blocks!.map((b) => b.id));
+      const hasFinal = Boolean(bracket.finalBlock?.rounds?.length);
+      if (raw === "final" && hasFinal) return "final";
+      if (raw.startsWith("block:")) {
+        const bid = raw.slice("block:".length);
+        if (ids.has(bid)) return raw;
+      }
+      return null;
+    };
+
     setBoardSliceKey((prevKey) => {
       const ids = new Set(bracket.blocks!.map((b) => b.id));
       const hasFinal = Boolean(bracket.finalBlock?.rounds?.length);
+
+      const fromUrl = resolveSliceFromUrl(sliceKeyParam);
+      if (fromUrl && (structuralChange || sliceKeyParamChanged)) {
+        return fromUrl;
+      }
 
       if (structuralChange) {
         const stored = readStoredSlice();
@@ -996,7 +1021,7 @@ export default function TournamentBracketBoardViewPage() {
       }
       return `block:${bracket.blocks![0].id}`;
     });
-  }, [bracket, sliceStorageKey]);
+  }, [bracket, sliceStorageKey, searchParams]);
 
   const bracketViewMergedStacks = useMemo(() => {
     if (!bracket || bracket.bracketMode !== "multi_block" || boardSliceKey !== "merged" || !bracket.blocks?.length) {

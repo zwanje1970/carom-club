@@ -1,11 +1,15 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import type { AuthRole } from "../../../../../../lib/auth/roles";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../lib/auth/session";
 import {
   duplicateTournament,
   getClientStatusByUserId,
   getUserById,
+  resolveCanonicalUserIdForAuth,
 } from "../../../../../../lib/platform-api";
+import { duplicateTournamentBasicFirestore } from "../../../../../../lib/server/firestore-tournaments";
+import { isFirestoreUsersBackendConfigured } from "../../../../../../lib/server/firestore-users";
 
 export const runtime = "nodejs";
 
@@ -34,6 +38,11 @@ async function getAuthorizedUser() {
   return { user, allowed: true as const };
 }
 
+async function actorTournamentUserId(user: { id: string; role: AuthRole }): Promise<string> {
+  if (user.role === "PLATFORM") return user.id;
+  return resolveCanonicalUserIdForAuth(user.id);
+}
+
 export async function POST(
   _request: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -47,9 +56,24 @@ export async function POST(
   }
 
   const { id } = await context.params;
+  const actorUserId = await actorTournamentUserId(auth.user);
+
+  if (isFirestoreUsersBackendConfigured()) {
+    const result = await duplicateTournamentBasicFirestore({
+      sourceTournamentId: id,
+      actorUserId,
+      actorRole: auth.user.role,
+    });
+    if (!result.ok) {
+      const status = result.httpStatus ?? 400;
+      return NextResponse.json({ error: result.error }, { status });
+    }
+    return NextResponse.json({ ok: true, tournament: result.tournament });
+  }
+
   const result = await duplicateTournament({
     sourceTournamentId: id,
-    actorUserId: auth.user.id,
+    actorUserId,
     actorRole: auth.user.role,
   });
 

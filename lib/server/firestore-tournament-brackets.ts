@@ -38,6 +38,39 @@ import {
 const SNAPSHOTS = "v3_tournament_participant_snapshots";
 const BRACKETS = "v3_tournament_brackets";
 
+const BRACKET_PROGRESS_BLOCKS_SPLIT_OR_SHUFFLE_KO =
+  "이미 경기가 진행된 대진표는 조분할 또는 재생성을 할 수 없습니다.";
+
+/** 클라이언트 `bracketHasAnyRecordedWinner` 와 동일: 실제 승자 기록이 있으면 조분할·1라운드 재생성 금지 */
+function bracketHasRecordedWinnerForSplitShuffleGuard(b: {
+  rounds: Bracket["rounds"];
+  bracketMode?: Bracket["bracketMode"];
+  blocks?: Bracket["blocks"];
+  finalBlock?: Bracket["finalBlock"];
+}): boolean {
+  const scanMatches = (matches: BracketMatch[]) => {
+    for (const m of matches) {
+      const w = typeof m.winnerUserId === "string" ? m.winnerUserId.trim() : "";
+      if (w !== "" && !w.startsWith("__")) return true;
+    }
+    return false;
+  };
+  const scanRounds = (rounds: Bracket["rounds"]) => {
+    for (const r of rounds) {
+      if (scanMatches(r.matches ?? [])) return true;
+    }
+    return false;
+  };
+  if (b.bracketMode === "multi_block") {
+    for (const bl of b.blocks ?? []) {
+      if (scanRounds(bl.rounds)) return true;
+    }
+    if (b.finalBlock?.rounds?.length && scanRounds(b.finalBlock.rounds)) return true;
+    return false;
+  }
+  return scanRounds(b.rounds);
+}
+
 class BracketOpReject extends Error {}
 
 function snapshotFromDoc(docId: string, data: Record<string, unknown> | undefined): BracketParticipantSnapshot | null {
@@ -101,6 +134,14 @@ function bracketFromDoc(docId: string, data: Record<string, unknown> | undefined
       : {}),
   };
   return normalizeBracket(raw);
+}
+
+/** 확정 대진표 문서의 `createdAt`을 최종 생성·재생성 시각으로 덮어쓴다(히스토리 필드 없음). */
+async function bumpBracketCreatedAtOnDocumentFirestore(bracket: Bracket): Promise<Bracket> {
+  const now = new Date().toISOString();
+  const db = getSharedFirestoreDb();
+  await db.collection(BRACKETS).doc(bracket.id.trim()).update({ createdAt: now });
+  return normalizeBracket({ ...bracket, createdAt: now });
 }
 
 function bracketToPlain(b: Bracket): Record<string, unknown> {
@@ -408,7 +449,8 @@ export async function createBracketFromSnapshotFirestore(
     existingSnap &&
     bracketBelongsToScope(existingSnap, snapshot.tournamentId, zoneScopeSnap, tournament.zonesEnabled === true)
   ) {
-    return { ok: true, bracket: existingSnap };
+    const bracket = await bumpBracketCreatedAtOnDocumentFirestore(existingSnap);
+    return { ok: true, bracket };
   }
 
   const pairCount = Math.floor(snapshot.participants.length / 2);
@@ -491,7 +533,8 @@ export async function createBracketFromDraftFirestore(params: {
     existingDraft &&
     bracketBelongsToScope(existingDraft, params.tournamentId, zoneScopeDraft, tournament.zonesEnabled === true)
   ) {
-    return { ok: true, bracket: existingDraft };
+    const bracket = await bumpBracketCreatedAtOnDocumentFirestore(existingDraft);
+    return { ok: true, bracket };
   }
 
   const snapshotParticipants = new Map(snapshot.participants.map((participant) => [participant.userId, participant]));
@@ -1469,6 +1512,10 @@ export async function convertLatestBracketToMultiBlockFirestore(params: {
         throw new BracketOpReject("이미 분할된 대진표입니다.");
       }
 
+      if (bracketHasRecordedWinnerForSplitShuffleGuard(mut)) {
+        throw new BracketOpReject(BRACKET_PROGRESS_BLOCKS_SPLIT_OR_SHUFFLE_KO);
+      }
+
       const slots = extractRoundOneSlotsFlat(mut.rounds);
       if (!slots?.length) {
         throw new BracketOpReject("1라운드 슬롯이 없어 분할할 수 없습니다.");
@@ -1762,10 +1809,15 @@ export async function shuffleBracketRoundFirestore(params: {
         );
       }
 
+      if (bracketHasRecordedWinnerForSplitShuffleGuard(mut)) {
+        throw new BracketOpReject(BRACKET_PROGRESS_BLOCKS_SPLIT_OR_SHUFFLE_KO);
+      }
+
       runShuffle(mut.rounds);
 
       normalizeRoundStatusesEverywhere(mut);
       syncFinalBlockFromQualifiersInPlace(mut);
+      mut.createdAt = new Date().toISOString();
       const normalized = normalizeBracket(mut as Bracket);
       tx.set(ref, bracketToPlain(normalized));
       return normalized;

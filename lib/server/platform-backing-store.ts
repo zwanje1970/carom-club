@@ -5679,11 +5679,11 @@ export async function getTournamentOwnerAccessPreviewById(
   };
 }
 
-/** 동일 작성자 대회 제목 중 `이름 (n)` 패턴으로 다음 복제 제목 계산 */
+/** 동일 작성자 대회 제목 중 `이름(n)` / `이름 (n)` 패턴으로 다음 복제 제목 계산 */
 export function computeDuplicateTournamentTitle(sourceTitle: string, existingTitles: string[]): string {
   const parseOne = (title: string): { base: string; suffix: number | null } => {
     const t = title.trim();
-    const m = t.match(/^(.*) \((\d+)\)$/);
+    const m = t.match(/^(.*?)\s*\((\d+)\)$/);
     if (m?.[1] != null && m[2] != null) {
       const n = Number(m[2]);
       return { base: m[1].trim(), suffix: Number.isFinite(n) ? n : null };
@@ -5698,7 +5698,7 @@ export function computeDuplicateTournamentTitle(sourceTitle: string, existingTit
     if (p.suffix === null) max = Math.max(max, 0);
     else max = Math.max(max, p.suffix);
   }
-  return `${sourceBase} (${max + 1})`;
+  return `${sourceBase}(${max + 1})`;
 }
 
 export async function assertClientCanManageTournament(params: {

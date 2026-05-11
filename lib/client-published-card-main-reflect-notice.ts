@@ -6,7 +6,7 @@
  * `unstable_cache`에 `revalidate: 60`으로 걸려 있어, 최악의 주기적 갱신 지연은 약 1분 수준으로 안내한다.
  * (메인 슬라이드 전용 캐시 항목 자체에는 `revalidate` 숫자가 없음.)
  */
-export const PUBLISHED_CARD_MAIN_REFLECT_NOTICE_KO = "게시카드는 약 1분 후 메인에 반영됩니다.";
+export const PUBLISHED_CARD_MAIN_REFLECT_NOTICE_KO = "약 1분 후 메인에 카드가 게시됩니다";
 
 export function withPublishedCardMainReflectNotice(successBody: string): string {
   return `${successBody}\n\n${PUBLISHED_CARD_MAIN_REFLECT_NOTICE_KO}`;

@@ -15,6 +15,7 @@ export default function TournamentCardOverflowMenu({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [dupBusy, setDupBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);
   const [menuFixed, setMenuFixed] = useState<{ top: number; right: number } | null>(null);
@@ -60,38 +61,61 @@ export default function TournamentCardOverflowMenu({
       const res = await fetch(`/api/client/tournaments/${encodeURIComponent(tournamentId)}/duplicate`, {
         method: "POST",
       });
-      const data = (await res.json()) as { error?: string; tournament?: { id: string } };
+      let data: { error?: string; tournament?: { id: string } };
+      try {
+        data = (await res.json()) as { error?: string; tournament?: { id: string } };
+      } catch {
+        window.alert("복제 응답을 처리하지 못했습니다.");
+        return;
+      }
       if (!res.ok) {
         window.alert(data.error ?? "복제에 실패했습니다.");
         return;
       }
+      const newId = data.tournament?.id?.trim();
       setOpen(false);
+      if (newId) {
+        router.push(`/client/tournaments/${encodeURIComponent(newId)}/edit`);
+      }
       router.refresh();
+    } catch {
+      window.alert("복제 요청에 실패했습니다.");
     } finally {
       setDupBusy(false);
     }
   }
 
-  function onDelete() {
+  async function onDelete() {
     if (
       !window.confirm(
-        `「${title}」 대회를 삭제할까요?\n참가 신청·대진·정산 등 이 대회에 연결된 데이터도 함께 제거됩니다.`
+        `「${title}」 대회를 삭제할까요?\n신청자가 없을 때만 삭제할 수 있습니다.`
       )
     ) {
       return;
     }
-    void (async () => {
+    setDeleteBusy(true);
+    try {
       const res = await fetch(`/api/client/tournaments/${encodeURIComponent(tournamentId)}`, {
         method: "DELETE",
       });
-      const data = (await res.json()) as { error?: string };
+      let data: { error?: string };
+      try {
+        data = (await res.json()) as { error?: string };
+      } catch {
+        window.alert("삭제 응답을 처리하지 못했습니다.");
+        return;
+      }
       if (!res.ok) {
         window.alert(data.error ?? "삭제에 실패했습니다.");
         return;
       }
       setOpen(false);
       router.refresh();
-    })();
+    } catch {
+      window.alert("삭제 요청에 실패했습니다.");
+    } finally {
+      setDeleteBusy(false);
+    }
   }
 
   const menuPanel =
@@ -126,7 +150,7 @@ export default function TournamentCardOverflowMenu({
             <Link
               role="menuitem"
               className="v3-btn"
-              href={`/client/tournaments/new?edit=${encodeURIComponent(tournamentId)}`}
+              href={`/client/tournaments/${encodeURIComponent(tournamentId)}/edit`}
               onClick={() => setOpen(false)}
               style={{
                 display: "block",
@@ -150,9 +174,8 @@ export default function TournamentCardOverflowMenu({
               role="menuitem"
               type="button"
               className="v3-btn"
-              onClick={() => {
-                onDelete();
-              }}
+              disabled={deleteBusy}
+              onClick={() => void onDelete()}
               style={{
                 display: "block",
                 width: "100%",
@@ -163,10 +186,10 @@ export default function TournamentCardOverflowMenu({
                 padding: "0.45rem 0.85rem",
                 fontSize: "0.92rem",
                 fontWeight: 500,
-                cursor: "pointer",
+                cursor: deleteBusy ? "wait" : "pointer",
               }}
             >
-              삭제
+              {deleteBusy ? "삭제 중…" : "삭제"}
             </button>
           </li>
           <li role="none">

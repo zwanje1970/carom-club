@@ -358,6 +358,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   const [boardSliceKey, setBoardSliceKey] = useState<string | null>(null);
   const [multiBlockSizeDraft, setMultiBlockSizeDraft] = useState("16");
   const [multiBlockBusy, setMultiBlockBusy] = useState(false);
+  const [hubAutoSectionMessage, setHubAutoSectionMessage] = useState("");
   const [selectedQuickRoundNumber, setSelectedQuickRoundNumber] = useState<number | null>(null);
   const confirmedSectionRef = useRef<HTMLDivElement | null>(null);
   const didInitialBoardFocusRef = useRef(false);
@@ -371,6 +372,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   const bracketRef = useRef<Bracket | null>(null);
   const replayRunningRef = useRef(false);
   const sliceMetaRefManage = useRef<{ bracketId: string; blockSig: string }>({ bracketId: "", blockSig: "" });
+  const prevManageSliceKeyParamRef = useRef("");
   const [navigatorOnline, setNavigatorOnline] = useState(
     typeof navigator !== "undefined" ? navigator.onLine : true,
   );
@@ -396,19 +398,40 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     if (!bracket) {
       setBoardSliceKey(null);
       sliceMetaRefManage.current = { bracketId: "", blockSig: "" };
+      prevManageSliceKeyParamRef.current = "";
       return;
     }
     if (bracket.bracketMode !== "multi_block" || !bracket.blocks?.[0]) {
       setBoardSliceKey(null);
       sliceMetaRefManage.current = { bracketId: bracket.id, blockSig: "" };
+      prevManageSliceKeyParamRef.current = "";
       return;
     }
+    const urlSlice = searchParams.get("sliceKey")?.trim() ?? "";
+    const sliceKeyParamChanged = prevManageSliceKeyParamRef.current !== urlSlice;
+    prevManageSliceKeyParamRef.current = urlSlice;
+
     const blockSig = bracket.blocks.map((b) => b.id).join("|");
     const prevM = sliceMetaRefManage.current;
     const structuralChange = prevM.bracketId !== bracket.id || prevM.blockSig !== blockSig;
     sliceMetaRefManage.current = { bracketId: bracket.id, blockSig };
     const ids = new Set(bracket.blocks.map((b) => b.id));
+
+    const resolveFromUrl = (): string | null => {
+      if (urlSlice === "final" && bracket.finalBlock?.rounds?.length) return "final";
+      if (urlSlice.startsWith("block:")) {
+        const bid = urlSlice.slice("block:".length);
+        if (ids.has(bid)) return urlSlice;
+      }
+      return null;
+    };
+
+    const fromUrl = resolveFromUrl();
+
     setBoardSliceKey((prevKey) => {
+      if (fromUrl && (structuralChange || sliceKeyParamChanged)) {
+        return fromUrl;
+      }
       if (!structuralChange) {
         if (prevKey === "final" && bracket.finalBlock?.rounds?.length) return prevKey;
         if (typeof prevKey === "string" && prevKey.startsWith("block:")) {
@@ -419,7 +442,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       }
       return defaultBoardSliceKey(bracket);
     });
-  }, [bracket]);
+  }, [bracket, searchParams]);
+
+  useEffect(() => {
+    setHubAutoSectionMessage("");
+  }, [bracket?.id, selectedZoneId]);
 
   const displayRounds = useMemo(() => {
     if (!bracket) return [];
@@ -459,6 +486,32 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   }, [displayRoundsSorted]);
 
   const bracketHasRecordedWinners = useMemo(() => bracketHasAnyRecordedWinner(bracket), [bracket]);
+
+  const bracketOpsSliceQuerySuffix = useMemo(() => {
+    if (!bracket || bracket.bracketMode !== "multi_block" || !boardSliceKey || boardSliceKey === "merged") {
+      return "";
+    }
+    const sep = bracketZoneQuery ? "&" : "?";
+    return `${sep}sliceKey=${encodeURIComponent(boardSliceKey)}`;
+  }, [bracket, bracketZoneQuery, boardSliceKey]);
+
+  const bracketViewOpsPath = useMemo(
+    () => `/client/tournaments/${tournamentId}/bracket/view${bracketZoneQuery}${bracketOpsSliceQuerySuffix}`,
+    [bracketOpsSliceQuerySuffix, bracketZoneQuery, tournamentId],
+  );
+
+  const bracketViewFullscreenPath = useMemo(() => {
+    const base = `/client/tournaments/${tournamentId}/bracket/view`;
+    if (bracket?.bracketMode === "multi_block") {
+      return bracketZoneQuery ? `${base}${bracketZoneQuery}&viewMode=merged` : `${base}?viewMode=merged`;
+    }
+    return `${base}${bracketZoneQuery}`;
+  }, [bracket?.bracketMode, bracketZoneQuery, tournamentId]);
+
+  const quickResultsHref = useMemo(
+    () => `/client/tournaments/${tournamentId}/bracket/quick-results${bracketZoneQuery}${bracketOpsSliceQuerySuffix}`,
+    [bracketOpsSliceQuerySuffix, bracketZoneQuery, tournamentId],
+  );
 
   const hubOperatePhase = useMemo(() => {
     if (!bracket) return false;
@@ -1422,11 +1475,12 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   async function executeRoundShuffle(roundNumber: number) {
     if (!tournamentId || !bracket) return;
     if (bracket.bracketMode === "multi_block") {
-      setMessage("조분할 상태에서는 대진표 생성/재생성을 사용할 수 없습니다. 전체 초기화 후 이용해 주세요.");
+      setHubAutoSectionMessage("조분할 상태에서는 대진표 생성/재생성을 사용할 수 없습니다. 전체 초기화 후 이용해 주세요.");
       return;
     }
     setMultiBlockBusy(true);
     setMessage("");
+    setHubAutoSectionMessage("");
     try {
       const res = await fetch(
         `/api/client/tournaments/${tournamentId}/bracket/shuffle-round-one${bracketZoneQuery}`,
@@ -1442,11 +1496,12 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       );
       const json = (await res.json()) as { bracket?: Bracket; error?: string };
       if (!res.ok || !json.bracket) {
-        setMessage(json.error ?? "라운드 재배치에 실패했습니다.");
+        setHubAutoSectionMessage(json.error ?? "라운드 재배치에 실패했습니다.");
         return;
       }
       setBracket(json.bracket);
       setMessage("");
+      setHubAutoSectionMessage("");
     } finally {
       setMultiBlockBusy(false);
     }
@@ -1746,7 +1801,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               minHeight: "40px",
               boxShadow: "none",
             }}
-            onClick={() => router.push(`/client/tournaments/${tournamentId}/bracket/view${bracketZoneQuery}`)}
+            onClick={() => router.push(bracketViewOpsPath)}
           >
             대진표 보기
           </button>
@@ -2141,6 +2196,12 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               </p>
             ) : null}
 
+            {hubAutoSectionMessage ? (
+              <p style={{ margin: 0, fontSize: "0.82rem", color: "#b45309", fontWeight: 600 }}>
+                {hubAutoSectionMessage}
+              </p>
+            ) : null}
+
             <p style={{ margin: 0, fontSize: "0.88rem", color: "#475569" }}>
               <strong style={{ color: "#0f172a" }}>생성 시각:</strong>{" "}
               {new Date(bracket.createdAt).toLocaleString("ko-KR")}
@@ -2212,15 +2273,14 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                         return;
                       }
                       if (
-                        !window.confirm(
-                          "분할 시 상위 라운드는 초기화됩니다.\n단일 대진표가 예선 조와 결선 구조로 바뀝니다. 계속하시겠습니까?",
-                        )
+                        !window.confirm("단일 대진표가 예선 조와 결선 구조로 변경됩니다. 계속하시겠습니까?")
                       ) {
                         return;
                       }
                       void (async () => {
                         setMultiBlockBusy(true);
                         setMessage("");
+                        setHubAutoSectionMessage("");
                         try {
                           const res = await fetch(
                             `/api/client/tournaments/${tournamentId}/bracket/multi-block${bracketZoneQuery}`,
@@ -2233,7 +2293,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                           );
                           const json = (await res.json()) as { bracket?: Bracket; error?: string };
                           if (!res.ok || !json.bracket) {
-                            setMessage(json.error ?? "대진표 분할에 실패했습니다.");
+                            setHubAutoSectionMessage(json.error ?? "대진표 분할에 실패했습니다.");
                             return;
                           }
                           setBracket(json.bracket);
@@ -2299,9 +2359,8 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
         ) : (
           <>
             <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
-              빠른 입력·다음 라운드 생성·전체 화면 보기입니다.
+              빠른 입력·다음 라운드 생성·조별 대진표 보기입니다.
             </p>
-            <BracketProgressSummaryCard bracket={bracket} />
             {bracket.bracketMode === "multi_block" && bracket.blocks?.length ? (
               <div
                 className="v3-row"
@@ -2349,6 +2408,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                 ) : null}
               </div>
             ) : null}
+            {bracket.bracketMode !== "multi_block" ? <BracketProgressSummaryCard bracket={bracket} /> : null}
 
             {displayRoundsSorted.length > 0 ? (
               <div className="v3-stack" style={{ gap: "0.35rem" }}>
@@ -2415,7 +2475,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               </p>
               <button
                 type="button"
-                onClick={() => router.push(`/client/tournaments/${tournamentId}/bracket/view${bracketZoneQuery}`)}
+                onClick={() => router.push(bracketViewOpsPath)}
                 style={{
                   width: "100%",
                   minHeight: "52px",
@@ -2428,12 +2488,12 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                   boxShadow: "none",
                 }}
               >
-                대진표 보기 (전체 화면)
+                대진표 보기
               </button>
             </div>
 
             <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
-              운영판 UI는 전체 화면 「대진표 보기」에서 제공합니다.
+              조별 운영 화면은 위 「대진표 보기」에서, 통합·현장 출력은 「3. 출력 설정」을 이용하세요.
             </p>
             {bracket.zoneId ? (
               <p style={{ margin: 0 }}>
@@ -2456,7 +2516,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       ) : null}
 
       <div
-        aria-label="현장 운영"
+        aria-label="출력 설정"
         className="v3-stack"
         style={{
           gap: "0.35rem",
@@ -2469,15 +2529,15 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       >
         <BracketHubAccordionPanel
           sectionId="hub-field"
-          title="3. 현장 운영"
-          summary="TV·인쇄용 대진표"
+          title="3. 출력 설정"
+          summary="전체 화면·TV·인쇄"
           expanded={isAccordionOpen("field")}
           onToggle={() => toggleAccordion("field")}
         >
         <div className="v3-stack" style={{ gap: "0.5rem", width: "100%" }}>
           <button
             type="button"
-            onClick={() => router.push(`/client/tournaments/${tournamentId}/bracket/view${bracketZoneQuery}`)}
+            onClick={() => router.push(bracketViewFullscreenPath)}
             style={{
               width: "100%",
               minHeight: "52px",
@@ -2491,39 +2551,19 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               cursor: "pointer",
             }}
           >
-            대진표 보기
+            대진표 보기 (전체 화면)
           </button>
           {bracket?.bracketMode === "multi_block" ? (
-            <button
-              type="button"
-              onClick={() =>
-                router.push(
-                  `/client/tournaments/${tournamentId}/bracket/view${
-                    bracketZoneQuery ? `${bracketZoneQuery}&viewMode=merged` : "?viewMode=merged"
-                  }`,
-                )
-              }
-              style={{
-                width: "100%",
-                minHeight: "52px",
-                borderRadius: "8px",
-                border: "1px solid #0f766e",
-                background: "#0d9488",
-                color: "#fff",
-                fontWeight: 800,
-                fontSize: "1rem",
-                boxShadow: "none",
-                cursor: "pointer",
-              }}
-            >
-              통합 대진표 보기
-            </button>
-          ) : null}
-          {bracket?.bracketMode === "multi_block" ? (
             <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem", lineHeight: 1.45 }}>
-              조별 대진표와 결선 대진표를 한 화면에서 함께 확인합니다.
+              예선 조와 결선을 한 화면에서 통합해 봅니다. 조 탭 선택과 무관합니다.
             </p>
           ) : null}
+          <div>
+            <p style={{ margin: "0 0 0.45rem", fontWeight: 800, fontSize: "0.9rem", color: "#0f172a" }}>TV 연결</p>
+            <div className="client-tournament-manage" style={{ width: "100%", maxWidth: "100%" }}>
+              <TournamentTvLinkBlock tournamentId={tournamentId} />
+            </div>
+          </div>
         </div>
 
         <section
@@ -2550,13 +2590,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             </p>
           )}
         </section>
-
-        <div>
-          <p style={{ margin: "0 0 0.45rem", fontWeight: 800, fontSize: "0.9rem", color: "#0f172a" }}>TV 연결</p>
-          <div className="client-tournament-manage" style={{ width: "100%", maxWidth: "100%" }}>
-            <TournamentTvLinkBlock tournamentId={tournamentId} />
-          </div>
-        </div>
         </BracketHubAccordionPanel>
       </div>
 

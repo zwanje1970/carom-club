@@ -10,6 +10,7 @@ import { revalidateSiteDataTag } from "../revalidate-site-data-tag";
 import { isEmptyOutlineHtml } from "../outline-content-helpers";
 import type { OutlineDisplayMode } from "../outline-content-types";
 import { assertClientFirestorePersistenceConfigured, listApprovedClientOrganizationsFirestore } from "./firestore-client-applications";
+import { hasAnyTournamentApplicationForTournamentFirestore } from "./firestore-tournament-application-count";
 import { getSharedFirestoreDb } from "./firestore-users";
 import type {
   ClientOrganizationStored,
@@ -20,6 +21,7 @@ import type {
 import { isEntityLifecycleVisibleForList } from "./entity-lifecycle";
 import {
   buildTournamentFromParsedRow,
+  computeDuplicateTournamentTitle,
   finalizeTournamentDates,
   normalizeTournament,
   normalizeTournamentRule,
@@ -612,6 +614,61 @@ export async function createTournamentFirestore(params: {
   return { ok: true, tournament: await normalizeTournament(tournament, undefined, venueOrgs) };
 }
 
+/** 원본 대회 문서만 참고해 기본 정보 신규 생성 — 신청·대진 등 하위 컬렉션 미복사 */
+export async function duplicateTournamentBasicFirestore(params: {
+  sourceTournamentId: string;
+  actorUserId: string;
+  actorRole: AuthRole;
+}): Promise<{ ok: true; tournament: Tournament } | { ok: false; error: string; httpStatus?: 403 | 404 }> {
+  assertClientFirestorePersistenceConfigured();
+  const gate = await assertClientCanManageTournamentFirestore({
+    actorUserId: params.actorUserId,
+    actorRole: params.actorRole,
+    tournamentId: params.sourceTournamentId,
+  });
+  if (!gate.ok) return { ok: false, error: gate.error, httpStatus: gate.httpStatus };
+
+  const source = gate.tournament;
+  const db = getSharedFirestoreDb();
+  const uid = source.createdBy.trim();
+  let titlesSnap: FirebaseFirestore.QuerySnapshot;
+  try {
+    titlesSnap = await db
+      .collection(COLLECTION)
+      .where("createdBy", "==", uid)
+      .select("title")
+      .get();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error ?? "");
+    if (!message.includes("FAILED_PRECONDITION")) throw error;
+    titlesSnap = await db.collection(COLLECTION).where("createdBy", "==", uid).select("title").get();
+  }
+  const titles = titlesSnap.docs.map((d) => String((d.data() as { title?: unknown }).title ?? ""));
+  const newTitle = computeDuplicateTournamentTitle(source.title, titles);
+
+  return createTournamentFirestore({
+    title: newTitle,
+    date: source.date,
+    location: source.location,
+    maxParticipants: source.maxParticipants,
+    entryFee: source.entryFee,
+    createdBy: source.createdBy,
+    rule: source.rule,
+    posterImageUrl: source.posterImageUrl,
+    statusBadge: "초안",
+    summary: source.summary,
+    prizeInfo: source.prizeInfo,
+    outlineDisplayMode: source.outlineDisplayMode,
+    outlineHtml: source.outlineHtml,
+    outlineImageUrl: source.outlineImageUrl,
+    outlinePdfUrl: source.outlinePdfUrl,
+    venueGuideVenueId: source.venueGuideVenueId,
+    eventDates: source.eventDates,
+    extraVenues: source.extraVenues,
+    ...(typeof source.zonesEnabled === "boolean" ? { zonesEnabled: source.zonesEnabled } : {}),
+  });
+}
+
 export async function updateTournamentFirestore(params: {
   tournamentId: string;
   actorUserId: string;
@@ -759,6 +816,32 @@ export async function deleteTournamentFirestore(params: {
     },
     { merge: true },
   );
+  await rebuildPublicTournamentListSnapshotsSafe();
+  revalidatePublicTournamentCache(id);
+  return { ok: true };
+}
+
+/** 신청자 없을 때만 대회 기본 문서를 물리 삭제 — 하위 컬렉션 일괄 삭제 없음 */
+export async function deleteClientTournamentDocumentHardIfNoApplicantsFirestore(params: {
+  tournamentId: string;
+  actorUserId: string;
+  actorRole: AuthRole;
+}): Promise<{ ok: true } | { ok: false; error: string; httpStatus?: 400 | 403 | 404 }> {
+  assertClientFirestorePersistenceConfigured();
+  const gate = await assertClientCanManageTournamentFirestore({
+    actorUserId: params.actorUserId,
+    actorRole: params.actorRole,
+    tournamentId: params.tournamentId,
+  });
+  if (!gate.ok) return { ok: false, error: gate.error, httpStatus: gate.httpStatus };
+
+  const id = params.tournamentId.trim();
+  if (await hasAnyTournamentApplicationForTournamentFirestore(id)) {
+    return { ok: false, error: "신청자가 있는 대회는 삭제할 수 없습니다.", httpStatus: 400 };
+  }
+
+  const db = getSharedFirestoreDb();
+  await db.collection(COLLECTION).doc(id).delete();
   await rebuildPublicTournamentListSnapshotsSafe();
   revalidatePublicTournamentCache(id);
   return { ok: true };

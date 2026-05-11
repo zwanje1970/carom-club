@@ -250,6 +250,8 @@ export async function getTournamentApplicationByIdFirestore(
   return tournamentApplicationFromFirestore(snap.id, data);
 }
 
+export { hasAnyTournamentApplicationForTournamentFirestore } from "./firestore-tournament-application-count";
+
 export async function listTournamentApplicationsByTournamentIdFirestore(
   tournamentId: string
 ): Promise<TournamentApplication[]> {

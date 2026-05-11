@@ -7,7 +7,7 @@ import type { OutlineDisplayMode } from "../../../../../lib/outline-content-type
 import { getUserById, getClientStatusByUserId, resolveCanonicalUserIdForAuth, type TournamentRuleSnapshot } from "../../../../../lib/platform-api";
 import {
   assertClientCanManageTournamentFirestore,
-  deleteTournamentFirestore,
+  deleteClientTournamentDocumentHardIfNoApplicantsFirestore,
   updateTournamentFirestore,
 } from "../../../../../lib/server/firestore-tournaments";
 import { reconcileTournamentPublishedCardsForTournamentId } from "../../../../../lib/server/platform-backing-store";
@@ -281,7 +281,7 @@ export async function DELETE(
 
   const { id } = await context.params;
   const actorUserId = await actorTournamentUserId(auth.user);
-  const result = await deleteTournamentFirestore({
+  const result = await deleteClientTournamentDocumentHardIfNoApplicantsFirestore({
     tournamentId: id,
     actorUserId,
     actorRole: auth.user.role,
