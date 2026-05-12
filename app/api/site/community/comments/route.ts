@@ -5,6 +5,8 @@ import { createComment, getUserById, listCommentsByPostId } from "../../../../..
 
 export const runtime = "nodejs";
 
+const MAX_COMMUNITY_COMMENT_CONTENT_LENGTH = 500;
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const postId = typeof url.searchParams.get("postId") === "string" ? url.searchParams.get("postId")!.trim() : "";
@@ -35,6 +37,9 @@ export async function POST(request: Request) {
 
   const postId = typeof body.postId === "string" ? body.postId : "";
   const content = typeof body.content === "string" ? body.content : "";
+  if (content.trim().length > MAX_COMMUNITY_COMMENT_CONTENT_LENGTH) {
+    return NextResponse.json({ error: "댓글은 500자까지 입력할 수 있습니다." }, { status: 400 });
+  }
 
   const result = await createComment(postId, user.id, user.nickname, content);
   if (!result.ok) {

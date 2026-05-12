@@ -35,6 +35,11 @@ function warnSkippedTournamentSnapshotRow(reason: string, detail: unknown): void
   console.warn(`[site-public-list-snapshots-kv] 대회 목록 스냅샷 행 제외: ${reason}`, detail);
 }
 
+function warnSkippedVenueSnapshotRow(reason: string, detail: unknown): void {
+  if (!isSitePublicListDevLog) return;
+  console.warn(`[site-public-list-snapshots-kv] 클럽 목록 스냅샷 행 제외: ${reason}`, detail);
+}
+
 function tournamentDeadlineSortValue(t: Pick<Tournament, "date" | "eventDates">): string {
   const dates =
     t.eventDates && t.eventDates.length > 0
@@ -62,6 +67,34 @@ function tournamentPlayScaleLabel(t: Pick<Tournament, "maxParticipants">): strin
   return `${Math.floor(n)}강`;
 }
 
+/** 대회 `rule`만 사용 — 목록에서 추가 조회 없음 */
+function tournamentTypeLabelForSnapshot(t: Pick<Tournament, "rule">): string {
+  const r = t.rule;
+  if (r.isScotch === true) return "스카치";
+  if (r.nationalTournament === true || r.scope === "NATIONAL") return "권역";
+  return "일반";
+}
+
+/** `prizeInfo`의 `우승:` 줄 — 숫자만이면 "1등 N만" 형태(만원 단위 입력과 동일 가정) */
+function tournamentFirstPrizeLabelFromPrizeInfo(prizeInfo: string | null | undefined): string {
+  if (!prizeInfo?.trim()) return "";
+  for (const line of String(prizeInfo).split(/\r?\n/)) {
+    const t = line.trim();
+    const m = /^우승\s*:\s*(.+)$/i.exec(t);
+    if (!m) continue;
+    const raw = (m[1] ?? "").trim();
+    if (!raw) return "";
+    if (/^\d+$/.test(raw)) return `1등 ${raw}만`;
+    if (/만원?$/.test(raw)) return `1등 ${raw.replace(/\s*만원?\s*$/i, "").trim()}만`;
+    return `1등 ${raw}`;
+  }
+  return "";
+}
+
+function tournamentDeadlineLabelFromGathering(gatheringTime: string | null | undefined): string {
+  return typeof gatheringTime === "string" ? gatheringTime.trim() : "";
+}
+
 /** Tournament `location` 값에서 주최장소명만 — `app/client/tournaments/.../card-publish-v2`의 venueNameOnly와 동일 */
 function tournamentVenueDisplayNameFromLocation(raw: string | null | undefined): string {
   let s = String(raw ?? "").trim();
@@ -87,6 +120,9 @@ function buildTournamentSnapshot(
     title: t.title?.trim() || "이름 없음",
     statusBadge: t.statusBadge,
     playScaleLabel: tournamentPlayScaleLabel(t),
+    tournamentTypeLabel: tournamentTypeLabelForSnapshot(t),
+    firstPrizeLabel: tournamentFirstPrizeLabelFromPrizeInfo(t.prizeInfo),
+    deadlineLabel: tournamentDeadlineLabelFromGathering(t.gatheringTime ?? null),
     dateLabel: tournamentDateLabelForList(t),
     regionLabel: buildRegionLabelForSiteListSnapshot(regionSource),
     venueName: tournamentVenueDisplayNameFromLocation(regionSource),
@@ -139,6 +175,9 @@ function parseOneTournamentSnapshotRow(row: unknown, index: number): SiteTournam
     statusBadge = o.statusBadge;
   }
   const playScaleLabel = typeof o.playScaleLabel === "string" ? o.playScaleLabel : "";
+  const tournamentTypeLabel = typeof o.tournamentTypeLabel === "string" ? o.tournamentTypeLabel : "";
+  const firstPrizeLabel = typeof o.firstPrizeLabel === "string" ? o.firstPrizeLabel : "";
+  const deadlineLabel = typeof o.deadlineLabel === "string" ? o.deadlineLabel : "";
   const dateLabel = typeof o.dateLabel === "string" ? o.dateLabel : "";
   const regionLabel = typeof o.regionLabel === "string" ? o.regionLabel : "";
   const venueName = typeof o.venueName === "string" ? o.venueName : "";
@@ -171,6 +210,9 @@ function parseOneTournamentSnapshotRow(row: unknown, index: number): SiteTournam
     title,
     statusBadge,
     playScaleLabel,
+    tournamentTypeLabel,
+    firstPrizeLabel,
+    deadlineLabel,
     dateLabel,
     regionLabel,
     venueName,
@@ -202,42 +244,77 @@ function isVenuePricingType(v: unknown): v is VenuePricingType {
   return v === "GENERAL" || v === "FLAT" || v === "MIXED";
 }
 
+function parseOneVenueSnapshotRow(row: unknown, index: number): SiteVenueListSnapshot | null {
+  if (!row || typeof row !== "object") {
+    warnSkippedVenueSnapshotRow(`인덱스 ${index}: 객체 아님`, row);
+    return null;
+  }
+  const o = row as Record<string, unknown>;
+  const venueId = typeof o.venueId === "string" ? o.venueId.trim() : "";
+  const name = typeof o.name === "string" ? o.name : "";
+  if (!venueId || !name) {
+    warnSkippedVenueSnapshotRow(`인덱스 ${index}: venueId 또는 name 없음`, {
+      venueId: venueId || "(비어 있음)",
+    });
+    return null;
+  }
+  const regionLabel = typeof o.regionLabel === "string" ? o.regionLabel : "";
+  const thumbnail160Url =
+    o.thumbnail160Url === null || typeof o.thumbnail160Url === "string" ? o.thumbnail160Url : null;
+  const detailUrl = typeof o.detailUrl === "string" ? o.detailUrl : "";
+  const lat = o.lat === null ? null : typeof o.lat === "number" && Number.isFinite(o.lat) ? o.lat : null;
+  const lng = o.lng === null ? null : typeof o.lng === "number" && Number.isFinite(o.lng) ? o.lng : null;
+  const venueCategory = o.venueCategory === "mixed" ? "mixed" : o.venueCategory === "daedae_only" ? "daedae_only" : null;
+  if (!venueCategory) {
+    warnSkippedVenueSnapshotRow(`인덱스 ${index}: venueCategory 허용 값 아님`, {
+      venueId,
+      venueCategory: o.venueCategory,
+    });
+    return null;
+  }
+  const pt = o.pricingType;
+  if (!isVenuePricingType(pt)) {
+    warnSkippedVenueSnapshotRow(`인덱스 ${index}: pricingType 허용 값 아님`, { venueId, pricingType: pt });
+    return null;
+  }
+  const catalogTypeLabel = typeof o.catalogTypeLabel === "string" ? o.catalogTypeLabel : "당구장";
+  const updatedAt = typeof o.updatedAt === "string" ? o.updatedAt : "";
+  const isVisibleOnSite = o.isVisibleOnSite === true;
+  if (!detailUrl || !updatedAt) {
+    warnSkippedVenueSnapshotRow(`인덱스 ${index}: detailUrl 또는 updatedAt 누락`, {
+      venueId,
+      hasDetailUrl: Boolean(detailUrl),
+      hasUpdatedAt: Boolean(updatedAt),
+    });
+    return null;
+  }
+  return {
+    venueId,
+    name,
+    regionLabel,
+    thumbnail160Url,
+    detailUrl,
+    lat,
+    lng,
+    venueCategory,
+    pricingType: pt,
+    catalogTypeLabel: catalogTypeLabel || "당구장",
+    isVisibleOnSite,
+    updatedAt,
+  };
+}
+
+/**
+ * KV 클럽 목록 JSON 파싱.
+ * - 최상위가 배열이 아니면 `null`(lazy rebuild로 처리).
+ * - 배열이면 행 단위로 파싱하며, 깨진 행만 제외하고 나머지를 반환.
+ */
 function parseVenueSnapshots(raw: unknown): SiteVenueListSnapshot[] | null {
   if (!Array.isArray(raw)) return null;
   const out: SiteVenueListSnapshot[] = [];
-  for (const row of raw) {
-    if (!row || typeof row !== "object") return null;
-    const o = row as Record<string, unknown>;
-    const venueId = typeof o.venueId === "string" ? o.venueId.trim() : "";
-    const name = typeof o.name === "string" ? o.name : "";
-    if (!venueId || !name) return null;
-    const regionLabel = typeof o.regionLabel === "string" ? o.regionLabel : "";
-    const thumbnail160Url =
-      o.thumbnail160Url === null || typeof o.thumbnail160Url === "string" ? o.thumbnail160Url : null;
-    const detailUrl = typeof o.detailUrl === "string" ? o.detailUrl : "";
-    const lat = o.lat === null ? null : typeof o.lat === "number" && Number.isFinite(o.lat) ? o.lat : null;
-    const lng = o.lng === null ? null : typeof o.lng === "number" && Number.isFinite(o.lng) ? o.lng : null;
-    const venueCategory = o.venueCategory === "mixed" ? "mixed" : o.venueCategory === "daedae_only" ? "daedae_only" : null;
-    if (!venueCategory) return null;
-    if (!isVenuePricingType(o.pricingType)) return null;
-    const catalogTypeLabel = typeof o.catalogTypeLabel === "string" ? o.catalogTypeLabel : "당구장";
-    const updatedAt = typeof o.updatedAt === "string" ? o.updatedAt : "";
-    const isVisibleOnSite = o.isVisibleOnSite === true;
-    if (!detailUrl || !updatedAt) return null;
-    out.push({
-      venueId,
-      name,
-      regionLabel,
-      thumbnail160Url,
-      detailUrl,
-      lat,
-      lng,
-      venueCategory,
-      pricingType: o.pricingType,
-      catalogTypeLabel: catalogTypeLabel || "당구장",
-      isVisibleOnSite,
-      updatedAt,
-    });
+  for (let i = 0; i < raw.length; i++) {
+    const one = parseOneVenueSnapshotRow(raw[i], i);
+    if (one) out.push(one);
   }
   return out;
 }
@@ -357,7 +434,13 @@ export async function getSitePublicVenueListSnapshotsWithLazyRebuild(): Promise<
   const raw = await readPlatformKvJson(KV_VENUES);
   if (raw != null) {
     const parsed = parseVenueSnapshots(raw);
-    if (parsed !== null) return mapSanitizeVenueThumbnails(parsed, assetsById);
+    if (parsed !== null) {
+      const rawArr = Array.isArray(raw) ? raw : [];
+      const allRowsDropped = rawArr.length > 0 && parsed.length === 0;
+      if (!allRowsDropped) {
+        return mapSanitizeVenueThumbnails(parsed, assetsById);
+      }
+    }
   }
   await rebuildSitePublicVenueListSnapshots(assetsById);
   const raw2 = await readPlatformKvJson(KV_VENUES);

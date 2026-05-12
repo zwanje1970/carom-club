@@ -8614,19 +8614,46 @@ function hasProofImageIdInFirstImage(rows: CommunityBoardPost[]): boolean {
   return false;
 }
 
+const IS_SITE_COMMUNITY_KV_PARSE_DEV = process.env.NODE_ENV === "development";
+
+function warnCommunityFeedKvShape(message: string, detail?: unknown): void {
+  if (!IS_SITE_COMMUNITY_KV_PARSE_DEV) return;
+  console.warn(`[platform-backing-store] 커뮤니티 피드 KV: ${message}`, detail);
+}
+
+function warnSkippedCommunityPostKvRow(index: number, row: unknown): void {
+  if (!IS_SITE_COMMUNITY_KV_PARSE_DEV) return;
+  const hint =
+    row && typeof row === "object"
+      ? {
+          id: typeof (row as Record<string, unknown>).id === "string" ? (row as Record<string, unknown>).id : undefined,
+          boardType: (row as Record<string, unknown>).boardType,
+        }
+      : row;
+  console.warn(`[platform-backing-store] 커뮤니티 공개 목록 KV 게시글 제외 (인덱스 ${index})`, hint);
+}
+
 function parseSiteCommunityFeedFromKvRaw(raw: unknown): {
   communityPosts: CommunityBoardPost[];
   communityComments: CommunityComment[];
 } {
   if (!raw || typeof raw !== "object") {
+    warnCommunityFeedKvShape("최상위가 객체가 아님 (전체 피드 파싱)", typeof raw);
     return { communityPosts: [], communityComments: [] };
   }
   const o = raw as Record<string, unknown>;
   const pr = o.communityPosts;
   const cr = o.communityComments;
-  const communityPosts = Array.isArray(pr)
-    ? pr.map(normalizeCommunityBoardPostRow).filter((item): item is CommunityBoardPost => item !== null)
-    : [];
+  const communityPosts: CommunityBoardPost[] = [];
+  if (Array.isArray(pr)) {
+    for (let i = 0; i < pr.length; i++) {
+      const p = normalizeCommunityBoardPostRow(pr[i]);
+      if (p) communityPosts.push(p);
+      else warnSkippedCommunityPostKvRow(i, pr[i]);
+    }
+  } else {
+    warnCommunityFeedKvShape("communityPosts가 배열이 아님 (전체 피드)", pr);
+  }
   const communityComments = Array.isArray(cr)
     ? cr.map(normalizeCommunityCommentRow).filter((item): item is CommunityComment => item !== null)
     : [];
@@ -8634,12 +8661,23 @@ function parseSiteCommunityFeedFromKvRaw(raw: unknown): {
 }
 
 function parseSiteCommunityPostsOnlyFromKvRaw(raw: unknown): CommunityBoardPost[] {
-  if (!raw || typeof raw !== "object") return [];
+  if (!raw || typeof raw !== "object") {
+    warnCommunityFeedKvShape("최상위가 객체가 아님 (공개 목록 게시글만)", typeof raw);
+    return [];
+  }
   const o = raw as Record<string, unknown>;
   const pr = o.communityPosts;
-  return Array.isArray(pr)
-    ? pr.map(normalizeCommunityBoardPostRow).filter((item): item is CommunityBoardPost => item !== null)
-    : [];
+  if (!Array.isArray(pr)) {
+    warnCommunityFeedKvShape("communityPosts가 배열이 아님 (공개 목록 게시글만)", pr);
+    return [];
+  }
+  const out: CommunityBoardPost[] = [];
+  for (let i = 0; i < pr.length; i++) {
+    const p = normalizeCommunityBoardPostRow(pr[i]);
+    if (p) out.push(p);
+    else warnSkippedCommunityPostKvRow(i, pr[i]);
+  }
+  return out;
 }
 
 function parseSiteCommunityCommentsOnlyFromKvRaw(raw: unknown): CommunityComment[] {

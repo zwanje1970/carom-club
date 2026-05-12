@@ -40,15 +40,23 @@ async function SiteTournamentsPageContent({
 
   ordered.sort((a, b) => a.sortDate.localeCompare(b.sortDate));
 
-  const rows: SiteTournamentListRow[] = ordered.map((s) => ({
-    id: s.tournamentId,
-    statusBadge: s.statusBadge,
-    title: s.title,
-    scheduleLine: s.dateLabel,
-    locationLine: s.venueName,
-    bracketParen: s.playScaleLabel.trim() ? s.playScaleLabel : null,
-    posterSrc: s.thumbnail160Url,
-  }));
+  const rows: SiteTournamentListRow[] = ordered.map((s) => {
+    const reg = (s.regionLabel ?? "").trim();
+    const ven = (s.venueName ?? "").trim();
+    const locationLine = reg && ven ? `[${reg}] ${ven}` : ven || (reg ? `[${reg}]` : "");
+    return {
+      id: s.tournamentId,
+      statusBadge: s.statusBadge,
+      title: s.title,
+      scheduleLine: s.dateLabel,
+      locationLine,
+      bracketParen: s.playScaleLabel.trim() ? s.playScaleLabel : null,
+      posterSrc: s.thumbnail160Url,
+      tournamentTypeLabel: s.tournamentTypeLabel ?? "",
+      firstPrizeLabel: s.firstPrizeLabel ?? "",
+      deadlineLabel: s.deadlineLabel ?? "",
+    };
+  });
 
   return <SiteTournamentsDistanceShell rows={rows} searchParams={resolvedSearchParams} currentStatus={statusFilter} />;
 }

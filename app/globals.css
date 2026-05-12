@@ -890,6 +890,302 @@ button.secondary-button.site-mypage-logout:hover,
   align-self: flex-start;
 }
 
+/* =============================================================================
+   공개 사이트 — 대회·클럽 목록: 디바이더 리스트 (카드·그림자 없음, lightweight typography)
+   ============================================================================= */
+
+.site-site-list--tournaments.site-board-card-list,
+.site-site-list--venues.site-board-card-list {
+  gap: 0;
+}
+
+.site-site-list--tournaments .site-board-card,
+.site-site-list--venues .site-board-card {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+.site-site-list--tournaments .site-board-card:last-child,
+.site-site-list--venues .site-board-card:last-child {
+  border-bottom: none;
+}
+
+.site-site-list--tournaments .site-board-card:hover,
+.site-site-list--venues .site-board-card:hover {
+  box-shadow: none;
+  background-color: rgba(248, 250, 252, 0.88);
+}
+
+/* 대회안내 행 — 좌: 몇강·일정 / 중: 제목·장소명 / 우: 상태 (스냅샷 포스터는 목록에서 비표시) */
+.site-site-list--tournaments .site-board-card > a.site-tournament-list-link {
+  display: grid;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.68rem 0.5rem;
+  text-decoration: none;
+  color: inherit;
+  align-items: start;
+  column-gap: 0.65rem;
+  row-gap: 0.35rem;
+  grid-template-columns: minmax(3.35rem, 5.25rem) minmax(0, 1fr) minmax(4.25rem, auto);
+  grid-template-areas: "tl tc tr";
+}
+
+.site-site-list--tournaments .site-tournament-list-left {
+  grid-area: tl;
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.site-site-list--tournaments .site-tournament-list-bracket {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #dc2626;
+  letter-spacing: -0.01em;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.site-site-list--tournaments .site-tournament-type-chip {
+  display: inline-flex;
+  align-self: flex-start;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.site-site-list--tournaments .site-tournament-type-chip--normal {
+  background: rgba(241, 245, 249, 0.96);
+  color: #475569;
+}
+
+.site-site-list--tournaments .site-tournament-type-chip--scotch {
+  background: rgba(220, 252, 231, 0.9);
+  color: #166534;
+}
+
+.site-site-list--tournaments .site-tournament-type-chip--national {
+  background: rgba(237, 233, 254, 0.92);
+  color: #5b21b6;
+}
+
+.site-site-list--tournaments .site-tournament-list-center {
+  grid-area: tc;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.site-site-list--tournaments .site-tournament-list-right {
+  grid-area: tr;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 0.26rem;
+  min-width: 0;
+}
+
+.site-site-list--tournaments .site-tournament-list-right .site-board-status-badge,
+.site-site-list--tournaments .site-tournament-list-right .badge-status {
+  font-weight: 500;
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+.site-site-list--tournaments .site-tournament-list-prize {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: #475569;
+  text-align: right;
+  max-width: 7.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.site-site-list--tournaments .site-tournament-list-deadline {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: #94a3b8;
+  text-align: right;
+  max-width: 7.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.site-site-list--tournaments .site-tournament-card-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: -0.015em;
+  color: var(--color-text-main, #0f172a);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.site-site-list--tournaments .site-tournament-schedule,
+.site-site-list--tournaments .site-tournament-location {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.45;
+  color: #94a3b8;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.site-site-list--tournaments .site-tournament-list-thumb {
+  display: none !important;
+}
+
+@media (max-width: 380px) {
+  .site-site-list--tournaments .site-board-card > a.site-tournament-list-link {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "tl tr"
+      "tc tc";
+  }
+}
+
+/* 클럽안내 행 — 좌: 썸네일 / 중: 상호·유형·전화 / 우: 즐겨찾기 자리·거리 */
+.site-site-list--venues .site-board-card > a.site-venue-list-link {
+  display: grid;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.88rem 0.55rem;
+  text-decoration: none;
+  color: inherit;
+  align-items: start;
+  column-gap: 0.85rem;
+  row-gap: 0.4rem;
+  grid-template-columns: 4.35rem minmax(0, 1fr) minmax(3.1rem, auto);
+}
+
+.site-site-list--venues .site-venue-list-thumb {
+  margin-left: 0;
+  margin-right: 0;
+  align-self: start;
+  width: 4.35rem;
+  min-width: 4.35rem;
+  height: 4.35rem;
+  border-radius: 10px;
+}
+
+.site-site-list--venues .site-venue-card-main {
+  gap: 0.38rem;
+  padding-top: 0.04rem;
+}
+
+.site-site-list--venues .site-venue-card-title {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: #334155;
+}
+
+.site-site-list--venues .site-venue-address {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.45;
+  color: #94a3b8;
+}
+
+.site-site-list--venues .site-venue-phone {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: #64748b;
+}
+
+.site-site-list--venues .site-venue-chips .site-list-chip {
+  font-weight: 500;
+  font-size: 0.6875rem;
+}
+
+.site-site-list--venues .site-venue-list-trail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.18rem;
+  padding-top: 0.08rem;
+  min-width: 2.5rem;
+}
+
+.site-site-list--venues .site-venue-fav-slot {
+  font-size: 0.95rem;
+  line-height: 1;
+  font-weight: 400;
+  color: rgba(148, 163, 184, 0.9);
+  user-select: none;
+}
+
+.site-site-list--venues .site-venue-distance {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: #2563eb;
+  text-align: right;
+}
+
+/* 클럽 필터: 가벼운 라벨·그룹 구분 (동작 동일) */
+.site-venues-list-filters.filterRow {
+  gap: 0.45rem 0.55rem;
+  row-gap: 0.42rem;
+}
+
+.site-venues-list-filters .filterField:nth-child(2) {
+  padding-left: 0.5rem;
+  margin-left: 0.1rem;
+  border-left: 1px solid rgba(148, 163, 184, 0.55);
+}
+
+.site-venues-list-filters .filterFieldLabel {
+  font-weight: 400;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.site-venues-list-filters .filterFieldLabel::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 0.32rem;
+  border-radius: 50%;
+  border: 1px solid rgba(100, 116, 139, 0.55);
+  box-sizing: border-box;
+  vertical-align: middle;
+  transform: translateY(-1px);
+}
+
 /* 대회·당구장 목록: 필터 바 — 페이지 배경(#EEF2F7)과 동일 톤 */
 .site-shell-controls.site-shell-controls--site-list {
   background: #eef2f7;
@@ -2982,6 +3278,17 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-board-card--venue > a {
   padding: 0.78rem 0;
   align-items: flex-start;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-site-list--tournaments .site-board-card > a.site-tournament-list-link,
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-site-list--venues .site-board-card > a.site-venue-list-link {
+  align-items: start;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-site-list--venues .site-venue-list-thumb {
+  width: 4rem;
+  min-width: 4rem;
+  height: 4rem;
 }
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-card-main {

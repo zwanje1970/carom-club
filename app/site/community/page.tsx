@@ -3,6 +3,7 @@ import { getSiteCommunityConfig, listCommunityPostsAllPrimaryForPublicSite } fro
 import { communityNavTabsFromConfig, visibleCommunityBoardKeysForTabs } from "./community-tab-config";
 import type { SiteCommunityConfig } from "../../../lib/types/entities";
 import CommunityBoardPostList from "./CommunityBoardPostList";
+import CommunityBoardListScrollShell from "./CommunityBoardListScrollShell";
 import CommunityBoardSearchForm from "./CommunityBoardSearchForm";
 import CommunityBoardTabs from "./CommunityBoardTabs";
 import CommunityBoardSwipeShell from "./CommunityBoardSwipeShell";
@@ -93,7 +94,9 @@ async function SiteCommunityPageContent({
 
   return (
     <section className="site-site-gray-main v3-stack ui-community-page" data-community-board="all">
-      <CommunityBoardPostList showRoomPrefix config={config} items={items} />
+      <CommunityBoardListScrollShell boardListKey="all" searchParams={sp} itemsCount={items.length}>
+        <CommunityBoardPostList showRoomPrefix config={config} items={items} />
+      </CommunityBoardListScrollShell>
     </section>
   );
 }

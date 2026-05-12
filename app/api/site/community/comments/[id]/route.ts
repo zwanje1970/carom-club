@@ -5,6 +5,8 @@ import { getUserById, softDeleteComment, updateComment } from "../../../../../..
 
 export const runtime = "nodejs";
 
+const MAX_COMMUNITY_COMMENT_CONTENT_LENGTH = 500;
+
 export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
   const cookieStore = await cookies();
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
@@ -60,6 +62,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ error: "요청 본문이 올바르지 않습니다." }, { status: 400 });
   }
   const content = typeof body.content === "string" ? body.content : "";
+  if (content.trim().length > MAX_COMMUNITY_COMMENT_CONTENT_LENGTH) {
+    return NextResponse.json({ error: "댓글은 500자까지 입력할 수 있습니다." }, { status: 400 });
+  }
 
   const result = await updateComment(commentId, user.id, content);
   if (!result.ok) {

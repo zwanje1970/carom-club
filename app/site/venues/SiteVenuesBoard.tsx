@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FilterButton from "../components/FilterButton";
 import FilterDropdown from "../components/FilterDropdown";
 import SiteShellFrame from "../components/SiteShellFrame";
@@ -13,6 +13,7 @@ import {
   SITE_GEO_DENIED_USER_MESSAGE,
 } from "../lib/site-geolocation-flow";
 import { buildVenuesListHref } from "./venues-list-url";
+import { buildVenuesListScrollSignature } from "./venues-list-scroll-signature";
 
 export type SiteVenueBoardRow = {
   venueId: string;
@@ -79,6 +80,40 @@ const FEE_TYPE_OPTIONS: { value: FeeTypeFilter; label: string }[] = [
   { value: "flat", label: "정액제" },
 ];
 
+const VENUES_SCROLL_STORAGE_KEY = "carom.site.venues.scrollY";
+
+function readVenuesListScroll(signature: string): { scrollY: number } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(VENUES_SCROLL_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { signature?: unknown; scrollY?: unknown };
+    if (parsed.signature !== signature || typeof parsed.scrollY !== "number") return null;
+    return { scrollY: parsed.scrollY };
+  } catch {
+    return null;
+  }
+}
+
+function writeVenuesListScroll(signature: string, scrollY: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(
+      VENUES_SCROLL_STORAGE_KEY,
+      JSON.stringify({ signature, scrollY: Math.max(0, scrollY) }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+function shouldSaveScrollBeforeDetailNavigate(ev: React.MouseEvent): boolean {
+  if (ev.defaultPrevented) return false;
+  if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return false;
+  if (ev.button !== 0) return false;
+  return true;
+}
+
 type Props = {
   initialRows: SiteVenueBoardRow[];
 };
@@ -142,6 +177,37 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
     return list;
   }, [filtered, memoryCoords]);
 
+  const listScrollSignature = useMemo(
+    () =>
+      buildVenuesListScrollSignature({
+        venueType,
+        feeType,
+        distanceLat: memoryCoords?.lat ?? null,
+        distanceLng: memoryCoords?.lng ?? null,
+      }),
+    [venueType, feeType, memoryCoords],
+  );
+
+  const didRestoreForSignatureRef = useRef<string | null>(null);
+
+  const saveScrollBeforeDetail = useCallback(() => {
+    writeVenuesListScroll(listScrollSignature, window.scrollY || window.pageYOffset || 0);
+  }, [listScrollSignature]);
+
+  useEffect(() => {
+    if (ordered.length === 0) return;
+    if (didRestoreForSignatureRef.current === listScrollSignature) return;
+    const stored = readVenuesListScroll(listScrollSignature);
+    didRestoreForSignatureRef.current = listScrollSignature;
+    if (!stored) return;
+    const y = stored.scrollY;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.scrollTo(0, y);
+      });
+    });
+  }, [ordered.length, listScrollSignature]);
+
   const distanceHref = `/site/venues${buildVenuesListHref({})}`;
 
   const onDistanceClick = useCallback(
@@ -169,7 +235,7 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
 
   const auxiliary = (
     <div
-      className={`site-list-filter-bar ${filterStyles.filterRow} ${filterStyles.filterRowSingle} ${filterStyles.filterRowSingleDouble} ${filterStyles.filterRowFilterPack}`}
+      className={`site-venues-list-filters site-list-filter-bar ${filterStyles.filterRow} ${filterStyles.filterRowSingle} ${filterStyles.filterRowSingleDouble} ${filterStyles.filterRowFilterPack}`}
     >
       <div className={filterStyles.filterField}>
         <span
@@ -234,24 +300,54 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
 
   return (
     <SiteShellFrame brandTitle="클럽안내" auxiliaryBarClassName="site-shell-controls--site-list" auxiliary={auxiliary}>
-      <section className="site-site-gray-main v3-stack">
+      <section className="site-site-gray-main v3-stack site-venues-list-page">
         {showDeniedHint ? (
           <p role="status" className="v3-muted site-list-geo-hint">
             {SITE_GEO_DENIED_USER_MESSAGE}
           </p>
         ) : null}
-        <ul className="site-board-card-list" style={{ margin: 0 }}>
-          {ordered.map((row) => (
-            <li key={row.venueId} className="site-board-card site-board-card--venue">
-              <Link prefetch={false} href={`/site/venues/${row.venueId}`}>
-                <div className="site-venue-card-main">
-                  <span className="site-venue-card-title">{row.name}</span>
-                  {(() => {
-                    const cat = categoryLabel(row.venueCategory);
-                    const fee = feeLabelFromPricingType(row.pricingType);
-                    const feeKey = feeChipKeyFromPricingType(row.pricingType);
-                    if (!cat && !fee) return null;
-                    return (
+        <ul className="site-board-card-list site-site-list--venues" style={{ margin: 0 }}>
+          {ordered.map((row) => {
+            const region = String(row.region ?? "").trim();
+            const dm =
+              memoryCoords && row.lat != null && row.lng != null
+                ? distanceMeters(memoryCoords, { lat: row.lat, lng: row.lng })
+                : null;
+            const distStr = dm != null && Number.isFinite(dm) ? formatDistanceKmFromMeters(dm) : null;
+            const distPart =
+              memoryCoords && row.lat != null && row.lng != null
+                ? distStr
+                : memoryCoords
+                  ? "—"
+                  : null;
+            const cat = categoryLabel(row.venueCategory);
+            const fee = feeLabelFromPricingType(row.pricingType);
+            const feeKey = feeChipKeyFromPricingType(row.pricingType);
+            return (
+              <li key={row.venueId} className="site-board-card site-board-card--venue">
+                <Link
+                  prefetch={false}
+                  className="site-venue-list-link"
+                  href={`/site/venues/${row.venueId}`}
+                  onClick={(ev) => {
+                    if (!shouldSaveScrollBeforeDetailNavigate(ev)) return;
+                    saveScrollBeforeDetail();
+                  }}
+                >
+                  <div className="site-venue-list-thumb">
+                    {row.thumbnailUrl ? (
+                      <SiteListImage160
+                        src={row.thumbnailUrl}
+                        alt=""
+                        placeholderClassName="site-venue-list-thumb-placeholder"
+                      />
+                    ) : (
+                      <div className="site-venue-list-thumb-placeholder" aria-hidden />
+                    )}
+                  </div>
+                  <div className="site-venue-card-main">
+                    <span className="site-venue-card-title">{row.name}</span>
+                    {cat || fee ? (
                       <div className="site-venue-chips">
                         {cat ? (
                           <span className={`site-list-chip site-venue-chip--cat-${row.venueCategory}`}>{cat}</span>
@@ -260,48 +356,24 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
                           <span className={`site-list-chip site-venue-chip--fee-${feeKey}`}>{fee}</span>
                         ) : null}
                       </div>
-                    );
-                  })()}
-                  {(() => {
-                    const region = String(row.region ?? "").trim();
-                    const dm =
-                      memoryCoords && row.lat != null && row.lng != null
-                        ? distanceMeters(memoryCoords, { lat: row.lat, lng: row.lng })
-                        : null;
-                    const distStr = dm != null && Number.isFinite(dm) ? formatDistanceKmFromMeters(dm) : null;
-                    const distPart =
-                      memoryCoords && row.lat != null && row.lng != null
-                        ? distStr
-                        : memoryCoords
-                          ? "—"
-                          : null;
-                    if (!region && !distPart) return null;
-                    return (
-                      <span className="site-venue-address">
-                        {region ? <>{region}</> : null}
-                        {region && distPart ? <> · </> : null}
-                        {distPart ? <span className="site-venue-distance">{distPart}</span> : null}
-                      </span>
-                    );
-                  })()}
-                  {row.phone?.trim() ? (
-                    <a className="site-venue-phone" href={`tel:${row.phone.trim().replace(/\s+/g, "")}`}>
-                      {row.phone.trim()}
-                    </a>
-                  ) : null}
-                </div>
-                {row.thumbnailUrl ? (
-                  <div className="site-venue-list-thumb">
-                    <SiteListImage160
-                      src={row.thumbnailUrl}
-                      alt=""
-                      placeholderClassName="site-venue-list-thumb-placeholder"
-                    />
+                    ) : null}
+                    {region ? <span className="site-venue-address">{region}</span> : null}
+                    {row.phone?.trim() ? (
+                      <a className="site-venue-phone" href={`tel:${row.phone.trim().replace(/\s+/g, "")}`}>
+                        {row.phone.trim()}
+                      </a>
+                    ) : null}
                   </div>
-                ) : null}
-              </Link>
-            </li>
-          ))}
+                  <div className="site-venue-list-trail">
+                    <span className="site-venue-fav-slot" aria-hidden>
+                      ☆
+                    </span>
+                    {distPart != null ? <span className="site-venue-distance">{distPart}</span> : null}
+                  </div>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
 
         {ordered.length === 0 ? (

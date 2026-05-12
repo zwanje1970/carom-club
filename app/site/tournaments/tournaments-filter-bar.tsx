@@ -1,11 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  buildTournamentListHref,
-  TOURNAMENT_STATUS_TAB_VALUES,
-  type TournamentStatusFilter,
-} from "./tournament-list-url";
+import { buildTournamentListHref, TOURNAMENT_STATUS_TAB_VALUES, type TournamentStatusFilter } from "./tournament-list-url";
 
 const STATUS_SEGMENTS: { value: TournamentStatusFilter; label: string }[] = [
   { value: "all", label: "전체" },
@@ -34,6 +30,14 @@ export default function TournamentsFilterBar({ searchParams, currentStatus }: Pr
               href={href}
               className={`site-tournament-status-filter__tab${active ? " site-tournament-status-filter__tab--active" : ""}`}
               aria-current={active ? "page" : undefined}
+              onClick={() => {
+                try {
+                  sessionStorage.removeItem("carom.site.tournaments.listReturnPending");
+                  sessionStorage.removeItem("carom.site.tournaments.historyRestorePending");
+                } catch {
+                  /* ignore */
+                }
+              }}
             >
               {label}
             </Link>

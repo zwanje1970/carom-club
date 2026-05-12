@@ -10,6 +10,12 @@ export type SiteTournamentListSnapshot = {
   title: string;
   statusBadge: TournamentStatusBadge;
   playScaleLabel: string;
+  /** 종목·범위 요약(대회 `rule`에서 스냅샷 생성 시점에만 결정) */
+  tournamentTypeLabel: string;
+  /** 1등 상금 한 줄 표시용(`prizeInfo`의 `우승:` 줄 기반, 없으면 "") */
+  firstPrizeLabel: string;
+  /** 신청·집합 등 주최가 입력한 `gatheringTime` 문자열 그대로, 없으면 "" */
+  deadlineLabel: string;
   dateLabel: string;
   regionLabel: string;
   /** Tournament `location`에서 카드·목록용 주최장소명만(주소 전체 아님). 없으면 "" */

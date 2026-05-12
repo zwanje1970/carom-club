@@ -1,10 +1,8 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import CommunityPostBodyEditor, {
-  type CommunityPostBodyEditorHandle,
-} from "../../../CommunityPostBodyEditor";
+import CommunityPostBodyEditor from "../../../CommunityPostBodyEditor";
 import { MAX_COMMUNITY_POST_IMAGE_COUNT } from "../../../../../../lib/community-post-images";
 import type { SiteCommunityBoardKey } from "../../../../../../lib/types/entities";
 import { communityBoardListHref } from "../../../community-tab-config";
@@ -35,7 +33,6 @@ export default function CommunityPostEditForm({
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const bodyEditorRef = useRef<CommunityPostBodyEditorHandle>(null);
   const [attachUi, setAttachUi] = useState({
     uploading: false,
     remaining: MAX_COMMUNITY_POST_IMAGE_COUNT,
@@ -110,23 +107,6 @@ export default function CommunityPostEditForm({
 
   return (
     <form className="ui-community-post-form ui-community-post-form--plain v3-stack" onSubmit={handleSubmit}>
-      <div className="ui-community-compose-topbar">
-        <button
-          type="button"
-          className="ui-community-post-attach-button"
-          disabled={loading || attachUi.uploading || attachUi.pendingImages || attachUi.remaining <= 0}
-          onClick={() => bodyEditorRef.current?.openImageAttach()}
-        >
-          {attachUi.uploading ? "업로드…" : "이미지첨부"}
-        </button>
-        <button
-          type="submit"
-          className="primary-button ui-community-compose-topbar-submit"
-          disabled={loading || attachUi.uploading || attachUi.pendingImages}
-        >
-          {loading ? "저장 중..." : "저장"}
-        </button>
-      </div>
       <div className="ui-community-form-field v3-stack">
         <input
           className="ui-community-form-input"
@@ -141,7 +121,6 @@ export default function CommunityPostEditForm({
       </div>
       <div className="ui-community-form-field v3-stack">
         <CommunityPostBodyEditor
-          ref={bodyEditorRef}
           key={editorKey}
           disabled={loading}
           initialContent={editorInit.content}
@@ -150,6 +129,15 @@ export default function CommunityPostEditForm({
           onSerializedChange={onBodyChange}
           onAttachUiChange={onAttachUiChange}
         />
+      </div>
+      <div className="ui-community-compose-save-row">
+        <button
+          type="submit"
+          className="primary-button ui-community-compose-save-submit"
+          disabled={loading || attachUi.uploading || attachUi.pendingImages}
+        >
+          {loading ? "저장 중..." : "저장"}
+        </button>
       </div>
       {message ? <p className="v3-muted ui-community-form-message">{message}</p> : null}
     </form>

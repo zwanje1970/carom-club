@@ -1,10 +1,48 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import SiteShellFrame from "../components/SiteShellFrame";
 import SiteListImage160 from "../components/SiteListImage160";
 import TournamentsFilterBar from "./tournaments-filter-bar";
-import type { TournamentStatusFilter } from "./tournament-list-url";
+import {
+  buildTournamentsListScrollSignature,
+  type TournamentStatusFilter,
+} from "./tournament-list-url";
+
+const TOURNAMENTS_SCROLL_STORAGE_KEY = "carom.site.tournaments.scrollY";
+
+function readStoredListScroll(signature: string): { scrollY: number } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(TOURNAMENTS_SCROLL_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { signature?: unknown; scrollY?: unknown };
+    if (parsed.signature !== signature || typeof parsed.scrollY !== "number") return null;
+    return { scrollY: parsed.scrollY };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredListScroll(signature: string, scrollY: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(
+      TOURNAMENTS_SCROLL_STORAGE_KEY,
+      JSON.stringify({ signature, scrollY: Math.max(0, scrollY) }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+function shouldSaveScrollBeforeDetailNavigate(ev: React.MouseEvent): boolean {
+  if (ev.defaultPrevented) return false;
+  if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return false;
+  if (ev.button !== 0) return false;
+  return true;
+}
 
 export type SiteTournamentListRow = {
   id: string;
@@ -14,6 +52,9 @@ export type SiteTournamentListRow = {
   locationLine: string;
   bracketParen: string | null;
   posterSrc: string | null;
+  tournamentTypeLabel: string;
+  firstPrizeLabel: string;
+  deadlineLabel: string;
 };
 
 function tournamentStatusBadgeClassName(statusBadge: string): string {
@@ -25,6 +66,14 @@ function tournamentStatusBadgeClassName(statusBadge: string): string {
   return "site-board-status-badge site-board-status-badge--muted";
 }
 
+function tournamentTypeChipClassName(label: string): string {
+  const t = label.trim();
+  const base = "site-tournament-type-chip";
+  if (t === "스카치") return `${base} ${base}--scotch`;
+  if (t === "권역") return `${base} ${base}--national`;
+  return `${base} ${base}--normal`;
+}
+
 type Props = {
   rows: SiteTournamentListRow[];
   searchParams: Record<string, string | string[] | undefined>;
@@ -32,37 +81,78 @@ type Props = {
 };
 
 export default function SiteTournamentsDistanceShell({ rows, searchParams, currentStatus }: Props) {
+  const listScrollSignature = useMemo(() => buildTournamentsListScrollSignature(searchParams), [searchParams]);
+  const didRestoreForSignatureRef = useRef<string | null>(null);
+
+  const saveScrollBeforeDetail = useCallback(() => {
+    writeStoredListScroll(listScrollSignature, window.scrollY || window.pageYOffset || 0);
+  }, [listScrollSignature]);
+
+  useEffect(() => {
+    if (rows.length === 0) return;
+    if (didRestoreForSignatureRef.current === listScrollSignature) return;
+    const stored = readStoredListScroll(listScrollSignature);
+    didRestoreForSignatureRef.current = listScrollSignature;
+    if (!stored) return;
+    const y = stored.scrollY;
+    const apply = () => {
+      window.scrollTo(0, y);
+    };
+    requestAnimationFrame(() => {
+      requestAnimationFrame(apply);
+    });
+  }, [rows, listScrollSignature]);
+
   return (
     <SiteShellFrame
       brandTitle="대회안내"
       auxiliaryBarClassName="site-shell-controls--site-list"
       auxiliary={<TournamentsFilterBar searchParams={searchParams} currentStatus={currentStatus} />}
     >
-      <section className="site-site-gray-main v3-stack">
+      <section className="site-site-gray-main v3-stack site-tournaments-list-page">
         {rows.length === 0 ? (
           <p className="v3-muted site-list-empty-hint">등록된 대회가 없습니다.</p>
         ) : (
-          <ul className="site-board-card-list">
+          <ul className="site-board-card-list site-site-list--tournaments">
             {rows.map((tournament) => (
-              <li key={tournament.id} className="site-board-card">
-                <Link prefetch={false} href={`/site/tournaments/${tournament.id}`}>
-                  <div className="site-tournament-card-main">
-                    <div className="site-tournament-card-head">
-                      <span className={tournamentStatusBadgeClassName(tournament.statusBadge)}>
-                        {tournament.statusBadge}
-                      </span>
-                      <strong className="site-tournament-card-title">{tournament.title}</strong>
-                    </div>
+              <li key={tournament.id} className="site-board-card site-board-card--tournament-row">
+                <Link
+                  prefetch={false}
+                  className="site-tournament-list-link"
+                  href={`/site/tournaments/${tournament.id}`}
+                  onClick={(ev) => {
+                    if (!shouldSaveScrollBeforeDetailNavigate(ev)) return;
+                    saveScrollBeforeDetail();
+                  }}
+                >
+                  <div className="site-tournament-list-left">
+                    {tournament.bracketParen ? (
+                      <span className="site-tournament-list-bracket">{tournament.bracketParen}</span>
+                    ) : null}
                     {tournament.scheduleLine ? (
                       <span className="site-tournament-schedule">{tournament.scheduleLine}</span>
                     ) : null}
+                  </div>
+                  <div className="site-tournament-list-center">
+                    {tournament.tournamentTypeLabel.trim() ? (
+                      <span className={tournamentTypeChipClassName(tournament.tournamentTypeLabel)}>
+                        {tournament.tournamentTypeLabel.trim()}
+                      </span>
+                    ) : null}
+                    <span className="site-tournament-card-title">{tournament.title}</span>
                     {tournament.locationLine ? (
                       <span className="site-tournament-location">{tournament.locationLine}</span>
                     ) : null}
-                    {tournament.bracketParen ? (
-                      <div className="site-tournament-chips">
-                        <span className="site-list-chip">{tournament.bracketParen}</span>
-                      </div>
+                  </div>
+                  <div className="site-tournament-list-right">
+                    <span className={tournamentStatusBadgeClassName(tournament.statusBadge)}>
+                      {tournament.statusBadge}
+                    </span>
+                    {tournament.firstPrizeLabel.trim() ? (
+                      <span className="site-tournament-list-prize">{tournament.firstPrizeLabel.trim()}</span>
+                    ) : null}
+                    {tournament.deadlineLabel.trim() ? (
+                      <span className="site-tournament-list-deadline">{tournament.deadlineLabel.trim()}</span>
                     ) : null}
                   </div>
                   {tournament.posterSrc ? (

@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+const COMMUNITY_COMMENT_MAX_LENGTH = 500;
 
 type CommentItem = {
   id: string;
@@ -17,6 +19,11 @@ type Props = {
   isLoggedIn: boolean;
   currentUserId: string | null;
 };
+
+function sliceCommunityCommentInput(value: string): string {
+  if (value.length <= COMMUNITY_COMMENT_MAX_LENGTH) return value;
+  return value.slice(0, COMMUNITY_COMMENT_MAX_LENGTH);
+}
 
 function formatCommentDate(iso: string): string {
   const d = new Date(iso);
@@ -39,6 +46,7 @@ export default function CommunityPostCommentsSection({ boardType, postId, isLogg
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const load = useCallback(async () => {
     const q = encodeURIComponent(postId);
@@ -62,6 +70,21 @@ export default function CommunityPostCommentsSection({ boardType, postId, isLogg
     };
   }, [load]);
 
+  useEffect(() => {
+    const el = commentTextareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const cs = window.getComputedStyle(el);
+    const line = parseFloat(cs.lineHeight);
+    const lineHeight = Number.isFinite(line) && line > 0 ? line : 22;
+    const pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const minH = Math.ceil(lineHeight * 1 + pad);
+    const maxH = Math.ceil(lineHeight * 4 + pad);
+    const next = Math.min(Math.max(el.scrollHeight, minH), maxH);
+    el.style.height = `${next}px`;
+    el.style.overflowY = el.scrollHeight > maxH ? "auto" : "hidden";
+  }, [content]);
+
   function cancelEdit() {
     setEditingCommentId(null);
     setContent("");
@@ -69,12 +92,32 @@ export default function CommunityPostCommentsSection({ boardType, postId, isLogg
 
   function startEdit(c: CommentItem) {
     setEditingCommentId(c.id);
-    setContent(c.content);
+    setContent(sliceCommunityCommentInput(c.content));
+  }
+
+  function handleCommentPaste(ev: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const pasted = ev.clipboardData.getData("text/plain");
+    if (!pasted) return;
+    ev.preventDefault();
+    const ta = ev.currentTarget;
+    const start = ta.selectionStart ?? 0;
+    const end = ta.selectionEnd ?? 0;
+    const merged = content.slice(0, start) + pasted + content.slice(end);
+    const next = sliceCommunityCommentInput(merged);
+    setContent(next);
+    const caret = Math.min(start + pasted.length, next.length);
+    requestAnimationFrame(() => {
+      try {
+        ta.selectionStart = ta.selectionEnd = caret;
+      } catch {
+        /* ignore */
+      }
+    });
   }
 
   async function handleSubmit() {
     if (!isLoggedIn || submitting) return;
-    const text = content.trim();
+    const text = sliceCommunityCommentInput(content).trim();
     if (!text) return;
     setSubmitting(true);
     try {
@@ -117,6 +160,9 @@ export default function CommunityPostCommentsSection({ boardType, postId, isLogg
       // ignore
     }
   }
+
+  const contentLen = content.length;
+  const canSubmit = Boolean(content.trim()) && !submitting;
 
   return (
     <section className="ui-community-comments v3-stack">
@@ -161,27 +207,38 @@ export default function CommunityPostCommentsSection({ boardType, postId, isLogg
 
       {isLoggedIn ? (
         <div className="ui-community-comment-compose v3-stack">
-          <div className="ui-community-comment-compose-inline">
-            {editingCommentId ? (
-              <button type="button" className="ui-community-comment-compose-cancel-inline" onClick={cancelEdit}>
-                취소
+          <div className="ui-community-comment-compose-block">
+            <div className="ui-community-comment-compose-inline">
+              {editingCommentId ? (
+                <button type="button" className="ui-community-comment-compose-cancel-inline" onClick={cancelEdit}>
+                  취소
+                </button>
+              ) : null}
+              <textarea
+                ref={commentTextareaRef}
+                className="ui-community-form-textarea ui-community-comment-textarea-inline"
+                value={content}
+                onChange={(e) => setContent(sliceCommunityCommentInput(e.target.value))}
+                onPaste={handleCommentPaste}
+                rows={1}
+                maxLength={COMMUNITY_COMMENT_MAX_LENGTH}
+                placeholder="댓글을 입력하세요"
+                spellCheck={false}
+              />
+              <button
+                type="button"
+                className="primary-button ui-community-comment-submit-inline"
+                disabled={!canSubmit}
+                onClick={() => {
+                  void handleSubmit();
+                }}
+              >
+                {submitting ? (editingCommentId ? "수정 중..." : "등록 중...") : editingCommentId ? "수정완료" : "등록"}
               </button>
-            ) : null}
-            <textarea
-              className="ui-community-form-textarea ui-community-comment-textarea-inline"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={2}
-              placeholder="댓글을 입력하세요"
-            />
-            <button
-              type="button"
-              className="primary-button ui-community-comment-submit-inline"
-              disabled={submitting || !content.trim()}
-              onClick={handleSubmit}
-            >
-              {submitting ? (editingCommentId ? "수정 중..." : "등록 중...") : editingCommentId ? "수정완료" : "등록"}
-            </button>
+            </div>
+            <div className="ui-community-comment-compose-meter" aria-live="polite">
+              {contentLen} / {COMMUNITY_COMMENT_MAX_LENGTH}
+            </div>
           </div>
         </div>
       ) : (

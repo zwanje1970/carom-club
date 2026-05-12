@@ -134,7 +134,13 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.max(el.scrollHeight, 220)}px`;
+    const cs = window.getComputedStyle(el);
+    const line = parseFloat(cs.lineHeight);
+    const lineHeight = Number.isFinite(line) && line > 0 ? line : 22;
+    const pad =
+      (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const minOneLine = Math.ceil(lineHeight + pad);
+    el.style.height = `${Math.max(el.scrollHeight, minOneLine)}px`;
   }, [text]);
 
   const remaining = MAX_COMMUNITY_POST_IMAGE_COUNT - images.length;
@@ -215,6 +221,16 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
         onChange={(e) => setText(e.target.value)}
         disabled={disabled}
       />
+      {!disabled ? (
+        <button
+          type="button"
+          className="ui-community-post-attach-button ui-community-post-attach-button--after-body"
+          disabled={uploading || remaining <= 0}
+          onClick={() => fileRef.current?.click()}
+        >
+          {uploading ? "업로드…" : "이미지 첨부"}
+        </button>
+      ) : null}
       <input
         ref={fileRef}
         type="file"
@@ -224,27 +240,35 @@ const CommunityPostBodyEditor = forwardRef<CommunityPostBodyEditorHandle, Props>
         className="ui-community-post-editor-file"
       />
       {images.length > 0 ? (
-        <ul className="ui-community-post-editor-image-list">
+        <div className="ui-community-post-images ui-community-post-images--uniform ui-community-post-editor-previews">
           {images.map((img, idx) => {
             const src = img.previewUrl ? img.previewUrl : img.url;
             if (!src) return null;
             return (
-              <li key={`${src}-${idx}`} className="ui-community-post-editor-image-item">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="ui-community-post-editor-image" src={src} alt="" loading="lazy" decoding="async" />
+              <div key={`${src}-${idx}`} className="ui-community-post-editor-preview-item">
+                <span className="ui-community-post-body-figure">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    className="ui-community-post-inline-img"
+                    src={src}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </span>
                 {!disabled ? (
                   <button
                     type="button"
-                    className="ui-community-comment-text-action"
+                    className="ui-community-comment-text-action ui-community-post-editor-preview-remove"
                     onClick={() => removeImageAt(idx)}
                   >
                     이미지 삭제
                   </button>
                 ) : null}
-              </li>
+              </div>
             );
           })}
-        </ul>
+        </div>
       ) : null}
       {error ? <p className="v3-muted ui-community-form-message">{error}</p> : null}
     </div>

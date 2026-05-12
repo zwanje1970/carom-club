@@ -81,21 +81,21 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
   return (
     <SiteShellFrame
       brandTitle={
-        <div className="site-community-detail-brand-row">
-          <span className="site-community-detail-brand-name site-home-brand-ellipsis">{boardPillLabel}</span>
-          <CommunityPostDetailActions
-            canManageAuthor={canManageAuthor}
-            canDeletePost={canDeletePost}
-            postId={postId}
-            boardType={boardType}
-            className="site-community-detail-header-actions"
-          />
-        </div>
+        <span className="site-community-detail-brand-name site-home-brand-ellipsis">{boardPillLabel}</span>
       }
     >
       <section className="site-site-gray-main v3-stack ui-community-post-detail-page">
         <article className="ui-community-post-detail-article v3-stack">
-          <h1 className="ui-community-post-detail-title">{post.title}</h1>
+          <div className="ui-community-post-detail-heading-row">
+            <h1 className="ui-community-post-detail-title">{post.title}</h1>
+            <CommunityPostDetailActions
+              canManageAuthor={canManageAuthor}
+              canDeletePost={canDeletePost}
+              postId={postId}
+              boardType={boardType}
+              className="ui-community-post-detail-actions ui-community-post-detail-actions--in-article"
+            />
+          </div>
           <p className="ui-community-post-detail-meta">
             <span className="ui-community-post-detail-author">{post.authorNickname}</span>
             <span className="ui-community-post-detail-meta-plain">

@@ -15,6 +15,7 @@ export default function TournamentCardOverflowMenu({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [dupBusy, setDupBusy] = useState(false);
+  const [dupToast, setDupToast] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);
@@ -72,11 +73,9 @@ export default function TournamentCardOverflowMenu({
         window.alert(data.error ?? "복제에 실패했습니다.");
         return;
       }
-      const newId = data.tournament?.id?.trim();
       setOpen(false);
-      if (newId) {
-        router.push(`/client/tournaments/${encodeURIComponent(newId)}/edit`);
-      }
+      setDupToast("대회가 복제되었습니다.");
+      window.setTimeout(() => setDupToast(null), 2800);
       router.refresh();
     } catch {
       window.alert("복제 요청에 실패했습니다.");
@@ -239,6 +238,33 @@ export default function TournamentCardOverflowMenu({
         ⋮
       </button>
       {menuPanel ? createPortal(menuPanel, document.body) : null}
+      {dupToast && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              role="status"
+              aria-live="polite"
+              style={{
+                position: "fixed",
+                left: "50%",
+                bottom: "max(1rem, env(safe-area-inset-bottom, 0px))",
+                transform: "translateX(-50%)",
+                zIndex: 10001,
+                maxWidth: "min(92vw, 22rem)",
+                padding: "0.55rem 1rem",
+                borderRadius: "0.5rem",
+                background: "#0f172a",
+                color: "#f8fafc",
+                fontSize: "0.92rem",
+                fontWeight: 600,
+                boxShadow: "0 8px 24px rgba(0,0,0,0.2)",
+                pointerEvents: "none",
+              }}
+            >
+              {dupToast}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
