@@ -66,12 +66,27 @@ function tournamentStatusBadgeClassName(statusBadge: string): string {
   return "site-board-status-badge site-board-status-badge--muted";
 }
 
-function tournamentTypeChipClassName(label: string): string {
-  const t = label.trim();
-  const base = "site-tournament-type-chip";
-  if (t === "스카치") return `${base} ${base}--scotch`;
-  if (t === "권역") return `${base} ${base}--national`;
-  return `${base} ${base}--normal`;
+/** 스냅샷 `dateLabel` 표시만: `YYYY.MM.DD` → `YY/MM/DD`, 한 줄. */
+function formatTournamentListScheduleDisplay(scheduleLine: string): string {
+  const s = scheduleLine.trim().replace(/\s*\r?\n+\s*/g, " ");
+  if (!s) return "";
+  return s.replace(/\b(\d{4})\.(\d{2})\.(\d{2})\b/g, (_, y: string, m: string, d: string) => `${y.slice(2)}/${m}/${d}`);
+}
+
+/** 목록 표시용: `1등 N만` → `1등 N만원` (스냅샷 문자열은 그대로 두고 화면에서만 보정). */
+function displayFirstPrizeForList(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "";
+  if (/만원\s*$/.test(t)) return t;
+  if (/만\s*$/.test(t)) return `${t}원`;
+  return t;
+}
+
+function splitPlayScaleBracket(playScale: string | null): { num: string; suffix: string } | null {
+  if (!playScale?.trim()) return null;
+  const m = /^(\d+)\s*(강)$/.exec(playScale.trim());
+  if (!m) return null;
+  return { num: m[1]!, suffix: m[2]! };
 }
 
 type Props = {
@@ -127,18 +142,30 @@ export default function SiteTournamentsDistanceShell({ rows, searchParams, curre
                 >
                   <div className="site-tournament-list-left">
                     {tournament.bracketParen ? (
-                      <span className="site-tournament-list-bracket">{tournament.bracketParen}</span>
+                      (() => {
+                        const parts = splitPlayScaleBracket(tournament.bracketParen);
+                        if (!parts) {
+                          return (
+                            <span className="site-tournament-list-bracket site-tournament-list-bracket--plain">
+                              {tournament.bracketParen}
+                            </span>
+                          );
+                        }
+                        return (
+                          <span className="site-tournament-list-bracket">
+                            <span className="site-tournament-list-bracket-num">{parts.num}</span>
+                            {parts.suffix}
+                          </span>
+                        );
+                      })()
                     ) : null}
                     {tournament.scheduleLine ? (
-                      <span className="site-tournament-schedule">{tournament.scheduleLine}</span>
+                      <span className="site-tournament-schedule">
+                        {formatTournamentListScheduleDisplay(tournament.scheduleLine)}
+                      </span>
                     ) : null}
                   </div>
                   <div className="site-tournament-list-center">
-                    {tournament.tournamentTypeLabel.trim() ? (
-                      <span className={tournamentTypeChipClassName(tournament.tournamentTypeLabel)}>
-                        {tournament.tournamentTypeLabel.trim()}
-                      </span>
-                    ) : null}
                     <span className="site-tournament-card-title">{tournament.title}</span>
                     {tournament.locationLine ? (
                       <span className="site-tournament-location">{tournament.locationLine}</span>
@@ -149,10 +176,9 @@ export default function SiteTournamentsDistanceShell({ rows, searchParams, curre
                       {tournament.statusBadge}
                     </span>
                     {tournament.firstPrizeLabel.trim() ? (
-                      <span className="site-tournament-list-prize">{tournament.firstPrizeLabel.trim()}</span>
-                    ) : null}
-                    {tournament.deadlineLabel.trim() ? (
-                      <span className="site-tournament-list-deadline">{tournament.deadlineLabel.trim()}</span>
+                      <span className="site-tournament-list-prize">
+                        {displayFirstPrizeForList(tournament.firstPrizeLabel)}
+                      </span>
                     ) : null}
                   </div>
                   {tournament.posterSrc ? (

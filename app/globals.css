@@ -945,8 +945,12 @@ button.secondary-button.site-mypage-logout:hover,
 
 .site-site-list--tournaments .site-tournament-list-bracket {
   margin: 0;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.04em;
   font-size: 0.8125rem;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.35;
   color: #dc2626;
   letter-spacing: -0.01em;
@@ -954,6 +958,17 @@ button.secondary-button.site-mypage-logout:hover,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.site-site-list--tournaments .site-tournament-list-bracket--plain {
+  font-weight: 400;
+}
+
+.site-site-list--tournaments .site-tournament-list-bracket-num {
+  font-size: 1.35rem;
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.03em;
 }
 
 .site-site-list--tournaments .site-tournament-type-chip {
@@ -1001,7 +1016,7 @@ button.secondary-button.site-mypage-logout:hover,
   flex-direction: column;
   align-items: flex-end;
   justify-content: flex-start;
-  gap: 0.26rem;
+  gap: 0.18rem;
   min-width: 0;
 }
 
@@ -1014,10 +1029,10 @@ button.secondary-button.site-mypage-logout:hover,
 
 .site-site-list--tournaments .site-tournament-list-prize {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 400;
   line-height: 1.35;
-  color: #475569;
+  color: #b91c1c;
   text-align: right;
   max-width: 7.75rem;
   overflow: hidden;
@@ -1057,6 +1072,17 @@ button.secondary-button.site-mypage-logout:hover,
   font-weight: 400;
   line-height: 1.45;
   color: #94a3b8;
+}
+
+.site-site-list--tournaments .site-tournament-schedule {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  display: block;
+}
+
+.site-site-list--tournaments .site-tournament-location {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -1076,7 +1102,7 @@ button.secondary-button.site-mypage-logout:hover,
   }
 }
 
-/* 클럽안내 행 — 좌: 썸네일 / 중: 상호·유형·전화 / 우: 즐겨찾기 자리·거리 */
+/* 클럽안내 행 — 좌: 썸네일 / 중: 상호·배지·지역|전화 / 우: 거리 */
 .site-site-list--venues .site-board-card > a.site-venue-list-link {
   display: grid;
   box-sizing: border-box;
@@ -1110,6 +1136,62 @@ button.secondary-button.site-mypage-logout:hover,
   font-weight: 500;
   line-height: 1.4;
   color: #334155;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.site-venue-title-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.site-venue-fav-slot--title {
+  flex: 0 0 auto;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  font-weight: 400;
+  color: rgba(148, 163, 184, 0.9);
+  user-select: none;
+  margin-top: 0.02rem;
+}
+
+.site-venue-meta-line {
+  display: block;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.45;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.site-site-list--venues .site-venue-address--inline {
+  display: inline;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+
+.site-site-list--venues .site-venue-phone--inline {
+  display: inline;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  color: #64748b;
+  text-decoration: none;
+}
+
+.site-site-list--venues .site-venue-phone--inline:active {
+  color: #2563eb;
 }
 
 .site-site-list--venues .site-venue-address {
@@ -1126,7 +1208,7 @@ button.secondary-button.site-mypage-logout:hover,
 }
 
 .site-site-list--venues .site-venue-chips .site-list-chip {
-  font-weight: 500;
+  font-weight: 400;
   font-size: 0.6875rem;
 }
 
@@ -1155,35 +1237,228 @@ button.secondary-button.site-mypage-logout:hover,
   text-align: right;
 }
 
-/* 클럽 필터: 가벼운 라벨·그룹 구분 (동작 동일) */
+/* 클럽 목록 상단: 전체(좌) / 즐겨찾기·거리순(우) + 둘째 줄 필터 */
+.site-venues-aux-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.36rem;
+  width: 100%;
+}
+
+.site-venues-aux-top-line {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+  width: 100%;
+  min-width: 0;
+}
+
+.site-venues-aux-top-right {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.site-venues-master-all {
+  flex: 0 1 auto;
+  min-width: 0;
+  border: none;
+  margin: 0;
+  padding: 0.1rem 0.2rem 0.1rem 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+}
+
+.site-venues-master-all-face {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: #334155;
+}
+
+.site-venues-master-all-face::before {
+  content: "○ ";
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.site-venues-master-all[aria-pressed="true"] .site-venues-master-all-face {
+  color: #0f172a;
+}
+
+.site-venues-master-all[aria-pressed="true"] .site-venues-master-all-face::before {
+  content: "⊙ ";
+  color: #0f172a;
+}
+
+.site-venues-aux-favorites-label {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: #64748b;
+  user-select: none;
+}
+
+.site-venues-aux-distance-pin {
+  margin-right: 0.1rem;
+}
+
+/* 거리순: 가벼운 pill — 색은 기존 거리순 톤 유지 */
+.site-venues-aux-top-line a.site-list-filter-distance-btn.site-venues-aux-distance-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 0.14rem 0.42rem;
+  min-height: unset;
+  border: 1px solid #2563eb;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.3;
+  text-decoration: none;
+  box-shadow: none;
+}
+
+.site-venues-aux-top-line a.site-list-filter-distance-btn.site-venues-aux-distance-link:hover {
+  background: #dbeafe;
+}
+
+.site-venues-aux-top-line a.site-list-filter-distance-btn.site-venues-aux-distance-link:active {
+  background: #bfdbfe;
+}
+
+.site-venues-aux-top-line a.site-list-filter-distance-btn.site-venues-aux-distance-link.site-venues-aux-distance-link--active {
+  border-color: #dc2626;
+  background: #dc2626;
+  color: #ffffff;
+}
+
+/* 거리순 링크: 모듈 `.button` 기본 높이보다 우선 */
+.site-shell-controls.site-shell-controls--site-list .site-venues-aux-top-line a.site-list-filter-distance-btn.site-venues-aux-distance-link {
+  min-height: unset;
+  font-weight: 400;
+}
+
+.site-venues-aux-filter-line2 {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.22rem 0.38rem;
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.site-venues-aux-filter-line2::-webkit-scrollbar {
+  display: none;
+}
+
+.site-venues-radio-group {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 0.06rem 0.22rem;
+  flex: 0 0 auto;
+}
+
+.site-venues-radio-sep {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 0 0.08rem;
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: rgba(148, 163, 184, 0.95);
+  user-select: none;
+}
+
+.site-venues-filter-toggle {
+  border: none;
+  background: transparent;
+  margin: 0;
+  padding: 0.06rem 0.1rem;
+  font: inherit;
+  cursor: pointer;
+  color: inherit;
+}
+
+.site-venues-radio-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.site-venues-radio-input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.site-venues-radio-face {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: #475569;
+}
+
+.site-venues-radio-face::before {
+  content: "○ ";
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.site-venues-radio-label:has(:checked) .site-venues-radio-face {
+  color: #0f172a;
+}
+
+.site-venues-radio-label:has(:checked) .site-venues-radio-face::before {
+  content: "⊙ ";
+  color: #0f172a;
+}
+
+.site-venues-filter-toggle[aria-checked="true"] .site-venues-radio-face {
+  color: #0f172a;
+}
+
+.site-venues-filter-toggle[aria-checked="true"] .site-venues-radio-face::before {
+  content: "⊙ ";
+  color: #0f172a;
+}
+
 .site-venues-list-filters.filterRow {
   gap: 0.45rem 0.55rem;
   row-gap: 0.42rem;
-}
-
-.site-venues-list-filters .filterField:nth-child(2) {
-  padding-left: 0.5rem;
-  margin-left: 0.1rem;
-  border-left: 1px solid rgba(148, 163, 184, 0.55);
-}
-
-.site-venues-list-filters .filterFieldLabel {
-  font-weight: 400;
-  font-size: 0.72rem;
-  color: #94a3b8;
-}
-
-.site-venues-list-filters .filterFieldLabel::before {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: 0.32rem;
-  border-radius: 50%;
-  border: 1px solid rgba(100, 116, 139, 0.55);
-  box-sizing: border-box;
-  vertical-align: middle;
-  transform: translateY(-1px);
 }
 
 /* 대회·당구장 목록: 필터 바 — 페이지 배경(#EEF2F7)과 동일 톤 */
@@ -3325,6 +3600,21 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   color: #94a3b8;
 }
 
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-schedule {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  display: block;
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-location {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-tournament-chips {
   margin-top: 0.1rem;
 }
@@ -3354,6 +3644,11 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   overflow: hidden;
 }
 
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-venue-phone--inline {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-venue-phone {
   display: block;
   font-size: 0.75rem;
@@ -3373,7 +3668,7 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
 
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-list-chip {
   font-size: 0.6875rem;
-  font-weight: 500;
+  font-weight: 400;
   padding: 2px 7px;
 }
 

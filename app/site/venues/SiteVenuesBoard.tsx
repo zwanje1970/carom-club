@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FilterButton from "../components/FilterButton";
-import FilterDropdown from "../components/FilterDropdown";
 import SiteShellFrame from "../components/SiteShellFrame";
 import SiteListImage160 from "../components/SiteListImage160";
 import filterStyles from "../components/filter-controls.module.css";
@@ -48,7 +47,7 @@ function distanceMeters(
 
 function categoryLabel(v: SiteVenueBoardRow["venueCategory"]): string {
   if (v === "daedae_only") return "대대전용";
-  if (v === "mixed") return "복합구장";
+  if (v === "mixed") return "혼합구장";
   return "";
 }
 
@@ -68,14 +67,12 @@ function formatDistanceKmFromMeters(meters: number): string {
 type VenueTypeFilter = "all" | "daedae_only" | "mixed";
 type FeeTypeFilter = "all" | "normal" | "flat";
 
-const VENUE_TYPE_OPTIONS: { value: VenueTypeFilter; label: string }[] = [
-  { value: "all", label: "전체" },
+const VENUE_LINE_OPTIONS: { value: Exclude<VenueTypeFilter, "all">; label: string }[] = [
   { value: "daedae_only", label: "대대전용" },
-  { value: "mixed", label: "복합구장" },
+  { value: "mixed", label: "혼합구장" },
 ];
 
-const FEE_TYPE_OPTIONS: { value: FeeTypeFilter; label: string }[] = [
-  { value: "all", label: "전체" },
+const FEE_LINE_OPTIONS: { value: Exclude<FeeTypeFilter, "all">; label: string }[] = [
   { value: "normal", label: "일반요금" },
   { value: "flat", label: "정액제" },
 ];
@@ -233,68 +230,82 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
     [geoBusy, memoryCoords],
   );
 
+  const masterAll = venueType === "all" && feeType === "all";
+
   const auxiliary = (
-    <div
-      className={`site-venues-list-filters site-list-filter-bar ${filterStyles.filterRow} ${filterStyles.filterRowSingle} ${filterStyles.filterRowSingleDouble} ${filterStyles.filterRowFilterPack}`}
-    >
-      <div className={filterStyles.filterField}>
-        <span
-          className={`${filterStyles.filterFieldLabel} site-list-filter-label`}
-          id="site-venues-filter-venue-type-label"
+    <div className="site-venues-aux-stack">
+      <div className="site-venues-aux-top-line">
+        <button
+          type="button"
+          className="site-venues-master-all"
+          aria-pressed={masterAll}
+          aria-label="유형·요금 전체 보기"
+          onClick={() => {
+            setVenueType("all");
+            setFeeType("all");
+          }}
         >
-          유형
-        </span>
-        <FilterDropdown
-          id="site-venues-filter-venue-type"
-          className={filterStyles.dropdownFlex}
-          value={venueType}
-          onChange={(e) => setVenueType(e.target.value as VenueTypeFilter)}
-          aria-labelledby="site-venues-filter-venue-type-label"
-        >
-          {VENUE_TYPE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </FilterDropdown>
+          <span className="site-venues-master-all-face">전체</span>
+        </button>
+        <div className="site-venues-aux-top-right">
+          <span className="site-venues-aux-favorites-label" aria-hidden>
+            ☆ 즐겨찾기
+          </span>
+          <FilterButton
+            className={[
+              filterStyles.buttonDistance,
+              "site-list-filter-distance-btn",
+              "site-venues-aux-distance-link",
+              memoryCoords != null ? "site-venues-aux-distance-link--active" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            href={distanceHref}
+            useNextLink={false}
+            onClick={(e) => {
+              void onDistanceClick(e);
+            }}
+          >
+            <span className="site-venues-aux-distance-pin" aria-hidden>
+              📍
+            </span>
+            거리순
+          </FilterButton>
+        </div>
       </div>
-      <div className={filterStyles.filterField}>
-        <span
-          className={`${filterStyles.filterFieldLabel} site-list-filter-label`}
-          id="site-venues-filter-fee-type-label"
-        >
-          요금제
-        </span>
-        <FilterDropdown
-          id="site-venues-filter-fee-type"
-          className={filterStyles.dropdownFlex}
-          value={feeType}
-          onChange={(e) => setFeeType(e.target.value as FeeTypeFilter)}
-          aria-labelledby="site-venues-filter-fee-type-label"
-        >
-          {FEE_TYPE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
+      <div className="site-venues-aux-filter-line2" role="group" aria-label="당구장 목록 필터">
+        <div className="site-venues-radio-group" role="radiogroup" aria-label="구장 구분">
+          {VENUE_LINE_OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              role="radio"
+              aria-checked={venueType === o.value}
+              className="site-venues-filter-toggle"
+              onClick={() => setVenueType(o.value)}
+            >
+              <span className="site-venues-radio-face">{o.label}</span>
+            </button>
           ))}
-        </FilterDropdown>
+        </div>
+        <span className="site-venues-radio-sep" aria-hidden>
+          |
+        </span>
+        <div className="site-venues-radio-group" role="radiogroup" aria-label="요금">
+          {FEE_LINE_OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              role="radio"
+              aria-checked={feeType === o.value}
+              className="site-venues-filter-toggle"
+              onClick={() => setFeeType(o.value)}
+            >
+              <span className="site-venues-radio-face">{o.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
-      <FilterButton
-        className={[
-          filterStyles.buttonDistance,
-          memoryCoords != null ? filterStyles.buttonDistanceActive : "",
-          "site-list-filter-distance-btn",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        href={distanceHref}
-        useNextLink={false}
-        onClick={(e) => {
-          void onDistanceClick(e);
-        }}
-      >
-        거리순
-      </FilterButton>
     </div>
   );
 
@@ -346,7 +357,12 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
                     )}
                   </div>
                   <div className="site-venue-card-main">
-                    <span className="site-venue-card-title">{row.name}</span>
+                    <div className="site-venue-title-row">
+                      <span className="site-venue-card-title">{row.name}</span>
+                      <span className="site-venue-fav-slot site-venue-fav-slot--title" aria-hidden>
+                        ☆
+                      </span>
+                    </div>
                     {cat || fee ? (
                       <div className="site-venue-chips">
                         {cat ? (
@@ -357,17 +373,24 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
                         ) : null}
                       </div>
                     ) : null}
-                    {region ? <span className="site-venue-address">{region}</span> : null}
-                    {row.phone?.trim() ? (
-                      <a className="site-venue-phone" href={`tel:${row.phone.trim().replace(/\s+/g, "")}`}>
-                        {row.phone.trim()}
-                      </a>
+                    {region || row.phone?.trim() ? (
+                      <span className="site-venue-meta-line">
+                        {region ? <span className="site-venue-address site-venue-address--inline">{region}</span> : null}
+                        {region && row.phone?.trim() ? (
+                          <span className="site-venue-meta-sep" aria-hidden>
+                            {" "}
+                            |{" "}
+                          </span>
+                        ) : null}
+                        {row.phone?.trim() ? (
+                          <a className="site-venue-phone site-venue-phone--inline" href={`tel:${row.phone.trim().replace(/\s+/g, "")}`}>
+                            {row.phone.trim()}
+                          </a>
+                        ) : null}
+                      </span>
                     ) : null}
                   </div>
                   <div className="site-venue-list-trail">
-                    <span className="site-venue-fav-slot" aria-hidden>
-                      ☆
-                    </span>
                     {distPart != null ? <span className="site-venue-distance">{distPart}</span> : null}
                   </div>
                 </Link>
