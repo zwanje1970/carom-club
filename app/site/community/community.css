@@ -125,29 +125,55 @@
 .ui-community-tabs-list {
   list-style: none;
   margin: 0;
-  padding: 0 0 0.26rem;
+  padding: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.12rem 0.22rem;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.12);
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  box-sizing: border-box;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+.ui-community-tabs-list::-webkit-scrollbar {
+  display: none;
+}
+
+.ui-community-tabs-item {
+  flex: 0 0 auto;
+  margin: 0;
 }
 
 .ui-community-tabs-link {
-  display: inline-block;
-  padding: 0.16rem 0.38rem;
-  font-size: 0.765rem;
+  display: block;
+  box-sizing: border-box;
+  padding: 0.38rem 0.52rem 0.34rem;
+  font-size: 0.875rem;
   font-weight: 400;
-  color: #475569;
-  text-decoration: none;
-  border-radius: 6px;
   line-height: 1.28;
+  color: #64748b;
+  text-decoration: none;
+  border-radius: 0;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
   background: transparent;
+  white-space: nowrap;
   -webkit-tap-highlight-color: transparent;
 }
 
 .ui-community-tabs-link:hover {
-  color: #0f172a;
-  background: rgba(15, 23, 42, 0.045);
+  color: #334155;
+  background: transparent;
+}
+
+.ui-community-tabs-link:active {
+  color: #1e293b;
+  background: transparent;
 }
 
 .ui-community-tabs-link--active {
@@ -155,10 +181,8 @@
   color: #0f172a;
   background: transparent;
   box-shadow: none;
-  text-decoration: underline;
-  text-underline-offset: 5px;
-  text-decoration-thickness: 1.5px;
-  text-decoration-color: var(--ui-primary, #2563eb);
+  text-decoration: none;
+  border-bottom-color: #2563eb;
 }
 
 .ui-community-search-label {

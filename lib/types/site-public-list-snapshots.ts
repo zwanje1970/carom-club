@@ -36,6 +36,8 @@ export type SiteVenueListSnapshot = {
   venueId: string;
   name: string;
   regionLabel: string;
+  /** 목록 `지역 | 전화` 표시용 — 구 KV에 없으면 파싱 시 null */
+  phone: string | null;
   thumbnail160Url: string | null;
   detailUrl: string;
   lat: number | null;

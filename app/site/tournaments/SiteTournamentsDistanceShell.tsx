@@ -75,7 +75,7 @@ function formatTournamentListScheduleDisplay(scheduleLine: string): string {
 
 /** 목록 표시용: `1등 N만` → `1등 N만원` (스냅샷 문자열은 그대로 두고 화면에서만 보정). */
 function displayFirstPrizeForList(raw: string): string {
-  const t = raw.trim();
+  const t = raw.replace(/\u00a0/g, " ").trim();
   if (!t) return "";
   if (/만원\s*$/.test(t)) return t;
   if (/만\s*$/.test(t)) return `${t}원`;
@@ -175,7 +175,7 @@ export default function SiteTournamentsDistanceShell({ rows, searchParams, curre
                     <span className={tournamentStatusBadgeClassName(tournament.statusBadge)}>
                       {tournament.statusBadge}
                     </span>
-                    {tournament.firstPrizeLabel.trim() ? (
+                    {tournament.firstPrizeLabel.replace(/\u00a0/g, " ").trim() ? (
                       <span className="site-tournament-list-prize">
                         {displayFirstPrizeForList(tournament.firstPrizeLabel)}
                       </span>

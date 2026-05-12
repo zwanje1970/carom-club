@@ -245,6 +245,7 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
             setFeeType("all");
           }}
         >
+          <span className="site-venues-radio-mark" aria-hidden />
           <span className="site-venues-master-all-face">전체</span>
         </button>
         <div className="site-venues-aux-top-right">
@@ -284,6 +285,7 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
               className="site-venues-filter-toggle"
               onClick={() => setVenueType(o.value)}
             >
+              <span className="site-venues-radio-mark" aria-hidden />
               <span className="site-venues-radio-face">{o.label}</span>
             </button>
           ))}
@@ -301,6 +303,7 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
               className="site-venues-filter-toggle"
               onClick={() => setFeeType(o.value)}
             >
+              <span className="site-venues-radio-mark" aria-hidden />
               <span className="site-venues-radio-face">{o.label}</span>
             </button>
           ))}
@@ -320,6 +323,9 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
         <ul className="site-board-card-list site-site-list--venues" style={{ margin: 0 }}>
           {ordered.map((row) => {
             const region = String(row.region ?? "").trim();
+            const phoneDisplay = String(row.phone ?? "")
+              .replace(/\u00a0/g, " ")
+              .trim();
             const dm =
               memoryCoords && row.lat != null && row.lng != null
                 ? distanceMeters(memoryCoords, { lat: row.lat, lng: row.lng })
@@ -373,18 +379,18 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
                         ) : null}
                       </div>
                     ) : null}
-                    {region || row.phone?.trim() ? (
+                    {region || phoneDisplay ? (
                       <span className="site-venue-meta-line">
                         {region ? <span className="site-venue-address site-venue-address--inline">{region}</span> : null}
-                        {region && row.phone?.trim() ? (
+                        {region && phoneDisplay ? (
                           <span className="site-venue-meta-sep" aria-hidden>
                             {" "}
                             |{" "}
                           </span>
                         ) : null}
-                        {row.phone?.trim() ? (
-                          <a className="site-venue-phone site-venue-phone--inline" href={`tel:${row.phone.trim().replace(/\s+/g, "")}`}>
-                            {row.phone.trim()}
+                        {phoneDisplay ? (
+                          <a className="site-venue-phone site-venue-phone--inline" href={`tel:${phoneDisplay.replace(/\s+/g, "")}`}>
+                            {phoneDisplay}
                           </a>
                         ) : null}
                       </span>

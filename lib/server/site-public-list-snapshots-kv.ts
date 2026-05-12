@@ -278,6 +278,13 @@ function parseOneVenueSnapshotRow(row: unknown, index: number): SiteVenueListSna
     return null;
   }
   const catalogTypeLabel = typeof o.catalogTypeLabel === "string" ? o.catalogTypeLabel : "당구장";
+  const phoneRaw = o.phone;
+  const phone =
+    phoneRaw === null || phoneRaw === undefined
+      ? null
+      : typeof phoneRaw === "string"
+        ? phoneRaw.trim() || null
+        : null;
   const updatedAt = typeof o.updatedAt === "string" ? o.updatedAt : "";
   const isVisibleOnSite = o.isVisibleOnSite === true;
   if (!detailUrl || !updatedAt) {
@@ -292,6 +299,7 @@ function parseOneVenueSnapshotRow(row: unknown, index: number): SiteVenueListSna
     venueId,
     name,
     regionLabel,
+    phone,
     thumbnail160Url,
     detailUrl,
     lat,
@@ -388,6 +396,7 @@ export async function rebuildSitePublicVenueListSnapshots(
         venueId: org.slug?.trim() || org.id,
         name: org.name?.trim() || "이름 없음",
         regionLabel: buildRegionLabelForSiteListSnapshot(road),
+        phone: org.phone?.trim() ? org.phone.trim() : null,
         thumbnail160Url:
           resolveSiteListThumbnailFromPosterWithAssetMap(reps[0] || cover || "", assetsById, buildSitePublicImageUrl) ??
           null,
@@ -467,7 +476,7 @@ export function venueSnapshotsToBoardRows(snaps: SiteVenueListSnapshot[]): SiteV
         introLine: null,
         thumbnailUrl: s.thumbnail160Url,
         address: null,
-        phone: null,
+        phone: s.phone ?? null,
         website: null,
         lat: s.lat,
         lng: s.lng,
