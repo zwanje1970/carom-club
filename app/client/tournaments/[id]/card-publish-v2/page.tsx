@@ -213,7 +213,8 @@ export default function ClientTournamentCardPublishV2Page() {
 
   const [message, setMessage] = useState("");
   const [publishBusy, setPublishBusy] = useState(false);
-  /** 모집중 게시: 캡처·업로드·저장 백그라운드 진행 중(버튼만 짧게 막고 화면 이탈은 허용) */
+  const [publishCompleteModalOpen, setPublishCompleteModalOpen] = useState(false);
+  /** 모집중 게시 백그라운드 진행 중 — 중복 클릭 방지·finally 시 리렌더용(버튼 문구에는 쓰지 않음) */
   const [publishBackgroundBusy, setPublishBackgroundBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   /** 캡처용 오프스크린 카드 — 초기 타이핑 부담 완화 후 `requestIdleCallback`으로 마운트 */
@@ -555,7 +556,8 @@ export default function ClientTournamentCardPublishV2Page() {
 
       recruitingBgInFlightRef.current = true;
       setPublishBackgroundBusy(true);
-      setMessage(PUBLISHED_CARD_MAIN_REFLECT_NOTICE_KO);
+      setMessage("");
+      setPublishCompleteModalOpen(true);
       void router.refresh();
 
       void publishTournamentCardFromEditorClient({
@@ -595,11 +597,12 @@ export default function ClientTournamentCardPublishV2Page() {
 
   const publishActionBlocked =
     publishBusy || (publishIntent === "recruiting" && publishBackgroundBusy);
-  const publishButtonLabel = publishBusy
-    ? "처리 중…"
-    : publishIntent === "recruiting" && publishBackgroundBusy
-      ? "게시 처리 중…"
-      : "게시";
+  const publishButtonLabel = publishBusy ? "처리 중…" : "게시";
+
+  function handlePublishCompleteModalConfirm(): void {
+    setPublishCompleteModalOpen(false);
+    router.push(`/client/tournaments/${encodeURIComponent(tournamentId)}`);
+  }
 
   const handleUploadImage = useCallback(
     async (file: File) => {
@@ -888,6 +891,45 @@ export default function ClientTournamentCardPublishV2Page() {
         </div>
         <aside className={editorStyles.pcPageAside} aria-hidden="true" />
       </div>
+
+      {publishCompleteModalOpen ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 10050,
+            background: "rgba(15, 23, 42, 0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "1rem",
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="card-publish-publish-request-done-title"
+            className="v3-box v3-stack"
+            style={{
+              maxWidth: "22rem",
+              width: "100%",
+              gap: "0.85rem",
+              boxShadow: "0 18px 48px rgba(15, 23, 42, 0.28)",
+            }}
+          >
+            <h2 id="card-publish-publish-request-done-title" className="v3-h2" style={{ margin: 0 }}>
+              게시 요청 완료
+            </h2>
+            <p className="v3-muted" style={{ margin: 0, fontSize: "0.95rem", lineHeight: 1.5 }}>
+              약 1분 후 메인에 카드가 게시됩니다.
+            </p>
+            <button type="button" className="v3-btn" onClick={handlePublishCompleteModalConfirm}>
+              확인
+            </button>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

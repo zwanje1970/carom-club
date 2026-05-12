@@ -152,7 +152,7 @@ export function parseOcrEligibilityText(rawText: string): OcrEligibilityParsed {
 
   let average: number | null = null;
   const avgLabelM = text.match(
-    /(?:애버리지|에버리지|에버|AVG|AVERAGE|average)\s*[:：]?\s*(?:\r?\n\s*)?([\d.,]+)/i
+    /(?:애버리지|애버|에버리지|에버|AVG|AVERAGE|average)\s*[:：]?\s*(?:\r?\n\s*)?([\d.,]+)/i
   );
   if (avgLabelM?.[1]) {
     average = parseNumberFlexible(avgLabelM[1]);
