@@ -33,5 +33,6 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     entryFee: tournament.entryFee,
     confirmedParticipantCount,
     capacityFilledCount,
+    verificationMode: tournament.rule.verificationMode,
   });
 }

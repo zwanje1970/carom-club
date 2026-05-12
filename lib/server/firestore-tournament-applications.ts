@@ -430,13 +430,15 @@ export async function createTournamentApplicationFirestore(params: {
   if (!applicantName) return { ok: false, error: "이름을 입력해 주세요." };
   if (!phone) return { ok: false, error: "전화번호를 입력해 주세요." };
   if (!depositorName) return { ok: false, error: "입금자명을 입력해 주세요." };
-  if (!proofImageId) {
-    return { ok: false, error: "증빙 이미지를 업로드해 주세요." };
-  }
 
   const canonicalUserId = await resolveCanonicalUserIdForAuth(params.userId.trim());
   const tournament = await getTournamentByIdFirestore(params.tournamentId);
   if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다." };
+
+  const requiresProof = tournament.rule.verificationMode !== "NONE";
+  if (requiresProof && !proofImageId) {
+    return { ok: false, error: "증빙 이미지를 업로드해 주세요." };
+  }
 
   const recruitClosed = normalizeTournamentStatusBadge(tournament.statusBadge);
   if (recruitClosed === "마감" || recruitClosed === "진행중" || recruitClosed === "종료") {
@@ -462,12 +464,22 @@ export async function createTournamentApplicationFirestore(params: {
     return { ok: false, error: "이미 신청한 대회입니다." };
   }
 
-  const proofImage = await getProofImageAssetById(proofImageId);
-  if (!proofImage) {
-    return { ok: false, error: "증빙 이미지를 다시 업로드해 주세요." };
-  }
-  if (proofImage.uploaderUserId !== canonicalUserId) {
-    return { ok: false, error: "잘못된 요청입니다." };
+  let resolvedProofImageId = "";
+  let proofImage320Url = "";
+  let proofImage640Url = "";
+  let proofOriginalUrl = "";
+  if (requiresProof) {
+    const proofImage = await getProofImageAssetById(proofImageId);
+    if (!proofImage) {
+      return { ok: false, error: "증빙 이미지를 다시 업로드해 주세요." };
+    }
+    if (proofImage.uploaderUserId !== canonicalUserId) {
+      return { ok: false, error: "잘못된 요청입니다." };
+    }
+    resolvedProofImageId = proofImageId;
+    proofImage320Url = buildProtectedProofImageUrl(proofImageId, "w320");
+    proofImage640Url = buildProtectedProofImageUrl(proofImageId, "w640");
+    proofOriginalUrl = buildProtectedProofImageUrl(proofImageId, "original");
   }
 
   const now = new Date().toISOString();
@@ -479,10 +491,10 @@ export async function createTournamentApplicationFirestore(params: {
     applicantName,
     phone,
     depositorName,
-    proofImageId,
-    proofImage320Url: buildProtectedProofImageUrl(proofImageId, "w320"),
-    proofImage640Url: buildProtectedProofImageUrl(proofImageId, "w640"),
-    proofOriginalUrl: buildProtectedProofImageUrl(proofImageId, "original"),
+    proofImageId: resolvedProofImageId,
+    proofImage320Url,
+    proofImage640Url,
+    proofOriginalUrl,
     ocrStatus: "NOT_REQUESTED",
     ocrText: "",
     ocrRawResult: "",

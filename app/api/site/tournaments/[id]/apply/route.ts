@@ -68,6 +68,8 @@ export async function POST(
         depositorName: typeof body.depositorName === "string" ? body.depositorName : "",
         phone: typeof body.phone === "string" ? body.phone : "",
       },
+      applicantName: typeof body.applicantName === "string" ? body.applicantName : "",
+      applicantPhone: typeof body.phone === "string" ? body.phone : "",
     });
     if (!gate.ok) {
       return NextResponse.json({ error: gate.userMessage }, { status: 400 });
@@ -91,11 +93,12 @@ export async function POST(
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  // OCR은 비동기로 시작하고 신청 응답은 즉시 반환한다.
-  triggerOcrForTournamentApplication({
-    tournamentId: id,
-    entryId: result.application.id,
-  });
+  if (result.application.proofImageId.trim() !== "") {
+    triggerOcrForTournamentApplication({
+      tournamentId: id,
+      entryId: result.application.id,
+    });
+  }
 
   return NextResponse.json({
     ok: true,

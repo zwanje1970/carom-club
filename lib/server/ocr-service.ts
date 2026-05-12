@@ -51,10 +51,31 @@ async function loadProofImageOriginalBuffer(proofImage: ProofImageAsset): Promis
   return fromDisk.buffer;
 }
 
-async function runMockOcrFromSeed(seed: { depositorName: string; phone: string }): Promise<OcrRecognitionResult> {
+async function runMockOcrFromSeed(seed: {
+  depositorName: string;
+  phone: string;
+  applicantName?: string;
+}): Promise<OcrRecognitionResult> {
+  const nm =
+    typeof seed.applicantName === "string" && seed.applicantName.trim() !== ""
+      ? seed.applicantName.trim()
+      : seed.depositorName.trim() || "모의신청자";
+  const ph = seed.phone.trim() || "010-0000-0000";
+  const now = new Date();
+  const y = now.getFullYear();
+  const mo = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const rawText = [
+    `이름: ${nm}`,
+    `전화번호: ${ph}`,
+    `발행일: ${y}-${mo}-${day}`,
+    `입금자명 추정: ${seed.depositorName}`,
+    `핸디: 0`,
+    `에버: 0.00`,
+  ].join("\n");
   return {
-    rawText: `입금자명 추정: ${seed.depositorName}\n전화번호 추정: ${seed.phone}`,
-    extractedValue: seed.depositorName || null,
+    rawText,
+    extractedValue: nm || null,
     confidence: 0.78,
     provider: "mock",
     processedAt: new Date().toISOString(),
@@ -63,7 +84,11 @@ async function runMockOcrFromSeed(seed: { depositorName: string; phone: string }
 }
 
 async function runMockOcr(application: TournamentApplication): Promise<OcrRecognitionResult> {
-  return runMockOcrFromSeed({ depositorName: application.depositorName, phone: application.phone });
+  return runMockOcrFromSeed({
+    depositorName: application.depositorName,
+    phone: application.phone,
+    applicantName: application.applicantName,
+  });
 }
 
 /**
@@ -72,7 +97,7 @@ async function runMockOcr(application: TournamentApplication): Promise<OcrRecogn
  */
 export async function runOcrForProofImageAsset(
   proofImage: ProofImageAsset,
-  mockSeed?: { depositorName: string; phone: string }
+  mockSeed?: { depositorName: string; phone: string; applicantName?: string }
 ): Promise<OcrRecognitionResult> {
   const providerEnv = (process.env.OCR_PROVIDER ?? "mock").trim() || "mock";
   try {
@@ -198,6 +223,7 @@ export async function runOcrForProofImage(params: {
   return runOcrForProofImageAsset(proofImage, {
     depositorName: application.depositorName,
     phone: application.phone,
+    applicantName: application.applicantName,
   });
 }
 

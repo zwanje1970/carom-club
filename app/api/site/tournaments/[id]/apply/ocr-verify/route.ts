@@ -29,6 +29,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     proofImageId?: unknown;
     depositorName?: unknown;
     phone?: unknown;
+    applicantName?: unknown;
   } = {};
   try {
     body = (await request.json()) as typeof body;
@@ -57,11 +58,14 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 
   const depositorName = typeof body.depositorName === "string" ? body.depositorName : "";
   const phone = typeof body.phone === "string" ? body.phone : "";
+  const applicantName = typeof body.applicantName === "string" ? body.applicantName : "";
 
   const gate = await evaluateSiteApplyOcrGate({
     proofImage,
     rule: tournament.rule,
     mockOcrSeed: { depositorName, phone },
+    applicantName,
+    applicantPhone: phone,
   });
 
   return NextResponse.json({

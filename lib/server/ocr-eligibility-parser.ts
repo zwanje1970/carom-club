@@ -5,6 +5,8 @@ export type OcrEligibilityParsed = {
   phone: string | null;
   score: number | null;
   average: number | null;
+  /** 발행일(현지 자정 기준). */
+  issueDate: Date | null;
 };
 
 export type OcrEligibilityCheckResult = {
@@ -28,14 +30,87 @@ function parseNumberFlexible(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** 비교용: 공백 제거 후 소문자(ASCII). */
+export function normalizeOcrPersonName(s: string): string {
+  return (s ?? "").replace(/[\s\u00a0\u2000-\u200b\ufeff]+/g, "").toLowerCase();
+}
+
+/** 비교용: 숫자만. */
+export function digitsOnlyPhone(s: string): string {
+  return (s ?? "").replace(/\D/g, "");
+}
+
+function parseYmdToLocalDate(y: number, m: number, d: number): Date | null {
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
+  const mo = Math.floor(m);
+  const day = Math.floor(d);
+  if (mo < 1 || mo > 12 || day < 1 || day > 31) return null;
+  const dt = new Date(y, mo - 1, day);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== day) return null;
+  return dt;
+}
+
+function tryParseDateFromSegment(seg: string): Date | null {
+  const t = seg.trim();
+  if (!t) return null;
+  let m = t.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
+  if (m) {
+    return parseYmdToLocalDate(Number(m[1]), Number(m[2]), Number(m[3]));
+  }
+  m = t.match(/^(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+  if (m) {
+    return parseYmdToLocalDate(Number(m[1]), Number(m[2]), Number(m[3]));
+  }
+  return null;
+}
+
 /**
- * 증빙 OCR 텍스트에서 이름·전화·핸디(점수)·에버(평균) 후보를 느슨하게 추출한다.
- * 관리자 참고용이며 법적/자동 승인 근거로 쓰이지 않는다.
+ * 발행일 후보: 라벨 줄 및 전역 YYYY.MM.DD 등 패턴에서 유효한 날짜를 모은 뒤 가장 늦은 날짜를 사용.
+ */
+export function parseIssueDateFromOcrText(rawText: string): Date | null {
+  const text = (rawText ?? "").replace(/\r\n/g, "\n");
+  if (!text.trim()) return null;
+  const candidates: Date[] = [];
+
+  const labelBlock = text.match(
+    /(?:발행일|발급일|작성일)\s*[:：]?\s*([^\n\r]+)/i,
+  );
+  if (labelBlock?.[1]) {
+    const d = tryParseDateFromSegment(labelBlock[1]);
+    if (d) candidates.push(d);
+  }
+
+  const reYmd = /(\d{4})[./-](\d{1,2})[./-](\d{1,2})/g;
+  let mm: RegExpExecArray | null;
+  while ((mm = reYmd.exec(text)) !== null) {
+    const d = parseYmdToLocalDate(Number(mm[1]), Number(mm[2]), Number(mm[3]));
+    if (d) candidates.push(d);
+  }
+
+  const reKo = /(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/g;
+  while ((mm = reKo.exec(text)) !== null) {
+    const d = parseYmdToLocalDate(Number(mm[1]), Number(mm[2]), Number(mm[3]));
+    if (d) candidates.push(d);
+  }
+
+  if (candidates.length === 0) return null;
+  return new Date(Math.max(...candidates.map((d) => d.getTime())));
+}
+
+/** 신청일(now) 기준 발행일이 3개월 이내인지(발행일 >= now - 3달, 달력 기준). */
+export function isIssueDateWithinThreeMonths(issueDate: Date, now: Date): boolean {
+  const cutoff = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+  const issueDay = new Date(issueDate.getFullYear(), issueDate.getMonth(), issueDate.getDate());
+  return issueDay.getTime() >= cutoff.getTime();
+}
+
+/**
+ * 증빙 OCR 텍스트에서 이름·전화·핸디·에버·발행일 후보를 추출한다.
  */
 export function parseOcrEligibilityText(rawText: string): OcrEligibilityParsed {
   const text = (rawText ?? "").replace(/\r\n/g, "\n");
   if (!text.trim()) {
-    return { name: null, phone: null, score: null, average: null };
+    return { name: null, phone: null, score: null, average: null, issueDate: null };
   }
 
   let name: string | null = null;
@@ -54,11 +129,21 @@ export function parseOcrEligibilityText(rawText: string): OcrEligibilityParsed {
   }
 
   let score: number | null = null;
-  const handiM = text.match(
-    /(?:핸디|점수)\s*[:：]?\s*(?:\r?\n\s*)?([\d.,]+)\s*점?/i
+  const scoreLabel = new RegExp(
+    "(?:점수|핸디|HD|H\\/C|Handicap)\\s*[:：]?\\s*(?:\\r?\\n\\s*)?([\\d.,]+)\\s*점?",
+    "i",
   );
+  const handiM = text.match(scoreLabel);
   if (handiM?.[1]) {
     score = parseNumberFlexible(handiM[1]);
+  }
+  if (score == null) {
+    const hdBare = text.match(/\bHD\s*[:：]?\s*([\d.,]+)/i);
+    if (hdBare?.[1]) score = parseNumberFlexible(hdBare[1]);
+  }
+  if (score == null) {
+    const hcBare = text.match(/\bH\/C\s*[:：]?\s*([\d.,]+)/i);
+    if (hcBare?.[1]) score = parseNumberFlexible(hcBare[1]);
   }
   if (score == null) {
     const ptM = text.match(/(\d+)\s*점(?!\d)/);
@@ -67,7 +152,7 @@ export function parseOcrEligibilityText(rawText: string): OcrEligibilityParsed {
 
   let average: number | null = null;
   const avgLabelM = text.match(
-    /(?:애버리지|에버리지|에버|AVG|average)\s*[:：]?\s*(?:\r?\n\s*)?([\d.,]+)/i
+    /(?:애버리지|에버리지|에버|AVG|AVERAGE|average)\s*[:：]?\s*(?:\r?\n\s*)?([\d.,]+)/i
   );
   if (avgLabelM?.[1]) {
     average = parseNumberFlexible(avgLabelM[1]);
@@ -77,10 +162,12 @@ export function parseOcrEligibilityText(rawText: string): OcrEligibilityParsed {
     if (decM?.[1]) average = parseNumberFlexible(decM[1]);
   }
 
-  return { name, phone, score, average };
+  const issueDate = parseIssueDateFromOcrText(text);
+
+  return { name, phone, score, average, issueDate };
 }
 
-function compareValue(value: number, limit: number, compare: "LTE" | "LT"): boolean {
+export function compareValue(value: number, limit: number, compare: "LTE" | "LT"): boolean {
   return compare === "LT" ? value < limit : value <= limit;
 }
 

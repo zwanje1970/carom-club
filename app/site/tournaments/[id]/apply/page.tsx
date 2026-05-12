@@ -3,7 +3,63 @@
 import SiteShellFrame from "../../../components/SiteShellFrame";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+
+/** 키보드 상단과 입력칸 사이 여백(px). */
+const APPLY_MOBILE_KEYBOARD_CLEARANCE_PX = 72;
+
+function isSiteApplyKeyboardScrollTarget(el: HTMLElement): boolean {
+  if (el.isContentEditable) return true;
+  const name = el.tagName;
+  if (name === "TEXTAREA" || name === "SELECT") return true;
+  if (name === "INPUT") {
+    const type = (el as HTMLInputElement).type.toLowerCase();
+    return (
+      type !== "hidden" &&
+      type !== "checkbox" &&
+      type !== "radio" &&
+      type !== "submit" &&
+      type !== "button" &&
+      type !== "reset" &&
+      type !== "image"
+    );
+  }
+  return false;
+}
+
+/** 모바일 키보드에 가리지 않도록 visualViewport 기준으로만 최소 스크롤 보정(복구 스크롤은 하지 않음). */
+function scrollSiteApplyFieldClearOfKeyboard(root: HTMLElement) {
+  if (typeof window === "undefined") return;
+  const active = document.activeElement;
+  if (!active || !(active instanceof HTMLElement) || !root.contains(active)) return;
+  if (!isSiteApplyKeyboardScrollTarget(active)) return;
+
+  const runAdjust = () => {
+    const el = document.activeElement;
+    if (!el || !(el instanceof HTMLElement) || !root.contains(el) || !isSiteApplyKeyboardScrollTarget(el)) return;
+    const rect = el.getBoundingClientRect();
+    const vv = window.visualViewport;
+    const pad = APPLY_MOBILE_KEYBOARD_CLEARANCE_PX;
+    if (vv && typeof vv.height === "number" && vv.height > 0) {
+      const topLimit = vv.offsetTop + pad;
+      const bottomLimit = vv.offsetTop + vv.height - pad;
+      if (rect.bottom > bottomLimit) {
+        window.scrollBy({ top: rect.bottom - bottomLimit + 12, behavior: "smooth" });
+      } else if (rect.top < topLimit) {
+        window.scrollBy({ top: rect.top - topLimit - 12, behavior: "smooth" });
+      }
+    } else {
+      el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    }
+  };
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      runAdjust();
+      window.setTimeout(runAdjust, 320);
+    });
+  });
+}
 
 type SessionUser = {
   id: string;
@@ -41,9 +97,16 @@ export default function SiteTournamentApplyPage() {
     capacityFilledCount: number;
   } | null>(null);
   const [capacityFullModalOpen, setCapacityFullModalOpen] = useState(false);
+  const [applyVerificationMode, setApplyVerificationMode] = useState<"NONE" | "AUTO" | "MANUAL" | null>(null);
   const ocrGateCacheRef = useRef<{ seed: string; result: { ok: boolean; userMessage: string } } | null>(null);
   const proofAreaRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const applyPageScrollRootRef = useRef<HTMLElement | null>(null);
+
+  const requiresProof = useMemo(
+    () => applyVerificationMode === null || applyVerificationMode !== "NONE",
+    [applyVerificationMode],
+  );
 
   const focusProofArea = useCallback(() => {
     proofAreaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -53,7 +116,12 @@ export default function SiteTournamentApplyPage() {
   }, []);
 
   const runOcrGateForProof = useCallback(
-    async (image: UploadedProofImage, depositor: string, phoneValue: string): Promise<{ ok: boolean; userMessage: string }> => {
+    async (
+      image: UploadedProofImage,
+      depositor: string,
+      phoneValue: string,
+      nameForOcr: string,
+    ): Promise<{ ok: boolean; userMessage: string }> => {
       setOcrVerifying(true);
       setOcrGateOk(null);
       setOcrGateMessage("");
@@ -65,6 +133,7 @@ export default function SiteTournamentApplyPage() {
             proofImageId: image.imageId,
             depositorName: depositor.trim(),
             phone: phoneValue.trim(),
+            applicantName: nameForOcr.trim(),
           }),
         });
         const result = (await response.json()) as {
@@ -135,9 +204,14 @@ export default function SiteTournamentApplyPage() {
           entryFee?: number;
           confirmedParticipantCount?: number;
           capacityFilledCount?: number;
+          verificationMode?: unknown;
         };
         if (!cancelled && res.ok) {
           setApplicationsClosed(json.applicationsClosed === true);
+          const rawVm = json.verificationMode;
+          const vm: "NONE" | "AUTO" | "MANUAL" =
+            rawVm === "NONE" || rawVm === "AUTO" || rawVm === "MANUAL" ? rawVm : "AUTO";
+          setApplyVerificationMode(vm);
           const maxP = json.maxParticipants;
           const fee = json.entryFee;
           const confirmed = json.confirmedParticipantCount;
@@ -169,6 +243,41 @@ export default function SiteTournamentApplyPage() {
     };
   }, [tournamentId]);
 
+  useLayoutEffect(() => {
+    const root = applyPageScrollRootRef.current;
+    if (!root) return;
+
+    const onFocusIn = (e: FocusEvent) => {
+      const t = e.target;
+      if (t instanceof HTMLElement && root.contains(t) && isSiteApplyKeyboardScrollTarget(t)) {
+        scrollSiteApplyFieldClearOfKeyboard(root);
+      }
+    };
+
+    let raf = 0;
+    const onVisualViewportChange = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const el = document.activeElement;
+        if (el instanceof HTMLElement && root.contains(el) && isSiteApplyKeyboardScrollTarget(el)) {
+          scrollSiteApplyFieldClearOfKeyboard(root);
+        }
+      });
+    };
+
+    root.addEventListener("focusin", onFocusIn, true);
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", onVisualViewportChange);
+    vv?.addEventListener("scroll", onVisualViewportChange);
+
+    return () => {
+      root.removeEventListener("focusin", onFocusIn, true);
+      vv?.removeEventListener("resize", onVisualViewportChange);
+      vv?.removeEventListener("scroll", onVisualViewportChange);
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+
   async function submitApplication(waitlist: boolean) {
     if (!tournamentId || loading || applicationsClosed) return;
 
@@ -188,29 +297,31 @@ export default function SiteTournamentApplyPage() {
       setMessage("입금자명을 입력해 주세요.");
       return;
     }
-    if (!uploadedProofImage) {
-      setMessage("증빙 이미지를 먼저 업로드해 주세요.");
-      focusProofArea();
-      return;
-    }
-
-    const ocrSeed = `${depositorTrim}|${phoneTrim}|${uploadedProofImage.imageId}`;
-    const cached = ocrGateCacheRef.current;
-    let gate: { ok: boolean; userMessage: string };
-    if (cached?.seed === ocrSeed && cached.result.ok) {
-      gate = cached.result;
-    } else {
-      gate = await runOcrGateForProof(uploadedProofImage, depositorTrim, phoneTrim);
-      if (gate.ok) {
-        ocrGateCacheRef.current = { seed: ocrSeed, result: gate };
-      } else {
-        ocrGateCacheRef.current = null;
+    if (requiresProof) {
+      if (!uploadedProofImage) {
+        setMessage("증빙 이미지를 먼저 업로드해 주세요.");
+        focusProofArea();
+        return;
       }
-    }
-    if (!gate.ok) {
-      setMessage(gate.userMessage);
-      focusProofArea();
-      return;
+
+      const ocrSeed = `${nameTrim}|${depositorTrim}|${phoneTrim}|${uploadedProofImage.imageId}`;
+      const cached = ocrGateCacheRef.current;
+      let gate: { ok: boolean; userMessage: string };
+      if (cached?.seed === ocrSeed && cached.result.ok) {
+        gate = cached.result;
+      } else {
+        gate = await runOcrGateForProof(uploadedProofImage, depositorTrim, phoneTrim, nameTrim);
+        if (gate.ok) {
+          ocrGateCacheRef.current = { seed: ocrSeed, result: gate };
+        } else {
+          ocrGateCacheRef.current = null;
+        }
+      }
+      if (!gate.ok) {
+        setMessage(gate.userMessage);
+        focusProofArea();
+        return;
+      }
     }
 
     setLoading(true);
@@ -223,10 +334,10 @@ export default function SiteTournamentApplyPage() {
           applicantName: applicantName.trim(),
           phone: phone.trim(),
           depositorName: depositorName.trim(),
-          proofImageId: uploadedProofImage.imageId,
-          proofImage320Url: uploadedProofImage.w320Url,
-          proofImage640Url: uploadedProofImage.w640Url,
-          proofOriginalUrl: uploadedProofImage.w640Url,
+          proofImageId: uploadedProofImage?.imageId ?? "",
+          proofImage320Url: uploadedProofImage?.w320Url ?? "",
+          proofImage640Url: uploadedProofImage?.w640Url ?? "",
+          proofOriginalUrl: uploadedProofImage?.w640Url ?? "",
           waitlist,
         }),
       });
@@ -240,10 +351,11 @@ export default function SiteTournamentApplyPage() {
         }
         setMessage(result.error ?? "신청 저장에 실패했습니다.");
         if (
-          err.includes("판독불가") ||
-          err.includes("기준 부적합") ||
-          err.includes("OCR") ||
-          err.includes("증빙")
+          requiresProof &&
+          (err.includes("판독불가") ||
+            err.includes("기준 부적합") ||
+            err.includes("OCR") ||
+            err.includes("증빙"))
         ) {
           setOcrGateOk(false);
           setOcrGateMessage(err);
@@ -303,7 +415,7 @@ export default function SiteTournamentApplyPage() {
       };
       setUploadedProofImage(uploaded);
       setMessage("증빙 이미지 업로드가 완료되었습니다. OCR 검증 중...");
-      const gate = await runOcrGateForProof(uploaded, depositorName, phone);
+      const gate = await runOcrGateForProof(uploaded, depositorName, phone, applicantName);
       const seed = `${depositorName.trim()}|${phone.trim()}|${uploaded.imageId}`;
       if (gate.ok) {
         ocrGateCacheRef.current = { seed, result: gate };
@@ -319,14 +431,20 @@ export default function SiteTournamentApplyPage() {
 
   return (
     <SiteShellFrame brandTitle="참가신청서">
-      <section className="site-site-gray-main v3-stack" style={{ maxWidth: "36rem", margin: "0 auto" }}>
+      <section
+        ref={applyPageScrollRootRef}
+        className="site-site-gray-main v3-stack"
+        style={{ maxWidth: "36rem", margin: "0 auto" }}
+      >
       <p className="v3-muted">대회 ID: {tournamentId}</p>
       <p className="v3-muted">로그인 사용자 기준 최소 신청 흐름입니다.</p>
 
       <section className="v3-box v3-stack">
         <p>신청자 계정: {user?.name ?? "-"}</p>
         <p>연락처(기본값): {user?.phone ?? "-"}</p>
-        <p>증빙 이미지: {uploadedProofImage ? "업로드 완료" : uploading ? "업로드 중..." : "미업로드"}</p>
+        {requiresProof ? (
+          <p>증빙 이미지: {uploadedProofImage ? "업로드 완료" : uploading ? "업로드 중..." : "미업로드"}</p>
+        ) : null}
       </section>
 
       {applySummaryMeta ? (
@@ -380,8 +498,10 @@ export default function SiteTournamentApplyPage() {
             value={phone}
             onChange={(event) => {
               setPhone(event.target.value);
-              ocrGateCacheRef.current = null;
-              setOcrGateOk(null);
+              if (requiresProof) {
+                ocrGateCacheRef.current = null;
+                setOcrGateOk(null);
+              }
             }}
             disabled={applicationsClosed}
             style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
@@ -393,41 +513,49 @@ export default function SiteTournamentApplyPage() {
             value={depositorName}
             onChange={(event) => {
               setDepositorName(event.target.value);
-              ocrGateCacheRef.current = null;
-              setOcrGateOk(null);
+              if (requiresProof) {
+                ocrGateCacheRef.current = null;
+                setOcrGateOk(null);
+              }
             }}
             disabled={applicationsClosed}
             style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
           />
         </label>
-        <div ref={proofAreaRef} className="v3-stack">
-        <label className="v3-stack">
-          <span>증빙 이미지 업로드</span>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            disabled={applicationsClosed}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) {
-                void handleUploadProofImage(file);
-              }
-            }}
-            style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem", background: "#fff" }}
-          />
-        </label>
-        {uploadedProofImage?.w320Url ? (
-          <img
-            src={uploadedProofImage.w320Url}
-            alt="증빙 이미지 미리보기"
-            style={{ width: "100%", maxHeight: "12rem", objectFit: "cover", borderRadius: "0.55rem" }}
-          />
+        {requiresProof ? (
+          <div ref={proofAreaRef} className="v3-stack">
+            <label className="v3-stack">
+              <span>증빙 이미지 업로드</span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={applicationsClosed}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) {
+                    void handleUploadProofImage(file);
+                  }
+                }}
+                style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem", background: "#fff" }}
+              />
+            </label>
+            {uploadedProofImage?.w320Url ? (
+              <img
+                src={uploadedProofImage.w320Url}
+                alt="증빙 이미지 미리보기"
+                style={{ width: "100%", maxHeight: "12rem", objectFit: "cover", borderRadius: "0.55rem" }}
+              />
+            ) : null}
+            {ocrVerifying ? <p className="v3-muted">OCR 검증 중...</p> : null}
+          </div>
         ) : null}
-        {ocrVerifying ? <p className="v3-muted">OCR 검증 중...</p> : null}
-        </div>
-        <button type="submit" className="v3-btn" disabled={loading || ocrVerifying || applicationsClosed}>
-          {loading ? "저장 중..." : ocrVerifying ? "OCR 검증 중..." : "참가신청 저장"}
+        <button
+          type="submit"
+          className="v3-btn"
+          disabled={loading || (requiresProof && ocrVerifying) || applicationsClosed}
+        >
+          {loading ? "저장 중..." : requiresProof && ocrVerifying ? "OCR 검증 중..." : "참가신청 저장"}
         </button>
       </form>
 
