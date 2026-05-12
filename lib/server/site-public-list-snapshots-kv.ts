@@ -28,6 +28,13 @@ import { isEntityLifecycleVisibleForList } from "./entity-lifecycle";
 const KV_TOURNAMENTS: PlatformKvSettingKey = PLATFORM_KV_KEYS.sitePublicTournamentListSnapshots;
 const KV_VENUES: PlatformKvSettingKey = PLATFORM_KV_KEYS.sitePublicVenueListSnapshots;
 
+const isSitePublicListDevLog = process.env.NODE_ENV === "development";
+
+function warnSkippedTournamentSnapshotRow(reason: string, detail: unknown): void {
+  if (!isSitePublicListDevLog) return;
+  console.warn(`[site-public-list-snapshots-kv] 대회 목록 스냅샷 행 제외: ${reason}`, detail);
+}
+
 function tournamentDeadlineSortValue(t: Pick<Tournament, "date" | "eventDates">): string {
   const dates =
     t.eventDates && t.eventDates.length > 0
@@ -97,57 +104,96 @@ function isTournamentStatusBadge(v: unknown): v is TournamentStatusBadge {
     v === "모집중" ||
     v === "마감임박" ||
     v === "마감" ||
+    v === "진행중" ||
     v === "예정" ||
     v === "종료" ||
     v === "초안"
   );
 }
 
+/** KV 한 행 → 스냅샷. 실패 시 null(호출부에서 행만 제외). */
+function parseOneTournamentSnapshotRow(row: unknown, index: number): SiteTournamentListSnapshot | null {
+  if (!row || typeof row !== "object") {
+    warnSkippedTournamentSnapshotRow(`인덱스 ${index}: 객체 아님`, row);
+    return null;
+  }
+  const o = row as Record<string, unknown>;
+  const tournamentId = typeof o.tournamentId === "string" ? o.tournamentId.trim() : "";
+  const title = typeof o.title === "string" ? o.title : "";
+  if (!tournamentId || !title) {
+    warnSkippedTournamentSnapshotRow(`인덱스 ${index}: tournamentId 또는 title 없음`, {
+      tournamentId: tournamentId || "(비어 있음)",
+    });
+    return null;
+  }
+  let statusBadge: TournamentStatusBadge;
+  if (o.statusBadge === "대기자모집") {
+    statusBadge = "모집중";
+  } else if (!isTournamentStatusBadge(o.statusBadge)) {
+    warnSkippedTournamentSnapshotRow(`인덱스 ${index}: statusBadge 허용 범위 아님`, {
+      tournamentId,
+      statusBadge: o.statusBadge,
+    });
+    return null;
+  } else {
+    statusBadge = o.statusBadge;
+  }
+  const playScaleLabel = typeof o.playScaleLabel === "string" ? o.playScaleLabel : "";
+  const dateLabel = typeof o.dateLabel === "string" ? o.dateLabel : "";
+  const regionLabel = typeof o.regionLabel === "string" ? o.regionLabel : "";
+  const venueName = typeof o.venueName === "string" ? o.venueName : "";
+  if (!("venueName" in o) && isSitePublicListDevLog) {
+    warnSkippedTournamentSnapshotRow(`인덱스 ${index}: venueName 필드 없음(빈 문자열로 처리)`, { tournamentId });
+  }
+  if (!(o.thumbnail160Url === null || typeof o.thumbnail160Url === "string")) {
+    warnSkippedTournamentSnapshotRow(`인덱스 ${index}: thumbnail160Url 타입 오류`, { tournamentId });
+    return null;
+  }
+  const thumbnail160Url =
+    o.thumbnail160Url === null || typeof o.thumbnail160Url === "string" ? o.thumbnail160Url : null;
+  const detailUrl = typeof o.detailUrl === "string" ? o.detailUrl : "";
+  const sortDate = typeof o.sortDate === "string" ? o.sortDate : "";
+  const createdAt = typeof o.createdAt === "string" ? o.createdAt : "";
+  const updatedAt = typeof o.updatedAt === "string" ? o.updatedAt : "";
+  const isVisibleOnSite = o.isVisibleOnSite === true;
+  if (!detailUrl || !sortDate || !createdAt || !updatedAt) {
+    warnSkippedTournamentSnapshotRow(`인덱스 ${index}: detailUrl/sortDate/createdAt/updatedAt 누락`, {
+      tournamentId,
+      hasDetailUrl: Boolean(detailUrl),
+      hasSortDate: Boolean(sortDate),
+      hasCreatedAt: Boolean(createdAt),
+      hasUpdatedAt: Boolean(updatedAt),
+    });
+    return null;
+  }
+  return {
+    tournamentId,
+    title,
+    statusBadge,
+    playScaleLabel,
+    dateLabel,
+    regionLabel,
+    venueName,
+    thumbnail160Url,
+    detailUrl,
+    sortDate,
+    createdAt,
+    isVisibleOnSite,
+    updatedAt,
+  };
+}
+
+/**
+ * KV 대회 목록 JSON 파싱.
+ * - 최상위가 배열이 아니면 `null`(lazy rebuild로 처리).
+ * - 배열이면 행 단위로 파싱하며, 깨진 행만 제외하고 나머지를 반환(전체 null 없음).
+ */
 function parseTournamentSnapshots(raw: unknown): SiteTournamentListSnapshot[] | null {
   if (!Array.isArray(raw)) return null;
   const out: SiteTournamentListSnapshot[] = [];
-  for (const row of raw) {
-    if (!row || typeof row !== "object") return null;
-    const o = row as Record<string, unknown>;
-    const tournamentId = typeof o.tournamentId === "string" ? o.tournamentId.trim() : "";
-    const title = typeof o.title === "string" ? o.title : "";
-    if (!tournamentId || !title) return null;
-    let statusBadge: TournamentStatusBadge;
-    if (o.statusBadge === "대기자모집") {
-      statusBadge = "모집중";
-    } else if (!isTournamentStatusBadge(o.statusBadge)) {
-      return null;
-    } else {
-      statusBadge = o.statusBadge;
-    }
-    const playScaleLabel = typeof o.playScaleLabel === "string" ? o.playScaleLabel : "";
-    const dateLabel = typeof o.dateLabel === "string" ? o.dateLabel : "";
-    const regionLabel = typeof o.regionLabel === "string" ? o.regionLabel : "";
-    if (!("venueName" in o)) return null;
-    const venueName = typeof o.venueName === "string" ? o.venueName : "";
-    const thumbnail160Url =
-      o.thumbnail160Url === null || typeof o.thumbnail160Url === "string" ? o.thumbnail160Url : null;
-    const detailUrl = typeof o.detailUrl === "string" ? o.detailUrl : "";
-    const sortDate = typeof o.sortDate === "string" ? o.sortDate : "";
-    const createdAt = typeof o.createdAt === "string" ? o.createdAt : "";
-    const updatedAt = typeof o.updatedAt === "string" ? o.updatedAt : "";
-    const isVisibleOnSite = o.isVisibleOnSite === true;
-    if (!detailUrl || !sortDate || !createdAt || !updatedAt) return null;
-    out.push({
-      tournamentId,
-      title,
-      statusBadge,
-      playScaleLabel,
-      dateLabel,
-      regionLabel,
-      venueName,
-      thumbnail160Url,
-      detailUrl,
-      sortDate,
-      createdAt,
-      isVisibleOnSite,
-      updatedAt,
-    });
+  for (let i = 0; i < raw.length; i++) {
+    const one = parseOneTournamentSnapshotRow(raw[i], i);
+    if (one) out.push(one);
   }
   return out;
 }
@@ -289,7 +335,13 @@ export async function getSitePublicTournamentListSnapshotsWithLazyRebuild(): Pro
   const raw = await readPlatformKvJson(KV_TOURNAMENTS);
   if (raw != null) {
     const parsed = parseTournamentSnapshots(raw);
-    if (parsed !== null) return mapSanitizeTournamentThumbnails(parsed, assetsById);
+    if (parsed !== null) {
+      const rawArr = Array.isArray(raw) ? raw : [];
+      const allRowsDropped = rawArr.length > 0 && parsed.length === 0;
+      if (!allRowsDropped) {
+        return mapSanitizeTournamentThumbnails(parsed, assetsById);
+      }
+    }
   }
   await rebuildSitePublicTournamentListSnapshots(assetsById);
   const raw2 = await readPlatformKvJson(KV_TOURNAMENTS);
