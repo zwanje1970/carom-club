@@ -78,7 +78,6 @@ export default function SiteTournamentApplyPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const tournamentId = useMemo(() => (typeof params.id === "string" ? params.id : ""), [params.id]);
-  const [user, setUser] = useState<SessionUser | null>(null);
   const [applicantName, setApplicantName] = useState("");
   const [phone, setPhone] = useState("");
   const [depositorName, setDepositorName] = useState("");
@@ -180,7 +179,6 @@ export default function SiteTournamentApplyPage() {
         return;
       }
 
-      setUser(result.user);
       setApplicantName(result.user.name ?? "");
       setPhone(result.user.phone ?? "");
     }
@@ -436,43 +434,6 @@ export default function SiteTournamentApplyPage() {
         className="site-site-gray-main v3-stack"
         style={{ maxWidth: "36rem", margin: "0 auto" }}
       >
-      <p className="v3-muted">대회 ID: {tournamentId}</p>
-      <p className="v3-muted">로그인 사용자 기준 최소 신청 흐름입니다.</p>
-
-      <section className="v3-box v3-stack">
-        <p>신청자 계정: {user?.name ?? "-"}</p>
-        <p>연락처(기본값): {user?.phone ?? "-"}</p>
-        {requiresProof ? (
-          <p>증빙 이미지: {uploadedProofImage ? "업로드 완료" : uploading ? "업로드 중..." : "미업로드"}</p>
-        ) : null}
-      </section>
-
-      {applySummaryMeta ? (
-        <section
-          className="v3-box v3-stack"
-          style={{
-            gap: "0.35rem",
-            fontVariantNumeric: "tabular-nums",
-            wordBreak: "keep-all",
-          }}
-          aria-label="대회 모집·확정·참가비"
-        >
-          <p style={{ margin: 0, lineHeight: 1.45 }}>
-            <span style={{ fontWeight: 700 }}>모집인원</span> {applySummaryMeta.maxParticipants}명
-          </p>
-          <p style={{ margin: 0, lineHeight: 1.45 }}>
-            <span style={{ fontWeight: 700 }}>확정인원</span> {applySummaryMeta.confirmedParticipantCount}명
-          </p>
-          <p style={{ margin: 0, lineHeight: 1.45 }}>
-            <span style={{ fontWeight: 700 }}>모집 배정</span> {applySummaryMeta.capacityFilledCount}명 /{" "}
-            {applySummaryMeta.maxParticipants}명
-          </p>
-          <p style={{ margin: 0, lineHeight: 1.45 }}>
-            <span style={{ fontWeight: 700 }}>참가비</span> {applySummaryMeta.entryFee.toLocaleString("ko-KR")}원
-          </p>
-        </section>
-      ) : null}
-
       {applicationsClosed ? (
         <section className="v3-box v3-stack" style={{ borderColor: "#e2e8f0", background: "#f8fafc" }}>
           <p style={{ margin: 0, fontWeight: 800 }}>신청이 마감된 대회입니다.</p>

@@ -140,13 +140,9 @@ export default function ClientApplyPage() {
   return (
     <main className="v3-page v3-stack" style={{ maxWidth: "34rem", margin: "0 auto" }}>
       <h1 className="v3-h1">클라이언트 신청</h1>
-      <p className="v3-muted">일반회원 계정으로 먼저 가입한 뒤, 클라이언트 신청을 제출하는 최소 흐름입니다.</p>
-
-      <section className="v3-box v3-stack">
-        <p>현재 계정: {snapshot?.user.name ?? "-"}</p>
-        <p>현재 역할: {snapshot?.user.role ?? "-"}</p>
-        <p>현재 신청 상태: {snapshot?.user.clientStatus ?? "신청 전"}</p>
-      </section>
+      <p style={{ margin: "0 0 0.75rem", fontSize: "0.95rem" }}>
+        현재 계정: {snapshot?.user.name ?? "-"}
+      </p>
 
       <form className="v3-box v3-stack" onSubmit={handleFormSubmit} noValidate>
         {annualVisible ? (
