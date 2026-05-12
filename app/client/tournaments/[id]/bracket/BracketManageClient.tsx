@@ -335,6 +335,54 @@ function defaultBoardSliceKey(b: Bracket | null): string | null {
   return `block:${b.blocks[0].id}`;
 }
 
+/** 대진표 보기·운영과 동일한 slice 저장 키 (`view/page.tsx`와 공유). */
+function bracketManageSliceStorageKey(tournamentId: string, zoneSeg: string, bracketId: string): string {
+  return `v3:bracketViewSlice:${tournamentId}:${zoneSeg}:${bracketId}`;
+}
+
+function readManageBracketSliceFromStorage(
+  storageKey: string | null,
+  bracket: Bracket & { bracketMode: "multi_block"; blocks: NonNullable<Bracket["blocks"]> },
+): string | null {
+  if (!storageKey || typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(storageKey);
+    if (raw === "merged") return null;
+    if (raw === "final" && bracket.finalBlock?.rounds?.length) return "final";
+    if (raw?.startsWith("block:")) {
+      const bid = raw.slice("block:".length);
+      if (bracket.blocks.some((b) => b.id === bid)) return raw;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function writeManageBracketSliceToStorage(storageKey: string | null, slice: string | null): void {
+  if (!storageKey || typeof window === "undefined" || !slice || slice === "merged") return;
+  try {
+    sessionStorage.setItem(storageKey, slice);
+  } catch {
+    /* ignore */
+  }
+}
+
+function clearManageBracketSliceStorage(storageKey: string | null): void {
+  if (!storageKey || typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(storageKey);
+  } catch {
+    /* ignore */
+  }
+}
+
+function multiBlockBlockButtonLabel(bl: { id: string; label?: string }): string {
+  const lab = typeof bl.label === "string" ? bl.label.trim() : "";
+  if (lab !== "") return `${lab}조`;
+  return `조 ${bl.id}`;
+}
+
 function bracketSlotLabel(p: { name: string; displayName?: string | null }): string {
   const d = typeof p.displayName === "string" ? p.displayName.trim() : "";
   return d || p.name;
@@ -348,6 +396,25 @@ function parseMultiBlockSplitSizeDraft(draft: string): number | null {
   if (!Number.isFinite(n)) return null;
   return n;
 }
+
+/** 서버 error 문자열 우선(비어 있으면 일반 실패 문구). 클라 전용 안내는 호출부에서 지정. */
+function bracketHubFailureModalMessage(raw: string | undefined): string {
+  const t = (raw ?? "").trim();
+  if (t) return t;
+  return "요청을 처리하지 못했습니다.";
+}
+
+type BracketHubModalState =
+  | null
+  | { type: "error"; message: string }
+  | { type: "splitCancelConfirm" }
+  | { type: "splitCancelSuccess" }
+  | {
+      type: "shuffleRegenConfirm";
+      roundNumber: number;
+      scope: ReturnType<typeof shuffleScopeForSlice>;
+    }
+  | { type: "shuffleRegenSuccess" };
 
 export default function BracketManageClient({ variant = "full" }: { variant?: "full" | "quickResults" }) {
   const params = useParams<{ id: string }>();
@@ -377,6 +444,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   const [multiBlockSizeDraft, setMultiBlockSizeDraft] = useState("16");
   const [multiBlockBusy, setMultiBlockBusy] = useState(false);
   const [hubAutoSectionMessage, setHubAutoSectionMessage] = useState("");
+  const [bracketHubModal, setBracketHubModal] = useState<BracketHubModalState>(null);
   const [selectedQuickRoundNumber, setSelectedQuickRoundNumber] = useState<number | null>(null);
   const confirmedSectionRef = useRef<HTMLDivElement | null>(null);
   const didInitialBoardFocusRef = useRef(false);
@@ -385,6 +453,13 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     if (!zonesEnabled || !selectedZoneId) return "";
     return `?zoneId=${encodeURIComponent(selectedZoneId)}`;
   }, [zonesEnabled, selectedZoneId]);
+
+  const manageSliceStorageKey = useMemo(() => {
+    if (!tournamentId || !bracket?.id || bracket.bracketMode !== "multi_block") return null;
+    const z = zonesEnabled ? selectedZoneId : "-";
+    return bracketManageSliceStorageKey(tournamentId, z, bracket.id);
+  }, [tournamentId, bracket?.id, bracket?.bracketMode, zonesEnabled, selectedZoneId]);
+
   const actionQueueRef = useRef<Promise<void>>(Promise.resolve());
   const pendingActionKeysRef = useRef<Set<string>>(new Set());
   const bracketRef = useRef<Bracket | null>(null);
@@ -446,6 +521,12 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
 
     const fromUrl = resolveFromUrl();
 
+    const readStoredSlice = (): string | null =>
+      readManageBracketSliceFromStorage(
+        manageSliceStorageKey,
+        bracket as Bracket & { bracketMode: "multi_block"; blocks: NonNullable<Bracket["blocks"]> },
+      );
+
     setBoardSliceKey((prevKey) => {
       if (fromUrl && (structuralChange || sliceKeyParamChanged)) {
         return fromUrl;
@@ -458,9 +539,23 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
         }
         return prevKey;
       }
+      const stored = readStoredSlice();
+      if (stored) return stored;
+      const hasFinal = Boolean(bracket.finalBlock?.rounds?.length);
+      if (prevKey === "final" && hasFinal) return "final";
+      if (typeof prevKey === "string" && prevKey.startsWith("block:")) {
+        const bid = prevKey.slice("block:".length);
+        if (ids.has(bid)) return prevKey;
+      }
       return defaultBoardSliceKey(bracket);
     });
-  }, [bracket, searchParams]);
+  }, [bracket, searchParams, manageSliceStorageKey]);
+
+  useEffect(() => {
+    if (bracket?.bracketMode !== "multi_block") return;
+    if (!manageSliceStorageKey || !boardSliceKey || boardSliceKey === "merged") return;
+    writeManageBracketSliceToStorage(manageSliceStorageKey, boardSliceKey);
+  }, [bracket?.bracketMode, manageSliceStorageKey, boardSliceKey]);
 
   useEffect(() => {
     setHubAutoSectionMessage("");
@@ -633,11 +728,9 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       setMessage("");
       return;
     }
-    if (!cached) {
-      setBracket(pulled.bracket);
-      if (pulled.bracket) writeLastGoodBracket(tournamentId, seg, pulled.bracket);
-      else writeLastGoodBracket(tournamentId, seg, null);
-    }
+    setBracket(pulled.bracket);
+    if (pulled.bracket) writeLastGoodBracket(tournamentId, seg, pulled.bracket);
+    else writeLastGoodBracket(tournamentId, seg, null);
     setMessage("");
   }, [pullManageBracket, storageSeg, tournamentId, zonesEnabled, selectedZoneId]);
 
@@ -1497,54 +1590,76 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     }
   }
 
-  async function executeRoundShuffle(roundNumber: number) {
-    if (!tournamentId || !bracket) return;
-    if (bracket.bracketMode === "multi_block") {
-      setHubAutoSectionMessage(
-        "조분할 상태에서는 대진표 생성/재생성을 사용할 수 없습니다. 「분할취소」로 단일 예선으로 복귀한 뒤 이용해 주세요.",
-      );
-      return;
-    }
-    setMultiBlockBusy(true);
-    setMessage("");
-    setHubAutoSectionMessage("");
-    try {
-      const res = await fetch(
-        `/api/client/tournaments/${tournamentId}/bracket/shuffle-round-one${bracketZoneQuery}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "same-origin",
-          body: JSON.stringify({
-            scope: shuffleScopeForSlice(bracket, boardSliceKey),
-            roundNumber,
-          }),
-        },
-      );
-      const json = (await res.json()) as { bracket?: Bracket; error?: string };
-      if (!res.ok || !json.bracket) {
-        setHubAutoSectionMessage(json.error ?? "라운드 재배치에 실패했습니다.");
-        return;
+  const runShuffleRoundOneApi = useCallback(
+    async (
+      roundNumber: number,
+      scope: ReturnType<typeof shuffleScopeForSlice>,
+    ): Promise<{ ok: true; bracket: Bracket } | { ok: false; error?: string }> => {
+      if (!tournamentId) return { ok: false, error: "" };
+      const b = bracketRef.current;
+      if (!b) return { ok: false, error: "" };
+      if (b.bracketMode === "multi_block") {
+        return {
+          ok: false,
+          error:
+            "조분할 상태에서는 대진표 생성/재생성을 사용할 수 없습니다. 「분할취소」로 단일 예선으로 복귀한 뒤 이용해 주세요.",
+        };
       }
-      setBracket(json.bracket);
-      setMessage("");
-      setHubAutoSectionMessage("");
-    } finally {
-      setMultiBlockBusy(false);
-    }
-  }
+      try {
+        const res = await fetch(
+          `/api/client/tournaments/${tournamentId}/bracket/shuffle-round-one${bracketZoneQuery}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ scope, roundNumber }),
+          },
+        );
+        const json = (await res.json()) as { bracket?: Bracket; error?: string };
+        if (!res.ok || !json.bracket) {
+          return { ok: false, error: json.error };
+        }
+        return { ok: true, bracket: json.bracket };
+      } catch {
+        return { ok: false, error: "라운드 재배치 중 오류가 발생했습니다." };
+      }
+    },
+    [bracketZoneQuery, tournamentId],
+  );
 
-  async function submitCancelMultiBlockSplit() {
-    if (!tournamentId || multiBlockBusy || interactionLocked || !multiBlockSplitCancelAllowed) return;
-    if (
-      !window.confirm(
-        "조 분할만 해제하고 단일 예선 1라운드로 돌아갑니다. 1라운드 대진 순서·상대는 유지되며 다시 섞이지 않습니다. 계속하시겠습니까?",
-      )
-    ) {
+  const confirmShuffleRegenAndPost = useCallback(
+    async (roundNumber: number, scope: ReturnType<typeof shuffleScopeForSlice>) => {
+      setBracketHubModal(null);
+      setMultiBlockBusy(true);
+      setHubAutoSectionMessage("");
+      try {
+        const r = await runShuffleRoundOneApi(roundNumber, scope);
+        if (!r.ok) {
+          setBracketHubModal({ type: "error", message: bracketHubFailureModalMessage(r.error) });
+          return;
+        }
+        setBracket(r.bracket);
+        writeLastGoodBracket(tournamentId, storageSeg, r.bracket);
+        setBracketHubModal({ type: "shuffleRegenSuccess" });
+      } finally {
+        setMultiBlockBusy(false);
+      }
+    },
+    [runShuffleRoundOneApi, storageSeg, tournamentId],
+  );
+
+  const confirmSplitCancelAndPost = useCallback(async () => {
+    if (!tournamentId || interactionLocked || !multiBlockSplitCancelAllowed) {
+      setBracketHubModal(null);
       return;
     }
+    const z = zonesEnabled ? selectedZoneId : "-";
+    const sliceClearKey =
+      bracket?.id && bracket.bracketMode === "multi_block"
+        ? bracketManageSliceStorageKey(tournamentId, z, bracket.id)
+        : null;
+    setBracketHubModal(null);
     setMultiBlockBusy(true);
-    setMessage("");
     setHubAutoSectionMessage("");
     try {
       const res = await fetch(
@@ -1553,16 +1668,26 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       );
       const json = (await res.json()) as { bracket?: Bracket; error?: string };
       if (!res.ok || !json.bracket) {
-        setHubAutoSectionMessage(json.error ?? "분할 취소에 실패했습니다.");
+        setBracketHubModal({ type: "error", message: bracketHubFailureModalMessage(json.error) });
         return;
       }
+      if (sliceClearKey) clearManageBracketSliceStorage(sliceClearKey);
       setBracket(json.bracket);
-      setMessage("조 분할이 취소되어 단일 예선 1라운드로 복귀했습니다.");
-      router.refresh();
+      writeLastGoodBracket(tournamentId, storageSeg, json.bracket);
+      setBracketHubModal({ type: "splitCancelSuccess" });
     } finally {
       setMultiBlockBusy(false);
     }
-  }
+  }, [
+    bracket,
+    bracketZoneQuery,
+    interactionLocked,
+    multiBlockSplitCancelAllowed,
+    selectedZoneId,
+    storageSeg,
+    tournamentId,
+    zonesEnabled,
+  ]);
 
   async function handleSwapPlayers(args: {
     roundNumber: number;
@@ -2224,7 +2349,14 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               <button
                 type="button"
                 disabled={actionLoading || interactionLocked || multiBlockBusy || bracketHasRecordedWinners}
-                onClick={() => void executeRoundShuffle(displayRoundsSorted[0]!.roundNumber)}
+                onClick={() => {
+                  if (!bracket) return;
+                  setBracketHubModal({
+                    type: "shuffleRegenConfirm",
+                    roundNumber: displayRoundsSorted[0]!.roundNumber,
+                    scope: shuffleScopeForSlice(bracket, boardSliceKey),
+                  });
+                }}
                 style={{
                   width: "100%",
                   minHeight: "48px",
@@ -2326,11 +2458,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                     onClick={() => {
                       const blockSize = parseMultiBlockSplitSizeDraft(multiBlockSizeDraft);
                       if (blockSize === null) {
-                        setMessage("조당 인원을 입력해 주세요.");
+                        setBracketHubModal({ type: "error", message: "조당 인원을 확인하세요." });
                         return;
                       }
                       if (blockSize < 2) {
-                        setMessage("조당 인원은 2 이상으로 입력해 주세요.");
+                        setBracketHubModal({ type: "error", message: "조당 인원을 확인하세요." });
                         return;
                       }
                       if (
@@ -2354,10 +2486,14 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                           );
                           const json = (await res.json()) as { bracket?: Bracket; error?: string };
                           if (!res.ok || !json.bracket) {
-                            setHubAutoSectionMessage(json.error ?? "대진표 분할에 실패했습니다.");
+                            setBracketHubModal({
+                              type: "error",
+                              message: bracketHubFailureModalMessage(json.error),
+                            });
                             return;
                           }
                           setBracket(json.bracket);
+                          writeLastGoodBracket(tournamentId, storageSeg, json.bracket);
                           const groups = projectedQualifierBlockCount(bracket, blockSize);
                           setMessage(
                             `${blockSize}명 조당 · ${groups}개의 예선 대진표가 생성되었습니다. 대회개시(진행중)와 운영 메뉴는 대회 관리 홈에서 이용하세요.`,
@@ -2387,7 +2523,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                       bracket.bracketMode !== "multi_block" ||
                       !multiBlockSplitCancelAllowed
                     }
-                    onClick={() => void submitCancelMultiBlockSplit()}
+                    onClick={() => setBracketHubModal({ type: "splitCancelConfirm" })}
                     style={{
                       boxShadow: "none",
                       fontWeight: 700,
@@ -2479,7 +2615,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                         boxShadow: "none",
                       }}
                     >
-                      조 {bl.label ?? bl.id}
+                      {multiBlockBlockButtonLabel(bl)}
                     </button>
                   );
                 })}
@@ -2546,7 +2682,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             <div className="v3-stack" style={{ gap: "0.5rem", width: "100%" }}>
               <Link
                 prefetch={false}
-                href={`/client/tournaments/${tournamentId}/bracket/quick-results${bracketZoneQuery}`}
+                href={quickResultsHref}
                 style={{
                   width: "100%",
                   minHeight: "52px",
@@ -2993,6 +3129,195 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                 {dangerBusy ? "처리 중…" : "비밀번호 확인 후 초기화"}
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {bracketHubModal ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 402,
+            background: "rgba(15,23,42,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding:
+              "max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, var(--client-bottom-space, 80px)) max(16px, env(safe-area-inset-left))",
+            boxSizing: "border-box",
+          }}
+          onClick={() => {
+            if (multiBlockBusy) return;
+            if (bracketHubModal.type === "splitCancelConfirm" || bracketHubModal.type === "shuffleRegenConfirm") {
+              setBracketHubModal(null);
+            }
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: "22rem",
+              background: "#fff",
+              borderRadius: "12px",
+              padding: "1.15rem",
+              border: "1px solid #cbd5e1",
+              boxShadow: "none",
+              boxSizing: "border-box",
+            }}
+          >
+            {bracketHubModal.type === "splitCancelConfirm" ? (
+              <>
+                <h2 style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}>조 분할 취소</h2>
+                <p style={{ margin: "0 0 0.85rem", fontSize: "0.88rem", lineHeight: 1.5, color: "#334155" }}>
+                  분할을 취소하면 단일 대진표로 돌아갑니다. 대진 순서와 상대는 그대로 유지됩니다. 계속하시겠습니까?
+                </p>
+                <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="v3-btn"
+                    disabled={multiBlockBusy}
+                    onClick={() => setBracketHubModal(null)}
+                    style={{ minHeight: 44 }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    disabled={multiBlockBusy}
+                    onClick={() => void confirmSplitCancelAndPost()}
+                    style={{
+                      minHeight: 44,
+                      padding: "0.5rem 1rem",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: "#2563eb",
+                      color: "#fff",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {multiBlockBusy ? "처리 중…" : "확인"}
+                  </button>
+                </div>
+              </>
+            ) : null}
+            {bracketHubModal.type === "shuffleRegenConfirm" ? (
+              <>
+                <h2 style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}>대진표 생성/재생성</h2>
+                <p style={{ margin: "0 0 0.85rem", fontSize: "0.88rem", lineHeight: 1.5, color: "#334155" }}>
+                  대진표가 재생성되면 기존 대진은 되돌릴 수 없습니다. 계속하시겠습니까?
+                </p>
+                <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="v3-btn"
+                    disabled={multiBlockBusy}
+                    onClick={() => setBracketHubModal(null)}
+                    style={{ minHeight: 44 }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    disabled={multiBlockBusy}
+                    onClick={() =>
+                      void confirmShuffleRegenAndPost(bracketHubModal.roundNumber, bracketHubModal.scope)
+                    }
+                    style={{
+                      minHeight: 44,
+                      padding: "0.5rem 1rem",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: "#d97706",
+                      color: "#fff",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {multiBlockBusy ? "처리 중…" : "확인"}
+                  </button>
+                </div>
+              </>
+            ) : null}
+            {bracketHubModal.type === "splitCancelSuccess" ? (
+              <>
+                <h2 style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}>조 분할 취소</h2>
+                <p style={{ margin: "0 0 0.85rem", fontSize: "0.88rem", lineHeight: 1.5, color: "#334155" }}>
+                  분할이 취소되었습니다.
+                </p>
+                <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    style={{
+                      minHeight: 44,
+                      padding: "0.5rem 1rem",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: "#2563eb",
+                      color: "#fff",
+                      fontWeight: 700,
+                    }}
+                    onClick={() => {
+                      setBracketHubModal(null);
+                      void loadLatestBracket();
+                      router.refresh();
+                    }}
+                  >
+                    확인
+                  </button>
+                </div>
+              </>
+            ) : null}
+            {bracketHubModal.type === "shuffleRegenSuccess" ? (
+              <>
+                <h2 style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}>대진표 생성/재생성</h2>
+                <p style={{ margin: "0 0 0.85rem", fontSize: "0.88rem", lineHeight: 1.5, color: "#334155" }}>
+                  대진표가 재생성되었습니다.
+                </p>
+                <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    style={{
+                      minHeight: 44,
+                      padding: "0.5rem 1rem",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: "#d97706",
+                      color: "#fff",
+                      fontWeight: 700,
+                    }}
+                    onClick={() => {
+                      setBracketHubModal(null);
+                      void loadLatestBracket();
+                      router.refresh();
+                    }}
+                  >
+                    확인
+                  </button>
+                </div>
+              </>
+            ) : null}
+            {bracketHubModal.type === "error" ? (
+              <>
+                <h2 style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}>안내</h2>
+                <p style={{ margin: "0 0 0.85rem", fontSize: "0.88rem", lineHeight: 1.5, color: "#334155", whiteSpace: "pre-wrap" }}>
+                  {bracketHubModal.message}
+                </p>
+                <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="v3-btn"
+                    onClick={() => setBracketHubModal(null)}
+                    style={{ minHeight: 44, fontWeight: 700 }}
+                  >
+                    확인
+                  </button>
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
       ) : null}
