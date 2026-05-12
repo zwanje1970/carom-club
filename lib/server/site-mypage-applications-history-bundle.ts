@@ -2,20 +2,19 @@ import type { TournamentApplicationStatus } from "./platform-backing-store";
 import { listTournamentApplicationsByUserIdFirestore } from "./firestore-tournament-applications";
 import { getTournamentByIdFirestore } from "./firestore-tournaments";
 import type { Tournament } from "../types/entities";
+import type { MypageApplicationStatusLabelInput } from "../site/mypage-tournament-application-status-label";
 
-export type MypageApplicationRowPayload = {
+export type MypageApplicationRowPayload = MypageApplicationStatusLabelInput & {
   applicationId: string;
   tournamentId: string;
-  status: string;
   createdAt: string;
   tournamentTitle: string;
   tournamentDate: string;
 };
 
-export type MypageHistoryRowPayload = {
+export type MypageHistoryRowPayload = MypageApplicationStatusLabelInput & {
   applicationId: string;
   tournamentId: string;
-  status: string;
   tournamentTitle: string;
   dateLine: string;
 };
@@ -60,6 +59,9 @@ export async function buildMypageActiveApplicationRows(userId: string): Promise<
       applicationId: row.application.id,
       tournamentId: row.application.tournamentId,
       status: row.application.status,
+      clientDepositConfirmedAt: row.application.clientDepositConfirmedAt ?? null,
+      clientApplicationApprovedAt: row.application.clientApplicationApprovedAt ?? null,
+      processingApprovalCanceledNotifiedAt: row.application.processingApprovalCanceledNotifiedAt ?? null,
       createdAt: row.application.createdAt,
       tournamentTitle: row.tournament?.title ?? "대회",
       tournamentDate: row.tournament?.date || row.application.createdAt.slice(0, 10),
@@ -98,6 +100,9 @@ export async function buildMypageHistoryRows(userId: string): Promise<MypageHist
       applicationId: row.application.id,
       tournamentId: row.application.tournamentId,
       status: row.application.status as TournamentApplicationStatus,
+      clientDepositConfirmedAt: row.application.clientDepositConfirmedAt ?? null,
+      clientApplicationApprovedAt: row.application.clientApplicationApprovedAt ?? null,
+      processingApprovalCanceledNotifiedAt: row.application.processingApprovalCanceledNotifiedAt ?? null,
       tournamentTitle: row.tournament?.title ?? "대회",
       dateLine: (row.application.statusChangedAt || row.application.updatedAt || row.application.createdAt).slice(0, 10),
     }));
@@ -137,6 +142,9 @@ export async function loadMypageApplicationsHistoryBundleForUserId(userId: strin
       applicationId: row.application.id,
       tournamentId: row.application.tournamentId,
       status: row.application.status,
+      clientDepositConfirmedAt: row.application.clientDepositConfirmedAt ?? null,
+      clientApplicationApprovedAt: row.application.clientApplicationApprovedAt ?? null,
+      processingApprovalCanceledNotifiedAt: row.application.processingApprovalCanceledNotifiedAt ?? null,
       createdAt: row.application.createdAt,
       tournamentTitle: row.tournament?.title ?? "대회",
       tournamentDate: row.tournament?.date || row.application.createdAt.slice(0, 10),
@@ -166,6 +174,9 @@ export async function loadMypageApplicationsHistoryBundleForUserId(userId: strin
       applicationId: row.application.id,
       tournamentId: row.application.tournamentId,
       status: row.application.status as TournamentApplicationStatus,
+      clientDepositConfirmedAt: row.application.clientDepositConfirmedAt ?? null,
+      clientApplicationApprovedAt: row.application.clientApplicationApprovedAt ?? null,
+      processingApprovalCanceledNotifiedAt: row.application.processingApprovalCanceledNotifiedAt ?? null,
       tournamentTitle: row.tournament?.title ?? "대회",
       dateLine: (row.application.statusChangedAt || row.application.updatedAt || row.application.createdAt).slice(0, 10),
     }));

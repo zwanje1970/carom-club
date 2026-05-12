@@ -7,7 +7,10 @@ import {
   listAllTournamentsFirestore,
   setTournamentReminderSentAtFirestore,
 } from "../../../../lib/server/firestore-tournaments";
-import { listTournamentApplicationsByTournamentIdFirestore } from "../../../../lib/server/firestore-tournament-applications";
+import {
+  isManualParticipantUserId,
+  listTournamentApplicationsByTournamentIdFirestore,
+} from "../../../../lib/server/firestore-tournament-applications";
 import {
   addDaysYyyyMmDd,
   clampAutoPushBody,
@@ -67,8 +70,21 @@ export async function GET(request: Request) {
 
   for (const t of candidates) {
     const apps = await listTournamentApplicationsByTournamentIdFirestore(t.id);
-    const approved = apps.filter((a) => a.status === "APPROVED");
-    const userIds = [...new Set(approved.map((a) => String(a.userId ?? "").trim()).filter(Boolean))];
+    const reminderTargets = apps.filter((a) => {
+      if (a.status === "REJECTED") return false;
+      const uid = String(a.userId ?? "").trim();
+      if (!uid || isManualParticipantUserId(uid)) return false;
+      const caa =
+        typeof a.clientApplicationApprovedAt === "string" ? a.clientApplicationApprovedAt.trim() : "";
+      if (!caa) return false;
+      const pacn =
+        typeof a.processingApprovalCanceledNotifiedAt === "string"
+          ? a.processingApprovalCanceledNotifiedAt.trim()
+          : "";
+      if (pacn) return false;
+      return true;
+    });
+    const userIds = [...new Set(reminderTargets.map((a) => String(a.userId ?? "").trim()).filter(Boolean))];
     if (userIds.length === 0) {
       skippedNoRecipients += 1;
       continue;

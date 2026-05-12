@@ -2,23 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import {
+  getMypageTournamentApplicationStatusLabel,
+  type MypageApplicationStatusLabelInput,
+} from "../../../../lib/site/mypage-tournament-application-status-label";
 
-export type MypageHistoryRow = {
+export type MypageHistoryRow = MypageApplicationStatusLabelInput & {
   applicationId: string;
   tournamentId: string;
-  status: string;
   tournamentTitle: string;
   dateLine: string;
 };
-
-function getHistoryStatusLabel(status: string): string {
-  if (status === "APPROVED") return "참가 완료";
-  if (status === "REJECTED") return "참가 불가";
-  if (status === "VERIFYING") return "검증 진행중";
-  if (status === "WAITING_PAYMENT") return "입금 필요";
-  if (status === "WAITING") return "대기자";
-  return "신청 접수";
-}
 
 export default function MypageHistoryList({
   initialRows,
@@ -82,7 +76,7 @@ export default function MypageHistoryList({
             <div className="site-mypage-link-main">
               <span className="site-mypage-link-title">{row.tournamentTitle}</span>
               <span className="site-mypage-link-sub">
-                {getHistoryStatusLabel(row.status)} · {row.dateLine}
+                {getMypageTournamentApplicationStatusLabel(row, { history: true })} · {row.dateLine}
               </span>
             </div>
             <span className="site-mypage-link-chevron" aria-hidden>

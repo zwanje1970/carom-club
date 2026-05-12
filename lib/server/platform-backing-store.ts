@@ -494,6 +494,10 @@ export type TournamentApplication = {
   clientDepositConfirmedAt?: string | null;
   /** 운영자 신청 승인 시각. 참가확정은 별도(참가자 확정 시 APPROVED) */
   clientApplicationApprovedAt?: string | null;
+  /** processing 승인 후 “참가신청 완료” 알림·FCM 1회 발송 시각(중복 방지, promote·approvedNotifiedAt과 무관) */
+  processingApprovedNotifiedAt?: string | null;
+  /** processing 승인 취소 알림 1회 발송 시각(중복 방지) */
+  processingApprovalCanceledNotifiedAt?: string | null;
 };
 
 /** 클라이언트 참가자 목록 RSC — 증빙·OCR 등 제외(입금자명은 목록 표시용으로 포함) */

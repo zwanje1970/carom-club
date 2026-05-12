@@ -156,6 +156,14 @@ function tournamentApplicationFromFirestore(id: string, data: Record<string, unk
   const approvedNotifiedAt =
     typeof approvedRaw === "string" && approvedRaw.trim() ? approvedRaw.trim() : null;
 
+  const panRaw = item.processingApprovedNotifiedAt;
+  const processingApprovedNotifiedAt =
+    typeof panRaw === "string" && panRaw.trim() ? panRaw.trim() : null;
+
+  const pacnRaw = item.processingApprovalCanceledNotifiedAt;
+  const processingApprovalCanceledNotifiedAt =
+    typeof pacnRaw === "string" && pacnRaw.trim() ? pacnRaw.trim() : null;
+
   const zr = item.zoneId;
   const zoneId =
     typeof zr === "string" && zr.trim() !== ""
@@ -206,6 +214,8 @@ function tournamentApplicationFromFirestore(id: string, data: Record<string, unk
     adminNote,
     attendanceChecked,
     ...(approvedNotifiedAt ? { approvedNotifiedAt } : {}),
+    ...(processingApprovedNotifiedAt ? { processingApprovedNotifiedAt } : {}),
+    ...(processingApprovalCanceledNotifiedAt ? { processingApprovalCanceledNotifiedAt } : {}),
     ...(zoneId !== undefined ? { zoneId } : {}),
     ...(affiliation !== undefined ? { affiliation } : {}),
     ...(clientDepositConfirmedAt !== undefined ? { clientDepositConfirmedAt } : {}),
@@ -229,6 +239,54 @@ export async function tryClaimApplicationApprovedNotifiedAtFirestore(entryId: st
     if (typeof existing === "string" && existing.trim()) return false;
     const now = new Date().toISOString();
     tx.set(ref, { approvedNotifiedAt: now, updatedAt: now }, { merge: true });
+    return true;
+  });
+}
+
+/**
+ * 신청자관리 processing 승인(`clientApplicationApprovedAt`) 직후 알림 1회 —
+ * `processingApprovedNotifiedAt` 미기록이고 승인 시각이 있을 때만 설정.
+ */
+export async function tryClaimProcessingApplicationApprovedNotifiedAtFirestore(entryId: string): Promise<boolean> {
+  assertClientFirestorePersistenceConfigured();
+  const eid = entryId.trim();
+  if (!eid) return false;
+  const db = getSharedFirestoreDb();
+  const ref = db.collection(COLLECTION).doc(eid);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return false;
+    const d = snap.data() as Record<string, unknown>;
+    const existingPan = d.processingApprovedNotifiedAt;
+    if (typeof existingPan === "string" && existingPan.trim()) return false;
+    const caa = d.clientApplicationApprovedAt;
+    if (typeof caa !== "string" || !caa.trim()) return false;
+    const now = new Date().toISOString();
+    tx.set(ref, { processingApprovedNotifiedAt: now, updatedAt: now }, { merge: true });
+    return true;
+  });
+}
+
+/**
+ * processing 승인 취소(`clientApplicationApprovedAt` 해제) 직후 알림 1회 —
+ * `processingApprovalCanceledNotifiedAt` 미기록이고 승인 시각이 비어 있을 때만 설정.
+ */
+export async function tryClaimProcessingApprovalCanceledNotifiedAtFirestore(entryId: string): Promise<boolean> {
+  assertClientFirestorePersistenceConfigured();
+  const eid = entryId.trim();
+  if (!eid) return false;
+  const db = getSharedFirestoreDb();
+  const ref = db.collection(COLLECTION).doc(eid);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return false;
+    const d = snap.data() as Record<string, unknown>;
+    const existingCan = d.processingApprovalCanceledNotifiedAt;
+    if (typeof existingCan === "string" && existingCan.trim()) return false;
+    const caa = d.clientApplicationApprovedAt;
+    if (typeof caa === "string" && caa.trim()) return false;
+    const now = new Date().toISOString();
+    tx.set(ref, { processingApprovalCanceledNotifiedAt: now, updatedAt: now }, { merge: true });
     return true;
   });
 }
@@ -610,6 +668,10 @@ export async function patchTournamentApplicationProcessingFirestore(params: {
     return { ok: false, error: "참가신청을 찾을 수 없습니다." };
   }
 
+  const hadApplicationApprovedAtBefore =
+    typeof application.clientApplicationApprovedAt === "string" &&
+    application.clientApplicationApprovedAt.trim() !== "";
+
   const st = application.status;
   if (st === "REJECTED") {
     return { ok: false, error: "종료된 신청입니다." };
@@ -635,6 +697,7 @@ export async function patchTournamentApplicationProcessingFirestore(params: {
     } else {
       patch.clientDepositConfirmedAt = null;
       patch.clientApplicationApprovedAt = null;
+      patch.processingApprovedNotifiedAt = null;
     }
   } else if (params.applicationApproved === true) {
     const dep =
@@ -643,8 +706,10 @@ export async function patchTournamentApplicationProcessingFirestore(params: {
       return { ok: false, error: "입금확인 후 승인할 수 있습니다." };
     }
     patch.clientApplicationApprovedAt = now;
+    patch.processingApprovalCanceledNotifiedAt = null;
   } else {
     patch.clientApplicationApprovedAt = null;
+    patch.processingApprovedNotifiedAt = null;
   }
 
   await ref.set(patch, { merge: true });
@@ -653,6 +718,61 @@ export async function patchTournamentApplicationProcessingFirestore(params: {
   if (!after) {
     return { ok: false, error: "참가신청을 찾을 수 없습니다." };
   }
+
+  if (hasApprove && params.applicationApproved === true && !hadApplicationApprovedAtBefore) {
+    const uid = String(after.userId ?? "").trim();
+    if (uid && !isManualParticipantUserId(uid)) {
+      void getTournamentByIdFirestore(tournamentId)
+        .then((tournament) => {
+          if (!tournament) return;
+          return import("./participant-approved-notify").then(({ notifyParticipantAfterProcessingApplicationApproved }) =>
+            notifyParticipantAfterProcessingApplicationApproved({
+              entryId,
+              applicantUserId: uid,
+              tournamentId,
+              tournamentTitle: tournament.title,
+              tournamentDate: tournament.date,
+            })
+          );
+        })
+        .catch((e) => {
+          console.error("[processing-approved-notify:schedule]", {
+            tournamentId,
+            entryId,
+            applicantUserId: uid,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        });
+    }
+  }
+
+  if (hasApprove && params.applicationApproved === false && hadApplicationApprovedAtBefore) {
+    const uid = String(after.userId ?? "").trim();
+    if (uid && !isManualParticipantUserId(uid)) {
+      void getTournamentByIdFirestore(tournamentId)
+        .then((tournament) => {
+          if (!tournament) return;
+          return import("./participant-approved-notify").then(
+            ({ notifyParticipantAfterProcessingApplicationApprovalCanceled }) =>
+              notifyParticipantAfterProcessingApplicationApprovalCanceled({
+                entryId,
+                applicantUserId: uid,
+                tournamentId,
+                tournamentTitle: tournament.title,
+              })
+          );
+        })
+        .catch((e) => {
+          console.error("[processing-approval-canceled-notify:schedule]", {
+            tournamentId,
+            entryId,
+            applicantUserId: uid,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        });
+    }
+  }
+
   return { ok: true, application: after };
 }
 
@@ -722,15 +842,17 @@ export async function promoteOperatorApprovedApplicationsFirestore(params: {
   const { notifyParticipantApprovedAfterDepositConfirm } = await import("./participant-approved-notify");
   for (const t of targets) {
     const uid = String(t.userId ?? "").trim();
-    if (uid && !isManualParticipantUserId(uid)) {
-      void notifyParticipantApprovedAfterDepositConfirm({
-        entryId: t.id,
-        applicantUserId: uid,
-        tournamentId,
-        tournamentTitle: tournament.title,
-        tournamentDate: tournament.date,
-      });
-    }
+    if (!uid || isManualParticipantUserId(uid)) continue;
+    const pan =
+      typeof t.processingApprovedNotifiedAt === "string" ? t.processingApprovedNotifiedAt.trim() : "";
+    if (pan) continue;
+    void notifyParticipantApprovedAfterDepositConfirm({
+      entryId: t.id,
+      applicantUserId: uid,
+      tournamentId,
+      tournamentTitle: tournament.title,
+      tournamentDate: tournament.date,
+    });
   }
 
   return { ok: true, promoted: targets.length };
