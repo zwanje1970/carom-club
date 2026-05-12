@@ -447,17 +447,17 @@ button.secondary-button.ui-community-search-submit:hover {
    --------------------------------------------------------------------------- */
 
 .ui-community-post-detail-page {
-  gap: 0.85rem !important;
+  gap: 0.92rem !important;
 }
 
-/* 게시글 상세(읽기) 전용: 바깥 카드 없음, 모바일 좌우 12~16px급, 댓글·버튼 여백 축소 — 작성/수정 폼(:has 없음)에는 적용하지 않음 */
+/* 게시글 상세(읽기): 목록과 동일한 좌우 리듬 — 작성/수정 폼(:has 없음)에는 적용하지 않음 */
 @media (max-width: 767px) {
   .site-site-gray-main.ui-community-post-detail-page:has(.ui-community-post-detail-article) {
-    margin-left: calc(-1 * max(0.85rem, env(safe-area-inset-left, 0px)));
-    margin-right: calc(-1 * max(0.85rem, env(safe-area-inset-right, 0px)));
-    padding-left: max(14px, env(safe-area-inset-left, 0px));
-    padding-right: max(14px, env(safe-area-inset-right, 0px));
-    gap: 0.65rem !important;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
+    gap: 0.72rem !important;
   }
 }
 
@@ -594,8 +594,8 @@ button.ui-community-post-detail-action-btn {
 
 .ui-community-post-body-text {
   display: block;
-  width: 90%;
-  max-width: 640px;
+  width: 100%;
+  max-width: 100%;
   margin: 0;
   white-space: pre-wrap;
 }
@@ -611,8 +611,8 @@ button.ui-community-post-detail-action-btn {
 
 .ui-community-post-body-figure {
   display: block;
-  width: 90%;
-  max-width: 640px;
+  width: 100%;
+  max-width: 100%;
   margin: 0.2rem 0;
   line-height: 0;
   box-sizing: border-box;
@@ -1235,10 +1235,6 @@ button.primary-button.ui-community-comment-submit-inline {
    커뮤니티 상세·댓글 v1 — 모바일 UA 공개 셸 + 표준 페이지만 (메인 슬라이드 비적용)
    --------------------------------------------------------------------------- */
 
-.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-site-gray-main.ui-community-post-detail-page:has(.ui-community-post-detail-article) {
-  gap: 0.5rem !important;
-}
-
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .ui-community-post-detail-article.v3-stack {
   gap: 0.32rem;
 }
@@ -1414,13 +1410,13 @@ button.primary-button.ui-community-comment-submit-inline {
   opacity: 0.45;
 }
 
-/* 게시글 상세: 좌우 inset은 부모 .site-site-gray-main(v1 토큰)에 맡김 — 이중 여백 방지 */
 .site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-site-gray-main.ui-community-post-detail-page:has(.ui-community-post-detail-article) {
   margin-left: 0;
   margin-right: 0;
-  padding-left: 0;
-  padding-right: 0;
+  padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
   box-sizing: border-box;
+  gap: 0.72rem !important;
   scroll-padding-bottom: calc(var(--site-fixed-bottom-nav-layout-height) + 6.75rem);
 }
 
@@ -1435,7 +1431,7 @@ button.primary-button.ui-community-comment-submit-inline {
   bottom: var(--site-fixed-bottom-nav-layout-height);
   z-index: 72;
   margin: 0;
-  padding: 0.5rem max(16px, env(safe-area-inset-left, 0px)) 0.45rem max(16px, env(safe-area-inset-right, 0px));
+  padding: 0.5rem max(0.85rem, env(safe-area-inset-left, 0px)) 0.45rem max(0.85rem, env(safe-area-inset-right, 0px));
   background: #ffffff;
   border-top: 1px solid var(--site-v1-divider, rgba(15, 23, 42, 0.1));
   border-bottom: none;

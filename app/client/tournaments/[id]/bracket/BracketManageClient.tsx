@@ -67,6 +67,7 @@ type Bracket = {
   bracketMode?: "single" | "multi_block";
   blocks?: Array<{ id: string; label?: string; rounds: BracketRoundDoc[] }>;
   finalBlock?: { rounds: BracketRoundDoc[] };
+  blockSplit?: { mode: "blockSize"; blockSize: number } | { mode: "blockCount"; blockCount: number };
 };
 
 function getSliceRoundsFromBracket(b: Bracket, sliceKey: string | null): BracketRoundDoc[] {
@@ -130,6 +131,23 @@ function getFinalRoundForCompletion(b: Bracket): BracketRoundDoc | null {
 function canSplitBracket(b: Bracket | null): boolean {
   if (!b || b.bracketMode === "multi_block") return false;
   return b.rounds.some((r) => r.roundNumber === 1 && r.matches.length > 0);
+}
+
+/** 분할취소: 예선 각 조·결선에 라운드 1만 있을 때(진출 라운드 생성 전) */
+function multiBlockSlicesOnlyRoundOne(b: Bracket | null): boolean {
+  if (!b || b.bracketMode !== "multi_block" || !b.blocks?.length) return false;
+  for (const bl of b.blocks) {
+    if (bl.rounds.some((r) => r.roundNumber > 1)) return false;
+  }
+  if (b.finalBlock?.rounds?.some((r) => r.roundNumber > 1)) return false;
+  return true;
+}
+
+function multiBlockSplitSizeFieldValue(b: Bracket | null, draft: string): string {
+  if (!b || b.bracketMode !== "multi_block" || !b.blockSplit) return draft;
+  if (b.blockSplit.mode === "blockSize") return String(b.blockSplit.blockSize);
+  if (b.blockSplit.mode === "blockCount") return String(b.blockSplit.blockCount);
+  return draft;
 }
 
 function collectBracketRoundDocs(b: Bracket): BracketRoundDoc[] {
@@ -467,8 +485,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     return `총 ${total}명 → ${n}명씩 → ${groups}개 조 생성`;
   }, [bracket, multiBlockSizeDraft]);
 
-  const splitParsedBlockSize = useMemo(() => parseMultiBlockSplitSizeDraft(multiBlockSizeDraft), [multiBlockSizeDraft]);
-
   const displayRoundsSorted = useMemo(
     () => [...displayRounds].sort((a, b) => a.roundNumber - b.roundNumber),
     [displayRounds],
@@ -486,6 +502,15 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   }, [displayRoundsSorted]);
 
   const bracketHasRecordedWinners = useMemo(() => bracketHasAnyRecordedWinner(bracket), [bracket]);
+
+  const multiBlockSplitCancelAllowed = useMemo(
+    () =>
+      !!bracket &&
+      bracket.bracketMode === "multi_block" &&
+      !bracketHasAnyRecordedWinner(bracket) &&
+      multiBlockSlicesOnlyRoundOne(bracket),
+    [bracket],
+  );
 
   const bracketOpsSliceQuerySuffix = useMemo(() => {
     if (!bracket || bracket.bracketMode !== "multi_block" || !boardSliceKey || boardSliceKey === "merged") {
@@ -1475,7 +1500,9 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   async function executeRoundShuffle(roundNumber: number) {
     if (!tournamentId || !bracket) return;
     if (bracket.bracketMode === "multi_block") {
-      setHubAutoSectionMessage("조분할 상태에서는 대진표 생성/재생성을 사용할 수 없습니다. 전체 초기화 후 이용해 주세요.");
+      setHubAutoSectionMessage(
+        "조분할 상태에서는 대진표 생성/재생성을 사용할 수 없습니다. 「분할취소」로 단일 예선으로 복귀한 뒤 이용해 주세요.",
+      );
       return;
     }
     setMultiBlockBusy(true);
@@ -1502,6 +1529,36 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       setBracket(json.bracket);
       setMessage("");
       setHubAutoSectionMessage("");
+    } finally {
+      setMultiBlockBusy(false);
+    }
+  }
+
+  async function submitCancelMultiBlockSplit() {
+    if (!tournamentId || multiBlockBusy || interactionLocked || !multiBlockSplitCancelAllowed) return;
+    if (
+      !window.confirm(
+        "조 분할만 해제하고 단일 예선 1라운드로 돌아갑니다. 1라운드 대진 순서·상대는 유지되며 다시 섞이지 않습니다. 계속하시겠습니까?",
+      )
+    ) {
+      return;
+    }
+    setMultiBlockBusy(true);
+    setMessage("");
+    setHubAutoSectionMessage("");
+    try {
+      const res = await fetch(
+        `/api/client/tournaments/${encodeURIComponent(tournamentId)}/bracket/cancel-multi-block-split${bracketZoneQuery}`,
+        { method: "POST", credentials: "same-origin" },
+      );
+      const json = (await res.json()) as { bracket?: Bracket; error?: string };
+      if (!res.ok || !json.bracket) {
+        setHubAutoSectionMessage(json.error ?? "분할 취소에 실패했습니다.");
+        return;
+      }
+      setBracket(json.bracket);
+      setMessage("조 분할이 취소되어 단일 예선 1라운드로 복귀했습니다.");
+      router.refresh();
     } finally {
       setMultiBlockBusy(false);
     }
@@ -1613,7 +1670,9 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     if (!bracket || actionLoading || interactionLocked) return;
     if (bracket.bracketMode === "multi_block") {
       setSaveState("error");
-      setMessage("조분할 상태에서는 대진표 생성/재생성을 사용할 수 없습니다. 전체 초기화 후 이용해 주세요.");
+      setMessage(
+        "조분할 상태에서는 대진표 생성/재생성을 사용할 수 없습니다. 「분할취소」로 단일 예선으로 복귀한 뒤 이용해 주세요.",
+      );
       return;
     }
     const sliceRounds = getSliceRoundsFromBracket(bracket, boardSliceKey);
@@ -2077,7 +2136,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             !bracket
               ? "확정 전 · 만들기·분할 준비"
               : bracket.bracketMode === "multi_block"
-                ? "조분할 됨 · 재배치는 단일로 복귀 후"
+                ? "조분할 됨 · 분할취소 후 재배치 가능"
                 : bracketHasRecordedWinners
                   ? "승패 기록됨 · 구조 변경 잠금"
                   : "생성/재생성·조분할 가능"
@@ -2186,7 +2245,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               </button>
             ) : bracket.bracketMode === "multi_block" ? (
               <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem", lineHeight: 1.45 }}>
-                조 분할 상태에서는 「대진표 생성/재생성」으로 1라운드를 재배치할 수 없습니다. 전체 초기화 후 단일 대진표로 되돌린 뒤 이용하세요.
+                조 분할 상태에서는 「대진표 생성/재생성」으로 1라운드를 재배치할 수 없습니다. 「분할취소」로 단일 예선으로 복귀한 뒤 이용하세요.
               </p>
             ) : null}
 
@@ -2203,11 +2262,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             ) : null}
 
             <p style={{ margin: 0, fontSize: "0.88rem", color: "#475569" }}>
-              <strong style={{ color: "#0f172a" }}>생성 시각:</strong>{" "}
+              <strong style={{ color: "#0f172a" }}>마지막 생성·재생성 시각:</strong>{" "}
               {new Date(bracket.createdAt).toLocaleString("ko-KR")}
             </p>
 
-            {canSplitBracket(bracket) ? (
+            {canSplitBracket(bracket) || bracket.bracketMode === "multi_block" ? (
               <div
                 className="v3-stack"
                 style={{
@@ -2218,16 +2277,16 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               >
                 <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "#0f172a" }}>조 분할</span>
                 <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem", lineHeight: 1.45 }}>
-                  조분할을 하시면 대진표를 운영하기가 편리합니다.
+                  조분할은 이미 만들어진 1라운드 대진을 조당 인원 기준으로 나눕니다. 매치 순서·상대는 그대로 두고 조만 나뉩니다.
                   <br />
-                  예) 64강을 16명씩 분할하여 4개 조로 운영 시 각 대진표 1위자가 결선 대진표에서 4강전으로 가능합니다.
+                  예) 64강을 16명씩 4개 조, 32명씩 2개 조, 8명씩 8개 조 등 입력한 인원 그대로 처리됩니다.
                 </p>
                 <div
                   className="v3-row"
                   style={{
                     alignItems: "center",
                     gap: "0.45rem",
-                    flexWrap: "nowrap",
+                    flexWrap: "wrap",
                     width: "100%",
                     minWidth: 0,
                   }}
@@ -2249,15 +2308,21 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                       boxShadow: "none",
                       textAlign: "center",
                     }}
-                    value={multiBlockSizeDraft}
+                    value={multiBlockSplitSizeFieldValue(bracket, multiBlockSizeDraft)}
                     onChange={(e) => setMultiBlockSizeDraft(e.target.value)}
-                    disabled={interactionLocked}
+                    disabled={interactionLocked || bracket.bracketMode === "multi_block"}
                     aria-label="조당 인원"
                   />
                   <button
                     type="button"
                     className="v3-btn"
-                    disabled={actionLoading || interactionLocked || multiBlockBusy || bracketHasRecordedWinners}
+                    disabled={
+                      actionLoading ||
+                      interactionLocked ||
+                      multiBlockBusy ||
+                      bracketHasRecordedWinners ||
+                      bracket.bracketMode === "multi_block"
+                    }
                     onClick={() => {
                       const blockSize = parseMultiBlockSplitSizeDraft(multiBlockSizeDraft);
                       if (blockSize === null) {
@@ -2266,10 +2331,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                       }
                       if (blockSize < 2) {
                         setMessage("조당 인원은 2 이상으로 입력해 주세요.");
-                        return;
-                      }
-                      if (projectedQualifierBlockCount(bracket, blockSize) < 4) {
-                        setMessage("분할 후 결선이 최소 준결승(4강) 이상이 되려면 조가 4개 이상이어야 합니다.");
                         return;
                       }
                       if (
@@ -2316,10 +2377,44 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                   >
                     분할 실행
                   </button>
+                  <button
+                    type="button"
+                    className="v3-btn"
+                    disabled={
+                      actionLoading ||
+                      interactionLocked ||
+                      multiBlockBusy ||
+                      bracket.bracketMode !== "multi_block" ||
+                      !multiBlockSplitCancelAllowed
+                    }
+                    onClick={() => void submitCancelMultiBlockSplit()}
+                    style={{
+                      boxShadow: "none",
+                      fontWeight: 700,
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                      minHeight: 34,
+                    }}
+                    title={
+                      bracket.bracketMode !== "multi_block"
+                        ? "조분할된 대진표에서만 사용할 수 있습니다."
+                        : !multiBlockSlicesOnlyRoundOne(bracket)
+                          ? "예선·결선에 2라운드 이상이 있으면 사용할 수 없습니다. 위험 작업의 전체 초기화를 이용해 주세요."
+                          : bracketHasRecordedWinners
+                            ? "승패가 있으면 사용할 수 없습니다."
+                            : undefined
+                    }
+                  >
+                    분할취소
+                  </button>
                 </div>
-                {splitParsedBlockSize != null && projectedQualifierBlockCount(bracket, splitParsedBlockSize) < 4 ? (
+                {bracket.bracketMode === "multi_block" && !multiBlockSplitCancelAllowed ? (
                   <span className="v3-muted" style={{ fontSize: "0.82rem" }}>
-                    분할 후 결선이 최소 준결승(4강) 이상이 되려면 조가 4개 이상이어야 합니다.
+                    {bracketHasRecordedWinners
+                      ? "승패가 기록된 경우에는 분할취소를 사용할 수 없습니다. 승패를 모두 되돌린 뒤(예선·결선 1라운드만 남은 상태) 다시 시도하거나, 위험 작업의 전체 초기화를 이용해 주세요."
+                      : !multiBlockSlicesOnlyRoundOne(bracket)
+                        ? "예선·결선에 2라운드 이상이 있으면 분할취소를 사용할 수 없습니다. 위험 작업의 전체 초기화를 이용해 주세요."
+                        : null}
                   </span>
                 ) : null}
                 {splitPreviewLine ? (

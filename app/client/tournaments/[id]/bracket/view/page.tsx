@@ -798,7 +798,7 @@ export default function TournamentBracketBoardViewPage() {
       if (!bracket || actionBusy || isTournamentClosed || !tournamentId) return;
       if (bracket.bracketMode === "multi_block") {
         setSaveState("error");
-        setMessage("조분할 상태에서는 다시 섞기를 사용할 수 없습니다. 전체 초기화 후 이용해 주세요.");
+        setMessage("조분할 상태에서는 다시 섞기를 사용할 수 없습니다. 「분할취소」로 단일 예선으로 복귀한 뒤 이용해 주세요.");
         return;
       }
       const seg = storageSeg;
