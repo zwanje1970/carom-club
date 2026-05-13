@@ -145,7 +145,8 @@
 }
 
 .client-tournament-manage a.client-tournament-manage__featureCard,
-.client-tournament-manage span.client-tournament-manage__featureCard {
+.client-tournament-manage span.client-tournament-manage__featureCard,
+.client-tournament-manage button.client-tournament-manage__featureCard {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -163,6 +164,15 @@
   min-width: 0;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+}
+
+.client-tournament-manage button.client-tournament-manage__featureCard.client-tournament-manage__featureCard--blockedCreate {
+  opacity: 0.5;
+  cursor: pointer;
+  box-shadow: none;
+  border: none;
+  font: inherit;
+  text-align: left;
 }
 
 .client-tournament-manage span.client-tournament-manage__featureCard--disabled {

@@ -2,20 +2,8 @@
 
 import Link from "next/link";
 import type { TournamentStatusBadge } from "../../../../lib/types/entities";
+import TournamentBracketPlanCreateCard from "./TournamentBracketPlanCreateCard";
 import TournamentTvLinkBlock from "./TournamentTvLinkBlock";
-
-function IconGrid() {
-  return (
-    <svg viewBox="0 0 24 24" width={22} height={22} fill="none" aria-hidden>
-      <path
-        d="M8 6h4v4H8V6zM12 14h4v4h-4v-4zM4 14h4v4H4v-4zM16 6h4v4h-4V6z"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 function IconUsers() {
   return (
@@ -66,8 +54,6 @@ export default function TournamentManageFeatureCards({
   hasConfirmedBracket: boolean;
   operationalUnlocked: boolean;
 }) {
-  const bracketManageHref = `/client/tournaments/${tournamentId}/bracket`;
-  const bracketWizardHref = `/client/tournaments/${tournamentId}/bracket/wizard`;
   const participantsHref = `/client/tournaments/${tournamentId}/participants`;
   const quickResultsHref = `/client/tournaments/${tournamentId}/bracket/quick-results`;
   const bracketViewHref = `/client/tournaments/${tournamentId}/bracket/view`;
@@ -90,48 +76,14 @@ export default function TournamentManageFeatureCards({
     </Link>
   );
 
-  const bracketCard =
-    bracketPlanEnabled && hasConfirmedBracket ? (
-      <Link
-        prefetch={false}
-        href={bracketManageHref}
-        className={`client-tournament-manage__featureCard client-tournament-manage__featureCard--accent client-tournament-manage__featureCard--span${recruitingHighlight ? " client-tournament-manage__featureCard--secondaryOps" : ""}`}
-      >
-        <span className="client-tournament-manage__featureIconWrap" aria-hidden>
-          <IconGrid />
-        </span>
-        <span className="client-tournament-manage__featureCardTextCol">
-          <span className="client-tournament-manage__featureTitle">대진표 관리</span>
-          <span className="client-tournament-manage__featureDesc">분할·결과·인쇄</span>
-        </span>
-      </Link>
-    ) : bracketPlanEnabled ? (
-      <Link
-        prefetch={false}
-        href={bracketWizardHref}
-        className={`client-tournament-manage__featureCard client-tournament-manage__featureCard--accent client-tournament-manage__featureCard--span${recruitingHighlight ? " client-tournament-manage__featureCard--secondaryOps" : ""}`}
-      >
-        <span className="client-tournament-manage__featureIconWrap" aria-hidden>
-          <IconGrid />
-        </span>
-        <span className="client-tournament-manage__featureCardTextCol">
-          <span className="client-tournament-manage__featureTitle">대진표 생성</span>
-          <span className="client-tournament-manage__featureDesc">참가확정자 기준 단순 생성</span>
-        </span>
-      </Link>
-    ) : (
-      <span
-        className={`client-tournament-manage__featureCard client-tournament-manage__featureCard--accent client-tournament-manage__featureCard--span client-tournament-manage__featureCard--disabled${recruitingHighlight ? " client-tournament-manage__featureCard--secondaryOps" : ""}`}
-      >
-        <span className="client-tournament-manage__featureIconWrap" aria-hidden>
-          <IconGrid />
-        </span>
-        <span className="client-tournament-manage__featureCardTextCol">
-          <span className="client-tournament-manage__featureTitle">대진표 생성</span>
-          <span className="client-tournament-manage__featureDesc">참가자 확정 후 이용 가능</span>
-        </span>
-      </span>
-    );
+  const bracketCard = (
+    <TournamentBracketPlanCreateCard
+      tournamentId={tournamentId}
+      bracketPlanEnabled={bracketPlanEnabled}
+      hasConfirmedBracket={hasConfirmedBracket}
+      recruitingHighlight={recruitingHighlight}
+    />
+  );
 
   return (
     <div className="client-tournament-manage__hubStack">

@@ -70,8 +70,18 @@ type Bracket = {
   blockSplit?: { mode: "blockSize"; blockSize: number } | { mode: "blockCount"; blockCount: number };
 };
 
+/** 서버 문서와 동기: bracketMode 누락·캐시 불일치 시에도 조분할 구조면 true */
+function bracketLooksLikeSplitLayout(b: Bracket | null): boolean {
+  if (!b) return false;
+  if (b.bracketMode === "multi_block") return true;
+  if (Array.isArray(b.blocks) && b.blocks.length > 0) return true;
+  if (b.finalBlock != null) return true;
+  if (b.blockSplit != null) return true;
+  return false;
+}
+
 function getSliceRoundsFromBracket(b: Bracket, sliceKey: string | null): BracketRoundDoc[] {
-  if (b.bracketMode === "multi_block" && sliceKey) {
+  if (bracketLooksLikeSplitLayout(b) && sliceKey) {
     if (sliceKey === "final") return b.finalBlock?.rounds ?? [];
     if (sliceKey.startsWith("block:")) {
       const bid = sliceKey.slice("block:".length);
@@ -93,7 +103,7 @@ function findBracketMatchLocation(
 } | null {
   const id = matchId.trim();
   if (!id) return null;
-  if (bracket.bracketMode === "multi_block" && bracket.blocks?.length) {
+  if (bracketLooksLikeSplitLayout(bracket) && bracket.blocks?.length) {
     for (const block of bracket.blocks) {
       for (const round of block.rounds) {
         const match = round.matches.find((m) => m.id === id);
@@ -121,7 +131,7 @@ function hasDownstreamRoundsInSlice(sliceRounds: BracketRoundDoc[], roundNumber:
 }
 
 function getFinalRoundForCompletion(b: Bracket): BracketRoundDoc | null {
-  if (b.bracketMode === "multi_block" && b.finalBlock?.rounds?.length) {
+  if (bracketLooksLikeSplitLayout(b) && b.finalBlock?.rounds?.length) {
     return b.finalBlock.rounds[b.finalBlock.rounds.length - 1] ?? null;
   }
   return b.rounds[b.rounds.length - 1] ?? null;
@@ -129,13 +139,13 @@ function getFinalRoundForCompletion(b: Bracket): BracketRoundDoc | null {
 
 /** 단일(root) 확정 대진표만 분할 가능 */
 function canSplitBracket(b: Bracket | null): boolean {
-  if (!b || b.bracketMode === "multi_block") return false;
+  if (!b || bracketLooksLikeSplitLayout(b)) return false;
   return b.rounds.some((r) => r.roundNumber === 1 && r.matches.length > 0);
 }
 
 /** 분할취소: 예선 각 조·결선에 라운드 1만 있을 때(진출 라운드 생성 전) */
 function multiBlockSlicesOnlyRoundOne(b: Bracket | null): boolean {
-  if (!b || b.bracketMode !== "multi_block" || !b.blocks?.length) return false;
+  if (!b || !bracketLooksLikeSplitLayout(b) || !b.blocks?.length) return false;
   for (const bl of b.blocks) {
     if (bl.rounds.some((r) => r.roundNumber > 1)) return false;
   }
@@ -144,20 +154,20 @@ function multiBlockSlicesOnlyRoundOne(b: Bracket | null): boolean {
 }
 
 function multiBlockSplitSizeFieldValue(b: Bracket | null, draft: string): string {
-  if (!b || b.bracketMode !== "multi_block" || !b.blockSplit) return draft;
+  if (!b || !bracketLooksLikeSplitLayout(b) || !b.blockSplit) return draft;
   if (b.blockSplit.mode === "blockSize") return String(b.blockSplit.blockSize);
   if (b.blockSplit.mode === "blockCount") return String(b.blockSplit.blockCount);
   return draft;
 }
 
 function collectBracketRoundDocs(b: Bracket): BracketRoundDoc[] {
-  if (b.bracketMode === "multi_block") {
+  if (bracketLooksLikeSplitLayout(b)) {
     const out: BracketRoundDoc[] = [];
     for (const bl of b.blocks ?? []) {
       out.push(...bl.rounds);
     }
     if (b.finalBlock?.rounds?.length) out.push(...b.finalBlock.rounds);
-    return out;
+    if (out.length > 0) return out;
   }
   return b.rounds;
 }
@@ -291,7 +301,7 @@ function printStartPlayersHintFromBracket(b: Bracket | null, sliceKey: string | 
   const structural = (r1?.matches.length ?? 0) * 2;
   const counted = countSliceFilledSlotsRoundOne(sliceRounds);
 
-  if (b.bracketMode === "multi_block" && (sliceKey?.startsWith("block:") || sliceKey === "final")) {
+  if (bracketLooksLikeSplitLayout(b) && (sliceKey?.startsWith("block:") || sliceKey === "final")) {
     const basis = Math.max(counted, structural);
     return toAllowedPrintStartSize(basis > 0 ? basis : 32);
   }
@@ -312,7 +322,7 @@ function shuffleScopeForSlice(
   b: Bracket,
   sliceKey: string | null,
 ): "final_only" | "qualifiers_only" | { blockId: string } {
-  if (b.bracketMode !== "multi_block") return "qualifiers_only";
+  if (!bracketLooksLikeSplitLayout(b)) return "qualifiers_only";
   if (sliceKey === "final") return "final_only";
   if (sliceKey?.startsWith("block:")) {
     return { blockId: sliceKey.slice("block:".length) };
@@ -331,7 +341,7 @@ function zoneFinalizedStorageKey(tournamentId: string, zoneId: string): string {
 }
 
 function defaultBoardSliceKey(b: Bracket | null): string | null {
-  if (!b || b.bracketMode !== "multi_block" || !b.blocks?.[0]) return null;
+  if (!b || !bracketLooksLikeSplitLayout(b) || !b.blocks?.[0]) return null;
   return `block:${b.blocks[0].id}`;
 }
 
@@ -455,10 +465,10 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   }, [zonesEnabled, selectedZoneId]);
 
   const manageSliceStorageKey = useMemo(() => {
-    if (!tournamentId || !bracket?.id || bracket.bracketMode !== "multi_block") return null;
+    if (!tournamentId || !bracket?.id || !bracketLooksLikeSplitLayout(bracket)) return null;
     const z = zonesEnabled ? selectedZoneId : "-";
     return bracketManageSliceStorageKey(tournamentId, z, bracket.id);
-  }, [tournamentId, bracket?.id, bracket?.bracketMode, zonesEnabled, selectedZoneId]);
+  }, [tournamentId, bracket?.id, bracket?.bracketMode, bracket?.blocks, bracket?.finalBlock, bracket?.blockSplit, zonesEnabled, selectedZoneId]);
 
   const actionQueueRef = useRef<Promise<void>>(Promise.resolve());
   const pendingActionKeysRef = useRef<Set<string>>(new Set());
@@ -494,7 +504,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       prevManageSliceKeyParamRef.current = "";
       return;
     }
-    if (bracket.bracketMode !== "multi_block" || !bracket.blocks?.[0]) {
+    if (!bracketLooksLikeSplitLayout(bracket) || !bracket.blocks?.[0]) {
       setBoardSliceKey(null);
       sliceMetaRefManage.current = { bracketId: bracket.id, blockSig: "" };
       prevManageSliceKeyParamRef.current = "";
@@ -552,10 +562,10 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   }, [bracket, searchParams, manageSliceStorageKey]);
 
   useEffect(() => {
-    if (bracket?.bracketMode !== "multi_block") return;
+    if (!bracket || !bracketLooksLikeSplitLayout(bracket)) return;
     if (!manageSliceStorageKey || !boardSliceKey || boardSliceKey === "merged") return;
     writeManageBracketSliceToStorage(manageSliceStorageKey, boardSliceKey);
-  }, [bracket?.bracketMode, manageSliceStorageKey, boardSliceKey]);
+  }, [bracket, manageSliceStorageKey, boardSliceKey]);
 
   useEffect(() => {
     setHubAutoSectionMessage("");
@@ -601,14 +611,14 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   const multiBlockSplitCancelAllowed = useMemo(
     () =>
       !!bracket &&
-      bracket.bracketMode === "multi_block" &&
+      bracketLooksLikeSplitLayout(bracket) &&
       !bracketHasAnyRecordedWinner(bracket) &&
       multiBlockSlicesOnlyRoundOne(bracket),
     [bracket],
   );
 
   const bracketOpsSliceQuerySuffix = useMemo(() => {
-    if (!bracket || bracket.bracketMode !== "multi_block" || !boardSliceKey || boardSliceKey === "merged") {
+    if (!bracket || !bracketLooksLikeSplitLayout(bracket) || !boardSliceKey || boardSliceKey === "merged") {
       return "";
     }
     const sep = bracketZoneQuery ? "&" : "?";
@@ -622,11 +632,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
 
   const bracketViewFullscreenPath = useMemo(() => {
     const base = `/client/tournaments/${tournamentId}/bracket/view`;
-    if (bracket?.bracketMode === "multi_block") {
+    if (bracket && bracketLooksLikeSplitLayout(bracket)) {
       return bracketZoneQuery ? `${base}${bracketZoneQuery}&viewMode=merged` : `${base}?viewMode=merged`;
     }
     return `${base}${bracketZoneQuery}`;
-  }, [bracket?.bracketMode, bracketZoneQuery, tournamentId]);
+  }, [bracket, bracketZoneQuery, tournamentId]);
 
   const quickResultsHref = useMemo(
     () => `/client/tournaments/${tournamentId}/bracket/quick-results${bracketZoneQuery}${bracketOpsSliceQuerySuffix}`,
@@ -635,7 +645,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
 
   const hubOperatePhase = useMemo(() => {
     if (!bracket) return false;
-    if (bracket.bracketMode === "multi_block") return true;
+    if (bracketLooksLikeSplitLayout(bracket)) return true;
     return bracketHasRecordedWinners;
   }, [bracket, bracketHasRecordedWinners]);
 
@@ -1598,7 +1608,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       if (!tournamentId) return { ok: false, error: "" };
       const b = bracketRef.current;
       if (!b) return { ok: false, error: "" };
-      if (b.bracketMode === "multi_block") {
+      if (bracketLooksLikeSplitLayout(b)) {
         return {
           ok: false,
           error:
@@ -1657,7 +1667,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       setBracketHubModal({ type: "error", message: "현재 대진표 작업을 진행할 수 없는 상태입니다." });
       return;
     }
-    if (!bracket || bracket.bracketMode !== "multi_block") {
+    if (!bracket || !bracketLooksLikeSplitLayout(bracket)) {
       setBracketHubModal({ type: "error", message: "현재 조분할된 대진표가 아닙니다." });
       return;
     }
@@ -1690,7 +1700,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       setBracketHubModal({ type: "error", message: "현재 대진표 작업을 진행할 수 없는 상태입니다." });
       return;
     }
-    if (!bracket || bracket.bracketMode !== "multi_block") {
+    if (!bracket || !bracketLooksLikeSplitLayout(bracket)) {
       setBracketHubModal({ type: "error", message: "현재 조분할된 대진표가 아닙니다." });
       return;
     }
@@ -1703,7 +1713,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     }
     const z = zonesEnabled ? selectedZoneId : "-";
     const sliceClearKey =
-      bracket?.id && bracket.bracketMode === "multi_block"
+      bracket?.id && bracketLooksLikeSplitLayout(bracket)
         ? bracketManageSliceStorageKey(tournamentId, z, bracket.id)
         : null;
     setBracketHubModal(null);
@@ -1752,7 +1762,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     if (args.first.matchId === args.second.matchId && args.first.slot === args.second.slot) return;
     const loc = findBracketMatchLocation(bracket, args.first.matchId);
     const swapSlice = loc?.sliceKey ?? null;
-    if (bracket.bracketMode === "multi_block" && swapSlice === null) {
+    if (bracketLooksLikeSplitLayout(bracket) && swapSlice === null) {
       setMessage("분할 대진표에서 매치 위치를 특정할 수 없습니다.");
       return;
     }
@@ -1820,7 +1830,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     const nextName = args.displayName.trim();
     const loc = findBracketMatchLocation(bracket, args.matchId);
     const renameSlice = loc?.sliceKey ?? null;
-    if (bracket.bracketMode === "multi_block" && renameSlice === null) {
+    if (bracketLooksLikeSplitLayout(bracket) && renameSlice === null) {
       setMessage("분할 대진표에서 매치 위치를 특정할 수 없습니다.");
       return;
     }
@@ -1847,7 +1857,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
 
   async function handleShuffleCurrentRound(roundNumber: number) {
     if (!bracket || actionLoading || interactionLocked) return;
-    if (bracket.bracketMode === "multi_block") {
+    if (bracketLooksLikeSplitLayout(bracket)) {
       setSaveState("error");
       setMessage(
         "조분할 상태에서는 대진표 생성/재생성을 사용할 수 없습니다. 「분할취소」로 단일 예선으로 복귀한 뒤 이용해 주세요.",
@@ -2073,7 +2083,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           <p className="v3-muted">아직 확정된 대진표가 없습니다.</p>
         ) : (
           <>
-            {bracket.bracketMode === "multi_block" && bracket.blocks?.length ? (
+            {bracketLooksLikeSplitLayout(bracket) && bracket.blocks?.length ? (
               <div
                 className="v3-row"
                 style={{ gap: "0.35rem", flexWrap: "wrap", alignItems: "center", marginBottom: "0.4rem" }}
@@ -2314,7 +2324,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           summary={
             !bracket
               ? "확정 전 · 만들기·분할 준비"
-              : bracket.bracketMode === "multi_block"
+              : bracketLooksLikeSplitLayout(bracket)
                 ? "조분할 됨 · 분할취소 후 재배치 가능"
                 : bracketHasRecordedWinners
                   ? "승패 기록됨 · 구조 변경 잠금"
@@ -2399,7 +2409,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           </div>
         ) : (
           <div className="v3-stack" style={{ gap: "0.65rem", width: "100%" }}>
-            {bracket.bracketMode !== "multi_block" && displayRoundsSorted.length > 0 ? (
+            {!bracketLooksLikeSplitLayout(bracket) && displayRoundsSorted.length > 0 ? (
               <button
                 type="button"
                 disabled={actionLoading || interactionLocked || multiBlockBusy || bracketHasRecordedWinners}
@@ -2429,13 +2439,13 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               >
                 {multiBlockBusy ? "처리 중…" : "대진표 생성/재생성"}
               </button>
-            ) : bracket.bracketMode === "multi_block" ? (
+            ) : bracketLooksLikeSplitLayout(bracket) ? (
               <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem", lineHeight: 1.45 }}>
                 조 분할 상태에서는 「대진표 생성/재생성」으로 1라운드를 재배치할 수 없습니다. 「분할취소」로 단일 예선으로 복귀한 뒤 이용하세요.
               </p>
             ) : null}
 
-            {bracket.bracketMode !== "multi_block" && bracketHasRecordedWinners ? (
+            {!bracketLooksLikeSplitLayout(bracket) && bracketHasRecordedWinners ? (
               <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem", lineHeight: 1.45 }}>
                 승패가 기록된 뒤에는 「대진표 생성/재생성」과 「분할 실행」을 사용할 수 없습니다.
               </p>
@@ -2452,7 +2462,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               {new Date(bracket.createdAt).toLocaleString("ko-KR")}
             </p>
 
-            {canSplitBracket(bracket) || bracket.bracketMode === "multi_block" ? (
+            {canSplitBracket(bracket) || bracketLooksLikeSplitLayout(bracket) ? (
               <div
                 className="v3-stack"
                 style={{
@@ -2496,7 +2506,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                     }}
                     value={multiBlockSplitSizeFieldValue(bracket, multiBlockSizeDraft)}
                     onChange={(e) => setMultiBlockSizeDraft(e.target.value)}
-                    disabled={interactionLocked || bracket.bracketMode === "multi_block"}
+                    disabled={interactionLocked || bracketLooksLikeSplitLayout(bracket)}
                     aria-label="조당 인원"
                   />
                   <button
@@ -2506,8 +2516,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                       actionLoading ||
                       interactionLocked ||
                       multiBlockBusy ||
-                      bracketHasRecordedWinners ||
-                      bracket.bracketMode === "multi_block"
+                      bracketHasRecordedWinners
                     }
                     onClick={() => {
                       const blockSize = parseMultiBlockSplitSizeDraft(multiBlockSizeDraft);
@@ -2517,6 +2526,13 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                       }
                       if (blockSize < 2) {
                         setBracketHubModal({ type: "error", message: "조당 인원을 확인하세요." });
+                        return;
+                      }
+                      if (bracketLooksLikeSplitLayout(bracket)) {
+                        setBracketHubModal({
+                          type: "error",
+                          message: "이미 조분할된 대진표입니다. 다시 분할하려면 먼저 조분할을 취소하세요.",
+                        });
                         return;
                       }
                       if (
@@ -2579,7 +2595,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                       minHeight: 34,
                     }}
                     title={
-                      bracket.bracketMode !== "multi_block"
+                      !bracketLooksLikeSplitLayout(bracket)
                         ? "조분할된 대진표에서만 사용할 수 있습니다."
                         : !multiBlockSlicesOnlyRoundOne(bracket)
                           ? "예선·결선에 2라운드 이상이 있으면 사용할 수 없습니다. 위험 작업의 전체 초기화를 이용해 주세요."
@@ -2591,7 +2607,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                     분할취소
                   </button>
                 </div>
-                {bracket.bracketMode === "multi_block" && !multiBlockSplitCancelAllowed ? (
+                {bracketLooksLikeSplitLayout(bracket) && !multiBlockSplitCancelAllowed ? (
                   <span className="v3-muted" style={{ fontSize: "0.82rem" }}>
                     {bracketHasRecordedWinners
                       ? "승패가 기록된 경우에는 분할취소를 사용할 수 없습니다. 승패를 모두 되돌린 뒤(예선·결선 1라운드만 남은 상태) 다시 시도하거나, 위험 작업의 전체 초기화를 이용해 주세요."
@@ -2639,7 +2655,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
               빠른 입력·다음 라운드 생성·조별 대진표 보기입니다.
             </p>
-            {bracket.bracketMode === "multi_block" && bracket.blocks?.length ? (
+            {bracketLooksLikeSplitLayout(bracket) && bracket.blocks?.length ? (
               <div
                 className="v3-row"
                 style={{ gap: "0.35rem", flexWrap: "wrap", alignItems: "center", marginBottom: "0.35rem" }}
@@ -2686,7 +2702,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                 ) : null}
               </div>
             ) : null}
-            {bracket.bracketMode !== "multi_block" ? <BracketProgressSummaryCard bracket={bracket} /> : null}
+            {!bracketLooksLikeSplitLayout(bracket) ? <BracketProgressSummaryCard bracket={bracket} /> : null}
 
             {displayRoundsSorted.length > 0 ? (
               <div className="v3-stack" style={{ gap: "0.35rem" }}>
@@ -2831,7 +2847,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           >
             대진표 보기 (전체 화면)
           </button>
-          {bracket?.bracketMode === "multi_block" ? (
+          {bracket && bracketLooksLikeSplitLayout(bracket) ? (
             <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem", lineHeight: 1.45 }}>
               예선 조와 결선을 한 화면에서 통합해 봅니다. 조 탭 선택과 무관합니다.
             </p>
@@ -2871,7 +2887,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
         </BracketHubAccordionPanel>
       </div>
 
-      {bracket?.bracketMode === "multi_block" ? (
+      {bracket && bracketLooksLikeSplitLayout(bracket) ? (
         <div
           className="v3-stack"
           style={{

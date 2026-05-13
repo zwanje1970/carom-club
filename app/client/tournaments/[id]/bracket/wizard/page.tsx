@@ -57,6 +57,8 @@ export default function BracketWizardPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [phase, setPhase] = useState<"start" | "done">("start");
+  const [tournamentStatusBadge, setTournamentStatusBadge] = useState("");
+  const [participantsFinalizeModalOpen, setParticipantsFinalizeModalOpen] = useState(false);
 
   const bracketZoneQuery = useMemo(() => {
     if (!zonesEnabled || !selectedZoneId) return "";
@@ -73,6 +75,11 @@ export default function BracketWizardPage() {
   }, [listItems, zonesEnabled, selectedZoneId]);
 
   const approvedCount = approvedEntries.length;
+
+  const bracketPlanEnabledForCreate = useMemo(() => {
+    const b = tournamentStatusBadge.trim();
+    return b === "마감" || b === "진행중" || b === "종료";
+  }, [tournamentStatusBadge]);
 
   const loadListItems = useCallback(async () => {
     if (!tournamentId) return;
@@ -107,9 +114,12 @@ export default function BracketWizardPage() {
     void (async () => {
       try {
         const res = await fetch(`/api/client/tournaments/${tournamentId}`, { credentials: "same-origin" });
-        const json = (await res.json()) as { tournament?: { zonesEnabled?: boolean } };
+        const json = (await res.json()) as { tournament?: { zonesEnabled?: boolean; statusBadge?: string | null } };
         if (!res.ok || cancelled || !json.tournament) return;
         setZonesEnabled(json.tournament.zonesEnabled === true);
+        setTournamentStatusBadge(
+          typeof json.tournament.statusBadge === "string" ? json.tournament.statusBadge.trim() : "",
+        );
       } catch {
         /* ignore */
       }
@@ -155,6 +165,10 @@ export default function BracketWizardPage() {
 
   async function createBracketFlow() {
     if (!tournamentId || busy) return;
+    if (!bracketPlanEnabledForCreate) {
+      setParticipantsFinalizeModalOpen(true);
+      return;
+    }
     if (zonesEnabled && !selectedZoneId) {
       setMessage("권역을 선택해 주세요.");
       return;
@@ -329,6 +343,67 @@ export default function BracketWizardPage() {
         <p className="v3-muted" style={{ color: "#b45309", margin: 0 }}>
           {message}
         </p>
+      ) : null}
+
+      {participantsFinalizeModalOpen ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 500,
+            background: "rgba(15,23,42,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding:
+              "max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, var(--client-bottom-space, 80px)) max(16px, env(safe-area-inset-left))",
+            boxSizing: "border-box",
+          }}
+          onClick={() => setParticipantsFinalizeModalOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="wizard-participants-blocked-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: "22rem",
+              background: "#fff",
+              borderRadius: "12px",
+              padding: "1.15rem",
+              border: "1px solid #cbd5e1",
+              boxShadow: "none",
+              boxSizing: "border-box",
+            }}
+          >
+            <h2 id="wizard-participants-blocked-title" style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}>
+              안내
+            </h2>
+            <p
+              style={{
+                margin: "0 0 0.85rem",
+                fontSize: "0.88rem",
+                lineHeight: 1.5,
+                color: "#334155",
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {"참가자가 아직 확정되지 않았습니다.\n\n참가자 확정 후 대진표를 생성하세요."}
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                className="v3-btn"
+                onClick={() => setParticipantsFinalizeModalOpen(false)}
+                style={{ minHeight: 44, fontWeight: 700 }}
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </main>
   );
