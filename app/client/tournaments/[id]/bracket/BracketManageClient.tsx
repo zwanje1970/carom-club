@@ -1650,7 +1650,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
 
   const confirmSplitCancelAndPost = useCallback(async () => {
     if (!tournamentId || interactionLocked || !multiBlockSplitCancelAllowed) {
-      setBracketHubModal(null);
+      setBracketHubModal({ type: "error", message: "조분할을 취소하지 못했습니다." });
       return;
     }
     const z = zonesEnabled ? selectedZoneId : "-";
@@ -1668,7 +1668,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       );
       const json = (await res.json()) as { bracket?: Bracket; error?: string };
       if (!res.ok || !json.bracket) {
-        setBracketHubModal({ type: "error", message: bracketHubFailureModalMessage(json.error) });
+        const serverErr = (json.error ?? "").trim();
+        setBracketHubModal({
+          type: "error",
+          message: serverErr ? `${serverErr}\n\n조분할을 취소하지 못했습니다.` : "조분할을 취소하지 못했습니다.",
+        });
         return;
       }
       if (sliceClearKey) clearManageBracketSliceStorage(sliceClearKey);
@@ -3150,7 +3154,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           }}
           onClick={() => {
             if (multiBlockBusy) return;
-            if (bracketHubModal.type === "splitCancelConfirm" || bracketHubModal.type === "shuffleRegenConfirm") {
+            if (bracketHubModal.type === "shuffleRegenConfirm") {
               setBracketHubModal(null);
             }
           }}
@@ -3159,6 +3163,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
             style={{
               width: "100%",
               maxWidth: "22rem",
