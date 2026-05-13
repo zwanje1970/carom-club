@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { listSitePublicTournamentListSnapshotsForPublicSite } from "../../../lib/surface-read";
 import SiteTournamentsDistanceShell, { type SiteTournamentListRow } from "./SiteTournamentsDistanceShell";
 import { parseTournamentStatusFilter } from "./tournament-list-url";
-import SiteListPageSkeleton from "../components/SiteListPageSkeleton";
+import SiteDetailShellBodyLoader from "../components/SiteDetailShellBodyLoader";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,7 @@ export default function SiteTournamentsPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   return (
-    <Suspense fallback={<SiteListPageSkeleton brandTitle="대회안내" auxiliaryLabel="대회 목록을 불러오는 중입니다." listRows={4} />}>
+    <Suspense fallback={<SiteDetailShellBodyLoader />}>
       <SiteTournamentsPageContent searchParams={searchParams} />
     </Suspense>
   );
@@ -24,10 +24,11 @@ async function SiteTournamentsPageContent({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const [resolvedSearchParams, snapshots] = await Promise.all([
+    searchParams ?? Promise.resolve<Record<string, string | string[] | undefined>>({}),
+    listSitePublicTournamentListSnapshotsForPublicSite(),
+  ]);
   const statusFilter = parseTournamentStatusFilter(resolvedSearchParams.status);
-
-  const snapshots = await listSitePublicTournamentListSnapshotsForPublicSite();
 
   let ordered = snapshots.filter((s) => !SITE_TOURNAMENT_LIST_EXCLUDED_BADGES.has(s.statusBadge));
   if (statusFilter !== "all") {

@@ -131,10 +131,10 @@ export default function SiteTournamentsDistanceShell({ rows, searchParams, curre
           <p className="v3-muted site-list-empty-hint">등록된 대회가 없습니다.</p>
         ) : (
           <ul className="site-board-card-list site-site-list--tournaments">
-            {rows.map((tournament) => (
+            {rows.map((tournament, idx) => (
               <li key={tournament.id} className="site-board-card site-board-card--tournament-row">
                 <Link
-                  prefetch={false}
+                  prefetch={idx < 6 ? true : false}
                   className="site-tournament-list-link"
                   href={`/site/tournaments/${tournament.id}`}
                   onClick={(ev) => {

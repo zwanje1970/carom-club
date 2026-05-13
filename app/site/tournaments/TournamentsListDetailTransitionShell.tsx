@@ -7,14 +7,14 @@ import {
   type TournamentsListDetailTransitionContextValue,
 } from "./tournaments-list-detail-transition-context";
 
-/** 본 슬라이드 — 탭 직후 멈춤 완화를 위해 340~420ms 중간대 */
-const MAIN_DURATION_MS = 380;
+/** 본 슬라이드 — 탭 직후 체감 지연 완화를 위해 소폭 단축 */
+const MAIN_DURATION_MS = 320;
 /** 빠른 초반·끝에서 감속 */
 const MAIN_EASING = "cubic-bezier(0.22, 0.92, 0.32, 1)";
 
 /** 탭 직후 목록/상세가 “움직이기 시작”했다는 즉시 피드백 */
 const NUDGE_PX = 14;
-const NUDGE_DURATION_MS = 95;
+const NUDGE_DURATION_MS = 80;
 const NUDGE_EASING = "cubic-bezier(0.33, 1, 0.55, 1)";
 
 function normalizePathname(pathname: string): string {

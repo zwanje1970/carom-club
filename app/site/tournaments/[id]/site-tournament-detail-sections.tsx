@@ -25,6 +25,8 @@ type Props = {
   showLiveBracketEmbed?: boolean;
   /** 관리자 승인 확정(APPROVED) 인원 — 공개 상세 페이지 등에서만 전달 (목록·메인에서는 조회하지 않음) */
   confirmedParticipantCount?: number;
+  /** `true`면 첫 화면 필수 정보만 우선 표시하고 무거운 부가 섹션은 숨김 */
+  deferHeavy?: boolean;
 };
 
 /** 일반 참가자격: [기준유형] [기준값] [이하/미만] — 부자동배정과 분리 */
@@ -102,6 +104,7 @@ export default function SiteTournamentDetailSections({
   detailLayout = "legacy",
   showLiveBracketEmbed = false,
   confirmedParticipantCount,
+  deferHeavy = false,
 }: Props) {
   const posterUrl = resolveSitePosterDisplayUrl(tournament.posterImageUrl ?? null);
   const scheduleLabel = formatTournamentScheduleLabel(tournament);
@@ -145,7 +148,7 @@ export default function SiteTournamentDetailSections({
     const applicationsClosed =
       tournament.statusBadge === "마감" || tournament.statusBadge === "진행중" || tournament.statusBadge === "종료";
     const recruitmentParts: string[] = [`정원 ${tournament.maxParticipants ?? 24}명`];
-    if (typeof confirmedParticipantCount === "number") {
+    if (!deferHeavy && typeof confirmedParticipantCount === "number") {
       recruitmentParts.push(`확정 ${confirmedParticipantCount}명`);
     }
 
@@ -229,7 +232,7 @@ export default function SiteTournamentDetailSections({
             <p className="site-detail-value" style={{ fontVariantNumeric: "tabular-nums" }}>
               {tournament.maxParticipants ?? 24}명
             </p>
-            {typeof confirmedParticipantCount === "number" ? (
+            {!deferHeavy && typeof confirmedParticipantCount === "number" ? (
               <>
                 <p className="site-detail-label">확정인원</p>
                 <p className="site-detail-value" style={{ fontVariantNumeric: "tabular-nums" }}>
@@ -259,7 +262,7 @@ export default function SiteTournamentDetailSections({
           ) : null}
         </section>
 
-        {showDivisionBlock ? (
+        {!deferHeavy && showDivisionBlock ? (
           <section className="card-clean site-detail-inner-stack">
             <h2 className="site-detail-section-title">
               참가조건 (부자동배정 · {divisionMetricLabel(rule.divisionMetricType)})
@@ -274,27 +277,29 @@ export default function SiteTournamentDetailSections({
           </section>
         ) : null}
 
-        <section className="card-clean site-detail-inner-stack">
-          <h2 className="site-detail-section-title">요강 · 안내</h2>
-          <div className="site-detail-actions-row">
-            {hasOutlineData ? (
-              outlinePdf ? (
-                <SiteOutlineDocumentCard url={outlinePdf} fileKind={outlinePdfFileKind} caption="요강 보기" />
-              ) : (
-                <Link prefetch={false} className="secondary-button" href={`${outlineBasePath}/outline`}>
-                  대회요강 보기
+        {!deferHeavy ? (
+          <section className="card-clean site-detail-inner-stack">
+            <h2 className="site-detail-section-title">요강 · 안내</h2>
+            <div className="site-detail-actions-row">
+              {hasOutlineData ? (
+                outlinePdf ? (
+                  <SiteOutlineDocumentCard url={outlinePdf} fileKind={outlinePdfFileKind} caption="요강 보기" />
+                ) : (
+                  <Link prefetch={false} className="secondary-button" href={`${outlineBasePath}/outline`}>
+                    대회요강 보기
+                  </Link>
+                )
+              ) : null}
+              {venueHref && audience === "site" ? (
+                <Link prefetch={false} className="secondary-button" href={venueHref}>
+                  시합장 보기
                 </Link>
-              )
-            ) : null}
-            {venueHref && audience === "site" ? (
-              <Link prefetch={false} className="secondary-button" href={venueHref}>
-                시합장 보기
-              </Link>
-            ) : null}
-          </div>
-        </section>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
 
-        {showLiveBracketEmbed ? (
+        {!deferHeavy && showLiveBracketEmbed ? (
           <SiteTournamentBracketEmbedDynamic
             tournamentId={tournament.id}
             fastPoll={tournament.statusBadge === "진행중"}
@@ -383,7 +388,7 @@ export default function SiteTournamentDetailSections({
         <p style={{ margin: 0, fontVariantNumeric: "tabular-nums", wordBreak: "keep-all" }}>
           <span style={{ fontWeight: 600 }}>모집인원</span> {tournament.maxParticipants ?? 24}명
         </p>
-        {typeof confirmedParticipantCount === "number" ? (
+        {!deferHeavy && typeof confirmedParticipantCount === "number" ? (
           <p style={{ margin: "0.35rem 0 0", fontVariantNumeric: "tabular-nums", wordBreak: "keep-all" }}>
             <span style={{ fontWeight: 600 }}>확정인원</span> {confirmedParticipantCount}명
           </p>
@@ -408,7 +413,7 @@ export default function SiteTournamentDetailSections({
         ) : null}
       </section>
 
-      {showDivisionBlock ? (
+      {!deferHeavy && showDivisionBlock ? (
         <section className="v3-box v3-stack">
           <h2 className="v3-h2">
             참가조건(부자동배정 : {divisionMetricLabel(rule.divisionMetricType)})
@@ -423,41 +428,43 @@ export default function SiteTournamentDetailSections({
         </section>
       ) : null}
 
-      <section className="v3-box v3-stack">
-        <div
-          className="v3-row"
-          style={{
-            flexWrap: "wrap",
-            gap: "0.65rem",
-            alignItems: "center",
-          }}
-        >
-          {hasOutlineData ? (
-            outlinePdf ? (
-              <SiteOutlineDocumentCard url={outlinePdf} fileKind={outlinePdfFileKind} caption="요강 보기" />
-            ) : (
+      {!deferHeavy ? (
+        <section className="v3-box v3-stack">
+          <div
+            className="v3-row"
+            style={{
+              flexWrap: "wrap",
+              gap: "0.65rem",
+              alignItems: "center",
+            }}
+          >
+            {hasOutlineData ? (
+              outlinePdf ? (
+                <SiteOutlineDocumentCard url={outlinePdf} fileKind={outlinePdfFileKind} caption="요강 보기" />
+              ) : (
+                <Link
+                  prefetch={false}
+                  className="v3-btn"
+                  href={`${outlineBasePath}/outline`}
+                  style={{ padding: "0.55rem 1rem", fontWeight: 600, display: "inline-flex" }}
+                >
+                  대회요강 보기
+                </Link>
+              )
+            ) : null}
+            {venueHref && audience === "site" ? (
               <Link
                 prefetch={false}
                 className="v3-btn"
-                href={`${outlineBasePath}/outline`}
+                href={venueHref}
                 style={{ padding: "0.55rem 1rem", fontWeight: 600, display: "inline-flex" }}
               >
-                대회요강 보기
+                시합장 보기
               </Link>
-            )
-          ) : null}
-          {venueHref && audience === "site" ? (
-            <Link
-              prefetch={false}
-              className="v3-btn"
-              href={venueHref}
-              style={{ padding: "0.55rem 1rem", fontWeight: 600, display: "inline-flex" }}
-            >
-              시합장 보기
-            </Link>
-          ) : null}
-        </div>
-      </section>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       <div className="v3-row">
         <TournamentsListBackLink className="v3-btn" href={listBackHref}>

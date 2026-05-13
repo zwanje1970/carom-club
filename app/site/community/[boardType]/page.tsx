@@ -10,7 +10,7 @@ import CommunityBoardSearchForm from "../CommunityBoardSearchForm";
 import CommunityBoardTabs from "../CommunityBoardTabs";
 import CommunityBoardSwipeShell from "../CommunityBoardSwipeShell";
 import SiteShellFrame from "../../components/SiteShellFrame";
-import SiteListPageSkeleton from "../../components/SiteListPageSkeleton";
+import SiteDetailShellBodyLoader from "../../components/SiteDetailShellBodyLoader";
 
 type Props = {
   params: Promise<{ boardType: string }>;
@@ -20,7 +20,7 @@ type Props = {
 function CommunityBoardListFallback() {
   return (
     <SiteShellFrame brandTitle="커뮤니티" auxiliaryBarClassName="site-shell-controls--site-list">
-      <SiteListPageSkeleton contentOnly brandTitle="커뮤니티" auxiliaryLabel="" listRows={5} />
+      <SiteDetailShellBodyLoader />
     </SiteShellFrame>
   );
 }
@@ -34,15 +34,15 @@ export default function SiteCommunityBoardListPage({ params, searchParams }: Pro
 }
 
 async function SiteCommunityBoardListPageInner({ params, searchParams }: Props) {
-  const { boardType: raw } = await params;
+  const [{ boardType: raw }, sp, config] = await Promise.all([
+    params,
+    searchParams ? searchParams : Promise.resolve<Record<string, string | string[] | undefined>>({}),
+    getSiteCommunityConfig(),
+  ]);
   const boardType = parseCommunityBoardTypeParam(raw);
   if (!boardType) notFound();
-
-  const sp = searchParams ? await searchParams : {};
   const qRaw = sp.q;
   const q = typeof qRaw === "string" ? qRaw.trim() : Array.isArray(qRaw) ? String(qRaw[0] ?? "").trim() : "";
-
-  const config = await getSiteCommunityConfig();
   const board = config[boardType];
   if (!board.visible) notFound();
   const navTabs = communityNavTabsFromConfig(config);

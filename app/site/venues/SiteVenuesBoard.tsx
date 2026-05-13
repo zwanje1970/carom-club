@@ -323,7 +323,7 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
           </p>
         ) : null}
         <ul className="site-board-card-list site-site-list--venues" style={{ margin: 0 }}>
-          {ordered.map((row) => {
+          {ordered.map((row, idx) => {
             const region = String(row.region ?? "").trim();
             const phoneDisplay = String(row.phone ?? "")
               .replace(/\u00a0/g, " ")
@@ -345,7 +345,7 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
             return (
               <li key={row.venueId} className="site-board-card site-board-card--venue">
                 <Link
-                  prefetch={false}
+                  prefetch={idx < 6 ? true : false}
                   className="site-venue-list-link"
                   href={`/site/venues/${row.venueId}`}
                   onClick={(ev) => {

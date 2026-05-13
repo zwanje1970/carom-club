@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { cookies, headers } from "next/headers";
 import { after } from "next/server";
 import { isCaromClubMobileAppShell } from "../../../../../lib/is-carom-club-mobile-app-shell";
@@ -16,6 +17,7 @@ import {
 import type { SiteCommunityBoardKey } from "../../../../../lib/types/entities";
 import { communityBoardListHref } from "../../community-tab-config";
 import CommunityListBackLink from "../../CommunityListBackLink";
+import SiteDetailShellBodyLoader from "../../../components/SiteDetailShellBodyLoader";
 import CommunityPostCommentsSection from "./CommunityPostCommentsSection";
 import CommunityPostDetailBody from "./CommunityPostDetailBody";
 import CommunityPostDetailActions from "./CommunityPostDetailActions";
@@ -39,6 +41,92 @@ type Props = {
   postId: string;
 };
 
+type ViewerContext = {
+  isLoggedIn: boolean;
+  currentUserId: string | null;
+  canManageAuthor: boolean;
+  canDeletePost: boolean;
+};
+
+async function loadViewerContext(postAuthorUserId: string): Promise<ViewerContext> {
+  const cookieStore = await cookies();
+  const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
+  if (!session) {
+    return { isLoggedIn: false, currentUserId: null, canManageAuthor: false, canDeletePost: false };
+  }
+
+  const user = await getUserById(session.userId);
+  if (!user) {
+    return { isLoggedIn: true, currentUserId: null, canManageAuthor: false, canDeletePost: false };
+  }
+
+  const canManageAuthor = await isCommunityPostAuthor(postAuthorUserId, user.id);
+  const canPlatformDelete =
+    user.role === "PLATFORM" && !isCaromClubMobileAppShell(await headers());
+  return {
+    isLoggedIn: true,
+    currentUserId: user.id,
+    canManageAuthor,
+    canDeletePost: canManageAuthor || canPlatformDelete,
+  };
+}
+
+type PostBodyPayload = {
+  content: string;
+  imageUrls: string[];
+  imageSizeLevels: number[];
+};
+
+async function CommunityPostDetailBodyAsync({ payload }: { payload: PostBodyPayload }) {
+  const { segments, tailImages } = await parseCommunityPostBodyForPublicSiteDetail(
+    payload.content,
+    payload.imageUrls,
+    payload.imageSizeLevels,
+  );
+  return <CommunityPostDetailBody segments={segments} tailImages={tailImages} />;
+}
+
+async function CommunityPostDetailActionsAsync({
+  viewerContextPromise,
+  postId,
+  boardType,
+}: {
+  viewerContextPromise: Promise<ViewerContext>;
+  postId: string;
+  boardType: SiteCommunityBoardKey;
+}) {
+  const viewer = await viewerContextPromise;
+  return (
+    <CommunityPostDetailActions
+      canManageAuthor={viewer.canManageAuthor}
+      canDeletePost={viewer.canDeletePost}
+      postId={postId}
+      boardType={boardType}
+      className="ui-community-post-detail-actions ui-community-post-detail-actions--in-article"
+    />
+  );
+}
+
+async function CommunityPostCommentsAsync({
+  viewerContextPromise,
+  boardType,
+  postId,
+}: {
+  viewerContextPromise: Promise<ViewerContext>;
+  boardType: SiteCommunityBoardKey;
+  postId: string;
+}) {
+  const viewer = await viewerContextPromise;
+  return (
+    <CommunityPostCommentsSection
+      boardType={boardType}
+      postId={postId}
+      isLoggedIn={viewer.isLoggedIn}
+      currentUserId={viewer.currentUserId}
+    />
+  );
+}
+
 export default async function SiteCommunityPostDetailPageContent({ boardType, postId }: Props) {
   const config = await getSiteCommunityConfig();
   const board = config[boardType];
@@ -51,40 +139,25 @@ export default async function SiteCommunityPostDetailPageContent({ boardType, po
     void incrementCommunityPostViewCountLight(postId);
   });
 
-  const cookieStore = await cookies();
-  const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
-  let canManageAuthor = false;
-  let canPlatformDelete = false;
-  let currentUserId: string | null = null;
-  if (session) {
-    const user = await getUserById(session.userId);
-    if (user) {
-      currentUserId = user.id;
-      canManageAuthor = await isCommunityPostAuthor(post.authorUserId, user.id);
-      const headerList = await headers();
-      canPlatformDelete = user.role === "PLATFORM" && !isCaromClubMobileAppShell(headerList);
-    }
-  }
-  const canDeletePost = canManageAuthor || canPlatformDelete;
-
-  const { segments, tailImages } = await parseCommunityPostBodyForPublicSiteDetail(
-    post.content,
-    post.imageUrls,
-    post.imageSizeLevels,
-  );
+  const viewerContextPromise = loadViewerContext(post.authorUserId);
+  const postBodyPayload: PostBodyPayload = {
+    content: post.content,
+    imageUrls: post.imageUrls,
+    imageSizeLevels: post.imageSizeLevels,
+  };
 
   return (
     <>
       <article className="ui-community-post-detail-article v3-stack">
         <div className="ui-community-post-detail-heading-row">
           <h1 className="ui-community-post-detail-title">{post.title}</h1>
-          <CommunityPostDetailActions
-            canManageAuthor={canManageAuthor}
-            canDeletePost={canDeletePost}
-            postId={postId}
-            boardType={boardType}
-            className="ui-community-post-detail-actions ui-community-post-detail-actions--in-article"
-          />
+          <Suspense fallback={null}>
+            <CommunityPostDetailActionsAsync
+              viewerContextPromise={viewerContextPromise}
+              postId={postId}
+              boardType={boardType}
+            />
+          </Suspense>
         </div>
         <p className="ui-community-post-detail-meta">
           <span className="ui-community-post-detail-author">{post.authorNickname}</span>
@@ -93,14 +166,17 @@ export default async function SiteCommunityPostDetailPageContent({ boardType, po
             · {formatDetailDateTime(post.createdAt)} · 조회 {post.viewCount} · 댓글 {post.commentCount}
           </span>
         </p>
-        <CommunityPostDetailBody segments={segments} tailImages={tailImages} />
+        <Suspense fallback={<SiteDetailShellBodyLoader />}>
+          <CommunityPostDetailBodyAsync payload={postBodyPayload} />
+        </Suspense>
       </article>
-      <CommunityPostCommentsSection
-        boardType={boardType}
-        postId={postId}
-        isLoggedIn={Boolean(session)}
-        currentUserId={currentUserId}
-      />
+      <Suspense fallback={<SiteDetailShellBodyLoader />}>
+        <CommunityPostCommentsAsync
+          viewerContextPromise={viewerContextPromise}
+          boardType={boardType}
+          postId={postId}
+        />
+      </Suspense>
       <div style={{ marginTop: "0.9rem" }}>
         <CommunityListBackLink className="secondary-button" href={communityBoardListHref(boardType)}>
           목록으로

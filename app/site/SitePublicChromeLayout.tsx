@@ -46,7 +46,6 @@ export default async function SitePublicChromeLayout({
   const headerStore = await headers();
   const useMobileShell = isPublicSiteMobileShell(headerStore);
   const caromAppShellRequest = isCaromClubMobileAppShell(headerStore);
-  const config = await getSiteLayoutConfig();
   const siteBuilderPreviewHeader = headerStore.get("x-site-builder-preview");
   const nextUrlHeader =
     headerStore.get("next-url") ??
@@ -64,7 +63,9 @@ export default async function SitePublicChromeLayout({
   const isSiteMainSample = pathnameIndicatesSiteMainSample(nextUrlHeader);
   const siteShellSampleClass = isSiteMainSample ? " site-shell--site-main-sample" : "";
 
+  /** 모바일·프리뷰 분기에서는 PC 관리자 플래그를 조회하지 않음(기존과 동일). PC 분기만 레이아웃 설정과 병렬 await */
   if (useMobileShell || isPageBuilderPreviewRequest) {
+    const config = await getSiteLayoutConfig();
     return (
       <div
         className={`site-shell site-shell--ua-mobile-site${siteShellSampleClass}`}
@@ -83,7 +84,7 @@ export default async function SitePublicChromeLayout({
     );
   }
 
-  const pcAdminEntry = await getPcSiteHeaderAdminFlags();
+  const [config, pcAdminEntry] = await Promise.all([getSiteLayoutConfig(), getPcSiteHeaderAdminFlags()]);
   const pcHeaderMenuItems = filterPcHeaderAdminMenuItems(config.header.pc.menuItems);
 
   return (

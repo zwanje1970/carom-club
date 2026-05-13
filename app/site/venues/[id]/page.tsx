@@ -201,13 +201,22 @@ function htmlToPlainText(html: string): string {
     .join("\n\n");
 }
 
+async function VenueIntroPdfDocumentCard({ introPdfUrl }: { introPdfUrl: string }) {
+  const introPdfId = outlinePdfIdFromPublicUrl(introPdfUrl);
+  const introPdfAsset = introPdfId ? await getOutlinePdfAssetById(introPdfId) : null;
+  const introPdfFileKind = outlineFileKindFromAsset(introPdfAsset);
+  return (
+    <SiteOutlineDocumentCard
+      url={introPdfUrl}
+      fileKind={introPdfFileKind}
+      caption="소개 보기"
+    />
+  );
+}
+
 async function SiteVenueDetailPageContent({ id }: { id: string }) {
   const venue = await getSiteVenueDetailById(id);
   if (!venue) notFound();
-
-  const introPdfId = outlinePdfIdFromPublicUrl(venue.introPdfUrl);
-  const introPdfAsset = introPdfId ? await getOutlinePdfAssetById(introPdfId) : null;
-  const introPdfFileKind = outlineFileKindFromAsset(introPdfAsset);
 
   const images = venue.galleryImageUrls;
   const heroCoverUrl = images.length > 0 ? images[0] : null;
@@ -238,7 +247,8 @@ async function SiteVenueDetailPageContent({ id }: { id: string }) {
     (s): s is string => Boolean(s && s.length)
   );
 
-  const showPdf = Boolean(venue.introPdfUrl?.trim());
+  const introPdfUrl = venue.introPdfUrl?.trim() ?? "";
+  const showPdf = introPdfUrl.length > 0;
   const websiteUrl = venue.website ? normalizeExternalUrl(venue.website) : "";
   const showWebsiteBtn = websiteUrl.length > 0;
   const linkParts = venue.website ? classifyExternalLink(venue.website) : null;
@@ -417,11 +427,9 @@ async function SiteVenueDetailPageContent({ id }: { id: string }) {
               </p>
             ))}
             {showPdf ? (
-              <SiteOutlineDocumentCard
-                url={venue.introPdfUrl!}
-                fileKind={introPdfFileKind}
-                caption="소개 보기"
-              />
+              <Suspense fallback={<p className="v3-muted" style={{ margin: 0 }}>불러오는 중...</p>}>
+                <VenueIntroPdfDocumentCard introPdfUrl={introPdfUrl} />
+              </Suspense>
             ) : null}
           </section>
         ) : null}

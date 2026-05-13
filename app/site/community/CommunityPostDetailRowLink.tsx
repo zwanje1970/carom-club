@@ -15,14 +15,15 @@ type Props = {
   href: string;
   className?: string;
   children: ReactNode;
+  prefetch?: boolean;
 };
 
 /** 목록 행 → 게시글 상세: 탭 직시 nudge용(탭·검색 전용 링크에는 사용하지 않음) */
-export default function CommunityPostDetailRowLink({ href, className, children }: Props) {
+export default function CommunityPostDetailRowLink({ href, className, children, prefetch = false }: Props) {
   const ctx = useCommunityListDetailTransition();
   return (
     <Link
-      prefetch={false}
+      prefetch={prefetch}
       href={href}
       className={className}
       onClick={(ev) => {

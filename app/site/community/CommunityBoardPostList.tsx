@@ -62,7 +62,7 @@ export default function CommunityBoardPostList({
           </div>
         </li>
       ) : (
-        items.map((post) => {
+        items.map((post, idx) => {
           const href = communityPostDetailHref(post.boardType, post.id);
           const prefix = showRoomPrefix
             ? isPrimaryTabKey(post.boardType)
@@ -75,7 +75,7 @@ export default function CommunityBoardPostList({
           const authorLabel = (post.nickname ?? "").trim() || "—";
           return (
             <li key={post.id} className="ui-community-board-row">
-              <CommunityPostDetailRowLink href={href} className="ui-community-board-row-link">
+              <CommunityPostDetailRowLink href={href} className="ui-community-board-row-link" prefetch={idx < 6}>
                 <div className="ui-community-board-row-body">
                   <div className="ui-community-board-line1">
                     {prefix ? (
