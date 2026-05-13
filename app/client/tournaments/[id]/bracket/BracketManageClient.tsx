@@ -1648,9 +1648,57 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     [runShuffleRoundOneApi, storageSeg, tournamentId],
   );
 
+  const openSplitCancelConfirmOrExplain = useCallback(() => {
+    if (actionLoading || multiBlockBusy) {
+      setBracketHubModal({ type: "error", message: "처리 중입니다. 잠시 후 다시 시도하세요." });
+      return;
+    }
+    if (interactionLocked) {
+      setBracketHubModal({ type: "error", message: "현재 대진표 작업을 진행할 수 없는 상태입니다." });
+      return;
+    }
+    if (!bracket || bracket.bracketMode !== "multi_block") {
+      setBracketHubModal({ type: "error", message: "현재 조분할된 대진표가 아닙니다." });
+      return;
+    }
+    if (!multiBlockSplitCancelAllowed) {
+      setBracketHubModal({
+        type: "error",
+        message: "대진표에 경기 이력이 있습니다. 경기 이력을 모두 되돌린 후 조분할을 취소하세요.",
+      });
+      return;
+    }
+    setBracketHubModal({ type: "splitCancelConfirm" });
+  }, [
+    actionLoading,
+    bracket,
+    interactionLocked,
+    multiBlockBusy,
+    multiBlockSplitCancelAllowed,
+  ]);
+
   const confirmSplitCancelAndPost = useCallback(async () => {
-    if (!tournamentId || interactionLocked || !multiBlockSplitCancelAllowed) {
+    if (!tournamentId) {
       setBracketHubModal({ type: "error", message: "조분할을 취소하지 못했습니다." });
+      return;
+    }
+    if (actionLoading || multiBlockBusy) {
+      setBracketHubModal({ type: "error", message: "처리 중입니다. 잠시 후 다시 시도하세요." });
+      return;
+    }
+    if (interactionLocked) {
+      setBracketHubModal({ type: "error", message: "현재 대진표 작업을 진행할 수 없는 상태입니다." });
+      return;
+    }
+    if (!bracket || bracket.bracketMode !== "multi_block") {
+      setBracketHubModal({ type: "error", message: "현재 조분할된 대진표가 아닙니다." });
+      return;
+    }
+    if (!multiBlockSplitCancelAllowed) {
+      setBracketHubModal({
+        type: "error",
+        message: "대진표에 경기 이력이 있습니다. 경기 이력을 모두 되돌린 후 조분할을 취소하세요.",
+      });
       return;
     }
     const z = zonesEnabled ? selectedZoneId : "-";
@@ -1683,9 +1731,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       setMultiBlockBusy(false);
     }
   }, [
+    actionLoading,
     bracket,
     bracketZoneQuery,
     interactionLocked,
+    multiBlockBusy,
     multiBlockSplitCancelAllowed,
     selectedZoneId,
     storageSeg,
@@ -2520,14 +2570,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                   <button
                     type="button"
                     className="v3-btn"
-                    disabled={
-                      actionLoading ||
-                      interactionLocked ||
-                      multiBlockBusy ||
-                      bracket.bracketMode !== "multi_block" ||
-                      !multiBlockSplitCancelAllowed
-                    }
-                    onClick={() => setBracketHubModal({ type: "splitCancelConfirm" })}
+                    onClick={openSplitCancelConfirmOrExplain}
                     style={{
                       boxShadow: "none",
                       fontWeight: 700,
