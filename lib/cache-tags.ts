@@ -12,6 +12,9 @@ export const CACHE_TAG_SITE_PUBLIC_TOURNAMENTS_LIST = "site-data:public-tourname
 /** 공개 사이트 커뮤니티 목록 피드 전용 — `revalidateTag` 연동 시 사용 */
 export const CACHE_TAG_SITE_PUBLIC_COMMUNITY_FEED = "site-data:public-community-feed";
 
+/** 공개 사이트 증빙 이미지 메타 목록 — 커뮤니티 목록 썸네일 등에서 `unstable_cache` 무효화용 */
+export const CACHE_TAG_SITE_PUBLIC_PROOF_IMAGE_ASSETS = "site-data:public-proof-image-assets";
+
 export function cacheTagTournamentById(tournamentId: string): string {
   return `site-data:tournament:${tournamentId.trim()}`;
 }

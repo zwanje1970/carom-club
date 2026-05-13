@@ -1,9 +1,13 @@
 import { cookies, headers } from "next/headers";
+import { after } from "next/server";
 import { isCaromClubMobileAppShell } from "../../../../../lib/is-carom-club-mobile-app-shell";
 import { notFound } from "next/navigation";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
 import { parseCommunityPostBodyForPublicSiteDetail } from "../../../../../lib/server/community-post-detail-site-images";
-import { getCommunityPostWithIncrementView } from "../../../../../lib/server/platform-backing-store";
+import {
+  getCommunityPostDetailForPublicSitePage,
+  incrementCommunityPostViewCountLight,
+} from "../../../../../lib/server/platform-backing-store";
 import { parseCommunityBoardTypeParam } from "../../../../../lib/community-board-params";
 import {
   getSiteCommunityConfig,
@@ -49,8 +53,12 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
   const board = config[boardType as SiteCommunityBoardKey];
   if (!board.visible) notFound();
 
-  const post = await getCommunityPostWithIncrementView(postId, { expectedBoardType: boardType });
+  const post = await getCommunityPostDetailForPublicSitePage(postId, { expectedBoardType: boardType });
   if (!post) notFound();
+
+  after(() => {
+    void incrementCommunityPostViewCountLight(postId);
+  });
 
   const cookieStore = await cookies();
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);

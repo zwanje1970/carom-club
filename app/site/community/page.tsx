@@ -13,12 +13,7 @@ import SiteListPageSkeleton from "../components/SiteListPageSkeleton";
 function CommunityPageFallback() {
   return (
     <SiteShellFrame brandTitle="커뮤니티" auxiliaryBarClassName="site-shell-controls--site-list">
-      <SiteListPageSkeleton
-        contentOnly
-        brandTitle="커뮤니티"
-        auxiliaryLabel="게시글 목록을 불러오는 중입니다."
-        listRows={5}
-      />
+      <SiteListPageSkeleton contentOnly brandTitle="커뮤니티" auxiliaryLabel="" listRows={5} />
     </SiteShellFrame>
   );
 }
@@ -30,12 +25,12 @@ export default function SiteCommunityPage({
 }) {
   return (
     <Suspense fallback={<CommunityPageFallback />}>
-      <SiteCommunityPageResolved searchParams={searchParams} />
+      <SiteCommunityPageInner searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function SiteCommunityPageResolved({
+async function SiteCommunityPageInner({
   searchParams,
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -44,8 +39,10 @@ async function SiteCommunityPageResolved({
   const qRaw = sp.q;
   const q = typeof qRaw === "string" ? qRaw.trim() : Array.isArray(qRaw) ? String(qRaw[0] ?? "").trim() : "";
 
-  const config = await getSiteCommunityConfig();
+  const config: SiteCommunityConfig = await getSiteCommunityConfig();
   const navTabs = communityNavTabsFromConfig(config);
+  const visibleBoardKeys = visibleCommunityBoardKeysForTabs(config);
+  const items = await listCommunityPostsAllPrimaryForPublicSite(visibleBoardKeys, q ? { q } : undefined);
 
   return (
     <SiteShellFrame
@@ -60,43 +57,13 @@ async function SiteCommunityPageResolved({
     >
       <>
         <CommunityBoardSwipeShell tabs={navTabs.map(({ key, href }) => ({ key, href }))}>
-          <Suspense
-            fallback={
-              <SiteListPageSkeleton
-                contentOnly
-                brandTitle="커뮤니티"
-                auxiliaryLabel="게시글 목록을 불러오는 중입니다."
-                listRows={5}
-              />
-            }
-          >
-            <SiteCommunityPageContent config={config} searchParams={searchParams} />
-          </Suspense>
+          <section className="site-site-gray-main v3-stack ui-community-page" data-community-board="all">
+            <CommunityBoardListScrollShell boardListKey="all" searchParams={sp} itemsCount={items.length}>
+              <CommunityBoardPostList showRoomPrefix config={config} items={items} />
+            </CommunityBoardListScrollShell>
+          </section>
         </CommunityBoardSwipeShell>
       </>
     </SiteShellFrame>
-  );
-}
-
-async function SiteCommunityPageContent({
-  config,
-  searchParams,
-}: {
-  config: SiteCommunityConfig;
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const sp = searchParams ? await searchParams : {};
-  const qRaw = sp.q;
-  const q = typeof qRaw === "string" ? qRaw.trim() : Array.isArray(qRaw) ? String(qRaw[0] ?? "").trim() : "";
-
-  const visibleBoardKeys = visibleCommunityBoardKeysForTabs(config);
-  const items = await listCommunityPostsAllPrimaryForPublicSite(visibleBoardKeys, q ? { q } : undefined);
-
-  return (
-    <section className="site-site-gray-main v3-stack ui-community-page" data-community-board="all">
-      <CommunityBoardListScrollShell boardListKey="all" searchParams={sp} itemsCount={items.length}>
-        <CommunityBoardPostList showRoomPrefix config={config} items={items} />
-      </CommunityBoardListScrollShell>
-    </section>
   );
 }

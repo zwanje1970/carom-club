@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { parseCommunityBoardTypeParam } from "../../../../lib/community-board-params";
 import { getSiteCommunityConfig, listCommunityPostsForPublicSite } from "../../../../lib/surface-read";
-import type { SiteCommunityBoardKey } from "../../../../lib/types/entities";
 import { communityBoardListHref, communityNavTabsFromConfig } from "../community-tab-config";
 import CommunityBoardPostList from "../CommunityBoardPostList";
 import CommunityBoardListScrollShell from "../CommunityBoardListScrollShell";
@@ -21,12 +20,7 @@ type Props = {
 function CommunityBoardListFallback() {
   return (
     <SiteShellFrame brandTitle="커뮤니티" auxiliaryBarClassName="site-shell-controls--site-list">
-      <SiteListPageSkeleton
-        contentOnly
-        brandTitle="커뮤니티"
-        auxiliaryLabel="게시글 목록을 불러오는 중입니다."
-        listRows={5}
-      />
+      <SiteListPageSkeleton contentOnly brandTitle="커뮤니티" auxiliaryLabel="" listRows={5} />
     </SiteShellFrame>
   );
 }
@@ -34,12 +28,12 @@ function CommunityBoardListFallback() {
 export default function SiteCommunityBoardListPage({ params, searchParams }: Props) {
   return (
     <Suspense fallback={<CommunityBoardListFallback />}>
-      <SiteCommunityBoardListPageResolved params={params} searchParams={searchParams} />
+      <SiteCommunityBoardListPageInner params={params} searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function SiteCommunityBoardListPageResolved({ params, searchParams }: Props) {
+async function SiteCommunityBoardListPageInner({ params, searchParams }: Props) {
   const { boardType: raw } = await params;
   const boardType = parseCommunityBoardTypeParam(raw);
   if (!boardType) notFound();
@@ -52,6 +46,8 @@ async function SiteCommunityBoardListPageResolved({ params, searchParams }: Prop
   const board = config[boardType];
   if (!board.visible) notFound();
   const navTabs = communityNavTabsFromConfig(config);
+
+  const items = await listCommunityPostsForPublicSite(boardType, q ? { q } : undefined);
 
   return (
     <SiteShellFrame
@@ -70,18 +66,11 @@ async function SiteCommunityBoardListPageResolved({ params, searchParams }: Prop
     >
       <>
         <CommunityBoardSwipeShell tabs={navTabs.map(({ key, href }) => ({ key, href }))}>
-          <Suspense
-            fallback={
-              <SiteListPageSkeleton
-                contentOnly
-                brandTitle="커뮤니티"
-                auxiliaryLabel="게시글 목록을 불러오는 중입니다."
-                listRows={5}
-              />
-            }
-          >
-            <SiteCommunityBoardListContent boardType={boardType} searchParams={searchParams} />
-          </Suspense>
+          <section className="site-site-gray-main v3-stack ui-community-page" data-community-board={boardType}>
+            <CommunityBoardListScrollShell boardListKey={boardType} searchParams={sp} itemsCount={items.length}>
+              <CommunityBoardPostList showRoomPrefix={false} items={items} />
+            </CommunityBoardListScrollShell>
+          </section>
         </CommunityBoardSwipeShell>
         <Link
           prefetch={false}
@@ -93,27 +82,5 @@ async function SiteCommunityBoardListPageResolved({ params, searchParams }: Prop
         </Link>
       </>
     </SiteShellFrame>
-  );
-}
-
-async function SiteCommunityBoardListContent({
-  boardType,
-  searchParams,
-}: {
-  boardType: SiteCommunityBoardKey;
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const sp = searchParams ? await searchParams : {};
-  const qRaw = sp.q;
-  const q = typeof qRaw === "string" ? qRaw.trim() : Array.isArray(qRaw) ? String(qRaw[0] ?? "").trim() : "";
-
-  const items = await listCommunityPostsForPublicSite(boardType, q ? { q } : undefined);
-
-  return (
-    <section className="site-site-gray-main v3-stack ui-community-page" data-community-board={boardType}>
-      <CommunityBoardListScrollShell boardListKey={boardType} searchParams={sp} itemsCount={items.length}>
-        <CommunityBoardPostList showRoomPrefix={false} items={items} />
-      </CommunityBoardListScrollShell>
-    </section>
   );
 }

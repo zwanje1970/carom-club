@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { createHash, randomUUID } from "crypto";
 import { copyFile, mkdir, open, readFile, readdir, rename, stat, unlink, writeFile } from "fs/promises";
@@ -12,6 +13,7 @@ import {
   CACHE_TAG_MAIN_SLIDE_ADS,
   CACHE_TAG_MAIN_SLIDE_SNAPSHOTS,
   CACHE_TAG_SITE_PUBLIC_TOURNAMENTS_LIST,
+  CACHE_TAG_SITE_PUBLIC_PROOF_IMAGE_ASSETS,
 } from "../cache-tags";
 import { revalidateSiteDataTag } from "../revalidate-site-data-tag";
 import { normalizeRepresentativeImageUrls, parseTypeSpecific, resolveVenuePricingType } from "../client-organization-setup-parse";
@@ -8836,7 +8838,14 @@ function parseProofImageAssetsFromKvRaw(raw: unknown): ProofImageAsset[] {
   return raw.map(normalizeProofImageRow).filter((item): item is ProofImageAsset => item !== null);
 }
 
-export async function loadProofImageAssetsList(): Promise<ProofImageAsset[]> {
+/** 목록 썸네일 등에서만 사용 — 상세 본문은 비캐시 `loadProofImageAssetsList` 유지 */
+const loadProofImageAssetsListCachedForPublicList = unstable_cache(
+  async (): Promise<ProofImageAsset[]> => fetchProofImageAssetsListCore(),
+  ["public-site-proof-image-assets-v1"],
+  { revalidate: 120, tags: [CACHE_TAG_SITE_PUBLIC_PROOF_IMAGE_ASSETS] },
+);
+
+async function fetchProofImageAssetsListCore(): Promise<ProofImageAsset[]> {
   const rs = resolveSiteProofImageAssetsReadStrategy();
   if (rs === "firestore-kv") {
     try {
@@ -8854,16 +8863,22 @@ export async function loadProofImageAssetsList(): Promise<ProofImageAsset[]> {
   return [...store.proofImages];
 }
 
+export async function loadProofImageAssetsList(): Promise<ProofImageAsset[]> {
+  return fetchProofImageAssetsListCore();
+}
+
 async function persistProofImageAssetsList(list: ProofImageAsset[]): Promise<boolean> {
   const ws = resolveSiteProofImageAssetsWriteStrategy();
   if (ws === "firestore-kv") {
     await upsertSiteProofImageAssetsToFirestoreKv(list);
+    revalidateSiteDataTag(CACHE_TAG_SITE_PUBLIC_PROOF_IMAGE_ASSETS);
     return true;
   }
   if (ws === "blocked") return false;
   const store = await readLocalJsonAggregate();
   store.proofImages = list;
   await writeLocalJsonAggregate(store);
+  revalidateSiteDataTag(CACHE_TAG_SITE_PUBLIC_PROOF_IMAGE_ASSETS);
   return true;
 }
 
@@ -8883,7 +8898,7 @@ export async function filterCommunityPostsAllPrimaryFromFeed(
   if (!hasProofImageIdInFirstImage(rows)) {
     return rows.map((p) => mapPostToListItem(p, { useRawFirstImageWhenNoProof: true }));
   }
-  const proofAssets = await loadProofImageAssetsList();
+  const proofAssets = await loadProofImageAssetsListCachedForPublicList();
   const assetsById = new Map<string, SiteListThumbnailProofFields>(proofAssets.map((a) => [a.id, a]));
   return rows.map((p) => mapPostToListItem(p, { assetsById }));
 }
@@ -8903,7 +8918,7 @@ export async function filterCommunityPostsFromFeed(
   if (!hasProofImageIdInFirstImage(rows)) {
     return rows.map((p) => mapPostToListItem(p, { useRawFirstImageWhenNoProof: true }));
   }
-  const proofAssets = await loadProofImageAssetsList();
+  const proofAssets = await loadProofImageAssetsListCachedForPublicList();
   const assetsById = new Map<string, SiteListThumbnailProofFields>(proofAssets.map((a) => [a.id, a]));
   return rows.map((p) => mapPostToListItem(p, { assetsById }));
 }
@@ -8925,73 +8940,122 @@ export async function listCommunityPosts(
   return await filterCommunityPostsFromFeed(feed, boardType, options);
 }
 
+function mapCommunityBoardPostToDetail(p: CommunityBoardPost): CommunityPostDetail {
+  const imageUrls = normalizeCommunityPostImageUrls(p.imageUrls);
+  const imageSizeLevels = normalizeCommunityPostImageSizeLevels(imageUrls.length, p.imageSizeLevels);
+  return {
+    id: p.id,
+    boardType: p.boardType,
+    title: p.title,
+    content: p.content,
+    imageUrls,
+    imageSizeLevels,
+    authorUserId: p.authorUserId,
+    authorNickname: p.authorNickname,
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
+    viewCount: p.viewCount,
+    commentCount: p.commentCount,
+    imageLayout: p.imageLayout === "grid2" ? "grid2" : "full",
+  };
+}
+
 export async function getCommunityPostById(postId: string): Promise<CommunityPostDetail | null> {
   const feed = await loadSiteCommunityFeed();
   const id = postId.trim();
   const p = feed.communityPosts.find((x) => x.id === id);
   if (!p || !isCommunityBoardPostListed(p)) return null;
-  const imageUrls = normalizeCommunityPostImageUrls(p.imageUrls);
-  const imageSizeLevels = normalizeCommunityPostImageSizeLevels(imageUrls.length, p.imageSizeLevels);
-  return {
-    id: p.id,
-    boardType: p.boardType,
-    title: p.title,
-    content: p.content,
-    imageUrls,
-    imageSizeLevels,
-    authorUserId: p.authorUserId,
-    authorNickname: p.authorNickname,
-    createdAt: p.createdAt,
-    updatedAt: p.updatedAt,
-    viewCount: p.viewCount,
-    commentCount: p.commentCount,
-    imageLayout: p.imageLayout === "grid2" ? "grid2" : "full",
-  };
+  return mapCommunityBoardPostToDetail(p);
 }
 
-/** 상세 페이지 전용: 단일 feed 로드에서 조회수 증가 + 상세 반환 */
+/**
+ * 공개 사이트 상세 전용: 게시글만 경량 로드(`loadSiteCommunityFeedForPublicList`) 후 단건 매핑.
+ * 댓글 배열을 파싱·로드하지 않는다.
+ */
+export async function getCommunityPostDetailForPublicSitePage(
+  postId: string,
+  options?: { expectedBoardType?: SiteCommunityBoardKey },
+): Promise<CommunityPostDetail | null> {
+  const { communityPosts } = await loadSiteCommunityFeedForPublicList();
+  const id = postId.trim();
+  const p = communityPosts.find((x) => x.id === id);
+  if (!p || !isCommunityBoardPostListed(p)) return null;
+  if (options?.expectedBoardType && p.boardType !== options.expectedBoardType) return null;
+  return mapCommunityBoardPostToDetail(p);
+}
+
+/**
+ * 조회수 +1 영속. 전체 피드·댓글을 객체로 파싱하지 않고, KV/로컬 스토어에서 해당 글만 갱신한다.
+ */
+export async function incrementCommunityPostViewCountLight(postId: string): Promise<number | null> {
+  const id = postId.trim();
+  if (!id) return null;
+
+  const readStrategy = resolveSiteCommunityFeedReadStrategy();
+  const writeStrategy = resolveSiteCommunityFeedWriteStrategy();
+
+  if (readStrategy === "production-empty-only") return null;
+
+  if (readStrategy === "firestore-kv") {
+    if (writeStrategy !== "firestore-kv") return null;
+    try {
+      const raw = await readSiteCommunityFeedRawFromFirestoreKv();
+      if (!raw || typeof raw !== "object") return null;
+      const clone = JSON.parse(JSON.stringify(raw)) as { communityPosts?: unknown[] };
+      const posts = clone.communityPosts;
+      if (!Array.isArray(posts)) return null;
+      for (let i = 0; i < posts.length; i++) {
+        const row = posts[i];
+        const norm = normalizeCommunityBoardPostRow(row);
+        if (!norm || norm.id.trim() !== id) continue;
+        if (!isCommunityBoardPostListed(norm)) return null;
+        const pr = posts[i] as Record<string, unknown>;
+        const prev = Number(pr.viewCount);
+        const base = Number.isFinite(prev) ? prev : Number(norm.viewCount) || 0;
+        const next = base + 1;
+        pr.viewCount = next;
+        pr.updatedAt = new Date().toISOString();
+        await upsertSiteCommunityFeedToFirestoreKv(clone);
+        return next;
+      }
+      return null;
+    } catch (e) {
+      console.warn("[incrementCommunityPostViewCountLight] firestore-kv failed", e);
+      return null;
+    }
+  }
+
+  if (readStrategy === "local-json-file") {
+    if (writeStrategy !== "local-json-file") return null;
+    const store = await readLocalJsonAggregate();
+    ensureCommunityPostsArray(store);
+    const p = store.communityPosts.find((x) => x.id.trim() === id);
+    if (!p || !isCommunityBoardPostListed(p)) return null;
+    const next = (p.viewCount ?? 0) + 1;
+    p.viewCount = next;
+    p.updatedAt = new Date().toISOString();
+    await writeLocalJsonAggregate(store);
+    return next;
+  }
+
+  return null;
+}
+
+/** 상세 호환: 게시글만 경량 로드 후 조회수 증가(경량 경로)까지 await — 전체 댓글 파싱 없음 */
 export async function getCommunityPostWithIncrementView(
   postId: string,
   options?: { expectedBoardType?: SiteCommunityBoardKey },
 ): Promise<CommunityPostDetail | null> {
-  const feed = await loadSiteCommunityFeed();
-  const id = postId.trim();
-  const p = feed.communityPosts.find((x) => x.id === id);
-  if (!p || !isCommunityBoardPostListed(p)) return null;
-  if (options?.expectedBoardType && p.boardType !== options.expectedBoardType) return null;
-
-  p.viewCount = (p.viewCount ?? 0) + 1;
-  p.updatedAt = new Date().toISOString();
-  void persistSiteCommunityFeed(feed);
-
-  const imageUrls = normalizeCommunityPostImageUrls(p.imageUrls);
-  const imageSizeLevels = normalizeCommunityPostImageSizeLevels(imageUrls.length, p.imageSizeLevels);
-  return {
-    id: p.id,
-    boardType: p.boardType,
-    title: p.title,
-    content: p.content,
-    imageUrls,
-    imageSizeLevels,
-    authorUserId: p.authorUserId,
-    authorNickname: p.authorNickname,
-    createdAt: p.createdAt,
-    updatedAt: p.updatedAt,
-    viewCount: p.viewCount,
-    commentCount: p.commentCount,
-    imageLayout: p.imageLayout === "grid2" ? "grid2" : "full",
-  };
+  const detail = await getCommunityPostDetailForPublicSitePage(postId, options);
+  if (!detail) return null;
+  const next = await incrementCommunityPostViewCountLight(postId.trim());
+  if (next == null) return detail;
+  const now = new Date().toISOString();
+  return { ...detail, viewCount: next, updatedAt: now };
 }
 
 export async function incrementCommunityPostViewCount(postId: string): Promise<number | null> {
-  const feed = await loadSiteCommunityFeed();
-  const id = postId.trim();
-  const p = feed.communityPosts.find((x) => x.id === id);
-  if (!p || !isCommunityBoardPostListed(p)) return null;
-  p.viewCount = (p.viewCount ?? 0) + 1;
-  p.updatedAt = new Date().toISOString();
-  void persistSiteCommunityFeed(feed);
-  return p.viewCount;
+  return incrementCommunityPostViewCountLight(postId.trim());
 }
 
 export async function createCommunityPost(params: {
