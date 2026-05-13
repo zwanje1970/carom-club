@@ -1,55 +1,26 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { cookies } from "next/headers";
-import { outlineFileKindFromAsset, outlinePdfIdFromPublicUrl } from "../../../../lib/outline-pdf-helpers";
-import { getOutlinePdfAssetById, getTournamentByIdForPublicSitePage } from "../../../../lib/surface-read";
-import { countApprovedApplicationsByTournamentIdFirestore } from "../../../../lib/server/firestore-tournament-applications";
-import { getLatestBracketByTournamentIdFirestore } from "../../../../lib/server/firestore-tournament-brackets";
-import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
 import SiteShellFrame from "../../components/SiteShellFrame";
-import SiteTournamentDetailSections from "./site-tournament-detail-sections";
+import SiteDetailShellBodyLoader from "../../components/SiteDetailShellBodyLoader";
+import SiteTournamentDetailPageContent from "./SiteTournamentDetailPageContent";
+
+export const dynamic = "force-dynamic";
 
 export default async function SiteTournamentDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
-  const tournament = await getTournamentByIdForPublicSitePage(id);
-  if (!tournament) {
-    notFound();
-  }
-
-  const confirmedParticipantCount = await countApprovedApplicationsByTournamentIdFirestore(id);
-
-  const latestBracket = await getLatestBracketByTournamentIdFirestore(id);
-  const showLiveBracketEmbed =
-    Boolean(latestBracket) &&
-    (tournament.statusBadge === "마감" ||
-      tournament.statusBadge === "진행중" ||
-      tournament.statusBadge === "종료");
-
-  const outlinePdfId = outlinePdfIdFromPublicUrl(tournament.outlinePdfUrl);
-  const outlinePdfAsset = outlinePdfId ? await getOutlinePdfAssetById(outlinePdfId) : null;
-  const outlinePdfFileKind = outlineFileKindFromAsset(outlinePdfAsset);
-
-  const cookieStore = await cookies();
-  const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
-  const applyHref = session
-    ? `/site/tournaments/${id}/apply`
-    : `/login?next=${encodeURIComponent(`/site/tournaments/${id}/apply`)}`;
+  const { id: rawId } = await params;
+  const id = typeof rawId === "string" ? rawId.trim() : "";
+  if (!id) notFound();
 
   return (
     <SiteShellFrame brandTitle={<span className="site-home-brand-ellipsis">대회상세</span>}>
       <section className="site-site-gray-main v3-stack">
-        <SiteTournamentDetailSections
-          tournament={tournament}
-          applyHref={applyHref}
-          listBackHref="/site/tournaments"
-          outlinePdfFileKind={outlinePdfFileKind}
-          detailLayout="site"
-          showLiveBracketEmbed={showLiveBracketEmbed}
-          confirmedParticipantCount={confirmedParticipantCount}
-        />
+        <Suspense fallback={<SiteDetailShellBodyLoader />}>
+          <SiteTournamentDetailPageContent id={id} />
+        </Suspense>
       </section>
     </SiteShellFrame>
   );

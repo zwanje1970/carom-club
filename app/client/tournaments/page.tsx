@@ -3,7 +3,6 @@ import type { CSSProperties } from "react";
 import { cookies } from "next/headers";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../lib/auth/session";
 import { resolveCanonicalUserIdForAuth } from "../../../lib/auth/resolve-canonical-user-id-for-auth";
-import { getUserById } from "../../../lib/platform-api";
 import { listTournamentsByCreatorFirestore } from "../../../lib/server/firestore-tournaments";
 import type { Tournament, TournamentStatusBadge } from "../../../lib/types/entities";
 import TournamentCardOverflowMenu from "../tournament/TournamentCardOverflowMenu";
@@ -80,30 +79,17 @@ const secondaryActionLinkStyle: CSSProperties = {
   boxShadow: "none",
 };
 
-function listCreatorDisplayName(user: Awaited<ReturnType<typeof getUserById>>): string {
-  if (!user) return "회원";
-  const name = typeof user.name === "string" ? user.name.trim() : "";
-  if (name) return name;
-  const nick = typeof user.nickname === "string" ? user.nickname.trim() : "";
-  if (nick) return nick;
-  const login = typeof user.loginId === "string" ? user.loginId.trim() : "";
-  if (login) return login;
-  return "회원";
-}
-
 export default async function ClientTournamentsListPage() {
   const cookieStore = await cookies();
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
-  const sessionUser = session ? await getUserById(session.userId) : null;
-  const creatorLabel = listCreatorDisplayName(sessionUser);
   const tournaments = session
     ? await listTournamentsByCreatorFirestore(await resolveCanonicalUserIdForAuth(session.userId))
     : [];
 
   return (
     <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
-      <p className="v3-muted" style={{ margin: "0 0 0.5rem", fontSize: "0.875rem", lineHeight: 1.45, color: "#64748b" }}>
-        {creatorLabel}님이 생성한 대회 목록입니다.
+      <p className="v3-muted" style={{ margin: "0.12rem 0 0.35rem", fontSize: "0.8125rem", lineHeight: 1.4, color: "#94a3b8" }}>
+        대회 선택 시 대회관리로 연결됩니다.
       </p>
 
       <section>

@@ -137,7 +137,12 @@ export default function TournamentBadgeCardManageRow({
           </option>
         ))}
       </select>
-      <button type="button" className="v3-btn" disabled={applyBusy} onClick={() => void onApplyStatus()}>
+      <button
+        type="button"
+        className="client-tournament-manage__topToolBtn client-tournament-manage__topToolBtn--statusApply"
+        disabled={applyBusy}
+        onClick={() => void onApplyStatus()}
+      >
         {applyBusy ? "적용 중…" : "상태 적용"}
       </button>
     </div>
@@ -148,7 +153,7 @@ export default function TournamentBadgeCardManageRow({
       <Link
         prefetch={false}
         href={cardPublishHref}
-        className="v3-btn"
+        className="client-tournament-manage__topToolBtn client-tournament-manage__topToolBtn--cardPublish"
         style={{ flex: "1 1 auto", minWidth: "min(100%, 10rem)", textAlign: "center", textDecoration: "none" }}
       >
         게시카드 수정
@@ -156,7 +161,7 @@ export default function TournamentBadgeCardManageRow({
       <Link
         prefetch={false}
         href={editHref}
-        className="v3-btn"
+        className="client-tournament-manage__topToolBtn client-tournament-manage__topToolBtn--infoEdit"
         style={{ flex: "1 1 auto", minWidth: "min(100%, 10rem)", textAlign: "center", textDecoration: "none" }}
       >
         대회정보 수정

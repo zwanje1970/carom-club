@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";
 import { isEmptyOutlineHtml } from "../../../../lib/outline-content-helpers";
@@ -6,6 +7,7 @@ import { outlineFileKindFromAsset, outlinePdfIdFromPublicUrl } from "../../../..
 import { getOutlinePdfAssetById, getSiteVenueDetailById } from "../../../../lib/surface-read";
 import SiteOutlineDocumentCard from "../../components/SiteOutlineDocumentCard";
 import SiteShellFrame from "../../components/SiteShellFrame";
+import SiteDetailShellBodyLoader from "../../components/SiteDetailShellBodyLoader";
 import VenuesListBackLink from "../VenuesListBackLink";
 
 export const dynamic = "force-dynamic";
@@ -199,12 +201,7 @@ function htmlToPlainText(html: string): string {
     .join("\n\n");
 }
 
-export default async function SiteVenueDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
+async function SiteVenueDetailPageContent({ id }: { id: string }) {
   const venue = await getSiteVenueDetailById(id);
   if (!venue) notFound();
 
@@ -261,8 +258,7 @@ export default async function SiteVenueDetailPage({
   const telHref = telDigits.length > 0 ? `tel:${telDigits}` : "";
 
   return (
-    <SiteShellFrame brandTitle={<span className="site-home-brand-ellipsis">{venue.name}</span>}>
-      <section className="site-site-gray-main v3-stack site-detail-page-stack site-venue-detail-site">
+    <section className="site-site-gray-main v3-stack site-detail-page-stack site-venue-detail-site">
         <section className="card-clean site-detail-inner-stack site-venue-detail-hero-block">
           {heroCoverUrl ? (
             <div className="site-venue-detail-hero-cover">
@@ -449,6 +445,19 @@ export default async function SiteVenueDetailPage({
           클럽안내 목록으로
         </VenuesListBackLink>
       </section>
+  );
+}
+
+export default async function SiteVenueDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: raw } = await params;
+  const id = typeof raw === "string" ? raw.trim() : "";
+  if (!id) notFound();
+
+  return (
+    <SiteShellFrame brandTitle={<span className="site-home-brand-ellipsis">클럽상세</span>}>
+      <Suspense fallback={<SiteDetailShellBodyLoader />}>
+        <SiteVenueDetailPageContent id={id} />
+      </Suspense>
     </SiteShellFrame>
   );
 }

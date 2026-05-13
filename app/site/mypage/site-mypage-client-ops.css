@@ -1,0 +1,98 @@
+/**
+ * 마이페이지 — 클라이언트 운영관리 진입 카드 전용.
+ * SiteMypageClient.tsx 에서만 import (마이페이지 라우트 번들).
+ */
+
+.site-mypage-workspace-cta .site-mypage-menu-row.site-mypage-menu-row--client-ops {
+  border-color: rgba(37, 99, 235, 0.22);
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  box-shadow: none;
+}
+
+.site-mypage-workspace-cta .site-mypage-menu-row.site-mypage-menu-row--client-ops:hover {
+  background: linear-gradient(180deg, #eff6ff 0%, #e8eef5 100%);
+  border-color: rgba(37, 99, 235, 0.3);
+}
+
+.site-mypage-workspace-cta .site-mypage-menu-row.site-mypage-menu-row--client-ops:active {
+  background: #e2e8f0;
+  border-color: rgba(37, 99, 235, 0.25);
+}
+
+.site-mypage-workspace-cta .site-mypage-menu-row--client-ops .site-mypage-menu-row-title {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+.site-mypage-workspace-cta .site-mypage-menu-row--client-ops .site-mypage-menu-row-sub {
+  color: #94a3b8;
+}
+
+.site-mypage-workspace-cta .site-mypage-menu-row--client-ops .site-mypage-menu-pill--ops {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.site-mypage-workspace-cta .site-mypage-menu-row--client-ops .site-mypage-menu-row-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.site-mypage-workspace-cta .site-mypage-menu-row--client-ops:hover .site-mypage-menu-row-chevron {
+  background: rgba(59, 130, 246, 0.2);
+  color: #1d4ed8;
+}
+
+.site-mypage-workspace-cta .site-mypage-menu-row--client-ops:active .site-mypage-menu-row-chevron {
+  background: rgba(59, 130, 246, 0.26);
+  color: #1e40af;
+}
+
+/* 다크 메인 배경(마이페이지가 어두운 셸 위에 있을 때) — 대비 유지 */
+.site-home-dark-main .site-mypage-workspace-cta .site-mypage-menu-row.site-mypage-menu-row--client-ops {
+  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.site-home-dark-main .site-mypage-workspace-cta .site-mypage-menu-row.site-mypage-menu-row--client-ops:hover {
+  border-color: rgba(96, 165, 250, 0.45);
+  background: rgba(30, 58, 138, 0.35);
+}
+
+.site-home-dark-main .site-mypage-workspace-cta .site-mypage-menu-row--client-ops .site-mypage-menu-row-title {
+  color: #f1f5f9;
+}
+
+.site-home-dark-main .site-mypage-workspace-cta .site-mypage-menu-row--client-ops .site-mypage-menu-row-sub {
+  color: #94a3b8;
+}
+
+.site-home-dark-main .site-mypage-workspace-cta .site-mypage-menu-row--client-ops .site-mypage-menu-row-chevron {
+  background: rgba(59, 130, 246, 0.22);
+  color: #93c5fd;
+}
+
+.site-home-dark-main .site-mypage-workspace-cta .site-mypage-menu-row--client-ops:hover .site-mypage-menu-row-chevron {
+  background: rgba(59, 130, 246, 0.32);
+  color: #bfdbfe;
+}
+
+/* 모바일 표준 셸 — globals 의 workspace-cta 규칙보다 구체적으로 덮어씀 */
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-mypage-workspace-cta .site-mypage-menu-row.site-mypage-menu-row--client-ops {
+  border-color: rgba(37, 99, 235, 0.22);
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.site-shell.site-shell--ua-mobile-site .site-home-page--standard .site-mypage-workspace-cta .site-mypage-menu-row.site-mypage-menu-row--client-ops:hover {
+  background: linear-gradient(180deg, #eff6ff 0%, #e8eef5 100%);
+  border-color: rgba(37, 99, 235, 0.3);
+}

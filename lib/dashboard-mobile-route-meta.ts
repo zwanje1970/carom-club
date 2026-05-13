@@ -21,7 +21,7 @@ export function dashboardMobileChromeMeta(
 
   if (area === "client") {
     if (p === "/client") return { title: "클라이언트 운영관리", backHref: null };
-    if (p === "/client/tournaments") return { title: "대회관리", backHref: "/client" };
+    if (p === "/client/tournaments") return { title: "대회목록", backHref: "/client" };
     if (p === "/client/tournaments/new") return { title: "대회 만들기", backHref: "/client/tournaments" };
     if (p === "/client/settlement") return { title: "정산관리", backHref: "/client" };
     if (p === "/client/member") return { title: "회원관리", backHref: "/client" };
@@ -38,7 +38,7 @@ export function dashboardMobileChromeMeta(
     if (p === "/client/tournament") return { title: "대회", backHref: "/client" };
     if (/^\/client\/settlement\/[^/]+$/.test(p)) return { title: "정산 장부", backHref: "/client/settlement" };
     const tbase = clientTournamentBase(p);
-    if (tbase && p === tbase) return { title: "대회", backHref: "/client/tournaments" };
+    if (tbase && p === tbase) return { title: "대회관리", backHref: "/client/tournaments" };
     if (tbase && p.startsWith(`${tbase}/`)) {
       if (p.endsWith("/edit")) return { title: "대회 수정", backHref: tbase };
       if (p.includes("/bracket/quick-results")) return { title: "간편입력", backHref: `${tbase}/bracket` };

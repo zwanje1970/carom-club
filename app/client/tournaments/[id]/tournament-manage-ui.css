@@ -24,6 +24,15 @@
   box-sizing: border-box;
 }
 
+.client-tournament-manage .client-tournament-manage__card--hub,
+.client-tournament-manage .client-tournament-manage__card--settlementFooter {
+  box-shadow: none;
+}
+
+.client-tournament-manage .client-tournament-manage__card--hub {
+  border: 1px solid #e2e8f0;
+}
+
 .client-tournament-manage .client-tournament-manage__card--participants {
   display: flex;
   flex-direction: column;
@@ -104,6 +113,66 @@
   justify-content: center;
 }
 
+/* 상단: 상태 적용 / 게시카드 수정 / 대회정보 수정 — 역할별 톤 분리(연한 배경 + 테두리) */
+.client-tournament-manage a.client-tournament-manage__topToolBtn,
+.client-tournament-manage button.client-tournament-manage__topToolBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 40px;
+  padding: 0.45rem 0.65rem;
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25;
+  box-shadow: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.client-tournament-manage a.client-tournament-manage__topToolBtn {
+  text-decoration: none;
+}
+
+.client-tournament-manage button.client-tournament-manage__topToolBtn:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+
+.client-tournament-manage button.client-tournament-manage__topToolBtn--statusApply {
+  border: 1px solid #93c5fd;
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.client-tournament-manage button.client-tournament-manage__topToolBtn--statusApply:hover:not(:disabled) {
+  background: #dbeafe;
+  border-color: #60a5fa;
+}
+
+.client-tournament-manage a.client-tournament-manage__topToolBtn--cardPublish {
+  border: 1px solid #c4b5fd;
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.client-tournament-manage a.client-tournament-manage__topToolBtn--cardPublish:hover {
+  background: #e0e7ff;
+  border-color: #a78bfa;
+}
+
+.client-tournament-manage a.client-tournament-manage__topToolBtn--infoEdit {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.client-tournament-manage a.client-tournament-manage__topToolBtn--infoEdit:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
 .client-tournament-manage .client-tournament-manage__badgeToggleRow {
   margin-top: 0;
 }
@@ -157,8 +226,8 @@
   background: #fff;
   border-radius: var(--tm-card-radius);
   padding: 0.55rem 0.65rem;
-  box-shadow: var(--tm-card-shadow);
-  border: none;
+  box-shadow: none;
+  border: 1px solid #e2e8f0;
   box-sizing: border-box;
   min-height: 4rem;
   min-width: 0;
@@ -170,7 +239,7 @@
   opacity: 0.5;
   cursor: pointer;
   box-shadow: none;
-  border: none;
+  border: 1px dashed #cbd5e1;
   font: inherit;
   text-align: left;
 }
@@ -180,6 +249,7 @@
   cursor: not-allowed;
   pointer-events: none;
   box-shadow: none;
+  border: 1px dashed #cbd5e1;
 }
 
 .client-tournament-manage .client-tournament-manage__featureIconWrap {
@@ -526,7 +596,7 @@
   padding: 0.85rem 1rem;
   border: 2px solid rgba(37, 99, 235, 0.38);
   background: linear-gradient(145deg, #eff6ff 0%, #ffffff 52%);
-  box-shadow: 0 8px 26px rgba(37, 99, 235, 0.14);
+  box-shadow: none;
 }
 
 .client-tournament-manage a.client-tournament-manage__featureCard--participantsHero .client-tournament-manage__featureIconWrap {
@@ -616,8 +686,8 @@
   color: inherit;
   background: #fff;
   border-radius: var(--tm-card-radius);
-  box-shadow: var(--tm-card-shadow);
-  border: none;
+  box-shadow: none;
+  border: 1px solid #e2e8f0;
   box-sizing: border-box;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;

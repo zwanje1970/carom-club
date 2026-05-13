@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import LogoutButton from "../../components/LogoutButton";
 import type { MypageClientMenuPayload } from "./mypage-client-types";
+import "./site-mypage-client-ops.css";
 
 export type SiteMypageUserSummary = {
   id: string;
@@ -55,12 +56,12 @@ export default function SiteMypageClient({
     menuPayload === null ? (
       <p className="site-mypage-menu-loading v3-muted">메뉴 불러오는 중…</p>
     ) : clientApproved ? (
-      <Link prefetch={false} href="/client" className="site-mypage-menu-row site-mypage-menu-row--workspace">
+      <Link prefetch={false} href="/client" className="site-mypage-menu-row site-mypage-menu-row--workspace site-mypage-menu-row--client-ops">
         <div className="site-mypage-menu-row-main">
-          <span className="site-mypage-menu-row-title">클라이언트 대시보드</span>
+          <span className="site-mypage-menu-row-title">클라이언트 운영관리</span>
           <span className="site-mypage-menu-row-sub">
-            <span className="site-mypage-menu-pill">운영</span>
-            대회·참가자 관리
+            <span className="site-mypage-menu-pill site-mypage-menu-pill--ops">운영</span>
+            대회 운영 · 참가자 관리
           </span>
         </div>
         <span className="site-mypage-menu-row-chevron" aria-hidden>
@@ -78,12 +79,12 @@ export default function SiteMypageClient({
         </span>
       </Link>
     ) : user.role === "CLIENT" ? (
-      <Link prefetch={false} href="/client" className="site-mypage-menu-row site-mypage-menu-row--workspace">
+      <Link prefetch={false} href="/client" className="site-mypage-menu-row site-mypage-menu-row--workspace site-mypage-menu-row--client-ops">
         <div className="site-mypage-menu-row-main">
-          <span className="site-mypage-menu-row-title">클라이언트 대시보드</span>
+          <span className="site-mypage-menu-row-title">클라이언트 운영관리</span>
           <span className="site-mypage-menu-row-sub">
-            <span className="site-mypage-menu-pill">운영</span>
-            대회·참가자 관리
+            <span className="site-mypage-menu-pill site-mypage-menu-pill--ops">운영</span>
+            대회 운영 · 참가자 관리
           </span>
         </div>
         <span className="site-mypage-menu-row-chevron" aria-hidden>
@@ -172,7 +173,7 @@ export default function SiteMypageClient({
         </Link>
       </nav>
 
-      <div className="site-mypage-workspace-cta" aria-label="운영·대시보드">
+      <div className="site-mypage-workspace-cta" aria-label="운영·워크스페이스">
         {workspaceMenu}
       </div>
 

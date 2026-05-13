@@ -164,7 +164,6 @@ function IconExtrasToolbox() {
 }
 
 const MSG_TODAY_SHELL = "아래 바로가기와 메뉴에서 이어서 진행할 수 있습니다.";
-const MSG_TOURNAMENT_SHELL = "대회 목록은 전체대회 보기에서 열 수 있습니다.";
 const MSG_EXTRAS_SHELL = "설정·문의 등은 아래 링크에서 바로 열 수 있습니다.";
 
 export default function ClientDashboardHomeClient({
@@ -258,7 +257,6 @@ export default function ClientDashboardHomeClient({
   let todayButtonLabel = "";
   let todayButtonHref = "/client/setup";
   let membershipSection: ReactNode = null;
-  let tournamentListSection: ReactNode = null;
 
   if (isReady) {
     const d = state.data;
@@ -284,11 +282,11 @@ export default function ClientDashboardHomeClient({
       todayButtonHref = "/client/tournaments/new";
     } else if (!d.hasPublishedTournamentCard) {
       todayStatusText = "대회 카드를 게시해 주세요";
-      todayButtonLabel = "대회 관리";
+      todayButtonLabel = "대회목록 보기";
       todayButtonHref = "/client/tournaments";
     } else {
-      todayStatusText = "대회와 게시 카드가 준비되어 있습니다";
-      todayButtonLabel = "대회 관리";
+      todayStatusText = "대회 목록에서 대회를 선택한 뒤 관리 화면으로 들어가세요";
+      todayButtonLabel = "대회목록 보기";
       todayButtonHref = "/client/tournaments";
     }
 
@@ -331,16 +329,6 @@ export default function ClientDashboardHomeClient({
           )}
         </AdminSurface>
       ) : null;
-
-    tournamentListSection = !d.hasActiveTournament ? (
-      <p className="client-dashboard-main__tournamentEmpty">진행 중인 대회가 없습니다. 대회를 만들어 주세요.</p>
-    ) : !d.hasPublishedTournamentCard ? (
-      <p className="client-dashboard-main__tournamentEmpty">활성 대회에 게시 카드를 올려 주세요.</p>
-    ) : (
-      <p className="client-dashboard-main__tournamentEmpty" style={{ marginBottom: 0 }}>
-        대회와 게시 카드가 준비된 상태입니다. 상세는 대회 관리에서 확인하세요.
-      </p>
-    );
   }
 
   const todayBar =
@@ -415,19 +403,21 @@ export default function ClientDashboardHomeClient({
 
       {membershipSection}
 
-      <section className="v3-stack" aria-labelledby="client-ongoing-tournaments-heading" style={{ gap: "0.5rem" }}>
-        <h2 id="client-ongoing-tournaments-heading" className="v3-h2" style={{ margin: 0, fontSize: "1rem" }}>
-          진행중 대회
+      <section className="v3-stack client-dashboard-main__hubTournaments" aria-labelledby="client-hub-tournaments-heading" style={{ gap: "0.45rem" }}>
+        <h2 id="client-hub-tournaments-heading" className="v3-h2" style={{ margin: 0, fontSize: "1rem" }}>
+          대회
         </h2>
-        {isReady ? (
-          tournamentListSection
-        ) : (
-          <p className="v3-muted" style={{ margin: 0 }}>
-            {isFetchError ? pendingAreaMessage : MSG_TOURNAMENT_SHELL}
-          </p>
-        )}
-        <Link href="/client/tournaments" prefetch={false} className="client-dashboard-main__tournamentSeeAll">
-          전체대회 보기
+        <p className="v3-muted" style={{ margin: 0, fontSize: "0.88rem", lineHeight: 1.5 }}>
+          {isReady
+            ? "대회목록에서 대회를 고른 뒤, 해당 대회의 관리 화면으로 이동합니다."
+            : "요약을 불러오는 동안에도 아래에서 대회 목록으로 이동할 수 있습니다."}
+        </p>
+        <Link
+          href="/client/tournaments"
+          prefetch={false}
+          className="client-dashboard-main__tournamentSeeAll client-dashboard-main__tournamentSeeAll--primary"
+        >
+          대회목록 보기
         </Link>
       </section>
 

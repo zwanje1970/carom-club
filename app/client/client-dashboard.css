@@ -371,6 +371,32 @@ main.client-dashboard-main a.client-dashboard-main__tournamentSeeAll:hover {
   background: rgba(248, 250, 252, 0.95);
 }
 
+/** 대시보드 허브 — 대회 목록 메인 진입 */
+main.client-dashboard-main a.client-dashboard-main__tournamentSeeAll--primary {
+  display: flex;
+  align-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin-top: 0.35rem;
+  padding: 0.85rem 1.1rem;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  justify-content: center;
+  align-items: center;
+  text-decoration: none;
+  color: #ffffff;
+  border: none;
+  background: var(--ds-primary);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.22);
+}
+
+main.client-dashboard-main a.client-dashboard-main__tournamentSeeAll--primary:hover {
+  background: #1d4ed8;
+  color: #ffffff;
+}
+
 /* 기본 버튼 (강조 카드 내부 링크는 위에서 별도 지정) */
 main.client-dashboard-main .v3-btn {
   border-radius: 12px;
