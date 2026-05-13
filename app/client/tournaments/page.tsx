@@ -3,11 +3,12 @@ import { cookies } from "next/headers";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../lib/auth/session";
 import { resolveCanonicalUserIdForAuth } from "../../../lib/auth/resolve-canonical-user-id-for-auth";
 import { listTournamentsByCreatorFirestore } from "../../../lib/server/firestore-tournaments";
-import { formatTournamentScheduleLabel } from "../../../lib/tournament-schedule";
-import type { TournamentStatusBadge } from "../../../lib/types/entities";
+import type { Tournament, TournamentStatusBadge } from "../../../lib/types/entities";
 import TournamentCardOverflowMenu from "../tournament/TournamentCardOverflowMenu";
 
 export const dynamic = "force-dynamic";
+
+const KO_WEEKDAY_SHORT = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
 function statusBadgeStyle(badge: TournamentStatusBadge): { background: string; color: string } {
   if (badge === "모집중") {
@@ -33,6 +34,43 @@ function clientListBracketScaleLabel(maxParticipants: number): string {
   if (!Number.isFinite(k) || k <= 0) return "—";
   return `${k}강`;
 }
+
+/** 목록 왼쪽: 첫 일정만 `YY/MM/DD (요)` 형태 */
+function formatClientListPrimaryDateLine(t: Pick<Tournament, "date" | "eventDates">): string {
+  const dates =
+    t.eventDates && t.eventDates.length > 0
+      ? [...t.eventDates].map((d) => d.trim()).filter(Boolean).sort()
+      : t.date
+        ? [t.date.trim()].filter(Boolean)
+        : [];
+  const first = dates[0];
+  if (!first) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(first);
+  if (!m) return first;
+  const y2 = m[1]!.slice(2);
+  const mo = m[2]!;
+  const d = m[3]!;
+  const dt = new Date(`${m[1]}-${m[2]}-${m[3]}T12:00:00`);
+  const wd = Number.isNaN(dt.getTime()) ? "" : ` (${KO_WEEKDAY_SHORT[dt.getDay()]})`;
+  return `${y2}/${mo}/${d}${wd}`;
+}
+
+const secondaryActionLinkStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "0.18rem 0.42rem",
+  minHeight: 28,
+  fontSize: "0.72rem",
+  fontWeight: 600,
+  lineHeight: 1.2,
+  borderRadius: "4px",
+  border: "1px solid #e2e8f0",
+  background: "#f8fafc",
+  color: "#475569",
+  textDecoration: "none",
+  boxShadow: "none",
+};
 
 export default async function ClientTournamentsListPage() {
   const cookieStore = await cookies();
@@ -66,31 +104,31 @@ export default async function ClientTournamentsListPage() {
           >
             {tournaments.map((t, idx) => {
               const detailHref = `/client/tournaments/${t.id}`;
+              const settlementHref = `/client/settlement/${encodeURIComponent(t.id)}`;
               const bc = statusBadgeStyle(t.statusBadge);
-              const scheduleLine = formatTournamentScheduleLabel(t);
               const scale = clientListBracketScaleLabel(t.maxParticipants);
-              const venue = (t.location ?? "").trim();
+              const dateLine = formatClientListPrimaryDateLine(t);
               const isLast = idx === tournaments.length - 1;
               return (
                 <li
                   key={t.id}
                   style={{
                     borderBottom: isLast ? "none" : "1px solid #e2e8f0",
-                    padding: "0.45rem 0.5rem",
+                    padding: "0.58rem 0.55rem",
                   }}
                 >
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "minmax(3.1rem, 3.6rem) minmax(0, 1fr) auto",
-                      gap: "0.35rem 0.45rem",
+                      gridTemplateColumns: "minmax(3.25rem, 3.75rem) minmax(0, 1fr) auto",
+                      gap: "0.4rem 0.5rem",
                       alignItems: "start",
                     }}
                   >
                     <div
                       className="v3-stack"
                       style={{
-                        gap: "0.12rem",
+                        gap: "0.18rem",
                         minWidth: 0,
                         fontSize: "0.72rem",
                         lineHeight: 1.25,
@@ -100,79 +138,79 @@ export default async function ClientTournamentsListPage() {
                       }}
                     >
                       <span style={{ color: "#0f172a", fontWeight: 800 }}>{scale}</span>
-                      {scheduleLine ? (
-                        <span style={{ wordBreak: "break-all", fontWeight: 600 }}>{scheduleLine}</span>
+                      {dateLine ? (
+                        <span style={{ wordBreak: "break-all", fontWeight: 600 }}>{dateLine}</span>
                       ) : null}
                     </div>
-                    <div className="v3-stack" style={{ gap: "0.12rem", minWidth: 0 }}>
-                      <Link
-                        href={detailHref}
+                    <div className="v3-stack" style={{ gap: "0.35rem", minWidth: 0 }}>
+                      <div
+                        className="v3-row"
                         style={{
-                          textDecoration: "none",
-                          color: "#0f172a",
-                          fontWeight: 800,
-                          fontSize: "0.92rem",
-                          lineHeight: 1.25,
-                          wordBreak: "break-word",
+                          alignItems: "flex-start",
+                          gap: "0.35rem",
+                          flexWrap: "wrap",
+                          minWidth: 0,
                         }}
                       >
-                        {t.title}
-                      </Link>
-                      {venue ? (
-                        <span className="v3-muted" style={{ fontSize: "0.78rem", lineHeight: 1.3, margin: 0 }}>
-                          {venue}
+                        <Link
+                          href={detailHref}
+                          style={{
+                            textDecoration: "none",
+                            color: "#0f172a",
+                            fontWeight: 800,
+                            fontSize: "0.92rem",
+                            lineHeight: 1.25,
+                            wordBreak: "break-word",
+                            flex: "1 1 8rem",
+                            minWidth: 0,
+                          }}
+                        >
+                          {t.title}
+                        </Link>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            padding: "0.12rem 0.4rem",
+                            borderRadius: "4px",
+                            fontSize: "0.68rem",
+                            fontWeight: 800,
+                            whiteSpace: "nowrap",
+                            flexShrink: 0,
+                            ...bc,
+                          }}
+                        >
+                          {t.statusBadge}
                         </span>
-                      ) : null}
+                      </div>
+                      <div
+                        className="v3-row"
+                        style={{
+                          alignItems: "center",
+                          gap: "0.35rem",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <Link prefetch={false} href={settlementHref} style={secondaryActionLinkStyle}>
+                          대회정산
+                        </Link>
+                        <Link prefetch={false} href={`/client/tournaments/${t.id}/participants`} style={secondaryActionLinkStyle}>
+                          신청자관리
+                        </Link>
+                        <Link prefetch={false} href={`/client/tournaments/${t.id}/bracket`} style={secondaryActionLinkStyle}>
+                          대진표
+                        </Link>
+                      </div>
                     </div>
                     <div
                       style={{
-                        display: "flex",
-                        flexDirection: "row",
-                        alignItems: "flex-start",
-                        justifyContent: "flex-end",
-                        gap: "0.25rem",
+                        justifySelf: "end",
+                        alignSelf: "start",
                         flexShrink: 0,
+                        paddingTop: "0.05rem",
                       }}
                     >
-                      <span
-                        style={{
-                          display: "inline-block",
-                          padding: "0.12rem 0.4rem",
-                          borderRadius: "4px",
-                          fontSize: "0.68rem",
-                          fontWeight: 800,
-                          whiteSpace: "nowrap",
-                          ...bc,
-                        }}
-                      >
-                        {t.statusBadge}
-                      </span>
                       <TournamentCardOverflowMenu tournamentId={t.id} title={t.title} />
                     </div>
-                  </div>
-                  <div
-                    className="v3-row"
-                    style={{
-                      marginTop: "0.35rem",
-                      alignItems: "center",
-                      gap: "0.3rem",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <Link
-                      className="v3-btn"
-                      href={`/client/tournaments/${t.id}/participants`}
-                      style={{ padding: "0.28rem 0.5rem", fontSize: "0.78rem", fontWeight: 700, minHeight: 36 }}
-                    >
-                      신청자 관리
-                    </Link>
-                    <Link
-                      className="v3-btn"
-                      href={`/client/tournaments/${t.id}/bracket`}
-                      style={{ padding: "0.28rem 0.5rem", fontSize: "0.78rem", fontWeight: 700, minHeight: 36 }}
-                    >
-                      대진표
-                    </Link>
                   </div>
                 </li>
               );
