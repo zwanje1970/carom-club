@@ -357,6 +357,85 @@ function parseDashboardTournamentCreatedAtMillis(value: unknown): number {
   return 0;
 }
 
+const DASHBOARD_TOURNAMENT_GATE_FLAG_FIELDS = [
+  "createdAt",
+  "status",
+  "isDeleted",
+  "deletedAt",
+  "statusBadge",
+] as const;
+
+const DASHBOARD_GATE_FLAG_MAX_PAGES = 80;
+
+/**
+ * 대시보드 요약 전용: `종료`가 아닌 표시 가능 대회 id(제목·preview 없음). 스캔 페이지 상한 있음.
+ */
+export async function listClientUserActiveNonEndedTournamentIdsFirestore(userId: string): Promise<string[]> {
+  assertClientFirestorePersistenceConfigured();
+  const db = getSharedFirestoreDb();
+  const uid = userId.trim();
+  const fsSelect = [...DASHBOARD_TOURNAMENT_GATE_FLAG_FIELDS];
+  const out: string[] = [];
+
+  try {
+    let cursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
+    let pageIx = 0;
+    while (pageIx < DASHBOARD_GATE_FLAG_MAX_PAGES) {
+      pageIx += 1;
+      let query = db
+        .collection(COLLECTION)
+        .where("createdBy", "==", uid)
+        .orderBy("createdAt", "desc")
+        .limit(DASHBOARD_TOURNAMENT_SCAN_LIMIT)
+        .select(...fsSelect);
+      if (cursor) query = query.startAfter(cursor);
+      const page = await query.get();
+      if (page.empty) break;
+      for (const doc of page.docs) {
+        const raw = doc.data() as Record<string, unknown> | undefined;
+        if (
+          !isEntityLifecycleVisibleForList(raw?.status, {
+            legacyIsDeleted: raw?.isDeleted === true,
+          })
+        ) {
+          continue;
+        }
+        const badge = normalizeTournamentStatusBadge(raw?.statusBadge);
+        if (badge === "종료") continue;
+        out.push(doc.id);
+      }
+      cursor = page.docs[page.docs.length - 1];
+      if (page.docs.length < DASHBOARD_TOURNAMENT_SCAN_LIMIT) break;
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error ?? "");
+    if (!message.includes("FAILED_PRECONDITION")) {
+      throw error;
+    }
+    const q = await db.collection(COLLECTION).where("createdBy", "==", uid).select(...fsSelect).get();
+    const docs = q.docs.slice().sort((a, b) => {
+      const ac = parseDashboardTournamentCreatedAtMillis(a.data()?.createdAt);
+      const bc = parseDashboardTournamentCreatedAtMillis(b.data()?.createdAt);
+      return bc - ac;
+    });
+    for (const doc of docs) {
+      const raw = doc.data() as Record<string, unknown> | undefined;
+      if (
+        !isEntityLifecycleVisibleForList(raw?.status, {
+          legacyIsDeleted: raw?.isDeleted === true,
+        })
+      ) {
+        continue;
+      }
+      const badge = normalizeTournamentStatusBadge(raw?.statusBadge);
+      if (badge === "종료") continue;
+      out.push(doc.id);
+    }
+  }
+
+  return out;
+}
+
 /**
  * `/api/client/dashboard-gate` 전용: preview 생성 없이 표시 가능한 첫 대회 id만 찾는다.
  */

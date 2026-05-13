@@ -16,7 +16,16 @@ let memorySummary: ClientDashboardSummaryJson | null = null;
 function isValidSummary(v: unknown): v is ClientDashboardSummaryJson {
   if (!v || typeof v !== "object") return false;
   const o = v as Partial<ClientDashboardSummaryJson>;
-  return o.ok === true && typeof o.hasVenueIntro === "boolean";
+  return (
+    o.ok === true &&
+    typeof o.hasVenueIntro === "boolean" &&
+    typeof o.hasOrgSetup === "boolean" &&
+    typeof o.hasActiveTournament === "boolean" &&
+    typeof o.hasPublishedTournamentCard === "boolean" &&
+    typeof o.autoParticipantPushEnabled === "boolean" &&
+    o.policy != null &&
+    typeof o.policy === "object"
+  );
 }
 
 export function readClientDashboardSummaryMemory(): ClientDashboardSummaryJson | null {

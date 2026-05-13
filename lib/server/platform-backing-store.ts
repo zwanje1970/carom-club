@@ -5111,28 +5111,39 @@ export function clientVenueIntroHasMeaningfulContent(intro: ClientVenueIntroStor
   return false;
 }
 
-/** 대시보드: 전체 대회 id 배열 없이 최근 쪽 1건만 탐색 */
-export async function loadClientDashboardTournamentRollupLightForUser(userId: string): Promise<{
-  hasAnyTournament: boolean;
-  firstTournamentId: string;
-  recentTournamentsForSummary: ClientDashboardTournamentPreviewRow[];
+/** 대시보드 요약: 종료가 아닌 활성 대회 존재 여부 + 그 대회들 중 게시 카드 활성 여부(제목·preview 없음) */
+export async function getClientDashboardTournamentGateFlagsForUser(userId: string): Promise<{
+  hasActiveTournament: boolean;
+  hasPublishedTournamentCard: boolean;
 }> {
   if (isFirestoreUsersBackendConfigured()) {
     const mod = await import("./firestore-tournaments");
-    return mod.listClientDashboardTournamentFirstVisibleFirestore(userId);
+    const ids = await mod.listClientUserActiveNonEndedTournamentIdsFirestore(userId);
+    const hasActiveTournament = ids.length > 0;
+    const idSet = new Set(ids.map((id) => id.trim()).filter(Boolean));
+    const cards = await loadTournamentPublishedCardsArray();
+    const hasPublishedTournamentCard = cards.some(
+      (c) => c.isPublished === true && c.isActive === true && idSet.has(String(c.tournamentId ?? "").trim()),
+    );
+    return { hasActiveTournament, hasPublishedTournamentCard };
   }
   const store = await readLocalJsonAggregate();
   const canonicalUserId = resolveCanonicalUserId(store, userId.trim());
-  const filtered = store.tournaments
-    .filter((item) => item.createdBy === canonicalUserId)
-    .filter((item) => isEntityLifecycleVisibleForList(item.status))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  if (filtered.length === 0) return { hasAnyTournament: false, firstTournamentId: "", recentTournamentsForSummary: [] };
-  return {
-    hasAnyTournament: true,
-    firstTournamentId: filtered[0]!.id,
-    recentTournamentsForSummary: [tournamentToClientDashboardPreview(filtered[0]!)],
-  };
+  const ids: string[] = [];
+  for (const item of store.tournaments) {
+    if (item.createdBy !== canonicalUserId) continue;
+    if (!isEntityLifecycleVisibleForList(item.status)) continue;
+    const badge = normalizeTournamentStatusBadge((item as { statusBadge?: unknown }).statusBadge);
+    if (badge === "종료") continue;
+    ids.push(item.id);
+  }
+  const hasActiveTournament = ids.length > 0;
+  const idSet = new Set(ids);
+  const cards = await loadTournamentPublishedCardsArray();
+  const hasPublishedTournamentCard = cards.some(
+    (c) => c.isPublished === true && c.isActive === true && idSet.has(String(c.tournamentId ?? "").trim()),
+  );
+  return { hasActiveTournament, hasPublishedTournamentCard };
 }
 
 /** 대시보드 게이트 전용: preview 생성 없이 대회 존재 여부와 첫 대회 id만 확인한다. */

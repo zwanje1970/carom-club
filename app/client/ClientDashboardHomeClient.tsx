@@ -14,7 +14,6 @@ import {
 import ClientAutoParticipantPushToggle from "./ClientAutoParticipantPushToggle";
 import { AdminSurface } from "../components/admin/AdminCard";
 import type { ClientDashboardSummaryJson } from "./dashboard-summary-types";
-import type { TournamentStatusBadge } from "../../lib/server/platform-backing-store";
 import {
   mergeClientDashboardSummaryCache,
   persistClientDashboardSummaryCache,
@@ -22,7 +21,8 @@ import {
 } from "./dashboard-summary-cache";
 
 type SummaryState =
-  | { status: "loading" }
+  /** 요약 전·재시도 대기 — 레이아웃은 그대로, 강한 로딩 UI 없음 */
+  | { status: "shell" }
   | { status: "error"; message: string }
   | { status: "ready"; data: ClientDashboardSummaryJson; refreshWarning?: string };
 
@@ -57,12 +57,6 @@ export function useClientDashboardSummaryBootstrap(): ClientDashboardSummaryBoot
   return useContext(clientDashboardSummaryBootstrapContext);
 }
 
-type DashboardPublishedCardStatusResult =
-  | { ok: true; hasPublishedActiveForSomeTournament: boolean }
-  | { ok: false };
-
-const DASHBOARD_PUBLISHED_CARD_STATUS_DELAY_MS = 2200;
-
 async function fetchDashboardSummary(
   bootstrap: ClientDashboardSummaryBootstrap | null,
 ): Promise<DashboardFetchResult> {
@@ -94,55 +88,6 @@ async function fetchDashboardSummary(
   }
 }
 
-async function fetchDashboardPublishedCardStatus(
-  tournamentId: string,
-): Promise<DashboardPublishedCardStatusResult> {
-  const id = tournamentId.trim();
-  if (!id) return { ok: false };
-  try {
-    const res = await fetch(
-      `/api/client/dashboard-summary/published-card-status?tournamentId=${encodeURIComponent(id)}`,
-      { credentials: "same-origin" },
-    );
-    const json = (await res.json()) as
-      | { ok: true; hasPublishedActiveForSomeTournament: boolean }
-      | { ok: false; error?: string };
-    if (!res.ok || json.ok !== true) return { ok: false };
-    return {
-      ok: true,
-      hasPublishedActiveForSomeTournament:
-        json.hasPublishedActiveForSomeTournament === true,
-    };
-  } catch {
-    return { ok: false };
-  }
-}
-
-let dashboardPublishedCardStatusInFlight: Promise<DashboardPublishedCardStatusResult> | null = null;
-let dashboardPublishedCardStatusInFlightKey = "";
-
-function fetchDashboardPublishedCardStatusCoalesced(
-  tournamentId: string,
-): Promise<DashboardPublishedCardStatusResult> {
-  const key = tournamentId.trim();
-  if (!key) return Promise.resolve({ ok: false });
-  if (dashboardPublishedCardStatusInFlight && dashboardPublishedCardStatusInFlightKey === key) {
-    return dashboardPublishedCardStatusInFlight;
-  }
-  dashboardPublishedCardStatusInFlightKey = key;
-  const p = fetchDashboardPublishedCardStatus(key);
-  dashboardPublishedCardStatusInFlight = p;
-  void p.finally(() => {
-    queueMicrotask(() => {
-      if (dashboardPublishedCardStatusInFlight === p) {
-        dashboardPublishedCardStatusInFlight = null;
-        dashboardPublishedCardStatusInFlightKey = "";
-      }
-    });
-  });
-  return dashboardPublishedCardStatusInFlight;
-}
-
 let dashboardSummaryInFlight: Promise<DashboardFetchResult> | null = null;
 let dashboardSummaryInFlightKey = "";
 
@@ -163,23 +108,6 @@ function fetchDashboardSummaryCoalesced(
     });
   });
   return dashboardSummaryInFlight;
-}
-
-function clientDashboardTournamentBadgeClass(badge: TournamentStatusBadge): string {
-  switch (badge) {
-    case "모집중":
-      return "client-dashboard-main__tournamentBadge client-dashboard-main__tournamentBadge--success";
-    case "마감임박":
-      return "client-dashboard-main__tournamentBadge client-dashboard-main__tournamentBadge--warning";
-    case "진행중":
-      return "client-dashboard-main__tournamentBadge client-dashboard-main__tournamentBadge--purple";
-    case "마감":
-    case "종료":
-    case "초안":
-      return "client-dashboard-main__tournamentBadge client-dashboard-main__tournamentBadge--neutral";
-    case "예정":
-      return "client-dashboard-main__tournamentBadge client-dashboard-main__tournamentBadge--purple";
-  }
 }
 
 function IconTournamentLine() {
@@ -235,31 +163,17 @@ function IconExtrasToolbox() {
   );
 }
 
-function formatTournamentCardSubtitle(t: { date: string; maxParticipants: number }): string {
-  const date = (t.date ?? "").trim() || "—";
-  const n = t.maxParticipants;
-  const g = typeof n === "number" && Number.isFinite(n) && n > 0 ? `${Math.floor(n)}강` : "—";
-  return `${date} / ${g}`;
-}
-
-const MSG_TODAY_LOADING = "오늘 할 일을 불러오는 중";
-const MSG_TOURNAMENT_LOADING = "대회 정보를 불러오는 중";
-const MSG_ORG_LOADING = "업체 정보를 불러오는 중";
+const MSG_TODAY_SHELL = "아래 바로가기와 메뉴에서 이어서 진행할 수 있습니다.";
+const MSG_TOURNAMENT_SHELL = "대회 목록은 전체대회 보기에서 열 수 있습니다.";
+const MSG_EXTRAS_SHELL = "설정·문의 등은 아래 링크에서 바로 열 수 있습니다.";
 
 export default function ClientDashboardHomeClient({
   bootstrap,
 }: {
   bootstrap?: ClientDashboardSummaryBootstrap | null;
 }) {
-  const [state, setState] = useState<SummaryState>({ status: "loading" });
-  const [publishedCardStatus, setPublishedCardStatus] = useState<{
-    tournamentId: string;
-    state: "idle" | "checking" | "resolved" | "failed";
-  }>({ tournamentId: "", state: "idle" });
+  const [state, setState] = useState<SummaryState>({ status: "shell" });
   const extrasDetailsRef = useRef<HTMLDetailsElement>(null);
-  const didStartInitialLoadRef = useRef(false);
-  const publishedCardStatusInFlightForRef = useRef<string>("");
-  const publishedCardStatusCompletedTidRef = useRef<string>("");
 
   const onExtrasToggle = useCallback((e: SyntheticEvent<HTMLDetailsElement>) => {
     if (!e.currentTarget.open) return;
@@ -269,141 +183,59 @@ export default function ClientDashboardHomeClient({
   }, []);
 
   useEffect(() => {
-    if (didStartInitialLoadRef.current) return;
-    didStartInitialLoadRef.current = true;
-
     const snapshot = readClientDashboardSummaryCache();
     if (snapshot) {
       setState({ status: "ready", data: snapshot });
     }
-    void (async () => {
-      const r = await fetchDashboardSummaryCoalesced(bootstrap ?? null);
-      if (r.ok) {
-        const cached = readClientDashboardSummaryCache();
-        const merged =
-          cached &&
-          cached.firstTournamentId.trim() === r.data.firstTournamentId.trim() &&
-          cached.hasPublishedActiveForSomeTournament === true &&
-          r.data.hasPublishedActiveForSomeTournament === false
-            ? { ...r.data, hasPublishedActiveForSomeTournament: true }
-            : r.data;
-        persistClientDashboardSummaryCache(merged);
-        setState({ status: "ready", data: merged });
-      } else if (snapshot) {
-        setState({ status: "ready", data: snapshot, refreshWarning: r.message });
-      } else {
-        setState({ status: "error", message: r.message });
-      }
-    })();
-  }, [bootstrap]);
 
-  const publishedCardSummaryReady = state.status === "ready";
-  const publishedCardHasAnyTournament = publishedCardSummaryReady && state.data.hasAnyTournament;
-  const publishedCardTid = publishedCardSummaryReady ? state.data.firstTournamentId.trim() : "";
-
-  useEffect(() => {
-    if (!publishedCardSummaryReady) return;
-    const tid = publishedCardTid;
-    if (!publishedCardHasAnyTournament || !tid) {
-      publishedCardStatusCompletedTidRef.current = "";
-      setPublishedCardStatus((prev) =>
-        prev.state === "idle" && prev.tournamentId === "" ? prev : { tournamentId: "", state: "idle" },
-      );
-      return;
-    }
-    if (publishedCardStatusCompletedTidRef.current === tid) {
-      return;
-    }
-    setPublishedCardStatus((prev) => {
-      if (prev.tournamentId !== tid) return { tournamentId: tid, state: "checking" };
-      if (prev.state === "idle" || prev.state === "failed") return { tournamentId: tid, state: "checking" };
-      return prev;
-    });
-    if (publishedCardStatusInFlightForRef.current === tid) return;
-    publishedCardStatusInFlightForRef.current = tid;
     let cancelled = false;
-    const w = window as Window & {
-      requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
-      cancelIdleCallback?: (id: number) => void;
-    };
-    let timerId: number | null = null;
-    let idleId: number | null = null;
-    const run = () => {
+    const load = () => {
       if (cancelled) return;
       void (async () => {
-        const r = await fetchDashboardPublishedCardStatusCoalesced(tid);
+        const r = await fetchDashboardSummaryCoalesced(bootstrap ?? null);
         if (cancelled) return;
-        if (publishedCardStatusInFlightForRef.current === tid) {
-          publishedCardStatusInFlightForRef.current = "";
+        if (r.ok) {
+          const cached = readClientDashboardSummaryCache();
+          const merged =
+            cached &&
+            cached.hasPublishedTournamentCard === true &&
+            r.data.hasPublishedTournamentCard === false
+              ? { ...r.data, hasPublishedTournamentCard: true }
+              : r.data;
+          persistClientDashboardSummaryCache(merged);
+          setState({ status: "ready", data: merged });
+        } else if (snapshot) {
+          setState({ status: "ready", data: snapshot, refreshWarning: r.message });
+        } else {
+          setState({ status: "error", message: r.message });
         }
-        if (!r.ok) {
-          publishedCardStatusCompletedTidRef.current = tid;
-          setPublishedCardStatus((prev) =>
-            prev.tournamentId === tid ? { tournamentId: tid, state: "failed" } : prev,
-          );
-          return;
-        }
-        publishedCardStatusCompletedTidRef.current = tid;
-        mergeClientDashboardSummaryCache({
-          hasPublishedActiveForSomeTournament: r.hasPublishedActiveForSomeTournament,
-        });
-        setPublishedCardStatus({ tournamentId: tid, state: "resolved" });
-        setState((prev) => {
-          if (prev.status !== "ready") return prev;
-          if (prev.data.firstTournamentId.trim() !== tid) return prev;
-          if (
-            prev.data.hasPublishedActiveForSomeTournament ===
-            r.hasPublishedActiveForSomeTournament
-          ) {
-            return prev;
-          }
-          return {
-            ...prev,
-            data: {
-              ...prev.data,
-              hasPublishedActiveForSomeTournament:
-                r.hasPublishedActiveForSomeTournament,
-            },
-          };
-        });
       })();
     };
-    void (async () => {
-      timerId = window.setTimeout(() => {
-        if (typeof w.requestIdleCallback === "function") {
-          idleId = w.requestIdleCallback(run, { timeout: 1500 });
-          return;
-        }
-        run();
-      }, DASHBOARD_PUBLISHED_CARD_STATUS_DELAY_MS);
-    })();
+
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        if (!cancelled) load();
+      });
+    });
     return () => {
       cancelled = true;
-      if (timerId != null) window.clearTimeout(timerId);
-      if (idleId != null && typeof w.cancelIdleCallback === "function") {
-        w.cancelIdleCallback(idleId);
-      }
-      if (publishedCardStatusInFlightForRef.current === tid) {
-        publishedCardStatusInFlightForRef.current = "";
-      }
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
     };
-  }, [publishedCardSummaryReady, publishedCardHasAnyTournament, publishedCardTid]);
+  }, [bootstrap]);
 
   const handleRetry = useCallback(() => {
-    publishedCardStatusCompletedTidRef.current = "";
-    publishedCardStatusInFlightForRef.current = "";
-    setPublishedCardStatus({ tournamentId: "", state: "idle" });
-    setState({ status: "loading" });
+    setState({ status: "shell" });
     void (async () => {
       const r = await fetchDashboardSummaryCoalesced(bootstrap ?? null);
       if (r.ok) {
         const cached = readClientDashboardSummaryCache();
         const merged =
           cached &&
-          cached.firstTournamentId.trim() === r.data.firstTournamentId.trim() &&
-          cached.hasPublishedActiveForSomeTournament === true &&
-          r.data.hasPublishedActiveForSomeTournament === false
-            ? { ...r.data, hasPublishedActiveForSomeTournament: true }
+          cached.hasPublishedTournamentCard === true &&
+          r.data.hasPublishedTournamentCard === false
+            ? { ...r.data, hasPublishedTournamentCard: true }
             : r.data;
         persistClientDashboardSummaryCache(merged);
         setState({ status: "ready", data: merged });
@@ -425,26 +257,11 @@ export default function ClientDashboardHomeClient({
   let todayStatusText = "";
   let todayButtonLabel = "";
   let todayButtonHref = "/client/setup";
-  let ongoingTournamentsToRender: ClientDashboardSummaryJson["recentTournaments"] = [];
   let membershipSection: ReactNode = null;
   let tournamentListSection: ReactNode = null;
 
   if (isReady) {
     const d = state.data;
-    const firstTournamentId = d.firstTournamentId.trim();
-    const isPublishedCardStatusPending =
-      d.hasAnyTournament &&
-      firstTournamentId !== "" &&
-      d.hasPublishedActiveForSomeTournament !== true &&
-      publishedCardStatus.tournamentId === firstTournamentId &&
-      publishedCardStatus.state === "checking";
-    const isPublishedCardStatusUnknown =
-      d.hasAnyTournament &&
-      firstTournamentId !== "" &&
-      d.hasPublishedActiveForSomeTournament !== true &&
-      (publishedCardStatus.tournamentId !== firstTournamentId ||
-        publishedCardStatus.state === "checking" ||
-        publishedCardStatus.state === "failed");
     const policy = d.policy;
     const membershipLabel =
       policy.membershipState === "ACTIVE"
@@ -461,27 +278,19 @@ export default function ClientDashboardHomeClient({
       todayStatusText = "당구장 소개를 작성하세요";
       todayButtonLabel = "작성하기";
       todayButtonHref = "/client/setup/venue-intro";
-    } else if (!d.hasAnyTournament) {
-      todayStatusText = "대회를 개최하세요";
+    } else if (!d.hasActiveTournament) {
+      todayStatusText = "대회를 만들어 주세요";
       todayButtonLabel = "대회 만들기";
       todayButtonHref = "/client/tournaments/new";
-    } else if (isPublishedCardStatusPending || isPublishedCardStatusUnknown) {
-      todayStatusText = "게시카드 상태를 확인 중입니다";
+    } else if (!d.hasPublishedTournamentCard) {
+      todayStatusText = "대회 카드를 게시해 주세요";
       todayButtonLabel = "대회 관리";
-      todayButtonHref = d.firstTournamentId ? `/client/tournaments/${d.firstTournamentId}` : "/client/tournaments";
-    } else if (!d.hasPublishedActiveForSomeTournament) {
-      todayStatusText = "메인에 대회 홍보용 카드를 게시하세요";
-      todayButtonLabel = "게시카드 작성";
-      todayButtonHref = d.firstTournamentId
-        ? `/client/tournaments/${d.firstTournamentId}/card-publish-v2`
-        : "/client/tournaments/new";
+      todayButtonHref = "/client/tournaments";
     } else {
-      todayStatusText = "진행중인 대회가 있습니다";
+      todayStatusText = "대회와 게시 카드가 준비되어 있습니다";
       todayButtonLabel = "대회 관리";
-      todayButtonHref = d.firstTournamentId ? `/client/tournaments/${d.firstTournamentId}` : "/client/tournaments";
+      todayButtonHref = "/client/tournaments";
     }
-
-    ongoingTournamentsToRender = d.recentTournaments.slice(0, 1);
 
     membershipSection =
       policy.annualMembershipVisible ? (
@@ -523,27 +332,15 @@ export default function ClientDashboardHomeClient({
         </AdminSurface>
       ) : null;
 
-    tournamentListSection =
-      d.recentTournaments.length === 0 ? (
-        <p className="client-dashboard-main__tournamentEmpty">진행중 대회가 없습니다</p>
-      ) : (
-        <ul className="v3-stack client-dashboard-main__tournamentList" style={{ listStyle: "none", margin: 0, padding: 0 }}>
-          {ongoingTournamentsToRender.map((t) => (
-            <li key={t.id} className="v3-stack client-dashboard-main__dsCard client-dashboard-main__tournamentCard">
-              <div className="client-dashboard-main__tournamentTop">
-                <div className="client-dashboard-main__tournamentTitle">{t.title}</div>
-                <span className={clientDashboardTournamentBadgeClass(t.statusBadge)}>{t.statusBadge}</span>
-              </div>
-              <div className="client-dashboard-main__tournamentMeta">{formatTournamentCardSubtitle(t)}</div>
-              <div className="client-dashboard-main__tournamentActions">
-                <Link className="client-dashboard-main__tournamentManage" href={`/client/tournaments/${t.id}`} prefetch={false}>
-                  관리하기
-                </Link>
-              </div>
-            </li>
-          ))}
-        </ul>
-      );
+    tournamentListSection = !d.hasActiveTournament ? (
+      <p className="client-dashboard-main__tournamentEmpty">진행 중인 대회가 없습니다. 대회를 만들어 주세요.</p>
+    ) : !d.hasPublishedTournamentCard ? (
+      <p className="client-dashboard-main__tournamentEmpty">활성 대회에 게시 카드를 올려 주세요.</p>
+    ) : (
+      <p className="client-dashboard-main__tournamentEmpty" style={{ marginBottom: 0 }}>
+        대회와 게시 카드가 준비된 상태입니다. 상세는 대회 관리에서 확인하세요.
+      </p>
+    );
   }
 
   const todayBar =
@@ -587,22 +384,23 @@ export default function ClientDashboardHomeClient({
         </button>
       </div>
     ) : (
-      <div
-        className="client-dashboard-main__todayBar"
-        aria-busy="true"
-        aria-live="polite"
-        aria-labelledby="client-today-heading"
+      <Link
+        href="/client/setup"
+        prefetch={false}
+        className="client-dashboard-main__todayBar client-dashboard-main__todayBarLink"
+        aria-labelledby="client-today-heading client-today-cta-label"
+        aria-describedby="client-today-status"
       >
         <h2 id="client-today-heading" className="client-dashboard-main__todayBarHeading">
           지금 할 일
         </h2>
         <p id="client-today-status" className="client-dashboard-main__todayBarText">
-          {MSG_TODAY_LOADING}
+          {MSG_TODAY_SHELL}
         </p>
-        <span className="client-dashboard-main__todayBarBtn" aria-hidden>
-          …
+        <span id="client-today-cta-label" className="client-dashboard-main__todayBarBtn" aria-hidden="true">
+          업체 설정
         </span>
-      </div>
+      </Link>
     );
 
   return (
@@ -625,7 +423,7 @@ export default function ClientDashboardHomeClient({
           tournamentListSection
         ) : (
           <p className="v3-muted" style={{ margin: 0 }}>
-            {isFetchError ? pendingAreaMessage : MSG_TOURNAMENT_LOADING}
+            {isFetchError ? pendingAreaMessage : MSG_TOURNAMENT_SHELL}
           </p>
         )}
         <Link href="/client/tournaments" prefetch={false} className="client-dashboard-main__tournamentSeeAll">
@@ -694,7 +492,7 @@ export default function ClientDashboardHomeClient({
           <div className="client-dashboard-main__extrasList">
             {!isReady ? (
               <p className="v3-muted" style={{ margin: 0, padding: "0.25rem 0" }}>
-                {isFetchError ? pendingAreaMessage : MSG_ORG_LOADING}
+                {isFetchError ? pendingAreaMessage : MSG_EXTRAS_SHELL}
               </p>
             ) : null}
             {isReady ? (

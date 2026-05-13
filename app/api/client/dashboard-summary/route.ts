@@ -4,20 +4,17 @@ import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/au
 import {
   clientVenueIntroHasMeaningfulContent,
   getClientDashboardPolicyAndOrganization,
+  getClientDashboardTournamentGateFlagsForUser,
   getClientStatusByUserId,
   getClientVenueIntroByUserId,
   getUserById,
-  loadClientDashboardTournamentRollupLightForUser,
   resolveClientOrganizationForDashboardPolicy,
 } from "../../../../lib/platform-api";
-import type {
-  ClientDashboardSummaryJson,
-  ClientDashboardSummaryTournament,
-} from "../../../client/dashboard-summary-types";
+import type { ClientDashboardSummaryJson } from "../../../client/dashboard-summary-types";
 
 export const runtime = "nodejs";
 
-export type { ClientDashboardSummaryJson, ClientDashboardSummaryTournament };
+export type { ClientDashboardSummaryJson };
 
 type DashboardSummaryBootstrapHint = {
   userId?: unknown;
@@ -86,24 +83,20 @@ async function buildDashboardSummaryResponse(hint: ReturnType<typeof normalizeBo
   }
 
   try {
-    const [{ policy, org }, intro, rollupLight] = await Promise.all([
+    const [{ policy, org }, intro, gate] = await Promise.all([
       getClientDashboardPolicyAndOrganization(userId),
       getClientVenueIntroByUserId(userId),
-      loadClientDashboardTournamentRollupLightForUser(userId),
+      getClientDashboardTournamentGateFlagsForUser(userId),
     ]);
 
     const hasVenueIntro = clientVenueIntroHasMeaningfulContent(intro);
-    const firstTournamentId = rollupLight.firstTournamentId.trim();
 
     const body: ClientDashboardSummaryJson = {
       ok: true,
       hasOrgSetup: Boolean(org?.setupCompleted),
       hasVenueIntro,
-      hasAnyTournament: rollupLight.hasAnyTournament,
-      /** 대표 대회 게시카드 활성 여부는 후속 경량 API에서 지연 확인 */
-      hasPublishedActiveForSomeTournament: false,
-      firstTournamentId,
-      recentTournaments: rollupLight.recentTournamentsForSummary as ClientDashboardSummaryTournament[],
+      hasActiveTournament: gate.hasActiveTournament,
+      hasPublishedTournamentCard: gate.hasPublishedTournamentCard,
       autoParticipantPushEnabled: org?.autoParticipantPushEnabled !== false,
       policy: {
         annualMembershipVisible: policy.annualMembershipVisible,
