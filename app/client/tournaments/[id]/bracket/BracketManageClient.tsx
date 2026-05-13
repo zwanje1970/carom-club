@@ -689,9 +689,16 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   const bracketViewFullscreenPath = useMemo(() => {
     const base = `/client/tournaments/${tournamentId}/bracket/view`;
     if (bracket && bracketLooksLikeSplitLayout(bracket)) {
-      return bracketZoneQuery ? `${base}${bracketZoneQuery}&viewMode=merged` : `${base}?viewMode=merged`;
+      return bracketZoneQuery ? `${base}${bracketZoneQuery}&viewMode=originalFull` : `${base}?viewMode=originalFull`;
     }
     return `${base}${bracketZoneQuery}`;
+  }, [bracket, bracketZoneQuery, tournamentId]);
+
+  /** 통합(A조+B조+결선) 보기 — `viewMode=merged` 유지 */
+  const bracketViewMergedFullPath = useMemo(() => {
+    const base = `/client/tournaments/${tournamentId}/bracket/view`;
+    if (!bracket || !bracketLooksLikeSplitLayout(bracket)) return `${base}${bracketZoneQuery}`;
+    return bracketZoneQuery ? `${base}${bracketZoneQuery}&viewMode=merged` : `${base}?viewMode=merged`;
   }, [bracket, bracketZoneQuery, tournamentId]);
 
   const quickResultsHref = useMemo(
@@ -2960,9 +2967,32 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             대진표 보기 (전체 화면)
           </button>
           {bracket && bracketLooksLikeSplitLayout(bracket) ? (
-            <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem", lineHeight: 1.45 }}>
-              예선 조와 결선을 한 화면에서 통합해 봅니다. 조 탭 선택과 무관합니다.
-            </p>
+            <>
+              <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem", lineHeight: 1.45 }}>
+                전체 화면은 분할 전 단일 트리(`rounds`)가 저장된 경우에만 표시됩니다. 조분할 직후에는 저장된 원본이 없을 수 있습니다.
+              </p>
+              <button
+                type="button"
+                onClick={() => router.push(bracketViewMergedFullPath)}
+                style={{
+                  width: "100%",
+                  minHeight: "48px",
+                  borderRadius: "8px",
+                  border: "1px solid #64748b",
+                  background: "#fff",
+                  color: "#334155",
+                  fontWeight: 700,
+                  fontSize: "0.95rem",
+                  boxShadow: "none",
+                  cursor: "pointer",
+                }}
+              >
+                통합 대진표 보기
+              </button>
+              <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem", lineHeight: 1.45 }}>
+                예선 조와 결선을 한 화면에 나열합니다. 조 탭 선택과 무관합니다.
+              </p>
+            </>
           ) : null}
           <div>
             <p style={{ margin: "0 0 0.45rem", fontWeight: 800, fontSize: "0.9rem", color: "#0f172a" }}>TV 연결</p>

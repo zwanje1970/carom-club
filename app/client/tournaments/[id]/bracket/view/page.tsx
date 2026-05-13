@@ -79,6 +79,10 @@ export default function TournamentBracketBoardViewPage() {
   const searchParams = useSearchParams();
   const tournamentId = useMemo(() => (typeof params.id === "string" ? params.id : ""), [params.id]);
   const urlZoneId = useMemo(() => searchParams.get("zoneId")?.trim() ?? "", [searchParams]);
+  const viewModeOriginalFull = useMemo(
+    () => searchParams.get("viewMode")?.trim() === "originalFull",
+    [searchParams],
+  );
 
   const [zonesEnabled, setZonesEnabled] = useState(false);
   const [zoneOptions, setZoneOptions] = useState<{ id: string; zoneName: string }[]>([]);
@@ -971,6 +975,11 @@ export default function TournamentBracketBoardViewPage() {
     const structuralChange = prevBracketId !== bracket.id || prevSig !== blockSig;
     sliceMetaRef.current = { bracketId: bracket.id, blockSig };
 
+    if (searchParams.get("viewMode")?.trim() === "originalFull") {
+      setBoardSliceKey(null);
+      return;
+    }
+
     const readStoredSlice = (): string | null => {
       if (!sliceStorageKey || typeof window === "undefined") return null;
       try {
@@ -1053,6 +1062,14 @@ export default function TournamentBracketBoardViewPage() {
 
   const boardBracket = useMemo(() => {
     if (!bracket) return null;
+    if (viewModeOriginalFull) {
+      if (bracket.bracketMode === "multi_block") {
+        const root = bracket.rounds;
+        if (!root?.length) return null;
+        return { id: `${bracket.id}:originalFull`, rounds: root };
+      }
+      return { id: `${bracket.id}:root`, rounds: bracket.rounds };
+    }
     let rounds: BracketRoundView[];
     if (bracket.bracketMode === "multi_block" && boardSliceKey) {
       if (boardSliceKey === "merged" && bracketViewMergedStacks?.length) {
@@ -1070,7 +1087,7 @@ export default function TournamentBracketBoardViewPage() {
     }
     const suffix = boardSliceKey ?? "root";
     return { id: `${bracket.id}:${suffix}`, rounds };
-  }, [bracket, boardSliceKey, bracketViewMergedStacks]);
+  }, [bracket, boardSliceKey, bracketViewMergedStacks, viewModeOriginalFull]);
 
   const viewStateStorageKey = useMemo(() => {
     if (!tournamentId || !boardBracket) return undefined;
@@ -1083,15 +1100,15 @@ export default function TournamentBracketBoardViewPage() {
   const connectivityHint = !navigatorOnline ? "오프라인" : bracketSyncBusy ? "연결 복구 중" : "";
 
   const bracketViewSlicePicker =
-    bracket?.bracketMode === "multi_block" && bracket.blocks?.length
-      ? {
+    viewModeOriginalFull || !(bracket?.bracketMode === "multi_block" && bracket.blocks?.length)
+      ? null
+      : {
           blocks: bracket.blocks.map((bl) => ({ id: bl.id, label: bl.label })),
           hasFinal: Boolean(bracket.finalBlock?.rounds?.length),
           hasMerged: true,
           boardSliceKey,
           onSliceChange: handleBoardSliceChange,
-        }
-      : null;
+        };
 
   const bracketViewZones = zonesEnabled
     ? {
@@ -1168,6 +1185,31 @@ export default function TournamentBracketBoardViewPage() {
           >
             <p>아직 확정된 대진표가 없습니다.</p>
           </div>
+        ) : viewModeOriginalFull &&
+          bracket.bracketMode === "multi_block" &&
+          (!bracket.rounds || bracket.rounds.length === 0) ? (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "grid",
+              placeItems: "center",
+              color: "#e2e8f0",
+              padding: "1rem",
+              textAlign: "center",
+              maxWidth: "26rem",
+              margin: "0 auto",
+            }}
+          >
+            <p style={{ margin: "0 0 0.75rem", fontSize: "0.95rem", fontWeight: 700 }}>
+              분할 전 단일 대진표 데이터가 없습니다.
+            </p>
+            <p style={{ margin: 0, fontSize: "0.88rem", lineHeight: 1.55, color: "#cbd5e1" }}>
+              조분할 시 서버 문서의 루트 <code style={{ color: "#f1f5f9" }}>rounds</code>가 비워지며, 원본 전체 트리는
+              현재 스키마에 보관되지 않습니다. 「통합 대진표 보기」로 예선·결선을 한 화면에서 확인하거나, 대진표 관리의
+              「위험 작업」에서 분할 취소 후 단일 예선으로 복귀할 수 있습니다.
+            </p>
+          </div>
         ) : boardBracket ? (
           <div
             style={{
@@ -1208,7 +1250,7 @@ export default function TournamentBracketBoardViewPage() {
               tournamentDate={tournamentDate}
               tournamentLocation={tournamentLocation}
               shuffleRoundHidden={bracket?.bracketMode === "multi_block"}
-              interactionDisabled={isTournamentClosed || boardSliceKey === "merged"}
+              interactionDisabled={isTournamentClosed || boardSliceKey === "merged" || viewModeOriginalFull}
               actionBusy={actionBusy}
               canUndo={false}
               saveStateText={saveStateText}
