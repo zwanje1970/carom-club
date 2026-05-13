@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import FilterButton from "../components/FilterButton";
 import SiteShellFrame from "../components/SiteShellFrame";
 import SiteListImage160 from "../components/SiteListImage160";
@@ -117,6 +119,7 @@ type Props = {
 };
 
 export default function SiteVenuesBoard({ initialRows }: Props) {
+  const router = useRouter();
   const listTransition = useVenuesListDetailTransition();
   const [memoryCoords, setMemoryCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [showDeniedHint, setShowDeniedHint] = useState(false);
@@ -350,8 +353,13 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
                   href={`/site/venues/${row.venueId}`}
                   onClick={(ev) => {
                     if (!shouldSaveScrollBeforeDetailNavigate(ev)) return;
-                    listTransition?.signalForwardIntent();
+                    const href = `/site/venues/${row.venueId}`;
+                    ev.preventDefault();
+                    flushSync(() => {
+                      listTransition?.beginForwardOpening(href);
+                    });
                     saveScrollBeforeDetail();
+                    router.push(href);
                   }}
                 >
                   <div className="site-venue-list-thumb">

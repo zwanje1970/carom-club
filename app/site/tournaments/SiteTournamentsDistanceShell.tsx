@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { flushSync } from "react-dom";
 import SiteShellFrame from "../components/SiteShellFrame";
 import SiteListImage160 from "../components/SiteListImage160";
 import TournamentsFilterBar from "./tournaments-filter-bar";
@@ -97,6 +99,7 @@ type Props = {
 };
 
 export default function SiteTournamentsDistanceShell({ rows, searchParams, currentStatus }: Props) {
+  const router = useRouter();
   const listTransition = useTournamentsListDetailTransition();
   const listScrollSignature = useMemo(() => buildTournamentsListScrollSignature(searchParams), [searchParams]);
   const didRestoreForSignatureRef = useRef<string | null>(null);
@@ -139,8 +142,13 @@ export default function SiteTournamentsDistanceShell({ rows, searchParams, curre
                   href={`/site/tournaments/${tournament.id}`}
                   onClick={(ev) => {
                     if (!shouldSaveScrollBeforeDetailNavigate(ev)) return;
-                    listTransition?.signalForwardIntent();
+                    const href = `/site/tournaments/${tournament.id}`;
+                    ev.preventDefault();
+                    flushSync(() => {
+                      listTransition?.beginForwardOpening(href);
+                    });
                     saveScrollBeforeDetail();
+                    router.push(href);
                   }}
                 >
                   <div className="site-tournament-list-left">

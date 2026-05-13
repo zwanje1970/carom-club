@@ -15,12 +15,14 @@ export default async function SiteMypagePage() {
     redirect("/login?next=/site/mypage");
   }
 
-  const user = await getUserById(session.userId);
+  const [user, headerList] = await Promise.all([
+    getUserById(session.userId),
+    headers(),
+  ]);
   if (!user) {
     redirect("/login?next=/site/mypage");
   }
 
-  const headerList = await headers();
   const hidePlatformDashboardLink = isCaromClubMobileAppShell(headerList);
 
   return (

@@ -60,9 +60,11 @@ async function loadViewerContext(postAuthorUserId: string): Promise<ViewerContex
     return { isLoggedIn: true, currentUserId: null, canManageAuthor: false, canDeletePost: false };
   }
 
-  const canManageAuthor = await isCommunityPostAuthor(postAuthorUserId, user.id);
-  const canPlatformDelete =
-    user.role === "PLATFORM" && !isCaromClubMobileAppShell(await headers());
+  const [canManageAuthor, requestHeaders] = await Promise.all([
+    isCommunityPostAuthor(postAuthorUserId, user.id),
+    headers(),
+  ]);
+  const canPlatformDelete = user.role === "PLATFORM" && !isCaromClubMobileAppShell(requestHeaders);
   return {
     isLoggedIn: true,
     currentUserId: user.id,

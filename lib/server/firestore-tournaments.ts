@@ -245,6 +245,30 @@ export async function getTournamentDateLocationFieldsByIdsFirestore(
   return out;
 }
 
+/** 마이페이지 신청/이력용: 대회 문서의 `title`·`date`만 배치 조회(정규화 없음). */
+export async function getTournamentTitleDateFieldsByIdsFirestore(
+  tournamentIds: string[],
+): Promise<Map<string, { title: string; date: string }>> {
+  assertClientFirestorePersistenceConfigured();
+  const unique = [...new Set(tournamentIds.map((id) => String(id).trim()).filter(Boolean))];
+  const out = new Map<string, { title: string; date: string }>();
+  if (unique.length === 0) return out;
+  const db = getSharedFirestoreDb();
+  for (let i = 0; i < unique.length; i += 10) {
+    const chunk = unique.slice(i, i + 10);
+    const refs = chunk.map((id) => db.collection(COLLECTION).doc(id));
+    const snaps = await db.getAll(...refs);
+    for (const snap of snaps) {
+      if (!snap.exists) continue;
+      const data = snap.data() as Record<string, unknown> | undefined;
+      const title = typeof data?.title === "string" ? data.title : "";
+      const date = typeof data?.date === "string" ? data.date : "";
+      out.set(snap.id, { title, date });
+    }
+  }
+  return out;
+}
+
 export async function setTournamentReminderSentAtFirestore(tournamentId: string): Promise<void> {
   assertClientFirestorePersistenceConfigured();
   const tid = tournamentId.trim();

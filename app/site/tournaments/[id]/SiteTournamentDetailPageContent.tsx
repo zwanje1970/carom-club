@@ -16,8 +16,10 @@ type BaseProps = {
 };
 
 async function TournamentDetailSupplementSections({ id, tournament, applyHref }: BaseProps) {
-  const confirmedParticipantCount = await countApprovedApplicationsByTournamentIdFirestore(id);
-  const latestBracket = await getLatestBracketByTournamentIdFirestore(id);
+  const [confirmedParticipantCount, latestBracket] = await Promise.all([
+    countApprovedApplicationsByTournamentIdFirestore(id),
+    getLatestBracketByTournamentIdFirestore(id),
+  ]);
   const showLiveBracketEmbed =
     Boolean(latestBracket) &&
     (tournament.statusBadge === "마감" ||
@@ -25,7 +27,8 @@ async function TournamentDetailSupplementSections({ id, tournament, applyHref }:
       tournament.statusBadge === "종료");
 
   const outlinePdfId = outlinePdfIdFromPublicUrl(tournament.outlinePdfUrl);
-  const outlinePdfAsset = outlinePdfId ? await getOutlinePdfAssetById(outlinePdfId) : null;
+  const outlinePdfAssetPromise = outlinePdfId ? getOutlinePdfAssetById(outlinePdfId) : Promise.resolve(null);
+  const outlinePdfAsset = await outlinePdfAssetPromise;
   const outlinePdfFileKind = outlineFileKindFromAsset(outlinePdfAsset);
 
   return (

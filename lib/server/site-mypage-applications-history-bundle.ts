@@ -1,7 +1,6 @@
 import type { TournamentApplicationStatus } from "./platform-backing-store";
 import { listTournamentApplicationsByUserIdFirestore } from "./firestore-tournament-applications";
-import { getTournamentByIdFirestore } from "./firestore-tournaments";
-import type { Tournament } from "../types/entities";
+import { getTournamentTitleDateFieldsByIdsFirestore } from "./firestore-tournaments";
 import type { MypageApplicationStatusLabelInput } from "../site/mypage-tournament-application-status-label";
 
 export type MypageApplicationRowPayload = MypageApplicationStatusLabelInput & {
@@ -27,12 +26,11 @@ function isTournamentOngoing(dateText: string): boolean {
 
 async function loadJoinedApplicationsWithTournaments(userId: string) {
   const applications = await listTournamentApplicationsByUserIdFirestore(userId);
-  return Promise.all(
-    applications.map(async (application) => ({
-      application,
-      tournament: await getTournamentByIdFirestore(application.tournamentId),
-    })),
-  );
+  const byTournamentId = await getTournamentTitleDateFieldsByIdsFirestore(applications.map((a) => a.tournamentId));
+  return applications.map((application) => ({
+    application,
+    tournament: byTournamentId.get(application.tournamentId) ?? null,
+  }));
 }
 
 /** `/api/site/mypage?part=applications` — 진행중·미완료 목록 */

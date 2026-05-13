@@ -445,6 +445,38 @@ export async function getClientOrganizationByIdForPlatformFirestore(orgId: strin
   return organizationFromDoc(snap.id, snap.data() as Record<string, unknown>);
 }
 
+function isApprovedActivePublicVenueOrg(org: ClientOrganizationStored): boolean {
+  return (
+    org.type === "VENUE" &&
+    org.approvalStatus === "APPROVED" &&
+    org.status === "ACTIVE" &&
+    org.isPublished === true &&
+    org.setupCompleted === true
+  );
+}
+
+/** 공개 클럽 상세 단건 조회 전용: slug 우선, 없으면 id 문서 단건 조회 */
+export async function getApprovedPublicVenueOrganizationBySlugOrIdFirestore(
+  venueIdRaw: string
+): Promise<ClientOrganizationStored | null> {
+  assertClientFirestorePersistenceConfigured();
+  const venueId = venueIdRaw.trim();
+  if (!venueId) return null;
+  const db = getSharedFirestoreDb();
+
+  const bySlug = await db.collection(V3_CLIENT_ORGANIZATIONS).where("slug", "==", venueId).limit(1).get();
+  if (!bySlug.empty) {
+    const row = organizationFromDoc(bySlug.docs[0]!.id, bySlug.docs[0]!.data() as Record<string, unknown>);
+    if (row && isApprovedActivePublicVenueOrg(row)) return row;
+  }
+
+  const byId = await db.collection(V3_CLIENT_ORGANIZATIONS).doc(venueId).get();
+  if (!byId.exists) return null;
+  const row = organizationFromDoc(byId.id, byId.data() as Record<string, unknown>);
+  if (!row || !isApprovedActivePublicVenueOrg(row)) return null;
+  return row;
+}
+
 export async function listApprovedClientOrganizationsFirestore(params?: {
   status?: ClientOrganizationStatus | "all";
   clientType?: ClientOrganizationType | "all";

@@ -141,6 +141,7 @@ import { isEntityLifecycleVisibleForList, normalizeEntityLifecycleStatus } from 
 import {
   ClientFirestoreUnavailableError,
   createClientApplicationFirestore,
+  getApprovedPublicVenueOrganizationBySlugOrIdFirestore,
   getApplicationSummariesFirestore,
   getClientOrganizationByIdForPlatformFirestore,
   getClientOrganizationByUserIdFirestore,
@@ -5296,17 +5297,7 @@ export type SiteVenueDetail = {
 export async function getSiteVenueDetailById(venueIdRaw: string): Promise<SiteVenueDetail | null> {
   const venueId = venueIdRaw.trim();
   if (!venueId) return null;
-  const orgs = await listApprovedClientOrganizationsFirestore({ status: "ACTIVE", clientType: "all" });
-  const org =
-    orgs.find(
-      (x) =>
-        x.type === "VENUE" &&
-        x.approvalStatus === "APPROVED" &&
-        x.status === "ACTIVE" &&
-        x.isPublished &&
-        x.setupCompleted &&
-        (x.slug === venueId || x.id === venueId)
-    ) ?? null;
+  const org = await getApprovedPublicVenueOrganizationBySlugOrIdFirestore(venueId);
   if (!org) return null;
   const intro = await getClientVenueIntroByUserId(org.clientUserId);
   const ts = parseTypeSpecific("VENUE", org.typeSpecificJson ?? null);

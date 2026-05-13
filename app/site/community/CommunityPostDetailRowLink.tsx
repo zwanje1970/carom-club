@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { useCommunityListDetailTransition } from "./community-list-detail-transition-context";
 
 function shouldPrimaryListNavigate(ev: React.MouseEvent): boolean {
@@ -20,6 +22,7 @@ type Props = {
 
 /** 목록 행 → 게시글 상세: 탭 직시 nudge용(탭·검색 전용 링크에는 사용하지 않음) */
 export default function CommunityPostDetailRowLink({ href, className, children, prefetch = false }: Props) {
+  const router = useRouter();
   const ctx = useCommunityListDetailTransition();
   return (
     <Link
@@ -28,7 +31,11 @@ export default function CommunityPostDetailRowLink({ href, className, children, 
       className={className}
       onClick={(ev) => {
         if (!shouldPrimaryListNavigate(ev)) return;
-        ctx?.signalForwardIntent();
+        ev.preventDefault();
+        flushSync(() => {
+          ctx?.beginForwardOpening(href);
+        });
+        router.push(href);
       }}
     >
       {children}

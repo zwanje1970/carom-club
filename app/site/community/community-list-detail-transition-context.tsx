@@ -5,6 +5,7 @@ import { createContext, useContext } from "react";
 export type CommunityListDetailTransitionContextValue = {
   signalForwardIntent: () => void;
   signalBackIntent: () => void;
+  beginForwardOpening: (targetHref: string) => void;
 };
 
 export const CommunityListDetailTransitionContext = createContext<CommunityListDetailTransitionContextValue | null>(
