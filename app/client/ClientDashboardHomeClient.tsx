@@ -163,7 +163,7 @@ function IconExtrasToolbox() {
   );
 }
 
-const MSG_TODAY_SHELL = "아래 바로가기와 메뉴에서 이어서 진행할 수 있습니다.";
+const MSG_TODAY_SHELL = "요약을 불러오는 중입니다.";
 const MSG_EXTRAS_SHELL = "설정·문의 등은 아래 링크에서 바로 열 수 있습니다.";
 
 export default function ClientDashboardHomeClient({
@@ -254,7 +254,7 @@ export default function ClientDashboardHomeClient({
   const pendingAreaMessage = isFetchError ? state.message : "";
 
   let todayStatusText = "";
-  let todayButtonLabel = "";
+  let todayButtonLabel: string | null = null;
   let todayButtonHref = "/client/setup";
   let membershipSection: ReactNode = null;
 
@@ -269,25 +269,20 @@ export default function ClientDashboardHomeClient({
           : "일반";
 
     if (!d.hasOrgSetup) {
-      todayStatusText = "업체 설정을 먼저 완료하세요";
+      todayStatusText = "먼저 업체를 설정하셔야 합니다";
       todayButtonLabel = "업체 설정";
       todayButtonHref = "/client/setup";
-    } else if (!d.hasVenueIntro) {
-      todayStatusText = "당구장 소개를 작성하세요";
-      todayButtonLabel = "작성하기";
-      todayButtonHref = "/client/setup/venue-intro";
     } else if (!d.hasActiveTournament) {
-      todayStatusText = "대회를 만들어 주세요";
+      todayStatusText = "먼저 대회를 생성하세요";
       todayButtonLabel = "대회 만들기";
       todayButtonHref = "/client/tournaments/new";
     } else if (!d.hasPublishedTournamentCard) {
-      todayStatusText = "대회 카드를 게시해 주세요";
-      todayButtonLabel = "대회목록 보기";
+      todayStatusText = "메인에 대회카드를 게시하세요";
+      todayButtonLabel = "카드 게시";
       todayButtonHref = "/client/tournaments";
     } else {
-      todayStatusText = "대회 목록에서 대회를 선택한 뒤 관리 화면으로 들어가세요";
-      todayButtonLabel = "대회목록 보기";
-      todayButtonHref = "/client/tournaments";
+      todayStatusText = "현재 생성된 대회가 있습니다";
+      todayButtonLabel = null;
     }
 
     membershipSection =
@@ -333,32 +328,25 @@ export default function ClientDashboardHomeClient({
 
   const todayBar =
     isReady ? (
-      <Link
-        href={todayButtonHref}
-        prefetch={false}
-        className="client-dashboard-main__todayBar client-dashboard-main__todayBarLink"
-        aria-labelledby="client-today-heading client-today-cta-label"
-        aria-describedby="client-today-status"
-      >
-        <h2 id="client-today-heading" className="client-dashboard-main__todayBarHeading">
-          지금 할 일
-        </h2>
-        <p id="client-today-status" className="client-dashboard-main__todayBarText">
+      <div className="client-dashboard-main__todayBar" role="status" aria-live="polite">
+        <p
+          id="client-today-status"
+          className={`client-dashboard-main__todayBarText${todayButtonLabel ? "" : " client-dashboard-main__todayBarText--done"}`}
+        >
           {todayStatusText}
         </p>
-        <span id="client-today-cta-label" className="client-dashboard-main__todayBarBtn" aria-hidden="true">
-          {todayButtonLabel}
-        </span>
-      </Link>
+        {todayButtonLabel ? (
+          <Link
+            href={todayButtonHref}
+            prefetch={false}
+            className="client-dashboard-main__todayBarBtn client-dashboard-main__todayBarBtnLink"
+          >
+            {todayButtonLabel}
+          </Link>
+        ) : null}
+      </div>
     ) : isFetchError ? (
-      <div
-        className="client-dashboard-main__todayBar"
-        role="alert"
-        aria-labelledby="client-today-heading"
-      >
-        <h2 id="client-today-heading" className="client-dashboard-main__todayBarHeading">
-          지금 할 일
-        </h2>
+      <div className="client-dashboard-main__todayBar" role="alert">
         <p id="client-today-status" className="client-dashboard-main__todayBarText">
           {pendingAreaMessage}
         </p>
@@ -372,23 +360,14 @@ export default function ClientDashboardHomeClient({
         </button>
       </div>
     ) : (
-      <Link
-        href="/client/setup"
-        prefetch={false}
-        className="client-dashboard-main__todayBar client-dashboard-main__todayBarLink"
-        aria-labelledby="client-today-heading client-today-cta-label"
-        aria-describedby="client-today-status"
-      >
-        <h2 id="client-today-heading" className="client-dashboard-main__todayBarHeading">
-          지금 할 일
-        </h2>
+      <div className="client-dashboard-main__todayBar">
         <p id="client-today-status" className="client-dashboard-main__todayBarText">
           {MSG_TODAY_SHELL}
         </p>
-        <span id="client-today-cta-label" className="client-dashboard-main__todayBarBtn" aria-hidden="true">
+        <Link href="/client/setup" prefetch={false} className="client-dashboard-main__todayBarBtn client-dashboard-main__todayBarBtnLink">
           업체 설정
-        </span>
-      </Link>
+        </Link>
+      </div>
     );
 
   return (

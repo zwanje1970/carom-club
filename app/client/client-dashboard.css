@@ -647,7 +647,7 @@ main.client-dashboard-main .client-dashboard-main__featureDesc {
   background: var(--ui-primary-dark);
 }
 
-/* —— 오늘 할 일: 기존 CTA 대비 한 줄 축소 —— */
+/* —— 상단 상태 카드: 문구 + 단일 CTA —— */
 main.client-dashboard-main .client-dashboard-main__todayBar {
   display: flex;
   flex-direction: row;
@@ -661,27 +661,6 @@ main.client-dashboard-main .client-dashboard-main__todayBar {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
-main.client-dashboard-main .client-dashboard-main__todayBarLink {
-  text-decoration: none;
-  color: inherit;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-main.client-dashboard-main .client-dashboard-main__todayBarLink:focus-visible {
-  outline: 2px solid #2563eb;
-  outline-offset: 2px;
-}
-
-main.client-dashboard-main .client-dashboard-main__todayBarHeading {
-  margin: 0;
-  font-size: 0.78rem;
-  font-weight: 800;
-  color: #64748b;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-
 main.client-dashboard-main .client-dashboard-main__todayBarText {
   margin: 0;
   flex: 1 1 12rem;
@@ -690,6 +669,23 @@ main.client-dashboard-main .client-dashboard-main__todayBarText {
   font-weight: 700;
   color: #1e293b;
   line-height: 1.35;
+}
+
+main.client-dashboard-main .client-dashboard-main__todayBarText--done {
+  font-weight: 600;
+  color: #64748b;
+}
+
+main.client-dashboard-main a.client-dashboard-main__todayBarBtnLink {
+  text-decoration: none;
+  color: inherit;
+  box-sizing: border-box;
+  touch-action: manipulation;
+}
+
+main.client-dashboard-main a.client-dashboard-main__todayBarBtnLink:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }
 
 main.client-dashboard-main .client-dashboard-main__todayBarBtn {
