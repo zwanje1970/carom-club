@@ -73,6 +73,10 @@ function bracketHasRecordedWinnerForSplitShuffleGuard(b: {
 
 class BracketOpReject extends Error {}
 
+function cloneBracketRoundsForPreSplitArchive(rounds: Bracket["rounds"]): Bracket["rounds"] {
+  return JSON.parse(JSON.stringify(rounds)) as Bracket["rounds"];
+}
+
 function snapshotFromDoc(docId: string, data: Record<string, unknown> | undefined): BracketParticipantSnapshot | null {
   if (!data || typeof data !== "object") return null;
   const tournamentId = typeof data.tournamentId === "string" ? data.tournamentId : "";
@@ -132,6 +136,9 @@ function bracketFromDoc(docId: string, data: Record<string, unknown> | undefined
     ...(data.blockSplit && typeof data.blockSplit === "object"
       ? { blockSplit: data.blockSplit as Bracket["blockSplit"] }
       : {}),
+    ...(Array.isArray(data.preSplitRootRounds)
+      ? { preSplitRootRounds: data.preSplitRootRounds as Bracket["rounds"] }
+      : {}),
   };
   return normalizeBracket(raw);
 }
@@ -161,6 +168,9 @@ function bracketToPlain(b: Bracket): Record<string, unknown> {
     plain.finalBlockSlotManual = b.finalBlockSlotManual;
   }
   if (b.blockSplit) plain.blockSplit = b.blockSplit;
+  if (Array.isArray(b.preSplitRootRounds) && b.preSplitRootRounds.length > 0) {
+    plain.preSplitRootRounds = b.preSplitRootRounds;
+  }
   return plain;
 }
 
@@ -1562,6 +1572,11 @@ export async function convertLatestBracketToMultiBlockFirestore(params: {
           },
         ],
       };
+      const existingPreSplit = mut.preSplitRootRounds;
+      const alreadyHasPreSplit = Array.isArray(existingPreSplit) && existingPreSplit.length > 0;
+      if (!alreadyHasPreSplit && Array.isArray(mut.rounds) && mut.rounds.length > 0) {
+        mut.preSplitRootRounds = cloneBracketRoundsForPreSplitArchive(mut.rounds);
+      }
       mut.rounds = [];
       mut.blockSplit = hasBs
         ? { mode: "blockSize" as const, blockSize: Math.floor(bs as number) }

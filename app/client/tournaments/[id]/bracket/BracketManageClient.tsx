@@ -68,6 +68,7 @@ type Bracket = {
   blocks?: Array<{ id: string; label?: string; rounds: BracketRoundDoc[] }>;
   finalBlock?: { rounds: BracketRoundDoc[] };
   blockSplit?: { mode: "blockSize"; blockSize: number } | { mode: "blockCount"; blockCount: number };
+  preSplitRootRounds?: BracketRoundDoc[];
 };
 
 /** 서버 문서와 동기: bracketMode 누락·캐시 불일치 시에도 조분할 구조면 true */

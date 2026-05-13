@@ -593,6 +593,11 @@ export type Bracket = {
     blockSize?: number;
     blockCount?: number;
   };
+  /**
+   * 조분할 직전 루트 `rounds` 스냅샷(최초 1회만 저장). `multi_block` 전환 시 `rounds`가 비워지므로
+   * 전체 화면 출력 등에서 원본 단일 트리 복원에 사용한다.
+   */
+  preSplitRootRounds?: BracketRound[];
 };
 
 export type BracketDraftMatchInput = {
@@ -3751,6 +3756,9 @@ export function applyBracketDefaultsInPlace(bracket: MutableBracket): void {
   if (bracket.finalBlock?.rounds) {
     normalizeMutableRoundsInPlace(bracket.finalBlock.rounds);
   }
+  if (Array.isArray(bracket.preSplitRootRounds) && bracket.preSplitRootRounds.length > 0) {
+    normalizeMutableRoundsInPlace(bracket.preSplitRootRounds);
+  }
 }
 
 export function normalizeBracket(bracket: Bracket): Bracket {
@@ -3779,6 +3787,14 @@ export function normalizeBracket(bracket: Bracket): Bracket {
               matches: (round.matches ?? []).map((match) => ({ ...match })),
             })),
           },
+        }
+      : {}),
+    ...(Array.isArray(bracket.preSplitRootRounds) && bracket.preSplitRootRounds.length > 0
+      ? {
+          preSplitRootRounds: bracket.preSplitRootRounds.map((round) => ({
+            ...round,
+            matches: (round.matches ?? []).map((match) => ({ ...match })),
+          })),
         }
       : {}),
   } as MutableBracket;

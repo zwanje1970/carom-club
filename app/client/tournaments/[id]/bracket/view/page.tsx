@@ -69,6 +69,8 @@ type Bracket = {
   bracketMode?: "single" | "multi_block";
   blocks?: Array<{ id: string; label?: string; rounds: BracketRoundView[] }>;
   finalBlock?: { rounds: BracketRoundView[] };
+  /** 조분할 직전 루트 트리 스냅샷(서버 저장). */
+  preSplitRootRounds?: BracketRoundView[];
 };
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -1064,7 +1066,9 @@ export default function TournamentBracketBoardViewPage() {
     if (!bracket) return null;
     if (viewModeOriginalFull) {
       if (bracket.bracketMode === "multi_block") {
-        const root = bracket.rounds;
+        const rootLive = bracket.rounds?.length ? bracket.rounds : null;
+        const rootPre = bracket.preSplitRootRounds?.length ? bracket.preSplitRootRounds : null;
+        const root = rootLive ?? rootPre;
         if (!root?.length) return null;
         return { id: `${bracket.id}:originalFull`, rounds: root };
       }
@@ -1187,7 +1191,8 @@ export default function TournamentBracketBoardViewPage() {
           </div>
         ) : viewModeOriginalFull &&
           bracket.bracketMode === "multi_block" &&
-          (!bracket.rounds || bracket.rounds.length === 0) ? (
+          !(bracket.rounds?.length) &&
+          !(bracket.preSplitRootRounds?.length) ? (
           <div
             style={{
               position: "absolute",
@@ -1205,9 +1210,9 @@ export default function TournamentBracketBoardViewPage() {
               분할 전 단일 대진표 데이터가 없습니다.
             </p>
             <p style={{ margin: 0, fontSize: "0.88rem", lineHeight: 1.55, color: "#cbd5e1" }}>
-              조분할 시 서버 문서의 루트 <code style={{ color: "#f1f5f9" }}>rounds</code>가 비워지며, 원본 전체 트리는
-              현재 스키마에 보관되지 않습니다. 「통합 대진표 보기」로 예선·결선을 한 화면에서 확인하거나, 대진표 관리의
-              「위험 작업」에서 분할 취소 후 단일 예선으로 복귀할 수 있습니다.
+              이 대회는 조분할 시점에 원본 트리(<code style={{ color: "#f1f5f9" }}>preSplitRootRounds</code>)가 저장되지
+              않았습니다. 이후 조분할부터는 자동 보관됩니다. 「통합 대진표 보기」로 예선·결선을 한 화면에서 확인하거나,
+              대진표 관리의 「위험 작업」에서 분할 취소 후 단일 예선으로 복귀할 수 있습니다.
             </p>
           </div>
         ) : boardBracket ? (
