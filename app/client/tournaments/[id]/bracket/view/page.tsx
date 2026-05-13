@@ -94,7 +94,7 @@ export default function TournamentBracketBoardViewPage() {
   const [actionBusy, setActionBusy] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const sliceMetaRef = useRef<{ bracketId: string; blockSig: string }>({ bracketId: "", blockSig: "" });
-  /** `viewMode=merged` 는 최초 진입 시 한 번만 적용(사용자가 조·결선 전환 시 덮어쓰지 않음) */
+  /** `viewMode=merged` URL일 때 초기 `setBoardSliceKey("merged")` 중복 방지; URL에서 merged가 빠지면 리셋 */
   const appliedMergedFromUrlRef = useRef(false);
   /** 허브 등에서 `sliceKey` 쿼리로 들어올 때 브라켓 구조가 같아도 URL 변경을 감지한다 */
   const prevViewSliceKeyParamRef = useRef("");
@@ -129,6 +129,12 @@ export default function TournamentBracketBoardViewPage() {
     appliedMergedFromUrlRef.current = true;
     setBoardSliceKey("merged");
   }, [bracket?.id, bracket?.bracketMode, searchParams]);
+
+  useEffect(() => {
+    if (searchParams.get("viewMode")?.trim() !== "merged") {
+      appliedMergedFromUrlRef.current = false;
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const up = () => setNavigatorOnline(true);
@@ -993,6 +999,11 @@ export default function TournamentBracketBoardViewPage() {
     };
 
     setBoardSliceKey((prevKey) => {
+      const viewModeMerged = searchParams.get("viewMode")?.trim() === "merged";
+      if (viewModeMerged) {
+        return "merged";
+      }
+
       const ids = new Set(bracket.blocks!.map((b) => b.id));
       const hasFinal = Boolean(bracket.finalBlock?.rounds?.length);
 

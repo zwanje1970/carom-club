@@ -187,6 +187,25 @@ function bracketHasAnyRecordedWinner(b: Bracket | null): boolean {
   return scan(collectBracketRoundDocs(b));
 }
 
+/** `/client` 셸: `window`가 아니라 메인 스크롤 열(`.app-client-mobile-main-scroll`)이 스크롤된다. */
+function findBracketHubScrollContainer(start: HTMLElement | null): HTMLElement | null {
+  if (start == null || typeof window === "undefined") return null;
+  let el: HTMLElement | null = start;
+  while (el) {
+    if (el.classList.contains("app-client-mobile-main-scroll")) return el;
+    el = el.parentElement;
+  }
+  el = start;
+  while (el && el !== document.documentElement) {
+    const st = window.getComputedStyle(el);
+    const oy = st.overflowY;
+    if ((oy === "auto" || oy === "scroll") && el.scrollHeight > el.clientHeight + 1) return el;
+    el = el.parentElement;
+  }
+  const doc = document.scrollingElement;
+  return doc instanceof HTMLElement ? doc : null;
+}
+
 function BracketHubAccordionPanel({
   sectionId,
   title,
@@ -205,8 +224,36 @@ function BracketHubAccordionPanel({
   children: ReactNode;
 }) {
   const danger = headerTone === "danger";
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const prevExpandedRef = useRef(expanded);
+
+  useLayoutEffect(() => {
+    const wasExpanded = prevExpandedRef.current;
+    prevExpandedRef.current = expanded;
+    if (!expanded) return;
+    if (wasExpanded) return;
+
+    const run = () => {
+      const el = sectionRef.current;
+      if (!el) return;
+      const scrollRoot = findBracketHubScrollContainer(el);
+      if (!scrollRoot) return;
+      const pad = 10;
+      const rect = el.getBoundingClientRect();
+      const rootRect = scrollRoot.getBoundingClientRect();
+      const bottomLimit = rootRect.bottom - pad;
+      if (rect.bottom <= bottomLimit) return;
+      const delta = rect.bottom - bottomLimit;
+      scrollRoot.scrollBy({ top: delta, behavior: "smooth" });
+    };
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(run);
+    });
+  }, [expanded]);
+
   return (
-    <section className="v3-stack" style={{ gap: "0.35rem" }} aria-labelledby={`${sectionId}-heading`}>
+    <section ref={sectionRef} className="v3-stack" style={{ gap: "0.35rem" }} aria-labelledby={`${sectionId}-heading`}>
       <button
         type="button"
         id={`${sectionId}-heading`}
@@ -424,7 +471,13 @@ type BracketHubModalState =
       roundNumber: number;
       scope: ReturnType<typeof shuffleScopeForSlice>;
     }
-  | { type: "shuffleRegenSuccess" };
+  | { type: "shuffleRegenSuccess" }
+  | { type: "participantsRequired" };
+
+type HubApplicationListItem = {
+  status?: string;
+  zoneId?: string | null;
+};
 
 export default function BracketManageClient({ variant = "full" }: { variant?: "full" | "quickResults" }) {
   const params = useParams<{ id: string }>();
@@ -455,6 +508,9 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   const [multiBlockBusy, setMultiBlockBusy] = useState(false);
   const [hubAutoSectionMessage, setHubAutoSectionMessage] = useState("");
   const [bracketHubModal, setBracketHubModal] = useState<BracketHubModalState>(null);
+  const [tournamentStatusBadge, setTournamentStatusBadge] = useState("");
+  const [applicationListItems, setApplicationListItems] = useState<HubApplicationListItem[]>([]);
+  const [applicationListLoading, setApplicationListLoading] = useState(false);
   const [selectedQuickRoundNumber, setSelectedQuickRoundNumber] = useState<number | null>(null);
   const confirmedSectionRef = useRef<HTMLDivElement | null>(null);
   const didInitialBoardFocusRef = useRef(false);
@@ -754,6 +810,9 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
         if (!res.ok || cancelled || !json.tournament) return;
         setZonesEnabled(json.tournament.zonesEnabled === true);
         setIsTournamentClosed((json.tournament.statusBadge ?? "") === "종료");
+        setTournamentStatusBadge(
+          typeof json.tournament.statusBadge === "string" ? json.tournament.statusBadge.trim() : "",
+        );
       } catch {
         /* ignore */
       }
@@ -800,6 +859,31 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   useEffect(() => {
     void loadLatestBracket();
   }, [loadLatestBracket]);
+
+  const loadApplicationListItems = useCallback(async () => {
+    if (!tournamentId) return;
+    setApplicationListLoading(true);
+    try {
+      const res = await fetch(`/api/client/tournaments/${tournamentId}/applications/list-items`, {
+        credentials: "same-origin",
+      });
+      const json = (await res.json()) as { ok?: boolean; entries?: HubApplicationListItem[]; error?: string };
+      if (!res.ok || !json.ok || !Array.isArray(json.entries)) {
+        setApplicationListItems([]);
+        return;
+      }
+      setApplicationListItems(json.entries);
+    } catch {
+      setApplicationListItems([]);
+    } finally {
+      setApplicationListLoading(false);
+    }
+  }, [tournamentId]);
+
+  useEffect(() => {
+    if (variant !== "full" || !tournamentId || bracket) return;
+    void loadApplicationListItems();
+  }, [variant, tournamentId, bracket, loadApplicationListItems]);
 
   useEffect(() => {
     didInitialBoardFocusRef.current = false;
@@ -1995,6 +2079,50 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     }
   }
 
+  const approvedEntriesForHub = useMemo(() => {
+    return applicationListItems.filter((e) => {
+      if (e.status !== "APPROVED") return false;
+      if (!zonesEnabled || !selectedZoneId) return true;
+      const z = typeof e.zoneId === "string" ? e.zoneId.trim() : "";
+      return z === selectedZoneId;
+    });
+  }, [applicationListItems, zonesEnabled, selectedZoneId]);
+
+  const approvedCountForHub = approvedEntriesForHub.length;
+
+  const bracketPlanEnabledForCreate = useMemo(() => {
+    const b = tournamentStatusBadge.trim();
+    return b === "마감" || b === "진행중" || b === "종료";
+  }, [tournamentStatusBadge]);
+
+  const participantsReadyForBracketCreation = useMemo(() => {
+    if (variant !== "full") return true;
+    if (!bracketPlanEnabledForCreate) return false;
+    if (applicationListLoading) return false;
+    if (approvedCountForHub < 2) return false;
+    if (zonesEnabled && !selectedZoneId) return false;
+    return true;
+  }, [
+    variant,
+    bracketPlanEnabledForCreate,
+    applicationListLoading,
+    approvedCountForHub,
+    zonesEnabled,
+    selectedZoneId,
+  ]);
+
+  const tryOpenBracketCreation = useCallback(
+    (relativePath: string) => {
+      if (zonesEnabled && !selectedZoneId) return;
+      if (!participantsReadyForBracketCreation) {
+        setBracketHubModal({ type: "participantsRequired" });
+        return;
+      }
+      router.push(relativePath);
+    },
+    [router, zonesEnabled, selectedZoneId, participantsReadyForBracketCreation],
+  );
+
   if (variant === "quickResults") {
     const activeQuickRound =
       displayRoundsSorted.find((r) => r.roundNumber === selectedQuickRoundNumber) ?? displayRoundsSorted[0] ?? null;
@@ -2318,9 +2446,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           </p>
         ) : !bracket ? (
           <div className="v3-stack" style={{ gap: "0.5rem", width: "100%" }}>
-            <Link
-              prefetch={false}
-              href={`/client/tournaments/${tournamentId}/bracket/create${bracketZoneQuery}`}
+            <button
+              type="button"
+              onClick={() =>
+                tryOpenBracketCreation(`/client/tournaments/${tournamentId}/bracket/create${bracketZoneQuery}`)
+              }
               style={{
                 width: "100%",
                 minHeight: "52px",
@@ -2335,13 +2465,16 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                 alignItems: "center",
                 justifyContent: "center",
                 boxShadow: "none",
+                cursor: "pointer",
               }}
             >
               전체 대진표 만들기
-            </Link>
-            <Link
-              prefetch={false}
-              href={`/client/tournaments/${tournamentId}/bracket/auto${bracketZoneQuery}`}
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                tryOpenBracketCreation(`/client/tournaments/${tournamentId}/bracket/auto${bracketZoneQuery}`)
+              }
               style={{
                 width: "100%",
                 minHeight: "48px",
@@ -2356,13 +2489,16 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                 alignItems: "center",
                 justifyContent: "center",
                 boxShadow: "none",
+                cursor: "pointer",
               }}
             >
               자동 배정으로 만들기
-            </Link>
-            <Link
-              prefetch={false}
-              href={`/client/tournaments/${tournamentId}/bracket/manual${bracketZoneQuery}`}
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                tryOpenBracketCreation(`/client/tournaments/${tournamentId}/bracket/manual${bracketZoneQuery}`)
+              }
               style={{
                 width: "100%",
                 minHeight: "48px",
@@ -2377,10 +2513,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                 alignItems: "center",
                 justifyContent: "center",
                 boxShadow: "none",
+                cursor: "pointer",
               }}
             >
               수동 배정으로 만들기
-            </Link>
+            </button>
           </div>
         ) : (
           <div className="v3-stack" style={{ gap: "0.65rem", width: "100%" }}>
@@ -3188,7 +3325,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           }}
           onClick={() => {
             if (multiBlockBusy) return;
-            if (bracketHubModal.type === "shuffleRegenConfirm") {
+            if (bracketHubModal.type === "shuffleRegenConfirm" || bracketHubModal.type === "participantsRequired") {
               setBracketHubModal(null);
             }
           }}
@@ -3196,6 +3333,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           <div
             role="dialog"
             aria-modal="true"
+            aria-labelledby={
+              bracketHubModal.type === "participantsRequired"
+                ? "bracket-hub-participants-required-title"
+                : undefined
+            }
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
             style={{
@@ -3335,6 +3477,49 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                     }}
                   >
                     확인
+                  </button>
+                </div>
+              </>
+            ) : null}
+            {bracketHubModal.type === "participantsRequired" ? (
+              <>
+                <h2
+                  id="bracket-hub-participants-required-title"
+                  style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}
+                >
+                  참가자 확정이 필요합니다
+                </h2>
+                <p style={{ margin: "0 0 0.85rem", fontSize: "0.88rem", lineHeight: 1.5, color: "#334155" }}>
+                  대진표를 만들려면 먼저 참가자를 확정해야 합니다.
+                  <br />
+                  신청자 관리에서 참가자를 확정한 뒤 다시 진행하세요.
+                </p>
+                <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="v3-btn"
+                    onClick={() => setBracketHubModal(null)}
+                    style={{ minHeight: 44, fontWeight: 700 }}
+                  >
+                    닫기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBracketHubModal(null);
+                      router.push(`/client/tournaments/${tournamentId}/participants`);
+                    }}
+                    style={{
+                      minHeight: 44,
+                      padding: "0.5rem 1rem",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: "#2563eb",
+                      color: "#fff",
+                      fontWeight: 700,
+                    }}
+                  >
+                    신청자 관리로 이동
                   </button>
                 </div>
               </>

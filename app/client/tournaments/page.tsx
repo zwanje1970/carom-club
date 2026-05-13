@@ -13,13 +13,25 @@ function statusBadgeStyle(badge: TournamentStatusBadge): { background: string; c
   if (badge === "모집중") {
     return { background: "#fef3c7", color: "#92400e" };
   }
+  if (badge === "마감임박") {
+    return { background: "#ffedd5", color: "#9a3412" };
+  }
   if (badge === "마감" || badge === "종료") {
     return { background: "#f3f4f6", color: "#4b5563" };
   }
   if (badge === "진행중") {
     return { background: "#dbeafe", color: "#1e40af" };
   }
+  if (badge === "예정") {
+    return { background: "#ecfdf5", color: "#166534" };
+  }
   return { background: "#eff6ff", color: "#1e3a5f" };
+}
+
+function clientListBracketScaleLabel(maxParticipants: number): string {
+  const k = Math.floor(Number(maxParticipants));
+  if (!Number.isFinite(k) || k <= 0) return "—";
+  return `${k}강`;
 }
 
 export default async function ClientTournamentsListPage() {
@@ -31,93 +43,137 @@ export default async function ClientTournamentsListPage() {
 
   return (
     <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
-      <p className="v3-muted">로그인 사용자 기준으로 생성된 대회를 확인합니다.</p>
+      <p className="v3-muted" style={{ margin: "0 0 0.35rem", fontSize: "0.88rem" }}>
+        로그인 사용자 기준으로 생성된 대회를 확인합니다.
+      </p>
 
-      <section className="v3-stack">
+      <section>
         {tournaments.length === 0 ? (
-          <p className="v3-muted">생성된 대회가 없습니다.</p>
+          <p className="v3-muted" style={{ margin: 0 }}>
+            생성된 대회가 없습니다.
+          </p>
         ) : (
-          <ul className="v3-stack" style={{ gap: "1rem", listStyle: "none", margin: 0, padding: 0 }}>
-            {tournaments.map((t) => {
+          <ul
+            style={{
+              listStyle: "none",
+              margin: 0,
+              padding: 0,
+              border: "1px solid #e2e8f0",
+              borderRadius: "6px",
+              background: "#fff",
+              overflow: "hidden",
+            }}
+          >
+            {tournaments.map((t, idx) => {
               const detailHref = `/client/tournaments/${t.id}`;
               const bc = statusBadgeStyle(t.statusBadge);
               const scheduleLine = formatTournamentScheduleLabel(t);
+              const scale = clientListBracketScaleLabel(t.maxParticipants);
+              const venue = (t.location ?? "").trim();
+              const isLast = idx === tournaments.length - 1;
               return (
-                <li key={t.id}>
-                  <section
+                <li
+                  key={t.id}
+                  style={{
+                    borderBottom: isLast ? "none" : "1px solid #e2e8f0",
+                    padding: "0.45rem 0.5rem",
+                  }}
+                >
+                  <div
                     style={{
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "16px",
-                      padding: "0.85rem 1rem",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "0.65rem",
-                      background: "#ffffff",
-                      boxShadow: "0 2px 10px rgba(0, 0, 0, 0.05)",
+                      display: "grid",
+                      gridTemplateColumns: "minmax(3.1rem, 3.6rem) minmax(0, 1fr) auto",
+                      gap: "0.35rem 0.45rem",
+                      alignItems: "start",
                     }}
                   >
                     <div
-                      className="v3-row"
+                      className="v3-stack"
                       style={{
-                        alignItems: "flex-start",
-                        justifyContent: "space-between",
-                        gap: "0.65rem",
+                        gap: "0.12rem",
+                        minWidth: 0,
+                        fontSize: "0.72rem",
+                        lineHeight: 1.25,
+                        color: "#64748b",
+                        fontWeight: 600,
+                        textAlign: "left",
                       }}
                     >
+                      <span style={{ color: "#0f172a", fontWeight: 800 }}>{scale}</span>
+                      {scheduleLine ? (
+                        <span style={{ wordBreak: "break-all", fontWeight: 600 }}>{scheduleLine}</span>
+                      ) : null}
+                    </div>
+                    <div className="v3-stack" style={{ gap: "0.12rem", minWidth: 0 }}>
                       <Link
                         href={detailHref}
                         style={{
                           textDecoration: "none",
-                          color: "inherit",
-                          display: "block",
-                          flex: "1 1 auto",
-                          minWidth: 0,
+                          color: "#0f172a",
+                          fontWeight: 800,
+                          fontSize: "0.92rem",
+                          lineHeight: 1.25,
+                          wordBreak: "break-word",
                         }}
                       >
-                        <div className="v3-row" style={{ alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-                          <span
-                            style={{
-                              display: "inline-block",
-                              padding: "0.2rem 0.55rem",
-                              borderRadius: "0.35rem",
-                              fontSize: "0.8rem",
-                              fontWeight: 700,
-                              ...bc,
-                            }}
-                          >
-                            {t.statusBadge}
-                          </span>
-                        </div>
-                        <h2 className="v3-h2" style={{ margin: "0.35rem 0 0", fontSize: "1.1rem" }}>
-                          {t.title}
-                        </h2>
-                        {scheduleLine ? (
-                          <p className="v3-muted" style={{ margin: "0.35rem 0 0", fontSize: "0.95rem" }}>
-                            {scheduleLine}
-                          </p>
-                        ) : null}
+                        {t.title}
                       </Link>
-                      <div style={{ flexShrink: 0, alignSelf: "flex-start" }}>
-                        <TournamentCardOverflowMenu tournamentId={t.id} title={t.title} />
-                      </div>
+                      {venue ? (
+                        <span className="v3-muted" style={{ fontSize: "0.78rem", lineHeight: 1.3, margin: 0 }}>
+                          {venue}
+                        </span>
+                      ) : null}
                     </div>
-                    <div className="v3-row" style={{ alignItems: "center", gap: "0.35rem", justifyContent: "flex-start" }}>
-                      <Link
-                        className="v3-btn"
-                        href={`/client/tournaments/${t.id}/participants`}
-                        style={{ padding: "0.35rem 0.55rem", fontSize: "0.85rem" }}
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "row",
+                        alignItems: "flex-start",
+                        justifyContent: "flex-end",
+                        gap: "0.25rem",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: "inline-block",
+                          padding: "0.12rem 0.4rem",
+                          borderRadius: "4px",
+                          fontSize: "0.68rem",
+                          fontWeight: 800,
+                          whiteSpace: "nowrap",
+                          ...bc,
+                        }}
                       >
-                        신청자 관리
-                      </Link>
-                      <Link
-                        className="v3-btn"
-                        href={`/client/tournaments/${t.id}/bracket`}
-                        style={{ padding: "0.35rem 0.55rem", fontSize: "0.85rem" }}
-                      >
-                        대진표
-                      </Link>
+                        {t.statusBadge}
+                      </span>
+                      <TournamentCardOverflowMenu tournamentId={t.id} title={t.title} />
                     </div>
-                  </section>
+                  </div>
+                  <div
+                    className="v3-row"
+                    style={{
+                      marginTop: "0.35rem",
+                      alignItems: "center",
+                      gap: "0.3rem",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <Link
+                      className="v3-btn"
+                      href={`/client/tournaments/${t.id}/participants`}
+                      style={{ padding: "0.28rem 0.5rem", fontSize: "0.78rem", fontWeight: 700, minHeight: 36 }}
+                    >
+                      신청자 관리
+                    </Link>
+                    <Link
+                      className="v3-btn"
+                      href={`/client/tournaments/${t.id}/bracket`}
+                      style={{ padding: "0.28rem 0.5rem", fontSize: "0.78rem", fontWeight: 700, minHeight: 36 }}
+                    >
+                      대진표
+                    </Link>
+                  </div>
                 </li>
               );
             })}
