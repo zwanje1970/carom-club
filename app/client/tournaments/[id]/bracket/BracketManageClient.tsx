@@ -1667,25 +1667,8 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       setBracketHubModal({ type: "error", message: "현재 대진표 작업을 진행할 수 없는 상태입니다." });
       return;
     }
-    if (!bracket || !bracketLooksLikeSplitLayout(bracket)) {
-      setBracketHubModal({ type: "error", message: "현재 조분할된 대진표가 아닙니다." });
-      return;
-    }
-    if (!multiBlockSplitCancelAllowed) {
-      setBracketHubModal({
-        type: "error",
-        message: "대진표에 경기 이력이 있습니다. 경기 이력을 모두 되돌린 후 조분할을 취소하세요.",
-      });
-      return;
-    }
     setBracketHubModal({ type: "splitCancelConfirm" });
-  }, [
-    actionLoading,
-    bracket,
-    interactionLocked,
-    multiBlockBusy,
-    multiBlockSplitCancelAllowed,
-  ]);
+  }, [actionLoading, interactionLocked, multiBlockBusy]);
 
   const confirmSplitCancelAndPost = useCallback(async () => {
     if (!tournamentId) {
@@ -1700,21 +1683,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       setBracketHubModal({ type: "error", message: "현재 대진표 작업을 진행할 수 없는 상태입니다." });
       return;
     }
-    if (!bracket || !bracketLooksLikeSplitLayout(bracket)) {
-      setBracketHubModal({ type: "error", message: "현재 조분할된 대진표가 아닙니다." });
-      return;
-    }
-    if (!multiBlockSplitCancelAllowed) {
-      setBracketHubModal({
-        type: "error",
-        message: "대진표에 경기 이력이 있습니다. 경기 이력을 모두 되돌린 후 조분할을 취소하세요.",
-      });
-      return;
-    }
     const z = zonesEnabled ? selectedZoneId : "-";
+    const sliceClearBracketId = bracket?.id ?? null;
     const sliceClearKey =
-      bracket?.id && bracketLooksLikeSplitLayout(bracket)
-        ? bracketManageSliceStorageKey(tournamentId, z, bracket.id)
+      sliceClearBracketId && tournamentId
+        ? bracketManageSliceStorageKey(tournamentId, z, sliceClearBracketId)
         : null;
     setBracketHubModal(null);
     setMultiBlockBusy(true);
@@ -1726,27 +1699,29 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       );
       const json = (await res.json()) as { bracket?: Bracket; error?: string };
       if (!res.ok || !json.bracket) {
-        const serverErr = (json.error ?? "").trim();
         setBracketHubModal({
           type: "error",
-          message: serverErr ? `${serverErr}\n\n조분할을 취소하지 못했습니다.` : "조분할을 취소하지 못했습니다.",
+          message: bracketHubFailureModalMessage(json.error),
         });
         return;
       }
       if (sliceClearKey) clearManageBracketSliceStorage(sliceClearKey);
       setBracket(json.bracket);
       writeLastGoodBracket(tournamentId, storageSeg, json.bracket);
+      void loadLatestBracket();
+      router.refresh();
       setBracketHubModal({ type: "splitCancelSuccess" });
     } finally {
       setMultiBlockBusy(false);
     }
   }, [
     actionLoading,
-    bracket,
+    bracket?.id,
     bracketZoneQuery,
     interactionLocked,
+    loadLatestBracket,
     multiBlockBusy,
-    multiBlockSplitCancelAllowed,
+    router,
     selectedZoneId,
     storageSeg,
     tournamentId,
