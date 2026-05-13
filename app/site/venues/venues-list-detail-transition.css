@@ -1,0 +1,57 @@
+/**
+ * 클럽 목록↔상세 전환 — site-shell-main 직계 .site-home-page flex 체인 보강.
+ */
+
+.site-shell--pc-sticky-footer .site-shell-main > .site-venues-list-detail-transition-viewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  width: 100%;
+  align-self: stretch;
+}
+
+.site-shell--pc-sticky-footer
+  .site-shell-main
+  > .site-venues-list-detail-transition-viewport
+  > .site-venues-list-detail-transition-track
+  > main.site-home-page--standard {
+  flex: 1 1 auto;
+  min-height: 0 !important;
+  height: 100% !important;
+  width: 100%;
+  align-self: stretch;
+  overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  .site-shell.site-shell--ua-mobile-site:not(:has(.site-root-swipe-viewport))
+    > .site-venues-list-detail-transition-viewport {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    width: 100%;
+  }
+
+  .site-shell.site-shell--ua-mobile-site:not(:has(.site-root-swipe-viewport))
+    > .site-venues-list-detail-transition-viewport
+    > .site-venues-list-detail-transition-track {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .site-shell.site-shell--ua-mobile-site:not(:has(.site-root-swipe-viewport))
+    > .site-venues-list-detail-transition-viewport
+    > .site-venues-list-detail-transition-track
+    > main.site-home-page--standard {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+  }
+}

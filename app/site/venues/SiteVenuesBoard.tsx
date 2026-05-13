@@ -13,6 +13,7 @@ import {
 } from "../lib/site-geolocation-flow";
 import { buildVenuesListHref } from "./venues-list-url";
 import { buildVenuesListScrollSignature } from "./venues-list-scroll-signature";
+import { useVenuesListDetailTransition } from "./venues-list-detail-transition-context";
 
 export type SiteVenueBoardRow = {
   venueId: string;
@@ -116,6 +117,7 @@ type Props = {
 };
 
 export default function SiteVenuesBoard({ initialRows }: Props) {
+  const listTransition = useVenuesListDetailTransition();
   const [memoryCoords, setMemoryCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [showDeniedHint, setShowDeniedHint] = useState(false);
   const [geoBusy, setGeoBusy] = useState(false);
@@ -348,6 +350,7 @@ export default function SiteVenuesBoard({ initialRows }: Props) {
                   href={`/site/venues/${row.venueId}`}
                   onClick={(ev) => {
                     if (!shouldSaveScrollBeforeDetailNavigate(ev)) return;
+                    listTransition?.signalForwardIntent();
                     saveScrollBeforeDetail();
                   }}
                 >

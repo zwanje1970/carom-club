@@ -1,6 +1,5 @@
 /** 커뮤니티 게시판 목록 — 가벼운 게시판형 리스트 */
 
-import Link from "next/link";
 import type { CommunityPostListItem, SiteCommunityBoardKey, SiteCommunityConfig } from "../../../lib/types/entities";
 import {
   COMMUNITY_ROOM_PREFIX_SHORT,
@@ -8,6 +7,7 @@ import {
   communityTabLabelForBoard,
   isPrimaryTabKey,
 } from "./community-tab-config";
+import CommunityPostDetailRowLink from "./CommunityPostDetailRowLink";
 import SiteListImage160 from "../components/SiteListImage160";
 
 function formatListDateTime(iso: string): string {
@@ -75,7 +75,7 @@ export default function CommunityBoardPostList({
           const authorLabel = (post.nickname ?? "").trim() || "—";
           return (
             <li key={post.id} className="ui-community-board-row">
-              <Link prefetch={false} href={href} className="ui-community-board-row-link">
+              <CommunityPostDetailRowLink href={href} className="ui-community-board-row-link">
                 <div className="ui-community-board-row-body">
                   <div className="ui-community-board-line1">
                     {prefix ? (
@@ -102,7 +102,7 @@ export default function CommunityBoardPostList({
                     />
                   ) : null}
                 </div>
-              </Link>
+              </CommunityPostDetailRowLink>
             </li>
           );
         })

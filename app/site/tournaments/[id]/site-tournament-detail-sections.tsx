@@ -1,4 +1,5 @@
 import Link from "next/link";
+import TournamentsListBackLink from "../TournamentsListBackLink";
 import SiteOutlineDocumentCard from "../../components/SiteOutlineDocumentCard";
 import AccountNumberCopyInline from "./account-number-copy-inline";
 import { formatTournamentScheduleLabel } from "../../../../lib/tournament-schedule";
@@ -301,9 +302,9 @@ export default function SiteTournamentDetailSections({
         ) : null}
 
         <div className="site-detail-actions-row">
-          <Link prefetch={false} className="secondary-button" href={listBackHref} style={{ flex: "1 1 100%", maxWidth: "100%" }}>
+          <TournamentsListBackLink className="secondary-button" href={listBackHref} style={{ flex: "1 1 100%", maxWidth: "100%" }}>
             목록으로
-          </Link>
+          </TournamentsListBackLink>
         </div>
       </div>
     );
@@ -459,9 +460,9 @@ export default function SiteTournamentDetailSections({
       </section>
 
       <div className="v3-row">
-        <Link prefetch={false} className="v3-btn" href={listBackHref}>
+        <TournamentsListBackLink className="v3-btn" href={listBackHref}>
           목록으로
-        </Link>
+        </TournamentsListBackLink>
       </div>
     </>
   );

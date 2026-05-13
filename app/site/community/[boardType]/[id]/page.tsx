@@ -18,9 +18,11 @@ import type { SiteCommunityBoardKey } from "../../../../../lib/types/entities";
 import SiteShellFrame from "../../../components/SiteShellFrame";
 import {
   COMMUNITY_ROOM_PREFIX_SHORT,
+  communityBoardListHref,
   communityTabLabelForBoard,
   isPrimaryTabKey,
 } from "../../community-tab-config";
+import CommunityListBackLink from "../../CommunityListBackLink";
 import CommunityPostCommentsSection from "./CommunityPostCommentsSection";
 import CommunityPostDetailBody from "./CommunityPostDetailBody";
 import CommunityPostDetailActions from "./CommunityPostDetailActions";
@@ -122,6 +124,11 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
           isLoggedIn={Boolean(session)}
           currentUserId={currentUserId}
         />
+        <div style={{ marginTop: "0.9rem" }}>
+          <CommunityListBackLink className="secondary-button" href={communityBoardListHref(boardType)}>
+            목록으로
+          </CommunityListBackLink>
+        </div>
       </section>
     </SiteShellFrame>
   );

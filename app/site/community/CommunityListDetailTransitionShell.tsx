@@ -2,17 +2,14 @@
 
 import { usePathname } from "next/navigation";
 import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
+import { isCommunityBoardListHubPath } from "../lib/site-root-swipe-order";
 import {
-  TournamentsListDetailTransitionContext,
-  type TournamentsListDetailTransitionContextValue,
-} from "./tournaments-list-detail-transition-context";
+  CommunityListDetailTransitionContext,
+  type CommunityListDetailTransitionContextValue,
+} from "./community-list-detail-transition-context";
 
-/** 본 슬라이드 — 탭 직후 멈춤 완화를 위해 340~420ms 중간대 */
 const MAIN_DURATION_MS = 380;
-/** 빠른 초반·끝에서 감속 */
 const MAIN_EASING = "cubic-bezier(0.22, 0.92, 0.32, 1)";
-
-/** 탭 직후 목록/상세가 “움직이기 시작”했다는 즉시 피드백 */
 const NUDGE_PX = 14;
 const NUDGE_DURATION_MS = 95;
 const NUDGE_EASING = "cubic-bezier(0.33, 1, 0.55, 1)";
@@ -23,20 +20,28 @@ function normalizePathname(pathname: string): string {
   return raw;
 }
 
-function isTournamentsListPath(p: string): boolean {
-  return normalizePathname(p) === "/site/tournaments";
+/**
+ * `/site/community/[board]/[postId]` 만 (게시글 읽기).
+ * `/site/community/[board]/write`, `.../edit` 등은 제외.
+ */
+function isCommunityPostDetailPath(p: string): boolean {
+  const n = normalizePathname(p);
+  const m = /^\/site\/community\/([^/]+)\/([^/]+)$/.exec(n);
+  if (!m?.[2]) return false;
+  const idSeg = m[2];
+  if (idSeg === "write" || idSeg === "edit" || idSeg === "preview") return false;
+  return true;
 }
 
-/** `/site/tournaments/[id]` 만 — 하위 세그먼트(/apply 등) 제외 */
-function isTournamentsDetailOnlyPath(p: string): boolean {
-  return /^\/site\/tournaments\/[^/]+$/.test(normalizePathname(p));
+function isCommunityListHubPath(p: string): boolean {
+  return isCommunityBoardListHubPath(p);
 }
 
 function isListDetailEligible(p: string): boolean {
-  return isTournamentsListPath(p) || isTournamentsDetailOnlyPath(p);
+  return isCommunityListHubPath(p) || isCommunityPostDetailPath(p);
 }
 
-export default function TournamentsListDetailTransitionShell({ children }: { children: React.ReactNode }) {
+export default function CommunityListDetailTransitionShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
   const pathKey = normalizePathname(pathname);
   const pathKeyRef = useRef(pathKey);
@@ -51,7 +56,7 @@ export default function TournamentsListDetailTransitionShell({ children }: { chi
   const applyNudgeForward = useCallback(() => {
     const track = trackRef.current;
     if (!track) return;
-    if (!isTournamentsListPath(pathKeyRef.current)) return;
+    if (!isCommunityListHubPath(pathKeyRef.current)) return;
     track.style.willChange = "transform";
     track.style.transition = `transform ${NUDGE_DURATION_MS}ms ${NUDGE_EASING}`;
     track.style.transform = `translate3d(-${NUDGE_PX}px,0,0)`;
@@ -60,7 +65,7 @@ export default function TournamentsListDetailTransitionShell({ children }: { chi
   const applyNudgeBack = useCallback(() => {
     const track = trackRef.current;
     if (!track) return;
-    if (!isTournamentsDetailOnlyPath(pathKeyRef.current)) return;
+    if (!isCommunityPostDetailPath(pathKeyRef.current)) return;
     track.style.willChange = "transform";
     track.style.transition = `transform ${NUDGE_DURATION_MS}ms ${NUDGE_EASING}`;
     track.style.transform = `translate3d(${NUDGE_PX}px,0,0)`;
@@ -74,7 +79,7 @@ export default function TournamentsListDetailTransitionShell({ children }: { chi
     applyNudgeBack();
   }, [applyNudgeBack]);
 
-  const ctxValue = useMemo<TournamentsListDetailTransitionContextValue>(
+  const ctxValue = useMemo<CommunityListDetailTransitionContextValue>(
     () => ({ signalForwardIntent, signalBackIntent }),
     [signalForwardIntent, signalBackIntent],
   );
@@ -123,8 +128,8 @@ export default function TournamentsListDetailTransitionShell({ children }: { chi
     }
 
     let direction: "forward" | "back" | null = null;
-    if (isTournamentsListPath(prev) && isTournamentsDetailOnlyPath(current)) direction = "forward";
-    else if (isTournamentsDetailOnlyPath(prev) && isTournamentsListPath(current)) direction = "back";
+    if (isCommunityListHubPath(prev) && isCommunityPostDetailPath(current)) direction = "forward";
+    else if (isCommunityPostDetailPath(prev) && isCommunityListHubPath(current)) direction = "back";
 
     if (direction == null) {
       clearScheduled();
@@ -191,12 +196,12 @@ export default function TournamentsListDetailTransitionShell({ children }: { chi
   }, [pathKey]);
 
   return (
-    <TournamentsListDetailTransitionContext.Provider value={ctxValue}>
-      <div className="site-tournaments-list-detail-transition-viewport">
-        <div ref={trackRef} className="site-tournaments-list-detail-transition-track">
+    <CommunityListDetailTransitionContext.Provider value={ctxValue}>
+      <div className="site-community-list-detail-transition-viewport">
+        <div ref={trackRef} className="site-community-list-detail-transition-track">
           {children}
         </div>
       </div>
-    </TournamentsListDetailTransitionContext.Provider>
+    </CommunityListDetailTransitionContext.Provider>
   );
 }

@@ -9,6 +9,7 @@ import {
   buildTournamentsListScrollSignature,
   type TournamentStatusFilter,
 } from "./tournament-list-url";
+import { useTournamentsListDetailTransition } from "./tournaments-list-detail-transition-context";
 
 const TOURNAMENTS_SCROLL_STORAGE_KEY = "carom.site.tournaments.scrollY";
 
@@ -96,6 +97,7 @@ type Props = {
 };
 
 export default function SiteTournamentsDistanceShell({ rows, searchParams, currentStatus }: Props) {
+  const listTransition = useTournamentsListDetailTransition();
   const listScrollSignature = useMemo(() => buildTournamentsListScrollSignature(searchParams), [searchParams]);
   const didRestoreForSignatureRef = useRef<string | null>(null);
 
@@ -137,6 +139,7 @@ export default function SiteTournamentsDistanceShell({ rows, searchParams, curre
                   href={`/site/tournaments/${tournament.id}`}
                   onClick={(ev) => {
                     if (!shouldSaveScrollBeforeDetailNavigate(ev)) return;
+                    listTransition?.signalForwardIntent();
                     saveScrollBeforeDetail();
                   }}
                 >

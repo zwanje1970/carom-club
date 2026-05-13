@@ -6,6 +6,7 @@ import { outlineFileKindFromAsset, outlinePdfIdFromPublicUrl } from "../../../..
 import { getOutlinePdfAssetById, getSiteVenueDetailById } from "../../../../lib/surface-read";
 import SiteOutlineDocumentCard from "../../components/SiteOutlineDocumentCard";
 import SiteShellFrame from "../../components/SiteShellFrame";
+import VenuesListBackLink from "../VenuesListBackLink";
 
 export const dynamic = "force-dynamic";
 
@@ -444,9 +445,9 @@ export default async function SiteVenueDetailPage({
           </section>
         ) : null}
 
-        <Link prefetch={false} className="secondary-button" href="/site/venues" style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>
+        <VenuesListBackLink className="secondary-button" href="/site/venues" style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>
           클럽안내 목록으로
-        </Link>
+        </VenuesListBackLink>
       </section>
     </SiteShellFrame>
   );
