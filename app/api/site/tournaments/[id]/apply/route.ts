@@ -38,6 +38,9 @@ export async function POST(
     applicantName?: unknown;
     phone?: unknown;
     depositorName?: unknown;
+    affiliation?: unknown;
+    handicap?: unknown;
+    participantAverage?: unknown;
     proofImageId?: unknown;
     proofImage320Url?: unknown;
     proofImage640Url?: unknown;
@@ -52,6 +55,25 @@ export async function POST(
   }
 
   const proofImageId = typeof body.proofImageId === "string" ? body.proofImageId.trim() : "";
+  const bodyAffiliation = typeof body.affiliation === "string" ? body.affiliation : "";
+  const bodyHandicap =
+    typeof body.handicap === "number" && Number.isFinite(body.handicap)
+      ? body.handicap
+      : typeof body.handicap === "string" && body.handicap.trim() !== "" && Number.isFinite(Number(body.handicap))
+        ? Number(body.handicap)
+        : null;
+  const bodyParticipantAverage =
+    typeof body.participantAverage === "number" && Number.isFinite(body.participantAverage)
+      ? body.participantAverage
+      : typeof body.participantAverage === "string" &&
+          body.participantAverage.trim() !== "" &&
+          Number.isFinite(Number(body.participantAverage))
+        ? Number(body.participantAverage)
+        : null;
+
+  let gateResult:
+    | { ok: boolean; userMessage: string; handicap: number | null; average: number | null }
+    | null = null;
   if (proofImageId) {
     const canonicalUserId = await resolveCanonicalUserIdForAuth(user.id);
     const proofImage = await getProofImageAssetById(proofImageId);
@@ -71,10 +93,25 @@ export async function POST(
       applicantName: typeof body.applicantName === "string" ? body.applicantName : "",
       applicantPhone: typeof body.phone === "string" ? body.phone : "",
     });
+    gateResult = gate;
     if (!gate.ok) {
       return NextResponse.json({ error: gate.userMessage }, { status: 400 });
     }
+    if (tournament.rule.verificationMode === "AUTO") {
+      if (gate.handicap == null || gate.average == null) {
+        return NextResponse.json({ error: gate.userMessage || "판독불가, 재업로드 요망" }, { status: 400 });
+      }
+    }
   }
+
+  const finalHandicap =
+    tournament.rule.verificationMode === "AUTO"
+      ? (gateResult?.handicap ?? null)
+      : bodyHandicap;
+  const finalParticipantAverage =
+    tournament.rule.verificationMode === "AUTO"
+      ? (gateResult?.average ?? null)
+      : bodyParticipantAverage;
 
   const result = await createTournamentApplicationFirestore({
     tournamentId: id,
@@ -82,6 +119,9 @@ export async function POST(
     applicantName: typeof body.applicantName === "string" ? body.applicantName : "",
     phone: typeof body.phone === "string" ? body.phone : "",
     depositorName: typeof body.depositorName === "string" ? body.depositorName : "",
+    affiliation: bodyAffiliation,
+    handicap: finalHandicap ?? undefined,
+    participantAverage: finalParticipantAverage ?? undefined,
     proofImageId: typeof body.proofImageId === "string" ? body.proofImageId : "",
     proofImage320Url: typeof body.proofImage320Url === "string" ? body.proofImage320Url : "",
     proofImage640Url: typeof body.proofImage640Url === "string" ? body.proofImage640Url : "",

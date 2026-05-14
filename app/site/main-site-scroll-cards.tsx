@@ -23,6 +23,14 @@ type MainSiteScrollStoredV1 = {
   scrollTop: number;
 };
 
+type MainSiteScrollStoredV2 = {
+  v: 2;
+  idsKey: string;
+  scrollTop: number;
+  /** 덱 구성 변경 시에도 대략 같은 진행 구간을 복원하기 위한 비율(0~1) */
+  progressRatio: number;
+};
+
 function mainScrollIdsKey(items: MainSiteScrollCardItem[]): string {
   return items.map((i) => i.id).join("\u001f");
 }
@@ -254,21 +262,45 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     const viewport = viewportRef.current;
     if (!viewport) return;
 
-    let parsed: MainSiteScrollStoredV1 | null = null;
+    let parsed:
+      | (MainSiteScrollStoredV1 & { progressRatio?: number })
+      | (MainSiteScrollStoredV2 & { progressRatio: number })
+      | null = null;
     try {
       const raw = sessionStorage.getItem(MAIN_SITE_SCROLL_STORAGE_KEY);
       if (raw) {
-        const o = JSON.parse(raw) as Partial<MainSiteScrollStoredV1>;
+        const o = JSON.parse(raw) as Partial<MainSiteScrollStoredV2> & Partial<MainSiteScrollStoredV1>;
         if (o?.v === 1 && typeof o.idsKey === "string" && typeof o.scrollTop === "number") {
           parsed = { v: 1, idsKey: o.idsKey, scrollTop: o.scrollTop };
+        } else if (
+          o?.v === 2 &&
+          typeof o.idsKey === "string" &&
+          typeof o.scrollTop === "number" &&
+          typeof o.progressRatio === "number"
+        ) {
+          parsed = {
+            v: 2,
+            idsKey: o.idsKey,
+            scrollTop: o.scrollTop,
+            progressRatio: o.progressRatio,
+          };
         }
       }
     } catch {
       parsed = null;
     }
-    if (!parsed || parsed.idsKey !== itemsIdsKey) return;
+    if (!parsed) return;
 
-    const target = parsed.scrollTop;
+    const targetFromRatio = () => {
+      const maxScroll = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+      const ratio = Math.min(1, Math.max(0, Number(parsed?.progressRatio ?? NaN)));
+      if (!Number.isFinite(ratio)) return null;
+      return maxScroll * ratio;
+    };
+    const target =
+      parsed.idsKey === itemsIdsKey
+        ? parsed.scrollTop
+        : targetFromRatio() ?? parsed.scrollTop;
     const apply = () => {
       const maxScroll = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
       const nextTop = Math.min(Math.max(0, target), maxScroll);
@@ -553,10 +585,12 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       try {
         const node = viewportRef.current;
         if (node && items.length > 0) {
-          const payload: MainSiteScrollStoredV1 = {
-            v: 1,
+          const maxScroll = Math.max(1, node.scrollHeight - node.clientHeight);
+          const payload: MainSiteScrollStoredV2 = {
+            v: 2,
             idsKey: mainScrollIdsKey(items),
             scrollTop: node.scrollTop,
+            progressRatio: Math.min(1, Math.max(0, node.scrollTop / maxScroll)),
           };
           sessionStorage.setItem(MAIN_SITE_SCROLL_STORAGE_KEY, JSON.stringify(payload));
         }

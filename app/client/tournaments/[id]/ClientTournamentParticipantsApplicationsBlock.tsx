@@ -427,10 +427,12 @@ export default function ClientTournamentParticipantsApplicationsBlock({
 
   const titleLine = `${tournamentTitle.trim()} / ${bracketScaleLabel(maxParticipants)}`;
 
-  const appActionTwoLines = (line1: string, line2: string) => (
+  const appActionLabel = (icon: string, label: string) => (
     <>
-      <span className="client-tournament-manage__appActionLine">{line1}</span>
-      <span className="client-tournament-manage__appActionLine">{line2}</span>
+      <span className="client-tournament-manage__appActionIcon" aria-hidden>
+        {icon}
+      </span>
+      <span className="client-tournament-manage__appActionLine">{label}</span>
     </>
   );
 
@@ -480,7 +482,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                       {finalizeBusy ? (
                         <span className="client-tournament-manage__appActionLine">처리 중…</span>
                       ) : (
-                        appActionTwoLines("참가", "확정 취소")
+                        appActionLabel("↺", "확정취소")
                       )}
                     </button>
                   ) : showFinalize ? (
@@ -493,7 +495,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                       {finalizeBusy ? (
                         <span className="client-tournament-manage__appActionLine">처리 중…</span>
                       ) : (
-                        appActionTwoLines("참가자", "확정")
+                        appActionLabel("✓", "참가자확정")
                       )}
                     </button>
                   ) : (
@@ -502,7 +504,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                 </div>
                 <div className="client-tournament-manage__applicationsOpsGrid4Cell">
                   <Link prefetch={false} href={printHref} className="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--neutral">
-                    {appActionTwoLines("확정", "리스트")}
+                    {appActionLabel("☰", "확정리스트")}
                   </Link>
                 </div>
                 <div className="client-tournament-manage__applicationsOpsGrid4Cell">
@@ -515,7 +517,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     {bulkApproveBusy ? (
                       <span className="client-tournament-manage__appActionLine">처리 중…</span>
                     ) : (
-                      appActionTwoLines("입금확인", "전체승인")
+                      appActionLabel("₩", "입금확인 전체승인")
                     )}
                   </button>
                 </div>
@@ -527,7 +529,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     participantsFinalized={tournamentStatusBadge === "마감"}
                     hasActiveBracket={hasActiveBracket}
                     triggerClassName="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--neutral"
-                    triggerLabel={appActionTwoLines("수동", "추가")}
+                    triggerLabel={appActionLabel("+", "수동추가")}
                   />
                 </div>
               </div>
@@ -612,39 +614,58 @@ export default function ClientTournamentParticipantsApplicationsBlock({
               </div>
             </div>
             <p className="client-tournament-manage__applicationsNotify client-tournament-manage__applicationsNotify--alert">
-              승인완료시 신청자에게 신청완료 알림이 자동발신 됩니다.
+              <span className="client-tournament-manage__applicationsNotifyIcon" aria-hidden>
+                ⚠
+              </span>
+              <span className="client-tournament-manage__applicationsNotifyText">승인완료시 신청자에게 신청완료 알림이 자동발신 됩니다.</span>
             </p>
             <div className="client-tournament-manage__applicationsStatusLegendSingleLine" aria-label="신청 현황 및 표 버튼 안내">
               <div className="client-tournament-manage__applicationsStatusLegendSingleLine-chips">
-                <span className="client-tournament-manage__statusChipCompact" style={{ ...pillBase, background: "#f8fafc", color: "#475569", borderColor: "#e2e8f0" }}>
-                  신청 {participantCountSummary.total}명
+                <span
+                  className="client-tournament-manage__statusChipCompact client-tournament-manage__statusChipCompact--apply"
+                  style={pillBase}
+                >
+                  <span className="client-tournament-manage__statusChipLabel">신청</span>
+                  <strong className="client-tournament-manage__statusChipCount">{participantCountSummary.total}명</strong>
                 </span>
-                <span className="client-tournament-manage__statusChipCompact" style={{ ...pillBase, background: "#ecfdf5", color: "#166534", borderColor: "#86efac" }}>
-                  승인 {chipApproved}명
+                <span
+                  className="client-tournament-manage__statusChipCompact client-tournament-manage__statusChipCompact--approved"
+                  style={pillBase}
+                >
+                  <span className="client-tournament-manage__statusChipLabel">승인</span>
+                  <strong className="client-tournament-manage__statusChipCount">{chipApproved}명</strong>
                 </span>
-                <span className="client-tournament-manage__statusChipCompact" style={{ ...pillBase, background: "#f9fafb", color: "#4b5563", borderColor: "#e5e7eb" }}>
-                  취소 {participantCountSummary.reject}명
+                <span
+                  className="client-tournament-manage__statusChipCompact client-tournament-manage__statusChipCompact--rejected"
+                  style={pillBase}
+                >
+                  <span className="client-tournament-manage__statusChipLabel">취소</span>
+                  <strong className="client-tournament-manage__statusChipCount">{participantCountSummary.reject}명</strong>
                 </span>
                 {waitingListTotal > 0 ? (
-                  <span className="client-tournament-manage__statusChipCompact" style={{ ...pillBase, background: "#fffbeb", color: "#92400e", borderColor: "#fcd34d" }}>
-                    대기자 {waitingListTotal}명
+                  <span
+                    className="client-tournament-manage__statusChipCompact client-tournament-manage__statusChipCompact--waiting"
+                    style={pillBase}
+                  >
+                    <span className="client-tournament-manage__statusChipLabel">대기자</span>
+                    <strong className="client-tournament-manage__statusChipCount">{waitingListTotal}명</strong>
                   </span>
                 ) : null}
               </div>
               <div className="client-tournament-manage__applicationsStatusLegendSingleLine-legend">
-                <span className="client-tournament-manage__opLegendItem client-tournament-manage__opLegendItem--singleLine">
+                <span className="client-tournament-manage__opLegendItem client-tournament-manage__opLegendItem--singleLine client-tournament-manage__opLegendItem--won">
                   <span className="client-tournament-manage__opLegendDisk client-tournament-manage__opLegendDisk--won client-tournament-manage__opLegendDisk--singleLine" aria-hidden>
                     ₩
                   </span>
                   <span className="client-tournament-manage__opLegendCaption client-tournament-manage__opLegendCaption--singleLine">입금확인</span>
                 </span>
-                <span className="client-tournament-manage__opLegendItem client-tournament-manage__opLegendItem--singleLine">
+                <span className="client-tournament-manage__opLegendItem client-tournament-manage__opLegendItem--singleLine client-tournament-manage__opLegendItem--check">
                   <span className="client-tournament-manage__opLegendDisk client-tournament-manage__opLegendDisk--check client-tournament-manage__opLegendDisk--singleLine" aria-hidden>
                     ✓
                   </span>
                   <span className="client-tournament-manage__opLegendCaption client-tournament-manage__opLegendCaption--singleLine">승인</span>
                 </span>
-                <span className="client-tournament-manage__opLegendItem client-tournament-manage__opLegendItem--singleLine">
+                <span className="client-tournament-manage__opLegendItem client-tournament-manage__opLegendItem--singleLine client-tournament-manage__opLegendItem--cross">
                   <span className="client-tournament-manage__opLegendDisk client-tournament-manage__opLegendDisk--cross client-tournament-manage__opLegendDisk--singleLine" aria-hidden>
                     ✕
                   </span>
@@ -759,6 +780,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                   <col className="participant-col-w-fs participant-col-w-fs--apply" />
                   <col className="participant-col-w-fs participant-col-w-fs--name" />
                   <col className="participant-col-w-fs participant-col-w-fs--phone" />
+                  <col className="participant-col-w-fs participant-col-w-fs--handicap" />
                   <col className="participant-col-w-fs participant-col-w-fs--metric" />
                   <col className="participant-col-w-fs participant-col-w-fs--affiliation" />
                   <col className="participant-col-w-fs participant-col-w-fs--depositor" />
@@ -790,6 +812,9 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                       </th>
                       <th className="participant-th participant-th--phoneFs" style={{ ...participantApplicationsTableThBase, textAlign: "left" }}>
                         전화번호
+                      </th>
+                      <th className="participant-th participant-th--handicap" style={{ ...participantApplicationsTableThBase, textAlign: "center" }}>
+                        핸디
                       </th>
                       <th className="participant-th participant-th--metric" style={{ ...participantApplicationsTableThBase, textAlign: "center" }}>
                         {metricColumnTitle}
@@ -853,6 +878,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     phone={entry.phone}
                     registrationCreatedAt={entry.createdAt}
                     registrationSource={entry.registrationSource ?? null}
+                    handicap={entry.handicap ?? null}
                     participantAverage={entry.participantAverage ?? null}
                     metricColumnTitle={metricColumnTitle}
                     adminNote={entry.adminNote ?? null}

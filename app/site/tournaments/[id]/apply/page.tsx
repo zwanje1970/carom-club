@@ -81,6 +81,9 @@ export default function SiteTournamentApplyPage() {
   const [applicantName, setApplicantName] = useState("");
   const [phone, setPhone] = useState("");
   const [depositorName, setDepositorName] = useState("");
+  const [affiliation, setAffiliation] = useState("");
+  const [handicap, setHandicap] = useState("");
+  const [participantAverage, setParticipantAverage] = useState("");
   const [uploadedProofImage, setUploadedProofImage] = useState<UploadedProofImage | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -106,6 +109,7 @@ export default function SiteTournamentApplyPage() {
     () => applyVerificationMode === null || applyVerificationMode !== "NONE",
     [applyVerificationMode],
   );
+  const metricsReadOnly = useMemo(() => applyVerificationMode === "AUTO", [applyVerificationMode]);
 
   const focusProofArea = useCallback(() => {
     proofAreaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -138,6 +142,8 @@ export default function SiteTournamentApplyPage() {
         const result = (await response.json()) as {
           ok?: boolean;
           userMessage?: string;
+          handicap?: number | null;
+          average?: number | null;
           error?: string;
         };
         const ok = result.ok === true;
@@ -148,6 +154,18 @@ export default function SiteTournamentApplyPage() {
           "증빙 OCR 검증에 실패했습니다.";
         setOcrGateMessage(msg);
         setMessage(msg);
+        if (applyVerificationMode === "AUTO" && ok) {
+          const handicapValue =
+            typeof result.handicap === "number" && Number.isFinite(result.handicap) ? result.handicap : null;
+          const avgValue =
+            typeof result.average === "number" && Number.isFinite(result.average) ? result.average : null;
+          setHandicap(handicapValue == null ? "" : String(handicapValue));
+          setParticipantAverage(avgValue == null ? "" : String(avgValue));
+        }
+        if (applyVerificationMode === "AUTO" && !ok) {
+          setHandicap("");
+          setParticipantAverage("");
+        }
         if (!ok) {
           focusProofArea();
         }
@@ -163,7 +181,7 @@ export default function SiteTournamentApplyPage() {
         setOcrVerifying(false);
       }
     },
-    [focusProofArea, tournamentId]
+    [applyVerificationMode, focusProofArea, tournamentId]
   );
 
   useEffect(() => {
@@ -241,6 +259,13 @@ export default function SiteTournamentApplyPage() {
     };
   }, [tournamentId]);
 
+  useEffect(() => {
+    if (applyVerificationMode === "AUTO" && !uploadedProofImage?.imageId) {
+      setHandicap("");
+      setParticipantAverage("");
+    }
+  }, [applyVerificationMode, uploadedProofImage?.imageId]);
+
   useLayoutEffect(() => {
     const root = applyPageScrollRootRef.current;
     if (!root) return;
@@ -295,6 +320,16 @@ export default function SiteTournamentApplyPage() {
       setMessage("입금자명을 입력해 주세요.");
       return;
     }
+    const handicapTrim = handicap.trim();
+    const avgTrim = participantAverage.trim();
+    if (!handicapTrim) {
+      setMessage("핸디를 입력해 주세요.");
+      return;
+    }
+    if (!avgTrim) {
+      setMessage("AVG를 입력해 주세요.");
+      return;
+    }
     if (requiresProof) {
       if (!uploadedProofImage) {
         setMessage("증빙 이미지를 먼저 업로드해 주세요.");
@@ -332,6 +367,9 @@ export default function SiteTournamentApplyPage() {
           applicantName: applicantName.trim(),
           phone: phone.trim(),
           depositorName: depositorName.trim(),
+          affiliation: affiliation.trim(),
+          handicap: handicap.trim(),
+          participantAverage: participantAverage.trim(),
           proofImageId: uploadedProofImage?.imageId ?? "",
           proofImage320Url: uploadedProofImage?.w320Url ?? "",
           proofImage640Url: uploadedProofImage?.w640Url ?? "",
@@ -422,6 +460,10 @@ export default function SiteTournamentApplyPage() {
       }
     } catch {
       setMessage("증빙 이미지 업로드 중 오류가 발생했습니다.");
+      if (applyVerificationMode === "AUTO") {
+        setHandicap("");
+        setParticipantAverage("");
+      }
     } finally {
       setUploading(false);
     }
@@ -445,7 +487,7 @@ export default function SiteTournamentApplyPage() {
 
       <form className="v3-box v3-stack" onSubmit={handleSubmit} style={{ opacity: applicationsClosed ? 0.5 : 1 }} aria-disabled={applicationsClosed}>
         <label className="v3-stack">
-          <span>이름</span>
+          <span>이름 *</span>
           <input
             value={applicantName}
             onChange={(event) => setApplicantName(event.target.value)}
@@ -454,7 +496,7 @@ export default function SiteTournamentApplyPage() {
           />
         </label>
         <label className="v3-stack">
-          <span>전화번호</span>
+          <span>전화번호 *</span>
           <input
             value={phone}
             onChange={(event) => {
@@ -469,7 +511,63 @@ export default function SiteTournamentApplyPage() {
           />
         </label>
         <label className="v3-stack">
-          <span>입금자명</span>
+          <span>소속</span>
+          <input
+            value={affiliation}
+            placeholder="동호회명이나 단골클럽명을 입력하세요."
+            onChange={(event) => setAffiliation(event.target.value)}
+            disabled={applicationsClosed}
+            style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
+          />
+        </label>
+        <div
+          className="v3-row"
+          style={{
+            gap: "0.55rem",
+            alignItems: "flex-end",
+            flexWrap: "nowrap",
+          }}
+        >
+          <label className="v3-stack" style={{ flex: "1 1 0", minWidth: 0 }}>
+            <span>핸디 *</span>
+            <div className="v3-row" style={{ gap: "0.35rem", alignItems: "center", flexWrap: "nowrap" }}>
+              <input
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={handicap}
+                onChange={(event) => {
+                  const onlyDigits = event.target.value.replace(/\D/g, "");
+                  setHandicap(onlyDigits);
+                }}
+                disabled={applicationsClosed || metricsReadOnly}
+                style={{ flex: "1 1 auto", minWidth: 0, padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
+              />
+              <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "#475569", whiteSpace: "nowrap" }}>점</span>
+            </div>
+          </label>
+          <label className="v3-stack" style={{ flex: "1 1 0", minWidth: 0 }}>
+            <span>AVG *</span>
+            <input
+              inputMode="decimal"
+              value={participantAverage}
+              onChange={(event) => {
+                const normalized = event.target.value.replace(/[^0-9.]/g, "");
+                const firstDot = normalized.indexOf(".");
+                if (firstDot === -1) {
+                  setParticipantAverage(normalized);
+                } else {
+                  const before = normalized.slice(0, firstDot + 1);
+                  const after = normalized.slice(firstDot + 1).replace(/\./g, "");
+                  setParticipantAverage(before + after);
+                }
+              }}
+              disabled={applicationsClosed || metricsReadOnly}
+              style={{ padding: "0.55rem", border: "1px solid #bbb", borderRadius: "0.4rem" }}
+            />
+          </label>
+        </div>
+        <label className="v3-stack">
+          <span>입금자명 *</span>
           <input
             value={depositorName}
             onChange={(event) => {

@@ -27,6 +27,7 @@ const TOURNAMENT_APPLICATION_LIST_FIRESTORE_FIELDS = [
   "status",
   "registrationSource",
   "participantAverage",
+  "handicap",
   "adminNote",
   "statusChangedAt",
   "attendanceChecked",
@@ -62,6 +63,13 @@ function tournamentApplicationToListItem(
       ? pa
       : pa != null && typeof pa === "string" && pa.trim() !== "" && Number.isFinite(Number(pa))
         ? Number(pa)
+        : null;
+  const hc = item.handicap;
+  const handicap =
+    typeof hc === "number" && Number.isFinite(hc)
+      ? hc
+      : hc != null && typeof hc === "string" && hc.trim() !== "" && Number.isFinite(Number(hc))
+        ? Number(hc)
         : null;
   const adminNoteRaw = item.adminNote;
   const adminNote =
@@ -107,6 +115,7 @@ function tournamentApplicationToListItem(
     createdAt,
     registrationSource,
     participantAverage,
+    handicap,
     adminNote,
     ...(statusChangedAt ? { statusChangedAt } : {}),
     attendanceChecked,
@@ -142,6 +151,13 @@ function tournamentApplicationFromFirestore(id: string, data: Record<string, unk
       ? pa
       : pa != null && typeof pa === "string" && pa.trim() !== "" && Number.isFinite(Number(pa))
         ? Number(pa)
+        : null;
+  const hc = item.handicap;
+  const handicap =
+    typeof hc === "number" && Number.isFinite(hc)
+      ? hc
+      : hc != null && typeof hc === "string" && hc.trim() !== "" && Number.isFinite(Number(hc))
+        ? Number(hc)
         : null;
   const adminNoteRaw = item.adminNote;
   const adminNote =
@@ -211,6 +227,7 @@ function tournamentApplicationFromFirestore(id: string, data: Record<string, unk
           : createdAt,
     registrationSource,
     participantAverage,
+    handicap,
     adminNote,
     attendanceChecked,
     ...(approvedNotifiedAt ? { approvedNotifiedAt } : {}),
@@ -471,6 +488,9 @@ export async function createTournamentApplicationFirestore(params: {
   applicantName: string;
   phone: string;
   depositorName: string;
+  affiliation?: string;
+  handicap?: number;
+  participantAverage?: number;
   proofImageId: string;
   proofImage320Url: string;
   proofImage640Url: string;
@@ -482,12 +502,21 @@ export async function createTournamentApplicationFirestore(params: {
   const applicantName = params.applicantName.trim();
   const phone = params.phone.trim();
   const depositorName = params.depositorName.trim();
+  const affiliation = typeof params.affiliation === "string" ? params.affiliation.trim() : "";
   const proofImageId = params.proofImageId.trim();
   const waitlist = params.waitlist === true;
+  const handicap =
+    typeof params.handicap === "number" && Number.isFinite(params.handicap) ? params.handicap : null;
+  const participantAverage =
+    typeof params.participantAverage === "number" && Number.isFinite(params.participantAverage)
+      ? params.participantAverage
+      : null;
 
   if (!applicantName) return { ok: false, error: "이름을 입력해 주세요." };
   if (!phone) return { ok: false, error: "전화번호를 입력해 주세요." };
   if (!depositorName) return { ok: false, error: "입금자명을 입력해 주세요." };
+  if (handicap == null) return { ok: false, error: "핸디를 입력해 주세요." };
+  if (participantAverage == null) return { ok: false, error: "AVG를 입력해 주세요." };
 
   const canonicalUserId = await resolveCanonicalUserIdForAuth(params.userId.trim());
   const tournament = await getTournamentByIdFirestore(params.tournamentId);
@@ -562,6 +591,9 @@ export async function createTournamentApplicationFirestore(params: {
     createdAt: now,
     updatedAt: now,
     statusChangedAt: now,
+    ...(affiliation ? { affiliation } : {}),
+    handicap,
+    participantAverage,
   };
 
   const plain: Record<string, unknown> = {
@@ -584,6 +616,9 @@ export async function createTournamentApplicationFirestore(params: {
     createdAt: application.createdAt,
     updatedAt: application.updatedAt,
     statusChangedAt: application.statusChangedAt,
+    affiliation: application.affiliation ?? null,
+    handicap: application.handicap ?? null,
+    participantAverage: application.participantAverage ?? null,
   };
   await db.collection(COLLECTION).doc(application.id).set(plain);
   return { ok: true, application };

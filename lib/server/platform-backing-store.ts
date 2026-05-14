@@ -493,6 +493,8 @@ export type TournamentApplication = {
   zoneId?: string | null;
   /** 신청자 소속(표시용, 선택) */
   affiliation?: string | null;
+  /** 신청자 핸디(점수) */
+  handicap?: number | null;
   /** 운영자 입금확인 시각(신청 처리 UI). 참가확정(APPROVED)과 별개 */
   clientDepositConfirmedAt?: string | null;
   /** 운영자 신청 승인 시각. 참가확정은 별도(참가자 확정 시 APPROVED) */
@@ -519,6 +521,7 @@ export type TournamentApplicationListItem = {
   attendanceChecked?: boolean;
   zoneId?: string | null;
   affiliation?: string | null;
+  handicap?: number | null;
   clientDepositConfirmedAt?: string | null;
   clientApplicationApprovedAt?: string | null;
 };

@@ -47,6 +47,8 @@ function ocrGateDebugEmit(payload: Record<string, unknown>): void {
 export type SiteApplyOcrGateEvaluation = {
   ok: boolean;
   userMessage: string;
+  handicap: number | null;
+  average: number | null;
 };
 
 /**
@@ -80,7 +82,7 @@ export async function evaluateSiteApplyOcrGate(params: {
       applicantPhone: params.applicantPhone,
       userMessage: MSG_USER_READ_FAIL,
     });
-    return { ok: false, userMessage: MSG_USER_READ_FAIL };
+    return { ok: false, userMessage: MSG_USER_READ_FAIL, handicap: null, average: null };
   }
 
   const parsed = parseOcrEligibilityText(rawFull);
@@ -98,7 +100,7 @@ export async function evaluateSiteApplyOcrGate(params: {
       applicantPhone: params.applicantPhone,
       userMessage: MSG_USER_READ_FAIL,
     });
-    return { ok: false, userMessage: MSG_USER_READ_FAIL };
+    return { ok: false, userMessage: MSG_USER_READ_FAIL, handicap: null, average: null };
   }
 
   const applicantNameNorm = normalizeOcrPersonName(params.applicantName);
@@ -118,7 +120,7 @@ export async function evaluateSiteApplyOcrGate(params: {
       applicantPhone: params.applicantPhone,
       userMessage: MSG_USER_READ_FAIL,
     });
-    return { ok: false, userMessage: MSG_USER_READ_FAIL };
+    return { ok: false, userMessage: MSG_USER_READ_FAIL, handicap: null, average: null };
   }
   if (applicantNameNorm.length === 0) {
     ocrGateDebugEmit({
@@ -133,7 +135,7 @@ export async function evaluateSiteApplyOcrGate(params: {
       applicantPhone: params.applicantPhone,
       userMessage: MSG_USER_MISMATCH,
     });
-    return { ok: false, userMessage: MSG_USER_MISMATCH };
+    return { ok: false, userMessage: MSG_USER_MISMATCH, handicap: null, average: null };
   }
   if (normalizeOcrPersonName(parsed.name) !== applicantNameNorm) {
     ocrGateDebugEmit({
@@ -150,7 +152,7 @@ export async function evaluateSiteApplyOcrGate(params: {
       applicantNameNormalized: applicantNameNorm,
       userMessage: MSG_USER_MISMATCH,
     });
-    return { ok: false, userMessage: MSG_USER_MISMATCH };
+    return { ok: false, userMessage: MSG_USER_MISMATCH, handicap: null, average: null };
   }
 
   if (parsed.phone == null || parsed.phone.trim() === "") {
@@ -166,7 +168,7 @@ export async function evaluateSiteApplyOcrGate(params: {
       applicantPhone: params.applicantPhone,
       userMessage: MSG_USER_READ_FAIL,
     });
-    return { ok: false, userMessage: MSG_USER_READ_FAIL };
+    return { ok: false, userMessage: MSG_USER_READ_FAIL, handicap: null, average: null };
   }
   const ocrPhoneDigits = digitsOnlyPhone(parsed.phone);
   if (applicantPhoneDigits.length === 0 || ocrPhoneDigits.length === 0) {
@@ -184,7 +186,7 @@ export async function evaluateSiteApplyOcrGate(params: {
       ocrPhoneDigits,
       userMessage: MSG_USER_MISMATCH,
     });
-    return { ok: false, userMessage: MSG_USER_MISMATCH };
+    return { ok: false, userMessage: MSG_USER_MISMATCH, handicap: null, average: null };
   }
   if (ocrPhoneDigits !== applicantPhoneDigits) {
     ocrGateDebugEmit({
@@ -201,7 +203,7 @@ export async function evaluateSiteApplyOcrGate(params: {
       ocrPhoneDigits,
       userMessage: MSG_USER_MISMATCH,
     });
-    return { ok: false, userMessage: MSG_USER_MISMATCH };
+    return { ok: false, userMessage: MSG_USER_MISMATCH, handicap: null, average: null };
   }
 
   if (parsed.issueDate == null) {
@@ -217,7 +219,7 @@ export async function evaluateSiteApplyOcrGate(params: {
       applicantPhone: params.applicantPhone,
       userMessage: MSG_USER_READ_FAIL,
     });
-    return { ok: false, userMessage: MSG_USER_READ_FAIL };
+    return { ok: false, userMessage: MSG_USER_READ_FAIL, handicap: null, average: null };
   }
   if (!isIssueDateWithinThreeMonths(parsed.issueDate, now)) {
     ocrGateDebugEmit({
@@ -232,7 +234,7 @@ export async function evaluateSiteApplyOcrGate(params: {
       applicantPhone: params.applicantPhone,
       userMessage: MSG_USER_MISMATCH,
     });
-    return { ok: false, userMessage: MSG_USER_MISMATCH };
+    return { ok: false, userMessage: MSG_USER_MISMATCH, handicap: null, average: null };
   }
 
   if (rule.entryQualificationType === "NONE") {
@@ -249,7 +251,7 @@ export async function evaluateSiteApplyOcrGate(params: {
       applicantPhone: params.applicantPhone,
       userMessage: MSG_USER_PASS,
     });
-    return { ok: true, userMessage: MSG_USER_PASS };
+    return { ok: true, userMessage: MSG_USER_PASS, handicap: parsed.score, average: parsed.average };
   }
 
   const eligibilityCheck = checkOcrEligibility(parsed, rule);
@@ -275,7 +277,7 @@ export async function evaluateSiteApplyOcrGate(params: {
       },
       userMessage: MSG_USER_PASS,
     });
-    return { ok: true, userMessage: MSG_USER_PASS };
+    return { ok: true, userMessage: MSG_USER_PASS, handicap: parsed.score, average: parsed.average };
   }
   if (eligibilityCheck.passed === false) {
     ocrGateDebugEmit({
@@ -298,7 +300,7 @@ export async function evaluateSiteApplyOcrGate(params: {
       },
       userMessage: MSG_USER_MISMATCH,
     });
-    return { ok: false, userMessage: MSG_USER_MISMATCH };
+    return { ok: false, userMessage: MSG_USER_MISMATCH, handicap: null, average: null };
   }
 
   if (eligibilityCheck.target === "UNKNOWN") {
@@ -320,7 +322,7 @@ export async function evaluateSiteApplyOcrGate(params: {
       },
       userMessage: MSG_USER_READ_FAIL,
     });
-    return { ok: false, userMessage: MSG_USER_READ_FAIL };
+    return { ok: false, userMessage: MSG_USER_READ_FAIL, handicap: null, average: null };
   }
   if (eligibilityCheck.limit == null) {
     ocrGateDebugEmit({
@@ -341,7 +343,7 @@ export async function evaluateSiteApplyOcrGate(params: {
       },
       userMessage: MSG_USER_READ_FAIL,
     });
-    return { ok: false, userMessage: MSG_USER_READ_FAIL };
+    return { ok: false, userMessage: MSG_USER_READ_FAIL, handicap: null, average: null };
   }
 
   ocrGateDebugEmit({
@@ -364,5 +366,5 @@ export async function evaluateSiteApplyOcrGate(params: {
     },
     userMessage: MSG_USER_READ_FAIL,
   });
-  return { ok: false, userMessage: MSG_USER_READ_FAIL };
+  return { ok: false, userMessage: MSG_USER_READ_FAIL, handicap: null, average: null };
 }

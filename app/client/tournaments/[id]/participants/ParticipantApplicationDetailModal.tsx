@@ -77,6 +77,7 @@ export default function ParticipantApplicationDetailModal({
   registrationCreatedAt,
   registrationSource,
   participantAverage,
+  handicap,
   adminNote,
   statusChangedAt,
   attendanceChecked,
@@ -95,6 +96,7 @@ export default function ParticipantApplicationDetailModal({
   registrationCreatedAt: string;
   registrationSource?: "admin" | null;
   participantAverage?: number | null;
+  handicap?: number | null;
   adminNote?: string | null;
   statusChangedAt?: string;
   attendanceChecked?: boolean | null;
@@ -109,6 +111,7 @@ export default function ParticipantApplicationDetailModal({
 
   const fullPageHref = `/client/tournaments/${tournamentId}/participants/${entryId}`;
   const showEver = participantAverage != null && Number.isFinite(participantAverage);
+  const showHandicap = handicap != null && Number.isFinite(handicap);
   const depositLine = formatDepositMd(status, statusChangedAt);
 
   async function pipelineTransition(nextStatus: TournamentApplicationStatus) {
@@ -193,6 +196,13 @@ export default function ParticipantApplicationDetailModal({
             <>
               <span style={labelStyle}>등록</span>
               <span>관리자 등록</span>
+            </>
+          ) : null}
+
+          {showHandicap ? (
+            <>
+              <span style={labelStyle}>핸디</span>
+              <span>{String(handicap)}</span>
             </>
           ) : null}
 

@@ -9,7 +9,7 @@ import {
 } from "./tournaments-list-detail-transition-context";
 
 /** 본 슬라이드 — 탭 직후 체감 지연 완화를 위해 소폭 단축 */
-const MAIN_DURATION_MS = 450;
+const MAIN_DURATION_MS = 700;
 /** 빠른 초반·끝에서 감속 */
 const MAIN_EASING = "cubic-bezier(0.22, 0.92, 0.32, 1)";
 

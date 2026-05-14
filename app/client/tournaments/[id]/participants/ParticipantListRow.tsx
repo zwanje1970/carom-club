@@ -40,6 +40,7 @@ export default function ParticipantListRow({
   registrationCreatedAt,
   registrationSource,
   participantAverage,
+  handicap,
   metricColumnTitle,
   adminNote,
   statusChangedAt,
@@ -59,6 +60,7 @@ export default function ParticipantListRow({
   registrationCreatedAt: string;
   registrationSource?: "admin" | null;
   participantAverage?: number | null;
+  handicap?: number | null;
   metricColumnTitle: string;
   adminNote?: string | null;
   statusChangedAt?: string;
@@ -546,6 +548,7 @@ export default function ParticipantListRow({
   const affiliationDisplay = (typeof affiliation === "string" ? affiliation.trim() : "") || "—";
   const metricDisplay =
     participantAverage != null && Number.isFinite(participantAverage) ? String(participantAverage) : "—";
+  const handicapDisplay = handicap != null && Number.isFinite(handicap) ? String(handicap) : "—";
 
   const rowBg = terminalRejected ? "#f3f4f6" : terminalWaiting ? "#fffbeb" : "#fff";
 
@@ -565,6 +568,7 @@ export default function ParticipantListRow({
             applicantName={applicantName}
             depositorName={depositorDisplay !== "—" ? depositorDisplay : ""}
             affiliation={affiliationDisplay !== "—" ? affiliationDisplay : ""}
+            handicap={handicap}
             status={status}
             phone={phone}
             registrationCreatedAt={registrationCreatedAt}
@@ -640,6 +644,15 @@ export default function ParticipantListRow({
             title={phoneDisplay}
           >
             {phoneDisplay}
+          </td>
+        ) : null}
+        {rowLayout === "fullscreen" ? (
+          <td
+            data-participant-label="핸디"
+            className="participant-col participant-col--handicap"
+            style={{ ...cellBase, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
+          >
+            {handicapDisplay}
           </td>
         ) : null}
         {rowLayout === "fullscreen" ? (

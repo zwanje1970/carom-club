@@ -9,7 +9,7 @@ import {
   type CommunityListDetailTransitionContextValue,
 } from "./community-list-detail-transition-context";
 
-const MAIN_DURATION_MS = 450;
+const MAIN_DURATION_MS = 700;
 const MAIN_EASING = "cubic-bezier(0.22, 0.92, 0.32, 1)";
 const NUDGE_PX = 14;
 const NUDGE_DURATION_MS = 80;

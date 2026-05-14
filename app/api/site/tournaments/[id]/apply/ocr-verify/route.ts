@@ -71,5 +71,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   return NextResponse.json({
     ok: gate.ok,
     userMessage: gate.userMessage,
+    handicap: gate.handicap,
+    average: gate.average,
   });
 }
