@@ -240,55 +240,60 @@ export default async function SiteOperationalHome() {
     ),
   ]);
 
-  const tournamentSlideDeckItems: SlideDeckItem[] = mainSlideSnapshots.map((snapshot) => ({
-    type: "tournament" as const,
-    linkType: "internal" as const,
-    snapshotId: snapshot.snapshotId,
-    title: snapshot.title,
-    subtitle: snapshot.subtitle,
-    targetDetailUrl: snapshot.targetDetailUrl,
-    image320Url: snapshot.image320Url,
-    statusBadge: snapshot.statusBadge,
-    cardExtraLine1: snapshot.cardExtraLine1,
-    cardExtraLine2: snapshot.cardExtraLine2,
-    cardExtraLine3: snapshot.cardExtraLine3,
-    cardTemplate: snapshot.tournamentCardTemplate ?? "A",
-    backgroundType: snapshot.tournamentBackgroundType ?? (snapshot.image320Url?.trim() ? "image" : "theme"),
-    themeType: snapshot.tournamentTheme ?? "dark",
-    ...(typeof snapshot.tournamentMediaBackground === "string"
-      ? { mediaBackground: snapshot.tournamentMediaBackground }
-      : {}),
-    ...(typeof snapshot.tournamentImageOverlayBlend === "boolean"
-      ? { imageOverlayBlend: snapshot.tournamentImageOverlayBlend }
-      : {}),
-    ...(typeof snapshot.tournamentImageOverlayOpacity === "number"
-      ? { imageOverlayOpacity: snapshot.tournamentImageOverlayOpacity }
-      : {}),
-    ...(typeof snapshot.cardLeadTextColor === "string" && snapshot.cardLeadTextColor.trim()
-      ? { cardLeadTextColor: snapshot.cardLeadTextColor.trim() }
-      : {}),
-    ...(typeof snapshot.cardTitleTextColor === "string" && snapshot.cardTitleTextColor.trim()
-      ? { cardTitleTextColor: snapshot.cardTitleTextColor.trim() }
-      : {}),
-    ...(typeof snapshot.cardDescriptionTextColor === "string" && snapshot.cardDescriptionTextColor.trim()
-      ? { cardDescriptionTextColor: snapshot.cardDescriptionTextColor.trim() }
-      : {}),
-    ...(snapshot.tournamentCardTextShadowEnabled === true ? { cardTextShadowEnabled: true } : {}),
-    ...(snapshot.tournamentCardSurfaceLayout === "full" ? { cardSurfaceLayout: "full" as const } : {}),
-    ...(typeof snapshot.cardFooterDateTextColor === "string" && snapshot.cardFooterDateTextColor.trim()
-      ? { cardFooterDateTextColor: snapshot.cardFooterDateTextColor.trim() }
-      : {}),
-    ...(typeof snapshot.cardFooterPlaceTextColor === "string" && snapshot.cardFooterPlaceTextColor.trim()
-      ? { cardFooterPlaceTextColor: snapshot.cardFooterPlaceTextColor.trim() }
-      : {}),
-    ...(typeof snapshot.publishedCardImageUrl === "string" && snapshot.publishedCardImageUrl.trim()
-      ? { publishedCardImageUrl: snapshot.publishedCardImageUrl.trim() }
-      : {}),
-    ...(typeof snapshot.publishedCardImage320Url === "string" && snapshot.publishedCardImage320Url.trim()
-      ? { publishedCardImage320Url: snapshot.publishedCardImage320Url.trim() }
-      : {}),
-    ...(snapshot.publishedCardImageBackgroundOnly === true ? { publishedCardImageBackgroundOnly: true as const } : {}),
-  }));
+  const tournamentSlideDeckItems: SlideDeckItem[] = mainSlideSnapshots.map((snapshot) => {
+    const pub320 = typeof snapshot.publishedCardImage320Url === "string" ? snapshot.publishedCardImage320Url.trim() : "";
+    const pub640 = typeof snapshot.publishedCardImageUrl === "string" ? snapshot.publishedCardImageUrl.trim() : "";
+    const hasPublishedCardPng = Boolean(pub320 || pub640);
+    /** compact·과거 행에 플래그가 빠져 있어도 html2canvas 배경-only PNG면 메인 HTML 오버레이 필요 */
+    const publishedPngNeedsHtmlTextOverlay =
+      snapshot.publishedCardImageBackgroundOnly === true ||
+      (hasPublishedCardPng && snapshot.publishedCardImageBackgroundOnly !== false);
+    return {
+      type: "tournament" as const,
+      linkType: "internal" as const,
+      snapshotId: snapshot.snapshotId,
+      title: snapshot.title,
+      subtitle: snapshot.subtitle,
+      targetDetailUrl: snapshot.targetDetailUrl,
+      image320Url: snapshot.image320Url,
+      statusBadge: snapshot.statusBadge,
+      cardExtraLine1: snapshot.cardExtraLine1,
+      cardExtraLine2: snapshot.cardExtraLine2,
+      cardExtraLine3: snapshot.cardExtraLine3,
+      cardTemplate: snapshot.tournamentCardTemplate ?? "A",
+      backgroundType: snapshot.tournamentBackgroundType ?? (snapshot.image320Url?.trim() ? "image" : "theme"),
+      themeType: snapshot.tournamentTheme ?? "dark",
+      ...(typeof snapshot.tournamentMediaBackground === "string"
+        ? { mediaBackground: snapshot.tournamentMediaBackground }
+        : {}),
+      ...(typeof snapshot.tournamentImageOverlayBlend === "boolean"
+        ? { imageOverlayBlend: snapshot.tournamentImageOverlayBlend }
+        : {}),
+      ...(typeof snapshot.tournamentImageOverlayOpacity === "number"
+        ? { imageOverlayOpacity: snapshot.tournamentImageOverlayOpacity }
+        : {}),
+      ...(typeof snapshot.cardLeadTextColor === "string" && snapshot.cardLeadTextColor.trim()
+        ? { cardLeadTextColor: snapshot.cardLeadTextColor.trim() }
+        : {}),
+      ...(typeof snapshot.cardTitleTextColor === "string" && snapshot.cardTitleTextColor.trim()
+        ? { cardTitleTextColor: snapshot.cardTitleTextColor.trim() }
+        : {}),
+      ...(typeof snapshot.cardDescriptionTextColor === "string" && snapshot.cardDescriptionTextColor.trim()
+        ? { cardDescriptionTextColor: snapshot.cardDescriptionTextColor.trim() }
+        : {}),
+      ...(snapshot.tournamentCardTextShadowEnabled === true ? { cardTextShadowEnabled: true } : {}),
+      ...(snapshot.tournamentCardSurfaceLayout === "full" ? { cardSurfaceLayout: "full" as const } : {}),
+      ...(typeof snapshot.cardFooterDateTextColor === "string" && snapshot.cardFooterDateTextColor.trim()
+        ? { cardFooterDateTextColor: snapshot.cardFooterDateTextColor.trim() }
+        : {}),
+      ...(typeof snapshot.cardFooterPlaceTextColor === "string" && snapshot.cardFooterPlaceTextColor.trim()
+        ? { cardFooterPlaceTextColor: snapshot.cardFooterPlaceTextColor.trim() }
+        : {}),
+      ...(pub640 ? { publishedCardImageUrl: pub640 } : {}),
+      ...(pub320 ? { publishedCardImage320Url: pub320 } : {}),
+      ...(publishedPngNeedsHtmlTextOverlay ? { publishedCardImageBackgroundOnly: true as const } : {}),
+    };
+  });
 
   const liveSlideItems = mergeTournamentAndAdSlideDeckItems(
     tournamentSlideDeckItems,

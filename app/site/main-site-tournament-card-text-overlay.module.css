@@ -6,7 +6,10 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 4;
+  z-index: 6;
+  width: 100%;
+  min-width: 1px;
+  min-height: 1px;
   container-type: inline-size;
   container-name: main-tournament-card-overlay;
 }
@@ -24,5 +27,6 @@
   width: 440px;
   flex-shrink: 0;
   transform-origin: top center;
-  transform: scale(calc(100cqw / 440px));
+  /* cqw 가 0에 가까울 때 글자가 사라지는 것 방지 — 상한은 초대형 뷰포트에서의 과도한 확대만 제한 */
+  transform: scale(clamp(0.02, calc(100cqw / 440px), 20));
 }

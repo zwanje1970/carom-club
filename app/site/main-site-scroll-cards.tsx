@@ -236,6 +236,10 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   const measureFrameRef = useRef<number | null>(null);
   const pausedByUserRef = useRef(false);
   const programmaticScrollUntilMsRef = useRef(0);
+  /** sessionStorage 복원 직후 자동 슬라이드가 scrollTop을 덮어쓰지 않도록 */
+  const restoreSettleUntilMsRef = useRef(0);
+  /** 이번 마운트에서 세션 복원을 적용했으면 자동 슬라이드 준비 지연을 늘림 */
+  const sessionRestoreAppliedRef = useRef(false);
   /** `pxPerSec * dt` + carry; 매 프레임 `deltaTotal % 1`을 다음 carry로 유지 */
   const scrollPixelCarryRef = useRef(0);
 
@@ -261,6 +265,9 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     if (items.length === 0 || !itemsIdsKey) return;
     const viewport = viewportRef.current;
     if (!viewport) return;
+
+    sessionRestoreAppliedRef.current = false;
+    restoreSettleUntilMsRef.current = 0;
 
     let parsed:
       | (MainSiteScrollStoredV1 & { progressRatio?: number })
@@ -291,6 +298,10 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     }
     if (!parsed) return;
 
+    sessionRestoreAppliedRef.current = true;
+    const settleUntil = performance.now() + 900;
+    restoreSettleUntilMsRef.current = settleUntil;
+
     const targetFromRatio = () => {
       const maxScroll = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
       const ratio = Math.min(1, Math.max(0, Number(parsed?.progressRatio ?? NaN)));
@@ -301,14 +312,50 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       parsed.idsKey === itemsIdsKey
         ? parsed.scrollTop
         : targetFromRatio() ?? parsed.scrollTop;
+
     const apply = () => {
       const maxScroll = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
       const nextTop = Math.min(Math.max(0, target), maxScroll);
       viewport.scrollTop = nextTop;
-      programmaticScrollUntilMsRef.current = performance.now() + 250;
+      const now = performance.now();
+      programmaticScrollUntilMsRef.current = Math.max(programmaticScrollUntilMsRef.current, now + 900);
+      restoreSettleUntilMsRef.current = Math.max(restoreSettleUntilMsRef.current, now + 250);
     };
+
     apply();
-    requestAnimationFrame(apply);
+    let rafOuter: number | null = requestAnimationFrame(() => {
+      rafOuter = null;
+      apply();
+      requestAnimationFrame(() => {
+        apply();
+        requestAnimationFrame(() => {
+          apply();
+        });
+      });
+    });
+
+    let ro: ResizeObserver | null = null;
+    let roTimer: number | undefined;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(() => {
+        apply();
+      });
+      ro.observe(viewport);
+      roTimer = window.setTimeout(() => {
+        ro?.disconnect();
+        ro = null;
+      }, 2500);
+    }
+
+    const retryDelaysMs = [80, 160, 320, 500];
+    const retryTimers = retryDelaysMs.map((ms) => window.setTimeout(() => apply(), ms));
+
+    return () => {
+      if (rafOuter != null) cancelAnimationFrame(rafOuter);
+      retryTimers.forEach((t) => window.clearTimeout(t));
+      if (roTimer != null) window.clearTimeout(roTimer);
+      ro?.disconnect();
+    };
   }, [items.length, itemsIdsKey]);
 
   const onCardPointerDown = useCallback((itemId: string) => {
@@ -338,13 +385,48 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       return;
     }
     let cancelled = false;
+    const delayMs = sessionRestoreAppliedRef.current ? 900 : 220;
     const timer = window.setTimeout(() => {
       if (!cancelled) setAutoSlideReady(true);
-    }, 220);
+    }, delayMs);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
       setAutoSlideReady(false);
+    };
+  }, [itemsIdsKey, items.length]);
+
+  /** 탭 이동·복귀 시에도 스크롤 위치가 반영되도록 언마운트만이 아닌 스크롤 중 저장 */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const node = viewportRef.current;
+    if (!node || items.length === 0 || !itemsIdsKey) return;
+    const idsKey = itemsIdsKey;
+    let throttleTimer: number | null = null;
+    const flush = () => {
+      throttleTimer = null;
+      if (performance.now() < restoreSettleUntilMsRef.current) return;
+      try {
+        const maxScroll = Math.max(1, node.scrollHeight - node.clientHeight);
+        const payload: MainSiteScrollStoredV2 = {
+          v: 2,
+          idsKey,
+          scrollTop: node.scrollTop,
+          progressRatio: Math.min(1, Math.max(0, node.scrollTop / maxScroll)),
+        };
+        sessionStorage.setItem(MAIN_SITE_SCROLL_STORAGE_KEY, JSON.stringify(payload));
+      } catch {
+        /* ignore */
+      }
+    };
+    const onScroll = () => {
+      if (throttleTimer != null) return;
+      throttleTimer = window.setTimeout(flush, 200);
+    };
+    node.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      node.removeEventListener("scroll", onScroll);
+      if (throttleTimer != null) window.clearTimeout(throttleTimer);
     };
   }, [itemsIdsKey, items.length]);
 
@@ -446,6 +528,12 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       const maxScrollTop = node.scrollHeight - node.clientHeight;
       if (maxScrollTop <= 0) {
         if (segmentHeight <= 0) scheduleMeasureRetry();
+        rafRef.current = requestAnimationFrame(step);
+        return;
+      }
+
+      if (performance.now() < restoreSettleUntilMsRef.current) {
+        lastFrameTimeRef.current = frameTime;
         rafRef.current = requestAnimationFrame(step);
         return;
       }

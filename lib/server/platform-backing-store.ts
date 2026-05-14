@@ -2763,6 +2763,9 @@ function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedC
   if (typeof r.publishedCardImage320Url === "string" && r.publishedCardImage320Url.trim()) {
     base.publishedCardImage320Url = r.publishedCardImage320Url.trim();
   }
+  if (r.publishedCardImageBackgroundOnly === true) {
+    base.publishedCardImageBackgroundOnly = true;
+  }
   base.lifecycleStatus = normalizeEntityLifecycleStatus(r.lifecycleStatus);
   const lcDelAt = r.deletedAt;
   if (typeof lcDelAt === "string" && lcDelAt.trim() !== "") base.deletedAt = lcDelAt.trim();

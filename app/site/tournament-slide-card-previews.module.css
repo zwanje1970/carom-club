@@ -311,14 +311,15 @@
 .fullSurfaceFooter {
   display: flex;
   flex-direction: row;
-  align-items: flex-end;
+  /* 분할형 .cardFooter 와 동일: 한 줄 띠 안에서 세로 가운데 정렬 */
+  align-items: center;
   justify-content: space-between;
   gap: calc(10px * var(--tournament-card-height-scale));
   width: 100%;
   box-sizing: border-box;
   margin-top: auto;
-  padding: calc(10px * var(--tournament-card-height-scale)) calc(12px * var(--tournament-card-height-scale))
-    calc(4px * var(--tournament-card-height-scale));
+  /* 분할형 .cardFooter 와 동일 — 가로 패딩만(세로는 본문 .classicInner·.frameInner 패딩에 맡김) */
+  padding: 0 calc(12px * var(--tournament-card-height-scale));
   position: relative;
   z-index: 4;
   flex-shrink: 0;
@@ -338,9 +339,7 @@
   flex: 0 1 auto;
   min-width: 0;
   text-align: left;
-  white-space: pre-wrap;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  /* 분할형 .footerDate 와 동일 — 기본 줄바꿈만(전용 pre-wrap 없음) */
 }
 
 .fullSurfaceFooterPlace {
@@ -670,14 +669,10 @@
   line-height: 1.16;
 }
 
-.cardRootTemplateLayout .fullSurfaceFooter {
-  padding-left: calc(13px * var(--tournament-card-height-scale));
-  padding-right: calc(13px * var(--tournament-card-height-scale));
-}
-
 .cardRootTemplateLayout .fullSurfaceFooterDate,
 .cardRootTemplateLayout .fullSurfaceFooterPlace {
-  font-size: calc((0.72rem + 1pt + 2pt - 1pt) * var(--tournament-card-height-scale));
+  /* 분할형 .footerDate / .footerPlace 와 동일(높이 스케일을 글자에 이중 적용하지 않음) */
+  font-size: calc(0.72rem + 1pt + 2pt - 1pt);
   line-height: 1.25;
   font-weight: 400;
 }
