@@ -28,12 +28,12 @@ export function getImageExtFromFileName(fileName: string): "jpg" | "png" | "webp
 }
 
 export type PersistProofImageW320W640Result =
-  | { ok: true; imageId: string; w160Url: string; w320Url: string; w640Url: string }
+  | { ok: true; imageId: string; originalUrl: string; w160Url: string; w320Url: string; w640Url: string }
   | { ok: false; error: string; status: number; code?: string };
 
 /**
- * 증빙/사이트 이미지와 동일 파이프라인: sharp로 w640·w320·w160 생성 후 디스크 또는 Firebase Storage + proof 메타.
- * `preservePngTransparency`: 게시 카드 스냅샷만 — JPEG 변환 없이 PNG(알파)로 w160/w320/w640 저장.
+ * 증빙/사이트 이미지와 동일 파이프라인: sharp로 original(1280)·w640·w320·w160 생성 후 저장.
+ * `preservePngTransparency`: 게시 카드 스냅샷만 — JPEG 변환 없이 PNG(알파)로 변형 저장.
  */
 export async function persistProofImageW320W640Variants(params: {
   imageId: string;
@@ -47,10 +47,12 @@ export async function persistProofImageW320W640Variants(params: {
   const preservePngTransparency = params.preservePngTransparency === true;
 
   if (preservePngTransparency) {
+    let originalBuf: Buffer;
     let w640Buf: Buffer;
     let w320Buf: Buffer;
     let w160Buf: Buffer;
     try {
+      originalBuf = await sharp(buffer).resize({ width: 1280, withoutEnlargement: true }).png().toBuffer();
       w640Buf = await sharp(buffer).resize({ width: 640, withoutEnlargement: true }).png().toBuffer();
       w320Buf = await sharp(buffer).resize({ width: 320, withoutEnlargement: true }).png().toBuffer();
       w160Buf = await sharp(buffer).resize({ width: 160, withoutEnlargement: true }).png().toBuffer();
@@ -64,13 +66,17 @@ export async function persistProofImageW320W640Variants(params: {
       const w160Dir = path.join(baseUploadDir, "w160");
       const w320Dir = path.join(baseUploadDir, "w320");
       const w640Dir = path.join(baseUploadDir, "w640");
+      const originalDir = path.join(baseUploadDir, "original");
       await mkdir(w160Dir, { recursive: true });
       await mkdir(w320Dir, { recursive: true });
       await mkdir(w640Dir, { recursive: true });
+      await mkdir(originalDir, { recursive: true });
+      const originalPng = path.join(originalDir, `${imageId}.png`);
       const w640Png = path.join(w640Dir, `${imageId}.png`);
       const w320Png = path.join(w320Dir, `${imageId}.png`);
       const w160Png = path.join(w160Dir, `${imageId}.png`);
       try {
+        await writeFile(originalPng, originalBuf);
         await writeFile(w640Png, w640Buf);
         await writeFile(w320Png, w320Buf);
         await writeFile(w160Png, w160Buf);
@@ -91,16 +97,23 @@ export async function persistProofImageW320W640Variants(params: {
       return {
         ok: true,
         imageId,
+        originalUrl: buildUrl(imageId, "original"),
         w160Url: buildUrl(imageId, "w160"),
         w320Url: buildUrl(imageId, "w320"),
         w640Url: buildUrl(imageId, "w640"),
       };
     }
 
-    let storageUrls: { storageW160Url: string; storageW320Url: string; storageW640Url: string };
+    let storageUrls: {
+      storageOriginalUrl: string;
+      storageW160Url: string;
+      storageW320Url: string;
+      storageW640Url: string;
+    };
     try {
       storageUrls = await uploadProofImageVariantsToFirebaseStorage({
         imageId,
+        originalBuffer: originalBuf,
         w160Buffer: w160Buf,
         w320Buffer: w320Buf,
         w640Buffer: w640Buf,
@@ -125,7 +138,7 @@ export async function persistProofImageW320W640Variants(params: {
       uploaderUserId,
       originalExt: "png",
       sitePublic,
-      storageOriginalUrl: storageUrls.storageW640Url,
+      storageOriginalUrl: storageUrls.storageOriginalUrl,
       storageW160Url: storageUrls.storageW160Url,
       storageW320Url: storageUrls.storageW320Url,
       storageW640Url: storageUrls.storageW640Url,
@@ -137,6 +150,7 @@ export async function persistProofImageW320W640Variants(params: {
     return {
       ok: true,
       imageId,
+      originalUrl: storageUrls.storageOriginalUrl,
       w160Url: storageUrls.storageW160Url,
       w320Url: storageUrls.storageW320Url,
       w640Url: storageUrls.storageW640Url,
@@ -148,26 +162,38 @@ export async function persistProofImageW320W640Variants(params: {
     const w160Dir = path.join(baseUploadDir, "w160");
     const w320Dir = path.join(baseUploadDir, "w320");
     const w640Dir = path.join(baseUploadDir, "w640");
+    const originalDir = path.join(baseUploadDir, "original");
     await mkdir(w160Dir, { recursive: true });
     await mkdir(w320Dir, { recursive: true });
     await mkdir(w640Dir, { recursive: true });
+    await mkdir(originalDir, { recursive: true });
 
     const w160Jpg = path.join(w160Dir, `${imageId}.jpg`);
     const w320Jpg = path.join(w320Dir, `${imageId}.jpg`);
     const w640Jpg = path.join(w640Dir, `${imageId}.jpg`);
+    const originalJpg = path.join(originalDir, `${imageId}.jpg`);
     const w640Alt = path.join(w640Dir, `${imageId}.${ext}`);
+    const originalAlt = path.join(originalDir, `${imageId}.${ext}`);
 
     let w640ForDownstream: Buffer;
+    let originalForDownstream: Buffer;
     try {
+      originalForDownstream = await sharp(buffer)
+        .resize({ width: 1280, withoutEnlargement: true })
+        .jpeg({ quality: 90 })
+        .toBuffer();
       w640ForDownstream = await sharp(buffer)
         .resize({ width: 640, withoutEnlargement: true })
         .jpeg({ quality: 88 })
         .toBuffer();
+      await writeFile(originalJpg, originalForDownstream);
       await writeFile(w640Jpg, w640ForDownstream);
     } catch (err) {
       console.warn("[persist-proof-image-w320-w640] w640 sharp 실패, 원본 바이트를 w640에 저장", err);
+      originalForDownstream = buffer;
       w640ForDownstream = buffer;
       try {
+        await writeFile(originalAlt, buffer);
         await writeFile(w640Alt, buffer);
       } catch (e2) {
         console.error("[persist-proof-image-w320-w640] w640 저장 실패", e2);
@@ -248,6 +274,7 @@ export async function persistProofImageW320W640Variants(params: {
     return {
       ok: true,
       imageId,
+      originalUrl: buildUrl(imageId, "original"),
       w160Url: buildUrl(imageId, "w160"),
       w320Url: buildUrl(imageId, "w320"),
       w640Url: buildUrl(imageId, "w640"),
@@ -255,13 +282,19 @@ export async function persistProofImageW320W640Variants(params: {
   }
 
   let w640Buffer: Buffer;
+  let originalBuffer: Buffer;
   try {
+    originalBuffer = await sharp(buffer)
+      .resize({ width: 1280, withoutEnlargement: true })
+      .jpeg({ quality: 90 })
+      .toBuffer();
     w640Buffer = await sharp(buffer)
       .resize({ width: 640, withoutEnlargement: true })
       .jpeg({ quality: 88 })
       .toBuffer();
   } catch (err) {
     console.warn("[persist-proof-image-w320-w640] w640 sharp 실패(원본 바이트로 w640 업로드)", err);
+    originalBuffer = buffer;
     w640Buffer = buffer;
   }
 
@@ -303,10 +336,16 @@ export async function persistProofImageW320W640Variants(params: {
     }
   }
 
-  let storageUrls: { storageW160Url: string; storageW320Url: string; storageW640Url: string };
+  let storageUrls: {
+    storageOriginalUrl: string;
+    storageW160Url: string;
+    storageW320Url: string;
+    storageW640Url: string;
+  };
   try {
     storageUrls = await uploadProofImageVariantsToFirebaseStorage({
       imageId,
+      originalBuffer,
       w160Buffer,
       w320Buffer,
       w640Buffer,
@@ -331,7 +370,7 @@ export async function persistProofImageW320W640Variants(params: {
     uploaderUserId,
     originalExt: ext,
     sitePublic,
-    storageOriginalUrl: storageUrls.storageW640Url,
+    storageOriginalUrl: storageUrls.storageOriginalUrl,
     storageW160Url: storageUrls.storageW160Url,
     storageW320Url: storageUrls.storageW320Url,
     storageW640Url: storageUrls.storageW640Url,
@@ -350,6 +389,7 @@ export async function persistProofImageW320W640Variants(params: {
   return {
     ok: true,
     imageId,
+    originalUrl: storageUrls.storageOriginalUrl,
     w160Url: storageUrls.storageW160Url,
     w320Url: storageUrls.storageW320Url,
     w640Url: storageUrls.storageW640Url,

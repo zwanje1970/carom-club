@@ -40,7 +40,7 @@ export function resolveSiteListThumbnailFromPosterWithAssetMap(
 /** 메인 슬라이드 게시카드(320 계열) */
 export const SITE_MAIN_SLIDE_CARD_IMAGE_VARIANT_PREF = ["w320", "w640", "w160", "original"] as const;
 /** 상세·본문(640 계열 우선) */
-export const SITE_PUBLIC_DETAIL_IMAGE_VARIANT_PREF = ["w640", "w320", "w160", "original"] as const;
+export const SITE_PUBLIC_DETAIL_IMAGE_VARIANT_PREF = ["original", "w640", "w320", "w160"] as const;
 
 export type SiteProofImageVariantPref = "w320" | "w640" | "w160" | "original";
 

@@ -146,8 +146,10 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     imageId: persist.imageId,
+    originalUrl: persist.originalUrl,
     publishedCardImageUrl: persist.w640Url,
     publishedCardImage320Url: persist.w320Url,
+    w1280Url: persist.originalUrl,
     w640Url: persist.w640Url,
     w320Url: persist.w320Url,
   });

@@ -21,7 +21,9 @@
     "test:ocr-google": "npx --yes tsx --env-file=.env.local scripts/ocr-test-google-vision-receipt.mts"
   },
   "dependencies": {
+    "@fontsource-variable/noto-sans-kr": "^5.2.10",
     "@google-cloud/vision": "^4.3.3",
+    "@resvg/resvg-js": "^2.6.2",
     "@tiptap/extension-color": "^3.22.3",
     "@tiptap/extension-link": "^3.22.3",
     "@tiptap/extension-placeholder": "^3.22.3",

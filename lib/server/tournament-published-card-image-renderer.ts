@@ -1,12 +1,18 @@
 import "server-only";
 
+import { existsSync, readdirSync } from "fs";
+import path from "path";
+import { Resvg } from "@resvg/resvg-js";
 import sharp from "sharp";
 
 const SOURCE_WIDTH = 440;
 const SOURCE_HEIGHT = 180;
+/** 레이아웃 계산은 기존 640 논리 좌표로 유지하고, 실제 PNG는 2x(1280)로 라스터화한다. */
 const OUTPUT_WIDTH = 640;
 const OUTPUT_HEIGHT = Math.round((OUTPUT_WIDTH * SOURCE_HEIGHT) / SOURCE_WIDTH);
+const RASTER_WIDTH = 1280;
 const SCALE = OUTPUT_WIDTH / SOURCE_WIDTH;
+const CARD_FONT_FAMILY = "'Noto Sans KR Variable', 'Noto Sans KR', system-ui, sans-serif";
 
 export type TournamentPublishedCardImagePayload = {
   tournamentId: string;
@@ -36,6 +42,20 @@ const THEME_BACKGROUNDS: Record<"dark" | "light" | "natural", string> = {
   light: "#e0f2fe",
   natural: "#166534",
 };
+
+function getBundledKoreanFontFiles(): string[] {
+  const dir = path.join(
+    /* turbopackIgnore: true */ process.cwd(),
+    "node_modules",
+    "@fontsource-variable",
+    "noto-sans-kr",
+    "files",
+  );
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((name) => name.endsWith(".woff2"))
+    .map((name) => path.join(dir, name));
+}
 
 function esc(raw: unknown): string {
   return String(raw ?? "")
@@ -123,7 +143,7 @@ function textBlock(params: {
   const spans = params.lines
     .map((line, idx) => `<tspan x="${params.x}" dy="${idx === 0 ? 0 : lineHeight}">${esc(line)}</tspan>`)
     .join("");
-  return `<text x="${params.x}" y="${params.y}" fill="${esc(params.color)}" font-size="${params.fontSize}" font-weight="${params.fontWeight}" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" text-anchor="${anchor}"${params.filter ? ` filter="${params.filter}"` : ""}>${spans}</text>`;
+  return `<text x="${params.x}" y="${params.y}" fill="${esc(params.color)}" font-size="${params.fontSize}" font-weight="${params.fontWeight}" font-family="${CARD_FONT_FAMILY}" text-anchor="${anchor}"${params.filter ? ` filter="${params.filter}"` : ""}>${spans}</text>`;
 }
 
 function statusKind(raw: string): "recruiting" | "closing" | "full" | "live" | "ended" {
@@ -161,7 +181,7 @@ function statusBadgeSvg(raw: string): string {
       : `<tspan x="${cx}" dy="7">${esc(badge[0])}</tspan>`;
   return `
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${gradientId})" stroke="#fff" stroke-width="3" filter="url(#badgeShadow)" />
-    <text x="${cx}" y="${cy}" fill="#fafaf9" font-size="${fontSize}" font-weight="800" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" text-anchor="middle" dominant-baseline="middle">${tspans}</text>
+    <text x="${cx}" y="${cy}" fill="#fafaf9" font-size="${fontSize}" font-weight="800" font-family="${CARD_FONT_FAMILY}" text-anchor="middle" dominant-baseline="middle">${tspans}</text>
   `;
 }
 
@@ -328,13 +348,13 @@ export async function renderTournamentPublishedCardPng(params: {
     surfaceLayout === "split"
       ? `
         <rect x="0" y="${mediaHeight}" width="${OUTPUT_WIDTH}" height="${footerHeight}" fill="#fff" />
-        <text x="18" y="${mediaHeight + 36}" fill="${esc(footerDateColor)}" font-size="19" font-weight="400" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"${shadowFilter}>${esc(subtitle.dateText)}</text>
-        <text x="${OUTPUT_WIDTH - 18}" y="${mediaHeight + 36}" fill="${esc(footerPlaceColor)}" font-size="19" font-weight="400" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" text-anchor="end"${shadowFilter}>${esc(subtitle.placeText)}</text>
+        <text x="18" y="${mediaHeight + 36}" fill="${esc(footerDateColor)}" font-size="19" font-weight="400" font-family="${CARD_FONT_FAMILY}"${shadowFilter}>${esc(subtitle.dateText)}</text>
+        <text x="${OUTPUT_WIDTH - 18}" y="${mediaHeight + 36}" fill="${esc(footerPlaceColor)}" font-size="19" font-weight="400" font-family="${CARD_FONT_FAMILY}" text-anchor="end"${shadowFilter}>${esc(subtitle.placeText)}</text>
       `
       : `
         <rect x="0" y="${OUTPUT_HEIGHT - 44}" width="${OUTPUT_WIDTH}" height="44" fill="rgba(0,0,0,0.16)" />
-        <text x="18" y="${OUTPUT_HEIGHT - 17}" fill="${esc(footerDateColor)}" font-size="19" font-weight="400" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"${shadowFilter}>${esc(subtitle.dateText)}</text>
-        <text x="${OUTPUT_WIDTH - 18}" y="${OUTPUT_HEIGHT - 17}" fill="${esc(footerPlaceColor)}" font-size="19" font-weight="400" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" text-anchor="end"${shadowFilter}>${esc(subtitle.placeText)}</text>
+        <text x="18" y="${OUTPUT_HEIGHT - 17}" fill="${esc(footerDateColor)}" font-size="19" font-weight="400" font-family="${CARD_FONT_FAMILY}"${shadowFilter}>${esc(subtitle.dateText)}</text>
+        <text x="${OUTPUT_WIDTH - 18}" y="${OUTPUT_HEIGHT - 17}" fill="${esc(footerPlaceColor)}" font-size="19" font-weight="400" font-family="${CARD_FONT_FAMILY}" text-anchor="end"${shadowFilter}>${esc(subtitle.placeText)}</text>
       `;
 
   const imageLayer = imageDataUri
@@ -366,5 +386,21 @@ export async function renderTournamentPublishedCardPng(params: {
     </svg>
   `;
 
-  return sharp(Buffer.from(svg)).png().toBuffer();
+  const rendered = new Resvg(svg, {
+    fitTo: { mode: "width", value: RASTER_WIDTH },
+    font: {
+      loadSystemFonts: false,
+      fontFiles: getBundledKoreanFontFiles(),
+      defaultFontFamily: "Noto Sans KR Variable",
+      sansSerifFamily: "Noto Sans KR Variable",
+    },
+    textRendering: 1,
+    shapeRendering: 2,
+    imageRendering: 0,
+    logLevel: "off",
+  })
+    .render()
+    .asPng();
+
+  return sharp(rendered).png({ compressionLevel: 9, adaptiveFiltering: true }).toBuffer();
 }

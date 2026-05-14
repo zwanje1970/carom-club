@@ -43,24 +43,18 @@ async function readW320W640DirFiles(
   }
 }
 
-/**
- * variant `original` 은 w640(최대 해상도)을 가리킨다. (신규: `w640/` 만 사용)
- * `original/` 구버전 경로는 기존 데이터용으로만 읽는다.
- */
 export async function readProofImageVariantFile(
   imageId: string,
   variant: "original" | "w160" | "w320" | "w640",
   originalExt: ProofImageOriginalExt
 ): Promise<{ buffer: Buffer; ext: string } | null> {
   if (variant === "original") {
-    const fromW640 = await readW320W640DirFiles("w640", imageId, originalExt);
-    if (fromW640) return fromW640;
     const base = getProofImagesBaseDir();
     const legacy = base + path.sep + "original" + path.sep + imageId + "." + originalExt;
     try {
       return { buffer: await readFile(legacy), ext: originalExt };
     } catch {
-      return null;
+      return readW320W640DirFiles("w640", imageId, originalExt);
     }
   }
   return readW320W640DirFiles(variant, imageId, originalExt);
