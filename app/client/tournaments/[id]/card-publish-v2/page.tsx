@@ -25,12 +25,12 @@ const PUBLISH_PROGRESS_DRAFT_SAVE = {
   label: "카드 초안을 저장하고 있습니다.",
 };
 const PUBLISH_PROGRESS_STATUS_PATCH = {
-  percent: 30,
+  percent: 40,
   label: "대회 상태를 모집중으로 변경하고 있습니다.",
 };
 const PUBLISH_PROGRESS_CARD_IMAGE = {
-  percent: 50,
-  label: "게시용 카드 이미지를 만들고 있습니다. 잠시만 기다려 주세요.",
+  percent: 60,
+  label: "서버에서 게시용 이미지를 만들고 있습니다.",
 };
 const PUBLISH_PROGRESS_MAIN_SAVE = {
   percent: 80,
@@ -242,12 +242,8 @@ export default function ClientTournamentCardPublishV2Page() {
   /** `loadSnapshots` 기준 대회 배지 — 게시 실패 시 PATCH 롤백용 */
   const [tournamentStatusBadge, setTournamentStatusBadge] = useState("");
   const [uploading, setUploading] = useState(false);
-  /** 캡처용 오프스크린 카드 — 초기 타이핑 부담 완화 후 `requestIdleCallback`으로 마운트 */
-  const [renderOffscreenCaptureCard, setRenderOffscreenCaptureCard] = useState(false);
 
   const bgFileInputRef = useRef<HTMLInputElement>(null);
-  const cardPublishCaptureRef = useRef<HTMLDivElement>(null);
-  const cardPublishCaptureForImageRef = useRef<HTMLDivElement>(null);
   /** 저장 중복 요청 차단 — ref로 동기 가드 */
   const saveInFlightRef = useRef(false);
   const mountedRef = useRef(true);
@@ -329,21 +325,6 @@ export default function ClientTournamentCardPublishV2Page() {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let idleHandle = 0;
-    let timeoutHandle = 0;
-    const enable = () => setRenderOffscreenCaptureCard(true);
-    if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") {
-      idleHandle = window.requestIdleCallback(enable, { timeout: 2000 });
-    } else if (typeof window !== "undefined") {
-      timeoutHandle = window.setTimeout(enable, 300);
-    }
-    return () => {
-      if (idleHandle) window.cancelIdleCallback(idleHandle);
-      if (timeoutHandle) window.clearTimeout(timeoutHandle);
     };
   }, []);
 
@@ -650,8 +631,7 @@ export default function ClientTournamentCardPublishV2Page() {
       }, 380);
     } catch {
       if (recruitingPublish) {
-        setPublishFlowError(PUBLISH_FLOW_FAIL_KO);
-        setPublishFlow(null);
+      setPublishFlowError(PUBLISH_FLOW_FAIL_KO);
       } else {
         window.alert("처리 중 오류가 발생했습니다.");
       }
@@ -663,7 +643,8 @@ export default function ClientTournamentCardPublishV2Page() {
     }
   }
 
-  const publishActionBlocked = publishBusy;
+  const editorLocked = publishBusy || uploading;
+  const publishActionBlocked = publishBusy || uploading;
   const publishButtonLabel = publishBusy ? "처리 중…" : "게시";
 
   function handlePublishCompleteModalConfirm(): void {
@@ -790,34 +771,13 @@ export default function ClientTournamentCardPublishV2Page() {
                       <div
                         className={`${editorStyles.previewCardWrap} ${editorStyles.previewCardWrapV2Chrome}`}
                       >
-                        <CardPublishPreview ref={cardPublishCaptureRef} model={previewModel} />
+                        <CardPublishPreview model={previewModel} />
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-          <div className={editorStyles.cardPublishCaptureOffscreen} aria-hidden>
-            {renderOffscreenCaptureCard ? (
-              <div className={editorStyles.previewInner}>
-                <div className={editorStyles.previewSlideLayer}>
-                  <div className={editorStyles.previewCardScaleHost}>
-                    <div className={editorStyles.previewCardAspectFace}>
-                      <div
-                        className={`${editorStyles.previewCardWrap} ${editorStyles.previewCardWrapV2Chrome}`}
-                      >
-                        <CardPublishPreview
-                          ref={cardPublishCaptureForImageRef}
-                          model={previewModel}
-                          isImageCaptureMode
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : null}
           </div>
         </div>
 
@@ -829,6 +789,7 @@ export default function ClientTournamentCardPublishV2Page() {
                 role="tab"
                 aria-selected={editorTab === "background"}
                 className={`${editorStyles.stepTab} ${editorTab === "background" ? editorStyles.stepTabActive : ""}`}
+              disabled={editorLocked}
                 onClick={() => setEditorTab("background")}
               >
                 배경설정
@@ -838,6 +799,7 @@ export default function ClientTournamentCardPublishV2Page() {
                 role="tab"
                 aria-selected={editorTab === "content"}
                 className={`${editorStyles.stepTab} ${editorTab === "content" ? editorStyles.stepTabActive : ""}`}
+              disabled={editorLocked}
                 onClick={() => setEditorTab("content")}
               >
                 내용입력
@@ -871,6 +833,7 @@ export default function ClientTournamentCardPublishV2Page() {
               setCardPlace={setCardPlace}
               cardTextShadowEnabled={cardTextShadowEnabled}
               setCardTextShadowEnabled={setCardTextShadowEnabled}
+              disabled={editorLocked}
             />
           ) : (
             <CardPublishBackgroundTab
@@ -883,6 +846,7 @@ export default function ClientTournamentCardPublishV2Page() {
               uploadedImage={uploadedImage}
               imageOverlayOpacity={imageOverlayOpacity}
               onImageOverlayChange={onImageOverlayChange}
+              disabled={editorLocked}
             />
           )}
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { type CSSProperties, FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import adminUi from "../../../../components/admin/admin-card.module.css";
 import { isEmptyOutlineHtml } from "../../../../../lib/outline-content-helpers";
@@ -769,8 +769,7 @@ export default function ClientTournamentEditPage() {
     }
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function handleSubmit() {
     if (loading || !editId) return;
 
     const wizardCheck = validateWizardBeforeSave();

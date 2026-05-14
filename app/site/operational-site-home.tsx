@@ -255,7 +255,7 @@ export default async function SiteOperationalHome() {
     const pub320 = typeof snapshot.publishedCardImage320Url === "string" ? snapshot.publishedCardImage320Url.trim() : "";
     const pub640 = typeof snapshot.publishedCardImageUrl === "string" ? snapshot.publishedCardImageUrl.trim() : "";
     const hasPublishedCardPng = Boolean(pub320 || pub640);
-    /** compact·과거 행에 플래그가 빠져 있어도 html2canvas 배경-only PNG면 메인 HTML 오버레이 필요 */
+    /** 과거 배경-only PNG는 플래그 누락 시 overlay 유지. 서버 완성 PNG는 false가 compact에 저장되어 overlay 없음. */
     const publishedPngNeedsHtmlTextOverlay =
       snapshot.publishedCardImageBackgroundOnly === true ||
       (hasPublishedCardPng && snapshot.publishedCardImageBackgroundOnly !== false);

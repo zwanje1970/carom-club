@@ -13,6 +13,7 @@ export const TextColorSwatches = memo(function TextColorSwatches({
   swatchClass,
   swatchLightClass,
   swatchSelectedClass,
+  disabled = false,
 }: {
   value: string;
   onChange: (next: string) => void;
@@ -20,6 +21,7 @@ export const TextColorSwatches = memo(function TextColorSwatches({
   swatchClass: string;
   swatchLightClass: string;
   swatchSelectedClass: string;
+  disabled?: boolean;
 }) {
   return (
     <div className={wrapClass} role="group" aria-label="글자색">
@@ -34,6 +36,7 @@ export const TextColorSwatches = memo(function TextColorSwatches({
             style={{ backgroundColor: hex }}
             aria-label={`색 ${hex}`}
             aria-pressed={selected}
+            disabled={disabled}
             onClick={() => onChange(selected ? "" : hex)}
           />
         );
@@ -88,6 +91,7 @@ export const CardPublishBackgroundTab = memo(function CardPublishBackgroundTab({
   uploadedImage,
   imageOverlayOpacity,
   onImageOverlayChange,
+  disabled = false,
 }: {
   mediaBackground: string;
   onPickPaletteColor: (hex: string) => void;
@@ -98,6 +102,7 @@ export const CardPublishBackgroundTab = memo(function CardPublishBackgroundTab({
   uploadedImage: { w320Url: string } | null;
   imageOverlayOpacity: number;
   onImageOverlayChange: (opacity01: number) => void;
+  disabled?: boolean;
 }) {
   return (
     <>
@@ -119,11 +124,12 @@ export const CardPublishBackgroundTab = memo(function CardPublishBackgroundTab({
                   border: "none",
                   borderRadius: 7,
                   backgroundColor: hex,
-                  cursor: "pointer",
+                  cursor: disabled ? "default" : "pointer",
                   boxSizing: "border-box",
                   outline: selected ? "2px solid #ffffff" : "none",
                   boxShadow: selected ? "0 0 0 2px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.25)" : "none",
                 }}
+                disabled={disabled}
                 onClick={() => onPickPaletteColor(hex)}
               />
             );
@@ -139,12 +145,14 @@ export const CardPublishBackgroundTab = memo(function CardPublishBackgroundTab({
             className={editorStyles.fieldFile}
             type="file"
             accept="image/jpeg,image/png,image/webp"
+            disabled={disabled}
             onChange={onBackgroundFileChange}
           />
           <button
             type="button"
             className={editorStyles.clearBtn}
             style={{ marginTop: 0 }}
+            disabled={disabled}
             onClick={onClearBackgroundFileSelection}
           >
             선택해제
@@ -167,7 +175,7 @@ export const CardPublishBackgroundTab = memo(function CardPublishBackgroundTab({
             max={100}
             step={1}
             value={Math.round(imageOverlayOpacity * 100)}
-            disabled={!uploadedImage}
+            disabled={disabled || !uploadedImage}
             aria-label="배경그림 투명도"
             onChange={(e) => onImageOverlayChange(Number(e.target.value) / 100)}
           />
@@ -207,6 +215,7 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
   setCardPlace,
   cardTextShadowEnabled,
   setCardTextShadowEnabled,
+  disabled = false,
 }: {
   leadTextColor: string;
   setLeadTextColor: (v: string) => void;
@@ -230,6 +239,7 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
   setCardPlace: (v: string) => void;
   cardTextShadowEnabled: boolean;
   setCardTextShadowEnabled: (v: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <>
@@ -243,12 +253,14 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
             swatchClass={editorStyles.fieldSwatch}
             swatchLightClass={editorStyles.fieldSwatchLight}
             swatchSelectedClass={editorStyles.fieldSwatchSelected}
+            disabled={disabled}
           />
         </div>
         <input
           className={editorStyles.fieldInput}
           type="text"
           value={textLine1}
+          disabled={disabled}
           onChange={(e) => setTextLine1(e.target.value)}
           autoComplete="off"
           placeholder="비우면 표시 안 함"
@@ -265,12 +277,14 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
             swatchClass={editorStyles.fieldSwatch}
             swatchLightClass={editorStyles.fieldSwatchLight}
             swatchSelectedClass={editorStyles.fieldSwatchSelected}
+            disabled={disabled}
           />
         </div>
         <input
           className={editorStyles.fieldInput}
           type="text"
           value={title}
+          disabled={disabled}
           onChange={(e) => setTitle(e.target.value)}
           autoComplete="off"
           spellCheck={false}
@@ -287,12 +301,14 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
             swatchClass={editorStyles.fieldSwatch}
             swatchLightClass={editorStyles.fieldSwatchLight}
             swatchSelectedClass={editorStyles.fieldSwatchSelected}
+            disabled={disabled}
           />
         </div>
         <textarea
           className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight}`}
           rows={3}
           value={textLine2}
+          disabled={disabled}
           onChange={(e) => setTextLine2(clampDescriptionToMaxLines(e.target.value, DESCRIPTION_MAX_LINES))}
           spellCheck={false}
           placeholder="비우면 카드에 표시하지 않음"
@@ -309,12 +325,14 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
             swatchClass={editorStyles.fieldSwatch}
             swatchLightClass={editorStyles.fieldSwatchLight}
             swatchSelectedClass={editorStyles.fieldSwatchSelected}
+            disabled={disabled}
           />
         </div>
         <input
           className={`${editorStyles.fieldInput} ${editorStyles.fieldInputContentTight}`}
           type="text"
           value={cardDate}
+          disabled={disabled}
           onChange={(e) => setCardDate(e.target.value)}
           autoComplete="off"
           placeholder="예: 2026-05-09 (일)"
@@ -331,12 +349,14 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
             swatchClass={editorStyles.fieldSwatch}
             swatchLightClass={editorStyles.fieldSwatchLight}
             swatchSelectedClass={editorStyles.fieldSwatchSelected}
+            disabled={disabled}
           />
         </div>
         <input
           className={`${editorStyles.fieldInput} ${editorStyles.fieldInputContentTight}`}
           type="text"
           value={cardPlace}
+          disabled={disabled}
           onChange={(e) => setCardPlace(e.target.value)}
           autoComplete="off"
           placeholder="예: 캐롬클럽 빌리어즈"
@@ -347,6 +367,7 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
         <input
           type="checkbox"
           checked={cardTextShadowEnabled}
+          disabled={disabled}
           onChange={(e) => setCardTextShadowEnabled(e.target.checked)}
         />
         <span>전체 글자에 그림자 넣기</span>

@@ -1,6 +1,4 @@
-import type { TournamentCardOverlaySnapshot } from "../../../../lib/site/tournament-card-overlay-snapshot";
 import { buildSlideDeckItemForTournamentCapture } from "./tournament-card-build-slide-deck-item";
-import { captureAndUploadTournamentCardSnapshots } from "./tournament-card-publish-capture";
 
 type CardSnapshotRow = {
   snapshotId?: string;
@@ -61,9 +59,40 @@ export type TournamentCardClientPublishResult =
 
 export type TournamentCardClientPublishProgressPhase = "publish-start" | "before-post";
 
+const SERVER_CARD_IMAGE_FAIL_KO = "게시 이미지 생성 또는 저장에 실패했습니다. 다시 게시해 주세요.";
+const PUBLISH_IMAGE_TIMEOUT_MS = 45_000;
+
+function joinAbortSignals(a: AbortSignal, b: AbortSignal): AbortSignal {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (a.aborted || b.aborted) {
+    controller.abort();
+    return controller.signal;
+  }
+  a.addEventListener("abort", abort, { once: true });
+  b.addEventListener("abort", abort, { once: true });
+  return controller.signal;
+}
+
+async function fetchJsonWithTimeout<T>(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<{ ok: boolean; status: number; json: T }> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  const signal = init.signal ? joinAbortSignals(init.signal, controller.signal) : controller.signal;
+  try {
+    const res = await fetch(input, { ...init, signal });
+    return { ok: res.ok, status: res.status, json: (await res.json()) as T };
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 /**
- * 클라이언트에서 카드 스냅샷 GET → 캡처 → POST(`draftOnly: false`)까지 수행.
- * 대회 `status-badge`는 호출 전에 이미 반영되어 있어야 캡처 배지·메인 노출 플래그가 맞습니다.
+ * 클라이언트에서 카드 스냅샷 GET → 서버 이미지 생성 → POST(`draftOnly: false`)까지 수행.
+ * 대회 `status-badge`는 호출 전에 이미 반영되어 있어야 이미지 배지·메인 노출 플래그가 맞습니다.
  */
 export async function publishTournamentCardFromEditorClient(args: {
   tournamentId: string;
@@ -125,7 +154,7 @@ export async function publishTournamentCardFromEditorClient(args: {
 
   let publishedCardImageUrl = "";
   let publishedCardImage320Url = "";
-  let overlaySnapshot: TournamentCardOverlaySnapshot | null = null;
+  let publishedCardImageId = "";
   try {
     const slideDeckItem = buildSlideDeckItemForTournamentCapture({
       tournamentId,
@@ -157,14 +186,54 @@ export async function publishTournamentCardFromEditorClient(args: {
       tournamentFallbackDate: tournamentDate,
       tournamentFallbackLocation: tournamentLocation,
     });
-    const capture = await captureAndUploadTournamentCardSnapshots(slideDeckItem);
-    publishedCardImageUrl = capture.publishedCardImageUrl;
-    publishedCardImage320Url = capture.publishedCardImage320Url;
-    overlaySnapshot = capture.overlaySnapshot;
+    const imageRes = await fetchJsonWithTimeout<{
+      error?: string;
+      imageId?: string;
+      publishedCardImageUrl?: string;
+      publishedCardImage320Url?: string;
+      w640Url?: string;
+      w320Url?: string;
+    }>(
+      "/api/client/tournament-card-image",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tournamentId,
+          templateId: slideDeckItem.cardTemplate ?? "A",
+          title: slideDeckItem.title,
+          subtitle: slideDeckItem.subtitle,
+          textLine1: slideDeckItem.cardExtraLine1 ?? null,
+          textLine2: slideDeckItem.cardExtraLine2 ?? null,
+          textLine3: slideDeckItem.cardExtraLine3 ?? null,
+          statusBadge: args.slideStatusBadge,
+          backgroundType: slideDeckItem.backgroundType ?? "image",
+          themeType: slideDeckItem.themeType ?? "dark",
+          backgroundImageUrl: slideDeckItem.image320Url ?? null,
+          backgroundImageOpacity:
+            typeof slideDeckItem.imageOverlayOpacity === "number" ? slideDeckItem.imageOverlayOpacity : null,
+          mediaBackground: slideDeckItem.mediaBackground ?? null,
+          textShadowEnabled: slideDeckItem.cardTextShadowEnabled === true,
+          surfaceLayout: slideDeckItem.cardSurfaceLayout === "full" ? "full" : "split",
+          leadTextColor: slideDeckItem.cardLeadTextColor ?? null,
+          titleTextColor: slideDeckItem.cardTitleTextColor ?? null,
+          descriptionTextColor: slideDeckItem.cardDescriptionTextColor ?? null,
+          footerDateTextColor: slideDeckItem.cardFooterDateTextColor ?? null,
+          footerPlaceTextColor: slideDeckItem.cardFooterPlaceTextColor ?? null,
+        }),
+      },
+      PUBLISH_IMAGE_TIMEOUT_MS,
+    );
+    publishedCardImageUrl = (imageRes.json.publishedCardImageUrl ?? imageRes.json.w640Url ?? "").trim();
+    publishedCardImage320Url = (imageRes.json.publishedCardImage320Url ?? imageRes.json.w320Url ?? "").trim();
+    publishedCardImageId = (imageRes.json.imageId ?? "").trim();
+    if (!imageRes.ok || !publishedCardImageUrl || !publishedCardImage320Url || !publishedCardImageId) {
+      return { ok: false, error: SERVER_CARD_IMAGE_FAIL_KO };
+    }
   } catch (e) {
     return {
       ok: false,
-      error: e instanceof Error ? e.message : "카드 이미지 생성에 실패했습니다.",
+      error: e instanceof DOMException && e.name === "AbortError" ? SERVER_CARD_IMAGE_FAIL_KO : SERVER_CARD_IMAGE_FAIL_KO,
     };
   }
 
@@ -229,8 +298,7 @@ export async function publishTournamentCardFromEditorClient(args: {
         : {}),
       publishedCardImageUrl,
       publishedCardImage320Url,
-      publishedCardImageBackgroundOnly: true,
-      ...(overlaySnapshot ? { overlaySnapshot } : {}),
+      publishedCardImageBackgroundOnly: false,
     }),
   });
   const postData = (await postRes.json()) as { error?: string };

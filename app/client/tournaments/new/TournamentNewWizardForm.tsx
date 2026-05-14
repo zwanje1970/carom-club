@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties, Dispatch, FormEvent, MutableRefObject, SetStateAction } from "react";
+import type { CSSProperties, Dispatch, MutableRefObject, SetStateAction } from "react";
 import adminUi from "../../../components/admin/admin-card.module.css";
 import OutlineContentEditor from "../../../../components/shared/outline/OutlineContentEditor";
 import type { OutlineDisplayMode } from "../../../../lib/outline-content-types";
@@ -47,7 +47,8 @@ export type TournamentNewWizardFormProps = {
   /** 신규 생성 최종 확인 모달이 열린 동안 제출 버튼 비활성(중복 제출 방지) */
   createConfirmPending?: boolean;
   saveState: "idle" | "saving" | "success" | "error";
-  onSubmit: (e: FormEvent<HTMLFormElement>) => void;
+  /** 저장·생성은 버튼 클릭으로만 요청 (암시적 폼 제출·Enter로 인한 오동작 방지) */
+  onSubmit: () => void | Promise<void>;
   onCancelClick: () => void;
   title: string;
   setTitle: Dispatch<SetStateAction<string>>;
@@ -266,7 +267,14 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
   const canNext = step < TOURNAMENT_CREATE_WIZARD_COUNT;
 
   return (
-    <form className="v3-stack" style={sectionGap} onSubmit={onSubmit} noValidate>
+    <form
+      className="v3-stack"
+      style={sectionGap}
+      onSubmit={(e) => {
+        e.preventDefault();
+      }}
+      noValidate
+    >
       <nav
         aria-label={tocMode ? "대회 수정 목차" : "대회 입력 단계"}
         className={`${adminUi.surface} v3-stack`}
@@ -1077,7 +1085,15 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
           </button>
         )}
         {tocMode ? (
-          <button type="submit" className="v3-btn" disabled={loading || editLoading || createConfirmPending} style={{ padding: "0.75rem 1rem" }}>
+          <button
+            type="button"
+            className="v3-btn"
+            disabled={loading || editLoading || createConfirmPending}
+            style={{ padding: "0.75rem 1rem" }}
+            onClick={() => {
+              void onSubmit();
+            }}
+          >
             {loading ? "저장 중…" : "변경 저장"}
           </button>
         ) : canNext ? (
@@ -1091,7 +1107,15 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
             다음 단계
           </button>
         ) : (
-          <button type="submit" className="v3-btn" disabled={loading || editLoading || createConfirmPending} style={{ padding: "0.75rem 1rem" }}>
+          <button
+            type="button"
+            className="v3-btn"
+            disabled={loading || editLoading || createConfirmPending}
+            style={{ padding: "0.75rem 1rem" }}
+            onClick={() => {
+              void onSubmit();
+            }}
+          >
             {loading ? (editId ? "저장 중…" : "생성 중…") : editId ? "변경 저장" : "대회 생성"}
           </button>
         )}

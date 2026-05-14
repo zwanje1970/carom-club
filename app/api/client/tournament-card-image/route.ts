@@ -1,0 +1,154 @@
+import { randomUUID } from "crypto";
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
+import {
+  getClientStatusByUserId,
+  getUserById,
+  resolveCanonicalUserIdForAuth,
+} from "../../../../lib/platform-api";
+import { getTournamentByIdFirestore } from "../../../../lib/server/firestore-tournaments";
+import { isFirestoreUsersBackendConfigured } from "../../../../lib/server/firestore-users";
+import { persistProofImageW320W640Variants } from "../../../../lib/server/persist-proof-image-w320-w640-variants";
+import {
+  renderTournamentPublishedCardPng,
+  type TournamentPublishedCardImagePayload,
+} from "../../../../lib/server/tournament-published-card-image-renderer";
+
+export const runtime = "nodejs";
+
+const SERVER_CARD_IMAGE_FAIL_KO = "게시 이미지 생성 또는 저장에 실패했습니다. 다시 게시해 주세요.";
+
+async function publisherTournamentOwnerId(user: { id: string; role: string }): Promise<string> {
+  if (user.role === "PLATFORM") return user.id;
+  return resolveCanonicalUserIdForAuth(user.id);
+}
+
+async function getPublisher() {
+  const cookieStore = await cookies();
+  const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
+  if (!session) return { ok: false as const, error: "Login is required.", status: 401 };
+
+  const user = await getUserById(session.userId);
+  if (!user) return { ok: false as const, error: "User not found.", status: 401 };
+
+  if (user.role === "PLATFORM") return { ok: true as const, user };
+  if (user.role !== "CLIENT") return { ok: false as const, error: "CLIENT role is required.", status: 403 };
+
+  const clientStatus = await getClientStatusByUserId(user.id);
+  if (clientStatus !== "APPROVED") {
+    return { ok: false as const, error: "Only APPROVED clients can publish.", status: 403 };
+  }
+
+  return { ok: true as const, user };
+}
+
+function asString(v: unknown): string {
+  return typeof v === "string" ? v : "";
+}
+
+function asNullableString(v: unknown): string | null {
+  if (v === null) return null;
+  return typeof v === "string" ? v : null;
+}
+
+function asFiniteNumber(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+function parsePayload(raw: unknown): TournamentPublishedCardImagePayload | null {
+  if (!raw || typeof raw !== "object") return null;
+  const b = raw as Record<string, unknown>;
+  const tournamentId = asString(b.tournamentId).trim();
+  const title = asString(b.title).trim();
+  if (!tournamentId || !title) return null;
+  return {
+    tournamentId,
+    templateId: b.templateId === "B" ? "B" : "A",
+    title,
+    subtitle: asString(b.subtitle),
+    textLine1: asNullableString(b.textLine1),
+    textLine2: asNullableString(b.textLine2),
+    textLine3: asNullableString(b.textLine3),
+    statusBadge: asNullableString(b.statusBadge),
+    backgroundType: b.backgroundType === "theme" ? "theme" : "image",
+    themeType: b.themeType === "light" || b.themeType === "natural" ? b.themeType : "dark",
+    backgroundImageUrl: asNullableString(b.backgroundImageUrl),
+    backgroundImageOpacity: asFiniteNumber(b.backgroundImageOpacity),
+    mediaBackground: asNullableString(b.mediaBackground),
+    textShadowEnabled: b.textShadowEnabled === true,
+    surfaceLayout: b.surfaceLayout === "full" ? "full" : "split",
+    leadTextColor: asNullableString(b.leadTextColor),
+    titleTextColor: asNullableString(b.titleTextColor),
+    descriptionTextColor: asNullableString(b.descriptionTextColor),
+    footerDateTextColor: asNullableString(b.footerDateTextColor),
+    footerPlaceTextColor: asNullableString(b.footerPlaceTextColor),
+  };
+}
+
+export async function POST(request: Request) {
+  const publisher = await getPublisher();
+  if (!publisher.ok) {
+    return NextResponse.json({ error: publisher.error }, { status: publisher.status });
+  }
+  if (!isFirestoreUsersBackendConfigured() && process.env.NODE_ENV !== "development") {
+    return NextResponse.json({ error: SERVER_CARD_IMAGE_FAIL_KO }, { status: 503 });
+  }
+
+  let payload: TournamentPublishedCardImagePayload | null = null;
+  try {
+    payload = parsePayload(await request.json());
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+  if (!payload) {
+    return NextResponse.json({ error: "tournamentId and title are required." }, { status: 400 });
+  }
+
+  let tournament: Awaited<ReturnType<typeof getTournamentByIdFirestore>>;
+  try {
+    tournament = await getTournamentByIdFirestore(payload.tournamentId);
+  } catch {
+    return NextResponse.json({ error: SERVER_CARD_IMAGE_FAIL_KO }, { status: 500 });
+  }
+  if (!tournament) {
+    return NextResponse.json({ error: "Tournament not found." }, { status: 404 });
+  }
+  const ownerId = await publisherTournamentOwnerId(publisher.user);
+  if (publisher.user.role !== "PLATFORM" && tournament.createdBy !== ownerId) {
+    return NextResponse.json({ error: "You can publish only your tournaments." }, { status: 403 });
+  }
+
+  let png: Buffer;
+  try {
+    const baseUrl = new URL(request.url).origin;
+    png = await renderTournamentPublishedCardPng({ payload, requestBaseUrl: baseUrl });
+  } catch {
+    return NextResponse.json({ error: SERVER_CARD_IMAGE_FAIL_KO }, { status: 500 });
+  }
+
+  const imageId = randomUUID();
+  const persist = await persistProofImageW320W640Variants({
+    imageId,
+    buffer: png,
+    ext: "png",
+    uploaderUserId: publisher.user.id,
+    sitePublic: true,
+    preservePngTransparency: true,
+  });
+  if (!persist.ok) {
+    return NextResponse.json(
+      { error: SERVER_CARD_IMAGE_FAIL_KO, ...(persist.code ? { code: persist.code } : {}) },
+      { status: persist.status },
+    );
+  }
+
+  return NextResponse.json({
+    ok: true,
+    imageId: persist.imageId,
+    publishedCardImageUrl: persist.w640Url,
+    publishedCardImage320Url: persist.w320Url,
+    w640Url: persist.w640Url,
+    w320Url: persist.w320Url,
+  });
+}

@@ -1,7 +1,7 @@
 import { buildTournamentPublishedCardSubtitle } from "../../../../lib/tournament-slide-card-subtitle";
 import type { SlideDeckItem } from "../../../site/tournament-snapshot-card-view";
 
-/** 게시 직전 html2canvas 입력 — 서버 PublishedCardSnapshot GET 과 동일 필드 묶음 */
+/** 게시 직전 서버 이미지 생성 입력 — 서버 PublishedCardSnapshot GET 과 동일 필드 묶음 */
 export type TournamentCardPublishCaptureSource = {
   snapshotId?: string;
   title: string;

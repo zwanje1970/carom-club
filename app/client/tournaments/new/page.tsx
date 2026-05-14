@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { type CSSProperties, FormEvent, useEffect, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 
 import adminUi from "../../../components/admin/admin-card.module.css";
 import { isEmptyOutlineHtml } from "../../../../lib/outline-content-helpers";
@@ -910,10 +910,7 @@ export default function ClientTournamentNewPage() {
     }
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    event.stopPropagation();
-
+  async function handleSubmit() {
     if (tournamentCreateSubmitInFlightRef.current || loading) return;
     tournamentCreateSubmitInFlightRef.current = true;
     setLoading(true);

@@ -58,8 +58,8 @@ function publishedCardSnapshotToEditorGetBody(s: PublishedCardSnapshot): Record<
   if (typeof s.tournamentImageOverlayOpacity === "number") {
     out.tournamentImageOverlayOpacity = s.tournamentImageOverlayOpacity;
   }
-  if (s.publishedCardImageBackgroundOnly === true) {
-    out.publishedCardImageBackgroundOnly = true;
+  if (typeof s.publishedCardImageBackgroundOnly === "boolean") {
+    out.publishedCardImageBackgroundOnly = s.publishedCardImageBackgroundOnly;
   }
   return out;
 }
@@ -148,7 +148,6 @@ export async function POST(request: Request) {
   }
 
   const tournamentId = typeof body.tournamentId === "string" ? body.tournamentId : "";
-  console.log("[PUBLISH] start", tournamentId);
   let tournament: Awaited<ReturnType<typeof getTournamentByIdFirestore>>;
   try {
     tournament = await getTournamentByIdFirestore(tournamentId);
@@ -227,12 +226,14 @@ export async function POST(request: Request) {
     !draftOnly && typeof body.publishedCardImageUrl === "string" ? body.publishedCardImageUrl : undefined;
   const publishedCardImage320Url =
     !draftOnly && typeof body.publishedCardImage320Url === "string" ? body.publishedCardImage320Url : undefined;
-  const publishedCardImageBackgroundOnly = body.publishedCardImageBackgroundOnly === true;
+  const publishedCardImageBackgroundOnly =
+    !draftOnly && typeof body.publishedCardImageBackgroundOnly === "boolean"
+      ? body.publishedCardImageBackgroundOnly
+      : undefined;
   const statusBadge = !draftOnly && typeof body.statusBadge === "string" ? body.statusBadge : undefined;
 
   let result: Awaited<ReturnType<typeof upsertTournamentPublishedCard>>;
   try {
-    console.log("[PUBLISH] before upsert");
     result = await upsertTournamentPublishedCard({
       tournamentId,
       title,
@@ -262,10 +263,9 @@ export async function POST(request: Request) {
       ...(cardFooterPlaceTextColor !== undefined ? { cardFooterPlaceTextColor } : {}),
       ...(publishedCardImageUrl !== undefined ? { publishedCardImageUrl } : {}),
       ...(publishedCardImage320Url !== undefined ? { publishedCardImage320Url } : {}),
-      ...(publishedCardImageBackgroundOnly ? { publishedCardImageBackgroundOnly: true as const } : {}),
+      ...(publishedCardImageBackgroundOnly !== undefined ? { publishedCardImageBackgroundOnly } : {}),
       ...(!draftOnly && body.overlaySnapshot != null ? { overlaySnapshot: body.overlaySnapshot } : {}),
     });
-    console.log("[PUBLISH] after upsert");
   } catch (e) {
     const message = e instanceof Error ? e.message : "Failed to save tournament card.";
     if (isTournamentPublishedCardsWritePersistenceBlockedError(e)) {
@@ -287,18 +287,15 @@ export async function POST(request: Request) {
 
   if (!draftOnly) {
     try {
-      console.log("[PUBLISH] before reconcile");
       await reconcileTournamentPublishedCardsForTournamentId(tournamentId, {
         protectFreshActivePublishedRows: true,
       });
-      console.log("[PUBLISH] after reconcile");
     } catch (e) {
       console.warn("[api/client/card-snapshots] POST reconcile published cards failed", e);
     }
     revalidatePublicTournamentCache(tournamentId);
   }
 
-  console.log("[PUBLISH] response return");
   return NextResponse.json({ ok: true, snapshot: result.snapshot });
 }
 

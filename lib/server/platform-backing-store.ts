@@ -860,7 +860,7 @@ export type TournamentPublishedCard = {
   publishedCardImageUrl?: string;
   /** 동일 스냅샷의 320 변형(관리·목록용 선택) */
   publishedCardImage320Url?: string;
-  /** true: 게시 PNG가 배경만(글자 제외) — 메인에서 HTML 텍스트 오버레이 */
+  /** true: 게시 PNG가 배경만(글자 제외) — 메인에서 HTML 텍스트 오버레이. false: 완성 PNG. */
   publishedCardImageBackgroundOnly?: boolean;
   /** 게시 시점 템플릿에서 확정한 글자 레이어(메인은 그대로 렌더만) */
   overlaySnapshot?: TournamentCardOverlaySnapshot | null;
@@ -926,7 +926,7 @@ export type PublishedCardSnapshot = {
   /** 게시 시 카드 본문 640 스냅샷(메인 등에서 우선) */
   publishedCardImageUrl?: string | null;
   publishedCardImage320Url?: string | null;
-  /** 메인: 배경 PNG + HTML 글자 모드 */
+  /** 메인: 배경 PNG + HTML 글자 모드. false면 완성 PNG로 간주해 HTML 오버레이 없음. */
   publishedCardImageBackgroundOnly?: boolean;
   /** 메인: 게시 시점 오버레이 좌표·타이포 스냅샷(있으면 템플릿 분기 없이 표시) */
   overlaySnapshot?: TournamentCardOverlaySnapshot | null;
@@ -2789,8 +2789,8 @@ function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedC
   if (typeof r.publishedCardImage320Url === "string" && r.publishedCardImage320Url.trim()) {
     base.publishedCardImage320Url = r.publishedCardImage320Url.trim();
   }
-  if (r.publishedCardImageBackgroundOnly === true) {
-    base.publishedCardImageBackgroundOnly = true;
+  if (typeof r.publishedCardImageBackgroundOnly === "boolean") {
+    base.publishedCardImageBackgroundOnly = r.publishedCardImageBackgroundOnly;
   }
   if ("overlaySnapshot" in r && r.overlaySnapshot != null) {
     const ov = parsePublishedCardOverlaySnapshotForStorage(r.overlaySnapshot);
@@ -9506,8 +9506,8 @@ function tournamentPublishedCardToPublishedSnapshot(
   if (typeof t.publishedCardImage320Url === "string" && t.publishedCardImage320Url.trim()) {
     snap.publishedCardImage320Url = t.publishedCardImage320Url.trim();
   }
-  if (t.publishedCardImageBackgroundOnly === true) {
-    snap.publishedCardImageBackgroundOnly = true;
+  if (typeof t.publishedCardImageBackgroundOnly === "boolean") {
+    snap.publishedCardImageBackgroundOnly = t.publishedCardImageBackgroundOnly;
   }
   if (t.overlaySnapshot != null) {
     const ov = parsePublishedCardOverlaySnapshotForStorage(t.overlaySnapshot);
@@ -9547,7 +9547,7 @@ export async function upsertTournamentPublishedCard(params: {
   /** 게시 시에만: 카드 본문 640 스냅샷 URL */
   publishedCardImageUrl?: string | null;
   publishedCardImage320Url?: string | null;
-  /** 게시 PNG가 배경만(텍스트 제외)인 경우 true */
+  /** 게시 PNG가 배경만(텍스트 제외)인 경우 true, 완성 PNG면 false */
   publishedCardImageBackgroundOnly?: boolean;
   /** 게시 시 템플릿 DOM에서 확정한 오버레이(검증 실패 시 무시) */
   overlaySnapshot?: unknown;
@@ -9740,8 +9740,8 @@ export async function upsertTournamentPublishedCard(params: {
       typeof params.publishedCardImage320Url === "string" ? params.publishedCardImage320Url.trim() : "";
     if (pub640) row.publishedCardImageUrl = pub640;
     if (pub320) row.publishedCardImage320Url = pub320;
-    if (params.publishedCardImageBackgroundOnly === true) {
-      row.publishedCardImageBackgroundOnly = true;
+    if (typeof params.publishedCardImageBackgroundOnly === "boolean") {
+      row.publishedCardImageBackgroundOnly = params.publishedCardImageBackgroundOnly;
     }
     if (params.overlaySnapshot != null) {
       const ov = parsePublishedCardOverlaySnapshotForStorage(params.overlaySnapshot);
@@ -10795,15 +10795,6 @@ async function rebuildMainSlideTournamentSnapshotsCompactKvNow(): Promise<Publis
     const { main, archived } = await buildMainSlideTournamentAndArchivedKvSnapshots();
     await saveMainSlideTournamentSnapshotsCompactToStorage(main);
     await saveMainSlideArchivedTournamentSnapshotsToStorage(archived);
-    try {
-      console.log("[COMPACT] rebuilt main", main.length, "archived", archived.length);
-    } catch (logErr) {
-      if (!isBrokenPipeWriteError(logErr)) throw logErr;
-      if (!rebuildMainSlideCompactKvEpipeWarned) {
-        rebuildMainSlideCompactKvEpipeWarned = true;
-        console.warn("[main-slide-kv] compact rebuild log skipped (EPIPE), ignoring further EPIPE noise");
-      }
-    }
     return main;
   } catch (e) {
     if (isBrokenPipeWriteError(e)) {
