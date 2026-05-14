@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
 import { parseCommunityBoardTypeParam } from "../../../../lib/community-board-params";
+import { getDefaultSiteCommunityConfigForPublicSite } from "../../../../lib/server/platform-backing-store";
 import { getSiteCommunityConfig, getUserById, listCommunityPostsForPublicSite } from "../../../../lib/surface-read";
 import { communityBoardListHref, communityNavTabsFromConfig, isCommunityNoticeBoard } from "../community-tab-config";
 import CommunityBoardPostList from "../CommunityBoardPostList";
@@ -13,6 +14,7 @@ import CommunityBoardTabs from "../CommunityBoardTabs";
 import CommunityBoardSwipeShell from "../CommunityBoardSwipeShell";
 import SiteShellFrame from "../../components/SiteShellFrame";
 import SiteDetailShellBodyLoader from "../../components/SiteDetailShellBodyLoader";
+import type { CommunityPostListItem, SiteCommunityConfig } from "../../../../lib/types/entities";
 
 type Props = {
   params: Promise<{ boardType: string }>;
@@ -36,11 +38,17 @@ export default function SiteCommunityBoardListPage({ params, searchParams }: Pro
 }
 
 async function SiteCommunityBoardListPageInner({ params, searchParams }: Props) {
-  const [{ boardType: raw }, sp, config] = await Promise.all([
+  const [{ boardType: raw }, sp] = await Promise.all([
     params,
     searchParams ? searchParams : Promise.resolve<Record<string, string | string[] | undefined>>({}),
-    getSiteCommunityConfig(),
   ]);
+  let config: SiteCommunityConfig;
+  try {
+    config = await getSiteCommunityConfig();
+  } catch (e) {
+    console.error("[site/community/board] getSiteCommunityConfig failed", e);
+    config = getDefaultSiteCommunityConfigForPublicSite();
+  }
   const boardType = parseCommunityBoardTypeParam(raw);
   if (!boardType) notFound();
   const qRaw = sp.q;
@@ -49,11 +57,21 @@ async function SiteCommunityBoardListPageInner({ params, searchParams }: Props) 
   if (!board.visible) notFound();
   const navTabs = communityNavTabsFromConfig(config);
 
-  const items = await listCommunityPostsForPublicSite(boardType, q ? { q } : undefined);
+  let items: CommunityPostListItem[] = [];
+  try {
+    items = await listCommunityPostsForPublicSite(boardType, q ? { q } : undefined);
+  } catch (e) {
+    console.error("[site/community/board] listCommunityPostsForPublicSite failed", { boardType, e });
+  }
 
-  const cookieStore = await cookies();
-  const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
-  const user = session ? await getUserById(session.userId) : null;
+  let user: Awaited<ReturnType<typeof getUserById>> | null = null;
+  try {
+    const cookieStore = await cookies();
+    const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
+    user = session ? await getUserById(session.userId) : null;
+  } catch (e) {
+    console.error("[site/community/board] session or getUserById failed", e);
+  }
   const isNoticeBoard = isCommunityNoticeBoard(boardType, config);
   const showWriteFab = !isNoticeBoard || user?.role === "PLATFORM";
 

@@ -1,7 +1,8 @@
 import { Suspense } from "react";
+import { getDefaultSiteCommunityConfigForPublicSite } from "../../../lib/server/platform-backing-store";
 import { getSiteCommunityConfig, listCommunityPostsAllPrimaryForPublicSite } from "../../../lib/surface-read";
 import { communityNavTabsFromConfig, visibleCommunityBoardKeysForTabs } from "./community-tab-config";
-import type { SiteCommunityConfig } from "../../../lib/types/entities";
+import type { CommunityPostListItem, SiteCommunityConfig } from "../../../lib/types/entities";
 import CommunityBoardPostList from "./CommunityBoardPostList";
 import CommunityBoardListScrollShell from "./CommunityBoardListScrollShell";
 import CommunityBoardSearchForm from "./CommunityBoardSearchForm";
@@ -39,10 +40,21 @@ async function SiteCommunityPageInner({
   const qRaw = sp.q;
   const q = typeof qRaw === "string" ? qRaw.trim() : Array.isArray(qRaw) ? String(qRaw[0] ?? "").trim() : "";
 
-  const config: SiteCommunityConfig = await getSiteCommunityConfig();
+  let config: SiteCommunityConfig;
+  try {
+    config = await getSiteCommunityConfig();
+  } catch (e) {
+    console.error("[site/community] getSiteCommunityConfig failed", e);
+    config = getDefaultSiteCommunityConfigForPublicSite();
+  }
   const navTabs = communityNavTabsFromConfig(config);
   const visibleBoardKeys = visibleCommunityBoardKeysForTabs(config);
-  const items = await listCommunityPostsAllPrimaryForPublicSite(visibleBoardKeys, q ? { q } : undefined);
+  let items: CommunityPostListItem[] = [];
+  try {
+    items = await listCommunityPostsAllPrimaryForPublicSite(visibleBoardKeys, q ? { q } : undefined);
+  } catch (e) {
+    console.error("[site/community] listCommunityPostsAllPrimaryForPublicSite failed", e);
+  }
 
   return (
     <SiteShellFrame

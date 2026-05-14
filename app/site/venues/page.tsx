@@ -14,6 +14,9 @@ export default function SiteVenuesPage() {
 }
 
 async function SiteVenuesPageContent() {
-  const rows = await getSiteVenuesBoardRows();
+  const rows = await getSiteVenuesBoardRows().catch((e) => {
+    console.error("[site/venues] getSiteVenuesBoardRows failed", e);
+    return [] as Awaited<ReturnType<typeof getSiteVenuesBoardRows>>;
+  });
   return <SiteVenuesBoard initialRows={rows} />;
 }

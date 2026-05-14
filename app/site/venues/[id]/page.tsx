@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";
@@ -9,7 +8,6 @@ import SiteOutlineDocumentCard from "../../components/SiteOutlineDocumentCard";
 import SiteHeaderListBackLink from "../../components/SiteHeaderListBackLink";
 import SiteShellFrame from "../../components/SiteShellFrame";
 import SiteDetailShellBodyLoader from "../../components/SiteDetailShellBodyLoader";
-import VenuesListBackLink from "../VenuesListBackLink";
 
 export const dynamic = "force-dynamic";
 
@@ -458,10 +456,6 @@ async function SiteVenueDetailPageContent({ id }: { id: string }) {
             </a>
           </section>
         ) : null}
-
-        <VenuesListBackLink className="secondary-button" href="/site/venues" style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>
-          클럽안내 목록으로
-        </VenuesListBackLink>
       </section>
   );
 }

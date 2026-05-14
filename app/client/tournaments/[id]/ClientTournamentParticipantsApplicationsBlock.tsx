@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AlertTriangle, BadgeCheck, ClipboardList, RotateCcw, UserCheck, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { TournamentApplicationListItem, TournamentStatusBadge } from "../../../../lib/types/entities";
@@ -137,15 +138,6 @@ function participantMetricColumnTitle(eq: TournamentEntryQualificationType): str
   if (eq === "BOTH") return "점수·AVG";
   return "AVG";
 }
-
-const pillBase: CSSProperties = {
-  fontSize: "0.78rem",
-  fontWeight: 500,
-  padding: "0.1rem 0.34rem",
-  borderRadius: "999px",
-  border: "1px solid #e2e8f0",
-  whiteSpace: "nowrap",
-};
 
 export default function ClientTournamentParticipantsApplicationsBlock({
   tournamentId,
@@ -427,14 +419,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
 
   const titleLine = `${tournamentTitle.trim()} / ${bracketScaleLabel(maxParticipants)}`;
 
-  const appActionLabel = (icon: string, label: string) => (
-    <>
-      <span className="client-tournament-manage__appActionIcon" aria-hidden>
-        {icon}
-      </span>
-      <span className="client-tournament-manage__appActionLine">{label}</span>
-    </>
-  );
+  const appActionLucideProps = { size: 17, strokeWidth: 2, className: "client-tournament-manage__appActionLucide" } as const;
 
   return (
     <div
@@ -475,27 +460,33 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                   {showCancelFinalize ? (
                     <button
                       type="button"
-                      className="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--warn"
+                      className="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--tileOrange"
                       disabled={finalizeBusy}
                       onClick={() => void onCancelFinalizeParticipants()}
                     >
                       {finalizeBusy ? (
                         <span className="client-tournament-manage__appActionLine">처리 중…</span>
                       ) : (
-                        appActionLabel("↺", "확정취소")
+                        <>
+                          <RotateCcw {...appActionLucideProps} aria-hidden />
+                          <span className="client-tournament-manage__appActionLine">확정취소</span>
+                        </>
                       )}
                     </button>
                   ) : showFinalize ? (
                     <button
                       type="button"
-                      className="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--primary"
+                      className="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--tileBlue"
                       disabled={finalizeBusy}
                       onClick={() => void onFinalizeParticipants()}
                     >
                       {finalizeBusy ? (
                         <span className="client-tournament-manage__appActionLine">처리 중…</span>
                       ) : (
-                        appActionLabel("✓", "참가자확정")
+                        <>
+                          <UserCheck {...appActionLucideProps} aria-hidden />
+                          <span className="client-tournament-manage__appActionLine">참가자확정</span>
+                        </>
                       )}
                     </button>
                   ) : (
@@ -503,21 +494,27 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                   )}
                 </div>
                 <div className="client-tournament-manage__applicationsOpsGrid4Cell">
-                  <Link prefetch={false} href={printHref} className="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--neutral">
-                    {appActionLabel("☰", "확정리스트")}
+                  <Link prefetch={false} href={printHref} className="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--tileTeal">
+                    <>
+                      <ClipboardList {...appActionLucideProps} aria-hidden />
+                      <span className="client-tournament-manage__appActionLine">확정리스트</span>
+                    </>
                   </Link>
                 </div>
                 <div className="client-tournament-manage__applicationsOpsGrid4Cell">
                   <button
                     type="button"
-                    className="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--success"
+                    className="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--tileGreen"
                     disabled={bulkApproveBusy}
                     onClick={() => requestBulkDepositApprove()}
                   >
                     {bulkApproveBusy ? (
                       <span className="client-tournament-manage__appActionLine">처리 중…</span>
                     ) : (
-                      appActionLabel("₩", "입금확인 전체승인")
+                      <>
+                        <BadgeCheck {...appActionLucideProps} aria-hidden />
+                        <span className="client-tournament-manage__appActionLine">입금확인 전체승인</span>
+                      </>
                     )}
                   </button>
                 </div>
@@ -528,8 +525,13 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     capacityOccupied={capacityOccupied}
                     participantsFinalized={tournamentStatusBadge === "마감"}
                     hasActiveBracket={hasActiveBracket}
-                    triggerClassName="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--neutral"
-                    triggerLabel={appActionLabel("+", "수동추가")}
+                    triggerClassName="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--tileAdd"
+                    triggerLabel={
+                      <>
+                        <UserPlus {...appActionLucideProps} aria-hidden />
+                        <span className="client-tournament-manage__appActionLine">수동추가</span>
+                      </>
+                    }
                   />
                 </div>
               </div>
@@ -615,38 +617,26 @@ export default function ClientTournamentParticipantsApplicationsBlock({
             </div>
             <p className="client-tournament-manage__applicationsNotify client-tournament-manage__applicationsNotify--alert">
               <span className="client-tournament-manage__applicationsNotifyIcon" aria-hidden>
-                ⚠
+                <AlertTriangle size={14} strokeWidth={2} className="client-tournament-manage__applicationsNotifyLucide" />
               </span>
               <span className="client-tournament-manage__applicationsNotifyText">승인완료시 신청자에게 신청완료 알림이 자동발신 됩니다.</span>
             </p>
             <div className="client-tournament-manage__applicationsStatusLegendSingleLine" aria-label="신청 현황 및 표 버튼 안내">
               <div className="client-tournament-manage__applicationsStatusLegendSingleLine-chips">
-                <span
-                  className="client-tournament-manage__statusChipCompact client-tournament-manage__statusChipCompact--apply"
-                  style={pillBase}
-                >
+                <span className="client-tournament-manage__statusChipCompact client-tournament-manage__statusChipCompact--apply">
                   <span className="client-tournament-manage__statusChipLabel">신청</span>
                   <strong className="client-tournament-manage__statusChipCount">{participantCountSummary.total}명</strong>
                 </span>
-                <span
-                  className="client-tournament-manage__statusChipCompact client-tournament-manage__statusChipCompact--approved"
-                  style={pillBase}
-                >
+                <span className="client-tournament-manage__statusChipCompact client-tournament-manage__statusChipCompact--approved">
                   <span className="client-tournament-manage__statusChipLabel">승인</span>
                   <strong className="client-tournament-manage__statusChipCount">{chipApproved}명</strong>
                 </span>
-                <span
-                  className="client-tournament-manage__statusChipCompact client-tournament-manage__statusChipCompact--rejected"
-                  style={pillBase}
-                >
+                <span className="client-tournament-manage__statusChipCompact client-tournament-manage__statusChipCompact--rejected">
                   <span className="client-tournament-manage__statusChipLabel">취소</span>
                   <strong className="client-tournament-manage__statusChipCount">{participantCountSummary.reject}명</strong>
                 </span>
                 {waitingListTotal > 0 ? (
-                  <span
-                    className="client-tournament-manage__statusChipCompact client-tournament-manage__statusChipCompact--waiting"
-                    style={pillBase}
-                  >
+                  <span className="client-tournament-manage__statusChipCompact client-tournament-manage__statusChipCompact--waiting">
                     <span className="client-tournament-manage__statusChipLabel">대기자</span>
                     <strong className="client-tournament-manage__statusChipCount">{waitingListTotal}명</strong>
                   </span>

@@ -24,10 +24,14 @@ async function SiteTournamentsPageContent({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [resolvedSearchParams, snapshots] = await Promise.all([
+  const [resolvedSearchParams, snapshotsResult] = await Promise.all([
     searchParams ?? Promise.resolve<Record<string, string | string[] | undefined>>({}),
-    listSitePublicTournamentListSnapshotsForPublicSite(),
+    listSitePublicTournamentListSnapshotsForPublicSite().catch((e) => {
+      console.error("[site/tournaments] listSitePublicTournamentListSnapshotsForPublicSite failed", e);
+      return [] as Awaited<ReturnType<typeof listSitePublicTournamentListSnapshotsForPublicSite>>;
+    }),
   ]);
+  const snapshots = snapshotsResult;
   const statusFilter = parseTournamentStatusFilter(resolvedSearchParams.status);
 
   let ordered = snapshots.filter((s) => !SITE_TOURNAMENT_LIST_EXCLUDED_BADGES.has(s.statusBadge));

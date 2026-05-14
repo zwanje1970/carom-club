@@ -8565,6 +8565,11 @@ export async function getSiteCommunityConfig(): Promise<SiteCommunityConfig> {
   return normalizeSiteCommunityConfig(store.siteCommunityConfig);
 }
 
+/** 공개 사이트 목록 등: `getSiteCommunityConfig` 캐시/원본 실패 시 동일 규칙의 기본 설정만 반환 */
+export function getDefaultSiteCommunityConfigForPublicSite(): SiteCommunityConfig {
+  return normalizeSiteCommunityConfig(undefined);
+}
+
 export async function patchSiteCommunityConfig(params: {
   free?: Partial<SiteCommunityBoardConfig>;
   qna?: Partial<SiteCommunityBoardConfig>;
