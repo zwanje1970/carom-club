@@ -81,7 +81,8 @@ export async function publishTournamentCardFromEditorClient(args: {
   let latest: CardSnapshotRow | null = null;
   try {
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 2000);
+    /** 게시 직전 초안이 저장된 직후 GET이 이어지므로 넉넉히 둔다(짧은 타임아웃은 오탐 실패 유발). */
+    const timeoutId = window.setTimeout(() => controller.abort(), 30_000);
     try {
       const res = await fetch(`/api/client/card-snapshots?tournamentId=${encodeURIComponent(tournamentId)}`, {
         signal: controller.signal,

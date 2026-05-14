@@ -47,7 +47,10 @@ export default async function ClientTournamentManagePage({ params }: { params: P
     getLatestBracketByTournamentIdFirestore(id),
     listCardSnapshotsByTournamentId(id),
   ]);
-  const hasDraftCardSnapshot = cardSnapshots.some((s) => s.isPublished === true && s.isActive === false);
+  const hasActivePublishedCard = cardSnapshots.some((s) => s.isPublished === true && s.isActive === true);
+  const hasInactiveDraftRow = cardSnapshots.some((s) => s.isPublished === true && s.isActive === false);
+  /** 활성 게시가 없을 때만(공개본 없음 + 비활성 초안 행 있음) 임시저장 뱃지 */
+  const hasDraftCardSnapshot = !hasActivePublishedCard && hasInactiveDraftRow;
   const scheduleLine = formatTournamentScheduleLabel(tournament);
   const bracketPlanEnabled =
     tournament.statusBadge === "마감" || tournament.statusBadge === "진행중" || tournament.statusBadge === "종료";

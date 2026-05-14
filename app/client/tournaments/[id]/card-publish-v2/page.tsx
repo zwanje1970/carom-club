@@ -4,7 +4,6 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { publishTournamentCardFromEditorClient } from "../tournament-card-client-publish";
 import type { TournamentCardSurfaceLayout } from "../../../../site/tournament-snapshot-card-view";
-import { PUBLISHED_CARD_MAIN_REFLECT_NOTICE_KO } from "../../../../../lib/client-published-card-main-reflect-notice";
 import { POSTCARD_TEMPLATE_APP_DEFAULTS } from "../../../../../lib/postcard-template-reference";
 import editorStyles from "../card-publish-editor.module.css";
 import { useClientTournamentFormKeyboardScroll } from "../../client-tournament-form-keyboard-scroll";
@@ -214,8 +213,8 @@ export default function ClientTournamentCardPublishV2Page() {
   const [message, setMessage] = useState("");
   const [publishBusy, setPublishBusy] = useState(false);
   const [publishCompleteModalOpen, setPublishCompleteModalOpen] = useState(false);
-  /** 모집중 게시 백그라운드 진행 중 — 중복 클릭 방지·finally 시 리렌더용(버튼 문구에는 쓰지 않음) */
-  const [publishBackgroundBusy, setPublishBackgroundBusy] = useState(false);
+  /** `loadSnapshots` 기준 대회 배지 — 게시 실패 시 PATCH 롤백용 */
+  const [tournamentStatusBadge, setTournamentStatusBadge] = useState("");
   const [uploading, setUploading] = useState(false);
   /** 캡처용 오프스크린 카드 — 초기 타이핑 부담 완화 후 `requestIdleCallback`으로 마운트 */
   const [renderOffscreenCaptureCard, setRenderOffscreenCaptureCard] = useState(false);
@@ -225,8 +224,6 @@ export default function ClientTournamentCardPublishV2Page() {
   const cardPublishCaptureForImageRef = useRef<HTMLDivElement>(null);
   /** 저장 중복 요청 차단 — ref로 동기 가드 */
   const saveInFlightRef = useRef(false);
-  /** 모집중 게시 백그라운드 작업 중(상태 갱신 전에도 동기적으로 중복 클릭 방지) */
-  const recruitingBgInFlightRef = useRef(false);
   const mountedRef = useRef(true);
   const userEditedTextLine2Ref = useRef(false);
   const prizeAutoSeededRef = useRef(false);
@@ -343,6 +340,8 @@ export default function ClientTournamentCardPublishV2Page() {
 
       const t = result.tournament;
       if (!t) return;
+
+      setTournamentStatusBadge(typeof t.statusBadge === "string" ? t.statusBadge.trim() : "");
 
       const summaryLine1 = firstNonEmptyLine(t.summary);
       const summaryLine2 = secondNonEmptyLine(t.summary);
@@ -527,7 +526,6 @@ export default function ClientTournamentCardPublishV2Page() {
 
   async function handlePublish(): Promise<void> {
     if (!tournamentId.trim() || publishBusy) return;
-    if (publishIntent === "recruiting" && recruitingBgInFlightRef.current) return;
     if (saveInFlightRef.current) return;
     saveInFlightRef.current = true;
     setPublishBusy(true);
@@ -543,6 +541,7 @@ export default function ClientTournamentCardPublishV2Page() {
         return;
       }
 
+      const previousBadgeForRevert = tournamentStatusBadge.trim();
       const patchRes = await fetch(`/api/client/tournaments/${encodeURIComponent(tournamentId)}/status-badge`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -554,39 +553,36 @@ export default function ClientTournamentCardPublishV2Page() {
         return;
       }
 
-      recruitingBgInFlightRef.current = true;
-      setPublishBackgroundBusy(true);
-      setMessage("");
-      setPublishCompleteModalOpen(true);
-      void router.refresh();
-
-      void publishTournamentCardFromEditorClient({
+      const pub = await publishTournamentCardFromEditorClient({
         tournamentId,
         slideStatusBadge: "모집중",
-      })
-        .then((pub) => {
-          if (!pub.ok) {
-            console.error("[card-publish-v2] background publish failed:", pub.error);
-            if (mountedRef.current) {
-              setMessage(
-                `${PUBLISHED_CARD_MAIN_REFLECT_NOTICE_KO}\n\n게시 저장에 실패했습니다: ${pub.error}`
-              );
+      });
+
+      if (!pub.ok) {
+        if (previousBadgeForRevert) {
+          try {
+            const rev = await fetch(`/api/client/tournaments/${encodeURIComponent(tournamentId)}/status-badge`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ statusBadge: previousBadgeForRevert }),
+            });
+            if (!rev.ok) {
+              console.warn("[card-publish-v2] status-badge revert after publish failure failed");
             }
-            return;
+          } catch {
+            console.warn("[card-publish-v2] status-badge revert threw");
           }
-          void router.refresh();
-        })
-        .catch((e) => {
-          console.error("[card-publish-v2] background publish threw:", e);
-          if (mountedRef.current) {
-            const detail = e instanceof Error ? e.message : String(e);
-            setMessage(`${PUBLISHED_CARD_MAIN_REFLECT_NOTICE_KO}\n\n게시 처리 중 오류: ${detail}`);
-          }
-        })
-        .finally(() => {
-          recruitingBgInFlightRef.current = false;
-          if (mountedRef.current) setPublishBackgroundBusy(false);
-        });
+        }
+        window.alert(pub.error);
+        void loadSnapshots();
+        void router.refresh();
+        return;
+      }
+
+      setMessage("");
+      setPublishCompleteModalOpen(true);
+      void loadSnapshots();
+      void router.refresh();
     } catch {
       window.alert("처리 중 오류가 발생했습니다.");
     } finally {
@@ -595,8 +591,7 @@ export default function ClientTournamentCardPublishV2Page() {
     }
   }
 
-  const publishActionBlocked =
-    publishBusy || (publishIntent === "recruiting" && publishBackgroundBusy);
+  const publishActionBlocked = publishBusy;
   const publishButtonLabel = publishBusy ? "처리 중…" : "게시";
 
   function handlePublishCompleteModalConfirm(): void {

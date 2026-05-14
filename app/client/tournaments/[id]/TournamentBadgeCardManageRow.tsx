@@ -38,7 +38,7 @@ export default function TournamentBadgeCardManageRow({
   tournamentId: string;
   initialStatus: TournamentStatusBadge;
   infoCard?: TournamentManageInfoCardFields;
-  /** 게시카드 임시저장 스냅샷 존재(공개본과 별도) */
+  /** 활성 게시 카드가 없고 비활성(초안) 행만 있을 때 true — 공개 게시가 있으면 false */
   hasDraftCardSnapshot?: boolean;
 }) {
   const router = useRouter();
