@@ -19,6 +19,29 @@ const DEFAULT_BG_IMAGE_OVERLAY_OPACITY = 1;
 
 const KO_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
+/** 모집중 게시 단계형 진행(실제 비율 아님). */
+const PUBLISH_PROGRESS_DRAFT_SAVE = {
+  percent: 20,
+  label: "카드 초안을 저장하고 있습니다.",
+};
+const PUBLISH_PROGRESS_STATUS_PATCH = {
+  percent: 30,
+  label: "대회 상태를 모집중으로 변경하고 있습니다.",
+};
+const PUBLISH_PROGRESS_CARD_IMAGE = {
+  percent: 50,
+  label: "게시용 카드 이미지를 만들고 있습니다. 잠시만 기다려 주세요.",
+};
+const PUBLISH_PROGRESS_MAIN_SAVE = {
+  percent: 80,
+  label: "메인 게시 데이터를 저장하고 있습니다.",
+};
+const PUBLISH_PROGRESS_DONE = {
+  percent: 100,
+  label: "게시가 완료되었습니다.",
+};
+const PUBLISH_FLOW_FAIL_KO = "게시 이미지 생성 또는 저장에 실패했습니다. 다시 게시해 주세요.";
+
 /** `2026-05-09 (일)` — 저장/미리보기 입력값과 동일 형식 */
 function formatCardDateForDisplay(raw: string): string {
   const s = raw.trim();
@@ -213,6 +236,9 @@ export default function ClientTournamentCardPublishV2Page() {
   const [message, setMessage] = useState("");
   const [publishBusy, setPublishBusy] = useState(false);
   const [publishCompleteModalOpen, setPublishCompleteModalOpen] = useState(false);
+  /** 모집중 게시 진행(단계형 % + 한 줄 설명) */
+  const [publishFlow, setPublishFlow] = useState<{ percent: number; label: string } | null>(null);
+  const [publishFlowError, setPublishFlowError] = useState("");
   /** `loadSnapshots` 기준 대회 배지 — 게시 실패 시 PATCH 롤백용 */
   const [tournamentStatusBadge, setTournamentStatusBadge] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -527,11 +553,19 @@ export default function ClientTournamentCardPublishV2Page() {
   async function handlePublish(): Promise<void> {
     if (!tournamentId.trim() || publishBusy) return;
     if (saveInFlightRef.current) return;
+    const recruitingPublish = publishIntent === "recruiting";
+    let holdBusyUntilSuccessModal = false;
     saveInFlightRef.current = true;
     setPublishBusy(true);
     setMessage("");
+    setPublishFlowError("");
     try {
+      if (recruitingPublish) {
+        setPublishFlow({ percent: PUBLISH_PROGRESS_DRAFT_SAVE.percent, label: PUBLISH_PROGRESS_DRAFT_SAVE.label });
+      }
+
       if (!(await persistCardDraftSnapshot())) {
+        if (recruitingPublish) setPublishFlow(null);
         return;
       }
 
@@ -541,6 +575,10 @@ export default function ClientTournamentCardPublishV2Page() {
         return;
       }
 
+      setPublishFlow({
+        percent: PUBLISH_PROGRESS_STATUS_PATCH.percent,
+        label: PUBLISH_PROGRESS_STATUS_PATCH.label,
+      });
       const previousBadgeForRevert = tournamentStatusBadge.trim();
       const patchRes = await fetch(`/api/client/tournaments/${encodeURIComponent(tournamentId)}/status-badge`, {
         method: "PATCH",
@@ -548,14 +586,30 @@ export default function ClientTournamentCardPublishV2Page() {
         body: JSON.stringify({ statusBadge: "모집중" }),
       });
       if (!patchRes.ok) {
-        const data = (await patchRes.json()) as { error?: string };
-        window.alert(data.error ?? "대회 상태를 모집중으로 바꾸지 못했습니다.");
+        setPublishFlow({
+          percent: PUBLISH_PROGRESS_STATUS_PATCH.percent,
+          label: PUBLISH_PROGRESS_STATUS_PATCH.label,
+        });
+        setPublishFlowError(PUBLISH_FLOW_FAIL_KO);
         return;
       }
 
       const pub = await publishTournamentCardFromEditorClient({
         tournamentId,
         slideStatusBadge: "모집중",
+        onProgress: (phase) => {
+          if (phase === "publish-start") {
+            setPublishFlow({
+              percent: PUBLISH_PROGRESS_CARD_IMAGE.percent,
+              label: PUBLISH_PROGRESS_CARD_IMAGE.label,
+            });
+          } else if (phase === "before-post") {
+            setPublishFlow({
+              percent: PUBLISH_PROGRESS_MAIN_SAVE.percent,
+              label: PUBLISH_PROGRESS_MAIN_SAVE.label,
+            });
+          }
+        },
       });
 
       if (!pub.ok) {
@@ -573,20 +627,38 @@ export default function ClientTournamentCardPublishV2Page() {
             console.warn("[card-publish-v2] status-badge revert threw");
           }
         }
-        window.alert(pub.error);
+        setPublishFlowError(PUBLISH_FLOW_FAIL_KO);
         void loadSnapshots();
         void router.refresh();
         return;
       }
 
+      setPublishFlow({ percent: PUBLISH_PROGRESS_DONE.percent, label: PUBLISH_PROGRESS_DONE.label });
       setMessage("");
-      setPublishCompleteModalOpen(true);
-      void loadSnapshots();
-      void router.refresh();
+      holdBusyUntilSuccessModal = true;
+      window.setTimeout(() => {
+        if (!mountedRef.current) {
+          setPublishBusy(false);
+          return;
+        }
+        setPublishCompleteModalOpen(true);
+        setPublishFlow(null);
+        setPublishFlowError("");
+        setPublishBusy(false);
+        void loadSnapshots();
+        void router.refresh();
+      }, 380);
     } catch {
-      window.alert("처리 중 오류가 발생했습니다.");
+      if (recruitingPublish) {
+        setPublishFlowError(PUBLISH_FLOW_FAIL_KO);
+        setPublishFlow(null);
+      } else {
+        window.alert("처리 중 오류가 발생했습니다.");
+      }
     } finally {
-      setPublishBusy(false);
+      if (!holdBusyUntilSuccessModal) {
+        setPublishBusy(false);
+      }
       saveInFlightRef.current = false;
     }
   }
@@ -860,9 +932,77 @@ export default function ClientTournamentCardPublishV2Page() {
                   임시저장
                 </label>
               </div>
-              <p className="v3-muted" style={{ margin: 0, fontSize: "0.8rem", lineHeight: 1.45 }}>
-                모집중으로 게시하면 메인에 홍보됩니다. 임시저장은 공개 카드를 바꾸지 않습니다.
-              </p>
+              {!publishFlow ? (
+                <p className="v3-muted" style={{ margin: 0, fontSize: "0.8rem", lineHeight: 1.45 }}>
+                  모집중으로 게시하면 메인에 홍보됩니다. 임시저장은 공개 카드를 바꾸지 않습니다.
+                </p>
+              ) : null}
+              {(publishFlow || publishFlowError) ? (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  aria-busy={Boolean(publishBusy && publishIntent === "recruiting" && !publishFlowError && publishFlow)}
+                  className="v3-stack"
+                  style={{
+                    gap: "0.3rem",
+                    padding: "0.45rem 0.5rem",
+                    borderRadius: "8px",
+                    border: "1px solid #e2e8f0",
+                    background: "#f8fafc",
+                  }}
+                >
+                  {publishFlow ? (
+                    <>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          justifyContent: "space-between",
+                          gap: "0.5rem",
+                          fontSize: "0.72rem",
+                          lineHeight: 1.35,
+                          color: "#334155",
+                        }}
+                      >
+                        <span style={{ flex: "1 1 auto", minWidth: 0 }}>{publishFlow.label}</span>
+                        <span
+                          style={{
+                            flex: "0 0 auto",
+                            fontWeight: 800,
+                            fontVariantNumeric: "tabular-nums",
+                            color: "#1e293b",
+                          }}
+                        >
+                          {publishFlow.percent}%
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          height: 3,
+                          borderRadius: 2,
+                          background: "#e2e8f0",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${publishFlow.percent}%`,
+                            height: "100%",
+                            borderRadius: 2,
+                            background: "#2563eb",
+                            transition: "width 0.35s ease",
+                          }}
+                        />
+                      </div>
+                    </>
+                  ) : null}
+                  {publishFlowError ? (
+                    <p style={{ margin: 0, fontSize: "0.72rem", lineHeight: 1.45, color: "#b91c1c" }}>
+                      {publishFlowError}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               <button
                 type="button"
                 className="v3-btn"
@@ -878,7 +1018,7 @@ export default function ClientTournamentCardPublishV2Page() {
         </div>
           </div>
 
-          {message ? (
+          {message && !publishFlow && !publishFlowError ? (
             <p className="v3-muted" role="status" style={{ paddingLeft: "0.75rem", whiteSpace: "pre-line" }}>
               {message}
             </p>
@@ -914,10 +1054,10 @@ export default function ClientTournamentCardPublishV2Page() {
             }}
           >
             <h2 id="card-publish-publish-request-done-title" className="v3-h2" style={{ margin: 0 }}>
-              게시 요청 완료
+              게시 완료
             </h2>
             <p className="v3-muted" style={{ margin: 0, fontSize: "0.95rem", lineHeight: 1.5 }}>
-              약 1분 후 메인에 카드가 게시됩니다.
+              게시가 완료되었습니다.
             </p>
             <button type="button" className="v3-btn" onClick={handlePublishCompleteModalConfirm}>
               확인

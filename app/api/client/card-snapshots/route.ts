@@ -285,7 +285,9 @@ export async function POST(request: Request) {
   if (!draftOnly) {
     try {
       console.log("[PUBLISH] before reconcile");
-      await reconcileTournamentPublishedCardsForTournamentId(tournamentId);
+      await reconcileTournamentPublishedCardsForTournamentId(tournamentId, {
+        protectFreshActivePublishedRows: true,
+      });
       console.log("[PUBLISH] after reconcile");
     } catch (e) {
       console.warn("[api/client/card-snapshots] POST reconcile published cards failed", e);

@@ -59,6 +59,8 @@ export type TournamentCardClientPublishResult =
   | { ok: true; hadPublishedBefore: boolean }
   | { ok: false; error: string };
 
+export type TournamentCardClientPublishProgressPhase = "publish-start" | "before-post";
+
 /**
  * 클라이언트에서 카드 스냅샷 GET → 캡처 → POST(`draftOnly: false`)까지 수행.
  * 대회 `status-badge`는 호출 전에 이미 반영되어 있어야 캡처 배지·메인 노출 플래그가 맞습니다.
@@ -67,9 +69,13 @@ export async function publishTournamentCardFromEditorClient(args: {
   tournamentId: string;
   /** 슬라이드/PNG에 찍힐 배지 문구(예: 모집중) */
   slideStatusBadge: string;
+  /** 단계형 진행 UI용(실제 비율 아님). GET·캡처 구간 시작 시 / draftOnly:false POST 직전. */
+  onProgress?: (phase: TournamentCardClientPublishProgressPhase) => void;
 }): Promise<TournamentCardClientPublishResult> {
   const tournamentId = args.tournamentId.trim();
   if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+
+  args.onProgress?.("publish-start");
 
   let data: {
     snapshots?: CardSnapshotRow[];
@@ -161,6 +167,8 @@ export async function publishTournamentCardFromEditorClient(args: {
       error: e instanceof Error ? e.message : "카드 이미지 생성에 실패했습니다.",
     };
   }
+
+  args.onProgress?.("before-post");
 
   const postRes = await fetch("/api/client/card-snapshots", {
     method: "POST",

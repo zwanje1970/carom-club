@@ -10100,12 +10100,30 @@ async function loadTournamentByIdForPublishedCardReconcile(tournamentId: string)
   return normalizeTournament(row, store, venueOrgs);
 }
 
+type ReconcileTournamentPublishedCardsOptions = {
+  /**
+   * 카드 게시 직후 실행되는 단건 reconcile 전용 보호장치.
+   * 방금 저장된 활성 게시 행을 일정 조회/파싱 오판으로 즉시 inactive 처리하지 않는다.
+   */
+  protectFreshActivePublishedRows?: boolean;
+};
+
+const FRESH_PUBLISHED_CARD_RECONCILE_PROTECTION_MS = 10 * 60 * 1000;
+
+function isFreshActivePublishedCardRowForReconcile(c: TournamentPublishedCard, nowMs: number): boolean {
+  if (c.isPublished !== true || c.isActive !== true) return false;
+  const updatedMs = Date.parse(c.updatedAt);
+  if (!Number.isFinite(updatedMs)) return false;
+  return Math.abs(nowMs - updatedMs) <= FRESH_PUBLISHED_CARD_RECONCILE_PROTECTION_MS;
+}
+
 /**
  * 대회 1건 기준: 삭제·일정 경과·고아면 게시카드 메인 비활성화, 정상 복귀 시 isExpired 해제.
  * 메인 페이지에서 호출 금지(쓰기·대회 로드).
  */
 export async function reconcileTournamentPublishedCardsForTournamentId(
   tournamentId: string,
+  options?: ReconcileTournamentPublishedCardsOptions,
 ): Promise<{ ok: true; changedRowCount: number } | { ok: false; error: string }> {
   const ws = resolveTournamentPublishedCardsWriteStrategy();
   if (ws === "blocked") return { ok: false, error: "게시 카드 저장소에 쓸 수 없습니다." };
@@ -10120,6 +10138,7 @@ export async function reconcileTournamentPublishedCardsForTournamentId(
   const allRows = await loadTournamentPublishedCardsRowsIncludingDeleted();
   let changedRowCount = 0;
   const now = new Date().toISOString();
+  const nowMs = Date.parse(now);
   const next = allRows.map((c) => {
     if (c.tournamentId.trim() !== tid) return c;
     if (!isEntityLifecycleVisibleForList(c.lifecycleStatus)) return c;
@@ -10127,6 +10146,13 @@ export async function reconcileTournamentPublishedCardsForTournamentId(
     const shouldDeac = inactiveTournament || past;
     if (shouldDeac) {
       if (!c.isActive && !c.showOnMainSlide && c.isExpired === true) return c;
+      if (
+        options?.protectFreshActivePublishedRows === true &&
+        t?.status !== "DELETED" &&
+        isFreshActivePublishedCardRowForReconcile(c, nowMs)
+      ) {
+        return c;
+      }
       changedRowCount += 1;
       return {
         ...c,
