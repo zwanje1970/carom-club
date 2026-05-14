@@ -173,7 +173,9 @@ export default function SiteTournamentDetailSections({
                 className="site-detail-poster site-tournament-detail-hero-poster"
                 src={posterUrl}
                 alt={`${tournament.title ?? "대회"} 포스터`}
-                loading="lazy"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
               />
             </div>
           ) : null}

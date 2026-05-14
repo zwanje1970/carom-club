@@ -273,7 +273,16 @@ async function SiteVenueDetailPageContent({ id }: { id: string }) {
           {heroCoverUrl ? (
             <div className="site-venue-detail-hero-cover">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="site-venue-detail-hero-cover-img" src={heroCoverUrl} alt="" width={1200} height={675} />
+              <img
+                className="site-venue-detail-hero-cover-img"
+                src={heroCoverUrl}
+                alt=""
+                width={1200}
+                height={675}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+              />
             </div>
           ) : null}
           <h1 className="site-venue-detail-title">{venue.name}</h1>

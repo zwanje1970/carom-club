@@ -62,14 +62,15 @@ export default function CommunityPostDetailBody({ segments, tailImages }: Props)
 function ImageCluster({ images }: { images: { url: string; key: string }[] }) {
   return (
     <div className="ui-community-post-images ui-community-post-images--uniform">
-      {images.map((img) => (
+      {images.map((img, index) => (
         <span key={img.key} className="ui-community-post-body-figure">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             className="ui-community-post-inline-img"
             src={img.url}
             alt=""
-            loading="lazy"
+            loading={index === 0 ? "eager" : "lazy"}
+            {...(index === 0 ? { fetchPriority: "high" as const } : {})}
             decoding="async"
             style={imgStyleUniform()}
           />

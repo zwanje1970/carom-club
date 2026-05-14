@@ -52,6 +52,8 @@ type CardRowProps = {
   onCardPointerDown: (itemId: string) => void;
   /** 문서 순서상 첫 번째 면 이미지(LCP 후보) — 링크 preload 없이 img 우선순위만 부여 */
   lcpHeroImage?: boolean;
+  /** 초기 뷰포트 근처 카드: lazy 완화 */
+  prioritizeNearViewportImage?: boolean;
 };
 
 function cardSlotClassNames(base: string, selected: boolean, selectedMod?: string): string {
@@ -64,6 +66,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
   selected,
   onCardPointerDown,
   lcpHeroImage = false,
+  prioritizeNearViewportImage = false,
 }: CardRowProps) {
   const onPointerDown = useCallback(
     (e: PointerEvent<HTMLDivElement>) => {
@@ -142,9 +145,13 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
                           src={deckImgUrl}
                           alt=""
                           className={styles.sampleMainCardPosterPublishedSnapshot}
-                          decoding="async"
-                          loading={lcpHeroImage ? "eager" : "lazy"}
-                          {...(lcpHeroImage ? { fetchPriority: "high" as const } : {})}
+                          decoding={prioritizeNearViewportImage ? "sync" : "async"}
+                          loading={prioritizeNearViewportImage ? "eager" : "lazy"}
+                          {...(lcpHeroImage
+                            ? { fetchPriority: "high" as const }
+                            : prioritizeNearViewportImage
+                              ? { fetchPriority: "auto" as const }
+                              : {})}
                         />
                         {item.tournamentCardTextOverlay ? (
                           <MainSiteTournamentCardTextOverlay payload={item.tournamentCardTextOverlay} />
@@ -210,6 +217,7 @@ export type MainSiteScrollCardsProps = {
 
 export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSiteScrollCardsProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [autoSlideReady, setAutoSlideReady] = useState(false);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const primarySegmentRef = useRef<HTMLDivElement | null>(null);
@@ -227,6 +235,16 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     () => items.findIndex((x) => Boolean(x.imageUrl?.trim()) && !x.slideDeckPngPlaceholder),
     [items],
   );
+  const initialPriorityIndexes = useMemo(() => {
+    const out: number[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const hasDeckImage = Boolean(items[i]?.imageUrl?.trim()) && !items[i]?.slideDeckPngPlaceholder;
+      if (!hasDeckImage) continue;
+      out.push(i);
+      if (out.length >= 3) break;
+    }
+    return out;
+  }, [items]);
 
   const itemsIdsKey = items.length > 0 ? mainScrollIdsKey(items) : "";
 
@@ -283,9 +301,26 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   }, [selectedItemId]);
 
   useEffect(() => {
+    if (items.length === 0) {
+      setAutoSlideReady(false);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (!cancelled) setAutoSlideReady(true);
+    }, 220);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      setAutoSlideReady(false);
+    };
+  }, [itemsIdsKey, items.length]);
+
+  useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
     if (items.length === 0) return;
+    if (!autoSlideReady) return;
 
     const speedLevel = Number.isFinite(slideCardMoveSpeedLevel)
       ? Math.min(10, Math.max(1, Math.round(slideCardMoveSpeedLevel)))
@@ -543,7 +578,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       programmaticScrollUntilMsRef.current = 0;
       scrollPixelCarryRef.current = 0;
     };
-  }, [items, slideCardMoveSpeedLevel, selectedItemId]);
+  }, [items, slideCardMoveSpeedLevel, selectedItemId, autoSlideReady]);
 
   if (items.length === 0) {
     return (
@@ -562,6 +597,8 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
         const rowKey = `${segmentKey}-${item.id}`;
         const lcpHeroImage =
           segmentKey === "a" && itemIndex === lcpHeroItemIndex && lcpHeroItemIndex >= 0;
+        const prioritizeNearViewportImage =
+          segmentKey === "a" && initialPriorityIndexes.includes(itemIndex);
         return (
           <div
             key={rowKey}
@@ -574,6 +611,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
               selected={selectedItemId === item.id}
               onCardPointerDown={onCardPointerDown}
               lcpHeroImage={lcpHeroImage}
+              prioritizeNearViewportImage={prioritizeNearViewportImage}
             />
           </div>
         );

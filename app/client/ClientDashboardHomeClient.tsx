@@ -383,12 +383,12 @@ export default function ClientDashboardHomeClient({
       {membershipSection}
 
       <section className="v3-stack client-dashboard-main__hubTournaments" aria-labelledby="client-hub-tournaments-heading" style={{ gap: "0.45rem" }}>
-        <h2 id="client-hub-tournaments-heading" className="v3-h2" style={{ margin: 0, fontSize: "1rem" }}>
-          대회
+        <h2 id="client-hub-tournaments-heading" className="sr-only">
+          대회 관리
         </h2>
         <p className="v3-muted" style={{ margin: 0, fontSize: "0.88rem", lineHeight: 1.5 }}>
           {isReady
-            ? "대회목록에서 대회를 고른 뒤, 해당 대회의 관리 화면으로 이동합니다."
+            ? "대회목록에서 선택 후 대회를 관리 할 수 있습니다"
             : "요약을 불러오는 동안에도 아래에서 대회 목록으로 이동할 수 있습니다."}
         </p>
         <Link
