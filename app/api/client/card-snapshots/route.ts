@@ -137,6 +137,7 @@ export async function POST(request: Request) {
     publishedCardImageUrl?: unknown;
     publishedCardImage320Url?: unknown;
     publishedCardImageBackgroundOnly?: unknown;
+    statusBadge?: unknown;
     overlaySnapshot?: unknown;
   } = {};
 
@@ -227,6 +228,7 @@ export async function POST(request: Request) {
   const publishedCardImage320Url =
     !draftOnly && typeof body.publishedCardImage320Url === "string" ? body.publishedCardImage320Url : undefined;
   const publishedCardImageBackgroundOnly = body.publishedCardImageBackgroundOnly === true;
+  const statusBadge = !draftOnly && typeof body.statusBadge === "string" ? body.statusBadge : undefined;
 
   let result: Awaited<ReturnType<typeof upsertTournamentPublishedCard>>;
   try {
@@ -245,6 +247,7 @@ export async function POST(request: Request) {
       targetDetailUrl: `/site/tournaments/${tournamentId}`,
       publishedBy: publisher.user.id,
       draftOnly,
+      ...(statusBadge !== undefined ? { statusBadge } : {}),
       ...(mediaBackground !== undefined ? { mediaBackground } : {}),
       ...(imageOverlayBlend !== undefined ? { imageOverlayBlend } : {}),
       ...(imageOverlayOpacity !== undefined ? { imageOverlayOpacity } : {}),

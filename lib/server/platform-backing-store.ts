@@ -9531,6 +9531,7 @@ export async function upsertTournamentPublishedCard(params: {
   targetDetailUrl: string;
   publishedBy: string;
   draftOnly: boolean;
+  statusBadge?: string | null;
   mediaBackground?: string | null;
   imageOverlayBlend?: boolean;
   imageOverlayOpacity?: number;
@@ -9583,7 +9584,11 @@ export async function upsertTournamentPublishedCard(params: {
 
   const templateId = TOURNAMENT_SNAPSHOT_TEMPLATE_ID;
 
-  const statusStr = String(normalizeTournamentStatusBadge(tournament.statusBadge));
+  const requestedStatusStr =
+    !params.draftOnly && typeof params.statusBadge === "string"
+      ? String(normalizeTournamentStatusBadge(params.statusBadge))
+      : "";
+  const statusStr = requestedStatusStr || String(normalizeTournamentStatusBadge(tournament.statusBadge));
   const defaultShowOnMainSlide = tournamentStatusEligibleForMainSlide(statusStr);
   const now = new Date().toISOString();
 

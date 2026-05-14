@@ -185,6 +185,7 @@ export async function publishTournamentCardFromEditorClient(args: {
       imageId: publishSource.imageId?.trim() ?? "",
       image320Url: publishSource.image320Url?.trim() ?? "",
       draftOnly: false,
+      statusBadge: args.slideStatusBadge,
       cardTextShadowEnabled: publishSource.tournamentCardTextShadowEnabled === true,
       cardSurfaceLayout: publishSource.tournamentCardSurfaceLayout === "full" ? "full" : "split",
       ...(publishSource.tournamentCardSurfaceLayout === "full"
