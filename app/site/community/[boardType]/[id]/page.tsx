@@ -2,7 +2,9 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { parseCommunityBoardTypeParam } from "../../../../../lib/community-board-params";
 import type { SiteCommunityBoardKey } from "../../../../../lib/types/entities";
+import SiteHeaderListBackLink from "../../../components/SiteHeaderListBackLink";
 import SiteShellFrame from "../../../components/SiteShellFrame";
+import { communityBoardListHref } from "../../community-tab-config";
 import SiteDetailShellBodyLoader from "../../../components/SiteDetailShellBodyLoader";
 import SiteCommunityPostDetailPageContent from "./SiteCommunityPostDetailPageContent";
 
@@ -18,6 +20,9 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
 
   return (
     <SiteShellFrame
+      brandLeading={
+        <SiteHeaderListBackLink href={communityBoardListHref(boardType)} transition="community" />
+      }
       brandTitle={
         <span className="site-community-detail-brand-name site-home-brand-ellipsis">게시글</span>
       }

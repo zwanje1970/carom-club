@@ -1,9 +1,11 @@
 import { Suspense } from "react";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/auth/session";
 import { parseCommunityBoardTypeParam } from "../../../../lib/community-board-params";
-import { getSiteCommunityConfig, listCommunityPostsForPublicSite } from "../../../../lib/surface-read";
-import { communityBoardListHref, communityNavTabsFromConfig } from "../community-tab-config";
+import { getSiteCommunityConfig, getUserById, listCommunityPostsForPublicSite } from "../../../../lib/surface-read";
+import { communityBoardListHref, communityNavTabsFromConfig, isCommunityNoticeBoard } from "../community-tab-config";
 import CommunityBoardPostList from "../CommunityBoardPostList";
 import CommunityBoardListScrollShell from "../CommunityBoardListScrollShell";
 import CommunityBoardSearchForm from "../CommunityBoardSearchForm";
@@ -49,6 +51,12 @@ async function SiteCommunityBoardListPageInner({ params, searchParams }: Props) 
 
   const items = await listCommunityPostsForPublicSite(boardType, q ? { q } : undefined);
 
+  const cookieStore = await cookies();
+  const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
+  const user = session ? await getUserById(session.userId) : null;
+  const isNoticeBoard = isCommunityNoticeBoard(boardType, config);
+  const showWriteFab = !isNoticeBoard || user?.role === "PLATFORM";
+
   return (
     <SiteShellFrame
       brandTitle="커뮤니티"
@@ -72,14 +80,16 @@ async function SiteCommunityBoardListPageInner({ params, searchParams }: Props) 
             </CommunityBoardListScrollShell>
           </section>
         </CommunityBoardSwipeShell>
-        <Link
-          prefetch={false}
-          href={`${communityBoardListHref(boardType)}/write`}
-          className="community-write-fab"
-          aria-label={`${boardType} 글쓰기`}
-        >
-          <span aria-hidden>+</span>
-        </Link>
+        {showWriteFab ? (
+          <Link
+            prefetch={false}
+            href={`${communityBoardListHref(boardType)}/write`}
+            className="community-write-fab"
+            aria-label={`${boardType} 글쓰기`}
+          >
+            <span aria-hidden>+</span>
+          </Link>
+        ) : null}
       </>
     </SiteShellFrame>
   );

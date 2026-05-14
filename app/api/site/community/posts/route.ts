@@ -9,6 +9,8 @@ import {
   listCommunityPosts,
   parseCommunityBoardTypeParam,
 } from "../../../../../lib/platform-api";
+import { getSiteCommunityConfig } from "../../../../../lib/surface-read";
+import { isCommunityNoticeBoard } from "../../../../site/community/community-tab-config";
 
 export const runtime = "nodejs";
 
@@ -52,6 +54,11 @@ export async function POST(request: Request) {
   const boardType = parseCommunityBoardTypeParam(typeof body.boardType === "string" ? body.boardType : "");
   if (!boardType) {
     return NextResponse.json({ error: "boardType이 올바르지 않습니다." }, { status: 400 });
+  }
+
+  const config = await getSiteCommunityConfig();
+  if (isCommunityNoticeBoard(boardType, config) && user.role !== "PLATFORM") {
+    return NextResponse.json({ error: "공지 게시판에는 플랫폼 관리자만 글을 쓸 수 있습니다." }, { status: 403 });
   }
 
   const title = typeof body.title === "string" ? body.title : "";

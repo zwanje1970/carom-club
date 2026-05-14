@@ -55,6 +55,10 @@ const shellStyleStandard: CSSProperties = {
 export type SiteShellFrameProps = {
   brandTitle: ReactNode;
   /**
+   * 헤더 청바 왼쪽(제목 앞) — 상세→목록 등. `brandTitle`은 가운데 정렬 유지.
+   */
+  brandLeading?: ReactNode;
+  /**
    * 헤더(청색 제목 바) 바로 아래 컨트롤 영역 — 필터·정렬·탭·검색 등.
    * 본문(회색 영역) 위에 두어 제목만 헤더에 남긴다.
    */
@@ -91,6 +95,7 @@ export type SiteShellFrameProps = {
  */
 export default function SiteShellFrame({
   brandTitle,
+  brandLeading,
   auxiliary,
   children,
   homeBelowHeader,
@@ -126,7 +131,10 @@ export default function SiteShellFrame({
 
   const headerBlock = (
     <div className={topWhiteClass}>
-      <div className="site-home-brand">
+      <div
+        className={["site-home-brand", brandLeading ? "site-home-brand--with-leading" : ""].filter(Boolean).join(" ")}
+      >
+        {brandLeading}
         <div className="site-mobile-page-title-block">{brandTitle}</div>
       </div>
     </div>

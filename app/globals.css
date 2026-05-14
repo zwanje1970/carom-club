@@ -3009,6 +3009,39 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   letter-spacing: 0.04em;
 }
 
+/* 상세 등: 헤더 왼쪽 « 목록 — 제목 가운데 유지, 터치 영역 확보 */
+.site-home-brand.site-home-brand--with-leading {
+  position: relative;
+}
+
+.site-shell-header-list-back {
+  position: absolute;
+  left: max(0.35rem, env(safe-area-inset-left, 0px));
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  padding: 0.5rem 0.6rem;
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: inherit !important;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: 0.35rem;
+  box-sizing: border-box;
+  min-height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.site-home-brand--with-leading .site-mobile-page-title-block {
+  padding-left: 4.75rem;
+  padding-right: 4.75rem;
+  box-sizing: border-box;
+}
+
 .site-home-top-white--main .site-home-brand,
 .site-home-top-white--standard .site-home-brand {
   padding-bottom: var(--site-shell-brand-padding-bottom);

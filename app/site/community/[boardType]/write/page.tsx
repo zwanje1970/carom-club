@@ -3,9 +3,9 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../lib/auth/session";
 import { parseCommunityBoardTypeParam } from "../../../../../lib/community-board-params";
-import { getSiteCommunityConfig } from "../../../../../lib/surface-read";
+import { getSiteCommunityConfig, getUserById } from "../../../../../lib/surface-read";
 import type { SiteCommunityBoardKey } from "../../../../../lib/types/entities";
-import { communityBoardListHref } from "../../community-tab-config";
+import { communityBoardListHref, isCommunityNoticeBoard } from "../../community-tab-config";
 import SiteShellFrame from "../../../components/SiteShellFrame";
 import CommunityPostWriteForm from "./CommunityPostWriteForm";
 
@@ -26,6 +26,11 @@ export default async function SiteCommunityWritePage({ params }: Props) {
   const session = parseSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
   if (!session) {
     redirect(`/login?next=${encodeURIComponent(`/site/community/${boardType}/write`)}`);
+  }
+
+  const user = await getUserById(session.userId);
+  if (isCommunityNoticeBoard(boardType, config) && user?.role !== "PLATFORM") {
+    redirect(communityBoardListHref(boardType));
   }
 
   return (

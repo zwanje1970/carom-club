@@ -1,3 +1,4 @@
+import type { TournamentCardOverlaySnapshot } from "../../../../lib/site/tournament-card-overlay-snapshot";
 import { buildSlideDeckItemForTournamentCapture } from "./tournament-card-build-slide-deck-item";
 import { captureAndUploadTournamentCardSnapshots } from "./tournament-card-publish-capture";
 
@@ -117,6 +118,7 @@ export async function publishTournamentCardFromEditorClient(args: {
 
   let publishedCardImageUrl = "";
   let publishedCardImage320Url = "";
+  let overlaySnapshot: TournamentCardOverlaySnapshot | null = null;
   try {
     const slideDeckItem = buildSlideDeckItemForTournamentCapture({
       tournamentId,
@@ -148,9 +150,10 @@ export async function publishTournamentCardFromEditorClient(args: {
       tournamentFallbackDate: tournamentDate,
       tournamentFallbackLocation: tournamentLocation,
     });
-    const urls = await captureAndUploadTournamentCardSnapshots(slideDeckItem);
-    publishedCardImageUrl = urls.publishedCardImageUrl;
-    publishedCardImage320Url = urls.publishedCardImage320Url;
+    const capture = await captureAndUploadTournamentCardSnapshots(slideDeckItem);
+    publishedCardImageUrl = capture.publishedCardImageUrl;
+    publishedCardImage320Url = capture.publishedCardImage320Url;
+    overlaySnapshot = capture.overlaySnapshot;
   } catch (e) {
     return {
       ok: false,
@@ -217,6 +220,7 @@ export async function publishTournamentCardFromEditorClient(args: {
       publishedCardImageUrl,
       publishedCardImage320Url,
       publishedCardImageBackgroundOnly: true,
+      ...(overlaySnapshot ? { overlaySnapshot } : {}),
     }),
   });
   const postData = (await postRes.json()) as { error?: string };

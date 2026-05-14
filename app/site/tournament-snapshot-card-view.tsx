@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { useCallback, useLayoutEffect, useRef } from "react";
+import type { TournamentCardOverlaySnapshot } from "../../lib/site/tournament-card-overlay-snapshot";
 import { TournamentStatusBadge, type TournamentPostStatus } from "./tournament-slide-card-status-badge";
 import styles from "./tournament-slide-card-previews.module.css";
 
@@ -50,6 +51,8 @@ export type SlideDeckItem = {
   publishedCardImage320Url?: string;
   /** true: PNG에 글자 미포함(배경만) — 메인에서 HTML 오버레이 */
   publishedCardImageBackgroundOnly?: boolean;
+  /** 메인 HTML 오버레이: 게시 시점 좌표 스냅샷(있으면 메인은 템플릿 분기 없이 표시) */
+  overlaySnapshot?: TournamentCardOverlaySnapshot | null;
 };
 
 /** carom-postcard-template-test: TournamentSlideCardPreview.tsx TournamentSlidePreviewItem */
@@ -197,7 +200,15 @@ function MediaStack({
           onLoad={repImageHighPriority && onRepImageLoad ? fireRepImageLoad : undefined}
         />
       ) : null}
-      <div className={styles.statusBadgeWrap}>
+      <div
+        className={styles.statusBadgeWrap}
+        {...(!mainSlideAd
+          ? {
+              "data-tournament-card-overlay": "statusBadge",
+              "data-status-badge-display": (item.statusBadge ?? "").trim(),
+            }
+          : {})}
+      >
         {mainSlideAd ? (
           <span
             className={`${styles.adMark} ${isImageCaptureMode ? styles.imageCaptureHideGlyph : ""}`.trim()}
@@ -296,10 +307,18 @@ function TournamentSlideCardPreview({
 
   const fullOverlayFooter = (
     <div className={styles.fullSurfaceFooter}>
-      <p className={`${styles.fullSurfaceFooterDate} ${captureHideGlyphClass}`.trim()} style={fullFooterDateStyle}>
+      <p
+        data-tournament-card-overlay="date"
+        className={`${styles.fullSurfaceFooterDate} ${captureHideGlyphClass}`.trim()}
+        style={fullFooterDateStyle}
+      >
         {parsed.dateText}
       </p>
-      <p className={`${styles.fullSurfaceFooterPlace} ${captureHideGlyphClass}`.trim()} style={fullFooterPlaceStyle}>
+      <p
+        data-tournament-card-overlay="place"
+        className={`${styles.fullSurfaceFooterPlace} ${captureHideGlyphClass}`.trim()}
+        style={fullFooterPlaceStyle}
+      >
         {parsed.placeText}
       </p>
     </div>
@@ -310,10 +329,18 @@ function TournamentSlideCardPreview({
 
   const splitFooter = (
     <footer className={styles.cardFooter}>
-      <p className={`${styles.footerDate} ${captureHideGlyphClass}`.trim()} style={splitDateStyle}>
+      <p
+        data-tournament-card-overlay="date"
+        className={`${styles.footerDate} ${captureHideGlyphClass}`.trim()}
+        style={splitDateStyle}
+      >
         {parsed.dateText}
       </p>
-      <p className={`${styles.footerPlace} ${captureHideGlyphClass}`.trim()} style={splitPlaceStyle}>
+      <p
+        data-tournament-card-overlay="place"
+        className={`${styles.footerPlace} ${captureHideGlyphClass}`.trim()}
+        style={splitPlaceStyle}
+      >
         {parsed.placeText}
       </p>
     </footer>
@@ -343,6 +370,7 @@ function TournamentSlideCardPreview({
                 <div className={styles.classicMain}>
                   {showLeadBlock ? (
                     <p
+                      data-tournament-card-overlay="lead"
                       className={`${styles.classicLead} ${captureHideGlyphClass}`.trim()}
                       style={leadColor ? { color: leadColor } : undefined}
                     >
@@ -350,6 +378,7 @@ function TournamentSlideCardPreview({
                     </p>
                   ) : null}
                   <h3
+                    data-tournament-card-overlay="title"
                     className={`${styles.classicTitle} ${captureHideGlyphClass}`.trim()}
                     style={titleColor ? { color: titleColor } : undefined}
                   >
@@ -357,6 +386,7 @@ function TournamentSlideCardPreview({
                   </h3>
                   {showDescBlock ? (
                     <p
+                      data-tournament-card-overlay="subtitle"
                       className={`${styles.classicDesc} ${captureHideGlyphClass}`.trim()}
                       style={descColor ? { color: descColor } : undefined}
                     >
@@ -365,6 +395,7 @@ function TournamentSlideCardPreview({
                   ) : null}
                   {showDesc2Block ? (
                     <p
+                      data-tournament-card-overlay="subtitle2"
                       className={`${styles.classicDescSecondary} ${captureHideGlyphClass}`.trim()}
                       style={descColor ? { color: descColor } : undefined}
                     >
@@ -405,6 +436,7 @@ function TournamentSlideCardPreview({
               <div className={styles.frameCenter}>
                 {showLeadBlock ? (
                   <p
+                    data-tournament-card-overlay="lead"
                     className={`${styles.frameLead} ${captureHideGlyphClass}`.trim()}
                     style={leadColor ? { color: leadColor } : undefined}
                   >
@@ -412,6 +444,7 @@ function TournamentSlideCardPreview({
                   </p>
                 ) : null}
                 <h3
+                  data-tournament-card-overlay="title"
                   className={`${styles.frameTitle} ${captureHideGlyphClass}`.trim()}
                   style={titleColor ? { color: titleColor } : undefined}
                 >
@@ -419,6 +452,7 @@ function TournamentSlideCardPreview({
                 </h3>
                 {showDescBlock ? (
                   <p
+                    data-tournament-card-overlay="subtitle"
                     className={`${styles.frameDesc} ${captureHideGlyphClass}`.trim()}
                     style={descColor ? { color: descColor } : undefined}
                   >
@@ -427,6 +461,7 @@ function TournamentSlideCardPreview({
                 ) : null}
                 {showDesc2Block ? (
                   <p
+                    data-tournament-card-overlay="subtitle2"
                     className={`${styles.frameDescSecondary} ${captureHideGlyphClass}`.trim()}
                     style={descColor ? { color: descColor } : undefined}
                   >

@@ -6,6 +6,7 @@ import { isEmptyOutlineHtml } from "../../../../lib/outline-content-helpers";
 import { outlineFileKindFromAsset, outlinePdfIdFromPublicUrl } from "../../../../lib/outline-pdf-helpers";
 import { getOutlinePdfAssetById, getSiteVenueDetailById } from "../../../../lib/surface-read";
 import SiteOutlineDocumentCard from "../../components/SiteOutlineDocumentCard";
+import SiteHeaderListBackLink from "../../components/SiteHeaderListBackLink";
 import SiteShellFrame from "../../components/SiteShellFrame";
 import SiteDetailShellBodyLoader from "../../components/SiteDetailShellBodyLoader";
 import VenuesListBackLink from "../VenuesListBackLink";
@@ -471,7 +472,10 @@ export default async function SiteVenueDetailPage({ params }: { params: Promise<
   if (!id) notFound();
 
   return (
-    <SiteShellFrame brandTitle={<span className="site-home-brand-ellipsis">클럽상세</span>}>
+    <SiteShellFrame
+      brandLeading={<SiteHeaderListBackLink href="/site/venues" transition="venues" />}
+      brandTitle={<span className="site-home-brand-ellipsis">클럽상세</span>}
+    >
       <Suspense fallback={<SiteDetailShellBodyLoader />}>
         <SiteVenueDetailPageContent id={id} />
       </Suspense>

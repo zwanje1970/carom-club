@@ -32,6 +32,10 @@ import type {
   TournamentVerificationMode,
 } from "../tournament-rule-types";
 import { buildTournamentPublishedCardSubtitle } from "../tournament-slide-card-subtitle";
+import {
+  parsePublishedCardOverlaySnapshotForStorage,
+  type TournamentCardOverlaySnapshot,
+} from "../site/tournament-card-overlay-snapshot";
 import { computeLegacyAutoSettlementSummary } from "./settlement-legacy-summary";
 import { MAX_COMMUNITY_POST_IMAGE_COUNT } from "../community-post-images";
 import {
@@ -840,6 +844,8 @@ export type TournamentPublishedCard = {
   publishedCardImage320Url?: string;
   /** true: 게시 PNG가 배경만(글자 제외) — 메인에서 HTML 텍스트 오버레이 */
   publishedCardImageBackgroundOnly?: boolean;
+  /** 게시 시점 템플릿에서 확정한 글자 레이어(메인은 그대로 렌더만) */
+  overlaySnapshot?: TournamentCardOverlaySnapshot | null;
 };
 
 /** 게시 카드 스냅샷 교체 시 이전 proof 이미지 id — `deleteAfter` 이후 삭제 시도 */
@@ -904,6 +910,8 @@ export type PublishedCardSnapshot = {
   publishedCardImage320Url?: string | null;
   /** 메인: 배경 PNG + HTML 글자 모드 */
   publishedCardImageBackgroundOnly?: boolean;
+  /** 메인: 게시 시점 오버레이 좌표·타이포 스냅샷(있으면 템플릿 분기 없이 표시) */
+  overlaySnapshot?: TournamentCardOverlaySnapshot | null;
 };
 
 export type SitePageBuilderDraftBlock = {
@@ -2765,6 +2773,10 @@ function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedC
   }
   if (r.publishedCardImageBackgroundOnly === true) {
     base.publishedCardImageBackgroundOnly = true;
+  }
+  if ("overlaySnapshot" in r && r.overlaySnapshot != null) {
+    const ov = parsePublishedCardOverlaySnapshotForStorage(r.overlaySnapshot);
+    if (ov) base.overlaySnapshot = ov;
   }
   base.lifecycleStatus = normalizeEntityLifecycleStatus(r.lifecycleStatus);
   const lcDelAt = r.deletedAt;
@@ -9474,6 +9486,10 @@ function tournamentPublishedCardToPublishedSnapshot(
   if (t.publishedCardImageBackgroundOnly === true) {
     snap.publishedCardImageBackgroundOnly = true;
   }
+  if (t.overlaySnapshot != null) {
+    const ov = parsePublishedCardOverlaySnapshotForStorage(t.overlaySnapshot);
+    if (ov) snap.overlaySnapshot = ov;
+  }
   return snap;
 }
 
@@ -9509,6 +9525,8 @@ export async function upsertTournamentPublishedCard(params: {
   publishedCardImage320Url?: string | null;
   /** 게시 PNG가 배경만(텍스트 제외)인 경우 true */
   publishedCardImageBackgroundOnly?: boolean;
+  /** 게시 시 템플릿 DOM에서 확정한 오버레이(검증 실패 시 무시) */
+  overlaySnapshot?: unknown;
 }): Promise<{ ok: true; snapshot: PublishedCardSnapshot } | { ok: false; error: string }> {
   if (!params.title.trim()) return { ok: false, error: "카드 제목을 입력해 주세요." };
   const title = params.title;
@@ -9696,6 +9714,10 @@ export async function upsertTournamentPublishedCard(params: {
     if (pub320) row.publishedCardImage320Url = pub320;
     if (params.publishedCardImageBackgroundOnly === true) {
       row.publishedCardImageBackgroundOnly = true;
+    }
+    if (params.overlaySnapshot != null) {
+      const ov = parsePublishedCardOverlaySnapshotForStorage(params.overlaySnapshot);
+      if (ov) row.overlaySnapshot = ov;
     }
   }
 
@@ -10555,7 +10577,7 @@ function normalizeMainSlideTournamentSnapshotsCompactRow(row: unknown): Publishe
     targetDetailUrl,
   });
   if (sourceType !== "TOURNAMENT_SNAPSHOT") return null;
-  return {
+  const merged: PublishedCardSnapshot = {
     ...(s as PublishedCardSnapshot),
     snapshotId,
     tournamentId,
@@ -10573,6 +10595,10 @@ function normalizeMainSlideTournamentSnapshotsCompactRow(row: unknown): Publishe
     updatedAt,
     snapshotSourceType: sourceType,
   };
+  const ov = parsePublishedCardOverlaySnapshotForStorage(merged.overlaySnapshot);
+  if (ov) merged.overlaySnapshot = ov;
+  else delete merged.overlaySnapshot;
+  return merged;
 }
 
 async function loadMainSlideTournamentSnapshotsCompactFromStorage(): Promise<PublishedCardSnapshot[] | null> {

@@ -4,10 +4,16 @@ import { memo } from "react";
 import { parseTournamentSlideCardSubtitleParts } from "../../lib/tournament-slide-card-subtitle";
 import previewStyles from "./tournament-slide-card-previews.module.css";
 import overlayStyles from "./main-site-tournament-card-text-overlay.module.css";
+import {
+  TournamentStatusBadge,
+  tournamentSlideStatusBadgeToPostStatus,
+} from "./tournament-slide-card-status-badge";
 
 export type MainSiteTournamentCardTextOverlayPayload = {
   cardTemplate: "A" | "B";
   surfaceLayout: "split" | "full";
+  /** 대회 상태 배지 — 배경-only PNG에는 라벨이 없으므로 메인 오버레이에서만 표시 */
+  statusBadge?: string | null;
   title: string;
   subtitle: string;
   cardExtraLine1: string | null;
@@ -25,6 +31,8 @@ function MainSiteTournamentCardTextOverlayInner({ payload }: { payload: MainSite
   const { dateText, placeText } = parseTournamentSlideCardSubtitleParts(payload.subtitle);
   const surfaceFull = payload.surfaceLayout === "full";
   const classic = payload.cardTemplate !== "B";
+  const statusRaw = (payload.statusBadge ?? "").trim();
+  const postStatus = statusRaw ? tournamentSlideStatusBadgeToPostStatus(statusRaw) : null;
 
   const rootArticleClass = [
     previewStyles.cardRoot,
@@ -79,6 +87,11 @@ function MainSiteTournamentCardTextOverlayInner({ payload }: { payload: MainSite
           <div className={overlayStyles.overlayArtboard}>
             <div className={rootArticleClass} role="presentation">
               <div className={previewStyles.media}>
+                {postStatus ? (
+                  <div className={previewStyles.statusBadgeWrap}>
+                    <TournamentStatusBadge status={postStatus} />
+                  </div>
+                ) : null}
                 <div className={previewStyles.classicInner}>
                   <div className={previewStyles.classicTop}>
                     <div className={previewStyles.classicMain}>
@@ -119,6 +132,11 @@ function MainSiteTournamentCardTextOverlayInner({ payload }: { payload: MainSite
         <div className={overlayStyles.overlayArtboard}>
           <div className={rootArticleClass} role="presentation">
             <div className={previewStyles.media}>
+              {postStatus ? (
+                <div className={previewStyles.statusBadgeWrap}>
+                  <TournamentStatusBadge status={postStatus} />
+                </div>
+              ) : null}
               <div className={previewStyles.frameInner}>
                 <div className={previewStyles.frameCenter}>
                   {lead ? (

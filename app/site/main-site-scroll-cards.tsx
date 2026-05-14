@@ -7,9 +7,13 @@ import styles from "./main-sample/main-sample.module.css";
 import siteStyles from "./main-site-scroll-cards.module.css";
 import deckShellStyles from "./main-site-scroll-tournament-deck-shell.module.css";
 import {
+  MainSiteTournamentCardOverlayFromSnapshot,
+} from "./main-site-tournament-card-overlay-from-snapshot";
+import {
   MainSiteTournamentCardTextOverlay,
   type MainSiteTournamentCardTextOverlayPayload,
 } from "./main-site-tournament-card-text-overlay";
+import type { TournamentCardOverlaySnapshot } from "../../lib/site/tournament-card-overlay-snapshot";
 
 const SITE_SCROLL_CARD = "data-site-scroll-card";
 const SITE_SCROLL_SHORTCUT = "data-site-scroll-shortcut";
@@ -49,8 +53,10 @@ export type MainSiteScrollCardItem = {
   slideDeckPngPlaceholder?: boolean;
   /** 광고만 우측 상단 AD 표시(포인터 비참여) */
   slideDeckPngAdMark?: boolean;
-  /** 배경 전용 PNG 게시분 — 아래 오버레이로 글자 표시 */
+  /** 배경 전용 PNG 게시분 — 아래 오버레이로 글자 표시(레거시: 메인이 템플릿 필드로 조립) */
   tournamentCardTextOverlay?: MainSiteTournamentCardTextOverlayPayload | null;
+  /** 배경 전용 PNG + 게시 시점 좌표 스냅샷(있으면 템플릿 분기 없이 표시) */
+  tournamentCardOverlaySnapshot?: TournamentCardOverlaySnapshot | null;
 };
 
 type CardRowProps = {
@@ -161,7 +167,9 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
                               ? { fetchPriority: "auto" as const }
                               : {})}
                         />
-                        {item.tournamentCardTextOverlay ? (
+                        {item.tournamentCardOverlaySnapshot ? (
+                          <MainSiteTournamentCardOverlayFromSnapshot snapshot={item.tournamentCardOverlaySnapshot} />
+                        ) : item.tournamentCardTextOverlay ? (
                           <MainSiteTournamentCardTextOverlay payload={item.tournamentCardTextOverlay} />
                         ) : null}
                         {item.slideDeckPngAdMark ? (

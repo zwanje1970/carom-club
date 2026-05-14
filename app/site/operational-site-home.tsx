@@ -13,6 +13,7 @@ import {
   normalizeMainSlideAdConfig,
   type MainSiteSlideAd,
 } from "../../lib/site/main-slide-stream";
+import { parsePublishedCardOverlaySnapshotForStorage } from "../../lib/site/tournament-card-overlay-snapshot";
 import { headers } from "next/headers";
 import { isCaromClubMobileAppShell } from "../../lib/is-carom-club-mobile-app-shell";
 import CaromAppExitControl from "./components/CaromAppExitControl";
@@ -112,11 +113,15 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
         const published640 = (item.publishedCardImageUrl ?? "").trim();
         const published320 = (item.publishedCardImage320Url ?? "").trim();
         const scrollImg = published320 || published640;
+        const needsHtmlOverlay = item.publishedCardImageBackgroundOnly === true && Boolean(scrollImg);
+        const tournamentCardOverlaySnapshot =
+          needsHtmlOverlay && item.overlaySnapshot ? item.overlaySnapshot : undefined;
         const tournamentCardTextOverlay: MainSiteTournamentCardTextOverlayPayload | undefined =
-          item.publishedCardImageBackgroundOnly === true && scrollImg
+          needsHtmlOverlay && !tournamentCardOverlaySnapshot
             ? {
                 cardTemplate: item.cardTemplate ?? "A",
                 surfaceLayout: item.cardSurfaceLayout === "full" ? "full" : "split",
+                statusBadge: item.statusBadge ?? null,
                 title: item.title,
                 subtitle: item.subtitle,
                 cardExtraLine1: item.cardExtraLine1 ?? null,
@@ -140,6 +145,7 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
           slideDeckPngFace: Boolean(scrollImg),
           slideDeckPngPlaceholder: !scrollImg,
           slideDeckPngAdMark: false,
+          ...(tournamentCardOverlaySnapshot ? { tournamentCardOverlaySnapshot } : {}),
           ...(tournamentCardTextOverlay ? { tournamentCardTextOverlay } : {}),
         };
       }
@@ -180,11 +186,15 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
         const published640 = (item.publishedCardImageUrl ?? "").trim();
         const published320 = (item.publishedCardImage320Url ?? "").trim();
         const scrollImg = published320 || published640;
+        const needsHtmlOverlay = item.publishedCardImageBackgroundOnly === true && Boolean(scrollImg);
+        const tournamentCardOverlaySnapshot =
+          needsHtmlOverlay && item.overlaySnapshot ? item.overlaySnapshot : undefined;
         const tournamentCardTextOverlay: MainSiteTournamentCardTextOverlayPayload | undefined =
-          item.publishedCardImageBackgroundOnly === true && scrollImg
+          needsHtmlOverlay && !tournamentCardOverlaySnapshot
             ? {
                 cardTemplate: item.cardTemplate ?? "A",
                 surfaceLayout: item.cardSurfaceLayout === "full" ? "full" : "split",
+                statusBadge: item.statusBadge ?? null,
                 title: item.title,
                 subtitle: item.subtitle,
                 cardExtraLine1: item.cardExtraLine1 ?? null,
@@ -208,6 +218,7 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
           slideDeckPngFace: Boolean(scrollImg),
           slideDeckPngPlaceholder: !scrollImg,
           slideDeckPngAdMark: false,
+          ...(tournamentCardOverlaySnapshot ? { tournamentCardOverlaySnapshot } : {}),
           ...(tournamentCardTextOverlay ? { tournamentCardTextOverlay } : {}),
         };
       }
@@ -248,6 +259,7 @@ export default async function SiteOperationalHome() {
     const publishedPngNeedsHtmlTextOverlay =
       snapshot.publishedCardImageBackgroundOnly === true ||
       (hasPublishedCardPng && snapshot.publishedCardImageBackgroundOnly !== false);
+    const overlayParsed = parsePublishedCardOverlaySnapshotForStorage(snapshot.overlaySnapshot);
     return {
       type: "tournament" as const,
       linkType: "internal" as const,
@@ -292,6 +304,7 @@ export default async function SiteOperationalHome() {
       ...(pub640 ? { publishedCardImageUrl: pub640 } : {}),
       ...(pub320 ? { publishedCardImage320Url: pub320 } : {}),
       ...(publishedPngNeedsHtmlTextOverlay ? { publishedCardImageBackgroundOnly: true as const } : {}),
+      ...(overlayParsed ? { overlaySnapshot: overlayParsed } : {}),
     };
   });
 

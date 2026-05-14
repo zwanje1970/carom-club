@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
+import SiteHeaderListBackLink from "../../components/SiteHeaderListBackLink";
 import SiteShellFrame from "../../components/SiteShellFrame";
 import SiteDetailShellBodyLoader from "../../components/SiteDetailShellBodyLoader";
 import SiteTournamentDetailPageContent from "./SiteTournamentDetailPageContent";
@@ -16,7 +17,10 @@ export default async function SiteTournamentDetailPage({
   if (!id) notFound();
 
   return (
-    <SiteShellFrame brandTitle={<span className="site-home-brand-ellipsis">대회상세</span>}>
+    <SiteShellFrame
+      brandLeading={<SiteHeaderListBackLink href="/site/tournaments" transition="tournaments" />}
+      brandTitle={<span className="site-home-brand-ellipsis">대회상세</span>}
+    >
       <section className="site-site-gray-main v3-stack">
         <Suspense fallback={<SiteDetailShellBodyLoader />}>
           <SiteTournamentDetailPageContent id={id} />

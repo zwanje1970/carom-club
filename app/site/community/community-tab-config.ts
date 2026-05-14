@@ -67,3 +67,12 @@ export function communityNavTabsFromConfig(config: SiteCommunityConfig): Communi
     })),
   ];
 }
+
+/**
+ * 공지 전용 게시판 — 플랫폼에서 해당 슬롯 `label`을 `공지` 또는 `NOTICE`로 둔 경우만.
+ * (일반 자유/질문/후기 탭과 구분; FAB·작성 권한 UI/API와 동기)
+ */
+export function isCommunityNoticeBoard(boardKey: SiteCommunityBoardKey, config: SiteCommunityConfig): boolean {
+  const label = config[boardKey].label.trim();
+  return label === "공지" || label === "NOTICE";
+}

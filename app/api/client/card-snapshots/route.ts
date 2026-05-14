@@ -137,6 +137,7 @@ export async function POST(request: Request) {
     publishedCardImageUrl?: unknown;
     publishedCardImage320Url?: unknown;
     publishedCardImageBackgroundOnly?: unknown;
+    overlaySnapshot?: unknown;
   } = {};
 
   try {
@@ -259,6 +260,7 @@ export async function POST(request: Request) {
       ...(publishedCardImageUrl !== undefined ? { publishedCardImageUrl } : {}),
       ...(publishedCardImage320Url !== undefined ? { publishedCardImage320Url } : {}),
       ...(publishedCardImageBackgroundOnly ? { publishedCardImageBackgroundOnly: true as const } : {}),
+      ...(!draftOnly && body.overlaySnapshot != null ? { overlaySnapshot: body.overlaySnapshot } : {}),
     });
     console.log("[PUBLISH] after upsert");
   } catch (e) {
