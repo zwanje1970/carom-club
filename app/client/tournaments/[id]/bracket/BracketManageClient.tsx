@@ -38,11 +38,17 @@ import BracketProgressSummaryCard from "./BracketProgressSummaryCard";
 import TournamentTvLinkBlock from "../TournamentTvLinkBlock";
 import "../tournament-manage-ui.css";
 import { roundLabelFromMatchCount } from "./bracket-progress-utils";
+import { fetchClientBracketMetaJson } from "./bracket-client-poll-meta";
 
 const TournamentGroupRound1PrintClient = dynamic(
   () => import("./TournamentGroupRound1PrintClient"),
   { ssr: false, loading: () => <p className="v3-muted">조별 1차 대진표 인쇄 도구를 불러오는 중…</p> },
 );
+
+const QuickResultDetailModal = dynamic(() => import("./QuickResultDetailModal"), {
+  ssr: false,
+  loading: () => null,
+});
 
 type BracketRoundDoc = {
   roundNumber: number;
@@ -54,6 +60,19 @@ type BracketRoundDoc = {
     winnerUserId: string | null;
     winnerName: string | null;
     status: "PENDING" | "COMPLETED";
+    quickResultDetail?: {
+      firstAttackUserId: string;
+      scorePlayer1: number;
+      scorePlayer2: number;
+      endInning: number;
+      inningsPlayer1: number;
+      inningsPlayer2: number;
+      avgPlayer1: number;
+      avgPlayer2: number;
+      highRunPlayer1: number | null;
+      highRunPlayer2: number | null;
+      recordedAt: string;
+    } | null;
   }>;
 };
 
@@ -64,6 +83,7 @@ type Bracket = {
   zoneId?: string | null;
   rounds: BracketRoundDoc[];
   createdAt: string;
+  updatedAt?: string;
   bracketMode?: "single" | "multi_block";
   blocks?: Array<{ id: string; label?: string; rounds: BracketRoundDoc[] }>;
   finalBlock?: { rounds: BracketRoundDoc[] };
@@ -531,12 +551,16 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   const pendingActionKeysRef = useRef<Set<string>>(new Set());
   const bracketRef = useRef<Bracket | null>(null);
   const replayRunningRef = useRef(false);
+  const quickResultsRemoteSigRef = useRef("");
   const sliceMetaRefManage = useRef<{ bracketId: string; blockSig: string }>({ bracketId: "", blockSig: "" });
   const prevManageSliceKeyParamRef = useRef("");
   const [navigatorOnline, setNavigatorOnline] = useState(
     typeof navigator !== "undefined" ? navigator.onLine : true,
   );
   const [bracketSyncBusy, setBracketSyncBusy] = useState(false);
+  const [quickResultsRefreshBusy, setQuickResultsRefreshBusy] = useState(false);
+  const [quickDetailInputEnabled, setQuickDetailInputEnabled] = useState(false);
+  const [quickDetailMatchId, setQuickDetailMatchId] = useState<string | null>(null);
   const storageSeg = useMemo(() => bracketOfflineSegment(zonesEnabled, selectedZoneId), [zonesEnabled, selectedZoneId]);
 
   useLayoutEffect(() => {
@@ -758,6 +782,29 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     return activeQuickRound;
   }, [bracket, displayRoundsSorted, displayRounds, selectedQuickRoundNumber]);
 
+  const quickResultsActiveRound = useMemo(() => {
+    if (variant !== "quickResults") return null;
+    if (!displayRoundsSorted.length) return null;
+    return displayRoundsSorted.find((r) => r.roundNumber === selectedQuickRoundNumber) ?? displayRoundsSorted[0] ?? null;
+  }, [variant, displayRoundsSorted, selectedQuickRoundNumber]);
+
+  const quickDetailModalMatch = useMemo(() => {
+    if (!quickDetailMatchId || !quickResultsActiveRound) return null;
+    return quickResultsActiveRound.matches.find((m) => m.id === quickDetailMatchId) ?? null;
+  }, [quickDetailMatchId, quickResultsActiveRound]);
+
+  const quickDetailModalLabels = useMemo(() => {
+    if (!quickDetailModalMatch) return { p1: "", p2: "" };
+    return {
+      p1: bracketSlotLabel(quickDetailModalMatch.player1),
+      p2: bracketSlotLabel(quickDetailModalMatch.player2),
+    };
+  }, [quickDetailModalMatch]);
+
+  useEffect(() => {
+    if (!quickDetailInputEnabled) setQuickDetailMatchId(null);
+  }, [quickDetailInputEnabled]);
+
   const pullManageBracket = useCallback(async (): Promise<
     { ok: true; bracket: Bracket | null } | { ok: false; error?: string }
   > => {
@@ -807,6 +854,85 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     else writeLastGoodBracket(tournamentId, seg, null);
     setMessage("");
   }, [pullManageBracket, storageSeg, tournamentId, zonesEnabled, selectedZoneId]);
+
+  useEffect(() => {
+    if (variant !== "quickResults") return;
+    if (!bracket) {
+      quickResultsRemoteSigRef.current = "";
+      return;
+    }
+    const u = typeof bracket.updatedAt === "string" && bracket.updatedAt.trim() !== "" ? bracket.updatedAt.trim() : "";
+    quickResultsRemoteSigRef.current = u || bracket.createdAt || "";
+  }, [variant, bracket]);
+
+  const applyQuickResultsPolledBracket = useCallback(
+    async (opts?: { skipMeta?: boolean }) => {
+      if (variant !== "quickResults") return;
+      if (!tournamentId) return;
+      if (zonesEnabled && !selectedZoneId) return;
+      const seg = storageSeg;
+      if (readOfflineDirty(tournamentId, seg)) return;
+      if (!opts?.skipMeta) {
+        const meta = await fetchClientBracketMetaJson(tournamentId, zonesEnabled, selectedZoneId);
+        if (!meta.updatedAt || meta.updatedAt === quickResultsRemoteSigRef.current) return;
+      }
+      const pulled = await pullManageBracket();
+      if (!pulled.ok) return;
+      if (readOfflineDirty(tournamentId, seg)) return;
+      setBracket(pulled.bracket);
+      if (pulled.bracket) writeLastGoodBracket(tournamentId, seg, pulled.bracket);
+      else writeLastGoodBracket(tournamentId, seg, null);
+    },
+    [pullManageBracket, selectedZoneId, storageSeg, tournamentId, variant, zonesEnabled],
+  );
+
+  const onQuickResultsManualRefresh = useCallback(async () => {
+    if (variant !== "quickResults") return;
+    if (quickResultsRefreshBusy) return;
+    if (!tournamentId) return;
+    if (zonesEnabled && !selectedZoneId) return;
+    setQuickResultsRefreshBusy(true);
+    try {
+      const seg = storageSeg;
+      if (readOfflineDirty(tournamentId, seg)) return;
+      const pulled = await pullManageBracket();
+      if (!pulled.ok) return;
+      if (readOfflineDirty(tournamentId, seg)) return;
+      setBracket(pulled.bracket);
+      if (pulled.bracket) writeLastGoodBracket(tournamentId, seg, pulled.bracket);
+      else writeLastGoodBracket(tournamentId, seg, null);
+    } finally {
+      setQuickResultsRefreshBusy(false);
+    }
+  }, [pullManageBracket, quickResultsRefreshBusy, selectedZoneId, storageSeg, tournamentId, variant, zonesEnabled]);
+
+  useEffect(() => {
+    if (variant !== "quickResults") return;
+    if (!tournamentId) return;
+    if (zonesEnabled && !selectedZoneId) return;
+    let cancelled = false;
+    const POLL_MS = 10_000;
+
+    const tick = async () => {
+      if (cancelled || (typeof document !== "undefined" && document.hidden)) return;
+      await applyQuickResultsPolledBracket();
+    };
+
+    const onVis = () => {
+      if (!document.hidden) void applyQuickResultsPolledBracket({ skipMeta: true });
+    };
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVis);
+    }
+    const timer = typeof window !== "undefined" ? window.setInterval(tick, POLL_MS) : 0;
+    return () => {
+      cancelled = true;
+      if (timer) window.clearInterval(timer);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVis);
+      }
+    };
+  }, [applyQuickResultsPolledBracket, selectedZoneId, tournamentId, variant, zonesEnabled]);
 
   useEffect(() => {
     if (!tournamentId) return;
@@ -2132,8 +2258,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   );
 
   if (variant === "quickResults") {
-    const activeQuickRound =
-      displayRoundsSorted.find((r) => r.roundNumber === selectedQuickRoundNumber) ?? displayRoundsSorted[0] ?? null;
+    const activeQuickRound = quickResultsActiveRound;
 
     return (
       <main className="v3-page v3-stack" style={{ paddingTop: "0.25rem" }}>
@@ -2150,20 +2275,60 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           <h1 className="v3-h2" style={{ margin: 0, fontSize: "clamp(1rem, 4vw, 1.15rem)", fontWeight: 700 }}>
             빠른 결과 입력
           </h1>
-          <button
-            type="button"
-            className="ui-btn-primary-solid"
+          <div className="v3-row" style={{ alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="v3-btn"
+              disabled={quickResultsRefreshBusy || !bracket}
+              onClick={() => void onQuickResultsManualRefresh()}
+              style={{
+                padding: "0.4rem 0.55rem",
+                fontWeight: 700,
+                fontSize: "0.82rem",
+                minHeight: "40px",
+                boxShadow: "none",
+                opacity: quickResultsRefreshBusy ? 0.78 : 1,
+              }}
+            >
+              {quickResultsRefreshBusy ? "새로고침…" : "새로고침"}
+            </button>
+            <button
+              type="button"
+              className="ui-btn-primary-solid"
+              style={{
+                padding: "0.4rem 0.65rem",
+                fontWeight: 600,
+                fontSize: "0.88rem",
+                minHeight: "40px",
+                boxShadow: "none",
+              }}
+              onClick={() => router.push(bracketViewOpsPath)}
+            >
+              대진표 보기
+            </button>
+          </div>
+        </div>
+
+        <div className="v3-row" style={{ alignItems: "center", gap: "0.45rem", marginBottom: "0.35rem", flexWrap: "wrap" }}>
+          <label
             style={{
-              padding: "0.4rem 0.65rem",
-              fontWeight: 600,
-              fontSize: "0.88rem",
-              minHeight: "40px",
-              boxShadow: "none",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.35rem",
+              fontWeight: 700,
+              fontSize: "0.86rem",
+              cursor: "pointer",
+              userSelect: "none",
             }}
-            onClick={() => router.push(bracketViewOpsPath)}
           >
-            대진표 보기
-          </button>
+            <input
+              type="checkbox"
+              checked={quickDetailInputEnabled}
+              onChange={(e) => setQuickDetailInputEnabled(e.target.checked)}
+              style={{ width: "1rem", height: "1rem" }}
+            />
+            상세입력
+          </label>
         </div>
 
         {zonesEnabled ? (
@@ -2248,6 +2413,19 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                           match.winnerUserId.trim() !== "";
                         const p1Win = done && match.winnerUserId === match.player1.userId;
                         const p2Win = done && match.winnerUserId === match.player2.userId;
+                        const detailRecorded =
+                          typeof match.quickResultDetail?.recordedAt === "string" &&
+                          match.quickResultDetail.recordedAt.trim() !== "";
+                        const vsMark = detailRecorded ? (
+                          <>
+                            vs
+                            <span style={{ fontSize: "0.72em", color: "#16a34a", fontWeight: 800, marginLeft: "0.06em" }} title="상세기록 있음">
+                              ✓
+                            </span>
+                          </>
+                        ) : (
+                          "vs"
+                        );
                         const pill = (label: string, bg: string, color: string) => (
                           <span
                             style={{
@@ -2296,7 +2474,41 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                                       </button>
                                     )}
                             </td>
-                            <td style={{ padding: "0.35rem 0.25rem", color: "#64748b" }}>vs</td>
+                            <td
+                              style={{
+                                padding: "0.35rem 0.25rem",
+                                color: "#64748b",
+                                textAlign: "center",
+                                verticalAlign: "middle",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {quickDetailInputEnabled ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setQuickDetailMatchId(match.id)}
+                                  disabled={interactionLocked}
+                                  title={detailRecorded ? "상세 기록" : "상세 입력"}
+                                  style={{
+                                    border: "1px solid rgba(148, 163, 184, 0.75)",
+                                    background: "#fff",
+                                    borderRadius: 6,
+                                    padding: "0.1rem 0.42rem",
+                                    fontSize: "0.82rem",
+                                    color: "#64748b",
+                                    fontWeight: 600,
+                                    lineHeight: 1.25,
+                                    minWidth: "2.75rem",
+                                    cursor: interactionLocked ? "not-allowed" : "pointer",
+                                    opacity: interactionLocked ? 0.55 : 1,
+                                  }}
+                                >
+                                  {vsMark}
+                                </button>
+                              ) : (
+                                <span style={{ pointerEvents: "none", userSelect: "none" }}>{vsMark}</span>
+                              )}
+                            </td>
                             <td style={{ padding: "0.35rem 0.45rem" }}>{p2Label}</td>
                             <td style={{ padding: "0.35rem 0.25rem", whiteSpace: "nowrap" }}>
                               {p2Win
@@ -2380,6 +2592,21 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             ) : null}
           </>
         )}
+        <QuickResultDetailModal
+          open={Boolean(tournamentId && quickDetailMatchId && quickDetailModalMatch)}
+          onClose={() => setQuickDetailMatchId(null)}
+          match={quickDetailModalMatch}
+          tournamentId={tournamentId}
+          bracketZoneQuery={bracketZoneQuery}
+          p1Label={quickDetailModalLabels.p1}
+          p2Label={quickDetailModalLabels.p2}
+          disabled={interactionLocked}
+          onSaved={(b) => {
+            setBracket(b as Bracket);
+            writeLastGoodBracket(tournamentId, storageSeg, b as Bracket);
+            bumpBracketLocalAuthorityRev(tournamentId, storageSeg);
+          }}
+        />
       </main>
     );
   }

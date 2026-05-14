@@ -6,10 +6,11 @@ import { useCommunityListDetailTransition } from "../community/community-list-de
 import { useTournamentsListDetailTransition } from "../tournaments/tournaments-list-detail-transition-context";
 import { useVenuesListDetailTransition } from "../venues/venues-list-detail-transition-context";
 
-export type SiteHeaderListBackTransition = "tournaments" | "venues" | "community";
+export type SiteHeaderListBackTransition = "tournaments" | "venues" | "community" | "mypage";
 
 /**
- * 상단 청 헤더용 목록 링크 — 항목 URL로 이동하며, 목록/상세 전환 셸이 있으면 `signalBackIntent`로 스크롤 복원 힌트.
+ * 상단 청 헤더용 목록 링크 — `Link` + 기본 prefetch로 목록 RSC를 미리 받아 두어 복귀 체감 지연을 줄임.
+ * 목록/상세 전환 셸이 있으면 `onClick`에서 `signalBackIntent`(짧은 nudge) 호출.
  */
 export default function SiteHeaderListBackLink({
   href,
@@ -27,11 +28,11 @@ export default function SiteHeaderListBackLink({
   const onClick = () => {
     if (transition === "tournaments") tourn?.signalBackIntent();
     else if (transition === "venues") venue?.signalBackIntent();
-    else comm?.signalBackIntent();
+    else if (transition === "community") comm?.signalBackIntent();
   };
 
   return (
-    <Link prefetch={false} href={href} className="site-shell-header-list-back" onClick={onClick}>
+    <Link prefetch href={href} className="site-shell-header-list-back" onClick={onClick}>
       {children}
     </Link>
   );

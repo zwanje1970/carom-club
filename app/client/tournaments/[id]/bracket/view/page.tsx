@@ -36,6 +36,7 @@ import {
 } from "../bracket-offline-cache";
 import viewStyles from "../bracket-view-page.module.css";
 import type { BracketBoardPdfSnapshot } from "../bracket-pdf-client-export";
+import { fetchClientBracketMetaJson } from "../bracket-client-poll-meta";
 import {
   applyCaromOrientationMode,
   CAROM_BRACKET_NATIVE_LANDSCAPE_SESSION_ID,
@@ -66,6 +67,7 @@ type Bracket = {
   zoneId?: string | null;
   rounds: BracketRoundView[];
   createdAt: string;
+  updatedAt?: string;
   bracketMode?: "single" | "multi_block";
   blocks?: Array<{ id: string; label?: string; rounds: BracketRoundView[] }>;
   finalBlock?: { rounds: BracketRoundView[] };
@@ -95,6 +97,7 @@ export default function TournamentBracketBoardViewPage() {
   const [tournamentLocation, setTournamentLocation] = useState("");
   const [bracket, setBracket] = useState<Bracket | null>(null);
   const [bracketDataLoading, setBracketDataLoading] = useState(true);
+  const [manualRefreshBusy, setManualRefreshBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [boardSliceKey, setBoardSliceKey] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
@@ -107,6 +110,7 @@ export default function TournamentBracketBoardViewPage() {
   const bracketPdfSnapshotRef = useRef<(() => BracketBoardPdfSnapshot) | null>(null);
   const bracketRef = useRef<Bracket | null>(null);
   const replayRunningRef = useRef(false);
+  const remoteBracketSigRef = useRef("");
   const [navigatorOnline, setNavigatorOnline] = useState(
     typeof navigator !== "undefined" ? navigator.onLine : true,
   );
@@ -217,6 +221,81 @@ export default function TournamentBracketBoardViewPage() {
       }
     }
   }, [pullBracketSnapshot, storageSeg, tournamentId, zonesEnabled, selectedZoneId]);
+
+  useEffect(() => {
+    if (!bracket) {
+      remoteBracketSigRef.current = "";
+      return;
+    }
+    const u = typeof bracket.updatedAt === "string" && bracket.updatedAt.trim() !== "" ? bracket.updatedAt.trim() : "";
+    remoteBracketSigRef.current = u || bracket.createdAt || "";
+  }, [bracket]);
+
+  const applyPolledBracket = useCallback(
+    async (opts?: { skipMeta?: boolean }) => {
+      if (!tournamentId) return;
+      if (zonesEnabled && !selectedZoneId) return;
+      const seg = storageSeg;
+      if (readOfflineDirty(tournamentId, seg)) return;
+      if (!opts?.skipMeta) {
+        const meta = await fetchClientBracketMetaJson(tournamentId, zonesEnabled, selectedZoneId);
+        if (!meta.updatedAt || meta.updatedAt === remoteBracketSigRef.current) return;
+      }
+      const pulled = await pullBracketSnapshot();
+      if (!pulled.ok) return;
+      if (readOfflineDirty(tournamentId, seg)) return;
+      setBracket(pulled.bracket);
+      if (pulled.bracket) writeLastGoodBracket(tournamentId, seg, pulled.bracket);
+      else writeLastGoodBracket(tournamentId, seg, null);
+    },
+    [pullBracketSnapshot, selectedZoneId, storageSeg, tournamentId, zonesEnabled],
+  );
+
+  const onManualRefreshBracket = useCallback(async () => {
+    if (manualRefreshBusy) return;
+    if (!tournamentId) return;
+    if (zonesEnabled && !selectedZoneId) return;
+    setManualRefreshBusy(true);
+    try {
+      const seg = storageSeg;
+      if (readOfflineDirty(tournamentId, seg)) return;
+      const pulled = await pullBracketSnapshot();
+      if (!pulled.ok) return;
+      if (readOfflineDirty(tournamentId, seg)) return;
+      setBracket(pulled.bracket);
+      if (pulled.bracket) writeLastGoodBracket(tournamentId, seg, pulled.bracket);
+      else writeLastGoodBracket(tournamentId, seg, null);
+    } finally {
+      setManualRefreshBusy(false);
+    }
+  }, [manualRefreshBusy, pullBracketSnapshot, selectedZoneId, storageSeg, tournamentId, zonesEnabled]);
+
+  useEffect(() => {
+    if (!tournamentId) return;
+    if (zonesEnabled && !selectedZoneId) return;
+    let cancelled = false;
+    const POLL_MS = 10_000;
+
+    const tick = async () => {
+      if (cancelled || (typeof document !== "undefined" && document.hidden)) return;
+      await applyPolledBracket();
+    };
+
+    const onVis = () => {
+      if (!document.hidden) void applyPolledBracket({ skipMeta: true });
+    };
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVis);
+    }
+    const timer = typeof window !== "undefined" ? window.setInterval(tick, POLL_MS) : 0;
+    return () => {
+      cancelled = true;
+      if (timer) window.clearInterval(timer);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVis);
+      }
+    };
+  }, [applyPolledBracket, tournamentId, zonesEnabled, selectedZoneId]);
 
   const mutationFns = useMemo<MutationFns>(() => {
     return {
@@ -1138,6 +1217,32 @@ export default function TournamentBracketBoardViewPage() {
         overscrollBehavior: "none",
       }}
     >
+      {boardBracket ? (
+        <div
+          style={{
+            position: "fixed",
+            top: "max(0.45rem, env(safe-area-inset-top, 0px))",
+            right: "max(0.45rem, env(safe-area-inset-right, 0px))",
+            zIndex: 120,
+          }}
+        >
+          <button
+            type="button"
+            className="v3-btn"
+            disabled={manualRefreshBusy || bracketDataLoading || !bracket}
+            onClick={() => void onManualRefreshBracket()}
+            style={{
+              minHeight: 36,
+              fontWeight: 700,
+              fontSize: "0.82rem",
+              boxShadow: "none",
+              opacity: manualRefreshBusy ? 0.78 : 1,
+            }}
+          >
+            {manualRefreshBusy ? "새로고침…" : "새로고침"}
+          </button>
+        </div>
+      ) : null}
       <section
         style={{
           position: "absolute",

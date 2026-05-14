@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type MatchJson = {
   id: string;
@@ -20,6 +20,8 @@ type RoundJson = {
 
 type BracketJson = {
   id: string;
+  createdAt?: string;
+  updatedAt?: string;
   rounds: RoundJson[];
   bracketMode?: string;
   blocks?: Array<{ id: string; label?: string; rounds: RoundJson[] }>;
@@ -33,15 +35,32 @@ function slotName(p: { name: string; displayName?: string | null }): string {
 
 export default function SiteTournamentBracketEmbed({
   tournamentId,
-  fastPoll,
+  fastPoll: _fastPoll,
 }: {
   tournamentId: string;
+  /** @deprecated 진행중 여부와 무관하게 공개 화면은 30초 간격 메타 폴링으로 통일 */
   fastPoll: boolean;
 }) {
   const [title, setTitle] = useState("");
   const [rounds, setRounds] = useState<RoundJson[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [multiBlock, setMultiBlock] = useState(false);
+  const remoteSigRef = useRef("");
+
+  const applyBracketJson = useCallback((b: BracketJson | null) => {
+    if (!b) {
+      setRounds([]);
+      setMultiBlock(false);
+      remoteSigRef.current = "";
+      return;
+    }
+    const u = typeof b.updatedAt === "string" && b.updatedAt.trim() !== "" ? b.updatedAt.trim() : "";
+    remoteSigRef.current = u || (typeof b.createdAt === "string" ? b.createdAt : "") || "";
+    const isMulti = b.bracketMode === "multi_block" && Boolean(b.blocks?.[0]?.rounds?.length);
+    setMultiBlock(isMulti);
+    const flat: RoundJson[] = isMulti && b.blocks?.[0]?.rounds?.length ? b.blocks[0].rounds : (b.rounds ?? []);
+    setRounds([...flat].sort((a, b) => a.roundNumber - b.roundNumber));
+  }, []);
 
   const load = useCallback(async () => {
     const id = tournamentId.trim();
@@ -59,30 +78,45 @@ export default function SiteTournamentBracketEmbed({
       }
       setErr(null);
       setTitle(json.tournamentTitle ?? "");
-      const b = json.bracket;
-      if (!b) {
-        setRounds([]);
-        setMultiBlock(false);
-        return;
-      }
-      const isMulti = b.bracketMode === "multi_block" && Boolean(b.blocks?.[0]?.rounds?.length);
-      setMultiBlock(isMulti);
-      const flat: RoundJson[] = isMulti && b.blocks?.[0]?.rounds?.length ? b.blocks[0].rounds : (b.rounds ?? []);
-      setRounds([...flat].sort((a, b) => a.roundNumber - b.roundNumber));
+      applyBracketJson(json.bracket ?? null);
     } catch {
       setErr("대진표 요청 중 오류가 발생했습니다.");
     }
-  }, [tournamentId]);
+  }, [applyBracketJson, tournamentId]);
+
+  const pollTick = useCallback(async () => {
+    const id = tournamentId.trim();
+    if (!id || (typeof document !== "undefined" && document.hidden)) return;
+    try {
+      const res = await fetch(`/api/site/tournaments/${encodeURIComponent(id)}/bracket?meta=1`, { cache: "no-store" });
+      const json = (await res.json()) as { updatedAt?: string | null; error?: string };
+      if (!res.ok) return;
+      const sig =
+        typeof json.updatedAt === "string" && json.updatedAt.trim() !== "" ? json.updatedAt.trim() : null;
+      if (!sig || sig === remoteSigRef.current) return;
+      await load();
+    } catch {
+      /* ignore */
+    }
+  }, [load, tournamentId]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   useEffect(() => {
-    const ms = fastPoll ? 4000 : 12000;
-    const t = window.setInterval(() => void load(), ms);
-    return () => window.clearInterval(t);
-  }, [fastPoll, load]);
+    const POLL_MS = 30_000;
+    const tick = () => void pollTick();
+    const onVis = () => {
+      if (!document.hidden) void load();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    const t = window.setInterval(tick, POLL_MS);
+    return () => {
+      window.clearInterval(t);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [load, pollTick]);
 
   const r1 = rounds.find((r) => r.roundNumber === 1);
 

@@ -556,6 +556,21 @@ export type BracketPlayer = {
 export type BracketMatchStatus = "PENDING" | "COMPLETED";
 export type BracketRoundStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED";
 
+/** 빠른결과 상세기록(통계 원본) — 매치 문서에 중첩 저장 */
+export type BracketQuickResultDetail = {
+  firstAttackUserId: string;
+  scorePlayer1: number;
+  scorePlayer2: number;
+  endInning: number;
+  inningsPlayer1: number;
+  inningsPlayer2: number;
+  avgPlayer1: number;
+  avgPlayer2: number;
+  highRunPlayer1: number | null;
+  highRunPlayer2: number | null;
+  recordedAt: string;
+};
+
 export type BracketMatch = {
   id: string;
   player1: BracketPlayer;
@@ -563,6 +578,7 @@ export type BracketMatch = {
   winnerUserId: string | null;
   winnerName: string | null;
   status: BracketMatchStatus;
+  quickResultDetail?: BracketQuickResultDetail | null;
 };
 
 export type BracketRound = {
@@ -589,6 +605,8 @@ export type Bracket = {
   snapshotId: string;
   rounds: BracketRound[];
   createdAt: string;
+  /** 승패·편집 등 확정 대진표 변경 시각(폴링 비교용). 없으면 `createdAt`으로 대체 비교 */
+  updatedAt?: string;
   /** 권역별 대진표 구분용. 없으면 기존 단일 대진표 */
   zoneId?: string | null;
   /** 미설정·single = 기존 단일 대진표 (`rounds`만 사용) */
@@ -10534,7 +10552,8 @@ function normalizeMainSlideTournamentSnapshotsCompactRow(row: unknown): Publishe
   const tournamentId = typeof s.tournamentId === "string" ? s.tournamentId.trim() : "";
   const templateId = typeof s.templateId === "string" ? s.templateId : "";
   const title = typeof s.title === "string" ? s.title : "";
-  const subtitle = typeof s.subtitle === "string" ? s.subtitle : "";
+  /** compact KV 빌드는 대회 일시·장소 없이 카드 필드만 쓰므로 부제가 빈 경우가 있음 — `parseTournamentSlideCardSubtitleParts`와 동일하게 `-`로 보정 */
+  const subtitle = (typeof s.subtitle === "string" ? s.subtitle.trim() : "") || "-";
   const imageId = typeof s.imageId === "string" ? s.imageId : "";
   const image320Raw = typeof s.image320Url === "string" ? s.image320Url : "";
   const image320Url = image320Raw.trim();
@@ -10554,7 +10573,6 @@ function normalizeMainSlideTournamentSnapshotsCompactRow(row: unknown): Publishe
     !tournamentId ||
     !templateId ||
     !title ||
-    !subtitle ||
     !imageId ||
     (!isThemeCard && !image320Url) ||
     !textLayout ||

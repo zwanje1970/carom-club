@@ -15,15 +15,7 @@ type Props = {
 export default function TournamentsListBackLink({ href, className, style, children }: Props) {
   const ctx = useTournamentsListDetailTransition();
   return (
-    <Link
-      prefetch={false}
-      href={href}
-      className={className}
-      style={style}
-      onClick={() => {
-        ctx?.signalBackIntent();
-      }}
-    >
+    <Link prefetch href={href} className={className} style={style} onClick={() => ctx?.signalBackIntent()}>
       {children}
     </Link>
   );

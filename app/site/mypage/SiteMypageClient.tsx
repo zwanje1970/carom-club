@@ -171,6 +171,15 @@ export default function SiteMypageClient({
             ›
           </span>
         </Link>
+        <Link prefetch={false} href="/site/mypage/match-records" className="site-mypage-menu-row">
+          <div className="site-mypage-menu-row-main">
+            <span className="site-mypage-menu-row-title">내 경기기록</span>
+            <span className="site-mypage-menu-row-sub">대회별 경기·통계</span>
+          </div>
+          <span className="site-mypage-menu-row-chevron" aria-hidden>
+            ›
+          </span>
+        </Link>
       </nav>
 
       <div className="site-mypage-workspace-cta" aria-label="운영·워크스페이스">

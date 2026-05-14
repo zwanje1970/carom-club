@@ -44,6 +44,8 @@ export type TournamentNewWizardFormProps = {
   editId: string | null;
   editLoading: boolean;
   loading: boolean;
+  /** 신규 생성 최종 확인 모달이 열린 동안 제출 버튼 비활성(중복 제출 방지) */
+  createConfirmPending?: boolean;
   saveState: "idle" | "saving" | "success" | "error";
   onSubmit: (e: FormEvent<HTMLFormElement>) => void;
   onCancelClick: () => void;
@@ -155,6 +157,7 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
     editId,
     editLoading,
     loading,
+    createConfirmPending = false,
     saveState,
     onSubmit,
     onCancelClick,
@@ -1074,7 +1077,7 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
           </button>
         )}
         {tocMode ? (
-          <button type="submit" className="v3-btn" disabled={loading || editLoading} style={{ padding: "0.75rem 1rem" }}>
+          <button type="submit" className="v3-btn" disabled={loading || editLoading || createConfirmPending} style={{ padding: "0.75rem 1rem" }}>
             {loading ? "저장 중…" : "변경 저장"}
           </button>
         ) : canNext ? (
@@ -1088,7 +1091,7 @@ export default function TournamentNewWizardForm(p: TournamentNewWizardFormProps)
             다음 단계
           </button>
         ) : (
-          <button type="submit" className="v3-btn" disabled={loading || editLoading} style={{ padding: "0.75rem 1rem" }}>
+          <button type="submit" className="v3-btn" disabled={loading || editLoading || createConfirmPending} style={{ padding: "0.75rem 1rem" }}>
             {loading ? (editId ? "저장 중…" : "생성 중…") : editId ? "변경 저장" : "대회 생성"}
           </button>
         )}

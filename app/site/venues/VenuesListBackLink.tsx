@@ -14,7 +14,7 @@ type Props = {
 export default function VenuesListBackLink({ href, className, style, children }: Props) {
   const ctx = useVenuesListDetailTransition();
   return (
-    <Link prefetch={false} href={href} className={className} style={style} onClick={() => ctx?.signalBackIntent()}>
+    <Link prefetch href={href} className={className} style={style} onClick={() => ctx?.signalBackIntent()}>
       {children}
     </Link>
   );

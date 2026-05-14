@@ -57,6 +57,7 @@ export default function TournamentManageFeatureCards({
   const participantsHref = `/client/tournaments/${tournamentId}/participants`;
   const quickResultsHref = `/client/tournaments/${tournamentId}/bracket/quick-results`;
   const bracketViewHref = `/client/tournaments/${tournamentId}/bracket/view`;
+  const detailedResultsHref = `/client/tournaments/${tournamentId}/results`;
 
   const recruitingHighlight = statusBadge === "모집중" || statusBadge === "마감임박";
 
@@ -123,6 +124,15 @@ export default function TournamentManageFeatureCards({
               <span className="client-tournament-manage__featureCardTextCol">
                 <span className="client-tournament-manage__featureTitle">대진표 보기</span>
                 <span className="client-tournament-manage__featureDesc">전체 화면 보드</span>
+              </span>
+            </Link>
+            <Link prefetch={false} href={detailedResultsHref} className="client-tournament-manage__featureCard client-tournament-manage__featureCard--neutral">
+              <span className="client-tournament-manage__featureIconWrap" aria-hidden>
+                <IconEye />
+              </span>
+              <span className="client-tournament-manage__featureCardTextCol">
+                <span className="client-tournament-manage__featureTitle">대회결과</span>
+                <span className="client-tournament-manage__featureDesc">선수별 경기·통계</span>
               </span>
             </Link>
             <Link prefetch={false} href={participantsHref} className="client-tournament-manage__featureCard client-tournament-manage__featureCard--neutral">

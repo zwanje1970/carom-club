@@ -12,7 +12,7 @@ import {
 export const runtime = "nodejs";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string; zoneId: string }> }
 ) {
   const { id, zoneId } = await context.params;
@@ -38,6 +38,17 @@ export async function GET(
 
   if (auth.access.kind === "zone_manager" && !zoneManagerMayAccessZoneId(auth.access, zid)) {
     return NextResponse.json({ error: TOURNAMENT_ZONE_FORBIDDEN_ERROR }, { status: 403 });
+  }
+
+  if (request.nextUrl.searchParams.get("meta") === "1") {
+    const bracket = await getLatestBracketByTournamentIdAndZoneIdFirestore(id, zid);
+    const updatedAt =
+      typeof bracket?.updatedAt === "string" && bracket.updatedAt.trim() !== ""
+        ? bracket.updatedAt.trim()
+        : typeof bracket?.createdAt === "string"
+          ? bracket.createdAt
+          : null;
+    return NextResponse.json({ updatedAt, bracketId: bracket?.id ?? null });
   }
 
   const bracket = await getLatestBracketByTournamentIdAndZoneIdFirestore(id, zid);

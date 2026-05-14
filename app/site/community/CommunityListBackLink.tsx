@@ -14,7 +14,7 @@ type Props = {
 export default function CommunityListBackLink({ href, className, children }: Props) {
   const ctx = useCommunityListDetailTransition();
   return (
-    <Link prefetch={false} href={href} className={className} onClick={() => ctx?.signalBackIntent()}>
+    <Link prefetch href={href} className={className} onClick={() => ctx?.signalBackIntent()}>
       {children}
     </Link>
   );

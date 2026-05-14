@@ -132,6 +132,9 @@ export default function SiteTournamentDetailSections({
   const hasExtraVenues = Boolean(tournament.extraVenues && tournament.extraVenues.length > 0);
   const hasLocationBlock = mainLocationLines.length > 0 || hasExtraVenues;
 
+  const applicationsClosed =
+    tournament.statusBadge === "마감" || tournament.statusBadge === "진행중" || tournament.statusBadge === "종료";
+
   if (detailLayout === "site") {
     const firstExtraHead =
       hasExtraVenues && tournament.extraVenues?.length
@@ -145,8 +148,6 @@ export default function SiteTournamentDetailSections({
       : "";
     const venueHeroLine = mainLocationLines[0]?.trim() || firstExtraHead?.trim() || "";
     const statusClass = tournamentStatusBadgeClassName(tournament.statusBadge);
-    const applicationsClosed =
-      tournament.statusBadge === "마감" || tournament.statusBadge === "진행중" || tournament.statusBadge === "종료";
     const recruitmentParts: string[] = [`정원 ${tournament.maxParticipants ?? 24}명`];
     if (!deferHeavy && typeof confirmedParticipantCount === "number") {
       recruitmentParts.push(`확정 ${confirmedParticipantCount}명`);
@@ -295,6 +296,15 @@ export default function SiteTournamentDetailSections({
               {venueHref && audience === "site" ? (
                 <Link prefetch={false} className="secondary-button" href={venueHref}>
                   시합장 보기
+                </Link>
+              ) : null}
+              {applicationsClosed ? (
+                <Link
+                  prefetch={false}
+                  className="secondary-button"
+                  href={`${audience === "client" ? "/client" : "/site"}/tournaments/${encodeURIComponent(tournament.id)}/results`}
+                >
+                  대회결과
                 </Link>
               ) : null}
             </div>
@@ -462,6 +472,16 @@ export default function SiteTournamentDetailSections({
                 style={{ padding: "0.55rem 1rem", fontWeight: 600, display: "inline-flex" }}
               >
                 시합장 보기
+              </Link>
+            ) : null}
+            {applicationsClosed ? (
+              <Link
+                prefetch={false}
+                className="v3-btn"
+                href={`${audience === "client" ? "/client" : "/site"}/tournaments/${encodeURIComponent(tournament.id)}/results`}
+                style={{ padding: "0.55rem 1rem", fontWeight: 600, display: "inline-flex" }}
+              >
+                대회결과
               </Link>
             ) : null}
           </div>

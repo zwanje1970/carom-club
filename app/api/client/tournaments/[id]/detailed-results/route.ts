@@ -1,9 +1,11 @@
 import { cookies } from "next/headers";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../lib/auth/session";
 import { checkClientFeatureAccessByUserId, getUserById } from "../../../../../../lib/platform-api";
-import { getLatestBracketByTournamentIdFirestore } from "../../../../../../lib/server/firestore-tournament-brackets";
+import { listActiveBracketsForTournamentResultsFirestore } from "../../../../../../lib/server/firestore-tournament-brackets";
+import { getTournamentByIdFirestore } from "../../../../../../lib/server/firestore-tournaments";
 import { getTournamentOwnerAccessPreviewById } from "../../../../../../lib/server/platform-backing-store";
+import { buildDetailedResultsBundleFromBrackets } from "../../../../../../lib/tournament-detailed-results";
 
 export const runtime = "nodejs";
 
@@ -38,27 +40,22 @@ async function requireBracketAccess(tournamentId: string) {
   return { ok: true as const, user };
 }
 
-export async function GET(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
-  const auth = await requireBracketAccess(id);
+  const tid = id.trim();
+  if (!tid) {
+    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+  }
+
+  const auth = await requireBracketAccess(tid);
   if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  if (request.nextUrl.searchParams.get("meta") === "1") {
-    const bracket = await getLatestBracketByTournamentIdFirestore(id);
-    const updatedAt =
-      typeof bracket?.updatedAt === "string" && bracket.updatedAt.trim() !== ""
-        ? bracket.updatedAt.trim()
-        : typeof bracket?.createdAt === "string"
-          ? bracket.createdAt
-          : null;
-    return NextResponse.json({ updatedAt, bracketId: bracket?.id ?? null });
-  }
+  const [tournament, brackets] = await Promise.all([getTournamentByIdFirestore(tid), listActiveBracketsForTournamentResultsFirestore(tid)]);
 
-  const bracket = await getLatestBracketByTournamentIdFirestore(id);
-  return NextResponse.json({ bracket: bracket ?? null });
+  const bundle = buildDetailedResultsBundleFromBrackets(brackets);
+  const tournamentTitle = tournament?.title?.trim() ?? "";
+
+  return NextResponse.json({ bundle, tournamentTitle });
 }

@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { type CSSProperties, type MouseEvent as ReactMouseEvent, FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type CSSProperties, FormEvent, useEffect, useRef, useState } from "react";
 
 import adminUi from "../../../components/admin/admin-card.module.css";
 import { isEmptyOutlineHtml } from "../../../../lib/outline-content-helpers";
@@ -16,8 +15,6 @@ import type {
   TournamentTeamScoreRule,
   TournamentVerificationMode,
 } from "../../../../lib/tournament-rule-types";
-import SiteTournamentDetailSections from "../../../site/tournaments/[id]/site-tournament-detail-sections";
-
 import { useClientTournamentFormKeyboardScroll } from "../client-tournament-form-keyboard-scroll";
 import TournamentNewWizardForm from "./TournamentNewWizardForm";
 
@@ -259,16 +256,9 @@ export default function ClientTournamentNewPage() {
   const [loading, setLoading] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
-  /** 새 대회 생성 직후 안내(저장은 이미 완료된 상태) */
-  const [createSuccessId, setCreateSuccessId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    const p = new URLSearchParams(window.location.search);
-    const e = p.get("edit");
-    const d = p.get("done");
-    return !e && d && d.trim() ? d.trim() : null;
-  });
-  const [createDoneTournament, setCreateDoneTournament] = useState<Tournament | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  /** 신규 생성: 검증 통과 후 최종 확인 모달 */
+  const [createConfirmOpen, setCreateConfirmOpen] = useState(false);
   /** 대회 생성·수정 입력 단계(1~8). 저장 로직과 무관한 UI 상태 */
   const [wizardStep, setWizardStep] = useState(1);
   /** 신규 생성 시 증빙 정책(확인 함/안 함)을 한 번이라도 눌렀는지 — 제출 전 필수 */
@@ -312,36 +302,13 @@ export default function ClientTournamentNewPage() {
     };
   }, [editId]);
 
-  useEffect(() => {
-    if (!createSuccessId) {
-      setCreateDoneTournament(null);
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch(`/api/client/tournaments/${encodeURIComponent(createSuccessId)}`, {
-          credentials: "same-origin",
-        });
-        const json = (await res.json()) as { tournament?: Tournament };
-        if (cancelled) return;
-        if (!res.ok || !json.tournament) return;
-        setCreateDoneTournament(json.tournament);
-      } catch {
-        /* noop */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [createSuccessId]);
-
-  /** replace 후에도 searchParams와 createSuccessId 동기화(리마운트·타이밍 차이 대비) */
+  /** 예전 `?done=` 완료 URL 북마크 → 메인 게시용 홍보카드 작성 화면으로 통일 */
   useEffect(() => {
     if (editId) return;
     const done = searchParams.get("done")?.trim();
-    if (done) setCreateSuccessId(done);
-  }, [searchParams, editId]);
+    if (!done) return;
+    router.replace(`/client/tournaments/${encodeURIComponent(done)}/card-publish-v2`);
+  }, [editId, searchParams, router]);
 
   useEffect(() => {
     if (durationType !== "MULTI_DAY") return;
@@ -670,7 +637,6 @@ export default function ClientTournamentNewPage() {
   }
 
   function hasUnsavedDraft(): boolean {
-    if (createSuccessId && !editId) return false;
     if (editId) {
       if (editLoading || editBaselineJsonRef.current === null) return false;
       return serializeTournamentFormSnapshot() !== editBaselineJsonRef.current;
@@ -828,28 +794,8 @@ export default function ClientTournamentNewPage() {
     }
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (tournamentCreateSubmitInFlightRef.current || loading) return;
-    tournamentCreateSubmitInFlightRef.current = true;
-    setLoading(true);
-
+  async function executeTournamentSave() {
     try {
-      const wizardCheck = validateWizardBeforeSave();
-      if (!wizardCheck.ok) {
-        setWizardStep(wizardCheck.step);
-        setMessage(wizardCheck.message);
-        setSaveState("idle");
-        window.setTimeout(() => {
-          const el = document.getElementById(wizardCheck.focusId);
-          el?.scrollIntoView({ behavior: "smooth", block: "center" });
-          (el as HTMLElement | null)?.focus?.();
-        }, 0);
-        return;
-      }
-
       setSaveState("saving");
       setMessage("");
       const outlineHtmlPayload =
@@ -955,31 +901,73 @@ export default function ClientTournamentNewPage() {
       } else {
         setSaveState("success");
         const createdId = savedId.trim();
-        /** URL과 동일 소스로 상태 반영 — replace만 하면 같은 페이지가 리마운트되지 않아 createSuccessId가 비어 완료 안내가 안 뜰 수 있음 */
-        setCreateSuccessId(createdId);
-        router.replace(`/client/tournaments/new?done=${encodeURIComponent(createdId)}`);
+        router.push(`/client/tournaments/${encodeURIComponent(createdId)}/card-publish-v2`);
+        router.refresh();
       }
     } catch {
       setMessage(editId ? "저장 요청 중 오류가 발생했습니다." : "대회 생성 요청 중 오류가 발생했습니다.");
       setSaveState("error");
+    }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (tournamentCreateSubmitInFlightRef.current || loading) return;
+    tournamentCreateSubmitInFlightRef.current = true;
+    setLoading(true);
+
+    try {
+      const wizardCheck = validateWizardBeforeSave();
+      if (!wizardCheck.ok) {
+        setWizardStep(wizardCheck.step);
+        setMessage(wizardCheck.message);
+        setSaveState("idle");
+        window.setTimeout(() => {
+          const el = document.getElementById(wizardCheck.focusId);
+          el?.scrollIntoView({ behavior: "smooth", block: "center" });
+          (el as HTMLElement | null)?.focus?.();
+        }, 0);
+        return;
+      }
+
+      if (!editId) {
+        setCreateConfirmOpen(true);
+        return;
+      }
+
+      await executeTournamentSave();
     } finally {
       tournamentCreateSubmitInFlightRef.current = false;
       setLoading(false);
     }
   }
 
-  const showCreateDone = Boolean(createSuccessId && !editId);
-
-  const onCreateDoneDetailClickCapture = useCallback(
-    (e: ReactMouseEvent<HTMLDivElement>) => {
-      const target = e.target as HTMLElement | null;
-      const anchor = target?.closest?.("a.primary-button--block");
-      if (!anchor) return;
-      e.preventDefault();
-      e.stopPropagation();
-    },
-    [],
-  );
+  async function handleCreateConfirm() {
+    if (tournamentCreateSubmitInFlightRef.current || loading) return;
+    tournamentCreateSubmitInFlightRef.current = true;
+    setLoading(true);
+    setCreateConfirmOpen(false);
+    try {
+      const wizardCheck = validateWizardBeforeSave();
+      if (!wizardCheck.ok) {
+        setWizardStep(wizardCheck.step);
+        setMessage(wizardCheck.message);
+        setSaveState("idle");
+        window.setTimeout(() => {
+          const el = document.getElementById(wizardCheck.focusId);
+          el?.scrollIntoView({ behavior: "smooth", block: "center" });
+          (el as HTMLElement | null)?.focus?.();
+        }, 0);
+        return;
+      }
+      await executeTournamentSave();
+    } finally {
+      tournamentCreateSubmitInFlightRef.current = false;
+      setLoading(false);
+    }
+  }
 
   const posterNormalizedForDisplay =
     posterImageUrl.trim() !== "" ? normalizePosterImageSrcForPreview(posterImageUrl) : "";
@@ -994,57 +982,7 @@ export default function ClientTournamentNewPage() {
       className="v3-page v3-stack"
       style={{ maxWidth: "40rem", margin: "0 auto", paddingTop: "0.35rem" }}
     >
-      {editId || showCreateDone ? (
-        <h1 className="v3-h1">
-          {showCreateDone ? "대회 생성 완료" : "대회 수정"}
-        </h1>
-      ) : null}
-      {showCreateDone && createSuccessId ? (
-        <section
-          className="v3-stack"
-          style={{
-            gap: "0.65rem",
-            padding: "1rem 1rem",
-            borderRadius: "12px",
-            border: "1px solid #e2e8f0",
-            background: "#f8fafc",
-            marginBottom: "0.75rem",
-          }}
-          aria-labelledby="create-done-heading"
-        >
-          <h2 id="create-done-heading" className="v3-h2" style={{ margin: 0, fontSize: "1.05rem" }}>
-            대회가 생성되었습니다.
-          </h2>
-          <p style={{ margin: 0, fontSize: "0.92rem", lineHeight: 1.55, color: "#334155" }}>
-            생성된 대회는 대회안내에서 확인할 수 있습니다.
-            <br />
-            대회를 홍보하려면 대회카드를 게시하세요.
-          </p>
-          <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
-            <Link
-              className="v3-btn"
-              prefetch={false}
-              href={`/client/tournaments/${encodeURIComponent(createSuccessId)}/card-publish-v2`}
-            >
-              대회카드 작성
-            </Link>
-            <Link className="v3-btn" prefetch={false} href="/client">
-              다음에 하기
-            </Link>
-          </div>
-        </section>
-      ) : null}
-      {showCreateDone && createDoneTournament ? (
-        <div onClickCapture={onCreateDoneDetailClickCapture}>
-          <SiteTournamentDetailSections
-            tournament={createDoneTournament}
-            audience="site"
-            detailLayout="site"
-            applyHref={`/site/tournaments/${createDoneTournament.id}/apply`}
-            listBackHref="/site/tournaments"
-          />
-        </div>
-      ) : null}
+      {editId ? <h1 className="v3-h1">대회 수정</h1> : null}
       {editId ? (
         <p className="v3-muted">기존 대회 정보를 불러왔습니다. 수정 후 저장하면 동일 대회에 반영됩니다.</p>
       ) : null}
@@ -1055,8 +993,6 @@ export default function ClientTournamentNewPage() {
         </p>
       ) : null}
 
-      {showCreateDone && createSuccessId ? null : (
-        <>
       <TournamentNewWizardForm
         inputStyle={inputStyle}
         sectionGap={sectionGap}
@@ -1065,6 +1001,7 @@ export default function ClientTournamentNewPage() {
         editId={editId}
         editLoading={editLoading}
         loading={loading}
+        createConfirmPending={Boolean(!editId && createConfirmOpen)}
         saveState={saveState}
         onSubmit={handleSubmit}
         onCancelClick={handleCancelClick}
@@ -1198,8 +1135,47 @@ export default function ClientTournamentNewPage() {
         </div>
       ) : null}
 
-        </>
-      )}
+      {createConfirmOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-confirm-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 60,
+            padding: "1rem",
+          }}
+        >
+          <div className={`${adminUi.surface} v3-stack`} style={{ maxWidth: "22rem", width: "100%", gap: "1rem" }}>
+            <h2 id="create-confirm-title" className="v3-h2" style={{ margin: 0, fontSize: "1.05rem" }}>
+              대회 생성 확인
+            </h2>
+            <div className="v3-stack" style={{ gap: "0.65rem" }}>
+              <p style={{ margin: 0, lineHeight: 1.55 }}>대회 생성을 완료하시겠습니까?</p>
+              <p style={{ margin: 0, lineHeight: 1.55 }}>확인 후 메인 게시용 홍보카드 만들기로 이동합니다.</p>
+            </div>
+            <div className="v3-row" style={{ gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="v3-btn"
+                style={{ background: "#fff", border: "1px solid #bbb" }}
+                disabled={loading}
+                onClick={() => setCreateConfirmOpen(false)}
+              >
+                취소
+              </button>
+              <button type="button" className="v3-btn" disabled={loading} onClick={() => void handleCreateConfirm()}>
+                {loading ? "생성 중…" : "확인"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

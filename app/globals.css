@@ -3034,6 +3034,12 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   min-height: 2.5rem;
   display: inline-flex;
   align-items: center;
+  transition: opacity 0.08s ease, background-color 0.08s ease;
+}
+
+.site-shell-header-list-back:active {
+  opacity: 0.88;
+  background-color: rgba(255, 255, 255, 0.14);
 }
 
 .site-home-brand--with-leading .site-mobile-page-title-block {

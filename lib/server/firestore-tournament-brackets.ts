@@ -7,12 +7,14 @@ import {
   mergeTournamentActiveBracketPointerFirestore,
 } from "./firestore-tournaments";
 import { getSharedFirestoreDb } from "./firestore-users";
+import type { DocumentReference, Transaction } from "firebase-admin/firestore";
 import type {
   Bracket,
   BracketDraftMatchInput,
   BracketMatch,
   BracketParticipantSnapshot,
   BracketPlayer,
+  BracketQuickResultDetail,
   MutableBracket,
   MutableBracketMatch,
   MutableBracketRound,
@@ -124,6 +126,7 @@ function bracketFromDoc(docId: string, data: Record<string, unknown> | undefined
     snapshotId: typeof data.snapshotId === "string" ? data.snapshotId : "",
     rounds: (Array.isArray(data.rounds) ? data.rounds : []) as Bracket["rounds"],
     createdAt: typeof data.createdAt === "string" ? data.createdAt : new Date().toISOString(),
+    ...(typeof data.updatedAt === "string" && data.updatedAt.trim() !== "" ? { updatedAt: data.updatedAt.trim() } : {}),
     ...(zoneId !== undefined ? { zoneId } : {}),
     ...(data.bracketMode === "multi_block" ? { bracketMode: "multi_block" as const } : {}),
     ...(Array.isArray(data.blocks) ? { blocks: data.blocks as Bracket["blocks"] } : {}),
@@ -147,8 +150,8 @@ function bracketFromDoc(docId: string, data: Record<string, unknown> | undefined
 async function bumpBracketCreatedAtOnDocumentFirestore(bracket: Bracket): Promise<Bracket> {
   const now = new Date().toISOString();
   const db = getSharedFirestoreDb();
-  await db.collection(BRACKETS).doc(bracket.id.trim()).update({ createdAt: now });
-  return normalizeBracket({ ...bracket, createdAt: now });
+  await db.collection(BRACKETS).doc(bracket.id.trim()).update({ createdAt: now, updatedAt: now });
+  return normalizeBracket({ ...bracket, createdAt: now, updatedAt: now });
 }
 
 function bracketToPlain(b: Bracket): Record<string, unknown> {
@@ -171,7 +174,14 @@ function bracketToPlain(b: Bracket): Record<string, unknown> {
   if (Array.isArray(b.preSplitRootRounds) && b.preSplitRootRounds.length > 0) {
     plain.preSplitRootRounds = b.preSplitRootRounds;
   }
+  if (typeof b.updatedAt === "string" && b.updatedAt.trim() !== "") plain.updatedAt = b.updatedAt.trim();
   return plain;
+}
+
+function commitBracketWriteInTx(tx: Transaction, ref: DocumentReference, normalized: Bracket): Bracket {
+  const touchIso = new Date().toISOString();
+  tx.set(ref, { ...bracketToPlain(normalized), updatedAt: touchIso });
+  return { ...normalized, updatedAt: touchIso };
 }
 
 export async function getBracketParticipantSnapshotByIdFirestore(
@@ -437,6 +447,37 @@ export async function getLatestBracketByTournamentIdAndZoneIdFirestore(
   return resolveActiveBracketDocumentFirestore(tournamentId.trim(), zid);
 }
 
+/** 대회결과·통계용: 권역별 활성 브래킷을 모두 수집(단일 대진표면 1개). */
+export async function listActiveBracketsForTournamentResultsFirestore(tournamentId: string): Promise<Bracket[]> {
+  const tid = tournamentId.trim();
+  if (!tid) return [];
+  const pointers = await getTournamentBracketPointerFieldsFirestore(tid);
+  const zonesEnabled = pointers?.zonesEnabled === true;
+  const out: Bracket[] = [];
+  const seen = new Set<string>();
+
+  if (zonesEnabled && pointers?.activeBracketByZoneId && Object.keys(pointers.activeBracketByZoneId).length > 0) {
+    for (const bracketId of Object.values(pointers.activeBracketByZoneId)) {
+      const bid = typeof bracketId === "string" ? bracketId.trim() : "";
+      if (!bid || seen.has(bid)) continue;
+      const b = await getBracketByIdFirestore(bid);
+      if (b) {
+        seen.add(bid);
+        out.push(b);
+      }
+    }
+  }
+
+  if (out.length === 0) {
+    const b = await getLatestBracketByTournamentIdFirestore(tid);
+    if (b && !seen.has(b.id)) {
+      out.push(b);
+    }
+  }
+
+  return out;
+}
+
 export async function createBracketFromSnapshotFirestore(
   snapshotId: string
 ): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
@@ -500,8 +541,10 @@ export async function createBracketFromSnapshotFirestore(
   };
 
   const db = getSharedFirestoreDb();
-  await db.collection(BRACKETS).doc(bracket.id).set(bracketToPlain(normalizeBracket(bracket)));
-  const normalizedSnap = normalizeBracket(bracket);
+  const normalizedCreate = normalizeBracket(bracket);
+  const touchIsoCreate = new Date().toISOString();
+  await db.collection(BRACKETS).doc(bracket.id).set({ ...bracketToPlain(normalizedCreate), updatedAt: touchIsoCreate });
+  const normalizedSnap = { ...normalizedCreate, updatedAt: touchIsoCreate } as Bracket;
   await mergeTournamentActiveBracketPointerFirestore({
     tournamentId: snapshot.tournamentId,
     bracketId: normalizedSnap.id,
@@ -597,8 +640,10 @@ export async function createBracketFromDraftFirestore(params: {
   };
 
   const db = getSharedFirestoreDb();
-  await db.collection(BRACKETS).doc(bracket.id).set(bracketToPlain(normalizeBracket(bracket)));
-  const normalizedDraft = normalizeBracket(bracket);
+  const normalizedDraftBase = normalizeBracket(bracket);
+  const touchIsoDraft = new Date().toISOString();
+  await db.collection(BRACKETS).doc(bracket.id).set({ ...bracketToPlain(normalizedDraftBase), updatedAt: touchIsoDraft });
+  const normalizedDraft = { ...normalizedDraftBase, updatedAt: touchIsoDraft } as Bracket;
   await mergeTournamentActiveBracketPointerFirestore({
     tournamentId: params.tournamentId,
     bracketId: normalizedDraft.id,
@@ -693,6 +738,7 @@ export async function updateBracketMatchResultFirestore(params: {
         targetMatch.winnerUserId = null;
         targetMatch.winnerName = null;
         targetMatch.status = "PENDING";
+        delete (targetMatch as MutableBracketMatch & { quickResultDetail?: unknown }).quickResultDetail;
       } else {
         const winner =
           targetMatch.player1.userId === normalizedWinnerUserId
@@ -706,6 +752,10 @@ export async function updateBracketMatchResultFirestore(params: {
         if (targetMatch.status === "COMPLETED" && targetMatch.winnerUserId === winner.userId) {
           throw new BracketOpReject("이미 처리된 상태입니다.");
         }
+        const prevW = targetMatch.winnerUserId?.trim() ?? "";
+        if (prevW && prevW !== winner.userId) {
+          delete (targetMatch as MutableBracketMatch & { quickResultDetail?: unknown }).quickResultDetail;
+        }
 
         targetMatch.winnerUserId = winner.userId;
         targetMatch.winnerName = winner.name;
@@ -717,8 +767,185 @@ export async function updateBracketMatchResultFirestore(params: {
       syncFinalBlockFromQualifiersInPlace(latestBracket);
 
       const normalized = normalizeBracket(latestBracket as Bracket);
-      tx.set(ref, bracketToPlain(normalized));
-      return normalized;
+      return commitBracketWriteInTx(tx, ref, normalized);
+    });
+    return { ok: true, bracket };
+  } catch (e) {
+    if (e instanceof BracketOpReject) {
+      return { ok: false, error: e.message };
+    }
+    throw e;
+  }
+}
+
+function buildQuickResultDetailComputed(params: {
+  firstAttackUserId: string;
+  player1UserId: string;
+  player2UserId: string;
+  winnerUserId: string;
+  scorePlayer1: number;
+  scorePlayer2: number;
+  endInning: number;
+  highRunPlayer1: number | null;
+  highRunPlayer2: number | null;
+}): BracketQuickResultDetail {
+  const p1 = params.player1UserId.trim();
+  const p2 = params.player2UserId.trim();
+  const first = params.firstAttackUserId.trim();
+  const win = params.winnerUserId.trim();
+  const E = params.endInning;
+  let inn1: number;
+  let inn2: number;
+  if (first === p1) {
+    if (win === p1) {
+      inn1 = E;
+      inn2 = Math.max(1, E - 1);
+    } else {
+      inn1 = E;
+      inn2 = E;
+    }
+  } else if (first === p2) {
+    if (win === p2) {
+      inn2 = E;
+      inn1 = Math.max(1, E - 1);
+    } else {
+      inn1 = E;
+      inn2 = E;
+    }
+  } else {
+    inn1 = Math.max(1, E);
+    inn2 = Math.max(1, E);
+  }
+  const avg1 = Math.round((params.scorePlayer1 / inn1) * 1000) / 1000;
+  const avg2 = Math.round((params.scorePlayer2 / inn2) * 1000) / 1000;
+  return {
+    firstAttackUserId: first,
+    scorePlayer1: params.scorePlayer1,
+    scorePlayer2: params.scorePlayer2,
+    endInning: E,
+    inningsPlayer1: inn1,
+    inningsPlayer2: inn2,
+    avgPlayer1: avg1,
+    avgPlayer2: avg2,
+    highRunPlayer1: params.highRunPlayer1,
+    highRunPlayer2: params.highRunPlayer2,
+    recordedAt: new Date().toISOString(),
+  };
+}
+
+export async function updateBracketMatchQuickResultDetailFirestore(params: {
+  tournamentId: string;
+  matchId: string;
+  bracketZoneId?: string | null;
+  firstAttackUserId: string;
+  scorePlayer1: number;
+  scorePlayer2: number;
+  endInning: number;
+  highRunPlayer1: number | null;
+  highRunPlayer2: number | null;
+}): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const tournamentId = params.tournamentId.trim();
+  const matchId = params.matchId.trim();
+  if (!tournamentId || !matchId) {
+    return { ok: false, error: "잘못된 요청입니다." };
+  }
+  const firstAttackUserId = params.firstAttackUserId.trim();
+  if (!firstAttackUserId) {
+    return { ok: false, error: "선공을 선택해 주세요." };
+  }
+  const endInning = Math.floor(Number(params.endInning));
+  if (!Number.isFinite(endInning) || endInning < 1) {
+    return { ok: false, error: "종료이닝을 확인해 주세요." };
+  }
+  const s1 = Math.floor(Number(params.scorePlayer1));
+  const s2 = Math.floor(Number(params.scorePlayer2));
+  if (!Number.isFinite(s1) || !Number.isFinite(s2) || s1 < 0 || s2 < 0) {
+    return { ok: false, error: "점수를 확인해 주세요." };
+  }
+  const hr1 = params.highRunPlayer1;
+  const hr2 = params.highRunPlayer2;
+  if (hr1 != null && (!Number.isFinite(hr1) || hr1 < 0 || Math.floor(hr1) !== hr1)) {
+    return { ok: false, error: "A 하이런 값이 올바르지 않습니다." };
+  }
+  if (hr2 != null && (!Number.isFinite(hr2) || hr2 < 0 || Math.floor(hr2) !== hr2)) {
+    return { ok: false, error: "B 하이런 값이 올바르지 않습니다." };
+  }
+
+  const tournament = await getTournamentByIdFirestore(tournamentId);
+  if (!tournament) {
+    return { ok: false, error: "대회를 찾을 수 없습니다." };
+  }
+
+  const resolved = await resolveLatestBracketForMutationFirestore({
+    tournamentId,
+    tournament,
+    bracketZoneId: params.bracketZoneId,
+  });
+  if (!resolved) {
+    return {
+      ok: false,
+      error:
+        tournament.zonesEnabled === true
+          ? "권역(zoneId)를 지정하거나 해당 권역의 확정 대진표가 없습니다."
+          : "확정 대진표가 없습니다.",
+    };
+  }
+
+  const db = getSharedFirestoreDb();
+  try {
+    const bracket = await db.runTransaction(async (tx) => {
+      const ref = db.collection(BRACKETS).doc(resolved.id);
+      const docSnap = await tx.get(ref);
+      if (!docSnap.exists) {
+        throw new BracketOpReject("확정 대진표가 없습니다.");
+      }
+      const latestBracket = bracketFromDoc(docSnap.id, docSnap.data() as Record<string, unknown>) as MutableBracket;
+      if (!latestBracket) {
+        throw new BracketOpReject("확정 대진표가 없습니다.");
+      }
+
+      applyBracketDefaultsInPlace(latestBracket);
+
+      const found = findMutableMatchById(latestBracket, matchId);
+      if (!found) {
+        throw new BracketOpReject("대상 매치를 찾을 수 없습니다.");
+      }
+      const { rounds: sliceRounds, round: targetRound, match: targetMatch } = found;
+      if (sliceRounds.some((round) => round.roundNumber === targetRound.roundNumber + 1)) {
+        throw new BracketOpReject("다음 라운드가 이미 생성되어 있어 수정할 수 없습니다.");
+      }
+
+      const win = targetMatch.winnerUserId?.trim() ?? "";
+      if (targetMatch.status !== "COMPLETED" || !win) {
+        throw new BracketOpReject("먼저 승패를 선택해 주세요.");
+      }
+
+      const p1 = targetMatch.player1.userId.trim();
+      const p2 = targetMatch.player2.userId.trim();
+      if (firstAttackUserId !== p1 && firstAttackUserId !== p2) {
+        throw new BracketOpReject("선공 선택이 올바르지 않습니다.");
+      }
+
+      const detail = buildQuickResultDetailComputed({
+        firstAttackUserId,
+        player1UserId: p1,
+        player2UserId: p2,
+        winnerUserId: win,
+        scorePlayer1: s1,
+        scorePlayer2: s2,
+        endInning,
+        highRunPlayer1: hr1,
+        highRunPlayer2: hr2,
+      });
+      (targetMatch as MutableBracketMatch).quickResultDetail = detail;
+
+      targetRound.status = deriveRoundStatus(targetRound.matches);
+      normalizeRoundStatusesEverywhere(latestBracket);
+      syncFinalBlockFromQualifiersInPlace(latestBracket);
+
+      const normalized = normalizeBracket(latestBracket as Bracket);
+      return commitBracketWriteInTx(tx, ref, normalized);
     });
     return { ok: true, bracket };
   } catch (e) {
@@ -821,8 +1048,7 @@ export async function replaceBracketMatchPlayerFirestore(params: {
       syncFinalBlockFromQualifiersInPlace(latestBracket);
 
       const normalized = normalizeBracket(latestBracket as Bracket);
-      tx.set(ref, bracketToPlain(normalized));
-      return normalized;
+      return commitBracketWriteInTx(tx, ref, normalized);
     });
     return { ok: true, bracket };
   } catch (e) {
@@ -910,8 +1136,7 @@ export async function advanceBracketRoundFirestore(
       syncFinalBlockFromQualifiersInPlace(bracketMut);
 
       const normalized = normalizeBracket(bracketMut as Bracket);
-      tx.set(ref, bracketToPlain(normalized));
-      return normalized;
+      return commitBracketWriteInTx(tx, ref, normalized);
     });
     return { ok: true, bracket };
   } catch (e) {
@@ -1021,8 +1246,7 @@ export async function resetBracketRoundsAfterFirestore(params: {
       normalizeRoundStatusesEverywhere(mut);
       syncFinalBlockFromQualifiersInPlace(mut);
       const normalized = normalizeBracket(mut as Bracket);
-      tx.set(ref, bracketToPlain(normalized));
-      return normalized;
+      return commitBracketWriteInTx(tx, ref, normalized);
     });
     return { ok: true, bracket };
   } catch (e) {
@@ -1101,8 +1325,7 @@ export async function rebuildBracketRoundFirestore(params: {
       normalizeRoundStatusesEverywhere(mut);
       syncFinalBlockFromQualifiersInPlace(mut);
       const normalized = normalizeBracket(mut as Bracket);
-      tx.set(ref, bracketToPlain(normalized));
-      return normalized;
+      return commitBracketWriteInTx(tx, ref, normalized);
     });
     return { ok: true, bracket };
   } catch (e) {
@@ -1183,8 +1406,7 @@ export async function rebuildBracketFromRoundFirestore(params: {
       normalizeRoundStatusesEverywhere(mut);
       syncFinalBlockFromQualifiersInPlace(mut);
       const normalized = normalizeBracket(mut as Bracket);
-      tx.set(ref, bracketToPlain(normalized));
-      return normalized;
+      return commitBracketWriteInTx(tx, ref, normalized);
     });
     return { ok: true, bracket };
   } catch (e) {
@@ -1314,8 +1536,7 @@ export async function reassignBracketMatchesFirestore(params: {
       }
       syncFinalBlockFromQualifiersInPlace(mut);
       const normalized = normalizeBracket(mut as Bracket);
-      tx.set(ref, bracketToPlain(normalized));
-      return normalized;
+      return commitBracketWriteInTx(tx, ref, normalized);
     });
     return { ok: true, bracket };
   } catch (e) {
@@ -1386,8 +1607,7 @@ export async function updateBracketMatchPlayerNameFirestore(params: {
       normalizeRoundStatusesEverywhere(mut);
       syncFinalBlockFromQualifiersInPlace(mut);
       const normalized = normalizeBracket(mut as Bracket);
-      tx.set(ref, bracketToPlain(normalized));
-      return normalized;
+      return commitBracketWriteInTx(tx, ref, normalized);
     });
     return { ok: true, bracket };
   } catch (e) {
@@ -1586,8 +1806,7 @@ export async function convertLatestBracketToMultiBlockFirestore(params: {
       normalizeRoundStatusesEverywhere(mut);
       syncFinalBlockFromQualifiersInPlace(mut);
       const normalized = normalizeBracket(mut as Bracket);
-      tx.set(ref, bracketToPlain(normalized));
-      return normalized;
+      return commitBracketWriteInTx(tx, ref, normalized);
     });
     return { ok: true, bracket };
   } catch (e) {
@@ -1705,8 +1924,7 @@ export async function resetQualifierBlockResultsFirestore(params: {
       applyBracketDefaultsInPlace(mut);
       resetQualifierBlockResultsInPlace(mut, blockId);
       const normalized = normalizeBracket(mut as Bracket);
-      tx.set(ref, bracketToPlain(normalized));
-      return normalized;
+      return commitBracketWriteInTx(tx, ref, normalized);
     });
     return { ok: true, bracket };
   } catch (e) {
@@ -1777,8 +1995,7 @@ export async function cancelMultiBlockSplitFirestore(params: {
       }
       revertMultiBlockBracketToSingleInPlace(mut);
       const normalized = normalizeBracket(mut as Bracket);
-      tx.set(ref, bracketToPlain(normalized));
-      return normalized;
+      return commitBracketWriteInTx(tx, ref, normalized);
     });
     return { ok: true, bracket };
   } catch (e) {
@@ -1824,8 +2041,7 @@ export async function revertMultiBlockBracketToSingleFirestore(params: {
       applyBracketDefaultsInPlace(mut);
       revertMultiBlockBracketToSingleInPlace(mut);
       const normalized = normalizeBracket(mut as Bracket);
-      tx.set(ref, bracketToPlain(normalized));
-      return normalized;
+      return commitBracketWriteInTx(tx, ref, normalized);
     });
     return { ok: true, bracket };
   } catch (e) {
@@ -1902,8 +2118,7 @@ export async function shuffleBracketRoundFirestore(params: {
       syncFinalBlockFromQualifiersInPlace(mut);
       mut.createdAt = new Date().toISOString();
       const normalized = normalizeBracket(mut as Bracket);
-      tx.set(ref, bracketToPlain(normalized));
-      return normalized;
+      return commitBracketWriteInTx(tx, ref, normalized);
     });
     return { ok: true, bracket };
   } catch (e) {

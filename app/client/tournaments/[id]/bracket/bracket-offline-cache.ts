@@ -188,6 +188,10 @@ export function applyLocalWinnerPick(bracket: BracketLike, matchId: string, winn
   const p1 = m.player1.userId.trim() === w;
   const p2 = m.player2.userId.trim() === w;
   if (!p1 && !p2) return null;
+  const prevW = (m.winnerUserId ?? "").trim();
+  if (prevW && prevW !== w) {
+    delete (m as { quickResultDetail?: unknown }).quickResultDetail;
+  }
   m.winnerUserId = w;
   m.winnerName = p1 ? slotLabel(m.player1) : slotLabel(m.player2);
   m.status = "COMPLETED";
@@ -214,6 +218,7 @@ export function applyLocalClearWinner(bracket: BracketLike, matchId: string): Br
   loc.match.winnerUserId = null;
   loc.match.winnerName = null;
   loc.match.status = "PENDING";
+  delete (loc.match as { quickResultDetail?: unknown }).quickResultDetail;
   return b;
 }
 
@@ -230,12 +235,14 @@ export function applyLocalClearWinnerCascadeInSlice(bracket: BracketLike, matchI
       m.winnerUserId = null;
       m.winnerName = null;
       m.status = "PENDING";
+      delete (m as { quickResultDetail?: unknown }).quickResultDetail;
     }
     refreshRoundStatusFromMatches(r);
   }
   loc.match.winnerUserId = null;
   loc.match.winnerName = null;
   loc.match.status = "PENDING";
+  delete (loc.match as { quickResultDetail?: unknown }).quickResultDetail;
   refreshRoundStatusFromMatches(loc.round);
   return b;
 }
