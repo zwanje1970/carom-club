@@ -35,6 +35,55 @@ function isMainSitePosterTestSlideItem(item: SlideDeckItem): boolean {
   return /포스터\s*광고판\s*확인\s*(?:[1-5]|[１-５])\s*$/i.test(t);
 }
 
+function slideDeckPublishedScrollImgPresent(item: SlideDeckItem): boolean {
+  const u =
+    (item.publishedCardImage480Url ?? "").trim() ||
+    (item.publishedCardImage320Url ?? "").trim() ||
+    (item.publishedCardImageUrl ?? "").trim();
+  return Boolean(u);
+}
+
+function slideDeckAdImage320Present(item: SlideDeckItem): boolean {
+  return Boolean((item.image320Url ?? "").trim());
+}
+
+/**
+ * RSC가 다시 내려올 때(홈 복귀 등) 클라이언트 덱에 이미 채워진 이미지·광고 URL이
+ * 초기 props보다 나으면 같은 슬롯 인덱스에서 유지한다. 길이·순서는 incoming 기준.
+ */
+function mergeInitialSlideDeckPreferringRicherVisual(
+  prevDeck: SlideDeckItem[],
+  incoming: SlideDeckItem[],
+): SlideDeckItem[] {
+  if (prevDeck.length !== incoming.length) return incoming;
+  const out: SlideDeckItem[] = [];
+  for (let i = 0; i < incoming.length; i++) {
+    const inc = incoming[i]!;
+    const prev = prevDeck[i]!;
+    if (inc.type === "ad" && prev.type === "ad") {
+      const sidIn = (inc.mainSlideScrollStableId ?? "").trim();
+      const sidPr = (prev.mainSlideScrollStableId ?? "").trim();
+      if (sidIn && sidPr === sidIn && slideDeckAdImage320Present(prev) && !slideDeckAdImage320Present(inc)) {
+        out.push({ ...prev, mainSlideScrollStableId: sidIn });
+        continue;
+      }
+    }
+    if (inc.type !== "ad" && prev.type !== "ad" && inc.snapshotId === prev.snapshotId) {
+      if (slideDeckPublishedScrollImgPresent(prev) && !slideDeckPublishedScrollImgPresent(inc)) {
+        out.push({
+          ...inc,
+          ...(prev.publishedCardImageUrl?.trim() ? { publishedCardImageUrl: prev.publishedCardImageUrl } : {}),
+          ...(prev.publishedCardImage320Url?.trim() ? { publishedCardImage320Url: prev.publishedCardImage320Url } : {}),
+          ...(prev.publishedCardImage480Url?.trim() ? { publishedCardImage480Url: prev.publishedCardImage480Url } : {}),
+        });
+        continue;
+      }
+    }
+    out.push(inc);
+  }
+  return out;
+}
+
 function preloadScrollCardImageOk(url: string): Promise<boolean> {
   const u = url.trim();
   if (!u) return Promise.resolve(true);
@@ -106,7 +155,7 @@ export function MainSiteSlideSection({
       initialSlideDeckItemsLen: initialSlideDeckItems.length,
       firstDeckSnapshotId: firstId,
     });
-    setDeckItems(initialSlideDeckItems);
+    setDeckItems((prev) => mergeInitialSlideDeckPreferringRicherVisual(prev, initialSlideDeckItems));
   }, [initialSlideDeckItems]);
 
   useEffect(() => {

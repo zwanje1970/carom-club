@@ -95,8 +95,8 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
   );
 
   const deckImgUrl = item.imageUrl?.trim() ?? "";
-  /** PNG 면: URL 있고 플레이스홀더 행이 아님 — 대회·광고 동일 */
-  const showPngDeck = Boolean(deckImgUrl) && !item.slideDeckPngPlaceholder;
+  /** PNG 면: 표시 가능한 이미지 URL이 있으면 PNG 면(플래그와 어긋나도 URL 우선 — 홈 복귀 후 플래그 잔류 방지) */
+  const showPngDeck = Boolean(deckImgUrl);
 
   const slotShellProps = {
     className: cardSlotClassNames(styles.sampleMainCardSlot, selected, styles.sampleMainCardSlotSelected),
