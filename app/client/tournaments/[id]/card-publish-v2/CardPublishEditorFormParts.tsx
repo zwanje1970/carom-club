@@ -87,7 +87,6 @@ export const CardPublishBackgroundTab = memo(function CardPublishBackgroundTab({
   bgFileInputRef,
   onBackgroundFileChange,
   onClearBackgroundFileSelection,
-  uploading,
   uploadedImage,
   imageOverlayOpacity,
   onImageOverlayChange,
@@ -98,7 +97,6 @@ export const CardPublishBackgroundTab = memo(function CardPublishBackgroundTab({
   bgFileInputRef: RefObject<HTMLInputElement | null>;
   onBackgroundFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onClearBackgroundFileSelection: () => void;
-  uploading: boolean;
   uploadedImage: { w320Url: string } | null;
   imageOverlayOpacity: number;
   onImageOverlayChange: (opacity01: number) => void;
@@ -158,11 +156,6 @@ export const CardPublishBackgroundTab = memo(function CardPublishBackgroundTab({
             선택해제
           </button>
         </div>
-        {uploading ? (
-          <p className="v3-muted" style={{ margin: 0, fontSize: "0.78rem" }}>
-            업로드 중…
-          </p>
-        ) : null}
         <div className={editorStyles.rangeBlock}>
           <span className={`${editorStyles.fieldLabel} ${editorStyles.fieldLabelRow}`}>
             배경그림 투명도

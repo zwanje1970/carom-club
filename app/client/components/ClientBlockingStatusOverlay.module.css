@@ -1,0 +1,72 @@
+@keyframes clientBlockingSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.backdropFull {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  box-sizing: border-box;
+  background: rgba(15, 23, 42, 0.48);
+  pointer-events: auto;
+}
+
+.backdropCompact {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  box-sizing: border-box;
+  background: rgba(15, 23, 42, 0.22);
+  pointer-events: auto;
+}
+
+.panel {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.65rem;
+  max-width: min(100vw - 2rem, 22rem);
+  margin: 0;
+  padding: 0.7rem 0.95rem;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
+  color: #0f172a;
+}
+
+.spinner {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid rgba(15, 23, 42, 0.18);
+  border-top-color: #2563eb;
+  animation: clientBlockingSpin 0.65s linear infinite;
+}
+
+.msg {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+    border-color: #2563eb;
+    border-top-color: #2563eb;
+    opacity: 0.85;
+  }
+}

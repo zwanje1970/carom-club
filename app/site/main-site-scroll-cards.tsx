@@ -8,6 +8,10 @@ import siteStyles from "./main-site-scroll-cards.module.css";
 import deckShellStyles from "./main-site-scroll-tournament-deck-shell.module.css";
 import { isMainSiteLoadDiagEnabled, logMainSiteLoadDiag } from "../../lib/site/main-site-load-diag";
 
+function logMainCardReturnDiag(payload: Record<string, unknown>) {
+  console.info("[main-card-return-diag]", payload);
+}
+
 const SITE_SCROLL_CARD = "data-site-scroll-card";
 const SITE_SCROLL_SHORTCUT = "data-site-scroll-shortcut";
 
@@ -279,6 +283,52 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   const itemsRef = useRef(items);
   itemsRef.current = items;
 
+  useEffect(() => {
+    const path = typeof window !== "undefined" ? window.location.pathname : "";
+    logMainCardReturnDiag({ phase: "scroll-cards-mount", path, itemsLen: items.length, itemsIdsKey });
+    return () => {
+      logMainCardReturnDiag({
+        phase: "scroll-cards-unmount",
+        path: typeof window !== "undefined" ? window.location.pathname : "",
+        itemsLen: itemsRef.current.length,
+        itemsIdsKey: itemsRef.current.length > 0 ? mainScrollIdsKey(itemsRef.current) : "",
+      });
+    };
+  }, []);
+
+  useEffect(() => {
+    const path = typeof window !== "undefined" ? window.location.pathname : "";
+    const sample = items.slice(0, 4).map((it) => ({
+      id: it.id,
+      titleLen: (it.title ?? "").length,
+      hasImageUrl: Boolean(it.imageUrl?.trim()),
+      placeholder: Boolean(it.slideDeckPngPlaceholder),
+      pngFace: Boolean(it.slideDeckPngFace),
+    }));
+    logMainCardReturnDiag({
+      phase: "scroll-cards-items",
+      path,
+      itemsLen: items.length,
+      itemsIdsKey,
+      sample,
+    });
+  }, [items, itemsIdsKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onPageShow = (ev: PageTransitionEvent) => {
+      logMainCardReturnDiag({
+        phase: "window-pageshow",
+        persisted: ev.persisted,
+        path: window.location.pathname,
+        itemsLen: itemsRef.current.length,
+        itemsIdsKey: itemsRef.current.length > 0 ? mainScrollIdsKey(itemsRef.current) : "",
+      });
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
+
   const mountLoggedRef = useRef(false);
   const lcpHeroLoadLoggedRef = useRef(false);
 
@@ -316,7 +366,16 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
 
   useLayoutEffect(() => {
     if (typeof window === "undefined") return;
-    if (items.length === 0 || !itemsIdsKey) return;
+    if (items.length === 0 || !itemsIdsKey) {
+      logMainCardReturnDiag({
+        phase: "session-restore-skip",
+        reason: items.length === 0 ? "empty-items" : "empty-ids-key",
+        path: typeof window !== "undefined" ? window.location.pathname : "",
+        itemsLen: items.length,
+        itemsIdsKey,
+      });
+      return;
+    }
     const viewport = viewportRef.current;
     if (!viewport) return;
 
@@ -350,7 +409,29 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     } catch {
       parsed = null;
     }
-    if (!parsed) return;
+    if (!parsed) {
+      logMainCardReturnDiag({
+        phase: "session-restore-skip",
+        reason: "no-parseable-session",
+        path: typeof window !== "undefined" ? window.location.pathname : "",
+        itemsLen: items.length,
+        itemsIdsKey,
+      });
+      return;
+    }
+
+    const idsMatch = parsed.idsKey === itemsIdsKey;
+    logMainCardReturnDiag({
+      phase: "session-restore-apply",
+      path: typeof window !== "undefined" ? window.location.pathname : "",
+      itemsLen: items.length,
+      itemsIdsKey,
+      storedIdsKeyLen: parsed.idsKey.length,
+      idsMatch,
+      scrollTopStored: parsed.scrollTop,
+      progressRatioStored: "progressRatio" in parsed ? parsed.progressRatio : null,
+      storageV: parsed.v,
+    });
 
     sessionRestoreAppliedRef.current = true;
     const settleUntil = performance.now() + 900;
@@ -490,6 +571,14 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     }
     let cancelled = false;
     const delayMs = sessionRestoreAppliedRef.current ? 900 : 220;
+    logMainCardReturnDiag({
+      phase: "auto-slide-ready-schedule",
+      path: typeof window !== "undefined" ? window.location.pathname : "",
+      delayMs,
+      sessionRestoreApplied: sessionRestoreAppliedRef.current,
+      itemsLen: items.length,
+      itemsIdsKey,
+    });
     const timer = window.setTimeout(() => {
       if (!cancelled) setAutoSlideReady(true);
     }, delayMs);
@@ -539,6 +628,15 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     if (!viewport) return;
     if (items.length === 0) return;
     if (!autoSlideReady) return;
+
+    logMainCardReturnDiag({
+      phase: "marquee-raf-effect-start",
+      path: typeof window !== "undefined" ? window.location.pathname : "",
+      itemsLen: items.length,
+      itemsIdsKey,
+      slideCardMoveSpeedLevel,
+      autoSlideReady,
+    });
 
     const speedLevel = Number.isFinite(slideCardMoveSpeedLevel)
       ? Math.min(10, Math.max(1, Math.round(slideCardMoveSpeedLevel)))
@@ -726,6 +824,15 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
             progressRatio: Math.min(1, Math.max(0, node.scrollTop / maxScroll)),
           };
           sessionStorage.setItem(MAIN_SITE_SCROLL_STORAGE_KEY, JSON.stringify(payload));
+          logMainCardReturnDiag({
+            phase: "marquee-raf-effect-cleanup-save-session",
+            path: typeof window !== "undefined" ? window.location.pathname : "",
+            idsKeyLen: payload.idsKey.length,
+            scrollTop: payload.scrollTop,
+            progressRatio: payload.progressRatio,
+            scrollHeight: node.scrollHeight,
+            clientHeight: node.clientHeight,
+          });
         }
       } catch {
         /* 저장 공간 부족 등 */

@@ -15,6 +15,7 @@ import type {
   TournamentTeamScoreRule,
   TournamentVerificationMode,
 } from "../../../../lib/tournament-rule-types";
+import { ClientBlockingStatusOverlay } from "../../components/ClientBlockingStatusOverlay";
 import { useClientTournamentFormKeyboardScroll } from "../client-tournament-form-keyboard-scroll";
 import TournamentNewWizardForm from "./TournamentNewWizardForm";
 
@@ -259,6 +260,8 @@ export default function ClientTournamentNewPage() {
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   /** 신규 생성: 검증 통과 후 최종 확인 모달 */
   const [createConfirmOpen, setCreateConfirmOpen] = useState(false);
+  /** 신규 생성 확인 후 저장·게시카드 화면 이동 중 — 성공 시 라우트 전환으로 언마운트될 때까지 유지 */
+  const [createSaveNavigateCardPublishOverlay, setCreateSaveNavigateCardPublishOverlay] = useState(false);
   /** 대회 생성·수정 입력 단계(1~8). 저장 로직과 무관한 UI 상태 */
   const [wizardStep, setWizardStep] = useState(1);
   /** 신규 생성 시 증빙 정책(확인 함/안 함)을 한 번이라도 눌렀는지 — 제출 전 필수 */
@@ -882,6 +885,7 @@ export default function ClientTournamentNewPage() {
       });
       const result = (await response.json()) as { error?: string; tournament?: { id: string } };
       if (!response.ok) {
+        setCreateSaveNavigateCardPublishOverlay(false);
         setMessage(result.error ?? (editId ? "저장에 실패했습니다." : "대회 생성에 실패했습니다."));
         setSaveState("error");
         return;
@@ -889,6 +893,7 @@ export default function ClientTournamentNewPage() {
 
       const savedId = result.tournament?.id;
       if (!savedId) {
+        setCreateSaveNavigateCardPublishOverlay(false);
         setMessage(editId ? "저장 결과를 확인할 수 없습니다." : "대회 생성 결과를 확인할 수 없습니다.");
         setSaveState("error");
         return;
@@ -905,6 +910,7 @@ export default function ClientTournamentNewPage() {
         router.refresh();
       }
     } catch {
+      setCreateSaveNavigateCardPublishOverlay(false);
       setMessage(editId ? "저장 요청 중 오류가 발생했습니다." : "대회 생성 요청 중 오류가 발생했습니다.");
       setSaveState("error");
     }
@@ -944,11 +950,13 @@ export default function ClientTournamentNewPage() {
   async function handleCreateConfirm() {
     if (tournamentCreateSubmitInFlightRef.current || loading) return;
     tournamentCreateSubmitInFlightRef.current = true;
+    setCreateSaveNavigateCardPublishOverlay(true);
     setLoading(true);
     setCreateConfirmOpen(false);
     try {
       const wizardCheck = validateWizardBeforeSave();
       if (!wizardCheck.ok) {
+        setCreateSaveNavigateCardPublishOverlay(false);
         setWizardStep(wizardCheck.step);
         setMessage(wizardCheck.message);
         setSaveState("idle");
@@ -1131,6 +1139,12 @@ export default function ClientTournamentNewPage() {
           </div>
         </div>
       ) : null}
+
+      <ClientBlockingStatusOverlay
+        open={createSaveNavigateCardPublishOverlay}
+        variant="full"
+        message="대회를 저장하고 게시카드 작성 화면으로 이동 중입니다."
+      />
 
       {createConfirmOpen ? (
         <div

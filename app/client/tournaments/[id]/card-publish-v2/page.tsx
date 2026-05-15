@@ -6,6 +6,7 @@ import { publishTournamentCardFromEditorClient } from "../tournament-card-client
 import type { TournamentCardSurfaceLayout } from "../../../../site/tournament-snapshot-card-view";
 import { POSTCARD_TEMPLATE_APP_DEFAULTS } from "../../../../../lib/postcard-template-reference";
 import editorStyles from "../card-publish-editor.module.css";
+import { ClientBlockingStatusOverlay } from "../../../components/ClientBlockingStatusOverlay";
 import { useClientTournamentFormKeyboardScroll } from "../../client-tournament-form-keyboard-scroll";
 import { CardPublishBackgroundTab, CardPublishContentTab } from "./CardPublishEditorFormParts";
 import { normalizeCardEditorBackgroundUpload } from "./normalize-card-editor-background-upload";
@@ -753,6 +754,11 @@ export default function ClientTournamentCardPublishV2Page() {
       data-card-publish-v2="1"
       style={{ maxWidth: "none", margin: 0, width: "100%" }}
     >
+      <ClientBlockingStatusOverlay
+        open={uploading}
+        variant="compact"
+        message="이미지를 준비하는 중입니다."
+      />
       <div className={editorStyles.pcPageShell}>
         <div className={editorStyles.pcPageMain}>
           <div className={`${editorStyles.pageWrap} ${editorStyles.pageWrapV2}`}>
@@ -860,7 +866,6 @@ export default function ClientTournamentCardPublishV2Page() {
               bgFileInputRef={bgFileInputRef}
               onBackgroundFileChange={onBackgroundFileChange}
               onClearBackgroundFileSelection={clearBackgroundFileSelection}
-              uploading={uploading}
               uploadedImage={uploadedImage}
               imageOverlayOpacity={imageOverlayOpacity}
               onImageOverlayChange={onImageOverlayChange}

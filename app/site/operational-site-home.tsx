@@ -97,6 +97,19 @@ export default async function SiteOperationalHome() {
   );
   const heroPreloadUrls = collectHeroImagePreloadUrls(slideDeckItemsToScrollCards(tournamentBaseForSlide));
 
+  const scrollForReturnDiag = slideDeckItemsToScrollCards(initialSlideDeckItems);
+  const firstScrollForReturnDiag = scrollForReturnDiag[0];
+  console.info("[main-card-return-diag]", {
+    phase: "server-operational-home",
+    snapshotCount: mainSlideSnapshots.length,
+    tournamentDeckItemsLen: tournamentDeckItems.length,
+    initialSlideDeckItemsLen: initialSlideDeckItems.length,
+    scrollCardsLen: scrollForReturnDiag.length,
+    placeholderCards: scrollForReturnDiag.filter((c) => c.slideDeckPngPlaceholder).length,
+    firstCardHasImageUrl: Boolean(firstScrollForReturnDiag?.imageUrl?.trim()),
+    firstCardId: firstScrollForReturnDiag?.id ?? null,
+  });
+
   if (isMainSiteLoadDiagEnabled()) {
     const scrollForDiag = slideDeckItemsToScrollCards(initialSlideDeckItems);
     const firstImageUrl = scrollForDiag[0]?.imageUrl?.trim() ?? "";

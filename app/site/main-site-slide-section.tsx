@@ -14,6 +14,10 @@ import {
 } from "../../lib/site/main-slide-stream";
 import { slideDeckItemsToScrollCards } from "../../lib/site/slide-deck-items-to-scroll-cards";
 
+function logMainCardReturnDiag(payload: Record<string, unknown>) {
+  console.info("[main-card-return-diag]", payload);
+}
+
 const MAIN_SITE_ADS_FETCH_DELAY_MS = 7_500;
 
 type MainSiteSlideSectionProps = {
@@ -66,6 +70,42 @@ export function MainSiteSlideSection({
   );
 
   useEffect(() => {
+    logMainCardReturnDiag({
+      phase: "slide-section-mount",
+      path: typeof window !== "undefined" ? window.location.pathname : "",
+    });
+    return () => {
+      logMainCardReturnDiag({
+        phase: "slide-section-unmount",
+        path: typeof window !== "undefined" ? window.location.pathname : "",
+      });
+    };
+  }, []);
+
+  useEffect(() => {
+    const path = typeof window !== "undefined" ? window.location.pathname : "";
+    const cards = slideDeckItemsToScrollCards(deckItems);
+    const placeholderCards = cards.filter((c) => c.slideDeckPngPlaceholder).length;
+    const withoutImageUrl = cards.filter((c) => !c.imageUrl?.trim()).length;
+    logMainCardReturnDiag({
+      phase: "slide-section-deck-snapshot",
+      path,
+      deckItemsLen: deckItems.length,
+      scrollCardsLen: cards.length,
+      placeholderCards,
+      scrollCardsWithoutImageUrl: withoutImageUrl,
+    });
+  }, [deckItems]);
+
+  useEffect(() => {
+    const path = typeof window !== "undefined" ? window.location.pathname : "";
+    const firstId = initialSlideDeckItems[0]?.snapshotId ?? null;
+    logMainCardReturnDiag({
+      phase: "slide-section-initial-props-sync",
+      path,
+      initialSlideDeckItemsLen: initialSlideDeckItems.length,
+      firstDeckSnapshotId: firstId,
+    });
     setDeckItems(initialSlideDeckItems);
   }, [initialSlideDeckItems]);
 
@@ -75,21 +115,48 @@ export function MainSiteSlideSection({
 
   useEffect(() => {
     let cancelled = false;
+    logMainCardReturnDiag({
+      phase: "ads-fetch-timer-scheduled",
+      path: typeof window !== "undefined" ? window.location.pathname : "",
+      delayMs: MAIN_SITE_ADS_FETCH_DELAY_MS,
+      tournamentBaseLen: tournamentBase.length,
+    });
     const timer = window.setTimeout(() => {
       void (async () => {
+        logMainCardReturnDiag({
+          phase: "ads-fetch-start",
+          path: typeof window !== "undefined" ? window.location.pathname : "",
+          deckItemsRefLen: deckItemsRef.current.length,
+        });
         try {
           const res = await fetch("/api/site/main-slide-deck-ads", { cache: "no-store" });
-          if (!res.ok) return;
+          if (!res.ok) {
+            logMainCardReturnDiag({
+              phase: "ads-fetch-fail",
+              path: typeof window !== "undefined" ? window.location.pathname : "",
+              httpStatus: res.status,
+            });
+            return;
+          }
           const json = (await res.json()) as {
             config?: unknown;
             activeAds?: MainSiteSlideAd[];
           };
-          if (cancelled) return;
+          if (cancelled) {
+            logMainCardReturnDiag({ phase: "ads-fetch-cancelled-after-json", path: typeof window !== "undefined" ? window.location.pathname : "" });
+            return;
+          }
           const config = normalizeMainSlideAdConfig(json.config ?? DEFAULT_MAIN_SLIDE_AD_CONFIG);
           const activeAds = Array.isArray(json.activeAds) ? json.activeAds : [];
 
           const merged = mergeTournamentAndAdSlideDeckItems(tournamentBase, activeAds, config);
           const aligned = alignMainSlideAdDeckStableScrollIds(deckItemsRef.current, merged);
+          logMainCardReturnDiag({
+            phase: "ads-preload-batch-start",
+            path: typeof window !== "undefined" ? window.location.pathname : "",
+            alignedLen: aligned.length,
+            deckItemsRefLenBeforeAlign: deckItemsRef.current.length,
+          });
           const preloadOkFlags = await Promise.all(
             aligned.map(async (deckItem) => {
               if (deckItem.type !== "ad") return true;
@@ -98,6 +165,14 @@ export function MainSiteSlideSection({
               return preloadScrollCardImageOk(u);
             }),
           );
+          const preloadAttempted = preloadOkFlags.filter((_, i) => {
+            const d = aligned[i];
+            return d?.type === "ad" && Boolean((d.image320Url ?? "").trim());
+          }).length;
+          const preloadFailed = preloadOkFlags.filter((ok, i) => {
+            const d = aligned[i];
+            return d?.type === "ad" && Boolean((d.image320Url ?? "").trim()) && !ok;
+          }).length;
           const patched = aligned.map((deckItem, i) => {
             if (!preloadOkFlags[i] && deckItem.type === "ad") {
               const sid = (deckItem.mainSlideScrollStableId ?? "").trim();
@@ -105,15 +180,36 @@ export function MainSiteSlideSection({
             }
             return deckItem;
           });
-          if (cancelled) return;
+          if (cancelled) {
+            logMainCardReturnDiag({ phase: "ads-fetch-cancelled-after-preload", path: typeof window !== "undefined" ? window.location.pathname : "" });
+            return;
+          }
+          logMainCardReturnDiag({
+            phase: "ads-fetch-success-set-deck",
+            path: typeof window !== "undefined" ? window.location.pathname : "",
+            mergedLen: merged.length,
+            alignedLen: aligned.length,
+            patchedLen: patched.length,
+            activeAdsLen: activeAds.length,
+            preloadAttempted,
+            preloadFailed,
+          });
           setSlideSpeedLevel(config.cardMoveDurationSec);
           setDeckItems(patched);
-        } catch {
-          /* 메인 슬라이드와 분리 — 실패 시 기존 덱 유지 */
+        } catch (err) {
+          logMainCardReturnDiag({
+            phase: "ads-fetch-throw",
+            path: typeof window !== "undefined" ? window.location.pathname : "",
+            err: err instanceof Error ? err.message : String(err),
+          });
         }
       })();
     }, MAIN_SITE_ADS_FETCH_DELAY_MS);
     return () => {
+      logMainCardReturnDiag({
+        phase: "ads-fetch-timer-cancelled",
+        path: typeof window !== "undefined" ? window.location.pathname : "",
+      });
       cancelled = true;
       window.clearTimeout(timer);
     };
