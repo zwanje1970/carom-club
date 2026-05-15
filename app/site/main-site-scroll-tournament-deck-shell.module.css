@@ -26,7 +26,7 @@
 }
 
 .mainScrollDeckCardOuterFlex.mainScrollDeckCardOuterSelected {
-  overflow: visible;
+  overflow: hidden;
 }
 
 .mainScrollDeckCardInner {

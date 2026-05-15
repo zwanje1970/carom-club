@@ -18,9 +18,6 @@ import type {
 } from "../../../../lib/site/tournament-card-overlay-snapshot";
 import { isTournamentCardOverlaySlotType } from "../../../../lib/site/tournament-card-overlay-snapshot";
 
-/** 최종 PNG 가로 약 1280px — 440 아트보드 × 배율 */
-export const TOURNAMENT_CARD_PUBLISH_BROWSER_CAPTURE_SCALE = 1280 / TOURNAMENT_CARD_ARTBOARD_WIDTH_PX;
-
 export function isBrowserCaptureDiagEnabled(): boolean {
   return process.env.NEXT_PUBLIC_TOURNAMENT_CARD_BROWSER_CAPTURE_DIAG === "1";
 }
@@ -140,6 +137,48 @@ function assertPublishedCardCanvasHasLikelyContent(canvas: HTMLCanvasElement): v
   }
 }
 
+function assertPublishedCardCanvasHasLikelyPhotoBackground(canvas: HTMLCanvasElement): void {
+  const w = canvas.width;
+  const h = canvas.height;
+  if (w < 20 || h < 20) {
+    throw new Error("게시 카드 캡처 크기가 비정상입니다.");
+  }
+  const ctx = canvas.getContext("2d", { willReadFrequently: true }) ?? canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("게시 카드 캡처를 분석할 수 없습니다.");
+  }
+  let imageData: ImageData;
+  try {
+    imageData = ctx.getImageData(0, 0, w, h);
+  } catch {
+    throw new Error("캡처 이미지를 읽을 수 없습니다. 다시 시도해 주세요.");
+  }
+  const d = imageData.data;
+  const stepX = Math.max(1, Math.floor(w / 56));
+  const stepY = Math.max(1, Math.floor(h / 28));
+  const colorBins = new Set<string>();
+  const lum: number[] = [];
+  for (let y = 1; y < h - 1; y += stepY) {
+    for (let x = 1; x < w - 1; x += stepX) {
+      const i = (Math.floor(y) * w + Math.floor(x)) * 4;
+      const r = d[i] ?? 0;
+      const g = d[i + 1] ?? 0;
+      const b = d[i + 2] ?? 0;
+      const rq = Math.floor(r / 32);
+      const gq = Math.floor(g / 32);
+      const bq = Math.floor(b / 32);
+      colorBins.add(`${rq}:${gq}:${bq}`);
+      lum.push(0.299 * r + 0.587 * g + 0.114 * b);
+    }
+  }
+  if (lum.length < 10) return;
+  const mean = lum.reduce((a, b) => a + b, 0) / lum.length;
+  const variance = lum.reduce((acc, L) => acc + (L - mean) * (L - mean), 0) / lum.length;
+  if (colorBins.size < 8 && variance < 120) {
+    throw new Error("배경 이미지가 캡처에 반영되지 않았습니다. 미리보기를 확인한 뒤 다시 게시해 주세요.");
+  }
+}
+
 function isBrowserLocalCanvasImageSrc(src: string): boolean {
   const s = src.trim();
   return s.startsWith("blob:") || s.startsWith("data:");
@@ -181,25 +220,17 @@ function doubleRaf(): Promise<void> {
   });
 }
 
-/**
- * 미리보기 열의 `transform: scale(...)`는 html2canvas가 배경·레이어를 누락하는 원인이 될 수 있어,
- * 캡처 구간에서만 일시적으로 제거한다.
- */
-async function withPreviewScaleTransformSuspended<T>(previewCaptureRoot: HTMLElement, run: () => Promise<T>): Promise<T> {
-  const scaleEl = previewCaptureRoot.closest(
-    '[data-card-publish-scale-inner="1"]',
-  ) as HTMLElement | null;
-  if (!scaleEl) {
-    return run();
-  }
-  const prev = scaleEl.style.transform;
-  scaleEl.style.transform = "none";
-  try {
-    await doubleRaf();
-    return await run();
-  } finally {
-    scaleEl.style.transform = prev;
-  }
+function resolveVisibleCaptureRect(root: HTMLElement): { width: number; height: number } {
+  const rect = root.getBoundingClientRect();
+  const width = Math.max(1, Math.round(rect.width));
+  const height = Math.max(1, Math.round(rect.height));
+  return { width, height };
+}
+
+function resolveCaptureScaleFromDevice(): number {
+  const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+  if (!Number.isFinite(dpr) || dpr <= 0) return 1;
+  return Math.min(3, Math.max(1, dpr));
 }
 
 async function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
@@ -345,19 +376,22 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
   const { tournamentId, item, previewCaptureRoot, signal } = args;
   logBrowserCapture("full-png capture start (preview DOM)", { tournamentId });
 
-  const articleEl = previewCaptureRoot.querySelector("article");
+  const articleEl = previewCaptureRoot.querySelector(
+    '[data-tournament-card-capture-root="1"]',
+  ) as HTMLElement | null;
   if (!(articleEl instanceof HTMLElement)) {
     const msg = "게시카드 미리보기에서 카드 article 요소를 찾을 수 없습니다.";
     console.error("[tournament-card-browser-capture]", msg);
     throw new Error(msg);
   }
+  const captureRoot = articleEl;
 
   try {
     if (typeof document.fonts?.ready?.then === "function") {
       await document.fonts.ready;
     }
     throwIfAborted(signal);
-    await waitForAllImagesStrict(previewCaptureRoot);
+    await waitForAllImagesStrict(captureRoot);
     throwIfAborted(signal);
     await doubleRaf();
     throwIfAborted(signal);
@@ -371,20 +405,21 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
     throwIfAborted(signal);
 
     const [{ default: html2canvas }] = await Promise.all([import("html2canvas")]);
-    const canvasBg = resolvePublishedCardHtml2CanvasBackground(item);
-    const canvas = await withPreviewScaleTransformSuspended(previewCaptureRoot, () =>
-      html2canvas(previewCaptureRoot, {
-        scale: TOURNAMENT_CARD_PUBLISH_BROWSER_CAPTURE_SCALE,
-        backgroundColor: canvasBg,
-        useCORS: true,
-        allowTaint: false,
-        logging: false,
-        width: TOURNAMENT_CARD_ARTBOARD_WIDTH_PX,
-        height: TOURNAMENT_CARD_ARTBOARD_HEIGHT_PX,
-      }),
-    );
+    const captureRect = resolveVisibleCaptureRect(captureRoot);
+    const canvas = await html2canvas(captureRoot, {
+      scale: resolveCaptureScaleFromDevice(),
+      backgroundColor: null,
+      useCORS: true,
+      allowTaint: false,
+      logging: false,
+      width: captureRect.width,
+      height: captureRect.height,
+    });
 
     assertPublishedCardCanvasHasLikelyContent(canvas);
+    if (expectsImageBg) {
+      assertPublishedCardCanvasHasLikelyPhotoBackground(canvas);
+    }
 
     const blob = await canvasToBlob(canvas);
     if (blob.size < 2800) {

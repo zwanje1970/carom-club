@@ -359,6 +359,7 @@ function TournamentSlideCardPreview({
     return (
       <article
         className={rootClass}
+        data-tournament-card-capture-root="1"
         data-editor-card-preview={editorPreviewFixedLayout && !artboardPx ? "1" : undefined}
       >
         <MediaStack
@@ -427,6 +428,7 @@ function TournamentSlideCardPreview({
     return (
       <article
         className={rootClass}
+        data-tournament-card-capture-root="1"
         data-editor-card-preview={editorPreviewFixedLayout && !artboardPx ? "1" : undefined}
       >
         <MediaStack
