@@ -140,38 +140,23 @@ function assertPublishedCardCanvasHasLikelyContent(canvas: HTMLCanvasElement): v
   }
 }
 
-function assertBackgroundHeroDecoded(article: HTMLElement, expectedImage320Url: string): void {
-  const exp = expectedImage320Url.trim();
-  if (!exp) return;
+function isBrowserLocalCanvasImageSrc(src: string): boolean {
+  const s = src.trim();
+  return s.startsWith("blob:") || s.startsWith("data:");
+}
+
+function assertBackgroundHeroDecodedForCanvas(article: HTMLElement): void {
   const imgs = [...article.querySelectorAll<HTMLImageElement>("img")];
   const decoded = imgs.filter((i) => i.naturalWidth >= 2 && i.naturalHeight >= 2);
   if (decoded.length === 0) {
     throw new Error("게시 카드 미리보기에서 디코드된 배경 이미지를 찾을 수 없습니다.");
   }
-  let expHref = "";
-  try {
-    expHref = new URL(exp, window.location.origin).href;
-  } catch {
-    /* ignore */
-  }
-  const expTail = exp.split("/").pop()?.split("?")[0] ?? exp;
-  const matched = decoded.some((img) => {
-    const src = (img.currentSrc || img.src || "").trim();
-    if (!src) return false;
-    if (expHref && src === expHref) return true;
-    try {
-      if (new URL(src, window.location.origin).href === expHref) return true;
-    } catch {
-      /* ignore */
-    }
-    return expTail.length > 1 && src.includes(expTail);
-  });
-  if (!matched) {
-    console.error("[tournament-card-browser-capture] 배경 URL 불일치", {
-      expected: exp,
+  const hasLocalCanvasSource = decoded.some((img) => isBrowserLocalCanvasImageSrc(img.currentSrc || img.src || ""));
+  if (!hasLocalCanvasSource) {
+    console.error("[tournament-card-browser-capture] 캡처용 배경 이미지가 브라우저 로컬 소스가 아닙니다.", {
       observed: decoded.map((i) => i.currentSrc || i.src),
     });
-    throw new Error("게시 카드 배경 이미지가 미리보기에 로드된 URL과 일치하지 않습니다.");
+    throw new Error("게시 카드 배경 이미지를 캡처 가능한 브라우저 이미지로 준비하지 못했습니다.");
   }
 }
 
@@ -379,7 +364,7 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
 
     const expectsImageBg = item.backgroundType === "image" && Boolean((item.image320Url ?? "").trim());
     if (expectsImageBg) {
-      assertBackgroundHeroDecoded(articleEl, item.image320Url!.trim());
+      assertBackgroundHeroDecodedForCanvas(articleEl);
     }
 
     await doubleRaf();

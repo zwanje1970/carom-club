@@ -5,18 +5,12 @@ import { fileURLToPath } from "url";
 const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["@resvg/resvg-js"],
   outputFileTracingRoot: projectRoot,
   turbopack: {
     root: projectRoot,
   },
   outputFileTracingExcludes: {
     "/*": ["./legacy-local-backup/**/*"],
-  },
-  outputFileTracingIncludes: {
-    "/api/client/tournament-card-image": [
-      "./node_modules/@fontsource-variable/noto-sans-kr/files/*.woff2",
-    ],
   },
 };
 

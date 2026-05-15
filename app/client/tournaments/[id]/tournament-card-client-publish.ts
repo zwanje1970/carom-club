@@ -1,8 +1,5 @@
 import { buildSlideDeckItemForTournamentCapture } from "./tournament-card-build-slide-deck-item";
-import {
-  captureAndUploadTournamentPublishedCardFullPngInBrowser,
-  isBrowserCaptureDiagEnabled,
-} from "./tournament-card-publish-capture";
+import { captureAndUploadTournamentPublishedCardFullPngInBrowser } from "./tournament-card-publish-capture";
 
 type CardSnapshotRow = {
   snapshotId?: string;
@@ -64,38 +61,12 @@ export type TournamentCardClientPublishResult =
 export type TournamentCardClientPublishProgressPhase = "publish-start" | "before-post";
 
 const SERVER_CARD_IMAGE_FAIL_KO = "게시 이미지 생성 또는 저장에 실패했습니다. 다시 게시해 주세요.";
+/** 브라우저 DOM 캡처만 허용 — 서버 resvg 대체 생성 없음 */
+const BROWSER_CARD_IMAGE_CAPTURE_FAIL_KO = "카드 이미지 생성에 실패했습니다. 다시 시도해 주세요.";
 const PUBLISH_IMAGE_TIMEOUT_MS = 45_000;
 
-function joinAbortSignals(a: AbortSignal, b: AbortSignal): AbortSignal {
-  const controller = new AbortController();
-  const abort = () => controller.abort();
-  if (a.aborted || b.aborted) {
-    controller.abort();
-    return controller.signal;
-  }
-  a.addEventListener("abort", abort, { once: true });
-  b.addEventListener("abort", abort, { once: true });
-  return controller.signal;
-}
-
-async function fetchJsonWithTimeout<T>(
-  input: RequestInfo | URL,
-  init: RequestInit,
-  timeoutMs: number,
-): Promise<{ ok: boolean; status: number; json: T }> {
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
-  const signal = init.signal ? joinAbortSignals(init.signal, controller.signal) : controller.signal;
-  try {
-    const res = await fetch(input, { ...init, signal });
-    return { ok: res.ok, status: res.status, json: (await res.json()) as T };
-  } finally {
-    window.clearTimeout(timeoutId);
-  }
-}
-
 /**
- * 클라이언트에서 카드 스냅샷 GET → 서버 이미지 생성 → POST(`draftOnly: false`)까지 수행.
+ * 클라이언트에서 카드 스냅샷 GET → 브라우저 DOM PNG 캡처·업로드 → POST(`draftOnly: false`)까지 수행.
  * 대회 `status-badge`는 호출 전에 이미 반영되어 있어야 이미지 배지·메인 노출 플래그가 맞습니다.
  */
 export async function publishTournamentCardFromEditorClient(args: {
@@ -202,82 +173,29 @@ export async function publishTournamentCardFromEditorClient(args: {
     const browserImageController = new AbortController();
     const browserImageTimeoutId = window.setTimeout(() => browserImageController.abort(), PUBLISH_IMAGE_TIMEOUT_MS);
     try {
-      try {
-        const r = await captureAndUploadTournamentPublishedCardFullPngInBrowser({
-          tournamentId,
-          item: slideDeckItem,
-          previewCaptureRoot,
-          signal: browserImageController.signal,
-        });
-        publishedCardImageUrl = r.publishedCardImageUrl;
-        publishedCardImage480Url = r.publishedCardImage480Url;
-        publishedCardImage320Url = r.publishedCardImage320Url;
-        publishedCardImageId = r.imageId;
-      } catch (browserErr) {
-        if (isBrowserCaptureDiagEnabled()) {
-          console.warn(
-            "[publishTournamentCardFromEditorClient] browser full-card png failed, falling back to server resvg",
-            browserErr,
-          );
-        }
-        const imageRes = await fetchJsonWithTimeout<{
-          error?: string;
-          imageId?: string;
-          publishedCardImageUrl?: string;
-          publishedCardImage320Url?: string;
-          publishedCardImage480Url?: string;
-          w640Url?: string;
-          w480Url?: string;
-          w320Url?: string;
-        }>(
-          "/api/client/tournament-card-image",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              tournamentId,
-              templateId: slideDeckItem.cardTemplate ?? "A",
-              title: slideDeckItem.title,
-              subtitle: slideDeckItem.subtitle,
-              textLine1: slideDeckItem.cardExtraLine1 ?? null,
-              textLine2: slideDeckItem.cardExtraLine2 ?? null,
-              textLine3: slideDeckItem.cardExtraLine3 ?? null,
-              statusBadge: args.slideStatusBadge,
-              backgroundType: slideDeckItem.backgroundType ?? "image",
-              themeType: slideDeckItem.themeType ?? "dark",
-              backgroundImageUrl: slideDeckItem.image320Url ?? null,
-              backgroundImageOpacity:
-                typeof slideDeckItem.imageOverlayOpacity === "number" ? slideDeckItem.imageOverlayOpacity : null,
-              mediaBackground: slideDeckItem.mediaBackground ?? null,
-              textShadowEnabled: slideDeckItem.cardTextShadowEnabled === true,
-              surfaceLayout: slideDeckItem.cardSurfaceLayout === "full" ? "full" : "split",
-              leadTextColor: slideDeckItem.cardLeadTextColor ?? null,
-              titleTextColor: slideDeckItem.cardTitleTextColor ?? null,
-              descriptionTextColor: slideDeckItem.cardDescriptionTextColor ?? null,
-              footerDateTextColor: slideDeckItem.cardFooterDateTextColor ?? null,
-              footerPlaceTextColor: slideDeckItem.cardFooterPlaceTextColor ?? null,
-            }),
-          },
-          PUBLISH_IMAGE_TIMEOUT_MS,
-        );
-        publishedCardImageUrl = (imageRes.json.publishedCardImageUrl ?? imageRes.json.w640Url ?? "").trim();
-        publishedCardImage480Url = (imageRes.json.publishedCardImage480Url ?? imageRes.json.w480Url ?? "").trim();
-        publishedCardImage320Url = (imageRes.json.publishedCardImage320Url ?? imageRes.json.w320Url ?? "").trim();
-        publishedCardImageId = (imageRes.json.imageId ?? "").trim();
-        if (!imageRes.ok || !publishedCardImageUrl || !publishedCardImage320Url || !publishedCardImageId) {
-          return { ok: false, error: SERVER_CARD_IMAGE_FAIL_KO };
-        }
-      }
+      const r = await captureAndUploadTournamentPublishedCardFullPngInBrowser({
+        tournamentId,
+        item: slideDeckItem,
+        previewCaptureRoot,
+        signal: browserImageController.signal,
+      });
+      publishedCardImageUrl = r.publishedCardImageUrl;
+      publishedCardImage480Url = r.publishedCardImage480Url;
+      publishedCardImage320Url = r.publishedCardImage320Url;
+      publishedCardImageId = r.imageId;
+    } catch (browserErr) {
+      console.error("[publishTournamentCardFromEditorClient] browser full-card png failed", browserErr);
+      return { ok: false, error: BROWSER_CARD_IMAGE_CAPTURE_FAIL_KO };
     } finally {
       window.clearTimeout(browserImageTimeoutId);
     }
     if (!publishedCardImageUrl || !publishedCardImage320Url || !publishedCardImageId) {
-      return { ok: false, error: SERVER_CARD_IMAGE_FAIL_KO };
+      return { ok: false, error: BROWSER_CARD_IMAGE_CAPTURE_FAIL_KO };
     }
   } catch (e) {
     return {
       ok: false,
-      error: e instanceof DOMException && e.name === "AbortError" ? SERVER_CARD_IMAGE_FAIL_KO : SERVER_CARD_IMAGE_FAIL_KO,
+      error: e instanceof DOMException && e.name === "AbortError" ? BROWSER_CARD_IMAGE_CAPTURE_FAIL_KO : SERVER_CARD_IMAGE_FAIL_KO,
     };
   }
 

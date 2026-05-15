@@ -10,15 +10,12 @@ import {
 import { getTournamentByIdFirestore } from "../../../../lib/server/firestore-tournaments";
 import { isFirestoreUsersBackendConfigured } from "../../../../lib/server/firestore-users";
 import { persistProofImageW320W640Variants } from "../../../../lib/server/persist-proof-image-w320-w640-variants";
-import {
-  renderTournamentPublishedCardPng,
-  type TournamentPublishedCardImagePayload,
-} from "../../../../lib/server/tournament-published-card-image-renderer";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
 const SERVER_CARD_IMAGE_FAIL_KO = "게시 이미지 생성 또는 저장에 실패했습니다. 다시 게시해 주세요.";
+const MULTIPART_ONLY_KO = "게시 카드 이미지는 브라우저에서 캡처한 PNG(multipart)만 업로드할 수 있습니다.";
 
 function tournamentImageDiagEnabled(): boolean {
   return process.env.TOURNAMENT_CARD_IMAGE_DIAG === "1";
@@ -50,45 +47,6 @@ async function getPublisher() {
 
 function asString(v: unknown): string {
   return typeof v === "string" ? v : "";
-}
-
-function asNullableString(v: unknown): string | null {
-  if (v === null) return null;
-  return typeof v === "string" ? v : null;
-}
-
-function asFiniteNumber(v: unknown): number | null {
-  return typeof v === "number" && Number.isFinite(v) ? v : null;
-}
-
-function parsePayload(raw: unknown): TournamentPublishedCardImagePayload | null {
-  if (!raw || typeof raw !== "object") return null;
-  const b = raw as Record<string, unknown>;
-  const tournamentId = asString(b.tournamentId).trim();
-  const title = asString(b.title).trim();
-  if (!tournamentId || !title) return null;
-  return {
-    tournamentId,
-    templateId: b.templateId === "B" ? "B" : "A",
-    title,
-    subtitle: asString(b.subtitle),
-    textLine1: asNullableString(b.textLine1),
-    textLine2: asNullableString(b.textLine2),
-    textLine3: asNullableString(b.textLine3),
-    statusBadge: asNullableString(b.statusBadge),
-    backgroundType: b.backgroundType === "theme" ? "theme" : "image",
-    themeType: b.themeType === "light" || b.themeType === "natural" ? b.themeType : "dark",
-    backgroundImageUrl: asNullableString(b.backgroundImageUrl),
-    backgroundImageOpacity: asFiniteNumber(b.backgroundImageOpacity),
-    mediaBackground: asNullableString(b.mediaBackground),
-    textShadowEnabled: b.textShadowEnabled === true,
-    surfaceLayout: b.surfaceLayout === "full" ? "full" : "split",
-    leadTextColor: asNullableString(b.leadTextColor),
-    titleTextColor: asNullableString(b.titleTextColor),
-    descriptionTextColor: asNullableString(b.descriptionTextColor),
-    footerDateTextColor: asNullableString(b.footerDateTextColor),
-    footerPlaceTextColor: asNullableString(b.footerPlaceTextColor),
-  };
 }
 
 async function assertTournamentImageAccess(params: {
@@ -165,70 +123,45 @@ export async function POST(request: Request) {
   }
 
   const contentType = request.headers.get("content-type") ?? "";
-
-  if (contentType.includes("multipart/form-data")) {
-    let formData: FormData;
-    try {
-      formData = await request.formData();
-    } catch {
-      return NextResponse.json({ error: "Invalid multipart body." }, { status: 400 });
-    }
-    const tournamentId = asString(formData.get("tournamentId")).trim();
-    if (!tournamentId) {
-      return NextResponse.json({ error: "tournamentId is required." }, { status: 400 });
-    }
-    const accessMulti = await assertTournamentImageAccess({ publisher, tournamentId });
-    if (!accessMulti.ok) return accessMulti.response;
-
-    const file = formData.get("file");
-    if (!(file instanceof File)) {
-      return NextResponse.json({ error: "PNG file is required." }, { status: 400 });
-    }
-    const mime = (file.type ?? "").toLowerCase();
-    const name = (file.name ?? "").toLowerCase();
-    if (!mime.includes("png") && !name.endsWith(".png")) {
-      return NextResponse.json({ error: "Only PNG uploads are allowed for published card images." }, { status: 400 });
-    }
-
-    let png: Buffer;
-    try {
-      png = Buffer.from(await file.arrayBuffer());
-    } catch {
-      return NextResponse.json({ error: SERVER_CARD_IMAGE_FAIL_KO }, { status: 400 });
-    }
-    if (png.length < 100) {
-      return NextResponse.json({ error: "Uploaded image is too small or empty." }, { status: 400 });
-    }
-
-    if (tournamentImageDiagEnabled()) {
-      console.info("[tournament-card-image] png source: client-browser-upload", { bytes: png.length, tournamentId });
-    }
-
-    return persistPngResponse({ png, uploaderUserId: publisher.user.id });
+  if (!contentType.includes("multipart/form-data")) {
+    return NextResponse.json({ error: MULTIPART_ONLY_KO }, { status: 415 });
   }
 
-  let payload: TournamentPublishedCardImagePayload | null = null;
+  let formData: FormData;
   try {
-    payload = parsePayload(await request.json());
+    formData = await request.formData();
   } catch {
-    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid multipart body." }, { status: 400 });
   }
-  if (!payload) {
-    return NextResponse.json({ error: "tournamentId and title are required." }, { status: 400 });
+  const tournamentId = asString(formData.get("tournamentId")).trim();
+  if (!tournamentId) {
+    return NextResponse.json({ error: "tournamentId is required." }, { status: 400 });
+  }
+  const accessMulti = await assertTournamentImageAccess({ publisher, tournamentId });
+  if (!accessMulti.ok) return accessMulti.response;
+
+  const file = formData.get("file");
+  if (!(file instanceof File)) {
+    return NextResponse.json({ error: "PNG file is required." }, { status: 400 });
+  }
+  const mime = (file.type ?? "").toLowerCase();
+  const name = (file.name ?? "").toLowerCase();
+  if (!mime.includes("png") && !name.endsWith(".png")) {
+    return NextResponse.json({ error: "Only PNG uploads are allowed for published card images." }, { status: 400 });
   }
 
-  const accessJson = await assertTournamentImageAccess({ publisher, tournamentId: payload.tournamentId });
-  if (!accessJson.ok) return accessJson.response;
-
-  const baseUrl = new URL(request.url).origin;
   let png: Buffer;
   try {
-    png = await renderTournamentPublishedCardPng({ payload, requestBaseUrl: baseUrl });
-    if (tournamentImageDiagEnabled()) {
-      console.info("[tournament-card-image] png source: resvg-json-fallback", { bytes: png.length });
-    }
+    png = Buffer.from(await file.arrayBuffer());
   } catch {
-    return NextResponse.json({ error: SERVER_CARD_IMAGE_FAIL_KO }, { status: 500 });
+    return NextResponse.json({ error: SERVER_CARD_IMAGE_FAIL_KO }, { status: 400 });
+  }
+  if (png.length < 100) {
+    return NextResponse.json({ error: "Uploaded image is too small or empty." }, { status: 400 });
+  }
+
+  if (tournamentImageDiagEnabled()) {
+    console.info("[tournament-card-image] png source: client-browser-upload", { bytes: png.length, tournamentId });
   }
 
   return persistPngResponse({ png, uploaderUserId: publisher.user.id });

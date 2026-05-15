@@ -160,6 +160,17 @@ type UploadedImage = {
   w640Url: string;
 };
 
+function isBrowserLocalImageSrc(src: string): boolean {
+  const s = src.trim();
+  return s.startsWith("blob:") || s.startsWith("data:");
+}
+
+function waitForNextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
 type CardTemplate = "A" | "B";
 type CardTheme = "dark" | "light" | "natural";
 
@@ -253,10 +264,13 @@ export default function ClientTournamentCardPublishV2Page() {
   /** 저장 중복 요청 차단 — ref로 동기 가드 */
   const saveInFlightRef = useRef(false);
   const mountedRef = useRef(true);
+  const captureImageObjectUrlRef = useRef<string | null>(null);
   const userEditedTextLine2Ref = useRef(false);
   const prizeAutoSeededRef = useRef(false);
   /** 모집중 게시 시 브라우저 PNG 캡처 대상 — `CardPublishPreview` 아트보드 루트 */
   const cardPublishPreviewCaptureRef = useRef<HTMLDivElement>(null);
+  /** 캡처용 미리보기 `<img src>` — 저장 URL과 분리된 브라우저 로컬 소스(blob/data). */
+  const [captureImageSrc, setCaptureImageSrc] = useState("");
 
   const handleTextLine2Change = useCallback((next: string) => {
     userEditedTextLine2Ref.current = true;
@@ -272,7 +286,8 @@ export default function ClientTournamentCardPublishV2Page() {
     const datePart = formatCardDateForDisplay(cardDate) || cardDate.trim() || "-";
     const placePart = venueNameOnly(cardPlace) || "-";
     const subtitle = `${datePart} · ${placePart}`;
-    const noBgImage = !uploadedImage?.w320Url;
+    const previewImageSrc = captureImageSrc.trim() || uploadedImage?.w320Url;
+    const noBgImage = !previewImageSrc;
     const noCssBg = !(mediaBackground || "").trim();
     const resolvedPreviewMediaBg =
       noBgImage && noCssBg ? DEFAULT_PREVIEW_MEDIA_BG : mediaBackground.trim();
@@ -287,7 +302,7 @@ export default function ClientTournamentCardPublishV2Page() {
       slideStatusBadge: publishIntent === "recruiting" ? "모집중" : "임시저장",
       slideExtra1: textLine1.length > 0 ? textLine1 : null,
       slideExtra2: textLine2.length > 0 ? textLine2 : null,
-      slideImage320Url: uploadedImage?.w320Url,
+      slideImage320Url: previewImageSrc,
       slideCardTemplate: cardTemplate,
       slideBackgroundType: backgroundType,
       slideThemeType: themeType,
@@ -318,6 +333,7 @@ export default function ClientTournamentCardPublishV2Page() {
     footerDateTextColor,
     footerPlaceTextColor,
     uploadedImage?.w320Url,
+    captureImageSrc,
     cardTemplate,
     backgroundType,
     themeType,
@@ -335,6 +351,56 @@ export default function ClientTournamentCardPublishV2Page() {
       mountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (captureImageObjectUrlRef.current) {
+        URL.revokeObjectURL(captureImageObjectUrlRef.current);
+        captureImageObjectUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  function clearCaptureImageSource(): void {
+    if (captureImageObjectUrlRef.current) {
+      URL.revokeObjectURL(captureImageObjectUrlRef.current);
+      captureImageObjectUrlRef.current = null;
+    }
+    setCaptureImageSrc("");
+  }
+
+  function setCaptureImageObjectUrl(nextUrl: string): void {
+    if (captureImageObjectUrlRef.current) {
+      URL.revokeObjectURL(captureImageObjectUrlRef.current);
+    }
+    captureImageObjectUrlRef.current = nextUrl;
+    setCaptureImageSrc(nextUrl);
+  }
+
+  async function createLocalObjectUrlFromStoredImage(url: string): Promise<string | null> {
+    const src = url.trim();
+    if (!src) return null;
+    try {
+      const response = await fetch(src, { credentials: "same-origin", cache: "force-cache" });
+      if (!response.ok) return null;
+      const blob = await response.blob();
+      if (!blob.type.toLowerCase().startsWith("image/") || blob.size <= 0) return null;
+      return URL.createObjectURL(blob);
+    } catch {
+      return null;
+    }
+  }
+
+  async function ensureLocalCaptureImageSource(): Promise<boolean> {
+    if (backgroundType !== "image" || !uploadedImage) return true;
+    if (isBrowserLocalImageSrc(captureImageSrc)) return true;
+
+    const localUrl = await createLocalObjectUrlFromStoredImage(uploadedImage.w640Url || uploadedImage.w320Url);
+    if (!localUrl) return false;
+    setCaptureImageObjectUrl(localUrl);
+    await waitForNextPaint();
+    return true;
+  }
 
   const loadSnapshots = useCallback(async () => {
     if (!tournamentId) return;
@@ -404,12 +470,14 @@ export default function ClientTournamentCardPublishV2Page() {
           pick.tournamentTheme === "light" ? "light" : pick.tournamentTheme === "natural" ? "natural" : "dark"
         );
         if (pick.tournamentBackgroundType === "image" && pick.image320Url?.trim()) {
+          clearCaptureImageSource();
           setUploadedImage({
             imageId: pick.imageId || "",
             w320Url: pick.image320Url,
             w640Url: pick.image640Url || pick.image320Url,
           });
         } else {
+          clearCaptureImageSource();
           setUploadedImage(null);
         }
         if (hasStoredV2Media(pick)) {
@@ -447,6 +515,7 @@ export default function ClientTournamentCardPublishV2Page() {
         setLeadTextColor("");
         setTitleTextColor("");
         setDescriptionTextColor("");
+        clearCaptureImageSource();
         setUploadedImage(null);
         setV2MediaMode("on");
         setMediaBackground(DEFAULT_CARD_MEDIA_BACKGROUND);
@@ -564,6 +633,16 @@ export default function ClientTournamentCardPublishV2Page() {
       if (publishIntent === "draft") {
         window.alert("대회카드가 임시저장되었습니다.");
         void router.refresh();
+        return;
+      }
+
+      if (!(await ensureLocalCaptureImageSource())) {
+        setPublishFlow({
+          percent: PUBLISH_PROGRESS_CARD_IMAGE.percent,
+          label: PUBLISH_PROGRESS_CARD_IMAGE.label,
+          hint: PUBLISH_PROGRESS_CARD_IMAGE.hint,
+        });
+        setPublishFlowError("배경 이미지를 캡처 가능한 브라우저 이미지로 준비하지 못했습니다. 이미지를 다시 선택해 주세요.");
         return;
       }
 
@@ -704,11 +783,13 @@ export default function ClientTournamentCardPublishV2Page() {
           setMessage(result.error ?? "이미지 업로드에 실패했습니다.");
           return;
         }
+        const localCaptureUrl = URL.createObjectURL(uploadFile);
         setUploadedImage({
           imageId: result.imageId,
           w320Url: result.w320Url,
           w640Url: result.w640Url,
         });
+        setCaptureImageObjectUrl(localCaptureUrl);
         setImageOverlayOpacity(DEFAULT_BG_IMAGE_OVERLAY_OPACITY);
         activateV2Media();
         setEditorTab("background");
@@ -722,6 +803,7 @@ export default function ClientTournamentCardPublishV2Page() {
   );
 
   const clearImage = useCallback(() => {
+    clearCaptureImageSource();
     setUploadedImage(null);
     setImageOverlayOpacity(DEFAULT_BG_IMAGE_OVERLAY_OPACITY);
     setMessage("이미지를 제거했습니다. 테마 배경으로 표시됩니다.");
