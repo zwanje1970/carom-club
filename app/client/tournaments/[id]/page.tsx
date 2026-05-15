@@ -5,7 +5,10 @@ import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/au
 import { getClientTournamentDetailPreviewById, getUserById } from "../../../../lib/platform-api";
 import { getLatestBracketByTournamentIdFirestore } from "../../../../lib/server/firestore-tournament-brackets";
 import { getTournamentApplicationListCountsFirestore } from "../../../../lib/server/firestore-tournament-applications";
-import { listCardSnapshotsByTournamentId } from "../../../../lib/server/platform-backing-store";
+import {
+  listCardSnapshotsByTournamentId,
+  type PublishedCardSnapshot,
+} from "../../../../lib/server/platform-backing-store";
 import { formatTournamentScheduleLabel } from "../../../../lib/tournament-schedule";
 import Link from "next/link";
 import TournamentBadgeCardManageRow from "./TournamentBadgeCardManageRow";
@@ -48,9 +51,15 @@ export default async function ClientTournamentManagePage({ params }: { params: P
     listCardSnapshotsByTournamentId(id),
   ]);
   const hasActivePublishedCard = cardSnapshots.some((s) => s.isPublished === true && s.isActive === true);
-  const hasInactiveDraftRow = cardSnapshots.some((s) => s.isPublished === true && s.isActive === false);
-  /** 활성 게시가 없을 때만(공개본 없음 + 비활성 초안 행 있음) 임시저장 뱃지 */
-  const hasDraftCardSnapshot = !hasActivePublishedCard && hasInactiveDraftRow;
+  /** 비활성 + 게시용 PNG 없음 = 초안 임시저장만. 비활성이어도 PNG 있으면 과거 게시·메인만료 등으로 임시저장과 구분 */
+  function isDraftOnlyInactiveSnapshot(s: PublishedCardSnapshot): boolean {
+    if (s.isPublished !== true || s.isActive !== false) return false;
+    const u640 = (s.publishedCardImageUrl ?? "").trim();
+    const u320 = (s.publishedCardImage320Url ?? "").trim();
+    const u480 = (s.publishedCardImage480Url ?? "").trim();
+    return !u640 && !u320 && !u480;
+  }
+  const hasDraftCardSnapshot = !hasActivePublishedCard && cardSnapshots.some(isDraftOnlyInactiveSnapshot);
   const scheduleLine = formatTournamentScheduleLabel(tournament);
   const bracketPlanEnabled =
     tournament.statusBadge === "마감" || tournament.statusBadge === "진행중" || tournament.statusBadge === "종료";

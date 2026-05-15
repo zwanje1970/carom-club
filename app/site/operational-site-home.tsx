@@ -1,10 +1,12 @@
 import {
   listTournamentSnapshotsForMainSite,
+  getMainSlideAdSettingsForSite,
 } from "../../lib/surface-read";
 import {
   listTournamentSnapshotsForMainSite as loadMainTournamentSnapshotsDirect,
 } from "../../lib/server/platform-backing-store";
-import { DEFAULT_MAIN_SLIDE_AD_CONFIG } from "../../lib/site/main-slide-stream";
+import type { MainSiteSlideAd } from "../../lib/site/main-slide-stream";
+import { mergeTournamentAndAdSlideDeckItems, normalizeMainSlideAdConfig } from "../../lib/site/main-slide-stream";
 import { slideDeckItemsToScrollCards } from "../../lib/site/slide-deck-items-to-scroll-cards";
 import { headers } from "next/headers";
 import { isCaromClubMobileAppShell } from "../../lib/is-carom-club-mobile-app-shell";
@@ -14,6 +16,7 @@ import SiteMainLogo from "./components/SiteMainLogo";
 import { MainSiteSlideSection } from "./main-site-slide-section";
 import type { SlideDeckItem } from "./tournament-snapshot-card-view";
 import type { PublishedCardSnapshot } from "../../lib/server/platform-backing-store";
+import { isMainSiteLoadDiagEnabled } from "../../lib/site/main-site-load-diag";
 
 /** `/site` 표시만 제외 — 테스트용 메인 슬라이드 광고 제목만 숨김 */
 function isMainSitePosterTestSlideItem(item: SlideDeckItem): boolean {
@@ -77,13 +80,35 @@ export default async function SiteOperationalHome() {
   const appShell = isCaromClubMobileAppShell(headerList);
   const publicMobileSiteChrome = false;
 
-  const mainSlideSnapshots = await loadMainSlideSnapshots();
+  const [mainSlideSnapshots, adSettings] = await Promise.all([
+    loadMainSlideSnapshots(),
+    getMainSlideAdSettingsForSite().catch(() => ({
+      config: normalizeMainSlideAdConfig(undefined),
+      activeAds: [] as MainSiteSlideAd[],
+    })),
+  ]);
 
   const tournamentDeckItems = mainSlideSnapshots.map(snapshotToTournamentSlideDeckItem);
-  const scrollItems = slideDeckItemsToScrollCards(
-    tournamentDeckItems.filter((item) => !isMainSitePosterTestSlideItem(item)),
+  const tournamentBaseForSlide = tournamentDeckItems.filter((item) => !isMainSitePosterTestSlideItem(item));
+  const initialSlideDeckItems = mergeTournamentAndAdSlideDeckItems(
+    tournamentBaseForSlide,
+    adSettings.activeAds,
+    adSettings.config,
   );
-  const heroPreloadUrls = collectHeroImagePreloadUrls(scrollItems);
+  const heroPreloadUrls = collectHeroImagePreloadUrls(slideDeckItemsToScrollCards(tournamentBaseForSlide));
+
+  if (isMainSiteLoadDiagEnabled()) {
+    const scrollForDiag = slideDeckItemsToScrollCards(initialSlideDeckItems);
+    const firstImageUrl = scrollForDiag[0]?.imageUrl?.trim() ?? "";
+    console.info("[site-main-load-diag:server]", "main card data ready", {
+      ts: Date.now(),
+      snapshotCount: mainSlideSnapshots.length,
+      scrollItemCount: scrollForDiag.length,
+      firstCardImageUrlPresent: firstImageUrl.length > 0,
+      ...(firstImageUrl ? { firstCardImageUrl: firstImageUrl } : {}),
+      heroPreloadCount: heroPreloadUrls.length,
+    });
+  }
 
   const homeBrandTitle = <span className="site-home-main-mobile-dock-brand-placeholder" aria-hidden="true" />;
 
@@ -101,9 +126,9 @@ export default async function SiteOperationalHome() {
         <div className="site-home-main-content-box">
           <section className="v3-stack site-home-slide-stack site-home-slide-stack--flush" style={{ gap: 0 }}>
             <MainSiteSlideSection
-              initialScrollItems={scrollItems}
+              initialSlideDeckItems={initialSlideDeckItems}
               tournamentDeckItems={tournamentDeckItems}
-              defaultSlideSpeedLevel={DEFAULT_MAIN_SLIDE_AD_CONFIG.cardMoveDurationSec}
+              defaultSlideSpeedLevel={adSettings.config.cardMoveDurationSec}
               publicMobileSiteChrome={publicMobileSiteChrome}
               logo={<SiteMainLogo />}
             />

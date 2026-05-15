@@ -6,6 +6,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import styles from "./main-sample/main-sample.module.css";
 import siteStyles from "./main-site-scroll-cards.module.css";
 import deckShellStyles from "./main-site-scroll-tournament-deck-shell.module.css";
+import { isMainSiteLoadDiagEnabled, logMainSiteLoadDiag } from "../../lib/site/main-site-load-diag";
 
 const SITE_SCROLL_CARD = "data-site-scroll-card";
 const SITE_SCROLL_SHORTCUT = "data-site-scroll-shortcut";
@@ -60,6 +61,8 @@ type CardRowProps = {
   lcpHeroImage?: boolean;
   /** 초기 뷰포트 근처 카드: lazy 완화 */
   prioritizeNearViewportImage?: boolean;
+  onLcpHeroImageLoad?: () => void;
+  onLcpHeroImageError?: () => void;
 };
 
 function cardSlotClassNames(base: string, selected: boolean, selectedMod?: string): string {
@@ -74,6 +77,8 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
   onShortcutActivate,
   lcpHeroImage = false,
   prioritizeNearViewportImage = false,
+  onLcpHeroImageLoad,
+  onLcpHeroImageError,
 }: CardRowProps) {
   const onPointerDown = useCallback(
     (e: PointerEvent<HTMLDivElement>) => {
@@ -167,6 +172,12 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
                             : prioritizeNearViewportImage
                               ? { fetchPriority: "auto" as const }
                               : {})}
+                          {...(lcpHeroImage
+                            ? {
+                                onLoad: () => onLcpHeroImageLoad?.(),
+                                onError: () => onLcpHeroImageError?.(),
+                              }
+                            : {})}
                         />
                         {item.slideDeckPngAdMark ? (
                           <span className={siteStyles.slideDeckPngAdMark} aria-hidden>
@@ -264,6 +275,44 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   }, [items]);
 
   const itemsIdsKey = items.length > 0 ? mainScrollIdsKey(items) : "";
+
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+
+  const mountLoggedRef = useRef(false);
+  const lcpHeroLoadLoggedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isMainSiteLoadDiagEnabled() || mountLoggedRef.current) return;
+    mountLoggedRef.current = true;
+    const first = items[lcpHeroItemIndex >= 0 ? lcpHeroItemIndex : 0];
+    logMainSiteLoadDiag("client-scroll", "MainSiteScrollCards mounted", {
+      itemCount: items.length,
+      lcpHeroItemIndex,
+      firstCardImageUrlPresent: Boolean(first?.imageUrl?.trim()),
+      firstCardId: first?.id ?? null,
+    });
+  }, [items, lcpHeroItemIndex]);
+
+  const onLcpHeroImageLoad = useCallback(() => {
+    if (!isMainSiteLoadDiagEnabled() || lcpHeroLoadLoggedRef.current) return;
+    lcpHeroLoadLoggedRef.current = true;
+    const hero = lcpHeroItemIndex >= 0 ? items[lcpHeroItemIndex] : items[0];
+    logMainSiteLoadDiag("client-scroll", "first card image load success", {
+      itemId: hero?.id ?? null,
+      imageUrl: hero?.imageUrl?.trim() ?? "",
+    });
+  }, [items, lcpHeroItemIndex]);
+
+  const onLcpHeroImageError = useCallback(() => {
+    if (!isMainSiteLoadDiagEnabled() || lcpHeroLoadLoggedRef.current) return;
+    lcpHeroLoadLoggedRef.current = true;
+    const hero = lcpHeroItemIndex >= 0 ? items[lcpHeroItemIndex] : items[0];
+    logMainSiteLoadDiag("client-scroll", "first card image load failed", {
+      itemId: hero?.id ?? null,
+      imageUrl: hero?.imageUrl?.trim() ?? "",
+    });
+  }, [items, lcpHeroItemIndex]);
 
   useLayoutEffect(() => {
     if (typeof window === "undefined") return;
@@ -503,23 +552,12 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       if (!start) return 0;
       let total = 0;
       let el: Element | null = start;
-      for (let i = 0; i < items.length && el; i++) {
+      for (let i = 0; i < itemsRef.current.length && el; i++) {
         if (!(el instanceof HTMLElement)) break;
         total += el.offsetHeight;
         el = el.nextElementSibling;
       }
       return Number.isFinite(total) && total > 0 ? total : 0;
-    };
-
-    const isMainScrollDevDiag = process.env.NODE_ENV === "development";
-    let devDiagLastLogMs = 0;
-    let devDiagLastPxPerSec = -1;
-    const readViewportLeadInPaddingTop = () => {
-      if (!isMainScrollDevDiag) return 0;
-      const v = viewportRef.current;
-      if (!v) return 0;
-      const pt = Number.parseFloat(window.getComputedStyle(v).paddingTop || "0");
-      return Number.isFinite(pt) && pt > 0 ? pt : 0;
     };
 
     const stopAutoSlide = () => {
@@ -624,11 +662,8 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       const deltaTotal = pxPerSec * dtSec + carryBefore;
       scrollPixelCarryRef.current = deltaTotal % 1;
       let nextScrollTop = node.scrollTop + deltaTotal;
-      const nextScrollTopBeforeWrap = nextScrollTop;
-      let wrappedCount = 0;
       while (nextScrollTop >= loopEnd && loopDistance > 0) {
         nextScrollTop -= loopDistance;
-        wrappedCount += 1;
       }
       /**
        * 루프 보정 후 좌표가 상단 리드인(spacer)으로 떨어지지 않도록
@@ -638,55 +673,10 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
         nextScrollTop = firstStart + ((nextScrollTop - firstStart) % loopDistance + loopDistance) % loopDistance;
       }
 
-      const scrollTopBefore = node.scrollTop;
       const appliedScrollTop = Math.min(nextScrollTop, maxScrollTop);
       // programmatic scrollTop 변경 직후 발생하는 scroll 이벤트를 사용자 입력으로 오인하지 않도록 보호
       programmaticScrollUntilMsRef.current = performance.now() + 160;
       node.scrollTop = appliedScrollTop;
-      const scrollTopReadBack = node.scrollTop;
-
-      if (isMainScrollDevDiag) {
-        const nowMs = performance.now();
-        const scrollMismatch = Math.abs(scrollTopReadBack - appliedScrollTop) > 1;
-        const pxJumped =
-          devDiagLastPxPerSec > 0 && Math.abs(pxPerSec - devDiagLastPxPerSec) > devDiagLastPxPerSec * 0.2;
-        const routineDue = nowMs - devDiagLastLogMs >= 1000;
-        const bumpDue = scrollMismatch || pxJumped;
-        if (routineDue || (bumpDue && nowMs - devDiagLastLogMs >= 250)) {
-          devDiagLastLogMs = nowMs;
-          devDiagLastPxPerSec = pxPerSec;
-          console.info("[main-scroll-diag]", {
-            speedLevel,
-            baseTravelSec,
-            clientH,
-            viewportPaddingTop: readViewportLeadInPaddingTop(),
-            pxPerSec,
-            speedSource,
-            usingFallback24: speedSource === "fallback",
-            dtSec,
-            deltaTotal,
-            carryBefore,
-            carryAfter: scrollPixelCarryRef.current,
-            scrollTopBefore,
-            nextScrollTopBeforeWrap,
-            nextScrollTop,
-            appliedScrollTop,
-            scrollTopReadBack,
-            scrollMismatch,
-            wrappedCount,
-            loopDistance,
-            loopEnd,
-            primarySegmentOffsetTop: primaryOffset,
-            secondarySegmentOffsetTop: secondaryOffset,
-            trackOffsetTop: trackStart,
-            firstStart,
-            secondStart,
-            segmentHeight,
-            scrollHeight: node.scrollHeight,
-            maxScrollTop,
-          });
-        }
-      }
 
       rafRef.current = requestAnimationFrame(step);
     };
@@ -727,11 +717,11 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     return () => {
       try {
         const node = viewportRef.current;
-        if (node && items.length > 0) {
+        if (node && itemsRef.current.length > 0) {
           const maxScroll = Math.max(1, node.scrollHeight - node.clientHeight);
           const payload: MainSiteScrollStoredV2 = {
             v: 2,
-            idsKey: mainScrollIdsKey(items),
+            idsKey: mainScrollIdsKey(itemsRef.current),
             scrollTop: node.scrollTop,
             progressRatio: Math.min(1, Math.max(0, node.scrollTop / maxScroll)),
           };
@@ -755,7 +745,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       programmaticScrollUntilMsRef.current = 0;
       scrollPixelCarryRef.current = 0;
     };
-  }, [items, slideCardMoveSpeedLevel, selectedItemId, autoSlideReady]);
+  }, [itemsIdsKey, items.length, slideCardMoveSpeedLevel, selectedItemId, autoSlideReady]);
 
   if (items.length === 0) {
     return (
@@ -790,6 +780,8 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
               onShortcutActivate={clearAutoDeselectTimer}
               lcpHeroImage={lcpHeroImage}
               prioritizeNearViewportImage={prioritizeNearViewportImage}
+              onLcpHeroImageLoad={lcpHeroImage ? onLcpHeroImageLoad : undefined}
+              onLcpHeroImageError={lcpHeroImage ? onLcpHeroImageError : undefined}
             />
           </div>
         );

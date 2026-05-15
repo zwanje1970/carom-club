@@ -19,28 +19,33 @@ const DEFAULT_BG_IMAGE_OVERLAY_OPACITY = 1;
 
 const KO_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
-/** 모집중 게시 단계형 진행(실제 비율 아님). */
+/** 모집중 게시 단계형 진행(단계 전환 시에만 % 변경, 타이머 가짜 증가 없음). */
 const PUBLISH_PROGRESS_DRAFT_SAVE = {
   percent: 20,
-  label: "카드 초안을 저장하고 있습니다.",
+  label: "초안 저장 중",
 };
 const PUBLISH_PROGRESS_STATUS_PATCH = {
   percent: 40,
-  label: "대회 상태를 모집중으로 변경하고 있습니다.",
+  label: "대회 상태 변경 중",
 };
 const PUBLISH_PROGRESS_CARD_IMAGE = {
-  percent: 60,
-  label: "서버에서 게시용 이미지를 만들고 있습니다.",
+  percent: 70,
+  label: "카드 이미지 생성 중",
+  hint: "카드 이미지 생성 중입니다. 잠시만 기다려 주세요.",
 };
 const PUBLISH_PROGRESS_MAIN_SAVE = {
-  percent: 80,
-  label: "메인 게시 데이터를 저장하고 있습니다.",
+  percent: 90,
+  label: "게시 데이터 저장 중",
 };
 const PUBLISH_PROGRESS_DONE = {
   percent: 100,
-  label: "게시가 완료되었습니다.",
+  label: "게시 완료",
 };
 const PUBLISH_FLOW_FAIL_KO = "게시 이미지 생성 또는 저장에 실패했습니다. 다시 게시해 주세요.";
+const PUBLISH_DRAFT_SAVE_FAIL_KO = "초안 저장에 실패했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.";
+const PUBLISH_STATUS_PATCH_FAIL_KO = PUBLISH_FLOW_FAIL_KO;
+
+type PublishFlowState = { percent: number; label: string; hint?: string };
 
 /** `2026-05-09 (일)` — 저장/미리보기 입력값과 동일 형식 */
 function formatCardDateForDisplay(raw: string): string {
@@ -236,8 +241,8 @@ export default function ClientTournamentCardPublishV2Page() {
   const [message, setMessage] = useState("");
   const [publishBusy, setPublishBusy] = useState(false);
   const [publishCompleteModalOpen, setPublishCompleteModalOpen] = useState(false);
-  /** 모집중 게시 진행(단계형 % + 한 줄 설명) */
-  const [publishFlow, setPublishFlow] = useState<{ percent: number; label: string } | null>(null);
+  /** 모집중 게시 진행(단계형 % + 문구) */
+  const [publishFlow, setPublishFlow] = useState<PublishFlowState | null>(null);
   const [publishFlowError, setPublishFlowError] = useState("");
   /** `loadSnapshots` 기준 대회 배지 — 게시 실패 시 PATCH 롤백용 */
   const [tournamentStatusBadge, setTournamentStatusBadge] = useState("");
@@ -546,7 +551,10 @@ export default function ClientTournamentCardPublishV2Page() {
       }
 
       if (!(await persistCardDraftSnapshot())) {
-        if (recruitingPublish) setPublishFlow(null);
+        if (recruitingPublish) {
+          setPublishFlow({ percent: PUBLISH_PROGRESS_DRAFT_SAVE.percent, label: PUBLISH_PROGRESS_DRAFT_SAVE.label });
+          setPublishFlowError(PUBLISH_DRAFT_SAVE_FAIL_KO);
+        }
         return;
       }
 
@@ -571,7 +579,7 @@ export default function ClientTournamentCardPublishV2Page() {
           percent: PUBLISH_PROGRESS_STATUS_PATCH.percent,
           label: PUBLISH_PROGRESS_STATUS_PATCH.label,
         });
-        setPublishFlowError(PUBLISH_FLOW_FAIL_KO);
+        setPublishFlowError(PUBLISH_STATUS_PATCH_FAIL_KO);
         return;
       }
 
@@ -583,6 +591,7 @@ export default function ClientTournamentCardPublishV2Page() {
             setPublishFlow({
               percent: PUBLISH_PROGRESS_CARD_IMAGE.percent,
               label: PUBLISH_PROGRESS_CARD_IMAGE.label,
+              hint: PUBLISH_PROGRESS_CARD_IMAGE.hint,
             });
           } else if (phase === "before-post") {
             setPublishFlow({
@@ -608,7 +617,9 @@ export default function ClientTournamentCardPublishV2Page() {
             console.warn("[card-publish-v2] status-badge revert threw");
           }
         }
-        setPublishFlowError(PUBLISH_FLOW_FAIL_KO);
+        setPublishFlowError(
+          typeof pub.error === "string" && pub.error.trim() ? pub.error.trim() : PUBLISH_FLOW_FAIL_KO,
+        );
         void loadSnapshots();
         void router.refresh();
         return;
@@ -631,7 +642,14 @@ export default function ClientTournamentCardPublishV2Page() {
       }, 380);
     } catch {
       if (recruitingPublish) {
-      setPublishFlowError(PUBLISH_FLOW_FAIL_KO);
+        setPublishFlow((prev) =>
+          prev ?? {
+            percent: PUBLISH_PROGRESS_CARD_IMAGE.percent,
+            label: PUBLISH_PROGRESS_CARD_IMAGE.label,
+            hint: PUBLISH_PROGRESS_CARD_IMAGE.hint,
+          },
+        );
+        setPublishFlowError(PUBLISH_FLOW_FAIL_KO);
       } else {
         window.alert("처리 중 오류가 발생했습니다.");
       }
@@ -900,7 +918,7 @@ export default function ClientTournamentCardPublishV2Page() {
                 role="status"
                 aria-live="polite"
                 aria-busy={Boolean(publishBusy && publishIntent === "recruiting" && !publishFlowError && publishFlow)}
-                className={`${editorStyles.publishStatusSlot} ${publishFlow || publishFlowError ? editorStyles.publishStatusSlotActive : ""}`}
+                className={`${editorStyles.publishStatusSlot} ${publishFlow || publishFlowError ? editorStyles.publishStatusSlotActive : ""} ${publishFlowError ? editorStyles.publishStatusSlotError : ""}`}
               >
                 <div className={editorStyles.publishStatusTextRow}>
                   {!publishFlow && !publishFlowError ? (
@@ -914,13 +932,16 @@ export default function ClientTournamentCardPublishV2Page() {
                     </>
                   ) : null}
                 </div>
+                {publishFlow?.hint ? (
+                  <p className={editorStyles.publishStatusHint}>{publishFlow.hint}</p>
+                ) : null}
                 <div
-                  className={`${editorStyles.publishStatusBarTrack} ${!publishFlow ? editorStyles.publishStatusBarTrackIdle : ""}`}
-                  aria-hidden={!publishFlow}
+                  className={`${editorStyles.publishStatusBarTrack} ${!publishFlow && !publishFlowError ? editorStyles.publishStatusBarTrackIdle : ""} ${publishFlowError ? editorStyles.publishStatusBarTrackError : ""}`}
+                  aria-hidden={!publishFlow && !publishFlowError}
                 >
                   {publishFlow ? (
                     <div
-                      className={editorStyles.publishStatusBarFill}
+                      className={`${editorStyles.publishStatusBarFill} ${publishFlowError ? editorStyles.publishStatusBarFillError : ""}`}
                       style={{ width: `${publishFlow.percent}%` }}
                     />
                   ) : null}

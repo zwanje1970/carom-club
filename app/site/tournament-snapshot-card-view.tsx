@@ -20,6 +20,8 @@ export type SlideDeckItem = {
   linkType?: "internal" | "external";
   /** type === "ad"일 때 집계용 id */
   mainSlideAdId?: string;
+  /** 메인 세로 덱: 광고 지연 로드 시에도 `MainSiteScrollCardItem.id` 고정용(미설정 시 snapshotId+index) */
+  mainSlideScrollStableId?: string;
   snapshotId: string;
   title: string;
   subtitle: string;

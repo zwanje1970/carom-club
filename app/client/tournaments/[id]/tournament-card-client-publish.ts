@@ -308,7 +308,10 @@ export async function publishTournamentCardFromEditorClient(args: {
   });
   const postData = (await postRes.json()) as { error?: string };
   if (!postRes.ok) {
-    return { ok: false, error: postData.error ?? "게시에 실패했습니다." };
+    if (postData.error) {
+      console.warn("[publishTournamentCardFromEditorClient] draftOnly:false POST failed", postData.error);
+    }
+    return { ok: false, error: SERVER_CARD_IMAGE_FAIL_KO };
   }
 
   return { ok: true, hadPublishedBefore };

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { existsSync, readdirSync } from "fs";
+import { existsSync, readFileSync, readdirSync } from "fs";
 import path from "path";
 import { Resvg } from "@resvg/resvg-js";
 import sharp from "sharp";
@@ -43,14 +43,22 @@ const THEME_BACKGROUNDS: Record<"dark" | "light" | "natural", string> = {
   natural: "#166534",
 };
 
-function getBundledKoreanFontFiles(): string[] {
-  const dir = path.join(
+let bundledKoreanFontBuffers: Buffer[] | null = null;
+
+function getBundledKoreanFontDir(): string {
+  return path.join(
     /* turbopackIgnore: true */ process.cwd(),
     "node_modules",
     "@fontsource-variable",
     "noto-sans-kr",
     "files",
   );
+}
+
+/** resvg는 fontFiles 경로 로딩이 환경에 따라 실패할 수 있어, woff2 전체를 메모리에 적재한다. */
+function getBundledKoreanFontBuffers(): Buffer[] {
+  if (bundledKoreanFontBuffers) return bundledKoreanFontBuffers;
+  const dir = getBundledKoreanFontDir();
   if (!existsSync(dir)) {
     throw new Error("Noto Sans KR font directory is missing.");
   }
@@ -60,7 +68,8 @@ function getBundledKoreanFontFiles(): string[] {
   if (files.length === 0) {
     throw new Error("Noto Sans KR font files are missing.");
   }
-  return files;
+  bundledKoreanFontBuffers = files.map((filePath) => readFileSync(filePath));
+  return bundledKoreanFontBuffers;
 }
 
 function esc(raw: unknown): string {
@@ -149,9 +158,15 @@ function textBlock(params: {
   if (params.lines.length === 0) return "";
   const makeText = (dx: number, dy: number, fill: string, opacity?: number) => {
     const spans = params.lines
-      .map((line, idx) => `<tspan x="${params.x + dx}" dy="${idx === 0 ? 0 : lineHeight}">${esc(line)}</tspan>`)
+      .map((line, idx) => {
+        const x = params.x + dx;
+        if (idx === 0) {
+          return `<tspan x="${x}" y="${params.y + dy}">${esc(line)}</tspan>`;
+        }
+        return `<tspan x="${x}" dy="${lineHeight}">${esc(line)}</tspan>`;
+      })
       .join("");
-    return `<text x="${params.x + dx}" y="${params.y + dy}" fill="${esc(fill)}" font-size="${params.fontSize}" font-weight="${params.fontWeight}" font-family="${CARD_FONT_FAMILY}" text-anchor="${anchor}"${opacity != null ? ` opacity="${opacity}"` : ""}>${spans}</text>`;
+    return `<text fill="${esc(fill)}" font-size="${params.fontSize}" font-weight="${params.fontWeight}" font-family="${CARD_FONT_FAMILY}" text-anchor="${anchor}"${opacity != null ? ` opacity="${opacity}"` : ""}>${spans}</text>`;
   };
   const shadow = params.shadow ? makeText(0, 2, "#000000", 0.5) : "";
   return `${shadow}${makeText(0, 0, params.color)}`;
@@ -182,7 +197,7 @@ function singleLineText(params: {
 export function getTournamentPublishedCardRendererDiagnostics(): {
   bundledKoreanFontFileCount: number;
 } {
-  return { bundledKoreanFontFileCount: getBundledKoreanFontFiles().length };
+  return { bundledKoreanFontFileCount: getBundledKoreanFontBuffers().length };
 }
 
 function statusKind(raw: string): "recruiting" | "closing" | "full" | "live" | "ended" {
@@ -215,13 +230,33 @@ function statusBadgeSvg(raw: string): string {
   const tspans =
     badge.length > 1
       ? badge
-          .map((line, idx) => `<tspan x="${cx}" dy="${idx === 0 ? -3 : 19}">${esc(line)}</tspan>`)
+          .map((line, idx) => {
+            if (idx === 0) return `<tspan x="${cx}" y="${cy - 3}">${esc(line)}</tspan>`;
+            return `<tspan x="${cx}" dy="19">${esc(line)}</tspan>`;
+          })
           .join("")
-      : `<tspan x="${cx}" dy="7">${esc(badge[0])}</tspan>`;
+      : `<tspan x="${cx}" y="${cy + 7}">${esc(badge[0])}</tspan>`;
   return `
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${gradientId})" stroke="#fff" stroke-width="3" filter="url(#badgeShadow)" />
-    <text x="${cx}" y="${cy}" fill="#fafaf9" font-size="${fontSize}" font-weight="800" font-family="${CARD_FONT_FAMILY}" text-anchor="middle" dominant-baseline="middle">${tspans}</text>
+    <text fill="#fafaf9" font-size="${fontSize}" font-weight="800" font-family="${CARD_FONT_FAMILY}" text-anchor="middle">${tspans}</text>
   `;
+}
+
+function assertPublishedCardSvgHasText(
+  svg: string,
+  payload: { title: string; subtitle?: string },
+): void {
+  if (!/<text[\s>]/.test(svg)) {
+    throw new Error("Published card SVG text layer is missing.");
+  }
+  const title = payload.title.trim() || "(제목)";
+  if (!svg.includes(esc(title))) {
+    throw new Error("Published card SVG is missing title text.");
+  }
+  const { dateText, placeText } = parseSubtitle(payload.subtitle ?? "");
+  if (!svg.includes(esc(dateText)) || !svg.includes(esc(placeText))) {
+    throw new Error("Published card SVG is missing footer text.");
+  }
 }
 
 function resolveThemeBackground(payload: TournamentPublishedCardImagePayload): string {
@@ -423,26 +458,28 @@ export async function renderTournamentPublishedCardPng(params: {
       </g>
     </svg>
   `;
-  if (!/<text[\s>]/.test(svg)) {
-    throw new Error("Published card SVG text layer is missing.");
-  }
-  const fontFiles = getBundledKoreanFontFiles();
+  assertPublishedCardSvgHasText(svg, payload);
+
+  type ResvgFontConfig = NonNullable<ConstructorParameters<typeof Resvg>[1]>["font"] & {
+    fontBuffers?: Buffer[];
+  };
 
   const rendered = new Resvg(svg, {
     fitTo: { mode: "width", value: RASTER_WIDTH },
     font: {
       loadSystemFonts: false,
-      fontFiles,
+      fontBuffers: getBundledKoreanFontBuffers(),
       defaultFontFamily: "Noto Sans KR Variable",
       sansSerifFamily: "Noto Sans KR Variable",
-    },
-    textRendering: 1,
-    shapeRendering: 2,
-    imageRendering: 0,
-    logLevel: "off",
+    } as ResvgFontConfig,
   })
     .render()
     .asPng();
 
-  return sharp(rendered).png({ compressionLevel: 9, adaptiveFiltering: true }).toBuffer();
+  const rasterized =
+    (await sharp(rendered).metadata()).width === RASTER_WIDTH
+      ? rendered
+      : await sharp(rendered).resize({ width: RASTER_WIDTH, withoutEnlargement: false }).png().toBuffer();
+
+  return sharp(rasterized).png({ compressionLevel: 9, adaptiveFiltering: true }).toBuffer();
 }

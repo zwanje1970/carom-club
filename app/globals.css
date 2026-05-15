@@ -3494,25 +3494,61 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   flex-direction: column;
 }
 
-/* 목록↔상세 슬라이드 트랙 — 전환 중 흰 빈 판 노출 방지 */
+/*
+ * 목록↔상세 슬라이드 — 뒤로가기 시 트랙이 -100%에서 진입하므로, 빈 뷰포트 슬롯은
+ * standard 헤더(.site-home-top-white--standard) 청색과 맞춤. (#fff면 헤더 자리가 백색으로 깜빡임)
+ */
 .site-community-list-detail-transition-viewport,
 .site-tournaments-list-detail-transition-viewport,
 .site-venues-list-detail-transition-viewport {
-  background-color: #ffffff;
+  background-color: #4d7db5;
+  overflow: hidden;
 }
 
 .site-community-list-detail-transition-track,
 .site-tournaments-list-detail-transition-track,
 .site-venues-list-detail-transition-track {
-  background-color: #ffffff;
+  background-color: #4d7db5;
   min-height: 100%;
 }
 
+.site-community-list-detail-transition-list-pane,
+.site-tournaments-list-detail-transition-list-pane,
+.site-venues-list-detail-transition-list-pane,
 .site-community-list-detail-transition-detail-pane,
 .site-tournaments-list-detail-transition-detail-pane,
 .site-venues-list-detail-transition-detail-pane {
-  background-color: #ffffff;
+  background-color: #4d7db5;
   min-height: 100%;
+}
+
+.site-community-list-detail-transition-list-pane,
+.site-tournaments-list-detail-transition-list-pane,
+.site-venues-list-detail-transition-list-pane {
+  display: flex;
+  flex-direction: column;
+}
+
+/* transform 슬라이드 중 상단 고정 크롬(청 헤더·필터 dock) 배경 유지 */
+.site-community-list-detail-transition-track > main.site-home-page--standard .site-shell-sticky-dock,
+.site-tournaments-list-detail-transition-track > main.site-home-page--standard .site-shell-sticky-dock,
+.site-venues-list-detail-transition-track > main.site-home-page--standard .site-shell-sticky-dock,
+.site-community-list-detail-transition-list-pane > main.site-home-page--standard .site-shell-sticky-dock,
+.site-tournaments-list-detail-transition-list-pane > main.site-home-page--standard .site-shell-sticky-dock,
+.site-venues-list-detail-transition-list-pane > main.site-home-page--standard .site-shell-sticky-dock,
+.site-community-list-detail-transition-detail-pane > main.site-home-page--standard .site-shell-sticky-dock,
+.site-tournaments-list-detail-transition-detail-pane > main.site-home-page--standard .site-shell-sticky-dock,
+.site-venues-list-detail-transition-detail-pane > main.site-home-page--standard .site-shell-sticky-dock,
+.site-community-list-detail-transition-track > main.site-home-page--standard .site-home-top-white--standard,
+.site-tournaments-list-detail-transition-track > main.site-home-page--standard .site-home-top-white--standard,
+.site-venues-list-detail-transition-track > main.site-home-page--standard .site-home-top-white--standard,
+.site-community-list-detail-transition-list-pane > main.site-home-page--standard .site-home-top-white--standard,
+.site-tournaments-list-detail-transition-list-pane > main.site-home-page--standard .site-home-top-white--standard,
+.site-venues-list-detail-transition-list-pane > main.site-home-page--standard .site-home-top-white--standard,
+.site-community-list-detail-transition-detail-pane > main.site-home-page--standard .site-home-top-white--standard,
+.site-tournaments-list-detail-transition-detail-pane > main.site-home-page--standard .site-home-top-white--standard,
+.site-venues-list-detail-transition-detail-pane > main.site-home-page--standard .site-home-top-white--standard {
+  background-color: #4d7db5;
 }
 
 /* 목록 로딩 스켈레톤 — PC·기본: 카드형; 모바일 UA 표준 페이지에서는 아래 블록에서 디바이더형으로 덮음 */

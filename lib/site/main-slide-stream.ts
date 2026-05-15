@@ -294,13 +294,14 @@ export function mergeMainSiteSlideAdsFromAdminPayload(
   return out;
 }
 
-function adToSlideDeckItem(ad: MainSiteSlideAd): SlideDeckItem {
+function adToSlideDeckItem(ad: MainSiteSlideAd, stableScrollId: string): SlideDeckItem {
   const title = (ad.adName ?? ad.title ?? "").trim() || "광고";
   return {
     type: "ad",
     linkType: "external",
     snapshotId: `main-slide-ad:${ad.id}`,
     mainSlideAdId: ad.id,
+    mainSlideScrollStableId: stableScrollId,
     title,
     subtitle: " · ",
     targetDetailUrl: ad.externalLink.trim(),
@@ -311,6 +312,27 @@ function adToSlideDeckItem(ad: MainSiteSlideAd): SlideDeckItem {
     cardExtraLine3: null,
     cardTemplate: "A",
     backgroundType: "image",
+    themeType: "dark",
+  };
+}
+
+/** 광고 API 지연 구간 — 슬롯 높이·덱 길이만 유지(이미지·링크는 이후 치환) */
+export function mainSlideAdPlaceholderSlideDeckItem(stableScrollId: string): SlideDeckItem {
+  return {
+    type: "ad",
+    linkType: "external",
+    snapshotId: stableScrollId,
+    mainSlideScrollStableId: stableScrollId,
+    title: "\u00a0",
+    subtitle: " · ",
+    targetDetailUrl: "https://carom.club/site",
+    image320Url: "",
+    statusBadge: "진행",
+    cardExtraLine1: "",
+    cardExtraLine2: null,
+    cardExtraLine3: null,
+    cardTemplate: "A",
+    backgroundType: "theme",
     themeType: "dark",
   };
 }
@@ -416,9 +438,9 @@ function computeVirtualTournamentCycleLength(
 
 /**
  * 대회 카드 스트림에 광고를 삽입한다.
- * enabled·간격·개수·max·활성 광고 없음이면 대회만(타입 메타만 보강) 반환.
- * 광고가 켜진 경우: 대회는 `base[index % base.length]` 순환 스트림으로 간주하고,
- * 한 캐러셀 주기(LCM·순차 광고 주기)만큼 가상 슬롯을 펼쳐 삽입한다.
+ * enabled·간격·개수·max가 유효하지 않으면 대회만(타입 메타만 보강) 반환.
+ * enabled이고 활성 광고가 없으면: **광고 슬롯만** placeholder로 채워 길이·간격을 고정(지연 로드용).
+ * 광고가 있으면: 동일 슬롯 규칙으로 실제 광고 행을 넣고 `mainSlideScrollStableId`로 스크롤 행 id를 슬롯별 고정.
  */
 export function mergeTournamentAndAdSlideDeckItems(
   tournamentItems: SlideDeckItem[],
@@ -435,13 +457,7 @@ export function mergeTournamentAndAdSlideDeckItems(
     maxAdsPerCycle,
   } = config;
 
-  if (
-    !enabled ||
-    insertInterval <= 0 ||
-    adsPerInsert <= 0 ||
-    maxAdsPerCycle <= 0 ||
-    activeAdsInOrder.length === 0
-  ) {
+  if (!enabled || insertInterval <= 0 || adsPerInsert <= 0 || maxAdsPerCycle <= 0) {
     return base;
   }
 
@@ -450,8 +466,10 @@ export function mergeTournamentAndAdSlideDeckItems(
     return base;
   }
 
-  const adsForPick =
-    rotationMode === "sequential"
+  const placeholderOnly = activeAdsInOrder.length === 0;
+  const adsForPick = placeholderOnly
+    ? []
+    : rotationMode === "sequential"
       ? [...activeAdsInOrder].sort((a, b) => {
           const dw = effectiveMainSlideAdWeight(b) - effectiveMainSlideAdWeight(a);
           if (dw !== 0) return dw;
@@ -459,15 +477,12 @@ export function mergeTournamentAndAdSlideDeckItems(
         })
       : activeAdsInOrder;
 
-  const virtualLen = computeVirtualTournamentCycleLength(
-    n,
-    insertInterval,
-    adsForPick.length,
-    rotationMode,
-  );
+  const cycleAdsLen = placeholderOnly ? 1 : Math.max(1, adsForPick.length);
+  const virtualLen = computeVirtualTournamentCycleLength(n, insertInterval, cycleAdsLen, rotationMode);
 
   let seqCursor = 0;
   let adsInserted = 0;
+  let adSlotOrdinal = 0;
   const out: SlideDeckItem[] = [];
   let sinceInsert = 0;
 
@@ -490,11 +505,36 @@ export function mergeTournamentAndAdSlideDeckItems(
     sinceInsert = 0;
     for (let k = 0; k < adsPerInsert; k += 1) {
       if (adsInserted >= maxAdsPerCycle) break;
-      const ad = pickAd();
-      if (!ad) break;
+      const stableId = `main-slide-ad-slot-${adSlotOrdinal}`;
+      adSlotOrdinal += 1;
       adsInserted += 1;
-      out.push(adToSlideDeckItem(ad));
+      const ad = pickAd();
+      if (!ad) {
+        out.push(mainSlideAdPlaceholderSlideDeckItem(stableId));
+      } else {
+        out.push(adToSlideDeckItem(ad, stableId));
+      }
     }
   }
   return out;
+}
+
+/**
+ * 지연 로드 후 실제 덱과 기존 placeholder 덱의 길이가 같을 때,
+ * 광고 슬롯의 `mainSlideScrollStableId`를 이전 값으로 맞춰 스크롤 id·레이아웃을 유지한다.
+ */
+export function alignMainSlideAdDeckStableScrollIds(
+  previous: SlideDeckItem[],
+  next: SlideDeckItem[],
+): SlideDeckItem[] {
+  if (previous.length !== next.length) return next;
+  return next.map((item, i) => {
+    const prevItem = previous[i];
+    const sid =
+      typeof prevItem?.mainSlideScrollStableId === "string" ? prevItem.mainSlideScrollStableId.trim() : "";
+    if (item.type === "ad" && sid) {
+      return { ...item, mainSlideScrollStableId: sid };
+    }
+    return item;
+  });
 }

@@ -6,7 +6,11 @@ export function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScr
   return items.map((item, index) => {
     const href = (item.targetDetailUrl ?? "").trim() || "/site/tournaments";
     const external = item.linkType === "external" || /^https?:\/\//i.test(href);
-    const rowId = `${item.snapshotId}__m${index}`;
+    const stableScroll =
+      typeof item.mainSlideScrollStableId === "string" && item.mainSlideScrollStableId.trim()
+        ? item.mainSlideScrollStableId.trim()
+        : "";
+    const rowId = stableScroll || `${item.snapshotId}__m${index}`;
 
     if (item.type === "ad") {
       const published640 = (item.publishedCardImageUrl ?? "").trim();
