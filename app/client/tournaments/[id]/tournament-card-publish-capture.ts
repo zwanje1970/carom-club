@@ -86,47 +86,58 @@ async function waitForAllImagesStrict(root: HTMLElement): Promise<void> {
   await Promise.all(imgs.map((img) => waitForImageElementStrict(img)));
 }
 
-/** http(s) 배경만 — 미리보기는 crossOrigin 없이 표시하고, 캡처 직전에만 anonymous 재로드(html2canvas). */
-function shouldCoerceImageCrossOriginForCapture(src: string): boolean {
-  const t = src.trim();
-  if (!t) return false;
-  if (t.startsWith("blob:") || t.startsWith("data:")) return false;
-  return /^https?:/i.test(t);
-}
-
 /**
- * html2canvas(`allowTaint: false`)용: 루트 내 http(s) 이미지에 `crossOrigin="anonymous"` 후 재로드.
- * 편집 미리보기에서는 붙이지 않아 스토리지 CORS 미설정 시에도 배경이 보이게 한다.
+ * html2canvas 결과가 검은 단색·빈 단색·극단적으로 평탄한 비트맵이면 저장하지 않는다.
+ * (글자 OCR은 하지 않고, 픽셀 분포로 “카드가 찍혔는지”만 본다.)
  */
-async function preparePreviewRootImagesForCanvasCapture(root: HTMLElement): Promise<void> {
-  const jobs: Promise<void>[] = [];
-  for (const img of root.querySelectorAll<HTMLImageElement>("img")) {
-    const src = (img.currentSrc || img.src || "").trim();
-    if (!shouldCoerceImageCrossOriginForCapture(src)) continue;
-    if (img.crossOrigin === "anonymous") continue;
-    jobs.push(
-      new Promise<void>((resolve, reject) => {
-        const onLoad = () => {
-          img.removeEventListener("error", onError);
-          const s = (img.currentSrc || img.src || "").trim();
-          if (img.naturalWidth === 0 && s) {
-            reject(new Error(`배경 이미지 CORS 재로드 후 크기가 0입니다: ${s}`));
-          } else {
-            resolve();
-          }
-        };
-        const onError = () => {
-          img.removeEventListener("load", onLoad);
-          reject(new Error(`배경 이미지 CORS 재로드 실패: ${src}`));
-        };
-        img.addEventListener("load", onLoad, { once: true });
-        img.addEventListener("error", onError, { once: true });
-        img.crossOrigin = "anonymous";
-        img.src = src;
-      }),
+function assertPublishedCardCanvasHasLikelyContent(canvas: HTMLCanvasElement): void {
+  const w = canvas.width;
+  const h = canvas.height;
+  if (w < 40 || h < 40) {
+    throw new Error("게시 카드 캡처 크기가 비정상입니다.");
+  }
+  const ctx = canvas.getContext("2d", { willReadFrequently: true }) ?? canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("게시 카드 캡처를 분석할 수 없습니다.");
+  }
+  let imageData: ImageData;
+  try {
+    imageData = ctx.getImageData(0, 0, w, h);
+  } catch {
+    throw new Error(
+      "캡처 이미지를 읽을 수 없습니다. 외부 배경 이미지 정책을 확인한 뒤 다시 시도해 주세요.",
     );
   }
-  await Promise.all(jobs);
+  const d = imageData.data;
+  const stepX = Math.max(1, Math.floor(w / 48));
+  const stepY = Math.max(1, Math.floor(h / 24));
+  const lum: number[] = [];
+  for (let y = 1; y < h - 1; y += stepY) {
+    for (let x = 1; x < w - 1; x += stepX) {
+      const i = (Math.floor(y) * w + Math.floor(x)) * 4;
+      const r = d[i] ?? 0;
+      const g = d[i + 1] ?? 0;
+      const b = d[i + 2] ?? 0;
+      lum.push(0.299 * r + 0.587 * g + 0.114 * b);
+    }
+  }
+  if (lum.length < 8) return;
+  const mean = lum.reduce((a, b) => a + b, 0) / lum.length;
+  const minL = Math.min(...lum);
+  const maxL = Math.max(...lum);
+  const range = maxL - minL;
+  const varSum = lum.reduce((acc, L) => acc + (L - mean) * (L - mean), 0);
+  const variance = varSum / lum.length;
+
+  if (mean < 12 && range < 28) {
+    throw new Error("캡처 결과가 거의 검은 화면입니다. 미리보기를 확인한 뒤 다시 게시해 주세요.");
+  }
+  if (mean > 248 && variance < 80 && range < 40) {
+    throw new Error("캡처 결과가 비어 있는 단색에 가깝습니다. 미리보기를 확인한 뒤 다시 게시해 주세요.");
+  }
+  if (variance < 18 && range < 22 && mean > 30 && mean < 220) {
+    throw new Error("캡처된 카드 내용이 거의 구분되지 않습니다. 미리보기를 확인한 뒤 다시 게시해 주세요.");
+  }
 }
 
 function assertBackgroundHeroDecoded(article: HTMLElement, expectedImage320Url: string): void {
@@ -361,8 +372,6 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
       await document.fonts.ready;
     }
     throwIfAborted(signal);
-    await preparePreviewRootImagesForCanvasCapture(previewCaptureRoot);
-    throwIfAborted(signal);
     await waitForAllImagesStrict(previewCaptureRoot);
     throwIfAborted(signal);
     await doubleRaf();
@@ -390,7 +399,12 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
       }),
     );
 
+    assertPublishedCardCanvasHasLikelyContent(canvas);
+
     const blob = await canvasToBlob(canvas);
+    if (blob.size < 2800) {
+      throw new Error("캡처 PNG가 비정상적으로 작습니다. 미리보기를 확인한 뒤 다시 게시해 주세요.");
+    }
     logBrowserCapture("full-png canvas ok", {
       canvasWidth: canvas.width,
       canvasHeight: canvas.height,
