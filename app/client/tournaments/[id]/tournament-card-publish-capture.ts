@@ -31,6 +31,96 @@ function logBrowserCapture(msg: string, extra?: Record<string, unknown>) {
   else console.info("[tournament-card-browser-capture]", msg);
 }
 
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+}
+
+/** html2canvas 캔버스 바닥 — 불투명 사각 비트맵(모서리 알파에 의존하지 않음). 사진 배경은 흰색으로 투명 구멍만 메움. */
+function resolvePublishedCardHtml2CanvasBackground(item: SlideDeckItem): string {
+  const hasPhoto = item.backgroundType === "image" && Boolean((item.image320Url ?? "").trim());
+  if (hasPhoto) {
+    return "#ffffff";
+  }
+  if (item.backgroundType === "theme") {
+    const t = item.themeType ?? "dark";
+    if (t === "light") return "#e0f2fe";
+    if (t === "natural") return "#166534";
+    return "#0f2747";
+  }
+  const cssBg = (item.mediaBackground ?? "").trim();
+  if (/^#[0-9a-f]{3,8}$/i.test(cssBg)) return cssBg;
+  if (/^rgba?\(/i.test(cssBg)) return cssBg;
+  return "#0f2747";
+}
+
+function waitForImageElementStrict(img: HTMLImageElement): Promise<void> {
+  if (img.complete) {
+    const src = (img.currentSrc || img.src || "").trim();
+    if (img.naturalWidth === 0 && src) {
+      return Promise.reject(new Error(`이미지가 로드되지 않았거나 크기가 0입니다: ${src}`));
+    }
+    return Promise.resolve();
+  }
+  return new Promise((resolve, reject) => {
+    const onLoad = () => {
+      img.removeEventListener("error", onError);
+      const src = (img.currentSrc || img.src || "").trim();
+      if (img.naturalWidth === 0 && src) {
+        reject(new Error(`이미지 디코드 후 크기가 0입니다: ${src}`));
+      } else {
+        resolve();
+      }
+    };
+    const onError = () => {
+      img.removeEventListener("load", onLoad);
+      const src = (img.currentSrc || img.src || "").trim();
+      reject(new Error(`이미지 로드 실패: ${src || "(src 없음)"}`));
+    };
+    img.addEventListener("load", onLoad, { once: true });
+    img.addEventListener("error", onError, { once: true });
+  });
+}
+
+async function waitForAllImagesStrict(root: HTMLElement): Promise<void> {
+  const imgs = [...root.querySelectorAll("img")];
+  await Promise.all(imgs.map((img) => waitForImageElementStrict(img)));
+}
+
+function assertBackgroundHeroDecoded(article: HTMLElement, expectedImage320Url: string): void {
+  const exp = expectedImage320Url.trim();
+  if (!exp) return;
+  const imgs = [...article.querySelectorAll<HTMLImageElement>("img")];
+  const decoded = imgs.filter((i) => i.naturalWidth >= 2 && i.naturalHeight >= 2);
+  if (decoded.length === 0) {
+    throw new Error("게시 카드 미리보기에서 디코드된 배경 이미지를 찾을 수 없습니다.");
+  }
+  let expHref = "";
+  try {
+    expHref = new URL(exp, window.location.origin).href;
+  } catch {
+    /* ignore */
+  }
+  const expTail = exp.split("/").pop()?.split("?")[0] ?? exp;
+  const matched = decoded.some((img) => {
+    const src = (img.currentSrc || img.src || "").trim();
+    if (!src) return false;
+    if (expHref && src === expHref) return true;
+    try {
+      if (new URL(src, window.location.origin).href === expHref) return true;
+    } catch {
+      /* ignore */
+    }
+    return expTail.length > 1 && src.includes(expTail);
+  });
+  if (!matched) {
+    console.error("[tournament-card-browser-capture] 배경 URL 불일치", {
+      expected: exp,
+      observed: decoded.map((i) => i.currentSrc || i.src),
+    });
+    throw new Error("게시 카드 배경 이미지가 미리보기에 로드된 URL과 일치하지 않습니다.");
+  }
+}
+
 function waitForImages(root: HTMLElement): Promise<void> {
   const imgs = [...root.querySelectorAll("img")];
   const pending = imgs.filter((img) => !img.complete);
@@ -50,6 +140,27 @@ function doubleRaf(): Promise<void> {
   return new Promise((resolve) => {
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
   });
+}
+
+/**
+ * 미리보기 열의 `transform: scale(...)`는 html2canvas가 배경·레이어를 누락하는 원인이 될 수 있어,
+ * 캡처 구간에서만 일시적으로 제거한다.
+ */
+async function withPreviewScaleTransformSuspended<T>(previewCaptureRoot: HTMLElement, run: () => Promise<T>): Promise<T> {
+  const scaleEl = previewCaptureRoot.closest(
+    '[data-card-publish-scale-inner="1"]',
+  ) as HTMLElement | null;
+  if (!scaleEl) {
+    return run();
+  }
+  const prev = scaleEl.style.transform;
+  scaleEl.style.transform = "none";
+  try {
+    await doubleRaf();
+    return await run();
+  } finally {
+    scaleEl.style.transform = prev;
+  }
 }
 
 async function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
@@ -176,12 +287,15 @@ async function captureOverlaySnapshotDom(item: SlideDeckItem): Promise<Tournamen
 }
 
 /**
- * 게시 발행: 제작자 브라우저에서 카드 본체 전체(글자·배지·배경·그림자)를 PNG로 캡처 후
- * `POST /api/client/tournament-card-image`(multipart)로 업로드한다. html2canvas는 이 모듈에서만 동적 import.
+ * 게시 발행: 편집 화면의 게시카드 미리보기 루트(`CardPublishPreview` ref, `data-card-publish-artboard`)를
+ * html2canvas로 PNG로 캡처한 뒤 `POST /api/client/tournament-card-image`(multipart)로 업로드한다.
+ * html2canvas는 이 모듈에서만 동적 import.
  */
 export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(args: {
   tournamentId: string;
   item: SlideDeckItem;
+  /** `CardPublishPreview` 아트보드 루트(ref) — 폼·페이지 배경 제외, 미리보기 블록만 캡처 */
+  previewCaptureRoot: HTMLElement;
   signal?: AbortSignal;
 }): Promise<{
   imageId: string;
@@ -189,49 +303,47 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
   publishedCardImage320Url: string;
   publishedCardImage480Url: string;
 }> {
-  const { tournamentId, item, signal } = args;
-  logBrowserCapture("full-png capture start", { tournamentId });
+  const { tournamentId, item, previewCaptureRoot, signal } = args;
+  logBrowserCapture("full-png capture start (preview DOM)", { tournamentId });
 
-  const host = createCaptureHost();
-  document.body.appendChild(host);
-  const reactRoot = createRoot(host);
-  reactRoot.render(
-    createElement(TournamentSnapshotCardView, {
-      item,
-      slideDeck: true,
-      slideDeckAspectFill: true,
-      templateCardLayout: true,
-      suppressLink: true,
-      artboardPx: true,
-      slideDeckSolidBackdrop: SLIDE_DECK_SOLID_BACKDROPS[0],
-      isImageCaptureMode: false,
-    }),
-  );
+  const articleEl = previewCaptureRoot.querySelector("article");
+  if (!(articleEl instanceof HTMLElement)) {
+    const msg = "게시카드 미리보기에서 카드 article 요소를 찾을 수 없습니다.";
+    console.error("[tournament-card-browser-capture]", msg);
+    throw new Error(msg);
+  }
 
   try {
     if (typeof document.fonts?.ready?.then === "function") {
       await document.fonts.ready;
     }
-    await waitForImages(host);
+    throwIfAborted(signal);
+    await waitForAllImagesStrict(previewCaptureRoot);
+    throwIfAborted(signal);
     await doubleRaf();
+    throwIfAborted(signal);
 
-    const articleEl = host.querySelector("article");
-    const captureRoot = articleEl instanceof HTMLElement ? articleEl : host;
-    for (const img of host.querySelectorAll("img")) {
-      img.crossOrigin = "anonymous";
+    const expectsImageBg = item.backgroundType === "image" && Boolean((item.image320Url ?? "").trim());
+    if (expectsImageBg) {
+      assertBackgroundHeroDecoded(articleEl, item.image320Url!.trim());
     }
-    await waitForImages(host);
+
     await doubleRaf();
+    throwIfAborted(signal);
 
     const [{ default: html2canvas }] = await Promise.all([import("html2canvas")]);
-    const canvas = await html2canvas(captureRoot, {
-      scale: TOURNAMENT_CARD_PUBLISH_BROWSER_CAPTURE_SCALE,
-      backgroundColor: null,
-      useCORS: true,
-      logging: false,
-      width: TOURNAMENT_CARD_ARTBOARD_WIDTH_PX,
-      height: TOURNAMENT_CARD_ARTBOARD_HEIGHT_PX,
-    });
+    const canvasBg = resolvePublishedCardHtml2CanvasBackground(item);
+    const canvas = await withPreviewScaleTransformSuspended(previewCaptureRoot, () =>
+      html2canvas(previewCaptureRoot, {
+        scale: TOURNAMENT_CARD_PUBLISH_BROWSER_CAPTURE_SCALE,
+        backgroundColor: canvasBg,
+        useCORS: true,
+        allowTaint: false,
+        logging: false,
+        width: TOURNAMENT_CARD_ARTBOARD_WIDTH_PX,
+        height: TOURNAMENT_CARD_ARTBOARD_HEIGHT_PX,
+      }),
+    );
 
     const blob = await canvasToBlob(canvas);
     logBrowserCapture("full-png canvas ok", {
@@ -275,9 +387,10 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
       publishedCardImage320Url,
       publishedCardImage480Url: publishedCardImage480Url || publishedCardImage320Url,
     };
-  } finally {
-    reactRoot.unmount();
-    host.remove();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[tournament-card-browser-capture] full-png capture failed", msg, e);
+    throw e;
   }
 }
 
@@ -328,8 +441,9 @@ export async function captureAndUploadTournamentCardSnapshots(item: SlideDeckIte
     const [{ default: html2canvas }] = await Promise.all([import("html2canvas")]);
     const canvas = await html2canvas(captureRoot, {
       scale: 2,
-      backgroundColor: null,
+      backgroundColor: resolvePublishedCardHtml2CanvasBackground(item),
       useCORS: true,
+      allowTaint: false,
       logging: false,
       width: TOURNAMENT_CARD_ARTBOARD_WIDTH_PX,
       height: TOURNAMENT_CARD_ARTBOARD_HEIGHT_PX,

@@ -308,6 +308,10 @@ export async function renderTournamentPublishedCardPng(params: {
     payload.backgroundType === "image"
       ? await imageUrlToDataUri(payload.backgroundImageUrl, params.requestBaseUrl)
       : null;
+  const requiredBgUrl = (payload.backgroundImageUrl ?? "").trim();
+  if (payload.backgroundType === "image" && requiredBgUrl && !imageDataUri) {
+    throw new Error("Published card background image could not be fetched for server render.");
+  }
   const opacity = clamp01(payload.backgroundImageOpacity, 1);
   const leadColor = normalizeColor(payload.leadTextColor, "#ffffff");
   const titleColor = normalizeColor(payload.titleTextColor, "#ffe566");

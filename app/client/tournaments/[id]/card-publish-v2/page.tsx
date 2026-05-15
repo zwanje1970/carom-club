@@ -255,6 +255,8 @@ export default function ClientTournamentCardPublishV2Page() {
   const mountedRef = useRef(true);
   const userEditedTextLine2Ref = useRef(false);
   const prizeAutoSeededRef = useRef(false);
+  /** 모집중 게시 시 브라우저 PNG 캡처 대상 — `CardPublishPreview` 아트보드 루트 */
+  const cardPublishPreviewCaptureRef = useRef<HTMLDivElement>(null);
 
   const handleTextLine2Change = useCallback((next: string) => {
     userEditedTextLine2Ref.current = true;
@@ -587,6 +589,7 @@ export default function ClientTournamentCardPublishV2Page() {
       const pub = await publishTournamentCardFromEditorClient({
         tournamentId,
         slideStatusBadge: "모집중",
+        getPreviewCaptureRoot: () => cardPublishPreviewCaptureRef.current,
         onProgress: (phase) => {
           if (phase === "publish-start") {
             setPublishFlow({
@@ -791,11 +794,11 @@ export default function ClientTournamentCardPublishV2Page() {
                   className={`${editorStyles.previewCardAspectFace} ${editorStyles.previewCardAspectFaceScaledPreview}`}
                 >
                   <div className={editorStyles.previewCardScaleClip}>
-                    <div className={editorStyles.previewCardScaleInner}>
+                    <div className={editorStyles.previewCardScaleInner} data-card-publish-scale-inner="1">
                       <div
                         className={`${editorStyles.previewCardWrap} ${editorStyles.previewCardWrapV2Chrome}`}
                       >
-                        <CardPublishPreview model={previewModel} />
+                        <CardPublishPreview ref={cardPublishPreviewCaptureRef} model={previewModel} />
                       </div>
                     </div>
                   </div>

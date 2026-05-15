@@ -102,6 +102,8 @@ export async function publishTournamentCardFromEditorClient(args: {
   tournamentId: string;
   /** 슬라이드/PNG에 찍힐 배지 문구(예: 모집중) */
   slideStatusBadge: string;
+  /** 편집 화면 `CardPublishPreview` 아트보드 루트(ref.current) — 브라우저 PNG 캡처에 필수 */
+  getPreviewCaptureRoot: () => HTMLElement | null;
   /** 단계형 진행 UI용(실제 비율 아님). GET·캡처 구간 시작 시 / draftOnly:false POST 직전. */
   onProgress?: (phase: TournamentCardClientPublishProgressPhase) => void;
 }): Promise<TournamentCardClientPublishResult> {
@@ -191,6 +193,12 @@ export async function publishTournamentCardFromEditorClient(args: {
       tournamentFallbackDate: tournamentDate,
       tournamentFallbackLocation: tournamentLocation,
     });
+    const previewCaptureRoot = args.getPreviewCaptureRoot();
+    if (!previewCaptureRoot) {
+      console.error("[publishTournamentCardFromEditorClient] 게시카드 미리보기 DOM을 찾을 수 없습니다.");
+      return { ok: false, error: "게시카드 미리보기를 불러온 뒤 다시 게시해 주세요." };
+    }
+
     const browserImageController = new AbortController();
     const browserImageTimeoutId = window.setTimeout(() => browserImageController.abort(), PUBLISH_IMAGE_TIMEOUT_MS);
     try {
@@ -198,6 +206,7 @@ export async function publishTournamentCardFromEditorClient(args: {
         const r = await captureAndUploadTournamentPublishedCardFullPngInBrowser({
           tournamentId,
           item: slideDeckItem,
+          previewCaptureRoot,
           signal: browserImageController.signal,
         });
         publishedCardImageUrl = r.publishedCardImageUrl;

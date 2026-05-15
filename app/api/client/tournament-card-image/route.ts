@@ -124,6 +124,7 @@ async function persistPngResponse(params: {
     uploaderUserId: params.uploaderUserId,
     sitePublic: true,
     preservePngTransparency: true,
+    flattenPublishedCardPng: true,
   });
   if (!persist.ok) {
     return NextResponse.json(

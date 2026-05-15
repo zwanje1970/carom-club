@@ -20,6 +20,8 @@ export type CardPublishPreviewModel = {
   slideBackgroundType: "image" | "theme";
   slideThemeType: "dark" | "light" | "natural";
   slideMediaBackground: string;
+  /** v2 미디어 오버레이 켜짐일 때만 true — 스냅샷 `imageOverlayBlend`와 동일 */
+  slideImageOverlayBlend?: boolean;
   slideImageOverlayOpacity: number;
   slideLeadTextColor?: string;
   slideTitleTextColor?: string;
@@ -44,7 +46,7 @@ function slideItemFromModel(m: CardPublishPreviewModel): SlideDeckItem {
     backgroundType: m.slideBackgroundType,
     themeType: m.slideThemeType,
     mediaBackground: m.slideMediaBackground,
-    imageOverlayBlend: true,
+    imageOverlayBlend: m.slideImageOverlayBlend === true,
     imageOverlayOpacity: m.slideImageOverlayOpacity,
     ...(m.slideLeadTextColor ? { cardLeadTextColor: m.slideLeadTextColor } : {}),
     ...(m.slideTitleTextColor ? { cardTitleTextColor: m.slideTitleTextColor } : {}),
@@ -65,6 +67,7 @@ const CardPublishPreviewInner = forwardRef<
     <div
       ref={ref}
       data-card-publish-artboard="1"
+      data-tournament-card-publish-preview-root="1"
       className={`${editorStyles.cardPublishCaptureRoot} ${editorStyles.cardPublishCaptureRootFlexFill}`}
     >
       <TournamentSnapshotCardView
@@ -73,7 +76,10 @@ const CardPublishPreviewInner = forwardRef<
         slideDeckAspectFill
         templateCardLayout
         artboardPx
+        suppressLink
+        repImageHighPriority={Boolean(model.slideImage320Url?.trim())}
         slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
+        forceHeroImageCrossOrigin={Boolean(model.slideImage320Url?.trim())}
         isImageCaptureMode={isImageCaptureMode}
       />
     </div>

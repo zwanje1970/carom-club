@@ -1,7 +1,7 @@
 import type { MainSiteScrollCardItem } from "../../app/site/main-site-scroll-cards";
 import type { SlideDeckItem } from "../../app/site/tournament-snapshot-card-view";
 
-/** 메인 슬라이드: 게시 PNG(w480 우선) 1장만 표시 — HTML overlay 미사용 */
+/** 메인 세로 스크롤: 게시 PNG(w480 우선) 1장만 표시 — 카드 DOM은 img+CTA만(오버레이·텍스트 HTML 중복 없음). */
 export function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCardItem[] {
   return items.map((item, index) => {
     const href = (item.targetDetailUrl ?? "").trim() || "/site/tournaments";

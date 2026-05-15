@@ -41,7 +41,8 @@ export type PersistProofImageW320W640Result =
 
 /**
  * 증빙/사이트 이미지와 동일 파이프라인: sharp로 original(1280)·w640·w480·w320·w160 생성 후 저장.
- * `preservePngTransparency`: 게시 카드 스냅샷만 — JPEG 변환 없이 PNG(알파)로 변형 저장.
+ * `preservePngTransparency`: JPEG 변환 없이 PNG 변형 저장.
+ * `flattenPublishedCardPng`: 게시 카드 전용 — 알파를 흰 배경과 합성해 불투명 사각 PNG로 만든 뒤 변형한다.
  */
 export async function persistProofImageW320W640Variants(params: {
   imageId: string;
@@ -50,22 +51,36 @@ export async function persistProofImageW320W640Variants(params: {
   uploaderUserId: string;
   sitePublic: boolean;
   preservePngTransparency?: boolean;
+  flattenPublishedCardPng?: boolean;
 }): Promise<PersistProofImageW320W640Result> {
   const { imageId, buffer, ext, uploaderUserId, sitePublic } = params;
   const preservePngTransparency = params.preservePngTransparency === true;
 
   if (preservePngTransparency) {
+    let srcBuf = buffer;
+    if (params.flattenPublishedCardPng === true) {
+      try {
+        srcBuf = await sharp(buffer)
+          .flatten({ background: { r: 255, g: 255, b: 255 } })
+          .png()
+          .toBuffer();
+      } catch (err) {
+        console.error("[persist-proof-image-w320-w640] 게시카드 PNG flatten 실패", err);
+        return { ok: false, error: "이미지 파일을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.", status: 500 };
+      }
+    }
+
     let originalBuf: Buffer;
     let w640Buf: Buffer;
     let w480Buf: Buffer;
     let w320Buf: Buffer;
     let w160Buf: Buffer;
     try {
-      originalBuf = await sharp(buffer).resize({ width: 1280, withoutEnlargement: true }).png().toBuffer();
-      w640Buf = await sharp(buffer).resize({ width: 640, withoutEnlargement: true }).png().toBuffer();
-      w480Buf = await sharp(buffer).resize({ width: 480, withoutEnlargement: true }).png().toBuffer();
-      w320Buf = await sharp(buffer).resize({ width: 320, withoutEnlargement: true }).png().toBuffer();
-      w160Buf = await sharp(buffer).resize({ width: 160, withoutEnlargement: true }).png().toBuffer();
+      originalBuf = await sharp(srcBuf).resize({ width: 1280, withoutEnlargement: true }).png().toBuffer();
+      w640Buf = await sharp(srcBuf).resize({ width: 640, withoutEnlargement: true }).png().toBuffer();
+      w480Buf = await sharp(srcBuf).resize({ width: 480, withoutEnlargement: true }).png().toBuffer();
+      w320Buf = await sharp(srcBuf).resize({ width: 320, withoutEnlargement: true }).png().toBuffer();
+      w160Buf = await sharp(srcBuf).resize({ width: 160, withoutEnlargement: true }).png().toBuffer();
     } catch (err) {
       console.error("[persist-proof-image-w320-w640] png variant sharp 실패", err);
       return { ok: false, error: "이미지 파일을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.", status: 500 };

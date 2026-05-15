@@ -7,7 +7,7 @@ import type { TournamentCardOverlaySnapshot } from "../../lib/site/tournament-ca
 import { TournamentStatusBadge, type TournamentPostStatus } from "./tournament-slide-card-status-badge";
 import styles from "./tournament-slide-card-previews.module.css";
 
-/* 편집기 미리보기·게시 PNG(html2canvas) 입력용 HTML 렌더 — /site 메인 슬라이드는 PNG(`MainSiteScrollCards`)만 사용. 디자인 좌표 440×180 아트보드(`slideDeckAspectFill`). */
+/* 편집기 미리보기·게시 PNG(html2canvas) 입력용 HTML 렌더 — /site 메인 세로 덱은 평면화된 게시 PNG 1장(`MainSiteScrollCards`)만 표시(글자·배지 HTML 레이어 없음). 둥근 모서리는 카드 컨테이너(border-radius+overflow)가 담당. 디자인 좌표 440×180 아트보드(`slideDeckAspectFill`). */
 
 export type { TournamentPostStatus };
 
@@ -137,6 +137,7 @@ function MediaStack({
   mainSlideAd,
   onRepImageLoad,
   isImageCaptureMode,
+  forceHeroImageCrossOrigin,
 }: {
   variant: SlidePreviewVariant;
   item: TournamentSlidePreviewItem;
@@ -150,6 +151,8 @@ function MediaStack({
   onRepImageLoad?: () => void;
   /** 게시 PNG 캡처: AD 마크 등 글자만 숨김 */
   isImageCaptureMode?: boolean;
+  /** 편집 미리보기 등: 첫 페인트부터 CORS 가능한 히어로 이미지(캡처용) */
+  forceHeroImageCrossOrigin?: boolean;
 }) {
   const solidBackdrop = slideDeckSolidBackdrop?.trim();
   const cssBg = item.mediaBackground?.trim();
@@ -199,7 +202,7 @@ function MediaStack({
           alt={item.title || "카드 배경"}
           loading={repImageHighPriority ? "eager" : "lazy"}
           decoding="async"
-          {...(isImageCaptureMode ? { crossOrigin: "anonymous" as const } : {})}
+          {...(isImageCaptureMode || forceHeroImageCrossOrigin ? { crossOrigin: "anonymous" as const } : {})}
           {...(repImageHighPriority ? { fetchPriority: "high" as const } : {})}
           onLoad={repImageHighPriority && onRepImageLoad ? fireRepImageLoad : undefined}
         />
@@ -244,6 +247,7 @@ function TournamentSlideCardPreview({
   artboardPx = false,
   onRepImageLoad,
   isImageCaptureMode = false,
+  forceHeroImageCrossOrigin,
 }: {
   item: TournamentSlidePreviewItem;
   variant: SlidePreviewVariant;
@@ -266,6 +270,7 @@ function TournamentSlideCardPreview({
   onRepImageLoad?: () => void;
   /** true: 제목·부가·푸터·배지 글자만 숨김(레이아웃 유지) — html2canvas PNG용 */
   isImageCaptureMode?: boolean;
+  forceHeroImageCrossOrigin?: boolean;
 }) {
   const status = toStatus(item.statusBadge);
   const parsed = parseSubtitle(item.subtitle);
@@ -365,6 +370,7 @@ function TournamentSlideCardPreview({
           mainSlideAd={mainSlideAd}
           onRepImageLoad={onRepImageLoad}
           isImageCaptureMode={isImageCaptureMode}
+          forceHeroImageCrossOrigin={forceHeroImageCrossOrigin}
         >
           {mainSlideAd ? (
             <div className={styles.adCardMediaFill} aria-hidden />
@@ -432,6 +438,7 @@ function TournamentSlideCardPreview({
           mainSlideAd={mainSlideAd}
           onRepImageLoad={onRepImageLoad}
           isImageCaptureMode={isImageCaptureMode}
+          forceHeroImageCrossOrigin={forceHeroImageCrossOrigin}
         >
           {mainSlideAd ? (
             <div className={styles.adCardMediaFill} aria-hidden />
@@ -507,6 +514,7 @@ export function TournamentSnapshotCardView({
   onRepImageLoad,
   isImageCaptureMode = false,
   suppressLink = false,
+  forceHeroImageCrossOrigin,
 }: {
   item: SlideDeckItem;
   slideDeck?: boolean;
@@ -524,6 +532,8 @@ export function TournamentSnapshotCardView({
   isImageCaptureMode?: boolean;
   /** true: 내부 미리보기만 렌더(바깥에서 Link/a로 감쌀 때) */
   suppressLink?: boolean;
+  /** 편집 미리보기: 히어로 배경 img에 crossOrigin(캡처 시 CORS) */
+  forceHeroImageCrossOrigin?: boolean;
 }) {
   const previewItem = slideDeckItemToPreviewItem(item);
   const variant: SlidePreviewVariant = item.cardTemplate === "B" ? "frame" : "classic";
@@ -544,6 +554,7 @@ export function TournamentSnapshotCardView({
       artboardPx={artboardPx}
       onRepImageLoad={onRepImageLoad}
       isImageCaptureMode={isImageCaptureMode}
+      forceHeroImageCrossOrigin={forceHeroImageCrossOrigin}
     />
   );
   if (!href || suppressLink) return inner;
