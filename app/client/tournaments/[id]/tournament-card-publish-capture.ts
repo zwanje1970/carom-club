@@ -86,6 +86,49 @@ async function waitForAllImagesStrict(root: HTMLElement): Promise<void> {
   await Promise.all(imgs.map((img) => waitForImageElementStrict(img)));
 }
 
+/** http(s) 배경만 — 미리보기는 crossOrigin 없이 표시하고, 캡처 직전에만 anonymous 재로드(html2canvas). */
+function shouldCoerceImageCrossOriginForCapture(src: string): boolean {
+  const t = src.trim();
+  if (!t) return false;
+  if (t.startsWith("blob:") || t.startsWith("data:")) return false;
+  return /^https?:/i.test(t);
+}
+
+/**
+ * html2canvas(`allowTaint: false`)용: 루트 내 http(s) 이미지에 `crossOrigin="anonymous"` 후 재로드.
+ * 편집 미리보기에서는 붙이지 않아 스토리지 CORS 미설정 시에도 배경이 보이게 한다.
+ */
+async function preparePreviewRootImagesForCanvasCapture(root: HTMLElement): Promise<void> {
+  const jobs: Promise<void>[] = [];
+  for (const img of root.querySelectorAll<HTMLImageElement>("img")) {
+    const src = (img.currentSrc || img.src || "").trim();
+    if (!shouldCoerceImageCrossOriginForCapture(src)) continue;
+    if (img.crossOrigin === "anonymous") continue;
+    jobs.push(
+      new Promise<void>((resolve, reject) => {
+        const onLoad = () => {
+          img.removeEventListener("error", onError);
+          const s = (img.currentSrc || img.src || "").trim();
+          if (img.naturalWidth === 0 && s) {
+            reject(new Error(`배경 이미지 CORS 재로드 후 크기가 0입니다: ${s}`));
+          } else {
+            resolve();
+          }
+        };
+        const onError = () => {
+          img.removeEventListener("load", onLoad);
+          reject(new Error(`배경 이미지 CORS 재로드 실패: ${src}`));
+        };
+        img.addEventListener("load", onLoad, { once: true });
+        img.addEventListener("error", onError, { once: true });
+        img.crossOrigin = "anonymous";
+        img.src = src;
+      }),
+    );
+  }
+  await Promise.all(jobs);
+}
+
 function assertBackgroundHeroDecoded(article: HTMLElement, expectedImage320Url: string): void {
   const exp = expectedImage320Url.trim();
   if (!exp) return;
@@ -317,6 +360,8 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
     if (typeof document.fonts?.ready?.then === "function") {
       await document.fonts.ready;
     }
+    throwIfAborted(signal);
+    await preparePreviewRootImagesForCanvasCapture(previewCaptureRoot);
     throwIfAborted(signal);
     await waitForAllImagesStrict(previewCaptureRoot);
     throwIfAborted(signal);

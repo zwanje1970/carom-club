@@ -292,6 +292,7 @@ export default function ClientTournamentCardPublishV2Page() {
       slideBackgroundType: backgroundType,
       slideThemeType: themeType,
       slideMediaBackground: resolvedPreviewMediaBg,
+      slideImageOverlayBlend: v2MediaMode === "on",
       slideImageOverlayOpacity:
         v2MediaMode === "on" ? imageOverlayOpacity : DEFAULT_BG_IMAGE_OVERLAY_OPACITY,
       slideLeadTextColor: lead || undefined,
@@ -322,7 +323,6 @@ export default function ClientTournamentCardPublishV2Page() {
     themeType,
     v2MediaMode,
     mediaBackground,
-    imageOverlayOpacity,
   ]);
 
   const activateV2Media = useCallback(() => {

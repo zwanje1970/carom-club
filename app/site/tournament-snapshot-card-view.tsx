@@ -199,7 +199,7 @@ function MediaStack({
           className={styles.bg}
           style={overlayBlend ? { opacity: overlayOpacity } : { opacity: 1 }}
           src={imgUrl}
-          alt={item.title || "카드 배경"}
+          alt=""
           loading={repImageHighPriority ? "eager" : "lazy"}
           decoding="async"
           {...(isImageCaptureMode || forceHeroImageCrossOrigin ? { crossOrigin: "anonymous" as const } : {})}

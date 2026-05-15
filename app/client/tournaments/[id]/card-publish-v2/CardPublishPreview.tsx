@@ -79,7 +79,6 @@ const CardPublishPreviewInner = forwardRef<
         suppressLink
         repImageHighPriority={Boolean(model.slideImage320Url?.trim())}
         slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
-        forceHeroImageCrossOrigin={Boolean(model.slideImage320Url?.trim())}
         isImageCaptureMode={isImageCaptureMode}
       />
     </div>
