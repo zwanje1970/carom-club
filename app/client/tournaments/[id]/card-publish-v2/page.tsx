@@ -896,77 +896,41 @@ export default function ClientTournamentCardPublishV2Page() {
                   임시저장
                 </label>
               </div>
-              {!publishFlow ? (
-                <p className="v3-muted" style={{ margin: 0, fontSize: "0.8rem", lineHeight: 1.45 }}>
-                  모집중으로 게시하면 메인에 홍보됩니다. 임시저장은 공개 카드를 바꾸지 않습니다.
-                </p>
-              ) : null}
-              {(publishFlow || publishFlowError) ? (
-                <div
-                  role="status"
-                  aria-live="polite"
-                  aria-busy={Boolean(publishBusy && publishIntent === "recruiting" && !publishFlowError && publishFlow)}
-                  className="v3-stack"
-                  style={{
-                    gap: "0.3rem",
-                    padding: "0.45rem 0.5rem",
-                    borderRadius: "8px",
-                    border: "1px solid #e2e8f0",
-                    background: "#f8fafc",
-                  }}
-                >
-                  {publishFlow ? (
+              <div
+                role="status"
+                aria-live="polite"
+                aria-busy={Boolean(publishBusy && publishIntent === "recruiting" && !publishFlowError && publishFlow)}
+                className={`${editorStyles.publishStatusSlot} ${publishFlow || publishFlowError ? editorStyles.publishStatusSlotActive : ""}`}
+              >
+                <div className={editorStyles.publishStatusTextRow}>
+                  {!publishFlow && !publishFlowError ? (
+                    <p className={editorStyles.publishStatusHelper}>
+                      모집중으로 게시하면 메인에 홍보됩니다. 임시저장은 공개 카드를 바꾸지 않습니다.
+                    </p>
+                  ) : publishFlow ? (
                     <>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          justifyContent: "space-between",
-                          gap: "0.5rem",
-                          fontSize: "0.72rem",
-                          lineHeight: 1.35,
-                          color: "#334155",
-                        }}
-                      >
-                        <span style={{ flex: "1 1 auto", minWidth: 0 }}>{publishFlow.label}</span>
-                        <span
-                          style={{
-                            flex: "0 0 auto",
-                            fontWeight: 800,
-                            fontVariantNumeric: "tabular-nums",
-                            color: "#1e293b",
-                          }}
-                        >
-                          {publishFlow.percent}%
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          height: 3,
-                          borderRadius: 2,
-                          background: "#e2e8f0",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: `${publishFlow.percent}%`,
-                            height: "100%",
-                            borderRadius: 2,
-                            background: "#2563eb",
-                            transition: "width 0.35s ease",
-                          }}
-                        />
-                      </div>
+                      <span className={editorStyles.publishStatusLabel}>{publishFlow.label}</span>
+                      <span className={editorStyles.publishStatusPercent}>{publishFlow.percent}%</span>
                     </>
                   ) : null}
-                  {publishFlowError ? (
-                    <p style={{ margin: 0, fontSize: "0.72rem", lineHeight: 1.45, color: "#b91c1c" }}>
-                      {publishFlowError}
-                    </p>
+                </div>
+                <div
+                  className={`${editorStyles.publishStatusBarTrack} ${!publishFlow ? editorStyles.publishStatusBarTrackIdle : ""}`}
+                  aria-hidden={!publishFlow}
+                >
+                  {publishFlow ? (
+                    <div
+                      className={editorStyles.publishStatusBarFill}
+                      style={{ width: `${publishFlow.percent}%` }}
+                    />
                   ) : null}
                 </div>
-              ) : null}
+                <p
+                  className={`${editorStyles.publishStatusErrorLine} ${publishFlowError ? editorStyles.publishStatusErrorLineVisible : ""}`}
+                >
+                  {publishFlowError || "\u00a0"}
+                </p>
+              </div>
               <button
                 type="button"
                 className="v3-btn"

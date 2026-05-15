@@ -7,9 +7,10 @@ export function getStoredProofImageVariantUrl(
     storageOriginalUrl?: string;
     storageW160Url?: string;
     storageW320Url?: string;
+    storageW480Url?: string;
     storageW640Url?: string;
   },
-  variant: "original" | "w160" | "w320" | "w640"
+  variant: "original" | "w160" | "w320" | "w480" | "w640"
 ): string | null {
   const raw =
     variant === "original"
@@ -20,7 +21,9 @@ export function getStoredProofImageVariantUrl(
         ? asset.storageW160Url
         : variant === "w320"
           ? asset.storageW320Url
-          : asset.storageW640Url;
+          : variant === "w480"
+            ? asset.storageW480Url ?? asset.storageW640Url
+            : asset.storageW640Url;
   const s = typeof raw === "string" ? raw.trim() : "";
   if (!s.startsWith("https://")) return null;
   return s;

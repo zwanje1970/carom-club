@@ -408,6 +408,30 @@ function zoneFinalizedStorageKey(tournamentId: string, zoneId: string): string {
   return `v3:bracket:zone-finalized:${tournamentId}:${zoneId || "global"}`;
 }
 
+function quickDetailInputStorageKey(tournamentId: string): string {
+  return `v3:bracket:quick-detail-input:${tournamentId}`;
+}
+
+function readQuickDetailInputEnabled(tournamentId: string): boolean {
+  if (!tournamentId || typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(quickDetailInputStorageKey(tournamentId)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeQuickDetailInputEnabled(tournamentId: string, enabled: boolean): void {
+  if (!tournamentId || typeof window === "undefined") return;
+  try {
+    const key = quickDetailInputStorageKey(tournamentId);
+    if (enabled) window.localStorage.setItem(key, "1");
+    else window.localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+}
+
 function defaultBoardSliceKey(b: Bracket | null): string | null {
   if (!b || !bracketLooksLikeSplitLayout(b) || !b.blocks?.[0]) return null;
   return `block:${b.blocks[0].id}`;
@@ -566,6 +590,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   useLayoutEffect(() => {
     bracketRef.current = bracket;
   }, [bracket]);
+
+  useEffect(() => {
+    if (!tournamentId) return;
+    setQuickDetailInputEnabled(readQuickDetailInputEnabled(tournamentId));
+  }, [tournamentId]);
 
   useEffect(() => {
     const up = () => setNavigatorOnline(true);
@@ -2324,7 +2353,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             <input
               type="checkbox"
               checked={quickDetailInputEnabled}
-              onChange={(e) => setQuickDetailInputEnabled(e.target.checked)}
+              onChange={(e) => {
+                const next = e.target.checked;
+                setQuickDetailInputEnabled(next);
+                writeQuickDetailInputEnabled(tournamentId, next);
+              }}
               style={{ width: "1rem", height: "1rem" }}
             />
             상세입력

@@ -12,7 +12,7 @@ const OUTPUT_WIDTH = 640;
 const OUTPUT_HEIGHT = Math.round((OUTPUT_WIDTH * SOURCE_HEIGHT) / SOURCE_WIDTH);
 const RASTER_WIDTH = 1280;
 const SCALE = OUTPUT_WIDTH / SOURCE_WIDTH;
-const CARD_FONT_FAMILY = "'Noto Sans KR Variable', 'Noto Sans KR', system-ui, sans-serif";
+const CARD_FONT_FAMILY = "Noto Sans KR Variable";
 
 export type TournamentPublishedCardImagePayload = {
   tournamentId: string;
@@ -51,10 +51,16 @@ function getBundledKoreanFontFiles(): string[] {
     "noto-sans-kr",
     "files",
   );
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir)
+  if (!existsSync(dir)) {
+    throw new Error("Noto Sans KR font directory is missing.");
+  }
+  const files = readdirSync(dir)
     .filter((name) => name.endsWith(".woff2"))
     .map((name) => path.join(dir, name));
+  if (files.length === 0) {
+    throw new Error("Noto Sans KR font files are missing.");
+  }
+  return files;
 }
 
 function esc(raw: unknown): string {
@@ -136,14 +142,47 @@ function textBlock(params: {
   color: string;
   lineHeight?: number;
   textAnchor?: "start" | "middle" | "end";
-  filter?: string;
+  shadow?: boolean;
 }): string {
   const lineHeight = params.lineHeight ?? params.fontSize * 1.2;
   const anchor = params.textAnchor ?? "start";
-  const spans = params.lines
-    .map((line, idx) => `<tspan x="${params.x}" dy="${idx === 0 ? 0 : lineHeight}">${esc(line)}</tspan>`)
-    .join("");
-  return `<text x="${params.x}" y="${params.y}" fill="${esc(params.color)}" font-size="${params.fontSize}" font-weight="${params.fontWeight}" font-family="${CARD_FONT_FAMILY}" text-anchor="${anchor}"${params.filter ? ` filter="${params.filter}"` : ""}>${spans}</text>`;
+  if (params.lines.length === 0) return "";
+  const makeText = (dx: number, dy: number, fill: string, opacity?: number) => {
+    const spans = params.lines
+      .map((line, idx) => `<tspan x="${params.x + dx}" dy="${idx === 0 ? 0 : lineHeight}">${esc(line)}</tspan>`)
+      .join("");
+    return `<text x="${params.x + dx}" y="${params.y + dy}" fill="${esc(fill)}" font-size="${params.fontSize}" font-weight="${params.fontWeight}" font-family="${CARD_FONT_FAMILY}" text-anchor="${anchor}"${opacity != null ? ` opacity="${opacity}"` : ""}>${spans}</text>`;
+  };
+  const shadow = params.shadow ? makeText(0, 2, "#000000", 0.5) : "";
+  return `${shadow}${makeText(0, 0, params.color)}`;
+}
+
+function singleLineText(params: {
+  x: number;
+  y: number;
+  text: string;
+  fontSize: number;
+  fontWeight: number;
+  color: string;
+  textAnchor?: "start" | "middle" | "end";
+  shadow?: boolean;
+}): string {
+  return textBlock({
+    x: params.x,
+    y: params.y,
+    lines: [params.text],
+    fontSize: params.fontSize,
+    fontWeight: params.fontWeight,
+    color: params.color,
+    textAnchor: params.textAnchor,
+    shadow: params.shadow,
+  });
+}
+
+export function getTournamentPublishedCardRendererDiagnostics(): {
+  bundledKoreanFontFileCount: number;
+} {
+  return { bundledKoreanFontFileCount: getBundledKoreanFontFiles().length };
 }
 
 function statusKind(raw: string): "recruiting" | "closing" | "full" | "live" | "ended" {
@@ -235,7 +274,6 @@ export async function renderTournamentPublishedCardPng(params: {
       ? await imageUrlToDataUri(payload.backgroundImageUrl, params.requestBaseUrl)
       : null;
   const opacity = clamp01(payload.backgroundImageOpacity, 1);
-  const shadowFilter = payload.textShadowEnabled ? ' filter="url(#textShadow)"' : "";
   const leadColor = normalizeColor(payload.leadTextColor, "#ffffff");
   const titleColor = normalizeColor(payload.titleTextColor, "#ffe566");
   const descColor = normalizeColor(payload.descriptionTextColor, "#ffffff");
@@ -250,7 +288,7 @@ export async function renderTournamentPublishedCardPng(params: {
   const textMax = template === "B" ? 30 : 34;
   const titleMax = template === "B" ? 20 : 24;
   const anchor = template === "B" ? "middle" : "start";
-  const textFilterAttr = payload.textShadowEnabled ? "url(#textShadow)" : undefined;
+  const textShadow = payload.textShadowEnabled === true;
 
   let bodyText = "";
   if (template === "B") {
@@ -263,7 +301,7 @@ export async function renderTournamentPublishedCardPng(params: {
       fontWeight: 400,
       color: leadColor,
       textAnchor: anchor,
-      filter: textFilterAttr,
+      shadow: textShadow,
     });
     bodyText += textBlock({
       x: left,
@@ -274,7 +312,7 @@ export async function renderTournamentPublishedCardPng(params: {
       color: titleColor,
       lineHeight: 32,
       textAnchor: anchor,
-      filter: textFilterAttr,
+      shadow: textShadow,
     });
     bodyText += textBlock({
       x: left,
@@ -285,7 +323,7 @@ export async function renderTournamentPublishedCardPng(params: {
       color: descColor,
       lineHeight: 24,
       textAnchor: anchor,
-      filter: textFilterAttr,
+      shadow: textShadow,
     });
     bodyText += textBlock({
       x: left,
@@ -295,7 +333,7 @@ export async function renderTournamentPublishedCardPng(params: {
       fontWeight: 700,
       color: descColor,
       textAnchor: anchor,
-      filter: textFilterAttr,
+      shadow: textShadow,
     });
   } else {
     bodyText += textBlock({
@@ -305,7 +343,7 @@ export async function renderTournamentPublishedCardPng(params: {
       fontSize: 20,
       fontWeight: 400,
       color: leadColor,
-      filter: textFilterAttr,
+      shadow: textShadow,
     });
     bodyText += textBlock({
       x: left,
@@ -315,7 +353,7 @@ export async function renderTournamentPublishedCardPng(params: {
       fontWeight: 800,
       color: titleColor,
       lineHeight: 33,
-      filter: textFilterAttr,
+      shadow: textShadow,
     });
     bodyText += textBlock({
       x: left,
@@ -325,7 +363,7 @@ export async function renderTournamentPublishedCardPng(params: {
       fontWeight: 400,
       color: descColor,
       lineHeight: 24,
-      filter: textFilterAttr,
+      shadow: textShadow,
     });
     bodyText += textBlock({
       x: left,
@@ -334,7 +372,7 @@ export async function renderTournamentPublishedCardPng(params: {
       fontSize: 19,
       fontWeight: 700,
       color: descColor,
-      filter: textFilterAttr,
+      shadow: textShadow,
     });
   }
 
@@ -348,13 +386,13 @@ export async function renderTournamentPublishedCardPng(params: {
     surfaceLayout === "split"
       ? `
         <rect x="0" y="${mediaHeight}" width="${OUTPUT_WIDTH}" height="${footerHeight}" fill="#fff" />
-        <text x="18" y="${mediaHeight + 36}" fill="${esc(footerDateColor)}" font-size="19" font-weight="400" font-family="${CARD_FONT_FAMILY}"${shadowFilter}>${esc(subtitle.dateText)}</text>
-        <text x="${OUTPUT_WIDTH - 18}" y="${mediaHeight + 36}" fill="${esc(footerPlaceColor)}" font-size="19" font-weight="400" font-family="${CARD_FONT_FAMILY}" text-anchor="end"${shadowFilter}>${esc(subtitle.placeText)}</text>
+        ${singleLineText({ x: 18, y: mediaHeight + 36, text: subtitle.dateText, fontSize: 19, fontWeight: 400, color: footerDateColor, shadow: textShadow })}
+        ${singleLineText({ x: OUTPUT_WIDTH - 18, y: mediaHeight + 36, text: subtitle.placeText, fontSize: 19, fontWeight: 400, color: footerPlaceColor, textAnchor: "end", shadow: textShadow })}
       `
       : `
         <rect x="0" y="${OUTPUT_HEIGHT - 44}" width="${OUTPUT_WIDTH}" height="44" fill="rgba(0,0,0,0.16)" />
-        <text x="18" y="${OUTPUT_HEIGHT - 17}" fill="${esc(footerDateColor)}" font-size="19" font-weight="400" font-family="${CARD_FONT_FAMILY}"${shadowFilter}>${esc(subtitle.dateText)}</text>
-        <text x="${OUTPUT_WIDTH - 18}" y="${OUTPUT_HEIGHT - 17}" fill="${esc(footerPlaceColor)}" font-size="19" font-weight="400" font-family="${CARD_FONT_FAMILY}" text-anchor="end"${shadowFilter}>${esc(subtitle.placeText)}</text>
+        ${singleLineText({ x: 18, y: OUTPUT_HEIGHT - 17, text: subtitle.dateText, fontSize: 19, fontWeight: 400, color: footerDateColor, shadow: textShadow })}
+        ${singleLineText({ x: OUTPUT_WIDTH - 18, y: OUTPUT_HEIGHT - 17, text: subtitle.placeText, fontSize: 19, fontWeight: 400, color: footerPlaceColor, textAnchor: "end", shadow: textShadow })}
       `;
 
   const imageLayer = imageDataUri
@@ -385,12 +423,16 @@ export async function renderTournamentPublishedCardPng(params: {
       </g>
     </svg>
   `;
+  if (!/<text[\s>]/.test(svg)) {
+    throw new Error("Published card SVG text layer is missing.");
+  }
+  const fontFiles = getBundledKoreanFontFiles();
 
   const rendered = new Resvg(svg, {
     fitTo: { mode: "width", value: RASTER_WIDTH },
     font: {
       loadSystemFonts: false,
-      fontFiles: getBundledKoreanFontFiles(),
+      fontFiles,
       defaultFontFamily: "Noto Sans KR Variable",
       sansSerifFamily: "Noto Sans KR Variable",
     },

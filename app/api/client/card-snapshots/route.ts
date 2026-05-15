@@ -136,6 +136,7 @@ export async function POST(request: Request) {
     cardFooterPlaceTextColor?: unknown;
     publishedCardImageUrl?: unknown;
     publishedCardImage320Url?: unknown;
+    publishedCardImage480Url?: unknown;
     publishedCardImageBackgroundOnly?: unknown;
     statusBadge?: unknown;
     overlaySnapshot?: unknown;
@@ -226,6 +227,8 @@ export async function POST(request: Request) {
     !draftOnly && typeof body.publishedCardImageUrl === "string" ? body.publishedCardImageUrl : undefined;
   const publishedCardImage320Url =
     !draftOnly && typeof body.publishedCardImage320Url === "string" ? body.publishedCardImage320Url : undefined;
+  const publishedCardImage480Url =
+    !draftOnly && typeof body.publishedCardImage480Url === "string" ? body.publishedCardImage480Url : undefined;
   const publishedCardImageBackgroundOnly =
     !draftOnly && typeof body.publishedCardImageBackgroundOnly === "boolean"
       ? body.publishedCardImageBackgroundOnly
@@ -263,6 +266,7 @@ export async function POST(request: Request) {
       ...(cardFooterPlaceTextColor !== undefined ? { cardFooterPlaceTextColor } : {}),
       ...(publishedCardImageUrl !== undefined ? { publishedCardImageUrl } : {}),
       ...(publishedCardImage320Url !== undefined ? { publishedCardImage320Url } : {}),
+      ...(publishedCardImage480Url !== undefined ? { publishedCardImage480Url } : {}),
       ...(publishedCardImageBackgroundOnly !== undefined ? { publishedCardImageBackgroundOnly } : {}),
       ...(!draftOnly && body.overlaySnapshot != null ? { overlaySnapshot: body.overlaySnapshot } : {}),
     });

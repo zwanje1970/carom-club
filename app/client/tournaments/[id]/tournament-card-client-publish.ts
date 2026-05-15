@@ -153,6 +153,7 @@ export async function publishTournamentCardFromEditorClient(args: {
   const tournamentLocation = typeof data.tournament?.location === "string" ? data.tournament.location : "";
 
   let publishedCardImageUrl = "";
+  let publishedCardImage480Url = "";
   let publishedCardImage320Url = "";
   let publishedCardImageId = "";
   try {
@@ -191,7 +192,9 @@ export async function publishTournamentCardFromEditorClient(args: {
       imageId?: string;
       publishedCardImageUrl?: string;
       publishedCardImage320Url?: string;
+      publishedCardImage480Url?: string;
       w640Url?: string;
+      w480Url?: string;
       w320Url?: string;
     }>(
       "/api/client/tournament-card-image",
@@ -225,6 +228,7 @@ export async function publishTournamentCardFromEditorClient(args: {
       PUBLISH_IMAGE_TIMEOUT_MS,
     );
     publishedCardImageUrl = (imageRes.json.publishedCardImageUrl ?? imageRes.json.w640Url ?? "").trim();
+    publishedCardImage480Url = (imageRes.json.publishedCardImage480Url ?? imageRes.json.w480Url ?? "").trim();
     publishedCardImage320Url = (imageRes.json.publishedCardImage320Url ?? imageRes.json.w320Url ?? "").trim();
     publishedCardImageId = (imageRes.json.imageId ?? "").trim();
     if (!imageRes.ok || !publishedCardImageUrl || !publishedCardImage320Url || !publishedCardImageId) {
@@ -297,6 +301,7 @@ export async function publishTournamentCardFromEditorClient(args: {
         ? { cardDescriptionTextColor: publishSource.cardDescriptionTextColor.trim() }
         : {}),
       publishedCardImageUrl,
+      ...(publishedCardImage480Url ? { publishedCardImage480Url } : {}),
       publishedCardImage320Url,
       publishedCardImageBackgroundOnly: false,
     }),

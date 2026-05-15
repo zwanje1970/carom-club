@@ -38,16 +38,23 @@ async function uploadOneObject(params: {
   return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${enc}?alt=media&token=${token}`;
 }
 
-/** original / w160 / w320 / w640 업로드. 게시카드는 original=1280, main은 w320을 사용한다. */
+/** original / w160 / w320 / w480 / w640 업로드. 게시카드는 original=1280, main은 w480을 우선 사용한다. */
 export async function uploadProofImageVariantsToFirebaseStorage(params: {
   imageId: string;
   originalBuffer: Buffer;
   w160Buffer: Buffer;
   w320Buffer: Buffer;
+  w480Buffer?: Buffer;
   w640Buffer: Buffer;
   /** 기본 jpeg. `png` 는 게시 카드 스냅샷(알파 유지) 전용 */
   outputFormat?: "jpeg" | "png";
-}): Promise<{ storageOriginalUrl: string; storageW160Url: string; storageW320Url: string; storageW640Url: string }> {
+}): Promise<{
+  storageOriginalUrl: string;
+  storageW160Url: string;
+  storageW320Url: string;
+  storageW480Url?: string;
+  storageW640Url: string;
+}> {
   ensureFirebaseApp();
   const base = `proof-images/${params.imageId}`;
   const fmt = params.outputFormat ?? "jpeg";
@@ -58,7 +65,7 @@ export async function uploadProofImageVariantsToFirebaseStorage(params: {
   for (const bucketName of bucketCandidates) {
     const bucket = admin.storage().bucket(bucketName);
     try {
-      const [storageOriginalUrl, storageW160Url, storageW320Url, storageW640Url] = await Promise.all([
+      const [storageOriginalUrl, storageW160Url, storageW320Url, storageW480Url, storageW640Url] = await Promise.all([
         uploadOneObject({
           bucket,
           objectPath: `${base}/original.${ext}`,
@@ -77,6 +84,14 @@ export async function uploadProofImageVariantsToFirebaseStorage(params: {
           buffer: params.w320Buffer,
           contentType,
         }),
+        params.w480Buffer
+          ? uploadOneObject({
+              bucket,
+              objectPath: `${base}/w480.${ext}`,
+              buffer: params.w480Buffer,
+              contentType,
+            })
+          : Promise.resolve(undefined),
         uploadOneObject({
           bucket,
           objectPath: `${base}/w640.${ext}`,
@@ -85,7 +100,13 @@ export async function uploadProofImageVariantsToFirebaseStorage(params: {
         }),
       ]);
 
-      const urls = { storageOriginalUrl, storageW160Url, storageW320Url, storageW640Url };
+      const urls = {
+        storageOriginalUrl,
+        storageW160Url,
+        storageW320Url,
+        ...(storageW480Url ? { storageW480Url } : {}),
+        storageW640Url,
+      };
       for (const v of Object.values(urls)) {
         if (typeof v !== "string" || !v.trim().startsWith("https://")) {
           throw new Error("incomplete proof image storage URLs");

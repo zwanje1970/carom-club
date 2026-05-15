@@ -4,6 +4,7 @@ import { extractProofImageIdFromSiteImageUrl } from "./site-proof-image-id";
 export type SiteListThumbnailProofFields = {
   storageW160Url?: string;
   storageW320Url?: string;
+  storageW480Url?: string;
   storageW640Url?: string;
   storageOriginalUrl?: string;
 };
@@ -15,7 +16,7 @@ export type SiteListThumbnailProofFields = {
 export function resolveSiteListThumbnailFromPosterWithAssetMap(
   posterUrl: string | null | undefined,
   assetsById: ReadonlyMap<string, SiteListThumbnailProofFields>,
-  buildPublicImageUrl: (imageId: string, variant: "original" | "w160" | "w320" | "w640") => string,
+  buildPublicImageUrl: (imageId: string, variant: "original" | "w160" | "w320" | "w480" | "w640") => string,
 ): string | null {
   if (typeof posterUrl !== "string") return null;
   const trimmed = posterUrl.trim();
@@ -27,22 +28,24 @@ export function resolveSiteListThumbnailFromPosterWithAssetMap(
 
   const has160 = Boolean(asset.storageW160Url?.trim());
   const has320 = Boolean(asset.storageW320Url?.trim());
+  const has480 = Boolean(asset.storageW480Url?.trim());
   const has640 = Boolean(asset.storageW640Url?.trim());
   const hasOrig = Boolean(asset.storageOriginalUrl?.trim());
 
   if (has160) return buildPublicImageUrl(id, "w160");
   if (has320) return buildPublicImageUrl(id, "w320");
+  if (has480) return buildPublicImageUrl(id, "w480");
   if (has640) return buildPublicImageUrl(id, "w640");
   if (hasOrig) return buildPublicImageUrl(id, "original");
   return buildPublicImageUrl(id, "w160");
 }
 
-/** 메인 슬라이드 게시카드(320 계열) */
-export const SITE_MAIN_SLIDE_CARD_IMAGE_VARIANT_PREF = ["w320", "w640", "w160", "original"] as const;
+/** 메인 슬라이드 게시카드(480 계열) */
+export const SITE_MAIN_SLIDE_CARD_IMAGE_VARIANT_PREF = ["w480", "w320", "w640", "w160", "original"] as const;
 /** 상세·본문(640 계열 우선) */
 export const SITE_PUBLIC_DETAIL_IMAGE_VARIANT_PREF = ["original", "w640", "w320", "w160"] as const;
 
-export type SiteProofImageVariantPref = "w320" | "w640" | "w160" | "original";
+export type SiteProofImageVariantPref = "w320" | "w480" | "w640" | "w160" | "original";
 
 /**
  * 증빙 URL만 메타 검증·변형 폴백. id 추출 불가면 원문 URL 그대로(외부 이미지 등).
@@ -51,7 +54,7 @@ export type SiteProofImageVariantPref = "w320" | "w640" | "w160" | "original";
 export function resolveSiteProofImageUrlWithVariantPreference(
   url: string | null | undefined,
   assetsById: ReadonlyMap<string, SiteListThumbnailProofFields>,
-  buildPublicImageUrl: (imageId: string, variant: "original" | "w160" | "w320" | "w640") => string,
+  buildPublicImageUrl: (imageId: string, variant: "original" | "w160" | "w320" | "w480" | "w640") => string,
   preference: readonly SiteProofImageVariantPref[],
 ): string | null {
   if (typeof url !== "string") return null;
@@ -66,12 +69,14 @@ export function resolveSiteProofImageUrlWithVariantPreference(
 
   const has160 = Boolean(asset.storageW160Url?.trim());
   const has320 = Boolean(asset.storageW320Url?.trim());
+  const has480 = Boolean(asset.storageW480Url?.trim());
   const has640 = Boolean(asset.storageW640Url?.trim());
   const hasOrig = Boolean(asset.storageOriginalUrl?.trim());
 
   const pick = (v: SiteProofImageVariantPref): string | null => {
     if (v === "w160" && has160) return buildPublicImageUrl(id, "w160");
     if (v === "w320" && has320) return buildPublicImageUrl(id, "w320");
+    if (v === "w480" && has480) return buildPublicImageUrl(id, "w480");
     if (v === "w640" && has640) return buildPublicImageUrl(id, "w640");
     if (v === "original" && hasOrig) return buildPublicImageUrl(id, "original");
     return null;

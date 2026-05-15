@@ -112,7 +112,8 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
         /** 메인 대회 면: 게시 PNG 만 — 대회·광고와 동일 슬라이드 덱 행(slideDeckPng*). */
         const published640 = (item.publishedCardImageUrl ?? "").trim();
         const published320 = (item.publishedCardImage320Url ?? "").trim();
-        const scrollImg = published320 || published640;
+        const published480 = (item.publishedCardImage480Url ?? "").trim();
+        const scrollImg = published480 || published320 || published640;
         const needsHtmlOverlay = item.publishedCardImageBackgroundOnly === true && Boolean(scrollImg);
         const tournamentCardOverlaySnapshot =
           needsHtmlOverlay && item.overlaySnapshot ? item.overlaySnapshot : undefined;
@@ -152,7 +153,8 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
 
       const published640 = (item.publishedCardImageUrl ?? "").trim();
       const published320 = (item.publishedCardImage320Url ?? "").trim();
-      const publishedScrollBg = published320 || published640;
+      const published480 = (item.publishedCardImage480Url ?? "").trim();
+      const publishedScrollBg = published480 || published320 || published640;
       if (publishedScrollBg) {
         return {
           id: rowId,
@@ -185,7 +187,8 @@ function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCard
       if (item.type !== "ad") {
         const published640 = (item.publishedCardImageUrl ?? "").trim();
         const published320 = (item.publishedCardImage320Url ?? "").trim();
-        const scrollImg = published320 || published640;
+        const published480 = (item.publishedCardImage480Url ?? "").trim();
+        const scrollImg = published480 || published320 || published640;
         const needsHtmlOverlay = item.publishedCardImageBackgroundOnly === true && Boolean(scrollImg);
         const tournamentCardOverlaySnapshot =
           needsHtmlOverlay && item.overlaySnapshot ? item.overlaySnapshot : undefined;
@@ -253,8 +256,9 @@ export default async function SiteOperationalHome() {
 
   const tournamentSlideDeckItems: SlideDeckItem[] = mainSlideSnapshots.map((snapshot) => {
     const pub320 = typeof snapshot.publishedCardImage320Url === "string" ? snapshot.publishedCardImage320Url.trim() : "";
+    const pub480 = typeof snapshot.publishedCardImage480Url === "string" ? snapshot.publishedCardImage480Url.trim() : "";
     const pub640 = typeof snapshot.publishedCardImageUrl === "string" ? snapshot.publishedCardImageUrl.trim() : "";
-    const hasPublishedCardPng = Boolean(pub320 || pub640);
+    const hasPublishedCardPng = Boolean(pub480 || pub320 || pub640);
     /** 과거 배경-only PNG는 플래그 누락 시 overlay 유지. 서버 완성 PNG는 false가 compact에 저장되어 overlay 없음. */
     const publishedPngNeedsHtmlTextOverlay =
       snapshot.publishedCardImageBackgroundOnly === true ||
@@ -303,6 +307,7 @@ export default async function SiteOperationalHome() {
         : {}),
       ...(pub640 ? { publishedCardImageUrl: pub640 } : {}),
       ...(pub320 ? { publishedCardImage320Url: pub320 } : {}),
+      ...(pub480 ? { publishedCardImage480Url: pub480 } : {}),
       ...(publishedPngNeedsHtmlTextOverlay ? { publishedCardImageBackgroundOnly: true as const } : {}),
       ...(overlayParsed ? { overlaySnapshot: overlayParsed } : {}),
     };

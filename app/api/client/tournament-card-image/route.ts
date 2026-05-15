@@ -149,8 +149,10 @@ export async function POST(request: Request) {
     originalUrl: persist.originalUrl,
     publishedCardImageUrl: persist.w640Url,
     publishedCardImage320Url: persist.w320Url,
+    publishedCardImage480Url: persist.w480Url ?? persist.w320Url,
     w1280Url: persist.originalUrl,
     w640Url: persist.w640Url,
+    w480Url: persist.w480Url ?? persist.w320Url,
     w320Url: persist.w320Url,
   });
 }

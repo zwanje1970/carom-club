@@ -816,8 +816,8 @@ function buildQuickResultDetailComputed(params: {
     inn1 = Math.max(1, E);
     inn2 = Math.max(1, E);
   }
-  const avg1 = Math.round((params.scorePlayer1 / inn1) * 1000) / 1000;
-  const avg2 = Math.round((params.scorePlayer2 / inn2) * 1000) / 1000;
+  const avg1 = Math.floor((params.scorePlayer1 / inn1) * 1000) / 1000;
+  const avg2 = Math.floor((params.scorePlayer2 / inn2) * 1000) / 1000;
   return {
     firstAttackUserId: first,
     scorePlayer1: params.scorePlayer1,

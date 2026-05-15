@@ -16,7 +16,7 @@ export function resolveSitePosterDisplayUrl(posterUrl: string | null | undefined
       const sp = new URLSearchParams(q >= 0 ? hashless.slice(q + 1) : "");
       const vr = sp.get("variant");
       let v =
-        vr === "original" || vr === "w160" || vr === "w320" || vr === "w640" ? vr : "w640";
+        vr === "original" || vr === "w160" || vr === "w320" || vr === "w480" || vr === "w640" ? vr : "w640";
       if (v === "w160") v = "w640";
       return `/site-images/${v}/${encodeURIComponent(id)}`;
     }
@@ -24,9 +24,9 @@ export function resolveSitePosterDisplayUrl(posterUrl: string | null | undefined
 
   if (trimmed.startsWith("/api/proof-images/")) {
     const idMatch = trimmed.match(/^\/api\/proof-images\/([^/?#]+)/);
-    const vMatch = trimmed.match(/[?&]variant=(original|w160|w320|w640)/);
+    const vMatch = trimmed.match(/[?&]variant=(original|w160|w320|w480|w640)/);
     const id = idMatch?.[1] ? decodeURIComponent(idMatch[1]) : "";
-    let v = (vMatch?.[1] as "original" | "w160" | "w320" | "w640" | undefined) ?? "w640";
+    let v = (vMatch?.[1] as "original" | "w160" | "w320" | "w480" | "w640" | undefined) ?? "w640";
     if (v === "w160") v = "w640";
     if (id) return `/site-images/${v}/${encodeURIComponent(id)}`;
   }

@@ -860,6 +860,8 @@ export type TournamentPublishedCard = {
   publishedCardImageUrl?: string;
   /** 동일 스냅샷의 320 변형(관리·목록용 선택) */
   publishedCardImage320Url?: string;
+  /** 동일 스냅샷의 480 변형(메인 스크롤 카드 우선) */
+  publishedCardImage480Url?: string;
   /** true: 게시 PNG가 배경만(글자 제외) — 메인에서 HTML 텍스트 오버레이. false: 완성 PNG. */
   publishedCardImageBackgroundOnly?: boolean;
   /** 게시 시점 템플릿에서 확정한 글자 레이어(메인은 그대로 렌더만) */
@@ -926,6 +928,7 @@ export type PublishedCardSnapshot = {
   /** 게시 시 카드 본문 640 스냅샷(메인 등에서 우선) */
   publishedCardImageUrl?: string | null;
   publishedCardImage320Url?: string | null;
+  publishedCardImage480Url?: string | null;
   /** 메인: 배경 PNG + HTML 글자 모드. false면 완성 PNG로 간주해 HTML 오버레이 없음. */
   publishedCardImageBackgroundOnly?: boolean;
   /** 메인: 게시 시점 오버레이 좌표·타이포 스냅샷(있으면 템플릿 분기 없이 표시) */
@@ -1032,6 +1035,7 @@ export type ProofImageAsset = {
   storageOriginalUrl?: string;
   storageW160Url?: string;
   storageW320Url?: string;
+  storageW480Url?: string;
   storageW640Url?: string;
 };
 
@@ -2261,6 +2265,7 @@ function normalizeProofImageRow(row: unknown): ProofImageAsset | null {
   const storageOriginalUrl = normalizeOptionalHttpsUrl(r.storageOriginalUrl);
   const storageW160Url = normalizeOptionalHttpsUrl(r.storageW160Url);
   const storageW320Url = normalizeOptionalHttpsUrl(r.storageW320Url);
+  const storageW480Url = normalizeOptionalHttpsUrl(r.storageW480Url);
   const storageW640Url = normalizeOptionalHttpsUrl(r.storageW640Url);
   return {
     id,
@@ -2271,6 +2276,7 @@ function normalizeProofImageRow(row: unknown): ProofImageAsset | null {
     ...(storageOriginalUrl ? { storageOriginalUrl } : {}),
     ...(storageW160Url ? { storageW160Url } : {}),
     ...(storageW320Url ? { storageW320Url } : {}),
+    ...(storageW480Url ? { storageW480Url } : {}),
     ...(storageW640Url ? { storageW640Url } : {}),
   };
 }
@@ -2460,7 +2466,7 @@ function collectReplacedPublishedSnapshotImageIdsForDeletionSchedule(
   const nextId640 = nextPublished640 ? extractProofImageIdFromPosterUrl(nextPublished640) : null;
   const nextId320 = nextPublished320 ? extractProofImageIdFromPosterUrl(nextPublished320) : null;
   const out = new Set<string>();
-  for (const url of [prev.publishedCardImageUrl, prev.publishedCardImage320Url]) {
+  for (const url of [prev.publishedCardImageUrl, prev.publishedCardImage480Url, prev.publishedCardImage320Url]) {
     if (typeof url !== "string" || !url.trim()) continue;
     const id = extractProofImageIdFromPosterUrl(url);
     if (!id) continue;
@@ -2521,7 +2527,7 @@ async function isProofImageIdStillReferencedGlobally(imageId: string): Promise<b
   const allCards = await loadTournamentPublishedCardsRowsIncludingDeleted();
   for (const c of allCards) {
     if ((c.imageId ?? "").trim() === norm) return true;
-    for (const u of [c.publishedCardImageUrl, c.publishedCardImage320Url, c.image320Url]) {
+    for (const u of [c.publishedCardImageUrl, c.publishedCardImage480Url, c.publishedCardImage320Url, c.image320Url]) {
       if (typeof u === "string" && extractProofImageIdFromPosterUrl(u) === norm) return true;
     }
   }
@@ -2550,8 +2556,10 @@ async function tryDeleteFirebaseProofImageStorageObjects(imageId: string): Promi
     const bucketNames = [`${projectId}.firebasestorage.app`, `${projectId}.appspot.com`];
     const paths = [
       `proof-images/${norm}/w320.jpg`,
+      `proof-images/${norm}/w480.jpg`,
       `proof-images/${norm}/w640.jpg`,
       `proof-images/${norm}/w320.png`,
+      `proof-images/${norm}/w480.png`,
       `proof-images/${norm}/w640.png`,
     ];
     for (const bucketName of bucketNames) {
@@ -2585,7 +2593,7 @@ async function deleteProofImageBinaryAndRegistryRow(
     if (asset?.originalExt === "jpg" || asset?.originalExt === "png" || asset?.originalExt === "webp") {
       extCandidates.add(asset.originalExt);
     }
-    for (const variant of ["w320", "w640"] as const) {
+    for (const variant of ["w320", "w480", "w640"] as const) {
       for (const ext of extCandidates) {
         try {
           await unlink(base + path.sep + variant + path.sep + norm + "." + ext);
@@ -2788,6 +2796,9 @@ function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedC
   }
   if (typeof r.publishedCardImage320Url === "string" && r.publishedCardImage320Url.trim()) {
     base.publishedCardImage320Url = r.publishedCardImage320Url.trim();
+  }
+  if (typeof r.publishedCardImage480Url === "string" && r.publishedCardImage480Url.trim()) {
+    base.publishedCardImage480Url = r.publishedCardImage480Url.trim();
   }
   if (typeof r.publishedCardImageBackgroundOnly === "boolean") {
     base.publishedCardImageBackgroundOnly = r.publishedCardImageBackgroundOnly;
@@ -6523,12 +6534,18 @@ export async function replaceSettlementLedgerLines(params: {
   return { ok: true };
 }
 
-export function buildProtectedProofImageUrl(imageId: string, variant: "original" | "w160" | "w320" | "w640"): string {
+export function buildProtectedProofImageUrl(
+  imageId: string,
+  variant: "original" | "w160" | "w320" | "w480" | "w640",
+): string {
   return `/api/proof-images/${encodeURIComponent(imageId)}?variant=${variant}`;
 }
 
 /** 대회 포스터 등 사이트 공개 페이지용 이미지 URL — `<img src>`용 바이너리 경로(쿼리 없음) */
-export function buildSitePublicImageUrl(imageId: string, variant: "original" | "w160" | "w320" | "w640"): string {
+export function buildSitePublicImageUrl(
+  imageId: string,
+  variant: "original" | "w160" | "w320" | "w480" | "w640",
+): string {
   return `/site-images/${variant}/${encodeURIComponent(imageId.trim())}`;
 }
 
@@ -6611,6 +6628,7 @@ export async function createProofImageAsset(params: {
   storageOriginalUrl?: string;
   storageW160Url?: string;
   storageW320Url?: string;
+  storageW480Url?: string;
   storageW640Url?: string;
 }): Promise<{ ok: true; asset: ProofImageAsset } | { ok: false; error: string }> {
   const imageId = params.imageId.trim();
@@ -6627,23 +6645,32 @@ export async function createProofImageAsset(params: {
     (typeof params.storageOriginalUrl === "string" && params.storageOriginalUrl.trim() !== "") ||
     (typeof params.storageW160Url === "string" && params.storageW160Url.trim() !== "") ||
     (typeof params.storageW320Url === "string" && params.storageW320Url.trim() !== "") ||
+    (typeof params.storageW480Url === "string" && params.storageW480Url.trim() !== "") ||
     (typeof params.storageW640Url === "string" && params.storageW640Url.trim() !== "");
 
   let storagePatch: {
     storageOriginalUrl: string;
     storageW160Url: string;
     storageW320Url: string;
+    storageW480Url?: string;
     storageW640Url: string;
   } | null = null;
   if (hasAnyStorageParam) {
     const storageOriginalUrl = normalizeOptionalHttpsUrl(params.storageOriginalUrl);
     const storageW160Url = normalizeOptionalHttpsUrl(params.storageW160Url);
     const storageW320Url = normalizeOptionalHttpsUrl(params.storageW320Url);
+    const storageW480Url = normalizeOptionalHttpsUrl(params.storageW480Url);
     const storageW640Url = normalizeOptionalHttpsUrl(params.storageW640Url);
     if (!storageOriginalUrl || !storageW160Url || !storageW320Url || !storageW640Url) {
       return { ok: false, error: "증빙 이미지 Storage URL이 완전하지 않습니다." };
     }
-    storagePatch = { storageOriginalUrl, storageW160Url, storageW320Url, storageW640Url };
+    storagePatch = {
+      storageOriginalUrl,
+      storageW160Url,
+      storageW320Url,
+      ...(storageW480Url ? { storageW480Url } : {}),
+      storageW640Url,
+    };
   }
 
   const list = await loadProofImageAssetsList();
@@ -8450,7 +8477,6 @@ function revalidateSiteNoticeCache(): void {
 }
 
 function revalidateMainSlideSnapshotsCache(): void {
-  console.log("[CACHE] revalidateMainSlideSnapshotsCache");
   revalidateSiteDataTag(CACHE_TAG_MAIN_SLIDE_SNAPSHOTS);
   revalidateSiteDataTag(CACHE_TAG_SITE_PUBLIC_TOURNAMENTS_LIST);
 }
@@ -9506,6 +9532,9 @@ function tournamentPublishedCardToPublishedSnapshot(
   if (typeof t.publishedCardImage320Url === "string" && t.publishedCardImage320Url.trim()) {
     snap.publishedCardImage320Url = t.publishedCardImage320Url.trim();
   }
+  if (typeof t.publishedCardImage480Url === "string" && t.publishedCardImage480Url.trim()) {
+    snap.publishedCardImage480Url = t.publishedCardImage480Url.trim();
+  }
   if (typeof t.publishedCardImageBackgroundOnly === "boolean") {
     snap.publishedCardImageBackgroundOnly = t.publishedCardImageBackgroundOnly;
   }
@@ -9547,6 +9576,7 @@ export async function upsertTournamentPublishedCard(params: {
   /** 게시 시에만: 카드 본문 640 스냅샷 URL */
   publishedCardImageUrl?: string | null;
   publishedCardImage320Url?: string | null;
+  publishedCardImage480Url?: string | null;
   /** 게시 PNG가 배경만(텍스트 제외)인 경우 true, 완성 PNG면 false */
   publishedCardImageBackgroundOnly?: boolean;
   /** 게시 시 템플릿 DOM에서 확정한 오버레이(검증 실패 시 무시) */
@@ -9738,8 +9768,11 @@ export async function upsertTournamentPublishedCard(params: {
       typeof params.publishedCardImageUrl === "string" ? params.publishedCardImageUrl.trim() : "";
     const pub320 =
       typeof params.publishedCardImage320Url === "string" ? params.publishedCardImage320Url.trim() : "";
+    const pub480 =
+      typeof params.publishedCardImage480Url === "string" ? params.publishedCardImage480Url.trim() : "";
     if (pub640) row.publishedCardImageUrl = pub640;
     if (pub320) row.publishedCardImage320Url = pub320;
+    if (pub480) row.publishedCardImage480Url = pub480;
     if (typeof params.publishedCardImageBackgroundOnly === "boolean") {
       row.publishedCardImageBackgroundOnly = params.publishedCardImageBackgroundOnly;
     }
@@ -10011,11 +10044,9 @@ async function loadTournamentPublishedCardsArrayForMainSite(): Promise<Tournamen
 }
 
 async function persistTournamentPublishedCardsRows(next: TournamentPublishedCard[]): Promise<void> {
-  console.log("[PERSIST] start");
   const ws = resolveTournamentPublishedCardsWriteStrategy();
   if (ws === "firestore-kv") {
     await upsertTournamentPublishedCardsToFirestoreKv(next);
-    console.log("[PERSIST] saved KV");
     await rebuildMainSlideTournamentSnapshotsCompactKvNow();
     revalidateMainSlideSnapshotsCache();
     return;
@@ -10026,7 +10057,6 @@ async function persistTournamentPublishedCardsRows(next: TournamentPublishedCard
   const store = await readLocalJsonAggregate();
   store.tournamentPublishedCards = next;
   await writeLocalJsonAggregate(store);
-  console.log("[PERSIST] saved KV");
   await rebuildMainSlideTournamentSnapshotsCompactKvNow();
   revalidateMainSlideSnapshotsCache();
 }
@@ -10500,7 +10530,7 @@ export async function pruneOrphanTournamentPublishedCards(): Promise<{
 }
 
 function posterSourceUrlFromPublishedCardSnapshot(s: PublishedCardSnapshot): string {
-  for (const u of [s.publishedCardImage320Url, s.image320Url, s.publishedCardImageUrl, s.image640Url]) {
+  for (const u of [s.publishedCardImage480Url, s.publishedCardImage320Url, s.image320Url, s.publishedCardImageUrl, s.image640Url]) {
     const t = typeof u === "string" ? u.trim() : "";
     if (t && extractProofImageIdFromSiteImageUrl(t)) return t;
   }
@@ -10519,7 +10549,7 @@ function sanitizePublishedCardSnapshotForMainSiteSlide(
   const source = posterSourceUrlFromPublishedCardSnapshot(s);
   if (!source) return s;
 
-  const img320 = resolveSiteProofImageUrlWithVariantPreference(
+  const imgMain = resolveSiteProofImageUrlWithVariantPreference(
     source,
     byId,
     buildSitePublicImageUrl,
@@ -10532,7 +10562,7 @@ function sanitizePublishedCardSnapshotForMainSiteSlide(
     SITE_PUBLIC_DETAIL_IMAGE_VARIANT_PREF,
   );
 
-  if (img320 === null) {
+  if (imgMain === null) {
     const next: PublishedCardSnapshot = {
       ...s,
       image320Url: "",
@@ -10544,19 +10574,25 @@ function sanitizePublishedCardSnapshotForMainSiteSlide(
     if (next.publishedCardImage320Url && extractProofImageIdFromSiteImageUrl(next.publishedCardImage320Url)) {
       next.publishedCardImage320Url = undefined;
     }
+    if (next.publishedCardImage480Url && extractProofImageIdFromSiteImageUrl(next.publishedCardImage480Url)) {
+      next.publishedCardImage480Url = undefined;
+    }
     return next;
   }
 
   const next: PublishedCardSnapshot = {
     ...s,
-    image320Url: img320,
-    image640Url: img640 ?? img320,
+    image320Url: imgMain,
+    image640Url: img640 ?? imgMain,
   };
+  if (next.publishedCardImage480Url && extractProofImageIdFromSiteImageUrl(next.publishedCardImage480Url)) {
+    next.publishedCardImage480Url = imgMain;
+  }
   if (next.publishedCardImage320Url && extractProofImageIdFromSiteImageUrl(next.publishedCardImage320Url)) {
-    next.publishedCardImage320Url = img320;
+    next.publishedCardImage320Url = imgMain;
   }
   if (next.publishedCardImageUrl && extractProofImageIdFromSiteImageUrl(next.publishedCardImageUrl)) {
-    next.publishedCardImageUrl = img640 ?? img320;
+    next.publishedCardImageUrl = img640 ?? imgMain;
   }
   return next;
 }

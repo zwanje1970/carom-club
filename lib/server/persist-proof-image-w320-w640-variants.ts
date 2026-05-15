@@ -28,11 +28,19 @@ export function getImageExtFromFileName(fileName: string): "jpg" | "png" | "webp
 }
 
 export type PersistProofImageW320W640Result =
-  | { ok: true; imageId: string; originalUrl: string; w160Url: string; w320Url: string; w640Url: string }
+  | {
+      ok: true;
+      imageId: string;
+      originalUrl: string;
+      w160Url: string;
+      w320Url: string;
+      w480Url?: string;
+      w640Url: string;
+    }
   | { ok: false; error: string; status: number; code?: string };
 
 /**
- * 증빙/사이트 이미지와 동일 파이프라인: sharp로 original(1280)·w640·w320·w160 생성 후 저장.
+ * 증빙/사이트 이미지와 동일 파이프라인: sharp로 original(1280)·w640·w480·w320·w160 생성 후 저장.
  * `preservePngTransparency`: 게시 카드 스냅샷만 — JPEG 변환 없이 PNG(알파)로 변형 저장.
  */
 export async function persistProofImageW320W640Variants(params: {
@@ -49,11 +57,13 @@ export async function persistProofImageW320W640Variants(params: {
   if (preservePngTransparency) {
     let originalBuf: Buffer;
     let w640Buf: Buffer;
+    let w480Buf: Buffer;
     let w320Buf: Buffer;
     let w160Buf: Buffer;
     try {
       originalBuf = await sharp(buffer).resize({ width: 1280, withoutEnlargement: true }).png().toBuffer();
       w640Buf = await sharp(buffer).resize({ width: 640, withoutEnlargement: true }).png().toBuffer();
+      w480Buf = await sharp(buffer).resize({ width: 480, withoutEnlargement: true }).png().toBuffer();
       w320Buf = await sharp(buffer).resize({ width: 320, withoutEnlargement: true }).png().toBuffer();
       w160Buf = await sharp(buffer).resize({ width: 160, withoutEnlargement: true }).png().toBuffer();
     } catch (err) {
@@ -65,19 +75,23 @@ export async function persistProofImageW320W640Variants(params: {
       const baseUploadDir = getProofImagesBaseDir();
       const w160Dir = path.join(baseUploadDir, "w160");
       const w320Dir = path.join(baseUploadDir, "w320");
+      const w480Dir = path.join(baseUploadDir, "w480");
       const w640Dir = path.join(baseUploadDir, "w640");
       const originalDir = path.join(baseUploadDir, "original");
       await mkdir(w160Dir, { recursive: true });
       await mkdir(w320Dir, { recursive: true });
+      await mkdir(w480Dir, { recursive: true });
       await mkdir(w640Dir, { recursive: true });
       await mkdir(originalDir, { recursive: true });
       const originalPng = path.join(originalDir, `${imageId}.png`);
       const w640Png = path.join(w640Dir, `${imageId}.png`);
+      const w480Png = path.join(w480Dir, `${imageId}.png`);
       const w320Png = path.join(w320Dir, `${imageId}.png`);
       const w160Png = path.join(w160Dir, `${imageId}.png`);
       try {
         await writeFile(originalPng, originalBuf);
         await writeFile(w640Png, w640Buf);
+        await writeFile(w480Png, w480Buf);
         await writeFile(w320Png, w320Buf);
         await writeFile(w160Png, w160Buf);
       } catch (e2) {
@@ -100,6 +114,7 @@ export async function persistProofImageW320W640Variants(params: {
         originalUrl: buildUrl(imageId, "original"),
         w160Url: buildUrl(imageId, "w160"),
         w320Url: buildUrl(imageId, "w320"),
+        w480Url: buildUrl(imageId, "w480"),
         w640Url: buildUrl(imageId, "w640"),
       };
     }
@@ -108,6 +123,7 @@ export async function persistProofImageW320W640Variants(params: {
       storageOriginalUrl: string;
       storageW160Url: string;
       storageW320Url: string;
+      storageW480Url?: string;
       storageW640Url: string;
     };
     try {
@@ -116,6 +132,7 @@ export async function persistProofImageW320W640Variants(params: {
         originalBuffer: originalBuf,
         w160Buffer: w160Buf,
         w320Buffer: w320Buf,
+        w480Buffer: w480Buf,
         w640Buffer: w640Buf,
         outputFormat: "png",
       });
@@ -141,6 +158,7 @@ export async function persistProofImageW320W640Variants(params: {
       storageOriginalUrl: storageUrls.storageOriginalUrl,
       storageW160Url: storageUrls.storageW160Url,
       storageW320Url: storageUrls.storageW320Url,
+      ...(storageUrls.storageW480Url ? { storageW480Url: storageUrls.storageW480Url } : {}),
       storageW640Url: storageUrls.storageW640Url,
     });
     if (!createAssetResult.ok) {
@@ -153,6 +171,7 @@ export async function persistProofImageW320W640Variants(params: {
       originalUrl: storageUrls.storageOriginalUrl,
       w160Url: storageUrls.storageW160Url,
       w320Url: storageUrls.storageW320Url,
+      ...(storageUrls.storageW480Url ? { w480Url: storageUrls.storageW480Url } : {}),
       w640Url: storageUrls.storageW640Url,
     };
   }
@@ -161,15 +180,18 @@ export async function persistProofImageW320W640Variants(params: {
     const baseUploadDir = getProofImagesBaseDir();
     const w160Dir = path.join(baseUploadDir, "w160");
     const w320Dir = path.join(baseUploadDir, "w320");
+    const w480Dir = path.join(baseUploadDir, "w480");
     const w640Dir = path.join(baseUploadDir, "w640");
     const originalDir = path.join(baseUploadDir, "original");
     await mkdir(w160Dir, { recursive: true });
     await mkdir(w320Dir, { recursive: true });
+    await mkdir(w480Dir, { recursive: true });
     await mkdir(w640Dir, { recursive: true });
     await mkdir(originalDir, { recursive: true });
 
     const w160Jpg = path.join(w160Dir, `${imageId}.jpg`);
     const w320Jpg = path.join(w320Dir, `${imageId}.jpg`);
+    const w480Jpg = path.join(w480Dir, `${imageId}.jpg`);
     const w640Jpg = path.join(w640Dir, `${imageId}.jpg`);
     const originalJpg = path.join(originalDir, `${imageId}.jpg`);
     const w640Alt = path.join(w640Dir, `${imageId}.${ext}`);
@@ -235,6 +257,30 @@ export async function persistProofImageW320W640Variants(params: {
       }
     }
 
+    let w480Ok = false;
+    try {
+      const w480Buf = await sharp(w640ForDownstream)
+        .resize({ width: 480, withoutEnlargement: true })
+        .jpeg({ quality: 87 })
+        .toBuffer();
+      await writeFile(w480Jpg, w480Buf);
+      w480Ok = true;
+    } catch (err) {
+      console.warn("[persist-proof-image-w320-w640] w480 w640기반 sharp 실패, 원본→480 재시도", err);
+    }
+    if (!w480Ok) {
+      try {
+        const w480Buf = await sharp(buffer)
+          .resize({ width: 480, withoutEnlargement: true })
+          .jpeg({ quality: 87 })
+          .toBuffer();
+        await writeFile(w480Jpg, w480Buf);
+        w480Ok = true;
+      } catch (err) {
+        console.warn("[persist-proof-image-w320-w640] w480 저장 실패, w480 생략", err);
+      }
+    }
+
     let w160Ok = false;
     try {
       const w160Buf = await sharp(w640ForDownstream)
@@ -277,6 +323,7 @@ export async function persistProofImageW320W640Variants(params: {
       originalUrl: buildUrl(imageId, "original"),
       w160Url: buildUrl(imageId, "w160"),
       w320Url: buildUrl(imageId, "w320"),
+      ...(w480Ok ? { w480Url: buildUrl(imageId, "w480") } : {}),
       w640Url: buildUrl(imageId, "w640"),
     };
   }
@@ -317,6 +364,16 @@ export async function persistProofImageW320W640Variants(params: {
     }
   }
 
+  let w480Buffer: Buffer | undefined;
+  try {
+    w480Buffer = await sharp(w640Buffer)
+      .resize({ width: 480, withoutEnlargement: true })
+      .jpeg({ quality: 87 })
+      .toBuffer();
+  } catch (err) {
+    console.warn("[persist-proof-image-w320-w640] w480 w640기반 sharp 실패, w480 생략", err);
+  }
+
   let w160Buffer: Buffer;
   try {
     w160Buffer = await sharp(buffer)
@@ -340,6 +397,7 @@ export async function persistProofImageW320W640Variants(params: {
     storageOriginalUrl: string;
     storageW160Url: string;
     storageW320Url: string;
+    storageW480Url?: string;
     storageW640Url: string;
   };
   try {
@@ -348,6 +406,7 @@ export async function persistProofImageW320W640Variants(params: {
       originalBuffer,
       w160Buffer,
       w320Buffer,
+      ...(w480Buffer ? { w480Buffer } : {}),
       w640Buffer,
     });
   } catch (err) {
@@ -373,6 +432,7 @@ export async function persistProofImageW320W640Variants(params: {
     storageOriginalUrl: storageUrls.storageOriginalUrl,
     storageW160Url: storageUrls.storageW160Url,
     storageW320Url: storageUrls.storageW320Url,
+    ...(storageUrls.storageW480Url ? { storageW480Url: storageUrls.storageW480Url } : {}),
     storageW640Url: storageUrls.storageW640Url,
   });
   if (!createAssetResult.ok) {
@@ -392,6 +452,7 @@ export async function persistProofImageW320W640Variants(params: {
     originalUrl: storageUrls.storageOriginalUrl,
     w160Url: storageUrls.storageW160Url,
     w320Url: storageUrls.storageW320Url,
+    ...(storageUrls.storageW480Url ? { w480Url: storageUrls.storageW480Url } : {}),
     w640Url: storageUrls.storageW640Url,
   };
 }

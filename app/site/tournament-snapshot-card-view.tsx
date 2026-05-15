@@ -49,6 +49,8 @@ export type SlideDeckItem = {
   publishedCardImageUrl?: string;
   /** 게시 시 생성한 카드 본문 320 스냅샷 URL — 메인 스크롤 등 목록 표시용 */
   publishedCardImage320Url?: string;
+  /** 게시 시 생성한 카드 본문 480 스냅샷 URL — 메인 스크롤 카드 우선 */
+  publishedCardImage480Url?: string;
   /** true: PNG에 글자 미포함(배경만) — 메인에서 HTML 오버레이 */
   publishedCardImageBackgroundOnly?: boolean;
   /** 메인 HTML 오버레이: 게시 시점 좌표 스냅샷(있으면 메인은 템플릿 분기 없이 표시) */

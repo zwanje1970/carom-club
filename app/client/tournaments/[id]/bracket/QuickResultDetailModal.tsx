@@ -1,6 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import styles from "./QuickResultDetailModal.module.css";
+
+/** AVG = 점수 ÷ 이닝, 소수 셋째 자리까지 버림 */
+function truncateAvg3(score: number, innings: number): number {
+  if (!Number.isFinite(score) || !Number.isFinite(innings) || innings < 1) return 0;
+  return Math.floor((score / innings) * 1000) / 1000;
+}
 
 /** 서버 `buildQuickResultDetailComputed`와 동일한 이닝·AVG 계산(미리보기용) */
 function computeInningsAndAvgs(params: {
@@ -40,13 +47,40 @@ function computeInningsAndAvgs(params: {
     inn1 = Math.max(1, E);
     inn2 = Math.max(1, E);
   }
-  const avg1 = Math.round((params.scorePlayer1 / inn1) * 1000) / 1000;
-  const avg2 = Math.round((params.scorePlayer2 / inn2) * 1000) / 1000;
-  return { inn1, inn2, avg1, avg2 };
+  return {
+    inn1,
+    inn2,
+    avg1: truncateAvg3(params.scorePlayer1, inn1),
+    avg2: truncateAvg3(params.scorePlayer2, inn2),
+  };
 }
 
 function formatAvg3(n: number): string {
   return Number.isFinite(n) ? n.toFixed(3) : "—";
+}
+
+function ResultPill({ label, variant }: { label: string; variant: "win" | "lose" }) {
+  return (
+    <span className={`${styles.pill} ${variant === "win" ? styles.pillWin : styles.pillLose}`}>{label}</span>
+  );
+}
+
+function BreakIndicator({ kind }: { kind: "first" | "second" }) {
+  return (
+    <span className={styles.breakMark} title={kind === "first" ? "선구" : "후구"}>
+      {kind === "first" ? (
+        <>
+          <span className={styles.breakWhite} aria-hidden />
+          선구
+        </>
+      ) : (
+        <>
+          <span className={styles.breakYellow} aria-hidden />
+          후구
+        </>
+      )}
+    </span>
+  );
 }
 
 export type QuickResultDetailModalMatch = {
@@ -93,7 +127,6 @@ export default function QuickResultDetailModal({
   const [scorePlayer1, setScorePlayer1] = useState("");
   const [scorePlayer2, setScorePlayer2] = useState("");
   const [endInning, setEndInning] = useState("");
-  const [highExpanded, setHighExpanded] = useState(false);
   const [highRunPlayer1, setHighRunPlayer1] = useState("");
   const [highRunPlayer2, setHighRunPlayer2] = useState("");
   const [formError, setFormError] = useState("");
@@ -102,21 +135,26 @@ export default function QuickResultDetailModal({
   useEffect(() => {
     if (!open || !match) return;
     const d = match.quickResultDetail;
-    setFirstAttackUserId(d?.firstAttackUserId?.trim() ?? "");
+    const savedFirst = d?.firstAttackUserId?.trim() ?? "";
+    setFirstAttackUserId(savedFirst || match.player1.userId);
     setScorePlayer1(d != null ? String(d.scorePlayer1) : "");
     setScorePlayer2(d != null ? String(d.scorePlayer2) : "");
     setEndInning(d != null ? String(d.endInning) : "");
-    const hasHr = d != null && (d.highRunPlayer1 != null || d.highRunPlayer2 != null);
-    setHighExpanded(hasHr);
     setHighRunPlayer1(d?.highRunPlayer1 != null && d.highRunPlayer1 !== undefined ? String(d.highRunPlayer1) : "");
     setHighRunPlayer2(d?.highRunPlayer2 != null && d.highRunPlayer2 !== undefined ? String(d.highRunPlayer2) : "");
     setFormError("");
   }, [open, match]);
 
+  const winnerUserId = (match?.winnerUserId ?? "").trim();
+  const matchCompleted = match?.status === "COMPLETED" && winnerUserId !== "";
+  const p1Win = matchCompleted && winnerUserId === match?.player1.userId;
+  const p2Win = matchCompleted && winnerUserId === match?.player2.userId;
+
+  const p1IsFirst = firstAttackUserId === match?.player1.userId;
+  const p2IsFirst = firstAttackUserId === match?.player2.userId;
+
   const preview = useMemo(() => {
-    if (!match) return null;
-    const win = (match.winnerUserId ?? "").trim();
-    if (!win || match.status !== "COMPLETED") return null;
+    if (!match || !matchCompleted) return null;
     const s1 = Math.floor(Number(scorePlayer1));
     const s2 = Math.floor(Number(scorePlayer2));
     const E = Math.floor(Number(endInning));
@@ -128,12 +166,12 @@ export default function QuickResultDetailModal({
       firstAttackUserId: fa,
       player1UserId: match.player1.userId,
       player2UserId: match.player2.userId,
-      winnerUserId: win,
+      winnerUserId,
       scorePlayer1: s1,
       scorePlayer2: s2,
       endInning: E,
     });
-  }, [endInning, firstAttackUserId, match, scorePlayer1, scorePlayer2]);
+  }, [endInning, firstAttackUserId, match, matchCompleted, scorePlayer1, scorePlayer2, winnerUserId]);
 
   const parseOptionalInt = (raw: string): number | null | "bad" => {
     const t = raw.trim();
@@ -143,18 +181,21 @@ export default function QuickResultDetailModal({
     return n;
   };
 
+  const handleSwapBreak = useCallback(() => {
+    if (!match) return;
+    setFirstAttackUserId((prev) => {
+      const cur = prev.trim() || match.player1.userId;
+      return cur === match.player1.userId ? match.player2.userId : match.player1.userId;
+    });
+  }, [match]);
+
   const handleSave = useCallback(async () => {
     if (!match || !tournamentId.trim()) return;
-    const win = (match.winnerUserId ?? "").trim();
-    if (!win || match.status !== "COMPLETED") {
+    if (!matchCompleted) {
       window.alert("먼저 승패를 선택해 주세요.");
       return;
     }
-    const fa = firstAttackUserId.trim();
-    if (!fa) {
-      setFormError("선공을 선택해 주세요.");
-      return;
-    }
+    const fa = firstAttackUserId.trim() || match.player1.userId;
     const s1 = Math.floor(Number(scorePlayer1));
     const s2 = Math.floor(Number(scorePlayer2));
     const E = Math.floor(Number(endInning));
@@ -163,20 +204,14 @@ export default function QuickResultDetailModal({
       return;
     }
     if (!Number.isFinite(E) || E < 1) {
-      setFormError("종료이닝을 확인해 주세요.");
+      setFormError("승자 이닝을 확인해 주세요.");
       return;
     }
-    let hr1: number | null = null;
-    let hr2: number | null = null;
-    if (highExpanded) {
-      const a = parseOptionalInt(highRunPlayer1);
-      const b = parseOptionalInt(highRunPlayer2);
-      if (a === "bad" || b === "bad") {
-        setFormError("하이런 값이 올바르지 않습니다. 비워 두면 미입력으로 저장됩니다.");
-        return;
-      }
-      hr1 = a;
-      hr2 = b;
+    const hr1 = parseOptionalInt(highRunPlayer1);
+    const hr2 = parseOptionalInt(highRunPlayer2);
+    if (hr1 === "bad" || hr2 === "bad") {
+      setFormError("하이런 값이 올바르지 않습니다. 비워 두면 미입력으로 저장됩니다.");
+      return;
     }
     setFormError("");
     setSaveBusy(true);
@@ -213,10 +248,10 @@ export default function QuickResultDetailModal({
     bracketZoneQuery,
     endInning,
     firstAttackUserId,
-    highExpanded,
     highRunPlayer1,
     highRunPlayer2,
     match,
+    matchCompleted,
     onClose,
     onSaved,
     scorePlayer1,
@@ -226,194 +261,173 @@ export default function QuickResultDetailModal({
 
   if (!open || !match) return null;
 
+  const p1InningDisplay = () => {
+    if (!matchCompleted) return <span className={styles.emptyDash}>—</span>;
+    if (p1Win) {
+      return (
+        <input
+          className={styles.cellInput}
+          inputMode="numeric"
+          value={endInning}
+          onChange={(e) => setEndInning(e.target.value)}
+          disabled={disabled || saveBusy}
+          aria-label="승자 이닝"
+        />
+      );
+    }
+    if (preview) return <span className={styles.computed}>{preview.inn1}</span>;
+    return <span className={styles.emptyDash}>—</span>;
+  };
+
+  const p2InningDisplay = () => {
+    if (!matchCompleted) return <span className={styles.emptyDash}>—</span>;
+    if (p2Win) {
+      return (
+        <input
+          className={styles.cellInput}
+          inputMode="numeric"
+          value={endInning}
+          onChange={(e) => setEndInning(e.target.value)}
+          disabled={disabled || saveBusy}
+          aria-label="승자 이닝"
+        />
+      );
+    }
+    if (preview) return <span className={styles.computed}>{preview.inn2}</span>;
+    return <span className={styles.emptyDash}>—</span>;
+  };
+
+  const p1AvgDisplay = preview ? formatAvg3(preview.avg1) : "—";
+  const p2AvgDisplay = preview ? formatAvg3(preview.avg2) : "—";
+
   return (
     <div
       role="presentation"
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 401,
-        background: "rgba(15,23,42,0.45)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, var(--client-bottom-space, 80px)) max(16px, env(safe-area-inset-left))",
-        boxSizing: "border-box",
-      }}
+      className={styles.overlay}
       onClick={() => (!saveBusy && !disabled ? onClose() : null)}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="qr-detail-title"
+        className={styles.dialog}
         onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%",
-          maxWidth: "24rem",
-          background: "#fff",
-          borderRadius: "12px",
-          padding: "1.05rem",
-          border: "1px solid #cbd5e1",
-          boxShadow: "none",
-          boxSizing: "border-box",
-          maxHeight: "min(90vh, 32rem)",
-          overflowY: "auto",
-        }}
       >
-        <h2 id="qr-detail-title" style={{ margin: "0 0 0.55rem", fontSize: "1.02rem", fontWeight: 800 }}>
-          상세 입력
-        </h2>
-        <p className="v3-muted" style={{ margin: "0 0 0.65rem", fontSize: "0.82rem", lineHeight: 1.45 }}>
-          승패는 이 화면의 승·패 버튼으로만 반영됩니다. 여기서는 기록만 저장합니다.
-        </p>
+        <div className={styles.toolbar}>
+          <h2 id="qr-detail-title" className={styles.title}>
+            상세 입력
+          </h2>
+          <button
+            type="button"
+            className={styles.swapBtn}
+            onClick={handleSwapBreak}
+            disabled={disabled || saveBusy}
+          >
+            선구 변경
+          </button>
+        </div>
+        <p className={styles.hint}>승패는 목록의 승·패 버튼으로만 반영됩니다. 여기서는 기록만 저장합니다.</p>
 
-        <div className="v3-stack" style={{ gap: "0.55rem" }}>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: "0.86rem", marginBottom: "0.28rem" }}>선공</div>
-            <div className="v3-row" style={{ gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
-              <label style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", fontSize: "0.88rem", cursor: "pointer" }}>
+        <table className={styles.recordTable}>
+          <thead>
+            <tr>
+              <th className={styles.labelCol} aria-hidden />
+              <th className={styles.playerCol}>
+                <div className={styles.playerHead}>
+                  <span>{p1Label}</span>
+                  {matchCompleted ? (
+                    p1Win ? <ResultPill label="승" variant="win" /> : p2Win ? <ResultPill label="패" variant="lose" /> : null
+                  ) : null}
+                  {p1IsFirst ? <BreakIndicator kind="first" /> : p2IsFirst ? <BreakIndicator kind="second" /> : null}
+                </div>
+              </th>
+              <th className={styles.playerCol}>
+                <div className={styles.playerHead}>
+                  <span>{p2Label}</span>
+                  {matchCompleted ? (
+                    p2Win ? <ResultPill label="승" variant="win" /> : p1Win ? <ResultPill label="패" variant="lose" /> : null
+                  ) : null}
+                  {p2IsFirst ? <BreakIndicator kind="first" /> : p1IsFirst ? <BreakIndicator kind="second" /> : null}
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className={styles.labelCol}>점수</td>
+              <td className={styles.playerCol}>
                 <input
-                  type="radio"
-                  name={`qr-first-${match.id}`}
-                  checked={firstAttackUserId === match.player1.userId}
-                  onChange={() => setFirstAttackUserId(match.player1.userId)}
-                  disabled={disabled || saveBusy}
+                  className={styles.cellInput}
+                  inputMode="numeric"
+                  value={scorePlayer1}
+                  onChange={(e) => setScorePlayer1(e.target.value)}
+                  disabled={disabled || saveBusy || !matchCompleted}
                 />
-                <span>
-                  A ({p1Label}) <span style={{ fontWeight: 800 }}>○선</span>
-                </span>
-              </label>
-              <label style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", fontSize: "0.88rem", cursor: "pointer" }}>
+              </td>
+              <td className={styles.playerCol}>
                 <input
-                  type="radio"
-                  name={`qr-first-${match.id}`}
-                  checked={firstAttackUserId === match.player2.userId}
-                  onChange={() => setFirstAttackUserId(match.player2.userId)}
-                  disabled={disabled || saveBusy}
+                  className={styles.cellInput}
+                  inputMode="numeric"
+                  value={scorePlayer2}
+                  onChange={(e) => setScorePlayer2(e.target.value)}
+                  disabled={disabled || saveBusy || !matchCompleted}
                 />
-                <span>
-                  B ({p2Label}) <span style={{ fontWeight: 800 }}>○선</span>
-                </span>
-              </label>
-            </div>
-          </div>
+              </td>
+            </tr>
+            <tr>
+              <td className={styles.labelCol}>이닝</td>
+              <td className={styles.playerCol}>{p1InningDisplay()}</td>
+              <td className={styles.playerCol}>{p2InningDisplay()}</td>
+            </tr>
+            <tr>
+              <td className={styles.labelCol}>AVG</td>
+              <td className={styles.playerCol}>
+                <span className={preview ? styles.computed : styles.emptyDash}>{p1AvgDisplay}</span>
+              </td>
+              <td className={styles.playerCol}>
+                <span className={preview ? styles.computed : styles.emptyDash}>{p2AvgDisplay}</span>
+              </td>
+            </tr>
+            <tr>
+              <td className={styles.labelCol}>하이런</td>
+              <td className={styles.playerCol}>
+                <input
+                  className={styles.cellInput}
+                  inputMode="numeric"
+                  value={highRunPlayer1}
+                  onChange={(e) => setHighRunPlayer1(e.target.value)}
+                  disabled={disabled || saveBusy || !matchCompleted}
+                  placeholder="—"
+                />
+              </td>
+              <td className={styles.playerCol}>
+                <input
+                  className={styles.cellInput}
+                  inputMode="numeric"
+                  value={highRunPlayer2}
+                  onChange={(e) => setHighRunPlayer2(e.target.value)}
+                  disabled={disabled || saveBusy || !matchCompleted}
+                  placeholder="—"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
 
-          <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
-            <label style={{ flex: "1 1 8rem", display: "flex", flexDirection: "column", gap: "0.2rem", fontSize: "0.82rem", fontWeight: 700 }}>
-              A 점수
-              <input
-                className="v3-btn"
-                inputMode="numeric"
-                value={scorePlayer1}
-                onChange={(e) => setScorePlayer1(e.target.value)}
-                disabled={disabled || saveBusy}
-                style={{ fontWeight: 600, minHeight: 40 }}
-              />
-            </label>
-            <label style={{ flex: "1 1 8rem", display: "flex", flexDirection: "column", gap: "0.2rem", fontSize: "0.82rem", fontWeight: 700 }}>
-              B 점수
-              <input
-                className="v3-btn"
-                inputMode="numeric"
-                value={scorePlayer2}
-                onChange={(e) => setScorePlayer2(e.target.value)}
-                disabled={disabled || saveBusy}
-                style={{ fontWeight: 600, minHeight: 40 }}
-              />
-            </label>
-          </div>
+        {formError ? <p className={styles.formError}>{formError}</p> : null}
 
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem", fontSize: "0.82rem", fontWeight: 700 }}>
-            종료 이닝
-            <input
-              className="v3-btn"
-              inputMode="numeric"
-              value={endInning}
-              onChange={(e) => setEndInning(e.target.value)}
-              disabled={disabled || saveBusy}
-              style={{ fontWeight: 600, minHeight: 40, maxWidth: "10rem" }}
-            />
-          </label>
-
-          {preview ? (
-            <div
-              style={{
-                fontSize: "0.82rem",
-                lineHeight: 1.5,
-                color: "#334155",
-                background: "#f1f5f9",
-                borderRadius: 8,
-                padding: "0.45rem 0.55rem",
-              }}
-            >
-              <div style={{ fontWeight: 800, marginBottom: "0.25rem" }}>계산 미리보기</div>
-              <div>
-                A 이닝 {preview.inn1} · A AVG {formatAvg3(preview.avg1)}
-              </div>
-              <div>
-                B 이닝 {preview.inn2} · B AVG {formatAvg3(preview.avg2)}
-              </div>
-            </div>
-          ) : null}
-
-          <div>
-            <button
-              type="button"
-              className="v3-btn"
-              onClick={() => setHighExpanded((v) => !v)}
-              disabled={disabled || saveBusy}
-              style={{ fontSize: "0.84rem", fontWeight: 700, padding: "0.35rem 0.55rem" }}
-            >
-              {highExpanded ? "하이런 접기" : "하이런 입력"}
-            </button>
-            {highExpanded ? (
-              <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap", marginTop: "0.45rem" }}>
-                <label style={{ flex: "1 1 8rem", display: "flex", flexDirection: "column", gap: "0.2rem", fontSize: "0.82rem", fontWeight: 700 }}>
-                  A 하이런 (선택)
-                  <input
-                    className="v3-btn"
-                    inputMode="numeric"
-                    value={highRunPlayer1}
-                    onChange={(e) => setHighRunPlayer1(e.target.value)}
-                    disabled={disabled || saveBusy}
-                    style={{ fontWeight: 600, minHeight: 40 }}
-                    placeholder="비움"
-                  />
-                </label>
-                <label style={{ flex: "1 1 8rem", display: "flex", flexDirection: "column", gap: "0.2rem", fontSize: "0.82rem", fontWeight: 700 }}>
-                  B 하이런 (선택)
-                  <input
-                    className="v3-btn"
-                    inputMode="numeric"
-                    value={highRunPlayer2}
-                    onChange={(e) => setHighRunPlayer2(e.target.value)}
-                    disabled={disabled || saveBusy}
-                    style={{ fontWeight: 600, minHeight: 40 }}
-                    placeholder="비움"
-                  />
-                </label>
-              </div>
-            ) : null}
-          </div>
-
-          {formError ? (
-            <p style={{ margin: 0, color: "#b91c1c", fontSize: "0.84rem", fontWeight: 600 }}>{formError}</p>
-          ) : null}
-
-          <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap", marginTop: "0.25rem" }}>
-            <button type="button" className="v3-btn" disabled={saveBusy || disabled} onClick={onClose} style={{ minHeight: 44 }}>
-              닫기
-            </button>
-            <button
-              type="button"
-              className="ui-btn-primary-solid"
-              disabled={saveBusy || disabled}
-              onClick={() => void handleSave()}
-              style={{ minHeight: 44, fontWeight: 700 }}
-            >
-              {saveBusy ? "저장 중…" : "저장"}
-            </button>
-          </div>
+        <div className={styles.actions}>
+          <button type="button" className={`v3-btn ${styles.actionBtn}`} disabled={saveBusy || disabled} onClick={onClose}>
+            닫기
+          </button>
+          <button
+            type="button"
+            className={`ui-btn-primary-solid ${styles.saveBtn}`}
+            disabled={saveBusy || disabled || !matchCompleted}
+            onClick={() => void handleSave()}
+          >
+            {saveBusy ? "저장 중…" : "저장"}
+          </button>
         </div>
       </div>
     </div>
