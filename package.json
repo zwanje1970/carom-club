@@ -48,6 +48,7 @@
     "@types/node": "^22.17.2",
     "@types/react": "^19.1.9",
     "@types/react-dom": "^19.1.7",
+    "playwright": "^1.51.0",
     "typescript": "^5.9.2"
   }
 }

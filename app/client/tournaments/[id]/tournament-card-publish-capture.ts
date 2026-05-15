@@ -18,6 +18,19 @@ import type {
 } from "../../../../lib/site/tournament-card-overlay-snapshot";
 import { isTournamentCardOverlaySlotType } from "../../../../lib/site/tournament-card-overlay-snapshot";
 
+/** 최종 PNG 가로 약 1280px — 440 아트보드 × 배율 */
+export const TOURNAMENT_CARD_PUBLISH_BROWSER_CAPTURE_SCALE = 1280 / TOURNAMENT_CARD_ARTBOARD_WIDTH_PX;
+
+export function isBrowserCaptureDiagEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_TOURNAMENT_CARD_BROWSER_CAPTURE_DIAG === "1";
+}
+
+function logBrowserCapture(msg: string, extra?: Record<string, unknown>) {
+  if (!isBrowserCaptureDiagEnabled()) return;
+  if (extra) console.info("[tournament-card-browser-capture]", msg, extra);
+  else console.info("[tournament-card-browser-capture]", msg);
+}
+
 function waitForImages(root: HTMLElement): Promise<void> {
   const imgs = [...root.querySelectorAll("img")];
   const pending = imgs.filter((img) => !img.complete);
@@ -50,7 +63,7 @@ function createCaptureHost(): HTMLDivElement {
   host.setAttribute("data-tournament-card-capture-host", "1");
   host.style.cssText = [
     "position:fixed",
-    "left:-12000px",
+    "left:-99999px",
     "top:0",
     `width:${TOURNAMENT_CARD_ARTBOARD_WIDTH_PX}px`,
     `height:${TOURNAMENT_CARD_ARTBOARD_HEIGHT_PX}px`,
@@ -156,6 +169,112 @@ async function captureOverlaySnapshotDom(item: SlideDeckItem): Promise<Tournamen
     const articleEl = host.querySelector("article");
     if (!(articleEl instanceof HTMLElement)) return null;
     return measureOverlayFromArticle(articleEl);
+  } finally {
+    reactRoot.unmount();
+    host.remove();
+  }
+}
+
+/**
+ * 게시 발행: 제작자 브라우저에서 카드 본체 전체(글자·배지·배경·그림자)를 PNG로 캡처 후
+ * `POST /api/client/tournament-card-image`(multipart)로 업로드한다. html2canvas는 이 모듈에서만 동적 import.
+ */
+export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(args: {
+  tournamentId: string;
+  item: SlideDeckItem;
+  signal?: AbortSignal;
+}): Promise<{
+  imageId: string;
+  publishedCardImageUrl: string;
+  publishedCardImage320Url: string;
+  publishedCardImage480Url: string;
+}> {
+  const { tournamentId, item, signal } = args;
+  logBrowserCapture("full-png capture start", { tournamentId });
+
+  const host = createCaptureHost();
+  document.body.appendChild(host);
+  const reactRoot = createRoot(host);
+  reactRoot.render(
+    createElement(TournamentSnapshotCardView, {
+      item,
+      slideDeck: true,
+      slideDeckAspectFill: true,
+      templateCardLayout: true,
+      suppressLink: true,
+      artboardPx: true,
+      slideDeckSolidBackdrop: SLIDE_DECK_SOLID_BACKDROPS[0],
+      isImageCaptureMode: false,
+    }),
+  );
+
+  try {
+    if (typeof document.fonts?.ready?.then === "function") {
+      await document.fonts.ready;
+    }
+    await waitForImages(host);
+    await doubleRaf();
+
+    const articleEl = host.querySelector("article");
+    const captureRoot = articleEl instanceof HTMLElement ? articleEl : host;
+    for (const img of host.querySelectorAll("img")) {
+      img.crossOrigin = "anonymous";
+    }
+    await waitForImages(host);
+    await doubleRaf();
+
+    const [{ default: html2canvas }] = await Promise.all([import("html2canvas")]);
+    const canvas = await html2canvas(captureRoot, {
+      scale: TOURNAMENT_CARD_PUBLISH_BROWSER_CAPTURE_SCALE,
+      backgroundColor: null,
+      useCORS: true,
+      logging: false,
+      width: TOURNAMENT_CARD_ARTBOARD_WIDTH_PX,
+      height: TOURNAMENT_CARD_ARTBOARD_HEIGHT_PX,
+    });
+
+    const blob = await canvasToBlob(canvas);
+    logBrowserCapture("full-png canvas ok", {
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height,
+      blobBytes: blob.size,
+    });
+
+    const formData = new FormData();
+    formData.append("tournamentId", tournamentId);
+    formData.append("file", blob, "tournament-published-card.png");
+
+    const res = await fetch("/api/client/tournament-card-image", {
+      method: "POST",
+      body: formData,
+      credentials: "same-origin",
+      signal,
+    });
+    const json = (await res.json()) as {
+      error?: string;
+      imageId?: string;
+      publishedCardImageUrl?: string;
+      publishedCardImage320Url?: string;
+      publishedCardImage480Url?: string;
+      w640Url?: string;
+      w480Url?: string;
+      w320Url?: string;
+    };
+    const publishedCardImageUrl = (json.publishedCardImageUrl ?? json.w640Url ?? "").trim();
+    const publishedCardImage320Url = (json.publishedCardImage320Url ?? json.w320Url ?? "").trim();
+    const publishedCardImage480Url = (json.publishedCardImage480Url ?? json.w480Url ?? "").trim();
+    const imageId = (json.imageId ?? "").trim();
+    if (!res.ok || !publishedCardImageUrl || !publishedCardImage320Url || !imageId) {
+      logBrowserCapture("multipart upload failed", { status: res.status, error: json.error });
+      throw new Error(json.error ?? "게시 카드 이미지 업로드에 실패했습니다.");
+    }
+    logBrowserCapture("full-png upload ok", { imageId, publishedCardImageUrl });
+    return {
+      imageId,
+      publishedCardImageUrl,
+      publishedCardImage320Url,
+      publishedCardImage480Url: publishedCardImage480Url || publishedCardImage320Url,
+    };
   } finally {
     reactRoot.unmount();
     host.remove();

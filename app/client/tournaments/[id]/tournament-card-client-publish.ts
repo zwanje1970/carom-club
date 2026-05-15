@@ -1,4 +1,8 @@
 import { buildSlideDeckItemForTournamentCapture } from "./tournament-card-build-slide-deck-item";
+import {
+  captureAndUploadTournamentPublishedCardFullPngInBrowser,
+  isBrowserCaptureDiagEnabled,
+} from "./tournament-card-publish-capture";
 
 type CardSnapshotRow = {
   snapshotId?: string;
@@ -187,51 +191,78 @@ export async function publishTournamentCardFromEditorClient(args: {
       tournamentFallbackDate: tournamentDate,
       tournamentFallbackLocation: tournamentLocation,
     });
-    const imageRes = await fetchJsonWithTimeout<{
-      error?: string;
-      imageId?: string;
-      publishedCardImageUrl?: string;
-      publishedCardImage320Url?: string;
-      publishedCardImage480Url?: string;
-      w640Url?: string;
-      w480Url?: string;
-      w320Url?: string;
-    }>(
-      "/api/client/tournament-card-image",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+    const browserImageController = new AbortController();
+    const browserImageTimeoutId = window.setTimeout(() => browserImageController.abort(), PUBLISH_IMAGE_TIMEOUT_MS);
+    try {
+      try {
+        const r = await captureAndUploadTournamentPublishedCardFullPngInBrowser({
           tournamentId,
-          templateId: slideDeckItem.cardTemplate ?? "A",
-          title: slideDeckItem.title,
-          subtitle: slideDeckItem.subtitle,
-          textLine1: slideDeckItem.cardExtraLine1 ?? null,
-          textLine2: slideDeckItem.cardExtraLine2 ?? null,
-          textLine3: slideDeckItem.cardExtraLine3 ?? null,
-          statusBadge: args.slideStatusBadge,
-          backgroundType: slideDeckItem.backgroundType ?? "image",
-          themeType: slideDeckItem.themeType ?? "dark",
-          backgroundImageUrl: slideDeckItem.image320Url ?? null,
-          backgroundImageOpacity:
-            typeof slideDeckItem.imageOverlayOpacity === "number" ? slideDeckItem.imageOverlayOpacity : null,
-          mediaBackground: slideDeckItem.mediaBackground ?? null,
-          textShadowEnabled: slideDeckItem.cardTextShadowEnabled === true,
-          surfaceLayout: slideDeckItem.cardSurfaceLayout === "full" ? "full" : "split",
-          leadTextColor: slideDeckItem.cardLeadTextColor ?? null,
-          titleTextColor: slideDeckItem.cardTitleTextColor ?? null,
-          descriptionTextColor: slideDeckItem.cardDescriptionTextColor ?? null,
-          footerDateTextColor: slideDeckItem.cardFooterDateTextColor ?? null,
-          footerPlaceTextColor: slideDeckItem.cardFooterPlaceTextColor ?? null,
-        }),
-      },
-      PUBLISH_IMAGE_TIMEOUT_MS,
-    );
-    publishedCardImageUrl = (imageRes.json.publishedCardImageUrl ?? imageRes.json.w640Url ?? "").trim();
-    publishedCardImage480Url = (imageRes.json.publishedCardImage480Url ?? imageRes.json.w480Url ?? "").trim();
-    publishedCardImage320Url = (imageRes.json.publishedCardImage320Url ?? imageRes.json.w320Url ?? "").trim();
-    publishedCardImageId = (imageRes.json.imageId ?? "").trim();
-    if (!imageRes.ok || !publishedCardImageUrl || !publishedCardImage320Url || !publishedCardImageId) {
+          item: slideDeckItem,
+          signal: browserImageController.signal,
+        });
+        publishedCardImageUrl = r.publishedCardImageUrl;
+        publishedCardImage480Url = r.publishedCardImage480Url;
+        publishedCardImage320Url = r.publishedCardImage320Url;
+        publishedCardImageId = r.imageId;
+      } catch (browserErr) {
+        if (isBrowserCaptureDiagEnabled()) {
+          console.warn(
+            "[publishTournamentCardFromEditorClient] browser full-card png failed, falling back to server resvg",
+            browserErr,
+          );
+        }
+        const imageRes = await fetchJsonWithTimeout<{
+          error?: string;
+          imageId?: string;
+          publishedCardImageUrl?: string;
+          publishedCardImage320Url?: string;
+          publishedCardImage480Url?: string;
+          w640Url?: string;
+          w480Url?: string;
+          w320Url?: string;
+        }>(
+          "/api/client/tournament-card-image",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              tournamentId,
+              templateId: slideDeckItem.cardTemplate ?? "A",
+              title: slideDeckItem.title,
+              subtitle: slideDeckItem.subtitle,
+              textLine1: slideDeckItem.cardExtraLine1 ?? null,
+              textLine2: slideDeckItem.cardExtraLine2 ?? null,
+              textLine3: slideDeckItem.cardExtraLine3 ?? null,
+              statusBadge: args.slideStatusBadge,
+              backgroundType: slideDeckItem.backgroundType ?? "image",
+              themeType: slideDeckItem.themeType ?? "dark",
+              backgroundImageUrl: slideDeckItem.image320Url ?? null,
+              backgroundImageOpacity:
+                typeof slideDeckItem.imageOverlayOpacity === "number" ? slideDeckItem.imageOverlayOpacity : null,
+              mediaBackground: slideDeckItem.mediaBackground ?? null,
+              textShadowEnabled: slideDeckItem.cardTextShadowEnabled === true,
+              surfaceLayout: slideDeckItem.cardSurfaceLayout === "full" ? "full" : "split",
+              leadTextColor: slideDeckItem.cardLeadTextColor ?? null,
+              titleTextColor: slideDeckItem.cardTitleTextColor ?? null,
+              descriptionTextColor: slideDeckItem.cardDescriptionTextColor ?? null,
+              footerDateTextColor: slideDeckItem.cardFooterDateTextColor ?? null,
+              footerPlaceTextColor: slideDeckItem.cardFooterPlaceTextColor ?? null,
+            }),
+          },
+          PUBLISH_IMAGE_TIMEOUT_MS,
+        );
+        publishedCardImageUrl = (imageRes.json.publishedCardImageUrl ?? imageRes.json.w640Url ?? "").trim();
+        publishedCardImage480Url = (imageRes.json.publishedCardImage480Url ?? imageRes.json.w480Url ?? "").trim();
+        publishedCardImage320Url = (imageRes.json.publishedCardImage320Url ?? imageRes.json.w320Url ?? "").trim();
+        publishedCardImageId = (imageRes.json.imageId ?? "").trim();
+        if (!imageRes.ok || !publishedCardImageUrl || !publishedCardImage320Url || !publishedCardImageId) {
+          return { ok: false, error: SERVER_CARD_IMAGE_FAIL_KO };
+        }
+      }
+    } finally {
+      window.clearTimeout(browserImageTimeoutId);
+    }
+    if (!publishedCardImageUrl || !publishedCardImage320Url || !publishedCardImageId) {
       return { ok: false, error: SERVER_CARD_IMAGE_FAIL_KO };
     }
   } catch (e) {
