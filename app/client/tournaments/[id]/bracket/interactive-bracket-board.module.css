@@ -140,6 +140,7 @@
   border-right: 1px solid rgba(148, 163, 184, 0.38);
   box-shadow: 8px 0 28px rgba(0, 0, 0, 0.45);
   padding: max(10px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px)) 14px;
+  touch-action: none;
 }
 
 .bracketViewOpsSheetBody {
@@ -1019,12 +1020,12 @@
   }
 
   .boardChromeBracketView .toolbarExitBracketView {
-    width: 36px !important;
-    min-width: 36px !important;
+    width: auto !important;
+    min-width: 0 !important;
     height: 36px !important;
-    padding: 0 !important;
-    font-size: 18px !important;
-    font-weight: 700 !important;
+    padding: 0 0.65rem !important;
+    font-size: 0.82rem !important;
+    font-weight: 600 !important;
   }
 
   .boardChromeBracketView .bracketViewToolbarIcons .toolbarOrientationWide {

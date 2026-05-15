@@ -1,18 +1,9 @@
 import SiteDetailShellBodyLoader from "./components/SiteDetailShellBodyLoader";
 
-/** `/site` 세그먼트 전환용 — 무거운 전체 스켈레톤 대신 상세와 동일 톤의 소형 로더만 */
+/** `/site` 세그먼트 전환용 — 본문 슬롯 배경 즉시 채움 */
 export default function Loading() {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "min(42dvh, 18rem)",
-        padding: "1rem",
-        boxSizing: "border-box",
-      }}
-    >
+    <div className="site-hub-route-loading site-hub-route-loading--fill">
       <SiteDetailShellBodyLoader />
     </div>
   );

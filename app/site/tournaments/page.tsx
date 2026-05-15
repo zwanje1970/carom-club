@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { listSitePublicTournamentListSnapshotsForPublicSite } from "../../../lib/surface-read";
 import SiteTournamentsDistanceShell, { type SiteTournamentListRow } from "./SiteTournamentsDistanceShell";
 import { parseTournamentStatusFilter } from "./tournament-list-url";
-import SiteDetailShellBodyLoader from "../components/SiteDetailShellBodyLoader";
+import SiteHubRouteLoadingShell from "../components/SiteHubRouteLoadingShell";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,7 @@ export default function SiteTournamentsPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   return (
-    <Suspense fallback={<SiteDetailShellBodyLoader />}>
+    <Suspense fallback={<SiteHubRouteLoadingShell brandTitle="대회안내" />}>
       <SiteTournamentsPageContent searchParams={searchParams} />
     </Suspense>
   );

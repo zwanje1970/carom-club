@@ -1,7 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FocusEvent } from "react";
 import styles from "./QuickResultDetailModal.module.css";
+import {
+  clearQuickResultDetailDraft,
+  readQuickResultDetailDraft,
+  writeQuickResultDetailDraft,
+} from "./quick-result-detail-draft";
 
 /** AVG = 점수 ÷ 이닝, 소수 셋째 자리까지 버림 */
 function truncateAvg3(score: number, innings: number): number {
@@ -62,6 +67,44 @@ function formatAvg3(n: number): string {
 function ResultPill({ label, variant }: { label: string; variant: "win" | "lose" }) {
   return (
     <span className={`${styles.pill} ${variant === "win" ? styles.pillWin : styles.pillLose}`}>{label}</span>
+  );
+}
+
+function OptionalHighRunInput({
+  value,
+  onChange,
+  disabled,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  disabled?: boolean;
+  ariaLabel: string;
+}) {
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    onChange(e.target.value.replace(/[^\d]/g, ""));
+  };
+  const handleFocus = (e: FocusEvent<HTMLInputElement>) => {
+    if (!value) e.currentTarget.placeholder = "";
+  };
+  const handleBlur = (e: FocusEvent<HTMLInputElement>) => {
+    if (!e.currentTarget.value.trim()) {
+      e.currentTarget.placeholder = "—";
+    }
+  };
+
+  return (
+    <input
+      className={`${styles.cellInput} ${!value ? styles.cellInputPlaceholder : ""}`}
+      inputMode="numeric"
+      value={value}
+      onChange={handleChange}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      disabled={disabled}
+      placeholder="—"
+      aria-label={ariaLabel}
+    />
   );
 }
 
@@ -136,14 +179,27 @@ export default function QuickResultDetailModal({
     if (!open || !match) return;
     const d = match.quickResultDetail;
     const savedFirst = d?.firstAttackUserId?.trim() ?? "";
-    setFirstAttackUserId(savedFirst || match.player1.userId);
-    setScorePlayer1(d != null ? String(d.scorePlayer1) : "");
-    setScorePlayer2(d != null ? String(d.scorePlayer2) : "");
-    setEndInning(d != null ? String(d.endInning) : "");
-    setHighRunPlayer1(d?.highRunPlayer1 != null && d.highRunPlayer1 !== undefined ? String(d.highRunPlayer1) : "");
-    setHighRunPlayer2(d?.highRunPlayer2 != null && d.highRunPlayer2 !== undefined ? String(d.highRunPlayer2) : "");
+    const win = (match.winnerUserId ?? "").trim();
+    const fromSaved = {
+      firstAttackUserId: savedFirst || match.player1.userId,
+      scorePlayer1: d != null ? String(d.scorePlayer1) : "",
+      scorePlayer2: d != null ? String(d.scorePlayer2) : "",
+      endInning: d != null ? String(d.endInning) : "",
+      highRunPlayer1:
+        d?.highRunPlayer1 != null && d.highRunPlayer1 !== undefined ? String(d.highRunPlayer1) : "",
+      highRunPlayer2:
+        d?.highRunPlayer2 != null && d.highRunPlayer2 !== undefined ? String(d.highRunPlayer2) : "",
+    };
+    const draft = tournamentId.trim() ? readQuickResultDetailDraft(tournamentId, match.id) : null;
+    const useDraft = draft != null && draft.winnerUserId === win;
+    setFirstAttackUserId(useDraft ? draft.firstAttackUserId || fromSaved.firstAttackUserId : fromSaved.firstAttackUserId);
+    setScorePlayer1(useDraft ? draft.scorePlayer1 : fromSaved.scorePlayer1);
+    setScorePlayer2(useDraft ? draft.scorePlayer2 : fromSaved.scorePlayer2);
+    setEndInning(useDraft ? draft.endInning : fromSaved.endInning);
+    setHighRunPlayer1(useDraft ? draft.highRunPlayer1 : fromSaved.highRunPlayer1);
+    setHighRunPlayer2(useDraft ? draft.highRunPlayer2 : fromSaved.highRunPlayer2);
     setFormError("");
-  }, [open, match]);
+  }, [open, match, tournamentId]);
 
   const winnerUserId = (match?.winnerUserId ?? "").trim();
   const matchCompleted = match?.status === "COMPLETED" && winnerUserId !== "";
@@ -152,6 +208,30 @@ export default function QuickResultDetailModal({
 
   const p1IsFirst = firstAttackUserId === match?.player1.userId;
   const p2IsFirst = firstAttackUserId === match?.player2.userId;
+
+  useEffect(() => {
+    if (!open || !match || !tournamentId.trim()) return;
+    writeQuickResultDetailDraft(tournamentId, match.id, {
+      firstAttackUserId,
+      scorePlayer1,
+      scorePlayer2,
+      endInning,
+      highRunPlayer1,
+      highRunPlayer2,
+      winnerUserId,
+    });
+  }, [
+    open,
+    match,
+    tournamentId,
+    firstAttackUserId,
+    scorePlayer1,
+    scorePlayer2,
+    endInning,
+    highRunPlayer1,
+    highRunPlayer2,
+    winnerUserId,
+  ]);
 
   const preview = useMemo(() => {
     if (!match || !matchCompleted) return null;
@@ -237,6 +317,7 @@ export default function QuickResultDetailModal({
         setFormError(json.error ?? "저장에 실패했습니다.");
         return;
       }
+      clearQuickResultDetailDraft(tournamentId, match.id);
       onSaved(json.bracket);
       onClose();
     } catch {
@@ -391,23 +472,19 @@ export default function QuickResultDetailModal({
             <tr>
               <td className={styles.labelCol}>하이런</td>
               <td className={styles.playerCol}>
-                <input
-                  className={styles.cellInput}
-                  inputMode="numeric"
+                <OptionalHighRunInput
                   value={highRunPlayer1}
-                  onChange={(e) => setHighRunPlayer1(e.target.value)}
+                  onChange={setHighRunPlayer1}
                   disabled={disabled || saveBusy || !matchCompleted}
-                  placeholder="—"
+                  ariaLabel="선수1 하이런"
                 />
               </td>
               <td className={styles.playerCol}>
-                <input
-                  className={styles.cellInput}
-                  inputMode="numeric"
+                <OptionalHighRunInput
                   value={highRunPlayer2}
-                  onChange={(e) => setHighRunPlayer2(e.target.value)}
+                  onChange={setHighRunPlayer2}
                   disabled={disabled || saveBusy || !matchCompleted}
-                  placeholder="—"
+                  ariaLabel="선수2 하이런"
                 />
               </td>
             </tr>

@@ -54,7 +54,12 @@ const OPS_DRAWER_TAP_MAX_PX = 12;
 const OPS_DRAWER_VELOCITY_SNAP_PX_PER_MS = 0.42;
 const OPS_DRAWER_OPEN_PROGRESS = 0.33;
 
-type OpsDrawerDragKind = "strip" | "sheetEdge" | "handle";
+type OpsDrawerDragKind = "strip" | "sheetEdge" | "handle" | "sheet";
+
+function isOpsDrawerSwipeBlockedTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest("button, a, input, select, textarea, [role='button'], label"));
+}
 
 function bracketSlotLabel(p: { name: string; displayName?: string | null }): string {
   const d = typeof p.displayName === "string" ? p.displayName.trim() : "";
@@ -590,7 +595,9 @@ export default function InteractiveBracketBoard({
   const panDragRef = useRef<{ pointerId: number; x: number; y: number; left: number; top: number } | null>(null);
   const lastTapRef = useRef<{ key: string; ts: number }>({ key: "", ts: 0 });
   const scaleRef = useRef(1);
-  const [viewMode, setViewMode] = useState<BoardViewMode>("vertical");
+  const [viewMode, setViewMode] = useState<BoardViewMode>(() =>
+    chromeMode === "bracketView" ? "horizontal" : "vertical",
+  );
   const [interactionMode, setInteractionMode] = useState<"winner" | "editSwap">("winner");
   const [selectedBoxKey, setSelectedBoxKey] = useState("");
   const [swapCandidate, setSwapCandidate] = useState<{
@@ -1054,6 +1061,16 @@ export default function InteractiveBracketBoard({
       } catch {
         /* ignore corrupt storage */
       }
+      if (chromeMode === "bracketView") {
+        setViewMode("horizontal");
+        scrollResetSigRef.current = `${bracketId}|horizontal`;
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            fitBracketToViewport();
+          });
+        });
+        return;
+      }
     }
 
     const sig = `${bracketId}|${viewMode}`;
@@ -1061,7 +1078,7 @@ export default function InteractiveBracketBoard({
       scrollResetSigRef.current = sig;
       scrollViewportToDefault();
     }
-  }, [bracket?.id, chromeMode, clampScale, scrollViewportToDefault, viewMode, viewStateStorageKey]);
+  }, [bracket?.id, chromeMode, clampScale, fitBracketToViewport, scrollViewportToDefault, viewMode, viewStateStorageKey]);
 
   useEffect(() => {
     if (!viewStateStorageKey || chromeMode !== "bracketView") return;
@@ -1571,7 +1588,17 @@ export default function InteractiveBracketBoard({
                   : undefined
               }
             >
-              <div className={styles.bracketViewOpsSheet}>
+              <div
+                className={styles.bracketViewOpsSheet}
+                onPointerDown={(e) => {
+                  if (isOpsDrawerSwipeBlockedTarget(e.target)) return;
+                  beginOpsDrawerDrag(e, "sheet", e.currentTarget);
+                }}
+                onPointerMove={moveOpsDrawerDrag}
+                onPointerUp={endOpsDrawerDrag}
+                onPointerCancel={cancelOpsDrawerDrag}
+                onLostPointerCapture={cancelOpsDrawerDrag}
+              >
                 <div className={styles.bracketViewOpsSheetBody}>
                   <div
                     className={styles.bracketViewOpsSheetSwipeEdge}
@@ -1616,14 +1643,13 @@ export default function InteractiveBracketBoard({
                   <div className={styles.bracketViewOpsLabeledRow}>
                     <button
                       type="button"
-                      className={`${styles.toolbarButton} ${styles.toolbarExitBracketView}`}
+                      className={`${styles.toolbarButton} ${styles.toolbarBracketViewWideBtn} ${styles.toolbarExitBracketView}`}
                       title="나가기"
                       aria-label="나가기"
                       onClick={() => onExit()}
                     >
-                      ←
+                      나가기
                     </button>
-                    <span className={styles.bracketViewOpsItemLabel}>나가기</span>
                   </div>
                 ) : null}
                 {bracketViewSlicePicker ? (
@@ -1668,7 +1694,7 @@ export default function InteractiveBracketBoard({
                     disabled={Boolean(bracketViewMergedStacks?.length)}
                     onClick={() => setViewMode("vertical")}
                   >
-                    <span className={styles.toolbarBtnLabelShort}>├</span>
+                    <span className={styles.toolbarBtnLabelShort}>ㅗ</span>
                   </button>
                   <span className={styles.bracketViewOpsItemLabel}>세로형</span>
                 </div>
@@ -1683,7 +1709,7 @@ export default function InteractiveBracketBoard({
                     disabled={Boolean(bracketViewMergedStacks?.length)}
                     onClick={() => setViewMode("dual")}
                   >
-                    <span className={styles.toolbarBtnLabelShort}>┴</span>
+                    <span className={styles.toolbarBtnLabelShort}>⇄</span>
                   </button>
                   <span className={styles.bracketViewOpsItemLabel}>양쪽형</span>
                 </div>
@@ -1698,7 +1724,7 @@ export default function InteractiveBracketBoard({
                     disabled={Boolean(bracketViewMergedStacks?.length)}
                     onClick={() => setViewMode("horizontal")}
                   >
-                    <span className={styles.toolbarBtnLabelShort}>⇄</span>
+                    <span className={styles.toolbarBtnLabelShort}>ㅏ</span>
                   </button>
                   <span className={styles.bracketViewOpsItemLabel}>가로형</span>
                 </div>

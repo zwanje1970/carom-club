@@ -37,7 +37,6 @@ import {
 import BracketProgressSummaryCard from "./BracketProgressSummaryCard";
 import TournamentTvLinkBlock from "../TournamentTvLinkBlock";
 import "../tournament-manage-ui.css";
-import { roundLabelFromMatchCount } from "./bracket-progress-utils";
 import { fetchClientBracketMetaJson } from "./bracket-client-poll-meta";
 
 const TournamentGroupRound1PrintClient = dynamic(
@@ -739,14 +738,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     () => `/client/tournaments/${tournamentId}/bracket/view${bracketZoneQuery}${bracketOpsSliceQuerySuffix}`,
     [bracketOpsSliceQuerySuffix, bracketZoneQuery, tournamentId],
   );
-
-  const bracketViewFullscreenPath = useMemo(() => {
-    const base = `/client/tournaments/${tournamentId}/bracket/view`;
-    if (bracket && bracketLooksLikeSplitLayout(bracket)) {
-      return bracketZoneQuery ? `${base}${bracketZoneQuery}&viewMode=originalFull` : `${base}?viewMode=originalFull`;
-    }
-    return `${base}${bracketZoneQuery}`;
-  }, [bracket, bracketZoneQuery, tournamentId]);
 
   /** 통합(A조+B조+결선) 보기 — `viewMode=merged` 유지 */
   const bracketViewMergedFullPath = useMemo(() => {
@@ -1533,7 +1524,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   const handleQuickClearMatchResult = useCallback(
     (
       matchId: string,
-      rowCtx?: { roundNumber: number; boardSliceKey: string | null; rowIndex1Based: number },
+      rowCtx?: { roundNumber: number; boardSliceKey: string | null; rowIndex1Based?: number },
     ) => {
       const trimmedId = matchId.trim();
       if (!tournamentId || interactionLocked || !trimmedId) return;
@@ -2362,6 +2353,9 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             />
             상세입력
           </label>
+          <span style={{ fontSize: "0.72rem", fontWeight: 400, color: "#94a3b8", lineHeight: 1.3 }}>
+            VS 터치 시 기록 입력
+          </span>
         </div>
 
         {zonesEnabled ? (
@@ -2419,25 +2413,12 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               </div>
             ) : null}
 
-            <div className="v3-row" style={{ gap: "0.35rem", flexWrap: "wrap", alignItems: "center", marginBottom: "0.45rem" }}>
-              {displayRoundsSorted.map((round) => (
-                <button
-                  key={`qr-tab-${bracket.id}-${boardSliceKey ?? "root"}-${round.roundNumber}`}
-                  type="button"
-                  className={selectedQuickRoundNumber === round.roundNumber ? "ui-btn-primary-solid" : "v3-btn"}
-                  onClick={() => setSelectedQuickRoundNumber(round.roundNumber)}
-                >
-                  {roundLabelFromMatchCount(round.matches.length)}
-                </button>
-              ))}
-            </div>
-
             {activeQuickRound ? (
               <section className="v3-box v3-stack" style={{ background: "#f8fafc", border: "1px solid #e2e8f0", padding: "0.5rem 0.55rem", gap: "0.35rem" }}>
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.88rem" }}>
                     <tbody>
-                      {activeQuickRound.matches.map((match, idx) => {
+                      {activeQuickRound.matches.map((match) => {
                         const p1Label = bracketSlotLabel(match.player1);
                         const p2Label = bracketSlotLabel(match.player2);
                         const done =
@@ -2484,10 +2465,20 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                               borderBottom: "1px solid rgba(15, 23, 42, 0.15)",
                             }}
                           >
-                            <td style={{ padding: "0.35rem 0.45rem", whiteSpace: "nowrap", fontWeight: 700 }}>
-                              {idx + 1}번
+                            <td
+                              style={{
+                                padding: "0.35rem 0.4rem",
+                                maxWidth: 0,
+                                width: "38%",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                fontWeight: 600,
+                              }}
+                              title={p1Label}
+                            >
+                              {p1Label}
                             </td>
-                            <td style={{ padding: "0.35rem 0.45rem" }}>{p1Label}</td>
                             <td style={{ padding: "0.35rem 0.25rem", whiteSpace: "nowrap" }}>
                               {p1Win
                                 ? pill("승", "#22c55e", "#fff")
@@ -2542,7 +2533,20 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                                 <span style={{ pointerEvents: "none", userSelect: "none" }}>{vsMark}</span>
                               )}
                             </td>
-                            <td style={{ padding: "0.35rem 0.45rem" }}>{p2Label}</td>
+                            <td
+                              style={{
+                                padding: "0.35rem 0.4rem",
+                                maxWidth: 0,
+                                width: "38%",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                fontWeight: 600,
+                              }}
+                              title={p2Label}
+                            >
+                              {p2Label}
+                            </td>
                             <td style={{ padding: "0.35rem 0.25rem", whiteSpace: "nowrap" }}>
                               {p2Win
                                 ? pill("승", "#22c55e", "#fff")
@@ -2562,7 +2566,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                                       </button>
                                     )}
                             </td>
-                            <td style={{ padding: "0.35rem 0.25rem", whiteSpace: "nowrap", width: "3rem" }}>
+                            <td style={{ padding: "0.2rem 0.15rem", whiteSpace: "nowrap", width: "1.75rem" }}>
                               <button
                                 type="button"
                                 className="v3-btn"
@@ -2573,21 +2577,25 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                                   void handleQuickClearMatchResult(match.id, {
                                     roundNumber: activeQuickRound.roundNumber,
                                     boardSliceKey,
-                                    rowIndex1Based: idx + 1,
                                   })
                                 }
                                 style={{
-                                  minWidth: 44,
-                                  minHeight: 44,
-                                  width: 44,
-                                  height: 44,
+                                  minWidth: 28,
+                                  minHeight: 28,
+                                  width: 28,
+                                  height: 28,
                                   padding: 0,
                                   display: "inline-flex",
                                   alignItems: "center",
                                   justifyContent: "center",
-                                  fontSize: "1.25rem",
+                                  fontSize: "0.95rem",
                                   lineHeight: 1,
-                                  borderRadius: "0.35rem",
+                                  borderRadius: "0.25rem",
+                                  boxShadow: "none",
+                                  border: "1px solid rgba(148, 163, 184, 0.45)",
+                                  background: "#fff",
+                                  color: "#64748b",
+                                  fontWeight: 500,
                                 }}
                               >
                                 ↶
@@ -3032,9 +3040,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           <p className="v3-muted">아직 확정된 대진표가 없습니다. 「1. 대진표 자동생성」에서 먼저 만들어 주세요.</p>
         ) : (
           <>
-            <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
-              빠른 입력·다음 라운드 생성·조별 대진표 보기입니다.
-            </p>
             {bracketLooksLikeSplitLayout(bracket) && bracket.blocks?.length ? (
               <div
                 className="v3-row"
@@ -3084,41 +3089,23 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
             ) : null}
             {!bracketLooksLikeSplitLayout(bracket) ? <BracketProgressSummaryCard bracket={bracket} /> : null}
 
-            {displayRoundsSorted.length > 0 ? (
+            {displayRoundsSorted.length > 0 && hubAdvanceTargetRound ? (
               <div className="v3-stack" style={{ gap: "0.35rem" }}>
-                <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
-                  선택한 라운드가 모두 끝나면 다음 라운드를 생성합니다. (현재 조·결선 탭 기준)
-                </p>
-                <div className="v3-row" style={{ gap: "0.35rem", flexWrap: "wrap", alignItems: "center" }}>
-                  {displayRoundsSorted.map((round) => (
-                    <button
-                      key={`hub-adv-tab-${bracket.id}-${boardSliceKey ?? "root"}-${round.roundNumber}`}
-                      type="button"
-                      className={selectedQuickRoundNumber === round.roundNumber ? "ui-btn-primary-solid" : "v3-btn"}
-                      onClick={() => setSelectedQuickRoundNumber(round.roundNumber)}
-                      style={{ boxShadow: "none", minHeight: 36 }}
-                    >
-                      {roundLabelFromMatchCount(round.matches.length)}
-                    </button>
-                  ))}
-                </div>
-                {hubAdvanceTargetRound ? (
-                  <button
-                    type="button"
-                    className="v3-btn"
-                    onClick={() => void handleAdvanceRound(hubAdvanceTargetRound.roundNumber)}
-                    disabled={actionLoading || interactionLocked}
-                    style={{
-                      boxShadow: "none",
-                      fontWeight: 700,
-                      alignSelf: "flex-start",
-                      minHeight: 44,
-                      borderRadius: "8px",
-                    }}
-                  >
-                    다음 라운드 생성
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  className="v3-btn"
+                  onClick={() => void handleAdvanceRound(hubAdvanceTargetRound.roundNumber)}
+                  disabled={actionLoading || interactionLocked}
+                  style={{
+                    boxShadow: "none",
+                    fontWeight: 700,
+                    alignSelf: "flex-start",
+                    minHeight: 44,
+                    borderRadius: "8px",
+                  }}
+                >
+                  다음 라운드 생성
+                </button>
               </div>
             ) : null}
 
@@ -3166,9 +3153,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               </button>
             </div>
 
-            <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
-              조별 운영 화면은 위 「대진표 보기」에서, 통합·현장 출력은 「3. 출력 설정」을 이용하세요.
-            </p>
             {bracket.zoneId ? (
               <p style={{ margin: 0 }}>
                 <strong>권역:</strong> {bracket.zoneId}
@@ -3211,13 +3195,13 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
         <div className="v3-stack" style={{ gap: "0.5rem", width: "100%" }}>
           <button
             type="button"
-            onClick={() => router.push(bracketViewFullscreenPath)}
+            onClick={() => router.push(bracketViewMergedFullPath)}
             style={{
               width: "100%",
               minHeight: "52px",
               borderRadius: "8px",
-              border: "1px solid #1d4ed8",
-              background: "#2563eb",
+              border: "1px solid #0f766e",
+              background: "#0d9488",
               color: "#fff",
               fontWeight: 800,
               fontSize: "1rem",
@@ -3225,35 +3209,12 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               cursor: "pointer",
             }}
           >
-            대진표 보기 (전체 화면)
+            통합 대진표 보기
           </button>
           {bracket && bracketLooksLikeSplitLayout(bracket) ? (
-            <>
-              <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem", lineHeight: 1.45 }}>
-                전체 화면은 분할 전 단일 트리(`rounds`)가 저장된 경우에만 표시됩니다. 조분할 직후에는 저장된 원본이 없을 수 있습니다.
-              </p>
-              <button
-                type="button"
-                onClick={() => router.push(bracketViewMergedFullPath)}
-                style={{
-                  width: "100%",
-                  minHeight: "48px",
-                  borderRadius: "8px",
-                  border: "1px solid #64748b",
-                  background: "#fff",
-                  color: "#334155",
-                  fontWeight: 700,
-                  fontSize: "0.95rem",
-                  boxShadow: "none",
-                  cursor: "pointer",
-                }}
-              >
-                통합 대진표 보기
-              </button>
-              <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem", lineHeight: 1.45 }}>
-                예선 조와 결선을 한 화면에 나열합니다. 조 탭 선택과 무관합니다.
-              </p>
-            </>
+            <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem", lineHeight: 1.45 }}>
+              예선 조와 결선을 한 화면에 나열합니다. 조 탭 선택과 무관합니다.
+            </p>
           ) : null}
           <div>
             <p style={{ margin: "0 0 0.45rem", fontWeight: 800, fontSize: "0.9rem", color: "#0f172a" }}>TV 연결</p>

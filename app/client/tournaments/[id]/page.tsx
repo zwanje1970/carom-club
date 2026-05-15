@@ -106,8 +106,13 @@ export default async function ClientTournamentManagePage({ params }: { params: P
         <p className="v3-muted" style={{ margin: "0 0 0.5rem", fontSize: "0.82rem", lineHeight: 1.45 }}>
           대회 운영 흐름과 별도로 언제든 정산을 입력할 수 있습니다.
         </p>
-        <Link prefetch={false} href={settlementHref} className="ui-btn-primary-solid" style={{ textDecoration: "none", display: "inline-flex", fontWeight: 700 }}>
-          정산 관리 열기
+        <Link
+          prefetch={false}
+          href={settlementHref}
+          className="ui-btn-primary-solid"
+          style={{ textDecoration: "none", display: "inline-flex", fontWeight: 700, boxShadow: "none" }}
+        >
+          대회 정산
         </Link>
       </section>
     </main>

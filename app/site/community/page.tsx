@@ -8,14 +8,16 @@ import CommunityBoardListScrollShell from "./CommunityBoardListScrollShell";
 import CommunityBoardSearchForm from "./CommunityBoardSearchForm";
 import CommunityBoardTabs from "./CommunityBoardTabs";
 import CommunityBoardSwipeShell from "./CommunityBoardSwipeShell";
+import SiteHubRouteLoadingShell from "../components/SiteHubRouteLoadingShell";
 import SiteShellFrame from "../components/SiteShellFrame";
-import SiteListPageSkeleton from "../components/SiteListPageSkeleton";
 
 function CommunityPageFallback() {
   return (
-    <SiteShellFrame brandTitle="커뮤니티" auxiliaryBarClassName="site-shell-controls--site-list">
-      <SiteListPageSkeleton contentOnly brandTitle="커뮤니티" auxiliaryLabel="" listRows={5} />
-    </SiteShellFrame>
+    <SiteHubRouteLoadingShell
+      brandTitle="커뮤니티"
+      auxiliaryBarClassName="site-shell-controls--site-list"
+      sectionClassName="site-site-gray-main v3-stack ui-community-page"
+    />
   );
 }
 

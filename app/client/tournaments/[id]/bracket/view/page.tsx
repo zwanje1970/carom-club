@@ -1233,10 +1233,13 @@ export default function TournamentBracketBoardViewPage() {
             onClick={() => void onManualRefreshBracket()}
             style={{
               minHeight: 36,
-              fontWeight: 700,
+              fontWeight: 600,
               fontSize: "0.82rem",
               boxShadow: "none",
               opacity: manualRefreshBusy ? 0.78 : 1,
+              background: "rgba(15, 23, 42, 0.88)",
+              color: "#f1f5f9",
+              border: "1px solid rgba(148, 163, 184, 0.35)",
             }}
           >
             {manualRefreshBusy ? "새로고침…" : "새로고침"}

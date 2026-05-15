@@ -911,10 +911,7 @@ export async function updateBracketMatchQuickResultDetailFirestore(params: {
       if (!found) {
         throw new BracketOpReject("대상 매치를 찾을 수 없습니다.");
       }
-      const { rounds: sliceRounds, round: targetRound, match: targetMatch } = found;
-      if (sliceRounds.some((round) => round.roundNumber === targetRound.roundNumber + 1)) {
-        throw new BracketOpReject("다음 라운드가 이미 생성되어 있어 수정할 수 없습니다.");
-      }
+      const { round: targetRound, match: targetMatch } = found;
 
       const win = targetMatch.winnerUserId?.trim() ?? "";
       if (targetMatch.status !== "COMPLETED" || !win) {

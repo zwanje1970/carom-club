@@ -12,7 +12,7 @@ type Props = {
 export default function SiteListDetailForwardOpeningPane({ brandTitle, sectionClassName }: Props) {
   return (
     <SiteShellFrame brandTitle={brandTitle}>
-      <section className={sectionClassName}>
+      <section className={`${sectionClassName} site-list-detail-forward-opening-section`}>
         <SiteDetailShellBodyLoader />
       </section>
     </SiteShellFrame>

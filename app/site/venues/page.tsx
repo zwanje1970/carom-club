@@ -1,13 +1,13 @@
 import { getSiteVenuesBoardRows } from "../../../lib/surface-read";
 import { Suspense } from "react";
 import SiteVenuesBoard from "./SiteVenuesBoard";
-import SiteDetailShellBodyLoader from "../components/SiteDetailShellBodyLoader";
+import SiteHubRouteLoadingShell from "../components/SiteHubRouteLoadingShell";
 
 export const dynamic = "force-dynamic";
 
 export default function SiteVenuesPage() {
   return (
-    <Suspense fallback={<SiteDetailShellBodyLoader />}>
+    <Suspense fallback={<SiteHubRouteLoadingShell brandTitle="클럽안내" />}>
       <SiteVenuesPageContent />
     </Suspense>
   );

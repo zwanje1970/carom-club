@@ -6,20 +6,14 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import styles from "./main-sample/main-sample.module.css";
 import siteStyles from "./main-site-scroll-cards.module.css";
 import deckShellStyles from "./main-site-scroll-tournament-deck-shell.module.css";
-import {
-  MainSiteTournamentCardOverlayFromSnapshot,
-} from "./main-site-tournament-card-overlay-from-snapshot";
-import {
-  MainSiteTournamentCardTextOverlay,
-  type MainSiteTournamentCardTextOverlayPayload,
-} from "./main-site-tournament-card-text-overlay";
-import type { TournamentCardOverlaySnapshot } from "../../lib/site/tournament-card-overlay-snapshot";
 
 const SITE_SCROLL_CARD = "data-site-scroll-card";
 const SITE_SCROLL_SHORTCUT = "data-site-scroll-shortcut";
 
 /** 메인 이탈 후 복귀 시 세로 스크롤 위치 복원 — 새 세션·덱 변경 시 무시 */
 const MAIN_SITE_SCROLL_STORAGE_KEY = "site-main-marquee-scroll-v1";
+/** 카드 선택 후 무동작 시 자동 선택취소 */
+const MAIN_SITE_CARD_AUTO_DESELECT_MS = 10_000;
 
 type MainSiteScrollStoredV1 = {
   v: 1;
@@ -53,10 +47,6 @@ export type MainSiteScrollCardItem = {
   slideDeckPngPlaceholder?: boolean;
   /** 광고만 우측 상단 AD 표시(포인터 비참여) */
   slideDeckPngAdMark?: boolean;
-  /** 배경 전용 PNG 게시분 — 아래 오버레이로 글자 표시(레거시: 메인이 템플릿 필드로 조립) */
-  tournamentCardTextOverlay?: MainSiteTournamentCardTextOverlayPayload | null;
-  /** 배경 전용 PNG + 게시 시점 좌표 스냅샷(있으면 템플릿 분기 없이 표시) */
-  tournamentCardOverlaySnapshot?: TournamentCardOverlaySnapshot | null;
 };
 
 type CardRowProps = {
@@ -64,6 +54,8 @@ type CardRowProps = {
   item: MainSiteScrollCardItem;
   selected: boolean;
   onCardPointerDown: (itemId: string) => void;
+  /** CTA 탭 시 자동 선택취소 타이머 제거(상세 진입) */
+  onShortcutActivate?: () => void;
   /** 문서 순서상 첫 번째 면 이미지(LCP 후보) — 링크 preload 없이 img 우선순위만 부여 */
   lcpHeroImage?: boolean;
   /** 초기 뷰포트 근처 카드: lazy 완화 */
@@ -79,6 +71,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
   item,
   selected,
   onCardPointerDown,
+  onShortcutActivate,
   lcpHeroImage = false,
   prioritizeNearViewportImage = false,
 }: CardRowProps) {
@@ -121,7 +114,11 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
         className={styles.sampleMainCardShortcut}
         {...{ [SITE_SCROLL_SHORTCUT]: "" }}
         tabIndex={0}
-        onPointerDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onShortcutActivate?.();
+        }}
+        onClick={() => onShortcutActivate?.()}
       >
         자세히 보기 ▶
       </a>
@@ -132,7 +129,11 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
         className={styles.sampleMainCardShortcut}
         {...{ [SITE_SCROLL_SHORTCUT]: "" }}
         tabIndex={0}
-        onPointerDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onShortcutActivate?.();
+        }}
+        onClick={() => onShortcutActivate?.()}
       >
         자세히 보기 ▶
       </Link>
@@ -167,11 +168,6 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
                               ? { fetchPriority: "auto" as const }
                               : {})}
                         />
-                        {item.tournamentCardOverlaySnapshot ? (
-                          <MainSiteTournamentCardOverlayFromSnapshot snapshot={item.tournamentCardOverlaySnapshot} />
-                        ) : item.tournamentCardTextOverlay ? (
-                          <MainSiteTournamentCardTextOverlay payload={item.tournamentCardTextOverlay} />
-                        ) : null}
                         {item.slideDeckPngAdMark ? (
                           <span className={siteStyles.slideDeckPngAdMark} aria-hidden>
                             AD
@@ -241,6 +237,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   const rafRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number | null>(null);
   const resumeTimerRef = useRef<number | null>(null);
+  const autoDeselectTimerRef = useRef<number | null>(null);
   const measureFrameRef = useRef<number | null>(null);
   const pausedByUserRef = useRef(false);
   const programmaticScrollUntilMsRef = useRef(0);
@@ -366,6 +363,25 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     };
   }, [items.length, itemsIdsKey]);
 
+  const clearCardSelection = useCallback(() => {
+    setSelectedItemId(null);
+  }, []);
+
+  const clearAutoDeselectTimer = useCallback(() => {
+    if (autoDeselectTimerRef.current !== null) {
+      window.clearTimeout(autoDeselectTimerRef.current);
+      autoDeselectTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleAutoDeselect = useCallback(() => {
+    clearAutoDeselectTimer();
+    autoDeselectTimerRef.current = window.setTimeout(() => {
+      autoDeselectTimerRef.current = null;
+      clearCardSelection();
+    }, MAIN_SITE_CARD_AUTO_DESELECT_MS);
+  }, [clearAutoDeselectTimer, clearCardSelection]);
+
   const onCardPointerDown = useCallback((itemId: string) => {
     setSelectedItemId((prev) => {
       if (prev === null) return itemId;
@@ -375,17 +391,48 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   }, []);
 
   useEffect(() => {
+    if (selectedItemId === null) {
+      clearAutoDeselectTimer();
+      return;
+    }
+    scheduleAutoDeselect();
+    const viewport = viewportRef.current;
+    if (!viewport) {
+      return () => clearAutoDeselectTimer();
+    }
+    const bumpAutoDeselect = () => scheduleAutoDeselect();
+    viewport.addEventListener("touchstart", bumpAutoDeselect, { passive: true });
+    viewport.addEventListener("touchmove", bumpAutoDeselect, { passive: true });
+    viewport.addEventListener("wheel", bumpAutoDeselect, { passive: true });
+    viewport.addEventListener("pointerdown", bumpAutoDeselect, { passive: true });
+    viewport.addEventListener("scroll", bumpAutoDeselect, { passive: true });
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") bumpAutoDeselect();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clearAutoDeselectTimer();
+      viewport.removeEventListener("touchstart", bumpAutoDeselect);
+      viewport.removeEventListener("touchmove", bumpAutoDeselect);
+      viewport.removeEventListener("wheel", bumpAutoDeselect);
+      viewport.removeEventListener("pointerdown", bumpAutoDeselect);
+      viewport.removeEventListener("scroll", bumpAutoDeselect);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [clearAutoDeselectTimer, scheduleAutoDeselect, selectedItemId]);
+
+  useEffect(() => {
     if (selectedItemId === null) return;
     const onDocPointerDownCapture = (e: Event) => {
       const el = e.target as HTMLElement | null;
       if (!el) return;
       if (el.closest(`[${SITE_SCROLL_CARD}]`)) return;
       if (el.closest(`[${SITE_SCROLL_SHORTCUT}]`)) return;
-      setSelectedItemId(null);
+      clearCardSelection();
     };
     document.addEventListener("pointerdown", onDocPointerDownCapture, true);
     return () => document.removeEventListener("pointerdown", onDocPointerDownCapture, true);
-  }, [selectedItemId]);
+  }, [clearCardSelection, selectedItemId]);
 
   useEffect(() => {
     if (items.length === 0) {
@@ -740,6 +787,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
               item={item}
               selected={selectedItemId === item.id}
               onCardPointerDown={onCardPointerDown}
+              onShortcutActivate={clearAutoDeselectTimer}
               lcpHeroImage={lcpHeroImage}
               prioritizeNearViewportImage={prioritizeNearViewportImage}
             />

@@ -3467,6 +3467,54 @@ body:has(.site-shell.site-shell--ua-mobile-site .site-home-page--main) {
   }
 }
 
+/* 허브 전환·세그먼트 loading — blank 슬라이드 방지 */
+.site-hub-route-loading--fill {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  background-color: #ffffff;
+  padding: 1rem;
+}
+
+.site-hub-route-loading-section {
+  flex: 1 1 auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.site-list-detail-forward-opening-section {
+  flex: 1 1 auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 목록↔상세 슬라이드 트랙 — 전환 중 흰 빈 판 노출 방지 */
+.site-community-list-detail-transition-viewport,
+.site-tournaments-list-detail-transition-viewport,
+.site-venues-list-detail-transition-viewport {
+  background-color: #ffffff;
+}
+
+.site-community-list-detail-transition-track,
+.site-tournaments-list-detail-transition-track,
+.site-venues-list-detail-transition-track {
+  background-color: #ffffff;
+  min-height: 100%;
+}
+
+.site-community-list-detail-transition-detail-pane,
+.site-tournaments-list-detail-transition-detail-pane,
+.site-venues-list-detail-transition-detail-pane {
+  background-color: #ffffff;
+  min-height: 100%;
+}
+
 /* 목록 로딩 스켈레톤 — PC·기본: 카드형; 모바일 UA 표준 페이지에서는 아래 블록에서 디바이더형으로 덮음 */
 .site-list-page-skeleton-rows {
   gap: var(--spacing-card-gap, 14px);
