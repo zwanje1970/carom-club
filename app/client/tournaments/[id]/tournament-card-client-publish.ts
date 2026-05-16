@@ -1,5 +1,7 @@
-import { buildSlideDeckItemForTournamentCapture } from "./tournament-card-build-slide-deck-item";
-import { captureAndUploadTournamentPublishedCardFullPngInBrowser } from "./tournament-card-publish-capture";
+import {
+  APP_ONLY_ERROR_CODE,
+  captureAndUploadTournamentPublishedCardFullPngInBrowser,
+} from "./tournament-card-publish-capture";
 
 type CardSnapshotRow = {
   snapshotId?: string;
@@ -61,8 +63,8 @@ export type TournamentCardClientPublishResult =
 export type TournamentCardClientPublishProgressPhase = "publish-start" | "before-post";
 
 const SERVER_CARD_IMAGE_FAIL_KO = "게시 이미지 생성 또는 저장에 실패했습니다. 다시 게시해 주세요.";
-/** 브라우저 DOM 캡처만 허용 — 서버 resvg 대체 생성 없음 */
-const BROWSER_CARD_IMAGE_CAPTURE_FAIL_KO = "앱 화면 캡처에 실패했습니다. 화면을 다시 확인 후 재시도해 주세요.";
+const NATIVE_CAPTURE_FAIL_KO = "앱 화면 캡처에 실패했습니다. 화면을 다시 확인 후 재시도해 주세요.";
+const APP_ONLY_KO = "게시카드 저장 기능은 앱에서만 가능합니다.";
 const PUBLISH_IMAGE_TIMEOUT_MS = 45_000;
 
 /**
@@ -134,68 +136,44 @@ export async function publishTournamentCardFromEditorClient(args: {
   let publishedCardImage320Url = "";
   let publishedCardImageId = "";
   try {
-    const slideDeckItem = buildSlideDeckItemForTournamentCapture({
-      tournamentId,
-      source: {
-        snapshotId: publishSource.snapshotId,
-        title: publishSource.title,
-        subtitle: publishSource.subtitle,
-        cardExtraLine1: publishSource.cardExtraLine1,
-        cardExtraLine2: publishSource.cardExtraLine2,
-        cardExtraLine3: publishSource.cardExtraLine3,
-        image320Url: publishSource.image320Url,
-        tournamentCardTemplate: publishSource.tournamentCardTemplate,
-        tournamentBackgroundType: publishSource.tournamentBackgroundType,
-        tournamentTheme: publishSource.tournamentTheme,
-        tournamentMediaBackground: publishSource.tournamentMediaBackground,
-        tournamentImageOverlayBlend: publishSource.tournamentImageOverlayBlend,
-        tournamentImageOverlayOpacity: publishSource.tournamentImageOverlayOpacity,
-        tournamentCardDisplayDate: publishSource.tournamentCardDisplayDate,
-        tournamentCardDisplayLocation: publishSource.tournamentCardDisplayLocation,
-        cardLeadTextColor: publishSource.cardLeadTextColor,
-        cardTitleTextColor: publishSource.cardTitleTextColor,
-        cardDescriptionTextColor: publishSource.cardDescriptionTextColor,
-        tournamentCardTextShadowEnabled: publishSource.tournamentCardTextShadowEnabled,
-        tournamentCardSurfaceLayout: publishSource.tournamentCardSurfaceLayout,
-        cardFooterDateTextColor: publishSource.cardFooterDateTextColor,
-        cardFooterPlaceTextColor: publishSource.cardFooterPlaceTextColor,
-      },
-      statusBadge: args.slideStatusBadge,
-      tournamentFallbackDate: tournamentDate,
-      tournamentFallbackLocation: tournamentLocation,
-    });
     const previewCaptureRoot = args.getPreviewCaptureRoot();
     if (!previewCaptureRoot) {
       console.error("[publishTournamentCardFromEditorClient] 게시카드 미리보기 DOM을 찾을 수 없습니다.");
       return { ok: false, error: "게시카드 미리보기를 불러온 뒤 다시 게시해 주세요." };
     }
 
-    const browserImageController = new AbortController();
-    const browserImageTimeoutId = window.setTimeout(() => browserImageController.abort(), PUBLISH_IMAGE_TIMEOUT_MS);
+    const captureController = new AbortController();
+    const captureTimeoutId = window.setTimeout(() => captureController.abort(), PUBLISH_IMAGE_TIMEOUT_MS);
     try {
       const r = await captureAndUploadTournamentPublishedCardFullPngInBrowser({
         tournamentId,
-        item: slideDeckItem,
         previewCaptureRoot,
-        signal: browserImageController.signal,
+        signal: captureController.signal,
       });
       publishedCardImageUrl = r.publishedCardImageUrl;
       publishedCardImage480Url = r.publishedCardImage480Url;
       publishedCardImage320Url = r.publishedCardImage320Url;
       publishedCardImageId = r.imageId;
-    } catch (browserErr) {
-      console.error("[publishTournamentCardFromEditorClient] browser full-card png failed", browserErr);
-      return { ok: false, error: BROWSER_CARD_IMAGE_CAPTURE_FAIL_KO };
+    } catch (captureErr) {
+      console.error("[publishTournamentCardFromEditorClient] capture failed", captureErr);
+      const code = captureErr instanceof Error ? (captureErr as Error & { code?: string }).code : undefined;
+      if (code === APP_ONLY_ERROR_CODE) {
+        return { ok: false, error: APP_ONLY_KO };
+      }
+      if (captureErr instanceof DOMException && captureErr.name === "AbortError") {
+        return { ok: false, error: NATIVE_CAPTURE_FAIL_KO };
+      }
+      return { ok: false, error: captureErr instanceof Error ? captureErr.message : NATIVE_CAPTURE_FAIL_KO };
     } finally {
-      window.clearTimeout(browserImageTimeoutId);
+      window.clearTimeout(captureTimeoutId);
     }
     if (!publishedCardImageUrl || !publishedCardImage320Url || !publishedCardImageId) {
-      return { ok: false, error: BROWSER_CARD_IMAGE_CAPTURE_FAIL_KO };
+      return { ok: false, error: NATIVE_CAPTURE_FAIL_KO };
     }
   } catch (e) {
     return {
       ok: false,
-      error: e instanceof DOMException && e.name === "AbortError" ? BROWSER_CARD_IMAGE_CAPTURE_FAIL_KO : SERVER_CARD_IMAGE_FAIL_KO,
+      error: e instanceof DOMException && e.name === "AbortError" ? NATIVE_CAPTURE_FAIL_KO : SERVER_CARD_IMAGE_FAIL_KO,
     };
   }
 

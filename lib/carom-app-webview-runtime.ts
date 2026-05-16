@@ -17,11 +17,6 @@ export function isCaromAppWebViewRuntime(): boolean {
   return false;
 }
 
-function logNativeCaptureDiag(message: string, extra?: Record<string, unknown>): void {
-  if (extra) console.info("[card-publish-capture]", message, extra);
-  else console.info("[card-publish-capture]", message);
-}
-
 type CaromNativeCaptureRequest = {
   requestId: string;
   left: number;
@@ -32,6 +27,8 @@ type CaromNativeCaptureRequest = {
   viewportHeight: number;
   devicePixelRatio: number;
   format: "png";
+  /** 크롭 후 리사이즈할 목표 가로 픽셀 (0 이하면 리사이즈 생략) */
+  targetWidth: number;
 };
 
 type CaromNativeCaptureResult =
@@ -73,6 +70,11 @@ function makeCaptureError(message: string, code?: string): Error & { code?: stri
   const e = new Error(message) as Error & { code?: string };
   if (code) e.code = code;
   return e;
+}
+
+function logNativeCaptureDiag(message: string, extra?: Record<string, unknown>): void {
+  if (extra) console.info("[card-publish-capture]", message, extra);
+  else console.info("[card-publish-capture]", message);
 }
 
 function ensureCaromNativeCaptureResultHandler(): void {
@@ -135,6 +137,8 @@ export async function captureCardRegionViaCaromNativeBridge(args: {
   viewportWidth?: number;
   viewportHeight?: number;
   devicePixelRatio?: number;
+  /** 크롭 후 리사이즈할 목표 가로 픽셀. 기본값 1280. */
+  targetWidth?: number;
   timeoutMs?: number;
 }): Promise<Extract<CaromNativeCaptureResult, { ok: true }>> {
   if (typeof window === "undefined") {
@@ -165,6 +169,7 @@ export async function captureCardRegionViaCaromNativeBridge(args: {
     viewportHeight: args.viewportHeight ?? window.innerHeight,
     devicePixelRatio: args.devicePixelRatio ?? (window.devicePixelRatio || 1),
     format: "png",
+    targetWidth: args.targetWidth ?? 1280,
   };
   return await new Promise<Extract<CaromNativeCaptureResult, { ok: true }>>((resolve, reject) => {
     const timeoutMs = Math.max(1_000, args.timeoutMs ?? 12_000);
@@ -183,6 +188,7 @@ export async function captureCardRegionViaCaromNativeBridge(args: {
         height: request.height,
         viewportWidth: request.viewportWidth,
         viewportHeight: request.viewportHeight,
+        targetWidth: request.targetWidth,
       });
       bridge.captureCardRegion!(JSON.stringify(request));
     } catch {

@@ -589,6 +589,7 @@ class CaromAppBridge(
         val height = req.optDouble("height", Double.NaN)
         val viewportWidth = req.optDouble("viewportWidth", Double.NaN)
         val viewportHeight = req.optDouble("viewportHeight", Double.NaN)
+        val targetWidth = req.optInt("targetWidth", 0)
         val format = req.optString("format", "png").trim().lowercase(Locale.getDefault())
         if (!left.isFinite() || !top.isFinite() || !width.isFinite() || !height.isFinite()) {
             Log.w(CARD_CAPTURE_LOG_TAG, "native fail code=E_INVALID_RECT reason=non_finite_rect requestId=$requestId")
@@ -656,6 +657,29 @@ class CaromAppBridge(
                 cropHeight = cropHeight.coerceAtMost(sourceBitmap.height - cropTop).coerceAtLeast(1)
 
                 cropped = Bitmap.createBitmap(sourceBitmap, cropLeft, cropTop, cropWidth, cropHeight)
+
+                // targetWidth > 0이면 비율 유지하며 리사이즈 (예: 1280px)
+                if (targetWidth > 0 && cropped.width != targetWidth) {
+                    val scale = targetWidth.toDouble() / cropped.width.toDouble()
+                    val targetHeight = (cropped.height * scale).roundToInt().coerceAtLeast(1)
+                    val resized = try {
+                        Bitmap.createScaledBitmap(cropped, targetWidth, targetHeight, true)
+                    } catch (oom: OutOfMemoryError) {
+                        postCaptureError(requestId, "E_OOM", "리사이즈 중 메모리가 부족합니다.")
+                        return@runOnUiThread
+                    } catch (_: Exception) {
+                        postCaptureError(requestId, "E_CAPTURE_FAILED", "리사이즈에 실패했습니다.")
+                        return@runOnUiThread
+                    }
+                    Log.i(
+                        CARD_CAPTURE_LOG_TAG,
+                        "native resize ok requestId=$requestId " +
+                            "src=${cropped.width}x${cropped.height} -> ${resized.width}x${resized.height}",
+                    )
+                    cropped.recycle()
+                    cropped = resized
+                }
+
                 val out = ByteArrayOutputStream()
                 val compressed = cropped.compress(Bitmap.CompressFormat.PNG, 100, out)
                 if (!compressed) {
