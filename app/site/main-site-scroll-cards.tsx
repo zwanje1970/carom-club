@@ -24,19 +24,48 @@ function logMainCardReturnDiag(payload: Record<string, unknown>) {
   console.info(...args);
 }
 
-/** 홈 복귀·스크롤 복원 후 lazy img가 뷰포트에 남는 WebView 표시 누락 보정 */
+function tryDecodeMainScrollDeckImage(img: HTMLImageElement) {
+  if (typeof img.decode !== "function") return;
+  void img.decode().catch(() => {});
+}
+
+/** 홈 복귀·스크롤 복원 후 lazy img가 뷰포트에 남는 WebView 표시 누락 보정 — 뷰포트 내 img만 */
 function kickVisibleMainScrollDeckImages(viewport: HTMLElement) {
   const vRect = viewport.getBoundingClientRect();
   const imgs = viewport.querySelectorAll<HTMLImageElement>(`img.${styles.sampleMainCardPosterPublishedSnapshot}`);
+  let foundImages = 0;
+  let reloadedImages = 0;
   for (const img of imgs) {
     const r = img.getBoundingClientRect();
     if (r.bottom < vRect.top - 8 || r.top > vRect.bottom + 8) continue;
     const src = (img.currentSrc || img.src || "").trim();
     if (!src) continue;
-    if (img.complete && img.naturalWidth > 0) continue;
-    img.loading = "eager";
-    img.src = src;
+    foundImages++;
+    img.dataset.forceVisible = "1";
+    const needsReload = !img.complete || img.naturalWidth <= 0;
+    if (needsReload) {
+      img.loading = "eager";
+      img.src = src;
+      reloadedImages++;
+    }
+    tryDecodeMainScrollDeckImage(img);
+    requestAnimationFrame(() => {
+      tryDecodeMainScrollDeckImage(img);
+    });
   }
+  logMainCardReturnDiag({
+    phase: "kick-visible-images",
+    foundImages,
+    reloadedImages,
+  });
+}
+
+/** 즉시 1회 + rAF 1회 — WebView lazy 재감지 */
+function scheduleKickVisibleMainScrollDeckImages(viewport: HTMLElement) {
+  kickVisibleMainScrollDeckImages(viewport);
+  requestAnimationFrame(() => {
+    kickVisibleMainScrollDeckImages(viewport);
+  });
 }
 
 const SITE_SCROLL_CARD = "data-site-scroll-card";
@@ -364,7 +393,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
         itemsIdsKey: itemsRef.current.length > 0 ? mainScrollIdsKey(itemsRef.current) : "",
       });
       const viewport = viewportRef.current;
-      if (viewport) kickVisibleMainScrollDeckImages(viewport);
+      if (viewport) scheduleKickVisibleMainScrollDeckImages(viewport);
     };
     window.addEventListener("pageshow", onPageShow);
     return () => window.removeEventListener("pageshow", onPageShow);
@@ -499,6 +528,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     };
 
     apply();
+    scheduleKickVisibleMainScrollDeckImages(viewport);
     let rafOuter: number | null = requestAnimationFrame(() => {
       rafOuter = null;
       apply();
@@ -506,7 +536,6 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
         apply();
         requestAnimationFrame(() => {
           apply();
-          kickVisibleMainScrollDeckImages(viewport);
         });
       });
     });
