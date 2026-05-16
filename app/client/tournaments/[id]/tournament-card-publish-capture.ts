@@ -157,10 +157,25 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e));
     const code = (err as Error & { code?: string }).code ?? "E_CAPTURE_FAILED";
-    logCapture("native result fail", { code, message: err.message });
+    // 안드로이드가 보내온 실제 예외 클래스명·메시지를 그대로 보존
+    const nativeDetail = err.message || "";
+    logCapture("native result fail", { code, nativeDetail });
+
     // AbortError·앱전용 에러는 원본 그대로 전파
     if (err.name === "AbortError" || code === APP_ONLY_ERROR_CODE) throw e;
-    throw makeCodedError(APP_CAPTURE_FAIL_MSG, code);
+
+    // ── 디버깅: 화면에 실제 에러 원인 직접 표시 (원인 파악 후 제거 가능) ──
+    if (typeof window !== "undefined" && nativeDetail) {
+      window.alert(
+        `[캡처 디버그] code=${code}\n\n${nativeDetail}`,
+      );
+    }
+
+    // 네이티브 실제 메시지를 포함해서 던진다
+    const fullMsg = nativeDetail
+      ? `${APP_CAPTURE_FAIL_MSG}\n상세: ${nativeDetail}`
+      : APP_CAPTURE_FAIL_MSG;
+    throw makeCodedError(fullMsg, code);
   } finally {
     nativeCaptureInFlight = false;
   }

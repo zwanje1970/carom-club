@@ -636,11 +636,11 @@ class CaromAppBridge(
                     b
                 } catch (oom: OutOfMemoryError) {
                     Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_OOM reason=draw_oom requestId=$requestId", oom)
-                    postCaptureError(requestId, "E_OOM", "캡처 중 메모리가 부족합니다.")
+                    postCaptureError(requestId, "E_OOM", "[OutOfMemoryError] WebView 드로우 중 메모리 부족: ${oom.message}")
                     return@post
                 } catch (e: Exception) {
                     Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_CAPTURE_FAILED reason=draw_exception requestId=$requestId", e)
-                    postCaptureError(requestId, "E_CAPTURE_FAILED", "화면 캡처에 실패했습니다.")
+                    postCaptureError(requestId, "E_CAPTURE_FAILED", "[${e.javaClass.simpleName}] WebView 드로우 실패: ${e.message}")
                     return@post
                 }
 
@@ -683,11 +683,11 @@ class CaromAppBridge(
                     Bitmap.createBitmap(sourceBitmap, safeLeft, safeTop, safeWidth, safeHeight)
                 } catch (e: IllegalArgumentException) {
                     Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_CROP_OUT_OF_BOUNDS reason=createBitmap_iae requestId=$requestId bitmap=${bw}x${bh} crop=[l=$safeLeft t=$safeTop w=$safeWidth h=$safeHeight]", e)
-                    postCaptureError(requestId, "E_CROP_OUT_OF_BOUNDS", "캡처 영역이 화면 범위를 벗어났습니다.")
+                    postCaptureError(requestId, "E_CROP_OUT_OF_BOUNDS", "[IllegalArgumentException] 크롭 범위 초과 bitmap=${bw}x${bh} safe=[l=$safeLeft t=$safeTop w=$safeWidth h=$safeHeight]: ${e.message}")
                     return@post
                 } catch (oom: OutOfMemoryError) {
                     Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_OOM reason=crop_oom requestId=$requestId", oom)
-                    postCaptureError(requestId, "E_OOM", "크롭 중 메모리가 부족합니다.")
+                    postCaptureError(requestId, "E_OOM", "[OutOfMemoryError] 크롭 중 메모리 부족: ${oom.message}")
                     return@post
                 }
 
@@ -714,11 +714,11 @@ class CaromAppBridge(
                         dst
                     } catch (oom: OutOfMemoryError) {
                         Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_OOM reason=resize_oom requestId=$requestId", oom)
-                        postCaptureError(requestId, "E_OOM", "리사이즈 중 메모리가 부족합니다.")
+                        postCaptureError(requestId, "E_OOM", "[OutOfMemoryError] 리사이즈 중 메모리 부족 (${targetWidth}px): ${oom.message}")
                         return@post
                     } catch (e: Exception) {
                         Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_CAPTURE_FAILED reason=resize_exception requestId=$requestId", e)
-                        postCaptureError(requestId, "E_CAPTURE_FAILED", "리사이즈에 실패했습니다.")
+                        postCaptureError(requestId, "E_CAPTURE_FAILED", "[${e.javaClass.simpleName}] 리사이즈 실패 (${targetWidth}px): ${e.message}")
                         return@post
                     }
                     cropped.recycle()
@@ -759,10 +759,10 @@ class CaromAppBridge(
                 )
             } catch (oom: OutOfMemoryError) {
                 Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_OOM reason=unexpected requestId=$requestId", oom)
-                postCaptureError(requestId, "E_OOM", "캡처 처리 중 메모리가 부족합니다.")
+                postCaptureError(requestId, "E_OOM", "[OutOfMemoryError] 캡처 처리 중 예상치 못한 메모리 부족: ${oom.message}")
             } catch (e: Exception) {
                 Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_CAPTURE_FAILED reason=unexpected_exception requestId=$requestId", e)
-                postCaptureError(requestId, "E_CAPTURE_FAILED", "앱 화면 캡처 처리에 실패했습니다.")
+                postCaptureError(requestId, "E_CAPTURE_FAILED", "[${e.javaClass.simpleName}] 캡처 처리 중 예상치 못한 예외: ${e.message}")
             } finally {
                 // captureInProgress는 어떤 경로로 종료되더라도 반드시 해제
                 try { cropped?.recycle() } catch (_: Exception) { /* no-op */ }
