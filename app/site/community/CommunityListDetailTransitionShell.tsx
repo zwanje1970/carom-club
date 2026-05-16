@@ -2,12 +2,14 @@
 
 import { usePathname } from "next/navigation";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { parseCommunityBoardTypeParam } from "../../../lib/community-board-params";
 import { isCommunityBoardListHubPath } from "../lib/site-root-swipe-order";
 import SiteListDetailForwardOpeningPane from "../components/SiteListDetailForwardOpeningPane";
 import {
   CommunityListDetailTransitionContext,
   type CommunityListDetailTransitionContextValue,
 } from "./community-list-detail-transition-context";
+import { communityBoardMobileHeaderTitle } from "./community-tab-config";
 
 const MAIN_DURATION_MS = 1000;
 const MAIN_EASING = "cubic-bezier(0.22, 0.92, 0.32, 1)";
@@ -42,6 +44,13 @@ function isCommunityListHubPath(p: string): boolean {
 
 function isListDetailEligible(p: string): boolean {
   return isCommunityListHubPath(p) || isCommunityPostDetailPath(p);
+}
+
+function communityDetailHeaderTitleFromPath(pathname: string): string {
+  const m = /^\/site\/community\/([^/]+)\/([^/]+)$/.exec(normalizePathname(pathname));
+  const boardKey = m?.[1] ? parseCommunityBoardTypeParam(m[1]) : null;
+  if (!boardKey) return "커뮤니티";
+  return communityBoardMobileHeaderTitle(boardKey);
 }
 
 export default function CommunityListDetailTransitionShell({ children }: { children: React.ReactNode }) {
@@ -300,7 +309,9 @@ export default function CommunityListDetailTransitionShell({ children }: { child
               <div className="site-community-list-detail-transition-detail-pane">
                 <SiteListDetailForwardOpeningPane
                   brandTitle={
-                    <span className="site-community-detail-brand-name site-home-brand-ellipsis">게시글</span>
+                    <span className="site-community-detail-brand-name site-home-brand-ellipsis">
+                      {communityDetailHeaderTitleFromPath(forwardOpening.targetPath)}
+                    </span>
                   }
                   sectionClassName="site-site-gray-main v3-stack ui-community-post-detail-page"
                 />

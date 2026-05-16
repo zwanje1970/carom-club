@@ -18,6 +18,9 @@ import type {
 } from "../../../../lib/site/tournament-card-overlay-snapshot";
 import { isTournamentCardOverlaySlotType } from "../../../../lib/site/tournament-card-overlay-snapshot";
 
+/** 게시 캡처 출력폭 기준: 440 아트보드 -> 약 1280px */
+export const TOURNAMENT_CARD_PUBLISH_BROWSER_CAPTURE_SCALE = 1280 / TOURNAMENT_CARD_ARTBOARD_WIDTH_PX;
+
 export function isBrowserCaptureDiagEnabled(): boolean {
   return process.env.NEXT_PUBLIC_TOURNAMENT_CARD_BROWSER_CAPTURE_DIAG === "1";
 }
@@ -220,19 +223,6 @@ function doubleRaf(): Promise<void> {
   });
 }
 
-function resolveVisibleCaptureRect(root: HTMLElement): { width: number; height: number } {
-  const rect = root.getBoundingClientRect();
-  const width = Math.max(1, Math.round(rect.width));
-  const height = Math.max(1, Math.round(rect.height));
-  return { width, height };
-}
-
-function resolveCaptureScaleFromDevice(): number {
-  const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-  if (!Number.isFinite(dpr) || dpr <= 0) return 1;
-  return Math.min(3, Math.max(1, dpr));
-}
-
 async function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), "image/png");
@@ -405,15 +395,14 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
     throwIfAborted(signal);
 
     const [{ default: html2canvas }] = await Promise.all([import("html2canvas")]);
-    const captureRect = resolveVisibleCaptureRect(captureRoot);
     const canvas = await html2canvas(captureRoot, {
-      scale: resolveCaptureScaleFromDevice(),
+      scale: TOURNAMENT_CARD_PUBLISH_BROWSER_CAPTURE_SCALE,
       backgroundColor: null,
       useCORS: true,
       allowTaint: false,
       logging: false,
-      width: captureRect.width,
-      height: captureRect.height,
+      width: TOURNAMENT_CARD_ARTBOARD_WIDTH_PX,
+      height: TOURNAMENT_CARD_ARTBOARD_HEIGHT_PX,
     });
 
     assertPublishedCardCanvasHasLikelyContent(canvas);

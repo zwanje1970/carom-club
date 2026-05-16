@@ -6,7 +6,11 @@ import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../lib/au
 import { parseCommunityBoardTypeParam } from "../../../../lib/community-board-params";
 import { getDefaultSiteCommunityConfigForPublicSite } from "../../../../lib/server/platform-backing-store";
 import { getSiteCommunityConfig, getUserById, listCommunityPostsForPublicSite } from "../../../../lib/surface-read";
-import { communityBoardListHref, communityNavTabsFromConfig, isCommunityNoticeBoard } from "../community-tab-config";
+import {
+  communityBoardListHref,
+  communityNavTabsFromConfig,
+  isCommunityNoticeBoard,
+} from "../community-tab-config";
 import CommunityBoardPostList from "../CommunityBoardPostList";
 import CommunityBoardListScrollShell from "../CommunityBoardListScrollShell";
 import CommunityBoardSearchForm from "../CommunityBoardSearchForm";
@@ -76,10 +80,11 @@ async function SiteCommunityBoardListPageInner({ params, searchParams }: Props) 
   }
   const isNoticeBoard = isCommunityNoticeBoard(boardType, config);
   const showWriteFab = !isNoticeBoard || user?.role === "PLATFORM";
+  const listHeaderTitle = isNoticeBoard ? "공지사항" : "커뮤니티";
 
   return (
     <SiteShellFrame
-      brandTitle="커뮤니티"
+      brandTitle={listHeaderTitle}
       auxiliaryBarClassName="site-shell-controls--site-list"
       auxiliary={
         <div className="ui-community-shell-context v3-stack" data-community-board={boardType}>

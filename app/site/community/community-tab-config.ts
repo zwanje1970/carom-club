@@ -46,13 +46,30 @@ export function isPrimaryTabKey(k: SiteCommunityBoardKey): k is keyof typeof COM
   return k in COMMUNITY_PRIMARY_TAB_LABEL;
 }
 
-export function communityTabLabelForBoard(boardKey: SiteCommunityBoardKey, config: SiteCommunityConfig): string {
+function normalizeCommunityUserFacingBoardLabel(label: string): string {
+  const trimmed = label.trim();
+  if (trimmed === "공지" || trimmed === "NOTICE") return "공지사항";
+  return trimmed;
+}
+
+/** 공개 사이트 모바일/상단 헤더·탭 등 사용자-facing 게시판 표시명 */
+export function communityBoardMobileHeaderTitle(
+  boardKey: SiteCommunityBoardKey,
+  config?: SiteCommunityConfig,
+): string {
+  if (config && isCommunityNoticeBoard(boardKey, config)) return "공지사항";
   if (isPrimaryTabKey(boardKey)) return COMMUNITY_PRIMARY_TAB_LABEL[boardKey];
-  const label = config[boardKey].label.trim();
-  if (label.length > 0) return label;
+  if (config) {
+    const label = normalizeCommunityUserFacingBoardLabel(config[boardKey].label);
+    if (label.length > 0) return label;
+  }
   if (boardKey === "extra1") return "예비게시판 1";
   if (boardKey === "extra2") return "예비게시판 2";
   return boardKey;
+}
+
+export function communityTabLabelForBoard(boardKey: SiteCommunityBoardKey, config: SiteCommunityConfig): string {
+  return communityBoardMobileHeaderTitle(boardKey, config);
 }
 
 /** 전체 탭 + 플랫폼에서 `visible` 인 게시판만 (비활성 예비 게시판은 노출 안 함) */
