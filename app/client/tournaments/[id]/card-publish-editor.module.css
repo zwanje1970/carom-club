@@ -65,7 +65,7 @@
 }
 
 .pageWrapV2 .previewSlideLayer {
-  padding: 8px 0;
+  padding: 0;
 }
 
 /* 게시 v2 미리보기·메인 스크롤 대회 카드 공통 — `.pageWrapV2` 하위 선택자 대신 클래스로 동일 외곽 재사용 */
@@ -190,7 +190,7 @@
   box-sizing: border-box;
   display: flex;
   justify-content: center;
-  align-items: flex-start;
+  align-items: center;
 }
 
 /**
@@ -254,13 +254,13 @@
   min-height: 180px;
   height: 180px;
   flex: 0 0 auto;
-  align-self: flex-start;
+  align-self: center;
 }
 
 .previewCardScaleInner .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"] > :global(article) {
   flex: 0 0 auto;
   flex-shrink: 0;
-  align-self: flex-start;
+  align-self: center;
   min-width: 440px;
   width: 440px;
   border-radius: 12px;
