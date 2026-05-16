@@ -26,6 +26,10 @@ export type DetailedResultsPlayerBlock = {
   playerDisplayName: string;
   wins: number;
   losses: number;
+  /** 승률 기준 순위(동률 동순) */
+  rank: number | null;
+  /** 상세입력 경기 1건 이상 */
+  hasDetailedMatches: boolean;
   /** 경기별 AVG 합 ÷ 상세가 있는 경기 수 */
   avgMean: number | null;
   /** 단일 경기 최고 AVG */
@@ -202,11 +206,14 @@ export function buildDetailedResultsBundleFromBrackets(brackets: Bracket[]): Det
     .map((a) => {
       a.rows.sort((x, y) => y.sortKey.localeCompare(x.sortKey));
       const avgMean = a.avgCount > 0 ? Math.round((a.avgSum / a.avgCount) * 1000) / 1000 : null;
+      const hasDetailedMatches = a.rows.some((r) => r.avgDisplay != null);
       return {
         playerUserId: a.uid,
         playerDisplayName: a.name,
         wins: a.wins,
         losses: a.losses,
+        rank: null,
+        hasDetailedMatches,
         avgMean,
         avgBest: a.avgBest,
         highRunBest: a.highRunBest,
@@ -214,6 +221,19 @@ export function buildDetailedResultsBundleFromBrackets(brackets: Bracket[]): Det
       };
     })
     .sort((p, q) => p.playerDisplayName.localeCompare(q.playerDisplayName, "ko"));
+
+  const rankSorted = [...players].sort((a, b) => b.wins - a.wins || a.losses - b.losses);
+  let rank = 0;
+  let prevKey = "";
+  for (let i = 0; i < rankSorted.length; i++) {
+    const p = rankSorted[i]!;
+    const key = `${p.wins}:${p.losses}`;
+    if (key !== prevKey) {
+      rank = i + 1;
+      prevKey = key;
+    }
+    p.rank = rank;
+  }
 
   return { players };
 }

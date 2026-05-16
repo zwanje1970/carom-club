@@ -9,6 +9,7 @@ import { isEmptyOutlineHtml } from "../../../../lib/outline-content-helpers";
 import { buildSiteVenueDetailPath } from "../../../../lib/site-venues-catalog";
 import type { TournamentDivisionMetricType, TournamentEntryQualificationType } from "../../../../lib/tournament-rule-types";
 import SiteTournamentBracketEmbedDynamic from "./site-tournament-bracket-embed-dynamic";
+import SiteTournamentDetailResultsEmbedDynamic from "./site-tournament-detail-results-embed-dynamic";
 
 type Props = {
   tournament: Tournament;
@@ -73,6 +74,48 @@ function formatPrizeInfoForDisplay(prizeInfo: string): string {
   return prizeInfo.split("\n").map(formatPrizeInfoLineForDisplay).join("\n");
 }
 
+type DetailHeroCta = { kind: "link"; label: string; href: string } | { kind: "closed-note" };
+
+function resolveDetailHeroCta(params: {
+  statusBadge: string;
+  tournamentId: string;
+  applyHref?: string;
+  audience: "site" | "client";
+}): DetailHeroCta | null {
+  const badge = params.statusBadge.trim();
+  const base =
+    params.audience === "client"
+      ? `/client/tournaments/${encodeURIComponent(params.tournamentId)}`
+      : `/site/tournaments/${encodeURIComponent(params.tournamentId)}`;
+
+  if ((badge === "모집중" || badge === "마감임박") && params.applyHref) {
+    return { kind: "link", label: "참가신청", href: params.applyHref };
+  }
+  if (badge === "진행중") {
+    return { kind: "link", label: "대회현황", href: `${base}#tournament-live-status` };
+  }
+  if (badge === "종료") {
+    return { kind: "link", label: "대회결과", href: `${base}#tournament-results` };
+  }
+  if (params.applyHref && badge === "마감") {
+    return { kind: "closed-note" };
+  }
+  return null;
+}
+
+function DetailHeroCtaBlock({ cta }: { cta: DetailHeroCta }) {
+  if (cta.kind === "closed-note") {
+    return (
+      <p className="site-detail-body-text site-tournament-detail-apply-closed-note">신청이 마감된 대회입니다.</p>
+    );
+  }
+  return (
+    <Link prefetch={false} className="primary-button primary-button--block site-tournament-detail-apply-cta" href={cta.href}>
+      {cta.label}
+    </Link>
+  );
+}
+
 function tournamentStatusBadgeClassName(statusBadge: string): string {
   const s = statusBadge.trim();
   if (s === "모집중") return "badge-status";
@@ -132,8 +175,12 @@ export default function SiteTournamentDetailSections({
   const hasExtraVenues = Boolean(tournament.extraVenues && tournament.extraVenues.length > 0);
   const hasLocationBlock = mainLocationLines.length > 0 || hasExtraVenues;
 
-  const applicationsClosed =
-    tournament.statusBadge === "마감" || tournament.statusBadge === "진행중" || tournament.statusBadge === "종료";
+  const heroCta = resolveDetailHeroCta({
+    statusBadge: tournament.statusBadge,
+    tournamentId: tournament.id,
+    applyHref,
+    audience,
+  });
 
   if (detailLayout === "site") {
     const firstExtraHead =
@@ -180,19 +227,7 @@ export default function SiteTournamentDetailSections({
               />
             </div>
           ) : null}
-          {applyHref && !applicationsClosed ? (
-            <Link
-              prefetch={false}
-              className="primary-button primary-button--block site-tournament-detail-apply-cta"
-              href={applyHref}
-            >
-              참가신청
-            </Link>
-          ) : applyHref && applicationsClosed ? (
-            <p className="site-detail-body-text site-tournament-detail-apply-closed-note">
-              신청이 마감된 대회입니다.
-            </p>
-          ) : null}
+          {heroCta ? <DetailHeroCtaBlock cta={heroCta} /> : null}
         </section>
 
         <section className="card-clean site-detail-inner-stack">
@@ -298,7 +333,7 @@ export default function SiteTournamentDetailSections({
                   시합장 보기
                 </Link>
               ) : null}
-              {applicationsClosed ? (
+              {tournament.statusBadge === "종료" ? (
                 <Link
                   prefetch={false}
                   className="secondary-button"
@@ -312,10 +347,23 @@ export default function SiteTournamentDetailSections({
         ) : null}
 
         {!deferHeavy && showLiveBracketEmbed ? (
-          <SiteTournamentBracketEmbedDynamic
-            tournamentId={tournament.id}
-            fastPoll={tournament.statusBadge === "진행중"}
-          />
+          <section id="tournament-live-status" className="site-tournament-detail-anchor-section">
+            <SiteTournamentBracketEmbedDynamic
+              tournamentId={tournament.id}
+              fastPoll={tournament.statusBadge === "진행중"}
+              statusBadge={tournament.statusBadge}
+              schedule={{ date: tournament.date, eventDates: tournament.eventDates }}
+            />
+          </section>
+        ) : null}
+
+        {!deferHeavy && tournament.statusBadge === "종료" ? (
+          <section
+            id="tournament-results"
+            className="card-clean site-detail-inner-stack site-tournament-detail-anchor-section"
+          >
+            <SiteTournamentDetailResultsEmbedDynamic tournamentId={tournament.id} />
+          </section>
         ) : null}
 
         <div className="site-detail-actions-row">
@@ -352,10 +400,16 @@ export default function SiteTournamentDetailSections({
         {tournament.summary ? (
           <p style={{ whiteSpace: "pre-wrap", marginTop: "0.5rem" }}>{tournament.summary}</p>
         ) : null}
-        {applyHref ? (
-          <Link prefetch={false} className="v3-btn" href={applyHref} style={{ padding: "0.5rem 0.9rem" }}>
-            참가신청
-          </Link>
+        {heroCta ? (
+          heroCta.kind === "closed-note" ? (
+            <p className="v3-muted" style={{ margin: 0 }}>
+              신청이 마감된 대회입니다.
+            </p>
+          ) : (
+            <Link prefetch={false} className="v3-btn" href={heroCta.href} style={{ padding: "0.5rem 0.9rem" }}>
+              {heroCta.label}
+            </Link>
+          )
         ) : null}
       </section>
 
@@ -474,7 +528,7 @@ export default function SiteTournamentDetailSections({
                 시합장 보기
               </Link>
             ) : null}
-            {applicationsClosed ? (
+            {tournament.statusBadge === "종료" ? (
               <Link
                 prefetch={false}
                 className="v3-btn"

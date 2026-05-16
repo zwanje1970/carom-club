@@ -44,7 +44,17 @@ export type SlideDeckItem = {
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
   cardTextShadowEnabled?: boolean;
+  /** 제목 효과(제목만 적용) */
+  cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
   cardSurfaceLayout?: TournamentCardSurfaceLayout;
+  /** 하단 날짜/장소 분리영역 배경색 */
+  cardBottomBarColor?: string | null;
+  /** 하단 분리영역 투명도 0~1 */
+  cardBottomBarOpacity?: number | null;
+  /** 배경 위 가독성 그라데이션 프리셋 */
+  cardGradientPreset?: "none" | "top" | "left" | "top_left" | "soft";
+  /** 그라데이션 강도 0~1 */
+  cardGradientOpacity?: number | null;
   cardFooterDateTextColor?: string | null;
   cardFooterPlaceTextColor?: string | null;
   /** 게시 시 생성한 카드 본문 640 스냅샷 URL — 메인 스크롤 카드에서 우선 표시 */
@@ -75,7 +85,12 @@ type TournamentSlidePreviewItem = {
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
   cardTextShadowEnabled?: boolean;
+  cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
   cardSurfaceLayout?: TournamentCardSurfaceLayout;
+  cardBottomBarColor?: string | null;
+  cardBottomBarOpacity?: number | null;
+  cardGradientPreset?: "none" | "top" | "left" | "top_left" | "soft";
+  cardGradientOpacity?: number | null;
   cardFooterDateTextColor?: string | null;
   cardFooterPlaceTextColor?: string | null;
 };
@@ -102,7 +117,12 @@ function slideDeckItemToPreviewItem(item: SlideDeckItem): TournamentSlidePreview
     cardTitleTextColor: item.cardTitleTextColor,
     cardDescriptionTextColor: item.cardDescriptionTextColor,
     cardTextShadowEnabled: item.cardTextShadowEnabled,
+    cardTitleEffect: item.cardTitleEffect,
     cardSurfaceLayout: item.cardSurfaceLayout === "full" ? "full" : "split",
+    cardBottomBarColor: item.cardBottomBarColor,
+    cardBottomBarOpacity: item.cardBottomBarOpacity,
+    cardGradientPreset: item.cardGradientPreset,
+    cardGradientOpacity: item.cardGradientOpacity,
     cardFooterDateTextColor: item.cardFooterDateTextColor,
     cardFooterPlaceTextColor: item.cardFooterPlaceTextColor,
   };
@@ -122,7 +142,7 @@ function toStatus(value: string | undefined): TournamentPostStatus {
   const badge = (value ?? "").trim();
   if (badge === "진행중") return "진행중";
   if (badge.includes("마감임박") || (badge.includes("마감") && badge.includes("임박"))) return "마감임박";
-  if (badge.includes("종료")) return "종료";
+  if (badge.includes("종료")) return "진행중";
   if (badge.includes("마감")) return "마감";
   return "모집중";
 }
@@ -280,14 +300,41 @@ function TournamentSlideCardPreview({
   const leadColor = (item.cardLeadTextColor ?? "").trim();
   const titleColor = (item.cardTitleTextColor ?? "").trim();
   const descColor = (item.cardDescriptionTextColor ?? "").trim();
+  const titleEffect = item.cardTitleEffect ?? "none";
   const statusBadge = <TournamentStatusBadge status={status} hideLabel={isImageCaptureMode} />;
   const captureHideGlyphClass = isImageCaptureMode ? styles.imageCaptureHideGlyph : "";
-  const surfaceLayout: TournamentCardSurfaceLayout =
-    item.cardSurfaceLayout === "full" ? "full" : "split";
+  const surfaceLayout: TournamentCardSurfaceLayout = "split";
   const footerDateColor = (item.cardFooterDateTextColor ?? "").trim();
   const footerPlaceColor = (item.cardFooterPlaceTextColor ?? "").trim();
-  const fullFooterDateStyle = footerDateColor ? { color: footerDateColor } : undefined;
-  const fullFooterPlaceStyle = footerPlaceColor ? { color: footerPlaceColor } : undefined;
+  const bottomBarColor = (item.cardBottomBarColor ?? "").trim() || "#ffffff";
+  const bottomBarOpacityRaw =
+    typeof item.cardBottomBarOpacity === "number" && Number.isFinite(item.cardBottomBarOpacity)
+      ? item.cardBottomBarOpacity
+      : 1;
+  const bottomBarOpacity = Math.min(1, Math.max(0, bottomBarOpacityRaw));
+  const bottomBarStyle =
+    bottomBarOpacity <= 0
+      ? ({ background: "transparent" } as CSSProperties)
+      : ({
+          backgroundColor: bottomBarColor,
+          opacity: bottomBarOpacity,
+        } as CSSProperties);
+  const gradientPreset = item.cardGradientPreset ?? "none";
+  const gradientOpacityRaw =
+    typeof item.cardGradientOpacity === "number" && Number.isFinite(item.cardGradientOpacity)
+      ? item.cardGradientOpacity
+      : 0;
+  const gradientOpacity = Math.min(1, Math.max(0, gradientOpacityRaw));
+  const gradientLayerClass =
+    gradientPreset === "top"
+      ? styles.mediaGradientTop
+      : gradientPreset === "left"
+        ? styles.mediaGradientLeft
+        : gradientPreset === "top_left"
+          ? styles.mediaGradientTopLeft
+          : gradientPreset === "soft"
+            ? styles.mediaGradientSoft
+            : "";
 
   const rootClass = [
     styles.cardRoot,
@@ -296,7 +343,9 @@ function TournamentSlideCardPreview({
     templateCardLayout ? styles.cardRootTemplateLayout : "",
     tournamentPublishedHeightScale ? styles.cardRootTournamentPublishedScale : "",
     item.cardTextShadowEnabled ? styles.cardTextShadowOn : "",
-    surfaceLayout === "full" ? styles.cardRootSurfaceFull : "",
+    titleEffect === "shadow" ? styles.cardTitleEffectShadow : "",
+    titleEffect === "outline" ? styles.cardTitleEffectOutline : "",
+    titleEffect === "shadow_outline" ? styles.cardTitleEffectShadowOutline : "",
     mainSlideAd ? styles.cardRootMainSlideAd : "",
     artboardPx ? styles.cardRootArtboardPx : "",
   ]
@@ -314,30 +363,12 @@ function TournamentSlideCardPreview({
   const descDisplay = layoutStableSlots && !descText ? "\u00a0" : description;
   const desc2Display = layoutStableSlots && !desc2Text ? "\u00a0" : description2;
 
-  const fullOverlayFooter = (
-    <div className={styles.fullSurfaceFooter}>
-      <p
-        data-tournament-card-overlay="date"
-        className={`${styles.fullSurfaceFooterDate} ${captureHideGlyphClass}`.trim()}
-        style={fullFooterDateStyle}
-      >
-        {parsed.dateText}
-      </p>
-      <p
-        data-tournament-card-overlay="place"
-        className={`${styles.fullSurfaceFooterPlace} ${captureHideGlyphClass}`.trim()}
-        style={fullFooterPlaceStyle}
-      >
-        {parsed.placeText}
-      </p>
-    </div>
-  );
-
   const splitDateStyle = footerDateColor ? { color: footerDateColor } : undefined;
   const splitPlaceStyle = footerPlaceColor ? { color: footerPlaceColor } : undefined;
 
   const splitFooter = (
     <footer className={styles.cardFooter}>
+      <div className={styles.cardFooterBackground} style={bottomBarStyle} />
       <p
         data-tournament-card-overlay="date"
         className={`${styles.footerDate} ${captureHideGlyphClass}`.trim()}
@@ -377,6 +408,9 @@ function TournamentSlideCardPreview({
             <div className={styles.adCardMediaFill} aria-hidden />
           ) : (
             <div className={styles.classicInner}>
+              {gradientLayerClass && gradientOpacity > 0 ? (
+                <div className={`${styles.mediaGradientLayer} ${gradientLayerClass}`} style={{ opacity: gradientOpacity }} />
+              ) : null}
               <div className={styles.classicTop}>
                 <div className={styles.classicMain}>
                   {showLeadBlock ? (
@@ -415,11 +449,10 @@ function TournamentSlideCardPreview({
                   ) : null}
                 </div>
               </div>
-              {surfaceLayout === "full" ? fullOverlayFooter : null}
             </div>
           )}
         </MediaStack>
-        {mainSlideAd ? null : surfaceLayout === "split" ? splitFooter : null}
+        {mainSlideAd ? null : splitFooter}
       </article>
     );
   }
@@ -446,6 +479,9 @@ function TournamentSlideCardPreview({
             <div className={styles.adCardMediaFill} aria-hidden />
           ) : (
             <div className={styles.frameInner}>
+              {gradientLayerClass && gradientOpacity > 0 ? (
+                <div className={`${styles.mediaGradientLayer} ${gradientLayerClass}`} style={{ opacity: gradientOpacity }} />
+              ) : null}
               <div className={styles.frameCenter}>
                 {showLeadBlock ? (
                   <p
@@ -481,12 +517,11 @@ function TournamentSlideCardPreview({
                     {desc2Display}
                   </p>
                 ) : null}
-                {surfaceLayout === "full" ? fullOverlayFooter : null}
               </div>
             </div>
           )}
         </MediaStack>
-        {mainSlideAd ? null : surfaceLayout === "split" ? splitFooter : null}
+        {mainSlideAd ? null : splitFooter}
       </article>
     );
   }

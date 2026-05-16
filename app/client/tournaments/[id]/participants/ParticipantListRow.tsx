@@ -49,6 +49,7 @@ export default function ParticipantListRow({
   attendanceChecked,
   rowLayout = "standard",
   opButtonPresentation = "icon",
+  approvalCapacityFull = false,
 }: {
   tournamentId: string;
   entryId: string;
@@ -69,6 +70,8 @@ export default function ParticipantListRow({
   attendanceChecked?: boolean | null;
   rowLayout?: "standard" | "fullscreen";
   opButtonPresentation?: "icon" | "text";
+  /** 모집인원 승인 정원 충족 — 신규 승인 불가 */
+  approvalCapacityFull?: boolean;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<TournamentApplicationStatus>(initialStatus);
@@ -266,6 +269,10 @@ export default function ParticipantListRow({
     if (terminalRejected || terminalApproved || terminalWaiting) return;
     if (!depositDone) return;
     if (!approveDone) {
+      if (approvalCapacityFull) {
+        window.alert("모집인원이 가득 찼습니다.\n기존 승인자를 취소 후 추가해주세요.");
+        return;
+      }
       void (async () => {
         const inflight = depositConfirmInflightRef.current;
         if (inflight) {
@@ -405,7 +412,7 @@ export default function ParticipantListRow({
           </button>
         );
       }
-      if (!depositDone) {
+      if (!depositDone || (approvalCapacityFull && !approveDone)) {
         return (
           <button type="button" disabled className="participant-op-textBtn" style={{ ...textOpBtnBase, opacity: 0.55 }}>
             승인
@@ -457,10 +464,15 @@ export default function ParticipantListRow({
         </span>
       );
     }
-    if (!depositDone) {
+    if (!depositDone || (approvalCapacityFull && !approveDone)) {
       return (
         <span className="participant-op-hit">
-          <button type="button" disabled className="participant-op-btn participant-op-btn--check participant-op-btn--check-wait" aria-label="승인(입금확인 필요)">
+          <button
+            type="button"
+            disabled
+            className="participant-op-btn participant-op-btn--check participant-op-btn--check-wait"
+            aria-label={!depositDone ? "승인(입금확인 필요)" : "승인(정원 초과)"}
+          >
             ✓
           </button>
         </span>

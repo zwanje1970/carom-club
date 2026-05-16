@@ -40,6 +40,13 @@ function publishedCardSnapshotToEditorGetBody(s: PublishedCardSnapshot): Record<
     cardLeadTextColor: s.cardLeadTextColor ?? null,
     cardTitleTextColor: s.cardTitleTextColor ?? null,
     cardDescriptionTextColor: s.cardDescriptionTextColor ?? null,
+    cardTitleEffect: s.cardTitleEffect ?? null,
+    cardBottomBarColor: s.cardBottomBarColor ?? null,
+    cardBottomBarOpacity:
+      typeof s.cardBottomBarOpacity === "number" ? s.cardBottomBarOpacity : null,
+    cardGradientPreset: s.cardGradientPreset ?? null,
+    cardGradientOpacity:
+      typeof s.cardGradientOpacity === "number" ? s.cardGradientOpacity : null,
     cardFooterDateTextColor: s.cardFooterDateTextColor ?? null,
     cardFooterPlaceTextColor: s.cardFooterPlaceTextColor ?? null,
   };
@@ -130,6 +137,11 @@ export async function POST(request: Request) {
     cardLeadTextColor?: unknown;
     cardTitleTextColor?: unknown;
     cardDescriptionTextColor?: unknown;
+    cardTitleEffect?: unknown;
+    cardBottomBarColor?: unknown;
+    cardBottomBarOpacity?: unknown;
+    cardGradientPreset?: unknown;
+    cardGradientOpacity?: unknown;
     cardTextShadowEnabled?: unknown;
     cardSurfaceLayout?: unknown;
     cardFooterDateTextColor?: unknown;
@@ -208,6 +220,33 @@ export async function POST(request: Request) {
   const cardTitleTextColor = typeof body.cardTitleTextColor === "string" ? body.cardTitleTextColor : undefined;
   const cardDescriptionTextColor =
     typeof body.cardDescriptionTextColor === "string" ? body.cardDescriptionTextColor : undefined;
+  const cardTitleEffect =
+    body.cardTitleEffect === "shadow" ||
+    body.cardTitleEffect === "outline" ||
+    body.cardTitleEffect === "shadow_outline"
+      ? body.cardTitleEffect
+      : "none";
+  const cardBottomBarColor =
+    body.cardBottomBarColor === null
+      ? null
+      : typeof body.cardBottomBarColor === "string"
+        ? body.cardBottomBarColor
+        : undefined;
+  const cardBottomBarOpacity =
+    typeof body.cardBottomBarOpacity === "number" && Number.isFinite(body.cardBottomBarOpacity)
+      ? body.cardBottomBarOpacity
+      : undefined;
+  const cardGradientPreset =
+    body.cardGradientPreset === "top" ||
+    body.cardGradientPreset === "left" ||
+    body.cardGradientPreset === "top_left" ||
+    body.cardGradientPreset === "soft"
+      ? body.cardGradientPreset
+      : "none";
+  const cardGradientOpacity =
+    typeof body.cardGradientOpacity === "number" && Number.isFinite(body.cardGradientOpacity)
+      ? body.cardGradientOpacity
+      : undefined;
   const cardTextShadowEnabled = body.cardTextShadowEnabled === true;
   const cardSurfaceLayout = body.cardSurfaceLayout === "full" ? "full" : "split";
   const cardFooterDateTextColor =
@@ -260,6 +299,11 @@ export async function POST(request: Request) {
       ...(cardLeadTextColor !== undefined ? { cardLeadTextColor } : {}),
       ...(cardTitleTextColor !== undefined ? { cardTitleTextColor } : {}),
       ...(cardDescriptionTextColor !== undefined ? { cardDescriptionTextColor } : {}),
+      ...(cardTitleEffect !== undefined ? { cardTitleEffect } : {}),
+      ...(cardBottomBarColor !== undefined ? { cardBottomBarColor } : {}),
+      ...(cardBottomBarOpacity !== undefined ? { cardBottomBarOpacity } : {}),
+      ...(cardGradientPreset !== undefined ? { cardGradientPreset } : {}),
+      ...(cardGradientOpacity !== undefined ? { cardGradientOpacity } : {}),
       cardTextShadowEnabled,
       cardSurfaceLayout,
       ...(cardFooterDateTextColor !== undefined ? { cardFooterDateTextColor } : {}),

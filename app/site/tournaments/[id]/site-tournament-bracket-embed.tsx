@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isTournamentPastAutoEndSchedule } from "../../../../lib/tournament-auto-end-schedule";
 
 type MatchJson = {
   id: string;
@@ -33,16 +34,51 @@ function slotName(p: { name: string; displayName?: string | null }): string {
   return d || p.name.trim() || "—";
 }
 
+function bracketLooksLikeSplitLayout(b: BracketJson | null): boolean {
+  if (!b) return false;
+  if (b.bracketMode === "multi_block") return true;
+  if (Array.isArray(b.blocks) && b.blocks.length > 0) return true;
+  if (b.finalBlock != null) return true;
+  return false;
+}
+
+function getFinalRoundFromBracketJson(b: BracketJson): RoundJson | null {
+  if (bracketLooksLikeSplitLayout(b) && b.finalBlock?.rounds?.length) {
+    const finals = b.finalBlock.rounds;
+    return finals[finals.length - 1] ?? null;
+  }
+  const rs = b.rounds ?? [];
+  return rs.length > 0 ? rs[rs.length - 1]! : null;
+}
+
+function isFinalMatchConfirmedInBracketJson(b: BracketJson | null): boolean {
+  if (!b) return false;
+  const finalRound = getFinalRoundFromBracketJson(b);
+  const finalMatch = finalRound?.matches?.[0] ?? null;
+  if (!finalRound || !finalMatch) return false;
+  return (
+    finalRound.matches.length === 1 &&
+    finalMatch.status === "COMPLETED" &&
+    typeof finalMatch.winnerUserId === "string" &&
+    finalMatch.winnerUserId.trim() !== ""
+  );
+}
+
 export default function SiteTournamentBracketEmbed({
   tournamentId,
   fastPoll: _fastPoll,
+  statusBadge,
+  schedule,
 }: {
   tournamentId: string;
   /** @deprecated 진행중 여부와 무관하게 공개 화면은 30초 간격 메타 폴링으로 통일 */
   fastPoll: boolean;
+  statusBadge?: string;
+  schedule?: { date?: string; eventDates?: string[] | null };
 }) {
   const [title, setTitle] = useState("");
   const [rounds, setRounds] = useState<RoundJson[]>([]);
+  const [fullBracket, setFullBracket] = useState<BracketJson | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [multiBlock, setMultiBlock] = useState(false);
   const remoteSigRef = useRef("");
@@ -50,10 +86,12 @@ export default function SiteTournamentBracketEmbed({
   const applyBracketJson = useCallback((b: BracketJson | null) => {
     if (!b) {
       setRounds([]);
+      setFullBracket(null);
       setMultiBlock(false);
       remoteSigRef.current = "";
       return;
     }
+    setFullBracket(b);
     const u = typeof b.updatedAt === "string" && b.updatedAt.trim() !== "" ? b.updatedAt.trim() : "";
     remoteSigRef.current = u || (typeof b.createdAt === "string" ? b.createdAt : "") || "";
     const isMulti = b.bracketMode === "multi_block" && Boolean(b.blocks?.[0]?.rounds?.length);
@@ -120,6 +158,16 @@ export default function SiteTournamentBracketEmbed({
 
   const r1 = rounds.find((r) => r.roundNumber === 1);
 
+  const showResultsPendingNotice = useMemo(() => {
+    if ((statusBadge ?? "").trim() !== "진행중") return false;
+    if (!isFinalMatchConfirmedInBracketJson(fullBracket)) return false;
+    if (!schedule) return false;
+    return !isTournamentPastAutoEndSchedule({
+      date: typeof schedule.date === "string" ? schedule.date : "",
+      eventDates: schedule.eventDates ?? null,
+    });
+  }, [fullBracket, schedule, statusBadge]);
+
   return (
     <div className="site-tournament-bracket-embed card-clean site-detail-inner-stack" style={{ gap: "0.5rem" }}>
       <div className="v3-row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "0.35rem" }}>
@@ -182,6 +230,14 @@ export default function SiteTournamentBracketEmbed({
           </table>
         </div>
       )}
+      {showResultsPendingNotice ? (
+        <p
+          className="v3-muted"
+          style={{ margin: "0.35rem 0 0", fontSize: "0.78rem", lineHeight: 1.45, wordBreak: "keep-all" }}
+        >
+          대회결과는 대회 다음날 오전에 반영됩니다.
+        </p>
+      ) : null}
     </div>
   );
 }

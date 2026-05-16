@@ -27,6 +27,11 @@ type CardSnapshotRow = {
   cardLeadTextColor?: string | null;
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
+  cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardBottomBarColor?: string | null;
+  cardBottomBarOpacity?: number | null;
+  cardGradientPreset?: "none" | "top" | "left" | "top_left" | "soft";
+  cardGradientOpacity?: number | null;
   isActive?: boolean;
 };
 
@@ -236,6 +241,17 @@ export async function publishTournamentCardFromEditorClient(args: {
         : {}),
       ...(typeof publishSource.cardDescriptionTextColor === "string" && publishSource.cardDescriptionTextColor.trim()
         ? { cardDescriptionTextColor: publishSource.cardDescriptionTextColor.trim() }
+        : {}),
+      ...(publishSource.cardTitleEffect ? { cardTitleEffect: publishSource.cardTitleEffect } : {}),
+      ...(typeof publishSource.cardBottomBarColor === "string"
+        ? { cardBottomBarColor: publishSource.cardBottomBarColor }
+        : {}),
+      ...(typeof publishSource.cardBottomBarOpacity === "number"
+        ? { cardBottomBarOpacity: publishSource.cardBottomBarOpacity }
+        : {}),
+      ...(publishSource.cardGradientPreset ? { cardGradientPreset: publishSource.cardGradientPreset } : {}),
+      ...(typeof publishSource.cardGradientOpacity === "number"
+        ? { cardGradientOpacity: publishSource.cardGradientOpacity }
         : {}),
       publishedCardImageUrl,
       ...(publishedCardImage480Url ? { publishedCardImage480Url } : {}),

@@ -398,6 +398,44 @@ export async function getTournamentApplicationListCountsFirestore(tournamentId: 
   };
 }
 
+export const PARTICIPANT_APPROVAL_CAPACITY_FULL_ERROR =
+  "모집인원이 가득 찼습니다.\n기존 승인자를 취소 후 추가해주세요.";
+
+function applicationOccupiesApprovalCapacity(app: {
+  status?: string;
+  clientApplicationApprovedAt?: string | null;
+}): boolean {
+  const st = app.status;
+  if (st === "REJECTED" || st === "WAITING") return false;
+  if (st === "APPROVED") return true;
+  return typeof app.clientApplicationApprovedAt === "string" && app.clientApplicationApprovedAt.trim() !== "";
+}
+
+/** 승인 직전 정원 검사 — `현재 승인인원 < 모집인원` */
+async function assertParticipantApprovalCapacityFirestore(params: {
+  tournamentId: string;
+  maxParticipants: number;
+  excludeEntryId?: string;
+  excludeApplication?: Pick<TournamentApplication, "id" | "status" | "clientApplicationApprovedAt">;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const maxP = Math.floor(Number(params.maxParticipants));
+  if (!Number.isFinite(maxP) || maxP <= 0) return { ok: true };
+
+  let occupied = await countCapacityOccupiedApplicationsForTournamentFirestore(params.tournamentId);
+  if (
+    params.excludeEntryId &&
+    params.excludeApplication &&
+    params.excludeApplication.id === params.excludeEntryId &&
+    applicationOccupiesApprovalCapacity(params.excludeApplication)
+  ) {
+    occupied -= 1;
+  }
+  if (occupied >= maxP) {
+    return { ok: false, error: PARTICIPANT_APPROVAL_CAPACITY_FULL_ERROR };
+  }
+  return { ok: true };
+}
+
 /** 모집 정원 충족 판단용 — `WAITING`(대기자)·`REJECTED` 제외, 승인 처리된 건·참가 확정 건 포함 */
 export async function countCapacityOccupiedApplicationsForTournamentFirestore(tournamentId: string): Promise<number> {
   assertClientFirestorePersistenceConfigured();
@@ -698,6 +736,11 @@ export async function patchTournamentApplicationProcessingFirestore(params: {
     return { ok: false, error: "요청 값이 올바르지 않습니다." };
   }
 
+  const tournament = await getTournamentByIdFirestore(tournamentId);
+  if (!tournament) {
+    return { ok: false, error: "대회를 찾을 수 없습니다." };
+  }
+
   const application = await getTournamentApplicationByIdFirestore(tournamentId, entryId);
   if (!application) {
     return { ok: false, error: "참가신청을 찾을 수 없습니다." };
@@ -739,6 +782,15 @@ export async function patchTournamentApplicationProcessingFirestore(params: {
       typeof application.clientDepositConfirmedAt === "string" && application.clientDepositConfirmedAt.trim() !== "";
     if (!dep) {
       return { ok: false, error: "입금확인 후 승인할 수 있습니다." };
+    }
+    if (!hadApplicationApprovedAtBefore) {
+      const cap = await assertParticipantApprovalCapacityFirestore({
+        tournamentId,
+        maxParticipants: tournament.maxParticipants,
+        excludeEntryId: entryId,
+        excludeApplication: application,
+      });
+      if (!cap.ok) return cap;
     }
     patch.clientApplicationApprovedAt = now;
     patch.processingApprovalCanceledNotifiedAt = null;
@@ -1137,6 +1189,11 @@ export async function createAdminRegisteredParticipantFirestore(params: {
   const tournament = await getTournamentByIdFirestore(params.tournamentId);
   if (!tournament) return { ok: false, error: "대회를 찾을 수 없습니다." };
 
+  const maxParticipants = Number(tournament.maxParticipants);
+  const occupied = await countCapacityOccupiedApplicationsForTournamentFirestore(params.tournamentId);
+  const atCapacity =
+    Number.isFinite(maxParticipants) && maxParticipants > 0 && occupied >= maxParticipants;
+
   const id = randomUUID();
   const manualUserId = `${MANUAL_PARTICIPANT_USER_ID_PREFIX}${id}`;
   const now = new Date().toISOString();
@@ -1156,7 +1213,7 @@ export async function createAdminRegisteredParticipantFirestore(params: {
     ocrRawResult: "",
     ocrRequestedAt: null,
     ocrCompletedAt: null,
-    status: "APPROVED",
+    status: atCapacity ? "APPLIED" : "APPROVED",
     createdAt: now,
     updatedAt: now,
     statusChangedAt: now,

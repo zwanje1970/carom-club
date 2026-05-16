@@ -1437,19 +1437,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     return () => window.clearTimeout(t);
   }, [replayOfflinePendingManage, selectedZoneId, storageSeg, tournamentId, zonesEnabled]);
 
-  const runSetTournamentClosedMutation = useCallback(async () => {
-    const response = await fetch(`/api/client/tournaments/${tournamentId}/status-badge`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ statusBadge: "종료" }),
-    });
-    const result = (await response.json().catch(() => ({}))) as { error?: string };
-    if (!response.ok) {
-      return { ok: false as const, error: result.error ?? "대회 종료 처리에 실패했습니다." };
-    }
-    return { ok: true as const };
-  }, [tournamentId]);
-
   const captureBracketImageSnapshot = useCallback(
     async (targetBracket: Bracket): Promise<string | null> => {
       try {
@@ -1499,18 +1486,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
         return true;
       }
 
-      const closed = await runSetTournamentClosedMutation();
-      if (!closed.ok) {
-        setSaveState("error");
-        setMessage(closed.error);
-        return true;
-      }
-      setIsTournamentClosed(true);
-      setMessage("결승 종료로 대회가 자동 종료되었습니다.");
+      setMessage("결승 결과가 확정되었습니다.");
       setSaveState("idle");
       return true;
     },
-    [captureBracketImageSnapshot, runSetTournamentClosedMutation, selectedZoneId, tournamentId, zonesEnabled],
+    [captureBracketImageSnapshot, selectedZoneId, tournamentId, zonesEnabled],
   );
 
   useEffect(() => {
@@ -2659,6 +2639,9 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
 
   return (
     <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
+      <p className="v3-muted" style={{ margin: 0, fontSize: "0.78rem", lineHeight: 1.45 }}>
+        대회 시작 시 대회 카드 상태를 &quot;진행중&quot;으로 변경해 주세요. 상태 변경 시 대회 상세 버튼과 표시 내용이 자동 변경됩니다.
+      </p>
       {zonesEnabled ? (
         <section className="v3-box v3-stack" style={{ padding: "0.65rem 0.75rem" }}>
           <div className="v3-row" style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>

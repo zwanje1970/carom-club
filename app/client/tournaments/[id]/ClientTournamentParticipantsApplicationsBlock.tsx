@@ -266,6 +266,9 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   );
   const rowLayout = fullscreenTable ? "fullscreen" : "standard";
   const capacityOccupied = useMemo(() => countCapacityOccupiedFromListItems(entries), [entries]);
+  const maxP = Math.floor(Number(maxParticipants));
+  const approvalCapacityFull =
+    Number.isFinite(maxP) && maxP > 0 && capacityOccupied >= maxP;
   const waitingListTotal = participantCountSummary.waitingList ?? 0;
 
   function requestBulkDepositApprove() {
@@ -291,7 +294,13 @@ export default function ClientTournamentParticipantsApplicationsBlock({
     setBulkDepositApproveTargetIds([]);
     setBulkApproveBusy(true);
     try {
+      let slotsLeft =
+        Number.isFinite(maxP) && maxP > 0
+          ? Math.max(0, maxP - countCapacityOccupiedFromListItems(entries))
+          : ids.length;
+      let approvedCount = 0;
       for (const id of ids) {
+        if (slotsLeft <= 0) break;
         const t = entries.find((e) => e.id === id);
         if (!t || !listItemEligibleBulkDepositApprove(t)) continue;
         const res = await fetch(
@@ -314,10 +323,15 @@ export default function ClientTournamentParticipantsApplicationsBlock({
         }
         const at = json.application?.clientApplicationApprovedAt;
         if (typeof at === "string" && at.trim()) {
+          approvedCount += 1;
+          slotsLeft -= 1;
           setEntries((prev) =>
             prev.map((e) => (e.id === t.id ? { ...e, clientApplicationApprovedAt: at.trim() } : e))
           );
         }
+      }
+      if (approvedCount < ids.length) {
+        window.alert("모집인원이 가득 찼습니다.\n기존 승인자를 취소 후 추가해주세요.");
       }
       router.refresh();
     } catch {
@@ -878,6 +892,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     initialClientApplicationApprovedAt={entry.clientApplicationApprovedAt ?? null}
                     rowLayout={rowLayout}
                     opButtonPresentation="icon"
+                    approvalCapacityFull={approvalCapacityFull}
                   />
                 ))}
               </tbody>

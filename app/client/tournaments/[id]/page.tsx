@@ -83,6 +83,9 @@ export default async function ClientTournamentManagePage({ params }: { params: P
       />
 
       <section className="client-tournament-manage__card client-tournament-manage__card--hub">
+        <p className="v3-muted" style={{ margin: "0 0 0.35rem", fontSize: "0.78rem", lineHeight: 1.45 }}>
+          대회 시작 시 대회 카드 상태를 &quot;진행중&quot;으로 변경해 주세요. 상태 변경 시 대회 상세 버튼과 표시 내용이 자동 변경됩니다.
+        </p>
         <TournamentOperationalStartStrip
           tournamentId={id}
           statusBadge={tournament.statusBadge}

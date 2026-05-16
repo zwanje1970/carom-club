@@ -12,10 +12,13 @@ export default function TournamentDetailedResultsFetchClient({
   fetchUrl,
   backHref,
   backLabel,
+  embedded = false,
 }: {
   fetchUrl: string;
   backHref: string;
   backLabel: string;
+  /** 대회 상세 내 임베드: 상단 이동 버튼·중복 제목 생략 */
+  embedded?: boolean;
 }) {
   const [bundle, setBundle] = useState<DetailedResultsBundle | null>(null);
   const [title, setTitle] = useState("");
@@ -49,20 +52,28 @@ export default function TournamentDetailedResultsFetchClient({
 
   return (
     <div className="v3-stack" style={{ gap: "0.65rem" }}>
-      <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-        <Link prefetch={false} href={backHref} className="v3-btn" style={{ fontWeight: 700 }}>
-          {backLabel}
-        </Link>
-        <button type="button" className="v3-btn" onClick={() => void load()} disabled={loading} style={{ fontWeight: 700 }}>
-          {loading ? "불러오는 중…" : "다시 불러오기"}
-        </button>
-      </div>
-      {title ? (
+      {embedded ? null : (
+        <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
+          <Link prefetch={false} href={backHref} className="v3-btn" style={{ fontWeight: 700 }}>
+            {backLabel}
+          </Link>
+          <button type="button" className="v3-btn" onClick={() => void load()} disabled={loading} style={{ fontWeight: 700 }}>
+            {loading ? "불러오는 중…" : "다시 불러오기"}
+          </button>
+        </div>
+      )}
+      {title && !embedded ? (
         <p style={{ margin: 0, fontSize: "0.95rem", fontWeight: 800, color: "#0f172a" }}>{title}</p>
       ) : null}
-      <h1 className="v3-h2" style={{ margin: 0, fontSize: "clamp(1.05rem, 4vw, 1.2rem)", fontWeight: 900 }}>
-        대회결과
-      </h1>
+      {embedded ? (
+        <h2 className="site-detail-section-title" style={{ margin: 0 }}>
+          대회결과
+        </h2>
+      ) : (
+        <h1 className="v3-h2" style={{ margin: 0, fontSize: "clamp(1.05rem, 4vw, 1.2rem)", fontWeight: 900 }}>
+          대회결과
+        </h1>
+      )}
       {err ? <p style={{ margin: 0, color: "#b91c1c", fontWeight: 700 }}>{err}</p> : null}
       {loading && !err ? <p className="v3-muted" style={{ margin: 0 }}>불러오는 중…</p> : null}
       {!loading && !err ? <TournamentDetailedResultsView bundle={bundle} /> : null}

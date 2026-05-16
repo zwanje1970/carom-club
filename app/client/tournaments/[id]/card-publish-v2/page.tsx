@@ -171,7 +171,6 @@ function waitForNextPaint(): Promise<void> {
   });
 }
 
-type CardTemplate = "A" | "B";
 type CardTheme = "dark" | "light" | "natural";
 
 type TournamentSummary = {
@@ -203,7 +202,12 @@ type SnapshotPick = {
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
   tournamentCardTextShadowEnabled?: boolean;
+  cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
   tournamentCardSurfaceLayout?: TournamentCardSurfaceLayout;
+  cardBottomBarColor?: string | null;
+  cardBottomBarOpacity?: number | null;
+  cardGradientPreset?: "none" | "top" | "left" | "top_left" | "soft";
+  cardGradientOpacity?: number | null;
   cardFooterDateTextColor?: string | null;
   cardFooterPlaceTextColor?: string | null;
   publishedCardImageUrl?: string | null;
@@ -230,7 +234,7 @@ export default function ClientTournamentCardPublishV2Page() {
   const [publishIntent, setPublishIntent] = useState<"recruiting" | "draft">("recruiting");
   const [cardDate, setCardDate] = useState("");
   const [cardPlace, setCardPlace] = useState("");
-  const [cardTemplate, setCardTemplate] = useState<CardTemplate>("A");
+  const cardTemplate = "A" as const;
   const [title, setTitle] = useState("");
   const [textLine1, setTextLine1] = useState("");
   const [textLine2, setTextLine2] = useState("");
@@ -243,8 +247,13 @@ export default function ClientTournamentCardPublishV2Page() {
   const [mediaBackground, setMediaBackground] = useState(DEFAULT_CARD_MEDIA_BACKGROUND);
   const [imageOverlayOpacity, setImageOverlayOpacity] = useState(DEFAULT_BG_IMAGE_OVERLAY_OPACITY);
   const [v2MediaMode, setV2MediaMode] = useState<"inherit" | "on">("on");
-  const [cardTextShadowEnabled, setCardTextShadowEnabled] = useState(false);
-  const [cardSurfaceLayout, setCardSurfaceLayout] = useState<TournamentCardSurfaceLayout>("split");
+  const [cardTextShadowEnabled] = useState(false);
+  const [cardSurfaceLayout] = useState<TournamentCardSurfaceLayout>("split");
+  const [cardTitleEffect, setCardTitleEffect] = useState<"none" | "shadow" | "outline" | "shadow_outline">("none");
+  const [bottomBarColor, setBottomBarColor] = useState("#ffffff");
+  const [bottomBarOpacity, setBottomBarOpacity] = useState(1);
+  const [gradientPreset, setGradientPreset] = useState<"none" | "top" | "left" | "top_left" | "soft">("none");
+  const [gradientOpacity, setGradientOpacity] = useState(0);
   const [footerDateTextColor, setFooterDateTextColor] = useState("");
   const [footerPlaceTextColor, setFooterPlaceTextColor] = useState("");
 
@@ -314,7 +323,12 @@ export default function ClientTournamentCardPublishV2Page() {
       slideTitleTextColor: tc || undefined,
       slideDescTextColor: dc || undefined,
       slideTextShadowEnabled: cardTextShadowEnabled,
-      slideSurfaceFull: cardSurfaceLayout === "full",
+      slideTitleEffect: cardTitleEffect,
+      slideBottomBarColor: bottomBarColor,
+      slideBottomBarOpacity: bottomBarOpacity,
+      slideGradientPreset: gradientPreset,
+      slideGradientOpacity: gradientOpacity,
+      slideSurfaceFull: false,
       slideFooterDateTextColor: fdc || undefined,
       slideFooterPlaceTextColor: fpc || undefined,
     };
@@ -329,7 +343,12 @@ export default function ClientTournamentCardPublishV2Page() {
     titleTextColor,
     descriptionTextColor,
     cardTextShadowEnabled,
+    cardTitleEffect,
     cardSurfaceLayout,
+    bottomBarColor,
+    bottomBarOpacity,
+    gradientPreset,
+    gradientOpacity,
     footerDateTextColor,
     footerPlaceTextColor,
     uploadedImage?.w320Url,
@@ -452,8 +471,36 @@ export default function ClientTournamentCardPublishV2Page() {
             prizeAutoSeededRef.current = true;
           }
         }
-        setCardTextShadowEnabled(pick.tournamentCardTextShadowEnabled === true);
-        setCardSurfaceLayout(pick.tournamentCardSurfaceLayout === "full" ? "full" : "split");
+        setCardTitleEffect(
+          pick.cardTitleEffect === "shadow" ||
+            pick.cardTitleEffect === "outline" ||
+            pick.cardTitleEffect === "shadow_outline"
+            ? pick.cardTitleEffect
+            : "none"
+        );
+        setBottomBarColor(
+          typeof pick.cardBottomBarColor === "string" && pick.cardBottomBarColor.trim()
+            ? pick.cardBottomBarColor.trim()
+            : "#ffffff"
+        );
+        setBottomBarOpacity(
+          typeof pick.cardBottomBarOpacity === "number" && Number.isFinite(pick.cardBottomBarOpacity)
+            ? Math.min(1, Math.max(0, pick.cardBottomBarOpacity))
+            : 1
+        );
+        setGradientPreset(
+          pick.cardGradientPreset === "top" ||
+            pick.cardGradientPreset === "left" ||
+            pick.cardGradientPreset === "top_left" ||
+            pick.cardGradientPreset === "soft"
+            ? pick.cardGradientPreset
+            : "none"
+        );
+        setGradientOpacity(
+          typeof pick.cardGradientOpacity === "number" && Number.isFinite(pick.cardGradientOpacity)
+            ? Math.min(1, Math.max(0, pick.cardGradientOpacity))
+            : 0
+        );
         setFooterDateTextColor(
           typeof pick.cardFooterDateTextColor === "string" ? pick.cardFooterDateTextColor.trim() : ""
         );
@@ -465,7 +512,6 @@ export default function ClientTournamentCardPublishV2Page() {
         setDescriptionTextColor(
           typeof pick.cardDescriptionTextColor === "string" ? pick.cardDescriptionTextColor.trim() : ""
         );
-        setCardTemplate(pick.tournamentCardTemplate === "B" ? "B" : "A");
         setThemeType(
           pick.tournamentTheme === "light" ? "light" : pick.tournamentTheme === "natural" ? "natural" : "dark"
         );
@@ -524,8 +570,11 @@ export default function ClientTournamentCardPublishV2Page() {
         const loc0 = typeof t.location === "string" ? t.location : "";
         setCardDate(d0 ? formatCardDateForDisplay(d0) : POSTCARD_TEMPLATE_APP_DEFAULTS.dateText);
         setCardPlace(loc0 ? venueNameOnly(loc0) : POSTCARD_TEMPLATE_APP_DEFAULTS.placeText);
-        setCardTextShadowEnabled(false);
-        setCardSurfaceLayout("split");
+        setCardTitleEffect("none");
+        setBottomBarColor("#ffffff");
+        setBottomBarOpacity(1);
+        setGradientPreset("none");
+        setGradientOpacity(0);
         setFooterDateTextColor("");
         setFooterPlaceTextColor("");
       }
@@ -573,6 +622,11 @@ export default function ClientTournamentCardPublishV2Page() {
       cardDisplayLocation: cardPlace.trim(),
       cardTextShadowEnabled,
       cardSurfaceLayout,
+      cardTitleEffect,
+      cardBottomBarColor: bottomBarColor,
+      cardBottomBarOpacity: bottomBarOpacity,
+      cardGradientPreset: gradientPreset,
+      cardGradientOpacity: gradientOpacity,
       cardFooterDateTextColor: footerDateTextColor.trim() || null,
       cardFooterPlaceTextColor: footerPlaceTextColor.trim() || null,
     };
@@ -824,6 +878,14 @@ export default function ClientTournamentCardPublishV2Page() {
     setImageOverlayOpacity(opacity);
   }, []);
 
+  const onBottomBarOpacityChange = useCallback((opacity: number) => {
+    setBottomBarOpacity(opacity);
+  }, []);
+
+  const onGradientOpacityChange = useCallback((opacity: number) => {
+    setGradientOpacity(opacity);
+  }, []);
+
   const onBackgroundFileChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
@@ -847,27 +909,6 @@ export default function ClientTournamentCardPublishV2Page() {
       <div className={editorStyles.pcPageShell}>
         <div className={editorStyles.pcPageMain}>
           <div className={`${editorStyles.pageWrap} ${editorStyles.pageWrapV2}`}>
-        <div className={editorStyles.surfaceTemplateRow}>
-          <div className={editorStyles.surfaceTemplateTabs} role="radiogroup" aria-label="카드 템플릿">
-            <button
-              type="button"
-              className={`${editorStyles.surfaceTemplateTab} ${cardSurfaceLayout === "split" ? editorStyles.surfaceTemplateTabActive : ""}`}
-              aria-pressed={cardSurfaceLayout === "split"}
-              onClick={() => setCardSurfaceLayout("split")}
-            >
-              분리형
-            </button>
-            <button
-              type="button"
-              className={`${editorStyles.surfaceTemplateTab} ${cardSurfaceLayout === "full" ? editorStyles.surfaceTemplateTabActive : ""}`}
-              aria-pressed={cardSurfaceLayout === "full"}
-              onClick={() => setCardSurfaceLayout("full")}
-            >
-              전체형
-            </button>
-          </div>
-        </div>
-
         <div className={editorStyles.previewSticky}>
           <div className={editorStyles.previewInner}>
             <div className={editorStyles.previewSlideLayer}>
@@ -940,8 +981,8 @@ export default function ClientTournamentCardPublishV2Page() {
               setCardDate={setCardDate}
               cardPlace={cardPlace}
               setCardPlace={setCardPlace}
-              cardTextShadowEnabled={cardTextShadowEnabled}
-              setCardTextShadowEnabled={setCardTextShadowEnabled}
+              cardTitleEffect={cardTitleEffect}
+              setCardTitleEffect={setCardTitleEffect}
               disabled={editorLocked}
             />
           ) : (
@@ -954,6 +995,14 @@ export default function ClientTournamentCardPublishV2Page() {
               uploadedImage={uploadedImage}
               imageOverlayOpacity={imageOverlayOpacity}
               onImageOverlayChange={onImageOverlayChange}
+              bottomBarColor={bottomBarColor}
+              onPickBottomBarColor={setBottomBarColor}
+              bottomBarOpacity={bottomBarOpacity}
+              onBottomBarOpacityChange={onBottomBarOpacityChange}
+              gradientPreset={gradientPreset}
+              onGradientPresetChange={setGradientPreset}
+              gradientOpacity={gradientOpacity}
+              onGradientOpacityChange={onGradientOpacityChange}
               disabled={editorLocked}
             />
           )}

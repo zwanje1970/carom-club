@@ -27,6 +27,11 @@ export type CardPublishPreviewModel = {
   slideTitleTextColor?: string;
   slideDescTextColor?: string;
   slideTextShadowEnabled: boolean;
+  slideTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  slideBottomBarColor?: string;
+  slideBottomBarOpacity?: number;
+  slideGradientPreset?: "none" | "top" | "left" | "top_left" | "soft";
+  slideGradientOpacity?: number;
   slideSurfaceFull: boolean;
   slideFooterDateTextColor?: string;
   slideFooterPlaceTextColor?: string;
@@ -52,6 +57,11 @@ function slideItemFromModel(m: CardPublishPreviewModel): SlideDeckItem {
     ...(m.slideTitleTextColor ? { cardTitleTextColor: m.slideTitleTextColor } : {}),
     ...(m.slideDescTextColor ? { cardDescriptionTextColor: m.slideDescTextColor } : {}),
     ...(m.slideTextShadowEnabled ? { cardTextShadowEnabled: true } : {}),
+    ...(m.slideTitleEffect ? { cardTitleEffect: m.slideTitleEffect } : {}),
+    ...(m.slideBottomBarColor ? { cardBottomBarColor: m.slideBottomBarColor } : {}),
+    ...(typeof m.slideBottomBarOpacity === "number" ? { cardBottomBarOpacity: m.slideBottomBarOpacity } : {}),
+    ...(m.slideGradientPreset ? { cardGradientPreset: m.slideGradientPreset } : {}),
+    ...(typeof m.slideGradientOpacity === "number" ? { cardGradientOpacity: m.slideGradientOpacity } : {}),
     ...(m.slideSurfaceFull ? { cardSurfaceLayout: "full" as const } : {}),
     ...(m.slideFooterDateTextColor ? { cardFooterDateTextColor: m.slideFooterDateTextColor } : {}),
     ...(m.slideFooterPlaceTextColor ? { cardFooterPlaceTextColor: m.slideFooterPlaceTextColor } : {}),

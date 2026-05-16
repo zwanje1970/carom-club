@@ -90,6 +90,14 @@ export const CardPublishBackgroundTab = memo(function CardPublishBackgroundTab({
   uploadedImage,
   imageOverlayOpacity,
   onImageOverlayChange,
+  bottomBarColor,
+  onPickBottomBarColor,
+  bottomBarOpacity,
+  onBottomBarOpacityChange,
+  gradientPreset,
+  onGradientPresetChange,
+  gradientOpacity,
+  onGradientOpacityChange,
   disabled = false,
 }: {
   mediaBackground: string;
@@ -100,6 +108,14 @@ export const CardPublishBackgroundTab = memo(function CardPublishBackgroundTab({
   uploadedImage: { w320Url: string } | null;
   imageOverlayOpacity: number;
   onImageOverlayChange: (opacity01: number) => void;
+  bottomBarColor: string;
+  onPickBottomBarColor: (hex: string) => void;
+  bottomBarOpacity: number;
+  onBottomBarOpacityChange: (opacity01: number) => void;
+  gradientPreset: "none" | "top" | "left" | "top_left" | "soft";
+  onGradientPresetChange: (preset: "none" | "top" | "left" | "top_left" | "soft") => void;
+  gradientOpacity: number;
+  onGradientOpacityChange: (opacity01: number) => void;
   disabled?: boolean;
 }) {
   return (
@@ -174,6 +190,99 @@ export const CardPublishBackgroundTab = memo(function CardPublishBackgroundTab({
           />
         </div>
       </div>
+
+      <div className={editorStyles.field}>
+        <span className={editorStyles.fieldLabel}>하단 영역 색상</span>
+        <div className={editorStyles.colorPaletteGrid}>
+          {CARD_COLOR_PALETTE_32.map((hex, index) => {
+            const selected = bottomBarColor.trim().toLowerCase() === hex.toLowerCase();
+            return (
+              <button
+                key={`card-bottom-color-${index}-${hex}`}
+                type="button"
+                aria-label={`하단 영역색 ${hex}`}
+                className="card-publish-color-swatch"
+                style={{
+                  width: 34,
+                  height: 34,
+                  padding: 0,
+                  border: "none",
+                  borderRadius: 7,
+                  backgroundColor: hex,
+                  cursor: disabled ? "default" : "pointer",
+                  boxSizing: "border-box",
+                  outline: selected ? "2px solid #ffffff" : "none",
+                  boxShadow: selected ? "0 0 0 2px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.25)" : "none",
+                }}
+                disabled={disabled}
+                onClick={() => onPickBottomBarColor(hex)}
+              />
+            );
+          })}
+        </div>
+        <div className={editorStyles.rangeBlock}>
+          <span className={`${editorStyles.fieldLabel} ${editorStyles.fieldLabelRow}`}>
+            하단 영역 투명도
+            <output className={editorStyles.rangeOut}>{Math.round(bottomBarOpacity * 100)}%</output>
+          </span>
+          <input
+            className={editorStyles.range}
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={Math.round(bottomBarOpacity * 100)}
+            disabled={disabled}
+            aria-label="하단 영역 투명도"
+            onChange={(e) => onBottomBarOpacityChange(Number(e.target.value) / 100)}
+          />
+        </div>
+      </div>
+
+      <div className={editorStyles.field}>
+        <span className={editorStyles.fieldLabel}>가독성 그라데이션</span>
+        <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.4rem" }}>
+          {[
+            { id: "none", label: "없음" },
+            { id: "top", label: "상단" },
+            { id: "left", label: "좌측" },
+            { id: "top_left", label: "상단 + 좌측" },
+            { id: "soft", label: "전체 약한 음영" },
+          ].map((opt) => {
+            const active = gradientPreset === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                className="v3-btn"
+                aria-pressed={active}
+                disabled={disabled}
+                style={{ fontWeight: active ? 800 : 600 }}
+                onClick={() => onGradientPresetChange(opt.id as "none" | "top" | "left" | "top_left" | "soft")}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className={editorStyles.rangeBlock}>
+          <span className={`${editorStyles.fieldLabel} ${editorStyles.fieldLabelRow}`}>
+            그라데이션 강도
+            <output className={editorStyles.rangeOut}>{Math.round(gradientOpacity * 100)}%</output>
+          </span>
+          <input
+            className={editorStyles.range}
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={Math.round(gradientOpacity * 100)}
+            disabled={disabled}
+            aria-label="그라데이션 강도"
+            onChange={(e) => onGradientOpacityChange(Number(e.target.value) / 100)}
+          />
+        </div>
+      </div>
     </>
   );
 });
@@ -206,8 +315,8 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
   setCardDate,
   cardPlace,
   setCardPlace,
-  cardTextShadowEnabled,
-  setCardTextShadowEnabled,
+  cardTitleEffect,
+  setCardTitleEffect,
   disabled = false,
 }: {
   leadTextColor: string;
@@ -230,8 +339,8 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
   setCardDate: (v: string) => void;
   cardPlace: string;
   setCardPlace: (v: string) => void;
-  cardTextShadowEnabled: boolean;
-  setCardTextShadowEnabled: (v: boolean) => void;
+  cardTitleEffect: "none" | "shadow" | "outline" | "shadow_outline";
+  setCardTitleEffect: (v: "none" | "shadow" | "outline" | "shadow_outline") => void;
   disabled?: boolean;
 }) {
   return (
@@ -356,15 +465,32 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
         />
       </div>
 
-      <label className={editorStyles.fieldCheck}>
-        <input
-          type="checkbox"
-          checked={cardTextShadowEnabled}
-          disabled={disabled}
-          onChange={(e) => setCardTextShadowEnabled(e.target.checked)}
-        />
-        <span>전체 글자에 그림자 넣기</span>
-      </label>
+      <div className={editorStyles.field}>
+        <span className={editorStyles.fieldLabel}>제목 효과</span>
+        <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.4rem" }}>
+          {[
+            { id: "none", label: "없음" },
+            { id: "shadow", label: "그림자" },
+            { id: "outline", label: "외곽선" },
+            { id: "shadow_outline", label: "그림자 + 외곽선" },
+          ].map((opt) => {
+            const active = cardTitleEffect === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                className="v3-btn"
+                aria-pressed={active}
+                disabled={disabled}
+                style={{ fontWeight: active ? 800 : 600 }}
+                onClick={() => setCardTitleEffect(opt.id as "none" | "shadow" | "outline" | "shadow_outline")}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </>
   );
 });

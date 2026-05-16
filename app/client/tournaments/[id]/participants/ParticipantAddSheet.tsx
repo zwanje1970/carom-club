@@ -91,15 +91,6 @@ export default function ParticipantAddSheet({
       return;
     }
 
-    const maxP = Math.floor(Number(maxParticipants));
-    const capOk =
-      !Number.isFinite(maxP) ||
-      maxP <= 0 ||
-      capacityOccupied < maxP ||
-      window.confirm(`모집정원(${maxP}명)을 초과합니다. 그래도 추가하시겠습니까?`);
-
-    if (!capOk) return;
-
     const payload: PendingRegister = {
       applicantName: name,
       participantAverage: avg,

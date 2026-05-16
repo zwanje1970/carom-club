@@ -21,6 +21,11 @@ export type TournamentCardPublishCaptureSource = {
   cardLeadTextColor?: string | null;
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
+  cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardBottomBarColor?: string | null;
+  cardBottomBarOpacity?: number | null;
+  cardGradientPreset?: "none" | "top" | "left" | "top_left" | "soft";
+  cardGradientOpacity?: number | null;
   tournamentCardTextShadowEnabled?: boolean;
   tournamentCardSurfaceLayout?: "split" | "full";
   cardFooterDateTextColor?: string | null;
@@ -80,6 +85,11 @@ export function buildSlideDeckItemForTournamentCapture(args: {
     ...(typeof source.cardDescriptionTextColor === "string" && source.cardDescriptionTextColor.trim()
       ? { cardDescriptionTextColor: source.cardDescriptionTextColor.trim() }
       : {}),
+    ...(source.cardTitleEffect ? { cardTitleEffect: source.cardTitleEffect } : {}),
+    ...(typeof source.cardBottomBarColor === "string" ? { cardBottomBarColor: source.cardBottomBarColor } : {}),
+    ...(typeof source.cardBottomBarOpacity === "number" ? { cardBottomBarOpacity: source.cardBottomBarOpacity } : {}),
+    ...(source.cardGradientPreset ? { cardGradientPreset: source.cardGradientPreset } : {}),
+    ...(typeof source.cardGradientOpacity === "number" ? { cardGradientOpacity: source.cardGradientOpacity } : {}),
     ...(source.tournamentCardTextShadowEnabled === true ? { cardTextShadowEnabled: true } : {}),
     ...(source.tournamentCardSurfaceLayout === "full" ? { cardSurfaceLayout: "full" as const } : {}),
     ...(typeof source.cardFooterDateTextColor === "string" && source.cardFooterDateTextColor.trim()

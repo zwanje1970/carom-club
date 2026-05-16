@@ -58,22 +58,20 @@
 
 /** 게시카드 작성 v2 전용 — 구 `card-publish` 페이지 미리보기는 기존 스타일 유지 */
 .pageWrapV2 .previewSticky {
-  padding: 8px 0 10px;
+  padding: 0;
   margin: 0;
-  background: transparent;
+  background: #f8fafc;
   border-bottom: none;
 }
 
 .pageWrapV2 .previewSlideLayer {
-  padding: 0;
+  padding: 16px 0;
 }
 
 /* 게시 v2 미리보기·메인 스크롤 대회 카드 공통 — `.pageWrapV2` 하위 선택자 대신 클래스로 동일 외곽 재사용 */
 .previewCardWrap.previewCardWrapV2Chrome {
   border: none;
-  box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.1),
-    0 4px 14px rgba(0, 0, 0, 0.06);
+  box-shadow: none;
 }
 
 /** html2canvas 게시 스냅샷 캡처 루트 — 카드 본문만 포함 */

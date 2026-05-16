@@ -32,6 +32,7 @@ import type {
   TournamentVerificationMode,
 } from "../tournament-rule-types";
 import { buildTournamentPublishedCardSubtitle } from "../tournament-slide-card-subtitle";
+import { isTournamentPastAutoEndSchedule } from "../tournament-auto-end-schedule";
 import {
   parsePublishedCardOverlaySnapshotForStorage,
   type TournamentCardOverlaySnapshot,
@@ -838,6 +839,11 @@ export type TournamentPublishedCard = {
   cardLeadTextColor?: string | null;
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
+  cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardBottomBarColor?: string | null;
+  cardBottomBarOpacity?: number | null;
+  cardGradientPreset?: "none" | "top" | "left" | "top_left" | "soft";
+  cardGradientOpacity?: number | null;
   /** 제목·본문 텍스트 그림자(미설정·과거 데이터는 OFF) */
   cardTextShadowEnabled?: boolean;
   /** 카드 면 레이아웃(미설정·과거 데이터는 분리형) */
@@ -906,6 +912,11 @@ export type PublishedCardSnapshot = {
   cardLeadTextColor?: string | null;
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
+  cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardBottomBarColor?: string | null;
+  cardBottomBarOpacity?: number | null;
+  cardGradientPreset?: "none" | "top" | "left" | "top_left" | "soft";
+  cardGradientOpacity?: number | null;
   tournamentCardTextShadowEnabled?: boolean;
   tournamentCardSurfaceLayout?: TournamentCardSurfaceLayout;
   cardFooterDateTextColor?: string | null;
@@ -2770,6 +2781,39 @@ function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedC
   }
   if ("cardDescriptionTextColor" in r) {
     base.cardDescriptionTextColor = normalizeOptionalCardTextColor(r.cardDescriptionTextColor);
+  }
+  if (
+    r.cardTitleEffect === "shadow" ||
+    r.cardTitleEffect === "outline" ||
+    r.cardTitleEffect === "shadow_outline"
+  ) {
+    base.cardTitleEffect = r.cardTitleEffect;
+  } else if ("cardTitleEffect" in r) {
+    base.cardTitleEffect = "none";
+  }
+  if ("cardBottomBarColor" in r) {
+    base.cardBottomBarColor =
+      typeof r.cardBottomBarColor === "string" ? r.cardBottomBarColor : null;
+  }
+  if ("cardBottomBarOpacity" in r) {
+    const x = r.cardBottomBarOpacity;
+    base.cardBottomBarOpacity =
+      typeof x === "number" && Number.isFinite(x) ? Math.min(1, Math.max(0, x)) : null;
+  }
+  if (
+    r.cardGradientPreset === "top" ||
+    r.cardGradientPreset === "left" ||
+    r.cardGradientPreset === "top_left" ||
+    r.cardGradientPreset === "soft"
+  ) {
+    base.cardGradientPreset = r.cardGradientPreset;
+  } else if ("cardGradientPreset" in r) {
+    base.cardGradientPreset = "none";
+  }
+  if ("cardGradientOpacity" in r) {
+    const x = r.cardGradientOpacity;
+    base.cardGradientOpacity =
+      typeof x === "number" && Number.isFinite(x) ? Math.min(1, Math.max(0, x)) : null;
   }
   if ("cardTextShadowEnabled" in r && typeof r.cardTextShadowEnabled === "boolean") {
     base.cardTextShadowEnabled = r.cardTextShadowEnabled;
@@ -9519,6 +9563,34 @@ function tournamentPublishedCardToPublishedSnapshot(
   if (leadColor) snap.cardLeadTextColor = leadColor;
   if (titleColor) snap.cardTitleTextColor = titleColor;
   if (descColor) snap.cardDescriptionTextColor = descColor;
+  if (
+    t.cardTitleEffect === "shadow" ||
+    t.cardTitleEffect === "outline" ||
+    t.cardTitleEffect === "shadow_outline"
+  ) {
+    snap.cardTitleEffect = t.cardTitleEffect;
+  } else {
+    snap.cardTitleEffect = "none";
+  }
+  if (typeof t.cardBottomBarColor === "string") {
+    snap.cardBottomBarColor = t.cardBottomBarColor;
+  }
+  if (typeof t.cardBottomBarOpacity === "number") {
+    snap.cardBottomBarOpacity = t.cardBottomBarOpacity;
+  }
+  if (
+    t.cardGradientPreset === "top" ||
+    t.cardGradientPreset === "left" ||
+    t.cardGradientPreset === "top_left" ||
+    t.cardGradientPreset === "soft"
+  ) {
+    snap.cardGradientPreset = t.cardGradientPreset;
+  } else {
+    snap.cardGradientPreset = "none";
+  }
+  if (typeof t.cardGradientOpacity === "number") {
+    snap.cardGradientOpacity = t.cardGradientOpacity;
+  }
   if (t.cardTextShadowEnabled === true) {
     snap.tournamentCardTextShadowEnabled = true;
   }
@@ -9569,6 +9641,11 @@ export async function upsertTournamentPublishedCard(params: {
   cardLeadTextColor?: string | null;
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
+  cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardBottomBarColor?: string | null;
+  cardBottomBarOpacity?: number | null;
+  cardGradientPreset?: "none" | "top" | "left" | "top_left" | "soft";
+  cardGradientOpacity?: number | null;
   cardTextShadowEnabled?: boolean;
   cardSurfaceLayout?: TournamentCardSurfaceLayout;
   cardFooterDateTextColor?: string | null;
@@ -9749,6 +9826,34 @@ export async function upsertTournamentPublishedCard(params: {
   if (leadC) row.cardLeadTextColor = leadC;
   if (titleC) row.cardTitleTextColor = titleC;
   if (descC) row.cardDescriptionTextColor = descC;
+  row.cardTitleEffect =
+    params.cardTitleEffect === "shadow" ||
+    params.cardTitleEffect === "outline" ||
+    params.cardTitleEffect === "shadow_outline"
+      ? params.cardTitleEffect
+      : "none";
+  if (params.cardBottomBarColor !== undefined) {
+    row.cardBottomBarColor = params.cardBottomBarColor;
+  }
+  if (params.cardBottomBarOpacity !== undefined) {
+    row.cardBottomBarOpacity =
+      params.cardBottomBarOpacity == null
+        ? null
+        : Math.min(1, Math.max(0, params.cardBottomBarOpacity));
+  }
+  row.cardGradientPreset =
+    params.cardGradientPreset === "top" ||
+    params.cardGradientPreset === "left" ||
+    params.cardGradientPreset === "top_left" ||
+    params.cardGradientPreset === "soft"
+      ? params.cardGradientPreset
+      : "none";
+  if (params.cardGradientOpacity !== undefined) {
+    row.cardGradientOpacity =
+      params.cardGradientOpacity == null
+        ? null
+        : Math.min(1, Math.max(0, params.cardGradientOpacity));
+  }
   row.cardTextShadowEnabled = params.cardTextShadowEnabled === true;
   row.cardSurfaceLayout = params.cardSurfaceLayout === "full" ? "full" : "split";
   if (params.cardFooterDateTextColor !== undefined) {
@@ -10111,14 +10216,12 @@ export function resolveTournamentLastScheduleDayYyyyMmDd(
   return yyyyMmDdPrefixFromScheduleField(typeof t.date === "string" ? t.date : "");
 }
 
-/** 종료일(달력일) 다음날부터 비활성: `todayYyyyMmDd > lastScheduleDay` */
+/** 종료일 다음날 06:00(KST) 이후 메인 비활성화 */
 export function isTournamentPastScheduleEndForMainSlideCleanup(
   t: Pick<Tournament, "date" | "eventDates">,
-  todayYyyyMmDd: string,
+  _todayYyyyMmDd?: string,
 ): boolean {
-  const last = resolveTournamentLastScheduleDayYyyyMmDd(t);
-  if (!last) return false;
-  return todayYyyyMmDd > last;
+  return isTournamentPastAutoEndSchedule(t);
 }
 
 async function loadTournamentByIdForPublishedCardReconcile(tournamentId: string): Promise<Tournament | null> {
