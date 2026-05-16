@@ -383,8 +383,12 @@ export default function ClientDashboardHomeClient({
       {membershipSection}
 
       <section className="v3-stack client-dashboard-main__hubTournaments" aria-labelledby="client-hub-tournaments-heading" style={{ gap: "0.45rem" }}>
-        <h2 id="client-hub-tournaments-heading" className="sr-only">
-          대회 관리
+        <h2
+          id="client-hub-tournaments-heading"
+          className="v3-h2"
+          style={{ margin: 0, fontSize: "calc(1rem - 2px)", whiteSpace: "nowrap" }}
+        >
+          내 대회 관리
         </h2>
         <p className="v3-muted" style={{ margin: 0, fontSize: "0.88rem", lineHeight: 1.5 }}>
           {isReady
@@ -396,7 +400,7 @@ export default function ClientDashboardHomeClient({
           prefetch={false}
           className="client-dashboard-main__tournamentSeeAll client-dashboard-main__tournamentSeeAll--primary"
         >
-          대회목록 보기
+          내 대회 목록 보기
         </Link>
       </section>
 
