@@ -9,7 +9,19 @@ import deckShellStyles from "./main-site-scroll-tournament-deck-shell.module.css
 import { isMainSiteLoadDiagEnabled, logMainSiteLoadDiag } from "../../lib/site/main-site-load-diag";
 
 function logMainCardReturnDiag(payload: Record<string, unknown>) {
-  console.info("[main-card-return-diag]", payload);
+  const args: unknown[] = ["[main-card-return-diag]"];
+  for (const key of Object.keys(payload)) {
+    const value = payload[key];
+    if (Array.isArray(value)) {
+      args.push(`${key}Len=`, value.length);
+      continue;
+    }
+    if (value !== null && typeof value === "object") {
+      continue;
+    }
+    args.push(`${key}=`, value);
+  }
+  console.info(...args);
 }
 
 const SITE_SCROLL_CARD = "data-site-scroll-card";

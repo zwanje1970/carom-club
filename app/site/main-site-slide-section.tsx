@@ -15,7 +15,19 @@ import {
 import { slideDeckItemsToScrollCards } from "../../lib/site/slide-deck-items-to-scroll-cards";
 
 function logMainCardReturnDiag(payload: Record<string, unknown>) {
-  console.info("[main-card-return-diag]", payload);
+  const args: unknown[] = ["[main-card-return-diag]"];
+  for (const key of Object.keys(payload)) {
+    const value = payload[key];
+    if (Array.isArray(value)) {
+      args.push(`${key}Len=`, value.length);
+      continue;
+    }
+    if (value !== null && typeof value === "object") {
+      continue;
+    }
+    args.push(`${key}=`, value);
+  }
+  console.info(...args);
 }
 
 const MAIN_SITE_ADS_FETCH_DELAY_MS = 7_500;
