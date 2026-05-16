@@ -14,9 +14,13 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.net.Uri
 import android.view.ViewGroup
+import android.graphics.Paint
+import android.graphics.RectF
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.provider.MediaStore
 import android.util.Log
@@ -546,7 +550,8 @@ class CaromAppBridge(
             "window.CaromNativeCapture && window.CaromNativeCapture.onResult(" +
                 JSONObject.quote(payload.toString()) +
                 ");"
-        activity.runOnUiThread {
+        // Handler(Looper.getMainLooper())를 사용해 WebView 스레드와 동기화를 보장한다.
+        Handler(Looper.getMainLooper()).post {
             webView.evaluateJavascript(script, null)
         }
     }
@@ -612,82 +617,129 @@ class CaromAppBridge(
             return
         }
         captureInProgress = true
-        activity.runOnUiThread {
-            val sourceBitmap: Bitmap =
-                try {
-                    val vw = webView.width
-                    val vh = webView.height
-                    if (vw <= 0 || vh <= 0) {
-                        Log.w(CARD_CAPTURE_LOG_TAG, "native fail code=E_CAPTURE_FAILED reason=invalid_webview_size requestId=$requestId")
-                        postCaptureError(requestId, "E_CAPTURE_FAILED", "WebView 크기를 확인할 수 없습니다.")
-                        return@runOnUiThread
-                    }
+        Handler(Looper.getMainLooper()).post {
+            var sourceBitmap: Bitmap? = null
+            var cropped: Bitmap? = null
+            try {
+                // ── 1. WebView 전체 비트맵 캡처 ──────────────────────────────────
+                val vw = webView.width
+                val vh = webView.height
+                if (vw <= 0 || vh <= 0) {
+                    Log.w(CARD_CAPTURE_LOG_TAG, "native fail code=E_CAPTURE_FAILED reason=invalid_webview_size requestId=$requestId vw=$vw vh=$vh")
+                    postCaptureError(requestId, "E_CAPTURE_FAILED", "WebView 크기를 확인할 수 없습니다.")
+                    return@post
+                }
+                sourceBitmap = try {
                     val b = Bitmap.createBitmap(vw, vh, Bitmap.Config.ARGB_8888)
                     val canvas = Canvas(b)
                     webView.draw(canvas)
                     b
                 } catch (oom: OutOfMemoryError) {
-                    Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_OOM requestId=$requestId", oom)
+                    Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_OOM reason=draw_oom requestId=$requestId", oom)
                     postCaptureError(requestId, "E_OOM", "캡처 중 메모리가 부족합니다.")
-                    return@runOnUiThread
-                } catch (_: Exception) {
-                    Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_CAPTURE_FAILED reason=draw_exception requestId=$requestId")
+                    return@post
+                } catch (e: Exception) {
+                    Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_CAPTURE_FAILED reason=draw_exception requestId=$requestId", e)
                     postCaptureError(requestId, "E_CAPTURE_FAILED", "화면 캡처에 실패했습니다.")
-                    return@runOnUiThread
+                    return@post
                 }
 
-            var cropped: Bitmap? = null
-            try {
-                val bw = sourceBitmap.width.toDouble()
-                val bh = sourceBitmap.height.toDouble()
-                val scaleX = bw / viewportWidth
-                val scaleY = bh / viewportHeight
-                var cropLeft = (left * scaleX).roundToInt()
-                var cropTop = (top * scaleY).roundToInt()
-                var cropWidth = (width * scaleX).roundToInt()
-                var cropHeight = (height * scaleY).roundToInt()
-                if (cropWidth <= 0 || cropHeight <= 0) {
-                    Log.w(CARD_CAPTURE_LOG_TAG, "native fail code=E_CROP_OUT_OF_BOUNDS reason=empty_crop requestId=$requestId")
+                // ── 2. 크롭 좌표 계산 (수학적 방어 포함) ────────────────────────
+                val bw = sourceBitmap.width
+                val bh = sourceBitmap.height
+                val scaleX = bw.toDouble() / viewportWidth
+                val scaleY = bh.toDouble() / viewportHeight
+
+                // 원시 계산값 로깅 (좌표 이슈 디버깅용)
+                val rawCropLeft = (left * scaleX).roundToInt()
+                val rawCropTop = (top * scaleY).roundToInt()
+                val rawCropWidth = (width * scaleX).roundToInt()
+                val rawCropHeight = (height * scaleY).roundToInt()
+                Log.i(
+                    CARD_CAPTURE_LOG_TAG,
+                    "native crop raw requestId=$requestId bitmap=${bw}x${bh} " +
+                        "viewport=${viewportWidth}x${viewportHeight} " +
+                        "js=[l=$left t=$top w=$width h=$height] " +
+                        "raw=[l=$rawCropLeft t=$rawCropTop w=$rawCropWidth h=$rawCropHeight]",
+                )
+
+                if (rawCropWidth <= 0 || rawCropHeight <= 0) {
+                    Log.w(CARD_CAPTURE_LOG_TAG, "native fail code=E_CROP_OUT_OF_BOUNDS reason=empty_raw_crop requestId=$requestId")
                     postCaptureError(requestId, "E_CROP_OUT_OF_BOUNDS", "캡처 영역이 비어 있습니다.")
-                    return@runOnUiThread
+                    return@post
                 }
-                cropLeft = cropLeft.coerceIn(0, sourceBitmap.width - 1)
-                cropTop = cropTop.coerceIn(0, sourceBitmap.height - 1)
-                cropWidth = cropWidth.coerceAtMost(sourceBitmap.width - cropLeft).coerceAtLeast(1)
-                cropHeight = cropHeight.coerceAtMost(sourceBitmap.height - cropTop).coerceAtLeast(1)
 
-                cropped = Bitmap.createBitmap(sourceBitmap, cropLeft, cropTop, cropWidth, cropHeight)
+                // 비트맵 범위를 절대로 벗어나지 않도록 수학적 방어
+                val safeLeft = rawCropLeft.coerceIn(0, bw - 1)
+                val safeTop = rawCropTop.coerceIn(0, bh - 1)
+                val safeWidth = rawCropWidth.coerceIn(1, bw - safeLeft)
+                val safeHeight = rawCropHeight.coerceIn(1, bh - safeTop)
+                Log.i(
+                    CARD_CAPTURE_LOG_TAG,
+                    "native crop safe requestId=$requestId [l=$safeLeft t=$safeTop w=$safeWidth h=$safeHeight]",
+                )
 
-                // targetWidth > 0이면 비율 유지하며 리사이즈 (예: 1280px)
+                cropped = try {
+                    Bitmap.createBitmap(sourceBitmap, safeLeft, safeTop, safeWidth, safeHeight)
+                } catch (e: IllegalArgumentException) {
+                    Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_CROP_OUT_OF_BOUNDS reason=createBitmap_iae requestId=$requestId bitmap=${bw}x${bh} crop=[l=$safeLeft t=$safeTop w=$safeWidth h=$safeHeight]", e)
+                    postCaptureError(requestId, "E_CROP_OUT_OF_BOUNDS", "캡처 영역이 화면 범위를 벗어났습니다.")
+                    return@post
+                } catch (oom: OutOfMemoryError) {
+                    Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_OOM reason=crop_oom requestId=$requestId", oom)
+                    postCaptureError(requestId, "E_OOM", "크롭 중 메모리가 부족합니다.")
+                    return@post
+                }
+
+                // ── 3. targetWidth로 비율 유지 리사이즈 (ARGB_8888 고정) ─────────
                 if (targetWidth > 0 && cropped.width != targetWidth) {
                     val scale = targetWidth.toDouble() / cropped.width.toDouble()
-                    val targetHeight = (cropped.height * scale).roundToInt().coerceAtLeast(1)
-                    val resized = try {
-                        Bitmap.createScaledBitmap(cropped, targetWidth, targetHeight, true)
-                    } catch (oom: OutOfMemoryError) {
-                        postCaptureError(requestId, "E_OOM", "리사이즈 중 메모리가 부족합니다.")
-                        return@runOnUiThread
-                    } catch (_: Exception) {
-                        postCaptureError(requestId, "E_CAPTURE_FAILED", "리사이즈에 실패했습니다.")
-                        return@runOnUiThread
-                    }
+                    val resizeHeight = (cropped.height * scale).roundToInt().coerceAtLeast(1)
                     Log.i(
                         CARD_CAPTURE_LOG_TAG,
-                        "native resize ok requestId=$requestId " +
-                            "src=${cropped.width}x${cropped.height} -> ${resized.width}x${resized.height}",
+                        "native resize start requestId=$requestId " +
+                            "src=${cropped.width}x${cropped.height} -> ${targetWidth}x${resizeHeight}",
                     )
+                    val resized = try {
+                        // Canvas 방식으로 ARGB_8888 강제 지정 (createScaledBitmap은 소스 포맷 상속)
+                        val dst = Bitmap.createBitmap(targetWidth, resizeHeight, Bitmap.Config.ARGB_8888)
+                        val canvas = Canvas(dst)
+                        val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+                        canvas.drawBitmap(
+                            cropped,
+                            null,
+                            RectF(0f, 0f, targetWidth.toFloat(), resizeHeight.toFloat()),
+                            paint,
+                        )
+                        dst
+                    } catch (oom: OutOfMemoryError) {
+                        Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_OOM reason=resize_oom requestId=$requestId", oom)
+                        postCaptureError(requestId, "E_OOM", "리사이즈 중 메모리가 부족합니다.")
+                        return@post
+                    } catch (e: Exception) {
+                        Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_CAPTURE_FAILED reason=resize_exception requestId=$requestId", e)
+                        postCaptureError(requestId, "E_CAPTURE_FAILED", "리사이즈에 실패했습니다.")
+                        return@post
+                    }
                     cropped.recycle()
                     cropped = resized
+                    Log.i(
+                        CARD_CAPTURE_LOG_TAG,
+                        "native resize ok requestId=$requestId result=${cropped.width}x${cropped.height}",
+                    )
                 }
 
+                // ── 4. PNG 인코딩 ─────────────────────────────────────────────────
                 val out = ByteArrayOutputStream()
                 val compressed = cropped.compress(Bitmap.CompressFormat.PNG, 100, out)
                 if (!compressed) {
                     Log.w(CARD_CAPTURE_LOG_TAG, "native fail code=E_ENCODE_FAILED reason=compress_false requestId=$requestId")
                     postCaptureError(requestId, "E_ENCODE_FAILED", "PNG 인코딩에 실패했습니다.")
-                    return@runOnUiThread
+                    return@post
                 }
                 val base64 = Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
+
+                // ── 5. 결과 전송 ──────────────────────────────────────────────────
                 val payload =
                     JSONObject().apply {
                         put("ok", true)
@@ -703,28 +755,18 @@ class CaromAppBridge(
                 postCaptureResult(payload)
                 Log.i(
                     CARD_CAPTURE_LOG_TAG,
-                    "native result ok requestId=$requestId cropWidth=${cropped.width} cropHeight=${cropped.height}",
+                    "native result ok requestId=$requestId final=${cropped.width}x${cropped.height} base64Len=${base64.length}",
                 )
             } catch (oom: OutOfMemoryError) {
-                Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_OOM requestId=$requestId", oom)
+                Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_OOM reason=unexpected requestId=$requestId", oom)
                 postCaptureError(requestId, "E_OOM", "캡처 처리 중 메모리가 부족합니다.")
-            } catch (_: IllegalArgumentException) {
-                Log.w(CARD_CAPTURE_LOG_TAG, "native fail code=E_CROP_OUT_OF_BOUNDS reason=illegal_argument requestId=$requestId")
-                postCaptureError(requestId, "E_CROP_OUT_OF_BOUNDS", "캡처 영역이 화면 범위를 벗어났습니다.")
-            } catch (_: Exception) {
-                Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_CAPTURE_FAILED reason=unexpected_exception requestId=$requestId")
+            } catch (e: Exception) {
+                Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_CAPTURE_FAILED reason=unexpected_exception requestId=$requestId", e)
                 postCaptureError(requestId, "E_CAPTURE_FAILED", "앱 화면 캡처 처리에 실패했습니다.")
             } finally {
-                try {
-                    cropped?.recycle()
-                } catch (_: Exception) {
-                    // no-op
-                }
-                try {
-                    sourceBitmap.recycle()
-                } catch (_: Exception) {
-                    // no-op
-                }
+                // captureInProgress는 어떤 경로로 종료되더라도 반드시 해제
+                try { cropped?.recycle() } catch (_: Exception) { /* no-op */ }
+                try { sourceBitmap?.recycle() } catch (_: Exception) { /* no-op */ }
                 captureInProgress = false
             }
         }

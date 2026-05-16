@@ -137,7 +137,7 @@ export async function captureCardRegionViaCaromNativeBridge(args: {
   viewportWidth?: number;
   viewportHeight?: number;
   devicePixelRatio?: number;
-  /** 크롭 후 리사이즈할 목표 가로 픽셀. 기본값 1280. */
+  /** 크롭 후 리사이즈할 목표 가로 픽셀. 기본값 640. */
   targetWidth?: number;
   timeoutMs?: number;
 }): Promise<Extract<CaromNativeCaptureResult, { ok: true }>> {
@@ -169,7 +169,7 @@ export async function captureCardRegionViaCaromNativeBridge(args: {
     viewportHeight: args.viewportHeight ?? window.innerHeight,
     devicePixelRatio: args.devicePixelRatio ?? (window.devicePixelRatio || 1),
     format: "png",
-    targetWidth: args.targetWidth ?? 1280,
+    targetWidth: args.targetWidth ?? 640,
   };
   return await new Promise<Extract<CaromNativeCaptureResult, { ok: true }>>((resolve, reject) => {
     const timeoutMs = Math.max(1_000, args.timeoutMs ?? 12_000);
