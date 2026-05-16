@@ -692,6 +692,27 @@
     1px 1px 0 rgba(0, 0, 0, 0.52);
 }
 
+.cardTitleEffectOutlineWhite .classicTitle,
+.cardTitleEffectOutlineWhite .frameTitle {
+  -webkit-text-stroke: 0.6px rgba(255, 255, 255, 0.82);
+  text-shadow:
+    -1px -1px 0 rgba(255, 255, 255, 0.58),
+    1px -1px 0 rgba(255, 255, 255, 0.58),
+    -1px 1px 0 rgba(255, 255, 255, 0.58),
+    1px 1px 0 rgba(255, 255, 255, 0.58);
+}
+
+.cardTitleEffectShadowOutlineWhite .classicTitle,
+.cardTitleEffectShadowOutlineWhite .frameTitle {
+  -webkit-text-stroke: 0.6px rgba(255, 255, 255, 0.85);
+  text-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.5),
+    -1px -1px 0 rgba(255, 255, 255, 0.6),
+    1px -1px 0 rgba(255, 255, 255, 0.6),
+    -1px 1px 0 rgba(255, 255, 255, 0.6),
+    1px 1px 0 rgba(255, 255, 255, 0.6);
+}
+
 .cardRootTemplateLayout .classicDesc,
 .cardRootTemplateLayout .frameDesc {
   margin: 0.65rem 0 0;

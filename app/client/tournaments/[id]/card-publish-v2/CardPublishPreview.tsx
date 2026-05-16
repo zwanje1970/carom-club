@@ -28,6 +28,7 @@ export type CardPublishPreviewModel = {
   slideDescTextColor?: string;
   slideTextShadowEnabled: boolean;
   slideTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  slideTitleOutlineColor?: "black" | "white";
   slideBottomBarColor?: string;
   slideBottomBarOpacity?: number;
   slideGradientPreset?: "none" | "top" | "left" | "top_left" | "soft";
@@ -58,6 +59,7 @@ function slideItemFromModel(m: CardPublishPreviewModel): SlideDeckItem {
     ...(m.slideDescTextColor ? { cardDescriptionTextColor: m.slideDescTextColor } : {}),
     ...(m.slideTextShadowEnabled ? { cardTextShadowEnabled: true } : {}),
     ...(m.slideTitleEffect ? { cardTitleEffect: m.slideTitleEffect } : {}),
+    ...(m.slideTitleOutlineColor ? { cardTitleOutlineColor: m.slideTitleOutlineColor } : {}),
     ...(m.slideBottomBarColor ? { cardBottomBarColor: m.slideBottomBarColor } : {}),
     ...(typeof m.slideBottomBarOpacity === "number" ? { cardBottomBarOpacity: m.slideBottomBarOpacity } : {}),
     ...(m.slideGradientPreset ? { cardGradientPreset: m.slideGradientPreset } : {}),

@@ -81,6 +81,45 @@ export const CARD_COLOR_PALETTE_32 = [
   "#EC4899",
 ] as const;
 
+const OpacitySliderRow = memo(function OpacitySliderRow({
+  label,
+  value01,
+  onChange,
+  min = 0,
+  max = 100,
+  disabled = false,
+  ariaLabel,
+}: {
+  label: string;
+  value01: number;
+  onChange: (next01: number) => void;
+  min?: number;
+  max?: number;
+  disabled?: boolean;
+  ariaLabel: string;
+}) {
+  const percent = Math.round(value01 * 100);
+  return (
+    <div className={editorStyles.rangeBlock}>
+      <span className={`${editorStyles.fieldLabel} ${editorStyles.fieldLabelRow}`}>
+        {label}
+        <output className={editorStyles.rangeOut}>{percent}%</output>
+      </span>
+      <input
+        className={editorStyles.range}
+        type="range"
+        min={min}
+        max={max}
+        step={1}
+        value={percent}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        onChange={(e) => onChange(Number(e.target.value) / 100)}
+      />
+    </div>
+  );
+});
+
 export const CardPublishBackgroundTab = memo(function CardPublishBackgroundTab({
   mediaBackground,
   onPickPaletteColor,
@@ -172,23 +211,15 @@ export const CardPublishBackgroundTab = memo(function CardPublishBackgroundTab({
             선택해제
           </button>
         </div>
-        <div className={editorStyles.rangeBlock}>
-          <span className={`${editorStyles.fieldLabel} ${editorStyles.fieldLabelRow}`}>
-            배경그림 투명도
-            <output className={editorStyles.rangeOut}>{Math.round(imageOverlayOpacity * 100)}%</output>
-          </span>
-          <input
-            className={editorStyles.range}
-            type="range"
-            min={15}
-            max={100}
-            step={1}
-            value={Math.round(imageOverlayOpacity * 100)}
-            disabled={disabled || !uploadedImage}
-            aria-label="배경그림 투명도"
-            onChange={(e) => onImageOverlayChange(Number(e.target.value) / 100)}
-          />
-        </div>
+        <OpacitySliderRow
+          label="배경그림 투명도"
+          value01={imageOverlayOpacity}
+          min={15}
+          max={100}
+          disabled={disabled || !uploadedImage}
+          ariaLabel="배경그림 투명도"
+          onChange={onImageOverlayChange}
+        />
       </div>
 
       <div className={editorStyles.field}>
@@ -220,23 +251,15 @@ export const CardPublishBackgroundTab = memo(function CardPublishBackgroundTab({
             );
           })}
         </div>
-        <div className={editorStyles.rangeBlock}>
-          <span className={`${editorStyles.fieldLabel} ${editorStyles.fieldLabelRow}`}>
-            하단 영역 투명도
-            <output className={editorStyles.rangeOut}>{Math.round(bottomBarOpacity * 100)}%</output>
-          </span>
-          <input
-            className={editorStyles.range}
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            value={Math.round(bottomBarOpacity * 100)}
-            disabled={disabled}
-            aria-label="하단 영역 투명도"
-            onChange={(e) => onBottomBarOpacityChange(Number(e.target.value) / 100)}
-          />
-        </div>
+        <OpacitySliderRow
+          label="하단 영역 투명도"
+          value01={bottomBarOpacity}
+          min={0}
+          max={100}
+          disabled={disabled}
+          ariaLabel="하단 영역 투명도"
+          onChange={onBottomBarOpacityChange}
+        />
       </div>
 
       <div className={editorStyles.field}>
@@ -265,23 +288,15 @@ export const CardPublishBackgroundTab = memo(function CardPublishBackgroundTab({
             );
           })}
         </div>
-        <div className={editorStyles.rangeBlock}>
-          <span className={`${editorStyles.fieldLabel} ${editorStyles.fieldLabelRow}`}>
-            그라데이션 강도
-            <output className={editorStyles.rangeOut}>{Math.round(gradientOpacity * 100)}%</output>
-          </span>
-          <input
-            className={editorStyles.range}
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            value={Math.round(gradientOpacity * 100)}
-            disabled={disabled}
-            aria-label="그라데이션 강도"
-            onChange={(e) => onGradientOpacityChange(Number(e.target.value) / 100)}
-          />
-        </div>
+        <OpacitySliderRow
+          label="그라데이션 강도"
+          value01={gradientOpacity}
+          min={0}
+          max={100}
+          disabled={disabled}
+          ariaLabel="그라데이션 강도"
+          onChange={onGradientOpacityChange}
+        />
       </div>
     </>
   );
@@ -317,6 +332,8 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
   setCardPlace,
   cardTitleEffect,
   setCardTitleEffect,
+  cardTitleOutlineColor,
+  setCardTitleOutlineColor,
   disabled = false,
 }: {
   leadTextColor: string;
@@ -341,6 +358,8 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
   setCardPlace: (v: string) => void;
   cardTitleEffect: "none" | "shadow" | "outline" | "shadow_outline";
   setCardTitleEffect: (v: "none" | "shadow" | "outline" | "shadow_outline") => void;
+  cardTitleOutlineColor: "black" | "white";
+  setCardTitleOutlineColor: (v: "black" | "white") => void;
   disabled?: boolean;
 }) {
   return (
@@ -491,6 +510,34 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
           })}
         </div>
       </div>
+
+      {cardTitleEffect === "outline" || cardTitleEffect === "shadow_outline" ? (
+        <div className={editorStyles.field}>
+          <span className={editorStyles.fieldLabel}>제목 외곽선 색상</span>
+          <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.4rem" }}>
+            <button
+              type="button"
+              className="v3-btn"
+              aria-pressed={cardTitleOutlineColor === "black"}
+              disabled={disabled}
+              style={{ fontWeight: cardTitleOutlineColor === "black" ? 800 : 600 }}
+              onClick={() => setCardTitleOutlineColor("black")}
+            >
+              검정
+            </button>
+            <button
+              type="button"
+              className="v3-btn"
+              aria-pressed={cardTitleOutlineColor === "white"}
+              disabled={disabled}
+              style={{ fontWeight: cardTitleOutlineColor === "white" ? 800 : 600 }}
+              onClick={() => setCardTitleOutlineColor("white")}
+            >
+              흰색
+            </button>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 });

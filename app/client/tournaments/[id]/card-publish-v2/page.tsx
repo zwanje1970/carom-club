@@ -203,6 +203,7 @@ type SnapshotPick = {
   cardDescriptionTextColor?: string | null;
   tournamentCardTextShadowEnabled?: boolean;
   cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardTitleOutlineColor?: "black" | "white" | null;
   tournamentCardSurfaceLayout?: TournamentCardSurfaceLayout;
   cardBottomBarColor?: string | null;
   cardBottomBarOpacity?: number | null;
@@ -250,6 +251,7 @@ export default function ClientTournamentCardPublishV2Page() {
   const [cardTextShadowEnabled] = useState(false);
   const [cardSurfaceLayout] = useState<TournamentCardSurfaceLayout>("split");
   const [cardTitleEffect, setCardTitleEffect] = useState<"none" | "shadow" | "outline" | "shadow_outline">("none");
+  const [cardTitleOutlineColor, setCardTitleOutlineColor] = useState<"black" | "white">("black");
   const [bottomBarColor, setBottomBarColor] = useState("#ffffff");
   const [bottomBarOpacity, setBottomBarOpacity] = useState(1);
   const [gradientPreset, setGradientPreset] = useState<"none" | "top" | "left" | "top_left" | "soft">("none");
@@ -324,6 +326,7 @@ export default function ClientTournamentCardPublishV2Page() {
       slideDescTextColor: dc || undefined,
       slideTextShadowEnabled: cardTextShadowEnabled,
       slideTitleEffect: cardTitleEffect,
+      slideTitleOutlineColor: cardTitleOutlineColor,
       slideBottomBarColor: bottomBarColor,
       slideBottomBarOpacity: bottomBarOpacity,
       slideGradientPreset: gradientPreset,
@@ -344,6 +347,7 @@ export default function ClientTournamentCardPublishV2Page() {
     descriptionTextColor,
     cardTextShadowEnabled,
     cardTitleEffect,
+    cardTitleOutlineColor,
     cardSurfaceLayout,
     bottomBarColor,
     bottomBarOpacity,
@@ -478,6 +482,7 @@ export default function ClientTournamentCardPublishV2Page() {
             ? pick.cardTitleEffect
             : "none"
         );
+        setCardTitleOutlineColor(pick.cardTitleOutlineColor === "white" ? "white" : "black");
         setBottomBarColor(
           typeof pick.cardBottomBarColor === "string" && pick.cardBottomBarColor.trim()
             ? pick.cardBottomBarColor.trim()
@@ -571,6 +576,7 @@ export default function ClientTournamentCardPublishV2Page() {
         setCardDate(d0 ? formatCardDateForDisplay(d0) : POSTCARD_TEMPLATE_APP_DEFAULTS.dateText);
         setCardPlace(loc0 ? venueNameOnly(loc0) : POSTCARD_TEMPLATE_APP_DEFAULTS.placeText);
         setCardTitleEffect("none");
+        setCardTitleOutlineColor("black");
         setBottomBarColor("#ffffff");
         setBottomBarOpacity(1);
         setGradientPreset("none");
@@ -623,6 +629,7 @@ export default function ClientTournamentCardPublishV2Page() {
       cardTextShadowEnabled,
       cardSurfaceLayout,
       cardTitleEffect,
+      cardTitleOutlineColor,
       cardBottomBarColor: bottomBarColor,
       cardBottomBarOpacity: bottomBarOpacity,
       cardGradientPreset: gradientPreset,
@@ -983,6 +990,8 @@ export default function ClientTournamentCardPublishV2Page() {
               setCardPlace={setCardPlace}
               cardTitleEffect={cardTitleEffect}
               setCardTitleEffect={setCardTitleEffect}
+              cardTitleOutlineColor={cardTitleOutlineColor}
+              setCardTitleOutlineColor={setCardTitleOutlineColor}
               disabled={editorLocked}
             />
           ) : (

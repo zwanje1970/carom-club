@@ -36,7 +36,7 @@
 /* 모집중 — 파란색 · 1줄 */
 .tournament-post-card__badge--recruiting {
   background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
-  font-size: 0.76rem;
+  font-size: calc(0.76rem + 1pt);
   letter-spacing: -0.03em;
 }
 
@@ -55,13 +55,13 @@
 /* 마감 — 초록색 · 1줄 */
 .tournament-post-card__badge--full {
   background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
-  font-size: 0.8rem;
+  font-size: calc(0.8rem + 1pt);
 }
 
 /* 진행중 — 보라·파랑 · 1줄 */
 .tournament-post-card__badge--live {
   background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
-  font-size: 0.74rem;
+  font-size: calc(0.74rem + 1pt);
 }
 
 /* v3 스냅샷 데이터 전용(템플릿 원본에 없음): 대기자모집 */

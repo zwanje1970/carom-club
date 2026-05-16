@@ -840,6 +840,7 @@ export type TournamentPublishedCard = {
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
   cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardTitleOutlineColor?: "black" | "white";
   cardBottomBarColor?: string | null;
   cardBottomBarOpacity?: number | null;
   cardGradientPreset?: "none" | "top" | "left" | "top_left" | "soft";
@@ -913,6 +914,7 @@ export type PublishedCardSnapshot = {
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
   cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardTitleOutlineColor?: "black" | "white";
   cardBottomBarColor?: string | null;
   cardBottomBarOpacity?: number | null;
   cardGradientPreset?: "none" | "top" | "left" | "top_left" | "soft";
@@ -2790,6 +2792,9 @@ function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedC
     base.cardTitleEffect = r.cardTitleEffect;
   } else if ("cardTitleEffect" in r) {
     base.cardTitleEffect = "none";
+  }
+  if ("cardTitleOutlineColor" in r) {
+    base.cardTitleOutlineColor = r.cardTitleOutlineColor === "white" ? "white" : "black";
   }
   if ("cardBottomBarColor" in r) {
     base.cardBottomBarColor =
@@ -9572,6 +9577,7 @@ function tournamentPublishedCardToPublishedSnapshot(
   } else {
     snap.cardTitleEffect = "none";
   }
+  snap.cardTitleOutlineColor = t.cardTitleOutlineColor === "white" ? "white" : "black";
   if (typeof t.cardBottomBarColor === "string") {
     snap.cardBottomBarColor = t.cardBottomBarColor;
   }
@@ -9642,6 +9648,7 @@ export async function upsertTournamentPublishedCard(params: {
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
   cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardTitleOutlineColor?: "black" | "white";
   cardBottomBarColor?: string | null;
   cardBottomBarOpacity?: number | null;
   cardGradientPreset?: "none" | "top" | "left" | "top_left" | "soft";
@@ -9832,6 +9839,7 @@ export async function upsertTournamentPublishedCard(params: {
     params.cardTitleEffect === "shadow_outline"
       ? params.cardTitleEffect
       : "none";
+  row.cardTitleOutlineColor = params.cardTitleOutlineColor === "white" ? "white" : "black";
   if (params.cardBottomBarColor !== undefined) {
     row.cardBottomBarColor = params.cardBottomBarColor;
   }

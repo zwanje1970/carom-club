@@ -41,6 +41,7 @@ function publishedCardSnapshotToEditorGetBody(s: PublishedCardSnapshot): Record<
     cardTitleTextColor: s.cardTitleTextColor ?? null,
     cardDescriptionTextColor: s.cardDescriptionTextColor ?? null,
     cardTitleEffect: s.cardTitleEffect ?? null,
+    cardTitleOutlineColor: s.cardTitleOutlineColor ?? null,
     cardBottomBarColor: s.cardBottomBarColor ?? null,
     cardBottomBarOpacity:
       typeof s.cardBottomBarOpacity === "number" ? s.cardBottomBarOpacity : null,
@@ -138,6 +139,7 @@ export async function POST(request: Request) {
     cardTitleTextColor?: unknown;
     cardDescriptionTextColor?: unknown;
     cardTitleEffect?: unknown;
+    cardTitleOutlineColor?: unknown;
     cardBottomBarColor?: unknown;
     cardBottomBarOpacity?: unknown;
     cardGradientPreset?: unknown;
@@ -226,6 +228,7 @@ export async function POST(request: Request) {
     body.cardTitleEffect === "shadow_outline"
       ? body.cardTitleEffect
       : "none";
+  const cardTitleOutlineColor = body.cardTitleOutlineColor === "white" ? "white" : "black";
   const cardBottomBarColor =
     body.cardBottomBarColor === null
       ? null
@@ -300,6 +303,7 @@ export async function POST(request: Request) {
       ...(cardTitleTextColor !== undefined ? { cardTitleTextColor } : {}),
       ...(cardDescriptionTextColor !== undefined ? { cardDescriptionTextColor } : {}),
       ...(cardTitleEffect !== undefined ? { cardTitleEffect } : {}),
+      ...(cardTitleOutlineColor !== undefined ? { cardTitleOutlineColor } : {}),
       ...(cardBottomBarColor !== undefined ? { cardBottomBarColor } : {}),
       ...(cardBottomBarOpacity !== undefined ? { cardBottomBarOpacity } : {}),
       ...(cardGradientPreset !== undefined ? { cardGradientPreset } : {}),

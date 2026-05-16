@@ -46,6 +46,7 @@ export type SlideDeckItem = {
   cardTextShadowEnabled?: boolean;
   /** 제목 효과(제목만 적용) */
   cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardTitleOutlineColor?: "black" | "white";
   cardSurfaceLayout?: TournamentCardSurfaceLayout;
   /** 하단 날짜/장소 분리영역 배경색 */
   cardBottomBarColor?: string | null;
@@ -86,6 +87,7 @@ type TournamentSlidePreviewItem = {
   cardDescriptionTextColor?: string | null;
   cardTextShadowEnabled?: boolean;
   cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardTitleOutlineColor?: "black" | "white";
   cardSurfaceLayout?: TournamentCardSurfaceLayout;
   cardBottomBarColor?: string | null;
   cardBottomBarOpacity?: number | null;
@@ -118,6 +120,7 @@ function slideDeckItemToPreviewItem(item: SlideDeckItem): TournamentSlidePreview
     cardDescriptionTextColor: item.cardDescriptionTextColor,
     cardTextShadowEnabled: item.cardTextShadowEnabled,
     cardTitleEffect: item.cardTitleEffect,
+    cardTitleOutlineColor: item.cardTitleOutlineColor,
     cardSurfaceLayout: item.cardSurfaceLayout === "full" ? "full" : "split",
     cardBottomBarColor: item.cardBottomBarColor,
     cardBottomBarOpacity: item.cardBottomBarOpacity,
@@ -301,6 +304,7 @@ function TournamentSlideCardPreview({
   const titleColor = (item.cardTitleTextColor ?? "").trim();
   const descColor = (item.cardDescriptionTextColor ?? "").trim();
   const titleEffect = item.cardTitleEffect ?? "none";
+  const titleOutlineColor = item.cardTitleOutlineColor === "white" ? "white" : "black";
   const statusBadge = <TournamentStatusBadge status={status} hideLabel={isImageCaptureMode} />;
   const captureHideGlyphClass = isImageCaptureMode ? styles.imageCaptureHideGlyph : "";
   const surfaceLayout: TournamentCardSurfaceLayout = "split";
@@ -345,7 +349,11 @@ function TournamentSlideCardPreview({
     item.cardTextShadowEnabled ? styles.cardTextShadowOn : "",
     titleEffect === "shadow" ? styles.cardTitleEffectShadow : "",
     titleEffect === "outline" ? styles.cardTitleEffectOutline : "",
+    titleEffect === "outline" && titleOutlineColor === "white" ? styles.cardTitleEffectOutlineWhite : "",
     titleEffect === "shadow_outline" ? styles.cardTitleEffectShadowOutline : "",
+    titleEffect === "shadow_outline" && titleOutlineColor === "white"
+      ? styles.cardTitleEffectShadowOutlineWhite
+      : "",
     mainSlideAd ? styles.cardRootMainSlideAd : "",
     artboardPx ? styles.cardRootArtboardPx : "",
   ]

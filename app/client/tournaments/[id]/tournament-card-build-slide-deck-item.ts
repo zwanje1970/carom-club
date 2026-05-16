@@ -22,6 +22,7 @@ export type TournamentCardPublishCaptureSource = {
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
   cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardTitleOutlineColor?: "black" | "white";
   cardBottomBarColor?: string | null;
   cardBottomBarOpacity?: number | null;
   cardGradientPreset?: "none" | "top" | "left" | "top_left" | "soft";
@@ -86,6 +87,7 @@ export function buildSlideDeckItemForTournamentCapture(args: {
       ? { cardDescriptionTextColor: source.cardDescriptionTextColor.trim() }
       : {}),
     ...(source.cardTitleEffect ? { cardTitleEffect: source.cardTitleEffect } : {}),
+    ...(source.cardTitleOutlineColor ? { cardTitleOutlineColor: source.cardTitleOutlineColor } : {}),
     ...(typeof source.cardBottomBarColor === "string" ? { cardBottomBarColor: source.cardBottomBarColor } : {}),
     ...(typeof source.cardBottomBarOpacity === "number" ? { cardBottomBarOpacity: source.cardBottomBarOpacity } : {}),
     ...(source.cardGradientPreset ? { cardGradientPreset: source.cardGradientPreset } : {}),
