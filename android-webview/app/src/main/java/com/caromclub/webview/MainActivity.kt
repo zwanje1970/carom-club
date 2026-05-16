@@ -541,18 +541,34 @@ class CaromAppBridge(
 ) {
     companion object {
         private const val CARD_CAPTURE_LOG_TAG = "card-publish-capture"
+
+        /**
+         * [진단 전용] true 이면 실제 비트맵 작업 없이 즉시 E_DIAG_BRIDGE_OK 응답을 반환.
+         * 이 상태에서 JS 팝업이 뜨면 JavascriptInterface 등록 ✅, 안 뜨면 브리지 연결 자체 파손.
+         * 원인 확인 후 반드시 false 로 되돌릴 것.
+         */
+        private const val DIAG_BRIDGE_ECHO_TEST = true
     }
     @Volatile
     private var captureInProgress: Boolean = false
 
     private fun postCaptureResult(payload: JSONObject) {
-        val script =
-            "window.CaromNativeCapture && window.CaromNativeCapture.onResult(" +
-                JSONObject.quote(payload.toString()) +
-                ");"
-        // Handler(Looper.getMainLooper())를 사용해 WebView 스레드와 동기화를 보장한다.
+        // JSONObject.quote()로 JSON 전체를 안전하게 이스케이프한 뒤 JS 문자열 인수로 전달.
+        val escaped = try {
+            JSONObject.quote(payload.toString())
+        } catch (t: Throwable) {
+            Log.e(CARD_CAPTURE_LOG_TAG, "postCaptureResult: JSON quote failed", t)
+            return
+        }
+        val script = "window.CaromNativeCapture && window.CaromNativeCapture.onResult($escaped);"
         Handler(Looper.getMainLooper()).post {
-            webView.evaluateJavascript(script, null)
+            try {
+                webView.evaluateJavascript(script, null)
+                Log.i(CARD_CAPTURE_LOG_TAG, "evaluateJavascript dispatched ok")
+            } catch (t: Throwable) {
+                // evaluateJavascript 자체가 실패하면 Logcat에만 기록 가능
+                Log.e(CARD_CAPTURE_LOG_TAG, "evaluateJavascript FAILED: [${t.javaClass.simpleName}] ${t.message}", t)
+            }
         }
     }
 
@@ -583,6 +599,21 @@ class CaromAppBridge(
             postCaptureError("", "E_INVALID_RECT", "요청 ID가 없습니다.")
             return
         }
+
+        // ── [진단 에코 테스트] ─────────────────────────────────────────────────
+        // DIAG_BRIDGE_ECHO_TEST = true 동안 비트맵 처리 없이 즉시 응답을 반환한다.
+        // JS 팝업이 뜨면 브리지 연결 OK. 안 뜨면 JavascriptInterface 등록 자체가 파손됨.
+        // 확인 후 companion object의 DIAG_BRIDGE_ECHO_TEST 를 false 로 변경할 것.
+        if (DIAG_BRIDGE_ECHO_TEST) {
+            Log.w(CARD_CAPTURE_LOG_TAG, "DIAG_BRIDGE_ECHO_TEST active — 실제 캡처 없이 즉시 응답")
+            postCaptureError(
+                requestId,
+                "E_DIAG_BRIDGE_OK",
+                "브리지 진입 확인. 이 팝업이 보이면 JS↔Native 연결 정상. requestId=$requestId",
+            )
+            return
+        }
+
         if (captureInProgress) {
             Log.w(CARD_CAPTURE_LOG_TAG, "native fail code=E_CAPTURE_FAILED reason=in_flight requestId=$requestId")
             postCaptureError(requestId, "E_CAPTURE_FAILED", "이미 캡처가 진행 중입니다.")
@@ -757,16 +788,20 @@ class CaromAppBridge(
                     CARD_CAPTURE_LOG_TAG,
                     "native result ok requestId=$requestId final=${cropped.width}x${cropped.height} base64Len=${base64.length}",
                 )
-            } catch (oom: OutOfMemoryError) {
-                Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_OOM reason=unexpected requestId=$requestId", oom)
-                postCaptureError(requestId, "E_OOM", "[OutOfMemoryError] 캡처 처리 중 예상치 못한 메모리 부족: ${oom.message}")
-            } catch (e: Exception) {
-                Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_CAPTURE_FAILED reason=unexpected_exception requestId=$requestId", e)
-                postCaptureError(requestId, "E_CAPTURE_FAILED", "[${e.javaClass.simpleName}] 캡처 처리 중 예상치 못한 예외: ${e.message}")
+            } catch (t: Throwable) {
+                // Exception + OutOfMemoryError + 모든 시스템 Error를 싹 다 포착
+                val crashLog = "[${t.javaClass.simpleName}] ${t.message ?: "(no message)"}"
+                Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_NATIVE_CRASH requestId=$requestId $crashLog", t)
+                try {
+                    postCaptureError(requestId, "E_NATIVE_CRASH", crashLog)
+                } catch (inner: Throwable) {
+                    // postCaptureError 자체도 실패할 경우 Logcat에만 기록
+                    Log.e(CARD_CAPTURE_LOG_TAG, "postCaptureError also failed: ${inner.message}", inner)
+                }
             } finally {
                 // captureInProgress는 어떤 경로로 종료되더라도 반드시 해제
-                try { cropped?.recycle() } catch (_: Exception) { /* no-op */ }
-                try { sourceBitmap?.recycle() } catch (_: Exception) { /* no-op */ }
+                try { cropped?.recycle() } catch (_: Throwable) { /* no-op */ }
+                try { sourceBitmap?.recycle() } catch (_: Throwable) { /* no-op */ }
                 captureInProgress = false
             }
         }

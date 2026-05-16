@@ -166,9 +166,11 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
 
     // ── 디버깅: 화면에 실제 에러 원인 직접 표시 (원인 파악 후 제거 가능) ──
     if (typeof window !== "undefined" && nativeDetail) {
-      window.alert(
-        `[캡처 디버그] code=${code}\n\n${nativeDetail}`,
-      );
+      const diagLabel =
+        code === "E_DIAG_BRIDGE_OK"
+          ? "✅ 브리지 연결 확인"
+          : `❌ 캡처 실패 [${code}]`;
+      window.alert(`[card-publish 디버그]\n${diagLabel}\n\n${nativeDetail}`);
     }
 
     // 네이티브 실제 메시지를 포함해서 던진다
