@@ -7,7 +7,7 @@ import {
 } from "../../../../lib/carom-app-webview-runtime";
 
 /** 네이티브 캡처 출력 목표 가로 픽셀 (크롭 후 리사이즈) */
-export const NATIVE_CAPTURE_TARGET_WIDTH = 640;
+export const NATIVE_CAPTURE_TARGET_WIDTH = 960;
 
 const APP_ONLY_MSG = "게시카드 저장 기능은 앱에서만 가능합니다.";
 const APP_CAPTURE_FAIL_MSG = "앱 화면 캡처에 실패했습니다. 화면을 다시 확인 후 재시도해 주세요.";
