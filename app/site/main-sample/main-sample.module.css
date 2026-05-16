@@ -383,6 +383,16 @@
   pointer-events: none;
   box-sizing: border-box;
   vertical-align: top;
+  opacity: 1;
+  visibility: visible;
+  position: relative;
+  z-index: 1;
+}
+
+.sampleMainCardFace.sampleMainCardFaceTournamentDeck .sampleMainCardPublishedInner {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-self: stretch;
 }
 
 /* 대회·광고 PNG 덱 면: CTA z-index */

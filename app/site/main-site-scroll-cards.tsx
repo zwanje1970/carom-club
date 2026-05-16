@@ -24,6 +24,21 @@ function logMainCardReturnDiag(payload: Record<string, unknown>) {
   console.info(...args);
 }
 
+/** 홈 복귀·스크롤 복원 후 lazy img가 뷰포트에 남는 WebView 표시 누락 보정 */
+function kickVisibleMainScrollDeckImages(viewport: HTMLElement) {
+  const vRect = viewport.getBoundingClientRect();
+  const imgs = viewport.querySelectorAll<HTMLImageElement>(`img.${styles.sampleMainCardPosterPublishedSnapshot}`);
+  for (const img of imgs) {
+    const r = img.getBoundingClientRect();
+    if (r.bottom < vRect.top - 8 || r.top > vRect.bottom + 8) continue;
+    const src = (img.currentSrc || img.src || "").trim();
+    if (!src) continue;
+    if (img.complete && img.naturalWidth > 0) continue;
+    img.loading = "eager";
+    img.src = src;
+  }
+}
+
 const SITE_SCROLL_CARD = "data-site-scroll-card";
 const SITE_SCROLL_SHORTCUT = "data-site-scroll-shortcut";
 
@@ -107,8 +122,8 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
   );
 
   const deckImgUrl = item.imageUrl?.trim() ?? "";
-  /** PNG 면: 표시 가능한 이미지 URL이 있으면 PNG 면(플래그와 어긋나도 URL 우선 — 홈 복귀 후 플래그 잔류 방지) */
-  const showPngDeck = Boolean(deckImgUrl);
+  /** PNG 면: URL 있으면 placeholder 플래그와 무관하게 실제 이미지 카드 */
+  const renderAsPngDeck = Boolean(deckImgUrl);
 
   const slotShellProps = {
     className: cardSlotClassNames(styles.sampleMainCardSlot, selected, styles.sampleMainCardSlotSelected),
@@ -160,7 +175,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
       </Link>
     ));
 
-  if (showPngDeck) {
+  if (renderAsPngDeck) {
     return (
       <div {...slotShellProps}>
         <div
@@ -181,8 +196,9 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
                           src={deckImgUrl}
                           alt=""
                           className={styles.sampleMainCardPosterPublishedSnapshot}
+                          data-site-scroll-deck-img=""
                           decoding={prioritizeNearViewportImage ? "sync" : "async"}
-                          loading={prioritizeNearViewportImage ? "eager" : "lazy"}
+                          loading={prioritizeNearViewportImage || lcpHeroImage ? "eager" : "lazy"}
                           {...(lcpHeroImage
                             ? { fetchPriority: "high" as const }
                             : prioritizeNearViewportImage
@@ -276,14 +292,13 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   const scrollPixelCarryRef = useRef(0);
 
   const lcpHeroItemIndex = useMemo(
-    () => items.findIndex((x) => Boolean(x.imageUrl?.trim()) && !x.slideDeckPngPlaceholder),
+    () => items.findIndex((x) => Boolean(x.imageUrl?.trim())),
     [items],
   );
   const initialPriorityIndexes = useMemo(() => {
     const out: number[] = [];
     for (let i = 0; i < items.length; i++) {
-      const hasDeckImage = Boolean(items[i]?.imageUrl?.trim()) && !items[i]?.slideDeckPngPlaceholder;
-      if (!hasDeckImage) continue;
+      if (!Boolean(items[i]?.imageUrl?.trim())) continue;
       out.push(i);
       if (out.length >= 3) break;
     }
@@ -324,6 +339,18 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       itemsIdsKey,
       sample,
     });
+    for (let i = 0; i < Math.min(5, items.length); i++) {
+      const it = items[i]!;
+      const deckImgUrlExists = Boolean(it.imageUrl?.trim());
+      logMainCardReturnDiag({
+        phase: "render-card-sample",
+        sampleIndex: i,
+        deckImgUrlExists,
+        slideDeckPngPlaceholder: Boolean(it.slideDeckPngPlaceholder),
+        renderAsPngDeck: deckImgUrlExists,
+        renderAsPlaceholder: !deckImgUrlExists,
+      });
+    }
   }, [items, itemsIdsKey]);
 
   useEffect(() => {
@@ -336,6 +363,8 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
         itemsLen: itemsRef.current.length,
         itemsIdsKey: itemsRef.current.length > 0 ? mainScrollIdsKey(itemsRef.current) : "",
       });
+      const viewport = viewportRef.current;
+      if (viewport) kickVisibleMainScrollDeckImages(viewport);
     };
     window.addEventListener("pageshow", onPageShow);
     return () => window.removeEventListener("pageshow", onPageShow);
@@ -477,6 +506,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
         apply();
         requestAnimationFrame(() => {
           apply();
+          kickVisibleMainScrollDeckImages(viewport);
         });
       });
     });
