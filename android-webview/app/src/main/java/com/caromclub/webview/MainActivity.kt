@@ -535,6 +535,9 @@ class CaromAppBridge(
     private val activity: AppCompatActivity,
     private val webView: WebView,
 ) {
+    companion object {
+        private const val CARD_CAPTURE_LOG_TAG = "card-publish-capture"
+    }
     @Volatile
     private var captureInProgress: Boolean = false
 
@@ -561,6 +564,7 @@ class CaromAppBridge(
 
     @JavascriptInterface
     fun captureCardRegion(requestJson: String) {
+        Log.i(CARD_CAPTURE_LOG_TAG, "native captureCardRegion reached")
         val req =
             try {
                 JSONObject(requestJson)
@@ -569,11 +573,13 @@ class CaromAppBridge(
                 return
             }
         val requestId = req.optString("requestId", "").trim()
+        Log.i(CARD_CAPTURE_LOG_TAG, "native request parsed requestId=$requestId")
         if (requestId.isBlank()) {
             postCaptureError("", "E_INVALID_RECT", "요청 ID가 없습니다.")
             return
         }
         if (captureInProgress) {
+            Log.w(CARD_CAPTURE_LOG_TAG, "native fail code=E_CAPTURE_FAILED reason=in_flight requestId=$requestId")
             postCaptureError(requestId, "E_CAPTURE_FAILED", "이미 캡처가 진행 중입니다.")
             return
         }
@@ -585,18 +591,22 @@ class CaromAppBridge(
         val viewportHeight = req.optDouble("viewportHeight", Double.NaN)
         val format = req.optString("format", "png").trim().lowercase(Locale.getDefault())
         if (!left.isFinite() || !top.isFinite() || !width.isFinite() || !height.isFinite()) {
+            Log.w(CARD_CAPTURE_LOG_TAG, "native fail code=E_INVALID_RECT reason=non_finite_rect requestId=$requestId")
             postCaptureError(requestId, "E_INVALID_RECT", "캡처 좌표가 유효하지 않습니다.")
             return
         }
         if (!viewportWidth.isFinite() || !viewportHeight.isFinite() || viewportWidth <= 0.0 || viewportHeight <= 0.0) {
+            Log.w(CARD_CAPTURE_LOG_TAG, "native fail code=E_INVALID_RECT reason=invalid_viewport requestId=$requestId")
             postCaptureError(requestId, "E_INVALID_RECT", "뷰포트 크기가 유효하지 않습니다.")
             return
         }
         if (width <= 1.0 || height <= 1.0) {
+            Log.w(CARD_CAPTURE_LOG_TAG, "native fail code=E_INVALID_RECT reason=too_small_rect requestId=$requestId")
             postCaptureError(requestId, "E_INVALID_RECT", "캡처 영역 크기가 너무 작습니다.")
             return
         }
         if (format != "png") {
+            Log.w(CARD_CAPTURE_LOG_TAG, "native fail code=E_ENCODE_FAILED reason=unsupported_format requestId=$requestId")
             postCaptureError(requestId, "E_ENCODE_FAILED", "지원하지 않는 포맷입니다.")
             return
         }
@@ -607,6 +617,7 @@ class CaromAppBridge(
                     val vw = webView.width
                     val vh = webView.height
                     if (vw <= 0 || vh <= 0) {
+                        Log.w(CARD_CAPTURE_LOG_TAG, "native fail code=E_CAPTURE_FAILED reason=invalid_webview_size requestId=$requestId")
                         postCaptureError(requestId, "E_CAPTURE_FAILED", "WebView 크기를 확인할 수 없습니다.")
                         return@runOnUiThread
                     }
@@ -615,9 +626,11 @@ class CaromAppBridge(
                     webView.draw(canvas)
                     b
                 } catch (oom: OutOfMemoryError) {
+                    Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_OOM requestId=$requestId", oom)
                     postCaptureError(requestId, "E_OOM", "캡처 중 메모리가 부족합니다.")
                     return@runOnUiThread
                 } catch (_: Exception) {
+                    Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_CAPTURE_FAILED reason=draw_exception requestId=$requestId")
                     postCaptureError(requestId, "E_CAPTURE_FAILED", "화면 캡처에 실패했습니다.")
                     return@runOnUiThread
                 }
@@ -633,6 +646,7 @@ class CaromAppBridge(
                 var cropWidth = (width * scaleX).roundToInt()
                 var cropHeight = (height * scaleY).roundToInt()
                 if (cropWidth <= 0 || cropHeight <= 0) {
+                    Log.w(CARD_CAPTURE_LOG_TAG, "native fail code=E_CROP_OUT_OF_BOUNDS reason=empty_crop requestId=$requestId")
                     postCaptureError(requestId, "E_CROP_OUT_OF_BOUNDS", "캡처 영역이 비어 있습니다.")
                     return@runOnUiThread
                 }
@@ -645,6 +659,7 @@ class CaromAppBridge(
                 val out = ByteArrayOutputStream()
                 val compressed = cropped.compress(Bitmap.CompressFormat.PNG, 100, out)
                 if (!compressed) {
+                    Log.w(CARD_CAPTURE_LOG_TAG, "native fail code=E_ENCODE_FAILED reason=compress_false requestId=$requestId")
                     postCaptureError(requestId, "E_ENCODE_FAILED", "PNG 인코딩에 실패했습니다.")
                     return@runOnUiThread
                 }
@@ -662,11 +677,18 @@ class CaromAppBridge(
                         put("cropHeight", cropped.height)
                     }
                 postCaptureResult(payload)
+                Log.i(
+                    CARD_CAPTURE_LOG_TAG,
+                    "native result ok requestId=$requestId cropWidth=${cropped.width} cropHeight=${cropped.height}",
+                )
             } catch (oom: OutOfMemoryError) {
+                Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_OOM requestId=$requestId", oom)
                 postCaptureError(requestId, "E_OOM", "캡처 처리 중 메모리가 부족합니다.")
             } catch (_: IllegalArgumentException) {
+                Log.w(CARD_CAPTURE_LOG_TAG, "native fail code=E_CROP_OUT_OF_BOUNDS reason=illegal_argument requestId=$requestId")
                 postCaptureError(requestId, "E_CROP_OUT_OF_BOUNDS", "캡처 영역이 화면 범위를 벗어났습니다.")
             } catch (_: Exception) {
+                Log.e(CARD_CAPTURE_LOG_TAG, "native fail code=E_CAPTURE_FAILED reason=unexpected_exception requestId=$requestId")
                 postCaptureError(requestId, "E_CAPTURE_FAILED", "앱 화면 캡처 처리에 실패했습니다.")
             } finally {
                 try {

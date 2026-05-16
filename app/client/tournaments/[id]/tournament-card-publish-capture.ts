@@ -36,6 +36,11 @@ function logBrowserCapture(msg: string, extra?: Record<string, unknown>) {
   else console.info("[tournament-card-browser-capture]", msg);
 }
 
+function logCardPublishCapture(msg: string, extra?: Record<string, unknown>) {
+  if (extra) console.info("[card-publish-capture]", msg, extra);
+  else console.info("[card-publish-capture]", msg);
+}
+
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
 }
@@ -380,6 +385,19 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
   publishedCardImage480Url: string;
 }> {
   const { tournamentId, item, previewCaptureRoot, signal } = args;
+  const runtime = isCaromAppWebViewRuntime() ? "native" : "web";
+  const hasNativeBridge = hasCaromNativeCaptureBridge();
+  const w = window as Window & {
+    CaromAppBridge?: unknown;
+    CaromNativeCapture?: { onResult?: unknown };
+  };
+  logCardPublishCapture(`runtime = ${runtime}`, { tournamentId });
+  logCardPublishCapture("runtime flags", {
+    isCaromAppWebViewRuntime: runtime === "native",
+    hasNativeBridge,
+    hasCaromAppBridge: Boolean(w.CaromAppBridge),
+    hasNativeOnResult: typeof w.CaromNativeCapture?.onResult === "function",
+  });
   logBrowserCapture("full-png capture start (preview DOM)", { tournamentId });
 
   const articleEl = previewCaptureRoot.querySelector(
@@ -415,11 +433,13 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
     let captureCanvasHeight = 0;
     if (isCaromAppWebViewRuntime()) {
       if (!hasCaromNativeCaptureBridge()) {
+        logCardPublishCapture("native result fail", { code: "E_BRIDGE_UNAVAILABLE" });
         const e = new Error(APP_NATIVE_CAPTURE_FAIL_KO) as Error & { code?: string };
         e.code = "E_BRIDGE_UNAVAILABLE";
         throw e;
       }
       if (nativeCaptureInFlight) {
+        logCardPublishCapture("native result fail", { code: "E_CAPTURE_FAILED", reason: "in_flight" });
         const e = new Error(APP_NATIVE_CAPTURE_FAIL_KO) as Error & { code?: string };
         e.code = "E_CAPTURE_FAILED";
         throw e;
@@ -428,11 +448,13 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
       try {
         const rect = articleEl.getBoundingClientRect();
         if (!Number.isFinite(rect.left) || !Number.isFinite(rect.top) || !Number.isFinite(rect.width) || !Number.isFinite(rect.height)) {
+          logCardPublishCapture("native result fail", { code: "E_INVALID_RECT", reason: "non_finite_rect" });
           const e = new Error(APP_NATIVE_CAPTURE_FAIL_KO) as Error & { code?: string };
           e.code = "E_INVALID_RECT";
           throw e;
         }
         if (rect.width < 2 || rect.height < 2) {
+          logCardPublishCapture("native result fail", { code: "E_INVALID_RECT", reason: "too_small_rect" });
           const e = new Error(APP_NATIVE_CAPTURE_FAIL_KO) as Error & { code?: string };
           e.code = "E_INVALID_RECT";
           throw e;
@@ -450,16 +472,28 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
         });
         throwIfAborted(signal);
         blob = decodeBase64PngToBlob(native.base64);
+        logCardPublishCapture("native base64->blob ok", {
+          cropWidth: native.cropWidth,
+          cropHeight: native.cropHeight,
+          blobBytes: blob.size,
+        });
         captureCanvasWidth = native.cropWidth;
         captureCanvasHeight = native.cropHeight;
       } catch (e) {
         const known = e instanceof Error && typeof (e as Error & { code?: string }).code === "string";
-        if (known) throw new Error(APP_NATIVE_CAPTURE_FAIL_KO);
+        if (known) {
+          logCardPublishCapture("native result fail", {
+            code: (e as Error & { code?: string }).code,
+            message: e instanceof Error ? e.message : String(e),
+          });
+          throw new Error(APP_NATIVE_CAPTURE_FAIL_KO);
+        }
         throw e;
       } finally {
         nativeCaptureInFlight = false;
       }
     } else {
+      logCardPublishCapture("web html2canvas path selected");
       const [{ default: html2canvas }] = await Promise.all([import("html2canvas")]);
       const canvas = await html2canvas(captureRoot, {
         scale: TOURNAMENT_CARD_PUBLISH_BROWSER_CAPTURE_SCALE,
@@ -492,6 +526,12 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
     const formData = new FormData();
     formData.append("tournamentId", tournamentId);
     formData.append("file", blob, "tournament-published-card.png");
+    logCardPublishCapture("upload start", {
+      route: "/api/client/tournament-card-image",
+      blobBytes: blob.size,
+      width: captureCanvasWidth,
+      height: captureCanvasHeight,
+    });
 
     const res = await fetch("/api/client/tournament-card-image", {
       method: "POST",
@@ -514,9 +554,17 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
     const publishedCardImage480Url = (json.publishedCardImage480Url ?? json.w480Url ?? "").trim();
     const imageId = (json.imageId ?? "").trim();
     if (!res.ok || !publishedCardImageUrl || !publishedCardImage320Url || !imageId) {
+      logCardPublishCapture("upload fail", {
+        status: res.status,
+        error: json.error,
+        hasImageId: Boolean(imageId),
+        has640: Boolean(publishedCardImageUrl),
+        has320: Boolean(publishedCardImage320Url),
+      });
       logBrowserCapture("multipart upload failed", { status: res.status, error: json.error });
       throw new Error(json.error ?? "게시 카드 이미지 업로드에 실패했습니다.");
     }
+    logCardPublishCapture("upload ok", { imageId, status: res.status });
     logBrowserCapture("full-png upload ok", { imageId, publishedCardImageUrl });
     return {
       imageId,

@@ -17,6 +17,11 @@ export function isCaromAppWebViewRuntime(): boolean {
   return false;
 }
 
+function logNativeCaptureDiag(message: string, extra?: Record<string, unknown>): void {
+  if (extra) console.info("[card-publish-capture]", message, extra);
+  else console.info("[card-publish-capture]", message);
+}
+
 type CaromNativeCaptureRequest = {
   requestId: string;
   left: number;
@@ -75,6 +80,7 @@ function ensureCaromNativeCaptureResultHandler(): void {
   const w = window as CaptureWindow;
   const current = w.CaromNativeCapture?.onResult;
   if (typeof current === "function" && (current as unknown as { __caromNativeBound?: boolean }).__caromNativeBound) {
+    logNativeCaptureDiag("native onResult already registered");
     return;
   }
   const handler = (resultJson: string) => {
@@ -91,14 +97,28 @@ function ensureCaromNativeCaptureResultHandler(): void {
     capturePending.delete(requestId);
     window.clearTimeout(pending.timer);
     if (payload.ok) {
+      logNativeCaptureDiag("native result ok", {
+        requestId,
+        cropWidth: payload.cropWidth,
+        cropHeight: payload.cropHeight,
+      });
       pending.resolve(payload);
       return;
     }
+    logNativeCaptureDiag("native result fail", {
+      requestId,
+      code: payload.code,
+      message: payload.message,
+    });
     pending.reject(makeCaptureError(payload.message || "앱 화면 캡처에 실패했습니다.", payload.code));
   };
   (handler as unknown as { __caromNativeBound?: boolean }).__caromNativeBound = true;
   w.CaromNativeCapture = w.CaromNativeCapture ?? {};
   w.CaromNativeCapture.onResult = handler;
+  logNativeCaptureDiag("native onResult registered", {
+    hasCaromNativeCaptureObject: Boolean(w.CaromNativeCapture),
+    hasOnResult: typeof w.CaromNativeCapture?.onResult === "function",
+  });
 }
 
 export function hasCaromNativeCaptureBridge(): boolean {
@@ -125,6 +145,11 @@ export async function captureCardRegionViaCaromNativeBridge(args: {
   if (!bridge || typeof bridge.captureCardRegion !== "function") {
     throw makeCaptureError("앱 캡처 브리지를 찾을 수 없습니다.", "E_BRIDGE_UNAVAILABLE");
   }
+  logNativeCaptureDiag("native bridge precheck", {
+    hasCaromAppBridge: Boolean(w.CaromAppBridge),
+    hasCaptureCardRegion: typeof w.CaromAppBridge?.captureCardRegion === "function",
+    hasOnResultBeforeEnsure: typeof w.CaromNativeCapture?.onResult === "function",
+  });
   const requestId =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
@@ -145,14 +170,25 @@ export async function captureCardRegionViaCaromNativeBridge(args: {
     const timeoutMs = Math.max(1_000, args.timeoutMs ?? 12_000);
     const timer = window.setTimeout(() => {
       capturePending.delete(requestId);
+      logNativeCaptureDiag("native result fail", { requestId, code: "E_CAPTURE_TIMEOUT" });
       reject(makeCaptureError("앱 화면 캡처 시간이 초과되었습니다.", "E_CAPTURE_TIMEOUT"));
     }, timeoutMs);
     capturePending.set(requestId, { resolve, reject, timer });
     try {
+      logNativeCaptureDiag("native request sent", {
+        requestId,
+        left: request.left,
+        top: request.top,
+        width: request.width,
+        height: request.height,
+        viewportWidth: request.viewportWidth,
+        viewportHeight: request.viewportHeight,
+      });
       bridge.captureCardRegion!(JSON.stringify(request));
     } catch {
       window.clearTimeout(timer);
       capturePending.delete(requestId);
+      logNativeCaptureDiag("native result fail", { requestId, code: "E_CAPTURE_FAILED" });
       reject(makeCaptureError("앱 화면 캡처 브리지 호출에 실패했습니다.", "E_CAPTURE_FAILED"));
     }
   });
