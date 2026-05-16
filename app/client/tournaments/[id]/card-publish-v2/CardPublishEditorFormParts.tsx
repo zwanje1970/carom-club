@@ -486,58 +486,71 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
 
       <div className={editorStyles.field}>
         <span className={editorStyles.fieldLabel}>제목 효과</span>
-        <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.4rem" }}>
-          {[
-            { id: "none", label: "없음" },
-            { id: "shadow", label: "그림자" },
-            { id: "outline", label: "외곽선" },
-            { id: "shadow_outline", label: "그림자 + 외곽선" },
-          ].map((opt) => {
-            const active = cardTitleEffect === opt.id;
-            return (
+        <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.4rem", alignItems: "center" }}>
+          <button
+            type="button"
+            className="v3-btn"
+            aria-pressed={cardTitleEffect === "none"}
+            disabled={disabled}
+            style={{ fontWeight: cardTitleEffect === "none" ? 800 : 600 }}
+            onClick={() => setCardTitleEffect("none")}
+          >
+            없음
+          </button>
+          <button
+            type="button"
+            className="v3-btn"
+            aria-pressed={cardTitleEffect === "shadow"}
+            disabled={disabled}
+            style={{ fontWeight: cardTitleEffect === "shadow" ? 800 : 600 }}
+            onClick={() => setCardTitleEffect("shadow")}
+          >
+            그림자
+          </button>
+          <button
+            type="button"
+            className="v3-btn"
+            aria-pressed={cardTitleEffect === "outline"}
+            disabled={disabled}
+            style={{ fontWeight: cardTitleEffect === "outline" ? 800 : 600 }}
+            onClick={() => setCardTitleEffect("outline")}
+          >
+            외곽선
+          </button>
+          {(cardTitleEffect === "outline" || cardTitleEffect === "shadow_outline") ? (
+            <div className={editorStyles.fieldSwatches} role="group" aria-label="외곽선 색상">
               <button
-                key={opt.id}
                 type="button"
-                className="v3-btn"
-                aria-pressed={active}
+                className={`${editorStyles.fieldSwatch} ${cardTitleOutlineColor === "black" ? editorStyles.fieldSwatchSelected : ""}`}
+                style={{ backgroundColor: "#111827" }}
+                aria-label="외곽선 검정"
+                aria-pressed={cardTitleOutlineColor === "black"}
                 disabled={disabled}
-                style={{ fontWeight: active ? 800 : 600 }}
-                onClick={() => setCardTitleEffect(opt.id as "none" | "shadow" | "outline" | "shadow_outline")}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
+                onClick={() => setCardTitleOutlineColor("black")}
+              />
+              <button
+                type="button"
+                className={`${editorStyles.fieldSwatch} ${editorStyles.fieldSwatchLight} ${cardTitleOutlineColor === "white" ? editorStyles.fieldSwatchSelected : ""}`}
+                style={{ backgroundColor: "#ffffff" }}
+                aria-label="외곽선 흰색"
+                aria-pressed={cardTitleOutlineColor === "white"}
+                disabled={disabled}
+                onClick={() => setCardTitleOutlineColor("white")}
+              />
+            </div>
+          ) : null}
+          <button
+            type="button"
+            className="v3-btn"
+            aria-pressed={cardTitleEffect === "shadow_outline"}
+            disabled={disabled}
+            style={{ fontWeight: cardTitleEffect === "shadow_outline" ? 800 : 600 }}
+            onClick={() => setCardTitleEffect("shadow_outline")}
+          >
+            그림자 + 외곽선
+          </button>
         </div>
       </div>
-
-      {cardTitleEffect === "outline" || cardTitleEffect === "shadow_outline" ? (
-        <div className={editorStyles.field}>
-          <span className={editorStyles.fieldLabel}>제목 외곽선 색상</span>
-          <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.4rem" }}>
-            <button
-              type="button"
-              className="v3-btn"
-              aria-pressed={cardTitleOutlineColor === "black"}
-              disabled={disabled}
-              style={{ fontWeight: cardTitleOutlineColor === "black" ? 800 : 600 }}
-              onClick={() => setCardTitleOutlineColor("black")}
-            >
-              검정
-            </button>
-            <button
-              type="button"
-              className="v3-btn"
-              aria-pressed={cardTitleOutlineColor === "white"}
-              disabled={disabled}
-              style={{ fontWeight: cardTitleOutlineColor === "white" ? 800 : 600 }}
-              onClick={() => setCardTitleOutlineColor("white")}
-            >
-              흰색
-            </button>
-          </div>
-        </div>
-      ) : null}
     </>
   );
 });

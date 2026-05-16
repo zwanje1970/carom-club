@@ -305,6 +305,7 @@ function TournamentSlideCardPreview({
   const descColor = (item.cardDescriptionTextColor ?? "").trim();
   const titleEffect = item.cardTitleEffect ?? "none";
   const titleOutlineColor = item.cardTitleOutlineColor === "white" ? "white" : "black";
+  const useLayeredTitleOutline = titleEffect === "outline" || titleEffect === "shadow_outline";
   const statusBadge = <TournamentStatusBadge status={status} hideLabel={isImageCaptureMode} />;
   const captureHideGlyphClass = isImageCaptureMode ? styles.imageCaptureHideGlyph : "";
   const surfaceLayout: TournamentCardSurfaceLayout = "split";
@@ -435,7 +436,18 @@ function TournamentSlideCardPreview({
                     className={`${styles.classicTitle} ${captureHideGlyphClass}`.trim()}
                     style={titleColor ? { color: titleColor } : undefined}
                   >
-                    {item.title.length > 0 ? item.title : "(제목)"}
+                    {useLayeredTitleOutline ? (
+                      <span className={styles.titleLayerWrap}>
+                        <span className={styles.titleLayerStroke} aria-hidden>
+                          {item.title.length > 0 ? item.title : "(제목)"}
+                        </span>
+                        <span className={styles.titleLayerFill}>
+                          {item.title.length > 0 ? item.title : "(제목)"}
+                        </span>
+                      </span>
+                    ) : (
+                      item.title.length > 0 ? item.title : "(제목)"
+                    )}
                   </h3>
                   {showDescBlock ? (
                     <p
@@ -505,7 +517,18 @@ function TournamentSlideCardPreview({
                   className={`${styles.frameTitle} ${captureHideGlyphClass}`.trim()}
                   style={titleColor ? { color: titleColor } : undefined}
                 >
-                  {item.title.length > 0 ? item.title : "(제목)"}
+                  {useLayeredTitleOutline ? (
+                    <span className={styles.titleLayerWrap}>
+                      <span className={styles.titleLayerStroke} aria-hidden>
+                        {item.title.length > 0 ? item.title : "(제목)"}
+                      </span>
+                      <span className={styles.titleLayerFill}>
+                        {item.title.length > 0 ? item.title : "(제목)"}
+                      </span>
+                    </span>
+                  ) : (
+                    item.title.length > 0 ? item.title : "(제목)"
+                  )}
                 </h3>
                 {showDescBlock ? (
                   <p
