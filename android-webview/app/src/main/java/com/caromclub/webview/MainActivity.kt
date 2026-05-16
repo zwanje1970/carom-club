@@ -696,10 +696,11 @@ class CaromAppBridge(
                 }
 
                 // 비트맵 범위를 절대로 벗어나지 않도록 수학적 방어
-                val safeLeft = rawCropLeft.coerceIn(0, bw - 1)
-                val safeTop = rawCropTop.coerceIn(0, bh - 1)
-                val safeWidth = rawCropWidth.coerceIn(1, bw - safeLeft)
-                val safeHeight = rawCropHeight.coerceIn(1, bh - safeTop)
+                // ※ coerceIn(1, 0) 은 IAE를 던지므로 상한을 먼저 1 이상으로 보장해야 한다.
+                val safeLeft = rawCropLeft.coerceIn(0, (bw - 1).coerceAtLeast(0))
+                val safeTop = rawCropTop.coerceIn(0, (bh - 1).coerceAtLeast(0))
+                val safeWidth = rawCropWidth.coerceIn(1, (bw - safeLeft).coerceAtLeast(1))
+                val safeHeight = rawCropHeight.coerceIn(1, (bh - safeTop).coerceAtLeast(1))
                 Log.i(
                     CARD_CAPTURE_LOG_TAG,
                     "native crop safe requestId=$requestId [l=$safeLeft t=$safeTop w=$safeWidth h=$safeHeight]",
@@ -719,18 +720,28 @@ class CaromAppBridge(
 
                 // ── 3. targetWidth로 비율 유지 리사이즈 (ARGB_8888 고정) ─────────
                 if (targetWidth > 0 && cropped.width != targetWidth) {
-                    val scale = targetWidth.toDouble() / cropped.width.toDouble()
-                    val resizeHeight = (cropped.height * scale).roundToInt().coerceAtLeast(1)
+                    // Float 기반 비율 계산 — 분모(cropped.width) 0 방어 후 targetHeight 산출
+                    val cropW = cropped.width.coerceAtLeast(1).toFloat()
+                    val cropH = cropped.height.coerceAtLeast(1).toFloat()
+                    val resizeHeight = Math.round(cropH / cropW * targetWidth.toFloat()).coerceAtLeast(1)
+                    if (resizeHeight <= 0) {
+                        Log.w(CARD_CAPTURE_LOG_TAG, "native fail code=E_CAPTURE_FAILED reason=zero_resize_height requestId=$requestId cropW=$cropW cropH=$cropH targetWidth=$targetWidth")
+                        postCaptureError(requestId, "E_CAPTURE_FAILED", "리사이즈 높이 계산 결과가 0입니다. cropW=$cropW cropH=$cropH")
+                        return@post
+                    }
                     Log.i(
                         CARD_CAPTURE_LOG_TAG,
                         "native resize start requestId=$requestId " +
                             "src=${cropped.width}x${cropped.height} -> ${targetWidth}x${resizeHeight}",
                     )
                     val resized = try {
-                        // Canvas 방식으로 ARGB_8888 강제 지정 (createScaledBitmap은 소스 포맷 상속)
+                        // Canvas + ARGB_8888 강제 지정, paint 속성 명시
                         val dst = Bitmap.createBitmap(targetWidth, resizeHeight, Bitmap.Config.ARGB_8888)
                         val canvas = Canvas(dst)
-                        val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+                        val paint = Paint().apply {
+                            isAntiAlias = true
+                            isFilterBitmap = true
+                        }
                         canvas.drawBitmap(
                             cropped,
                             null,
