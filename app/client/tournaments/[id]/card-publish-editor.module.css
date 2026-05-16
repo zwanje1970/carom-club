@@ -66,6 +66,17 @@
 
 .pageWrapV2 .previewSlideLayer {
   padding: 0;
+  width: fit-content;
+  max-width: 100%;
+  height: fit-content;
+  margin-inline: auto;
+}
+
+.pageWrapV2 .previewCardScaleHost {
+  width: fit-content;
+  max-width: 100%;
+  height: fit-content;
+  margin-inline: auto;
 }
 
 /* 게시 v2 미리보기·메인 스크롤 대회 카드 공통 — `.pageWrapV2` 하위 선택자 대신 클래스로 동일 외곽 재사용 */
@@ -220,7 +231,10 @@
   container-name: card-publish-v2-preview;
   aspect-ratio: unset;
   min-height: unset;
-  height: auto;
+  width: fit-content;
+  max-width: 100%;
+  height: fit-content;
+  margin-inline: auto;
   display: block;
 }
 
@@ -228,13 +242,20 @@
   width: min(100cqw, 440px);
   height: calc(min(100cqw, 440px) * 180 / 440);
   overflow: hidden;
-  margin-inline: auto;
+  margin: 0;
   box-sizing: border-box;
+  position: relative;
+  flex: 0 0 auto;
+  line-height: 0;
 }
 
 .previewCardScaleInner {
   width: 440px;
   height: 180px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
   transform-origin: top left;
   transform: scale(calc(min(100cqw, 440px) / 440px));
   box-sizing: border-box;
@@ -251,18 +272,18 @@
 .previewCardScaleInner .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"] {
   width: 440px;
   max-width: 440px;
-  min-height: 180px;
   height: 180px;
   flex: 0 0 auto;
-  align-self: center;
+  align-self: stretch;
 }
 
 .previewCardScaleInner .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"] > :global(article) {
   flex: 0 0 auto;
   flex-shrink: 0;
-  align-self: center;
+  align-self: stretch;
   min-width: 440px;
   width: 440px;
+  height: 180px;
   border-radius: 12px;
   overflow: hidden;
 }

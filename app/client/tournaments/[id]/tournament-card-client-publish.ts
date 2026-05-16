@@ -62,7 +62,7 @@ export type TournamentCardClientPublishProgressPhase = "publish-start" | "before
 
 const SERVER_CARD_IMAGE_FAIL_KO = "게시 이미지 생성 또는 저장에 실패했습니다. 다시 게시해 주세요.";
 /** 브라우저 DOM 캡처만 허용 — 서버 resvg 대체 생성 없음 */
-const BROWSER_CARD_IMAGE_CAPTURE_FAIL_KO = "카드 이미지 생성에 실패했습니다. 다시 시도해 주세요.";
+const BROWSER_CARD_IMAGE_CAPTURE_FAIL_KO = "앱 화면 캡처에 실패했습니다. 화면을 다시 확인 후 재시도해 주세요.";
 const PUBLISH_IMAGE_TIMEOUT_MS = 45_000;
 
 /**

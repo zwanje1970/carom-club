@@ -12,6 +12,11 @@ import {
   TOURNAMENT_CARD_ARTBOARD_HEIGHT_PX,
   TOURNAMENT_CARD_ARTBOARD_WIDTH_PX,
 } from "../../../../lib/site/tournament-card-artboard";
+import {
+  captureCardRegionViaCaromNativeBridge,
+  hasCaromNativeCaptureBridge,
+  isCaromAppWebViewRuntime,
+} from "../../../../lib/carom-app-webview-runtime";
 import type {
   TournamentCardOverlaySnapshot,
   TournamentCardOverlaySnapshotItem,
@@ -34,6 +39,9 @@ function logBrowserCapture(msg: string, extra?: Record<string, unknown>) {
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
 }
+
+const APP_NATIVE_CAPTURE_FAIL_KO = "앱 화면 캡처에 실패했습니다. 화면을 다시 확인 후 재시도해 주세요.";
+let nativeCaptureInFlight = false;
 
 /** html2canvas 캔버스 바닥 — 불투명 사각 비트맵(모서리 알파에 의존하지 않음). 사진 배경은 흰색으로 투명 구멍만 메움. */
 function resolvePublishedCardHtml2CanvasBackground(item: SlideDeckItem): string {
@@ -229,6 +237,15 @@ async function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   });
 }
 
+function decodeBase64PngToBlob(base64: string): Blob {
+  const raw = atob(base64);
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i += 1) {
+    bytes[i] = raw.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: "image/png" });
+}
+
 function createCaptureHost(): HTMLDivElement {
   const host = document.createElement("div");
   host.setAttribute("data-tournament-card-capture-host", "1");
@@ -347,9 +364,8 @@ async function captureOverlaySnapshotDom(item: SlideDeckItem): Promise<Tournamen
 }
 
 /**
- * 게시 발행: 편집 화면의 게시카드 미리보기 루트(`CardPublishPreview` ref, `data-card-publish-artboard`)를
- * html2canvas로 PNG로 캡처한 뒤 `POST /api/client/tournament-card-image`(multipart)로 업로드한다.
- * html2canvas는 이 모듈에서만 동적 import.
+ * 게시 발행: 편집 화면 카드 article을 앱(WebView)에서는 네이티브 실제 픽셀 캡처로,
+ * 웹/PC에서는 html2canvas로 PNG 캡처한 뒤 `POST /api/client/tournament-card-image`(multipart)로 업로드한다.
  */
 export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(args: {
   tournamentId: string;
@@ -394,29 +410,82 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
     await doubleRaf();
     throwIfAborted(signal);
 
-    const [{ default: html2canvas }] = await Promise.all([import("html2canvas")]);
-    const canvas = await html2canvas(captureRoot, {
-      scale: TOURNAMENT_CARD_PUBLISH_BROWSER_CAPTURE_SCALE,
-      backgroundColor: null,
-      useCORS: true,
-      allowTaint: false,
-      logging: false,
-      width: TOURNAMENT_CARD_ARTBOARD_WIDTH_PX,
-      height: TOURNAMENT_CARD_ARTBOARD_HEIGHT_PX,
-    });
+    let blob: Blob;
+    let captureCanvasWidth = 0;
+    let captureCanvasHeight = 0;
+    if (isCaromAppWebViewRuntime()) {
+      if (!hasCaromNativeCaptureBridge()) {
+        const e = new Error(APP_NATIVE_CAPTURE_FAIL_KO) as Error & { code?: string };
+        e.code = "E_BRIDGE_UNAVAILABLE";
+        throw e;
+      }
+      if (nativeCaptureInFlight) {
+        const e = new Error(APP_NATIVE_CAPTURE_FAIL_KO) as Error & { code?: string };
+        e.code = "E_CAPTURE_FAILED";
+        throw e;
+      }
+      nativeCaptureInFlight = true;
+      try {
+        const rect = articleEl.getBoundingClientRect();
+        if (!Number.isFinite(rect.left) || !Number.isFinite(rect.top) || !Number.isFinite(rect.width) || !Number.isFinite(rect.height)) {
+          const e = new Error(APP_NATIVE_CAPTURE_FAIL_KO) as Error & { code?: string };
+          e.code = "E_INVALID_RECT";
+          throw e;
+        }
+        if (rect.width < 2 || rect.height < 2) {
+          const e = new Error(APP_NATIVE_CAPTURE_FAIL_KO) as Error & { code?: string };
+          e.code = "E_INVALID_RECT";
+          throw e;
+        }
+        throwIfAborted(signal);
+        const native = await captureCardRegionViaCaromNativeBridge({
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+          devicePixelRatio: window.devicePixelRatio || 1,
+          timeoutMs: 12_000,
+        });
+        throwIfAborted(signal);
+        blob = decodeBase64PngToBlob(native.base64);
+        captureCanvasWidth = native.cropWidth;
+        captureCanvasHeight = native.cropHeight;
+      } catch (e) {
+        const known = e instanceof Error && typeof (e as Error & { code?: string }).code === "string";
+        if (known) throw new Error(APP_NATIVE_CAPTURE_FAIL_KO);
+        throw e;
+      } finally {
+        nativeCaptureInFlight = false;
+      }
+    } else {
+      const [{ default: html2canvas }] = await Promise.all([import("html2canvas")]);
+      const canvas = await html2canvas(captureRoot, {
+        scale: TOURNAMENT_CARD_PUBLISH_BROWSER_CAPTURE_SCALE,
+        backgroundColor: null,
+        useCORS: true,
+        allowTaint: false,
+        logging: false,
+        width: TOURNAMENT_CARD_ARTBOARD_WIDTH_PX,
+        height: TOURNAMENT_CARD_ARTBOARD_HEIGHT_PX,
+      });
 
-    assertPublishedCardCanvasHasLikelyContent(canvas);
-    if (expectsImageBg) {
-      assertPublishedCardCanvasHasLikelyPhotoBackground(canvas);
+      assertPublishedCardCanvasHasLikelyContent(canvas);
+      if (expectsImageBg) {
+        assertPublishedCardCanvasHasLikelyPhotoBackground(canvas);
+      }
+      blob = await canvasToBlob(canvas);
+      captureCanvasWidth = canvas.width;
+      captureCanvasHeight = canvas.height;
     }
 
-    const blob = await canvasToBlob(canvas);
     if (blob.size < 2800) {
       throw new Error("캡처 PNG가 비정상적으로 작습니다. 미리보기를 확인한 뒤 다시 게시해 주세요.");
     }
     logBrowserCapture("full-png canvas ok", {
-      canvasWidth: canvas.width,
-      canvasHeight: canvas.height,
+      canvasWidth: captureCanvasWidth,
+      canvasHeight: captureCanvasHeight,
       blobBytes: blob.size,
     });
 

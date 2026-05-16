@@ -9,6 +9,8 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
 import android.net.Uri
 import android.view.ViewGroup
@@ -18,6 +20,7 @@ import android.os.Environment
 import android.os.SystemClock
 import android.provider.MediaStore
 import android.util.Log
+import android.util.Base64
 import android.widget.Toast
 import android.webkit.CookieManager
 import android.webkit.GeolocationPermissions
@@ -38,12 +41,15 @@ import androidx.core.content.FileProvider
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import com.google.firebase.messaging.FirebaseMessaging
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.roundToInt
+import org.json.JSONObject
 
 private const val ORIENTATION_BRIDGE_TAG = "CaromAppBridge"
 
@@ -265,7 +271,7 @@ class MainActivity : AppCompatActivity() {
             WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, false)
         }
 
-        appBridge = CaromAppBridge(this)
+        appBridge = CaromAppBridge(this, webView)
         webView.addJavascriptInterface(appBridge, "CaromAppBridge")
         webView.addJavascriptInterface(PdfDownloadBridge(this, webView), "CaromPdfDownload")
         webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, contentLength ->
@@ -527,7 +533,157 @@ class MainActivity : AppCompatActivity() {
 
 class CaromAppBridge(
     private val activity: AppCompatActivity,
+    private val webView: WebView,
 ) {
+    @Volatile
+    private var captureInProgress: Boolean = false
+
+    private fun postCaptureResult(payload: JSONObject) {
+        val script =
+            "window.CaromNativeCapture && window.CaromNativeCapture.onResult(" +
+                JSONObject.quote(payload.toString()) +
+                ");"
+        activity.runOnUiThread {
+            webView.evaluateJavascript(script, null)
+        }
+    }
+
+    private fun postCaptureError(requestId: String, code: String, message: String) {
+        val payload =
+            JSONObject().apply {
+                put("ok", false)
+                put("requestId", requestId)
+                put("code", code)
+                put("message", message)
+            }
+        postCaptureResult(payload)
+    }
+
+    @JavascriptInterface
+    fun captureCardRegion(requestJson: String) {
+        val req =
+            try {
+                JSONObject(requestJson)
+            } catch (_: Exception) {
+                postCaptureError("", "E_INVALID_RECT", "요청 형식이 잘못되었습니다.")
+                return
+            }
+        val requestId = req.optString("requestId", "").trim()
+        if (requestId.isBlank()) {
+            postCaptureError("", "E_INVALID_RECT", "요청 ID가 없습니다.")
+            return
+        }
+        if (captureInProgress) {
+            postCaptureError(requestId, "E_CAPTURE_FAILED", "이미 캡처가 진행 중입니다.")
+            return
+        }
+        val left = req.optDouble("left", Double.NaN)
+        val top = req.optDouble("top", Double.NaN)
+        val width = req.optDouble("width", Double.NaN)
+        val height = req.optDouble("height", Double.NaN)
+        val viewportWidth = req.optDouble("viewportWidth", Double.NaN)
+        val viewportHeight = req.optDouble("viewportHeight", Double.NaN)
+        val format = req.optString("format", "png").trim().lowercase(Locale.getDefault())
+        if (!left.isFinite() || !top.isFinite() || !width.isFinite() || !height.isFinite()) {
+            postCaptureError(requestId, "E_INVALID_RECT", "캡처 좌표가 유효하지 않습니다.")
+            return
+        }
+        if (!viewportWidth.isFinite() || !viewportHeight.isFinite() || viewportWidth <= 0.0 || viewportHeight <= 0.0) {
+            postCaptureError(requestId, "E_INVALID_RECT", "뷰포트 크기가 유효하지 않습니다.")
+            return
+        }
+        if (width <= 1.0 || height <= 1.0) {
+            postCaptureError(requestId, "E_INVALID_RECT", "캡처 영역 크기가 너무 작습니다.")
+            return
+        }
+        if (format != "png") {
+            postCaptureError(requestId, "E_ENCODE_FAILED", "지원하지 않는 포맷입니다.")
+            return
+        }
+        captureInProgress = true
+        activity.runOnUiThread {
+            val sourceBitmap: Bitmap =
+                try {
+                    val vw = webView.width
+                    val vh = webView.height
+                    if (vw <= 0 || vh <= 0) {
+                        postCaptureError(requestId, "E_CAPTURE_FAILED", "WebView 크기를 확인할 수 없습니다.")
+                        return@runOnUiThread
+                    }
+                    val b = Bitmap.createBitmap(vw, vh, Bitmap.Config.ARGB_8888)
+                    val canvas = Canvas(b)
+                    webView.draw(canvas)
+                    b
+                } catch (oom: OutOfMemoryError) {
+                    postCaptureError(requestId, "E_OOM", "캡처 중 메모리가 부족합니다.")
+                    return@runOnUiThread
+                } catch (_: Exception) {
+                    postCaptureError(requestId, "E_CAPTURE_FAILED", "화면 캡처에 실패했습니다.")
+                    return@runOnUiThread
+                }
+
+            var cropped: Bitmap? = null
+            try {
+                val bw = sourceBitmap.width.toDouble()
+                val bh = sourceBitmap.height.toDouble()
+                val scaleX = bw / viewportWidth
+                val scaleY = bh / viewportHeight
+                var cropLeft = (left * scaleX).roundToInt()
+                var cropTop = (top * scaleY).roundToInt()
+                var cropWidth = (width * scaleX).roundToInt()
+                var cropHeight = (height * scaleY).roundToInt()
+                if (cropWidth <= 0 || cropHeight <= 0) {
+                    postCaptureError(requestId, "E_CROP_OUT_OF_BOUNDS", "캡처 영역이 비어 있습니다.")
+                    return@runOnUiThread
+                }
+                cropLeft = cropLeft.coerceIn(0, sourceBitmap.width - 1)
+                cropTop = cropTop.coerceIn(0, sourceBitmap.height - 1)
+                cropWidth = cropWidth.coerceAtMost(sourceBitmap.width - cropLeft).coerceAtLeast(1)
+                cropHeight = cropHeight.coerceAtMost(sourceBitmap.height - cropTop).coerceAtLeast(1)
+
+                cropped = Bitmap.createBitmap(sourceBitmap, cropLeft, cropTop, cropWidth, cropHeight)
+                val out = ByteArrayOutputStream()
+                val compressed = cropped.compress(Bitmap.CompressFormat.PNG, 100, out)
+                if (!compressed) {
+                    postCaptureError(requestId, "E_ENCODE_FAILED", "PNG 인코딩에 실패했습니다.")
+                    return@runOnUiThread
+                }
+                val base64 = Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
+                val payload =
+                    JSONObject().apply {
+                        put("ok", true)
+                        put("requestId", requestId)
+                        put("format", "png")
+                        put("mimeType", "image/png")
+                        put("base64", base64)
+                        put("bitmapWidth", sourceBitmap.width)
+                        put("bitmapHeight", sourceBitmap.height)
+                        put("cropWidth", cropped.width)
+                        put("cropHeight", cropped.height)
+                    }
+                postCaptureResult(payload)
+            } catch (oom: OutOfMemoryError) {
+                postCaptureError(requestId, "E_OOM", "캡처 처리 중 메모리가 부족합니다.")
+            } catch (_: IllegalArgumentException) {
+                postCaptureError(requestId, "E_CROP_OUT_OF_BOUNDS", "캡처 영역이 화면 범위를 벗어났습니다.")
+            } catch (_: Exception) {
+                postCaptureError(requestId, "E_CAPTURE_FAILED", "앱 화면 캡처 처리에 실패했습니다.")
+            } finally {
+                try {
+                    cropped?.recycle()
+                } catch (_: Exception) {
+                    // no-op
+                }
+                try {
+                    sourceBitmap.recycle()
+                } catch (_: Exception) {
+                    // no-op
+                }
+                captureInProgress = false
+            }
+        }
+    }
+
     @JavascriptInterface
     fun exitApp() {
         activity.runOnUiThread {
