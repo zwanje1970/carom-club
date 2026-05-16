@@ -28,6 +28,12 @@ function makeCodedError(message: string, code: string): Error & { code: string }
   return e;
 }
 
+/** 디버깅: 화면에 강제 팝업. 원인 확인 후 제거할 것. */
+function diagAlert(step: string, detail: string): void {
+  if (typeof window === "undefined") return;
+  window.alert(`[JS 진단 — ${step}]\n\n${detail}`);
+}
+
 function decodeBase64PngToBlob(base64: string): Blob {
   const raw = atob(base64);
   const bytes = new Uint8Array(raw.length);
@@ -45,16 +51,8 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
 }
 
-/**
- * 편집 화면의 카드 article 요소를 Android native bridge로 픽셀 캡처하고
- * 가로 1280px PNG로 리사이즈한 뒤 `POST /api/client/tournament-card-image`(multipart)로 업로드한다.
- *
- * - html2canvas 미사용: 레이아웃 재계산 없이 화면에 보이는 그대로 캡처한다.
- * - 앱(Android WebView) 외 환경에서는 기능을 엄격히 차단한다.
- */
 export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(args: {
   tournamentId: string;
-  /** `CardPublishPreview` 아트보드 루트(ref) */
   previewCaptureRoot: HTMLElement;
   signal?: AbortSignal;
 }): Promise<{
@@ -65,37 +63,65 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
 }> {
   const { tournamentId, previewCaptureRoot, signal } = args;
 
+  // ── 체크포인트 1: 런타임 판별 ─────────────────────────────
+  const w = window as Window & {
+    CaromAppBridge?: { captureCardRegion?: unknown };
+    CaromNativeCapture?: { onResult?: unknown };
+  };
   const isNative = isCaromAppWebViewRuntime();
-  logCapture(`runtime = ${isNative ? "native" : "web"}`, { tournamentId });
+  const hasBridge = hasCaromNativeCaptureBridge();
+  const bridgeKeys = w.CaromAppBridge
+    ? Object.keys(w.CaromAppBridge as object).join(", ") || "(no enumerable keys)"
+    : "(CaromAppBridge 없음)";
+  const captureCardRegionType = w.CaromAppBridge
+    ? typeof (w.CaromAppBridge as Record<string, unknown>)["captureCardRegion"]
+    : "N/A";
 
-  // ── 앱 외 환경 엄격 차단 ──────────────────────────────────
+  diagAlert(
+    "1 런타임 판별",
+    `isCaromAppWebViewRuntime: ${isNative}\nhasCaromNativeCaptureBridge: ${hasBridge}\nwindow.CaromAppBridge 존재: ${Boolean(w.CaromAppBridge)}\nCaromAppBridge keys: ${bridgeKeys}\ntypeof captureCardRegion: ${captureCardRegionType}\nUserAgent: ${navigator.userAgent.slice(0, 120)}`,
+  );
+
+  logCapture(`runtime = ${isNative ? "native" : "web"}`, { tournamentId, isNative, hasBridge });
+
   if (!isNative) {
     logCapture("blocked: non-native runtime");
     throw makeCodedError(APP_ONLY_MSG, APP_ONLY_ERROR_CODE);
   }
 
-  // ── bridge 가용성 확인 ────────────────────────────────────
-  if (!hasCaromNativeCaptureBridge()) {
+  // ── 체크포인트 2: bridge 메서드 가용성 ──────────────────────
+  if (!hasBridge) {
+    diagAlert(
+      "2 bridge 메서드 없음",
+      `window.CaromAppBridge: ${JSON.stringify(w.CaromAppBridge)}\ntypeof captureCardRegion: ${captureCardRegionType}\n\n→ @JavascriptInterface 등록 누락 또는 메서드명 불일치 의심`,
+    );
     logCapture("native result fail", { code: "E_BRIDGE_UNAVAILABLE" });
     throw makeCodedError(APP_CAPTURE_FAIL_MSG, "E_BRIDGE_UNAVAILABLE");
   }
 
   if (nativeCaptureInFlight) {
+    diagAlert("2 in_flight", "이미 캡처가 진행 중입니다 (nativeCaptureInFlight = true)");
     logCapture("native result fail", { code: "E_CAPTURE_FAILED", reason: "in_flight" });
     throw makeCodedError(APP_CAPTURE_FAIL_MSG, "E_CAPTURE_FAILED");
   }
 
-  // ── 카드 article 요소 찾기 ────────────────────────────────
+  // ── 체크포인트 3: 카드 article 요소 탐색 ────────────────────
   const articleEl = previewCaptureRoot.querySelector(
     '[data-tournament-card-capture-root="1"]',
   ) as HTMLElement | null;
+
+  diagAlert(
+    "3 DOM 탐색",
+    `previewCaptureRoot tagName: ${previewCaptureRoot.tagName}\npreviewCaptureRoot id: ${previewCaptureRoot.id || "(없음)"}\narticleEl 발견: ${articleEl instanceof HTMLElement}\narticleEl: ${articleEl ? articleEl.outerHTML.slice(0, 120) : "null"}`,
+  );
+
   if (!(articleEl instanceof HTMLElement)) {
     const msg = "게시카드 미리보기에서 카드 요소를 찾을 수 없습니다.";
     console.error("[card-publish-capture]", msg);
     throw makeCodedError(msg, "E_CAPTURE_FAILED");
   }
 
-  // ── 레이아웃·폰트 확정 대기 ──────────────────────────────
+  // ── 체크포인트 4: 레이아웃 대기 후 rect 측정 ─────────────────
   if (typeof document.fonts?.ready?.then === "function") {
     await document.fonts.ready;
   }
@@ -103,8 +129,12 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
   await doubleRaf();
   throwIfAborted(signal);
 
-  // ── rect 측정 ─────────────────────────────────────────────
   const rect = articleEl.getBoundingClientRect();
+  diagAlert(
+    "4 getBoundingClientRect",
+    `left: ${rect.left}\ntop: ${rect.top}\nwidth: ${rect.width}\nheight: ${rect.height}\nwindow.innerWidth: ${window.innerWidth}\nwindow.innerHeight: ${window.innerHeight}\ndevicePixelRatio: ${window.devicePixelRatio}`,
+  );
+
   if (
     !Number.isFinite(rect.left) ||
     !Number.isFinite(rect.top) ||
@@ -119,6 +149,12 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
     });
     throw makeCodedError(APP_CAPTURE_FAIL_MSG, "E_INVALID_RECT");
   }
+
+  // ── 체크포인트 5: bridge 호출 직전 ──────────────────────────
+  diagAlert(
+    "5 bridge 호출 직전",
+    `이 팝업 이후 Android captureCardRegion 호출됩니다.\nrequestId는 Android Logcat에 출력됩니다.\ntargetWidth: ${NATIVE_CAPTURE_TARGET_WIDTH}`,
+  );
 
   // ── Native capture (Android bridge) ──────────────────────
   nativeCaptureInFlight = true;
@@ -157,23 +193,21 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e));
     const code = (err as Error & { code?: string }).code ?? "E_CAPTURE_FAILED";
-    // 안드로이드가 보내온 실제 예외 클래스명·메시지를 그대로 보존
     const nativeDetail = err.message || "";
     logCapture("native result fail", { code, nativeDetail });
 
-    // AbortError·앱전용 에러는 원본 그대로 전파
     if (err.name === "AbortError" || code === APP_ONLY_ERROR_CODE) throw e;
 
-    // ── 디버깅: 화면에 실제 에러 원인 직접 표시 (원인 파악 후 제거 가능) ──
-    if (typeof window !== "undefined" && nativeDetail) {
-      const diagLabel =
-        code === "E_DIAG_BRIDGE_OK"
-          ? "✅ 브리지 연결 확인"
-          : `❌ 캡처 실패 [${code}]`;
-      window.alert(`[card-publish 디버그]\n${diagLabel}\n\n${nativeDetail}`);
-    }
+    // ── 체크포인트 6: 네이티브 응답 실패 ─────────────────────
+    const diagLabel =
+      code === "E_DIAG_BRIDGE_OK"
+        ? "✅ 브리지 연결 확인 (DIAG_BRIDGE_ECHO_TEST=true 상태)"
+        : `❌ 캡처 실패 [${code}]`;
+    diagAlert(
+      `6 네이티브 응답 실패`,
+      `${diagLabel}\n\n${nativeDetail || err.name + ": " + err.message}`,
+    );
 
-    // 네이티브 실제 메시지를 포함해서 던진다
     const fullMsg = nativeDetail
       ? `${APP_CAPTURE_FAIL_MSG}\n상세: ${nativeDetail}`
       : APP_CAPTURE_FAIL_MSG;

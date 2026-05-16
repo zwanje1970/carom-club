@@ -157,6 +157,12 @@ export async function publishTournamentCardFromEditorClient(args: {
     } catch (captureErr) {
       console.error("[publishTournamentCardFromEditorClient] capture failed", captureErr);
       const code = captureErr instanceof Error ? (captureErr as Error & { code?: string }).code : undefined;
+      const errName = captureErr instanceof Error ? captureErr.name : String(typeof captureErr);
+      const errMsg = captureErr instanceof Error ? captureErr.message : String(captureErr);
+      // 디버깅: catch에 걸린 실제 JS 에러를 화면에 표시
+      window.alert(
+        `[JS 내부 에러 — captureErr catch]\n${errName}: ${errMsg}\n\ncode: ${code ?? "(없음)"}`,
+      );
       if (code === APP_ONLY_ERROR_CODE) {
         return { ok: false, error: APP_ONLY_KO };
       }
@@ -171,6 +177,11 @@ export async function publishTournamentCardFromEditorClient(args: {
       return { ok: false, error: NATIVE_CAPTURE_FAIL_KO };
     }
   } catch (e) {
+    const outerErrName = e instanceof Error ? e.name : String(typeof e);
+    const outerErrMsg = e instanceof Error ? e.message : String(e);
+    window.alert(
+      `[JS 내부 에러 — 외부 catch]\n${outerErrName}: ${outerErrMsg}`,
+    );
     return {
       ok: false,
       error: e instanceof DOMException && e.name === "AbortError" ? NATIVE_CAPTURE_FAIL_KO : SERVER_CARD_IMAGE_FAIL_KO,
