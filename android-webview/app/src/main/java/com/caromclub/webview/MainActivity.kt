@@ -542,12 +542,7 @@ class CaromAppBridge(
     companion object {
         private const val CARD_CAPTURE_LOG_TAG = "card-publish-capture"
 
-        /**
-         * [진단 전용] true 이면 실제 비트맵 작업 없이 즉시 E_DIAG_BRIDGE_OK 응답을 반환.
-         * 이 상태에서 JS 팝업이 뜨면 JavascriptInterface 등록 ✅, 안 뜨면 브리지 연결 자체 파손.
-         * 원인 확인 후 반드시 false 로 되돌릴 것.
-         */
-        private const val DIAG_BRIDGE_ECHO_TEST = true
+        private const val DIAG_BRIDGE_ECHO_TEST = false
     }
     @Volatile
     private var captureInProgress: Boolean = false
