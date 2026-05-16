@@ -388,11 +388,11 @@ export default function ClientDashboardHomeClient({
           className="v3-h2"
           style={{ margin: 0, fontSize: "calc(1rem - 2px)", whiteSpace: "nowrap" }}
         >
-          내 대회 관리
+          대회 관리
         </h2>
         <p className="v3-muted" style={{ margin: 0, fontSize: "0.88rem", lineHeight: 1.5 }}>
           {isReady
-            ? "대회목록에서 선택 후 대회를 관리 할 수 있습니다"
+            ? "운영 중인 대회를 선택하여 관리합니다"
             : "요약을 불러오는 동안에도 아래에서 대회 목록으로 이동할 수 있습니다."}
         </p>
         <Link
@@ -400,7 +400,7 @@ export default function ClientDashboardHomeClient({
           prefetch={false}
           className="client-dashboard-main__tournamentSeeAll client-dashboard-main__tournamentSeeAll--primary"
         >
-          내 대회 목록 보기
+          운영 대회 목록
         </Link>
       </section>
 

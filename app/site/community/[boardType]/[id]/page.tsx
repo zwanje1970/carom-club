@@ -7,8 +7,12 @@ import type { SiteCommunityBoardKey } from "../../../../../lib/types/entities";
 import SiteHeaderListBackLink from "../../../components/SiteHeaderListBackLink";
 import SiteShellFrame from "../../../components/SiteShellFrame";
 import { communityBoardListHref, communityBoardMobileHeaderTitle } from "../../community-tab-config";
-import SiteDetailShellBodyLoader from "../../../components/SiteDetailShellBodyLoader";
 import SiteCommunityPostDetailPageContent from "./SiteCommunityPostDetailPageContent";
+import {
+  CommunityDetailSuspenseFallback,
+  CommunityLoadDiagConfigComplete,
+  CommunityLoadDiagEnter,
+} from "./community-load-diag-client";
 
 type Props = {
   params: Promise<{ boardType: string; id: string }>;
@@ -21,11 +25,13 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
   if (!boardType || !postId) notFound();
 
   let config;
+  const pageConfigFetchStartMs = Date.now();
   try {
     config = await getSiteCommunityConfig();
   } catch {
     config = getDefaultSiteCommunityConfigForPublicSite();
   }
+  const pageConfigFetchDurationMs = Date.now() - pageConfigFetchStartMs;
   const headerTitle = communityBoardMobileHeaderTitle(boardType, config);
 
   return (
@@ -38,7 +44,11 @@ export default async function SiteCommunityPostDetailPage({ params }: Props) {
       }
     >
       <section className="site-site-gray-main v3-stack ui-community-post-detail-page">
-        <Suspense fallback={<SiteDetailShellBodyLoader />}>
+        <CommunityLoadDiagEnter postId={postId} />
+        <CommunityLoadDiagConfigComplete durationMs={pageConfigFetchDurationMs} />
+        <Suspense
+          fallback={<CommunityDetailSuspenseFallback fetchStarts={["config", "post"]} />}
+        >
           <SiteCommunityPostDetailPageContent boardType={boardType as SiteCommunityBoardKey} postId={postId} />
         </Suspense>
       </section>

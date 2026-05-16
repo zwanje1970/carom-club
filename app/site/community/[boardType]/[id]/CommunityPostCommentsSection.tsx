@@ -2,6 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  isCommunityLoadDiagEnabled,
+  logCommunityLoadDiagFetchComplete,
+  logCommunityLoadDiagFetchStart,
+  markCommunityLoadDiagCommentsReady,
+} from "../../../../../lib/site/community-load-diag";
 
 const COMMUNITY_COMMENT_MAX_LENGTH = 500;
 
@@ -49,21 +55,40 @@ export default function CommunityPostCommentsSection({ boardType, postId, isLogg
   const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const load = useCallback(async () => {
+    const diagEnabled = isCommunityLoadDiagEnabled();
+    const fetchStartMs = diagEnabled ? performance.now() : 0;
+    if (diagEnabled) logCommunityLoadDiagFetchStart("comments");
     const q = encodeURIComponent(postId);
     const response = await fetch(`/api/site/community/comments?postId=${q}`);
     if (!response.ok) {
       setItems([]);
+      if (diagEnabled) {
+        logCommunityLoadDiagFetchComplete("comments", {
+          durationMs: performance.now() - fetchStartMs,
+          commentCount: 0,
+        });
+      }
       return;
     }
     const data = (await response.json()) as { items?: CommentItem[] };
-    setItems(Array.isArray(data.items) ? data.items : []);
+    const nextItems = Array.isArray(data.items) ? data.items : [];
+    setItems(nextItems);
+    if (diagEnabled) {
+      logCommunityLoadDiagFetchComplete("comments", {
+        durationMs: performance.now() - fetchStartMs,
+        commentCount: nextItems.length,
+      });
+    }
   }, [postId]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     load().finally(() => {
-      if (!cancelled) setLoading(false);
+      if (!cancelled) {
+        setLoading(false);
+        markCommunityLoadDiagCommentsReady();
+      }
     });
     return () => {
       cancelled = true;

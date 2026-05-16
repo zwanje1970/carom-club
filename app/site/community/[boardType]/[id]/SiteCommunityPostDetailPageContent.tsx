@@ -17,10 +17,15 @@ import {
 import type { SiteCommunityBoardKey } from "../../../../../lib/types/entities";
 import { communityBoardListHref } from "../../community-tab-config";
 import CommunityListBackLink from "../../CommunityListBackLink";
-import SiteDetailShellBodyLoader from "../../../components/SiteDetailShellBodyLoader";
 import CommunityPostCommentsSection from "./CommunityPostCommentsSection";
 import CommunityPostDetailBody from "./CommunityPostDetailBody";
 import CommunityPostDetailActions from "./CommunityPostDetailActions";
+import {
+  CommunityDetailSuspenseFallback,
+  CommunityLoadDiagBodyReady,
+  CommunityLoadDiagConfigComplete,
+  CommunityLoadDiagPostComplete,
+} from "./community-load-diag-client";
 
 function formatDetailDateTime(iso: string): string {
   const d = new Date(iso);
@@ -85,7 +90,12 @@ async function CommunityPostDetailBodyAsync({ payload }: { payload: PostBodyPayl
     payload.imageUrls,
     payload.imageSizeLevels,
   );
-  return <CommunityPostDetailBody segments={segments} tailImages={tailImages} />;
+  return (
+    <>
+      <CommunityPostDetailBody segments={segments} tailImages={tailImages} />
+      <CommunityLoadDiagBodyReady />
+    </>
+  );
 }
 
 async function CommunityPostDetailActionsAsync({
@@ -130,11 +140,15 @@ async function CommunityPostCommentsAsync({
 }
 
 export default async function SiteCommunityPostDetailPageContent({ boardType, postId }: Props) {
+  const contentConfigFetchStartMs = Date.now();
   const config = await getSiteCommunityConfig();
+  const contentConfigFetchDurationMs = Date.now() - contentConfigFetchStartMs;
   const board = config[boardType];
   if (!board.visible) notFound();
 
+  const postFetchStartMs = Date.now();
   const post = await getCommunityPostDetailForPublicSitePage(postId, { expectedBoardType: boardType });
+  const postFetchDurationMs = Date.now() - postFetchStartMs;
   if (!post) notFound();
 
   after(() => {
@@ -150,6 +164,12 @@ export default async function SiteCommunityPostDetailPageContent({ boardType, po
 
   return (
     <>
+      <CommunityLoadDiagConfigComplete durationMs={contentConfigFetchDurationMs} />
+      <CommunityLoadDiagPostComplete
+        durationMs={postFetchDurationMs}
+        titleLength={post.title.length}
+        contentLength={post.content.length}
+      />
       <article className="ui-community-post-detail-article v3-stack">
         <div className="ui-community-post-detail-heading-row">
           <h1 className="ui-community-post-detail-title">{post.title}</h1>
@@ -168,11 +188,11 @@ export default async function SiteCommunityPostDetailPageContent({ boardType, po
             · {formatDetailDateTime(post.createdAt)} · 조회 {post.viewCount} · 댓글 {post.commentCount}
           </span>
         </p>
-        <Suspense fallback={<SiteDetailShellBodyLoader />}>
+        <Suspense fallback={<CommunityDetailSuspenseFallback />}>
           <CommunityPostDetailBodyAsync payload={postBodyPayload} />
         </Suspense>
       </article>
-      <Suspense fallback={<SiteDetailShellBodyLoader />}>
+      <Suspense fallback={<CommunityDetailSuspenseFallback />}>
         <CommunityPostCommentsAsync
           viewerContextPromise={viewerContextPromise}
           boardType={boardType}
