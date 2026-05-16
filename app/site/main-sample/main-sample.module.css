@@ -256,7 +256,7 @@
   /* 뷰포트 토큰과 동일한 바닥 — flex min-height:0 체인으로 면이 깎이지 않게 */
   min-height: var(--sample-main-card-height);
   border-radius: var(--site-main-scroll-card-face-border-radius, 12px);
-  box-shadow: none;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14);
   transform: none;
   overflow: hidden;
   background: transparent;
@@ -273,17 +273,17 @@
 
 .sampleMainCardSlot:active .sampleMainCardFace.sampleMainCardFaceTournamentDeck:not(.sampleMainCardFaceSelected) {
   transform: translateY(-6px) scale(1.03);
-  box-shadow: none;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
 }
 
 .sampleMainCardFace.sampleMainCardFaceTournamentDeck.sampleMainCardFaceSelected {
   transform: translateY(-14px) scale(1.06);
-  box-shadow: none;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
 }
 
 .sampleMainCardSlot:active .sampleMainCardFace.sampleMainCardFaceTournamentDeck.sampleMainCardFaceSelected {
   transform: translateY(-16px) scale(1.07);
-  box-shadow: none;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
 }
 
 .sampleMainCardSlot:focus-visible .sampleMainCardFace.sampleMainCardFaceTournamentDeck {

@@ -11,9 +11,7 @@
   border-radius: 12px;
   overflow: hidden;
   border: none;
-  box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.1),
-    0 4px 14px rgba(0, 0, 0, 0.06);
+  box-shadow: none;
 }
 
 .mainScrollDeckCardOuterFlex {
