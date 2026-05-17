@@ -939,10 +939,8 @@ export default function ClientTournamentCardPublishV2Page() {
         </div>
       </div>
 
-      <div className={editorStyles.pcPageShell}>
-        <div className={editorStyles.pcPageMain}>
-          <div className={`${editorStyles.pageWrap} ${editorStyles.pageWrapV2}`}>
-            <div className={editorStyles.formPanel}>
+      <div className={`${editorStyles.pageWrap} ${editorStyles.pageWrapV2}`}>
+        <div className={editorStyles.formPanel}>
               <div className={editorStyles.stepTabsWrap}>
                 <div className={editorStyles.stepTabs} role="tablist" aria-label="편집 단계">
                   <button
@@ -1116,17 +1114,14 @@ export default function ClientTournamentCardPublishV2Page() {
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {message && !publishFlow && !publishFlowError ? (
-            <p className="v3-muted" role="status" style={{ paddingLeft: "0.75rem", whiteSpace: "pre-line" }}>
-              {message}
-            </p>
-          ) : null}
         </div>
-        <aside className={editorStyles.pcPageAside} aria-hidden="true" />
       </div>
+
+      {message && !publishFlow && !publishFlowError ? (
+        <p className="v3-muted" role="status" style={{ paddingLeft: "0.75rem", whiteSpace: "pre-line" }}>
+          {message}
+        </p>
+      ) : null}
 
       {publishCompleteModalOpen ? (
         <div

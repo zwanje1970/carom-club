@@ -56,9 +56,12 @@
   box-shadow: inset 0 -2px 0 #3b82f6;
 }
 
-/** 게시카드 작성 v2 — 상단 미리보기 풀폭 블록(pageWrap·pcPageShell 밖) */
+/** 게시카드 작성 v2 — 상단 미리보기 풀폭 블록(main 직계, pageWrap과 형제) */
 .previewFullWidthBlock {
   width: 100%;
+  max-width: none;
+  min-width: 0;
+  align-self: stretch;
   box-sizing: border-box;
   padding: 0;
   margin: 0;
@@ -175,6 +178,7 @@
 .previewSlideLayer {
   box-sizing: border-box;
   width: 100%;
+  max-width: none;
   display: block;
   padding: 0;
   background-color: rgba(191, 219, 254, 0.5);
@@ -744,8 +748,17 @@
   display: none;
 }
 
-/* 미리보기 풀폭 — main 좌우 패딩은 pageWrap(편집툴)에만 적용 */
+/* 미리보기 풀폭 — main·셸 좌우 패딩 제거, 편집툴 inset은 pageWrap padding만 */
 :global(main[data-card-publish-v2="1"]).v3-page {
+  padding-left: 0;
+  padding-right: 0;
+  width: 100%;
+  max-width: none;
+  align-items: stretch;
+}
+
+:global(.app-dashboard-mobile-root:has(main[data-card-publish-v2="1"]))
+  > .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
   padding-left: 0;
   padding-right: 0;
 }
@@ -785,40 +798,21 @@
     margin: 0 !important;
   }
 
-  :global(main[data-card-publish-v2="1"]) .pcPageShell {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
   :global(main[data-card-publish-v2="1"]) .previewFullWidthBlock {
     flex-shrink: 0;
     border-bottom: 1px solid #e4e4e7;
-  }
-
-  :global(main[data-card-publish-v2="1"]) .pcPageMain {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  :global(main[data-card-publish-v2="1"]) .pageWrapV2 {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
   }
 
   :global(main[data-card-publish-v2="1"]) .surfaceTemplateRow {
     margin-bottom: 8px;
   }
 
-  .pageWrap.pageWrapV2 {
+  :global(main[data-card-publish-v2="1"]) .pageWrap.pageWrapV2 {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     padding-left: max(0.35rem, env(safe-area-inset-left, 0px));
     padding-right: max(0.35rem, env(safe-area-inset-right, 0px));
   }
