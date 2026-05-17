@@ -144,12 +144,15 @@ export default function ParticipantListRow({
     !approveDone &&
     !processingCancelled;
 
-  async function patchProcessing(patch: {
-    depositConfirmed?: boolean;
-    applicationApproved?: boolean;
-    applicationCancelled?: boolean;
-  }): Promise<boolean> {
-    if (loading) return false;
+  async function patchProcessing(
+    patch: {
+      depositConfirmed?: boolean;
+      applicationApproved?: boolean;
+      applicationCancelled?: boolean;
+    },
+    options?: { fromConfirmModal?: boolean },
+  ): Promise<boolean> {
+    if (loading && !options?.fromConfirmModal) return false;
     setLoading(true);
     try {
       const response = await fetch(
@@ -370,13 +373,13 @@ export default function ParticipantListRow({
     try {
       let ok = false;
       if (confirmKind === "deposit-unconfirm") {
-        ok = await patchProcessing({ depositConfirmed: false });
+        ok = await patchProcessing({ depositConfirmed: false }, { fromConfirmModal: true });
       } else if (confirmKind === "approval-unconfirm") {
-        ok = await patchProcessing({ applicationApproved: false });
+        ok = await patchProcessing({ applicationApproved: false }, { fromConfirmModal: true });
       } else if (confirmKind === "cancel-on") {
-        ok = await patchProcessing({ applicationCancelled: true });
+        ok = await patchProcessing({ applicationCancelled: true }, { fromConfirmModal: true });
       } else if (confirmKind === "cancel-off") {
-        ok = await patchProcessing({ applicationCancelled: false });
+        ok = await patchProcessing({ applicationCancelled: false }, { fromConfirmModal: true });
       }
       if (ok) setConfirmKind(null);
     } finally {

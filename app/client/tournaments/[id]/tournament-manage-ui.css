@@ -1440,7 +1440,7 @@
   opacity: 0.72;
 }
 
-.client-tournament-manage .participant-processing-confirm-backdrop {
+.client-tournament-manage.participant-processing-confirm-backdrop {
   position: fixed;
   inset: 0;
   z-index: 260;
