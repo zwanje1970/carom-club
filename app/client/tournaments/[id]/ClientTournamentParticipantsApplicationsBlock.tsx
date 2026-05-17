@@ -150,6 +150,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   const router = useRouter();
   const metricColumnTitle = participantMetricColumnTitle(entryQualificationType);
   const [entries, setEntries] = useState<TournamentApplicationListItem[]>(initialEntries);
+  const deletedEntryIdsRef = useRef<Set<string>>(new Set());
   const [finalizeBusy, setFinalizeBusy] = useState(false);
   const [finalizeUnapprovedModalCount, setFinalizeUnapprovedModalCount] = useState<number | null>(null);
   const [bulkApproveBusy, setBulkApproveBusy] = useState(false);
@@ -158,8 +159,13 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   const [moreLoading, setMoreLoading] = useState(() => participantCountSummary.total > initialEntries.length);
   const fullFetchDoneRef = useRef(false);
 
+  function excludeDeletedEntries(list: TournamentApplicationListItem[]): TournamentApplicationListItem[] {
+    if (deletedEntryIdsRef.current.size === 0) return list;
+    return list.filter((e) => !deletedEntryIdsRef.current.has(e.id));
+  }
+
   useEffect(() => {
-    setEntries((prev) => mergeByEntryId(initialEntries, prev));
+    setEntries((prev) => excludeDeletedEntries(mergeByEntryId(initialEntries, prev)));
   }, [initialEntries]);
 
   useEffect(() => {
@@ -187,7 +193,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
           return;
         }
         if (cancelled) return;
-        setEntries((prev) => mergeByEntryId(json.entries, prev));
+        setEntries((prev) => excludeDeletedEntries(mergeByEntryId(json.entries, prev)));
         fullFetchDoneRef.current = true;
       } catch {
         /* ignore */
@@ -254,11 +260,12 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   const chipApproved = countApplicationApprovedChip(entries);
   const chipCancelled = countApplicationCancelledChip(entries);
   const printHref = `/client/tournaments/${encodeURIComponent(tournamentId)}/participants/print`;
+  const participantsPortraitHref = `/client/tournaments/${encodeURIComponent(tournamentId)}/participants`;
   const tableViewHref = `/client/tournaments/${encodeURIComponent(tournamentId)}/participants/table-view`;
   const showFinalize = !CLOSED_BADGES.includes(tournamentStatusBadge);
   const showCancelFinalize = tournamentStatusBadge === "마감";
   const fullscreenTable = variant === "fullscreenTable";
-  const chipTotal = fullscreenTable ? entries.length : participantCountSummary.total;
+  const chipTotal = entries.length;
   const [tableLandscapePhase, setTableLandscapePhase] = useState<ApplicationsTableLandscapePhase>(() =>
     fullscreenTable ? "pending" : "ready",
   );
@@ -268,6 +275,10 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   const approvalCapacityFull =
     Number.isFinite(maxP) && maxP > 0 && capacityOccupied >= maxP;
   const waitingListTotal = participantCountSummary.waitingList ?? 0;
+
+  function exitFullscreenTableView() {
+    router.replace(participantsPortraitHref);
+  }
 
   function requestBulkDepositApprove() {
     if (bulkApproveBusy) return;
@@ -442,18 +453,27 @@ export default function ClientTournamentParticipantsApplicationsBlock({
       }
     >
       {fullscreenTable ? <ApplicationsTableOrientationLock onPhaseChange={setTableLandscapePhase} /> : null}
+      {fullscreenTable && tableLandscapePhase === "ready" ? (
+        <button
+          type="button"
+          className="client-tournament-manage__fullscreenTableLandscapeClose"
+          aria-label="세로보기로 돌아가기"
+          onClick={() => exitFullscreenTableView()}
+        >
+          ←
+        </button>
+      ) : null}
       <div className="client-tournament-manage__applicationsHeaderZone">
         {fullscreenTable ? (
           <div className="client-tournament-manage__fullscreenTableHead">
-            <Link
-              prefetch={false}
-              replace
-              href={`/client/tournaments/${encodeURIComponent(tournamentId)}/participants`}
+            <button
+              type="button"
               className="client-tournament-manage__fullscreenTableClose"
-              style={{ ...opsBtn, flex: "0 0 auto", textDecoration: "none", fontWeight: 500 }}
+              style={{ ...opsBtn, flex: "0 0 auto", fontWeight: 500 }}
+              onClick={() => exitFullscreenTableView()}
             >
               ← 닫기
-            </Link>
+            </button>
             <p className="client-tournament-manage__fullscreenTableTitle">{titleLine}</p>
           </div>
         ) : (
@@ -462,7 +482,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
               <p className="client-tournament-manage__applicationsTitle client-tournament-manage__applicationsTitle--inline">
                 {titleLine}
               </p>
-              <Link prefetch={false} replace href={tableViewHref} className="client-tournament-manage__applicationsTableViewLink">
+              <Link prefetch={false} href={tableViewHref} className="client-tournament-manage__applicationsTableViewLink">
                 가로보기
               </Link>
             </div>
@@ -759,7 +779,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
         ) : null}
         {zoneFilteredEntries.length === 0 ? (
           <p className="v3-muted" style={{ margin: 0, padding: "0.65rem 0.75rem" }}>
-            {participantCountSummary.total === 0
+            {entries.length === 0
               ? "저장된 참가신청이 없습니다."
               : sortedEntries.length === 0
                 ? "표시할 신청이 없습니다."
@@ -901,8 +921,9 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                         prev.map((e) => (e.id === entry.id ? { ...e, ...patch } : e)),
                       );
                     }}
-                    onDeleted={() => {
-                      setEntries((prev) => prev.filter((e) => e.id !== entry.id));
+                    onDeleted={(deletedEntryId) => {
+                      deletedEntryIdsRef.current.add(deletedEntryId);
+                      setEntries((prev) => prev.filter((e) => e.id !== deletedEntryId));
                     }}
                   />
                 ))}

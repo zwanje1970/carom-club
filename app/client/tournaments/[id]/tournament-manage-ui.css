@@ -1588,6 +1588,10 @@ main[data-client-applications-table-fullscreen="1"].client-tournament-manage--pa
   padding-top: max(0.35rem, env(safe-area-inset-top, 0px));
 }
 
+.client-tournament-manage .client-tournament-manage__fullscreenTableLandscapeClose {
+  display: none;
+}
+
 .client-tournament-manage .client-tournament-manage__fullscreenTableBulkRow {
   display: flex;
   flex-wrap: wrap;
@@ -2106,6 +2110,30 @@ main[data-client-applications-table-fullscreen="1"].client-tournament-manage
 
   main[data-client-applications-table-fullscreen="1"] .client-tournament-manage__applicationsHeaderZone {
     display: none !important;
+  }
+
+  main[data-client-applications-table-fullscreen="1"] .client-tournament-manage__fullscreenTableLandscapeClose {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: max(0.35rem, env(safe-area-inset-top, 0px));
+    left: max(0.35rem, env(safe-area-inset-left, 0px));
+    z-index: 30;
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0.2rem 0.45rem;
+    border-radius: 0.35rem;
+    border: 1px solid #cbd5e1;
+    background: rgba(255, 255, 255, 0.94);
+    color: #334155;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    touch-action: manipulation;
+    font-family: inherit;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
   }
 
   /* 가로보기: 컬럼 제목 행만 연한 배경(데이터 행과 구분, 높이는 기존 패딩 유지) */

@@ -85,7 +85,7 @@ export default function ParticipantListRow({
     clientApplicationApprovedAt?: string | null;
     clientApplicationCancelledAt?: string | null;
   }) => void;
-  onDeleted?: () => void;
+  onDeleted?: (entryId: string) => void;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<TournamentApplicationStatus>(initialStatus);
@@ -358,8 +358,7 @@ export default function ParticipantListRow({
           return;
         }
         setConfirmKind(null);
-        onDeleted?.();
-        router.refresh();
+        onDeleted?.(entryId);
       } catch {
         window.alert("삭제 중 오류가 발생했습니다.");
       } finally {
