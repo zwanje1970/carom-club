@@ -915,20 +915,20 @@ export default function ClientTournamentCardPublishV2Page() {
       />
       <div className={editorStyles.pcPageShell}>
         <div className={editorStyles.pcPageMain}>
-          <div className={`${editorStyles.pageWrap} ${editorStyles.pageWrapV2}`}>
-        <div className={editorStyles.previewSticky}>
-          <div className={editorStyles.previewInner}>
-            <div className={editorStyles.previewSlideLayer}>
-              <div className={editorStyles.previewCardScaleHost}>
-                <div
-                  className={`${editorStyles.previewCardAspectFace} ${editorStyles.previewCardAspectFaceScaledPreview}`}
-                >
-                  <div className={editorStyles.previewCardScaleClip}>
-                    <div className={editorStyles.previewCardScaleInner} data-card-publish-scale-inner="1">
-                      <div
-                        className={`${editorStyles.previewCardWrap} ${editorStyles.previewCardWrapV2Chrome}`}
-                      >
-                        <CardPublishPreview ref={cardPublishPreviewCaptureRef} model={previewModel} />
+          <div className={editorStyles.previewSection}>
+            <div className={editorStyles.previewInner}>
+              <div className={editorStyles.previewSlideLayer}>
+                <div className={editorStyles.previewCardScaleHost}>
+                  <div
+                    className={`${editorStyles.previewCardAspectFace} ${editorStyles.previewCardAspectFaceScaledPreview}`}
+                  >
+                    <div className={editorStyles.previewCardScaleClip}>
+                      <div className={editorStyles.previewCardScaleInner} data-card-publish-scale-inner="1">
+                        <div
+                          className={`${editorStyles.previewCardWrap} ${editorStyles.previewCardWrapV2Chrome}`}
+                        >
+                          <CardPublishPreview ref={cardPublishPreviewCaptureRef} model={previewModel} />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -936,183 +936,183 @@ export default function ClientTournamentCardPublishV2Page() {
               </div>
             </div>
           </div>
-        </div>
 
-        <div className={editorStyles.formPanel}>
-          <div className={editorStyles.stepTabsWrap}>
-            <div className={editorStyles.stepTabs} role="tablist" aria-label="편집 단계">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={editorTab === "background"}
-                className={`${editorStyles.stepTab} ${editorTab === "background" ? editorStyles.stepTabActive : ""}`}
-              disabled={editorLocked}
-                onClick={() => setEditorTab("background")}
-              >
-                배경설정
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={editorTab === "content"}
-                className={`${editorStyles.stepTab} ${editorTab === "content" ? editorStyles.stepTabActive : ""}`}
-              disabled={editorLocked}
-                onClick={() => setEditorTab("content")}
-              >
-                내용입력
-              </button>
-            </div>
-          </div>
-
-          <div className={`${editorStyles.formScrollPane} client-dashboard-scroll-safe-area`}>
-          <div className={editorStyles.stepScrollBody}>
-          {editorTab === "content" ? (
-            <CardPublishContentTab
-              leadTextColor={leadTextColor}
-              setLeadTextColor={setLeadTextColor}
-              titleTextColor={titleTextColor}
-              setTitleTextColor={setTitleTextColor}
-              descriptionTextColor={descriptionTextColor}
-              setDescriptionTextColor={setDescriptionTextColor}
-              footerDateTextColor={footerDateTextColor}
-              setFooterDateTextColor={setFooterDateTextColor}
-              footerPlaceTextColor={footerPlaceTextColor}
-              setFooterPlaceTextColor={setFooterPlaceTextColor}
-              textLine1={textLine1}
-              setTextLine1={setTextLine1}
-              title={title}
-              setTitle={setTitle}
-              textLine2={textLine2}
-              setTextLine2={handleTextLine2Change}
-              cardDate={cardDate}
-              setCardDate={setCardDate}
-              cardPlace={cardPlace}
-              setCardPlace={setCardPlace}
-              cardTitleEffect={cardTitleEffect}
-              setCardTitleEffect={setCardTitleEffect}
-              cardTitleOutlineColor={cardTitleOutlineColor}
-              setCardTitleOutlineColor={setCardTitleOutlineColor}
-              disabled={editorLocked}
-            />
-          ) : (
-            <CardPublishBackgroundTab
-              mediaBackground={mediaBackground}
-              onPickPaletteColor={onPickPaletteColor}
-              bgFileInputRef={bgFileInputRef}
-              onBackgroundFileChange={onBackgroundFileChange}
-              onClearBackgroundFileSelection={clearBackgroundFileSelection}
-              uploadedImage={uploadedImage}
-              imageOverlayOpacity={imageOverlayOpacity}
-              onImageOverlayChange={onImageOverlayChange}
-              bottomBarColor={bottomBarColor}
-              onPickBottomBarColor={setBottomBarColor}
-              bottomBarOpacity={bottomBarOpacity}
-              onBottomBarOpacityChange={onBottomBarOpacityChange}
-              gradientPreset={gradientPreset}
-              onGradientPresetChange={setGradientPreset}
-              gradientOpacity={gradientOpacity}
-              onGradientOpacityChange={onGradientOpacityChange}
-              disabled={editorLocked}
-            />
-          )}
-
-          <div className={editorStyles.actions}>
-            <div className="v3-stack" style={{ gap: "0.35rem", alignItems: "stretch" }}>
-              <p style={{ margin: 0, fontSize: "0.82rem", fontWeight: 800, color: "#334155" }}>게시 상태</p>
-              <div
-                className="v3-row"
-                role="radiogroup"
-                aria-label="게시 상태"
-                style={{ flexWrap: "wrap", gap: "0.65rem", alignItems: "center" }}
-              >
-                <label
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "0.35rem",
-                    fontSize: "0.9rem",
-                    cursor: publishBusy ? "default" : "pointer",
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="publish-intent"
-                    checked={publishIntent === "recruiting"}
-                    disabled={publishBusy}
-                    onChange={() => setPublishIntent("recruiting")}
-                  />
-                  모집중
-                </label>
-                <label
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "0.35rem",
-                    fontSize: "0.9rem",
-                    cursor: publishBusy ? "default" : "pointer",
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="publish-intent"
-                    checked={publishIntent === "draft"}
-                    disabled={publishBusy}
-                    onChange={() => setPublishIntent("draft")}
-                  />
-                  임시저장
-                </label>
-              </div>
-              <div
-                role="status"
-                aria-live="polite"
-                aria-busy={Boolean(publishBusy && publishIntent === "recruiting" && !publishFlowError && publishFlow)}
-                className={`${editorStyles.publishStatusSlot} ${publishFlow || publishFlowError ? editorStyles.publishStatusSlotActive : ""} ${publishFlowError ? editorStyles.publishStatusSlotError : ""}`}
-              >
-                <div className={editorStyles.publishStatusTextRow}>
-                  {!publishFlow && !publishFlowError ? (
-                    <p className={editorStyles.publishStatusHelper}>
-                      모집중으로 게시하면 메인에 홍보됩니다. 임시저장은 공개 카드를 바꾸지 않습니다.
-                    </p>
-                  ) : publishFlow ? (
-                    <>
-                      <span className={editorStyles.publishStatusLabel}>{publishFlow.label}</span>
-                      <span className={editorStyles.publishStatusPercent}>{publishFlow.percent}%</span>
-                    </>
-                  ) : null}
+          <div className={`${editorStyles.pageWrap} ${editorStyles.pageWrapV2}`}>
+            <div className={editorStyles.formPanel}>
+              <div className={editorStyles.stepTabsWrap}>
+                <div className={editorStyles.stepTabs} role="tablist" aria-label="편집 단계">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={editorTab === "background"}
+                    className={`${editorStyles.stepTab} ${editorTab === "background" ? editorStyles.stepTabActive : ""}`}
+                    disabled={editorLocked}
+                    onClick={() => setEditorTab("background")}
+                  >
+                    배경설정
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={editorTab === "content"}
+                    className={`${editorStyles.stepTab} ${editorTab === "content" ? editorStyles.stepTabActive : ""}`}
+                    disabled={editorLocked}
+                    onClick={() => setEditorTab("content")}
+                  >
+                    내용입력
+                  </button>
                 </div>
-                {publishFlow?.hint ? (
-                  <p className={editorStyles.publishStatusHint}>{publishFlow.hint}</p>
-                ) : null}
-                <div
-                  className={`${editorStyles.publishStatusBarTrack} ${!publishFlow && !publishFlowError ? editorStyles.publishStatusBarTrackIdle : ""} ${publishFlowError ? editorStyles.publishStatusBarTrackError : ""}`}
-                  aria-hidden={!publishFlow && !publishFlowError}
-                >
-                  {publishFlow ? (
-                    <div
-                      className={`${editorStyles.publishStatusBarFill} ${publishFlowError ? editorStyles.publishStatusBarFillError : ""}`}
-                      style={{ width: `${publishFlow.percent}%` }}
+              </div>
+
+              <div className={`${editorStyles.formScrollPane} client-dashboard-scroll-safe-area`}>
+                <div className={editorStyles.stepScrollBody}>
+                  {editorTab === "content" ? (
+                    <CardPublishContentTab
+                      leadTextColor={leadTextColor}
+                      setLeadTextColor={setLeadTextColor}
+                      titleTextColor={titleTextColor}
+                      setTitleTextColor={setTitleTextColor}
+                      descriptionTextColor={descriptionTextColor}
+                      setDescriptionTextColor={setDescriptionTextColor}
+                      footerDateTextColor={footerDateTextColor}
+                      setFooterDateTextColor={setFooterDateTextColor}
+                      footerPlaceTextColor={footerPlaceTextColor}
+                      setFooterPlaceTextColor={setFooterPlaceTextColor}
+                      textLine1={textLine1}
+                      setTextLine1={setTextLine1}
+                      title={title}
+                      setTitle={setTitle}
+                      textLine2={textLine2}
+                      setTextLine2={handleTextLine2Change}
+                      cardDate={cardDate}
+                      setCardDate={setCardDate}
+                      cardPlace={cardPlace}
+                      setCardPlace={setCardPlace}
+                      cardTitleEffect={cardTitleEffect}
+                      setCardTitleEffect={setCardTitleEffect}
+                      cardTitleOutlineColor={cardTitleOutlineColor}
+                      setCardTitleOutlineColor={setCardTitleOutlineColor}
+                      disabled={editorLocked}
                     />
-                  ) : null}
+                  ) : (
+                    <CardPublishBackgroundTab
+                      mediaBackground={mediaBackground}
+                      onPickPaletteColor={onPickPaletteColor}
+                      bgFileInputRef={bgFileInputRef}
+                      onBackgroundFileChange={onBackgroundFileChange}
+                      onClearBackgroundFileSelection={clearBackgroundFileSelection}
+                      uploadedImage={uploadedImage}
+                      imageOverlayOpacity={imageOverlayOpacity}
+                      onImageOverlayChange={onImageOverlayChange}
+                      bottomBarColor={bottomBarColor}
+                      onPickBottomBarColor={setBottomBarColor}
+                      bottomBarOpacity={bottomBarOpacity}
+                      onBottomBarOpacityChange={onBottomBarOpacityChange}
+                      gradientPreset={gradientPreset}
+                      onGradientPresetChange={setGradientPreset}
+                      gradientOpacity={gradientOpacity}
+                      onGradientOpacityChange={onGradientOpacityChange}
+                      disabled={editorLocked}
+                    />
+                  )}
+
+                  <div className={editorStyles.actions}>
+                    <div className="v3-stack" style={{ gap: "0.35rem", alignItems: "stretch" }}>
+                      <p style={{ margin: 0, fontSize: "0.82rem", fontWeight: 800, color: "#334155" }}>게시 상태</p>
+                      <div
+                        className="v3-row"
+                        role="radiogroup"
+                        aria-label="게시 상태"
+                        style={{ flexWrap: "wrap", gap: "0.65rem", alignItems: "center" }}
+                      >
+                        <label
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.35rem",
+                            fontSize: "0.9rem",
+                            cursor: publishBusy ? "default" : "pointer",
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="publish-intent"
+                            checked={publishIntent === "recruiting"}
+                            disabled={publishBusy}
+                            onChange={() => setPublishIntent("recruiting")}
+                          />
+                          모집중
+                        </label>
+                        <label
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.35rem",
+                            fontSize: "0.9rem",
+                            cursor: publishBusy ? "default" : "pointer",
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="publish-intent"
+                            checked={publishIntent === "draft"}
+                            disabled={publishBusy}
+                            onChange={() => setPublishIntent("draft")}
+                          />
+                          임시저장
+                        </label>
+                      </div>
+                      <div
+                        role="status"
+                        aria-live="polite"
+                        aria-busy={Boolean(publishBusy && publishIntent === "recruiting" && !publishFlowError && publishFlow)}
+                        className={`${editorStyles.publishStatusSlot} ${publishFlow || publishFlowError ? editorStyles.publishStatusSlotActive : ""} ${publishFlowError ? editorStyles.publishStatusSlotError : ""}`}
+                      >
+                        <div className={editorStyles.publishStatusTextRow}>
+                          {!publishFlow && !publishFlowError ? (
+                            <p className={editorStyles.publishStatusHelper}>
+                              모집중으로 게시하면 메인에 홍보됩니다. 임시저장은 공개 카드를 바꾸지 않습니다.
+                            </p>
+                          ) : publishFlow ? (
+                            <>
+                              <span className={editorStyles.publishStatusLabel}>{publishFlow.label}</span>
+                              <span className={editorStyles.publishStatusPercent}>{publishFlow.percent}%</span>
+                            </>
+                          ) : null}
+                        </div>
+                        {publishFlow?.hint ? (
+                          <p className={editorStyles.publishStatusHint}>{publishFlow.hint}</p>
+                        ) : null}
+                        <div
+                          className={`${editorStyles.publishStatusBarTrack} ${!publishFlow && !publishFlowError ? editorStyles.publishStatusBarTrackIdle : ""} ${publishFlowError ? editorStyles.publishStatusBarTrackError : ""}`}
+                          aria-hidden={!publishFlow && !publishFlowError}
+                        >
+                          {publishFlow ? (
+                            <div
+                              className={`${editorStyles.publishStatusBarFill} ${publishFlowError ? editorStyles.publishStatusBarFillError : ""}`}
+                              style={{ width: `${publishFlow.percent}%` }}
+                            />
+                          ) : null}
+                        </div>
+                        <p
+                          className={`${editorStyles.publishStatusErrorLine} ${publishFlowError ? editorStyles.publishStatusErrorLineVisible : ""}`}
+                        >
+                          {publishFlowError || "\u00a0"}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="v3-btn"
+                        disabled={publishActionBlocked}
+                        onClick={() => void handlePublish()}
+                      >
+                        {publishButtonLabel}
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <p
-                  className={`${editorStyles.publishStatusErrorLine} ${publishFlowError ? editorStyles.publishStatusErrorLineVisible : ""}`}
-                >
-                  {publishFlowError || "\u00a0"}
-                </p>
               </div>
-              <button
-                type="button"
-                className="v3-btn"
-                disabled={publishActionBlocked}
-                onClick={() => void handlePublish()}
-              >
-                {publishButtonLabel}
-              </button>
             </div>
-          </div>
-          </div>
-          </div>
-        </div>
           </div>
 
           {message && !publishFlow && !publishFlowError ? (
