@@ -170,23 +170,32 @@
 }
 
 /**
- * 메인 세로 스크롤 카드 영역과 동일 — `.slideViewportSiteMain` 배경 + `.sampleMainCardSlot` margin(15px).
+ * 메인 `.slideViewportSiteMain` 과 동일 배경·가로 풀폭 무대(세로는 카드 1장 높이만).
  */
 .previewSlideLayer {
   box-sizing: border-box;
   width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 15px;
+  display: block;
+  padding: 0;
   background-color: rgba(191, 219, 254, 0.5);
+  overflow-x: hidden;
   --sample-main-scroll-card-width: min(100%, var(--slide-card-max-width, 440px));
   --sample-main-card-height: calc(var(--sample-main-scroll-card-width) * 180 / 440);
   --site-main-scroll-card-face-border-radius: 12px;
 }
 
+/** 메인 `.sampleMainCardSlot` 과 동일 margin(15px) — 카드 주변 여백 */
+.previewCardSlot {
+  box-sizing: border-box;
+  width: auto;
+  min-width: 0;
+  margin: 15px;
+  padding: 0;
+  flex-shrink: 0;
+}
+
 /**
- * /site 메인 `.sampleMainCardFaceTournamentDeck` 과 동일 비율(440:180)·둥근 모서리.
+ * /site 메인 `.sampleMainCardFaceTournamentDeck` 과 동일 비율(440:180)·둥근 모서리·그림자.
  */
 .previewCardAspectFace {
   box-sizing: border-box;
@@ -202,13 +211,42 @@
   flex-direction: column;
   align-items: stretch;
   overflow: hidden;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.22);
+  background: transparent;
 }
 
-/* 미리보기 면: 메인 덱과 동일 — aspect-ratio 박스를 채우며 rem 고정 높이 축소 없음 */
-.previewCardAspectFace :global(article[data-editor-card-preview="1"].cardRoot.cardRootSlideDeck) {
-  height: 100%;
+/* 미리보기 무대: editor rem 고정 높이·line-clamp 대신 메인 slideDeckAspectFill 채움 */
+.previewFullWidthBlock :global(article[data-editor-card-preview="1"].cardRoot.cardRootSlideDeck) {
+  height: auto;
   min-height: 100%;
   flex: 1 1 auto;
+  flex-shrink: 0;
+}
+
+.previewFullWidthBlock :global(article[data-editor-card-preview="1"] .classicTitle),
+.previewFullWidthBlock :global(article[data-editor-card-preview="1"] .frameTitle),
+.previewFullWidthBlock :global(article[data-editor-card-preview="1"] .classicLead),
+.previewFullWidthBlock :global(article[data-editor-card-preview="1"] .frameLead),
+.previewFullWidthBlock :global(article[data-editor-card-preview="1"] .classicDesc),
+.previewFullWidthBlock :global(article[data-editor-card-preview="1"] .frameDesc),
+.previewFullWidthBlock :global(article[data-editor-card-preview="1"] .classicDescSecondary),
+.previewFullWidthBlock :global(article[data-editor-card-preview="1"] .frameDescSecondary) {
+  display: block;
+  -webkit-box-orient: unset;
+  -webkit-line-clamp: unset;
+  overflow: hidden;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.previewCardAspectFace .cardPublishCaptureRootFlexFill {
+  flex: 1 1 auto;
+  min-height: 100%;
+  width: 100%;
+}
+
+.previewCardAspectFace .cardPublishCaptureRootFlexFill > :global(article) {
+  min-height: 100%;
 }
 
 .previewCardAspectFace > .previewCardWrap {
@@ -227,6 +265,13 @@
   flex-shrink: 0;
   min-height: 100%;
   border: none;
+  box-shadow: none;
+}
+
+.previewCardSlot .previewCardWrap {
+  max-width: none;
+  border: none;
+  box-shadow: none;
 }
 
 .previewCardWrap {
