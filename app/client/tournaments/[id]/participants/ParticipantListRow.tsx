@@ -1,9 +1,13 @@
 "use client";
 
+import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import ParticipantApplicationDetailModal from "./ParticipantApplicationDetailModal";
+import ParticipantProcessingConfirmModal, {
+  type ParticipantProcessingConfirmKind,
+} from "./ParticipantProcessingConfirmModal";
 
 type TournamentApplicationStatus =
   | "APPLIED"
@@ -46,10 +50,13 @@ export default function ParticipantListRow({
   statusChangedAt,
   initialClientDepositConfirmedAt,
   initialClientApplicationApprovedAt,
+  initialClientApplicationCancelledAt,
   attendanceChecked,
   rowLayout = "standard",
   opButtonPresentation = "icon",
   approvalCapacityFull = false,
+  onProcessingUpdated,
+  onDeleted,
 }: {
   tournamentId: string;
   entryId: string;
@@ -67,11 +74,18 @@ export default function ParticipantListRow({
   statusChangedAt?: string;
   initialClientDepositConfirmedAt?: string | null;
   initialClientApplicationApprovedAt?: string | null;
+  initialClientApplicationCancelledAt?: string | null;
   attendanceChecked?: boolean | null;
   rowLayout?: "standard" | "fullscreen";
   opButtonPresentation?: "icon" | "text";
   /** 모집인원 승인 정원 충족 — 신규 승인 불가 */
   approvalCapacityFull?: boolean;
+  onProcessingUpdated?: (patch: {
+    clientDepositConfirmedAt?: string | null;
+    clientApplicationApprovedAt?: string | null;
+    clientApplicationCancelledAt?: string | null;
+  }) => void;
+  onDeleted?: () => void;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<TournamentApplicationStatus>(initialStatus);
@@ -81,10 +95,16 @@ export default function ParticipantListRow({
   const [clientApplicationApprovedAt, setClientApplicationApprovedAt] = useState<string | null>(
     initialClientApplicationApprovedAt ?? null,
   );
+  const [clientApplicationCancelledAt, setClientApplicationCancelledAt] = useState<string | null>(
+    initialClientApplicationCancelledAt ?? null,
+  );
   const [loading, setLoading] = useState(false);
   const [depositConfirmSaving, setDepositConfirmSaving] = useState(false);
   const depositConfirmInflightRef = useRef<Promise<void> | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [confirmKind, setConfirmKind] = useState<ParticipantProcessingConfirmKind | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   useEffect(() => {
     setStatus(initialStatus);
@@ -98,9 +118,15 @@ export default function ParticipantListRow({
     setClientApplicationApprovedAt(initialClientApplicationApprovedAt ?? null);
   }, [initialClientApplicationApprovedAt]);
 
+  useEffect(() => {
+    setClientApplicationCancelledAt(initialClientApplicationCancelledAt ?? null);
+  }, [initialClientApplicationCancelledAt]);
+
   const terminalRejected = status === "REJECTED";
   const terminalApproved = status === "APPROVED";
   const terminalWaiting = status === "WAITING";
+  const processingCancelled =
+    typeof clientApplicationCancelledAt === "string" && clientApplicationCancelledAt.trim() !== "";
 
   const depositDone =
     terminalApproved ||
@@ -108,9 +134,22 @@ export default function ParticipantListRow({
   const approveDone =
     terminalApproved ||
     (typeof clientApplicationApprovedAt === "string" && clientApplicationApprovedAt.trim() !== "");
+  const showDeleteButton = rowLayout === "fullscreen";
+  const deleteAllowed =
+    showDeleteButton &&
+    !terminalRejected &&
+    !terminalApproved &&
+    !terminalWaiting &&
+    !depositDone &&
+    !approveDone &&
+    !processingCancelled;
 
-  async function patchProcessing(patch: { depositConfirmed?: boolean; applicationApproved?: boolean }) {
-    if (loading) return;
+  async function patchProcessing(patch: {
+    depositConfirmed?: boolean;
+    applicationApproved?: boolean;
+    applicationCancelled?: boolean;
+  }): Promise<boolean> {
+    if (loading) return false;
     setLoading(true);
     try {
       const response = await fetch(
@@ -128,11 +167,12 @@ export default function ParticipantListRow({
           status?: TournamentApplicationStatus;
           clientDepositConfirmedAt?: string | null;
           clientApplicationApprovedAt?: string | null;
+          clientApplicationCancelledAt?: string | null;
         };
       };
       if (!response.ok) {
         window.alert(result.error ?? "저장에 실패했습니다.");
-        return;
+        return false;
       }
       const app = result.application;
       if (app?.status) setStatus(app.status);
@@ -150,40 +190,37 @@ export default function ParticipantListRow({
             : null,
         );
       }
+      const nextDeposit =
+        app && "clientDepositConfirmedAt" in app
+          ? typeof app.clientDepositConfirmedAt === "string" && app.clientDepositConfirmedAt.trim()
+            ? app.clientDepositConfirmedAt.trim()
+            : null
+          : undefined;
+      const nextApprove =
+        app && "clientApplicationApprovedAt" in app
+          ? typeof app.clientApplicationApprovedAt === "string" && app.clientApplicationApprovedAt.trim()
+            ? app.clientApplicationApprovedAt.trim()
+            : null
+          : undefined;
+      const nextCancelled =
+        app && "clientApplicationCancelledAt" in app
+          ? typeof app.clientApplicationCancelledAt === "string" && app.clientApplicationCancelledAt.trim()
+            ? app.clientApplicationCancelledAt.trim()
+            : null
+          : undefined;
+      if (app && "clientApplicationCancelledAt" in app) {
+        setClientApplicationCancelledAt(nextCancelled ?? null);
+      }
+      onProcessingUpdated?.({
+        ...(nextDeposit !== undefined ? { clientDepositConfirmedAt: nextDeposit } : {}),
+        ...(nextApprove !== undefined ? { clientApplicationApprovedAt: nextApprove } : {}),
+        ...(nextCancelled !== undefined ? { clientApplicationCancelledAt: nextCancelled } : {}),
+      });
       router.refresh();
+      return true;
     } catch {
       window.alert("처리 중 오류가 발생했습니다.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleTransition(nextStatus: TournamentApplicationStatus, rejectReason?: string) {
-    if (loading) return;
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/client/tournaments/${tournamentId}/participants/${entryId}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nextStatus,
-          ...(nextStatus === "REJECTED" && rejectReason ? { rejectReason } : {}),
-        }),
-        credentials: "same-origin",
-      });
-      const result = (await response.json()) as {
-        error?: string;
-        application?: { status?: TournamentApplicationStatus };
-      };
-      if (!response.ok) {
-        window.alert(result.error ?? "상태 변경에 실패했습니다.");
-        return;
-      }
-      const updatedStatus = result.application?.status ?? nextStatus;
-      setStatus(updatedStatus);
-      router.refresh();
-    } catch {
-      window.alert("상태 변경 중 오류가 발생했습니다.");
+      return false;
     } finally {
       setLoading(false);
     }
@@ -256,17 +293,16 @@ export default function ParticipantListRow({
   }
 
   function onDepositClick() {
-    if (terminalRejected || terminalApproved || terminalWaiting) return;
+    if (terminalRejected || terminalApproved || terminalWaiting || processingCancelled) return;
     if (!depositDone) {
       runDepositConfirmOptimistic();
       return;
     }
-    if (!window.confirm("입금확인을 해제할까요? 신청 승인도 함께 해제됩니다.")) return;
-    void patchProcessing({ depositConfirmed: false });
+    setConfirmKind("deposit-unconfirm");
   }
 
   function onApproveClick() {
-    if (terminalRejected || terminalApproved || terminalWaiting) return;
+    if (terminalRejected || terminalApproved || terminalWaiting || processingCancelled) return;
     if (!depositDone) return;
     if (!approveDone) {
       if (approvalCapacityFull) {
@@ -286,16 +322,66 @@ export default function ParticipantListRow({
       })();
       return;
     }
-    if (!window.confirm("신청 승인을 해제할까요?")) return;
-    void patchProcessing({ applicationApproved: false });
+    setConfirmKind("approval-unconfirm");
   }
 
-  function onCancelRejectClick() {
-    if (terminalRejected || terminalApproved || loading) return;
-    const raw = window.prompt("운영자 거절 사유를 입력하세요. 비우면 신청자 취소로 기록합니다.") ?? null;
-    if (raw === null) return;
-    const rejectReason = raw.trim() === "" ? "[신청자 취소]" : raw.trim();
-    void handleTransition("REJECTED", rejectReason);
+  function onCancelClick() {
+    if (terminalRejected || terminalApproved || terminalWaiting || loading) return;
+    setConfirmKind(processingCancelled ? "cancel-off" : "cancel-on");
+  }
+
+  function onDeleteClick() {
+    if (!showDeleteButton || terminalRejected || terminalApproved || terminalWaiting || deleteBusy) return;
+    if (!deleteAllowed) {
+      window.alert("삭제하려면 먼저 입금확인, 승인, 취소를 모두 해제하세요.");
+      return;
+    }
+    setConfirmKind("delete");
+  }
+
+  async function handleConfirmModalAction() {
+    if (!confirmKind || confirmBusy || deleteBusy) return;
+    if (confirmKind === "delete") {
+      setConfirmBusy(true);
+      setDeleteBusy(true);
+      try {
+        const response = await fetch(
+          `/api/client/tournaments/${encodeURIComponent(tournamentId)}/participants/${encodeURIComponent(entryId)}`,
+          { method: "DELETE", credentials: "same-origin" },
+        );
+        const result = (await response.json()) as { error?: string };
+        if (!response.ok) {
+          window.alert(result.error ?? "삭제에 실패했습니다.");
+          return;
+        }
+        setConfirmKind(null);
+        onDeleted?.();
+        router.refresh();
+      } catch {
+        window.alert("삭제 중 오류가 발생했습니다.");
+      } finally {
+        setConfirmBusy(false);
+        setDeleteBusy(false);
+      }
+      return;
+    }
+
+    setConfirmBusy(true);
+    try {
+      let ok = false;
+      if (confirmKind === "deposit-unconfirm") {
+        ok = await patchProcessing({ depositConfirmed: false });
+      } else if (confirmKind === "approval-unconfirm") {
+        ok = await patchProcessing({ applicationApproved: false });
+      } else if (confirmKind === "cancel-on") {
+        ok = await patchProcessing({ applicationCancelled: true });
+      } else if (confirmKind === "cancel-off") {
+        ok = await patchProcessing({ applicationCancelled: false });
+      }
+      if (ok) setConfirmKind(null);
+    } finally {
+      setConfirmBusy(false);
+    }
   }
 
   const textOpBtnBase: CSSProperties = {
@@ -319,7 +405,7 @@ export default function ParticipantListRow({
   /** ₩ 입금확인 — 빨강 계열, 미완 ○ / 완료 ● */
   function renderWonBtn() {
     if (opButtonPresentation === "text") {
-      if (terminalWaiting || terminalRejected) {
+      if (terminalWaiting || terminalRejected || processingCancelled) {
         return (
           <button type="button" disabled className="participant-op-textBtn" style={{ ...textOpBtnBase, opacity: 0.55 }}>
             입금확인
@@ -380,6 +466,15 @@ export default function ParticipantListRow({
         </span>
       );
     }
+    if (processingCancelled) {
+      return (
+        <span className="participant-op-hit">
+          <button type="button" disabled className="participant-op-btn participant-op-btn--won participant-op-btn--won-muted" aria-label="입금확인(취소됨)">
+            ₩
+          </button>
+        </span>
+      );
+    }
     return (
       <span className="participant-op-hit">
         <button
@@ -398,7 +493,7 @@ export default function ParticipantListRow({
   /** ✓ 승인 — 초록 계열 */
   function renderCheckBtn() {
     if (opButtonPresentation === "text") {
-      if (terminalWaiting || terminalRejected) {
+      if (terminalWaiting || terminalRejected || processingCancelled) {
         return (
           <button type="button" disabled className="participant-op-textBtn" style={{ ...textOpBtnBase, opacity: 0.55 }}>
             승인
@@ -464,6 +559,15 @@ export default function ParticipantListRow({
         </span>
       );
     }
+    if (processingCancelled) {
+      return (
+        <span className="participant-op-hit">
+          <button type="button" disabled className="participant-op-btn participant-op-btn--check participant-op-btn--check-muted" aria-label="승인(취소됨)">
+            ✓
+          </button>
+        </span>
+      );
+    }
     if (!depositDone || (approvalCapacityFull && !approveDone)) {
       return (
         <span className="participant-op-hit">
@@ -489,10 +593,10 @@ export default function ParticipantListRow({
     );
   }
 
-  /** ✕ 취소/거절 — 회색 계열 */
+  /** ✕ 취소 — 회색 계열, 토글 */
   function renderCrossBtn() {
     if (opButtonPresentation === "text") {
-      if (terminalApproved) {
+      if (terminalApproved || terminalWaiting) {
         return (
           <button type="button" disabled className="participant-op-textBtn" style={{ ...textOpBtnBase, opacity: 0.55 }}>
             취소
@@ -506,6 +610,7 @@ export default function ParticipantListRow({
           </button>
         );
       }
+      const done = processingCancelled;
       return (
         <button
           type="button"
@@ -513,17 +618,17 @@ export default function ParticipantListRow({
           disabled={loading}
           style={{
             ...textOpBtnBase,
-            borderColor: "#64748b",
-            color: "#334155",
-            background: "#fff",
+            borderColor: done ? "#64748b" : "#cbd5e1",
+            color: done ? "#fff" : "#334155",
+            background: done ? "#64748b" : "#fff",
           }}
-          onClick={() => onCancelRejectClick()}
+          onClick={() => onCancelClick()}
         >
           취소
         </button>
       );
     }
-    if (terminalApproved) {
+    if (terminalApproved || terminalWaiting) {
       return (
         <span className="participant-op-hit">
           <button type="button" disabled className="participant-op-btn participant-op-btn--cross participant-op-btn--cross-muted participant-op-btn--disabled" aria-label="취소(불가)">
@@ -545,12 +650,57 @@ export default function ParticipantListRow({
         </span>
       );
     }
+    const done = processingCancelled;
+    const cls = done
+      ? "participant-op-btn participant-op-btn--cross participant-op-btn--cross-done"
+      : "participant-op-btn participant-op-btn--cross participant-op-btn--cross-idle";
     return (
       <span className="participant-op-hit">
-        <button type="button" disabled={loading} className="participant-op-btn participant-op-btn--cross participant-op-btn--cross-idle" aria-label="취소" onClick={() => onCancelRejectClick()}>
+        <button
+          type="button"
+          disabled={loading}
+          className={cls}
+          aria-label={done ? "취소(완료)" : "취소"}
+          onClick={() => onCancelClick()}
+        >
           <span className="participant-op-cross-glyph" aria-hidden="true">
             ✕
           </span>
+        </button>
+      </span>
+    );
+  }
+
+  /** 휴지통 삭제 — 가로모드(fullscreen) 전용 */
+  function renderDeleteBtn() {
+    if (!showDeleteButton) return null;
+    if (terminalApproved || terminalWaiting || terminalRejected) {
+      return (
+        <span className="participant-op-hit">
+          <button
+            type="button"
+            disabled
+            className="participant-op-btn participant-op-btn--delete participant-op-btn--delete-muted"
+            aria-label="삭제(불가)"
+          >
+            <Trash2 size={11} strokeWidth={2.2} aria-hidden />
+          </button>
+        </span>
+      );
+    }
+    const cls = deleteAllowed
+      ? "participant-op-btn participant-op-btn--delete participant-op-btn--delete-idle"
+      : "participant-op-btn participant-op-btn--delete participant-op-btn--delete-muted";
+    return (
+      <span className="participant-op-hit">
+        <button
+          type="button"
+          disabled={loading || deleteBusy}
+          className={cls}
+          aria-label={deleteAllowed ? "삭제" : "삭제(해제 필요)"}
+          onClick={() => onDeleteClick()}
+        >
+          <Trash2 size={11} strokeWidth={2.2} aria-hidden />
         </button>
       </span>
     );
@@ -562,10 +712,11 @@ export default function ParticipantListRow({
     participantAverage != null && Number.isFinite(participantAverage) ? String(participantAverage) : "—";
   const handicapDisplay = handicap != null && Number.isFinite(handicap) ? String(handicap) : "—";
 
-  const rowBg = terminalRejected ? "#f3f4f6" : terminalWaiting ? "#fffbeb" : "#fff";
+  const rowBg = terminalRejected || processingCancelled ? "#f3f4f6" : terminalWaiting ? "#fffbeb" : "#fff";
 
   const approveAtRaw = (clientApplicationApprovedAt ?? "").trim();
-  const approveInfoCell = terminalRejected ? "—" : approveAtRaw ? formatDateSlashMd(approveAtRaw) : "-";
+  const approveInfoCell =
+    terminalRejected || processingCancelled ? "—" : approveAtRaw ? formatDateSlashMd(approveAtRaw) : "-";
 
   const phoneDisplay = (phone ?? "").trim() || "—";
 
@@ -611,6 +762,11 @@ export default function ParticipantListRow({
       <div className="participant-op-inline">{renderCrossBtn()}</div>
     </td>
   );
+  const opsCellDelete = showDeleteButton ? (
+    <td className="participant-col participant-col--ops participant-col--delete" style={{ ...cellBase, textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap" }}>
+      <div className="participant-op-inline">{renderDeleteBtn()}</div>
+    </td>
+  ) : null;
 
   const ellipsisTd = (label: string, content: string, align: "left" | "center" = "left", extraClass = "") => (
     <td
@@ -633,7 +789,10 @@ export default function ParticipantListRow({
 
   return (
     <>
-      <tr className={terminalRejected ? "participant-row--rejected" : undefined} style={{ background: rowBg }}>
+      <tr
+        className={terminalRejected || processingCancelled ? "participant-row--rejected" : undefined}
+        style={{ background: rowBg }}
+      >
         <td
           data-participant-label="신청"
           className="participant-col participant-col--apply"
@@ -702,8 +861,19 @@ export default function ParticipantListRow({
         {opsCell}
         {opsCellCheck}
         {opsCellCross}
+        {opsCellDelete}
       </tr>
       {modalEl}
+      {confirmKind ? (
+        <ParticipantProcessingConfirmModal
+          kind={confirmKind}
+          busy={confirmBusy || deleteBusy}
+          onClose={() => {
+            if (!confirmBusy && !deleteBusy) setConfirmKind(null);
+          }}
+          onConfirm={() => void handleConfirmModalAction()}
+        />
+      ) : null}
     </>
   );
 }

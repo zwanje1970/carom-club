@@ -34,6 +34,7 @@ function publishedCardSnapshotToEditorGetBody(s: PublishedCardSnapshot): Record<
     tournamentTheme: s.tournamentTheme,
     tournamentBackgroundType: s.tournamentBackgroundType,
     image320Url: s.image320Url,
+    image640Url: s.image640Url,
     imageId: s.imageId,
     tournamentCardDisplayDate: s.tournamentCardDisplayDate ?? null,
     tournamentCardDisplayLocation: s.tournamentCardDisplayLocation ?? null,

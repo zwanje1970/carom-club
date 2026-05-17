@@ -35,7 +35,41 @@ const TOURNAMENT_APPLICATION_LIST_FIRESTORE_FIELDS = [
   "affiliation",
   "clientDepositConfirmedAt",
   "clientApplicationApprovedAt",
+  "clientApplicationCancelledAt",
 ] as const;
+
+function hasNonEmptyIsoAt(v: unknown): boolean {
+  return typeof v === "string" && v.trim() !== "";
+}
+
+function parseOptionalIsoAt(v: unknown): string | null | undefined {
+  if (hasNonEmptyIsoAt(v)) return (v as string).trim();
+  if (v === null) return null;
+  return undefined;
+}
+
+/** 신청자관리 processing 취소 토글 O — 입금·승인 버튼 비활성·정원·승인 수 제외 */
+export function isTournamentApplicationProcessingCancelled(app: {
+  status?: string;
+  clientApplicationCancelledAt?: string | null;
+}): boolean {
+  return hasNonEmptyIsoAt(app.clientApplicationCancelledAt);
+}
+
+function isTournamentApplicationSoftDeletedData(data: Record<string, unknown>): boolean {
+  return hasNonEmptyIsoAt(data.deletedAt);
+}
+
+/** 신청자관리 삭제 가능 — 입금·승인·취소 모두 X, 참가확정·거절·대기자 제외 */
+export function canSoftDeleteTournamentApplication(application: TournamentApplication): boolean {
+  if (isTournamentApplicationSoftDeletedData(application as unknown as Record<string, unknown>)) return false;
+  const st = application.status;
+  if (st === "APPROVED" || st === "REJECTED" || st === "WAITING") return false;
+  if (isTournamentApplicationProcessingCancelled(application)) return false;
+  if (hasNonEmptyIsoAt(application.clientDepositConfirmedAt)) return false;
+  if (hasNonEmptyIsoAt(application.clientApplicationApprovedAt)) return false;
+  return true;
+}
 
 /** `select` 결과만 — `tournamentApplicationFromFirestore`와 동일 규칙으로 목록 필드만 파싱 */
 function tournamentApplicationToListItem(
@@ -106,6 +140,10 @@ function tournamentApplicationToListItem(
   const clientApplicationApprovedAt =
     typeof caa === "string" && caa.trim() !== "" ? caa.trim() : caa === null ? null : undefined;
 
+  const cac = item.clientApplicationCancelledAt;
+  const clientApplicationCancelledAt =
+    typeof cac === "string" && cac.trim() !== "" ? cac.trim() : cac === null ? null : undefined;
+
   return {
     id,
     applicantName: typeof item.applicantName === "string" ? item.applicantName : "",
@@ -123,6 +161,7 @@ function tournamentApplicationToListItem(
     ...(affiliation !== undefined ? { affiliation } : {}),
     ...(clientDepositConfirmedAt !== undefined ? { clientDepositConfirmedAt } : {}),
     ...(clientApplicationApprovedAt !== undefined ? { clientApplicationApprovedAt } : {}),
+    ...(clientApplicationCancelledAt !== undefined ? { clientApplicationCancelledAt } : {}),
   };
 }
 
@@ -200,6 +239,18 @@ function tournamentApplicationFromFirestore(id: string, data: Record<string, unk
   const clientApplicationApprovedAt =
     typeof caa === "string" && caa.trim() !== "" ? caa.trim() : caa === null ? null : undefined;
 
+  const cac = item.clientApplicationCancelledAt;
+  const clientApplicationCancelledAt = parseOptionalIsoAt(cac);
+
+  const cdbc = item.clientDepositBeforeCancelAt;
+  const clientDepositBeforeCancelAt = parseOptionalIsoAt(cdbc);
+
+  const caabc = item.clientApplicationApprovedBeforeCancelAt;
+  const clientApplicationApprovedBeforeCancelAt = parseOptionalIsoAt(caabc);
+
+  const delAt = item.deletedAt;
+  const deletedAt = parseOptionalIsoAt(delAt);
+
   return {
     id,
     tournamentId: typeof item.tournamentId === "string" ? item.tournamentId : "",
@@ -237,6 +288,10 @@ function tournamentApplicationFromFirestore(id: string, data: Record<string, unk
     ...(affiliation !== undefined ? { affiliation } : {}),
     ...(clientDepositConfirmedAt !== undefined ? { clientDepositConfirmedAt } : {}),
     ...(clientApplicationApprovedAt !== undefined ? { clientApplicationApprovedAt } : {}),
+    ...(clientApplicationCancelledAt !== undefined ? { clientApplicationCancelledAt } : {}),
+    ...(clientDepositBeforeCancelAt !== undefined ? { clientDepositBeforeCancelAt } : {}),
+    ...(clientApplicationApprovedBeforeCancelAt !== undefined ? { clientApplicationApprovedBeforeCancelAt } : {}),
+    ...(deletedAt !== undefined ? { deletedAt } : {}),
   };
 }
 
@@ -322,6 +377,7 @@ export async function getTournamentApplicationByIdFirestore(
   if (!snap.exists) return null;
   const data = snap.data() as Record<string, unknown> | undefined;
   if (data?.tournamentId !== tid) return null;
+  if (isTournamentApplicationSoftDeletedData(data)) return null;
   return tournamentApplicationFromFirestore(snap.id, data);
 }
 
@@ -339,7 +395,9 @@ export async function listTournamentApplicationsByTournamentIdFirestore(
     .where("tournamentId", "==", id)
     .orderBy("createdAt", "desc")
     .get();
-  return q.docs.map((doc) => tournamentApplicationFromFirestore(doc.id, doc.data() as Record<string, unknown>));
+  return q.docs
+    .filter((doc) => !isTournamentApplicationSoftDeletedData(doc.data() as Record<string, unknown>))
+    .map((doc) => tournamentApplicationFromFirestore(doc.id, doc.data() as Record<string, unknown>));
 }
 
 /** 참가자 목록 RSC 전용 — 증빙·OCR 등 대용량 필드 미조회 */
@@ -361,10 +419,12 @@ export async function listTournamentApplicationsListItemsByTournamentIdFirestore
     lim != null && Number.isFinite(lim)
       ? await base.limit(Math.max(1, Math.min(500, Math.floor(lim)))).get()
       : await base.get();
-  return q.docs.map((doc) => tournamentApplicationToListItem(doc.id, doc.data() as Record<string, unknown>));
+  return q.docs
+    .filter((doc) => !isTournamentApplicationSoftDeletedData(doc.data() as Record<string, unknown>))
+    .map((doc) => tournamentApplicationToListItem(doc.id, doc.data() as Record<string, unknown>));
 }
 
-/** 필터 탭·헤더 건수용 — 문서 본문 없이 aggregate count만 */
+/** 필터 탭·헤더 건수용 — soft delete 제외, 경량 select */
 export async function getTournamentApplicationListCountsFirestore(tournamentId: string): Promise<{
   total: number;
   approved: number;
@@ -376,26 +436,28 @@ export async function getTournamentApplicationListCountsFirestore(tournamentId: 
   const id = tournamentId.trim();
   if (!id) return { total: 0, approved: 0, wait: 0, reject: 0, waitingList: 0 };
   const db = getSharedFirestoreDb();
-  const col = () => db.collection(COLLECTION).where("tournamentId", "==", id);
-  const [totalSnap, approvedSnap, rejectedSnap, appliedSnap, verifyingSnap, waitingPaySnap, waitingListSnap] =
-    await Promise.all([
-      col().count().get(),
-      col().where("status", "==", "APPROVED").count().get(),
-      col().where("status", "==", "REJECTED").count().get(),
-      col().where("status", "==", "APPLIED").count().get(),
-      col().where("status", "==", "VERIFYING").count().get(),
-      col().where("status", "==", "WAITING_PAYMENT").count().get(),
-      col().where("status", "==", "WAITING").count().get(),
-    ]);
-  const wait =
-    appliedSnap.data().count + verifyingSnap.data().count + waitingPaySnap.data().count;
-  return {
-    total: totalSnap.data().count,
-    approved: approvedSnap.data().count,
-    wait,
-    reject: rejectedSnap.data().count,
-    waitingList: waitingListSnap.data().count,
-  };
+  const snap = await db
+    .collection(COLLECTION)
+    .where("tournamentId", "==", id)
+    .select("status", "deletedAt", "clientApplicationCancelledAt")
+    .get();
+  let total = 0;
+  let approved = 0;
+  let wait = 0;
+  let reject = 0;
+  let waitingList = 0;
+  for (const doc of snap.docs) {
+    const d = doc.data() as Record<string, unknown>;
+    if (isTournamentApplicationSoftDeletedData(d)) continue;
+    total += 1;
+    const st = d.status;
+    if (st === "APPROVED") approved += 1;
+    else if (st === "REJECTED") reject += 1;
+    else if (st === "WAITING") waitingList += 1;
+    else if (st === "APPLIED" || st === "VERIFYING" || st === "WAITING_PAYMENT") wait += 1;
+    if (st !== "REJECTED" && isTournamentApplicationProcessingCancelled(d)) reject += 1;
+  }
+  return { total, approved, wait, reject, waitingList };
 }
 
 export const PARTICIPANT_APPROVAL_CAPACITY_FULL_ERROR =
@@ -404,7 +466,9 @@ export const PARTICIPANT_APPROVAL_CAPACITY_FULL_ERROR =
 function applicationOccupiesApprovalCapacity(app: {
   status?: string;
   clientApplicationApprovedAt?: string | null;
+  clientApplicationCancelledAt?: string | null;
 }): boolean {
+  if (isTournamentApplicationProcessingCancelled(app)) return false;
   const st = app.status;
   if (st === "REJECTED" || st === "WAITING") return false;
   if (st === "APPROVED") return true;
@@ -445,11 +509,13 @@ export async function countCapacityOccupiedApplicationsForTournamentFirestore(to
   const q = await db
     .collection(COLLECTION)
     .where("tournamentId", "==", id)
-    .select("status", "clientApplicationApprovedAt")
+    .select("status", "clientApplicationApprovedAt", "clientApplicationCancelledAt", "deletedAt")
     .get();
   let n = 0;
   for (const doc of q.docs) {
     const d = doc.data() as Record<string, unknown>;
+    if (isTournamentApplicationSoftDeletedData(d)) continue;
+    if (isTournamentApplicationProcessingCancelled(d)) continue;
     const st = d.status;
     if (st === "REJECTED" || st === "WAITING") continue;
     if (st === "APPROVED") {
@@ -722,6 +788,7 @@ export async function patchTournamentApplicationProcessingFirestore(params: {
   entryId: string;
   depositConfirmed?: boolean;
   applicationApproved?: boolean;
+  applicationCancelled?: boolean;
 }): Promise<{ ok: true; application: TournamentApplication } | { ok: false; error: string }> {
   assertClientFirestorePersistenceConfigured();
   const tournamentId = params.tournamentId.trim();
@@ -732,7 +799,9 @@ export async function patchTournamentApplicationProcessingFirestore(params: {
 
   const hasDeposit = typeof params.depositConfirmed === "boolean";
   const hasApprove = typeof params.applicationApproved === "boolean";
-  if ((hasDeposit && hasApprove) || (!hasDeposit && !hasApprove)) {
+  const hasCancel = typeof params.applicationCancelled === "boolean";
+  const opCount = [hasDeposit, hasApprove, hasCancel].filter(Boolean).length;
+  if (opCount !== 1) {
     return { ok: false, error: "요청 값이 올바르지 않습니다." };
   }
 
@@ -768,8 +837,51 @@ export async function patchTournamentApplicationProcessingFirestore(params: {
   const db = getSharedFirestoreDb();
   const ref = db.collection(COLLECTION).doc(entryId);
   const patch: Record<string, unknown> = { updatedAt: now };
+  const isCancelled = isTournamentApplicationProcessingCancelled(application);
 
-  if (hasDeposit) {
+  if (hasCancel) {
+    if (params.applicationCancelled === true) {
+      if (isCancelled) {
+        return { ok: false, error: "이미 취소된 신청입니다." };
+      }
+      const depBefore = hasNonEmptyIsoAt(application.clientDepositConfirmedAt)
+        ? application.clientDepositConfirmedAt!.trim()
+        : null;
+      const appBefore = hasNonEmptyIsoAt(application.clientApplicationApprovedAt)
+        ? application.clientApplicationApprovedAt!.trim()
+        : null;
+      patch.clientDepositBeforeCancelAt = depBefore;
+      patch.clientApplicationApprovedBeforeCancelAt = appBefore;
+      patch.clientDepositConfirmedAt = null;
+      patch.clientApplicationApprovedAt = null;
+      patch.processingApprovedNotifiedAt = null;
+      patch.clientApplicationCancelledAt = now;
+    } else {
+      if (!isCancelled) {
+        return { ok: false, error: "취소 상태가 아닙니다." };
+      }
+      const depBefore = application.clientDepositBeforeCancelAt;
+      const appBefore = application.clientApplicationApprovedBeforeCancelAt;
+      const willRestoreApproval = hasNonEmptyIsoAt(appBefore);
+      if (willRestoreApproval) {
+        const cap = await assertParticipantApprovalCapacityFirestore({
+          tournamentId,
+          maxParticipants: tournament.maxParticipants,
+          excludeEntryId: entryId,
+          excludeApplication: application,
+        });
+        if (!cap.ok) return cap;
+      }
+      patch.clientDepositConfirmedAt = hasNonEmptyIsoAt(depBefore) ? depBefore!.trim() : null;
+      patch.clientApplicationApprovedAt = hasNonEmptyIsoAt(appBefore) ? appBefore!.trim() : null;
+      patch.clientApplicationCancelledAt = null;
+      patch.clientDepositBeforeCancelAt = null;
+      patch.clientApplicationApprovedBeforeCancelAt = null;
+      patch.processingApprovalCanceledNotifiedAt = null;
+    }
+  } else if (isCancelled) {
+    return { ok: false, error: "취소된 신청입니다." };
+  } else if (hasDeposit) {
     if (params.depositConfirmed === true) {
       patch.clientDepositConfirmedAt = now;
     } else {
@@ -863,6 +975,42 @@ export async function patchTournamentApplicationProcessingFirestore(params: {
   return { ok: true, application: after };
 }
 
+/** 신청자관리 soft delete — 입금·승인·취소 모두 해제된 일반 대기 상태만 */
+export async function softDeleteTournamentApplicationFirestore(params: {
+  tournamentId: string;
+  entryId: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  assertClientFirestorePersistenceConfigured();
+  const tournamentId = params.tournamentId.trim();
+  const entryId = params.entryId.trim();
+  if (!tournamentId || !entryId) {
+    return { ok: false, error: "잘못된 요청입니다." };
+  }
+
+  const db = getSharedFirestoreDb();
+  const ref = db.collection(COLLECTION).doc(entryId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    return { ok: false, error: "참가신청을 찾을 수 없습니다." };
+  }
+  const data = snap.data() as Record<string, unknown>;
+  if (data.tournamentId !== tournamentId) {
+    return { ok: false, error: "참가신청을 찾을 수 없습니다." };
+  }
+  if (isTournamentApplicationSoftDeletedData(data)) {
+    return { ok: false, error: "이미 삭제된 신청입니다." };
+  }
+
+  const application = tournamentApplicationFromFirestore(snap.id, data);
+  if (!canSoftDeleteTournamentApplication(application)) {
+    return { ok: false, error: "삭제하려면 먼저 입금확인, 승인, 취소를 모두 해제하세요." };
+  }
+
+  const now = new Date().toISOString();
+  await ref.set({ deletedAt: now, updatedAt: now }, { merge: true });
+  return { ok: true };
+}
+
 /**
  * 신청 승인(`clientApplicationApprovedAt`)된 건만 `APPROVED`(참가 확정)로 승격. 알림은 기존 입금확정 흐름 재사용.
  * 권역 관리자는 `zoneIdsFilter`로 해당 권역 배정 건만 처리.
@@ -890,6 +1038,7 @@ export async function promoteOperatorApprovedApplicationsFirestore(params: {
 
   let targets = all.filter(
     (a) =>
+      !isTournamentApplicationProcessingCancelled(a) &&
       a.status !== "APPROVED" &&
       a.status !== "REJECTED" &&
       a.status !== "WAITING" &&

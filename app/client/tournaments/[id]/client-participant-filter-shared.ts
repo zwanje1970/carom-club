@@ -17,10 +17,29 @@ function isApplicantBucket(e: TournamentApplicationListItem): boolean {
   );
 }
 
-/** 모집 정원 충족 판단(목록 기준) — 대기자·거절 제외, 승인 처리·참가 확정 포함 */
+export function isProcessingCancelledEntry(e: TournamentApplicationListItem): boolean {
+  return typeof e.clientApplicationCancelledAt === "string" && e.clientApplicationCancelledAt.trim() !== "";
+}
+
+/** 모집 정원 충족 판단(목록 기준) — 대기자·거절·취소 제외, 승인 처리·참가 확정 포함 */
 export function countCapacityOccupiedFromListItems(entries: TournamentApplicationListItem[]): number {
   return entries.filter((e) => {
+    if (isProcessingCancelledEntry(e)) return false;
     if (e.status === "REJECTED" || e.status === "WAITING") return false;
+    if (e.status === "APPROVED") return true;
+    return typeof e.clientApplicationApprovedAt === "string" && e.clientApplicationApprovedAt.trim() !== "";
+  }).length;
+}
+
+/** 신청자관리 취소 칩 — processing 취소 토글 + 기존 REJECTED(거절) */
+export function countApplicationCancelledChip(entries: TournamentApplicationListItem[]): number {
+  return entries.filter((e) => isProcessingCancelledEntry(e) || e.status === "REJECTED").length;
+}
+
+/** 신청자관리 승인 칩 — 취소 상태 제외 */
+export function countApplicationApprovedChip(entries: TournamentApplicationListItem[]): number {
+  return entries.filter((e) => {
+    if (isProcessingCancelledEntry(e)) return false;
     if (e.status === "APPROVED") return true;
     return typeof e.clientApplicationApprovedAt === "string" && e.clientApplicationApprovedAt.trim() !== "";
   }).length;
@@ -29,6 +48,7 @@ export function countCapacityOccupiedFromListItems(entries: TournamentApplicatio
 /** 참가 확정 전 — 운영 「신청 승인」 미완료 추정 건수 */
 export function countPendingOperatorApplicationApproval(entries: TournamentApplicationListItem[]): number {
   return entries.filter((e) => {
+    if (isProcessingCancelledEntry(e)) return false;
     if (e.status === "REJECTED" || e.status === "APPROVED") return false;
     return !(typeof e.clientApplicationApprovedAt === "string" && e.clientApplicationApprovedAt.trim());
   }).length;
@@ -40,7 +60,7 @@ export function filterParticipantEntries(
 ): TournamentApplicationListItem[] {
   if (key === "approved") return entries.filter((e) => e.status === "APPROVED");
   if (key === "wait") return entries.filter(isApplicantBucket);
-  if (key === "reject") return entries.filter((e) => e.status === "REJECTED");
+  if (key === "reject") return entries.filter((e) => isProcessingCancelledEntry(e) || e.status === "REJECTED");
   return entries;
 }
 
@@ -49,6 +69,6 @@ export function countParticipantApplications(entries: TournamentApplicationListI
     all: entries.length,
     approved: entries.filter((e) => e.status === "APPROVED").length,
     wait: entries.filter(isApplicantBucket).length,
-    reject: entries.filter((e) => e.status === "REJECTED").length,
+    reject: countApplicationCancelledChip(entries),
   };
 }

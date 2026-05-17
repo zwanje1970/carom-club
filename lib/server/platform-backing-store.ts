@@ -504,10 +504,18 @@ export type TournamentApplication = {
   clientDepositConfirmedAt?: string | null;
   /** 운영자 신청 승인 시각. 참가확정은 별도(참가자 확정 시 APPROVED) */
   clientApplicationApprovedAt?: string | null;
+  /** 운영자 신청 취소 시각(신청 처리 UI 토글). status REJECTED와 별개 */
+  clientApplicationCancelledAt?: string | null;
+  /** 취소 직전 입금확인 시각(취소 해제 시 복구) */
+  clientDepositBeforeCancelAt?: string | null;
+  /** 취소 직전 신청 승인 시각(취소 해제 시 복구) */
+  clientApplicationApprovedBeforeCancelAt?: string | null;
   /** processing 승인 후 “참가신청 완료” 알림·FCM 1회 발송 시각(중복 방지, promote·approvedNotifiedAt과 무관) */
   processingApprovedNotifiedAt?: string | null;
   /** processing 승인 취소 알림 1회 발송 시각(중복 방지) */
   processingApprovalCanceledNotifiedAt?: string | null;
+  /** 신청자관리 soft delete — 설정 시 목록·카운트에서 제외 */
+  deletedAt?: string | null;
 };
 
 /** 클라이언트 참가자 목록 RSC — 증빙·OCR 등 제외(입금자명은 목록 표시용으로 포함) */
@@ -529,6 +537,7 @@ export type TournamentApplicationListItem = {
   handicap?: number | null;
   clientDepositConfirmedAt?: string | null;
   clientApplicationApprovedAt?: string | null;
+  clientApplicationCancelledAt?: string | null;
 };
 
 export type BracketParticipantSnapshotParticipant = {
@@ -5986,6 +5995,10 @@ export async function deleteTournament(params: {
     deleteReason: "",
   };
   await writeLocalJsonAggregate(store);
+  const cardDelete = await deleteAllTournamentPublishedCardsForTournamentId(id);
+  if (!cardDelete.ok) {
+    console.warn("[deleteTournament] published cards delete failed", { tournamentId: id, error: cardDelete.error });
+  }
   return { ok: true };
 }
 
@@ -10532,6 +10545,73 @@ export async function reconcileAllTournamentPublishedCardsForMainSlide(): Promis
   return { ok: true, changedRowCount, uniqueTournamentIds: uniqueTids.length, snapshotFieldAlignmentChanged };
 }
 
+function collectPublishedCardImageIdsForDeletionSchedule(c: TournamentPublishedCard): string[] {
+  const out = new Set<string>();
+  const bg = (c.imageId ?? "").trim();
+  if (bg && bg !== "theme") out.add(bg);
+  for (const u of [c.publishedCardImageUrl, c.publishedCardImage480Url, c.publishedCardImage320Url, c.image320Url]) {
+    const id = extractProofImageIdFromPosterUrl(typeof u === "string" ? u : "");
+    if (id) out.add(id);
+  }
+  return [...out];
+}
+
+async function removeLegacyPublishedCardSnapshotsForTournamentId(tournamentId: string): Promise<number> {
+  const tid = tournamentId.trim();
+  if (!tid || isFirestoreUsersBackendConfigured()) return 0;
+  const store = await readLocalJsonAggregate();
+  const before = store.publishedCardSnapshots.length;
+  store.publishedCardSnapshots = store.publishedCardSnapshots.filter((s) => {
+    if (normalizeSnapshotSourceType(s) !== "TOURNAMENT_SNAPSHOT") return true;
+    return (s.tournamentId ?? "").trim() !== tid;
+  });
+  if (store.publishedCardSnapshots.length !== before) {
+    await writeLocalJsonAggregate(store);
+  }
+  return before - store.publishedCardSnapshots.length;
+}
+
+/**
+ * 대회 삭제 시 해당 대회의 게시카드 전부 저장소에서 제거(메인·목록·백업함 행 포함).
+ * 대회 삭제 API·Firestore 삭제 함수에서 호출한다.
+ */
+export async function deleteAllTournamentPublishedCardsForTournamentId(
+  tournamentId: string,
+): Promise<{ ok: true; removedCount: number } | { ok: false; error: string }> {
+  const tid = tournamentId.trim();
+  if (!tid) return { ok: false, error: "잘못된 요청입니다." };
+  const ws = resolveTournamentPublishedCardsWriteStrategy();
+  if (ws === "blocked") return { ok: false, error: "게시 카드 저장소에 쓸 수 없습니다." };
+
+  const allRows = await loadTournamentPublishedCardsRowsIncludingDeleted();
+  const toRemove = allRows.filter((c) => c.tournamentId.trim() === tid);
+  const imageIds = new Set<string>();
+  for (const c of toRemove) {
+    for (const id of collectPublishedCardImageIdsForDeletionSchedule(c)) {
+      imageIds.add(id);
+    }
+  }
+
+  if (toRemove.length > 0) {
+    const keep = allRows.filter((c) => c.tournamentId.trim() !== tid);
+    await persistTournamentPublishedCardsRows(keep);
+
+    const now = new Date().toISOString();
+    const deleteAfter = new Date(Date.now() + PUBLISHED_CARD_SNAPSHOT_IMAGE_DELETE_DELAY_MS).toISOString();
+    const queueRows: PublishedCardImageDeleteQueueRow[] = [];
+    for (const imageId of imageIds) {
+      if (await isProofImageIdStillReferencedGlobally(imageId)) continue;
+      queueRows.push({ id: randomUUID(), imageId, deleteAfter, createdAt: now });
+    }
+    if (queueRows.length > 0) {
+      await appendPublishedCardImageDeleteQueueRows(queueRows);
+    }
+  }
+
+  await removeLegacyPublishedCardSnapshotsForTournamentId(tid);
+  return { ok: true, removedCount: toRemove.length };
+}
+
 /** 대회 게시 카드 1건 소프트 삭제(플랫폼 관리자). */
 export async function softDeleteTournamentPublishedCardBySnapshotIdForPlatform(params: {
   tournamentId: string;
@@ -11419,6 +11499,13 @@ export async function permanentlyDeleteTournamentForPlatformBackup(
   if (t.status !== "DELETED") return { ok: false, error: "백업함에 있는 삭제된 대회만 완전 삭제할 수 있습니다." };
   store.tournaments = store.tournaments.filter((x) => x.id !== id);
   await writeLocalJsonAggregate(store);
+  const cardDelete = await deleteAllTournamentPublishedCardsForTournamentId(id);
+  if (!cardDelete.ok) {
+    console.warn("[permanentlyDeleteTournamentForPlatformBackup] published cards delete failed", {
+      tournamentId: id,
+      error: cardDelete.error,
+    });
+  }
   return { ok: true };
 }
 

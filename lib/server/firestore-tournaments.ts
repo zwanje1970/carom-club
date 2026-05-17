@@ -32,6 +32,7 @@ import {
   tournamentToClientDashboardPreview,
   type ClientDashboardTournamentPreviewRow,
   validateTournamentRuleForCreate,
+  deleteAllTournamentPublishedCardsForTournamentId,
 } from "./platform-backing-store";
 import { generateTvAccessToken } from "./tv-access";
 
@@ -921,6 +922,10 @@ export async function deleteTournamentFirestore(params: {
   );
   await rebuildPublicTournamentListSnapshotsSafe();
   revalidatePublicTournamentCache(id);
+  const cardDelete = await deleteAllTournamentPublishedCardsForTournamentId(id);
+  if (!cardDelete.ok) {
+    console.warn("[deleteTournamentFirestore] published cards delete failed", { tournamentId: id, error: cardDelete.error });
+  }
   return { ok: true };
 }
 
@@ -947,6 +952,13 @@ export async function deleteClientTournamentDocumentHardIfNoApplicantsFirestore(
   await db.collection(COLLECTION).doc(id).delete();
   await rebuildPublicTournamentListSnapshotsSafe();
   revalidatePublicTournamentCache(id);
+  const cardDelete = await deleteAllTournamentPublishedCardsForTournamentId(id);
+  if (!cardDelete.ok) {
+    console.warn("[deleteClientTournamentDocumentHard] published cards delete failed", {
+      tournamentId: id,
+      error: cardDelete.error,
+    });
+  }
   return { ok: true };
 }
 
@@ -1060,6 +1072,13 @@ export async function permanentlyDeleteTournamentDocumentFirestore(
   await ref.delete();
   await rebuildPublicTournamentListSnapshotsSafe();
   revalidatePublicTournamentCache(id);
+  const cardDelete = await deleteAllTournamentPublishedCardsForTournamentId(id);
+  if (!cardDelete.ok) {
+    console.warn("[permanentlyDeleteTournamentDocumentFirestore] published cards delete failed", {
+      tournamentId: id,
+      error: cardDelete.error,
+    });
+  }
   return { ok: true };
 }
 

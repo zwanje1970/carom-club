@@ -1420,6 +1420,108 @@
   color: #64748b;
 }
 
+/* 휴지통 삭제 — 검은색 계열(가로모드 전용) */
+.client-tournament-manage .participant-op-btn--delete-idle {
+  border: 1.5px solid #0f172a;
+  background: #1e293b;
+  color: #fff;
+}
+
+.client-tournament-manage .participant-op-btn--delete-idle:not(:disabled):hover,
+.client-tournament-manage .participant-op-btn--delete-idle:not(:disabled):active {
+  background: #334155;
+  border-color: #334155;
+}
+
+.client-tournament-manage .participant-op-btn--delete-muted {
+  border: 1.5px solid #cbd5e1;
+  background: #e2e8f0;
+  color: #94a3b8;
+  opacity: 0.72;
+}
+
+.client-tournament-manage .participant-processing-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px))
+    max(1rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px));
+  box-sizing: border-box;
+}
+
+.client-tournament-manage .participant-processing-confirm-dialog {
+  width: 100%;
+  max-width: 22rem;
+  background: #fff;
+  border-radius: 0.65rem;
+  padding: 1rem 1rem 0.85rem;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.18);
+  box-sizing: border-box;
+}
+
+.client-tournament-manage .participant-processing-confirm-title {
+  margin: 0 0 0.55rem;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.35;
+}
+
+.client-tournament-manage .participant-processing-confirm-body {
+  margin: 0 0 0.85rem;
+}
+
+.client-tournament-manage .participant-processing-confirm-bodyLine {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.client-tournament-manage .participant-processing-confirm-bodyLine + .participant-processing-confirm-bodyLine {
+  margin-top: 0.35rem;
+}
+
+.client-tournament-manage .participant-processing-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.client-tournament-manage .participant-processing-confirm-btn {
+  min-height: 34px;
+  padding: 0.28rem 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 0.35rem;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.client-tournament-manage .participant-processing-confirm-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.client-tournament-manage .participant-processing-confirm-btn--primary {
+  border-color: #334155;
+  background: #334155;
+  color: #fff;
+}
+
+.client-tournament-manage .participant-processing-confirm-btn--danger {
+  border-color: #0f172a;
+  background: #1e293b;
+  color: #fff;
+}
+
 .client-tournament-manage .participant-name-cell-1l {
   display: flex;
   flex-direction: row;
@@ -1879,12 +1981,12 @@ main[data-client-applications-table-fullscreen="1"].client-tournament-manage--pa
 }
 
 /*
- * 신청자 표 fullscreen(10열): 신청=승인(정보) 동일폭, 이름=입금자 동일폭, 입금/승인/취소 동일폭, AVG·소속 확보.
+ * 신청자 표 fullscreen(11열): 입금/승인/취소/삭제 동일폭, 이름·전화·소속 확보.
  */
 main[data-client-applications-table-fullscreen="1"]
   .client-tournament-manage__participantTableColgroup--fullscreen
   col.participant-col-w-fs--apply {
-  width: 6%;
+  width: 5.5%;
 }
 main[data-client-applications-table-fullscreen="1"]
   .client-tournament-manage__participantTableColgroup--fullscreen
@@ -1899,42 +2001,47 @@ main[data-client-applications-table-fullscreen="1"]
 main[data-client-applications-table-fullscreen="1"]
   .client-tournament-manage__participantTableColgroup--fullscreen
   col.participant-col-w-fs--handicap {
-  width: 6%;
+  width: 5.5%;
 }
 main[data-client-applications-table-fullscreen="1"]
   .client-tournament-manage__participantTableColgroup--fullscreen
   col.participant-col-w-fs--metric {
-  width: 6.5%;
-}
-main[data-client-applications-table-fullscreen="1"]
-  .client-tournament-manage__participantTableColgroup--fullscreen
-  col.participant-col-w-fs--affiliation {
-  width: 18%;
-}
-main[data-client-applications-table-fullscreen="1"]
-  .client-tournament-manage__participantTableColgroup--fullscreen
-  col.participant-col-w-fs--depositor {
-  width: 11%;
-}
-main[data-client-applications-table-fullscreen="1"]
-  .client-tournament-manage__participantTableColgroup--fullscreen
-  col.participant-col-w-fs--approveInfo {
   width: 6%;
 }
 main[data-client-applications-table-fullscreen="1"]
   .client-tournament-manage__participantTableColgroup--fullscreen
+  col.participant-col-w-fs--affiliation {
+  width: 17%;
+}
+main[data-client-applications-table-fullscreen="1"]
+  .client-tournament-manage__participantTableColgroup--fullscreen
+  col.participant-col-w-fs--depositor {
+  width: 10%;
+}
+main[data-client-applications-table-fullscreen="1"]
+  .client-tournament-manage__participantTableColgroup--fullscreen
+  col.participant-col-w-fs--approveInfo {
+  width: 5.5%;
+}
+main[data-client-applications-table-fullscreen="1"]
+  .client-tournament-manage__participantTableColgroup--fullscreen
   col.participant-col-w-fs--deposit {
-  width: 8.83%;
+  width: 7.25%;
 }
 main[data-client-applications-table-fullscreen="1"]
   .client-tournament-manage__participantTableColgroup--fullscreen
   col.participant-col-w-fs--approveBtn {
-  width: 8.83%;
+  width: 7.25%;
 }
 main[data-client-applications-table-fullscreen="1"]
   .client-tournament-manage__participantTableColgroup--fullscreen
   col.participant-col-w-fs--reject {
-  width: 8.84%;
+  width: 7.25%;
+}
+main[data-client-applications-table-fullscreen="1"]
+  .client-tournament-manage__participantTableColgroup--fullscreen
+  col.participant-col-w-fs--delete {
+  width: 7.25%;
 }
 
 main[data-client-applications-table-fullscreen="1"] .participant-op-textBtn {

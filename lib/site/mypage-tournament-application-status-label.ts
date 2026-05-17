@@ -6,6 +6,7 @@ export type MypageApplicationStatusLabelInput = {
   status: string;
   clientDepositConfirmedAt?: string | null;
   clientApplicationApprovedAt?: string | null;
+  clientApplicationCancelledAt?: string | null;
   processingApprovalCanceledNotifiedAt?: string | null;
 };
 
@@ -26,6 +27,7 @@ export function getMypageTournamentApplicationStatusLabel(
   const pacn = hasNonEmptyString(input.processingApprovalCanceledNotifiedAt);
 
   if (st === "REJECTED") return "참가 불가";
+  if (hasNonEmptyString(input.clientApplicationCancelledAt)) return "신청취소";
   if (pacn) return "신청취소";
   if (dep && app) return "신청완료";
   if (st === "APPROVED") return options?.history ? "참가 완료" : "참가 확정";

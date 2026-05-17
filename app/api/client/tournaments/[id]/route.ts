@@ -292,11 +292,5 @@ export async function DELETE(
     return NextResponse.json({ error: result.error }, { status });
   }
 
-  try {
-    await reconcileTournamentPublishedCardsForTournamentId(id);
-  } catch (e) {
-    console.warn("[api/client/tournaments/[id]] DELETE reconcile published cards failed", e);
-  }
-
   return NextResponse.json({ ok: true });
 }

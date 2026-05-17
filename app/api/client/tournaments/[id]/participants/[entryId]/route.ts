@@ -1,22 +1,22 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../../../lib/auth/session";
-import { getClientStatusByUserId, getUserById, resolveCanonicalUserIdForAuth } from "../../../../../../../../lib/platform-api";
+import { parseSessionCookieValue, SESSION_COOKIE_NAME } from "../../../../../../../lib/auth/session";
+import { getClientStatusByUserId, getUserById, resolveCanonicalUserIdForAuth } from "../../../../../../../lib/platform-api";
 import {
   getTournamentApplicationByIdFirestore,
-  patchTournamentApplicationProcessingFirestore,
-} from "../../../../../../../../lib/server/firestore-tournament-applications";
-import { getTournamentByIdFirestore } from "../../../../../../../../lib/server/firestore-tournaments";
+  softDeleteTournamentApplicationFirestore,
+} from "../../../../../../../lib/server/firestore-tournament-applications";
+import { getTournamentByIdFirestore } from "../../../../../../../lib/server/firestore-tournaments";
 import {
   resolveTournamentZoneClientAccess,
   TOURNAMENT_ZONE_FORBIDDEN_ERROR,
   zoneManagerMayAccessZoneId,
-} from "../../../../../../../../lib/server/tournament-zone-access";
+} from "../../../../../../../lib/server/tournament-zone-access";
 
 export const runtime = "nodejs";
 
-export async function PATCH(
-  request: NextRequest,
+export async function DELETE(
+  _request: NextRequest,
   context: { params: Promise<{ id: string; entryId: string }> }
 ) {
   const cookieStore = await cookies();
@@ -63,40 +63,13 @@ export async function PATCH(
   }
 
   if (!canManage) {
-    return NextResponse.json({ error: "상태 변경 권한이 없습니다." }, { status: 403 });
+    return NextResponse.json({ error: "삭제 권한이 없습니다." }, { status: 403 });
   }
 
-  let body: { depositConfirmed?: unknown; applicationApproved?: unknown; applicationCancelled?: unknown } = {};
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return NextResponse.json({ error: "요청 본문이 올바르지 않습니다." }, { status: 400 });
-  }
-
-  const dc = body.depositConfirmed;
-  const aa = body.applicationApproved;
-  const ac = body.applicationCancelled;
-  const hasDc = typeof dc === "boolean";
-  const hasAa = typeof aa === "boolean";
-  const hasAc = typeof ac === "boolean";
-  if ([hasDc, hasAa, hasAc].filter(Boolean).length !== 1) {
-    return NextResponse.json(
-      { error: "depositConfirmed, applicationApproved, applicationCancelled 중 하나만 보내 주세요." },
-      { status: 400 },
-    );
-  }
-
-  const result = await patchTournamentApplicationProcessingFirestore({
-    tournamentId: id,
-    entryId,
-    ...(hasDc ? { depositConfirmed: dc } : {}),
-    ...(hasAa ? { applicationApproved: aa } : {}),
-    ...(hasAc ? { applicationCancelled: ac } : {}),
-  });
-
+  const result = await softDeleteTournamentApplicationFirestore({ tournamentId: id, entryId });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  return NextResponse.json({ ok: true as const, application: result.application });
+  return NextResponse.json({ ok: true as const });
 }

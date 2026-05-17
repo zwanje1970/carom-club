@@ -215,6 +215,22 @@ type SnapshotPick = {
   publishedCardImage320Url?: string | null;
 };
 
+function pickStoredImageFromSnapshot(pick: SnapshotPick): UploadedImage | null {
+  const bgType = pick.tournamentBackgroundType === "theme" ? "theme" : "image";
+  if (bgType !== "image") return null;
+
+  const imageId = typeof pick.imageId === "string" ? pick.imageId.trim() : "";
+  const image320 = typeof pick.image320Url === "string" ? pick.image320Url.trim() : "";
+  const image640 = typeof pick.image640Url === "string" ? pick.image640Url.trim() : "";
+  if (!imageId || !image320) return null;
+
+  return {
+    imageId,
+    w320Url: image320,
+    w640Url: image640 || image320,
+  };
+}
+
 function hasStoredV2Media(pick: SnapshotPick): boolean {
   return (
     typeof pick.tournamentMediaBackground === "string" ||
@@ -521,13 +537,10 @@ export default function ClientTournamentCardPublishV2Page() {
         setThemeType(
           pick.tournamentTheme === "light" ? "light" : pick.tournamentTheme === "natural" ? "natural" : "dark"
         );
-        if (pick.tournamentBackgroundType === "image" && pick.image320Url?.trim()) {
+        const restoredImage = pickStoredImageFromSnapshot(pick);
+        if (restoredImage) {
           clearCaptureImageSource();
-          setUploadedImage({
-            imageId: pick.imageId || "",
-            w320Url: pick.image320Url,
-            w640Url: pick.image640Url || pick.image320Url,
-          });
+          setUploadedImage(restoredImage);
         } else {
           clearCaptureImageSource();
           setUploadedImage(null);

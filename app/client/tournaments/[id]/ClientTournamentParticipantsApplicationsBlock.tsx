@@ -7,8 +7,11 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import type { TournamentApplicationListItem, TournamentStatusBadge } from "../../../../lib/types/entities";
 import type { TournamentEntryQualificationType } from "../../../../lib/tournament-rule-types";
 import {
+  countApplicationApprovedChip,
+  countApplicationCancelledChip,
   countCapacityOccupiedFromListItems,
   countPendingOperatorApplicationApproval,
+  isProcessingCancelledEntry,
 } from "./client-participant-filter-shared";
 import ParticipantListRow from "./participants/ParticipantListRow";
 import ParticipantAddSheet from "./participants/ParticipantAddSheet";
@@ -111,19 +114,12 @@ function coerceClientProcessingIsoAt(raw: unknown): string | null {
   return null;
 }
 
-function countApplicationApprovedChip(entries: TournamentApplicationListItem[]): number {
-  return entries.filter(
-    (e) =>
-      e.status === "APPROVED" ||
-      (typeof e.clientApplicationApprovedAt === "string" && e.clientApplicationApprovedAt.trim() !== "")
-  ).length;
-}
-
 /**
  * 입금확인 전체승인 대상: 입금확인 시각 있음 · 신청 승인 시각 없음 · 거절(REJECTED)·참가확정(APPROVED)·대기자(WAITING) 제외.
  * (patchTournamentApplicationProcessingFirestore: WAITING·REJECTED·APPROVED 는 신청 승인 불가)
  */
 function listItemEligibleBulkDepositApprove(e: TournamentApplicationListItem): boolean {
+  if (isProcessingCancelledEntry(e)) return false;
   if (e.status === "REJECTED" || e.status === "APPROVED" || e.status === "WAITING") return false;
   const depAt = coerceClientProcessingIsoAt(e.clientDepositConfirmedAt as unknown);
   if (!depAt) return false;
@@ -256,11 +252,13 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   }, [sortedEntries, zonesEnabled, zoneFilterZoneId]);
 
   const chipApproved = countApplicationApprovedChip(entries);
+  const chipCancelled = countApplicationCancelledChip(entries);
   const printHref = `/client/tournaments/${encodeURIComponent(tournamentId)}/participants/print`;
   const tableViewHref = `/client/tournaments/${encodeURIComponent(tournamentId)}/participants/table-view`;
   const showFinalize = !CLOSED_BADGES.includes(tournamentStatusBadge);
   const showCancelFinalize = tournamentStatusBadge === "마감";
   const fullscreenTable = variant === "fullscreenTable";
+  const chipTotal = fullscreenTable ? entries.length : participantCountSummary.total;
   const [tableLandscapePhase, setTableLandscapePhase] = useState<ApplicationsTableLandscapePhase>(() =>
     fullscreenTable ? "pending" : "ready",
   );
@@ -639,7 +637,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
               <div className="client-tournament-manage__applicationsStatusLegendSingleLine-chips">
                 <span className="client-tournament-manage__statusChipCompact client-tournament-manage__statusChipCompact--apply">
                   <span className="client-tournament-manage__statusChipLabel">신청</span>
-                  <strong className="client-tournament-manage__statusChipCount">{participantCountSummary.total}명</strong>
+                  <strong className="client-tournament-manage__statusChipCount">{chipTotal}명</strong>
                 </span>
                 <span className="client-tournament-manage__statusChipCompact client-tournament-manage__statusChipCompact--approved">
                   <span className="client-tournament-manage__statusChipLabel">승인</span>
@@ -647,7 +645,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                 </span>
                 <span className="client-tournament-manage__statusChipCompact client-tournament-manage__statusChipCompact--rejected">
                   <span className="client-tournament-manage__statusChipLabel">취소</span>
-                  <strong className="client-tournament-manage__statusChipCount">{participantCountSummary.reject}명</strong>
+                  <strong className="client-tournament-manage__statusChipCount">{chipCancelled}명</strong>
                 </span>
                 {waitingListTotal > 0 ? (
                   <span className="client-tournament-manage__statusChipCompact client-tournament-manage__statusChipCompact--waiting">
@@ -792,6 +790,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                   <col className="participant-col-w-fs participant-col-w-fs--deposit" />
                   <col className="participant-col-w-fs participant-col-w-fs--approveBtn" />
                   <col className="participant-col-w-fs participant-col-w-fs--reject" />
+                  <col className="participant-col-w-fs participant-col-w-fs--delete" />
                 </colgroup>
               ) : (
                 <colgroup className="client-tournament-manage__participantTableColgroup--appsStandard">
@@ -840,6 +839,9 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                       </th>
                       <th className="participant-th participant-th--reject" style={{ ...participantApplicationsTableThBase, textAlign: "center" }}>
                         취소
+                      </th>
+                      <th className="participant-th participant-th--delete" style={{ ...participantApplicationsTableThBase, textAlign: "center" }}>
+                        삭제
                       </th>
                     </>
                   ) : (
@@ -890,9 +892,18 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     attendanceChecked={entry.attendanceChecked}
                     initialClientDepositConfirmedAt={entry.clientDepositConfirmedAt ?? null}
                     initialClientApplicationApprovedAt={entry.clientApplicationApprovedAt ?? null}
+                    initialClientApplicationCancelledAt={entry.clientApplicationCancelledAt ?? null}
                     rowLayout={rowLayout}
                     opButtonPresentation="icon"
                     approvalCapacityFull={approvalCapacityFull}
+                    onProcessingUpdated={(patch) => {
+                      setEntries((prev) =>
+                        prev.map((e) => (e.id === entry.id ? { ...e, ...patch } : e)),
+                      );
+                    }}
+                    onDeleted={() => {
+                      setEntries((prev) => prev.filter((e) => e.id !== entry.id));
+                    }}
                   />
                 ))}
               </tbody>
