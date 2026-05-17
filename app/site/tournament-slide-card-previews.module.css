@@ -265,6 +265,17 @@
   pointer-events: none;
 }
 
+.footerContent {
+  position: relative;
+  z-index: 6;
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(10px * var(--tournament-card-height-scale));
+}
+
 .footerDate,
 .footerPlace {
   position: relative;
@@ -389,7 +400,7 @@
 
 .classicInner {
   position: relative;
-  z-index: 4;
+  z-index: 6;
   height: 100%;
   box-sizing: border-box;
   padding: calc(14px * var(--tournament-card-height-scale)) 16px
@@ -482,7 +493,7 @@
 .frameInner {
   --frame-badge-size: calc(3.35rem * 1.1 * var(--tournament-card-height-scale));
   position: relative;
-  z-index: 4;
+  z-index: 6;
   height: 100%;
   box-sizing: border-box;
   padding: calc(8px * var(--tournament-card-height-scale)) calc(12px * var(--tournament-card-height-scale))
@@ -662,6 +673,7 @@
 .cardRootTemplateLayout .classicTitle {
   font-size: clamp(1rem, 4.8vw, 1.3rem);
   line-height: 1.16;
+  font-weight: 800;
 }
 
 .mediaGradientLayer {
@@ -706,6 +718,7 @@
   white-space: inherit;
   word-break: inherit;
   overflow-wrap: inherit;
+  font-weight: 800;
 }
 
 .titleLayerStroke {
@@ -790,6 +803,7 @@
 .cardRootTemplateLayout .frameTitle {
   font-size: clamp(1rem, 4.8vw, 1.3rem);
   line-height: 1.16;
+  font-weight: 800;
 }
 
 .cardRootTemplateLayout .fullSurfaceFooterDate,

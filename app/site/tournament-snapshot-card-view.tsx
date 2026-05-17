@@ -390,22 +390,24 @@ function TournamentSlideCardPreview({
   const splitFooter = (
     <footer className={styles.cardFooter}>
       <div className={styles.cardFooterBackground} style={bottomBarStyle} />
-      <p
-        data-tournament-card-overlay="date"
-        data-outline-content-item="1"
-        className={`${styles.footerDate} ${captureHideGlyphClass}`.trim()}
-        style={splitDateStyle}
-      >
-        {parsed.dateText}
-      </p>
-      <p
-        data-tournament-card-overlay="place"
-        data-outline-content-item="1"
-        className={`${styles.footerPlace} ${captureHideGlyphClass}`.trim()}
-        style={splitPlaceStyle}
-      >
-        {parsed.placeText}
-      </p>
+      <div className={styles.footerContent}>
+        <p
+          data-tournament-card-overlay="date"
+          data-outline-content-item="1"
+          className={`${styles.footerDate} ${captureHideGlyphClass}`.trim()}
+          style={splitDateStyle}
+        >
+          {parsed.dateText}
+        </p>
+        <p
+          data-tournament-card-overlay="place"
+          data-outline-content-item="1"
+          className={`${styles.footerPlace} ${captureHideGlyphClass}`.trim()}
+          style={splitPlaceStyle}
+        >
+          {parsed.placeText}
+        </p>
+      </div>
     </footer>
   );
 

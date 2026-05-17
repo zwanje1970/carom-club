@@ -283,6 +283,7 @@ export default function ClientTournamentCardPublishV2Page() {
   /** 모집중 게시 진행(단계형 % + 문구) */
   const [publishFlow, setPublishFlow] = useState<PublishFlowState | null>(null);
   const [publishFlowError, setPublishFlowError] = useState("");
+  const [publishUiPercent, setPublishUiPercent] = useState(0);
   /** `loadSnapshots` 기준 대회 배지 — 게시 실패 시 PATCH 롤백용 */
   const [tournamentStatusBadge, setTournamentStatusBadge] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -623,6 +624,27 @@ export default function ClientTournamentCardPublishV2Page() {
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [loadSnapshots]);
 
+  useEffect(() => {
+    const activeRecruitingFlow =
+      publishBusy && publishIntent === "recruiting" && !publishFlowError;
+    if (!activeRecruitingFlow) {
+      setPublishUiPercent(0);
+      return;
+    }
+    const targetPercent = Math.max(0, Math.min(100, Math.round(publishFlow?.percent ?? 0)));
+    if (targetPercent >= 100) {
+      setPublishUiPercent(100);
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setPublishUiPercent((prev) => {
+        if (prev >= targetPercent) return prev;
+        return Math.min(prev + 10, targetPercent);
+      });
+    }, 220);
+    return () => window.clearInterval(timer);
+  }, [publishBusy, publishIntent, publishFlow?.percent, publishFlowError]);
+
   function buildCardPayload(draftOnly: boolean): { ok: true; body: Record<string, unknown> } | { ok: false; error: string } {
     if (!tournamentId.trim()) return { ok: false, error: "대회 정보가 없습니다." };
     if (!title.trim()) return { ok: false, error: "제목을 입력해 주세요." };
@@ -822,6 +844,17 @@ export default function ClientTournamentCardPublishV2Page() {
   const editorLocked = publishBusy || uploading;
   const publishActionBlocked = publishBusy || uploading;
   const publishButtonLabel = publishBusy ? "처리 중…" : "게시";
+  const showRecruitingFlow = publishIntent === "recruiting" && (Boolean(publishFlow) || Boolean(publishFlowError));
+  const publishStatusMessage = !showRecruitingFlow
+    ? "모집중으로 게시하면 메인에 홍보됩니다. 임시저장은 공개 카드를 바꾸지 않습니다."
+    : publishFlow
+      ? publishFlow.label
+      : "";
+  const publishStatusGraphPercent = publishFlowError
+    ? 0
+    : publishFlow?.percent === 100
+      ? 100
+      : publishUiPercent;
 
   function handlePublishCompleteModalConfirm(): void {
     setPublishCompleteModalOpen(false);
@@ -1071,31 +1104,21 @@ export default function ClientTournamentCardPublishV2Page() {
                         aria-busy={Boolean(publishBusy && publishIntent === "recruiting" && !publishFlowError && publishFlow)}
                         className={`${editorStyles.publishStatusSlot} ${publishFlow || publishFlowError ? editorStyles.publishStatusSlotActive : ""} ${publishFlowError ? editorStyles.publishStatusSlotError : ""}`}
                       >
-                        <div className={editorStyles.publishStatusTextRow}>
-                          {!publishFlow && !publishFlowError ? (
-                            <p className={editorStyles.publishStatusHelper}>
-                              모집중으로 게시하면 메인에 홍보됩니다. 임시저장은 공개 카드를 바꾸지 않습니다.
-                            </p>
-                          ) : publishFlow ? (
-                            <>
-                              <span className={editorStyles.publishStatusLabel}>{publishFlow.label}</span>
-                              <span className={editorStyles.publishStatusPercent}>{publishFlow.percent}%</span>
-                            </>
-                          ) : null}
-                        </div>
-                        {publishFlow?.hint ? (
-                          <p className={editorStyles.publishStatusHint}>{publishFlow.hint}</p>
-                        ) : null}
-                        <div
-                          className={`${editorStyles.publishStatusBarTrack} ${!publishFlow && !publishFlowError ? editorStyles.publishStatusBarTrackIdle : ""} ${publishFlowError ? editorStyles.publishStatusBarTrackError : ""}`}
-                          aria-hidden={!publishFlow && !publishFlowError}
-                        >
-                          {publishFlow ? (
-                            <div
-                              className={`${editorStyles.publishStatusBarFill} ${publishFlowError ? editorStyles.publishStatusBarFillError : ""}`}
-                              style={{ width: `${publishFlow.percent}%` }}
-                            />
-                          ) : null}
+                        <p className={editorStyles.publishStatusMessage}>{publishStatusMessage || "\u00a0"}</p>
+                        <div className={editorStyles.publishStatusGraphBox} aria-hidden={!showRecruitingFlow}>
+                          <div
+                            className={`${editorStyles.publishStatusBarTrack} ${publishFlowError ? editorStyles.publishStatusBarTrackError : ""}`}
+                          >
+                            {showRecruitingFlow ? (
+                              <div
+                                className={`${editorStyles.publishStatusBarFill} ${publishFlowError ? editorStyles.publishStatusBarFillError : ""}`}
+                                style={{ width: `${publishStatusGraphPercent}%` }}
+                              />
+                            ) : null}
+                          </div>
+                          <span className={editorStyles.publishStatusPercentInside}>
+                            {showRecruitingFlow && !publishFlowError ? `${publishStatusGraphPercent}%` : ""}
+                          </span>
                         </div>
                         <p
                           className={`${editorStyles.publishStatusErrorLine} ${publishFlowError ? editorStyles.publishStatusErrorLineVisible : ""}`}
