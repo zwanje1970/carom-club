@@ -80,14 +80,54 @@ function bracketScaleLabel(maxParticipants: number): string {
   return `${k}강`;
 }
 
-function mergeByEntryId(
-  a: TournamentApplicationListItem[],
-  b: TournamentApplicationListItem[]
+type ListItemMaybeDeleted = TournamentApplicationListItem & { deletedAt?: string | null };
+
+function hasListItemDeletedAt(entry: ListItemMaybeDeleted): boolean {
+  const raw = entry.deletedAt;
+  return typeof raw === "string" && raw.trim() !== "";
+}
+
+function filterVisibleListEntries(
+  list: TournamentApplicationListItem[],
+  deletedIds: Set<string>,
 ): TournamentApplicationListItem[] {
-  const map = new Map<string, TournamentApplicationListItem>();
-  for (const e of a) map.set(e.id, e);
-  for (const e of b) map.set(e.id, e);
-  return Array.from(map.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return list.filter((e) => {
+    if (deletedIds.has(e.id)) return false;
+    if (hasListItemDeletedAt(e as ListItemMaybeDeleted)) return false;
+    return true;
+  });
+}
+
+/** 서버 목록 기준 병합 — prev에만 있고 서버에 없는(삭제 잔여) 항목은 다시 넣지 않는다. */
+function mergeServerEntriesWithPrev(
+  serverEntries: TournamentApplicationListItem[],
+  prev: TournamentApplicationListItem[],
+  deletedIds: Set<string>,
+): TournamentApplicationListItem[] {
+  const visibleServer = filterVisibleListEntries(serverEntries, deletedIds);
+  const serverIdSet = new Set(visibleServer.map((e) => e.id));
+  const prevById = new Map(
+    filterVisibleListEntries(prev, deletedIds)
+      .filter((e) => serverIdSet.has(e.id))
+      .map((e) => [e.id, e] as const),
+  );
+  const merged = visibleServer.map((serverEntry) => {
+    const prevEntry = prevById.get(serverEntry.id);
+    if (!prevEntry) return serverEntry;
+    return {
+      ...serverEntry,
+      ...(prevEntry.clientDepositConfirmedAt !== undefined
+        ? { clientDepositConfirmedAt: prevEntry.clientDepositConfirmedAt }
+        : {}),
+      ...(prevEntry.clientApplicationApprovedAt !== undefined
+        ? { clientApplicationApprovedAt: prevEntry.clientApplicationApprovedAt }
+        : {}),
+      ...(prevEntry.clientApplicationCancelledAt !== undefined
+        ? { clientApplicationCancelledAt: prevEntry.clientApplicationCancelledAt }
+        : {}),
+    };
+  });
+  return merged.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 /** 목록 항목의 입금/신청승인 시각 — 문자열 외 직렬화 형태 보정(전체승인 대상 판정만, 타입 정의는 유지) */
@@ -149,8 +189,10 @@ export default function ClientTournamentParticipantsApplicationsBlock({
 }: Props) {
   const router = useRouter();
   const metricColumnTitle = participantMetricColumnTitle(entryQualificationType);
-  const [entries, setEntries] = useState<TournamentApplicationListItem[]>(initialEntries);
   const deletedEntryIdsRef = useRef<Set<string>>(new Set());
+  const [entries, setEntries] = useState<TournamentApplicationListItem[]>(() =>
+    mergeServerEntriesWithPrev(initialEntries, [], deletedEntryIdsRef.current),
+  );
   const [finalizeBusy, setFinalizeBusy] = useState(false);
   const [finalizeUnapprovedModalCount, setFinalizeUnapprovedModalCount] = useState<number | null>(null);
   const [bulkApproveBusy, setBulkApproveBusy] = useState(false);
@@ -159,13 +201,8 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   const [moreLoading, setMoreLoading] = useState(() => participantCountSummary.total > initialEntries.length);
   const fullFetchDoneRef = useRef(false);
 
-  function excludeDeletedEntries(list: TournamentApplicationListItem[]): TournamentApplicationListItem[] {
-    if (deletedEntryIdsRef.current.size === 0) return list;
-    return list.filter((e) => !deletedEntryIdsRef.current.has(e.id));
-  }
-
   useEffect(() => {
-    setEntries((prev) => excludeDeletedEntries(mergeByEntryId(initialEntries, prev)));
+    setEntries((prev) => mergeServerEntriesWithPrev(initialEntries, prev, deletedEntryIdsRef.current));
   }, [initialEntries]);
 
   useEffect(() => {
@@ -193,7 +230,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
           return;
         }
         if (cancelled) return;
-        setEntries((prev) => excludeDeletedEntries(mergeByEntryId(json.entries, prev)));
+        setEntries((prev) => mergeServerEntriesWithPrev(json.entries, prev, deletedEntryIdsRef.current));
         fullFetchDoneRef.current = true;
       } catch {
         /* ignore */
@@ -924,6 +961,13 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                     onDeleted={(deletedEntryId) => {
                       deletedEntryIdsRef.current.add(deletedEntryId);
                       setEntries((prev) => prev.filter((e) => e.id !== deletedEntryId));
+                    }}
+                    onDeletedRestore={(restoredEntry) => {
+                      deletedEntryIdsRef.current.delete(restoredEntry.id);
+                      setEntries((prev) => {
+                        if (prev.some((e) => e.id === restoredEntry.id)) return prev;
+                        return [...prev, restoredEntry].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+                      });
                     }}
                   />
                 ))}

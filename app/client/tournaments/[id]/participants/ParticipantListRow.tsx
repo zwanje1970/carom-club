@@ -8,6 +8,17 @@ import ParticipantApplicationDetailModal from "./ParticipantApplicationDetailMod
 import ParticipantProcessingConfirmModal, {
   type ParticipantProcessingConfirmKind,
 } from "./ParticipantProcessingConfirmModal";
+import type { TournamentApplicationListItem } from "../../../../../lib/types/entities";
+
+function isParticipantDeleteAlreadyGone(status: number, error?: string): boolean {
+  if (status === 404) return true;
+  const msg = (error ?? "").trim();
+  return (
+    msg === "참가신청을 찾을 수 없습니다." ||
+    msg === "이미 삭제된 신청입니다." ||
+    msg.includes("삭제할 참가신청을 찾을 수 없")
+  );
+}
 
 type TournamentApplicationStatus =
   | "APPLIED"
@@ -57,6 +68,7 @@ export default function ParticipantListRow({
   approvalCapacityFull = false,
   onProcessingUpdated,
   onDeleted,
+  onDeletedRestore,
 }: {
   tournamentId: string;
   entryId: string;
@@ -86,6 +98,7 @@ export default function ParticipantListRow({
     clientApplicationCancelledAt?: string | null;
   }) => void;
   onDeleted?: (entryId: string) => void;
+  onDeletedRestore?: (entry: TournamentApplicationListItem) => void;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<TournamentApplicationStatus>(initialStatus);
@@ -103,8 +116,16 @@ export default function ParticipantListRow({
   const depositConfirmInflightRef = useRef<Promise<void> | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [confirmKind, setConfirmKind] = useState<ParticipantProcessingConfirmKind | null>(null);
-  const [confirmBusy, setConfirmBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [processingAction, setProcessingAction] = useState<ParticipantProcessingConfirmKind | null>(null);
+  const processingSnapshotRef = useRef<{
+    clientDepositConfirmedAt: string | null;
+    clientApplicationApprovedAt: string | null;
+    clientApplicationCancelledAt: string | null;
+    status: TournamentApplicationStatus;
+  } | null>(null);
+  const cancelBeforeSnapshotRef = useRef<{ deposit: string | null; approve: string | null } | null>(null);
+  const rowActionBusy = loading || deleteBusy;
 
   useEffect(() => {
     setStatus(initialStatus);
@@ -150,10 +171,10 @@ export default function ParticipantListRow({
       applicationApproved?: boolean;
       applicationCancelled?: boolean;
     },
-    options?: { fromConfirmModal?: boolean },
+    options?: { fromConfirmModal?: boolean; skipRefresh?: boolean },
   ): Promise<boolean> {
     if (loading && !options?.fromConfirmModal) return false;
-    setLoading(true);
+    if (!options?.fromConfirmModal) setLoading(true);
     try {
       const response = await fetch(
         `/api/client/tournaments/${encodeURIComponent(tournamentId)}/participants/${encodeURIComponent(entryId)}/processing`,
@@ -219,7 +240,7 @@ export default function ParticipantListRow({
         ...(nextApprove !== undefined ? { clientApplicationApprovedAt: nextApprove } : {}),
         ...(nextCancelled !== undefined ? { clientApplicationCancelledAt: nextCancelled } : {}),
       });
-      router.refresh();
+      if (!options?.skipRefresh) router.refresh();
       return true;
     } catch {
       window.alert("처리 중 오류가 발생했습니다.");
@@ -329,12 +350,12 @@ export default function ParticipantListRow({
   }
 
   function onCancelClick() {
-    if (terminalRejected || terminalApproved || terminalWaiting || loading) return;
+    if (terminalRejected || terminalApproved || terminalWaiting || rowActionBusy) return;
     setConfirmKind(processingCancelled ? "cancel-off" : "cancel-on");
   }
 
   function onDeleteClick() {
-    if (!showDeleteButton || terminalRejected || terminalApproved || terminalWaiting || deleteBusy) return;
+    if (!showDeleteButton || terminalRejected || terminalApproved || terminalWaiting || rowActionBusy) return;
     if (!deleteAllowed) {
       window.alert("삭제하려면 먼저 입금확인, 승인, 취소를 모두 해제하세요.");
       return;
@@ -342,11 +363,106 @@ export default function ParticipantListRow({
     setConfirmKind("delete");
   }
 
+  function buildEntrySnapshot(): TournamentApplicationListItem {
+    return {
+      id: entryId,
+      applicantName,
+      phone,
+      status,
+      createdAt: registrationCreatedAt,
+      ...(depositorName != null ? { depositorName } : {}),
+      ...(affiliation != null ? { affiliation } : {}),
+      ...(registrationSource != null ? { registrationSource } : {}),
+      ...(participantAverage != null ? { participantAverage } : {}),
+      ...(handicap != null ? { handicap } : {}),
+      ...(adminNote != null ? { adminNote } : {}),
+      ...(statusChangedAt ? { statusChangedAt } : {}),
+      ...(attendanceChecked != null ? { attendanceChecked } : {}),
+      clientDepositConfirmedAt,
+      clientApplicationApprovedAt,
+      clientApplicationCancelledAt,
+    };
+  }
+
+  function captureProcessingSnapshot() {
+    processingSnapshotRef.current = {
+      clientDepositConfirmedAt,
+      clientApplicationApprovedAt,
+      clientApplicationCancelledAt,
+      status,
+    };
+  }
+
+  function rollbackProcessingSnapshot() {
+    const snap = processingSnapshotRef.current;
+    if (!snap) return;
+    setClientDepositConfirmedAt(snap.clientDepositConfirmedAt);
+    setClientApplicationApprovedAt(snap.clientApplicationApprovedAt);
+    setClientApplicationCancelledAt(snap.clientApplicationCancelledAt);
+    setStatus(snap.status);
+    onProcessingUpdated?.({
+      clientDepositConfirmedAt: snap.clientDepositConfirmedAt,
+      clientApplicationApprovedAt: snap.clientApplicationApprovedAt,
+      clientApplicationCancelledAt: snap.clientApplicationCancelledAt,
+    });
+    processingSnapshotRef.current = null;
+  }
+
+  function applyOptimisticConfirm(kind: ParticipantProcessingConfirmKind) {
+    if (kind === "deposit-unconfirm") {
+      setClientDepositConfirmedAt(null);
+      setClientApplicationApprovedAt(null);
+      onProcessingUpdated?.({ clientDepositConfirmedAt: null, clientApplicationApprovedAt: null });
+      return;
+    }
+    if (kind === "approval-unconfirm") {
+      setClientApplicationApprovedAt(null);
+      onProcessingUpdated?.({ clientApplicationApprovedAt: null });
+      return;
+    }
+    if (kind === "cancel-on") {
+      cancelBeforeSnapshotRef.current = {
+        deposit: clientDepositConfirmedAt,
+        approve: clientApplicationApprovedAt,
+      };
+      const now = new Date().toISOString();
+      setClientDepositConfirmedAt(null);
+      setClientApplicationApprovedAt(null);
+      setClientApplicationCancelledAt(now);
+      onProcessingUpdated?.({
+        clientDepositConfirmedAt: null,
+        clientApplicationApprovedAt: null,
+        clientApplicationCancelledAt: now,
+      });
+      return;
+    }
+    if (kind === "cancel-off") {
+      const before = cancelBeforeSnapshotRef.current;
+      setClientApplicationCancelledAt(null);
+      if (before) {
+        setClientDepositConfirmedAt(before.deposit);
+        setClientApplicationApprovedAt(before.approve);
+        onProcessingUpdated?.({
+          clientApplicationCancelledAt: null,
+          clientDepositConfirmedAt: before.deposit,
+          clientApplicationApprovedAt: before.approve,
+        });
+      } else {
+        onProcessingUpdated?.({ clientApplicationCancelledAt: null });
+      }
+    }
+  }
+
   async function handleConfirmModalAction() {
-    if (!confirmKind || confirmBusy || deleteBusy) return;
-    if (confirmKind === "delete") {
-      setConfirmBusy(true);
+    if (!confirmKind || rowActionBusy) return;
+    const kind = confirmKind;
+
+    if (kind === "delete") {
+      const entrySnapshot = buildEntrySnapshot();
       setDeleteBusy(true);
+      setLoading(true);
+      onDeleted?.(entryId);
+      setConfirmKind(null);
       try {
         const response = await fetch(
           `/api/client/tournaments/${encodeURIComponent(tournamentId)}/participants/${encodeURIComponent(entryId)}`,
@@ -354,35 +470,44 @@ export default function ParticipantListRow({
         );
         const result = (await response.json()) as { error?: string };
         if (!response.ok) {
+          if (isParticipantDeleteAlreadyGone(response.status, result.error)) {
+            return;
+          }
+          onDeletedRestore?.(entrySnapshot);
           window.alert(result.error ?? "삭제에 실패했습니다.");
-          return;
         }
-        setConfirmKind(null);
-        onDeleted?.(entryId);
       } catch {
+        onDeletedRestore?.(entrySnapshot);
         window.alert("삭제 중 오류가 발생했습니다.");
       } finally {
-        setConfirmBusy(false);
         setDeleteBusy(false);
+        setLoading(false);
       }
       return;
     }
 
-    setConfirmBusy(true);
+    captureProcessingSnapshot();
+    applyOptimisticConfirm(kind);
+    setProcessingAction(kind);
+    setLoading(true);
+    setConfirmKind(null);
     try {
       let ok = false;
-      if (confirmKind === "deposit-unconfirm") {
-        ok = await patchProcessing({ depositConfirmed: false }, { fromConfirmModal: true });
-      } else if (confirmKind === "approval-unconfirm") {
-        ok = await patchProcessing({ applicationApproved: false }, { fromConfirmModal: true });
-      } else if (confirmKind === "cancel-on") {
-        ok = await patchProcessing({ applicationCancelled: true }, { fromConfirmModal: true });
-      } else if (confirmKind === "cancel-off") {
-        ok = await patchProcessing({ applicationCancelled: false }, { fromConfirmModal: true });
+      const patchOpts = { fromConfirmModal: true, skipRefresh: true };
+      if (kind === "deposit-unconfirm") {
+        ok = await patchProcessing({ depositConfirmed: false }, patchOpts);
+      } else if (kind === "approval-unconfirm") {
+        ok = await patchProcessing({ applicationApproved: false }, patchOpts);
+      } else if (kind === "cancel-on") {
+        ok = await patchProcessing({ applicationCancelled: true }, patchOpts);
+      } else if (kind === "cancel-off") {
+        ok = await patchProcessing({ applicationCancelled: false }, patchOpts);
       }
-      if (ok) setConfirmKind(null);
+      if (!ok) rollbackProcessingSnapshot();
+      else processingSnapshotRef.current = null;
     } finally {
-      setConfirmBusy(false);
+      setProcessingAction(null);
+      setLoading(false);
     }
   }
 
@@ -426,7 +551,7 @@ export default function ParticipantListRow({
         <button
           type="button"
           className="participant-op-textBtn"
-          disabled={loading || depositConfirmSaving}
+          disabled={rowActionBusy || depositConfirmSaving}
           style={{
             ...textOpBtnBase,
             borderColor: done ? "#dc2626" : "#f87171",
@@ -435,7 +560,7 @@ export default function ParticipantListRow({
           }}
           onClick={() => onDepositClick()}
         >
-          입금확인
+          {processingAction === "deposit-unconfirm" ? "처리중" : "입금확인"}
         </button>
       );
     }
@@ -481,12 +606,12 @@ export default function ParticipantListRow({
       <span className="participant-op-hit">
         <button
           type="button"
-          disabled={loading || depositConfirmSaving}
+          disabled={rowActionBusy || depositConfirmSaving}
           className={idleCls}
-          aria-label={done ? "입금확인(완료)" : "입금확인"}
+          aria-label={processingAction === "deposit-unconfirm" ? "입금확인(처리중)" : done ? "입금확인(완료)" : "입금확인"}
           onClick={() => onDepositClick()}
         >
-          ₩
+          {processingAction === "deposit-unconfirm" ? "…" : "₩"}
         </button>
       </span>
     );
@@ -521,7 +646,7 @@ export default function ParticipantListRow({
         <button
           type="button"
           className="participant-op-textBtn"
-          disabled={loading}
+          disabled={rowActionBusy}
           style={{
             ...textOpBtnBase,
             borderColor: done ? "#15803d" : "#86efac",
@@ -530,7 +655,7 @@ export default function ParticipantListRow({
           }}
           onClick={() => onApproveClick()}
         >
-          승인
+          {processingAction === "approval-unconfirm" ? "처리중" : "승인"}
         </button>
       );
     }
@@ -588,8 +713,14 @@ export default function ParticipantListRow({
     const cls = done ? "participant-op-btn participant-op-btn--check participant-op-btn--check-done" : "participant-op-btn participant-op-btn--check participant-op-btn--check-idle";
     return (
       <span className="participant-op-hit">
-        <button type="button" disabled={loading} className={cls} aria-label={done ? "승인(완료)" : "승인"} onClick={() => onApproveClick()}>
-          ✓
+        <button
+          type="button"
+          disabled={rowActionBusy}
+          className={cls}
+          aria-label={processingAction === "approval-unconfirm" ? "승인(처리중)" : done ? "승인(완료)" : "승인"}
+          onClick={() => onApproveClick()}
+        >
+          {processingAction === "approval-unconfirm" ? "…" : "✓"}
         </button>
       </span>
     );
@@ -617,7 +748,7 @@ export default function ParticipantListRow({
         <button
           type="button"
           className="participant-op-textBtn"
-          disabled={loading}
+          disabled={rowActionBusy}
           style={{
             ...textOpBtnBase,
             borderColor: done ? "#64748b" : "#cbd5e1",
@@ -626,7 +757,7 @@ export default function ParticipantListRow({
           }}
           onClick={() => onCancelClick()}
         >
-          취소
+          {processingAction === "cancel-on" || processingAction === "cancel-off" ? "처리중" : "취소"}
         </button>
       );
     }
@@ -660,13 +791,19 @@ export default function ParticipantListRow({
       <span className="participant-op-hit">
         <button
           type="button"
-          disabled={loading}
+          disabled={rowActionBusy}
           className={cls}
-          aria-label={done ? "취소(완료)" : "취소"}
+          aria-label={
+            processingAction === "cancel-on" || processingAction === "cancel-off"
+              ? "취소(처리중)"
+              : done
+                ? "취소(완료)"
+                : "취소"
+          }
           onClick={() => onCancelClick()}
         >
           <span className="participant-op-cross-glyph" aria-hidden="true">
-            ✕
+            {processingAction === "cancel-on" || processingAction === "cancel-off" ? "…" : "✕"}
           </span>
         </button>
       </span>
@@ -869,9 +1006,9 @@ export default function ParticipantListRow({
       {confirmKind ? (
         <ParticipantProcessingConfirmModal
           kind={confirmKind}
-          busy={confirmBusy || deleteBusy}
+          busy={rowActionBusy}
           onClose={() => {
-            if (!confirmBusy && !deleteBusy) setConfirmKind(null);
+            if (!rowActionBusy) setConfirmKind(null);
           }}
           onConfirm={() => void handleConfirmModalAction()}
         />

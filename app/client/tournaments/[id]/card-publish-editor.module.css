@@ -56,15 +56,14 @@
   box-shadow: inset 0 -2px 0 #3b82f6;
 }
 
-/** 게시카드 작성 v2 전용 상단 미리보기 섹션(풀폭) */
-.previewSection {
+/** 게시카드 작성 v2 — 상단 미리보기 풀폭 블록(pageWrap·pcPageShell 밖) */
+.previewFullWidthBlock {
   width: 100%;
   box-sizing: border-box;
   padding: 0;
   margin: 0;
+  flex-shrink: 0;
   background: transparent;
-  border-bottom: none;
-  grid-column: 1 / -1;
 }
 
 /* 게시 v2 미리보기·메인 스크롤 대회 카드 공통 — `.pageWrapV2` 하위 선택자 대신 클래스로 동일 외곽 재사용 */
@@ -700,6 +699,12 @@
   display: none;
 }
 
+/* 미리보기 풀폭 — main 좌우 패딩은 pageWrap(편집툴)에만 적용 */
+:global(main[data-card-publish-v2="1"]).v3-page {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 @media (min-width: 1024px) {
   .pcPageShell {
     display: grid;
@@ -719,12 +724,6 @@
     display: block;
     min-width: 0;
     box-sizing: border-box;
-  }
-
-  .pcPageMain > .previewSection {
-    margin-left: calc(50% - 50vw);
-    margin-right: calc(50% - 50vw);
-    width: 100vw;
   }
 }
 
@@ -749,6 +748,11 @@
     overflow: hidden;
   }
 
+  :global(main[data-card-publish-v2="1"]) .previewFullWidthBlock {
+    flex-shrink: 0;
+    border-bottom: 1px solid #e4e4e7;
+  }
+
   :global(main[data-card-publish-v2="1"]) .pcPageMain {
     flex: 1 1 auto;
     min-height: 0;
@@ -769,36 +773,9 @@
     margin-bottom: 8px;
   }
 
-  /*
-   * 미리보기 카드 폭 = min(440, 본문 폭). 모바일에서 v3-page·pageWrap 좌우 패딩 합이 크면
-   * 실제 면이 과소해져 440:180 대비 높이도 작아 보임 — 게시 v2만 패딩 완화.
-   */
-  :global(main[data-card-publish-v2="1"]).v3-page {
+  .pageWrap.pageWrapV2 {
     padding-left: max(0.35rem, env(safe-area-inset-left, 0px));
     padding-right: max(0.35rem, env(safe-area-inset-right, 0px));
-  }
-
-  .pageWrap.pageWrapV2 {
-    padding-left: 0.35rem;
-    padding-right: 0.35rem;
-  }
-
-  :global(main[data-card-publish-v2="1"]) .previewSection {
-    position: relative;
-    top: auto;
-    z-index: 1;
-    flex-shrink: 0;
-    padding: 0;
-    margin-left: calc(50% - 50vw);
-    margin-right: calc(50% - 50vw);
-    width: 100vw;
-    max-width: 100vw;
-    background: transparent;
-    border-bottom: 1px solid #e4e4e7;
-  }
-
-  :global(main[data-card-publish-v2="1"]) .previewSlideLayer {
-    padding: 15px;
   }
 
   :global(main[data-card-publish-v2="1"]) .formPanel {

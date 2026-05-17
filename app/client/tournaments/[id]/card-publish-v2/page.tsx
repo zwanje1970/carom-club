@@ -927,18 +927,18 @@ export default function ClientTournamentCardPublishV2Page() {
         variant="compact"
         message="이미지를 준비하는 중입니다."
       />
-      <div className={editorStyles.pcPageShell}>
-        <div className={editorStyles.pcPageMain}>
-          <div className={editorStyles.previewSection}>
-            <div className={editorStyles.previewSlideLayer}>
-              <div className={editorStyles.previewCardAspectFace}>
-                <div className={`${editorStyles.previewCardWrap} ${editorStyles.previewCardWrapV2Chrome}`}>
-                  <CardPublishPreview ref={cardPublishPreviewCaptureRef} model={previewModel} />
-                </div>
-              </div>
+      <div className={editorStyles.previewFullWidthBlock}>
+        <div className={editorStyles.previewSlideLayer}>
+          <div className={editorStyles.previewCardAspectFace}>
+            <div className={`${editorStyles.previewCardWrap} ${editorStyles.previewCardWrapV2Chrome}`}>
+              <CardPublishPreview ref={cardPublishPreviewCaptureRef} model={previewModel} />
             </div>
           </div>
+        </div>
+      </div>
 
+      <div className={editorStyles.pcPageShell}>
+        <div className={editorStyles.pcPageMain}>
           <div className={`${editorStyles.pageWrap} ${editorStyles.pageWrapV2}`}>
             <div className={editorStyles.formPanel}>
               <div className={editorStyles.stepTabsWrap}>
