@@ -56,17 +56,18 @@
   box-shadow: inset 0 -2px 0 #3b82f6;
 }
 
-/** 게시카드 작성 v2 — 상단 미리보기 풀폭 블록(main 직계, pageWrap과 형제) */
+/** 게시카드 작성 v2 — 상단 미리보기 래퍼(main 직계, pageWrap과 형제) — 폭·배경은 previewSlideLayer */
 .previewFullWidthBlock {
-  width: 100%;
-  max-width: none;
-  min-width: 0;
-  align-self: stretch;
   box-sizing: border-box;
+  display: block;
   padding: 0;
   margin: 0;
   flex-shrink: 0;
   background: transparent;
+  min-width: 0;
+  align-self: stretch;
+  max-width: none;
+  overflow: visible;
 }
 
 /* 게시 v2 미리보기·메인 스크롤 대회 카드 공통 — `.pageWrapV2` 하위 선택자 대신 클래스로 동일 외곽 재사용 */
@@ -173,13 +174,15 @@
 }
 
 /**
- * 메인 `.slideViewportSiteMain` 과 동일 배경·가로 풀폭 무대(세로는 카드 1장 높이만).
+ * 메인 `.slideViewportSiteMain` 과 동일 배경·앱 가로 풀폭 무대(세로는 카드 1장 높이만).
+ * 좌우 여백 없음 — 카드 inset 은 previewCardSlot margin 만.
  */
 .previewSlideLayer {
   box-sizing: border-box;
+  display: block;
   width: 100%;
   max-width: none;
-  display: block;
+  margin: 0;
   padding: 0;
   background-color: rgba(191, 219, 254, 0.5);
   overflow-x: hidden;
@@ -188,14 +191,14 @@
   --site-main-scroll-card-face-border-radius: 12px;
 }
 
-/** 메인 `.sampleMainCardSlot` 과 동일 margin(15px) — 카드 주변 여백 */
+/** 메인 `.sampleMainCardSlot` 과 동일 margin(15px) — 무대 안 카드 여백만 */
 .previewCardSlot {
   box-sizing: border-box;
+  display: block;
   width: auto;
   min-width: 0;
   margin: 15px;
   padding: 0;
-  flex-shrink: 0;
 }
 
 /**
@@ -219,38 +222,39 @@
   background: transparent;
 }
 
-/* 미리보기 무대: editor rem 고정 높이·line-clamp 대신 메인 slideDeckAspectFill 채움 */
-.previewFullWidthBlock :global(article[data-editor-card-preview="1"].cardRoot.cardRootSlideDeck) {
-  height: auto;
-  min-height: 100%;
+/*
+ * 미리보기 무대: editor rem calc 고정 높이(201px 등) 대신 면(previewCardAspectFace) 100% 채움.
+ * .cardRoot 등 CSS Module 해시 클래스는 :global() 안 attribute 선택자만 사용.
+ */
+.previewFullWidthBlock :global(article[data-editor-card-preview="1"]) {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
   flex: 1 1 auto;
-  flex-shrink: 0;
-}
-
-.previewFullWidthBlock :global(article[data-editor-card-preview="1"] .classicTitle),
-.previewFullWidthBlock :global(article[data-editor-card-preview="1"] .frameTitle),
-.previewFullWidthBlock :global(article[data-editor-card-preview="1"] .classicLead),
-.previewFullWidthBlock :global(article[data-editor-card-preview="1"] .frameLead),
-.previewFullWidthBlock :global(article[data-editor-card-preview="1"] .classicDesc),
-.previewFullWidthBlock :global(article[data-editor-card-preview="1"] .frameDesc),
-.previewFullWidthBlock :global(article[data-editor-card-preview="1"] .classicDescSecondary),
-.previewFullWidthBlock :global(article[data-editor-card-preview="1"] .frameDescSecondary) {
-  display: block;
-  -webkit-box-orient: unset;
-  -webkit-line-clamp: unset;
+  flex-shrink: 1;
   overflow: hidden;
-  word-break: break-word;
-  white-space: pre-wrap;
+  box-sizing: border-box;
 }
 
 .previewCardAspectFace .cardPublishCaptureRootFlexFill {
   flex: 1 1 auto;
-  min-height: 100%;
+  min-height: 0;
+  height: 100%;
   width: 100%;
 }
 
 .previewCardAspectFace .cardPublishCaptureRootFlexFill > :global(article) {
-  min-height: 100%;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+}
+
+.previewCardAspectFace .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"] > :global(article) {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-shrink: 1;
 }
 
 .previewCardAspectFace > .previewCardWrap {
@@ -266,8 +270,9 @@
 
 .previewCardAspectFace > .previewCardWrap.previewCardWrapV2Chrome {
   flex: 1 1 auto;
-  flex-shrink: 0;
-  min-height: 100%;
+  flex-shrink: 1;
+  min-height: 0;
+  height: 100%;
   border: none;
   box-shadow: none;
 }
@@ -748,17 +753,42 @@
   display: none;
 }
 
-/* 미리보기 풀폭 — main·셸 좌우 패딩 제거, 편집툴 inset은 pageWrap padding만 */
-:global(main[data-card-publish-v2="1"]).v3-page {
-  padding-left: 0;
-  padding-right: 0;
+/*
+ * 미리보기 하늘색 무대(previewSlideLayer)만 앱 가로 풀폭 — globals client 셸 padding 과 동일 값으로 상쇄.
+ * pageWrap·셸 padding·하단 편집툴은 그대로.
+ */
+:global(main[data-card-publish-v2="1"].v3-page) {
+  --card-publish-dashboard-pad-left: max(12px, env(safe-area-inset-left, 0px));
+  --card-publish-dashboard-pad-right: max(12px, env(safe-area-inset-right, 0px));
+  padding-left: 0 !important;
+  padding-right: 0 !important;
   width: 100%;
   max-width: none;
   align-items: stretch;
 }
 
-:global(.app-dashboard-mobile-root:has(main[data-card-publish-v2="1"]))
-  > .app-mobile-bottom-nav-scroll-pad.app-dashboard-shell--with-mobile-chrome {
+/* main 좌우 padding 제거 후 하단 편집툴(pageWrap) 콘텐츠 폭만 기존과 동일하게 유지 — pageWrap 규칙 자체는 무변경 */
+:global(main[data-card-publish-v2="1"].v3-page) > :not([class*="previewFullWidthBlock"]) {
+  margin-left: 16px;
+  margin-right: 16px;
+  width: calc(100% - 32px);
+  box-sizing: border-box;
+}
+
+:global(main[data-card-publish-v2="1"]) .previewFullWidthBlock {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+:global(main[data-card-publish-v2="1"]) .previewSlideLayer {
+  margin-left: calc(-1 * var(--card-publish-dashboard-pad-left, 12px));
+  margin-right: calc(-1 * var(--card-publish-dashboard-pad-right, 12px));
+  width: calc(
+    100% + var(--card-publish-dashboard-pad-left, 12px) + var(--card-publish-dashboard-pad-right, 12px)
+  );
+  max-width: none;
   padding-left: 0;
   padding-right: 0;
 }
@@ -790,7 +820,7 @@
   :global(main[data-card-publish-v2="1"]) {
     flex: 1 1 auto;
     min-height: 0;
-    overflow: hidden;
+    overflow: visible;
     display: flex;
     flex-direction: column;
     width: 100%;

@@ -18,6 +18,7 @@ import ParticipantAddSheet from "./participants/ParticipantAddSheet";
 import ApplicationsTableOrientationLock, {
   type ApplicationsTableLandscapePhase,
 } from "./participants/ApplicationsTableOrientationLock";
+import { getSharedDeletedEntryIds } from "./client-participant-deleted-entry-ids-session";
 
 export type ParticipantCountSummary = {
   total: number;
@@ -189,7 +190,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
 }: Props) {
   const router = useRouter();
   const metricColumnTitle = participantMetricColumnTitle(entryQualificationType);
-  const deletedEntryIdsRef = useRef<Set<string>>(new Set());
+  const deletedEntryIdsRef = useRef(getSharedDeletedEntryIds(tournamentId));
   const [entries, setEntries] = useState<TournamentApplicationListItem[]>(() =>
     mergeServerEntriesWithPrev(initialEntries, [], deletedEntryIdsRef.current),
   );
@@ -202,8 +203,9 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   const fullFetchDoneRef = useRef(false);
 
   useEffect(() => {
+    deletedEntryIdsRef.current = getSharedDeletedEntryIds(tournamentId);
     setEntries((prev) => mergeServerEntriesWithPrev(initialEntries, prev, deletedEntryIdsRef.current));
-  }, [initialEntries]);
+  }, [initialEntries, tournamentId]);
 
   useEffect(() => {
     fullFetchDoneRef.current = false;
@@ -243,9 +245,14 @@ export default function ClientTournamentParticipantsApplicationsBlock({
     };
   }, [tournamentId, participantCountSummary.total, initialEntries.length]);
 
+  const visibleEntries = useMemo(
+    () => filterVisibleListEntries(entries, deletedEntryIdsRef.current),
+    [entries],
+  );
+
   const sortedEntries = useMemo(
-    () => [...entries].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    [entries]
+    () => [...visibleEntries].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [visibleEntries],
   );
 
   const [zones, setZones] = useState<TournamentZoneListEntry[]>([]);
