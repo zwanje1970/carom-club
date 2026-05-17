@@ -2,6 +2,7 @@ import {
   APP_ONLY_ERROR_CODE,
   captureAndUploadTournamentPublishedCardFullPngInBrowser,
 } from "./tournament-card-publish-capture";
+import { withCardPreviewTextPathLayer } from "./card-publish-v2/preview-text-outline-path";
 
 type CardSnapshotRow = {
   snapshotId?: string;
@@ -151,15 +152,20 @@ export async function publishTournamentCardFromEditorClient(args: {
     const captureController = new AbortController();
     const captureTimeoutId = window.setTimeout(() => captureController.abort(), PUBLISH_IMAGE_TIMEOUT_MS);
     try {
-      const r = await captureAndUploadTournamentPublishedCardFullPngInBrowser({
-        tournamentId,
+      await withCardPreviewTextPathLayer({
         previewCaptureRoot,
-        signal: captureController.signal,
+        run: async () => {
+          const r = await captureAndUploadTournamentPublishedCardFullPngInBrowser({
+            tournamentId,
+            previewCaptureRoot,
+            signal: captureController.signal,
+          });
+          publishedCardImageUrl = r.publishedCardImageUrl;
+          publishedCardImage480Url = r.publishedCardImage480Url;
+          publishedCardImage320Url = r.publishedCardImage320Url;
+          publishedCardImageId = r.imageId;
+        },
       });
-      publishedCardImageUrl = r.publishedCardImageUrl;
-      publishedCardImage480Url = r.publishedCardImage480Url;
-      publishedCardImage320Url = r.publishedCardImage320Url;
-      publishedCardImageId = r.imageId;
     } catch (captureErr) {
       console.error("[publishTournamentCardFromEditorClient] capture failed", captureErr);
       const code = captureErr instanceof Error ? (captureErr as Error & { code?: string }).code : undefined;

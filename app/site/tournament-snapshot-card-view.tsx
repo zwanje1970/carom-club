@@ -392,6 +392,7 @@ function TournamentSlideCardPreview({
       <div className={styles.cardFooterBackground} style={bottomBarStyle} />
       <p
         data-tournament-card-overlay="date"
+        data-outline-content-item="1"
         className={`${styles.footerDate} ${captureHideGlyphClass}`.trim()}
         style={splitDateStyle}
       >
@@ -399,6 +400,7 @@ function TournamentSlideCardPreview({
       </p>
       <p
         data-tournament-card-overlay="place"
+        data-outline-content-item="1"
         className={`${styles.footerPlace} ${captureHideGlyphClass}`.trim()}
         style={splitPlaceStyle}
       >
@@ -436,6 +438,7 @@ function TournamentSlideCardPreview({
                   {showLeadBlock ? (
                     <p
                       data-tournament-card-overlay="lead"
+                      data-outline-content-item="1"
                       className={`${styles.classicLead} ${captureHideGlyphClass}`.trim()}
                       style={leadColor ? { color: leadColor } : undefined}
                     >
@@ -444,6 +447,9 @@ function TournamentSlideCardPreview({
                   ) : null}
                   <h3
                     data-tournament-card-overlay="title"
+                    data-outline-content-item="1"
+                    data-title-outline-enabled={useLayeredTitleOutline ? "1" : undefined}
+                    data-title-outline-color={useLayeredTitleOutline ? titleOutlineColor : undefined}
                     className={`${styles.classicTitle} ${captureHideGlyphClass}`.trim()}
                     style={titleColor ? { color: titleColor } : undefined}
                   >
@@ -463,6 +469,7 @@ function TournamentSlideCardPreview({
                   {showDescBlock ? (
                     <p
                       data-tournament-card-overlay="subtitle"
+                      data-outline-content-item="1"
                       className={`${styles.classicDesc} ${captureHideGlyphClass}`.trim()}
                       style={descColor ? { color: descColor } : undefined}
                     >
@@ -516,6 +523,7 @@ function TournamentSlideCardPreview({
                 {showLeadBlock ? (
                   <p
                     data-tournament-card-overlay="lead"
+                    data-outline-content-item="1"
                     className={`${styles.frameLead} ${captureHideGlyphClass}`.trim()}
                     style={leadColor ? { color: leadColor } : undefined}
                   >
@@ -524,6 +532,9 @@ function TournamentSlideCardPreview({
                 ) : null}
                 <h3
                   data-tournament-card-overlay="title"
+                  data-outline-content-item="1"
+                  data-title-outline-enabled={useLayeredTitleOutline ? "1" : undefined}
+                  data-title-outline-color={useLayeredTitleOutline ? titleOutlineColor : undefined}
                   className={`${styles.frameTitle} ${captureHideGlyphClass}`.trim()}
                   style={titleColor ? { color: titleColor } : undefined}
                 >
@@ -543,6 +554,7 @@ function TournamentSlideCardPreview({
                 {showDescBlock ? (
                   <p
                     data-tournament-card-overlay="subtitle"
+                    data-outline-content-item="1"
                     className={`${styles.frameDesc} ${captureHideGlyphClass}`.trim()}
                     style={descColor ? { color: descColor } : undefined}
                   >
