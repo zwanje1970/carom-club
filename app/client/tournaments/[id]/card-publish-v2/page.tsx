@@ -990,6 +990,7 @@ export default function ClientTournamentCardPublishV2Page() {
                       setCardDate={setCardDate}
                       cardPlace={cardPlace}
                       setCardPlace={setCardPlace}
+                      statusTextReadonly={(publishIntent === "recruiting" ? "모집중" : "임시저장").trim()}
                       cardTitleEffect={cardTitleEffect}
                       setCardTitleEffect={setCardTitleEffect}
                       cardTitleOutlineColor={cardTitleOutlineColor}

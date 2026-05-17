@@ -476,6 +476,34 @@
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
 }
 
+.readonlyStatusField {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
+  pointer-events: none;
+  user-select: none;
+}
+
+.readonlyStatusValue {
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.readonlyStatusHint {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
 .fieldTextarea {
   resize: vertical;
   min-height: 3.5rem;

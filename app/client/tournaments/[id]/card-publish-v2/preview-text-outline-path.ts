@@ -38,6 +38,26 @@ type OutlineSnapshot = {
 
 let cachedFontPromise: Promise<OpenTypeFont | null> | null = null;
 
+const ENABLE_PATH_LAYER_CHECK_LOG = process.env.NODE_ENV !== "production";
+
+function logCardPathLayerCheck(message: string, payload?: Record<string, unknown>): void {
+  if (!ENABLE_PATH_LAYER_CHECK_LOG) return;
+  if (payload) {
+    console.info("[card-path-layer-check]", message, payload);
+    return;
+  }
+  console.info("[card-path-layer-check]", message);
+}
+
+function isHtmlTextNodeVisible(node: HTMLElement): boolean {
+  const style = window.getComputedStyle(node);
+  if (style.visibility === "hidden") return false;
+  if (style.display === "none") return false;
+  if (Number.parseFloat(style.opacity || "1") <= 0) return false;
+  const rect = node.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
 function parseLineHeightPx(raw: string, fontSize: number): number {
   if (raw === "normal") return Math.round(fontSize * 1.2);
   const n = Number.parseFloat(raw.replace("px", "").trim());
@@ -155,8 +175,12 @@ export async function withCardPreviewTextPathLayer(args: {
   previewCaptureRoot: HTMLElement;
   run: () => Promise<void>;
 }): Promise<void> {
+  logCardPathLayerCheck("captureRoot-ready", {
+    hasCaptureRoot: args.previewCaptureRoot instanceof HTMLElement,
+  });
   const cardRoot = args.previewCaptureRoot.querySelector('[data-tournament-card-capture-root="1"]') as HTMLElement | null;
   if (!(cardRoot instanceof HTMLElement)) {
+    logCardPathLayerCheck("cardRoot-missing");
     await args.run();
     return;
   }
@@ -169,6 +193,7 @@ export async function withCardPreviewTextPathLayer(args: {
 
   const textItems = extractOutlineSnapshots(cardRoot);
   if (textItems.length === 0) {
+    logCardPathLayerCheck("outline-items-empty");
     await args.run();
     return;
   }
@@ -176,19 +201,89 @@ export async function withCardPreviewTextPathLayer(args: {
   const pathSvg = buildPathLayerSvg(cardRoot, font, textItems);
   const hiddenNodes: Array<{ node: HTMLElement; prevVisibility: string }> = [];
   const textNodes = Array.from(cardRoot.querySelectorAll<HTMLElement>('[data-outline-content-item="1"]'));
+  logCardPathLayerCheck("before-hide", {
+    contentItems: textNodes.length,
+  });
   textNodes.forEach((node) => {
     hiddenNodes.push({ node, prevVisibility: node.style.visibility });
     node.style.visibility = "hidden";
   });
+  const notHidden = textNodes
+    .map((node) => {
+      const style = window.getComputedStyle(node);
+      if (style.visibility === "hidden") return null;
+      const label =
+        node.dataset.tournamentCardOverlay ||
+        node.dataset.tournamentCardLabel ||
+        node.className ||
+        (node.textContent ?? "").slice(0, 18);
+      return String(label || "unknown");
+    })
+    .filter((v): v is string => Boolean(v));
+  const styleSamples = textNodes.slice(0, 6).map((node, idx) => {
+    const style = window.getComputedStyle(node);
+    return {
+      index: idx,
+      label:
+        node.dataset.tournamentCardOverlay ||
+        node.dataset.tournamentCardLabel ||
+        (node.textContent ?? "").slice(0, 18),
+      visibility: style.visibility,
+      display: style.display,
+      opacity: style.opacity,
+    };
+  });
+  logCardPathLayerCheck("after-hide", {
+    contentItems: textNodes.length,
+    hiddenItems: textNodes.length - notHidden.length,
+    notHidden,
+    styleSamples,
+  });
 
   cardRoot.style.position ||= "relative";
   cardRoot.appendChild(pathSvg);
+  const svgPathCount = pathSvg.querySelectorAll("path").length;
+  const visibleHtmlTextNodes = textNodes.filter((node) => isHtmlTextNodeVisible(node));
+  const remaining = visibleHtmlTextNodes
+    .map((node) => {
+      const label =
+        node.dataset.tournamentCardOverlay ||
+        node.dataset.tournamentCardLabel ||
+        node.className ||
+        (node.textContent ?? "").slice(0, 18);
+      return String(label || "unknown");
+    })
+    .filter((v, i, arr) => arr.indexOf(v) === i);
+  logCardPathLayerCheck("capture-before-run", {
+    contentItems: textNodes.length,
+    hiddenItems: textNodes.length - notHidden.length,
+    notHidden,
+    visibleHtmlTextNodes: visibleHtmlTextNodes.length,
+    remaining,
+    hasSvgInCardRoot: cardRoot.contains(pathSvg),
+    svgPathCount,
+  });
   try {
     await args.run();
   } finally {
     pathSvg.remove();
     hiddenNodes.forEach(({ node, prevVisibility }) => {
       node.style.visibility = prevVisibility;
+    });
+    const restoredNotVisible = textNodes
+      .filter((node) => window.getComputedStyle(node).visibility === "hidden")
+      .map((node) => {
+        const label =
+          node.dataset.tournamentCardOverlay ||
+          node.dataset.tournamentCardLabel ||
+          node.className ||
+          (node.textContent ?? "").slice(0, 18);
+        return String(label || "unknown");
+      });
+    logCardPathLayerCheck("capture-finally-restored", {
+      svgRemoved: !cardRoot.contains(pathSvg),
+      restoredHiddenCount: textNodes.length - restoredNotVisible.length,
+      stillHidden: restoredNotVisible,
     });
   }
 }

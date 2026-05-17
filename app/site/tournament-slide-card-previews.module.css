@@ -235,12 +235,13 @@
   display: block;
 }
 
-/* 하단 백색 띠 — (면 기준 1/4 상당) − 1rem */
+/* 하단 분할영역 — 카드 전체 배경 위 하단 고정 오버레이 */
 .cardFooter {
-  position: relative;
-  z-index: 3;
-  flex: 0 0 auto;
-  flex-shrink: 0;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
   box-sizing: border-box;
   height: calc(
     var(--slide-card-face-height) / 3 * var(--tournament-card-height-scale)
@@ -254,6 +255,7 @@
   gap: calc(10px * var(--tournament-card-height-scale));
   padding: 0 calc(12px * var(--tournament-card-height-scale));
   background: transparent;
+  pointer-events: none;
 }
 
 .cardFooterBackground {
@@ -489,6 +491,21 @@
   flex-direction: column;
   align-items: stretch;
   text-align: center;
+}
+
+/* 분리형: 하단 오버레이 영역만큼 본문 하단 안전 패딩 확보 */
+.cardRoot:not(.cardRootSurfaceFull) .classicInner {
+  padding-bottom: calc(
+    12px * var(--tournament-card-height-scale) +
+      (var(--slide-card-face-height) / 3 * var(--tournament-card-height-scale) - 1rem * var(--tournament-card-height-scale))
+  );
+}
+
+.cardRoot:not(.cardRootSurfaceFull) .frameInner {
+  padding-bottom: calc(
+    6px * var(--tournament-card-height-scale) +
+      (var(--slide-card-face-height) / 3 * var(--tournament-card-height-scale) - 1rem * var(--tournament-card-height-scale))
+  );
 }
 
 .frameCenter {
@@ -926,16 +943,15 @@ article[data-editor-card-preview="1"] .fullSurfaceFooterPlace {
   align-self: flex-start;
 }
 
-/* 아트보드 분리형: media 140px + 흰 띠 40px (날짜·장소 한 줄 · 좌/우 정렬은 기존 .cardFooter flex 유지) */
+/* 아트보드 분리형도 전체 배경 180px 위에 하단 오버레이를 올린다 */
 .cardRootArtboardPx:not(.cardRootSurfaceFull) > .media {
-  flex: 0 0 140px;
-  height: 140px;
-  min-height: 140px;
-  max-height: 140px;
+  flex: 1 1 auto;
+  height: 180px;
+  min-height: 180px;
+  max-height: 180px;
 }
 
 .cardRootArtboardPx:not(.cardRootSurfaceFull) > .cardFooter {
-  flex: 0 0 40px;
   height: 40px;
   min-height: 40px;
   max-height: 40px;

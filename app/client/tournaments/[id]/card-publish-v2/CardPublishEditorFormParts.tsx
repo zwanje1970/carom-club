@@ -330,6 +330,7 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
   setCardDate,
   cardPlace,
   setCardPlace,
+  statusTextReadonly,
   cardTitleEffect,
   setCardTitleEffect,
   cardTitleOutlineColor,
@@ -356,6 +357,7 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
   setCardDate: (v: string) => void;
   cardPlace: string;
   setCardPlace: (v: string) => void;
+  statusTextReadonly: string;
   cardTitleEffect: "none" | "shadow" | "outline" | "shadow_outline";
   setCardTitleEffect: (v: "none" | "shadow" | "outline" | "shadow_outline") => void;
   cardTitleOutlineColor: "black" | "white";
@@ -482,6 +484,23 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
           autoComplete="off"
           placeholder="예: 캐롬클럽 빌리어즈"
         />
+      </div>
+
+      <div className={editorStyles.field}>
+        <div className={editorStyles.fieldHead}>
+          <span className={editorStyles.fieldLabel}>상태문구</span>
+        </div>
+        <div
+          className={editorStyles.readonlyStatusField}
+          role="note"
+          aria-label="상태문구 읽기전용"
+          data-outline-content-item="1"
+          data-tournament-card-overlay="statusBadge"
+          tabIndex={-1}
+        >
+          <span className={editorStyles.readonlyStatusValue}>{statusTextReadonly}</span>
+          <span className={editorStyles.readonlyStatusHint}>수정 불가</span>
+        </div>
       </div>
 
       <div className={editorStyles.field}>
