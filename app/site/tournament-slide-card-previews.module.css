@@ -330,12 +330,14 @@
   /* 분할형 .cardFooter 와 동일 — 가로 패딩만(세로는 본문 .classicInner·.frameInner 패딩에 맡김) */
   padding: 0 calc(12px * var(--tournament-card-height-scale));
   position: relative;
-  z-index: 4;
+  z-index: 3;
   flex-shrink: 0;
 }
 
 .fullSurfaceFooterDate,
 .fullSurfaceFooterPlace {
+  position: relative;
+  z-index: 1;
   margin: 0;
   font-size: calc(0.78rem + 1pt - 1pt);
   line-height: 1.3;
@@ -385,7 +387,7 @@
 
 .classicInner {
   position: relative;
-  z-index: 3;
+  z-index: 4;
   height: 100%;
   box-sizing: border-box;
   padding: calc(14px * var(--tournament-card-height-scale)) 16px
@@ -478,7 +480,7 @@
 .frameInner {
   --frame-badge-size: calc(3.35rem * 1.1 * var(--tournament-card-height-scale));
   position: relative;
-  z-index: 3;
+  z-index: 4;
   height: 100%;
   box-sizing: border-box;
   padding: calc(8px * var(--tournament-card-height-scale)) calc(12px * var(--tournament-card-height-scale))
